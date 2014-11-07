@@ -1,0 +1,1 @@
+FROM cattle/server:latest
