@@ -1,5 +1,15 @@
 #!/bin/bash
 
+check_debug()
+{
+    if [ -n "$CATTLE_SCRIPT_DEBUG" ] || echo "${@}" | grep -q -- --debug; then
+        export CATTLE_SCRIPT_DEBUG=true
+        export PS4='[${BASH_SOURCE##*/}:${LINENO}] '
+        set -x
+    fi
+}
+check_debug
+
 load()
 {
     CONTENT=$(curl -sL $URL)
@@ -31,7 +41,7 @@ IMAGE=$(docker inspect -f '{{.Image}}' $(hostname))
 if [ -z "$IMAGE" ]; then
     IMAGE=rancher/agent:latest
 else
-    GATEWAY=$(ip route get 8.8.8.8 | grep via | awk '{print $3}')
+    GATEWAY=$(docker run --rm --net=host $IMAGE -- ip route get 8.8.8.8 | grep via | awk '{print $7}')
     URL=$(echo $URL | sed -e 's/127.0.0.1/'$GATEWAY'/' -e 's/localhost/'$GATEWAY'/')
 fi
 
