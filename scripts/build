@@ -1,0 +1,16 @@
+#!/bin/bash
+
+
+cd $(dirname $0)
+
+TAG=$(<../version)
+
+mkdir -p ../dist
+> ../dist/images
+
+for i in agent server; do
+    cd ../$i
+    docker build -t rancher/${i}:$TAG .
+    echo Created rancher/${i}:$TAG
+    echo rancher/${i}:$TAG >> ../dist/images
+done

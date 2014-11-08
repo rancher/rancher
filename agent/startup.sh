@@ -41,12 +41,7 @@ IMAGE=$(docker inspect -f '{{.Image}}' $(hostname))
 if [ -z "$IMAGE" ]; then
     IMAGE=rancher/agent:latest
 else
-    HOSTNAME=$(docker run --rm --net=host $IMAGE -- hostname)
-    if [ "$HOSTNAME" = "boot2docker" ]; then
-        GATEWAY=$(docker run --rm --net=host $IMAGE -- ip route get 8.8.8.8 | grep via | awk '{print $3}')
-    else
-        GATEWAY=$(docker run --rm --net=host $IMAGE -- ip route get 8.8.8.8 | grep via | awk '{print $7}')
-    fi
+    GATEWAY=$(docker run --rm --net=host $IMAGE -- ip route get 8.8.8.8 | grep via | awk '{print $7}')
     URL=$(echo $URL | sed -e 's/127.0.0.1/'$GATEWAY'/' -e 's/localhost/'$GATEWAY'/')
 fi
 
