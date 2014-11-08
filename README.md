@@ -14,7 +14,9 @@ Start the management server
 
 Register a node by pointing it to the created management server
 
-    docker run -v /var/run/docker.sock:/var/run/docker.sock rancher/agent http://MANAGE_IP:8080
+    docker run -v /var/run/docker.sock:/var/run/docker.sock rancher/agent http://MANAGEMENT_IP:8080
+
+The UI/API is available on the exposed port 8080.
 
 ### Vagrant
 
