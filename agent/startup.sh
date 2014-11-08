@@ -1,7 +1,5 @@
 #!/bin/bash
 
-CATTLE_AGENT_IMAGE=${CATTLE_AGENT_IMAGE:-rancher/agent:latest}
-
 load()
 {
     CONTENT=$(curl -sL $URL)
@@ -9,6 +7,11 @@ load()
     if [[ "$CONTENT" =~ .!/bin/sh.* ]]; then
         eval "$CONTENT"
     fi
+}
+
+check()
+{
+    curl -sL $URL >/dev/null 2>&1
 }
 
 if [ "$1" == "--" ]; then
@@ -23,10 +26,27 @@ fi
 
 URL=$1
 
-if ! curl -sL $URL >/dev/null 2>&1; then
-    echo "Invalid URL [$URL] or not authorized"
-    exit 1
+IMAGE=$(docker inspect -f '{{.Image}}' $(hostname))
+
+if [ -z "$IMAGE" ]; then
+    IMAGE=rancher/agent:latest
+else
+    GATEWAY=$(ip route get 8.8.8.8 | grep via | awk '{print $3}')
+    URL=$(echo $URL | sed -e 's/127.0.0.1/'$GATEWAY'/' -e 's/localhost/'$GATEWAY'/')
 fi
+
+CATTLE_AGENT_IMAGE=${CATTLE_AGENT_IMAGE:-$IMAGE}
+
+
+while ! check; do
+    if [ "$WAIT" = true ]; then
+        echo Waiting for $URL
+        sleep 1
+    else
+        echo "Invalid URL [$URL] or not authorized"
+        exit 1
+    fi
+done
 
 load
 
@@ -47,6 +67,7 @@ while docker inspect rancher-agent >/dev/null 2>&1; do
     sleep 1
 done
 
+
 docker run \
     --net=host \
     --restart=always \
@@ -58,7 +79,7 @@ docker run \
     -e CATTLE_REGISTRATION_SECRET_KEY="${CATTLE_REGISTRATION_SECRET_KEY}" \
     -e CATTLE_AGENT_IP="${CATTLE_AGENT_IP}" \
     -e CATTLE_URL="${CATTLE_URL}" \
-    -v /lib/modules:/host/lib/modules:ro \
+    -v /lib/modules:/host/lib/modules \
     -v /var/lib/docker:/host/var/lib/docker \
     -v /var/lib/cattle:/host/var/lib/cattle \
     -v /opt/bin:/host/opt/bin \
