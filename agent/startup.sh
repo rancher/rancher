@@ -48,12 +48,19 @@ fi
 CATTLE_AGENT_IMAGE=${CATTLE_AGENT_IMAGE:-$IMAGE}
 
 
+i=0
 while ! check; do
     if [ "$WAIT" = true ]; then
         echo Waiting for $URL
         sleep 1
     else
         echo "Invalid URL [$URL] or not authorized"
+        if [ "$i" -lt 300 ]; then
+            i=$((i+1))
+            echo "Will retry in another second"
+            sleep 1
+            continue
+        fi
         exit 1
     fi
 done
