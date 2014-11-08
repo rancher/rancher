@@ -100,5 +100,6 @@ docker run \
     -v /opt/bin:/host/opt/bin \
     -v /proc:/host/proc \
     -v /run:/host/run \
+    -v /var/run:/host/var/run \
     -d \
     "${CATTLE_AGENT_IMAGE}" -- /agent-env.sh
