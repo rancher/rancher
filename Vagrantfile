@@ -58,7 +58,7 @@ Vagrant.configure("2") do |config|
 
     config.vm.network :private_network, ip: "172.17.8.100"
 
-    config.vm.provision :shell, :inline => "docker run -d -p 8080:8080 rancher/server:ci", :privileged => true
-    config.vm.provision :shell, :inline => "docker run -e WAIT=true -v /var/run/docker.sock:/var/run/docker.sock rancher/agent:ci http://localhost:8080", :privileged => true
+    config.vm.provision :shell, :inline => "docker run -d -p 8080:8080 rancher/server:latest", :privileged => true
+    config.vm.provision :shell, :inline => "docker run -e WAIT=true -v /var/run/docker.sock:/var/run/docker.sock rancher/agent:latest http://localhost:8080", :privileged => true
   end
 end
