@@ -4,15 +4,23 @@ Rancher is an open source project that provides infrastructure services designed
 
 ## Why?
 
-Implicitly most applications take advantage of storage and networking infrastructure services in one way or another.  If you are running on AWS today and you are using any functionality from EBS, VPC, etc. you are effectively tying your application to AWS.  While Docker provides a portable compute unit, Rancher.io aims to complete the picture by providing portable implementations of storage and networking.
+Implicitly most applications take advantage of storage and networking infrastructure services in one way or another.  If you are running on AWS today and you are using any functionality from EBS, VPC, etc. you are effectively limiting the portability of your application.  While Docker provides a portable compute unit, Rancher.io aims to complete the picture by providing portable implementations of storage and networking services.
 
 ## Installation
 
-Start the management server
+Rancher is deployed as a set of Docker containers.  Running Rancher is a simple as launching two containers.  One container as the management server and another container on a node as an agent.
+
+### Requirements
+
+* Docker 1.3+
+* Ubuntu 14.04 or CoreOS 494+
+    * *Note: These are the only tested distributions at the moment, but most modern Linux distributions will work*
+
+### Management Server
 
     docker run -d -p 8080:8080 rancher/server
 
-Register a node by pointing it to the created management server
+### Register Docker Nodes
 
     docker run --rm -it -v /var/run/docker.sock:/var/run/docker.sock rancher/agent http://MANAGEMENT_IP:8080
 
@@ -20,15 +28,19 @@ The UI/API is available on the exposed port 8080.
 
 ### Vagrant
 
-Just run `vagrant up` and then access port 8080 for the UI.
+If you want to use Vagrant to run this on your laptop just clone the repo and to do `vagrant up` and then access port 8080 for the UI.
 
 ## UI
 
 The UI is available by accessing the base HTTP URL of the management server.  For example, http://server:8080
 
+![UI](docs/host.png)
+
 ## API
 
 The API is available by accessing the `/v1` HTTP path of the management server.  For example, http://server:8080/v1
+
+Rancher has its own API for infrastructure management tasks.  For Docker related operations, the intention is to support the Docker CLI.  That work is currently in progress.
 
 ## Status
 
