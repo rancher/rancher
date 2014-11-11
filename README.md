@@ -26,10 +26,6 @@ Rancher is deployed as a set of Docker containers.  Running Rancher is a simple 
 
 The UI/API is available on the exposed port 8080.
 
-### Vagrant
-
-If you want to use Vagrant to run this on your laptop just clone the repo and to do `vagrant up` and then access port 8080 for the UI.
-
 ## UI
 
 The UI is available by accessing the base HTTP URL of the management server.  For example, http://server:8080
@@ -41,6 +37,10 @@ The UI is available by accessing the base HTTP URL of the management server.  Fo
 The API is available by accessing the `/v1` HTTP path of the management server.  For example, http://server:8080/v1
 
 Rancher has its own API for infrastructure management tasks.  For Docker related operations, the intention is to support the Docker CLI.  That work is currently in progress.
+
+### Vagrant
+
+If you want to use Vagrant to run this on your laptop just clone the repo and to do `vagrant up` and then access port 8080 for the UI.
 
 ## Status
 
