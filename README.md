@@ -46,6 +46,10 @@ If you want to use Vagrant to run this on your laptop just clone the repo and to
 
 We've just recently kicked off this project.  Currently Rancher.io is able to provide a basic implementation of overlay networking and cross server Docker links.  A lot of work has been done to put in a solid orchestration platform to control all the functionality we wish to do.  Now that that framework is in place expect this project to produce a high amount of features over the next six months.
 
+## Source Code
+
+This repo is a meta-repo used for packaging.  The source code for Rancher is in other repos in the rancherio organization.  The majority of the code is in https://github.com/rancherio/cattle.
+
 ## Planned
 
 * Storage
