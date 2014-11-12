@@ -8,7 +8,11 @@ Implicitly most applications take advantage of storage and networking infrastruc
 
 ## Installation
 
-Rancher is deployed as a set of Docker containers.  Running Rancher is a simple as launching two containers.  One container as the management server and another container on a node as an agent.
+Rancher is deployed as a set of Docker containers.  Running Rancher is a simple as launching two containers.  One container as the management server and another container on a node as an agent.  You can install the containers in following approaches.
+
+* [Manually](#installation)
+* [Vagrant](#vagrant)
+* [Puppet](https://github.com/nickschuch/puppet-rancher) (Thanks @nickschuch) 
 
 ### Requirements
 
