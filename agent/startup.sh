@@ -1,5 +1,7 @@
 #!/bin/bash
 
+DOCKER_MIN_VERSION="1.3.0"
+
 check_debug()
 {
     if [ -n "$CATTLE_SCRIPT_DEBUG" ] || echo "${@}" | grep -q -- --debug; then
@@ -24,6 +26,14 @@ check()
     curl -sL $URL >/dev/null 2>&1
 }
 
+verify_docker_client_server_version()
+{
+    docker version 2>&1 | grep Server\ version >/dev/null || {
+        echo "Docker server API too old. Please upgrade Docker to version ${DOCKER_MIN_VERSION} or greater."
+        exit 1
+    }
+}
+
 if [ "$1" == "--" ]; then
     shift 1
     exec "$@"
@@ -36,6 +46,8 @@ fi
 
 URL=$1
 
+#check for the correct version of Docker.
+verify_docker_client_server_version
 IMAGE=$(docker inspect -f '{{.Image}}' $(hostname))
 
 if [ -z "$IMAGE" ]; then
