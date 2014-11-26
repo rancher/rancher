@@ -15,6 +15,7 @@ $expose_rancher_ui = 8080
 $vb_gui = false
 $vb_memory = 1024
 $vb_cpus = 1
+$private_ip = "172.17.8.100"
 
 if File.exist?(CONFIG)
   require CONFIG
@@ -56,9 +57,9 @@ Vagrant.configure("2") do |config|
       vb.cpus = $vb_cpus
     end
 
-    config.vm.network :private_network, ip: "172.17.8.100"
+    config.vm.network :private_network, ip: $private_ip
 
     config.vm.provision :shell, :inline => "docker run -d -p 8080:8080 rancher/server:latest", :privileged => true
-    config.vm.provision :shell, :inline => "docker run -e WAIT=true -v /var/run/docker.sock:/var/run/docker.sock rancher/agent:latest http://localhost:8080", :privileged => true
+    config.vm.provision :shell, :inline => "docker run -e CATTLE_AGENT_IP=%s -e WAIT=true -v /var/run/docker.sock:/var/run/docker.sock rancher/agent:latest http://localhost:8080" % $private_ip, :privileged => true
   end
 end
