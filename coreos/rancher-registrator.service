@@ -1,0 +1,20 @@
+[Unit]
+Description=Rancher : Manager
+After=docker.service
+Requires=docker.service
+
+[Service]
+EnvironmentFile=-/etc/environment
+ExecStartPre=/usr/bin/docker run --rm -v /opt/bin:/opt/bin ibuildthecloud/systemd-docker:0.1.1
+ExecStart=/opt/bin/systemd-docker run -v /var/run/docker.sock:/tmp/docker.sock --net=host progrium/registrator etcd:///services
+Restart=always
+RestartSec=10s
+Type=notify
+NotifyAccess=all
+TimeoutStartSec=120
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target
+
+[X-Fleet]

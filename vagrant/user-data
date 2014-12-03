@@ -1,0 +1,19 @@
+#cloud-config
+
+coreos:
+  etcd:
+    # You only need a discovery token if you run a cluster of more than one machine
+    #
+    # generate a new token for each unique cluster from https://discovery.etcd.io/new
+    # WARNING: replace each time you 'vagrant destroy'
+    #discovery: https://discovery.etcd.io/<token>
+    addr: $public_ipv4:4001
+    peer-addr: $public_ipv4:7001
+  fleet:
+    public-ip: $public_ipv4
+  units:
+    # Etcd/Fleet is required by Stampede
+    - name: etcd.service
+      command: start
+    - name: fleet.service
+      command: start
