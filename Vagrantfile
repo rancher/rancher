@@ -30,11 +30,22 @@ Vagrant.configure("2") do |config|
     override.vm.box_url = "http://%s.release.core-os.net/amd64-usr/current/coreos_production_vagrant_vmware_fusion.json" % $update_channel
   end
 
+  config.vm.provider :parallels do |vb, override|
+    override.vm.box_url = nil
+    override.vm.box_version = ">= 1.4.4"
+    override.vm.box = "yungsang/coreos-alpha"
+  end
+
   config.vm.provider :virtualbox do |v|
     # On VirtualBox, we don't have guest additions or a functional vboxsf
     # in CoreOS, so tell Vagrant that so it can be smarter.
     v.check_guest_additions = false
     v.functional_vboxsf     = false
+  end
+
+  config.vm.provider "parallels" do |v|
+    v.update_guest_tools = false
+    v.check_guest_tools = false
   end
 
   # plugin conflict
@@ -53,6 +64,11 @@ Vagrant.configure("2") do |config|
 
     config.vm.provider :virtualbox do |vb|
       vb.gui = $vb_gui
+      vb.memory = $vb_memory
+      vb.cpus = $vb_cpus
+    end
+
+    config.vm.provider :parallels do |vb|
       vb.memory = $vb_memory
       vb.cpus = $vb_cpus
     end
