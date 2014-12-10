@@ -20,6 +20,10 @@ load()
 
     if [ "$URL" = "upgrade" ]; then
         eval $(docker inspect rancher-agent | jq -r '"export \"" + .[0].Config.Env[] + "\""')
+        if [ "$CATTLE_URL_ARG" != "upgrade" ]; then
+            URL=$CATTLE_URL_ARG
+            load
+        fi
     else
         CONTENT=$(curl -sL $URL)
 
@@ -90,11 +94,8 @@ done
 
 load
 
-if [[ "$URL" != "upgrade" && -z "$CATTLE_REGISTRATION_SECRET_KEY" ]]; then
-    CATTLE_URL_ARG=$URL
-fi
-
-export CATTLE_AGENT_IP=${CATTLE_AGENT_IP:-$DETECTED_CATTLE_AGENT_IP}
+CATTLE_URL_ARG=$URL
+CATTLE_AGENT_IP=${CATTLE_AGENT_IP:-$DETECTED_CATTLE_AGENT_IP}
 
 while docker inspect rancher-agent >/dev/null 2>&1; do
     docker rm -f rancher-agent
