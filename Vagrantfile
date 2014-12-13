@@ -31,7 +31,6 @@ Vagrant.configure("2") do |config|
   end
 
   config.vm.provider :parallels do |vb, override|
-<<<<<<< HEAD
     override.vm.box_url = nil
     override.vm.box_version = ">= 1.4.4"
     override.vm.box = "yungsang/coreos-alpha"

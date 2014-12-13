@@ -19,4 +19,4 @@ COPY register.py /
 COPY resolve_url.py /
 COPY startup.sh /
 ENTRYPOINT ["/startup.sh"]
-ENV RANCHER_AGENT_IMAGE rancher/agent:v0.2.0
+ENV RANCHER_AGENT_IMAGE rancher/agent:master
