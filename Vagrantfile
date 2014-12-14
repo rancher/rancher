@@ -31,9 +31,9 @@ Vagrant.configure("2") do |config|
   end
 
   config.vm.provider :parallels do |vb, override|
-    override.vm.box_url = nil
+    override.vm.box_url = "https://vagrantcloud.com/yungsang/coreos-%s" % $update_channel
     override.vm.box_version = ">= 1.4.4"
-    override.vm.box = "yungsang/coreos-alpha"
+    override.vm.box = "yungsang/coreos-%s" % $update_channel
   end
 
   config.vm.provider :virtualbox do |v|
