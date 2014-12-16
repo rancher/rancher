@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 DOCKER_MIN_VERSION="1.3.0"
 
@@ -14,30 +15,19 @@ check_debug
 
 load()
 {
-    if [ "$URL" = "etcd" ]; then
-        return 0
-    fi
+    CONTENT=$(curl -sL $URL)
 
-    if [ "$URL" = "upgrade" ]; then
-        eval $(docker inspect rancher-agent | jq -r '"export \"" + .[0].Config.Env[] + "\""')
-        if [ "$CATTLE_URL_ARG" != "upgrade" ]; then
-            URL=$CATTLE_URL_ARG
-            load
-        fi
-    else
-        CONTENT=$(curl -sL $URL)
-
-        if [[ "$CONTENT" =~ .!/bin/sh.* ]]; then
-            eval "$CONTENT"
-        fi
+    if [[ "$CONTENT" =~ .!/bin/sh.* ]]; then
+        eval "$CONTENT"
     fi
 }
 
 check()
 {
-    if [[ "$URL" = "etcd" || "$URL" = "upgrade" ]]; then
+    if [ "$URL" = "upgrade" ]; then
         return 0
     fi
+
     curl -sL $URL >/dev/null 2>&1
 }
 
@@ -92,10 +82,27 @@ while ! check; do
     fi
 done
 
+if [ "$URL" = "upgrade" ]; then
+    eval $(docker inspect rancher-agent | jq -r '"export \"" + .[0].Config.Env[] + "\""')
+    URL=$CATTLE_URL_ARG
+    if [ -z "$URL" ]; then
+        URL=$CATTLE_URL
+    fi
+fi
+
 load
 
-CATTLE_URL_ARG=$URL
-CATTLE_AGENT_IP=${CATTLE_AGENT_IP:-$DETECTED_CATTLE_AGENT_IP}
+if [ -z "$CATTLE_REGISTRATION_SECRET_KEY" ]; then
+    URL=$(./resolve_url.py $URL)
+    load
+fi
+
+if [ -z "$CATTLE_REGISTRATION_SECRET_KEY" ]; then
+    echo "Failed to load environment" 1>&2
+    exit 1
+fi
+
+export CATTLE_AGENT_IP=${CATTLE_AGENT_IP:-$DETECTED_CATTLE_AGENT_IP}
 
 while docker inspect rancher-agent >/dev/null 2>&1; do
     docker rm -f rancher-agent
@@ -110,13 +117,12 @@ docker run \
     --name rancher-agent \
     --privileged \
     -e CATTLE_SCRIPT_DEBUG=${CATTLE_SCRIPT_DEBUG} \
-    -e ETCD_URL=${ETCD_URL} \
     -e CATTLE_EXEC_AGENT=true \
     -e CATTLE_REGISTRATION_ACCESS_KEY="${CATTLE_REGISTRATION_ACCESS_KEY}" \
     -e CATTLE_REGISTRATION_SECRET_KEY="${CATTLE_REGISTRATION_SECRET_KEY}" \
     -e CATTLE_AGENT_IP="${CATTLE_AGENT_IP}" \
     -e CATTLE_URL="${CATTLE_URL}" \
-    -e CATTLE_URL_ARG="${CATTLE_URL_ARG}" \
+    -e CATTLE_URL_ARG="${URL}" \
     -v /lib/modules:/host/lib/modules \
     -v /var/lib/docker:/host/var/lib/docker \
     -v /var/lib/cattle:/host/var/lib/cattle \
