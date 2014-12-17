@@ -6,4 +6,4 @@ ADD artifacts /usr/share/cattle
 VOLUME ["/var/lib/cattle"]
 EXPOSE 8080
 CMD ["/usr/share/cattle/cattle.sh"]
-ADD https://github.com/rancherio/cattle/releases/download/v0.6.0/cattle.jar /usr/share/cattle/
+ADD https://github.com/rancherio/cattle/releases/download/v0.7.0/cattle.jar /usr/share/cattle/
