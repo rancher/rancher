@@ -1,8 +1,6 @@
 #!/bin/bash
 set -e
 
-DOCKER_MIN_VERSION="1.3.0"
-
 check_debug()
 {
     if [ -n "$CATTLE_SCRIPT_DEBUG" ] || echo "${@}" | grep -q -- --debug; then
@@ -34,7 +32,8 @@ check()
 verify_docker_client_server_version()
 {
     docker version 2>&1 | grep Server\ version >/dev/null || {
-        echo "Docker server API too old. Please upgrade Docker to version ${DOCKER_MIN_VERSION} or greater."
+        client_version=$(docker version |grep Client\ version | cut -d":" -f2)
+        echo "Please ensure Host Docker version is >=${client_version} and container has r/w permissions to docker.sock" 1>&2
         exit 1
     }
 }
