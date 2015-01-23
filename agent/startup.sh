@@ -103,12 +103,6 @@ fi
 
 export CATTLE_AGENT_IP=${CATTLE_AGENT_IP:-$DETECTED_CATTLE_AGENT_IP}
 
-if [ -n "$CATTLE_PHYSICAL_HOST_UUID" ]; then
-    ph_uuid_env_opt="-e CATTLE_PHYSICAL_HOST_UUID=${CATTLE_PHYSICAL_HOST_UUID}"
-else
-    ph_uuid_env_opt=""
-fi
-
 while docker inspect rancher-agent >/dev/null 2>&1; do
     docker rm -f rancher-agent
     sleep 1
@@ -128,7 +122,7 @@ docker run \
     -e CATTLE_AGENT_IP="${CATTLE_AGENT_IP}" \
     -e CATTLE_URL="${CATTLE_URL}" \
     -e CATTLE_URL_ARG="${URL}" \
-    ${ph_uuid_env_opt} \
+    -e CATTLE_PHYSICAL_HOST_UUID="${CATTLE_PHYSICAL_HOST_UUID}" \
     -v /lib/modules:/host/lib/modules \
     -v /var/lib/docker:/host/var/lib/docker \
     -v /var/lib/cattle:/host/var/lib/cattle \
