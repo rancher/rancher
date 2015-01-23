@@ -122,6 +122,7 @@ docker run \
     -e CATTLE_AGENT_IP="${CATTLE_AGENT_IP}" \
     -e CATTLE_URL="${CATTLE_URL}" \
     -e CATTLE_URL_ARG="${URL}" \
+    -e CATTLE_PHYSICAL_HOST_UUID="${CATTLE_PHYSICAL_HOST_UUID}" \
     -v /lib/modules:/host/lib/modules \
     -v /var/lib/docker:/host/var/lib/docker \
     -v /var/lib/cattle:/host/var/lib/cattle \
