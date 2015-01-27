@@ -16,7 +16,7 @@ Rancher is deployed as a set of Docker containers.  Running Rancher is a simple 
 
 ### Requirements
 
-* Docker 1.3+
+* Docker 1.4.1+
 * Ubuntu 14.04 or CoreOS 494+
     * *Note: These are the only tested distributions at the moment, but most modern Linux distributions will work*
 
