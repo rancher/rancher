@@ -1,5 +1,4 @@
-# Install nsenter move to ubuntu:14.04.1
-FROM ibuildthecloud/ubuntu-core-base:14.04-1
+FROM ubuntu:14.04.1
 RUN apt-get update && \
      apt-get install --no-install-recommends -y \
      arptables \
@@ -14,9 +13,10 @@ RUN pip install cattle docker-py
 RUN curl -s http://stedolan.github.io/jq/download/linux64/jq > /usr/bin/jq; chmod +x /usr/bin/jq
 RUN curl -s https://get.docker.io/builds/Linux/x86_64/docker-1.3.2 > /usr/bin/docker; chmod +x /usr/bin/docker
 RUN apt-get update && apt-get install -y --no-install-recommends nodejs
-COPY agent-env.sh /
+RUN mkdir -p /var/lib/cattle /var/lib/rancher
 COPY register.py /
 COPY resolve_url.py /
-COPY startup.sh /
-ENTRYPOINT ["/startup.sh"]
-ENV RANCHER_AGENT_IMAGE rancher/agent:v0.2.1
+COPY agent.sh /
+COPY run.sh /
+ENTRYPOINT ["/run.sh"]
+ENV RANCHER_AGENT_IMAGE rancher/agent:v0.3.0
