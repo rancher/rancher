@@ -117,7 +117,7 @@ resolve_image()
 delete_container()
 {
     while docker inspect $1 >/dev/null 2>&1; do
-        docker rm -f $1
+        docker rm -f $1 >/dev/null 2>&1 || true
         sleep 1
     done
 }
