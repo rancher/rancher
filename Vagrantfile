@@ -30,10 +30,11 @@ Vagrant.configure("2") do |config|
     override.vm.box_url = "http://%s.release.core-os.net/amd64-usr/current/coreos_production_vagrant_vmware_fusion.json" % $update_channel
   end
 
+  # until upstream provides them officially (generated with https://github.com/AntonioMeireles/coreos-packer)
+  # see https://github.com/coreos/coreos-vagrant/pull/199
   config.vm.provider :parallels do |vb, override|
-    override.vm.box_url = "https://vagrantcloud.com/yungsang/coreos-%s" % $update_channel
-    override.vm.box_version = ">= 1.4.4"
-    override.vm.box = "yungsang/coreos-%s" % $update_channel
+    override.vm.box_url = "https://vagrantcloud.com/AntonioMeireles/coreos-%s" % $update_channel
+    override.vm.box = "AntonioMeireles/coreos-%s" % $update_channel
   end
 
   config.vm.provider :virtualbox do |v|
