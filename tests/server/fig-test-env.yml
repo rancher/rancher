@@ -1,0 +1,42 @@
+h2dbcattle:
+  image: rancher/server:dev
+  ports:
+    - "8080:8080"
+  environment:
+    CATTLE_DB_CATTLE_DATABASE: h2
+mysqllink:
+  image: mysql:latest
+  environment:
+    MYSQL_ROOT_PASSWORD: password
+    MYSQL_USER: cattle
+    MYSQL_PASSWORD: cattle
+    MYSQL_DATABASE: cattle
+mysqllinkscattle:
+  image: rancher/server:dev
+  ports:
+    - "8081:8080"
+  links:
+    - mysqllink:mysql
+localmysqlcattle:
+  image: rancher/server:dev
+  ports:
+    - "8082:8080"
+mysqlmanual:
+  image: mysql:latest
+  ports:
+    - "13306:3306"
+  environment:
+    MYSQL_ROOT_PASSWORD: 'password'
+    MYSQL_USER: 'cattle1'
+    MYSQL_PASSWORD: 'cattle1'
+    MYSQL_DATABASE: 'cattle1'
+mysqlmanualcattle:
+  image: rancher/server:dev
+  environment:
+    CATTLE_DB_CATTLE_MYSQL_HOST:
+    CATTLE_DB_CATTLE_MYSQL_PORT: '13306'
+    CATTLE_DB_CATTLE_USERNAME: 'cattle1'
+    CATTLE_DB_CATTLE_PASSWORD: 'cattle1'
+    CATTLE_DB_CATTLE_MYSQL_NAME: 'cattle1'
+  ports:
+    - "8083:8080"

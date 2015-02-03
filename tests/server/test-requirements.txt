@@ -1,0 +1,4 @@
+pytest
+cattle
+flake8
+docker-py

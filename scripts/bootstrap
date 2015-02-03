@@ -1,0 +1,7 @@
+#!/bin/bash
+
+apt-get update -q
+apt-get install -y python-dev python-pip python-tox libyaml-dev
+
+pip install -U pip tox virtualenv
+/usr/local/bin/pip install docker-compose==1.1.0
