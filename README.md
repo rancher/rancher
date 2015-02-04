@@ -1,10 +1,10 @@
 #Rancher.io
 
-Rancher is an open source project that provides infrastructure services designed specifically for Docker. Rancher makes AWS-like functions, such as EBS, VPC, ELB and Security Groups, available and consistent across any servers running locally or in any cloud.
+Rancher is an open source project that provides a complete platform for operating Docker in production. It provides infrastructure services such as multi-host networking, global and local load balancing, and volume snapshots. It integrates native Docker management capabilities such as Docker Machine and Docker Swarm. It offers a rich user experience that enables devops admins to operate Docker in production at large scale.
 
 ## Why?
 
-Implicitly most applications take advantage of storage and networking infrastructure services in one way or another.  If you are running on AWS today and you are using any functionality from EBS, VPC, etc. you are effectively limiting the portability of your application.  While Docker provides a portable compute unit, Rancher.io aims to complete the picture by providing portable implementations of storage and networking services.
+Developers and operations teams love Docker because it provides a consist computing platform that extends the entire devops life cycle, from laptop, QA, pre-production, to production environment. Rancher additionally implements consistent networking and storage services for Docker containers to operate on any bare-metal servers, VMware clusters, and public/private clouds. By integrating Rancher’s networking and storage services with native Docker management capabilities in an intuitive UI, Rancher offers a complete production platform for Docker.
 
 ## Installation
 
