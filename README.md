@@ -32,6 +32,8 @@ The UI and API are available on the exposed port `8080`.
 
 Make sure that any security groups or firewalls allow traffic from the internet to the node on `TCP` ports `9345` and `9346`.
 
+Also, compute nodes must be able to communicate with each other on UDP ports `500` and `4500`.  This allows Rancher to create ipsec tunnels between the nodes for networking.
+
 ## UI
 
 The UI is available by accessing the base HTTP URL of the management server.  For example, `http://server:8080/`
