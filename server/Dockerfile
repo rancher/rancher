@@ -6,6 +6,6 @@ ENV CATTLE_API_UI_INDEX http://cdn.rancher.io/ui/0.8.19/static/index.html
 ADD artifacts /usr/share/cattle
 VOLUME ["/var/lib/cattle"]
 EXPOSE 8080
-ENV RANCHER_SERVER_IMAGE v0.9.0
+ENV RANCHER_SERVER_IMAGE v0.9.1
 CMD ["/usr/share/cattle/cattle.sh"]
-ADD https://github.com/rancherio/cattle/releases/download/v0.15.0/cattle.jar /usr/share/cattle/
+ADD https://github.com/rancherio/cattle/releases/download/v0.16.0/cattle.jar /usr/share/cattle/
