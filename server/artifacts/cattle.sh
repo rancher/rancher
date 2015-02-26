@@ -5,6 +5,7 @@ cd /var/lib/cattle
 
 JAR=/usr/share/cattle/cattle.jar
 DEBUG_JAR=/var/lib/cattle/lib/cattle-debug.jar
+export S6_SERVICE_DIR=${S6_SERVICE_DIR:-$S6_SERVICE_DIR}
 
 if [ "$URL" != "" ]
 then
@@ -34,12 +35,59 @@ setup_gelf()
     fi
 }
 
+start_local_mysql()
+{
+    s6-svc -u ${S6_SERVICE_DIR}/mysql
+
+    set +e
+    for ((i=0;i<60;i++))
+    do
+        if mysqladmin status 2> /dev/null; then
+            break
+        else
+            if [ "$i" -eq "59" ]; then
+                echo "Could not start MySQL..." 1>&2
+                exit 1
+            fi
+                sleep 1
+            fi
+    done
+    set -e
+}
+
+setup_local_db()
+{
+    local db_user=$CATTLE_DB_CATTLE_USERNAME
+    local db_pass=$CATTLE_DB_CATTLE_PASSWORD
+    local db_name=$CATTLE_DB_CATTLE_MYSQL_NAME
+
+    echo "Setting up database"
+    mysql -uroot<< EOF
+CREATE DATABASE IF NOT EXISTS ${db_name} COLLATE = 'utf8_general_ci' CHARACTER SET = 'utf8';
+GRANT ALL ON ${db_name}.* TO "${db_user}"@'%' IDENTIFIED BY "${db_pass}";
+GRANT ALL ON ${db_name}.* TO "${db_user}"@'localhost' IDENTIFIED BY "${db_pass}";
+EOF
+}
+
 setup_mysql()
 {
-    export CATTLE_DB_CATTLE_MYSQL_HOST=${CATTLE_DB_CATTLE_MYSQL_HOST:-$MYSQL_PORT_3306_TCP_ADDR}
-    export CATTLE_DB_CATTLE_MYSQL_PORT=${CATTLE_DB_CATTLE_MYSQL_PORT:-$MYSQL_PORT_3306_TCP_PORT}
-    if [ -n "$CATTLE_DB_CATTLE_MYSQL_HOST" ]; then
-        export CATTLE_DB_CATTLE_DATABASE=${CATTLE_DB_CATTLE_DATABASE:-mysql}
+    # Set in the Dockerfile by default... overriden by runtime.
+    if [ ${CATTLE_DB_CATTLE_DATABASE} == "mysql" ]; then
+        export CATTLE_DB_CATTLE_MYSQL_HOST=${CATTLE_DB_CATTLE_MYSQL_HOST:-$MYSQL_PORT_3306_TCP_ADDR}
+        export CATTLE_DB_CATTLE_MYSQL_PORT=${CATTLE_DB_CATTLE_MYSQL_PORT:-$MYSQL_PORT_3306_TCP_PORT}
+        export CATTLE_DB_CATTLE_USERNAME=${CATTLE_DB_CATTLE_USERNAME:-cattle}
+        export CATTLE_DB_CATTLE_PASSWORD=${CATTLE_DB_CATTLE_PASSWORD:-cattle}
+        export CATTLE_DB_CATTLE_MYSQL_NAME=${CATTLE_DB_CATTLE_MYSQL_NAME:-cattle}
+
+        if [ -z "$CATTLE_DB_CATTLE_MYSQL_HOST" ]; then
+            export CATTLE_DB_CATTLE_MYSQL_HOST="localhost"
+            start_local_mysql
+            setup_local_db
+        fi
+
+        if [ -z "$CATTLE_DB_CATTLE_MYSQL_PORT" ]; then
+            CATTLE_DB_CATTLE_MYSQL_PORT=3306
+        fi
     fi
 }
 

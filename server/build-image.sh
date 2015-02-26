@@ -1,7 +1,12 @@
 #!/bin/bash
 
+
+cd $(dirname $0)
+
+mkdir target
+docker run -it -v $(pwd)/target:/output rancher/s6-builder:v0.1.0 /opt/build.sh
+
 TAG=${TAG:-dev}
 IMAGE=rancher/server:${TAG}
 
-cd $(dirname $0)
 docker build -t ${IMAGE} .

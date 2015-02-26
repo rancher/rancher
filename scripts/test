@@ -1,0 +1,111 @@
+#!/bin/bash
+
+teardown()
+{
+    rm -rf .tox
+    docker-compose -f fig-test-env.yml stop
+}
+
+wait_for_env()
+{
+    local url=$1
+    echo "Checking for $url availability"
+    for ((i=0;i<180;i++))
+    do
+        if [[ "$(curl -s ${url}/ping)" = "pong" ]]; then
+            if [[ "$i" = "1" ]]; then
+                echo "Environment at ${url} did not come up"
+            fi
+            break
+        else
+            sleep 1
+        fi
+    done
+}
+
+get_port()
+{
+    local id=$1
+    echo $(docker inspect -f '{{ (index (index .NetworkSettings.Ports "8080/tcp") 0).HostPort }}' \
+        $id)
+}
+
+get_url()
+{
+    local port=$1
+    echo "http://${DOCKER_IP}:${port}"
+}
+
+setup()
+{
+    local server=$1
+    local url=$2
+    ID=$(fig_get_id $server)
+    PORT=$(get_port $ID)
+    export $url=$(get_url $PORT)
+    eval url=\$$url
+    wait_for_env $url
+}
+
+if [ -x /usr/local/bin/wrapdocker ]; then
+    wrapdocker > /tmp/docker.log 2>&1
+    WRAPPED="true"
+fi
+
+if [ "$(uname -s)" == "Linux" ]; then
+    export DOCKER_IP=$(ip addr show eth0 |grep inet|grep -v inet6|cut -d' ' -f6|cut -d'/' -f1)
+fi
+
+if [ $(command -v boot2docker) ]; then
+    export DOCKER_IP=$(boot2docker ip)
+fi
+
+cd $(dirname $0)/..
+pushd ./server > /dev/null
+./build-image.sh 
+popd > /dev/null
+
+# Just doing server for now.
+pushd ./tests/server > /dev/null
+
+export CATTLE_DB_CATTLE_MYSQL_HOST=$DOCKER_IP
+docker-compose -f fig-test-env.yml build
+docker-compose -f fig-test-env.yml up -d
+
+fig_get_id()
+{
+    echo $(docker-compose -f fig-test-env.yml ps -q $1)
+}
+
+trap teardown EXIT
+
+for db_case in "h2dbcattle" "mysqllinkscattle" "mysqlmanualcattle" "localmysqlcattle"; do
+    echo $db_case
+
+    case $db_case in
+        h2dbcattle)
+            setup $db_case "CATTLE_H2DB_TEST_URL"
+            ;;
+        mysqllinkscattle)
+            setup $db_case "CATTLE_MYSQL_LINK_TEST_URL"
+            ;;
+        localmysqlcattle)
+            setup $db_case "CATTLE_MYSQL_LOCAL_TEST_URL"
+            ;;
+        mysqlmanualcattle)
+            setup $db_case "CATTLE_MYSQL_MANUAL_TEST_URL"
+            ;;
+        *)
+            echo "No tests setup for $db_case"
+            ;;
+    esac
+done
+
+popd > /dev/null
+if [[ "$WRAPPED" == "true" ]]; then
+    cp -r ./tests /scratch
+    pushd /scratch > /dev/null
+fi
+pushd tests/server >/dev/null
+rm -rf .tox
+tox 
