@@ -239,7 +239,7 @@ wait_for()
     local url=$(echo "${CATTLE_URL}"| sed -e 's!/v1/scripts.*!/v1!')
     info "Attempting to connect to: ${url}"
     for ((i=0; i < 300; i++)); do
-        if ! curl -f -s ${url} >/dev/null 2>&1; then
+        if ! curl -f -s ${CATTLE_URL} >/dev/null 2>&1; then
             error "${url}" is not accessible
             sleep 2
             if [ "$i" -eq "299" ]; then
