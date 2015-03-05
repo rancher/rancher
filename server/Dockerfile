@@ -33,5 +33,5 @@ ADD https://github.com/rancherio/go-machine-service/releases/download/v0.1.0/go-
 RUN tar xpvf /tmp/go-machine-service.tar.xz -C /usr/bin/ && \
     chmod +x /usr/bin/go-machine-service
 
-
+ENV CATTLE_MACHINE_EXECUTE true
 CMD ["/usr/bin/s6-svscan", "/service"]
