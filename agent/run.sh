@@ -118,8 +118,11 @@ resolve_image()
 delete_container()
 {
     while docker inspect $1 >/dev/null 2>&1; do
+        echo Deleting container $1
         docker rm -f $1 >/dev/null 2>&1 || true
-        sleep 1
+        if [ "$2" != "nowait" ]; then
+            sleep 1
+        fi
     done
 }
 
@@ -130,6 +133,11 @@ cleanup_agent()
 
 cleanup_upgrade()
 {
+    # Delete old agents
+    for old_agent in $(docker ps -a | grep -v rancher-agent | awk '{print $1 " " $2}' | grep 'rancher/agent:' | awk '{print $1}'); do
+        delete_container $old_agent nowait
+    done
+
     delete_container rancher-agent-upgrade
     delete_container rancher-agent-upgrade-stage2
 }
