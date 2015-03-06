@@ -133,6 +133,13 @@ cleanup_agent()
 
 cleanup_upgrade()
 {
+    # Kill old agents
+    local old_agents="$(docker ps -a | grep -v rancher-agent | awk '{print $1 " " $2}' | grep 'rancher/agent:' | awk '{print $1}')"
+    if [ -n "$old_agents" ]; then
+        echo Killing $old_agents
+        docker kill $old_agents || true
+    fi
+
     # Delete old agents
     for old_agent in $(docker ps -a | grep -v rancher-agent | awk '{print $1 " " $2}' | grep 'rancher/agent:' | awk '{print $1}'); do
         delete_container $old_agent nowait
