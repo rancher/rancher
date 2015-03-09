@@ -19,4 +19,4 @@ COPY resolve_url.py /
 COPY agent.sh /
 COPY run.sh /
 ENTRYPOINT ["/run.sh"]
-ENV RANCHER_AGENT_IMAGE rancher/agent:v0.5.2
+ENV RANCHER_AGENT_IMAGE rancher/agent:v0.6.0-rc1
