@@ -4,7 +4,8 @@ ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends openjdk-7-jre-headless \
                     curl \
                     mysql-server \
-                    xz-utils
+                    xz-utils \
+                    keychain
 
 ENV CATTLE_HOME /var/lib/cattle
 ENV CATTLE_API_UI_INDEX http://cdn.rancher.io/ui/0.11.0/static/index.html
