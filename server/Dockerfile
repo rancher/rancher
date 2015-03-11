@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends openjdk-7-jre-h
                     xz-utils
 
 ENV CATTLE_HOME /var/lib/cattle
-ENV CATTLE_API_UI_INDEX http://cdn.rancher.io/ui/0.10.0/static/index.html
+ENV CATTLE_API_UI_INDEX http://cdn.rancher.io/ui/0.11.0/static/index.html
 ENV CATTLE_DB_CATTLE_DATABASE mysql
 ADD artifacts /usr/share/cattle
 
@@ -21,10 +21,10 @@ VOLUME ["/var/lib/cattle"]
 VOLUME ["/var/lib/mysql"]
 
 EXPOSE 8080
-ENV RANCHER_SERVER_IMAGE v0.10.1
+ENV RANCHER_SERVER_IMAGE v0.11.0
 
 EXPOSE 3306
-ADD https://github.com/rancherio/cattle/releases/download/v0.18.0/cattle.jar /usr/share/cattle/
+ADD https://github.com/rancherio/cattle/releases/download/v0.19.0/cattle.jar /usr/share/cattle/
 
 ADD https://github.com/docker/machine/releases/download/v0.1.0/docker-machine_linux-amd64 /usr/bin/docker-machine
 RUN chmod +x /usr/bin/docker-machine
