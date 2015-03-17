@@ -27,22 +27,24 @@ Rancher is deployed as a set of Docker containers.  Running Rancher is a simple 
 The UI and API are available on the exposed port `8080`.
 
 ### Register Docker Nodes
-
+ 
     docker run --rm -it --privileged -v /var/run/docker.sock:/var/run/docker.sock rancher/agent http://MANAGEMENT_IP:8080
 
 Make sure that any security groups or firewalls allow traffic from the internet to the node on `TCP` ports `9345` and `9346`.
 
 Also, compute nodes must be able to communicate with each other on UDP ports `500` and `4500`.  This allows Rancher to create ipsec tunnels between the nodes for networking.
 
+ * *Note on Access Control: If you have already enabled Access Control in the Rancher UI, the command will need the registration token in order to be authenticated to connect to the Management Server. The specific command with registration token can be found in the Rancher UI under the "Register a new Host" for a custom/Bare Metal host.*
+
 ## UI
 
-The UI is available by accessing the base HTTP URL of the management server.  For example, `http://server:8080/`
+The UI is available by accessing the base HTTP URL of the management server.  For example, `http://MANAGEMENT_IP:8080/`
 
 ![UI](docs/host.png)
 
 ## API
 
-The API is available by accessing the `/v1` HTTP path of the management server.  For example, `http://server:8080/v1`
+The API is available by accessing the `/v1` HTTP path of the management server.  For example, `http://MANAGEMENT_IP:8080/v1`
 
 Rancher has its own API for infrastructure management tasks.  For Docker related operations, the intention is to support the Docker CLI.  That work is currently in progress.
 
