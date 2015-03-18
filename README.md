@@ -4,7 +4,7 @@ Rancher is an open source project that provides a complete platform for operatin
 
 ## Why?
 
-Developers and operations teams love Docker because it provides a consist computing platform that extends the entire devops life cycle, from laptop, QA, pre-production, to production environment. Rancher additionally implements consistent networking and storage services for Docker containers to operate on any bare-metal servers, VMware clusters, and public/private clouds. By integrating Rancher’s networking and storage services with native Docker management capabilities in an intuitive UI, Rancher offers a complete production platform for Docker.
+Developers and operations teams love Docker because it provides a consistent computing platform that extends the entire devops life cycle, from laptop, QA, pre-production, to production environment. Rancher additionally implements consistent networking and storage services for Docker containers to operate on any bare-metal servers, VMware clusters, and public/private clouds. By integrating Rancher’s networking and storage services with native Docker management capabilities in an intuitive UI, Rancher offers a complete production platform for Docker.
 
 ## Installation
 
