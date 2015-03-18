@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends openjdk-7-jre-h
                     keychain
 
 ENV CATTLE_HOME /var/lib/cattle
-ENV CATTLE_API_UI_INDEX http://cdn.rancher.io/ui/0.11.0/static/index.html
+ENV CATTLE_API_UI_INDEX http://cdn.rancher.io/ui/0.12.0/static/index.html
 ENV CATTLE_DB_CATTLE_DATABASE mysql
 ADD artifacts /usr/share/cattle
 
@@ -22,7 +22,7 @@ VOLUME ["/var/lib/cattle"]
 VOLUME ["/var/lib/mysql"]
 
 EXPOSE 8080
-ENV RANCHER_SERVER_IMAGE v0.11.1
+ENV RANCHER_SERVER_IMAGE v0.12.0
 
 EXPOSE 3306
 ADD https://github.com/rancherio/cattle/releases/download/v0.20.0/cattle.jar /usr/share/cattle/
