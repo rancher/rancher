@@ -28,13 +28,11 @@ The UI and API are available on the exposed port `8080`.
 
 ### Register Docker Nodes
  
-    docker run --rm -it --privileged -v /var/run/docker.sock:/var/run/docker.sock rancher/agent http://MANAGEMENT_IP:8080
-
+Access the UI and click on "Add Host" to find the command in the custom/Bare Metal option. 
+ 
 Make sure that any security groups or firewalls allow traffic from the internet to the node on `TCP` ports `9345` and `9346`.
 
 Also, compute nodes must be able to communicate with each other on UDP ports `500` and `4500`.  This allows Rancher to create ipsec tunnels between the nodes for networking.
-
- * *Note on Access Control: If you have already enabled Access Control in the Rancher UI, the command will need the registration token in order to be authenticated to connect to the Management Server. The specific command with registration token can be found in the Rancher UI under the "Register a new Host" for a custom/Bare Metal host.*
 
 ## UI
 
