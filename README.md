@@ -26,9 +26,9 @@ Rancher is deployed as a set of Docker containers.  Running Rancher is a simple 
 
 The UI and API are available on the exposed port `8080`.
 
-### Register Docker Nodes
+### Register Nodes
  
-Access the UI and click on "Add Host" to find the command in the custom/Bare Metal option. 
+In order to add nodes, access the UI and click on "Add Host" to find the command in the Custom option. 
  
 Make sure that any security groups or firewalls allow traffic from the internet to the node on `TCP` ports `9345` and `9346`.
 
