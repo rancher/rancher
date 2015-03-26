@@ -69,6 +69,12 @@ This repo is a meta-repo used for packaging.  The source code for Rancher is in 
     * Security groups
     * Load balancing
 
+### Bugs & Issues
+Please submit any Rancher bugs and issues to [rancherio/rancher](//github.com/rancherio/rancher/issues). 
+
+Only bugs for RancherOS should be submitted in a different repo. Those bugs should be filed in [rancherio/os](//github.com/rancherio/os/issues).
+
+
 #License
 Copyright (c) 2014-2015 [Rancher Labs, Inc.](http://rancher.com)
 
