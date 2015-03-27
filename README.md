@@ -34,6 +34,12 @@ Make sure that any security groups or firewalls allow traffic from the internet 
 
 Also, compute nodes must be able to communicate with each other on UDP ports `500` and `4500`.  This allows Rancher to create ipsec tunnels between the nodes for networking.
 
+> **Note:** If you are running on OS X and try the UI command and get this message: 
+```bash
+FATA[0000] Post http:///var/run/docker.sock/v1.17/containers/create: dial unix /var/run/docker.sock: no such file or directory. Are you trying to connect to a TLS-enabled daemon without TLS?
+```
+please retry the command without sudo.
+
 ## UI
 
 The UI is available by accessing the base HTTP URL of the management server.  For example, `http://MANAGEMENT_IP:8080/`
