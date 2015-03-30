@@ -30,7 +30,7 @@ ADD https://github.com/rancherio/cattle/releases/download/v0.21.0/cattle.jar /us
 ADD https://github.com/docker/machine/releases/download/v0.1.0/docker-machine_linux-amd64 /usr/bin/docker-machine
 RUN chmod +x /usr/bin/docker-machine
 
-ADD https://github.com/rancherio/go-machine-service/releases/download/v0.3.0/go-machine-service.tar.xz /tmp/
+ADD https://github.com/rancherio/go-machine-service/releases/download/v0.4.0/go-machine-service.tar.xz /tmp/
 RUN tar xpvf /tmp/go-machine-service.tar.xz -C /usr/bin/ && \
     chmod +x /usr/bin/go-machine-service
 
