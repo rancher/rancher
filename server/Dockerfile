@@ -27,10 +27,10 @@ ENV RANCHER_SERVER_IMAGE v0.14.1
 EXPOSE 3306
 ADD https://github.com/rancherio/cattle/releases/download/v0.22.0/cattle.jar /usr/share/cattle/
 
-ADD https://github.com/docker/machine/releases/download/v0.1.0/docker-machine_linux-amd64 /usr/bin/docker-machine
+ADD https://github.com/docker/machine/releases/download/v0.2.0-rc3/docker-machine_linux-amd64 /usr/bin/docker-machine
 RUN chmod +x /usr/bin/docker-machine
 
-ADD https://github.com/rancherio/go-machine-service/releases/download/v0.4.0/go-machine-service.tar.xz /tmp/
+ADD https://github.com/rancherio/go-machine-service/releases/download/v0.5.0/go-machine-service.tar.xz /tmp/
 RUN tar xpvf /tmp/go-machine-service.tar.xz -C /usr/bin/ && \
     chmod +x /usr/bin/go-machine-service
 
