@@ -171,6 +171,7 @@ setup_state()
     export CATTLE_STATE_DIR=/var/lib/cattle/state
     export CATTLE_AGENT_LOG_FILE=/var/lib/cattle/logs/agent.log
     export CATTLE_CADVISOR_WRAPPER=cadvisor.sh
+    export CATTLE_AGENT_PIDNS=host
 }
 
 load()
@@ -268,7 +269,7 @@ wait_for()
     done
 }
 
-DOCKER_OPTS="-d --name rancher-agent --restart=always --net=host"
+DOCKER_OPTS="-d --name rancher-agent --restart=always --net=host --pid=host"
 
 if [ "$#" == 0 ]; then
     error "One parameter required"
