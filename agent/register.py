@@ -1,12 +1,18 @@
 #!/usr/bin/env python
 import sys
 import os
+import logging
 
 from cattle import from_env
 
 
-client = from_env(access_key=os.environ['CATTLE_REGISTRATION_ACCESS_KEY'],
-                  secret_key=os.environ['CATTLE_REGISTRATION_SECRET_KEY'])
+try:
+    client = from_env(access_key=os.environ['CATTLE_REGISTRATION_ACCESS_KEY'],
+                    secret_key=os.environ['CATTLE_REGISTRATION_SECRET_KEY'])
+except KeyError:
+    logging.exception('Missing CATTLE_REGISTRATION_ACCESS_KEY or CATTLE_REGISTRATION_SECRET_KEY')
+    sys.exit(1)
+
 
 if not client.valid():
     print "echo Invalid API credentials; exit 1"
