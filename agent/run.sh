@@ -37,11 +37,11 @@ launch_volume()
 
     local opts=""
 
-    if [ "$(var_lib_writable)" = "true" ]; then
+    if [ "${CATTLE_VAR_LIB_WRITABLE}" = "true" ]; then
         opts="-v /var/lib/rancher:/var/lib/rancher"
     fi
 
-    if [ "$(var_lib_cattle)" = "true" ]; then
+    if [ "${CATTLE_HOST_HAS_CATTLE}" = "true" ]; then
         opts="$opts -v /var/lib/cattle:/var/lib/cattle-legacy"
     fi
 
@@ -49,17 +49,12 @@ launch_volume()
         --name rancher-agent-state \
         -v /var/lib/cattle \
         -v /var/log/rancher:/var/log/rancher \
-        ${opts} ${CATTLE_AGENT_IMAGE} state
+        ${opts} ${RANCHER_AGENT_IMAGE} state
 }
 
-var_lib_writable()
+inspect_host()
 {
-    docker run --rm --privileged -v /var/lib:/var/lib ${CATTLE_AGENT_IMAGE} check-var-lib
-}
-
-var_lib_cattle()
-{
-    docker run --rm --privileged -v /var/lib:/var/lib ${CATTLE_AGENT_IMAGE} check-var-lib-cattle
+    docker run --rm --privileged -v /var/lib:/var/lib ${RANCHER_AGENT_IMAGE} inspect-host
 }
 
 launch_agent()
@@ -69,7 +64,11 @@ launch_agent()
     local var_lib_docker=$(resolve_var_lib_docker)
 
     docker run \
-        ${DOCKER_OPTS} \
+        -d \
+        --name rancher-agent \
+        --restart=always \
+        --net=host \
+        --pid=host \
         --privileged \
         -e CATTLE_PHYSICAL_HOST_UUID=${CATTLE_PHYSICAL_HOST_UUID} \
         -e CATTLE_SCRIPT_DEBUG=${CATTLE_SCRIPT_DEBUG} \
@@ -79,11 +78,11 @@ launch_agent()
         -e CATTLE_HOST_API_PROXY="${CATTLE_HOST_API_PROXY}" \
         -e CATTLE_URL="${CATTLE_URL}" \
         -v /var/run/docker.sock:/var/run/docker.sock \
-        -v /lib/modules:/lib/modules:/ro \
+        -v /lib/modules:/lib/modules:ro \
         -v ${var_lib_docker}:${var_lib_docker} \
         -v /proc:/host/proc \
         --volumes-from rancher-agent-state \
-        "${CATTLE_AGENT_IMAGE}" "$@"
+        "${RANCHER_AGENT_IMAGE}" "$@"
 }
 
 resolve_var_lib_docker()
@@ -94,31 +93,24 @@ resolve_var_lib_docker()
 
 verify_docker_client_server_version()
 {
+    local client_version=$(docker version |grep Client\ version | cut -d":" -f2)
+    info "Checking for Docker version >=" $client_version
     docker version 2>&1 | grep Server\ version >/dev/null || {
-        local client_version=$(docker version |grep Client\ version | cut -d":" -f2)
         echo "Please ensure Host Docker version is >=${client_version} and container has r/w permissions to docker.sock" 1>&2
         exit 1
     }
-}
-
-resolve_image()
-{
-    local image=$(docker inspect -f '{{.Image}}' $(hostname) 2>/dev/null)
-
-    if [ -z "$image" ]; then
-        image=${RANCHER_AGENT_IMAGE:-rancher/agent:latest}
-    else
-        local gateway=$(docker run --rm --net=host $image -- ip route get 8.8.8.8 | grep via | awk '{print $7}')
-        CATTLE_URL=$(echo $CATTLE_URL | sed -e 's/127.0.0.1/'$gateway'/' -e 's/localhost/'$gateway'/')
-    fi
-
-    CATTLE_AGENT_IMAGE=${CATTLE_AGENT_IMAGE:-$image}
+    info Found $(docker version 2>&1 | grep Server\ version)
+    for i in version info; do
+        docker $i | while read LINE; do
+            info "docker $i:" $LINE
+        done
+    done
 }
 
 delete_container()
 {
     while docker inspect $1 >/dev/null 2>&1; do
-        echo Deleting container $1
+        info Deleting container $1
         docker rm -f $1 >/dev/null 2>&1 || true
         if [ "$2" != "nowait" ]; then
             sleep 1
@@ -133,20 +125,12 @@ cleanup_agent()
 
 cleanup_upgrade()
 {
-    # Kill old agents
-    local old_agents="$(docker ps -a | grep -v rancher-agent | awk '{print $1 " " $2}' | grep 'rancher/agent:' | awk '{print $1}')"
-    if [ -n "$old_agents" ]; then
-        echo Killing $old_agents
-        docker kill $old_agents || true
-    fi
-
     # Delete old agents
     for old_agent in $(docker ps -a | grep -v rancher-agent | awk '{print $1 " " $2}' | grep 'rancher/agent:' | awk '{print $1}'); do
         delete_container $old_agent nowait
     done
 
     delete_container rancher-agent-upgrade
-    delete_container rancher-agent-upgrade-stage2
 }
 
 setup_state()
@@ -171,7 +155,6 @@ setup_state()
     export CATTLE_STATE_DIR=/var/lib/cattle/state
     export CATTLE_AGENT_LOG_FILE=/var/lib/cattle/logs/agent.log
     export CATTLE_CADVISOR_WRAPPER=cadvisor.sh
-    export CATTLE_AGENT_PIDNS=host
 }
 
 load()
@@ -183,10 +166,8 @@ load()
     fi
 }
 
-register()
+print_token()
 {
-    load $(./resolve_url.py $CATTLE_URL)
-
     local legacy_token_file=/var/lib/cattle-legacy/.registration_token
     local token_file=/var/lib/cattle/state/.registration_token
     local token=
@@ -205,7 +186,12 @@ register()
         echo $token > $token_file
     fi
 
-    ENV=$(./register.py $token)
+    info env "TOKEN=$token"
+}
+
+register()
+{
+    ENV=$(./register.py $TOKEN)
     eval "$ENV"
 
     CATTLE_AGENT_IP=${CATTLE_AGENT_IP:-${DETECTED_CATTLE_AGENT_IP}}
@@ -224,8 +210,7 @@ run_bootstrap()
 
     # Sanity check if this account is really being authenticated as an agent account or the default admin auth
     if curl -f -u ${CATTLE_ACCESS_KEY}:${CATTLE_SECRET_KEY} -s ${CATTLE_URL}/schemas/account >/dev/null 2>&1; then
-        resolve_image
-        DOCKER_OPTS="--rm" launch_agent ${CATTLE_URL}
+        launch_agent ${CATTLE_URL}
         exit 0
     fi
 
@@ -245,18 +230,27 @@ run()
     done
 }
 
-upgrade()
+read_rancher_agent_env()
 {
+    info Reading environment from rancher-agent
+    local save=$RANCHER_AGENT_IMAGE
     eval $(docker inspect rancher-agent | jq -r '"export \"" + .[0].Config.Env[] + "\""')
+    RANCHER_AGENT_IMAGE=$save
+}
+
+print_url()
+{
+    local url=$(echo "${CATTLE_URL}"| sed -e 's!/v1/scripts.*!/v1!')
+    echo $url
 }
 
 wait_for()
 {
-    local url=$(echo "${CATTLE_URL}"| sed -e 's!/v1/scripts.*!/v1!')
+    local url="$(print_url $CATTLE_URL)"
     info "Attempting to connect to: ${url}"
     for ((i=0; i < 300; i++)); do
         if ! curl -f -s ${CATTLE_URL} >/dev/null 2>&1; then
-            error "${url}" is not accessible
+            error ${url} is not accessible
             sleep 2
             if [ "$i" -eq "299" ]; then
                 error "Could not reach ${url}. Giving up."
@@ -269,53 +263,100 @@ wait_for()
     done
 }
 
-DOCKER_OPTS="-d --name rancher-agent --restart=always --net=host --pid=host"
+inspect()
+{
+    setup_state
+    print_token
+
+    if mkdir -p /var/lib/rancher/state >/dev/null 2>&1; then
+        info env "CATTLE_VAR_LIB_WRITABLE=true"
+    else
+        info env "CATTLE_VAR_LIB_WRITABLE=false"
+    fi
+
+    if [ -d /var/lib/cattle ]; then
+        info env "CATTLE_HOST_HAS_CATTLE=true"
+    else
+        info env "CATTLE_HOST_HAS_CATTLE=false"
+    fi
+
+    if [ -e /var/run/system-docker.sock ]; then
+        info env "CATTLE_RANCHEROS=true"
+    else
+        info env "CATTLE_RANCHEROS=false"
+    fi
+}
+
+setup_env()
+{
+    if [ "$1" != "upgrade" ]; then
+        local env="$(./resolve_url.py $CATTLE_URL)"
+        load "$env"
+    fi
+
+    info Inspecting host capabilities
+    local content=$(inspect_host)
+
+    echo "$content" | grep -v 'INFO: env' || true
+    eval $(echo "$content" | grep 'INFO: env' | sed 's/INFO: env//g')
+
+    info Host writable: ${CATTLE_VAR_LIB_WRITABLE}
+    info Legacy path: ${CATTLE_HOST_HAS_CATTLE}
+    info Token: $(echo $TOKEN | sed 's/........*/xxxxxxxx/g')
+
+    if [[ -z "$CATTLE_ACCESS_KEY" || -z "$CATTLE_SECRET_KEY" ]]; then
+        info Running registration
+        register
+    else
+        info Skipping registration
+    fi
+
+    info Printing Environment
+    env | sort | while read LINE; do
+        if [[ $LINE =~ RANCHER.* || $LINE =~ CATTLE.* ]]; then
+            info "ENV:" $(echo $LINE | sed 's/\(SECRET.*=\).*/\1xxxxxxx/g')
+        fi
+    done
+}
+
+setup_cattle_url()
+{
+    if [ "$1" = "register" ]; then
+        if [ -z "$RANCHER_URL" ]; then
+            info No RANCHER_URL environment variable, exiting
+            exit 0
+        fi
+        CATTLE_URL="$RANCHER_URL"
+    elif [ "$1" = "upgrade" ]; then
+        read_rancher_agent_env
+    else
+        CATTLE_URL="$1"
+    fi
+}
+
 
 if [ "$#" == 0 ]; then
     error "One parameter required"
     exit 1
 fi
 
-if [[ $1 =~ http.* ]]; then
-    CATTLE_URL="$1"
+if [[ $1 =~ http.* || $1 = "register" || $1 = "upgrade" ]]; then
+    if [ "$1" = "upgrade" ]; then
+        info Running upgrade
+    else
+        info Running Agent Registration Process, CATTLE_URL=$(print_url $CATTLE_URL)
+    fi
+    setup_cattle_url $1
     verify_docker_client_server_version
-    resolve_image
     wait_for
+    setup_env $1
     cleanup_agent
-    DOCKER_OPTS="--rm" launch_agent register
-    sleep 2
-elif [ "$1" = "check-var-lib" ]; then
-    if mkdir -p /var/lib/rancher/state >/dev/null 2>&1; then
-        echo true
-    else
-        echo false
-    fi
-elif [ "$1" = "check-var-lib-cattle" ]; then
-    if [ -d /var/lib/cattle ]; then
-        echo true
-    else
-        echo false
-    fi
+    ID=$(launch_agent run)
+    info Launched Rancher Agent: $ID
+elif [ "$1" = "inspect-host" ]; then
+    inspect
 elif [ "$1" = "state" ]; then
     echo Rancher State
-elif [ "$1" = "register" ]; then
-    verify_docker_client_server_version
-    resolve_image
-    cleanup_agent
-    setup_state
-    register
-    launch_agent run
-elif [ "$1" = "upgrade" ]; then
-    verify_docker_client_server_version
-    resolve_image
-    upgrade
-    DOCKER_OPTS="--rm --name rancher-agent-upgrade-stage2" launch_agent upgrade-stage2
-elif [ "$1" = "upgrade-stage2" ]; then
-    verify_docker_client_server_version
-    resolve_image
-    cleanup_agent
-    setup_state
-    launch_agent run
 elif [ "$1" = "run" ]; then
     cleanup_upgrade
     setup_state
