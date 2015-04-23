@@ -348,7 +348,9 @@ if [[ $1 =~ http.* || $1 = "register" || $1 = "upgrade" ]]; then
     fi
     setup_cattle_url $1
     verify_docker_client_server_version
-    wait_for
+    if [ "$1" != "upgrade" ]; then
+        wait_for
+    fi
     setup_env $1
     cleanup_agent
     ID=$(launch_agent run)
