@@ -1,4 +1,4 @@
-FROM ubuntu:14.04.1
+FROM ubuntu:14.04.2
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends openjdk-7-jre-headless \
@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends openjdk-7-jre-h
                     keychain
 
 ENV CATTLE_HOME /var/lib/cattle
-ENV CATTLE_API_UI_INDEX http://releases.rancher.com/ui/0.16.2/static/index.html
+ENV CATTLE_API_UI_INDEX http://releases.rancher.com/ui/0.17.0/static/index.html
 ENV CATTLE_DB_CATTLE_DATABASE mysql
 ADD artifacts /usr/share/cattle
 
@@ -22,10 +22,10 @@ VOLUME ["/var/lib/cattle"]
 VOLUME ["/var/lib/mysql"]
 
 EXPOSE 8080
-ENV RANCHER_SERVER_IMAGE v0.16.3
+ENV RANCHER_SERVER_IMAGE v0.17.0
 
 EXPOSE 3306
-ADD https://github.com/rancherio/cattle/releases/download/v0.27.0/cattle.jar /usr/share/cattle/
+ADD https://github.com/rancherio/cattle/releases/download/v0.28.0/cattle.jar /usr/share/cattle/
 
 ADD https://github.com/docker/machine/releases/download/v0.2.0/docker-machine_linux-amd64 /usr/bin/docker-machine
 RUN chmod +x /usr/bin/docker-machine
