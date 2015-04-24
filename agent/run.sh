@@ -81,6 +81,7 @@ launch_agent()
         -v /lib/modules:/lib/modules:ro \
         -v ${var_lib_docker}:${var_lib_docker} \
         -v /proc:/host/proc \
+        -v /dev:/host/dev \
         --volumes-from rancher-agent-state \
         "${RANCHER_AGENT_IMAGE}" "$@"
 }
@@ -224,6 +225,7 @@ run_bootstrap()
 
 run()
 {
+    mount --rbind /host/dev /dev
     while true; do
         run_bootstrap "$@" || true
         sleep 5
