@@ -26,19 +26,32 @@ Rancher is deployed as a set of Docker containers.  Running Rancher is a simple 
 
 The UI and API are available on the exposed port `8080`.
 
+ 
+
 ### Register Nodes
  
 In order to add nodes, access the UI and click on "Add Host" to find the command in the Custom option. 
- 
+
 Make sure that any security groups or firewalls allow traffic from the internet to the node on `TCP` ports `9345` and `9346`.
 
 Also, compute nodes must be able to communicate with each other on UDP ports `500` and `4500`.  This allows Rancher to create ipsec tunnels between the nodes for networking.
+
 
 > **Note:** If you are running on OS X and try the UI command and get this message: 
 ```bash
 FATA[0000] Post http:///var/run/docker.sock/v1.17/containers/create: dial unix /var/run/docker.sock: no such file or directory. Are you trying to connect to a TLS-enabled daemon without TLS?
 ```
 please retry the command without sudo.
+
+**Adding Nodes on the same host as Management Server**
+
+If you are adding your node on the same VM as Rancher server, you will need to add additional information to the command provided from the UI. In order for the Rancher agent to be set correctly, you will need to set the CATTLE_AGENT_IP environment variable to the public IP of the VM that Rancher server is running on. 
+
+```bash
+sudo docker run -d -e CATTLE_AGENT_IP=<IP_OF_RANCHER_SERVER> -v /var/run/docker....
+```
+
+If you have decided to launch your node on the same VM as the server, please note that you should not create any containers on the node that bind to port `8080`. Since the UI of the server relies on the `8080` port, you will lose access to Rancher server if you add a container that is using the same server IP and port. 
 
 ## UI
 
