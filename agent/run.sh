@@ -70,6 +70,7 @@ launch_agent()
         --net=host \
         --pid=host \
         --privileged \
+        -e CATTLE_AGENT_PIDNS=host \
         -e CATTLE_PHYSICAL_HOST_UUID=${CATTLE_PHYSICAL_HOST_UUID} \
         -e CATTLE_SCRIPT_DEBUG=${CATTLE_SCRIPT_DEBUG} \
         -e CATTLE_ACCESS_KEY="${CATTLE_ACCESS_KEY}" \
