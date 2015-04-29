@@ -1,4 +1,5 @@
 pytest
-cattle
+cattle==0.4.0
 flake8
 docker-py
+requests==2.6.0

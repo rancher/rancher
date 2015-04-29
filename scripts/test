@@ -1,9 +1,11 @@
 #!/bin/bash
 
+COMPOSE="/usr/local/bin/docker-compose"
+
 teardown()
 {
     rm -rf .tox
-    docker-compose -f fig-test-env.yml stop
+    $COMPOSE -f fig-test-env.yml stop
 }
 
 wait_for_env()
@@ -69,12 +71,12 @@ popd > /dev/null
 pushd ./tests/server > /dev/null
 
 export CATTLE_DB_CATTLE_MYSQL_HOST=$DOCKER_IP
-docker-compose -f fig-test-env.yml build
-docker-compose -f fig-test-env.yml up -d
+$COMPOSE -f fig-test-env.yml build
+$COMPOSE -f fig-test-env.yml up -d
 
 fig_get_id()
 {
-    echo $(docker-compose -f fig-test-env.yml ps -q $1)
+    echo $($COMPOSE -f fig-test-env.yml ps -q $1)
 }
 
 trap teardown EXIT

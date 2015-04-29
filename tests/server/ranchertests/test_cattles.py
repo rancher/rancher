@@ -1,8 +1,13 @@
 import os
 import cattle
 import pytest
+import gdapi
 from docker import Client
 from docker.utils import kwargs_from_env
+
+
+ADMIN_HEADERS = dict(gdapi.HEADERS)
+ADMIN_HEADERS['X-API-Project-Id'] = 'USER'
 
 
 class CattleConfig(object):
@@ -11,7 +16,8 @@ class CattleConfig(object):
 
     def _get_client(self):
         client = cattle.from_env(url=self.cattle_url(),
-                                 cache=False)
+                                 cache=False,
+                                 headers=ADMIN_HEADERS)
         assert client.valid()
         return client
 
