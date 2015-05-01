@@ -78,6 +78,7 @@ launch_agent()
         -e CATTLE_AGENT_IP="${CATTLE_AGENT_IP}" \
         -e CATTLE_HOST_API_PROXY="${CATTLE_HOST_API_PROXY}" \
         -e CATTLE_URL="${CATTLE_URL}" \
+        -e CATTLE_VOLMGR_ENABLED="${CATTLE_VOLMGR_ENABLED}" \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -v /lib/modules:/lib/modules:ro \
         -v ${var_lib_docker}:${var_lib_docker} \
