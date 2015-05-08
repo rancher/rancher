@@ -115,9 +115,6 @@ delete_container()
     while docker inspect $1 >/dev/null 2>&1; do
         info Deleting container $1
         docker rm -f $1 >/dev/null 2>&1 || true
-        if [ "$2" != "nowait" ]; then
-            sleep 1
-        fi
     done
 }
 
@@ -128,11 +125,6 @@ cleanup_agent()
 
 cleanup_upgrade()
 {
-    # Delete old agents
-    for old_agent in $(docker ps -a | grep -v rancher-agent | awk '{print $1 " " $2}' | grep 'rancher/agent:' | awk '{print $1}'); do
-        delete_container $old_agent nowait
-    done
-
     delete_container rancher-agent-upgrade
 }
 
@@ -345,12 +337,12 @@ if [ "$#" == 0 ]; then
 fi
 
 if [[ $1 =~ http.* || $1 = "register" || $1 = "upgrade" ]]; then
+    setup_cattle_url $1
     if [ "$1" = "upgrade" ]; then
         info Running upgrade
     else
         info Running Agent Registration Process, CATTLE_URL=$(print_url $CATTLE_URL)
     fi
-    setup_cattle_url $1
     verify_docker_client_server_version
     if [ "$1" != "upgrade" ]; then
         wait_for
