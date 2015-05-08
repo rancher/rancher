@@ -145,12 +145,24 @@ setup_zk()
     fi
 }
 
+setup_proxy()
+{
+    if [[ -n "$CATTLE_HTTP_PROXY" && -n "$CATTLE_HTTP_PROXY_PORT" ]]; then
+        PROXY_ARGS="-Dhttp.proxyHost=${CATTLE_HTTP_PROXY} -Dhttp.proxyPort=${CATTLE_HTTP_PROXY_PORT}"
+    fi
+
+    if [[ -n "$CATTLE_HTTPS_PROXY" && -n "$CATTLE_HTTPS_PROXY_PORT" ]]; then
+        PROXY_ARGS="${PROXY_ARGS} -Dhttps.proxyHost=${CATTLE_HTTPS_PROXY} -Dhttps.proxyPort=${CATTLE_HTTPS_PROXY_PORT}"
+    fi
+}
+
 setup_graphite
 setup_gelf
 setup_mysql
 setup_redis
 setup_zk
+setup_proxy
 
 env | grep CATTLE | grep -v PASS | sort
 
-exec java ${CATTLE_JAVA_OPTS:--Xmx256m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR} -jar $JAR "$@" $ARGS
+exec java ${CATTLE_JAVA_OPTS:--Xmx256m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR} $PROXY_ARGS -jar $JAR "$@" $ARGS
