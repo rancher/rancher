@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+set -x
 
 trap "exit 1" SIGINT SIGTERM
 
@@ -71,14 +72,18 @@ launch_agent()
         --pid=host \
         --privileged \
         -e CATTLE_AGENT_PIDNS=host \
-        -e CATTLE_PHYSICAL_HOST_UUID=${CATTLE_PHYSICAL_HOST_UUID} \
-        -e CATTLE_SCRIPT_DEBUG=${CATTLE_SCRIPT_DEBUG} \
-        -e CATTLE_ACCESS_KEY="${CATTLE_ACCESS_KEY}" \
-        -e CATTLE_SECRET_KEY="${CATTLE_SECRET_KEY}" \
-        -e CATTLE_AGENT_IP="${CATTLE_AGENT_IP}" \
-        -e CATTLE_HOST_API_PROXY="${CATTLE_HOST_API_PROXY}" \
-        -e CATTLE_URL="${CATTLE_URL}" \
-        -e CATTLE_VOLMGR_ENABLED="${CATTLE_VOLMGR_ENABLED}" \
+        -e CATTLE_HTTP_PROXY_HOST \
+        -e CATTLE_HTTP_PROXY_PORT \
+        -e CATTLE_HTTPS_PROXY_HOST \
+        -e CATTLE_HTTPS_PROXY_PORT \
+        -e CATTLE_PHYSICAL_HOST_UUID \
+        -e CATTLE_SCRIPT_DEBUG \
+        -e CATTLE_ACCESS_KEY \
+        -e CATTLE_SECRET_KEY \
+        -e CATTLE_AGENT_IP \
+        -e CATTLE_HOST_API_PROXY \
+        -e CATTLE_URL \
+        -e CATTLE_VOLMGR_ENABLED \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -v /lib/modules:/lib/modules:ro \
         -v ${var_lib_docker}:${var_lib_docker} \
@@ -115,9 +120,6 @@ delete_container()
     while docker inspect $1 >/dev/null 2>&1; do
         info Deleting container $1
         docker rm -f $1 >/dev/null 2>&1 || true
-        if [ "$2" != "nowait" ]; then
-            sleep 1
-        fi
     done
 }
 
@@ -128,11 +130,6 @@ cleanup_agent()
 
 cleanup_upgrade()
 {
-    # Delete old agents
-    for old_agent in $(docker ps -a | grep -v rancher-agent | awk '{print $1 " " $2}' | grep 'rancher/agent:' | awk '{print $1}'); do
-        delete_container $old_agent nowait
-    done
-
     delete_container rancher-agent-upgrade
 }
 
@@ -158,6 +155,14 @@ setup_state()
     export CATTLE_STATE_DIR=/var/lib/cattle/state
     export CATTLE_AGENT_LOG_FILE=/var/lib/cattle/logs/agent.log
     export CATTLE_CADVISOR_WRAPPER=cadvisor.sh
+
+    if [[ -n "$CATTLE_HTTP_PROXY_HOST" && -n "$CATTLE_HTTP_PROXY_PORT" ]]; then
+        export http_proxy=http://${CATTLE_HTTP_PROXY_HOST}:${CATTLE_HTTP_PROXY_PORT}
+    fi
+
+    if [[ -n "$CATTLE_HTTPS_PROXY_HOST" && -n "$CATTLE_HTTPS_PROXY_PORT" ]]; then
+        export https_proxy=https://${CATTLE_HTTPS_PROXY_HOST}:${CATTLE_HTTPS_PROXY_PORT}
+    fi
 }
 
 load()
@@ -345,12 +350,12 @@ if [ "$#" == 0 ]; then
 fi
 
 if [[ $1 =~ http.* || $1 = "register" || $1 = "upgrade" ]]; then
+    setup_cattle_url $1
     if [ "$1" = "upgrade" ]; then
         info Running upgrade
     else
         info Running Agent Registration Process, CATTLE_URL=$(print_url $CATTLE_URL)
     fi
-    setup_cattle_url $1
     verify_docker_client_server_version
     if [ "$1" != "upgrade" ]; then
         wait_for
