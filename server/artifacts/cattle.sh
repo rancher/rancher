@@ -5,6 +5,7 @@ cd /var/lib/cattle
 
 JAR=/usr/share/cattle/cattle.jar
 DEBUG_JAR=/var/lib/cattle/lib/cattle-debug.jar
+LOG_DIR=/var/lib/cattle/logs
 export S6_SERVICE_DIR=${S6_SERVICE_DIR:-$S6_SERVICE_DIR}
 
 if [ "$URL" != "" ]
@@ -152,4 +153,4 @@ setup_zk
 
 env | grep CATTLE | grep -v PASS | sort
 
-exec java ${CATTLE_JAVA_OPTS:--Xmx256m} -jar $JAR "$@" $ARGS
+exec java ${CATTLE_JAVA_OPTS:--Xmx256m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR} -jar $JAR "$@" $ARGS
