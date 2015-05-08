@@ -18,4 +18,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends nodejs
 RUN mkdir -p /var/lib/cattle /var/lib/rancher
 COPY register.py resolve_url.py agent.sh run.sh /
 ENTRYPOINT ["/run.sh"]
-ENV RANCHER_AGENT_IMAGE rancher/agent:v0.7.0
+LABEL "io.rancher.container.system"="rancher-agent"
+ENV RANCHER_AGENT_IMAGE rancher/agent:v0.7.1
