@@ -1,6 +1,5 @@
 #!/bin/bash
 set -e
-set -x
 
 trap "exit 1" SIGINT SIGTERM
 
