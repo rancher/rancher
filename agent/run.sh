@@ -41,10 +41,6 @@ launch_volume()
         opts="-v /var/lib/rancher:/var/lib/rancher"
     fi
 
-    if [ "${CATTLE_HOST_HAS_CATTLE}" = "true" ]; then
-        opts="$opts -v /var/lib/cattle:/var/lib/cattle-legacy"
-    fi
-
     docker run \
         --name rancher-agent-state \
         -v /var/lib/cattle \
@@ -136,23 +132,8 @@ setup_state()
 {
     mkdir -p /var/lib/{cattle,rancher/state}
 
-    if [[ -e /var/lib/rancher/state && ! -e /var/lib/cattle/state ]]; then
-        ln -s /var/lib/rancher/state /var/lib/cattle/state
-    fi
-
-    if [[ ! -e /var/lib/cattle/logs ]]; then
-        mkdir -p /var/log/rancher
-        ln -s /var/log/rancher /var/lib/cattle/logs
-    fi
-
-    for i in .docker_uuid .physical_host_uuid .registration_token; do
-        if [[ ! -e /var/lib/rancher/state/$i && -e /var/lib/cattle-legacy/$i ]]; then
-            cp -v /var/lib/cattle-legacy/$i /var/lib/rancher/state/$i
-        fi
-    done
-
-    export CATTLE_STATE_DIR=/var/lib/cattle/state
-    export CATTLE_AGENT_LOG_FILE=/var/lib/cattle/logs/agent.log
+    export CATTLE_STATE_DIR=/var/lib/rancher/state
+    export CATTLE_AGENT_LOG_FILE=/var/log/rancher/agent.log
     export CATTLE_CADVISOR_WRAPPER=cadvisor.sh
 
     if [[ -n "$CATTLE_HTTP_PROXY_HOST" && -n "$CATTLE_HTTP_PROXY_PORT" ]]; then
@@ -175,13 +156,8 @@ load()
 
 print_token()
 {
-    local legacy_token_file=/var/lib/cattle-legacy/.registration_token
-    local token_file=/var/lib/cattle/state/.registration_token
+    local token_file=/var/lib/rancher/state/.registration_token
     local token=
-
-    if [[ -e ${legacy_token_file} && ! -e ${token_file} ]]; then
-        cp -f ${legacy_token_file} ${token_file}
-    fi
 
     if [ -e $token_file ]; then
         token="$(<$token_file)"
@@ -201,7 +177,7 @@ register()
     ENV=$(./register.py $TOKEN)
     eval "$ENV"
 
-    CATTLE_AGENT_IP=${CATTLE_AGENT_IP:-${DETECTED_CATTLE_AGENT_IP}}
+    export CATTLE_AGENT_IP=${CATTLE_AGENT_IP:-${DETECTED_CATTLE_AGENT_IP}}
 }
 
 run_bootstrap()
@@ -273,19 +249,12 @@ wait_for()
 
 inspect()
 {
-    setup_state
     print_token
 
     if mkdir -p /var/lib/rancher/state >/dev/null 2>&1; then
         info env "CATTLE_VAR_LIB_WRITABLE=true"
     else
         info env "CATTLE_VAR_LIB_WRITABLE=false"
-    fi
-
-    if [ -d /var/lib/cattle ]; then
-        info env "CATTLE_HOST_HAS_CATTLE=true"
-    else
-        info env "CATTLE_HOST_HAS_CATTLE=false"
     fi
 
     if [ -e /var/run/system-docker.sock ]; then
@@ -309,7 +278,6 @@ setup_env()
     eval $(echo "$content" | grep 'INFO: env' | sed 's/INFO: env//g')
 
     info Host writable: ${CATTLE_VAR_LIB_WRITABLE}
-    info Legacy path: ${CATTLE_HOST_HAS_CATTLE}
     info Token: $(echo $TOKEN | sed 's/........*/xxxxxxxx/g')
 
     if [[ -z "$CATTLE_ACCESS_KEY" || -z "$CATTLE_SECRET_KEY" ]]; then
@@ -345,6 +313,8 @@ setup_cattle_url()
         local gateway=$(docker run --rm --net=host $RANCHER_AGENT_IMAGE -- ip route get 8.8.8.8 | grep via | awk '{print $7}')
         CATTLE_URL=$(echo $CATTLE_URL | sed -e 's/127.0.0.1/'$gateway'/' -e 's/localhost/'$gateway'/')
     fi
+
+    export CATTLE_URL
 }
 
 
