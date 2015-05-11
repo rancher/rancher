@@ -67,10 +67,9 @@ launch_agent()
         --pid=host \
         --privileged \
         -e CATTLE_AGENT_PIDNS=host \
-        -e CATTLE_HTTP_PROXY_HOST \
-        -e CATTLE_HTTP_PROXY_PORT \
-        -e CATTLE_HTTPS_PROXY_HOST \
-        -e CATTLE_HTTPS_PROXY_PORT \
+        -e http_proxy \
+        -e https_proxy \
+        -e NO_PROXY \
         -e CATTLE_PHYSICAL_HOST_UUID \
         -e CATTLE_SCRIPT_DEBUG \
         -e CATTLE_ACCESS_KEY \
@@ -135,14 +134,6 @@ setup_state()
     export CATTLE_STATE_DIR=/var/lib/rancher/state
     export CATTLE_AGENT_LOG_FILE=/var/log/rancher/agent.log
     export CATTLE_CADVISOR_WRAPPER=cadvisor.sh
-
-    if [[ -n "$CATTLE_HTTP_PROXY_HOST" && -n "$CATTLE_HTTP_PROXY_PORT" ]]; then
-        export http_proxy=http://${CATTLE_HTTP_PROXY_HOST}:${CATTLE_HTTP_PROXY_PORT}
-    fi
-
-    if [[ -n "$CATTLE_HTTPS_PROXY_HOST" && -n "$CATTLE_HTTPS_PROXY_PORT" ]]; then
-        export https_proxy=https://${CATTLE_HTTPS_PROXY_HOST}:${CATTLE_HTTPS_PROXY_PORT}
-    fi
 }
 
 load()
@@ -193,8 +184,8 @@ run_bootstrap()
 
     # Sanity check if this account is really being authenticated as an agent account or the default admin auth
     if curl -f -u ${CATTLE_ACCESS_KEY}:${CATTLE_SECRET_KEY} -s ${CATTLE_URL}/schemas/account >/dev/null 2>&1; then
-        launch_agent ${CATTLE_URL}
-        exit 0
+        error Please re-register this agent
+        exit 1
     fi
 
     info "Starting agent for ${CATTLE_ACCESS_KEY}"
@@ -324,6 +315,7 @@ if [ "$#" == 0 ]; then
 fi
 
 if [[ $1 =~ http.* || $1 = "register" || $1 = "upgrade" ]]; then
+    echo $http_proxy $https_proxy
     setup_cattle_url $1
     if [ "$1" = "upgrade" ]; then
         info Running upgrade
