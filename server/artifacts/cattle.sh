@@ -147,12 +147,24 @@ setup_zk()
 
 setup_proxy()
 {
-    if [[ -n "$CATTLE_HTTP_PROXY" && -n "$CATTLE_HTTP_PROXY_PORT" ]]; then
-        PROXY_ARGS="-Dhttp.proxyHost=${CATTLE_HTTP_PROXY} -Dhttp.proxyPort=${CATTLE_HTTP_PROXY_PORT}"
+    if [ -n "$http_proxy" ]; then
+        local host=$(echo $http_proxy | sed 's!.*//!!' | cut -f1 -d:)
+        local port=$(echo $http_proxy | sed 's!.*//!!' | cut -f2 -d:)
+
+        PROXY_ARGS="-Dhttp.proxyHost=${host}"
+        if [ "$host" != "$port" ]; then
+            PROXY_ARGS="$PROXY_ARGS -Dhttp.proxyPort=${port}"
+        fi
     fi
 
-    if [[ -n "$CATTLE_HTTPS_PROXY" && -n "$CATTLE_HTTPS_PROXY_PORT" ]]; then
-        PROXY_ARGS="${PROXY_ARGS} -Dhttps.proxyHost=${CATTLE_HTTPS_PROXY} -Dhttps.proxyPort=${CATTLE_HTTPS_PROXY_PORT}"
+    if [ -n "$https_proxy" ]; then
+        local host=$(echo $https_proxy | sed 's!.*//!!' | cut -f1 -d:)
+        local port=$(echo $https_proxy | sed 's!.*//!!' | cut -f2 -d:)
+
+        PROXY_ARGS="$PROXY_ARGS -Dhttps.proxyHost=${host}"
+        if [ "$host" != "$port" ]; then
+            PROXY_ARGS="$PROXY_ARGS -Dhttps.proxyPort=${port}"
+        fi
     fi
 }
 
