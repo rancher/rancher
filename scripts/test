@@ -110,4 +110,5 @@ if [[ "$WRAPPED" == "true" ]]; then
 fi
 pushd tests/server >/dev/null
 rm -rf .tox
+printenv
 tox 

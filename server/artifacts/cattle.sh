@@ -39,6 +39,8 @@ setup_gelf()
 start_local_mysql()
 {
     sed -i 's/^\(bind-address.*\)$/#\1/' /etc/mysql/my.cnf
+    sed -i 's/^#\(max_connections.*\)/\1/;s/100/1000/' /etc/mysql/my.cnf
+    
     s6-svc -u ${S6_SERVICE_DIR}/mysql
 
     set +e
