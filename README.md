@@ -22,7 +22,7 @@ Rancher is deployed as a set of Docker containers.  Running Rancher is a simple 
 
 ### Management Server
 
-    docker run -d -p 8080:8080 rancher/server
+    docker run -d --restart=always -p 8080:8080 rancher/server
 
 The UI and API are available on the exposed port `8080`.
 
