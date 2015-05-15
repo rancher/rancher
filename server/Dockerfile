@@ -22,7 +22,7 @@ VOLUME ["/var/lib/cattle"]
 VOLUME ["/var/lib/mysql"]
 
 EXPOSE 8080
-ENV RANCHER_SERVER_IMAGE v0.20.3
+ENV RANCHER_SERVER_IMAGE v0.20.4
 
 EXPOSE 3306
 ADD https://github.com/rancherio/cattle/releases/download/v0.39.0/cattle.jar /usr/share/cattle/
