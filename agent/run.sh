@@ -50,7 +50,7 @@ launch_volume()
 
 inspect_host()
 {
-    docker run --rm --privileged -v /var/lib:/var/lib ${RANCHER_AGENT_IMAGE} inspect-host
+    docker run --rm --privileged -v /run:/run -v /var/lib:/var/lib ${RANCHER_AGENT_IMAGE} inspect-host
 }
 
 launch_agent()
@@ -76,6 +76,7 @@ launch_agent()
         -e CATTLE_SECRET_KEY \
         -e CATTLE_AGENT_IP \
         -e CATTLE_HOST_API_PROXY \
+        -e CATTLE_SYSTEMD \
         -e CATTLE_URL \
         -e CATTLE_VOLMGR_ENABLED \
         -v /var/run/docker.sock:/var/run/docker.sock \
@@ -134,6 +135,10 @@ setup_state()
     export CATTLE_STATE_DIR=/var/lib/rancher/state
     export CATTLE_AGENT_LOG_FILE=/var/log/rancher/agent.log
     export CATTLE_CADVISOR_WRAPPER=cadvisor.sh
+
+    if [ "$CATTLE_SYSTEMD" = "true" ]; then
+        mkdir -p /run/systemd/system
+    fi
 }
 
 load()
@@ -253,6 +258,12 @@ inspect()
     else
         info env "CATTLE_RANCHEROS=false"
     fi
+
+    if [ -e /run/systemd/system ]; then
+        info env "CATTLE_SYSTEMD=true"
+    else
+        info env "CATTLE_SYSTEMD=false"
+    fi
 }
 
 setup_env()
@@ -268,6 +279,9 @@ setup_env()
     echo "$content" | grep -v 'INFO: env' || true
     eval $(echo "$content" | grep 'INFO: env' | sed 's/INFO: env//g')
 
+    export CATTLE_SYSTEMD
+
+    info System: ${CATTLE_SYSTEMD}
     info Host writable: ${CATTLE_VAR_LIB_WRITABLE}
     info Token: $(echo $TOKEN | sed 's/........*/xxxxxxxx/g')
 
