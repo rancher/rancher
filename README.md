@@ -48,7 +48,7 @@ please retry the command without sudo.
 If you are adding your node on the same VM as Rancher server, you will need to add additional information to the command provided from the UI. In order for the Rancher agent to be set correctly, you will need to set the CATTLE_AGENT_IP environment variable to the public IP of the VM that Rancher server is running on. 
 
 ```bash
-sudo docker run -d -e CATTLE_AGENT_IP=<IP_OF_RANCHER_SERVER> -v /var/run/docker....
+sudo docker run -d --privileged -e CATTLE_AGENT_IP=<IP_OF_RANCHER_SERVER> -v /var/run/docker...
 ```
 
 If you have decided to launch your node on the same VM as the server, please note that you should not create any containers on the node that bind to port `8080`. Since the UI of the server relies on the `8080` port, you will lose access to Rancher server if you add a container that is using the same server IP and port. 
