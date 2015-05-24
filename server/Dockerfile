@@ -22,10 +22,10 @@ VOLUME ["/var/lib/cattle"]
 VOLUME ["/var/lib/mysql"]
 
 EXPOSE 8080
-ENV CATTLE_RANCHER_SERVER_IMAGE v0.21.4
+ENV CATTLE_RANCHER_SERVER_IMAGE v0.21.5-rc1
 
 EXPOSE 3306
-ADD https://github.com/rancherio/cattle/releases/download/v0.43.0/cattle.jar /usr/share/cattle/
+ADD https://github.com/rancherio/cattle/releases/download/v0.44.0/cattle.jar /usr/share/cattle/
 
 ADD https://github.com/will-chan/machine/releases/download/v0.2.0-packet-3/docker-machine_linux-amd64 /usr/bin/docker-machine
 RUN chmod +x /usr/bin/docker-machine
