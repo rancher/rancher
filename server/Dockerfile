@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends openjdk-7-jre-h
                     keychain
 
 ENV CATTLE_HOME /var/lib/cattle
-ENV CATTLE_API_UI_INDEX http://releases.rancher.com/ui/0.21.4/static/index.html
+ENV DEFAULT_CATTLE_API_UI_INDEX http://releases.rancher.com/ui/0.21.4/static/index.html
 ENV CATTLE_DB_CATTLE_DATABASE mysql
 ADD artifacts /usr/share/cattle
 
@@ -34,5 +34,5 @@ ADD https://github.com/rancherio/go-machine-service/releases/download/v0.9.0/go-
 RUN tar xpvf /tmp/go-machine-service.tar.xz -C /usr/bin/ && \
     chmod +x /usr/bin/go-machine-service
 
-ENV CATTLE_MACHINE_EXECUTE true
+ENV DEFAULT_CATTLE_MACHINE_EXECUTE true
 CMD ["/usr/bin/s6-svscan", "/service"]
