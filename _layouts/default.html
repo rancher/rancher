@@ -1,14 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+    
+    <head>
+        <meta charset="utf-8">
+            <title>{{ site.name }}</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <meta name="description" content="{{ site.description }}">
+            <link href="{{site.baseurl}}/css/bootstrap.css" rel="stylesheet">
+            <link href="{{site.baseurl}}/css/syntax.css" rel="stylesheet">
+            <link href="{{site.baseurl}}/css/rancher.css" rel="stylesheet">
 
-         {% include header.html %}
-<div class="row-fluid">
-    <div class="span8">
-        {{ content }}
-    </div>
-    <div class="span3">
-        {% include sidebar.html %}
-    </div>
-    
-    
-</div>
-            
-         {% include footer.html %}
+    </head>
+    <body>
+        <div class="container-fluid">
+            <div class="row body" >
+                <div class="col-sm-3">
+                          {% include sidebar.html %}
+                </div>
+                <div class="col-sm-9">
+                    <div class="content-container">
+                        {{ content }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+    <footer>
+        <div class="container-fluid">
+            <div class="row">
+                <span class="pull-left">Copyright &copy; 2015  <a href="http://rancher.com">Rancher Labs</a>. All Rights Reserved.</span>
+            </div><!-- .row -->
+        </div><!-- #footer-content.container -->
+    </footer><!-- #footer -->
+    <script src="http://code.jquery.com/jquery.js"></script>
+    <script src="{{site.baseurl}}/js/bootstrap.js"></script>
+</html>

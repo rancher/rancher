@@ -1,0 +1,195 @@
+/* make sidebar nav vertical */
+@media (min-width: 768px) {
+    .sidebar-nav .navbar .navbar-collapse {
+        padding: 0;
+        max-height: none;
+    }
+    .sidebar-nav .navbar ul {
+        float: none;
+    }
+    .sidebar-nav .navbar ul:not {
+        display: block;
+    }
+    .sidebar-nav .navbar li {
+        float: none;
+        display: block;
+    }
+    .sidebar-nav .navbar li a {
+        padding-top: 12px;
+        padding-bottom: 12px;
+    }
+}
+
+pre {
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
+}
+
+pre code {
+    display: block;
+    padding: 9.5px;
+    margin: 0 0 10px;
+    font-size: 13px;
+    line-height: 1.42857143;
+    color: #333;
+    word-break: break-all;
+    word-wrap: break-word;
+    background-color: #f5f5f5;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.language-bash {
+    padding: 9.5px;
+    margin: 0 0 10px;
+    font-size: 13px;
+    line-height: 1.42857143;
+    word-break: break-all;
+    word-wrap: break-word;
+    border-radius: 4px;
+    border: black;
+    background-color: black;
+    color: white;
+}
+
+.language-sh {
+    padding: 9.5px;
+    margin: 0 0 10px;
+    font-size: 13px;
+    line-height: 1.42857143;
+    word-break: break-all;
+    word-wrap: break-word;
+    border-radius: 4px;
+    border: black;
+    background-color: black;
+    color: white;
+}
+
+/*Adds borders to tables in markdown files*/
+
+table {
+    border: 1px solid black;
+}
+
+th, td {
+    border: 1px solid black;
+    padding: 5px;
+}
+
+/* Link Color in Content*/
+a {
+  color: #37b7e1;
+  text-decoration: none;
+}
+
+a:hover,
+a:focus {
+  color: #37b7e1;
+  text-decoration: underline;
+}
+
+/* Heading in Markdown using # */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    margin-top: 20px;
+    font-weight: normal;
+    color: inherit;
+    text-rendering: optimizelegibility;
+}
+
+h2 {
+    font-weight:100;
+    color:#49b6a2;
+    font-size: 45px;
+}
+
+h3 {
+    font-weight:100;
+    color:#656a76;
+    font-size: 30px;
+    margin-bottom: 0;
+}
+
+/* Line bar in markdown as --- */
+hr {
+    margin-top: 10px;
+}
+
+/*Remove rounded corners on navigation*/
+@media (min-width: 768px) {
+    .navbar {
+        border-radius: 0px;
+    }
+}
+
+
+/* Remove right and left padding on column containers for */
+.col-xs-1, .col-sm-1, .col-md-1, .col-lg-1, .col-xs-2, .col-sm-2, .col-md-2, .col-lg-2, .col-xs-3, .col-sm-3, .col-md-3, .col-lg-3, .col-xs-4, .col-sm-4, .col-md-4, .col-lg-4, .col-xs-5, .col-sm-5, .col-md-5, .col-lg-5, .col-xs-6, .col-sm-6, .col-md-6, .col-lg-6, .col-xs-7, .col-sm-7, .col-md-7, .col-lg-7, .col-xs-8, .col-sm-8, .col-md-8, .col-lg-8, .col-xs-9, .col-sm-9, .col-md-9, .col-lg-9, .col-xs-10, .col-sm-10, .col-md-10, .col-lg-10, .col-xs-11, .col-sm-11, .col-md-11, .col-lg-11, .col-xs-12, .col-sm-12, .col-md-12, .col-lg-12 {
+    padding-right: 0px;
+    padding-left: 0px;
+}
+.container {
+    margin-right: 0;
+    margin-left: 0;
+    width: 100%;
+}
+
+/*Provides padding around context*/
+.content-container {
+    padding-right: 15px;
+    padding-left: 15px;
+}
+
+.navbar-inverse {
+    background:#2f333c;
+    border: none;
+    color: #FFF;
+}
+
+
+.navbar-inverse .navbar-nav > li > a {
+    color: #FFF;
+}
+.navbar-inverse .navbar-nav > li > a:hover,
+.navbar-inverse .navbar-nav > li > a:focus {
+    color: #fff;
+    background-color: transparent;
+    text-decoration: underline;
+}
+
+.navbar-inverse .navbar-nav > li > .no-list-group {
+    color: #788188;
+}
+.navbar-inverse .navbar-nav > li > .no-list-group:hover,
+.navbar-inverse .navbar-nav > li > .no-list-group:focus {
+    color: #788188;
+    background-color: transparent;
+    text-decoration: none;
+}
+
+.list-group-item {
+    position: relative;
+    display: block;
+    padding: 10px 10px;
+    margin-bottom: -1px;
+    background-color: transparent;
+    border: none;
+}
+
+.list-group-submenu li a {
+    color: #FFF;
+}
+.list-group-submenu li {
+    list-style: none;
+    margin-left: 0;
+    margin-bottom:7px;
+    color:#788188;
+    padding:0;
+}

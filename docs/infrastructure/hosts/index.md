@@ -25,12 +25,12 @@ There are two ways to easily add a host. Click on the **Hosts** icon in the side
 **IMAGE NEEDED TO SHOW ADD HOST BUTTONS**
 ![Hosts on Rancher 2]({{site.baseurl}}/img/Rancher_hosts2.png)
 
-The first time that you add a host, you will be required to set up the [Host Registration]({{site.baseurl}}/docs/rancher-settings/host-registration/). This setup determines what DNS name or IP address, and port that your hosts will be connected to the Rancher API. By default, we have selected the management server IP and port `8080`.  If you choose to change the address, please make sure to specify the port that should be used to connect to the Rancher API. At any time, you can update the [Host Registration]({{site.baseurl}}/docs/rancher-settings/host-registration/).
+<!--HIDE FOR SAAS Docs The first time that you add a host, you will be required to set up the [Host Registration]({{site.baseurl}}/docs/rancher-settings/host-registration/). This setup determines what DNS name or IP address, and port that your hosts will be connected to the Rancher API. By default, we have selected the management server IP and port `8080`.  If you choose to change the address, please make sure to specify the port that should be used to connect to the Rancher API. At any time, you can update the [Host Registration]({{site.baseurl}}/docs/rancher-settings/host-registration/).
 
 **IMAGE NEEDED FOR HOST REGISTRATION**
-![Hosts on Rancher 3]({{site.baseurl}}/img/Rancher_hosts-registration1.png)
+![Hosts on Rancher 3]({{site.baseurl}}/img/Rancher_hosts-registration1.png)-->
 
-Decide what kind of host you want to add to Rancher. We support adding hosts directly from cloud providers or adding existing hosts. An existing host is any Linux machine that is already provisioned. 
+We support adding hosts directly from cloud providers or adding existing hosts. An existing host is any Linux machine that is already provisioned. Select which host type you want to add:
 
 * [Adding Existing Hosts]({{site.baseurl}}/docs/getting-started/hosts/custom/)
 * [Adding Amazon EC2 Hosts]({{site.baseurl}}/docs/getting-started/hosts/amazon/)

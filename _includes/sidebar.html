@@ -1,37 +1,73 @@
-<div class="row-fluid">
- 
- 
- <h3>Documentation</h3>
- <div id="navcontainer">
-     <ul>
-         <li><a href="{{site.baseurl}}/">What is Rancher?</a></li>
-         <li><a href="{{site.baseurl}}/docs/getting-started/">Getting Started</a></li>
-            <ul>
-                <li><a href="{{site.baseurl}}/docs/getting-started/hosts/">Adding Hosts</a></li>
-                <ul>
-                    <li><a href="{{site.baseurl}}/docs/getting-started/hosts/custom/">Adding existing Hosts</a></li>
-                    <li><a href="{{site.baseurl}}/docs/getting-started/hosts/amazon/">Amazon EC2</a></li>
-                    <li><a href="{{site.baseurl}}/docs/getting-started/hosts/digitalocean/">DigitalOcean Droplets</a></li>
-                </ul>
-                <li><a href="{{site.baseurl}}/docs/getting-started/services/">Starting Services</a></li>
-            </ul>
-         <li><a href="{{site.baseurl}}/docs/private-registries/">Private Registry</a></li>
-         <li><a href="{{site.baseurl}}/docs/load-balancers/">Load Balancing</a></li>
-         <li><a href="{{site.baseurl}}/docs/clusters/">Clustering</a></li>
-         <li><a href="{{site.baseurl}}/docs/rancher-settings/">Rancher Settings</a>
-             <ul><a href="{{site.baseurl}}/docs/rancher-settings/projects/">Projects</a></ul>
-             <ul><a href="{{site.baseurl}}/docs/rancher-settings/api/">API</a></ul>
-             <ul><a href="{{site.baseurl}}/docs/rancher-settings/access-control/">Access Control</a></ul>
-            <ul><a href="{{site.baseurl}}/docs/rancher-settings/host-registration/">Host Registration</a></ul>
-          </li>
-         <li><a href="{{site.baseurl}}/docs/upgrading/">Upgrading</a></li>
-         <li><a href="{{site.baseurl}}/docs/contributing/">Contributing</a></li>
-         <li><a href="{{site.baseurl}}/docs/faqs/">FAQs</a></li>
-            <ul>
-                <li><a href="{{site.baseurl}}/docs/faqs/load-balancers/">Load Balancers</a></li>
-                <li><a href="{{site.baseurl}}/docs/faqs/hosts/">Hosts</a></li>
-                <li><a href="{{site.baseurl}}/docs/faqs/containers/">Containers</a></li>
-            </ul>
-     </ul>
- </div>
-</div>
+<div class="sidebar-nav">
+    <div class="navbar navbar-inverse" role="navigation">
+        
+        <!-- Brand and Toggle get grouped for better mobile display -->
+        <div class="navbar-header">
+            <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+            </button>
+            <a class="navbar-brand" href="http://rancher.com/"><img src="{{site.baseurl}}/img/rancher-logo-nopadding.png"></a>
+        </div>
+        <div class="clearfix"></div>
+        <!-- Collect the nav links, forms, and other content for toggling -->
+        <div class="navbar-collapse">
+            <ul class="nav navbar-nav">
+                <li><a href="{{site.baseurl}}/">Overview</a></li>
+                <li><a href="{{site.baseurl}}/docs/running-rancher/">Running Rancher</a></li>
+                <li>
+                    <a href="{{site.baseurl}}/docs/configuration/">Configuration</a>
+                    <ul class="list-group-submenu" id="configuration">
+                        <li><a href="{{site.baseurl}}/docs/configuration/access-control/">Access Control</a></li>
+                        <li><a href="{{site.baseurl}}/docs/configuration/environments/">Environments</a></li>
+                        <li><a href="{{site.baseurl}}/docs/configuration/api-keys/">API Keys</a></li>
+                        <li><a href="{{site.baseurl}}/docs/configuration/registries/">Registries</a></li>
+                        <li><a href="{{site.baseurl}}/docs/configuration/host-registration">Host Registration</a></li>
+                    </ul>
+                </li>
+                <li>
+                    <a href="{{site.baseurl}}/docs/services/">Services</a>
+                    <ul class="list-group-submenu" id="services">
+                        <li><a href="{{site.baseurl}}/docs/services/projects/">Projects</a>
+                            <ul>
+                                <li><a href="{{site.baseurl}}/docs/services/projects/adding-services/">Adding Services</a></li>
+                                <li><a href="{{site.baseurl}}/docs/services/projects/adding-balancers/">Adding Balancers</a></li>
+                                <li><a href="{{site.baseurl}}/docs/services/projects/services-options/">Services Options</a></li>
+                            </ul>
+                        </li>
+                    </ul>
+                </li>
+                <li>
+                    <a href="{{site.baseurl}}/docs/infrastructure/">Infrastructure</a>
+                    <ul class="list-group-submenu" id="infrastructure">
+                        <li><a href="{{site.baseurl}}/docs/infrastructure/hosts/">Hosts</a>
+                              <ul class="list-group-submenu" id="hosts">
+                                  <li><a href="{{site.baseurl}}/docs/infrastructure/hosts/custom/">Adding existing Hosts</a></li>
+                                  <li><a href="{{site.baseurl}}/docs/infrastructure/hosts/amazon/">Amazon EC2</a></li>
+                                  <li><a href="{{site.baseurl}}/docs/infrastructure/hosts/digitalocean/">DigitalOcean Droplets</a></li>
+
+                              </ul>
+                        </li>
+                        <li><a href="{{site.baseurl}}/docs/infrastructure/containers/">Containers</a></li>
+                        <li><a href="{{site.baseurl}}/docs/infrastructure/volumes/">Volumes</a></li>
+                        <li><a href="{{site.baseurl}}/docs/infrastructure/load-balancers">Load Balancers</a></li>
+                        <li><a href="{{site.baseurl}}/docs/infrastructure/balancer-configs/">Balancer Configs</a></li>
+                    </ul>
+                </li>
+                <li><a href="{{site.baseurl}}/docs/upgrading/">Upgrading</a></li>
+                <li><a href="{{site.baseurl}}/docs/contributing/">Contributing to Rancher</a></li>
+                <li><a href="{{site.baseurl}}/docs/faqs/">FAQs</a></li>
+                    <ul class="list-group-submenu" id="faqs">
+                        <li><a href="{{site.baseurl}}/docs/faqs/load-balancers/">Load Balancers</a></li>
+                        <li><a href="{{site.baseurl}}/docs/faqs/hosts/">Hosts</a></li>
+                        <li><a href="{{site.baseurl}}/docs/faqs/containers/">Containers</a></li>
+                    </ul>
+                </li>
+            </ul><!-- /.navbar-nav -->
+        </div><!-- /.navbar-collapse -->
+        
+        
+    </div> <!-- /.navbar-inverse -->
+</div> <!-- /.sidebar-nav -->
