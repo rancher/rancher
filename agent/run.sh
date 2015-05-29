@@ -78,6 +78,7 @@ launch_agent()
         -e CATTLE_HOST_API_PROXY \
         -e CATTLE_SYSTEMD \
         -e CATTLE_URL \
+        -e CATTLE_HOST_LABELS \
         -e CATTLE_VOLMGR_ENABLED \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -v /lib/modules:/lib/modules:ro \
