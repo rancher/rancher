@@ -6,21 +6,7 @@ layout: default
 ## Container FAQs
 ---
 
-**How do I add containers?**
-
-There are multiple ways to add containers.
-
-Option 1: On the Services page, add an Environment and add a service (i.e. a group of the same containers). 
-
-Option 2: On the Hosts page, go to the host that you want to add containers to. Click on the **Add Container** that is located beneath the host. It will display the detailed page for adding containers.
-
-Option 2: On the Containers page, click on the **Add Container** button located at the top right corner. This will display the detailed page for adding containers. 
-
-**What is the Network Agent container? I didn’t request to create it.**
-
-The Network Agent container is a Rancher specific container that is deployed upon the creation of the first container on a host. This container is what Rancher uses to allow containers between different hosts be able to communicate with each other. You will not have the ability to do any commands (start/stop/restart/etc) to this container through the UI,
-
-**What are my options with a container?**
+### What are my options with a container?
 
 If you hover over the container, a drop down will appear on the right hand side.
 
@@ -33,7 +19,7 @@ If you hover over the container, a drop down will appear on the right hand side.
 * **View Logs:** This will show the docker logs -f on the container.
 * **Edit:** In the Edit screen, you have the ability to update some of the settings regarding the container. 
 
-**Why does my container still show up after I have deleted it?**
+### Why does my container still show up after I have deleted it?
 
 In the background, Rancher is taking care of the necessary steps to remove the container. Upon completion, Rancher UI will automatically refresh and remove the container. 
 
@@ -41,5 +27,6 @@ If you had accidentally deleted your container, you still have an option to save
 
 If you want to make the container disappear from your Rancher UI immediately, you can **Purge** the container after deleting it. 
 
-**Why do my deleted containers still show up on the Containers page?**
+### Why do my deleted containers still show up on the Containers page?
+
 Even if the container is no longer showing on the hosts page, the Container may still show up on the Containers page. Since Rancher needs to spend some time deleting the Container, it will show up on the Container page as _Removed_ until Rancher has finished cleaning it up. If you’d like to have it removed immediately, you can use the drop down menu to **Purge** the container.

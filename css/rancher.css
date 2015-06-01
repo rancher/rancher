@@ -193,3 +193,11 @@ hr {
     color:#788188;
     padding:0;
 }
+
+span.highlight {
+    background-color: yellow;
+}
+
+blockquote {
+    font-size: inherit;
+}

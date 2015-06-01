@@ -5,64 +5,50 @@ layout: default
 
 ## Load Balancing on Rancher
 ---
-If you want to set up a web application, you're probably considering adding a load balancer. Let’s walk through the process of how to set one up in Rancher. If you want to understand the specific components of our load balancer, view our [FAQs]({{site.baseurl}}/docs/faqs/load-balancers/).
 
-### Setting up the Web Service 
-We'll need to have a couple of hosts launched before setting up our load balancer. If you haven't set up your hosts, please follow our [guide]({{site.baseurl}}/docs/getting-started/hosts/) to launch some new hosts. In our example, we've launched 4 hosts.
+Our load balancer distributes network traffic across a number of containers. This is a key requirement for developers and ops who want to deploy large-scale applications. Load balancing support is notoriously uneven across different clouds. By offering a uniform, simple, and powerful load balancer solution, Rancher makes it possible for Docker developers to port applications easily across multiple clouds, or to use different cloud providers as independent resource pools to host highly available applications.
 
-**DO YOU WANT TO ADD DETAILS OF HOW TO ADD HOST OR JUST DIRECT THEM TO GUIDE?**
+The load balancer is created and managed by Rancher. For each host selected for a Load Balancer, a load balancer agent (i.e. container) is started and HAProxy software is installed in it. 
 
-Besides our hosts, we'll need to have our web application launched as well. Please follow our [guide]({{site.baseurl}}/docs/getting-started/services/) if you haven't set up your web service. In our example, we have 6 containers in our service. 
+## Adding a Load Balancer
+---
 
-**DO YOU WANT TO ADD DETAILS OF HOW TO ADD SERVICE OR JUST DIRECT THEM TO GUIDE?**
+In the **Infrastructure** -> **Load Balancers** page, click on the **Add Balancer** button. 
 
-### Adding the Load Balancer
-
-With our hosts and web service set up, we are ready to launch the load balancer. Go to the the **Balancing** icon on the sidebar. Click on **Balancers**. There are two ways to add a Load Balancer. By either clicking on the **+** next to the Load Balancer text at the top of the screen or clicking on the image that contains **Add Load Balancer**. 
-
-**IMAGE NEEDED TO SHOW HOW TO ADD LOAD BALANCERS**
-![Load Balancing on Rancher 1]({{site.baseurl}}/img/Rancher_lb1.png)
-
-In the **Add Load Balancer** page, provide a **name**, description (optional field), select the hosts that were launched earlier ,and select the targets (i.e. containers in the service that was made earlier). For hosts and targets, click on the **+** button to add additional ones. If you need to remove one of the hosts/targets, please click on the **x** next to the dropdown.
-
-**IMAGE NEEDED TO SHOW First half of ADD LOAD BALANCERS PAGE**
-![Load Balancing on Rancher 2]({{site.baseurl}}/img/Rancher_lb2.png)
-
-Finally, you'll need to select a **Configuration** for the Load Balancer. If you have existing configurations, you'll have the opportunity to re-use it. In our case, since this is our first load balancer, we'll have to create a new configuration. Within each configuration, you define the **Listeners**, **Health Check** and **Stickiness**.
-
-In the **Listeners** tab, you define the listening ports that are used from the source (i.e. host) to  the target (i.e. service or group of containers) as well as the protocol for each port. The source port is the port that will be accessed publicly through the host. The target port is the private port that targets will use to communicate with the hosts. 
-
-Besides the ports and protocol, you'll also pick the algorithm. This algorithm is how the load balancer will choose which target to use. Please read this [article](http://cbonte.github.io/haproxy-dconv/configuration-1.5.html) to read more about algorithms that is used by HAProxy. HAProxy is the software that is installed on our load balancers.
-
-You must define at least one listener. Otherwise, the load balancer won't be very useful! In our example, we'll configure our listener for these ports.
-Source Port: 8090; Protocol: http
-Target Port: 80; Protocol: http
-Algorithm: round robin
-
-**IMAGE NEEDED TO SHOW LISTENERS Tab**
-![Load Balancing on Rancher 3]({{site.baseurl}}/img/Rancher_lb3.png)
-
-In the **Health Check** tab, you can define the health check policy for your load balancer. The health check is used to check if the host is still available. There is a default policy already set on the load balancer configuration.
-
-In our example, we'll leave the health check policy as the default policy.
-
-**IMAGE NEEDED TO SHOW HEALTH CHECK Tab**
-![Load Balancing on Rancher 4]({{site.baseurl}}/img/Rancher_lb4.png)
-
-In the **Stickiness** tab, you can select a cookie policy.  
-
-In our example, we'll select **None**.'
-
-**IMAGE NEEDED TO SHOW STICKINESS Tab**
-![Load Balancing on Rancher 5]({{site.baseurl}}/img/Rancher_lb5.png)
-
-Click on **Create**. That’s it! Your load balancer will be launching some load balancer agents on the selected hosts. After these agents are finished installing, we'll be ready to test out our load balancer.
-
-### Testing our load-balanced Web application
+1. Provide a **Name** and if desired, **Description** for the host.
+2. Select the host(s) that you want the load balancer agents to run on. Please be sure there is no port conflicts on the hosts that you pick. Otherwise, the load balancer will not be able to finish creating. It will continue to try adding the load balancer agent onto the host until the port has no conflicts.
+3. Select the target(s) that you want to load balance. The targets can be any containers or any external IP address that you want traffic distributed for. The algorithm picked in the **Listeners** section will determine which target should be used. 
+4. Create a new balancer config or re-use an existing one. Please read more about balancer configs in our detailed [documentation]({{site.baseurl}}/docs/infrastructure/balancer-configs).
+5. Click on **Create**.
 
 
+## Editing a Load Balancer
+---
 
+From the **Infrastructure** -> **Load Balancers** page, you can view all the load balancers in the Rancher instance including any balancers added to a project. 
 
+When you hover over the load balancer, you can see the dropdown icon in the upper right corner. Alternatively, you can click on the load balancer's name to go to the detailed page. In the upper right corner of the page, the dropdown icon is available.
 
+From the dropdown menu, you can **Delete** a load balancer, which will remove it from Rancher. The other available option is to **Edit**, which allows you to change the name and description.
 
+### Editing Hosts 
 
+If you want to add or remove hosts to the load balancer, you will need to go to the detailed view of the load balancer by clicking on its name. By default, it will navigate to the **Hosts** tab of the load balancer.
+
+To add hosts to the load balancer, click on **Add Hosts**. A pop-up will appear to allow you to pick additional hosts. Click on **Add** to add these hosts to Rancher.
+
+To remove hosts from the load balancer, pick the host that you want removed and select **Remove Host** from the dropdown menu. The dropdown menu is located on the right side of the host name.
+
+### Editing Targets
+
+If you want to add or remove targets to the load balancer, you will need to go to the detailed view of the load balancer by clicking on its name. Navigate to the **Targets** tab of the load balancer.
+
+To add targets to the load balancer, click on **Add Targets**. A pop-up will appear to allow you to pick additional targets. You can either add additional container or external IP addresses. Click on **Add** to add these targets to Rancher.
+
+To remove targets from the load balancer, pick the target that you want removed and select **Remove Target** from the dropdown menu. The dropdown menu is located on the right side of the targets name.
+
+### Editing Balancer Configurations
+
+If you want to edit the balancer config, you will need to go to the detailed view of the load balancer by clicking on its name. Navigate to the **Config** tab of the load balancer.
+
+Click on **Edit Configuration**. <span class="highlight">Currently, we only support editing the config's name and description.</span>

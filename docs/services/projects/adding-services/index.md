@@ -6,11 +6,9 @@ layout: default
 ## Adding Services
 ---
 
-### What is a Service? 
+With Rancher, you can add multiple services in a project to make an application. With this guide, we'll assume you've already created a project and are ready to build your application. If your project is not set up yet, please follow our [guide]({{site.baseurl}}/docs/services/projects/) on creating a project. 
 
-A service is a group of containers of the same image. With Rancher, you can add multiple services in a project to make an application. With this guide, we'll assume you've already created a project and are ready to build your application. If your project is not set up yet, please follow our [guide]({{site.baseurl}}/docs/services/projects/) on creating a project. 
-
-Note: Before starting any services, you'll need to have a least 1 host launched in Rancher. Please follow our [guide]({{site.baseurl}}/getting-started/hosts) to learn how to launch a host.
+> **Note:** Before starting any services, you'll need to have a least 1 host launched in Rancher. Please follow our [guide]({{site.baseurl}}/getting-started/hosts) to learn how to launch a host.
 
 We'll walk through how to create a Wordpress application linked to a MySQL database. Inside your project, you add a service by clicking the **Add Service** button. Alternatively, if you are viewing the projects at the project level, you can add a service to a project with the **Add Service** button on the specific project. 
 
@@ -24,7 +22,7 @@ Provide the **Image** to use. You can use any image on [DockerHub](https://hub.d
 
 Syntax of image names. By default, we pull from the docker registry. If no tag is specified, we will pull the latest tag. 
 
-`[docker]:[registyname]/[namespace]/[imagename]:[version]`
+`[registry-name]/[namespace]/[imagename]:[version]`
 
 We'll start by creating our MySQL database service with only 1 container.
 
@@ -32,7 +30,8 @@ We'll start by creating our MySQL database service with only 1 container.
 
 ### Service Options
 
-Just like adding individual [containers]({{site.baseurl}}/docs/infrastructure/containers/), any options that `docker run` supports, Rancher also supports! Port mapping and links are shown on the main page, but other options are within the **Advaanced Options** section.
+Just like adding individual [containers]({{site.baseurl}}/docs/infrastructure/containers/), any options that `docker run` supports, Rancher also supports! Port mapping and service links are shown on the main page, but other options are within the **Advanced Options** section. <span class="highlight">Do we want to go over every possible option in Rancher and how it maps to docker?</span>
+
 
 ![Services on Rancher 4]({{site.baseurl}}/img/rancher_add_services_4.png)
 
@@ -42,7 +41,7 @@ When using port mapping, if the scale of your service is more than the number of
 
 If other services have already been created, you can add links to the service. Linking services will link all containers in one service to all containers in another service. It acts just like the `--link` functionality in a `docker run` command. 
 
-Note: Linking services and/or containers will not automatically populate any environment variables that is supported when linking containers. You will need to manually add the environment variables when launching the container. 
+> **Note:** Linking services and/or containers will not automatically populate any environment variables that is supported when linking containers. You will need to manually add the environment variables when launching the container. 
 
 For the MySQL service, we'll need to add the `MYSQL_ROOT_PASSWORD` as an environment variable and provide the key and value.
 
@@ -50,7 +49,7 @@ For the MySQL service, we'll need to add the `MYSQL_ROOT_PASSWORD` as an environ
 
 Final step is to click **Create**. Creating the service will not automatically start the service. This allows you to create multiple services and when your application is ready, you can start all services at once!
 
-Now that we've launched our database, we'll add the Wordpress service to our project. This time, we'll launch 3 containers in our service using the wordpress image. We will not expose any ports in our wordpress service as we will want to load balance this application. Since we've already created the database service, we'll pick the database service in the **Service Links**.
+Now that we've launched our database, we'll add the Wordpress service to our project. This time, we'll launch 3 containers in our service using the Wordpress image. We will not expose any ports in our Wordpress service as we will want to load balance this application. Since we've already created the database service, we'll pick the database service in the **Service Links**.
 
 ![Services on Rancher 6]({{site.baseurl}}/img/rancher_add_services_6.png)
 
@@ -70,8 +69,7 @@ There are several ways to start services. You can immediately start it after cre
 
 ### Load Balancing Services
 
-At this time, it would make sense to load balance our Wordpress service. Let's move on to how to add a load balancer into our project. Follow our [guide]({{site.baseurl}}/docs/services/projects/adding-balancers/).
-
+At this time, it would make sense to load balance our Wordpress service. Let's move on to how to [add a load balancer]({{site.baseurl}}/docs/services/projects/adding-balancers/) into our project.
 
 
 

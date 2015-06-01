@@ -5,11 +5,29 @@ layout: default
 
 ## Hosts FAQs
 ---
-**How do I add a new Host?**
+### How does the host determine IP address and how can I change it?
 
-Please follow the getting started [guide]({{site.baseurl}}/docs/getting-started/hosts/) on hosts to add new hosts. 
+When the agent connects to Rancher server, it auto detects the IP of the agent. Sometimes, the IP that is selected is not the IP that you want to use. You can override this setting and set the host IP to what you want. 
 
-***What are all the different states that my host can display?***
+In order to update the IP address for a host, you will need to alter the registration command for the host. You will need to set the CATTLE_AGENT_IP to the IP address that you want to use. 
+
+If you already have hosts running, you just need to rerun the agent registration command. If you have any containers existing on the host, please follow the upgrade instructions in order to have the containers remained on your host.
+
+> **Note:** You should not update the IP of a host to the docker0 interface on the host machine. 
+
+Typically, the registration command from the UI follows this template:
+```bash
+sudo docker run -d --privileged -v /var/run/docker.sock:/var/run/docker.sock rancher/agent:v0.5.2 http://MANAGEMENT_IP:8080/v1/scripts/SECURITY_TOKEN
+```
+The command will need to be edited to include setting the CATTLE_AGENT_IP by adding the **-e CATTLE_AGENT_IP=x.x.x.x**
+
+```bash
+sudo docker run -d --privileged -v /var/run/docker.sock:/var/run/docker.sock –e CATTLE_AGENT_IP=x.x.x.x rancher/agent:v0.5.2 http://MANAGEMENT_IP:8080/v1/scripts/SECURITY_TOKEN
+```
+> **Note:** When override the IP address, if there are existing containers in the rancher server, those hosts will no longer to be able to ping the host with the new IP. We are working to fix this issue, but please update the IP address with caution.
+
+
+### What are all the different states that my host can display?
 
 There are many states shown for a host as we are trying to provide as much detail to the user as possible so that you can understand what's going on with the host.
 
@@ -23,27 +41,10 @@ There are many states shown for a host as we are trying to provide as much detai
 * _Purged_: The host is only in this state for a couple of seconds before disappearing from the UI. 
 * _Reconnecting_: The host has lost its connection with Rancher. Rancher will attempt to restart the communication.
 
-**How do I remove a host from my Rancher server?**
-
-In order to remove a host from the server, you will need to do a couple of step located in the host’s drop down menu. In order to view the drop down, hover over the host and a drop down icon will appear.
-
-1. Select **Deactivate**. 
-1. When the host has completed the deactivation, the host will display an _Inactive_ state. Select **Delete**. The server will start the removal process of the host from the Rancher server instance.  
-1. Notes: All containers including the Rancher agent will continue to remain on the host.  The first state that it will display after it’s finished deleting it will be _Removed_. It will continue to finalize the removal process and move to a _Purged_ state before immediately disappearing from the UI. 
-1. Optional: Once the host ‘s status displays _Removed_, you can purge the host to remove it from the UI faster.  We have this option for the user so that if any errors occur during the removal process, it can be displayed in between the _Removed_ and _Purged_ states. 
-
-**What happens when I deactivate my host?**
-
-Deactivating the host will put the host into an _Inactive_ state. In this state, no new containers can be deployed. Any active containers on the host will continue to be active and you will still have the ability to perform actions on these containers (start/stop/restart). The host will still be connected to the Rancher server.
-
-**How do I get my _Inactive_ host up again?**
-
-In the host’s drop down menu, select **Activate**. The host will become _Active_ and the ability to add additional containers will become available. 
-
-**What happens if my host is deleted outside of Rancher?**
+### What happens if my host is deleted outside of Rancher?
 
 If your host is deleted outside of Rancher, then Rancher server will continue to show the host until it’s removed. Typically, these hosts will show up in a _Reconnecting_ state and never be able to reconnect. You will be able to **Delete** these hosts to remove them from the UI. 
 
-**Why does my host have this weird name (e.g. 1ph7)?**
+### Why does my host have this weird name (e.g. 1ph7)?
 
 If you didn’t enter a name during host creation, the UI will automatically assign a name. This name is displayed on the host. 

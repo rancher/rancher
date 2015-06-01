@@ -1,68 +1,67 @@
 ---
-title: Load Balancing on Rancher
+title: Balancer Configs on Rancher
 layout: default
 ---
 
-## Load Balancing on Rancher
+## Balancer Configs on Rancher
 ---
-If you want to set up a web application, you're probably considering adding a load balancer. Let’s walk through the process of how to set one up in Rancher. If you want to understand the specific components of our load balancer, view our [FAQs]({{site.baseurl}}/docs/faqs/load-balancers/).
 
-### Setting up the Web Service 
-We'll need to have a couple of hosts launched before setting up our load balancer. If you haven't set up your hosts, please follow our [guide]({{site.baseurl}}/docs/getting-started/hosts/) to launch some new hosts. In our example, we've launched 4 hosts.
+A load balancer config is a configuration used to set up a [load balancer]({{site.baseurl}}/docs/load-balancers) or [load balancer service]({{site.baseurl}}/docs/services/projects/adding-balancers). The load balancer config includes listener(s), a health check policy and cookie policies (i.e. stickiness). When a load balancer is created, the balancer config is used to create the HAProxy config in the HA Proxy software inside the load balancer agent container. A load balancer config can be used with multiple load balancers, but cannot be re-used with balancer services.
 
-**DO YOU WANT TO ADD DETAILS OF HOW TO ADD HOST OR JUST DIRECT THEM TO GUIDE?**
+<span class="highlight">IS THIS POSSIBLE? Note: If any change is made to the balancer config, it will be propogated on all load balancers or balancer services using that load balancer config.
 
-Besides our hosts, we'll need to have our web application launched as well. Please follow our [guide]({{site.baseurl}}/docs/getting-started/services/) if you haven't set up your web service. In our example, we have 6 containers in our service. 
+In any balancer config, you have the ability to edit the listeners, health check or stickiness. Let's review in detail what each one of them are.</span>
 
-**DO YOU WANT TO ADD DETAILS OF HOW TO ADD SERVICE OR JUST DIRECT THEM TO GUIDE?**
+The list of load balancer configs can be found in the **Infrastructure** --> **Balancer Configs**. This list will show the names of all the balancer configs in Rancher as well as how many listeners are in each config. The stickiness policy will be displayed as well as the load balancers/load balancer services using the load balancer config. 
 
-### Adding the Load Balancer
+### Listeners 
 
-With our hosts and web service set up, we are ready to launch the load balancer. Go to the the **Balancing** icon on the sidebar. Click on **Balancers**. There are two ways to add a Load Balancer. By either clicking on the **+** next to the Load Balancer text at the top of the screen or clicking on the image that contains **Add Load Balancer**. 
+A listener is a process that listens for connection requests. It is a one to one mapping of a port for the sources (i.e. hosts) to a port for the targets (i.e. containers/external public IPs) with protocols established for each port.  An algorithm is also selected for each listener to determine which target should be used. HAProxy is the software that is installed on the load balancers. You can read more about different algorithm rules that are used by [HAProxy]( http://cbonte.github.io/haproxy-dconv/configuration-1.5.html).
 
-**IMAGE NEEDED TO SHOW HOW TO ADD LOAD BALANCERS**
-![Load Balancing on Rancher 1]({{site.baseurl}}/img/Rancher_lb1.png)
+> **Note:** Currently, the only algorithm supported in a load balancer service is the round robin algorithm. We are looking to support the other algorithms in the future.
 
-In the **Add Load Balancer** page, provide a **name**, description (optional field), select the hosts that were launched earlier ,and select the targets (i.e. containers in the service that was made earlier). For hosts and targets, click on the **+** button to add additional ones. If you need to remove one of the hosts/targets, please click on the **x** next to the dropdown.
+Any load balancer config will need a listener. The listener is the mapping that allows the incoming traffic to be distributed to your targets. Without the listener, the traffic will not be distributed.
 
-**IMAGE NEEDED TO SHOW First half of ADD LOAD BALANCERS PAGE**
-![Load Balancing on Rancher 2]({{site.baseurl}}/img/Rancher_lb2.png)
+### Health Check 
 
-Finally, you'll need to select a **Configuration** for the Load Balancer. If you have existing configurations, you'll have the opportunity to re-use it. In our case, since this is our first load balancer, we'll have to create a new configuration. Within each configuration, you define the **Listeners**, **Health Check** and **Stickiness**.
+Health Check is the policy that can be defined to deteremine if the target ports and target IPs are reachable. 
 
-In the **Listeners** tab, you define the listening ports that are used from the source (i.e. host) to  the target (i.e. service or group of containers) as well as the protocol for each port. The source port is the port that will be accessed publicly through the host. The target port is the private port that targets will use to communicate with the hosts. 
+The **HTTP Check** is the <span class="highlight">Need feedback on how to describe these fields</span>
 
-Besides the ports and protocol, you'll also pick the algorithm. This algorithm is how the load balancer will choose which target to use. Please read this [article](http://cbonte.github.io/haproxy-dconv/configuration-1.5.html) to read more about algorithms that is used by HAProxy. HAProxy is the software that is installed on our load balancers.
+The **Check Interval** is how often Rancher will check that the targets are still available. The default interval is 2000 ms. The **Timeout** is how long Rancher will wait for a response from the target before giving up. The default timeout is 2000 ms. 
 
-You must define at least one listener. Otherwise, the load balancer won't be very useful! In our example, we'll configure our listener for these ports.
-Source Port: 8090; Protocol: http
-Target Port: 80; Protocol: http
-Algorithm: round robin
+There is a **Healthy Threshold** and an **Unhealthy Threshold**. This is the <span class="highlight">what exactly do they do?</span>
 
-**IMAGE NEEDED TO SHOW LISTENERS Tab**
-![Load Balancing on Rancher 3]({{site.baseurl}}/img/Rancher_lb3.png)
+### Stickiness
 
-In the **Health Check** tab, you can define the health check policy for your load balancer. The health check is used to check if the host is still available. There is a default policy already set on the load balancer configuration.
+Stickiness is the cookie policy that you want to use for when using cookies of the website. 
 
-In our example, we'll leave the health check policy as the default policy.
+The three options that Rancher provides are:
+* **None**: This option means that no cookie policy is in place.
+* **Use existing cookie**: This option means <span class="highlight">What exactly?</span>
+* **Create new cookie**: This option means <span class="highlight">What exactly?</span>
 
-**IMAGE NEEDED TO SHOW HEALTH CHECK Tab**
-![Load Balancing on Rancher 4]({{site.baseurl}}/img/Rancher_lb4.png)
+You can only select one of these three choices and by default, we have selected **None**.
 
-In the **Stickiness** tab, you can select a cookie policy.  
+## Adding New Balancer Configs
+---
 
-In our example, we'll select **None**.'
+In the **Infrastructure** -> **Balancer Configs**, you can add new balancer configs by clicking on the **Add Config** button. The new balancer config can be used when creating a load balancer, which allows you to set up your balancer configs before creating the load balancer. 
 
-**IMAGE NEEDED TO SHOW STICKINESS Tab**
-![Load Balancing on Rancher 5]({{site.baseurl}}/img/Rancher_lb5.png)
+Provide the **Name** and **Description**, if desired, for the balancer config. 
 
-Click on **Create**. That’s it! Your load balancer will be launching some load balancer agents on the selected hosts. After these agents are finished installing, we'll be ready to test out our load balancer.
+Determine the **listeners** to add to the balancer configs, determine the **health check** policy and select the cookie policy.
 
-### Testing our load-balanced Web application
+Click on **Create** to add the balancer config to your list of available balancer configs.
 
+## Changing Balancer Configs
+----
 
+If at any time you want to change the name or description of the [load balancer]({{site.baseurl}}/docs/infrastructure/load-balancers/) or [balancer services]({{site.baseurl}}/docs/services/projects/adding-balancers), you go to the **Infrastructure** -> **Balancer Configs** tab. For the balancer config that you want to edit, click on the dropdown menu and select **Edit**.
 
+## Deleting Balancer Configs
+---
 
+Once a balancer config is created, you can remove it from the Rancher instance. But you'll only be able to remove a config as long as it's not actively being used by a load balancer or balancer service. In the **Infrastructure** -> **Balancer Configs**, you can view the list of balancer configs in Rancher in your [environment]({{site.baseurl}}/docs/configuration/environment/).
 
-
-
+In the list of balancer configs, you can see which load balancers and balancer services are using the balancer configs. If the balancer config has **None** listed in the **Used by** column, then the dropdown menu of the balancer config will have the option to **Delete**.

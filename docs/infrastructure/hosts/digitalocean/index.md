@@ -6,36 +6,33 @@ layout: default
 ## Adding DigitalOcean Hosts
 ---
 
-You can launch DigitalOcean hosts directly from the UI. If you don't have a DigitalOcean account, here's a [link](NEED LINK) to get free $10 credit. You'll just need to make sure you input billing information in order to activate the credit.
+Rancher supports provisioning [DigitalOcean](https://www.digitalocean.com/) hosts using `docker machine`. If you don't have a DigitalOcean account, here's a <span class="highlight">"[link]</span> to get free $10 credit. You'll just need to make sure you input billing information in order to activate the credit.
 
-### Finding DigitalOcean information
+### Finding DigitalOcean Credentials
 
-In order to launch a DigitalOcean host, you'll need a **Personal Access Token** provided by Digital Ocean. Log in to your Digital Ocean account. 
+In order to launch a DigitalOcean host, you'll need a **Personal Access Token** provided by DigitalOcean. Log in to your DigitalOcean account. 
 
 1. Navigate to the [Apps & API page](https://cloud.digitalocean.com/settings/applications). 
 
-    ![DO Hosts on Rancher 1]({{site.baseurl}}/img/Rancher_do1.png)
+    ![DO Host on Rancher 1]({{site.baseurl}}/img/rancher_do_1.png)
 
 2. In the **Personal Access Tokens**, click on the **Generate New Token** button. Name your token (e.g. Rancher) and click **Generate Token**.
 
-    ![DO Hosts on Rancher 2]({{site.baseurl}}/img/Rancher_do2.png)
+    ![DO Host on Rancher 2]({{site.baseurl}}/img/rancher_do_2.png)
 
 3. Copy your **Access Token** from the UI and save it somewhere safe. This is the only time you will be able to see the access token. Next time you go to the page, the token will no longer be shown and you will not be able to retrieve it.
 
+### Launching DigitalOcean Host(s)
 
-### Launching the DO Droplet
+Now that we've saved the **Access Token**, we are ready to launch our DigitalOcean host. Under the **Infrastucture -> Hosts** tab, click **Add Host**. Select the **DigitalOcean** icon. 
 
-Now that we've saved the **Access Token**, we just need to complete the DigitalOcean host page.
+1. Select the number of hosts you want to launch using the slider.
+2. Provide a **Name** and if desired, **Description** for the host.
+3. Provide the **Access Token** that you have created for your DigitalOcean account.
+4. Select the **Image** that you want launched. Whatever `docker machine` supports for DigitalOcean is also supported by Rancher.
+5. Select the **Size** of the image. 
+6. Select the **Region** that you want to launch in. We've provided the available regions that can be launched using metadata. Some regions may not be included as the API doesn't support it.
+7. If you want to enable any of the additional options (i.e. backups, IPv6, private networking), select those options.
+8. When complete, click **Create**. 
 
-**IMAGE NEEDED TO SHOW DO AddHost page**
-![DO Hosts on Rancher 3]({{site.baseurl}}/img/Rancher_do3.png)
-
-1. Provide a **Name** and if desired, **Description** for the host.
-2. Fill in the **Access Token** that you have created for your DigitalOcean account.
-3. Select the **Image** that you want launched.
-4. Select the **Size** of the image. 
-5. Pick the **Region** that you want to launch in. We've provided the available regions that can be launched using metadata. Some regions may not be included as the API doesn't support it.
-6. If you want to enable any of the additional options, select those options.
-7. When complete, click **Create**. 
-
-Once you click on create, Rancher will create the DigitalOcean droplet and launch the _rancher-agent_ container in the droplet. In a minute or two, the host will be active and available to launch services. **ADD LINK TO LAUNCHING SERVICES**
+Once you click on create, Rancher will create the DigitalOcean droplet and launch the _rancher-agent_ container in the droplet. In a couple of minutes, the host will be active and available for [services]({{site.baseurl}}/docs/services/).
