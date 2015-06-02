@@ -18,7 +18,7 @@ Rancher is deployed as a set of Docker containers. Running Rancher is a simple a
 
 On your Linux machine with Docker installed, the command to start Rancher is simple.
 
-`docker run -d --restart=always -p 8080:8080 rancher/server`
+`sudo docker run -d --restart=always -p 8080:8080 rancher/server`
 
 The UI and API will be available on the exposed port `8080`. After the docker image is downloaded, it will take a minute or two before Rancher has successfully started. The IP of the machine will need to be public and accessible from the internet in order for Rancher to work.
 
