@@ -30,6 +30,7 @@ We support adding hosts directly from cloud providers or adding a host that's al
 * [Adding Rackspace Hosts]({{site.baseurl}}/docs/infrastructure/hosts/rackspace/)
 * [Adding Custom Hosts]({{site.baseurl}}/docs/infrastructure/hosts/custom/)
 
+When a host is added to Rancher, an agent container is launched on the host. Rancher will automatically pull the correct image version tag for the `rancher/agent` and run the required version. The agent version is tagged specifically to each Rancher server version.
 
 ## Editing Hosts
 ---
@@ -57,4 +58,23 @@ If the host was created on a cloud provider using Rancher, the host will be dele
 If your host is deleted outside of Rancher, then Rancher server will continue to show the host until it’s removed. Eventually, these hosts will show up in a _Reconnecting_ state and never be able to reconnect. You will be able to **Delete** these hosts to remove them from the UI. 
 
 
+## Hosts created by Rancher
+---
 
+For any hosts deployed by Rancher, there are additional options for these hosts. 
+
+### Host Access
+
+After Rancher launches the host, you may want to be able to access the host. We provide all the certificates generated when launching the machine in an easy to download file. Click on **Machine Config** in the host's dropdown menu. It will download a tar.gz file that has all the certificates.
+
+To SSH into your host, go to your terminal/command prompt. Navigate to the folder of all the certificates and ssh in using the `id_rsa` certificate.
+
+```bash
+$ ssh -i id_rsa root@<IP_OF_HOST>
+```
+
+<span class="highlight">What to use JSON file included in the machine config?</span>
+
+### Cloning a Host
+
+Since launching cloud providers requires using an access key, you might want to easily create another host without needing to input all the credentials again. Rancher provides the ability to clone these credentials to spin up a new host. Select **Clone** from the host's drop down menu. It will bring up an **Add Host** page with the credentials of the cloned host populated.

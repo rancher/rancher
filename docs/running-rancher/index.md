@@ -16,7 +16,7 @@ Rancher is deployed as a set of Docker containers. Running Rancher is a simple a
 
 ### Launching Rancher Server 
 
-On your Linux machine, the command to run Rancher is simple.
+On your Linux machine with Docker installed, the command to start Rancher is simple.
 
 `docker run -d --restart=always -p 8080:8080 rancher/server`
 
@@ -26,5 +26,5 @@ You can access the UI by going to the base URL of the management server.
 
 `http://machine_ip:8080`
 
-Once the UI is up and running, you should start [adding hosts]({{site.baseurl}}/docs/infrastructure/hosts/). After the hosts are setup, you can start running [services]({{site.baseurl}}/docs/services/).
+Once the UI is up and running, you can start [adding hosts]({{site.baseurl}}/docs/infrastructure/hosts/). After the hosts are setup, you can start running [services]({{site.baseurl}}/docs/services/).
 

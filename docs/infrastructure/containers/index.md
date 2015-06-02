@@ -33,13 +33,17 @@ These options will bring you to the **Add Container** page. Any options that `do
 
 4. In the **Advanced Options** section, all options available in Docker are available for Rancher. By default, we have set the `-i -t`. 
     
-    Linking containers will not automatically populate any environment variables that is supported when linking containers. You will need to manually add the environment variables when launching the container. 
+    Linking containers will not automatically populate any environment variables that is supported when linking containers. You will need to manually add the environment variables when launching the container. Rancher supports the ability to copy and paste environment variable (i.e. `name=value`) pairs into any of the environment variable name fields. 
+
+    * All keys and values are trimmed on both sides. Empty lines are ignored.
+    * If there is an existing value for a `name` in the paste, the old value is overwritten.
+    * A line with just a key (no "=") is allowed. If the entire paste has no "=" then it is not a special paste and the string just replaces the name you pasted into.
   
     If you chose to add the container from the **Infrastructure** -> **Containers** page, Rancher will automatically pick a host for you. Otherwise, if you have picked a host to add a container to, the host will be populated within the **Advanced Options** -> **Security/Host** tab.
 
     <span class="highlight">Do we want to go over every possible option in Rancher and how it maps to docker?</span>
 
-5. When you have completed filling out your container options, click **Create**. If this is the first container on the host to be launched by Rancher, it will automatically deploy a container named _Network Agent_. This container is what Rancher uses to allow containers between different hosts be able to communicate with each other. 
+5. When you have completed filling out your container options, click **Create**. If this is the first container on the host to be launched by Rancher, it will automatically deploy a container named _Network Agent_ in the Rancher UI. This container is what Rancher uses to allow containers between different hosts be able to communicate with each other. The _Network Agent_ runs using the `rancher/agent-instance` image. Rancher will automatically pull the correct version tag for this container.
 
 ## Editing Containers
 ---
