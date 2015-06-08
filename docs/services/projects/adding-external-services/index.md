@@ -16,3 +16,8 @@ Add the target(s) that you want. The target will be an external IP. Finally, cli
 
 The list of IPs that the alias is serving is shown in the service. Just like our services, you will need to have the service alias started before it is working.
 
+### Adding/Removing targets
+
+At any time, you can edit the targets in an external service. Click on the **Edit** within the service's dropdown menu. You will have the ability to add more targets or remove existing targets.
+
+
