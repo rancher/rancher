@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends libssl-dev pyth
     pip install --upgrade requests[security]==2.7.0 &&\
     apt-get remove -y --purge python-dev libffi-dev libssl-dev gcc && apt-get autoremove -y
 RUN curl -s http://stedolan.github.io/jq/download/linux64/jq > /usr/bin/jq; chmod +x /usr/bin/jq
-RUN curl -s https://get.docker.io/builds/Linux/x86_64/docker-1.6.0 > /usr/bin/docker; chmod +x /usr/bin/docker
+RUN curl -s https://get.docker.io/builds/Linux/x86_64/docker-1.6.2 > /usr/bin/docker; chmod +x /usr/bin/docker
 RUN curl -s -L https://github.com/rancherio/thin-provisioning-tools/releases/download/rancher-v0.1/pdata_tools > /usr/bin/pdata_tools; chmod +x /usr/bin/pdata_tools
 RUN apt-get update && apt-get install -y --no-install-recommends nodejs
 RUN mkdir -p /var/lib/cattle /var/lib/rancher
