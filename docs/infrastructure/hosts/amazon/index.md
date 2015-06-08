@@ -6,14 +6,14 @@ layout: default
 ## Adding Amazon Web Services Hosts
 ---
 
-Rancher supports provisiong [Amazon EC2](http://aws.amazon.com/ec2/) hosts using `docker machine`. 
+Rancher supports provisioning [Amazon EC2](http://aws.amazon.com/ec2/) hosts using `docker machine`. 
 
 ### Finding AWS Credentials
 Before launching a host on AWS, you'll need to find your AWS account credentials as well as your security group information. The **Account Access** information can be found using Amazon's [documentation](http://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSGettingStartedGuide/AWSCredentials.html) to find the correct keys. When creating an **access key** and **secret key**, please be sure to save it somewhere as it will not be available unless you create a new key pair. 
 
 ### Launching Amazon EC2 Host(s)
 
-Under the Infrastucture -> Hosts tab, click **Add Host**. Select the **Amazon EC2** icon. Provide your AWS **Access key** and **Secret Key**, click on **Next: Authenticate & select a network**. Rancher will use your credentials to determine what is available in AWS to launch instances.
+Under the Infrastructure -> Hosts tab, click **Add Host**. Select the **Amazon EC2** icon. Provide your AWS **Access key** and **Secret Key**, click on **Next: Authenticate & select a network**. Rancher will use your credentials to determine what is available in AWS to launch instances.
 
 ![AWS on Rancher 1]({{site.baseurl}}/img/rancher_aws_1.png)
 
@@ -44,9 +44,10 @@ Finally, you'll just need to finish filling out the final details of the host(s)
 2. Provide a **Name** and if desired, **Description** for the host.
 3. Select the **Instance Type** that you want launched. 
 4. Select the **Root Size** of the image. The default in `docker machine` is 16GB, which is what we have defaulted in Rancher. 
-5. For the **AMI**, `docker machine` defaults with an Ubuntu 14.04 TLS image in the specific region. You also have the option to select your own AMI. If you input your own AMI, make sure it's available in that region!
-6. Provide the **IAM Profile** to be used as an instance profile. This is an optional field.
-7. When complete, click **Create**. 
+5. (Optional) For the **AMI**, `docker machine` defaults with an Ubuntu 14.04 TLS image in the specific region. You also have the option to select your own AMI. If you input your own AMI, make sure it's available in that region!
+6. (Optional) Provide the **IAM Profile** to be used as an instance profile. 
+7. (Optional) Add **[labels]({{site.baseurl}}/docs/infrastructure/hosts/#labels)** to hosts to help organize your hosts and to [schedule services]({{site.baseurl}}/docs/services/projects/adding-services/#scheduling-services).
+8. When complete, click **Create**. 
 
 Rancher will create the EC2 instance(s) and launch the _rancher-agent_ container in the instance. In a couple of minutes, the host will be active and available for [services]({{site.baseurl}}/docs/services/).
 

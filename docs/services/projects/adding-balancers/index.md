@@ -8,11 +8,7 @@ layout: default
 
 After adding multiple services to your project, you might have decided that you want to load balancer your web applications. With Rancher, it's easy to add a balancer service to your project! 
 
-We'll walk through how to load balance the Wordpress application created earlier in the [adding services guide]({{site.baseurl}}/docs/services/projects/adding-services/). Inside the Wordpress project, you add a balancer by clicking the **Add Balancer** button. Alternatively, if you are viewing the projects at the project level, you can add a balancer to a project with the **Add Balancer** button on the specific project. 
-
-![Balancers on Rancher 1]({{site.baseurl}}/img/rancher_add_balancers_1.png)
-
-![Balancers on Rancher 2]({{site.baseurl}}/img/rancher_add_balancers_2.png)
+We'll walk through how to load balance the Wordpress application created earlier in the [adding services guide]({{site.baseurl}}/docs/services/projects/adding-services/). Inside the Wordpress project, you add a balancer by clicking the **Add Service** dropdown icon and selecting **Balancer Service**. Alternatively, if you are viewing the projects at the project level, you can add a balancer service to a project with the **Add Service** dropdown on the specific project. 
 
 In the **Add Load Balancer** page, you will need to provide a **Name** and if desired, **Description** of the load balancer. Use the slider to select the number of load balancers you want launched. 
 

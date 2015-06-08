@@ -10,9 +10,9 @@ layout: default
 
 <span class="highlight">An environment is a way to share deployments and resources with different sets of users. Within each environment, you have the ability to invite others so it makes it easy to collaborate with others. By adding users to your environment, they will have the also have the ability to create deployments and manage resources. </span>
 
-> **Note:** Infrastructure resources cannot be shared across multiple environments. 
+> **Note:** Infrastructure resources cannot be shared across multiple environments. [Registries]({{site.baseurl}}/docs/configuration/registries/) and [API-Keys]({{site.baseurl}}/docs/configuration/api-keys/) are also environment specific.  
 
-The first time that you log in to Rancher, you are already working in the **Default** environment. This default environment can be renamed, shared with others, or you can create additional environments to share with users. The environment that you're working in is always displayed in the upper right corner of the screen.
+The first time that you log in to Rancher, you are working in the **Default** environment. This default environment can be renamed, shared with others, or you can create additional environments to share with users. The environment that you're working in is always displayed in the upper right corner of the screen.
 
 ![Environments on Rancher 1]({{site.baseurl}}/img/rancher_environments_1.png)
 
@@ -36,7 +36,7 @@ Click on **Add Environment**. Each environment will have its own name, descripti
 
 > **Note:** If you have not configured [Access Control]({{site.baseurl}}/docs/configuration/access-control/), all environments will be available to anyone accessing Rancher. There will be no restriction of membership for any environments.
 
-There are two ways to add members to an environment. Provide the GitHub user or organization name. Click on the **+** to add the name to the list of members. If the name is not on the list, then they will not be added to the environment. Alternatively, there is a dropdown menu on the right side of the **+** button. Rancher has automatically populated all the GitHub organizations and teams that your GitHub account is linked to. By selecting one of the organizations/teams, it will automatically add them to the list of members. 
+There are two ways to add members to an environment. Provide the GitHub user or organization name. Click on the **+** to add the name to the list of members. If the name is not on the list, then they will not be added to the environment. Alternatively, there is a dropdown button on the right side of the **+** button. Rancher has automatically populated all the GitHub organizations and teams that your GitHub account is linked to. By selecting one of the organizations/teams, it will automatically add them to the list of members. 
 
 For each member (i.e. individual, team, or organization), you can define the role to be either an owner or a member. By default, they are added as a member. You can change their role in the dropdown next to their name. If you are an owner, you can always change the list of members and their roles at any time.
 

@@ -26,7 +26,7 @@ In order to launch a Packet host, you'll need an **API Key**. Log in to your Pac
 
 ### Launching Packet Host(s)
 
-Now that we've found our **Token**, we are ready to launch our Packet host(s). Under the **Infrastucture -> Hosts** tab, click **Add Host**. Select the **Packet** icon. 
+Now that we've found our **Token**, we are ready to launch our Packet host(s). Under the **Infrastructure -> Hosts** tab, click **Add Host**. Select the **Packet** icon. 
 
 1. Select the number of hosts you want to launch using the slider.
 2. Provide a **Name** and if desired, **Description** for the host.
@@ -35,7 +35,8 @@ Now that we've found our **Token**, we are ready to launch our Packet host(s). U
 5. Select the **Image**. Whatever `docker machine` supports for Packet is also supported by Rancher.
 5. Select the **Size** of the image. 
 6. Select the **Region** that you want to launch in. 
-7. When complete, click **Create**. 
+7. (Optional) Add **[labels]({{site.baseurl}}/docs/infrastructure/hosts/#labels)** to hosts to help organize your hosts and to [schedule services]({{site.baseurl}}/docs/services/projects/adding-services/#scheduling-services).
+8. When complete, click **Create**. 
 
 Once you click on create, Rancher will create the Packet and launch the _rancher-agent_ container. In a minute or two, the host will be active and available for [services]({{site.baseurl}}/docs/services/).
 

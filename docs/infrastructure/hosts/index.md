@@ -5,14 +5,13 @@ layout: default
 
 ## Getting Started with Hosts
 ---
-
-### What is a Host?
-
 <span class="highlight">A host is a Linux machine that is used to deploy and run all your applications. The machine can be physical or virtual, which allows you flexibility of how you want to set up your Rancher instance. </span>
 
 Within Rancher, we provide easy instructions to add your host from the Cloud providers that are supported directly from our UI as well as instructions to add your own host if your Cloud provider is not supported yet.
 
-### Adding a Host
+<a id="addhost"></a>
+## Adding a Host
+---
 
 From the **Hosts** tab within the Infrastructure tab, you click on **Add Host**.
 
@@ -32,10 +31,37 @@ We support adding hosts directly from cloud providers or adding a host that's al
 
 When a host is added to Rancher, an agent container is launched on the host. Rancher will automatically pull the correct image version tag for the `rancher/agent` and run the required version. The agent version is tagged specifically to each Rancher server version.
 
+<a id="hostlabels"></a>
+### Host Labels
+
+<span class="highlight">Needs review and additional content</span>
+With each host, you have the ability to add labels to help you organize your hosts. The labels are a key/value pair and they are added as an environment variable to the Rancher agent container. 
+
+By adding labels to hosts, you can use these labels when [scheduling services]({{site.baseurl}}/docs/services/projects/adding-services/#scheduling-services) and create a whitelist or blacklist of hosts for your [services]({{site.baseurl}}/docs/services) to run on. 
+
+<a id="machine-config"></a>
+### Host Access for Hosts created by Rancher
+
+After Rancher launches the host, you may want to be able to access the host. We provide all the certificates generated when launching the machine in an easy to download file. Click on **Machine Config** in the host's dropdown menu. It will download a tar.gz file that has all the certificates.
+
+To SSH into your host, go to your terminal/command prompt. Navigate to the folder of all the certificates and ssh in using the `id_rsa` certificate.
+
+```bash
+$ ssh -i id_rsa root@<IP_OF_HOST>
+```
+
+<span class="highlight">What to use JSON file included in the machine config?</span>
+
+### Cloning a Host
+
+Since launching hosts on cloud providers requires using an access key, you might want to easily create another host without needing to input all the credentials again. Rancher provides the ability to clone these credentials to spin up a new host. Select **Clone** from the host's drop down menu. It will bring up an **Add Host** page with the credentials of the cloned host populated.
+
 ## Editing Hosts
 ---
 
 The options for what can be done to a host are located in the host's dropdown. From the **Infrastructure** -> **Hosts** page, the dropdown icon will appear when you hover over the host. If you click on the host name to view more details of a host, the dropdown icon is located in the upper right corner of the page. It's located next to the State of the host.
+
+If you select **Edit**, you can update the name, description or labels on the host. 
 
 ### Deactivating/Activating Hosts
 
@@ -53,28 +79,9 @@ If the host was created on a cloud provider using Rancher, the host will be dele
                                                                                                                                                                                                                                                                                                                                                         
 > **Notes:** For custom hosts, all containers including the Rancher agent will continue to remain on the host.  
 
-## Notes on Hosts
+## Deleting Hosts outside of Rancher
+---
 
 If your host is deleted outside of Rancher, then Rancher server will continue to show the host until it’s removed. Eventually, these hosts will show up in a _Reconnecting_ state and never be able to reconnect. You will be able to **Delete** these hosts to remove them from the UI. 
 
 
-## Hosts created by Rancher
----
-
-For any hosts deployed by Rancher, there are additional options for these hosts. 
-
-### Host Access
-
-After Rancher launches the host, you may want to be able to access the host. We provide all the certificates generated when launching the machine in an easy to download file. Click on **Machine Config** in the host's dropdown menu. It will download a tar.gz file that has all the certificates.
-
-To SSH into your host, go to your terminal/command prompt. Navigate to the folder of all the certificates and ssh in using the `id_rsa` certificate.
-
-```bash
-$ ssh -i id_rsa root@<IP_OF_HOST>
-```
-
-<span class="highlight">What to use JSON file included in the machine config?</span>
-
-### Cloning a Host
-
-Since launching cloud providers requires using an access key, you might want to easily create another host without needing to input all the credentials again. Rancher provides the ability to clone these credentials to spin up a new host. Select **Clone** from the host's drop down menu. It will bring up an **Add Host** page with the credentials of the cloned host populated.

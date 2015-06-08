@@ -15,16 +15,13 @@ In the **Services** -> **Projects** page, click on **Add Project**. You will nee
 ![Services Options on Rancher 1]({{site.baseurl}}/img/rancher_projects_1.png)
 
 
-You will immediately be brought to the project and can begin [adding services]({{site.baseurl}}/docs/services/projects/adding-services/) or [adding balancers]({{site.baseurl}}/docs/services/projects/adding-balancers/).
+You will immediately be brought to the project and can begin [adding services]({{site.baseurl}}/docs/services/projects/adding-services/) or [adding balancer services]({{site.baseurl}}/docs/services/projects/adding-balancers/).
 
 > **Note:** Before deploying any services, you'll need to have a least 1 host launched in Rancher. Please follow our [documentation]({{site.baseurl}}/getting-started/hosts) to learn how to add hosts to Rancher.
 
 ### Viewing Project Services
 
 From the projects page, you can easily monitor all your projects in your [environment]({{site.baseurl}}/docs/configuration/environment). From each project, you can expand the project to show the individual services by clicking on the carat next to the dropdown menu.
-
-![Services Options on Rancher 2]({{site.baseurl}}/img/rancher_projects_2.png)
-
 
 This will expand to show you any services within the project as well as all the containers that are part of the service. You can click on any individual container or service to go to the detailed page.
 
@@ -39,17 +36,11 @@ The `rancher.yml` file is used to manage the additional information used by Ranc
 
 In the project dropdown, you can select **View Config** or click on the **file icon**.
 
-<img src="{{site.baseurl}}/img/rancher_services_options_1.png" style="float: left; margin-right: 1%; margin-bottom: 0.5em;">
-<img src="{{site.baseurl}}/img/rancher_services_options_2.png" style="float: left; margin-right: 1%; margin-bottom: 0.5em;">
-<p style="clear: both;">
-
 ### Exporting Configurations
 
 There are a couple of options to export the files. 
 
 Option 1: Download a zip file that contains both files by selecting **Export Config** in the project dropdown menu.
-
-![Services Options on Rancher 3]({{site.baseurl}}/img/rancher_projects_3.png)
 
 Option 2: Copy the file to your clipboard by clicking on the icon next to the file name that you want to copy. You can copy either the `docker-compose.yml` file or the `rancher-compose.yml` file. 
 
@@ -82,7 +73,7 @@ You can also increase or decrease the number of containers in a service by selec
 ### Editing 
 There are limited options for editing a service. To see what you can change, you select **Edit** on the dropdown menu of the service. The name, description and scale can be changed. If you forgot to link your service when you had set it up, you will have the ability to link services through this option. 
 
-> **Note:** For container services, the advanced options and port mapping do not have the ability to change dynamically.
+For container services, the advanced options and port mapping do not have the ability to change dynamically. As Docker containers are immutable (not changeable) after creation. To get around this limitation, you can **Clone** a service or container. This will set up launching a service or container with the same parameters. You'll be able to make changes before creating a new service or container.
 
 ### Stopping 
 
@@ -90,7 +81,5 @@ You can stop individual services or all services in a project at once. If you wa
 
 ### Deleting
 
-You can delete individual services/balancers or delete an entire project. When you select **Delete** for the individual service/balancer, it will stop the containers before removing them from the host. 
-
-> **Note:** There might be a slight delay as we clean up the containers before they are deleted from the UI.
+You can delete individual services/balancers or delete an entire project. When you select **Delete** for the individual service/balancer, it will stop the containers before removing them from the host. There might be a slight delay as we clean up the containers before they are deleted from the UI.
 

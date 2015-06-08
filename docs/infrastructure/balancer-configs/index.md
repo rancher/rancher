@@ -8,7 +8,7 @@ layout: default
 
 A load balancer config is a configuration used to set up a [load balancer]({{site.baseurl}}/docs/load-balancers) or [load balancer service]({{site.baseurl}}/docs/services/projects/adding-balancers). The load balancer config includes listener(s), a health check policy and cookie policies (i.e. stickiness). When a load balancer is created, the balancer config is used to create the HAProxy config in the HA Proxy software inside the load balancer agent container. A load balancer config can be used with multiple load balancers, but cannot be re-used with balancer services.
 
-<span class="highlight">IS THIS POSSIBLE? Note: If any change is made to the balancer config, it will be propogated on all load balancers or balancer services using that load balancer config.
+<span class="highlight">IS THIS POSSIBLE? Note: If any change is made to the balancer config, it will be propagated on all load balancers or balancer services using that load balancer config.
 
 In any balancer config, you have the ability to edit the listeners, health check or stickiness. Let's review in detail what each one of them are.</span>
 
@@ -24,7 +24,7 @@ Any load balancer config will need a listener. The listener is the mapping that 
 
 ### Health Check 
 
-Health Check is the policy that can be defined to deteremine if the target ports and target IPs are reachable. 
+Health Check is the policy that can be defined to determine if the target ports and target IPs are reachable. 
 
 The **HTTP Check** is the <span class="highlight">Need feedback on how to describe these fields</span>
 

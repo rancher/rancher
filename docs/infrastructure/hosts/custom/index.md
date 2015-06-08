@@ -10,18 +10,18 @@ If you already have Linux machines deployed and just want to add them into Ranch
 
 If you are using different [environments]({{site.baseurl}}/docs/configuration/environments/), the command provided through the UI will be unique to whatever **environment** that you are in.
 
-Please make sure that you are in the environment that you want to add hosts to.
+Please make sure that you are in the environment that you want to add hosts to. The environment is displayed in the upper right corner next to the account dropdown. When you first login to the Rancher instance, you are in the **Default** environment.
 
-<span class="highlight">**IMAGE NEEDED TO SHOW ENVIORNMENT FOLDER**</span>
-![Custom Hosts on Rancher 1]({{site.baseurl}}/img/rancher_custom_1.png)
+![Environments on Rancher 1]({{site.baseurl}}/img/rancher_environments_1.png)
 
 For any hosts that are added, please make sure that any security groups or firewalls allow traffic. If these are not enabled, then the functionality of Rancher will be limited.
 
 * From the internet to TCP ports `9345` and `9346` (for UI hosts stats/graphs)
 * From and To all other hosts on UDP ports `500` and `4500` (for IPsec networking)
 
-Once your hosts are added to Rancher, they are available for [services]({{site.baseurl}}/docs/services/).
+Once your hosts are added to Rancher, they are available for [our services]({{site.baseurl}}/docs/services/).
 
+<a id="samehost"></a>
 ### Adding Hosts to the same machine as Rancher Server
 
 If you are adding an agent host on the same machine as Rancher server, you will need to edit the command provided from the UI. In order for the _rancher-agent_ container to be launched correctly, you will need to set the `CATTLE_AGENT_IP` environment variable to the public IP of the VM that Rancher server is running on.
@@ -30,7 +30,7 @@ If you are adding an agent host on the same machine as Rancher server, you will 
 sudo docker run -d -e CATTLE_AGENT_IP=<IP_OF_RANCHER_SERVER> -v /var/run/docker....
 ```
 
-If you have added a host onto the same host as Rancher server, please note that you will not be able to create any containers on the host that binds to port `8080`. Since the UI of the Rancher server relies on the `8080` port, there will be a port conflict.
+If you have added a host onto the same host as Rancher server, please note that you will not be able to create any containers on the host that binds to port `8080`. Since the UI of the Rancher server relies on the `8080` port, there will be a port conflict and Rancher will stop working.
 
 ### VMs with Private and Public IP Addresses
 
