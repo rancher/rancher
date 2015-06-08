@@ -23,14 +23,21 @@ VOLUME ["/var/lib/mysql"]
 
 EXPOSE 8080
 ENV CATTLE_RANCHER_SERVER_IMAGE v0.23.0-rc6
+ENV CATTLE_RANCHER_COMPOSE_VERSION v0.1.1
+ENV DEFAULT_CATTLE_RANCHER_COMPOSE_LINUX_URL   https://github.com/rancherio/rancher-compose/releases/download/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose_linux-amd64
+ENV DEFAULT_CATTLE_RANCHER_COMPOSE_DARWIN_URL  https://github.com/rancherio/rancher-compose/releases/download/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose_darwin-amd64
+ENV DEFAULT_CATTLE_RANCHER_COMPOSE_WINDOWS_URL https://github.com/rancherio/rancher-compose/releases/download/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose_windows-386.exe
 
 EXPOSE 3306
-ADD https://github.com/rancherio/cattle/releases/download/v0.52.0/cattle.jar /usr/share/cattle/
+ENV CATTLE_CATTLE_VERSION v0.52.0
+ADD https://github.com/rancherio/cattle/releases/download/${CATTLE_CATTLE_VERSION}/cattle.jar /usr/share/cattle/
 
-ADD https://github.com/wlan0/machine/releases/download/v0.3.0-dev-packet/docker-machine /usr/bin/docker-machine
+ENV CATTLE_DOCKER_MACHINE_VERSION v0.3.0-dev-packet
+ADD https://github.com/wlan0/machine/releases/download/${CATTLE_DOCKER_MACHINE_VERSION}/docker-machine /usr/bin/docker-machine
 RUN chmod +x /usr/bin/docker-machine
 
-ADD https://github.com/rancherio/go-machine-service/releases/download/v0.12.0/go-machine-service.tar.xz /tmp/
+ENV CATTLE_GO_MACHINE_SERVICE_VERSION v0.12.0
+ADD https://github.com/rancherio/go-machine-service/releases/download/${CATTLE_GO_MACHINE_SERVICE_VERSION}/go-machine-service.tar.xz /tmp/
 RUN tar xpvf /tmp/go-machine-service.tar.xz -C /usr/bin/ && \
     chmod +x /usr/bin/go-machine-service
 
