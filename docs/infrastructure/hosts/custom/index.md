@@ -30,7 +30,7 @@ If you are adding an agent host on the same machine as Rancher server, you will 
 sudo docker run -d -e CATTLE_AGENT_IP=<IP_OF_RANCHER_SERVER> -v /var/run/docker....
 ```
 
-If you have added a host onto the same host as Rancher server, please note that you will not be able to create any containers on the host that binds to port `8080`. Since the UI of the Rancher server relies on the `8080` port, there will be a port conflict and Rancher will stop working.
+If you have added a host onto the same host as Rancher server, please note that you will not be able to create any containers on the host that binds to port `8080`. Since the UI of the Rancher server relies on the `8080` port, there will be a port conflict and Rancher will stop working. If you require using port `8080` for your containers, you could launch Rancher server using a different port. 
 
 ### VMs with Private and Public IP Addresses
 
@@ -42,5 +42,23 @@ sudo docker run -d -e CATTLE_AGENT_IP=<PRIVATE_IP> -v /var/run/docker....
 
 > **Note**: When setting the private IP address, any existing containers in Rancher will not be part of the same managed network. 
 
+### Hosts behind a Proxy
 
+In order to set up a HTTP proxy, you'll need to edit the Docker daemon to point to the proxy. Before attempting to add the custom host, you'll need to edit the `/etc/default/docker` file to point to your proxy and restart Docker.
 
+```bash
+$ sudo vi /etc/default/docker
+```
+
+Within the file, edit the `#export http_proxy="http://127.0.0.1:3128/"` to have it point to your proxy. Save your changes and then restart docker. Restarting Docker is different on every OS. 
+
+You'll need to add in environment variables in order for the Rancher agent to use the proxy.
+
+Potential Environment Variables to Set:
+* http_proxy
+* https_proxy
+* no_proxy
+
+```bash
+$ sudo docker run -d -e http_proxy=<proxyURL> -e https_proxy=<proxyURL> -e NO_PROXY=<proxyURL> -v /var/run/docker....
+```
