@@ -39,6 +39,8 @@ launch_volume()
 
     if [ "${CATTLE_VAR_LIB_WRITABLE}" = "true" ]; then
         opts="-v /var/lib/rancher:/var/lib/rancher"
+    else
+        opts="-v /var/lib/rancher"
     fi
 
     docker run \
