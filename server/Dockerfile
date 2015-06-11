@@ -32,7 +32,7 @@ EXPOSE 3306
 ENV CATTLE_CATTLE_VERSION v0.52.0
 ADD https://github.com/rancherio/cattle/releases/download/${CATTLE_CATTLE_VERSION}/cattle.jar /usr/share/cattle/
 
-ENV CATTLE_DOCKER_MACHINE_VERSION v0.3.0-dev-packet
+ENV CATTLE_DOCKER_MACHINE_VERSION v0.3.0-dev-packet-rc2
 ADD https://github.com/wlan0/machine/releases/download/${CATTLE_DOCKER_MACHINE_VERSION}/docker-machine /usr/bin/docker-machine
 RUN chmod +x /usr/bin/docker-machine
 
