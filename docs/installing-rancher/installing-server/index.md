@@ -1,15 +1,15 @@
 ---
-title: Running Rancher 
+title: Installing Rancher Server
 layout: default
 ---
 
-## Running Rancher
+## Installing Rancher Server
 ---
 Rancher is deployed as a set of Docker containers. Running Rancher is a simple as launching two containers. One container as the management server and another container on a node as an agent. 
 
 ### Requirements
 
-* Docker 1.6.2+ ([Steps]({{site.baseurl}}/docs/running-rancher/#docker-install) on how to update to the latest Docker binary)
+* Docker 1.6.2+ ([Steps]({{site.baseurl}}/docs/installing-rancher/installing-server/#docker-install) on how to update to the latest Docker binary)
 * Ubuntu 14.04, CoreOS 494+, CentOS 6/7, RHEL 6/7 <span class="highlight">What else are we going to support?</span>
 * <span class="highlight">RAM/CPU?</span>
 * Note: These are the only tested distributions at the moment, but most modern Linux distributions will work.

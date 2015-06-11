@@ -36,7 +36,7 @@ docker pull rancher/server:latest
 docker run -d --volumes-from=<container_name_of_old_server> --restart=always -p 8080:8080 rancher/server:<version>
 ```
 
-You can also configure an external MySQL database server by setting these environment variables on the container. This allows you to decouple the server from the DB. Please read the [guidelines]({{site.baseurl}}/docs/running-rancher/#external-db) on how to set up an external database.
+You can also configure an external MySQL database server by setting these environment variables on the container. This allows you to decouple the server from the DB. Please read the [guidelines]({{site.baseurl}}/docs/installing-rancher/#external-db) on how to set up an external database.
 
 
 ### Rancher Agents 
