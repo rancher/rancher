@@ -41,5 +41,9 @@ ADD https://github.com/rancherio/go-machine-service/releases/download/${CATTLE_G
 RUN tar xpvf /tmp/go-machine-service.tar.xz -C /usr/bin/ && \
     chmod +x /usr/bin/go-machine-service
 
+ADD https://github.com/rancherio/websocket-proxy/releases/download/v0.1.1/websocket-proxy.tar.xz /tmp/
+RUN tar xpvf /tmp/websocket-proxy.tar.xz -C /usr/bin/ && \
+    chmod +x /usr/bin/websocket-proxy
+
 ENV DEFAULT_CATTLE_MACHINE_EXECUTE true
 CMD ["/usr/bin/s6-svscan", "/service"]
