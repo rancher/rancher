@@ -23,7 +23,7 @@ VOLUME ["/var/lib/mysql"]
 
 EXPOSE 8080
 ENV CATTLE_RANCHER_SERVER_IMAGE v0.23.0-rc6
-ENV CATTLE_RANCHER_COMPOSE_VERSION v0.1.1
+ENV CATTLE_RANCHER_COMPOSE_VERSION v0.1.2
 ENV DEFAULT_CATTLE_RANCHER_COMPOSE_LINUX_URL   https://github.com/rancherio/rancher-compose/releases/download/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose_linux-amd64
 ENV DEFAULT_CATTLE_RANCHER_COMPOSE_DARWIN_URL  https://github.com/rancherio/rancher-compose/releases/download/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose_darwin-amd64
 ENV DEFAULT_CATTLE_RANCHER_COMPOSE_WINDOWS_URL https://github.com/rancherio/rancher-compose/releases/download/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose_windows-386.exe
