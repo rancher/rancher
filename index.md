@@ -4,12 +4,16 @@ layout: default
 
 ---
 
-## Rancher
+## Overview
 ---
 
 Rancher is is an open source software platform that implements purpose-built infrastructure for running containers in production. Docker containers, as an increasingly popular application workload, create new requirements in infrastructure services such as networking, storage, load balancer, security, service discovery, and resource management.
 
+### Computing Resources
+
 Rancher takes in raw computing resources from any public or private cloud in the form of Linux hosts. Each Linux host can be a virtual machine or a physical machine. Rancher does not expect more from each host than CPU, memory, local disk storage, and network connectivity. From Rancher's perspective, a VM instance from a cloud provider and a bare metal server hosted at a colo facility are indistinguishable.
+
+### Key Features
 
 Key product features of Rancher include: 
 
@@ -27,6 +31,7 @@ Key product features of Rancher include:
 
 7. Multi-tenancy & user management: Rancher is designed for multiple users and allows organizations to collaborate throughout the application lifecycle. By connecting with existing directory services, Rancher allows users to create separate development, testing, and production environments and invite their peers to collaboratively manage resources and applications.
 
+### Primary Consumption Interfaces
 
 There are three primary ways for users to interact with Rancher:
 
@@ -37,3 +42,20 @@ There are three primary ways for users to interact with Rancher:
 The following figure illustrates Rancher's major features, its ability to run any clouds, and the three primary ways to interact with Rancher.
 
 ![Rancher Overview](/img/Rancher Overview.png)
+
+### Outline of This Guide
+
+It is easy to get Rancher up and running. If you have access to a Linux VM on your laptop or in a cloud, go to the [Quick Start Guide](/rancher/docs/quick-start-guide/) to get started right away.
+
+If you are ready to set up a production-grade Rancher installation, follow the instructions in the [Installing Rancher](/rancher/docs/installing-rancher/) to setup a Rancher server and add hosts into the Rancher installation.
+
+Before you start using Rancher, make sure to read through the [Concepts](/rancher/docs/concepts/) section to understand how Rancher works.
+
+The [Configuration](/rancher/docs/configuration/) section documents how you perform various one-time tasks after you complete installation of Rancher and start using Rancher.
+
+The next three sections--[Using Rancher Through Native Docker CLI](/rancher/docs/native-docker/), [Rancher Compose](/rancher/docs/rancher-compose), and [Rancher UI](/rancher/docs/rancher-ui)--covers three primary ways you can consume Rancher features.
+
+The [Upgrading Rancher](/rancher/docs/upgrading) section is essential if you run Rancher in production.
+
+The [Contributing to Rancher](/rancher/docs/contributing) section contains information on how you can participate in the Rancher open source community.
+
