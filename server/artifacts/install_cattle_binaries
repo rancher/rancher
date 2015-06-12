@@ -1,0 +1,36 @@
+#!/bin/bash
+
+set -e
+
+mkdir -p /tmp/extracted_cattle
+cd /tmp/extracted_cattle
+
+install_binary()
+{
+    local src=${1}
+    local dest=${2}
+    local xz=${3:-"true"}
+
+    #deletes the longest possible match from the left
+    file=$(echo ${src##*/});
+
+    curl -L -o ${file} ${1}
+    if [ "$xz" = "true" ]; then
+        tar -xpJf ${file} -C ${dest}
+    fi
+    chmod +x ${dest}/${file}
+}
+
+if [ -f "/usr/share/cattle/cattle.jar" ]; then
+    unzip /usr/share/cattle/cattle.jar
+    mkdir -p res && cd res
+    unpack200 ../WEB-INF/lib/cattle-resources-*.jar.pack resources.jar
+    unzip resources.jar
+
+    for i in $(grep service\.package\.*\.url cattle-global.properties|cut -d"=" -f2); do
+        install_binary $i "/usr/bin"
+    done
+fi
+
+cd /tmp
+rm -rf ./extracted_cattle
