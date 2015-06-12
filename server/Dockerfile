@@ -5,7 +5,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends openjdk-7-jre-h
                     curl \
                     mysql-server \
                     xz-utils \
-                    keychain
+                    keychain \
+                    unzip
 
 ENV CATTLE_HOME /var/lib/cattle
 ENV DEFAULT_CATTLE_API_UI_INDEX //releases.rancher.com/ui/0.25.0
@@ -31,6 +32,7 @@ ENV DEFAULT_CATTLE_RANCHER_COMPOSE_WINDOWS_URL https://github.com/rancherio/ranc
 EXPOSE 3306
 ENV CATTLE_CATTLE_VERSION v0.53.0
 ADD https://github.com/rancherio/cattle/releases/download/${CATTLE_CATTLE_VERSION}/cattle.jar /usr/share/cattle/
+RUN /usr/share/cattle/install_cattle_binaries
 
 ENV CATTLE_DOCKER_MACHINE_VERSION v0.3.0-dev-packet-rc2
 ADD https://github.com/wlan0/machine/releases/download/${CATTLE_DOCKER_MACHINE_VERSION}/docker-machine /usr/bin/docker-machine
