@@ -97,7 +97,7 @@ docker run --it --label io.rancher.container.network=true ubuntu
 
 The label io.rancher.container.network enables us to pass a hint through the Docker command line so Rancher will set up the container to connect to the overlay network.
 
-Given Rancher’s ability to import existing containers automatically, you might wonder why you do not see the Rancher server container itself in the Rancher UI. To avoid confusion, Rancher does not automatically import server or agent containers created by Rancher.
+<!--Given Rancher’s ability to import existing containers automatically, you might wonder why you do not see the Rancher server container itself in the Rancher UI. To avoid confusion, Rancher does not automatically import server or agent containers created by Rancher.-->
 
 ### Create a Multi-Container Application through Rancher Compose
 
