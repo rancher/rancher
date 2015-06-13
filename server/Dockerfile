@@ -35,7 +35,7 @@ ADD https://github.com/rancherio/cattle/releases/download/${CATTLE_CATTLE_VERSIO
 RUN /usr/share/cattle/install_cattle_binaries
 
 ENV CATTLE_DOCKER_MACHINE_VERSION v0.3.0-dev-packet-rc2
-ADD https://github.com/wlan0/machine/releases/download/${CATTLE_DOCKER_MACHINE_VERSION}/docker-machine /usr/bin/docker-machine
+ADD https://github.com/rancherio/machine/releases/download/${CATTLE_DOCKER_MACHINE_VERSION}/docker-machine /usr/bin/docker-machine
 RUN chmod +x /usr/bin/docker-machine
 
 ENV CATTLE_GO_MACHINE_SERVICE_VERSION v0.13.0
