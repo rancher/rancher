@@ -35,8 +35,6 @@ You can start Rancher server by simply typing this command:
 $ sudo docker run --restart=always -p 8080:8080 rancher/server
 ```
 
-> **Note:** The command is purposely not running with `-d` so you can see the log output and can make sure the server is listening on 8080. If you prefer to not watch the log output, you can add `-d`.
-
 It takes a couple of minutes for Rancher server to start up. In the logs, Rancher UI is up and running, when you see this in your screen. 
 
 ```bash
@@ -54,13 +52,14 @@ To add the Rancher server host, access the UI and click **Infrastructure**, whic
 For now you can ignore these warnings as we will only add the Rancher server host itself. Click **Save**. You’ll be presented with a few options to add hosts from various cloud providers. Since we are adding the existing Rancher server host, we click the **Custom** option. Rancher will display a command line like this:
 
 ```bash
-$ sudo docker run -d --privileged -v /var/run/docker.sock:/var/run/docker.sock rancher/agent:v0.7.9 http://server_ip:8080/v1/scripts/DB121CFBA836F9493653:1434085200000:2ZOwUMd6fIzz44efikGhBP1veo
+$ sudo docker run -d --privileged -v /var/run/docker.sock:/var/run/docker.sock rancher/agent:v0.7.9 http://172.17.0.3:8080/v1/scripts/DB121CFBA836F9493653:1434085200000:2ZOwUMd6fIzz44efikGhBP1veo
 ```
 
-Since we are adding the host on the Rancher server host, we will need to edit the command and insert `-e CATTLE_AGENT_IP=server_ip` into the command. This command will set the IP for the host to use. The updated command will look like this:
+Since we are adding the host on the Rancher server host, we will need to edit the command and insert `-e CATTLE_AGENT_IP=<host_ip>` into the command, where `<host_ip>` is the IP address of the Rancher server host. 
+Assuming `<host_ip>` is `192.168.111.159`, the updated command will look like this:
 
 ```bash
-$ sudo docker run -e CATTLE_AGENT_IP=server_ip -d --privileged -v /var/run/docker.sock:/var/run/docker.sock rancher/agent:v0.7.9 http://server_ip:8080/v1/scripts/DB121CFBA836F9493653:1434085200000:2ZOwUMd6fIzz44efikGhBP1veo
+$ sudo docker run -e CATTLE_AGENT_IP=192.168.111.159 -d --privileged -v /var/run/docker.sock:/var/run/docker.sock rancher/agent:v0.7.9 http://172.17.0.3:8080/v1/scripts/DB121CFBA836F9493653:1434085200000:2ZOwUMd6fIzz44efikGhBP1veo
 ```
 
 Just copy, paste, and run this command in a shell terminal of the Rancher server host.
