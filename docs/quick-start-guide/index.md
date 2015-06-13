@@ -98,6 +98,37 @@ The label io.rancher.container.network enables us to pass a hint through the Doc
 
 <!--Given Rancher’s ability to import existing containers automatically, you might wonder why you do not see the Rancher server container itself in the Rancher UI. To avoid confusion, Rancher does not automatically import server or agent containers created by Rancher.-->
 
-### Create a Multi-Container Application through Rancher Compose
+### Create a Multi-Container Application
 
-<span>Provide an example to create a simple multi-container application using Rancher Compose</span>
+We have shown you how to create individual containers and connect them to a cross-host network. Most real-world applications, however, are made out of multiple services, with each service made up of multiple containers. A WordPress
+application, for example, could consist of the following services:
+
+1. A load balancer service. The load balancer redirects Internet traffic to the WordPress application.
+2. A WordPress service consisting of two WordPress containers.
+3. A database service consisting of one MySQL container.
+
+The load balancer service links to the WordPress service, and the WordPress service links to the MySQL service.
+
+In this section, we will show you how to create and deploy the WordPress application in Rancher.
+
+From the Rancher UI, click `Services` tab, and create a project called `WordPress`.
+
+[TODO: Fill in the rest of the steps to create a mysql service, wordpress service, and load balancer service.]
+
+### Create a Multi-Container Application using Rancher Compose
+
+In this section, we will show you how to create and deploy the same WordPress application we created in the previous section using a command-line tool called `rancher-compose`.
+
+The `rancher-compose` tool works just like the popular `docker-compose` tool. It takes in the same `docker-compose.yml` file and deploys the application on Rancher. You can specify additional attributes in a `rancher-compose.yml` file which extends and overwrites the `docker-compose.yml` file.
+
+Once you create the WordPress deployment in the previous section, you can export `docker-compose.yml` and `rancher-compose.yml` files. Save them in your local directory. Download `rancher-compose` binary from Rancher UI. Rancher makes `rancher-compose` binary for Windows, Mac, and Linux available for download.
+
+From the Rancher UI, find the API URL for the current environment and its access key and secret key. Setup environment variables `RANCHER_URL`, `RANCHER_ACCESS_KEY`, and `RANCHER_SECRET_KEY`.
+
+Run the following command in the directory where you saved `docker-compose.yml` and `rancher-compose.yml`.
+
+```
+# rancher-compose -p WordPress2 up
+```
+You will see a new project called `WordPress2` gets created in Rancher the WordPress app gets deployed in that project.
+
