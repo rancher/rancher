@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -e -x
 
 mkdir -p /tmp/extracted_cattle
 cd /tmp/extracted_cattle
@@ -18,7 +18,8 @@ install_binary()
     if [ "$xz" = "true" ]; then
         tar -xpJf ${file} -C ${dest}
     fi
-    chmod +x ${dest}/${file}
+    binary=$(echo ${file}|cut -d'.' -f1)
+    chmod +x ${dest}/${binary}
 }
 
 if [ -f "/usr/share/cattle/cattle.jar" ]; then
