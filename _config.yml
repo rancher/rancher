@@ -1,0 +1,17 @@
+name: Rancher Documentation
+description: Documentation for Rancher
+
+URL: “http://deniseschannon.github.io/rancher”
+baseurl: /rancher
+
+markdown: redcarpet
+
+redcarpet:
+  extensions: ["smart", "tables", "no_intra_emphasis", "autolink", "strikethrough", "superscript", "with_toc_data"]
+  syntax_highlighter: rouge
+
+kramdown: 
+  syntax_highlighter: rouge
+  input: GFM
+permalink: pretty
+
