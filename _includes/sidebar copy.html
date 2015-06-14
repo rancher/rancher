@@ -17,24 +17,20 @@
             <ul class="nav navbar-nav" id="mainmenu">
                 <li><a href="{{site.baseurl}}/">Overview</a></li>
                 <li><a href="{{site.baseurl}}/docs/quick-start-guide/">Quick Start Guide</a></li>
-                <li class="panel">
-                     <a href="#installing-rancher" class="collapsed" data-toggle="collapse" data-parent="#mainmenu">Installing Rancher<i class="pull-right fa fa-angle-down"></i><i class="pull-right fa fa-angle-up"></i></a>
-                     <ul class="collapse list-group-submenu" id="installing-rancher">
-                        <li>
-                            <a href="#installing-server" data-toggle="collapse" class="collapsed" data-parent="#installing-server">Installing Rancher server<i class="pull-right fa fa-angle-down"></i><i class="pull-right fa fa-angle-up"></i></a>
-                             <!-- OLD href="{{site.baseurl}}/docs/installing-rancher/installing-server/" -->
-                             <ul class="collapse" id="installing-server">
-                                 <li><a href="{{site.baseurl}}/docs/installing-rancher/installing-server/non-ha/">Non-HA</a></li>
-                                 <li><a href="{{site.baseurl}}/docs/installing-rancher/installing-server/ha/">HA</a></li>
-                             </ul>
-                        </li>
+                <li>
+                    <a class="no-list-group">Installing Rancher</a>
+                    <ul class="list-group-submenu" id="installing-rancher">
+                        <li><a href="{{site.baseurl}}/docs/installing-rancher/installing-server/">Installing Rancher server</a></li>
+                        <ul>
+                            <li><a href="{{site.baseurl}}/docs/installing-rancher/installing-server/non-ha/">Non-HA</a></li>
+                            <li><a href="{{site.baseurl}}/docs/installing-rancher/installing-server/ha/">HA</a></li>
+                        </ul>
                         <li><a href="{{site.baseurl}}/docs/installing-rancher/adding-hosts/">Adding Hosts</a></li>
                     </ul>
                 </li>
-                <li class="panel">
-                    <a href="#concepts" class="collapsed" data-toggle="collapse" data-parent="#mainmenu">Concepts<i class="pull-right fa fa-angle-down"></i><i class="pull-right fa fa-angle-up"></i></a>
-                    <!-- OLD href="{{site.baseurl}}/docs/concepts/"-->
-                    <ul class="collapse list-group-submenu" id="concepts">
+                <li>
+                    <a href="{{site.baseurl}}/docs/concepts/">Concepts</a>
+                    <ul class="list-group-submenu" id="concepts">
                         <li><a href="{{site.baseurl}}/docs/concepts/#users">Users</a></li>
                         <li><a href="{{site.baseurl}}/docs/concepts/#host">Hosts</a></li>
                         <li><a href="{{site.baseurl}}/docs/concepts/#environments">Environments</a></li>
@@ -51,10 +47,9 @@
                         <li><a href="{{site.baseurl}}/docs/concepts/#sidekicks">Sidekicks</a></li>
                     </ul>
                 </li>
-                <li class="panel">
-                    <a href="#configuration" class="collapsed" data-toggle="collapse" data-parent="#mainmenu">Configuration<i class="pull-right fa fa-angle-down"></i><i class="pull-right fa fa-angle-up"></i></a>
-                    <!--OLD href="{{site.baseurl}}/docs/configuration/"-->
-                    <ul class="collapse list-group-submenu" id="configuration">
+                <li>
+                    <a href="{{site.baseurl}}/docs/configuration/">Configuration</a>
+                    <ul class="list-group-submenu" id="configuration">
                         <li><a href="{{site.baseurl}}/docs/configuration/access-control/">Access Control</a></li>
                         <li><a href="{{site.baseurl}}/docs/configuration/environments/">Environments</a></li>
                         <li><a href="{{site.baseurl}}/docs/configuration/api-keys/">API Keys</a></li>
@@ -64,18 +59,13 @@
                 </li>
                 <li><a href="{{site.baseurl}}/docs/native-docker/">Using Rancher through Native Docker CLI</a></li>
                 <li><a href="{{site.baseurl}}/docs/rancher-compose/">Rancher Compose</a></li>
-                <li class="panel">
-                    <a href="#rancherui" class="collapsed" data-toggle="collapse" data-parent="#mainmenu">Rancher UI<i class="pull-right fa fa-angle-down"></i><i class="pull-right fa fa-angle-up"></i></a>
-                    <!--OLD href="{{site.baseurl}}/docs/rancher-ui/"-->
-                    <ul class="collapse list-group-submenu" id="rancherui">
-                        <li>
-                            <a href="#services" data-toggle="collapse" class="collapsed" data-parent="#service">Services<i class="pull-right fa fa-angle-down"></i><i class="pull-right fa fa-angle-up"></i></a>
-                            <!--OLD href="{{site.baseurl}}/docs/services/"-->
-                            <ul class="collapse list-group-submenu-submenu" id="services">
-                                <li>
-                                    <a href="#projects" data-toggle="collapse" class="collapsed" data-parent="#projects">Projects <i class="pull-right fa fa-angle-down"></i><i class="pull-right fa fa-angle-up"></i></a>
-                                    <!-- OLD href="{{site.baseurl}}/docs/services/projects/"-->
-                                    <ul class-"collapse" id="projects">
+                <li>
+                    <a href="{{site.baseurl}}/docs/rancher-ui/">Rancher UI</a>
+                    <ul class="list-group-submenu" id="rancherui">
+                        <li><a href="{{site.baseurl}}/docs/services/">Services</a></li>
+                            <ul class="list-group-submenu-submenu" id="services">
+                                <li><a href="{{site.baseurl}}/docs/services/projects/">Projects</a>
+                                    <ul>
                                         <li><a href="{{site.baseurl}}/docs/services/projects/adding-services/">Adding Services</a></li>
                                         <li><a href="{{site.baseurl}}/docs/services/projects/adding-service-alias/">Adding Service Alias</a></li>
                                         <li><a href="{{site.baseurl}}/docs/services/projects/adding-balancers/">Adding Balancer Services</a></li>
@@ -85,13 +75,10 @@
                             </ul>
                         </li>
                         <li>
-                           <a href="#infrastructure" data-toggle="collapse" class="collapsed" data-parent="#infrastructure">Infrastructure<i class="pull-right fa fa-angle-down"></i><i class="pull-right fa fa-angle-up"></i></a>
-                           <!-- OLD href="{{site.baseurl}}/docs/infrastructure/"-->
-                           <ul class="collapse list-group-submenu-submenu" id="infrastructure">
-                                <li>
-                                    <a href="#hosts" data-toggle="collapse" class="collapsed" data-parent="#hosts">Hosts <i class="pull-right fa fa-angle-down"></i><i class="pull-right fa fa-angle-up"></i></a>
-                                    <!-- href="{{site.baseurl}}/docs/infrastructure/hosts/"-->
-                                    <ul class="collapse list-group-submenu" id="hosts">
+                            <a href="{{site.baseurl}}/docs/infrastructure/">Infrastructure</a>
+                            <ul class="list-group-submenu-submenu" id="infrastructure">
+                                <li><a href="{{site.baseurl}}/docs/infrastructure/hosts/">Hosts</a>
+                                    <ul class="list-group-submenu" id="hosts">
                                         <li><a href="{{site.baseurl}}/docs/infrastructure/hosts/digitalocean/">DigitalOcean</a></li>
                                         <li><a href="{{site.baseurl}}/docs/infrastructure/hosts/amazon/">Amazon EC2</a></li>
                                         <li><a href="{{site.baseurl}}/docs/infrastructure/hosts/packet/">Packet</a></li>
@@ -109,10 +96,8 @@
                 </li>
                 <li><a href="{{site.baseurl}}/docs/upgrading/">Upgrading Rancher</a></li>
                 <li><a href="{{site.baseurl}}/docs/contributing/">Contributing to Rancher</a></li>
-                <li class="panel">
-                    <a href="#faqs" class="collapsed" data-toggle="collapse" data-parent="#mainmenu">FAQs<i class="pull-right fa fa-angle-down"></i><i class="pull-right fa fa-angle-up"></i></a>
-                    <!--OLD href="{{site.baseurl}}/docs/faqs/"-->
-                    <ul class="collapse list-group-submenu" id="faqs">
+                <li><a href="{{site.baseurl}}/docs/faqs/">FAQs</a>
+                    <ul class="list-group-submenu" id="faqs">
                         <li><a href="{{site.baseurl}}/docs/faqs/hosts/">Hosts</a></li>
                         <li><a href="{{site.baseurl}}/docs/faqs/containers/">Containers</a></li>
                     </ul>

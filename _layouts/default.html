@@ -5,33 +5,77 @@
         <meta charset="utf-8">
             <title>{{ site.name }}</title>
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <meta name="description" content="{{ site.description }}">
-            <link href="{{site.baseurl}}/css/bootstrap.css" rel="stylesheet">
-            <link href="{{site.baseurl}}/css/syntax.css" rel="stylesheet">
-            <link href="{{site.baseurl}}/css/rancher.css" rel="stylesheet">
-
-    </head>
+                <meta name="description" content="{{ site.description }}">
+                    <link href="{{site.baseurl}}/css/bootstrap.css" rel="stylesheet">
+                        <link href="{{site.baseurl}}/css/syntax.css" rel="stylesheet">
+                            <link href="{{site.baseurl}}/css/rancher.css" rel="stylesheet">
+                                <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+                                    </head>
     <body>
         <div class="container-fluid">
             <div class="row body" >
                 <div class="col-sm-3">
-                          {% include sidebar.html %}
+                    {% include sidebar.html %}
                 </div>
                 <div class="col-sm-9">
                     <div class="content-container">
                         {{ content }}
                     </div>
                 </div>
+                <div class="col-sm-12">
+                    <div class="row">
+                        <span class="copyright" >Copyright &copy; 2015  <a href="http://rancher.com">Rancher Labs</a>. All Rights Reserved.</span>
+                    </div>
+                </div>
             </div>
         </div>
     </body>
-    <footer>
-        <div class="container-fluid">
-            <div class="row">
-                <span class="pull-left">Copyright &copy; 2015  <a href="http://rancher.com">Rancher Labs</a>. All Rights Reserved.</span>
-            </div><!-- .row -->
-        </div><!-- #footer-content.container -->
-    </footer><!-- #footer -->
     <script src="http://code.jquery.com/jquery.js"></script>
     <script src="{{site.baseurl}}/js/bootstrap.js"></script>
+    <script>
+        jQuery(document).ready(function () {
+                               // Set height
+                               var content_height = $(".col-sm-9").height();
+                               $(".col-sm-3").css("min-height", content_height + "px");
+                               
+                               
+                               var url = window.location.pathname;
+                               $("ul").find("a[href='" + url + "']").addClass('active');
+                               var parents = $("ul").find("a[href='" + url + "']").parents('ul').length;
+                               if (parents === 2) {
+                               $("ul").find("a[href='" + url + "']").parent().parent().addClass('in');
+                               $("ul").find("a[href='" + url + "']").parent().parent().parent().find('a.collapsed').attr('aria-expanded', 'true');
+                               } else if (parents === 3) {
+                               $("ul").find("a[href='" + url + "']").parent().parent().addClass('in');
+                               var select = $("ul").find("a[href='" + url + "']").parent().parent().attr('id');
+                               $("ul").find("a[href='" + url + "']").parent().parent().parent().parent().addClass('in');
+                               $("ul").find("a[href='" + url + "']").parent().parent().parent().parent().parent().find('a[href=#' + select + ']').addClass('active');
+                               var select = $("ul").find("a[href='" + url + "']").parent().parent().parent().parent().attr('id');
+                               console.log(select);
+                               $("ul").find("a[href='" + url + "']").parent().parent().parent().parent().parent().parent().find('a[href=#' + select + ']').addClass('active');
+                               }
+                               
+                               var destination = $("ul.nav li a").attr("href");
+                               $("ul.nav li a").click(function (event) {
+                                                      event.preventDefault();
+                                                      var local_destination = $(this).attr("href");
+                                                      $.get(local_destination, function (data) {
+                                                            var title = $(data).find("title").text();
+                                                            var local_content = $(data).find(".col-sm-9").html();
+                                                            changeUrl(title, local_destination);
+                                                            
+                                                            $(".col-sm-9").html(local_content);
+                                                            // Set height
+                                                            var content_height = $(".col-sm-9").height();
+                                                            $(".col-sm-3").css("min-height", content_height + "px");
+                                                            });
+                                                      })
+                               });
+                               function changeUrl(title, url) {
+                                   if (typeof (history.pushState) != "undefined") {
+                                       var obj = {Title: title, Url: url};
+                                       history.pushState(obj, obj.Title, obj.Url);
+                                   }
+                               }
+    </script>
 </html>
