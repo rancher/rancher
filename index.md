@@ -45,17 +45,17 @@ The following figure illustrates Rancher's major features, its ability to run an
 
 ### Outline of This Guide
 
-It is easy to get Rancher up and running. If you have access to a Linux VM on your laptop or in a cloud, go to the [Quick Start Guide](/rancher/docs/quick-start-guide/) to get started right away.
+It is easy to get Rancher up and running. If you have access to a Linux VM on your laptop or in a cloud, go to the [Quick Start Guide]({{site.baseurl}}/docs/quick-start-guide/) to get started right away.
 
-If you are ready to set up a production-grade Rancher installation, follow the instructions in the [Installing Rancher](/rancher/docs/installing-rancher/) to setup a Rancher server and add hosts into the Rancher installation.
+If you are ready to set up a production-grade Rancher installation, follow the instructions in the [Installing Rancher]({{site.baseurl}}/docs/installing-rancher/installing-server/) to setup a Rancher server and add hosts into the Rancher installation.
 
-Before you start using Rancher, make sure to read through the [Concepts](/rancher/docs/concepts/) section to understand how Rancher works.
+Before you start using Rancher, make sure to read through the [Concepts]({{site.baseurl}}/docs/concepts/) section to understand how Rancher works.
 
-The [Configuration](/rancher/docs/configuration/) section documents how you perform various one-time tasks after you complete installation of Rancher and start using Rancher.
+The [Configuration]({{site.baseurl}}/docs/configuration/) section documents how you perform various one-time tasks after you complete installation of Rancher and start using Rancher.
 
-The next three sections--[Using Rancher Through Native Docker CLI](/rancher/docs/native-docker/), [Rancher Compose](/rancher/docs/rancher-compose), and [Rancher UI](/rancher/docs/rancher-ui)--covers three primary ways you can consume Rancher features.
+The next three sections--[Using Rancher Through Native Docker CLI]({{site.baseurl}}/docs/native-docker/), [Rancher Compose]({{site.baseurl}}/docs/rancher-compose), and [Rancher UI]({{site.baseurl}}/docs/rancher-ui)--covers three primary ways you can consume Rancher features.
 
-The [Upgrading Rancher](/rancher/docs/upgrading) section is essential if you run Rancher in production.
+The [Upgrading Rancher]({{site.baseurl}}/docs/upgrading) section is essential if you run Rancher in production.
 
-The [Contributing to Rancher](/rancher/docs/contributing) section contains information on how you can participate in the Rancher open source community.
+The [Contributing to Rancher]({{site.baseurl}}/docs/contributing) section contains information on how you can participate in the Rancher open source community.
 
