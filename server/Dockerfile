@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends openjdk-7-jre-h
                     unzip
 
 ENV CATTLE_HOME /var/lib/cattle
-ENV DEFAULT_CATTLE_API_UI_INDEX //releases.rancher.com/ui/0.26.0
+ENV DEFAULT_CATTLE_API_UI_INDEX //releases.rancher.com/ui/0.27.0
 ENV CATTLE_DB_CATTLE_DATABASE mysql
 ADD artifacts /usr/share/cattle
 
@@ -24,14 +24,14 @@ VOLUME ["/var/lib/mysql"]
 
 EXPOSE 8080
 ENV CATTLE_HOST_API_PROXY_MODE embedded
-ENV CATTLE_RANCHER_SERVER_IMAGE v0.24.0-rc3
-ENV CATTLE_RANCHER_COMPOSE_VERSION v0.1.1
-ENV DEFAULT_CATTLE_RANCHER_COMPOSE_LINUX_URL   https://github.com/rancherio/rancher-compose/releases/download/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose_linux-amd64
-ENV DEFAULT_CATTLE_RANCHER_COMPOSE_DARWIN_URL  https://github.com/rancherio/rancher-compose/releases/download/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose_darwin-amd64
-ENV DEFAULT_CATTLE_RANCHER_COMPOSE_WINDOWS_URL https://github.com/rancherio/rancher-compose/releases/download/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose_windows-386.exe
+ENV CATTLE_RANCHER_SERVER_IMAGE v0.24.0-rc4
+ENV CATTLE_RANCHER_COMPOSE_VERSION latest
+ENV DEFAULT_CATTLE_RANCHER_COMPOSE_LINUX_URL   https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-linux-amd64.tar.gz
+ENV DEFAULT_CATTLE_RANCHER_COMPOSE_DARWIN_URL  https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-darwin-amd64.tar.gz
+ENV DEFAULT_CATTLE_RANCHER_COMPOSE_WINDOWS_URL https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-windows-386.zip
 
 EXPOSE 3306
-ENV CATTLE_CATTLE_VERSION v0.54.0
+ENV CATTLE_CATTLE_VERSION v0.55.0
 ADD https://github.com/rancherio/cattle/releases/download/${CATTLE_CATTLE_VERSION}/cattle.jar /usr/share/cattle/
 RUN /usr/share/cattle/install_cattle_binaries
 
