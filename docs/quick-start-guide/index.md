@@ -64,11 +64,11 @@ $ sudo docker run -e CATTLE_AGENT_IP=192.168.111.159 -d --privileged -v /var/run
 
 Just copy, paste, and run this command in a shell terminal of the Rancher server host.
 
-Now, if you click **Close** on the Rancher UI, you will be directed back to the **Infrastructure** -> **Hosts** view, you should see the Rancher server host registered.
+Now, if you click **Close** on the Rancher UI, you will be directed back to the **Infrastructure** -> **Hosts** view. In a little bit, the Rancher server host will appear.
 
 ### Create a Container through UI
 
-In the newly added host, click **+ Add Container**. Provide the container a name like “first_container”. Leave the rest of the selection as default and click **Create**. You will see Rancher creates two containers. One is the **_first_container_** you specified. The other is a **_Network Agent_**, which is a system container created by Rancher to handle tasks such as cross-host networking, health checking, etc.
+In the newly added host, click **+ Add Container**. Provide the container a name like “first_container”. Leave the rest of the selection as default and click **Create**. You will see Rancher create two containers. One is the **_first_container_** you specified. The other is a **_Network Agent_**, which is a system container created by Rancher to handle tasks such as cross-host networking, health checking, etc.
 
 Regardless what IP address your host has, you will see both the **_first_container_** and **_Network Agent_** have IP addresses in the `10.42.*.*` range. Rancher has created this overlay network so containers can communicate with each other even if they reside on different hosts.
 
@@ -100,8 +100,7 @@ The label io.rancher.container.network enables us to pass a hint through the Doc
 
 ### Create a Multi-Container Application
 
-We have shown you how to create individual containers and connect them to a cross-host network. Most real-world applications, however, are made out of multiple services, with each service made up of multiple containers. A WordPress
-application, for example, could consist of the following services:
+We have shown you how to create individual containers and connect them to a cross-host network. Most real-world applications, however, are made out of multiple services, with each service made up of multiple containers. A WordPress application, for example, could consist of the following services:
 
 1. A load balancer service. The load balancer redirects Internet traffic to the WordPress application.
 2. A WordPress service consisting of two WordPress containers.
@@ -111,9 +110,13 @@ The load balancer service links to the WordPress service, and the WordPress serv
 
 In this section, we will show you how to create and deploy the WordPress application in Rancher.
 
-From the Rancher UI, click `Services` tab, and create a project called `WordPress`.
+From the Rancher UI, click `Services` tab, and create a project called `WordPress` by clicking on **Add Project**. 
 
-[TODO: Fill in the rest of the steps to create a mysql service, wordpress service, and load balancer service.]
+In the project, click on **Add Service**. First, we'll create the database service, by using the mysql image and using the **Advanced Options** to add the environment variable `MYSQL_ROOT_PASSWORD=pass1`. Click **Create**.
+
+Next, we'll add a Wordpress service linked to the database.
+
+[TODO: Fill in the rest of the steps to create a wordpress service, and load balancer service.]
 
 ### Create a Multi-Container Application using Rancher Compose
 

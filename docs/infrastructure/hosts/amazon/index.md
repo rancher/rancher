@@ -32,7 +32,7 @@ In the **Custom** option, you can choose an existing security group, but you wil
  * From the internet to TCP ports `9345` and `9346` (for UI hosts stats/graphs) 
  * From and To all other hosts on UDP ports `500` and `4500` (for IPsec networking)
 
-> **Note:** If you re-use the `rancher-machine` security group, any missing ports in the security group will not be re-opened. You will need to check the security 
+> **Note:** If you re-use the `rancher-machine` security group, any missing ports in the security group will not be re-opened. You will need to check the security group in AWS if the host does not launch correctly. 
 
 After choosing your security option, click on **Next: Set Instance Options**. 
 

@@ -23,7 +23,7 @@ Hosts are the most basic unit of resources. A host represents a Linux server wit
 <span class="highlight">Need more details on "host belonging to same user must be able to reach each other" or do we want to place in the add host section?</span>
 
 Please read more about how to get started with [hosts]({{site.baseurl}}/docs/infrastructure/hosts).
-                                                
+
 ### Environments
 
 It is sometimes desirable to use different resource pools for different workloads. For example, you may want to separate dev/test workload from production workload. A Rancher environment is a resource pool.
