@@ -41,13 +41,13 @@ Under Rancher's network, a container will be assigned both a Docker bridge IP (1
 
 ### Service Discovery
 
-Rancher adopts the standard Docker Compose terminology for services. A service is simply a group of containers created from the same Docker image.
+Rancher adopts the standard Docker Compose terminology for services and defines a basic service as one or more containers  created from the same Docker image.  Once a service (consumer) is linked to another service (producer) within the same project, a DNS record mapped to each container instance is automatically created and discoverable by containers from the "consuming" service.  Other benefits of creating a service under Rancher include:
 
-There are two ways for containers implementing a service to be discovered: by registering itself behind a load balancer or by registering itself in the DNS service.
-
-Rancher provides a managed load balancer service and a managed distributed DNS service. Load balancers have built-in health checks. Rancher additionally manages a health check services. Rancher removes unhealthy containers from the DNS service.
-
-Rancher services can link to services implemented by other containers or to external services defined as a web services API.
+* Service HA - the ability to have Rancher automatically monitor container states and maintain a service's desired scale.
+* Health Monitoring - the ability to set basic monitoring thresholds for container health.
+* Add Balancer Services - the ability to add a simple load balancer service for your services using HAProxy
+* Add External Services - the ability to add any-IP as a service to be discovered
+* Add Service Alias - the ability to add a DNS record for your services to be discovered
 
 ### Load Balancer
 
