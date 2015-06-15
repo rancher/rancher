@@ -7,15 +7,19 @@ layout: default
 ## Concepts
 ---
 
-In this section we introduce the key concepts in Rancher. You should be familiar with these concepts before attempting to use Rancher in production.
+In this section we introduce the key concepts in Rancher. You should be familiar with these concepts before attempting to use Rancher.
 
 ### Users
 
-Rancher is a multi-user platform. Each user has a distinct view of the resources and containers. Rancher open source software is configured to authenticate against GitHub. In the future, Rancher will authenticate against multiple user directories such as LDAP or Active Directory. 
+Users govern who has the access rights to view and manage Rancher resources within their environment.  By default, Rancher is configured with access for a single tenant but user authentication can be enabled using Github for multi-user support.  
 
-To learn more about how to add users, please read about [access control]({{site.baseurl}}/docs/configuration/access-control/), which needs to be configured to add users.
+Please read about [access control]({{site.baseurl}}/docs/configuration/access-control/) to enable GitHub authentication.
 
-<a id="host"></a>
+### Environments
+
+All hosts and any Rancher resources (i.e. containers, load balancers, etc.) are created and belong to an environment.  Access control to who can view and manage these resources are then defined by the owner of the environment.  Rancher currently supports the capability for each user to manage and invite other users to their environment and allows for the ability to create multiple environments for different workloads.  For example, you may want to create a "dev" environment and a separate "production" environment with its own set of resources and limited user access for your application deployment.
+
+[Access control]({{site.baseurl}}/docs/configuration/access-control/) will need to be set up before being able to [share environments]({{site.baseurl}}/docs/configuration/environments/) with users. 
 
 ### Hosts
 
@@ -24,13 +28,7 @@ Hosts are the most basic unit of resources. A host represents a Linux server wit
 
 Please read more about how to get started with [hosts]({{site.baseurl}}/docs/infrastructure/hosts).
 
-### Environments
 
-It is sometimes desirable to use different resource pools for different workloads. For example, you may want to separate dev/test workload from production workload. A Rancher environment is a resource pool.
-
-Each user may have access to one or more environments. A user may create new environments. The owner of an environment can grant other users to access the environment.
-
-[Access control]({{site.baseurl}}/docs/configuration/access-control/) will need to be set up before being able to [share environments]({{site.baseurl}}/docs/configuration/environments/) with users. 
 
 ### Networking
 
@@ -95,7 +93,8 @@ This command deploys the docker-compose.yml template in the current directory in
 
 Rancher implements scheduling policies that are modeled closely after Docker Swarm. Just like Docker Swarm, Rancher implements host-based and label-based affinity and anti-affinity scheduling policies. You can run Docker Swarm on Rancher directly, but rancher-compose requires certain extensions in scheduling policies not present in Docker Swarm. Extension to Docker Swarm include the global scheduling policy, where Rancher ensures an instance of a particular service exists on every host. (Son to verify and add more details here.)
 
+<!--
 ### Sidekicks
 
 Rancher implements a special scheduling directive for the sidekick pattern. If service A is a sidekick to service B, they must be scheduled and scaled in lock step. A service can have multiple sidekicks. The volumes-from directive only works between sidekicks. Sidekicks is somewhat similar to Kubernetes pods although it is limited to scheduling and does not imply namespace sharing. (Alena to review and add more details)
-
+-->
