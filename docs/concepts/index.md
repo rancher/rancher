@@ -51,15 +51,13 @@ Rancher adopts the standard Docker Compose terminology for services and defines 
 
 ### Load Balancer
 
-Rancher implements a managed load balancer service using HAProxy. A load balancer service can scale to multiple hosts.
-
-There are two ways to use load balancers. You can add individual containers to a load balancer manually. Alternatively, you can add a service to a load balancer. If you add a service to a load balancer, all containers implementing that service will be added to the load balancer automatically.
+Rancher implements a managed load balancer service using HAProxy that can be manually scaled to multiple hosts.  A load balancer can be used to distribute network and application traffic to individual containers by directly adding them or "linked" to a basic service.  A basic service that is "linked" to a load balancer will have all its underlying containers automatically configured by Rancher.
 
 ### Distributed DNS Service
 
-Rancher implements a distributed DNS service using our own light-weight DNS server coupled with a distributed control plane. Each healthy container is automatically added to the DNS service. When queried by the service name, the DNS service returns a randomized list of IP addresses of the healthy containers implementing that service.
+Rancher implements a distributed DNS service using our own light-weight DNS server coupled with a highly available control plane. Each healthy container is automatically added to the DNS service when linked to another service or added to a Service Alias. When queried by the service name, the DNS service returns a randomized list of IP addresses of the healthy containers implementing that service.
 
-Because Rancher’s overlay networking provides each container with a distinct IP address, we do not need to deal with port mappings and do not need to handle situations like the same service listening on different ports. As a result, a simple DNS service is adequate for handling service discovery.
+Because Rancher’s overlay networking provides each container with a distinct IP address, we do not need to deal with port mappings and do not need to handle situations like duplicated services listening on different ports. As a result, a simple DNS service is adequate for handling service discovery.
 
 ### Health Checks
 
