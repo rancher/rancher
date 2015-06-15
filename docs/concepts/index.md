@@ -29,6 +29,8 @@ Hosts are the most basic unit of resource within Rancher and is represented as a
 * Must be able to communicate with the Rancher server via http or https through the pre-configured port (Default is 8080).
 * Must be routable to any other hosts belonging to the same environment to leverage Rancher's cross-host networking for Docker containers.
 
+Rancher also supports Docker Machine and allows you to add your host via any of its supported drivers.
+
 Read the following to [add your first host]({{site.baseurl}}/docs/infrastructure/hosts) to Rancher.
 
 ### Networking
@@ -81,7 +83,7 @@ Rancher implements and ships a command-line tool called rancher-compose that is 
 
 ### Projects
 
-A Rancher project mirrors the same concept as a docker-compose project.  It also defines the scope of service discovery when linking service to one another.
+A Rancher project mirrors the same concept as a docker-compose project.  It also defines the scope of service discovery when linking services to one another.
 
 <!--
 ```bash
@@ -90,9 +92,16 @@ rancher-compose up -p app1
 
 This command deploys the docker-compose.yml template in the current directory into app1. All services in the same project can link to each other through service discovery.
 -->
-### Scheduling
+### Container Scheduling
 
-Rancher implements scheduling policies that are modeled closely after Docker Swarm. Just like Docker Swarm, Rancher implements host-based and label-based affinity and anti-affinity scheduling policies. You can run Docker Swarm on Rancher directly, but rancher-compose requires certain extensions in scheduling policies not present in Docker Swarm. Extension to Docker Swarm include the global scheduling policy, where Rancher ensures an instance of a particular service exists on every host. (Son to verify and add more details here.)
+Rancher supports container scheduling policies that are modeled closely after Docker Swarm.  They include scheduling based on:
+
+* port conflicts
+* shared volumes
+* host labels
+* strict and soft affinity/anti-affinity rules using both env var (Swarm) and labels (Rancher)
+
+In addition, Rancher supports addition scheduling service policies based off of host triggers like our Global policy which allows users to specify on rules like on "host add" or "host label", to automatically launch a container from a given service onto hosts with specific labels.
 
 <!--
 ### Sidekicks
