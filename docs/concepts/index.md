@@ -23,12 +23,13 @@ All hosts and any Rancher resources (i.e. containers, load balancers, etc.) are 
 
 ### Hosts
 
-Hosts are the most basic unit of resources. A host represents a Linux server with a certain amount of CPU, memory, and local disk storage resources. A host must have network connectivity and must be able to reach the Rancher server. A host belonging to the same user must be able to reach each other. A host needs to have only one IP address (although it does not hurt to have multiple IPs associated with a host, like when hosts use public and private IP addresses for Internet-facing and internal traffic.)
-<span class="highlight">Need more details on "host belonging to same user must be able to reach each other" or do we want to place in the add host section?</span>
+Hosts are the most basic unit of resource within Rancher and is represented as any Linux server, virtual or physical, with the following minimum requirements:
 
-Please read more about how to get started with [hosts]({{site.baseurl}}/docs/infrastructure/hosts).
+* Any modern Linux distribution that supports Docker 1.6+.
+* Must be able to communicate with the Rancher server via http or https through the pre-configured port (Default is 8080).
+* Must be routable to any other hosts belonging to the same environment to leverage Rancher's cross-host networking for Docker containers.
 
-
+Read the following to [add your first host]({{site.baseurl}}/docs/infrastructure/hosts) to Rancher.
 
 ### Networking
 
