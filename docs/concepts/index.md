@@ -61,11 +61,11 @@ Because Rancher’s overlay networking provides each container with a distinct I
 
 ### Health Checks
 
-Rancher implements a distributed health checker by running an HAProxy instance on every host. These HAProxy instances are used for the sole purpose of health checking and not used for load balancing. Each container is checked by up to three HAProxy instances running on different hosts. The container is considered healthy if it passes health check with at least one of the HAProxy instances.
+Rancher implements a distributed health monitoring system by running an HAProxy instance on every host for the sole purpose of providing health checks to containers.  When health checks are enabled either on an individual container or a service,  each container is then monitored by up to three HAProxy instances running on different hosts. The container is considered healthy if at least one HAProxy instance reports a "passed" health check.
 
 Rancher’s approach handles network partitions and is more efficient than client-based health checks. By using HAProxy to perform health checks, Rancher enables users to specify the same health check policy for DNS service and for load balancers.
 
-Depending on the result of health checks, a container is either in green or red state. A service is in green state if all the containers implementing that service are in green state. If all the containers are in red state the service is in red state. A service is in yellow state if Rancher has detected some of the containers in red state and is performing an action to remedy the situation.
+Depending on the result of health checks, a container is either in a green or red state. A service is in green (or "up") state if all containers implementing that service are in a green state and alternatively, in a red (or "down") state if all containers are subsequently in a red state.  A service is in yellow (or "degraded") state if Rancher has detected that at least one of the containers is either in a red state or in the process of returning it to a green state.
 
 ### Service HA
 
