@@ -28,19 +28,12 @@ These options will bring you to the **Add Container** page. Any options that `do
 3. If desired, set up port mapping for your host to container relationship. Assuming that your host is using its public IP, when we are mapping ports, we are creating the ability to access the container through the host IP. In the **Port Map** section, you will define the public ports that will be used to communicate with the container. You will also be defining which port will be exposed on the container. When mapping ports for a container to a host, Rancher will check to see if there are any port conflicts. 
 
 4. In the **Advanced Options** section, all options available in Docker are available for Rancher. By default, we have set the `-i -t`. 
-    
-    Linking containers will not automatically populate any environment variables that is supported when linking containers. You will need to manually add the environment variables when launching the container. Rancher supports the ability to copy and paste environment variable (i.e. `name=value`) pairs into any of the environment variable name fields. 
-
- * All keys and values are trimmed on both sides. Empty lines are ignored.
- * If there is an existing value for a `name` in the paste, the old value is overwritten.
- * A line with just a key (no "=") is allowed. If the entire paste has no "=" then it is not a special paste and the string just replaces the name you pasted into.
   
  If you chose to add the container from the **Infrastructure** -> **Containers** page, Rancher will automatically pick a host for you. Otherwise, if you have picked a host to add a container to, the host will be populated within the **Advanced Options** -> **Security/Host** tab.
     
  **Labels/Scheduling**
 
  When creating containers, we provide the option to create labels for the container and the ability to schedule which host you want the container to be placed on. The scheduling rules provide flexibility on how you want Rancher to pick which host to use. In Rancher, we use container labels to help define scheduling rules. You can create as many labels on a container as you'd like. By default, Rancher adds labels on every container, which Rancher uses to define how to treat the container within Rancher. With multiple scheduling rules, you have complete control on which host you want the container to be created on. You could request that the container to be launched on a host with a specific host label, container label or name, or a specific service. These scheduling rules can help create blacklists and whitelists for your container to host relationships. 
-
 
 Labels can be found in the **Advanced Options** -> **Labels** section of page. To add scheduling rules, open the **Advanced Options** -> **Scheduling** section. 
 
