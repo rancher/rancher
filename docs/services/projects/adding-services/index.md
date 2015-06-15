@@ -61,17 +61,17 @@ _Fields_
 * **service with the name**: Rancher will check to see if a host has a container from the specified service running on it. If at a later time, this service has a name change or is inactive/removed, the rule will no longer be valid. 
 * **container with the name**: Rancher will check to see if a host has a container with a specific name running on it. If at a later time, the container has a name change or is inactive/removed, the rule will no longer be valid.
 
-### Starting the Service
+### Starting Services
 
-After filling out the information for your service, click **Create**. Creating the service will not automatically start the service. This allows you to create multiple services and when your application is ready, you can start all services at once!
+After filling out the information for your service, click **Create**. Creating the service will not automatically start the service. Currently, any linked services that are dependent on environment variables will need to be started in the correct order. This means that you will need to start the database before any services that are linked to the database. <!--This allows you to create multiple services and when your application is ready, you can start all services at once!-->
 
 Now that we've launched our database, we'll add the Wordpress service to our project. This time, we'll launch 3 containers in our service using the Wordpress image. We will not expose any ports in our Wordpress service as we will want to load balance this application. Since we've already created the database service, we'll pick the database service in the **Service Links** and select the name _mysql_. Just like Docker, Rancher will set up the environment variables in the WordPress image when linking two containers together, by naming the database as _mysql_.
 
 Click on **Create** and our Wordpress app is ready to be started! In our wordpress app, it shows us that the database service is linked. 
 
-### Starting Services
+<!-- ### Starting Services
 
-There are several ways to start services. You can immediately start it after creating the service by clicking on the **Start** link within the service or even using the **Start** option in the service's dropdown menu. You can also wait until after you have created all your services and start them all at once using the **Start Services** in the dropdown menu of the Project. 
+There are several ways to start services. You can immediately start it after creating the service by clicking on the **Start** link within the service or even using the **Start** option in the service's dropdown menu. You can also wait until after you have created all your services and start them all at once using the **Start Services** in the dropdown menu of the Project. -->
 
 ### Load Balancing Services
 
