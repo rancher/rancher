@@ -51,7 +51,7 @@ Rancher adopts the standard Docker Compose terminology for services and defines 
 
 ### Load Balancer
 
-Rancher implements a managed load balancer service using HAProxy that can be manually scaled to multiple hosts.  A load balancer can be used to distribute network and application traffic to individual containers by directly adding them or "linked" to a basic service.  A basic service that is "linked" to a load balancer will have all its underlying containers automatically configured by Rancher.
+Rancher implements a managed load balancer service using HAProxy that can be manually scaled to multiple hosts.  A load balancer can be used to distribute network and application traffic to individual containers by directly adding them or "linked" to a basic service.  A basic service that is "linked" will have all its underlying containers automatically registered as load balancer targets by Rancher.
 
 ### Distributed DNS Service
 
