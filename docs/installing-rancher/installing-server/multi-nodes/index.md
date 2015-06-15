@@ -46,8 +46,14 @@ When launching rancher server, the following environment variables will need to 
 1. Each server must have the basic [system requirements]({{site.baseurl}}/docs/installing-rancher/installing-server/) needed to run Rancher
 2. Verify all servers can talk to your Redis installation
 3. Verify all servers can talk to your ZooKeeper installation
-4. Setup your MySQL database
-      * You will need to create a database and user before starting Rancher server.
+4. Setup your MySQL database: You will need to create a database and user before starting Rancher server.
+
+    ```sql
+    CREATE DATABASE IF NOT EXISTS cattle COLLATE = 'utf8_general_ci' CHARACTER SET = 'utf8';
+    GRANT ALL ON cattle.* TO 'cattle'@'%' IDENTIFIED BY 'cattle';
+    GRANT ALL ON cattle.* TO 'cattle'@'localhost' IDENTIFIED BY 'cattle'; 
+    ```
+
 5. Launch your rancher server instances with this command:
       
       ```bash

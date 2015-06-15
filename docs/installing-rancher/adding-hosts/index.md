@@ -10,10 +10,9 @@ Within Rancher, we provide easy instructions to add your host from the Cloud pro
 
 ### Hosts Requirements
 
-* Docker 1.6.2+ ([Steps]({{site.baseurl}}/docs/installing-rancher/installing-server/#docker-install) on how to update to the latest Docker binary)
-* Ubuntu 14.04, CoreOS 494+, CentOS 6/7, RHEL 6/7 
+* Any modern Linux distribution that supports Docker 1.6+. (Ubuntu, RHEL/CentOS 6/7 are more heavily tested.) 
+* 1GB RAM 
 * Recommended CPU w/ AES-NI 
-* Note: These are the only tested distributions at the moment, but most modern Linux distributions will work.
 
 ### Host Registration
 
