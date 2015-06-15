@@ -30,9 +30,7 @@ When using port mapping, if the scale of your service is more than the number of
 
 If other services have already been created, you can add links to the service. Linking services will link all containers in one service to all containers in another service. It acts just like the `--link` functionality in a `docker run` command. 
 
-> **Note:** Linking services and/or containers will not automatically populate any environment variables that is supported when linking containers. You will need to manually add the environment variables when launching the container. 
-
-For the MySQL service, we'll need to add the `MYSQL_ROOT_PASSWORD` as an environment variable and provide the key and value.
+For the MySQL service, we'll need to add the `MYSQL_ROOT_PASSWORD` as an environment variable and provide the key and value. This field is located in the **Advanced Options**.
 
 <a id="scheduling-services"></a>
 ### Labels/Scheduling 
@@ -67,9 +65,7 @@ _Fields_
 
 After filling out the information for your service, click **Create**. Creating the service will not automatically start the service. This allows you to create multiple services and when your application is ready, you can start all services at once!
 
-Now that we've launched our database, we'll add the Wordpress service to our project. This time, we'll launch 3 containers in our service using the Wordpress image. We will not expose any ports in our Wordpress service as we will want to load balance this application. Since we've already created the database service, we'll pick the database service in the **Service Links**.
-
-As mentioned earlier, linking our services/containers will not automatically pass through any environment variables. In docker, when linking the database, the `WORDPRESS_DB_HOST` and `WORDPRESS_DB_PASSWORD` environment variables are typically populated. In our case, we'll need to manually add these environment variables to our service. When linking services to each other, we can just use the name of the service and Rancher will automatically provide all the containers in that service. 
+Now that we've launched our database, we'll add the Wordpress service to our project. This time, we'll launch 3 containers in our service using the Wordpress image. We will not expose any ports in our Wordpress service as we will want to load balance this application. Since we've already created the database service, we'll pick the database service in the **Service Links**. Just like Docker, Rancher will set up the environment variables in the WordPress image when linking two containers together. 
 
 Click on **Create** and our Wordpress app is ready to be started! In our wordpress app, it shows us that the database service is linked. 
 
@@ -79,4 +75,4 @@ There are several ways to start services. You can immediately start it after cre
 
 ### Load Balancing Services
 
-At this time, it would make sense to load balance our Wordpress service. Let's move on to how to [add a load balancer]({{site.baseurl}}/docs/services/projects/adding-balancers/) into our project.
+At this point, it would make sense to load balance our Wordpress service. Let's move on to how to [add a balancer service]({{site.baseurl}}/docs/services/projects/adding-balancers/) into our project.
