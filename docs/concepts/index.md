@@ -11,7 +11,7 @@ In this section we introduce the key concepts in Rancher. You should be familiar
 
 ### Users
 
-Users govern who has the access rights to view and manage Rancher resources within their environment.  By default, Rancher is configured with access for a single tenant but user authentication can be enabled using Github for multi-user support.  
+Users govern who has the access rights to view and manage Rancher resources within their environment.  Rancher allows access for a single tenant but multi-user support can be enabled by integrating with GitHub's OAuth support for authorization.
 
 Please read about [access control]({{site.baseurl}}/docs/configuration/access-control/) to enable GitHub authentication.
 
