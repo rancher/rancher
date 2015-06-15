@@ -12,7 +12,7 @@ We'll walk through how to load balance the Wordpress application created earlier
 
 In the **Add Load Balancer** page, you will need to provide a **Name** and if desired, **Description** of the load balancer. Use the slider to select the number of load balancers you want launched. 
 
-> **Note:** The number of load balancers cannot exceed the number of hosts in the environment, otherwise there will be a port conflict and the balancer service will be stuck in an activating state. It will continue to try and find an available host and open port until you edit the scale of the balancer service or [add additional hosts]({{site.baseurl}}/infrastructure/hosts/). 
+> **Note:** The number of load balancers cannot exceed the number of hosts in the environment, otherwise there will be a port conflict and the balancer service will be stuck in an activating state. It will continue to try and find an available host and open port until you edit the scale of the balancer service or [add additional hosts]({{site.baseurl}}/docs/infrastructure/hosts/). 
 
 In our example, we only have 2 hosts in our environment, so therefore we can only create a maximum of 2 load balancers.
 
@@ -36,5 +36,5 @@ Click on **Create**.
 
 Just like with services, the balancer is not started until the user starts the service. You can individually start the load balancer by clicking **Start** or selecting **Start** in the dropdown menu. If the user selects to **Start Services** from the dropdown menu of the project, then it will also start a balancer.
 
-Now, to see the balancer in action, click on a container name inside the balancer service. This will bring you to a detailed container page of the balancer. Copy the IP address of the host by clicking on the **paper icon**. Paste the IP into the web browser of your choice and add **:8090**. The Wordpress application will come up.
+Now, to see the balancer in action, click on a container name inside the balancer service. This will bring you to a detailed container page of the balancer. Copy the IP address of the host by clicking on the **paper icon**. Paste the IP into the web browser of your choice and add `:8090`. The Wordpress application will come up.
 

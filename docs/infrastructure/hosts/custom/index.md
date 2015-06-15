@@ -17,7 +17,7 @@ For any hosts that are added, please make sure that any security groups or firew
 * From the internet to TCP ports `9345` and `9346` (for UI hosts stats/graphs)
 * From and To all other hosts on UDP ports `500` and `4500` (for IPsec networking)
 
-Once your hosts are added to Rancher, they are available for [our services]({{site.baseurl}}/docs/services/).
+Once your hosts are added to Rancher, they are available for [our services]({{site.baseurl}}/docs/services/projects/adding-services/).
 
 <a id="samehost"></a>
 ### Adding Hosts to the same machine as Rancher Server

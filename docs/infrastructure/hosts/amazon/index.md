@@ -49,6 +49,6 @@ Finally, you'll just need to finish filling out the final details of the host(s)
 7. (Optional) Add **[labels]({{site.baseurl}}/docs/infrastructure/hosts/#labels)** to hosts to help organize your hosts and to [schedule services]({{site.baseurl}}/docs/services/projects/adding-services/#scheduling-services).
 8. When complete, click **Create**. 
 
-Rancher will create the EC2 instance(s) and launch the _rancher-agent_ container in the instance. In a couple of minutes, the host will be active and available for [services]({{site.baseurl}}/docs/services/).
+Rancher will create the EC2 instance(s) and launch the _rancher-agent_ container in the instance. In a couple of minutes, the host will be active and available for [services]({{site.baseurl}}/docs/services/projects/adding-services/).
 
 

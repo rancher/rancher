@@ -6,7 +6,7 @@ layout: default
 ## Balancer Configs on Rancher
 ---
 
-A load balancer config is a configuration used to set up a [load balancer]({{site.baseurl}}/docs/load-balancers) or [load balancer service]({{site.baseurl}}/docs/services/projects/adding-balancers). The load balancer config includes listener(s), a health check policy and cookie policies (i.e. stickiness). When a load balancer is created, the balancer config is used to create the HAProxy config in the HA Proxy software inside the load balancer agent container. A load balancer config can be used with multiple load balancers, but cannot be re-used with balancer services.
+A load balancer config is a configuration used to set up a [load balancer]({{site.baseurl}}/docs/infrastructure/load-balancers) or [load balancer service]({{site.baseurl}}/docs/services/projects/adding-balancers). The load balancer config includes listener(s), a health check policy and cookie policies (i.e. stickiness). When a load balancer is created, the balancer config is used to create the HAProxy config in the HA Proxy software inside the load balancer agent container. A load balancer config can be used with multiple load balancers, but cannot be re-used with balancer services.
 
 > **Note:** If any change is made to the balancer config, it will be propagated on all load balancers or balancer services using that load balancer config.
 
@@ -65,6 +65,6 @@ If at any time you want to change the name or description of the [load balancer]
 ## Deleting Balancer Configs
 ---
 
-Once a balancer config is created, you can remove it from the Rancher instance. But you'll only be able to remove a config as long as it's not actively being used by a load balancer or balancer service. In the **Infrastructure** -> **Balancer Configs**, you can view the list of balancer configs in Rancher in your [environment]({{site.baseurl}}/docs/configuration/environment/).
+Once a balancer config is created, you can remove it from the Rancher instance. But you'll only be able to remove a config as long as it's not actively being used by a load balancer or balancer service. In the **Infrastructure** -> **Balancer Configs**, you can view the list of balancer configs in Rancher in your [environment]({{site.baseurl}}/docs/configuration/environments/).
 
 In the list of balancer configs, you can see which load balancers and balancer services are using the balancer configs. If the balancer config has **None** listed in the **Used by** column, then the dropdown menu of the balancer config will have the option to **Delete**.

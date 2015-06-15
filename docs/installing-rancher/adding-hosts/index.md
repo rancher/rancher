@@ -36,7 +36,7 @@ When a host is added to Rancher, an agent container is launched on the host. Ran
 
 With each host, you have the ability to add labels to help you organize your hosts. The labels are a key/value pair and the keys must be unique identifiers. If you added two keys with different values, we'll take the last inputted value to use as the key/value pair.
 
-By adding labels to hosts, you can use these labels when [scheduling services]({{site.baseurl}}/docs/services/projects/adding-services/#scheduling-services) and create a whitelist or blacklist of hosts for your [services]({{site.baseurl}}/docs/services) to run on. 
+By adding labels to hosts, you can use these labels when [scheduling services]({{site.baseurl}}/docs/services/projects/adding-services/#scheduling-services) and create a whitelist or blacklist of hosts for your [services]({{site.baseurl}}/docs/services/projects/adding-services) to run on. 
 
 <a id="machine-config"></a>
 ### Host Access for Hosts created by Rancher

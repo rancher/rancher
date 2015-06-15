@@ -12,11 +12,11 @@ In the **Services** -> **Projects** page, click on **Add Project**. You will nee
 
 You will immediately be brought to the project and can begin [adding services]({{site.baseurl}}/docs/services/projects/adding-services/), [adding balancer services]({{site.baseurl}}/docs/services/projects/adding-balancers/), [adding service aliases]({{site.baseurl}}/docs/services/projects/adding-service-alias), or [adding external services]({{site.baseurl}}/docs/services/projects/adding-external-services).
 
-> **Note:** Before deploying any services, you'll need to have a least 1 host launched in Rancher. Please follow our [documentation]({{site.baseurl}}/infrastructure/hosts) to learn how to add hosts to Rancher.
+> **Note:** Before deploying any services, you'll need to have a least 1 host launched in Rancher. Please follow our [documentation]({{site.baseurl}}/docs/infrastructure/hosts) to learn how to add hosts to Rancher.
 
 ### Viewing Project Services
 
-From the projects page, you can easily monitor all your projects in your [environment]({{site.baseurl}}/docs/configuration/environment). From each project, you can expand the project to show the individual services by clicking on the carat next to the dropdown menu.
+From the projects page, you can easily monitor all your projects in your [environment]({{site.baseurl}}/docs/configuration/environments/). From each project, you can expand the project to show the individual services by clicking on the carat next to the dropdown menu.
 
 This will expand to show you any services within the project as well as all the containers that are part of the service. You can click on any individual container or service to go to the detailed page.
 
@@ -26,6 +26,8 @@ This will expand to show you any services within the project as well as all the 
 As services are created, we simultaneously create a `docker-compose.yml` and `rancher.yml` file of your project. The `docker-compose` yaml file could be used outside of Rancher to start the same set of services using the `docker-compose` commands. Read [here](https://docs.docker.com/compose/) for more information on `docker-compose`. 
 
 The `rancher.yml` file is used to manage the additional information used by Rancher to start services. These fields are not supported inside the docker-compose file.
+
+With these files, you can also use `rancher-compose` to start services that will be included in Rancher. For more details, please read about [rancher-compose]({{site.baseurl}}/docs/rancher-compose/).
 
 ### Viewing Configurations
 
