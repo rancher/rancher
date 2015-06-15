@@ -8,7 +8,7 @@ layout: default
 
 Currently, upgrades are **NOT** officially supported between releases before we hit a GA release. Therefore, certain features might break in later versions as we enhance them. The procedure we follow when we upgrade is outlined below. We typically only go from one version to the next if we do upgrade.
 
-Use the original Rancher Server container to be your DB server forever. Any changes that are made in the upgraded version will always be saved in the original Rancher Server container.
+Use the original Rancher Server container to be your DB server. Any changes that are made in the upgraded version will always be saved in the original Rancher Server container.
 
 > **Note:** Do not remove the original Rancher Server container at any time! 
 

@@ -9,10 +9,8 @@ Rancher is deployed as a set of Docker containers. Running Rancher is a simple a
 
 ### Requirements
 
-* Docker 1.6.2+ ([Steps]({{site.baseurl}}/docs/installing-rancher/installing-server/#docker-install) on how to update to the latest Docker binary)
-* Ubuntu 14.04, CoreOS 494+, CentOS 6/7, RHEL 6/7 
+* Any modern Linux distribution that supports Docker 1.6+. (Ubuntu, RHEL/CentOS 6/7 are more heavily tested.) 
 * 1GB RAM 
-* Note: These are the only tested distributions at the moment, but most modern Linux distributions will work.
 
 ### Launching Rancher Server 
 
@@ -45,7 +43,17 @@ The following environment variables will need to be passed within the `docker ru
 * CATTLE_DB_CATTLE_PASSWORD: `Password`
 
 
-> **Note:** The name and user of the database must already exist in order for Rancher to be able to create the database schema. Rancher will not create the database.
+> **Note:** The name and user of the database must already exist in order for Rancher to be able to create the database schema. Rancher will not create the database. 
+
+Here is the SQL command to create a database and users.
+
+ ```sql
+ CREATE DATABASE IF NOT EXISTS cattle COLLATE = 'utf8_general_ci' CHARACTER SET = 'utf8';
+ GRANT ALL ON cattle.* TO 'cattle'@'%' IDENTIFIED BY 'cattle';
+ GRANT ALL ON cattle.* TO 'cattle'@'localhost' IDENTIFIED BY 'cattle';
+ ```
+
+After the database and user is created, you can run the command to launch rancher server.
 
 ```bash
 sudo docker run -d --restart=always -p 8080:8080 \
@@ -54,69 +62,5 @@ sudo docker run -d --restart=always -p 8080:8080 \
     -e CATTLE_DB_CATTLE_MYSQL_NAME: <Name of Database> \
     -e CATTLE_DB_CATTLE_USERNAME: <Username> \
     -e CATTLE_DB_CATTLE_PASSWORD: <Password> \
-    -e CATTLE_ZOOKEEPER_CONNECTION_STRING: <comma separated list of zookeeper IPs ie. 10.0.1.2,10.0.1.3> \
-    -e CATTLE_REDIS_HOSTS: <comma separated list of host:port server ips. ie 10.0.1.3:6379,10.0.1.4:6379> \
-    -e CATTLE_REDIS_PASSWORD: <optional Redis password> \
     rancher/server
-```
-<a id="docker-install"></a>
-
-## Updating to Latest Docker Binary
-
-### Ubuntu 14.04
-
-Please refer to the official Docker [documentation](https://docs.docker.com/installation/ubuntulinux/) for how to install Docker on Ubuntu 14.04.
-
-```bash
-# Get the latest Docker version
-$ sudo wget -qO- https://get.docker.com/ | sh
-# Check the Docker version
-$ sudo docker version
-```
-
-### CentOS/RHEL 6/7
-
-Please refer to the official Docker documentation for how to install Docker on [CentOS](https://docs.docker.com/installation/centos/) or [RHEL](https://docs.docker.com/installation/rhel/).
-
-**CentOS/RHEL 7**
-
-```bash
-# Stop the Docker daemon
-$ sudo systemctl stop docker.service
-# Install wget for CentOS 7
-$ sudo yum install wget
-# Get the latest Docker version 
-$ sudo wget https://get.docker.com/builds/Linux/x86_64/docker-latest -O /usr/bin/docker
-# Start the Docker daemon
-$ sudo systemctl start docker.service
-# Check the Docker version
-$ sudo docker version
-```
-
-RHEL 7/Docker 1.6.2: The service will fail to start due to an invalid argument. We need to remove one of the arguments in the Docker service file and reboot. 
-
-```bash
-# Edit the service file if docker fails to start
-$ sudo vi /usr/lib/systemd/system/docker.service
-```
-Remove the `$ADD_REGISTRY` argument from the file, reboot and attempt to start the Docker service again.
-
-```bash
-# Start the Docker daemon
-$ sudo service docker start
-# Check the Docker version
-$ sudo docker version
-```
-
-**CentOS/RHEL 6**
-
-```bash
-# Stop the Docker daemon
-$ sudo service docker stop
-# Get the latest Docker version 
-$ sudo wget https://get.docker.com/builds/Linux/x86_64/docker-latest -O /usr/bin/docker
-# Start the Docker daemon
-$ sudo service docker start
-# Check the Docker version
-$ sudo docker version
 ```

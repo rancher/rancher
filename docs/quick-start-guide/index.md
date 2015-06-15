@@ -16,13 +16,8 @@ Get a Linux host with 64-bit Ubuntu 14.04 running, which must have a kernel of 3
 To install Docker on the server, follow these instructions, which are simplified from the [Docker](https://docs.docker.com/installation/ubuntulinux/) documentation. 
 
 ```bash
-#Verify that wget is installed
-$ which wget
-#If wget isn't installed, install it after updating your manager
-$ sudo apt-get update
-$ sudo apt-get install wget
 #Get the latest Docker package
-$ sudo wget -qO- https://get.docker.com/ | sh
+$ wget -qO- https://get.docker.com/ | sh
 # Verify Docker works
 $ sudo docker version
 ```
@@ -32,7 +27,9 @@ $ sudo docker version
 You can start Rancher server by simply typing this command:
 
 ```bash
-$ sudo docker run --restart=always -p 8080:8080 rancher/server
+$ sudo docker run -d --restart=always -p 8080:8080 rancher/server
+# Tail the logs to show Rancher
+$ sudo docker logs -f containerid
 ```
 
 It takes a couple of minutes for Rancher server to start up. In the logs, Rancher UI is up and running, when you see this in your screen. 
