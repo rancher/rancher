@@ -83,7 +83,7 @@ Rancher implements and ships a command-line tool called rancher-compose that is 
 
 ### Projects
 
-A Rancher project mirrors the same concept as a docker-compose project.  It also defines the scope of service discovery when linking services to one another.
+A Rancher project mirrors the same concept as a docker-compose project.  It also defines the scope of service discovery when linking services to one another and represents a group of services that make up a typical application or workload.
 
 <!--
 ```bash
@@ -101,7 +101,7 @@ Rancher supports container scheduling policies that are modeled closely after Do
 * host labels
 * strict and soft affinity/anti-affinity rules using both env var (Swarm) and labels (Rancher)
 
-In addition, Rancher supports addition scheduling service policies based off of host triggers like our Global policy which allows users to specify on rules like on "host add" or "host label", to automatically launch a container from a given service onto hosts with specific labels.
+In addition, Rancher supports scheduling service triggers that allows users to specify rules such as on "host add" or "host label" to automatically scale services onto hosts with specific labels.
 
 <!--
 ### Sidekicks
