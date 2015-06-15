@@ -10,9 +10,9 @@ layout: default
 
 In the **Services** -> **Projects** page, click on **Add Project**. You will need to provide a **Name** and click **Create**. 
 
-You will immediately be brought to the project and can begin [adding services]({{site.baseurl}}/docs/services/projects/adding-services/) or [adding balancer services]({{site.baseurl}}/docs/services/projects/adding-balancers/).
+You will immediately be brought to the project and can begin [adding services]({{site.baseurl}}/docs/services/projects/adding-services/), [adding balancer services]({{site.baseurl}}/docs/services/projects/adding-balancers/), [adding service aliases]({{site.baseurl}}/docs/services/projects/adding-service-alias), or [adding external services]({{site.baseurl}}/docs/services/projects/adding-external-services).
 
-> **Note:** Before deploying any services, you'll need to have a least 1 host launched in Rancher. Please follow our [documentation]({{site.baseurl}}/getting-started/hosts) to learn how to add hosts to Rancher.
+> **Note:** Before deploying any services, you'll need to have a least 1 host launched in Rancher. Please follow our [documentation]({{site.baseurl}}/infrastructure/hosts) to learn how to add hosts to Rancher.
 
 ### Viewing Project Services
 

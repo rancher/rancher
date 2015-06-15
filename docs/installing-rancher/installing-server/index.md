@@ -24,11 +24,11 @@ sudo docker run -d --restart=always -p 8080:8080 rancher/server
 
 The UI and API will be available on the exposed port `8080`. After the docker image is downloaded, it will take a minute or two before Rancher has successfully started. The IP of the machine will need to be public and accessible from the internet in order for Rancher to work.
 
-You can access the UI by going to the following URL. The `machine_ip` is the public IP address of the host that is running Rancher server.
+You can access the UI by going to the following URL. The `server_ip` is the public IP address of the host that is running Rancher server.
 
-`http://machine_ip:8080`
+`http://server_ip:8080`
 
-Once the UI is up and running, you can start [adding hosts]({{site.baseurl}}/docs/infrastructure/hosts/). After the hosts are setup, you can start running [services]({{site.baseurl}}/docs/services/).
+Once the UI is up and running, you can start [adding hosts]({{site.baseurl}}/docs/infrastructure/hosts/). After the hosts are setup, you can start adding [services]({{site.baseurl}}/docs/services/projects/adding-services/).
 
 <a id="external-db"></a>
 
@@ -38,34 +38,27 @@ If you require using an external database to run Rancher server, please follow t
 
 The following environment variables will need to be passed within the `docker run` command in order to decouple the server from the DB. 
 
-```bash
-CATTLE_DB_CATTLE_MYSQL_HOST
-CATTLE_DB_CATTLE_MYSQL_PORT
-CATTLE_DB_CATTLE_USERNAME
-CATTLE_DB_CATTLE_PASSWORD
-CATTLE_DB_CATTLE_MYSQL_NAME
-```
+* CATTLE_DB_CATTLE_MYSQL_HOST: `hostname or IP of MySQL instance`
+* CATTLE_DB_CATTLE_MYSQL_PORT: `3306`
+* CATTLE_DB_CATTLE_MYSQL_NAME: `Name of Database`
+* CATTLE_DB_CATTLE_USERNAME: `Username`
+* CATTLE_DB_CATTLE_PASSWORD: `Password`
 
-> **Note:** The `CATTLE_DB_CATTLE_MYSQL_NAME` must already exist in order for Rancher to be able to create the database schema. Rancher will not create the database.
 
-```bash
-sudo docker run -d --restart=always -p 8080:8080 -e CATTLE_DB_CATTLE_MYSQL_HOST=<location_of_db> -e CATTLE_DB_CATTLE_MYSQL_PORT=<port_of_db> -e CATTLE_DB_CATTLE_USERNAME=<username_for_db> -e CATTLE_DB_CATTLE_PASSWORD=<password_for_user> -e CATTLE_DB_CATTLE_MYSQL_NAME=<name_of_existing_db>  rancher/server
-```
-
-### Running Rancher behind a Proxy
-
-In order to set up a HTTP proxy, you'll need to edit the Docker daemon to point to the proxy. Before launching Rancher, you'll need to edit the `/etc/default/docker` file to point to your proxy and restart Docker.
+> **Note:** The name and user of the database must already exist in order for Rancher to be able to create the database schema. Rancher will not create the database.
 
 ```bash
-$ sudo vi /etc/default/docker
+sudo docker run -d --restart=always -p 8080:8080 
+    -e CATTLE_DB_CATTLE_MYSQL_HOST=<location_of_db> 
+    -e CATTLE_DB_CATTLE_MYSQL_PORT=<port_of_db> 
+    -e CATTLE_DB_CATTLE_USERNAME=<username_for_db> 
+    -e CATTLE_DB_CATTLE_PASSWORD=<password_for_user> 
+    -e CATTLE_DB_CATTLE_MYSQL_NAME=<name_of_existing_db>  
+    rancher/server
 ```
-
-Within the file, edit the `#export http_proxy="http://127.0.0.1:3128/"` to have it point to your proxy. Save your changes and then restart docker. Restarting Docker is different on every OS. 
-
 <a id="docker-install"></a>
-## Installing the Latest Docker Versions
 
-Please refer to the official Docker [documentation](https://docs.docker.com/installation/) on how to install Docker. We have provided a quick guide on how to get Docker up with the latest binary on some of our supported OSes. All of the directions are assuming that Docker is already installed and you just need to upgrade to latest binary.
+## Updating to Latest Docker Binary
 
 ### Ubuntu 14.04
 
