@@ -65,7 +65,7 @@ _Fields_
 
 After filling out the information for your service, click **Create**. Creating the service will not automatically start the service. This allows you to create multiple services and when your application is ready, you can start all services at once!
 
-Now that we've launched our database, we'll add the Wordpress service to our project. This time, we'll launch 3 containers in our service using the Wordpress image. We will not expose any ports in our Wordpress service as we will want to load balance this application. Since we've already created the database service, we'll pick the database service in the **Service Links**. Just like Docker, Rancher will set up the environment variables in the WordPress image when linking two containers together. 
+Now that we've launched our database, we'll add the Wordpress service to our project. This time, we'll launch 3 containers in our service using the Wordpress image. We will not expose any ports in our Wordpress service as we will want to load balance this application. Since we've already created the database service, we'll pick the database service in the **Service Links** and select the name _mysql_. Just like Docker, Rancher will set up the environment variables in the WordPress image when linking two containers together, by naming the database as _mysql_.
 
 Click on **Create** and our Wordpress app is ready to be started! In our wordpress app, it shows us that the database service is linked. 
 
