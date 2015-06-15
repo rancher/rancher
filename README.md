@@ -6,7 +6,7 @@ Rancher is an open source project that provides a complete platform for operatin
 
 Rancher is deployed as a set of Docker containers.  Running Rancher is a simple as launching two containers.  One container as the management server and another container on a node as an agent.  You can install the containers in following approaches.
 
-* [Manually](#installation)
+* [Manually](#launching-management-server)
 * [Vagrant](#vagrant)
 * [Puppet](https://github.com/nickschuch/puppet-rancher) (Thanks @nickschuch) 
 
