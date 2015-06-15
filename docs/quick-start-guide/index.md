@@ -91,10 +91,10 @@ If you take a look at the IP address of **_second_container_**, you will notice 
 What if we want to create a Docker container through CLI and still give it an IP address from Rancher’s overlay network? We can accomplish that by specifying a label on the Docker command line:
 
 ```bash
-docker run --it --label io.rancher.container.network=true ubuntu
+docker run -it --label io.rancher.container.network=true ubuntu
 ```
 
-The label io.rancher.container.network enables us to pass a hint through the Docker command line so Rancher will set up the container to connect to the overlay network.
+The label `io.rancher.container.network` enables us to pass a hint through the Docker command line so Rancher will set up the container to connect to the overlay network.
 
 <!--Given Rancher’s ability to import existing containers automatically, you might wonder why you do not see the Rancher server container itself in the Rancher UI. To avoid confusion, Rancher does not automatically import server or agent containers created by Rancher.-->
 
@@ -109,14 +109,15 @@ We have shown you how to create individual containers and connect them to a cros
 The load balancer service links to the WordPress service, and the WordPress service links to the MySQL service.
 
 In this section, we will show you how to create and deploy the WordPress application in Rancher.
+From the Rancher UI, click the **Services** tab, and create a project called **WordPress** by clicking on **Add Project**. 
 
-From the Rancher UI, click `Services` tab, and create a project called `WordPress` by clicking on **Add Project**. 
+In the project, click on **Add Service**. First, we'll create a database service called _mysql_ and use the mysql image. In the **Advanced Options**, add the environment variable `MYSQL_ROOT_PASSWORD=pass1`. Click **Create**. 
 
-In the project, click on **Add Service**. First, we'll create the database service, by using the mysql image and using the **Advanced Options** to add the environment variable `MYSQL_ROOT_PASSWORD=pass1`. Click **Create**.
+Next, we'll add a WordPress service and link to the mysql service. Add another service called _wordpress_ with the wordpress image and use the slider to have the scale of the service be 2 containers. In the **Service Links**, add the _mysql_ service and provide a name such as _database_. In the **Advanced Options**, add in the environment variables that are used when setting up an external DB in WordPress. Though Rancher is linking the two services together, the environment variables in the wordpress service will need to be explicitly set. You will need to set these two environment variables:  `WORDPRESS_DB_HOST=mysql:3306` and `WORDPRESS_DB_PASSWORD=pass1`. Click **Create**.
 
-Next, we'll add a Wordpress service linked to the database.
+Finally, we'll create our load balancer. Click on the dropdown menu icon next to the **Add Service** button. Select **Add Balancer Service**. Provide a name like _wordpress-lb_ and select the target. The target will be _wordpress_ service. Finally, set the public port on the host that you'll use to access the wordpress application and set the target port as `80`. Click **Create**.
 
-[TODO: Fill in the rest of the steps to create a wordpress service, and load balancer service.]
+All the services have been created, but they need to be started. In the project dropdown menu on the right, select **Start Services**. All the services should start. Find the IP of the host that the load balancer is on. Open a browser to the `host_IP:public_port` and you should see the wordpress application.
 
 ### Create a Multi-Container Application using Rancher Compose
 

@@ -6,7 +6,7 @@ layout: default
 ## Adding DigitalOcean Hosts
 ---
 
-Rancher supports provisioning [DigitalOcean](https://www.digitalocean.com/) hosts using `docker machine`. If you don't have a DigitalOcean account, here's a <span class="highlight">"[link]</span> to get free $10 credit. You'll just need to make sure you input billing information in order to activate the credit.
+Rancher supports provisioning [DigitalOcean](https://www.digitalocean.com/) hosts using `docker machine`. If you don't have a DigitalOcean account, here's a [link](https://www.digitalocean.com/?refcode=e6dff463eb35) to get free $10 credit. You'll just need to make sure you input billing information in order to activate the credit.
 
 ### Finding DigitalOcean Credentials
 

@@ -20,13 +20,9 @@ Syntax of image names. By default, we pull from the docker registry. If no tag i
 
 We'll start by creating our MySQL database service with only 1 container.
 
-![Services on Rancher 1]({{site.baseurl}}/img/rancher_add_services_1.png)
-
 ### Service Options
 
-Just like adding individual [containers]({{site.baseurl}}/docs/infrastructure/containers/), any options that `docker run` supports, Rancher also supports! Port mapping and service links are shown on the main page, but other options are within the **Advanced Options** section. <span class="highlight">Do we want to go over every possible option in Rancher and how it maps to docker?</span>
-
-![Services on Rancher 2]({{site.baseurl}}/img/rancher_add_services_2.png)
+Just like adding individual [containers]({{site.baseurl}}/docs/infrastructure/containers/), any options that `docker run` supports, Rancher also supports! Port mapping and service links are shown on the main page, but other options are within the **Advanced Options** section. 
 
 Assuming that your host is using its public IP, when we are mapping ports, we are creating the ability to access the container through the host IP. In the **Port Map** section, you will define the public ports that will be used to communicate with the container. You will also be defining which port will be exposed on the container. When mapping ports for a container to a host, Rancher will check to see if there are any port conflicts. 
 
@@ -37,8 +33,6 @@ If other services have already been created, you can add links to the service. L
 > **Note:** Linking services and/or containers will not automatically populate any environment variables that is supported when linking containers. You will need to manually add the environment variables when launching the container. 
 
 For the MySQL service, we'll need to add the `MYSQL_ROOT_PASSWORD` as an environment variable and provide the key and value.
-
-![Services on Rancher 3]({{site.baseurl}}/img/rancher_add_services_3.png)
 
 <a id="scheduling-services"></a>
 ### Labels/Scheduling 
@@ -55,7 +49,7 @@ By selecting this option, all containers in your service will be started on the 
 **Option 2: Automatically pick hosts for each container matching scheduling rules**
 By selecting this option, you have the flexibility to choose your scheduling rules. Any host that follows all the rules is a host that could have the containers started on. You can add rules by clicking on the **+** button. 
 
-For each rule, you select a **condition** of the rule. There are 4 different conditions, which define how strict the rule must be followed. The **field** determines which field you want the rule to be applied to. The **key** and **value** are the values which you want the field to be checked against. <span class="highlight">Rancher will spread the distribution of containers on the applicable hosts based on the load of each host. Depending on the condition chosen will determine what the applicable hosts are.</span>
+For each rule, you select a **condition** of the rule. There are 4 different conditions, which define how strict the rule must be followed. The **field** determines which field you want the rule to be applied to. The **key** and **value** are the values which you want the field to be checked against. Rancher will spread the distribution of containers on the applicable hosts based on the load of each host. Depending on the condition chosen will determine what the applicable hosts are.
 
 _Conditions_
 

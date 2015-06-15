@@ -8,17 +8,13 @@ layout: default
 
 ### What is Access Control?
 
-Access Control is how Rancher limits the users who have access to your Rancher instance. By default, access control is not configured. This means anyone who has the IP address of your Rancher instance will be able to use it and access the API. Your Rancher instance is open to the public! We recommend configuring Access Control after launching Rancher. Upon enabling access control, you can share your Rancher instance to who you want to. They will be required to authenticate to the instance before being able to access it. The API becomes only accessible to those who have valid API keys to the instance. <span class="highlight">Provide a description of Access Control</span>
+Access Control is how Rancher limits the users who have access to your Rancher instance. By default, access control is not configured. This means anyone who has the IP address of your Rancher instance will be able to use it and access the API. Your Rancher instance is open to the public! We recommend configuring Access Control after launching Rancher. Upon enabling access control, you can share your Rancher instance to who you want to. They will be required to authenticate to the instance before being able to access it. The API becomes only accessible to those who have valid API keys to the instance. 
 
 The first account that authenticates with Rancher will become the **admin** of the account. Only the admin will have permissions to view **Access Control** and **[Host Registration]({{site.baseurl}}/docs/configuration/host-registration/)**. As an admin of the site, you also have the ability to view all [environments]({{site.baseurl}}/docs/configuration/environments/) in the site even if you are not added as a member to the environment. In the admin's environment dropdown menu, they will only see the environments that they are added to, but all environments can be seen on the **Manage Environments** page.
 
 ### Enabling Access Control
 
 In the account dropdown menu, click on **Access Control** within the Administration section or click on the **Settings** link in the red banner.
-
-<img src="{{site.baseurl}}/img/rancher_access_control_1.png" style="float: left; margin-right: 1%; margin-bottom: 0.5em;">
-<img src="{{site.baseurl}}/img/rancher_access_control_2.png" style="float: left; margin-right: 1%; margin-bottom: 0.5em;">
-<p style="clear: both;">
 
 Follow the directions to register Rancher as a GitHub application. After authenticating your Rancher instance with GitHub, access control will be enabled. With access control enabled, you will be able to manage different [environments]({{site.baseurl}}/docs/configuration/environments/) and share them with different groups of people.
 

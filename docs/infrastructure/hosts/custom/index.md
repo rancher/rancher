@@ -12,8 +12,6 @@ If you are using different [environments]({{site.baseurl}}/docs/configuration/en
 
 Please make sure that you are in the environment that you want to add hosts to. The environment is displayed in the upper right corner next to the account dropdown. When you first login to the Rancher instance, you are in the **Default** environment.
 
-![Environments on Rancher 1]({{site.baseurl}}/img/rancher_environments_1.png)
-
 For any hosts that are added, please make sure that any security groups or firewalls allow traffic. If these are not enabled, then the functionality of Rancher will be limited.
 
 * From the internet to TCP ports `9345` and `9346` (for UI hosts stats/graphs)

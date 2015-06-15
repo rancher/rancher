@@ -10,8 +10,8 @@ Rancher is deployed as a set of Docker containers. Running Rancher is a simple a
 ### Requirements
 
 * Docker 1.6.2+ ([Steps]({{site.baseurl}}/docs/installing-rancher/installing-server/#docker-install) on how to update to the latest Docker binary)
-* Ubuntu 14.04, CoreOS 494+, CentOS 6/7, RHEL 6/7 <span class="highlight">What else are we going to support?</span>
-* <span class="highlight">RAM/CPU?</span>
+* Ubuntu 14.04, CoreOS 494+, CentOS 6/7, RHEL 6/7 
+* 1GB RAM 
 * Note: These are the only tested distributions at the moment, but most modern Linux distributions will work.
 
 ### Launching Rancher Server 
@@ -66,8 +66,6 @@ Within the file, edit the `#export http_proxy="http://127.0.0.1:3128/"` to have 
 ## Installing the Latest Docker Versions
 
 Please refer to the official Docker [documentation](https://docs.docker.com/installation/) on how to install Docker. We have provided a quick guide on how to get Docker up with the latest binary on some of our supported OSes. All of the directions are assuming that Docker is already installed and you just need to upgrade to latest binary.
-
-<span class="highlight">How to update CoreOS?</span>
 
 ### Ubuntu 14.04
 

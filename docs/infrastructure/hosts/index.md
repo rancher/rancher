@@ -5,8 +5,6 @@ layout: default
 
 ## Getting Started with Hosts
 ---
-<span class="highlight">A host is a Linux machine that is used to deploy and run all your applications. The machine can be physical or virtual, which allows you flexibility of how you want to set up your Rancher instance. </span>
-
 Within Rancher, we provide easy instructions to add your host from the Cloud providers that are supported directly from our UI as well as instructions to add your own host if your Cloud provider is not supported yet.
 
 <a id="addhost"></a>
@@ -15,11 +13,7 @@ Within Rancher, we provide easy instructions to add your host from the Cloud pro
 
 From the **Hosts** tab within the Infrastructure tab, you click on **Add Host**.
 
-![Hosts on Rancher 1]({{site.baseurl}}/img/rancher_hosts_1.png)
-
 The first time that you add a host, you may be required to set up the [Host Registration]({{site.baseurl}}/docs/configuration/host-registration/). This setup determines what DNS name or IP address, and port that your hosts will be connected to the Rancher API. By default, we have selected the management server IP and port `8080`.  If you choose to change the address, please make sure to specify the port that should be used to connect to the Rancher API. At any time, you can update the [Host Registration]({{site.baseurl}}/docs/configuration/host-registration/). After setting up your host registration, click on **Save**.
-
-![Host Registration on Rancher 1]({{site.baseurl}}/img/rancher_hosts_registration_1.png)
 
 We support adding hosts directly from cloud providers or adding a host that's already been provisioned. Select which host type you want to add:
 
@@ -34,7 +28,6 @@ When a host is added to Rancher, an agent container is launched on the host. Ran
 <a id="hostlabels"></a>
 ### Host Labels
 
-<span class="highlight">Needs review and additional content</span>
 With each host, you have the ability to add labels to help you organize your hosts. The labels are a key/value pair and the keys must be unique identifiers. If you added two keys with different values, we'll take the last inputted value to use as the key/value pair.
 
 By adding labels to hosts, you can use these labels when [scheduling services]({{site.baseurl}}/docs/services/projects/adding-services/#scheduling-services) and create a whitelist or blacklist of hosts for your [services]({{site.baseurl}}/docs/services) to run on. 
@@ -49,8 +42,6 @@ To SSH into your host, go to your terminal/command prompt. Navigate to the folde
 ```bash
 $ ssh -i id_rsa root@<IP_OF_HOST>
 ```
-
-<span class="highlight">What to use JSON file included in the machine config?</span>
 
 ### Cloning a Host
 

@@ -8,9 +8,9 @@ layout: default
 
 A load balancer config is a configuration used to set up a [load balancer]({{site.baseurl}}/docs/load-balancers) or [load balancer service]({{site.baseurl}}/docs/services/projects/adding-balancers). The load balancer config includes listener(s), a health check policy and cookie policies (i.e. stickiness). When a load balancer is created, the balancer config is used to create the HAProxy config in the HA Proxy software inside the load balancer agent container. A load balancer config can be used with multiple load balancers, but cannot be re-used with balancer services.
 
-<span class="highlight">IS THIS POSSIBLE? Note: If any change is made to the balancer config, it will be propagated on all load balancers or balancer services using that load balancer config.
+> **Note:** If any change is made to the balancer config, it will be propagated on all load balancers or balancer services using that load balancer config.
 
-In any balancer config, you have the ability to edit the listeners, health check or stickiness. Let's review in detail what each one of them are.</span>
+In any balancer config, you have the ability to edit the listeners, health check or stickiness. Let's review in detail what each one of them are.
 
 The list of load balancer configs can be found in the **Infrastructure** --> **Balancer Configs**. This list will show the names of all the balancer configs in Rancher as well as how many listeners are in each config. The stickiness policy will be displayed as well as the load balancers/load balancer services using the load balancer config. 
 
@@ -26,20 +26,23 @@ Any load balancer config will need a listener. The listener is the mapping that 
 
 Health Check is the policy that can be defined to determine if the target ports and target IPs are reachable. 
 
-The **HTTP Check** is the <span class="highlight">Need feedback on how to describe these fields</span>
+If **HTTP Check** is blank, then a tcp request is being made against the healthcheck port to confirm that the backend server is up. You can choose to fill in a http uri in the **HTTP Check**, which will change the health check into a http request to the specificed http uri. 
 
 The **Check Interval** is how often Rancher will check that the targets are still available. The default interval is 2000 ms. The **Timeout** is how long Rancher will wait for a response from the target before giving up. The default timeout is 2000 ms. 
 
-There is a **Healthy Threshold** and an **Unhealthy Threshold**. This is the <span class="highlight">what exactly do they do?</span>
+A **Healthy Threshold** is the number of consecutive successful health checks that are required for Rancher to consider the server as operational. 
+
+An **Unhealthy Threshold** is the number of consectutive unsuccessful health checks that are required for Rancher to consider the server as dead. 
 
 ### Stickiness
 
 Stickiness is the cookie policy that you want to use for when using cookies of the website. 
 
 The three options that Rancher provides are:
+
 * **None**: This option means that no cookie policy is in place.
-* **Use existing cookie**: This option means <span class="highlight">What exactly?</span>
-* **Create new cookie**: This option means <span class="highlight">What exactly?</span>
+* **Use existing cookie**: This option means that we will attempt to use the application's cookie for stickiness policies configuration. 
+* **Create new cookie**: This option means that the cookie will be defined outside of your application. This cookie is what the load balancer would set on requests and responses. This cookie would determine the stickiness policy. 
 
 You can only select one of these three choices and by default, we have selected **None**.
 

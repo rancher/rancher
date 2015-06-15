@@ -6,14 +6,9 @@ layout: default
 ## Projects
 ---
 
-<span class="highlight">WHAT IS A PROJECT?</span>
-
 ### Adding Projects
 
 In the **Services** -> **Projects** page, click on **Add Project**. You will need to provide a **Name** and click **Create**. 
-
-![Services Options on Rancher 1]({{site.baseurl}}/img/rancher_projects_1.png)
-
 
 You will immediately be brought to the project and can begin [adding services]({{site.baseurl}}/docs/services/projects/adding-services/) or [adding balancer services]({{site.baseurl}}/docs/services/projects/adding-balancers/).
 
@@ -52,10 +47,6 @@ Option 2: Copy the file to your clipboard by clicking on the icon next to the fi
 We can view the project in another view, which shows how all services/balancers are related to each other. If they are linked together, there is a connection between the service names. 
 
 Clicking on the **graph icon** will show this view.
-
-<span class="highlight">**NEED IMAGE OF COMPLICATED APPLICATION!**</highlight>
-![Services Options on Rancher 5]({{site.baseurl}}/img/rancher_projects_5.png)
-
 
 ### Editing Services
 ---

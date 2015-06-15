@@ -49,6 +49,6 @@ To remove targets from the load balancer, pick the target that you want removed 
 
 ### Editing Balancer Configurations
 
-If you want to edit the balancer config, you will need to go to the detailed view of the load balancer by clicking on its name. Navigate to the **Config** tab of the load balancer.
+In **Infrastructure** -> **Balancer Configs**, find the balancer config that you want to edit. In the balancer config's dropdown menu, select **Edit**. 
 
-Click on **Edit Configuration**. <span class="highlight">Currently, we only support editing the config's name and description.</span>
+In the Edit page, you'll be able to edit all fields related to a balancer config. 
