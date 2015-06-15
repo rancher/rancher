@@ -8,28 +8,28 @@ layout: default
 More details coming soon!
 =======
 
-As of the Beta release, Rancher server is capable of running in an HA configuration. We recognize the setup is complex, and will be working on making it easier to stand up as we approach GA. In the meantime, if you would like to experiment with Rancher running in HA here is the basic outline.
+As of the Beta release, Rancher server is capable of running in a HA configuration. We recognize that the setup is complex, and we will be working on making it easier to stand up as we approach GA. In the meantime, if you would like to experiment with Rancher running in HA, here is the basic outline.
 
-###Pre-requisites
+### Pre-requisites
 
-To launch an HA configuration Rancher needs the following:
+To launch a HA configuration Rancher needs the following:
 
-1. Shared MySQL DB instance
-2. Redis
-3. Zookeeper
-4. Load balancer to spread traffic across instances.
+*  Shared MySQL DB instance
+*  Redis
+*  Zookeeper
+*  Load balancer to spread traffic across the Rancher instances
 
 
-Documentation for building and scaling reliable Redis and Zookeeper installations are outside the scope of this document. As far as Rancher is concerned though, Redis and Zookeeper do not need to persist the data used by Rancher. If either ZooKeeper or Redis go down, Rancher will also, but the data in those system does not need to be present to recover. 
+Documentation for building and scaling reliable Redis and Zookeeper installations are outside the scope of this document. As far as Rancher is concerned though, Redis and Zookeeper do not need to persist the data used by Rancher. If either ZooKeeper or Redis go down, Rancher will also go down, but the data in those system does not need to be present to recover. 
 
 For MySQL, you can run your own or use MySQL provided by a cloud provider. We have used Google Cloud SQL and AWS RDS MySQL. 
 
-Loadbalancing configuration can be handled in a number of ways. In this configuration servers can be used in a round-robin configuration. The most basic health check that could be used is hitting the /ping url. It does not require authentication to resceive the `pong` response. 
+Load balancing configuration can be handled in a number of ways. In our example configuration, servers are used in a round-robin configuration. The most basic health check that could be used is hitting the `/ping` url. It does not require authentication to receive the `pong` response. 
 
 
 ### Configuration
 
-When Launching the Rancher Server the following environment variables will need to be set.
+When launching rancher server, the following environment variables will need to be set:
 
 * Database:
   * CATTLE_DB_CATTLE_MYSQL_HOST: `hostname or IP of MySQL instance`
@@ -45,15 +45,15 @@ When Launching the Rancher Server the following environment variables will need 
 
 ### Steps
 
-1. Each server must have the basic [system requirements](http://rancherio.github.io/rancher/docs/installing-rancher/installing-server/) needed to run Rancher.
-2. Verify all servers can talk to your Redis installation.
-3. Verify all servers can talk to ZooKeeper installation.
-4. Setup your MySQL database. 
-      - you will need to create a database and user before starting Rancher server.
-5. Launch your Rancher Server instances
+1. Each server must have the basic [system requirements]({{site.baseurl}}/docs/installing-rancher/installing-server/) needed to run Rancher
+2. Verify all servers can talk to your Redis installation
+3. Verify all servers can talk to your ZooKeeper installation
+4. Setup your MySQL database
+      * You will need to create a database and user before starting Rancher server.
+5. Launch your rancher server instances with this command:
       
       ```
-      docker run --restart=always -p 8080:8080 \
+      sudo docker run -d --restart=always -p 8080:8080 \
       -e CATTLE_DB_CATTLE_MYSQL_HOST: <hostname or IP of MySQL instance> \
       -e CATTLE_DB_CATTLE_MYSQL_PORT: <port> \
       -e CATTLE_DB_CATTLE_MYSQL_NAME: <Name of Database> \
@@ -65,5 +65,5 @@ When Launching the Rancher Server the following environment variables will need 
       rancher/server
       ```  
       
-6. Point load balancer at the server targets.
+6. Point your load balancer at the server targets
 7. Go to new installation ip: `http://<LB ip>:<port>` 
