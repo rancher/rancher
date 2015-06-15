@@ -13,5 +13,3 @@ The setup determines what DNS name or IP address, and port that your hosts will 
 
 If [access control]({{site.baseurl}}/docs/configuration/access-control/) is turned on for Rancher, only the **admin** will be able to change the host registration. The **admin** is the first user to authenticate with Rancher when access control was configured. If access-control is still not configured, any users to the site can change host registration. In the account dropdown menu at the upper right corner, **Host Registration** can be found under the **Administration** section. 
 
-![Host Registration on Rancher 2]({{site.baseurl}}/img/rancher_hosts_registration_2.png)
-

@@ -91,10 +91,10 @@ If you take a look at the IP address of **_second_container_**, you will notice 
 What if we want to create a Docker container through CLI and still give it an IP address from Rancher’s overlay network? We can accomplish that by specifying a label on the Docker command line:
 
 ```bash
-docker run --it --label io.rancher.container.network=true ubuntu
+docker run -it --label io.rancher.container.network=true ubuntu
 ```
 
-The label io.rancher.container.network enables us to pass a hint through the Docker command line so Rancher will set up the container to connect to the overlay network.
+The label `io.rancher.container.network` enables us to pass a hint through the Docker command line so Rancher will set up the container to connect to the overlay network.
 
 <!--Given Rancher’s ability to import existing containers automatically, you might wonder why you do not see the Rancher server container itself in the Rancher UI. To avoid confusion, Rancher does not automatically import server or agent containers created by Rancher.-->
 

@@ -23,8 +23,6 @@ All of repositories are located within our main GitHub [page](https://github.com
 
 [UI Repo](https://github.com/rancherio/ui): This repo is where all the UI for Rancher is developed. 
 
-<span class="highlight">Need to know what other repos should be listed</span>
-
 If you have any updates to our documentation, please fork the `gh-pages` branch in our main [Rancher Repo](https://github.com/rancherio/rancher) and contribute to that branch. 
 
 ### Bugs

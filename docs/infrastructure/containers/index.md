@@ -6,8 +6,6 @@ layout: default
 ## Containers
 ---
 
-<span class="highlight">A container is where applications and it's dependencies are launched through Docker. </span>
-
 ### Adding Containers
 
 Typically, we recommend that people add containers using [services]({{site.baseurl}}/docs/services/projects/adding-services) as it provides a little more flexibility for the user, but sometimes we understand that you might want to spin up one container. 
@@ -28,8 +26,6 @@ These options will bring you to the **Add Container** page. Any options that `do
     `[registry-name]/[namespace]/[imagename]:[version]`
 
 3. If desired, set up port mapping for your host to container relationship. Assuming that your host is using its public IP, when we are mapping ports, we are creating the ability to access the container through the host IP. In the **Port Map** section, you will define the public ports that will be used to communicate with the container. You will also be defining which port will be exposed on the container. When mapping ports for a container to a host, Rancher will check to see if there are any port conflicts. 
- 
-    There is also an ability to select **Publish all ports to a random host port**. <span class="highlight">Need to know what the outcome of what this does</span>
 
 4. In the **Advanced Options** section, all options available in Docker are available for Rancher. By default, we have set the `-i -t`. 
     
@@ -40,8 +36,6 @@ These options will bring you to the **Add Container** page. Any options that `do
  * A line with just a key (no "=") is allowed. If the entire paste has no "=" then it is not a special paste and the string just replaces the name you pasted into.
   
  If you chose to add the container from the **Infrastructure** -> **Containers** page, Rancher will automatically pick a host for you. Otherwise, if you have picked a host to add a container to, the host will be populated within the **Advanced Options** -> **Security/Host** tab.
-
-<span class="highlight">Do we want to go over every possible option in Rancher and how it maps to docker?</span>
     
  **Labels/Scheduling**
 
@@ -58,7 +52,7 @@ By selecting this option, the container will be started on the same host. If you
 **Option 2: Automatically pick a host matching scheduling rules**
 By selecting this option, you have the flexibility to choose your scheduling rules. Any host that follows all the rules is a host that could have the container started on. You can add rules by clicking on the **+** button. 
 
-For each rule, you select a **condition** of the rule. There are 4 different conditions, which define how strict the rule must be followed. The **field** determines which field you want the rule to be applied to. The **key** and **value** are the values which you want the field to be checked against. <span class="highlight">Rancher will spread the distribution of containers on the applicable hosts based on the load of each host. Depending on the condition chosen will determine what the applicable hosts are.</span>
+For each rule, you select a **condition** of the rule. There are 4 different conditions, which define how strict the rule must be followed. The **field** determines which field you want the rule to be applied to. The **key** and **value** are the values which you want the field to be checked against. Rancher will spread the distribution of containers on the applicable hosts based on the load of each host. Depending on the condition chosen will determine what the applicable hosts are.
 
 _Conditions_
 
@@ -91,10 +85,10 @@ You can **Delete** a container and have it removed from the host.
 
 ### Executing the Shell
 
-When you select **Execute Shell**, it brings you into the container shell prompt. <span class="highlight">What do we want to write about the shell console?</span>"
+When you select **Execute Shell**, it brings you into the container shell prompt. 
 
 ### Viewing Logs
 
-It's always useful to see what is going on with the logs of a container. Clicking **View Logs** provides the equivalent of `docker logs -f <CONTAINER_ID>` on the host. <span class="highlight">Is this correct?</span>
+It's always useful to see what is going on with the logs of a container. Clicking **View Logs** provides the equivalent of `docker logs <CONTAINER_ID>` on the host.
 
 

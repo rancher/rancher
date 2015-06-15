@@ -6,7 +6,7 @@ layout: default
 ## Adding External Service
 ---
 
-You may have services hosted outside of Rancher that you want integrated with Rancher. You can add these services into Rancher by adding an external service. <span class="highlight">Need more details on use case/example</span>
+You may have services hosted outside of Rancher that you want integrated with Rancher. You can add these services into Rancher by adding an external service. 
 
 Inside your project, you add an external service by clicking on the dropdown icon next to the **Add Service** button. Select **External Service**. Alternatively, if you are viewing the projects at the project level, the same **Add Service** dropdown is visible for each specific project.
 

@@ -8,13 +8,11 @@ layout: default
 
 ### What is an Environment?
 
-<span class="highlight">An environment is a way to share deployments and resources with different sets of users. Within each environment, you have the ability to invite others so it makes it easy to collaborate with others. By adding users to your environment, they will have the also have the ability to create deployments and manage resources. </span>
+An environment is a way to share deployments and resources with different sets of users. Within each environment, you have the ability to invite others so it makes it easy to collaborate with others. By adding users to your environment, they will have the also have the ability to create deployments and manage resources. 
 
 > **Note:** Infrastructure resources cannot be shared across multiple environments. [Registries]({{site.baseurl}}/docs/configuration/registries/) and [API-Keys]({{site.baseurl}}/docs/configuration/api-keys/) are also environment specific.  
 
 The first time that you log in to Rancher, you are working in the **Default** environment. This default environment can be renamed, shared with others, or you can create additional environments to share with users. The environment that you're working in is always displayed in the upper right corner of the screen.
-
-![Environments on Rancher 1]({{site.baseurl}}/img/rancher_environments_1.png)
 
 ### Adding Environments
 

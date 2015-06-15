@@ -368,6 +368,15 @@ p{
     margin-bottom:20px;
 }
 
+body {
+    font-size:16px;
+    line-height:24px;
+    font-weight:400;
+    color :#343434;
+    font-family:'Open Sans', sans-serif;
+    margin-bottom:20px;
+}
+
 code{
     padding:2px 5px;
     display:inline-block;
