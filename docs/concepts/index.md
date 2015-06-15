@@ -98,10 +98,11 @@ Rancher supports container scheduling policies that are modeled closely after Do
 
 * port conflicts
 * shared volumes
-* host labels
+* host tagging
+* shared network stack: --net=container:dependency
 * strict and soft affinity/anti-affinity rules using both env var (Swarm) and labels (Rancher)
 
-In addition, Rancher supports scheduling service triggers that allows users to specify rules such as on "host add" or "host label" to automatically scale services onto hosts with specific labels.
+In addition, Rancher supports scheduling service triggers that allow users to specify rules such as on "host add" or "host label" to automatically scale services onto hosts with specific labels.
 
 <!--
 ### Sidekicks
