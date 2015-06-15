@@ -5,8 +5,6 @@ layout: default
 
 ## Installing Rancher Server (HA)
 ---
-More details coming soon!
-=======
 
 As of the Beta release, Rancher server is capable of running in a HA configuration. We recognize that the setup is complex, and we will be working on making it easier to stand up as we approach GA. In the meantime, if you would like to experiment with Rancher running in HA, here is the basic outline.
 
