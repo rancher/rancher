@@ -80,14 +80,16 @@ Rancher supports the notion of service upgrades by allowing users to either load
 Rancher implements and ships a command-line tool called rancher-compose that is modeled after docker-compose. It takes in the same docker-compose.yml templates and deploys the projects onto Rancher. The rancher-compose tool additionally takes in a rancher-compose.yml file which extends docker-compose.yml to allow specifications of attributes such as scale, load balancing rules, health check policies, and external links not yet currently supported by docker-compose.
 
 ### Projects
-Rancher project defines a scope of service discovery. It can be specified as an argument when running rancher-compose. For example:
 
+A Rancher project mirrors the same concept as a docker-compose project.  It also defines the scope of service discovery when linking service to one another.
+
+<!--
 ```bash
 rancher-compose up -p app1
 ```
 
 This command deploys the docker-compose.yml template in the current directory into app1. All services in the same project can link to each other through service discovery.
-
+-->
 ### Scheduling
 
 Rancher implements scheduling policies that are modeled closely after Docker Swarm. Just like Docker Swarm, Rancher implements host-based and label-based affinity and anti-affinity scheduling policies. You can run Docker Swarm on Rancher directly, but rancher-compose requires certain extensions in scheduling policies not present in Docker Swarm. Extension to Docker Swarm include the global scheduling policy, where Rancher ensures an instance of a particular service exists on every host. (Son to verify and add more details here.)
