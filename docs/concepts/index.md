@@ -69,11 +69,11 @@ Depending on the result of health checks, a container is either in a green or re
 
 ### Service HA
 
-Rancher can ensure that a fixed number of healthy containers are present in a service and restart new containers upon host crash or container failure.
+Rancher constantly monitors the state of your containers within a service and actively manages to ensure the desired scale of the service.  This can be triggered when there are fewer (or even more) healthy containers than the desired scale of your service, a host becomes unavailable, a container fails, or being unable to meet a health check.
 
 ### Service Upgrade
 
-To upgrade a service in Rancher, the user clones that service and gives it a new name. The cloned service runs a new version of Docker image. The cloned service retains all the links of the original service but is not linked to by any of the existing services. The cloned service can therefore be tested in isolation. Once the cloned service passes the test, it can be put into production by mapping to the original service name or adding to a load balancer.
+Rancher supports the notion of service upgrades by allowing users to either load balance or apply a service alias for a given service.  By leveraging either Rancher features, it creates a static destination for existing workloads that require that service.  Once this is established, the underlying service can be cloned from Rancher as a new service, validated through isolated testing, and added to either the load balancer or service alias when ready.  The existing service can be removed when obsolete and all network or application traffic are then automatically distributed to the new service.
 
 ### Rancher Compose
 
