@@ -77,7 +77,7 @@ Rancher supports the notion of service upgrades by allowing users to either load
 
 ### Rancher Compose
 
-Rancher implements a command-line tool called rancher-compose that is modeled after docker-compose. It takes in the same docker-compose.yml templates and deploys the application on Rancher. The rancher-compose tool additionally takes in a rancher-compose.yml file which extends and overwrites the docker-compose.yml file. The rancher-compose.yml file specifies attributes not present in standard docker-compose.yml files, such as the number of containers desired in a service, load balancing rules, and health check policies.
+Rancher implements and ships a command-line tool called rancher-compose that is modeled after docker-compose. It takes in the same docker-compose.yml templates and deploys the projects onto Rancher. The rancher-compose tool additionally takes in a rancher-compose.yml file which extends docker-compose.yml to allow specifications of attributes such as scale, load balancing rules, health check policies, and external links not yet currently supported by docker-compose.
 
 ### Projects
 Rancher project defines a scope of service discovery. It can be specified as an argument when running rancher-compose. For example:
