@@ -20,7 +20,7 @@ Follow the directions to register Rancher as a GitHub application. After authent
 
 ### Site Access
 
-By default, anyone who is a member or owner of an environment will have also access to the Rancher instance. Alternatively, you can also invite members to access the Rancher instance, but when they log in, they will have their own default environment. These members who are added using the **Site Access** will not be able to see other environments until they are added as a member to them.
+Anyone who is a member or owner of an environment will have also access to the Rancher instance. Alternatively, you can also invite members to access the Rancher instance, but when they log in, they will have their own environment. These members who are added using the **Site Access** will not be able to see other environments until they are added as a member to them.
 
 Anyone with permissions to view the Rancher instance will be given user permissions. They will not be able to view Access Control or Host Registration. The users will only be able to view environments that they are added to. 
 

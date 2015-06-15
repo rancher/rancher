@@ -12,7 +12,7 @@ An environment is a way to share deployments and resources with different sets o
 
 > **Note:** Infrastructure resources cannot be shared across multiple environments. [Registries]({{site.baseurl}}/docs/configuration/registries/) and [API-Keys]({{site.baseurl}}/docs/configuration/api-keys/) are also environment specific.  
 
-The first time that you log in to Rancher, you are working in the **Default** environment. This default environment can be renamed, shared with others, or you can create additional environments to share with users. The environment that you're working in is always displayed in the upper right corner of the screen.
+The first time that you log in to Rancher, you are working in a **Default** environment. This default environment can be renamed, shared with others, or you can create additional environments to share with users. The environment that you're working in is always displayed in the upper right corner of the screen.
 
 ### Adding Environments
 
@@ -25,10 +25,7 @@ To add new environments, you'll need to navigate to the **Manage Environments** 
 <img src="{{site.baseurl}}/img/rancher_environments_3.png" style="float: left; margin-right: 1%; margin-bottom: 0.5em;">
 <p style="clear: both;">
 
-
 After navigating to the **Environments** page, you will see a list of environments.
-
-![Environments on Rancher 4]({{site.baseurl}}/img/Rancher_environments_4.png)
 
 Click on **Add Environment**. Each environment will have its own name, description, and members. The members can be any individual GitHub user, a GitHub organization, or a GitHub team. 
 
@@ -36,9 +33,9 @@ Click on **Add Environment**. Each environment will have its own name, descripti
 
 There are two ways to add members to an environment. Provide the GitHub user or organization name. Click on the **+** to add the name to the list of members. If the name is not on the list, then they will not be added to the environment. Alternatively, there is a dropdown button on the right side of the **+** button. Rancher has automatically populated all the GitHub organizations and teams that your GitHub account is linked to. By selecting one of the organizations/teams, it will automatically add them to the list of members. 
 
-For each member (i.e. individual, team, or organization), you can define the role to be either an owner or a member. By default, they are added as a member. You can change their role in the dropdown next to their name. If you are an owner, you can always change the list of members and their roles at any time.
+For each member (i.e. individual, team, or organization), you can define the role to be either an owner or a member. By default, they are added to the list as a member. You can change their role in the dropdown next to their name. As an owner, you can always change the list of members and their roles at any time, but members do not have the ability to change the membership of the environment.
 
-Click on **Create** and the environment will immediately be available to all members and owners. At this point, anyone, that the environment is shared with, can start adding [services]({{site.baseurl}}/docs/services/)!
+Click on **Create** and the environment will immediately be available to all members and owners. At this point, anyone, that the environment is shared with, can start adding [services]({{site.baseurl}}/docs/services/)!. adding [hosts]({{site.baseurl}}/docs/infrastructure/hosts/) and anything else that a member can do.
 
 ### Editing Environments
 
@@ -46,9 +43,9 @@ After creating environments, owners might want to deactivate or delete the envir
 
 Deactivating an environment will remove the viewing ability from any members of the environment. All owners will still be able to view and activate the environment. You will not be able to change the membership of the environment until it's been re-activated. Nothing will change with your services or infrastructure. Therefore, if you want to make any changes to your services/infrastructure, you'll need to make these changes before your environment is deactivated.
 
-In order to delete an environment, you will need to first deactivate it. When you delete an environment, any resources created by Rancher should be deleted. Any hosts launched through the UI will be deleted on the cloud provider, but any hosts added by the [custom host]({{site.baseurl}}/docs/infrastructure/hosts/custom/) will remain on the cloud provider. Since those were not launched by Rancher, Rancher does not have the ability to delete those hosts.
+In order to delete an environment, you will need to first deactivate it. All registries, balancers and API keys created in the environment will be removed from Rancher.
 
-All registries, balancers and API keys created in the environment will be removed from Rancher.
+> **Note:** When deleting an environment, the hosts will not be removed from the cloud providers, so please make sure to check your cloud provider after deleting an environment. 
 
 ### Editing Members
 
