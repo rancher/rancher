@@ -52,7 +52,7 @@ When launching rancher server, the following environment variables will need to 
       * You will need to create a database and user before starting Rancher server.
 5. Launch your rancher server instances with this command:
       
-      ```
+      ```bash
       sudo docker run -d --restart=always -p 8080:8080 \
       -e CATTLE_DB_CATTLE_MYSQL_HOST: <hostname or IP of MySQL instance> \
       -e CATTLE_DB_CATTLE_MYSQL_PORT: <port> \
