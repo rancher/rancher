@@ -52,15 +52,15 @@ When launching rancher server, the following environment variables will need to 
       
       ```bash
       sudo docker run -d --restart=always -p 8080:8080 \
-      -e CATTLE_DB_CATTLE_MYSQL_HOST: <hostname or IP of MySQL instance> \
-      -e CATTLE_DB_CATTLE_MYSQL_PORT: <port> \
-      -e CATTLE_DB_CATTLE_MYSQL_NAME: <Name of Database> \
-      -e CATTLE_DB_CATTLE_USERNAME: <Username> \
-      -e CATTLE_DB_CATTLE_PASSWORD: <Password> \
-      -e CATTLE_ZOOKEEPER_CONNECTION_STRING: <comma separated list of zookeeper IPs ie. 10.0.1.2,10.0.1.3> \
-      -e CATTLE_REDIS_HOSTS: <comma separated list of host:port server ips. ie 10.0.1.3:6379,10.0.1.4:6379> \
-      -e CATTLE_REDIS_PASSWORD: <optional Redis password> \
-      rancher/server
+        -e CATTLE_DB_CATTLE_MYSQL_HOST: <hostname or IP of MySQL instance> \
+        -e CATTLE_DB_CATTLE_MYSQL_PORT: <port> \
+        -e CATTLE_DB_CATTLE_MYSQL_NAME: <Name of Database> \
+        -e CATTLE_DB_CATTLE_USERNAME: <Username> \
+        -e CATTLE_DB_CATTLE_PASSWORD: <Password> \
+        -e CATTLE_ZOOKEEPER_CONNECTION_STRING: <comma separated list of zookeeper IPs ie. 10.0.1.2,10.0.1.3> \
+        -e CATTLE_REDIS_HOSTS: <comma separated list of host:port server ips. ie 10.0.1.3:6379,10.0.1.4:6379> \
+        -e CATTLE_REDIS_PASSWORD: <optional Redis password> \
+        rancher/server
       ```  
       
 6. Point your load balancer at the server targets

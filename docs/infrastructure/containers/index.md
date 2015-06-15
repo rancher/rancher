@@ -19,7 +19,7 @@ Option 2: On a specific host, you can click on the **+ Add Container** image wit
 These options will bring you to the **Add Container** page. Any options that `docker run` supports when creating containers is also supported in Rancher.
 
 1. Provide a **Name** and if desired, **Description** for the host.
-2. Provide the **Image** to use. You can use any image on [DockerHub](https://hub.docker.com/) as well as any [registries]({{site.baseurl}}/configuration/registries) that have been added to Rancher. The syntax for image name would match any `docker run` commands. 
+2. Provide the **Image** to use. You can use any image on [DockerHub](https://hub.docker.com/) as well as any [registries]({{site.baseurl}}/docs/configuration/registries) that have been added to Rancher. The syntax for image name would match any `docker run` commands. 
 
     Syntax of image names. By default, we pull from the docker registry. If no tag is specified, we will pull the latest tag. 
 

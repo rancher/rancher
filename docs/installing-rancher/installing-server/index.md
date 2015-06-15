@@ -48,12 +48,15 @@ The following environment variables will need to be passed within the `docker ru
 > **Note:** The name and user of the database must already exist in order for Rancher to be able to create the database schema. Rancher will not create the database.
 
 ```bash
-sudo docker run -d --restart=always -p 8080:8080 
-    -e CATTLE_DB_CATTLE_MYSQL_HOST=<location_of_db> 
-    -e CATTLE_DB_CATTLE_MYSQL_PORT=<port_of_db> 
-    -e CATTLE_DB_CATTLE_USERNAME=<username_for_db> 
-    -e CATTLE_DB_CATTLE_PASSWORD=<password_for_user> 
-    -e CATTLE_DB_CATTLE_MYSQL_NAME=<name_of_existing_db>  
+sudo docker run -d --restart=always -p 8080:8080 \
+    -e CATTLE_DB_CATTLE_MYSQL_HOST: <hostname or IP of MySQL instance> \
+    -e CATTLE_DB_CATTLE_MYSQL_PORT: <port> \
+    -e CATTLE_DB_CATTLE_MYSQL_NAME: <Name of Database> \
+    -e CATTLE_DB_CATTLE_USERNAME: <Username> \
+    -e CATTLE_DB_CATTLE_PASSWORD: <Password> \
+    -e CATTLE_ZOOKEEPER_CONNECTION_STRING: <comma separated list of zookeeper IPs ie. 10.0.1.2,10.0.1.3> \
+    -e CATTLE_REDIS_HOSTS: <comma separated list of host:port server ips. ie 10.0.1.3:6379,10.0.1.4:6379> \
+    -e CATTLE_REDIS_PASSWORD: <optional Redis password> \
     rancher/server
 ```
 <a id="docker-install"></a>
