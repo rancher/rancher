@@ -33,11 +33,11 @@ Read the following to [add your first host]({{site.baseurl}}/docs/infrastructure
 
 ### Networking
 
-Rancher implements an overlay network for containers. Each container retains its usual IP address provided by the Docker daemon. Rancher provides the container with an additional IP address in the overlay network.
+Rancher supports cross-host container communication by implementing a simple and secure overlay network using IPsec tunneling.  To leverage this capability, a container launched through Rancher must select "Managed" for its network mode or if launched through Docker, provide an extra label "--label io.rancher.container.network=true".  Most of Rancher's network features such as a load balancer or DNS service require the container to be in the managed network.
 
-Containers in the same environment can communicate with each other using the Rancher-assigned IP address.
+Under Rancher's network, a container will be assigned both a Docker bridge IP (172.17.0.0/16) and a Rancher managed IP (10.42.0.0/16) on the default docker0 bridge.  Containers within the same environment are then routable and reachable via the managed network.
 
-The Rancher-assigned IP address is not present in Docker meta-data and does not appear in the result of docker inspect. This sometimes causes incompatibilities with certain tools. We are working with the Docker community to make sure a future version of Docker can handle overlay network more cleanly.
+**_Note:_** _The Rancher managed IP address will be not present in Docker meta-data and as such will not appear in the result of a Docker "inspect." This sometimes causes incompatibilities with certain tools that require a Docker bridge IP. We are already working with the Docker community to make sure a future version of Docker can handle overlay networks more cleanly._
 
 ### Service Discovery
 
