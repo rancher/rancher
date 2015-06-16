@@ -10,27 +10,25 @@ After adding multiple services to your project, you might have decided that you 
 
 We'll walk through how to load balance the Wordpress application created earlier in the [adding services guide]({{site.baseurl}}/docs/services/projects/adding-services/). Inside the Wordpress project, you add a balancer by clicking the **Add Service** dropdown icon and selecting **Balancer Service**. Alternatively, if you are viewing the projects at the project level, you can add a balancer service to a project with the **Add Service** dropdown on the specific project. 
 
-In the **Add Load Balancer** page, you will need to provide a **Name** and if desired, **Description** of the load balancer. Use the slider to select the number of load balancers you want launched. 
+In the **Add Load Balancer** page, you will need to provide a **Name** and if desired, **Description** of the balancer service. Use the slider to select the scale, i.e. how many containers. 
 
-> **Note:** The number of load balancers cannot exceed the number of hosts in the environment, otherwise there will be a port conflict and the balancer service will be stuck in an activating state. It will continue to try and find an available host and open port until you edit the scale of the balancer service or [add additional hosts]({{site.baseurl}}/docs/infrastructure/hosts/). 
+> **Note:** The number of containers of this balancer service cannot exceed the number of hosts in the environment, otherwise there will be a port conflict and this service will be stuck in an activating state. It will continue to try and find an available host and open port until you edit the scale of this balancer service or [add additional hosts]({{site.baseurl}}/docs/infrastructure/hosts/). 
 
 In our example, we only have 2 hosts in our environment, so therefore we can only create a maximum of 2 load balancers.
 
 Next, we will select our target(s), which is our wordpress service. The available target(s) in the drop down list are any services within the project.
 
-In our load balancer, you will define a listener, health check and stickiness policy for the load balancer.
+In our balancer service, you will define balancer configuration, which consists of a listener, health check and stickiness policy. Please read more about [balancer configuration]({{site.baseurl}}/docs/infrastructure/balancer-configs/) to understand the details of how you can configure your balancing service.
 
 In the **Listeners** tab, you define the listening ports that are used from the source (i.e. host) to  the target (i.e. service or group of containers) as well as the protocol for each port. The source port is the port that will be accessed publicly through the host. The target port is the private port that targets will use to communicate with the hosts. Currently, the balancer services have only one algorithm that is used by HAProxy, which is round robin. HAProxy is the software that is installed on our balancers.
 
 You must define at least one listener. Otherwise, the load balancer won't be very useful! In our example, we'll configure our listener with these settings:
 
-* Source Port: 8090; Protocol: http
-* Target Port: 80; Protocol: http
+* Source Port: `8090`; Protocol: http
+* Target Port: `80`; Protocol: http
 * Algorithm: round robin
 
-In the **Health Check** tab, you can define the health check policy for your load balancer. The health check is used to help determine if a host is still available and the web service is still useable. There is a default policy already set on the balancer, but you can always edit it.
-
-In the **Stickiness** tab, you can select a cookie policy. By default, there is no cookie policy selected. 
+Let's leave **Health Check** and **Stickiness** to the default values, but you can read more about these options in our [balancer configuration]({{site.baseurl}}/docs/infrastructure/balancer-configs/).
 
 Click on **Create**. 
 
