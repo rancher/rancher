@@ -16,7 +16,10 @@ The load balancer is created and managed by Rancher. For each host selected for 
 In the **Infrastructure** -> **Load Balancers** page, click on the **Add Balancer** button. 
 
 1. Provide a **Name** and if desired, **Description** for the host.
-2. Select the host(s) that you want the load balancer agents to run on. Please be sure there is no port conflicts on the hosts that you pick. Otherwise, the load balancer will not be able to finish creating. It will continue to try adding the load balancer agent onto the host until the port has no conflicts.
+2. Select the host(s) that you want the load balancer agents to run on. **_Please be sure there is no port conflicts on the hosts that you pick._** Otherwise, the load balancer will not be able to finish creating. It will continue to try adding the load balancer agent onto the host until the port has no conflicts.
+
+    > **Note:** If there is a port conflict on the host, the load balancer will still start on the host. When there are port conflicts on the host, the last container to be launched on the host using the port will be what the host communicates with.
+
 3. Select the target(s) that you want to load balance. The targets can be any containers or any external IP address that you want traffic distributed for. The algorithm picked in the **Listeners** section will determine which target should be used. 
 4. Create a new balancer config or re-use an existing one. Please read more about balancer configs in our detailed [documentation]({{site.baseurl}}/docs/infrastructure/balancer-configs).
 5. Click on **Create**.
