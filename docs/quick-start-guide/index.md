@@ -172,7 +172,7 @@ database:
   scale: 1
 ```
 
-Download the `rancher-compose` binary from Rancher UI. We provide the ability to download the binaries for Windows, Mac, and Linux.
+Download the `rancher-compose` binary from Rancher UI, which is located on the upper right corner of the **Services** -> **Projects** page. We provide the ability to download the binaries for Windows, Mac, and Linux.
 
 If order for services to be launched in Rancher using `rancher-compose`, you will need to set some variables in `rancher-compose`. You will need to create an [API Key]({{site.baseurl}}/docs/configuration/api-keys/) in the Rancher UI. Click on the account icon and go to **Settings** -> **API & Keys**. Click on **Add API Key**. Save the username (access key) and password (secret key). Set up the environment variables needed for rancher-compose: `RANCHER_URL`, `RANCHER_ACCESS_KEY`, and `RANCHER_SECRET_KEY`.
 
