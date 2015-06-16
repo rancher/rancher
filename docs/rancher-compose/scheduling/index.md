@@ -4,7 +4,7 @@ layout: default
 
 ---
 
-## Scheduling through Native Docker CLI
+## Scheduling with Rancher-Compose
 ---
 
 More details coming soon!
