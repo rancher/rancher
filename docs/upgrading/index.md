@@ -8,29 +8,28 @@ layout: default
 
 Currently, upgrades are **NOT** officially supported between releases before we hit a GA release. Therefore, certain features might break in later versions as we enhance them. The procedure we follow when we upgrade is outlined below. We typically only go from one version to the next if we do upgrade.
 
-Use the original Rancher Server container to be your DB server. Any changes that are made in the upgraded version will always be saved in the original Rancher Server container.
+Use the original Rancher Server container to be your DB server. Any changes that are made in the upgraded version will always be saved in the original Rancher Server container. Do not remove the original Rancher Server container! 
 
-> **Note:** Do not remove the original Rancher Server container at any time! 
 
-1 . Stop the container.
+1. Stop the container.
 
-```bash
-$ docker stop <container_name_of_old_server>
-```
+    ```bash
+    $ docker stop <container_name_of_old_server>
+    ```
 
 2. Pull the most recent image of Rancher Server. Note: If you skip this step and try to run the latest image, it will not automatically pull an updated image.
 
-```bash
-$ docker pull rancher/server:latest
-```
+    ```bash
+    $ docker pull rancher/server:latest
+    ```
 
 3. Run this command to start the Rancher Server container using the data from the original Rancher Server container. 
 
-```bash
-$ docker run -d --volumes-from=<container_name_of_old_server> --restart=always -p 8080:8080 rancher/server:latest
-```
+    ```bash
+    $ docker run -d --volumes-from=<container_name_of_old_server> --restart=always -p 8080:8080 rancher/server:latest
+    ```
 
-> **Note:** If you set any environment variables in your original Rancher server setup, you'll need to add those environment variables in the command.
+    > **Note:** If you set any environment variables in your original Rancher server setup, you'll need to add those environment variables in the command.
 
 ### Rancher Agents 
 
