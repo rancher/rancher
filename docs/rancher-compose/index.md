@@ -76,10 +76,90 @@ For S3 based builds to work you must [setup AWS credentials](https://github.com/
 
 ### Custom Rancher Services
 
-Load Balancer
+Custom Rancher services are configured by using a special image name in the compose template.  The image name is how rancher-compose know to setup a Rancher service versus a normal service.
 
-External Service
+Service | Image Name
+--------|-----------
+Load Balancer | rancher/load-balancer-service
+External Service | rancher/external-service
+Alias/DNS Service | rancher/dns-service
+
+
+### Load Balancer
+
+Sample configuration `docker-compose.yml`
+
+
+```yaml
+lb:
+  ports:
+  # Load Balancer public port 80 to private port 81 using HTTP
+  - 80:81
+  # Load Balancer public port 9999 to private port 8888 using tcp
+  - 9999:8888/tcp
+  labels:
+    # Put load balancer containers on hosts with label lb=true
+    - "io.rancher.scheduler.affinity:host_label=lb=true"
+```
+
+Sample `rancher-compose.yml`
+
+```yaml
+lb:
+  # Two load balancer containers
+  scale: 2
+  load_balancer_config:
+    # Health check configurations
+    health_check:
+      port: 80
+      interval: 2000
+      unhealthy_threshold: 3
+      request_line: GET /index.html HTTP/1.0
+      healthy_threshold: 2
+      response_timeout: 2000
+```
+
+### External Service
+
+Sample configuration `docker-compose.yml`
+
+```yaml
+db:
+  image: rancher/external-service
+
+redis:
+  image: redis
+```
+
+Sample `rancher-compose.yml`
+```yaml
+db:
+  external_ips:
+  - 1.1.1.1
+  - 2.2.2.2
+
+# Override any service to become an external service
+redis:
+  image: redis
+  external_ips:
+  - 1.1.1.1
+  - 2.2.2.2
+```
 
 Service Alias/DNS service
 
+### Sample configuration `docker-compose.yml`
 
+```yaml
+web:
+  image: rancher/dns-service
+  links:
+  - web1
+  - web2
+
+web1:
+  image: nginx
+
+web2:
+  image: nginx
+```
