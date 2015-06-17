@@ -1,37 +1,40 @@
 #!/bin/bash
 
-set -e -x
+set -e 
 
 mkdir -p /tmp/extracted_cattle
 cd /tmp/extracted_cattle
 
-install_binary()
+install_build_tools()
 {
-    local src=${1}
-    local dest=${2}
-    local xz=${3:-"true"}
-
-    #deletes the longest possible match from the left
-    file=$(echo ${src##*/});
-
-    curl -L -o ${file} ${1}
-    if [ "$xz" = "true" ]; then
-        tar -xpJf ${file} -C ${dest}
-    fi
-    binary=$(echo ${file}|cut -d'.' -f1)
-    chmod +x ${dest}/${binary}
+    BUILD_TOOLS_VERSION="0.1.0"
+    tmpdir=$(mktemp -d)
+    pushd $tmpdir
+    curl -sSL -o build-tools.tar.gz https://github.com/rancherio/build-tools/archive/v${BUILD_TOOLS_VERSION}.tar.gz
+    tar -xzvf build-tools.tar.gz && cp ./build-tools-${BUILD_TOOLS_VERSION}/bin/* /usr/bin
+    popd
+    rm -rf ${tmpdir}
 }
 
-if [ -f "/usr/share/cattle/cattle.jar" ]; then
+unpack_jar()
+{
     unzip /usr/share/cattle/cattle.jar
     mkdir -p res && cd res
     unpack200 ../WEB-INF/lib/cattle-resources-*.jar.pack resources.jar
     unzip resources.jar
+}
 
-    for i in $(grep service\.package\.*\.url cattle-global.properties|cut -d"=" -f2); do
-        install_binary $i "/usr/bin"
-    done
+clean_up()
+{
+    cd /tmp
+    rm -rf ./extracted_cattle
+}
+
+trap clean_up EXIT SIGINT SIGTERM
+
+install_build_tools
+
+if [ -f "/usr/share/cattle/cattle.jar" ]; then
+    unpack_jar
+    /usr/bin/cattle-binary-pull ./cattle-global.properties /usr/bin
 fi
-
-cd /tmp
-rm -rf ./extracted_cattle
