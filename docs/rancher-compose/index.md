@@ -109,10 +109,8 @@ lb:
   # Two load balancer containers
   scale: 2
   load_balancer_config:
-    description: null
     name: lb config
     # Cookie policy configurations
-    lb_cookie_stickiness_policy: null
     app_cookie_stickiness_policy: 
       cookie: cookiename
       max_length: 1024

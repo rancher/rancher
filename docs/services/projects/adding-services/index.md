@@ -51,8 +51,8 @@ For each rule, you select a **condition** of the rule. There are 4 different con
 
 _Conditions_
 
-* **must** or **must not**: Rancher will only use hosts that match or do not match the field and value. If port mapping is defined on the service, the service could get stuck in an _Activating_ state when the number of containers in the service and available hosts. With port mapping, only one container can be launched per host to avoid port conflicts. Therefore, the service will continually try to find a host that could have the container started. In order to get the service out of the _Activating_ state, you can either edit the number on the scale by editing the service, or you can add another host that would satisfy the scheduling rules.
-* **should** or **should not**: Rancher will attempt to use hosts that match the field and value. In the case of when port mapping is defined and there are not enough hosts that satisfy the _should_ or _should not_ rules, Rancher will start ignoring 1 of these rules at a time to find the correct number of hosts to finish launching the service. 
+* **must** or **must not**: Rancher will only use hosts that match or do not match the field and value. If Rancher cannot find a host that meets all of the rules with these conditions, your service could get stuck in an _Activating_ state. The service will be continually trying to find a host for the containers. To fix this state, you can either edit the number of the scale by editing the service or add/edit another host that would satisfy all of these rules. 
+* **should** or **should not**: Rancher will attempt to use hosts that match the field and value. In the case of when there are not enough hosts that match all the rules, Rancher will start ignoring 1 of the should/should not rules at a time to find the correct number of hosts to finish launching the service. 
 
 _Fields_
 

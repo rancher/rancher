@@ -49,7 +49,7 @@ For each rule, you select a **condition** of the rule. There are 4 different con
 
 _Conditions_
 
-* **must** or **must not**: Rancher will only pick a host that matches or does not match the field and value. If port mapping is defined on the container and there is no available host, the container will fail to launch.
+* **must** or **must not**: Rancher will only pick a host that matches or does not match the field and value. If port mapping is defined on the container and there is no available host with those ports open, the container will fail to launch.
 * **should** or **should not**: Rancher will attempt to use a host that matches the field and value. In the case of when port mapping is defined and there is no host that satisfies the _should_ or _should not_ rules, Rancher will start ignoring 1 of these rules at a time to find a host.
 
 _Fields_
