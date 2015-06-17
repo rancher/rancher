@@ -14,8 +14,11 @@ Please make sure that you are in the environment that you want to add hosts to. 
 
 For any hosts that are added, please make sure that any security groups or firewalls allow traffic. If these are not enabled, then the functionality of Rancher will be limited.
 
-* From the internet to TCP ports `9345` and `9346` (for UI hosts stats/graphs)
 * From and To all other hosts on UDP ports `500` and `4500` (for IPsec networking)
+
+As of our Beta release (v0.24.0), we no longer require any additional TCP ports. But if you are using a version prior to Beta, then you will need to add the following ports:
+
+* From the internet to TCP ports `9345` and `9346` (for UI hosts stats/graphs) 
 
 Once your hosts are added to Rancher, they are available for [our services]({{site.baseurl}}/docs/services/projects/adding-services/).
 

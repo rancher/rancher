@@ -85,7 +85,7 @@ External Service | rancher/external-service
 Alias/DNS Service | rancher/dns-service
 
 
-### Load Balancer
+#### Load Balancer
 
 Sample configuration `docker-compose.yml`
 
@@ -109,6 +109,17 @@ lb:
   # Two load balancer containers
   scale: 2
   load_balancer_config:
+    description: null
+    name: lb config
+    # Cookie policy configurations
+    lb_cookie_stickiness_policy: null
+    app_cookie_stickiness_policy: 
+      cookie: cookiename
+      max_length: 1024
+      prefix: false
+      request_learn: true
+      timeout: 3600000
+      mode: path_parameters
     # Health check configurations
     health_check:
       port: 80
@@ -119,7 +130,7 @@ lb:
       response_timeout: 2000
 ```
 
-### External Service
+#### External Service
 
 Sample configuration `docker-compose.yml`
 
@@ -132,6 +143,7 @@ redis:
 ```
 
 Sample `rancher-compose.yml`
+
 ```yaml
 db:
   external_ips:
@@ -146,9 +158,9 @@ redis:
   - 2.2.2.2
 ```
 
-Service Alias/DNS service
+#### Service Alias/DNS service
 
-### Sample configuration `docker-compose.yml`
+Sample configuration `docker-compose.yml`
 
 ```yaml
 web:

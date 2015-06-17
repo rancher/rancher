@@ -29,8 +29,11 @@ In the **Custom** option, you can choose an existing security group, but you wil
 ### Required Ports for Rancher to work:
 
  * From the rancher server to TCP port `22` (SSH to install and configure Docker)
- * From the internet to TCP ports `9345` and `9346` (for UI hosts stats/graphs) 
  * From and To all other hosts on UDP ports `500` and `4500` (for IPsec networking)
+
+As of our Beta release (v0.24.0), we no longer require any additional TCP ports. But if you are using a version prior to Beta, then you will need to add the following ports:
+
+* From the internet to TCP ports `9345` and `9346` (for UI hosts stats/graphs) 
 
 > **Note:** If you re-use the `rancher-machine` security group, any missing ports in the security group will not be re-opened. You will need to check the security group in AWS if the host does not launch correctly. 
 
