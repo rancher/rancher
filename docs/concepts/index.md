@@ -51,9 +51,13 @@ Rancher adopts the standard Docker Compose terminology for services and defines 
 * Add External Services - the ability to add any-IP as a service to be discovered
 * Add Service Alias - the ability to add a DNS record for your services to be discovered
 
+Read more about [adding services]({{site.baseurl}}/docs/services/projects/adding-services/), [adding balancer services]({{site.baseurl}}/docs/services/projects/adding-balancers/), [adding external services]({{site.baseurl}}/docs/services/projects/adding-external-services/) or [adding service alias]({{site.baseurl}}/docs/services/projects/adding-service-alias/).
+
 ### Load Balancer
 
 Rancher implements a managed load balancer service using HAProxy that can be manually scaled to multiple hosts.  A load balancer can be used to distribute network and application traffic to individual containers by directly adding them or "linked" to a basic service.  A basic service that is "linked" will have all its underlying containers automatically registered as load balancer targets by Rancher.
+
+Read more about our [load balancers]({{site.baseurl}}/docs/infrastructure/load-balancers/) and the [load balancer configurations]({{site.baseurl}}/docs/infrastructure/balancer-configs/) that are used with load balancers.
 
 ### Distributed DNS Service
 
@@ -81,6 +85,8 @@ Rancher supports the notion of service upgrades by allowing users to either load
 
 Rancher implements and ships a command-line tool called rancher-compose that is modeled after docker-compose. It takes in the same docker-compose.yml templates and deploys the projects onto Rancher. The rancher-compose tool additionally takes in a rancher-compose.yml file which extends docker-compose.yml to allow specifications of attributes such as scale, load balancing rules, health check policies, and external links not yet currently supported by docker-compose.
 
+Read more about how to use [rancher-compose]({{site.baseurl}}/docs/rancher-compose/).
+
 ### Projects
 
 A Rancher project mirrors the same concept as a docker-compose project.  It also defines the scope of service discovery when linking services to one another and represents a group of services that make up a typical application or workload.
@@ -103,6 +109,8 @@ Rancher supports container scheduling policies that are modeled closely after Do
 * strict and soft affinity/anti-affinity rules using both env var (Swarm) and labels (Rancher)
 
 In addition, Rancher supports scheduling service triggers that allow users to specify rules such as on "host add" or "host label" to automatically scale services onto hosts with specific labels.
+
+Read more about scheduling with [rancher-compose]({{site.baseurl}}/docs/rancher-compose/scheduling/), in the UI with [services]({{site.baseurl}}/docs/services/projects/adding-services/#scheduling-services), or in the UI with individual [containers]({{site.baseurl}}/docs/infrastructure/containers/#scheduling-containers).
 
 <!--
 ### Sidekicks

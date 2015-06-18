@@ -31,6 +31,7 @@ These options will bring you to the **Add Container** page. Any options that `do
   
     If you chose to add the container from the **Infrastructure** -> **Containers** page, Rancher will automatically pick a host for you. Otherwise, if you have picked a host to add a container to, the host will be populated within the **Advanced Options** -> **Security/Host** tab.
     
+    <a id="scheduling-containers"></a>
     **Labels/Scheduling**
 
     When creating containers, we provide the option to create labels for the container and the ability to schedule which host you want the container to be placed on. The scheduling rules provide flexibility on how you want Rancher to pick which host to use. In Rancher, we use labels to help define scheduling rules. You can create as many labels on a container as you'd like. With multiple scheduling rules, you have complete control on which host you want the container to be created on. You could request that the container to be launched on a host with a specific host label, container label or name, or a specific service. These scheduling rules can help create blacklists and whitelists for your container to host relationships. 
