@@ -35,14 +35,5 @@ ENV CATTLE_CATTLE_VERSION v0.56.0
 ADD https://github.com/rancherio/cattle/releases/download/${CATTLE_CATTLE_VERSION}/cattle.jar /usr/share/cattle/
 RUN /usr/share/cattle/install_cattle_binaries
 
-ENV CATTLE_DOCKER_MACHINE_VERSION v0.3.0-dev-packet-rc2
-ADD https://github.com/rancherio/machine/releases/download/${CATTLE_DOCKER_MACHINE_VERSION}/docker-machine /usr/bin/docker-machine
-RUN chmod +x /usr/bin/docker-machine
-
-ENV CATTLE_GO_MACHINE_SERVICE_VERSION v0.13.0
-ADD https://github.com/rancherio/go-machine-service/releases/download/${CATTLE_GO_MACHINE_SERVICE_VERSION}/go-machine-service.tar.xz /tmp/
-RUN tar xpvf /tmp/go-machine-service.tar.xz -C /usr/bin/ && \
-    chmod +x /usr/bin/go-machine-service
-
 ENV DEFAULT_CATTLE_MACHINE_EXECUTE true
 CMD ["/usr/bin/s6-svscan", "/service"]
