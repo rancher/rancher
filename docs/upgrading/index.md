@@ -23,7 +23,7 @@ Use the original Rancher Server container to be your DB server. Any changes that
     $ docker pull rancher/server:latest
     ```
 
-3. Run this command to start the Rancher Server container using the data from the original Rancher Server container. 
+3. Run this command to start the Rancher Server container using the data from the original Rancher Server container. Any changes made in the new version will be reflected in the volumes of the original Rancher server container. Therfore, if you have already upgraded in the past, you will need to use the same container name that was used to upgrade in the past. Example: OriginalRancher is upgraded to Rancher1. If I want to upgrade Rancher1, I would use the OriginalRancher as my volumes from container.
 
     ```bash
     $ docker run -d --volumes-from=<container_name_of_old_server> --restart=always -p 8080:8080 rancher/server:latest
