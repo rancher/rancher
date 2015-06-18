@@ -9,6 +9,7 @@ Rancher is deployed as a set of Docker containers.  Running Rancher is a simple 
 * [Manually](#launching-management-server)
 * [Vagrant](#vagrant)
 * [Puppet](https://github.com/nickschuch/puppet-rancher) (Thanks @nickschuch) 
+* [Ansible](https://github.com/joshuacox/ansibleplaybook-rancher)
 
 ### Requirements
 
