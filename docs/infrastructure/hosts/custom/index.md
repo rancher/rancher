@@ -58,7 +58,7 @@ You'll need to add in environment variables in order for the Rancher agent to us
 Potential Environment Variables to Set:
 * http_proxy
 * https_proxy
-* no_proxy
+* NO_PROXY (must be capitalized)
 
 ```bash
 $ sudo docker run -d -e http_proxy=<proxyURL> -e https_proxy=<proxyURL> -e NO_PROXY=<proxyURL> -v /var/run/docker....

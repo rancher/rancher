@@ -6,6 +6,32 @@ layout: default
 ## FAQs
 ---
 
+### What version of Rancher am I running?
+
+As of our Beta release, you can click on the cow in the upper left hand corner, which will display which version of Rancher you are running. 
+
+If clicking on the cow doesn't work, then you have a version prior to Beta. We recommend upgrading to Beta as it's a much more stable release due to many bug fixes. To find out what version you're running if prior to Beta, do a `docker inspect` on the container to view the environment variables. 
+
+### How do I run Rancher and my hosts behind a proxy?
+
+In order to set up a HTTP proxy, you'll need to edit the Docker daemon to point to the proxy. You will need to update this for your server and any hosts added to Rancher. You'll need to edit the `/etc/default/docker` file to point to your proxy and restart Docker.
+
+```bash
+$ sudo vi /etc/default/docker
+```
+
+Within the file, edit the `#export http_proxy="http://127.0.0.1:3128/"` to have it point to your proxy. Save your changes and then restart docker. Restarting Docker is different on every OS. 
+
+You'll need to add in environment variables in order for the Rancher agent to use the proxy.
+
+Potential Environment Variables to Set:
+* http_proxy
+* https_proxy
+* NO_PROXY (must be capitalized)
+
+```bash
+$ sudo docker run -d -e http_proxy=<proxyURL> -e https_proxy=<proxyURL> -e NO_PROXY=<proxyURL> --restart=always -p 8080:8080 rancher/server
+```
 ### How do linked containers/services work in Rancher?
 
 In Docker, linked containers (using `--link` in `docker run`) shows up in the /etc/hosts of the container it's linked to. In Rancher, we don't edit the /etc/hosts. Instead we run a DNS server that makes links work across hosts. The DNS server would respond with the correct IP.

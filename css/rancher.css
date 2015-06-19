@@ -380,6 +380,8 @@ body {
 code{
     padding:2px 5px;
     display:inline-block;
+    background-color: #f5f5f5;
+    color: #333;
 }
 
 .row{
@@ -389,9 +391,7 @@ code{
 }
 
 .row .col-sm-3{
-    height: 100vh;
-    min-height: 100vh;
-    background-color:#f2efef;
+   background-color:#f2efef;
 }
 .copyright {
     width: 100%;
