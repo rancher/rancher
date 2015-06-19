@@ -76,7 +76,7 @@ For S3 based builds to work you must [setup AWS credentials](https://github.com/
 
 ### Custom Rancher Services
 
-Custom Rancher services are configured by using a special image name in the compose template.  The image name is how rancher-compose know to setup a Rancher service versus a normal service.
+Custom Rancher services are configured by using a special image name in the compose template.  The image name is how rancher-compose knows to set up a Rancher service versus a normal service.
 
 Service | Image Name
 --------|-----------
@@ -92,6 +92,7 @@ Sample configuration `docker-compose.yml`
 
 ```yaml
 lb:
+  image: rancher/load-balancer-service
   ports:
   # Load Balancer public port 80 to private port 81 using HTTP
   - 80:81
