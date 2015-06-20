@@ -1,8 +1,8 @@
 name: Rancher Documentation
 description: Documentation for Rancher
 
-URL: “http://deniseschannon.github.io/rancher”
-baseurl: /rancher
+URL: "http://deniseschannon.github.io/rancher"
+baseurl: ""
 
 markdown: redcarpet
 
