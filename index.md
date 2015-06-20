@@ -41,7 +41,8 @@ There are three primary ways for users to interact with Rancher:
 
 The following figure illustrates Rancher's major features, its ability to run any clouds, and the three primary ways to interact with Rancher.
 
-![Rancher Overview]({{site.baseurl}}/img/rancher_overview.png)
+<!--![Rancher Overview]({{site.baseurl}}/img/rancher_overview.png)-->
+<img src="{{site.baseurl}}/img/rancher_overview.png" width="800" alt="Rancher Overview">
 
 ### Outline of This Guide
 
