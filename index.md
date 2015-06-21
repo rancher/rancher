@@ -4,7 +4,7 @@ layout: default
 
 ---
 
-## Overview
+## Overview of Rancher
 ---
 
 Rancher is an open source software platform that implements a purpose-built infrastructure for running containers in production. Docker containers, as an increasingly popular application workload, create new requirements in infrastructure services such as networking, storage, load balancer, security, service discovery, and resource management.
