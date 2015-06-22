@@ -26,7 +26,7 @@ The UI and API are available on the exposed port `8080`.
 
 ### Using Rancher
 
-To learn more about using Rancher, please refer to our [documentation](http://rancherio.github.io/rancher/). 
+To learn more about using Rancher, please refer to our [Rancher Documentation](http://rancher.docs.rancher.com/). 
  
 ### Vagrant
 
