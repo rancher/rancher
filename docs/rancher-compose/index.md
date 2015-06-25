@@ -98,6 +98,9 @@ lb:
   - 80:81
   # Load Balancer public port 9999 to private port 8888 using tcp
   - 9999:8888/tcp
+  labels:
+    # Put load balancer containers on hosts with label lb=true
+    - "io.rancher.scheduler.affinity:host_label=lb=true"
 ```
 
 Sample `rancher-compose.yml`
