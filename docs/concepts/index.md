@@ -21,6 +21,8 @@ All hosts and any Rancher resources (i.e. containers, load balancers, etc.) are 
 
 [Access control]({{site.baseurl}}/docs/configuration/access-control/) will need to be set up before being able to [share environments]({{site.baseurl}}/docs/configuration/environments/) with users. 
 
+<a id="host"></a>
+
 ### Hosts
 
 Hosts are the most basic unit of resource within Rancher and is represented as any Linux server, virtual or physical, with the following minimum requirements:
