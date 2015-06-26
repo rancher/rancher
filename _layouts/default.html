@@ -59,13 +59,21 @@
                                var destination = $("ul.nav li a").attr("href");
                                $("ul.nav li a").click(function (event) {
                                                       event.preventDefault();
-                                                      var local_destination = $(this).attr("href");
+                                                      var link = $(this);
+                                                      var local_destination = link.attr("href");
                                                       $.get(local_destination, function (data) {
                                                             var title = $(data).find("title").text();
                                                             var local_content = $(data).find(".col-sm-9").html();
                                                             changeUrl(title, local_destination);
                                                             checkActiveState();
                                                             $(".col-sm-9").html(local_content);
+                                                            //If has a class hash (jump on the page)
+                                                            if(link.hasClass('hash')){
+                                                              var local_destination_array = local_destination.split('#');
+                                                              var paragraph_id = local_destination_array[1];
+                                                              var paragraph_destination = $('.col-sm-9 #' + paragraph_id).offset().top;
+                                                              $('body,html').animate({scrollTop: paragraph_destination + "px"});
+                                                            }
                                                             // Set height
                                                             var content_height = $(".col-sm-9").height();
                                                             $(".col-sm-3").css("min-height", content_height + "px");
