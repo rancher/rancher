@@ -37,7 +37,7 @@ Host Label | `io.rancher.scheduler.affinity:host_label`
 Container Label/Service Name | `io.rancher.scheduler.affinity:container_label`
 Container Name | `io.rancher.scheduler.affinity:container`
 
-Notice how there is not a specific prefix for service name. When Rancher creates a service, system labels are added to all containers of the service to indicate the project and service name. More details on how to compare against a service name is located in the [container label section]({{site.baseurl}}/docs/rancher-compose/scheduling/#container-labels).
+Notice how there is not a specific prefix for service name. When Rancher creates a service, system labels are added to all containers of the service to indicate the project and service name. 
 
 To create the key of our label, we start with a field prefix (e.g. `io.rancher.scheduler.affinity:host_label`) and based on the condition that we are looking for, we append the type of condition we want. For example, if we want the containers to be launched on a host that must not equal (i.e. `_ne`) to a host label value, the label key would be `io.rancher.scheduler.affinity:host_label_ne`. 
 
@@ -54,7 +54,7 @@ labels:
 
 Making a service into a global service is the equivalent of selecting **Always run one instance of this container on every host** in the UI. This means that a container will be started on any host in the [environment]{{site.baseurl}}/docs/configuration/environments/). If a new host is added to the environment, and the host fulfills the global service's host requirements, the service will automatically be started. 
 
-Currently, we only support global services with [host labels]({{site.baseurl}}/docs/rancher-compose/scheduling/#host-labels) that are using the hard condition. This means that only labels that are related to `host_labels` will be adhered to when scheduling and it **must** or **must not** equal the values. Any other label types will be ignored.
+Currently, we only support global services with host labels fields that are using the hard condition. This means that only labels that are related to `host_labels` will be adhered to when scheduling and it **must** or **must not** equal the values. Any other label types will be ignored.
 
 Example `docker-compose.yml`:
 
@@ -91,10 +91,9 @@ labels:
   io.rancher.scheduler.affinity:host_label_soft_ne: key4=value4
 ```
 
-<a id="container-labels"></a>
 #### Finding Hosts with Container Labels
 
-When adding containers or services to Rancher, you can add container labels. These labels can be used for the field that you want a rule to compare against. Reminder: This cannot be used if you set [global service]({{site.baseurl}}/docs/rancher-compose/scheduling/#global-service) to true.
+When adding containers or services to Rancher, you can add container labels. These labels can be used for the field that you want a rule to compare against. Reminder: This cannot be used if you set global service to true.
 
 > **Note:** If there are multiple values for container labels, Rancher will look at all labels on all containers on the host to check the container labels. The multiple values do not need to be on the same container on a host. 
 
@@ -134,7 +133,7 @@ labels:
 
 #### Finding Hosts with Container Names
 
-When adding containers to Rancher, you give each container a name. You can use this name as a field that you want a rule to compare against. Reminder: This cannot be used if you set [global service]({{site.baseurl}}/docs/rancher-compose/scheduling/#global-service) to true.
+When adding containers to Rancher, you give each container a name. You can use this name as a field that you want a rule to compare against. Reminder: This cannot be used if you set global service to true.
 
 ```yaml
 labels:
