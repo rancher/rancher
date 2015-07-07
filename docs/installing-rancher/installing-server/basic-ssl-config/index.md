@@ -6,35 +6,36 @@ layout: default
 ## Installing Rancher Server With SSL
 ---
 
-In order to run Rancher Server from an https url, you will need to terminate SSL with a proxy that is capable of setting headers. This outlines the steps for NGINX, but you could use other tools.
+In order to run Rancher Server from an https url, you will need to terminate SSL with a proxy that is capable of setting headers. We''ll provide an outline of how to set it up with NGINX, but other tools could be used. 
 
 ## Requirements
-In addition to Rancher Server requirements, you will also need:
+
+Besides the typical Rancher Server [requirements]({{site.baseurl}}/docs/installing-rancher/installing-server/#requirements), you will also need:
 
 * Valid SSL certificate
 * DNS entries configured
 
 ## Launching Rancher Server
 
-In this configuration, all traffic will pass through the proxy and be sent over a Docker link to the Rancher Server container. There are alternative approaches that could be followed, but this approach is simple and translates well. 
+In our configuration, all traffic will pass through the proxy and be sent over a Docker link to the Rancher Server container. There are alternative approaches that could be followed, but this approach is simple and translates well. 
 
-Start the Rancher Server container
+Start the Rancher Server container with the additional environment variables.
 
-```
-sudo docker run -d --restart=always --name=rancher-server \
+```bash
+$ sudo docker run -d --restart=always --name=rancher-server \
 -e "CATTLE_API_ALLOW_CLIENT_OVERRIDE=true" \
 -e "CATTLE_HOST_API_PROXY_SCHEME=wss" rancher/server
 ```
 
-*Note: This is assuming you will run your proxy in a container. If you are going to run a proxy from the host, you will need to expose port 8080* 
+> **Note:** We are assuming that you will run your proxy in a container. If you are going to run a proxy from the host, you will need to expose port 8080 by adding `-p 8080:8080` to the command. 
 
-If you are converting an existing environment configured with a data volume or external DB, stop and remove the existing Rancher Server container and launch the new container with --volumes-from=<data container> or DB settings. 
+If you are converting an existing Rancher instance configured with a data volume or external DB, stop and remove the existing Rancher Server container. Launch the new container with `--volumes-from=<data_container>` or [external DB settings]({{site.baseurl}}/docs/installing-rancher/installing-server/#external-db). 
 
 ## Nginx Configuration
 
-We realize that some of these configurations are not ideal, and are working to make things simpler and open up different SSL termination options.
+We are working on making a simpler configuration and allow different SSL termination options.
 
-Your NGINX configuration will need to look something like this, this is showing the minimum configuration, and should be customized to meet best practices:
+Here is the minimum NGINX configuration that will need to be configured. You should customize your configuration to meet best practices. 
 
 ```
 upstream rancher {
@@ -66,17 +67,18 @@ server {
 }
 ```
 
-The important things here are that we disable Nginx proxy_buffering. Enabling this causes the host pings to backup on the server, and forces the agent to reconnect.
+**Important Setting Notes:**
 
-The other is setting the X-API-request-url header. This header is what makes the API schema show the correct information. We are working to support standard X-Forwarded-* headers. 
+* Please be sure to disable NGINX `proxy-buffering`. If this setting is enable, the hosts will ping back to the server and this forces the agent to reconnect. 
+* `X-API-request-url` header must be configured. This header is how the API schema will show the correct information. We are working to support standard `X-Forwarded-*` headers. 
 
 ## Settings
 
-The UI should now load. You now need to visit the URL in your browser:
+After Rancher is launched with these settings, the UI will be up and you can find it at this URL: 
 
-`https://<your server>/v1/settings/api.host`
+`https://<rancher_server_ip>/v1/settings/api.host`
 
-Click the `Edit` button. Set the value equal to a space " " and save.
+Click on **Edit**. Set the value equal to a space " " and **Save**.
 
 
 
