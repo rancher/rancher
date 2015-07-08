@@ -26,7 +26,7 @@ You can access the UI by going to the following URL. The `server_ip` is the publ
 
 `http://server_ip:8080`
 
-Once the UI is up and running, you can start [adding hosts]({{site.baseurl}}/docs/infrastructure/hosts/). After the hosts are setup, you can start adding [services]({{site.baseurl}}/docs/services/projects/adding-services/).
+Once the UI is up and running, you can start [adding hosts]({{site.baseurl}}/docs/rancher-ui/infrastructure/hosts/). After the hosts are setup, you can start adding [services]({{site.baseurl}}/docs/rancher-ui/applications/stacks/adding-services/).
 
 <a id="external-db"></a>
 

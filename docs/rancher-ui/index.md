@@ -15,5 +15,5 @@ http://MANAGEMENT_SERVER_IP:8080
 
 Currently, we only support Chrome, Firefox and Safari. 
 
-After you access the URL, we suggest that you configure your [access control]({{site.baseurl}}/configuration/access-control/) so that server and its API is not public. Afterwards, you can follow the UI guides on [adding hosts]({{site.baseurl}}/docs/infrastructure/hosts/) and then [adding services]({{site.baseurl}}/docs/services/projects/adding-services). 
+After you access the URL, we suggest that you configure your [access control]({{site.baseurl}}/configuration/access-control/) so that server and its API is not public. Afterwards, you can follow the UI guides on [adding hosts]({{site.baseurl}}/docs/rancher-ui/infrastructure/hosts/) and then [adding services]({{site.baseurl}}/docs/rancher-ui/applications/stacks/adding-services). 
 

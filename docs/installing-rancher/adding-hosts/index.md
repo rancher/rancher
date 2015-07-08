@@ -22,11 +22,11 @@ The first time that you add a host, you may be required to set up the [Host Regi
 
 We support adding hosts directly from cloud providers or adding a host that's already been provisioned. Select which host type you want to add:
 
-* [Adding DigitalOcean Droplet Hosts]({{site.baseurl}}/docs/infrastructure/hosts/digitalocean/)
-* [Adding Amazon EC2 Hosts]({{site.baseurl}}/docs/infrastructure/hosts/amazon/)
-* [Adding Packet Hosts]({{site.baseurl}}/docs/infrastructure/hosts/packet/)
-* [Adding Rackspace Hosts]({{site.baseurl}}/docs/infrastructure/hosts/rackspace/)
-* [Adding Custom Hosts]({{site.baseurl}}/docs/infrastructure/hosts/custom/)
+* [Adding DigitalOcean Droplet Hosts]({{site.baseurl}}/docs/rancher-ui/infrastructure/hosts/digitalocean/)
+* [Adding Amazon EC2 Hosts]({{site.baseurl}}/docs/rancher-ui/infrastructure/hosts/amazon/)
+* [Adding Packet Hosts]({{site.baseurl}}/docs/rancher-ui/infrastructure/hosts/packet/)
+* [Adding Rackspace Hosts]({{site.baseurl}}/docs/rancher-ui/infrastructure/hosts/rackspace/)
+* [Adding Custom Hosts]({{site.baseurl}}/docs/rancher-ui/infrastructure/hosts/custom/)
 
 When a host is added to Rancher, an agent container is launched on the host. Rancher will automatically pull the correct image version tag for rancher/agent image and run the required version. The agent version is tagged specifically to each Rancher server version.
 
@@ -35,7 +35,7 @@ When a host is added to Rancher, an agent container is launched on the host. Ran
 
 With each host, you have the ability to add labels to help you organize your hosts. The labels are a key/value pair and the keys must be unique identifiers. If you added two keys with different values, we'll take the last inputted value to use as the key/value pair.
 
-By adding labels to hosts, you can use these labels when [scheduling services]({{site.baseurl}}/docs/services/projects/adding-services/#scheduling-services) and create a whitelist or blacklist of hosts for your [services]({{site.baseurl}}/docs/services/projects/adding-services) to run on. 
+By adding labels to hosts, you can use these labels when [scheduling services]({{site.baseurl}}/docs/rancher-ui/applications/stacks/adding-services/#scheduling-services) and create a whitelist or blacklist of hosts for your [services]({{site.baseurl}}/docs/rancher-ui/applications/stacks/adding-services) to run on. 
 
 <a id="machine-config"></a>
 ### Host Access for Hosts created by Rancher
