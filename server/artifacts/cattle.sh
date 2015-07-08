@@ -179,4 +179,4 @@ setup_proxy
 
 env | grep CATTLE | grep -v PASS | sort
 
-exec java ${CATTLE_JAVA_OPTS:--Xms128m -Xmx512m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR} $PROXY_ARGS -jar $JAR "$@" $ARGS
+exec java $JAVA_OPTS ${CATTLE_JAVA_OPTS:--Xms128m -Xmx512m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR} $PROXY_ARGS -jar $JAR "$@" $ARGS
