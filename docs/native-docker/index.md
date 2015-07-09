@@ -29,7 +29,7 @@ To read more about the Rancher managed network and cross-host networking, please
 
 ### Importing Existing Containers
 
-Rancher also supports importing existing container upon host registration. When you register a host through the [custom command]({{site.baseurl}}/docs/infrastructure/hosts/custom/), any containers currently on the host will be detected and imported into Rancher.
+Rancher also supports importing existing container upon host registration. When you register a host through the [custom command]({{site.baseurl}}/docs/rancher-ui/infrastructure/hosts/custom/), any containers currently on the host will be detected and imported into Rancher.
 
 ### Periodically Syncing State
 

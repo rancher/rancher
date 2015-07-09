@@ -17,7 +17,7 @@ Rancher takes in raw computing resources from any public or private cloud in the
 
 Key product features of Rancher include: 
 
-1. Cross-host networking. Rancher creates a private software defined network for each environment, allowing secure communication between containers across hosts and clouds.
+1. Cross-host networking. Rancher creates a private software defined network for each project, allowing secure communication between containers across hosts and clouds.
 
 2. Container load balancing. Rancher provides an integrated, elastic load balancing service to distribute traffic between containers or services. The load balancing service works across multiple clouds.
 
@@ -29,7 +29,7 @@ Key product features of Rancher include:
 
 6.	Resource management: Rancher supports Docker Machine, a powerful tool for provisioning hosts directly from cloud providers. Rancher then monitors host resources and manages container deployment.
 
-7. Multi-tenancy & user management: Rancher is designed for multiple users and allows organizations to collaborate throughout the application lifecycle. By connecting with existing directory services, Rancher allows users to create separate development, testing, and production environments and invite their peers to collaboratively manage resources and applications.
+7. Multi-tenancy & user management: Rancher is designed for multiple users and allows organizations to collaborate throughout the application lifecycle. By connecting with existing directory services, Rancher allows users to create separate development, testing, and production projects and invite their peers to collaboratively manage resources and applications.
 
 ### Primary Consumption Interfaces
 
@@ -37,7 +37,7 @@ There are three primary ways for users to interact with Rancher:
 
 1. Users can interact with Rancher through native Docker CLI or API. Rancher is not another orchestration or management layer that shields users from the native Docker experience. As Docker platform grows over time, a wrapper layer will likely be superseded by native Docker features. Rancher instead works in the background so that users can continue to use native Docker CLI and Docker Compose templates. Rancher uses Docker labels--a Docker 1.6 feature contributed by Rancher Labs--to pass additional information through the native Docker CLI.  Because Rancher supports native Docker CLI and API, third-party tools like Kubernetes work on Rancher automatically.
 2. Users can interact with Rancher using a command-line tool called `rancher-compose`. The `rancher-compose` tool enables users to stand up multiple containers and services based on the Docker Compose templates on Rancher infrastructure. The `rancher-compose` tool supports the standard `docker-compose.yml` file format. An optional `rancher-compose.yml` file can be used to extend and overwrite service definitions in `docker-compose.yml`.
-3. Users can interact with Rancher using the Rancher UI. Rancher UI is required for one-time configuration tasks such as setting up access control, managing environments, and adding Docker registries. Rancher UI additionally provides a simple and intuitive experience for managing infrastructure and services.
+3. Users can interact with Rancher using the Rancher UI. Rancher UI is required for one-time configuration tasks such as setting up access control, managing projects, and adding Docker registries. Rancher UI additionally provides a simple and intuitive experience for managing infrastructure and services.
 
 The following figure illustrates Rancher's major features, its ability to run any clouds, and the three primary ways to interact with Rancher.
 

@@ -106,9 +106,9 @@ The load balancer service links to the WordPress service, and the WordPress serv
 
 In this section, we will walk through how to create and deploy the WordPress application in Rancher.
 
-From the Rancher UI, click the **Services** tab, and click on the **Get Started** button.
+From the Rancher UI, click the **Applications** tab, and click on the **Get Started** button to add your first service. 
 
-You will immediately be able to add a service. First, we'll create a database service called _database_ and use the mysql image. In the **Advanced Options**, add the environment variable `MYSQL_ROOT_PASSWORD=pass1`. Click **Create**. You will be immediately brought to a project page, which will contain all the services. After the service is created, click on **Start** in the service.
+You will immediately be able to add a service. First, we'll create a database service called _database_ and use the mysql image. In the **Advanced Options**, add the environment variable `MYSQL_ROOT_PASSWORD=pass1`. Click **Create**. You will be immediately brought to a stack page, which will contain all the services. After the service is created, click on **Start** in the service.
 
 Next, click on the **Add Service** to add another service. We'll add a WordPress service and link to the mysql service. Let's use the name, _mywordpress_, and use the wordpress image. We'll move the slider to have the scale of the service be 2 containers. In the **Service Links**, add the _database_ service and provide the name _mysql_. Just like in Docker, Rancher will link the necessary environment variables in the WordPress image from the linked database when you select the name as _mysql_. Click **Create**. After the service is created, click on **Start** in the service and you will see 2 containers being launched for this service.
 
@@ -122,7 +122,7 @@ In this section, we will show you how to create and deploy the same WordPress ap
 
 The `rancher-compose` tool works just like the popular `docker-compose` tool. It takes in the same `docker-compose.yml` file and deploys the application on Rancher. You can specify additional attributes in a `rancher-compose.yml` file which extends and overwrites the `docker-compose.yml` file.
 
-In the previous section, we created a Wordpress application with a load balancer. If you had created it in Rancher, you can download the files directly from our UI by selecting **Export Config** from the project's dropdown menu. The `docker-compose.yml` and `rancher-compose.yml` files would look like this:
+In the previous section, we created a Wordpress application with a load balancer. If you had created it in Rancher, you can download the files directly from our UI by selecting **Export Config** from the stack's dropdown menu. The `docker-compose.yml` and `rancher-compose.yml` files would look like this:
 
 **docker-compose.yml**
 
@@ -172,7 +172,7 @@ database:
   scale: 1
 ```
 
-Download the `rancher-compose` binary from Rancher UI, which is located on the upper right corner of the **Services** -> **Projects** page. We provide the ability to download the binaries for Windows, Mac, and Linux.
+Download the `rancher-compose` binary from Rancher UI, which is located on the upper right corner of the **Applications** -> **Stacks** page. We provide the ability to download the binaries for Windows, Mac, and Linux.
 
 If order for services to be launched in Rancher using `rancher-compose`, you will need to set some variables in `rancher-compose`. You will need to create an [API Key]({{site.baseurl}}/docs/configuration/api-keys/) in the Rancher UI. Click on the account icon and go to **Settings** -> **API & Keys**. Click on **Add API Key**. Save the username (access key) and password (secret key). Set up the environment variables needed for rancher-compose: `RANCHER_URL`, `RANCHER_ACCESS_KEY`, and `RANCHER_SECRET_KEY`.
 
@@ -191,4 +191,4 @@ Now, navigate to the directory where you saved `docker-compose.yml` and `rancher
 $ rancher-compose -p NewWordpress up
 ```
 
-In Rancher, a new project will be created called **NewWordPress** with all of the services launched.
+In Rancher, a new stack will be created called **NewWordPress** with all of the services launched.

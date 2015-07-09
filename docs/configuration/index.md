@@ -20,7 +20,7 @@ In [Host Registration]({{site.baseurl}}/docs/configuration/host-registration), y
 
 In [API & Keys]({{site.baseurl}}/docs/configuration/api-keys/), you can view the link to the API as well as create API Keys to access the API. If your Rancher instance has Access Control enabled, then you will need to create keys in order access the API.
 
-In [Environments]({{site.baseurl}}/docs/configuration/environments/), you create different environments, which allow you to share services and resources to specific groups of users. These environments are how your company can manage different teams and isolate resources between those teams.
+In [Projects]({{site.baseurl}}/docs/configuration/projects/), you create different projects, which allow you to share services and resources to specific groups of users. These projects are how your company can manage different teams and isolate resources between those teams.
 
 In [Registries]({{site.baseurl}}/docs/configuration/registries/), you can add different private registry credentials so you can use your own images to create containers.
 

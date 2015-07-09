@@ -8,7 +8,7 @@ layout: default
 
 ### Help! I added my host, but it's not showing up. What can I do?
 
-If you have added your host on the same server as Rancher server, then you will need to edit the custom command. Please review the following [notes]({{site.baseurl}}/docs/infrastructure/hosts/custom/#samehost) about using the same host for Rancher server and Rancher agent. 
+If you have added your host on the same server as Rancher server, then you will need to edit the custom command. Please review the following [notes]({{site.baseurl}}/docs/rancher-ui/infrastructure/hosts/custom/#samehost) about using the same host for Rancher server and Rancher agent. 
 
 ### How does the host determine IP address and how can I change it?
 

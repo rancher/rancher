@@ -7,7 +7,7 @@ layout: default
 ## Scheduling with Rancher-Compose
 ---
 
-When creating services using `rancher-compose`, you can direct the host(s) of where the containers should be launched based on scheduling rules. This scheduling ability is available in the [UI]({{site.baseurl}}/docs/services/projects/services/#scheduling-services) and also support in `rancher-compose`. Rancher determines how to schedule a service's containers based on the `labels` defined in the `docker-compose.yml` file.
+When creating services using `rancher-compose`, you can direct the host(s) of where the containers should be launched based on scheduling rules. This scheduling ability is available in the [UI]({{site.baseurl}}/docs/rancher-ui/applications/stacks/services/#scheduling-services) and also support in `rancher-compose`. Rancher determines how to schedule a service's containers based on the `labels` defined in the `docker-compose.yml` file.
 
 ### Labels used in Docker-Compose
 
@@ -37,7 +37,7 @@ Host Label | `io.rancher.scheduler.affinity:host_label`
 Container Label/Service Name | `io.rancher.scheduler.affinity:container_label`
 Container Name | `io.rancher.scheduler.affinity:container`
 
-Notice how there is not a specific prefix for service name. When Rancher creates a service, system labels are added to all containers of the service to indicate the project and service name. 
+Notice how there is not a specific prefix for service name. When Rancher creates a service, system labels are added to all containers of the service to indicate the stack and service name. 
 
 To create the key of our label, we start with a field prefix (e.g. `io.rancher.scheduler.affinity:host_label`) and based on the condition that we are looking for, we append the type of condition we want. For example, if we want the containers to be launched on a host that must not equal (i.e. `_ne`) to a host label value, the label key would be `io.rancher.scheduler.affinity:host_label_ne`. 
 
@@ -52,7 +52,7 @@ labels:
 
 #### Global Service
 
-Making a service into a global service is the equivalent of selecting **Always run one instance of this container on every host** in the UI. This means that a container will be started on any host in the [environment]{{site.baseurl}}/docs/configuration/environments/). If a new host is added to the environment, and the host fulfills the global service's host requirements, the service will automatically be started. 
+Making a service into a global service is the equivalent of selecting **Always run one instance of this container on every host** in the UI. This means that a container will be started on any host in the [project]{{site.baseurl}}/docs/configuration/projects/). If a new host is added to the project, and the host fulfills the global service's host requirements, the service will automatically be started. 
 
 Currently, we only support global services with host labels fields that are using the hard condition. This means that only labels that are related to `host_labels` will be adhered to when scheduling and it **must** or **must not** equal the values. Any other label types will be ignored.
 
@@ -75,7 +75,7 @@ wordpress:
 
 #### Finding Hosts with Host Labels
 
-When adding hosts to Rancher, you can add [host labels]({{site.baseurl}}/docs/infrastructure/hosts/#host-labels). When scheduling a service, you can leverage these labels to create rules to pick the hosts you want your service to be deployed on.
+When adding hosts to Rancher, you can add [host labels]({{site.baseurl}}/docs/rancher-ui/infrastructure/hosts/#host-labels). When scheduling a service, you can leverage these labels to create rules to pick the hosts you want your service to be deployed on.
 
 Examples for each condition type:
 
@@ -116,19 +116,19 @@ When `rancher-compose` starts containers for a service, it also automatically cr
 
 Label | Value
 ----|-----
-io.rancher.project.name | `${project_name}`
-io.rancher.project_service.name | `${project_name}/${service_name}`
+io.rancher.stack.name | `${stack_name}`
+io.rancher.stack_service.name | `${stack_name}/${service_name}`
 
-Note: When using the `io.rancher.project_service.name`, the value must be in the format of `project name/service name.
+Note: When using the `io.rancher.stack_service.name`, the value must be in the format of `stack name/service name.
 
-The macros `${project_name}` and `${service_name}` can also be used in the `docker-compose.yml` file and will be evaluated when the service is started.
+The macros `${stack_name}` and `${service_name}` can also be used in the `docker-compose.yml` file and will be evaluated when the service is started.
 
 Example of Service Name:
 
 ```yaml
 labels:
   # Host MUST have a container from service name `value1`
-  io.rancher.scheduler.affinity:container_label: io.rancher.project_service.name=projectname/servicename
+  io.rancher.scheduler.affinity:container_label: io.rancher.stack_service.name=stackname/servicename
 ```
 
 #### Finding Hosts with Container Names
@@ -155,14 +155,14 @@ A typical scheduling policy may be to try to spread the containers of a service 
 
 ```yaml
 labels: 
-  io.rancher.scheduler.affinity:container_label_ne: io.rancher.project_service.name=${project_name}/${service_name}
+  io.rancher.scheduler.affinity:container_label_ne: io.rancher.stack_service.name=${stack_name}/${service_name}
 ```
 
 Since this is a hard anti-affinity rule, we may run into problems if the scale is larger than the number of hosts available.  In this case, we might want to use a soft anti-affinity rule so that the scheduler is still allowed to deploy a container to a host that already has that container running.  Basically, this is a soft rule so it can be ignored if no better alternative exists.
 
 ```yaml
 labels: 
-io.rancher.scheduler.affinity:container_label_soft_ne: io.rancher.project_service.name=${project_name}/${service_name}
+io.rancher.scheduler.affinity:container_label_soft_ne: io.rancher.stack_service.name=${stack_name}/${service_name}
 ```
 
 #### Example 2:
@@ -171,7 +171,7 @@ Another example may be to deploy all the containers on the same host regardless 
 
 ```yaml
 labels: 
-  io.rancher.scheduler.affinity:container_label_soft: io.rancher.project_service.name=${project_name}/${service_name}
+  io.rancher.scheduler.affinity:container_label_soft: io.rancher.stack_service.name=${stack_name}/${service_name}
 ```
 
 If a hard affinity rule to itself was chosen instead, the deployment of the first container would fail since there would be no host that currently has that service running.
@@ -229,7 +229,7 @@ Rancher supports the same environment variable syntax used by Swarm, in addition
 <tr><td>
 <strong>Container label affinity</strong> can be specified using the environment variable <code>affinity:com.example.type==frontend</code> where the container label is <code>com.example.type==frontend</code>
 </td><td>
-Rancher's environment variable for specifying container label affinity is slightly different.  Using the same example, it would look like: <code>affinity:container_label:com.example.type==frontend</code>.  Although, Rancher tries to stay compatible with Docker as much as possible, both projects are being developed and changing at an incredible pace and minor differences occasionally occurs.
+Rancher's environment variable for specifying container label affinity is slightly different.  Using the same example, it would look like: <code>affinity:container_label:com.example.type==frontend</code>.  Although, Rancher tries to stay compatible with Docker as much as possible, both stacks are being developed and changing at an incredible pace and minor differences occasionally occurs.
 </td></tr>
 </table>
 

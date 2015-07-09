@@ -10,21 +10,21 @@ layout: default
 
 Access Control is how Rancher limits the users who have access to your Rancher instance. By default, access control is not configured. This means anyone who has the IP address of your Rancher instance will be able to use it and access the API. Your Rancher instance is open to the public! We recommend configuring Access Control after launching Rancher. Upon enabling access control, you can share your Rancher instance to who you want to. They will be required to authenticate to the instance before being able to access it. The API becomes only accessible to those who have valid API keys to the instance. 
 
-The first account that authenticates with Rancher will become the **admin** of the account. Only the admin will have permissions to view **Access Control** and **[Host Registration]({{site.baseurl}}/docs/configuration/host-registration/)**. As an admin of the site, you also have the ability to view all [environments]({{site.baseurl}}/docs/configuration/environments/) in the site even if you are not added as a member to the environment. In the admin's environment dropdown menu, they will only see the environments that they are added to, but all environments can be seen on the **Manage Environments** page.
+The first account that authenticates with Rancher will become the **admin** of the account. Only the admin will have permissions to view **Access Control** and **[Host Registration]({{site.baseurl}}/docs/configuration/host-registration/)**. As an admin of the site, you also have the ability to view all [projects]({{site.baseurl}}/docs/configuration/projects/) in the site even if you are not added as a member to the project. In the admin's project dropdown menu, they will only see the projects that they are added to, but all projects can be seen on the **Manage Projects** page.
 
 ### Enabling Access Control
 
 In the account dropdown menu, click on **Access Control** within the Administration section or click on the **Settings** link in the red banner.
 
-Follow the directions to register Rancher as a GitHub application. After authenticating your Rancher instance with GitHub, access control will be enabled. With access control enabled, you will be able to manage different [environments]({{site.baseurl}}/docs/configuration/environments/) and share them with different groups of people.
+Follow the directions to register Rancher as a GitHub application. After authenticating your Rancher instance with GitHub, access control will be enabled. With access control enabled, you will be able to manage different [projects]({{site.baseurl}}/docs/configuration/projects/) and share them with different groups of people.
 
 ### Site Access
 
-Anyone who is a member or owner of an environment will have also access to the Rancher instance. Alternatively, you can also invite members to access the Rancher instance, but when they log in, they will have their own environment. These members who are added using the **Site Access** will not be able to see other environments until they are added as a member to them.
+Anyone who is a member or owner of a project will have also access to the Rancher instance. Alternatively, you can also invite members to access the Rancher instance, but when they log in, they will have their own project. These members who are added using the **Site Access** will not be able to see other projects until they are added as a member to them.
 
-Anyone with permissions to view the Rancher instance will be given user permissions. They will not be able to view Access Control or Host Registration. The users will only be able to view environments that they are added to. 
+Anyone with permissions to view the Rancher instance will be given user permissions. They will not be able to view Access Control or Host Registration. The users will only be able to view projects that they are added to. 
 
-If you wanted to add users to Rancher without sharing your environment, you can add them in the **Site Access** section. Click on the **Customize** button.
+If you wanted to add users to Rancher without sharing your project, you can add them in the **Site Access** section. Click on the **Customize** button.
 
 **Option 1: Allow any GitHub user** 
 

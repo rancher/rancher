@@ -9,7 +9,7 @@ layout: default
 
 The `rancher-compose` tool works just like the popular `docker-compose` and supports any `docker-compose.yml` file. When we launch a service in rancher-compose, it will show up in the specified Rancher server instance. We also have a `rancher-compose.yml` which extends and overwrites `docker-compose.yml.` The rancher-compose yaml file are attributes only supported in Rancher, for example, scale of a service.
 
-The binary can be downloaded directly from the UI. The link can be found on the **Services** -> **Projects** page in the upper right corner. We have binaries for Windows, Mac, and Linux.
+The binary can be downloaded directly from the UI. The link can be found on the **Applications** -> **Stacks** page in the upper right corner. We have binaries for Windows, Mac, and Linux.
 
 To enable `rancher-compose` to launch services in a Rancher instance, you'll need to set a couple of environment variables:`RANCHER_URL`, `RANCHER_ACCESS_KEY`, and `RANCHER_SECRET_KEY`. The access key and secret key will be an [API key]({{site.baseurl}}/docs/configuration/api-keys/). 
 
@@ -22,7 +22,7 @@ $ export RANCHER_ACCESS_KEY=<username_of_key>
 $ export RANCHER_SECRET_KEY=<password_of_key>
 ```
 
-Now, you can create run any `docker-compose.yml` file using `rancher-compose`. The containers will automatically be launched in your Rancher instance in the [environment]({{site.baseurl}}/docs/configuration/environments/) that the API key is located in.
+Now, you can create run any `docker-compose.yml` file using `rancher-compose`. The containers will automatically be launched in your Rancher instance in the [project]({{site.baseurl}}/docs/configuration/projects/) that the API key is located in.
 
 ### Commands
 
@@ -53,7 +53,7 @@ Name | Description
 --secret-key 	|		Specify Rancher API secret key [$RANCHER_SECRET_KEY]
 --file, -f "docker-compose.yml"	| Specify an alternate compose file (default: docker-compose.yml)
 --rancher-file, -r 		|	Specify an alternate Rancher compose file (default: rancher-compose.yml)
---project-name, -p 		|	Specify an alternate [project]({{site.baseurl}}/docs/services/projects/) name (default: directory name)
+--project-name, -p 		|	Specify an alternate [stack]({{site.baseurl}}/docs/rancher-ui/applications/stacks/) name (default: directory name)
 --help, -h			|	show help
 --version, -v		|	print the version
 
