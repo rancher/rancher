@@ -34,14 +34,14 @@ If you want to use Vagrant to run this on your laptop just clone the repo and to
 
 ## Source Code
 
-This repo is a meta-repo used for packaging.  The source code for Rancher is in other repos in the rancherio organization.  The majority of the code is in https://github.com/rancher/cattle.
+This repo is a meta-repo used for packaging.  The source code for Rancher is in other repos in the rancher organization.  The majority of the code is in https://github.com/rancher/cattle.
 
 ## Support, Discussion, and Community
 If you need any help with Rancher or RancherOS, please join us at either our [Rancher forums](http://forums.rancher.com/) or [#rancher IRC channel](http://webchat.freenode.net/?channels=rancher) where most of our team hangs out at.
 
 Please submit any **Rancher** bugs, issues, and feature requests to [rancher/rancher](//github.com/rancher/rancher/issues).
 
-Please submit any **RancherOS** bugs, issues, and feature requests to [rancherio/os](//github.com/rancher/os/issues).
+Please submit any **RancherOS** bugs, issues, and feature requests to [rancher/os](//github.com/rancher/os/issues).
 
 #License
 Copyright (c) 2014-2015 [Rancher Labs, Inc.](http://rancher.com)
