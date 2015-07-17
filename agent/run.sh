@@ -72,6 +72,7 @@ launch_agent()
         -e http_proxy \
         -e https_proxy \
         -e NO_PROXY \
+        -e no_proxy \
         -e CATTLE_PHYSICAL_HOST_UUID \
         -e CATTLE_SCRIPT_DEBUG \
         -e CATTLE_ACCESS_KEY \
