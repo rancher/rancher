@@ -61,6 +61,10 @@ launch_agent()
 
     local var_lib_docker=$(resolve_var_lib_docker)
 
+    if [ -n "$NO_PROXY" ]; then
+        export no_proxy=$NO_PROXY
+    fi
+
     docker run \
         -d \
         --name rancher-agent \
