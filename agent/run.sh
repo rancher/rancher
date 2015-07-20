@@ -61,6 +61,10 @@ launch_agent()
 
     local var_lib_docker=$(resolve_var_lib_docker)
 
+    if [ -n "$NO_PROXY" ]; then
+        export no_proxy=$NO_PROXY
+    fi
+
     docker run \
         -d \
         --name rancher-agent \
@@ -72,6 +76,7 @@ launch_agent()
         -e http_proxy \
         -e https_proxy \
         -e NO_PROXY \
+        -e no_proxy \
         -e CATTLE_PHYSICAL_HOST_UUID \
         -e CATTLE_SCRIPT_DEBUG \
         -e CATTLE_ACCESS_KEY \
