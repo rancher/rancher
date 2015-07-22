@@ -22,4 +22,4 @@ RUN mkdir -p /var/lib/cattle /var/lib/rancher
 COPY register.py resolve_url.py agent.sh run.sh /
 ENTRYPOINT ["/run.sh"]
 LABEL "io.rancher.container.system"="rancher-agent"
-ENV RANCHER_AGENT_IMAGE rancher/agent:v0.7.10
+ENV RANCHER_AGENT_IMAGE rancher/agent:v0.7.11
