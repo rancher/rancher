@@ -14,8 +14,7 @@ Rancher is deployed as a set of Docker containers.  Running Rancher is a simple 
 ### Requirements
 
 * Docker 1.6.0+
-* Ubuntu 14.04 or CoreOS 494+
-    * *Note: These are the only tested distributions at the moment, but most modern Linux distributions will work*
+* Any modern Linux distribution that supports Docker 1.6+. (Ubuntu, RHEL/CentOS 6/7 are more heavily tested.) Rancher also works with [RancherOS](https://github.com/rancher/os).
 * RAM: 1GB+
  
 ### Launching Management Server
