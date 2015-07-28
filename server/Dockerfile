@@ -21,6 +21,7 @@ RUN cd / && for i in $(ls /s6-statics/*static.tar.gz);do tar -zxvf $i;done
 
 VOLUME ["/var/lib/cattle"]
 VOLUME ["/var/lib/mysql"]
+VOLUME ["/var/log/mysql"]
 
 EXPOSE 8080
 ENV CATTLE_HOST_API_PROXY_MODE embedded

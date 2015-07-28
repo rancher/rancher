@@ -36,43 +36,6 @@ setup_gelf()
     fi
 }
 
-start_local_mysql()
-{
-    sed -i 's/^\(bind-address.*\)$/#\1/' /etc/mysql/my.cnf
-    sed -i 's/^#\(max_connections.*\)/\1/;s/100/1000/' /etc/mysql/my.cnf
-    
-    s6-svc -u ${S6_SERVICE_DIR}/mysql
-
-    set +e
-    for ((i=0;i<60;i++))
-    do
-        if mysqladmin status 2> /dev/null; then
-            break
-        else
-            if [ "$i" -eq "59" ]; then
-                echo "Could not start MySQL..." 1>&2
-                exit 1
-            fi
-                sleep 1
-            fi
-    done
-    set -e
-}
-
-setup_local_db()
-{
-    local db_user=$CATTLE_DB_CATTLE_USERNAME
-    local db_pass=$CATTLE_DB_CATTLE_PASSWORD
-    local db_name=$CATTLE_DB_CATTLE_MYSQL_NAME
-
-    echo "Setting up database"
-    mysql -uroot<< EOF
-CREATE DATABASE IF NOT EXISTS ${db_name} COLLATE = 'utf8_general_ci' CHARACTER SET = 'utf8';
-GRANT ALL ON ${db_name}.* TO "${db_user}"@'%' IDENTIFIED BY "${db_pass}";
-GRANT ALL ON ${db_name}.* TO "${db_user}"@'localhost' IDENTIFIED BY "${db_pass}";
-EOF
-}
-
 setup_mysql()
 {
     # Set in the Dockerfile by default... overriden by runtime.
@@ -85,8 +48,7 @@ setup_mysql()
 
         if [ -z "$CATTLE_DB_CATTLE_MYSQL_HOST" ]; then
             export CATTLE_DB_CATTLE_MYSQL_HOST="localhost"
-            start_local_mysql
-            setup_local_db
+            /usr/share/cattle/mysql.sh
         fi
 
         if [ -z "$CATTLE_DB_CATTLE_MYSQL_PORT" ]; then
