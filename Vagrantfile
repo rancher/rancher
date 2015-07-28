@@ -22,6 +22,10 @@ if File.exist?(CONFIG)
 end
 
 Vagrant.configure("2") do |config|
+  # vagrant fails to replace key properly, which leads to inability to control
+  # VM after second start
+  config.ssh.insert_key = false
+
   config.vm.box = "coreos-%s" % $update_channel
   config.vm.box_version = ">= 308.0.1"
   config.vm.box_url = "http://%s.release.core-os.net/amd64-usr/current/coreos_production_vagrant.json" % $update_channel
