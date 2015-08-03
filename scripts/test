@@ -1,6 +1,6 @@
 #!/bin/bash
 
-COMPOSE="/usr/local/bin/docker-compose"
+COMPOSE="docker-compose"
 
 teardown()
 {
@@ -12,7 +12,7 @@ wait_for_env()
 {
     local url=$1
     echo "Checking for $url availability"
-    for ((i=0;i<180;i++))
+    for ((i=0;i<300;i++))
     do
         if [[ "$(curl -s ${url}/ping)" = "pong" ]]; then
             if [[ "$i" = "1" ]]; then
@@ -20,6 +20,10 @@ wait_for_env()
             fi
             break
         else
+            if [[ "$i" -eq "299" ]]; then
+                echo "Env did not start"
+                exit 1
+            fi
             sleep 1
         fi
     done
@@ -62,9 +66,14 @@ if [ $(command -v boot2docker) ]; then
     export DOCKER_IP=$(boot2docker ip)
 fi
 
+if [ $(command -v docker-machine) ]; then
+    machine=$(docker-machine active)
+    export DOCKER_IP=$(docker-machine ip ${machine})
+fi
+
 cd $(dirname $0)/..
 pushd ./server > /dev/null
-./build-image.sh 
+TAG=dev ./build-image.sh 
 popd > /dev/null
 
 # Just doing server for now.
