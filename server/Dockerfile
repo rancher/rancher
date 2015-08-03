@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends openjdk-7-jre-h
 ENV CATTLE_HOME /var/lib/cattle
 ENV DEFAULT_CATTLE_API_UI_INDEX //releases.rancher.com/ui/0.40.0
 ENV CATTLE_DB_CATTLE_DATABASE mysql
+ENV CATTLE_USE_LOCAL_ARTIFACTS true
 ADD artifacts /usr/share/cattle
 
 ADD service /service
