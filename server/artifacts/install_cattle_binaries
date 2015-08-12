@@ -7,7 +7,7 @@ cd /tmp/extracted_cattle
 
 install_build_tools()
 {
-    BUILD_TOOLS_VERSION="0.1.0"
+    BUILD_TOOLS_VERSION="0.2.0"
     tmpdir=$(mktemp -d)
     pushd $tmpdir
     curl -sSL -o build-tools.tar.gz https://github.com/rancherio/build-tools/archive/v${BUILD_TOOLS_VERSION}.tar.gz
@@ -30,6 +30,18 @@ clean_up()
     rm -rf ./extracted_cattle
 }
 
+local_agents()
+{
+    mkdir -p /usr/share/cattle/artifacts
+    echo "# Autopopulated by cattle_binary_pull">/usr/share/cattle/env_vars
+    for i in $(grep agent\.package ./cattle-global.properties); do
+        env_var_name=$(echo $i | cut -d'=' -f1 | sed 's/^\(.*\)/CATTLE_\1/;s/\./_/g' | tr [a-z] [A-Z])
+        url=$(echo $i| cut -d'=' -f2)
+        file_name=$(echo ${url##*/})
+        echo export ${env_var_name}=/usr/share/cattle/artifacts/${file_name} >> /usr/share/cattle/env_vars
+    done
+}
+
 trap clean_up EXIT SIGINT SIGTERM
 
 install_build_tools
@@ -37,4 +49,6 @@ install_build_tools
 if [ -f "/usr/share/cattle/cattle.jar" ]; then
     unpack_jar
     /usr/bin/cattle-binary-pull ./cattle-global.properties /usr/bin
+    local_agents
+    /usr/bin/cattle-binary-pull ./cattle-global.properties /usr/share/cattle/artifacts agent
 fi

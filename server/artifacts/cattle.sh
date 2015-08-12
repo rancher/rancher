@@ -19,6 +19,15 @@ if [ -e $DEBUG_JAR ]; then
     JAR=$DEBUG_JAR
 fi
 
+setup_local_agents()
+{
+    if [ "${CATTLE_USE_LOCAL_ARTIFACTS}" == "true" ]; then
+        if [ -f /usr/share/cattle/env_vars ]; then
+            source /usr/share/cattle/env_vars
+        fi
+    fi
+}
+
 setup_graphite()
 {
     # Setup Graphite
@@ -132,12 +141,14 @@ setup_proxy()
     fi
 }
 
+setup_local_agents
 setup_graphite
 setup_gelf
 setup_mysql
 setup_redis
 setup_zk
 setup_proxy
+
 
 env | grep CATTLE | grep -v PASS | sort
 
