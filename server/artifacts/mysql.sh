@@ -64,7 +64,6 @@ config_mysql()
         sed -i 's/^#\(log_bin.*\)/\1/' /etc/mysql/my.cnf
         sed -i '/^log_bin.*$/a innodb_flush_log_at_trx_commit = 1' /etc/mysql/my.cnf
         sed -i '/^log_bin.*$/a sync_binlog           = 1' /etc/mysql/my.cnf
-        sed -i '/^log_bin.*$/a binlog_format         = row' /etc/mysql/my.cnf
     fi
 }
 
