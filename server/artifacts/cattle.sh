@@ -152,4 +152,13 @@ setup_proxy
 
 env | grep CATTLE | grep -v PASS | sort
 
+if [ -f "/ca.crt" ]; then
+    if [ ! -e "/usr/share/ca-certificates/rancher/ca.crt" ]; then
+        echo Adding ca.crt to Certs.
+        mkdir /usr/share/ca-certificates/rancher
+        cp /ca.crt /usr/share/ca-certificates/rancher/ca.crt
+        echo rancher/ca.crt >> /etc/ca-certificates.conf
+        update-ca-certificates
+    fi
+fi
 exec java $JAVA_OPTS ${CATTLE_JAVA_OPTS:--Xms128m -Xmx512m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR} $PROXY_ARGS -jar $JAR "$@" $ARGS
