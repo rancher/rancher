@@ -29,6 +29,19 @@ export CATTLE_HOME=${CATTLE_HOME:-/var/lib/cattle}
 
 check_debug
 
+CONTAINER="$(hostname)"
+if [ "$1" = "run" ]; then
+    CONTAINER="rancher-agent"
+fi
+
+if [ "$1" != "inspect-host" ]; then
+    RUNNING_IMAGE="$(docker inspect -f '{{.Config.Image}}' ${CONTAINER})"
+fi
+
+if [[ -n ${RUNNING_IMAGE} && ${RUNNING_IMAGE} != ${RANCHER_AGENT_IMAGE} ]]; then
+    export RANCHER_AGENT_IMAGE=${RUNNING_IMAGE}
+fi
+
 launch_volume()
 {
     if docker inspect rancher-agent-state >/dev/null 2>&1; then
