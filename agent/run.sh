@@ -34,7 +34,7 @@ if [ "$1" = "run" ]; then
     CONTAINER="rancher-agent"
 fi
 
-if [ "$1" != "inspect-host" ]; then
+if [[ "$1" != "inspect-host" && $1 != "--" ]]; then
     RUNNING_IMAGE="$(docker inspect -f '{{.Config.Image}}' ${CONTAINER})"
 fi
 
