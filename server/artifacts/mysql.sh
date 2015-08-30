@@ -55,7 +55,7 @@ init_new_data_dir()
 config_mysql()
 {
     sed -i 's/^\(bind-address.*\)$/#\1/' /etc/mysql/my.cnf
-    sed -i 's/^#\(max_connections.*\)/\1/;s/100/1000/' /etc/mysql/my.cnf
+    sed -i 's/^#\(max_connections.*\)/\1/;s/100$/1000/' /etc/mysql/my.cnf
     sed -i 's/^key_buffer[[:space:]]/key_buffer_size/' /etc/mysql/my.cnf
 
     # setup to be a master
