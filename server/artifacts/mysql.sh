@@ -3,6 +3,9 @@
 set -e
 
 DATADIR='/var/lib/mysql'
+SOCKET="/var/run/mysqld/mysqld.sock"
+
+PATH=/usr/libexec:/sbin:/usr/sbin:$PATH
 
 check_mysql_action()
 {
@@ -18,7 +21,7 @@ check_mysql_action()
     set +e
     for ((i=0;i<60;i++))
     do
-        if mysqladmin status 2> /dev/null; then
+        if mysqladmin -S ${SOCKET} status 2> /dev/null; then
             ${cmd1}
         else
             if [ "$i" -eq "59" ]; then
@@ -34,36 +37,49 @@ check_mysql_action()
 init_new_data_dir()
 {
     local pidfile="${DATADIR}/mysql.pid"
-
     # If a blank directory is bind mounted, configure it.
     echo "Running mysql_install_db..."
     mysql_install_db --user=mysql --datadir="${DATADIR}" --rpm --basedir=/usr
 
     echo "Starting MySQL to initialize..."
-    mysqld --user=mysql --datadir="${DATADIR}" --skip-networking --basedir=/usr --socket=/var/run/mysqld/mysqld.sock --pid-file="${pidfile}" &
+    mysqld --user=mysql --datadir="${DATADIR}" --skip-networking --basedir=/usr --socket=${SOCKET} --pid-file="${pidfile}" &
     echo "Waiting for mysql to start"
     check_mysql_action start
 
-    mysql_tzinfo_to_sql /usr/share/zoneinfo |mysql --protocol=socket -uroot mysql
+    mysql_tzinfo_to_sql /usr/share/zoneinfo |mysql --protocol=socket -S ${SOCKET} -uroot mysql
 
     kill $(<"${pidfile}")
     check_mysql_action stop
     echo "Exiting MySQL initialization"
 }
 
+get_mysql_conf()
+{
+    if [ -f "/etc/my.cnf" ]; then 
+        mycnf="/etc/my.cnf"
+    elif [ -f "/etc/mysql/my.cnf" ]; then
+        mycnf="/etc/mysql/my.cnf"
+    else
+        echo "Cannot find my.cnf"
+        exit 1;
+    fi
+
+    echo $mycnf
+}
 
 config_mysql()
 {
-    sed -i 's/^\(bind-address.*\)$/#\1/' /etc/mysql/my.cnf
-    sed -i 's/^#\(max_connections.*\)/\1/;s/100$/1000/' /etc/mysql/my.cnf
-    sed -i 's/^key_buffer[[:space:]]/key_buffer_size/' /etc/mysql/my.cnf
+    mysql_cnf=$(get_mysql_conf)
+    sed -i 's/^\(bind-address.*\)$/#\1/' $mysql_cnf
+    sed -i 's/^#\(max_connections.*\)/\1/;s/100$/1000/' $mysql_cnf
+    sed -i 's/^key_buffer[[:space:]]/key_buffer_size/' $mysql_cnf
 
     # setup to be a master
-    if [ "$(grep ^#server-id /etc/mysql/my.cnf)" ]; then
-        sed -i 's/^#\(server-id.*\)/\1/' /etc/mysql/my.cnf
-        sed -i 's/^#\(log_bin.*\)/\1/' /etc/mysql/my.cnf
-        sed -i '/^log_bin.*$/a innodb_flush_log_at_trx_commit = 1' /etc/mysql/my.cnf
-        sed -i '/^log_bin.*$/a sync_binlog           = 1' /etc/mysql/my.cnf
+    if [ "$(grep ^#server-id ${mysql_cnf})" ]; then
+        sed -i 's/^#\(server-id.*\)/\1/' $mysql_cnf
+        sed -i 's/^#\(log_bin.*\)/\1/' $mysql_cnf
+        sed -i '/^log_bin.*$/a innodb_flush_log_at_trx_commit = 1' $mysql_cnf
+        sed -i '/^log_bin.*$/a sync_binlog           = 1' $mysql_cnf
     fi
 }
 
@@ -82,7 +98,7 @@ setup_cattle_db()
     local db_name=$CATTLE_DB_CATTLE_MYSQL_NAME
 
     echo "Setting up database"
-    mysql -uroot<< EOF
+    mysql -uroot -S ${SOCKET}<< EOF
 CREATE DATABASE IF NOT EXISTS ${db_name} COLLATE = 'utf8_general_ci' CHARACTER SET = 'utf8';
 GRANT ALL ON ${db_name}.* TO "${db_user}"@'%' IDENTIFIED BY "${db_pass}";
 GRANT ALL ON ${db_name}.* TO "${db_user}"@'localhost' IDENTIFIED BY "${db_pass}";
@@ -90,10 +106,11 @@ EOF
 }
 
 ## Boot2docker hack
-if [ "$(lsmod | grep vboxguest)" ]; then
+if [ "$(lsmod | grep vboxguest)" ] && [ -d ${DATADIR} ]; then
     echo "Running in VBox change mysql UID"
     uid=$(stat -c "%u" ${DATADIR})
     usermod -u ${uid} mysql
+    mkdir -p /var/run/mysqld
     chown -R mysql /var/run/mysqld
     chown -R mysql /var/log/mysql
 fi
