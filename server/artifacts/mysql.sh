@@ -90,7 +90,7 @@ EOF
 }
 
 ## Boot2docker hack
-if [ "$(lsmod | grep vboxguest)" ]; then
+if [ "$(grep /var/lib/mysql /proc/mounts|cut -d' ' -f3)" = "vboxsf" ]; then
     echo "Running in VBox change mysql UID"
     uid=$(stat -c "%u" ${DATADIR})
     usermod -u ${uid} mysql
