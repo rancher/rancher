@@ -161,4 +161,4 @@ if [ -f "/ca.crt" ]; then
         update-ca-certificates
     fi
 fi
-exec java $JAVA_OPTS ${CATTLE_JAVA_OPTS:--Xms128m -Xmx512m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR} $PROXY_ARGS -jar $JAR "$@" $ARGS
+exec java ${CATTLE_JAVA_OPTS:--Xms128m -Xmx512m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR} $PROXY_ARGS $JAVA_OPTS -jar $JAR "$@" $ARGS
