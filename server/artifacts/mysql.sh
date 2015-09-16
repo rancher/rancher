@@ -87,6 +87,12 @@ CREATE DATABASE IF NOT EXISTS ${db_name} COLLATE = 'utf8_general_ci' CHARACTER S
 GRANT ALL ON ${db_name}.* TO "${db_user}"@'%' IDENTIFIED BY "${db_pass}";
 GRANT ALL ON ${db_name}.* TO "${db_user}"@'localhost' IDENTIFIED BY "${db_pass}";
 EOF
+
+    if ! echo 'show tables' | mysql -uroot $db_name | grep -iq account; then
+        echo "Importing schema"
+        mysql -uroot $db_name < /usr/share/cattle/mysql-dump.sql
+    fi
+
 }
 
 ## Boot2docker hack
