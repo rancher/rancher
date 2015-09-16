@@ -4,6 +4,7 @@ set -e
 cd /var/lib/cattle
 
 JAR=/usr/share/cattle/cattle.jar
+HASH=$(md5sum $JAR | awk '{print $1}')
 DEBUG_JAR=/var/lib/cattle/lib/cattle-debug.jar
 LOG_DIR=/var/lib/cattle/logs
 export S6_SERVICE_DIR=${S6_SERVICE_DIR:-$S6_SERVICE_DIR}
@@ -141,24 +142,52 @@ setup_proxy()
     fi
 }
 
-setup_local_agents
-setup_graphite
-setup_gelf
-setup_mysql
-setup_redis
-setup_zk
-setup_proxy
+run() {
+    setup_local_agents
+    setup_graphite
+    setup_gelf
+    setup_mysql
+    setup_redis
+    setup_zk
+    setup_proxy
 
+    env | grep CATTLE | grep -v PASS | sort
 
-env | grep CATTLE | grep -v PASS | sort
-
-if [ -f "/ca.crt" ]; then
-    if [ ! -e "/usr/share/ca-certificates/rancher/ca.crt" ]; then
-        echo Adding ca.crt to Certs.
-        mkdir /usr/share/ca-certificates/rancher
-        cp /ca.crt /usr/share/ca-certificates/rancher/ca.crt
-        echo rancher/ca.crt >> /etc/ca-certificates.conf
-        update-ca-certificates
+    if [ -f "/ca.crt" ]; then
+        if [ ! -e "/usr/share/ca-certificates/rancher/ca.crt" ]; then
+            echo Adding ca.crt to Certs.
+            mkdir /usr/share/ca-certificates/rancher
+            cp /ca.crt /usr/share/ca-certificates/rancher/ca.crt
+            echo rancher/ca.crt >> /etc/ca-certificates.conf
+            update-ca-certificates
+        fi
     fi
+
+    HASH_PATH=$(dirname $JAR)/$HASH
+    if [ -e $HASH_PATH ]; then
+        if [ -e $HASH_PATH/index.html ]; then
+            export DEFAULT_CATTLE_API_UI_INDEX=local
+        fi
+        exec java ${CATTLE_JAVA_OPTS:--Xms128m -Xmx1024m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR} -Dlogback.bootstrap.level=WARN $PROXY_ARGS $JAVA_OPTS -cp ${HASH_PATH}:${HASH_PATH}/etc/cattle io.cattle.platform.launcher.Main "$@" $ARGS
+    else
+        exec java ${CATTLE_JAVA_OPTS:--Xms128m -Xmx1024m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR} $PROXY_ARGS $JAVA_OPTS -jar $JAR "$@" $ARGS
+    fi
+}
+
+extract()
+{
+    cd $(dirname $JAR)
+    java -jar $JAR war
+    mkdir $HASH
+    ln -s $HASH war
+    cd war
+    unzip ../*.war
+    unzip $JAR etc\*
+    rm ../*.war
+}
+
+if [ "$1" = "extract" ]; then
+    extract
+else
+    run
 fi
-exec java ${CATTLE_JAVA_OPTS:--Xms128m -Xmx512m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR} $PROXY_ARGS $JAVA_OPTS -jar $JAR "$@" $ARGS
