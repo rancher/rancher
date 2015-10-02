@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends openjdk-7-jre-h
                     unzip
 
 ENV CATTLE_HOME /var/lib/cattle
-ENV DEFAULT_CATTLE_API_UI_INDEX //releases.rancher.com/ui/0.53.0
+ENV DEFAULT_CATTLE_API_UI_INDEX //releases.rancher.com/ui/0.54.0
 ENV CATTLE_DB_CATTLE_DATABASE mysql
 ENV CATTLE_USE_LOCAL_ARTIFACTS true
 ADD artifacts /usr/share/cattle
@@ -26,7 +26,7 @@ VOLUME ["/var/log/mysql"]
 
 EXPOSE 8080
 ENV CATTLE_HOST_API_PROXY_MODE embedded
-ENV CATTLE_RANCHER_SERVER_IMAGE v0.40.0-rc1
+ENV CATTLE_RANCHER_SERVER_IMAGE v0.40.0-rc2
 ENV CATTLE_RANCHER_COMPOSE_VERSION beta/latest
 ENV DEFAULT_CATTLE_RANCHER_COMPOSE_LINUX_URL   https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-linux-amd64.tar.gz
 ENV DEFAULT_CATTLE_RANCHER_COMPOSE_DARWIN_URL  https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-darwin-amd64.tar.gz
