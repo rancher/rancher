@@ -26,14 +26,14 @@ VOLUME ["/var/log/mysql"]
 
 EXPOSE 8080
 ENV CATTLE_HOST_API_PROXY_MODE embedded
-ENV CATTLE_RANCHER_SERVER_IMAGE v0.40.0-rc2
+ENV CATTLE_RANCHER_SERVER_IMAGE v0.40.0-rc3
 ENV CATTLE_RANCHER_COMPOSE_VERSION beta/latest
 ENV DEFAULT_CATTLE_RANCHER_COMPOSE_LINUX_URL   https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-linux-amd64.tar.gz
 ENV DEFAULT_CATTLE_RANCHER_COMPOSE_DARWIN_URL  https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-darwin-amd64.tar.gz
 ENV DEFAULT_CATTLE_RANCHER_COMPOSE_WINDOWS_URL https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-windows-386.zip
 
 EXPOSE 3306
-ENV CATTLE_CATTLE_VERSION v0.96.0
+ENV CATTLE_CATTLE_VERSION v0.97.0
 ADD https://github.com/rancherio/cattle/releases/download/${CATTLE_CATTLE_VERSION}/cattle.jar /usr/share/cattle/
 RUN /usr/share/cattle/cattle.sh extract
 RUN curl -sL https:${DEFAULT_CATTLE_API_UI_INDEX}.tar.gz | tar xvzf - -C /usr/share/cattle/war --strip-components=1
