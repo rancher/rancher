@@ -41,5 +41,6 @@ RUN /usr/share/cattle/install_cattle_binaries
 
 ENV DEFAULT_CATTLE_MACHINE_EXECUTE true
 ENV DEFAULT_CATTLE_COMPOSE_EXECUTOR_EXECUTE true
+ENV DEFAULT_CATTLE_CATALOG_EXECUTE true
 
 CMD ["/usr/bin/s6-svscan", "/service"]
