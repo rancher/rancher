@@ -3,7 +3,7 @@
 
 require_relative 'vagrant_ros_guest_plugin.rb'
 
-$number_of_nodes = 1
+$number_of_nodes = 2
 # DO NOT USE 172.17.*, 172.18.*, 10.0.2 as these are used on other NICs: routing will get screwed!
 $private_ip_prefix = '172.19.8' # rancher-server will be on 172.19.8.100, other nodes will start from 172.19.8.101
 $expose_rancher_ui = 8080
@@ -21,7 +21,7 @@ end
 
 Vagrant.configure(2) do |config|
   config.vm.box         = 'rancherio/rancheros'
-  config.vm.box_version = '>=0.3.3'
+  config.vm.box_version = '0.4.1'
 
   config.vm.provider 'virtualbox' do |vb|
     vb.gui = $vb_gui
