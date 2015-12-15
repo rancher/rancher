@@ -34,7 +34,7 @@ ENV DEFAULT_CATTLE_RANCHER_COMPOSE_WINDOWS_URL https://releases.rancher.com/comp
 
 EXPOSE 3306
 ENV CATTLE_CATTLE_VERSION v0.77.0
-ADD https://github.com/rancherio/cattle/releases/download/${CATTLE_CATTLE_VERSION}/cattle.jar /usr/share/cattle/
+ADD https://github.com/rancher/cattle/releases/download/${CATTLE_CATTLE_VERSION}/cattle.jar /usr/share/cattle/
 RUN /usr/share/cattle/install_cattle_binaries
 
 ENV DEFAULT_CATTLE_MACHINE_EXECUTE true
