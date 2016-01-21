@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends openjdk-7-jre-h
                     xz-utils \
                     keychain \
                     unzip \
+                    openssh-client \
                     git
 
 ENV CATTLE_HOME /var/lib/cattle
