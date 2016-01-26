@@ -3,6 +3,40 @@ set -e
 
 trap "exit 1" SIGINT SIGTERM
 
+export AGENT_CONF_FILE="/var/lib/rancher/etc/agent.conf"
+export CA_CERT_FILE="/var/lib/rancher/etc/ssl/ca.crt"
+
+check_and_add_conf()
+{
+    if [ -d /var/lib/rancher/etc ]; then
+        grep -q -F "${1}=${2}" ${AGENT_CONF_FILE} || \
+            echo "export ${1}=${2}" >> ${AGENT_CONF_FILE}
+    fi
+}
+
+
+if [ -e ${CA_CERT_FILE} ]; then
+    check_and_add_conf "CURL_CA_BUNDLE" ${CA_CERT_FILE}
+    check_and_add_conf "REQUESTS_CA_BUNDLE" ${CA_CERT_FILE}
+
+    # Update core container CA certs for Golang
+    mkdir -p /usr/local/share/ca-certificates/rancher
+    cp ${CURL_CA_BUNDLE} /usr/local/share/ca-certificates/rancher/rancherAddedCA.crt
+    update-ca-certificates
+
+    # Configure python websocket pre-shipped cacerts.
+    local websocket_pem='/var/lib/cattle/pyagent/dist/websocket/cacert.pem'
+    local websocket_orig='/var/lib/cattle/pyagent/dist/websocket/cacert.orig'
+    if [[ -e ${websocket_pem} && ! -e ${websocket_orig} ]]; then
+        cp ${websocket_pem} ${websocket_orig}
+    fi
+    cat ${websocket_orig} /var/lib/rancher/etc/ssl/ca.crt > ${websocket_pem}
+fi
+
+if [ -e "${AGENT_CONF_FILE}" ]; then
+    source "${AGENT_CONF_FILE}"
+fi
+
 # This is copied from common/scripts.sh, if there is a change here
 # make it in common and then copy here
 check_debug()
