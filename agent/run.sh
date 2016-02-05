@@ -100,6 +100,7 @@ launch_volume()
 
     docker run \
         --name rancher-agent-state \
+        --label io.rancher.container.start_once=true \
         -v /var/lib/cattle \
         -v /var/log/rancher:/var/log/rancher \
         ${opts} ${RANCHER_AGENT_IMAGE} state
