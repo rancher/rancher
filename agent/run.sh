@@ -167,7 +167,7 @@ verify_docker_client_server_version()
         echo "Please ensure Host Docker version is >=${client_version} and container has r/w permissions to docker.sock" 1>&2
         exit 1
     }
-    info Found $(docker version --format '{{.Server.Version}}')
+    info Found $server_version
     for i in version info; do
         docker $i | while read LINE; do
             info "docker $i:" $LINE
