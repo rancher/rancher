@@ -161,8 +161,9 @@ resolve_var_lib_docker()
 verify_docker_client_server_version()
 {
     local client_version=$(docker version --format '{{.Client.Version}}')
+    local server_version=$(docker version --format '{{.Server.Version}}')
     info "Checking for Docker version >=" $client_version
-    docker version 2>&1 | grep Server\ version >/dev/null || {
+    docker version 2>&1 | grep $server_version >/dev/null || {
         echo "Please ensure Host Docker version is >=${client_version} and container has r/w permissions to docker.sock" 1>&2
         exit 1
     }
