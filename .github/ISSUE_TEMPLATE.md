@@ -1,8 +1,6 @@
 Version - <version or date of master build>
 
-Steps: 
-1. 
-2.
+Steps:  <list steps to reproduce>
 
 Results: <list results and screenshot>
 
