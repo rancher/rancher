@@ -1,11 +1,9 @@
-Rancher Version: ___
+Version - <version or date of master build>
 
-Cattle Version: ___
+Steps: 
+1. 
+2.
 
-User Interface Version : ___
+Results: <list results and screenshot>
 
-Rancher Compose Version : ___
-
-Authentication Mode: ___
-
-**Fill out the above information and remove this line. Issues with this line included will be ignored.**
+Expected: <list what should happen>
