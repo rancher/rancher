@@ -1,7 +1,7 @@
-Version: <version or date of master build>
+Version:
 
-Steps: <list steps to reproduce>
+Steps: 
 
-Results: <list results and screenshot>
+Results: 
 
-Expected: <list what should happen>
+Expected:
