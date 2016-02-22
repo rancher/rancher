@@ -14,14 +14,13 @@ To get automated notifications of our latest release, you can watch the announce
 Rancher is deployed as a set of Docker containers.  Running Rancher is a simple as launching two containers.  One container as the management server and another container on a node as an agent.  You can install the containers in following approaches.
 
 * [Manually](#launching-management-server)
-* [Vagrant](#vagrant)
 * [Puppet](https://github.com/nickschuch/puppet-rancher) (Thanks @nickschuch) 
 * [Ansible](https://github.com/joshuacox/ansibleplaybook-rancher)
 
 ### Requirements
 
-* Docker 1.6.0+
-* Any modern Linux distribution that supports Docker 1.6+. (Ubuntu, RHEL/CentOS 6/7 are more heavily tested.) Rancher also works with [RancherOS](https://github.com/rancher/os).
+* Docker 1.9.1+
+* Any modern Linux distribution that supports Docker 1.9.1+. (Ubuntu, RHEL/CentOS 7 are more heavily tested.) Rancher also works with [RancherOS](https://github.com/rancher/os).
 * RAM: 1GB+
  
 ### Launching Management Server
@@ -33,10 +32,6 @@ The UI and API are available on the exposed port `8080`.
 ### Using Rancher
 
 To learn more about using Rancher, please refer to our [Rancher Documentation](http://docs.rancher.com/). 
- 
-### Vagrant
-
-If you want to use Vagrant to run this on your laptop just clone the repo and to do `vagrant up` and then access port 8080 for the UI.
 
 ## Source Code
 
