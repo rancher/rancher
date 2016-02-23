@@ -1,6 +1,10 @@
-Version:
+Rancher Version:
 
-Steps: 
+Docker Version:
+
+OS: 
+
+Steps to Reproduce: 
 
 Results: 
 
