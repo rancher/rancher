@@ -40,7 +40,7 @@ This repo is a meta-repo used for packaging.  The source code for Rancher is in 
 ## Support, Discussion, and Community
 If you need any help with Rancher or RancherOS, please join us at either our [Rancher forums](http://forums.rancher.com/) or [#rancher IRC channel](http://webchat.freenode.net/?channels=rancher) where most of our team hangs out at.
 
-Please submit any **Rancher** bugs, issues, and feature requests to [rancher/rancher](//github.com/rancher/rancher/issues).
+Please submit any **Rancher** bugs, issues, and feature requests to [rancher/rancher](//github.com/rancher/rancher/issues). If there are any security issues, please email security@rancher.com instead of posting an open issue in Github. 
 
 Please submit any **RancherOS** bugs, issues, and feature requests to [rancher/os](//github.com/rancher/os/issues).
 
