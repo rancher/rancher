@@ -114,6 +114,7 @@ launch_agent()
 {
     launch_volume
 
+    # Needed to edit resolv.conf on the host
     local var_lib_docker=$(resolve_var_lib_docker)
 
     if [ -n "$NO_PROXY" ]; then
@@ -211,6 +212,15 @@ load()
 
     if [[ "$content" =~ .!/bin/sh.* ]]; then
         eval "$content"
+        if [ -n "$CATTLE_URL_OVERRIDE" ]; then
+            CATTLE_URL=$CATTLE_URL_OVERRIDE
+        fi
+    else
+        error $(print_url $1) returned
+        error "--- START ---"
+        echo "$content"
+        error "--- END ---"
+        return 1
     fi
 }
 
@@ -284,7 +294,7 @@ read_rancher_agent_env()
 
 print_url()
 {
-    local url=$(echo "${CATTLE_URL}"| sed -e 's!/v1/scripts.*!/v1!')
+    local url=$(echo "$1"| sed -e 's!/v1/scripts.*!/v1!')
     echo $url
 }
 
@@ -334,7 +344,11 @@ setup_env()
 {
     if [ "$1" != "upgrade" ]; then
         local env="$(./resolve_url.py $CATTLE_URL)"
-        load "$env"
+        if ! load "$env"; then
+            error Failed to load registration env from CATTLE_URL=$(print_url $CATTLE_URL) ENV_URL=$(print_url $env)
+            error Please ensure the proper value for the Host Registration URL is set
+            exit 1
+        fi
     fi
 
     info Inspecting host capabilities
