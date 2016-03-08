@@ -58,6 +58,7 @@ config_mysql()
     sed -i 's/^#\(max_connections.*\)/\1/;s/100$/1000/' /etc/mysql/my.cnf
     sed -i 's/^key_buffer[[:space:]]/key_buffer_size/' /etc/mysql/my.cnf
     sed -i 's/^\(expire_logs_days.*\)/\1/;s/10$/2/' /etc/mysql/my.cnf
+    sed -i '/^max_connections.*$/a sql_mode = ONLY_FULL_GROUP_BY' /etc/mysql/my.cnf
 
     # setup to be a master
     if [ "$(grep ^#server-id /etc/mysql/my.cnf)" ]; then
