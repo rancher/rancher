@@ -14,6 +14,7 @@ ENV CATTLE_HOME /var/lib/cattle
 ENV DEFAULT_CATTLE_API_UI_INDEX //releases.rancher.com/ui/0.91.0
 ENV CATTLE_DB_CATTLE_DATABASE mysql
 ENV CATTLE_USE_LOCAL_ARTIFACTS true
+ENV no_proxy localhost,127.0.0.1,localaddress,.localdomain.com
 ADD artifacts /usr/share/cattle
 
 ADD service /service
