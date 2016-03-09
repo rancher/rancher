@@ -12,7 +12,7 @@ export S6_SERVICE_DIR=${S6_SERVICE_DIR:-$S6_SERVICE_DIR}
 if [ "$URL" != "" ]
 then
     echo Downloading $URL
-    curl -s $URL > cattle-download.jar
+    curl -sLf $URL > cattle-download.jar
     JAR=cattle-download.jar
 fi
 
@@ -117,6 +117,24 @@ setup_zk()
     if [ -n "$CATTLE_ZOOKEEPER_CONNECTION_STRING" ]; then
         export CATTLE_MODULE_PROFILE_ZOOKEEPER=true
     fi
+
+    if [ -n "$CATTLE_ZOOKEEPER_CONNECTION_STRING" ]; then
+        local ok=false
+        for ((i=0; i<=30; i++)); do
+            local host="$(echo $CATTLE_ZOOKEEPER_CONNECTION_STRING | cut -f1 -d, | cut -f1 -d:)"
+            local port="$(echo $CATTLE_ZOOKEEPER_CONNECTION_STRING | cut -f1 -d, | cut -f2 -d:)"
+            echo Waiting for Zookeeper at ${host}:${port}
+            if [ "$(echo ruok | nc $host $port)" == "imok" ]; then
+                ok=true
+                break
+            fi
+            sleep 2
+        done
+        if [ "$ok" != "true" ]; then
+            echo Failed waiting for Zookeeper at ${host}:${port}
+            return 1
+        fi
+    fi
 }
 
 setup_proxy()
@@ -163,14 +181,27 @@ run() {
         fi
     fi
 
+    local ram=$(free -g --si | awk '/^Mem:/{print $2}')
+    if [ ${ram} -gt 15 ]; then
+        MX="8g"
+    elif [ ${ram} -gt 11 ]; then
+        MX="6g"
+    elif [ ${ram} -gt 7 ]; then
+        MX="4g"
+    elif [ ${ram} -gt 3 ]; then
+        MX="2g"
+    else
+        MX="1g"
+    fi
+
     HASH_PATH=$(dirname $JAR)/$HASH
     if [ -e $HASH_PATH ]; then
         if [ -e $HASH_PATH/index.html ]; then
             export DEFAULT_CATTLE_API_UI_INDEX=local
         fi
-        exec java ${CATTLE_JAVA_OPTS:--Xms128m -Xmx1024m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR} -Dlogback.bootstrap.level=WARN $PROXY_ARGS $JAVA_OPTS -cp ${HASH_PATH}:${HASH_PATH}/etc/cattle io.cattle.platform.launcher.Main "$@" $ARGS
+        exec java ${CATTLE_JAVA_OPTS:--Xms128m -Xmx${MX} -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR} -Dlogback.bootstrap.level=WARN $PROXY_ARGS $JAVA_OPTS -cp ${HASH_PATH}:${HASH_PATH}/etc/cattle io.cattle.platform.launcher.Main "$@" $ARGS
     else
-        exec java ${CATTLE_JAVA_OPTS:--Xms128m -Xmx1024m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR} $PROXY_ARGS $JAVA_OPTS -jar $JAR "$@" $ARGS
+        exec java ${CATTLE_JAVA_OPTS:--Xms128m -Xmx${MX} -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR} $PROXY_ARGS $JAVA_OPTS -jar $JAR "$@" $ARGS
     fi
 }
 

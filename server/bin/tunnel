@@ -1,0 +1,4 @@
+#!/bin/bash
+
+cat /var/lib/rancher/etc/${CATTLE_HA_ENCRYPTION_KEY_PATH} | base64 -d > /key/key
+exec spiped -F -k /key/key "$@"
