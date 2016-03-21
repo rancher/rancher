@@ -303,7 +303,7 @@ wait_for()
     local url="$(print_url $CATTLE_URL)"
     info "Attempting to connect to: ${url}"
     for ((i=0; i < 300; i++)); do
-        if ! curl -f -s ${CATTLE_URL} >/dev/null 2>&1; then
+        if ! curl -f -L -s ${CATTLE_URL} >/dev/null 2>&1; then
             error ${url} is not accessible
             sleep 2
             if [ "$i" -eq "299" ]; then
