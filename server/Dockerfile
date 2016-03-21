@@ -34,13 +34,15 @@ ENV CATTLE_RANCHER_COMPOSE_VERSION v0.7.2
 ENV DEFAULT_CATTLE_RANCHER_COMPOSE_LINUX_URL   https://releases.rancher.com/compose/beta/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-linux-amd64-${CATTLE_RANCHER_COMPOSE_VERSION}.tar.gz
 ENV DEFAULT_CATTLE_RANCHER_COMPOSE_DARWIN_URL  https://releases.rancher.com/compose/beta/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-darwin-amd64-${CATTLE_RANCHER_COMPOSE_VERSION}.tar.gz
 ENV DEFAULT_CATTLE_RANCHER_COMPOSE_WINDOWS_URL https://releases.rancher.com/compose/beta/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-windows-386-${CATTLE_RANCHER_COMPOSE_VERSION}.zip
+ENV DEFAULT_CATTLE_CATALOG_URL=library=https://github.com/rancher/rancher-catalog.git,community=https://github.com/rancher/community-catalog.git
 
 EXPOSE 3306
 ENV CATTLE_CATTLE_VERSION v0.155.1
 ADD https://github.com/rancherio/cattle/releases/download/${CATTLE_CATTLE_VERSION}/cattle.jar /usr/share/cattle/
 RUN /usr/share/cattle/cattle.sh extract
 RUN curl -sL https:${DEFAULT_CATTLE_API_UI_INDEX}.tar.gz | tar xvzf - -C /usr/share/cattle/war --strip-components=1
-RUN /usr/share/cattle/install_cattle_binaries
+RUN /usr/share/cattle/install_cattle_binaries && \
+    cd /var/lib/cattle && rancher-catalog-service -validate -catalogUrl=$DEFAULT_CATTLE_CATALOG_URL
 
 ENV DEFAULT_CATTLE_MACHINE_EXECUTE true
 ENV DEFAULT_CATTLE_COMPOSE_EXECUTOR_EXECUTE true
