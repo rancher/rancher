@@ -21,11 +21,6 @@ ADD service /service
 ENV S6_SERVICE_DIR /service
 
 COPY target/*static.tar.gz /s6-statics/
-RUN cd / && for i in $(ls /s6-statics/*static.tar.gz);do tar -zxvf $i;done
-
-VOLUME ["/var/lib/cattle"]
-VOLUME ["/var/lib/mysql"]
-VOLUME ["/var/log/mysql"]
 
 EXPOSE 8080
 ENV CATTLE_HOST_API_PROXY_MODE embedded
@@ -34,15 +29,21 @@ ENV CATTLE_RANCHER_COMPOSE_VERSION v0.7.3-rc2
 ENV DEFAULT_CATTLE_RANCHER_COMPOSE_LINUX_URL   https://releases.rancher.com/compose/beta/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-linux-amd64-${CATTLE_RANCHER_COMPOSE_VERSION}.tar.gz
 ENV DEFAULT_CATTLE_RANCHER_COMPOSE_DARWIN_URL  https://releases.rancher.com/compose/beta/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-darwin-amd64-${CATTLE_RANCHER_COMPOSE_VERSION}.tar.gz
 ENV DEFAULT_CATTLE_RANCHER_COMPOSE_WINDOWS_URL https://releases.rancher.com/compose/beta/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-windows-386-${CATTLE_RANCHER_COMPOSE_VERSION}.zip
-ENV DEFAULT_CATTLE_CATALOG_URL=library=https://github.com/rancher/rancher-catalog.git,community=https://github.com/rancher/community-catalog.git
+ENV DEFAULT_CATTLE_CATALOG_URL="library=https://github.com/rancher/rancher-catalog.git,community=https://github.com/rancher/community-catalog.git"
 
 EXPOSE 3306
 ENV CATTLE_CATTLE_VERSION v0.156.2
 ADD https://github.com/rancherio/cattle/releases/download/${CATTLE_CATTLE_VERSION}/cattle.jar /usr/share/cattle/
-RUN /usr/share/cattle/cattle.sh extract
-RUN curl -sL https:${DEFAULT_CATTLE_API_UI_INDEX}.tar.gz | tar xvzf - -C /usr/share/cattle/war --strip-components=1
-RUN /usr/share/cattle/install_cattle_binaries && \
-    cd /var/lib/cattle && rancher-catalog-service -validate -catalogUrl=$DEFAULT_CATTLE_CATALOG_URL
+
+RUN cd / && for i in $(ls /s6-statics/*static.tar.gz);do tar -zxvf $i;done && rm -rf /s6-statics/*static.tar.gz && \
+    mkdir -p $CATTLE_HOME && \
+    /usr/share/cattle/cattle.sh extract && \
+    curl -sL https:${DEFAULT_CATTLE_API_UI_INDEX}.tar.gz | tar xvzf - -C /usr/share/cattle/war --strip-components=1 && \
+    /usr/share/cattle/install_cattle_binaries && \
+    cd $CATTLE_HOME && export IFS="," &&\
+    for i in $DEFAULT_CATTLE_CATALOG_URL; do rancher-catalog-service -validate -catalogUrl=$i;done
+
+VOLUME /var/lib/mysql /var/log/mysql /var/lib/cattle
 
 ENV DEFAULT_CATTLE_MACHINE_EXECUTE true
 ENV DEFAULT_CATTLE_COMPOSE_EXECUTOR_EXECUTE true
