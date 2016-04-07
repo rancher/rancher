@@ -1,0 +1,3 @@
+#!/bin/bash
+
+exec giddyup leader elect --proxy-tcp-port 80 giddyup health -p 80 go-machine-service

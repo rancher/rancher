@@ -1,0 +1,135 @@
+cattle:
+  image: rancher/none
+  labels:
+    io.rancher.service.selector.container: "io.rancher.ha.service.name in (cattle, parent)"
+  links:
+  - redis
+  - zookeeper
+  health_check:
+    port: 8080
+    interval: 1000
+    unhealthy_threshold: 2
+    request_line: 'GET /healthcheck HTTP/1.0'
+    healthy_threshold: 1
+    response_timeout: 1000
+
+redis:
+  image: rancher/none
+  labels:
+    io.rancher.service.selector.container: "io.rancher.ha.service.name=redis"
+  links:
+  - tunnel
+
+zookeeper:
+  image: rancher/none
+  labels:
+    io.rancher.service.selector.container: "io.rancher.ha.service.name=zk"
+  links:
+  - tunnel
+
+tunnel:
+  image: rancher/none
+  labels:
+    io.rancher.service.selector.container: "io.rancher.ha.service.tunnel"
+  links:
+  - zookeeper
+  - redis
+
+websocket-proxy-ssl:
+  scale: 2
+  image: ${HA_IMAGE}
+  command: wsp
+  labels:
+    io.rancher.container.agent.role: system
+  environment:
+    PROXY_LISTEN_ADDRESS: ":8080"
+    PROXY_TLS_LISTEN_ADDRESS: ":8443"
+    PROXY_CATTLE_ADDRESS: "cattle:8080"
+    PROXY_PROTOCOL_HTTPS_PORTS: ${CATTLE_HA_PORT_HTTPS}
+  links:
+  - cattle
+  health_check:
+    port: 8080
+    interval: 1000
+    unhealthy_threshold: 2
+    request_line: ''
+    healthy_threshold: 1
+    response_timeout: 1000
+
+websocket-proxy:
+  scale: 2
+  image: ${HA_IMAGE}
+  command: wsp
+  labels:
+    io.rancher.container.agent.role: system
+  environment:
+    PROXY_LISTEN_ADDRESS: ":8080"
+    PROXY_TLS_LISTEN_ADDRESS: ":8443"
+    PROXY_CATTLE_ADDRESS: "cattle:8080"
+    PROXY_PROTOCOL_HTTPS_PORTS: ${CATTLE_HA_PORT_HTTPS}
+  links:
+  - cattle
+  health_check:
+    port: 8080
+    interval: 1000
+    unhealthy_threshold: 2
+    request_line: ''
+    healthy_threshold: 1
+    response_timeout: 1000
+
+rancher-compose-executor:
+  scale: 2
+  image: ${HA_IMAGE}
+  command: rce
+  labels:
+    io.rancher.container.agent.role: system
+  links:
+  - cattle
+  health_check:
+    port: 80
+    interval: 1000
+    unhealthy_threshold: 2
+    request_line: ''
+    healthy_threshold: 1
+    response_timeout: 1000
+
+go-machine-service:
+  scale: 2
+  image: ${HA_IMAGE}
+  command: gms
+  labels:
+    io.rancher.container.agent.role: system
+  links:
+  - cattle
+  health_check:
+    port: 80
+    interval: 1000
+    unhealthy_threshold: 2
+    request_line: ''
+    healthy_threshold: 1
+    response_timeout: 1000
+
+load-balancer-swarm:
+  ports:
+  - ${CATTLE_HA_PORT_SWARM}:8443/tcp
+  labels:
+    io.rancher.scheduler.global: 'true'
+  image: rancher/load-balancer-service
+  links:
+  - websocket-proxy-ssl
+
+load-balancer:
+  ports:
+  - ${CATTLE_HA_PORT_HTTP}:8080
+  - ${CATTLE_HA_PORT_HTTPS}:8080
+  labels:
+    io.rancher.scheduler.global: 'true'
+    io.rancher.loadbalancer.ssl.ports: ${CATTLE_HA_PORT_HTTPS}
+    io.rancher.loadbalancer.proxy-protocol.ports: ${CATTLE_HA_PORT_HTTPS},${CATTLE_HA_PORT_HTTP}
+    io.rancher.loadbalancer.target.websocket-proxy: /r,/v1/connectbackend,/v1/logs,/v1/stats,/v1/exec,/v1/console,/v1/dockersocket,/v1/hoststats,/v1/containerstats
+    io.rancher.loadbalancer.target.cattle: ${CATTLE_HA_PORT_HTTP}=8080,${CATTLE_HA_PORT_HTTPS}=8080
+  image: rancher/load-balancer-service
+  default_cert: system-ssl
+  links:
+  - websocket-proxy
+  - cattle

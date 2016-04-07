@@ -1,0 +1,22 @@
+#!/bin/bash
+
+for i in agent server; do
+    f=/var/lib/rancher/etc/${i}.conf
+    if [ -e $f ]; then
+        source $f
+    fi
+done
+
+if [ -e /usr/bin/rancher-compose-executor ] && [ ! -e /usr/bin/rancher-compose ]; then
+    cp /usr/bin/{rancher-compose-executor,rancher-compose}
+fi
+
+cd /usr/share/cattle
+
+export CATTLE_HA_CLUSTER_IP=${CATTLE_HA_CLUSTER_IP:-${CATTLE_AGENT_IP}}
+export CATTLE_HA_CLUSTER_IP=${CATTLE_HA_CLUSTER_IP:-$(ip route get 8.8.8.8 | grep via | awk '{print $7}')}
+
+iptables -t nat -F CATTLE_PREROUTING 2>/dev/null || true
+iptables -t nat -F CATTLE_POSTROUTING 2>/dev/null || true
+
+exec cluster-manager "$@"
