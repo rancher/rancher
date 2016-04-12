@@ -54,6 +54,11 @@ check_and_add_conf()
     fi
 }
 
+print_url()
+{
+    local url=$(echo "$1"| sed -e 's!/v1/scripts.*!/v1!')
+    echo $url
+}
 
 setup_custom_ca_bundle()
 {
@@ -76,8 +81,37 @@ setup_custom_ca_bundle()
     fi
 }
 
+setup_self_signed()
+{
+    if [[ -n "${CA_FINGERPRINT}" && $1 =~ https://.* ]]; then
+        # Check if curl works
+        if curl -sLf $1 >/dev/null 2>&1; then
+            return
+        fi
+
+        CERT="$(print_url $1)/scripts/ca.crt"
+        if ! curl --insecure -sLf "$CERT" > /tmp/ca.crt; then
+            return
+        fi
+
+        if ! openssl x509 -in /tmp/ca.crt -inform pem > /tmp/ca.crt.clean; then
+            return
+        fi
+
+        if [ "$(openssl x509 -in /tmp/ca.crt.clean -inform pem -noout -fingerprint | cut -f2 -d=)" != "${CA_FINGERPRINT}" ]; then
+            return
+        fi
+
+        mkdir -p $(dirname $CA_CERT_FILE)
+        cp /tmp/ca.crt.clean $CA_CERT_FILE
+        setup_custom_ca_bundle
+    fi
+}
+
 if [ -e ${CA_CERT_FILE} ]; then
     setup_custom_ca_bundle
+else
+    setup_self_signed "$1"
 fi
 
 if [ -e "${AGENT_CONF_FILE}" ]; then
@@ -290,12 +324,6 @@ read_rancher_agent_env()
     local save=$RANCHER_AGENT_IMAGE
     eval $(docker inspect rancher-agent | jq -r '"export \"" + .[0].Config.Env[] + "\""')
     RANCHER_AGENT_IMAGE=$save
-}
-
-print_url()
-{
-    local url=$(echo "$1"| sed -e 's!/v1/scripts.*!/v1!')
-    echo $url
 }
 
 wait_for()
