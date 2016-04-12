@@ -171,15 +171,7 @@ run() {
 
     env | grep CATTLE | grep -v PASS | sort
 
-    if [ -f "/ca.crt" ]; then
-        if [ ! -e "/usr/share/ca-certificates/rancher/ca.crt" ]; then
-            echo Adding ca.crt to Certs.
-            mkdir /usr/share/ca-certificates/rancher
-            cp /ca.crt /usr/share/ca-certificates/rancher/ca.crt
-            echo rancher/ca.crt >> /etc/ca-certificates.conf
-            update-ca-certificates
-        fi
-    fi
+    update-rancher-ssl
 
     local ram=$(free -g --si | awk '/^Mem:/{print $2}')
     if [ ${ram} -gt 15 ]; then

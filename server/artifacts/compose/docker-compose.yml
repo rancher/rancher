@@ -85,6 +85,8 @@ rancher-compose-executor:
     io.rancher.container.agent.role: system
   links:
   - cattle
+  volumes:
+  - ${CONFIG_PATH}:/var/lib/rancher/etc
   health_check:
     port: 80
     interval: 1000
@@ -97,6 +99,8 @@ go-machine-service:
   scale: 2
   image: ${HA_IMAGE}
   command: gms
+  volumes:
+  - ${CONFIG_PATH}:/var/lib/rancher/etc
   labels:
     io.rancher.container.agent.role: system
   links:

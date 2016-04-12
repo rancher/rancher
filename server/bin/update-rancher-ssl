@@ -1,0 +1,13 @@
+#!/bin/bash
+
+for i in /ca.crt /var/lib/rancher/etc/ssl/ca.crt; do
+    if [ -f $i ]; then
+        if [ ! -e "/usr/share/ca-certificates/rancher/ca.crt" ]; then
+            echo Adding ca.crt to Certs.
+            mkdir /usr/share/ca-certificates/rancher
+            cp $i /usr/share/ca-certificates/rancher/ca.crt
+            echo rancher/ca.crt >> /etc/ca-certificates.conf
+            update-ca-certificates
+        fi
+    fi
+done
