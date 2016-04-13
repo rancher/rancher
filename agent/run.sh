@@ -177,6 +177,8 @@ launch_agent()
         -e CATTLE_URL \
         -e CATTLE_HOST_LABELS \
         -e CATTLE_VOLMGR_ENABLED \
+        -e CATTLE_CADVISOR_INTERVAL \
+        -e CATTLE_CADVISOR_OPTS \
         -e HOST_DOCKER_SOCK \
         -v $HOST_DOCKER_SOCK:/var/run/docker.sock \
         -v /lib/modules:/lib/modules:ro \
