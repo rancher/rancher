@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends openjdk-7-jre-h
                     spiped
 
 ADD https://github.com/cloudnautique/giddyup/releases/download/v0.10.0/giddyup /usr/bin/
-ADD https://github.com/rancher/cluster-manager/releases/download/v0.1.3/cluster-manager /usr/bin/
+ADD https://github.com/rancher/cluster-manager/releases/download/v0.1.4/cluster-manager /usr/bin/
 RUN chmod +x /usr/bin/giddyup /usr/bin/cluster-manager
 COPY bin/* /usr/bin/
 
@@ -33,7 +33,7 @@ COPY target/*static.tar.gz /s6-statics/
 
 EXPOSE 8080
 ENV CATTLE_HOST_API_PROXY_MODE embedded
-ENV CATTLE_RANCHER_SERVER_IMAGE v1.0.1-rc6
+ENV CATTLE_RANCHER_SERVER_IMAGE v1.0.1-rc7
 ENV CATTLE_RANCHER_COMPOSE_VERSION v0.7.4
 ENV DEFAULT_CATTLE_RANCHER_COMPOSE_LINUX_URL   https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-linux-amd64-${CATTLE_RANCHER_COMPOSE_VERSION}.tar.gz
 ENV DEFAULT_CATTLE_RANCHER_COMPOSE_DARWIN_URL  https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-darwin-amd64-${CATTLE_RANCHER_COMPOSE_VERSION}.tar.gz
