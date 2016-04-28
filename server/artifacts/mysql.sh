@@ -60,14 +60,6 @@ config_mysql()
     sed -i 's/^\(expire_logs_days.*\)/\1/;s/10$/2/' /etc/mysql/my.cnf
     sed -i '/^max_connections.*$/a sql_mode = ONLY_FULL_GROUP_BY' /etc/mysql/my.cnf
 
-    # setup to be a master
-    if [ "$(grep ^#server-id /etc/mysql/my.cnf)" ]; then
-        sed -i 's/^#\(server-id.*\)/\1/' /etc/mysql/my.cnf
-        sed -i 's/^#\(log_bin.*\)/\1/' /etc/mysql/my.cnf
-        sed -i '/^log_bin.*$/a innodb_flush_log_at_trx_commit = 1' /etc/mysql/my.cnf
-        sed -i '/^log_bin.*$/a sync_binlog           = 1' /etc/mysql/my.cnf
-    fi
-
     if [ ! "$(grep innodb_file_per_table /etc/mysql/my.cnf)" ]; then
         sed -i '/^# \* InnoDB.*$/a innodb_file_per_table = 1' /etc/mysql/my.cnf
     fi
