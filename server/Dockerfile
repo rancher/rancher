@@ -1,7 +1,7 @@
-FROM ubuntu:16.04
+FROM ubuntu:14.04.4
 
 ENV DEBIAN_FRONTEND noninteractive
-RUN apt-get update && apt-get install -y --no-install-recommends openjdk-8-jre-headless \
+RUN apt-get update && apt-get install -y --no-install-recommends openjdk-7-jre-headless \
                     curl \
                     mysql-server \
                     xz-utils \
@@ -9,12 +9,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends openjdk-8-jre-h
                     unzip \
                     openssh-client \
                     iptables \
-                    iproute2 \
                     git \
                     redis-server \
                     zookeeper \
                     spiped
-RUN mkdir -p /var/run/mysqld && chmod -R 777 /var/run/mysqld
 
 ADD https://github.com/cloudnautique/giddyup/releases/download/v0.10.0/giddyup /usr/bin/
 ADD https://github.com/rancher/cluster-manager/releases/download/v0.1.4/cluster-manager /usr/bin/
