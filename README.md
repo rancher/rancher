@@ -3,9 +3,9 @@
 Rancher is an open source project that provides a complete platform for operating Docker in production. It provides infrastructure services such as multi-host networking, global and local load balancing, and volume snapshots. It integrates native Docker management capabilities such as Docker Machine and Docker Swarm. It offers a rich user experience that enables devops admins to operate Docker in production at large scale.
 
 ## Latest Release
-**v1.0.1**
+**v1.1.0-dev1**
 
-Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v1.0.1).
+Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v1.1.0-dev1).
 
 To get automated notifications of our latest release, you can watch the announcements category in our [forums](http://forums.rancher.com/c/announcements). 
 
