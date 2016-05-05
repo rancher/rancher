@@ -1,7 +1,7 @@
 FROM armhf/ubuntu:16.04
 
-ENV DEBIAN_FRONTEND noninteractive
-RUN apt-get update && apt-get install -y --no-install-recommends openjdk-8-jre-headless \
+ENV TERM xterm
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends openjdk-8-jre-headless \
                     curl \
                     mysql-server \
                     xz-utils \
@@ -15,6 +15,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends openjdk-8-jre-h
                     zookeeper \
                     spiped
 RUN mkdir -p /var/run/mysqld && chmod -R 777 /var/run/mysqld
+
+RUN apt-get install -y --no-install-recommends software-properties-common
+RUN add-apt-repository -y ppa:webupd8team/java && apt-get update
+RUN echo 'yes' | DEBIAN_FRONTEND=Teletype apt-get install -y --no-install-recommends oracle-java8-installer
 
 ADD https://github.com/imikushin/giddyup/releases/download/v0.10.1_arm/giddyup /usr/bin/
 ADD https://github.com/imikushin/cluster-manager/releases/download/v0.1.4_arm/cluster-manager /usr/bin/
@@ -46,12 +50,11 @@ EXPOSE 3306
 ENV CATTLE_CATTLE_VERSION v0.159.7-arm-4
 ADD https://github.com/imikushin/cattle/releases/download/${CATTLE_CATTLE_VERSION}/cattle.jar /usr/share/cattle/
 
-RUN cd /usr && for i in $(ls /s6-statics/*static.tar.gz);do tar -zxvf $i;done && rm -rf /s6-statics/*static.tar.gz && \
-    cd / && mkdir -p $CATTLE_HOME && \
-    /usr/share/cattle/cattle.sh extract && \
-    curl -sL https:${DEFAULT_CATTLE_API_UI_INDEX}.tar.gz | tar xvzf - -C /usr/share/cattle/war --strip-components=1 && \
-    /usr/share/cattle/install_cattle_binaries && \
-    cd $CATTLE_HOME && export IFS="," &&\
+RUN cd /usr && for i in $(ls /s6-statics/*static.tar.gz);do tar -zxvf $i;done && rm -rf /s6-statics/*static.tar.gz
+RUN cd / && mkdir -p $CATTLE_HOME && /usr/share/cattle/cattle.sh extract
+RUN curl -sLf https:${DEFAULT_CATTLE_API_UI_INDEX}.tar.gz | tar xvzf - -C /usr/share/cattle/war --strip-components=1
+RUN /usr/share/cattle/install_cattle_binaries && \
+    cd $CATTLE_HOME && export IFS="," && \
     for i in $DEFAULT_CATTLE_CATALOG_URL; do rancher-catalog-service -validate -catalogUrl=$i;done
 
 VOLUME /var/lib/mysql /var/log/mysql /var/lib/cattle
