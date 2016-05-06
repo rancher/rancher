@@ -1,11 +1,15 @@
-Rancher Version:
+**Rancher Version:**
 
-Docker Version:
+**Docker Version:**
 
-OS: 
+**OS and where are the hosts located? (cloud, bare metal, etc):**
 
-Steps to Reproduce: 
+**Setup Details: (single node vs. single node, internal DB vs. external DB)**
 
-Results: 
+**Environment Type: (Cattle/Kubernetes/Swarm/Mesos)**
 
-Expected:
+**Steps to Reproduce: **
+
+**Results:** 
+
+**Expected:**
