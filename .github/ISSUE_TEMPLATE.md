@@ -8,7 +8,7 @@
 
 **Environment Type: (Cattle/Kubernetes/Swarm/Mesos)**
 
-**Steps to Reproduce: **
+**Steps to Reproduce:**
 
 **Results:** 
 
