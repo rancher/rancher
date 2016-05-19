@@ -130,7 +130,7 @@ load-balancer:
   - ${CATTLE_HA_PORT_PP_HTTPS}:8080
   labels:
     io.rancher.scheduler.global: 'true'
-    io.rancher.loadbalancer.ssl.ports: ${CATTLE_HA_PORT_HTTPS}
+    io.rancher.loadbalancer.ssl.ports: ${CATTLE_HA_PORT_HTTPS},${CATTLE_HA_PORT_PP_HTTPS}
     io.rancher.loadbalancer.proxy-protocol.ports: ${CATTLE_HA_PORT_PP_HTTPS},${CATTLE_HA_PORT_PP_HTTP}
     io.rancher.loadbalancer.target.websocket-proxy: /r,/v1/connectbackend,/v1/logs,/v1/stats,/v1/exec,/v1/console,/v1/dockersocket,/v1/hoststats,/v1/containerstats
     io.rancher.loadbalancer.target.cattle: ${CATTLE_HA_PORT_HTTP}=8080,${CATTLE_HA_PORT_HTTPS}=8080,${CATTLE_HA_PORT_PP_HTTP}=8080,${CATTLE_HA_PORT_PP_HTTPS}=8080
