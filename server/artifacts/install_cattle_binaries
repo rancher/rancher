@@ -7,10 +7,10 @@ cd /tmp/extracted_cattle
 
 install_build_tools()
 {
-    BUILD_TOOLS_VERSION="0.3.1"
+    BUILD_TOOLS_VERSION="v0.3.1-1"
     tmpdir=$(mktemp -d)
     pushd $tmpdir
-    curl -sSL -o build-tools.tar.gz https://github.com/rancherio/build-tools/archive/v${BUILD_TOOLS_VERSION}.tar.gz
+    curl -sSL -o build-tools.tar.gz https://github.com/imikushin/build-tools/archive/v${BUILD_TOOLS_VERSION}.tar.gz
     tar -xzvf build-tools.tar.gz && cp ./build-tools-${BUILD_TOOLS_VERSION}/bin/* /usr/bin
     popd
     rm -rf ${tmpdir}
