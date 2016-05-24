@@ -349,10 +349,16 @@ inspect()
 {
     print_token
 
-    if mkdir -p /var/lib/rancher/state >/dev/null 2>&1; then
-        info env "CATTLE_VAR_LIB_WRITABLE=true"
-    else
+    if lsb_release 2>/dev/null | grep -i boot2docker >/dev/null 2>&1; then
+        info env "CATTLE_BOOT2DOCKER=true"
         info env "CATTLE_VAR_LIB_WRITABLE=false"
+    else
+        info env "CATTLE_BOOT2DOCKER=false"
+        if mkdir -p /var/lib/rancher/state >/dev/null 2>&1; then
+            info env "CATTLE_VAR_LIB_WRITABLE=true"
+        else
+            info env "CATTLE_VAR_LIB_WRITABLE=false"
+        fi
     fi
 
     if [ -e /var/run/system-docker.sock ]; then
@@ -387,7 +393,8 @@ setup_env()
 
     export CATTLE_SYSTEMD
 
-    info System: ${CATTLE_SYSTEMD}
+    info Systemd: ${CATTLE_SYSTEMD}
+    info Boot2Docker: ${CATTLE_BOOT2DOCKER}
     info Host writable: ${CATTLE_VAR_LIB_WRITABLE}
     info Token: $(echo $TOKEN | sed 's/........*/xxxxxxxx/g')
 
