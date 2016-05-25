@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends openjdk-7-jre-h
                     spiped
 
 ADD https://github.com/cloudnautique/giddyup/releases/download/v0.10.0/giddyup /usr/bin/
-ADD https://github.com/rancher/cluster-manager/releases/download/v0.1.4/cluster-manager /usr/bin/
+ADD https://github.com/rancher/cluster-manager/releases/download/v0.1.5/cluster-manager /usr/bin/
 RUN chmod +x /usr/bin/giddyup /usr/bin/cluster-manager
 COPY bin/* /usr/bin/
 
