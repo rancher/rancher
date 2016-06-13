@@ -11,7 +11,8 @@ RUN apt-get update && \
      gcc \
      make \
      conntrack \
-     libaio1 && \
+     libaio1 \
+     fio && \
     curl -s https://www.python.org/ftp/python/2.7.11/Python-2.7.11.tgz | tar -zxv -C /tmp/ && \
     cd /tmp/Python-2.7.11 && ./configure && make && make install && \
     curl -s https://bootstrap.pypa.io/get-pip.py | python && \
@@ -28,4 +29,4 @@ COPY register.py resolve_url.py run.sh /
 ENTRYPOINT ["/run.sh"]
 LABEL "io.rancher.container.system"="rancher-agent"
 ENV HOST_DOCKER_SOCK /var/run/docker.sock
-ENV RANCHER_AGENT_IMAGE rancher/agent:v1.0.1
+ENV RANCHER_AGENT_IMAGE rancher/agent:v1.0.2
