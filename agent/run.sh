@@ -177,6 +177,7 @@ launch_agent()
         -e CATTLE_URL \
         -e CATTLE_HOST_LABELS \
         -e CATTLE_VOLMGR_ENABLED \
+        -e CATTLE_RUN_FIO \
         -e HOST_DOCKER_SOCK \
         -v $HOST_DOCKER_SOCK:/var/run/docker.sock \
         -v /lib/modules:/lib/modules:ro \
