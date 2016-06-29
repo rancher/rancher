@@ -9,8 +9,9 @@ if [ ! -e target/.done ]; then
     touch target/.done
 fi
 
-TAG=${TAG:-$(awk '/CATTLE_RANCHER_SERVER_IMAGE/{print $3}' Dockerfile)}
-IMAGE=rancher/server:${TAG}
+TAG=${TAG:-$(awk '/CATTLE_RANCHER_SERVER_VERSION/{print $3}' Dockerfile)}
+REPO=${REPO:-$(awk '/CATTLE_RANCHER_SERVER_IMAGE/{print $3}' Dockerfile)}
+IMAGE=${REPO}:${TAG}
 
 docker build -t "${IMAGE}" .
 
