@@ -21,6 +21,7 @@ COPY bin/* /usr/bin/
 
 ENV CATTLE_HOME /var/lib/cattle
 ENV DEFAULT_CATTLE_API_UI_INDEX //releases.rancher.com/ui/1.2.1
+ENV CATTLE_API_UI_URL //releases.rancher.com/api-ui/1.0.7
 ENV CATTLE_DB_CATTLE_DATABASE mysql
 ENV CATTLE_USE_LOCAL_ARTIFACTS true
 ENV no_proxy localhost,127.0.0.1,localaddress,.localdomain.com
@@ -48,12 +49,16 @@ RUN cd / && for i in $(ls /s6-statics/*static.tar.gz);do tar -zxvf $i;done && rm
     mkdir -p $CATTLE_HOME && \
     /usr/share/cattle/cattle.sh extract && \
     curl -sL https:${DEFAULT_CATTLE_API_UI_INDEX}.tar.gz | tar xvzf - -C /usr/share/cattle/war --strip-components=1 && \
+    mkdir -p /usr/share/cattle/war/api-ui && \
+    curl -sL https:${CATTLE_API_UI_URL}.tar.gz | tar xvzf - -C /usr/share/cattle/war/api-ui --strip-components=1 && \
     /usr/share/cattle/install_cattle_binaries && \
     cd $CATTLE_HOME && export IFS="," &&\
     for i in $DEFAULT_CATTLE_CATALOG_URL; do rancher-catalog-service -validate -catalogUrl=$i;done
 
 VOLUME /var/lib/mysql /var/log/mysql /var/lib/cattle
 
+ENV DEFAULT_CATTLE_API_UI_JS_URL /api-ui/ui.min.js
+ENV DEFAULT_CATTLE_API_UI_CSS_URL /api-ui/ui.min.css
 ENV DEFAULT_CATTLE_MACHINE_EXECUTE true
 ENV DEFAULT_CATTLE_COMPOSE_EXECUTOR_EXECUTE true
 ENV DEFAULT_CATTLE_CATALOG_EXECUTE true
