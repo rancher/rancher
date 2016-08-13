@@ -40,9 +40,9 @@ ENV DEFAULT_CATTLE_RANCHER_COMPOSE_LINUX_URL   https://releases.rancher.com/comp
 ENV DEFAULT_CATTLE_RANCHER_COMPOSE_DARWIN_URL  https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-darwin-amd64-${CATTLE_RANCHER_COMPOSE_VERSION}.tar.gz
 ENV DEFAULT_CATTLE_RANCHER_COMPOSE_WINDOWS_URL https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-windows-386-${CATTLE_RANCHER_COMPOSE_VERSION}.zip
 ENV CATTLE_RANCHER_CLI_VERSION v0.0.2
-ENV DEFAULT_CATTLE_RANCHER_CLI_LINUX_URL   https://releases.rancher.com/compose/${CATTLE_RANCHER_CLI_VERSION}/rancher-cli-linux-amd64-${CATTLE_RANCHER_CLI_VERSION}.tar.gz
-ENV DEFAULT_CATTLE_RANCHER_CLI_DARWIN_URL  https://releases.rancher.com/compose/${CATTLE_RANCHER_CLI_VERSION}/rancher-cli-darwin-amd64-${CATTLE_RANCHER_CLI_VERSION}.tar.gz
-ENV DEFAULT_CATTLE_RANCHER_CLI_WINDOWS_URL https://releases.rancher.com/compose/${CATTLE_RANCHER_CLI_VERSION}/rancher-cli-windows-386-${CATTLE_RANCHER_CLI_VERSION}.zip
+ENV DEFAULT_CATTLE_RANCHER_CLI_LINUX_URL   https://releases.rancher.com/cli/${CATTLE_RANCHER_CLI_VERSION}/rancher-linux-amd64-${CATTLE_RANCHER_CLI_VERSION}.tar.gz
+ENV DEFAULT_CATTLE_RANCHER_CLI_DARWIN_URL  https://releases.rancher.com/cli/${CATTLE_RANCHER_CLI_VERSION}/rancher-darwin-amd64-${CATTLE_RANCHER_CLI_VERSION}.tar.gz
+ENV DEFAULT_CATTLE_RANCHER_CLI_WINDOWS_URL https://releases.rancher.com/cli/${CATTLE_RANCHER_CLI_VERSION}/rancher-windows-386-${CATTLE_RANCHER_CLI_VERSION}.zip
 ENV DEFAULT_CATTLE_CATALOG_URL="library=https://github.com/rancher/rancher-catalog.git,community=https://github.com/rancher/community-catalog.git"
 
 EXPOSE 3306
