@@ -9,6 +9,8 @@ Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v1
 
 To get automated notifications of our latest release, you can watch the announcements category in our [forums](http://forums.rancher.com/c/announcements). 
 
+> Note: Our latest stable release of Rancher (v1.1.3) is tagged as `rancher/server:latest`. Users will need to tag any specific development builds (i.e. anything tagged with `preX`) to get the specific development version. .
+
 ## Installation
 
 Rancher is deployed as a set of Docker containers.  Running Rancher is as simple as launching two containers.  One container as the management server and another container on a node as an agent.  You can install the containers in following approaches.
