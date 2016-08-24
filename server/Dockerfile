@@ -21,7 +21,7 @@ COPY bin/* /usr/bin/
 
 ENV CATTLE_HOME /var/lib/cattle
 ENV DEFAULT_CATTLE_API_UI_INDEX //releases.rancher.com/ui/1.2.8
-ENV CATTLE_API_UI_URL //releases.rancher.com/api-ui/1.0.7
+ENV CATTLE_API_UI_URL //releases.rancher.com/api-ui/1.0.8
 ENV CATTLE_DB_CATTLE_DATABASE mysql
 ENV CATTLE_USE_LOCAL_ARTIFACTS true
 ENV no_proxy localhost,127.0.0.1,localaddress,.localdomain.com
