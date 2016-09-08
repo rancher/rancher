@@ -209,8 +209,63 @@ extract()
     rm ../*.war
 }
 
+master()
+{
+    unset CATTLE_API_UI_URL
+    unset CATTLE_CATTLE_VERSION
+    unset CATTLE_RANCHER_SERVER_VERSION
+    unset CATTLE_RANCHER_SERVER_VERSION
+    unset CATTLE_USE_LOCAL_ARTIFACTS
+    unset DEFAULT_CATTLE_API_UI_CSS_URL
+    unset DEFAULT_CATTLE_API_UI_INDEX
+    unset DEFAULT_CATTLE_API_UI_JS_URL
+
+    export HASH=none
+    export CATTLE_IDEMPOTENT_CHECKS=false
+    export CATTLE_RANCHER_COMPOSE_VERSION latest
+    export DEFAULT_CATTLE_RANCHER_COMPOSE_LINUX_URL=https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-linux-amd64-${CATTLE_RANCHER_COMPOSE_VERSION}.tar.gz
+    export DEFAULT_CATTLE_RANCHER_COMPOSE_DARWIN_URL=https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-darwin-amd64-${CATTLE_RANCHER_COMPOSE_VERSION}.tar.gz
+    export DEFAULT_CATTLE_RANCHER_COMPOSE_WINDOWS_URL=https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-windows-386-${CATTLE_RANCHER_COMPOSE_VERSION}.zip
+    export CATTLE_RANCHER_CLI_VERSION latest
+    export DEFAULT_CATTLE_RANCHER_CLI_LINUX_URL=https://releases.rancher.com/cli/${CATTLE_RANCHER_CLI_VERSION}/rancher-linux-amd64-${CATTLE_RANCHER_CLI_VERSION}.tar.gz
+    export DEFAULT_CATTLE_RANCHER_CLI_DARWIN_URL=https://releases.rancher.com/cli/${CATTLE_RANCHER_CLI_VERSION}/rancher-darwin-amd64-${CATTLE_RANCHER_CLI_VERSION}.tar.gz
+    export DEFAULT_CATTLE_RANCHER_CLI_WINDOWS_URL=https://releases.rancher.com/cli/${CATTLE_RANCHER_CLI_VERSION}/rancher-windows-386-${CATTLE_RANCHER_CLI_VERSION}.zip
+
+    mkdir -p /source
+    cd /source
+    if [ ! -e cattle ]; then
+        git clone https://github.com/rancher/cattle
+        cd cattle
+    elif [ ! -e cattle/.manual ]; then
+        cd cattle
+        git fetch origin
+        git checkout master
+        git reset --hard origin/master
+        git clean -dxf
+    else
+        cd cattle
+    fi
+
+    cattle-binary-pull ./resources/content/cattle-global.properties /usr/bin >/tmp/download.log 2>&1 &
+
+    if [ ! -x "$(which mvn)" ]; then
+        apt-get update
+        apt-get install --no-install-recommends -y maven openjdk-7-jdk
+    fi
+
+    mvn package
+    wait || {
+        cat /tmp/download.log
+        exit 1
+    }
+    JAR=$(readlink -f code/packaging/app/target/cattle-app-*.war)
+    run
+}
+
 if [ "$1" = "extract" ]; then
     extract
+elif [ "$CATTLE_MASTER" = true ]; then
+    master
 else
     run
 fi
