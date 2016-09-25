@@ -6,3 +6,5 @@ __pycache__
 .tox
 server/target
 MANIFEST
+.docker-env.*
+image-manifest.yml
