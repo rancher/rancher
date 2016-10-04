@@ -168,6 +168,7 @@ launch_agent()
         -e NO_PROXY \
         -e no_proxy \
         -e CATTLE_PHYSICAL_HOST_UUID \
+        -e CATTLE_DOCKER_UUID \
         -e CATTLE_SCRIPT_DEBUG \
         -e CATTLE_ACCESS_KEY \
         -e CATTLE_SECRET_KEY \
