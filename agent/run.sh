@@ -243,6 +243,8 @@ setup_state()
     if [ "$CATTLE_SYSTEMD" = "true" ]; then
         mkdir -p /run/systemd/system
     fi
+
+    docker run --privileged --net host --pid host -v /:/host --rm $RANCHER_AGENT_IMAGE -- /usr/bin/share-mnt /var/lib/rancher/volumes /var/lib/kubelet -- norun
 }
 
 load()

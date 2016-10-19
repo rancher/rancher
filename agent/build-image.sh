@@ -2,11 +2,9 @@
 
 cd $(dirname $0)
 
-if [ -z "$TAG" ]; then
-    TAG=$(grep RANCHER_AGENT_IMAGE Dockerfile | cut -f2 -d:)
+if [ -z "$IMAGE" ]; then
+    IMAGE=$(grep RANCHER_AGENT_IMAGE Dockerfile | awk '{print $3}')
 fi
-
-IMAGE=rancher/agent:${TAG}
 
 echo Building $IMAGE
 docker build -t ${IMAGE} .
