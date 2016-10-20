@@ -442,6 +442,10 @@ setup_cattle_url()
     export CATTLE_URL
 }
 
+purge_state()
+{
+    rm -rf /var/lib/rancher/state
+}
 
 if [ "$#" == 0 ]; then
     error "One parameter required"
@@ -450,6 +454,10 @@ fi
 
 if [[ $1 =~ http.* || $1 = "register" || $1 = "upgrade" ]]; then
     echo $http_proxy $https_proxy
+    if [ -n "$CATTLE_CLEAN_UP" ]; then
+        info Cleaning up all states
+        purge_state
+    fi
     setup_cattle_url $1
     if [ "$1" = "upgrade" ]; then
         info Running upgrade
