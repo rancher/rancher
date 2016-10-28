@@ -11,7 +11,6 @@ RUN apt-get update && \
         python2.7 \
         jq && \
     curl -s -L https://get.docker.com/builds/Linux/x86_64/docker-1.6.0 > /usr/bin/docker; chmod +x /usr/bin/docker && \
-    curl -s -L https://get.docker.com/builds/Linux/x86_64/docker-1.9.1 > /usr/bin/docker-1.9; chmod +x /usr/bin/docker-1.9 && \
     mkdir -p /var/lib/cattle /var/lib/rancher && \
     ln -s /usr/bin/python2.7 /usr/bin/python && \
     curl -s https://bootstrap.pypa.io/get-pip.py | python2.7 && \
@@ -22,4 +21,4 @@ COPY register.py resolve_url.py run.sh /
 ENTRYPOINT ["/run.sh"]
 LABEL "io.rancher.container.system"="rancher-agent"
 ENV HOST_DOCKER_SOCK /var/run/docker.sock
-ENV RANCHER_AGENT_IMAGE rancher/agent:v1.1.0-rc7
+ENV RANCHER_AGENT_IMAGE rancher/agent:v1.1.0-rc8

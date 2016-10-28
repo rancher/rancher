@@ -300,6 +300,14 @@ run_bootstrap()
     export CATTLE_CONFIG_URL="${CATTLE_CONFIG_URL:-${CATTLE_URL}}"
     export CATTLE_STORAGE_URL="${CATTLE_STORAGE_URL:-${CATTLE_URL}}"
 
+    # Sanity check that these credentials are valid
+    if curl -u ${CATTLE_ACCESS_KEY}:${CATTLE_SECRET_KEY} -s ${CATTLE_URL}/schemas/configcontent >test.json 2>&1; then
+        if [ "$(cat test.json | jq -r .id)" != "configContent" ]; then
+            error Credentials are no longer valid, please re-register this agent
+            exit 1
+        fi
+    fi
+
     curl -u ${CATTLE_ACCESS_KEY}:${CATTLE_SECRET_KEY} -s ${CATTLE_URL}/scripts/bootstrap > $SCRIPT 
 
     # Sanity check if this account is really being authenticated as an agent account or the default admin auth
