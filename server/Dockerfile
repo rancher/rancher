@@ -43,7 +43,7 @@ ENV CATTLE_RANCHER_CLI_VERSION v0.3.0
 ENV DEFAULT_CATTLE_RANCHER_CLI_LINUX_URL   https://releases.rancher.com/cli/${CATTLE_RANCHER_CLI_VERSION}/rancher-linux-amd64-${CATTLE_RANCHER_CLI_VERSION}.tar.gz
 ENV DEFAULT_CATTLE_RANCHER_CLI_DARWIN_URL  https://releases.rancher.com/cli/${CATTLE_RANCHER_CLI_VERSION}/rancher-darwin-amd64-${CATTLE_RANCHER_CLI_VERSION}.tar.gz
 ENV DEFAULT_CATTLE_RANCHER_CLI_WINDOWS_URL https://releases.rancher.com/cli/${CATTLE_RANCHER_CLI_VERSION}/rancher-windows-386-${CATTLE_RANCHER_CLI_VERSION}.zip
-ENV DEFAULT_CATTLE_CATALOG_URL="infra=https://git.rancher.io/infra-catalog.git,library=https://git.rancher.io/rancher-catalog.git,community=https://git.rancher.io/community-catalog.git"
+ENV DEFAULT_CATTLE_CATALOG_URL="library=https://git.rancher.io/rancher-catalog.git,community=https://git.rancher.io/community-catalog.git"
 
 EXPOSE 3306
 ENV CATTLE_CATTLE_VERSION v0.171.0
