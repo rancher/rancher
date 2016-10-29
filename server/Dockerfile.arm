@@ -1,0 +1,82 @@
+FROM armhf/ubuntu:16.04
+
+ENV TERM xterm
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends openjdk-8-jre-headless \
+                    curl \
+                    mysql-server \
+                    xz-utils \
+                    keychain \
+                    unzip \
+                    openssh-client \
+                    iptables \
+                    iproute2 \
+                    git \
+                    redis-server \
+                    zookeeper \
+                    spiped
+RUN mkdir -p /var/run/mysqld && chmod -R 777 /var/run/mysqld
+
+RUN apt-get install -y --no-install-recommends software-properties-common
+RUN add-apt-repository -y ppa:webupd8team/java && apt-get update
+RUN echo 'yes' | DEBIAN_FRONTEND=Teletype apt-get install -y --no-install-recommends oracle-java8-installer
+
+ADD https://github.com/imikushin/giddyup/releases/download/v0.10.1_arm/giddyup /usr/bin/
+ADD https://github.com/imikushin/cluster-manager/releases/download/v0.1.4_arm/cluster-manager /usr/bin/
+RUN chmod +x /usr/bin/giddyup /usr/bin/cluster-manager
+COPY bin/* /usr/bin/
+
+ENV CATTLE_AGENT_INSTANCE_IMAGE=rancher/agent-instance:v0.8.1_arm \
+    CATTLE_BOOTSTRAP_REQUIRED_IMAGE=rancher/agent:v1.0.1_arm \
+    DEFAULT_CATTLE_AGENT_PACKAGE_RANCHER_DNS_URL=https://github.com/imikushin/rancher-dns/releases/download/v0.9.2_arm/rancher-dns.tar.gz \
+    DEFAULT_CATTLE_AGENT_PACKAGE_RANCHER_METADATA_URL=https://github.com/imikushin/rancher-metadata/releases/download/v0.5.1_arm/rancher-metadata.tar.gz \
+    DEFAULT_CATTLE_AGENT_PACKAGE_HOST_API_URL=https://github.com/imikushin/host-api/releases/download/v0.30.1_arm/host-api.tar.gz \
+    DEFAULT_CATTLE_AGENT_PACKAGE_RANCHER_NET_URL=https://github.com/imikushin/rancher-net/releases/download/v0.3.2_arm/rancher-net.tar.gz \
+    DEFAULT_CATTLE_AGENT_PACKAGE_CADVISOR_URL=https://github.com/imikushin/cadvisor-package/releases/download/v0.22.0-1_arm/cadvisor.tar.gz \
+    DEFAULT_CATTLE_SERVICE_PACKAGE_CATALOG_URL=https://github.com/imikushin/rancher-catalog-service/releases/download/v0.6.1_arm/rancher-catalog-service.tar.xz \
+    DEFAULT_CATTLE_SERVICE_PACKAGE_COMPOSE_EXECUTOR_URL=https://releases.rancher.com/compose/v0.8.1/binaries/linux-arm/rancher-compose.gz,rancher-compose-executor \
+    DEFAULT_CATTLE_SERVICE_PACKAGE_WEBSOCKET_PROXY_URL=https://github.com/imikushin/websocket-proxy/releases/download/v0.16.4_arm/websocket-proxy.tar.xz \
+    DEFAULT_CATTLE_SERVICE_PACKAGE_GO_MACHINE_SERVICE_URL=https://github.com/imikushin/go-machine-service/releases/download/v0.29.2_arm/go-machine-service.tar.xz \
+    DEFAULT_CATTLE_SERVICE_PACKAGE_DOCKER_MACHINE_URL=https://github.com/imikushin/machine/releases/download/v0.7.0_arm/docker-machine.tar.gz \
+    DEFAULT_CATTLE_SERVICE_PACKAGE_GOVC_URL=https://github.com/imikushin/govmomi/releases/download/v0.2.0_arm/govc_linux_arm.gz,govc
+
+ENV CATTLE_CLUSTER_IMAGE_NAME=${CATTLE_AGENT_INSTANCE_IMAGE}
+
+ENV CATTLE_HOME /var/lib/cattle
+ENV DEFAULT_CATTLE_API_UI_INDEX //releases.rancher.com/ui/1.0.10
+ENV CATTLE_DB_CATTLE_DATABASE mysql
+ENV CATTLE_USE_LOCAL_ARTIFACTS true
+ENV no_proxy localhost,127.0.0.1,localaddress,.localdomain.com
+ADD artifacts /usr/share/cattle
+
+ADD service /service
+ENV S6_SERVICE_DIR /service
+
+COPY target/arm/*static.tar.gz /s6-statics/
+
+EXPOSE 8080
+ENV CATTLE_HOST_API_PROXY_MODE embedded
+ENV CATTLE_RANCHER_SERVER_IMAGE v1.1.0-dev2-rc3_arm
+ENV CATTLE_RANCHER_COMPOSE_VERSION v0.8.0
+ENV DEFAULT_CATTLE_RANCHER_COMPOSE_LINUX_URL   https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-linux-amd64-${CATTLE_RANCHER_COMPOSE_VERSION}.tar.gz
+ENV DEFAULT_CATTLE_RANCHER_COMPOSE_DARWIN_URL  https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-darwin-amd64-${CATTLE_RANCHER_COMPOSE_VERSION}.tar.gz
+ENV DEFAULT_CATTLE_RANCHER_COMPOSE_WINDOWS_URL https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-windows-386-${CATTLE_RANCHER_COMPOSE_VERSION}.zip
+ENV DEFAULT_CATTLE_CATALOG_URL="library=https://github.com/rancher/rancher-catalog.git,community=https://github.com/rancher/community-catalog.git"
+
+EXPOSE 3306
+ENV CATTLE_CATTLE_VERSION v0.161.2
+ADD https://github.com/rancherio/cattle/releases/download/${CATTLE_CATTLE_VERSION}/cattle.jar /usr/share/cattle/
+
+RUN cd /usr && for i in $(ls /s6-statics/*static.tar.gz);do tar -zxvf $i;done && rm -rf /s6-statics/*static.tar.gz
+RUN cd / && mkdir -p $CATTLE_HOME && /usr/share/cattle/cattle.sh extract
+RUN curl -sLf https:${DEFAULT_CATTLE_API_UI_INDEX}.tar.gz | tar xvzf - -C /usr/share/cattle/war --strip-components=1
+RUN /usr/share/cattle/install_cattle_binaries && \
+    cd $CATTLE_HOME && export IFS="," && \
+    for i in $DEFAULT_CATTLE_CATALOG_URL; do rancher-catalog-service -validate -catalogUrl=$i;done
+
+VOLUME /var/lib/mysql /var/log/mysql /var/lib/cattle
+
+ENV DEFAULT_CATTLE_MACHINE_EXECUTE true
+ENV DEFAULT_CATTLE_COMPOSE_EXECUTOR_EXECUTE true
+ENV DEFAULT_CATTLE_CATALOG_EXECUTE true
+
+CMD ["/usr/bin/s6-svscan", "/service"]

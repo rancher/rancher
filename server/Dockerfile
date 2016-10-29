@@ -49,8 +49,8 @@ EXPOSE 3306
 ENV CATTLE_CATTLE_VERSION v0.171.0
 ADD https://github.com/rancherio/cattle/releases/download/${CATTLE_CATTLE_VERSION}/cattle.jar /usr/share/cattle/
 
-RUN cd / && for i in $(ls /s6-statics/*static.tar.gz);do tar -zxvf $i;done && rm -rf /s6-statics/*static.tar.gz && \
-    mkdir -p $CATTLE_HOME && \
+RUN cd /usr && for i in $(ls /s6-statics/*static.tar.gz);do tar -zxvf $i;done && rm -rf /s6-statics/*static.tar.gz && \
+    cd / && mkdir -p $CATTLE_HOME && \
     /usr/share/cattle/cattle.sh extract && \
     curl -sL https:${DEFAULT_CATTLE_API_UI_INDEX}.tar.gz | tar xvzf - -C /usr/share/cattle/war --strip-components=1 && \
     mkdir -p /usr/share/cattle/war/api-ui && \
