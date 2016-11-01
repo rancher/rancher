@@ -188,6 +188,7 @@ launch_agent()
         -v ${var_lib_docker}:${var_lib_docker} \
         -v /proc:/host/proc \
         -v /dev:/host/dev \
+        -v rancher-cni:/.r \
         --volumes-from rancher-agent-state \
         "${RANCHER_AGENT_IMAGE}" "$@"
 }
@@ -245,6 +246,8 @@ setup_state()
     fi
 
     docker run --privileged --net host --pid host -v /:/host --rm $RANCHER_AGENT_IMAGE -- /usr/bin/share-mnt /var/lib/rancher/volumes /var/lib/kubelet -- norun
+
+    cp -f /usr/bin/r /.r/r || true
 }
 
 load()
