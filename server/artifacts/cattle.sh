@@ -174,11 +174,7 @@ run() {
     update-rancher-ssl
 
     local ram=$(free -g --si | awk '/^Mem:/{print $2}')
-    if [ ${ram} -gt 15 ]; then
-        MX="8g"
-    elif [ ${ram} -gt 11 ]; then
-        MX="6g"
-    elif [ ${ram} -gt 7 ]; then
+    if [ ${ram} -gt 7 ]; then
         MX="4g"
     elif [ ${ram} -gt 3 ]; then
         MX="2g"
@@ -191,9 +187,9 @@ run() {
         if [ -e $HASH_PATH/index.html ]; then
             export DEFAULT_CATTLE_API_UI_INDEX=local
         fi
-        exec java ${CATTLE_JAVA_OPTS:--Xms128m -Xmx${MX} -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR} -Dlogback.bootstrap.level=WARN $PROXY_ARGS $JAVA_OPTS -cp ${HASH_PATH}:${HASH_PATH}/etc/cattle io.cattle.platform.launcher.Main "$@" $ARGS
+        exec java ${CATTLE_JAVA_OPTS:--XX:+UseConcMarkSweepGC -XX:+CMSClassUnloadingEnabled -Xms128m -Xmx${MX} -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR} -Dlogback.bootstrap.level=WARN $PROXY_ARGS $JAVA_OPTS -cp ${HASH_PATH}:${HASH_PATH}/etc/cattle io.cattle.platform.launcher.Main "$@" $ARGS
     else
-        exec java ${CATTLE_JAVA_OPTS:--Xms128m -Xmx${MX} -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR} $PROXY_ARGS $JAVA_OPTS -jar $JAR "$@" $ARGS
+        exec java ${CATTLE_JAVA_OPTS:--XX:+UseConcMarkSweepGC -XX:+CMSClassUnloadingEnabled -Xms128m -Xmx${MX} -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR} $PROXY_ARGS $JAVA_OPTS -jar $JAR "$@" $ARGS
     fi
 }
 
