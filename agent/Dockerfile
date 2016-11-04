@@ -17,10 +17,10 @@ RUN apt-get update && \
     pip install cattle
 RUN curl -sL https://github.com/rancher/runc/releases/download/share-mnt-v0.2.1/share-mnt > /usr/bin/share-mnt && \
     chmod +x /usr/bin/share-mnt
-RUN curl -sL https://github.com/rancher/weave/releases/download/r-v0.0.2/r > /usr/bin/r && \
+RUN curl -sL https://github.com/rancher/weave/releases/download/r-v0.0.3/r > /usr/bin/r && \
     chmod +x /usr/bin/r
 COPY register.py resolve_url.py run.sh /
 ENTRYPOINT ["/run.sh"]
 LABEL "io.rancher.container.system"="rancher-agent"
 ENV HOST_DOCKER_SOCK /var/run/docker.sock
-ENV RANCHER_AGENT_IMAGE rancher/agent:v1.1.0-rc12
+ENV RANCHER_AGENT_IMAGE rancher/agent:v1.1.0-rc13
