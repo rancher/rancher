@@ -12,7 +12,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends openjdk-7-jre-h
                     git \
                     redis-server \
                     zookeeper \
-                    spiped
+                    spiped \
+    && rm -rf /var/lib/apt/lists/*
 
 ADD https://github.com/cloudnautique/giddyup/releases/download/v0.10.0/giddyup /usr/bin/
 ADD https://github.com/rancher/cluster-manager/releases/download/v0.1.6/cluster-manager /usr/bin/
