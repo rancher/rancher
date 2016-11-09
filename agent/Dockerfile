@@ -10,6 +10,7 @@ RUN apt-get update && \
         conntrack \
         python2.7 \
         jq && \
+    rm -rf /var/lib/apt/lists/* && \
     curl -s -L https://get.docker.com/builds/Linux/x86_64/docker-1.6.0 > /usr/bin/docker; chmod +x /usr/bin/docker && \
     mkdir -p /var/lib/cattle /var/lib/rancher && \
     ln -s /usr/bin/python2.7 /usr/bin/python && \
