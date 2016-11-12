@@ -3,6 +3,7 @@
 set -e
 
 DATADIR='/var/lib/mysql'
+PIDFILE="/${DATADIR}/mysqld.pid"
 
 check_mysql_action()
 {
@@ -33,27 +34,24 @@ check_mysql_action()
 
 init_new_data_dir()
 {
-    local pidfile="${DATADIR}/mysql.pid"
-
     # If a blank directory is bind mounted, configure it.
     echo "Running mysql_install_db..."
-    mysql_install_db --user=mysql --datadir="${DATADIR}" --rpm --basedir=/usr
+    mysql_install_db --user=mysql --rpm
 
     echo "Starting MySQL to initialize..."
-    mysqld --user=mysql --datadir="${DATADIR}" --skip-networking --basedir=/usr --socket=/var/run/mysqld/mysqld.sock --pid-file="${pidfile}" &
-    echo "Waiting for mysql to start"
-    check_mysql_action start
+    start_admin_mysql
 
-    mysql_tzinfo_to_sql /usr/share/zoneinfo |mysql --protocol=socket -uroot mysql
+    mysql_tzinfo_to_sql /usr/share/zoneinfo | mysql --protocol=socket -uroot mysql
 
-    kill $(<"${pidfile}")
-    check_mysql_action stop
+    stop_mysql
     echo "Exiting MySQL initialization"
 }
 
 
 config_mysql()
 {
+    grep -l . /etc/mysql/*.cnf | xargs \
+        sed -i '/socket/s/=.*/= \/var\/lib\/mysql\/mysqld.sock/'
     sed -i 's/^\(bind-address.*\)$/#\1/' /etc/mysql/my.cnf
     sed -i 's/^#\(max_connections.*\)/\1/;s/100$/1000/' /etc/mysql/my.cnf
     sed -i 's/^key_buffer[[:space:]]/key_buffer_size/' /etc/mysql/my.cnf
@@ -65,6 +63,18 @@ config_mysql()
     fi
 }
 
+start_admin_mysql()
+{
+    mysqld --user=mysql --skip-networking --pid-file="${PIDFILE}" &
+    echo "Waiting for mysql to start"
+    check_mysql_action start
+}
+
+stop_mysql()
+{
+    kill $(<"${PIDFILE}")
+    check_mysql_action stop
+}
 
 start_mysql()
 {
@@ -93,6 +103,21 @@ EOF
 
 }
 
+
+upgrade_mysql()
+{
+    chown -R mysql:mysql /var/lib/mysql
+    chown mysql:root /var/lib/mysql/mysql
+
+    echo "Starting MySQL to upgrade..."
+    start_admin_mysql
+
+    mysql_upgrade
+
+    stop_mysql
+    echo "Exiting MySQL upgrade"
+}
+
 ## Boot2docker hack
 if [ "$(grep /var/lib/mysql /proc/mounts|cut -d' ' -f3)" = "vboxsf" ]; then
     echo "Running in VBox change mysql UID"
@@ -102,10 +127,12 @@ if [ "$(grep /var/lib/mysql /proc/mounts|cut -d' ' -f3)" = "vboxsf" ]; then
     chown -R mysql /var/log/mysql
 fi
 
+config_mysql
+
 if [ ! -d "${DATADIR}/mysql" ]; then
     init_new_data_dir
 fi
 
-config_mysql
+upgrade_mysql
 start_mysql
 setup_cattle_db
