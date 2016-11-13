@@ -305,9 +305,9 @@ run_bootstrap()
 
     # Sanity check that these credentials are valid
     if curl -u ${CATTLE_ACCESS_KEY}:${CATTLE_SECRET_KEY} -s ${CATTLE_URL}/schemas/configcontent >test.json 2>&1; then
-        if [ "$(cat test.json | jq -r .id)" != "configContent" ]; then
+        if cat test.json | jq -r .id >/dev/null 2>&1 && [ "$(cat test.json | jq -r .id)" != "configContent" ]; then
             error Credentials are no longer valid, please re-register this agent
-            exit 1
+            return 1
         fi
     fi
 
