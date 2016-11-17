@@ -1,0 +1,31 @@
+FROM alpine:3.4
+RUN apk --update add \
+        bash \
+        bridge-utils \
+        ca-certificates \
+        conntrack-tools \
+        curl \
+        iptables \
+        iproute2 \
+        jq \
+        libaio \
+        procps \
+        python \
+        py-pip \
+        socat \
+        tar \
+        util-linux \
+        && \
+    rm -rf /var/cache/apk/* && \
+    curl -s -L https://get.docker.com/builds/Linux/x86_64/docker-1.6.0 > /usr/bin/docker; chmod +x /usr/bin/docker && \
+    mkdir -p /var/lib/cattle /var/lib/rancher && \
+    pip install cattle
+RUN curl -sL https://github.com/rancher/runc/releases/download/share-mnt-v0.2.1/share-mnt > /usr/bin/share-mnt && \
+    chmod +x /usr/bin/share-mnt
+RUN curl -sL https://github.com/rancher/weave/releases/download/r-v0.0.4/r > /usr/bin/r && \
+    chmod +x /usr/bin/r
+COPY register.py resolve_url.py run.sh /
+ENTRYPOINT ["/run.sh"]
+LABEL "io.rancher.container.system"="rancher-agent"
+ENV HOST_DOCKER_SOCK /var/run/docker.sock
+ENV RANCHER_AGENT_IMAGE rancher/agent:v1.1.0-rc16
