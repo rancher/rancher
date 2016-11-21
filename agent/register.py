@@ -24,11 +24,11 @@ rs = client.list_register(key=key)
 
 if len(rs) > 0:
     r = rs[0]
-    r = client.wait_success(r)
+    r = client.wait_success(r, timeout=300)
     r = client.list_register(key=key)[0]
 else:
     r = client.create_register(key=key)
-    r = client.wait_success(r)
+    r = client.wait_success(r, timeout=300)
     r = client.list_register(key=key)[0]
 
 print "export CATTLE_ACCESS_KEY={}".format(r.accessKey)
