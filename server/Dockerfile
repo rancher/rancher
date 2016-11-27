@@ -1,7 +1,8 @@
-FROM ubuntu:14.04.4
+FROM azul/zulu-openjdk:8u72
 
 ENV DEBIAN_FRONTEND noninteractive
-RUN apt-get update && apt-get install -y --no-install-recommends openjdk-7-jre-headless \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+                    ca-certificates \
                     curl \
                     mysql-server \
                     xz-utils \
@@ -11,9 +12,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends openjdk-7-jre-h
                     iptables \
                     git \
                     redis-server \
-                    zookeeper \
                     spiped \
     && rm -rf /var/lib/apt/lists/*
+
+# In Zulu these two JAR files are built directly from OpenJDK source,
+# and result in a local_policy JAR limited to 128-bit max cipher lengths, and a
+# US_export_policy set no restriction (very large keys, ie. precise value is
+# 2^32-1 or 0x7FFFFFFF).
+#
+# Make US export policy local policy
+RUN cp /usr/lib/jvm/zulu-8-amd64/jre/lib/security/US_export_policy.jar /usr/lib/jvm/zulu-8-amd64/jre/lib/security/local_policy.jar
+
+ENV ZOOKEEPER_VERSION 3.4.9
+ENV ZOOCFGDIR /etc/zookeeper/conf
+RUN mkdir -p /etc/zookeeper/conf && mkdir -p /var/lib/zookeeper \
+    && curl -sL http://apache.mirrors.pair.com/zookeeper/zookeeper-$ZOOKEEPER_VERSION/zookeeper-$ZOOKEEPER_VERSION.tar.gz | tar -xzf - -C /usr/share \
+    && mv /usr/share/zookeeper-$ZOOKEEPER_VERSION /usr/share/zookeeper
 
 ADD https://github.com/cloudnautique/giddyup/releases/download/v0.10.0/giddyup /usr/bin/
 ADD https://github.com/rancher/cluster-manager/releases/download/v0.1.6/cluster-manager /usr/bin/
