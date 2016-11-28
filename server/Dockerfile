@@ -11,8 +11,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
                     openssh-client \
                     iptables \
                     git \
-                    redis-server \
-                    spiped \
     && rm -rf /var/lib/apt/lists/*
 
 # In Zulu these two JAR files are built directly from OpenJDK source,
@@ -23,16 +21,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Make US export policy local policy
 RUN cp /usr/lib/jvm/zulu-8-amd64/jre/lib/security/US_export_policy.jar /usr/lib/jvm/zulu-8-amd64/jre/lib/security/local_policy.jar
 
-ENV ZOOKEEPER_VERSION 3.4.9
-ENV ZOOCFGDIR /etc/zookeeper/conf
-RUN mkdir -p /etc/zookeeper/conf && mkdir -p /var/lib/zookeeper \
-    && curl -sL http://apache.mirrors.pair.com/zookeeper/zookeeper-$ZOOKEEPER_VERSION/zookeeper-$ZOOKEEPER_VERSION.tar.gz | tar -xzf - -C /usr/share \
-    && mv /usr/share/zookeeper-$ZOOKEEPER_VERSION /usr/share/zookeeper
-
-ADD https://github.com/cloudnautique/giddyup/releases/download/v0.10.0/giddyup /usr/bin/
-ADD https://github.com/rancher/cluster-manager/releases/download/v0.1.6/cluster-manager /usr/bin/
-RUN chmod +x /usr/bin/giddyup /usr/bin/cluster-manager
 COPY bin/* /usr/bin/
+RUN curl -sfL https://github.com/containous/traefik/releases/download/v1.1.0/traefik_linux-amd64 > /usr/bin/traefik \
+    && chmod +x /usr/bin/traefik
 
 ENV CATTLE_HOME /var/lib/cattle
 ENV DEFAULT_CATTLE_API_UI_INDEX //releases.rancher.com/ui/1.2.31
@@ -91,6 +82,8 @@ ENV DEFAULT_CATTLE_MACHINE_EXECUTE true
 ENV DEFAULT_CATTLE_COMPOSE_EXECUTOR_EXECUTE true
 ENV DEFAULT_CATTLE_CATALOG_EXECUTE true
 ENV DEFAULT_CATTLE_AUTH_SERVICE_EXECUTE true
+ENV DEFAULT_CATTLE_TRAEFIK_EXECUTE true
 ENV CATTLE_RANCHER_SERVER_IMAGE rancher/server
 
+ENTRYPOINT ["/usr/bin/entry"]
 CMD ["/usr/bin/s6-svscan", "/service"]

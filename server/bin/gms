@@ -1,5 +1,0 @@
-#!/bin/bash
-
-update-rancher-ssl
-
-exec giddyup leader elect --proxy-tcp-port 80 giddyup health -p 80 go-machine-service

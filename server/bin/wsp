@@ -1,3 +1,0 @@
-#!/bin/bash
-
-exec giddyup leader elect --proxy-tcp-port 8080 websocket-proxy

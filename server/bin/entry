@@ -1,0 +1,95 @@
+#!/bin/bash
+
+usage()
+{
+    cat << EOF
+Example:
+  # Single container (non-HA)
+  $ docker run -d --restart=unless-stopped -p 8080:8080 ${CATTLE_RANCHER_SERVER_IMAGE}:${CATTLE_RANCHER_SERVER_VERSION}
+
+  # Single Container using an External DB (non-HA)
+  $ docker run -d --restart=unless-stopped -p 8080:8080 ${CATTLE_RANCHER_SERVER_IMAGE}:${CATTLE_RANCHER_SERVER_VERSION} --db-host myhost.example.com --db-user cattle --db-pass supersecure
+
+  # Full Active/Active HA
+  $ docker run -d --restart=unless-stopped -p 8080:8080 -p 9345:9345 ${CATTLE_RANCHER_SERVER_IMAGE}:${CATTLE_RANCHER_SERVER_VERSION} --advertise-address 1.1.1.1 --db-host myhost.example.com --db-user cattle --db-pass supersecure
+
+Usage: docker run -d -p 8080:8080 ${CATTLE_RANCHER_SERVER_IMAGE}:${CATTLE_RANCHER_SERVER_VERSION} [options]
+
+Options:
+   --db-host               IP or hostname of MySQL server
+   --db-port               port of MySQL server (default: 3306)
+   --db-user               username for MySQL login (default: cattle)
+   --db-pass               password for MySQL login (default: cattle)
+   --db-name               MySQL database name to use (default: cattle)
+
+Clustering Options:
+   --advertise-address     IP Address to which other servers will connect for full active/active HA.
+                           This address does not need to be locally bound.  Full HA requires inbound
+                           port 9345 to be open.  This setting is required for HA to be enabled.
+   --advertise-http-port   The published HTTP port on which other servers can connect to this one.
+                           This should be the published port of the Docker container and not the port
+                           of the load balancer in front of Rancher. (default: 8080)
+EOF
+    exit 0
+}
+
+
+while [ "$#" -gt 0 ]; do
+    case $1 in
+        --help)
+            usage
+            ;;
+        -h)
+            usage
+            ;;
+        --db-host)
+            shift 1
+            export CATTLE_DB_CATTLE_MYSQL_HOST=$1
+            ;;
+        --db-port)
+            shift 1
+            export CATTLE_DB_CATTLE_MYSQL_PORT=$1
+            ;;
+        --db-user)
+            shift 1
+            export CATTLE_DB_CATTLE_USERNAME=$1
+            ;;
+        --db-pass)
+            shift 1
+            export CATTLE_DB_CATTLE_PASSWORD=$1
+            ;;
+        --db-name)
+            shift 1
+            export CATTLE_DB_CATTLE_MYSQL_NAME=$1
+            ;;
+        --advertise-address)
+            shift 1
+            export CATTLE_MODULE_PROFILE_HAZELCAST_LOCK=true
+            export CATTLE_MODULE_PROFILE_HAZELCAST_EVENTING=true
+            if [ -e "/sys/class/net/$1" ]; then
+                export CATTLE_CLUSTER_ADVERTISE_ADDRESS=$(ip addr show dev wlan0 | grep -w inet | awk '{print $2}' | cut -f1 -d/)
+            elif [ "$1" = "ipify" ]; then
+                export CATTLE_CLUSTER_ADVERTISE_ADDRESS=$(curl -s https://api.ipify.org)
+            else
+                export CATTLE_CLUSTER_ADVERTISE_ADDRESS=$1
+            fi
+            ;;
+        --advertise-http-port)
+            shift 1
+            export CATTLE_MODULE_PROFILE_HAZELCAST_LOCK=true
+            export CATTLE_MODULE_PROFILE_HAZELCAST_EVENTING=true
+            export CATTLE_CLUSTER_ADVERTISE_HTTP_PORT=$1
+            ;;
+        *)
+            break
+            ;;
+    esac
+
+    shift 1
+done
+
+if [ "$#" = 0 ]; then
+    exec /usr/bin/s6-svscan /service
+fi
+
+exec "$@"

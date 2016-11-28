@@ -189,6 +189,8 @@ run() {
         fi
         exec java ${CATTLE_JAVA_OPTS:--XX:+UseConcMarkSweepGC -XX:+CMSClassUnloadingEnabled -Xms128m -Xmx${MX} -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR} -Dlogback.bootstrap.level=WARN $PROXY_ARGS $JAVA_OPTS -cp ${HASH_PATH}:${HASH_PATH}/etc/cattle io.cattle.platform.launcher.Main "$@" $ARGS
     else
+        unset DEFAULT_CATTLE_API_UI_JS_URL
+        unset DEFAULT_CATTLE_API_UI_CSS_URL
         exec java ${CATTLE_JAVA_OPTS:--XX:+UseConcMarkSweepGC -XX:+CMSClassUnloadingEnabled -Xms128m -Xmx${MX} -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR} $PROXY_ARGS $JAVA_OPTS -jar $JAR "$@" $ARGS
     fi
 }
