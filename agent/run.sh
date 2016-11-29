@@ -201,12 +201,36 @@ resolve_var_lib_docker()
 
 verify_docker_client_server_version()
 {
-    local client_version=$(docker version |grep Client\ version | cut -d":" -f2)
-    info "Checking for Docker version >=" $client_version
-    docker version 2>&1 | grep Server\ version >/dev/null || {
-        echo "Please ensure Host Docker version is >=${client_version} and container has r/w permissions to docker.sock" 1>&2
+    # get the version of docker client and server
+    local client_version=$(docker version |grep Client\ version | cut -d":" -f2 | sed 's/ //g')
+    local server_version=$(docker version |grep Server\ version | cut -d":" -f2 | sed 's/ //g')
+    
+    # check version is null or not
+    if [ -z "${client_version}" ] || [ -z "${server_version}" ]
+    then
+        echo "Get Host Docker version failed <client version=${client_version}, server version=${server_version}>. "
         exit 1
-    }
+    fi
+    
+    # check whether server version is great than client version or not
+    info "Checking for Docker version >=" $client_version
+    i=1
+    while [ $i -le 3 ]
+    do
+        client_version_part=`echo "${client_version}" | awk -F\. '{print $'"$i"'}'`
+        server_version_part=`echo "${server_version}" | awk -F\. '{print $'"$i"'}'`
+        
+        let i++
+        
+        if [ ${server_version_part} -ge ${client_version_part} ]
+        then
+            continue
+        else
+            echo "Get Host Docker version failed <client version=${client_version}, server version=${server_version}>. "
+            exit 1
+        fi
+    done
+
     info Found $(docker version 2>&1 | grep Server\ version)
     for i in version info; do
         docker $i | while read LINE; do
