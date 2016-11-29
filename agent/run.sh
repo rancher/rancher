@@ -118,41 +118,21 @@ if [ -e "${AGENT_CONF_FILE}" ]; then
     source "${AGENT_CONF_FILE}"
 fi
 
-launch_volume()
+inspect_host()
 {
-    if docker inspect rancher-agent-state >/dev/null 2>&1; then
-        return
-    fi
+    docker run --rm --privileged -v /run:/run -v /var/run:/var/run -v /var/lib:/var/lib ${RANCHER_AGENT_IMAGE} inspect-host
+}
 
-    local opts=""
+launch_agent()
+{
+    if [ -n "$NO_PROXY" ]; then
+        export no_proxy=$NO_PROXY
+    fi
 
     if [ "${CATTLE_VAR_LIB_WRITABLE}" = "true" ]; then
         opts="-v /var/lib/rancher:/var/lib/rancher"
     else
         opts="-v /var/lib/rancher"
-    fi
-
-    docker run \
-        --name rancher-agent-state \
-        -v /var/lib/cattle \
-        -v /var/log/rancher:/var/log/rancher \
-        ${opts} ${RANCHER_AGENT_IMAGE} state
-}
-
-inspect_host()
-{
-    docker run --rm --privileged -v /run:/run -v /var/lib:/var/lib ${RANCHER_AGENT_IMAGE} inspect-host
-}
-
-launch_agent()
-{
-    launch_volume
-
-    # Needed to edit resolv.conf on the host
-    local var_lib_docker=$(resolve_var_lib_docker)
-
-    if [ -n "$NO_PROXY" ]; then
-        export no_proxy=$NO_PROXY
     fi
 
     docker run \
@@ -174,7 +154,6 @@ launch_agent()
         -e CATTLE_SECRET_KEY \
         -e CATTLE_AGENT_IP \
         -e CATTLE_HOST_API_PROXY \
-        -e CATTLE_SYSTEMD \
         -e CATTLE_URL \
         -e CATTLE_HOST_LABELS \
         -e CATTLE_VOLMGR_ENABLED \
@@ -182,37 +161,14 @@ launch_agent()
         -e CATTLE_MEMORY_OVERRIDE \
         -e CATTLE_MILLI_CPU_OVERRIDE \
         -e CATTLE_LOCAL_STORAGE_MB_OVERRIDE \
-        -e HOST_DOCKER_SOCK \
-        -v $HOST_DOCKER_SOCK:/var/run/docker.sock \
+        -v /var/run/docker.sock:/var/run/docker.sock \
         -v /lib/modules:/lib/modules:ro \
-        -v ${var_lib_docker}:${var_lib_docker} \
+        -v /var/lib/docker:/var/lib/docker \
         -v /proc:/host/proc \
         -v /dev:/host/dev \
         -v rancher-cni:/.r \
-        --volumes-from rancher-agent-state \
-        "${RANCHER_AGENT_IMAGE}" "$@"
-}
-
-resolve_var_lib_docker()
-{
-    local dir="$(docker inspect -f '{{index .Volumes "/var/lib/cattle"}}' rancher-agent-state)"
-    echo $(dirname $(dirname $(dirname $dir)))
-}
-
-verify_docker_client_server_version()
-{
-    local client_version=$(docker version |grep Client\ version | cut -d":" -f2)
-    info "Checking for Docker version >=" $client_version
-    docker version 2>&1 | grep Server\ version >/dev/null || {
-        echo "Please ensure Host Docker version is >=${client_version} and container has r/w permissions to docker.sock" 1>&2
-        exit 1
-    }
-    info Found $(docker version 2>&1 | grep Server\ version)
-    for i in version info; do
-        docker $i | while read LINE; do
-            info "docker $i:" $LINE
-        done
-    done
+        -v rancher-agent-state:/var/lib/cattle \
+        ${opts} "${RANCHER_AGENT_IMAGE}" "$@"
 }
 
 delete_container()
@@ -239,11 +195,6 @@ setup_state()
 
     export CATTLE_STATE_DIR=/var/lib/rancher/state
     export CATTLE_AGENT_LOG_FILE=/var/log/rancher/agent.log
-    export CATTLE_CADVISOR_WRAPPER=cadvisor.sh
-
-    if [ "$CATTLE_SYSTEMD" = "true" ]; then
-        mkdir -p /run/systemd/system
-    fi
 
     docker run --privileged --net host --pid host -v /:/host --rm $RANCHER_AGENT_IMAGE -- /usr/bin/share-mnt /var/lib/rancher/volumes /var/lib/kubelet -- norun
 
@@ -290,8 +241,6 @@ register()
 {
     ENV=$(./register.py $TOKEN)
     eval "$ENV"
-
-    export CATTLE_AGENT_IP=${CATTLE_AGENT_IP:-${DETECTED_CATTLE_AGENT_IP}}
 }
 
 run_bootstrap()
@@ -378,18 +327,6 @@ inspect()
             info env "CATTLE_VAR_LIB_WRITABLE=false"
         fi
     fi
-
-    if [ -e /var/run/system-docker.sock ]; then
-        info env "CATTLE_RANCHEROS=true"
-    else
-        info env "CATTLE_RANCHEROS=false"
-    fi
-
-    if [ -e /run/systemd/system ]; then
-        info env "CATTLE_SYSTEMD=true"
-    else
-        info env "CATTLE_SYSTEMD=false"
-    fi
 }
 
 setup_env()
@@ -409,9 +346,6 @@ setup_env()
     echo "$content" | grep -v 'INFO: env' || true
     eval $(echo "$content" | grep 'INFO: env' | sed 's/INFO: env//g')
 
-    export CATTLE_SYSTEMD
-
-    info Systemd: ${CATTLE_SYSTEMD}
     info Boot2Docker: ${CATTLE_BOOT2DOCKER}
     info Host writable: ${CATTLE_VAR_LIB_WRITABLE}
     info Token: $(echo $TOKEN | sed 's/........*/xxxxxxxx/g')
@@ -467,7 +401,6 @@ if [[ $1 =~ http.* || $1 = "register" || $1 = "upgrade" ]]; then
     else
         info Running Agent Registration Process, CATTLE_URL=$(print_url $CATTLE_URL)
     fi
-    verify_docker_client_server_version
     if [ "$1" != "upgrade" ]; then
         wait_for
     fi
