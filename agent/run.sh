@@ -135,6 +135,12 @@ launch_agent()
         opts="-v /var/lib/rancher"
     fi
 
+    ROOTBIND="-v /var/lib/docker:/var/lib/docker"
+    ROOT=$(curl -s --unix /var/run/docker.sock http://localhost/info | jq -r .DockerRootDir)
+    if [ -n "$ROOT" ] && [ "$ROOT" != "/var/lib/docker" ]; then
+        ROOTBIND="-v ${ROOT}:${ROOT} -v ${ROOT}:/var/lib/docker"
+    fi
+
     docker run \
         -d \
         --name rancher-agent \
@@ -165,7 +171,7 @@ launch_agent()
         -e CATTLE_LOCAL_STORAGE_MB_OVERRIDE \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -v /lib/modules:/lib/modules:ro \
-        -v /var/lib/docker:/var/lib/docker \
+        $ROOTBIND \
         -v /proc:/host/proc \
         -v /dev:/host/dev \
         -v rancher-cni:/.r \
