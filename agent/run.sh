@@ -144,7 +144,9 @@ launch_agent()
         --privileged \
         -e CATTLE_AGENT_PIDNS=host \
         -e http_proxy \
+	 -e HTTP_PROXY \
         -e https_proxy \
+	 -e HTTPS_PROXY \
         -e NO_PROXY \
         -e no_proxy \
         -e CATTLE_PHYSICAL_HOST_UUID \
