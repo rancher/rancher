@@ -1,0 +1,211 @@
+#!/bin/bash
+#Version 0.3
+# Manual & github repository: https://github.com/goody80/rancher_server_ctl
+
+BARR="====================================================="
+
+## Outfile for error check
+check_file="/tmp/output.err"
+
+## Rancher default setting
+#rancher_DB_dir="/data/src/rancher_data"
+rancher_image="rancher/server:latest"
+
+conf_dir="/tmp/rancher_tmp"
+conf_file="$conf_dir/rancher_ha.conf"
+	## check directory
+	if [[ ! -d $conf_dir  ]];then
+		mkdir -p $conf_dir
+	fi
+
+	## check config file
+	if [[ ! -f $conf_file  ]];then
+		touch $conf_file
+	fi
+
+## check the sudo command
+sudo 2> $check_file
+	if [[ `(grep "not found" $check_file)` = "" ]];then
+		SUDO="sudo"
+	else
+		SUDO=""
+	fi
+
+conf_check(){
+	target_conf=$@
+	return_variable=""
+	if [[ `(grep $target_conf $conf_file | awk -F '=' '{print $2}' |sed -e 's/"//g' -e "s/'//g" )` = "" ]];then
+		echo " -- Please insert the \"$target_conf\" information --"
+		read return_variable
+		echo "$target_conf=\"$return_variable\"" >> $conf_file
+	fi
+}
+
+## check the  HA mode for mysql connection information
+ha_mode_check(){
+	target_conf=$@
+	return_variable=""
+	if [[ `(grep "ha_mode" $conf_file | awk -F '=' '{print $2}' |sed -e 's/"//g' -e "s/'//g" )` = "" ]];then
+		echo " -- Do you have database for Rancher server HA mode ? [ y / n ] --"
+		read return_variable
+		echo "ha_mode=\"$return_variable\"" >> $conf_file
+	fi
+}
+
+
+notification(){
+	echo "$BARR"
+	echo " You can control the rancher as these options [ start / run / stop / status / restart / clear ]"
+}
+
+	if [[ $1 = "" ]];then
+		notification
+		exit 0
+	fi
+
+## check the conf file for rancher port check
+conf_check rancher_server_port
+
+## check the HA mode
+ha_mode_check ha_mode
+
+## Get configuration
+source $conf_file
+
+data_dir="$rancher_DB_dir/mysql"
+
+
+rancher_ha_mode(){
+runtime_mode=$1
+	conf_check mysql_host
+	conf_check mysql_port
+	conf_check mysql_db_name
+	conf_check mysql_user
+
+	## You can change the configuration as you want into below config
+	source $conf_file
+
+	echo " -- Please insert a mysql \"$mysql_user\" password -- "
+	read -s user_password
+
+	$SUDO docker run $runtime_mode --restart=always -p $rancher_server_port:8080 \
+	-e CATTLE_DB_CATTLE_MYSQL_HOST=$mysql_host \
+	-e CATTLE_DB_CATTLE_MYSQL_PORT=$mysql_port \
+	-e CATTLE_DB_CATTLE_MYSQL_NAME=$mysql_db_name \
+	-e CATTLE_DB_CATTLE_USERNAME=$mysql_user \
+	-e CATTLE_DB_CATTLE_PASSWORD=$user_password \
+	$rancher_image
+}
+
+
+rancher_data_dir_check(){
+	if [[ ! -d $data_dir ]];then
+		$SUDO docker run -d $rancher_image
+		echo " Trying to make a new database. "
+		echo " Please wait for 4 mins...."
+		sleep 240
+		tmp_rancher_id=`$SUDO docker ps -a | grep "$rancher_image" | head -1 | awk '{print $1}'`
+		$SUDO mkdir -p $rancher_DB_dir
+		$SUDO docker stop $tmp_rancher_id
+		$SUDO docker cp $tmp_rancher_id:/var/lib/mysql $rancher_DB_dir
+		$SUDO chown -R 102:105 $data_dir
+		$SUDO docker rm $tmp_rancher_id
+	else
+		$SUDO chown -R 102:105 $data_dir
+	fi
+}
+
+## check the docker command
+$SUDO docker 1> /dev/null 2>  $check_file
+	if [[ `($SUDO grep "not found" $check_file)` != "" ]];then
+		echo "$BARR"
+		echo " You need to install the Docker first !!"
+	fi
+
+return_check(){
+	Result=`$SUDO grep 'Error' $check_file`
+		if [[ $Result != "" ]];then
+			cat $check_file
+			exit 1;
+		fi
+	$SUDO rm -f $check_file
+}
+
+rancher_start (){
+
+## check for runtime mode or daemnon
+runtime_mode=$1
+	if [[ $runtime_mode = "run" ]];then
+		daemon_option=""
+	else
+		daemon_option="-d"
+	fi
+
+	if [[ $ha_mode = "y" ]];then
+		rancher_ha_mode $daemon_option
+	else
+		rancher_data_dir_check
+		$SUDO docker run $daemon_option -v $data_dir:/var/lib/mysql -p $rancher_server_port:8080  --restart=unless-stopped $rancher_image  2> $check_file
+		return_check
+		echo "$BARR"
+		echo " Rancher server has been started :)"
+	fi
+}
+
+
+rancher_status (){
+	echo "$BARR"
+	$SUDO docker ps | head -1
+	$SUDO docker ps |grep $rancher_image
+}
+
+
+rancher_stop (){
+	Rancher_id=`$SUDO docker ps |grep $rancher_image | awk '{print $1}'`
+	$SUDO docker stop $Rancher_id  2> $check_file
+	return_check
+	echo "$BARR"
+	echo " Rancher server has been stopped!!"
+	echo " Data directory is -> $data_dir"
+	echo " Docker container ID was -> $Rancher_id"
+}
+
+
+conf_reset(){
+	echo "$BARR"
+	echo " --  Do you want to clear the configuration of rancher_ctl ? [ y / n ] "
+	read clearing
+		if [[ $clearing = "y"  ]];then
+			rm -f $conf_file
+			echo " $conf_file has been deleted !!"
+		else
+			echo " --- Canceled ---"
+		fi
+}
+	case $1 in
+		start )
+			rancher_start
+			rancher_status
+			;;
+		run )
+			rancher_start run
+			rancher_status
+			;;
+		status )
+			rancher_status
+			;;
+		stop )
+			rancher_stop
+			;;
+		restart )
+			rancher_stop
+			rancher_start
+			rancher_status
+			;;
+		clear )
+			conf_reset
+			;;
+		*)
+			notification
+	esac
+	echo "$BARR"
