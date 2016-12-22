@@ -1,4 +1,7 @@
 FROM ubuntu:16.04
+
+COPY ./rancher-entrypoint.sh /
+ENV SSL_SCRIPT_COMMIT 98660ada3d800f653fc1f105771b5173f9d1a019
 RUN apt-get update && \
         apt-get install --no-install-recommends -y \
         arptables \
@@ -29,4 +32,8 @@ RUN apt-get update && \
     curl -sLf https://get.docker.com/builds/Linux/x86_64/docker-1.10.3 > /usr/bin/docker && \
     chmod +x /usr/bin/docker && \
     rm /var/run && \
-    mkdir /var/run
+    mkdir /var/run && \
+    curl -sLf https://raw.githubusercontent.com/rancher/rancher/${SSL_SCRIPT_COMMIT}/server/bin/update-rancher-ssl > /usr/bin/update-rancher-ssl && \
+    chmod +x /usr/bin/update-rancher-ssl
+
+ENTRYPOINT ["/rancher-entrypoint.sh"]
