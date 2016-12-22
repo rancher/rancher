@@ -174,9 +174,9 @@ run() {
     update-rancher-ssl
 
     local ram=$(free -g --si | awk '/^Mem:/{print $2}')
-    if [ ${ram} -gt 7 ]; then
+    if [ ${ram} -gt 6 ]; then
         MX="4g"
-    elif [ ${ram} -gt 3 ]; then
+    elif [ ${ram} -gt 2 ]; then
         MX="2g"
     else
         MX="1g"
