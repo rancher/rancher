@@ -40,7 +40,7 @@ COPY target/*static.tar.gz /s6-statics/
 
 EXPOSE 8080
 ENV CATTLE_HOST_API_PROXY_MODE embedded
-ENV CATTLE_RANCHER_SERVER_VERSION v1.2.2-rc4
+ENV CATTLE_RANCHER_SERVER_VERSION v1.2.2
 ENV CATTLE_RANCHER_COMPOSE_VERSION v0.12.1
 ENV DEFAULT_CATTLE_RANCHER_COMPOSE_LINUX_URL   https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-linux-amd64-${CATTLE_RANCHER_COMPOSE_VERSION}.tar.gz
 ENV DEFAULT_CATTLE_RANCHER_COMPOSE_DARWIN_URL  https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-darwin-amd64-${CATTLE_RANCHER_COMPOSE_VERSION}.tar.gz
@@ -54,7 +54,7 @@ ENV DEFAULT_CATTLE_CATALOG_URL='{"catalogs":{"community":{"url":"https://git.ran
 
 
 EXPOSE 3306
-ENV CATTLE_CATTLE_VERSION v0.174.12
+ENV CATTLE_CATTLE_VERSION v0.174.13
 ADD https://github.com/rancherio/cattle/releases/download/${CATTLE_CATTLE_VERSION}/cattle.jar /usr/share/cattle/
 
 RUN cd / && for i in $(ls /s6-statics/*static.tar.gz);do tar -zxvf $i;done && rm -rf /s6-statics/*static.tar.gz && \
