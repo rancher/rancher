@@ -49,8 +49,8 @@ ENV CATTLE_RANCHER_CLI_VERSION v0.4.1
 ENV DEFAULT_CATTLE_RANCHER_CLI_LINUX_URL   https://releases.rancher.com/cli/${CATTLE_RANCHER_CLI_VERSION}/rancher-linux-amd64-${CATTLE_RANCHER_CLI_VERSION}.tar.gz
 ENV DEFAULT_CATTLE_RANCHER_CLI_DARWIN_URL  https://releases.rancher.com/cli/${CATTLE_RANCHER_CLI_VERSION}/rancher-darwin-amd64-${CATTLE_RANCHER_CLI_VERSION}.tar.gz
 ENV DEFAULT_CATTLE_RANCHER_CLI_WINDOWS_URL https://releases.rancher.com/cli/${CATTLE_RANCHER_CLI_VERSION}/rancher-windows-386-${CATTLE_RANCHER_CLI_VERSION}.zip
-ENV DEFAULT_CATTLE_CATALOG_URL='{"catalogs":{"community":{"url":"https://git.rancher.io/community-catalog.git","branch":"master"},"library":{"url":"https://git.rancher.io/rancher-catalog.git","branch":"1.2.2-rc4"}}}'
-#ENV DEFAULT_CATTLE_CATALOG_URL=community=https://git.rancher.io/community-catalog.git,library=https://git.rancher.io/rancher-catalog.git
+#ENV DEFAULT_CATTLE_CATALOG_URL='{"catalogs":{"community":{"url":"https://git.rancher.io/community-catalog.git","branch":"master"},"library":{"url":"https://git.rancher.io/rancher-catalog.git","branch":"1.2.2-rc4"}}}'
+ENV DEFAULT_CATTLE_CATALOG_URL=community=https://git.rancher.io/community-catalog.git,library=https://git.rancher.io/rancher-catalog.git
 
 
 EXPOSE 3306
