@@ -64,6 +64,8 @@ while [ "$#" -gt 0 ]; do
             ;;
         --advertise-address)
             shift 1
+            export CATTLE_MODULE_PROFILE_HAZELCAST_LOCK=true
+            export CATTLE_MODULE_PROFILE_HAZELCAST_EVENTING=true
             export SPRING_PROFILES_ACTIVE="hazelcast.eventing,hazelcast.lock,hazelcast.config.basic"
             export DEFAULT_CATTLE_TRAEFIK_EXECUTE=true
             if [ -e "/sys/class/net/$1" ]; then
@@ -76,6 +78,8 @@ while [ "$#" -gt 0 ]; do
             ;;
         --advertise-http-port)
             shift 1
+            export CATTLE_MODULE_PROFILE_HAZELCAST_LOCK=true
+            export CATTLE_MODULE_PROFILE_HAZELCAST_EVENTING=true
             export SPRING_PROFILES_ACTIVE="hazelcast.eventing,hazelcast.lock,hazelcast.config.basic"
             export DEFAULT_CATTLE_TRAEFIK_EXECUTE=true
             export CATTLE_CLUSTER_ADVERTISE_HTTP_PORT=$1
