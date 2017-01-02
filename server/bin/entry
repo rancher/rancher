@@ -26,6 +26,8 @@ Clustering Options:
    --advertise-address     IP Address to which other servers will connect for full active/active HA.
                            This address does not need to be locally bound.  Full HA requires inbound
                            port 9345 to be open.  This setting is required for HA to be enabled.
+                           You may use either "ipify" for fetching global IP, "awslocal" for getting an AWS local IP, 
+                           a network interface (eg: eth0), or an ip address itself (eg: 172.10.11.12)
    --advertise-http-port   The published HTTP port on which other servers can connect to this one.
                            This should be the published port of the Docker container and not the port
                            of the load balancer in front of Rancher. (default: 8080)
@@ -70,6 +72,8 @@ while [ "$#" -gt 0 ]; do
             export DEFAULT_CATTLE_TRAEFIK_EXECUTE=true
             if [ -e "/sys/class/net/$1" ]; then
                 export CATTLE_CLUSTER_ADVERTISE_ADDRESS=$(ip addr show dev $1 | grep -w inet | awk '{print $2}' | cut -f1 -d/)
+            elif [ "$1" = "awslocal" ]; then
+                export CATTLE_CLUSTER_ADVERTISE_ADDRESS=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
             elif [ "$1" = "ipify" ]; then
                 export CATTLE_CLUSTER_ADVERTISE_ADDRESS=$(curl -s https://api.ipify.org)
             else
