@@ -16,7 +16,7 @@ if [ -f "$CA_ROOT" ]; then
 
   if [ -n "$CATTLE_RANCHER_SERVER_VERSION" ]; then 
     # Remove the key if it exists
-    if keytool -list -keystore $JKS_STORE -alias rancher_ca -storepass $JAVA_STORE_PASS ; then
+    if keytool -list -keystore $JKS_STORE -alias rancher_ca -storepass $JAVA_STORE_PASS 2>&1 > /dev/null ; then
         keytool -delete -alias rancher_ca -storepass $JAVA_STORE_PASS -keystore $JKS_STORE -noprompt
     fi
 
