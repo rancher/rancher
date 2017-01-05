@@ -171,8 +171,6 @@ run() {
 
     env | grep CATTLE | grep -v PASS | sort
 
-    update-rancher-ssl
-
     local ram=$(free -g --si | awk '/^Mem:/{print $2}')
     if [ ${ram} -gt 6 ]; then
         MX="4g"
@@ -259,6 +257,8 @@ master()
     JAR=$(readlink -f code/packaging/app/target/cattle-app-*.war)
     run
 }
+
+update-rancher-ssl
 
 if [ "$1" = "extract" ]; then
     extract
