@@ -1,4 +1,10 @@
-**Rancher Version:**
+**Versions:**
+Server:
+healthcheck:
+ipsec:
+network-services:
+scheduler:
+kubernetes (if applicable):
 
 **Docker Version:**
 
