@@ -40,7 +40,7 @@ COPY target/*static.tar.gz /s6-statics/
 
 EXPOSE 8080
 ENV CATTLE_HOST_API_PROXY_MODE embedded
-ENV CATTLE_RANCHER_SERVER_VERSION v1.3.1-rc4
+ENV CATTLE_RANCHER_SERVER_VERSION v1.3.1
 ENV CATTLE_RANCHER_COMPOSE_VERSION v0.12.1
 ENV DEFAULT_CATTLE_RANCHER_COMPOSE_LINUX_URL   https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-linux-amd64-${CATTLE_RANCHER_COMPOSE_VERSION}.tar.gz
 ENV DEFAULT_CATTLE_RANCHER_COMPOSE_DARWIN_URL  https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-darwin-amd64-${CATTLE_RANCHER_COMPOSE_VERSION}.tar.gz
@@ -49,8 +49,8 @@ ENV CATTLE_RANCHER_CLI_VERSION v0.4.1
 ENV DEFAULT_CATTLE_RANCHER_CLI_LINUX_URL   https://releases.rancher.com/cli/${CATTLE_RANCHER_CLI_VERSION}/rancher-linux-amd64-${CATTLE_RANCHER_CLI_VERSION}.tar.gz
 ENV DEFAULT_CATTLE_RANCHER_CLI_DARWIN_URL  https://releases.rancher.com/cli/${CATTLE_RANCHER_CLI_VERSION}/rancher-darwin-amd64-${CATTLE_RANCHER_CLI_VERSION}.tar.gz
 ENV DEFAULT_CATTLE_RANCHER_CLI_WINDOWS_URL https://releases.rancher.com/cli/${CATTLE_RANCHER_CLI_VERSION}/rancher-windows-386-${CATTLE_RANCHER_CLI_VERSION}.zip
-ENV DEFAULT_CATTLE_CATALOG_URL='{"catalogs":{"community":{"url":"https://git.rancher.io/community-catalog.git","branch":"master"},"library":{"url":"https://git.rancher.io/rancher-catalog.git","branch":"v1.3.1-rc3"}}}'
-#ENV DEFAULT_CATTLE_CATALOG_URL=community=https://git.rancher.io/community-catalog.git,library=https://git.rancher.io/rancher-catalog.git
+#ENV DEFAULT_CATTLE_CATALOG_URL='{"catalogs":{"community":{"url":"https://git.rancher.io/community-catalog.git","branch":"master"},"library":{"url":"https://git.rancher.io/rancher-catalog.git","branch":"v1.3.1-rc3"}}}'
+ENV DEFAULT_CATTLE_CATALOG_URL=community=https://git.rancher.io/community-catalog.git,library=https://git.rancher.io/rancher-catalog.git
 
 
 EXPOSE 3306
