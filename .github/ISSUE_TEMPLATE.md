@@ -17,5 +17,3 @@ kubernetes (if applicable):
 **Steps to Reproduce:**
 
 **Results:** 
-
-**Expected:**
