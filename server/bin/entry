@@ -68,7 +68,7 @@ while [ "$#" -gt 0 ]; do
             export CATTLE_MODULE_PROFILE_HAZELCAST_EVENTING=true
             export DEFAULT_CATTLE_TRAEFIK_EXECUTE=true
             if [ -e "/sys/class/net/$1" ]; then
-                export CATTLE_CLUSTER_ADVERTISE_ADDRESS=$(ip addr show dev wlan0 | grep -w inet | awk '{print $2}' | cut -f1 -d/)
+                export CATTLE_CLUSTER_ADVERTISE_ADDRESS=$(ip addr show dev $1 | grep -w inet | awk '{print $2}' | cut -f1 -d/)
             elif [ "$1" = "ipify" ]; then
                 export CATTLE_CLUSTER_ADVERTISE_ADDRESS=$(curl -s https://api.ipify.org)
             else
