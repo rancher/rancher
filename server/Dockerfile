@@ -22,8 +22,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN cp /usr/lib/jvm/zulu-8-amd64/jre/lib/security/US_export_policy.jar /usr/lib/jvm/zulu-8-amd64/jre/lib/security/local_policy.jar
 
 COPY bin/* /usr/bin/
-RUN curl -sfL https://github.com/containous/traefik/releases/download/v1.1.0/traefik_linux-amd64 > /usr/bin/traefik \
-    && chmod +x /usr/bin/traefik
 
 ENV CATTLE_HOME /var/lib/cattle
 ENV DEFAULT_CATTLE_API_UI_INDEX //releases.rancher.com/ui/1.3.5
@@ -40,7 +38,7 @@ COPY target/*static.tar.gz /s6-statics/
 
 EXPOSE 8080
 ENV CATTLE_HOST_API_PROXY_MODE embedded
-ENV CATTLE_RANCHER_SERVER_VERSION v1.3.2
+ENV CATTLE_RANCHER_SERVER_VERSION v1.3.3-rc1
 ENV CATTLE_RANCHER_COMPOSE_VERSION v0.12.1
 ENV DEFAULT_CATTLE_RANCHER_COMPOSE_LINUX_URL   https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-linux-amd64-${CATTLE_RANCHER_COMPOSE_VERSION}.tar.gz
 ENV DEFAULT_CATTLE_RANCHER_COMPOSE_DARWIN_URL  https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-darwin-amd64-${CATTLE_RANCHER_COMPOSE_VERSION}.tar.gz
@@ -54,7 +52,7 @@ ENV DEFAULT_CATTLE_CATALOG_URL=community=https://git.rancher.io/community-catalo
 
 
 EXPOSE 3306
-ENV CATTLE_CATTLE_VERSION v0.175.8
+ENV CATTLE_CATTLE_VERSION v0.175.9
 ADD https://github.com/rancherio/cattle/releases/download/${CATTLE_CATTLE_VERSION}/cattle.jar /usr/share/cattle/
 
 RUN cd / && for i in $(ls /s6-statics/*static.tar.gz);do tar -zxvf $i;done && rm -rf /s6-statics/*static.tar.gz && \
