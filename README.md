@@ -3,13 +3,13 @@
 Rancher is an open source project that provides a complete platform for operating Docker in production. It provides infrastructure services such as multi-host networking, global and local load balancing, and volume snapshots. It integrates native Docker management capabilities such as Docker Machine and Docker Swarm. It offers a rich user experience that enables devops admins to operate Docker in production at large scale.
 
 ## Latest Release
-**v1.3.2**
+**v1.3.3**
 
-Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v1.3.2).
+Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v1.3.3).
 
 To get automated notifications of our latest release, you can watch the announcements category in our [forums](http://forums.rancher.com/c/announcements).
 
-> Note: Our latest stable release of Rancher (v1.3.2) is tagged as `rancher/server:stable`.
+> Note: Our latest stable release of Rancher (v1.3.3) is tagged as `rancher/server:stable`.
 
 ## Installation
 
@@ -22,8 +22,8 @@ Rancher is deployed as a set of Docker containers.  Running Rancher is as simple
 
 ### Requirements
 
-* Docker 1.10.3+
-* Any modern Linux distribution that supports Docker 1.10.3+. (Ubuntu, RHEL/CentOS 7 are more heavily tested.) Rancher also works with [RancherOS](https://github.com/rancher/os).
+* [Supported Docker version](http://docs.rancher.com/rancher/v1.3/en/hosts/#supported-docker-versions)
+* Any modern Linux distribution with a [supported Docker version](http://docs.rancher.com/rancher/v1.3/en/hosts/#supported-docker-versions). (Ubuntu, RHEL/CentOS 7 are more heavily tested.) Rancher also works with [RancherOS](https://github.com/rancher/os).
 * RAM: 1GB+
 
 ### Launching Management Server
