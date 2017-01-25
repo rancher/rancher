@@ -149,6 +149,7 @@ launch_agent()
 	 -e HTTPS_PROXY \
         -e NO_PROXY \
         -e no_proxy \
+	 -e CATTLE_SCHEDULER_IPS \
         -e CATTLE_PHYSICAL_HOST_UUID \
         -e CATTLE_DOCKER_UUID \
         -e CATTLE_SCRIPT_DEBUG \
