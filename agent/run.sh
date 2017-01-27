@@ -132,7 +132,7 @@ launch_agent()
     if [ "${CATTLE_VAR_LIB_WRITABLE}" = "true" ]; then
         opts="-v /var/lib/rancher:/var/lib/rancher"
     else
-        opts="-v /var/lib/rancher"
+        opts="-v rancher-agent-state:/var/lib/rancher"
     fi
 
     docker run \
@@ -319,7 +319,7 @@ inspect()
 {
     print_token
 
-    if lsb_release 2>/dev/null | grep -i boot2docker >/dev/null 2>&1; then
+    if docker info 2>/dev/null | grep -i boot2docker >/dev/null 2>&1; then
         info env "CATTLE_BOOT2DOCKER=true"
         info env "CATTLE_VAR_LIB_WRITABLE=false"
     else
