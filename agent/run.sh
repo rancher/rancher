@@ -142,6 +142,7 @@ launch_agent()
         --net=host \
         --pid=host \
         --privileged \
+        --oom-score-adj="-500" \
         -e CATTLE_AGENT_PIDNS=host \
         -e http_proxy \
 	 -e HTTP_PROXY \
