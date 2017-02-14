@@ -49,7 +49,7 @@ For security issues, please email security@rancher.com instead of posting a publ
 
 
 #License
-Copyright (c) 2014-2016 [Rancher Labs, Inc.](http://rancher.com), portions Copyright © 2017 [Rancher Labs, Inc.](http://rancher.com) and HNA Ecological Technology Group Co., Ltd.
+Copyright (c) 2014-2016 [Rancher Labs, Inc.](http://rancher.com), portions Copyright © 2017 [Rancher Labs, Inc.](http://rancher.com) and HNA Ecological Technology Group Co., Ltd. See [copyright details.](COPYRIGHT_DETAILS.md)
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
