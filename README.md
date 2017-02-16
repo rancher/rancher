@@ -39,7 +39,7 @@ To learn more about using Rancher, please refer to our [Rancher Documentation](h
 This repo is a meta-repo used for packaging.  The source code for Rancher is in other repos in the rancher organization.  The majority of the code is in https://github.com/rancher/cattle.
 
 ## Support, Discussion, and Community
-If you need any help with Rancher or RancherOS, please join us at either our [Rancher forums](http://forums.rancher.com/) or [#rancher IRC channel](http://webchat.freenode.net/?channels=rancher) where most of our team hangs out at.
+If you need any help with Rancher or RancherOS, please join us at either our [Rancher forums](http://forums.rancher.com/), [#rancher IRC channel](http://webchat.freenode.net/?channels=rancher) or [Slack](https://slack.rancher.io/) where most of our team hangs out at.
 
 Please submit any **Rancher** bugs, issues, and feature requests to [rancher/rancher](//github.com/rancher/rancher/issues). 
 
