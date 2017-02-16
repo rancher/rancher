@@ -50,7 +50,6 @@ ENV DEFAULT_CATTLE_RANCHER_CLI_LINUX_URL   https://releases.rancher.com/cli/${CA
 ENV DEFAULT_CATTLE_RANCHER_CLI_DARWIN_URL  https://releases.rancher.com/cli/${CATTLE_RANCHER_CLI_VERSION}/rancher-darwin-amd64-${CATTLE_RANCHER_CLI_VERSION}.tar.gz
 ENV DEFAULT_CATTLE_RANCHER_CLI_WINDOWS_URL https://releases.rancher.com/cli/${CATTLE_RANCHER_CLI_VERSION}/rancher-windows-386-${CATTLE_RANCHER_CLI_VERSION}.zip
 ENV DEFAULT_CATTLE_CATALOG_URL='{"catalogs":{"community":{"url":"https://git.rancher.io/community-catalog.git","branch":"master"},"library":{"url":"https://git.rancher.io/rancher-catalog.git","branch":"v1.5.0-dev"}}}'
-#ENV DEFAULT_CATTLE_CATALOG_URL=community=https://git.rancher.io/community-catalog.git,library=https://git.rancher.io/rancher-catalog.git
 
 
 EXPOSE 3306
@@ -65,14 +64,10 @@ RUN cd / && for i in $(ls /s6-statics/*static.tar.gz);do tar -zxvf $i;done && rm
     curl -sL https:${CATTLE_API_UI_URL}.tar.gz | tar xvzf - -C /usr/share/cattle/war/api-ui --strip-components=1 && \
     /usr/share/cattle/install_cattle_binaries && \
     cd $CATTLE_HOME && export IFS="," && \
-    if echo "$DEFAULT_CATTLE_CATALOG_URL" | grep -q '^{'; then \
-        echo "$DEFAULT_CATTLE_CATALOG_URL" > repo.json && \
-        cat repo.json && \
-        rancher-catalog-service -validate -configFile repo.json \
-    ;else \
-        for i in $DEFAULT_CATTLE_CATALOG_URL; do rancher-catalog-service -validate -catalogUrl=$i;done \
-    ;fi && \
-    for i in DATA/*; do [ -d $i ] && touch $i/.nopurge; done
+    echo "$DEFAULT_CATTLE_CATALOG_URL" > repo.json && \
+    cat repo.json && \
+    rancher-catalog-service --sqlite --validate --config repo.json && \
+    for i in cache/*/*; do [ -d $i ] && touch $i/.nopurge; done
 
 VOLUME /var/lib/mysql /var/log/mysql /var/lib/cattle
 
