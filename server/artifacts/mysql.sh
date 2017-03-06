@@ -81,7 +81,7 @@ setup_cattle_db()
 
     echo "Setting up database"
     mysql -uroot<< EOF
-CREATE DATABASE IF NOT EXISTS ${db_name} COLLATE = 'utf8_general_ci' CHARACTER SET = 'utf8';
+CREATE DATABASE IF NOT EXISTS ${db_name} COLLATE = 'utf8mb4_unicode_ci' CHARACTER SET = 'utf8mb4';
 GRANT ALL ON ${db_name}.* TO "${db_user}"@'%' IDENTIFIED BY "${db_pass}";
 GRANT ALL ON ${db_name}.* TO "${db_user}"@'localhost' IDENTIFIED BY "${db_pass}";
 EOF
