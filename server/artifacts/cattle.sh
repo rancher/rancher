@@ -229,33 +229,75 @@ master()
 
     mkdir -p /source
     cd /source
-    if [ ! -e cattle ]; then
-        git clone https://github.com/rancher/cattle
-        cd cattle
-    elif [ ! -e cattle/.manual ]; then
-        cd cattle
-        git fetch origin
-        git checkout master
-        git reset --hard origin/master
-        git clean -dxf
-    else
-        cd cattle
-    fi
+    get_source
 
+    cd cattle
     cattle-binary-pull ./resources/content/cattle-global.properties /usr/bin >/tmp/download.log 2>&1 &
+    cd ..
 
-    if [ ! -x "$(which mvn)" ]; then
-        apt-get update
-        apt-get install --no-install-recommends -y maven openjdk-7-jdk
-    fi
+    build_source
 
-    mvn package
+    cd cattle
+    ./mvnw package
     wait || {
         cat /tmp/download.log
         exit 1
     }
     JAR=$(readlink -f code/packaging/app/target/cattle-app-*.war)
     run
+}
+
+get_source()
+{
+    if [[ ! -e cattle || -e .cattle.default ]] && ! echo "$REPOS" | grep -q cattle; then
+        REPOS="$REPOS cattle"
+        touch .cattle.default
+    fi
+    for r in $REPOS; do
+        if ! [[ $r =~ ^http || $r =~ ^git ]]; then
+            r="https://github.com/rancher/$r"
+        fi
+        tag=$(echo $r | cut -f2 -d,)
+        r=$(echo $r | cut -f1 -d,)
+        d=$(echo $r | awk -F/ '{print $NF}' | cut -f1 -d.)
+        if [[ -z "$tag" || "$tag" = "$r" ]]; then
+            tag=origin/master
+        fi
+        if [ -e $d ]; then
+            git -C $d fetch origin
+            git -C $d reset --hard $tag
+        else
+            git clone $r $d
+            git -C $d checkout --detach $tag
+        fi
+    done
+}
+
+build_source()
+{
+    for i in *; do
+        if [[ ! -d $i || $i == cattle ]]; then
+            continue
+        fi
+
+        if [ ! -x "$(which make)" ]; then
+            apt-get update
+            apt-get install -y make
+        fi
+
+        if [ ! -x "$(which docker)" ]; then
+            curl -sLf https://get.docker.com/builds/Linux/x86_64/docker-1.10.3 > /usr/bin/docker
+            chmod +x /usr/bin/docker
+        fi
+
+        cd $i
+        make build 2>&1 | xargs -I{} echo $i '|' "{}"
+        ln -sf $(pwd)/bin/* /usr/local/bin/
+        if [ "$i" = "agent" ]; then
+            export CATTLE_AGENT_PACKAGE_PYTHON_AGENT_URL=$(pwd)
+        fi
+        cd ..
+    done
 }
 
 update-rancher-ssl
