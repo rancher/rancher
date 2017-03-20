@@ -36,6 +36,16 @@ setup_graphite()
     export CATTLE_GRAPHITE_PORT=${CATTLE_GRAPHITE_PORT:-$GRAPHITE_PORT_2003_TCP_PORT}
 }
 
+setup_prometheus()
+{
+    # Setup Prometheus Graphite exporter
+    if [ "${CATTLE_PROMETHEUS_EXPORTER}" == "true" ]; then
+        s6-svc -u ${S6_SERVICE_DIR}/graphite_exporter
+        export DEFAULT_CATTLE_GRAPHITE_HOST=127.0.0.1
+        export DEFAULT_CATTLE_GRAPHITE_PORT=9109
+    fi
+}
+
 setup_gelf()
 {
     # Setup GELF
@@ -163,6 +173,7 @@ setup_proxy()
 run() {
     setup_local_agents
     setup_graphite
+    setup_prometheus
     setup_gelf
     setup_mysql
     setup_redis
