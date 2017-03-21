@@ -24,7 +24,7 @@ The value of `REPOS` environment variable supports two formats.
 
 ### Specific Branches
 
-You can use any branch for a component with the following format, `GIT_URL[,BRANCH] GIT_URL[,BRANCH] ...`.  For example, `REPOS=https://github.com/rancher/cattle,custom_branch`. When testing personal forks or branches of components, this is the recommended format.
+You can use any branch for a component with the following format, `GIT_URL[,origin/BRANCH] GIT_URL[,origin/BRANCH] ...`.  For example, `REPOS=https://github.com/rancher/cattle,origin/custom_branch`. When testing personal forks or branches of components, this is the recommended format.
 
 ### Master Branch on the Rancher Repo
 
@@ -40,6 +40,14 @@ Run the master container using the `master` branch of [cattle](https://github.co
 
 ```
 docker run -p 8080:8080 rancher/server:master
+```
+
+### Only `otherbranch` branch of cattle
+
+Run the master container using the `otherbranch` branch of [cattle](https://github.com/rancher/cattle).
+
+```
+docker run -p 8080:8080 -e REPOS="https://github.com/rancher/cattle,origin/otherbranch" rancher/server:master
 ```
 
 ### Changing rancher-compose-executor to run from the `master` branch instead of the released version
@@ -58,7 +66,7 @@ docker run -p 8080:8080 -e REPOS="https://github.com/rancher/rancher-compose-exe
 Run the master container using the `master` branch of [rancher-compose-executor](https://github.com/rancher/rancher-compose-executor) and a custom branch (i.e. `fix-something`) of [websocket-proxy](https://github.com/rancher/websocket-proxy).
 
 ```
-docker run -p 8080:8080 -e REPOS="rancher-compose-executor https://github.com/ibuildthecloud/websocketproxy,fix-something" -v /var/run/docker.sock:/var/run/docker.sock rancher/server:master
+docker run -p 8080:8080 -e REPOS="rancher-compose-executor https://github.com/ibuildthecloud/websocketproxy,origin/fix-something" -v /var/run/docker.sock:/var/run/docker.sock rancher/server:master
 ```
 
 ## Bind mounting
