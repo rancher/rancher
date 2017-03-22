@@ -32,6 +32,15 @@ export CATTLE_HOME=${CATTLE_HOME:-/var/lib/cattle}
 
 check_debug
 
+MODULES="ansi_cprng
+drbg
+esp4
+veth
+xfrm4_mode_tunnel
+xfrm6_mode_tunnel
+xt_mark
+xt_nat"
+
 CONTAINER="$(hostname)"
 if [ "$1" = "run" ]; then
     CONTAINER="rancher-agent"
@@ -204,6 +213,10 @@ setup_state()
     docker run --privileged --net host --pid host -v /:/host --rm $RANCHER_AGENT_IMAGE -- /usr/bin/share-mnt /var/lib/rancher/volumes /var/lib/kubelet -- norun
 
     cp -f /usr/bin/r /.r/r || true
+
+    for m in $MODULES; do
+        modprobe $m >/dev/null 2>&1 || true
+    done
 }
 
 load()
