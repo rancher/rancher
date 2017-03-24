@@ -24,7 +24,7 @@ RUN cp /usr/lib/jvm/zulu-8-amd64/jre/lib/security/US_export_policy.jar /usr/lib/
 COPY bin/* /usr/bin/
 
 ENV CATTLE_HOME /var/lib/cattle
-ENV DEFAULT_CATTLE_API_UI_INDEX //releases.rancher.com/ui/1.2.41
+ENV DEFAULT_CATTLE_API_UI_INDEX //releases.rancher.com/ui/1.2.40
 ENV CATTLE_API_UI_URL //releases.rancher.com/api-ui/1.0.8
 ENV CATTLE_DB_CATTLE_DATABASE mysql
 ENV CATTLE_USE_LOCAL_ARTIFACTS true
@@ -52,7 +52,7 @@ ENV DEFAULT_CATTLE_CATALOG_URL=community=https://git.rancher.io/community-catalo
 
 
 EXPOSE 3306
-ENV CATTLE_CATTLE_VERSION v0.174.15
+ENV CATTLE_CATTLE_VERSION v0.174.16
 ADD https://github.com/rancherio/cattle/releases/download/${CATTLE_CATTLE_VERSION}/cattle.jar /usr/share/cattle/
 
 RUN cd / && for i in $(ls /s6-statics/*static.tar.gz);do tar -zxvf $i;done && rm -rf /s6-statics/*static.tar.gz && \
