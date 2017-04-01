@@ -1,4 +1,4 @@
-#Rancher
+# Rancher
 
 Rancher is an open source project that provides a complete platform for operating Docker in production. It provides infrastructure services such as multi-host networking, global and local load balancing, and volume snapshots. It integrates native Docker management capabilities such as Docker Machine and Docker Swarm. It offers a rich user experience that enables devops admins to operate Docker in production at large scale.
 
@@ -46,8 +46,8 @@ Please submit any **RancherOS** bugs, issues, and feature requests to [rancher/o
 
 For security issues, please email security@rancher.com instead of posting a public issue in GitHub.  You may (but are not required to) use the GPG key located on [Keybase](https://keybase.io/rancher).
 
+# License
 
-#License
 Copyright (c) 2014-2016 [Rancher Labs, Inc.](http://rancher.com), portions Copyright © 2017 [Rancher Labs, Inc.](http://rancher.com) and HNA Ecological Technology Group Co., Ltd. See [copyright details.](COPYRIGHT_DETAILS.md)
 
 Licensed under the Apache License, Version 2.0 (the "License");
