@@ -311,13 +311,27 @@ read_rancher_agent_env()
     RANCHER_AGENT_IMAGE=$save
 }
 
+check_url()
+{
+    local err
+    err=$(curl -f -L -sS --connect-timeout 15 -o /dev/null --stderr - $1 | head -n1 ; exit ${PIPESTATUS[0]})
+    if [ $? -eq 0 ]
+    then
+        echo ""
+    else
+        echo ${err} | sed -e 's/^curl: ([0-9]\+) //'
+    fi
+}
+
 wait_for()
 {
     local url="$(print_url $CATTLE_URL)"
     info "Attempting to connect to: ${url}"
+    local err
     for ((i=0; i < 300; i++)); do
-        if ! curl -f -L -s ${CATTLE_URL} >/dev/null 2>&1; then
-            error ${url} is not accessible
+        err=$(check_url $url)
+        if [[ $err ]]; then
+            error "${url} is not accessible (${err})"
             sleep 2
             if [ "$i" -eq "299" ]; then
                 error "Could not reach ${url}. Giving up."
