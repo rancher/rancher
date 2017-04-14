@@ -1,4 +1,4 @@
 #!/bin/bash
 
 exec 2>&1
-exec /usr/bin/graphite_exporter -graphite.mapping-config=/usr/share/cattle/metric-map.conf
+exec /usr/bin/graphite_exporter -graphite.mapping-config=/usr/share/cattle/metric-map.conf -graphite.mapping-strict-match
