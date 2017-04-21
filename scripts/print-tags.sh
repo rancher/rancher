@@ -35,3 +35,5 @@ while read -r l; do
 
 done < <(curl -s https://raw.githubusercontent.com/rancher/cattle/$CATTLE_VER/resources/content/cattle-global.properties)
 
+echo -e "\n\nCatalog item versions: (Pulling image may take several minutes)"
+docker run --rm -it rancher/server:$tag bash -c 'for i in /var/lib/cattle/cache/global/*; do git -C $i remote -vv; git -C $i rev-parse HEAD; for j in $i/infra-templates/*; do A=$(grep version $j/config.yml 2>/dev/null | cut -d" " -f2); echo $(basename $j): $A; for x in $(grep -Irl --exclude=config.yml $A $j 2>/dev/null); do grep -rh --include="docker-compose.*" -e "^[ \t]*image: " $(dirname $x) 2>/dev/null; done; done; echo -e "\n"; done' 2>/dev/null
