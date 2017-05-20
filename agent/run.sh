@@ -405,6 +405,22 @@ setup_cattle_url()
     export CATTLE_URL
 }
 
+function valid_ip()
+{
+    local  ip=$1
+    local  stat=1
+
+    if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+        OIFS=$IFS
+        IFS='.'
+        ip=($ip)
+        IFS=$OIFS
+        [[ ${ip[0]} -le 255 && ${ip[1]} -le 255 \
+            && ${ip[2]} -le 255 && ${ip[3]} -le 255 ]]
+        stat=$?
+    fi
+    return $stat
+}
 
 if [ "$#" == 0 ]; then
     error "One parameter required"
@@ -412,6 +428,12 @@ if [ "$#" == 0 ]; then
 fi
 
 if [[ $1 =~ http.* || $1 = "register" || $1 = "upgrade" ]]; then
+    if [ -n "$CATTLE_AGENT_IP" ]; then
+        if ! valid_ip $CATTLE_AGENT_IP; then
+            error "Invalid CATTLE_AGENT_IP (${CATTLE_AGENT_IP})"
+            exit 1
+        fi
+    fi
     echo $http_proxy $https_proxy
     setup_cattle_url $1
     if [ "$1" = "upgrade" ]; then
