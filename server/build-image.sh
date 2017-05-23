@@ -5,7 +5,7 @@ cd "$(dirname "$0")"
 
 if [ ! -e target/.done ]; then
     mkdir -p target
-    docker run -it -v "$(pwd)/target:/output" rancher/s6-builder:v0.1.0 /opt/build.sh
+    curl -sL -o target/s6-overlay-x86-static.tar.gz https://github.com/just-containers/s6-overlay/releases/download/v1.19.1.1/s6-overlay-x86.tar.gz
     touch target/.done
 fi
 

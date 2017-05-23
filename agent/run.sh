@@ -32,6 +32,15 @@ export CATTLE_HOME=${CATTLE_HOME:-/var/lib/cattle}
 
 check_debug
 
+MODULES="ansi_cprng
+drbg
+esp4
+veth
+xfrm4_mode_tunnel
+xfrm6_mode_tunnel
+xt_mark
+xt_nat"
+
 CONTAINER="$(hostname)"
 if [ "$1" = "run" ]; then
     CONTAINER="rancher-agent"
@@ -132,7 +141,7 @@ launch_agent()
     if [ "${CATTLE_VAR_LIB_WRITABLE}" = "true" ]; then
         opts="-v /var/lib/rancher:/var/lib/rancher"
     else
-        opts="-v /var/lib/rancher"
+        opts="-v rancher-agent-state:/var/lib/rancher"
     fi
 
     docker run \
@@ -142,6 +151,7 @@ launch_agent()
         --net=host \
         --pid=host \
         --privileged \
+        --oom-score-adj="-500" \
         -e CATTLE_AGENT_PIDNS=host \
         -e http_proxy \
 	 -e HTTP_PROXY \
@@ -149,6 +159,8 @@ launch_agent()
 	 -e HTTPS_PROXY \
         -e NO_PROXY \
         -e no_proxy \
+	 -e CATTLE_SCHEDULER_IPS \
+	 -e CATTLE_SCHEDULER_REQUIRE_ANY \
         -e CATTLE_PHYSICAL_HOST_UUID \
         -e CATTLE_DOCKER_UUID \
         -e CATTLE_SCRIPT_DEBUG \
@@ -164,6 +176,7 @@ launch_agent()
         -e CATTLE_MILLI_CPU_OVERRIDE \
         -e CATTLE_LOCAL_STORAGE_MB_OVERRIDE \
         -v /var/run/docker.sock:/var/run/docker.sock \
+        -v /var/run/rancher/storage:/var/run/rancher/storage \
         -v /lib/modules:/lib/modules:ro \
         -v /proc:/host/proc \
         -v /dev:/host/dev \
@@ -200,6 +213,10 @@ setup_state()
     docker run --privileged --net host --pid host -v /:/host --rm $RANCHER_AGENT_IMAGE -- /usr/bin/share-mnt /var/lib/rancher/volumes /var/lib/kubelet -- norun
 
     cp -f /usr/bin/r /.r/r || true
+
+    for m in $MODULES; do
+        modprobe $m >/dev/null 2>&1 || true
+    done
 }
 
 load()
@@ -317,7 +334,7 @@ inspect()
 {
     print_token
 
-    if lsb_release 2>/dev/null | grep -i boot2docker >/dev/null 2>&1; then
+    if docker info 2>/dev/null | grep -i boot2docker >/dev/null 2>&1; then
         info env "CATTLE_BOOT2DOCKER=true"
         info env "CATTLE_VAR_LIB_WRITABLE=false"
     else

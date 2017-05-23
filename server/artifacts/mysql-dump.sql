@@ -3717,7 +3717,7 @@ CREATE TABLE `volume` (
   `image_id` bigint(20) DEFAULT NULL,
   `offering_id` bigint(20) DEFAULT NULL,
   `zone_id` bigint(20) DEFAULT NULL,
-  `uri` varchar(512) DEFAULT NULL,
+  `uri` varchar(255) DEFAULT NULL,
   `external_id` varchar(128) DEFAULT NULL,
   `access_mode` varchar(255) DEFAULT NULL,
   `host_id` bigint(20) DEFAULT NULL,

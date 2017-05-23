@@ -1,15 +1,24 @@
-**Rancher Version:**
+**Rancher versions:**
+rancher/server:
+rancher/agent:
 
-**Docker Version:**
+**Infrastructure Stack versions:**
+healthcheck:
+ipsec:
+network-services:
+scheduler:
+kubernetes (if applicable):
 
-**OS and where are the hosts located? (cloud, bare metal, etc):**
+**Docker version: (`docker version`,`docker info` preferred)**
 
-**Setup Details: (single node rancher vs. HA rancher, internal DB vs. external DB)**
+**Operating system and kernel: (`cat /etc/os-release`, `uname -r` preferred)**
 
-**Environment Type: (Cattle/Kubernetes/Swarm/Mesos)**
+**Type/provider of hosts: (VirtualBox/Bare-metal/AWS/GCE/DO)**
+
+**Setup details: (single node rancher vs. HA rancher, internal DB vs. external DB)**
+
+**Environment Template: (Cattle/Kubernetes/Swarm/Mesos)**
 
 **Steps to Reproduce:**
 
-**Results:** 
-
-**Expected:**
+**Results:**

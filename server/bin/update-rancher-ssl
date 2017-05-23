@@ -1,13 +1,29 @@
 #!/bin/bash
 
-for i in /ca.crt /var/lib/rancher/etc/ssl/ca.crt; do
-    if [ -f $i ]; then
-        if [ ! -e "/usr/share/ca-certificates/rancher/ca.crt" ]; then
-            echo Adding ca.crt to Certs.
-            mkdir /usr/share/ca-certificates/rancher
-            cp $i /usr/share/ca-certificates/rancher/ca.crt
-            echo rancher/ca.crt >> /etc/ca-certificates.conf
-            update-ca-certificates
-        fi
+CA_ROOT="/var/lib/rancher/etc/ssl/ca.crt"
+JKS_STORE="/usr/lib/jvm/zulu-8-amd64/jre/lib/security/cacerts"
+
+JAVA_STORE_PASS=${JAVA_STORE_PASS:=changeit}
+
+if [ -f "$CA_ROOT" ]; then
+  if [ ! -e "/usr/share/ca-certificates/rancher/ca.crt" ]; then
+    echo Adding ca.crt to Certs.
+    mkdir /usr/share/ca-certificates/rancher
+    cp $CA_ROOT /usr/share/ca-certificates/rancher/ca.crt
+    echo rancher/ca.crt >> /etc/ca-certificates.conf
+    update-ca-certificates
+  fi
+
+  if [ -n "$CATTLE_RANCHER_SERVER_VERSION" ]; then 
+    # Remove the key if it exists
+    if keytool -list -keystore $JKS_STORE -alias rancher_ca -storepass $JAVA_STORE_PASS 2>&1 > /dev/null ; then
+        keytool -delete -alias rancher_ca -storepass $JAVA_STORE_PASS -keystore $JKS_STORE -noprompt
     fi
-done
+
+    # Then always add it back
+    keytool -import -trustcacerts \
+        -file $CA_ROOT -alias rancher_ca \
+        -keystore $JKS_STORE -storepass $JAVA_STORE_PASS \
+        -noprompt
+  fi
+fi

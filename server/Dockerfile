@@ -22,11 +22,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN cp /usr/lib/jvm/zulu-8-amd64/jre/lib/security/US_export_policy.jar /usr/lib/jvm/zulu-8-amd64/jre/lib/security/local_policy.jar
 
 COPY bin/* /usr/bin/
-RUN curl -sfL https://github.com/containous/traefik/releases/download/v1.1.0/traefik_linux-amd64 > /usr/bin/traefik \
-    && chmod +x /usr/bin/traefik
 
 ENV CATTLE_HOME /var/lib/cattle
-ENV DEFAULT_CATTLE_API_UI_INDEX //releases.rancher.com/ui/1.3.0
+ENV DEFAULT_CATTLE_API_UI_INDEX //releases.rancher.com/ui/1.6.3
 ENV CATTLE_API_UI_URL //releases.rancher.com/api-ui/1.0.8
 ENV CATTLE_DB_CATTLE_DATABASE mysql
 ENV CATTLE_USE_LOCAL_ARTIFACTS true
@@ -40,39 +38,35 @@ COPY target/*static.tar.gz /s6-statics/
 
 EXPOSE 8080
 ENV CATTLE_HOST_API_PROXY_MODE embedded
-ENV CATTLE_RANCHER_SERVER_VERSION v1.3.0-rc1
-ENV CATTLE_RANCHER_COMPOSE_VERSION v0.12.0
+ENV CATTLE_RANCHER_SERVER_VERSION v1.6.1-rc5
+ENV CATTLE_RANCHER_COMPOSE_VERSION v0.12.5
 ENV DEFAULT_CATTLE_RANCHER_COMPOSE_LINUX_URL   https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-linux-amd64-${CATTLE_RANCHER_COMPOSE_VERSION}.tar.gz
 ENV DEFAULT_CATTLE_RANCHER_COMPOSE_DARWIN_URL  https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-darwin-amd64-${CATTLE_RANCHER_COMPOSE_VERSION}.tar.gz
 ENV DEFAULT_CATTLE_RANCHER_COMPOSE_WINDOWS_URL https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-windows-386-${CATTLE_RANCHER_COMPOSE_VERSION}.zip
-ENV CATTLE_RANCHER_CLI_VERSION v0.4.0
+ENV CATTLE_RANCHER_CLI_VERSION v0.6.0
 ENV DEFAULT_CATTLE_RANCHER_CLI_LINUX_URL   https://releases.rancher.com/cli/${CATTLE_RANCHER_CLI_VERSION}/rancher-linux-amd64-${CATTLE_RANCHER_CLI_VERSION}.tar.gz
 ENV DEFAULT_CATTLE_RANCHER_CLI_DARWIN_URL  https://releases.rancher.com/cli/${CATTLE_RANCHER_CLI_VERSION}/rancher-darwin-amd64-${CATTLE_RANCHER_CLI_VERSION}.tar.gz
 ENV DEFAULT_CATTLE_RANCHER_CLI_WINDOWS_URL https://releases.rancher.com/cli/${CATTLE_RANCHER_CLI_VERSION}/rancher-windows-386-${CATTLE_RANCHER_CLI_VERSION}.zip
-#ENV DEFAULT_CATTLE_CATALOG_URL='{"catalogs":{"community":{"url":"https://git.rancher.io/community-catalog.git","branch":"master"},"library":{"url":"https://git.rancher.io/rancher-catalog.git","branch":"staging"}}}'
-ENV DEFAULT_CATTLE_CATALOG_URL=community=https://git.rancher.io/community-catalog.git,library=https://git.rancher.io/rancher-catalog.git
+ENV DEFAULT_CATTLE_CATALOG_URL='{"catalogs":{"community":{"url":"https://git.rancher.io/community-catalog.git","branch":"master"},"library":{"url":"https://git.rancher.io/rancher-catalog.git","branch":"v1.6.1-rc5"}}}'
 
 
 EXPOSE 3306
-ENV CATTLE_CATTLE_VERSION v0.175.0
+ENV CATTLE_CATTLE_VERSION v0.180.1
 ADD https://github.com/rancherio/cattle/releases/download/${CATTLE_CATTLE_VERSION}/cattle.jar /usr/share/cattle/
 
-RUN cd / && for i in $(ls /s6-statics/*static.tar.gz);do tar -zxvf $i;done && rm -rf /s6-statics/*static.tar.gz && \
+RUN cd / && for i in $(ls /s6-statics/*static.tar.gz);do tar -C /usr -zxvf $i;done && rm -rf /s6-statics/*static.tar.gz && \
     mkdir -p $CATTLE_HOME && \
     /usr/share/cattle/cattle.sh extract && \
     curl -sL https:${DEFAULT_CATTLE_API_UI_INDEX}.tar.gz | tar xvzf - -C /usr/share/cattle/war --strip-components=1 && \
     mkdir -p /usr/share/cattle/war/api-ui && \
     curl -sL https:${CATTLE_API_UI_URL}.tar.gz | tar xvzf - -C /usr/share/cattle/war/api-ui --strip-components=1 && \
     /usr/share/cattle/install_cattle_binaries && \
+    curl -sL https://github.com/prometheus/graphite_exporter/releases/download/v0.2.0/graphite_exporter-0.2.0.linux-amd64.tar.gz | tar -xzv -C /usr/bin/ --strip-components=1 && \
     cd $CATTLE_HOME && export IFS="," && \
-    if echo "$DEFAULT_CATTLE_CATALOG_URL" | grep -q '^{'; then \
-        echo "$DEFAULT_CATTLE_CATALOG_URL" > repo.json && \
-        cat repo.json && \
-        rancher-catalog-service -validate -configFile repo.json \
-    ;else \
-        for i in $DEFAULT_CATTLE_CATALOG_URL; do rancher-catalog-service -validate -catalogUrl=$i;done \
-    ;fi && \
-    for i in DATA/*; do [ -d $i ] && touch $i/.nopurge; done
+    echo "$DEFAULT_CATTLE_CATALOG_URL" > repo.json && \
+    cat repo.json && \
+    rancher-catalog-service-sqlite --sqlite --validate --config repo.json && \
+    for i in cache/*/*; do [ -d $i ] && touch $i/.nopurge; done
 
 VOLUME /var/lib/mysql /var/log/mysql /var/lib/cattle
 
@@ -83,6 +77,7 @@ ENV DEFAULT_CATTLE_COMPOSE_EXECUTOR_EXECUTE true
 ENV DEFAULT_CATTLE_CATALOG_EXECUTE true
 ENV DEFAULT_CATTLE_AUTH_SERVICE_EXECUTE true
 ENV DEFAULT_CATTLE_WEBHOOK_SERVICE_EXECUTE true
+ENV DEFAULT_CATTLE_SECRETS_API_EXECUTE true
 ENV CATTLE_RANCHER_SERVER_IMAGE rancher/server
 
 ENTRYPOINT ["/usr/bin/entry"]

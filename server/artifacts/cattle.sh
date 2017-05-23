@@ -36,6 +36,16 @@ setup_graphite()
     export CATTLE_GRAPHITE_PORT=${CATTLE_GRAPHITE_PORT:-$GRAPHITE_PORT_2003_TCP_PORT}
 }
 
+setup_prometheus()
+{
+    # Setup Prometheus Graphite exporter
+    if [ "${CATTLE_PROMETHEUS_EXPORTER}" == "true" ]; then
+        s6-svc -u ${S6_SERVICE_DIR}/graphite_exporter
+        export DEFAULT_CATTLE_GRAPHITE_HOST=127.0.0.1
+        export DEFAULT_CATTLE_GRAPHITE_PORT=9109
+    fi
+}
+
 setup_gelf()
 {
     # Setup GELF
@@ -163,6 +173,7 @@ setup_proxy()
 run() {
     setup_local_agents
     setup_graphite
+    setup_prometheus
     setup_gelf
     setup_mysql
     setup_redis
@@ -171,12 +182,10 @@ run() {
 
     env | grep CATTLE | grep -v PASS | sort
 
-    update-rancher-ssl
-
     local ram=$(free -g --si | awk '/^Mem:/{print $2}')
-    if [ ${ram} -gt 7 ]; then
+    if [ ${ram} -gt 6 ]; then
         MX="4g"
-    elif [ ${ram} -gt 3 ]; then
+    elif [ ${ram} -gt 2 ]; then
         MX="2g"
     else
         MX="1g"
@@ -231,27 +240,16 @@ master()
 
     mkdir -p /source
     cd /source
-    if [ ! -e cattle ]; then
-        git clone https://github.com/rancher/cattle
-        cd cattle
-    elif [ ! -e cattle/.manual ]; then
-        cd cattle
-        git fetch origin
-        git checkout master
-        git reset --hard origin/master
-        git clean -dxf
-    else
-        cd cattle
-    fi
+    get_source
 
+    cd cattle
     cattle-binary-pull ./resources/content/cattle-global.properties /usr/bin >/tmp/download.log 2>&1 &
+    cd ..
 
-    if [ ! -x "$(which mvn)" ]; then
-        apt-get update
-        apt-get install --no-install-recommends -y maven openjdk-7-jdk
-    fi
+    build_source
 
-    mvn package
+    cd cattle
+    ./mvnw package
     wait || {
         cat /tmp/download.log
         exit 1
@@ -259,6 +257,61 @@ master()
     JAR=$(readlink -f code/packaging/app/target/cattle-app-*.war)
     run
 }
+
+get_source()
+{
+    if [[ ! -e cattle || -e .cattle.default ]] && ! echo "$REPOS" | grep -q cattle; then
+        REPOS="$REPOS cattle"
+        touch .cattle.default
+    fi
+    for r in $REPOS; do
+        if ! [[ $r =~ ^http || $r =~ ^git ]]; then
+            r="https://github.com/rancher/$r"
+        fi
+        tag=$(echo $r | cut -f2 -d,)
+        r=$(echo $r | cut -f1 -d,)
+        d=$(echo $r | awk -F/ '{print $NF}' | cut -f1 -d.)
+        if [[ -z "$tag" || "$tag" = "$r" ]]; then
+            tag=origin/master
+        fi
+        if [ -e $d ]; then
+            git -C $d fetch origin
+            git -C $d reset --hard $tag
+        else
+            git clone $r $d
+            git -C $d checkout --detach $tag
+        fi
+    done
+}
+
+build_source()
+{
+    for i in *; do
+        if [[ ! -d $i || $i == cattle ]]; then
+            continue
+        fi
+
+        if [ ! -x "$(which make)" ]; then
+            apt-get update
+            apt-get install -y make
+        fi
+
+        if [ ! -x "$(which docker)" ]; then
+            curl -sLf https://get.docker.com/builds/Linux/x86_64/docker-1.10.3 > /usr/bin/docker
+            chmod +x /usr/bin/docker
+        fi
+
+        cd $i
+        make build 2>&1 | xargs -I{} echo $i '|' "{}"
+        ln -sf $(pwd)/bin/* /usr/local/bin/
+        if [ "$i" = "agent" ]; then
+            export CATTLE_AGENT_PACKAGE_PYTHON_AGENT_URL=$(pwd)
+        fi
+        cd ..
+    done
+}
+
+update-rancher-ssl
 
 if [ "$1" = "extract" ]; then
     extract
