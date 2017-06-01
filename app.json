@@ -1,0 +1,16 @@
+{
+  "name": "rancher",
+  "description": "Ggg",
+  "scripts": {
+  },
+  "env": {
+  },
+  "formation": {
+  },
+  "addons": [
+
+  ],
+  "buildpacks": [
+
+  ]
+}
