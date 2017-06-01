@@ -63,9 +63,9 @@ RUN cd / && for i in $(ls /s6-statics/*static.tar.gz);do tar -C /usr -zxvf $i;do
     mkdir -p /usr/share/cattle/war/api-ui && \
     curl -sL https:${CATTLE_API_UI_URL}.tar.gz | tar xvzf - -C /usr/share/cattle/war/api-ui --strip-components=1 && \
     /usr/share/cattle/install_cattle_binaries && \
-    curl -sL https://github.com/prometheus/graphite_exporter/releases/download/v0.2.0/graphite_exporter-0.2.0.linux-amd64.tar.gz | tar -xzv -C /usr/bin/ --strip-components=1 && \
-    cd $CATTLE_HOME && export IFS="," && \
-    echo "$DEFAULT_CATTLE_CATALOG_URL" > repo.json && \
+    curl -sL https://github.com/prometheus/graphite_exporter/releases/download/v0.2.0/graphite_exporter-0.2.0.linux-amd64.tar.gz | tar -xzv -C /usr/bin/ --strip-components=1
+RUN cd $CATTLE_HOME && \
+    echo "$DEFAULT_CATTLE_CATALOG_URL" | sed 's/${RELEASE}/'$(echo $CATTLE_RANCHER_SERVER_VERSION | sed -E 's/(v[0-9]+\.[0-9]+).*/\1-release/')/g > repo.json && \
     cat repo.json && \
     rancher-catalog-service-sqlite --sqlite --validate --config repo.json && \
     for i in cache/*/*; do [ -d $i ] && touch $i/.nopurge; done
