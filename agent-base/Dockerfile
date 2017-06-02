@@ -12,6 +12,7 @@ RUN apt-get update && \
         ethtool \
         iproute2 \
         iptables \
+        ipset \
         iputils-ping \
         jq \
         kmod \
