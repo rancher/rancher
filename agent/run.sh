@@ -329,18 +329,20 @@ wait_for()
     info "Attempting to connect to: ${url}"
     local err
     for ((i=0; i < 300; i++)); do
+      if ! curl -f -L -s ${CATTLE_URL} >/dev/null 2>&1; then
         err=$(check_url $url)
         if [[ $err ]]; then
-            error "${url} is not accessible (${err})"
-            sleep 2
-            if [ "$i" -eq "299" ]; then
-                error "Could not reach ${url}. Giving up."
-                exit 1
-            fi
-        else
-            info "${url} is accessible"
-            break
+          error "${url} is not accessible (${err})"
+          sleep 2
+          if [ "$i" -eq "299" ]; then
+            error "Could not reach ${url}. Giving up."
+            exit 1
+          fi
         fi
+      else
+        info "${url} is accessible"
+        break
+      fi
     done
 }
 
