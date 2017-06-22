@@ -314,7 +314,7 @@ read_rancher_agent_env()
 check_url()
 {
     local err
-    err=$(curl -f -L -sS --connect-timeout 15 -o /dev/null --stderr - $1 | head -n1 ; exit ${PIPESTATUS[0]})
+    err=$(curl -L -sS --connect-timeout 15 -o /dev/null --stderr - $1 | head -n1 ; exit ${PIPESTATUS[0]})
     if [ $? -eq 0 ]
     then
         echo ""
