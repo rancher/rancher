@@ -329,7 +329,7 @@ wait_for()
     info "Attempting to connect to: ${url}"
     local err
     for ((i=0; i < 300; i++)); do
-        err=$(check_url $url)
+        err=$(check_url $CATTLE_URL)
         if [[ $err ]]; then
             error "${url} is not accessible (${err})"
             sleep 2
