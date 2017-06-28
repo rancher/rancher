@@ -411,9 +411,9 @@ setup_cattle_url()
         CATTLE_URL="$1"
     fi
 
-    if echo $CATTLE_URL | grep -qE '127.0.0.1|localhost'; then
+    if echo $CATTLE_URL | grep -qE '127\.0\.0\.1|localhost'; then
         local gateway=$(docker run --rm --net=host $RANCHER_AGENT_IMAGE -- ip route get 8.8.8.8 | grep via | awk '{print $7}')
-        CATTLE_URL=$(echo $CATTLE_URL | sed -e 's/127.0.0.1/'$gateway'/' -e 's/localhost/'$gateway'/')
+        CATTLE_URL=$(echo $CATTLE_URL | sed -e 's/127\.0\.0\.1/'$gateway'/' -e 's/localhost/'$gateway'/')
     fi
 
     export CATTLE_URL
