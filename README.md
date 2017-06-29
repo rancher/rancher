@@ -21,8 +21,8 @@ Rancher is deployed as a set of Docker containers.  Running Rancher is as simple
 
 ### Requirements
 
-* [Supported Docker version](http://docs.rancher.com/rancher/v1.3/en/hosts/#supported-docker-versions)
-* Any modern Linux distribution with a [supported Docker version](http://docs.rancher.com/rancher/v1.3/en/hosts/#supported-docker-versions). (Ubuntu, RHEL/CentOS 7 are more heavily tested.) Rancher also works with [RancherOS](https://github.com/rancher/os).
+* [Supported Docker version](http://rancher.com/docs/rancher/v1.6/en/hosts/#supported-docker-versions)
+* Any modern Linux distribution with a [supported Docker version](http://rancher.com/docs/rancher/v1.6/en/hosts/#supported-docker-versions). (Ubuntu, RHEL/CentOS 7 are more heavily tested.) Rancher also works with [RancherOS](https://github.com/rancher/os).
 * RAM: 1GB+
 
 ### Launching Management Server
