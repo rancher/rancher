@@ -1,9 +1,9 @@
 #!/usr/bin/env python2.7
 
-# Requires git, python 2.7 and python addon module 'semver'
+# Requires git, python 2.7 and python modules 'PyYAML' and 'semver'
 # 
 # apt-get install git python-pip
-# pip install semver
+# pip install -r requirements.txt
 
 import argparse
 import os
