@@ -15,12 +15,17 @@ IMAGE=${REPO}:${TAG}
 
 docker build -t "${IMAGE}" .
 
+if [ -n "$REPOS" ]; then
+    REPOS_ENV="ENV REPOS=$REPOS"
+fi
+
 cat > Dockerfile.master << EOF
 FROM ${IMAGE}
 ENV CATTLE_MASTER true
+$REPOS_ENV
 EOF
 trap "rm Dockerfile.master" EXIT
 
 docker build -t "${REPO}:master" -f Dockerfile.master .
 
-echo Done building "${IMAGE}"
+echo -e "Done building:\n ${REPO}:master\n ${IMAGE}"
