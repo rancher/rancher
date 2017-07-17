@@ -18,11 +18,11 @@ RUN apt-get update && \
         openssl \
         psmisc \
         python2.7 \
+        python-cryptography \
         tcpdump \
         vim-tiny && \
     rm -rf /var/lib/apt/lists/* && \
     mkdir -p /var/lib/cattle /var/lib/rancher && \
-    ln -s /usr/bin/python2.7 /usr/bin/python && \
     curl -s https://bootstrap.pypa.io/get-pip.py | python2.7 && \
     pip install cattle && \
     curl -sL https://github.com/rancher/runc/releases/download/share-mnt-v0.2.1/share-mnt > /usr/bin/share-mnt && \
