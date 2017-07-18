@@ -15,10 +15,15 @@ import sys
 import uuid
 import yaml
 
-parser = argparse.ArgumentParser(
-    description='Prepare for an airgap Rancher installation.')
+description = """Computes Docker images required to run each infrastructure service for a
+specific Rancher version. This is valuable when preparing an air-gapped Rancher
+installation for the latest infrastructure services without legacy image bloat.
+"""
+
+parser = argparse.ArgumentParser(description=description)
+
 parser.add_argument('-v', '--version',
-                    default='v1.6.2',
+                    required=True,
                     help='Rancher Server version')
 args = parser.parse_args()
 
