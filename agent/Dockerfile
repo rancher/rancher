@@ -4,3 +4,4 @@ ENTRYPOINT ["/run.sh"]
 LABEL "io.rancher.container.system"="rancher-agent"
 RUN curl -sL https://github.com/rancher/share-mnt/releases/download/v1.0.0/share-mnt.tar.gz | tar xvzf - -C /usr/bin
 ENV RANCHER_AGENT_IMAGE rancher/agent:v1.2.5
+ENV HOST_DOCKER_SOCK /var/run/docker.sock
