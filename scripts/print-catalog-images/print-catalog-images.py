@@ -22,6 +22,11 @@ installation for the latest infrastructure services without legacy image bloat.
 
 parser = argparse.ArgumentParser(description=description)
 
+parser.add_argument('-u', '--url',
+                    default='https://git.rancher.io/rancher-catalog',
+                    help='Rancher catalog URL accessible in airgap environment')
+parser.add_argument('-b', '--branch',
+                    help='Rancher catalog branch accessible in airgap environment')
 parser.add_argument('-v', '--version',
                     required=True,
                     help='Rancher Server version')
@@ -149,17 +154,24 @@ def version_images(service_version_dir):
 
     return images
 
+
 version = args.version.lstrip('v')
-branch = get_catalog_branch(version)
+if args.branch is None:
+    args.branch = get_catalog_branch(version)
 
 print 'Rancher Version: ' + version
-print 'Catalog Branch: ' + branch
+print 'Catalog URL: ' + args.url
+print 'Catalog Branch: ' + args.branch
 print
 
 catalog_dir = str(uuid.uuid4())
-subprocess.call(["git", "clone", "https://git.rancher.io/rancher-catalog",
-                 "--quiet", "--single-branch", "--branch", branch,
-                 catalog_dir])
+try:
+    subprocess.check_call(["git", "clone", args.url,
+                           "--quiet", "--single-branch", "--branch", args.branch,
+                           catalog_dir])
+except subprocess.CalledProcessError:
+    sys.exit(1)
+
 
 infra_dir = catalog_dir + "/infra-templates"
 for infra_service in os.listdir(infra_dir):
