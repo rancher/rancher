@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
                     openssh-client \
                     iptables \
                     git \
+                    openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
 # In Zulu these two JAR files are built directly from OpenJDK source,
