@@ -56,14 +56,12 @@ ENV DEFAULT_CATTLE_RANCHER_CLI_WINDOWS_URL https://releases.rancher.com/cli/${CA
 EXPOSE 3306
 ADD https://github.com/rancherio/cattle/releases/download/${CATTLE_CATTLE_VERSION}/cattle.jar /usr/share/cattle/
 
-RUN cd / && for i in $(ls /s6-statics/*static.tar.gz);do tar -C /usr -zxvf $i;done && rm -rf /s6-statics/*static.tar.gz && \
-    mkdir -p $CATTLE_HOME && \
-    /usr/share/cattle/cattle.sh extract && \
-    curl -sL https:${DEFAULT_CATTLE_API_UI_INDEX}.tar.gz | tar xvzf - -C /usr/share/cattle/war --strip-components=1 && \
-    mkdir -p /usr/share/cattle/war/api-ui && \
-    curl -sL https:${CATTLE_API_UI_URL}.tar.gz | tar xvzf - -C /usr/share/cattle/war/api-ui --strip-components=1 && \
-    /usr/share/cattle/install_cattle_binaries && \
-    curl -sL https://github.com/prometheus/graphite_exporter/releases/download/v0.2.0/graphite_exporter-0.2.0.linux-amd64.tar.gz | tar -xzv -C /usr/bin/ --strip-components=1
+RUN curl -sL https://github.com/prometheus/graphite_exporter/releases/download/v0.2.0/graphite_exporter-0.2.0.linux-amd64.tar.gz | tar -xzv -C /usr/bin/ --strip-components=1
+RUN cd / && for i in $(ls /s6-statics/*static.tar.gz);do tar -C /usr -zxvf $i;done && rm -rf /s6-statics/*static.tar.gz
+RUN mkdir -p $CATTLE_HOME && /usr/share/cattle/cattle.sh extract
+RUN curl -sL https:${DEFAULT_CATTLE_API_UI_INDEX}.tar.gz | tar xvzf - -C /usr/share/cattle/war --strip-components=1
+RUN mkdir -p /usr/share/cattle/war/api-ui && curl -sL https:${CATTLE_API_UI_URL}.tar.gz | tar xvzf - -C /usr/share/cattle/war/api-ui --strip-components=1
+RUN /usr/share/cattle/install_cattle_binaries
 RUN cd $CATTLE_HOME && \
     echo "$DEFAULT_CATTLE_CATALOG_URL" | sed 's/${RELEASE}/'$(echo $CATTLE_RANCHER_SERVER_VERSION | sed -E 's/(v[0-9]+\.[0-9]+).*/\1-release/')/g > repo.json && \
     cat repo.json && \
