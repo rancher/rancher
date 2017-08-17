@@ -39,7 +39,8 @@ veth
 xfrm4_mode_tunnel
 xfrm6_mode_tunnel
 xt_mark
-xt_nat"
+xt_nat
+vxlan"
 
 CONTAINER="$(hostname)"
 if [ "$1" = "run" ]; then
