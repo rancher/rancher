@@ -216,7 +216,7 @@ setup_state()
     cp -f /usr/bin/r /.r/r || true
 
     for m in $MODULES; do
-        modprobe $m >/dev/null 2>&1 || true
+        nsenter -m -t 1 /sbin/modprobe $m >/dev/null 2>&1 || true
     done
 }
 
