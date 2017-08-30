@@ -291,6 +291,7 @@ run_bootstrap()
     if [ "$CATTLE_EXEC_AGENT" = "true" ]; then
         exec bash $SCRIPT "$@"
     else
+        cat $SCRIPT
         bash $SCRIPT "$@"
     fi
 }
