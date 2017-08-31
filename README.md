@@ -15,6 +15,7 @@ To get automated notifications of our latest release, you can watch the announce
 Rancher is deployed as a set of Docker containers.  Running Rancher is as simple as launching two containers.  One container as the management server and another container on a node as an agent.  You can install the containers in following approaches.
 
 * [Manually](#launching-management-server)
+* [Terraform](https://github.com/rancher/terraform-modules)
 * [Puppet](https://github.com/nickschuch/puppet-rancher) (Thanks @nickschuch)
 * [Ansible](https://github.com/joshuacox/ansibleplaybook-rancher)
 * [SaltStack](https://github.com/komljen/rancher-salt)
