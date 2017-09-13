@@ -19,6 +19,7 @@ Rancher is deployed as a set of Docker containers.  Running Rancher is as simple
 * [Puppet](https://github.com/nickschuch/puppet-rancher) (Thanks @nickschuch)
 * [Ansible](https://github.com/joshuacox/ansibleplaybook-rancher)
 * [SaltStack](https://github.com/komljen/rancher-salt)
+* [Chef](https://supermarket.chef.io/cookbooks/rancher-ng)
 
 ### Requirements
 
