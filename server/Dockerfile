@@ -1,4 +1,4 @@
-FROM azul/zulu-openjdk:8u72
+FROM azul/zulu-openjdk:8u144
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \

@@ -102,6 +102,11 @@ if [ "$(grep /var/lib/mysql /proc/mounts|cut -d' ' -f3)" = "vboxsf" ]; then
     chown -R mysql /var/log/mysql
 fi
 
+if [ ! -d /var/run/mysqld ]; then
+  mkdir -p /var/run/mysqld
+  chown mysql:mysql /var/run/mysqld
+fi
+
 if [ ! -d "${DATADIR}/mysql" ]; then
     init_new_data_dir
 fi
