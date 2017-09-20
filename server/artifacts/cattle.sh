@@ -1,24 +1,12 @@
 #!/bin/bash
-set -e
+set -e -x
 
 cd /var/lib/cattle
 
-JAR=/usr/share/cattle/cattle.jar
-HASH=$(md5sum $JAR | awk '{print $1}')
-DEBUG_JAR=/var/lib/cattle/lib/cattle-debug.jar
+SCRIPT=/usr/share/cattle/bin/cattle
+HASH=$(md5sum $SCRIPT | awk '{print $1}')
 LOG_DIR=/var/lib/cattle/logs
 export S6_SERVICE_DIR=${S6_SERVICE_DIR:-$S6_SERVICE_DIR}
-
-if [ "$URL" != "" ]
-then
-    echo Downloading $URL
-    curl -sLf $URL > cattle-download.jar
-    JAR=cattle-download.jar
-fi
-
-if [ -e $DEBUG_JAR ]; then
-    JAR=$DEBUG_JAR
-fi
 
 setup_local_agents()
 {
@@ -77,76 +65,6 @@ setup_mysql()
     fi
 }
 
-setup_redis()
-{
-    local hosts=""
-    local i=1
-
-    while [ -n "$(eval echo \$REDIS${i}_PORT_6379_TCP_ADDR)" ]; do
-        local host="$(eval echo \$REDIS${i}_PORT_6379_TCP_ADDR:\$REDIS${i}_PORT_6379_TCP_PORT)"
-
-        if [ -n "$hosts" ]; then
-            hosts="$hosts,$host"
-        else
-            hosts="$host"
-        fi
-
-        i=$((i+1))
-    done
-
-    if [ -n "$hosts" ]; then
-        export CATTLE_REDIS_HOSTS=${CATTLE_REDIS_HOSTS:-$hosts}
-    fi
-
-    if [ -n "$CATTLE_REDIS_HOSTS" ]; then
-        export CATTLE_MODULE_PROFILE_REDIS=true
-    fi
-}
-
-setup_zk()
-{
-    local hosts=""
-    local i=1
-
-    while [ -n "$(eval echo \$ZK${i}_PORT_2181_TCP_ADDR)" ]; do
-        local host="$(eval echo \$ZK${i}_PORT_2181_TCP_ADDR:\$ZK${i}_PORT_2181_TCP_PORT)"
-
-        if [ -n "$hosts" ]; then
-            hosts="$hosts,$host"
-        else
-            hosts="$host"
-        fi
-
-        i=$((i+1))
-    done
-
-    if [ -n "$hosts" ]; then
-        export CATTLE_ZOOKEEPER_CONNECTION_STRING=${CATTLE_ZOOKEEPER_CONNECTION_STRING:-$hosts}
-    fi
-
-    if [ -n "$CATTLE_ZOOKEEPER_CONNECTION_STRING" ]; then
-        export CATTLE_MODULE_PROFILE_ZOOKEEPER=true
-    fi
-
-    if [ -n "$CATTLE_ZOOKEEPER_CONNECTION_STRING" ]; then
-        local ok=false
-        for ((i=0; i<=30; i++)); do
-            local host="$(echo $CATTLE_ZOOKEEPER_CONNECTION_STRING | cut -f1 -d, | cut -f1 -d:)"
-            local port="$(echo $CATTLE_ZOOKEEPER_CONNECTION_STRING | cut -f1 -d, | cut -f2 -d:)"
-            echo Waiting for Zookeeper at ${host}:${port}
-            if [ "$(echo ruok | nc $host $port)" == "imok" ]; then
-                ok=true
-                break
-            fi
-            sleep 2
-        done
-        if [ "$ok" != "true" ]; then
-            echo Failed waiting for Zookeeper at ${host}:${port}
-            return 1
-        fi
-    fi
-}
-
 setup_proxy()
 {
     if [ -n "$http_proxy" ]; then
@@ -176,8 +94,6 @@ run() {
     setup_prometheus
     setup_gelf
     setup_mysql
-    setup_redis
-    setup_zk
     setup_proxy
 
     env | grep CATTLE | grep -v PASS | sort
@@ -191,29 +107,10 @@ run() {
         MX="1g"
     fi
 
-    HASH_PATH=$(dirname $JAR)/$HASH
-    if [ -e $HASH_PATH ]; then
-        if [ -e $HASH_PATH/index.html ]; then
-            export DEFAULT_CATTLE_API_UI_INDEX=local
-        fi
-        exec java ${CATTLE_JAVA_OPTS:--XX:+UseConcMarkSweepGC -XX:+CMSClassUnloadingEnabled -Xms128m -Xmx${MX} -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR} -Dlogback.bootstrap.level=WARN $PROXY_ARGS $JAVA_OPTS -cp ${HASH_PATH}:${HASH_PATH}/etc/cattle io.cattle.platform.launcher.Main "$@" $ARGS
-    else
-        unset DEFAULT_CATTLE_API_UI_JS_URL
-        unset DEFAULT_CATTLE_API_UI_CSS_URL
-        exec java ${CATTLE_JAVA_OPTS:--XX:+UseConcMarkSweepGC -XX:+CMSClassUnloadingEnabled -Xms128m -Xmx${MX} -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR} $PROXY_ARGS $JAVA_OPTS -jar $JAR "$@" $ARGS
-    fi
-}
-
-extract()
-{
-    cd $(dirname $JAR)
-    java -jar $JAR war
-    mkdir $HASH
-    ln -s $HASH war
-    cd war
-    unzip ../*.war
-    unzip $JAR etc\*
-    rm ../*.war
+    unset DEFAULT_CATTLE_API_UI_JS_URL
+    unset DEFAULT_CATTLE_API_UI_CSS_URL
+    export JAVA_OPTS="${CATTLE_JAVA_OPTS:--XX:+UseConcMarkSweepGC -XX:+CMSClassUnloadingEnabled -Xms128m -Xmx${MX} -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR} $PROXY_ARGS $JAVA_OPTS"
+    exec $SCRIPT "$@" $ARGS
 }
 
 master()
@@ -243,18 +140,18 @@ master()
     get_source
 
     cd cattle
-    cattle-binary-pull ./resources/content/cattle-global.properties /usr/bin >/tmp/download.log 2>&1 &
+    cattle-binary-pull ./modules/resources/src/main/resources/cattle-global.properties /usr/bin >/tmp/download.log 2>&1 &
     cd ..
 
     build_source
 
     cd cattle
-    ./mvnw package
-    wait || {
-        cat /tmp/download.log
-        exit 1
-    }
-    JAR=$(readlink -f code/packaging/app/target/cattle-app-*.war)
+    ./gradlew distZip
+    EXTRACT=$(mktemp -d)
+    ZIP=$(readlink -f modules/main/build/distributions/cattle*.zip)
+    cd $EXTRACT
+    unzip $ZIP
+    SCRIPT=$(readlink -f */bin/cattle)
     run
 }
 
@@ -313,9 +210,7 @@ build_source()
 
 update-rancher-ssl
 
-if [ "$1" = "extract" ]; then
-    extract
-elif [ "$CATTLE_MASTER" = true ]; then
+if [ "$CATTLE_MASTER" = true ]; then
     master
 else
     run

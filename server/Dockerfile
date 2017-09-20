@@ -1,4 +1,4 @@
-FROM azul/zulu-openjdk:8u72
+FROM azul/zulu-openjdk:8u144
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -39,30 +39,28 @@ EXPOSE 8080
 ENV CATTLE_HOST_API_PROXY_MODE embedded
 
 # Environment variables commonly updated when performing a release
-ENV CATTLE_RANCHER_SERVER_VERSION v1.6.10
-ENV DEFAULT_CATTLE_API_UI_INDEX //releases.rancher.com/ui/1.6.23
-ENV CATTLE_CATTLE_VERSION v0.183.22
-ENV CATTLE_RANCHER_CLI_VERSION v0.6.4
-ENV CATTLE_RANCHER_COMPOSE_VERSION v0.12.5
-ENV DEFAULT_CATTLE_CATALOG_URL='{"catalogs":{"community":{"url":"https://git.rancher.io/community-catalog.git","branch":"master"},"library":{"url":"https://git.rancher.io/rancher-catalog.git","branch":"${RELEASE}"}}}'
+ENV CATTLE_RANCHER_SERVER_VERSION v2.0.0-alpha1
+ENV DEFAULT_CATTLE_API_UI_INDEX //releases.rancher.com/ui/1.6.17
+ENV CATTLE_CATTLE_VERSION v0.184.0
+ENV CATTLE_RANCHER_CLI_VERSION v0.6.3
+#ENV DEFAULT_CATTLE_CATALOG_URL='{"catalogs":{"community":{"url":"https://git.rancher.io/community-catalog.git","branch":"master"},"library":{"url":"https://git.rancher.io/rancher-catalog.git","branch":"${RELEASE}"}}}'
+ENV DEFAULT_CATTLE_CATALOG_URL='{"catalogs":{"community":{"url":"https://git.rancher.io/community-catalog.git","branch":"master"},"library":{"url":"https://github.com/rancher/rancher-catalog.git","branch":"v2.0-development"}}}'
 
-ENV DEFAULT_CATTLE_RANCHER_COMPOSE_LINUX_URL   https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-linux-amd64-${CATTLE_RANCHER_COMPOSE_VERSION}.tar.gz
-ENV DEFAULT_CATTLE_RANCHER_COMPOSE_DARWIN_URL  https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-darwin-amd64-${CATTLE_RANCHER_COMPOSE_VERSION}.tar.gz
-ENV DEFAULT_CATTLE_RANCHER_COMPOSE_WINDOWS_URL https://releases.rancher.com/compose/${CATTLE_RANCHER_COMPOSE_VERSION}/rancher-compose-windows-386-${CATTLE_RANCHER_COMPOSE_VERSION}.zip
 ENV DEFAULT_CATTLE_RANCHER_CLI_LINUX_URL   https://releases.rancher.com/cli/${CATTLE_RANCHER_CLI_VERSION}/rancher-linux-amd64-${CATTLE_RANCHER_CLI_VERSION}.tar.gz
 ENV DEFAULT_CATTLE_RANCHER_CLI_DARWIN_URL  https://releases.rancher.com/cli/${CATTLE_RANCHER_CLI_VERSION}/rancher-darwin-amd64-${CATTLE_RANCHER_CLI_VERSION}.tar.gz
 ENV DEFAULT_CATTLE_RANCHER_CLI_WINDOWS_URL https://releases.rancher.com/cli/${CATTLE_RANCHER_CLI_VERSION}/rancher-windows-386-${CATTLE_RANCHER_CLI_VERSION}.zip
 
 EXPOSE 3306
-ADD https://github.com/rancherio/cattle/releases/download/${CATTLE_CATTLE_VERSION}/cattle.jar /usr/share/cattle/
+RUN curl -sfL https://github.com/rancherio/cattle/releases/download/${CATTLE_CATTLE_VERSION}/cattle-${CATTLE_CATTLE_VERSION}.tar.gz | tar xvzf - -C /usr/share/cattle/ --strip-components=1
 
 RUN cd / && for i in $(ls /s6-statics/*static.tar.gz);do tar -C /usr -zxvf $i;done && rm -rf /s6-statics/*static.tar.gz && \
     mkdir -p $CATTLE_HOME && \
-    /usr/share/cattle/cattle.sh extract && \
-    curl -sL https:${DEFAULT_CATTLE_API_UI_INDEX}.tar.gz | tar xvzf - -C /usr/share/cattle/war --strip-components=1 && \
-    mkdir -p /usr/share/cattle/war/api-ui && \
-    curl -sL https:${CATTLE_API_UI_URL}.tar.gz | tar xvzf - -C /usr/share/cattle/war/api-ui --strip-components=1 && \
-    /usr/share/cattle/install_cattle_binaries && \
+    mkdir -p /usr/share/cattle/ui/api-ui && \
+    curl -sL https:${DEFAULT_CATTLE_API_UI_INDEX}.tar.gz | tar xvzf - -C /usr/share/cattle/ui --strip-components=1 && \
+    curl -sL https:${CATTLE_API_UI_URL}.tar.gz | tar xvzf - -C /usr/share/cattle/ui/api-ui --strip-components=1 && \
+    jar xvf /usr/share/cattle/lib/cattle-resources-${CATTLE_CATTLE_VERSION}.jar cattle-global.properties && \
+    bash -x /usr/share/cattle/install_cattle_binaries && \
+    rm cattle-global.properties && \
     curl -sL https://github.com/prometheus/graphite_exporter/releases/download/v0.2.0/graphite_exporter-0.2.0.linux-amd64.tar.gz | tar -xzv -C /usr/bin/ --strip-components=1
 RUN cd $CATTLE_HOME && \
     echo "$DEFAULT_CATTLE_CATALOG_URL" | sed 's/${RELEASE}/'$(echo $CATTLE_RANCHER_SERVER_VERSION | sed -E 's/(v[0-9]+\.[0-9]+).*/\1-release/')/g > repo.json && \
@@ -80,7 +78,11 @@ ENV DEFAULT_CATTLE_CATALOG_EXECUTE true
 ENV DEFAULT_CATTLE_AUTH_SERVICE_EXECUTE true
 ENV DEFAULT_CATTLE_WEBHOOK_SERVICE_EXECUTE true
 ENV DEFAULT_CATTLE_SECRETS_API_EXECUTE true
+ENV DEFAULT_CATTLE_NETES_AGENT_EXECUTE true
+ENV DEFAULT_CATTLE_NETES_EXECUTE true
 ENV CATTLE_RANCHER_SERVER_IMAGE rancher/server
 
 ENTRYPOINT ["/usr/bin/entry"]
 CMD ["/usr/bin/s6-svscan", "/service"]
+
+ENV REPOS "netes-agent"
