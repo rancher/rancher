@@ -1,0 +1,3 @@
+#!/bin/bash
+
+su-exec postgres /usr/bin/postgres -D /var/lib/pgsql/9.6

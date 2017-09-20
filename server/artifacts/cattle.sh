@@ -56,25 +56,49 @@ setup_gelf()
     fi
 }
 
-setup_mysql()
+setup_db()
 {
-    # Set in the Dockerfile by default... overriden by runtime.
-    if [ ${CATTLE_DB_CATTLE_DATABASE} == "mysql" ]; then
-        export CATTLE_DB_CATTLE_MYSQL_HOST=${CATTLE_DB_CATTLE_MYSQL_HOST:-$MYSQL_PORT_3306_TCP_ADDR}
-        export CATTLE_DB_CATTLE_MYSQL_PORT=${CATTLE_DB_CATTLE_MYSQL_PORT:-$MYSQL_PORT_3306_TCP_PORT}
-        export CATTLE_DB_CATTLE_USERNAME=${CATTLE_DB_CATTLE_USERNAME:-cattle}
-        export CATTLE_DB_CATTLE_PASSWORD=${CATTLE_DB_CATTLE_PASSWORD:-cattle}
-        export CATTLE_DB_CATTLE_MYSQL_NAME=${CATTLE_DB_CATTLE_MYSQL_NAME:-cattle}
+    case ${CATTLE_DB_CATTLE_DATABASE} in
 
-        if [ -z "$CATTLE_DB_CATTLE_MYSQL_HOST" ]; then
-            export CATTLE_DB_CATTLE_MYSQL_HOST="localhost"
-            /usr/share/cattle/mysql.sh
-        fi
+        mysql )
+            export CATTLE_DB_CATTLE_MYSQL_HOST=${CATTLE_DB_CATTLE_MYSQL_HOST:-$MYSQL_PORT_3306_TCP_ADDR}
+            export CATTLE_DB_CATTLE_MYSQL_PORT=${CATTLE_DB_CATTLE_MYSQL_PORT:-$MYSQL_PORT_3306_TCP_PORT}
+            export CATTLE_DB_CATTLE_USERNAME=${CATTLE_DB_CATTLE_USERNAME:-cattle}
+            export CATTLE_DB_CATTLE_PASSWORD=${CATTLE_DB_CATTLE_PASSWORD:-cattle}
+            export CATTLE_DB_CATTLE_MYSQL_NAME=${CATTLE_DB_CATTLE_MYSQL_NAME:-cattle}
 
-        if [ -z "$CATTLE_DB_CATTLE_MYSQL_PORT" ]; then
-            CATTLE_DB_CATTLE_MYSQL_PORT=3306
-        fi
-    fi
+            if [ -z "$CATTLE_DB_CATTLE_MYSQL_HOST" ]; then
+                export CATTLE_DB_CATTLE_MYSQL_HOST="localhost"
+                /usr/share/cattle/mysql.sh
+            fi
+
+            if [ -z "$CATTLE_DB_CATTLE_MYSQL_PORT" ]; then
+                CATTLE_DB_CATTLE_MYSQL_PORT=3306
+            fi
+            ;;
+
+        postgres )
+            export CATTLE_DB_CATTLE_POSTGRES_HOST=${CATTLE_DB_CATTLE_POSTGRES_HOST:-$POSTGRES_PORT_5432_TCP_ADDR}
+            export CATTLE_DB_CATTLE_POSTGRES_PORT=${CATTLE_DB_CATTLE_POSTGRES_PORT:-$POSTGRES_PORT_5432_TCP_PORT}
+            export CATTLE_DB_CATTLE_USERNAME=${CATTLE_DB_CATTLE_USERNAME:-cattle}
+            export CATTLE_DB_CATTLE_PASSWORD=${CATTLE_DB_CATTLE_PASSWORD:-cattle}
+            export CATTLE_DB_CATTLE_POSTGRES_NAME=${CATTLE_DB_CATTLE_POSTGRES_NAME:-cattle}
+
+            if [ -z "$CATTLE_DB_CATTLE_POSTGRES_HOST" ]; then
+                export CATTLE_DB_CATTLE_POSTGRES_HOST="localhost"
+                /usr/share/cattle/pgsql.sh
+            fi
+
+            if [ -z "$CATTLE_DB_CATTLE_POSTGRES_PORT" ]; then
+                CATTLE_DB_CATTLE_POSTGRES_PORT=5432
+            fi
+            ;;
+
+        * )
+            echo Unsupported database specified
+            exit 1
+            ;;
+    esac
 }
 
 setup_redis()
@@ -175,7 +199,7 @@ run() {
     setup_graphite
     setup_prometheus
     setup_gelf
-    setup_mysql
+    setup_db
     setup_redis
     setup_zk
     setup_proxy
