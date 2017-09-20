@@ -216,7 +216,7 @@ extract()
     rm ../*.war
 }
 
-master()
+from_source()
 {
     unset CATTLE_API_UI_URL
     unset CATTLE_CATTLE_VERSION
@@ -226,6 +226,7 @@ master()
     unset DEFAULT_CATTLE_API_UI_CSS_URL
     unset DEFAULT_CATTLE_API_UI_INDEX
     unset DEFAULT_CATTLE_API_UI_JS_URL
+    unset DEFAULT_CATTLE_CATALOG_URL
 
     export HASH=none
     export CATTLE_IDEMPOTENT_CHECKS=false
@@ -240,7 +241,7 @@ master()
 
     mkdir -p /source
     cd /source
-    get_source
+    get_source $1
 
     cd cattle
     cattle-binary-pull ./resources/content/cattle-global.properties /usr/bin >/tmp/download.log 2>&1 &
@@ -261,7 +262,7 @@ master()
 get_source()
 {
     if [[ ! -e cattle || -e .cattle.default ]] && ! echo "$REPOS" | grep -q cattle; then
-        REPOS="$REPOS cattle"
+        REPOS="$REPOS cattle,$1"
         touch .cattle.default
     fi
     for r in $REPOS; do
@@ -315,8 +316,8 @@ update-rancher-ssl
 
 if [ "$1" = "extract" ]; then
     extract
-elif [ "$CATTLE_MASTER" = true ]; then
-    master
+elif [ -n "$CATTLE_BRANCH" ]; then
+    from_source $CATTLE_BRANCH
 else
     run
 fi

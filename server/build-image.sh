@@ -1,6 +1,19 @@
 #!/bin/bash
 set -e
 
+build_from_source_image() {
+    local branch=$1
+    local version=$2
+
+    cat > Dockerfile.$version << EOF
+FROM ${IMAGE}
+ENV CATTLE_BRANCH origin/$branch
+EOF
+
+    docker build -t "${REPO}:$version" -f Dockerfile.$version .
+    rm Dockerfile.$version
+}
+
 cd "$(dirname "$0")"
 
 if [ ! -e target/.done ]; then
@@ -15,12 +28,7 @@ IMAGE=${REPO}:${TAG}
 
 docker build -t "${IMAGE}" .
 
-cat > Dockerfile.master << EOF
-FROM ${IMAGE}
-ENV CATTLE_MASTER true
-EOF
-trap "rm Dockerfile.master" EXIT
+build_from_source_image master master
+build_from_source_image v1.6 v1.6-dev
 
-docker build -t "${REPO}:master" -f Dockerfile.master .
-
-echo Done building "${IMAGE}"
+echo -e "Done building:\n ${REPO}:master\n ${REPO}:v1.6-dev\n ${IMAGE}"
