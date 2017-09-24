@@ -40,11 +40,10 @@ ENV CATTLE_HOST_API_PROXY_MODE embedded
 
 # Environment variables commonly updated when performing a release
 ENV CATTLE_RANCHER_SERVER_VERSION v2.0.0-alpha1
-ENV DEFAULT_CATTLE_API_UI_INDEX //releases.rancher.com/ui/1.6.17
-ENV CATTLE_CATTLE_VERSION v0.184.0
-ENV CATTLE_RANCHER_CLI_VERSION v0.6.3
-#ENV DEFAULT_CATTLE_CATALOG_URL='{"catalogs":{"community":{"url":"https://git.rancher.io/community-catalog.git","branch":"master"},"library":{"url":"https://git.rancher.io/rancher-catalog.git","branch":"${RELEASE}"}}}'
-ENV DEFAULT_CATTLE_CATALOG_URL='{"catalogs":{"community":{"url":"https://git.rancher.io/community-catalog.git","branch":"master"},"library":{"url":"https://github.com/rancher/rancher-catalog.git","branch":"v2.0-development"}}}'
+ENV DEFAULT_CATTLE_API_UI_INDEX //releases.rancher.com/ui/2.0.2
+ENV CATTLE_CATTLE_VERSION v0.184.1
+ENV CATTLE_RANCHER_CLI_VERSION v1.0.0-alpha2
+ENV DEFAULT_CATTLE_CATALOG_URL='{"catalogs":{"community":{"url":"https://git.rancher.io/community-catalog.git","branch":"${RELEASE}"},"library":{"url":"https://git.rancher.io/rancher-catalog.git","branch":"${RELEASE}"}}}'
 
 ENV DEFAULT_CATTLE_RANCHER_CLI_LINUX_URL   https://releases.rancher.com/cli/${CATTLE_RANCHER_CLI_VERSION}/rancher-linux-amd64-${CATTLE_RANCHER_CLI_VERSION}.tar.gz
 ENV DEFAULT_CATTLE_RANCHER_CLI_DARWIN_URL  https://releases.rancher.com/cli/${CATTLE_RANCHER_CLI_VERSION}/rancher-darwin-amd64-${CATTLE_RANCHER_CLI_VERSION}.tar.gz
@@ -87,5 +86,3 @@ ENV CATTLE_RANCHER_SERVER_IMAGE rancher/server
 
 ENTRYPOINT ["/usr/bin/entry"]
 CMD ["/usr/bin/s6-svscan", "/service"]
-
-ENV REPOS "netes-agent"
