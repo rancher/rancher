@@ -176,6 +176,7 @@ launch_agent()
         -e CATTLE_MEMORY_OVERRIDE \
         -e CATTLE_MILLI_CPU_OVERRIDE \
         -e CATTLE_LOCAL_STORAGE_MB_OVERRIDE \
+        -e CATTLE_DETECT_CLOUD_PROVIDER \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -v /var/run/rancher/storage:/var/run/rancher/storage \
         -v /lib/modules:/lib/modules:ro \
