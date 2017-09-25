@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e -x
+set -e
 
 cd /var/lib/cattle
 
