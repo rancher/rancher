@@ -10,8 +10,9 @@ export CA_CERT_FILE="/var/lib/rancher/etc/ssl/ca.crt"
 # make it in common and then copy here
 check_debug()
 {
-    if [ -n "$CATTLE_SCRIPT_DEBUG" ] || echo "${@}" | grep -q -- --debug; then
+    if [ -n "$CATTLE_SCRIPT_DEBUG" ] || [ -n "$RANCHER_DEBUG" ] || echo "${@}" | grep -q -- --debug; then
         export CATTLE_SCRIPT_DEBUG=true
+        export RANCHER_DEBUG=true
         export PS4='[${BASH_SOURCE##*/}:${LINENO}] '
         set -x
     fi
@@ -155,13 +156,13 @@ launch_agent()
         --oom-score-adj="-500" \
         -e CATTLE_AGENT_PIDNS=host \
         -e http_proxy \
-	 -e HTTP_PROXY \
+        -e HTTP_PROXY \
         -e https_proxy \
-	 -e HTTPS_PROXY \
+        -e HTTPS_PROXY \
         -e NO_PROXY \
         -e no_proxy \
-	 -e CATTLE_SCHEDULER_IPS \
-	 -e CATTLE_SCHEDULER_REQUIRE_ANY \
+        -e CATTLE_SCHEDULER_IPS \
+        -e CATTLE_SCHEDULER_REQUIRE_ANY \
         -e CATTLE_PHYSICAL_HOST_UUID \
         -e CATTLE_DOCKER_UUID \
         -e CATTLE_SCRIPT_DEBUG \
@@ -177,6 +178,7 @@ launch_agent()
         -e CATTLE_MILLI_CPU_OVERRIDE \
         -e CATTLE_LOCAL_STORAGE_MB_OVERRIDE \
         -e CATTLE_DETECT_CLOUD_PROVIDER \
+        -e RANCHER_DEBUG \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -v /var/run/rancher/storage:/var/run/rancher/storage \
         -v /lib/modules:/lib/modules:ro \
