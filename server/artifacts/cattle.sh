@@ -107,8 +107,6 @@ run() {
         MX="1g"
     fi
 
-    unset DEFAULT_CATTLE_API_UI_JS_URL
-    unset DEFAULT_CATTLE_API_UI_CSS_URL
     export JAVA_OPTS="${CATTLE_JAVA_OPTS:--XX:+UseConcMarkSweepGC -XX:+CMSClassUnloadingEnabled -Xms128m -Xmx${MX} -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR} $PROXY_ARGS $JAVA_OPTS"
     exec $SCRIPT "$@" $ARGS
 }

@@ -24,7 +24,7 @@ RUN cp /usr/lib/jvm/zulu-8-amd64/jre/lib/security/US_export_policy.jar /usr/lib/
 COPY bin/* /usr/bin/
 
 ENV CATTLE_HOME /var/lib/cattle
-ENV CATTLE_API_UI_URL //releases.rancher.com/api-ui/1.0.8
+ENV CATTLE_API_UI_URL //releases.rancher.com/api-ui/1.1.0
 ENV CATTLE_DB_CATTLE_DATABASE mysql
 ENV CATTLE_USE_LOCAL_ARTIFACTS true
 ENV no_proxy localhost,127.0.0.1,localaddress,.localdomain.com
@@ -54,9 +54,9 @@ RUN curl -sfL https://github.com/rancherio/cattle/releases/download/${CATTLE_CAT
 
 RUN cd / && for i in $(ls /s6-statics/*static.tar.gz);do tar -C /usr -zxvf $i;done && rm -rf /s6-statics/*static.tar.gz && \
     mkdir -p $CATTLE_HOME && \
-    mkdir -p /usr/share/cattle/ui/api-ui && \
-    curl -sL https:${DEFAULT_CATTLE_API_UI_INDEX}.tar.gz | tar xvzf - -C /usr/share/cattle/ui --strip-components=1 && \
-    curl -sL https:${CATTLE_API_UI_URL}.tar.gz | tar xvzf - -C /usr/share/cattle/ui/api-ui --strip-components=1 && \
+    mkdir -p /var/lib/cattle/api-ui && \
+    curl -sL https:${DEFAULT_CATTLE_API_UI_INDEX}.tar.gz | tar xvzf - -C /var/lib/cattle --strip-components=1 && \
+    curl -sL https:${CATTLE_API_UI_URL}.tar.gz | tar xvzf - -C /var/lib/cattle/api-ui --strip-components=1 && \
     jar xvf /usr/share/cattle/lib/cattle-resources-${CATTLE_CATTLE_VERSION}.jar cattle-global.properties && \
     bash -x /usr/share/cattle/install_cattle_binaries && \
     rm cattle-global.properties && \
@@ -72,6 +72,7 @@ RUN chmod +x /usr/bin/kubectl
 
 VOLUME /var/lib/mysql /var/log/mysql /var/lib/cattle
 
+ENV DEFAULT_CATTLE_API_UI_INDEX local
 ENV DEFAULT_CATTLE_API_UI_JS_URL /api-ui/ui.min.js
 ENV DEFAULT_CATTLE_API_UI_CSS_URL /api-ui/ui.min.css
 ENV DEFAULT_CATTLE_MACHINE_EXECUTE true
