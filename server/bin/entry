@@ -1,5 +1,9 @@
 #!/bin/bash
 
+set -e
+
+export STRICT_ENFORCING=false
+
 usage()
 {
     cat << EOF
@@ -21,6 +25,9 @@ Options:
    --db-user               username for MySQL login (default: cattle)
    --db-pass               password for MySQL login (default: cattle)
    --db-name               MySQL database name to use (default: cattle)
+   --db-strict-enforcing   If MySQL DB is strict enforcing pre-create the DATABASECHANGELOG table with PK.
+                           This requires all --db-* options to be passed to the script, or CATTLE_DB_* env
+                           vars to be set at the container level.
 
 Clustering Options:
    --advertise-address     IP Address to which other servers will connect for full active/active HA.
@@ -64,6 +71,10 @@ while [ "$#" -gt 0 ]; do
             shift 1
             export CATTLE_DB_CATTLE_MYSQL_NAME=$1
             ;;
+        --db-strict-enforcing)
+            # Do not shift... last shift will remove.
+            STRICT_ENFORCING=true
+            ;;
         --advertise-address)
             shift 1
             export CATTLE_MODULE_PROFILE_HAZELCAST_LOCK=true
@@ -95,6 +106,11 @@ while [ "$#" -gt 0 ]; do
 
     shift 1
 done
+
+
+if [ "${STRICT_ENFORCING}" = "true" ];then
+   mysql-strict-sql-setup.sh
+fi
 
 if [ "$#" = 0 ]; then
     exec /usr/bin/s6-svscan /service
