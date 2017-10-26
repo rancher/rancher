@@ -423,6 +423,20 @@ setup_cattle_url()
     export CATTLE_URL
 }
 
+validate_ip() {
+        local ip=$1
+        # Format should match an IP (filters pasting http://192.168.0.10 for example)
+        [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]] || return 1
+        local -a oc=(${ip//\./ })
+        # Check if all octects are <= 255
+        [[ ${oc[0]} -le 255 && ${oc[1]} -le 255 && ${oc[2]} -le 255 && ${oc[3]} -le 255 ]] || return 1
+        # Filter loopback (127.0.0.0/8)
+        [[ ${oc[0]} -ne 127 ]] || return 1
+        # Filter 0.0.0.0 and 255.255.255.255
+        [ $ip != '0.0.0.0' ] || return 1
+        [ $ip != '255.255.255.255' ] || return 1
+        return 0
+}
 
 if [ "$#" == 0 ]; then
     error "One parameter required"
@@ -430,6 +444,12 @@ if [ "$#" == 0 ]; then
 fi
 
 if [[ $1 =~ http.* || $1 = "register" || $1 = "upgrade" ]]; then
+    if [ -n "$CATTLE_AGENT_IP" ]; then
+        if ! validate_ip $CATTLE_AGENT_IP; then
+            error "Invalid CATTLE_AGENT_IP (${CATTLE_AGENT_IP})"
+            exit 1
+        fi
+    fi
     echo $http_proxy $https_proxy
     setup_cattle_url $1
     if [ "$1" = "upgrade" ]; then
