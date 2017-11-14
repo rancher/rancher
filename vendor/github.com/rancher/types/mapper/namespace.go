@@ -1,0 +1,39 @@
+package mapper
+
+import (
+	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/mapper"
+)
+
+type NamespaceIDMapper struct {
+	Move *mapper.Move
+}
+
+func (n *NamespaceIDMapper) FromInternal(data map[string]interface{}) {
+	if n.Move != nil {
+		n.Move.FromInternal(data)
+	}
+}
+
+func (n *NamespaceIDMapper) ToInternal(data map[string]interface{}) {
+	if n.Move != nil {
+		n.Move.ToInternal(data)
+	}
+}
+
+func (n *NamespaceIDMapper) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {
+	field, ok := schema.ResourceFields["namespace"]
+	if !ok {
+		return nil
+	}
+
+	field.Type = "reference[namespace]"
+	schema.ResourceFields["namespace"] = field
+
+	n.Move = &mapper.Move{
+		From: "namespace",
+		To:   "namespaceId",
+	}
+
+	return n.Move.ModifySchema(schema, schemas)
+}

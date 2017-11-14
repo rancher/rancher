@@ -1,0 +1,6 @@
+/.dapper
+/bin
+/dist
+*.swp
+/.trash-cache
+admin.config

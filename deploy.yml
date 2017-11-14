@@ -1,0 +1,19 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: cattle
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: cattle
+    spec:
+      containers:
+      - image: rancher/cattle:master
+        imagePullPolicy: Always
+        name: cattle
+        ports:
+        - containerPort: 1234
+          hostPort: 1234
+          protocol: TCP
