@@ -4,7 +4,7 @@ Rancher is an open source project that provides a complete platform for operatin
 
 ## Latest Release
 
-* Beta - v1.6.10 - `rancher/server:latest` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v1.6.10).
+* Beta - v1.6.11 - `rancher/server:latest` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v1.6.11).
 
 * Stable - v1.6.10 - `rancher/server:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v1.6.10).
 
