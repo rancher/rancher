@@ -67,8 +67,8 @@ RUN cd $CATTLE_HOME && \
     rancher-catalog-service-sqlite --sqlite --validate --config repo.json && \
     for i in cache/*/*; do [ -d $i ] && touch $i/.nopurge; done
 
-RUN curl -L https://storage.googleapis.com/kubernetes-release/release/v1.7.0/bin/linux/amd64/kubectl > /usr/bin/kubectl
-RUN chmod +x /usr/bin/kubectl
+RUN curl -L https://storage.googleapis.com/kubernetes-release/release/v1.7.0/bin/linux/amd64/kubectl > /usr/bin/kubectl && \
+    chmod +x /usr/bin/kubectl
 
 VOLUME /var/lib/mysql /var/log/mysql /var/lib/cattle
 
