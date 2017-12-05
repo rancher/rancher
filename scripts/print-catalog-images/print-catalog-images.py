@@ -126,9 +126,17 @@ def version_images(service_version_dir):
     compose_tpl_filepath = service_version_dir + "/docker-compose.yml.tpl"
 
     filedata = ''
+    templatevalues = {}
     if os.path.isfile(compose_tpl_filepath):
         with open(compose_tpl_filepath, 'r') as f:
             filedata = f.read()
+            for line in filedata.splitlines():
+                  match = re.search( r'(\$.*?):="(.*?)"', line)
+                  if match:
+                      key, value = match.groups()
+		      templatevalues[key] = value
+            for k, v in templatevalues.iteritems():
+                filedata = re.sub(r'{{' + re.escape(k) + '}}', v, filedata)
             filedata, subs = re.subn('{{[^}]*}}', '', filedata)
     elif os.path.isfile(compose_filepath):
         with open(compose_filepath, 'r') as f:
