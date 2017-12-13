@@ -12,6 +12,10 @@ A microservice that does micro things.
 
 `./bin/rancher`
 
+From K8s
+
+`kubectl apply -f deploy.xml`
+
 ## License
 Copyright (c) 2014-2017 [Rancher Labs, Inc.](http://rancher.com)
 
