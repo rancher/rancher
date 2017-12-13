@@ -147,6 +147,7 @@ type URLBuilder interface {
 	ReverseSort(order SortOrder) string
 	Sort(field string) string
 	SetSubContext(subContext string)
+	FilterLink(schema *Schema, fieldName string, value string) string
 }
 
 type Store interface {

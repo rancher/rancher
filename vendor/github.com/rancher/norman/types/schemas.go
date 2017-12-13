@@ -7,6 +7,7 @@ import (
 
 	"github.com/rancher/norman/name"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/norman/types/definition"
 )
 
 type SchemaCollection struct {
@@ -17,10 +18,16 @@ type SchemaInitFunc func(*Schemas) *Schemas
 
 type MappersFactory func() []Mapper
 
+type BackReference struct {
+	FieldName string
+	Schema    *Schema
+}
+
 type Schemas struct {
 	schemasByPath       map[string]map[string]*Schema
 	schemasBySubContext map[string]*Schema
 	mappers             map[string]map[string][]Mapper
+	references          map[string][]BackReference
 	DefaultMappers      MappersFactory
 	DefaultPostMappers  MappersFactory
 	versions            []APIVersion
@@ -33,6 +40,7 @@ func NewSchemas() *Schemas {
 		schemasByPath:       map[string]map[string]*Schema{},
 		schemasBySubContext: map[string]*Schema{},
 		mappers:             map[string]map[string][]Mapper{},
+		references:          map[string][]BackReference{},
 	}
 }
 
@@ -92,6 +100,22 @@ func (s *Schemas) AddSchema(schema Schema) *Schemas {
 	if _, ok := schemas[schema.ID]; !ok {
 		schemas[schema.ID] = &schema
 		s.schemas = append(s.schemas, &schema)
+
+		for name, field := range schema.ResourceFields {
+			if !definition.IsReferenceType(field.Type) {
+				continue
+			}
+
+			refType := definition.SubType(field.Type)
+			if !strings.HasPrefix(refType, "/") {
+				refType = convert.ToFullReference(schema.Version.Path, refType)
+			}
+
+			s.references[refType] = append(s.references[refType], BackReference{
+				FieldName: name,
+				Schema:    &schema,
+			})
+		}
 	}
 
 	if schema.SubContext != "" {
@@ -99,6 +123,11 @@ func (s *Schemas) AddSchema(schema Schema) *Schemas {
 	}
 
 	return s
+}
+
+func (s *Schemas) References(schema *Schema) []BackReference {
+	refType := convert.ToFullReference(schema.Version.Path, schema.ID)
+	return s.references[refType]
 }
 
 func (s *Schemas) AddMapper(version *APIVersion, schemaID string, mapper Mapper) *Schemas {

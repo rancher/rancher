@@ -50,7 +50,7 @@ func DefaultURLParser(schemas *types.Schemas, url *url.URL) (ParsedURL, error) {
 	path = multiSlashRegexp.ReplaceAllString(path, "/")
 
 	parts := strings.SplitN(path[len(version.Path):], "/", 4)
-	prefix, parts, subContext := parseSubContext(version, parts)
+	prefix, parts, subContext := parseSubContext(schemas, version, parts)
 
 	result.Version = version.Path
 	result.SubContext = subContext
@@ -139,7 +139,7 @@ func Parse(rw http.ResponseWriter, req *http.Request, schemas *types.Schemas, ur
 	return result, nil
 }
 
-func parseSubContext(version *types.APIVersion, parts []string) (string, []string, map[string]string) {
+func parseSubContext(schemas *types.Schemas, version *types.APIVersion, parts []string) (string, []string, map[string]string) {
 	subContext := ""
 	result := map[string]string{}
 
@@ -148,6 +148,11 @@ func parseSubContext(version *types.APIVersion, parts []string) (string, []strin
 		resourceID := parts[2]
 
 		if !version.SubContexts[resourceType] {
+			break
+		}
+
+		subSchema := schemas.Schema(version, parts[3])
+		if subSchema == nil {
 			break
 		}
 

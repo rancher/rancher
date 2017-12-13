@@ -7,9 +7,10 @@ import (
 const (
 	ClusterEventType                 = "clusterEvent"
 	ClusterEventFieldAnnotations     = "annotations"
-	ClusterEventFieldClusterName     = "clusterName"
+	ClusterEventFieldClusterId       = "clusterId"
 	ClusterEventFieldCount           = "count"
 	ClusterEventFieldCreated         = "created"
+	ClusterEventFieldEventType       = "eventType"
 	ClusterEventFieldFinalizers      = "finalizers"
 	ClusterEventFieldFirstTimestamp  = "firstTimestamp"
 	ClusterEventFieldInvolvedObject  = "involvedObject"
@@ -22,16 +23,16 @@ const (
 	ClusterEventFieldRemoved         = "removed"
 	ClusterEventFieldResourcePath    = "resourcePath"
 	ClusterEventFieldSource          = "source"
-	ClusterEventFieldType            = "type"
 	ClusterEventFieldUuid            = "uuid"
 )
 
 type ClusterEvent struct {
 	types.Resource
 	Annotations     map[string]string `json:"annotations,omitempty"`
-	ClusterName     string            `json:"clusterName,omitempty"`
+	ClusterId       string            `json:"clusterId,omitempty"`
 	Count           *int64            `json:"count,omitempty"`
 	Created         string            `json:"created,omitempty"`
+	EventType       string            `json:"eventType,omitempty"`
 	Finalizers      []string          `json:"finalizers,omitempty"`
 	FirstTimestamp  string            `json:"firstTimestamp,omitempty"`
 	InvolvedObject  *ObjectReference  `json:"involvedObject,omitempty"`
@@ -44,7 +45,6 @@ type ClusterEvent struct {
 	Removed         string            `json:"removed,omitempty"`
 	ResourcePath    string            `json:"resourcePath,omitempty"`
 	Source          *EventSource      `json:"source,omitempty"`
-	Type            string            `json:"type,omitempty"`
 	Uuid            string            `json:"uuid,omitempty"`
 }
 type ClusterEventCollection struct {

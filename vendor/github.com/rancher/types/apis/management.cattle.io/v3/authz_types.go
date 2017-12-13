@@ -14,8 +14,9 @@ type Project struct {
 }
 
 type ProjectSpec struct {
-	DisplayName string `json:"displayName,omitempty" norman:"required"`
-	ClusterName string `json:"clusterName,omitempty" norman:"required,type=reference[cluster]"`
+	DisplayName                   string `json:"displayName,omitempty" norman:"required"`
+	ClusterName                   string `json:"clusterName,omitempty" norman:"required,type=reference[cluster]"`
+	PodSecurityPolicyTemplateName string `json:"podSecurityPolicyTemplateName,omitempty" norman:"type=reference[podSecurityPolicyTemplate]"`
 }
 
 type RoleTemplate struct {
@@ -25,8 +26,7 @@ type RoleTemplate struct {
 	Rules   []rbacv1.PolicyRule `json:"rules,omitempty"`
 	Builtin bool                `json:"builtin"`
 
-	RoleTemplateNames              []string `json:"roleTemplateNames,omitempty" norman:"type=array[reference[roleTemplate]]"`
-	PodSecurityPolicyTemplateNames []string `json:"podSecurityPolicyTemplateNames,omitempty" norman:"type=array[reference[podSecurityPolicyTemplate]]"`
+	RoleTemplateNames []string `json:"roleTemplateNames,omitempty" norman:"type=array[reference[roleTemplate]]"`
 }
 
 type PodSecurityPolicyTemplate struct {

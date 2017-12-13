@@ -233,6 +233,7 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 		).
 		AddMapperForType(&Version, v1.ContainerPort{},
 			m.Drop{Field: "name"},
+			m.Move{From: "hostIP", To: "hostIp"},
 		).
 		AddMapperForType(&Version, v1.VolumeMount{},
 			m.Enum{

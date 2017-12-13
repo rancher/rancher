@@ -3,7 +3,6 @@ package builtin
 import (
 	"github.com/rancher/norman/store/empty"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/norman/types/convert"
 )
 
 func APIRootFormatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -21,52 +20,11 @@ func APIRootFormatter(apiContext *types.APIContext, resource *types.RawResource)
 
 	resource.Links["self"] = apiContext.URLBuilder.Version(apiVersion)
 
-	if len(apiVersion.SubContexts) > 0 {
-		subContextToSchema := apiContext.Schemas.SubContextSchemas()
-		if len(subContextToSchema) > 0 {
-			for _, schema := range subContextToSchema {
-				addCollectionLink(apiContext, schema, resource.Links)
-			}
-
-			for _, schema := range getNonReferencedSchemas(apiContext.Schemas.SchemasForVersion(apiVersion),
-				subContextToSchema) {
-				addCollectionLink(apiContext, schema, resource.Links)
-			}
-
-			return
-		}
-	}
-
 	for _, schema := range apiContext.Schemas.SchemasForVersion(apiVersion) {
 		addCollectionLink(apiContext, schema, resource.Links)
 	}
 
 	return
-}
-
-func getNonReferencedSchemas(schemas map[string]*types.Schema, subContexts map[string]*types.Schema) []*types.Schema {
-	var result []*types.Schema
-	typeNames := map[string]bool{}
-
-	for _, subContext := range subContexts {
-		ref := convert.ToReference(subContext.ID)
-		fullRef := convert.ToFullReference(subContext.Version.Path, subContext.ID)
-		typeNames[ref] = true
-		typeNames[fullRef] = true
-	}
-
-outer:
-	for _, schema := range schemas {
-		for _, field := range schema.ResourceFields {
-			if typeNames[field.Type] {
-				continue outer
-			}
-		}
-
-		result = append(result, schema)
-	}
-
-	return result
 }
 
 func addCollectionLink(apiContext *types.APIContext, schema *types.Schema, links map[string]string) {
