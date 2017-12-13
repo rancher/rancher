@@ -5,37 +5,35 @@ import (
 )
 
 const (
-	RoleTemplateType                              = "roleTemplate"
-	RoleTemplateFieldAnnotations                  = "annotations"
-	RoleTemplateFieldBuiltin                      = "builtin"
-	RoleTemplateFieldCreated                      = "created"
-	RoleTemplateFieldFinalizers                   = "finalizers"
-	RoleTemplateFieldLabels                       = "labels"
-	RoleTemplateFieldName                         = "name"
-	RoleTemplateFieldOwnerReferences              = "ownerReferences"
-	RoleTemplateFieldPodSecurityPolicyTemplateIds = "podSecurityPolicyTemplateIds"
-	RoleTemplateFieldRemoved                      = "removed"
-	RoleTemplateFieldResourcePath                 = "resourcePath"
-	RoleTemplateFieldRoleTemplateIds              = "roleTemplateIds"
-	RoleTemplateFieldRules                        = "rules"
-	RoleTemplateFieldUuid                         = "uuid"
+	RoleTemplateType                 = "roleTemplate"
+	RoleTemplateFieldAnnotations     = "annotations"
+	RoleTemplateFieldBuiltin         = "builtin"
+	RoleTemplateFieldCreated         = "created"
+	RoleTemplateFieldFinalizers      = "finalizers"
+	RoleTemplateFieldLabels          = "labels"
+	RoleTemplateFieldName            = "name"
+	RoleTemplateFieldOwnerReferences = "ownerReferences"
+	RoleTemplateFieldRemoved         = "removed"
+	RoleTemplateFieldResourcePath    = "resourcePath"
+	RoleTemplateFieldRoleTemplateIds = "roleTemplateIds"
+	RoleTemplateFieldRules           = "rules"
+	RoleTemplateFieldUuid            = "uuid"
 )
 
 type RoleTemplate struct {
 	types.Resource
-	Annotations                  map[string]string `json:"annotations,omitempty"`
-	Builtin                      *bool             `json:"builtin,omitempty"`
-	Created                      string            `json:"created,omitempty"`
-	Finalizers                   []string          `json:"finalizers,omitempty"`
-	Labels                       map[string]string `json:"labels,omitempty"`
-	Name                         string            `json:"name,omitempty"`
-	OwnerReferences              []OwnerReference  `json:"ownerReferences,omitempty"`
-	PodSecurityPolicyTemplateIds []string          `json:"podSecurityPolicyTemplateIds,omitempty"`
-	Removed                      string            `json:"removed,omitempty"`
-	ResourcePath                 string            `json:"resourcePath,omitempty"`
-	RoleTemplateIds              []string          `json:"roleTemplateIds,omitempty"`
-	Rules                        []PolicyRule      `json:"rules,omitempty"`
-	Uuid                         string            `json:"uuid,omitempty"`
+	Annotations     map[string]string `json:"annotations,omitempty"`
+	Builtin         *bool             `json:"builtin,omitempty"`
+	Created         string            `json:"created,omitempty"`
+	Finalizers      []string          `json:"finalizers,omitempty"`
+	Labels          map[string]string `json:"labels,omitempty"`
+	Name            string            `json:"name,omitempty"`
+	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
+	Removed         string            `json:"removed,omitempty"`
+	ResourcePath    string            `json:"resourcePath,omitempty"`
+	RoleTemplateIds []string          `json:"roleTemplateIds,omitempty"`
+	Rules           []PolicyRule      `json:"rules,omitempty"`
+	Uuid            string            `json:"uuid,omitempty"`
 }
 type RoleTemplateCollection struct {
 	types.Collection

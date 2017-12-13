@@ -129,6 +129,11 @@ func (u *urlBuilder) Version(version types.APIVersion) string {
 	return u.constructBasicURL(version)
 }
 
+func (u *urlBuilder) FilterLink(schema *types.Schema, fieldName string, value string) string {
+	return u.constructBasicURL(schema.Version, schema.PluralName) + "?" +
+		url.QueryEscape(fieldName) + "=" + url.QueryEscape(value)
+}
+
 func (u *urlBuilder) constructBasicURL(version types.APIVersion, parts ...string) string {
 	buffer := bytes.Buffer{}
 

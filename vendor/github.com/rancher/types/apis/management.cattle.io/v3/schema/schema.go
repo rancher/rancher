@@ -14,6 +14,9 @@ var (
 		Version: "v3",
 		Group:   "management.cattle.io",
 		Path:    "/v3",
+		SubContexts: map[string]bool{
+			"clusters": true,
+		},
 	}
 
 	Schemas = factory.Schemas(&Version).
@@ -71,7 +74,13 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 		AddMapperForType(&Version, v3.ClusterStatus{},
 			m.Drop{"appliedSpec"},
 		).
-		MustImport(&Version, v3.Cluster{}).
+		AddMapperForType(&Version, v3.ClusterEvent{}, &m.Move{
+			From: "type",
+			To:   "eventType",
+		}).
+		MustImportAndCustomize(&Version, v3.Cluster{}, func(schema *types.Schema) {
+			schema.SubContext = "clusters"
+		}).
 		MustImport(&Version, v3.ClusterEvent{}).
 		MustImport(&Version, v3.ClusterRegistrationToken{})
 }

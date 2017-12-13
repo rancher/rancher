@@ -37,7 +37,7 @@ type GroupMember struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	GroupName  string `json:"groupName,omitempty" norman:"type=reference[/v3/schemas/group]"`
+	GroupName  string `json:"groupName,omitempty" norman:"type=reference[group]"`
 	ExternalID string `json:"externalId,omitempty"`
 }
 
@@ -57,9 +57,6 @@ type Identity struct {
 
 //LoginInput structure defines all properties that can be sent by client to create a token
 type LoginInput struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
 	TTLMillis                string           `json:"ttl,omitempty"`
 	IdentityRefreshTTLMillis string           `json:"identityRefreshTTL,omitempty"`
 	Description              string           `json:"description,omitempty"`
@@ -70,17 +67,11 @@ type LoginInput struct {
 
 //LocalCredential stores the local auth creds
 type LocalCredential struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
 //GithubCredential stores the github auth creds
 type GithubCredential struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
 	Code string `json:"code"`
 }

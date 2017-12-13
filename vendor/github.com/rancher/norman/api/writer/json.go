@@ -121,14 +121,24 @@ func (j *JSONResponseWriter) convert(b *builder.Builder, context *types.APIConte
 }
 
 func (j *JSONResponseWriter) addLinks(b *builder.Builder, schema *types.Schema, context *types.APIContext, input map[string]interface{}, rawResource *types.RawResource) {
-	if rawResource.ID != "" {
-		self := context.URLBuilder.ResourceLink(rawResource)
-		rawResource.Links["self"] = self
-		if schema.CanUpdate() {
-			rawResource.Links["update"] = self
-		}
-		if schema.CanDelete() {
-			rawResource.Links["remove"] = self
+	if rawResource.ID == "" {
+		return
+	}
+
+	self := context.URLBuilder.ResourceLink(rawResource)
+	rawResource.Links["self"] = self
+	if schema.CanUpdate() {
+		rawResource.Links["update"] = self
+	}
+	if schema.CanDelete() {
+		rawResource.Links["remove"] = self
+	}
+
+	for _, backRef := range context.Schemas.References(schema) {
+		if schema.SubContext == "" {
+			rawResource.Links[backRef.Schema.PluralName] = context.URLBuilder.FilterLink(backRef.Schema, backRef.FieldName, rawResource.ID)
+		} else {
+			rawResource.Links[backRef.Schema.PluralName] = context.URLBuilder.SubContextCollection(schema, rawResource.ID, backRef.Schema)
 		}
 	}
 }

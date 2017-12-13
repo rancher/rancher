@@ -5,33 +5,35 @@ import (
 )
 
 const (
-	ProjectType                 = "project"
-	ProjectFieldAnnotations     = "annotations"
-	ProjectFieldClusterId       = "clusterId"
-	ProjectFieldCreated         = "created"
-	ProjectFieldFinalizers      = "finalizers"
-	ProjectFieldId              = "id"
-	ProjectFieldLabels          = "labels"
-	ProjectFieldName            = "name"
-	ProjectFieldOwnerReferences = "ownerReferences"
-	ProjectFieldRemoved         = "removed"
-	ProjectFieldResourcePath    = "resourcePath"
-	ProjectFieldUuid            = "uuid"
+	ProjectType                             = "project"
+	ProjectFieldAnnotations                 = "annotations"
+	ProjectFieldClusterId                   = "clusterId"
+	ProjectFieldCreated                     = "created"
+	ProjectFieldFinalizers                  = "finalizers"
+	ProjectFieldId                          = "id"
+	ProjectFieldLabels                      = "labels"
+	ProjectFieldName                        = "name"
+	ProjectFieldOwnerReferences             = "ownerReferences"
+	ProjectFieldPodSecurityPolicyTemplateId = "podSecurityPolicyTemplateId"
+	ProjectFieldRemoved                     = "removed"
+	ProjectFieldResourcePath                = "resourcePath"
+	ProjectFieldUuid                        = "uuid"
 )
 
 type Project struct {
 	types.Resource
-	Annotations     map[string]string `json:"annotations,omitempty"`
-	ClusterId       string            `json:"clusterId,omitempty"`
-	Created         string            `json:"created,omitempty"`
-	Finalizers      []string          `json:"finalizers,omitempty"`
-	Id              string            `json:"id,omitempty"`
-	Labels          map[string]string `json:"labels,omitempty"`
-	Name            string            `json:"name,omitempty"`
-	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
-	Removed         string            `json:"removed,omitempty"`
-	ResourcePath    string            `json:"resourcePath,omitempty"`
-	Uuid            string            `json:"uuid,omitempty"`
+	Annotations                 map[string]string `json:"annotations,omitempty"`
+	ClusterId                   string            `json:"clusterId,omitempty"`
+	Created                     string            `json:"created,omitempty"`
+	Finalizers                  []string          `json:"finalizers,omitempty"`
+	Id                          string            `json:"id,omitempty"`
+	Labels                      map[string]string `json:"labels,omitempty"`
+	Name                        string            `json:"name,omitempty"`
+	OwnerReferences             []OwnerReference  `json:"ownerReferences,omitempty"`
+	PodSecurityPolicyTemplateId string            `json:"podSecurityPolicyTemplateId,omitempty"`
+	Removed                     string            `json:"removed,omitempty"`
+	ResourcePath                string            `json:"resourcePath,omitempty"`
+	Uuid                        string            `json:"uuid,omitempty"`
 }
 type ProjectCollection struct {
 	types.Collection
