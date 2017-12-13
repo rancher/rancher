@@ -18,7 +18,7 @@ fi
 
 cp ../bin/rancher .
 
-IMAGE=${REPO}/rancher:${TAG}
+IMAGE=${REPO}/cattle:${TAG}
 docker build -t ${IMAGE} .
 echo ${IMAGE} > ../dist/images
 echo Built ${IMAGE}
