@@ -94,7 +94,7 @@ func saveClusterCerts(kubeClient *kubernetes.Clientset, crts map[string]pki.Cert
 			return fmt.Errorf("Failed to save certificate [%s] to kubernetes: %v", crtName, err)
 		}
 	}
-	logrus.Infof("[certificates] Successfuly saved certificates as kubernetes secret [%s]", pki.CertificatesSecretName)
+	logrus.Infof("[certificates] Successfully saved certificates as kubernetes secret [%s]", pki.CertificatesSecretName)
 	return nil
 }
 

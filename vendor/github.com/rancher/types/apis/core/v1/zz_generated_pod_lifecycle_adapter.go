@@ -7,25 +7,37 @@ import (
 )
 
 type PodLifecycle interface {
-	Create(obj *v1.Pod) error
-	Remove(obj *v1.Pod) error
-	Updated(obj *v1.Pod) error
+	Create(obj *v1.Pod) (*v1.Pod, error)
+	Remove(obj *v1.Pod) (*v1.Pod, error)
+	Updated(obj *v1.Pod) (*v1.Pod, error)
 }
 
 type podLifecycleAdapter struct {
 	lifecycle PodLifecycle
 }
 
-func (w *podLifecycleAdapter) Create(obj runtime.Object) error {
-	return w.lifecycle.Create(obj.(*v1.Pod))
+func (w *podLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Create(obj.(*v1.Pod))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *podLifecycleAdapter) Finalize(obj runtime.Object) error {
-	return w.lifecycle.Remove(obj.(*v1.Pod))
+func (w *podLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Remove(obj.(*v1.Pod))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *podLifecycleAdapter) Updated(obj runtime.Object) error {
-	return w.lifecycle.Updated(obj.(*v1.Pod))
+func (w *podLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Updated(obj.(*v1.Pod))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
 func NewPodLifecycleAdapter(name string, client PodInterface, l PodLifecycle) PodHandlerFunc {

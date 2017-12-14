@@ -13,9 +13,9 @@ var (
 )
 
 type ObjectLifecycle interface {
-	Create(obj runtime.Object) error
-	Finalize(obj runtime.Object) error
-	Updated(obj runtime.Object) error
+	Create(obj runtime.Object) (runtime.Object, error)
+	Finalize(obj runtime.Object) (runtime.Object, error)
+	Updated(obj runtime.Object) (runtime.Object, error)
 }
 
 type objectLifecycleAdapter struct {
@@ -51,7 +51,14 @@ func (o *objectLifecycleAdapter) sync(key string, obj runtime.Object) error {
 		return err
 	}
 
-	return o.lifecycle.Updated(obj.DeepCopyObject())
+	if newObj, err := o.lifecycle.Updated(obj); err != nil {
+		return err
+	} else if newObj != nil {
+		_, err = o.objectClient.Update(metadata.GetName(), newObj)
+		return err
+	}
+
+	return nil
 }
 
 func (o *objectLifecycleAdapter) finalize(metadata metav1.Object, obj runtime.Object) (bool, error) {
@@ -79,11 +86,14 @@ func (o *objectLifecycleAdapter) finalize(metadata metav1.Object, obj runtime.Ob
 	}
 	metadata.SetFinalizers(finalizers)
 
-	if err := o.lifecycle.Finalize(obj); err != nil {
+	if newObj, err := o.lifecycle.Finalize(obj); err != nil {
 		return false, err
+	} else if newObj != nil {
+		_, err = o.objectClient.Update(metadata.GetName(), newObj)
+	} else {
+		_, err = o.objectClient.Update(metadata.GetName(), obj)
 	}
 
-	_, err = o.objectClient.Update(metadata.GetName(), obj)
 	return false, err
 }
 
@@ -110,7 +120,10 @@ func (o *objectLifecycleAdapter) create(metadata metav1.Object, obj runtime.Obje
 
 	metadata.SetFinalizers(append(metadata.GetFinalizers(), o.name))
 	metadata.GetLabels()[initialized] = "true"
-	if err := o.lifecycle.Create(obj); err != nil {
+	if newObj, err := o.lifecycle.Create(obj); err != nil {
+		return false, err
+	} else if newObj != nil {
+		_, err = o.objectClient.Update(metadata.GetName(), newObj)
 		return false, err
 	}
 

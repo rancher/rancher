@@ -18,6 +18,8 @@ type RancherKubernetesEngineConfig struct {
 }
 
 type RKEConfigNode struct {
+	// Name of the host provisioned via docker machine
+	MachineName string `yaml:"machine_name" json:"machineName, omitempty"`
 	// IP or FQDN that is fully resolvable and used for SSH communication
 	Address string `yaml:"address" json:"address,omitempty"`
 	// Optional - Internal address that will be used for components communication

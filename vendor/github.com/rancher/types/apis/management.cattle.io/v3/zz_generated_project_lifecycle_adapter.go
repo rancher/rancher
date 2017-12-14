@@ -6,25 +6,37 @@ import (
 )
 
 type ProjectLifecycle interface {
-	Create(obj *Project) error
-	Remove(obj *Project) error
-	Updated(obj *Project) error
+	Create(obj *Project) (*Project, error)
+	Remove(obj *Project) (*Project, error)
+	Updated(obj *Project) (*Project, error)
 }
 
 type projectLifecycleAdapter struct {
 	lifecycle ProjectLifecycle
 }
 
-func (w *projectLifecycleAdapter) Create(obj runtime.Object) error {
-	return w.lifecycle.Create(obj.(*Project))
+func (w *projectLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Create(obj.(*Project))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *projectLifecycleAdapter) Finalize(obj runtime.Object) error {
-	return w.lifecycle.Remove(obj.(*Project))
+func (w *projectLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Remove(obj.(*Project))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *projectLifecycleAdapter) Updated(obj runtime.Object) error {
-	return w.lifecycle.Updated(obj.(*Project))
+func (w *projectLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Updated(obj.(*Project))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
 func NewProjectLifecycleAdapter(name string, client ProjectInterface, l ProjectLifecycle) ProjectHandlerFunc {

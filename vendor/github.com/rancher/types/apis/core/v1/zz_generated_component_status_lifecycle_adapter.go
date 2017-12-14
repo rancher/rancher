@@ -7,25 +7,37 @@ import (
 )
 
 type ComponentStatusLifecycle interface {
-	Create(obj *v1.ComponentStatus) error
-	Remove(obj *v1.ComponentStatus) error
-	Updated(obj *v1.ComponentStatus) error
+	Create(obj *v1.ComponentStatus) (*v1.ComponentStatus, error)
+	Remove(obj *v1.ComponentStatus) (*v1.ComponentStatus, error)
+	Updated(obj *v1.ComponentStatus) (*v1.ComponentStatus, error)
 }
 
 type componentStatusLifecycleAdapter struct {
 	lifecycle ComponentStatusLifecycle
 }
 
-func (w *componentStatusLifecycleAdapter) Create(obj runtime.Object) error {
-	return w.lifecycle.Create(obj.(*v1.ComponentStatus))
+func (w *componentStatusLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Create(obj.(*v1.ComponentStatus))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *componentStatusLifecycleAdapter) Finalize(obj runtime.Object) error {
-	return w.lifecycle.Remove(obj.(*v1.ComponentStatus))
+func (w *componentStatusLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Remove(obj.(*v1.ComponentStatus))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *componentStatusLifecycleAdapter) Updated(obj runtime.Object) error {
-	return w.lifecycle.Updated(obj.(*v1.ComponentStatus))
+func (w *componentStatusLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Updated(obj.(*v1.ComponentStatus))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
 func NewComponentStatusLifecycleAdapter(name string, client ComponentStatusInterface, l ComponentStatusLifecycle) ComponentStatusHandlerFunc {

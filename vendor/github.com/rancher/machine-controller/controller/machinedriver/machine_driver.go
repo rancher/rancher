@@ -31,28 +31,28 @@ type Lifecycle struct {
 	schemaClient        v3.DynamicSchemaInterface
 }
 
-func (m *Lifecycle) Create(obj *v3.MachineDriver) error {
+func (m *Lifecycle) Create(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
 	// if machine driver was created, we also activate the driver by default
 	driver := NewDriver(obj.Spec.Builtin, obj.Name, obj.Spec.URL, obj.Spec.Checksum)
 	if err := driver.Stage(); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := driver.Install(); err != nil {
 		logrus.Errorf("Failed to download/install driver %s: %v", driver.Name(), err)
-		return err
+		return nil, err
 	}
 
 	driverName := strings.TrimPrefix(driver.Name(), "docker-machine-driver-")
 	flags, err := getCreateFlagsForDriver(driverName)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	resourceFields := map[string]v3.Field{}
 	for _, flag := range flags {
 		name, field, err := flagToField(flag)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		resourceFields[name] = field
 	}
@@ -73,27 +73,27 @@ func (m *Lifecycle) Create(obj *v3.MachineDriver) error {
 	dynamicSchema.Labels = map[string]string{}
 	dynamicSchema.Labels[driverNameLabel] = obj.Name
 	_, err = m.schemaClient.Create(dynamicSchema)
-	return err
+	return obj, err
 }
 
-func (m *Lifecycle) Updated(obj *v3.MachineDriver) error {
+func (m *Lifecycle) Updated(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
 	// YOU MUST CALL DEEPCOPY
-	return nil
+	return nil, nil
 }
 
-func (m *Lifecycle) Remove(obj *v3.MachineDriver) error {
+func (m *Lifecycle) Remove(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
 	schemas, err := m.schemaClient.List(metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", driverNameLabel, obj.Name),
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	for _, schema := range schemas.Items {
 		logrus.Infof("Deleting schema %s", schema.Name)
 		if err := m.schemaClient.Delete(schema.Name, &metav1.DeleteOptions{}); err != nil {
-			return err
+			return nil, err
 		}
 		logrus.Infof("Deleting schema %s done", schema.Name)
 	}
-	return nil
+	return obj, nil
 }

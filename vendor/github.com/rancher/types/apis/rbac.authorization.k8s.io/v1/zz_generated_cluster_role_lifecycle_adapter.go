@@ -7,25 +7,37 @@ import (
 )
 
 type ClusterRoleLifecycle interface {
-	Create(obj *v1.ClusterRole) error
-	Remove(obj *v1.ClusterRole) error
-	Updated(obj *v1.ClusterRole) error
+	Create(obj *v1.ClusterRole) (*v1.ClusterRole, error)
+	Remove(obj *v1.ClusterRole) (*v1.ClusterRole, error)
+	Updated(obj *v1.ClusterRole) (*v1.ClusterRole, error)
 }
 
 type clusterRoleLifecycleAdapter struct {
 	lifecycle ClusterRoleLifecycle
 }
 
-func (w *clusterRoleLifecycleAdapter) Create(obj runtime.Object) error {
-	return w.lifecycle.Create(obj.(*v1.ClusterRole))
+func (w *clusterRoleLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Create(obj.(*v1.ClusterRole))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *clusterRoleLifecycleAdapter) Finalize(obj runtime.Object) error {
-	return w.lifecycle.Remove(obj.(*v1.ClusterRole))
+func (w *clusterRoleLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Remove(obj.(*v1.ClusterRole))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *clusterRoleLifecycleAdapter) Updated(obj runtime.Object) error {
-	return w.lifecycle.Updated(obj.(*v1.ClusterRole))
+func (w *clusterRoleLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Updated(obj.(*v1.ClusterRole))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
 func NewClusterRoleLifecycleAdapter(name string, client ClusterRoleInterface, l ClusterRoleLifecycle) ClusterRoleHandlerFunc {

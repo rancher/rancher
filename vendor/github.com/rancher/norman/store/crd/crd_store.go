@@ -2,7 +2,6 @@ package crd
 
 import (
 	"context"
-	"net/http"
 	"strings"
 	"time"
 
@@ -111,7 +110,7 @@ func (c *Store) AddSchemas(ctx context.Context, schemas ...*types.Schema) error 
 	var allSchemas []*types.Schema
 
 	for _, schema := range schemas {
-		if schema.Store != nil || !contains(schema.CollectionMethods, http.MethodGet) {
+		if schema.Store != nil || !schema.CanList() {
 			continue
 		}
 

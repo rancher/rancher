@@ -1,8 +1,9 @@
 package pki
 
 const (
-	CrtDownloaderContainer = "cert-deployer"
-	CertificatesSecretName = "k8s-certs"
+	CertificatesServiceName = "certificates"
+	CrtDownloaderContainer  = "cert-deployer"
+	CertificatesSecretName  = "k8s-certs"
 
 	CACertName    = "kube-ca"
 	CACertENVName = "KUBE_CA"

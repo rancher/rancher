@@ -62,8 +62,7 @@ func DeployCertificatesOnWorkers(workerHosts []*hosts.Host, crtMap map[string]Ce
 }
 
 func doRunDeployer(host *hosts.Host, containerEnv []string, certDownloaderImage string) error {
-	logrus.Debugf("[certificates] Pulling Certificate downloader Image on host [%s]", host.Address)
-	if err := docker.PullImage(host.DClient, host.Address, certDownloaderImage); err != nil {
+	if err := docker.UseLocalOrPull(host.DClient, host.Address, certDownloaderImage, CertificatesServiceName); err != nil {
 		return err
 	}
 	imageCfg := &container.Config{

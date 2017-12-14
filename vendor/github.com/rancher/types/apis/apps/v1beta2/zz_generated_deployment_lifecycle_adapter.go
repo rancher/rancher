@@ -7,25 +7,37 @@ import (
 )
 
 type DeploymentLifecycle interface {
-	Create(obj *v1beta2.Deployment) error
-	Remove(obj *v1beta2.Deployment) error
-	Updated(obj *v1beta2.Deployment) error
+	Create(obj *v1beta2.Deployment) (*v1beta2.Deployment, error)
+	Remove(obj *v1beta2.Deployment) (*v1beta2.Deployment, error)
+	Updated(obj *v1beta2.Deployment) (*v1beta2.Deployment, error)
 }
 
 type deploymentLifecycleAdapter struct {
 	lifecycle DeploymentLifecycle
 }
 
-func (w *deploymentLifecycleAdapter) Create(obj runtime.Object) error {
-	return w.lifecycle.Create(obj.(*v1beta2.Deployment))
+func (w *deploymentLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Create(obj.(*v1beta2.Deployment))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *deploymentLifecycleAdapter) Finalize(obj runtime.Object) error {
-	return w.lifecycle.Remove(obj.(*v1beta2.Deployment))
+func (w *deploymentLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Remove(obj.(*v1beta2.Deployment))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *deploymentLifecycleAdapter) Updated(obj runtime.Object) error {
-	return w.lifecycle.Updated(obj.(*v1beta2.Deployment))
+func (w *deploymentLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Updated(obj.(*v1beta2.Deployment))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
 func NewDeploymentLifecycleAdapter(name string, client DeploymentInterface, l DeploymentLifecycle) DeploymentHandlerFunc {

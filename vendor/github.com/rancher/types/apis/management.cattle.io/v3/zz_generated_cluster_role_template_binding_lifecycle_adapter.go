@@ -6,25 +6,37 @@ import (
 )
 
 type ClusterRoleTemplateBindingLifecycle interface {
-	Create(obj *ClusterRoleTemplateBinding) error
-	Remove(obj *ClusterRoleTemplateBinding) error
-	Updated(obj *ClusterRoleTemplateBinding) error
+	Create(obj *ClusterRoleTemplateBinding) (*ClusterRoleTemplateBinding, error)
+	Remove(obj *ClusterRoleTemplateBinding) (*ClusterRoleTemplateBinding, error)
+	Updated(obj *ClusterRoleTemplateBinding) (*ClusterRoleTemplateBinding, error)
 }
 
 type clusterRoleTemplateBindingLifecycleAdapter struct {
 	lifecycle ClusterRoleTemplateBindingLifecycle
 }
 
-func (w *clusterRoleTemplateBindingLifecycleAdapter) Create(obj runtime.Object) error {
-	return w.lifecycle.Create(obj.(*ClusterRoleTemplateBinding))
+func (w *clusterRoleTemplateBindingLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Create(obj.(*ClusterRoleTemplateBinding))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *clusterRoleTemplateBindingLifecycleAdapter) Finalize(obj runtime.Object) error {
-	return w.lifecycle.Remove(obj.(*ClusterRoleTemplateBinding))
+func (w *clusterRoleTemplateBindingLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Remove(obj.(*ClusterRoleTemplateBinding))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *clusterRoleTemplateBindingLifecycleAdapter) Updated(obj runtime.Object) error {
-	return w.lifecycle.Updated(obj.(*ClusterRoleTemplateBinding))
+func (w *clusterRoleTemplateBindingLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Updated(obj.(*ClusterRoleTemplateBinding))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
 func NewClusterRoleTemplateBindingLifecycleAdapter(name string, client ClusterRoleTemplateBindingInterface, l ClusterRoleTemplateBindingLifecycle) ClusterRoleTemplateBindingHandlerFunc {

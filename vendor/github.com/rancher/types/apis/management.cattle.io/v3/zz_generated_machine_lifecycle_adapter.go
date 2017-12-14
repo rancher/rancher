@@ -6,25 +6,37 @@ import (
 )
 
 type MachineLifecycle interface {
-	Create(obj *Machine) error
-	Remove(obj *Machine) error
-	Updated(obj *Machine) error
+	Create(obj *Machine) (*Machine, error)
+	Remove(obj *Machine) (*Machine, error)
+	Updated(obj *Machine) (*Machine, error)
 }
 
 type machineLifecycleAdapter struct {
 	lifecycle MachineLifecycle
 }
 
-func (w *machineLifecycleAdapter) Create(obj runtime.Object) error {
-	return w.lifecycle.Create(obj.(*Machine))
+func (w *machineLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Create(obj.(*Machine))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *machineLifecycleAdapter) Finalize(obj runtime.Object) error {
-	return w.lifecycle.Remove(obj.(*Machine))
+func (w *machineLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Remove(obj.(*Machine))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *machineLifecycleAdapter) Updated(obj runtime.Object) error {
-	return w.lifecycle.Updated(obj.(*Machine))
+func (w *machineLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Updated(obj.(*Machine))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
 func NewMachineLifecycleAdapter(name string, client MachineInterface, l MachineLifecycle) MachineHandlerFunc {

@@ -75,7 +75,7 @@ func (d *Driver) SetDriverOptions(driverOptions *generic.DriverOptions) error {
 
 // Create creates the rke cluster
 func (d *Driver) Create() error {
-	APIURL, caCrt, clientCert, clientKey, err := cmd.ClusterUp(d.ConfigYaml)
+	APIURL, caCrt, clientCert, clientKey, err := cmd.ClusterUp(d.ConfigYaml, nil)
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,7 @@ func (d *Driver) Create() error {
 
 // Update updates the rke cluster
 func (d *Driver) Update() error {
-	APIURL, caCrt, clientCert, clientKey, err := cmd.ClusterUp(d.ConfigYaml)
+	APIURL, caCrt, clientCert, clientKey, err := cmd.ClusterUp(d.ConfigYaml, nil)
 	if err != nil {
 		return err
 	}
@@ -144,5 +144,5 @@ func (d *Driver) PostCheck() error {
 
 // Remove removes the cluster
 func (d *Driver) Remove() error {
-	return cmd.ClusterRemove(d.ConfigYaml)
+	return cmd.ClusterRemove(d.ConfigYaml, nil)
 }

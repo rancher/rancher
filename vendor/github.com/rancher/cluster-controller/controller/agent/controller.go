@@ -23,15 +23,15 @@ type ClusterLifecycle struct {
 	ctx     context.Context
 }
 
-func (c *ClusterLifecycle) Create(obj *v3.Cluster) error {
-	return nil
+func (c *ClusterLifecycle) Create(obj *v3.Cluster) (*v3.Cluster, error) {
+	return nil, nil
 }
 
-func (c *ClusterLifecycle) Remove(obj *v3.Cluster) error {
+func (c *ClusterLifecycle) Remove(obj *v3.Cluster) (*v3.Cluster, error) {
 	c.Manager.Stop(c.ctx, obj)
-	return nil
+	return nil, nil
 }
 
-func (c *ClusterLifecycle) Updated(obj *v3.Cluster) error {
-	return c.Manager.Start(c.ctx, obj)
+func (c *ClusterLifecycle) Updated(obj *v3.Cluster) (*v3.Cluster, error) {
+	return nil, c.Manager.Start(c.ctx, obj)
 }

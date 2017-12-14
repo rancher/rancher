@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/rancher/rke/cluster"
+	"github.com/rancher/rke/hosts"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
@@ -32,9 +33,9 @@ func RemoveCommand() cli.Command {
 	}
 }
 
-func ClusterRemove(clusterFile string) error {
+func ClusterRemove(clusterFile string, customDialer hosts.Dialer) error {
 	logrus.Infof("Tearing down Kubernetes cluster")
-	kubeCluster, err := cluster.ParseConfig(clusterFile)
+	kubeCluster, err := cluster.ParseConfig(clusterFile, customDialer)
 	if err != nil {
 		return err
 	}
@@ -72,5 +73,5 @@ func clusterRemoveFromCli(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("Failed to resolve cluster file: %v", err)
 	}
-	return ClusterRemove(clusterFile)
+	return ClusterRemove(clusterFile, nil)
 }

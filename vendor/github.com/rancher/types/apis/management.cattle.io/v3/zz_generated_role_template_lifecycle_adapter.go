@@ -6,25 +6,37 @@ import (
 )
 
 type RoleTemplateLifecycle interface {
-	Create(obj *RoleTemplate) error
-	Remove(obj *RoleTemplate) error
-	Updated(obj *RoleTemplate) error
+	Create(obj *RoleTemplate) (*RoleTemplate, error)
+	Remove(obj *RoleTemplate) (*RoleTemplate, error)
+	Updated(obj *RoleTemplate) (*RoleTemplate, error)
 }
 
 type roleTemplateLifecycleAdapter struct {
 	lifecycle RoleTemplateLifecycle
 }
 
-func (w *roleTemplateLifecycleAdapter) Create(obj runtime.Object) error {
-	return w.lifecycle.Create(obj.(*RoleTemplate))
+func (w *roleTemplateLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Create(obj.(*RoleTemplate))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *roleTemplateLifecycleAdapter) Finalize(obj runtime.Object) error {
-	return w.lifecycle.Remove(obj.(*RoleTemplate))
+func (w *roleTemplateLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Remove(obj.(*RoleTemplate))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *roleTemplateLifecycleAdapter) Updated(obj runtime.Object) error {
-	return w.lifecycle.Updated(obj.(*RoleTemplate))
+func (w *roleTemplateLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Updated(obj.(*RoleTemplate))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
 func NewRoleTemplateLifecycleAdapter(name string, client RoleTemplateInterface, l RoleTemplateLifecycle) RoleTemplateHandlerFunc {

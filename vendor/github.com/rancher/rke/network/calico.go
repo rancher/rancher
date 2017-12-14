@@ -1,6 +1,54 @@
 package network
 
 func GetCalicoManifest(calicoConfig map[string]string) string {
+	awsIPPool := ""
+	if calicoConfig[CloudProvider] == AWSCloudProvider {
+		awsIPPool = `
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: aws-ippool
+  namespace: kube-system
+data:
+  aws-ippool: |-
+    apiVersion: v1
+    kind: ipPool
+    metadata:
+      cidr: ` + calicoConfig[ClusterCIDR] + `
+    spec:
+      nat-outgoing: true
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: calicoctl
+  namespace: kube-system
+spec:
+  hostNetwork: true
+  restartPolicy: OnFailure
+  containers:
+  - name: calicoctl
+    image: ` + calicoConfig[CalicoctlImage] + `
+    command: ["/bin/sh", "-c", "calicoctl apply -f aws-ippool.yaml"]
+    env:
+    - name: ETCD_ENDPOINTS
+      valueFrom:
+        configMapKeyRef:
+          name: calico-config
+          key: etcd_endpoints
+    volumeMounts:
+    - name: ippool-config
+      mountPath: /root/
+  volumes:
+  - name: ippool-config
+    configMap:
+      name: aws-ippool
+      items:
+        - key: aws-ippool
+          path: aws-ippool.yaml
+        `
+	}
 
 	return `# Calico Version master
 # https://docs.projectcalico.org/master/releases#master
@@ -389,11 +437,11 @@ metadata:
   namespace: kube-system
 
 ---
-
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: calico-node
   namespace: kube-system
+` + awsIPPool + `
 `
 }

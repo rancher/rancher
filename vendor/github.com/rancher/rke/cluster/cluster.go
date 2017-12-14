@@ -30,6 +30,7 @@ type Cluster struct {
 	ClusterDomain                    string
 	ClusterCIDR                      string
 	ClusterDNSServer                 string
+	Dialer                           hosts.Dialer
 }
 
 const (
@@ -72,13 +73,14 @@ func (c *Cluster) DeployClusterPlanes() error {
 	return nil
 }
 
-func ParseConfig(clusterFile string) (*Cluster, error) {
+func ParseConfig(clusterFile string, customDialer hosts.Dialer) (*Cluster, error) {
 	logrus.Debugf("Parsing cluster file [%v]", clusterFile)
 	var err error
 	c, err := parseClusterFile(clusterFile)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to parse the cluster file: %v", err)
 	}
+	c.Dialer = customDialer
 	err = c.InvertIndexHosts()
 	if err != nil {
 		return nil, fmt.Errorf("Failed to classify hosts from config file: %v", err)

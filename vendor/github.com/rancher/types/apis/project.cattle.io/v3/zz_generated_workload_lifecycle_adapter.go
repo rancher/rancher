@@ -6,25 +6,37 @@ import (
 )
 
 type WorkloadLifecycle interface {
-	Create(obj *Workload) error
-	Remove(obj *Workload) error
-	Updated(obj *Workload) error
+	Create(obj *Workload) (*Workload, error)
+	Remove(obj *Workload) (*Workload, error)
+	Updated(obj *Workload) (*Workload, error)
 }
 
 type workloadLifecycleAdapter struct {
 	lifecycle WorkloadLifecycle
 }
 
-func (w *workloadLifecycleAdapter) Create(obj runtime.Object) error {
-	return w.lifecycle.Create(obj.(*Workload))
+func (w *workloadLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Create(obj.(*Workload))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *workloadLifecycleAdapter) Finalize(obj runtime.Object) error {
-	return w.lifecycle.Remove(obj.(*Workload))
+func (w *workloadLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Remove(obj.(*Workload))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *workloadLifecycleAdapter) Updated(obj runtime.Object) error {
-	return w.lifecycle.Updated(obj.(*Workload))
+func (w *workloadLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Updated(obj.(*Workload))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
 func NewWorkloadLifecycleAdapter(name string, client WorkloadInterface, l WorkloadLifecycle) WorkloadHandlerFunc {

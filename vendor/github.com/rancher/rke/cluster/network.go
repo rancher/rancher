@@ -21,6 +21,8 @@ const (
 	CalicoNodeImage         = "calico_node_image"
 	CalicoCNIImage          = "calico_cni_image"
 	CalicoControllersImages = "calico_controllers_image"
+	CalicoctlImage          = "calicoctl_image"
+	CalicoCloudProvider     = "calico_cloud_provider"
 
 	CanalNetworkPlugin = "canal"
 	CanalNodeImage     = "canal_node_image"
@@ -71,6 +73,8 @@ func (c *Cluster) doCalicoDeploy() error {
 		network.CNIImage:         c.Network.Options[CalicoCNIImage],
 		network.NodeImage:        c.Network.Options[CalicoNodeImage],
 		network.ControllersImage: c.Network.Options[CalicoControllersImages],
+		network.CalicoctlImage:   c.Network.Options[CalicoctlImage],
+		network.CloudProvider:    c.Network.Options[CalicoCloudProvider],
 	}
 	pluginYaml := network.GetCalicoManifest(calicoConfig)
 	return c.doAddonDeploy(pluginYaml, NetworkPluginResourceName)
@@ -103,23 +107,39 @@ func (c *Cluster) setClusterNetworkDefaults() {
 		// don't break if the user didn't define options
 		c.Network.Options = make(map[string]string)
 	}
+	networkPluginConfigDefaultsMap := make(map[string]string)
 	switch {
 	case c.Network.Plugin == FlannelNetworkPlugin:
-		setDefaultIfEmptyMapValue(c.Network.Options, FlannelImage, DefaultFlannelImage)
-		setDefaultIfEmptyMapValue(c.Network.Options, FlannelCNIImage, DefaultFlannelCNIImage)
+		networkPluginConfigDefaultsMap = map[string]string{
+			FlannelImage:    DefaultFlannelImage,
+			FlannelCNIImage: DefaultFlannelCNIImage,
+		}
 
 	case c.Network.Plugin == CalicoNetworkPlugin:
-		setDefaultIfEmptyMapValue(c.Network.Options, CalicoCNIImage, DefaultCalicoCNIImage)
-		setDefaultIfEmptyMapValue(c.Network.Options, CalicoNodeImage, DefaultCalicoNodeImage)
-		setDefaultIfEmptyMapValue(c.Network.Options, CalicoControllersImages, DefaultCalicoControllersImage)
+		networkPluginConfigDefaultsMap = map[string]string{
+			CalicoCNIImage:          DefaultCalicoCNIImage,
+			CalicoNodeImage:         DefaultCalicoNodeImage,
+			CalicoControllersImages: DefaultCalicoControllersImage,
+			CalicoCloudProvider:     DefaultNetworkCloudProvider,
+			CalicoctlImage:          DefaultCalicoctlImage,
+		}
 
 	case c.Network.Plugin == CanalNetworkPlugin:
-		setDefaultIfEmptyMapValue(c.Network.Options, CanalCNIImage, DefaultCanalCNIImage)
-		setDefaultIfEmptyMapValue(c.Network.Options, CanalNodeImage, DefaultCanalNodeImage)
-		setDefaultIfEmptyMapValue(c.Network.Options, CanalFlannelImage, DefaultCanalFlannelImage)
+		networkPluginConfigDefaultsMap = map[string]string{
+			CanalCNIImage:     DefaultCanalCNIImage,
+			CanalNodeImage:    DefaultCanalNodeImage,
+			CanalFlannelImage: DefaultCanalFlannelImage,
+		}
 
 	case c.Network.Plugin == WeaveNetworkPlugin:
-		setDefaultIfEmptyMapValue(c.Network.Options, WeaveImage, DefaultWeaveImage)
-		setDefaultIfEmptyMapValue(c.Network.Options, WeaveCNIImage, DefaultWeaveCNIImage)
+		networkPluginConfigDefaultsMap = map[string]string{
+			WeaveImage:    DefaultWeaveImage,
+			WeaveCNIImage: DefaultWeaveCNIImage,
+		}
 	}
+
+	for k, v := range networkPluginConfigDefaultsMap {
+		setDefaultIfEmptyMapValue(c.Network.Options, k, v)
+	}
+
 }

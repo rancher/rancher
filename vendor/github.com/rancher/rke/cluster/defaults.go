@@ -11,7 +11,8 @@ const (
 
 	DefaultAuthStrategy = "x509"
 
-	DefaultNetworkPlugin = "flannel"
+	DefaultNetworkPlugin        = "flannel"
+	DefaultNetworkCloudProvider = "none"
 
 	DefaultInfraContainerImage  = "gcr.io/google_containers/pause-amd64:3.0"
 	DefaultAplineImage          = "alpine:latest"
@@ -19,16 +20,20 @@ const (
 	DefaultCertDownloaderImage  = "rancher/rke-cert-deployer:0.1.0"
 	DefaultServiceSidekickImage = "rancher/rke-service-sidekick:0.1.0"
 
-	DefaultFlannelImage           = "quay.io/coreos/flannel:v0.9.1"
-	DefaultFlannelCNIImage        = "quay.io/coreos/flannel-cni:v0.2.0"
+	DefaultFlannelImage    = "quay.io/coreos/flannel:v0.9.1"
+	DefaultFlannelCNIImage = "quay.io/coreos/flannel-cni:v0.2.0"
+
 	DefaultCalicoNodeImage        = "quay.io/calico/node:v2.6.2"
 	DefaultCalicoCNIImage         = "quay.io/calico/cni:v1.11.0"
 	DefaultCalicoControllersImage = "quay.io/calico/kube-controllers:v1.0.0"
-	DefaultCanalNodeImage         = "quay.io/calico/node:v2.6.2"
-	DefaultCanalCNIImage          = "quay.io/calico/cni:v1.11.0"
-	DefaultCanalFlannelImage      = "quay.io/coreos/flannel:v0.9.1"
-	DefaultWeaveImage             = "weaveworks/weave-kube:2.1.2"
-	DefaultWeaveCNIImage          = "weaveworks/weave-npc:2.1.2"
+	DefaultCalicoctlImage         = "quay.io/calico/ctl:v1.6.2"
+
+	DefaultWeaveImage    = "weaveworks/weave-kube:2.1.2"
+	DefaultWeaveCNIImage = "weaveworks/weave-npc:2.1.2"
+
+	DefaultCanalNodeImage    = "quay.io/calico/node:v2.6.2"
+	DefaultCanalCNIImage     = "quay.io/calico/cni:v1.11.0"
+	DefaultCanalFlannelImage = "quay.io/coreos/flannel:v0.9.1"
 
 	DefaultKubeDNSImage           = "gcr.io/google_containers/k8s-dns-kube-dns-amd64:1.14.5"
 	DefaultDNSMasqImage           = "gcr.io/google_containers/k8s-dns-dnsmasq-nanny-amd64:1.14.5"

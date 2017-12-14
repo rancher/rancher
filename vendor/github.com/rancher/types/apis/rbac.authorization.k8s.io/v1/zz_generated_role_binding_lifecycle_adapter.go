@@ -7,25 +7,37 @@ import (
 )
 
 type RoleBindingLifecycle interface {
-	Create(obj *v1.RoleBinding) error
-	Remove(obj *v1.RoleBinding) error
-	Updated(obj *v1.RoleBinding) error
+	Create(obj *v1.RoleBinding) (*v1.RoleBinding, error)
+	Remove(obj *v1.RoleBinding) (*v1.RoleBinding, error)
+	Updated(obj *v1.RoleBinding) (*v1.RoleBinding, error)
 }
 
 type roleBindingLifecycleAdapter struct {
 	lifecycle RoleBindingLifecycle
 }
 
-func (w *roleBindingLifecycleAdapter) Create(obj runtime.Object) error {
-	return w.lifecycle.Create(obj.(*v1.RoleBinding))
+func (w *roleBindingLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Create(obj.(*v1.RoleBinding))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *roleBindingLifecycleAdapter) Finalize(obj runtime.Object) error {
-	return w.lifecycle.Remove(obj.(*v1.RoleBinding))
+func (w *roleBindingLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Remove(obj.(*v1.RoleBinding))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *roleBindingLifecycleAdapter) Updated(obj runtime.Object) error {
-	return w.lifecycle.Updated(obj.(*v1.RoleBinding))
+func (w *roleBindingLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Updated(obj.(*v1.RoleBinding))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
 func NewRoleBindingLifecycleAdapter(name string, client RoleBindingInterface, l RoleBindingLifecycle) RoleBindingHandlerFunc {

@@ -5,6 +5,7 @@ import (
 
 	catalogController "github.com/rancher/catalog-controller/controller"
 	"github.com/rancher/cluster-controller/controller/agent"
+	"github.com/rancher/cluster-controller/controller/clusterevents"
 	"github.com/rancher/cluster-controller/controller/clusterheartbeat"
 	"github.com/rancher/cluster-controller/controller/clusterprovisioner"
 	"github.com/rancher/cluster-controller/controller/clusterstats"
@@ -19,4 +20,5 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	clusterprovisioner.Register(management)
 	clusterstats.Register(management)
 	agent.Register(ctx, management)
+	clusterevents.Register(ctx, management)
 }

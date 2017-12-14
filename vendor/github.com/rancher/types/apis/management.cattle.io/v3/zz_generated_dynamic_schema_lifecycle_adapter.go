@@ -6,25 +6,37 @@ import (
 )
 
 type DynamicSchemaLifecycle interface {
-	Create(obj *DynamicSchema) error
-	Remove(obj *DynamicSchema) error
-	Updated(obj *DynamicSchema) error
+	Create(obj *DynamicSchema) (*DynamicSchema, error)
+	Remove(obj *DynamicSchema) (*DynamicSchema, error)
+	Updated(obj *DynamicSchema) (*DynamicSchema, error)
 }
 
 type dynamicSchemaLifecycleAdapter struct {
 	lifecycle DynamicSchemaLifecycle
 }
 
-func (w *dynamicSchemaLifecycleAdapter) Create(obj runtime.Object) error {
-	return w.lifecycle.Create(obj.(*DynamicSchema))
+func (w *dynamicSchemaLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Create(obj.(*DynamicSchema))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *dynamicSchemaLifecycleAdapter) Finalize(obj runtime.Object) error {
-	return w.lifecycle.Remove(obj.(*DynamicSchema))
+func (w *dynamicSchemaLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Remove(obj.(*DynamicSchema))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *dynamicSchemaLifecycleAdapter) Updated(obj runtime.Object) error {
-	return w.lifecycle.Updated(obj.(*DynamicSchema))
+func (w *dynamicSchemaLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Updated(obj.(*DynamicSchema))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
 func NewDynamicSchemaLifecycleAdapter(name string, client DynamicSchemaInterface, l DynamicSchemaLifecycle) DynamicSchemaHandlerFunc {
