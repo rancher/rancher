@@ -6,25 +6,37 @@ import (
 )
 
 type GroupLifecycle interface {
-	Create(obj *Group) error
-	Remove(obj *Group) error
-	Updated(obj *Group) error
+	Create(obj *Group) (*Group, error)
+	Remove(obj *Group) (*Group, error)
+	Updated(obj *Group) (*Group, error)
 }
 
 type groupLifecycleAdapter struct {
 	lifecycle GroupLifecycle
 }
 
-func (w *groupLifecycleAdapter) Create(obj runtime.Object) error {
-	return w.lifecycle.Create(obj.(*Group))
+func (w *groupLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Create(obj.(*Group))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *groupLifecycleAdapter) Finalize(obj runtime.Object) error {
-	return w.lifecycle.Remove(obj.(*Group))
+func (w *groupLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Remove(obj.(*Group))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *groupLifecycleAdapter) Updated(obj runtime.Object) error {
-	return w.lifecycle.Updated(obj.(*Group))
+func (w *groupLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Updated(obj.(*Group))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
 func NewGroupLifecycleAdapter(name string, client GroupInterface, l GroupLifecycle) GroupHandlerFunc {

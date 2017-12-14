@@ -7,25 +7,37 @@ import (
 )
 
 type EventLifecycle interface {
-	Create(obj *v1.Event) error
-	Remove(obj *v1.Event) error
-	Updated(obj *v1.Event) error
+	Create(obj *v1.Event) (*v1.Event, error)
+	Remove(obj *v1.Event) (*v1.Event, error)
+	Updated(obj *v1.Event) (*v1.Event, error)
 }
 
 type eventLifecycleAdapter struct {
 	lifecycle EventLifecycle
 }
 
-func (w *eventLifecycleAdapter) Create(obj runtime.Object) error {
-	return w.lifecycle.Create(obj.(*v1.Event))
+func (w *eventLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Create(obj.(*v1.Event))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *eventLifecycleAdapter) Finalize(obj runtime.Object) error {
-	return w.lifecycle.Remove(obj.(*v1.Event))
+func (w *eventLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Remove(obj.(*v1.Event))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *eventLifecycleAdapter) Updated(obj runtime.Object) error {
-	return w.lifecycle.Updated(obj.(*v1.Event))
+func (w *eventLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Updated(obj.(*v1.Event))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
 func NewEventLifecycleAdapter(name string, client EventInterface, l EventLifecycle) EventHandlerFunc {

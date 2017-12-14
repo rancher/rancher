@@ -6,25 +6,37 @@ import (
 )
 
 type TemplateLifecycle interface {
-	Create(obj *Template) error
-	Remove(obj *Template) error
-	Updated(obj *Template) error
+	Create(obj *Template) (*Template, error)
+	Remove(obj *Template) (*Template, error)
+	Updated(obj *Template) (*Template, error)
 }
 
 type templateLifecycleAdapter struct {
 	lifecycle TemplateLifecycle
 }
 
-func (w *templateLifecycleAdapter) Create(obj runtime.Object) error {
-	return w.lifecycle.Create(obj.(*Template))
+func (w *templateLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Create(obj.(*Template))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *templateLifecycleAdapter) Finalize(obj runtime.Object) error {
-	return w.lifecycle.Remove(obj.(*Template))
+func (w *templateLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Remove(obj.(*Template))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *templateLifecycleAdapter) Updated(obj runtime.Object) error {
-	return w.lifecycle.Updated(obj.(*Template))
+func (w *templateLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Updated(obj.(*Template))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
 func NewTemplateLifecycleAdapter(name string, client TemplateInterface, l TemplateLifecycle) TemplateHandlerFunc {

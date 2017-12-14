@@ -36,12 +36,10 @@ func DoRunContainer(dClient *client.Client, imageCfg *container.Config, hostCfg 
 		return nil
 	}
 
-	logrus.Infof("[%s] Pulling Image on host [%s]", plane, hostname)
-	err = PullImage(dClient, hostname, imageCfg.Image)
+	err = UseLocalOrPull(dClient, hostname, imageCfg.Image, plane)
 	if err != nil {
 		return err
 	}
-	logrus.Infof("[%s] Successfully pulled [%s] image on host [%s]", plane, containerName, hostname)
 	resp, err := dClient.ContainerCreate(context.Background(), imageCfg, hostCfg, nil, containerName)
 	if err != nil {
 		return fmt.Errorf("Failed to create [%s] container on host [%s]: %v", containerName, hostname, err)
@@ -64,12 +62,10 @@ func DoRollingUpdateContainer(dClient *client.Client, imageCfg *container.Config
 		logrus.Infof("[%s] Container %s is not running on host [%s]", plane, containerName, hostname)
 		return nil
 	}
-	logrus.Infof("[%s] Pulling Image on host [%s]", plane, hostname)
-	err = PullImage(dClient, hostname, imageCfg.Image)
+	err = UseLocalOrPull(dClient, hostname, imageCfg.Image, plane)
 	if err != nil {
 		return err
 	}
-	logrus.Infof("[%s] Successfully pulled [%s] image on host [%s]", plane, containerName, hostname)
 	logrus.Debugf("[%s] Stopping old container", plane)
 	oldContainerName := "old-" + containerName
 	if err := StopRenameContainer(dClient, hostname, containerName, oldContainerName); err != nil {
@@ -111,7 +107,7 @@ func DoRemoveContainer(dClient *client.Client, containerName, hostname string) e
 	if err != nil {
 		return err
 	}
-	logrus.Infof("[remove/%s] Sucessfully removed container on host [%s]", containerName, hostname)
+	logrus.Infof("[remove/%s] Successfully removed container on host [%s]", containerName, hostname)
 	return nil
 }
 
@@ -130,7 +126,21 @@ func IsContainerRunning(dClient *client.Client, hostname string, containerName s
 	return false, nil
 }
 
-func PullImage(dClient *client.Client, hostname string, containerImage string) error {
+func localImageExists(dClient *client.Client, hostname string, containerImage string) (bool, error) {
+	logrus.Debugf("Checking if image [%s] exists on host [%s]", containerImage, hostname)
+	_, _, err := dClient.ImageInspectWithRaw(context.Background(), containerImage)
+	if err != nil {
+		if client.IsErrNotFound(err) {
+			logrus.Debugf("Image [%s] does not exist on host [%s]: %v", containerImage, hostname, err)
+			return false, nil
+		}
+		return false, fmt.Errorf("Error checking if image [%s] exists on host [%s]: %v", containerImage, hostname, err)
+	}
+	logrus.Debugf("Image [%s] exists on host [%s]", containerImage, hostname)
+	return true, nil
+}
+
+func pullImage(dClient *client.Client, hostname string, containerImage string) error {
 	out, err := dClient.ImagePull(context.Background(), containerImage, types.ImagePullOptions{})
 	if err != nil {
 		return fmt.Errorf("Can't pull Docker image [%s] for host [%s]: %v", containerImage, hostname, err)
@@ -142,6 +152,24 @@ func PullImage(dClient *client.Client, hostname string, containerImage string) e
 		io.Copy(ioutil.Discard, out)
 	}
 
+	return nil
+}
+
+func UseLocalOrPull(dClient *client.Client, hostname string, containerImage string, plane string) error {
+	logrus.Infof("[%s] Checking image [%s] on host [%s]", plane, containerImage, hostname)
+	imageExists, err := localImageExists(dClient, hostname, containerImage)
+	if err != nil {
+		return err
+	}
+	if imageExists {
+		logrus.Infof("[%s] No pull necessary, image [%s] exists on host [%s]", plane, containerImage, hostname)
+		return nil
+	}
+	logrus.Infof("[%s] Pulling image [%s] on host [%s]", plane, containerImage, hostname)
+	if err := pullImage(dClient, hostname, containerImage); err != nil {
+		return err
+	}
+	logrus.Infof("[%s] Successfully pulled image [%s] on host [%s]", plane, containerImage, hostname)
 	return nil
 }
 

@@ -6,25 +6,37 @@ import (
 )
 
 type CatalogLifecycle interface {
-	Create(obj *Catalog) error
-	Remove(obj *Catalog) error
-	Updated(obj *Catalog) error
+	Create(obj *Catalog) (*Catalog, error)
+	Remove(obj *Catalog) (*Catalog, error)
+	Updated(obj *Catalog) (*Catalog, error)
 }
 
 type catalogLifecycleAdapter struct {
 	lifecycle CatalogLifecycle
 }
 
-func (w *catalogLifecycleAdapter) Create(obj runtime.Object) error {
-	return w.lifecycle.Create(obj.(*Catalog))
+func (w *catalogLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Create(obj.(*Catalog))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *catalogLifecycleAdapter) Finalize(obj runtime.Object) error {
-	return w.lifecycle.Remove(obj.(*Catalog))
+func (w *catalogLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Remove(obj.(*Catalog))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *catalogLifecycleAdapter) Updated(obj runtime.Object) error {
-	return w.lifecycle.Updated(obj.(*Catalog))
+func (w *catalogLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Updated(obj.(*Catalog))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
 func NewCatalogLifecycleAdapter(name string, client CatalogInterface, l CatalogLifecycle) CatalogHandlerFunc {

@@ -6,25 +6,37 @@ import (
 )
 
 type ClusterLifecycle interface {
-	Create(obj *Cluster) error
-	Remove(obj *Cluster) error
-	Updated(obj *Cluster) error
+	Create(obj *Cluster) (*Cluster, error)
+	Remove(obj *Cluster) (*Cluster, error)
+	Updated(obj *Cluster) (*Cluster, error)
 }
 
 type clusterLifecycleAdapter struct {
 	lifecycle ClusterLifecycle
 }
 
-func (w *clusterLifecycleAdapter) Create(obj runtime.Object) error {
-	return w.lifecycle.Create(obj.(*Cluster))
+func (w *clusterLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Create(obj.(*Cluster))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *clusterLifecycleAdapter) Finalize(obj runtime.Object) error {
-	return w.lifecycle.Remove(obj.(*Cluster))
+func (w *clusterLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Remove(obj.(*Cluster))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *clusterLifecycleAdapter) Updated(obj runtime.Object) error {
-	return w.lifecycle.Updated(obj.(*Cluster))
+func (w *clusterLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Updated(obj.(*Cluster))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
 func NewClusterLifecycleAdapter(name string, client ClusterInterface, l ClusterLifecycle) ClusterHandlerFunc {

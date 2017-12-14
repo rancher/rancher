@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/rancher/rke/cluster"
+	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/pki"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -27,10 +28,10 @@ func UpCommand() cli.Command {
 	}
 }
 
-func ClusterUp(clusterFile string) (string, string, string, string, error) {
+func ClusterUp(clusterFile string, customDialer hosts.Dialer) (string, string, string, string, error) {
 	logrus.Infof("Building Kubernetes cluster")
 	var APIURL, caCrt, clientCert, clientKey string
-	kubeCluster, err := cluster.ParseConfig(clusterFile)
+	kubeCluster, err := cluster.ParseConfig(clusterFile, customDialer)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
@@ -103,6 +104,6 @@ func clusterUpFromCli(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("Failed to resolve cluster file: %v", err)
 	}
-	_, _, _, _, err = ClusterUp(clusterFile)
+	_, _, _, _, err = ClusterUp(clusterFile, nil)
 	return err
 }

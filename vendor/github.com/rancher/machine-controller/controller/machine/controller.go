@@ -1,11 +1,10 @@
 package machine
 
 import (
-	"time"
-
+	"bytes"
 	"os"
-
 	"strings"
+	"time"
 
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -30,58 +29,58 @@ type Lifecycle struct {
 	machineTemplateClient v3.MachineTemplateInterface
 }
 
-func (m *Lifecycle) Create(obj *v3.Machine) error {
+func (m *Lifecycle) Create(obj *v3.Machine) (*v3.Machine, error) {
 	// No need to create a deepcopy of obj, obj is already a deepcopy
 	return m.createOrUpdate(obj)
 }
 
-func (m *Lifecycle) Updated(obj *v3.Machine) error {
+func (m *Lifecycle) Updated(obj *v3.Machine) (*v3.Machine, error) {
 	// YOU MUST CALL DEEPCOPY
 	objCopy := obj.DeepCopy()
 	return m.createOrUpdate(objCopy)
 }
 
-func (m *Lifecycle) Remove(obj *v3.Machine) error {
+func (m *Lifecycle) Remove(obj *v3.Machine) (*v3.Machine, error) {
 	// No need to create a deepcopy of obj, obj is already a deepcopy
 	if obj.Spec.Driver == "" {
-		return nil
+		return nil, nil
 	}
 	machineDir, err := buildBaseHostDir(obj.Name)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	logrus.Debugf("Creating machine storage directory %s", machineDir)
 	err = restoreMachineDir(obj, machineDir)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer os.RemoveAll(machineDir)
 
 	mExists, err := machineExists(machineDir, obj.Name)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if mExists {
 		logrus.Infof("Removing machine %s", obj.Name)
 		if err := deleteMachine(machineDir, obj); err != nil {
-			return err
+			return nil, err
 		}
 		logrus.Infof("Removing machine %s done", obj.Name)
 	}
-	return nil
+	return obj, nil
 }
 
-func (m *Lifecycle) createOrUpdate(obj *v3.Machine) error {
+func (m *Lifecycle) createOrUpdate(obj *v3.Machine) (*v3.Machine, error) {
 	if obj.Spec.Driver == "" {
-		return nil
+		return nil, nil
 	}
 	if obj.Status.Provisioned && obj.Status.ExtractedConfig != "" {
-		return nil
+		return nil, nil
 	}
 	machineDir, err := buildBaseHostDir(obj.Name)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	logrus.Debugf("Creating machine storage directory %s", machineDir)
 	if !obj.Status.Provisioned {
@@ -89,7 +88,7 @@ func (m *Lifecycle) createOrUpdate(obj *v3.Machine) error {
 		if obj.Spec.MachineTemplateName != "" {
 			machineTemplate, err := m.machineTemplateClient.Get(obj.Spec.MachineTemplateName, metav1.GetOptions{})
 			if err != nil {
-				return err
+				return nil, err
 			}
 			for k, v := range machineTemplate.Spec.PublicValues {
 				configRawMap[k] = v
@@ -103,17 +102,17 @@ func (m *Lifecycle) createOrUpdate(obj *v3.Machine) error {
 			case "amazonec2":
 				configRawMap, err = toMap(obj.Spec.AmazonEC2Config)
 				if err != nil {
-					return err
+					return nil, err
 				}
 			case "digitalocean":
 				configRawMap, err = toMap(obj.Spec.DigitalOceanConfig)
 				if err != nil {
-					return err
+					return nil, err
 				}
 			case "azure":
 				configRawMap, err = toMap(obj.Spec.AzureConfig)
 				if err != nil {
-					return err
+					return nil, err
 				}
 			}
 		}
@@ -123,11 +122,11 @@ func (m *Lifecycle) createOrUpdate(obj *v3.Machine) error {
 		logrus.Infof("Provisioning machine %s", obj.Name)
 		// at the beginning of provisioning we set status to unknown
 		if err := m.updateMachineCondition(obj, v1.ConditionUnknown, ProvisionedState, ""); err != nil {
-			return err
+			return nil, err
 		}
 		stdoutReader, stderrReader, err := startReturnOutput(cmd)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		defer cmd.Wait()
 		hostExist := false
@@ -137,62 +136,79 @@ func (m *Lifecycle) createOrUpdate(obj *v3.Machine) error {
 			}
 			if !hostExist {
 				if err := m.updateMachineCondition(obj, v1.ConditionFalse, ProvisionedState, err.Error()); err != nil {
-					return err
+					return nil, err
 				}
-				return err
+				return nil, err
 			}
 		}
 		if err := cmd.Wait(); err != nil {
 			if !hostExist {
 				if err := m.updateMachineCondition(obj, v1.ConditionFalse, ProvisionedState, err.Error()); err != nil {
-					return err
+					return nil, err
 				}
-				return err
+				return nil, err
 			}
 		}
 		obj, err = m.machineClient.Get(obj.Name, metav1.GetOptions{})
 		if err != nil {
-			return err
+			return nil, err
 		}
 		obj.Status.Provisioned = true
 		if obj, err = m.machineClient.Update(obj); err != nil {
-			return err
+			return nil, err
 		}
 		logrus.Infof("Provisioning machine %s done", obj.Name)
 	}
 	if obj.Status.ExtractedConfig == "" {
 		logrus.Infof("Generating and uploading machine config %s", obj.Name)
 		if err := waitUntilSSHKey(machineDir, obj); err != nil {
-			return err
+			return nil, err
 		}
 		sshkey, err := getSSHPrivateKey(machineDir, obj)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		destFile, err := createExtractedConfig(machineDir, obj)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		extractedConf, err := encodeFile(destFile)
 		if err != nil {
-			return err
+			return nil, err
 		}
+		command := buildCommand(machineDir, []string{"ip", obj.Name})
+		output, err := command.Output()
+		if err != nil {
+			return nil, err
+		}
+		ip := string(bytes.TrimSpace(output))
 		obj, err = m.machineClient.Get(obj.Name, metav1.GetOptions{})
 		if err != nil {
-			return err
+			return nil, err
 		}
+		obj.Status.Address = ip
 		obj.Status.ExtractedConfig = extractedConf
 		obj.Status.SSHPrivateKey = sshkey
+		sshUser := ""
+		switch obj.Spec.Driver {
+		case "amazonec2":
+			sshUser = obj.Spec.AmazonEC2Config.SSHUser
+		case "digitalocean":
+			sshUser = obj.Spec.DigitalOceanConfig.SSHUser
+		case "azure":
+			sshUser = obj.Spec.AzureConfig.SSHUser
+		}
+		obj.Status.SSHUser = sshUser
 		if obj, err = m.machineClient.Update(obj); err != nil {
-			return err
+			return nil, err
 		}
 		if err := m.updateMachineCondition(obj, v1.ConditionTrue, ProvisionedState, "Machine is ready"); err != nil {
-			return err
+			return nil, err
 		}
 		logrus.Infof("Generating and uploading machine config %s done", obj.Name)
 	}
 	os.RemoveAll(machineDir)
-	return nil
+	return obj, nil
 }
 
 func (m *Lifecycle) updateMachineCondition(obj *v3.Machine, status v1.ConditionStatus, state, reason string) error {

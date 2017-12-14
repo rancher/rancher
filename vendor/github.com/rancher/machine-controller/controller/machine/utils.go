@@ -39,7 +39,6 @@ const (
 	defaultCattleHome    = "/var/lib/cattle"
 	ProvisioningState    = "Provisioning"
 	ProvisionedState     = "Provisioned"
-	ErrorState           = "Error"
 )
 
 func buildBaseHostDir(machineName string) (string, error) {

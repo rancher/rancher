@@ -15,6 +15,8 @@ const (
 	ControlRole = "controlplane"
 	WorkerRole  = "worker"
 
+	SidekickServiceName = "sidekick"
+
 	KubeAPIContainerName        = "kube-api"
 	KubeletContainerName        = "kubelet"
 	KubeproxyContainerName      = "kube-proxy"
@@ -56,11 +58,11 @@ func runSidekick(host *hosts.Host, sidekickImage string) error {
 		return err
 	}
 	if isRunning {
-		logrus.Infof("[sidekick] Sidekick container already created on host [%s]", host.Address)
+		logrus.Infof("[%s] Sidekick container already created on host [%s]", SidekickServiceName, host.Address)
 		return nil
 	}
 	imageCfg, hostCfg := buildSidekickConfig(sidekickImage)
-	if err := docker.PullImage(host.DClient, host.Address, sidekickImage); err != nil {
+	if err := docker.UseLocalOrPull(host.DClient, host.Address, sidekickImage, SidekickServiceName); err != nil {
 		return err
 	}
 	if _, err := docker.CreateContiner(host.DClient, host.Address, SidekickContainerName, imageCfg, hostCfg); err != nil {

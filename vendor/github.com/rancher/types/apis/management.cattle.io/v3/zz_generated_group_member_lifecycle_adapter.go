@@ -6,25 +6,37 @@ import (
 )
 
 type GroupMemberLifecycle interface {
-	Create(obj *GroupMember) error
-	Remove(obj *GroupMember) error
-	Updated(obj *GroupMember) error
+	Create(obj *GroupMember) (*GroupMember, error)
+	Remove(obj *GroupMember) (*GroupMember, error)
+	Updated(obj *GroupMember) (*GroupMember, error)
 }
 
 type groupMemberLifecycleAdapter struct {
 	lifecycle GroupMemberLifecycle
 }
 
-func (w *groupMemberLifecycleAdapter) Create(obj runtime.Object) error {
-	return w.lifecycle.Create(obj.(*GroupMember))
+func (w *groupMemberLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Create(obj.(*GroupMember))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *groupMemberLifecycleAdapter) Finalize(obj runtime.Object) error {
-	return w.lifecycle.Remove(obj.(*GroupMember))
+func (w *groupMemberLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Remove(obj.(*GroupMember))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *groupMemberLifecycleAdapter) Updated(obj runtime.Object) error {
-	return w.lifecycle.Updated(obj.(*GroupMember))
+func (w *groupMemberLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Updated(obj.(*GroupMember))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
 func NewGroupMemberLifecycleAdapter(name string, client GroupMemberInterface, l GroupMemberLifecycle) GroupMemberHandlerFunc {

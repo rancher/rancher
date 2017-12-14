@@ -10,6 +10,9 @@ auth:
 # calico
 # canal
 # weave
+#
+# If you are using calico on AWS, use the network plugin config option:
+# 'cloud_provider: aws'
 network:
   plugin: flannel
   options:

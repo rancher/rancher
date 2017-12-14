@@ -6,6 +6,7 @@ import (
 
 const (
 	MachineType                          = "machine"
+	MachineFieldAddress                  = "address"
 	MachineFieldAllocatable              = "allocatable"
 	MachineFieldAmazonEC2Config          = "amazonEc2Config"
 	MachineFieldAnnotations              = "annotations"
@@ -48,6 +49,7 @@ const (
 	MachineFieldRequested                = "requested"
 	MachineFieldResourcePath             = "resourcePath"
 	MachineFieldSSHPrivateKey            = "sshPrivateKey"
+	MachineFieldSSHUser                  = "sshUser"
 	MachineFieldState                    = "state"
 	MachineFieldTaints                   = "taints"
 	MachineFieldTransitioning            = "transitioning"
@@ -60,6 +62,7 @@ const (
 
 type Machine struct {
 	types.Resource
+	Address                  string                    `json:"address,omitempty"`
 	Allocatable              map[string]string         `json:"allocatable,omitempty"`
 	AmazonEC2Config          *AmazonEC2Config          `json:"amazonEc2Config,omitempty"`
 	Annotations              map[string]string         `json:"annotations,omitempty"`
@@ -102,6 +105,7 @@ type Machine struct {
 	Requested                map[string]string         `json:"requested,omitempty"`
 	ResourcePath             string                    `json:"resourcePath,omitempty"`
 	SSHPrivateKey            string                    `json:"sshPrivateKey,omitempty"`
+	SSHUser                  string                    `json:"sshUser,omitempty"`
 	State                    string                    `json:"state,omitempty"`
 	Taints                   []Taint                   `json:"taints,omitempty"`
 	Transitioning            string                    `json:"transitioning,omitempty"`

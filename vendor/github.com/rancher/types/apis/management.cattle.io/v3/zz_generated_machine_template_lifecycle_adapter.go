@@ -6,25 +6,37 @@ import (
 )
 
 type MachineTemplateLifecycle interface {
-	Create(obj *MachineTemplate) error
-	Remove(obj *MachineTemplate) error
-	Updated(obj *MachineTemplate) error
+	Create(obj *MachineTemplate) (*MachineTemplate, error)
+	Remove(obj *MachineTemplate) (*MachineTemplate, error)
+	Updated(obj *MachineTemplate) (*MachineTemplate, error)
 }
 
 type machineTemplateLifecycleAdapter struct {
 	lifecycle MachineTemplateLifecycle
 }
 
-func (w *machineTemplateLifecycleAdapter) Create(obj runtime.Object) error {
-	return w.lifecycle.Create(obj.(*MachineTemplate))
+func (w *machineTemplateLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Create(obj.(*MachineTemplate))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *machineTemplateLifecycleAdapter) Finalize(obj runtime.Object) error {
-	return w.lifecycle.Remove(obj.(*MachineTemplate))
+func (w *machineTemplateLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Remove(obj.(*MachineTemplate))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *machineTemplateLifecycleAdapter) Updated(obj runtime.Object) error {
-	return w.lifecycle.Updated(obj.(*MachineTemplate))
+func (w *machineTemplateLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Updated(obj.(*MachineTemplate))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
 func NewMachineTemplateLifecycleAdapter(name string, client MachineTemplateInterface, l MachineTemplateLifecycle) MachineTemplateHandlerFunc {

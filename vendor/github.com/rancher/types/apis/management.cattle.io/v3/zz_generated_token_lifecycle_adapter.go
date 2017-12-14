@@ -6,25 +6,37 @@ import (
 )
 
 type TokenLifecycle interface {
-	Create(obj *Token) error
-	Remove(obj *Token) error
-	Updated(obj *Token) error
+	Create(obj *Token) (*Token, error)
+	Remove(obj *Token) (*Token, error)
+	Updated(obj *Token) (*Token, error)
 }
 
 type tokenLifecycleAdapter struct {
 	lifecycle TokenLifecycle
 }
 
-func (w *tokenLifecycleAdapter) Create(obj runtime.Object) error {
-	return w.lifecycle.Create(obj.(*Token))
+func (w *tokenLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Create(obj.(*Token))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *tokenLifecycleAdapter) Finalize(obj runtime.Object) error {
-	return w.lifecycle.Remove(obj.(*Token))
+func (w *tokenLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Remove(obj.(*Token))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *tokenLifecycleAdapter) Updated(obj runtime.Object) error {
-	return w.lifecycle.Updated(obj.(*Token))
+func (w *tokenLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Updated(obj.(*Token))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
 func NewTokenLifecycleAdapter(name string, client TokenInterface, l TokenLifecycle) TokenHandlerFunc {

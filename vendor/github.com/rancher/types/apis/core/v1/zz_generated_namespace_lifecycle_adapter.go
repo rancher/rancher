@@ -7,25 +7,37 @@ import (
 )
 
 type NamespaceLifecycle interface {
-	Create(obj *v1.Namespace) error
-	Remove(obj *v1.Namespace) error
-	Updated(obj *v1.Namespace) error
+	Create(obj *v1.Namespace) (*v1.Namespace, error)
+	Remove(obj *v1.Namespace) (*v1.Namespace, error)
+	Updated(obj *v1.Namespace) (*v1.Namespace, error)
 }
 
 type namespaceLifecycleAdapter struct {
 	lifecycle NamespaceLifecycle
 }
 
-func (w *namespaceLifecycleAdapter) Create(obj runtime.Object) error {
-	return w.lifecycle.Create(obj.(*v1.Namespace))
+func (w *namespaceLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Create(obj.(*v1.Namespace))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *namespaceLifecycleAdapter) Finalize(obj runtime.Object) error {
-	return w.lifecycle.Remove(obj.(*v1.Namespace))
+func (w *namespaceLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Remove(obj.(*v1.Namespace))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
-func (w *namespaceLifecycleAdapter) Updated(obj runtime.Object) error {
-	return w.lifecycle.Updated(obj.(*v1.Namespace))
+func (w *namespaceLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error) {
+	o, err := w.lifecycle.Updated(obj.(*v1.Namespace))
+	if o == nil {
+		return nil, err
+	}
+	return o, err
 }
 
 func NewNamespaceLifecycleAdapter(name string, client NamespaceInterface, l NamespaceLifecycle) NamespaceHandlerFunc {

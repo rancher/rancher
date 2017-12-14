@@ -11,7 +11,10 @@ const (
 	CNIImage         = "cniImage"
 	NodeImage        = "nodeImage"
 	ControllersImage = "controllersImage"
+	CalicoctlImage   = "calicoctlImage"
 	FlannelImage     = "flannelImage"
 	FlannelCNIImage  = "flannelCNIImage"
 	FlannelIface     = "flannelIface"
+	CloudProvider    = "cloudprovider"
+	AWSCloudProvider = "aws"
 )
