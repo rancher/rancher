@@ -16,8 +16,8 @@ import (
 
 var (
 	DynamicSchemaGroupVersionKind = schema.GroupVersionKind{
-		Version: "v3",
-		Group:   "management.cattle.io",
+		Version: Version,
+		Group:   GroupName,
 		Kind:    "DynamicSchema",
 	}
 	DynamicSchemaResource = metav1.APIResource{
@@ -60,6 +60,8 @@ type DynamicSchemaInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() DynamicSchemaController
+	AddSyncHandler(sync DynamicSchemaHandlerFunc)
+	AddLifecycle(name string, lifecycle DynamicSchemaLifecycle)
 }
 
 type dynamicSchemaLister struct {
@@ -190,4 +192,13 @@ func (s *dynamicSchemaClient) Watch(opts metav1.ListOptions) (watch.Interface, e
 
 func (s *dynamicSchemaClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
+}
+
+func (s *dynamicSchemaClient) AddSyncHandler(sync DynamicSchemaHandlerFunc) {
+	s.Controller().AddHandler(sync)
+}
+
+func (s *dynamicSchemaClient) AddLifecycle(name string, lifecycle DynamicSchemaLifecycle) {
+	sync := NewDynamicSchemaLifecycleAdapter(name, s, lifecycle)
+	s.AddSyncHandler(sync)
 }

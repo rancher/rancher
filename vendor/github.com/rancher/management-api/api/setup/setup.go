@@ -30,7 +30,8 @@ func Schemas(ctx context.Context, management *config.ManagementContext, schemas 
 	ProjectLinks(schemas, management)
 	Templates(schemas)
 	ClusterRegistrationTokens(schemas)
-	addUserAction(schemas)
+	User(schemas)
+	Catalog(schemas)
 
 	crdStore, err := crd.NewCRDStoreFromConfig(management.RESTConfig)
 	if err != nil {
@@ -57,6 +58,15 @@ func Templates(schemas *types.Schemas) {
 	schema := schemas.Schema(&managementschema.Version, client.TemplateType)
 	schema.Formatter = catalog.TemplateFormatter
 	schema.LinkHandler = catalog.TemplateIconHandler
+}
+
+func Catalog(schemas *types.Schemas) {
+	schema := schemas.Schema(&managementschema.Version, client.CatalogType)
+	schema.ResourceActions = map[string]types.Action{
+		"refresh": {},
+	}
+	schema.Formatter = catalog.Formatter
+	schema.ActionHandler = catalog.RefreshActionHandler
 }
 
 func ClusterRegistrationTokens(schemas *types.Schemas) {
@@ -92,7 +102,7 @@ func Subscribe(schemas *types.Schemas) {
 	})
 }
 
-func addUserAction(schemas *types.Schemas) {
+func User(schemas *types.Schemas) {
 	schemas.MustImport(&managementschema.Version, authn.ChangePasswordInput{})
 	schema := schemas.Schema(&managementschema.Version, client.UserType)
 	schema.ResourceActions = map[string]types.Action{

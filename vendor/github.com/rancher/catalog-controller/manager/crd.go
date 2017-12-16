@@ -72,27 +72,18 @@ func (m *Manager) update(catalog *v3.Catalog, templates []v3.Template) error {
 			}
 			updateTemplate.Spec = template.Spec
 			logrus.Debugf("Updating template %s", name)
-			updateTemplate, err = m.templateClient.Update(updateTemplate)
+			result, err := m.templateClient.Update(updateTemplate)
 			if err != nil {
 				if strings.Contains(err.Error(), "request is too large") || strings.Contains(err.Error(), "exceeding the max size") {
-					updateTemplate.Spec.Icon = ""
-					if _, err := m.templateClient.Update(updateTemplate); err != nil {
-						return err
-					}
-					if err := m.deleteTemplateVersions(*updateTemplate); err != nil {
-						return err
-					}
-					if err := m.createTemplateVersions(updateTemplate.Spec.Versions, *updateTemplate); err != nil {
-						return err
-					}
+					logrus.Warnf("Template %s size is too large. Skipping", template.Name)
 					continue
 				}
 				return errors.Wrapf(err, "failed to update template %s", template.Name)
 			}
-			if err := m.deleteTemplateVersions(*updateTemplate); err != nil {
+			if err := m.deleteTemplateVersions(*result); err != nil {
 				return err
 			}
-			if err := m.createTemplateVersions(updateTemplate.Spec.Versions, *updateTemplate); err != nil {
+			if err := m.createTemplateVersions(updateTemplate.Spec.Versions, *result); err != nil {
 				return err
 			}
 		}
@@ -118,14 +109,7 @@ func (m *Manager) update(catalog *v3.Catalog, templates []v3.Template) error {
 			if err != nil {
 				// hack for the image size that are too big
 				if strings.Contains(err.Error(), "request is too large") || strings.Contains(err.Error(), "exceeding the max size") {
-					template.Spec.Icon = ""
-					template, err := m.templateClient.Create(&template)
-					if err != nil {
-						return err
-					}
-					if err := m.createTemplateVersions(template.Spec.Versions, *template); err != nil {
-						return err
-					}
+					logrus.Warnf("Template %s size is too large. Skipping", template.Name)
 					continue
 				}
 				return err

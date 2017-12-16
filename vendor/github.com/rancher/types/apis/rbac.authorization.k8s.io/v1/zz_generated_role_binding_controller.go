@@ -17,8 +17,8 @@ import (
 
 var (
 	RoleBindingGroupVersionKind = schema.GroupVersionKind{
-		Version: "v1",
-		Group:   "rbac.authorization.k8s.io",
+		Version: Version,
+		Group:   GroupName,
 		Kind:    "RoleBinding",
 	}
 	RoleBindingResource = metav1.APIResource{
@@ -61,6 +61,8 @@ type RoleBindingInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() RoleBindingController
+	AddSyncHandler(sync RoleBindingHandlerFunc)
+	AddLifecycle(name string, lifecycle RoleBindingLifecycle)
 }
 
 type roleBindingLister struct {
@@ -191,4 +193,13 @@ func (s *roleBindingClient) Watch(opts metav1.ListOptions) (watch.Interface, err
 
 func (s *roleBindingClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
+}
+
+func (s *roleBindingClient) AddSyncHandler(sync RoleBindingHandlerFunc) {
+	s.Controller().AddHandler(sync)
+}
+
+func (s *roleBindingClient) AddLifecycle(name string, lifecycle RoleBindingLifecycle) {
+	sync := NewRoleBindingLifecycleAdapter(name, s, lifecycle)
+	s.AddSyncHandler(sync)
 }

@@ -134,6 +134,10 @@ func (u *urlBuilder) FilterLink(schema *types.Schema, fieldName string, value st
 		url.QueryEscape(fieldName) + "=" + url.QueryEscape(value)
 }
 
+func (u *urlBuilder) ResourceLinkByID(schema *types.Schema, id string) string {
+	return u.constructBasicURL(schema.Version, schema.PluralName, id)
+}
+
 func (u *urlBuilder) constructBasicURL(version types.APIVersion, parts ...string) string {
 	buffer := bytes.Buffer{}
 

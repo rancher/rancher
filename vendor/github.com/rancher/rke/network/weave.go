@@ -1,7 +1,14 @@
 package network
 
-func GetWeaveManifest(clusterCIDR, image, cniImage string) string {
-	return `# This ConfigMap can be used to configure a self-hosted Weave Net installation.
+import "github.com/rancher/rke/services"
+
+func GetWeaveManifest(weaveConfig map[string]string) string {
+	rbacConfig := ""
+	if weaveConfig[RBACConfig] == services.RBACAuthorizationMode {
+		rbacConfig = getWeaveRBACManifest()
+	}
+	return `
+# This ConfigMap can be used to configure a self-hosted Weave Net installation.
 apiVersion: v1
 kind: List
 items:
@@ -34,8 +41,8 @@ items:
                       apiVersion: v1
                       fieldPath: spec.nodeName
                 - name: IPALLOC_RANGE
-                  value: "` + clusterCIDR + `"
-              image: ` + image + `
+                  value: "` + weaveConfig[ClusterCIDR] + `"
+              image: ` + weaveConfig[WeaveImage] + `
               livenessProbe:
                 httpGet:
                   host: 127.0.0.1
@@ -70,7 +77,7 @@ items:
                     fieldRef:
                       apiVersion: v1
                       fieldPath: spec.nodeName
-              image: ` + cniImage + `
+              image: ` + weaveConfig[WeaveCNIImage] + `
               resources:
                 requests:
                   cpu: 10m
@@ -112,5 +119,100 @@ items:
                 path: /run/xtables.lock
       updateStrategy:
         type: RollingUpdate
-`
+
+` + rbacConfig
+}
+
+func getWeaveRBACManifest() string {
+	return `
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: weave-net
+  labels:
+    name: weave-net
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: weave-net
+  labels:
+    name: weave-net
+rules:
+  - apiGroups:
+      - ''
+    resources:
+      - pods
+      - namespaces
+      - nodes
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - networkpolicies
+    verbs:
+      - get
+      - list
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: weave-net
+  labels:
+    name: weave-net
+roleRef:
+  kind: ClusterRole
+  name: weave-net
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+  - kind: ServiceAccount
+    name: weave-net
+    namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: Role
+metadata:
+  name: weave-net
+  labels:
+    name: weave-net
+  namespace: kube-system
+rules:
+  - apiGroups:
+      - ''
+    resourceNames:
+      - weave-net
+    resources:
+      - configmaps
+    verbs:
+      - get
+      - update
+  - apiGroups:
+      - ''
+    resources:
+      - configmaps
+    verbs:
+      - create
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: RoleBinding
+metadata:
+  name: weave-net
+  labels:
+    name: weave-net
+  namespace: kube-system
+roleRef:
+  kind: Role
+  name: weave-net
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+  - kind: ServiceAccount
+    name: weave-net
+    namespace: kube-system`
+
 }

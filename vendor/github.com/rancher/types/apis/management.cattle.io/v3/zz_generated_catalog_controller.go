@@ -16,8 +16,8 @@ import (
 
 var (
 	CatalogGroupVersionKind = schema.GroupVersionKind{
-		Version: "v3",
-		Group:   "management.cattle.io",
+		Version: Version,
+		Group:   GroupName,
 		Kind:    "Catalog",
 	}
 	CatalogResource = metav1.APIResource{
@@ -60,6 +60,8 @@ type CatalogInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() CatalogController
+	AddSyncHandler(sync CatalogHandlerFunc)
+	AddLifecycle(name string, lifecycle CatalogLifecycle)
 }
 
 type catalogLister struct {
@@ -190,4 +192,13 @@ func (s *catalogClient) Watch(opts metav1.ListOptions) (watch.Interface, error) 
 
 func (s *catalogClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
+}
+
+func (s *catalogClient) AddSyncHandler(sync CatalogHandlerFunc) {
+	s.Controller().AddHandler(sync)
+}
+
+func (s *catalogClient) AddLifecycle(name string, lifecycle CatalogLifecycle) {
+	sync := NewCatalogLifecycleAdapter(name, s, lifecycle)
+	s.AddSyncHandler(sync)
 }

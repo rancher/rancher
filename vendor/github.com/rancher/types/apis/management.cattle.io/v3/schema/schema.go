@@ -135,7 +135,7 @@ func machineTypes(schemas *types.Schemas) *types.Schemas {
 			&m.Embed{Field: "status"},
 			&m.Move{From: "name", To: "id"},
 			&m.Move{From: "nodeName", To: "name"}).
-		AddMapperForType(&Version, v3.MachineDriver{}, m.DisplayName{}).
+		AddMapperForType(&Version, v3.MachineDriver{}).
 		AddMapperForType(&Version, v3.MachineTemplate{}, m.DisplayName{}).
 		MustImport(&Version, v3.Machine{}).
 		MustImport(&Version, v3.MachineDriver{}).

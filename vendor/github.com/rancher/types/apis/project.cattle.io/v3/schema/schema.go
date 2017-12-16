@@ -205,6 +205,9 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 		AddMapperForType(&Version, v1.PodTemplateSpec{},
 			&m.Embed{Field: "spec"},
 		).
+		AddMapperForType(&Version, v1.HTTPGetAction{},
+			&m.Drop{Field: "host"},
+		).
 		AddMapperForType(&Version, v1.Capabilities{},
 			m.Move{From: "add", To: "capAdd"},
 			m.Move{From: "drop", To: "capDrop"},

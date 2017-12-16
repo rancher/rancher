@@ -15,10 +15,10 @@ import (
 
 type Host struct {
 	v3.RKEConfigNode
-	DClient   *client.Client
-	Dialer    Dialer
-	IsControl bool
-	IsWorker  bool
+	DClient             *client.Client
+	IsControl           bool
+	IsWorker            bool
+	IgnoreDockerVersion bool
 }
 
 const (
@@ -87,24 +87,6 @@ func (h *Host) CleanUp(toCleanPaths []string, cleanerImage string) error {
 		return err
 	}
 	logrus.Infof("[hosts] Successfully cleaned up host [%s]", h.Address)
-	return nil
-}
-
-func (h *Host) RegisterDialer(customDialer Dialer) error {
-	if customDialer == nil {
-		logrus.Infof("[ssh] Setup tunnel for host [%s]", h.Address)
-		key, err := checkEncryptedKey(h.SSHKey, h.SSHKeyPath)
-		if err != nil {
-			return fmt.Errorf("Failed to parse the private key: %v", err)
-		}
-		dialer := &sshDialer{
-			host:   h,
-			signer: key,
-		}
-		h.Dialer = dialer
-	} else {
-		h.Dialer = customDialer
-	}
 	return nil
 }
 

@@ -51,7 +51,7 @@ func (p *PrefixTypeStore) Update(apiContext *types.APIContext, schema *types.Sch
 	return addTypeToID(data), err
 }
 
-func (p *PrefixTypeStore) Delete(apiContext *types.APIContext, schema *types.Schema, id string) error {
+func (p *PrefixTypeStore) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
 	_, shortID := splitTypeAndID(id)
 	return p.Store.Delete(apiContext, schema, shortID)
 }

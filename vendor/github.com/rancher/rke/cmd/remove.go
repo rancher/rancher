@@ -8,6 +8,7 @@ import (
 
 	"github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/hosts"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
@@ -33,9 +34,9 @@ func RemoveCommand() cli.Command {
 	}
 }
 
-func ClusterRemove(clusterFile string, customDialer hosts.Dialer) error {
+func ClusterRemove(rkeConfig *v3.RancherKubernetesEngineConfig, dialerFactory hosts.DialerFactory) error {
 	logrus.Infof("Tearing down Kubernetes cluster")
-	kubeCluster, err := cluster.ParseConfig(clusterFile, customDialer)
+	kubeCluster, err := cluster.ParseCluster(rkeConfig, clusterFilePath, dialerFactory)
 	if err != nil {
 		return err
 	}
@@ -69,9 +70,15 @@ func clusterRemoveFromCli(ctx *cli.Context) error {
 			return nil
 		}
 	}
-	clusterFile, err := resolveClusterFile(ctx)
+	clusterFile, filePath, err := resolveClusterFile(ctx)
 	if err != nil {
 		return fmt.Errorf("Failed to resolve cluster file: %v", err)
 	}
-	return ClusterRemove(clusterFile, nil)
+	clusterFilePath = filePath
+
+	rkeConfig, err := cluster.ParseConfig(clusterFile)
+	if err != nil {
+		return fmt.Errorf("Failed to parse cluster file: %v", err)
+	}
+	return ClusterRemove(rkeConfig, nil)
 }

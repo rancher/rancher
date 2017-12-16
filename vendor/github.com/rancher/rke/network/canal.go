@@ -1,7 +1,15 @@
 package network
 
+import "github.com/rancher/rke/services"
+
 func GetCanalManifest(canalConfig map[string]string) string {
-	return `# This ConfigMap can be used to configure a self-hosted Canal installation.
+	rbacConfig := ""
+	if canalConfig[RBACConfig] == services.RBACAuthorizationMode {
+		rbacConfig = getCanalRBACManifest()
+	}
+	return rbacConfig + `
+---
+# This ConfigMap can be used to configure a self-hosted Canal installation.
 kind: ConfigMap
 apiVersion: v1
 metadata:
@@ -326,5 +334,125 @@ kind: ServiceAccount
 metadata:
   name: canal
   namespace: kube-system
+`
+}
+
+func getCanalRBACManifest() string {
+	return `
+# Calico Roles
+# Pulled from https://docs.projectcalico.org/v2.5/getting-started/kubernetes/installation/hosted/rbac-kdd.yaml
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: calico
+rules:
+  - apiGroups: [""]
+    resources:
+      - namespaces
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups: [""]
+    resources:
+      - pods/status
+    verbs:
+      - update
+  - apiGroups: [""]
+    resources:
+      - pods
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups: [""]
+    resources:
+      - nodes
+    verbs:
+      - get
+      - list
+      - update
+      - watch
+  - apiGroups: ["extensions"]
+    resources:
+      - networkpolicies
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups: ["crd.projectcalico.org"]
+    resources:
+      - globalfelixconfigs
+      - bgppeers
+      - globalbgpconfigs
+      - ippools
+      - globalnetworkpolicies
+    verbs:
+      - create
+      - get
+      - list
+      - update
+      - watch
+
+---
+
+# Flannel roles
+# Pulled from https://github.com/coreos/flannel/blob/master/Documentation/kube-flannel-rbac.yml
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: flannel
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+    verbs:
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - nodes/status
+    verbs:
+      - patch
+---
+
+# Bind the flannel ClusterRole to the canal ServiceAccount.
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: canal-flannel
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: flannel
+subjects:
+- kind: ServiceAccount
+  name: canal
+  namespace: kube-system
+
+---
+
+# Bind the calico ClusterRole to the canal ServiceAccount.
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: canal-calico
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: calico
+subjects:
+- kind: ServiceAccount
+  name: canal
+  namespace: kube-system
+
 `
 }

@@ -8,29 +8,26 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-type Dialer interface {
-	NewHTTPClient() (*http.Client, error)
-}
+type DialerFactory func(h *Host) (func(network, address string) (net.Conn, error), error)
 
-type sshDialer struct {
+type dialer struct {
 	host   *Host
 	signer ssh.Signer
 }
 
-func (d *sshDialer) NewHTTPClient() (*http.Client, error) {
-	dialer := &sshDialer{
-		host:   d.host,
-		signer: d.signer,
+func SSHFactory(h *Host) (func(network, address string) (net.Conn, error), error) {
+	key, err := checkEncryptedKey(h.SSHKey, h.SSHKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to parse the private key: %v", err)
 	}
-	httpClient := &http.Client{
-		Transport: &http.Transport{
-			Dial: dialer.Dial,
-		},
+	dialer := &dialer{
+		host:   h,
+		signer: key,
 	}
-	return httpClient, nil
+	return dialer.Dial, nil
 }
 
-func (d *sshDialer) Dial(network, addr string) (net.Conn, error) {
+func (d *dialer) Dial(network, addr string) (net.Conn, error) {
 	sshAddr := d.host.Address + ":22"
 	// Build SSH client configuration
 	cfg, err := makeSSHConfig(d.host.User, d.signer)
@@ -50,4 +47,24 @@ func (d *sshDialer) Dial(network, addr string) (net.Conn, error) {
 		return nil, fmt.Errorf("Failed to dial to Docker socket: %v", err)
 	}
 	return remote, err
+}
+
+func (h *Host) newHTTPClient(dialerFactory DialerFactory) (*http.Client, error) {
+	var factory DialerFactory
+
+	if dialerFactory == nil {
+		factory = SSHFactory
+	} else {
+		factory = dialerFactory
+	}
+
+	dialer, err := factory(h)
+	if err != nil {
+		return nil, err
+	}
+	return &http.Client{
+		Transport: &http.Transport{
+			Dial: dialer,
+		},
+	}, nil
 }

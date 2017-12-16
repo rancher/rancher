@@ -1,11 +1,7 @@
 package machine
 
 import (
-	"archive/tar"
 	"bufio"
-	"bytes"
-	"compress/gzip"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -21,7 +17,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
-	"k8s.io/api/core/v1"
 )
 
 var regExHyphen = regexp.MustCompile("([a-z])([A-Z])")
@@ -37,8 +32,6 @@ const (
 	machineDirEnvKey     = "MACHINE_STORAGE_PATH="
 	machineCmd           = "docker-machine"
 	defaultCattleHome    = "/var/lib/cattle"
-	ProvisioningState    = "Provisioning"
-	ProvisionedState     = "Provisioned"
 )
 
 func buildBaseHostDir(machineName string) (string, error) {
@@ -71,16 +64,16 @@ func toMap(obj interface{}) (map[string]interface{}, error) {
 }
 
 func buildCreateCommand(machine *v3.Machine, configMap map[string]interface{}) []string {
-	sDriver := strings.ToLower(machine.Spec.Driver)
+	sDriver := strings.ToLower(machine.Status.MachineTemplateSpec.Driver)
 	cmd := []string{"create", "-d", sDriver}
 
-	cmd = append(cmd, buildEngineOpts("--engine-install-url", []string{machine.Spec.EngineInstallURL})...)
-	cmd = append(cmd, buildEngineOpts("--engine-opt", mapToSlice(machine.Spec.EngineOpt))...)
-	cmd = append(cmd, buildEngineOpts("--engine-env", mapToSlice(machine.Spec.EngineEnv))...)
-	cmd = append(cmd, buildEngineOpts("--engine-insecure-registry", machine.Spec.EngineInsecureRegistry)...)
-	cmd = append(cmd, buildEngineOpts("--engine-label", mapToSlice(machine.Spec.EngineLabel))...)
-	cmd = append(cmd, buildEngineOpts("--engine-registry-mirror", machine.Spec.EngineRegistryMirror)...)
-	cmd = append(cmd, buildEngineOpts("--engine-storage-driver", []string{machine.Spec.EngineStorageDriver})...)
+	cmd = append(cmd, buildEngineOpts("--engine-install-url", []string{machine.Status.MachineTemplateSpec.EngineInstallURL})...)
+	cmd = append(cmd, buildEngineOpts("--engine-opt", mapToSlice(machine.Status.MachineTemplateSpec.EngineOpt))...)
+	cmd = append(cmd, buildEngineOpts("--engine-env", mapToSlice(machine.Status.MachineTemplateSpec.EngineEnv))...)
+	cmd = append(cmd, buildEngineOpts("--engine-insecure-registry", machine.Status.MachineTemplateSpec.EngineInsecureRegistry)...)
+	cmd = append(cmd, buildEngineOpts("--engine-label", mapToSlice(machine.Status.MachineTemplateSpec.EngineLabel))...)
+	cmd = append(cmd, buildEngineOpts("--engine-registry-mirror", machine.Status.MachineTemplateSpec.EngineRegistryMirror)...)
+	cmd = append(cmd, buildEngineOpts("--engine-storage-driver", []string{machine.Status.MachineTemplateSpec.EngineStorageDriver})...)
 
 	for k, v := range configMap {
 		dmField := "--" + sDriver + "-" + strings.ToLower(regExHyphen.ReplaceAllString(k, "${1}-${2}"))
@@ -151,7 +144,7 @@ func initEnviron(machineDir string) []string {
 	return env
 }
 
-func startReturnOutput(command *exec.Cmd) (io.Reader, io.Reader, error) {
+func startReturnOutput(command *exec.Cmd) (io.ReadCloser, io.ReadCloser, error) {
 	readerStdout, err := command.StdoutPipe()
 	if err != nil {
 		return nil, nil, err
@@ -162,14 +155,21 @@ func startReturnOutput(command *exec.Cmd) (io.Reader, io.Reader, error) {
 		return nil, nil, err
 	}
 
-	err = command.Start()
-	if err != nil {
-
-		defer readerStdout.Close()
-		defer readerStderr.Close()
+	if err := command.Start(); err != nil {
+		readerStdout.Close()
+		readerStderr.Close()
 		return nil, nil, err
 	}
+
 	return readerStdout, readerStderr, nil
+}
+
+func getSSHKey(machineDir string, obj *v3.Machine) (string, error) {
+	if err := waitUntilSSHKey(machineDir, obj); err != nil {
+		return "", err
+	}
+
+	return getSSHPrivateKey(machineDir, obj)
 }
 
 func (m *Lifecycle) reportStatus(stdoutReader io.Reader, stderrReader io.Reader, machine *v3.Machine) error {
@@ -177,13 +177,11 @@ func (m *Lifecycle) reportStatus(stdoutReader io.Reader, stderrReader io.Reader,
 	for scanner.Scan() {
 		msg := scanner.Text()
 		logrus.Infof("stdout: %s", msg)
-		_, err := filterDockerMessage(msg, machine, false)
+		_, err := filterDockerMessage(msg, machine)
 		if err != nil {
 			return err
 		}
-		if err := m.updateMachineCondition(machine, v1.ConditionTrue, ProvisioningState, msg); err != nil {
-			return err
-		}
+		m.logger.Info(machine, msg)
 	}
 	scanner = bufio.NewScanner(stderrReader)
 	for scanner.Scan() {
@@ -193,144 +191,14 @@ func (m *Lifecycle) reportStatus(stdoutReader io.Reader, stderrReader io.Reader,
 	return nil
 }
 
-func filterDockerMessage(msg string, machine *v3.Machine, errMsg bool) (string, error) {
-	if strings.Contains(msg, errorCreatingMachine) || errMsg {
+func filterDockerMessage(msg string, machine *v3.Machine) (string, error) {
+	if strings.Contains(msg, errorCreatingMachine) {
 		return "", errors.New(msg)
 	}
 	if strings.Contains(msg, machine.Name) {
 		return "", nil
 	}
 	return msg, nil
-}
-
-func createExtractedConfig(baseDir string, machine *v3.Machine) (string, error) {
-	// create the tar.gz file
-	destFile := filepath.Join(baseDir, machine.Name+".tar.gz")
-	tarfile, err := os.Create(destFile)
-	if err != nil {
-		return "", err
-	}
-	defer tarfile.Close()
-	fileWriter := gzip.NewWriter(tarfile)
-	defer fileWriter.Close()
-	tarfileWriter := tar.NewWriter(fileWriter)
-	defer tarfileWriter.Close()
-
-	if err := addDirToArchive(baseDir, tarfileWriter); err != nil {
-		return "", err
-	}
-
-	return destFile, nil
-}
-
-func addDirToArchive(source string, tarfileWriter *tar.Writer) error {
-	baseDir := filepath.Base(source)
-
-	return filepath.Walk(source,
-		func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-
-			if path == source || strings.HasSuffix(info.Name(), ".iso") ||
-				strings.HasSuffix(info.Name(), ".tar.gz") ||
-				strings.HasSuffix(info.Name(), ".vmdk") ||
-				strings.HasSuffix(info.Name(), ".img") {
-				return nil
-			}
-
-			header, err := tar.FileInfoHeader(info, info.Name())
-			if err != nil {
-				return err
-			}
-
-			header.Name = filepath.Join(baseDir, strings.TrimPrefix(path, source))
-
-			if err := tarfileWriter.WriteHeader(header); err != nil {
-				return err
-			}
-
-			if info.IsDir() {
-				return nil
-			}
-
-			file, err := os.Open(path)
-			if err != nil {
-				return err
-			}
-			defer file.Close()
-			_, err = io.Copy(tarfileWriter, file)
-			return err
-		})
-}
-
-func encodeFile(destFile string) (string, error) {
-	extractedTarfile, err := ioutil.ReadFile(destFile)
-	if err != nil {
-		return "", err
-	}
-
-	extractedEncodedConfig := base64.StdEncoding.EncodeToString(extractedTarfile)
-	if err != nil {
-		return "", err
-	}
-
-	return extractedEncodedConfig, nil
-}
-
-func restoreMachineDir(machine *v3.Machine, baseDir string) error {
-	machineBaseDir := filepath.Dir(baseDir)
-	if err := os.MkdirAll(machineBaseDir, 0740); err != nil {
-		return fmt.Errorf("Error reinitializing config (MkdirAll). Config Dir: %v. Error: %v", machineBaseDir, err)
-	}
-
-	if machine.Status.ExtractedConfig == "" {
-		return nil
-	}
-
-	configBytes, err := base64.StdEncoding.DecodeString(machine.Status.ExtractedConfig)
-	if err != nil {
-		return fmt.Errorf("Error reinitializing config (base64.DecodeString). Config Dir: %v. Error: %v", machineBaseDir, err)
-	}
-
-	gzipReader, err := gzip.NewReader(bytes.NewReader(configBytes))
-	if err != nil {
-		return err
-	}
-	tarReader := tar.NewReader(gzipReader)
-
-	for {
-		header, err := tarReader.Next()
-		if err != nil {
-			if err == io.EOF {
-				return nil
-			}
-			return fmt.Errorf("Error reinitializing config (tarRead.Next). Config Dir: %v. Error: %v", machineBaseDir, err)
-		}
-
-		filename := header.Name
-		filePath := filepath.Join(machineBaseDir, filename)
-		logrus.Debugf("Extracting %v", filePath)
-
-		info := header.FileInfo()
-		if info.IsDir() {
-			err = os.MkdirAll(filePath, os.FileMode(header.Mode))
-			if err != nil {
-				return fmt.Errorf("Error reinitializing config (Mkdirall). Config Dir: %v. Dir: %v. Error: %v", machineBaseDir, info.Name(), err)
-			}
-			continue
-		}
-
-		file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
-		if err != nil {
-			return fmt.Errorf("Error reinitializing config (OpenFile). Config Dir: %v. File: %v. Error: %v", machineBaseDir, info.Name(), err)
-		}
-		defer file.Close()
-		_, err = io.Copy(file, tarReader)
-		if err != nil {
-			return fmt.Errorf("Error reinitializing config (Copy). Config Dir: %v. File: %v. Error: %v", machineBaseDir, info.Name(), err)
-		}
-	}
 }
 
 func machineExists(machineDir string, name string) (bool, error) {

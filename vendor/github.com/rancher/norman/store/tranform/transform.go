@@ -100,6 +100,6 @@ func (t *TransformingStore) Update(apiContext *types.APIContext, schema *types.S
 	return t.Transformer(apiContext, data)
 }
 
-func (t *TransformingStore) Delete(apiContext *types.APIContext, schema *types.Schema, id string) error {
+func (t *TransformingStore) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
 	return t.Store.Delete(apiContext, schema, id)
 }

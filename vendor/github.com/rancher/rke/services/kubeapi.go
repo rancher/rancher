@@ -11,9 +11,9 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
-func runKubeAPI(host *hosts.Host, etcdHosts []*hosts.Host, kubeAPIService v3.KubeAPIService) error {
+func runKubeAPI(host *hosts.Host, etcdHosts []*hosts.Host, kubeAPIService v3.KubeAPIService, authorizationMode string) error {
 	etcdConnString := GetEtcdConnString(etcdHosts)
-	imageCfg, hostCfg := buildKubeAPIConfig(host, kubeAPIService, etcdConnString)
+	imageCfg, hostCfg := buildKubeAPIConfig(host, kubeAPIService, etcdConnString, authorizationMode)
 	return docker.DoRunContainer(host.DClient, imageCfg, hostCfg, KubeAPIContainerName, host.Address, ControlRole)
 }
 
@@ -21,7 +21,7 @@ func removeKubeAPI(host *hosts.Host) error {
 	return docker.DoRemoveContainer(host.DClient, KubeAPIContainerName, host.Address)
 }
 
-func buildKubeAPIConfig(host *hosts.Host, kubeAPIService v3.KubeAPIService, etcdConnString string) (*container.Config, *container.HostConfig) {
+func buildKubeAPIConfig(host *hosts.Host, kubeAPIService v3.KubeAPIService, etcdConnString, authorizationMode string) (*container.Config, *container.HostConfig) {
 	imageCfg := &container.Config{
 		Image: kubeAPIService.Image,
 		Entrypoint: []string{"/opt/rke/entrypoint.sh",
@@ -43,6 +43,9 @@ func buildKubeAPIConfig(host *hosts.Host, kubeAPIService v3.KubeAPIService, etcd
 			"--tls-cert-file=" + pki.KubeAPICertPath,
 			"--tls-private-key-file=" + pki.KubeAPIKeyPath,
 			"--service-account-key-file=" + pki.KubeAPIKeyPath},
+	}
+	if authorizationMode == RBACAuthorizationMode {
+		imageCfg.Cmd = append(imageCfg.Cmd, "--authorization-mode=RBAC")
 	}
 	hostCfg := &container.HostConfig{
 		VolumesFrom: []string{

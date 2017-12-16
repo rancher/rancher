@@ -43,7 +43,7 @@ func reconcileWorker(currentCluster, kubeCluster *Cluster, kubeClient *kubernete
 			return fmt.Errorf("Failed to delete worker node %s from cluster", toDeleteHost.Address)
 		}
 		// attempting to clean services/files on the host
-		if err := reconcileHost(toDeleteHost, true, currentCluster.SystemImages[AplineImage]); err != nil {
+		if err := reconcileHost(toDeleteHost, true, currentCluster.SystemImages[AplineImage], currentCluster.DialerFactory); err != nil {
 			logrus.Warnf("[reconcile] Couldn't clean up worker node [%s]: %v", toDeleteHost.Address, err)
 			continue
 		}
@@ -75,7 +75,7 @@ func reconcileControl(currentCluster, kubeCluster *Cluster, kubeClient *kubernet
 			return fmt.Errorf("Failed to delete controlplane node %s from cluster", toDeleteHost.Address)
 		}
 		// attempting to clean services/files on the host
-		if err := reconcileHost(toDeleteHost, false, currentCluster.SystemImages[AplineImage]); err != nil {
+		if err := reconcileHost(toDeleteHost, false, currentCluster.SystemImages[AplineImage], currentCluster.DialerFactory); err != nil {
 			logrus.Warnf("[reconcile] Couldn't clean up controlplane node [%s]: %v", toDeleteHost.Address, err)
 			continue
 		}
@@ -96,8 +96,8 @@ func reconcileControl(currentCluster, kubeCluster *Cluster, kubeClient *kubernet
 	return nil
 }
 
-func reconcileHost(toDeleteHost *hosts.Host, worker bool, cleanerImage string) error {
-	if err := toDeleteHost.TunnelUp(); err != nil {
+func reconcileHost(toDeleteHost *hosts.Host, worker bool, cleanerImage string, dialerFactory hosts.DialerFactory) error {
+	if err := toDeleteHost.TunnelUp(dialerFactory); err != nil {
 		return fmt.Errorf("Not able to reach the host: %v", err)
 	}
 	if worker {

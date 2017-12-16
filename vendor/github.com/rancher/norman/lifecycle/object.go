@@ -51,7 +51,11 @@ func (o *objectLifecycleAdapter) sync(key string, obj runtime.Object) error {
 		return err
 	}
 
+	obj = obj.DeepCopyObject()
 	if newObj, err := o.lifecycle.Updated(obj); err != nil {
+		if newObj != nil {
+			o.objectClient.Update(metadata.GetName(), newObj)
+		}
 		return err
 	} else if newObj != nil {
 		_, err = o.objectClient.Update(metadata.GetName(), newObj)
@@ -72,29 +76,39 @@ func (o *objectLifecycleAdapter) finalize(metadata metav1.Object, obj runtime.Ob
 	}
 
 	obj = obj.DeepCopyObject()
+	if newObj, err := o.lifecycle.Finalize(obj); err != nil {
+		if newObj != nil {
+			o.objectClient.Update(metadata.GetName(), newObj)
+		}
+		return false, err
+	} else if newObj != nil {
+		obj = newObj
+	}
+
+	if err := removeFinalizer(o.name, obj); err != nil {
+		return false, err
+	}
+
+	_, err := o.objectClient.Update(metadata.GetName(), obj)
+	return false, err
+}
+
+func removeFinalizer(name string, obj runtime.Object) error {
 	metadata, err := meta.Accessor(obj)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	var finalizers []string
 	for _, finalizer := range metadata.GetFinalizers() {
-		if finalizer == o.name {
+		if finalizer == name {
 			continue
 		}
 		finalizers = append(finalizers, finalizer)
 	}
 	metadata.SetFinalizers(finalizers)
 
-	if newObj, err := o.lifecycle.Finalize(obj); err != nil {
-		return false, err
-	} else if newObj != nil {
-		_, err = o.objectClient.Update(metadata.GetName(), newObj)
-	} else {
-		_, err = o.objectClient.Update(metadata.GetName(), obj)
-	}
-
-	return false, err
+	return nil
 }
 
 func (o *objectLifecycleAdapter) createKey() string {
@@ -104,28 +118,31 @@ func (o *objectLifecycleAdapter) createKey() string {
 func (o *objectLifecycleAdapter) create(metadata metav1.Object, obj runtime.Object) (bool, error) {
 	initialized := o.createKey()
 
-	if metadata.GetLabels()[initialized] == "true" {
+	if metadata.GetAnnotations()[initialized] == "true" {
 		return true, nil
 	}
 
 	obj = obj.DeepCopyObject()
+	if newObj, err := o.lifecycle.Create(obj); err != nil {
+		if newObj != nil {
+			o.objectClient.Update(metadata.GetName(), newObj)
+		}
+		return false, err
+	} else if newObj != nil {
+		obj = newObj
+	}
+
 	metadata, err := meta.Accessor(obj)
 	if err != nil {
 		return false, err
 	}
 
-	if metadata.GetLabels() == nil {
-		metadata.SetLabels(map[string]string{})
+	if metadata.GetAnnotations() == nil {
+		metadata.SetAnnotations(map[string]string{})
 	}
 
 	metadata.SetFinalizers(append(metadata.GetFinalizers(), o.name))
-	metadata.GetLabels()[initialized] = "true"
-	if newObj, err := o.lifecycle.Create(obj); err != nil {
-		return false, err
-	} else if newObj != nil {
-		_, err = o.objectClient.Update(metadata.GetName(), newObj)
-		return false, err
-	}
+	metadata.GetAnnotations()[initialized] = "true"
 
 	_, err = o.objectClient.Update(metadata.GetName(), obj)
 	return false, err

@@ -3,7 +3,7 @@ package parse
 import (
 	"github.com/rancher/catalog-controller/utils"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 )
 
 func TemplateInfo(contents []byte) (v3.Template, error) {
@@ -23,9 +23,11 @@ func TemplateInfo(contents []byte) (v3.Template, error) {
 	}
 
 	var template v3.Template
-	if err := utils.Convert(data, &template); err != nil {
+	var templateSpec v3.TemplateSpec
+	if err := utils.Convert(data, &templateSpec); err != nil {
 		return v3.Template{}, err
 	}
+	template.Spec = templateSpec
 
 	return template, nil
 }

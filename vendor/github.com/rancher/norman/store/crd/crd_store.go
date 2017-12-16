@@ -65,10 +65,10 @@ func (c *Store) ByID(apiContext *types.APIContext, schema *types.Schema, id stri
 	return store.ByID(apiContext, schema, id)
 }
 
-func (c *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id string) error {
+func (c *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
 	store, ok := c.schemaStores[key(schema)]
 	if !ok {
-		return nil
+		return nil, nil
 	}
 	return store.Delete(apiContext, schema, id)
 }

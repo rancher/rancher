@@ -16,8 +16,8 @@ import (
 
 var (
 	PrincipalGroupVersionKind = schema.GroupVersionKind{
-		Version: "v3",
-		Group:   "management.cattle.io",
+		Version: Version,
+		Group:   GroupName,
 		Kind:    "Principal",
 	}
 	PrincipalResource = metav1.APIResource{
@@ -60,6 +60,8 @@ type PrincipalInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PrincipalController
+	AddSyncHandler(sync PrincipalHandlerFunc)
+	AddLifecycle(name string, lifecycle PrincipalLifecycle)
 }
 
 type principalLister struct {
@@ -190,4 +192,13 @@ func (s *principalClient) Watch(opts metav1.ListOptions) (watch.Interface, error
 
 func (s *principalClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
+}
+
+func (s *principalClient) AddSyncHandler(sync PrincipalHandlerFunc) {
+	s.Controller().AddHandler(sync)
+}
+
+func (s *principalClient) AddLifecycle(name string, lifecycle PrincipalLifecycle) {
+	sync := NewPrincipalLifecycleAdapter(name, s, lifecycle)
+	s.AddSyncHandler(sync)
 }

@@ -16,8 +16,8 @@ import (
 
 var (
 	RoleTemplateGroupVersionKind = schema.GroupVersionKind{
-		Version: "v3",
-		Group:   "management.cattle.io",
+		Version: Version,
+		Group:   GroupName,
 		Kind:    "RoleTemplate",
 	}
 	RoleTemplateResource = metav1.APIResource{
@@ -60,6 +60,8 @@ type RoleTemplateInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() RoleTemplateController
+	AddSyncHandler(sync RoleTemplateHandlerFunc)
+	AddLifecycle(name string, lifecycle RoleTemplateLifecycle)
 }
 
 type roleTemplateLister struct {
@@ -190,4 +192,13 @@ func (s *roleTemplateClient) Watch(opts metav1.ListOptions) (watch.Interface, er
 
 func (s *roleTemplateClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
+}
+
+func (s *roleTemplateClient) AddSyncHandler(sync RoleTemplateHandlerFunc) {
+	s.Controller().AddHandler(sync)
+}
+
+func (s *roleTemplateClient) AddLifecycle(name string, lifecycle RoleTemplateLifecycle) {
+	sync := NewRoleTemplateLifecycleAdapter(name, s, lifecycle)
+	s.AddSyncHandler(sync)
 }

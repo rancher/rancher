@@ -9,7 +9,10 @@ const (
 	DefaultClusterDomain         = "cluster.local"
 	DefaultClusterSSHKeyPath     = "~/.ssh/id_rsa"
 
-	DefaultAuthStrategy = "x509"
+	DefaultDockerSockPath = "/var/run/docker.sock"
+
+	DefaultAuthStrategy      = "x509"
+	DefaultAuthorizationMode = "rbac"
 
 	DefaultNetworkPlugin        = "flannel"
 	DefaultNetworkCloudProvider = "none"
@@ -19,6 +22,9 @@ const (
 	DefaultNginxProxyImage      = "rancher/rke-nginx-proxy:0.1.0"
 	DefaultCertDownloaderImage  = "rancher/rke-cert-deployer:0.1.0"
 	DefaultServiceSidekickImage = "rancher/rke-service-sidekick:0.1.0"
+
+	DefaultEtcdImage = "quay.io/coreos/etcd:latest"
+	DefaultK8sImage  = "rancher/k8s:v1.8.3-rancher2"
 
 	DefaultFlannelImage    = "quay.io/coreos/flannel:v0.9.1"
 	DefaultFlannelCNIImage = "quay.io/coreos/flannel-cni:v0.2.0"

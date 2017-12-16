@@ -16,8 +16,8 @@ import (
 
 var (
 	ClusterRoleTemplateBindingGroupVersionKind = schema.GroupVersionKind{
-		Version: "v3",
-		Group:   "management.cattle.io",
+		Version: Version,
+		Group:   GroupName,
 		Kind:    "ClusterRoleTemplateBinding",
 	}
 	ClusterRoleTemplateBindingResource = metav1.APIResource{
@@ -60,6 +60,8 @@ type ClusterRoleTemplateBindingInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ClusterRoleTemplateBindingController
+	AddSyncHandler(sync ClusterRoleTemplateBindingHandlerFunc)
+	AddLifecycle(name string, lifecycle ClusterRoleTemplateBindingLifecycle)
 }
 
 type clusterRoleTemplateBindingLister struct {
@@ -190,4 +192,13 @@ func (s *clusterRoleTemplateBindingClient) Watch(opts metav1.ListOptions) (watch
 
 func (s *clusterRoleTemplateBindingClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
+}
+
+func (s *clusterRoleTemplateBindingClient) AddSyncHandler(sync ClusterRoleTemplateBindingHandlerFunc) {
+	s.Controller().AddHandler(sync)
+}
+
+func (s *clusterRoleTemplateBindingClient) AddLifecycle(name string, lifecycle ClusterRoleTemplateBindingLifecycle) {
+	sync := NewClusterRoleTemplateBindingLifecycleAdapter(name, s, lifecycle)
+	s.AddSyncHandler(sync)
 }

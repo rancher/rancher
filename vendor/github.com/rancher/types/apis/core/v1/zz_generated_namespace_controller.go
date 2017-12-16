@@ -17,8 +17,8 @@ import (
 
 var (
 	NamespaceGroupVersionKind = schema.GroupVersionKind{
-		Version: "v1",
-		Group:   "",
+		Version: Version,
+		Group:   GroupName,
 		Kind:    "Namespace",
 	}
 	NamespaceResource = metav1.APIResource{
@@ -61,6 +61,8 @@ type NamespaceInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NamespaceController
+	AddSyncHandler(sync NamespaceHandlerFunc)
+	AddLifecycle(name string, lifecycle NamespaceLifecycle)
 }
 
 type namespaceLister struct {
@@ -191,4 +193,13 @@ func (s *namespaceClient) Watch(opts metav1.ListOptions) (watch.Interface, error
 
 func (s *namespaceClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
+}
+
+func (s *namespaceClient) AddSyncHandler(sync NamespaceHandlerFunc) {
+	s.Controller().AddHandler(sync)
+}
+
+func (s *namespaceClient) AddLifecycle(name string, lifecycle NamespaceLifecycle) {
+	sync := NewNamespaceLifecycleAdapter(name, s, lifecycle)
+	s.AddSyncHandler(sync)
 }

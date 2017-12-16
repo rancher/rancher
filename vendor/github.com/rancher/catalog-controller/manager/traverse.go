@@ -257,7 +257,7 @@ func traverseGitFiles(repoPath string) ([]v3.Template, []error, error) {
 
 func handleFile(templateIndex map[string]*v3.Template, fullPath, relativePath, filename string) error {
 	switch {
-	case filename == "config.yml" || filename == "template.Spec.yml":
+	case filename == "config.yml" || filename == "template.yml":
 		base, templateName, parsedCorrectly := parse.TemplatePath(relativePath)
 		if !parsedCorrectly {
 			return nil
