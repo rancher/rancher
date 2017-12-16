@@ -6,6 +6,8 @@ import (
 
 	"strings"
 
+	"strconv"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -128,9 +130,9 @@ func (m *Manager) createTemplateVersions(versionsSpec []v3.TemplateVersionSpec, 
 	for _, spec := range versionsSpec {
 		templateVersion := v3.TemplateVersion{}
 		templateVersion.Spec = spec
-		revision := 0
+		revision := spec.Version
 		if spec.Revision != nil {
-			revision = *spec.Revision
+			revision = strconv.Itoa(*spec.Revision)
 		}
 		templateVersion.APIVersion = v3.TemplateVersionGroupVersionKind.Group + "/" + v3.TemplateVersionGroupVersionKind.Version
 		templateVersion.Kind = v3.TemplateVersionGroupVersionKind.Kind

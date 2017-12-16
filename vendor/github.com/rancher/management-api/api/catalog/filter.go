@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/norman/types"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/client/management/v3"
+	"strconv"
 )
 
 func TemplateFormatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -56,9 +57,15 @@ func extractVersionLinks(apiContext *types.APIContext, resource *types.RawResour
 	versionMap := resource.Values["versions"].([]interface{})
 	r := map[string]string{}
 	for _, version := range versionMap {
-		revision := version.(map[string]interface{})["revision"].(int64)
+		revision := ""
+		if v, ok := version.(map[string]interface{})["revision"].(int64); ok {
+			revision = strconv.FormatInt(v, 10)
+		}
 		version := version.(map[string]interface{})["version"].(string)
-		versionID := fmt.Sprintf("%v-%v", resource.ID, revision)
+		versionID := fmt.Sprintf("%v-%v", resource.ID, version)
+		if revision != "" {
+			versionID = fmt.Sprintf("%v-%v", resource.ID, revision)
+		}
 		r[version] = apiContext.URLBuilder.ResourceLinkByID(schema, versionID)
 	}
 	return r
