@@ -6,12 +6,11 @@ import (
 
 const (
 	MachineDriverType                      = "machineDriver"
-	MachineDriverFieldActivateOnCreate     = "activateOnCreate"
+	MachineDriverFieldActive               = "active"
 	MachineDriverFieldAnnotations          = "annotations"
 	MachineDriverFieldBuiltin              = "builtin"
 	MachineDriverFieldChecksum             = "checksum"
 	MachineDriverFieldCreated              = "created"
-	MachineDriverFieldDefaultActive        = "defaultActive"
 	MachineDriverFieldDescription          = "description"
 	MachineDriverFieldExternalID           = "externalId"
 	MachineDriverFieldFinalizers           = "finalizers"
@@ -32,12 +31,11 @@ const (
 
 type MachineDriver struct {
 	types.Resource
-	ActivateOnCreate     *bool                `json:"activateOnCreate,omitempty"`
+	Active               *bool                `json:"active,omitempty"`
 	Annotations          map[string]string    `json:"annotations,omitempty"`
 	Builtin              *bool                `json:"builtin,omitempty"`
 	Checksum             string               `json:"checksum,omitempty"`
 	Created              string               `json:"created,omitempty"`
-	DefaultActive        *bool                `json:"defaultActive,omitempty"`
 	Description          string               `json:"description,omitempty"`
 	ExternalID           string               `json:"externalId,omitempty"`
 	Finalizers           []string             `json:"finalizers,omitempty"`

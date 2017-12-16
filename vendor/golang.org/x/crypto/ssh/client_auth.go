@@ -283,7 +283,9 @@ func confirmKeyAck(key PublicKey, c packetConn) (bool, error) {
 		}
 		switch packet[0] {
 		case msgUserAuthBanner:
-			// TODO(gpaul): add callback to present the banner to the user
+			if err := handleBannerResponse(c, packet); err != nil {
+				return false, err
+			}
 		case msgUserAuthPubKeyOk:
 			var msg userAuthPubKeyOkMsg
 			if err := Unmarshal(packet, &msg); err != nil {
@@ -325,7 +327,9 @@ func handleAuthResponse(c packetConn) (bool, []string, error) {
 
 		switch packet[0] {
 		case msgUserAuthBanner:
-			// TODO: add callback to present the banner to the user
+			if err := handleBannerResponse(c, packet); err != nil {
+				return false, nil, err
+			}
 		case msgUserAuthFailure:
 			var msg userAuthFailureMsg
 			if err := Unmarshal(packet, &msg); err != nil {
@@ -340,6 +344,24 @@ func handleAuthResponse(c packetConn) (bool, []string, error) {
 	}
 }
 
+func handleBannerResponse(c packetConn, packet []byte) error {
+	var msg userAuthBannerMsg
+	if err := Unmarshal(packet, &msg); err != nil {
+		return err
+	}
+
+	transport, ok := c.(*handshakeTransport)
+	if !ok {
+		return nil
+	}
+
+	if transport.bannerCallback != nil {
+		return transport.bannerCallback(msg.Message)
+	}
+
+	return nil
+}
+
 // KeyboardInteractiveChallenge should print questions, optionally
 // disabling echoing (e.g. for passwords), and return all the answers.
 // Challenge may be called multiple times in a single session. After
@@ -349,7 +371,7 @@ func handleAuthResponse(c packetConn) (bool, []string, error) {
 // both CLI and GUI environments.
 type KeyboardInteractiveChallenge func(user, instruction string, questions []string, echos []bool) (answers []string, err error)
 
-// KeyboardInteractive returns a AuthMethod using a prompt/response
+// KeyboardInteractive returns an AuthMethod using a prompt/response
 // sequence controlled by the server.
 func KeyboardInteractive(challenge KeyboardInteractiveChallenge) AuthMethod {
 	return challenge
@@ -385,7 +407,9 @@ func (cb KeyboardInteractiveChallenge) auth(session []byte, user string, c packe
 		// like handleAuthResponse, but with less options.
 		switch packet[0] {
 		case msgUserAuthBanner:
-			// TODO: Print banners during userauth.
+			if err := handleBannerResponse(c, packet); err != nil {
+				return false, nil, err
+			}
 			continue
 		case msgUserAuthInfoRequest:
 			// OK

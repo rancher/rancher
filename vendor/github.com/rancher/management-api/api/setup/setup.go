@@ -7,6 +7,7 @@ import (
 
 	"encoding/base64"
 
+	"github.com/rancher/management-api/api/authn"
 	"github.com/rancher/management-api/api/catalog"
 	"github.com/rancher/management-api/api/project"
 	"github.com/rancher/management-api/api/subscribe"
@@ -29,6 +30,7 @@ func Schemas(ctx context.Context, management *config.ManagementContext, schemas 
 	ProjectLinks(schemas, management)
 	Templates(schemas)
 	ClusterRegistrationTokens(schemas)
+	addUserAction(schemas)
 
 	crdStore, err := crd.NewCRDStoreFromConfig(management.RESTConfig)
 	if err != nil {
@@ -42,7 +44,13 @@ func Schemas(ctx context.Context, management *config.ManagementContext, schemas 
 		}
 	}
 
-	return crdStore.AddSchemas(ctx, crdSchemas...)
+	if err := crdStore.AddSchemas(ctx, crdSchemas...); err != nil {
+		return err
+	}
+
+	authn.SetUserStore(schemas.Schema(&managementschema.Version, client.UserType))
+
+	return nil
 }
 
 func Templates(schemas *types.Schemas) {
@@ -82,4 +90,17 @@ func Subscribe(schemas *types.Schemas) {
 		schema.ListHandler = subscribe.Handler
 		schema.PluralName = "subscribe"
 	})
+}
+
+func addUserAction(schemas *types.Schemas) {
+	schemas.MustImport(&managementschema.Version, authn.ChangePasswordInput{})
+	schema := schemas.Schema(&managementschema.Version, client.UserType)
+	schema.ResourceActions = map[string]types.Action{
+		"changepassword": {
+			Input:  "changePasswordInput",
+			Output: "user",
+		},
+	}
+	schema.Formatter = authn.UserFormatter
+	schema.ActionHandler = authn.UserActionHandler
 }

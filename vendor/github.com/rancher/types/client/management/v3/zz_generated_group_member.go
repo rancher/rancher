@@ -8,12 +8,12 @@ const (
 	GroupMemberType                 = "groupMember"
 	GroupMemberFieldAnnotations     = "annotations"
 	GroupMemberFieldCreated         = "created"
-	GroupMemberFieldExternalID      = "externalId"
 	GroupMemberFieldFinalizers      = "finalizers"
 	GroupMemberFieldGroupId         = "groupId"
 	GroupMemberFieldLabels          = "labels"
 	GroupMemberFieldName            = "name"
 	GroupMemberFieldOwnerReferences = "ownerReferences"
+	GroupMemberFieldPrincipalID     = "principalId"
 	GroupMemberFieldRemoved         = "removed"
 	GroupMemberFieldResourcePath    = "resourcePath"
 	GroupMemberFieldUuid            = "uuid"
@@ -23,12 +23,12 @@ type GroupMember struct {
 	types.Resource
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	Created         string            `json:"created,omitempty"`
-	ExternalID      string            `json:"externalId,omitempty"`
 	Finalizers      []string          `json:"finalizers,omitempty"`
 	GroupId         string            `json:"groupId,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`
 	Name            string            `json:"name,omitempty"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
+	PrincipalID     string            `json:"principalId,omitempty"`
 	Removed         string            `json:"removed,omitempty"`
 	ResourcePath    string            `json:"resourcePath,omitempty"`
 	Uuid            string            `json:"uuid,omitempty"`

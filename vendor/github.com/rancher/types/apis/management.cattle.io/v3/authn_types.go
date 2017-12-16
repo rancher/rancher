@@ -8,40 +8,44 @@ type Token struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	TokenID                  string `json:"tokenId,omitempty"`
-	TokenValue               string `json:"tokenValue,omitempty"`
-	User                     string `json:"user,omitempty"`
-	ExternalID               string `json:"externalId,omitempty"`
-	AuthProvider             string `json:"authProvider,omitempty"`
-	TTLMillis                string `json:"ttl,omitempty"`
-	IdentityRefreshTTLMillis string `json:"identityRefreshTTL,omitempty"`
-	LastUpdateTime           string `json:"lastUpdateTime,omitempty"`
-	IsDerived                bool   `json:"isDerived,omitempty"`
-	Description              string `json:"description,omitempty"`
+	UserPrincipal   Principal         `json:"userPrincipal" norman:"type=reference[Principal]"`
+	GroupPrincipals []Principal       `json:"groupPrincipals" norman:"type=array[reference[Principal]]"`
+	ProviderInfo    map[string]string `json:"providerInfo,omitempty"`
+	UserID          string            `json:"userId" norman:"type=reference[User]"`
+	AuthProvider    string            `json:"authProvider"`
+	TTLMillis       int               `json:"ttl"`
+	LastUpdateTime  string            `json:"lastUpdateTime"`
+	IsDerived       bool              `json:"isDerived"`
+	Description     string            `json:"description"`
 }
 
 type User struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Secret     string `json:"secret,omitempty"`
-	ExternalID string `json:"externalId,omitempty"`
+	DisplayName        string   `json:"displayName,omitempty"`
+	UserName           string   `json:"userName,omitempty"`
+	Password           string   `json:"password,omitempty"`
+	MustChangePassword bool     `json:"mustChangePassword,omitempty"`
+	PrincipalIDs       []string `json:"principalIds,omitempty" norman:"type=array[reference[Principal]]"`
 }
 
 type Group struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	DisplayName string `json:"displayName,omitempty"`
 }
 
 type GroupMember struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	GroupName  string `json:"groupName,omitempty" norman:"type=reference[group]"`
-	ExternalID string `json:"externalId,omitempty"`
+	GroupName   string `json:"groupName,omitempty" norman:"type=reference[group]"`
+	PrincipalID string `json:"principalId,omitempty" norman:"type=reference[Principal]"`
 }
 
-type Identity struct {
+type Principal struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
@@ -57,12 +61,11 @@ type Identity struct {
 
 //LoginInput structure defines all properties that can be sent by client to create a token
 type LoginInput struct {
-	TTLMillis                string           `json:"ttl,omitempty"`
-	IdentityRefreshTTLMillis string           `json:"identityRefreshTTL,omitempty"`
-	Description              string           `json:"description,omitempty"`
-	ResponseType             string           `json:"responseType,omitempty"` //json or cookie
-	LocalCredential          LocalCredential  `json:"localCredential, omitempty"`
-	GithubCredential         GithubCredential `json:"githubCredential, omitempty"`
+	TTLMillis        int              `json:"ttl,omitempty"`
+	Description      string           `json:"description,omitempty"`
+	ResponseType     string           `json:"responseType,omitempty"` //json or cookie
+	LocalCredential  LocalCredential  `json:"localCredential, omitempty"`
+	GithubCredential GithubCredential `json:"githubCredential, omitempty"`
 }
 
 //LocalCredential stores the local auth creds
