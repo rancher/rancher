@@ -16,8 +16,8 @@ import (
 
 var (
 	ProjectRoleTemplateBindingGroupVersionKind = schema.GroupVersionKind{
-		Version: "v3",
-		Group:   "management.cattle.io",
+		Version: Version,
+		Group:   GroupName,
 		Kind:    "ProjectRoleTemplateBinding",
 	}
 	ProjectRoleTemplateBindingResource = metav1.APIResource{
@@ -60,6 +60,8 @@ type ProjectRoleTemplateBindingInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ProjectRoleTemplateBindingController
+	AddSyncHandler(sync ProjectRoleTemplateBindingHandlerFunc)
+	AddLifecycle(name string, lifecycle ProjectRoleTemplateBindingLifecycle)
 }
 
 type projectRoleTemplateBindingLister struct {
@@ -190,4 +192,13 @@ func (s *projectRoleTemplateBindingClient) Watch(opts metav1.ListOptions) (watch
 
 func (s *projectRoleTemplateBindingClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
+}
+
+func (s *projectRoleTemplateBindingClient) AddSyncHandler(sync ProjectRoleTemplateBindingHandlerFunc) {
+	s.Controller().AddHandler(sync)
+}
+
+func (s *projectRoleTemplateBindingClient) AddLifecycle(name string, lifecycle ProjectRoleTemplateBindingLifecycle) {
+	sync := NewProjectRoleTemplateBindingLifecycleAdapter(name, s, lifecycle)
+	s.AddSyncHandler(sync)
 }

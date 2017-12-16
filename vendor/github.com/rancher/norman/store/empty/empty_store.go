@@ -7,8 +7,8 @@ import (
 type Store struct {
 }
 
-func (e *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id string) error {
-	return nil
+func (e *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
+	return nil, nil
 }
 
 func (e *Store) ByID(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {

@@ -17,8 +17,8 @@ import (
 
 var (
 	ComponentStatusGroupVersionKind = schema.GroupVersionKind{
-		Version: "v1",
-		Group:   "",
+		Version: Version,
+		Group:   GroupName,
 		Kind:    "ComponentStatus",
 	}
 	ComponentStatusResource = metav1.APIResource{
@@ -61,6 +61,8 @@ type ComponentStatusInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ComponentStatusController
+	AddSyncHandler(sync ComponentStatusHandlerFunc)
+	AddLifecycle(name string, lifecycle ComponentStatusLifecycle)
 }
 
 type componentStatusLister struct {
@@ -191,4 +193,13 @@ func (s *componentStatusClient) Watch(opts metav1.ListOptions) (watch.Interface,
 
 func (s *componentStatusClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
+}
+
+func (s *componentStatusClient) AddSyncHandler(sync ComponentStatusHandlerFunc) {
+	s.Controller().AddHandler(sync)
+}
+
+func (s *componentStatusClient) AddLifecycle(name string, lifecycle ComponentStatusLifecycle) {
+	sync := NewComponentStatusLifecycleAdapter(name, s, lifecycle)
+	s.AddSyncHandler(sync)
 }

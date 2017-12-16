@@ -72,15 +72,11 @@ func addSchema(schema *types.Schema, schemaMap map[string]*types.Schema, schemas
 
 func traverseAndAdd(schema *types.Schema, schemaMap map[string]*types.Schema, schemas []*types.Schema, included map[string]bool) []*types.Schema {
 	for _, field := range schema.ResourceFields {
-		t := field.Type
-		if definition.HasReferenceType(t) {
-			for !definition.IsReferenceType(t) {
-				newT := definition.SubType(t)
-				if newT == t {
-					break
-				}
-				t = newT
-			}
+		t := ""
+		subType := field.Type
+		for subType != t {
+			t = subType
+			subType = definition.SubType(t)
 		}
 
 		if refSchema, ok := schemaMap[t]; ok && !included[t] {

@@ -26,7 +26,7 @@ type Server struct {
 	Resolver                    parse.ResolverFunc
 	SubContextAttributeProvider types.SubContextAttributeProvider
 	ResponseWriters             map[string]ResponseWriter
-	schemas                     *types.Schemas
+	Schemas                     *types.Schemas
 	QueryFilter                 types.QueryFilter
 	StoreWrapper                StoreWrapper
 	URLParser                   parse.URLParser
@@ -46,7 +46,7 @@ type Defaults struct {
 
 func NewAPIServer() *Server {
 	s := &Server{
-		schemas: types.NewSchemas(),
+		Schemas: types.NewSchemas(),
 		ResponseWriters: map[string]ResponseWriter{
 			"json": &writer.JSONResponseWriter{},
 			"html": &writer.HTMLResponseWriter{},
@@ -68,12 +68,13 @@ func NewAPIServer() *Server {
 		QueryFilter:  handler.QueryFilter,
 	}
 
+	s.Schemas.AddHook = s.setupDefaults
 	s.Parser = s.parser
 	return s
 }
 
 func (s *Server) parser(rw http.ResponseWriter, req *http.Request) (*types.APIContext, error) {
-	ctx, err := parse.Parse(rw, req, s.schemas, s.URLParser, s.Resolver)
+	ctx, err := parse.Parse(rw, req, s.Schemas, s.URLParser, s.Resolver)
 	ctx.ResponseWriter = s.ResponseWriters[ctx.ResponseFormat]
 	if ctx.ResponseWriter == nil {
 		ctx.ResponseWriter = s.ResponseWriters["json"]
@@ -102,20 +103,15 @@ func (s *Server) AddSchemas(schemas *types.Schemas) error {
 			return
 		}
 		for _, schema := range builtin.Schemas.Schemas() {
-			s.addSchema(*schema)
+			s.Schemas.AddSchema(*schema)
 		}
 	})
 
 	for _, schema := range schemas.Schemas() {
-		s.addSchema(*schema)
+		s.Schemas.AddSchema(*schema)
 	}
 
-	return s.schemas.Err()
-}
-
-func (s *Server) addSchema(schema types.Schema) {
-	s.setupDefaults(&schema)
-	s.schemas.AddSchema(schema)
+	return s.Schemas.Err()
 }
 
 func (s *Server) setupDefaults(schema *types.Schema) {

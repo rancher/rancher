@@ -56,6 +56,7 @@ func (c *Cluster) doFlannelDeploy() error {
 		network.FlannelImage:    c.Network.Options[FlannelImage],
 		network.FlannelCNIImage: c.Network.Options[FlannelCNIImage],
 		network.FlannelIface:    c.Network.Options[FlannelIface],
+		network.RBACConfig:      c.Authorization.Mode,
 	}
 	pluginYaml := network.GetFlannelManifest(flannelConfig)
 	return c.doAddonDeploy(pluginYaml, NetworkPluginResourceName)
@@ -75,6 +76,7 @@ func (c *Cluster) doCalicoDeploy() error {
 		network.ControllersImage: c.Network.Options[CalicoControllersImages],
 		network.CalicoctlImage:   c.Network.Options[CalicoctlImage],
 		network.CloudProvider:    c.Network.Options[CalicoCloudProvider],
+		network.RBACConfig:       c.Authorization.Mode,
 	}
 	pluginYaml := network.GetCalicoManifest(calicoConfig)
 	return c.doAddonDeploy(pluginYaml, NetworkPluginResourceName)
@@ -90,13 +92,20 @@ func (c *Cluster) doCanalDeploy() error {
 		network.NodeImage:    c.Network.Options[CanalNodeImage],
 		network.CNIImage:     c.Network.Options[CanalCNIImage],
 		network.FlannelImage: c.Network.Options[CanalFlannelImage],
+		network.RBACConfig:   c.Authorization.Mode,
 	}
 	pluginYaml := network.GetCanalManifest(canalConfig)
 	return c.doAddonDeploy(pluginYaml, NetworkPluginResourceName)
 }
 
 func (c *Cluster) doWeaveDeploy() error {
-	pluginYaml := network.GetWeaveManifest(c.ClusterCIDR, c.Network.Options[WeaveImage], c.Network.Options[WeaveCNIImage])
+	weaveConfig := map[string]string{
+		network.ClusterCIDR:   c.ClusterCIDR,
+		network.WeaveImage:    c.Network.Options[WeaveImage],
+		network.WeaveCNIImage: c.Network.Options[WeaveCNIImage],
+		network.RBACConfig:    c.Authorization.Mode,
+	}
+	pluginYaml := network.GetWeaveManifest(weaveConfig)
 	return c.doAddonDeploy(pluginYaml, NetworkPluginResourceName)
 }
 

@@ -17,8 +17,8 @@ import (
 
 var (
 	EventGroupVersionKind = schema.GroupVersionKind{
-		Version: "v1",
-		Group:   "",
+		Version: Version,
+		Group:   GroupName,
 		Kind:    "Event",
 	}
 	EventResource = metav1.APIResource{
@@ -61,6 +61,8 @@ type EventInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() EventController
+	AddSyncHandler(sync EventHandlerFunc)
+	AddLifecycle(name string, lifecycle EventLifecycle)
 }
 
 type eventLister struct {
@@ -191,4 +193,13 @@ func (s *eventClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 
 func (s *eventClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
+}
+
+func (s *eventClient) AddSyncHandler(sync EventHandlerFunc) {
+	s.Controller().AddHandler(sync)
+}
+
+func (s *eventClient) AddLifecycle(name string, lifecycle EventLifecycle) {
+	sync := NewEventLifecycleAdapter(name, s, lifecycle)
+	s.AddSyncHandler(sync)
 }

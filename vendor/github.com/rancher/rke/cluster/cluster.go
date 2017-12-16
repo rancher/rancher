@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/rancher/rke/authz"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
@@ -19,7 +20,7 @@ import (
 
 type Cluster struct {
 	v3.RancherKubernetesEngineConfig `yaml:",inline"`
-	ConfigPath                       string `yaml:"config_path"`
+	ConfigPath                       string
 	LocalKubeConfigPath              string
 	EtcdHosts                        []*hosts.Host
 	WorkerHosts                      []*hosts.Host
@@ -30,7 +31,7 @@ type Cluster struct {
 	ClusterDomain                    string
 	ClusterCIDR                      string
 	ClusterDNSServer                 string
-	Dialer                           hosts.Dialer
+	DialerFactory                    hosts.DialerFactory
 }
 
 const (
@@ -47,6 +48,7 @@ const (
 	KubeDNSSidecarImage        = "kubedns_sidecar_image"
 	KubeDNSAutoScalerImage     = "kubedns_autoscaler_image"
 	ServiceSidekickImage       = "service_sidekick_image"
+	NoneAuthorizationMode      = "none"
 )
 
 func (c *Cluster) DeployClusterPlanes() error {
@@ -58,9 +60,14 @@ func (c *Cluster) DeployClusterPlanes() error {
 	err = services.RunControlPlane(c.ControlPlaneHosts,
 		c.EtcdHosts,
 		c.Services,
-		c.SystemImages[ServiceSidekickImage])
+		c.SystemImages[ServiceSidekickImage],
+		c.Authorization.Mode)
 	if err != nil {
 		return fmt.Errorf("[controlPlane] Failed to bring up Control Plane: %v", err)
+	}
+	err = c.ApplyAuthzResources()
+	if err != nil {
+		return fmt.Errorf("[auths] Failed to apply RBAC resources: %v", err)
 	}
 	err = services.RunWorkerPlane(c.ControlPlaneHosts,
 		c.WorkerHosts,
@@ -73,21 +80,30 @@ func (c *Cluster) DeployClusterPlanes() error {
 	return nil
 }
 
-func ParseConfig(clusterFile string, customDialer hosts.Dialer) (*Cluster, error) {
+func ParseConfig(clusterFile string) (*v3.RancherKubernetesEngineConfig, error) {
 	logrus.Debugf("Parsing cluster file [%v]", clusterFile)
-	var err error
-	c, err := parseClusterFile(clusterFile)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to parse the cluster file: %v", err)
+	var rkeConfig v3.RancherKubernetesEngineConfig
+	if err := yaml.Unmarshal([]byte(clusterFile), &rkeConfig); err != nil {
+		return nil, err
 	}
-	c.Dialer = customDialer
-	err = c.InvertIndexHosts()
-	if err != nil {
+	return &rkeConfig, nil
+}
+
+func ParseCluster(rkeConfig *v3.RancherKubernetesEngineConfig, clusterFilePath string, dialerFactory hosts.DialerFactory) (*Cluster, error) {
+	var err error
+	c := &Cluster{
+		RancherKubernetesEngineConfig: *rkeConfig,
+		ConfigPath:                    clusterFilePath,
+		DialerFactory:                 dialerFactory,
+	}
+	// Setting cluster Defaults
+	c.setClusterDefaults()
+
+	if err := c.InvertIndexHosts(); err != nil {
 		return nil, fmt.Errorf("Failed to classify hosts from config file: %v", err)
 	}
 
-	err = c.ValidateCluster()
-	if err != nil {
+	if err := c.ValidateCluster(); err != nil {
 		return nil, fmt.Errorf("Failed to validate cluster: %v", err)
 	}
 
@@ -105,19 +121,6 @@ func ParseConfig(clusterFile string, customDialer hosts.Dialer) (*Cluster, error
 	return c, nil
 }
 
-func parseClusterFile(clusterFile string) (*Cluster, error) {
-	// parse hosts
-	var kubeCluster Cluster
-	err := yaml.Unmarshal([]byte(clusterFile), &kubeCluster)
-	if err != nil {
-		return nil, err
-	}
-	// Setting cluster Defaults
-	kubeCluster.setClusterDefaults()
-
-	return &kubeCluster, nil
-}
-
 func (c *Cluster) setClusterDefaults() {
 	if len(c.SSHKeyPath) == 0 {
 		c.SSHKeyPath = DefaultClusterSSHKeyPath
@@ -133,6 +136,9 @@ func (c *Cluster) setClusterDefaults() {
 		if len(host.SSHKeyPath) == 0 {
 			c.Nodes[i].SSHKeyPath = c.SSHKeyPath
 		}
+	}
+	if len(c.Authorization.Mode) == 0 {
+		c.Authorization.Mode = DefaultAuthorizationMode
 	}
 	c.setClusterServicesDefaults()
 	c.setClusterNetworkDefaults()
@@ -238,4 +244,19 @@ func getLocalAdminConfigWithNewAddress(localConfigPath, cpAddress string) string
 		string(config.CAData),
 		string(config.CertData),
 		string(config.KeyData))
+}
+
+func (c *Cluster) ApplyAuthzResources() error {
+	if err := authz.ApplyJobDeployerServiceAccount(c.LocalKubeConfigPath); err != nil {
+		return fmt.Errorf("Failed to apply the ServiceAccount needed for job execution: %v", err)
+	}
+	if c.Authorization.Mode == NoneAuthorizationMode {
+		return nil
+	}
+	if c.Authorization.Mode == services.RBACAuthorizationMode {
+		if err := authz.ApplySystemNodeClusterRoleBinding(c.LocalKubeConfigPath); err != nil {
+			return fmt.Errorf("Failed to apply the ClusterRoleBinding needed for node authorization: %v", err)
+		}
+	}
+	return nil
 }

@@ -128,11 +128,18 @@ func clusterConfig(ctx *cli.Context) error {
 	cluster.Network = *networkConfig
 
 	// Get Authentication Config
-	authConfig, err := getAuthConfig(reader)
+	authnConfig, err := getAuthnConfig(reader)
 	if err != nil {
 		return err
 	}
-	cluster.Authentication = *authConfig
+	cluster.Authentication = *authnConfig
+
+	// Get Authorization config
+	authzConfig, err := getAuthzConfig(reader)
+	if err != nil {
+		return err
+	}
+	cluster.Authorization = *authzConfig
 
 	// Get Services Config
 	serviceConfig, err := getServiceConfig(reader)
@@ -207,7 +214,7 @@ func getHostConfig(reader *bufio.Reader, index int) (*v3.RKEConfigNode, error) {
 	}
 	host.InternalAddress = internalAddress
 
-	dockerSocketPath, err := getConfig(reader, fmt.Sprintf("Docker socket path on host (%s)", address), "/var/run/docker.sock")
+	dockerSocketPath, err := getConfig(reader, fmt.Sprintf("Docker socket path on host (%s)", address), cluster.DefaultDockerSockPath)
 	if err != nil {
 		return nil, err
 	}
@@ -224,13 +231,13 @@ func getServiceConfig(reader *bufio.Reader) (*v3.RKEConfigServices, error) {
 	servicesConfig.Kubelet = v3.KubeletService{}
 	servicesConfig.Kubeproxy = v3.KubeproxyService{}
 
-	etcdImage, err := getConfig(reader, "Etcd Docker Image", "quay.io/coreos/etcd:latest")
+	etcdImage, err := getConfig(reader, "Etcd Docker Image", cluster.DefaultEtcdImage)
 	if err != nil {
 		return nil, err
 	}
 	servicesConfig.Etcd.Image = etcdImage
 
-	kubeImage, err := getConfig(reader, "Kubernetes Docker image", "rancher/k8s:v1.8.3-rancher2")
+	kubeImage, err := getConfig(reader, "Kubernetes Docker image", cluster.DefaultK8sImage)
 	if err != nil {
 		return nil, err
 	}
@@ -240,32 +247,32 @@ func getServiceConfig(reader *bufio.Reader) (*v3.RKEConfigServices, error) {
 	servicesConfig.Kubelet.Image = kubeImage
 	servicesConfig.Kubeproxy.Image = kubeImage
 
-	clusterDomain, err := getConfig(reader, "Cluster domain", "cluster.local")
+	clusterDomain, err := getConfig(reader, "Cluster domain", cluster.DefaultClusterDomain)
 	if err != nil {
 		return nil, err
 	}
 	servicesConfig.Kubelet.ClusterDomain = clusterDomain
 
-	serviceClusterIPRange, err := getConfig(reader, "Service Cluster IP Range", "10.233.0.0/18")
+	serviceClusterIPRange, err := getConfig(reader, "Service Cluster IP Range", cluster.DefaultServiceClusterIPRange)
 	if err != nil {
 		return nil, err
 	}
 	servicesConfig.KubeAPI.ServiceClusterIPRange = serviceClusterIPRange
 	servicesConfig.KubeController.ServiceClusterIPRange = serviceClusterIPRange
 
-	clusterNetworkCidr, err := getConfig(reader, "Cluster Network CIDR", "10.233.64.0/18")
+	clusterNetworkCidr, err := getConfig(reader, "Cluster Network CIDR", cluster.DefaultClusterCIDR)
 	if err != nil {
 		return nil, err
 	}
 	servicesConfig.KubeController.ClusterCIDR = clusterNetworkCidr
 
-	clusterDNSServiceIP, err := getConfig(reader, "Cluster DNS Service IP", "10.233.0.3")
+	clusterDNSServiceIP, err := getConfig(reader, "Cluster DNS Service IP", cluster.DefaultClusterDNSService)
 	if err != nil {
 		return nil, err
 	}
 	servicesConfig.Kubelet.ClusterDNSServer = clusterDNSServiceIP
 
-	infraPodImage, err := getConfig(reader, "Infra Container image", "gcr.io/google_containers/pause-amd64:3.0")
+	infraPodImage, err := getConfig(reader, "Infra Container image", cluster.DefaultInfraContainerImage)
 	if err != nil {
 		return nil, err
 	}
@@ -273,21 +280,31 @@ func getServiceConfig(reader *bufio.Reader) (*v3.RKEConfigServices, error) {
 	return &servicesConfig, nil
 }
 
-func getAuthConfig(reader *bufio.Reader) (*v3.AuthConfig, error) {
-	authConfig := v3.AuthConfig{}
+func getAuthnConfig(reader *bufio.Reader) (*v3.AuthnConfig, error) {
+	authnConfig := v3.AuthnConfig{}
 
-	authType, err := getConfig(reader, "Authentication Strategy", "x509")
+	authnType, err := getConfig(reader, "Authentication Strategy", cluster.DefaultAuthStrategy)
 	if err != nil {
 		return nil, err
 	}
-	authConfig.Strategy = authType
-	return &authConfig, nil
+	authnConfig.Strategy = authnType
+	return &authnConfig, nil
+}
+
+func getAuthzConfig(reader *bufio.Reader) (*v3.AuthzConfig, error) {
+	authzConfig := v3.AuthzConfig{}
+	authzMode, err := getConfig(reader, "Authorization Mode", "")
+	if err != nil {
+		return nil, err
+	}
+	authzConfig.Mode = authzMode
+	return &authzConfig, nil
 }
 
 func getNetworkConfig(reader *bufio.Reader) (*v3.NetworkConfig, error) {
 	networkConfig := v3.NetworkConfig{}
 
-	networkPlugin, err := getConfig(reader, "Network Plugin Type", "flannel")
+	networkPlugin, err := getConfig(reader, "Network Plugin Type", cluster.DefaultNetworkCloudProvider)
 	if err != nil {
 		return nil, err
 	}

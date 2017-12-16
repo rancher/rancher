@@ -1,10 +1,12 @@
 package client
 
 const (
-	CatalogStatusType        = "catalogStatus"
-	CatalogStatusFieldCommit = "commit"
+	CatalogStatusType                      = "catalogStatus"
+	CatalogStatusFieldCommit               = "commit"
+	CatalogStatusFieldLastRefreshTimestamp = "lastRefreshTimestamp"
 )
 
 type CatalogStatus struct {
-	Commit string `json:"commit,omitempty"`
+	Commit               string `json:"commit,omitempty"`
+	LastRefreshTimestamp string `json:"lastRefreshTimestamp,omitempty"`
 }

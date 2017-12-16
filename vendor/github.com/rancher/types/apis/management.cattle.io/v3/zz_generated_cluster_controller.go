@@ -16,8 +16,8 @@ import (
 
 var (
 	ClusterGroupVersionKind = schema.GroupVersionKind{
-		Version: "v3",
-		Group:   "management.cattle.io",
+		Version: Version,
+		Group:   GroupName,
 		Kind:    "Cluster",
 	}
 	ClusterResource = metav1.APIResource{
@@ -60,6 +60,8 @@ type ClusterInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ClusterController
+	AddSyncHandler(sync ClusterHandlerFunc)
+	AddLifecycle(name string, lifecycle ClusterLifecycle)
 }
 
 type clusterLister struct {
@@ -190,4 +192,13 @@ func (s *clusterClient) Watch(opts metav1.ListOptions) (watch.Interface, error) 
 
 func (s *clusterClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
+}
+
+func (s *clusterClient) AddSyncHandler(sync ClusterHandlerFunc) {
+	s.Controller().AddHandler(sync)
+}
+
+func (s *clusterClient) AddLifecycle(name string, lifecycle ClusterLifecycle) {
+	sync := NewClusterLifecycleAdapter(name, s, lifecycle)
+	s.AddSyncHandler(sync)
 }

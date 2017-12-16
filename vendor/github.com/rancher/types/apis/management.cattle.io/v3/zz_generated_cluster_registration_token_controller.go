@@ -16,8 +16,8 @@ import (
 
 var (
 	ClusterRegistrationTokenGroupVersionKind = schema.GroupVersionKind{
-		Version: "v3",
-		Group:   "management.cattle.io",
+		Version: Version,
+		Group:   GroupName,
 		Kind:    "ClusterRegistrationToken",
 	}
 	ClusterRegistrationTokenResource = metav1.APIResource{
@@ -60,6 +60,8 @@ type ClusterRegistrationTokenInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ClusterRegistrationTokenController
+	AddSyncHandler(sync ClusterRegistrationTokenHandlerFunc)
+	AddLifecycle(name string, lifecycle ClusterRegistrationTokenLifecycle)
 }
 
 type clusterRegistrationTokenLister struct {
@@ -190,4 +192,13 @@ func (s *clusterRegistrationTokenClient) Watch(opts metav1.ListOptions) (watch.I
 
 func (s *clusterRegistrationTokenClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
+}
+
+func (s *clusterRegistrationTokenClient) AddSyncHandler(sync ClusterRegistrationTokenHandlerFunc) {
+	s.Controller().AddHandler(sync)
+}
+
+func (s *clusterRegistrationTokenClient) AddLifecycle(name string, lifecycle ClusterRegistrationTokenLifecycle) {
+	sync := NewClusterRegistrationTokenLifecycleAdapter(name, s, lifecycle)
+	s.AddSyncHandler(sync)
 }

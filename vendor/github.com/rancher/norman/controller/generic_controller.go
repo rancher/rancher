@@ -162,7 +162,7 @@ func (g *genericController) processNextWorkItem() bool {
 
 	// do your work on the key.  This method will contains your "do stuff" logic
 	err := g.syncHandler(key.(string))
-	if err == nil {
+	if _, ok := err.(*ForgetError); err == nil || ok {
 		g.queue.Forget(key)
 		return true
 	}

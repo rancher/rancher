@@ -90,9 +90,9 @@ func (s *StoreWrapper) Update(apiContext *types.APIContext, schema *types.Schema
 	}, data), nil
 }
 
-func (s *StoreWrapper) Delete(apiContext *types.APIContext, schema *types.Schema, id string) error {
+func (s *StoreWrapper) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
 	if err := validateGet(apiContext, schema, id); err != nil {
-		return err
+		return nil, err
 	}
 
 	return s.store.Delete(apiContext, schema, id)

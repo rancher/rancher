@@ -6,13 +6,14 @@ import (
 	"time"
 
 	"github.com/rancher/rke/k8s"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v2"
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
-func (c *Cluster) SaveClusterState(clusterFile string) error {
+func (c *Cluster) SaveClusterState(rkeConfig *v3.RancherKubernetesEngineConfig) error {
 	// Reinitialize kubernetes Client
 	var err error
 	c.KubeClient, err = k8s.NewClient(c.LocalKubeConfigPath)
@@ -23,7 +24,7 @@ func (c *Cluster) SaveClusterState(clusterFile string) error {
 	if err != nil {
 		return fmt.Errorf("[certificates] Failed to Save Kubernetes certificates: %v", err)
 	}
-	err = saveStateToKubernetes(c.KubeClient, c.LocalKubeConfigPath, []byte(clusterFile))
+	err = saveStateToKubernetes(c.KubeClient, c.LocalKubeConfigPath, rkeConfig)
 	if err != nil {
 		return fmt.Errorf("[state] Failed to save configuration state: %v", err)
 	}
@@ -56,7 +57,7 @@ func (c *Cluster) GetClusterState() (*Cluster, error) {
 		// Get previous kubernetes certificates
 		if currentCluster != nil {
 			currentCluster.Certificates, err = getClusterCerts(c.KubeClient)
-			currentCluster.Dialer = c.Dialer
+			currentCluster.DialerFactory = c.DialerFactory
 			if err != nil {
 				return nil, fmt.Errorf("Failed to Get Kubernetes certificates: %v", err)
 			}
@@ -75,8 +76,12 @@ func (c *Cluster) GetClusterState() (*Cluster, error) {
 	return currentCluster, nil
 }
 
-func saveStateToKubernetes(kubeClient *kubernetes.Clientset, kubeConfigPath string, clusterFile []byte) error {
+func saveStateToKubernetes(kubeClient *kubernetes.Clientset, kubeConfigPath string, rkeConfig *v3.RancherKubernetesEngineConfig) error {
 	logrus.Infof("[state] Saving cluster state to Kubernetes")
+	clusterFile, err := yaml.Marshal(*rkeConfig)
+	if err != nil {
+		return err
+	}
 	timeout := make(chan bool, 1)
 	go func() {
 		for {

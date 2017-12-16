@@ -6,10 +6,13 @@ import (
 	"github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/pki"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"k8s.io/client-go/util/cert"
 )
+
+var clusterFilePath string
 
 func UpCommand() cli.Command {
 	upFlags := []cli.Flag{
@@ -28,10 +31,10 @@ func UpCommand() cli.Command {
 	}
 }
 
-func ClusterUp(clusterFile string, customDialer hosts.Dialer) (string, string, string, string, error) {
+func ClusterUp(rkeConfig *v3.RancherKubernetesEngineConfig, dialerFactory hosts.DialerFactory) (string, string, string, string, error) {
 	logrus.Infof("Building Kubernetes cluster")
 	var APIURL, caCrt, clientCert, clientKey string
-	kubeCluster, err := cluster.ParseConfig(clusterFile, customDialer)
+	kubeCluster, err := cluster.ParseCluster(rkeConfig, clusterFilePath, dialerFactory)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
@@ -70,7 +73,7 @@ func ClusterUp(clusterFile string, customDialer hosts.Dialer) (string, string, s
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
 
-	err = kubeCluster.SaveClusterState(clusterFile)
+	err = kubeCluster.SaveClusterState(rkeConfig)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
@@ -100,10 +103,16 @@ func ClusterUp(clusterFile string, customDialer hosts.Dialer) (string, string, s
 }
 
 func clusterUpFromCli(ctx *cli.Context) error {
-	clusterFile, err := resolveClusterFile(ctx)
+	clusterFile, filePath, err := resolveClusterFile(ctx)
 	if err != nil {
 		return fmt.Errorf("Failed to resolve cluster file: %v", err)
 	}
-	_, _, _, _, err = ClusterUp(clusterFile, nil)
+	clusterFilePath = filePath
+
+	rkeConfig, err := cluster.ParseConfig(clusterFile)
+	if err != nil {
+		return fmt.Errorf("Failed to parse cluster file: %v", err)
+	}
+	_, _, _, _, err = ClusterUp(rkeConfig, nil)
 	return err
 }

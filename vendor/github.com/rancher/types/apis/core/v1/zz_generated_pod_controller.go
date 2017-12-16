@@ -17,8 +17,8 @@ import (
 
 var (
 	PodGroupVersionKind = schema.GroupVersionKind{
-		Version: "v1",
-		Group:   "",
+		Version: Version,
+		Group:   GroupName,
 		Kind:    "Pod",
 	}
 	PodResource = metav1.APIResource{
@@ -61,6 +61,8 @@ type PodInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PodController
+	AddSyncHandler(sync PodHandlerFunc)
+	AddLifecycle(name string, lifecycle PodLifecycle)
 }
 
 type podLister struct {
@@ -191,4 +193,13 @@ func (s *podClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 
 func (s *podClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
+}
+
+func (s *podClient) AddSyncHandler(sync PodHandlerFunc) {
+	s.Controller().AddHandler(sync)
+}
+
+func (s *podClient) AddLifecycle(name string, lifecycle PodLifecycle) {
+	sync := NewPodLifecycleAdapter(name, s, lifecycle)
+	s.AddSyncHandler(sync)
 }

@@ -17,8 +17,8 @@ import (
 
 var (
 	ClusterRoleGroupVersionKind = schema.GroupVersionKind{
-		Version: "v1",
-		Group:   "rbac.authorization.k8s.io",
+		Version: Version,
+		Group:   GroupName,
 		Kind:    "ClusterRole",
 	}
 	ClusterRoleResource = metav1.APIResource{
@@ -61,6 +61,8 @@ type ClusterRoleInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ClusterRoleController
+	AddSyncHandler(sync ClusterRoleHandlerFunc)
+	AddLifecycle(name string, lifecycle ClusterRoleLifecycle)
 }
 
 type clusterRoleLister struct {
@@ -191,4 +193,13 @@ func (s *clusterRoleClient) Watch(opts metav1.ListOptions) (watch.Interface, err
 
 func (s *clusterRoleClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
+}
+
+func (s *clusterRoleClient) AddSyncHandler(sync ClusterRoleHandlerFunc) {
+	s.Controller().AddHandler(sync)
+}
+
+func (s *clusterRoleClient) AddLifecycle(name string, lifecycle ClusterRoleLifecycle) {
+	sync := NewClusterRoleLifecycleAdapter(name, s, lifecycle)
+	s.AddSyncHandler(sync)
 }

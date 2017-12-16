@@ -192,7 +192,7 @@ func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	return result, err
 }
 
-func (p *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id string) error {
+func (p *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
 	namespace, id := splitID(id)
 
 	prop := metav1.DeletePropagationForeground
@@ -202,7 +202,16 @@ func (p *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id st
 		}).
 		Name(id)
 
-	return req.Do().Error()
+	err := req.Do().Error()
+	if err != nil {
+		return nil, err
+	}
+
+	obj, err := p.ByID(apiContext, schema, id)
+	if err != nil {
+		return nil, nil
+	}
+	return obj, nil
 }
 
 func (p *Store) singleResult(schema *types.Schema, req *rest.Request) (string, map[string]interface{}, error) {

@@ -22,7 +22,8 @@ type CatalogSpec struct {
 }
 
 type CatalogStatus struct {
-	Commit string `json:"commit,omitempty"`
+	LastRefreshTimestamp string `json:"lastRefreshTimestamp,omitempty"`
+	Commit               string `json:"commit,omitempty"`
 }
 
 type Template struct {

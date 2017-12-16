@@ -16,8 +16,8 @@ import (
 
 var (
 	TemplateGroupVersionKind = schema.GroupVersionKind{
-		Version: "v3",
-		Group:   "management.cattle.io",
+		Version: Version,
+		Group:   GroupName,
 		Kind:    "Template",
 	}
 	TemplateResource = metav1.APIResource{
@@ -60,6 +60,8 @@ type TemplateInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() TemplateController
+	AddSyncHandler(sync TemplateHandlerFunc)
+	AddLifecycle(name string, lifecycle TemplateLifecycle)
 }
 
 type templateLister struct {
@@ -190,4 +192,13 @@ func (s *templateClient) Watch(opts metav1.ListOptions) (watch.Interface, error)
 
 func (s *templateClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
+}
+
+func (s *templateClient) AddSyncHandler(sync TemplateHandlerFunc) {
+	s.Controller().AddHandler(sync)
+}
+
+func (s *templateClient) AddLifecycle(name string, lifecycle TemplateLifecycle) {
+	sync := NewTemplateLifecycleAdapter(name, s, lifecycle)
+	s.AddSyncHandler(sync)
 }

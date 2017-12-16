@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
@@ -16,6 +17,17 @@ import (
 type ObjectFactory interface {
 	Object() runtime.Object
 	List() runtime.Object
+}
+
+type UnstructuredObjectFactory struct {
+}
+
+func (u *UnstructuredObjectFactory) Object() runtime.Object {
+	return &unstructured.Unstructured{}
+}
+
+func (u *UnstructuredObjectFactory) List() runtime.Object {
+	return &unstructured.UnstructuredList{}
 }
 
 type ObjectClient struct {
@@ -33,6 +45,16 @@ func NewObjectClient(namespace string, restClient rest.Interface, apiResource *m
 		gvk:        gvk,
 		ns:         namespace,
 		Factory:    factory,
+	}
+}
+
+func (p *ObjectClient) UnstructuredClient() *ObjectClient {
+	return &ObjectClient{
+		restClient: p.restClient,
+		resource:   p.resource,
+		gvk:        p.gvk,
+		ns:         p.ns,
+		Factory:    &UnstructuredObjectFactory{},
 	}
 }
 

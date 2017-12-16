@@ -11,6 +11,7 @@ spec:
       name: pi
     spec:
         hostNetwork: true
+        serviceAccountName: rke-job-deployer
         nodeName: ` + nodeName + `
         containers:
           - name: ` + addonName + `-pod

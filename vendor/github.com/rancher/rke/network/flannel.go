@@ -1,13 +1,21 @@
 package network
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/rancher/rke/services"
+)
 
 func GetFlannelManifest(flannelConfig map[string]string) string {
 	var extraArgs string
 	if len(flannelConfig[FlannelIface]) > 0 {
 		extraArgs = fmt.Sprintf(",--iface=%s", flannelConfig[FlannelIface])
 	}
-	return `
+	rbacConfig := ""
+	if flannelConfig[RBACConfig] == services.RBACAuthorizationMode {
+		rbacConfig = getFlannelRBACManifest()
+	}
+	return rbacConfig + `
 ---
 kind: ConfigMap
 apiVersion: v1
@@ -61,6 +69,7 @@ spec:
         tier: node
         k8s-app: flannel
     spec:
+      serviceAccountName: flannel
       containers:
       - name: kube-flannel
         image: ` + flannelConfig[FlannelImage] + `
@@ -129,5 +138,53 @@ spec:
   updateStrategy:
     rollingUpdate:
       maxUnavailable: 20%
-    type: RollingUpdate`
+    type: RollingUpdate
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: flannel
+  namespace: kube-system`
+}
+
+func getFlannelRBACManifest() string {
+	return `
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: flannel
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: flannel
+subjects:
+- kind: ServiceAccount
+  name: flannel
+  namespace: kube-system
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: flannel
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+    verbs:
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - nodes/status
+    verbs:
+      - patch`
 }

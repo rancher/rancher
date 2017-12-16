@@ -17,8 +17,8 @@ import (
 
 var (
 	NodeGroupVersionKind = schema.GroupVersionKind{
-		Version: "v1",
-		Group:   "",
+		Version: Version,
+		Group:   GroupName,
 		Kind:    "Node",
 	}
 	NodeResource = metav1.APIResource{
@@ -61,6 +61,8 @@ type NodeInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NodeController
+	AddSyncHandler(sync NodeHandlerFunc)
+	AddLifecycle(name string, lifecycle NodeLifecycle)
 }
 
 type nodeLister struct {
@@ -191,4 +193,13 @@ func (s *nodeClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 
 func (s *nodeClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
+}
+
+func (s *nodeClient) AddSyncHandler(sync NodeHandlerFunc) {
+	s.Controller().AddHandler(sync)
+}
+
+func (s *nodeClient) AddLifecycle(name string, lifecycle NodeLifecycle) {
+	sync := NewNodeLifecycleAdapter(name, s, lifecycle)
+	s.AddSyncHandler(sync)
 }

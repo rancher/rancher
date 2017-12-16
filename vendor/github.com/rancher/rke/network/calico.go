@@ -1,56 +1,21 @@
 package network
 
+import "github.com/rancher/rke/services"
+
 func GetCalicoManifest(calicoConfig map[string]string) string {
 	awsIPPool := ""
 	if calicoConfig[CloudProvider] == AWSCloudProvider {
-		awsIPPool = `
----
-kind: ConfigMap
-apiVersion: v1
-metadata:
-  name: aws-ippool
-  namespace: kube-system
-data:
-  aws-ippool: |-
-    apiVersion: v1
-    kind: ipPool
-    metadata:
-      cidr: ` + calicoConfig[ClusterCIDR] + `
-    spec:
-      nat-outgoing: true
----
-apiVersion: v1
-kind: Pod
-metadata:
-  name: calicoctl
-  namespace: kube-system
-spec:
-  hostNetwork: true
-  restartPolicy: OnFailure
-  containers:
-  - name: calicoctl
-    image: ` + calicoConfig[CalicoctlImage] + `
-    command: ["/bin/sh", "-c", "calicoctl apply -f aws-ippool.yaml"]
-    env:
-    - name: ETCD_ENDPOINTS
-      valueFrom:
-        configMapKeyRef:
-          name: calico-config
-          key: etcd_endpoints
-    volumeMounts:
-    - name: ippool-config
-      mountPath: /root/
-  volumes:
-  - name: ippool-config
-    configMap:
-      name: aws-ippool
-      items:
-        - key: aws-ippool
-          path: aws-ippool.yaml
-        `
+		awsIPPool = getCalicoAWSIPPoolManifest(calicoConfig)
 	}
 
-	return `# Calico Version master
+	rbacConfig := ""
+	if calicoConfig[RBACConfig] == services.RBACAuthorizationMode {
+		rbacConfig = getCalicoRBACManifest()
+	}
+
+	return rbacConfig + `
+---
+# Calico Version master
 # https://docs.projectcalico.org/master/releases#master
 # This manifest includes the following component versions:
 #   calico/node:master
@@ -443,5 +408,136 @@ metadata:
   name: calico-node
   namespace: kube-system
 ` + awsIPPool + `
+`
+}
+
+func getCalicoAWSIPPoolManifest(calicoConfig map[string]string) string {
+	return `
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: aws-ippool
+  namespace: kube-system
+data:
+  aws-ippool: |-
+    apiVersion: v1
+    kind: ipPool
+    metadata:
+      cidr: ` + calicoConfig[ClusterCIDR] + `
+    spec:
+      nat-outgoing: true
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: calicoctl
+  namespace: kube-system
+spec:
+  hostNetwork: true
+  restartPolicy: OnFailure
+  containers:
+  - name: calicoctl
+    image: ` + calicoConfig[CalicoctlImage] + `
+    command: ["/bin/sh", "-c", "calicoctl apply -f aws-ippool.yaml"]
+    env:
+    - name: ETCD_ENDPOINTS
+      valueFrom:
+        configMapKeyRef:
+          name: calico-config
+          key: etcd_endpoints
+    volumeMounts:
+    - name: ippool-config
+      mountPath: /root/
+  volumes:
+  - name: ippool-config
+    configMap:
+      name: aws-ippool
+      items:
+        - key: aws-ippool
+          path: aws-ippool.yaml
+        `
+}
+
+func getCalicoRBACManifest() string {
+	return `
+---
+
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: calico-cni-plugin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: calico-cni-plugin
+subjects:
+- kind: ServiceAccount
+  name: calico-cni-plugin
+  namespace: kube-system
+
+---
+
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: calico-cni-plugin
+rules:
+  - apiGroups: [""]
+    resources:
+      - pods
+      - nodes
+    verbs:
+      - get
+
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: calico-cni-plugin
+  namespace: kube-system
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: calico-kube-controllers
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: calico-kube-controllers
+subjects:
+- kind: ServiceAccount
+  name: calico-kube-controllers
+  namespace: kube-system
+
+---
+
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: calico-kube-controllers
+rules:
+  - apiGroups:
+    - ""
+    - extensions
+    resources:
+      - pods
+      - namespaces
+      - networkpolicies
+      - nodes
+    verbs:
+      - watch
+      - list
+
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: calico-kube-controllers
+  namespace: kube-system
 `
 }

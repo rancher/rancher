@@ -16,8 +16,8 @@ import (
 
 var (
 	WorkloadGroupVersionKind = schema.GroupVersionKind{
-		Version: "v3",
-		Group:   "project.cattle.io",
+		Version: Version,
+		Group:   GroupName,
 		Kind:    "Workload",
 	}
 	WorkloadResource = metav1.APIResource{
@@ -61,6 +61,8 @@ type WorkloadInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() WorkloadController
+	AddSyncHandler(sync WorkloadHandlerFunc)
+	AddLifecycle(name string, lifecycle WorkloadLifecycle)
 }
 
 type workloadLister struct {
@@ -191,4 +193,13 @@ func (s *workloadClient) Watch(opts metav1.ListOptions) (watch.Interface, error)
 
 func (s *workloadClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
+}
+
+func (s *workloadClient) AddSyncHandler(sync WorkloadHandlerFunc) {
+	s.Controller().AddHandler(sync)
+}
+
+func (s *workloadClient) AddLifecycle(name string, lifecycle WorkloadLifecycle) {
+	sync := NewWorkloadLifecycleAdapter(name, s, lifecycle)
+	s.AddSyncHandler(sync)
 }

@@ -16,8 +16,8 @@ import (
 
 var (
 	TokenGroupVersionKind = schema.GroupVersionKind{
-		Version: "v3",
-		Group:   "management.cattle.io",
+		Version: Version,
+		Group:   GroupName,
 		Kind:    "Token",
 	}
 	TokenResource = metav1.APIResource{
@@ -60,6 +60,8 @@ type TokenInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() TokenController
+	AddSyncHandler(sync TokenHandlerFunc)
+	AddLifecycle(name string, lifecycle TokenLifecycle)
 }
 
 type tokenLister struct {
@@ -190,4 +192,13 @@ func (s *tokenClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 
 func (s *tokenClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
+}
+
+func (s *tokenClient) AddSyncHandler(sync TokenHandlerFunc) {
+	s.Controller().AddHandler(sync)
+}
+
+func (s *tokenClient) AddLifecycle(name string, lifecycle TokenLifecycle) {
+	sync := NewTokenLifecycleAdapter(name, s, lifecycle)
+	s.AddSyncHandler(sync)
 }

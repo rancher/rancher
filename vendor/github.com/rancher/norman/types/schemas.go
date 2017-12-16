@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"sync"
+
 	"github.com/rancher/norman/name"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/definition"
@@ -14,7 +16,9 @@ type SchemaCollection struct {
 	Data []Schema
 }
 
-type SchemaInitFunc func(*Schemas) *Schemas
+type SchemasInitFunc func(*Schemas) *Schemas
+
+type SchemaHook func(*Schema)
 
 type MappersFactory func() []Mapper
 
@@ -24,14 +28,17 @@ type BackReference struct {
 }
 
 type Schemas struct {
+	sync.Mutex
 	schemasByPath       map[string]map[string]*Schema
 	schemasBySubContext map[string]*Schema
 	mappers             map[string]map[string][]Mapper
 	references          map[string][]BackReference
+	embedded            map[string]*Schema
 	DefaultMappers      MappersFactory
 	DefaultPostMappers  MappersFactory
 	versions            []APIVersion
 	schemas             []*Schema
+	AddHook             SchemaHook
 	errors              []error
 }
 
@@ -41,10 +48,11 @@ func NewSchemas() *Schemas {
 		schemasBySubContext: map[string]*Schema{},
 		mappers:             map[string]map[string][]Mapper{},
 		references:          map[string][]BackReference{},
+		embedded:            map[string]*Schema{},
 	}
 }
 
-func (s *Schemas) Init(initFunc SchemaInitFunc) *Schemas {
+func (s *Schemas) Init(initFunc SchemasInitFunc) *Schemas {
 	return initFunc(s)
 }
 
@@ -53,11 +61,9 @@ func (s *Schemas) Err() error {
 }
 
 func (s *Schemas) SubContext(subContext string) *Schema {
+	s.Lock()
+	defer s.Unlock()
 	return s.schemasBySubContext[subContext]
-}
-
-func (s *Schemas) SubContextSchemas() map[string]*Schema {
-	return s.schemasBySubContext
 }
 
 func (s *Schemas) AddSchemas(schema *Schemas) *Schemas {
@@ -67,27 +73,58 @@ func (s *Schemas) AddSchemas(schema *Schemas) *Schemas {
 	return s
 }
 
+func (s *Schemas) RemoveSchema(schema Schema) *Schemas {
+	s.Lock()
+	defer s.Unlock()
+	return s.doRemoveSchema(schema)
+}
+
+func (s *Schemas) doRemoveSchema(schema Schema) *Schemas {
+	delete(s.schemasByPath[schema.Version.Path], schema.ID)
+
+	s.removeReferences(&schema)
+
+	delete(s.schemasBySubContext, schema.SubContext)
+
+	if schema.Embed {
+		s.removeEmbed(&schema)
+	}
+
+	return s
+}
+
+func (s *Schemas) removeReferences(schema *Schema) {
+	fullType := convert.ToFullReference(schema.Version.Path, schema.ID)
+	delete(s.references, fullType)
+
+	for name, values := range s.references {
+		changed := false
+		var modified []BackReference
+		for _, value := range values {
+			if value.Schema.ID == schema.ID && value.Schema.Version.Path == schema.Version.Path {
+				changed = true
+				continue
+			}
+			modified = append(modified, value)
+		}
+
+		if changed {
+			s.references[name] = modified
+		}
+	}
+}
+
 func (s *Schemas) AddSchema(schema Schema) *Schemas {
-	schema.Type = "/meta/schemas/schema"
-	if schema.ID == "" {
-		s.errors = append(s.errors, fmt.Errorf("ID is not set on schema: %v", schema))
-		return s
-	}
-	if schema.Version.Path == "" || schema.Version.Version == "" {
-		s.errors = append(s.errors, fmt.Errorf("version is not set on schema: %s", schema.ID))
-		return s
-	}
-	if schema.PluralName == "" {
-		schema.PluralName = name.GuessPluralName(schema.ID)
-	}
-	if schema.CodeName == "" {
-		schema.CodeName = convert.Capitalize(schema.ID)
-	}
-	if schema.CodeNamePlural == "" {
-		schema.CodeNamePlural = name.GuessPluralName(schema.CodeName)
-	}
-	if schema.BaseType == "" {
-		schema.BaseType = schema.ID
+	s.Lock()
+	defer s.Unlock()
+	return s.doAddSchema(schema)
+}
+
+func (s *Schemas) doAddSchema(schema Schema) *Schemas {
+	s.setupDefaults(&schema)
+
+	if s.AddHook != nil {
+		s.AddHook(&schema)
 	}
 
 	schemas, ok := s.schemasByPath[schema.Version.Path]
@@ -101,20 +138,8 @@ func (s *Schemas) AddSchema(schema Schema) *Schemas {
 		schemas[schema.ID] = &schema
 		s.schemas = append(s.schemas, &schema)
 
-		for name, field := range schema.ResourceFields {
-			if !definition.IsReferenceType(field.Type) {
-				continue
-			}
-
-			refType := definition.SubType(field.Type)
-			if !strings.HasPrefix(refType, "/") {
-				refType = convert.ToFullReference(schema.Version.Path, refType)
-			}
-
-			s.references[refType] = append(s.references[refType], BackReference{
-				FieldName: name,
-				Schema:    &schema,
-			})
+		if !schema.Embed {
+			s.addReferences(&schema)
 		}
 	}
 
@@ -122,11 +147,100 @@ func (s *Schemas) AddSchema(schema Schema) *Schemas {
 		s.schemasBySubContext[schema.SubContext] = &schema
 	}
 
+	if schema.Embed {
+		s.embed(&schema)
+	}
+
 	return s
+}
+
+func (s *Schemas) removeEmbed(schema *Schema) {
+	target := s.doSchema(&schema.Version, schema.EmbedType, false)
+	if target == nil {
+		return
+	}
+
+	newSchema := *target
+	newSchema.ResourceFields = map[string]Field{}
+
+	for k, v := range target.ResourceFields {
+		newSchema.ResourceFields[k] = v
+	}
+
+	for k := range schema.ResourceFields {
+		delete(newSchema.ResourceFields, k)
+	}
+
+	s.doRemoveSchema(*target)
+	s.doAddSchema(newSchema)
+}
+
+func (s *Schemas) embed(schema *Schema) {
+	target := s.doSchema(&schema.Version, schema.EmbedType, false)
+	if target == nil {
+		return
+	}
+
+	newSchema := *target
+	newSchema.ResourceFields = map[string]Field{}
+
+	for k, v := range target.ResourceFields {
+		newSchema.ResourceFields[k] = v
+	}
+	for k, v := range schema.ResourceFields {
+		newSchema.ResourceFields[k] = v
+	}
+
+	s.doRemoveSchema(*target)
+	s.doAddSchema(newSchema)
+}
+
+func (s *Schemas) addReferences(schema *Schema) {
+	for name, field := range schema.ResourceFields {
+		if !definition.IsReferenceType(field.Type) {
+			continue
+		}
+
+		refType := definition.SubType(field.Type)
+		if !strings.HasPrefix(refType, "/") {
+			refType = convert.ToFullReference(schema.Version.Path, refType)
+		}
+
+		s.references[refType] = append(s.references[refType], BackReference{
+			FieldName: name,
+			Schema:    schema,
+		})
+	}
+}
+
+func (s *Schemas) setupDefaults(schema *Schema) {
+	schema.Type = "/meta/schemas/schema"
+	if schema.ID == "" {
+		s.errors = append(s.errors, fmt.Errorf("ID is not set on schema: %v", schema))
+		return
+	}
+	if schema.Version.Path == "" || schema.Version.Version == "" {
+		s.errors = append(s.errors, fmt.Errorf("version is not set on schema: %s", schema.ID))
+		return
+	}
+	if schema.PluralName == "" {
+		schema.PluralName = name.GuessPluralName(schema.ID)
+	}
+	if schema.CodeName == "" {
+		schema.CodeName = convert.Capitalize(schema.ID)
+	}
+	if schema.CodeNamePlural == "" {
+		schema.CodeNamePlural = name.GuessPluralName(schema.CodeName)
+	}
+	if schema.BaseType == "" {
+		schema.BaseType = schema.ID
+	}
 }
 
 func (s *Schemas) References(schema *Schema) []BackReference {
 	refType := convert.ToFullReference(schema.Version.Path, schema.ID)
+	s.Lock()
+	defer s.Unlock()
 	return s.references[refType]
 }
 
@@ -142,6 +256,8 @@ func (s *Schemas) AddMapper(version *APIVersion, schemaID string, mapper Mapper)
 }
 
 func (s *Schemas) SchemasForVersion(version APIVersion) map[string]*Schema {
+	s.Lock()
+	defer s.Unlock()
 	return s.schemasByPath[version.Path]
 }
 
@@ -182,6 +298,10 @@ func (s *Schemas) mapper(version *APIVersion, name string) []Mapper {
 }
 
 func (s *Schemas) Schema(version *APIVersion, name string) *Schema {
+	return s.doSchema(version, name, true)
+}
+
+func (s *Schemas) doSchema(version *APIVersion, name string, lock bool) *Schema {
 	var (
 		path string
 	)
@@ -196,7 +316,13 @@ func (s *Schemas) Schema(version *APIVersion, name string) *Schema {
 		path = "core"
 	}
 
+	if lock {
+		s.Lock()
+	}
 	schemas, ok := s.schemasByPath[path]
+	if lock {
+		s.Unlock()
+	}
 	if !ok {
 		return nil
 	}

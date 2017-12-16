@@ -79,6 +79,8 @@ type TypeScope string
 
 type Schema struct {
 	ID                string            `json:"id,omitempty"`
+	Embed             bool              `json:"embed,omitempty"`
+	EmbedType         string            `json:"embedType,omitempty"`
 	CodeName          string            `json:"-"`
 	CodeNamePlural    string            `json:"-"`
 	PkgName           string            `json:"-"`

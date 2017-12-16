@@ -12,6 +12,8 @@ const (
 	DynamicSchemaFieldCollectionFilters    = "collectionFilters"
 	DynamicSchemaFieldCollectionMethods    = "collectionMethods"
 	DynamicSchemaFieldCreated              = "created"
+	DynamicSchemaFieldEmbed                = "embed"
+	DynamicSchemaFieldEmbedType            = "embedType"
 	DynamicSchemaFieldFinalizers           = "finalizers"
 	DynamicSchemaFieldIncludeableLinks     = "includeableLinks"
 	DynamicSchemaFieldLabels               = "labels"
@@ -38,6 +40,8 @@ type DynamicSchema struct {
 	CollectionFilters    map[string]Filter    `json:"collectionFilters,omitempty"`
 	CollectionMethods    []string             `json:"collectionMethods,omitempty"`
 	Created              string               `json:"created,omitempty"`
+	Embed                *bool                `json:"embed,omitempty"`
+	EmbedType            string               `json:"embedType,omitempty"`
 	Finalizers           []string             `json:"finalizers,omitempty"`
 	IncludeableLinks     []string             `json:"includeableLinks,omitempty"`
 	Labels               map[string]string    `json:"labels,omitempty"`

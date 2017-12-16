@@ -16,8 +16,8 @@ import (
 
 var (
 	MachineGroupVersionKind = schema.GroupVersionKind{
-		Version: "v3",
-		Group:   "management.cattle.io",
+		Version: Version,
+		Group:   GroupName,
 		Kind:    "Machine",
 	}
 	MachineResource = metav1.APIResource{
@@ -60,6 +60,8 @@ type MachineInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() MachineController
+	AddSyncHandler(sync MachineHandlerFunc)
+	AddLifecycle(name string, lifecycle MachineLifecycle)
 }
 
 type machineLister struct {
@@ -190,4 +192,13 @@ func (s *machineClient) Watch(opts metav1.ListOptions) (watch.Interface, error) 
 
 func (s *machineClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
+}
+
+func (s *machineClient) AddSyncHandler(sync MachineHandlerFunc) {
+	s.Controller().AddHandler(sync)
+}
+
+func (s *machineClient) AddLifecycle(name string, lifecycle MachineLifecycle) {
+	sync := NewMachineLifecycleAdapter(name, s, lifecycle)
+	s.AddSyncHandler(sync)
 }

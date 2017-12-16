@@ -14,7 +14,6 @@ const (
 	MachineDriverFieldDescription          = "description"
 	MachineDriverFieldExternalID           = "externalId"
 	MachineDriverFieldFinalizers           = "finalizers"
-	MachineDriverFieldId                   = "id"
 	MachineDriverFieldLabels               = "labels"
 	MachineDriverFieldName                 = "name"
 	MachineDriverFieldOwnerReferences      = "ownerReferences"
@@ -39,7 +38,6 @@ type MachineDriver struct {
 	Description          string               `json:"description,omitempty"`
 	ExternalID           string               `json:"externalId,omitempty"`
 	Finalizers           []string             `json:"finalizers,omitempty"`
-	Id                   string               `json:"id,omitempty"`
 	Labels               map[string]string    `json:"labels,omitempty"`
 	Name                 string               `json:"name,omitempty"`
 	OwnerReferences      []OwnerReference     `json:"ownerReferences,omitempty"`

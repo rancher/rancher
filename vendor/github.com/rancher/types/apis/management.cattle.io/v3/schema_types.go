@@ -18,6 +18,8 @@ type DynamicSchema struct {
 }
 
 type DynamicSchemaSpec struct {
+	Embed             bool              `json:"embed,omitempty"`
+	EmbedType         string            `json:"embedType,omitempty"`
 	PluralName        string            `json:"pluralName,omitempty"`
 	ResourceMethods   []string          `json:"resourceMethods,omitempty"`
 	ResourceFields    map[string]Field  `json:"resourceFields,omitempty"`

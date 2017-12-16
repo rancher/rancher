@@ -149,6 +149,7 @@ type URLBuilder interface {
 	SetSubContext(subContext string)
 	FilterLink(schema *Schema, fieldName string, value string) string
 	Action(action string, resource *RawResource) string
+	ResourceLinkByID(schema *Schema, id string) string
 }
 
 type Store interface {
@@ -156,6 +157,6 @@ type Store interface {
 	List(apiContext *APIContext, schema *Schema, opt QueryOptions) ([]map[string]interface{}, error)
 	Create(apiContext *APIContext, schema *Schema, data map[string]interface{}) (map[string]interface{}, error)
 	Update(apiContext *APIContext, schema *Schema, data map[string]interface{}, id string) (map[string]interface{}, error)
-	Delete(apiContext *APIContext, schema *Schema, id string) error
+	Delete(apiContext *APIContext, schema *Schema, id string) (map[string]interface{}, error)
 	Watch(apiContext *APIContext, schema *Schema, opt QueryOptions) (chan map[string]interface{}, error)
 }

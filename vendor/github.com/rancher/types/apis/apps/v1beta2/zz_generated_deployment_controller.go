@@ -17,8 +17,8 @@ import (
 
 var (
 	DeploymentGroupVersionKind = schema.GroupVersionKind{
-		Version: "v1beta2",
-		Group:   "apps",
+		Version: Version,
+		Group:   GroupName,
 		Kind:    "Deployment",
 	}
 	DeploymentResource = metav1.APIResource{
@@ -61,6 +61,8 @@ type DeploymentInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() DeploymentController
+	AddSyncHandler(sync DeploymentHandlerFunc)
+	AddLifecycle(name string, lifecycle DeploymentLifecycle)
 }
 
 type deploymentLister struct {
@@ -191,4 +193,13 @@ func (s *deploymentClient) Watch(opts metav1.ListOptions) (watch.Interface, erro
 
 func (s *deploymentClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
+}
+
+func (s *deploymentClient) AddSyncHandler(sync DeploymentHandlerFunc) {
+	s.Controller().AddHandler(sync)
+}
+
+func (s *deploymentClient) AddLifecycle(name string, lifecycle DeploymentLifecycle) {
+	sync := NewDeploymentLifecycleAdapter(name, s, lifecycle)
+	s.AddSyncHandler(sync)
 }

@@ -10,8 +10,8 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
-func runKubeController(host *hosts.Host, kubeControllerService v3.KubeControllerService) error {
-	imageCfg, hostCfg := buildKubeControllerConfig(kubeControllerService)
+func runKubeController(host *hosts.Host, kubeControllerService v3.KubeControllerService, authorizationMode string) error {
+	imageCfg, hostCfg := buildKubeControllerConfig(kubeControllerService, authorizationMode)
 	return docker.DoRunContainer(host.DClient, imageCfg, hostCfg, KubeControllerContainerName, host.Address, ControlRole)
 }
 
@@ -19,7 +19,7 @@ func removeKubeController(host *hosts.Host) error {
 	return docker.DoRemoveContainer(host.DClient, KubeControllerContainerName, host.Address)
 }
 
-func buildKubeControllerConfig(kubeControllerService v3.KubeControllerService) (*container.Config, *container.HostConfig) {
+func buildKubeControllerConfig(kubeControllerService v3.KubeControllerService, authorizationMode string) (*container.Config, *container.HostConfig) {
 	imageCfg := &container.Config{
 		Image: kubeControllerService.Image,
 		Entrypoint: []string{"/opt/rke/entrypoint.sh",
@@ -38,6 +38,9 @@ func buildKubeControllerConfig(kubeControllerService v3.KubeControllerService) (
 			"--service-account-private-key-file=" + pki.KubeAPIKeyPath,
 			"--root-ca-file=" + pki.CACertPath,
 		},
+	}
+	if authorizationMode == RBACAuthorizationMode {
+		imageCfg.Cmd = append(imageCfg.Cmd, "--use-service-account-credentials=true")
 	}
 	hostCfg := &container.HostConfig{
 		VolumesFrom: []string{

@@ -24,91 +24,25 @@ type condition struct {
 }
 
 var conditionMappings = []conditionMapping{
-	{
-		Name:       "Initialized",
-		Transition: true,
-		State:      "initializing",
-	},
-	{
-		Name:       "Available",
-		Transition: true,
-		State:      "activating",
-	},
-	{
-		Name:       "Progressing",
-		Transition: true,
-		State:      "updating",
-	},
-	{
-		Name:       "Provisioned",
-		Transition: true,
-		State:      "provisioning",
-	},
-	{
-		Name:        "Updating",
-		Transition:  true,
-		FalseIsGood: true,
-		State:       "updating",
-	},
-	{
-		Name:       "ConfigOK",
-		Transition: true,
-		State:      "configuring",
-	},
-	{
-		Name:       "PodScheduled",
-		Transition: true,
-		State:      "scheduling",
-	},
-	{
-		Name:  "Completed",
-		State: "completed",
-	},
-	{
-		Name:  "Failed",
-		Error: true,
-		State: "error",
-	},
-	{
-		Name:        "OutOfDisk",
-		Error:       true,
-		FalseIsGood: true,
-	},
-	{
-		Name:        "MemoryPressure",
-		Error:       true,
-		FalseIsGood: true,
-	},
-	{
-		Name:        "DiskPressure",
-		Error:       true,
-		FalseIsGood: true,
-	},
-	{
-		Name:        "NetworkUnavailable",
-		FalseIsGood: true,
-		Error:       true,
-	},
-	{
-		Name:        "KernelHasNoDeadlock",
-		FalseIsGood: true,
-		Error:       true,
-	},
-	{
-		Name:        "Unschedulable",
-		Error:       true,
-		FalseIsGood: true,
-	},
-	{
-		Name:        "ReplicaFailure",
-		Error:       true,
-		FalseIsGood: true,
-	},
-	{
-		Name:       "Ready",
-		Transition: true,
-		State:      "activating",
-	},
+	{Name: "Initialized", Transition: true, State: "initializing"},
+	{Name: "Available", Transition: true, State: "activating"},
+	{Name: "Progressing", Transition: true, State: "updating"},
+	{Name: "Provisioned", Transition: true, State: "provisioning"},
+	{Name: "Saved", Transition: true, State: "saving"},
+	{Name: "AgentInstalled", Transition: true, State: "installing"},
+	{Name: "Updating", Transition: true, FalseIsGood: true, State: "updating"},
+	{Name: "ConfigOK", Transition: true, State: "configuring"},
+	{Name: "PodScheduled", Transition: true, State: "scheduling"},
+	{Name: "Completed", State: "completed"},
+	{Name: "Failed", Error: true, State: "error"},
+	{Name: "OutOfDisk", Error: true, FalseIsGood: true},
+	{Name: "MemoryPressure", Error: true, FalseIsGood: true},
+	{Name: "DiskPressure", Error: true, FalseIsGood: true},
+	{Name: "NetworkUnavailable", Error: true, FalseIsGood: true},
+	{Name: "KernelHasNoDeadlock", Error: true, FalseIsGood: true},
+	{Name: "Unschedulable", Error: true, FalseIsGood: true},
+	{Name: "ReplicaFailure", Error: true, FalseIsGood: true},
+	{Name: "Ready", Transition: false, State: "unavailable"},
 }
 
 func Set(data map[string]interface{}) {
@@ -202,6 +136,17 @@ func Set(data map[string]interface{}) {
 		val, _ := values.GetValueN(data, "status", "phase").(string)
 		if val != "" {
 			state = val
+		}
+	}
+
+	if state == "" {
+		val, ok := values.GetValue(data, "spec", "active")
+		if ok {
+			if convert.ToBool(val) {
+				state = "active"
+			} else {
+				state = "inactive"
+			}
 		}
 	}
 

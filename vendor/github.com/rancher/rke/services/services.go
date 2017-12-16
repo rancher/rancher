@@ -15,7 +15,8 @@ const (
 	ControlRole = "controlplane"
 	WorkerRole  = "worker"
 
-	SidekickServiceName = "sidekick"
+	SidekickServiceName   = "sidekick"
+	RBACAuthorizationMode = "rbac"
 
 	KubeAPIContainerName        = "kube-api"
 	KubeletContainerName        = "kubelet"

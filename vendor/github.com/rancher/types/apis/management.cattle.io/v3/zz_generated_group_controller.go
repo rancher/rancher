@@ -16,8 +16,8 @@ import (
 
 var (
 	GroupGroupVersionKind = schema.GroupVersionKind{
-		Version: "v3",
-		Group:   "management.cattle.io",
+		Version: Version,
+		Group:   GroupName,
 		Kind:    "Group",
 	}
 	GroupResource = metav1.APIResource{
@@ -60,6 +60,8 @@ type GroupInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() GroupController
+	AddSyncHandler(sync GroupHandlerFunc)
+	AddLifecycle(name string, lifecycle GroupLifecycle)
 }
 
 type groupLister struct {
@@ -190,4 +192,13 @@ func (s *groupClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 
 func (s *groupClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
+}
+
+func (s *groupClient) AddSyncHandler(sync GroupHandlerFunc) {
+	s.Controller().AddHandler(sync)
+}
+
+func (s *groupClient) AddLifecycle(name string, lifecycle GroupLifecycle) {
+	sync := NewGroupLifecycleAdapter(name, s, lifecycle)
+	s.AddSyncHandler(sync)
 }

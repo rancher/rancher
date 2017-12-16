@@ -3,6 +3,8 @@ package drivers
 import (
 	"fmt"
 
+	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"gopkg.in/yaml.v2"
 	"k8s.io/api/core/v1"
 	"k8s.io/api/rbac/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -90,4 +92,12 @@ func GenerateServiceAccountToken(clientset *kubernetes.Clientset) (string, error
 		}
 	}
 	return "", fmt.Errorf("failed to configure serviceAccountToken")
+}
+
+func ConvertToRkeConfig(config string) (v3.RancherKubernetesEngineConfig, error) {
+	var rkeConfig v3.RancherKubernetesEngineConfig
+	if err := yaml.Unmarshal([]byte(config), &rkeConfig); err != nil {
+		return rkeConfig, err
+	}
+	return rkeConfig, nil
 }

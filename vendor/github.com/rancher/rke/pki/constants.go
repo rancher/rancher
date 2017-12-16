@@ -45,7 +45,7 @@ const (
 	KubeProxyConfigPath    = "/etc/kubernetes/ssl/kubecfg-kube-proxy.yaml"
 
 	KubeNodeName             = "kube-node"
-	KubeNodeCommonName       = "kube-node"
+	KubeNodeCommonName       = "system:node"
 	KubeNodeOrganizationName = "system:nodes"
 	KubeNodeCertENVName      = "KUBE_NODE"
 	KubeNodeKeyENVName       = "KUBE_NODE_KEY"

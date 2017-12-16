@@ -17,8 +17,8 @@ import (
 
 var (
 	PodSecurityPolicyGroupVersionKind = schema.GroupVersionKind{
-		Version: "v1beta1",
-		Group:   "extensions",
+		Version: Version,
+		Group:   GroupName,
 		Kind:    "PodSecurityPolicy",
 	}
 	PodSecurityPolicyResource = metav1.APIResource{
@@ -61,6 +61,8 @@ type PodSecurityPolicyInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PodSecurityPolicyController
+	AddSyncHandler(sync PodSecurityPolicyHandlerFunc)
+	AddLifecycle(name string, lifecycle PodSecurityPolicyLifecycle)
 }
 
 type podSecurityPolicyLister struct {
@@ -191,4 +193,13 @@ func (s *podSecurityPolicyClient) Watch(opts metav1.ListOptions) (watch.Interfac
 
 func (s *podSecurityPolicyClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
+}
+
+func (s *podSecurityPolicyClient) AddSyncHandler(sync PodSecurityPolicyHandlerFunc) {
+	s.Controller().AddHandler(sync)
+}
+
+func (s *podSecurityPolicyClient) AddLifecycle(name string, lifecycle PodSecurityPolicyLifecycle) {
+	sync := NewPodSecurityPolicyLifecycleAdapter(name, s, lifecycle)
+	s.AddSyncHandler(sync)
 }

@@ -92,10 +92,10 @@ func (a *AggregateStore) Update(apiContext *types.APIContext, schema *types.Sche
 	return store.Update(apiContext, schema, data, id)
 }
 
-func (a *AggregateStore) Delete(apiContext *types.APIContext, schema *types.Schema, id string) error {
+func (a *AggregateStore) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
 	store, err := a.getStore(id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	return store.Delete(apiContext, schema, id)
 }
