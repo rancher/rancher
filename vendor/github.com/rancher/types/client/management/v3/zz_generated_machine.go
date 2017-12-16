@@ -40,6 +40,7 @@ const (
 	MachineFieldLimits                   = "limits"
 	MachineFieldMachineTemplateId        = "machineTemplateId"
 	MachineFieldName                     = "name"
+	MachineFieldNodeConfig               = "nodeConfig"
 	MachineFieldOwnerReferences          = "ownerReferences"
 	MachineFieldPhase                    = "phase"
 	MachineFieldPodCIDR                  = "podCIDR"
@@ -48,6 +49,7 @@ const (
 	MachineFieldRemoved                  = "removed"
 	MachineFieldRequested                = "requested"
 	MachineFieldResourcePath             = "resourcePath"
+	MachineFieldRole                     = "role"
 	MachineFieldSSHPrivateKey            = "sshPrivateKey"
 	MachineFieldSSHUser                  = "sshUser"
 	MachineFieldState                    = "state"
@@ -96,6 +98,7 @@ type Machine struct {
 	Limits                   map[string]string         `json:"limits,omitempty"`
 	MachineTemplateId        string                    `json:"machineTemplateId,omitempty"`
 	Name                     string                    `json:"name,omitempty"`
+	NodeConfig               *RKEConfigNode            `json:"nodeConfig,omitempty"`
 	OwnerReferences          []OwnerReference          `json:"ownerReferences,omitempty"`
 	Phase                    string                    `json:"phase,omitempty"`
 	PodCIDR                  string                    `json:"podCIDR,omitempty"`
@@ -104,6 +107,7 @@ type Machine struct {
 	Removed                  string                    `json:"removed,omitempty"`
 	Requested                map[string]string         `json:"requested,omitempty"`
 	ResourcePath             string                    `json:"resourcePath,omitempty"`
+	Role                     string                    `json:"role,omitempty"`
 	SSHPrivateKey            string                    `json:"sshPrivateKey,omitempty"`
 	SSHUser                  string                    `json:"sshUser,omitempty"`
 	State                    string                    `json:"state,omitempty"`

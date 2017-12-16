@@ -5,33 +5,39 @@ import (
 )
 
 const (
-	UserType                 = "user"
-	UserFieldAnnotations     = "annotations"
-	UserFieldCreated         = "created"
-	UserFieldExternalID      = "externalId"
-	UserFieldFinalizers      = "finalizers"
-	UserFieldLabels          = "labels"
-	UserFieldName            = "name"
-	UserFieldOwnerReferences = "ownerReferences"
-	UserFieldRemoved         = "removed"
-	UserFieldResourcePath    = "resourcePath"
-	UserFieldSecret          = "secret"
-	UserFieldUuid            = "uuid"
+	UserType                    = "user"
+	UserFieldAnnotations        = "annotations"
+	UserFieldCreated            = "created"
+	UserFieldFinalizers         = "finalizers"
+	UserFieldId                 = "id"
+	UserFieldLabels             = "labels"
+	UserFieldMustChangePassword = "mustChangePassword"
+	UserFieldName               = "name"
+	UserFieldOwnerReferences    = "ownerReferences"
+	UserFieldPassword           = "password"
+	UserFieldPrincipalIDs       = "principalIds"
+	UserFieldRemoved            = "removed"
+	UserFieldResourcePath       = "resourcePath"
+	UserFieldUserName           = "userName"
+	UserFieldUuid               = "uuid"
 )
 
 type User struct {
 	types.Resource
-	Annotations     map[string]string `json:"annotations,omitempty"`
-	Created         string            `json:"created,omitempty"`
-	ExternalID      string            `json:"externalId,omitempty"`
-	Finalizers      []string          `json:"finalizers,omitempty"`
-	Labels          map[string]string `json:"labels,omitempty"`
-	Name            string            `json:"name,omitempty"`
-	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
-	Removed         string            `json:"removed,omitempty"`
-	ResourcePath    string            `json:"resourcePath,omitempty"`
-	Secret          string            `json:"secret,omitempty"`
-	Uuid            string            `json:"uuid,omitempty"`
+	Annotations        map[string]string `json:"annotations,omitempty"`
+	Created            string            `json:"created,omitempty"`
+	Finalizers         []string          `json:"finalizers,omitempty"`
+	Id                 string            `json:"id,omitempty"`
+	Labels             map[string]string `json:"labels,omitempty"`
+	MustChangePassword *bool             `json:"mustChangePassword,omitempty"`
+	Name               string            `json:"name,omitempty"`
+	OwnerReferences    []OwnerReference  `json:"ownerReferences,omitempty"`
+	Password           string            `json:"password,omitempty"`
+	PrincipalIDs       []string          `json:"principalIds,omitempty"`
+	Removed            string            `json:"removed,omitempty"`
+	ResourcePath       string            `json:"resourcePath,omitempty"`
+	UserName           string            `json:"userName,omitempty"`
+	Uuid               string            `json:"uuid,omitempty"`
 }
 type UserCollection struct {
 	types.Collection

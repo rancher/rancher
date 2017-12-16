@@ -23,6 +23,7 @@ const (
 	MachineSpecFieldMachineTemplateId        = "machineTemplateId"
 	MachineSpecFieldPodCIDR                  = "podCIDR"
 	MachineSpecFieldProviderID               = "providerID"
+	MachineSpecFieldRole                     = "role"
 	MachineSpecFieldTaints                   = "taints"
 	MachineSpecFieldUnschedulable            = "unschedulable"
 )
@@ -49,6 +50,7 @@ type MachineSpec struct {
 	MachineTemplateId        string              `json:"machineTemplateId,omitempty"`
 	PodCIDR                  string              `json:"podCIDR,omitempty"`
 	ProviderID               string              `json:"providerID,omitempty"`
+	Role                     string              `json:"role,omitempty"`
 	Taints                   []Taint             `json:"taints,omitempty"`
 	Unschedulable            *bool               `json:"unschedulable,omitempty"`
 }

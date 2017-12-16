@@ -16,6 +16,7 @@ func ReturnHTTPError(w http.ResponseWriter, r *http.Request, httpStatus int, err
 	err := model.AuthError{
 		Status:  strconv.Itoa(httpStatus),
 		Message: errorMessage,
+		Type:    "error",
 	}
 
 	enc := json.NewEncoder(w)

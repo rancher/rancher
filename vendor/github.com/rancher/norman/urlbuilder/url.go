@@ -254,3 +254,7 @@ func parseResponseURLBase(requestURL string, r *http.Request) (string, error) {
 
 	return requestURL[0:index], nil
 }
+
+func (u *urlBuilder) Action(action string, resource *types.RawResource) string {
+	return u.constructBasicURL(resource.Schema.Version, resource.Schema.PluralName, resource.ID) + "?action=" + url.QueryEscape(action)
+}

@@ -31,7 +31,7 @@ func ValidateAction(request *types.APIContext) (*types.Action, error) {
 		return nil, httperror.NewAPIError(httperror.InvalidAction, fmt.Sprintf("Invalid action: %s", request.Action))
 	}
 
-	if request.ID != "" {
+	if request.ID != "" && request.ReferenceValidator != nil {
 		resource := request.ReferenceValidator.Lookup(request.Type, request.ID)
 		if resource == nil {
 			return nil, httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("Failed to find type: %s id: %s", request.Type, request.ID))
