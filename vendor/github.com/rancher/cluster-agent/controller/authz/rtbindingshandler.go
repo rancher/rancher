@@ -11,20 +11,31 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	typesrbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
+	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/tools/cache"
 )
 
 const (
 	finalizerName  = "rtbFinalizer"
 	rtbOwnerLabel  = "io.cattle.rtb.owner"
 	projectIDLabel = "io.cattle.field.projectId"
+	prtbIndex      = "io.cattle.authz.prtb.projectname"
 )
 
 func Register(workload *config.ClusterContext) {
+	// Add cache informer to project role template bindings
+	informer := workload.Management.Management.ProjectRoleTemplateBindings("").Controller().Informer()
+	indexers := map[string]cache.IndexFunc{
+		prtbIndex: prtbIndexer,
+	}
+	informer.AddIndexers(indexers)
+
 	r := &roleHandler{
 		workload:   workload,
+		indexer:    informer.GetIndexer(),
 		rtLister:   workload.Management.Management.RoleTemplates("").Controller().Lister(),
 		psptLister: workload.Management.Management.PodSecurityPolicyTemplates("").Controller().Lister(),
 		nsLister:   workload.Core.Namespaces("").Controller().Lister(),
@@ -35,11 +46,13 @@ func Register(workload *config.ClusterContext) {
 	}
 	workload.Management.Management.ProjectRoleTemplateBindings("").Controller().AddHandler(r.syncPRTB)
 	workload.Management.Management.ClusterRoleTemplateBindings("").Controller().AddHandler(r.syncCRTB)
+	workload.Core.Namespaces("").Controller().AddHandler(r.syncNS)
 }
 
 type roleHandler struct {
 	workload   *config.ClusterContext
 	rtLister   v3.RoleTemplateLister
+	indexer    cache.Indexer
 	psptLister v3.PodSecurityPolicyTemplateLister
 	nsLister   typescorev1.NamespaceLister
 	crLister   typesrbacv1.ClusterRoleLister
@@ -267,7 +280,7 @@ func (r *roleHandler) ensureRoles(rts map[string]*v3.RoleTemplate) error {
 			continue
 		}
 
-		if role, err := r.crLister.Get("", rt.Name); err == nil {
+		if role, err := r.crLister.Get("", rt.Name); err == nil && role != nil {
 			role = role.DeepCopy()
 			// TODO potentially check a version so that we don't do unnecessary updates
 			role.Rules = rt.Rules
@@ -275,6 +288,7 @@ func (r *roleHandler) ensureRoles(rts map[string]*v3.RoleTemplate) error {
 			if err != nil {
 				return errors.Wrapf(err, "couldn't update role %v", rt.Name)
 			}
+			continue
 		}
 
 		_, err := roleCli.Create(&rbacv1.ClusterRole{
@@ -294,7 +308,7 @@ func (r *roleHandler) ensureRoles(rts map[string]*v3.RoleTemplate) error {
 func (r *roleHandler) ensureClusterBinding(roleName string, binding *v3.ClusterRoleTemplateBinding) error {
 	bindingCli := r.workload.K8sClient.RbacV1().ClusterRoleBindings()
 	bindingName, objectMeta, subjects, roleRef := bindingParts(roleName, string(binding.UID), binding.Subject)
-	if _, err := r.crbLister.Get("", bindingName); err == nil {
+	if c, _ := r.crbLister.Get("", bindingName); c != nil {
 		return nil
 	}
 
@@ -310,10 +324,9 @@ func (r *roleHandler) ensureClusterBinding(roleName string, binding *v3.ClusterR
 func (r *roleHandler) ensureBinding(ns, roleName string, binding *v3.ProjectRoleTemplateBinding) error {
 	bindingCli := r.workload.K8sClient.RbacV1().RoleBindings(ns)
 	bindingName, objectMeta, subjects, roleRef := bindingParts(roleName, string(binding.UID), binding.Subject)
-	if _, err := r.crbLister.Get("", bindingName); err == nil {
+	if b, _ := r.rbLister.Get("", bindingName); b != nil {
 		return nil
 	}
-
 	_, err := bindingCli.Create(&rbacv1.RoleBinding{
 		ObjectMeta: objectMeta,
 		Subjects:   subjects,
@@ -334,4 +347,14 @@ func bindingParts(roleName, parentUID string, subject rbacv1.Subject) (string, m
 			Kind: "ClusterRole",
 			Name: roleName,
 		}
+}
+
+func prtbIndexer(obj interface{}) ([]string, error) {
+	prtb, ok := obj.(*v3.ProjectRoleTemplateBinding)
+	if !ok {
+		logrus.Infof("object %v is not Project Role Template Binding", obj)
+		return []string{}, nil
+	}
+
+	return []string{prtb.ProjectName}, nil
 }
