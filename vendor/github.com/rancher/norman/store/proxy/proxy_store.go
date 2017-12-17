@@ -19,13 +19,6 @@ import (
 	restclientwatch "k8s.io/client-go/rest/watch"
 )
 
-var (
-	authHeaders = []string{
-		"Impersonate-User",
-		"Impersonate-Group",
-	}
-)
-
 type Store struct {
 	k8sClient      rest.Interface
 	prefix         []string
@@ -47,13 +40,6 @@ func NewProxyStore(k8sClient rest.Interface,
 	}
 }
 
-func (p *Store) doAuthed(apiContext *types.APIContext, request *rest.Request) rest.Result {
-	for _, header := range authHeaders {
-		request.SetHeader(header, apiContext.Request.Header[header]...)
-	}
-	return request.Do()
-}
-
 func (p *Store) ByID(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
 	_, result, err := p.byID(apiContext, schema, id)
 	return result, err
@@ -65,7 +51,7 @@ func (p *Store) byID(apiContext *types.APIContext, schema *types.Schema, id stri
 	req := p.common(namespace, p.k8sClient.Get()).
 		Name(id)
 
-	return p.singleResult(apiContext, schema, req)
+	return p.singleResult(schema, req)
 }
 
 func (p *Store) List(apiContext *types.APIContext, schema *types.Schema, opt types.QueryOptions) ([]map[string]interface{}, error) {
@@ -164,7 +150,7 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 			Object: data,
 		})
 
-	_, result, err := p.singleResult(apiContext, schema, req)
+	_, result, err := p.singleResult(schema, req)
 	return result, err
 }
 
@@ -202,7 +188,7 @@ func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		}).
 		Name(id)
 
-	_, result, err := p.singleResult(apiContext, schema, req)
+	_, result, err := p.singleResult(schema, req)
 	return result, err
 }
 
@@ -216,7 +202,7 @@ func (p *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id st
 		}).
 		Name(id)
 
-	err := p.doAuthed(apiContext, req).Error()
+	err := req.Do().Error()
 	if err != nil {
 		return nil, err
 	}
@@ -228,9 +214,9 @@ func (p *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id st
 	return obj, nil
 }
 
-func (p *Store) singleResult(apiContext *types.APIContext, schema *types.Schema, req *rest.Request) (string, map[string]interface{}, error) {
+func (p *Store) singleResult(schema *types.Schema, req *rest.Request) (string, map[string]interface{}, error) {
 	result := &unstructured.Unstructured{}
-	err := p.doAuthed(apiContext, req).Into(result)
+	err := req.Do().Into(result)
 	if err != nil {
 		return "", nil, err
 	}
