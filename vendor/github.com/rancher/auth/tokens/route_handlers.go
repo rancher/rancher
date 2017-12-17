@@ -3,6 +3,7 @@ package tokens
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/gorilla/mux"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -175,4 +176,61 @@ func (s *tokenAPIServer) logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+}
+
+func (s *tokenAPIServer) getToken(w http.ResponseWriter, r *http.Request) {
+	// TODO switch to X-API-UserId header
+	cookie, err := r.Cookie(CookieName)
+	if err != nil {
+		log.Info("Failed to get token cookie: %v", err)
+		util.ReturnHTTPError(w, r, http.StatusUnauthorized, "Invalid token cookie")
+		return
+	}
+
+	log.Debugf("token cookie: %v %v", cookie.Name, cookie.Value)
+
+	vars := mux.Vars(r)
+	tokenID := vars["tokenId"]
+
+	//getToken
+	tokens, status, err := s.getDerivedToken(cookie.Value, tokenID)
+	if err != nil {
+		log.Errorf("GetToken failed with error: %v", err)
+		if status == 0 {
+			status = http.StatusInternalServerError
+		}
+		util.ReturnHTTPError(w, r, status, fmt.Sprintf("%v", err))
+		return
+	}
+
+	enc := json.NewEncoder(w)
+	enc.SetEscapeHTML(false)
+	enc.Encode(tokens)
+
+}
+
+func (s *tokenAPIServer) removeToken(w http.ResponseWriter, r *http.Request) {
+	// TODO switch to X-API-UserId header
+	cookie, err := r.Cookie(CookieName)
+	if err != nil {
+		log.Info("Failed to get token cookie: %v", err)
+		util.ReturnHTTPError(w, r, http.StatusUnauthorized, "Invalid token cookie")
+		return
+	}
+
+	log.Debugf("token cookie: %v %v", cookie.Name, cookie.Value)
+
+	vars := mux.Vars(r)
+	tokenID := vars["tokenId"]
+
+	//deleteToken
+	status, err := s.deleteDerivedToken(cookie.Value, tokenID)
+	if err != nil {
+		log.Errorf("DeleteToken failed with error: %v", err)
+		if status == 0 {
+			status = http.StatusInternalServerError
+		}
+		util.ReturnHTTPError(w, r, status, fmt.Sprintf("%v", err))
+		return
+	}
 }

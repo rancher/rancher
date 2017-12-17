@@ -16,14 +16,39 @@ type tokenAuthenticator struct {
 	tokens v3.TokenLister
 }
 
-func (a *tokenAuthenticator) Authenticate(req *http.Request) (bool, string, []string, error) {
-	cookie, err := req.Cookie(tokens.CookieName)
-	if err != nil {
-		return false, "", []string{}, fmt.Errorf("Failed to find auth cookie")
-	}
-	logrus.Debugf("Authenticate: token cookie: %v %v", cookie.Name, cookie.Value)
+const (
+	authHeaderName  = "Authorization"
+	authValuePrefix = "Bearer "
+)
 
-	token, err := a.getTokenCR(cookie.Value)
+func (a *tokenAuthenticator) Authenticate(req *http.Request) (bool, string, []string, error) {
+	//check if token cookie or authorization header
+
+	var tokenID string
+
+	authHeader := req.Header.Get(authHeaderName)
+	authHeader = strings.TrimPrefix(authHeader, " ")
+
+	if authHeader != "" && strings.HasPrefix(authHeader, authValuePrefix) {
+		logrus.Debugf("Authenticate: auth header: %v", authHeader)
+		tokenID = strings.TrimPrefix(authHeader, authValuePrefix)
+		tokenID = strings.TrimSpace(tokenID)
+	} else {
+		cookie, err := req.Cookie(tokens.CookieName)
+		if err == nil {
+			logrus.Debugf("Authenticate: token cookie: %v %v", cookie.Name, cookie.Value)
+			tokenID = cookie.Value
+		}
+	}
+
+	logrus.Debugf("Authenticate: token ID: %v", tokenID)
+
+	if tokenID == "" {
+		// no cookie or auth header, cannot authenticate
+		return false, "", []string{}, fmt.Errorf("failed to find auth cookie or headers")
+	}
+
+	token, err := a.getTokenCR(tokenID)
 	if err != nil {
 		return false, "", []string{}, err
 	}
@@ -41,7 +66,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (bool, string, []st
 func (a *tokenAuthenticator) getTokenCR(tokenID string) (*v3.Token, error) {
 	storedToken, err := a.tokens.Get("", tokenID)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to retrieve auth token, error: %v", err)
+		return nil, fmt.Errorf("failed to retrieve auth token, error: %v", err)
 	}
 
 	logrus.Debugf("storedToken token resource: %v", storedToken)

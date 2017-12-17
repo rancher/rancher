@@ -40,7 +40,7 @@ func userPrincipalIndexer(obj interface{}) ([]string, error) {
 
 func newTokenAPIServer(ctx context.Context, mgmtCtx *config.ManagementContext) (*tokenAPIServer, error) {
 	if mgmtCtx == nil {
-		return nil, fmt.Errorf("Failed to build tokenAPIHandler, nil ManagementContext")
+		return nil, fmt.Errorf("failed to build tokenAPIHandler, nil ManagementContext")
 	}
 	providers.Configure(ctx, mgmtCtx)
 
@@ -88,7 +88,7 @@ func (s *tokenAPIServer) createLoginToken(jsonInput v3.LoginInput) (v3.Token, in
 	key, err := generateKey()
 	if err != nil {
 		logrus.Errorf("Failed to generate token key: %v", err)
-		return v3.Token{}, 0, fmt.Errorf("Failed to generate token key")
+		return v3.Token{}, 0, fmt.Errorf("failed to generate token key")
 	}
 
 	ttl := jsonInput.TTLMillis
@@ -121,7 +121,7 @@ func (s *tokenAPIServer) createDerivedToken(jsonInput v3.Token, tokenID string) 
 	key, err := generateKey()
 	if err != nil {
 		logrus.Errorf("Failed to generate token key: %v", err)
-		return v3.Token{}, 0, fmt.Errorf("Failed to generate token key")
+		return v3.Token{}, 0, fmt.Errorf("failed to generate token key")
 	}
 
 	ttl := jsonInput.TTLMillis
@@ -172,25 +172,28 @@ func (s *tokenAPIServer) getK8sTokenCR(tokenID string) (*v3.Token, error) {
 	return storedToken, nil
 }
 
-//GetTokens will list all tokens of the authenticated user - login and derived
+//GetTokens will list all derived tokens of the authenticated user - only derived
 func (s *tokenAPIServer) getTokens(tokenID string) ([]v3.Token, int, error) {
-	logrus.Debug("GET Token Invoked")
+	logrus.Debug("LIST Tokens Invoked")
 	var tokens []v3.Token
 
 	storedToken, err := s.tokensClient.Get(tokenID, metav1.GetOptions{})
 	if err != nil {
 		return tokens, 401, err
 	}
+
 	logrus.Debugf("storedToken token resource: %v", storedToken)
 	userID := storedToken.UserID
 	set := labels.Set(map[string]string{userIDLabel: userID})
 	tokenList, err := s.tokensClient.List(metav1.ListOptions{LabelSelector: set.AsSelector().String()})
 	if err != nil {
-		return tokens, 0, fmt.Errorf("Error getting tokens for user: %v selector: %v  err: %v", userID, set.AsSelector().String(), err)
+		return tokens, 0, fmt.Errorf("error getting tokens for user: %v selector: %v  err: %v", userID, set.AsSelector().String(), err)
 	}
 
 	for _, t := range tokenList.Items {
-		tokens = append(tokens, t)
+		if t.IsDerived {
+			tokens = append(tokens, t)
+		}
 	}
 	return tokens, 0, nil
 }
@@ -203,8 +206,52 @@ func (s *tokenAPIServer) deleteToken(tokenKey string) (int, error) {
 		if e2, ok := err.(*errors.StatusError); ok && e2.Status().Code == 404 {
 			return 0, nil
 		}
-		return 500, fmt.Errorf("Failed to delete token")
+		return 500, fmt.Errorf("failed to delete token")
 	}
 	logrus.Debug("Deleted Token")
 	return 0, nil
+}
+
+//getDerivedToken will get the derived token - only derived
+func (s *tokenAPIServer) getDerivedToken(tokenID string, derivedTokenID string) (v3.Token, int, error) {
+	logrus.Debug("GET Derived Token Invoked")
+	derivedToken := &v3.Token{}
+
+	storedToken, err := s.getK8sTokenCR(tokenID)
+	if err != nil {
+		return *derivedToken, 401, err
+	}
+
+	logrus.Debugf("storedToken token resource: %v", storedToken)
+
+	derivedToken, err = s.getK8sTokenCR(derivedTokenID)
+
+	if err != nil {
+		return v3.Token{}, 404, err
+	}
+	logrus.Debugf("derivedToken token resource: %v", derivedToken)
+
+	if derivedToken.UserID != storedToken.UserID {
+		return v3.Token{}, 403, fmt.Errorf("access denied: cannot delete derived token")
+	}
+
+	return *derivedToken, 0, nil
+}
+
+//deleteDerivedToken will delete the derived token - only derived
+func (s *tokenAPIServer) deleteDerivedToken(tokenID string, derivedTokenID string) (int, error) {
+	logrus.Debug("DELETE Derived Token Invoked")
+
+	storedToken, err := s.getK8sTokenCR(tokenID)
+	if err != nil {
+		return 401, err
+	}
+	logrus.Debugf("storedToken token resource: %v", storedToken)
+	_, status, err := s.getDerivedToken(tokenID, derivedTokenID)
+
+	if err != nil {
+		return status, err
+	}
+
+	return s.deleteToken(derivedTokenID)
 }
