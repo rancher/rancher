@@ -14,7 +14,7 @@ func generateKey() (string, error) {
 	if _, err := rand.Read(secretKey); err != nil {
 		return "", err
 	}
-	secretKeyString := base64.StdEncoding.EncodeToString(secretKey)
+	secretKeyString := base64.RawURLEncoding.EncodeToString(secretKey)
 	secretKeyString = sanitizeKey(secretKeyString)
 
 	if len(secretKeyString) < 40 {
@@ -26,9 +26,9 @@ func generateKey() (string, error) {
 }
 
 func sanitizeKey(key string) string {
-	re := regexp.MustCompile("[O0lI+/=]")
-	key = re.ReplaceAllString(key, "")
-	return strings.ToLower(strings.Trim(key, ""))
+	re := regexp.MustCompile("[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*")
+	submatches := re.FindAllString(key, -1)
+	return strings.Join(submatches, "")
 }
 
 func getAuthProviderName(principalID string) string {
