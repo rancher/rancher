@@ -1,0 +1,7 @@
+/.dapper
+/bin
+/dist
+*.swp
+/.trash-cache
+/.trash-conf
+/management-auth-controller
