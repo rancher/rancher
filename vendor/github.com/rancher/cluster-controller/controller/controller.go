@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/cluster-controller/controller/clusterprovisioner"
 	"github.com/rancher/cluster-controller/controller/clusterstats"
 	machineController "github.com/rancher/machine-controller/controller"
+	authcontroller "github.com/rancher/management-auth-controller/controller"
 	"github.com/rancher/types/config"
 )
 
@@ -21,4 +22,5 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	clusterstats.Register(management)
 	agent.Register(ctx, management)
 	clusterevents.Register(ctx, management)
+	authcontroller.Register(ctx, management)
 }
