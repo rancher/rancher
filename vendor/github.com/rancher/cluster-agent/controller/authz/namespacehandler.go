@@ -25,7 +25,7 @@ func (r *roleHandler) ensurePRTBAddToNamespace(key string, obj *v1.Namespace) er
 		return nil
 	}
 
-	prtbs, err := r.indexer.ByIndex(prtbIndex, projectID)
+	prtbs, err := r.prtbIndexer.ByIndex(prtbIndex, projectID)
 	if err != nil {
 		return errors.Wrapf(err, "couldn't get project role binding templates associated with project id %s", projectID)
 	}
