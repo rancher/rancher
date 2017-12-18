@@ -19,15 +19,16 @@ usermod -aG docker <user_name>
 
 ## Getting Started
 
-Standing up a Kubernetes is as simple as creating a `cluster.yml` configuration file and and running the command:
+Standing up a Kubernetes is as simple as creating a `cluster.yml` configuration file and running the command:
 ```bash
-./rke up --config cluster.yaml
+./rke up --config cluster.yml
 ```
-### Full `cluster.yaml` example
+
+### Full `cluster.yml` example
 
 You can view full sample of cluster.yml [here](https://github.com/rancher/rke/blob/master/cluster.yml).
 
-### Minimal `cluster.yaml` example
+### Minimal `cluster.yml` example
 ```
 nodes:
   - address: 1.1.1.1
