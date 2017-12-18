@@ -158,7 +158,7 @@ func newCollection(apiContext *types.APIContext) *types.GenericCollection {
 	}
 
 	if apiContext.Method == http.MethodGet {
-		if apiContext.AccessControl.CanCreate(apiContext.Schema) {
+		if apiContext.AccessControl.CanCreate(apiContext, apiContext.Schema) {
 			result.CreateTypes[apiContext.Schema.ID] = apiContext.URLBuilder.Collection(apiContext.Schema, apiContext.Version)
 		}
 	}

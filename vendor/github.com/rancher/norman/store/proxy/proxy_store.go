@@ -4,6 +4,8 @@ import (
 	ejson "encoding/json"
 	"strings"
 
+	"net/http"
+
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
@@ -33,6 +35,7 @@ type Store struct {
 	version        string
 	kind           string
 	resourcePlural string
+	authContext    map[string]string
 }
 
 func NewProxyStore(k8sClient rest.Interface,
@@ -44,12 +47,16 @@ func NewProxyStore(k8sClient rest.Interface,
 		version:        version,
 		kind:           kind,
 		resourcePlural: resourcePlural,
+		authContext: map[string]string{
+			"apiGroup": group,
+			"resource": resourcePlural,
+		},
 	}
 }
 
 func (p *Store) doAuthed(apiContext *types.APIContext, request *rest.Request) rest.Result {
 	for _, header := range authHeaders {
-		request.SetHeader(header, apiContext.Request.Header[header]...)
+		request.SetHeader(header, apiContext.Request.Header[http.CanonicalHeaderKey(header)]...)
 	}
 	return request.Do()
 }
@@ -85,7 +92,7 @@ func (p *Store) List(apiContext *types.APIContext, schema *types.Schema, opt typ
 		result = append(result, p.fromInternal(schema, obj.Object))
 	}
 
-	return result, nil
+	return apiContext.AccessControl.FilterList(apiContext, result, p.authContext), nil
 }
 
 func (p *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt types.QueryOptions) (chan map[string]interface{}, error) {
@@ -115,7 +122,7 @@ func (p *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt ty
 		for event := range watcher.ResultChan() {
 			data := event.Object.(*unstructured.Unstructured)
 			p.fromInternal(schema, data.Object)
-			result <- data.Object
+			result <- apiContext.AccessControl.Filter(apiContext, data.Object, p.authContext)
 		}
 		close(result)
 	}()

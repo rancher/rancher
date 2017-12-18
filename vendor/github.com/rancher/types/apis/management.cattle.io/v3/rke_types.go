@@ -19,6 +19,8 @@ type RancherKubernetesEngineConfig struct {
 	Authorization AuthzConfig `yaml:"authorization" json:"authorization,omitempty"`
 	// Enable/disable strict docker version checking
 	IgnoreDockerVersion bool `yaml:"ignore_docker_version" json:"ignoreDockerVersion"`
+	// Enable/disable Pod Security Policy
+	DisablePSP bool `yaml:"disable_psp" json:"disablePSP,omitempty"`
 }
 
 type RKEConfigNode struct {
