@@ -17,6 +17,7 @@ type Interface interface {
 	RoleBindingsGetter
 	ClusterRoleBindingsGetter
 	ClusterRolesGetter
+	RolesGetter
 }
 
 type Client struct {
@@ -27,6 +28,7 @@ type Client struct {
 	roleBindingControllers        map[string]RoleBindingController
 	clusterRoleBindingControllers map[string]ClusterRoleBindingController
 	clusterRoleControllers        map[string]ClusterRoleController
+	roleControllers               map[string]RoleController
 }
 
 func NewForConfig(config rest.Config) (Interface, error) {
@@ -46,6 +48,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		roleBindingControllers:        map[string]RoleBindingController{},
 		clusterRoleBindingControllers: map[string]ClusterRoleBindingController{},
 		clusterRoleControllers:        map[string]ClusterRoleController{},
+		roleControllers:               map[string]RoleController{},
 	}, nil
 }
 
@@ -94,6 +97,19 @@ type ClusterRolesGetter interface {
 func (c *Client) ClusterRoles(namespace string) ClusterRoleInterface {
 	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &ClusterRoleResource, ClusterRoleGroupVersionKind, clusterRoleFactory{})
 	return &clusterRoleClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type RolesGetter interface {
+	Roles(namespace string) RoleInterface
+}
+
+func (c *Client) Roles(namespace string) RoleInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &RoleResource, RoleGroupVersionKind, roleFactory{})
+	return &roleClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

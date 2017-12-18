@@ -24,6 +24,7 @@ var (
 	ActionNotAvailable = ErrorCode{"ActionNotAvailable", 404}
 	InvalidState       = ErrorCode{"InvalidState", 422}
 	ServerError        = ErrorCode{"ServerError", 500}
+	PermissionDenied   = ErrorCode{"PermissionDenied", 403}
 
 	MethodNotAllowed = ErrorCode{"MethodNotAllow", 405}
 	NotFound         = ErrorCode{"NotFound", 404}

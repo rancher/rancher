@@ -31,6 +31,7 @@ type Server struct {
 	StoreWrapper                StoreWrapper
 	URLParser                   parse.URLParser
 	Defaults                    Defaults
+	AccessControl               types.AccessControl
 }
 
 type Defaults struct {
@@ -53,6 +54,7 @@ func NewAPIServer() *Server {
 		},
 		SubContextAttributeProvider: &parse.DefaultSubContextAttributeProvider{},
 		Resolver:                    parse.DefaultResolver,
+		AccessControl:               &authorization.AllAccess{},
 		Defaults: Defaults{
 			CreateHandler: handler.CreateHandler,
 			DeleteHandler: handler.DeleteHandler,
@@ -88,7 +90,7 @@ func (s *Server) parser(rw http.ResponseWriter, req *http.Request) (*types.APICo
 		ctx.SubContextAttributeProvider = s.SubContextAttributeProvider
 	}
 
-	ctx.AccessControl = &authorization.AllAccess{}
+	ctx.AccessControl = s.AccessControl
 
 	return ctx, err
 }
@@ -186,12 +188,24 @@ func (s *Server) handle(rw http.ResponseWriter, req *http.Request) (*types.APICo
 		if apiRequest.Link == "" {
 			switch apiRequest.Method {
 			case http.MethodGet:
+				if !apiRequest.AccessControl.CanList(apiRequest, apiRequest.Schema) {
+					return apiRequest, httperror.NewAPIError(httperror.PermissionDenied, "Can not list "+apiRequest.Schema.Type)
+				}
 				handler = apiRequest.Schema.ListHandler
 			case http.MethodPost:
+				if !apiRequest.AccessControl.CanCreate(apiRequest, apiRequest.Schema) {
+					return apiRequest, httperror.NewAPIError(httperror.PermissionDenied, "Can not create "+apiRequest.Schema.Type)
+				}
 				handler = apiRequest.Schema.CreateHandler
 			case http.MethodPut:
+				if !apiRequest.AccessControl.CanUpdate(apiRequest, apiRequest.Schema) {
+					return apiRequest, httperror.NewAPIError(httperror.PermissionDenied, "Can not update "+apiRequest.Schema.Type)
+				}
 				handler = apiRequest.Schema.UpdateHandler
 			case http.MethodDelete:
+				if !apiRequest.AccessControl.CanDelete(apiRequest, apiRequest.Schema) {
+					return apiRequest, httperror.NewAPIError(httperror.PermissionDenied, "Can not delete "+apiRequest.Schema.Type)
+				}
 				handler = apiRequest.Schema.DeleteHandler
 			}
 		} else {
