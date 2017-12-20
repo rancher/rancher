@@ -14,9 +14,9 @@ type Interface interface {
 	RESTClient() rest.Interface
 	controller.Starter
 
-	RoleBindingsGetter
 	ClusterRoleBindingsGetter
 	ClusterRolesGetter
+	RoleBindingsGetter
 	RolesGetter
 }
 
@@ -25,9 +25,9 @@ type Client struct {
 	restClient rest.Interface
 	starters   []controller.Starter
 
-	roleBindingControllers        map[string]RoleBindingController
 	clusterRoleBindingControllers map[string]ClusterRoleBindingController
 	clusterRoleControllers        map[string]ClusterRoleController
+	roleBindingControllers        map[string]RoleBindingController
 	roleControllers               map[string]RoleController
 }
 
@@ -45,9 +45,9 @@ func NewForConfig(config rest.Config) (Interface, error) {
 	return &Client{
 		restClient: restClient,
 
-		roleBindingControllers:        map[string]RoleBindingController{},
 		clusterRoleBindingControllers: map[string]ClusterRoleBindingController{},
 		clusterRoleControllers:        map[string]ClusterRoleController{},
+		roleBindingControllers:        map[string]RoleBindingController{},
 		roleControllers:               map[string]RoleController{},
 	}, nil
 }
@@ -62,19 +62,6 @@ func (c *Client) Sync(ctx context.Context) error {
 
 func (c *Client) Start(ctx context.Context, threadiness int) error {
 	return controller.Start(ctx, threadiness, c.starters...)
-}
-
-type RoleBindingsGetter interface {
-	RoleBindings(namespace string) RoleBindingInterface
-}
-
-func (c *Client) RoleBindings(namespace string) RoleBindingInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &RoleBindingResource, RoleBindingGroupVersionKind, roleBindingFactory{})
-	return &roleBindingClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
 }
 
 type ClusterRoleBindingsGetter interface {
@@ -97,6 +84,19 @@ type ClusterRolesGetter interface {
 func (c *Client) ClusterRoles(namespace string) ClusterRoleInterface {
 	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &ClusterRoleResource, ClusterRoleGroupVersionKind, clusterRoleFactory{})
 	return &clusterRoleClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type RoleBindingsGetter interface {
+	RoleBindings(namespace string) RoleBindingInterface
+}
+
+func (c *Client) RoleBindings(namespace string) RoleBindingInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &RoleBindingResource, RoleBindingGroupVersionKind, roleBindingFactory{})
+	return &roleBindingClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

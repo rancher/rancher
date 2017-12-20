@@ -24,8 +24,9 @@ var (
 	RoleResource = metav1.APIResource{
 		Name:         "roles",
 		SingularName: "role",
-		Namespaced:   false,
-		Kind:         RoleGroupVersionKind.Kind,
+		Namespaced:   true,
+
+		Kind: RoleGroupVersionKind.Kind,
 	}
 )
 

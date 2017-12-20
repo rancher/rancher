@@ -26,6 +26,7 @@ const (
 	StatefulSetSpecFieldRunAsNonRoot                  = "runAsNonRoot"
 	StatefulSetSpecFieldScale                         = "scale"
 	StatefulSetSpecFieldSchedulerName                 = "schedulerName"
+	StatefulSetSpecFieldScheduling                    = "scheduling"
 	StatefulSetSpecFieldServiceAccountName            = "serviceAccountName"
 	StatefulSetSpecFieldServiceName                   = "serviceName"
 	StatefulSetSpecFieldSubdomain                     = "subdomain"
@@ -41,7 +42,7 @@ type StatefulSetSpec struct {
 	ActiveDeadlineSeconds         *int64                     `json:"activeDeadlineSeconds,omitempty"`
 	AutomountServiceAccountToken  *bool                      `json:"automountServiceAccountToken,omitempty"`
 	BatchSize                     string                     `json:"batchSize,omitempty"`
-	Containers                    map[string]Container       `json:"containers,omitempty"`
+	Containers                    []Container                `json:"containers,omitempty"`
 	DNSPolicy                     string                     `json:"dnsPolicy,omitempty"`
 	DeploymentStrategy            *DeployStrategy            `json:"deploymentStrategy,omitempty"`
 	Fsgid                         *int64                     `json:"fsgid,omitempty"`
@@ -62,6 +63,7 @@ type StatefulSetSpec struct {
 	RunAsNonRoot                  *bool                      `json:"runAsNonRoot,omitempty"`
 	Scale                         *int64                     `json:"scale,omitempty"`
 	SchedulerName                 string                     `json:"schedulerName,omitempty"`
+	Scheduling                    *Scheduling                `json:"scheduling,omitempty"`
 	ServiceAccountName            string                     `json:"serviceAccountName,omitempty"`
 	ServiceName                   string                     `json:"serviceName,omitempty"`
 	Subdomain                     string                     `json:"subdomain,omitempty"`

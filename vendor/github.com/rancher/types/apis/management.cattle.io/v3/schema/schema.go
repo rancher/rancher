@@ -72,7 +72,7 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 			&m.Embed{Field: "status"},
 		).
 		AddMapperForType(&Version, v3.ClusterStatus{},
-			m.Drop{"appliedSpec"},
+			m.Drop{Field: "appliedSpec"},
 		).
 		AddMapperForType(&Version, v3.ClusterEvent{}, &m.Move{
 			From: "type",
@@ -102,9 +102,16 @@ func authzTypes(schemas *types.Schemas) *types.Schemas {
 			&m.Move{From: "subject/namespace", To: "subjectNamespace"},
 			&m.Drop{Field: "subject"},
 		).
+		AddMapperForType(&Version, v3.GlobalRoleBinding{},
+			&m.Move{From: "subject/name", To: "subjectName"},
+			&m.Move{From: "subject/kind", To: "subjectKind"},
+			&m.Drop{Field: "subject"},
+		).
 		MustImportAndCustomize(&Version, v3.Project{}, func(schema *types.Schema) {
 			schema.SubContext = "projects"
 		}).
+		MustImport(&Version, v3.GlobalRole{}).
+		MustImport(&Version, v3.GlobalRoleBinding{}).
 		MustImport(&Version, v3.RoleTemplate{}).
 		MustImport(&Version, v3.PodSecurityPolicyTemplate{}).
 		MustImportAndCustomize(&Version, v3.ClusterRoleTemplateBinding{}, func(schema *types.Schema) {
@@ -119,6 +126,14 @@ func authzTypes(schemas *types.Schemas) *types.Schemas {
 			schema.MustCustomizeField("subjectKind", func(field types.Field) types.Field {
 				field.Type = "enum"
 				field.Options = []string{"User", "Group", "ServiceAccount", "Principal"}
+				field.Nullable = false
+				return field
+			})
+		}).
+		MustImportAndCustomize(&Version, v3.GlobalRoleBinding{}, func(schema *types.Schema) {
+			schema.MustCustomizeField("subjectKind", func(field types.Field) types.Field {
+				field.Type = "enum"
+				field.Options = []string{"User", "Group", "Principal"}
 				field.Nullable = false
 				return field
 			})
@@ -146,12 +161,28 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
 		AddMapperForType(&Version, v3.User{}, m.DisplayName{}).
 		AddMapperForType(&Version, v3.Group{}, m.DisplayName{}).
-		MustImport(&Version, v3.Token{}).
-		MustImport(&Version, v3.User{}).
 		MustImport(&Version, v3.Group{}).
 		MustImport(&Version, v3.GroupMember{}).
 		MustImport(&Version, v3.Principal{}).
 		MustImport(&Version, v3.LoginInput{}).
 		MustImport(&Version, v3.LocalCredential{}).
-		MustImport(&Version, v3.GithubCredential{})
+		MustImport(&Version, v3.GithubCredential{}).
+		MustImport(&Version, v3.ChangePasswordInput{}).
+		MustImportAndCustomize(&Version, v3.Token{}, func(schema *types.Schema) {
+			schema.CollectionActions = map[string]types.Action{
+				"login": {
+					Input:  "loginInput",
+					Output: "token",
+				},
+				"logout": {},
+			}
+		}).
+		MustImportAndCustomize(&Version, v3.User{}, func(schema *types.Schema) {
+			schema.ResourceActions = map[string]types.Action{
+				"changepassword": {
+					Input:  "changePasswordInput",
+					Output: "user",
+				},
+			}
+		})
 }

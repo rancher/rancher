@@ -15,6 +15,7 @@ import (
 )
 
 func extractConfig(baseDir, extractedConfig string) error {
+	baseDir = filepath.Dir(baseDir)
 	configBytes, err := base64.StdEncoding.DecodeString(extractedConfig)
 	if err != nil {
 		return fmt.Errorf("error reinitializing config (base64.DecodeString). Config Dir: %v. Error: %v", baseDir, err)

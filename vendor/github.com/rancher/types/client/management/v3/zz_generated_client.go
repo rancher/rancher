@@ -12,6 +12,8 @@ type Client struct {
 	MachineDriver              MachineDriverOperations
 	MachineTemplate            MachineTemplateOperations
 	Project                    ProjectOperations
+	GlobalRole                 GlobalRoleOperations
+	GlobalRoleBinding          GlobalRoleBindingOperations
 	RoleTemplate               RoleTemplateOperations
 	PodSecurityPolicyTemplate  PodSecurityPolicyTemplateOperations
 	ClusterRoleTemplateBinding ClusterRoleTemplateBindingOperations
@@ -22,11 +24,11 @@ type Client struct {
 	Catalog                    CatalogOperations
 	Template                   TemplateOperations
 	TemplateVersion            TemplateVersionOperations
-	Token                      TokenOperations
-	User                       UserOperations
 	Group                      GroupOperations
 	GroupMember                GroupMemberOperations
 	Principal                  PrincipalOperations
+	Token                      TokenOperations
+	User                       UserOperations
 	DynamicSchema              DynamicSchemaOperations
 }
 
@@ -45,6 +47,8 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.MachineDriver = newMachineDriverClient(client)
 	client.MachineTemplate = newMachineTemplateClient(client)
 	client.Project = newProjectClient(client)
+	client.GlobalRole = newGlobalRoleClient(client)
+	client.GlobalRoleBinding = newGlobalRoleBindingClient(client)
 	client.RoleTemplate = newRoleTemplateClient(client)
 	client.PodSecurityPolicyTemplate = newPodSecurityPolicyTemplateClient(client)
 	client.ClusterRoleTemplateBinding = newClusterRoleTemplateBindingClient(client)
@@ -55,11 +59,11 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.Catalog = newCatalogClient(client)
 	client.Template = newTemplateClient(client)
 	client.TemplateVersion = newTemplateVersionClient(client)
-	client.Token = newTokenClient(client)
-	client.User = newUserClient(client)
 	client.Group = newGroupClient(client)
 	client.GroupMember = newGroupMemberClient(client)
 	client.Principal = newPrincipalClient(client)
+	client.Token = newTokenClient(client)
+	client.User = newUserClient(client)
 	client.DynamicSchema = newDynamicSchemaClient(client)
 
 	return client, nil

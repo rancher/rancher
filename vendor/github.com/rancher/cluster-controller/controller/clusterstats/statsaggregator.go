@@ -1,7 +1,6 @@
 package clusterstats
 
 import (
-	"encoding/json"
 	"time"
 
 	clusterv1 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -38,7 +37,7 @@ func Register(cluster *config.ManagementContext) {
 }
 
 func (s *StatsAggregator) sync(key string, clusterNode *clusterv1.Machine) error {
-	logrus.Infof("Syncing clusternode [%s]", key)
+	logrus.Debugf("Syncing clusternode [%s]", key)
 	if clusterNode == nil {
 		return s.deleteStats(key)
 	}
@@ -47,7 +46,7 @@ func (s *StatsAggregator) sync(key string, clusterNode *clusterv1.Machine) error
 
 func (s *StatsAggregator) deleteStats(key string) error {
 	if _, exists := nodeNameToClusterName[key]; !exists {
-		logrus.Infof("ClusterNode [%s] already deleted from stats", key)
+		logrus.Debugf("ClusterNode [%s] already deleted from stats", key)
 		return nil
 	}
 	clusterName, clusterNodeName := nodeNameToClusterName[key], key
@@ -59,7 +58,7 @@ func (s *StatsAggregator) deleteStats(key string) error {
 	if _, exists := stats[clusterName][clusterNodeName]; exists {
 		delete(stats[clusterName], clusterNodeName)
 		delete(nodeNameToClusterName, clusterNodeName)
-		logrus.Infof("ClusterNode [%s] stats deleted", key)
+		logrus.Debugf("ClusterNode [%s] stats deleted", key)
 	}
 	s.aggregate(cluster, clusterName)
 	err = s.update(cluster)
@@ -67,7 +66,7 @@ func (s *StatsAggregator) deleteStats(key string) error {
 		stats[clusterName][clusterNodeName] = oldData
 		return err
 	}
-	logrus.Infof("Successfully updated cluster [%s] stats", clusterName)
+	logrus.Debugf("Successfully updated cluster [%s] stats", clusterName)
 	return nil
 }
 
@@ -98,7 +97,7 @@ func (s *StatsAggregator) addOrUpdateStats(clusterNode *clusterv1.Machine) error
 		stats[clusterName][clusterNodeName] = oldData
 		return err
 	}
-	logrus.Infof("Successfully updated cluster [%s] stats", clusterName)
+	logrus.Debugf("Successfully updated cluster [%s] stats", clusterName)
 	return nil
 }
 
@@ -157,11 +156,6 @@ func (s *StatsAggregator) update(cluster *clusterv1.Cluster) error {
 
 func (s *StatsAggregator) getCluster(clusterName string) (*clusterv1.Cluster, error) {
 	return s.Clusters.Get(clusterName, metav1.GetOptions{})
-}
-
-func mp(i interface{}, msg string) {
-	ans, _ := json.Marshal(i)
-	logrus.Infof(msg+"  %s", string(ans))
 }
 
 func getNodeConditionByType(conditions []v1.NodeCondition, conditionType v1.NodeConditionType) *v1.NodeCondition {

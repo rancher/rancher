@@ -25,7 +25,7 @@ type User struct {
 
 	DisplayName        string   `json:"displayName,omitempty"`
 	UserName           string   `json:"userName,omitempty"`
-	Password           string   `json:"password,omitempty"`
+	Password           string   `json:"password,omitempty" norman:"writeOnly,noupdate"`
 	MustChangePassword bool     `json:"mustChangePassword,omitempty"`
 	PrincipalIDs       []string `json:"principalIds,omitempty" norman:"type=array[reference[Principal]]"`
 }
@@ -77,4 +77,8 @@ type LocalCredential struct {
 //GithubCredential stores the github auth creds
 type GithubCredential struct {
 	Code string `json:"code"`
+}
+
+type ChangePasswordInput struct {
+	NewPassword string `json:"newPassword"`
 }

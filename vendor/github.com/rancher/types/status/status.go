@@ -42,10 +42,14 @@ var conditionMappings = []conditionMapping{
 	{Name: "KernelHasNoDeadlock", Error: true, FalseIsGood: true},
 	{Name: "Unschedulable", Error: true, FalseIsGood: true},
 	{Name: "ReplicaFailure", Error: true, FalseIsGood: true},
-	{Name: "Ready", Transition: false, State: "unavailable"},
+	{Name: "Ready", Transition: false, State: "activating"},
 }
 
 func Set(data map[string]interface{}) {
+	if data == nil {
+		return
+	}
+
 	val, ok := values.GetValue(data, "metadata", "removed")
 	if ok && val != "" && val != nil {
 		data["state"] = "removing"

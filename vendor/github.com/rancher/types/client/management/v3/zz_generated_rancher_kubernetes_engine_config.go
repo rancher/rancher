@@ -5,7 +5,6 @@ const (
 	RancherKubernetesEngineConfigFieldAddons              = "addons"
 	RancherKubernetesEngineConfigFieldAuthentication      = "authentication"
 	RancherKubernetesEngineConfigFieldAuthorization       = "authorization"
-	RancherKubernetesEngineConfigFieldDisablePSP          = "disablePSP"
 	RancherKubernetesEngineConfigFieldIgnoreDockerVersion = "ignoreDockerVersion"
 	RancherKubernetesEngineConfigFieldNetwork             = "network"
 	RancherKubernetesEngineConfigFieldNodes               = "nodes"
@@ -18,7 +17,6 @@ type RancherKubernetesEngineConfig struct {
 	Addons              string             `json:"addons,omitempty"`
 	Authentication      *AuthnConfig       `json:"authentication,omitempty"`
 	Authorization       *AuthzConfig       `json:"authorization,omitempty"`
-	DisablePSP          *bool              `json:"disablePSP,omitempty"`
 	IgnoreDockerVersion *bool              `json:"ignoreDockerVersion,omitempty"`
 	Network             *NetworkConfig     `json:"network,omitempty"`
 	Nodes               []RKEConfigNode    `json:"nodes,omitempty"`

@@ -71,6 +71,44 @@ func (w *ClusterContext) controllers() []controller.Starter {
 	}
 }
 
+func (w *ClusterContext) WorkloadContext() *WorkloadContext {
+	return &WorkloadContext{
+		ClusterName:       w.ClusterName,
+		RESTConfig:        w.RESTConfig,
+		UnversionedClient: w.UnversionedClient,
+		K8sClient:         w.K8sClient,
+
+		Apps:       w.Apps,
+		Project:    w.Project,
+		Core:       w.Core,
+		RBAC:       w.RBAC,
+		Extensions: w.Extensions,
+	}
+}
+
+type WorkloadContext struct {
+	ClusterName       string
+	RESTConfig        rest.Config
+	UnversionedClient rest.Interface
+	K8sClient         kubernetes.Interface
+
+	Apps       appsv1beta2.Interface
+	Project    projectv3.Interface
+	Core       corev1.Interface
+	RBAC       rbacv1.Interface
+	Extensions extv1beta1.Interface
+}
+
+func (w *WorkloadContext) controllers() []controller.Starter {
+	return []controller.Starter{
+		w.Apps,
+		w.Project,
+		w.Core,
+		w.RBAC,
+		w.Extensions,
+	}
+}
+
 func NewManagementContext(config rest.Config) (*ManagementContext, error) {
 	var err error
 
@@ -131,7 +169,7 @@ func (c *ManagementContext) Start(ctx context.Context) error {
 		watcher.Stop()
 	}()
 
-	return controller.SyncThenSync(ctx, 5, c.controllers()...)
+	return controller.SyncThenStart(ctx, 5, c.controllers()...)
 }
 
 func (c *ManagementContext) StartAndWait() error {
@@ -201,10 +239,73 @@ func (w *ClusterContext) Start(ctx context.Context) error {
 	logrus.Info("Starting cluster controllers")
 	controllers := w.Management.controllers()
 	controllers = append(controllers, w.controllers()...)
-	return controller.SyncThenSync(ctx, 5, controllers...)
+	return controller.SyncThenStart(ctx, 5, controllers...)
 }
 
 func (w *ClusterContext) StartAndWait(ctx context.Context) error {
+	ctx = signal.SigTermCancelContext(ctx)
+	w.Start(ctx)
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func NewWorkloadContext(config rest.Config, clusterName string) (*WorkloadContext, error) {
+	var err error
+	context := &WorkloadContext{
+		RESTConfig:  config,
+		ClusterName: clusterName,
+	}
+
+	context.K8sClient, err = kubernetes.NewForConfig(&config)
+	if err != nil {
+		return nil, err
+	}
+
+	context.Apps, err = appsv1beta2.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	context.Core, err = corev1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	context.Project, err = projectv3.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	context.RBAC, err = rbacv1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	context.Extensions, err = extv1beta1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	dynamicConfig := config
+	if dynamicConfig.NegotiatedSerializer == nil {
+		configConfig := dynamic.ContentConfig()
+		dynamicConfig.NegotiatedSerializer = configConfig.NegotiatedSerializer
+	}
+
+	context.UnversionedClient, err = rest.UnversionedRESTClientFor(&dynamicConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return context, err
+}
+
+func (w *WorkloadContext) Start(ctx context.Context) error {
+	logrus.Info("Starting workload controllers")
+	return controller.SyncThenStart(ctx, 5, w.controllers()...)
+}
+
+func (w *WorkloadContext) StartAndWait(ctx context.Context) error {
 	ctx = signal.SigTermCancelContext(ctx)
 	w.Start(ctx)
 	<-ctx.Done()

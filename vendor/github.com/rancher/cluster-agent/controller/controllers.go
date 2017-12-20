@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/cluster-agent/controller/nodesyncer"
 	"github.com/rancher/cluster-agent/controller/statsyncer"
 	"github.com/rancher/types/config"
+	workloadController "github.com/rancher/workload-controller/controller"
 )
 
 func Register(ctx context.Context, cluster *config.ClusterContext) {
@@ -17,4 +18,7 @@ func Register(ctx context.Context, cluster *config.ClusterContext) {
 	authz.Register(cluster)
 	statsyncer.Register(ctx, cluster)
 	eventssyncer.Register(cluster)
+
+	workloadContext := cluster.WorkloadContext()
+	workloadController.Register(ctx, workloadContext)
 }

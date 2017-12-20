@@ -11,7 +11,7 @@ type Starter interface {
 	Start(ctx context.Context, threadiness int) error
 }
 
-func SyncThenSync(ctx context.Context, threadiness int, starters ...Starter) error {
+func SyncThenStart(ctx context.Context, threadiness int, starters ...Starter) error {
 	if err := Sync(ctx, starters...); err != nil {
 		return err
 	}

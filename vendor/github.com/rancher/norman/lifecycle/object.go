@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	created = "io.cattle.lifecycle.create"
+	created = "lifecycle.cattle.io/create"
 )
 
 type ObjectLifecycle interface {

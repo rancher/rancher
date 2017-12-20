@@ -58,6 +58,10 @@ func (p *ObjectClient) UnstructuredClient() *ObjectClient {
 	}
 }
 
+func (p *ObjectClient) GroupVersionKind() schema.GroupVersionKind {
+	return p.gvk
+}
+
 func (p *ObjectClient) getAPIPrefix() string {
 	if p.gvk.Group == "" {
 		return "api"
@@ -88,6 +92,23 @@ func (p *ObjectClient) Create(o runtime.Object) (runtime.Object, error) {
 		Do().
 		Into(result)
 	return result, err
+}
+
+func (p *ObjectClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (runtime.Object, error) {
+	result := p.Factory.Object()
+	req := p.restClient.Get().
+		Prefix(p.getAPIPrefix(), p.gvk.Group, p.gvk.Version)
+	if namespace != "" {
+		req = req.Namespace(namespace)
+	}
+	err := req.NamespaceIfScoped(p.ns, p.resource.Namespaced).
+		Resource(p.resource.Name).
+		VersionedParams(&opts, dynamic.VersionedParameterEncoderWithV1Fallback).
+		Name(name).
+		Do().
+		Into(result)
+	return result, err
+
 }
 
 func (p *ObjectClient) Get(name string, opts metav1.GetOptions) (runtime.Object, error) {
@@ -121,6 +142,19 @@ func (p *ObjectClient) Update(name string, o runtime.Object) (runtime.Object, er
 		Do().
 		Into(result)
 	return result, err
+}
+
+func (p *ObjectClient) DeleteNamespace(name, namespace string, opts *metav1.DeleteOptions) error {
+	req := p.restClient.Delete().
+		Prefix(p.getAPIPrefix(), p.gvk.Group, p.gvk.Version)
+	if namespace != "" {
+		req = req.Namespace(namespace)
+	}
+	return req.Resource(p.resource.Name).
+		Name(name).
+		Body(opts).
+		Do().
+		Error()
 }
 
 func (p *ObjectClient) Delete(name string, opts *metav1.DeleteOptions) error {

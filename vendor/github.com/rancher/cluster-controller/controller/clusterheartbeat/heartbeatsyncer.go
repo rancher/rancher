@@ -31,30 +31,30 @@ func Register(management *config.ManagementContext) {
 }
 
 func (h *HeartBeatSyncer) sync(key string, cluster *v3.Cluster) error {
-	logrus.Infof("Syncing cluster [%s] ", key)
+	logrus.Debugf("Syncing cluster [%s] ", key)
 	if cluster == nil {
 		// cluster has been deleted
 		if _, exists := clusterToLastUpdated[key]; exists {
 			delete(clusterToLastUpdated, key)
-			logrus.Infof("Cluster [%s] already deleted", key)
+			logrus.Debugf("Cluster [%s] already deleted", key)
 		}
 	} else {
 		condition := getConditionIfReady(cluster)
 		if condition != nil {
 			lastUpdateTime, _ := time.Parse(time.RFC3339, condition.LastUpdateTime)
 			clusterToLastUpdated[key] = lastUpdateTime
-			logrus.Infof("Synced cluster [%s] successfully", key)
+			logrus.Debugf("Synced cluster [%s] successfully", key)
 		}
 	}
-	logrus.Infof("Syncing cluster [%s] complete ", key)
+	logrus.Debugf("Syncing cluster [%s] complete ", key)
 	return nil
 }
 
 func (h *HeartBeatSyncer) syncHeartBeat(syncInterval time.Duration) {
 	for _ = range time.Tick(syncInterval) {
-		logrus.Infof("Start heartbeat")
+		logrus.Debugf("Start heartbeat")
 		h.checkHeartBeat()
-		logrus.Infof("Heartbeat complete")
+		logrus.Debugf("Heartbeat complete")
 	}
 }
 
@@ -63,14 +63,14 @@ func (h *HeartBeatSyncer) checkHeartBeat() {
 		if lastUpdatedTime.Add(syncInterval).Before(time.Now().UTC()) {
 			cluster, err := h.ClusterClient.Get(clusterName, metav1.GetOptions{})
 			if err != nil {
-				logrus.Infof("Error getting Cluster [%s] - %v", clusterName, err)
+				logrus.Errorf("Error getting Cluster [%s] - %v", clusterName, err)
 				continue
 			}
 			setConditionStatus(cluster, v3.ClusterConditionReady, corev1.ConditionUnknown)
 			logrus.Infof("Cluster [%s] condition status unknown", clusterName)
 			err = h.update(cluster)
 			if err != nil {
-				logrus.Infof("Error getting Cluster [%s] - %v", clusterName, err)
+				logrus.Errorf("Error getting Cluster [%s] - %v", clusterName, err)
 				continue
 			}
 		}

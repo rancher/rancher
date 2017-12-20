@@ -26,6 +26,10 @@ func (e *Embed) FromInternal(data map[string]interface{}) {
 }
 
 func (e *Embed) ToInternal(data map[string]interface{}) {
+	if data == nil {
+		return
+	}
+
 	sub := map[string]interface{}{}
 	for _, fieldName := range e.embeddedFields {
 		if v, ok := data[fieldName]; ok {

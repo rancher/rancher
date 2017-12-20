@@ -90,6 +90,7 @@ func (m *MachineConfig) loadConfig() error {
 		if err != nil {
 			return err
 		}
+		cm.Data = map[string]string{}
 	}
 
 	m.cm = cm
@@ -97,7 +98,7 @@ func (m *MachineConfig) loadConfig() error {
 }
 
 func (m *MachineConfig) getConfigMap() (*v1.ConfigMap, error) {
-	configMap, err := m.configMapClient.Get("mc-"+m.id, metav1.GetOptions{})
+	configMap, err := m.configMapClient.Get(m.id, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		return nil, nil
 	}

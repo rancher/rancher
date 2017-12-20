@@ -26,7 +26,11 @@ func (e NamespaceMapper) FromInternal(data map[string]interface{}) {
 
 func (e NamespaceMapper) ToInternal(data map[string]interface{}) {
 	for name, friendlyName := range namespaceMapping {
-		value := convert.ToString(data[friendlyName])
+		obj, ok := data[friendlyName]
+		if !ok {
+			continue
+		}
+		value := convert.ToString(obj)
 		if value == "host" {
 			data[name] = true
 		} else {

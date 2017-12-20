@@ -14,11 +14,11 @@ type Interface interface {
 	RESTClient() rest.Interface
 	controller.Starter
 
-	PodsGetter
 	NodesGetter
 	ComponentStatusesGetter
 	NamespacesGetter
 	EventsGetter
+	PodsGetter
 }
 
 type Client struct {
@@ -26,11 +26,11 @@ type Client struct {
 	restClient rest.Interface
 	starters   []controller.Starter
 
-	podControllers             map[string]PodController
 	nodeControllers            map[string]NodeController
 	componentStatusControllers map[string]ComponentStatusController
 	namespaceControllers       map[string]NamespaceController
 	eventControllers           map[string]EventController
+	podControllers             map[string]PodController
 }
 
 func NewForConfig(config rest.Config) (Interface, error) {
@@ -47,11 +47,11 @@ func NewForConfig(config rest.Config) (Interface, error) {
 	return &Client{
 		restClient: restClient,
 
-		podControllers:             map[string]PodController{},
 		nodeControllers:            map[string]NodeController{},
 		componentStatusControllers: map[string]ComponentStatusController{},
 		namespaceControllers:       map[string]NamespaceController{},
 		eventControllers:           map[string]EventController{},
+		podControllers:             map[string]PodController{},
 	}, nil
 }
 
@@ -65,19 +65,6 @@ func (c *Client) Sync(ctx context.Context) error {
 
 func (c *Client) Start(ctx context.Context, threadiness int) error {
 	return controller.Start(ctx, threadiness, c.starters...)
-}
-
-type PodsGetter interface {
-	Pods(namespace string) PodInterface
-}
-
-func (c *Client) Pods(namespace string) PodInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &PodResource, PodGroupVersionKind, podFactory{})
-	return &podClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
 }
 
 type NodesGetter interface {
@@ -126,6 +113,19 @@ type EventsGetter interface {
 func (c *Client) Events(namespace string) EventInterface {
 	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &EventResource, EventGroupVersionKind, eventFactory{})
 	return &eventClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type PodsGetter interface {
+	Pods(namespace string) PodInterface
+}
+
+func (c *Client) Pods(namespace string) PodInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &PodResource, PodGroupVersionKind, podFactory{})
+	return &podClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

@@ -78,9 +78,6 @@ func (s *tokenAPIServer) deriveToken(w http.ResponseWriter, r *http.Request) {
 		util.ReturnHTTPError(w, r, http.StatusUnauthorized, "No valid token cookie")
 		return
 	}
-
-	log.Infof("token cookie: %v %v", cookie.Name, cookie.Value)
-
 	bytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		log.Errorf("GetToken failed with error: %v", err)
@@ -119,9 +116,6 @@ func (s *tokenAPIServer) listTokens(w http.ResponseWriter, r *http.Request) {
 		util.ReturnHTTPError(w, r, http.StatusUnauthorized, "Invalid token cookie")
 		return
 	}
-
-	log.Debugf("token cookie: %v %v", cookie.Name, cookie.Value)
-
 	//getToken
 	tokens, status, err := s.getTokens(cookie.Value)
 	if err != nil {
@@ -146,8 +140,6 @@ func (s *tokenAPIServer) logout(w http.ResponseWriter, r *http.Request) {
 		util.ReturnHTTPError(w, r, http.StatusUnauthorized, "Invalid token cookie")
 		return
 	}
-
-	log.Debugf("token cookie: %v %v", cookie.Name, cookie.Value)
 
 	isSecure := false
 	if r.URL.Scheme == "https" {
@@ -187,8 +179,6 @@ func (s *tokenAPIServer) getToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Debugf("token cookie: %v %v", cookie.Name, cookie.Value)
-
 	vars := mux.Vars(r)
 	tokenID := vars["tokenId"]
 
@@ -217,9 +207,6 @@ func (s *tokenAPIServer) removeToken(w http.ResponseWriter, r *http.Request) {
 		util.ReturnHTTPError(w, r, http.StatusUnauthorized, "Invalid token cookie")
 		return
 	}
-
-	log.Debugf("token cookie: %v %v", cookie.Name, cookie.Value)
-
 	vars := mux.Vars(r)
 	tokenID := vars["tokenId"]
 

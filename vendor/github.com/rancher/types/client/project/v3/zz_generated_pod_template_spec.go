@@ -21,6 +21,7 @@ const (
 	PodTemplateSpecFieldRestart                       = "restart"
 	PodTemplateSpecFieldRunAsNonRoot                  = "runAsNonRoot"
 	PodTemplateSpecFieldSchedulerName                 = "schedulerName"
+	PodTemplateSpecFieldScheduling                    = "scheduling"
 	PodTemplateSpecFieldServiceAccountName            = "serviceAccountName"
 	PodTemplateSpecFieldSubdomain                     = "subdomain"
 	PodTemplateSpecFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
@@ -32,7 +33,7 @@ const (
 type PodTemplateSpec struct {
 	ActiveDeadlineSeconds         *int64                 `json:"activeDeadlineSeconds,omitempty"`
 	AutomountServiceAccountToken  *bool                  `json:"automountServiceAccountToken,omitempty"`
-	Containers                    map[string]Container   `json:"containers,omitempty"`
+	Containers                    []Container            `json:"containers,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty"`
@@ -49,6 +50,7 @@ type PodTemplateSpec struct {
 	Restart                       string                 `json:"restart,omitempty"`
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty"`
 	SchedulerName                 string                 `json:"schedulerName,omitempty"`
+	Scheduling                    *Scheduling            `json:"scheduling,omitempty"`
 	ServiceAccountName            string                 `json:"serviceAccountName,omitempty"`
 	Subdomain                     string                 `json:"subdomain,omitempty"`
 	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty"`

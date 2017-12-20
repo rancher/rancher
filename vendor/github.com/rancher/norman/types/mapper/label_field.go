@@ -10,7 +10,7 @@ type LabelField struct {
 }
 
 func (e LabelField) FromInternal(data map[string]interface{}) {
-	v, ok := values.RemoveValue(data, "labels", "io.cattle.field."+e.Field)
+	v, ok := values.RemoveValue(data, "labels", "field.cattle.io/"+e.Field)
 	if ok {
 		data[e.Field] = v
 	}
@@ -19,7 +19,7 @@ func (e LabelField) FromInternal(data map[string]interface{}) {
 func (e LabelField) ToInternal(data map[string]interface{}) {
 	v, ok := data[e.Field]
 	if ok {
-		values.PutValue(data, v, "labels", "io.cattle.field."+e.Field)
+		values.PutValue(data, v, "labels", "field.cattle.io/"+e.Field)
 	}
 }
 
