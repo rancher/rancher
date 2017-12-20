@@ -17,9 +17,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func traverseFiles(repoPath, kind string, catalogType CatalogType) ([]v3.Template, []error, error) {
+func traverseFiles(repoPath, kind, catalogName string, catalogType CatalogType) ([]v3.Template, []error, error) {
 	if kind == "" || kind == RancherTemplateType {
-		return traverseGitFiles(repoPath)
+		return traverseGitFiles(repoPath, catalogName)
 	}
 	if kind == HelmTemplateType {
 		if catalogType == CatalogTypeHelmGitRepo {
@@ -155,7 +155,7 @@ func traverseHelmFiles(repoPath string) ([]v3.Template, []error, error) {
 	return templates, nil, nil
 }
 
-func traverseGitFiles(repoPath string) ([]v3.Template, []error, error) {
+func traverseGitFiles(repoPath, catalogName string) ([]v3.Template, []error, error) {
 	templateIndex := map[string]*v3.Template{}
 	var errors []error
 
@@ -249,6 +249,22 @@ func traverseGitFiles(repoPath string) ([]v3.Template, []error, error) {
 			}
 		}
 		template.Spec.Versions = filteredVersions
+		template.Spec.CatalogID = catalogName
+		for _, versionSpec := range template.Spec.Versions {
+			if versionSpec.Version == template.Spec.DefaultVersion {
+				templateName := ""
+				if template.Spec.Base == "" && template.Spec.FolderName != "" {
+					templateName = fmt.Sprintf("%s-%s", catalogName, template.Spec.FolderName)
+				} else {
+					templateName = fmt.Sprintf("%s-%s-%s", catalogName, template.Spec.Base, template.Spec.FolderName)
+				}
+				revision := versionSpec.Version
+				if versionSpec.Revision != nil {
+					revision = strconv.Itoa(*versionSpec.Revision)
+				}
+				template.Spec.DefaultTemplateVersionID = fmt.Sprintf("%s-%s", templateName, revision)
+			}
+		}
 		templates = append(templates, *template)
 	}
 
@@ -274,6 +290,7 @@ func handleFile(templateIndex map[string]*v3.Template, fullPath, relativePath, f
 
 		template.Spec.Base = base
 		template.Spec.FolderName = templateName
+		template.Spec.Categories = []string{template.Spec.Category}
 
 		key := base + templateName
 

@@ -29,6 +29,7 @@ func Schemas(ctx context.Context, management *config.ManagementContext, schemas 
 	Subscribe(schemas)
 	ProjectLinks(schemas, management)
 	Templates(schemas)
+	TemplateVersion(schemas)
 	ClusterRegistrationTokens(schemas)
 	User(schemas)
 	Catalog(schemas)
@@ -58,6 +59,12 @@ func Templates(schemas *types.Schemas) {
 	schema := schemas.Schema(&managementschema.Version, client.TemplateType)
 	schema.Formatter = catalog.TemplateFormatter
 	schema.LinkHandler = catalog.TemplateIconHandler
+}
+
+func TemplateVersion(schemas *types.Schemas) {
+	schema := schemas.Schema(&managementschema.Version, client.TemplateVersionType)
+	schema.Formatter = catalog.TemplateVersionFormatter
+	schema.LinkHandler = catalog.TemplateVersionReadmeHandler
 }
 
 func Catalog(schemas *types.Schemas) {

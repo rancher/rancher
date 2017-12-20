@@ -2771,6 +2771,13 @@ func (in *TemplateVersionSpec) DeepCopyInto(out *TemplateVersionSpec) {
 			**out = **in
 		}
 	}
+	if in.UpgradeVersionLinks != nil {
+		in, out := &in.UpgradeVersionLinks, &out.UpgradeVersionLinks
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.Files != nil {
 		in, out := &in.Files, &out.Files
 		*out = make([]File, len(*in))
