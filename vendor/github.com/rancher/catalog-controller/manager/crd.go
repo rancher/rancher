@@ -13,11 +13,12 @@ import (
 	"github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/rancher/catalog-controller/utils"
 )
 
 const (
-	CatalogNameLabel  = "io.cattle.catalog.name"
-	TemplateNameLabel = "io.cattle.catalog.template_name"
+	CatalogNameLabel  = "catalog.cattle.io/name"
+	TemplateNameLabel = "catalog.cattle.io/template_name"
 )
 
 // update will sync templates with catalog without costing too much
@@ -129,6 +130,16 @@ func (m *Manager) createTemplateVersions(versionsSpec []v3.TemplateVersionSpec, 
 	rollback := false
 	for _, spec := range versionsSpec {
 		templateVersion := v3.TemplateVersion{}
+		spec.UpgradeVersionLinks = map[string]string{}
+		for _, versionSpec := range template.Spec.Versions {
+			if showUpgradeLinks(spec.Version, versionSpec.Version, versionSpec.UpgradeFrom) {
+				revision := versionSpec.Version
+				if spec.Revision != nil {
+					revision = strconv.Itoa(*versionSpec.Revision)
+				}
+				spec.UpgradeVersionLinks[versionSpec.Version] = fmt.Sprintf("%s-%s", template.Name, revision)
+			}
+		}
 		templateVersion.Spec = spec
 		revision := spec.Version
 		if spec.Revision != nil {
@@ -184,4 +195,18 @@ func (m *Manager) deleteTemplateVersions(template v3.Template) error {
 		}
 	}
 	return nil
+}
+
+func showUpgradeLinks(version, upgradeVersion, upgradeFrom string) bool {
+	if !utils.VersionGreaterThan(upgradeVersion, version) {
+		return false
+	}
+	if upgradeFrom != "" {
+		satisfiesRange, err := utils.VersionSatisfiesRange(version, upgradeFrom)
+		if err != nil {
+			return false
+		}
+		return satisfiesRange
+	}
+	return true
 }

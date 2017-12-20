@@ -38,7 +38,7 @@ func (m *Manager) Sync(key string, catalog *v3.Catalog) error {
 		return nil
 	}
 	catalogCopy.Status.Commit = commit
-	templates, errs, err := traverseFiles(repoPath, catalog.Spec.CatalogKind, catalogType)
+	templates, errs, err := traverseFiles(repoPath, catalog.Spec.CatalogKind, catalog.Name, catalogType)
 	if err != nil {
 		return errors.Wrap(err, "Repo traversal failed")
 	}

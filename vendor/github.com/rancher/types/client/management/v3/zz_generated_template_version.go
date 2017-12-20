@@ -25,6 +25,7 @@ const (
 	TemplateVersionFieldTransitioning         = "transitioning"
 	TemplateVersionFieldTransitioningMessage  = "transitioningMessage"
 	TemplateVersionFieldUpgradeFrom           = "upgradeFrom"
+	TemplateVersionFieldUpgradeVersionLinks   = "upgradeVersionLinks"
 	TemplateVersionFieldUuid                  = "uuid"
 	TemplateVersionFieldVersion               = "version"
 )
@@ -50,6 +51,7 @@ type TemplateVersion struct {
 	Transitioning         string                 `json:"transitioning,omitempty"`
 	TransitioningMessage  string                 `json:"transitioningMessage,omitempty"`
 	UpgradeFrom           string                 `json:"upgradeFrom,omitempty"`
+	UpgradeVersionLinks   map[string]string      `json:"upgradeVersionLinks,omitempty"`
 	Uuid                  string                 `json:"uuid,omitempty"`
 	Version               string                 `json:"version,omitempty"`
 }

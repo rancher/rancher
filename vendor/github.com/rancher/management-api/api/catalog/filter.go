@@ -10,22 +10,68 @@ import (
 
 	"strings"
 
+	"strconv"
+
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/client/management/v3"
-	"strconv"
 )
 
 func TemplateFormatter(apiContext *types.APIContext, resource *types.RawResource) {
-	delete(resource.Values, "icon")
+	// version links
 	resource.Values["versionLinks"] = extractVersionLinks(apiContext, resource)
-	delete(resource.Values, "versions")
+
+	//icon
+	delete(resource.Values, "icon")
 	resource.Links["icon"] = apiContext.URLBuilder.Link("icon", resource)
+
+	//catalog link
 	catalogSchema := apiContext.Schemas.Schema(&managementschema.Version, client.CatalogType)
 	catalogName := strings.Split(resource.ID, "-")[0]
 	resource.Links["catalog"] = apiContext.URLBuilder.ResourceLinkByID(catalogSchema, catalogName)
+
+	// delete category
+	delete(resource.Values, "category")
+
+	// delete versions
+	delete(resource.Values, "versions")
+}
+
+func TemplateVersionFormatter(apiContext *types.APIContext, resource *types.RawResource) {
+	// files
+	files := resource.Values["files"]
+	delete(resource.Values, "files")
+	fileMap := map[string]string{}
+	for _, file := range files.([]interface{}) {
+		m := file.(map[string]interface{})
+		fileMap[m["name"].(string)] = m["contents"].(string)
+	}
+	resource.Values["files"] = fileMap
+
+	// readme
+	delete(resource.Values, "readme")
+	resource.Links["readme"] = apiContext.URLBuilder.Link("readme", resource)
+
+	version := resource.Values["version"].(string)
+	if revision, ok := resource.Values["revision"]; ok {
+		version = strconv.FormatInt(revision.(int64), 10)
+	}
+	templateID := strings.TrimSuffix(apiContext.ID, "-"+version)
+	templateSchema := apiContext.Schemas.Schema(&managementschema.Version, client.TemplateType)
+	resource.Links["template"] = apiContext.URLBuilder.ResourceLinkByID(templateSchema, templateID)
+
+	upgradeLinks, ok := resource.Values["upgradeVersionLinks"].(map[string]interface{})
+	if ok {
+		linkMap := map[string]string{}
+		templateVersionSchema := apiContext.Schemas.Schema(&managementschema.Version, client.TemplateVersionType)
+		for v, versionID := range upgradeLinks {
+			linkMap[v] = apiContext.URLBuilder.ResourceLinkByID(templateVersionSchema, versionID.(string))
+		}
+		delete(resource.Values, "upgradeVersionLinks")
+		resource.Values["upgradeVersionLinks"] = linkMap
+	}
 }
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -72,21 +118,36 @@ func extractVersionLinks(apiContext *types.APIContext, resource *types.RawResour
 }
 
 func TemplateIconHandler(apiContext *types.APIContext) error {
-	if apiContext.Link != "icon" {
+	switch apiContext.Link {
+	case "icon":
+		template := &client.Template{}
+		if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, template); err != nil {
+			return err
+		}
+
+		icon, err := base64.StdEncoding.DecodeString(template.Icon)
+		if err != nil {
+			return err
+		}
+		iconReader := bytes.NewReader(icon)
+		http.ServeContent(apiContext.Response, apiContext.Request, template.IconFilename, time.Time{}, iconReader)
+		return nil
+	default:
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
+}
 
-	template := &client.Template{}
-	if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, template); err != nil {
-		return err
+func TemplateVersionReadmeHandler(apiContext *types.APIContext) error {
+	switch apiContext.Link {
+	case "readme":
+		templateVersion := &client.TemplateVersion{}
+		if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, templateVersion); err != nil {
+			return err
+		}
+		iconReader := bytes.NewReader([]byte(templateVersion.Readme))
+		http.ServeContent(apiContext.Response, apiContext.Request, "readme", time.Time{}, iconReader)
+		return nil
+	default:
+		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
-
-	icon, err := base64.StdEncoding.DecodeString(template.Icon)
-	if err != nil {
-		return err
-	}
-	iconReader := bytes.NewReader(icon)
-	http.ServeContent(apiContext.Response, apiContext.Request, template.IconFilename, time.Time{}, iconReader)
-
-	return nil
 }
