@@ -33,11 +33,11 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	// TODO this gets cleaned up when the types are fixed
 	scheme.AddKnownTypes(SchemeGroupVersion,
 
-		&PodList{},
 		&NodeList{},
 		&ComponentStatusList{},
 		&NamespaceList{},
 		&EventList{},
+		&PodList{},
 	)
 	return nil
 }

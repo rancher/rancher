@@ -24,8 +24,9 @@ var (
 	RoleBindingResource = metav1.APIResource{
 		Name:         "rolebindings",
 		SingularName: "rolebinding",
-		Namespaced:   false,
-		Kind:         RoleBindingGroupVersionKind.Kind,
+		Namespaced:   true,
+
+		Kind: RoleBindingGroupVersionKind.Kind,
 	}
 )
 

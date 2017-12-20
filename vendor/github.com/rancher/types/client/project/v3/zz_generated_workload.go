@@ -37,7 +37,9 @@ const (
 	WorkloadFieldRunAsNonRoot                  = "runAsNonRoot"
 	WorkloadFieldScale                         = "scale"
 	WorkloadFieldSchedulerName                 = "schedulerName"
+	WorkloadFieldScheduling                    = "scheduling"
 	WorkloadFieldServiceAccountName            = "serviceAccountName"
+	WorkloadFieldServiceLinks                  = "serviceLinks"
 	WorkloadFieldState                         = "state"
 	WorkloadFieldStatus                        = "status"
 	WorkloadFieldSubdomain                     = "subdomain"
@@ -58,7 +60,7 @@ type Workload struct {
 	Annotations                   map[string]string      `json:"annotations,omitempty"`
 	AutomountServiceAccountToken  *bool                  `json:"automountServiceAccountToken,omitempty"`
 	BatchSize                     string                 `json:"batchSize,omitempty"`
-	Containers                    map[string]Container   `json:"containers,omitempty"`
+	Containers                    []Container            `json:"containers,omitempty"`
 	Created                       string                 `json:"created,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty"`
 	DeploymentStrategy            *DeployStrategy        `json:"deploymentStrategy,omitempty"`
@@ -85,7 +87,9 @@ type Workload struct {
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty"`
 	Scale                         *int64                 `json:"scale,omitempty"`
 	SchedulerName                 string                 `json:"schedulerName,omitempty"`
+	Scheduling                    *Scheduling            `json:"scheduling,omitempty"`
 	ServiceAccountName            string                 `json:"serviceAccountName,omitempty"`
+	ServiceLinks                  []Link                 `json:"serviceLinks,omitempty"`
 	State                         string                 `json:"state,omitempty"`
 	Status                        *WorkloadStatus        `json:"status,omitempty"`
 	Subdomain                     string                 `json:"subdomain,omitempty"`

@@ -18,8 +18,8 @@ import (
 
 const (
 	defaultTokenTTL    = 57600000
-	userPrincipalIndex = "io.rancher.authn.index.userprincipal"
-	userIDLabel        = "io.cattle.token.field.userId"
+	userPrincipalIndex = "authn.management.cattle.io/user-principal-index"
+	userIDLabel        = "authn.management.cattle.io/token-userId"
 )
 
 type tokenAPIServer struct {
@@ -58,7 +58,7 @@ func newTokenAPIServer(ctx context.Context, mgmtCtx *config.ManagementContext) (
 
 //createLoginToken will authenticate with provider and creates a token CR
 func (s *tokenAPIServer) createLoginToken(jsonInput v3.LoginInput) (v3.Token, int, error) {
-	logrus.Debugf("Create Token Invoked %v", jsonInput)
+	logrus.Debugf("Create Token Invoked")
 
 	// Authenticate User
 	userPrincipal, groupPrincipals, status, err := providers.AuthenticateUser(jsonInput)
@@ -157,7 +157,6 @@ func (s *tokenAPIServer) createK8sTokenCR(key string, k8sToken *v3.Token) (v3.To
 	if err != nil {
 		return v3.Token{}, err
 	}
-	logrus.Debugf("Created Token %v", createdToken)
 	return *createdToken, nil
 }
 
@@ -166,8 +165,6 @@ func (s *tokenAPIServer) getK8sTokenCR(tokenID string) (*v3.Token, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	logrus.Debugf("storedToken token resource: %v", storedToken)
 
 	return storedToken, nil
 }
@@ -182,7 +179,6 @@ func (s *tokenAPIServer) getTokens(tokenID string) ([]v3.Token, int, error) {
 		return tokens, 401, err
 	}
 
-	logrus.Debugf("storedToken token resource: %v", storedToken)
 	userID := storedToken.UserID
 	set := labels.Set(map[string]string{userIDLabel: userID})
 	tokenList, err := s.tokensClient.List(metav1.ListOptions{LabelSelector: set.AsSelector().String()})
@@ -222,17 +218,14 @@ func (s *tokenAPIServer) getDerivedToken(tokenID string, derivedTokenID string) 
 		return *derivedToken, 401, err
 	}
 
-	logrus.Debugf("storedToken token resource: %v", storedToken)
-
 	derivedToken, err = s.getK8sTokenCR(derivedTokenID)
 
 	if err != nil {
 		return v3.Token{}, 404, err
 	}
-	logrus.Debugf("derivedToken token resource: %v", derivedToken)
 
 	if derivedToken.UserID != storedToken.UserID {
-		return v3.Token{}, 403, fmt.Errorf("access denied: cannot delete derived token")
+		return v3.Token{}, 403, fmt.Errorf("access denied: cannot get derived token")
 	}
 
 	return *derivedToken, 0, nil
@@ -242,11 +235,6 @@ func (s *tokenAPIServer) getDerivedToken(tokenID string, derivedTokenID string) 
 func (s *tokenAPIServer) deleteDerivedToken(tokenID string, derivedTokenID string) (int, error) {
 	logrus.Debug("DELETE Derived Token Invoked")
 
-	storedToken, err := s.getK8sTokenCR(tokenID)
-	if err != nil {
-		return 401, err
-	}
-	logrus.Debugf("storedToken token resource: %v", storedToken)
 	_, status, err := s.getDerivedToken(tokenID, derivedTokenID)
 
 	if err != nil {

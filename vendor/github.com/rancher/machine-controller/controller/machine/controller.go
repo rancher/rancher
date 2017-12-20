@@ -55,6 +55,9 @@ func (m *Lifecycle) Create(obj *v3.Machine) (*v3.Machine, error) {
 			return obj, err
 		}
 		obj.Status.MachineTemplateSpec = &template.Spec
+		if obj.Spec.DisplayName == "" {
+			obj.Spec.DisplayName = obj.Name
+		}
 
 		rawTemplate, err := m.machineTemplateGenericClient.Get(obj.Spec.MachineTemplateName, metav1.GetOptions{})
 		if err != nil {

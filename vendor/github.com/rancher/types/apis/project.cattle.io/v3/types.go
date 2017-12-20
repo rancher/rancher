@@ -6,8 +6,9 @@ import (
 )
 
 type WorkloadSpec struct {
-	DeployConfig DeployConfig
-	Template     v1.PodTemplateSpec
+	DeployConfig DeployConfig       `json:"deployConfig"`
+	Template     v1.PodTemplateSpec `json:"template"`
+	ServiceLinks []Link             `json:"serviceLinks"`
 }
 
 type WorkloadStatus struct {
@@ -21,36 +22,41 @@ type Workload struct {
 }
 
 type DeployConfig struct {
-	Scale              int64
-	BatchSize          string
-	DeploymentStrategy *DeployStrategy
+	Scale              int64           `json:"scale"`
+	BatchSize          string          `json:"batchSize"`
+	DeploymentStrategy *DeployStrategy `json:"deploymentStrategy"`
 }
 
 type DeploymentParallelConfig struct {
-	StartFirst              bool
-	MinReadySeconds         int64
-	ProgressDeadlineSeconds int64
+	StartFirst              bool  `json:"startFirst"`
+	MinReadySeconds         int64 `json:"minReadySeconds"`
+	ProgressDeadlineSeconds int64 `json:"processDeadlineSeconds"`
 }
 
 type DeploymentJobConfig struct {
-	BatchLimit            int64
-	ActiveDeadlineSeconds int64
-	OnDelete              bool
+	BatchLimit            int64 `json:"batchLimit"`
+	ActiveDeadlineSeconds int64 `json:"activeDeadlineSeconds"`
+	OnDelete              bool  `json:"onDelete"`
 }
 
 type DeploymentOrderedConfig struct {
-	PartitionSize int64
-	OnDelete      bool
+	PartitionSize int64 `json:"partitionSize"`
+	OnDelete      bool  `json:"onDelete"`
 }
 
 type DeploymentGlobalConfig struct {
-	OnDelete bool
+	OnDelete bool `json:"onDelete"`
 }
 
 type DeployStrategy struct {
-	Kind           string
-	ParallelConfig *DeploymentParallelConfig
-	JobConfig      *DeploymentJobConfig
-	OrderedConfig  *DeploymentOrderedConfig
-	GlobalConfig   *DeploymentGlobalConfig
+	Kind           string                    `json:"kind"`
+	ParallelConfig *DeploymentParallelConfig `json:"parallelConfig"`
+	JobConfig      *DeploymentJobConfig      `json:"jobConfig"`
+	OrderedConfig  *DeploymentOrderedConfig  `json:"orderedConfig"`
+	GlobalConfig   *DeploymentGlobalConfig   `json:"globalConfig"`
+}
+
+type Link struct {
+	Name  string `json:"name"`
+	Alias string `json:"alias"`
 }

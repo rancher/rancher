@@ -72,9 +72,14 @@ func (c Cond) Once(obj runtime.Object, f func() (runtime.Object, error)) (runtim
 	return obj, nil
 }
 
-func (c Cond) Do(obj runtime.Object, f func() error) error {
+func (c Cond) Do(obj runtime.Object, f func() (runtime.Object, error)) error {
 	c.Unknown(obj)
-	if err := f(); err != nil {
+	newObj, err := f()
+	if newObj != nil {
+		obj = newObj
+	}
+
+	if err != nil {
 		c.False(obj)
 		c.Reason(obj, err.Error())
 		return err

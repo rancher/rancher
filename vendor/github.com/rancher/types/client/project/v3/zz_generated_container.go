@@ -12,6 +12,7 @@ const (
 	ContainerFieldHealthcheck              = "healthcheck"
 	ContainerFieldImage                    = "image"
 	ContainerFieldInitContainer            = "initContainer"
+	ContainerFieldName                     = "name"
 	ContainerFieldPorts                    = "ports"
 	ContainerFieldPostStart                = "postStart"
 	ContainerFieldPreStop                  = "preStop"
@@ -21,7 +22,6 @@ const (
 	ContainerFieldReadycheck               = "readycheck"
 	ContainerFieldResources                = "resources"
 	ContainerFieldRunAsNonRoot             = "runAsNonRoot"
-	ContainerFieldScheduling               = "scheduling"
 	ContainerFieldStdin                    = "stdin"
 	ContainerFieldStdinOnce                = "stdinOnce"
 	ContainerFieldTTY                      = "tty"
@@ -43,6 +43,7 @@ type Container struct {
 	Healthcheck              *Probe            `json:"healthcheck,omitempty"`
 	Image                    string            `json:"image,omitempty"`
 	InitContainer            *bool             `json:"initContainer,omitempty"`
+	Name                     string            `json:"name,omitempty"`
 	Ports                    []ContainerPort   `json:"ports,omitempty"`
 	PostStart                *Handler          `json:"postStart,omitempty"`
 	PreStop                  *Handler          `json:"preStop,omitempty"`
@@ -52,7 +53,6 @@ type Container struct {
 	Readycheck               *Probe            `json:"readycheck,omitempty"`
 	Resources                *Resources        `json:"resources,omitempty"`
 	RunAsNonRoot             *bool             `json:"runAsNonRoot,omitempty"`
-	Scheduling               *Scheduling       `json:"scheduling,omitempty"`
 	Stdin                    *bool             `json:"stdin,omitempty"`
 	StdinOnce                *bool             `json:"stdinOnce,omitempty"`
 	TTY                      *bool             `json:"tty,omitempty"`

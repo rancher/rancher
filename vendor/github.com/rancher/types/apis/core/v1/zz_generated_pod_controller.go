@@ -24,8 +24,9 @@ var (
 	PodResource = metav1.APIResource{
 		Name:         "pods",
 		SingularName: "pod",
-		Namespaced:   false,
-		Kind:         PodGroupVersionKind.Kind,
+		Namespaced:   true,
+
+		Kind: PodGroupVersionKind.Kind,
 	}
 )
 

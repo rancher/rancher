@@ -103,14 +103,7 @@ func Subscribe(schemas *types.Schemas) {
 }
 
 func User(schemas *types.Schemas) {
-	schemas.MustImport(&managementschema.Version, authn.ChangePasswordInput{})
 	schema := schemas.Schema(&managementschema.Version, client.UserType)
-	schema.ResourceActions = map[string]types.Action{
-		"changepassword": {
-			Input:  "changePasswordInput",
-			Output: "user",
-		},
-	}
 	schema.Formatter = authn.UserFormatter
 	schema.ActionHandler = authn.UserActionHandler
 }

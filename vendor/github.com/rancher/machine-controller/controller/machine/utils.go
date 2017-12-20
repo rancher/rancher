@@ -93,7 +93,7 @@ func buildCreateCommand(machine *v3.Machine, configMap map[string]interface{}) [
 		}
 	}
 	logrus.Debugf("create cmd %v", cmd)
-	cmd = append(cmd, machine.Name)
+	cmd = append(cmd, machine.Spec.DisplayName)
 	return cmd
 }
 
@@ -195,7 +195,7 @@ func filterDockerMessage(msg string, machine *v3.Machine) (string, error) {
 	if strings.Contains(msg, errorCreatingMachine) {
 		return "", errors.New(msg)
 	}
-	if strings.Contains(msg, machine.Name) {
+	if strings.Contains(msg, machine.Spec.DisplayName) {
 		return "", nil
 	}
 	return msg, nil
@@ -233,7 +233,7 @@ func machineExists(machineDir string, name string) (bool, error) {
 }
 
 func deleteMachine(machineDir string, machine *v3.Machine) error {
-	command := buildCommand(machineDir, []string{"rm", "-f", machine.Name})
+	command := buildCommand(machineDir, []string{"rm", "-f", machine.Spec.DisplayName})
 	err := command.Start()
 	if err != nil {
 		return err
@@ -248,7 +248,7 @@ func deleteMachine(machineDir string, machine *v3.Machine) error {
 }
 
 func getSSHPrivateKey(machineDir string, machine *v3.Machine) (string, error) {
-	keyPath := filepath.Join(machineDir, "machines", machine.Name, "id_rsa")
+	keyPath := filepath.Join(machineDir, "machines", machine.Spec.DisplayName, "id_rsa")
 	data, err := ioutil.ReadFile(keyPath)
 	if err != nil {
 		return "", nil
@@ -257,7 +257,7 @@ func getSSHPrivateKey(machineDir string, machine *v3.Machine) (string, error) {
 }
 
 func waitUntilSSHKey(machineDir string, machine *v3.Machine) error {
-	keyPath := filepath.Join(machineDir, "machines", machine.Name, "id_rsa")
+	keyPath := filepath.Join(machineDir, "machines", machine.Spec.DisplayName, "id_rsa")
 	startTime := time.Now()
 	increments := 1
 	for {
@@ -265,7 +265,7 @@ func waitUntilSSHKey(machineDir string, machine *v3.Machine) error {
 			return errors.New("Timeout waiting for ssh key")
 		}
 		if _, err := os.Stat(keyPath); err != nil {
-			logrus.Debugf("keyPath not found. The machine is probably still provisioning. Sleep %s second", increments)
+			logrus.Debugf("keyPath not found. The machine is probably still provisioning. Sleep %v second", increments)
 			time.Sleep(time.Duration(increments) * time.Second)
 			increments = increments * 2
 			continue

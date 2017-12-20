@@ -146,5 +146,5 @@ func EncodeToMap(obj interface{}) (map[string]interface{}, error) {
 		return nil, err
 	}
 	result := map[string]interface{}{}
-	return result, json.Unmarshal(bytes, result)
+	return result, json.Unmarshal(bytes, &result)
 }

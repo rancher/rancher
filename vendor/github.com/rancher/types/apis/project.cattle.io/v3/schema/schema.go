@@ -46,14 +46,18 @@ func NamespaceTypes(version *types.APIVersion, schemas *types.Schemas) *types.Sc
 		).
 		AddMapperForType(version, v1.Namespace{},
 			&m.LabelField{Field: "projectId"},
+			&m.AnnotationField{Field: "externalId"},
+			&m.AnnotationField{Field: "templates", Object: true},
+			&m.AnnotationField{Field: "prune"},
+			&m.AnnotationField{Field: "answers", Object: true},
 		).
 		MustImport(version, v1.Namespace{}, struct {
-			ProjectID  string `norman:"type=reference[/v3/schemas/project]"`
-			Templates  map[string]string
-			Answers    map[string]interface{}
-			Prune      bool
-			ExternalID string
-			Tags       []string
+			ProjectID  string                 `norman:"type=reference[/v3/schemas/project]"`
+			Templates  map[string]string      `json:"templates"`
+			Answers    map[string]interface{} `json:"answers"`
+			Prune      bool                   `json:"prune"`
+			ExternalID string                 `json:"externalId"`
+			Tags       []string               `json:"tags"`
 		}{})
 }
 
@@ -266,10 +270,6 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 				Key:   "name",
 			},
 			&m.SliceToMap{
-				Field: "containers",
-				Key:   "name",
-			},
-			&m.SliceToMap{
 				Field: "hostAliases",
 				Key:   "ip",
 			},
@@ -288,17 +288,17 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v1.Handler{}, handlerOverride{}).
 		MustImport(&Version, v1.Probe{}, handlerOverride{}).
 		MustImport(&Version, v1.Container{}, struct {
-			Scheduling      *Scheduling
 			Resources       *Resources
 			Environment     map[string]string
 			EnvironmentFrom []EnvironmentFrom
 			InitContainer   bool
 		}{}).
 		MustImport(&Version, v1.PodSpec{}, struct {
-			NodeName string `norman:"type=reference[node]"`
-			Net      string
-			PID      string
-			IPC      string
+			Scheduling *Scheduling
+			NodeName   string `norman:"type=reference[node]"`
+			Net        string
+			PID        string
+			IPC        string
 		}{}).
 		MustImport(&Version, v1.Pod{}, projectOverride{}, struct {
 			WorkloadID string `norman:"type=reference[workload]"`

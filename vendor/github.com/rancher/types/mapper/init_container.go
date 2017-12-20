@@ -25,8 +25,8 @@ func (e InitContainerMapper) FromInternal(data map[string]interface{}) {
 }
 
 func (e InitContainerMapper) ToInternal(data map[string]interface{}) {
-	newContainers := []interface{}{}
-	newInitContainers := []interface{}{}
+	var newContainers []interface{}
+	var newInitContainers []interface{}
 
 	for _, container := range convert.ToMapSlice(data["containers"]) {
 		if convert.ToBool(container["initContainer"]) {

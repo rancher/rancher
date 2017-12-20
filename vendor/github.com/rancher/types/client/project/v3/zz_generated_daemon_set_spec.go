@@ -25,6 +25,7 @@ const (
 	DaemonSetSpecFieldRunAsNonRoot                  = "runAsNonRoot"
 	DaemonSetSpecFieldScale                         = "scale"
 	DaemonSetSpecFieldSchedulerName                 = "schedulerName"
+	DaemonSetSpecFieldScheduling                    = "scheduling"
 	DaemonSetSpecFieldServiceAccountName            = "serviceAccountName"
 	DaemonSetSpecFieldSubdomain                     = "subdomain"
 	DaemonSetSpecFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
@@ -38,7 +39,7 @@ type DaemonSetSpec struct {
 	ActiveDeadlineSeconds         *int64                   `json:"activeDeadlineSeconds,omitempty"`
 	AutomountServiceAccountToken  *bool                    `json:"automountServiceAccountToken,omitempty"`
 	BatchSize                     string                   `json:"batchSize,omitempty"`
-	Containers                    map[string]Container     `json:"containers,omitempty"`
+	Containers                    []Container              `json:"containers,omitempty"`
 	DNSPolicy                     string                   `json:"dnsPolicy,omitempty"`
 	DeploymentStrategy            *DeployStrategy          `json:"deploymentStrategy,omitempty"`
 	Fsgid                         *int64                   `json:"fsgid,omitempty"`
@@ -58,6 +59,7 @@ type DaemonSetSpec struct {
 	RunAsNonRoot                  *bool                    `json:"runAsNonRoot,omitempty"`
 	Scale                         *int64                   `json:"scale,omitempty"`
 	SchedulerName                 string                   `json:"schedulerName,omitempty"`
+	Scheduling                    *Scheduling              `json:"scheduling,omitempty"`
 	ServiceAccountName            string                   `json:"serviceAccountName,omitempty"`
 	Subdomain                     string                   `json:"subdomain,omitempty"`
 	TerminationGracePeriodSeconds *int64                   `json:"terminationGracePeriodSeconds,omitempty"`

@@ -37,7 +37,7 @@ func (c *Cleaner) sync(ctx context.Context, syncInterval time.Duration) {
 }
 
 func (c *Cleaner) cleanup() error {
-	logrus.Infof("Running cluster events cleanup periodic thread")
+	logrus.Infof("Running cluster events cleanup")
 	events, err := c.ClusterEventsClient.List(metav1.ListOptions{})
 	if err != nil {
 		return err
@@ -45,7 +45,7 @@ func (c *Cleaner) cleanup() error {
 	for _, event := range events.Items {
 		created := event.CreationTimestamp.Time
 		if time.Now().Sub(created) >= TTL {
-			logrus.Infof("Cleaninig up cluster event %s", event.Message)
+			logrus.Debugf("Cleaninig up cluster event %s", event.Message)
 			err := c.ClusterEventsClient.Delete(event.Name, &metav1.DeleteOptions{})
 			if err != nil {
 				// just log the error, retry will happen as a part of the next run
@@ -53,7 +53,7 @@ func (c *Cleaner) cleanup() error {
 			}
 		}
 	}
-	logrus.Infof("Done running cluster events cleanup periodic thread")
+	logrus.Infof("Done running cluster events cleanup")
 
 	return nil
 }

@@ -24,8 +24,9 @@ var (
 	DeploymentResource = metav1.APIResource{
 		Name:         "deployments",
 		SingularName: "deployment",
-		Namespaced:   false,
-		Kind:         DeploymentGroupVersionKind.Kind,
+		Namespaced:   true,
+
+		Kind: DeploymentGroupVersionKind.Kind,
 	}
 )
 

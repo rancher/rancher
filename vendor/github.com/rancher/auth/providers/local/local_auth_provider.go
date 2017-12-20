@@ -18,8 +18,8 @@ import (
 //Constants for github
 const (
 	Name             = "local"
-	userNameIndex    = "io.rancher.authn.index.user.username"
-	gmPrincipalIndex = "io.rancher.authn.index.groupmember.principalid"
+	userNameIndex    = "authn.management.cattle.io/user-username-index"
+	gmPrincipalIndex = "authn.management.cattle.io/groupmember-principalid-index"
 )
 
 func userNameIndexer(obj interface{}) ([]string, error) {

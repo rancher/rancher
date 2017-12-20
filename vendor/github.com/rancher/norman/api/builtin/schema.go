@@ -65,8 +65,8 @@ var (
 	APIRoot = types.Schema{
 		ID:                "apiRoot",
 		Version:           Version,
-		ResourceMethods:   []string{},
-		CollectionMethods: []string{},
+		CollectionMethods: []string{"GET"},
+		ResourceMethods:   []string{"GET"},
 		ResourceFields: map[string]types.Field{
 			"apiVersion": {Type: "map[json]"},
 			"path":       {Type: "string"},

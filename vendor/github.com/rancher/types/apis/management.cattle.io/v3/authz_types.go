@@ -19,14 +19,31 @@ type ProjectSpec struct {
 	PodSecurityPolicyTemplateName string `json:"podSecurityPolicyTemplateName,omitempty" norman:"type=reference[podSecurityPolicyTemplate]"`
 }
 
-type RoleTemplate struct {
+type GlobalRole struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Rules   []rbacv1.PolicyRule `json:"rules,omitempty"`
 	Builtin bool                `json:"builtin"`
+}
 
-	RoleTemplateNames []string `json:"roleTemplateNames,omitempty" norman:"type=array[reference[roleTemplate]]"`
+type GlobalRoleBinding struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Subject        rbacv1.Subject `json:"subject,omitempty"`
+	GlobalRoleName string         `json:"globalRoleName,omitempty" norman:"type=reference[globalRole]"`
+}
+
+type RoleTemplate struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Rules             []rbacv1.PolicyRule `json:"rules,omitempty"`
+	Builtin           bool                `json:"builtin"`
+	External          bool                `json:"external"`
+	Hidden            bool                `json:"hidden"`
+	RoleTemplateNames []string            `json:"roleTemplateNames,omitempty" norman:"type=array[reference[roleTemplate]]"`
 }
 
 type PodSecurityPolicyTemplate struct {
