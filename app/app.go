@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/pkg/errors"
 	managementController "github.com/rancher/cluster-controller/controller"
 	"github.com/rancher/norman/signal"
 	"github.com/rancher/rancher/server"
@@ -66,21 +67,22 @@ func addData(management *config.ManagementContext) error {
 	if err != nil {
 		return err
 	}
-	rbac.ClusterRoleBindings("").Create(&rbacv1.ClusterRoleBinding{
-		ObjectMeta: v1.ObjectMeta{
-			Name: "rancher-admin",
-		},
-		Subjects: []rbacv1.Subject{
-			{
-				Kind: "User",
-				Name: "admin",
+	rbac.ClusterRoleBindings("").Create(
+		&rbacv1.ClusterRoleBinding{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "rancher-admin",
 			},
-		},
-		RoleRef: rbacv1.RoleRef{
-			Kind: "ClusterRole",
-			Name: "cluster-admin",
-		},
-	})
+			Subjects: []rbacv1.Subject{
+				{
+					Kind: "User",
+					Name: "admin",
+				},
+			},
+			RoleRef: rbacv1.RoleRef{
+				Kind: "ClusterRole",
+				Name: "cluster-admin",
+			},
+		})
 	hash, _ := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
 	admin, err := management.Management.Users("").Create(&v3.User{
 		ObjectMeta: v1.ObjectMeta{
@@ -97,6 +99,27 @@ func addData(management *config.ManagementContext) error {
 	if len(admin.PrincipalIDs) == 0 {
 		admin.PrincipalIDs = []string{"local://" + admin.Name}
 		management.Management.Users("").Update(admin)
+	}
+
+	management.Management.GlobalRoleBindings("").Create(
+		&v3.GlobalRoleBinding{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "admin",
+			},
+			Subject: rbacv1.Subject{
+				Kind: "User",
+				Name: "admin",
+			},
+			GlobalRoleName: "admin",
+		})
+
+	rb := newRoleBuilder()
+	rb.addRole("admin").addRule().apiGroups("*").verbs("*").resources("*").
+		addRule().apiGroups().nonResourceURLs("*").verbs("*")
+	rb.addRole("user").
+		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("create")
+	if err := rb.reconcileGlobalRoles(management); err != nil {
+		return errors.Wrap(err, "problem reconciling globl roles")
 	}
 
 	return nil
