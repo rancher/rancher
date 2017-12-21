@@ -36,7 +36,7 @@ func RemoveCommand() cli.Command {
 
 func ClusterRemove(rkeConfig *v3.RancherKubernetesEngineConfig, dialerFactory hosts.DialerFactory) error {
 	logrus.Infof("Tearing down Kubernetes cluster")
-	kubeCluster, err := cluster.ParseCluster(rkeConfig, clusterFilePath, dialerFactory)
+	kubeCluster, err := cluster.ParseCluster(rkeConfig, clusterFilePath, dialerFactory, nil)
 	if err != nil {
 		return err
 	}

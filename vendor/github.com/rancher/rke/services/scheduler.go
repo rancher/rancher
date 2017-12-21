@@ -10,9 +10,12 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
-func runScheduler(host *hosts.Host, schedulerService v3.SchedulerService) error {
+func runScheduler(host *hosts.Host, schedulerService v3.SchedulerService, df hosts.DialerFactory) error {
 	imageCfg, hostCfg := buildSchedulerConfig(host, schedulerService)
-	return docker.DoRunContainer(host.DClient, imageCfg, hostCfg, SchedulerContainerName, host.Address, ControlRole)
+	if err := docker.DoRunContainer(host.DClient, imageCfg, hostCfg, SchedulerContainerName, host.Address, ControlRole); err != nil {
+		return err
+	}
+	return runHealthcheck(host, SchedulerPort, false, SchedulerContainerName, df)
 }
 
 func removeScheduler(host *hosts.Host) error {

@@ -10,9 +10,12 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
-func runKubeController(host *hosts.Host, kubeControllerService v3.KubeControllerService, authorizationMode string) error {
+func runKubeController(host *hosts.Host, kubeControllerService v3.KubeControllerService, authorizationMode string, df hosts.DialerFactory) error {
 	imageCfg, hostCfg := buildKubeControllerConfig(kubeControllerService, authorizationMode)
-	return docker.DoRunContainer(host.DClient, imageCfg, hostCfg, KubeControllerContainerName, host.Address, ControlRole)
+	if err := docker.DoRunContainer(host.DClient, imageCfg, hostCfg, KubeControllerContainerName, host.Address, ControlRole); err != nil {
+		return err
+	}
+	return runHealthcheck(host, KubeControllerPort, false, KubeControllerContainerName, df)
 }
 
 func removeKubeController(host *hosts.Host) error {

@@ -10,9 +10,12 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
-func runKubeproxy(host *hosts.Host, kubeproxyService v3.KubeproxyService) error {
+func runKubeproxy(host *hosts.Host, kubeproxyService v3.KubeproxyService, df hosts.DialerFactory) error {
 	imageCfg, hostCfg := buildKubeproxyConfig(host, kubeproxyService)
-	return docker.DoRunContainer(host.DClient, imageCfg, hostCfg, KubeproxyContainerName, host.Address, WorkerRole)
+	if err := docker.DoRunContainer(host.DClient, imageCfg, hostCfg, KubeproxyContainerName, host.Address, WorkerRole); err != nil {
+		return err
+	}
+	return runHealthcheck(host, KubeproxyPort, false, KubeproxyContainerName, df)
 }
 
 func removeKubeproxy(host *hosts.Host) error {

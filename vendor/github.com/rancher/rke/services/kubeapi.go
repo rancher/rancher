@@ -11,10 +11,13 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
-func runKubeAPI(host *hosts.Host, etcdHosts []*hosts.Host, kubeAPIService v3.KubeAPIService, authorizationMode string) error {
+func runKubeAPI(host *hosts.Host, etcdHosts []*hosts.Host, kubeAPIService v3.KubeAPIService, authorizationMode string, df hosts.DialerFactory) error {
 	etcdConnString := GetEtcdConnString(etcdHosts)
 	imageCfg, hostCfg := buildKubeAPIConfig(host, kubeAPIService, etcdConnString, authorizationMode)
-	return docker.DoRunContainer(host.DClient, imageCfg, hostCfg, KubeAPIContainerName, host.Address, ControlRole)
+	if err := docker.DoRunContainer(host.DClient, imageCfg, hostCfg, KubeAPIContainerName, host.Address, ControlRole); err != nil {
+		return err
+	}
+	return runHealthcheck(host, KubeAPIPort, false, KubeAPIContainerName, df)
 }
 
 func removeKubeAPI(host *hosts.Host) error {
@@ -46,6 +49,9 @@ func buildKubeAPIConfig(host *hosts.Host, kubeAPIService v3.KubeAPIService, etcd
 	}
 	if authorizationMode == RBACAuthorizationMode {
 		imageCfg.Cmd = append(imageCfg.Cmd, "--authorization-mode=RBAC")
+	}
+	if kubeAPIService.PodSecurityPolicy {
+		imageCfg.Cmd = append(imageCfg.Cmd, "--runtime-config=extensions/v1beta1/podsecuritypolicy=true", "--admission-control=PodSecurityPolicy")
 	}
 	hostCfg := &container.HostConfig{
 		VolumesFrom: []string{

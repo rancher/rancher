@@ -16,6 +16,7 @@ import (
 type Host struct {
 	v3.RKEConfigNode
 	DClient             *client.Client
+	HealthcheckPort     int
 	IsControl           bool
 	IsWorker            bool
 	IgnoreDockerVersion bool

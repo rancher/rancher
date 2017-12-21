@@ -260,6 +260,16 @@ func getServiceConfig(reader *bufio.Reader) (*v3.RKEConfigServices, error) {
 	servicesConfig.KubeAPI.ServiceClusterIPRange = serviceClusterIPRange
 	servicesConfig.KubeController.ServiceClusterIPRange = serviceClusterIPRange
 
+	podSecurityPolicy, err := getConfig(reader, "Enable PodSecurityPolicy", "n")
+	if err != nil {
+		return nil, err
+	}
+	if podSecurityPolicy == "y" || podSecurityPolicy == "Y" {
+		servicesConfig.KubeAPI.PodSecurityPolicy = true
+	} else {
+		servicesConfig.KubeAPI.PodSecurityPolicy = false
+	}
+
 	clusterNetworkCidr, err := getConfig(reader, "Cluster Network CIDR", cluster.DefaultClusterCIDR)
 	if err != nil {
 		return nil, err

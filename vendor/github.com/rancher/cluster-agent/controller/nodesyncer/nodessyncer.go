@@ -95,7 +95,7 @@ func (n *NodeSyncer) createOrUpdateClusterNode(node *v1.Node) error {
 		}
 		logrus.Infof("Created cluster node [%s]", node.Name)
 	} else {
-		logrus.Infof("Updating cluster node [%s]", node.Name)
+		logrus.Debugf("Updating cluster node [%s]", node.Name)
 		clusterNode.ResourceVersion = existing.ResourceVersion
 		clusterNode.Name = existing.Name
 		clusterNode.Status.Requested = existing.Status.Requested
@@ -104,7 +104,7 @@ func (n *NodeSyncer) createOrUpdateClusterNode(node *v1.Node) error {
 		if err != nil {
 			return fmt.Errorf("Failed to update cluster node [%s] %v", node.Name, err)
 		}
-		logrus.Infof("Updated cluster node [%s]", node.Name)
+		logrus.Debugf("Updated cluster node [%s]", node.Name)
 	}
 	return nil
 }

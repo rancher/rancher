@@ -45,7 +45,7 @@ func Register(ctx context.Context, cluster *config.ClusterContext) {
 func (s *StatSyncer) syncResources(ctx context.Context, syncInterval time.Duration) {
 	for range utils.TickerContext(ctx, syncInterval) {
 		err := s.syncClusterNodeResources()
-		logrus.Info("Syncing allocated resources")
+		logrus.Debugf("Syncing allocated resources for cluster [%s]", s.clusterName)
 		if err != nil {
 			logrus.Warn(err)
 		}

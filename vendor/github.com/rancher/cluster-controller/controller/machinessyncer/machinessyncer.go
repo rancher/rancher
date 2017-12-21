@@ -49,9 +49,13 @@ func (s *Syncer) addToClusterConfig(machine *v3.Machine) error {
 	if clusterName == "" {
 		return nil
 	}
+	if machine.Spec.MachineTemplateName == "" {
+		// regular, non machine provisioned host
+		return nil
+	}
 
 	if machine.Status.NodeConfig == nil {
-		logrus.Infof("Machine node [%s] for cluster [%s] is not provisioned yet", machine.Name, clusterName)
+		logrus.Debugf("Machine node [%s] for cluster [%s] is not provisioned yet", machine.Name, clusterName)
 		return nil
 	}
 

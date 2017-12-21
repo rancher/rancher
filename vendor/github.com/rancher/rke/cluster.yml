@@ -1,5 +1,4 @@
 ---
-
 auth:
   strategy: x509
   options:
@@ -21,10 +20,8 @@ network:
 
 ssh_key_path: ~/.ssh/test
 ignore_docker_version: false
-
 # Kubernetes authorization mode; currently only `rbac` is supported and enabled by default.
 # Use `mode: none` to disable authorization
-
 authorization:
   mode: rbac
   options:
@@ -53,6 +50,7 @@ services:
   kube-api:
     image: rancher/k8s:v1.8.3-rancher2
     service_cluster_ip_range: 10.233.0.0/18
+    pod_security_policy: false
     extra_args:
       v: 4
   kube-controller:
