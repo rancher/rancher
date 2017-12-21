@@ -10,9 +10,12 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
-func runKubelet(host *hosts.Host, kubeletService v3.KubeletService) error {
+func runKubelet(host *hosts.Host, kubeletService v3.KubeletService, df hosts.DialerFactory) error {
 	imageCfg, hostCfg := buildKubeletConfig(host, kubeletService)
-	return docker.DoRunContainer(host.DClient, imageCfg, hostCfg, KubeletContainerName, host.Address, WorkerRole)
+	if err := docker.DoRunContainer(host.DClient, imageCfg, hostCfg, KubeletContainerName, host.Address, WorkerRole); err != nil {
+		return err
+	}
+	return runHealthcheck(host, KubeletPort, true, KubeletContainerName, df)
 }
 
 func removeKubelet(host *hosts.Host) error {
@@ -66,7 +69,10 @@ func buildKubeletConfig(host *hosts.Host, kubeletService v3.KubeletService) (*co
 			"/var/lib/kubelet:/var/lib/kubelet:shared",
 			"/var/run:/var/run:rw",
 			"/run:/run",
-			"/dev:/host/dev"},
+			"/etc/ceph:/etc/ceph",
+			"/dev:/host/dev",
+			"/var/log/containers:/var/log/containers",
+			"/var/log/pods:/var/log/pods"},
 		NetworkMode:   "host",
 		PidMode:       "host",
 		Privileged:    true,

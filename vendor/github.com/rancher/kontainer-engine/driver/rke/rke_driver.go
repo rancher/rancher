@@ -79,7 +79,7 @@ func (d *Driver) Create() error {
 	if err != nil {
 		return err
 	}
-	APIURL, caCrt, clientCert, clientKey, err := cmd.ClusterUp(&rkeConfig, nil)
+	APIURL, caCrt, clientCert, clientKey, err := cmd.ClusterUp(&rkeConfig, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -96,7 +96,7 @@ func (d *Driver) Update() error {
 	if err != nil {
 		return err
 	}
-	APIURL, caCrt, clientCert, clientKey, err := cmd.ClusterUp(&rkeConfig, nil)
+	APIURL, caCrt, clientCert, clientKey, err := cmd.ClusterUp(&rkeConfig, nil, nil)
 	if err != nil {
 		return err
 	}

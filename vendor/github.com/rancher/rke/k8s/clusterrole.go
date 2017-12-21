@@ -32,3 +32,32 @@ func UpdateClusterRoleBindingFromYaml(k8sClient *kubernetes.Clientset, clusterRo
 	}
 	return err
 }
+
+func UpdateClusterRoleFromYaml(k8sClient *kubernetes.Clientset, clusterRoleYaml string) error {
+	clusterRole := rbacv1.ClusterRole{}
+	err := decodeYamlResource(&clusterRole, clusterRoleYaml)
+	if err != nil {
+		return err
+	}
+
+	for retries := 0; retries <= 5; retries++ {
+		if err = updateClusterRole(k8sClient, clusterRole); err != nil {
+			time.Sleep(time.Second * 5)
+			continue
+		}
+		return nil
+	}
+	return err
+}
+
+func updateClusterRole(k8sClient *kubernetes.Clientset, cr rbacv1.ClusterRole) error {
+	if _, err := k8sClient.RbacV1().ClusterRoles().Create(&cr); err != nil {
+		if !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+		if _, err := k8sClient.RbacV1().ClusterRoles().Update(&cr); err != nil {
+			return err
+		}
+	}
+	return nil
+}

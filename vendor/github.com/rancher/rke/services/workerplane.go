@@ -6,7 +6,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func RunWorkerPlane(controlHosts, workerHosts []*hosts.Host, workerServices v3.RKEConfigServices, nginxProxyImage, sidekickImage string) error {
+func RunWorkerPlane(controlHosts, workerHosts []*hosts.Host, workerServices v3.RKEConfigServices, nginxProxyImage, sidekickImage string, healthcheckDialerFactory hosts.DialerFactory) error {
 	logrus.Infof("[%s] Building up Worker Plane..", WorkerRole)
 	for _, host := range controlHosts {
 		// run sidekick
@@ -15,10 +15,10 @@ func RunWorkerPlane(controlHosts, workerHosts []*hosts.Host, workerServices v3.R
 		}
 		// run kubelet
 		// only one master for now
-		if err := runKubelet(host, workerServices.Kubelet); err != nil {
+		if err := runKubelet(host, workerServices.Kubelet, healthcheckDialerFactory); err != nil {
 			return err
 		}
-		if err := runKubeproxy(host, workerServices.Kubeproxy); err != nil {
+		if err := runKubeproxy(host, workerServices.Kubeproxy, healthcheckDialerFactory); err != nil {
 			return err
 		}
 	}
@@ -34,11 +34,11 @@ func RunWorkerPlane(controlHosts, workerHosts []*hosts.Host, workerServices v3.R
 			return err
 		}
 		// run kubelet
-		if err := runKubelet(host, workerServices.Kubelet); err != nil {
+		if err := runKubelet(host, workerServices.Kubelet, healthcheckDialerFactory); err != nil {
 			return err
 		}
 		// run kubeproxy
-		if err := runKubeproxy(host, workerServices.Kubeproxy); err != nil {
+		if err := runKubeproxy(host, workerServices.Kubeproxy, healthcheckDialerFactory); err != nil {
 			return err
 		}
 	}
