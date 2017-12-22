@@ -23,8 +23,9 @@ type GlobalRole struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Rules   []rbacv1.PolicyRule `json:"rules,omitempty"`
-	Builtin bool                `json:"builtin"`
+	DisplayName string              `json:"displayName,omitempty" norman:"required"`
+	Rules       []rbacv1.PolicyRule `json:"rules,omitempty"`
+	Builtin     bool                `json:"builtin"`
 }
 
 type GlobalRoleBinding struct {
@@ -39,6 +40,7 @@ type RoleTemplate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
+	DisplayName       string              `json:"displayName,omitempty" norman:"required"`
 	Rules             []rbacv1.PolicyRule `json:"rules,omitempty"`
 	Builtin           bool                `json:"builtin"`
 	External          bool                `json:"external"`

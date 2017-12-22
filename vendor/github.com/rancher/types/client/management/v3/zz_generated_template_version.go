@@ -8,6 +8,7 @@ const (
 	TemplateVersionType                       = "templateVersion"
 	TemplateVersionFieldAnnotations           = "annotations"
 	TemplateVersionFieldCreated               = "created"
+	TemplateVersionFieldExternalID            = "externalId"
 	TemplateVersionFieldFiles                 = "files"
 	TemplateVersionFieldFinalizers            = "finalizers"
 	TemplateVersionFieldLabels                = "labels"
@@ -34,6 +35,7 @@ type TemplateVersion struct {
 	types.Resource
 	Annotations           map[string]string      `json:"annotations,omitempty"`
 	Created               string                 `json:"created,omitempty"`
+	ExternalID            string                 `json:"externalId,omitempty"`
 	Files                 []File                 `json:"files,omitempty"`
 	Finalizers            []string               `json:"finalizers,omitempty"`
 	Labels                map[string]string      `json:"labels,omitempty"`

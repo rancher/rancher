@@ -2,6 +2,7 @@ package client
 
 const (
 	TemplateVersionSpecType                       = "templateVersionSpec"
+	TemplateVersionSpecFieldExternalID            = "externalId"
 	TemplateVersionSpecFieldFiles                 = "files"
 	TemplateVersionSpecFieldMaximumRancherVersion = "maximumRancherVersion"
 	TemplateVersionSpecFieldMinimumRancherVersion = "minimumRancherVersion"
@@ -14,6 +15,7 @@ const (
 )
 
 type TemplateVersionSpec struct {
+	ExternalID            string            `json:"externalId,omitempty"`
 	Files                 []File            `json:"files,omitempty"`
 	MaximumRancherVersion string            `json:"maximumRancherVersion,omitempty"`
 	MinimumRancherVersion string            `json:"minimumRancherVersion,omitempty"`
