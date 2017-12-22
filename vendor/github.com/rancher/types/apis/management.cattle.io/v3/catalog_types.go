@@ -77,6 +77,7 @@ type TemplateVersion struct {
 }
 
 type TemplateVersionSpec struct {
+	ExternalID            string            `json:"externalId,omitempty"`
 	Revision              *int              `json:"revision,omitempty"`
 	Version               string            `json:"version,omitempty"`
 	MinimumRancherVersion string            `json:"minimumRancherVersion,omitempty" yaml:"minimum_rancher_version,omitempty"`
