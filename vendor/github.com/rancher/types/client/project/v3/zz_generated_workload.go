@@ -32,7 +32,6 @@ const (
 	WorkloadFieldProjectID                     = "projectId"
 	WorkloadFieldPullSecrets                   = "pullSecrets"
 	WorkloadFieldRemoved                       = "removed"
-	WorkloadFieldResourcePath                  = "resourcePath"
 	WorkloadFieldRestart                       = "restart"
 	WorkloadFieldRunAsNonRoot                  = "runAsNonRoot"
 	WorkloadFieldScale                         = "scale"
@@ -44,7 +43,6 @@ const (
 	WorkloadFieldStatus                        = "status"
 	WorkloadFieldSubdomain                     = "subdomain"
 	WorkloadFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
-	WorkloadFieldTolerations                   = "tolerations"
 	WorkloadFieldTransitioning                 = "transitioning"
 	WorkloadFieldTransitioningMessage          = "transitioningMessage"
 	WorkloadFieldUid                           = "uid"
@@ -82,7 +80,6 @@ type Workload struct {
 	ProjectID                     string                 `json:"projectId,omitempty"`
 	PullSecrets                   []LocalObjectReference `json:"pullSecrets,omitempty"`
 	Removed                       string                 `json:"removed,omitempty"`
-	ResourcePath                  string                 `json:"resourcePath,omitempty"`
 	Restart                       string                 `json:"restart,omitempty"`
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty"`
 	Scale                         *int64                 `json:"scale,omitempty"`
@@ -94,7 +91,6 @@ type Workload struct {
 	Status                        *WorkloadStatus        `json:"status,omitempty"`
 	Subdomain                     string                 `json:"subdomain,omitempty"`
 	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty"`
-	Tolerations                   []Toleration           `json:"tolerations,omitempty"`
 	Transitioning                 string                 `json:"transitioning,omitempty"`
 	TransitioningMessage          string                 `json:"transitioningMessage,omitempty"`
 	Uid                           *int64                 `json:"uid,omitempty"`

@@ -17,7 +17,6 @@ const (
 	RoleTemplateFieldName            = "name"
 	RoleTemplateFieldOwnerReferences = "ownerReferences"
 	RoleTemplateFieldRemoved         = "removed"
-	RoleTemplateFieldResourcePath    = "resourcePath"
 	RoleTemplateFieldRoleTemplateIds = "roleTemplateIds"
 	RoleTemplateFieldRules           = "rules"
 	RoleTemplateFieldUuid            = "uuid"
@@ -36,7 +35,6 @@ type RoleTemplate struct {
 	Name            string            `json:"name,omitempty"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
 	Removed         string            `json:"removed,omitempty"`
-	ResourcePath    string            `json:"resourcePath,omitempty"`
 	RoleTemplateIds []string          `json:"roleTemplateIds,omitempty"`
 	Rules           []PolicyRule      `json:"rules,omitempty"`
 	Uuid            string            `json:"uuid,omitempty"`

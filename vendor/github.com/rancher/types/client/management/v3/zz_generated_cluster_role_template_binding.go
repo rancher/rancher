@@ -14,7 +14,6 @@ const (
 	ClusterRoleTemplateBindingFieldName             = "name"
 	ClusterRoleTemplateBindingFieldOwnerReferences  = "ownerReferences"
 	ClusterRoleTemplateBindingFieldRemoved          = "removed"
-	ClusterRoleTemplateBindingFieldResourcePath     = "resourcePath"
 	ClusterRoleTemplateBindingFieldRoleTemplateId   = "roleTemplateId"
 	ClusterRoleTemplateBindingFieldSubjectKind      = "subjectKind"
 	ClusterRoleTemplateBindingFieldSubjectName      = "subjectName"
@@ -32,7 +31,6 @@ type ClusterRoleTemplateBinding struct {
 	Name             string            `json:"name,omitempty"`
 	OwnerReferences  []OwnerReference  `json:"ownerReferences,omitempty"`
 	Removed          string            `json:"removed,omitempty"`
-	ResourcePath     string            `json:"resourcePath,omitempty"`
 	RoleTemplateId   string            `json:"roleTemplateId,omitempty"`
 	SubjectKind      string            `json:"subjectKind,omitempty"`
 	SubjectName      string            `json:"subjectName,omitempty"`

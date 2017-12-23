@@ -28,7 +28,6 @@ const (
 	ClusterFieldRancherKubernetesEngineConfig       = "rancherKubernetesEngineConfig"
 	ClusterFieldRemoved                             = "removed"
 	ClusterFieldRequested                           = "requested"
-	ClusterFieldResourcePath                        = "resourcePath"
 	ClusterFieldServiceAccountToken                 = "serviceAccountToken"
 	ClusterFieldState                               = "state"
 	ClusterFieldTransitioning                       = "transitioning"
@@ -60,7 +59,6 @@ type Cluster struct {
 	RancherKubernetesEngineConfig       *RancherKubernetesEngineConfig `json:"rancherKubernetesEngineConfig,omitempty"`
 	Removed                             string                         `json:"removed,omitempty"`
 	Requested                           map[string]string              `json:"requested,omitempty"`
-	ResourcePath                        string                         `json:"resourcePath,omitempty"`
 	ServiceAccountToken                 string                         `json:"serviceAccountToken,omitempty"`
 	State                               string                         `json:"state,omitempty"`
 	Transitioning                       string                         `json:"transitioning,omitempty"`

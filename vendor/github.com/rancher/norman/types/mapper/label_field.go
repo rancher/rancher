@@ -24,5 +24,5 @@ func (e LabelField) ToInternal(data map[string]interface{}) {
 }
 
 func (e LabelField) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {
-	return validateField(e.Field, schema)
+	return ValidateField(e.Field, schema)
 }

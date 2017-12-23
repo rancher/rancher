@@ -7,6 +7,14 @@ import (
 type Client struct {
 	clientbase.APIBaseClient
 
+	Secret                SecretOperations
+	ServiceAccountToken   ServiceAccountTokenOperations
+	DockerCredential      DockerCredentialOperations
+	Certificate           CertificateOperations
+	BasicAuth             BasicAuthOperations
+	SSHAuth               SSHAuthOperations
+	Service               ServiceOperations
+	Endpoint              EndpointOperations
 	Namespace             NamespaceOperations
 	Pod                   PodOperations
 	Deployment            DeploymentOperations
@@ -28,6 +36,14 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 		APIBaseClient: baseClient,
 	}
 
+	client.Secret = newSecretClient(client)
+	client.ServiceAccountToken = newServiceAccountTokenClient(client)
+	client.DockerCredential = newDockerCredentialClient(client)
+	client.Certificate = newCertificateClient(client)
+	client.BasicAuth = newBasicAuthClient(client)
+	client.SSHAuth = newSSHAuthClient(client)
+	client.Service = newServiceClient(client)
+	client.Endpoint = newEndpointClient(client)
 	client.Namespace = newNamespaceClient(client)
 	client.Pod = newPodClient(client)
 	client.Deployment = newDeploymentClient(client)

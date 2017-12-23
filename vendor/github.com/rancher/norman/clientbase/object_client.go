@@ -9,6 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
@@ -206,6 +207,27 @@ func (p *ObjectClient) DeleteCollection(deleteOptions *metav1.DeleteOptions, lis
 		Body(deleteOptions).
 		Do().
 		Error()
+}
+
+func (p *ObjectClient) Patch(name string, o runtime.Object, data []byte, subresources ...string) (runtime.Object, error) {
+	ns := p.ns
+	if obj, ok := o.(metav1.Object); ok && obj.GetNamespace() != "" {
+		ns = obj.GetNamespace()
+	}
+	result := p.Factory.Object()
+	if len(name) == 0 {
+		return result, errors.New("object missing name")
+	}
+	err := p.restClient.Patch(types.StrategicMergePatchType).
+		Prefix(p.getAPIPrefix(), p.gvk.Group, p.gvk.Version).
+		NamespaceIfScoped(ns, p.resource.Namespaced).
+		Resource(p.resource.Name).
+		SubResource(subresources...).
+		Name(name).
+		Body(data).
+		Do().
+		Into(result)
+	return result, err
 }
 
 type dynamicDecoder struct {

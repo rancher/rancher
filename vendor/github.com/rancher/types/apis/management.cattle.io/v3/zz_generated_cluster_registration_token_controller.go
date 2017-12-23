@@ -190,6 +190,12 @@ func (s *clusterRegistrationTokenClient) Watch(opts metav1.ListOptions) (watch.I
 	return s.objectClient.Watch(opts)
 }
 
+// Patch applies the patch and returns the patched deployment.
+func (s *clusterRegistrationTokenClient) Patch(o *ClusterRegistrationToken, data []byte, subresources ...string) (*ClusterRegistrationToken, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+	return obj.(*ClusterRegistrationToken), err
+}
+
 func (s *clusterRegistrationTokenClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }

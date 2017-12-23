@@ -26,7 +26,6 @@ const (
 	MachineTemplateFieldName                     = "name"
 	MachineTemplateFieldOwnerReferences          = "ownerReferences"
 	MachineTemplateFieldRemoved                  = "removed"
-	MachineTemplateFieldResourcePath             = "resourcePath"
 	MachineTemplateFieldState                    = "state"
 	MachineTemplateFieldStatus                   = "status"
 	MachineTemplateFieldTransitioning            = "transitioning"
@@ -56,7 +55,6 @@ type MachineTemplate struct {
 	Name                     string                 `json:"name,omitempty"`
 	OwnerReferences          []OwnerReference       `json:"ownerReferences,omitempty"`
 	Removed                  string                 `json:"removed,omitempty"`
-	ResourcePath             string                 `json:"resourcePath,omitempty"`
 	State                    string                 `json:"state,omitempty"`
 	Status                   *MachineTemplateStatus `json:"status,omitempty"`
 	Transitioning            string                 `json:"transitioning,omitempty"`

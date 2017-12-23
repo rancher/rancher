@@ -33,6 +33,16 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	// TODO this gets cleaned up when the types are fixed
 	scheme.AddKnownTypes(SchemeGroupVersion,
 
+		&ServiceAccountToken{},
+		&ServiceAccountTokenList{},
+		&DockerCredential{},
+		&DockerCredentialList{},
+		&Certificate{},
+		&CertificateList{},
+		&BasicAuth{},
+		&BasicAuthList{},
+		&SSHAuth{},
+		&SSHAuthList{},
 		&Workload{},
 		&WorkloadList{},
 	)

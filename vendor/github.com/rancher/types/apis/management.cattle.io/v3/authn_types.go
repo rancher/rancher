@@ -28,6 +28,7 @@ type User struct {
 	Password           string   `json:"password,omitempty" norman:"writeOnly,noupdate"`
 	MustChangePassword bool     `json:"mustChangePassword,omitempty"`
 	PrincipalIDs       []string `json:"principalIds,omitempty" norman:"type=array[reference[Principal]]"`
+	Me                 bool     `json:"me,omitempty"`
 }
 
 type Group struct {

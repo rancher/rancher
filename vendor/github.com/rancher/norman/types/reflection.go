@@ -26,13 +26,25 @@ var (
 	}
 )
 
+func (s *Schemas) TypeName(name string, obj interface{}) *Schemas {
+	s.typeNames[reflect.TypeOf(obj)] = name
+	return s
+}
+
+func (s *Schemas) getTypeName(t reflect.Type) string {
+	if name, ok := s.typeNames[t]; ok {
+		return name
+	}
+	return convert.LowerTitle(t.Name())
+}
+
 func (s *Schemas) AddMapperForType(version *APIVersion, obj interface{}, mapper ...Mapper) *Schemas {
 	if len(mapper) == 0 {
 		return s
 	}
 
 	t := reflect.TypeOf(obj)
-	typeName := convert.LowerTitle(t.Name())
+	typeName := s.getTypeName(t)
 	if len(mapper) == 1 {
 		return s.AddMapper(version, typeName, mapper[0])
 	}
@@ -111,7 +123,7 @@ func (s *Schemas) setupFilters(schema *Schema) {
 }
 
 func (s *Schemas) MustCustomizeType(version *APIVersion, obj interface{}, f func(*Schema)) *Schemas {
-	name := convert.LowerTitle(reflect.TypeOf(obj).Name())
+	name := s.getTypeName(reflect.TypeOf(obj))
 	schema := s.Schema(version, name)
 	if schema == nil {
 		panic("Failed to find schema " + name)
@@ -127,7 +139,7 @@ func (s *Schemas) MustCustomizeType(version *APIVersion, obj interface{}, f func
 }
 
 func (s *Schemas) importType(version *APIVersion, t reflect.Type, overrides ...reflect.Type) (*Schema, error) {
-	typeName := convert.LowerTitle(t.Name())
+	typeName := s.getTypeName(t)
 
 	existing := s.Schema(version, typeName)
 	if existing != nil {
@@ -167,6 +179,7 @@ func (s *Schemas) importType(version *APIVersion, t reflect.Type, overrides ...r
 
 	mapper := &typeMapper{
 		Mappers: mappers,
+		root:    schema.CanList(),
 	}
 
 	if err := mapper.ModifySchema(schema, s); err != nil {
@@ -376,6 +389,8 @@ func getKeyValue(input string) (string, string) {
 
 func (s *Schemas) determineSchemaType(version *APIVersion, t reflect.Type) (string, error) {
 	switch t.Kind() {
+	case reflect.Uint8:
+		return "byte", nil
 	case reflect.Bool:
 		return "boolean", nil
 	case reflect.Int:
@@ -396,6 +411,9 @@ func (s *Schemas) determineSchemaType(version *APIVersion, t reflect.Type) (stri
 		subType, err := s.determineSchemaType(version, t.Elem())
 		if err != nil {
 			return "", err
+		}
+		if subType == "byte" {
+			return "base64", nil
 		}
 		return fmt.Sprintf("array[%s]", subType), nil
 	case reflect.String:

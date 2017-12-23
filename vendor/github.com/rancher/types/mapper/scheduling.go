@@ -26,7 +26,7 @@ func (s SchedulingMapper) FromInternal(data map[string]interface{}) {
 		delete(data, "affinity")
 	}()
 
-	requireAll := []string{}
+	var requireAll []string
 	for key, value := range convert.ToMapInterface(data["nodeSelector"]) {
 		if value == "" {
 			requireAll = append(requireAll, key)
@@ -55,7 +55,7 @@ func (s SchedulingMapper) FromInternal(data map[string]interface{}) {
 }
 
 func (s SchedulingMapper) nodeAffinity(data map[string]interface{}, nodeAffinity *v1.NodeAffinity) {
-	requireAll := []string{}
+	var requireAll []string
 	requireAny := []string{}
 	preferred := []string{}
 
@@ -197,7 +197,7 @@ func (s SchedulingMapper) ToInternal(data map[string]interface{}) {
 		delete(data, "scheduling")
 	}()
 
-	nodeName := convert.ToString(values.GetValueN(data, "scheduling", "node", "name"))
+	nodeName := convert.ToString(values.GetValueN(data, "scheduling", "node", "nodeId"))
 	if nodeName != "" {
 		data["nodeName"] = nodeName
 	}

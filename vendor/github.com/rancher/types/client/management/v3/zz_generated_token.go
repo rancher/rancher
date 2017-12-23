@@ -19,7 +19,6 @@ const (
 	TokenFieldOwnerReferences = "ownerReferences"
 	TokenFieldProviderInfo    = "providerInfo"
 	TokenFieldRemoved         = "removed"
-	TokenFieldResourcePath    = "resourcePath"
 	TokenFieldTTLMillis       = "ttl"
 	TokenFieldUserID          = "userId"
 	TokenFieldUserPrincipal   = "userPrincipal"
@@ -41,7 +40,6 @@ type Token struct {
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
 	ProviderInfo    map[string]string `json:"providerInfo,omitempty"`
 	Removed         string            `json:"removed,omitempty"`
-	ResourcePath    string            `json:"resourcePath,omitempty"`
 	TTLMillis       *int64            `json:"ttl,omitempty"`
 	UserID          string            `json:"userId,omitempty"`
 	UserPrincipal   string            `json:"userPrincipal,omitempty"`

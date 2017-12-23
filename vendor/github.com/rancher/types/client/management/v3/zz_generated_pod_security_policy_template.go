@@ -26,7 +26,6 @@ const (
 	PodSecurityPolicyTemplateFieldReadOnlyRootFilesystem          = "readOnlyRootFilesystem"
 	PodSecurityPolicyTemplateFieldRemoved                         = "removed"
 	PodSecurityPolicyTemplateFieldRequiredDropCapabilities        = "requiredDropCapabilities"
-	PodSecurityPolicyTemplateFieldResourcePath                    = "resourcePath"
 	PodSecurityPolicyTemplateFieldRunAsUser                       = "runAsUser"
 	PodSecurityPolicyTemplateFieldSELinux                         = "seLinux"
 	PodSecurityPolicyTemplateFieldSupplementalGroups              = "supplementalGroups"
@@ -56,7 +55,6 @@ type PodSecurityPolicyTemplate struct {
 	ReadOnlyRootFilesystem          *bool                              `json:"readOnlyRootFilesystem,omitempty"`
 	Removed                         string                             `json:"removed,omitempty"`
 	RequiredDropCapabilities        []string                           `json:"requiredDropCapabilities,omitempty"`
-	ResourcePath                    string                             `json:"resourcePath,omitempty"`
 	RunAsUser                       *RunAsUserStrategyOptions          `json:"runAsUser,omitempty"`
 	SELinux                         *SELinuxStrategyOptions            `json:"seLinux,omitempty"`
 	SupplementalGroups              *SupplementalGroupsStrategyOptions `json:"supplementalGroups,omitempty"`

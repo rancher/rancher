@@ -29,7 +29,6 @@ const (
 	WorkloadSpecFieldServiceLinks                  = "serviceLinks"
 	WorkloadSpecFieldSubdomain                     = "subdomain"
 	WorkloadSpecFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
-	WorkloadSpecFieldTolerations                   = "tolerations"
 	WorkloadSpecFieldUid                           = "uid"
 	WorkloadSpecFieldVolumes                       = "volumes"
 )
@@ -62,7 +61,6 @@ type WorkloadSpec struct {
 	ServiceLinks                  []Link                 `json:"serviceLinks,omitempty"`
 	Subdomain                     string                 `json:"subdomain,omitempty"`
 	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty"`
-	Tolerations                   []Toleration           `json:"tolerations,omitempty"`
 	Uid                           *int64                 `json:"uid,omitempty"`
 	Volumes                       map[string]Volume      `json:"volumes,omitempty"`
 }

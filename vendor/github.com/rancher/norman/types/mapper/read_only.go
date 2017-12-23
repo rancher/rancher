@@ -25,7 +25,7 @@ func (r ReadOnly) ModifySchema(schema *types.Schema, schemas *types.Schemas) err
 		return nil
 	}
 
-	if err := validateField(r.Field, schema); err != nil {
+	if err := ValidateField(r.Field, schema); err != nil {
 		if r.Optional {
 			return nil
 		}

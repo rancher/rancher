@@ -20,7 +20,6 @@ const (
 	PrincipalFieldProfilePicture  = "profilePicture"
 	PrincipalFieldProfileURL      = "profileURL"
 	PrincipalFieldRemoved         = "removed"
-	PrincipalFieldResourcePath    = "resourcePath"
 	PrincipalFieldUuid            = "uuid"
 )
 
@@ -40,7 +39,6 @@ type Principal struct {
 	ProfilePicture  string            `json:"profilePicture,omitempty"`
 	ProfileURL      string            `json:"profileURL,omitempty"`
 	Removed         string            `json:"removed,omitempty"`
-	ResourcePath    string            `json:"resourcePath,omitempty"`
 	Uuid            string            `json:"uuid,omitempty"`
 }
 type PrincipalCollection struct {

@@ -1,6 +1,8 @@
 package project
 
 import (
+	"strings"
+
 	"github.com/rancher/management-api/cluster"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
@@ -33,6 +35,12 @@ func clusterRouterLinkHandler(apiContext *types.APIContext, clusterManager *clus
 	handler := clusterManager.APIServer(apiContext.Request.Context(), cluster)
 	if handler == nil {
 		return httperror.NewAPIError(httperror.NotFound, "failed to find cluster")
+	}
+
+	parts := strings.SplitN(apiContext.Request.URL.Path, "/", 5)
+	if len(parts) > 4 {
+		parts[4] = strings.Replace(parts[4], "namespaced", "", 1)
+		apiContext.Request.URL.Path = strings.Join(parts, "/")
 	}
 
 	handler.ServeHTTP(apiContext.Response, apiContext.Request)

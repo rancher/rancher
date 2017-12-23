@@ -140,6 +140,7 @@ func (m *Manager) createTemplateVersions(versionsSpec []v3.TemplateVersionSpec, 
 				spec.UpgradeVersionLinks[versionSpec.Version] = fmt.Sprintf("%s-%s", template.Name, revision)
 			}
 		}
+		spec.ExternalID = fmt.Sprintf("catalog://?catalog=%s&base=%s&template=%s&version=%s", template.Spec.CatalogID, template.Spec.Base, template.Spec.FolderName, spec.Version)
 		templateVersion.Spec = spec
 		revision := spec.Version
 		if spec.Revision != nil {

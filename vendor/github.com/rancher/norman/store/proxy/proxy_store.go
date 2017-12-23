@@ -2,9 +2,8 @@ package proxy
 
 import (
 	ejson "encoding/json"
-	"strings"
-
 	"net/http"
+	"strings"
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"

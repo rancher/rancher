@@ -6,7 +6,7 @@ import (
 	"github.com/rancher/norman/types"
 )
 
-func validateField(field string, schema *types.Schema) error {
+func ValidateField(field string, schema *types.Schema) error {
 	if _, ok := schema.ResourceFields[field]; !ok {
 		return fmt.Errorf("field %s missing on schema %s", field, schema.ID)
 	}

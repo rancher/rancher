@@ -30,7 +30,6 @@ const (
 	DeploymentSpecFieldServiceAccountName            = "serviceAccountName"
 	DeploymentSpecFieldSubdomain                     = "subdomain"
 	DeploymentSpecFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
-	DeploymentSpecFieldTolerations                   = "tolerations"
 	DeploymentSpecFieldUid                           = "uid"
 	DeploymentSpecFieldVolumes                       = "volumes"
 )
@@ -64,7 +63,6 @@ type DeploymentSpec struct {
 	ServiceAccountName            string                 `json:"serviceAccountName,omitempty"`
 	Subdomain                     string                 `json:"subdomain,omitempty"`
 	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty"`
-	Tolerations                   []Toleration           `json:"tolerations,omitempty"`
 	Uid                           *int64                 `json:"uid,omitempty"`
 	Volumes                       map[string]Volume      `json:"volumes,omitempty"`
 }

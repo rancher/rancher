@@ -30,7 +30,6 @@ const (
 	PodFieldProjectID                     = "projectId"
 	PodFieldPullSecrets                   = "pullSecrets"
 	PodFieldRemoved                       = "removed"
-	PodFieldResourcePath                  = "resourcePath"
 	PodFieldRestart                       = "restart"
 	PodFieldRunAsNonRoot                  = "runAsNonRoot"
 	PodFieldSchedulerName                 = "schedulerName"
@@ -40,7 +39,6 @@ const (
 	PodFieldStatus                        = "status"
 	PodFieldSubdomain                     = "subdomain"
 	PodFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
-	PodFieldTolerations                   = "tolerations"
 	PodFieldTransitioning                 = "transitioning"
 	PodFieldTransitioningMessage          = "transitioningMessage"
 	PodFieldUid                           = "uid"
@@ -75,7 +73,6 @@ type Pod struct {
 	ProjectID                     string                 `json:"projectId,omitempty"`
 	PullSecrets                   []LocalObjectReference `json:"pullSecrets,omitempty"`
 	Removed                       string                 `json:"removed,omitempty"`
-	ResourcePath                  string                 `json:"resourcePath,omitempty"`
 	Restart                       string                 `json:"restart,omitempty"`
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty"`
 	SchedulerName                 string                 `json:"schedulerName,omitempty"`
@@ -85,7 +82,6 @@ type Pod struct {
 	Status                        *PodStatus             `json:"status,omitempty"`
 	Subdomain                     string                 `json:"subdomain,omitempty"`
 	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty"`
-	Tolerations                   []Toleration           `json:"tolerations,omitempty"`
 	Transitioning                 string                 `json:"transitioning,omitempty"`
 	TransitioningMessage          string                 `json:"transitioningMessage,omitempty"`
 	Uid                           *int64                 `json:"uid,omitempty"`

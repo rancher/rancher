@@ -21,34 +21,34 @@ func QueryOptions(apiContext *types.APIContext, schema *types.Schema) types.Quer
 
 	result := &types.QueryOptions{}
 
-	result.Sort = parseSort(schema, req)
-	result.Pagination = parsePagination(req)
-	result.Conditions = parseFilters(schema, req)
+	result.Sort = parseSort(schema, apiContext)
+	result.Pagination = parsePagination(apiContext)
+	result.Conditions = parseFilters(schema, apiContext)
 
 	return *result
 }
 
-func parseOrder(req *http.Request) types.SortOrder {
-	order := req.URL.Query().Get("order")
+func parseOrder(apiContext *types.APIContext) types.SortOrder {
+	order := apiContext.Query.Get("order")
 	if types.SortOrder(order) == types.DESC {
 		return types.DESC
 	}
 	return types.ASC
 }
 
-func parseSort(schema *types.Schema, req *http.Request) types.Sort {
-	sortField := req.URL.Query().Get("sort")
+func parseSort(schema *types.Schema, apiContext *types.APIContext) types.Sort {
+	sortField := apiContext.Query.Get("sort")
 	if _, ok := schema.CollectionFilters[sortField]; !ok {
 		sortField = ""
 	}
 	return types.Sort{
-		Order: parseOrder(req),
+		Order: parseOrder(apiContext),
 		Name:  sortField,
 	}
 }
 
-func parsePagination(req *http.Request) *types.Pagination {
-	q := req.URL.Query()
+func parsePagination(apiContext *types.APIContext) *types.Pagination {
+	q := apiContext.Query
 	limit := q.Get("limit")
 	marker := q.Get("marker")
 
@@ -86,9 +86,9 @@ func parseNameAndOp(value string) (string, types.ModifierType) {
 	return name, types.ModifierType(op)
 }
 
-func parseFilters(schema *types.Schema, req *http.Request) []*types.QueryCondition {
+func parseFilters(schema *types.Schema, apiContext *types.APIContext) []*types.QueryCondition {
 	var conditions []*types.QueryCondition
-	for key, values := range req.URL.Query() {
+	for key, values := range apiContext.Query {
 		name, op := parseNameAndOp(key)
 		filter, ok := schema.CollectionFilters[name]
 		if !ok {

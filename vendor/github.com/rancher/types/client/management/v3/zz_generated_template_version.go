@@ -19,7 +19,6 @@ const (
 	TemplateVersionFieldQuestions             = "questions"
 	TemplateVersionFieldReadme                = "readme"
 	TemplateVersionFieldRemoved               = "removed"
-	TemplateVersionFieldResourcePath          = "resourcePath"
 	TemplateVersionFieldRevision              = "revision"
 	TemplateVersionFieldState                 = "state"
 	TemplateVersionFieldStatus                = "status"
@@ -46,7 +45,6 @@ type TemplateVersion struct {
 	Questions             []Question             `json:"questions,omitempty"`
 	Readme                string                 `json:"readme,omitempty"`
 	Removed               string                 `json:"removed,omitempty"`
-	ResourcePath          string                 `json:"resourcePath,omitempty"`
 	Revision              *int64                 `json:"revision,omitempty"`
 	State                 string                 `json:"state,omitempty"`
 	Status                *TemplateVersionStatus `json:"status,omitempty"`

@@ -18,7 +18,7 @@ func (e Access) ToInternal(data map[string]interface{}) {
 
 func (e Access) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {
 	for name, access := range e.Fields {
-		if err := validateField(name, schema); err != nil {
+		if err := ValidateField(name, schema); err != nil {
 			return err
 		}
 

@@ -190,6 +190,12 @@ func (s *projectRoleTemplateBindingClient) Watch(opts metav1.ListOptions) (watch
 	return s.objectClient.Watch(opts)
 }
 
+// Patch applies the patch and returns the patched deployment.
+func (s *projectRoleTemplateBindingClient) Patch(o *ProjectRoleTemplateBinding, data []byte, subresources ...string) (*ProjectRoleTemplateBinding, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+	return obj.(*ProjectRoleTemplateBinding), err
+}
+
 func (s *projectRoleTemplateBindingClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }

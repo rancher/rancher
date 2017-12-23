@@ -3,8 +3,8 @@ package types
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"strings"
-
 	"sync"
 
 	"github.com/rancher/norman/name"
@@ -29,6 +29,7 @@ type BackReference struct {
 
 type Schemas struct {
 	sync.Mutex
+	typeNames           map[reflect.Type]string
 	schemasByPath       map[string]map[string]*Schema
 	schemasBySubContext map[string]*Schema
 	mappers             map[string]map[string][]Mapper
@@ -44,6 +45,7 @@ type Schemas struct {
 
 func NewSchemas() *Schemas {
 	return &Schemas{
+		typeNames:           map[reflect.Type]string{},
 		schemasByPath:       map[string]map[string]*Schema{},
 		schemasBySubContext: map[string]*Schema{},
 		mappers:             map[string]map[string][]Mapper{},

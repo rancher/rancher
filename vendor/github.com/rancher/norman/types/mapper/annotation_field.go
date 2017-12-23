@@ -9,8 +9,9 @@ import (
 )
 
 type AnnotationField struct {
-	Field  string
-	Object bool
+	Field            string
+	Object           bool
+	IgnoreDefinition bool
 }
 
 func (e AnnotationField) FromInternal(data map[string]interface{}) {
@@ -41,5 +42,8 @@ func (e AnnotationField) ToInternal(data map[string]interface{}) {
 }
 
 func (e AnnotationField) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {
-	return validateField(e.Field, schema)
+	if e.IgnoreDefinition {
+		return nil
+	}
+	return ValidateField(e.Field, schema)
 }

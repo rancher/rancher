@@ -190,6 +190,12 @@ func (s *globalRoleClient) Watch(opts metav1.ListOptions) (watch.Interface, erro
 	return s.objectClient.Watch(opts)
 }
 
+// Patch applies the patch and returns the patched deployment.
+func (s *globalRoleClient) Patch(o *GlobalRole, data []byte, subresources ...string) (*GlobalRole, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+	return obj.(*GlobalRole), err
+}
+
 func (s *globalRoleClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }

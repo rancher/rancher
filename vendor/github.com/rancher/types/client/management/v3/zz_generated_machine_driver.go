@@ -18,7 +18,6 @@ const (
 	MachineDriverFieldName                 = "name"
 	MachineDriverFieldOwnerReferences      = "ownerReferences"
 	MachineDriverFieldRemoved              = "removed"
-	MachineDriverFieldResourcePath         = "resourcePath"
 	MachineDriverFieldState                = "state"
 	MachineDriverFieldStatus               = "status"
 	MachineDriverFieldTransitioning        = "transitioning"
@@ -42,7 +41,6 @@ type MachineDriver struct {
 	Name                 string               `json:"name,omitempty"`
 	OwnerReferences      []OwnerReference     `json:"ownerReferences,omitempty"`
 	Removed              string               `json:"removed,omitempty"`
-	ResourcePath         string               `json:"resourcePath,omitempty"`
 	State                string               `json:"state,omitempty"`
 	Status               *MachineDriverStatus `json:"status,omitempty"`
 	Transitioning        string               `json:"transitioning,omitempty"`

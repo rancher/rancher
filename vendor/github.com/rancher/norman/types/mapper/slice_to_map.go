@@ -47,7 +47,7 @@ func (s SliceToMap) ToInternal(data map[string]interface{}) {
 }
 
 func (s SliceToMap) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {
-	err := validateField(s.Field, schema)
+	err := ValidateField(s.Field, schema)
 	if err != nil {
 		return err
 	}

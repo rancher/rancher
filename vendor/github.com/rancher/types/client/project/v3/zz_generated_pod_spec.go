@@ -24,7 +24,6 @@ const (
 	PodSpecFieldServiceAccountName            = "serviceAccountName"
 	PodSpecFieldSubdomain                     = "subdomain"
 	PodSpecFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
-	PodSpecFieldTolerations                   = "tolerations"
 	PodSpecFieldUid                           = "uid"
 	PodSpecFieldVolumes                       = "volumes"
 )
@@ -52,7 +51,6 @@ type PodSpec struct {
 	ServiceAccountName            string                 `json:"serviceAccountName,omitempty"`
 	Subdomain                     string                 `json:"subdomain,omitempty"`
 	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty"`
-	Tolerations                   []Toleration           `json:"tolerations,omitempty"`
 	Uid                           *int64                 `json:"uid,omitempty"`
 	Volumes                       map[string]Volume      `json:"volumes,omitempty"`
 }
