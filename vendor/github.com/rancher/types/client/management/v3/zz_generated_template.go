@@ -29,7 +29,6 @@ const (
 	TemplateFieldProjectURL               = "projectURL"
 	TemplateFieldReadme                   = "readme"
 	TemplateFieldRemoved                  = "removed"
-	TemplateFieldResourcePath             = "resourcePath"
 	TemplateFieldState                    = "state"
 	TemplateFieldStatus                   = "status"
 	TemplateFieldTransitioning            = "transitioning"
@@ -64,7 +63,6 @@ type Template struct {
 	ProjectURL               string                `json:"projectURL,omitempty"`
 	Readme                   string                `json:"readme,omitempty"`
 	Removed                  string                `json:"removed,omitempty"`
-	ResourcePath             string                `json:"resourcePath,omitempty"`
 	State                    string                `json:"state,omitempty"`
 	Status                   *TemplateStatus       `json:"status,omitempty"`
 	Transitioning            string                `json:"transitioning,omitempty"`

@@ -190,6 +190,12 @@ func (s *dynamicSchemaClient) Watch(opts metav1.ListOptions) (watch.Interface, e
 	return s.objectClient.Watch(opts)
 }
 
+// Patch applies the patch and returns the patched deployment.
+func (s *dynamicSchemaClient) Patch(o *DynamicSchema, data []byte, subresources ...string) (*DynamicSchema, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+	return obj.(*DynamicSchema), err
+}
+
 func (s *dynamicSchemaClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }

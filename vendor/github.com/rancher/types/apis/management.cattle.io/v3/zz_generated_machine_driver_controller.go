@@ -190,6 +190,12 @@ func (s *machineDriverClient) Watch(opts metav1.ListOptions) (watch.Interface, e
 	return s.objectClient.Watch(opts)
 }
 
+// Patch applies the patch and returns the patched deployment.
+func (s *machineDriverClient) Patch(o *MachineDriver, data []byte, subresources ...string) (*MachineDriver, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+	return obj.(*MachineDriver), err
+}
+
 func (s *machineDriverClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }

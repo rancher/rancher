@@ -15,7 +15,6 @@ const (
 	GroupMemberFieldOwnerReferences = "ownerReferences"
 	GroupMemberFieldPrincipalID     = "principalId"
 	GroupMemberFieldRemoved         = "removed"
-	GroupMemberFieldResourcePath    = "resourcePath"
 	GroupMemberFieldUuid            = "uuid"
 )
 
@@ -30,7 +29,6 @@ type GroupMember struct {
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
 	PrincipalID     string            `json:"principalId,omitempty"`
 	Removed         string            `json:"removed,omitempty"`
-	ResourcePath    string            `json:"resourcePath,omitempty"`
 	Uuid            string            `json:"uuid,omitempty"`
 }
 type GroupMemberCollection struct {

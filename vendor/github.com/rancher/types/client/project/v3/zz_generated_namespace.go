@@ -17,7 +17,6 @@ const (
 	NamespaceFieldProjectID            = "projectId"
 	NamespaceFieldPrune                = "prune"
 	NamespaceFieldRemoved              = "removed"
-	NamespaceFieldResourcePath         = "resourcePath"
 	NamespaceFieldState                = "state"
 	NamespaceFieldStatus               = "status"
 	NamespaceFieldTags                 = "tags"
@@ -40,7 +39,6 @@ type Namespace struct {
 	ProjectID            string                 `json:"projectId,omitempty"`
 	Prune                *bool                  `json:"prune,omitempty"`
 	Removed              string                 `json:"removed,omitempty"`
-	ResourcePath         string                 `json:"resourcePath,omitempty"`
 	State                string                 `json:"state,omitempty"`
 	Status               *NamespaceStatus       `json:"status,omitempty"`
 	Tags                 []string               `json:"tags,omitempty"`

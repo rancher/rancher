@@ -32,6 +32,7 @@ type ParsedURL struct {
 	Action           string
 	SubContext       map[string]string
 	SubContextPrefix string
+	Query            url.Values
 }
 
 type ResolverFunc func(typeName string, context *types.APIContext) error
@@ -56,6 +57,7 @@ func DefaultURLParser(schemas *types.Schemas, url *url.URL) (ParsedURL, error) {
 	result.SubContext = subContext
 	result.SubContextPrefix = prefix
 	result.Action, result.Method = parseAction(url)
+	result.Query = url.Query()
 
 	result.Type = safeIndex(parts, 1)
 	result.ID = safeIndex(parts, 2)
@@ -86,6 +88,7 @@ func Parse(rw http.ResponseWriter, req *http.Request, schemas *types.Schemas, ur
 	result.ID = parsedURL.ID
 	result.Link = parsedURL.Link
 	result.Action = parsedURL.Action
+	result.Query = parsedURL.Query
 	if parsedURL.Method != "" {
 		result.Method = parsedURL.Method
 	}

@@ -190,6 +190,12 @@ func (s *podSecurityPolicyTemplateClient) Watch(opts metav1.ListOptions) (watch.
 	return s.objectClient.Watch(opts)
 }
 
+// Patch applies the patch and returns the patched deployment.
+func (s *podSecurityPolicyTemplateClient) Patch(o *PodSecurityPolicyTemplate, data []byte, subresources ...string) (*PodSecurityPolicyTemplate, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+	return obj.(*PodSecurityPolicyTemplate), err
+}
+
 func (s *podSecurityPolicyTemplateClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }

@@ -31,7 +31,6 @@ const (
 	StatefulSetSpecFieldServiceName                   = "serviceName"
 	StatefulSetSpecFieldSubdomain                     = "subdomain"
 	StatefulSetSpecFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
-	StatefulSetSpecFieldTolerations                   = "tolerations"
 	StatefulSetSpecFieldUid                           = "uid"
 	StatefulSetSpecFieldUpdateStrategy                = "updateStrategy"
 	StatefulSetSpecFieldVolumeClaimTemplates          = "volumeClaimTemplates"
@@ -68,7 +67,6 @@ type StatefulSetSpec struct {
 	ServiceName                   string                     `json:"serviceName,omitempty"`
 	Subdomain                     string                     `json:"subdomain,omitempty"`
 	TerminationGracePeriodSeconds *int64                     `json:"terminationGracePeriodSeconds,omitempty"`
-	Tolerations                   []Toleration               `json:"tolerations,omitempty"`
 	Uid                           *int64                     `json:"uid,omitempty"`
 	UpdateStrategy                *StatefulSetUpdateStrategy `json:"updateStrategy,omitempty"`
 	VolumeClaimTemplates          []PersistentVolumeClaim    `json:"volumeClaimTemplates,omitempty"`

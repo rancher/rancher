@@ -14,7 +14,6 @@ const (
 	PersistentVolumeClaimFieldName                 = "name"
 	PersistentVolumeClaimFieldOwnerReferences      = "ownerReferences"
 	PersistentVolumeClaimFieldRemoved              = "removed"
-	PersistentVolumeClaimFieldResourcePath         = "resourcePath"
 	PersistentVolumeClaimFieldResources            = "resources"
 	PersistentVolumeClaimFieldSelector             = "selector"
 	PersistentVolumeClaimFieldState                = "state"
@@ -36,7 +35,6 @@ type PersistentVolumeClaim struct {
 	Name                 string                       `json:"name,omitempty"`
 	OwnerReferences      []OwnerReference             `json:"ownerReferences,omitempty"`
 	Removed              string                       `json:"removed,omitempty"`
-	ResourcePath         string                       `json:"resourcePath,omitempty"`
 	Resources            *ResourceRequirements        `json:"resources,omitempty"`
 	Selector             *LabelSelector               `json:"selector,omitempty"`
 	State                string                       `json:"state,omitempty"`

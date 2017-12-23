@@ -7,7 +7,10 @@ import (
 	"strings"
 	"sync"
 
+	"encoding/json"
+
 	"github.com/rancher/norman/clientbase"
+	"github.com/rancher/norman/types/values"
 	"github.com/sirupsen/logrus"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -447,10 +450,10 @@ func (w *Reconciliation) updateObject(reference ObjectReference, oldObj runtime.
 			}
 
 			if data, changed := compareMaps(oldMeta.GetLabels(), newMeta.GetLabels()); changed {
-				changes["labels"] = data
+				values.PutValue(changes, data, "metadata", "labels")
 			}
 			if data, changed := compareMaps(oldMeta.GetAnnotations(), newMeta.GetAnnotations()); changed {
-				changes["annotations"] = data
+				values.PutValue(changes, data, "metadata", "annotations")
 			}
 		} else {
 			oldField := oldValue.FieldByName(key)
@@ -461,32 +464,23 @@ func (w *Reconciliation) updateObject(reference ObjectReference, oldObj runtime.
 				oldField.Set(newField)
 				changeName := jsonName(newValue, key)
 				if changeName != "-" {
-					changes[changeName] = newValue
+					changes[changeName] = newIValue
 				}
 			}
 		}
 	}
 
 	if len(changes) > 0 {
-		//newObj := &unstructured.Unstructured{}
-		//newObj.Object = changes
-		//newMeta, err := apimeta.Accessor(newObj)
-		//if err != nil {
-		//	return nil, err
-		//}
-		//
-		//newTypeMeta, err := apimeta.TypeAccessor(newObj)
-		//if err != nil {
-		//	return nil, err
-		//}
-		//
-		//newMeta.SetName(reference.Name)
-		//newMeta.SetNamespace(reference.Namespace)
-		//newTypeMeta.SetKind(reference.Kind)
-		//newTypeMeta.SetAPIVersion(reference.APIVersion)
+		meta, err := apimeta.Accessor(oldObj)
+		if err == nil {
+			values.PutValue(changes, meta.GetResourceVersion(), "metadata", "resourceVersion")
+		}
 
-		fmt.Println("!!!!!!!!!!!!!! UPDATE! !!!!!!!!!!!!!!")
-		return client.Update(reference.Name, oldObj)
+		data, err := json.Marshal(changes)
+		if err != nil {
+			return newObj, err
+		}
+		return client.Patch(reference.Name, oldObj, data)
 	}
 
 	return newObj, nil

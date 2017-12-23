@@ -29,7 +29,6 @@ const (
 	DaemonSetSpecFieldServiceAccountName            = "serviceAccountName"
 	DaemonSetSpecFieldSubdomain                     = "subdomain"
 	DaemonSetSpecFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
-	DaemonSetSpecFieldTolerations                   = "tolerations"
 	DaemonSetSpecFieldUid                           = "uid"
 	DaemonSetSpecFieldUpdateStrategy                = "updateStrategy"
 	DaemonSetSpecFieldVolumes                       = "volumes"
@@ -63,7 +62,6 @@ type DaemonSetSpec struct {
 	ServiceAccountName            string                   `json:"serviceAccountName,omitempty"`
 	Subdomain                     string                   `json:"subdomain,omitempty"`
 	TerminationGracePeriodSeconds *int64                   `json:"terminationGracePeriodSeconds,omitempty"`
-	Tolerations                   []Toleration             `json:"tolerations,omitempty"`
 	Uid                           *int64                   `json:"uid,omitempty"`
 	UpdateStrategy                *DaemonSetUpdateStrategy `json:"updateStrategy,omitempty"`
 	Volumes                       map[string]Volume        `json:"volumes,omitempty"`

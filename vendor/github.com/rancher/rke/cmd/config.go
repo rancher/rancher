@@ -23,10 +23,9 @@ const (
 
 func ConfigCommand() cli.Command {
 	return cli.Command{
-		Name:      "config",
-		ShortName: "config",
-		Usage:     "Setup cluster configuration",
-		Action:    clusterConfig,
+		Name:   "config",
+		Usage:  "Setup cluster configuration",
+		Action: clusterConfig,
 		Flags: []cli.Flag{
 			cli.StringFlag{
 				Name:  "name,n",
@@ -48,9 +47,9 @@ func ConfigCommand() cli.Command {
 func getConfig(reader *bufio.Reader, text, def string) (string, error) {
 	for {
 		if def == "" {
-			fmt.Printf("%s [%s]: ", text, "none")
+			fmt.Printf("[+] %s [%s]: ", text, "none")
 		} else {
-			fmt.Printf("%s [%s]: ", text, def)
+			fmt.Printf("[+] %s [%s]: ", text, def)
 		}
 		input, err := reader.ReadString('\n')
 		if err != nil {
@@ -101,7 +100,7 @@ func clusterConfig(ctx *cli.Context) error {
 	cluster.SSHKeyPath = sshKeyPath
 
 	// Get number of hosts
-	numberOfHostsString, err := getConfig(reader, "Number of Hosts", "3")
+	numberOfHostsString, err := getConfig(reader, "Number of Hosts", "1")
 	if err != nil {
 		return err
 	}
@@ -113,7 +112,7 @@ func clusterConfig(ctx *cli.Context) error {
 	// Get Hosts config
 	cluster.Nodes = make([]v3.RKEConfigNode, 0)
 	for i := 0; i < numberOfHostsInt; i++ {
-		hostCfg, err := getHostConfig(reader, i)
+		hostCfg, err := getHostConfig(reader, i, cluster.SSHKeyPath)
 		if err != nil {
 			return err
 		}
@@ -151,7 +150,7 @@ func clusterConfig(ctx *cli.Context) error {
 	return writeConfig(&cluster, configFile, print)
 }
 
-func getHostConfig(reader *bufio.Reader, index int) (*v3.RKEConfigNode, error) {
+func getHostConfig(reader *bufio.Reader, index int, clusterSSHKeyPath string) (*v3.RKEConfigNode, error) {
 	host := v3.RKEConfigNode{}
 
 	address, err := getConfig(reader, fmt.Sprintf("SSH Address of host (%d)", index+1), "")
@@ -164,13 +163,21 @@ func getHostConfig(reader *bufio.Reader, index int) (*v3.RKEConfigNode, error) {
 	if err != nil {
 		return nil, err
 	}
-	host.SSHKeyPath = sshKeyPath
-
-	sshKey, err := getConfig(reader, fmt.Sprintf("SSH Private Key of host (%s)", address), "")
-	if err != nil {
-		return nil, err
+	if len(sshKeyPath) == 0 {
+		fmt.Printf("[-] You have entered empty SSH key path, trying fetch from SSH key parameter\n")
+		sshKey, err := getConfig(reader, fmt.Sprintf("SSH Private Key of host (%s)", address), "")
+		if err != nil {
+			return nil, err
+		}
+		if len(sshKey) == 0 {
+			fmt.Printf("[-] You have entered empty SSH key, defaulting to cluster level SSH key: %s\n", clusterSSHKeyPath)
+			host.SSHKeyPath = clusterSSHKeyPath
+		} else {
+			host.SSHKey = sshKey
+		}
+	} else {
+		host.SSHKeyPath = sshKeyPath
 	}
-	host.SSHKey = sshKey
 
 	sshUser, err := getConfig(reader, fmt.Sprintf("SSH User of host (%s)", address), "ubuntu")
 	if err != nil {
@@ -303,7 +310,7 @@ func getAuthnConfig(reader *bufio.Reader) (*v3.AuthnConfig, error) {
 
 func getAuthzConfig(reader *bufio.Reader) (*v3.AuthzConfig, error) {
 	authzConfig := v3.AuthzConfig{}
-	authzMode, err := getConfig(reader, "Authorization Mode", "")
+	authzMode, err := getConfig(reader, "Authorization Mode (rbac, none)", cluster.DefaultAuthorizationMode)
 	if err != nil {
 		return nil, err
 	}
@@ -314,7 +321,7 @@ func getAuthzConfig(reader *bufio.Reader) (*v3.AuthzConfig, error) {
 func getNetworkConfig(reader *bufio.Reader) (*v3.NetworkConfig, error) {
 	networkConfig := v3.NetworkConfig{}
 
-	networkPlugin, err := getConfig(reader, "Network Plugin Type", cluster.DefaultNetworkCloudProvider)
+	networkPlugin, err := getConfig(reader, "Network Plugin Type (flannel, calico, weave, canal)", cluster.DefaultNetworkPlugin)
 	if err != nil {
 		return nil, err
 	}

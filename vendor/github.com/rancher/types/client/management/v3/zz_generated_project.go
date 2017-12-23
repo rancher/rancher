@@ -16,7 +16,6 @@ const (
 	ProjectFieldOwnerReferences             = "ownerReferences"
 	ProjectFieldPodSecurityPolicyTemplateId = "podSecurityPolicyTemplateId"
 	ProjectFieldRemoved                     = "removed"
-	ProjectFieldResourcePath                = "resourcePath"
 	ProjectFieldUuid                        = "uuid"
 )
 
@@ -32,7 +31,6 @@ type Project struct {
 	OwnerReferences             []OwnerReference  `json:"ownerReferences,omitempty"`
 	PodSecurityPolicyTemplateId string            `json:"podSecurityPolicyTemplateId,omitempty"`
 	Removed                     string            `json:"removed,omitempty"`
-	ResourcePath                string            `json:"resourcePath,omitempty"`
 	Uuid                        string            `json:"uuid,omitempty"`
 }
 type ProjectCollection struct {

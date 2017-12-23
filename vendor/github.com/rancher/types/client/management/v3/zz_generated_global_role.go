@@ -15,7 +15,6 @@ const (
 	GlobalRoleFieldName            = "name"
 	GlobalRoleFieldOwnerReferences = "ownerReferences"
 	GlobalRoleFieldRemoved         = "removed"
-	GlobalRoleFieldResourcePath    = "resourcePath"
 	GlobalRoleFieldRules           = "rules"
 	GlobalRoleFieldUuid            = "uuid"
 )
@@ -31,7 +30,6 @@ type GlobalRole struct {
 	Name            string            `json:"name,omitempty"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
 	Removed         string            `json:"removed,omitempty"`
-	ResourcePath    string            `json:"resourcePath,omitempty"`
 	Rules           []PolicyRule      `json:"rules,omitempty"`
 	Uuid            string            `json:"uuid,omitempty"`
 }

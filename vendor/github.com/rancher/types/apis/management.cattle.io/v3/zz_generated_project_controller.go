@@ -190,6 +190,12 @@ func (s *projectClient) Watch(opts metav1.ListOptions) (watch.Interface, error) 
 	return s.objectClient.Watch(opts)
 }
 
+// Patch applies the patch and returns the patched deployment.
+func (s *projectClient) Patch(o *Project, data []byte, subresources ...string) (*Project, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+	return obj.(*Project), err
+}
+
 func (s *projectClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }

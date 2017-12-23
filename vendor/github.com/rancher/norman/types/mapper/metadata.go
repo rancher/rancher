@@ -7,7 +7,9 @@ import (
 func NewMetadataMapper() types.Mapper {
 	return types.Mappers{
 		Drop{"generateName"},
-		Move{From: "selfLink", To: "resourcePath"},
+		//Move{From: "selfLink", To: "resourcePath"},
+		Drop{"selfLink"},
+		//Drop{"ownerReferences"},
 		Move{From: "uid", To: "uuid"},
 		Drop{"resourceVersion"},
 		Drop{"generation"},

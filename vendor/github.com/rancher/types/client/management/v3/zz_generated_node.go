@@ -23,7 +23,6 @@ const (
 	NodeFieldPodCIDR              = "podCIDR"
 	NodeFieldProviderID           = "providerID"
 	NodeFieldRemoved              = "removed"
-	NodeFieldResourcePath         = "resourcePath"
 	NodeFieldState                = "state"
 	NodeFieldTaints               = "taints"
 	NodeFieldTransitioning        = "transitioning"
@@ -53,7 +52,6 @@ type Node struct {
 	PodCIDR              string                    `json:"podCIDR,omitempty"`
 	ProviderID           string                    `json:"providerID,omitempty"`
 	Removed              string                    `json:"removed,omitempty"`
-	ResourcePath         string                    `json:"resourcePath,omitempty"`
 	State                string                    `json:"state,omitempty"`
 	Taints               []Taint                   `json:"taints,omitempty"`
 	Transitioning        string                    `json:"transitioning,omitempty"`

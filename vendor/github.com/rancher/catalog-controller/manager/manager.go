@@ -74,7 +74,7 @@ func (m *Manager) prepareRepoPath(catalog v3.Catalog, update bool) (string, stri
 	if catalog.Spec.CatalogKind == "" || catalog.Spec.CatalogKind == RancherTemplateType {
 		return m.prepareGitRepoPath(catalog, update, CatalogTypeRancher)
 	}
-	if catalog.Kind == HelmTemplateType {
+	if catalog.Spec.CatalogKind == HelmTemplateType {
 		if git.IsValid(catalog.Spec.URL) {
 			return m.prepareGitRepoPath(catalog, update, CatalogTypeHelmGitRepo)
 		}

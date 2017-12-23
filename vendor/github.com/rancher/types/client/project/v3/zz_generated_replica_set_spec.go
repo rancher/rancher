@@ -28,7 +28,6 @@ const (
 	ReplicaSetSpecFieldServiceAccountName            = "serviceAccountName"
 	ReplicaSetSpecFieldSubdomain                     = "subdomain"
 	ReplicaSetSpecFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
-	ReplicaSetSpecFieldTolerations                   = "tolerations"
 	ReplicaSetSpecFieldUid                           = "uid"
 	ReplicaSetSpecFieldVolumes                       = "volumes"
 )
@@ -60,7 +59,6 @@ type ReplicaSetSpec struct {
 	ServiceAccountName            string                 `json:"serviceAccountName,omitempty"`
 	Subdomain                     string                 `json:"subdomain,omitempty"`
 	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty"`
-	Tolerations                   []Toleration           `json:"tolerations,omitempty"`
 	Uid                           *int64                 `json:"uid,omitempty"`
 	Volumes                       map[string]Volume      `json:"volumes,omitempty"`
 }

@@ -15,7 +15,6 @@ const (
 	CatalogFieldName                 = "name"
 	CatalogFieldOwnerReferences      = "ownerReferences"
 	CatalogFieldRemoved              = "removed"
-	CatalogFieldResourcePath         = "resourcePath"
 	CatalogFieldState                = "state"
 	CatalogFieldStatus               = "status"
 	CatalogFieldTransitioning        = "transitioning"
@@ -35,7 +34,6 @@ type Catalog struct {
 	Name                 string            `json:"name,omitempty"`
 	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty"`
 	Removed              string            `json:"removed,omitempty"`
-	ResourcePath         string            `json:"resourcePath,omitempty"`
 	State                string            `json:"state,omitempty"`
 	Status               *CatalogStatus    `json:"status,omitempty"`
 	Transitioning        string            `json:"transitioning,omitempty"`

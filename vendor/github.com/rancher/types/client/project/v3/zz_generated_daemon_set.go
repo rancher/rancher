@@ -32,7 +32,6 @@ const (
 	DaemonSetFieldProjectID                     = "projectId"
 	DaemonSetFieldPullSecrets                   = "pullSecrets"
 	DaemonSetFieldRemoved                       = "removed"
-	DaemonSetFieldResourcePath                  = "resourcePath"
 	DaemonSetFieldRestart                       = "restart"
 	DaemonSetFieldRevisionHistoryLimit          = "revisionHistoryLimit"
 	DaemonSetFieldRunAsNonRoot                  = "runAsNonRoot"
@@ -44,7 +43,6 @@ const (
 	DaemonSetFieldStatus                        = "status"
 	DaemonSetFieldSubdomain                     = "subdomain"
 	DaemonSetFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
-	DaemonSetFieldTolerations                   = "tolerations"
 	DaemonSetFieldTransitioning                 = "transitioning"
 	DaemonSetFieldTransitioningMessage          = "transitioningMessage"
 	DaemonSetFieldUid                           = "uid"
@@ -83,7 +81,6 @@ type DaemonSet struct {
 	ProjectID                     string                   `json:"projectId,omitempty"`
 	PullSecrets                   []LocalObjectReference   `json:"pullSecrets,omitempty"`
 	Removed                       string                   `json:"removed,omitempty"`
-	ResourcePath                  string                   `json:"resourcePath,omitempty"`
 	Restart                       string                   `json:"restart,omitempty"`
 	RevisionHistoryLimit          *int64                   `json:"revisionHistoryLimit,omitempty"`
 	RunAsNonRoot                  *bool                    `json:"runAsNonRoot,omitempty"`
@@ -95,7 +92,6 @@ type DaemonSet struct {
 	Status                        *DaemonSetStatus         `json:"status,omitempty"`
 	Subdomain                     string                   `json:"subdomain,omitempty"`
 	TerminationGracePeriodSeconds *int64                   `json:"terminationGracePeriodSeconds,omitempty"`
-	Tolerations                   []Toleration             `json:"tolerations,omitempty"`
 	Transitioning                 string                   `json:"transitioning,omitempty"`
 	TransitioningMessage          string                   `json:"transitioningMessage,omitempty"`
 	Uid                           *int64                   `json:"uid,omitempty"`

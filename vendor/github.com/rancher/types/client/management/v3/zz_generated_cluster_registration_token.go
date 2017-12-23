@@ -13,7 +13,6 @@ const (
 	ClusterRegistrationTokenFieldName                 = "name"
 	ClusterRegistrationTokenFieldOwnerReferences      = "ownerReferences"
 	ClusterRegistrationTokenFieldRemoved              = "removed"
-	ClusterRegistrationTokenFieldResourcePath         = "resourcePath"
 	ClusterRegistrationTokenFieldState                = "state"
 	ClusterRegistrationTokenFieldStatus               = "status"
 	ClusterRegistrationTokenFieldTransitioning        = "transitioning"
@@ -30,7 +29,6 @@ type ClusterRegistrationToken struct {
 	Name                 string                          `json:"name,omitempty"`
 	OwnerReferences      []OwnerReference                `json:"ownerReferences,omitempty"`
 	Removed              string                          `json:"removed,omitempty"`
-	ResourcePath         string                          `json:"resourcePath,omitempty"`
 	State                string                          `json:"state,omitempty"`
 	Status               *ClusterRegistrationTokenStatus `json:"status,omitempty"`
 	Transitioning        string                          `json:"transitioning,omitempty"`

@@ -43,7 +43,7 @@ func (e *Embed) ToInternal(data map[string]interface{}) {
 }
 
 func (e *Embed) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {
-	err := validateField(e.Field, schema)
+	err := ValidateField(e.Field, schema)
 	if err != nil {
 		if e.Optional {
 			return nil

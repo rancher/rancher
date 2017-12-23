@@ -37,6 +37,7 @@ func (m Mappers) ModifySchema(schema *Schema, schemas *Schemas) error {
 
 type typeMapper struct {
 	Mappers         []Mapper
+	root            bool
 	typeName        string
 	subSchemas      map[string]*Schema
 	subArraySchemas map[string]*Schema
@@ -64,10 +65,11 @@ func (t *typeMapper) FromInternal(data map[string]interface{}) {
 
 	Mappers(t.Mappers).FromInternal(data)
 
-	if data != nil {
-		if _, ok := data["type"]; !ok {
-			data["type"] = t.typeName
-		}
+	if _, ok := data["type"]; !ok && data != nil {
+		data["type"] = t.typeName
+	}
+
+	if data != nil && t.root {
 		name, _ := data["name"].(string)
 		namespace, _ := data["namespaceId"].(string)
 

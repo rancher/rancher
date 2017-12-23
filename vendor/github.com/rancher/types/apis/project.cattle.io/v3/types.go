@@ -60,3 +60,59 @@ type Link struct {
 	Name  string `json:"name"`
 	Alias string `json:"alias"`
 }
+
+type ServiceAccountToken struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	AccountName string `json:"accountName"`
+	AccountUID  string `json:"accountUid"`
+	Token       string `json:"token" norman:"writeOnly"`
+	CACRT       string `json:"caCrt"`
+	NamespaceID string `json:"namespaceId" norman:"type=reference[namespace]"`
+}
+
+type DockerCredential struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Registries map[string]RegistryCredential `json:"registries"`
+}
+
+type RegistryCredential struct {
+	Username string `json:"username"`
+	Password string `json:"password" norman:"writeOnly"`
+	Auth     string `json:"auth"`
+}
+
+type Certificate struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Certs                   string `json:"certs"`
+	Key                     string `json:"key" norman:"writeOnly"`
+	CertFingerprint         string `json:"certFingerprint"`
+	CN                      string `json:"cn"`
+	Version                 string `json:"version"`
+	Issuer                  string `json:"issuer"`
+	IssuedAt                string `json:"issuedAt"`
+	Algorithm               string `json:"Algorithm"`
+	SerialNumber            string `json:"serialNumber"`
+	KeySize                 string `json:"keySize"`
+	SubjectAlternativeNames string `json:"subjectAlternativeNames"`
+}
+
+type BasicAuth struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Username string `json:"username"`
+	Password string `json:"password" norman:"writeOnly"`
+}
+
+type SSHAuth struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	PrivateKey string `json:"privateKey"`
+}

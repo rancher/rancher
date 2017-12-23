@@ -13,7 +13,9 @@ import (
 	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
+	projectSchema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	rbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
+	projectClient "github.com/rancher/types/client/project/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -22,6 +24,17 @@ import (
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
+)
+
+var (
+	ProjectTypes = []string{
+		projectClient.BasicAuthType,
+		projectClient.CertificateType,
+		projectClient.DockerCredentialType,
+		projectClient.ServiceAccountTokenType,
+		projectClient.SecretType,
+		projectClient.SSHAuthType,
+	}
 )
 
 type ManagementContext struct {
@@ -144,6 +157,11 @@ func NewManagementContext(config rest.Config) (*ManagementContext, error) {
 
 	context.Schemas = types.NewSchemas().
 		AddSchemas(managementSchema.Schemas)
+
+	for _, projectType := range ProjectTypes {
+		schema := projectSchema.Schemas.Schema(&projectSchema.Version, projectType)
+		context.Schemas.AddSchema(*schema)
+	}
 
 	context.Scheme = runtime.NewScheme()
 	managementv3.AddToScheme(context.Scheme)

@@ -21,7 +21,6 @@ const (
 	ClusterEventFieldOwnerReferences = "ownerReferences"
 	ClusterEventFieldReason          = "reason"
 	ClusterEventFieldRemoved         = "removed"
-	ClusterEventFieldResourcePath    = "resourcePath"
 	ClusterEventFieldSource          = "source"
 	ClusterEventFieldUuid            = "uuid"
 )
@@ -43,7 +42,6 @@ type ClusterEvent struct {
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
 	Reason          string            `json:"reason,omitempty"`
 	Removed         string            `json:"removed,omitempty"`
-	ResourcePath    string            `json:"resourcePath,omitempty"`
 	Source          *EventSource      `json:"source,omitempty"`
 	Uuid            string            `json:"uuid,omitempty"`
 }

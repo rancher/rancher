@@ -58,7 +58,7 @@ func TemplateVersionFormatter(apiContext *types.APIContext, resource *types.RawR
 	if revision, ok := resource.Values["revision"]; ok {
 		version = strconv.FormatInt(revision.(int64), 10)
 	}
-	templateID := strings.TrimSuffix(apiContext.ID, "-"+version)
+	templateID := strings.TrimSuffix(resource.ID, "-"+version)
 	templateSchema := apiContext.Schemas.Schema(&managementschema.Version, client.TemplateType)
 	resource.Links["template"] = apiContext.URLBuilder.ResourceLinkByID(templateSchema, templateID)
 
@@ -100,19 +100,21 @@ func RefreshActionHandler(actionName string, action *types.Action, apiContext *t
 
 func extractVersionLinks(apiContext *types.APIContext, resource *types.RawResource) map[string]string {
 	schema := apiContext.Schemas.Schema(&managementschema.Version, client.TemplateVersionType)
-	versionMap := resource.Values["versions"].([]interface{})
 	r := map[string]string{}
-	for _, version := range versionMap {
-		revision := ""
-		if v, ok := version.(map[string]interface{})["revision"].(int64); ok {
-			revision = strconv.FormatInt(v, 10)
+	versionMap, ok := resource.Values["versions"].([]interface{})
+	if ok {
+		for _, version := range versionMap {
+			revision := ""
+			if v, ok := version.(map[string]interface{})["revision"].(int64); ok {
+				revision = strconv.FormatInt(v, 10)
+			}
+			version := version.(map[string]interface{})["version"].(string)
+			versionID := fmt.Sprintf("%v-%v", resource.ID, version)
+			if revision != "" {
+				versionID = fmt.Sprintf("%v-%v", resource.ID, revision)
+			}
+			r[version] = apiContext.URLBuilder.ResourceLinkByID(schema, versionID)
 		}
-		version := version.(map[string]interface{})["version"].(string)
-		versionID := fmt.Sprintf("%v-%v", resource.ID, version)
-		if revision != "" {
-			versionID = fmt.Sprintf("%v-%v", resource.ID, revision)
-		}
-		r[version] = apiContext.URLBuilder.ResourceLinkByID(schema, versionID)
 	}
 	return r
 }

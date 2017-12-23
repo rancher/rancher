@@ -239,6 +239,8 @@ func (b *Builder) convert(fieldType string, value interface{}, op Operation) (in
 		return convert.ToString(value), nil
 	case "string":
 		return convert.ToString(value), nil
+	case "base64":
+		return convert.ToString(value), nil
 	case "reference":
 		return convert.ToString(value), nil
 	}

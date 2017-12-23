@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 )
 
 type ValuesMap struct {
@@ -79,6 +80,7 @@ type APIContext struct {
 	Schema                      *Schema
 	Schemas                     *Schemas
 	Version                     *APIVersion
+	Query                       url.Values
 	ResponseFormat              string
 	ReferenceValidator          ReferenceValidator
 	ResponseWriter              ResponseWriter

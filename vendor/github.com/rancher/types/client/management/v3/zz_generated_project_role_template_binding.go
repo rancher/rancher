@@ -14,7 +14,6 @@ const (
 	ProjectRoleTemplateBindingFieldOwnerReferences  = "ownerReferences"
 	ProjectRoleTemplateBindingFieldProjectId        = "projectId"
 	ProjectRoleTemplateBindingFieldRemoved          = "removed"
-	ProjectRoleTemplateBindingFieldResourcePath     = "resourcePath"
 	ProjectRoleTemplateBindingFieldRoleTemplateId   = "roleTemplateId"
 	ProjectRoleTemplateBindingFieldSubjectKind      = "subjectKind"
 	ProjectRoleTemplateBindingFieldSubjectName      = "subjectName"
@@ -32,7 +31,6 @@ type ProjectRoleTemplateBinding struct {
 	OwnerReferences  []OwnerReference  `json:"ownerReferences,omitempty"`
 	ProjectId        string            `json:"projectId,omitempty"`
 	Removed          string            `json:"removed,omitempty"`
-	ResourcePath     string            `json:"resourcePath,omitempty"`
 	RoleTemplateId   string            `json:"roleTemplateId,omitempty"`
 	SubjectKind      string            `json:"subjectKind,omitempty"`
 	SubjectName      string            `json:"subjectName,omitempty"`

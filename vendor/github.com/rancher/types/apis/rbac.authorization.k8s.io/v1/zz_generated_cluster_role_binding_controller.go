@@ -191,6 +191,12 @@ func (s *clusterRoleBindingClient) Watch(opts metav1.ListOptions) (watch.Interfa
 	return s.objectClient.Watch(opts)
 }
 
+// Patch applies the patch and returns the patched deployment.
+func (s *clusterRoleBindingClient) Patch(o *v1.ClusterRoleBinding, data []byte, subresources ...string) (*v1.ClusterRoleBinding, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+	return obj.(*v1.ClusterRoleBinding), err
+}
+
 func (s *clusterRoleBindingClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }

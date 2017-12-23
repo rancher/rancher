@@ -3,36 +3,42 @@ package setup
 import (
 	"context"
 
-	"net/http"
-
 	"encoding/base64"
 
 	"github.com/rancher/management-api/api/authn"
 	"github.com/rancher/management-api/api/catalog"
 	"github.com/rancher/management-api/api/project"
-	"github.com/rancher/management-api/api/subscribe"
 	clustermanager "github.com/rancher/management-api/cluster"
 	"github.com/rancher/norman/api/builtin"
+	"github.com/rancher/norman/pkg/subscribe"
 	"github.com/rancher/norman/store/crd"
+	"github.com/rancher/norman/store/proxy"
+	"github.com/rancher/norman/store/subtype"
+	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
+	projectchema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	"github.com/rancher/types/client/management/v3"
+	projectclient "github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/config"
 	"github.com/satori/uuid"
 )
 
-var crdVersions = []*types.APIVersion{
-	&managementschema.Version,
-}
+var (
+	crdVersions = []*types.APIVersion{
+		&managementschema.Version,
+	}
+)
 
 func Schemas(ctx context.Context, management *config.ManagementContext, schemas *types.Schemas) error {
-	Subscribe(schemas)
+	subscribe.Register(&builtin.Version, schemas)
 	ProjectLinks(schemas, management)
 	Templates(schemas)
 	TemplateVersion(schemas)
 	ClusterRegistrationTokens(schemas)
 	User(schemas)
 	Catalog(schemas)
+	ProjectTypes(schemas, management)
 
 	crdStore, err := crd.NewCRDStoreFromConfig(management.RESTConfig)
 	if err != nil {
@@ -100,13 +106,32 @@ func ProjectLinks(schemas *types.Schemas, management *config.ManagementContext) 
 	schema.LinkHandler = linkHandler
 }
 
-func Subscribe(schemas *types.Schemas) {
-	schemas.MustImportAndCustomize(&builtin.Version, subscribe.Subscribe{}, func(schema *types.Schema) {
-		schema.CollectionMethods = []string{http.MethodGet}
-		schema.ResourceMethods = []string{}
-		schema.ListHandler = subscribe.Handler
-		schema.PluralName = "subscribe"
-	})
+func ProjectTypes(schemas *types.Schemas, management *config.ManagementContext) {
+	schema := schemas.Schema(&projectchema.Version, projectclient.SecretType)
+	proxyStore := proxy.NewProxyStore(management.UnversionedClient,
+		[]string{"api"},
+		"",
+		"v1",
+		"Secret",
+		"secrets")
+	schema.Store = &transform.Store{
+		Store: proxyStore,
+		Transformer: func(apiContext *types.APIContext, data map[string]interface{}) (map[string]interface{}, error) {
+			if data == nil {
+				return data, nil
+			}
+			data[projectclient.SecretFieldProjectID] = data[projectclient.SecretFieldNamespaceId]
+			data[projectclient.SecretFieldNamespaceId] = nil
+			return data, nil
+		},
+	}
+
+	for _, secretSubType := range config.ProjectTypes {
+		if secretSubType != projectclient.SecretType {
+			subSchema := schemas.Schema(&projectchema.Version, secretSubType)
+			subSchema.Store = subtype.NewSubTypeStore(secretSubType, schema.Store)
+		}
+	}
 }
 
 func User(schemas *types.Schemas) {

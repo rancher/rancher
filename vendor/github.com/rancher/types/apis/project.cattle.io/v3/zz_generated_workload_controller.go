@@ -191,6 +191,12 @@ func (s *workloadClient) Watch(opts metav1.ListOptions) (watch.Interface, error)
 	return s.objectClient.Watch(opts)
 }
 
+// Patch applies the patch and returns the patched deployment.
+func (s *workloadClient) Patch(o *Workload, data []byte, subresources ...string) (*Workload, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+	return obj.(*Workload), err
+}
+
 func (s *workloadClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
