@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/types/factory"
 	"github.com/rancher/types/mapper"
 	"k8s.io/api/core/v1"
+	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/kubernetes/staging/src/k8s.io/api/apps/v1beta2"
 )
 
@@ -22,9 +23,10 @@ var (
 
 	Schemas = factory.Schemas(&Version).
 		// Namespace must be first
+		Init(namespaceTypes).
+		Init(ingressTypes).
 		Init(secretTypes).
 		Init(serviceTypes).
-		Init(namespaceTypes).
 		Init(podTypes).
 		Init(deploymentTypes).
 		Init(statefulSetTypes).
@@ -339,5 +341,29 @@ func serviceTypes(schemas *types.Schemas) *types.Schemas {
 			schema.CodeName = "Endpoint"
 		}, projectOverride{}, struct {
 			Targets []Target `json:"targets"`
+			PodIDs  []string `json:"podIds" norman:"type=array[reference[pod]]"`
+		}{})
+}
+
+func ingressTypes(schemas *types.Schemas) *types.Schemas {
+	return schemas.
+		AddMapperForType(&Version, v1beta1.HTTPIngressPath{},
+			&m.Embed{Field: "backend"},
+		).
+		AddMapperForType(&Version, v1beta1.Ingress{},
+			&mapper.NamespaceIDMapper{},
+			&m.Move{From: "backend", To: "defaultBackend"},
+		).
+		AddMapperForType(&Version, v1beta1.IngressTLS{},
+			&m.Move{From: "secretName", To: "certificateName"},
+		).
+		MustImport(&Version, v1beta1.IngressBackend{}, struct {
+			WorkloadIDs string `json:"workloadIds" norman:"type=array[reference[workload]]"`
+			ServiceName string `norman:"type=reference[service]"`
+		}{}).
+		MustImport(&Version, v1beta1.IngressTLS{}, struct {
+			SecretName string `norman:"type=reference[certificate]"`
+		}{}).
+		MustImport(&Version, v1beta1.Ingress{}, projectOverride{}, struct {
 		}{})
 }

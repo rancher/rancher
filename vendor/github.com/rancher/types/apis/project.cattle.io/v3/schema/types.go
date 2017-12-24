@@ -83,7 +83,8 @@ type projectOverride struct {
 }
 
 type Target struct {
-	Addresses []string `json:"addresses"`
-	Port      *int32   `json:"port"`
-	Protocol  string   `json:"protocol" norman:"type=enum,options=TCP|UDP"`
+	Addresses         []string `json:"addresses"`
+	NotReadyAddresses []string `json:"notReadyAddresses"`
+	Port              *int32   `json:"port"`
+	Protocol          string   `json:"protocol" norman:"type=enum,options=TCP|UDP"`
 }
