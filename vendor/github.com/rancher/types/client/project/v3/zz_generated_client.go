@@ -7,6 +7,8 @@ import (
 type Client struct {
 	clientbase.APIBaseClient
 
+	Namespace             NamespaceOperations
+	Ingress               IngressOperations
 	Secret                SecretOperations
 	ServiceAccountToken   ServiceAccountTokenOperations
 	DockerCredential      DockerCredentialOperations
@@ -15,7 +17,6 @@ type Client struct {
 	SSHAuth               SSHAuthOperations
 	Service               ServiceOperations
 	Endpoint              EndpointOperations
-	Namespace             NamespaceOperations
 	Pod                   PodOperations
 	Deployment            DeploymentOperations
 	PersistentVolumeClaim PersistentVolumeClaimOperations
@@ -36,6 +37,8 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 		APIBaseClient: baseClient,
 	}
 
+	client.Namespace = newNamespaceClient(client)
+	client.Ingress = newIngressClient(client)
 	client.Secret = newSecretClient(client)
 	client.ServiceAccountToken = newServiceAccountTokenClient(client)
 	client.DockerCredential = newDockerCredentialClient(client)
@@ -44,7 +47,6 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.SSHAuth = newSSHAuthClient(client)
 	client.Service = newServiceClient(client)
 	client.Endpoint = newEndpointClient(client)
-	client.Namespace = newNamespaceClient(client)
 	client.Pod = newPodClient(client)
 	client.Deployment = newDeploymentClient(client)
 	client.PersistentVolumeClaim = newPersistentVolumeClaimClient(client)

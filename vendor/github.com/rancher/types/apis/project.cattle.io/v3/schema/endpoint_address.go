@@ -1,6 +1,8 @@
 package schema
 
 import (
+	"fmt"
+
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/mapper"
@@ -22,9 +24,12 @@ func (e EndpointAddressMapper) FromInternal(data map[string]interface{}) {
 	}
 
 	var noPortsIPs []string
+	var noPortsUnavailIPs []string
+	var podIDs []string
 	var result []interface{}
 	for _, subset := range subsets {
 		var ips []string
+		var unAvailIPs []string
 		for _, ip := range subset.Addresses {
 			if ip.IP != "" {
 				ips = append(ips, ip.IP)
@@ -32,17 +37,32 @@ func (e EndpointAddressMapper) FromInternal(data map[string]interface{}) {
 			if ip.Hostname != "" {
 				ips = append(ips, ip.Hostname)
 			}
+			if ip.TargetRef != nil && ip.TargetRef.Kind == "Pod" {
+				podIDs = append(podIDs, fmt.Sprintf("%s:%s", ip.TargetRef.Namespace,
+					ip.TargetRef.Name))
+			}
 		}
 
-		if len(ips) == 0 {
+		for _, ip := range subset.NotReadyAddresses {
+			if ip.IP != "" {
+				unAvailIPs = append(ips, ip.IP)
+			}
+			if ip.Hostname != "" {
+				unAvailIPs = append(ips, ip.Hostname)
+			}
+		}
+
+		if len(subset.Ports) == 0 {
 			noPortsIPs = append(noPortsIPs, ips...)
+			noPortsUnavailIPs = append(noPortsIPs, unAvailIPs...)
 		} else {
 			for _, port := range subset.Ports {
 				if len(ips) > 0 {
 					result = append(result, map[string]interface{}{
-						"addresses": ips,
-						"port":      port.Port,
-						"protocol":  port.Protocol,
+						"addresses":         ips,
+						"notReadyAddresses": unAvailIPs,
+						"port":              port.Port,
+						"protocol":          port.Protocol,
 					})
 				}
 			}
@@ -51,12 +71,16 @@ func (e EndpointAddressMapper) FromInternal(data map[string]interface{}) {
 
 	if len(noPortsIPs) > 0 {
 		result = append(result, map[string]interface{}{
-			"addresses": noPortsIPs,
+			"addresses":         noPortsIPs,
+			"notReadyAddresses": noPortsUnavailIPs,
 		})
 	}
 
 	if len(result) > 0 {
 		data["targets"] = result
+	}
+	if len(podIDs) > 0 {
+		data["podIds"] = podIDs
 	}
 }
 

@@ -22,6 +22,7 @@ func Schemas(ctx context.Context, app *config.ClusterContext, schemas *types.Sch
 	DaemonSet(app.UnversionedClient, schemas)
 	Deployment(app.UnversionedClient, schemas)
 	Endpoint(app.UnversionedClient, schemas)
+	Ingress(app.UnversionedClient, schemas)
 	Namespace(app.UnversionedClient, schemas)
 	Node(app.UnversionedClient, schemas)
 	Pod(app.UnversionedClient, schemas)
@@ -141,6 +142,16 @@ func Service(k8sClient rest.Interface, schemas *types.Schemas) {
 		"v1",
 		"Service",
 		"services")
+}
+
+func Ingress(k8sClient rest.Interface, schemas *types.Schemas) {
+	schema := schemas.Schema(&schema.Version, "ingress")
+	schema.Store = proxy.NewProxyStore(k8sClient,
+		[]string{"apis"},
+		"extensions",
+		"v1beta1",
+		"Ingress",
+		"ingresses")
 }
 
 func Endpoint(k8sClient rest.Interface, schemas *types.Schemas) {

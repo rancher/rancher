@@ -13,6 +13,7 @@ const (
 	EndpointFieldName            = "name"
 	EndpointFieldNamespaceId     = "namespaceId"
 	EndpointFieldOwnerReferences = "ownerReferences"
+	EndpointFieldPodIDs          = "podIds"
 	EndpointFieldProjectID       = "projectId"
 	EndpointFieldRemoved         = "removed"
 	EndpointFieldTargets         = "targets"
@@ -28,6 +29,7 @@ type Endpoint struct {
 	Name            string            `json:"name,omitempty"`
 	NamespaceId     string            `json:"namespaceId,omitempty"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
+	PodIDs          []string          `json:"podIds,omitempty"`
 	ProjectID       string            `json:"projectId,omitempty"`
 	Removed         string            `json:"removed,omitempty"`
 	Targets         []Target          `json:"targets,omitempty"`
