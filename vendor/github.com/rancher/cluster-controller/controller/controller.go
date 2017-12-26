@@ -5,13 +5,13 @@ import (
 
 	catalogController "github.com/rancher/catalog-controller/controller"
 	"github.com/rancher/cluster-controller/controller/agent"
+	"github.com/rancher/cluster-controller/controller/auth"
 	"github.com/rancher/cluster-controller/controller/clusterevents"
 	"github.com/rancher/cluster-controller/controller/clusterheartbeat"
 	"github.com/rancher/cluster-controller/controller/clusterprovisioner"
 	"github.com/rancher/cluster-controller/controller/clusterstats"
 	"github.com/rancher/cluster-controller/controller/machinessyncer"
 	machineController "github.com/rancher/machine-controller/controller"
-	authcontroller "github.com/rancher/management-auth-controller/controller"
 	"github.com/rancher/types/config"
 )
 
@@ -23,6 +23,6 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	clusterstats.Register(management)
 	agent.Register(ctx, management)
 	clusterevents.Register(ctx, management)
-	authcontroller.Register(ctx, management)
+	auth.Register(ctx, management)
 	machinessyncer.Register(management)
 }
