@@ -6,6 +6,7 @@ import (
 
 const (
 	MachineTemplateType                          = "machineTemplate"
+	MachineTemplateField                         = "creatorId"
 	MachineTemplateFieldAnnotations              = "annotations"
 	MachineTemplateFieldAuthCertificateAuthority = "authCertificateAuthority"
 	MachineTemplateFieldAuthKey                  = "authKey"
@@ -35,6 +36,7 @@ const (
 
 type MachineTemplate struct {
 	types.Resource
+	string                   `json:"creatorId,omitempty"`
 	Annotations              map[string]string      `json:"annotations,omitempty"`
 	AuthCertificateAuthority string                 `json:"authCertificateAuthority,omitempty"`
 	AuthKey                  string                 `json:"authKey,omitempty"`

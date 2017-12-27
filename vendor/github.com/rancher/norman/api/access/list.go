@@ -30,7 +30,7 @@ func ByID(context *types.APIContext, version *types.APIVersion, typeName string,
 	return convert.ToObj(item, into)
 }
 
-func List(context *types.APIContext, version *types.APIVersion, typeName string, opts types.QueryOptions, into interface{}) error {
+func List(context *types.APIContext, version *types.APIVersion, typeName string, opts *types.QueryOptions, into interface{}) error {
 	schema := context.Schemas.Schema(version, typeName)
 	if schema == nil {
 		return fmt.Errorf("failed to find schema " + typeName)

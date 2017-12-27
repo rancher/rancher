@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/management-api/api/catalog"
 	"github.com/rancher/management-api/api/project"
 	clustermanager "github.com/rancher/management-api/cluster"
+	"github.com/rancher/management-api/store/projectscoped"
 	"github.com/rancher/norman/api/builtin"
 	"github.com/rancher/norman/pkg/subscribe"
 	"github.com/rancher/norman/store/crd"
@@ -108,14 +109,16 @@ func ProjectLinks(schemas *types.Schemas, management *config.ManagementContext) 
 
 func ProjectTypes(schemas *types.Schemas, management *config.ManagementContext) {
 	schema := schemas.Schema(&projectchema.Version, projectclient.SecretType)
-	proxyStore := proxy.NewProxyStore(management.UnversionedClient,
-		[]string{"api"},
-		"",
-		"v1",
-		"Secret",
-		"secrets")
+	projectScoped := &projectscoped.Store{
+		Store: proxy.NewProxyStore(management.UnversionedClient,
+			[]string{"api"},
+			"",
+			"v1",
+			"Secret",
+			"secrets"),
+	}
 	schema.Store = &transform.Store{
-		Store: proxyStore,
+		Store: projectScoped,
 		Transformer: func(apiContext *types.APIContext, data map[string]interface{}) (map[string]interface{}, error) {
 			if data == nil {
 				return data, nil

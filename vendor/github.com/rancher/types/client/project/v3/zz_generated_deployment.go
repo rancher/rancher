@@ -6,6 +6,7 @@ import (
 
 const (
 	DeploymentType                               = "deployment"
+	DeploymentField                              = "creatorId"
 	DeploymentFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	DeploymentFieldAnnotations                   = "annotations"
 	DeploymentFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
@@ -55,6 +56,7 @@ const (
 
 type Deployment struct {
 	types.Resource
+	string                        `json:"creatorId,omitempty"`
 	ActiveDeadlineSeconds         *int64                 `json:"activeDeadlineSeconds,omitempty"`
 	Annotations                   map[string]string      `json:"annotations,omitempty"`
 	AutomountServiceAccountToken  *bool                  `json:"automountServiceAccountToken,omitempty"`

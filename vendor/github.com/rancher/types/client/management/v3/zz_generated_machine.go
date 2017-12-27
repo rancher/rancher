@@ -6,6 +6,7 @@ import (
 
 const (
 	MachineType                      = "machine"
+	MachineField                     = "creatorId"
 	MachineFieldAllocatable          = "allocatable"
 	MachineFieldAnnotations          = "annotations"
 	MachineFieldCapacity             = "capacity"
@@ -14,7 +15,6 @@ const (
 	MachineFieldConfigSource         = "configSource"
 	MachineFieldCreated              = "created"
 	MachineFieldDescription          = "description"
-	MachineFieldDisplayName          = "displayName"
 	MachineFieldExternalId           = "externalId"
 	MachineFieldFinalizers           = "finalizers"
 	MachineFieldHostname             = "hostname"
@@ -48,6 +48,7 @@ const (
 
 type Machine struct {
 	types.Resource
+	string               `json:"creatorId,omitempty"`
 	Allocatable          map[string]string         `json:"allocatable,omitempty"`
 	Annotations          map[string]string         `json:"annotations,omitempty"`
 	Capacity             map[string]string         `json:"capacity,omitempty"`
@@ -56,7 +57,6 @@ type Machine struct {
 	ConfigSource         *NodeConfigSource         `json:"configSource,omitempty"`
 	Created              string                    `json:"created,omitempty"`
 	Description          string                    `json:"description,omitempty"`
-	DisplayName          string                    `json:"displayName,omitempty"`
 	ExternalId           string                    `json:"externalId,omitempty"`
 	Finalizers           []string                  `json:"finalizers,omitempty"`
 	Hostname             string                    `json:"hostname,omitempty"`

@@ -17,12 +17,12 @@ func (p *PrefixTypeStore) ByID(apiContext *types.APIContext, schema *types.Schem
 	return addTypeToID(data), err
 }
 
-func (p *PrefixTypeStore) List(apiContext *types.APIContext, schema *types.Schema, opt types.QueryOptions) ([]map[string]interface{}, error) {
+func (p *PrefixTypeStore) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {
 	data, err := p.Store.List(apiContext, schema, opt)
 	return addListTypeToID(data), err
 }
 
-func (p *PrefixTypeStore) Watch(apiContext *types.APIContext, schema *types.Schema, opt types.QueryOptions) (chan map[string]interface{}, error) {
+func (p *PrefixTypeStore) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
 	c, err := p.Store.Watch(apiContext, schema, opt)
 	if err != nil {
 		return nil, err

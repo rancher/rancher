@@ -65,14 +65,14 @@ func (h *HealthSyncer) updateClusterHealth() error {
 		return nil
 	}
 	updateConditionStatus(cluster, v3.ClusterConditionReady, v1.ConditionTrue, msgReady)
-	logrus.Infof("Cluster [%s] Condition Ready", h.clusterName)
+	logrus.Debugf("Cluster [%s] Condition Ready", h.clusterName)
 
 	h.updateClusterStatus(cluster, cses.Items)
 	_, err = h.Clusters.Update(cluster)
 	if err != nil {
 		return fmt.Errorf("Failed to update cluster [%s] %v", cluster.Name, err)
 	}
-	logrus.Infof("Updated cluster health successfully [%s]", h.clusterName)
+	logrus.Debugf("Updated cluster health successfully [%s]", h.clusterName)
 	return nil
 }
 

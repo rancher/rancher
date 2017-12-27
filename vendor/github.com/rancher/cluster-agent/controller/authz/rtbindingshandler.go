@@ -98,7 +98,7 @@ func (r *roleHandler) ensureCRTBDelete(key string, binding *v3.ClusterRoleTempla
 	}
 
 	if r.removeFinalizer(binding) {
-		_, err := r.workload.Management.Management.ClusterRoleTemplateBindings("").Update(binding)
+		_, err := r.workload.Management.Management.ClusterRoleTemplateBindings(binding.Namespace).Update(binding)
 		return err
 	}
 	return nil
@@ -107,8 +107,8 @@ func (r *roleHandler) ensureCRTBDelete(key string, binding *v3.ClusterRoleTempla
 func (r *roleHandler) ensureCRTB(key string, binding *v3.ClusterRoleTemplateBinding) error {
 	binding = binding.DeepCopy()
 	if r.addFinalizer(binding) {
-		if _, err := r.workload.Management.Management.ClusterRoleTemplateBindings("").Update(binding); err != nil {
-			return errors.Wrapf(err, "couldn't set finalizer set on %v", key)
+		if _, err := r.workload.Management.Management.ClusterRoleTemplateBindings(binding.Namespace).Update(binding); err != nil {
+			return errors.Wrapf(err, "couldn't set finalizer on %v", key)
 		}
 	}
 
@@ -151,8 +151,8 @@ func (r *roleHandler) ensurePRTB(key string, binding *v3.ProjectRoleTemplateBind
 	binding = binding.DeepCopy()
 	added := r.addFinalizer(binding)
 	if added {
-		if _, err := r.workload.Management.Management.ProjectRoleTemplateBindings("").Update(binding); err != nil {
-			return errors.Wrapf(err, "couldn't set finalizer set on %v", key)
+		if _, err := r.workload.Management.Management.ProjectRoleTemplateBindings(binding.Namespace).Update(binding); err != nil {
+			return errors.Wrapf(err, "couldn't set finalizer on %v", key)
 		}
 	}
 
@@ -224,7 +224,7 @@ func (r *roleHandler) ensurePRTBDelete(key string, binding *v3.ProjectRoleTempla
 	}
 
 	if r.removeFinalizer(binding) {
-		_, err := r.workload.Management.Management.ProjectRoleTemplateBindings("").Update(binding)
+		_, err := r.workload.Management.Management.ProjectRoleTemplateBindings(binding.Namespace).Update(binding)
 		return err
 	}
 	return nil

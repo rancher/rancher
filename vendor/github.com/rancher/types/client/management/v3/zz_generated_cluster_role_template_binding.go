@@ -6,12 +6,14 @@ import (
 
 const (
 	ClusterRoleTemplateBindingType                  = "clusterRoleTemplateBinding"
+	ClusterRoleTemplateBindingField                 = "creatorId"
 	ClusterRoleTemplateBindingFieldAnnotations      = "annotations"
 	ClusterRoleTemplateBindingFieldClusterId        = "clusterId"
 	ClusterRoleTemplateBindingFieldCreated          = "created"
 	ClusterRoleTemplateBindingFieldFinalizers       = "finalizers"
 	ClusterRoleTemplateBindingFieldLabels           = "labels"
 	ClusterRoleTemplateBindingFieldName             = "name"
+	ClusterRoleTemplateBindingFieldNamespaceId      = "namespaceId"
 	ClusterRoleTemplateBindingFieldOwnerReferences  = "ownerReferences"
 	ClusterRoleTemplateBindingFieldRemoved          = "removed"
 	ClusterRoleTemplateBindingFieldRoleTemplateId   = "roleTemplateId"
@@ -23,12 +25,14 @@ const (
 
 type ClusterRoleTemplateBinding struct {
 	types.Resource
+	string           `json:"creatorId,omitempty"`
 	Annotations      map[string]string `json:"annotations,omitempty"`
 	ClusterId        string            `json:"clusterId,omitempty"`
 	Created          string            `json:"created,omitempty"`
 	Finalizers       []string          `json:"finalizers,omitempty"`
 	Labels           map[string]string `json:"labels,omitempty"`
 	Name             string            `json:"name,omitempty"`
+	NamespaceId      string            `json:"namespaceId,omitempty"`
 	OwnerReferences  []OwnerReference  `json:"ownerReferences,omitempty"`
 	Removed          string            `json:"removed,omitempty"`
 	RoleTemplateId   string            `json:"roleTemplateId,omitempty"`

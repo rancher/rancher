@@ -6,6 +6,7 @@ import (
 
 const (
 	MachineDriverType                      = "machineDriver"
+	MachineDriverField                     = "creatorId"
 	MachineDriverFieldActive               = "active"
 	MachineDriverFieldAnnotations          = "annotations"
 	MachineDriverFieldBuiltin              = "builtin"
@@ -29,6 +30,7 @@ const (
 
 type MachineDriver struct {
 	types.Resource
+	string               `json:"creatorId,omitempty"`
 	Active               *bool                `json:"active,omitempty"`
 	Annotations          map[string]string    `json:"annotations,omitempty"`
 	Builtin              *bool                `json:"builtin,omitempty"`

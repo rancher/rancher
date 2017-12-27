@@ -6,11 +6,13 @@ import (
 
 const (
 	ProjectRoleTemplateBindingType                  = "projectRoleTemplateBinding"
+	ProjectRoleTemplateBindingField                 = "creatorId"
 	ProjectRoleTemplateBindingFieldAnnotations      = "annotations"
 	ProjectRoleTemplateBindingFieldCreated          = "created"
 	ProjectRoleTemplateBindingFieldFinalizers       = "finalizers"
 	ProjectRoleTemplateBindingFieldLabels           = "labels"
 	ProjectRoleTemplateBindingFieldName             = "name"
+	ProjectRoleTemplateBindingFieldNamespaceId      = "namespaceId"
 	ProjectRoleTemplateBindingFieldOwnerReferences  = "ownerReferences"
 	ProjectRoleTemplateBindingFieldProjectId        = "projectId"
 	ProjectRoleTemplateBindingFieldRemoved          = "removed"
@@ -23,11 +25,13 @@ const (
 
 type ProjectRoleTemplateBinding struct {
 	types.Resource
+	string           `json:"creatorId,omitempty"`
 	Annotations      map[string]string `json:"annotations,omitempty"`
 	Created          string            `json:"created,omitempty"`
 	Finalizers       []string          `json:"finalizers,omitempty"`
 	Labels           map[string]string `json:"labels,omitempty"`
 	Name             string            `json:"name,omitempty"`
+	NamespaceId      string            `json:"namespaceId,omitempty"`
 	OwnerReferences  []OwnerReference  `json:"ownerReferences,omitempty"`
 	ProjectId        string            `json:"projectId,omitempty"`
 	Removed          string            `json:"removed,omitempty"`

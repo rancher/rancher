@@ -38,6 +38,21 @@ func (c Cond) IsUnknown(obj runtime.Object) bool {
 func (c Cond) Reason(obj runtime.Object, reason string) {
 	cond := findOrCreateCond(obj, string(c))
 	getFieldValue(cond, "Reason").SetString(reason)
+}
+
+func (c Cond) Message(obj runtime.Object, message string) {
+	cond := findOrCreateCond(obj, string(c))
+	getFieldValue(cond, "Message").SetString(message)
+}
+
+func (c Cond) ReasonAndMessageFromError(obj runtime.Object, err error) {
+	cond := findOrCreateCond(obj, string(c))
+	getFieldValue(cond, "Message").SetString(err.Error())
+	if ce, ok := err.(*conditionError); ok {
+		getFieldValue(cond, "Reason").SetString(ce.reason)
+	} else {
+		getFieldValue(cond, "Reason").SetString("Error")
+	}
 	touchTS(cond)
 }
 
@@ -65,14 +80,14 @@ func (c Cond) Once(obj runtime.Object, f func() (runtime.Object, error)) (runtim
 
 	if err != nil {
 		c.False(obj)
-		c.Reason(obj, err.Error())
+		c.ReasonAndMessageFromError(obj, err)
 		return obj, err
 	}
 	c.True(obj)
 	return obj, nil
 }
 
-func (c Cond) Do(obj runtime.Object, f func() (runtime.Object, error)) error {
+func (c Cond) Do(obj runtime.Object, f func() (runtime.Object, error)) (runtime.Object, error) {
 	c.Unknown(obj)
 	newObj, err := f()
 	if newObj != nil {
@@ -81,11 +96,13 @@ func (c Cond) Do(obj runtime.Object, f func() (runtime.Object, error)) error {
 
 	if err != nil {
 		c.False(obj)
-		c.Reason(obj, err.Error())
-		return err
+		c.ReasonAndMessageFromError(obj, err)
+		return obj, err
 	}
 	c.True(obj)
-	return nil
+	c.Reason(obj, "")
+	c.Message(obj, "")
+	return obj, nil
 }
 
 func touchTS(value reflect.Value) {
@@ -151,4 +168,20 @@ func getFieldValue(v reflect.Value, name ...string) reflect.Value {
 		return field
 	}
 	return getFieldValue(field, name[1:]...)
+}
+
+func Error(reason string, err error) error {
+	return &conditionError{
+		reason:  reason,
+		message: err.Error(),
+	}
+}
+
+type conditionError struct {
+	reason  string
+	message string
+}
+
+func (e *conditionError) Error() string {
+	return e.message
 }

@@ -6,6 +6,7 @@ import (
 
 const (
 	ServiceType                          = "service"
+	ServiceField                         = "creatorId"
 	ServiceFieldAnnotations              = "annotations"
 	ServiceFieldClusterIp                = "clusterIp"
 	ServiceFieldCreated                  = "created"
@@ -39,6 +40,7 @@ const (
 
 type Service struct {
 	types.Resource
+	string                   `json:"creatorId,omitempty"`
 	Annotations              map[string]string      `json:"annotations,omitempty"`
 	ClusterIp                string                 `json:"clusterIp,omitempty"`
 	Created                  string                 `json:"created,omitempty"`

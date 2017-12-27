@@ -6,6 +6,7 @@ import (
 
 const (
 	DaemonSetType                               = "daemonSet"
+	DaemonSetField                              = "creatorId"
 	DaemonSetFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	DaemonSetFieldAnnotations                   = "annotations"
 	DaemonSetFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
@@ -55,6 +56,7 @@ const (
 
 type DaemonSet struct {
 	types.Resource
+	string                        `json:"creatorId,omitempty"`
 	ActiveDeadlineSeconds         *int64                   `json:"activeDeadlineSeconds,omitempty"`
 	Annotations                   map[string]string        `json:"annotations,omitempty"`
 	AutomountServiceAccountToken  *bool                    `json:"automountServiceAccountToken,omitempty"`

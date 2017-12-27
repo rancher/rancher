@@ -6,6 +6,7 @@ import (
 
 const (
 	TemplateVersionType                       = "templateVersion"
+	TemplateVersionField                      = "creatorId"
 	TemplateVersionFieldAnnotations           = "annotations"
 	TemplateVersionFieldCreated               = "created"
 	TemplateVersionFieldExternalID            = "externalId"
@@ -32,6 +33,7 @@ const (
 
 type TemplateVersion struct {
 	types.Resource
+	string                `json:"creatorId,omitempty"`
 	Annotations           map[string]string      `json:"annotations,omitempty"`
 	Created               string                 `json:"created,omitempty"`
 	ExternalID            string                 `json:"externalId,omitempty"`

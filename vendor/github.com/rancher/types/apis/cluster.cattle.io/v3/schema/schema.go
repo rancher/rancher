@@ -18,7 +18,8 @@ var (
 
 	Schemas = factory.Schemas(&Version).
 		Init(namespaceTypes).
-		Init(nodeTypes)
+		Init(nodeTypes).
+		Init(volumeTypes)
 )
 
 func namespaceTypes(schemas *types.Schemas) *types.Schemas {
@@ -48,4 +49,9 @@ func nodeTypes(schemas *types.Schemas) *types.Schemas {
 			Info      NodeInfo
 		}{}).
 		MustImport(&Version, v1.Node{})
+}
+
+func volumeTypes(schemas *types.Schemas) *types.Schemas {
+	return schemas.
+		MustImport(&Version, v1.PersistentVolume{})
 }

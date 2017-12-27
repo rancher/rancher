@@ -6,6 +6,7 @@ import (
 
 const (
 	GlobalRoleType                 = "globalRole"
+	GlobalRoleField                = "creatorId"
 	GlobalRoleFieldAnnotations     = "annotations"
 	GlobalRoleFieldBuiltin         = "builtin"
 	GlobalRoleFieldCreated         = "created"
@@ -21,6 +22,7 @@ const (
 
 type GlobalRole struct {
 	types.Resource
+	string          `json:"creatorId,omitempty"`
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	Builtin         *bool             `json:"builtin,omitempty"`
 	Created         string            `json:"created,omitempty"`

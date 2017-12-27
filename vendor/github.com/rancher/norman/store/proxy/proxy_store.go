@@ -21,8 +21,9 @@ import (
 )
 
 var (
-	authHeaders = []string{
-		"Impersonate-User",
+	userAuthHeader = "Impersonate-User"
+	authHeaders    = []string{
+		userAuthHeader,
 		"Impersonate-Group",
 	}
 )
@@ -53,6 +54,10 @@ func NewProxyStore(k8sClient rest.Interface,
 	}
 }
 
+func (p *Store) getUser(apiContext *types.APIContext) string {
+	return apiContext.Request.Header.Get(userAuthHeader)
+}
+
 func (p *Store) doAuthed(apiContext *types.APIContext, request *rest.Request) rest.Result {
 	for _, header := range authHeaders {
 		request.SetHeader(header, apiContext.Request.Header[http.CanonicalHeaderKey(header)]...)
@@ -74,7 +79,7 @@ func (p *Store) byID(apiContext *types.APIContext, schema *types.Schema, id stri
 	return p.singleResult(apiContext, schema, req)
 }
 
-func (p *Store) List(apiContext *types.APIContext, schema *types.Schema, opt types.QueryOptions) ([]map[string]interface{}, error) {
+func (p *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {
 	namespace := getNamespace(apiContext, opt)
 
 	req := p.common(namespace, p.k8sClient.Get())
@@ -94,7 +99,7 @@ func (p *Store) List(apiContext *types.APIContext, schema *types.Schema, opt typ
 	return apiContext.AccessControl.FilterList(apiContext, result, p.authContext), nil
 }
 
-func (p *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt types.QueryOptions) (chan map[string]interface{}, error) {
+func (p *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
 	namespace := getNamespace(apiContext, opt)
 
 	req := p.common(namespace, p.k8sClient.Get())
@@ -121,6 +126,9 @@ func (p *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt ty
 		for event := range watcher.ResultChan() {
 			data := event.Object.(*unstructured.Unstructured)
 			p.fromInternal(schema, data.Object)
+			if event.Type == watch.Deleted && data.Object != nil {
+				data.Object[".removed"] = true
+			}
 			result <- apiContext.AccessControl.Filter(apiContext, data.Object, p.authContext)
 		}
 		close(result)
@@ -139,7 +147,7 @@ func (d *unstructuredDecoder) Decode(data []byte, defaults *schema.GroupVersionK
 	return into, defaults, ejson.Unmarshal(data, &into)
 }
 
-func getNamespace(apiContext *types.APIContext, opt types.QueryOptions) string {
+func getNamespace(apiContext *types.APIContext, opt *types.QueryOptions) string {
 	if val, ok := apiContext.SubContext["namespaces"]; ok {
 		return convert.ToString(val)
 	}
@@ -156,6 +164,8 @@ func getNamespace(apiContext *types.APIContext, opt types.QueryOptions) string {
 func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
 	namespace, _ := data["namespaceId"].(string)
 	p.toInternal(schema.Mapper, data)
+
+	values.PutValue(data, p.getUser(apiContext), "metadata", "annotations", "field.cattle.io/creatorId")
 
 	name, _ := values.GetValueN(data, "metadata", "name").(string)
 	if name == "" {

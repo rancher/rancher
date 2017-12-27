@@ -37,11 +37,11 @@ func (a *AggregateStore) ByID(apiContext *types.APIContext, schema *types.Schema
 	return store.ByID(apiContext, schema, id)
 }
 
-func (a *AggregateStore) Watch(apiContext *types.APIContext, schema *types.Schema, opt types.QueryOptions) (chan map[string]interface{}, error) {
+func (a *AggregateStore) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
 	return a.CreateStore.Watch(apiContext, schema, opt)
 }
 
-func (a *AggregateStore) List(apiContext *types.APIContext, schema *types.Schema, opt types.QueryOptions) ([]map[string]interface{}, error) {
+func (a *AggregateStore) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {
 	items := make(chan map[string]interface{})
 
 	g, ctx := errgroup.WithContext(apiContext.Request.Context())

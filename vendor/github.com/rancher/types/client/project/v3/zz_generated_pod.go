@@ -6,6 +6,7 @@ import (
 
 const (
 	PodType                               = "pod"
+	PodField                              = "creatorId"
 	PodFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	PodFieldAnnotations                   = "annotations"
 	PodFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
@@ -49,6 +50,7 @@ const (
 
 type Pod struct {
 	types.Resource
+	string                        `json:"creatorId,omitempty"`
 	ActiveDeadlineSeconds         *int64                 `json:"activeDeadlineSeconds,omitempty"`
 	Annotations                   map[string]string      `json:"annotations,omitempty"`
 	AutomountServiceAccountToken  *bool                  `json:"automountServiceAccountToken,omitempty"`

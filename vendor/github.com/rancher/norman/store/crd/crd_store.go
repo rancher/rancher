@@ -68,7 +68,7 @@ func (c *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id st
 	return store.Delete(apiContext, schema, id)
 }
 
-func (c *Store) List(apiContext *types.APIContext, schema *types.Schema, opt types.QueryOptions) ([]map[string]interface{}, error) {
+func (c *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {
 	store, ok := c.schemaStores[key(schema)]
 	if !ok {
 		return nil, nil
@@ -76,7 +76,7 @@ func (c *Store) List(apiContext *types.APIContext, schema *types.Schema, opt typ
 	return store.List(apiContext, schema, opt)
 }
 
-func (c *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt types.QueryOptions) (chan map[string]interface{}, error) {
+func (c *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
 	store, ok := c.schemaStores[key(schema)]
 	if !ok {
 		return nil, nil

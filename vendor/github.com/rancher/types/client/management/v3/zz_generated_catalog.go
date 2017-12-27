@@ -6,6 +6,7 @@ import (
 
 const (
 	CatalogType                      = "catalog"
+	CatalogField                     = "creatorId"
 	CatalogFieldAnnotations          = "annotations"
 	CatalogFieldBranch               = "branch"
 	CatalogFieldCatalogKind          = "catalogKind"
@@ -25,6 +26,7 @@ const (
 
 type Catalog struct {
 	types.Resource
+	string               `json:"creatorId,omitempty"`
 	Annotations          map[string]string `json:"annotations,omitempty"`
 	Branch               string            `json:"branch,omitempty"`
 	CatalogKind          string            `json:"catalogKind,omitempty"`

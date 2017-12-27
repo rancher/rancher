@@ -6,6 +6,7 @@ import (
 
 const (
 	DynamicSchemaType                      = "dynamicSchema"
+	DynamicSchemaField                     = "creatorId"
 	DynamicSchemaFieldAnnotations          = "annotations"
 	DynamicSchemaFieldCollectionActions    = "collectionActions"
 	DynamicSchemaFieldCollectionFields     = "collectionFields"
@@ -33,6 +34,7 @@ const (
 
 type DynamicSchema struct {
 	types.Resource
+	string               `json:"creatorId,omitempty"`
 	Annotations          map[string]string    `json:"annotations,omitempty"`
 	CollectionActions    map[string]Action    `json:"collectionActions,omitempty"`
 	CollectionFields     map[string]Field     `json:"collectionFields,omitempty"`

@@ -6,6 +6,7 @@ import (
 
 const (
 	NamespaceType                      = "namespace"
+	NamespaceField                     = "creatorId"
 	NamespaceFieldAnnotations          = "annotations"
 	NamespaceFieldAnswers              = "answers"
 	NamespaceFieldCreated              = "created"
@@ -28,6 +29,7 @@ const (
 
 type Namespace struct {
 	types.Resource
+	string               `json:"creatorId,omitempty"`
 	Annotations          map[string]string      `json:"annotations,omitempty"`
 	Answers              map[string]interface{} `json:"answers,omitempty"`
 	Created              string                 `json:"created,omitempty"`

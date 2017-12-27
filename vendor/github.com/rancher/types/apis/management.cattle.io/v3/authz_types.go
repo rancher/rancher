@@ -1,16 +1,44 @@
 package v3
 
 import (
+	"github.com/rancher/norman/condition"
+	"github.com/rancher/norman/types"
+	"k8s.io/api/core/v1"
 	extv1 "k8s.io/api/extensions/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+var (
+	NamespaceBackedResource condition.Cond = "BackingNamespaceCreated"
+	CreatorMadeOwner        condition.Cond = "CreatorMadeOwner"
 )
 
 type Project struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec ProjectSpec `json:"spec,omitempty"`
+	Spec   ProjectSpec   `json:"spec,omitempty"`
+	Status ProjectStatus `json:"status"`
+}
+
+type ProjectStatus struct {
+	Conditions []ProjectCondition `json:"conditions"`
+}
+
+type ProjectCondition struct {
+	// Type of project condition.
+	Type string `json:"type"`
+	// Status of the condition, one of True, False, Unknown.
+	Status v1.ConditionStatus `json:"status"`
+	// The last time this condition was updated.
+	LastUpdateTime string `json:"lastUpdateTime,omitempty"`
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime string `json:"lastTransitionTime,omitempty"`
+	// The reason for the condition's last transition.
+	Reason string `json:"reason,omitempty"`
+	// Human-readable message indicating details about last transition
+	Message string `json:"message,omitempty"`
 }
 
 type ProjectSpec struct {
@@ -56,6 +84,7 @@ type PodSecurityPolicyTemplate struct {
 }
 
 type ProjectRoleTemplateBinding struct {
+	types.Namespaced
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
@@ -66,6 +95,7 @@ type ProjectRoleTemplateBinding struct {
 }
 
 type ClusterRoleTemplateBinding struct {
+	types.Namespaced
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 

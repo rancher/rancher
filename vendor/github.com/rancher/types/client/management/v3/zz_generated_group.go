@@ -6,6 +6,7 @@ import (
 
 const (
 	GroupType                 = "group"
+	GroupField                = "creatorId"
 	GroupFieldAnnotations     = "annotations"
 	GroupFieldCreated         = "created"
 	GroupFieldFinalizers      = "finalizers"
@@ -19,6 +20,7 @@ const (
 
 type Group struct {
 	types.Resource
+	string          `json:"creatorId,omitempty"`
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	Created         string            `json:"created,omitempty"`
 	Finalizers      []string          `json:"finalizers,omitempty"`

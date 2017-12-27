@@ -6,13 +6,16 @@ import (
 
 const (
 	PersistentVolumeClaimType                      = "persistentVolumeClaim"
+	PersistentVolumeClaimField                     = "creatorId"
 	PersistentVolumeClaimFieldAccessModes          = "accessModes"
 	PersistentVolumeClaimFieldAnnotations          = "annotations"
 	PersistentVolumeClaimFieldCreated              = "created"
 	PersistentVolumeClaimFieldFinalizers           = "finalizers"
 	PersistentVolumeClaimFieldLabels               = "labels"
 	PersistentVolumeClaimFieldName                 = "name"
+	PersistentVolumeClaimFieldNamespaceId          = "namespaceId"
 	PersistentVolumeClaimFieldOwnerReferences      = "ownerReferences"
+	PersistentVolumeClaimFieldProjectID            = "projectId"
 	PersistentVolumeClaimFieldRemoved              = "removed"
 	PersistentVolumeClaimFieldResources            = "resources"
 	PersistentVolumeClaimFieldSelector             = "selector"
@@ -27,13 +30,16 @@ const (
 
 type PersistentVolumeClaim struct {
 	types.Resource
+	string               `json:"creatorId,omitempty"`
 	AccessModes          []string                     `json:"accessModes,omitempty"`
 	Annotations          map[string]string            `json:"annotations,omitempty"`
 	Created              string                       `json:"created,omitempty"`
 	Finalizers           []string                     `json:"finalizers,omitempty"`
 	Labels               map[string]string            `json:"labels,omitempty"`
 	Name                 string                       `json:"name,omitempty"`
+	NamespaceId          string                       `json:"namespaceId,omitempty"`
 	OwnerReferences      []OwnerReference             `json:"ownerReferences,omitempty"`
+	ProjectID            string                       `json:"projectId,omitempty"`
 	Removed              string                       `json:"removed,omitempty"`
 	Resources            *ResourceRequirements        `json:"resources,omitempty"`
 	Selector             *LabelSelector               `json:"selector,omitempty"`

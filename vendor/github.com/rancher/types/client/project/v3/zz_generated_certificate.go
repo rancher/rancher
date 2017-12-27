@@ -6,7 +6,8 @@ import (
 
 const (
 	CertificateType                         = "certificate"
-	CertificateFieldAlgorithm               = "Algorithm"
+	CertificateField                        = "creatorId"
+	CertificateFieldAlgorithm               = "algorithm"
 	CertificateFieldAnnotations             = "annotations"
 	CertificateFieldCN                      = "cn"
 	CertificateFieldCertFingerprint         = "certFingerprint"
@@ -19,7 +20,7 @@ const (
 	CertificateFieldKeySize                 = "keySize"
 	CertificateFieldLabels                  = "labels"
 	CertificateFieldName                    = "name"
-	CertificateFieldNamespace               = "namespace"
+	CertificateFieldNamespaceId             = "namespaceId"
 	CertificateFieldOwnerReferences         = "ownerReferences"
 	CertificateFieldProjectID               = "projectId"
 	CertificateFieldRemoved                 = "removed"
@@ -31,7 +32,8 @@ const (
 
 type Certificate struct {
 	types.Resource
-	Algorithm               string            `json:"Algorithm,omitempty"`
+	string                  `json:"creatorId,omitempty"`
+	Algorithm               string            `json:"algorithm,omitempty"`
 	Annotations             map[string]string `json:"annotations,omitempty"`
 	CN                      string            `json:"cn,omitempty"`
 	CertFingerprint         string            `json:"certFingerprint,omitempty"`
@@ -44,7 +46,7 @@ type Certificate struct {
 	KeySize                 string            `json:"keySize,omitempty"`
 	Labels                  map[string]string `json:"labels,omitempty"`
 	Name                    string            `json:"name,omitempty"`
-	Namespace               string            `json:"namespace,omitempty"`
+	NamespaceId             string            `json:"namespaceId,omitempty"`
 	OwnerReferences         []OwnerReference  `json:"ownerReferences,omitempty"`
 	ProjectID               string            `json:"projectId,omitempty"`
 	Removed                 string            `json:"removed,omitempty"`

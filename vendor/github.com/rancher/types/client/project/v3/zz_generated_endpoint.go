@@ -6,6 +6,7 @@ import (
 
 const (
 	EndpointType                 = "endpoint"
+	EndpointField                = "creatorId"
 	EndpointFieldAnnotations     = "annotations"
 	EndpointFieldCreated         = "created"
 	EndpointFieldFinalizers      = "finalizers"
@@ -22,6 +23,7 @@ const (
 
 type Endpoint struct {
 	types.Resource
+	string          `json:"creatorId,omitempty"`
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	Created         string            `json:"created,omitempty"`
 	Finalizers      []string          `json:"finalizers,omitempty"`

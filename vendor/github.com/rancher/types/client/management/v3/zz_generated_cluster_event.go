@@ -6,6 +6,7 @@ import (
 
 const (
 	ClusterEventType                 = "clusterEvent"
+	ClusterEventField                = "creatorId"
 	ClusterEventFieldAnnotations     = "annotations"
 	ClusterEventFieldClusterId       = "clusterId"
 	ClusterEventFieldCount           = "count"
@@ -27,6 +28,7 @@ const (
 
 type ClusterEvent struct {
 	types.Resource
+	string          `json:"creatorId,omitempty"`
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	ClusterId       string            `json:"clusterId,omitempty"`
 	Count           *int64            `json:"count,omitempty"`

@@ -6,7 +6,7 @@ const (
 	RKEConfigNodeFieldDockerSocket     = "dockerSocket"
 	RKEConfigNodeFieldHostnameOverride = "hostnameOverride"
 	RKEConfigNodeFieldInternalAddress  = "internalAddress"
-	RKEConfigNodeFieldMachineName      = "machineName"
+	RKEConfigNodeFieldMachineId        = "machineId"
 	RKEConfigNodeFieldRole             = "role"
 	RKEConfigNodeFieldSSHKey           = "sshKey"
 	RKEConfigNodeFieldSSHKeyPath       = "sshKeyPath"
@@ -18,7 +18,7 @@ type RKEConfigNode struct {
 	DockerSocket     string   `json:"dockerSocket,omitempty"`
 	HostnameOverride string   `json:"hostnameOverride,omitempty"`
 	InternalAddress  string   `json:"internalAddress,omitempty"`
-	MachineName      string   `json:"machineName,omitempty"`
+	MachineId        string   `json:"machineId,omitempty"`
 	Role             []string `json:"role,omitempty"`
 	SSHKey           string   `json:"sshKey,omitempty"`
 	SSHKeyPath       string   `json:"sshKeyPath,omitempty"`

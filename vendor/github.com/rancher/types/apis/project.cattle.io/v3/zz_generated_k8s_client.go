@@ -19,6 +19,11 @@ type Interface interface {
 	CertificatesGetter
 	BasicAuthsGetter
 	SSHAuthsGetter
+	NamespacedServiceAccountTokensGetter
+	NamespacedDockerCredentialsGetter
+	NamespacedCertificatesGetter
+	NamespacedBasicAuthsGetter
+	NamespacedSSHAuthsGetter
 	WorkloadsGetter
 }
 
@@ -27,12 +32,17 @@ type Client struct {
 	restClient rest.Interface
 	starters   []controller.Starter
 
-	serviceAccountTokenControllers map[string]ServiceAccountTokenController
-	dockerCredentialControllers    map[string]DockerCredentialController
-	certificateControllers         map[string]CertificateController
-	basicAuthControllers           map[string]BasicAuthController
-	sshAuthControllers             map[string]SSHAuthController
-	workloadControllers            map[string]WorkloadController
+	serviceAccountTokenControllers           map[string]ServiceAccountTokenController
+	dockerCredentialControllers              map[string]DockerCredentialController
+	certificateControllers                   map[string]CertificateController
+	basicAuthControllers                     map[string]BasicAuthController
+	sshAuthControllers                       map[string]SSHAuthController
+	namespacedServiceAccountTokenControllers map[string]NamespacedServiceAccountTokenController
+	namespacedDockerCredentialControllers    map[string]NamespacedDockerCredentialController
+	namespacedCertificateControllers         map[string]NamespacedCertificateController
+	namespacedBasicAuthControllers           map[string]NamespacedBasicAuthController
+	namespacedSshAuthControllers             map[string]NamespacedSSHAuthController
+	workloadControllers                      map[string]WorkloadController
 }
 
 func NewForConfig(config rest.Config) (Interface, error) {
@@ -49,12 +59,17 @@ func NewForConfig(config rest.Config) (Interface, error) {
 	return &Client{
 		restClient: restClient,
 
-		serviceAccountTokenControllers: map[string]ServiceAccountTokenController{},
-		dockerCredentialControllers:    map[string]DockerCredentialController{},
-		certificateControllers:         map[string]CertificateController{},
-		basicAuthControllers:           map[string]BasicAuthController{},
-		sshAuthControllers:             map[string]SSHAuthController{},
-		workloadControllers:            map[string]WorkloadController{},
+		serviceAccountTokenControllers:           map[string]ServiceAccountTokenController{},
+		dockerCredentialControllers:              map[string]DockerCredentialController{},
+		certificateControllers:                   map[string]CertificateController{},
+		basicAuthControllers:                     map[string]BasicAuthController{},
+		sshAuthControllers:                       map[string]SSHAuthController{},
+		namespacedServiceAccountTokenControllers: map[string]NamespacedServiceAccountTokenController{},
+		namespacedDockerCredentialControllers:    map[string]NamespacedDockerCredentialController{},
+		namespacedCertificateControllers:         map[string]NamespacedCertificateController{},
+		namespacedBasicAuthControllers:           map[string]NamespacedBasicAuthController{},
+		namespacedSshAuthControllers:             map[string]NamespacedSSHAuthController{},
+		workloadControllers:                      map[string]WorkloadController{},
 	}, nil
 }
 
@@ -129,6 +144,71 @@ type SSHAuthsGetter interface {
 func (c *Client) SSHAuths(namespace string) SSHAuthInterface {
 	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &SSHAuthResource, SSHAuthGroupVersionKind, sshAuthFactory{})
 	return &sshAuthClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type NamespacedServiceAccountTokensGetter interface {
+	NamespacedServiceAccountTokens(namespace string) NamespacedServiceAccountTokenInterface
+}
+
+func (c *Client) NamespacedServiceAccountTokens(namespace string) NamespacedServiceAccountTokenInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &NamespacedServiceAccountTokenResource, NamespacedServiceAccountTokenGroupVersionKind, namespacedServiceAccountTokenFactory{})
+	return &namespacedServiceAccountTokenClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type NamespacedDockerCredentialsGetter interface {
+	NamespacedDockerCredentials(namespace string) NamespacedDockerCredentialInterface
+}
+
+func (c *Client) NamespacedDockerCredentials(namespace string) NamespacedDockerCredentialInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &NamespacedDockerCredentialResource, NamespacedDockerCredentialGroupVersionKind, namespacedDockerCredentialFactory{})
+	return &namespacedDockerCredentialClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type NamespacedCertificatesGetter interface {
+	NamespacedCertificates(namespace string) NamespacedCertificateInterface
+}
+
+func (c *Client) NamespacedCertificates(namespace string) NamespacedCertificateInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &NamespacedCertificateResource, NamespacedCertificateGroupVersionKind, namespacedCertificateFactory{})
+	return &namespacedCertificateClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type NamespacedBasicAuthsGetter interface {
+	NamespacedBasicAuths(namespace string) NamespacedBasicAuthInterface
+}
+
+func (c *Client) NamespacedBasicAuths(namespace string) NamespacedBasicAuthInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &NamespacedBasicAuthResource, NamespacedBasicAuthGroupVersionKind, namespacedBasicAuthFactory{})
+	return &namespacedBasicAuthClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type NamespacedSSHAuthsGetter interface {
+	NamespacedSSHAuths(namespace string) NamespacedSSHAuthInterface
+}
+
+func (c *Client) NamespacedSSHAuths(namespace string) NamespacedSSHAuthInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &NamespacedSSHAuthResource, NamespacedSSHAuthGroupVersionKind, namespacedSshAuthFactory{})
+	return &namespacedSshAuthClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,
