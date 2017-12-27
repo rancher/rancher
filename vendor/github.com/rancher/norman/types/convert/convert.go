@@ -76,6 +76,14 @@ func Capitalize(s string) string {
 	return strings.ToUpper(s[:1]) + s[1:]
 }
 
+func Uncapitalize(s string) string {
+	if len(s) <= 1 {
+		return strings.ToLower(s)
+	}
+
+	return strings.ToLower(s[:1]) + s[1:]
+}
+
 func LowerTitle(input string) string {
 	runes := []rune(input)
 	for i := 0; i < len(runes); i++ {

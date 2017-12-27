@@ -12,6 +12,5 @@ func NewWorkloadTypeMapper() types.Mapper {
 		&m.Move{From: "metadata/labels", To: "labels", NoDeleteFromField: true},
 		&m.Move{From: "metadata/annotations", To: "annotations", NoDeleteFromField: true},
 		&m.Drop{Field: "metadata"},
-		&NamespaceIDMapper{},
 	}
 }

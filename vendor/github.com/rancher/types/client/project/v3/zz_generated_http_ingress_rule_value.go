@@ -6,5 +6,5 @@ const (
 )
 
 type HTTPIngressRuleValue struct {
-	Paths []HTTPIngressPath `json:"paths,omitempty"`
+	Paths map[string]HTTPIngressPath `json:"paths,omitempty"`
 }

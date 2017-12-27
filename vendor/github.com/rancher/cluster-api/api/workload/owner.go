@@ -17,7 +17,7 @@ func OwnerMap(context *types.APIContext) (map[string]string, error) {
 	result := map[string]string{}
 
 	var workloads []client.Workload
-	if err := access.List(context, &schema.Version, client.WorkloadType, types.QueryOptions{
+	if err := access.List(context, &schema.Version, client.WorkloadType, &types.QueryOptions{
 		Options: map[string]string{
 			"hidden": "true",
 		},

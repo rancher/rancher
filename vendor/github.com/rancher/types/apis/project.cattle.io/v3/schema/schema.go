@@ -24,6 +24,8 @@ var (
 	Schemas = factory.Schemas(&Version).
 		// Namespace must be first
 		Init(namespaceTypes).
+		// volume before pod types.  pod types uses volume things, so need to register mapper
+		Init(volumeTypes).
 		Init(ingressTypes).
 		Init(secretTypes).
 		Init(serviceTypes).
@@ -282,9 +284,6 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 		AddMapperForType(&Version, v1.ResourceRequirements{},
 			mapper.PivotMapper{Plural: true},
 		).
-		AddMapperForType(&Version, v1.Pod{},
-			&mapper.NamespaceIDMapper{},
-		).
 		// Must import handlers before Container
 		MustImport(&Version, v1.Capabilities{}, struct {
 			Add  []string `norman:"type=array[enum],options=AUDIT_CONTROL|AUDIT_WRITE|BLOCK_SUSPEND|CHOWN|DAC_OVERRIDE|DAC_READ_SEARCH|FOWNER|FSETID|IPC_LOCK|IPC_OWNER|KILL|LEASE|LINUX_IMMUTABLE|MAC_ADMIN|MAC_OVERRIDE|MKNOD|NET_ADMIN|NET_BIND_SERVICE|NET_BROADCAST|NET_RAW|SETFCAP|SETGID|SETPCAP|SETUID|SYSLOG|SYS_ADMIN|SYS_BOOT|SYS_CHROOT|SYS_MODULE|SYS_NICE|SYS_PACCT|SYS_PTRACE|SYS_RAWIO|SYS_RESOURCE|SYS_TIME|SYS_TTY_CONFIG|WAKE_ALARM"`
@@ -323,13 +322,11 @@ func serviceTypes(schemas *types.Schemas) *types.Schemas {
 			&m.LabelField{Field: "workloadId"},
 			&m.Drop{Field: "status"},
 			&m.Move{From: "serviceKind", To: "kind"},
-			&mapper.NamespaceIDMapper{},
 			&m.AnnotationField{Field: "targetWorkloadIds", Object: true},
 			&m.AnnotationField{Field: "targetServiceIds", Object: true},
 		).
 		AddMapperForType(&Version, v1.Endpoints{},
 			&EndpointAddressMapper{},
-			&mapper.NamespaceIDMapper{},
 		).
 		MustImport(&Version, v1.Service{}, projectOverride{}, struct {
 			WorkloadID        string `json:"workloadId" norman:"type=reference[workload]"`
@@ -347,15 +344,23 @@ func serviceTypes(schemas *types.Schemas) *types.Schemas {
 
 func ingressTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
+		AddMapperForType(&Version, v1beta1.HTTPIngressRuleValue{},
+			&m.SliceToMap{Field: "paths", Key: "path"},
+		).
 		AddMapperForType(&Version, v1beta1.HTTPIngressPath{},
 			&m.Embed{Field: "backend"},
 		).
+		AddMapperForType(&Version, v1beta1.IngressRule{},
+			&m.Embed{Field: "http"},
+		).
 		AddMapperForType(&Version, v1beta1.Ingress{},
-			&mapper.NamespaceIDMapper{},
 			&m.Move{From: "backend", To: "defaultBackend"},
 		).
 		AddMapperForType(&Version, v1beta1.IngressTLS{},
 			&m.Move{From: "secretName", To: "certificateName"},
+		).
+		AddMapperForType(&Version, v1beta1.IngressBackend{},
+			&m.Move{From: "servicePort", To: "targetPort"},
 		).
 		MustImport(&Version, v1beta1.IngressBackend{}, struct {
 			WorkloadIDs string `json:"workloadIds" norman:"type=array[reference[workload]]"`
@@ -364,6 +369,10 @@ func ingressTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v1beta1.IngressTLS{}, struct {
 			SecretName string `norman:"type=reference[certificate]"`
 		}{}).
-		MustImport(&Version, v1beta1.Ingress{}, projectOverride{}, struct {
-		}{})
+		MustImport(&Version, v1beta1.Ingress{}, projectOverride{})
+}
+
+func volumeTypes(schemas *types.Schemas) *types.Schemas {
+	return schemas.
+		MustImport(&Version, v1.PersistentVolumeClaim{}, projectOverride{})
 }

@@ -9,7 +9,7 @@ import (
 
 func ProjectMap(apiContext *types.APIContext) (map[string]string, error) {
 	var namespaces []client.Namespace
-	if err := access.List(apiContext, &schema.Version, client.NamespaceType, types.QueryOptions{}, &namespaces); err != nil {
+	if err := access.List(apiContext, &schema.Version, client.NamespaceType, &types.QueryOptions{}, &namespaces); err != nil {
 		return nil, err
 	}
 

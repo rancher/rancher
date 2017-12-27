@@ -86,11 +86,12 @@ type MachineCondition struct {
 	LastTransitionTime string `json:"lastTransitionTime,omitempty"`
 	// The reason for the condition's last transition.
 	Reason string `json:"reason,omitempty"`
+	// Human-readable message indicating details about last transition
+	Message string `json:"message,omitempty"`
 }
 
 type MachineSpec struct {
 	NodeSpec            v1.NodeSpec `json:"nodeSpec"`
-	DisplayName         string      `json:"displayName"`
 	ClusterName         string      `json:"clusterName" norman:"type=reference[cluster]"`
 	Roles               []string    `json:"roles"`
 	MachineTemplateName string      `json:"machineTemplateName" norman:"type=reference[machineTemplate]"`

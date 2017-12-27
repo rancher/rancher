@@ -6,12 +6,14 @@ import (
 
 const (
 	SSHAuthType                 = "sshAuth"
+	SSHAuthField                = "creatorId"
 	SSHAuthFieldAnnotations     = "annotations"
 	SSHAuthFieldCreated         = "created"
 	SSHAuthFieldFinalizers      = "finalizers"
+	SSHAuthFieldFingerprint     = "certFingerprint"
 	SSHAuthFieldLabels          = "labels"
 	SSHAuthFieldName            = "name"
-	SSHAuthFieldNamespace       = "namespace"
+	SSHAuthFieldNamespaceId     = "namespaceId"
 	SSHAuthFieldOwnerReferences = "ownerReferences"
 	SSHAuthFieldPrivateKey      = "privateKey"
 	SSHAuthFieldProjectID       = "projectId"
@@ -21,12 +23,14 @@ const (
 
 type SSHAuth struct {
 	types.Resource
+	string          `json:"creatorId,omitempty"`
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	Created         string            `json:"created,omitempty"`
 	Finalizers      []string          `json:"finalizers,omitempty"`
+	Fingerprint     string            `json:"certFingerprint,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`
 	Name            string            `json:"name,omitempty"`
-	Namespace       string            `json:"namespace,omitempty"`
+	NamespaceId     string            `json:"namespaceId,omitempty"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
 	PrivateKey      string            `json:"privateKey,omitempty"`
 	ProjectID       string            `json:"projectId,omitempty"`

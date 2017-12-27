@@ -7,24 +7,30 @@ import (
 type Client struct {
 	clientbase.APIBaseClient
 
-	Namespace             NamespaceOperations
-	Ingress               IngressOperations
-	Secret                SecretOperations
-	ServiceAccountToken   ServiceAccountTokenOperations
-	DockerCredential      DockerCredentialOperations
-	Certificate           CertificateOperations
-	BasicAuth             BasicAuthOperations
-	SSHAuth               SSHAuthOperations
-	Service               ServiceOperations
-	Endpoint              EndpointOperations
-	Pod                   PodOperations
-	Deployment            DeploymentOperations
-	PersistentVolumeClaim PersistentVolumeClaimOperations
-	StatefulSet           StatefulSetOperations
-	ReplicaSet            ReplicaSetOperations
-	ReplicationController ReplicationControllerOperations
-	DaemonSet             DaemonSetOperations
-	Workload              WorkloadOperations
+	Namespace                     NamespaceOperations
+	PersistentVolumeClaim         PersistentVolumeClaimOperations
+	Ingress                       IngressOperations
+	Secret                        SecretOperations
+	ServiceAccountToken           ServiceAccountTokenOperations
+	DockerCredential              DockerCredentialOperations
+	Certificate                   CertificateOperations
+	BasicAuth                     BasicAuthOperations
+	SSHAuth                       SSHAuthOperations
+	NamespacedSecret              NamespacedSecretOperations
+	NamespacedServiceAccountToken NamespacedServiceAccountTokenOperations
+	NamespacedDockerCredential    NamespacedDockerCredentialOperations
+	NamespacedCertificate         NamespacedCertificateOperations
+	NamespacedBasicAuth           NamespacedBasicAuthOperations
+	NamespacedSSHAuth             NamespacedSSHAuthOperations
+	Service                       ServiceOperations
+	Endpoint                      EndpointOperations
+	Pod                           PodOperations
+	Deployment                    DeploymentOperations
+	StatefulSet                   StatefulSetOperations
+	ReplicaSet                    ReplicaSetOperations
+	ReplicationController         ReplicationControllerOperations
+	DaemonSet                     DaemonSetOperations
+	Workload                      WorkloadOperations
 }
 
 func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
@@ -38,6 +44,7 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	}
 
 	client.Namespace = newNamespaceClient(client)
+	client.PersistentVolumeClaim = newPersistentVolumeClaimClient(client)
 	client.Ingress = newIngressClient(client)
 	client.Secret = newSecretClient(client)
 	client.ServiceAccountToken = newServiceAccountTokenClient(client)
@@ -45,11 +52,16 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.Certificate = newCertificateClient(client)
 	client.BasicAuth = newBasicAuthClient(client)
 	client.SSHAuth = newSSHAuthClient(client)
+	client.NamespacedSecret = newNamespacedSecretClient(client)
+	client.NamespacedServiceAccountToken = newNamespacedServiceAccountTokenClient(client)
+	client.NamespacedDockerCredential = newNamespacedDockerCredentialClient(client)
+	client.NamespacedCertificate = newNamespacedCertificateClient(client)
+	client.NamespacedBasicAuth = newNamespacedBasicAuthClient(client)
+	client.NamespacedSSHAuth = newNamespacedSSHAuthClient(client)
 	client.Service = newServiceClient(client)
 	client.Endpoint = newEndpointClient(client)
 	client.Pod = newPodClient(client)
 	client.Deployment = newDeploymentClient(client)
-	client.PersistentVolumeClaim = newPersistentVolumeClaimClient(client)
 	client.StatefulSet = newStatefulSetClient(client)
 	client.ReplicaSet = newReplicaSetClient(client)
 	client.ReplicationController = newReplicationControllerClient(client)

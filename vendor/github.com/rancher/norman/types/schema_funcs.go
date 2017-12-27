@@ -25,6 +25,10 @@ func (s *Schema) CanList() bool {
 	return slice.ContainsString(s.CollectionMethods, http.MethodGet)
 }
 
+func (s *Schema) CanCreate() bool {
+	return slice.ContainsString(s.CollectionMethods, http.MethodPost)
+}
+
 func (s *Schema) CanUpdate() bool {
 	return slice.ContainsString(s.ResourceMethods, http.MethodPut)
 }

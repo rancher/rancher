@@ -6,6 +6,7 @@ import (
 
 const (
 	ClusterType                                     = "cluster"
+	ClusterField                                    = "creatorId"
 	ClusterFieldAPIEndpoint                         = "apiEndpoint"
 	ClusterFieldAllocatable                         = "allocatable"
 	ClusterFieldAnnotations                         = "annotations"
@@ -37,6 +38,7 @@ const (
 
 type Cluster struct {
 	types.Resource
+	string                              `json:"creatorId,omitempty"`
 	APIEndpoint                         string                         `json:"apiEndpoint,omitempty"`
 	Allocatable                         map[string]string              `json:"allocatable,omitempty"`
 	Annotations                         map[string]string              `json:"annotations,omitempty"`

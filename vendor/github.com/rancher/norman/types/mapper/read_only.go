@@ -5,8 +5,9 @@ import (
 )
 
 type ReadOnly struct {
-	Field    string
-	Optional bool
+	Field     string
+	Optional  bool
+	SubFields bool
 }
 
 func (r ReadOnly) FromInternal(data map[string]interface{}) {
@@ -15,12 +16,28 @@ func (r ReadOnly) FromInternal(data map[string]interface{}) {
 func (r ReadOnly) ToInternal(data map[string]interface{}) {
 }
 
+func (r ReadOnly) readOnly(field types.Field, schema *types.Schema, schemas *types.Schemas) types.Field {
+	field.Create = false
+	field.Update = false
+
+	if r.SubFields {
+		subSchema := schemas.Schema(&schema.Version, field.Type)
+		if subSchema != nil {
+			for name, field := range subSchema.ResourceFields {
+				field.Create = false
+				field.Update = false
+				subSchema.ResourceFields[name] = field
+			}
+		}
+	}
+
+	return field
+}
+
 func (r ReadOnly) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {
 	if r.Field == "*" {
 		for name, field := range schema.ResourceFields {
-			field.Create = false
-			field.Update = false
-			schema.ResourceFields[name] = field
+			schema.ResourceFields[name] = r.readOnly(field, schema, schemas)
 		}
 		return nil
 	}
@@ -33,9 +50,7 @@ func (r ReadOnly) ModifySchema(schema *types.Schema, schemas *types.Schemas) err
 	}
 
 	field := schema.ResourceFields[r.Field]
-	field.Create = false
-	field.Update = false
-	schema.ResourceFields[r.Field] = field
+	schema.ResourceFields[r.Field] = r.readOnly(field, schema, schemas)
 
 	return nil
 }

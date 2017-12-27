@@ -49,6 +49,9 @@ func urlParser(next parse.URLParser) parse.URLParser {
 			if schema != nil {
 				parsed.Query.Set(projectclient.SecretFieldProjectID, parsed.ID)
 				parsed.SubContextPrefix = "/" + parsed.ID
+				parsed.SubContext = map[string]string{
+					"projects": parsed.ID,
+				}
 				parsed.Version = projectschema.Version.Path
 				parsed.Type = schema.ID
 				parsed.ID = ""

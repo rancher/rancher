@@ -87,6 +87,7 @@ func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole) er
 	return nil
 
 }
+
 func getCRName(globalRole *v3.GlobalRole) string {
 	if crName, ok := globalRole.Annotations[crNameAnnotation]; ok {
 		return crName

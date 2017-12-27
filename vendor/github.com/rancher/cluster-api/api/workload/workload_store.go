@@ -30,7 +30,7 @@ type workloadStore struct {
 	types.Store
 }
 
-func (w *workloadStore) List(apiContext *types.APIContext, schema *types.Schema, opt types.QueryOptions) ([]map[string]interface{}, error) {
+func (w *workloadStore) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {
 	data, err := w.Store.List(apiContext, schema, opt)
 	if err != nil {
 		return nil, err

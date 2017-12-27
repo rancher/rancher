@@ -115,21 +115,33 @@ func (s *StatsAggregator) aggregate(cluster *clusterv1.Cluster, clusterName stri
 	condMem := v1.ConditionTrue
 
 	for _, v := range stats[clusterName] {
-		pods.Add(*v.Capacity.Pods())
-		mem.Add(*v.Capacity.Memory())
-		cpu.Add(*v.Capacity.Cpu())
+		if v == nil {
+			continue
+		}
 
-		apods.Add(*v.Allocatable.Pods())
-		amem.Add(*v.Allocatable.Memory())
-		acpu.Add(*v.Allocatable.Cpu())
+		if v.Capacity != nil {
+			pods.Add(*v.Capacity.Pods())
+			mem.Add(*v.Capacity.Memory())
+			cpu.Add(*v.Capacity.Cpu())
+		}
 
-		rpods.Add(*v.Requested.Pods())
-		rmem.Add(*v.Requested.Memory())
-		rcpu.Add(*v.Requested.Cpu())
+		if v.Allocatable != nil {
+			apods.Add(*v.Allocatable.Pods())
+			amem.Add(*v.Allocatable.Memory())
+			acpu.Add(*v.Allocatable.Cpu())
+		}
 
-		lpods.Add(*v.Limits.Pods())
-		lmem.Add(*v.Limits.Memory())
-		lcpu.Add(*v.Limits.Cpu())
+		if v.Requested != nil {
+			rpods.Add(*v.Requested.Pods())
+			rmem.Add(*v.Requested.Memory())
+			rcpu.Add(*v.Requested.Cpu())
+		}
+
+		if v.Limits != nil {
+			lpods.Add(*v.Limits.Pods())
+			lmem.Add(*v.Limits.Memory())
+			lcpu.Add(*v.Limits.Cpu())
+		}
 
 		if condDisk == v1.ConditionTrue && v.ConditionNoDiskPressureStatus == v1.ConditionTrue {
 			condDisk = v1.ConditionFalse

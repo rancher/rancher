@@ -34,11 +34,11 @@ func (s *Store) ByID(apiContext *types.APIContext, schema *types.Schema, id stri
 	return nil, nil
 }
 
-func (s *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt types.QueryOptions) (chan map[string]interface{}, error) {
+func (s *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
 	return nil, nil
 }
 
-func (s *Store) List(apiContext *types.APIContext, schema *types.Schema, opt types.QueryOptions) ([]map[string]interface{}, error) {
+func (s *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {
 	schemaMap := apiContext.Schemas.SchemasForVersion(*apiContext.Version)
 	schemas := make([]*types.Schema, 0, len(schemaMap))
 	schemaData := make([]map[string]interface{}, 0, len(schemaMap))

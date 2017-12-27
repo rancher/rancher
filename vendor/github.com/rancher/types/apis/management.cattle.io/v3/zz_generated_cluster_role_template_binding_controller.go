@@ -23,8 +23,9 @@ var (
 	ClusterRoleTemplateBindingResource = metav1.APIResource{
 		Name:         "clusterroletemplatebindings",
 		SingularName: "clusterroletemplatebinding",
-		Namespaced:   false,
-		Kind:         ClusterRoleTemplateBindingGroupVersionKind.Kind,
+		Namespaced:   true,
+
+		Kind: ClusterRoleTemplateBindingGroupVersionKind.Kind,
 	}
 )
 

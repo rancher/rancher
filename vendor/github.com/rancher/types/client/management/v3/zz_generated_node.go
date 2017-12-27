@@ -6,6 +6,7 @@ import (
 
 const (
 	NodeType                      = "node"
+	NodeField                     = "creatorId"
 	NodeFieldAllocatable          = "allocatable"
 	NodeFieldAnnotations          = "annotations"
 	NodeFieldCapacity             = "capacity"
@@ -35,6 +36,7 @@ const (
 
 type Node struct {
 	types.Resource
+	string               `json:"creatorId,omitempty"`
 	Allocatable          map[string]string         `json:"allocatable,omitempty"`
 	Annotations          map[string]string         `json:"annotations,omitempty"`
 	Capacity             map[string]string         `json:"capacity,omitempty"`

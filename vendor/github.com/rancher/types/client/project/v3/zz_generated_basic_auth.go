@@ -6,12 +6,13 @@ import (
 
 const (
 	BasicAuthType                 = "basicAuth"
+	BasicAuthField                = "creatorId"
 	BasicAuthFieldAnnotations     = "annotations"
 	BasicAuthFieldCreated         = "created"
 	BasicAuthFieldFinalizers      = "finalizers"
 	BasicAuthFieldLabels          = "labels"
 	BasicAuthFieldName            = "name"
-	BasicAuthFieldNamespace       = "namespace"
+	BasicAuthFieldNamespaceId     = "namespaceId"
 	BasicAuthFieldOwnerReferences = "ownerReferences"
 	BasicAuthFieldPassword        = "password"
 	BasicAuthFieldProjectID       = "projectId"
@@ -22,12 +23,13 @@ const (
 
 type BasicAuth struct {
 	types.Resource
+	string          `json:"creatorId,omitempty"`
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	Created         string            `json:"created,omitempty"`
 	Finalizers      []string          `json:"finalizers,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`
 	Name            string            `json:"name,omitempty"`
-	Namespace       string            `json:"namespace,omitempty"`
+	NamespaceId     string            `json:"namespaceId,omitempty"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
 	Password        string            `json:"password,omitempty"`
 	ProjectID       string            `json:"projectId,omitempty"`

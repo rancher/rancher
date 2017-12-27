@@ -6,6 +6,7 @@ import (
 
 const (
 	StatefulSetType                               = "statefulSet"
+	StatefulSetField                              = "creatorId"
 	StatefulSetFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	StatefulSetFieldAnnotations                   = "annotations"
 	StatefulSetFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
@@ -58,6 +59,7 @@ const (
 
 type StatefulSet struct {
 	types.Resource
+	string                        `json:"creatorId,omitempty"`
 	ActiveDeadlineSeconds         *int64                     `json:"activeDeadlineSeconds,omitempty"`
 	Annotations                   map[string]string          `json:"annotations,omitempty"`
 	AutomountServiceAccountToken  *bool                      `json:"automountServiceAccountToken,omitempty"`

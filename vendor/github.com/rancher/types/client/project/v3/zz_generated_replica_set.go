@@ -6,6 +6,7 @@ import (
 
 const (
 	ReplicaSetType                               = "replicaSet"
+	ReplicaSetField                              = "creatorId"
 	ReplicaSetFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	ReplicaSetFieldAnnotations                   = "annotations"
 	ReplicaSetFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
@@ -53,6 +54,7 @@ const (
 
 type ReplicaSet struct {
 	types.Resource
+	string                        `json:"creatorId,omitempty"`
 	ActiveDeadlineSeconds         *int64                 `json:"activeDeadlineSeconds,omitempty"`
 	Annotations                   map[string]string      `json:"annotations,omitempty"`
 	AutomountServiceAccountToken  *bool                  `json:"automountServiceAccountToken,omitempty"`

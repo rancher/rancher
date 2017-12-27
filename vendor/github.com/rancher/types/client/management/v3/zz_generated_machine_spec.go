@@ -5,7 +5,6 @@ const (
 	MachineSpecFieldClusterId         = "clusterId"
 	MachineSpecFieldConfigSource      = "configSource"
 	MachineSpecFieldDescription       = "description"
-	MachineSpecFieldDisplayName       = "displayName"
 	MachineSpecFieldExternalId        = "externalId"
 	MachineSpecFieldMachineTemplateId = "machineTemplateId"
 	MachineSpecFieldPodCIDR           = "podCIDR"
@@ -19,7 +18,6 @@ type MachineSpec struct {
 	ClusterId         string            `json:"clusterId,omitempty"`
 	ConfigSource      *NodeConfigSource `json:"configSource,omitempty"`
 	Description       string            `json:"description,omitempty"`
-	DisplayName       string            `json:"displayName,omitempty"`
 	ExternalId        string            `json:"externalId,omitempty"`
 	MachineTemplateId string            `json:"machineTemplateId,omitempty"`
 	PodCIDR           string            `json:"podCIDR,omitempty"`

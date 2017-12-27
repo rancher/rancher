@@ -22,27 +22,43 @@ type projectIDSetterStore struct {
 	types.Store
 }
 
+func (p *projectIDSetterStore) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
+	data, err := p.Store.Create(apiContext, schema, data)
+	if err != nil {
+		return nil, err
+	}
+
+	return lookupAndSetProjectID(apiContext, schema, data)
+}
+
+func (p *projectIDSetterStore) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
+	data, err := p.Store.Delete(apiContext, schema, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return lookupAndSetProjectID(apiContext, schema, data)
+}
+
 func (p *projectIDSetterStore) ByID(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
 	data, err := p.Store.ByID(apiContext, schema, id)
 	if err != nil {
 		return nil, err
 	}
 
-	if _, ok := schema.ResourceFields[client.NamespaceFieldProjectID]; !ok || schema.ID == client.NamespaceType {
-		return data, nil
-	}
+	return lookupAndSetProjectID(apiContext, schema, data)
+}
 
-	namespaceMap, err := namespace.ProjectMap(apiContext)
+func (p *projectIDSetterStore) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
+	data, err := p.Store.Update(apiContext, schema, data, id)
 	if err != nil {
 		return nil, err
 	}
 
-	setProjectID(namespaceMap, data)
-
-	return data, nil
+	return lookupAndSetProjectID(apiContext, schema, data)
 }
 
-func (p *projectIDSetterStore) List(apiContext *types.APIContext, schema *types.Schema, opt types.QueryOptions) ([]map[string]interface{}, error) {
+func (p *projectIDSetterStore) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {
 	datas, err := p.Store.List(apiContext, schema, opt)
 	if err != nil {
 		return nil, err
@@ -64,7 +80,7 @@ func (p *projectIDSetterStore) List(apiContext *types.APIContext, schema *types.
 	return datas, nil
 }
 
-func (p *projectIDSetterStore) Watch(apiContext *types.APIContext, schema *types.Schema, opt types.QueryOptions) (chan map[string]interface{}, error) {
+func (p *projectIDSetterStore) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
 	c, err := p.Store.Watch(apiContext, schema, opt)
 	if err != nil || c == nil {
 		return nil, err
@@ -93,7 +109,26 @@ func (p *projectIDSetterStore) Watch(apiContext *types.APIContext, schema *types
 	return result, nil
 }
 
+func lookupAndSetProjectID(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
+	if _, ok := schema.ResourceFields[client.NamespaceFieldProjectID]; !ok || schema.ID == client.NamespaceType {
+		return data, nil
+	}
+
+	namespaceMap, err := namespace.ProjectMap(apiContext)
+	if err != nil {
+		return nil, err
+	}
+
+	setProjectID(namespaceMap, data)
+
+	return data, nil
+}
+
 func setProjectID(namespaceMap map[string]string, data map[string]interface{}) {
+	if data == nil {
+		return
+	}
+
 	namespace, _ := data[client.PodFieldNamespaceId].(string)
 	projectID, _ := data[client.NamespaceFieldProjectID].(string)
 	if projectID != "" {

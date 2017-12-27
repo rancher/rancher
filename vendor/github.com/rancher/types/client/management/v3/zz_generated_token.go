@@ -6,6 +6,7 @@ import (
 
 const (
 	TokenType                 = "token"
+	TokenField                = "creatorId"
 	TokenFieldAnnotations     = "annotations"
 	TokenFieldAuthProvider    = "authProvider"
 	TokenFieldCreated         = "created"
@@ -27,6 +28,7 @@ const (
 
 type Token struct {
 	types.Resource
+	string          `json:"creatorId,omitempty"`
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	AuthProvider    string            `json:"authProvider,omitempty"`
 	Created         string            `json:"created,omitempty"`

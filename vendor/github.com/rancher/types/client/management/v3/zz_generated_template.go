@@ -6,6 +6,7 @@ import (
 
 const (
 	TemplateType                          = "template"
+	TemplateField                         = "creatorId"
 	TemplateFieldAnnotations              = "annotations"
 	TemplateFieldBase                     = "templateBase"
 	TemplateFieldCatalogID                = "catalogId"
@@ -40,6 +41,7 @@ const (
 
 type Template struct {
 	types.Resource
+	string                   `json:"creatorId,omitempty"`
 	Annotations              map[string]string     `json:"annotations,omitempty"`
 	Base                     string                `json:"templateBase,omitempty"`
 	CatalogID                string                `json:"catalogId,omitempty"`

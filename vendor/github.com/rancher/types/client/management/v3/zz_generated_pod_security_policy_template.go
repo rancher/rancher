@@ -6,6 +6,7 @@ import (
 
 const (
 	PodSecurityPolicyTemplateType                                 = "podSecurityPolicyTemplate"
+	PodSecurityPolicyTemplateField                                = "creatorId"
 	PodSecurityPolicyTemplateFieldAllowPrivilegeEscalation        = "allowPrivilegeEscalation"
 	PodSecurityPolicyTemplateFieldAllowedCapabilities             = "allowedCapabilities"
 	PodSecurityPolicyTemplateFieldAllowedHostPaths                = "allowedHostPaths"
@@ -35,6 +36,7 @@ const (
 
 type PodSecurityPolicyTemplate struct {
 	types.Resource
+	string                          `json:"creatorId,omitempty"`
 	AllowPrivilegeEscalation        *bool                              `json:"allowPrivilegeEscalation,omitempty"`
 	AllowedCapabilities             []string                           `json:"allowedCapabilities,omitempty"`
 	AllowedHostPaths                []AllowedHostPath                  `json:"allowedHostPaths,omitempty"`

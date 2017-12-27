@@ -6,6 +6,7 @@ import (
 
 const (
 	ReplicationControllerType                               = "replicationController"
+	ReplicationControllerField                              = "creatorId"
 	ReplicationControllerFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	ReplicationControllerFieldAnnotations                   = "annotations"
 	ReplicationControllerFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
@@ -53,6 +54,7 @@ const (
 
 type ReplicationController struct {
 	types.Resource
+	string                        `json:"creatorId,omitempty"`
 	ActiveDeadlineSeconds         *int64                       `json:"activeDeadlineSeconds,omitempty"`
 	Annotations                   map[string]string            `json:"annotations,omitempty"`
 	AutomountServiceAccountToken  *bool                        `json:"automountServiceAccountToken,omitempty"`

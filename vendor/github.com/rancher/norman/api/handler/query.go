@@ -7,11 +7,11 @@ import (
 	"github.com/rancher/norman/types/convert"
 )
 
-func QueryFilter(opts types.QueryOptions, data []map[string]interface{}) []map[string]interface{} {
+func QueryFilter(opts *types.QueryOptions, data []map[string]interface{}) []map[string]interface{} {
 	return ApplyQueryOptions(opts, data)
 }
 
-func ApplyQueryOptions(options types.QueryOptions, data []map[string]interface{}) []map[string]interface{} {
+func ApplyQueryOptions(options *types.QueryOptions, data []map[string]interface{}) []map[string]interface{} {
 	data = ApplyQueryConditions(options.Conditions, data)
 	data = ApplySort(options.Sort, data)
 	return ApplyPagination(options.Pagination, data)

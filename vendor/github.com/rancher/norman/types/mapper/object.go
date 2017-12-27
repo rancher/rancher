@@ -13,7 +13,7 @@ func NewObject(mappers ...types.Mapper) Object {
 		Mappers: append([]types.Mapper{
 			&Embed{Field: "metadata"},
 			&Embed{Field: "spec", Optional: true},
-			&ReadOnly{Field: "status", Optional: true},
+			&ReadOnly{Field: "status", Optional: true, SubFields: true},
 			Drop{"kind"},
 			Drop{"apiVersion"},
 			&Scope{

@@ -55,8 +55,8 @@ func (m *Lifecycle) Create(obj *v3.Machine) (*v3.Machine, error) {
 			return obj, err
 		}
 		obj.Status.MachineTemplateSpec = &template.Spec
-		if obj.Spec.DisplayName == "" {
-			obj.Spec.DisplayName = obj.Name
+		if obj.Status.NodeName == "" {
+			obj.Status.NodeName = obj.Name
 		}
 
 		rawTemplate, err := m.machineTemplateGenericClient.Get(obj.Spec.MachineTemplateName, metav1.GetOptions{})
@@ -95,7 +95,7 @@ func (m *Lifecycle) Remove(obj *v3.Machine) (*v3.Machine, error) {
 		return obj, nil
 	}
 
-	machineDir, err := buildBaseHostDir(obj.Spec.DisplayName)
+	machineDir, err := buildBaseHostDir(obj.Status.NodeName)
 	if err != nil {
 		return obj, err
 	}
@@ -107,17 +107,17 @@ func (m *Lifecycle) Remove(obj *v3.Machine) (*v3.Machine, error) {
 	}
 	defer config.Cleanup()
 
-	mExists, err := machineExists(machineDir, obj.Spec.DisplayName)
+	mExists, err := machineExists(machineDir, obj.Status.NodeName)
 	if err != nil {
 		return obj, err
 	}
 
 	if mExists {
-		m.logger.Infof(obj, "Removing machine %s", obj.Spec.DisplayName)
+		m.logger.Infof(obj, "Removing machine %s", obj.Status.NodeName)
 		if err := deleteMachine(machineDir, obj); err != nil {
 			return nil, err
 		}
-		m.logger.Infof(obj, "Removing machine %s done", obj.Spec.DisplayName)
+		m.logger.Infof(obj, "Removing machine %s done", obj.Status.NodeName)
 	}
 
 	return obj, nil
@@ -137,7 +137,7 @@ func (m *Lifecycle) provision(machineDir string, obj *v3.Machine) (*v3.Machine, 
 
 	createCommandsArgs := buildCreateCommand(obj, configRawMap)
 	cmd := buildCommand(machineDir, createCommandsArgs)
-	m.logger.Infof(obj, "Provisioning machine %s", obj.Spec.DisplayName)
+	m.logger.Infof(obj, "Provisioning machine %s", obj.Status.NodeName)
 
 	stdoutReader, stderrReader, err := startReturnOutput(cmd)
 	if err != nil {
@@ -161,12 +161,12 @@ func (m *Lifecycle) provision(machineDir string, obj *v3.Machine) (*v3.Machine, 
 		return obj, err
 	}
 
-	m.logger.Infof(obj, "Provisioning machine %s done", obj.Spec.DisplayName)
+	m.logger.Infof(obj, "Provisioning machine %s done", obj.Status.NodeName)
 	return obj, nil
 }
 
 func (m *Lifecycle) ready(obj *v3.Machine) (*v3.Machine, error) {
-	machineDir, err := buildBaseHostDir(obj.Spec.DisplayName)
+	machineDir, err := buildBaseHostDir(obj.Status.NodeName)
 	if err != nil {
 		return obj, err
 	}
@@ -221,7 +221,7 @@ func (m *Lifecycle) Updated(obj *v3.Machine) (*v3.Machine, error) {
 }
 
 func (m *Lifecycle) saveConfig(config *machineconfig.MachineConfig, machineDir string, obj *v3.Machine) (*v3.Machine, error) {
-	logrus.Infof("Generating and uploading machine config %s", obj.Spec.DisplayName)
+	logrus.Infof("Generating and uploading machine config %s", obj.Status.NodeName)
 	if err := config.Save(); err != nil {
 		return obj, err
 	}
@@ -251,7 +251,7 @@ func (m *Lifecycle) saveConfig(config *machineconfig.MachineConfig, machineDir s
 }
 
 func (m *Lifecycle) getIP(machineDir string, obj *v3.Machine) (string, error) {
-	command := buildCommand(machineDir, []string{"ip", obj.Spec.DisplayName})
+	command := buildCommand(machineDir, []string{"ip", obj.Status.NodeName})
 	output, err := command.Output()
 	return string(bytes.TrimSpace(output)), err
 }

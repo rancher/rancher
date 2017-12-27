@@ -52,7 +52,7 @@ func (a *APIRootStore) ByID(apiContext *types.APIContext, schema *types.Schema, 
 	return nil, nil
 }
 
-func (a *APIRootStore) List(apiContext *types.APIContext, schema *types.Schema, opt types.QueryOptions) ([]map[string]interface{}, error) {
+func (a *APIRootStore) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {
 	var roots []map[string]interface{}
 
 	for _, version := range apiContext.Schemas.Versions() {

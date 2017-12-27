@@ -20,7 +20,7 @@ func ListHandler(request *types.APIContext) error {
 
 	if request.ID == "" {
 		opts := parse.QueryOptions(request, request.Schema)
-		data, err = store.List(request, request.Schema, opts)
+		data, err = store.List(request, request.Schema, &opts)
 	} else if request.Link == "" {
 		data, err = store.ByID(request, request.Schema, request.ID)
 	} else {

@@ -48,3 +48,25 @@ func (s *userStore) Create(apiContext *types.APIContext, schema *types.Schema, d
 
 	return created, err
 }
+
+func (s *userStore) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {
+
+	req := apiContext.Request
+
+	schemaData, err := s.Store.List(apiContext, schema, opt)
+	if err != nil {
+		return nil, err
+	}
+	userID := req.Header.Get("Impersonate-User")
+	if userID != "" {
+		for _, data := range schemaData {
+			id, ok := data[client.UserFieldId].(string)
+			if ok {
+				if id == userID {
+					data["me"] = "true"
+				}
+			}
+		}
+	}
+	return schemaData, nil
+}

@@ -1,12 +1,12 @@
 package client
 
 const (
-	IngressRuleType      = "ingressRule"
-	IngressRuleFieldHTTP = "http"
-	IngressRuleFieldHost = "host"
+	IngressRuleType       = "ingressRule"
+	IngressRuleFieldHost  = "host"
+	IngressRuleFieldPaths = "paths"
 )
 
 type IngressRule struct {
-	HTTP *HTTPIngressRuleValue `json:"http,omitempty"`
-	Host string                `json:"host,omitempty"`
+	Host  string                     `json:"host,omitempty"`
+	Paths map[string]HTTPIngressPath `json:"paths,omitempty"`
 }

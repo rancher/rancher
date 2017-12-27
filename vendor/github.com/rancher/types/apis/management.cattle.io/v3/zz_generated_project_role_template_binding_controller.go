@@ -23,8 +23,9 @@ var (
 	ProjectRoleTemplateBindingResource = metav1.APIResource{
 		Name:         "projectroletemplatebindings",
 		SingularName: "projectroletemplatebinding",
-		Namespaced:   false,
-		Kind:         ProjectRoleTemplateBindingGroupVersionKind.Kind,
+		Namespaced:   true,
+
+		Kind: ProjectRoleTemplateBindingGroupVersionKind.Kind,
 	}
 )
 

@@ -27,6 +27,6 @@ func (e *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	return nil, nil
 }
 
-func (e *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt types.QueryOptions) (chan map[string]interface{}, error) {
+func (e *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
 	return nil, nil
 }

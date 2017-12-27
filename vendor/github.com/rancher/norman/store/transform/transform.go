@@ -26,7 +26,7 @@ func (t *Store) ByID(apiContext *types.APIContext, schema *types.Schema, id stri
 	return t.Transformer(apiContext, data)
 }
 
-func (t *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt types.QueryOptions) (chan map[string]interface{}, error) {
+func (t *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
 	c, err := t.Store.Watch(apiContext, schema, opt)
 	if err != nil {
 		return nil, err
@@ -50,7 +50,7 @@ func (t *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt ty
 	return result, nil
 }
 
-func (t *Store) List(apiContext *types.APIContext, schema *types.Schema, opt types.QueryOptions) ([]map[string]interface{}, error) {
+func (t *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {
 	data, err := t.Store.List(apiContext, schema, opt)
 	if err != nil {
 		return nil, err
