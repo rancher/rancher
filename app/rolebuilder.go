@@ -274,11 +274,12 @@ func (rb *roleBuilder) reconcileRoleTemplates(mgmt *config.ManagementContext) er
 				Name:   current.name,
 				Labels: defaultRTLabel,
 			},
-			DisplayName: current.displayName,
-			Builtin:     current.builtin,
-			External:    current.builtin,
-			Hidden:      current.hidden,
-			Rules:       current.policyRules(),
+			DisplayName:       current.displayName,
+			Builtin:           current.builtin,
+			External:          current.external,
+			Hidden:            current.hidden,
+			Rules:             current.policyRules(),
+			RoleTemplateNames: current.roleTemplateNames,
 		}
 		return role.Name, role
 	}
@@ -306,11 +307,13 @@ func (rb *roleBuilder) reconcileRoleTemplates(mgmt *config.ManagementContext) er
 			return false, nil, errors.Errorf("unexpected type comparing %v and %v", have, want)
 		}
 
-		equal := haveRT.DisplayName == wantRT.DisplayName && reflect.DeepEqual(haveRT.Rules, wantRT.Rules) && haveRT.Builtin != wantRT.Builtin &&
+		equal := haveRT.DisplayName == wantRT.DisplayName && reflect.DeepEqual(haveRT.Rules, wantRT.Rules) &&
+			reflect.DeepEqual(haveRT.RoleTemplateNames, wantRT.RoleTemplateNames) && haveRT.Builtin != wantRT.Builtin &&
 			haveRT.External && wantRT.External && haveRT.Hidden && wantRT.Hidden
 
 		haveRT.DisplayName = wantRT.DisplayName
 		haveRT.Rules = wantRT.Rules
+		haveRT.RoleTemplateNames = wantRT.RoleTemplateNames
 		haveRT.Builtin = wantRT.Builtin
 		haveRT.External = wantRT.External
 		haveRT.Hidden = wantRT.Hidden
