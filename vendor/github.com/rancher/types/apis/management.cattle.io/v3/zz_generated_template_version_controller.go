@@ -53,9 +53,11 @@ type TemplateVersionController interface {
 type TemplateVersionInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*TemplateVersion) (*TemplateVersion, error)
+	GetNamespace(name, namespace string, opts metav1.GetOptions) (*TemplateVersion, error)
 	Get(name string, opts metav1.GetOptions) (*TemplateVersion, error)
 	Update(*TemplateVersion) (*TemplateVersion, error)
 	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*TemplateVersionList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -172,6 +174,11 @@ func (s *templateVersionClient) Get(name string, opts metav1.GetOptions) (*Templ
 	return obj.(*TemplateVersion), err
 }
 
+func (s *templateVersionClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*TemplateVersion, error) {
+	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+	return obj.(*TemplateVersion), err
+}
+
 func (s *templateVersionClient) Update(o *TemplateVersion) (*TemplateVersion, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
 	return obj.(*TemplateVersion), err
@@ -179,6 +186,10 @@ func (s *templateVersionClient) Update(o *TemplateVersion) (*TemplateVersion, er
 
 func (s *templateVersionClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
+}
+
+func (s *templateVersionClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespace(name, namespace, options)
 }
 
 func (s *templateVersionClient) List(opts metav1.ListOptions) (*TemplateVersionList, error) {

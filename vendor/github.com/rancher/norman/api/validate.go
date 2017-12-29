@@ -17,7 +17,7 @@ const (
 )
 
 func ValidateAction(request *types.APIContext) (*types.Action, error) {
-	if request.Action == "" || request.Method != http.MethodPost {
+	if request.Action == "" || request.Link != "" || request.Method != http.MethodPost {
 		return nil, nil
 	}
 
@@ -45,12 +45,12 @@ func ValidateAction(request *types.APIContext) (*types.Action, error) {
 	return &action, nil
 }
 
-func CheckCSRF(rw http.ResponseWriter, req *http.Request) error {
-	if !parse.IsBrowser(req, false) {
+func CheckCSRF(apiContext *types.APIContext) error {
+	if !parse.IsBrowser(apiContext.Request, false) {
 		return nil
 	}
 
-	cookie, err := req.Cookie(csrfCookie)
+	cookie, err := apiContext.Request.Cookie(csrfCookie)
 	if err == http.ErrNoCookie {
 		bytes := make([]byte, 5)
 		_, err := rand.Read(bytes)
@@ -64,13 +64,13 @@ func CheckCSRF(rw http.ResponseWriter, req *http.Request) error {
 		}
 	} else if err != nil {
 		return httperror.NewAPIError(httperror.InvalidCSRFToken, "Failed to parse cookies")
-	} else if req.Method != http.MethodGet {
+	} else if apiContext.Method != http.MethodGet {
 		/*
-		 * Very important to use request.getMethod() and not httpRequest.getMethod(). The client can override the HTTP method with _method
+		 * Very important to use apiContext.Method and not apiContext.Request.Method. The client can override the HTTP method with _method
 		 */
-		if cookie.Value == req.Header.Get(csrfHeader) {
+		if cookie.Value == apiContext.Request.Header.Get(csrfHeader) {
 			// Good
-		} else if cookie.Value == req.URL.Query().Get(csrfCookie) {
+		} else if cookie.Value == apiContext.Request.URL.Query().Get(csrfCookie) {
 			// Good
 		} else {
 			return httperror.NewAPIError(httperror.InvalidCSRFToken, "Invalid CSRF token")
@@ -78,6 +78,6 @@ func CheckCSRF(rw http.ResponseWriter, req *http.Request) error {
 	}
 
 	cookie.Path = "/"
-	http.SetCookie(rw, cookie)
+	http.SetCookie(apiContext.Response, cookie)
 	return nil
 }

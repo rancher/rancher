@@ -117,10 +117,10 @@ type Field struct {
 	Type         string      `json:"type,omitempty"`
 	Default      interface{} `json:"default,omitempty"`
 	Nullable     bool        `json:"nullable,omitempty"`
-	Create       bool        `json:"create,omitempty"`
+	Create       bool        `json:"create"`
 	WriteOnly    bool        `json:"writeOnly,omitempty"`
 	Required     bool        `json:"required,omitempty"`
-	Update       bool        `json:"update,omitempty"`
+	Update       bool        `json:"update"`
 	MinLength    *int64      `json:"minLength,omitempty"`
 	MaxLength    *int64      `json:"maxLength,omitempty"`
 	Min          *int64      `json:"min,omitempty"`

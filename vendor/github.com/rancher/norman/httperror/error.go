@@ -46,6 +46,13 @@ type APIError struct {
 	fieldName string
 }
 
+func NewAPIErrorLong(status int, code, message string) error {
+	return NewAPIError(ErrorCode{
+		code:   code,
+		status: status,
+	}, message)
+}
+
 func NewAPIError(code ErrorCode, message string) error {
 	return &APIError{
 		code:    code,

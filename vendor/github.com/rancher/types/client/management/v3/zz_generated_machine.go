@@ -6,16 +6,13 @@ import (
 
 const (
 	MachineType                      = "machine"
-	MachineField                     = "creatorId"
 	MachineFieldAllocatable          = "allocatable"
 	MachineFieldAnnotations          = "annotations"
 	MachineFieldCapacity             = "capacity"
 	MachineFieldClusterId            = "clusterId"
-	MachineFieldConditions           = "conditions"
-	MachineFieldConfigSource         = "configSource"
 	MachineFieldCreated              = "created"
+	MachineFieldCreatorID            = "creatorId"
 	MachineFieldDescription          = "description"
-	MachineFieldExternalId           = "externalId"
 	MachineFieldFinalizers           = "finalizers"
 	MachineFieldHostname             = "hostname"
 	MachineFieldIPAddress            = "ipAddress"
@@ -23,18 +20,17 @@ const (
 	MachineFieldInfo                 = "info"
 	MachineFieldLabels               = "labels"
 	MachineFieldLimits               = "limits"
-	MachineFieldMachineDriverConfig  = "machineDriverConfig"
 	MachineFieldMachineTemplateId    = "machineTemplateId"
-	MachineFieldMachineTemplateSpec  = "machineTemplateSpec"
 	MachineFieldName                 = "name"
-	MachineFieldNodeConfig           = "rkeNode"
+	MachineFieldNodeName             = "nodeName"
 	MachineFieldOwnerReferences      = "ownerReferences"
-	MachineFieldPhase                = "phase"
-	MachineFieldPodCIDR              = "podCIDR"
-	MachineFieldProviderID           = "providerID"
+	MachineFieldPodCidr              = "podCidr"
+	MachineFieldProviderId           = "providerId"
 	MachineFieldRemoved              = "removed"
 	MachineFieldRequested            = "requested"
-	MachineFieldRoles                = "roles"
+	MachineFieldRequestedClusterId   = "requestedClusterId"
+	MachineFieldRequestedHostname    = "requestedHostname"
+	MachineFieldRequestedRoles       = "requestedRoles"
 	MachineFieldSSHUser              = "sshUser"
 	MachineFieldState                = "state"
 	MachineFieldTaints               = "taints"
@@ -48,16 +44,13 @@ const (
 
 type Machine struct {
 	types.Resource
-	string               `json:"creatorId,omitempty"`
 	Allocatable          map[string]string         `json:"allocatable,omitempty"`
 	Annotations          map[string]string         `json:"annotations,omitempty"`
 	Capacity             map[string]string         `json:"capacity,omitempty"`
 	ClusterId            string                    `json:"clusterId,omitempty"`
-	Conditions           []NodeCondition           `json:"conditions,omitempty"`
-	ConfigSource         *NodeConfigSource         `json:"configSource,omitempty"`
 	Created              string                    `json:"created,omitempty"`
+	CreatorID            string                    `json:"creatorId,omitempty"`
 	Description          string                    `json:"description,omitempty"`
-	ExternalId           string                    `json:"externalId,omitempty"`
 	Finalizers           []string                  `json:"finalizers,omitempty"`
 	Hostname             string                    `json:"hostname,omitempty"`
 	IPAddress            string                    `json:"ipAddress,omitempty"`
@@ -65,18 +58,17 @@ type Machine struct {
 	Info                 *NodeInfo                 `json:"info,omitempty"`
 	Labels               map[string]string         `json:"labels,omitempty"`
 	Limits               map[string]string         `json:"limits,omitempty"`
-	MachineDriverConfig  string                    `json:"machineDriverConfig,omitempty"`
 	MachineTemplateId    string                    `json:"machineTemplateId,omitempty"`
-	MachineTemplateSpec  *MachineTemplateSpec      `json:"machineTemplateSpec,omitempty"`
 	Name                 string                    `json:"name,omitempty"`
-	NodeConfig           *RKEConfigNode            `json:"rkeNode,omitempty"`
+	NodeName             string                    `json:"nodeName,omitempty"`
 	OwnerReferences      []OwnerReference          `json:"ownerReferences,omitempty"`
-	Phase                string                    `json:"phase,omitempty"`
-	PodCIDR              string                    `json:"podCIDR,omitempty"`
-	ProviderID           string                    `json:"providerID,omitempty"`
+	PodCidr              string                    `json:"podCidr,omitempty"`
+	ProviderId           string                    `json:"providerId,omitempty"`
 	Removed              string                    `json:"removed,omitempty"`
 	Requested            map[string]string         `json:"requested,omitempty"`
-	Roles                []string                  `json:"roles,omitempty"`
+	RequestedClusterId   string                    `json:"requestedClusterId,omitempty"`
+	RequestedHostname    string                    `json:"requestedHostname,omitempty"`
+	RequestedRoles       []string                  `json:"requestedRoles,omitempty"`
 	SSHUser              string                    `json:"sshUser,omitempty"`
 	State                string                    `json:"state,omitempty"`
 	Taints               []Taint                   `json:"taints,omitempty"`

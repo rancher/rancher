@@ -1,5 +1,7 @@
 package client
 
+import "k8s.io/apimachinery/pkg/util/intstr"
+
 const (
 	IngressBackendType             = "ingressBackend"
 	IngressBackendFieldServiceId   = "serviceId"
@@ -8,7 +10,7 @@ const (
 )
 
 type IngressBackend struct {
-	ServiceId   string   `json:"serviceId,omitempty"`
-	TargetPort  string   `json:"targetPort,omitempty"`
-	WorkloadIDs []string `json:"workloadIds,omitempty"`
+	ServiceId   string             `json:"serviceId,omitempty"`
+	TargetPort  intstr.IntOrString `json:"targetPort,omitempty"`
+	WorkloadIDs []string           `json:"workloadIds,omitempty"`
 }

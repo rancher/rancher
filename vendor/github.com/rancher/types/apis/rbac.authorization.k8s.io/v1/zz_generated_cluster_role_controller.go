@@ -54,9 +54,11 @@ type ClusterRoleController interface {
 type ClusterRoleInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*v1.ClusterRole) (*v1.ClusterRole, error)
+	GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1.ClusterRole, error)
 	Get(name string, opts metav1.GetOptions) (*v1.ClusterRole, error)
 	Update(*v1.ClusterRole) (*v1.ClusterRole, error)
 	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*ClusterRoleList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -173,6 +175,11 @@ func (s *clusterRoleClient) Get(name string, opts metav1.GetOptions) (*v1.Cluste
 	return obj.(*v1.ClusterRole), err
 }
 
+func (s *clusterRoleClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1.ClusterRole, error) {
+	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+	return obj.(*v1.ClusterRole), err
+}
+
 func (s *clusterRoleClient) Update(o *v1.ClusterRole) (*v1.ClusterRole, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
 	return obj.(*v1.ClusterRole), err
@@ -180,6 +187,10 @@ func (s *clusterRoleClient) Update(o *v1.ClusterRole) (*v1.ClusterRole, error) {
 
 func (s *clusterRoleClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
+}
+
+func (s *clusterRoleClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespace(name, namespace, options)
 }
 
 func (s *clusterRoleClient) List(opts metav1.ListOptions) (*ClusterRoleList, error) {

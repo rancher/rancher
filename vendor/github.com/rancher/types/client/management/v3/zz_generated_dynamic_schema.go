@@ -6,13 +6,13 @@ import (
 
 const (
 	DynamicSchemaType                      = "dynamicSchema"
-	DynamicSchemaField                     = "creatorId"
 	DynamicSchemaFieldAnnotations          = "annotations"
 	DynamicSchemaFieldCollectionActions    = "collectionActions"
 	DynamicSchemaFieldCollectionFields     = "collectionFields"
 	DynamicSchemaFieldCollectionFilters    = "collectionFilters"
 	DynamicSchemaFieldCollectionMethods    = "collectionMethods"
 	DynamicSchemaFieldCreated              = "created"
+	DynamicSchemaFieldCreatorID            = "creatorId"
 	DynamicSchemaFieldEmbed                = "embed"
 	DynamicSchemaFieldEmbedType            = "embedType"
 	DynamicSchemaFieldFinalizers           = "finalizers"
@@ -34,13 +34,13 @@ const (
 
 type DynamicSchema struct {
 	types.Resource
-	string               `json:"creatorId,omitempty"`
 	Annotations          map[string]string    `json:"annotations,omitempty"`
 	CollectionActions    map[string]Action    `json:"collectionActions,omitempty"`
 	CollectionFields     map[string]Field     `json:"collectionFields,omitempty"`
 	CollectionFilters    map[string]Filter    `json:"collectionFilters,omitempty"`
 	CollectionMethods    []string             `json:"collectionMethods,omitempty"`
 	Created              string               `json:"created,omitempty"`
+	CreatorID            string               `json:"creatorId,omitempty"`
 	Embed                *bool                `json:"embed,omitempty"`
 	EmbedType            string               `json:"embedType,omitempty"`
 	Finalizers           []string             `json:"finalizers,omitempty"`

@@ -6,13 +6,13 @@ import (
 
 const (
 	WorkloadType                               = "workload"
-	WorkloadField                              = "creatorId"
 	WorkloadFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	WorkloadFieldAnnotations                   = "annotations"
 	WorkloadFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
 	WorkloadFieldBatchSize                     = "batchSize"
 	WorkloadFieldContainers                    = "containers"
 	WorkloadFieldCreated                       = "created"
+	WorkloadFieldCreatorID                     = "creatorId"
 	WorkloadFieldDNSPolicy                     = "dnsPolicy"
 	WorkloadFieldDeploymentStrategy            = "deploymentStrategy"
 	WorkloadFieldFinalizers                    = "finalizers"
@@ -55,13 +55,13 @@ const (
 
 type Workload struct {
 	types.Resource
-	string                        `json:"creatorId,omitempty"`
 	ActiveDeadlineSeconds         *int64                 `json:"activeDeadlineSeconds,omitempty"`
 	Annotations                   map[string]string      `json:"annotations,omitempty"`
 	AutomountServiceAccountToken  *bool                  `json:"automountServiceAccountToken,omitempty"`
 	BatchSize                     string                 `json:"batchSize,omitempty"`
 	Containers                    []Container            `json:"containers,omitempty"`
 	Created                       string                 `json:"created,omitempty"`
+	CreatorID                     string                 `json:"creatorId,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty"`
 	DeploymentStrategy            *DeployStrategy        `json:"deploymentStrategy,omitempty"`
 	Finalizers                    []string               `json:"finalizers,omitempty"`

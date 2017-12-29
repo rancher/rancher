@@ -6,11 +6,11 @@ import (
 
 const (
 	CatalogType                      = "catalog"
-	CatalogField                     = "creatorId"
 	CatalogFieldAnnotations          = "annotations"
 	CatalogFieldBranch               = "branch"
 	CatalogFieldCatalogKind          = "catalogKind"
 	CatalogFieldCreated              = "created"
+	CatalogFieldCreatorID            = "creatorId"
 	CatalogFieldFinalizers           = "finalizers"
 	CatalogFieldLabels               = "labels"
 	CatalogFieldName                 = "name"
@@ -26,11 +26,11 @@ const (
 
 type Catalog struct {
 	types.Resource
-	string               `json:"creatorId,omitempty"`
 	Annotations          map[string]string `json:"annotations,omitempty"`
 	Branch               string            `json:"branch,omitempty"`
 	CatalogKind          string            `json:"catalogKind,omitempty"`
 	Created              string            `json:"created,omitempty"`
+	CreatorID            string            `json:"creatorId,omitempty"`
 	Finalizers           []string          `json:"finalizers,omitempty"`
 	Labels               map[string]string `json:"labels,omitempty"`
 	Name                 string            `json:"name,omitempty"`

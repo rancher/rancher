@@ -6,10 +6,10 @@ import (
 
 const (
 	TokenType                 = "token"
-	TokenField                = "creatorId"
 	TokenFieldAnnotations     = "annotations"
 	TokenFieldAuthProvider    = "authProvider"
 	TokenFieldCreated         = "created"
+	TokenFieldCreatorID       = "creatorId"
 	TokenFieldDescription     = "description"
 	TokenFieldFinalizers      = "finalizers"
 	TokenFieldGroupPrincipals = "groupPrincipals"
@@ -28,10 +28,10 @@ const (
 
 type Token struct {
 	types.Resource
-	string          `json:"creatorId,omitempty"`
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	AuthProvider    string            `json:"authProvider,omitempty"`
 	Created         string            `json:"created,omitempty"`
+	CreatorID       string            `json:"creatorId,omitempty"`
 	Description     string            `json:"description,omitempty"`
 	Finalizers      []string          `json:"finalizers,omitempty"`
 	GroupPrincipals []string          `json:"groupPrincipals,omitempty"`

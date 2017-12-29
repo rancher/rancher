@@ -6,11 +6,11 @@ import (
 
 const (
 	ProjectType                             = "project"
-	ProjectField                            = "creatorId"
 	ProjectFieldAnnotations                 = "annotations"
 	ProjectFieldClusterId                   = "clusterId"
 	ProjectFieldConditions                  = "conditions"
 	ProjectFieldCreated                     = "created"
+	ProjectFieldCreatorID                   = "creatorId"
 	ProjectFieldFinalizers                  = "finalizers"
 	ProjectFieldId                          = "id"
 	ProjectFieldLabels                      = "labels"
@@ -26,11 +26,11 @@ const (
 
 type Project struct {
 	types.Resource
-	string                      `json:"creatorId,omitempty"`
 	Annotations                 map[string]string  `json:"annotations,omitempty"`
 	ClusterId                   string             `json:"clusterId,omitempty"`
 	Conditions                  []ProjectCondition `json:"conditions,omitempty"`
 	Created                     string             `json:"created,omitempty"`
+	CreatorID                   string             `json:"creatorId,omitempty"`
 	Finalizers                  []string           `json:"finalizers,omitempty"`
 	Id                          string             `json:"id,omitempty"`
 	Labels                      map[string]string  `json:"labels,omitempty"`

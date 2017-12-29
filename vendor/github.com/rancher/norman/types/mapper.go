@@ -3,6 +3,7 @@ package types
 import (
 	"fmt"
 
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/definition"
 )
 
@@ -92,9 +93,9 @@ func (t *typeMapper) ToInternal(data map[string]interface{}) {
 		if schema.Mapper == nil {
 			continue
 		}
-		datas, _ := data[fieldName].([]map[string]interface{})
+		datas, _ := data[fieldName].([]interface{})
 		for _, fieldData := range datas {
-			schema.Mapper.ToInternal(fieldData)
+			schema.Mapper.ToInternal(convert.ToMapInterface(fieldData))
 		}
 	}
 

@@ -1928,8 +1928,8 @@ func (in *MachineList) DeepCopyObject() runtime.Object {
 func (in *MachineSpec) DeepCopyInto(out *MachineSpec) {
 	*out = *in
 	in.NodeSpec.DeepCopyInto(&out.NodeSpec)
-	if in.Roles != nil {
-		in, out := &in.Roles, &out.Roles
+	if in.RequestedRoles != nil {
+		in, out := &in.RequestedRoles, &out.RequestedRoles
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}

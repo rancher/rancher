@@ -53,9 +53,11 @@ type ProjectController interface {
 type ProjectInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*Project) (*Project, error)
+	GetNamespace(name, namespace string, opts metav1.GetOptions) (*Project, error)
 	Get(name string, opts metav1.GetOptions) (*Project, error)
 	Update(*Project) (*Project, error)
 	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*ProjectList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -172,6 +174,11 @@ func (s *projectClient) Get(name string, opts metav1.GetOptions) (*Project, erro
 	return obj.(*Project), err
 }
 
+func (s *projectClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*Project, error) {
+	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+	return obj.(*Project), err
+}
+
 func (s *projectClient) Update(o *Project) (*Project, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
 	return obj.(*Project), err
@@ -179,6 +186,10 @@ func (s *projectClient) Update(o *Project) (*Project, error) {
 
 func (s *projectClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
+}
+
+func (s *projectClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespace(name, namespace, options)
 }
 
 func (s *projectClient) List(opts metav1.ListOptions) (*ProjectList, error) {

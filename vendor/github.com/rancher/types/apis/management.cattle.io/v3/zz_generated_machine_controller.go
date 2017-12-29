@@ -53,9 +53,11 @@ type MachineController interface {
 type MachineInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*Machine) (*Machine, error)
+	GetNamespace(name, namespace string, opts metav1.GetOptions) (*Machine, error)
 	Get(name string, opts metav1.GetOptions) (*Machine, error)
 	Update(*Machine) (*Machine, error)
 	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*MachineList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -172,6 +174,11 @@ func (s *machineClient) Get(name string, opts metav1.GetOptions) (*Machine, erro
 	return obj.(*Machine), err
 }
 
+func (s *machineClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*Machine, error) {
+	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+	return obj.(*Machine), err
+}
+
 func (s *machineClient) Update(o *Machine) (*Machine, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
 	return obj.(*Machine), err
@@ -179,6 +186,10 @@ func (s *machineClient) Update(o *Machine) (*Machine, error) {
 
 func (s *machineClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
+}
+
+func (s *machineClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespace(name, namespace, options)
 }
 
 func (s *machineClient) List(opts metav1.ListOptions) (*MachineList, error) {

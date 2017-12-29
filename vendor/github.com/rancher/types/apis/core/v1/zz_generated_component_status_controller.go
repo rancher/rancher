@@ -54,9 +54,11 @@ type ComponentStatusController interface {
 type ComponentStatusInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*v1.ComponentStatus) (*v1.ComponentStatus, error)
+	GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1.ComponentStatus, error)
 	Get(name string, opts metav1.GetOptions) (*v1.ComponentStatus, error)
 	Update(*v1.ComponentStatus) (*v1.ComponentStatus, error)
 	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*ComponentStatusList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -173,6 +175,11 @@ func (s *componentStatusClient) Get(name string, opts metav1.GetOptions) (*v1.Co
 	return obj.(*v1.ComponentStatus), err
 }
 
+func (s *componentStatusClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1.ComponentStatus, error) {
+	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+	return obj.(*v1.ComponentStatus), err
+}
+
 func (s *componentStatusClient) Update(o *v1.ComponentStatus) (*v1.ComponentStatus, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
 	return obj.(*v1.ComponentStatus), err
@@ -180,6 +187,10 @@ func (s *componentStatusClient) Update(o *v1.ComponentStatus) (*v1.ComponentStat
 
 func (s *componentStatusClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
+}
+
+func (s *componentStatusClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespace(name, namespace, options)
 }
 
 func (s *componentStatusClient) List(opts metav1.ListOptions) (*ComponentStatusList, error) {

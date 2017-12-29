@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/cluster-api/api/pod"
 	"github.com/rancher/cluster-api/api/workload"
+	"github.com/rancher/cluster-api/store/ingress"
 	"github.com/rancher/cluster-api/store/secret"
 	"github.com/rancher/norman/pkg/subscribe"
 	"github.com/rancher/norman/store/crd"
@@ -20,11 +21,11 @@ import (
 )
 
 func Schemas(ctx context.Context, app *config.ClusterContext, schemas *types.Schemas) error {
+	subscribe.Register(&clusterSchema.Version, schemas)
 	subscribe.Register(&schema.Version, schemas)
 	DaemonSet(app.UnversionedClient, schemas)
 	Deployment(app.UnversionedClient, schemas)
-	Endpoint(app.UnversionedClient, schemas)
-	Ingress(app.UnversionedClient, schemas)
+	Ingress(app.WorkloadContext(), schemas)
 	Namespace(app.UnversionedClient, schemas)
 	Node(app.UnversionedClient, schemas)
 	PersistentVolume(app.UnversionedClient, schemas)
@@ -159,33 +160,21 @@ func StatefulSet(k8sClient rest.Interface, schemas *types.Schemas) {
 }
 
 func Service(k8sClient rest.Interface, schemas *types.Schemas) {
-	schema := schemas.Schema(&schema.Version, "service")
+	schema := schemas.Schema(&schema.Version, "dnsRecord")
 	schema.Store = proxy.NewProxyStore(k8sClient,
 		[]string{"api"},
 		"",
 		"v1",
 		"Service",
 		"services")
+
+	serviceSchema := schemas.Schema(&schema.Version, "service")
+	serviceSchema.Store = schema.Store
 }
 
-func Ingress(k8sClient rest.Interface, schemas *types.Schemas) {
+func Ingress(workload *config.WorkloadContext, schemas *types.Schemas) {
 	schema := schemas.Schema(&schema.Version, "ingress")
-	schema.Store = proxy.NewProxyStore(k8sClient,
-		[]string{"apis"},
-		"extensions",
-		"v1beta1",
-		"Ingress",
-		"ingresses")
-}
-
-func Endpoint(k8sClient rest.Interface, schemas *types.Schemas) {
-	schema := schemas.Schema(&schema.Version, "endpoint")
-	schema.Store = proxy.NewProxyStore(k8sClient,
-		[]string{"api"},
-		"",
-		"v1",
-		"Endpoint",
-		"endpoints")
+	schema.Store = ingress.NewStore(workload)
 }
 
 func Secret(k8sClient rest.Interface, schemas *types.Schemas) {

@@ -6,13 +6,13 @@ import (
 
 const (
 	NamespacedCertificateType                         = "namespacedCertificate"
-	NamespacedCertificateField                        = "creatorId"
 	NamespacedCertificateFieldAlgorithm               = "algorithm"
 	NamespacedCertificateFieldAnnotations             = "annotations"
 	NamespacedCertificateFieldCN                      = "cn"
 	NamespacedCertificateFieldCertFingerprint         = "certFingerprint"
 	NamespacedCertificateFieldCerts                   = "certs"
 	NamespacedCertificateFieldCreated                 = "created"
+	NamespacedCertificateFieldCreatorID               = "creatorId"
 	NamespacedCertificateFieldFinalizers              = "finalizers"
 	NamespacedCertificateFieldIssuedAt                = "issuedAt"
 	NamespacedCertificateFieldIssuer                  = "issuer"
@@ -32,13 +32,13 @@ const (
 
 type NamespacedCertificate struct {
 	types.Resource
-	string                  `json:"creatorId,omitempty"`
 	Algorithm               string            `json:"algorithm,omitempty"`
 	Annotations             map[string]string `json:"annotations,omitempty"`
 	CN                      string            `json:"cn,omitempty"`
 	CertFingerprint         string            `json:"certFingerprint,omitempty"`
 	Certs                   string            `json:"certs,omitempty"`
 	Created                 string            `json:"created,omitempty"`
+	CreatorID               string            `json:"creatorId,omitempty"`
 	Finalizers              []string          `json:"finalizers,omitempty"`
 	IssuedAt                string            `json:"issuedAt,omitempty"`
 	Issuer                  string            `json:"issuer,omitempty"`

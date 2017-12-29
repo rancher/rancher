@@ -53,9 +53,11 @@ type PrincipalController interface {
 type PrincipalInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*Principal) (*Principal, error)
+	GetNamespace(name, namespace string, opts metav1.GetOptions) (*Principal, error)
 	Get(name string, opts metav1.GetOptions) (*Principal, error)
 	Update(*Principal) (*Principal, error)
 	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*PrincipalList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -172,6 +174,11 @@ func (s *principalClient) Get(name string, opts metav1.GetOptions) (*Principal, 
 	return obj.(*Principal), err
 }
 
+func (s *principalClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*Principal, error) {
+	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+	return obj.(*Principal), err
+}
+
 func (s *principalClient) Update(o *Principal) (*Principal, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
 	return obj.(*Principal), err
@@ -179,6 +186,10 @@ func (s *principalClient) Update(o *Principal) (*Principal, error) {
 
 func (s *principalClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
+}
+
+func (s *principalClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespace(name, namespace, options)
 }
 
 func (s *principalClient) List(opts metav1.ListOptions) (*PrincipalList, error) {

@@ -6,9 +6,9 @@ import (
 
 const (
 	BasicAuthType                 = "basicAuth"
-	BasicAuthField                = "creatorId"
 	BasicAuthFieldAnnotations     = "annotations"
 	BasicAuthFieldCreated         = "created"
+	BasicAuthFieldCreatorID       = "creatorId"
 	BasicAuthFieldFinalizers      = "finalizers"
 	BasicAuthFieldLabels          = "labels"
 	BasicAuthFieldName            = "name"
@@ -23,9 +23,9 @@ const (
 
 type BasicAuth struct {
 	types.Resource
-	string          `json:"creatorId,omitempty"`
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	Created         string            `json:"created,omitempty"`
+	CreatorID       string            `json:"creatorId,omitempty"`
 	Finalizers      []string          `json:"finalizers,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`
 	Name            string            `json:"name,omitempty"`

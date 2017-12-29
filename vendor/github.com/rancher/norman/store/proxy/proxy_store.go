@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
+	patchtype "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
@@ -39,6 +40,24 @@ type Store struct {
 }
 
 func NewProxyStore(k8sClient rest.Interface,
+	prefix []string, group, version, kind, resourcePlural string) types.Store {
+	return &errorStore{
+		Store: &Store{
+			k8sClient:      k8sClient,
+			prefix:         prefix,
+			group:          group,
+			version:        version,
+			kind:           kind,
+			resourcePlural: resourcePlural,
+			authContext: map[string]string{
+				"apiGroup": group,
+				"resource": resourcePlural,
+			},
+		},
+	}
+}
+
+func NewRawProxyStore(k8sClient rest.Interface,
 	prefix []string, group, version, kind, resourcePlural string) *Store {
 	return &Store{
 		k8sClient:      k8sClient,
@@ -198,25 +217,15 @@ func (p *Store) toInternal(mapper types.Mapper, data map[string]interface{}) {
 }
 
 func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
-	resourceVersion, existing, err := p.byID(apiContext, schema, id)
-	if err != nil {
-		return data, nil
-	}
-
-	for k, v := range data {
-		existing[k] = v
-	}
-
-	p.toInternal(schema.Mapper, existing)
+	p.toInternal(schema.Mapper, data)
 	namespace, id := splitID(id)
 
-	values.PutValue(existing, resourceVersion, "metadata", "resourceVersion")
-
-	req := p.common(namespace, p.k8sClient.Put()).
+	req := p.common(namespace, p.k8sClient.Patch(patchtype.StrategicMergePatchType)).
 		Body(&unstructured.Unstructured{
-			Object: existing,
+			Object: data,
 		}).
-		Name(id)
+		Name(id).
+		SetHeader("Content-Type", string(patchtype.StrategicMergePatchType))
 
 	_, result, err := p.singleResult(apiContext, schema, req)
 	return result, err

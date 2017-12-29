@@ -6,10 +6,10 @@ import (
 
 const (
 	PersistentVolumeClaimType                      = "persistentVolumeClaim"
-	PersistentVolumeClaimField                     = "creatorId"
 	PersistentVolumeClaimFieldAccessModes          = "accessModes"
 	PersistentVolumeClaimFieldAnnotations          = "annotations"
 	PersistentVolumeClaimFieldCreated              = "created"
+	PersistentVolumeClaimFieldCreatorID            = "creatorId"
 	PersistentVolumeClaimFieldFinalizers           = "finalizers"
 	PersistentVolumeClaimFieldLabels               = "labels"
 	PersistentVolumeClaimFieldName                 = "name"
@@ -30,10 +30,10 @@ const (
 
 type PersistentVolumeClaim struct {
 	types.Resource
-	string               `json:"creatorId,omitempty"`
 	AccessModes          []string                     `json:"accessModes,omitempty"`
 	Annotations          map[string]string            `json:"annotations,omitempty"`
 	Created              string                       `json:"created,omitempty"`
+	CreatorID            string                       `json:"creatorId,omitempty"`
 	Finalizers           []string                     `json:"finalizers,omitempty"`
 	Labels               map[string]string            `json:"labels,omitempty"`
 	Name                 string                       `json:"name,omitempty"`

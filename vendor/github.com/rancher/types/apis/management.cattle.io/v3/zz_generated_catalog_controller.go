@@ -53,9 +53,11 @@ type CatalogController interface {
 type CatalogInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*Catalog) (*Catalog, error)
+	GetNamespace(name, namespace string, opts metav1.GetOptions) (*Catalog, error)
 	Get(name string, opts metav1.GetOptions) (*Catalog, error)
 	Update(*Catalog) (*Catalog, error)
 	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*CatalogList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -172,6 +174,11 @@ func (s *catalogClient) Get(name string, opts metav1.GetOptions) (*Catalog, erro
 	return obj.(*Catalog), err
 }
 
+func (s *catalogClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*Catalog, error) {
+	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+	return obj.(*Catalog), err
+}
+
 func (s *catalogClient) Update(o *Catalog) (*Catalog, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
 	return obj.(*Catalog), err
@@ -179,6 +186,10 @@ func (s *catalogClient) Update(o *Catalog) (*Catalog, error) {
 
 func (s *catalogClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
+}
+
+func (s *catalogClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespace(name, namespace, options)
 }
 
 func (s *catalogClient) List(opts metav1.ListOptions) (*CatalogList, error) {

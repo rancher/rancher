@@ -6,11 +6,11 @@ import (
 
 const (
 	ClusterEventType                 = "clusterEvent"
-	ClusterEventField                = "creatorId"
 	ClusterEventFieldAnnotations     = "annotations"
 	ClusterEventFieldClusterId       = "clusterId"
 	ClusterEventFieldCount           = "count"
 	ClusterEventFieldCreated         = "created"
+	ClusterEventFieldCreatorID       = "creatorId"
 	ClusterEventFieldEventType       = "eventType"
 	ClusterEventFieldFinalizers      = "finalizers"
 	ClusterEventFieldFirstTimestamp  = "firstTimestamp"
@@ -28,11 +28,11 @@ const (
 
 type ClusterEvent struct {
 	types.Resource
-	string          `json:"creatorId,omitempty"`
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	ClusterId       string            `json:"clusterId,omitempty"`
 	Count           *int64            `json:"count,omitempty"`
 	Created         string            `json:"created,omitempty"`
+	CreatorID       string            `json:"creatorId,omitempty"`
 	EventType       string            `json:"eventType,omitempty"`
 	Finalizers      []string          `json:"finalizers,omitempty"`
 	FirstTimestamp  string            `json:"firstTimestamp,omitempty"`

@@ -6,9 +6,9 @@ import (
 
 const (
 	PrincipalType                 = "principal"
-	PrincipalField                = "creatorId"
 	PrincipalFieldAnnotations     = "annotations"
 	PrincipalFieldCreated         = "created"
+	PrincipalFieldCreatorID       = "creatorId"
 	PrincipalFieldDisplayName     = "displayName"
 	PrincipalFieldExtraInfo       = "extraInfo"
 	PrincipalFieldFinalizers      = "finalizers"
@@ -26,9 +26,9 @@ const (
 
 type Principal struct {
 	types.Resource
-	string          `json:"creatorId,omitempty"`
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	Created         string            `json:"created,omitempty"`
+	CreatorID       string            `json:"creatorId,omitempty"`
 	DisplayName     string            `json:"displayName,omitempty"`
 	ExtraInfo       map[string]string `json:"extraInfo,omitempty"`
 	Finalizers      []string          `json:"finalizers,omitempty"`

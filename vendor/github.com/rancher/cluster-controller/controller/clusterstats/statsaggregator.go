@@ -71,7 +71,7 @@ func (s *StatsAggregator) deleteStats(key string) error {
 }
 
 func (s *StatsAggregator) addOrUpdateStats(clusterNode *clusterv1.Machine) error {
-	clusterName, clusterNodeName := clusterNode.Spec.ClusterName, clusterNode.Status.NodeName
+	clusterName, clusterNodeName := clusterNode.Status.ClusterName, clusterNode.Status.NodeName
 	cluster, err := s.getCluster(clusterName)
 	if err != nil {
 		return err

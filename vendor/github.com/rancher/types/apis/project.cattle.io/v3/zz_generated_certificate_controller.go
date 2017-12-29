@@ -54,9 +54,11 @@ type CertificateController interface {
 type CertificateInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*Certificate) (*Certificate, error)
+	GetNamespace(name, namespace string, opts metav1.GetOptions) (*Certificate, error)
 	Get(name string, opts metav1.GetOptions) (*Certificate, error)
 	Update(*Certificate) (*Certificate, error)
 	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*CertificateList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -173,6 +175,11 @@ func (s *certificateClient) Get(name string, opts metav1.GetOptions) (*Certifica
 	return obj.(*Certificate), err
 }
 
+func (s *certificateClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*Certificate, error) {
+	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+	return obj.(*Certificate), err
+}
+
 func (s *certificateClient) Update(o *Certificate) (*Certificate, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
 	return obj.(*Certificate), err
@@ -180,6 +187,10 @@ func (s *certificateClient) Update(o *Certificate) (*Certificate, error) {
 
 func (s *certificateClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
+}
+
+func (s *certificateClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespace(name, namespace, options)
 }
 
 func (s *certificateClient) List(opts metav1.ListOptions) (*CertificateList, error) {

@@ -57,15 +57,16 @@ type Machine struct {
 }
 
 type MachineStatus struct {
-	Conditions          []MachineCondition   `json:"conditions"`
-	NodeStatus          v1.NodeStatus        `json:"nodeStatus"`
-	NodeName            string               `json:"nodeName"`
+	Conditions          []MachineCondition   `json:"conditions,omitempty"`
+	NodeStatus          v1.NodeStatus        `json:"nodeStatus,omitempty"`
+	NodeName            string               `json:"nodeName,omitempty"`
+	ClusterName         string               `json:"clusterName,omitempty" norman:"type=reference[cluster]"`
 	Requested           v1.ResourceList      `json:"requested,omitempty"`
 	Limits              v1.ResourceList      `json:"limits,omitempty"`
-	MachineTemplateSpec *MachineTemplateSpec `json:"machineTemplateSpec"`
-	NodeConfig          *RKEConfigNode       `json:"rkeNode"`
-	SSHUser             string               `json:"sshUser"`
-	MachineDriverConfig string               `json:"machineDriverConfig"`
+	MachineTemplateSpec *MachineTemplateSpec `json:"machineTemplateSpec,omitempty"`
+	NodeConfig          *RKEConfigNode       `json:"rkeNode,omitempty"`
+	SSHUser             string               `json:"sshUser,omitempty"`
+	MachineDriverConfig string               `json:"machineDriverConfig,omitempty"`
 }
 
 var (
@@ -91,24 +92,26 @@ type MachineCondition struct {
 }
 
 type MachineSpec struct {
-	NodeSpec            v1.NodeSpec `json:"nodeSpec"`
-	ClusterName         string      `json:"clusterName" norman:"type=reference[cluster]"`
-	Roles               []string    `json:"roles"`
-	MachineTemplateName string      `json:"machineTemplateName" norman:"type=reference[machineTemplate]"`
-	Description         string      `json:"description"`
+	NodeSpec             v1.NodeSpec `json:"nodeSpec"`
+	DisplayName          string      `json:"displayName,omitempty"`
+	RequestedHostname    string      `json:"requestedHostname,omitempty" norman:"noupdate"`
+	RequestedClusterName string      `json:"requestedClusterName,omitempty" norman:"type=reference[cluster],noupdate"`
+	RequestedRoles       []string    `json:"requestedRoles,omitempty" norman:"noupdate"`
+	MachineTemplateName  string      `json:"machineTemplateName,omitempty" norman:"type=reference[machineTemplate],noupdate"`
+	Description          string      `json:"description,omitempty"`
 }
 
 type MachineCommonParams struct {
-	AuthCertificateAuthority string            `json:"authCertificateAuthority"`
-	AuthKey                  string            `json:"authKey"`
-	EngineInstallURL         string            `json:"engineInstallURL"`
-	DockerVersion            string            `json:"dockerVersion"`
-	EngineOpt                map[string]string `json:"engineOpt"`
-	EngineInsecureRegistry   []string          `json:"engineInsecureRegistry"`
-	EngineRegistryMirror     []string          `json:"engineRegistryMirror"`
-	EngineLabel              map[string]string `json:"engineLabel"`
-	EngineStorageDriver      string            `json:"engineStorageDriver"`
-	EngineEnv                map[string]string `json:"engineEnv"`
+	AuthCertificateAuthority string            `json:"authCertificateAuthority,omitempty"`
+	AuthKey                  string            `json:"authKey,omitempty"`
+	EngineInstallURL         string            `json:"engineInstallURL,omitempty"`
+	DockerVersion            string            `json:"dockerVersion,omitempty"`
+	EngineOpt                map[string]string `json:"engineOpt,omitempty"`
+	EngineInsecureRegistry   []string          `json:"engineInsecureRegistry,omitempty"`
+	EngineRegistryMirror     []string          `json:"engineRegistryMirror,omitempty"`
+	EngineLabel              map[string]string `json:"engineLabel,omitempty"`
+	EngineStorageDriver      string            `json:"engineStorageDriver,omitempty"`
+	EngineEnv                map[string]string `json:"engineEnv,omitempty"`
 }
 
 type MachineDriver struct {

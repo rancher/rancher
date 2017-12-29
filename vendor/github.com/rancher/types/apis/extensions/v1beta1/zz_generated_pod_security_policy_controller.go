@@ -54,9 +54,11 @@ type PodSecurityPolicyController interface {
 type PodSecurityPolicyInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*v1beta1.PodSecurityPolicy) (*v1beta1.PodSecurityPolicy, error)
+	GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1beta1.PodSecurityPolicy, error)
 	Get(name string, opts metav1.GetOptions) (*v1beta1.PodSecurityPolicy, error)
 	Update(*v1beta1.PodSecurityPolicy) (*v1beta1.PodSecurityPolicy, error)
 	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*PodSecurityPolicyList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -173,6 +175,11 @@ func (s *podSecurityPolicyClient) Get(name string, opts metav1.GetOptions) (*v1b
 	return obj.(*v1beta1.PodSecurityPolicy), err
 }
 
+func (s *podSecurityPolicyClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1beta1.PodSecurityPolicy, error) {
+	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+	return obj.(*v1beta1.PodSecurityPolicy), err
+}
+
 func (s *podSecurityPolicyClient) Update(o *v1beta1.PodSecurityPolicy) (*v1beta1.PodSecurityPolicy, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
 	return obj.(*v1beta1.PodSecurityPolicy), err
@@ -180,6 +187,10 @@ func (s *podSecurityPolicyClient) Update(o *v1beta1.PodSecurityPolicy) (*v1beta1
 
 func (s *podSecurityPolicyClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
+}
+
+func (s *podSecurityPolicyClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespace(name, namespace, options)
 }
 
 func (s *podSecurityPolicyClient) List(opts metav1.ListOptions) (*PodSecurityPolicyList, error) {

@@ -29,6 +29,7 @@ func (n *NamespaceIDMapper) ModifySchema(schema *types.Schema, schemas *types.Sc
 
 	field.Type = "reference[namespace]"
 	field.Required = true
+	field.Update = false
 	schema.ResourceFields["namespace"] = field
 
 	n.Move = &mapper.Move{

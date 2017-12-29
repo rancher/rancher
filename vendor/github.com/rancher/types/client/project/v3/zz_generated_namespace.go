@@ -6,10 +6,10 @@ import (
 
 const (
 	NamespaceType                      = "namespace"
-	NamespaceField                     = "creatorId"
 	NamespaceFieldAnnotations          = "annotations"
 	NamespaceFieldAnswers              = "answers"
 	NamespaceFieldCreated              = "created"
+	NamespaceFieldCreatorID            = "creatorId"
 	NamespaceFieldExternalID           = "externalId"
 	NamespaceFieldFinalizers           = "finalizers"
 	NamespaceFieldLabels               = "labels"
@@ -29,10 +29,10 @@ const (
 
 type Namespace struct {
 	types.Resource
-	string               `json:"creatorId,omitempty"`
 	Annotations          map[string]string      `json:"annotations,omitempty"`
 	Answers              map[string]interface{} `json:"answers,omitempty"`
 	Created              string                 `json:"created,omitempty"`
+	CreatorID            string                 `json:"creatorId,omitempty"`
 	ExternalID           string                 `json:"externalId,omitempty"`
 	Finalizers           []string               `json:"finalizers,omitempty"`
 	Labels               map[string]string      `json:"labels,omitempty"`

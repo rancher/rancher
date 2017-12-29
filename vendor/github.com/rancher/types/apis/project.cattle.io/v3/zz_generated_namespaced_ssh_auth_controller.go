@@ -54,9 +54,11 @@ type NamespacedSSHAuthController interface {
 type NamespacedSSHAuthInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*NamespacedSSHAuth) (*NamespacedSSHAuth, error)
+	GetNamespace(name, namespace string, opts metav1.GetOptions) (*NamespacedSSHAuth, error)
 	Get(name string, opts metav1.GetOptions) (*NamespacedSSHAuth, error)
 	Update(*NamespacedSSHAuth) (*NamespacedSSHAuth, error)
 	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*NamespacedSSHAuthList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -173,6 +175,11 @@ func (s *namespacedSshAuthClient) Get(name string, opts metav1.GetOptions) (*Nam
 	return obj.(*NamespacedSSHAuth), err
 }
 
+func (s *namespacedSshAuthClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*NamespacedSSHAuth, error) {
+	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+	return obj.(*NamespacedSSHAuth), err
+}
+
 func (s *namespacedSshAuthClient) Update(o *NamespacedSSHAuth) (*NamespacedSSHAuth, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
 	return obj.(*NamespacedSSHAuth), err
@@ -180,6 +187,10 @@ func (s *namespacedSshAuthClient) Update(o *NamespacedSSHAuth) (*NamespacedSSHAu
 
 func (s *namespacedSshAuthClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
+}
+
+func (s *namespacedSshAuthClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespace(name, namespace, options)
 }
 
 func (s *namespacedSshAuthClient) List(opts metav1.ListOptions) (*NamespacedSSHAuthList, error) {

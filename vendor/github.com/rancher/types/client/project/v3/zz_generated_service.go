@@ -6,15 +6,16 @@ import (
 
 const (
 	ServiceType                          = "service"
-	ServiceField                         = "creatorId"
 	ServiceFieldAnnotations              = "annotations"
 	ServiceFieldClusterIp                = "clusterIp"
 	ServiceFieldCreated                  = "created"
+	ServiceFieldCreatorID                = "creatorId"
 	ServiceFieldExternalIPs              = "externalIPs"
 	ServiceFieldExternalTrafficPolicy    = "externalTrafficPolicy"
 	ServiceFieldFinalizers               = "finalizers"
 	ServiceFieldHealthCheckNodePort      = "healthCheckNodePort"
 	ServiceFieldHostname                 = "hostname"
+	ServiceFieldIPAddresses              = "ipAddresses"
 	ServiceFieldKind                     = "kind"
 	ServiceFieldLabels                   = "labels"
 	ServiceFieldLoadBalancerIP           = "loadBalancerIP"
@@ -30,7 +31,7 @@ const (
 	ServiceFieldSessionAffinity          = "sessionAffinity"
 	ServiceFieldSessionAffinityConfig    = "sessionAffinityConfig"
 	ServiceFieldState                    = "state"
-	ServiceFieldTargetServiceIDs         = "targetServiceIds"
+	ServiceFieldTargetDNSRecordIDs       = "targetDnsRecordIds"
 	ServiceFieldTargetWorkloadIDs        = "targetWorkloadIds"
 	ServiceFieldTransitioning            = "transitioning"
 	ServiceFieldTransitioningMessage     = "transitioningMessage"
@@ -40,15 +41,16 @@ const (
 
 type Service struct {
 	types.Resource
-	string                   `json:"creatorId,omitempty"`
 	Annotations              map[string]string      `json:"annotations,omitempty"`
 	ClusterIp                string                 `json:"clusterIp,omitempty"`
 	Created                  string                 `json:"created,omitempty"`
+	CreatorID                string                 `json:"creatorId,omitempty"`
 	ExternalIPs              []string               `json:"externalIPs,omitempty"`
 	ExternalTrafficPolicy    string                 `json:"externalTrafficPolicy,omitempty"`
 	Finalizers               []string               `json:"finalizers,omitempty"`
 	HealthCheckNodePort      *int64                 `json:"healthCheckNodePort,omitempty"`
 	Hostname                 string                 `json:"hostname,omitempty"`
+	IPAddresses              []string               `json:"ipAddresses,omitempty"`
 	Kind                     string                 `json:"kind,omitempty"`
 	Labels                   map[string]string      `json:"labels,omitempty"`
 	LoadBalancerIP           string                 `json:"loadBalancerIP,omitempty"`
@@ -64,7 +66,7 @@ type Service struct {
 	SessionAffinity          string                 `json:"sessionAffinity,omitempty"`
 	SessionAffinityConfig    *SessionAffinityConfig `json:"sessionAffinityConfig,omitempty"`
 	State                    string                 `json:"state,omitempty"`
-	TargetServiceIDs         []string               `json:"targetServiceIds,omitempty"`
+	TargetDNSRecordIDs       []string               `json:"targetDnsRecordIds,omitempty"`
 	TargetWorkloadIDs        []string               `json:"targetWorkloadIds,omitempty"`
 	Transitioning            string                 `json:"transitioning,omitempty"`
 	TransitioningMessage     string                 `json:"transitioningMessage,omitempty"`
