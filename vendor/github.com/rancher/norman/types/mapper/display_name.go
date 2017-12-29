@@ -8,7 +8,8 @@ var displayNameMappers = types.Mappers{
 	&Move{From: "name", To: "id"},
 	&Move{From: "displayName", To: "name"},
 	Access{Fields: map[string]string{
-		"id": "",
+		"id":   "",
+		"name": "cru",
 	}},
 }
 

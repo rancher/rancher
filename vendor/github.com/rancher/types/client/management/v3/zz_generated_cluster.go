@@ -6,7 +6,6 @@ import (
 
 const (
 	ClusterType                                     = "cluster"
-	ClusterField                                    = "creatorId"
 	ClusterFieldAPIEndpoint                         = "apiEndpoint"
 	ClusterFieldAllocatable                         = "allocatable"
 	ClusterFieldAnnotations                         = "annotations"
@@ -16,6 +15,7 @@ const (
 	ClusterFieldComponentStatuses                   = "componentStatuses"
 	ClusterFieldConditions                          = "conditions"
 	ClusterFieldCreated                             = "created"
+	ClusterFieldCreatorID                           = "creatorId"
 	ClusterFieldDefaultClusterRoleForProjectMembers = "defaultClusterRoleForProjectMembers"
 	ClusterFieldDefaultPodSecurityPolicyTemplateId  = "defaultPodSecurityPolicyTemplateId"
 	ClusterFieldDescription                         = "description"
@@ -38,7 +38,6 @@ const (
 
 type Cluster struct {
 	types.Resource
-	string                              `json:"creatorId,omitempty"`
 	APIEndpoint                         string                         `json:"apiEndpoint,omitempty"`
 	Allocatable                         map[string]string              `json:"allocatable,omitempty"`
 	Annotations                         map[string]string              `json:"annotations,omitempty"`
@@ -48,6 +47,7 @@ type Cluster struct {
 	ComponentStatuses                   []ClusterComponentStatus       `json:"componentStatuses,omitempty"`
 	Conditions                          []ClusterCondition             `json:"conditions,omitempty"`
 	Created                             string                         `json:"created,omitempty"`
+	CreatorID                           string                         `json:"creatorId,omitempty"`
 	DefaultClusterRoleForProjectMembers string                         `json:"defaultClusterRoleForProjectMembers,omitempty"`
 	DefaultPodSecurityPolicyTemplateId  string                         `json:"defaultPodSecurityPolicyTemplateId,omitempty"`
 	Description                         string                         `json:"description,omitempty"`

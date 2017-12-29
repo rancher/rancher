@@ -6,13 +6,13 @@ import (
 
 const (
 	CertificateType                         = "certificate"
-	CertificateField                        = "creatorId"
 	CertificateFieldAlgorithm               = "algorithm"
 	CertificateFieldAnnotations             = "annotations"
 	CertificateFieldCN                      = "cn"
 	CertificateFieldCertFingerprint         = "certFingerprint"
 	CertificateFieldCerts                   = "certs"
 	CertificateFieldCreated                 = "created"
+	CertificateFieldCreatorID               = "creatorId"
 	CertificateFieldFinalizers              = "finalizers"
 	CertificateFieldIssuedAt                = "issuedAt"
 	CertificateFieldIssuer                  = "issuer"
@@ -32,13 +32,13 @@ const (
 
 type Certificate struct {
 	types.Resource
-	string                  `json:"creatorId,omitempty"`
 	Algorithm               string            `json:"algorithm,omitempty"`
 	Annotations             map[string]string `json:"annotations,omitempty"`
 	CN                      string            `json:"cn,omitempty"`
 	CertFingerprint         string            `json:"certFingerprint,omitempty"`
 	Certs                   string            `json:"certs,omitempty"`
 	Created                 string            `json:"created,omitempty"`
+	CreatorID               string            `json:"creatorId,omitempty"`
 	Finalizers              []string          `json:"finalizers,omitempty"`
 	IssuedAt                string            `json:"issuedAt,omitempty"`
 	Issuer                  string            `json:"issuer,omitempty"`

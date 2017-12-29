@@ -141,7 +141,9 @@ func (o *objectLifecycleAdapter) create(metadata metav1.Object, obj runtime.Obje
 		metadata.SetAnnotations(map[string]string{})
 	}
 
-	metadata.SetFinalizers(append(metadata.GetFinalizers(), o.name))
+	if o.objectClient.GroupVersionKind().Kind != "Namespace" {
+		metadata.SetFinalizers(append(metadata.GetFinalizers(), o.name))
+	}
 	metadata.GetAnnotations()[initialized] = "true"
 
 	_, err = o.objectClient.Update(metadata.GetName(), obj)

@@ -6,12 +6,12 @@ import (
 
 const (
 	PodType                               = "pod"
-	PodField                              = "creatorId"
 	PodFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	PodFieldAnnotations                   = "annotations"
 	PodFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
 	PodFieldContainers                    = "containers"
 	PodFieldCreated                       = "created"
+	PodFieldCreatorID                     = "creatorId"
 	PodFieldDNSPolicy                     = "dnsPolicy"
 	PodFieldFinalizers                    = "finalizers"
 	PodFieldFsgid                         = "fsgid"
@@ -50,12 +50,12 @@ const (
 
 type Pod struct {
 	types.Resource
-	string                        `json:"creatorId,omitempty"`
 	ActiveDeadlineSeconds         *int64                 `json:"activeDeadlineSeconds,omitempty"`
 	Annotations                   map[string]string      `json:"annotations,omitempty"`
 	AutomountServiceAccountToken  *bool                  `json:"automountServiceAccountToken,omitempty"`
 	Containers                    []Container            `json:"containers,omitempty"`
 	Created                       string                 `json:"created,omitempty"`
+	CreatorID                     string                 `json:"creatorId,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty"`
 	Finalizers                    []string               `json:"finalizers,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty"`

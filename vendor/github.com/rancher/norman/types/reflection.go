@@ -423,7 +423,7 @@ func (s *Schemas) determineSchemaType(version *APIVersion, t reflect.Type) (stri
 			return "date", nil
 		}
 		if t.Name() == "IntOrString" {
-			return "string", nil
+			return "intOrString", nil
 		}
 		if t.Name() == "Quantity" {
 			return "string", nil

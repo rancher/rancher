@@ -6,13 +6,13 @@ import (
 
 const (
 	TemplateType                          = "template"
-	TemplateField                         = "creatorId"
 	TemplateFieldAnnotations              = "annotations"
 	TemplateFieldBase                     = "templateBase"
 	TemplateFieldCatalogID                = "catalogId"
 	TemplateFieldCategories               = "categories"
 	TemplateFieldCategory                 = "category"
 	TemplateFieldCreated                  = "created"
+	TemplateFieldCreatorID                = "creatorId"
 	TemplateFieldDefaultTemplateVersionID = "defaultTemplateVersionId"
 	TemplateFieldDefaultVersion           = "defaultVersion"
 	TemplateFieldDescription              = "description"
@@ -41,13 +41,13 @@ const (
 
 type Template struct {
 	types.Resource
-	string                   `json:"creatorId,omitempty"`
 	Annotations              map[string]string     `json:"annotations,omitempty"`
 	Base                     string                `json:"templateBase,omitempty"`
 	CatalogID                string                `json:"catalogId,omitempty"`
 	Categories               []string              `json:"categories,omitempty"`
 	Category                 string                `json:"category,omitempty"`
 	Created                  string                `json:"created,omitempty"`
+	CreatorID                string                `json:"creatorId,omitempty"`
 	DefaultTemplateVersionID string                `json:"defaultTemplateVersionId,omitempty"`
 	DefaultVersion           string                `json:"defaultVersion,omitempty"`
 	Description              string                `json:"description,omitempty"`

@@ -239,6 +239,14 @@ func (b *Builder) convert(fieldType string, value interface{}, op Operation) (in
 		return convert.ToString(value), nil
 	case "string":
 		return convert.ToString(value), nil
+	case "dnsLabel":
+		return convert.ToString(value), nil
+	case "intOrString":
+		num, err := convert.ToNumber(value)
+		if err == nil {
+			return num, nil
+		}
+		return convert.ToString(value), nil
 	case "base64":
 		return convert.ToString(value), nil
 	case "reference":

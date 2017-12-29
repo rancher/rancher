@@ -38,6 +38,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&NamespaceList{},
 		&EventList{},
 		&PodList{},
+		&ServiceList{},
 	)
 	return nil
 }

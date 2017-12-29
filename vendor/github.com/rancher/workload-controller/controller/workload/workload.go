@@ -4,12 +4,11 @@ import (
 	"context"
 
 	"github.com/rancher/norman/offspring"
-	"github.com/rancher/norman/types"
-	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	"github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/config"
+	"github.com/rancher/workload-controller/converttypes"
 	"k8s.io/api/apps/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -60,7 +59,7 @@ func (c *Controller) Generate(obj runtime.Object) (offspring.ObjectSet, error) {
 
 func convertWorkloadToDeployment(workload *v3.Workload) (*v1beta2.Deployment, error) {
 	deployment := &v1beta2.Deployment{}
-	if err := convertTypes(workload, workloadSchema, deploymentSchema, deployment); err != nil {
+	if err := converttypes.InternalToInternal(workload, workloadSchema, deploymentSchema, deployment); err != nil {
 		return deployment, err
 	}
 
@@ -86,14 +85,4 @@ func getSelector(name string) *metav1.LabelSelector {
 			"workload.cattle.io/name": name,
 		},
 	}
-}
-
-func convertTypes(workload *v3.Workload, fromSchema *types.Schema, toSchema *types.Schema, target interface{}) error {
-	data, err := convert.EncodeToMap(workload)
-	if err != nil {
-		return err
-	}
-	fromSchema.Mapper.FromInternal(data)
-	toSchema.Mapper.ToInternal(data)
-	return convert.ToObj(data, target)
 }

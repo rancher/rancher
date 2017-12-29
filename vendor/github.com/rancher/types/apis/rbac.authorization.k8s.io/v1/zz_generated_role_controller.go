@@ -55,9 +55,11 @@ type RoleController interface {
 type RoleInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*v1.Role) (*v1.Role, error)
+	GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1.Role, error)
 	Get(name string, opts metav1.GetOptions) (*v1.Role, error)
 	Update(*v1.Role) (*v1.Role, error)
 	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*RoleList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -174,6 +176,11 @@ func (s *roleClient) Get(name string, opts metav1.GetOptions) (*v1.Role, error) 
 	return obj.(*v1.Role), err
 }
 
+func (s *roleClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1.Role, error) {
+	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+	return obj.(*v1.Role), err
+}
+
 func (s *roleClient) Update(o *v1.Role) (*v1.Role, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
 	return obj.(*v1.Role), err
@@ -181,6 +188,10 @@ func (s *roleClient) Update(o *v1.Role) (*v1.Role, error) {
 
 func (s *roleClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
+}
+
+func (s *roleClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespace(name, namespace, options)
 }
 
 func (s *roleClient) List(opts metav1.ListOptions) (*RoleList, error) {

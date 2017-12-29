@@ -1,5 +1,7 @@
 package client
 
+import "k8s.io/apimachinery/pkg/util/intstr"
+
 const (
 	RollingUpdateDeploymentType                = "rollingUpdateDeployment"
 	RollingUpdateDeploymentFieldMaxSurge       = "maxSurge"
@@ -7,6 +9,6 @@ const (
 )
 
 type RollingUpdateDeployment struct {
-	MaxSurge       string `json:"maxSurge,omitempty"`
-	MaxUnavailable string `json:"maxUnavailable,omitempty"`
+	MaxSurge       intstr.IntOrString `json:"maxSurge,omitempty"`
+	MaxUnavailable intstr.IntOrString `json:"maxUnavailable,omitempty"`
 }

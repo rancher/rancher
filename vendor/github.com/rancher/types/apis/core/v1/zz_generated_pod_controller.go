@@ -55,9 +55,11 @@ type PodController interface {
 type PodInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*v1.Pod) (*v1.Pod, error)
+	GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1.Pod, error)
 	Get(name string, opts metav1.GetOptions) (*v1.Pod, error)
 	Update(*v1.Pod) (*v1.Pod, error)
 	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*PodList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -174,6 +176,11 @@ func (s *podClient) Get(name string, opts metav1.GetOptions) (*v1.Pod, error) {
 	return obj.(*v1.Pod), err
 }
 
+func (s *podClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1.Pod, error) {
+	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+	return obj.(*v1.Pod), err
+}
+
 func (s *podClient) Update(o *v1.Pod) (*v1.Pod, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
 	return obj.(*v1.Pod), err
@@ -181,6 +188,10 @@ func (s *podClient) Update(o *v1.Pod) (*v1.Pod, error) {
 
 func (s *podClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
+}
+
+func (s *podClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespace(name, namespace, options)
 }
 
 func (s *podClient) List(opts metav1.ListOptions) (*PodList, error) {

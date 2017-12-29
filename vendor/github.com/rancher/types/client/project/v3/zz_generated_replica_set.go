@@ -6,13 +6,13 @@ import (
 
 const (
 	ReplicaSetType                               = "replicaSet"
-	ReplicaSetField                              = "creatorId"
 	ReplicaSetFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	ReplicaSetFieldAnnotations                   = "annotations"
 	ReplicaSetFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
 	ReplicaSetFieldBatchSize                     = "batchSize"
 	ReplicaSetFieldContainers                    = "containers"
 	ReplicaSetFieldCreated                       = "created"
+	ReplicaSetFieldCreatorID                     = "creatorId"
 	ReplicaSetFieldDNSPolicy                     = "dnsPolicy"
 	ReplicaSetFieldDeploymentStrategy            = "deploymentStrategy"
 	ReplicaSetFieldFinalizers                    = "finalizers"
@@ -54,13 +54,13 @@ const (
 
 type ReplicaSet struct {
 	types.Resource
-	string                        `json:"creatorId,omitempty"`
 	ActiveDeadlineSeconds         *int64                 `json:"activeDeadlineSeconds,omitempty"`
 	Annotations                   map[string]string      `json:"annotations,omitempty"`
 	AutomountServiceAccountToken  *bool                  `json:"automountServiceAccountToken,omitempty"`
 	BatchSize                     string                 `json:"batchSize,omitempty"`
 	Containers                    []Container            `json:"containers,omitempty"`
 	Created                       string                 `json:"created,omitempty"`
+	CreatorID                     string                 `json:"creatorId,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty"`
 	DeploymentStrategy            *DeployStrategy        `json:"deploymentStrategy,omitempty"`
 	Finalizers                    []string               `json:"finalizers,omitempty"`

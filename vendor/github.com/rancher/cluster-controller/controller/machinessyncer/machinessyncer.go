@@ -37,11 +37,11 @@ func (s *Syncer) sync(key string, machine *v3.Machine) error {
 }
 
 func getClusterName(machine *v3.Machine) string {
-	clusterName := machine.ClusterName
-	if clusterName == "" {
-		clusterName = machine.Spec.ClusterName
+	cluster := machine.Status.ClusterName
+	if cluster == "" {
+		cluster = machine.Spec.RequestedClusterName
 	}
-	return clusterName
+	return cluster
 }
 
 func (s *Syncer) addToClusterConfig(machine *v3.Machine) error {

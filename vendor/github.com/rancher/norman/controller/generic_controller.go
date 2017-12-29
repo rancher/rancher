@@ -167,7 +167,7 @@ func (g *genericController) processNextWorkItem() bool {
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("%v failed with : %v", key, err))
+	utilruntime.HandleError(fmt.Errorf("%v %v failed with : %v", g.name, key, err))
 	g.queue.AddRateLimited(key)
 
 	return true

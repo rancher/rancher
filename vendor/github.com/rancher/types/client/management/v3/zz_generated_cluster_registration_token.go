@@ -6,9 +6,9 @@ import (
 
 const (
 	ClusterRegistrationTokenType                      = "clusterRegistrationToken"
-	ClusterRegistrationTokenField                     = "creatorId"
 	ClusterRegistrationTokenFieldAnnotations          = "annotations"
 	ClusterRegistrationTokenFieldCreated              = "created"
+	ClusterRegistrationTokenFieldCreatorID            = "creatorId"
 	ClusterRegistrationTokenFieldFinalizers           = "finalizers"
 	ClusterRegistrationTokenFieldLabels               = "labels"
 	ClusterRegistrationTokenFieldName                 = "name"
@@ -23,9 +23,9 @@ const (
 
 type ClusterRegistrationToken struct {
 	types.Resource
-	string               `json:"creatorId,omitempty"`
 	Annotations          map[string]string               `json:"annotations,omitempty"`
 	Created              string                          `json:"created,omitempty"`
+	CreatorID            string                          `json:"creatorId,omitempty"`
 	Finalizers           []string                        `json:"finalizers,omitempty"`
 	Labels               map[string]string               `json:"labels,omitempty"`
 	Name                 string                          `json:"name,omitempty"`

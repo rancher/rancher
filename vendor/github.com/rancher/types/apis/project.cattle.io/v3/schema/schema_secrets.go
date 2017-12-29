@@ -228,19 +228,17 @@ func secretTypes(schemas *types.Schemas) *types.Schemas {
 }
 
 func addSecretSubtypes(schemas *types.Schemas, objs ...interface{}) *types.Schemas {
-	namespaced := map[string]bool{
-		"secret": true,
-	}
+	namespaced := []string{"secret"}
 
 	for _, obj := range objs {
 		schemas.MustImportAndCustomize(&Version, obj, func(schema *types.Schema) {
 			schema.BaseType = "secret"
 			schema.Mapper = schemas.Schema(&Version, "secret").Mapper
-			namespaced[schema.ID] = true
+			namespaced = append(namespaced, schema.ID)
 		}, projectOverride{})
 	}
 
-	for name := range namespaced {
+	for _, name := range namespaced {
 		baseSchema := schemas.Schema(&Version, name)
 
 		newFields := map[string]types.Field{}

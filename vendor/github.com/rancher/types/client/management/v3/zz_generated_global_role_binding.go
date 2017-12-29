@@ -6,9 +6,9 @@ import (
 
 const (
 	GlobalRoleBindingType                 = "globalRoleBinding"
-	GlobalRoleBindingField                = "creatorId"
 	GlobalRoleBindingFieldAnnotations     = "annotations"
 	GlobalRoleBindingFieldCreated         = "created"
+	GlobalRoleBindingFieldCreatorID       = "creatorId"
 	GlobalRoleBindingFieldFinalizers      = "finalizers"
 	GlobalRoleBindingFieldGlobalRoleId    = "globalRoleId"
 	GlobalRoleBindingFieldLabels          = "labels"
@@ -22,9 +22,9 @@ const (
 
 type GlobalRoleBinding struct {
 	types.Resource
-	string          `json:"creatorId,omitempty"`
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	Created         string            `json:"created,omitempty"`
+	CreatorID       string            `json:"creatorId,omitempty"`
 	Finalizers      []string          `json:"finalizers,omitempty"`
 	GlobalRoleId    string            `json:"globalRoleId,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`

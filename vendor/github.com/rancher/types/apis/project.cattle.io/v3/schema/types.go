@@ -79,7 +79,7 @@ type deployOverride struct {
 
 type projectOverride struct {
 	types.Namespaced
-	ProjectID string `norman:"type=reference[/v3/schemas/project]"`
+	ProjectID string `norman:"type=reference[/v3/schemas/project],noupdate"`
 }
 
 type Target struct {

@@ -23,7 +23,7 @@ type Client struct {
 	NamespacedBasicAuth           NamespacedBasicAuthOperations
 	NamespacedSSHAuth             NamespacedSSHAuthOperations
 	Service                       ServiceOperations
-	Endpoint                      EndpointOperations
+	DNSRecord                     DNSRecordOperations
 	Pod                           PodOperations
 	Deployment                    DeploymentOperations
 	StatefulSet                   StatefulSetOperations
@@ -59,7 +59,7 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.NamespacedBasicAuth = newNamespacedBasicAuthClient(client)
 	client.NamespacedSSHAuth = newNamespacedSSHAuthClient(client)
 	client.Service = newServiceClient(client)
-	client.Endpoint = newEndpointClient(client)
+	client.DNSRecord = newDNSRecordClient(client)
 	client.Pod = newPodClient(client)
 	client.Deployment = newDeploymentClient(client)
 	client.StatefulSet = newStatefulSetClient(client)

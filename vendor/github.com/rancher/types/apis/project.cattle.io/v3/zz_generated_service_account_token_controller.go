@@ -54,9 +54,11 @@ type ServiceAccountTokenController interface {
 type ServiceAccountTokenInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*ServiceAccountToken) (*ServiceAccountToken, error)
+	GetNamespace(name, namespace string, opts metav1.GetOptions) (*ServiceAccountToken, error)
 	Get(name string, opts metav1.GetOptions) (*ServiceAccountToken, error)
 	Update(*ServiceAccountToken) (*ServiceAccountToken, error)
 	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*ServiceAccountTokenList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -173,6 +175,11 @@ func (s *serviceAccountTokenClient) Get(name string, opts metav1.GetOptions) (*S
 	return obj.(*ServiceAccountToken), err
 }
 
+func (s *serviceAccountTokenClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*ServiceAccountToken, error) {
+	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+	return obj.(*ServiceAccountToken), err
+}
+
 func (s *serviceAccountTokenClient) Update(o *ServiceAccountToken) (*ServiceAccountToken, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
 	return obj.(*ServiceAccountToken), err
@@ -180,6 +187,10 @@ func (s *serviceAccountTokenClient) Update(o *ServiceAccountToken) (*ServiceAcco
 
 func (s *serviceAccountTokenClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
+}
+
+func (s *serviceAccountTokenClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespace(name, namespace, options)
 }
 
 func (s *serviceAccountTokenClient) List(opts metav1.ListOptions) (*ServiceAccountTokenList, error) {

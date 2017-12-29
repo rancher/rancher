@@ -6,11 +6,11 @@ import (
 
 const (
 	MachineTemplateType                          = "machineTemplate"
-	MachineTemplateField                         = "creatorId"
 	MachineTemplateFieldAnnotations              = "annotations"
 	MachineTemplateFieldAuthCertificateAuthority = "authCertificateAuthority"
 	MachineTemplateFieldAuthKey                  = "authKey"
 	MachineTemplateFieldCreated                  = "created"
+	MachineTemplateFieldCreatorID                = "creatorId"
 	MachineTemplateFieldDescription              = "description"
 	MachineTemplateFieldDockerVersion            = "dockerVersion"
 	MachineTemplateFieldDriver                   = "driver"
@@ -36,11 +36,11 @@ const (
 
 type MachineTemplate struct {
 	types.Resource
-	string                   `json:"creatorId,omitempty"`
 	Annotations              map[string]string      `json:"annotations,omitempty"`
 	AuthCertificateAuthority string                 `json:"authCertificateAuthority,omitempty"`
 	AuthKey                  string                 `json:"authKey,omitempty"`
 	Created                  string                 `json:"created,omitempty"`
+	CreatorID                string                 `json:"creatorId,omitempty"`
 	Description              string                 `json:"description,omitempty"`
 	DockerVersion            string                 `json:"dockerVersion,omitempty"`
 	Driver                   string                 `json:"driver,omitempty"`

@@ -1,5 +1,7 @@
 package client
 
+import "k8s.io/apimachinery/pkg/util/intstr"
+
 const (
 	HandlerType             = "handler"
 	HandlerFieldCommand     = "command"
@@ -12,11 +14,11 @@ const (
 )
 
 type Handler struct {
-	Command     []string     `json:"command,omitempty"`
-	HTTPHeaders []HTTPHeader `json:"httpHeaders,omitempty"`
-	Host        string       `json:"host,omitempty"`
-	Path        string       `json:"path,omitempty"`
-	Port        string       `json:"port,omitempty"`
-	Scheme      string       `json:"scheme,omitempty"`
-	TCP         *bool        `json:"tcp,omitempty"`
+	Command     []string           `json:"command,omitempty"`
+	HTTPHeaders []HTTPHeader       `json:"httpHeaders,omitempty"`
+	Host        string             `json:"host,omitempty"`
+	Path        string             `json:"path,omitempty"`
+	Port        intstr.IntOrString `json:"port,omitempty"`
+	Scheme      string             `json:"scheme,omitempty"`
+	TCP         *bool              `json:"tcp,omitempty"`
 }

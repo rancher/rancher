@@ -6,13 +6,13 @@ import (
 
 const (
 	DaemonSetType                               = "daemonSet"
-	DaemonSetField                              = "creatorId"
 	DaemonSetFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	DaemonSetFieldAnnotations                   = "annotations"
 	DaemonSetFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
 	DaemonSetFieldBatchSize                     = "batchSize"
 	DaemonSetFieldContainers                    = "containers"
 	DaemonSetFieldCreated                       = "created"
+	DaemonSetFieldCreatorID                     = "creatorId"
 	DaemonSetFieldDNSPolicy                     = "dnsPolicy"
 	DaemonSetFieldDeploymentStrategy            = "deploymentStrategy"
 	DaemonSetFieldFinalizers                    = "finalizers"
@@ -56,13 +56,13 @@ const (
 
 type DaemonSet struct {
 	types.Resource
-	string                        `json:"creatorId,omitempty"`
 	ActiveDeadlineSeconds         *int64                   `json:"activeDeadlineSeconds,omitempty"`
 	Annotations                   map[string]string        `json:"annotations,omitempty"`
 	AutomountServiceAccountToken  *bool                    `json:"automountServiceAccountToken,omitempty"`
 	BatchSize                     string                   `json:"batchSize,omitempty"`
 	Containers                    []Container              `json:"containers,omitempty"`
 	Created                       string                   `json:"created,omitempty"`
+	CreatorID                     string                   `json:"creatorId,omitempty"`
 	DNSPolicy                     string                   `json:"dnsPolicy,omitempty"`
 	DeploymentStrategy            *DeployStrategy          `json:"deploymentStrategy,omitempty"`
 	Finalizers                    []string                 `json:"finalizers,omitempty"`

@@ -54,9 +54,11 @@ type NamespacedDockerCredentialController interface {
 type NamespacedDockerCredentialInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*NamespacedDockerCredential) (*NamespacedDockerCredential, error)
+	GetNamespace(name, namespace string, opts metav1.GetOptions) (*NamespacedDockerCredential, error)
 	Get(name string, opts metav1.GetOptions) (*NamespacedDockerCredential, error)
 	Update(*NamespacedDockerCredential) (*NamespacedDockerCredential, error)
 	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*NamespacedDockerCredentialList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -173,6 +175,11 @@ func (s *namespacedDockerCredentialClient) Get(name string, opts metav1.GetOptio
 	return obj.(*NamespacedDockerCredential), err
 }
 
+func (s *namespacedDockerCredentialClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*NamespacedDockerCredential, error) {
+	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+	return obj.(*NamespacedDockerCredential), err
+}
+
 func (s *namespacedDockerCredentialClient) Update(o *NamespacedDockerCredential) (*NamespacedDockerCredential, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
 	return obj.(*NamespacedDockerCredential), err
@@ -180,6 +187,10 @@ func (s *namespacedDockerCredentialClient) Update(o *NamespacedDockerCredential)
 
 func (s *namespacedDockerCredentialClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
+}
+
+func (s *namespacedDockerCredentialClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespace(name, namespace, options)
 }
 
 func (s *namespacedDockerCredentialClient) List(opts metav1.ListOptions) (*NamespacedDockerCredentialList, error) {

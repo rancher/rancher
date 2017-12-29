@@ -6,13 +6,11 @@ import (
 
 const (
 	NodeType                      = "node"
-	NodeField                     = "creatorId"
 	NodeFieldAllocatable          = "allocatable"
 	NodeFieldAnnotations          = "annotations"
 	NodeFieldCapacity             = "capacity"
-	NodeFieldConfigSource         = "configSource"
 	NodeFieldCreated              = "created"
-	NodeFieldExternalId           = "externalId"
+	NodeFieldCreatorID            = "creatorId"
 	NodeFieldFinalizers           = "finalizers"
 	NodeFieldHostname             = "hostname"
 	NodeFieldIPAddress            = "ipAddress"
@@ -20,9 +18,8 @@ const (
 	NodeFieldLabels               = "labels"
 	NodeFieldName                 = "name"
 	NodeFieldOwnerReferences      = "ownerReferences"
-	NodeFieldPhase                = "phase"
-	NodeFieldPodCIDR              = "podCIDR"
-	NodeFieldProviderID           = "providerID"
+	NodeFieldPodCidr              = "podCidr"
+	NodeFieldProviderId           = "providerId"
 	NodeFieldRemoved              = "removed"
 	NodeFieldState                = "state"
 	NodeFieldTaints               = "taints"
@@ -36,13 +33,11 @@ const (
 
 type Node struct {
 	types.Resource
-	string               `json:"creatorId,omitempty"`
 	Allocatable          map[string]string         `json:"allocatable,omitempty"`
 	Annotations          map[string]string         `json:"annotations,omitempty"`
 	Capacity             map[string]string         `json:"capacity,omitempty"`
-	ConfigSource         *NodeConfigSource         `json:"configSource,omitempty"`
 	Created              string                    `json:"created,omitempty"`
-	ExternalId           string                    `json:"externalId,omitempty"`
+	CreatorID            string                    `json:"creatorId,omitempty"`
 	Finalizers           []string                  `json:"finalizers,omitempty"`
 	Hostname             string                    `json:"hostname,omitempty"`
 	IPAddress            string                    `json:"ipAddress,omitempty"`
@@ -50,9 +45,8 @@ type Node struct {
 	Labels               map[string]string         `json:"labels,omitempty"`
 	Name                 string                    `json:"name,omitempty"`
 	OwnerReferences      []OwnerReference          `json:"ownerReferences,omitempty"`
-	Phase                string                    `json:"phase,omitempty"`
-	PodCIDR              string                    `json:"podCIDR,omitempty"`
-	ProviderID           string                    `json:"providerID,omitempty"`
+	PodCidr              string                    `json:"podCidr,omitempty"`
+	ProviderId           string                    `json:"providerId,omitempty"`
 	Removed              string                    `json:"removed,omitempty"`
 	State                string                    `json:"state,omitempty"`
 	Taints               []Taint                   `json:"taints,omitempty"`

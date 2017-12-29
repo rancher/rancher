@@ -7,6 +7,6 @@ const (
 )
 
 type IngressRule struct {
-	Host  string                     `json:"host,omitempty"`
-	Paths map[string]HTTPIngressPath `json:"paths,omitempty"`
+	Host  string                    `json:"host,omitempty"`
+	Paths map[string]IngressBackend `json:"paths,omitempty"`
 }

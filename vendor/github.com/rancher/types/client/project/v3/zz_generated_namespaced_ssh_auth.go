@@ -6,9 +6,9 @@ import (
 
 const (
 	NamespacedSSHAuthType                 = "namespacedSshAuth"
-	NamespacedSSHAuthField                = "creatorId"
 	NamespacedSSHAuthFieldAnnotations     = "annotations"
 	NamespacedSSHAuthFieldCreated         = "created"
+	NamespacedSSHAuthFieldCreatorID       = "creatorId"
 	NamespacedSSHAuthFieldFinalizers      = "finalizers"
 	NamespacedSSHAuthFieldFingerprint     = "certFingerprint"
 	NamespacedSSHAuthFieldLabels          = "labels"
@@ -23,9 +23,9 @@ const (
 
 type NamespacedSSHAuth struct {
 	types.Resource
-	string          `json:"creatorId,omitempty"`
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	Created         string            `json:"created,omitempty"`
+	CreatorID       string            `json:"creatorId,omitempty"`
 	Finalizers      []string          `json:"finalizers,omitempty"`
 	Fingerprint     string            `json:"certFingerprint,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`

@@ -6,9 +6,9 @@ import (
 
 const (
 	NamespacedSecretType                 = "namespacedSecret"
-	NamespacedSecretField                = "creatorId"
 	NamespacedSecretFieldAnnotations     = "annotations"
 	NamespacedSecretFieldCreated         = "created"
+	NamespacedSecretFieldCreatorID       = "creatorId"
 	NamespacedSecretFieldData            = "data"
 	NamespacedSecretFieldFinalizers      = "finalizers"
 	NamespacedSecretFieldKind            = "kind"
@@ -24,9 +24,9 @@ const (
 
 type NamespacedSecret struct {
 	types.Resource
-	string          `json:"creatorId,omitempty"`
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	Created         string            `json:"created,omitempty"`
+	CreatorID       string            `json:"creatorId,omitempty"`
 	Data            map[string]string `json:"data,omitempty"`
 	Finalizers      []string          `json:"finalizers,omitempty"`
 	Kind            string            `json:"kind,omitempty"`

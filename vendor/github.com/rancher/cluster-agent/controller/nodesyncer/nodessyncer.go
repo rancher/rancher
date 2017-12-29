@@ -123,7 +123,7 @@ func (n *NodeSyncer) convertNodeToClusterNode(node *v1.Node, cluster *v3.Cluster
 	}
 	clusterNode.APIVersion = "management.cattle.io/v3"
 	clusterNode.Kind = "Machine"
-	clusterNode.Spec.ClusterName = n.clusterName
+	clusterNode.Status.ClusterName = n.clusterName
 	clusterNode.Status.NodeName = node.Name
 	clusterNode.ObjectMeta = metav1.ObjectMeta{
 		GenerateName: "machine-",

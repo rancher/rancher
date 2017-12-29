@@ -6,9 +6,9 @@ import (
 
 const (
 	UserType                    = "user"
-	UserField                   = "creatorId"
 	UserFieldAnnotations        = "annotations"
 	UserFieldCreated            = "created"
+	UserFieldCreatorID          = "creatorId"
 	UserFieldFinalizers         = "finalizers"
 	UserFieldId                 = "id"
 	UserFieldLabels             = "labels"
@@ -25,9 +25,9 @@ const (
 
 type User struct {
 	types.Resource
-	string             `json:"creatorId,omitempty"`
 	Annotations        map[string]string `json:"annotations,omitempty"`
 	Created            string            `json:"created,omitempty"`
+	CreatorID          string            `json:"creatorId,omitempty"`
 	Finalizers         []string          `json:"finalizers,omitempty"`
 	Id                 string            `json:"id,omitempty"`
 	Labels             map[string]string `json:"labels,omitempty"`

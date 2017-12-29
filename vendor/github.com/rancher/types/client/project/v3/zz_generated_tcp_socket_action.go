@@ -1,5 +1,7 @@
 package client
 
+import "k8s.io/apimachinery/pkg/util/intstr"
+
 const (
 	TCPSocketActionType      = "tcpSocketAction"
 	TCPSocketActionFieldHost = "host"
@@ -7,6 +9,6 @@ const (
 )
 
 type TCPSocketAction struct {
-	Host string `json:"host,omitempty"`
-	Port string `json:"port,omitempty"`
+	Host string             `json:"host,omitempty"`
+	Port intstr.IntOrString `json:"port,omitempty"`
 }

@@ -1,5 +1,7 @@
 package client
 
+import "k8s.io/apimachinery/pkg/util/intstr"
+
 const (
 	HTTPGetActionType             = "httpGetAction"
 	HTTPGetActionFieldHTTPHeaders = "httpHeaders"
@@ -9,8 +11,8 @@ const (
 )
 
 type HTTPGetAction struct {
-	HTTPHeaders []HTTPHeader `json:"httpHeaders,omitempty"`
-	Path        string       `json:"path,omitempty"`
-	Port        string       `json:"port,omitempty"`
-	Scheme      string       `json:"scheme,omitempty"`
+	HTTPHeaders []HTTPHeader       `json:"httpHeaders,omitempty"`
+	Path        string             `json:"path,omitempty"`
+	Port        intstr.IntOrString `json:"port,omitempty"`
+	Scheme      string             `json:"scheme,omitempty"`
 }

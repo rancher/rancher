@@ -6,9 +6,9 @@ import (
 
 const (
 	SecretType                 = "secret"
-	SecretField                = "creatorId"
 	SecretFieldAnnotations     = "annotations"
 	SecretFieldCreated         = "created"
+	SecretFieldCreatorID       = "creatorId"
 	SecretFieldData            = "data"
 	SecretFieldFinalizers      = "finalizers"
 	SecretFieldKind            = "kind"
@@ -24,9 +24,9 @@ const (
 
 type Secret struct {
 	types.Resource
-	string          `json:"creatorId,omitempty"`
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	Created         string            `json:"created,omitempty"`
+	CreatorID       string            `json:"creatorId,omitempty"`
 	Data            map[string]string `json:"data,omitempty"`
 	Finalizers      []string          `json:"finalizers,omitempty"`
 	Kind            string            `json:"kind,omitempty"`

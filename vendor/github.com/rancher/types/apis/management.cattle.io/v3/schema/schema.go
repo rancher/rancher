@@ -3,10 +3,10 @@ package schema
 import (
 	"github.com/rancher/norman/types"
 	m "github.com/rancher/norman/types/mapper"
+	"github.com/rancher/types/apis/cluster.cattle.io/v3/schema"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/factory"
 	"github.com/rancher/types/mapper"
-	"k8s.io/api/core/v1"
 )
 
 var (
@@ -42,28 +42,7 @@ func catalogTypes(schemas *types.Schemas) *types.Schemas {
 }
 
 func nodeTypes(schemas *types.Schemas) *types.Schemas {
-	return schemas.
-		AddMapperForType(&Version, v1.NodeStatus{},
-			&mapper.NodeAddressMapper{},
-			&mapper.OSInfo{},
-			&m.Drop{Field: "addresses"},
-			&m.Drop{Field: "daemonEndpoints"},
-			&m.Drop{Field: "images"},
-			&m.Drop{Field: "nodeInfo"},
-			&m.SliceToMap{Field: "volumesAttached", Key: "devicePath"},
-		).
-		AddMapperForType(&Version, v1.NodeSpec{},
-			&m.Move{From: "externalID", To: "externalId"}).
-		AddMapperForType(&Version, v1.Node{},
-			&m.Embed{Field: "status"},
-			&m.Drop{Field: "conditions"},
-		).
-		MustImport(&Version, v1.NodeStatus{}, struct {
-			IPAddress string
-			Hostname  string
-			Info      NodeInfo
-		}{}).
-		MustImport(&Version, v1.Node{})
+	return schema.NodeTypes(&Version, schemas)
 }
 
 func clusterTypes(schemas *types.Schemas) *types.Schemas {
@@ -148,19 +127,16 @@ func machineTypes(schemas *types.Schemas) *types.Schemas {
 		AddMapperForType(&Version, v3.MachineSpec{}, &m.Embed{Field: "nodeSpec"}).
 		AddMapperForType(&Version, v3.MachineStatus{},
 			&m.Drop{Field: "conditions"},
+			&m.Drop{Field: "rkeNode"},
+			&m.Drop{Field: "machineTemplateSpec"},
+			&m.Drop{Field: "machineDriverConfig"},
 			&m.Embed{Field: "nodeStatus"}).
 		AddMapperForType(&Version, v3.Machine{},
 			&m.Embed{Field: "status"},
-			&m.Move{From: "name", To: "id"},
-			&m.Move{From: "nodeName", To: "name"}).
+			m.DisplayName{}).
 		AddMapperForType(&Version, v3.MachineDriver{}).
 		AddMapperForType(&Version, v3.MachineTemplate{}, m.DisplayName{}).
-		MustImportAndCustomize(&Version, v3.Machine{}, func(schema *types.Schema) {
-			schema.MustCustomizeField("name", func(f types.Field) types.Field {
-				f.Create = true
-				return f
-			})
-		}).
+		MustImport(&Version, v3.Machine{}).
 		MustImport(&Version, v3.MachineDriver{}).
 		MustImport(&Version, v3.MachineTemplate{})
 }

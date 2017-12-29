@@ -4,3 +4,4 @@
 *.swp
 /.trash-cache
 cluster-controller
+/.idea

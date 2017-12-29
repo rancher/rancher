@@ -6,12 +6,12 @@ import (
 
 const (
 	PodSecurityPolicyTemplateType                                 = "podSecurityPolicyTemplate"
-	PodSecurityPolicyTemplateField                                = "creatorId"
 	PodSecurityPolicyTemplateFieldAllowPrivilegeEscalation        = "allowPrivilegeEscalation"
 	PodSecurityPolicyTemplateFieldAllowedCapabilities             = "allowedCapabilities"
 	PodSecurityPolicyTemplateFieldAllowedHostPaths                = "allowedHostPaths"
 	PodSecurityPolicyTemplateFieldAnnotations                     = "annotations"
 	PodSecurityPolicyTemplateFieldCreated                         = "created"
+	PodSecurityPolicyTemplateFieldCreatorID                       = "creatorId"
 	PodSecurityPolicyTemplateFieldDefaultAddCapabilities          = "defaultAddCapabilities"
 	PodSecurityPolicyTemplateFieldDefaultAllowPrivilegeEscalation = "defaultAllowPrivilegeEscalation"
 	PodSecurityPolicyTemplateFieldFSGroup                         = "fsGroup"
@@ -36,12 +36,12 @@ const (
 
 type PodSecurityPolicyTemplate struct {
 	types.Resource
-	string                          `json:"creatorId,omitempty"`
 	AllowPrivilegeEscalation        *bool                              `json:"allowPrivilegeEscalation,omitempty"`
 	AllowedCapabilities             []string                           `json:"allowedCapabilities,omitempty"`
 	AllowedHostPaths                []AllowedHostPath                  `json:"allowedHostPaths,omitempty"`
 	Annotations                     map[string]string                  `json:"annotations,omitempty"`
 	Created                         string                             `json:"created,omitempty"`
+	CreatorID                       string                             `json:"creatorId,omitempty"`
 	DefaultAddCapabilities          []string                           `json:"defaultAddCapabilities,omitempty"`
 	DefaultAllowPrivilegeEscalation *bool                              `json:"defaultAllowPrivilegeEscalation,omitempty"`
 	FSGroup                         *FSGroupStrategyOptions            `json:"fsGroup,omitempty"`

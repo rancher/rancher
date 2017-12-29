@@ -54,9 +54,11 @@ type NamespacedBasicAuthController interface {
 type NamespacedBasicAuthInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*NamespacedBasicAuth) (*NamespacedBasicAuth, error)
+	GetNamespace(name, namespace string, opts metav1.GetOptions) (*NamespacedBasicAuth, error)
 	Get(name string, opts metav1.GetOptions) (*NamespacedBasicAuth, error)
 	Update(*NamespacedBasicAuth) (*NamespacedBasicAuth, error)
 	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*NamespacedBasicAuthList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -173,6 +175,11 @@ func (s *namespacedBasicAuthClient) Get(name string, opts metav1.GetOptions) (*N
 	return obj.(*NamespacedBasicAuth), err
 }
 
+func (s *namespacedBasicAuthClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*NamespacedBasicAuth, error) {
+	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+	return obj.(*NamespacedBasicAuth), err
+}
+
 func (s *namespacedBasicAuthClient) Update(o *NamespacedBasicAuth) (*NamespacedBasicAuth, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
 	return obj.(*NamespacedBasicAuth), err
@@ -180,6 +187,10 @@ func (s *namespacedBasicAuthClient) Update(o *NamespacedBasicAuth) (*NamespacedB
 
 func (s *namespacedBasicAuthClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
+}
+
+func (s *namespacedBasicAuthClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespace(name, namespace, options)
 }
 
 func (s *namespacedBasicAuthClient) List(opts metav1.ListOptions) (*NamespacedBasicAuthList, error) {

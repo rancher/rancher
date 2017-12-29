@@ -3,7 +3,6 @@ package subscribe
 import (
 	"bytes"
 	"context"
-	"fmt"
 
 	"github.com/gorilla/websocket"
 	"github.com/rancher/norman/api/writer"
@@ -85,15 +84,9 @@ func handler(apiContext *types.APIContext) error {
 
 	jsonWriter := writer.JSONResponseWriter{}
 	for item := range events {
-		fmt.Printf("event %s %s %v\n", item["type"], item["id"], item)
-		messageWriter, err := c.NextWriter(websocket.TextMessage)
-		if err != nil {
-			return err
-		}
-
 		header := `{"name":"resource.change","data":`
 		if item[".removed"] == true {
-			header = `{"name":"resource.removed","data":`
+			header = `{"name":"resource.remove","data":`
 		}
 		schema := apiContext.Schemas.Schema(apiContext.Version, convert.ToString(item["type"]))
 		if schema != nil {
@@ -101,6 +94,12 @@ func handler(apiContext *types.APIContext) error {
 			if err := jsonWriter.VersionBody(apiContext, &schema.Version, buffer, item); err != nil {
 				return err
 			}
+
+			messageWriter, err := c.NextWriter(websocket.TextMessage)
+			if err != nil {
+				return err
+			}
+
 			if _, err := messageWriter.Write([]byte(header)); err != nil {
 				return err
 			}
@@ -121,29 +120,15 @@ func streamStore(ctx context.Context, eg *errgroup.Group, apiContext *types.APIC
 	eg.Go(func() error {
 		opts := parse.QueryOptions(apiContext, schema)
 		events, err := schema.Store.Watch(apiContext, schema, &opts)
-		if err != nil {
+		if err != nil || events == nil {
 			return err
 		}
 
-		if events == nil {
-			return nil
+		for e := range events {
+			result <- e
 		}
 
-		for {
-			select {
-			case e, ok := <-events:
-				if !ok {
-					return nil
-				}
-				select {
-				case result <- e:
-				case <-ctx.Done():
-					return ctx.Err()
-				}
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-		}
+		return nil
 	})
 }
 

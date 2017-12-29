@@ -6,10 +6,10 @@ import (
 
 const (
 	RoleTemplateType                 = "roleTemplate"
-	RoleTemplateField                = "creatorId"
 	RoleTemplateFieldAnnotations     = "annotations"
 	RoleTemplateFieldBuiltin         = "builtin"
 	RoleTemplateFieldCreated         = "created"
+	RoleTemplateFieldCreatorID       = "creatorId"
 	RoleTemplateFieldExternal        = "external"
 	RoleTemplateFieldFinalizers      = "finalizers"
 	RoleTemplateFieldHidden          = "hidden"
@@ -25,10 +25,10 @@ const (
 
 type RoleTemplate struct {
 	types.Resource
-	string          `json:"creatorId,omitempty"`
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	Builtin         *bool             `json:"builtin,omitempty"`
 	Created         string            `json:"created,omitempty"`
+	CreatorID       string            `json:"creatorId,omitempty"`
 	External        *bool             `json:"external,omitempty"`
 	Finalizers      []string          `json:"finalizers,omitempty"`
 	Hidden          *bool             `json:"hidden,omitempty"`

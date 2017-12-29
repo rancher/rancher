@@ -135,6 +135,10 @@ func (j *JSONResponseWriter) addLinks(b *builder.Builder, schema *types.Schema, 
 	}
 
 	for _, backRef := range context.Schemas.References(schema) {
+		if !backRef.Schema.CanList() {
+			continue
+		}
+
 		if schema.SubContext == "" {
 			rawResource.Links[backRef.Schema.PluralName] = context.URLBuilder.FilterLink(backRef.Schema, backRef.FieldName, rawResource.ID)
 		} else {

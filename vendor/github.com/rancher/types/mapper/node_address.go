@@ -14,7 +14,7 @@ func (n NodeAddressMapper) FromInternal(data map[string]interface{}) {
 		t := address["type"]
 		a := address["address"]
 		if t == "InternalIP" {
-			data["IpAddress"] = a
+			data["ipAddress"] = a
 		} else if t == "Hostname" {
 			data["hostname"] = a
 		}

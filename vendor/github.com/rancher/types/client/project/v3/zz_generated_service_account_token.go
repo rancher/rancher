@@ -6,12 +6,12 @@ import (
 
 const (
 	ServiceAccountTokenType                 = "serviceAccountToken"
-	ServiceAccountTokenField                = "creatorId"
 	ServiceAccountTokenFieldAccountName     = "accountName"
 	ServiceAccountTokenFieldAccountUID      = "accountUid"
 	ServiceAccountTokenFieldAnnotations     = "annotations"
 	ServiceAccountTokenFieldCACRT           = "caCrt"
 	ServiceAccountTokenFieldCreated         = "created"
+	ServiceAccountTokenFieldCreatorID       = "creatorId"
 	ServiceAccountTokenFieldFinalizers      = "finalizers"
 	ServiceAccountTokenFieldLabels          = "labels"
 	ServiceAccountTokenFieldName            = "name"
@@ -25,12 +25,12 @@ const (
 
 type ServiceAccountToken struct {
 	types.Resource
-	string          `json:"creatorId,omitempty"`
 	AccountName     string            `json:"accountName,omitempty"`
 	AccountUID      string            `json:"accountUid,omitempty"`
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	CACRT           string            `json:"caCrt,omitempty"`
 	Created         string            `json:"created,omitempty"`
+	CreatorID       string            `json:"creatorId,omitempty"`
 	Finalizers      []string          `json:"finalizers,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`
 	Name            string            `json:"name,omitempty"`

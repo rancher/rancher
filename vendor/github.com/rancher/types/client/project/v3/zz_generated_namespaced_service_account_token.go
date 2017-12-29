@@ -6,12 +6,12 @@ import (
 
 const (
 	NamespacedServiceAccountTokenType                 = "namespacedServiceAccountToken"
-	NamespacedServiceAccountTokenField                = "creatorId"
 	NamespacedServiceAccountTokenFieldAccountName     = "accountName"
 	NamespacedServiceAccountTokenFieldAccountUID      = "accountUid"
 	NamespacedServiceAccountTokenFieldAnnotations     = "annotations"
 	NamespacedServiceAccountTokenFieldCACRT           = "caCrt"
 	NamespacedServiceAccountTokenFieldCreated         = "created"
+	NamespacedServiceAccountTokenFieldCreatorID       = "creatorId"
 	NamespacedServiceAccountTokenFieldFinalizers      = "finalizers"
 	NamespacedServiceAccountTokenFieldLabels          = "labels"
 	NamespacedServiceAccountTokenFieldName            = "name"
@@ -25,12 +25,12 @@ const (
 
 type NamespacedServiceAccountToken struct {
 	types.Resource
-	string          `json:"creatorId,omitempty"`
 	AccountName     string            `json:"accountName,omitempty"`
 	AccountUID      string            `json:"accountUid,omitempty"`
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	CACRT           string            `json:"caCrt,omitempty"`
 	Created         string            `json:"created,omitempty"`
+	CreatorID       string            `json:"creatorId,omitempty"`
 	Finalizers      []string          `json:"finalizers,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`
 	Name            string            `json:"name,omitempty"`

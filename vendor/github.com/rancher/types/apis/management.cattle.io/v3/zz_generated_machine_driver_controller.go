@@ -53,9 +53,11 @@ type MachineDriverController interface {
 type MachineDriverInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*MachineDriver) (*MachineDriver, error)
+	GetNamespace(name, namespace string, opts metav1.GetOptions) (*MachineDriver, error)
 	Get(name string, opts metav1.GetOptions) (*MachineDriver, error)
 	Update(*MachineDriver) (*MachineDriver, error)
 	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*MachineDriverList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -172,6 +174,11 @@ func (s *machineDriverClient) Get(name string, opts metav1.GetOptions) (*Machine
 	return obj.(*MachineDriver), err
 }
 
+func (s *machineDriverClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*MachineDriver, error) {
+	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+	return obj.(*MachineDriver), err
+}
+
 func (s *machineDriverClient) Update(o *MachineDriver) (*MachineDriver, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
 	return obj.(*MachineDriver), err
@@ -179,6 +186,10 @@ func (s *machineDriverClient) Update(o *MachineDriver) (*MachineDriver, error) {
 
 func (s *machineDriverClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
+}
+
+func (s *machineDriverClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespace(name, namespace, options)
 }
 
 func (s *machineDriverClient) List(opts metav1.ListOptions) (*MachineDriverList, error) {
