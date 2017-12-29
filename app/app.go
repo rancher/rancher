@@ -109,7 +109,10 @@ func addData(management *config.ManagementContext) error {
 		addRule().apiGroups("project.cattle.io").resources("worklods").verbs("*").
 		setRoleTemplateNames("admin")
 
-	rb.addRoleTemplate("Member", "member", true, false, false).
+	rb.addRoleTemplate("Cluster Member", "cluster-member", true, false, false).
+		addRule().apiGroups("management.cattle.io").resources("projects").verbs("create")
+
+	rb.addRoleTemplate("Project Member", "project-member", true, false, false).
 		addRule().apiGroups("project.cattle.io").resources("worklods").verbs("*").
 		setRoleTemplateNames("edit")
 
