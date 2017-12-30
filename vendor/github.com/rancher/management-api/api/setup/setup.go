@@ -9,13 +9,12 @@ import (
 	"github.com/rancher/management-api/api/catalog"
 	"github.com/rancher/management-api/api/project"
 	clustermanager "github.com/rancher/management-api/cluster"
-	"github.com/rancher/management-api/store/projectscoped"
+	"github.com/rancher/management-api/store/scoped"
 	"github.com/rancher/norman/api/builtin"
 	"github.com/rancher/norman/pkg/subscribe"
 	"github.com/rancher/norman/store/crd"
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/store/subtype"
-	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	projectchema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
@@ -39,7 +38,7 @@ func Schemas(ctx context.Context, management *config.ManagementContext, schemas 
 	ClusterRegistrationTokens(schemas)
 	User(schemas)
 	Catalog(schemas)
-	ProjectTypes(schemas, management)
+	SecretTypes(schemas, management)
 
 	crdStore, err := crd.NewCRDStoreFromConfig(management.RESTConfig)
 	if err != nil {
@@ -59,7 +58,35 @@ func Schemas(ctx context.Context, management *config.ManagementContext, schemas 
 
 	authn.SetUserStore(schemas.Schema(&managementschema.Version, client.UserType))
 
+	NamespacedTypes(schemas)
+
 	return nil
+}
+
+func NamespacedTypes(schemas *types.Schemas) {
+	for _, version := range crdVersions {
+		for _, schema := range schemas.SchemasForVersion(*version) {
+			if schema.Scope != types.NamespaceScope || schema.Store == nil {
+				continue
+			}
+
+			for _, key := range []string{"projectId", "clusterId"} {
+				ns, ok := schema.ResourceFields["namespaceId"]
+				if !ok {
+					continue
+				}
+
+				if _, ok := schema.ResourceFields[key]; !ok {
+					continue
+				}
+
+				schema.Store = scoped.NewScopedStore(key, schema.Store)
+				ns.Required = false
+				schema.ResourceFields["namespaceId"] = ns
+				break
+			}
+		}
+	}
 }
 
 func Templates(schemas *types.Schemas) {
@@ -107,32 +134,21 @@ func ProjectLinks(schemas *types.Schemas, management *config.ManagementContext) 
 	schema.LinkHandler = linkHandler
 }
 
-func ProjectTypes(schemas *types.Schemas, management *config.ManagementContext) {
+func SecretTypes(schemas *types.Schemas, management *config.ManagementContext) {
 	schema := schemas.Schema(&projectchema.Version, projectclient.SecretType)
-	projectScoped := &projectscoped.Store{
-		Store: proxy.NewProxyStore(management.UnversionedClient,
-			[]string{"api"},
-			"",
-			"v1",
-			"Secret",
-			"secrets"),
-	}
-	schema.Store = &transform.Store{
-		Store: projectScoped,
-		Transformer: func(apiContext *types.APIContext, data map[string]interface{}) (map[string]interface{}, error) {
-			if data == nil {
-				return data, nil
-			}
-			data[projectclient.SecretFieldProjectID] = data[projectclient.SecretFieldNamespaceId]
-			data[projectclient.SecretFieldNamespaceId] = nil
-			return data, nil
-		},
-	}
+	schema.Store = scoped.NewScopedStore("projectId", proxy.NewProxyStore(management.UnversionedClient,
+		[]string{"api"},
+		"",
+		"v1",
+		"Secret",
+		"secrets"))
 
 	for _, secretSubType := range config.ProjectTypes {
 		if secretSubType != projectclient.SecretType {
 			subSchema := schemas.Schema(&projectchema.Version, secretSubType)
-			subSchema.Store = subtype.NewSubTypeStore(secretSubType, schema.Store)
+			if subSchema.CanList() {
+				subSchema.Store = subtype.NewSubTypeStore(secretSubType, schema.Store)
+			}
 		}
 	}
 }

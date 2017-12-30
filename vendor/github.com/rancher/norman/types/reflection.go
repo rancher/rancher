@@ -52,8 +52,6 @@ func (s *Schemas) AddMapperForType(version *APIVersion, obj interface{}, mapper 
 }
 
 func (s *Schemas) MustImport(version *APIVersion, obj interface{}, externalOverrides ...interface{}) *Schemas {
-	//TODO: remove
-	logrus.SetLevel(logrus.DebugLevel)
 	if _, err := s.Import(version, obj, externalOverrides...); err != nil {
 		panic(err)
 	}

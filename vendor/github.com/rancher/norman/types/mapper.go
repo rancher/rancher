@@ -74,7 +74,12 @@ func (t *typeMapper) FromInternal(data map[string]interface{}) {
 		name, _ := data["name"].(string)
 		namespace, _ := data["namespaceId"].(string)
 
-		if _, ok := data["id"]; !ok {
+		if _, ok := data["id"]; ok {
+			if namespace != "" {
+				id, _ := data["id"].(string)
+				data["id"] = namespace + ":" + id
+			}
+		} else {
 			if name != "" {
 				if namespace == "" {
 					data["id"] = name

@@ -51,7 +51,7 @@ func NamespaceTypes(version *types.APIVersion, schemas *types.Schemas) *types.Sc
 			&m.Drop{Field: "finalizers"},
 		).
 		AddMapperForType(version, v1.Namespace{},
-			&m.LabelField{Field: "projectId"},
+			&m.AnnotationField{Field: "projectId"},
 			&m.AnnotationField{Field: "externalId"},
 			&m.AnnotationField{Field: "templates", Object: true},
 			&m.AnnotationField{Field: "prune"},

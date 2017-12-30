@@ -65,7 +65,7 @@ func threeSplit(link string) (string, string, string) {
 	case 2:
 		return parts[0], parts[1], ""
 	case 3:
-		return parts[0], parts[1], parts[3]
+		return parts[0], parts[1], parts[2]
 	default:
 		return parts[0], "", ""
 	}

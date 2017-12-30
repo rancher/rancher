@@ -1,11 +1,11 @@
-package api
+package writer
 
 import (
 	"github.com/rancher/norman/api/builtin"
 	"github.com/rancher/norman/types"
 )
 
-func addCommonResponseHeader(apiContext *types.APIContext) error {
+func AddCommonResponseHeader(apiContext *types.APIContext) error {
 	addExpires(apiContext)
 	return addSchemasHeader(apiContext)
 }
