@@ -3,9 +3,8 @@ package writer
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
-
 	"io"
+	"net/http"
 
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/parse/builder"
@@ -18,6 +17,7 @@ type JSONResponseWriter struct {
 }
 
 func (j *JSONResponseWriter) start(apiContext *types.APIContext, code int, obj interface{}) {
+	AddCommonResponseHeader(apiContext)
 	apiContext.Response.Header().Set("content-type", "application/json")
 	apiContext.Response.WriteHeader(code)
 }

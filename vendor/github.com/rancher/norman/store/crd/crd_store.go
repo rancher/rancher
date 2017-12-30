@@ -119,7 +119,7 @@ func (c *Store) AddSchemas(ctx context.Context, schemas ...*types.Schema) error 
 	}
 
 	for schema, crd := range schemaStatus {
-		c.schemaStores[key(schema)] = proxy.NewProxyStore(c.k8sClient,
+		c.schemaStores[key(schema)] = proxy.NewProxyStoreForCRD(c.k8sClient,
 			[]string{"apis"},
 			crd.Spec.Group,
 			crd.Spec.Version,

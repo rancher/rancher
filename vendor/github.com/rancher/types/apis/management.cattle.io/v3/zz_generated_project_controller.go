@@ -23,8 +23,9 @@ var (
 	ProjectResource = metav1.APIResource{
 		Name:         "projects",
 		SingularName: "project",
-		Namespaced:   false,
-		Kind:         ProjectGroupVersionKind.Kind,
+		Namespaced:   true,
+
+		Kind: ProjectGroupVersionKind.Kind,
 	}
 )
 

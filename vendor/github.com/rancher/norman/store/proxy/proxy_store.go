@@ -37,12 +37,33 @@ type Store struct {
 	kind           string
 	resourcePlural string
 	authContext    map[string]string
+	supportPatch   bool
 }
 
 func NewProxyStore(k8sClient rest.Interface,
 	prefix []string, group, version, kind, resourcePlural string) types.Store {
 	return &errorStore{
 		Store: &Store{
+			supportPatch:   true,
+			k8sClient:      k8sClient,
+			prefix:         prefix,
+			group:          group,
+			version:        version,
+			kind:           kind,
+			resourcePlural: resourcePlural,
+			authContext: map[string]string{
+				"apiGroup": group,
+				"resource": resourcePlural,
+			},
+		},
+	}
+}
+
+func NewProxyStoreForCRD(k8sClient rest.Interface,
+	prefix []string, group, version, kind, resourcePlural string) types.Store {
+	return &errorStore{
+		Store: &Store{
+			supportPatch:   false,
 			k8sClient:      k8sClient,
 			prefix:         prefix,
 			group:          group,
@@ -217,15 +238,40 @@ func (p *Store) toInternal(mapper types.Mapper, data map[string]interface{}) {
 }
 
 func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
-	p.toInternal(schema.Mapper, data)
+	if p.supportPatch {
+		p.toInternal(schema.Mapper, data)
+		namespace, id := splitID(id)
+
+		req := p.common(namespace, p.k8sClient.Patch(patchtype.StrategicMergePatchType)).
+			Body(&unstructured.Unstructured{
+				Object: data,
+			}).
+			Name(id).
+			SetHeader("Content-Type", string(patchtype.StrategicMergePatchType))
+
+		_, result, err := p.singleResult(apiContext, schema, req)
+		return result, err
+	}
+
+	resourceVersion, existing, err := p.byID(apiContext, schema, id)
+	if err != nil {
+		return data, nil
+	}
+
+	for k, v := range data {
+		existing[k] = v
+	}
+
+	p.toInternal(schema.Mapper, existing)
 	namespace, id := splitID(id)
 
-	req := p.common(namespace, p.k8sClient.Patch(patchtype.StrategicMergePatchType)).
+	values.PutValue(existing, resourceVersion, "metadata", "resourceVersion")
+
+	req := p.common(namespace, p.k8sClient.Put()).
 		Body(&unstructured.Unstructured{
-			Object: data,
+			Object: existing,
 		}).
-		Name(id).
-		SetHeader("Content-Type", string(patchtype.StrategicMergePatchType))
+		Name(id)
 
 	_, result, err := p.singleResult(apiContext, schema, req)
 	return result, err

@@ -15,6 +15,7 @@ const (
 	ProjectFieldId                          = "id"
 	ProjectFieldLabels                      = "labels"
 	ProjectFieldName                        = "name"
+	ProjectFieldNamespaceId                 = "namespaceId"
 	ProjectFieldOwnerReferences             = "ownerReferences"
 	ProjectFieldPodSecurityPolicyTemplateId = "podSecurityPolicyTemplateId"
 	ProjectFieldRemoved                     = "removed"
@@ -35,6 +36,7 @@ type Project struct {
 	Id                          string             `json:"id,omitempty"`
 	Labels                      map[string]string  `json:"labels,omitempty"`
 	Name                        string             `json:"name,omitempty"`
+	NamespaceId                 string             `json:"namespaceId,omitempty"`
 	OwnerReferences             []OwnerReference   `json:"ownerReferences,omitempty"`
 	PodSecurityPolicyTemplateId string             `json:"podSecurityPolicyTemplateId,omitempty"`
 	Removed                     string             `json:"removed,omitempty"`
