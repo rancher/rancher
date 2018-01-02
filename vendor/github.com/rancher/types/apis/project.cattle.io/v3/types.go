@@ -103,6 +103,7 @@ type Certificate struct {
 	CertFingerprint         string `json:"certFingerprint" norman:"nocreate,noupdate"`
 	CN                      string `json:"cn" norman:"nocreate,noupdate"`
 	Version                 string `json:"version" norman:"nocreate,noupdate"`
+	ExpiresAt               string `json:"expiresAt" norman:"nocreate,noupdate"`
 	Issuer                  string `json:"issuer" norman:"nocreate,noupdate"`
 	IssuedAt                string `json:"issuedAt" norman:"nocreate,noupdate"`
 	Algorithm               string `json:"algorithm" norman:"nocreate,noupdate"`

@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/management-api/api/catalog"
 	"github.com/rancher/management-api/api/project"
 	clustermanager "github.com/rancher/management-api/cluster"
+	"github.com/rancher/management-api/store/cert"
 	"github.com/rancher/management-api/store/scoped"
 	"github.com/rancher/norman/api/builtin"
 	"github.com/rancher/norman/pkg/subscribe"
@@ -17,7 +18,7 @@ import (
 	"github.com/rancher/norman/store/subtype"
 	"github.com/rancher/norman/types"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
-	projectchema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
+	projectschema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	"github.com/rancher/types/client/management/v3"
 	projectclient "github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/config"
@@ -135,7 +136,7 @@ func ProjectLinks(schemas *types.Schemas, management *config.ManagementContext) 
 }
 
 func SecretTypes(schemas *types.Schemas, management *config.ManagementContext) {
-	schema := schemas.Schema(&projectchema.Version, projectclient.SecretType)
+	schema := schemas.Schema(&projectschema.Version, projectclient.SecretType)
 	schema.Store = scoped.NewScopedStore("projectId", proxy.NewProxyStore(management.UnversionedClient,
 		[]string{"api"},
 		"",
@@ -145,11 +146,16 @@ func SecretTypes(schemas *types.Schemas, management *config.ManagementContext) {
 
 	for _, secretSubType := range config.ProjectTypes {
 		if secretSubType != projectclient.SecretType {
-			subSchema := schemas.Schema(&projectchema.Version, secretSubType)
+			subSchema := schemas.Schema(&projectschema.Version, secretSubType)
 			if subSchema.CanList() {
 				subSchema.Store = subtype.NewSubTypeStore(secretSubType, schema.Store)
 			}
 		}
+	}
+
+	schema = schemas.Schema(&projectschema.Version, projectclient.CertificateType)
+	schema.Store = &cert.Store{
+		Store: schema.Store,
 	}
 }
 

@@ -27,6 +27,9 @@ func Singular(value interface{}) interface{} {
 }
 
 func ToString(value interface{}) string {
+	if t, ok := value.(time.Time); ok {
+		return t.Format(time.RFC3339)
+	}
 	single := Singular(value)
 	if single == nil {
 		return ""
@@ -37,7 +40,7 @@ func ToString(value interface{}) string {
 func ToTimestamp(value interface{}) (int64, error) {
 	str := ToString(value)
 	if str == "" {
-		return 0, errors.New("Invalid date")
+		return 0, errors.New("invalid date")
 	}
 	t, err := time.Parse(time.RFC3339, str)
 	if err != nil {
