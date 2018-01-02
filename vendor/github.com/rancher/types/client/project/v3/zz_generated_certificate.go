@@ -13,6 +13,7 @@ const (
 	CertificateFieldCerts                   = "certs"
 	CertificateFieldCreated                 = "created"
 	CertificateFieldCreatorID               = "creatorId"
+	CertificateFieldExpiresAt               = "expiresAt"
 	CertificateFieldFinalizers              = "finalizers"
 	CertificateFieldIssuedAt                = "issuedAt"
 	CertificateFieldIssuer                  = "issuer"
@@ -39,6 +40,7 @@ type Certificate struct {
 	Certs                   string            `json:"certs,omitempty"`
 	Created                 string            `json:"created,omitempty"`
 	CreatorID               string            `json:"creatorId,omitempty"`
+	ExpiresAt               string            `json:"expiresAt,omitempty"`
 	Finalizers              []string          `json:"finalizers,omitempty"`
 	IssuedAt                string            `json:"issuedAt,omitempty"`
 	Issuer                  string            `json:"issuer,omitempty"`
