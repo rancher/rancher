@@ -51,6 +51,7 @@ func NamespaceTypes(version *types.APIVersion, schemas *types.Schemas) *types.Sc
 			&m.Drop{Field: "finalizers"},
 		).
 		AddMapperForType(version, v1.Namespace{},
+			&m.AnnotationField{Field: "description"},
 			&m.AnnotationField{Field: "projectId"},
 			&m.AnnotationField{Field: "externalId"},
 			&m.AnnotationField{Field: "templates", Object: true},
@@ -58,12 +59,13 @@ func NamespaceTypes(version *types.APIVersion, schemas *types.Schemas) *types.Sc
 			&m.AnnotationField{Field: "answers", Object: true},
 		).
 		MustImport(version, v1.Namespace{}, struct {
-			ProjectID  string                 `norman:"type=reference[/v3/schemas/project]"`
-			Templates  map[string]string      `json:"templates"`
-			Answers    map[string]interface{} `json:"answers"`
-			Prune      bool                   `json:"prune"`
-			ExternalID string                 `json:"externalId"`
-			Tags       []string               `json:"tags"`
+			Description string                 `json:"description"`
+			ProjectID   string                 `norman:"type=reference[/v3/schemas/project]"`
+			Templates   map[string]string      `json:"templates"`
+			Answers     map[string]interface{} `json:"answers"`
+			Prune       bool                   `json:"prune"`
+			ExternalID  string                 `json:"externalId"`
+			Tags        []string               `json:"tags"`
 		}{})
 }
 
@@ -284,6 +286,9 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 		AddMapperForType(&Version, v1.ResourceRequirements{},
 			mapper.PivotMapper{Plural: true},
 		).
+		AddMapperForType(&Version, v1.Pod{},
+			&m.AnnotationField{Field: "description"},
+		).
 		// Must import handlers before Container
 		MustImport(&Version, v1.Capabilities{}, struct {
 			Add  []string `norman:"type=array[enum],options=AUDIT_CONTROL|AUDIT_WRITE|BLOCK_SUSPEND|CHOWN|DAC_OVERRIDE|DAC_READ_SEARCH|FOWNER|FSETID|IPC_LOCK|IPC_OWNER|KILL|LEASE|LINUX_IMMUTABLE|MAC_ADMIN|MAC_OVERRIDE|MKNOD|NET_ADMIN|NET_BIND_SERVICE|NET_BROADCAST|NET_RAW|SETFCAP|SETGID|SETPCAP|SETUID|SYSLOG|SYS_ADMIN|SYS_BOOT|SYS_CHROOT|SYS_MODULE|SYS_NICE|SYS_PACCT|SYS_PTRACE|SYS_RAWIO|SYS_RESOURCE|SYS_TIME|SYS_TTY_CONFIG|WAKE_ALARM"`
@@ -305,7 +310,8 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 			IPC        string
 		}{}).
 		MustImport(&Version, v1.Pod{}, projectOverride{}, struct {
-			WorkloadID string `norman:"type=reference[workload]"`
+			Description string `json:"description"`
+			WorkloadID  string `norman:"type=reference[workload]"`
 		}{})
 }
 
@@ -348,6 +354,7 @@ func addServiceOrDNSRecord(dns bool) types.SchemasInitFunc {
 			AddMapperForType(&Version, v1.Service{},
 				&m.Drop{Field: "status"},
 				&m.LabelField{Field: "workloadId"},
+				&m.AnnotationField{Field: "description"},
 				&m.AnnotationField{Field: "ipAddresses", List: true},
 				&m.AnnotationField{Field: "targetWorkloadIds", List: true},
 				&m.AnnotationField{Field: "targetDnsRecordIds", List: true},
@@ -380,6 +387,7 @@ func addServiceOrDNSRecord(dns bool) types.SchemasInitFunc {
 				})
 			}
 		}, projectOverride{}, struct {
+			Description        string   `json:"description"`
 			IPAddresses        []string `json:"ipAddresses"`
 			WorkloadID         string   `json:"workloadId" norman:"type=reference[workload],nocreate,noupdate"`
 			TargetWorkloadIDs  string   `json:"targetWorkloadIds" norman:"type=array[reference[workload]]"`
@@ -400,6 +408,7 @@ func ingressTypes(schemas *types.Schemas) *types.Schemas {
 			&m.Embed{Field: "http"},
 		).
 		AddMapperForType(&Version, v1beta1.Ingress{},
+			&m.AnnotationField{Field: "description"},
 			&m.Move{From: "backend", To: "defaultBackend"},
 		).
 		AddMapperForType(&Version, v1beta1.IngressTLS{},
@@ -421,7 +430,9 @@ func ingressTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v1beta1.IngressTLS{}, struct {
 			SecretName string `norman:"type=reference[certificate]"`
 		}{}).
-		MustImport(&Version, v1beta1.Ingress{}, projectOverride{})
+		MustImport(&Version, v1beta1.Ingress{}, projectOverride{}, struct {
+			Description string `json:"description"`
+		}{})
 }
 
 func volumeTypes(schemas *types.Schemas) *types.Schemas {

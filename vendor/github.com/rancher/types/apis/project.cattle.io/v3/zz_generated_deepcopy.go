@@ -216,6 +216,11 @@ func (in *Certificate) DeepCopyInto(out *Certificate) {
 	out.Namespaced = in.Namespaced
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	if in.SubjectAlternativeNames != nil {
+		in, out := &in.SubjectAlternativeNames, &out.SubjectAlternativeNames
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
@@ -566,6 +571,11 @@ func (in *NamespacedCertificate) DeepCopyInto(out *NamespacedCertificate) {
 	out.Namespaced = in.Namespaced
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	if in.SubjectAlternativeNames != nil {
+		in, out := &in.SubjectAlternativeNames, &out.SubjectAlternativeNames
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

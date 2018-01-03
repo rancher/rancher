@@ -15,6 +15,7 @@ const (
 	WorkloadFieldCreatorID                     = "creatorId"
 	WorkloadFieldDNSPolicy                     = "dnsPolicy"
 	WorkloadFieldDeploymentStrategy            = "deploymentStrategy"
+	WorkloadFieldDescription                   = "description"
 	WorkloadFieldFinalizers                    = "finalizers"
 	WorkloadFieldFsgid                         = "fsgid"
 	WorkloadFieldGids                          = "gids"
@@ -64,6 +65,7 @@ type Workload struct {
 	CreatorID                     string                 `json:"creatorId,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty"`
 	DeploymentStrategy            *DeployStrategy        `json:"deploymentStrategy,omitempty"`
+	Description                   string                 `json:"description,omitempty"`
 	Finalizers                    []string               `json:"finalizers,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty"`

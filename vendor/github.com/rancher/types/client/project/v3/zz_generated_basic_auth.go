@@ -9,6 +9,7 @@ const (
 	BasicAuthFieldAnnotations     = "annotations"
 	BasicAuthFieldCreated         = "created"
 	BasicAuthFieldCreatorID       = "creatorId"
+	BasicAuthFieldDescription     = "description"
 	BasicAuthFieldFinalizers      = "finalizers"
 	BasicAuthFieldLabels          = "labels"
 	BasicAuthFieldName            = "name"
@@ -26,6 +27,7 @@ type BasicAuth struct {
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	Created         string            `json:"created,omitempty"`
 	CreatorID       string            `json:"creatorId,omitempty"`
+	Description     string            `json:"description,omitempty"`
 	Finalizers      []string          `json:"finalizers,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`
 	Name            string            `json:"name,omitempty"`

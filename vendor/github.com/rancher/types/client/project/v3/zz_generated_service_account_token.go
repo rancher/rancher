@@ -12,6 +12,7 @@ const (
 	ServiceAccountTokenFieldCACRT           = "caCrt"
 	ServiceAccountTokenFieldCreated         = "created"
 	ServiceAccountTokenFieldCreatorID       = "creatorId"
+	ServiceAccountTokenFieldDescription     = "description"
 	ServiceAccountTokenFieldFinalizers      = "finalizers"
 	ServiceAccountTokenFieldLabels          = "labels"
 	ServiceAccountTokenFieldName            = "name"
@@ -31,6 +32,7 @@ type ServiceAccountToken struct {
 	CACRT           string            `json:"caCrt,omitempty"`
 	Created         string            `json:"created,omitempty"`
 	CreatorID       string            `json:"creatorId,omitempty"`
+	Description     string            `json:"description,omitempty"`
 	Finalizers      []string          `json:"finalizers,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`
 	Name            string            `json:"name,omitempty"`

@@ -8,6 +8,7 @@ const (
 	WorkloadSpecFieldContainers                    = "containers"
 	WorkloadSpecFieldDNSPolicy                     = "dnsPolicy"
 	WorkloadSpecFieldDeploymentStrategy            = "deploymentStrategy"
+	WorkloadSpecFieldDescription                   = "description"
 	WorkloadSpecFieldFsgid                         = "fsgid"
 	WorkloadSpecFieldGids                          = "gids"
 	WorkloadSpecFieldHostAliases                   = "hostAliases"
@@ -40,6 +41,7 @@ type WorkloadSpec struct {
 	Containers                    []Container            `json:"containers,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty"`
 	DeploymentStrategy            *DeployStrategy        `json:"deploymentStrategy,omitempty"`
+	Description                   string                 `json:"description,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty"`
 	HostAliases                   map[string]HostAlias   `json:"hostAliases,omitempty"`

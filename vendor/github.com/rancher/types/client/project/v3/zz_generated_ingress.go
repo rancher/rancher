@@ -10,6 +10,7 @@ const (
 	IngressFieldCreated              = "created"
 	IngressFieldCreatorID            = "creatorId"
 	IngressFieldDefaultBackend       = "defaultBackend"
+	IngressFieldDescription          = "description"
 	IngressFieldFinalizers           = "finalizers"
 	IngressFieldLabels               = "labels"
 	IngressFieldName                 = "name"
@@ -32,6 +33,7 @@ type Ingress struct {
 	Created              string            `json:"created,omitempty"`
 	CreatorID            string            `json:"creatorId,omitempty"`
 	DefaultBackend       *IngressBackend   `json:"defaultBackend,omitempty"`
+	Description          string            `json:"description,omitempty"`
 	Finalizers           []string          `json:"finalizers,omitempty"`
 	Labels               map[string]string `json:"labels,omitempty"`
 	Name                 string            `json:"name,omitempty"`

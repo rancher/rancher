@@ -14,6 +14,7 @@ const (
 	PodSecurityPolicyTemplateFieldCreatorID                       = "creatorId"
 	PodSecurityPolicyTemplateFieldDefaultAddCapabilities          = "defaultAddCapabilities"
 	PodSecurityPolicyTemplateFieldDefaultAllowPrivilegeEscalation = "defaultAllowPrivilegeEscalation"
+	PodSecurityPolicyTemplateFieldDescription                     = "description"
 	PodSecurityPolicyTemplateFieldFSGroup                         = "fsGroup"
 	PodSecurityPolicyTemplateFieldFinalizers                      = "finalizers"
 	PodSecurityPolicyTemplateFieldHostIPC                         = "hostIPC"
@@ -44,6 +45,7 @@ type PodSecurityPolicyTemplate struct {
 	CreatorID                       string                             `json:"creatorId,omitempty"`
 	DefaultAddCapabilities          []string                           `json:"defaultAddCapabilities,omitempty"`
 	DefaultAllowPrivilegeEscalation *bool                              `json:"defaultAllowPrivilegeEscalation,omitempty"`
+	Description                     string                             `json:"description,omitempty"`
 	FSGroup                         *FSGroupStrategyOptions            `json:"fsGroup,omitempty"`
 	Finalizers                      []string                           `json:"finalizers,omitempty"`
 	HostIPC                         *bool                              `json:"hostIPC,omitempty"`
