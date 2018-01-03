@@ -2,6 +2,7 @@ package authz
 
 import (
 	"github.com/rancher/rke/k8s"
+	"github.com/rancher/rke/templates"
 	"github.com/sirupsen/logrus"
 )
 
@@ -11,7 +12,7 @@ func ApplyDefaultPodSecurityPolicy(kubeConfigPath string) error {
 	if err != nil {
 		return err
 	}
-	if err := k8s.UpdatePodSecurityPolicyFromYaml(k8sClient, DefaultPodSecurityPolicy); err != nil {
+	if err := k8s.UpdatePodSecurityPolicyFromYaml(k8sClient, templates.DefaultPodSecurityPolicy); err != nil {
 		return err
 	}
 	logrus.Infof("[authz] Default PodSecurityPolicy applied successfully")
@@ -24,10 +25,10 @@ func ApplyDefaultPodSecurityPolicyRole(kubeConfigPath string) error {
 	if err != nil {
 		return err
 	}
-	if err := k8s.UpdateRoleFromYaml(k8sClient, DefaultPodSecurityRole); err != nil {
+	if err := k8s.UpdateRoleFromYaml(k8sClient, templates.DefaultPodSecurityRole); err != nil {
 		return err
 	}
-	if err := k8s.UpdateRoleBindingFromYaml(k8sClient, DefaultPodSecurityRoleBinding); err != nil {
+	if err := k8s.UpdateRoleBindingFromYaml(k8sClient, templates.DefaultPodSecurityRoleBinding); err != nil {
 		return err
 	}
 	logrus.Infof("[authz] Default PodSecurityPolicy Role and RoleBinding applied successfully")

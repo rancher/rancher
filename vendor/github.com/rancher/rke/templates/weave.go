@@ -1,13 +1,7 @@
-package network
+package templates
 
-import "github.com/rancher/rke/services"
-
-func GetWeaveManifest(weaveConfig map[string]string) string {
-	rbacConfig := ""
-	if weaveConfig[RBACConfig] == services.RBACAuthorizationMode {
-		rbacConfig = getWeaveRBACManifest()
-	}
-	return `
+const WeaveTemplate = `
+---
 # This ConfigMap can be used to configure a self-hosted Weave Net installation.
 apiVersion: v1
 kind: List
@@ -41,8 +35,8 @@ items:
                       apiVersion: v1
                       fieldPath: spec.nodeName
                 - name: IPALLOC_RANGE
-                  value: "` + weaveConfig[ClusterCIDR] + `"
-              image: ` + weaveConfig[WeaveImage] + `
+                  value: "{{.ClusterCIDR}}"
+              image: {{.Image}}
               livenessProbe:
                 httpGet:
                   host: 127.0.0.1
@@ -77,7 +71,7 @@ items:
                     fieldRef:
                       apiVersion: v1
                       fieldPath: spec.nodeName
-              image: ` + weaveConfig[WeaveCNIImage] + `
+              image: {{.CNIImage}}
               resources:
                 requests:
                   cpu: 10m
@@ -119,12 +113,7 @@ items:
                 path: /run/xtables.lock
       updateStrategy:
         type: RollingUpdate
-
-` + rbacConfig
-}
-
-func getWeaveRBACManifest() string {
-	return `
+{{- if eq .RBACConfig "rbac"}}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -213,6 +202,6 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: weave-net
-    namespace: kube-system`
-
-}
+    namespace: kube-system
+{{- end}}
+`

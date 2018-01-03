@@ -68,12 +68,17 @@ func ClusterUp(rkeConfig *v3.RancherKubernetesEngineConfig, dockerDialerFactory,
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
 
-	err = kubeCluster.DeployClusterPlanes()
+	err = kubeCluster.DeployControlPlane()
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
 
 	err = kubeCluster.SaveClusterState(rkeConfig)
+	if err != nil {
+		return APIURL, caCrt, clientCert, clientKey, err
+	}
+
+	err = kubeCluster.DeployWorkerPlane()
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}

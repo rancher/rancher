@@ -6,12 +6,12 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/slice"
-	typescorev1 "github.com/rancher/types/apis/core/v1"
 	typesextv1beta1 "github.com/rancher/types/apis/extensions/v1beta1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	typesrbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+	"k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,10 +20,11 @@ import (
 )
 
 const (
-	finalizerName  = "rtbFinalizer"
-	rtbOwnerLabel  = "io.cattle.rtb.owner"
-	projectIDLabel = "io.cattle.field.projectId"
-	prtbIndex      = "io.cattle.authz.prtb.projectname"
+	finalizerName       = "rtbFinalizer"
+	rtbOwnerLabel       = "io.cattle.rtb.owner"
+	projectIDAnnotation = "field.cattle.io/projectId"
+	prtbIndex           = "authz.cluster.cattle.io/prtb-index"
+	nsIndex             = "authz.cluster.cattle.io/ns-index"
 )
 
 func Register(workload *config.ClusterContext) {
@@ -34,12 +35,19 @@ func Register(workload *config.ClusterContext) {
 	}
 	informer.AddIndexers(indexers)
 
+	// Index for looking up namespaces by projectID annotation
+	nsInformer := workload.Core.Namespaces("").Controller().Informer()
+	nsIndexers := map[string]cache.IndexFunc{
+		nsIndex: nsIndexer,
+	}
+	nsInformer.AddIndexers(nsIndexers)
+
 	r := &roleHandler{
 		workload:    workload,
 		prtbIndexer: informer.GetIndexer(),
+		nsIndexer:   nsInformer.GetIndexer(),
 		rtLister:    workload.Management.Management.RoleTemplates("").Controller().Lister(),
 		psptLister:  workload.Management.Management.PodSecurityPolicyTemplates("").Controller().Lister(),
-		nsLister:    workload.Core.Namespaces("").Controller().Lister(),
 		rbLister:    workload.RBAC.RoleBindings("").Controller().Lister(),
 		crbLister:   workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
 		crLister:    workload.RBAC.ClusterRoles("").Controller().Lister(),
@@ -55,8 +63,8 @@ type roleHandler struct {
 	workload    *config.ClusterContext
 	rtLister    v3.RoleTemplateLister
 	prtbIndexer cache.Indexer
+	nsIndexer   cache.Indexer
 	psptLister  v3.PodSecurityPolicyTemplateLister
-	nsLister    typescorev1.NamespaceLister
 	crLister    typesrbacv1.ClusterRoleLister
 	crbLister   typesrbacv1.ClusterRoleBindingLister
 	rbLister    typesrbacv1.RoleBindingLister
@@ -112,6 +120,15 @@ func (r *roleHandler) ensureCRTB(key string, binding *v3.ClusterRoleTemplateBind
 		}
 	}
 
+	if binding.RoleTemplateName == "" {
+		logrus.Warnf("ClusterRoleTemplateBinding %v has no role template set. Skipping.", binding.Name)
+		return nil
+	}
+	if binding.Subject.Name == "" {
+		logrus.Warnf("Binding %v has no subject. Skipping", binding.Name)
+		return nil
+	}
+
 	rt, err := r.rtLister.Get("", binding.RoleTemplateName)
 	if err != nil {
 		return errors.Wrapf(err, "couldn't get role template %v", binding.RoleTemplateName)
@@ -156,16 +173,24 @@ func (r *roleHandler) ensurePRTB(key string, binding *v3.ProjectRoleTemplateBind
 		}
 	}
 
+	if binding.RoleTemplateName == "" {
+		logrus.Warnf("ProjectRoleTemplateBinding %v has no role template set. Skipping.", binding.Name)
+		return nil
+	}
+	if binding.Subject.Name == "" {
+		logrus.Warnf("Binding %v has no subject. Skipping", binding.Name)
+		return nil
+	}
+
 	rt, err := r.rtLister.Get("", binding.RoleTemplateName)
 	if err != nil {
 		return errors.Wrapf(err, "couldn't get role template %v", binding.RoleTemplateName)
 	}
 
 	// Get namespaces belonging to project
-	set := labels.Set(map[string]string{projectIDLabel: binding.ProjectName})
-	namespaces, err := r.nsLister.List("", set.AsSelector())
+	namespaces, err := r.nsIndexer.ByIndex(nsIndex, binding.ProjectName)
 	if err != nil {
-		return errors.Wrapf(err, "couldn't list namespaces with selector %s", set.AsSelector())
+		return errors.Wrapf(err, "couldn't list namespaces with project ID %v", binding.ProjectName)
 	}
 	if len(namespaces) == 0 {
 		return nil
@@ -180,8 +205,8 @@ func (r *roleHandler) ensurePRTB(key string, binding *v3.ProjectRoleTemplateBind
 		return errors.Wrap(err, "couldn't ensure roles")
 	}
 
-	// TODO is .Items the complete list or is there potential pagination to deal with?
-	for _, ns := range namespaces {
+	for _, n := range namespaces {
+		ns := n.(*v1.Namespace)
 		for _, role := range roles {
 			if err := r.ensureBinding(ns.Name, role.Name, binding); err != nil {
 				return errors.Wrapf(err, "couldn't ensure binding %v %v in %v", role.Name, binding.Subject.Name, ns.Name)
@@ -200,14 +225,14 @@ func (r *roleHandler) ensurePRTBDelete(key string, binding *v3.ProjectRoleTempla
 	binding = binding.DeepCopy()
 
 	// Get namespaces belonging to project
-	set := labels.Set(map[string]string{projectIDLabel: binding.ProjectName})
-	namespaces, err := r.nsLister.List("", set.AsSelector())
+	namespaces, err := r.nsIndexer.ByIndex(nsIndex, binding.ProjectName)
 	if err != nil {
-		return errors.Wrapf(err, "couldn't list namespaces with selector %s", set.AsSelector())
+		return errors.Wrapf(err, "couldn't list namespaces with project ID %v", binding.ProjectName)
 	}
 
-	set = labels.Set(map[string]string{rtbOwnerLabel: string(binding.UID)})
-	for _, ns := range namespaces {
+	set := labels.Set(map[string]string{rtbOwnerLabel: string(binding.UID)})
+	for _, n := range namespaces {
+		ns := n.(*v1.Namespace)
 		bindingCli := r.workload.K8sClient.RbacV1().RoleBindings(ns.Name)
 		rbs, err := r.rbLister.List(ns.Name, set.AsSelector())
 		if err != nil {
@@ -414,6 +439,20 @@ func bindingParts(roleName, parentUID string, subject rbacv1.Subject) (string, m
 			Kind: "ClusterRole",
 			Name: roleName,
 		}
+}
+
+func nsIndexer(obj interface{}) ([]string, error) {
+	ns, ok := obj.(*v1.Namespace)
+	if !ok {
+		logrus.Infof("object %v is not a namespace", obj)
+		return []string{}, nil
+	}
+
+	if id, ok := ns.Annotations[projectIDAnnotation]; ok {
+		return []string{id}, nil
+	}
+
+	return []string{}, nil
 }
 
 func prtbIndexer(obj interface{}) ([]string, error) {

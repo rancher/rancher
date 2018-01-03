@@ -1,7 +1,7 @@
-package authz
+package templates
 
 const (
-	systemNodeClusterRoleBinding = `
+	SystemNodeClusterRoleBinding = `
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -19,14 +19,14 @@ subjects:
   name: system:nodes
   apiGroup: rbac.authorization.k8s.io`
 
-	jobDeployerServiceAccount = `
+	JobDeployerServiceAccount = `
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: rke-job-deployer
   namespace: kube-system`
 
-	jobDeployerClusterRoleBinding = `
+	JobDeployerClusterRoleBinding = `
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:

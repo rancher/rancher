@@ -63,8 +63,13 @@ func (p *prtbLifecycle) Remove(obj *v3.ProjectRoleTemplateBinding) (*v3.ProjectR
 }
 
 func (p *prtbLifecycle) ensureBindings(binding *v3.ProjectRoleTemplateBinding) error {
-	projectName := binding.ProjectName
-	proj, err := p.projectLister.Get("", projectName)
+	parts := strings.SplitN(binding.ProjectName, ":", 2)
+	if len(parts) < 2 {
+		return errors.Errorf("cannot determine project and cluster from %v", binding.ProjectName)
+	}
+	clusterName := parts[0]
+	projectName := parts[1]
+	proj, err := p.projectLister.Get(clusterName, projectName)
 	if err != nil {
 		return err
 	}
@@ -72,7 +77,6 @@ func (p *prtbLifecycle) ensureBindings(binding *v3.ProjectRoleTemplateBinding) e
 		return errors.Errorf("cannot create binding because project %v was not found", projectName)
 	}
 
-	clusterName := proj.Spec.ClusterName
 	cluster, err := p.clusterLister.Get("", clusterName)
 	if err != nil {
 		return err

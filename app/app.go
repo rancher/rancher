@@ -86,7 +86,8 @@ func addData(management *config.ManagementContext) error {
 		addRule().apiGroups().nonResourceURLs("*").verbs("*")
 
 	rb.addRole("User", "user").
-		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("create")
+		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("create").
+		addRule().apiGroups("management.cattle.io").resources("users").verbs("list", "get")
 
 	if err := rb.reconcileGlobalRoles(management); err != nil {
 		return errors.Wrap(err, "problem reconciling globl roles")
