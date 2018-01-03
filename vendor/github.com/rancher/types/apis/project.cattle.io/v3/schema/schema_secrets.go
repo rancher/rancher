@@ -11,6 +11,7 @@ import (
 func secretTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
 		AddMapperForType(&Version, v1.Secret{},
+			m.AnnotationField{Field: "projectId", IgnoreDefinition: true},
 			m.SetValue{
 				Field: "type",
 				IfEq:  "kubernetes.io/service-account-token",

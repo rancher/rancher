@@ -103,6 +103,16 @@ func authzTypes(schemas *types.Schemas) *types.Schemas {
 				field.Nullable = false
 				return field
 			})
+			schema.MustCustomizeField("subjectName", func(field types.Field) types.Field {
+				field.Required = true
+				field.Nullable = false
+				return field
+			})
+			schema.MustCustomizeField("roleTemplateId", func(field types.Field) types.Field {
+				field.Required = true
+				field.Nullable = false
+				return field
+			})
 		}).
 		MustImportAndCustomize(&Version, v3.ProjectRoleTemplateBinding{}, func(schema *types.Schema) {
 			schema.MustCustomizeField("subjectKind", func(field types.Field) types.Field {
@@ -111,11 +121,31 @@ func authzTypes(schemas *types.Schemas) *types.Schemas {
 				field.Nullable = false
 				return field
 			})
+			schema.MustCustomizeField("subjectName", func(field types.Field) types.Field {
+				field.Required = true
+				field.Nullable = false
+				return field
+			})
+			schema.MustCustomizeField("roleTemplateId", func(field types.Field) types.Field {
+				field.Required = true
+				field.Nullable = false
+				return field
+			})
 		}).
 		MustImportAndCustomize(&Version, v3.GlobalRoleBinding{}, func(schema *types.Schema) {
 			schema.MustCustomizeField("subjectKind", func(field types.Field) types.Field {
 				field.Type = "enum"
 				field.Options = []string{"User", "Group", "Principal"}
+				field.Nullable = false
+				return field
+			})
+			schema.MustCustomizeField("subjectName", func(field types.Field) types.Field {
+				field.Required = true
+				field.Nullable = false
+				return field
+			})
+			schema.MustCustomizeField("globalRoleId", func(field types.Field) types.Field {
+				field.Required = true
 				field.Nullable = false
 				return field
 			})
