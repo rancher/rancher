@@ -7,6 +7,7 @@ import (
 
 	"github.com/rancher/cluster-api/api/setup"
 	"github.com/rancher/cluster-api/store"
+	"github.com/rancher/norman-rbac"
 	normanapi "github.com/rancher/norman/api"
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/types"
@@ -27,6 +28,7 @@ func New(ctx context.Context, cluster *config.ClusterContext) (http.Handler, err
 	}
 
 	server := normanapi.NewAPIServer()
+	server.AccessControl = rbac.NewAccessControl(cluster.RBAC)
 	server.URLParser = func(schemas *types.Schemas, url *url.URL) (parse.ParsedURL, error) {
 		return URLParser(cluster.ClusterName, schemas, url)
 	}
