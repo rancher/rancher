@@ -111,5 +111,8 @@ func (c *Manager) toServer(ctx context.Context, cluster *client.Cluster) (*recor
 		return nil, err
 	}
 
+	if err := clusterContext.Start(ctx); err != nil {
+		return s, err
+	}
 	return s, nil
 }
