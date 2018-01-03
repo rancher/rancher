@@ -1,19 +1,79 @@
-package network
+package templates
 
-import "github.com/rancher/rke/services"
+const CalicoTemplate = `
+{{if eq .RBACConfig "rbac"}}
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: calico-cni-plugin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: calico-cni-plugin
+subjects:
+- kind: ServiceAccount
+  name: calico-cni-plugin
+  namespace: kube-system
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: calico-cni-plugin
+rules:
+  - apiGroups: [""]
+    resources:
+      - pods
+      - nodes
+    verbs:
+      - get
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: calico-cni-plugin
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: calico-kube-controllers
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: calico-kube-controllers
+subjects:
+- kind: ServiceAccount
+  name: calico-kube-controllers
+  namespace: kube-system
 
-func GetCalicoManifest(calicoConfig map[string]string) string {
-	awsIPPool := ""
-	if calicoConfig[CloudProvider] == AWSCloudProvider {
-		awsIPPool = getCalicoAWSIPPoolManifest(calicoConfig)
-	}
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: calico-kube-controllers
+rules:
+  - apiGroups:
+    - ""
+    - extensions
+    resources:
+      - pods
+      - namespaces
+      - networkpolicies
+      - nodes
+    verbs:
+      - watch
+      - list
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: calico-kube-controllers
+  namespace: kube-system
 
-	rbacConfig := ""
-	if calicoConfig[RBACConfig] == services.RBACAuthorizationMode {
-		rbacConfig = getCalicoRBACManifest()
-	}
+## end rbac here
+{{end}}
 
-	return rbacConfig + `
 ---
 # Calico Version master
 # https://docs.projectcalico.org/master/releases#master
@@ -30,7 +90,7 @@ metadata:
   namespace: kube-system
 data:
   # Configure this with the location of your etcd cluster.
-  etcd_endpoints: "` + calicoConfig[EtcdEndpoints] + `"
+  etcd_endpoints: "{{.EtcdEndpoints}}"
 
   # Configure the Calico backend to use.
   calico_backend: "bird"
@@ -43,7 +103,7 @@ data:
       "plugins": [
         {
             "type": "calico",
-            "etcd_endpoints": "` + calicoConfig[EtcdEndpoints] + `",
+            "etcd_endpoints": "{{.EtcdEndpoints}}",
             "etcd_key_file": "",
             "etcd_cert_file": "",
             "etcd_ca_cert_file": "",
@@ -54,13 +114,13 @@ data:
             },
             "policy": {
                 "type": "k8s",
-                "k8s_api_root": "` + calicoConfig[APIRoot] + `",
-                "k8s_client_certificate": "` + calicoConfig[ClientCert] + `",
-                "k8s_client_key": "` + calicoConfig[ClientKey] + `",
-                "k8s_certificate_authority": "` + calicoConfig[ClientCA] + `"
+                "k8s_api_root": "{{.APIRoot}}",
+                "k8s_client_certificate": "{{.ClientCert}}",
+                "k8s_client_key": "{{.ClientKey}}",
+                "k8s_certificate_authority": "{{.ClientCA}}"
             },
             "kubernetes": {
-                "kubeconfig": "` + calicoConfig[KubeCfg] + `"
+                "kubeconfig": "{{.KubeCfg}}"
             }
         },
         {
@@ -137,7 +197,7 @@ spec:
         # container programs network policy and routes on each
         # host.
         - name: calico-node
-          image: ` + calicoConfig[NodeImage] + `
+          image: {{.NodeImage}}
           env:
             # The location of the Calico etcd cluster.
             - name: ETCD_ENDPOINTS
@@ -162,7 +222,7 @@ spec:
               value: "ACCEPT"
             # Configure the IP Pool from which Pod IPs will be chosen.
             - name: CALICO_IPV4POOL_CIDR
-              value: "` + calicoConfig[ClusterCIDR] + `"
+              value: "{{.ClusterCIDR}}"
             - name: CALICO_IPV4POOL_IPIP
               value: "Always"
             # Disable IPv6 on Kubernetes.
@@ -228,7 +288,7 @@ spec:
         # This container installs the Calico CNI binaries
         # and CNI network config file on each node.
         - name: install-cni
-          image: ` + calicoConfig[CNIImage] + `
+          image: {{.CNIImage}}
           command: ["/install-cni.sh"]
           env:
             # Name of the CNI config file to create.
@@ -317,7 +377,7 @@ spec:
           operator: "Exists"
       containers:
         - name: calico-kube-controllers
-          image: ` + calicoConfig[ControllersImage] + `
+          image: {{.ControllersImage}}
           env:
             # The location of the Calico etcd cluster.
             - name: ETCD_ENDPOINTS
@@ -384,7 +444,7 @@ spec:
       serviceAccountName: calico-kube-controllers
       containers:
         - name: calico-policy-controller
-          image: ` + calicoConfig[ControllersImage] + `
+          image: {{.ControllersImage}}
           env:
             # The location of the Calico etcd cluster.
             - name: ETCD_ENDPOINTS
@@ -407,12 +467,10 @@ kind: ServiceAccount
 metadata:
   name: calico-node
   namespace: kube-system
-` + awsIPPool + `
-`
-}
 
-func getCalicoAWSIPPoolManifest(calicoConfig map[string]string) string {
-	return `
+
+{{if eq .CloudProvider "aws"}}
+## aws stuff here
 ---
 kind: ConfigMap
 apiVersion: v1
@@ -424,7 +482,7 @@ data:
     apiVersion: v1
     kind: ipPool
     metadata:
-      cidr: ` + calicoConfig[ClusterCIDR] + `
+      cidr: {{.ClusterCIDR}}
     spec:
       nat-outgoing: true
 ---
@@ -438,7 +496,7 @@ spec:
   restartPolicy: OnFailure
   containers:
   - name: calicoctl
-    image: ` + calicoConfig[CalicoctlImage] + `
+    image: {{.Calicoctl}}
     command: ["/bin/sh", "-c", "calicoctl apply -f aws-ippool.yaml"]
     env:
     - name: ETCD_ENDPOINTS
@@ -456,88 +514,5 @@ spec:
       items:
         - key: aws-ippool
           path: aws-ippool.yaml
-        `
-}
-
-func getCalicoRBACManifest() string {
-	return `
----
-
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRoleBinding
-metadata:
-  name: calico-cni-plugin
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: calico-cni-plugin
-subjects:
-- kind: ServiceAccount
-  name: calico-cni-plugin
-  namespace: kube-system
-
----
-
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1beta1
-metadata:
-  name: calico-cni-plugin
-rules:
-  - apiGroups: [""]
-    resources:
-      - pods
-      - nodes
-    verbs:
-      - get
-
----
-
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: calico-cni-plugin
-  namespace: kube-system
-
----
-
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRoleBinding
-metadata:
-  name: calico-kube-controllers
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: calico-kube-controllers
-subjects:
-- kind: ServiceAccount
-  name: calico-kube-controllers
-  namespace: kube-system
-
----
-
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1beta1
-metadata:
-  name: calico-kube-controllers
-rules:
-  - apiGroups:
-    - ""
-    - extensions
-    resources:
-      - pods
-      - namespaces
-      - networkpolicies
-      - nodes
-    verbs:
-      - watch
-      - list
-
----
-
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: calico-kube-controllers
-  namespace: kube-system
+          {{end}}
 `
-}

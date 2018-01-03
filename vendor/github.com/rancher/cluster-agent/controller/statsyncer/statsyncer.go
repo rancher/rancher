@@ -65,7 +65,7 @@ func (s *StatSyncer) syncClusterNodeResources() error {
 		logrus.Infof("Skip syncing node resources, cluster [%s] deleted", s.clusterName)
 		return nil
 	}
-	if !utils.IsClusterProvisioned(cluster) {
+	if !v3.ClusterConditionProvisioned.IsTrue(cluster) {
 		return fmt.Errorf("Skip syncing node resources - cluster [%s] not provisioned yet", s.clusterName)
 	}
 	nodes, err := s.Nodes.List(metav1.ListOptions{})

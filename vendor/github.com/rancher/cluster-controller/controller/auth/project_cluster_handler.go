@@ -121,7 +121,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 			}
 			if _, err := m.mgmt.Management.ProjectRoleTemplateBindings(metaAccessor.GetName()).Create(&v3.ProjectRoleTemplateBinding{
 				ObjectMeta:       om,
-				ProjectName:      metaAccessor.GetName(),
+				ProjectName:      metaAccessor.GetNamespace() + ":" + metaAccessor.GetName(),
 				RoleTemplateName: "project-owner",
 				Subject:          subject,
 			}); err != nil {

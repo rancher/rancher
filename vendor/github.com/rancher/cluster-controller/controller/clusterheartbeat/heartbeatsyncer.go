@@ -3,6 +3,7 @@ package clusterheartbeat
 import (
 	"time"
 
+	"github.com/rancher/norman/condition"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -66,7 +67,8 @@ func (h *HeartBeatSyncer) checkHeartBeat() {
 				logrus.Errorf("Error getting Cluster [%s] - %v", clusterName, err)
 				continue
 			}
-			setConditionStatus(cluster, v3.ClusterConditionReady, corev1.ConditionUnknown)
+
+			v3.ClusterConditionReady.Unknown(cluster)
 			logrus.Infof("Cluster [%s] condition status unknown", clusterName)
 			err = h.update(cluster)
 			if err != nil {
@@ -82,9 +84,9 @@ func (h *HeartBeatSyncer) update(cluster *v3.Cluster) error {
 	return err
 }
 
-func getConditionByType(cluster *v3.Cluster, conditionType v3.ClusterConditionType) (int, *v3.ClusterCondition) {
+func getConditionByType(cluster *v3.Cluster, conditionType condition.Cond) (int, *v3.ClusterCondition) {
 	for index, condition := range cluster.Status.Conditions {
-		if condition.Type == conditionType {
+		if string(condition.Type) == string(conditionType) {
 			return index, &condition
 		}
 	}
@@ -94,22 +96,9 @@ func getConditionByType(cluster *v3.Cluster, conditionType v3.ClusterConditionTy
 // Condition is Ready if conditionType is Ready and conditionStatus is True/False but not unknown.
 func getConditionIfReady(cluster *v3.Cluster) *v3.ClusterCondition {
 	for _, condition := range cluster.Status.Conditions {
-		if condition.Type == v3.ClusterConditionReady && condition.Status != corev1.ConditionUnknown {
+		if string(condition.Type) == string(v3.ClusterConditionReady) && condition.Status != corev1.ConditionUnknown {
 			return &condition
 		}
 	}
 	return nil
-}
-
-func setConditionStatus(cluster *v3.Cluster, conditionType v3.ClusterConditionType, status corev1.ConditionStatus) {
-	pos, condition := getConditionByType(cluster, conditionType)
-	currTime := time.Now().Format(time.RFC3339)
-	if condition != nil {
-		if condition.Status != status {
-			condition.Status = status
-			condition.LastTransitionTime = currTime
-		}
-		condition.LastUpdateTime = currTime
-		cluster.Status.Conditions[pos] = *condition
-	}
 }

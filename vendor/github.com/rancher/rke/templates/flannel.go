@@ -1,21 +1,46 @@
-package network
+package templates
 
-import (
-	"fmt"
-
-	"github.com/rancher/rke/services"
-)
-
-func GetFlannelManifest(flannelConfig map[string]string) string {
-	var extraArgs string
-	if len(flannelConfig[FlannelIface]) > 0 {
-		extraArgs = fmt.Sprintf(",--iface=%s", flannelConfig[FlannelIface])
-	}
-	rbacConfig := ""
-	if flannelConfig[RBACConfig] == services.RBACAuthorizationMode {
-		rbacConfig = getFlannelRBACManifest()
-	}
-	return rbacConfig + `
+const FlannelTemplate = `
+{{- if eq .RBACConfig "rbac"}}
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: flannel
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: flannel
+subjects:
+- kind: ServiceAccount
+  name: flannel
+  namespace: kube-system
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: flannel
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+    verbs:
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - nodes/status
+    verbs:
+      - patch
+{{- end}}
 ---
 kind: ConfigMap
 apiVersion: v1
@@ -48,7 +73,7 @@ data:
     }
   net-conf.json: |
     {
-      "Network": "` + flannelConfig[ClusterCIDR] + `",
+      "Network": "{{.ClusterCIDR}}",
       "Backend": {
         "Type": "vxlan"
       }
@@ -72,7 +97,7 @@ spec:
       serviceAccountName: flannel
       containers:
       - name: kube-flannel
-        image: ` + flannelConfig[FlannelImage] + `
+        image: {{.Image}}
         imagePullPolicy: IfNotPresent
         resources:
           limits:
@@ -81,7 +106,11 @@ spec:
           requests:
             cpu: 150m
             memory: 64M
-        command: ["/opt/bin/flanneld","--ip-masq","--kube-subnet-mgr"` + extraArgs + `]
+        {{- if .FlannelInterface}}
+        command: ["/opt/bin/flanneld","--ip-masq","--kube-subnet-mgr","--iface={{.FlannelInterface}}"]
+        {{- else}}
+        command: ["/opt/bin/flanneld","--ip-masq","--kube-subnet-mgr"]
+        {{- end}}
         securityContext:
           privileged: true
         env:
@@ -101,7 +130,7 @@ spec:
         - name: flannel-cfg
           mountPath: /etc/kube-flannel/
       - name: install-cni
-        image: ` + flannelConfig[FlannelCNIImage] + `
+        image: {{.CNIImage}}
         command: ["/install-cni.sh"]
         env:
         # The CNI network config to install on each node.
@@ -145,46 +174,3 @@ kind: ServiceAccount
 metadata:
   name: flannel
   namespace: kube-system`
-}
-
-func getFlannelRBACManifest() string {
-	return `
----
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: flannel
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: flannel
-subjects:
-- kind: ServiceAccount
-  name: flannel
-  namespace: kube-system
----
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: flannel
-rules:
-  - apiGroups:
-      - ""
-    resources:
-      - pods
-    verbs:
-      - get
-  - apiGroups:
-      - ""
-    resources:
-      - nodes
-    verbs:
-      - list
-      - watch
-  - apiGroups:
-      - ""
-    resources:
-      - nodes/status
-    verbs:
-      - patch`
-}

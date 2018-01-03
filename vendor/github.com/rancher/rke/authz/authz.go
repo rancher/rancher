@@ -2,6 +2,7 @@ package authz
 
 import (
 	"github.com/rancher/rke/k8s"
+	"github.com/rancher/rke/templates"
 	"github.com/sirupsen/logrus"
 )
 
@@ -11,10 +12,10 @@ func ApplyJobDeployerServiceAccount(kubeConfigPath string) error {
 	if err != nil {
 		return err
 	}
-	if err := k8s.UpdateClusterRoleBindingFromYaml(k8sClient, jobDeployerClusterRoleBinding); err != nil {
+	if err := k8s.UpdateClusterRoleBindingFromYaml(k8sClient, templates.JobDeployerClusterRoleBinding); err != nil {
 		return err
 	}
-	if err := k8s.UpdateServiceAccountFromYaml(k8sClient, jobDeployerServiceAccount); err != nil {
+	if err := k8s.UpdateServiceAccountFromYaml(k8sClient, templates.JobDeployerServiceAccount); err != nil {
 		return err
 	}
 	logrus.Infof("[authz] rke-job-deployer ServiceAccount created successfully")
@@ -27,7 +28,7 @@ func ApplySystemNodeClusterRoleBinding(kubeConfigPath string) error {
 	if err != nil {
 		return err
 	}
-	if err := k8s.UpdateClusterRoleBindingFromYaml(k8sClient, systemNodeClusterRoleBinding); err != nil {
+	if err := k8s.UpdateClusterRoleBindingFromYaml(k8sClient, templates.SystemNodeClusterRoleBinding); err != nil {
 		return err
 	}
 	logrus.Infof("[authz] system:node ClusterRoleBinding created successfully")

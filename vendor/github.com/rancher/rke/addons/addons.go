@@ -1,33 +1,12 @@
 package addons
 
-func GetAddonsExcuteJob(addonName, nodeName, image string) string {
-	return `apiVersion: batch/v1
-kind: Job
-metadata:
-  name: ` + addonName + `-deploy-job
-spec:
-  template:
-    metadata:
-      name: pi
-    spec:
-        hostNetwork: true
-        serviceAccountName: rke-job-deployer
-        nodeName: ` + nodeName + `
-        containers:
-          - name: ` + addonName + `-pod
-            image: ` + image + `
-            command: [ "kubectl", "apply", "-f" , "/etc/config/` + addonName + `.yaml"]
-            volumeMounts:
-            - name: config-volume
-              mountPath: /etc/config
-        volumes:
-          - name: config-volume
-            configMap:
-              # Provide the name of the ConfigMap containing the files you want
-              # to add to the container
-              name: ` + addonName + `
-              items:
-                - key: ` + addonName + `
-                  path: ` + addonName + `.yaml
-        restartPolicy: Never`
+import "github.com/rancher/rke/templates"
+
+func GetAddonsExcuteJob(addonName, nodeName, image string) (string, error) {
+	jobConfig := map[string]string{
+		"AddonName": addonName,
+		"NodeName":  nodeName,
+		"Image":     image,
+	}
+	return templates.CompileTemplateFromMap(templates.JobDeployerTemplate, jobConfig)
 }

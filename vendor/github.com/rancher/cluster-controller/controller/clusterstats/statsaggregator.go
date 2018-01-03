@@ -1,9 +1,7 @@
 package clusterstats
 
 import (
-	"time"
-
-	clusterv1 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
@@ -12,7 +10,7 @@ import (
 )
 
 type StatsAggregator struct {
-	Clusters clusterv1.ClusterInterface
+	Clusters v3.ClusterInterface
 }
 
 type ClusterNodeData struct {
@@ -36,7 +34,7 @@ func Register(cluster *config.ManagementContext) {
 	cluster.Management.Machines("").Controller().AddHandler(s.sync)
 }
 
-func (s *StatsAggregator) sync(key string, clusterNode *clusterv1.Machine) error {
+func (s *StatsAggregator) sync(key string, clusterNode *v3.Machine) error {
 	logrus.Debugf("Syncing clusternode [%s]", key)
 	if clusterNode == nil {
 		return s.deleteStats(key)
@@ -70,7 +68,7 @@ func (s *StatsAggregator) deleteStats(key string) error {
 	return nil
 }
 
-func (s *StatsAggregator) addOrUpdateStats(clusterNode *clusterv1.Machine) error {
+func (s *StatsAggregator) addOrUpdateStats(clusterNode *v3.Machine) error {
 	clusterName, clusterNodeName := clusterNode.Status.ClusterName, clusterNode.Status.NodeName
 	cluster, err := s.getCluster(clusterName)
 	if err != nil {
@@ -101,7 +99,7 @@ func (s *StatsAggregator) addOrUpdateStats(clusterNode *clusterv1.Machine) error
 	return nil
 }
 
-func (s *StatsAggregator) aggregate(cluster *clusterv1.Cluster, clusterName string) {
+func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) {
 	// capacity keys
 	pods, mem, cpu := resource.Quantity{}, resource.Quantity{}, resource.Quantity{}
 	// allocatable keys
@@ -156,17 +154,24 @@ func (s *StatsAggregator) aggregate(cluster *clusterv1.Cluster, clusterName stri
 	cluster.Status.Allocatable = v1.ResourceList{v1.ResourcePods: apods, v1.ResourceMemory: amem, v1.ResourceCPU: acpu}
 	cluster.Status.Requested = v1.ResourceList{v1.ResourcePods: rpods, v1.ResourceMemory: rmem, v1.ResourceCPU: rcpu}
 	cluster.Status.Limits = v1.ResourceList{v1.ResourcePods: lpods, v1.ResourceMemory: lmem, v1.ResourceCPU: lcpu}
-
-	setConditionStatus(cluster, clusterv1.ClusterConditionNoDiskPressure, condDisk)
-	setConditionStatus(cluster, clusterv1.ClusterConditionNoMemoryPressure, condMem)
+	if condDisk == v1.ConditionTrue {
+		v3.ClusterConditionNoDiskPressure.True(cluster)
+	} else {
+		v3.ClusterConditionNoDiskPressure.False(cluster)
+	}
+	if condMem == v1.ConditionTrue {
+		v3.ClusterConditionNoMemoryPressure.True(cluster)
+	} else {
+		v3.ClusterConditionNoMemoryPressure.False(cluster)
+	}
 }
 
-func (s *StatsAggregator) update(cluster *clusterv1.Cluster) error {
+func (s *StatsAggregator) update(cluster *v3.Cluster) error {
 	_, err := s.Clusters.Update(cluster)
 	return err
 }
 
-func (s *StatsAggregator) getCluster(clusterName string) (*clusterv1.Cluster, error) {
+func (s *StatsAggregator) getCluster(clusterName string) (*v3.Cluster, error) {
 	return s.Clusters.Get(clusterName, metav1.GetOptions{})
 }
 
@@ -177,31 +182,4 @@ func getNodeConditionByType(conditions []v1.NodeCondition, conditionType v1.Node
 		}
 	}
 	return &v1.NodeCondition{}
-}
-
-func setConditionStatus(cluster *clusterv1.Cluster, conditionType clusterv1.ClusterConditionType, status v1.ConditionStatus) {
-	condition := getConditionByType(cluster, conditionType)
-	now := time.Now().Format(time.RFC3339)
-	if condition != nil {
-		if condition.Status != status {
-			condition.LastTransitionTime = now
-		}
-		condition.Status = status
-		condition.LastUpdateTime = now
-	} else {
-		cluster.Status.Conditions = append(cluster.Status.Conditions,
-			clusterv1.ClusterCondition{Type: conditionType,
-				Status:             status,
-				LastUpdateTime:     now,
-				LastTransitionTime: now})
-	}
-}
-
-func getConditionByType(cluster *clusterv1.Cluster, conditionType clusterv1.ClusterConditionType) *clusterv1.ClusterCondition {
-	for _, condition := range cluster.Status.Conditions {
-		if condition.Type == conditionType {
-			return &condition
-		}
-	}
-	return nil
 }

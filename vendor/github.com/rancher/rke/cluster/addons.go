@@ -44,7 +44,10 @@ func (c *Cluster) deployKubeDNS() error {
 		addons.KubeDNSSidecarImage:    c.SystemImages[KubeDNSSidecarImage],
 		addons.KubeDNSAutoScalerImage: c.SystemImages[KubeDNSAutoScalerImage],
 	}
-	kubeDNSYaml := addons.GetKubeDNSManifest(kubeDNSConfig)
+	kubeDNSYaml, err := addons.GetKubeDNSManifest(kubeDNSConfig)
+	if err != nil {
+		return err
+	}
 	if err := c.doAddonDeploy(kubeDNSYaml, KubeDNSAddonResourceName); err != nil {
 		return err
 	}
@@ -62,7 +65,10 @@ func (c *Cluster) doAddonDeploy(addonYaml, resourceName string) error {
 
 	logrus.Infof("[addons] Executing deploy job..")
 
-	addonJob := addons.GetAddonsExcuteJob(resourceName, c.ControlPlaneHosts[0].HostnameOverride, c.Services.KubeAPI.Image)
+	addonJob, err := addons.GetAddonsExcuteJob(resourceName, c.ControlPlaneHosts[0].HostnameOverride, c.Services.KubeAPI.Image)
+	if err != nil {
+		return fmt.Errorf("Failed to deploy addon execute job: %v", err)
+	}
 	err = c.ApplySystemAddonExcuteJob(addonJob)
 	if err != nil {
 		return fmt.Errorf("Failed to deploy addon execute job: %v", err)

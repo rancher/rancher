@@ -52,32 +52,35 @@ const (
 	NoneAuthorizationMode      = "none"
 )
 
-func (c *Cluster) DeployClusterPlanes() error {
-	// Deploy Kubernetes Planes
-	err := services.RunEtcdPlane(c.EtcdHosts, c.Services.Etcd)
-	if err != nil {
+func (c *Cluster) DeployControlPlane() error {
+	// Deploy Etcd Plane
+	if err := services.RunEtcdPlane(c.EtcdHosts, c.Services.Etcd); err != nil {
 		return fmt.Errorf("[etcd] Failed to bring up Etcd Plane: %v", err)
 	}
-	err = services.RunControlPlane(c.ControlPlaneHosts,
+	// Deploy Control plane
+	if err := services.RunControlPlane(c.ControlPlaneHosts,
 		c.EtcdHosts,
 		c.Services,
 		c.SystemImages[ServiceSidekickImage],
 		c.Authorization.Mode,
-		c.HealthcheckDialerFactory)
-	if err != nil {
+		c.HealthcheckDialerFactory); err != nil {
 		return fmt.Errorf("[controlPlane] Failed to bring up Control Plane: %v", err)
 	}
-	err = c.ApplyAuthzResources()
-	if err != nil {
+	// Apply Authz configuration after deploying controlplane
+	if err := c.ApplyAuthzResources(); err != nil {
 		return fmt.Errorf("[auths] Failed to apply RBAC resources: %v", err)
 	}
-	err = services.RunWorkerPlane(c.ControlPlaneHosts,
+	return nil
+}
+
+func (c *Cluster) DeployWorkerPlane() error {
+	// Deploy Worker Plane
+	if err := services.RunWorkerPlane(c.ControlPlaneHosts,
 		c.WorkerHosts,
 		c.Services,
 		c.SystemImages[NginxProxyImage],
 		c.SystemImages[ServiceSidekickImage],
-		c.HealthcheckDialerFactory)
-	if err != nil {
+		c.HealthcheckDialerFactory); err != nil {
 		return fmt.Errorf("[workerPlane] Failed to bring up Worker Plane: %v", err)
 	}
 	return nil

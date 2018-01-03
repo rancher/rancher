@@ -110,6 +110,10 @@ func (p *permissionIndex) filterPermissions(result []ListPermission, namespace, 
 			continue
 		}
 
+		nsForResourceNameGets := namespace
+		if namespace == "*" {
+			nsForResourceNameGets = ""
+		}
 		for _, verb := range rule.Verbs {
 			switch verb {
 			case "*":
@@ -122,7 +126,7 @@ func (p *permissionIndex) filterPermissions(result []ListPermission, namespace, 
 			case "get":
 				for _, resourceName := range rule.ResourceNames {
 					result = append(result, ListPermission{
-						Namespace: namespace,
+						Namespace: nsForResourceNameGets,
 						Name:      resourceName,
 					})
 				}
