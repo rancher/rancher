@@ -10,6 +10,7 @@ const (
 	RoleTemplateFieldBuiltin         = "builtin"
 	RoleTemplateFieldCreated         = "created"
 	RoleTemplateFieldCreatorID       = "creatorId"
+	RoleTemplateFieldDescription     = "description"
 	RoleTemplateFieldExternal        = "external"
 	RoleTemplateFieldFinalizers      = "finalizers"
 	RoleTemplateFieldHidden          = "hidden"
@@ -29,6 +30,7 @@ type RoleTemplate struct {
 	Builtin         *bool             `json:"builtin,omitempty"`
 	Created         string            `json:"created,omitempty"`
 	CreatorID       string            `json:"creatorId,omitempty"`
+	Description     string            `json:"description,omitempty"`
 	External        *bool             `json:"external,omitempty"`
 	Finalizers      []string          `json:"finalizers,omitempty"`
 	Hidden          *bool             `json:"hidden,omitempty"`

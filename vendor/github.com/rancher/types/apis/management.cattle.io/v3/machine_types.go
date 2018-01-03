@@ -93,12 +93,12 @@ type MachineCondition struct {
 
 type MachineSpec struct {
 	NodeSpec             v1.NodeSpec `json:"nodeSpec"`
+	Description          string      `json:"description,omitempty"`
 	DisplayName          string      `json:"displayName,omitempty"`
 	RequestedHostname    string      `json:"requestedHostname,omitempty" norman:"noupdate"`
 	RequestedClusterName string      `json:"requestedClusterName,omitempty" norman:"type=reference[cluster],noupdate"`
 	RequestedRoles       []string    `json:"requestedRoles,omitempty" norman:"noupdate"`
 	MachineTemplateName  string      `json:"machineTemplateName,omitempty" norman:"type=reference[machineTemplate],noupdate"`
-	Description          string      `json:"description,omitempty"`
 }
 
 type MachineCommonParams struct {

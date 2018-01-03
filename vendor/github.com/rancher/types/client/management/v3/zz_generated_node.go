@@ -11,6 +11,7 @@ const (
 	NodeFieldCapacity             = "capacity"
 	NodeFieldCreated              = "created"
 	NodeFieldCreatorID            = "creatorId"
+	NodeFieldDescription          = "description"
 	NodeFieldFinalizers           = "finalizers"
 	NodeFieldHostname             = "hostname"
 	NodeFieldIPAddress            = "ipAddress"
@@ -38,6 +39,7 @@ type Node struct {
 	Capacity             map[string]string         `json:"capacity,omitempty"`
 	Created              string                    `json:"created,omitempty"`
 	CreatorID            string                    `json:"creatorId,omitempty"`
+	Description          string                    `json:"description,omitempty"`
 	Finalizers           []string                  `json:"finalizers,omitempty"`
 	Hostname             string                    `json:"hostname,omitempty"`
 	IPAddress            string                    `json:"ipAddress,omitempty"`

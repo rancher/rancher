@@ -11,6 +11,7 @@ const (
 	ProjectFieldConditions                  = "conditions"
 	ProjectFieldCreated                     = "created"
 	ProjectFieldCreatorID                   = "creatorId"
+	ProjectFieldDescription                 = "description"
 	ProjectFieldFinalizers                  = "finalizers"
 	ProjectFieldId                          = "id"
 	ProjectFieldLabels                      = "labels"
@@ -32,6 +33,7 @@ type Project struct {
 	Conditions                  []ProjectCondition `json:"conditions,omitempty"`
 	Created                     string             `json:"created,omitempty"`
 	CreatorID                   string             `json:"creatorId,omitempty"`
+	Description                 string             `json:"description,omitempty"`
 	Finalizers                  []string           `json:"finalizers,omitempty"`
 	Id                          string             `json:"id,omitempty"`
 	Labels                      map[string]string  `json:"labels,omitempty"`

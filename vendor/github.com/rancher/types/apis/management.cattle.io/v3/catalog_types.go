@@ -16,6 +16,7 @@ type Catalog struct {
 }
 
 type CatalogSpec struct {
+	Description string `json:"description"`
 	URL         string `json:"url,omitempty"`
 	Branch      string `json:"branch,omitempty"`
 	CatalogKind string `json:"catalogKind,omitempty"`

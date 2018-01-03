@@ -7,6 +7,7 @@ import (
 )
 
 type WorkloadSpec struct {
+	Description  string             `json:"description"`
 	DeployConfig DeployConfig       `json:"deployConfig"`
 	Template     v1.PodTemplateSpec `json:"template"`
 	ServiceLinks []Link             `json:"serviceLinks"`
@@ -70,6 +71,7 @@ type ServiceAccountToken struct {
 
 	AccountName string `json:"accountName"`
 	AccountUID  string `json:"accountUid"`
+	Description string `json:"description"`
 	Token       string `json:"token" norman:"writeOnly"`
 	CACRT       string `json:"caCrt"`
 }
@@ -81,14 +83,16 @@ type DockerCredential struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Registries map[string]RegistryCredential `json:"registries"`
+	Description string                        `json:"description"`
+	Registries  map[string]RegistryCredential `json:"registries"`
 }
 type NamespacedDockerCredential DockerCredential
 
 type RegistryCredential struct {
-	Username string `json:"username"`
-	Password string `json:"password" norman:"writeOnly"`
-	Auth     string `json:"auth" norman:"writeOnly"`
+	Description string `json:"description"`
+	Username    string `json:"username"`
+	Password    string `json:"password" norman:"writeOnly"`
+	Auth        string `json:"auth" norman:"writeOnly"`
 }
 
 type Certificate struct {
@@ -97,19 +101,20 @@ type Certificate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Certs string `json:"certs"`
-	Key   string `json:"key" norman:"writeOnly"`
+	Description string `json:"description"`
+	Certs       string `json:"certs"`
+	Key         string `json:"key" norman:"writeOnly"`
 
-	CertFingerprint         string `json:"certFingerprint" norman:"nocreate,noupdate"`
-	CN                      string `json:"cn" norman:"nocreate,noupdate"`
-	Version                 string `json:"version" norman:"nocreate,noupdate"`
-	ExpiresAt               string `json:"expiresAt" norman:"nocreate,noupdate"`
-	Issuer                  string `json:"issuer" norman:"nocreate,noupdate"`
-	IssuedAt                string `json:"issuedAt" norman:"nocreate,noupdate"`
-	Algorithm               string `json:"algorithm" norman:"nocreate,noupdate"`
-	SerialNumber            string `json:"serialNumber" norman:"nocreate,noupdate"`
-	KeySize                 string `json:"keySize" norman:"nocreate,noupdate"`
-	SubjectAlternativeNames string `json:"subjectAlternativeNames" norman:"nocreate,noupdate"`
+	CertFingerprint         string   `json:"certFingerprint" norman:"nocreate,noupdate"`
+	CN                      string   `json:"cn" norman:"nocreate,noupdate"`
+	Version                 string   `json:"version" norman:"nocreate,noupdate"`
+	ExpiresAt               string   `json:"expiresAt" norman:"nocreate,noupdate"`
+	Issuer                  string   `json:"issuer" norman:"nocreate,noupdate"`
+	IssuedAt                string   `json:"issuedAt" norman:"nocreate,noupdate"`
+	Algorithm               string   `json:"algorithm" norman:"nocreate,noupdate"`
+	SerialNumber            string   `json:"serialNumber" norman:"nocreate,noupdate"`
+	KeySize                 string   `json:"keySize" norman:"nocreate,noupdate"`
+	SubjectAlternativeNames []string `json:"subjectAlternativeNames" norman:"nocreate,noupdate"`
 }
 type NamespacedCertificate Certificate
 
@@ -119,8 +124,9 @@ type BasicAuth struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Username string `json:"username"`
-	Password string `json:"password" norman:"writeOnly"`
+	Description string `json:"description"`
+	Username    string `json:"username"`
+	Password    string `json:"password" norman:"writeOnly"`
 }
 type NamespacedBasicAuth BasicAuth
 
@@ -130,6 +136,7 @@ type SSHAuth struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
+	Description string `json:"description"`
 	PrivateKey  string `json:"privateKey" norman:"writeOnly"`
 	Fingerprint string `json:"certFingerprint" norman:"nocreate,noupdate"`
 }

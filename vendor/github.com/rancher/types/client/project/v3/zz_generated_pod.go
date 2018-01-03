@@ -13,6 +13,7 @@ const (
 	PodFieldCreated                       = "created"
 	PodFieldCreatorID                     = "creatorId"
 	PodFieldDNSPolicy                     = "dnsPolicy"
+	PodFieldDescription                   = "description"
 	PodFieldFinalizers                    = "finalizers"
 	PodFieldFsgid                         = "fsgid"
 	PodFieldGids                          = "gids"
@@ -57,6 +58,7 @@ type Pod struct {
 	Created                       string                 `json:"created,omitempty"`
 	CreatorID                     string                 `json:"creatorId,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty"`
+	Description                   string                 `json:"description,omitempty"`
 	Finalizers                    []string               `json:"finalizers,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty"`

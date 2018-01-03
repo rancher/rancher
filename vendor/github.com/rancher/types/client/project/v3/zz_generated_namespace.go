@@ -10,6 +10,7 @@ const (
 	NamespaceFieldAnswers              = "answers"
 	NamespaceFieldCreated              = "created"
 	NamespaceFieldCreatorID            = "creatorId"
+	NamespaceFieldDescription          = "description"
 	NamespaceFieldExternalID           = "externalId"
 	NamespaceFieldFinalizers           = "finalizers"
 	NamespaceFieldLabels               = "labels"
@@ -33,6 +34,7 @@ type Namespace struct {
 	Answers              map[string]interface{} `json:"answers,omitempty"`
 	Created              string                 `json:"created,omitempty"`
 	CreatorID            string                 `json:"creatorId,omitempty"`
+	Description          string                 `json:"description,omitempty"`
 	ExternalID           string                 `json:"externalId,omitempty"`
 	Finalizers           []string               `json:"finalizers,omitempty"`
 	Labels               map[string]string      `json:"labels,omitempty"`
