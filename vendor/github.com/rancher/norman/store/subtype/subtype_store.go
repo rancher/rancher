@@ -1,7 +1,10 @@
 package subtype
 
 import (
+	"strings"
+
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 )
 
 type Store struct {
@@ -21,6 +24,14 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		data["kind"] = p.subType
 	}
 	return p.Store.Create(apiContext, schema, data)
+}
+
+func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
+	if data != nil {
+		data["kind"] = convert.Uncapitalize(strings.Replace(p.subType, "namespaced", "", 1))
+		data["type"] = data["kind"]
+	}
+	return p.Store.Update(apiContext, schema, data, id)
 }
 
 func (p *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {

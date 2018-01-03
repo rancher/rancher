@@ -183,7 +183,7 @@ func checkFieldCriteria(fieldName string, field types.Field, value interface{}) 
 			}
 
 			if !found {
-				httperror.NewFieldAPIError(httperror.InvalidOption, fieldName, "")
+				return httperror.NewFieldAPIError(httperror.InvalidOption, fieldName, "")
 			}
 		}
 	}
@@ -191,7 +191,7 @@ func checkFieldCriteria(fieldName string, field types.Field, value interface{}) 
 	if len(field.ValidChars) > 0 && hasStrVal {
 		for _, c := range strVal {
 			if !strings.ContainsRune(field.ValidChars, c) {
-				httperror.NewFieldAPIError(httperror.InvalidCharacters, fieldName, "")
+				return httperror.NewFieldAPIError(httperror.InvalidCharacters, fieldName, "")
 			}
 
 		}
@@ -199,7 +199,7 @@ func checkFieldCriteria(fieldName string, field types.Field, value interface{}) 
 
 	if len(field.InvalidChars) > 0 && hasStrVal {
 		if strings.ContainsAny(strVal, field.InvalidChars) {
-			httperror.NewFieldAPIError(httperror.InvalidCharacters, fieldName, "")
+			return httperror.NewFieldAPIError(httperror.InvalidCharacters, fieldName, "")
 		}
 	}
 
