@@ -9,6 +9,9 @@ import (
 )
 
 func Transform(context *types.APIContext, data map[string]interface{}) (map[string]interface{}, error) {
+	if data == nil {
+		return data, nil
+	}
 	mapping, err := workload.OwnerMap(context)
 	if err != nil {
 		return nil, err

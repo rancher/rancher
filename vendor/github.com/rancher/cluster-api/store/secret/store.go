@@ -32,6 +32,9 @@ func NewSecretStore(k8sClient rest.Interface, schemas *types.Schemas) *Store {
 				"Secret",
 				"secrets"),
 			Transformer: func(apiContext *types.APIContext, data map[string]interface{}) (map[string]interface{}, error) {
+				if data == nil {
+					return data, nil
+				}
 				parts := strings.Split(convert.ToString(data["type"]), "/")
 				parts[len(parts)-1] = "namespaced" + convert.Capitalize(parts[len(parts)-1])
 				data["type"] = strings.Join(parts, "/")
