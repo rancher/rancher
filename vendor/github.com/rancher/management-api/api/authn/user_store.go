@@ -39,11 +39,13 @@ func (s *userStore) Create(apiContext *types.APIContext, schema *types.Schema, d
 		return nil, err
 	}
 
-	if pids, ok := created[client.UserFieldPrincipalIDs].([]interface{}); ok {
-		if id, ok := created[client.UserFieldId].(string); ok {
-			created[client.UserFieldPrincipalIDs] = append(pids, "local://"+id)
-			return s.Update(apiContext, schema, created, id)
+	if id, ok := created[client.UserFieldId].(string); ok {
+		var principalIDs []interface{}
+		if pids, ok := created[client.UserFieldPrincipalIDs].([]interface{}); ok {
+			principalIDs = pids
 		}
+		created[client.UserFieldPrincipalIDs] = append(principalIDs, "local://"+id)
+		return s.Update(apiContext, schema, created, id)
 	}
 
 	return created, err
