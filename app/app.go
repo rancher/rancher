@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/server"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -137,5 +138,80 @@ func addData(management *config.ManagementContext) error {
 			GlobalRoleName: "admin",
 		})
 
-	return nil
+	return addMachineDrivers(management)
+}
+
+func addMachineDrivers(management *config.ManagementContext) error {
+	if err := addMachineDriver("amazonec2", "local://", "", true, true, management); err != nil {
+		return err
+	}
+	if err := addMachineDriver("azure", "local://", "", true, true, management); err != nil {
+		return err
+	}
+	if err := addMachineDriver("digitalocean", "local://", "", true, true, management); err != nil {
+		return err
+	}
+	if err := addMachineDriver("exoscale", "local://", "", false, true, management); err != nil {
+		return err
+	}
+	if err := addMachineDriver("generic", "local://", "", false, true, management); err != nil {
+		return err
+	}
+	if err := addMachineDriver("google", "local://", "", false, true, management); err != nil {
+		return err
+	}
+	if err := addMachineDriver("openstack", "local://", "", false, true, management); err != nil {
+		return err
+	}
+	if err := addMachineDriver("otc", "https://obs.otc.t-systems.com/dockermachinedriver/docker-machine-driver-otc",
+		"e98f246f625ca46f5e037dc29bdf00fe", false, false, management); err != nil {
+		return err
+	}
+	if err := addMachineDriver("packet", "https://github.com/packethost/docker-machine-driver-packet/releases/download/v0.1.2/docker-machine-driver-packet_linux-amd64.zip",
+		"cd610cd7d962dfdf88a811ec026bcdcf", true, false, management); err != nil {
+		return err
+	}
+	if err := addMachineDriver("rackspace", "local://", "", false, true, management); err != nil {
+		return err
+	}
+	if err := addMachineDriver("softlayer", "local://", "", false, true, management); err != nil {
+		return err
+	}
+	if err := addMachineDriver("vmwarevcloudair", "local://", "", false, true, management); err != nil {
+		return err
+	}
+
+	return addMachineDriver("vmwarevsphere", "local://", "", true, true, management)
+}
+
+func addMachineDriver(name, url, checksum string, active, builtin bool, management *config.ManagementContext) error {
+	lister := management.Management.MachineDrivers("").Controller().Lister()
+	cli := management.Management.MachineDrivers("")
+	m, _ := lister.Get("", name)
+	if m != nil {
+		if m.Spec.Builtin != builtin || m.Spec.URL != url || m.Spec.Checksum != checksum {
+			logrus.Infof("Updating machine driver %v", name)
+			m.Spec.Builtin = builtin
+			m.Spec.URL = url
+			m.Spec.Checksum = checksum
+			_, err := cli.Update(m)
+			return err
+		}
+		return nil
+	}
+
+	logrus.Infof("Creating machine driver %v", name)
+	_, err := cli.Create(&v3.MachineDriver{
+		ObjectMeta: v1.ObjectMeta{
+			Name: name,
+		},
+		Spec: v3.MachineDriverSpec{
+			Active:   active,
+			Builtin:  builtin,
+			URL:      url,
+			Checksum: checksum,
+		},
+	})
+
+	return err
 }
