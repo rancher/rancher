@@ -12,8 +12,8 @@ var (
 <!DOCTYPE html>
 <!-- If you are reading this, there is a good chance you would prefer sending an
 "Accept: application/json" header and receiving actual JSON responses. -->
-<link rel="stylesheet" type="text/css" href="https://releases.rancher.com/api-ui/1.1.3/ui.min.css" />
-<script src="https://releases.rancher.com/api-ui/1.1.3/ui.min.js"></script>
+<link rel="stylesheet" type="text/css" href="https://releases.rancher.com/api-ui/1.1.4/ui.min.css" />
+<script src="https://releases.rancher.com/api-ui/1.1.4/ui.min.js"></script>
 <script>
 var user = "admin";
 var curlUser='${CATTLE_ACCESS_KEY}:${CATTLE_SECRET_KEY}';
