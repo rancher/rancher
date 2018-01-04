@@ -54,12 +54,21 @@ func Schemas(ctx context.Context, app *config.ClusterContext, schemas *types.Sch
 
 func Namespace(k8sClient rest.Interface, schemas *types.Schemas) {
 	schema := schemas.Schema(&schema.Version, "namespace")
-	schema.Store = proxy.NewProxyStore(k8sClient,
-		[]string{"api"},
-		"",
-		"v1",
-		"Namespace",
-		"namespaces")
+	schema.Store = &transform.Store{
+		Store: proxy.NewProxyStore(k8sClient,
+			[]string{"api"},
+			"",
+			"v1",
+			"Namespace",
+			"namespaces"),
+		Transformer: func(apiContext *types.APIContext, data map[string]interface{}) (map[string]interface{}, error) {
+			anns, _ := data["annotations"].(map[string]interface{})
+			if anns["management.cattle.io/system-namespace"] == "true" {
+				return nil, nil
+			}
+			return data, nil
+		},
+	}
 
 	clusterSchema := schemas.Schema(&clusterSchema.Version, "namespace")
 	clusterSchema.Store = schema.Store

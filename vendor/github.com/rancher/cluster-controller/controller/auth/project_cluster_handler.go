@@ -161,6 +161,9 @@ func (m *mgr) reconcileResourceToNamespace(obj runtime.Object) (runtime.Object, 
 			_, err := nsClient.Create(&v12.Namespace{
 				ObjectMeta: v1.ObjectMeta{
 					Name: o.GetName(),
+					Annotations: map[string]string{
+						"management.cattle.io/system-namespace": "true",
+					},
 					OwnerReferences: []v1.OwnerReference{
 						{
 							APIVersion: t.GetAPIVersion(),
