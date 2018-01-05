@@ -39,7 +39,7 @@ func (a *AccessControl) Filter(apiContext *types.APIContext, obj map[string]inte
 func (a *AccessControl) canAccess(obj map[string]interface{}, permset ListPermissionSet) bool {
 	namespace, _ := obj["namespace"].(string)
 	id, _ := obj["id"].(string)
-	if permset.Access(namespace, "*") {
+	if permset.Access(namespace, "*") || permset.Access("*", "*") {
 		return true
 	}
 	return permset.Access(namespace, id)
