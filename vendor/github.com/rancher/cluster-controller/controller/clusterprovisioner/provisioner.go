@@ -72,7 +72,7 @@ func (p *Provisioner) Remove(cluster *v3.Cluster) (*v3.Cluster, error) {
 
 func (p *Provisioner) Updated(cluster *v3.Cluster) (*v3.Cluster, error) {
 	if v3.ClusterConditionProvisioned.IsTrue(cluster) && configChanged(cluster) {
-		return p.reconcileCluster(cluster)
+		return p.reconcileCluster(cluster, false)
 	}
 	return cluster, nil
 }
@@ -81,17 +81,24 @@ func (p *Provisioner) Create(cluster *v3.Cluster) (*v3.Cluster, error) {
 	if v3.ClusterConditionProvisioned.IsTrue(cluster) {
 		return cluster, nil
 	}
-	return p.reconcileCluster(cluster)
+	return p.reconcileCluster(cluster, true)
 }
 
-func (p *Provisioner) reconcileCluster(cluster *v3.Cluster) (*v3.Cluster, error) {
+func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cluster, error) {
 	newObj, err := v3.ClusterConditionProvisioned.Do(cluster, func() (runtime.Object, error) {
 		if needToProvision(cluster) {
 			logrus.Infof("Provisioning cluster [%s]", cluster.Name)
-			apiEndpoint, serviceAccountToken, caCert, err := driver.Update(cluster.Name, cluster.Spec)
+			var apiEndpoint, serviceAccountToken, caCert string
+			var err error
+			if create {
+				apiEndpoint, serviceAccountToken, caCert, err = driver.Create(cluster.Name, cluster.Spec)
+			} else {
+				apiEndpoint, serviceAccountToken, caCert, err = driver.Update(cluster.Name, cluster.Spec)
+			}
 			if err != nil {
 				return cluster, errors.Wrapf(err, "Failed to provision cluster [%s]", cluster.Name)
 			}
+
 			cluster.Status.AppliedSpec = cluster.Spec
 			cluster.Status.APIEndpoint = apiEndpoint
 			cluster.Status.ServiceAccountToken = serviceAccountToken

@@ -28,7 +28,10 @@ func generateKey() (string, error) {
 func sanitizeKey(key string) string {
 	re := regexp.MustCompile("[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*")
 	submatches := re.FindAllString(key, -1)
-	return strings.Join(submatches, "")
+	submatchJoin := strings.Join(submatches, "")
+	submatchJoin = strings.Trim(submatchJoin, "-")
+	submatchJoin = strings.Trim(submatchJoin, ".")
+	return submatchJoin
 }
 
 func getAuthProviderName(principalID string) string {
