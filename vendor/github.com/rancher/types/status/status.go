@@ -129,38 +129,38 @@ func Set(data map[string]interface{}) {
 	}
 
 	if state == "" {
+		val, ok := values.GetValue(data, "spec", "active")
+		if ok {
+			if convert.ToBool(val) {
+				state = "active"
+			} else {
+				state = "inactive"
+			}
+		}
+	}
+
+	if state == "" {
+		val, _ := values.GetValueN(data, "status", "phase").(string)
+		if val != "" {
+			state = val
+		}
+	}
+
+	if state == "" && len(conditions) == 0 {
 		if val, ok := values.GetValue(data, "metadata", "created"); ok {
 			if i, err := convert.ToTimestamp(val); err == nil {
 				if time.Unix(i/1000, 0).Add(5 * time.Second).Before(time.Now()) {
-					if state == "" {
-						val, _ := values.GetValueN(data, "status", "phase").(string)
-						if val != "" {
-							state = val
-						}
-					}
-
-					if state == "" {
-						val, ok := values.GetValue(data, "spec", "active")
-						if ok {
-							if convert.ToBool(val) {
-								state = "active"
-							} else {
-								state = "inactive"
-							}
-						}
-					}
-
-					if state == "" {
-						state = "active"
-					}
+					state = "active"
+				} else {
+					state = "initializing"
+					transitioning = true
 				}
 			}
 		}
+	}
 
-		if state == "" {
-			state = "initializing"
-			transitioning = true
-		}
+	if state == "" {
+		state = "active"
 	}
 
 	data["state"] = strings.ToLower(state)
