@@ -20,6 +20,9 @@ ENV DOCKER_URL_amd64=https://get.docker.com/builds/Linux/x86_64/docker-1.10.3 \
 
 RUN wget -O - ${!DOCKER_URL} > /usr/bin/docker && chmod +x /usr/bin/docker
 
+RUN apt-get update && \
+    apt-get install -y tox python2.7
+
 ENV DAPPER_ENV REPO TAG
 ENV DAPPER_SOURCE /go/src/github.com/rancher/rancher/
 ENV DAPPER_OUTPUT ./bin ./dist
