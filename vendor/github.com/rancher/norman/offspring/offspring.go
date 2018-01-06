@@ -245,7 +245,7 @@ func (w *Reconciliation) Changed(key string, obj runtime.Object) (runtime.Object
 		objectSet ObjectSet
 	)
 
-	if obj == nil {
+	if obj == nil || reflect.ValueOf(obj).IsNil() {
 		objectSet.Complete = true
 	} else {
 		objectSet, err = w.Generator(obj)
