@@ -1,11 +1,40 @@
 #!/bin/bash
 set -e
 
+cleanup()
+{
+    EXIT=$?
+    #kill $PID
+    return $EXIT
+}
+
 cd $(dirname $0)/..
+
+CMD=bin/rancher
+
+if [ ! -x $CMD ]; then
+    ./scripts/build
+fi
 
 echo Running tests
 
-PACKAGES=". $(find -name '*.go' | xargs -I{} dirname {} |  cut -f2 -d/ | sort -u | grep -Ev '(^\.$|.git|.trash-cache|vendor|bin)' | sed -e 's!^!./!' -e 's!$!/...!')"
+#PACKAGES=". $(find -name '*.go' | xargs -I{} dirname {} |  cut -f2 -d/ | sort -u | grep -Ev '(^\.$|.git|.trash-cache|vendor|bin)' | sed -e 's!^!./!' -e 's!$!/...!')"
+#
+#[ "${ARCH}" == "amd64" ] && RACE=-race
+#go test ${RACE} -cover -tags=test ${PACKAGES}
 
-[ "${ARCH}" == "amd64" ] && RACE=-race
-go test ${RACE} -cover -tags=test ${PACKAGES}
+rm -rf build/testdata
+mkdir -p build/testdata
+cd build/testdata
+KUBECONFIG= ../../$CMD --add-local &
+PID=$!
+trap cleanup exit
+cd ../..
+
+
+while ! curl -sf http://localhost:8080/ping; do
+    sleep 2
+done
+
+cd tests
+tox -- -n $(nproc)

@@ -1,0 +1,12 @@
+cattle==0.5.3
+git+https://github.com/ibuildthecloud/gdapi-python.git@3b34a117b1f3c1b37c15b9a981f832e2c5983302
+websocket-client==0.23.0
+PyJWT==1.4.0
+
+flake8==2.5.1
+pytest==3.0.2
+pytest-repeat
+pytest-xdist
+pyyaml
+netaddr
+requests
