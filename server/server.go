@@ -48,6 +48,8 @@ func New(ctx context.Context, management *config.ManagementContext) (http.Handle
 	unauthed.PathPrefix("/v3").Handler(authedHandler)
 	unauthed.PathPrefix("/meta").Handler(authedHandler)
 
+	registerHealth(unauthed)
+
 	return unauthed, nil
 }
 
