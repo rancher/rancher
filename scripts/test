@@ -4,7 +4,7 @@ set -e
 cleanup()
 {
     EXIT=$?
-    #kill $PID
+    kill $PID
     return $EXIT
 }
 
