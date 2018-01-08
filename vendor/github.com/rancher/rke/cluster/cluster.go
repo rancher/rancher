@@ -165,6 +165,12 @@ func (c *Cluster) setClusterServicesDefaults() {
 		&c.Services.Kubelet.ClusterDomain:                DefaultClusterDomain,
 		&c.Services.Kubelet.InfraContainerImage:          DefaultInfraContainerImage,
 		&c.Authentication.Strategy:                       DefaultAuthStrategy,
+		&c.Services.KubeAPI.Image:                        DefaultK8sImage,
+		&c.Services.Scheduler.Image:                      DefaultK8sImage,
+		&c.Services.KubeController.Image:                 DefaultK8sImage,
+		&c.Services.Kubelet.Image:                        DefaultK8sImage,
+		&c.Services.Kubeproxy.Image:                      DefaultK8sImage,
+		&c.Services.Etcd.Image:                           DefaultEtcdImage,
 	}
 	for k, v := range serviceConfigDefaultsMap {
 		setDefaultIfEmpty(k, v)

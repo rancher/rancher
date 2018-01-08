@@ -14,12 +14,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+const creatorIDAnn = "field.cattle.io/creatorId"
+
 func newPandCLifecycles(management *config.ManagementContext) (*projectLifecycle, *clusterLifecycle) {
 	m := &mgr{
-		mgmt:       management,
-		nsLister:   management.Core.Namespaces("").Controller().Lister(),
-		prtbLister: management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
-		crtbLister: management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
+		mgmt:          management,
+		nsLister:      management.Core.Namespaces("").Controller().Lister(),
+		prtbLister:    management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
+		crtbLister:    management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
+		projectLister: management.Management.Projects("").Controller().Lister(),
 	}
 	p := &projectLifecycle{
 		mgr: m,
@@ -66,12 +69,22 @@ func (l *clusterLifecycle) Create(obj *v3.Cluster) (*v3.Cluster, error) {
 		return obj, err
 	}
 
+	_, err = l.mgr.createDefaultProject(obj)
+	if err != nil {
+		return obj, err
+	}
+
 	_, err = l.mgr.reconcileCreatorRTB(obj)
 	return obj, err
 }
 
 func (l *clusterLifecycle) Updated(obj *v3.Cluster) (*v3.Cluster, error) {
 	_, err := l.mgr.reconcileResourceToNamespace(obj)
+	if err != nil {
+		return obj, err
+	}
+
+	_, err = l.mgr.createDefaultProject(obj)
 	return obj, err
 }
 
@@ -80,10 +93,47 @@ func (l *clusterLifecycle) Remove(obj *v3.Cluster) (*v3.Cluster, error) {
 }
 
 type mgr struct {
-	mgmt       *config.ManagementContext
-	nsLister   corev1.NamespaceLister
+	mgmt          *config.ManagementContext
+	nsLister      corev1.NamespaceLister
+	projectLister v3.ProjectLister
+
 	prtbLister v3.ProjectRoleTemplateBindingLister
 	crtbLister v3.ClusterRoleTemplateBindingLister
+}
+
+func (m *mgr) createDefaultProject(obj *v3.Cluster) (runtime.Object, error) {
+	return v3.ClusterConditionconditionDefautlProjectCreated.DoUntilTrue(obj, func() (runtime.Object, error) {
+		p, _ := m.projectLister.Get(obj.Name, "default")
+		if p != nil {
+			return obj, nil
+		}
+		metaAccessor, err := meta.Accessor(obj)
+		if err != nil {
+			return obj, err
+		}
+
+		creatorID, ok := metaAccessor.GetAnnotations()[creatorIDAnn]
+		if !ok {
+			logrus.Warnf("Cluster %v has no creatorId annotation. Cannot create default project", metaAccessor.GetName())
+			return obj, nil
+		}
+
+		_, err = m.mgmt.Management.Projects(obj.Name).Create(&v3.Project{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "default",
+				Annotations: map[string]string{
+					creatorIDAnn: creatorID,
+				},
+			},
+			Spec: v3.ProjectSpec{
+				DisplayName: "Default",
+				Description: "Default project created for the cluster",
+				ClusterName: obj.Name,
+			},
+		})
+
+		return obj, err
+	})
 }
 
 func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
@@ -98,7 +148,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 			return obj, err
 		}
 
-		creatorID, ok := metaAccessor.GetAnnotations()["field.cattle.io/creatorId"]
+		creatorID, ok := metaAccessor.GetAnnotations()[creatorIDAnn]
 		if !ok {
 			logrus.Warnf("%v %v has no creatorId annotation. Cannot add creator as owner", typeAccessor.GetKind(), metaAccessor.GetName())
 			return obj, nil

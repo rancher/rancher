@@ -9,11 +9,14 @@ import (
 	"github.com/rancher/auth/tokens"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type tokenAuthenticator struct {
-	ctx    context.Context
-	tokens v3.TokenLister
+	ctx         context.Context
+	tokens      v3.TokenLister
+	tokenClient v3.TokenInterface
 }
 
 const (
@@ -66,7 +69,15 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (bool, string, []st
 func (a *tokenAuthenticator) getTokenCR(tokenID string) (*v3.Token, error) {
 	storedToken, err := a.tokens.Get("", tokenID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve auth token, error: %v", err)
+		if e, ok := err.(*errors.StatusError); ok && e.ErrStatus.Code == 404 {
+			storedToken, err2 := a.tokenClient.Get(tokenID, v1.GetOptions{})
+			if err2 != nil {
+				return nil, fmt.Errorf("failed to retrieve auth token2, error: %#v", err)
+			}
+			return storedToken, nil
+
+		}
+		return nil, fmt.Errorf("failed to retrieve auth token1, error: %v", err)
 	}
 
 	logrus.Debugf("storedToken token resource: %v", storedToken)
