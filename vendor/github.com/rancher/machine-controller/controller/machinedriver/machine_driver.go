@@ -153,27 +153,37 @@ func (m *Lifecycle) createOrUpdateMachineForEmbeddedTypeWithParents(embeddedType
 		}
 		return nil
 	}
+	shouldUpdate := false
 	if embedded {
-		// if embedded we add the type to schema
-		logrus.Infof("uploading %s to machine schema", fieldName)
 		if machineSchema.Spec.ResourceFields == nil {
 			machineSchema.Spec.ResourceFields = map[string]v3.Field{}
 		}
-		machineSchema.Spec.ResourceFields[fieldName] = v3.Field{
-			Create:   true,
-			Nullable: true,
-			Update:   true,
-			Type:     embeddedType,
+		if _, ok := machineSchema.Spec.ResourceFields[fieldName]; !ok {
+			// if embedded we add the type to schema
+			logrus.Infof("uploading %s to machine schema", fieldName)
+			machineSchema.Spec.ResourceFields[fieldName] = v3.Field{
+				Create:   true,
+				Nullable: true,
+				Update:   true,
+				Type:     embeddedType,
+			}
+			shouldUpdate = true
 		}
 	} else {
 		// if not we delete it from schema
-		logrus.Infof("deleting %s from machine schema", fieldName)
-		delete(machineSchema.Spec.ResourceFields, fieldName)
+		if _, ok := machineSchema.Spec.ResourceFields[fieldName]; ok {
+			logrus.Infof("deleting %s from machine schema", fieldName)
+			delete(machineSchema.Spec.ResourceFields, fieldName)
+			shouldUpdate = true
+		}
 	}
 
-	_, err = m.schemaClient.Update(machineSchema)
-	if err != nil {
-		return err
+	if shouldUpdate {
+		_, err = m.schemaClient.Update(machineSchema)
+		if err != nil {
+			return err
+		}
 	}
+
 	return nil
 }
