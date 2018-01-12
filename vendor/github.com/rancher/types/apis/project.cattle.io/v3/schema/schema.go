@@ -35,8 +35,17 @@ var (
 		Init(replicaSet).
 		Init(replicationController).
 		Init(daemonSet).
-		Init(workloadTypes)
+		Init(workloadTypes).
+		Init(configMapTypes)
 )
+
+func configMapTypes(schemas *types.Schemas) *types.Schemas {
+	return ConfigMapTypes(&Version, schemas)
+}
+
+func ConfigMapTypes(version *types.APIVersion, schemas *types.Schemas) *types.Schemas {
+	return schemas.MustImport(version, v1.ConfigMap{})
+}
 
 func namespaceTypes(schemas *types.Schemas) *types.Schemas {
 	return NamespaceTypes(&Version, schemas)

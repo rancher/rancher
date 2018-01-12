@@ -30,6 +30,7 @@ type Client struct {
 	Token                      TokenOperations
 	User                       UserOperations
 	DynamicSchema              DynamicSchemaOperations
+	Stack                      StackOperations
 }
 
 func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
@@ -65,6 +66,7 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.Token = newTokenClient(client)
 	client.User = newUserClient(client)
 	client.DynamicSchema = newDynamicSchemaClient(client)
+	client.Stack = newStackClient(client)
 
 	return client, nil
 }

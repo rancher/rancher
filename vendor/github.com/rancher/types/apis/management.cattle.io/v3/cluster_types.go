@@ -43,6 +43,7 @@ type Cluster struct {
 
 type ClusterSpec struct {
 	Nodes                                []MachineConfig                `json:"nodes"`
+	DisplayName                          string                         `json:"displayName"`
 	Description                          string                         `json:"description"`
 	Internal                             bool                           `json:"internal" norman:"nocreate,noupdate"`
 	GoogleKubernetesEngineConfig         *GoogleKubernetesEngineConfig  `json:"googleKubernetesEngineConfig,omitempty"`

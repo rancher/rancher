@@ -40,7 +40,7 @@ func (c *Manager) APIServer(ctx context.Context, cluster *client.Cluster) http.H
 		return obj.(*record).handler
 	}
 
-	server, err := c.toServer(ctx, cluster)
+	server, err := c.toServer(cluster)
 	if server == nil || err != nil {
 		if err != nil {
 			logrus.Errorf("Failed to load cluster %s: %v", cluster.Name, err)
@@ -94,7 +94,7 @@ func (c *Manager) toRESTConfig(cluster *client.Cluster) (*rest.Config, error) {
 	}, nil
 }
 
-func (c *Manager) toServer(ctx context.Context, cluster *client.Cluster) (*record, error) {
+func (c *Manager) toServer(cluster *client.Cluster) (*record, error) {
 	kubeConfig, err := c.toRESTConfig(cluster)
 	if kubeConfig == nil || err != nil {
 		return nil, err
@@ -106,14 +106,14 @@ func (c *Manager) toServer(ctx context.Context, cluster *client.Cluster) (*recor
 	}
 
 	s := &record{}
-	s.ctx, s.cancel = context.WithCancel(ctx)
+	s.ctx, s.cancel = context.WithCancel(context.Background())
 
 	s.handler, err = clusterapi.New(s.ctx, clusterContext)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := clusterContext.Start(ctx); err != nil {
+	if err := clusterContext.Start(s.ctx); err != nil {
 		return s, err
 	}
 	return s, nil

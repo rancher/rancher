@@ -24,6 +24,7 @@ type Host struct {
 	EnforceDockerVersion bool
 	ToAddEtcdMember      bool
 	ExistingEtcdCluster  bool
+	SavedKeyPhrase       string
 }
 
 const (

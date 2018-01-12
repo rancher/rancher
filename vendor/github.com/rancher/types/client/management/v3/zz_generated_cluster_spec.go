@@ -6,6 +6,7 @@ const (
 	ClusterSpecFieldDefaultClusterRoleForProjectMembers = "defaultClusterRoleForProjectMembers"
 	ClusterSpecFieldDefaultPodSecurityPolicyTemplateId  = "defaultPodSecurityPolicyTemplateId"
 	ClusterSpecFieldDescription                         = "description"
+	ClusterSpecFieldDisplayName                         = "displayName"
 	ClusterSpecFieldGoogleKubernetesEngineConfig        = "googleKubernetesEngineConfig"
 	ClusterSpecFieldInternal                            = "internal"
 	ClusterSpecFieldNodes                               = "nodes"
@@ -17,6 +18,7 @@ type ClusterSpec struct {
 	DefaultClusterRoleForProjectMembers string                         `json:"defaultClusterRoleForProjectMembers,omitempty"`
 	DefaultPodSecurityPolicyTemplateId  string                         `json:"defaultPodSecurityPolicyTemplateId,omitempty"`
 	Description                         string                         `json:"description,omitempty"`
+	DisplayName                         string                         `json:"displayName,omitempty"`
 	GoogleKubernetesEngineConfig        *GoogleKubernetesEngineConfig  `json:"googleKubernetesEngineConfig,omitempty"`
 	Internal                            *bool                          `json:"internal,omitempty"`
 	Nodes                               []MachineConfig                `json:"nodes,omitempty"`

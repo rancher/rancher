@@ -21,6 +21,7 @@ const (
 	ClusterFieldDescription                         = "description"
 	ClusterFieldDriver                              = "driver"
 	ClusterFieldGoogleKubernetesEngineConfig        = "googleKubernetesEngineConfig"
+	ClusterFieldId                                  = "id"
 	ClusterFieldInternal                            = "internal"
 	ClusterFieldLabels                              = "labels"
 	ClusterFieldLimits                              = "limits"
@@ -54,6 +55,7 @@ type Cluster struct {
 	Description                         string                         `json:"description,omitempty"`
 	Driver                              string                         `json:"driver,omitempty"`
 	GoogleKubernetesEngineConfig        *GoogleKubernetesEngineConfig  `json:"googleKubernetesEngineConfig,omitempty"`
+	Id                                  string                         `json:"id,omitempty"`
 	Internal                            *bool                          `json:"internal,omitempty"`
 	Labels                              map[string]string              `json:"labels,omitempty"`
 	Limits                              map[string]string              `json:"limits,omitempty"`

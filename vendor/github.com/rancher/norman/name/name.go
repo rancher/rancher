@@ -7,6 +7,10 @@ func GuessPluralName(name string) string {
 		return name
 	}
 
+	if strings.EqualFold(name, "Endpoints") {
+		return name
+	}
+
 	if suffix(name, "s") || suffix(name, "ch") || suffix(name, "x") {
 		return name + "es"
 	}

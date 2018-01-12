@@ -25,7 +25,7 @@ func VersionCommand() cli.Command {
 }
 
 func getClusterVersion(ctx *cli.Context) error {
-	localKubeConfig := cluster.GetLocalKubeConfig(ctx.String("config"))
+	localKubeConfig := cluster.GetLocalKubeConfig(ctx.String("config"), "")
 	serverVersion, err := cluster.GetK8sVersion(localKubeConfig)
 	if err != nil {
 		return err
