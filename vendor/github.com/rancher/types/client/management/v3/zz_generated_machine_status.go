@@ -4,7 +4,7 @@ const (
 	MachineStatusType                 = "machineStatus"
 	MachineStatusFieldAllocatable     = "allocatable"
 	MachineStatusFieldCapacity        = "capacity"
-	MachineStatusFieldClusterId       = "clusterId"
+	MachineStatusFieldConditions      = "conditions"
 	MachineStatusFieldHostname        = "hostname"
 	MachineStatusFieldIPAddress       = "ipAddress"
 	MachineStatusFieldInfo            = "info"
@@ -19,7 +19,7 @@ const (
 type MachineStatus struct {
 	Allocatable     map[string]string         `json:"allocatable,omitempty"`
 	Capacity        map[string]string         `json:"capacity,omitempty"`
-	ClusterId       string                    `json:"clusterId,omitempty"`
+	Conditions      []MachineCondition        `json:"conditions,omitempty"`
 	Hostname        string                    `json:"hostname,omitempty"`
 	IPAddress       string                    `json:"ipAddress,omitempty"`
 	Info            *NodeInfo                 `json:"info,omitempty"`

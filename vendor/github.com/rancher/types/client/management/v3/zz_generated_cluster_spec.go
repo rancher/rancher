@@ -8,6 +8,7 @@ const (
 	ClusterSpecFieldDescription                         = "description"
 	ClusterSpecFieldGoogleKubernetesEngineConfig        = "googleKubernetesEngineConfig"
 	ClusterSpecFieldInternal                            = "internal"
+	ClusterSpecFieldNodes                               = "nodes"
 	ClusterSpecFieldRancherKubernetesEngineConfig       = "rancherKubernetesEngineConfig"
 )
 
@@ -18,5 +19,6 @@ type ClusterSpec struct {
 	Description                         string                         `json:"description,omitempty"`
 	GoogleKubernetesEngineConfig        *GoogleKubernetesEngineConfig  `json:"googleKubernetesEngineConfig,omitempty"`
 	Internal                            *bool                          `json:"internal,omitempty"`
+	Nodes                               []MachineConfig                `json:"nodes,omitempty"`
 	RancherKubernetesEngineConfig       *RancherKubernetesEngineConfig `json:"rancherKubernetesEngineConfig,omitempty"`
 }

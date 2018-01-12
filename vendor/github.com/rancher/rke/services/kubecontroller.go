@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/docker/docker/api/types/container"
@@ -10,16 +11,16 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
-func runKubeController(host *hosts.Host, kubeControllerService v3.KubeControllerService, authorizationMode string, df hosts.DialerFactory) error {
+func runKubeController(ctx context.Context, host *hosts.Host, kubeControllerService v3.KubeControllerService, authorizationMode string, df hosts.DialerFactory) error {
 	imageCfg, hostCfg := buildKubeControllerConfig(kubeControllerService, authorizationMode)
-	if err := docker.DoRunContainer(host.DClient, imageCfg, hostCfg, KubeControllerContainerName, host.Address, ControlRole); err != nil {
+	if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, KubeControllerContainerName, host.Address, ControlRole); err != nil {
 		return err
 	}
-	return runHealthcheck(host, KubeControllerPort, false, KubeControllerContainerName, df)
+	return runHealthcheck(ctx, host, KubeControllerPort, false, KubeControllerContainerName, df)
 }
 
-func removeKubeController(host *hosts.Host) error {
-	return docker.DoRemoveContainer(host.DClient, KubeControllerContainerName, host.Address)
+func removeKubeController(ctx context.Context, host *hosts.Host) error {
+	return docker.DoRemoveContainer(ctx, host.DClient, KubeControllerContainerName, host.Address)
 }
 
 func buildKubeControllerConfig(kubeControllerService v3.KubeControllerService, authorizationMode string) (*container.Config, *container.HostConfig) {

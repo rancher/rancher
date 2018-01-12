@@ -39,7 +39,7 @@ func NodeTypes(version *types.APIVersion, schemas *types.Schemas) *types.Schemas
 			&m.Drop{Field: "daemonEndpoints"},
 			&m.Drop{Field: "images"},
 			&m.Drop{Field: "nodeInfo"},
-			&m.Drop{Field: "conditions"},
+			&m.Move{From: "conditions", To: "nodeConditions"},
 			&m.Drop{Field: "phase"},
 			&m.SliceToMap{Field: "volumesAttached", Key: "devicePath"},
 		).

@@ -15,7 +15,6 @@ const (
 	ReplicaSetFieldCreatorID                     = "creatorId"
 	ReplicaSetFieldDNSPolicy                     = "dnsPolicy"
 	ReplicaSetFieldDeploymentStrategy            = "deploymentStrategy"
-	ReplicaSetFieldFinalizers                    = "finalizers"
 	ReplicaSetFieldFsgid                         = "fsgid"
 	ReplicaSetFieldGids                          = "gids"
 	ReplicaSetFieldHostAliases                   = "hostAliases"
@@ -31,6 +30,7 @@ const (
 	ReplicaSetFieldPriority                      = "priority"
 	ReplicaSetFieldPriorityClassName             = "priorityClassName"
 	ReplicaSetFieldProjectID                     = "projectId"
+	ReplicaSetFieldPullPolicy                    = "pullPolicy"
 	ReplicaSetFieldPullSecrets                   = "pullSecrets"
 	ReplicaSetFieldRemoved                       = "removed"
 	ReplicaSetFieldRestart                       = "restart"
@@ -63,7 +63,6 @@ type ReplicaSet struct {
 	CreatorID                     string                 `json:"creatorId,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty"`
 	DeploymentStrategy            *DeployStrategy        `json:"deploymentStrategy,omitempty"`
-	Finalizers                    []string               `json:"finalizers,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty"`
 	HostAliases                   map[string]HostAlias   `json:"hostAliases,omitempty"`
@@ -79,6 +78,7 @@ type ReplicaSet struct {
 	Priority                      *int64                 `json:"priority,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty"`
 	ProjectID                     string                 `json:"projectId,omitempty"`
+	PullPolicy                    string                 `json:"pullPolicy,omitempty"`
 	PullSecrets                   []LocalObjectReference `json:"pullSecrets,omitempty"`
 	Removed                       string                 `json:"removed,omitempty"`
 	Restart                       string                 `json:"restart,omitempty"`

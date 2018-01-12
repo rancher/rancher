@@ -21,7 +21,6 @@ const (
 	MachineTemplateFieldEngineOpt                = "engineOpt"
 	MachineTemplateFieldEngineRegistryMirror     = "engineRegistryMirror"
 	MachineTemplateFieldEngineStorageDriver      = "engineStorageDriver"
-	MachineTemplateFieldFinalizers               = "finalizers"
 	MachineTemplateFieldId                       = "id"
 	MachineTemplateFieldLabels                   = "labels"
 	MachineTemplateFieldName                     = "name"
@@ -51,7 +50,6 @@ type MachineTemplate struct {
 	EngineOpt                map[string]string      `json:"engineOpt,omitempty"`
 	EngineRegistryMirror     []string               `json:"engineRegistryMirror,omitempty"`
 	EngineStorageDriver      string                 `json:"engineStorageDriver,omitempty"`
-	Finalizers               []string               `json:"finalizers,omitempty"`
 	Id                       string                 `json:"id,omitempty"`
 	Labels                   map[string]string      `json:"labels,omitempty"`
 	Name                     string                 `json:"name,omitempty"`

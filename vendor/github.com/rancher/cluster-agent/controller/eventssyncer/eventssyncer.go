@@ -1,67 +1,89 @@
 package eventssyncer
 
 import (
-	"fmt"
+	"strings"
 
-	clusterv1 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/pkg/errors"
+	"github.com/rancher/types/apis/core/v1"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	projectIDLabel = "field.cattle.io/projectId"
+)
+
 type EventsSyncer struct {
-	clusterName   string
-	Clusters      clusterv1.ClusterInterface
-	ClusterEvents clusterv1.ClusterEventInterface
+	clusterName          string
+	clusters             v3.ClusterLister
+	clusterEvents        v3.ClusterEventLister
+	clusterEventsClient  v3.ClusterEventInterface
+	clusterNamespaces    v1.NamespaceLister
+	managementNamespaces v1.NamespaceLister
 }
 
 func Register(workload *config.ClusterContext) {
 	e := &EventsSyncer{
-		clusterName:   workload.ClusterName,
-		Clusters:      workload.Management.Management.Clusters(""),
-		ClusterEvents: workload.Management.Management.ClusterEvents(""),
+		clusterName:          workload.ClusterName,
+		clusters:             workload.Management.Management.Clusters("").Controller().Lister(),
+		clusterEventsClient:  workload.Management.Management.ClusterEvents(""),
+		clusterNamespaces:    workload.Core.Namespaces("").Controller().Lister(),
+		managementNamespaces: workload.Management.Core.Namespaces("").Controller().Lister(),
+		clusterEvents:        workload.Management.Management.ClusterEvents("").Controller().Lister(),
 	}
 	workload.Core.Events("").Controller().AddHandler(e.sync)
 }
 
-func (e *EventsSyncer) sync(key string, event *v1.Event) error {
+func (e *EventsSyncer) sync(key string, event *corev1.Event) error {
 	if event == nil {
 		return nil
 	}
 	return e.createClusterEvent(key, event)
 }
 
-func (e *EventsSyncer) createClusterEvent(key string, event *v1.Event) error {
-	existing, err := e.ClusterEvents.Get(event.Name, metav1.GetOptions{})
-
+func (e *EventsSyncer) createClusterEvent(key string, event *corev1.Event) error {
+	ns, err := e.getEventNamespaceName(event)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logrus.Warnf("Error propagating event [%s]: %v", event.Message, err)
+			return nil
+		}
+		return err
+	}
+	if ns == nil || ns.DeletionTimestamp != nil {
+		return nil
+	}
+	existing, err := e.clusterEvents.Get(ns.Name, event.Name)
 	if err == nil || apierrors.IsNotFound(err) {
 		if existing != nil && existing.Name != "" {
 			return nil
 		}
-		cluster, err := e.Clusters.Get(e.clusterName, metav1.GetOptions{})
+		cluster, err := e.clusters.Get("", e.clusterName)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return nil
 			}
-			return fmt.Errorf("Failed to get cluster [%s] %v", e.clusterName, err)
+			return errors.Wrapf(err, "Failed to get cluster [%s]", e.clusterName)
 		}
-
 		if cluster.DeletionTimestamp != nil {
 			return nil
 		}
+
 		logrus.Infof("Creating cluster event [%s]", event.Message)
-		clusterEvent := e.convertEventToClusterEvent(event, cluster)
-		_, err = e.ClusterEvents.Create(clusterEvent)
+		clusterEvent := e.convertEventToClusterEvent(event, ns)
+		_, err = e.clusterEventsClient.Create(clusterEvent)
 		return err
 	}
 
 	return err
 }
 
-func (e *EventsSyncer) convertEventToClusterEvent(event *v1.Event, cluster *clusterv1.Cluster) *clusterv1.ClusterEvent {
-	clusterEvent := &clusterv1.ClusterEvent{
+func (e *EventsSyncer) convertEventToClusterEvent(event *corev1.Event, ns *corev1.Namespace) *v3.ClusterEvent {
+	clusterEvent := &v3.ClusterEvent{
 		Event: *event,
 	}
 	clusterEvent.APIVersion = "management.cattle.io/v3"
@@ -71,13 +93,39 @@ func (e *EventsSyncer) convertEventToClusterEvent(event *v1.Event, cluster *clus
 		Name:        event.Name,
 		Labels:      event.Labels,
 		Annotations: event.Annotations,
+		Namespace:   ns.Name,
 	}
-	ref := metav1.OwnerReference{
-		Name:       e.clusterName,
-		UID:        cluster.UID,
-		APIVersion: cluster.APIVersion,
-		Kind:       cluster.Kind,
-	}
-	clusterEvent.ObjectMeta.OwnerReferences = append(clusterEvent.ObjectMeta.OwnerReferences, ref)
 	return clusterEvent
+}
+
+func (e *EventsSyncer) getEventNamespaceName(event *corev1.Event) (*corev1.Namespace, error) {
+	involedObjectNamespace := event.InvolvedObject.Namespace
+	if involedObjectNamespace == "" {
+		// cluster namespace, equals to cluster.name
+		namespace, err := e.managementNamespaces.Get("", e.clusterName)
+		if err != nil {
+			return nil, err
+		}
+		return namespace, nil
+	}
+
+	// user namespace, derive from the project id
+	// field.cattle.io/projectId value is <cluster name>:<project name>
+	userNamespace, err := e.clusterNamespaces.Get("", involedObjectNamespace)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed to find user namespace [%s]", e.clusterName)
+	}
+	if userNamespace.Annotations[projectIDLabel] != "" {
+		parts := strings.Split(userNamespace.Annotations[projectIDLabel], ":")
+		if len(parts) == 2 {
+			// project namespace name == project name
+			projectNamespaceName := parts[1]
+			namespace, err := e.managementNamespaces.Get("", projectNamespaceName)
+			if err != nil {
+				return nil, err
+			}
+			return namespace, nil
+		}
+	}
+	return nil, nil
 }

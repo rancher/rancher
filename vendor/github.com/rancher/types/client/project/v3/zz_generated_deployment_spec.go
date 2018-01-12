@@ -20,6 +20,7 @@ const (
 	DeploymentSpecFieldPaused                        = "paused"
 	DeploymentSpecFieldPriority                      = "priority"
 	DeploymentSpecFieldPriorityClassName             = "priorityClassName"
+	DeploymentSpecFieldPullPolicy                    = "pullPolicy"
 	DeploymentSpecFieldPullSecrets                   = "pullSecrets"
 	DeploymentSpecFieldRestart                       = "restart"
 	DeploymentSpecFieldRevisionHistoryLimit          = "revisionHistoryLimit"
@@ -53,6 +54,7 @@ type DeploymentSpec struct {
 	Paused                        *bool                  `json:"paused,omitempty"`
 	Priority                      *int64                 `json:"priority,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty"`
+	PullPolicy                    string                 `json:"pullPolicy,omitempty"`
 	PullSecrets                   []LocalObjectReference `json:"pullSecrets,omitempty"`
 	Restart                       string                 `json:"restart,omitempty"`
 	RevisionHistoryLimit          *int64                 `json:"revisionHistoryLimit,omitempty"`

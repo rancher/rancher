@@ -9,7 +9,6 @@ const (
 	GlobalRoleBindingFieldAnnotations     = "annotations"
 	GlobalRoleBindingFieldCreated         = "created"
 	GlobalRoleBindingFieldCreatorID       = "creatorId"
-	GlobalRoleBindingFieldFinalizers      = "finalizers"
 	GlobalRoleBindingFieldGlobalRoleId    = "globalRoleId"
 	GlobalRoleBindingFieldLabels          = "labels"
 	GlobalRoleBindingFieldName            = "name"
@@ -25,7 +24,6 @@ type GlobalRoleBinding struct {
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	Created         string            `json:"created,omitempty"`
 	CreatorID       string            `json:"creatorId,omitempty"`
-	Finalizers      []string          `json:"finalizers,omitempty"`
 	GlobalRoleId    string            `json:"globalRoleId,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`
 	Name            string            `json:"name,omitempty"`

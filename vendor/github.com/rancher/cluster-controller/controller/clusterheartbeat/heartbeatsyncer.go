@@ -1,58 +1,100 @@
 package clusterheartbeat
 
 import (
+	"context"
+	"sync"
 	"time"
 
-	"github.com/rancher/norman/condition"
+	"github.com/rancher/cluster-agent/utils"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
 	syncInterval = 20 * time.Second
+	msgUnknown   = "Not received heartbeat from cluster-agent"
 )
 
-var clusterToLastUpdated map[string]time.Time
+type updateData struct {
+	updated        bool //True if updated by cluster update from cluster-agent. False if updated by periodic sync.
+	lastUpdateTime time.Time
+}
+
+var (
+	clusterToLastUpdated map[string]*updateData
+	mapLock              = sync.Mutex{}
+)
 
 type HeartBeatSyncer struct {
-	ClusterClient v3.ClusterInterface
+	ClusterLister v3.ClusterLister
 }
 
-func Register(management *config.ManagementContext) {
+func Register(ctx context.Context, management *config.ManagementContext) {
+	clustersClient := management.Management.Clusters("")
+
 	h := &HeartBeatSyncer{
-		ClusterClient: management.Management.Clusters(""),
+		ClusterLister: clustersClient.Controller().Lister(),
 	}
-	management.Management.Clusters("").Controller().AddHandler(h.sync)
+	clustersClient.AddLifecycle(h.GetName(), h)
 
-	clusterToLastUpdated = make(map[string]time.Time)
-	go h.syncHeartBeat(syncInterval)
+	clusterToLastUpdated = make(map[string]*updateData)
+	go h.syncHeartBeat(ctx, syncInterval)
 }
 
-func (h *HeartBeatSyncer) sync(key string, cluster *v3.Cluster) error {
-	logrus.Debugf("Syncing cluster [%s] ", key)
-	if cluster == nil {
-		// cluster has been deleted
-		if _, exists := clusterToLastUpdated[key]; exists {
-			delete(clusterToLastUpdated, key)
-			logrus.Debugf("Cluster [%s] already deleted", key)
-		}
-	} else {
-		condition := getConditionIfReady(cluster)
-		if condition != nil {
-			lastUpdateTime, _ := time.Parse(time.RFC3339, condition.LastUpdateTime)
-			clusterToLastUpdated[key] = lastUpdateTime
-			logrus.Debugf("Synced cluster [%s] successfully", key)
-		}
-	}
-	logrus.Debugf("Syncing cluster [%s] complete ", key)
-	return nil
+func (h *HeartBeatSyncer) Create(cluster *v3.Cluster) (*v3.Cluster, error) {
+	h.storeLastUpdateTime(cluster)
+	return nil, nil
 }
 
-func (h *HeartBeatSyncer) syncHeartBeat(syncInterval time.Duration) {
-	for _ = range time.Tick(syncInterval) {
+func (h *HeartBeatSyncer) Updated(cluster *v3.Cluster) (*v3.Cluster, error) {
+	h.storeLastUpdateTime(cluster)
+	return nil, nil
+}
+
+func (h *HeartBeatSyncer) Remove(cluster *v3.Cluster) (*v3.Cluster, error) {
+	mapLock.Lock()
+	defer mapLock.Unlock()
+
+	key := cluster.Name
+	if _, exists := clusterToLastUpdated[key]; exists {
+		delete(clusterToLastUpdated, key)
+		logrus.Debugf("Cluster [%s] deleted", key)
+	}
+	return nil, nil
+}
+
+func isChanged(cluster *v3.Cluster) (bool, time.Time) {
+	condition := getConditionIfReady(cluster)
+	if condition != nil {
+		lastUpdateTime, _ := time.Parse(time.RFC3339, condition.LastUpdateTime)
+		if lastUpdateTime != clusterToLastUpdated[cluster.Name].lastUpdateTime {
+			return true, lastUpdateTime
+		}
+	}
+	return false, time.Now()
+}
+
+func (h *HeartBeatSyncer) storeLastUpdateTime(cluster *v3.Cluster) {
+	mapLock.Lock()
+	defer mapLock.Unlock()
+
+	key := cluster.Name
+	if _, exists := clusterToLastUpdated[key]; !exists {
+		clusterToLastUpdated[key] = &updateData{}
+	}
+	changed, lastUpdateTime := isChanged(cluster)
+	if changed {
+		clusterToLastUpdated[key].lastUpdateTime = lastUpdateTime
+		clusterToLastUpdated[key].updated = true
+
+		logrus.Debugf("Synced cluster [%s] successfully", key)
+	}
+}
+
+func (h *HeartBeatSyncer) syncHeartBeat(ctx context.Context, syncInterval time.Duration) {
+	for range utils.TickerContext(ctx, syncInterval) {
 		logrus.Debugf("Start heartbeat")
 		h.checkHeartBeat()
 		logrus.Debugf("Heartbeat complete")
@@ -60,37 +102,25 @@ func (h *HeartBeatSyncer) syncHeartBeat(syncInterval time.Duration) {
 }
 
 func (h *HeartBeatSyncer) checkHeartBeat() {
-	for clusterName, lastUpdatedTime := range clusterToLastUpdated {
-		if lastUpdatedTime.Add(syncInterval).Before(time.Now().UTC()) {
-			cluster, err := h.ClusterClient.Get(clusterName, metav1.GetOptions{})
+	mapLock.Lock()
+	defer mapLock.Unlock()
+
+	for clusterName := range clusterToLastUpdated {
+		if !clusterToLastUpdated[clusterName].updated {
+			cluster, err := h.ClusterLister.Get("", clusterName)
 			if err != nil {
 				logrus.Errorf("Error getting Cluster [%s] - %v", clusterName, err)
 				continue
 			}
 
 			v3.ClusterConditionReady.Unknown(cluster)
+			v3.ClusterConditionReady.Reason(cluster, msgUnknown)
+
 			logrus.Infof("Cluster [%s] condition status unknown", clusterName)
-			err = h.update(cluster)
-			if err != nil {
-				logrus.Errorf("Error getting Cluster [%s] - %v", clusterName, err)
-				continue
-			}
+		} else {
+			clusterToLastUpdated[clusterName].updated = false
 		}
 	}
-}
-
-func (h *HeartBeatSyncer) update(cluster *v3.Cluster) error {
-	_, err := h.ClusterClient.Update(cluster)
-	return err
-}
-
-func getConditionByType(cluster *v3.Cluster, conditionType condition.Cond) (int, *v3.ClusterCondition) {
-	for index, condition := range cluster.Status.Conditions {
-		if string(condition.Type) == string(conditionType) {
-			return index, &condition
-		}
-	}
-	return -1, nil
 }
 
 // Condition is Ready if conditionType is Ready and conditionStatus is True/False but not unknown.
@@ -101,4 +131,8 @@ func getConditionIfReady(cluster *v3.Cluster) *v3.ClusterCondition {
 		}
 	}
 	return nil
+}
+
+func (h *HeartBeatSyncer) GetName() string {
+	return "cluster-heartbeatsync-controller"
 }

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/docker/docker/api/types/container"
@@ -13,25 +14,25 @@ const (
 	NginxProxyEnvName = "CP_HOSTS"
 )
 
-func RollingUpdateNginxProxy(cpHosts []*hosts.Host, workerHosts []*hosts.Host, nginxProxyImage string) error {
+func RollingUpdateNginxProxy(ctx context.Context, cpHosts []*hosts.Host, workerHosts []*hosts.Host, nginxProxyImage string) error {
 	nginxProxyEnv := buildProxyEnv(cpHosts)
 	for _, host := range workerHosts {
 		imageCfg, hostCfg := buildNginxProxyConfig(host, nginxProxyEnv, nginxProxyImage)
-		if err := docker.DoRollingUpdateContainer(host.DClient, imageCfg, hostCfg, NginxProxyContainerName, host.Address, WorkerRole); err != nil {
+		if err := docker.DoRollingUpdateContainer(ctx, host.DClient, imageCfg, hostCfg, NginxProxyContainerName, host.Address, WorkerRole); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func runNginxProxy(host *hosts.Host, cpHosts []*hosts.Host, nginxProxyImage string) error {
+func runNginxProxy(ctx context.Context, host *hosts.Host, cpHosts []*hosts.Host, nginxProxyImage string) error {
 	nginxProxyEnv := buildProxyEnv(cpHosts)
 	imageCfg, hostCfg := buildNginxProxyConfig(host, nginxProxyEnv, nginxProxyImage)
-	return docker.DoRunContainer(host.DClient, imageCfg, hostCfg, NginxProxyContainerName, host.Address, WorkerRole)
+	return docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, NginxProxyContainerName, host.Address, WorkerRole)
 }
 
-func removeNginxProxy(host *hosts.Host) error {
-	return docker.DoRemoveContainer(host.DClient, NginxProxyContainerName, host.Address)
+func removeNginxProxy(ctx context.Context, host *hosts.Host) error {
+	return docker.DoRemoveContainer(ctx, host.DClient, NginxProxyContainerName, host.Address)
 }
 
 func buildNginxProxyConfig(host *hosts.Host, nginxProxyEnv, nginxProxyImage string) (*container.Config, *container.HostConfig) {

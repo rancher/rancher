@@ -15,7 +15,6 @@ const (
 	DynamicSchemaFieldCreatorID            = "creatorId"
 	DynamicSchemaFieldEmbed                = "embed"
 	DynamicSchemaFieldEmbedType            = "embedType"
-	DynamicSchemaFieldFinalizers           = "finalizers"
 	DynamicSchemaFieldIncludeableLinks     = "includeableLinks"
 	DynamicSchemaFieldLabels               = "labels"
 	DynamicSchemaFieldName                 = "name"
@@ -43,7 +42,6 @@ type DynamicSchema struct {
 	CreatorID            string               `json:"creatorId,omitempty"`
 	Embed                *bool                `json:"embed,omitempty"`
 	EmbedType            string               `json:"embedType,omitempty"`
-	Finalizers           []string             `json:"finalizers,omitempty"`
 	IncludeableLinks     []string             `json:"includeableLinks,omitempty"`
 	Labels               map[string]string    `json:"labels,omitempty"`
 	Name                 string               `json:"name,omitempty"`

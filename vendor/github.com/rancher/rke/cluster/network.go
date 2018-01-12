@@ -1,12 +1,13 @@
 package cluster
 
 import (
+	"context"
 	"fmt"
 
+	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/rke/templates"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -63,23 +64,23 @@ const (
 	RBACConfig       = "RBACConfig"
 )
 
-func (c *Cluster) DeployNetworkPlugin() error {
-	logrus.Infof("[network] Setting up network plugin: %s", c.Network.Plugin)
+func (c *Cluster) DeployNetworkPlugin(ctx context.Context) error {
+	log.Infof(ctx, "[network] Setting up network plugin: %s", c.Network.Plugin)
 	switch c.Network.Plugin {
 	case FlannelNetworkPlugin:
-		return c.doFlannelDeploy()
+		return c.doFlannelDeploy(ctx)
 	case CalicoNetworkPlugin:
-		return c.doCalicoDeploy()
+		return c.doCalicoDeploy(ctx)
 	case CanalNetworkPlugin:
-		return c.doCanalDeploy()
+		return c.doCanalDeploy(ctx)
 	case WeaveNetworkPlugin:
-		return c.doWeaveDeploy()
+		return c.doWeaveDeploy(ctx)
 	default:
 		return fmt.Errorf("[network] Unsupported network plugin: %s", c.Network.Plugin)
 	}
 }
 
-func (c *Cluster) doFlannelDeploy() error {
+func (c *Cluster) doFlannelDeploy(ctx context.Context) error {
 	flannelConfig := map[string]string{
 		ClusterCIDR:      c.ClusterCIDR,
 		Image:            c.Network.Options[FlannelImage],
@@ -91,10 +92,10 @@ func (c *Cluster) doFlannelDeploy() error {
 	if err != nil {
 		return err
 	}
-	return c.doAddonDeploy(pluginYaml, NetworkPluginResourceName)
+	return c.doAddonDeploy(ctx, pluginYaml, NetworkPluginResourceName)
 }
 
-func (c *Cluster) doCalicoDeploy() error {
+func (c *Cluster) doCalicoDeploy(ctx context.Context) error {
 	calicoConfig := map[string]string{
 		EtcdEndpoints:    services.GetEtcdConnString(c.EtcdHosts),
 		APIRoot:          "https://127.0.0.1:6443",
@@ -114,10 +115,10 @@ func (c *Cluster) doCalicoDeploy() error {
 	if err != nil {
 		return err
 	}
-	return c.doAddonDeploy(pluginYaml, NetworkPluginResourceName)
+	return c.doAddonDeploy(ctx, pluginYaml, NetworkPluginResourceName)
 }
 
-func (c *Cluster) doCanalDeploy() error {
+func (c *Cluster) doCanalDeploy(ctx context.Context) error {
 	canalConfig := map[string]string{
 		ClientCert:      pki.KubeNodeCertPath,
 		APIRoot:         "https://127.0.0.1:6443",
@@ -134,10 +135,10 @@ func (c *Cluster) doCanalDeploy() error {
 	if err != nil {
 		return err
 	}
-	return c.doAddonDeploy(pluginYaml, NetworkPluginResourceName)
+	return c.doAddonDeploy(ctx, pluginYaml, NetworkPluginResourceName)
 }
 
-func (c *Cluster) doWeaveDeploy() error {
+func (c *Cluster) doWeaveDeploy(ctx context.Context) error {
 	weaveConfig := map[string]string{
 		ClusterCIDR: c.ClusterCIDR,
 		Image:       c.Network.Options[WeaveImage],
@@ -148,7 +149,7 @@ func (c *Cluster) doWeaveDeploy() error {
 	if err != nil {
 		return err
 	}
-	return c.doAddonDeploy(pluginYaml, NetworkPluginResourceName)
+	return c.doAddonDeploy(ctx, pluginYaml, NetworkPluginResourceName)
 }
 
 func (c *Cluster) setClusterNetworkDefaults() {

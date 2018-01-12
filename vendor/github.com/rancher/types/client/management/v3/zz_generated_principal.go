@@ -11,7 +11,6 @@ const (
 	PrincipalFieldCreatorID       = "creatorId"
 	PrincipalFieldDisplayName     = "displayName"
 	PrincipalFieldExtraInfo       = "extraInfo"
-	PrincipalFieldFinalizers      = "finalizers"
 	PrincipalFieldLabels          = "labels"
 	PrincipalFieldLoginName       = "loginName"
 	PrincipalFieldMe              = "me"
@@ -31,7 +30,6 @@ type Principal struct {
 	CreatorID       string            `json:"creatorId,omitempty"`
 	DisplayName     string            `json:"displayName,omitempty"`
 	ExtraInfo       map[string]string `json:"extraInfo,omitempty"`
-	Finalizers      []string          `json:"finalizers,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`
 	LoginName       string            `json:"loginName,omitempty"`
 	Me              *bool             `json:"me,omitempty"`

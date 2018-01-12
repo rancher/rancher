@@ -23,8 +23,9 @@ var (
 	MachineResource = metav1.APIResource{
 		Name:         "machines",
 		SingularName: "machine",
-		Namespaced:   false,
-		Kind:         MachineGroupVersionKind.Kind,
+		Namespaced:   true,
+
+		Kind: MachineGroupVersionKind.Kind,
 	}
 )
 

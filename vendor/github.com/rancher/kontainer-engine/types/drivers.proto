@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package types;
+
+service Driver {
+    rpc Create (DriverOptions) returns (ClusterInfo) {}
+    rpc Update(UpdateRequest) returns (ClusterInfo) {}
+    rpc PostCheck(ClusterInfo) returns (ClusterInfo) {}
+    rpc Remove (ClusterInfo) returns (Empty) {}
+    rpc GetDriverCreateOptions (Empty) returns (DriverFlags) {}
+    rpc GetDriverUpdateOptions (Empty) returns (DriverFlags) {}
+}
+
+message Empty {
+}
+
+message DriverFlags {
+    map<string, Flag> options = 1;
+}
+
+message Flag {
+    string type = 1;
+
+    string usage = 2;
+
+    string value = 3;
+}
+
+message DriverOptions {
+    map<string, bool> bool_options = 1;
+
+    map<string, string> string_options = 2;
+
+    map<string, int64> int_options = 3;
+
+    map<string, StringSlice> string_slice_options = 4;
+}
+
+message StringSlice {
+    repeated string value = 1;
+}
+
+message ClusterInfo {
+    string version = 1;
+
+    string service_account_token = 2;
+
+    string endpoint = 3;
+
+    string username = 4;
+
+    string password = 5;
+
+    string root_ca_certificate = 6;
+
+    string client_certificate = 7;
+
+    string client_key = 8;
+
+    int64 node_count = 9;
+
+    map<string, string> metadata = 10;
+}
+
+message UpdateRequest {
+    ClusterInfo cluster_info = 1;
+    DriverOptions driver_options = 2;
+}

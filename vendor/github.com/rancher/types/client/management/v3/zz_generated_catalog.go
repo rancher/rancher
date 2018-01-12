@@ -12,7 +12,6 @@ const (
 	CatalogFieldCreated              = "created"
 	CatalogFieldCreatorID            = "creatorId"
 	CatalogFieldDescription          = "description"
-	CatalogFieldFinalizers           = "finalizers"
 	CatalogFieldLabels               = "labels"
 	CatalogFieldName                 = "name"
 	CatalogFieldOwnerReferences      = "ownerReferences"
@@ -33,7 +32,6 @@ type Catalog struct {
 	Created              string            `json:"created,omitempty"`
 	CreatorID            string            `json:"creatorId,omitempty"`
 	Description          string            `json:"description,omitempty"`
-	Finalizers           []string          `json:"finalizers,omitempty"`
 	Labels               map[string]string `json:"labels,omitempty"`
 	Name                 string            `json:"name,omitempty"`
 	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty"`

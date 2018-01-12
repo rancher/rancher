@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/docker/docker/api/types/container"
@@ -10,16 +11,16 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
-func runKubeproxy(host *hosts.Host, kubeproxyService v3.KubeproxyService, df hosts.DialerFactory) error {
+func runKubeproxy(ctx context.Context, host *hosts.Host, kubeproxyService v3.KubeproxyService, df hosts.DialerFactory) error {
 	imageCfg, hostCfg := buildKubeproxyConfig(host, kubeproxyService)
-	if err := docker.DoRunContainer(host.DClient, imageCfg, hostCfg, KubeproxyContainerName, host.Address, WorkerRole); err != nil {
+	if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, KubeproxyContainerName, host.Address, WorkerRole); err != nil {
 		return err
 	}
-	return runHealthcheck(host, KubeproxyPort, false, KubeproxyContainerName, df)
+	return runHealthcheck(ctx, host, KubeproxyPort, false, KubeproxyContainerName, df)
 }
 
-func removeKubeproxy(host *hosts.Host) error {
-	return docker.DoRemoveContainer(host.DClient, KubeproxyContainerName, host.Address)
+func removeKubeproxy(ctx context.Context, host *hosts.Host) error {
+	return docker.DoRemoveContainer(ctx, host.DClient, KubeproxyContainerName, host.Address)
 }
 
 func buildKubeproxyConfig(host *hosts.Host, kubeproxyService v3.KubeproxyService) (*container.Config, *container.HostConfig) {

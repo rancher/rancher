@@ -23,8 +23,9 @@ var (
 	ClusterEventResource = metav1.APIResource{
 		Name:         "clusterevents",
 		SingularName: "clusterevent",
-		Namespaced:   false,
-		Kind:         ClusterEventGroupVersionKind.Kind,
+		Namespaced:   true,
+
+		Kind: ClusterEventGroupVersionKind.Kind,
 	}
 )
 

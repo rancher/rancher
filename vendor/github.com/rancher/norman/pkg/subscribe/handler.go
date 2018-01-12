@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 
+	"time"
+
 	"github.com/gorilla/websocket"
 	"github.com/rancher/norman/api/writer"
 	"github.com/rancher/norman/httperror"
@@ -83,30 +85,35 @@ func handler(apiContext *types.APIContext) error {
 	}()
 
 	jsonWriter := writer.JSONResponseWriter{}
-	for item := range events {
-		header := `{"name":"resource.change","data":`
-		if item[".removed"] == true {
-			header = `{"name":"resource.remove","data":`
-		}
-		schema := apiContext.Schemas.Schema(apiContext.Version, convert.ToString(item["type"]))
-		if schema != nil {
-			buffer := &bytes.Buffer{}
-			if err := jsonWriter.VersionBody(apiContext, &schema.Version, buffer, item); err != nil {
-				return err
+	t := time.NewTicker(5 * time.Second)
+	defer t.Stop()
+
+	done := false
+	for !done {
+		select {
+		case item, ok := <-events:
+			if !ok {
+				done = true
+				break
 			}
 
-			messageWriter, err := c.NextWriter(websocket.TextMessage)
-			if err != nil {
-				return err
+			header := `{"name":"resource.change","data":`
+			if item[".removed"] == true {
+				header = `{"name":"resource.remove","data":`
 			}
+			schema := apiContext.Schemas.Schema(apiContext.Version, convert.ToString(item["type"]))
+			if schema != nil {
+				buffer := &bytes.Buffer{}
+				if err := jsonWriter.VersionBody(apiContext, &schema.Version, buffer, item); err != nil {
+					return err
+				}
 
-			if _, err := messageWriter.Write([]byte(header)); err != nil {
-				return err
+				if err := writeData(c, header, buffer.Bytes()); err != nil {
+					return err
+				}
 			}
-			if _, err := messageWriter.Write(buffer.Bytes()); err != nil {
-				return err
-			}
-			if _, err := messageWriter.Write([]byte(`}`)); err != nil {
+		case <-t.C:
+			if err := writeData(c, `{"name":"ping","data":`, []byte("{}")); err != nil {
 				return err
 			}
 		}
@@ -114,6 +121,24 @@ func handler(apiContext *types.APIContext) error {
 
 	// Group is already done at this point because of goroutine above, this is just to send the error if needed
 	return readerGroup.Wait()
+}
+
+func writeData(c *websocket.Conn, header string, buf []byte) error {
+	messageWriter, err := c.NextWriter(websocket.TextMessage)
+	if err != nil {
+		return err
+	}
+
+	if _, err := messageWriter.Write([]byte(header)); err != nil {
+		return err
+	}
+	if _, err := messageWriter.Write(buf); err != nil {
+		return err
+	}
+	if _, err := messageWriter.Write([]byte(`}`)); err != nil {
+		return err
+	}
+	return nil
 }
 
 func streamStore(ctx context.Context, eg *errgroup.Group, apiContext *types.APIContext, schema *types.Schema, result chan map[string]interface{}) {

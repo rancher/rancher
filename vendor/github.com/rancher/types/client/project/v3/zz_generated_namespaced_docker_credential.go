@@ -10,7 +10,6 @@ const (
 	NamespacedDockerCredentialFieldCreated         = "created"
 	NamespacedDockerCredentialFieldCreatorID       = "creatorId"
 	NamespacedDockerCredentialFieldDescription     = "description"
-	NamespacedDockerCredentialFieldFinalizers      = "finalizers"
 	NamespacedDockerCredentialFieldLabels          = "labels"
 	NamespacedDockerCredentialFieldName            = "name"
 	NamespacedDockerCredentialFieldNamespaceId     = "namespaceId"
@@ -27,7 +26,6 @@ type NamespacedDockerCredential struct {
 	Created         string                        `json:"created,omitempty"`
 	CreatorID       string                        `json:"creatorId,omitempty"`
 	Description     string                        `json:"description,omitempty"`
-	Finalizers      []string                      `json:"finalizers,omitempty"`
 	Labels          map[string]string             `json:"labels,omitempty"`
 	Name            string                        `json:"name,omitempty"`
 	NamespaceId     string                        `json:"namespaceId,omitempty"`

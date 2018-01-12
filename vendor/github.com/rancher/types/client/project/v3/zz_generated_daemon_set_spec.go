@@ -19,6 +19,7 @@ const (
 	DaemonSetSpecFieldPID                           = "pid"
 	DaemonSetSpecFieldPriority                      = "priority"
 	DaemonSetSpecFieldPriorityClassName             = "priorityClassName"
+	DaemonSetSpecFieldPullPolicy                    = "pullPolicy"
 	DaemonSetSpecFieldPullSecrets                   = "pullSecrets"
 	DaemonSetSpecFieldRestart                       = "restart"
 	DaemonSetSpecFieldRevisionHistoryLimit          = "revisionHistoryLimit"
@@ -52,6 +53,7 @@ type DaemonSetSpec struct {
 	PID                           string                   `json:"pid,omitempty"`
 	Priority                      *int64                   `json:"priority,omitempty"`
 	PriorityClassName             string                   `json:"priorityClassName,omitempty"`
+	PullPolicy                    string                   `json:"pullPolicy,omitempty"`
 	PullSecrets                   []LocalObjectReference   `json:"pullSecrets,omitempty"`
 	Restart                       string                   `json:"restart,omitempty"`
 	RevisionHistoryLimit          *int64                   `json:"revisionHistoryLimit,omitempty"`

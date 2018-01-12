@@ -9,7 +9,6 @@ const (
 	GroupFieldAnnotations     = "annotations"
 	GroupFieldCreated         = "created"
 	GroupFieldCreatorID       = "creatorId"
-	GroupFieldFinalizers      = "finalizers"
 	GroupFieldId              = "id"
 	GroupFieldLabels          = "labels"
 	GroupFieldName            = "name"
@@ -23,7 +22,6 @@ type Group struct {
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	Created         string            `json:"created,omitempty"`
 	CreatorID       string            `json:"creatorId,omitempty"`
-	Finalizers      []string          `json:"finalizers,omitempty"`
 	Id              string            `json:"id,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`
 	Name            string            `json:"name,omitempty"`

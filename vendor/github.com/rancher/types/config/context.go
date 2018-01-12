@@ -262,7 +262,7 @@ func NewClusterContext(managementConfig, config rest.Config, clusterName string)
 }
 
 func (w *ClusterContext) Start(ctx context.Context) error {
-	logrus.Info("Starting cluster controllers")
+	logrus.Info("Starting cluster controllers for ", w.ClusterName)
 	controllers := w.Management.controllers()
 	controllers = append(controllers, w.controllers()...)
 	return controller.SyncThenStart(ctx, 5, controllers...)

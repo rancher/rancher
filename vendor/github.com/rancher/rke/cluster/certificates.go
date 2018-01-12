@@ -1,24 +1,26 @@
 package cluster
 
 import (
+	"context"
 	"crypto/rsa"
 	"fmt"
 	"time"
 
 	"github.com/rancher/rke/k8s"
+	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/cert"
 )
 
-func SetUpAuthentication(kubeCluster, currentCluster *Cluster) error {
+func SetUpAuthentication(ctx context.Context, kubeCluster, currentCluster *Cluster) error {
 	if kubeCluster.Authentication.Strategy == X509AuthenticationProvider {
 		var err error
 		if currentCluster != nil {
 			kubeCluster.Certificates = currentCluster.Certificates
 		} else {
-			kubeCluster.Certificates, err = pki.StartCertificatesGeneration(
+			kubeCluster.Certificates, err = pki.StartCertificatesGeneration(ctx,
 				kubeCluster.ControlPlaneHosts,
 				kubeCluster.WorkerHosts,
 				kubeCluster.ClusterDomain,
@@ -53,8 +55,8 @@ func regenerateAPICertificate(c *Cluster, certificates map[string]pki.Certificat
 	return certificates, nil
 }
 
-func getClusterCerts(kubeClient *kubernetes.Clientset) (map[string]pki.CertificatePKI, error) {
-	logrus.Infof("[certificates] Getting Cluster certificates from Kubernetes")
+func getClusterCerts(ctx context.Context, kubeClient *kubernetes.Clientset) (map[string]pki.CertificatePKI, error) {
+	log.Infof(ctx, "[certificates] Getting Cluster certificates from Kubernetes")
 	certificatesNames := []string{
 		pki.CACertName,
 		pki.KubeAPICertName,
@@ -82,19 +84,19 @@ func getClusterCerts(kubeClient *kubernetes.Clientset) (map[string]pki.Certifica
 			KeyEnvName:    string(secret.Data["KeyEnvName"]),
 		}
 	}
-	logrus.Infof("[certificates] Successfully fetched Cluster certificates from Kubernetes")
+	log.Infof(ctx, "[certificates] Successfully fetched Cluster certificates from Kubernetes")
 	return certMap, nil
 }
 
-func saveClusterCerts(kubeClient *kubernetes.Clientset, crts map[string]pki.CertificatePKI) error {
-	logrus.Infof("[certificates] Save kubernetes certificates as secrets")
+func saveClusterCerts(ctx context.Context, kubeClient *kubernetes.Clientset, crts map[string]pki.CertificatePKI) error {
+	log.Infof(ctx, "[certificates] Save kubernetes certificates as secrets")
 	for crtName, crt := range crts {
 		err := saveCertToKubernetes(kubeClient, crtName, crt)
 		if err != nil {
 			return fmt.Errorf("Failed to save certificate [%s] to kubernetes: %v", crtName, err)
 		}
 	}
-	logrus.Infof("[certificates] Successfully saved certificates as kubernetes secret [%s]", pki.CertificatesSecretName)
+	log.Infof(ctx, "[certificates] Successfully saved certificates as kubernetes secret [%s]", pki.CertificatesSecretName)
 	return nil
 }
 

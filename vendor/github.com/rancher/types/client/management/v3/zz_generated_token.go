@@ -11,7 +11,6 @@ const (
 	TokenFieldCreated         = "created"
 	TokenFieldCreatorID       = "creatorId"
 	TokenFieldDescription     = "description"
-	TokenFieldFinalizers      = "finalizers"
 	TokenFieldGroupPrincipals = "groupPrincipals"
 	TokenFieldIsDerived       = "isDerived"
 	TokenFieldLabels          = "labels"
@@ -33,7 +32,6 @@ type Token struct {
 	Created         string            `json:"created,omitempty"`
 	CreatorID       string            `json:"creatorId,omitempty"`
 	Description     string            `json:"description,omitempty"`
-	Finalizers      []string          `json:"finalizers,omitempty"`
 	GroupPrincipals []string          `json:"groupPrincipals,omitempty"`
 	IsDerived       *bool             `json:"isDerived,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`

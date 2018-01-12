@@ -1,14 +1,14 @@
 package machine
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
-	machineconfig "github.com/rancher/machine-controller/controller/machine/config"
+	"github.com/rancher/machine-controller/store"
+	machineconfig "github.com/rancher/machine-controller/store/config"
 	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/event"
 	"github.com/rancher/norman/types/convert"
@@ -22,10 +22,20 @@ import (
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
+const (
+	defaultEngineInstallURL = "https://releases.rancher.com/install-docker/17.03.2.sh"
+)
+
 func Register(management *config.ManagementContext) {
+	secretStore, err := machineconfig.NewStore(management)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+
 	machineClient := management.Management.Machines("")
 
 	machineLifecycle := &Lifecycle{
+		secretStore:                  secretStore,
 		machineClient:                machineClient,
 		machineTemplateClient:        management.Management.MachineTemplates(""),
 		machineTemplateGenericClient: management.Management.MachineTemplates("").ObjectClient().UnstructuredClient(),
@@ -37,6 +47,7 @@ func Register(management *config.ManagementContext) {
 }
 
 type Lifecycle struct {
+	secretStore                  *store.GenericEncryptedStore
 	machineTemplateGenericClient *clientbase.ObjectClient
 	machineClient                v3.MachineInterface
 	machineTemplateClient        v3.MachineTemplateInterface
@@ -57,6 +68,10 @@ func (m *Lifecycle) Create(obj *v3.Machine) (*v3.Machine, error) {
 		obj.Status.MachineTemplateSpec = &template.Spec
 		if obj.Spec.RequestedHostname == "" {
 			obj.Spec.RequestedHostname = obj.Name
+		}
+
+		if obj.Status.MachineTemplateSpec.EngineInstallURL == "" {
+			obj.Status.MachineTemplateSpec.EngineInstallURL = defaultEngineInstallURL
 		}
 
 		rawTemplate, err := m.machineTemplateGenericClient.Get(obj.Spec.MachineTemplateName, metav1.GetOptions{})
@@ -95,26 +110,23 @@ func (m *Lifecycle) Remove(obj *v3.Machine) (*v3.Machine, error) {
 		return obj, nil
 	}
 
-	machineDir, err := buildBaseHostDir(obj.Spec.RequestedHostname)
+	config, err := machineconfig.NewMachineConfig(m.secretStore, obj)
 	if err != nil {
 		return obj, err
 	}
-	logrus.Debugf("Creating machine storage directory %s", machineDir)
-
-	config := machineconfig.NewMachineConfig(m.configMapGetter, machineDir, obj.Name)
 	if err := config.Restore(); err != nil {
 		return obj, err
 	}
-	defer config.Cleanup()
+	defer config.Remove()
 
-	mExists, err := machineExists(machineDir, obj.Spec.RequestedHostname)
+	mExists, err := machineExists(config.Dir(), obj.Spec.RequestedHostname)
 	if err != nil {
 		return obj, err
 	}
 
 	if mExists {
 		m.logger.Infof(obj, "Removing machine %s", obj.Spec.RequestedHostname)
-		if err := deleteMachine(machineDir, obj); err != nil {
+		if err := deleteMachine(config.Dir(), obj); err != nil {
 			return nil, err
 		}
 		m.logger.Infof(obj, "Removing machine %s done", obj.Spec.RequestedHostname)
@@ -148,7 +160,8 @@ func (m *Lifecycle) provision(machineDir string, obj *v3.Machine) (*v3.Machine, 
 	defer cmd.Wait()
 
 	hostExist := false
-	if err := m.reportStatus(stdoutReader, stderrReader, obj); err != nil {
+	obj, err = m.reportStatus(stdoutReader, stderrReader, obj)
+	if err != nil {
 		if strings.Contains(err.Error(), "Host already exists") {
 			hostExist = true
 		}
@@ -166,13 +179,10 @@ func (m *Lifecycle) provision(machineDir string, obj *v3.Machine) (*v3.Machine, 
 }
 
 func (m *Lifecycle) ready(obj *v3.Machine) (*v3.Machine, error) {
-	machineDir, err := buildBaseHostDir(obj.Spec.RequestedHostname)
+	config, err := machineconfig.NewMachineConfig(m.secretStore, obj)
 	if err != nil {
 		return obj, err
 	}
-	logrus.Debugf("Created machine storage directory %s", machineDir)
-
-	config := machineconfig.NewMachineConfig(m.configMapGetter, machineDir, obj.Name)
 	defer config.Cleanup()
 
 	if err := config.Restore(); err != nil {
@@ -183,7 +193,7 @@ func (m *Lifecycle) ready(obj *v3.Machine) (*v3.Machine, error) {
 	done := make(chan error)
 	go func() {
 		newObj, err := v3.MachineConditionProvisioned.Once(obj, func() (runtime.Object, error) {
-			return m.provision(machineDir, obj)
+			return m.provision(config.Dir(), obj)
 		})
 		obj = newObj.(*v3.Machine)
 		done <- err
@@ -193,17 +203,20 @@ func (m *Lifecycle) ready(obj *v3.Machine) (*v3.Machine, error) {
 outer:
 	for {
 		select {
-		case <-done:
+		case err = <-done:
 			break outer
 		case <-time.After(5 * time.Second):
 			config.Save()
 		}
 	}
 
-	newObj, err := v3.MachineConditionConfigSaved.Once(obj, func() (runtime.Object, error) {
-		return m.saveConfig(config, machineDir, obj)
+	newObj, saveError := v3.MachineConditionConfigSaved.Once(obj, func() (runtime.Object, error) {
+		return m.saveConfig(config, config.Dir(), obj)
 	})
 	obj = newObj.(*v3.Machine)
+	if err == nil {
+		return obj, saveError
+	}
 	return obj, err
 }
 
@@ -226,7 +239,12 @@ func (m *Lifecycle) saveConfig(config *machineconfig.MachineConfig, machineDir s
 		return obj, err
 	}
 
-	ip, err := m.getIP(machineDir, obj)
+	ip, err := config.IP()
+	if err != nil {
+		return obj, err
+	}
+
+	interalAddress, err := config.InternalIP()
 	if err != nil {
 		return obj, err
 	}
@@ -241,17 +259,18 @@ func (m *Lifecycle) saveConfig(config *machineconfig.MachineConfig, machineDir s
 	}
 
 	obj.Status.NodeConfig = &v3.RKEConfigNode{
-		Address: ip,
-		User:    obj.Status.SSHUser,
-		Role:    obj.Spec.RequestedRoles,
-		SSHKey:  sshKey,
+		MachineName:      obj.Spec.ClusterName + ":" + obj.Name,
+		Address:          ip,
+		InternalAddress:  interalAddress,
+		User:             obj.Status.SSHUser,
+		Role:             obj.Spec.Role,
+		HostnameOverride: obj.Spec.RequestedHostname,
+		SSHKey:           sshKey,
+	}
+
+	if len(obj.Status.NodeConfig.Role) == 0 {
+		obj.Status.NodeConfig.Role = []string{"worker"}
 	}
 
 	return obj, nil
-}
-
-func (m *Lifecycle) getIP(machineDir string, obj *v3.Machine) (string, error) {
-	command := buildCommand(machineDir, []string{"ip", obj.Spec.RequestedHostname})
-	output, err := command.Output()
-	return string(bytes.TrimSpace(output)), err
 }

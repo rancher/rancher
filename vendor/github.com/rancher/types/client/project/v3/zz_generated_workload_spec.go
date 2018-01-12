@@ -20,6 +20,7 @@ const (
 	WorkloadSpecFieldPID                           = "pid"
 	WorkloadSpecFieldPriority                      = "priority"
 	WorkloadSpecFieldPriorityClassName             = "priorityClassName"
+	WorkloadSpecFieldPullPolicy                    = "pullPolicy"
 	WorkloadSpecFieldPullSecrets                   = "pullSecrets"
 	WorkloadSpecFieldRestart                       = "restart"
 	WorkloadSpecFieldRunAsNonRoot                  = "runAsNonRoot"
@@ -53,6 +54,7 @@ type WorkloadSpec struct {
 	PID                           string                 `json:"pid,omitempty"`
 	Priority                      *int64                 `json:"priority,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty"`
+	PullPolicy                    string                 `json:"pullPolicy,omitempty"`
 	PullSecrets                   []LocalObjectReference `json:"pullSecrets,omitempty"`
 	Restart                       string                 `json:"restart,omitempty"`
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty"`

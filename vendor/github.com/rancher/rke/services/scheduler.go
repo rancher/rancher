@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/docker/docker/api/types/container"
@@ -10,16 +11,16 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
-func runScheduler(host *hosts.Host, schedulerService v3.SchedulerService, df hosts.DialerFactory) error {
+func runScheduler(ctx context.Context, host *hosts.Host, schedulerService v3.SchedulerService, df hosts.DialerFactory) error {
 	imageCfg, hostCfg := buildSchedulerConfig(host, schedulerService)
-	if err := docker.DoRunContainer(host.DClient, imageCfg, hostCfg, SchedulerContainerName, host.Address, ControlRole); err != nil {
+	if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, SchedulerContainerName, host.Address, ControlRole); err != nil {
 		return err
 	}
-	return runHealthcheck(host, SchedulerPort, false, SchedulerContainerName, df)
+	return runHealthcheck(ctx, host, SchedulerPort, false, SchedulerContainerName, df)
 }
 
-func removeScheduler(host *hosts.Host) error {
-	return docker.DoRemoveContainer(host.DClient, SchedulerContainerName, host.Address)
+func removeScheduler(ctx context.Context, host *hosts.Host) error {
+	return docker.DoRemoveContainer(ctx, host.DClient, SchedulerContainerName, host.Address)
 }
 
 func buildSchedulerConfig(host *hosts.Host, schedulerService v3.SchedulerService) (*container.Config, *container.HostConfig) {

@@ -16,7 +16,6 @@ const (
 	WorkloadFieldDNSPolicy                     = "dnsPolicy"
 	WorkloadFieldDeploymentStrategy            = "deploymentStrategy"
 	WorkloadFieldDescription                   = "description"
-	WorkloadFieldFinalizers                    = "finalizers"
 	WorkloadFieldFsgid                         = "fsgid"
 	WorkloadFieldGids                          = "gids"
 	WorkloadFieldHostAliases                   = "hostAliases"
@@ -32,6 +31,7 @@ const (
 	WorkloadFieldPriority                      = "priority"
 	WorkloadFieldPriorityClassName             = "priorityClassName"
 	WorkloadFieldProjectID                     = "projectId"
+	WorkloadFieldPullPolicy                    = "pullPolicy"
 	WorkloadFieldPullSecrets                   = "pullSecrets"
 	WorkloadFieldRemoved                       = "removed"
 	WorkloadFieldRestart                       = "restart"
@@ -66,7 +66,6 @@ type Workload struct {
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty"`
 	DeploymentStrategy            *DeployStrategy        `json:"deploymentStrategy,omitempty"`
 	Description                   string                 `json:"description,omitempty"`
-	Finalizers                    []string               `json:"finalizers,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty"`
 	HostAliases                   map[string]HostAlias   `json:"hostAliases,omitempty"`
@@ -82,6 +81,7 @@ type Workload struct {
 	Priority                      *int64                 `json:"priority,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty"`
 	ProjectID                     string                 `json:"projectId,omitempty"`
+	PullPolicy                    string                 `json:"pullPolicy,omitempty"`
 	PullSecrets                   []LocalObjectReference `json:"pullSecrets,omitempty"`
 	Removed                       string                 `json:"removed,omitempty"`
 	Restart                       string                 `json:"restart,omitempty"`

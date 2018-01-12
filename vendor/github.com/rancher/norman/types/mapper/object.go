@@ -14,14 +14,15 @@ func NewObject(mappers ...types.Mapper) Object {
 			&Embed{Field: "metadata"},
 			&Embed{Field: "spec", Optional: true},
 			&ReadOnly{Field: "status", Optional: true, SubFields: true},
-			Drop{"kind"},
-			Drop{"apiVersion"},
+			Drop{Field: "kind"},
+			Drop{Field: "apiVersion"},
 			&Scope{
 				IfNot: types.NamespaceScope,
 				Mappers: []types.Mapper{
-					&Drop{"namespace"},
+					&Drop{Field: "namespace"},
 				},
 			},
+			Drop{Field: "finalizers", IgnoreDefinition: true},
 		}, mappers...),
 	}
 }

@@ -10,10 +10,10 @@ const (
 	MachineFieldAnnotations          = "annotations"
 	MachineFieldCapacity             = "capacity"
 	MachineFieldClusterId            = "clusterId"
+	MachineFieldConditions           = "conditions"
 	MachineFieldCreated              = "created"
 	MachineFieldCreatorID            = "creatorId"
 	MachineFieldDescription          = "description"
-	MachineFieldFinalizers           = "finalizers"
 	MachineFieldHostname             = "hostname"
 	MachineFieldIPAddress            = "ipAddress"
 	MachineFieldId                   = "id"
@@ -22,15 +22,15 @@ const (
 	MachineFieldLimits               = "limits"
 	MachineFieldMachineTemplateId    = "machineTemplateId"
 	MachineFieldName                 = "name"
+	MachineFieldNamespaceId          = "namespaceId"
 	MachineFieldNodeName             = "nodeName"
 	MachineFieldOwnerReferences      = "ownerReferences"
 	MachineFieldPodCidr              = "podCidr"
 	MachineFieldProviderId           = "providerId"
 	MachineFieldRemoved              = "removed"
 	MachineFieldRequested            = "requested"
-	MachineFieldRequestedClusterId   = "requestedClusterId"
 	MachineFieldRequestedHostname    = "requestedHostname"
-	MachineFieldRequestedRoles       = "requestedRoles"
+	MachineFieldRole                 = "role"
 	MachineFieldSSHUser              = "sshUser"
 	MachineFieldState                = "state"
 	MachineFieldTaints               = "taints"
@@ -48,10 +48,10 @@ type Machine struct {
 	Annotations          map[string]string         `json:"annotations,omitempty"`
 	Capacity             map[string]string         `json:"capacity,omitempty"`
 	ClusterId            string                    `json:"clusterId,omitempty"`
+	Conditions           []MachineCondition        `json:"conditions,omitempty"`
 	Created              string                    `json:"created,omitempty"`
 	CreatorID            string                    `json:"creatorId,omitempty"`
 	Description          string                    `json:"description,omitempty"`
-	Finalizers           []string                  `json:"finalizers,omitempty"`
 	Hostname             string                    `json:"hostname,omitempty"`
 	IPAddress            string                    `json:"ipAddress,omitempty"`
 	Id                   string                    `json:"id,omitempty"`
@@ -60,15 +60,15 @@ type Machine struct {
 	Limits               map[string]string         `json:"limits,omitempty"`
 	MachineTemplateId    string                    `json:"machineTemplateId,omitempty"`
 	Name                 string                    `json:"name,omitempty"`
+	NamespaceId          string                    `json:"namespaceId,omitempty"`
 	NodeName             string                    `json:"nodeName,omitempty"`
 	OwnerReferences      []OwnerReference          `json:"ownerReferences,omitempty"`
 	PodCidr              string                    `json:"podCidr,omitempty"`
 	ProviderId           string                    `json:"providerId,omitempty"`
 	Removed              string                    `json:"removed,omitempty"`
 	Requested            map[string]string         `json:"requested,omitempty"`
-	RequestedClusterId   string                    `json:"requestedClusterId,omitempty"`
 	RequestedHostname    string                    `json:"requestedHostname,omitempty"`
-	RequestedRoles       []string                  `json:"requestedRoles,omitempty"`
+	Role                 []string                  `json:"role,omitempty"`
 	SSHUser              string                    `json:"sshUser,omitempty"`
 	State                string                    `json:"state,omitempty"`
 	Taints               []Taint                   `json:"taints,omitempty"`

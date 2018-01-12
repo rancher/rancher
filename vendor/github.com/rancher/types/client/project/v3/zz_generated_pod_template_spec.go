@@ -17,6 +17,7 @@ const (
 	PodTemplateSpecFieldPID                           = "pid"
 	PodTemplateSpecFieldPriority                      = "priority"
 	PodTemplateSpecFieldPriorityClassName             = "priorityClassName"
+	PodTemplateSpecFieldPullPolicy                    = "pullPolicy"
 	PodTemplateSpecFieldPullSecrets                   = "pullSecrets"
 	PodTemplateSpecFieldRestart                       = "restart"
 	PodTemplateSpecFieldRunAsNonRoot                  = "runAsNonRoot"
@@ -45,6 +46,7 @@ type PodTemplateSpec struct {
 	PID                           string                 `json:"pid,omitempty"`
 	Priority                      *int64                 `json:"priority,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty"`
+	PullPolicy                    string                 `json:"pullPolicy,omitempty"`
 	PullSecrets                   []LocalObjectReference `json:"pullSecrets,omitempty"`
 	Restart                       string                 `json:"restart,omitempty"`
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty"`

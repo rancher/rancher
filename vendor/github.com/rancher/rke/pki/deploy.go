@@ -11,10 +11,11 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
+	"github.com/rancher/rke/log"
 	"github.com/sirupsen/logrus"
 )
 
-func DeployCertificatesOnMasters(cpHosts []*hosts.Host, crtMap map[string]CertificatePKI, certDownloaderImage string) error {
+func DeployCertificatesOnMasters(ctx context.Context, cpHosts []*hosts.Host, crtMap map[string]CertificatePKI, certDownloaderImage string) error {
 	// list of certificates that should be deployed on the masters
 	crtList := []string{
 		CACertName,
@@ -31,7 +32,7 @@ func DeployCertificatesOnMasters(cpHosts []*hosts.Host, crtMap map[string]Certif
 	}
 
 	for i := range cpHosts {
-		err := doRunDeployer(cpHosts[i], env, certDownloaderImage)
+		err := doRunDeployer(ctx, cpHosts[i], env, certDownloaderImage)
 		if err != nil {
 			return err
 		}
@@ -39,7 +40,7 @@ func DeployCertificatesOnMasters(cpHosts []*hosts.Host, crtMap map[string]Certif
 	return nil
 }
 
-func DeployCertificatesOnWorkers(workerHosts []*hosts.Host, crtMap map[string]CertificatePKI, certDownloaderImage string) error {
+func DeployCertificatesOnWorkers(ctx context.Context, workerHosts []*hosts.Host, crtMap map[string]CertificatePKI, certDownloaderImage string) error {
 	// list of certificates that should be deployed on the workers
 	crtList := []string{
 		CACertName,
@@ -53,7 +54,7 @@ func DeployCertificatesOnWorkers(workerHosts []*hosts.Host, crtMap map[string]Ce
 	}
 
 	for i := range workerHosts {
-		err := doRunDeployer(workerHosts[i], env, certDownloaderImage)
+		err := doRunDeployer(ctx, workerHosts[i], env, certDownloaderImage)
 		if err != nil {
 			return err
 		}
@@ -61,8 +62,8 @@ func DeployCertificatesOnWorkers(workerHosts []*hosts.Host, crtMap map[string]Ce
 	return nil
 }
 
-func doRunDeployer(host *hosts.Host, containerEnv []string, certDownloaderImage string) error {
-	if err := docker.UseLocalOrPull(host.DClient, host.Address, certDownloaderImage, CertificatesServiceName); err != nil {
+func doRunDeployer(ctx context.Context, host *hosts.Host, containerEnv []string, certDownloaderImage string) error {
+	if err := docker.UseLocalOrPull(ctx, host.DClient, host.Address, certDownloaderImage, CertificatesServiceName); err != nil {
 		return err
 	}
 	imageCfg := &container.Config{
@@ -75,17 +76,17 @@ func doRunDeployer(host *hosts.Host, containerEnv []string, certDownloaderImage 
 		},
 		Privileged: true,
 	}
-	resp, err := host.DClient.ContainerCreate(context.Background(), imageCfg, hostCfg, nil, CrtDownloaderContainer)
+	resp, err := host.DClient.ContainerCreate(ctx, imageCfg, hostCfg, nil, CrtDownloaderContainer)
 	if err != nil {
 		return fmt.Errorf("Failed to create Certificates deployer container on host [%s]: %v", host.Address, err)
 	}
 
-	if err := host.DClient.ContainerStart(context.Background(), resp.ID, types.ContainerStartOptions{}); err != nil {
+	if err := host.DClient.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
 		return fmt.Errorf("Failed to start Certificates deployer container on host [%s]: %v", host.Address, err)
 	}
 	logrus.Debugf("[certificates] Successfully started Certificate deployer container: %s", resp.ID)
 	for {
-		isDeployerRunning, err := docker.IsContainerRunning(host.DClient, host.Address, CrtDownloaderContainer, false)
+		isDeployerRunning, err := docker.IsContainerRunning(ctx, host.DClient, host.Address, CrtDownloaderContainer, false)
 		if err != nil {
 			return err
 		}
@@ -93,28 +94,28 @@ func doRunDeployer(host *hosts.Host, containerEnv []string, certDownloaderImage 
 			time.Sleep(5 * time.Second)
 			continue
 		}
-		if err := host.DClient.ContainerRemove(context.Background(), resp.ID, types.ContainerRemoveOptions{}); err != nil {
+		if err := host.DClient.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{}); err != nil {
 			return fmt.Errorf("Failed to delete Certificates deployer container on host [%s]: %v", host.Address, err)
 		}
 		return nil
 	}
 }
 
-func DeployAdminConfig(kubeConfig, localConfigPath string) error {
+func DeployAdminConfig(ctx context.Context, kubeConfig, localConfigPath string) error {
 	logrus.Debugf("Deploying admin Kubeconfig locally: %s", kubeConfig)
 	err := ioutil.WriteFile(localConfigPath, []byte(kubeConfig), 0640)
 	if err != nil {
 		return fmt.Errorf("Failed to create local admin kubeconfig file: %v", err)
 	}
-	logrus.Infof("Successfully Deployed local admin kubeconfig at [%s]", localConfigPath)
+	log.Infof(ctx, "Successfully Deployed local admin kubeconfig at [%s]", localConfigPath)
 	return nil
 }
 
-func RemoveAdminConfig(localConfigPath string) {
-	logrus.Infof("Removing local admin Kubeconfig: %s", localConfigPath)
+func RemoveAdminConfig(ctx context.Context, localConfigPath string) {
+	log.Infof(ctx, "Removing local admin Kubeconfig: %s", localConfigPath)
 	if err := os.Remove(localConfigPath); err != nil {
 		logrus.Warningf("Failed to remove local admin Kubeconfig file: %v", err)
 		return
 	}
-	logrus.Infof("Local admin Kubeconfig removed successfully")
+	log.Infof(ctx, "Local admin Kubeconfig removed successfully")
 }

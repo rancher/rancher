@@ -1,16 +1,14 @@
-/*
-Package stub can only be imported if it is running as a library. The init function will start all the driver plugin servers
-*/
-package stub
+package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/rancher/kontainer-engine/cluster"
-	rpcDriver "github.com/rancher/kontainer-engine/driver"
 	"github.com/rancher/kontainer-engine/plugin"
+	"github.com/rancher/kontainer-engine/types"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
@@ -18,6 +16,7 @@ import (
 
 var (
 	pluginAddress = map[string]string{}
+	Drivers       = map[string]types.Driver{}
 )
 
 func init() {
@@ -25,7 +24,11 @@ func init() {
 		for driver := range plugin.BuiltInDrivers {
 			logrus.Infof("Activating driver %s", driver)
 			addr := make(chan string)
-			plugin.Run(driver, addr)
+			rpcDriver, err := plugin.Run(driver, addr)
+			if err != nil {
+				panic(err)
+			}
+			Drivers[driver] = rpcDriver
 			listenAddr := <-addr
 			pluginAddress[driver] = listenAddr
 			logrus.Infof("Activating driver %s done", driver)
@@ -39,12 +42,12 @@ type controllerConfigGetter struct {
 	clusterName string
 }
 
-func (c controllerConfigGetter) GetConfig() (rpcDriver.DriverOptions, error) {
-	driverOptions := rpcDriver.DriverOptions{
+func (c controllerConfigGetter) GetConfig() (types.DriverOptions, error) {
+	driverOptions := types.DriverOptions{
 		BoolOptions:        make(map[string]bool),
 		StringOptions:      make(map[string]string),
 		IntOptions:         make(map[string]int64),
-		StringSliceOptions: make(map[string]*rpcDriver.StringSlice),
+		StringSliceOptions: make(map[string]*types.StringSlice),
 	}
 	data := map[string]interface{}{}
 	switch c.driverName {
@@ -68,7 +71,7 @@ func (c controllerConfigGetter) GetConfig() (rpcDriver.DriverOptions, error) {
 }
 
 // flatten take a map and flatten it and convert it into driverOptions
-func flatten(data map[string]interface{}, driverOptions *rpcDriver.DriverOptions) {
+func flatten(data map[string]interface{}, driverOptions *types.DriverOptions) {
 	for k, v := range data {
 		switch v.(type) {
 		case float64:
@@ -78,7 +81,7 @@ func flatten(data map[string]interface{}, driverOptions *rpcDriver.DriverOptions
 		case bool:
 			driverOptions.BoolOptions[k] = v.(bool)
 		case []string:
-			driverOptions.StringSliceOptions[k] = &rpcDriver.StringSlice{Value: v.([]string)}
+			driverOptions.StringSliceOptions[k] = &types.StringSlice{Value: v.([]string)}
 		case map[string]interface{}:
 			// hack for labels
 			if k == "labels" {
@@ -86,34 +89,12 @@ func flatten(data map[string]interface{}, driverOptions *rpcDriver.DriverOptions
 				for key1, value1 := range v.(map[string]interface{}) {
 					r = append(r, fmt.Sprintf("%v=%v", key1, value1))
 				}
-				driverOptions.StringSliceOptions[k] = &rpcDriver.StringSlice{Value: r}
+				driverOptions.StringSliceOptions[k] = &types.StringSlice{Value: r}
 			} else {
 				flatten(v.(map[string]interface{}), driverOptions)
 			}
 		}
 	}
-}
-
-type controllerPersistStore struct{}
-
-// no-op
-func (c controllerPersistStore) Check(name string) (bool, error) {
-	return false, nil
-}
-
-// no-op
-func (c controllerPersistStore) Store(cluster cluster.Cluster) error {
-	return nil
-}
-
-// no-op
-func (c controllerPersistStore) Get(name string) (cluster.Cluster, error) {
-	return cluster.Cluster{}, nil
-}
-
-// no-op
-func (c controllerPersistStore) PersistStatus(cluster cluster.Cluster, status string) error {
-	return nil
 }
 
 func toMap(obj interface{}, format string) (map[string]interface{}, error) {
@@ -141,7 +122,23 @@ func toMap(obj interface{}, format string) (map[string]interface{}, error) {
 	return nil, nil
 }
 
-func convertCluster(name string, spec v3.ClusterSpec) (cluster.Cluster, error) {
+type EngineService interface {
+	Create(ctx context.Context, name string, clusterSpec v3.ClusterSpec) (string, string, string, error)
+	Update(ctx context.Context, name string, clusterSpec v3.ClusterSpec) (string, string, string, error)
+	Remove(ctx context.Context, name string, clusterSpec v3.ClusterSpec) error
+}
+
+type engineService struct {
+	store cluster.PersistStore
+}
+
+func NewEngineService(store cluster.PersistStore) EngineService {
+	return &engineService{
+		store: store,
+	}
+}
+
+func (e *engineService) convertCluster(name string, spec v3.ClusterSpec) (cluster.Cluster, error) {
 	// todo: decide whether we need a driver field
 	driverName := ""
 	if spec.AzureKubernetesServiceConfig != nil {
@@ -160,8 +157,7 @@ func convertCluster(name string, spec v3.ClusterSpec) (cluster.Cluster, error) {
 		clusterSpec: spec,
 		clusterName: name,
 	}
-	persistStore := controllerPersistStore{}
-	clusterPlugin, err := cluster.NewCluster(driverName, pluginAddr, name, configGetter, persistStore)
+	clusterPlugin, err := cluster.NewCluster(driverName, pluginAddr, name, configGetter, e.store)
 	if err != nil {
 		return cluster.Cluster{}, err
 	}
@@ -169,12 +165,12 @@ func convertCluster(name string, spec v3.ClusterSpec) (cluster.Cluster, error) {
 }
 
 // Create creates the stub for cluster manager to call
-func Create(name string, clusterSpec v3.ClusterSpec) (string, string, string, error) {
-	cls, err := convertCluster(name, clusterSpec)
+func (e *engineService) Create(ctx context.Context, name string, clusterSpec v3.ClusterSpec) (string, string, string, error) {
+	cls, err := e.convertCluster(name, clusterSpec)
 	if err != nil {
 		return "", "", "", err
 	}
-	if err := cls.Create(); err != nil {
+	if err := cls.Create(ctx); err != nil {
 		return "", "", "", err
 	}
 	endpoint := cls.Endpoint
@@ -185,12 +181,12 @@ func Create(name string, clusterSpec v3.ClusterSpec) (string, string, string, er
 }
 
 // Update creates the stub for cluster manager to call
-func Update(name string, clusterSpec v3.ClusterSpec) (string, string, string, error) {
-	cls, err := convertCluster(name, clusterSpec)
+func (e *engineService) Update(ctx context.Context, name string, clusterSpec v3.ClusterSpec) (string, string, string, error) {
+	cls, err := e.convertCluster(name, clusterSpec)
 	if err != nil {
 		return "", "", "", err
 	}
-	if err := cls.Update(); err != nil {
+	if err := cls.Update(ctx); err != nil {
 		return "", "", "", err
 	}
 	endpoint := cls.Endpoint
@@ -201,10 +197,10 @@ func Update(name string, clusterSpec v3.ClusterSpec) (string, string, string, er
 }
 
 // Remove removes stub for cluster manager to call
-func Remove(name string, clusterSpec v3.ClusterSpec) error {
-	cls, err := convertCluster(name, clusterSpec)
+func (e *engineService) Remove(ctx context.Context, name string, clusterSpec v3.ClusterSpec) error {
+	cls, err := e.convertCluster(name, clusterSpec)
 	if err != nil {
 		return err
 	}
-	return cls.Remove()
+	return cls.Remove(ctx)
 }

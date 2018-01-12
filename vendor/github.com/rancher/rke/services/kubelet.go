@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/docker/docker/api/types/container"
@@ -10,16 +11,16 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
-func runKubelet(host *hosts.Host, kubeletService v3.KubeletService, df hosts.DialerFactory) error {
+func runKubelet(ctx context.Context, host *hosts.Host, kubeletService v3.KubeletService, df hosts.DialerFactory) error {
 	imageCfg, hostCfg := buildKubeletConfig(host, kubeletService)
-	if err := docker.DoRunContainer(host.DClient, imageCfg, hostCfg, KubeletContainerName, host.Address, WorkerRole); err != nil {
+	if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, KubeletContainerName, host.Address, WorkerRole); err != nil {
 		return err
 	}
-	return runHealthcheck(host, KubeletPort, true, KubeletContainerName, df)
+	return runHealthcheck(ctx, host, KubeletPort, true, KubeletContainerName, df)
 }
 
-func removeKubelet(host *hosts.Host) error {
-	return docker.DoRemoveContainer(host.DClient, KubeletContainerName, host.Address)
+func removeKubelet(ctx context.Context, host *hosts.Host) error {
+	return docker.DoRemoveContainer(ctx, host.DClient, KubeletContainerName, host.Address)
 }
 
 func buildKubeletConfig(host *hosts.Host, kubeletService v3.KubeletService) (*container.Config, *container.HostConfig) {
@@ -61,6 +62,7 @@ func buildKubeletConfig(host *hosts.Host, kubeletService v3.KubeletService) (*co
 		},
 		Binds: []string{
 			"/etc/kubernetes:/etc/kubernetes",
+			"/usr/libexec/kubernetes/kubelet-plugins:/usr/libexec/kubernetes/kubelet-plugins",
 			"/etc/cni:/etc/cni:ro",
 			"/opt/cni:/opt/cni:ro",
 			"/etc/resolv.conf:/etc/resolv.conf",

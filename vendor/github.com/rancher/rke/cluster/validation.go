@@ -12,9 +12,6 @@ func (c *Cluster) ValidateCluster() error {
 	if len(c.ControlPlaneHosts) == 0 {
 		return fmt.Errorf("Cluster must have at least one control plane host")
 	}
-	if len(c.EtcdHosts)%2 == 0 {
-		return fmt.Errorf("Cluster must have odd number of etcd nodes")
-	}
 	if len(c.WorkerHosts) == 0 {
 		return fmt.Errorf("Cluster must have at least one worker plane host")
 	}
