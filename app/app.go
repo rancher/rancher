@@ -97,12 +97,25 @@ func addData(management *config.ManagementContext, local bool) error {
 
 	rb := newRoleBuilder()
 
+	rb.addRole("Create Clusters", "create-clusters").addRule().apiGroups("management.cattle.io").resources("clusters").verbs("create")
+	rb.addRole("Manage All Clusters", "manage-clusters").addRule().apiGroups("management.cattle.io").resources("clusters").verbs("*")
+	rb.addRole("Manage Node Drivers", "manage-node-drivers").addRule().apiGroups("management.cattle.io").resources("machinedrivers").verbs("*")
+	rb.addRole("Manage Catalogs", "manage-catalogs").addRule().apiGroups("management.cattle.io").resources("catalogs", "templates", "templateversions").verbs("*")
+	rb.addRole("Use Catalog Templates", "use-catalogs").addRule().apiGroups("management.cattle.io").resources("templates", "templateversions").verbs("get", "list")
+	rb.addRole("Manage Users", "manage-users").addRule().apiGroups("management.cattle.io").resources("users", "globalroles", "globalrolebindings").verbs("*")
+	rb.addRole("Manage Roles", "manage-roles").addRule().apiGroups("management.cattle.io").resources("roletemplates").verbs("*")
+	rb.addRole("Manage Authentication", "manage-authn").addRule().apiGroups("management.cattle.io").resources("authconfigs").verbs("get", "list", "update")
+	rb.addRole("Manage Node Templates", "manage-node-templates").addRule().apiGroups("management.cattle.io").resources("machinetemplates").verbs("*")
+	rb.addRole("Use Node Templates", "use-node-templates").addRule().apiGroups("management.cattle.io").resources("machinedrivers").verbs("get", "list").
+		addRule().apiGroups("management.cattle.io").resources("machinetemplates").verbs("*")
 	rb.addRole("Admin", "admin").addRule().apiGroups("*").resources("*").verbs("*").
 		addRule().apiGroups().nonResourceURLs("*").verbs("*")
+	rb.addRole("User Base", "user-base").addRule().apiGroups("management.cattle.io").resources("principals", "roletemplates").verbs("get", "list").
+		addRule().apiGroups("management.cattle.io").resources("users").verbs("get", "list")
 
-	rb.addRole("User", "user").
-		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("create").
-		addRule().apiGroups("management.cattle.io").resources("users").verbs("list", "get")
+	// TODO user should be dynamically authorized to only see herself
+	// TODO Need "self-service" for machinetemplates such that a user can create them, but only RUD their own
+	// TODO enable when groups are "in". they need to be self-service
 
 	if err := rb.reconcileGlobalRoles(management); err != nil {
 		return errors.Wrap(err, "problem reconciling globl roles")
