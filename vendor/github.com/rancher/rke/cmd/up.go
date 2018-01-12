@@ -23,6 +23,10 @@ func UpCommand() cli.Command {
 			Value:  cluster.DefaultClusterConfig,
 			EnvVar: "RKE_CONFIG",
 		},
+		cli.BoolFlag{
+			Name:  "local",
+			Usage: "Deploy Kubernetes cluster locally",
+		},
 	}
 	return cli.Command{
 		Name:   "up",
@@ -32,15 +36,20 @@ func UpCommand() cli.Command {
 	}
 }
 
-func ClusterUp(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig, dockerDialerFactory, localConnDialerFactory hosts.DialerFactory) (string, string, string, string, error) {
+func ClusterUp(
+	ctx context.Context,
+	rkeConfig *v3.RancherKubernetesEngineConfig,
+	dockerDialerFactory, localConnDialerFactory hosts.DialerFactory,
+	local bool, configDir string) (string, string, string, string, error) {
+
 	log.Infof(ctx, "Building Kubernetes cluster")
 	var APIURL, caCrt, clientCert, clientKey string
-	kubeCluster, err := cluster.ParseCluster(ctx, rkeConfig, clusterFilePath, dockerDialerFactory, localConnDialerFactory)
+	kubeCluster, err := cluster.ParseCluster(ctx, rkeConfig, clusterFilePath, configDir, dockerDialerFactory, localConnDialerFactory)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
 
-	err = kubeCluster.TunnelHosts(ctx)
+	err = kubeCluster.TunnelHosts(ctx, local)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
@@ -105,6 +114,8 @@ func ClusterUp(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig,
 }
 
 func clusterUpFromCli(ctx *cli.Context) error {
+	var local bool
+	var localConnDialerFactory hosts.DialerFactory
 	clusterFile, filePath, err := resolveClusterFile(ctx)
 	if err != nil {
 		return fmt.Errorf("Failed to resolve cluster file: %v", err)
@@ -115,6 +126,11 @@ func clusterUpFromCli(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("Failed to parse cluster file: %v", err)
 	}
-	_, _, _, _, err = ClusterUp(context.Background(), rkeConfig, nil, nil)
+	if ctx.Bool("local") {
+		rkeConfig.Nodes = []v3.RKEConfigNode{*cluster.GetLocalRKENodeConfig()}
+		localConnDialerFactory = hosts.LocalHealthcheckFactory
+		local = true
+	}
+	_, _, _, _, err = ClusterUp(context.Background(), rkeConfig, nil, localConnDialerFactory, local, "")
 	return err
 }

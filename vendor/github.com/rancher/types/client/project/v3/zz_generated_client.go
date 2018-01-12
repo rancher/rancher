@@ -31,6 +31,7 @@ type Client struct {
 	ReplicationController         ReplicationControllerOperations
 	DaemonSet                     DaemonSetOperations
 	Workload                      WorkloadOperations
+	ConfigMap                     ConfigMapOperations
 }
 
 func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
@@ -67,6 +68,7 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.ReplicationController = newReplicationControllerClient(client)
 	client.DaemonSet = newDaemonSetClient(client)
 	client.Workload = newWorkloadClient(client)
+	client.ConfigMap = newConfigMapClient(client)
 
 	return client, nil
 }

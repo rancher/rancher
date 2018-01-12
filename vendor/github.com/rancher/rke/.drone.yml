@@ -7,3 +7,67 @@ pipeline:
     - /var/run/docker.sock:/var/run/docker.sock
     commands:
     - dapper ci
+
+  build-all-binaries:
+    privileged: true
+    image: rancher/dapper:1.11.2
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+    - CROSS=1
+    commands:
+    - dapper build
+    when:
+      branch: master
+      event: tag
+
+  stage-binaries:
+    image: rancher/dapper:1.11.2
+    commands:
+    - cp -r ./bin/* ./package/
+    when:
+      branch: master
+      event: tag
+
+  github_binary_release:
+    image: plugins/github-release
+    files:
+     - bin/*
+     - build/bin/rke_*
+    secrets: [github_token]
+    when:
+      branch: master
+      event: tag
+
+  publish-rke-certs-deployer:
+    image: plugins/docker
+    dockerfile: package/certs-deployer/Dockerfile
+    repo: rancher/rke-certs-deployer
+    context: package/certs-deployer/
+    tag: ${DRONE_TAG}
+    secrets: [docker_username, docker_password]
+    when:
+      branch: master
+      event: tag
+
+  publish-rke-nginx-proxy:
+    image: plugins/docker
+    dockerfile: package/nginx-proxy/Dockerfile
+    repo: rancher/rke-nginx-proxy
+    context: package/nginx-proxy/
+    tag: ${DRONE_TAG}
+    secrets: [docker_username, docker_password]
+    when:
+      branch: master
+      event: tag
+
+  publish-rke-service-sidekick:
+    image: plugins/docker
+    dockerfile: package/service-sidekick/Dockerfile
+    repo: rancher/rke-service-sidekick
+    context: package/service-sidekick/
+    tag: ${DRONE_TAG}
+    secrets: [docker_username, docker_password]
+    when:
+      branch: master
+      event: tag

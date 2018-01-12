@@ -12,7 +12,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (c *Cluster) TunnelHosts(ctx context.Context) error {
+func (c *Cluster) TunnelHosts(ctx context.Context, local bool) error {
+	if local {
+		if err := c.EtcdHosts[0].TunnelUpLocal(ctx); err != nil {
+			return fmt.Errorf("Failed to connect to docker for local host [%s]: %v", c.EtcdHosts[0].Address, err)
+		}
+		return nil
+	}
 	for i := range c.EtcdHosts {
 		if err := c.EtcdHosts[i].TunnelUp(ctx, c.DockerDialerFactory); err != nil {
 			return fmt.Errorf("Failed to set up SSH tunneling for Etcd host [%s]: %v", c.EtcdHosts[i].Address, err)

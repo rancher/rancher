@@ -7,12 +7,21 @@ import (
 	"io/ioutil"
 	"strings"
 
+	"path/filepath"
+
+	"os"
+
 	"github.com/rancher/kontainer-engine/drivers"
 	"github.com/rancher/kontainer-engine/types"
 	"github.com/rancher/rke/cmd"
 	"github.com/rancher/rke/hosts"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+)
+
+const (
+	kubeConfigFile = ".kube_config_cluster.yml"
+	rancherPath    = "/var/lib/rancher/rke/"
 )
 
 // Driver is the struct of rke driver
@@ -74,12 +83,20 @@ func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions) (*types.
 		return nil, err
 	}
 
-	APIURL, caCrt, clientCert, clientKey, err := cmd.ClusterUp(ctx, &rkeConfig, d.DockerDialer, nil)
+	stateDir, err := d.restore(nil)
 	if err != nil {
 		return nil, err
 	}
+	APIURL, caCrt, clientCert, clientKey, err := cmd.ClusterUp(ctx, &rkeConfig, d.DockerDialer, nil, false, stateDir)
+	if err != nil {
+		return d.save(&types.ClusterInfo{
+			Metadata: map[string]string{
+				"Config": yaml,
+			},
+		}, stateDir), err
+	}
 
-	return &types.ClusterInfo{
+	return d.save(&types.ClusterInfo{
 		Metadata: map[string]string{
 			"Endpoint":   APIURL,
 			"RootCA":     caCrt,
@@ -87,7 +104,7 @@ func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions) (*types.
 			"ClientKey":  clientKey,
 			"Config":     yaml,
 		},
-	}, nil
+	}, stateDir), nil
 }
 
 // Update updates the rke cluster
@@ -102,7 +119,12 @@ func (d *Driver) Update(ctx context.Context, clusterInfo *types.ClusterInfo, opt
 		return nil, err
 	}
 
-	APIURL, caCrt, clientCert, clientKey, err := cmd.ClusterUp(ctx, &rkeConfig, d.DockerDialer, nil)
+	stateDir, err := d.restore(clusterInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	APIURL, caCrt, clientCert, clientKey, err := cmd.ClusterUp(ctx, &rkeConfig, d.DockerDialer, nil, false, stateDir)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +139,7 @@ func (d *Driver) Update(ctx context.Context, clusterInfo *types.ClusterInfo, opt
 	clusterInfo.Metadata["ClientKey"] = clientKey
 	clusterInfo.Metadata["Config"] = yaml
 
-	return clusterInfo, nil
+	return d.save(clusterInfo, stateDir), nil
 }
 
 // PostCheck does post action
@@ -166,5 +188,48 @@ func (d *Driver) Remove(ctx context.Context, clusterInfo *types.ClusterInfo) err
 	if err != nil {
 		return err
 	}
-	return cmd.ClusterRemove(ctx, &rkeConfig, d.DockerDialer)
+	stateDir, _ := d.restore(clusterInfo)
+	defer d.save(nil, stateDir)
+	return cmd.ClusterRemove(ctx, &rkeConfig, d.DockerDialer, false, stateDir)
+}
+
+func (d *Driver) restore(info *types.ClusterInfo) (string, error) {
+	os.MkdirAll(rancherPath, 0700)
+	dir, err := ioutil.TempDir(rancherPath, "rke-")
+	if err != nil {
+		return "", err
+	}
+
+	if info != nil {
+		state := info.Metadata["state"]
+		if state != "" {
+			ioutil.WriteFile(filepath.Join(dir, kubeConfigFile), []byte(state), 0600)
+		}
+	}
+
+	return filepath.Join(dir, "cluster.yml"), nil
+}
+
+func (d *Driver) save(info *types.ClusterInfo, stateDir string) *types.ClusterInfo {
+	if info != nil {
+		b, err := ioutil.ReadFile(kubeConfig(stateDir))
+		if err == nil {
+			if info.Metadata == nil {
+				info.Metadata = map[string]string{}
+			}
+			info.Metadata["state"] = string(b)
+		}
+	}
+
+	if strings.HasPrefix(stateDir, rancherPath) && strings.HasSuffix(stateDir, "/cluster.yml") && !strings.Contains(stateDir, "..") {
+		os.Remove(stateDir)
+		os.Remove(kubeConfig(stateDir))
+		os.Remove(filepath.Dir(stateDir))
+	}
+
+	return info
+}
+
+func kubeConfig(stateDir string) string {
+	return filepath.Join(filepath.Dir(stateDir), kubeConfigFile)
 }

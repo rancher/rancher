@@ -18,6 +18,7 @@ type Interface interface {
 	ComponentStatusesGetter
 	NamespacesGetter
 	EventsGetter
+	EndpointsGetter
 	PodsGetter
 	ServicesGetter
 	SecretsGetter
@@ -32,6 +33,7 @@ type Client struct {
 	componentStatusControllers map[string]ComponentStatusController
 	namespaceControllers       map[string]NamespaceController
 	eventControllers           map[string]EventController
+	endpointsControllers       map[string]EndpointsController
 	podControllers             map[string]PodController
 	serviceControllers         map[string]ServiceController
 	secretControllers          map[string]SecretController
@@ -55,6 +57,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		componentStatusControllers: map[string]ComponentStatusController{},
 		namespaceControllers:       map[string]NamespaceController{},
 		eventControllers:           map[string]EventController{},
+		endpointsControllers:       map[string]EndpointsController{},
 		podControllers:             map[string]PodController{},
 		serviceControllers:         map[string]ServiceController{},
 		secretControllers:          map[string]SecretController{},
@@ -119,6 +122,19 @@ type EventsGetter interface {
 func (c *Client) Events(namespace string) EventInterface {
 	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &EventResource, EventGroupVersionKind, eventFactory{})
 	return &eventClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type EndpointsGetter interface {
+	Endpoints(namespace string) EndpointsInterface
+}
+
+func (c *Client) Endpoints(namespace string) EndpointsInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &EndpointsResource, EndpointsGroupVersionKind, endpointsFactory{})
+	return &endpointsClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

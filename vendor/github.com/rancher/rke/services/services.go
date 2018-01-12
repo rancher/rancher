@@ -28,7 +28,7 @@ const (
 	NginxProxyContainerName     = "nginx-proxy"
 	SidekickContainerName       = "service-sidekick"
 
-	KubeAPIPort        = 8080
+	KubeAPIPort        = 6443
 	SchedulerPort      = 10251
 	KubeControllerPort = 10252
 	KubeletPort        = 10250

@@ -16,7 +16,7 @@ type dialer struct {
 }
 
 func SSHFactory(h *Host) (func(network, address string) (net.Conn, error), error) {
-	key, err := checkEncryptedKey(h.SSHKey, h.SSHKeyPath)
+	key, err := h.checkEncryptedKey()
 	if err != nil {
 		return nil, fmt.Errorf("Failed to parse the private key: %v", err)
 	}
@@ -28,7 +28,7 @@ func SSHFactory(h *Host) (func(network, address string) (net.Conn, error), error
 }
 
 func LocalConnFactory(h *Host) (func(network, address string) (net.Conn, error), error) {
-	key, err := checkEncryptedKey(h.SSHKey, h.SSHKeyPath)
+	key, err := h.checkEncryptedKey()
 	if err != nil {
 		return nil, fmt.Errorf("Failed to parse the private key: %v", err)
 	}

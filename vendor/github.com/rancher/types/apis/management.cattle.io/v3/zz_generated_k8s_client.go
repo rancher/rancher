@@ -36,6 +36,7 @@ type Interface interface {
 	TokensGetter
 	UsersGetter
 	DynamicSchemasGetter
+	StacksGetter
 }
 
 type Client struct {
@@ -65,6 +66,7 @@ type Client struct {
 	tokenControllers                      map[string]TokenController
 	userControllers                       map[string]UserController
 	dynamicSchemaControllers              map[string]DynamicSchemaController
+	stackControllers                      map[string]StackController
 }
 
 func NewForConfig(config rest.Config) (Interface, error) {
@@ -103,6 +105,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		tokenControllers:                      map[string]TokenController{},
 		userControllers:                       map[string]UserController{},
 		dynamicSchemaControllers:              map[string]DynamicSchemaController{},
+		stackControllers:                      map[string]StackController{},
 	}, nil
 }
 
@@ -398,6 +401,19 @@ type DynamicSchemasGetter interface {
 func (c *Client) DynamicSchemas(namespace string) DynamicSchemaInterface {
 	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &DynamicSchemaResource, DynamicSchemaGroupVersionKind, dynamicSchemaFactory{})
 	return &dynamicSchemaClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type StacksGetter interface {
+	Stacks(namespace string) StackInterface
+}
+
+func (c *Client) Stacks(namespace string) StackInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &StackResource, StackGroupVersionKind, stackFactory{})
+	return &stackClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

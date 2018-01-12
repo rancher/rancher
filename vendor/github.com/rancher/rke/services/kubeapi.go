@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/go-connections/nat"
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/pki"
@@ -18,7 +17,7 @@ func runKubeAPI(ctx context.Context, host *hosts.Host, etcdHosts []*hosts.Host, 
 	if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, KubeAPIContainerName, host.Address, ControlRole); err != nil {
 		return err
 	}
-	return runHealthcheck(ctx, host, KubeAPIPort, false, KubeAPIContainerName, df)
+	return runHealthcheck(ctx, host, KubeAPIPort, true, KubeAPIContainerName, df)
 }
 
 func removeKubeAPI(ctx context.Context, host *hosts.Host) error {
@@ -32,7 +31,7 @@ func buildKubeAPIConfig(host *hosts.Host, kubeAPIService v3.KubeAPIService, etcd
 			"kube-apiserver",
 			"--insecure-bind-address=127.0.0.1",
 			"--bind-address=0.0.0.0",
-			"--insecure-port=8080",
+			"--insecure-port=0",
 			"--secure-port=6443",
 			"--cloud-provider=",
 			"--allow_privileged=true",
@@ -63,14 +62,6 @@ func buildKubeAPIConfig(host *hosts.Host, kubeAPIService v3.KubeAPIService, etcd
 		},
 		NetworkMode:   "host",
 		RestartPolicy: container.RestartPolicy{Name: "always"},
-		PortBindings: nat.PortMap{
-			"8080/tcp": []nat.PortBinding{
-				{
-					HostIP:   "0.0.0.0",
-					HostPort: "8080",
-				},
-			},
-		},
 	}
 
 	for arg, value := range kubeAPIService.ExtraArgs {

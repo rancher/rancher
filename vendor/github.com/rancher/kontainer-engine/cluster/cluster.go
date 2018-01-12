@@ -112,6 +112,9 @@ func (c *Cluster) create(ctx context.Context) error {
 	// create cluster
 	info, err := c.Driver.Create(ctx, &driverOpts)
 	if err != nil {
+		if info != nil {
+			transformClusterInfo(c, info)
+		}
 		return err
 	}
 
