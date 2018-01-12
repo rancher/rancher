@@ -3,7 +3,8 @@ from common import auth_check
 
 def test_machine_fields(cclient):
     fields = {
-        'clusterId': 'r',
+        'namespaceId': 'cr',
+        'conditions': 'r',
         'allocatable': 'r',
         'capacity': 'r',
         'hostname': 'r',
@@ -12,8 +13,8 @@ def test_machine_fields(cclient):
         'limits': 'r',
         'nodeName': 'r',
         'requested': 'r',
-        'requestedClusterId': 'cr',
-        'requestedRoles': 'cr',
+        'clusterId': 'cr',
+        'role': 'cr',
         'requestedHostname': 'cr',
         'volumesAttached': 'r',
         'machineTemplateId': 'cr',
