@@ -102,7 +102,7 @@ func (p *ObjectClient) GetNamespace(name, namespace string, opts metav1.GetOptio
 	if namespace != "" {
 		req = req.Namespace(namespace)
 	}
-	err := req.NamespaceIfScoped(p.ns, p.resource.Namespaced).
+	err := req.
 		Resource(p.resource.Name).
 		VersionedParams(&opts, dynamic.VersionedParameterEncoderWithV1Fallback).
 		Name(name).

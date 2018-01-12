@@ -19,12 +19,13 @@ const (
 	ClusterFieldDefaultClusterRoleForProjectMembers = "defaultClusterRoleForProjectMembers"
 	ClusterFieldDefaultPodSecurityPolicyTemplateId  = "defaultPodSecurityPolicyTemplateId"
 	ClusterFieldDescription                         = "description"
-	ClusterFieldFinalizers                          = "finalizers"
+	ClusterFieldDriver                              = "driver"
 	ClusterFieldGoogleKubernetesEngineConfig        = "googleKubernetesEngineConfig"
 	ClusterFieldInternal                            = "internal"
 	ClusterFieldLabels                              = "labels"
 	ClusterFieldLimits                              = "limits"
 	ClusterFieldName                                = "name"
+	ClusterFieldNodes                               = "nodes"
 	ClusterFieldOwnerReferences                     = "ownerReferences"
 	ClusterFieldRancherKubernetesEngineConfig       = "rancherKubernetesEngineConfig"
 	ClusterFieldRemoved                             = "removed"
@@ -51,12 +52,13 @@ type Cluster struct {
 	DefaultClusterRoleForProjectMembers string                         `json:"defaultClusterRoleForProjectMembers,omitempty"`
 	DefaultPodSecurityPolicyTemplateId  string                         `json:"defaultPodSecurityPolicyTemplateId,omitempty"`
 	Description                         string                         `json:"description,omitempty"`
-	Finalizers                          []string                       `json:"finalizers,omitempty"`
+	Driver                              string                         `json:"driver,omitempty"`
 	GoogleKubernetesEngineConfig        *GoogleKubernetesEngineConfig  `json:"googleKubernetesEngineConfig,omitempty"`
 	Internal                            *bool                          `json:"internal,omitempty"`
 	Labels                              map[string]string              `json:"labels,omitempty"`
 	Limits                              map[string]string              `json:"limits,omitempty"`
 	Name                                string                         `json:"name,omitempty"`
+	Nodes                               []MachineConfig                `json:"nodes,omitempty"`
 	OwnerReferences                     []OwnerReference               `json:"ownerReferences,omitempty"`
 	RancherKubernetesEngineConfig       *RancherKubernetesEngineConfig `json:"rancherKubernetesEngineConfig,omitempty"`
 	Removed                             string                         `json:"removed,omitempty"`

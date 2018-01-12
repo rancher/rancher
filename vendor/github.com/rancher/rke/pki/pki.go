@@ -1,12 +1,14 @@
 package pki
 
 import (
+	"context"
 	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
 	"net"
 
 	"github.com/rancher/rke/hosts"
+	"github.com/rancher/rke/log"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/util/cert"
 )
@@ -27,19 +29,19 @@ type CertificatePKI struct {
 }
 
 // StartCertificatesGeneration ...
-func StartCertificatesGeneration(cpHosts []*hosts.Host, workerHosts []*hosts.Host, clusterDomain, localConfigPath string, KubernetesServiceIP net.IP) (map[string]CertificatePKI, error) {
-	logrus.Infof("[certificates] Generating kubernetes certificates")
-	certs, err := generateCerts(cpHosts, clusterDomain, localConfigPath, KubernetesServiceIP)
+func StartCertificatesGeneration(ctx context.Context, cpHosts []*hosts.Host, workerHosts []*hosts.Host, clusterDomain, localConfigPath string, KubernetesServiceIP net.IP) (map[string]CertificatePKI, error) {
+	log.Infof(ctx, "[certificates] Generating kubernetes certificates")
+	certs, err := generateCerts(ctx, cpHosts, clusterDomain, localConfigPath, KubernetesServiceIP)
 	if err != nil {
 		return nil, err
 	}
 	return certs, nil
 }
 
-func generateCerts(cpHosts []*hosts.Host, clusterDomain, localConfigPath string, KubernetesServiceIP net.IP) (map[string]CertificatePKI, error) {
+func generateCerts(ctx context.Context, cpHosts []*hosts.Host, clusterDomain, localConfigPath string, KubernetesServiceIP net.IP) (map[string]CertificatePKI, error) {
 	certs := make(map[string]CertificatePKI)
 	// generate CA certificate and key
-	logrus.Infof("[certificates] Generating CA kubernetes certificates")
+	log.Infof(ctx, "[certificates] Generating CA kubernetes certificates")
 	caCrt, caKey, err := generateCACertAndKey()
 	if err != nil {
 		return nil, err
@@ -56,7 +58,7 @@ func generateCerts(cpHosts []*hosts.Host, clusterDomain, localConfigPath string,
 	}
 
 	// generate API certificate and key
-	logrus.Infof("[certificates] Generating Kubernetes API server certificates")
+	log.Infof(ctx, "[certificates] Generating Kubernetes API server certificates")
 	kubeAPIAltNames := GetAltNames(cpHosts, clusterDomain, KubernetesServiceIP)
 	kubeAPICrt, kubeAPIKey, err := GenerateKubeAPICertAndKey(caCrt, caKey, kubeAPIAltNames)
 	if err != nil {
@@ -74,7 +76,7 @@ func generateCerts(cpHosts []*hosts.Host, clusterDomain, localConfigPath string,
 	}
 
 	// generate Kube controller-manager certificate and key
-	logrus.Infof("[certificates] Generating Kube Controller certificates")
+	log.Infof(ctx, "[certificates] Generating Kube Controller certificates")
 	kubeControllerCrt, kubeControllerKey, err := generateClientCertAndKey(caCrt, caKey, KubeControllerCommonName, []string{})
 	if err != nil {
 		return nil, err
@@ -95,7 +97,7 @@ func generateCerts(cpHosts []*hosts.Host, clusterDomain, localConfigPath string,
 	}
 
 	// generate Kube scheduler certificate and key
-	logrus.Infof("[certificates] Generating Kube Scheduler certificates")
+	log.Infof(ctx, "[certificates] Generating Kube Scheduler certificates")
 	kubeSchedulerCrt, kubeSchedulerKey, err := generateClientCertAndKey(caCrt, caKey, KubeSchedulerCommonName, []string{})
 	if err != nil {
 		return nil, err
@@ -116,7 +118,7 @@ func generateCerts(cpHosts []*hosts.Host, clusterDomain, localConfigPath string,
 	}
 
 	// generate Kube Proxy certificate and key
-	logrus.Infof("[certificates] Generating Kube Proxy certificates")
+	log.Infof(ctx, "[certificates] Generating Kube Proxy certificates")
 	kubeProxyCrt, kubeProxyKey, err := generateClientCertAndKey(caCrt, caKey, KubeProxyCommonName, []string{})
 	if err != nil {
 		return nil, err
@@ -137,7 +139,7 @@ func generateCerts(cpHosts []*hosts.Host, clusterDomain, localConfigPath string,
 	}
 
 	// generate Kubelet certificate and key
-	logrus.Infof("[certificates] Generating Node certificate")
+	log.Infof(ctx, "[certificates] Generating Node certificate")
 	nodeCrt, nodeKey, err := generateClientCertAndKey(caCrt, caKey, KubeNodeCommonName, []string{KubeNodeOrganizationName})
 	if err != nil {
 		return nil, err
@@ -157,7 +159,7 @@ func generateCerts(cpHosts []*hosts.Host, clusterDomain, localConfigPath string,
 		ConfigEnvName: KubeNodeConfigENVName,
 		ConfigPath:    KubeNodeCommonName,
 	}
-	logrus.Infof("[certificates] Generating admin certificates and kubeconfig")
+	log.Infof(ctx, "[certificates] Generating admin certificates and kubeconfig")
 	kubeAdminCrt, kubeAdminKey, err := generateClientCertAndKey(caCrt, caKey, KubeAdminCommonName, []string{KubeAdminOrganizationName})
 	if err != nil {
 		return nil, err

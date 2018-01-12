@@ -9,17 +9,21 @@ import (
 	"github.com/sirupsen/logrus"
 	v12 "k8s.io/api/core/v1"
 	v13 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+const creatorIDAnn = "field.cattle.io/creatorId"
+
 func newPandCLifecycles(management *config.ManagementContext) (*projectLifecycle, *clusterLifecycle) {
 	m := &mgr{
-		mgmt:       management,
-		nsLister:   management.Core.Namespaces("").Controller().Lister(),
-		prtbLister: management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
-		crtbLister: management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
+		mgmt:          management,
+		nsLister:      management.Core.Namespaces("").Controller().Lister(),
+		prtbLister:    management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
+		crtbLister:    management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
+		projectLister: management.Management.Projects("").Controller().Lister(),
 	}
 	p := &projectLifecycle{
 		mgr: m,
@@ -53,7 +57,8 @@ func (l *projectLifecycle) Updated(obj *v3.Project) (*v3.Project, error) {
 }
 
 func (l *projectLifecycle) Remove(obj *v3.Project) (*v3.Project, error) {
-	return obj, nil
+	err := l.mgr.deleteNamespace(obj)
+	return obj, err
 }
 
 type clusterLifecycle struct {
@@ -66,24 +71,73 @@ func (l *clusterLifecycle) Create(obj *v3.Cluster) (*v3.Cluster, error) {
 		return obj, err
 	}
 
+	_, err = l.mgr.createDefaultProject(obj)
+	if err != nil {
+		return obj, err
+	}
+
 	_, err = l.mgr.reconcileCreatorRTB(obj)
 	return obj, err
 }
 
 func (l *clusterLifecycle) Updated(obj *v3.Cluster) (*v3.Cluster, error) {
 	_, err := l.mgr.reconcileResourceToNamespace(obj)
+	if err != nil {
+		return obj, err
+	}
+
+	_, err = l.mgr.createDefaultProject(obj)
 	return obj, err
 }
 
 func (l *clusterLifecycle) Remove(obj *v3.Cluster) (*v3.Cluster, error) {
-	return obj, nil
+	err := l.mgr.deleteNamespace(obj)
+	return obj, err
 }
 
 type mgr struct {
-	mgmt       *config.ManagementContext
-	nsLister   corev1.NamespaceLister
+	mgmt          *config.ManagementContext
+	nsLister      corev1.NamespaceLister
+	projectLister v3.ProjectLister
+
 	prtbLister v3.ProjectRoleTemplateBindingLister
 	crtbLister v3.ClusterRoleTemplateBindingLister
+}
+
+func (m *mgr) createDefaultProject(obj *v3.Cluster) (runtime.Object, error) {
+	return v3.ClusterConditionconditionDefautlProjectCreated.DoUntilTrue(obj, func() (runtime.Object, error) {
+		projectName := "rancher-default"
+		p, _ := m.projectLister.Get(obj.Name, projectName)
+		if p != nil {
+			return obj, nil
+		}
+		metaAccessor, err := meta.Accessor(obj)
+		if err != nil {
+			return obj, err
+		}
+
+		creatorID, ok := metaAccessor.GetAnnotations()[creatorIDAnn]
+		if !ok {
+			logrus.Warnf("Cluster %v has no creatorId annotation. Cannot create default project", metaAccessor.GetName())
+			return obj, nil
+		}
+
+		_, err = m.mgmt.Management.Projects(obj.Name).Create(&v3.Project{
+			ObjectMeta: v1.ObjectMeta{
+				Name: projectName,
+				Annotations: map[string]string{
+					creatorIDAnn: creatorID,
+				},
+			},
+			Spec: v3.ProjectSpec{
+				DisplayName: "Default",
+				Description: "Default project created for the cluster",
+				ClusterName: obj.Name,
+			},
+		})
+
+		return obj, err
+	})
 }
 
 func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
@@ -98,7 +152,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 			return obj, err
 		}
 
-		creatorID, ok := metaAccessor.GetAnnotations()["field.cattle.io/creatorId"]
+		creatorID, ok := metaAccessor.GetAnnotations()[creatorIDAnn]
 		if !ok {
 			logrus.Warnf("%v %v has no creatorId annotation. Cannot add creator as owner", typeAccessor.GetKind(), metaAccessor.GetName())
 			return obj, nil
@@ -145,6 +199,20 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 	})
 }
 
+func (m *mgr) deleteNamespace(obj runtime.Object) error {
+	o, err := meta.Accessor(obj)
+	if err != nil {
+		return condition.Error("MissingMetadata", err)
+	}
+
+	nsClient := m.mgmt.K8sClient.CoreV1().Namespaces()
+	err = nsClient.Delete(o.GetName(), &v1.DeleteOptions{})
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	return err
+}
+
 func (m *mgr) reconcileResourceToNamespace(obj runtime.Object) (runtime.Object, error) {
 	return v3.NamespaceBackedResource.Do(obj, func() (runtime.Object, error) {
 		o, err := meta.Accessor(obj)
@@ -155,6 +223,7 @@ func (m *mgr) reconcileResourceToNamespace(obj runtime.Object) (runtime.Object, 
 		if err != nil {
 			return obj, condition.Error("MissingTypeMetadata", err)
 		}
+
 		ns, _ := m.nsLister.Get("", o.GetName())
 		if ns == nil {
 			nsClient := m.mgmt.K8sClient.CoreV1().Namespaces()
@@ -163,14 +232,6 @@ func (m *mgr) reconcileResourceToNamespace(obj runtime.Object) (runtime.Object, 
 					Name: o.GetName(),
 					Annotations: map[string]string{
 						"management.cattle.io/system-namespace": "true",
-					},
-					OwnerReferences: []v1.OwnerReference{
-						{
-							APIVersion: t.GetAPIVersion(),
-							Kind:       t.GetKind(),
-							Name:       o.GetName(),
-							UID:        o.GetUID(),
-						},
 					},
 				},
 			})

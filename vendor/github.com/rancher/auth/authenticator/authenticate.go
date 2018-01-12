@@ -13,7 +13,8 @@ type Authenticator interface {
 
 func NewAuthenticator(ctx context.Context, mgmtCtx *config.ManagementContext) Authenticator {
 	return &tokenAuthenticator{
-		ctx:    ctx,
-		tokens: mgmtCtx.Management.Tokens("").Controller().Lister(),
+		ctx:         ctx,
+		tokens:      mgmtCtx.Management.Tokens("").Controller().Lister(),
+		tokenClient: mgmtCtx.Management.Tokens(""),
 	}
 }

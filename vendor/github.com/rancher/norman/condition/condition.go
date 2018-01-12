@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/controller"
+	err2 "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -45,7 +46,15 @@ func (c Cond) Message(obj runtime.Object, message string) {
 	getFieldValue(cond, "Message").SetString(message)
 }
 
+func (c Cond) GetMessage(obj runtime.Object) string {
+	cond := findOrCreateCond(obj, string(c))
+	return getFieldValue(cond, "Message").String()
+}
+
 func (c Cond) ReasonAndMessageFromError(obj runtime.Object, err error) {
+	if err2.IsConflict(err) {
+		return
+	}
 	cond := findOrCreateCond(obj, string(c))
 	getFieldValue(cond, "Message").SetString(err.Error())
 	if ce, ok := err.(*conditionError); ok {
@@ -87,7 +96,32 @@ func (c Cond) Once(obj runtime.Object, f func() (runtime.Object, error)) (runtim
 	return obj, nil
 }
 
+func (c Cond) DoUntilTrue(obj runtime.Object, f func() (runtime.Object, error)) (runtime.Object, error) {
+	if c.IsTrue(obj) {
+		return obj, nil
+	}
+
+	c.Unknown(obj)
+	newObj, err := f()
+	if newObj != nil {
+		obj = newObj
+	}
+
+	if err != nil {
+		c.ReasonAndMessageFromError(obj, err)
+		return obj, err
+	}
+	c.True(obj)
+	c.Reason(obj, "")
+	c.Message(obj, "")
+	return obj, nil
+}
+
 func (c Cond) Do(obj runtime.Object, f func() (runtime.Object, error)) (runtime.Object, error) {
+	return c.do(obj, f)
+}
+
+func (c Cond) do(obj runtime.Object, f func() (runtime.Object, error)) (runtime.Object, error) {
 	c.Unknown(obj)
 	newObj, err := f()
 	if newObj != nil {

@@ -2,36 +2,27 @@ package tokens
 
 import (
 	"crypto/rand"
-	"encoding/base64"
-	"fmt"
-	"regexp"
+	"math/big"
 	"strings"
 )
 
+const (
+	characters  = "bcdfghjklmnpqrstvwxz2456789"
+	tokenLength = 54
+)
+
+var charsLength = big.NewInt(int64(len(characters)))
+
 func generateKey() (string, error) {
-	n := 128
-	secretKey := make([]byte, n)
-	if _, err := rand.Read(secretKey); err != nil {
-		return "", err
+	token := make([]byte, tokenLength)
+	for i := range token {
+		r, err := rand.Int(rand.Reader, charsLength)
+		if err != nil {
+			return "", err
+		}
+		token[i] = characters[r.Int64()]
 	}
-	secretKeyString := base64.RawURLEncoding.EncodeToString(secretKey)
-	secretKeyString = sanitizeKey(secretKeyString)
-
-	if len(secretKeyString) < 40 {
-		/* Wow, this is terribly bad luck */
-		return "", fmt.Errorf("Failed to create secretKey due to not enough good characters")
-	}
-
-	return secretKeyString[0:40], nil
-}
-
-func sanitizeKey(key string) string {
-	re := regexp.MustCompile("[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*")
-	submatches := re.FindAllString(key, -1)
-	submatchJoin := strings.Join(submatches, "")
-	submatchJoin = strings.Trim(submatchJoin, "-")
-	submatchJoin = strings.Trim(submatchJoin, ".")
-	return submatchJoin
+	return string(token), nil
 }
 
 func getAuthProviderName(principalID string) string {

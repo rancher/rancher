@@ -2,7 +2,6 @@ package machine
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -17,6 +16,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var regExHyphen = regexp.MustCompile("([a-z])([A-Z])")
@@ -31,37 +31,7 @@ const (
 	errorCreatingMachine = "Error creating machine: "
 	machineDirEnvKey     = "MACHINE_STORAGE_PATH="
 	machineCmd           = "docker-machine"
-	defaultCattleHome    = "/var/lib/cattle"
 )
-
-func buildBaseHostDir(machineName string) (string, error) {
-	machineDir := filepath.Join(getWorkDir(), "machines", machineName)
-	return machineDir, os.MkdirAll(machineDir, 0740)
-}
-
-func getWorkDir() string {
-	workDir := os.Getenv("MACHINE_WORK_DIR")
-	if workDir == "" {
-		workDir = os.Getenv("CATTLE_HOME")
-	}
-	if workDir == "" {
-		workDir = defaultCattleHome
-	}
-	return filepath.Join(workDir, "machine")
-}
-
-func toMap(obj interface{}) (map[string]interface{}, error) {
-	data, err := json.Marshal(obj)
-	if err != nil {
-		return nil, err
-	}
-	var dataMap map[string]interface{}
-	err = json.Unmarshal(data, &dataMap)
-	if err != nil {
-		return nil, err
-	}
-	return dataMap, nil
-}
 
 func buildCreateCommand(machine *v3.Machine, configMap map[string]interface{}) []string {
 	sDriver := strings.ToLower(machine.Status.MachineTemplateSpec.Driver)
@@ -98,7 +68,7 @@ func buildCreateCommand(machine *v3.Machine, configMap map[string]interface{}) [
 }
 
 func buildEngineOpts(name string, values []string) []string {
-	opts := []string{}
+	var opts []string
 	for _, value := range values {
 		if value == "" {
 			continue
@@ -109,7 +79,7 @@ func buildEngineOpts(name string, values []string) []string {
 }
 
 func mapToSlice(m map[string]string) []string {
-	ret := []string{}
+	var ret []string
 	for k, v := range m {
 		ret = append(ret, fmt.Sprintf("%s=%s", k, v))
 	}
@@ -172,23 +142,30 @@ func getSSHKey(machineDir string, obj *v3.Machine) (string, error) {
 	return getSSHPrivateKey(machineDir, obj)
 }
 
-func (m *Lifecycle) reportStatus(stdoutReader io.Reader, stderrReader io.Reader, machine *v3.Machine) error {
+func (m *Lifecycle) reportStatus(stdoutReader io.Reader, stderrReader io.Reader, machine *v3.Machine) (*v3.Machine, error) {
 	scanner := bufio.NewScanner(stdoutReader)
 	for scanner.Scan() {
 		msg := scanner.Text()
 		logrus.Infof("stdout: %s", msg)
 		_, err := filterDockerMessage(msg, machine)
 		if err != nil {
-			return err
+			return machine, err
 		}
 		m.logger.Info(machine, msg)
+		v3.MachineConditionProvisioned.Message(machine, msg)
+		// ignore update errors
+		if newObj, err := m.machineClient.Update(machine); err == nil {
+			machine = newObj
+		} else {
+			machine, _ = m.machineClient.Get(machine.Name, metav1.GetOptions{})
+		}
 	}
 	scanner = bufio.NewScanner(stderrReader)
 	for scanner.Scan() {
 		msg := scanner.Text()
-		return errors.New(msg)
+		return machine, errors.New(msg)
 	}
-	return nil
+	return machine, nil
 }
 
 func filterDockerMessage(msg string, machine *v3.Machine) (string, error) {

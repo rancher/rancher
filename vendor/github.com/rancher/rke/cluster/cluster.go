@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"path/filepath"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/rancher/rke/authz"
 	"github.com/rancher/rke/hosts"
+	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -32,7 +34,7 @@ type Cluster struct {
 	ClusterCIDR                      string
 	ClusterDNSServer                 string
 	DockerDialerFactory              hosts.DialerFactory
-	HealthcheckDialerFactory         hosts.DialerFactory
+	LocalConnDialerFactory           hosts.DialerFactory
 }
 
 const (
@@ -52,35 +54,35 @@ const (
 	NoneAuthorizationMode      = "none"
 )
 
-func (c *Cluster) DeployControlPlane() error {
+func (c *Cluster) DeployControlPlane(ctx context.Context) error {
 	// Deploy Etcd Plane
-	if err := services.RunEtcdPlane(c.EtcdHosts, c.Services.Etcd); err != nil {
+	if err := services.RunEtcdPlane(ctx, c.EtcdHosts, c.Services.Etcd, c.LocalConnDialerFactory); err != nil {
 		return fmt.Errorf("[etcd] Failed to bring up Etcd Plane: %v", err)
 	}
 	// Deploy Control plane
-	if err := services.RunControlPlane(c.ControlPlaneHosts,
+	if err := services.RunControlPlane(ctx, c.ControlPlaneHosts,
 		c.EtcdHosts,
 		c.Services,
 		c.SystemImages[ServiceSidekickImage],
 		c.Authorization.Mode,
-		c.HealthcheckDialerFactory); err != nil {
+		c.LocalConnDialerFactory); err != nil {
 		return fmt.Errorf("[controlPlane] Failed to bring up Control Plane: %v", err)
 	}
 	// Apply Authz configuration after deploying controlplane
-	if err := c.ApplyAuthzResources(); err != nil {
+	if err := c.ApplyAuthzResources(ctx); err != nil {
 		return fmt.Errorf("[auths] Failed to apply RBAC resources: %v", err)
 	}
 	return nil
 }
 
-func (c *Cluster) DeployWorkerPlane() error {
+func (c *Cluster) DeployWorkerPlane(ctx context.Context) error {
 	// Deploy Worker Plane
-	if err := services.RunWorkerPlane(c.ControlPlaneHosts,
+	if err := services.RunWorkerPlane(ctx, c.ControlPlaneHosts,
 		c.WorkerHosts,
 		c.Services,
 		c.SystemImages[NginxProxyImage],
 		c.SystemImages[ServiceSidekickImage],
-		c.HealthcheckDialerFactory); err != nil {
+		c.LocalConnDialerFactory); err != nil {
 		return fmt.Errorf("[workerPlane] Failed to bring up Worker Plane: %v", err)
 	}
 	return nil
@@ -95,16 +97,16 @@ func ParseConfig(clusterFile string) (*v3.RancherKubernetesEngineConfig, error) 
 	return &rkeConfig, nil
 }
 
-func ParseCluster(rkeConfig *v3.RancherKubernetesEngineConfig, clusterFilePath string, dockerDialerFactory, healthcheckDialerFactory hosts.DialerFactory) (*Cluster, error) {
+func ParseCluster(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig, clusterFilePath string, dockerDialerFactory, localConnDialerFactory hosts.DialerFactory) (*Cluster, error) {
 	var err error
 	c := &Cluster{
 		RancherKubernetesEngineConfig: *rkeConfig,
 		ConfigPath:                    clusterFilePath,
 		DockerDialerFactory:           dockerDialerFactory,
-		HealthcheckDialerFactory:      healthcheckDialerFactory,
+		LocalConnDialerFactory:        localConnDialerFactory,
 	}
 	// Setting cluster Defaults
-	c.setClusterDefaults()
+	c.setClusterDefaults(ctx)
 
 	if err := c.InvertIndexHosts(); err != nil {
 		return nil, fmt.Errorf("Failed to classify hosts from config file: %v", err)
@@ -128,7 +130,7 @@ func ParseCluster(rkeConfig *v3.RancherKubernetesEngineConfig, clusterFilePath s
 	return c, nil
 }
 
-func (c *Cluster) setClusterDefaults() {
+func (c *Cluster) setClusterDefaults(ctx context.Context) {
 	if len(c.SSHKeyPath) == 0 {
 		c.SSHKeyPath = DefaultClusterSSHKeyPath
 	}
@@ -148,7 +150,7 @@ func (c *Cluster) setClusterDefaults() {
 		c.Authorization.Mode = DefaultAuthorizationMode
 	}
 	if c.Services.KubeAPI.PodSecurityPolicy && c.Authorization.Mode != services.RBACAuthorizationMode {
-		logrus.Warnf("PodSecurityPolicy can't be enabled with RBAC support disabled")
+		log.Warnf(ctx, "PodSecurityPolicy can't be enabled with RBAC support disabled")
 		c.Services.KubeAPI.PodSecurityPolicy = false
 	}
 	c.setClusterServicesDefaults()
@@ -165,6 +167,12 @@ func (c *Cluster) setClusterServicesDefaults() {
 		&c.Services.Kubelet.ClusterDomain:                DefaultClusterDomain,
 		&c.Services.Kubelet.InfraContainerImage:          DefaultInfraContainerImage,
 		&c.Authentication.Strategy:                       DefaultAuthStrategy,
+		&c.Services.KubeAPI.Image:                        DefaultK8sImage,
+		&c.Services.Scheduler.Image:                      DefaultK8sImage,
+		&c.Services.KubeController.Image:                 DefaultK8sImage,
+		&c.Services.Kubelet.Image:                        DefaultK8sImage,
+		&c.Services.Kubeproxy.Image:                      DefaultK8sImage,
+		&c.Services.Etcd.Image:                           DefaultEtcdImage,
 	}
 	for k, v := range serviceConfigDefaultsMap {
 		setDefaultIfEmpty(k, v)
@@ -198,8 +206,8 @@ func GetLocalKubeConfig(configPath string) string {
 	return fmt.Sprintf("%s%s%s", baseDir, pki.KubeAdminConfigPrefix, fileName)
 }
 
-func rebuildLocalAdminConfig(kubeCluster *Cluster) error {
-	logrus.Infof("[reconcile] Rebuilding and updating local kube config")
+func rebuildLocalAdminConfig(ctx context.Context, kubeCluster *Cluster) error {
+	log.Infof(ctx, "[reconcile] Rebuilding and updating local kube config")
 	var workingConfig, newConfig string
 	currentKubeConfig := kubeCluster.Certificates[pki.KubeAdminCommonName]
 	caCrt := kubeCluster.Certificates[pki.CACertName].Certificate
@@ -214,12 +222,12 @@ func rebuildLocalAdminConfig(kubeCluster *Cluster) error {
 			keyData := string(cert.EncodePrivateKeyPEM(currentKubeConfig.Key))
 			newConfig = pki.GetKubeConfigX509WithData(kubeURL, pki.KubeAdminCommonName, caData, crtData, keyData)
 		}
-		if err := pki.DeployAdminConfig(newConfig, kubeCluster.LocalKubeConfigPath); err != nil {
+		if err := pki.DeployAdminConfig(ctx, newConfig, kubeCluster.LocalKubeConfigPath); err != nil {
 			return fmt.Errorf("Failed to redeploy local admin config with new host")
 		}
 		workingConfig = newConfig
 		if _, err := GetK8sVersion(kubeCluster.LocalKubeConfigPath); err == nil {
-			logrus.Infof("[reconcile] host [%s] is active master on the cluster", cpHost.Address)
+			log.Infof(ctx, "[reconcile] host [%s] is active master on the cluster", cpHost.Address)
 			break
 		}
 	}
@@ -228,9 +236,9 @@ func rebuildLocalAdminConfig(kubeCluster *Cluster) error {
 	return nil
 }
 
-func isLocalConfigWorking(localKubeConfigPath string) bool {
+func isLocalConfigWorking(ctx context.Context, localKubeConfigPath string) bool {
 	if _, err := GetK8sVersion(localKubeConfigPath); err != nil {
-		logrus.Infof("[reconcile] Local config is not vaild, rebuilding admin config")
+		log.Infof(ctx, "[reconcile] Local config is not vaild, rebuilding admin config")
 		return false
 	}
 	return true
@@ -257,23 +265,23 @@ func getLocalAdminConfigWithNewAddress(localConfigPath, cpAddress string) string
 		string(config.KeyData))
 }
 
-func (c *Cluster) ApplyAuthzResources() error {
-	if err := authz.ApplyJobDeployerServiceAccount(c.LocalKubeConfigPath); err != nil {
+func (c *Cluster) ApplyAuthzResources(ctx context.Context) error {
+	if err := authz.ApplyJobDeployerServiceAccount(ctx, c.LocalKubeConfigPath); err != nil {
 		return fmt.Errorf("Failed to apply the ServiceAccount needed for job execution: %v", err)
 	}
 	if c.Authorization.Mode == NoneAuthorizationMode {
 		return nil
 	}
 	if c.Authorization.Mode == services.RBACAuthorizationMode {
-		if err := authz.ApplySystemNodeClusterRoleBinding(c.LocalKubeConfigPath); err != nil {
+		if err := authz.ApplySystemNodeClusterRoleBinding(ctx, c.LocalKubeConfigPath); err != nil {
 			return fmt.Errorf("Failed to apply the ClusterRoleBinding needed for node authorization: %v", err)
 		}
 	}
 	if c.Authorization.Mode == services.RBACAuthorizationMode && c.Services.KubeAPI.PodSecurityPolicy {
-		if err := authz.ApplyDefaultPodSecurityPolicy(c.LocalKubeConfigPath); err != nil {
+		if err := authz.ApplyDefaultPodSecurityPolicy(ctx, c.LocalKubeConfigPath); err != nil {
 			return fmt.Errorf("Failed to apply default PodSecurityPolicy: %v", err)
 		}
-		if err := authz.ApplyDefaultPodSecurityPolicyRole(c.LocalKubeConfigPath); err != nil {
+		if err := authz.ApplyDefaultPodSecurityPolicyRole(ctx, c.LocalKubeConfigPath); err != nil {
 			return fmt.Errorf("Failed to apply default PodSecurityPolicy ClusterRole and ClusterRoleBinding: %v", err)
 		}
 	}

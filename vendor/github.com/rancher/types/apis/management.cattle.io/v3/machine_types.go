@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/condition"
+	"github.com/rancher/norman/types"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -44,6 +45,8 @@ type MachineTemplateSpec struct {
 }
 
 type Machine struct {
+	types.Namespaced
+
 	metav1.TypeMeta `json:",inline"`
 	// Standard object’s metadata. More info:
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
@@ -60,7 +63,6 @@ type MachineStatus struct {
 	Conditions          []MachineCondition   `json:"conditions,omitempty"`
 	NodeStatus          v1.NodeStatus        `json:"nodeStatus,omitempty"`
 	NodeName            string               `json:"nodeName,omitempty"`
-	ClusterName         string               `json:"clusterName,omitempty" norman:"type=reference[cluster]"`
 	Requested           v1.ResourceList      `json:"requested,omitempty"`
 	Limits              v1.ResourceList      `json:"limits,omitempty"`
 	MachineTemplateSpec *MachineTemplateSpec `json:"machineTemplateSpec,omitempty"`
@@ -91,14 +93,20 @@ type MachineCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
+type MachineConfig struct {
+	MachineSpec
+	Labels      map[string]string `json:"labels"`
+	Annotations map[string]string `json:"annotations"`
+}
+
 type MachineSpec struct {
-	NodeSpec             v1.NodeSpec `json:"nodeSpec"`
-	Description          string      `json:"description,omitempty"`
-	DisplayName          string      `json:"displayName,omitempty"`
-	RequestedHostname    string      `json:"requestedHostname,omitempty" norman:"noupdate"`
-	RequestedClusterName string      `json:"requestedClusterName,omitempty" norman:"type=reference[cluster],noupdate"`
-	RequestedRoles       []string    `json:"requestedRoles,omitempty" norman:"noupdate"`
-	MachineTemplateName  string      `json:"machineTemplateName,omitempty" norman:"type=reference[machineTemplate],noupdate"`
+	NodeSpec            v1.NodeSpec `json:"nodeSpec"`
+	Description         string      `json:"description,omitempty"`
+	DisplayName         string      `json:"displayName,omitempty"`
+	RequestedHostname   string      `json:"requestedHostname,omitempty" norman:"noupdate"`
+	ClusterName         string      `json:"clusterName,omitempty" norman:"type=reference[cluster],noupdate,required"`
+	Role                []string    `json:"role,omitempty" norman:"noupdate"`
+	MachineTemplateName string      `json:"machineTemplateName,omitempty" norman:"type=reference[machineTemplate],noupdate"`
 }
 
 type MachineCommonParams struct {

@@ -83,8 +83,6 @@ func extractConfigJSON(extractedConfig string) (map[string]interface{}, error) {
 			}
 		}
 	}
-
-	return result, nil
 }
 
 func extractTLS(extractedConfig string) (*TLSConfig, error) {
@@ -143,8 +141,6 @@ func extractTLS(extractedConfig string) (*TLSConfig, error) {
 			}
 		}
 	}
-
-	return result, nil
 }
 
 func extractConfig(baseDir, extractedConfig string) error {

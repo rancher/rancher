@@ -9,7 +9,6 @@ const (
 	ClusterRegistrationTokenFieldAnnotations          = "annotations"
 	ClusterRegistrationTokenFieldCreated              = "created"
 	ClusterRegistrationTokenFieldCreatorID            = "creatorId"
-	ClusterRegistrationTokenFieldFinalizers           = "finalizers"
 	ClusterRegistrationTokenFieldLabels               = "labels"
 	ClusterRegistrationTokenFieldName                 = "name"
 	ClusterRegistrationTokenFieldOwnerReferences      = "ownerReferences"
@@ -26,7 +25,6 @@ type ClusterRegistrationToken struct {
 	Annotations          map[string]string               `json:"annotations,omitempty"`
 	Created              string                          `json:"created,omitempty"`
 	CreatorID            string                          `json:"creatorId,omitempty"`
-	Finalizers           []string                        `json:"finalizers,omitempty"`
 	Labels               map[string]string               `json:"labels,omitempty"`
 	Name                 string                          `json:"name,omitempty"`
 	OwnerReferences      []OwnerReference                `json:"ownerReferences,omitempty"`

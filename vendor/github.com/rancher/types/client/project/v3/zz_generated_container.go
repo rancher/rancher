@@ -17,7 +17,6 @@ const (
 	ContainerFieldPostStart                = "postStart"
 	ContainerFieldPreStop                  = "preStop"
 	ContainerFieldPrivileged               = "privileged"
-	ContainerFieldPullPolicy               = "pullPolicy"
 	ContainerFieldReadOnly                 = "readOnly"
 	ContainerFieldReadycheck               = "readycheck"
 	ContainerFieldResources                = "resources"
@@ -48,7 +47,6 @@ type Container struct {
 	PostStart                *Handler          `json:"postStart,omitempty"`
 	PreStop                  *Handler          `json:"preStop,omitempty"`
 	Privileged               *bool             `json:"privileged,omitempty"`
-	PullPolicy               string            `json:"pullPolicy,omitempty"`
 	ReadOnly                 *bool             `json:"readOnly,omitempty"`
 	Readycheck               *Probe            `json:"readycheck,omitempty"`
 	Resources                *Resources        `json:"resources,omitempty"`

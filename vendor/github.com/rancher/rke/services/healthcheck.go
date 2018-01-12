@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"io/ioutil"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/rancher/rke/hosts"
+	"github.com/rancher/rke/log"
 	"github.com/sirupsen/logrus"
 )
 
@@ -18,9 +20,9 @@ const (
 	HTTPSProtoPrefix = "https://"
 )
 
-func runHealthcheck(host *hosts.Host, port int, useTLS bool, serviceName string, healthcheckDialerFactory hosts.DialerFactory) error {
-	logrus.Infof("[healthcheck] Start Healthcheck on service [%s] on host [%s]", serviceName, host.Address)
-	client, err := getHealthCheckHTTPClient(host, port, healthcheckDialerFactory)
+func runHealthcheck(ctx context.Context, host *hosts.Host, port int, useTLS bool, serviceName string, localConnDialerFactory hosts.DialerFactory) error {
+	log.Infof(ctx, "[healthcheck] Start Healthcheck on service [%s] on host [%s]", serviceName, host.Address)
+	client, err := getHealthCheckHTTPClient(host, port, localConnDialerFactory)
 	if err != nil {
 		return fmt.Errorf("Failed to initiate new HTTP client for service [%s] for host [%s]", serviceName, host.Address)
 	}
@@ -30,19 +32,19 @@ func runHealthcheck(host *hosts.Host, port int, useTLS bool, serviceName string,
 			time.Sleep(5 * time.Second)
 			continue
 		}
-		logrus.Infof("[healthcheck] service [%s] on host [%s] is healthy", serviceName, host.Address)
+		log.Infof(ctx, "[healthcheck] service [%s] on host [%s] is healthy", serviceName, host.Address)
 		return nil
 	}
 	return fmt.Errorf("Failed to verify healthcheck: %v", err)
 }
 
-func getHealthCheckHTTPClient(host *hosts.Host, port int, healthcheckDialerFactory hosts.DialerFactory) (*http.Client, error) {
-	host.HealthcheckPort = port
+func getHealthCheckHTTPClient(host *hosts.Host, port int, localConnDialerFactory hosts.DialerFactory) (*http.Client, error) {
+	host.LocalConnPort = port
 	var factory hosts.DialerFactory
-	if healthcheckDialerFactory == nil {
-		factory = hosts.HealthcheckFactory
+	if localConnDialerFactory == nil {
+		factory = hosts.LocalConnFactory
 	} else {
-		factory = healthcheckDialerFactory
+		factory = localConnDialerFactory
 	}
 	dialer, err := factory(host)
 	if err != nil {

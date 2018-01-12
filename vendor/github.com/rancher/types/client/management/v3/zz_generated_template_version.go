@@ -11,7 +11,6 @@ const (
 	TemplateVersionFieldCreatorID             = "creatorId"
 	TemplateVersionFieldExternalID            = "externalId"
 	TemplateVersionFieldFiles                 = "files"
-	TemplateVersionFieldFinalizers            = "finalizers"
 	TemplateVersionFieldLabels                = "labels"
 	TemplateVersionFieldMaximumRancherVersion = "maximumRancherVersion"
 	TemplateVersionFieldMinimumRancherVersion = "minimumRancherVersion"
@@ -38,7 +37,6 @@ type TemplateVersion struct {
 	CreatorID             string                 `json:"creatorId,omitempty"`
 	ExternalID            string                 `json:"externalId,omitempty"`
 	Files                 []File                 `json:"files,omitempty"`
-	Finalizers            []string               `json:"finalizers,omitempty"`
 	Labels                map[string]string      `json:"labels,omitempty"`
 	MaximumRancherVersion string                 `json:"maximumRancherVersion,omitempty"`
 	MinimumRancherVersion string                 `json:"minimumRancherVersion,omitempty"`

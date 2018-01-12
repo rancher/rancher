@@ -11,6 +11,7 @@ import (
 
 	"github.com/docker/docker/client"
 	"github.com/rancher/rke/docker"
+	"github.com/rancher/rke/log"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/terminal"
@@ -21,11 +22,11 @@ const (
 	K8sVersion       = "1.8"
 )
 
-func (h *Host) TunnelUp(dialerFactory DialerFactory) error {
+func (h *Host) TunnelUp(ctx context.Context, dialerFactory DialerFactory) error {
 	if h.DClient != nil {
 		return nil
 	}
-	logrus.Infof("[dialer] Setup tunnel for host [%s]", h.Address)
+	log.Infof(ctx, "[dialer] Setup tunnel for host [%s]", h.Address)
 	httpClient, err := h.newHTTPClient(dialerFactory)
 	if err != nil {
 		return fmt.Errorf("Can't establish dialer connection: %v", err)
@@ -37,7 +38,7 @@ func (h *Host) TunnelUp(dialerFactory DialerFactory) error {
 	if err != nil {
 		return fmt.Errorf("Can't initiate NewClient: %v", err)
 	}
-	info, err := h.DClient.Info(context.Background())
+	info, err := h.DClient.Info(ctx)
 	if err != nil {
 		return fmt.Errorf("Can't retrieve Docker Info: %v", err)
 	}
@@ -47,10 +48,10 @@ func (h *Host) TunnelUp(dialerFactory DialerFactory) error {
 		return fmt.Errorf("Error while determining supported Docker version [%s]: %v", info.ServerVersion, err)
 	}
 
-	if !isvalid && !h.IgnoreDockerVersion {
+	if !isvalid && h.EnforceDockerVersion {
 		return fmt.Errorf("Unsupported Docker version found [%s], supported versions are %v", info.ServerVersion, docker.K8sDockerVersions[K8sVersion])
 	} else if !isvalid {
-		logrus.Warnf("Unsupported Docker version found [%s], supported versions are %v", info.ServerVersion, docker.K8sDockerVersions[K8sVersion])
+		log.Warnf(ctx, "Unsupported Docker version found [%s], supported versions are %v", info.ServerVersion, docker.K8sDockerVersions[K8sVersion])
 	}
 
 	return nil

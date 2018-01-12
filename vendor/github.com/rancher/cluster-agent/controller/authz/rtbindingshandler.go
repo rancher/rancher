@@ -6,7 +6,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/slice"
-	typesextv1beta1 "github.com/rancher/types/apis/extensions/v1beta1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	typesrbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
@@ -20,7 +19,7 @@ import (
 )
 
 const (
-	finalizerName       = "rtbFinalizer"
+	finalizerName       = "rtbFinalizer-"
 	rtbOwnerLabel       = "io.cattle.rtb.owner"
 	projectIDAnnotation = "field.cattle.io/projectId"
 	prtbIndex           = "authz.cluster.cattle.io/prtb-index"
@@ -43,32 +42,34 @@ func Register(workload *config.ClusterContext) {
 	nsInformer.AddIndexers(nsIndexers)
 
 	r := &roleHandler{
-		workload:    workload,
-		prtbIndexer: informer.GetIndexer(),
-		nsIndexer:   nsInformer.GetIndexer(),
-		rtLister:    workload.Management.Management.RoleTemplates("").Controller().Lister(),
-		psptLister:  workload.Management.Management.PodSecurityPolicyTemplates("").Controller().Lister(),
-		rbLister:    workload.RBAC.RoleBindings("").Controller().Lister(),
-		crbLister:   workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
-		crLister:    workload.RBAC.ClusterRoles("").Controller().Lister(),
-		pspLister:   workload.Extensions.PodSecurityPolicies("").Controller().Lister(),
+		workload:      workload,
+		prtbIndexer:   informer.GetIndexer(),
+		nsIndexer:     nsInformer.GetIndexer(),
+		rtLister:      workload.Management.Management.RoleTemplates("").Controller().Lister(),
+		rbLister:      workload.RBAC.RoleBindings("").Controller().Lister(),
+		crbLister:     workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
+		crLister:      workload.RBAC.ClusterRoles("").Controller().Lister(),
+		finalizerName: finalizerName + workload.ClusterName,
 	}
 	workload.Management.Management.ProjectRoleTemplateBindings("").Controller().AddHandler(r.syncPRTB)
 	workload.Management.Management.ClusterRoleTemplateBindings("").Controller().AddHandler(r.syncCRTB)
 	workload.Management.Management.RoleTemplates("").Controller().AddHandler(r.syncRT)
 	workload.Core.Namespaces("").Controller().AddHandler(r.syncNS)
+
+	namespaceLifecycle := newNSLifecycle(workload)
+	workload.Core.Namespaces("").AddLifecycle("defaultNamespace", namespaceLifecycle)
+
 }
 
 type roleHandler struct {
-	workload    *config.ClusterContext
-	rtLister    v3.RoleTemplateLister
-	prtbIndexer cache.Indexer
-	nsIndexer   cache.Indexer
-	psptLister  v3.PodSecurityPolicyTemplateLister
-	crLister    typesrbacv1.ClusterRoleLister
-	crbLister   typesrbacv1.ClusterRoleBindingLister
-	rbLister    typesrbacv1.RoleBindingLister
-	pspLister   typesextv1beta1.PodSecurityPolicyLister
+	workload      *config.ClusterContext
+	rtLister      v3.RoleTemplateLister
+	prtbIndexer   cache.Indexer
+	nsIndexer     cache.Indexer
+	crLister      typesrbacv1.ClusterRoleLister
+	crbLister     typesrbacv1.ClusterRoleBindingLister
+	rbLister      typesrbacv1.RoleBindingLister
+	finalizerName string
 }
 
 func (r *roleHandler) syncCRTB(key string, binding *v3.ClusterRoleTemplateBinding) error {
@@ -84,7 +85,7 @@ func (r *roleHandler) syncCRTB(key string, binding *v3.ClusterRoleTemplateBindin
 }
 
 func (r *roleHandler) ensureCRTBDelete(key string, binding *v3.ClusterRoleTemplateBinding) error {
-	if len(binding.ObjectMeta.Finalizers) <= 0 || binding.ObjectMeta.Finalizers[0] != finalizerName {
+	if len(binding.ObjectMeta.Finalizers) <= 0 || binding.ObjectMeta.Finalizers[0] != r.finalizerName {
 		return nil
 	}
 
@@ -218,7 +219,7 @@ func (r *roleHandler) ensurePRTB(key string, binding *v3.ProjectRoleTemplateBind
 }
 
 func (r *roleHandler) ensurePRTBDelete(key string, binding *v3.ProjectRoleTemplateBinding) error {
-	if len(binding.ObjectMeta.Finalizers) <= 0 || binding.ObjectMeta.Finalizers[0] != finalizerName {
+	if len(binding.ObjectMeta.Finalizers) <= 0 || binding.ObjectMeta.Finalizers[0] != r.finalizerName {
 		return nil
 	}
 
@@ -288,7 +289,7 @@ func (r *roleHandler) ensureRT(key string, template *v3.RoleTemplate) error {
 }
 
 func (r *roleHandler) ensureRTDelete(key string, template *v3.RoleTemplate) error {
-	if len(template.ObjectMeta.Finalizers) <= 0 || template.ObjectMeta.Finalizers[0] != finalizerName {
+	if len(template.ObjectMeta.Finalizers) <= 0 || template.ObjectMeta.Finalizers[0] != r.finalizerName {
 		return nil
 	}
 
@@ -333,23 +334,23 @@ func (r *roleHandler) gatherRoles(rt *v3.RoleTemplate, roleTemplates map[string]
 }
 
 func (r *roleHandler) addFinalizer(objectMeta metav1.Object) bool {
-	if slice.ContainsString(objectMeta.GetFinalizers(), finalizerName) {
+	if slice.ContainsString(objectMeta.GetFinalizers(), r.finalizerName) {
 		return false
 	}
 
-	objectMeta.SetFinalizers(append(objectMeta.GetFinalizers(), finalizerName))
+	objectMeta.SetFinalizers(append(objectMeta.GetFinalizers(), r.finalizerName))
 	return true
 }
 
 func (r *roleHandler) removeFinalizer(objectMeta metav1.Object) bool {
-	if !slice.ContainsString(objectMeta.GetFinalizers(), finalizerName) {
+	if !slice.ContainsString(objectMeta.GetFinalizers(), r.finalizerName) {
 		return false
 	}
 
 	changed := false
 	var finalizers []string
 	for _, finalizer := range objectMeta.GetFinalizers() {
-		if finalizer == finalizerName {
+		if finalizer == r.finalizerName {
 			changed = true
 			continue
 		}

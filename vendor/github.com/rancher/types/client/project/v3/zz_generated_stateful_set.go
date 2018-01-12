@@ -15,7 +15,6 @@ const (
 	StatefulSetFieldCreatorID                     = "creatorId"
 	StatefulSetFieldDNSPolicy                     = "dnsPolicy"
 	StatefulSetFieldDeploymentStrategy            = "deploymentStrategy"
-	StatefulSetFieldFinalizers                    = "finalizers"
 	StatefulSetFieldFsgid                         = "fsgid"
 	StatefulSetFieldGids                          = "gids"
 	StatefulSetFieldHostAliases                   = "hostAliases"
@@ -32,6 +31,7 @@ const (
 	StatefulSetFieldPriority                      = "priority"
 	StatefulSetFieldPriorityClassName             = "priorityClassName"
 	StatefulSetFieldProjectID                     = "projectId"
+	StatefulSetFieldPullPolicy                    = "pullPolicy"
 	StatefulSetFieldPullSecrets                   = "pullSecrets"
 	StatefulSetFieldRemoved                       = "removed"
 	StatefulSetFieldRestart                       = "restart"
@@ -68,7 +68,6 @@ type StatefulSet struct {
 	CreatorID                     string                     `json:"creatorId,omitempty"`
 	DNSPolicy                     string                     `json:"dnsPolicy,omitempty"`
 	DeploymentStrategy            *DeployStrategy            `json:"deploymentStrategy,omitempty"`
-	Finalizers                    []string                   `json:"finalizers,omitempty"`
 	Fsgid                         *int64                     `json:"fsgid,omitempty"`
 	Gids                          []int64                    `json:"gids,omitempty"`
 	HostAliases                   map[string]HostAlias       `json:"hostAliases,omitempty"`
@@ -85,6 +84,7 @@ type StatefulSet struct {
 	Priority                      *int64                     `json:"priority,omitempty"`
 	PriorityClassName             string                     `json:"priorityClassName,omitempty"`
 	ProjectID                     string                     `json:"projectId,omitempty"`
+	PullPolicy                    string                     `json:"pullPolicy,omitempty"`
 	PullSecrets                   []LocalObjectReference     `json:"pullSecrets,omitempty"`
 	Removed                       string                     `json:"removed,omitempty"`
 	Restart                       string                     `json:"restart,omitempty"`

@@ -27,7 +27,7 @@ func SSHFactory(h *Host) (func(network, address string) (net.Conn, error), error
 	return dialer.DialDocker, nil
 }
 
-func HealthcheckFactory(h *Host) (func(network, address string) (net.Conn, error), error) {
+func LocalConnFactory(h *Host) (func(network, address string) (net.Conn, error), error) {
 	key, err := checkEncryptedKey(h.SSHKey, h.SSHKeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to parse the private key: %v", err)
@@ -36,7 +36,7 @@ func HealthcheckFactory(h *Host) (func(network, address string) (net.Conn, error
 		host:   h,
 		signer: key,
 	}
-	return dialer.DialHealthcheck, nil
+	return dialer.DialLocalConn, nil
 }
 
 func (d *dialer) DialDocker(network, addr string) (net.Conn, error) {
@@ -61,7 +61,7 @@ func (d *dialer) DialDocker(network, addr string) (net.Conn, error) {
 	return remote, err
 }
 
-func (d *dialer) DialHealthcheck(network, addr string) (net.Conn, error) {
+func (d *dialer) DialLocalConn(network, addr string) (net.Conn, error) {
 	sshAddr := d.host.Address + ":22"
 	// Build SSH client configuration
 	cfg, err := makeSSHConfig(d.host.User, d.signer)
@@ -73,9 +73,9 @@ func (d *dialer) DialHealthcheck(network, addr string) (net.Conn, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Failed to dial ssh using address [%s]: %v", sshAddr, err)
 	}
-	remote, err := conn.Dial("tcp", fmt.Sprintf("localhost:%d", d.host.HealthcheckPort))
+	remote, err := conn.Dial("tcp", fmt.Sprintf("localhost:%d", d.host.LocalConnPort))
 	if err != nil {
-		return nil, fmt.Errorf("Failed to dial to Healthcheck Port [%d] on host [%s]: %v", d.host.HealthcheckPort, d.host.Address, err)
+		return nil, fmt.Errorf("Failed to dial to Local Port [%d] on host [%s]: %v", d.host.LocalConnPort, d.host.Address, err)
 	}
 	return remote, err
 }

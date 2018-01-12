@@ -9,42 +9,70 @@ import (
 	"github.com/rancher/norman/types/values"
 )
 
-type conditionMapping struct {
-	Name        string
-	State       string
-	Transition  bool
-	Error       bool
-	FalseIsGood bool
-}
-
 type condition struct {
 	Type    string
 	Status  string
 	Message string
 }
 
-var conditionMappings = []conditionMapping{
-	{Name: "Initialized", Transition: true, State: "initializing"},
-	{Name: "Available", Transition: true, State: "activating"},
-	{Name: "Progressing", Transition: true, State: "updating"},
-	{Name: "Provisioned", Transition: true, State: "provisioning"},
-	{Name: "Saved", Transition: true, State: "saving"},
-	{Name: "AgentInstalled", Transition: true, State: "installing"},
-	{Name: "Updating", Transition: true, FalseIsGood: true, State: "updating"},
-	{Name: "ConfigOK", Transition: true, State: "configuring"},
-	{Name: "PodScheduled", Transition: true, State: "scheduling"},
-	{Name: "Completed", State: "completed"},
-	{Name: "Failed", Error: true, State: "error"},
-	{Name: "OutOfDisk", Error: true, FalseIsGood: true},
-	{Name: "MemoryPressure", Error: true, FalseIsGood: true},
-	{Name: "DiskPressure", Error: true, FalseIsGood: true},
-	{Name: "NetworkUnavailable", Error: true, FalseIsGood: true},
-	{Name: "KernelHasNoDeadlock", Error: true, FalseIsGood: true},
-	{Name: "Unschedulable", Error: true, FalseIsGood: true},
-	{Name: "ReplicaFailure", Error: true, FalseIsGood: true},
-	{Name: "Ready", Transition: false, State: "activating"},
-	{Name: "BackingNamespaceCreated", Transition: true, State: "activating"},
-	{Name: "CreatorMadeOwner", Transition: true, State: "activating"},
+// True ==
+// False == error
+// Unknown == transitioning
+var transitioningMap = map[string]string{
+	"AgentInstalled":           "installing",
+	"Available":                "activating",
+	"BackingNamespaceCreated":  "configuring",
+	"ConfigOK":                 "configuring",
+	"CreatorMadeOwner":         "configuring",
+	"DefaultNamespaceAssigned": "configuring",
+	"DefaultProjectCreated":    "configuring",
+	"Initialized":              "initializing",
+	"MachinesCreated":          "provisioning",
+	"PodScheduled":             "scheduling",
+	"Progressing":              "updating",
+	"Provisioned":              "provisioning",
+	"Removed":                  "removing",
+	"Saved":                    "saving",
+	"Updated":                  "updating",
+	"Updating":                 "updating",
+}
+
+// True == error
+// False ==
+// Unknown ==
+var reverseErrorMap = map[string]bool{
+	"OutOfDisk":           true,
+	"MemoryPressure":      true,
+	"DiskPressure":        true,
+	"NetworkUnavailable":  true,
+	"KernelHasNoDeadlock": true,
+	"Unschedulable":       true,
+	"ReplicaFailure":      true,
+}
+
+// True ==
+// False == error
+// Unknown ==
+var errorMapping = map[string]bool{
+	"Failed": true,
+}
+
+// True ==
+// False == transitioning
+// Unknown ==
+var doneMap = map[string]string{
+	"Completed": "activating",
+	"Ready":     "unavailable",
+}
+
+func concat(str, next string) string {
+	if str == "" {
+		return next
+	}
+	if next == "" {
+		return str
+	}
+	return str + ", " + next
 }
 
 func Set(data map[string]interface{}) {
@@ -77,54 +105,57 @@ func Set(data map[string]interface{}) {
 		return
 	}
 
-	conditionMap := map[string]condition{}
-	for _, c := range conditions {
-		conditionMap[c.Type] = condition{
-			Status:  c.Status,
-			Message: c.Message,
-		}
-	}
-
 	state := ""
 	error := false
 	transitioning := false
 	message := ""
 
-	for _, conditionMapping := range conditionMappings {
-		good := true
-		condition, ok := conditionMap[conditionMapping.Name]
+	for _, c := range conditions {
+		if errorMapping[c.Type] && c.Status == "False" {
+			error = true
+			message = c.Message
+			break
+		}
+	}
+
+	if !error {
+		for _, c := range conditions {
+			if reverseErrorMap[c.Type] && c.Status == "True" {
+				error = true
+				message = concat(message, c.Message)
+			}
+		}
+	}
+
+	for _, c := range conditions {
+		newState, ok := transitioningMap[c.Type]
 		if !ok {
 			continue
 		}
 
-		if conditionMapping.FalseIsGood && condition.Status == "True" {
-			good = false
-		} else if !conditionMapping.FalseIsGood && condition.Status == "False" {
-			good = false
-		} else if conditionMapping.Transition && !conditionMapping.FalseIsGood && condition.Status == "Unknown" {
-			good = false
-		}
-
-		if !good && conditionMapping.Transition {
-			transitioning = true
-			if len(message) > 0 {
-				message = strings.Join([]string{message, condition.Message}, ",")
-			} else {
-				message = condition.Message
-			}
-		}
-
-		if !good && state == "" && conditionMapping.State != "" {
-			state = conditionMapping.State
-		}
-
-		if !good && conditionMapping.Error {
+		if c.Status == "False" {
 			error = true
-			if len(message) > 0 {
-				message = strings.Join([]string{message, condition.Message}, ",")
-			} else {
-				message = condition.Message
-			}
+			state = newState
+			message = concat(message, c.Message)
+		} else if c.Status == "Unknown" && state == "" {
+			transitioning = true
+			state = newState
+			message = concat(message, c.Message)
+		}
+	}
+
+	for _, c := range conditions {
+		if state != "" {
+			break
+		}
+		newState, ok := doneMap[c.Type]
+		if !ok {
+			continue
+		}
+		if c.Status == "False" {
+			transitioning = true
+			state = newState
+			message = concat(message, c.Message)
 		}
 	}
 
@@ -140,8 +171,8 @@ func Set(data map[string]interface{}) {
 	}
 
 	if state == "" {
-		val, _ := values.GetValueN(data, "status", "phase").(string)
-		if val != "" {
+		val, ok := values.GetValueN(data, "status", "phase").(string)
+		if val != "" && ok {
 			state = val
 		}
 	}
@@ -149,9 +180,7 @@ func Set(data map[string]interface{}) {
 	if state == "" && len(conditions) == 0 {
 		if val, ok := values.GetValue(data, "metadata", "created"); ok {
 			if i, err := convert.ToTimestamp(val); err == nil {
-				if time.Unix(i/1000, 0).Add(5 * time.Second).Before(time.Now()) {
-					state = "active"
-				} else {
+				if time.Unix(i/1000, 0).Add(5 * time.Second).After(time.Now()) {
 					state = "initializing"
 					transitioning = true
 				}

@@ -24,15 +24,17 @@ const (
 
 type HealthSyncer struct {
 	clusterName       string
-	Clusters          v3.ClusterInterface
-	ComponentStatuses corev1.ComponentStatusInterface
+	clusters          v3.ClusterLister
+	clustersClient    v3.ClusterInterface
+	componentStatuses corev1.ComponentStatusInterface
 }
 
 func Register(ctx context.Context, workload *config.ClusterContext) {
 	h := &HealthSyncer{
 		clusterName:       workload.ClusterName,
-		Clusters:          workload.Management.Management.Clusters(""),
-		ComponentStatuses: workload.Core.ComponentStatuses(""),
+		clusters:          workload.Management.Management.Clusters("").Controller().Lister(),
+		clustersClient:    workload.Management.Management.Clusters(""),
+		componentStatuses: workload.Core.ComponentStatuses(""),
 	}
 
 	go h.syncHealth(ctx, syncInterval)
@@ -62,7 +64,7 @@ func (h *HealthSyncer) updateClusterHealth() error {
 	}
 
 	newObj, err := v3.ClusterConditionReady.Do(cluster, func() (runtime.Object, error) {
-		cses, err := h.ComponentStatuses.List(metav1.ListOptions{})
+		cses, err := h.componentStatuses.List(metav1.ListOptions{})
 		if err != nil {
 			return cluster, condition.Error("ComponentStatsFetchingFailure", errors.Wrap(err, "Failed to communicate with API server"))
 		}
@@ -74,7 +76,7 @@ func (h *HealthSyncer) updateClusterHealth() error {
 		return cluster, nil
 	})
 
-	_, err = h.Clusters.Update(newObj.(*v3.Cluster))
+	_, err = h.clustersClient.Update(newObj.(*v3.Cluster))
 	if err != nil {
 		return fmt.Errorf("Failed to update cluster [%s] %v", cluster.Name, err)
 	}
@@ -84,7 +86,7 @@ func (h *HealthSyncer) updateClusterHealth() error {
 }
 
 func (h *HealthSyncer) getCluster() (*v3.Cluster, error) {
-	return h.Clusters.Get(h.clusterName, metav1.GetOptions{})
+	return h.clusters.Get("", h.clusterName)
 }
 
 func convertToClusterComponentStatus(cs *v1.ComponentStatus) *v3.ClusterComponentStatus {

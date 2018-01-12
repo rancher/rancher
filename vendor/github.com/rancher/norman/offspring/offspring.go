@@ -2,12 +2,11 @@ package offspring
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
 	"sync"
-
-	"encoding/json"
 
 	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/types/values"

@@ -11,7 +11,6 @@ const (
 	GlobalRoleFieldCreated         = "created"
 	GlobalRoleFieldCreatorID       = "creatorId"
 	GlobalRoleFieldDescription     = "description"
-	GlobalRoleFieldFinalizers      = "finalizers"
 	GlobalRoleFieldId              = "id"
 	GlobalRoleFieldLabels          = "labels"
 	GlobalRoleFieldName            = "name"
@@ -28,7 +27,6 @@ type GlobalRole struct {
 	Created         string            `json:"created,omitempty"`
 	CreatorID       string            `json:"creatorId,omitempty"`
 	Description     string            `json:"description,omitempty"`
-	Finalizers      []string          `json:"finalizers,omitempty"`
 	Id              string            `json:"id,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`
 	Name            string            `json:"name,omitempty"`

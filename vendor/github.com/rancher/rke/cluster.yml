@@ -19,7 +19,7 @@ network:
     flannel_cni_image: quay.io/coreos/flannel-cni:v0.2.0
 
 ssh_key_path: ~/.ssh/test
-ignore_docker_version: false
+enforce_docker_version: false
 # Kubernetes authorization mode; currently only `rbac` is supported and enabled by default.
 # Use `mode: none` to disable authorization
 authorization:

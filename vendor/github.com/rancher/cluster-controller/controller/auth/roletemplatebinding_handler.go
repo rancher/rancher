@@ -7,17 +7,21 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/slice"
+	v12 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	typesrbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
 	"k8s.io/api/rbac/v1"
+	errors2 "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 const (
 	projectResource = "projects"
 	clusterResource = "clusters"
+	owner           = "owner"
 )
 
 func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *crtbLifecycle) {
@@ -28,6 +32,7 @@ func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *cr
 		rLister:   management.RBAC.Roles("").Controller().Lister(),
 		rbLister:  management.RBAC.RoleBindings("").Controller().Lister(),
 		rtLister:  management.Management.RoleTemplates("").Controller().Lister(),
+		nsLister:  management.Core.Namespaces("").Controller().Lister(),
 	}
 	prtb := &prtbLifecycle{
 		mgr:           mgr,
@@ -58,10 +63,15 @@ func (p *prtbLifecycle) Updated(obj *v3.ProjectRoleTemplateBinding) (*v3.Project
 }
 
 func (p *prtbLifecycle) Remove(obj *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
-	// Don't need to delete the created ClusterRoleBinding because owner reference will take care of that
-	return nil, nil
+	err := p.mgr.reconcileMembershipBindingForDelete(string(obj.UID))
+	return nil, err
 }
 
+// When a PRTB is created or updated, translate it into several k8s roles and bindings to actually enforce the RBAC.
+// Specifically:
+// - ensure the user can see the project and its parent cluster in the mgmt API
+// - if the user was granted owner permissions for the project, ensure they can create/update/delete the project
+// - if the user was granted user managment privileges for the project, ensure they can create PRTBs in the project's namespace
 func (p *prtbLifecycle) ensureBindings(binding *v3.ProjectRoleTemplateBinding) error {
 	parts := strings.SplitN(binding.ProjectName, ":", 2)
 	if len(parts) < 2 {
@@ -94,16 +104,14 @@ func (p *prtbLifecycle) ensureBindings(binding *v3.ProjectRoleTemplateBinding) e
 		projectRoleName = strings.ToLower(fmt.Sprintf("%v-projectmember", projectName))
 	}
 
-	if err := p.mgr.ensureMembershipBinding(projectRoleName, projectResource, projectName, isOwnerRole, binding.Subject, binding.ObjectMeta,
-		binding.TypeMeta, proj.ObjectMeta, proj.TypeMeta); err != nil {
+	if err := p.mgr.ensureMembershipBinding(projectRoleName, projectResource, projectName, string(binding.UID), isOwnerRole, binding.Subject); err != nil {
 		return err
 	}
-	if err := p.mgr.ensureMembershipBinding(clusterRoleName, clusterResource, clusterName, false, binding.Subject, binding.ObjectMeta,
-		binding.TypeMeta, cluster.ObjectMeta, cluster.TypeMeta); err != nil {
+	if err := p.mgr.ensureMembershipBinding(clusterRoleName, clusterResource, clusterName, string(binding.UID), false, binding.Subject); err != nil {
 		return err
 	}
 
-	return p.mgr.ensureRTBBinding(binding.Namespace, binding.RoleTemplateName, "projectroletemplatebindings", binding.Subject, binding)
+	return p.mgr.grantUserManagementPrivilges(binding.RoleTemplateName, "projectroletemplatebindings", binding.Subject, binding)
 }
 
 type crtbLifecycle struct {
@@ -122,10 +130,15 @@ func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (*v3.Cluster
 }
 
 func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-	// Don't need to delete the created ClusterRoleBinding because owner reference will take care of that
-	return nil, nil
+	err := c.mgr.reconcileMembershipBindingForDelete(string(obj.UID))
+	return nil, err
 }
 
+// When a CRTB is created or updated, translate it into several k8s roles and bindings to actually enforce the RBAC
+// Specifically:
+// - ensure the user can see the cluster in the mgmt API
+// - if the user was granted owner permissions for the clsuter, ensure they can create/update/delete the project
+// - if the user was granted user managment privileges for the cluster, ensure they can create CRTBs in the cluster's namespace
 func (c *crtbLifecycle) ensureBindings(binding *v3.ClusterRoleTemplateBinding) error {
 	clusterName := binding.ClusterName
 	cluster, err := c.clusterLister.Get("", clusterName)
@@ -144,12 +157,11 @@ func (c *crtbLifecycle) ensureBindings(binding *v3.ClusterRoleTemplateBinding) e
 		clusterRoleName = strings.ToLower(fmt.Sprintf("%v-clustermember", clusterName))
 	}
 
-	if err := c.mgr.ensureMembershipBinding(clusterRoleName, clusterResource, clusterName, isOwnerRole, binding.Subject, binding.ObjectMeta,
-		binding.TypeMeta, cluster.ObjectMeta, cluster.TypeMeta); err != nil {
+	if err := c.mgr.ensureMembershipBinding(clusterRoleName, clusterResource, clusterName, string(binding.UID), isOwnerRole, binding.Subject); err != nil {
 		return err
 	}
 
-	return c.mgr.ensureRTBBinding(binding.Namespace, binding.RoleTemplateName, "clusterroletemplatebindings", binding.Subject, binding)
+	return c.mgr.grantUserManagementPrivilges(binding.RoleTemplateName, "clusterroletemplatebindings", binding.Subject, binding)
 }
 
 type manager struct {
@@ -158,62 +170,25 @@ type manager struct {
 	rbLister  typesrbacv1.RoleBindingLister
 	crbLister typesrbacv1.ClusterRoleBindingLister
 	rtLister  v3.RoleTemplateLister
+	nsLister  v12.NamespaceLister
 	mgmt      *config.ManagementContext
 }
 
-func (m *manager) ensureRole(roleName, resource, resourceName string, isOwnerRole bool, ownerMeta metav1.ObjectMeta, ownerTypeMeta metav1.TypeMeta) error {
-	roleCli := m.mgmt.RBAC.ClusterRoles("")
-	if cr, _ := m.crLister.Get("", roleName); cr == nil {
-		rules := []v1.PolicyRule{
-			{
-				APIGroups:     []string{"management.cattle.io"},
-				Resources:     []string{resource},
-				ResourceNames: []string{resourceName},
-				Verbs:         []string{"get"},
-			},
-		}
-		if isOwnerRole {
-			rules[0].Verbs = []string{"*"}
-		} else {
-			rules[0].Verbs = []string{"get"}
-		}
-		_, err := roleCli.Create(&v1.ClusterRole{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: roleName,
-				OwnerReferences: []metav1.OwnerReference{
-					{
-						APIVersion: ownerTypeMeta.APIVersion,
-						Kind:       ownerTypeMeta.Kind,
-						Name:       ownerMeta.Name,
-						UID:        ownerMeta.UID,
-					},
-				},
-			},
-			Rules: rules,
-		})
+// When a PRTB/CRTB is created that gives a user some permissions in a project or cluster, we need to create a "membership" binding
+// that gives the user access to the the project/cluster custom resource itself
+func (m *manager) ensureMembershipBinding(roleName, resource, clusterOrProjectName, rtbUID string, makeOwner bool, subject v1.Subject) error {
+	if err := m.createMembershipRole(roleName, resource, clusterOrProjectName, makeOwner); err != nil {
 		return err
 	}
-	return nil
-}
 
-func (m *manager) ensureMembershipBinding(roleName, resource, resourceName string, isOwnerRole bool, subject v1.Subject, bindingOwnerMeta metav1.ObjectMeta,
-	bindingOwnerTypeMeta metav1.TypeMeta, roleOwnerMeta metav1.ObjectMeta, roleOwnerTypeMeta metav1.TypeMeta) error {
-	if err := m.ensureRole(roleName, resource, resourceName, isOwnerRole, roleOwnerMeta, roleOwnerTypeMeta); err != nil {
-		return err
-	}
 	name := strings.ToLower(fmt.Sprintf("%v-%v-%v", roleName, subject.Kind, subject.Name))
 	crb, _ := m.crbLister.Get("", name)
 	if crb == nil {
 		_, err := m.mgmt.RBAC.ClusterRoleBindings("").Create(&v1.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
-				OwnerReferences: []metav1.OwnerReference{
-					{
-						APIVersion: bindingOwnerTypeMeta.APIVersion,
-						Kind:       bindingOwnerTypeMeta.Kind,
-						Name:       bindingOwnerMeta.Name,
-						UID:        bindingOwnerMeta.UID,
-					},
+				Labels: map[string]string{
+					rtbUID: owner,
 				},
 			},
 			Subjects: []v1.Subject{subject},
@@ -224,40 +199,109 @@ func (m *manager) ensureMembershipBinding(roleName, resource, resourceName strin
 		})
 		return err
 	}
-	found := false
-	for _, o := range crb.OwnerReferences {
-		if bindingOwnerMeta.UID == o.UID && bindingOwnerMeta.Name == o.Name {
-			found = true
-			break
+
+	for owner := range crb.Labels {
+		if rtbUID == owner {
+			return nil
 		}
 	}
-	if !found {
-		crb = crb.DeepCopy()
-		crb.OwnerReferences = append(crb.OwnerReferences, metav1.OwnerReference{
-			APIVersion: bindingOwnerTypeMeta.APIVersion,
-			Kind:       bindingOwnerTypeMeta.Kind,
-			Name:       bindingOwnerMeta.Name,
-			UID:        bindingOwnerMeta.UID,
-		})
-		_, err := m.mgmt.RBAC.ClusterRoleBindings("").Update(crb)
-		if err != nil {
-			return err
+
+	crb = crb.DeepCopy()
+	if crb.Labels == nil {
+		crb.Labels = map[string]string{}
+	}
+	crb.Labels[rtbUID] = owner
+	_, err := m.mgmt.RBAC.ClusterRoleBindings("").Update(crb)
+	return err
+}
+
+// Creates a role that lets the bound user see (if they are an ordinary member) the project or cluster in the mgmt api
+// (or CRUD the project/cluster if they are an owner)
+func (m *manager) createMembershipRole(roleName, resource, projectOrClusterName string, makeOwner bool) error {
+	roleCli := m.mgmt.RBAC.ClusterRoles("")
+	ns, err := m.nsLister.Get("", projectOrClusterName)
+	if err != nil {
+		return err
+	}
+	if cr, _ := m.crLister.Get("", roleName); cr == nil {
+		rules := []v1.PolicyRule{
+			{
+				APIGroups:     []string{"management.cattle.io"},
+				Resources:     []string{resource},
+				ResourceNames: []string{projectOrClusterName},
+				Verbs:         []string{"get"},
+			},
 		}
+		if makeOwner {
+			rules[0].Verbs = []string{"*"}
+		} else {
+			rules[0].Verbs = []string{"get"}
+		}
+		_, err := roleCli.Create(&v1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: roleName,
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						APIVersion: ns.APIVersion,
+						Kind:       ns.Kind,
+						Name:       ns.Name,
+						UID:        ns.UID,
+					},
+				},
+			},
+			Rules: rules,
+		})
+		return err
 	}
 	return nil
 }
 
-// If the RoleTemplate being bound to grants privileges to PRTB/CRTB, create a role and binding the the project/cluster namespace
-// in the management plane
-func (m *manager) ensureRTBBinding(namespace, roleTemplateName, resource string, subject v1.Subject, binding interface{}) error {
-	metaAccessor, err := meta.Accessor(binding)
+// The PRTB/CRTB has been deleted, either delete or update the project/cluster membership binding so that the user
+// is removed from the project/cluster, if they should be
+func (m *manager) reconcileMembershipBindingForDelete(rtbUID string) error {
+	set := labels.Set(map[string]string{rtbUID: owner})
+	crbs, err := m.crbLister.List("", set.AsSelector())
 	if err != nil {
 		return err
 	}
-	typeAccessor, err := meta.TypeAccessor(binding)
+
+	for _, crb := range crbs {
+		crb = crb.DeepCopy()
+		for k, v := range crb.Labels {
+			if k == rtbUID && v == owner {
+				delete(crb.Labels, k)
+			}
+		}
+
+		if len(crb.Labels) == 0 {
+			if err := m.mgmt.RBAC.ClusterRoleBindings("").Delete(crb.Name, &metav1.DeleteOptions{}); err != nil {
+				if e, ok := err.(*errors2.StatusError); ok && e.ErrStatus.Code == 404 {
+					continue
+				}
+				return err
+			}
+		} else {
+			if _, err := m.mgmt.RBAC.ClusterRoleBindings("").Update(crb); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// When a CRTB/PRTB is create that grants user management privileges (ability to CUD PRTB/CRTB), we need to create  a k8s role and binding
+// in the project/cluster namespace in the management plane that grants the same privileges to the user for PRTB/CRTB
+func (m *manager) grantUserManagementPrivilges(roleTemplateName, userMgmtResource string, subject v1.Subject, binding interface{}) error {
+	bindingMeta, err := meta.Accessor(binding)
 	if err != nil {
 		return err
 	}
+	bindingTypeMeta, err := meta.TypeAccessor(binding)
+	if err != nil {
+		return err
+	}
+	namespace := bindingMeta.GetNamespace()
 
 	// gather roles that have PRTB/CRTB rules
 	rt, err := m.rtLister.Get("", roleTemplateName)
@@ -265,44 +309,32 @@ func (m *manager) ensureRTBBinding(namespace, roleTemplateName, resource string,
 		return err
 	}
 	allRoles := map[string]*v3.RoleTemplate{}
-	if err := m.gatherRTBRoles(rt, allRoles); err != nil {
+	if err := m.gatherRoleTemplates(rt, allRoles); err != nil {
 		return err
 	}
-	rtbRoles := map[string]*v3.RoleTemplate{}
-	rtbVerbs := map[string]map[string]bool{}
+	userMgmtRoles := map[string]*v3.RoleTemplate{}
+	userMgmtVerbs := map[string]map[string]bool{}
 	for _, role := range allRoles {
-		verbs := map[string]bool{}
-		rules, err := m.getRules(role)
-		if err != nil {
-			return err
-		}
-		for _, rule := range rules {
-			if (slice.ContainsString(rule.Resources, resource) || slice.ContainsString(rule.Resources, "*")) && len(rule.ResourceNames) == 0 && len(rule.Verbs) > 0 {
-				rtbRoles[role.Name] = role
-				for _, v := range rule.Verbs {
-					verbs[v] = true
-				}
-			}
-		}
+		verbs := m.checkForUserManagmentRules(role, userMgmtResource)
 		if len(verbs) > 0 {
-			rtbVerbs[role.Name] = verbs
+			userMgmtRoles[role.Name] = role
+			userMgmtVerbs[role.Name] = verbs
 		}
 	}
 
-	// if no roles have CRTB/PRTB rules, nothing to do
-	if len(rtbRoles) == 0 {
+	// if no roles are for user management, nothing to do
+	if len(userMgmtRoles) == 0 {
 		return nil
 	}
 
-	// create or find namespaced roles
-	if err := m.ensureRTBRoles(namespace, resource, rtbRoles, rtbVerbs); err != nil {
+	if err := m.reconcileUserMgmtRoles(namespace, userMgmtResource, userMgmtRoles, userMgmtVerbs); err != nil {
 		return err
 	}
 
 	// creating binding for user for each role in namespace
 	bindingCli := m.mgmt.RBAC.RoleBindings(namespace)
-	for roleName := range rtbRoles {
-		bindingName := metaAccessor.GetName()
+	for roleName := range userMgmtRoles {
+		bindingName := bindingMeta.GetName()
 		if b, _ := m.rbLister.Get(namespace, bindingName); b != nil {
 			return nil
 		}
@@ -312,10 +344,10 @@ func (m *manager) ensureRTBBinding(namespace, roleTemplateName, resource string,
 				Name: bindingName,
 				OwnerReferences: []metav1.OwnerReference{
 					{
-						APIVersion: typeAccessor.GetAPIVersion(),
-						Kind:       typeAccessor.GetKind(),
-						Name:       metaAccessor.GetName(),
-						UID:        metaAccessor.GetUID(),
+						APIVersion: bindingTypeMeta.GetAPIVersion(),
+						Kind:       bindingTypeMeta.GetKind(),
+						Name:       bindingMeta.GetName(),
+						UID:        bindingMeta.GetUID(),
 					},
 				},
 			},
@@ -334,20 +366,28 @@ func (m *manager) ensureRTBBinding(namespace, roleTemplateName, resource string,
 	return nil
 }
 
-func (m *manager) getRules(role *v3.RoleTemplate) ([]v1.PolicyRule, error) {
+// If the roleTemplate has rules granting C, U, or D to the CRTB/PRTB resource, return the verbs for those rules
+func (m *manager) checkForUserManagmentRules(role *v3.RoleTemplate, resource string) map[string]bool {
+	var rules []v1.PolicyRule
 	if !role.External {
-		return role.Rules, nil
+		rules = role.Rules
+	} else if r, _ := m.crLister.Get("", role.Name); r != nil {
+		rules = r.Rules
 	}
 
-	r, err := m.crLister.Get("", role.Name)
-	if err != nil {
-		return []v1.PolicyRule{}, err
+	verbs := map[string]bool{}
+	for _, rule := range rules {
+		if (slice.ContainsString(rule.Resources, resource) || slice.ContainsString(rule.Resources, "*")) && len(rule.ResourceNames) == 0 && len(rule.Verbs) > 0 {
+			for _, v := range rule.Verbs {
+				verbs[v] = true
+			}
+		}
 	}
 
-	return r.Rules, nil
+	return verbs
 }
 
-func (m *manager) ensureRTBRoles(namespace, resource string, rts map[string]*v3.RoleTemplate, roleRTBVerbs map[string]map[string]bool) error {
+func (m *manager) reconcileUserMgmtRoles(namespace, resource string, rts map[string]*v3.RoleTemplate, roleRTBVerbs map[string]map[string]bool) error {
 	roleCli := m.mgmt.RBAC.Roles(namespace)
 	for name, rt := range rts {
 		wantedVerbs, ok := roleRTBVerbs[name]
@@ -367,7 +407,7 @@ func (m *manager) ensureRTBRoles(namespace, resource string, rts map[string]*v3.
 
 			if !reflect.DeepEqual(currentVerbs, wantedVerbs) {
 				role = role.DeepCopy()
-				rules := buildRTBRules(resource, wantedVerbs)
+				rules := buildRules(resource, wantedVerbs)
 				role.Rules = rules
 				_, err := roleCli.Update(role)
 				if err != nil {
@@ -377,18 +417,10 @@ func (m *manager) ensureRTBRoles(namespace, resource string, rts map[string]*v3.
 			continue
 		}
 
-		rules := buildRTBRules(resource, wantedVerbs)
+		rules := buildRules(resource, wantedVerbs)
 		_, err := roleCli.Create(&v1.Role{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: rt.Name,
-				OwnerReferences: []metav1.OwnerReference{
-					{
-						APIVersion: rt.TypeMeta.APIVersion,
-						Kind:       rt.TypeMeta.Kind,
-						Name:       rt.Name,
-						UID:        rt.UID,
-					},
-				},
 			},
 			Rules: rules,
 		})
@@ -400,7 +432,7 @@ func (m *manager) ensureRTBRoles(namespace, resource string, rts map[string]*v3.
 	return nil
 }
 
-func (m *manager) gatherRTBRoles(rt *v3.RoleTemplate, roleTemplates map[string]*v3.RoleTemplate) error {
+func (m *manager) gatherRoleTemplates(rt *v3.RoleTemplate, roleTemplates map[string]*v3.RoleTemplate) error {
 	roleTemplates[rt.Name] = rt
 
 	for _, rtName := range rt.RoleTemplateNames {
@@ -408,7 +440,7 @@ func (m *manager) gatherRTBRoles(rt *v3.RoleTemplate, roleTemplates map[string]*
 		if err != nil {
 			return errors.Wrapf(err, "couldn't get RoleTemplate %s", rtName)
 		}
-		if err := m.gatherRTBRoles(subRT, roleTemplates); err != nil {
+		if err := m.gatherRoleTemplates(subRT, roleTemplates); err != nil {
 			return errors.Wrapf(err, "couldn't gather RoleTemplate %s", rtName)
 		}
 	}
@@ -416,7 +448,7 @@ func (m *manager) gatherRTBRoles(rt *v3.RoleTemplate, roleTemplates map[string]*
 	return nil
 }
 
-func buildRTBRules(resource string, verbs map[string]bool) []v1.PolicyRule {
+func buildRules(resource string, verbs map[string]bool) []v1.PolicyRule {
 	var vs []string
 	for v := range verbs {
 		vs = append(vs, v)

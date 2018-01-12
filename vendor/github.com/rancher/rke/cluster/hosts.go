@@ -3,26 +3,29 @@ package cluster
 import (
 	"fmt"
 
+	"context"
+
 	"github.com/rancher/rke/hosts"
+	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
 	"github.com/sirupsen/logrus"
 )
 
-func (c *Cluster) TunnelHosts() error {
+func (c *Cluster) TunnelHosts(ctx context.Context) error {
 	for i := range c.EtcdHosts {
-		if err := c.EtcdHosts[i].TunnelUp(c.DockerDialerFactory); err != nil {
+		if err := c.EtcdHosts[i].TunnelUp(ctx, c.DockerDialerFactory); err != nil {
 			return fmt.Errorf("Failed to set up SSH tunneling for Etcd host [%s]: %v", c.EtcdHosts[i].Address, err)
 		}
 	}
 	for i := range c.ControlPlaneHosts {
-		err := c.ControlPlaneHosts[i].TunnelUp(c.DockerDialerFactory)
+		err := c.ControlPlaneHosts[i].TunnelUp(ctx, c.DockerDialerFactory)
 		if err != nil {
 			return fmt.Errorf("Failed to set up SSH tunneling for Control host [%s]: %v", c.ControlPlaneHosts[i].Address, err)
 		}
 	}
 	for i := range c.WorkerHosts {
-		if err := c.WorkerHosts[i].TunnelUp(c.DockerDialerFactory); err != nil {
+		if err := c.WorkerHosts[i].TunnelUp(ctx, c.DockerDialerFactory); err != nil {
 			return fmt.Errorf("Failed to set up SSH tunneling for Worker host [%s]: %v", c.WorkerHosts[i].Address, err)
 		}
 	}
@@ -38,12 +41,13 @@ func (c *Cluster) InvertIndexHosts() error {
 			RKEConfigNode: host,
 		}
 
-		newHost.IgnoreDockerVersion = c.IgnoreDockerVersion
+		newHost.EnforceDockerVersion = c.EnforceDockerVersion
 
 		for _, role := range host.Role {
 			logrus.Debugf("Host: " + host.Address + " has role: " + role)
 			switch role {
 			case services.ETCDRole:
+				newHost.IsEtcd = true
 				c.EtcdHosts = append(c.EtcdHosts, &newHost)
 			case services.ControlRole:
 				newHost.IsControl = true
@@ -59,22 +63,22 @@ func (c *Cluster) InvertIndexHosts() error {
 	return nil
 }
 
-func (c *Cluster) SetUpHosts() error {
+func (c *Cluster) SetUpHosts(ctx context.Context) error {
 	if c.Authentication.Strategy == X509AuthenticationProvider {
-		logrus.Infof("[certificates] Deploying kubernetes certificates to Cluster nodes")
-		err := pki.DeployCertificatesOnMasters(c.ControlPlaneHosts, c.Certificates, c.SystemImages[CertDownloaderImage])
+		log.Infof(ctx, "[certificates] Deploying kubernetes certificates to Cluster nodes")
+		err := pki.DeployCertificatesOnMasters(ctx, c.ControlPlaneHosts, c.Certificates, c.SystemImages[CertDownloaderImage])
 		if err != nil {
 			return err
 		}
-		err = pki.DeployCertificatesOnWorkers(c.WorkerHosts, c.Certificates, c.SystemImages[CertDownloaderImage])
+		err = pki.DeployCertificatesOnWorkers(ctx, c.WorkerHosts, c.Certificates, c.SystemImages[CertDownloaderImage])
 		if err != nil {
 			return err
 		}
-		err = pki.DeployAdminConfig(c.Certificates[pki.KubeAdminCommonName].Config, c.LocalKubeConfigPath)
+		err = pki.DeployAdminConfig(ctx, c.Certificates[pki.KubeAdminCommonName].Config, c.LocalKubeConfigPath)
 		if err != nil {
 			return err
 		}
-		logrus.Infof("[certificates] Successfully deployed kubernetes certificates to Cluster nodes")
+		log.Infof(ctx, "[certificates] Successfully deployed kubernetes certificates to Cluster nodes")
 	}
 	return nil
 }

@@ -104,12 +104,28 @@ func LowerTitle(input string) string {
 }
 
 func IsEmpty(v interface{}) bool {
-	return v == nil || v == "" || v == 0 || v == false
+	if v == nil || v == "" || v == 0 || v == false {
+		return true
+	}
+	if m, ok := v.(map[string]interface{}); ok {
+		return len(m) == 0
+	}
+	if s, ok := v.([]interface{}); ok {
+		return len(s) == 0
+	}
+	return false
 }
 
 func ToMapInterface(obj interface{}) map[string]interface{} {
 	v, _ := obj.(map[string]interface{})
 	return v
+}
+
+func ToInterfaceSlice(obj interface{}) []interface{} {
+	if v, ok := obj.([]interface{}); ok {
+		return v
+	}
+	return nil
 }
 
 func ToMapSlice(obj interface{}) []map[string]interface{} {

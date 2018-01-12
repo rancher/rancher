@@ -1,13 +1,14 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/hosts"
+	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"k8s.io/client-go/util/cert"
 )
@@ -31,69 +32,65 @@ func UpCommand() cli.Command {
 	}
 }
 
-func ClusterUp(rkeConfig *v3.RancherKubernetesEngineConfig, dockerDialerFactory, healthcheckDialerFactory hosts.DialerFactory) (string, string, string, string, error) {
-	logrus.Infof("Building Kubernetes cluster")
+func ClusterUp(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig, dockerDialerFactory, localConnDialerFactory hosts.DialerFactory) (string, string, string, string, error) {
+	log.Infof(ctx, "Building Kubernetes cluster")
 	var APIURL, caCrt, clientCert, clientKey string
-	kubeCluster, err := cluster.ParseCluster(rkeConfig, clusterFilePath, dockerDialerFactory, healthcheckDialerFactory)
+	kubeCluster, err := cluster.ParseCluster(ctx, rkeConfig, clusterFilePath, dockerDialerFactory, localConnDialerFactory)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
 
-	err = kubeCluster.TunnelHosts()
+	err = kubeCluster.TunnelHosts(ctx)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
 
-	currentCluster, err := kubeCluster.GetClusterState()
+	currentCluster, err := kubeCluster.GetClusterState(ctx)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
 
-	if err := cluster.CheckEtcdHostsChanged(kubeCluster, currentCluster); err != nil {
-		return APIURL, caCrt, clientCert, clientKey, err
-	}
-
-	err = cluster.SetUpAuthentication(kubeCluster, currentCluster)
+	err = cluster.SetUpAuthentication(ctx, kubeCluster, currentCluster)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
 
-	err = cluster.ReconcileCluster(kubeCluster, currentCluster)
+	err = cluster.ReconcileCluster(ctx, kubeCluster, currentCluster)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
 
-	err = kubeCluster.SetUpHosts()
+	err = kubeCluster.SetUpHosts(ctx)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
 
-	err = kubeCluster.DeployControlPlane()
+	err = kubeCluster.DeployControlPlane(ctx)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
 
-	err = kubeCluster.SaveClusterState(rkeConfig)
+	err = kubeCluster.SaveClusterState(ctx, rkeConfig)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
 
-	err = kubeCluster.DeployWorkerPlane()
+	err = kubeCluster.DeployWorkerPlane(ctx)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
 
-	err = kubeCluster.DeployNetworkPlugin()
+	err = kubeCluster.DeployNetworkPlugin(ctx)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
 
-	err = kubeCluster.DeployK8sAddOns()
+	err = kubeCluster.DeployK8sAddOns(ctx)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
 
-	err = kubeCluster.DeployUserAddOns()
+	err = kubeCluster.DeployUserAddOns(ctx)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
@@ -103,7 +100,7 @@ func ClusterUp(rkeConfig *v3.RancherKubernetesEngineConfig, dockerDialerFactory,
 	clientCert = string(cert.EncodeCertPEM(kubeCluster.Certificates[pki.KubeAdminCommonName].Certificate))
 	clientKey = string(cert.EncodePrivateKeyPEM(kubeCluster.Certificates[pki.KubeAdminCommonName].Key))
 
-	logrus.Infof("Finished building Kubernetes cluster successfully")
+	log.Infof(ctx, "Finished building Kubernetes cluster successfully")
 	return APIURL, caCrt, clientCert, clientKey, nil
 }
 
@@ -118,6 +115,6 @@ func clusterUpFromCli(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("Failed to parse cluster file: %v", err)
 	}
-	_, _, _, _, err = ClusterUp(rkeConfig, nil, nil)
+	_, _, _, _, err = ClusterUp(context.Background(), rkeConfig, nil, nil)
 	return err
 }

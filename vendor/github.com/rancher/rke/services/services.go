@@ -1,13 +1,14 @@
 package services
 
 import (
+	"context"
 	"fmt"
 	"net"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
-	"github.com/sirupsen/logrus"
+	"github.com/rancher/rke/log"
 )
 
 const (
@@ -59,25 +60,25 @@ func buildSidekickConfig(sidekickImage string) (*container.Config, *container.Ho
 	return imageCfg, hostCfg
 }
 
-func runSidekick(host *hosts.Host, sidekickImage string) error {
-	isRunning, err := docker.IsContainerRunning(host.DClient, host.Address, SidekickContainerName, true)
+func runSidekick(ctx context.Context, host *hosts.Host, sidekickImage string) error {
+	isRunning, err := docker.IsContainerRunning(ctx, host.DClient, host.Address, SidekickContainerName, true)
 	if err != nil {
 		return err
 	}
 	if isRunning {
-		logrus.Infof("[%s] Sidekick container already created on host [%s]", SidekickServiceName, host.Address)
+		log.Infof(ctx, "[%s] Sidekick container already created on host [%s]", SidekickServiceName, host.Address)
 		return nil
 	}
 	imageCfg, hostCfg := buildSidekickConfig(sidekickImage)
-	if err := docker.UseLocalOrPull(host.DClient, host.Address, sidekickImage, SidekickServiceName); err != nil {
+	if err := docker.UseLocalOrPull(ctx, host.DClient, host.Address, sidekickImage, SidekickServiceName); err != nil {
 		return err
 	}
-	if _, err := docker.CreateContiner(host.DClient, host.Address, SidekickContainerName, imageCfg, hostCfg); err != nil {
+	if _, err := docker.CreateContiner(ctx, host.DClient, host.Address, SidekickContainerName, imageCfg, hostCfg); err != nil {
 		return err
 	}
 	return nil
 }
 
-func removeSidekick(host *hosts.Host) error {
-	return docker.DoRemoveContainer(host.DClient, SidekickContainerName, host.Address)
+func removeSidekick(ctx context.Context, host *hosts.Host) error {
+	return docker.DoRemoveContainer(ctx, host.DClient, SidekickContainerName, host.Address)
 }

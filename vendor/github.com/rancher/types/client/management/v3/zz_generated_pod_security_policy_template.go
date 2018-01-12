@@ -16,7 +16,6 @@ const (
 	PodSecurityPolicyTemplateFieldDefaultAllowPrivilegeEscalation = "defaultAllowPrivilegeEscalation"
 	PodSecurityPolicyTemplateFieldDescription                     = "description"
 	PodSecurityPolicyTemplateFieldFSGroup                         = "fsGroup"
-	PodSecurityPolicyTemplateFieldFinalizers                      = "finalizers"
 	PodSecurityPolicyTemplateFieldHostIPC                         = "hostIPC"
 	PodSecurityPolicyTemplateFieldHostNetwork                     = "hostNetwork"
 	PodSecurityPolicyTemplateFieldHostPID                         = "hostPID"
@@ -47,7 +46,6 @@ type PodSecurityPolicyTemplate struct {
 	DefaultAllowPrivilegeEscalation *bool                              `json:"defaultAllowPrivilegeEscalation,omitempty"`
 	Description                     string                             `json:"description,omitempty"`
 	FSGroup                         *FSGroupStrategyOptions            `json:"fsGroup,omitempty"`
-	Finalizers                      []string                           `json:"finalizers,omitempty"`
 	HostIPC                         *bool                              `json:"hostIPC,omitempty"`
 	HostNetwork                     *bool                              `json:"hostNetwork,omitempty"`
 	HostPID                         *bool                              `json:"hostPID,omitempty"`

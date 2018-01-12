@@ -2,12 +2,14 @@ package cmd
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/hosts"
+	"github.com/rancher/rke/log"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -34,25 +36,25 @@ func RemoveCommand() cli.Command {
 	}
 }
 
-func ClusterRemove(rkeConfig *v3.RancherKubernetesEngineConfig, dialerFactory hosts.DialerFactory) error {
-	logrus.Infof("Tearing down Kubernetes cluster")
-	kubeCluster, err := cluster.ParseCluster(rkeConfig, clusterFilePath, dialerFactory, nil)
+func ClusterRemove(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig, dialerFactory hosts.DialerFactory) error {
+	log.Infof(ctx, "Tearing down Kubernetes cluster")
+	kubeCluster, err := cluster.ParseCluster(ctx, rkeConfig, clusterFilePath, dialerFactory, nil)
 	if err != nil {
 		return err
 	}
 
-	err = kubeCluster.TunnelHosts()
+	err = kubeCluster.TunnelHosts(ctx)
 	if err != nil {
 		return err
 	}
 
 	logrus.Debugf("Starting Cluster removal")
-	err = kubeCluster.ClusterRemove()
+	err = kubeCluster.ClusterRemove(ctx)
 	if err != nil {
 		return err
 	}
 
-	logrus.Infof("Cluster removed successfully")
+	log.Infof(ctx, "Cluster removed successfully")
 	return nil
 }
 
@@ -80,5 +82,5 @@ func clusterRemoveFromCli(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("Failed to parse cluster file: %v", err)
 	}
-	return ClusterRemove(rkeConfig, nil)
+	return ClusterRemove(context.Background(), rkeConfig, nil)
 }

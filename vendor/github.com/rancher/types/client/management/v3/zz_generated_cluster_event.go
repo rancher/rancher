@@ -12,13 +12,13 @@ const (
 	ClusterEventFieldCreated         = "created"
 	ClusterEventFieldCreatorID       = "creatorId"
 	ClusterEventFieldEventType       = "eventType"
-	ClusterEventFieldFinalizers      = "finalizers"
 	ClusterEventFieldFirstTimestamp  = "firstTimestamp"
 	ClusterEventFieldInvolvedObject  = "involvedObject"
 	ClusterEventFieldLabels          = "labels"
 	ClusterEventFieldLastTimestamp   = "lastTimestamp"
 	ClusterEventFieldMessage         = "message"
 	ClusterEventFieldName            = "name"
+	ClusterEventFieldNamespaceId     = "namespaceId"
 	ClusterEventFieldOwnerReferences = "ownerReferences"
 	ClusterEventFieldReason          = "reason"
 	ClusterEventFieldRemoved         = "removed"
@@ -34,13 +34,13 @@ type ClusterEvent struct {
 	Created         string            `json:"created,omitempty"`
 	CreatorID       string            `json:"creatorId,omitempty"`
 	EventType       string            `json:"eventType,omitempty"`
-	Finalizers      []string          `json:"finalizers,omitempty"`
 	FirstTimestamp  string            `json:"firstTimestamp,omitempty"`
 	InvolvedObject  *ObjectReference  `json:"involvedObject,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`
 	LastTimestamp   string            `json:"lastTimestamp,omitempty"`
 	Message         string            `json:"message,omitempty"`
 	Name            string            `json:"name,omitempty"`
+	NamespaceId     string            `json:"namespaceId,omitempty"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
 	Reason          string            `json:"reason,omitempty"`
 	Removed         string            `json:"removed,omitempty"`

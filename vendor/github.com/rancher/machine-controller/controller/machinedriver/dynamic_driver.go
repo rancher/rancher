@@ -336,7 +336,7 @@ func (d *Driver) cacheFile() string {
 
 	base := os.Getenv("CATTLE_HOME")
 	if base == "" {
-		base = "/var/lib/cattle"
+		base = "/var/lib/rancher"
 	}
 
 	return path.Join(base, "machine-drivers", key)

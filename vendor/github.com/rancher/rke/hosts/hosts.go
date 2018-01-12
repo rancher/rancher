@@ -1,25 +1,29 @@
 package hosts
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/k8s"
+	"github.com/rancher/rke/log"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
 )
 
 type Host struct {
 	v3.RKEConfigNode
-	DClient             *client.Client
-	HealthcheckPort     int
-	IsControl           bool
-	IsWorker            bool
-	IgnoreDockerVersion bool
+	DClient              *client.Client
+	LocalConnPort        int
+	IsControl            bool
+	IsWorker             bool
+	IsEtcd               bool
+	EnforceDockerVersion bool
+	ToAddEtcdMember      bool
+	ExistingEtcdCluster  bool
 }
 
 const (
@@ -31,8 +35,8 @@ const (
 	CleanerContainerName = "kube-cleaner"
 )
 
-func (h *Host) CleanUpAll(cleanerImage string) error {
-	logrus.Infof("[hosts] Cleaning up host [%s]", h.Address)
+func (h *Host) CleanUpAll(ctx context.Context, cleanerImage string) error {
+	log.Infof(ctx, "[hosts] Cleaning up host [%s]", h.Address)
 	toCleanPaths := []string{
 		ToCleanEtcdDir,
 		ToCleanSSLDir,
@@ -40,12 +44,12 @@ func (h *Host) CleanUpAll(cleanerImage string) error {
 		ToCleanCNIBin,
 		ToCleanCalicoRun,
 	}
-	return h.CleanUp(toCleanPaths, cleanerImage)
+	return h.CleanUp(ctx, toCleanPaths, cleanerImage)
 }
 
-func (h *Host) CleanUpWorkerHost(controlRole, cleanerImage string) error {
+func (h *Host) CleanUpWorkerHost(ctx context.Context, cleanerImage string) error {
 	if h.IsControl {
-		logrus.Infof("[hosts] Host [%s] is already a controlplane host, skipping cleanup.", h.Address)
+		log.Infof(ctx, "[hosts] Host [%s] is already a controlplane host, skipping cleanup.", h.Address)
 		return nil
 	}
 	toCleanPaths := []string{
@@ -54,12 +58,12 @@ func (h *Host) CleanUpWorkerHost(controlRole, cleanerImage string) error {
 		ToCleanCNIBin,
 		ToCleanCalicoRun,
 	}
-	return h.CleanUp(toCleanPaths, cleanerImage)
+	return h.CleanUp(ctx, toCleanPaths, cleanerImage)
 }
 
-func (h *Host) CleanUpControlHost(workerRole, cleanerImage string) error {
+func (h *Host) CleanUpControlHost(ctx context.Context, cleanerImage string) error {
 	if h.IsWorker {
-		logrus.Infof("[hosts] Host [%s] is already a worker host, skipping cleanup.", h.Address)
+		log.Infof(ctx, "[hosts] Host [%s] is already a worker host, skipping cleanup.", h.Address)
 		return nil
 	}
 	toCleanPaths := []string{
@@ -68,38 +72,52 @@ func (h *Host) CleanUpControlHost(workerRole, cleanerImage string) error {
 		ToCleanCNIBin,
 		ToCleanCalicoRun,
 	}
-	return h.CleanUp(toCleanPaths, cleanerImage)
+	return h.CleanUp(ctx, toCleanPaths, cleanerImage)
 }
 
-func (h *Host) CleanUp(toCleanPaths []string, cleanerImage string) error {
-	logrus.Infof("[hosts] Cleaning up host [%s]", h.Address)
+func (h *Host) CleanUpEtcdHost(ctx context.Context, cleanerImage string) error {
+	toCleanPaths := []string{
+		ToCleanEtcdDir,
+		ToCleanSSLDir,
+	}
+	if h.IsWorker || h.IsControl {
+		log.Infof(ctx, "[hosts] Host [%s] is already a worker or control host, skipping cleanup certs.", h.Address)
+		toCleanPaths = []string{
+			ToCleanEtcdDir,
+		}
+	}
+	return h.CleanUp(ctx, toCleanPaths, cleanerImage)
+}
+
+func (h *Host) CleanUp(ctx context.Context, toCleanPaths []string, cleanerImage string) error {
+	log.Infof(ctx, "[hosts] Cleaning up host [%s]", h.Address)
 	imageCfg, hostCfg := buildCleanerConfig(h, toCleanPaths, cleanerImage)
-	logrus.Infof("[hosts] Running cleaner container on host [%s]", h.Address)
-	if err := docker.DoRunContainer(h.DClient, imageCfg, hostCfg, CleanerContainerName, h.Address, CleanerContainerName); err != nil {
+	log.Infof(ctx, "[hosts] Running cleaner container on host [%s]", h.Address)
+	if err := docker.DoRunContainer(ctx, h.DClient, imageCfg, hostCfg, CleanerContainerName, h.Address, CleanerContainerName); err != nil {
 		return err
 	}
 
-	if err := docker.WaitForContainer(h.DClient, CleanerContainerName); err != nil {
+	if err := docker.WaitForContainer(ctx, h.DClient, CleanerContainerName); err != nil {
 		return err
 	}
 
-	logrus.Infof("[hosts] Removing cleaner container on host [%s]", h.Address)
-	if err := docker.RemoveContainer(h.DClient, h.Address, CleanerContainerName); err != nil {
+	log.Infof(ctx, "[hosts] Removing cleaner container on host [%s]", h.Address)
+	if err := docker.RemoveContainer(ctx, h.DClient, h.Address, CleanerContainerName); err != nil {
 		return err
 	}
-	logrus.Infof("[hosts] Successfully cleaned up host [%s]", h.Address)
+	log.Infof(ctx, "[hosts] Successfully cleaned up host [%s]", h.Address)
 	return nil
 }
 
-func DeleteNode(toDeleteHost *Host, kubeClient *kubernetes.Clientset, hasAnotherRole bool) error {
+func DeleteNode(ctx context.Context, toDeleteHost *Host, kubeClient *kubernetes.Clientset, hasAnotherRole bool) error {
 	if hasAnotherRole {
-		logrus.Infof("[hosts] host [%s] has another role, skipping delete from kubernetes cluster", toDeleteHost.Address)
+		log.Infof(ctx, "[hosts] host [%s] has another role, skipping delete from kubernetes cluster", toDeleteHost.Address)
 		return nil
 	}
-	logrus.Infof("[hosts] Cordoning host [%s]", toDeleteHost.Address)
+	log.Infof(ctx, "[hosts] Cordoning host [%s]", toDeleteHost.Address)
 	if _, err := k8s.GetNode(kubeClient, toDeleteHost.HostnameOverride); err != nil {
 		if apierrors.IsNotFound(err) {
-			logrus.Warnf("[hosts] Can't find node by name [%s]", toDeleteHost.Address)
+			log.Warnf(ctx, "[hosts] Can't find node by name [%s]", toDeleteHost.Address)
 			return nil
 		}
 		return err
@@ -108,11 +126,11 @@ func DeleteNode(toDeleteHost *Host, kubeClient *kubernetes.Clientset, hasAnother
 	if err := k8s.CordonUncordon(kubeClient, toDeleteHost.HostnameOverride, true); err != nil {
 		return err
 	}
-	logrus.Infof("[hosts] Deleting host [%s] from the cluster", toDeleteHost.Address)
+	log.Infof(ctx, "[hosts] Deleting host [%s] from the cluster", toDeleteHost.Address)
 	if err := k8s.DeleteNode(kubeClient, toDeleteHost.HostnameOverride); err != nil {
 		return err
 	}
-	logrus.Infof("[hosts] Successfully deleted host [%s] from the cluster", toDeleteHost.Address)
+	log.Infof(ctx, "[hosts] Successfully deleted host [%s] from the cluster", toDeleteHost.Address)
 	return nil
 }
 
@@ -130,6 +148,23 @@ func GetToDeleteHosts(currentHosts, configHosts []*Host) []*Host {
 		}
 	}
 	return toDeleteHosts
+}
+
+func GetToAddHosts(currentHosts, configHosts []*Host) []*Host {
+	toAddHosts := []*Host{}
+	for _, configHost := range configHosts {
+		found := false
+		for _, currentHost := range currentHosts {
+			if currentHost.Address == configHost.Address {
+				found = true
+				break
+			}
+		}
+		if !found {
+			toAddHosts = append(toAddHosts, configHost)
+		}
+	}
+	return toAddHosts
 }
 
 func IsHostListChanged(currentHosts, configHosts []*Host) bool {

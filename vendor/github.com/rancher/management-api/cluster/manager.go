@@ -2,17 +2,16 @@ package cluster
 
 import (
 	"context"
+	"encoding/base64"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
-
-	"net/url"
-
-	"encoding/base64"
 
 	clusterapi "github.com/rancher/cluster-api/server"
 	"github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
+	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/rest"
 )
 
@@ -43,6 +42,9 @@ func (c *Manager) APIServer(ctx context.Context, cluster *client.Cluster) http.H
 
 	server, err := c.toServer(ctx, cluster)
 	if server == nil || err != nil {
+		if err != nil {
+			logrus.Errorf("Failed to load cluster %s: %v", cluster.Name, err)
+		}
 		return nil
 	}
 
