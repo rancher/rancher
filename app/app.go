@@ -72,7 +72,8 @@ func addData(management *config.ManagementContext, local bool) error {
 				},
 			},
 			Spec: v3.ClusterSpec{
-				Internal: true,
+				DisplayName: "local",
+				Internal:    true,
 			},
 		})
 	}
