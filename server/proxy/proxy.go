@@ -1,14 +1,12 @@
 package proxy
 
 import (
-	"net/http"
-	"strings"
-
 	"fmt"
+	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"regexp"
-
-	"net/http/httputil"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 )
@@ -59,7 +57,7 @@ func NewProxy(prefix string, validHosts Supplier) http.Handler {
 	return &httputil.ReverseProxy{
 		Director: func(req *http.Request) {
 			if err := p.proxy(req); err != nil {
-				logrus.Errorf("Failed to proxy %v: %v", req, err)
+				logrus.Infof("Failed to proxy %v: %v", req, err)
 			}
 		},
 	}
