@@ -27,6 +27,9 @@ func main() {
 		return
 	}
 
+	os.Unsetenv("SSH_AUTH_SOCK")
+	os.Unsetenv("SSH_AGENT_PID")
+
 	config := Config{}
 
 	app := cli.NewApp()
