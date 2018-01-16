@@ -40,9 +40,9 @@ func (w *namespaceLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object,
 	return o, err
 }
 
-func NewNamespaceLifecycleAdapter(name string, client NamespaceInterface, l NamespaceLifecycle) NamespaceHandlerFunc {
+func NewNamespaceLifecycleAdapter(name string, clusterScoped bool, client NamespaceInterface, l NamespaceLifecycle) NamespaceHandlerFunc {
 	adapter := &namespaceLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *v1.Namespace) error {
 		if obj == nil {
 			return syncFn(key, nil)

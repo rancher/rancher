@@ -39,9 +39,9 @@ func (w *machineTemplateLifecycleAdapter) Updated(obj runtime.Object) (runtime.O
 	return o, err
 }
 
-func NewMachineTemplateLifecycleAdapter(name string, client MachineTemplateInterface, l MachineTemplateLifecycle) MachineTemplateHandlerFunc {
+func NewMachineTemplateLifecycleAdapter(name string, clusterScoped bool, client MachineTemplateInterface, l MachineTemplateLifecycle) MachineTemplateHandlerFunc {
 	adapter := &machineTemplateLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *MachineTemplate) error {
 		if obj == nil {
 			return syncFn(key, nil)

@@ -40,9 +40,9 @@ func (w *roleLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, erro
 	return o, err
 }
 
-func NewRoleLifecycleAdapter(name string, client RoleInterface, l RoleLifecycle) RoleHandlerFunc {
+func NewRoleLifecycleAdapter(name string, clusterScoped bool, client RoleInterface, l RoleLifecycle) RoleHandlerFunc {
 	adapter := &roleLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *v1.Role) error {
 		if obj == nil {
 			return syncFn(key, nil)

@@ -39,9 +39,9 @@ func (w *userLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, erro
 	return o, err
 }
 
-func NewUserLifecycleAdapter(name string, client UserInterface, l UserLifecycle) UserHandlerFunc {
+func NewUserLifecycleAdapter(name string, clusterScoped bool, client UserInterface, l UserLifecycle) UserHandlerFunc {
 	adapter := &userLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *User) error {
 		if obj == nil {
 			return syncFn(key, nil)

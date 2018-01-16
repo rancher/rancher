@@ -11,8 +11,9 @@ import (
 )
 
 var (
-	created      = "lifecycle.cattle.io/create"
-	finalizerKey = "controller.cattle.io/"
+	created            = "lifecycle.cattle.io/create"
+	finalizerKey       = "controller.cattle.io/"
+	ScopedFinalizerKey = "clusterscoped.controller.cattle.io/"
 )
 
 type ObjectLifecycle interface {
@@ -22,16 +23,18 @@ type ObjectLifecycle interface {
 }
 
 type objectLifecycleAdapter struct {
-	name         string
-	lifecycle    ObjectLifecycle
-	objectClient *clientbase.ObjectClient
+	name          string
+	clusterScoped bool
+	lifecycle     ObjectLifecycle
+	objectClient  *clientbase.ObjectClient
 }
 
-func NewObjectLifecycleAdapter(name string, lifecycle ObjectLifecycle, objectClient *clientbase.ObjectClient) func(key string, obj runtime.Object) error {
+func NewObjectLifecycleAdapter(name string, clusterScoped bool, lifecycle ObjectLifecycle, objectClient *clientbase.ObjectClient) func(key string, obj runtime.Object) error {
 	o := objectLifecycleAdapter{
-		name:         name,
-		lifecycle:    lifecycle,
-		objectClient: objectClient,
+		name:          name,
+		clusterScoped: clusterScoped,
+		lifecycle:     lifecycle,
+		objectClient:  objectClient,
 	}
 	return o.sync
 }
@@ -116,6 +119,9 @@ func (o *objectLifecycleAdapter) createKey() string {
 }
 
 func (o *objectLifecycleAdapter) constructFinalizerKey() string {
+	if o.clusterScoped {
+		return ScopedFinalizerKey + o.name
+	}
 	return finalizerKey + o.name
 }
 

@@ -40,9 +40,9 @@ func (w *endpointsLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object,
 	return o, err
 }
 
-func NewEndpointsLifecycleAdapter(name string, client EndpointsInterface, l EndpointsLifecycle) EndpointsHandlerFunc {
+func NewEndpointsLifecycleAdapter(name string, clusterScoped bool, client EndpointsInterface, l EndpointsLifecycle) EndpointsHandlerFunc {
 	adapter := &endpointsLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *v1.Endpoints) error {
 		if obj == nil {
 			return syncFn(key, nil)

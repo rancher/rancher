@@ -39,9 +39,9 @@ func (w *clusterEventLifecycleAdapter) Updated(obj runtime.Object) (runtime.Obje
 	return o, err
 }
 
-func NewClusterEventLifecycleAdapter(name string, client ClusterEventInterface, l ClusterEventLifecycle) ClusterEventHandlerFunc {
+func NewClusterEventLifecycleAdapter(name string, clusterScoped bool, client ClusterEventInterface, l ClusterEventLifecycle) ClusterEventHandlerFunc {
 	adapter := &clusterEventLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *ClusterEvent) error {
 		if obj == nil {
 			return syncFn(key, nil)

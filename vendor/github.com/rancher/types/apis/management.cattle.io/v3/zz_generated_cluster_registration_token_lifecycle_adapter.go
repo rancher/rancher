@@ -39,9 +39,9 @@ func (w *clusterRegistrationTokenLifecycleAdapter) Updated(obj runtime.Object) (
 	return o, err
 }
 
-func NewClusterRegistrationTokenLifecycleAdapter(name string, client ClusterRegistrationTokenInterface, l ClusterRegistrationTokenLifecycle) ClusterRegistrationTokenHandlerFunc {
+func NewClusterRegistrationTokenLifecycleAdapter(name string, clusterScoped bool, client ClusterRegistrationTokenInterface, l ClusterRegistrationTokenLifecycle) ClusterRegistrationTokenHandlerFunc {
 	adapter := &clusterRegistrationTokenLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *ClusterRegistrationToken) error {
 		if obj == nil {
 			return syncFn(key, nil)

@@ -47,6 +47,7 @@ type PodController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() PodLister
 	AddHandler(name string, handler PodHandlerFunc)
+	AddClusterScopedHandler(name, clusterName string, handler PodHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -66,6 +67,8 @@ type PodInterface interface {
 	Controller() PodController
 	AddHandler(name string, sync PodHandlerFunc)
 	AddLifecycle(name string, lifecycle PodLifecycle)
+	AddClusterScopedHandler(name, clusterName string, sync PodHandlerFunc)
+	AddClusterScopedLifecycle(name, clusterName string, lifecycle PodLifecycle)
 }
 
 type podLister struct {
@@ -118,6 +121,24 @@ func (c *podController) AddHandler(name string, handler PodHandlerFunc) {
 		if !exists {
 			return handler(key, nil)
 		}
+		return handler(key, obj.(*v1.Pod))
+	})
+}
+
+func (c *podController) AddClusterScopedHandler(name, cluster string, handler PodHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
+		obj, exists, err := c.Informer().GetStore().GetByKey(key)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return handler(key, nil)
+		}
+
+		if !controller.ObjectInCluster(cluster, obj) {
+			return nil
+		}
+
 		return handler(key, obj.(*v1.Pod))
 	})
 }
@@ -218,6 +239,15 @@ func (s *podClient) AddHandler(name string, sync PodHandlerFunc) {
 }
 
 func (s *podClient) AddLifecycle(name string, lifecycle PodLifecycle) {
-	sync := NewPodLifecycleAdapter(name, s, lifecycle)
+	sync := NewPodLifecycleAdapter(name, false, s, lifecycle)
 	s.AddHandler(name, sync)
+}
+
+func (s *podClient) AddClusterScopedHandler(name, clusterName string, sync PodHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+}
+
+func (s *podClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle PodLifecycle) {
+	sync := NewPodLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.AddClusterScopedHandler(name, clusterName, sync)
 }

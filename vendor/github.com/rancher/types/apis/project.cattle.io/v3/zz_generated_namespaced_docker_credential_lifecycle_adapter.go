@@ -39,9 +39,9 @@ func (w *namespacedDockerCredentialLifecycleAdapter) Updated(obj runtime.Object)
 	return o, err
 }
 
-func NewNamespacedDockerCredentialLifecycleAdapter(name string, client NamespacedDockerCredentialInterface, l NamespacedDockerCredentialLifecycle) NamespacedDockerCredentialHandlerFunc {
+func NewNamespacedDockerCredentialLifecycleAdapter(name string, clusterScoped bool, client NamespacedDockerCredentialInterface, l NamespacedDockerCredentialLifecycle) NamespacedDockerCredentialHandlerFunc {
 	adapter := &namespacedDockerCredentialLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *NamespacedDockerCredential) error {
 		if obj == nil {
 			return syncFn(key, nil)

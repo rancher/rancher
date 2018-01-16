@@ -23,4 +23,5 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	clusterevents.Register(ctx, management)
 	auth.Register(ctx, management)
 	clusterprovisioner.Register(management)
+	registerClusterScopedGC(ctx, management)
 }

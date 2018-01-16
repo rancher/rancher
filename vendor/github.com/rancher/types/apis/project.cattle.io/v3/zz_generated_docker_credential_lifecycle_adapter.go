@@ -39,9 +39,9 @@ func (w *dockerCredentialLifecycleAdapter) Updated(obj runtime.Object) (runtime.
 	return o, err
 }
 
-func NewDockerCredentialLifecycleAdapter(name string, client DockerCredentialInterface, l DockerCredentialLifecycle) DockerCredentialHandlerFunc {
+func NewDockerCredentialLifecycleAdapter(name string, clusterScoped bool, client DockerCredentialInterface, l DockerCredentialLifecycle) DockerCredentialHandlerFunc {
 	adapter := &dockerCredentialLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *DockerCredential) error {
 		if obj == nil {
 			return syncFn(key, nil)

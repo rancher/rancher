@@ -39,9 +39,9 @@ func (w *dynamicSchemaLifecycleAdapter) Updated(obj runtime.Object) (runtime.Obj
 	return o, err
 }
 
-func NewDynamicSchemaLifecycleAdapter(name string, client DynamicSchemaInterface, l DynamicSchemaLifecycle) DynamicSchemaHandlerFunc {
+func NewDynamicSchemaLifecycleAdapter(name string, clusterScoped bool, client DynamicSchemaInterface, l DynamicSchemaLifecycle) DynamicSchemaHandlerFunc {
 	adapter := &dynamicSchemaLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *DynamicSchema) error {
 		if obj == nil {
 			return syncFn(key, nil)
