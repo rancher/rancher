@@ -16,7 +16,7 @@ func Register(ctx context.Context, cluster *config.ClusterContext) {
 	nodesyncer.Register(cluster)
 	healthsyncer.Register(ctx, cluster)
 	authz.Register(cluster)
-	statsyncer.Register(ctx, cluster)
+	statsyncer.Register(cluster)
 	eventssyncer.Register(cluster)
 
 	workloadContext := cluster.WorkloadContext()

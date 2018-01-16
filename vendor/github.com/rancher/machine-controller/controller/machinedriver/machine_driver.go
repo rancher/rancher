@@ -3,7 +3,6 @@ package machinedriver
 import (
 	"fmt"
 	"strings"
-
 	"sync"
 
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -11,6 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var (
@@ -22,11 +22,12 @@ const (
 )
 
 func Register(management *config.ManagementContext) {
-	machineDriverLifecycle := &Lifecycle{}
 	machineDriverClient := management.Management.MachineDrivers("")
-	dynamicSchemaClient := management.Management.DynamicSchemas("")
-	machineDriverLifecycle.machineDriverClient = machineDriverClient
-	machineDriverLifecycle.schemaClient = dynamicSchemaClient
+	machineDriverLifecycle := &Lifecycle{
+		machineDriverClient: machineDriverClient,
+		schemaClient:        management.Management.DynamicSchemas(""),
+		schemaLister:        management.Management.DynamicSchemas("").Controller().Lister(),
+	}
 
 	machineDriverClient.
 		AddLifecycle("machine-driver-controller", machineDriverLifecycle)
@@ -35,18 +36,45 @@ func Register(management *config.ManagementContext) {
 type Lifecycle struct {
 	machineDriverClient v3.MachineDriverInterface
 	schemaClient        v3.DynamicSchemaInterface
+	schemaLister        v3.DynamicSchemaLister
 }
 
 func (m *Lifecycle) Create(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
+	return m.download(obj)
+}
+
+func (m *Lifecycle) download(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
+	var err error
 	// if machine driver was created, we also activate the driver by default
-	driver := NewDriver(obj.Spec.Builtin, obj.Name, obj.Spec.URL, obj.Spec.Checksum)
-	if err := driver.Stage(); err != nil {
-		return nil, err
+	driver := NewDriver(obj.Spec.Builtin, obj.Spec.DisplayName, obj.Spec.URL, obj.Spec.Checksum)
+	schemaName := obj.Name + "config"
+	_, err = m.schemaLister.Get("", schemaName)
+
+	if driver.Exists() && err == nil {
+		return obj, nil
 	}
 
-	if err := driver.Install(); err != nil {
-		logrus.Errorf("Failed to download/install driver %s: %v", driver.Name(), err)
-		return nil, err
+	_, err = v3.MachineDriverConditionDownloaded.Do(obj, func() (runtime.Object, error) {
+		// update status
+		obj, err = m.machineDriverClient.Update(obj)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := driver.Stage(); err != nil {
+			return nil, err
+		}
+
+		if err := driver.Install(); err != nil {
+			logrus.Errorf("Failed to download/install driver %s: %v", driver.Name(), err)
+			return nil, err
+		}
+
+		obj.Spec.DisplayName = strings.TrimPrefix(driver.Name(), "docker-machine-driver-")
+		return obj, nil
+	})
+	if err != nil {
+		return obj, err
 	}
 
 	driverName := strings.TrimPrefix(driver.Name(), "docker-machine-driver-")
@@ -77,28 +105,36 @@ func (m *Lifecycle) Create(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
 		},
 	}
 	dynamicSchema.Labels = map[string]string{}
-	dynamicSchema.Labels[driverNameLabel] = obj.Name
+	dynamicSchema.Labels[driverNameLabel] = obj.Spec.DisplayName
 	_, err = m.schemaClient.Create(dynamicSchema)
 	if err != nil && !errors.IsAlreadyExists(err) {
-		return nil, err
-	}
-	if err := m.createOrUpdateMachineForEmbeddedType(dynamicSchema.Name, obj.Name+"Config", obj.Spec.Active); err != nil {
 		return nil, err
 	}
 	return obj, nil
 }
 
 func (m *Lifecycle) Updated(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
-	// YOU MUST CALL DEEPCOPY
-	if err := m.createOrUpdateMachineForEmbeddedType(obj.Name+"config", obj.Name+"Config", obj.Spec.Active); err != nil {
-		return nil, err
+	var err error
+
+	obj, err = m.download(obj)
+	if err != nil {
+		return obj, err
 	}
-	return nil, nil
+
+	if err := m.createOrUpdateMachineForEmbeddedType(obj.Spec.DisplayName+"config", obj.Spec.DisplayName+"Config", obj.Spec.Active); err != nil {
+		return obj, err
+	}
+
+	v3.MachineDriverConditionActive.True(obj)
+	v3.MachineDriverConditionInactive.True(obj)
+	v3.MachineDriverConditionDownloaded.True(obj)
+
+	return obj, nil
 }
 
 func (m *Lifecycle) Remove(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
 	schemas, err := m.schemaClient.List(metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", driverNameLabel, obj.Name),
+		LabelSelector: fmt.Sprintf("%s=%s", driverNameLabel, obj.Spec.DisplayName),
 	})
 	if err != nil {
 		return nil, err
@@ -110,7 +146,7 @@ func (m *Lifecycle) Remove(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
 		}
 		logrus.Infof("Deleting schema %s done", schema.Name)
 	}
-	if err := m.createOrUpdateMachineForEmbeddedType(obj.Name+"config", obj.Name+"Config", false); err != nil {
+	if err := m.createOrUpdateMachineForEmbeddedType(obj.Spec.DisplayName+"config", obj.Spec.DisplayName+"Config", false); err != nil {
 		return nil, err
 	}
 	return obj, nil
@@ -128,7 +164,7 @@ func (m *Lifecycle) createOrUpdateMachineForEmbeddedType(embeddedType, fieldName
 }
 
 func (m *Lifecycle) createOrUpdateMachineForEmbeddedTypeWithParents(embeddedType, fieldName, schemaID, parentID string, embedded bool) error {
-	machineSchema, err := m.schemaClient.Get(schemaID, metav1.GetOptions{})
+	machineSchema, err := m.schemaLister.Get("", schemaID)
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	} else if errors.IsNotFound(err) {
@@ -152,6 +188,7 @@ func (m *Lifecycle) createOrUpdateMachineForEmbeddedTypeWithParents(embeddedType
 		}
 		return nil
 	}
+
 	shouldUpdate := false
 	if embedded {
 		if machineSchema.Spec.ResourceFields == nil {

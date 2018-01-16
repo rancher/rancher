@@ -56,13 +56,12 @@ func (c Cond) ReasonAndMessageFromError(obj runtime.Object, err error) {
 		return
 	}
 	cond := findOrCreateCond(obj, string(c))
-	getFieldValue(cond, "Message").SetString(err.Error())
+	setValue(cond, "Message", err.Error())
 	if ce, ok := err.(*conditionError); ok {
-		getFieldValue(cond, "Reason").SetString(ce.reason)
+		setValue(cond, "Reason", ce.reason)
 	} else {
-		getFieldValue(cond, "Reason").SetString("Error")
+		setValue(cond, "Reason", "Error")
 	}
-	touchTS(cond)
 }
 
 func (c Cond) GetReason(obj runtime.Object) string {
@@ -151,8 +150,15 @@ func getStatus(obj interface{}, condName string) string {
 
 func setStatus(obj interface{}, condName, status string) {
 	cond := findOrCreateCond(obj, condName)
-	getFieldValue(cond, "Status").SetString(status)
-	touchTS(cond)
+	setValue(cond, "Status", status)
+}
+
+func setValue(cond reflect.Value, fieldName, newValue string) {
+	value := getFieldValue(cond, fieldName)
+	if value.String() != newValue {
+		value.SetString(newValue)
+		touchTS(cond)
+	}
 }
 
 func findOrCreateCond(obj interface{}, condName string) reflect.Value {

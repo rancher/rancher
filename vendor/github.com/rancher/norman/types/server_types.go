@@ -20,6 +20,10 @@ type RawResource struct {
 	ActionLinks bool                   `json:"-"`
 }
 
+func (r *RawResource) AddAction(apiContext *APIContext, name string) {
+	r.Actions[name] = apiContext.URLBuilder.Action(name, r)
+}
+
 func (r *RawResource) MarshalJSON() ([]byte, error) {
 	data := map[string]interface{}{}
 	for k, v := range r.Values {

@@ -117,7 +117,8 @@ func objectsAreEqual(existing *v3.Machine, toUpdate *v3.Machine) bool {
 	existingToCompare := resetConditions(existing)
 	statusEqual := reflect.DeepEqual(toUpdateToCompare.Status.NodeStatus, existingToCompare.Status.NodeStatus)
 	specEqual := reflect.DeepEqual(toUpdateToCompare.Spec.NodeSpec, existingToCompare.Spec.NodeSpec)
-	return statusEqual && specEqual
+	nodeNameEqual := toUpdateToCompare.Status.NodeName == existingToCompare.Status.NodeName
+	return statusEqual && specEqual && nodeNameEqual
 }
 
 func (n *NodeSyncer) convertNodeToMachine(node *corev1.Node, existing *v3.Machine) (*v3.Machine, error) {

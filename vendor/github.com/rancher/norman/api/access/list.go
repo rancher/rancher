@@ -27,6 +27,10 @@ func ByID(context *types.APIContext, version *types.APIVersion, typeName string,
 		return err
 	}
 
+	if into == nil {
+		return nil
+	}
+
 	return convert.ToObj(item, into)
 }
 

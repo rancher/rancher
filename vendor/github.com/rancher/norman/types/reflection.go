@@ -74,11 +74,13 @@ func (s *Schemas) Import(version *APIVersion, obj interface{}, externalOverrides
 
 func (s *Schemas) newSchemaFromType(version *APIVersion, t reflect.Type, typeName string) (*Schema, error) {
 	schema := &Schema{
-		ID:             typeName,
-		Version:        *version,
-		CodeName:       t.Name(),
-		PkgName:        t.PkgPath(),
-		ResourceFields: map[string]Field{},
+		ID:                typeName,
+		Version:           *version,
+		CodeName:          t.Name(),
+		PkgName:           t.PkgPath(),
+		ResourceFields:    map[string]Field{},
+		ResourceActions:   map[string]Action{},
+		CollectionActions: map[string]Action{},
 	}
 
 	if err := s.readFields(schema, t); err != nil {

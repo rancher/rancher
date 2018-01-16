@@ -19,6 +19,7 @@ type condition struct {
 // False == error
 // Unknown == transitioning
 var transitioningMap = map[string]string{
+	"Active":                   "activating",
 	"AgentInstalled":           "installing",
 	"Available":                "activating",
 	"BackingNamespaceCreated":  "configuring",
@@ -26,6 +27,8 @@ var transitioningMap = map[string]string{
 	"CreatorMadeOwner":         "configuring",
 	"DefaultNamespaceAssigned": "configuring",
 	"DefaultProjectCreated":    "configuring",
+	"Downloaded":               "downloading",
+	"Inactive":                 "deactivated",
 	"Initialized":              "initializing",
 	"MachinesCreated":          "provisioning",
 	"PodScheduled":             "scheduling",
