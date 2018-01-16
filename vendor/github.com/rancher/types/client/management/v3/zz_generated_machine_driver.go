@@ -65,6 +65,10 @@ type MachineDriverOperations interface {
 	Update(existing *MachineDriver, updates interface{}) (*MachineDriver, error)
 	ByID(id string) (*MachineDriver, error)
 	Delete(container *MachineDriver) error
+
+	ActionActivate(*MachineDriver) (*MachineDriver, error)
+
+	ActionDeactivate(*MachineDriver) (*MachineDriver, error)
 }
 
 func newMachineDriverClient(apiClient *Client) *MachineDriverClient {
@@ -110,4 +114,22 @@ func (c *MachineDriverClient) ByID(id string) (*MachineDriver, error) {
 
 func (c *MachineDriverClient) Delete(container *MachineDriver) error {
 	return c.apiClient.Ops.DoResourceDelete(MachineDriverType, &container.Resource)
+}
+
+func (c *MachineDriverClient) ActionActivate(resource *MachineDriver) (*MachineDriver, error) {
+
+	resp := &MachineDriver{}
+
+	err := c.apiClient.Ops.DoAction(MachineDriverType, "activate", &resource.Resource, nil, resp)
+
+	return resp, err
+}
+
+func (c *MachineDriverClient) ActionDeactivate(resource *MachineDriver) (*MachineDriver, error) {
+
+	resp := &MachineDriver{}
+
+	err := c.apiClient.Ops.DoAction(MachineDriverType, "deactivate", &resource.Resource, nil, resp)
+
+	return resp, err
 }

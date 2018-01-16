@@ -20,7 +20,7 @@ import (
 
 const (
 	kubeConfigFile = ".kube_config_cluster.yml"
-	rancherPath    = "/var/lib/rancher/rke/"
+	rancherPath    = "./management-state/rke/"
 )
 
 // Driver is the struct of rke driver

@@ -75,7 +75,7 @@ func TemplateVersionFormatter(apiContext *types.APIContext, resource *types.RawR
 }
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
-	resource.Actions["refresh"] = apiContext.URLBuilder.Action("refresh", resource)
+	resource.AddAction(apiContext, "refresh")
 }
 
 func RefreshActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {

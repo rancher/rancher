@@ -37,7 +37,7 @@ func NewDriver(builtin bool, name, url, hash string) *Driver {
 		url:     url,
 		hash:    hash,
 	}
-	if d.builtin && !strings.HasPrefix(d.name, "docker-machine-driver-") {
+	if !strings.HasPrefix(d.name, "docker-machine-driver-") {
 		d.name = "docker-machine-driver-" + d.name
 	}
 	return d
@@ -162,6 +162,18 @@ func (d *Driver) stage() error {
 
 	d.name = driverName
 	return nil
+}
+
+func (d *Driver) Exists() bool {
+	if d.name == "" {
+		return false
+	}
+	if d.builtin {
+		return true
+	}
+	binaryPath := path.Join(binDir(), d.name)
+	_, err := os.Stat(binaryPath)
+	return err == nil
 }
 
 func (d *Driver) Install() error {
@@ -336,7 +348,7 @@ func (d *Driver) cacheFile() string {
 
 	base := os.Getenv("CATTLE_HOME")
 	if base == "" {
-		base = "/var/lib/rancher"
+		base = "./management-state"
 	}
 
 	return path.Join(base, "machine-drivers", key)

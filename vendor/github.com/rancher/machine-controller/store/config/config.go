@@ -15,7 +15,7 @@ import (
 
 const (
 	configKey         = "extractedConfig"
-	defaultCattleHome = "/var/lib/rancher"
+	defaultCattleHome = "./management-state"
 )
 
 type MachineConfig struct {

@@ -57,8 +57,8 @@ func (o *objectLifecycleAdapter) sync(key string, obj runtime.Object) error {
 		return err
 	}
 
-	obj = obj.DeepCopyObject()
-	newObj, err := o.lifecycle.Updated(obj)
+	copyObj := obj.DeepCopyObject()
+	newObj, err := o.lifecycle.Updated(copyObj)
 	o.update(metadata.GetName(), obj, newObj)
 	return err
 }
@@ -80,19 +80,19 @@ func (o *objectLifecycleAdapter) finalize(metadata metav1.Object, obj runtime.Ob
 		return false, nil
 	}
 
-	obj = obj.DeepCopyObject()
-	if newObj, err := o.lifecycle.Finalize(obj); err != nil {
+	copyObj := obj.DeepCopyObject()
+	if newObj, err := o.lifecycle.Finalize(copyObj); err != nil {
 		o.update(metadata.GetName(), obj, newObj)
 		return false, err
 	} else if newObj != nil {
-		obj = newObj
+		copyObj = newObj
 	}
 
-	if err := removeFinalizer(o.constructFinalizerKey(), obj); err != nil {
+	if err := removeFinalizer(o.constructFinalizerKey(), copyObj); err != nil {
 		return false, err
 	}
 
-	_, err := o.objectClient.Update(metadata.GetName(), obj)
+	_, err := o.objectClient.Update(metadata.GetName(), copyObj)
 	return false, err
 }
 
@@ -130,21 +130,20 @@ func (o *objectLifecycleAdapter) create(metadata metav1.Object, obj runtime.Obje
 		return true, nil
 	}
 
-	// addFinalizer will always return a DeepCopy
-	obj, err := o.addFinalizer(obj)
+	copyObj := obj.DeepCopyObject()
+	copyObj, err := o.addFinalizer(copyObj)
 	if err != nil {
 		return false, err
 	}
 
-	orig := obj.DeepCopyObject()
-	if newObj, err := o.lifecycle.Create(obj); err != nil {
-		o.update(metadata.GetName(), orig, newObj)
+	if newObj, err := o.lifecycle.Create(copyObj); err != nil {
+		o.update(metadata.GetName(), obj, newObj)
 		return false, err
 	} else if newObj != nil {
-		obj = newObj
+		copyObj = newObj
 	}
 
-	return false, o.setInitialized(obj)
+	return false, o.setInitialized(copyObj)
 }
 
 func (o *objectLifecycleAdapter) isInitialized(metadata metav1.Object) bool {
@@ -170,8 +169,6 @@ func (o *objectLifecycleAdapter) setInitialized(obj runtime.Object) error {
 }
 
 func (o *objectLifecycleAdapter) addFinalizer(obj runtime.Object) (runtime.Object, error) {
-	obj = obj.DeepCopyObject()
-
 	metadata, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, err

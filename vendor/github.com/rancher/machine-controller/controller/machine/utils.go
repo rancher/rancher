@@ -56,9 +56,11 @@ func buildCreateCommand(machine *v3.Machine, configMap map[string]interface{}) [
 			if v.(bool) {
 				cmd = append(cmd, dmField, strconv.FormatBool(v.(bool)))
 			}
-		case []string:
-			for _, s := range v.([]string) {
-				cmd = append(cmd, dmField, s)
+		case []interface{}:
+			for _, s := range v.([]interface{}) {
+				if _, ok := s.(string); ok {
+					cmd = append(cmd, dmField, s.(string))
+				}
 			}
 		}
 	}

@@ -142,6 +142,12 @@ type MachineDriverStatus struct {
 	Conditions []MachineDriverCondition `json:"conditions"`
 }
 
+var (
+	MachineDriverConditionDownloaded condition.Cond = "Downloaded"
+	MachineDriverConditionActive     condition.Cond = "Active"
+	MachineDriverConditionInactive   condition.Cond = "Inactive"
+)
+
 type MachineDriverCondition struct {
 	// Type of cluster condition.
 	Type string `json:"type"`
@@ -153,9 +159,12 @@ type MachineDriverCondition struct {
 	LastTransitionTime string `json:"lastTransitionTime,omitempty"`
 	// The reason for the condition's last transition.
 	Reason string `json:"reason,omitempty"`
+	// Human-readable message indicating details about last transition
+	Message string `json:"message,omitempty"`
 }
 
 type MachineDriverSpec struct {
+	DisplayName string `json:"displayName"`
 	Description string `json:"description"`
 	URL         string `json:"url"`
 	ExternalID  string `json:"externalId"`

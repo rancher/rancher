@@ -14,7 +14,7 @@ type ChangePasswordInput struct {
 }
 
 func UserFormatter(apiContext *types.APIContext, resource *types.RawResource) {
-	resource.Actions["changepassword"] = apiContext.URLBuilder.Action("changepassword", resource)
+	resource.AddAction(apiContext, "changepassword")
 }
 
 func UserActionHandler(actionName string, action *types.Action, request *types.APIContext) error {
