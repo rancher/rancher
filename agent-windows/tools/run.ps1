@@ -4,6 +4,11 @@ param(
     [string]$AgentIp
 )
 
+$downloadFolder="download"
+$downloadNames=@{"windows-agent"="go-agent.zip";"per-host-subnet"="rancher-per-host-subnet.zip"}
+$rancherBaseDir="rancher"
+$tools=[System.Environment]::GetEnvironmentVariable("TOOLS_LIST").Split(",")
+
 function register {
     param(
         [string]$RegisterUrl
@@ -100,14 +105,18 @@ function getBinary{
     }
 }
 
-$downloadNames=@{"windows-agent"="go-agent.zip";"per-host-subnet"="rancher-per-host-subnet.zip"}
-$rancherBaseDir="rancher"
+
 $key,$secret,$url,$this_ip=$(register $RegisterUrl)
 if ($AgentIp -ne $null) { $this_ip=$AgentIp}
+Remove-Item -Path "$rancherBaseDir/$downloadFolder" -Confirm:$false -Recurse
+New-Item -ItemType Directory -Path "$rancherBaseDir/$downloadFolder" > $null
 getBinary $key $secret $url
 
 foreach($zipFile in $downloadNames.Values){
-    Expand-Archive "$zipFile" -DestinationPath .
+    Expand-Archive "$zipFile" -DestinationPath "./$rancherBaseDir/$downloadFolder"
 }
-Copy-item -Path "c:/program files/devcon.exe" -Destination "c:/program files/$rancherBaseDir/devcon.exe"
+
+foreach ($copyTarget in $tools) {
+    Copy-item -Path "c:/program files/$copyTarget" -Destination "c:/program files/$rancherBaseDir/$copyTarget"
+}
 Write-Output "`"$RegisterUrl`",`"$HostLabels`",`"$AgentIp`""
