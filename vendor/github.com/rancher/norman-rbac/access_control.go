@@ -2,6 +2,7 @@ package rbac
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/rancher/norman/authorization"
 	"github.com/rancher/norman/types"
@@ -37,12 +38,12 @@ func (a *AccessControl) Filter(apiContext *types.APIContext, obj map[string]inte
 }
 
 func (a *AccessControl) canAccess(obj map[string]interface{}, permset ListPermissionSet) bool {
-	namespace, _ := obj["namespace"].(string)
+	namespace, _ := obj["namespaceId"].(string)
 	id, _ := obj["id"].(string)
 	if permset.Access(namespace, "*") || permset.Access("*", "*") {
 		return true
 	}
-	return permset.Access(namespace, id)
+	return permset.Access(namespace, strings.TrimPrefix(id, namespace+":"))
 }
 
 func (a *AccessControl) FilterList(apiContext *types.APIContext, objs []map[string]interface{}, context map[string]string) []map[string]interface{} {

@@ -14,8 +14,7 @@ type LogConfig struct {
 
 type LogConfigCollection struct {
 	Collection
-	Data   []LogConfig `json:"data,omitempty"`
-	client *LogConfigClient
+	Data []LogConfig `json:"data,omitempty"`
 }
 
 type LogConfigClient struct {
@@ -51,18 +50,7 @@ func (c *LogConfigClient) Update(existing *LogConfig, updates interface{}) (*Log
 func (c *LogConfigClient) List(opts *ListOpts) (*LogConfigCollection, error) {
 	resp := &LogConfigCollection{}
 	err := c.rancherClient.doList(LOG_CONFIG_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *LogConfigCollection) Next() (*LogConfigCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &LogConfigCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *LogConfigClient) ById(id string) (*LogConfig, error) {

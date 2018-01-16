@@ -18,8 +18,7 @@ type HaConfig struct {
 
 type HaConfigCollection struct {
 	Collection
-	Data   []HaConfig `json:"data,omitempty"`
-	client *HaConfigClient
+	Data []HaConfig `json:"data,omitempty"`
 }
 
 type HaConfigClient struct {
@@ -55,18 +54,7 @@ func (c *HaConfigClient) Update(existing *HaConfig, updates interface{}) (*HaCon
 func (c *HaConfigClient) List(opts *ListOpts) (*HaConfigCollection, error) {
 	resp := &HaConfigCollection{}
 	err := c.rancherClient.doList(HA_CONFIG_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *HaConfigCollection) Next() (*HaConfigCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &HaConfigCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *HaConfigClient) ById(id string) (*HaConfig, error) {

@@ -39,9 +39,9 @@ func (w *certificateLifecycleAdapter) Updated(obj runtime.Object) (runtime.Objec
 	return o, err
 }
 
-func NewCertificateLifecycleAdapter(name string, client CertificateInterface, l CertificateLifecycle) CertificateHandlerFunc {
+func NewCertificateLifecycleAdapter(name string, clusterScoped bool, client CertificateInterface, l CertificateLifecycle) CertificateHandlerFunc {
 	adapter := &certificateLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *Certificate) error {
 		if obj == nil {
 			return syncFn(key, nil)

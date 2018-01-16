@@ -46,6 +46,7 @@ type ClusterRoleController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() ClusterRoleLister
 	AddHandler(name string, handler ClusterRoleHandlerFunc)
+	AddClusterScopedHandler(name, clusterName string, handler ClusterRoleHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -65,6 +66,8 @@ type ClusterRoleInterface interface {
 	Controller() ClusterRoleController
 	AddHandler(name string, sync ClusterRoleHandlerFunc)
 	AddLifecycle(name string, lifecycle ClusterRoleLifecycle)
+	AddClusterScopedHandler(name, clusterName string, sync ClusterRoleHandlerFunc)
+	AddClusterScopedLifecycle(name, clusterName string, lifecycle ClusterRoleLifecycle)
 }
 
 type clusterRoleLister struct {
@@ -117,6 +120,24 @@ func (c *clusterRoleController) AddHandler(name string, handler ClusterRoleHandl
 		if !exists {
 			return handler(key, nil)
 		}
+		return handler(key, obj.(*v1.ClusterRole))
+	})
+}
+
+func (c *clusterRoleController) AddClusterScopedHandler(name, cluster string, handler ClusterRoleHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
+		obj, exists, err := c.Informer().GetStore().GetByKey(key)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return handler(key, nil)
+		}
+
+		if !controller.ObjectInCluster(cluster, obj) {
+			return nil
+		}
+
 		return handler(key, obj.(*v1.ClusterRole))
 	})
 }
@@ -217,6 +238,15 @@ func (s *clusterRoleClient) AddHandler(name string, sync ClusterRoleHandlerFunc)
 }
 
 func (s *clusterRoleClient) AddLifecycle(name string, lifecycle ClusterRoleLifecycle) {
-	sync := NewClusterRoleLifecycleAdapter(name, s, lifecycle)
+	sync := NewClusterRoleLifecycleAdapter(name, false, s, lifecycle)
 	s.AddHandler(name, sync)
+}
+
+func (s *clusterRoleClient) AddClusterScopedHandler(name, clusterName string, sync ClusterRoleHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+}
+
+func (s *clusterRoleClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle ClusterRoleLifecycle) {
+	sync := NewClusterRoleLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.AddClusterScopedHandler(name, clusterName, sync)
 }

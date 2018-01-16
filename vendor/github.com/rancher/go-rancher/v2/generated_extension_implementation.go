@@ -16,8 +16,7 @@ type ExtensionImplementation struct {
 
 type ExtensionImplementationCollection struct {
 	Collection
-	Data   []ExtensionImplementation `json:"data,omitempty"`
-	client *ExtensionImplementationClient
+	Data []ExtensionImplementation `json:"data,omitempty"`
 }
 
 type ExtensionImplementationClient struct {
@@ -53,18 +52,7 @@ func (c *ExtensionImplementationClient) Update(existing *ExtensionImplementation
 func (c *ExtensionImplementationClient) List(opts *ListOpts) (*ExtensionImplementationCollection, error) {
 	resp := &ExtensionImplementationCollection{}
 	err := c.rancherClient.doList(EXTENSION_IMPLEMENTATION_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ExtensionImplementationCollection) Next() (*ExtensionImplementationCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ExtensionImplementationCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ExtensionImplementationClient) ById(id string) (*ExtensionImplementation, error) {

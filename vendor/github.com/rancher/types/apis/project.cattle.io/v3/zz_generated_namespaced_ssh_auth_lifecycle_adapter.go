@@ -39,9 +39,9 @@ func (w *namespacedSshAuthLifecycleAdapter) Updated(obj runtime.Object) (runtime
 	return o, err
 }
 
-func NewNamespacedSSHAuthLifecycleAdapter(name string, client NamespacedSSHAuthInterface, l NamespacedSSHAuthLifecycle) NamespacedSSHAuthHandlerFunc {
+func NewNamespacedSSHAuthLifecycleAdapter(name string, clusterScoped bool, client NamespacedSSHAuthInterface, l NamespacedSSHAuthLifecycle) NamespacedSSHAuthHandlerFunc {
 	adapter := &namespacedSshAuthLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *NamespacedSSHAuth) error {
 		if obj == nil {
 			return syncFn(key, nil)

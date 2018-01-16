@@ -44,8 +44,7 @@ type Mount struct {
 
 type MountCollection struct {
 	Collection
-	Data   []Mount `json:"data,omitempty"`
-	client *MountClient
+	Data []Mount `json:"data,omitempty"`
 }
 
 type MountClient struct {
@@ -87,18 +86,7 @@ func (c *MountClient) Update(existing *Mount, updates interface{}) (*Mount, erro
 func (c *MountClient) List(opts *ListOpts) (*MountCollection, error) {
 	resp := &MountCollection{}
 	err := c.rancherClient.doList(MOUNT_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *MountCollection) Next() (*MountCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &MountCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *MountClient) ById(id string) (*Mount, error) {

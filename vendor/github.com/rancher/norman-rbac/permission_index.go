@@ -1,6 +1,7 @@
 package rbac
 
 import (
+	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/client-go/tools/cache"
@@ -105,25 +106,18 @@ func (p *permissionIndex) get(name, apiGroup, resource string) []ListPermission 
 }
 
 func (p *permissionIndex) filterPermissions(result []ListPermission, namespace, kind, name, apiGroup, resource string) []ListPermission {
+	nsForResourceNameGets := namespace
+	if namespace == "*" {
+		nsForResourceNameGets = ""
+	}
+
 	for _, rule := range p.getRules(namespace, kind, name) {
 		if !matches(rule.APIGroups, apiGroup) || !matches(rule.Resources, resource) {
 			continue
 		}
 
-		nsForResourceNameGets := namespace
-		if namespace == "*" {
-			nsForResourceNameGets = ""
-		}
-		for _, verb := range rule.Verbs {
-			switch verb {
-			case "*":
-				fallthrough
-			case "list":
-				result = append(result, ListPermission{
-					Namespace: namespace,
-					Name:      "*",
-				})
-			case "get":
+		if len(rule.ResourceNames) > 0 {
+			if slice.ContainsString(rule.Verbs, "*") || slice.ContainsString(rule.Verbs, "get") {
 				for _, resourceName := range rule.ResourceNames {
 					result = append(result, ListPermission{
 						Namespace: nsForResourceNameGets,
@@ -131,6 +125,14 @@ func (p *permissionIndex) filterPermissions(result []ListPermission, namespace, 
 					})
 				}
 			}
+			continue
+		}
+
+		if slice.ContainsString(rule.Verbs, "*") || slice.ContainsString(rule.Verbs, "list") {
+			result = append(result, ListPermission{
+				Namespace: namespace,
+				Name:      "*",
+			})
 		}
 	}
 

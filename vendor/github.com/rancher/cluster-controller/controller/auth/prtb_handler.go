@@ -39,6 +39,10 @@ func (p *prtbLifecycle) Remove(obj *v3.ProjectRoleTemplateBinding) (*v3.ProjectR
 	}
 	clusterName := parts[0]
 	err := p.mgr.reconcileProjectMembershipBindingForDelete(clusterName, string(obj.UID))
+	if err != nil {
+		return nil, err
+	}
+	err = p.mgr.reconcileClusterMembershipBindingForDelete(string(obj.UID))
 	return nil, err
 }
 

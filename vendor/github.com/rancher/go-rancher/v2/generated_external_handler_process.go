@@ -34,8 +34,7 @@ type ExternalHandlerProcess struct {
 
 type ExternalHandlerProcessCollection struct {
 	Collection
-	Data   []ExternalHandlerProcess `json:"data,omitempty"`
-	client *ExternalHandlerProcessClient
+	Data []ExternalHandlerProcess `json:"data,omitempty"`
 }
 
 type ExternalHandlerProcessClient struct {
@@ -58,6 +57,8 @@ type ExternalHandlerProcessOperations interface {
 	ActionPurge(*ExternalHandlerProcess) (*ExternalHandlerProcess, error)
 
 	ActionRemove(*ExternalHandlerProcess) (*ExternalHandlerProcess, error)
+
+	ActionRestore(*ExternalHandlerProcess) (*ExternalHandlerProcess, error)
 
 	ActionUpdate(*ExternalHandlerProcess) (*ExternalHandlerProcess, error)
 }
@@ -83,18 +84,7 @@ func (c *ExternalHandlerProcessClient) Update(existing *ExternalHandlerProcess, 
 func (c *ExternalHandlerProcessClient) List(opts *ListOpts) (*ExternalHandlerProcessCollection, error) {
 	resp := &ExternalHandlerProcessCollection{}
 	err := c.rancherClient.doList(EXTERNAL_HANDLER_PROCESS_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ExternalHandlerProcessCollection) Next() (*ExternalHandlerProcessCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ExternalHandlerProcessCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ExternalHandlerProcessClient) ById(id string) (*ExternalHandlerProcess, error) {
@@ -153,6 +143,15 @@ func (c *ExternalHandlerProcessClient) ActionRemove(resource *ExternalHandlerPro
 	resp := &ExternalHandlerProcess{}
 
 	err := c.rancherClient.doAction(EXTERNAL_HANDLER_PROCESS_TYPE, "remove", &resource.Resource, nil, resp)
+
+	return resp, err
+}
+
+func (c *ExternalHandlerProcessClient) ActionRestore(resource *ExternalHandlerProcess) (*ExternalHandlerProcess, error) {
+
+	resp := &ExternalHandlerProcess{}
+
+	err := c.rancherClient.doAction(EXTERNAL_HANDLER_PROCESS_TYPE, "restore", &resource.Resource, nil, resp)
 
 	return resp, err
 }

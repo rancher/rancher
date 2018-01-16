@@ -40,8 +40,7 @@ type ContainerEvent struct {
 
 type ContainerEventCollection struct {
 	Collection
-	Data   []ContainerEvent `json:"data,omitempty"`
-	client *ContainerEventClient
+	Data []ContainerEvent `json:"data,omitempty"`
 }
 
 type ContainerEventClient struct {
@@ -81,18 +80,7 @@ func (c *ContainerEventClient) Update(existing *ContainerEvent, updates interfac
 func (c *ContainerEventClient) List(opts *ListOpts) (*ContainerEventCollection, error) {
 	resp := &ContainerEventCollection{}
 	err := c.rancherClient.doList(CONTAINER_EVENT_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ContainerEventCollection) Next() (*ContainerEventCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ContainerEventCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ContainerEventClient) ById(id string) (*ContainerEvent, error) {

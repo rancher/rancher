@@ -46,6 +46,7 @@ type SSHAuthController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() SSHAuthLister
 	AddHandler(name string, handler SSHAuthHandlerFunc)
+	AddClusterScopedHandler(name, clusterName string, handler SSHAuthHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -65,6 +66,8 @@ type SSHAuthInterface interface {
 	Controller() SSHAuthController
 	AddHandler(name string, sync SSHAuthHandlerFunc)
 	AddLifecycle(name string, lifecycle SSHAuthLifecycle)
+	AddClusterScopedHandler(name, clusterName string, sync SSHAuthHandlerFunc)
+	AddClusterScopedLifecycle(name, clusterName string, lifecycle SSHAuthLifecycle)
 }
 
 type sshAuthLister struct {
@@ -117,6 +120,24 @@ func (c *sshAuthController) AddHandler(name string, handler SSHAuthHandlerFunc) 
 		if !exists {
 			return handler(key, nil)
 		}
+		return handler(key, obj.(*SSHAuth))
+	})
+}
+
+func (c *sshAuthController) AddClusterScopedHandler(name, cluster string, handler SSHAuthHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
+		obj, exists, err := c.Informer().GetStore().GetByKey(key)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return handler(key, nil)
+		}
+
+		if !controller.ObjectInCluster(cluster, obj) {
+			return nil
+		}
+
 		return handler(key, obj.(*SSHAuth))
 	})
 }
@@ -217,6 +238,15 @@ func (s *sshAuthClient) AddHandler(name string, sync SSHAuthHandlerFunc) {
 }
 
 func (s *sshAuthClient) AddLifecycle(name string, lifecycle SSHAuthLifecycle) {
-	sync := NewSSHAuthLifecycleAdapter(name, s, lifecycle)
+	sync := NewSSHAuthLifecycleAdapter(name, false, s, lifecycle)
 	s.AddHandler(name, sync)
+}
+
+func (s *sshAuthClient) AddClusterScopedHandler(name, clusterName string, sync SSHAuthHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+}
+
+func (s *sshAuthClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle SSHAuthLifecycle) {
+	sync := NewSSHAuthLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.AddClusterScopedHandler(name, clusterName, sync)
 }

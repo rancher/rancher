@@ -10,8 +10,7 @@ type BaseMachineConfig struct {
 
 type BaseMachineConfigCollection struct {
 	Collection
-	Data   []BaseMachineConfig `json:"data,omitempty"`
-	client *BaseMachineConfigClient
+	Data []BaseMachineConfig `json:"data,omitempty"`
 }
 
 type BaseMachineConfigClient struct {
@@ -47,18 +46,7 @@ func (c *BaseMachineConfigClient) Update(existing *BaseMachineConfig, updates in
 func (c *BaseMachineConfigClient) List(opts *ListOpts) (*BaseMachineConfigCollection, error) {
 	resp := &BaseMachineConfigCollection{}
 	err := c.rancherClient.doList(BASE_MACHINE_CONFIG_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *BaseMachineConfigCollection) Next() (*BaseMachineConfigCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &BaseMachineConfigCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *BaseMachineConfigClient) ById(id string) (*BaseMachineConfig, error) {

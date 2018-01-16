@@ -13,25 +13,19 @@ type Project struct {
 
 	Data map[string]interface{} `json:"data,omitempty" yaml:"data,omitempty"`
 
-	DefaultNetworkId string `json:"defaultNetworkId,omitempty" yaml:"default_network_id,omitempty"`
-
 	Description string `json:"description,omitempty" yaml:"description,omitempty"`
-
-	HealthState string `json:"healthState,omitempty" yaml:"health_state,omitempty"`
-
-	HostRemoveDelaySeconds int64 `json:"hostRemoveDelaySeconds,omitempty" yaml:"host_remove_delay_seconds,omitempty"`
 
 	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
 
-	Members []ProjectMember `json:"members,omitempty" yaml:"members,omitempty"`
+	Kubernetes bool `json:"kubernetes,omitempty" yaml:"kubernetes,omitempty"`
+
+	Members []interface{} `json:"members,omitempty" yaml:"members,omitempty"`
+
+	Mesos bool `json:"mesos,omitempty" yaml:"mesos,omitempty"`
 
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 
-	Orchestration string `json:"orchestration,omitempty" yaml:"orchestration,omitempty"`
-
-	ProjectLinks []string `json:"projectLinks,omitempty" yaml:"project_links,omitempty"`
-
-	ProjectTemplateId string `json:"projectTemplateId,omitempty" yaml:"project_template_id,omitempty"`
+	PublicDns bool `json:"publicDns,omitempty" yaml:"public_dns,omitempty"`
 
 	RemoveTime string `json:"removeTime,omitempty" yaml:"remove_time,omitempty"`
 
@@ -41,6 +35,8 @@ type Project struct {
 
 	State string `json:"state,omitempty" yaml:"state,omitempty"`
 
+	Swarm bool `json:"swarm,omitempty" yaml:"swarm,omitempty"`
+
 	Transitioning string `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 
 	TransitioningMessage string `json:"transitioningMessage,omitempty" yaml:"transitioning_message,omitempty"`
@@ -49,15 +45,12 @@ type Project struct {
 
 	Uuid string `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 
-	Version string `json:"version,omitempty" yaml:"version,omitempty"`
-
 	VirtualMachine bool `json:"virtualMachine,omitempty" yaml:"virtual_machine,omitempty"`
 }
 
 type ProjectCollection struct {
 	Collection
-	Data   []Project `json:"data,omitempty"`
-	client *ProjectClient
+	Data []Project `json:"data,omitempty"`
 }
 
 type ProjectClient struct {
@@ -81,11 +74,11 @@ type ProjectOperations interface {
 
 	ActionRemove(*Project) (*Account, error)
 
+	ActionRestore(*Project) (*Account, error)
+
 	ActionSetmembers(*Project, *SetProjectMembersInput) (*SetProjectMembersInput, error)
 
 	ActionUpdate(*Project) (*Account, error)
-
-	ActionUpgrade(*Project) (*Account, error)
 }
 
 func newProjectClient(rancherClient *RancherClient) *ProjectClient {
@@ -109,18 +102,7 @@ func (c *ProjectClient) Update(existing *Project, updates interface{}) (*Project
 func (c *ProjectClient) List(opts *ListOpts) (*ProjectCollection, error) {
 	resp := &ProjectCollection{}
 	err := c.rancherClient.doList(PROJECT_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ProjectCollection) Next() (*ProjectCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ProjectCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ProjectClient) ById(id string) (*Project, error) {
@@ -183,6 +165,15 @@ func (c *ProjectClient) ActionRemove(resource *Project) (*Account, error) {
 	return resp, err
 }
 
+func (c *ProjectClient) ActionRestore(resource *Project) (*Account, error) {
+
+	resp := &Account{}
+
+	err := c.rancherClient.doAction(PROJECT_TYPE, "restore", &resource.Resource, nil, resp)
+
+	return resp, err
+}
+
 func (c *ProjectClient) ActionSetmembers(resource *Project, input *SetProjectMembersInput) (*SetProjectMembersInput, error) {
 
 	resp := &SetProjectMembersInput{}
@@ -197,15 +188,6 @@ func (c *ProjectClient) ActionUpdate(resource *Project) (*Account, error) {
 	resp := &Account{}
 
 	err := c.rancherClient.doAction(PROJECT_TYPE, "update", &resource.Resource, nil, resp)
-
-	return resp, err
-}
-
-func (c *ProjectClient) ActionUpgrade(resource *Project) (*Account, error) {
-
-	resp := &Account{}
-
-	err := c.rancherClient.doAction(PROJECT_TYPE, "upgrade", &resource.Resource, nil, resp)
 
 	return resp, err
 }

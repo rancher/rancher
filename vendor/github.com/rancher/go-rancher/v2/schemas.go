@@ -56,8 +56,6 @@ func typeToFields(t reflect.Type) map[string]Field {
 			continue
 		} else if typeField.Anonymous {
 			continue
-		} else if privateFieldRegex.FindStringIndex(typeField.Name) != nil {
-			continue
 		}
 
 		fieldString := strings.ToLower(typeField.Type.Kind().String())

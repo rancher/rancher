@@ -40,8 +40,7 @@ type Agent struct {
 
 type AgentCollection struct {
 	Collection
-	Data   []Agent `json:"data,omitempty"`
-	client *AgentClient
+	Data []Agent `json:"data,omitempty"`
 }
 
 type AgentClient struct {
@@ -63,13 +62,13 @@ type AgentOperations interface {
 
 	ActionDisconnect(*Agent) (*Agent, error)
 
-	ActionFinishreconnect(*Agent) (*Agent, error)
-
 	ActionPurge(*Agent) (*Agent, error)
 
 	ActionReconnect(*Agent) (*Agent, error)
 
 	ActionRemove(*Agent) (*Agent, error)
+
+	ActionRestore(*Agent) (*Agent, error)
 
 	ActionUpdate(*Agent) (*Agent, error)
 }
@@ -95,18 +94,7 @@ func (c *AgentClient) Update(existing *Agent, updates interface{}) (*Agent, erro
 func (c *AgentClient) List(opts *ListOpts) (*AgentCollection, error) {
 	resp := &AgentCollection{}
 	err := c.rancherClient.doList(AGENT_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *AgentCollection) Next() (*AgentCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &AgentCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *AgentClient) ById(id string) (*Agent, error) {
@@ -160,15 +148,6 @@ func (c *AgentClient) ActionDisconnect(resource *Agent) (*Agent, error) {
 	return resp, err
 }
 
-func (c *AgentClient) ActionFinishreconnect(resource *Agent) (*Agent, error) {
-
-	resp := &Agent{}
-
-	err := c.rancherClient.doAction(AGENT_TYPE, "finishreconnect", &resource.Resource, nil, resp)
-
-	return resp, err
-}
-
 func (c *AgentClient) ActionPurge(resource *Agent) (*Agent, error) {
 
 	resp := &Agent{}
@@ -192,6 +171,15 @@ func (c *AgentClient) ActionRemove(resource *Agent) (*Agent, error) {
 	resp := &Agent{}
 
 	err := c.rancherClient.doAction(AGENT_TYPE, "remove", &resource.Resource, nil, resp)
+
+	return resp, err
+}
+
+func (c *AgentClient) ActionRestore(resource *Agent) (*Agent, error) {
+
+	resp := &Agent{}
+
+	err := c.rancherClient.doAction(AGENT_TYPE, "restore", &resource.Resource, nil, resp)
 
 	return resp, err
 }

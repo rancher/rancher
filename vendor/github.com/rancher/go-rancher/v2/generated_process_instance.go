@@ -7,13 +7,9 @@ const (
 type ProcessInstance struct {
 	Resource
 
-	AccountId string `json:"accountId,omitempty" yaml:"account_id,omitempty"`
-
 	Data map[string]interface{} `json:"data,omitempty" yaml:"data,omitempty"`
 
 	EndTime string `json:"endTime,omitempty" yaml:"end_time,omitempty"`
-
-	ExecutionCount int64 `json:"executionCount,omitempty" yaml:"execution_count,omitempty"`
 
 	ExitReason string `json:"exitReason,omitempty" yaml:"exit_reason,omitempty"`
 
@@ -29,8 +25,6 @@ type ProcessInstance struct {
 
 	Result string `json:"result,omitempty" yaml:"result,omitempty"`
 
-	RunAfter string `json:"runAfter,omitempty" yaml:"run_after,omitempty"`
-
 	RunningProcessServerId string `json:"runningProcessServerId,omitempty" yaml:"running_process_server_id,omitempty"`
 
 	StartProcessServerId string `json:"startProcessServerId,omitempty" yaml:"start_process_server_id,omitempty"`
@@ -40,8 +34,7 @@ type ProcessInstance struct {
 
 type ProcessInstanceCollection struct {
 	Collection
-	Data   []ProcessInstance `json:"data,omitempty"`
-	client *ProcessInstanceClient
+	Data []ProcessInstance `json:"data,omitempty"`
 }
 
 type ProcessInstanceClient struct {
@@ -54,8 +47,6 @@ type ProcessInstanceOperations interface {
 	Update(existing *ProcessInstance, updates interface{}) (*ProcessInstance, error)
 	ById(id string) (*ProcessInstance, error)
 	Delete(container *ProcessInstance) error
-
-	ActionReplay(*ProcessInstance) (*ProcessInstance, error)
 }
 
 func newProcessInstanceClient(rancherClient *RancherClient) *ProcessInstanceClient {
@@ -79,18 +70,7 @@ func (c *ProcessInstanceClient) Update(existing *ProcessInstance, updates interf
 func (c *ProcessInstanceClient) List(opts *ListOpts) (*ProcessInstanceCollection, error) {
 	resp := &ProcessInstanceCollection{}
 	err := c.rancherClient.doList(PROCESS_INSTANCE_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ProcessInstanceCollection) Next() (*ProcessInstanceCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ProcessInstanceCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ProcessInstanceClient) ById(id string) (*ProcessInstance, error) {
@@ -106,13 +86,4 @@ func (c *ProcessInstanceClient) ById(id string) (*ProcessInstance, error) {
 
 func (c *ProcessInstanceClient) Delete(container *ProcessInstance) error {
 	return c.rancherClient.doResourceDelete(PROCESS_INSTANCE_TYPE, &container.Resource)
-}
-
-func (c *ProcessInstanceClient) ActionReplay(resource *ProcessInstance) (*ProcessInstance, error) {
-
-	resp := &ProcessInstance{}
-
-	err := c.rancherClient.doAction(PROCESS_INSTANCE_TYPE, "replay", &resource.Resource, nil, resp)
-
-	return resp, err
 }

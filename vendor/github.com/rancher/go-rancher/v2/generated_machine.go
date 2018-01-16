@@ -45,7 +45,7 @@ type Machine struct {
 
 	ExternalId string `json:"externalId,omitempty" yaml:"external_id,omitempty"`
 
-	HostTemplateId string `json:"hostTemplateId,omitempty" yaml:"host_template_id,omitempty"`
+	ExtractedConfig string `json:"extractedConfig,omitempty" yaml:"extracted_config,omitempty"`
 
 	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
 
@@ -72,8 +72,7 @@ type Machine struct {
 
 type MachineCollection struct {
 	Collection
-	Data   []Machine `json:"data,omitempty"`
-	client *MachineClient
+	Data []Machine `json:"data,omitempty"`
 }
 
 type MachineClient struct {
@@ -119,18 +118,7 @@ func (c *MachineClient) Update(existing *Machine, updates interface{}) (*Machine
 func (c *MachineClient) List(opts *ListOpts) (*MachineCollection, error) {
 	resp := &MachineCollection{}
 	err := c.rancherClient.doList(MACHINE_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *MachineCollection) Next() (*MachineCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &MachineCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *MachineClient) ById(id string) (*Machine, error) {

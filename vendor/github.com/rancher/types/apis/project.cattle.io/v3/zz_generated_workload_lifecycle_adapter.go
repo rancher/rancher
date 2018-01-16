@@ -39,9 +39,9 @@ func (w *workloadLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, 
 	return o, err
 }
 
-func NewWorkloadLifecycleAdapter(name string, client WorkloadInterface, l WorkloadLifecycle) WorkloadHandlerFunc {
+func NewWorkloadLifecycleAdapter(name string, clusterScoped bool, client WorkloadInterface, l WorkloadLifecycle) WorkloadHandlerFunc {
 	adapter := &workloadLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *Workload) error {
 		if obj == nil {
 			return syncFn(key, nil)

@@ -14,8 +14,7 @@ type ChangeSecretInput struct {
 
 type ChangeSecretInputCollection struct {
 	Collection
-	Data   []ChangeSecretInput `json:"data,omitempty"`
-	client *ChangeSecretInputClient
+	Data []ChangeSecretInput `json:"data,omitempty"`
 }
 
 type ChangeSecretInputClient struct {
@@ -51,18 +50,7 @@ func (c *ChangeSecretInputClient) Update(existing *ChangeSecretInput, updates in
 func (c *ChangeSecretInputClient) List(opts *ListOpts) (*ChangeSecretInputCollection, error) {
 	resp := &ChangeSecretInputCollection{}
 	err := c.rancherClient.doList(CHANGE_SECRET_INPUT_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ChangeSecretInputCollection) Next() (*ChangeSecretInputCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ChangeSecretInputCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ChangeSecretInputClient) ById(id string) (*ChangeSecretInput, error) {

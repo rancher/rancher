@@ -9,8 +9,6 @@ type KubernetesStack struct {
 
 	AccountId string `json:"accountId,omitempty" yaml:"account_id,omitempty"`
 
-	Answers map[string]interface{} `json:"answers,omitempty" yaml:"answers,omitempty"`
-
 	Binding *Binding `json:"binding,omitempty" yaml:"binding,omitempty"`
 
 	Created string `json:"created,omitempty" yaml:"created,omitempty"`
@@ -22,8 +20,6 @@ type KubernetesStack struct {
 	Environment map[string]interface{} `json:"environment,omitempty" yaml:"environment,omitempty"`
 
 	ExternalId string `json:"externalId,omitempty" yaml:"external_id,omitempty"`
-
-	Group string `json:"group,omitempty" yaml:"group,omitempty"`
 
 	HealthState string `json:"healthState,omitempty" yaml:"health_state,omitempty"`
 
@@ -41,11 +37,7 @@ type KubernetesStack struct {
 
 	Removed string `json:"removed,omitempty" yaml:"removed,omitempty"`
 
-	ServiceIds []string `json:"serviceIds,omitempty" yaml:"service_ids,omitempty"`
-
 	State string `json:"state,omitempty" yaml:"state,omitempty"`
-
-	System bool `json:"system,omitempty" yaml:"system,omitempty"`
 
 	Templates map[string]interface{} `json:"templates,omitempty" yaml:"templates,omitempty"`
 
@@ -60,8 +52,7 @@ type KubernetesStack struct {
 
 type KubernetesStackCollection struct {
 	Collection
-	Data   []KubernetesStack `json:"data,omitempty"`
-	client *KubernetesStackClient
+	Data []KubernetesStack `json:"data,omitempty"`
 }
 
 type KubernetesStackClient struct {
@@ -111,18 +102,7 @@ func (c *KubernetesStackClient) Update(existing *KubernetesStack, updates interf
 func (c *KubernetesStackClient) List(opts *ListOpts) (*KubernetesStackCollection, error) {
 	resp := &KubernetesStackCollection{}
 	err := c.rancherClient.doList(KUBERNETES_STACK_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *KubernetesStackCollection) Next() (*KubernetesStackCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &KubernetesStackCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *KubernetesStackClient) ById(id string) (*KubernetesStack, error) {

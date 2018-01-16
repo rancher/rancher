@@ -47,6 +47,7 @@ type ServiceController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() ServiceLister
 	AddHandler(name string, handler ServiceHandlerFunc)
+	AddClusterScopedHandler(name, clusterName string, handler ServiceHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -66,6 +67,8 @@ type ServiceInterface interface {
 	Controller() ServiceController
 	AddHandler(name string, sync ServiceHandlerFunc)
 	AddLifecycle(name string, lifecycle ServiceLifecycle)
+	AddClusterScopedHandler(name, clusterName string, sync ServiceHandlerFunc)
+	AddClusterScopedLifecycle(name, clusterName string, lifecycle ServiceLifecycle)
 }
 
 type serviceLister struct {
@@ -118,6 +121,24 @@ func (c *serviceController) AddHandler(name string, handler ServiceHandlerFunc) 
 		if !exists {
 			return handler(key, nil)
 		}
+		return handler(key, obj.(*v1.Service))
+	})
+}
+
+func (c *serviceController) AddClusterScopedHandler(name, cluster string, handler ServiceHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
+		obj, exists, err := c.Informer().GetStore().GetByKey(key)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return handler(key, nil)
+		}
+
+		if !controller.ObjectInCluster(cluster, obj) {
+			return nil
+		}
+
 		return handler(key, obj.(*v1.Service))
 	})
 }
@@ -218,6 +239,15 @@ func (s *serviceClient) AddHandler(name string, sync ServiceHandlerFunc) {
 }
 
 func (s *serviceClient) AddLifecycle(name string, lifecycle ServiceLifecycle) {
-	sync := NewServiceLifecycleAdapter(name, s, lifecycle)
+	sync := NewServiceLifecycleAdapter(name, false, s, lifecycle)
 	s.AddHandler(name, sync)
+}
+
+func (s *serviceClient) AddClusterScopedHandler(name, clusterName string, sync ServiceHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+}
+
+func (s *serviceClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle ServiceLifecycle) {
+	sync := NewServiceLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.AddClusterScopedHandler(name, clusterName, sync)
 }

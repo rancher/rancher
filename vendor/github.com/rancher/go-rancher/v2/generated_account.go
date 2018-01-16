@@ -36,14 +36,11 @@ type Account struct {
 	TransitioningProgress int64 `json:"transitioningProgress,omitempty" yaml:"transitioning_progress,omitempty"`
 
 	Uuid string `json:"uuid,omitempty" yaml:"uuid,omitempty"`
-
-	Version string `json:"version,omitempty" yaml:"version,omitempty"`
 }
 
 type AccountCollection struct {
 	Collection
-	Data   []Account `json:"data,omitempty"`
-	client *AccountClient
+	Data []Account `json:"data,omitempty"`
 }
 
 type AccountClient struct {
@@ -67,9 +64,9 @@ type AccountOperations interface {
 
 	ActionRemove(*Account) (*Account, error)
 
-	ActionUpdate(*Account) (*Account, error)
+	ActionRestore(*Account) (*Account, error)
 
-	ActionUpgrade(*Account) (*Account, error)
+	ActionUpdate(*Account) (*Account, error)
 }
 
 func newAccountClient(rancherClient *RancherClient) *AccountClient {
@@ -93,18 +90,7 @@ func (c *AccountClient) Update(existing *Account, updates interface{}) (*Account
 func (c *AccountClient) List(opts *ListOpts) (*AccountCollection, error) {
 	resp := &AccountCollection{}
 	err := c.rancherClient.doList(ACCOUNT_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *AccountCollection) Next() (*AccountCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &AccountCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *AccountClient) ById(id string) (*Account, error) {
@@ -167,20 +153,20 @@ func (c *AccountClient) ActionRemove(resource *Account) (*Account, error) {
 	return resp, err
 }
 
+func (c *AccountClient) ActionRestore(resource *Account) (*Account, error) {
+
+	resp := &Account{}
+
+	err := c.rancherClient.doAction(ACCOUNT_TYPE, "restore", &resource.Resource, nil, resp)
+
+	return resp, err
+}
+
 func (c *AccountClient) ActionUpdate(resource *Account) (*Account, error) {
 
 	resp := &Account{}
 
 	err := c.rancherClient.doAction(ACCOUNT_TYPE, "update", &resource.Resource, nil, resp)
-
-	return resp, err
-}
-
-func (c *AccountClient) ActionUpgrade(resource *Account) (*Account, error) {
-
-	resp := &Account{}
-
-	err := c.rancherClient.doAction(ACCOUNT_TYPE, "upgrade", &resource.Resource, nil, resp)
 
 	return resp, err
 }

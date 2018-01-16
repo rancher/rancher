@@ -44,8 +44,7 @@ type Backup struct {
 
 type BackupCollection struct {
 	Collection
-	Data   []Backup `json:"data,omitempty"`
-	client *BackupClient
+	Data []Backup `json:"data,omitempty"`
 }
 
 type BackupClient struct {
@@ -85,18 +84,7 @@ func (c *BackupClient) Update(existing *Backup, updates interface{}) (*Backup, e
 func (c *BackupClient) List(opts *ListOpts) (*BackupCollection, error) {
 	resp := &BackupCollection{}
 	err := c.rancherClient.doList(BACKUP_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *BackupCollection) Next() (*BackupCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &BackupCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *BackupClient) ById(id string) (*Backup, error) {

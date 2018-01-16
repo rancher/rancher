@@ -38,8 +38,7 @@ type BackupTarget struct {
 
 type BackupTargetCollection struct {
 	Collection
-	Data   []BackupTarget `json:"data,omitempty"`
-	client *BackupTargetClient
+	Data []BackupTarget `json:"data,omitempty"`
 }
 
 type BackupTargetClient struct {
@@ -79,18 +78,7 @@ func (c *BackupTargetClient) Update(existing *BackupTarget, updates interface{})
 func (c *BackupTargetClient) List(opts *ListOpts) (*BackupTargetCollection, error) {
 	resp := &BackupTargetCollection{}
 	err := c.rancherClient.doList(BACKUP_TARGET_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *BackupTargetCollection) Next() (*BackupTargetCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &BackupTargetCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *BackupTargetClient) ById(id string) (*BackupTarget, error) {

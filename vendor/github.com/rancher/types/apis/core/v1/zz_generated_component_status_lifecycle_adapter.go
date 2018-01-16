@@ -40,9 +40,9 @@ func (w *componentStatusLifecycleAdapter) Updated(obj runtime.Object) (runtime.O
 	return o, err
 }
 
-func NewComponentStatusLifecycleAdapter(name string, client ComponentStatusInterface, l ComponentStatusLifecycle) ComponentStatusHandlerFunc {
+func NewComponentStatusLifecycleAdapter(name string, clusterScoped bool, client ComponentStatusInterface, l ComponentStatusLifecycle) ComponentStatusHandlerFunc {
 	adapter := &componentStatusLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *v1.ComponentStatus) error {
 		if obj == nil {
 			return syncFn(key, nil)

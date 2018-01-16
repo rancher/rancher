@@ -42,8 +42,7 @@ type ExternalHandlerExternalHandlerProcessMap struct {
 
 type ExternalHandlerExternalHandlerProcessMapCollection struct {
 	Collection
-	Data   []ExternalHandlerExternalHandlerProcessMap `json:"data,omitempty"`
-	client *ExternalHandlerExternalHandlerProcessMapClient
+	Data []ExternalHandlerExternalHandlerProcessMap `json:"data,omitempty"`
 }
 
 type ExternalHandlerExternalHandlerProcessMapClient struct {
@@ -66,6 +65,8 @@ type ExternalHandlerExternalHandlerProcessMapOperations interface {
 	ActionPurge(*ExternalHandlerExternalHandlerProcessMap) (*ExternalHandlerExternalHandlerProcessMap, error)
 
 	ActionRemove(*ExternalHandlerExternalHandlerProcessMap) (*ExternalHandlerExternalHandlerProcessMap, error)
+
+	ActionRestore(*ExternalHandlerExternalHandlerProcessMap) (*ExternalHandlerExternalHandlerProcessMap, error)
 
 	ActionUpdate(*ExternalHandlerExternalHandlerProcessMap) (*ExternalHandlerExternalHandlerProcessMap, error)
 }
@@ -91,18 +92,7 @@ func (c *ExternalHandlerExternalHandlerProcessMapClient) Update(existing *Extern
 func (c *ExternalHandlerExternalHandlerProcessMapClient) List(opts *ListOpts) (*ExternalHandlerExternalHandlerProcessMapCollection, error) {
 	resp := &ExternalHandlerExternalHandlerProcessMapCollection{}
 	err := c.rancherClient.doList(EXTERNAL_HANDLER_EXTERNAL_HANDLER_PROCESS_MAP_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ExternalHandlerExternalHandlerProcessMapCollection) Next() (*ExternalHandlerExternalHandlerProcessMapCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ExternalHandlerExternalHandlerProcessMapCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ExternalHandlerExternalHandlerProcessMapClient) ById(id string) (*ExternalHandlerExternalHandlerProcessMap, error) {
@@ -161,6 +151,15 @@ func (c *ExternalHandlerExternalHandlerProcessMapClient) ActionRemove(resource *
 	resp := &ExternalHandlerExternalHandlerProcessMap{}
 
 	err := c.rancherClient.doAction(EXTERNAL_HANDLER_EXTERNAL_HANDLER_PROCESS_MAP_TYPE, "remove", &resource.Resource, nil, resp)
+
+	return resp, err
+}
+
+func (c *ExternalHandlerExternalHandlerProcessMapClient) ActionRestore(resource *ExternalHandlerExternalHandlerProcessMap) (*ExternalHandlerExternalHandlerProcessMap, error) {
+
+	resp := &ExternalHandlerExternalHandlerProcessMap{}
+
+	err := c.rancherClient.doAction(EXTERNAL_HANDLER_EXTERNAL_HANDLER_PROCESS_MAP_TYPE, "restore", &resource.Resource, nil, resp)
 
 	return resp, err
 }

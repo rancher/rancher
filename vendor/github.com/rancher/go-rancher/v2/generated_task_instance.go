@@ -22,8 +22,7 @@ type TaskInstance struct {
 
 type TaskInstanceCollection struct {
 	Collection
-	Data   []TaskInstance `json:"data,omitempty"`
-	client *TaskInstanceClient
+	Data []TaskInstance `json:"data,omitempty"`
 }
 
 type TaskInstanceClient struct {
@@ -59,18 +58,7 @@ func (c *TaskInstanceClient) Update(existing *TaskInstance, updates interface{})
 func (c *TaskInstanceClient) List(opts *ListOpts) (*TaskInstanceCollection, error) {
 	resp := &TaskInstanceCollection{}
 	err := c.rancherClient.doList(TASK_INSTANCE_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *TaskInstanceCollection) Next() (*TaskInstanceCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &TaskInstanceCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *TaskInstanceClient) ById(id string) (*TaskInstance, error) {

@@ -40,8 +40,7 @@ type ExternalDnsEvent struct {
 
 type ExternalDnsEventCollection struct {
 	Collection
-	Data   []ExternalDnsEvent `json:"data,omitempty"`
-	client *ExternalDnsEventClient
+	Data []ExternalDnsEvent `json:"data,omitempty"`
 }
 
 type ExternalDnsEventClient struct {
@@ -81,18 +80,7 @@ func (c *ExternalDnsEventClient) Update(existing *ExternalDnsEvent, updates inte
 func (c *ExternalDnsEventClient) List(opts *ListOpts) (*ExternalDnsEventCollection, error) {
 	resp := &ExternalDnsEventCollection{}
 	err := c.rancherClient.doList(EXTERNAL_DNS_EVENT_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ExternalDnsEventCollection) Next() (*ExternalDnsEventCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ExternalDnsEventCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ExternalDnsEventClient) ById(id string) (*ExternalDnsEvent, error) {

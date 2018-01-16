@@ -30,8 +30,7 @@ type Databasechangelog struct {
 
 type DatabasechangelogCollection struct {
 	Collection
-	Data   []Databasechangelog `json:"data,omitempty"`
-	client *DatabasechangelogClient
+	Data []Databasechangelog `json:"data,omitempty"`
 }
 
 type DatabasechangelogClient struct {
@@ -67,18 +66,7 @@ func (c *DatabasechangelogClient) Update(existing *Databasechangelog, updates in
 func (c *DatabasechangelogClient) List(opts *ListOpts) (*DatabasechangelogCollection, error) {
 	resp := &DatabasechangelogCollection{}
 	err := c.rancherClient.doList(DATABASECHANGELOG_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *DatabasechangelogCollection) Next() (*DatabasechangelogCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &DatabasechangelogCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *DatabasechangelogClient) ById(id string) (*Databasechangelog, error) {

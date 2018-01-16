@@ -12,8 +12,7 @@ type Binding struct {
 
 type BindingCollection struct {
 	Collection
-	Data   []Binding `json:"data,omitempty"`
-	client *BindingClient
+	Data []Binding `json:"data,omitempty"`
 }
 
 type BindingClient struct {
@@ -49,18 +48,7 @@ func (c *BindingClient) Update(existing *Binding, updates interface{}) (*Binding
 func (c *BindingClient) List(opts *ListOpts) (*BindingCollection, error) {
 	resp := &BindingCollection{}
 	err := c.rancherClient.doList(BINDING_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *BindingCollection) Next() (*BindingCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &BindingCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *BindingClient) ById(id string) (*Binding, error) {

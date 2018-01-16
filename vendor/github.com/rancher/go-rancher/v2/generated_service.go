@@ -27,21 +27,15 @@ type Service struct {
 
 	HealthState string `json:"healthState,omitempty" yaml:"health_state,omitempty"`
 
-	InstanceIds []string `json:"instanceIds,omitempty" yaml:"instance_ids,omitempty"`
-
 	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
 
 	LaunchConfig *LaunchConfig `json:"launchConfig,omitempty" yaml:"launch_config,omitempty"`
-
-	LbConfig *LbTargetConfig `json:"lbConfig,omitempty" yaml:"lb_config,omitempty"`
-
-	LinkedServices map[string]interface{} `json:"linkedServices,omitempty" yaml:"linked_services,omitempty"`
 
 	Metadata map[string]interface{} `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 
-	PublicEndpoints []PublicEndpoint `json:"publicEndpoints,omitempty" yaml:"public_endpoints,omitempty"`
+	PublicEndpoints []interface{} `json:"publicEndpoints,omitempty" yaml:"public_endpoints,omitempty"`
 
 	RemoveTime string `json:"removeTime,omitempty" yaml:"remove_time,omitempty"`
 
@@ -53,7 +47,7 @@ type Service struct {
 
 	ScalePolicy *ScalePolicy `json:"scalePolicy,omitempty" yaml:"scale_policy,omitempty"`
 
-	SecondaryLaunchConfigs []SecondaryLaunchConfig `json:"secondaryLaunchConfigs,omitempty" yaml:"secondary_launch_configs,omitempty"`
+	SecondaryLaunchConfigs []interface{} `json:"secondaryLaunchConfigs,omitempty" yaml:"secondary_launch_configs,omitempty"`
 
 	SelectorContainer string `json:"selectorContainer,omitempty" yaml:"selector_container,omitempty"`
 
@@ -64,8 +58,6 @@ type Service struct {
 	StartOnCreate bool `json:"startOnCreate,omitempty" yaml:"start_on_create,omitempty"`
 
 	State string `json:"state,omitempty" yaml:"state,omitempty"`
-
-	System bool `json:"system,omitempty" yaml:"system,omitempty"`
 
 	Transitioning string `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 
@@ -82,8 +74,7 @@ type Service struct {
 
 type ServiceCollection struct {
 	Collection
-	Data   []Service `json:"data,omitempty"`
-	client *ServiceClient
+	Data []Service `json:"data,omitempty"`
 }
 
 type ServiceClient struct {
@@ -147,18 +138,7 @@ func (c *ServiceClient) Update(existing *Service, updates interface{}) (*Service
 func (c *ServiceClient) List(opts *ListOpts) (*ServiceCollection, error) {
 	resp := &ServiceCollection{}
 	err := c.rancherClient.doList(SERVICE_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ServiceCollection) Next() (*ServiceCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ServiceCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ServiceClient) ById(id string) (*Service, error) {

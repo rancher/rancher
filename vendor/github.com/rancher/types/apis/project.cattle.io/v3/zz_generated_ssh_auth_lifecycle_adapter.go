@@ -39,9 +39,9 @@ func (w *sshAuthLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, e
 	return o, err
 }
 
-func NewSSHAuthLifecycleAdapter(name string, client SSHAuthInterface, l SSHAuthLifecycle) SSHAuthHandlerFunc {
+func NewSSHAuthLifecycleAdapter(name string, clusterScoped bool, client SSHAuthInterface, l SSHAuthLifecycle) SSHAuthHandlerFunc {
 	adapter := &sshAuthLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *SSHAuth) error {
 		if obj == nil {
 			return syncFn(key, nil)

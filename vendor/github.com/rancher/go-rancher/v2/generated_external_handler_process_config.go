@@ -14,8 +14,7 @@ type ExternalHandlerProcessConfig struct {
 
 type ExternalHandlerProcessConfigCollection struct {
 	Collection
-	Data   []ExternalHandlerProcessConfig `json:"data,omitempty"`
-	client *ExternalHandlerProcessConfigClient
+	Data []ExternalHandlerProcessConfig `json:"data,omitempty"`
 }
 
 type ExternalHandlerProcessConfigClient struct {
@@ -51,18 +50,7 @@ func (c *ExternalHandlerProcessConfigClient) Update(existing *ExternalHandlerPro
 func (c *ExternalHandlerProcessConfigClient) List(opts *ListOpts) (*ExternalHandlerProcessConfigCollection, error) {
 	resp := &ExternalHandlerProcessConfigCollection{}
 	err := c.rancherClient.doList(EXTERNAL_HANDLER_PROCESS_CONFIG_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ExternalHandlerProcessConfigCollection) Next() (*ExternalHandlerProcessConfigCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ExternalHandlerProcessConfigCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ExternalHandlerProcessConfigClient) ById(id string) (*ExternalHandlerProcessConfig, error) {

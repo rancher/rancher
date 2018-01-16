@@ -9,25 +9,17 @@ type Openldapconfig struct {
 
 	AccessMode string `json:"accessMode,omitempty" yaml:"access_mode,omitempty"`
 
-	AllowedIdentities []Identity `json:"allowedIdentities,omitempty" yaml:"allowed_identities,omitempty"`
-
 	ConnectionTimeout int64 `json:"connectionTimeout,omitempty" yaml:"connection_timeout,omitempty"`
 
 	Domain string `json:"domain,omitempty" yaml:"domain,omitempty"`
 
 	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 
-	GroupDNField string `json:"groupDNField,omitempty" yaml:"group_dnfield,omitempty"`
-
 	GroupMemberMappingAttribute string `json:"groupMemberMappingAttribute,omitempty" yaml:"group_member_mapping_attribute,omitempty"`
-
-	GroupMemberUserAttribute string `json:"groupMemberUserAttribute,omitempty" yaml:"group_member_user_attribute,omitempty"`
 
 	GroupNameField string `json:"groupNameField,omitempty" yaml:"group_name_field,omitempty"`
 
 	GroupObjectClass string `json:"groupObjectClass,omitempty" yaml:"group_object_class,omitempty"`
-
-	GroupSearchDomain string `json:"groupSearchDomain,omitempty" yaml:"group_search_domain,omitempty"`
 
 	GroupSearchField string `json:"groupSearchField,omitempty" yaml:"group_search_field,omitempty"`
 
@@ -62,8 +54,7 @@ type Openldapconfig struct {
 
 type OpenldapconfigCollection struct {
 	Collection
-	Data   []Openldapconfig `json:"data,omitempty"`
-	client *OpenldapconfigClient
+	Data []Openldapconfig `json:"data,omitempty"`
 }
 
 type OpenldapconfigClient struct {
@@ -99,18 +90,7 @@ func (c *OpenldapconfigClient) Update(existing *Openldapconfig, updates interfac
 func (c *OpenldapconfigClient) List(opts *ListOpts) (*OpenldapconfigCollection, error) {
 	resp := &OpenldapconfigCollection{}
 	err := c.rancherClient.doList(OPENLDAPCONFIG_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *OpenldapconfigCollection) Next() (*OpenldapconfigCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &OpenldapconfigCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *OpenldapconfigClient) ById(id string) (*Openldapconfig, error) {

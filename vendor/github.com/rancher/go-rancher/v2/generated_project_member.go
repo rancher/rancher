@@ -42,8 +42,7 @@ type ProjectMember struct {
 
 type ProjectMemberCollection struct {
 	Collection
-	Data   []ProjectMember `json:"data,omitempty"`
-	client *ProjectMemberClient
+	Data []ProjectMember `json:"data,omitempty"`
 }
 
 type ProjectMemberClient struct {
@@ -66,6 +65,8 @@ type ProjectMemberOperations interface {
 	ActionPurge(*ProjectMember) (*ProjectMember, error)
 
 	ActionRemove(*ProjectMember) (*ProjectMember, error)
+
+	ActionRestore(*ProjectMember) (*ProjectMember, error)
 
 	ActionUpdate(*ProjectMember) (*ProjectMember, error)
 }
@@ -91,18 +92,7 @@ func (c *ProjectMemberClient) Update(existing *ProjectMember, updates interface{
 func (c *ProjectMemberClient) List(opts *ListOpts) (*ProjectMemberCollection, error) {
 	resp := &ProjectMemberCollection{}
 	err := c.rancherClient.doList(PROJECT_MEMBER_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ProjectMemberCollection) Next() (*ProjectMemberCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ProjectMemberCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ProjectMemberClient) ById(id string) (*ProjectMember, error) {
@@ -161,6 +151,15 @@ func (c *ProjectMemberClient) ActionRemove(resource *ProjectMember) (*ProjectMem
 	resp := &ProjectMember{}
 
 	err := c.rancherClient.doAction(PROJECT_MEMBER_TYPE, "remove", &resource.Resource, nil, resp)
+
+	return resp, err
+}
+
+func (c *ProjectMemberClient) ActionRestore(resource *ProjectMember) (*ProjectMember, error) {
+
+	resp := &ProjectMember{}
+
+	err := c.rancherClient.doAction(PROJECT_MEMBER_TYPE, "restore", &resource.Resource, nil, resp)
 
 	return resp, err
 }

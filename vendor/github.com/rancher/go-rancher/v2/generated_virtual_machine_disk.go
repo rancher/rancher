@@ -24,8 +24,7 @@ type VirtualMachineDisk struct {
 
 type VirtualMachineDiskCollection struct {
 	Collection
-	Data   []VirtualMachineDisk `json:"data,omitempty"`
-	client *VirtualMachineDiskClient
+	Data []VirtualMachineDisk `json:"data,omitempty"`
 }
 
 type VirtualMachineDiskClient struct {
@@ -61,18 +60,7 @@ func (c *VirtualMachineDiskClient) Update(existing *VirtualMachineDisk, updates 
 func (c *VirtualMachineDiskClient) List(opts *ListOpts) (*VirtualMachineDiskCollection, error) {
 	resp := &VirtualMachineDiskCollection{}
 	err := c.rancherClient.doList(VIRTUAL_MACHINE_DISK_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *VirtualMachineDiskCollection) Next() (*VirtualMachineDiskCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &VirtualMachineDiskCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *VirtualMachineDiskClient) ById(id string) (*VirtualMachineDisk, error) {

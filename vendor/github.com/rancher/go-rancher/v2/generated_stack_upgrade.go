@@ -7,8 +7,6 @@ const (
 type StackUpgrade struct {
 	Resource
 
-	Answers map[string]interface{} `json:"answers,omitempty" yaml:"answers,omitempty"`
-
 	DockerCompose string `json:"dockerCompose,omitempty" yaml:"docker_compose,omitempty"`
 
 	Environment map[string]interface{} `json:"environment,omitempty" yaml:"environment,omitempty"`
@@ -16,14 +14,11 @@ type StackUpgrade struct {
 	ExternalId string `json:"externalId,omitempty" yaml:"external_id,omitempty"`
 
 	RancherCompose string `json:"rancherCompose,omitempty" yaml:"rancher_compose,omitempty"`
-
-	Templates map[string]interface{} `json:"templates,omitempty" yaml:"templates,omitempty"`
 }
 
 type StackUpgradeCollection struct {
 	Collection
-	Data   []StackUpgrade `json:"data,omitempty"`
-	client *StackUpgradeClient
+	Data []StackUpgrade `json:"data,omitempty"`
 }
 
 type StackUpgradeClient struct {
@@ -59,18 +54,7 @@ func (c *StackUpgradeClient) Update(existing *StackUpgrade, updates interface{})
 func (c *StackUpgradeClient) List(opts *ListOpts) (*StackUpgradeCollection, error) {
 	resp := &StackUpgradeCollection{}
 	err := c.rancherClient.doList(STACK_UPGRADE_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *StackUpgradeCollection) Next() (*StackUpgradeCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &StackUpgradeCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *StackUpgradeClient) ById(id string) (*StackUpgrade, error) {

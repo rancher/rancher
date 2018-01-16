@@ -39,9 +39,9 @@ func (w *catalogLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, e
 	return o, err
 }
 
-func NewCatalogLifecycleAdapter(name string, client CatalogInterface, l CatalogLifecycle) CatalogHandlerFunc {
+func NewCatalogLifecycleAdapter(name string, clusterScoped bool, client CatalogInterface, l CatalogLifecycle) CatalogHandlerFunc {
 	adapter := &catalogLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *Catalog) error {
 		if obj == nil {
 			return syncFn(key, nil)

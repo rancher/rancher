@@ -15,8 +15,6 @@ type AzureConfig struct {
 
 	CustomData string `json:"customData,omitempty" yaml:"custom_data,omitempty"`
 
-	Dns string `json:"dns,omitempty" yaml:"dns,omitempty"`
-
 	DockerPort string `json:"dockerPort,omitempty" yaml:"docker_port,omitempty"`
 
 	Environment string `json:"environment,omitempty" yaml:"environment,omitempty"`
@@ -54,8 +52,7 @@ type AzureConfig struct {
 
 type AzureConfigCollection struct {
 	Collection
-	Data   []AzureConfig `json:"data,omitempty"`
-	client *AzureConfigClient
+	Data []AzureConfig `json:"data,omitempty"`
 }
 
 type AzureConfigClient struct {
@@ -91,18 +88,7 @@ func (c *AzureConfigClient) Update(existing *AzureConfig, updates interface{}) (
 func (c *AzureConfigClient) List(opts *ListOpts) (*AzureConfigCollection, error) {
 	resp := &AzureConfigCollection{}
 	err := c.rancherClient.doList(AZURE_CONFIG_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *AzureConfigCollection) Next() (*AzureConfigCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &AzureConfigCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *AzureConfigClient) ById(id string) (*AzureConfig, error) {

@@ -27,8 +27,6 @@ type Register struct {
 
 	Removed string `json:"removed,omitempty" yaml:"removed,omitempty"`
 
-	ResourceData map[string]interface{} `json:"resourceData,omitempty" yaml:"resource_data,omitempty"`
-
 	SecretKey string `json:"secretKey,omitempty" yaml:"secret_key,omitempty"`
 
 	State string `json:"state,omitempty" yaml:"state,omitempty"`
@@ -44,8 +42,7 @@ type Register struct {
 
 type RegisterCollection struct {
 	Collection
-	Data   []Register `json:"data,omitempty"`
-	client *RegisterClient
+	Data []Register `json:"data,omitempty"`
 }
 
 type RegisterClient struct {
@@ -58,10 +55,6 @@ type RegisterOperations interface {
 	Update(existing *Register, updates interface{}) (*Register, error)
 	ById(id string) (*Register, error)
 	Delete(container *Register) error
-
-	ActionCreate(*Register) (*GenericObject, error)
-
-	ActionRemove(*Register) (*GenericObject, error)
 
 	ActionStop(*Register, *InstanceStop) (*Instance, error)
 }
@@ -87,18 +80,7 @@ func (c *RegisterClient) Update(existing *Register, updates interface{}) (*Regis
 func (c *RegisterClient) List(opts *ListOpts) (*RegisterCollection, error) {
 	resp := &RegisterCollection{}
 	err := c.rancherClient.doList(REGISTER_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *RegisterCollection) Next() (*RegisterCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &RegisterCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *RegisterClient) ById(id string) (*Register, error) {
@@ -114,24 +96,6 @@ func (c *RegisterClient) ById(id string) (*Register, error) {
 
 func (c *RegisterClient) Delete(container *Register) error {
 	return c.rancherClient.doResourceDelete(REGISTER_TYPE, &container.Resource)
-}
-
-func (c *RegisterClient) ActionCreate(resource *Register) (*GenericObject, error) {
-
-	resp := &GenericObject{}
-
-	err := c.rancherClient.doAction(REGISTER_TYPE, "create", &resource.Resource, nil, resp)
-
-	return resp, err
-}
-
-func (c *RegisterClient) ActionRemove(resource *Register) (*GenericObject, error) {
-
-	resp := &GenericObject{}
-
-	err := c.rancherClient.doAction(REGISTER_TYPE, "remove", &resource.Resource, nil, resp)
-
-	return resp, err
 }
 
 func (c *RegisterClient) ActionStop(resource *Register, input *InstanceStop) (*Instance, error) {

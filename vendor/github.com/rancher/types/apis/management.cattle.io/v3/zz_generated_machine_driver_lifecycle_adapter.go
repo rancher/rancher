@@ -39,9 +39,9 @@ func (w *machineDriverLifecycleAdapter) Updated(obj runtime.Object) (runtime.Obj
 	return o, err
 }
 
-func NewMachineDriverLifecycleAdapter(name string, client MachineDriverInterface, l MachineDriverLifecycle) MachineDriverHandlerFunc {
+func NewMachineDriverLifecycleAdapter(name string, clusterScoped bool, client MachineDriverInterface, l MachineDriverLifecycle) MachineDriverHandlerFunc {
 	adapter := &machineDriverLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *MachineDriver) error {
 		if obj == nil {
 			return syncFn(key, nil)

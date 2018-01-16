@@ -39,9 +39,9 @@ func (w *projectRoleTemplateBindingLifecycleAdapter) Updated(obj runtime.Object)
 	return o, err
 }
 
-func NewProjectRoleTemplateBindingLifecycleAdapter(name string, client ProjectRoleTemplateBindingInterface, l ProjectRoleTemplateBindingLifecycle) ProjectRoleTemplateBindingHandlerFunc {
+func NewProjectRoleTemplateBindingLifecycleAdapter(name string, clusterScoped bool, client ProjectRoleTemplateBindingInterface, l ProjectRoleTemplateBindingLifecycle) ProjectRoleTemplateBindingHandlerFunc {
 	adapter := &projectRoleTemplateBindingLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *ProjectRoleTemplateBinding) error {
 		if obj == nil {
 			return syncFn(key, nil)

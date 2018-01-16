@@ -12,8 +12,7 @@ type ServiceRestart struct {
 
 type ServiceRestartCollection struct {
 	Collection
-	Data   []ServiceRestart `json:"data,omitempty"`
-	client *ServiceRestartClient
+	Data []ServiceRestart `json:"data,omitempty"`
 }
 
 type ServiceRestartClient struct {
@@ -49,18 +48,7 @@ func (c *ServiceRestartClient) Update(existing *ServiceRestart, updates interfac
 func (c *ServiceRestartClient) List(opts *ListOpts) (*ServiceRestartCollection, error) {
 	resp := &ServiceRestartCollection{}
 	err := c.rancherClient.doList(SERVICE_RESTART_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ServiceRestartCollection) Next() (*ServiceRestartCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ServiceRestartCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ServiceRestartClient) ById(id string) (*ServiceRestart, error) {

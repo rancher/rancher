@@ -44,8 +44,7 @@ type InstanceLink struct {
 
 type InstanceLinkCollection struct {
 	Collection
-	Data   []InstanceLink `json:"data,omitempty"`
-	client *InstanceLinkClient
+	Data []InstanceLink `json:"data,omitempty"`
 }
 
 type InstanceLinkClient struct {
@@ -68,6 +67,8 @@ type InstanceLinkOperations interface {
 	ActionPurge(*InstanceLink) (*InstanceLink, error)
 
 	ActionRemove(*InstanceLink) (*InstanceLink, error)
+
+	ActionRestore(*InstanceLink) (*InstanceLink, error)
 
 	ActionUpdate(*InstanceLink) (*InstanceLink, error)
 }
@@ -93,18 +94,7 @@ func (c *InstanceLinkClient) Update(existing *InstanceLink, updates interface{})
 func (c *InstanceLinkClient) List(opts *ListOpts) (*InstanceLinkCollection, error) {
 	resp := &InstanceLinkCollection{}
 	err := c.rancherClient.doList(INSTANCE_LINK_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *InstanceLinkCollection) Next() (*InstanceLinkCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &InstanceLinkCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *InstanceLinkClient) ById(id string) (*InstanceLink, error) {
@@ -163,6 +153,15 @@ func (c *InstanceLinkClient) ActionRemove(resource *InstanceLink) (*InstanceLink
 	resp := &InstanceLink{}
 
 	err := c.rancherClient.doAction(INSTANCE_LINK_TYPE, "remove", &resource.Resource, nil, resp)
+
+	return resp, err
+}
+
+func (c *InstanceLinkClient) ActionRestore(resource *InstanceLink) (*InstanceLink, error) {
+
+	resp := &InstanceLink{}
+
+	err := c.rancherClient.doAction(INSTANCE_LINK_TYPE, "restore", &resource.Resource, nil, resp)
 
 	return resp, err
 }

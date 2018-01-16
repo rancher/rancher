@@ -38,8 +38,7 @@ type AuditLog struct {
 
 type AuditLogCollection struct {
 	Collection
-	Data   []AuditLog `json:"data,omitempty"`
-	client *AuditLogClient
+	Data []AuditLog `json:"data,omitempty"`
 }
 
 type AuditLogClient struct {
@@ -75,18 +74,7 @@ func (c *AuditLogClient) Update(existing *AuditLog, updates interface{}) (*Audit
 func (c *AuditLogClient) List(opts *ListOpts) (*AuditLogCollection, error) {
 	resp := &AuditLogCollection{}
 	err := c.rancherClient.doList(AUDIT_LOG_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *AuditLogCollection) Next() (*AuditLogCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &AuditLogCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *AuditLogClient) ById(id string) (*AuditLog, error) {

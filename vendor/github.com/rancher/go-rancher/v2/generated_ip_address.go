@@ -40,8 +40,7 @@ type IpAddress struct {
 
 type IpAddressCollection struct {
 	Collection
-	Data   []IpAddress `json:"data,omitempty"`
-	client *IpAddressClient
+	Data []IpAddress `json:"data,omitempty"`
 }
 
 type IpAddressClient struct {
@@ -57,8 +56,6 @@ type IpAddressOperations interface {
 
 	ActionActivate(*IpAddress) (*IpAddress, error)
 
-	ActionAssociate(*IpAddress) (*IpAddress, error)
-
 	ActionCreate(*IpAddress) (*IpAddress, error)
 
 	ActionDeactivate(*IpAddress) (*IpAddress, error)
@@ -68,6 +65,8 @@ type IpAddressOperations interface {
 	ActionPurge(*IpAddress) (*IpAddress, error)
 
 	ActionRemove(*IpAddress) (*IpAddress, error)
+
+	ActionRestore(*IpAddress) (*IpAddress, error)
 
 	ActionUpdate(*IpAddress) (*IpAddress, error)
 }
@@ -93,18 +92,7 @@ func (c *IpAddressClient) Update(existing *IpAddress, updates interface{}) (*IpA
 func (c *IpAddressClient) List(opts *ListOpts) (*IpAddressCollection, error) {
 	resp := &IpAddressCollection{}
 	err := c.rancherClient.doList(IP_ADDRESS_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *IpAddressCollection) Next() (*IpAddressCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &IpAddressCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *IpAddressClient) ById(id string) (*IpAddress, error) {
@@ -127,15 +115,6 @@ func (c *IpAddressClient) ActionActivate(resource *IpAddress) (*IpAddress, error
 	resp := &IpAddress{}
 
 	err := c.rancherClient.doAction(IP_ADDRESS_TYPE, "activate", &resource.Resource, nil, resp)
-
-	return resp, err
-}
-
-func (c *IpAddressClient) ActionAssociate(resource *IpAddress) (*IpAddress, error) {
-
-	resp := &IpAddress{}
-
-	err := c.rancherClient.doAction(IP_ADDRESS_TYPE, "associate", &resource.Resource, nil, resp)
 
 	return resp, err
 }
@@ -181,6 +160,15 @@ func (c *IpAddressClient) ActionRemove(resource *IpAddress) (*IpAddress, error) 
 	resp := &IpAddress{}
 
 	err := c.rancherClient.doAction(IP_ADDRESS_TYPE, "remove", &resource.Resource, nil, resp)
+
+	return resp, err
+}
+
+func (c *IpAddressClient) ActionRestore(resource *IpAddress) (*IpAddress, error) {
+
+	resp := &IpAddress{}
+
+	err := c.rancherClient.doAction(IP_ADDRESS_TYPE, "restore", &resource.Resource, nil, resp)
 
 	return resp, err
 }

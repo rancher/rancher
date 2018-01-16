@@ -20,8 +20,7 @@ type ServiceProxy struct {
 
 type ServiceProxyCollection struct {
 	Collection
-	Data   []ServiceProxy `json:"data,omitempty"`
-	client *ServiceProxyClient
+	Data []ServiceProxy `json:"data,omitempty"`
 }
 
 type ServiceProxyClient struct {
@@ -57,18 +56,7 @@ func (c *ServiceProxyClient) Update(existing *ServiceProxy, updates interface{})
 func (c *ServiceProxyClient) List(opts *ListOpts) (*ServiceProxyCollection, error) {
 	resp := &ServiceProxyCollection{}
 	err := c.rancherClient.doList(SERVICE_PROXY_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ServiceProxyCollection) Next() (*ServiceProxyCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ServiceProxyCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ServiceProxyClient) ById(id string) (*ServiceProxy, error) {

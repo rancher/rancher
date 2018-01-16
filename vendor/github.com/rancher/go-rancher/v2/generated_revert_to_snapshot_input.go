@@ -12,8 +12,7 @@ type RevertToSnapshotInput struct {
 
 type RevertToSnapshotInputCollection struct {
 	Collection
-	Data   []RevertToSnapshotInput `json:"data,omitempty"`
-	client *RevertToSnapshotInputClient
+	Data []RevertToSnapshotInput `json:"data,omitempty"`
 }
 
 type RevertToSnapshotInputClient struct {
@@ -49,18 +48,7 @@ func (c *RevertToSnapshotInputClient) Update(existing *RevertToSnapshotInput, up
 func (c *RevertToSnapshotInputClient) List(opts *ListOpts) (*RevertToSnapshotInputCollection, error) {
 	resp := &RevertToSnapshotInputCollection{}
 	err := c.rancherClient.doList(REVERT_TO_SNAPSHOT_INPUT_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *RevertToSnapshotInputCollection) Next() (*RevertToSnapshotInputCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &RevertToSnapshotInputCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *RevertToSnapshotInputClient) ById(id string) (*RevertToSnapshotInput, error) {

@@ -36,8 +36,7 @@ type ExternalVolumeEvent struct {
 
 type ExternalVolumeEventCollection struct {
 	Collection
-	Data   []ExternalVolumeEvent `json:"data,omitempty"`
-	client *ExternalVolumeEventClient
+	Data []ExternalVolumeEvent `json:"data,omitempty"`
 }
 
 type ExternalVolumeEventClient struct {
@@ -77,18 +76,7 @@ func (c *ExternalVolumeEventClient) Update(existing *ExternalVolumeEvent, update
 func (c *ExternalVolumeEventClient) List(opts *ListOpts) (*ExternalVolumeEventCollection, error) {
 	resp := &ExternalVolumeEventCollection{}
 	err := c.rancherClient.doList(EXTERNAL_VOLUME_EVENT_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ExternalVolumeEventCollection) Next() (*ExternalVolumeEventCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ExternalVolumeEventCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ExternalVolumeEventClient) ById(id string) (*ExternalVolumeEvent, error) {

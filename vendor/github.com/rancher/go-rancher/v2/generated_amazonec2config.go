@@ -11,8 +11,6 @@ type Amazonec2Config struct {
 
 	Ami string `json:"ami,omitempty" yaml:"ami,omitempty"`
 
-	BlockDurationMinutes string `json:"blockDurationMinutes,omitempty" yaml:"block_duration_minutes,omitempty"`
-
 	DeviceName string `json:"deviceName,omitempty" yaml:"device_name,omitempty"`
 
 	Endpoint string `json:"endpoint,omitempty" yaml:"endpoint,omitempty"`
@@ -59,8 +57,6 @@ type Amazonec2Config struct {
 
 	UsePrivateAddress bool `json:"usePrivateAddress,omitempty" yaml:"use_private_address,omitempty"`
 
-	Userdata string `json:"userdata,omitempty" yaml:"userdata,omitempty"`
-
 	VolumeType string `json:"volumeType,omitempty" yaml:"volume_type,omitempty"`
 
 	VpcId string `json:"vpcId,omitempty" yaml:"vpc_id,omitempty"`
@@ -70,8 +66,7 @@ type Amazonec2Config struct {
 
 type Amazonec2ConfigCollection struct {
 	Collection
-	Data   []Amazonec2Config `json:"data,omitempty"`
-	client *Amazonec2ConfigClient
+	Data []Amazonec2Config `json:"data,omitempty"`
 }
 
 type Amazonec2ConfigClient struct {
@@ -107,18 +102,7 @@ func (c *Amazonec2ConfigClient) Update(existing *Amazonec2Config, updates interf
 func (c *Amazonec2ConfigClient) List(opts *ListOpts) (*Amazonec2ConfigCollection, error) {
 	resp := &Amazonec2ConfigCollection{}
 	err := c.rancherClient.doList(AMAZONEC2CONFIG_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *Amazonec2ConfigCollection) Next() (*Amazonec2ConfigCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &Amazonec2ConfigCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *Amazonec2ConfigClient) ById(id string) (*Amazonec2Config, error) {
