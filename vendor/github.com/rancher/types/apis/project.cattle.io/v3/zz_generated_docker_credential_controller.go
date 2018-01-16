@@ -45,7 +45,7 @@ type DockerCredentialLister interface {
 type DockerCredentialController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() DockerCredentialLister
-	AddHandler(handler DockerCredentialHandlerFunc)
+	AddHandler(name string, handler DockerCredentialHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -63,7 +63,7 @@ type DockerCredentialInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() DockerCredentialController
-	AddSyncHandler(sync DockerCredentialHandlerFunc)
+	AddHandler(name string, sync DockerCredentialHandlerFunc)
 	AddLifecycle(name string, lifecycle DockerCredentialLifecycle)
 }
 
@@ -108,8 +108,8 @@ func (c *dockerCredentialController) Lister() DockerCredentialLister {
 	}
 }
 
-func (c *dockerCredentialController) AddHandler(handler DockerCredentialHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *dockerCredentialController) AddHandler(name string, handler DockerCredentialHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -212,11 +212,11 @@ func (s *dockerCredentialClient) DeleteCollection(deleteOpts *metav1.DeleteOptio
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *dockerCredentialClient) AddSyncHandler(sync DockerCredentialHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *dockerCredentialClient) AddHandler(name string, sync DockerCredentialHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *dockerCredentialClient) AddLifecycle(name string, lifecycle DockerCredentialLifecycle) {
 	sync := NewDockerCredentialLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

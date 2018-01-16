@@ -27,5 +27,12 @@ func generateKey() (string, error) {
 
 func getAuthProviderName(principalID string) string {
 	parts := strings.Split(principalID, "://")
-	return parts[0]
+	externalType := parts[0]
+	providerParts := strings.Split(externalType, "_")
+	return providerParts[0]
+}
+
+func getUserID(principalID string) string {
+	parts := strings.Split(principalID, "://")
+	return parts[1]
 }

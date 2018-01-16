@@ -68,7 +68,6 @@ func ClusterRemove(
 }
 
 func clusterRemoveFromCli(ctx *cli.Context) error {
-	var local bool
 	force := ctx.Bool("force")
 	if !force {
 		reader := bufio.NewReader(os.Stdin)
@@ -82,6 +81,9 @@ func clusterRemoveFromCli(ctx *cli.Context) error {
 			return nil
 		}
 	}
+	if ctx.Bool("local") {
+		return clusterRemoveLocal(ctx)
+	}
 	clusterFile, filePath, err := resolveClusterFile(ctx)
 	if err != nil {
 		return fmt.Errorf("Failed to resolve cluster file: %v", err)
@@ -91,9 +93,11 @@ func clusterRemoveFromCli(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("Failed to parse cluster file: %v", err)
 	}
-	if ctx.Bool("local") {
-		rkeConfig.Nodes = []v3.RKEConfigNode{*cluster.GetLocalRKENodeConfig()}
-		local = true
-	}
-	return ClusterRemove(context.Background(), rkeConfig, nil, local, "")
+	return ClusterRemove(context.Background(), rkeConfig, nil, false, "")
+}
+
+func clusterRemoveLocal(ctx *cli.Context) error {
+	var rkeConfig *v3.RancherKubernetesEngineConfig
+	rkeConfig = cluster.GetLocalRKEConfig()
+	return ClusterRemove(context.Background(), rkeConfig, nil, true, "")
 }

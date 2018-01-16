@@ -69,6 +69,9 @@ type MachineStatus struct {
 	NodeConfig          *RKEConfigNode       `json:"rkeNode,omitempty"`
 	SSHUser             string               `json:"sshUser,omitempty"`
 	MachineDriverConfig string               `json:"machineDriverConfig,omitempty"`
+	NodeAnnotations     map[string]string    `json:"nodeAnnotations,omitempty"`
+	NodeLabels          map[string]string    `json:"nodeLabels,omitempty"`
+	Token               string               `json:"token"`
 }
 
 var (

@@ -469,13 +469,12 @@ metadata:
   namespace: kube-system
 
 
-{{if eq .CloudProvider "aws"}}
-## aws stuff here
+{{if ne .CloudProvider ""}}
 ---
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: aws-ippool
+  name: {{.CloudProvider}}-ippool
   namespace: kube-system
 data:
   aws-ippool: |-
@@ -484,6 +483,8 @@ data:
     metadata:
       cidr: {{.ClusterCIDR}}
     spec:
+      ipip:
+        enabled: true
       nat-outgoing: true
 ---
 apiVersion: v1
@@ -497,7 +498,7 @@ spec:
   containers:
   - name: calicoctl
     image: {{.Calicoctl}}
-    command: ["/bin/sh", "-c", "calicoctl apply -f aws-ippool.yaml"]
+    command: ["/bin/sh", "-c", "calicoctl apply -f {{.CloudProvider}}-ippool.yaml"]
     env:
     - name: ETCD_ENDPOINTS
       valueFrom:
@@ -510,9 +511,9 @@ spec:
   volumes:
   - name: ippool-config
     configMap:
-      name: aws-ippool
+      name: {{.CloudProvider}}-ippool
       items:
-        - key: aws-ippool
-          path: aws-ippool.yaml
+        - key: {{.CloudProvider}}-ippool
+          path: {{.CloudProvider}}-ippool.yaml
           {{end}}
 `

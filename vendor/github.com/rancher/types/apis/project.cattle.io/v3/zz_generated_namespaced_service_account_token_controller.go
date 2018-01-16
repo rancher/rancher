@@ -45,7 +45,7 @@ type NamespacedServiceAccountTokenLister interface {
 type NamespacedServiceAccountTokenController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() NamespacedServiceAccountTokenLister
-	AddHandler(handler NamespacedServiceAccountTokenHandlerFunc)
+	AddHandler(name string, handler NamespacedServiceAccountTokenHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -63,7 +63,7 @@ type NamespacedServiceAccountTokenInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NamespacedServiceAccountTokenController
-	AddSyncHandler(sync NamespacedServiceAccountTokenHandlerFunc)
+	AddHandler(name string, sync NamespacedServiceAccountTokenHandlerFunc)
 	AddLifecycle(name string, lifecycle NamespacedServiceAccountTokenLifecycle)
 }
 
@@ -108,8 +108,8 @@ func (c *namespacedServiceAccountTokenController) Lister() NamespacedServiceAcco
 	}
 }
 
-func (c *namespacedServiceAccountTokenController) AddHandler(handler NamespacedServiceAccountTokenHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *namespacedServiceAccountTokenController) AddHandler(name string, handler NamespacedServiceAccountTokenHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -212,11 +212,11 @@ func (s *namespacedServiceAccountTokenClient) DeleteCollection(deleteOpts *metav
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *namespacedServiceAccountTokenClient) AddSyncHandler(sync NamespacedServiceAccountTokenHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *namespacedServiceAccountTokenClient) AddHandler(name string, sync NamespacedServiceAccountTokenHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *namespacedServiceAccountTokenClient) AddLifecycle(name string, lifecycle NamespacedServiceAccountTokenLifecycle) {
 	sync := NewNamespacedServiceAccountTokenLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

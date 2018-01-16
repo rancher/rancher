@@ -113,7 +113,7 @@ func (h *HeartBeatSyncer) checkHeartBeat() {
 				continue
 			}
 
-			v3.ClusterConditionReady.Unknown(cluster)
+			v3.ClusterConditionReady.False(cluster)
 			v3.ClusterConditionReady.Reason(cluster, msgUnknown)
 
 			logrus.Infof("Cluster [%s] condition status unknown", clusterName)
@@ -123,10 +123,10 @@ func (h *HeartBeatSyncer) checkHeartBeat() {
 	}
 }
 
-// Condition is Ready if conditionType is Ready and conditionStatus is True/False but not unknown.
+// Condition is Ready if conditionType is Ready and conditionStatus is True
 func getConditionIfReady(cluster *v3.Cluster) *v3.ClusterCondition {
 	for _, condition := range cluster.Status.Conditions {
-		if string(condition.Type) == string(v3.ClusterConditionReady) && condition.Status != corev1.ConditionUnknown {
+		if string(condition.Type) == string(v3.ClusterConditionReady) && condition.Status == corev1.ConditionTrue {
 			return &condition
 		}
 	}

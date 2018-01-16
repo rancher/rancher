@@ -29,8 +29,7 @@ func Register(management *config.ManagementContext) {
 	machineDriverLifecycle.schemaClient = dynamicSchemaClient
 
 	machineDriverClient.
-		Controller().
-		AddHandler(v3.NewMachineDriverLifecycleAdapter("machine-driver-controller", machineDriverClient, machineDriverLifecycle))
+		AddLifecycle("machine-driver-controller", machineDriverLifecycle)
 }
 
 type Lifecycle struct {

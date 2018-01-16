@@ -20,6 +20,17 @@ func SetUpAuthentication(ctx context.Context, kubeCluster, currentCluster *Clust
 		if currentCluster != nil {
 			kubeCluster.Certificates = currentCluster.Certificates
 		} else {
+			log.Infof(ctx, "[certificates] Attempting to recover certificates from backup on host [%s]", kubeCluster.EtcdHosts[0].Address)
+			kubeCluster.Certificates, err = pki.FetchCertificatesFromHost(ctx, kubeCluster.EtcdHosts[0], kubeCluster.SystemImages[AplineImage], kubeCluster.LocalKubeConfigPath)
+			if err != nil {
+				return err
+			}
+			if kubeCluster.Certificates != nil {
+				log.Infof(ctx, "[certificates] Certificate backup found on host [%s]", kubeCluster.EtcdHosts[0].Address)
+				return nil
+			}
+			log.Infof(ctx, "[certificates] No Certificate backup found on host [%s]", kubeCluster.EtcdHosts[0].Address)
+
 			kubeCluster.Certificates, err = pki.StartCertificatesGeneration(ctx,
 				kubeCluster.ControlPlaneHosts,
 				kubeCluster.WorkerHosts,
@@ -29,6 +40,11 @@ func SetUpAuthentication(ctx context.Context, kubeCluster, currentCluster *Clust
 			if err != nil {
 				return fmt.Errorf("Failed to generate Kubernetes certificates: %v", err)
 			}
+			log.Infof(ctx, "[certificates] Temporarily saving certs to etcd host [%s]", kubeCluster.EtcdHosts[0].Address)
+			if err := pki.DeployCertificatesOnHost(ctx, kubeCluster.EtcdHosts[0], kubeCluster.Certificates, kubeCluster.SystemImages[CertDownloaderImage]); err != nil {
+				return err
+			}
+			log.Infof(ctx, "[certificates] Saved certs to etcd host [%s]", kubeCluster.EtcdHosts[0].Address)
 		}
 	}
 	return nil

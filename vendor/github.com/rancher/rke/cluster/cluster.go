@@ -298,13 +298,3 @@ func (c *Cluster) ApplyAuthzResources(ctx context.Context) error {
 	}
 	return nil
 }
-
-func GetLocalRKENodeConfig() *v3.RKEConfigNode {
-	rkeLocalNode := &v3.RKEConfigNode{
-		Address:          LocalNodeAddress,
-		HostnameOverride: LocalNodeHostname,
-		User:             LocalNodeUser,
-		Role:             []string{services.ControlRole, services.WorkerRole, services.ETCDRole},
-	}
-	return rkeLocalNode
-}

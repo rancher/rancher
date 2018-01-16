@@ -45,7 +45,7 @@ type WorkloadLister interface {
 type WorkloadController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() WorkloadLister
-	AddHandler(handler WorkloadHandlerFunc)
+	AddHandler(name string, handler WorkloadHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -63,7 +63,7 @@ type WorkloadInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() WorkloadController
-	AddSyncHandler(sync WorkloadHandlerFunc)
+	AddHandler(name string, sync WorkloadHandlerFunc)
 	AddLifecycle(name string, lifecycle WorkloadLifecycle)
 }
 
@@ -108,8 +108,8 @@ func (c *workloadController) Lister() WorkloadLister {
 	}
 }
 
-func (c *workloadController) AddHandler(handler WorkloadHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *workloadController) AddHandler(name string, handler WorkloadHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -212,11 +212,11 @@ func (s *workloadClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, list
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *workloadClient) AddSyncHandler(sync WorkloadHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *workloadClient) AddHandler(name string, sync WorkloadHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *workloadClient) AddLifecycle(name string, lifecycle WorkloadLifecycle) {
 	sync := NewWorkloadLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

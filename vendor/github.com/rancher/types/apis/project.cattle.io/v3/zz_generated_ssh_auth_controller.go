@@ -45,7 +45,7 @@ type SSHAuthLister interface {
 type SSHAuthController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() SSHAuthLister
-	AddHandler(handler SSHAuthHandlerFunc)
+	AddHandler(name string, handler SSHAuthHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -63,7 +63,7 @@ type SSHAuthInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() SSHAuthController
-	AddSyncHandler(sync SSHAuthHandlerFunc)
+	AddHandler(name string, sync SSHAuthHandlerFunc)
 	AddLifecycle(name string, lifecycle SSHAuthLifecycle)
 }
 
@@ -108,8 +108,8 @@ func (c *sshAuthController) Lister() SSHAuthLister {
 	}
 }
 
-func (c *sshAuthController) AddHandler(handler SSHAuthHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *sshAuthController) AddHandler(name string, handler SSHAuthHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -212,11 +212,11 @@ func (s *sshAuthClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listO
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *sshAuthClient) AddSyncHandler(sync SSHAuthHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *sshAuthClient) AddHandler(name string, sync SSHAuthHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *sshAuthClient) AddLifecycle(name string, lifecycle SSHAuthLifecycle) {
 	sync := NewSSHAuthLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

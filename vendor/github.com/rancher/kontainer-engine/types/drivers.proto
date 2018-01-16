@@ -60,6 +60,8 @@ message ClusterInfo {
     int64 node_count = 9;
 
     map<string, string> metadata = 10;
+
+    string status = 11;
 }
 
 message UpdateRequest {

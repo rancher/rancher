@@ -46,7 +46,7 @@ type RoleBindingLister interface {
 type RoleBindingController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() RoleBindingLister
-	AddHandler(handler RoleBindingHandlerFunc)
+	AddHandler(name string, handler RoleBindingHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -64,7 +64,7 @@ type RoleBindingInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() RoleBindingController
-	AddSyncHandler(sync RoleBindingHandlerFunc)
+	AddHandler(name string, sync RoleBindingHandlerFunc)
 	AddLifecycle(name string, lifecycle RoleBindingLifecycle)
 }
 
@@ -109,8 +109,8 @@ func (c *roleBindingController) Lister() RoleBindingLister {
 	}
 }
 
-func (c *roleBindingController) AddHandler(handler RoleBindingHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *roleBindingController) AddHandler(name string, handler RoleBindingHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -213,11 +213,11 @@ func (s *roleBindingClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, l
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *roleBindingClient) AddSyncHandler(sync RoleBindingHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *roleBindingClient) AddHandler(name string, sync RoleBindingHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *roleBindingClient) AddLifecycle(name string, lifecycle RoleBindingLifecycle) {
 	sync := NewRoleBindingLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

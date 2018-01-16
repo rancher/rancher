@@ -1,5 +1,9 @@
 package types
 
+const (
+	ResourceFieldID = "id"
+)
+
 type Collection struct {
 	Type         string                 `json:"type,omitempty"`
 	Links        map[string]string      `json:"links"`

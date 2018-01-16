@@ -206,9 +206,15 @@ func (m *mgr) deleteNamespace(obj runtime.Object) error {
 	}
 
 	nsClient := m.mgmt.K8sClient.CoreV1().Namespaces()
-	err = nsClient.Delete(o.GetName(), &v1.DeleteOptions{})
+	ns, err := nsClient.Get(o.GetName(), v1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return nil
+	}
+	if ns.Status.Phase != v12.NamespaceTerminating {
+		err = nsClient.Delete(o.GetName(), nil)
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
 	}
 	return err
 }

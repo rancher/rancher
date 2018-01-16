@@ -45,7 +45,7 @@ type NamespacedDockerCredentialLister interface {
 type NamespacedDockerCredentialController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() NamespacedDockerCredentialLister
-	AddHandler(handler NamespacedDockerCredentialHandlerFunc)
+	AddHandler(name string, handler NamespacedDockerCredentialHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -63,7 +63,7 @@ type NamespacedDockerCredentialInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NamespacedDockerCredentialController
-	AddSyncHandler(sync NamespacedDockerCredentialHandlerFunc)
+	AddHandler(name string, sync NamespacedDockerCredentialHandlerFunc)
 	AddLifecycle(name string, lifecycle NamespacedDockerCredentialLifecycle)
 }
 
@@ -108,8 +108,8 @@ func (c *namespacedDockerCredentialController) Lister() NamespacedDockerCredenti
 	}
 }
 
-func (c *namespacedDockerCredentialController) AddHandler(handler NamespacedDockerCredentialHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *namespacedDockerCredentialController) AddHandler(name string, handler NamespacedDockerCredentialHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -212,11 +212,11 @@ func (s *namespacedDockerCredentialClient) DeleteCollection(deleteOpts *metav1.D
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *namespacedDockerCredentialClient) AddSyncHandler(sync NamespacedDockerCredentialHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *namespacedDockerCredentialClient) AddHandler(name string, sync NamespacedDockerCredentialHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *namespacedDockerCredentialClient) AddLifecycle(name string, lifecycle NamespacedDockerCredentialLifecycle) {
 	sync := NewNamespacedDockerCredentialLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

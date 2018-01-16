@@ -45,7 +45,7 @@ type StackLister interface {
 type StackController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() StackLister
-	AddHandler(handler StackHandlerFunc)
+	AddHandler(name string, handler StackHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -63,7 +63,7 @@ type StackInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() StackController
-	AddSyncHandler(sync StackHandlerFunc)
+	AddHandler(name string, sync StackHandlerFunc)
 	AddLifecycle(name string, lifecycle StackLifecycle)
 }
 
@@ -108,8 +108,8 @@ func (c *stackController) Lister() StackLister {
 	}
 }
 
-func (c *stackController) AddHandler(handler StackHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *stackController) AddHandler(name string, handler StackHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -212,11 +212,11 @@ func (s *stackClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpt
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *stackClient) AddSyncHandler(sync StackHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *stackClient) AddHandler(name string, sync StackHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *stackClient) AddLifecycle(name string, lifecycle StackLifecycle) {
 	sync := NewStackLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

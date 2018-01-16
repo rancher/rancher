@@ -46,7 +46,7 @@ type SecretLister interface {
 type SecretController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() SecretLister
-	AddHandler(handler SecretHandlerFunc)
+	AddHandler(name string, handler SecretHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -64,7 +64,7 @@ type SecretInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() SecretController
-	AddSyncHandler(sync SecretHandlerFunc)
+	AddHandler(name string, sync SecretHandlerFunc)
 	AddLifecycle(name string, lifecycle SecretLifecycle)
 }
 
@@ -109,8 +109,8 @@ func (c *secretController) Lister() SecretLister {
 	}
 }
 
-func (c *secretController) AddHandler(handler SecretHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *secretController) AddHandler(name string, handler SecretHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -213,11 +213,11 @@ func (s *secretClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOp
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *secretClient) AddSyncHandler(sync SecretHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *secretClient) AddHandler(name string, sync SecretHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *secretClient) AddLifecycle(name string, lifecycle SecretLifecycle) {
 	sync := NewSecretLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

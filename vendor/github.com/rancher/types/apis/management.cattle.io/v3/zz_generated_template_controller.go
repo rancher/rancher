@@ -44,7 +44,7 @@ type TemplateLister interface {
 type TemplateController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() TemplateLister
-	AddHandler(handler TemplateHandlerFunc)
+	AddHandler(name string, handler TemplateHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -62,7 +62,7 @@ type TemplateInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() TemplateController
-	AddSyncHandler(sync TemplateHandlerFunc)
+	AddHandler(name string, sync TemplateHandlerFunc)
 	AddLifecycle(name string, lifecycle TemplateLifecycle)
 }
 
@@ -107,8 +107,8 @@ func (c *templateController) Lister() TemplateLister {
 	}
 }
 
-func (c *templateController) AddHandler(handler TemplateHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *templateController) AddHandler(name string, handler TemplateHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -211,11 +211,11 @@ func (s *templateClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, list
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *templateClient) AddSyncHandler(sync TemplateHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *templateClient) AddHandler(name string, sync TemplateHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *templateClient) AddLifecycle(name string, lifecycle TemplateLifecycle) {
 	sync := NewTemplateLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

@@ -21,7 +21,7 @@ func Register(management *config.ManagementContext, schemas *types.Schemas) {
 	c := &Controller{
 		Schemas: schemas,
 	}
-	management.Management.DynamicSchemas("").AddSyncHandler(c.Sync)
+	management.Management.DynamicSchemas("").AddHandler("dynamic-schema", c.Sync)
 }
 
 func (c *Controller) Sync(key string, dynamicSchema *v3.DynamicSchema) error {

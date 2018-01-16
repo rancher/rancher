@@ -15,12 +15,12 @@ import (
 )
 
 func Register(ctx context.Context, management *config.ManagementContext) {
+	agent.Register(ctx, management)
 	machineController.Register(management)
 	catalogController.Register(ctx, management)
 	clusterheartbeat.Register(ctx, management)
-	clusterprovisioner.Register(management)
 	clusterstats.Register(management)
-	agent.Register(ctx, management)
 	clusterevents.Register(ctx, management)
 	auth.Register(ctx, management)
+	clusterprovisioner.Register(management)
 }

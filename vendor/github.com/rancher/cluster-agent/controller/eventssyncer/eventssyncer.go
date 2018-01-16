@@ -35,7 +35,7 @@ func Register(workload *config.ClusterContext) {
 		managementNamespaces: workload.Management.Core.Namespaces("").Controller().Lister(),
 		clusterEvents:        workload.Management.Management.ClusterEvents("").Controller().Lister(),
 	}
-	workload.Core.Events("").Controller().AddHandler(e.sync)
+	workload.Core.Events("").Controller().AddHandler("events-syncer", e.sync)
 }
 
 func (e *EventsSyncer) sync(key string, event *corev1.Event) error {
@@ -73,7 +73,7 @@ func (e *EventsSyncer) createClusterEvent(key string, event *corev1.Event) error
 			return nil
 		}
 
-		logrus.Infof("Creating cluster event [%s]", event.Message)
+		logrus.Debugf("Creating cluster event [%s]", event.Message)
 		clusterEvent := e.convertEventToClusterEvent(event, ns)
 		_, err = e.clusterEventsClient.Create(clusterEvent)
 		return err

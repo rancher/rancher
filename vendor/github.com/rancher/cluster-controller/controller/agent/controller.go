@@ -14,8 +14,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	}
 
 	clusterClient := management.Management.Clusters("")
-	handler := v3.NewClusterLifecycleAdapter("cluster-agent-controller", clusterClient, lifecycle)
-	clusterClient.Controller().AddHandler(handler)
+	clusterClient.AddLifecycle("cluster-agent-controller", lifecycle)
 }
 
 type ClusterLifecycle struct {

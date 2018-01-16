@@ -44,7 +44,7 @@ type GlobalRoleLister interface {
 type GlobalRoleController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() GlobalRoleLister
-	AddHandler(handler GlobalRoleHandlerFunc)
+	AddHandler(name string, handler GlobalRoleHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -62,7 +62,7 @@ type GlobalRoleInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() GlobalRoleController
-	AddSyncHandler(sync GlobalRoleHandlerFunc)
+	AddHandler(name string, sync GlobalRoleHandlerFunc)
 	AddLifecycle(name string, lifecycle GlobalRoleLifecycle)
 }
 
@@ -107,8 +107,8 @@ func (c *globalRoleController) Lister() GlobalRoleLister {
 	}
 }
 
-func (c *globalRoleController) AddHandler(handler GlobalRoleHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *globalRoleController) AddHandler(name string, handler GlobalRoleHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -211,11 +211,11 @@ func (s *globalRoleClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, li
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *globalRoleClient) AddSyncHandler(sync GlobalRoleHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *globalRoleClient) AddHandler(name string, sync GlobalRoleHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *globalRoleClient) AddLifecycle(name string, lifecycle GlobalRoleLifecycle) {
 	sync := NewGlobalRoleLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

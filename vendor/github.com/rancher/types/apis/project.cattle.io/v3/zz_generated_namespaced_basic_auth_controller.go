@@ -45,7 +45,7 @@ type NamespacedBasicAuthLister interface {
 type NamespacedBasicAuthController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() NamespacedBasicAuthLister
-	AddHandler(handler NamespacedBasicAuthHandlerFunc)
+	AddHandler(name string, handler NamespacedBasicAuthHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -63,7 +63,7 @@ type NamespacedBasicAuthInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NamespacedBasicAuthController
-	AddSyncHandler(sync NamespacedBasicAuthHandlerFunc)
+	AddHandler(name string, sync NamespacedBasicAuthHandlerFunc)
 	AddLifecycle(name string, lifecycle NamespacedBasicAuthLifecycle)
 }
 
@@ -108,8 +108,8 @@ func (c *namespacedBasicAuthController) Lister() NamespacedBasicAuthLister {
 	}
 }
 
-func (c *namespacedBasicAuthController) AddHandler(handler NamespacedBasicAuthHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *namespacedBasicAuthController) AddHandler(name string, handler NamespacedBasicAuthHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -212,11 +212,11 @@ func (s *namespacedBasicAuthClient) DeleteCollection(deleteOpts *metav1.DeleteOp
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *namespacedBasicAuthClient) AddSyncHandler(sync NamespacedBasicAuthHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *namespacedBasicAuthClient) AddHandler(name string, sync NamespacedBasicAuthHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *namespacedBasicAuthClient) AddLifecycle(name string, lifecycle NamespacedBasicAuthLifecycle) {
 	sync := NewNamespacedBasicAuthLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

@@ -83,7 +83,7 @@ func (c Cond) Once(obj runtime.Object, f func() (runtime.Object, error)) (runtim
 
 	c.Unknown(obj)
 	newObj, err := f()
-	if newObj != nil {
+	if newObj != nil && !reflect.ValueOf(newObj).IsNil() {
 		obj = newObj
 	}
 
@@ -103,7 +103,7 @@ func (c Cond) DoUntilTrue(obj runtime.Object, f func() (runtime.Object, error)) 
 
 	c.Unknown(obj)
 	newObj, err := f()
-	if newObj != nil {
+	if newObj != nil && !reflect.ValueOf(newObj).IsNil() {
 		obj = newObj
 	}
 
@@ -124,7 +124,7 @@ func (c Cond) Do(obj runtime.Object, f func() (runtime.Object, error)) (runtime.
 func (c Cond) do(obj runtime.Object, f func() (runtime.Object, error)) (runtime.Object, error) {
 	c.Unknown(obj)
 	newObj, err := f()
-	if newObj != nil {
+	if newObj != nil && !reflect.ValueOf(newObj).IsNil() {
 		obj = newObj
 	}
 

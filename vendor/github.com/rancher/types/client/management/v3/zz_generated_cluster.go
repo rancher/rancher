@@ -12,6 +12,7 @@ const (
 	ClusterFieldAzureKubernetesServiceConfig        = "azureKubernetesServiceConfig"
 	ClusterFieldCACert                              = "caCert"
 	ClusterFieldCapacity                            = "capacity"
+	ClusterFieldClusterName                         = "clusterName"
 	ClusterFieldComponentStatuses                   = "componentStatuses"
 	ClusterFieldConditions                          = "conditions"
 	ClusterFieldCreated                             = "created"
@@ -21,7 +22,6 @@ const (
 	ClusterFieldDescription                         = "description"
 	ClusterFieldDriver                              = "driver"
 	ClusterFieldGoogleKubernetesEngineConfig        = "googleKubernetesEngineConfig"
-	ClusterFieldId                                  = "id"
 	ClusterFieldInternal                            = "internal"
 	ClusterFieldLabels                              = "labels"
 	ClusterFieldLimits                              = "limits"
@@ -46,6 +46,7 @@ type Cluster struct {
 	AzureKubernetesServiceConfig        *AzureKubernetesServiceConfig  `json:"azureKubernetesServiceConfig,omitempty"`
 	CACert                              string                         `json:"caCert,omitempty"`
 	Capacity                            map[string]string              `json:"capacity,omitempty"`
+	ClusterName                         string                         `json:"clusterName,omitempty"`
 	ComponentStatuses                   []ClusterComponentStatus       `json:"componentStatuses,omitempty"`
 	Conditions                          []ClusterCondition             `json:"conditions,omitempty"`
 	Created                             string                         `json:"created,omitempty"`
@@ -55,7 +56,6 @@ type Cluster struct {
 	Description                         string                         `json:"description,omitempty"`
 	Driver                              string                         `json:"driver,omitempty"`
 	GoogleKubernetesEngineConfig        *GoogleKubernetesEngineConfig  `json:"googleKubernetesEngineConfig,omitempty"`
-	Id                                  string                         `json:"id,omitempty"`
 	Internal                            *bool                          `json:"internal,omitempty"`
 	Labels                              map[string]string              `json:"labels,omitempty"`
 	Limits                              map[string]string              `json:"limits,omitempty"`

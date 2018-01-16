@@ -16,13 +16,14 @@ const (
 	MachineFieldDescription          = "description"
 	MachineFieldHostname             = "hostname"
 	MachineFieldIPAddress            = "ipAddress"
-	MachineFieldId                   = "id"
 	MachineFieldInfo                 = "info"
 	MachineFieldLabels               = "labels"
 	MachineFieldLimits               = "limits"
 	MachineFieldMachineTemplateId    = "machineTemplateId"
 	MachineFieldName                 = "name"
 	MachineFieldNamespaceId          = "namespaceId"
+	MachineFieldNodeAnnotations      = "nodeAnnotations"
+	MachineFieldNodeLabels           = "nodeLabels"
 	MachineFieldNodeName             = "nodeName"
 	MachineFieldOwnerReferences      = "ownerReferences"
 	MachineFieldPodCidr              = "podCidr"
@@ -34,6 +35,7 @@ const (
 	MachineFieldSSHUser              = "sshUser"
 	MachineFieldState                = "state"
 	MachineFieldTaints               = "taints"
+	MachineFieldToken                = "token"
 	MachineFieldTransitioning        = "transitioning"
 	MachineFieldTransitioningMessage = "transitioningMessage"
 	MachineFieldUnschedulable        = "unschedulable"
@@ -54,13 +56,14 @@ type Machine struct {
 	Description          string                    `json:"description,omitempty"`
 	Hostname             string                    `json:"hostname,omitempty"`
 	IPAddress            string                    `json:"ipAddress,omitempty"`
-	Id                   string                    `json:"id,omitempty"`
 	Info                 *NodeInfo                 `json:"info,omitempty"`
 	Labels               map[string]string         `json:"labels,omitempty"`
 	Limits               map[string]string         `json:"limits,omitempty"`
 	MachineTemplateId    string                    `json:"machineTemplateId,omitempty"`
 	Name                 string                    `json:"name,omitempty"`
 	NamespaceId          string                    `json:"namespaceId,omitempty"`
+	NodeAnnotations      map[string]string         `json:"nodeAnnotations,omitempty"`
+	NodeLabels           map[string]string         `json:"nodeLabels,omitempty"`
 	NodeName             string                    `json:"nodeName,omitempty"`
 	OwnerReferences      []OwnerReference          `json:"ownerReferences,omitempty"`
 	PodCidr              string                    `json:"podCidr,omitempty"`
@@ -72,6 +75,7 @@ type Machine struct {
 	SSHUser              string                    `json:"sshUser,omitempty"`
 	State                string                    `json:"state,omitempty"`
 	Taints               []Taint                   `json:"taints,omitempty"`
+	Token                string                    `json:"token,omitempty"`
 	Transitioning        string                    `json:"transitioning,omitempty"`
 	TransitioningMessage string                    `json:"transitioningMessage,omitempty"`
 	Unschedulable        *bool                     `json:"unschedulable,omitempty"`

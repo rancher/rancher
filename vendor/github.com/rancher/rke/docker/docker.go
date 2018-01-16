@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"archive/tar"
 	"context"
 	"fmt"
 	"io"
@@ -21,11 +22,26 @@ var K8sDockerVersions = map[string][]string{
 }
 
 func DoRunContainer(ctx context.Context, dClient *client.Client, imageCfg *container.Config, hostCfg *container.HostConfig, containerName string, hostname string, plane string) error {
-	isRunning, err := IsContainerRunning(ctx, dClient, hostname, containerName, false)
+	container, err := dClient.ContainerInspect(ctx, containerName)
 	if err != nil {
-		return err
+		if !client.IsErrNotFound(err) {
+			return err
+		}
+		if err := UseLocalOrPull(ctx, dClient, hostname, imageCfg.Image, plane); err != nil {
+			return err
+		}
+		resp, err := dClient.ContainerCreate(ctx, imageCfg, hostCfg, nil, containerName)
+		if err != nil {
+			return fmt.Errorf("Failed to create [%s] container on host [%s]: %v", containerName, hostname, err)
+		}
+		if err := dClient.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+			return fmt.Errorf("Failed to start [%s] container on host [%s]: %v", containerName, hostname, err)
+		}
+		log.Infof(ctx, "[%s] Successfully started [%s] container on host [%s]", plane, containerName, hostname)
+		return nil
 	}
-	if isRunning {
+	// Check for upgrades
+	if container.State.Running {
 		log.Infof(ctx, "[%s] Container [%s] is already running on host [%s]", plane, containerName, hostname)
 		isUpgradable, err := IsContainerUpgradable(ctx, dClient, imageCfg, containerName, hostname, plane)
 		if err != nil {
@@ -37,18 +53,11 @@ func DoRunContainer(ctx context.Context, dClient *client.Client, imageCfg *conta
 		return nil
 	}
 
-	err = UseLocalOrPull(ctx, dClient, hostname, imageCfg.Image, plane)
-	if err != nil {
-		return err
-	}
-	resp, err := dClient.ContainerCreate(ctx, imageCfg, hostCfg, nil, containerName)
-	if err != nil {
-		return fmt.Errorf("Failed to create [%s] container on host [%s]: %v", containerName, hostname, err)
-	}
-	if err := dClient.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+	// start if not running
+	log.Infof(ctx, "[%s] Starting stopped container [%s] on host [%s]", plane, containerName, hostname)
+	if err := dClient.ContainerStart(ctx, container.ID, types.ContainerStartOptions{}); err != nil {
 		return fmt.Errorf("Failed to start [%s] container on host [%s]: %v", containerName, hostname, err)
 	}
-	logrus.Debugf("[%s] Successfully started [%s] container: [%s]", plane, containerName, resp.ID)
 	log.Infof(ctx, "[%s] Successfully started [%s] container on host [%s]", plane, containerName, hostname)
 	return nil
 }
@@ -270,4 +279,21 @@ func IsSupportedDockerVersion(info types.Info, K8sVersion string) (bool, error) 
 
 	}
 	return false, nil
+}
+
+func ReadFileFromContainer(ctx context.Context, dClient *client.Client, hostname, container, filePath string) (string, error) {
+	reader, _, err := dClient.CopyFromContainer(ctx, container, filePath)
+	if err != nil {
+		return "", fmt.Errorf("Failed to copy file [%s] from container [%s] on host [%s]: %v", filePath, container, hostname, err)
+	}
+	defer reader.Close()
+	tarReader := tar.NewReader(reader)
+	if _, err := tarReader.Next(); err != nil {
+		return "", err
+	}
+	file, err := ioutil.ReadAll(tarReader)
+	if err != nil {
+		return "", err
+	}
+	return string(file), nil
 }

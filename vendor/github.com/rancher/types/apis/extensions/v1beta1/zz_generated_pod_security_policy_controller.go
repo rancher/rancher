@@ -45,7 +45,7 @@ type PodSecurityPolicyLister interface {
 type PodSecurityPolicyController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() PodSecurityPolicyLister
-	AddHandler(handler PodSecurityPolicyHandlerFunc)
+	AddHandler(name string, handler PodSecurityPolicyHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -63,7 +63,7 @@ type PodSecurityPolicyInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PodSecurityPolicyController
-	AddSyncHandler(sync PodSecurityPolicyHandlerFunc)
+	AddHandler(name string, sync PodSecurityPolicyHandlerFunc)
 	AddLifecycle(name string, lifecycle PodSecurityPolicyLifecycle)
 }
 
@@ -108,8 +108,8 @@ func (c *podSecurityPolicyController) Lister() PodSecurityPolicyLister {
 	}
 }
 
-func (c *podSecurityPolicyController) AddHandler(handler PodSecurityPolicyHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *podSecurityPolicyController) AddHandler(name string, handler PodSecurityPolicyHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -212,11 +212,11 @@ func (s *podSecurityPolicyClient) DeleteCollection(deleteOpts *metav1.DeleteOpti
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *podSecurityPolicyClient) AddSyncHandler(sync PodSecurityPolicyHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *podSecurityPolicyClient) AddHandler(name string, sync PodSecurityPolicyHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *podSecurityPolicyClient) AddLifecycle(name string, lifecycle PodSecurityPolicyLifecycle) {
 	sync := NewPodSecurityPolicyLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

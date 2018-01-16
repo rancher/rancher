@@ -8,7 +8,6 @@ import (
 
 	etcdclient "github.com/coreos/etcd/client"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/go-connections/nat"
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
@@ -64,20 +63,7 @@ func buildEtcdConfig(host *hosts.Host, etcdService v3.ETCDService, initCluster s
 		RestartPolicy: container.RestartPolicy{Name: "always"},
 		Binds: []string{
 			"/var/lib/etcd:/etcd-data"},
-		PortBindings: nat.PortMap{
-			"2379/tcp": []nat.PortBinding{
-				{
-					HostIP:   "0.0.0.0",
-					HostPort: "2379",
-				},
-			},
-			"2380/tcp": []nat.PortBinding{
-				{
-					HostIP:   "0.0.0.0",
-					HostPort: "2380",
-				},
-			},
-		},
+		NetworkMode: "host",
 	}
 	for arg, value := range etcdService.ExtraArgs {
 		cmd := fmt.Sprintf("--%s=%s", arg, value)

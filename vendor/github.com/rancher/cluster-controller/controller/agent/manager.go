@@ -85,7 +85,7 @@ func (m *Manager) toRESTConfig(cluster *v3.Cluster) (*rest.Config, error) {
 		return nil, err
 	}
 
-	data, err := base64.StdEncoding.DecodeString(cluster.Status.CACert)
+	caBytes, err := base64.StdEncoding.DecodeString(cluster.Status.CACert)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (m *Manager) toRESTConfig(cluster *v3.Cluster) (*rest.Config, error) {
 		Prefix:      u.Path,
 		BearerToken: cluster.Status.ServiceAccountToken,
 		TLSClientConfig: rest.TLSClientConfig{
-			CAData: data,
+			CAData: caBytes,
 		},
 	}, nil
 }

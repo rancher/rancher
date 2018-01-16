@@ -45,7 +45,7 @@ type ComponentStatusLister interface {
 type ComponentStatusController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() ComponentStatusLister
-	AddHandler(handler ComponentStatusHandlerFunc)
+	AddHandler(name string, handler ComponentStatusHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -63,7 +63,7 @@ type ComponentStatusInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ComponentStatusController
-	AddSyncHandler(sync ComponentStatusHandlerFunc)
+	AddHandler(name string, sync ComponentStatusHandlerFunc)
 	AddLifecycle(name string, lifecycle ComponentStatusLifecycle)
 }
 
@@ -108,8 +108,8 @@ func (c *componentStatusController) Lister() ComponentStatusLister {
 	}
 }
 
-func (c *componentStatusController) AddHandler(handler ComponentStatusHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *componentStatusController) AddHandler(name string, handler ComponentStatusHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -212,11 +212,11 @@ func (s *componentStatusClient) DeleteCollection(deleteOpts *metav1.DeleteOption
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *componentStatusClient) AddSyncHandler(sync ComponentStatusHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *componentStatusClient) AddHandler(name string, sync ComponentStatusHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *componentStatusClient) AddLifecycle(name string, lifecycle ComponentStatusLifecycle) {
 	sync := NewComponentStatusLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

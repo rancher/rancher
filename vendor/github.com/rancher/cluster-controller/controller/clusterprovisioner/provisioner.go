@@ -64,7 +64,7 @@ func Register(management *config.ManagementContext) {
 
 	// Add handlers
 	p.Clusters.AddLifecycle("cluster-provisioner-controller", p)
-	management.Management.Machines("").AddSyncHandler(p.machineChanged)
+	management.Management.Machines("").AddHandler("cluster-provisioner-controller", p.machineChanged)
 
 	// Setup custom dialer to RKE
 	secretStore, err := machineconfig.NewStore(management)
@@ -162,7 +162,13 @@ func (p *Provisioner) Create(cluster *v3.Cluster) (*v3.Cluster, error) {
 		return nil, nil
 	}
 
-	v3.ClusterConditionReady.Unknown(cluster)
+	cluster.Status.ClusterName = cluster.Spec.DisplayName
+	if cluster.Status.ClusterName == "" {
+		cluster.Status.ClusterName = cluster.Name
+	}
+
+	v3.ClusterConditionProvisioned.Unknown(cluster)
+	v3.ClusterConditionReady.False(cluster)
 	v3.ClusterConditionReady.Message(cluster, "API not available")
 	obj, err := v3.ClusterConditionProvisioned.DoUntilTrue(cluster, func() (runtime.Object, error) {
 		newCluster, err := p.reconcileCluster(cluster, true)
@@ -172,7 +178,7 @@ func (p *Provisioner) Create(cluster *v3.Cluster) (*v3.Cluster, error) {
 		if err != nil {
 			return cluster, err
 		}
-		if newCluster == nil || !v3.ClusterConditionProvisioned.IsTrue(cluster) {
+		if newCluster == nil && err == nil {
 			return cluster, &controller.ForgetError{Err: fmt.Errorf("waiting to provision cluster")}
 		}
 		return cluster, err
@@ -231,7 +237,7 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 			return cluster, err
 		}
 
-		cluster.Status.AppliedSpec = cluster.Spec
+		cluster.Status.AppliedSpec = *spec
 		cluster.Status.APIEndpoint = apiEndpoint
 		cluster.Status.ServiceAccountToken = serviceAccountToken
 		cluster.Status.CACert = caCert
@@ -381,7 +387,7 @@ func (p *Provisioner) driverCreate(cluster *v3.Cluster, spec v3.ClusterSpec) (ap
 			cluster = newCluster
 		}
 
-		api, token, cert, err = p.Driver.Create(ctx, cluster.Name, spec)
+		api, token, cert, err = p.Driver.Create(ctx, cluster.Status.ClusterName, spec)
 		return cluster, err
 	})
 
@@ -397,7 +403,7 @@ func (p *Provisioner) driverUpdate(cluster *v3.Cluster, spec v3.ClusterSpec) (ap
 			cluster = newCluster
 		}
 
-		api, token, cert, err = p.Driver.Update(ctx, cluster.Name, spec)
+		api, token, cert, err = p.Driver.Update(ctx, cluster.Status.ClusterName, spec)
 		return cluster, err
 	})
 
@@ -413,7 +419,7 @@ func (p *Provisioner) driverRemove(cluster *v3.Cluster) error {
 			cluster = newCluster
 		}
 
-		return cluster, p.Driver.Remove(ctx, cluster.Name, cluster.Spec)
+		return cluster, p.Driver.Remove(ctx, cluster.Status.ClusterName, cluster.Spec)
 	})
 
 	return err
@@ -434,13 +440,17 @@ func (p *Provisioner) getCtx(cluster *v3.Cluster, cond condition.Cond) (context.
 				logrus.Infof("cluster [%s] provisioning: %s", cluster.Name, event.Message)
 			}
 			if cond.GetMessage(cluster) != event.Message {
-				cond.Message(cluster, event.Message)
-				if newCluster, err := p.Clusters.Update(cluster); err == nil {
-					cluster = newCluster
-				} else {
-					newCluster, err = p.Clusters.Get(cluster.Name, metav1.GetOptions{})
-					if err != nil {
+				updated := false
+				for i := 0; i < 2 && !updated; i++ {
+					cond.Message(cluster, event.Message)
+					if newCluster, err := p.Clusters.Update(cluster); err == nil {
+						updated = true
 						cluster = newCluster
+					} else {
+						newCluster, err = p.Clusters.Get(cluster.Name, metav1.GetOptions{})
+						if err == nil {
+							cluster = newCluster
+						}
 					}
 				}
 			}

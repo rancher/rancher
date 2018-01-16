@@ -46,7 +46,7 @@ type EndpointsLister interface {
 type EndpointsController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() EndpointsLister
-	AddHandler(handler EndpointsHandlerFunc)
+	AddHandler(name string, handler EndpointsHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -64,7 +64,7 @@ type EndpointsInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() EndpointsController
-	AddSyncHandler(sync EndpointsHandlerFunc)
+	AddHandler(name string, sync EndpointsHandlerFunc)
 	AddLifecycle(name string, lifecycle EndpointsLifecycle)
 }
 
@@ -109,8 +109,8 @@ func (c *endpointsController) Lister() EndpointsLister {
 	}
 }
 
-func (c *endpointsController) AddHandler(handler EndpointsHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *endpointsController) AddHandler(name string, handler EndpointsHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -213,11 +213,11 @@ func (s *endpointsClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, lis
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *endpointsClient) AddSyncHandler(sync EndpointsHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *endpointsClient) AddHandler(name string, sync EndpointsHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *endpointsClient) AddLifecycle(name string, lifecycle EndpointsLifecycle) {
 	sync := NewEndpointsLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

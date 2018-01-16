@@ -81,7 +81,7 @@ There are extra options that can be specified for each network plugin:
 - **calico_cni_image**: Calico CNI binary installer Docker image
 - **calico_controllers_image**: Calico Controller Docker image
 - **calicoctl_image**: Calicoctl tool Docker image
-- **calico_cloud_provider**: Cloud provider where Calico will operate, current available value is: `aws`
+- **calico_cloud_provider**: Cloud provider where Calico will operate, currently supported values are: `aws`, `gce`
 
 #### Cannal
 

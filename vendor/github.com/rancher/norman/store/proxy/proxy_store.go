@@ -266,6 +266,8 @@ func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	namespace, id := splitID(id)
 
 	values.PutValue(existing, resourceVersion, "metadata", "resourceVersion")
+	values.PutValue(existing, namespace, "metadata", "namespace")
+	values.PutValue(existing, id, "metadata", "name")
 
 	req := p.common(namespace, p.k8sClient.Put()).
 		Body(&unstructured.Unstructured{

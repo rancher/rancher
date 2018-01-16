@@ -45,7 +45,7 @@ type ClusterEventLister interface {
 type ClusterEventController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() ClusterEventLister
-	AddHandler(handler ClusterEventHandlerFunc)
+	AddHandler(name string, handler ClusterEventHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -63,7 +63,7 @@ type ClusterEventInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ClusterEventController
-	AddSyncHandler(sync ClusterEventHandlerFunc)
+	AddHandler(name string, sync ClusterEventHandlerFunc)
 	AddLifecycle(name string, lifecycle ClusterEventLifecycle)
 }
 
@@ -108,8 +108,8 @@ func (c *clusterEventController) Lister() ClusterEventLister {
 	}
 }
 
-func (c *clusterEventController) AddHandler(handler ClusterEventHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *clusterEventController) AddHandler(name string, handler ClusterEventHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -212,11 +212,11 @@ func (s *clusterEventClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, 
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *clusterEventClient) AddSyncHandler(sync ClusterEventHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *clusterEventClient) AddHandler(name string, sync ClusterEventHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *clusterEventClient) AddLifecycle(name string, lifecycle ClusterEventLifecycle) {
 	sync := NewClusterEventLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

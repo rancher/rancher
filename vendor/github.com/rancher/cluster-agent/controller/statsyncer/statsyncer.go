@@ -24,20 +24,21 @@ const (
 )
 
 type StatSyncer struct {
-	clusterName  string
-	clusters     v3.ClusterLister
-	clusterNodes v3.MachineInterface
-	pods         v1.PodInterface
-	nodes        v1.NodeLister
+	clusterName      string
+	clusterNamespace string
+	clusters         v3.ClusterLister
+	clusterNodes     v3.MachineInterface
+	pods             v1.PodInterface
+	nodes            v1.NodeLister
 }
 
 func Register(ctx context.Context, cluster *config.ClusterContext) {
 	s := &StatSyncer{
 		clusterName:  cluster.ClusterName,
 		clusters:     cluster.Management.Management.Clusters("").Controller().Lister(),
-		clusterNodes: cluster.Management.Management.Machines(""),
-		pods:         cluster.Core.Pods(""),
 		nodes:        cluster.Core.Nodes("").Controller().Lister(),
+		clusterNodes: cluster.Management.Management.Machines(cluster.ClusterName),
+		pods:         cluster.Core.Pods(""),
 	}
 
 	go s.syncResources(ctx, syncInterval)

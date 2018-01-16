@@ -45,7 +45,7 @@ type NodeLister interface {
 type NodeController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() NodeLister
-	AddHandler(handler NodeHandlerFunc)
+	AddHandler(name string, handler NodeHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -63,7 +63,7 @@ type NodeInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NodeController
-	AddSyncHandler(sync NodeHandlerFunc)
+	AddHandler(name string, sync NodeHandlerFunc)
 	AddLifecycle(name string, lifecycle NodeLifecycle)
 }
 
@@ -108,8 +108,8 @@ func (c *nodeController) Lister() NodeLister {
 	}
 }
 
-func (c *nodeController) AddHandler(handler NodeHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *nodeController) AddHandler(name string, handler NodeHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -212,11 +212,11 @@ func (s *nodeClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *nodeClient) AddSyncHandler(sync NodeHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *nodeClient) AddHandler(name string, sync NodeHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *nodeClient) AddLifecycle(name string, lifecycle NodeLifecycle) {
 	sync := NewNodeLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

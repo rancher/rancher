@@ -44,7 +44,7 @@ type PrincipalLister interface {
 type PrincipalController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() PrincipalLister
-	AddHandler(handler PrincipalHandlerFunc)
+	AddHandler(name string, handler PrincipalHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -62,7 +62,7 @@ type PrincipalInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PrincipalController
-	AddSyncHandler(sync PrincipalHandlerFunc)
+	AddHandler(name string, sync PrincipalHandlerFunc)
 	AddLifecycle(name string, lifecycle PrincipalLifecycle)
 }
 
@@ -107,8 +107,8 @@ func (c *principalController) Lister() PrincipalLister {
 	}
 }
 
-func (c *principalController) AddHandler(handler PrincipalHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *principalController) AddHandler(name string, handler PrincipalHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -211,11 +211,11 @@ func (s *principalClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, lis
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *principalClient) AddSyncHandler(sync PrincipalHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *principalClient) AddHandler(name string, sync PrincipalHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *principalClient) AddLifecycle(name string, lifecycle PrincipalLifecycle) {
 	sync := NewPrincipalLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

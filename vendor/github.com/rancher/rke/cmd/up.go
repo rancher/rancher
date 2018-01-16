@@ -114,8 +114,9 @@ func ClusterUp(
 }
 
 func clusterUpFromCli(ctx *cli.Context) error {
-	var local bool
-	var localConnDialerFactory hosts.DialerFactory
+	if ctx.Bool("local") {
+		return clusterUpLocal(ctx)
+	}
 	clusterFile, filePath, err := resolveClusterFile(ctx)
 	if err != nil {
 		return fmt.Errorf("Failed to resolve cluster file: %v", err)
@@ -126,11 +127,24 @@ func clusterUpFromCli(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("Failed to parse cluster file: %v", err)
 	}
-	if ctx.Bool("local") {
+	_, _, _, _, err = ClusterUp(context.Background(), rkeConfig, nil, nil, false, "")
+	return err
+}
+
+func clusterUpLocal(ctx *cli.Context) error {
+	var rkeConfig *v3.RancherKubernetesEngineConfig
+	clusterFile, filePath, err := resolveClusterFile(ctx)
+	if err != nil {
+		log.Infof(context.Background(), "Failed to resolve cluster file, using default cluster instead")
+		rkeConfig = cluster.GetLocalRKEConfig()
+	} else {
+		clusterFilePath = filePath
+		rkeConfig, err = cluster.ParseConfig(clusterFile)
+		if err != nil {
+			return fmt.Errorf("Failed to parse cluster file: %v", err)
+		}
 		rkeConfig.Nodes = []v3.RKEConfigNode{*cluster.GetLocalRKENodeConfig()}
-		localConnDialerFactory = hosts.LocalHealthcheckFactory
-		local = true
 	}
-	_, _, _, _, err = ClusterUp(context.Background(), rkeConfig, nil, localConnDialerFactory, local, "")
+	_, _, _, _, err = ClusterUp(context.Background(), rkeConfig, nil, hosts.LocalHealthcheckFactory, true, "")
 	return err
 }

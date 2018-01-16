@@ -7,10 +7,12 @@ import (
 const (
 	ClusterRegistrationTokenType                      = "clusterRegistrationToken"
 	ClusterRegistrationTokenFieldAnnotations          = "annotations"
+	ClusterRegistrationTokenFieldClusterId            = "clusterId"
 	ClusterRegistrationTokenFieldCreated              = "created"
 	ClusterRegistrationTokenFieldCreatorID            = "creatorId"
 	ClusterRegistrationTokenFieldLabels               = "labels"
 	ClusterRegistrationTokenFieldName                 = "name"
+	ClusterRegistrationTokenFieldNamespaceId          = "namespaceId"
 	ClusterRegistrationTokenFieldOwnerReferences      = "ownerReferences"
 	ClusterRegistrationTokenFieldRemoved              = "removed"
 	ClusterRegistrationTokenFieldState                = "state"
@@ -23,10 +25,12 @@ const (
 type ClusterRegistrationToken struct {
 	types.Resource
 	Annotations          map[string]string               `json:"annotations,omitempty"`
+	ClusterId            string                          `json:"clusterId,omitempty"`
 	Created              string                          `json:"created,omitempty"`
 	CreatorID            string                          `json:"creatorId,omitempty"`
 	Labels               map[string]string               `json:"labels,omitempty"`
 	Name                 string                          `json:"name,omitempty"`
+	NamespaceId          string                          `json:"namespaceId,omitempty"`
 	OwnerReferences      []OwnerReference                `json:"ownerReferences,omitempty"`
 	Removed              string                          `json:"removed,omitempty"`
 	State                string                          `json:"state,omitempty"`

@@ -19,7 +19,6 @@ import (
 )
 
 const (
-	projectResource = "projects"
 	clusterResource = "clusters"
 	owner           = "owner"
 )
@@ -46,74 +45,6 @@ func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *cr
 	return prtb, crtb
 }
 
-type prtbLifecycle struct {
-	mgr           *manager
-	projectLister v3.ProjectLister
-	clusterLister v3.ClusterLister
-}
-
-func (p *prtbLifecycle) Create(obj *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
-	err := p.ensureBindings(obj)
-	return obj, err
-}
-
-func (p *prtbLifecycle) Updated(obj *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
-	err := p.ensureBindings(obj)
-	return nil, err
-}
-
-func (p *prtbLifecycle) Remove(obj *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
-	err := p.mgr.reconcileMembershipBindingForDelete(string(obj.UID))
-	return nil, err
-}
-
-// When a PRTB is created or updated, translate it into several k8s roles and bindings to actually enforce the RBAC.
-// Specifically:
-// - ensure the user can see the project and its parent cluster in the mgmt API
-// - if the user was granted owner permissions for the project, ensure they can create/update/delete the project
-// - if the user was granted user managment privileges for the project, ensure they can create PRTBs in the project's namespace
-func (p *prtbLifecycle) ensureBindings(binding *v3.ProjectRoleTemplateBinding) error {
-	parts := strings.SplitN(binding.ProjectName, ":", 2)
-	if len(parts) < 2 {
-		return errors.Errorf("cannot determine project and cluster from %v", binding.ProjectName)
-	}
-	clusterName := parts[0]
-	projectName := parts[1]
-	proj, err := p.projectLister.Get(clusterName, projectName)
-	if err != nil {
-		return err
-	}
-	if proj == nil {
-		return errors.Errorf("cannot create binding because project %v was not found", projectName)
-	}
-
-	cluster, err := p.clusterLister.Get("", clusterName)
-	if err != nil {
-		return err
-	}
-	if cluster == nil {
-		return errors.Errorf("cannot create binding because cluster %v was not found", clusterName)
-	}
-
-	clusterRoleName := strings.ToLower(fmt.Sprintf("%v-clustermember", clusterName))
-	isOwnerRole := binding.RoleTemplateName == "project-owner"
-	var projectRoleName string
-	if isOwnerRole {
-		projectRoleName = strings.ToLower(fmt.Sprintf("%v-projectowner", projectName))
-	} else {
-		projectRoleName = strings.ToLower(fmt.Sprintf("%v-projectmember", projectName))
-	}
-
-	if err := p.mgr.ensureMembershipBinding(projectRoleName, projectResource, projectName, string(binding.UID), isOwnerRole, binding.Subject); err != nil {
-		return err
-	}
-	if err := p.mgr.ensureMembershipBinding(clusterRoleName, clusterResource, clusterName, string(binding.UID), false, binding.Subject); err != nil {
-		return err
-	}
-
-	return p.mgr.grantUserManagementPrivilges(binding.RoleTemplateName, "projectroletemplatebindings", binding.Subject, binding)
-}
-
 type crtbLifecycle struct {
 	mgr           *manager
 	clusterLister v3.ClusterLister
@@ -130,7 +61,7 @@ func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (*v3.Cluster
 }
 
 func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-	err := c.mgr.reconcileMembershipBindingForDelete(string(obj.UID))
+	err := c.mgr.reconcileClusterMembershipBindingForDelete(string(obj.UID))
 	return nil, err
 }
 
@@ -157,7 +88,7 @@ func (c *crtbLifecycle) ensureBindings(binding *v3.ClusterRoleTemplateBinding) e
 		clusterRoleName = strings.ToLower(fmt.Sprintf("%v-clustermember", clusterName))
 	}
 
-	if err := c.mgr.ensureMembershipBinding(clusterRoleName, clusterResource, clusterName, string(binding.UID), isOwnerRole, binding.Subject); err != nil {
+	if err := c.mgr.ensureClusterMembershipBinding(clusterRoleName, clusterName, string(binding.UID), isOwnerRole, binding.Subject); err != nil {
 		return err
 	}
 
@@ -174,10 +105,10 @@ type manager struct {
 	mgmt      *config.ManagementContext
 }
 
-// When a PRTB/CRTB is created that gives a user some permissions in a project or cluster, we need to create a "membership" binding
-// that gives the user access to the the project/cluster custom resource itself
-func (m *manager) ensureMembershipBinding(roleName, resource, clusterOrProjectName, rtbUID string, makeOwner bool, subject v1.Subject) error {
-	if err := m.createMembershipRole(roleName, resource, clusterOrProjectName, makeOwner); err != nil {
+// When a CRTB is created that gives a user some permissions in a project or cluster, we need to create a "membership" binding
+// that gives the user access to the the cluster custom resource itself
+func (m *manager) ensureClusterMembershipBinding(roleName, clusterName, rtbUID string, makeOwner bool, subject v1.Subject) error {
+	if err := m.createClusterMembershipRole(roleName, clusterName, makeOwner); err != nil {
 		return err
 	}
 
@@ -217,9 +148,9 @@ func (m *manager) ensureMembershipBinding(roleName, resource, clusterOrProjectNa
 
 // Creates a role that lets the bound user see (if they are an ordinary member) the project or cluster in the mgmt api
 // (or CRUD the project/cluster if they are an owner)
-func (m *manager) createMembershipRole(roleName, resource, projectOrClusterName string, makeOwner bool) error {
+func (m *manager) createClusterMembershipRole(roleName, clusterName string, makeOwner bool) error {
 	roleCli := m.mgmt.RBAC.ClusterRoles("")
-	ns, err := m.nsLister.Get("", projectOrClusterName)
+	ns, err := m.nsLister.Get("", clusterName)
 	if err != nil {
 		return err
 	}
@@ -227,8 +158,8 @@ func (m *manager) createMembershipRole(roleName, resource, projectOrClusterName 
 		rules := []v1.PolicyRule{
 			{
 				APIGroups:     []string{"management.cattle.io"},
-				Resources:     []string{resource},
-				ResourceNames: []string{projectOrClusterName},
+				Resources:     []string{clusterResource},
+				ResourceNames: []string{clusterName},
 				Verbs:         []string{"get"},
 			},
 		}
@@ -258,7 +189,7 @@ func (m *manager) createMembershipRole(roleName, resource, projectOrClusterName 
 
 // The PRTB/CRTB has been deleted, either delete or update the project/cluster membership binding so that the user
 // is removed from the project/cluster, if they should be
-func (m *manager) reconcileMembershipBindingForDelete(rtbUID string) error {
+func (m *manager) reconcileClusterMembershipBindingForDelete(rtbUID string) error {
 	set := labels.Set(map[string]string{rtbUID: owner})
 	crbs, err := m.crbLister.List("", set.AsSelector())
 	if err != nil {

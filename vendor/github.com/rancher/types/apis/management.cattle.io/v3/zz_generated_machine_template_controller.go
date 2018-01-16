@@ -44,7 +44,7 @@ type MachineTemplateLister interface {
 type MachineTemplateController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() MachineTemplateLister
-	AddHandler(handler MachineTemplateHandlerFunc)
+	AddHandler(name string, handler MachineTemplateHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -62,7 +62,7 @@ type MachineTemplateInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() MachineTemplateController
-	AddSyncHandler(sync MachineTemplateHandlerFunc)
+	AddHandler(name string, sync MachineTemplateHandlerFunc)
 	AddLifecycle(name string, lifecycle MachineTemplateLifecycle)
 }
 
@@ -107,8 +107,8 @@ func (c *machineTemplateController) Lister() MachineTemplateLister {
 	}
 }
 
-func (c *machineTemplateController) AddHandler(handler MachineTemplateHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *machineTemplateController) AddHandler(name string, handler MachineTemplateHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -211,11 +211,11 @@ func (s *machineTemplateClient) DeleteCollection(deleteOpts *metav1.DeleteOption
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *machineTemplateClient) AddSyncHandler(sync MachineTemplateHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *machineTemplateClient) AddHandler(name string, sync MachineTemplateHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *machineTemplateClient) AddLifecycle(name string, lifecycle MachineTemplateLifecycle) {
 	sync := NewMachineTemplateLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

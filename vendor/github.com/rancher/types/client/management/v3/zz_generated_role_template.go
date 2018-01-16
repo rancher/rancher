@@ -13,7 +13,6 @@ const (
 	RoleTemplateFieldDescription     = "description"
 	RoleTemplateFieldExternal        = "external"
 	RoleTemplateFieldHidden          = "hidden"
-	RoleTemplateFieldId              = "id"
 	RoleTemplateFieldLabels          = "labels"
 	RoleTemplateFieldName            = "name"
 	RoleTemplateFieldOwnerReferences = "ownerReferences"
@@ -32,7 +31,6 @@ type RoleTemplate struct {
 	Description     string            `json:"description,omitempty"`
 	External        *bool             `json:"external,omitempty"`
 	Hidden          *bool             `json:"hidden,omitempty"`
-	Id              string            `json:"id,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`
 	Name            string            `json:"name,omitempty"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
