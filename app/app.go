@@ -217,11 +217,12 @@ func addMachineDriver(name, url, checksum string, active, builtin bool, manageme
 	cli := management.Management.MachineDrivers("")
 	m, _ := lister.Get("", name)
 	if m != nil {
-		if m.Spec.Builtin != builtin || m.Spec.URL != url || m.Spec.Checksum != checksum {
+		if m.Spec.Builtin != builtin || m.Spec.URL != url || m.Spec.Checksum != checksum || m.Spec.DisplayName != name {
 			logrus.Infof("Updating machine driver %v", name)
 			m.Spec.Builtin = builtin
 			m.Spec.URL = url
 			m.Spec.Checksum = checksum
+			m.Spec.DisplayName = name
 			_, err := cli.Update(m)
 			return err
 		}
@@ -234,10 +235,11 @@ func addMachineDriver(name, url, checksum string, active, builtin bool, manageme
 			Name: name,
 		},
 		Spec: v3.MachineDriverSpec{
-			Active:   active,
-			Builtin:  builtin,
-			URL:      url,
-			Checksum: checksum,
+			Active:      active,
+			Builtin:     builtin,
+			URL:         url,
+			DisplayName: name,
+			Checksum:    checksum,
 		},
 	})
 
