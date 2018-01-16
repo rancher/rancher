@@ -21,8 +21,6 @@ type StoragePool struct {
 
 	ExternalId string `json:"externalId,omitempty" yaml:"external_id,omitempty"`
 
-	HostIds []string `json:"hostIds,omitempty" yaml:"host_ids,omitempty"`
-
 	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
 
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
@@ -32,8 +30,6 @@ type StoragePool struct {
 	Removed string `json:"removed,omitempty" yaml:"removed,omitempty"`
 
 	State string `json:"state,omitempty" yaml:"state,omitempty"`
-
-	StorageDriverId string `json:"storageDriverId,omitempty" yaml:"storage_driver_id,omitempty"`
 
 	Transitioning string `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 
@@ -46,14 +42,11 @@ type StoragePool struct {
 	VolumeAccessMode string `json:"volumeAccessMode,omitempty" yaml:"volume_access_mode,omitempty"`
 
 	VolumeCapabilities []string `json:"volumeCapabilities,omitempty" yaml:"volume_capabilities,omitempty"`
-
-	VolumeIds []string `json:"volumeIds,omitempty" yaml:"volume_ids,omitempty"`
 }
 
 type StoragePoolCollection struct {
 	Collection
-	Data   []StoragePool `json:"data,omitempty"`
-	client *StoragePoolClient
+	Data []StoragePool `json:"data,omitempty"`
 }
 
 type StoragePoolClient struct {
@@ -76,6 +69,8 @@ type StoragePoolOperations interface {
 	ActionPurge(*StoragePool) (*StoragePool, error)
 
 	ActionRemove(*StoragePool) (*StoragePool, error)
+
+	ActionRestore(*StoragePool) (*StoragePool, error)
 
 	ActionUpdate(*StoragePool) (*StoragePool, error)
 }
@@ -101,18 +96,7 @@ func (c *StoragePoolClient) Update(existing *StoragePool, updates interface{}) (
 func (c *StoragePoolClient) List(opts *ListOpts) (*StoragePoolCollection, error) {
 	resp := &StoragePoolCollection{}
 	err := c.rancherClient.doList(STORAGE_POOL_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *StoragePoolCollection) Next() (*StoragePoolCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &StoragePoolCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *StoragePoolClient) ById(id string) (*StoragePool, error) {
@@ -171,6 +155,15 @@ func (c *StoragePoolClient) ActionRemove(resource *StoragePool) (*StoragePool, e
 	resp := &StoragePool{}
 
 	err := c.rancherClient.doAction(STORAGE_POOL_TYPE, "remove", &resource.Resource, nil, resp)
+
+	return resp, err
+}
+
+func (c *StoragePoolClient) ActionRestore(resource *StoragePool) (*StoragePool, error) {
+
+	resp := &StoragePool{}
+
+	err := c.rancherClient.doAction(STORAGE_POOL_TYPE, "restore", &resource.Resource, nil, resp)
 
 	return resp, err
 }

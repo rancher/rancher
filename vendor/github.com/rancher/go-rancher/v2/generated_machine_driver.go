@@ -48,8 +48,7 @@ type MachineDriver struct {
 
 type MachineDriverCollection struct {
 	Collection
-	Data   []MachineDriver `json:"data,omitempty"`
-	client *MachineDriverClient
+	Data []MachineDriver `json:"data,omitempty"`
 }
 
 type MachineDriverClient struct {
@@ -64,8 +63,6 @@ type MachineDriverOperations interface {
 	Delete(container *MachineDriver) error
 
 	ActionActivate(*MachineDriver) (*MachineDriver, error)
-
-	ActionCreate(*MachineDriver) (*MachineDriver, error)
 
 	ActionDeactivate(*MachineDriver) (*MachineDriver, error)
 
@@ -99,18 +96,7 @@ func (c *MachineDriverClient) Update(existing *MachineDriver, updates interface{
 func (c *MachineDriverClient) List(opts *ListOpts) (*MachineDriverCollection, error) {
 	resp := &MachineDriverCollection{}
 	err := c.rancherClient.doList(MACHINE_DRIVER_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *MachineDriverCollection) Next() (*MachineDriverCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &MachineDriverCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *MachineDriverClient) ById(id string) (*MachineDriver, error) {
@@ -133,15 +119,6 @@ func (c *MachineDriverClient) ActionActivate(resource *MachineDriver) (*MachineD
 	resp := &MachineDriver{}
 
 	err := c.rancherClient.doAction(MACHINE_DRIVER_TYPE, "activate", &resource.Resource, nil, resp)
-
-	return resp, err
-}
-
-func (c *MachineDriverClient) ActionCreate(resource *MachineDriver) (*MachineDriver, error) {
-
-	resp := &MachineDriver{}
-
-	err := c.rancherClient.doAction(MACHINE_DRIVER_TYPE, "create", &resource.Resource, nil, resp)
 
 	return resp, err
 }

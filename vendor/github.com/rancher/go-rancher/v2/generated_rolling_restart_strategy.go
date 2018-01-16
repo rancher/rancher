@@ -14,8 +14,7 @@ type RollingRestartStrategy struct {
 
 type RollingRestartStrategyCollection struct {
 	Collection
-	Data   []RollingRestartStrategy `json:"data,omitempty"`
-	client *RollingRestartStrategyClient
+	Data []RollingRestartStrategy `json:"data,omitempty"`
 }
 
 type RollingRestartStrategyClient struct {
@@ -51,18 +50,7 @@ func (c *RollingRestartStrategyClient) Update(existing *RollingRestartStrategy, 
 func (c *RollingRestartStrategyClient) List(opts *ListOpts) (*RollingRestartStrategyCollection, error) {
 	resp := &RollingRestartStrategyCollection{}
 	err := c.rancherClient.doList(ROLLING_RESTART_STRATEGY_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *RollingRestartStrategyCollection) Next() (*RollingRestartStrategyCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &RollingRestartStrategyCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *RollingRestartStrategyClient) ById(id string) (*RollingRestartStrategy, error) {

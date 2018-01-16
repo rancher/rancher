@@ -39,9 +39,9 @@ func (w *namespacedCertificateLifecycleAdapter) Updated(obj runtime.Object) (run
 	return o, err
 }
 
-func NewNamespacedCertificateLifecycleAdapter(name string, client NamespacedCertificateInterface, l NamespacedCertificateLifecycle) NamespacedCertificateHandlerFunc {
+func NewNamespacedCertificateLifecycleAdapter(name string, clusterScoped bool, client NamespacedCertificateInterface, l NamespacedCertificateLifecycle) NamespacedCertificateHandlerFunc {
 	adapter := &namespacedCertificateLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *NamespacedCertificate) error {
 		if obj == nil {
 			return syncFn(key, nil)

@@ -40,9 +40,9 @@ func (w *podSecurityPolicyLifecycleAdapter) Updated(obj runtime.Object) (runtime
 	return o, err
 }
 
-func NewPodSecurityPolicyLifecycleAdapter(name string, client PodSecurityPolicyInterface, l PodSecurityPolicyLifecycle) PodSecurityPolicyHandlerFunc {
+func NewPodSecurityPolicyLifecycleAdapter(name string, clusterScoped bool, client PodSecurityPolicyInterface, l PodSecurityPolicyLifecycle) PodSecurityPolicyHandlerFunc {
 	adapter := &podSecurityPolicyLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *v1beta1.PodSecurityPolicy) error {
 		if obj == nil {
 			return syncFn(key, nil)

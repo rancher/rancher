@@ -10,26 +10,30 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-func (r *roleHandler) syncCRTB(key string, binding *v3.ClusterRoleTemplateBinding) error {
-	if binding == nil {
-		return nil
-	}
-
-	if binding.DeletionTimestamp != nil {
-		return r.ensureCRTBDelete(key, binding)
-	}
-
-	return r.ensureCRTB(key, binding)
+func newCRTBLifecycle(m *manager) *crtbLifecycle {
+	return &crtbLifecycle{m: m}
 }
 
-func (r *roleHandler) ensureCRTB(key string, binding *v3.ClusterRoleTemplateBinding) error {
-	binding = binding.DeepCopy()
-	if r.addFinalizer(binding) {
-		if _, err := r.workload.Management.Management.ClusterRoleTemplateBindings(binding.Namespace).Update(binding); err != nil {
-			return errors.Wrapf(err, "couldn't set finalizer on %v", key)
-		}
-	}
+type crtbLifecycle struct {
+	m *manager
+}
 
+func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+	err := c.syncCRTB(obj)
+	return obj, err
+}
+
+func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+	err := c.syncCRTB(obj)
+	return obj, err
+}
+
+func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+	err := c.ensureCRTBDelete(obj)
+	return obj, err
+}
+
+func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding) error {
 	if binding.RoleTemplateName == "" {
 		logrus.Warnf("ClusterRoleTemplateBinding %v has no role template set. Skipping.", binding.Name)
 		return nil
@@ -39,22 +43,22 @@ func (r *roleHandler) ensureCRTB(key string, binding *v3.ClusterRoleTemplateBind
 		return nil
 	}
 
-	rt, err := r.rtLister.Get("", binding.RoleTemplateName)
+	rt, err := c.m.rtLister.Get("", binding.RoleTemplateName)
 	if err != nil {
 		return errors.Wrapf(err, "couldn't get role template %v", binding.RoleTemplateName)
 	}
 
 	roles := map[string]*v3.RoleTemplate{}
-	if err := r.gatherRoles(rt, roles); err != nil {
+	if err := c.m.gatherRoles(rt, roles); err != nil {
 		return err
 	}
 
-	if err := r.ensureRoles(roles); err != nil {
+	if err := c.m.ensureRoles(roles); err != nil {
 		return errors.Wrap(err, "couldn't ensure roles")
 	}
 
 	for _, role := range roles {
-		if err := r.ensureClusterBinding(role.Name, binding); err != nil {
+		if err := c.ensureClusterBinding(role.Name, binding); err != nil {
 			return errors.Wrapf(err, "couldn't ensure cluster binding %v %v", role.Name, binding.Subject.Name)
 		}
 	}
@@ -62,10 +66,10 @@ func (r *roleHandler) ensureCRTB(key string, binding *v3.ClusterRoleTemplateBind
 	return nil
 }
 
-func (r *roleHandler) ensureClusterBinding(roleName string, binding *v3.ClusterRoleTemplateBinding) error {
-	bindingCli := r.workload.K8sClient.RbacV1().ClusterRoleBindings()
+func (c *crtbLifecycle) ensureClusterBinding(roleName string, binding *v3.ClusterRoleTemplateBinding) error {
+	bindingCli := c.m.workload.K8sClient.RbacV1().ClusterRoleBindings()
 	bindingName, objectMeta, subjects, roleRef := bindingParts(roleName, string(binding.UID), binding.Subject)
-	if c, _ := r.crbLister.Get("", bindingName); c != nil {
+	if c, _ := c.m.crbLister.Get("", bindingName); c != nil {
 		return nil
 	}
 
@@ -78,16 +82,10 @@ func (r *roleHandler) ensureClusterBinding(roleName string, binding *v3.ClusterR
 	return err
 }
 
-func (r *roleHandler) ensureCRTBDelete(key string, binding *v3.ClusterRoleTemplateBinding) error {
-	if len(binding.ObjectMeta.Finalizers) <= 0 || binding.ObjectMeta.Finalizers[0] != r.finalizerName {
-		return nil
-	}
-
-	binding = binding.DeepCopy()
-
+func (c *crtbLifecycle) ensureCRTBDelete(binding *v3.ClusterRoleTemplateBinding) error {
 	set := labels.Set(map[string]string{rtbOwnerLabel: string(binding.UID)})
-	bindingCli := r.workload.K8sClient.RbacV1().ClusterRoleBindings()
-	rbs, err := r.crbLister.List("", set.AsSelector())
+	bindingCli := c.m.workload.K8sClient.RbacV1().ClusterRoleBindings()
+	rbs, err := c.m.crbLister.List("", set.AsSelector())
 	if err != nil {
 		return errors.Wrapf(err, "couldn't list clusterrolebindings with selector %s", set.AsSelector())
 	}
@@ -100,9 +98,5 @@ func (r *roleHandler) ensureCRTBDelete(key string, binding *v3.ClusterRoleTempla
 		}
 	}
 
-	if r.removeFinalizer(binding) {
-		_, err := r.workload.Management.Management.ClusterRoleTemplateBindings(binding.Namespace).Update(binding)
-		return err
-	}
 	return nil
 }

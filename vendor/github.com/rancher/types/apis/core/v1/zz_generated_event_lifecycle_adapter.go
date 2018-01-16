@@ -40,9 +40,9 @@ func (w *eventLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, err
 	return o, err
 }
 
-func NewEventLifecycleAdapter(name string, client EventInterface, l EventLifecycle) EventHandlerFunc {
+func NewEventLifecycleAdapter(name string, clusterScoped bool, client EventInterface, l EventLifecycle) EventHandlerFunc {
 	adapter := &eventLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *v1.Event) error {
 		if obj == nil {
 			return syncFn(key, nil)

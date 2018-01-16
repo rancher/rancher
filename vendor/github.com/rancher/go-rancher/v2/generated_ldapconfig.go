@@ -9,7 +9,7 @@ type Ldapconfig struct {
 
 	AccessMode string `json:"accessMode,omitempty" yaml:"access_mode,omitempty"`
 
-	AllowedIdentities []Identity `json:"allowedIdentities,omitempty" yaml:"allowed_identities,omitempty"`
+	AllowedIdentities []interface{} `json:"allowedIdentities,omitempty" yaml:"allowed_identities,omitempty"`
 
 	ConnectionTimeout int64 `json:"connectionTimeout,omitempty" yaml:"connection_timeout,omitempty"`
 
@@ -22,8 +22,6 @@ type Ldapconfig struct {
 	GroupNameField string `json:"groupNameField,omitempty" yaml:"group_name_field,omitempty"`
 
 	GroupObjectClass string `json:"groupObjectClass,omitempty" yaml:"group_object_class,omitempty"`
-
-	GroupSearchDomain string `json:"groupSearchDomain,omitempty" yaml:"group_search_domain,omitempty"`
 
 	GroupSearchField string `json:"groupSearchField,omitempty" yaml:"group_search_field,omitempty"`
 
@@ -58,8 +56,7 @@ type Ldapconfig struct {
 
 type LdapconfigCollection struct {
 	Collection
-	Data   []Ldapconfig `json:"data,omitempty"`
-	client *LdapconfigClient
+	Data []Ldapconfig `json:"data,omitempty"`
 }
 
 type LdapconfigClient struct {
@@ -95,18 +92,7 @@ func (c *LdapconfigClient) Update(existing *Ldapconfig, updates interface{}) (*L
 func (c *LdapconfigClient) List(opts *ListOpts) (*LdapconfigCollection, error) {
 	resp := &LdapconfigCollection{}
 	err := c.rancherClient.doList(LDAPCONFIG_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *LdapconfigCollection) Next() (*LdapconfigCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &LdapconfigCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *LdapconfigClient) ById(id string) (*Ldapconfig, error) {

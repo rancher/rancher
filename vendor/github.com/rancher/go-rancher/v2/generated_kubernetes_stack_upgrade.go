@@ -7,8 +7,6 @@ const (
 type KubernetesStackUpgrade struct {
 	Resource
 
-	Answers map[string]interface{} `json:"answers,omitempty" yaml:"answers,omitempty"`
-
 	Environment map[string]interface{} `json:"environment,omitempty" yaml:"environment,omitempty"`
 
 	ExternalId string `json:"externalId,omitempty" yaml:"external_id,omitempty"`
@@ -18,8 +16,7 @@ type KubernetesStackUpgrade struct {
 
 type KubernetesStackUpgradeCollection struct {
 	Collection
-	Data   []KubernetesStackUpgrade `json:"data,omitempty"`
-	client *KubernetesStackUpgradeClient
+	Data []KubernetesStackUpgrade `json:"data,omitempty"`
 }
 
 type KubernetesStackUpgradeClient struct {
@@ -55,18 +52,7 @@ func (c *KubernetesStackUpgradeClient) Update(existing *KubernetesStackUpgrade, 
 func (c *KubernetesStackUpgradeClient) List(opts *ListOpts) (*KubernetesStackUpgradeCollection, error) {
 	resp := &KubernetesStackUpgradeCollection{}
 	err := c.rancherClient.doList(KUBERNETES_STACK_UPGRADE_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *KubernetesStackUpgradeCollection) Next() (*KubernetesStackUpgradeCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &KubernetesStackUpgradeCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *KubernetesStackUpgradeClient) ById(id string) (*KubernetesStackUpgrade, error) {

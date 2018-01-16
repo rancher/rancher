@@ -16,8 +16,7 @@ type ServiceLink struct {
 
 type ServiceLinkCollection struct {
 	Collection
-	Data   []ServiceLink `json:"data,omitempty"`
-	client *ServiceLinkClient
+	Data []ServiceLink `json:"data,omitempty"`
 }
 
 type ServiceLinkClient struct {
@@ -53,18 +52,7 @@ func (c *ServiceLinkClient) Update(existing *ServiceLink, updates interface{}) (
 func (c *ServiceLinkClient) List(opts *ListOpts) (*ServiceLinkCollection, error) {
 	resp := &ServiceLinkCollection{}
 	err := c.rancherClient.doList(SERVICE_LINK_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ServiceLinkCollection) Next() (*ServiceLinkCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ServiceLinkCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ServiceLinkClient) ById(id string) (*ServiceLink, error) {

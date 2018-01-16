@@ -46,6 +46,7 @@ type NamespaceController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() NamespaceLister
 	AddHandler(name string, handler NamespaceHandlerFunc)
+	AddClusterScopedHandler(name, clusterName string, handler NamespaceHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -65,6 +66,8 @@ type NamespaceInterface interface {
 	Controller() NamespaceController
 	AddHandler(name string, sync NamespaceHandlerFunc)
 	AddLifecycle(name string, lifecycle NamespaceLifecycle)
+	AddClusterScopedHandler(name, clusterName string, sync NamespaceHandlerFunc)
+	AddClusterScopedLifecycle(name, clusterName string, lifecycle NamespaceLifecycle)
 }
 
 type namespaceLister struct {
@@ -117,6 +120,24 @@ func (c *namespaceController) AddHandler(name string, handler NamespaceHandlerFu
 		if !exists {
 			return handler(key, nil)
 		}
+		return handler(key, obj.(*v1.Namespace))
+	})
+}
+
+func (c *namespaceController) AddClusterScopedHandler(name, cluster string, handler NamespaceHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
+		obj, exists, err := c.Informer().GetStore().GetByKey(key)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return handler(key, nil)
+		}
+
+		if !controller.ObjectInCluster(cluster, obj) {
+			return nil
+		}
+
 		return handler(key, obj.(*v1.Namespace))
 	})
 }
@@ -217,6 +238,15 @@ func (s *namespaceClient) AddHandler(name string, sync NamespaceHandlerFunc) {
 }
 
 func (s *namespaceClient) AddLifecycle(name string, lifecycle NamespaceLifecycle) {
-	sync := NewNamespaceLifecycleAdapter(name, s, lifecycle)
+	sync := NewNamespaceLifecycleAdapter(name, false, s, lifecycle)
 	s.AddHandler(name, sync)
+}
+
+func (s *namespaceClient) AddClusterScopedHandler(name, clusterName string, sync NamespaceHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+}
+
+func (s *namespaceClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle NamespaceLifecycle) {
+	sync := NewNamespaceLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.AddClusterScopedHandler(name, clusterName, sync)
 }

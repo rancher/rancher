@@ -19,11 +19,7 @@ type KubernetesService struct {
 
 	HealthState string `json:"healthState,omitempty" yaml:"health_state,omitempty"`
 
-	InstanceIds []string `json:"instanceIds,omitempty" yaml:"instance_ids,omitempty"`
-
 	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
-
-	LinkedServices map[string]interface{} `json:"linkedServices,omitempty" yaml:"linked_services,omitempty"`
 
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 
@@ -36,8 +32,6 @@ type KubernetesService struct {
 	StackId string `json:"stackId,omitempty" yaml:"stack_id,omitempty"`
 
 	State string `json:"state,omitempty" yaml:"state,omitempty"`
-
-	System bool `json:"system,omitempty" yaml:"system,omitempty"`
 
 	Template interface{} `json:"template,omitempty" yaml:"template,omitempty"`
 
@@ -54,8 +48,7 @@ type KubernetesService struct {
 
 type KubernetesServiceCollection struct {
 	Collection
-	Data   []KubernetesService `json:"data,omitempty"`
-	client *KubernetesServiceClient
+	Data []KubernetesService `json:"data,omitempty"`
 }
 
 type KubernetesServiceClient struct {
@@ -119,18 +112,7 @@ func (c *KubernetesServiceClient) Update(existing *KubernetesService, updates in
 func (c *KubernetesServiceClient) List(opts *ListOpts) (*KubernetesServiceCollection, error) {
 	resp := &KubernetesServiceCollection{}
 	err := c.rancherClient.doList(KUBERNETES_SERVICE_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *KubernetesServiceCollection) Next() (*KubernetesServiceCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &KubernetesServiceCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *KubernetesServiceClient) ById(id string) (*KubernetesService, error) {

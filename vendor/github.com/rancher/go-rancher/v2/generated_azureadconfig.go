@@ -26,8 +26,7 @@ type Azureadconfig struct {
 
 type AzureadconfigCollection struct {
 	Collection
-	Data   []Azureadconfig `json:"data,omitempty"`
-	client *AzureadconfigClient
+	Data []Azureadconfig `json:"data,omitempty"`
 }
 
 type AzureadconfigClient struct {
@@ -63,18 +62,7 @@ func (c *AzureadconfigClient) Update(existing *Azureadconfig, updates interface{
 func (c *AzureadconfigClient) List(opts *ListOpts) (*AzureadconfigCollection, error) {
 	resp := &AzureadconfigCollection{}
 	err := c.rancherClient.doList(AZUREADCONFIG_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *AzureadconfigCollection) Next() (*AzureadconfigCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &AzureadconfigCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *AzureadconfigClient) ById(id string) (*Azureadconfig, error) {

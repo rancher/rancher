@@ -47,6 +47,7 @@ type EndpointsController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() EndpointsLister
 	AddHandler(name string, handler EndpointsHandlerFunc)
+	AddClusterScopedHandler(name, clusterName string, handler EndpointsHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -66,6 +67,8 @@ type EndpointsInterface interface {
 	Controller() EndpointsController
 	AddHandler(name string, sync EndpointsHandlerFunc)
 	AddLifecycle(name string, lifecycle EndpointsLifecycle)
+	AddClusterScopedHandler(name, clusterName string, sync EndpointsHandlerFunc)
+	AddClusterScopedLifecycle(name, clusterName string, lifecycle EndpointsLifecycle)
 }
 
 type endpointsLister struct {
@@ -118,6 +121,24 @@ func (c *endpointsController) AddHandler(name string, handler EndpointsHandlerFu
 		if !exists {
 			return handler(key, nil)
 		}
+		return handler(key, obj.(*v1.Endpoints))
+	})
+}
+
+func (c *endpointsController) AddClusterScopedHandler(name, cluster string, handler EndpointsHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
+		obj, exists, err := c.Informer().GetStore().GetByKey(key)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return handler(key, nil)
+		}
+
+		if !controller.ObjectInCluster(cluster, obj) {
+			return nil
+		}
+
 		return handler(key, obj.(*v1.Endpoints))
 	})
 }
@@ -218,6 +239,15 @@ func (s *endpointsClient) AddHandler(name string, sync EndpointsHandlerFunc) {
 }
 
 func (s *endpointsClient) AddLifecycle(name string, lifecycle EndpointsLifecycle) {
-	sync := NewEndpointsLifecycleAdapter(name, s, lifecycle)
+	sync := NewEndpointsLifecycleAdapter(name, false, s, lifecycle)
 	s.AddHandler(name, sync)
+}
+
+func (s *endpointsClient) AddClusterScopedHandler(name, clusterName string, sync EndpointsHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+}
+
+func (s *endpointsClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle EndpointsLifecycle) {
+	sync := NewEndpointsLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.AddClusterScopedHandler(name, clusterName, sync)
 }

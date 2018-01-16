@@ -40,9 +40,9 @@ func (w *podLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error
 	return o, err
 }
 
-func NewPodLifecycleAdapter(name string, client PodInterface, l PodLifecycle) PodHandlerFunc {
+func NewPodLifecycleAdapter(name string, clusterScoped bool, client PodInterface, l PodLifecycle) PodHandlerFunc {
 	adapter := &podLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *v1.Pod) error {
 		if obj == nil {
 			return syncFn(key, nil)

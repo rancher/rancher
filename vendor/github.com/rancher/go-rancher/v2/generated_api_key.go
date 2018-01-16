@@ -40,8 +40,7 @@ type ApiKey struct {
 
 type ApiKeyCollection struct {
 	Collection
-	Data   []ApiKey `json:"data,omitempty"`
-	client *ApiKeyClient
+	Data []ApiKey `json:"data,omitempty"`
 }
 
 type ApiKeyClient struct {
@@ -89,18 +88,7 @@ func (c *ApiKeyClient) Update(existing *ApiKey, updates interface{}) (*ApiKey, e
 func (c *ApiKeyClient) List(opts *ListOpts) (*ApiKeyCollection, error) {
 	resp := &ApiKeyCollection{}
 	err := c.rancherClient.doList(API_KEY_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ApiKeyCollection) Next() (*ApiKeyCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ApiKeyCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ApiKeyClient) ById(id string) (*ApiKey, error) {

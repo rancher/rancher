@@ -46,8 +46,7 @@ type ServiceEvent struct {
 
 type ServiceEventCollection struct {
 	Collection
-	Data   []ServiceEvent `json:"data,omitempty"`
-	client *ServiceEventClient
+	Data []ServiceEvent `json:"data,omitempty"`
 }
 
 type ServiceEventClient struct {
@@ -87,18 +86,7 @@ func (c *ServiceEventClient) Update(existing *ServiceEvent, updates interface{})
 func (c *ServiceEventClient) List(opts *ListOpts) (*ServiceEventCollection, error) {
 	resp := &ServiceEventCollection{}
 	err := c.rancherClient.doList(SERVICE_EVENT_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ServiceEventCollection) Next() (*ServiceEventCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ServiceEventCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ServiceEventClient) ById(id string) (*ServiceEvent, error) {

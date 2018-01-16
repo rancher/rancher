@@ -46,6 +46,7 @@ type DockerCredentialController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() DockerCredentialLister
 	AddHandler(name string, handler DockerCredentialHandlerFunc)
+	AddClusterScopedHandler(name, clusterName string, handler DockerCredentialHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -65,6 +66,8 @@ type DockerCredentialInterface interface {
 	Controller() DockerCredentialController
 	AddHandler(name string, sync DockerCredentialHandlerFunc)
 	AddLifecycle(name string, lifecycle DockerCredentialLifecycle)
+	AddClusterScopedHandler(name, clusterName string, sync DockerCredentialHandlerFunc)
+	AddClusterScopedLifecycle(name, clusterName string, lifecycle DockerCredentialLifecycle)
 }
 
 type dockerCredentialLister struct {
@@ -117,6 +120,24 @@ func (c *dockerCredentialController) AddHandler(name string, handler DockerCrede
 		if !exists {
 			return handler(key, nil)
 		}
+		return handler(key, obj.(*DockerCredential))
+	})
+}
+
+func (c *dockerCredentialController) AddClusterScopedHandler(name, cluster string, handler DockerCredentialHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
+		obj, exists, err := c.Informer().GetStore().GetByKey(key)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return handler(key, nil)
+		}
+
+		if !controller.ObjectInCluster(cluster, obj) {
+			return nil
+		}
+
 		return handler(key, obj.(*DockerCredential))
 	})
 }
@@ -217,6 +238,15 @@ func (s *dockerCredentialClient) AddHandler(name string, sync DockerCredentialHa
 }
 
 func (s *dockerCredentialClient) AddLifecycle(name string, lifecycle DockerCredentialLifecycle) {
-	sync := NewDockerCredentialLifecycleAdapter(name, s, lifecycle)
+	sync := NewDockerCredentialLifecycleAdapter(name, false, s, lifecycle)
 	s.AddHandler(name, sync)
+}
+
+func (s *dockerCredentialClient) AddClusterScopedHandler(name, clusterName string, sync DockerCredentialHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+}
+
+func (s *dockerCredentialClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle DockerCredentialLifecycle) {
+	sync := NewDockerCredentialLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.AddClusterScopedHandler(name, clusterName, sync)
 }

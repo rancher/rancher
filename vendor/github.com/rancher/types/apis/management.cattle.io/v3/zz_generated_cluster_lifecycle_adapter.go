@@ -39,9 +39,9 @@ func (w *clusterLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, e
 	return o, err
 }
 
-func NewClusterLifecycleAdapter(name string, client ClusterInterface, l ClusterLifecycle) ClusterHandlerFunc {
+func NewClusterLifecycleAdapter(name string, clusterScoped bool, client ClusterInterface, l ClusterLifecycle) ClusterHandlerFunc {
 	adapter := &clusterLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *Cluster) error {
 		if obj == nil {
 			return syncFn(key, nil)

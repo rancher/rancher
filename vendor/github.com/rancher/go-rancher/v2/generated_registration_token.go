@@ -44,8 +44,7 @@ type RegistrationToken struct {
 
 type RegistrationTokenCollection struct {
 	Collection
-	Data   []RegistrationToken `json:"data,omitempty"`
-	client *RegistrationTokenClient
+	Data []RegistrationToken `json:"data,omitempty"`
 }
 
 type RegistrationTokenClient struct {
@@ -93,18 +92,7 @@ func (c *RegistrationTokenClient) Update(existing *RegistrationToken, updates in
 func (c *RegistrationTokenClient) List(opts *ListOpts) (*RegistrationTokenCollection, error) {
 	resp := &RegistrationTokenCollection{}
 	err := c.rancherClient.doList(REGISTRATION_TOKEN_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *RegistrationTokenCollection) Next() (*RegistrationTokenCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &RegistrationTokenCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *RegistrationTokenClient) ById(id string) (*RegistrationToken, error) {

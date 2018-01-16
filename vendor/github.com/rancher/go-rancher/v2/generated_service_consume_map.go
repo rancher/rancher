@@ -42,8 +42,7 @@ type ServiceConsumeMap struct {
 
 type ServiceConsumeMapCollection struct {
 	Collection
-	Data   []ServiceConsumeMap `json:"data,omitempty"`
-	client *ServiceConsumeMapClient
+	Data []ServiceConsumeMap `json:"data,omitempty"`
 }
 
 type ServiceConsumeMapClient struct {
@@ -85,18 +84,7 @@ func (c *ServiceConsumeMapClient) Update(existing *ServiceConsumeMap, updates in
 func (c *ServiceConsumeMapClient) List(opts *ListOpts) (*ServiceConsumeMapCollection, error) {
 	resp := &ServiceConsumeMapCollection{}
 	err := c.rancherClient.doList(SERVICE_CONSUME_MAP_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ServiceConsumeMapCollection) Next() (*ServiceConsumeMapCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ServiceConsumeMapCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ServiceConsumeMapClient) ById(id string) (*ServiceConsumeMap, error) {

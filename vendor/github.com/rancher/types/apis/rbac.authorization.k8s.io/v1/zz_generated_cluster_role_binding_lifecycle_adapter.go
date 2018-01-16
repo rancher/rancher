@@ -40,9 +40,9 @@ func (w *clusterRoleBindingLifecycleAdapter) Updated(obj runtime.Object) (runtim
 	return o, err
 }
 
-func NewClusterRoleBindingLifecycleAdapter(name string, client ClusterRoleBindingInterface, l ClusterRoleBindingLifecycle) ClusterRoleBindingHandlerFunc {
+func NewClusterRoleBindingLifecycleAdapter(name string, clusterScoped bool, client ClusterRoleBindingInterface, l ClusterRoleBindingLifecycle) ClusterRoleBindingHandlerFunc {
 	adapter := &clusterRoleBindingLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *v1.ClusterRoleBinding) error {
 		if obj == nil {
 			return syncFn(key, nil)

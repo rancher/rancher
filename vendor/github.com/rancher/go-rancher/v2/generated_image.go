@@ -36,8 +36,7 @@ type Image struct {
 
 type ImageCollection struct {
 	Collection
-	Data   []Image `json:"data,omitempty"`
-	client *ImageClient
+	Data []Image `json:"data,omitempty"`
 }
 
 type ImageClient struct {
@@ -60,6 +59,8 @@ type ImageOperations interface {
 	ActionPurge(*Image) (*Image, error)
 
 	ActionRemove(*Image) (*Image, error)
+
+	ActionRestore(*Image) (*Image, error)
 
 	ActionUpdate(*Image) (*Image, error)
 }
@@ -85,18 +86,7 @@ func (c *ImageClient) Update(existing *Image, updates interface{}) (*Image, erro
 func (c *ImageClient) List(opts *ListOpts) (*ImageCollection, error) {
 	resp := &ImageCollection{}
 	err := c.rancherClient.doList(IMAGE_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ImageCollection) Next() (*ImageCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ImageCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ImageClient) ById(id string) (*Image, error) {
@@ -155,6 +145,15 @@ func (c *ImageClient) ActionRemove(resource *Image) (*Image, error) {
 	resp := &Image{}
 
 	err := c.rancherClient.doAction(IMAGE_TYPE, "remove", &resource.Resource, nil, resp)
+
+	return resp, err
+}
+
+func (c *ImageClient) ActionRestore(resource *Image) (*Image, error) {
+
+	resp := &Image{}
+
+	err := c.rancherClient.doAction(IMAGE_TYPE, "restore", &resource.Resource, nil, resp)
 
 	return resp, err
 }

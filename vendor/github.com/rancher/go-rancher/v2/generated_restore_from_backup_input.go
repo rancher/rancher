@@ -12,8 +12,7 @@ type RestoreFromBackupInput struct {
 
 type RestoreFromBackupInputCollection struct {
 	Collection
-	Data   []RestoreFromBackupInput `json:"data,omitempty"`
-	client *RestoreFromBackupInputClient
+	Data []RestoreFromBackupInput `json:"data,omitempty"`
 }
 
 type RestoreFromBackupInputClient struct {
@@ -49,18 +48,7 @@ func (c *RestoreFromBackupInputClient) Update(existing *RestoreFromBackupInput, 
 func (c *RestoreFromBackupInputClient) List(opts *ListOpts) (*RestoreFromBackupInputCollection, error) {
 	resp := &RestoreFromBackupInputCollection{}
 	err := c.rancherClient.doList(RESTORE_FROM_BACKUP_INPUT_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *RestoreFromBackupInputCollection) Next() (*RestoreFromBackupInputCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &RestoreFromBackupInputCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *RestoreFromBackupInputClient) ById(id string) (*RestoreFromBackupInput, error) {

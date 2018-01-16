@@ -27,13 +27,9 @@ type ExternalService struct {
 
 	Hostname string `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 
-	InstanceIds []string `json:"instanceIds,omitempty" yaml:"instance_ids,omitempty"`
-
 	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
 
 	LaunchConfig *LaunchConfig `json:"launchConfig,omitempty" yaml:"launch_config,omitempty"`
-
-	LinkedServices map[string]interface{} `json:"linkedServices,omitempty" yaml:"linked_services,omitempty"`
 
 	Metadata map[string]interface{} `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
@@ -49,8 +45,6 @@ type ExternalService struct {
 
 	State string `json:"state,omitempty" yaml:"state,omitempty"`
 
-	System bool `json:"system,omitempty" yaml:"system,omitempty"`
-
 	Transitioning string `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 
 	TransitioningMessage string `json:"transitioningMessage,omitempty" yaml:"transitioning_message,omitempty"`
@@ -64,8 +58,7 @@ type ExternalService struct {
 
 type ExternalServiceCollection struct {
 	Collection
-	Data   []ExternalService `json:"data,omitempty"`
-	client *ExternalServiceClient
+	Data []ExternalService `json:"data,omitempty"`
 }
 
 type ExternalServiceClient struct {
@@ -123,18 +116,7 @@ func (c *ExternalServiceClient) Update(existing *ExternalService, updates interf
 func (c *ExternalServiceClient) List(opts *ListOpts) (*ExternalServiceCollection, error) {
 	resp := &ExternalServiceCollection{}
 	err := c.rancherClient.doList(EXTERNAL_SERVICE_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ExternalServiceCollection) Next() (*ExternalServiceCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ExternalServiceCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ExternalServiceClient) ById(id string) (*ExternalService, error) {

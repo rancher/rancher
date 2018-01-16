@@ -39,9 +39,9 @@ func (w *globalRoleLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object
 	return o, err
 }
 
-func NewGlobalRoleLifecycleAdapter(name string, client GlobalRoleInterface, l GlobalRoleLifecycle) GlobalRoleHandlerFunc {
+func NewGlobalRoleLifecycleAdapter(name string, clusterScoped bool, client GlobalRoleInterface, l GlobalRoleLifecycle) GlobalRoleHandlerFunc {
 	adapter := &globalRoleLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *GlobalRole) error {
 		if obj == nil {
 			return syncFn(key, nil)

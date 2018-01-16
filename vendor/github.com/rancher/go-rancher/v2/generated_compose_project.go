@@ -9,8 +9,6 @@ type ComposeProject struct {
 
 	AccountId string `json:"accountId,omitempty" yaml:"account_id,omitempty"`
 
-	Answers map[string]interface{} `json:"answers,omitempty" yaml:"answers,omitempty"`
-
 	Binding *Binding `json:"binding,omitempty" yaml:"binding,omitempty"`
 
 	Created string `json:"created,omitempty" yaml:"created,omitempty"`
@@ -22,8 +20,6 @@ type ComposeProject struct {
 	Environment map[string]interface{} `json:"environment,omitempty" yaml:"environment,omitempty"`
 
 	ExternalId string `json:"externalId,omitempty" yaml:"external_id,omitempty"`
-
-	Group string `json:"group,omitempty" yaml:"group,omitempty"`
 
 	HealthState string `json:"healthState,omitempty" yaml:"health_state,omitempty"`
 
@@ -39,11 +35,7 @@ type ComposeProject struct {
 
 	Removed string `json:"removed,omitempty" yaml:"removed,omitempty"`
 
-	ServiceIds []string `json:"serviceIds,omitempty" yaml:"service_ids,omitempty"`
-
 	State string `json:"state,omitempty" yaml:"state,omitempty"`
-
-	System bool `json:"system,omitempty" yaml:"system,omitempty"`
 
 	Templates map[string]interface{} `json:"templates,omitempty" yaml:"templates,omitempty"`
 
@@ -58,8 +50,7 @@ type ComposeProject struct {
 
 type ComposeProjectCollection struct {
 	Collection
-	Data   []ComposeProject `json:"data,omitempty"`
-	client *ComposeProjectClient
+	Data []ComposeProject `json:"data,omitempty"`
 }
 
 type ComposeProjectClient struct {
@@ -107,18 +98,7 @@ func (c *ComposeProjectClient) Update(existing *ComposeProject, updates interfac
 func (c *ComposeProjectClient) List(opts *ListOpts) (*ComposeProjectCollection, error) {
 	resp := &ComposeProjectCollection{}
 	err := c.rancherClient.doList(COMPOSE_PROJECT_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ComposeProjectCollection) Next() (*ComposeProjectCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ComposeProjectCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ComposeProjectClient) ById(id string) (*ComposeProject, error) {

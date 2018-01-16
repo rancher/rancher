@@ -32,8 +32,7 @@ type Publish struct {
 
 type PublishCollection struct {
 	Collection
-	Data   []Publish `json:"data,omitempty"`
-	client *PublishClient
+	Data []Publish `json:"data,omitempty"`
 }
 
 type PublishClient struct {
@@ -69,18 +68,7 @@ func (c *PublishClient) Update(existing *Publish, updates interface{}) (*Publish
 func (c *PublishClient) List(opts *ListOpts) (*PublishCollection, error) {
 	resp := &PublishCollection{}
 	err := c.rancherClient.doList(PUBLISH_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *PublishCollection) Next() (*PublishCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &PublishCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *PublishClient) ById(id string) (*Publish, error) {

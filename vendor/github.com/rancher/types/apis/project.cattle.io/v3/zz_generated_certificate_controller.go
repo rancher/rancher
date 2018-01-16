@@ -46,6 +46,7 @@ type CertificateController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() CertificateLister
 	AddHandler(name string, handler CertificateHandlerFunc)
+	AddClusterScopedHandler(name, clusterName string, handler CertificateHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -65,6 +66,8 @@ type CertificateInterface interface {
 	Controller() CertificateController
 	AddHandler(name string, sync CertificateHandlerFunc)
 	AddLifecycle(name string, lifecycle CertificateLifecycle)
+	AddClusterScopedHandler(name, clusterName string, sync CertificateHandlerFunc)
+	AddClusterScopedLifecycle(name, clusterName string, lifecycle CertificateLifecycle)
 }
 
 type certificateLister struct {
@@ -117,6 +120,24 @@ func (c *certificateController) AddHandler(name string, handler CertificateHandl
 		if !exists {
 			return handler(key, nil)
 		}
+		return handler(key, obj.(*Certificate))
+	})
+}
+
+func (c *certificateController) AddClusterScopedHandler(name, cluster string, handler CertificateHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
+		obj, exists, err := c.Informer().GetStore().GetByKey(key)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return handler(key, nil)
+		}
+
+		if !controller.ObjectInCluster(cluster, obj) {
+			return nil
+		}
+
 		return handler(key, obj.(*Certificate))
 	})
 }
@@ -217,6 +238,15 @@ func (s *certificateClient) AddHandler(name string, sync CertificateHandlerFunc)
 }
 
 func (s *certificateClient) AddLifecycle(name string, lifecycle CertificateLifecycle) {
-	sync := NewCertificateLifecycleAdapter(name, s, lifecycle)
+	sync := NewCertificateLifecycleAdapter(name, false, s, lifecycle)
 	s.AddHandler(name, sync)
+}
+
+func (s *certificateClient) AddClusterScopedHandler(name, clusterName string, sync CertificateHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+}
+
+func (s *certificateClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle CertificateLifecycle) {
+	sync := NewCertificateLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.AddClusterScopedHandler(name, clusterName, sync)
 }

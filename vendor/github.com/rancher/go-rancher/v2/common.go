@@ -2,7 +2,6 @@ package client
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,7 +10,6 @@ import (
 	"net/url"
 	"os"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -24,9 +22,8 @@ const (
 )
 
 var (
-	debug             = false
-	dialer            = &websocket.Dialer{}
-	privateFieldRegex = regexp.MustCompile("^[[:lower:]]")
+	debug  = false
+	dialer = &websocket.Dialer{}
 )
 
 type ClientOpts struct {
@@ -131,28 +128,7 @@ func appendFilters(urlString string, filters map[string]interface{}) (string, er
 	return u.String(), nil
 }
 
-func NormalizeUrl(existingUrl string) (string, error) {
-	u, err := url.Parse(existingUrl)
-	if err != nil {
-		return "", err
-	}
-
-	if u.Path == "" || u.Path == "/" {
-		u.Path = "v2-beta"
-	} else if u.Path == "/v1" || strings.HasPrefix(u.Path, "/v1/") {
-		u.Path = strings.Replace(u.Path, "/v1", "/v2-beta", 1)
-	}
-
-	return u.String(), nil
-}
-
 func setupRancherBaseClient(rancherClient *RancherBaseClientImpl, opts *ClientOpts) error {
-	var err error
-	opts.Url, err = NormalizeUrl(opts.Url)
-	if err != nil {
-		return err
-	}
-
 	if opts.Timeout == 0 {
 		opts.Timeout = time.Second * 10
 	}
@@ -262,17 +238,7 @@ func (rancherClient *RancherBaseClientImpl) doDelete(url string) error {
 }
 
 func (rancherClient *RancherBaseClientImpl) Websocket(url string, headers map[string][]string) (*websocket.Conn, *http.Response, error) {
-	httpHeaders := http.Header{}
-	for k, v := range httpHeaders {
-		httpHeaders[k] = v
-	}
-
-	if rancherClient.Opts != nil {
-		s := rancherClient.Opts.AccessKey + ":" + rancherClient.Opts.SecretKey
-		httpHeaders.Add("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(s)))
-	}
-
-	return dialer.Dial(url, http.Header(httpHeaders))
+	return dialer.Dial(url, http.Header(headers))
 }
 
 func (rancherClient *RancherBaseClientImpl) doGet(url string, opts *ListOpts, respObject interface{}) error {
@@ -345,10 +311,6 @@ func (rancherClient *RancherBaseClientImpl) doList(schemaType string, opts *List
 	return rancherClient.doGet(collectionUrl, opts, respObject)
 }
 
-func (rancherClient *RancherBaseClientImpl) doNext(nextUrl string, respObject interface{}) error {
-	return rancherClient.doGet(nextUrl, nil, respObject)
-}
-
 func (rancherClient *RancherBaseClientImpl) Post(url string, createObj interface{}, respObject interface{}) error {
 	return rancherClient.doModify("POST", url, createObj, respObject)
 }
@@ -381,6 +343,7 @@ func (rancherClient *RancherBaseClientImpl) doModify(method string, url string, 
 
 	rancherClient.setupRequest(req)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Length", string(len(bodyContent)))
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -598,18 +561,6 @@ func (rancherClient *RancherBaseClientImpl) doAction(schemaType string, action s
 	}
 
 	return json.Unmarshal(byteContent, respObject)
-}
-
-func (rancherClient *RancherBaseClientImpl) GetOpts() *ClientOpts {
-	return rancherClient.Opts
-}
-
-func (rancherClient *RancherBaseClientImpl) GetSchemas() *Schemas {
-	return rancherClient.Schemas
-}
-
-func (rancherClient *RancherBaseClientImpl) GetTypes() map[string]Schema {
-	return rancherClient.Types
 }
 
 func init() {

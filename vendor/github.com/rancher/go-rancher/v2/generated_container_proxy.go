@@ -14,8 +14,7 @@ type ContainerProxy struct {
 
 type ContainerProxyCollection struct {
 	Collection
-	Data   []ContainerProxy `json:"data,omitempty"`
-	client *ContainerProxyClient
+	Data []ContainerProxy `json:"data,omitempty"`
 }
 
 type ContainerProxyClient struct {
@@ -51,18 +50,7 @@ func (c *ContainerProxyClient) Update(existing *ContainerProxy, updates interfac
 func (c *ContainerProxyClient) List(opts *ListOpts) (*ContainerProxyCollection, error) {
 	resp := &ContainerProxyCollection{}
 	err := c.rancherClient.doList(CONTAINER_PROXY_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ContainerProxyCollection) Next() (*ContainerProxyCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ContainerProxyCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ContainerProxyClient) ById(id string) (*ContainerProxy, error) {

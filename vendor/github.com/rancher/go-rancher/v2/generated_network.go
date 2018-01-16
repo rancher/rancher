@@ -13,33 +13,17 @@ type Network struct {
 
 	Data map[string]interface{} `json:"data,omitempty" yaml:"data,omitempty"`
 
-	DefaultPolicyAction string `json:"defaultPolicyAction,omitempty" yaml:"default_policy_action,omitempty"`
-
 	Description string `json:"description,omitempty" yaml:"description,omitempty"`
-
-	Dns []string `json:"dns,omitempty" yaml:"dns,omitempty"`
-
-	DnsSearch []string `json:"dnsSearch,omitempty" yaml:"dns_search,omitempty"`
-
-	HostPorts bool `json:"hostPorts,omitempty" yaml:"host_ports,omitempty"`
 
 	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
 
-	Metadata map[string]interface{} `json:"metadata,omitempty" yaml:"metadata,omitempty"`
-
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
-
-	NetworkDriverId string `json:"networkDriverId,omitempty" yaml:"network_driver_id,omitempty"`
-
-	Policy []NetworkPolicyRule `json:"policy,omitempty" yaml:"policy,omitempty"`
 
 	RemoveTime string `json:"removeTime,omitempty" yaml:"remove_time,omitempty"`
 
 	Removed string `json:"removed,omitempty" yaml:"removed,omitempty"`
 
 	State string `json:"state,omitempty" yaml:"state,omitempty"`
-
-	Subnets []Subnet `json:"subnets,omitempty" yaml:"subnets,omitempty"`
 
 	Transitioning string `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 
@@ -52,8 +36,7 @@ type Network struct {
 
 type NetworkCollection struct {
 	Collection
-	Data   []Network `json:"data,omitempty"`
-	client *NetworkClient
+	Data []Network `json:"data,omitempty"`
 }
 
 type NetworkClient struct {
@@ -76,6 +59,8 @@ type NetworkOperations interface {
 	ActionPurge(*Network) (*Network, error)
 
 	ActionRemove(*Network) (*Network, error)
+
+	ActionRestore(*Network) (*Network, error)
 
 	ActionUpdate(*Network) (*Network, error)
 }
@@ -101,18 +86,7 @@ func (c *NetworkClient) Update(existing *Network, updates interface{}) (*Network
 func (c *NetworkClient) List(opts *ListOpts) (*NetworkCollection, error) {
 	resp := &NetworkCollection{}
 	err := c.rancherClient.doList(NETWORK_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *NetworkCollection) Next() (*NetworkCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &NetworkCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *NetworkClient) ById(id string) (*Network, error) {
@@ -171,6 +145,15 @@ func (c *NetworkClient) ActionRemove(resource *Network) (*Network, error) {
 	resp := &Network{}
 
 	err := c.rancherClient.doAction(NETWORK_TYPE, "remove", &resource.Resource, nil, resp)
+
+	return resp, err
+}
+
+func (c *NetworkClient) ActionRestore(resource *Network) (*Network, error) {
+
+	resp := &Network{}
+
+	err := c.rancherClient.doAction(NETWORK_TYPE, "restore", &resource.Resource, nil, resp)
 
 	return resp, err
 }

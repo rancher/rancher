@@ -10,8 +10,7 @@ type StateTransition struct {
 
 type StateTransitionCollection struct {
 	Collection
-	Data   []StateTransition `json:"data,omitempty"`
-	client *StateTransitionClient
+	Data []StateTransition `json:"data,omitempty"`
 }
 
 type StateTransitionClient struct {
@@ -47,18 +46,7 @@ func (c *StateTransitionClient) Update(existing *StateTransition, updates interf
 func (c *StateTransitionClient) List(opts *ListOpts) (*StateTransitionCollection, error) {
 	resp := &StateTransitionCollection{}
 	err := c.rancherClient.doList(STATE_TRANSITION_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *StateTransitionCollection) Next() (*StateTransitionCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &StateTransitionCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *StateTransitionClient) ById(id string) (*StateTransition, error) {

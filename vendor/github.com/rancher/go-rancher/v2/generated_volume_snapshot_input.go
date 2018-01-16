@@ -12,8 +12,7 @@ type VolumeSnapshotInput struct {
 
 type VolumeSnapshotInputCollection struct {
 	Collection
-	Data   []VolumeSnapshotInput `json:"data,omitempty"`
-	client *VolumeSnapshotInputClient
+	Data []VolumeSnapshotInput `json:"data,omitempty"`
 }
 
 type VolumeSnapshotInputClient struct {
@@ -49,18 +48,7 @@ func (c *VolumeSnapshotInputClient) Update(existing *VolumeSnapshotInput, update
 func (c *VolumeSnapshotInputClient) List(opts *ListOpts) (*VolumeSnapshotInputCollection, error) {
 	resp := &VolumeSnapshotInputCollection{}
 	err := c.rancherClient.doList(VOLUME_SNAPSHOT_INPUT_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *VolumeSnapshotInputCollection) Next() (*VolumeSnapshotInputCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &VolumeSnapshotInputCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *VolumeSnapshotInputClient) ById(id string) (*VolumeSnapshotInput, error) {

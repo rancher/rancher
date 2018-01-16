@@ -14,8 +14,7 @@ type InstanceStop struct {
 
 type InstanceStopCollection struct {
 	Collection
-	Data   []InstanceStop `json:"data,omitempty"`
-	client *InstanceStopClient
+	Data []InstanceStop `json:"data,omitempty"`
 }
 
 type InstanceStopClient struct {
@@ -51,18 +50,7 @@ func (c *InstanceStopClient) Update(existing *InstanceStop, updates interface{})
 func (c *InstanceStopClient) List(opts *ListOpts) (*InstanceStopCollection, error) {
 	resp := &InstanceStopCollection{}
 	err := c.rancherClient.doList(INSTANCE_STOP_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *InstanceStopCollection) Next() (*InstanceStopCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &InstanceStopCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *InstanceStopClient) ById(id string) (*InstanceStop, error) {

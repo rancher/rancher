@@ -9,7 +9,7 @@ type ExtensionPoint struct {
 
 	ExcludeSetting string `json:"excludeSetting,omitempty" yaml:"exclude_setting,omitempty"`
 
-	Implementations []ExtensionImplementation `json:"implementations,omitempty" yaml:"implementations,omitempty"`
+	Implementations []interface{} `json:"implementations,omitempty" yaml:"implementations,omitempty"`
 
 	IncludeSetting string `json:"includeSetting,omitempty" yaml:"include_setting,omitempty"`
 
@@ -20,8 +20,7 @@ type ExtensionPoint struct {
 
 type ExtensionPointCollection struct {
 	Collection
-	Data   []ExtensionPoint `json:"data,omitempty"`
-	client *ExtensionPointClient
+	Data []ExtensionPoint `json:"data,omitempty"`
 }
 
 type ExtensionPointClient struct {
@@ -57,18 +56,7 @@ func (c *ExtensionPointClient) Update(existing *ExtensionPoint, updates interfac
 func (c *ExtensionPointClient) List(opts *ListOpts) (*ExtensionPointCollection, error) {
 	resp := &ExtensionPointCollection{}
 	err := c.rancherClient.doList(EXTENSION_POINT_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ExtensionPointCollection) Next() (*ExtensionPointCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ExtensionPointCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ExtensionPointClient) ById(id string) (*ExtensionPoint, error) {

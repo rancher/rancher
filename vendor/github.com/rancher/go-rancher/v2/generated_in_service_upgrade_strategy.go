@@ -15,17 +15,16 @@ type InServiceUpgradeStrategy struct {
 
 	PreviousLaunchConfig *LaunchConfig `json:"previousLaunchConfig,omitempty" yaml:"previous_launch_config,omitempty"`
 
-	PreviousSecondaryLaunchConfigs []SecondaryLaunchConfig `json:"previousSecondaryLaunchConfigs,omitempty" yaml:"previous_secondary_launch_configs,omitempty"`
+	PreviousSecondaryLaunchConfigs []interface{} `json:"previousSecondaryLaunchConfigs,omitempty" yaml:"previous_secondary_launch_configs,omitempty"`
 
-	SecondaryLaunchConfigs []SecondaryLaunchConfig `json:"secondaryLaunchConfigs,omitempty" yaml:"secondary_launch_configs,omitempty"`
+	SecondaryLaunchConfigs []interface{} `json:"secondaryLaunchConfigs,omitempty" yaml:"secondary_launch_configs,omitempty"`
 
 	StartFirst bool `json:"startFirst,omitempty" yaml:"start_first,omitempty"`
 }
 
 type InServiceUpgradeStrategyCollection struct {
 	Collection
-	Data   []InServiceUpgradeStrategy `json:"data,omitempty"`
-	client *InServiceUpgradeStrategyClient
+	Data []InServiceUpgradeStrategy `json:"data,omitempty"`
 }
 
 type InServiceUpgradeStrategyClient struct {
@@ -61,18 +60,7 @@ func (c *InServiceUpgradeStrategyClient) Update(existing *InServiceUpgradeStrate
 func (c *InServiceUpgradeStrategyClient) List(opts *ListOpts) (*InServiceUpgradeStrategyCollection, error) {
 	resp := &InServiceUpgradeStrategyCollection{}
 	err := c.rancherClient.doList(IN_SERVICE_UPGRADE_STRATEGY_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *InServiceUpgradeStrategyCollection) Next() (*InServiceUpgradeStrategyCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &InServiceUpgradeStrategyCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *InServiceUpgradeStrategyClient) ById(id string) (*InServiceUpgradeStrategy, error) {

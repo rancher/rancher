@@ -24,14 +24,11 @@ type Identity struct {
 	ProjectId string `json:"projectId,omitempty" yaml:"project_id,omitempty"`
 
 	Role string `json:"role,omitempty" yaml:"role,omitempty"`
-
-	User bool `json:"user,omitempty" yaml:"user,omitempty"`
 }
 
 type IdentityCollection struct {
 	Collection
-	Data   []Identity `json:"data,omitempty"`
-	client *IdentityClient
+	Data []Identity `json:"data,omitempty"`
 }
 
 type IdentityClient struct {
@@ -67,18 +64,7 @@ func (c *IdentityClient) Update(existing *Identity, updates interface{}) (*Ident
 func (c *IdentityClient) List(opts *ListOpts) (*IdentityCollection, error) {
 	resp := &IdentityCollection{}
 	err := c.rancherClient.doList(IDENTITY_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *IdentityCollection) Next() (*IdentityCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &IdentityCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *IdentityClient) ById(id string) (*Identity, error) {

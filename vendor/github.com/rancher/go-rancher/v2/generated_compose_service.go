@@ -23,17 +23,13 @@ type ComposeService struct {
 
 	HealthState string `json:"healthState,omitempty" yaml:"health_state,omitempty"`
 
-	InstanceIds []string `json:"instanceIds,omitempty" yaml:"instance_ids,omitempty"`
-
 	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
 
 	LaunchConfig *LaunchConfig `json:"launchConfig,omitempty" yaml:"launch_config,omitempty"`
 
-	LinkedServices map[string]interface{} `json:"linkedServices,omitempty" yaml:"linked_services,omitempty"`
-
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 
-	PublicEndpoints []PublicEndpoint `json:"publicEndpoints,omitempty" yaml:"public_endpoints,omitempty"`
+	PublicEndpoints []interface{} `json:"publicEndpoints,omitempty" yaml:"public_endpoints,omitempty"`
 
 	RemoveTime string `json:"removeTime,omitempty" yaml:"remove_time,omitempty"`
 
@@ -53,8 +49,6 @@ type ComposeService struct {
 
 	State string `json:"state,omitempty" yaml:"state,omitempty"`
 
-	System bool `json:"system,omitempty" yaml:"system,omitempty"`
-
 	Transitioning string `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 
 	TransitioningMessage string `json:"transitioningMessage,omitempty" yaml:"transitioning_message,omitempty"`
@@ -68,8 +62,7 @@ type ComposeService struct {
 
 type ComposeServiceCollection struct {
 	Collection
-	Data   []ComposeService `json:"data,omitempty"`
-	client *ComposeServiceClient
+	Data []ComposeService `json:"data,omitempty"`
 }
 
 type ComposeServiceClient struct {
@@ -119,18 +112,7 @@ func (c *ComposeServiceClient) Update(existing *ComposeService, updates interfac
 func (c *ComposeServiceClient) List(opts *ListOpts) (*ComposeServiceCollection, error) {
 	resp := &ComposeServiceCollection{}
 	err := c.rancherClient.doList(COMPOSE_SERVICE_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ComposeServiceCollection) Next() (*ComposeServiceCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ComposeServiceCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ComposeServiceClient) ById(id string) (*ComposeService, error) {

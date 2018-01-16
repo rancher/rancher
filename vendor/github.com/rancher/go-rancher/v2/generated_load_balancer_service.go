@@ -11,11 +11,15 @@ type LoadBalancerService struct {
 
 	AssignServiceIpAddress bool `json:"assignServiceIpAddress,omitempty" yaml:"assign_service_ip_address,omitempty"`
 
+	CertificateIds []string `json:"certificateIds,omitempty" yaml:"certificate_ids,omitempty"`
+
 	Created string `json:"created,omitempty" yaml:"created,omitempty"`
 
 	CurrentScale int64 `json:"currentScale,omitempty" yaml:"current_scale,omitempty"`
 
 	Data map[string]interface{} `json:"data,omitempty" yaml:"data,omitempty"`
+
+	DefaultCertificateId string `json:"defaultCertificateId,omitempty" yaml:"default_certificate_id,omitempty"`
 
 	Description string `json:"description,omitempty" yaml:"description,omitempty"`
 
@@ -25,21 +29,17 @@ type LoadBalancerService struct {
 
 	HealthState string `json:"healthState,omitempty" yaml:"health_state,omitempty"`
 
-	InstanceIds []string `json:"instanceIds,omitempty" yaml:"instance_ids,omitempty"`
-
 	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
 
 	LaunchConfig *LaunchConfig `json:"launchConfig,omitempty" yaml:"launch_config,omitempty"`
 
-	LbConfig *LbConfig `json:"lbConfig,omitempty" yaml:"lb_config,omitempty"`
-
-	LinkedServices map[string]interface{} `json:"linkedServices,omitempty" yaml:"linked_services,omitempty"`
+	LoadBalancerConfig *LoadBalancerConfig `json:"loadBalancerConfig,omitempty" yaml:"load_balancer_config,omitempty"`
 
 	Metadata map[string]interface{} `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 
-	PublicEndpoints []PublicEndpoint `json:"publicEndpoints,omitempty" yaml:"public_endpoints,omitempty"`
+	PublicEndpoints []interface{} `json:"publicEndpoints,omitempty" yaml:"public_endpoints,omitempty"`
 
 	RemoveTime string `json:"removeTime,omitempty" yaml:"remove_time,omitempty"`
 
@@ -59,8 +59,6 @@ type LoadBalancerService struct {
 
 	State string `json:"state,omitempty" yaml:"state,omitempty"`
 
-	System bool `json:"system,omitempty" yaml:"system,omitempty"`
-
 	Transitioning string `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 
 	TransitioningMessage string `json:"transitioningMessage,omitempty" yaml:"transitioning_message,omitempty"`
@@ -76,8 +74,7 @@ type LoadBalancerService struct {
 
 type LoadBalancerServiceCollection struct {
 	Collection
-	Data   []LoadBalancerService `json:"data,omitempty"`
-	client *LoadBalancerServiceClient
+	Data []LoadBalancerService `json:"data,omitempty"`
 }
 
 type LoadBalancerServiceClient struct {
@@ -93,7 +90,7 @@ type LoadBalancerServiceOperations interface {
 
 	ActionActivate(*LoadBalancerService) (*Service, error)
 
-	ActionAddservicelink(*LoadBalancerService, *AddRemoveServiceLinkInput) (*Service, error)
+	ActionAddservicelink(*LoadBalancerService, *AddRemoveLoadBalancerServiceLinkInput) (*Service, error)
 
 	ActionCancelupgrade(*LoadBalancerService) (*Service, error)
 
@@ -107,13 +104,13 @@ type LoadBalancerServiceOperations interface {
 
 	ActionRemove(*LoadBalancerService) (*Service, error)
 
-	ActionRemoveservicelink(*LoadBalancerService, *AddRemoveServiceLinkInput) (*Service, error)
+	ActionRemoveservicelink(*LoadBalancerService, *AddRemoveLoadBalancerServiceLinkInput) (*Service, error)
 
 	ActionRestart(*LoadBalancerService, *ServiceRestart) (*Service, error)
 
 	ActionRollback(*LoadBalancerService) (*Service, error)
 
-	ActionSetservicelinks(*LoadBalancerService, *SetServiceLinksInput) (*Service, error)
+	ActionSetservicelinks(*LoadBalancerService, *SetLoadBalancerServiceLinksInput) (*Service, error)
 
 	ActionUpdate(*LoadBalancerService) (*Service, error)
 
@@ -141,18 +138,7 @@ func (c *LoadBalancerServiceClient) Update(existing *LoadBalancerService, update
 func (c *LoadBalancerServiceClient) List(opts *ListOpts) (*LoadBalancerServiceCollection, error) {
 	resp := &LoadBalancerServiceCollection{}
 	err := c.rancherClient.doList(LOAD_BALANCER_SERVICE_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *LoadBalancerServiceCollection) Next() (*LoadBalancerServiceCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &LoadBalancerServiceCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *LoadBalancerServiceClient) ById(id string) (*LoadBalancerService, error) {
@@ -179,7 +165,7 @@ func (c *LoadBalancerServiceClient) ActionActivate(resource *LoadBalancerService
 	return resp, err
 }
 
-func (c *LoadBalancerServiceClient) ActionAddservicelink(resource *LoadBalancerService, input *AddRemoveServiceLinkInput) (*Service, error) {
+func (c *LoadBalancerServiceClient) ActionAddservicelink(resource *LoadBalancerService, input *AddRemoveLoadBalancerServiceLinkInput) (*Service, error) {
 
 	resp := &Service{}
 
@@ -242,7 +228,7 @@ func (c *LoadBalancerServiceClient) ActionRemove(resource *LoadBalancerService) 
 	return resp, err
 }
 
-func (c *LoadBalancerServiceClient) ActionRemoveservicelink(resource *LoadBalancerService, input *AddRemoveServiceLinkInput) (*Service, error) {
+func (c *LoadBalancerServiceClient) ActionRemoveservicelink(resource *LoadBalancerService, input *AddRemoveLoadBalancerServiceLinkInput) (*Service, error) {
 
 	resp := &Service{}
 
@@ -269,7 +255,7 @@ func (c *LoadBalancerServiceClient) ActionRollback(resource *LoadBalancerService
 	return resp, err
 }
 
-func (c *LoadBalancerServiceClient) ActionSetservicelinks(resource *LoadBalancerService, input *SetServiceLinksInput) (*Service, error) {
+func (c *LoadBalancerServiceClient) ActionSetservicelinks(resource *LoadBalancerService, input *SetLoadBalancerServiceLinksInput) (*Service, error) {
 
 	resp := &Service{}
 

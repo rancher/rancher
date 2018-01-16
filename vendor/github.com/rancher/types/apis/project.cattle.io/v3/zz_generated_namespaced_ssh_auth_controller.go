@@ -46,6 +46,7 @@ type NamespacedSSHAuthController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() NamespacedSSHAuthLister
 	AddHandler(name string, handler NamespacedSSHAuthHandlerFunc)
+	AddClusterScopedHandler(name, clusterName string, handler NamespacedSSHAuthHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -65,6 +66,8 @@ type NamespacedSSHAuthInterface interface {
 	Controller() NamespacedSSHAuthController
 	AddHandler(name string, sync NamespacedSSHAuthHandlerFunc)
 	AddLifecycle(name string, lifecycle NamespacedSSHAuthLifecycle)
+	AddClusterScopedHandler(name, clusterName string, sync NamespacedSSHAuthHandlerFunc)
+	AddClusterScopedLifecycle(name, clusterName string, lifecycle NamespacedSSHAuthLifecycle)
 }
 
 type namespacedSshAuthLister struct {
@@ -117,6 +120,24 @@ func (c *namespacedSshAuthController) AddHandler(name string, handler Namespaced
 		if !exists {
 			return handler(key, nil)
 		}
+		return handler(key, obj.(*NamespacedSSHAuth))
+	})
+}
+
+func (c *namespacedSshAuthController) AddClusterScopedHandler(name, cluster string, handler NamespacedSSHAuthHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
+		obj, exists, err := c.Informer().GetStore().GetByKey(key)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return handler(key, nil)
+		}
+
+		if !controller.ObjectInCluster(cluster, obj) {
+			return nil
+		}
+
 		return handler(key, obj.(*NamespacedSSHAuth))
 	})
 }
@@ -217,6 +238,15 @@ func (s *namespacedSshAuthClient) AddHandler(name string, sync NamespacedSSHAuth
 }
 
 func (s *namespacedSshAuthClient) AddLifecycle(name string, lifecycle NamespacedSSHAuthLifecycle) {
-	sync := NewNamespacedSSHAuthLifecycleAdapter(name, s, lifecycle)
+	sync := NewNamespacedSSHAuthLifecycleAdapter(name, false, s, lifecycle)
 	s.AddHandler(name, sync)
+}
+
+func (s *namespacedSshAuthClient) AddClusterScopedHandler(name, clusterName string, sync NamespacedSSHAuthHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+}
+
+func (s *namespacedSshAuthClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle NamespacedSSHAuthLifecycle) {
+	sync := NewNamespacedSSHAuthLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.AddClusterScopedHandler(name, clusterName, sync)
 }

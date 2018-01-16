@@ -46,6 +46,7 @@ type ComponentStatusController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() ComponentStatusLister
 	AddHandler(name string, handler ComponentStatusHandlerFunc)
+	AddClusterScopedHandler(name, clusterName string, handler ComponentStatusHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -65,6 +66,8 @@ type ComponentStatusInterface interface {
 	Controller() ComponentStatusController
 	AddHandler(name string, sync ComponentStatusHandlerFunc)
 	AddLifecycle(name string, lifecycle ComponentStatusLifecycle)
+	AddClusterScopedHandler(name, clusterName string, sync ComponentStatusHandlerFunc)
+	AddClusterScopedLifecycle(name, clusterName string, lifecycle ComponentStatusLifecycle)
 }
 
 type componentStatusLister struct {
@@ -117,6 +120,24 @@ func (c *componentStatusController) AddHandler(name string, handler ComponentSta
 		if !exists {
 			return handler(key, nil)
 		}
+		return handler(key, obj.(*v1.ComponentStatus))
+	})
+}
+
+func (c *componentStatusController) AddClusterScopedHandler(name, cluster string, handler ComponentStatusHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
+		obj, exists, err := c.Informer().GetStore().GetByKey(key)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return handler(key, nil)
+		}
+
+		if !controller.ObjectInCluster(cluster, obj) {
+			return nil
+		}
+
 		return handler(key, obj.(*v1.ComponentStatus))
 	})
 }
@@ -217,6 +238,15 @@ func (s *componentStatusClient) AddHandler(name string, sync ComponentStatusHand
 }
 
 func (s *componentStatusClient) AddLifecycle(name string, lifecycle ComponentStatusLifecycle) {
-	sync := NewComponentStatusLifecycleAdapter(name, s, lifecycle)
+	sync := NewComponentStatusLifecycleAdapter(name, false, s, lifecycle)
 	s.AddHandler(name, sync)
+}
+
+func (s *componentStatusClient) AddClusterScopedHandler(name, clusterName string, sync ComponentStatusHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+}
+
+func (s *componentStatusClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle ComponentStatusLifecycle) {
+	sync := NewComponentStatusLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.AddClusterScopedHandler(name, clusterName, sync)
 }

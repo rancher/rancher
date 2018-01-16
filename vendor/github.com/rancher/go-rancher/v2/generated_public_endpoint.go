@@ -20,8 +20,7 @@ type PublicEndpoint struct {
 
 type PublicEndpointCollection struct {
 	Collection
-	Data   []PublicEndpoint `json:"data,omitempty"`
-	client *PublicEndpointClient
+	Data []PublicEndpoint `json:"data,omitempty"`
 }
 
 type PublicEndpointClient struct {
@@ -57,18 +56,7 @@ func (c *PublicEndpointClient) Update(existing *PublicEndpoint, updates interfac
 func (c *PublicEndpointClient) List(opts *ListOpts) (*PublicEndpointCollection, error) {
 	resp := &PublicEndpointCollection{}
 	err := c.rancherClient.doList(PUBLIC_ENDPOINT_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *PublicEndpointCollection) Next() (*PublicEndpointCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &PublicEndpointCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *PublicEndpointClient) ById(id string) (*PublicEndpoint, error) {

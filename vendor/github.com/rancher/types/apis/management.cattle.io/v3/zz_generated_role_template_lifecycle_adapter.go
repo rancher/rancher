@@ -39,9 +39,9 @@ func (w *roleTemplateLifecycleAdapter) Updated(obj runtime.Object) (runtime.Obje
 	return o, err
 }
 
-func NewRoleTemplateLifecycleAdapter(name string, client RoleTemplateInterface, l RoleTemplateLifecycle) RoleTemplateHandlerFunc {
+func NewRoleTemplateLifecycleAdapter(name string, clusterScoped bool, client RoleTemplateInterface, l RoleTemplateLifecycle) RoleTemplateHandlerFunc {
 	adapter := &roleTemplateLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *RoleTemplate) error {
 		if obj == nil {
 			return syncFn(key, nil)

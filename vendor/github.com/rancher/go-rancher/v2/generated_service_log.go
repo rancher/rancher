@@ -34,8 +34,7 @@ type ServiceLog struct {
 
 type ServiceLogCollection struct {
 	Collection
-	Data   []ServiceLog `json:"data,omitempty"`
-	client *ServiceLogClient
+	Data []ServiceLog `json:"data,omitempty"`
 }
 
 type ServiceLogClient struct {
@@ -71,18 +70,7 @@ func (c *ServiceLogClient) Update(existing *ServiceLog, updates interface{}) (*S
 func (c *ServiceLogClient) List(opts *ListOpts) (*ServiceLogCollection, error) {
 	resp := &ServiceLogCollection{}
 	err := c.rancherClient.doList(SERVICE_LOG_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ServiceLogCollection) Next() (*ServiceLogCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ServiceLogCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ServiceLogClient) ById(id string) (*ServiceLog, error) {

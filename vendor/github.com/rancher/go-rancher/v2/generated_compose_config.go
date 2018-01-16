@@ -14,8 +14,7 @@ type ComposeConfig struct {
 
 type ComposeConfigCollection struct {
 	Collection
-	Data   []ComposeConfig `json:"data,omitempty"`
-	client *ComposeConfigClient
+	Data []ComposeConfig `json:"data,omitempty"`
 }
 
 type ComposeConfigClient struct {
@@ -51,18 +50,7 @@ func (c *ComposeConfigClient) Update(existing *ComposeConfig, updates interface{
 func (c *ComposeConfigClient) List(opts *ListOpts) (*ComposeConfigCollection, error) {
 	resp := &ComposeConfigCollection{}
 	err := c.rancherClient.doList(COMPOSE_CONFIG_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ComposeConfigCollection) Next() (*ComposeConfigCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ComposeConfigCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ComposeConfigClient) ById(id string) (*ComposeConfig, error) {

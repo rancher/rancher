@@ -46,6 +46,7 @@ type NamespacedBasicAuthController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() NamespacedBasicAuthLister
 	AddHandler(name string, handler NamespacedBasicAuthHandlerFunc)
+	AddClusterScopedHandler(name, clusterName string, handler NamespacedBasicAuthHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -65,6 +66,8 @@ type NamespacedBasicAuthInterface interface {
 	Controller() NamespacedBasicAuthController
 	AddHandler(name string, sync NamespacedBasicAuthHandlerFunc)
 	AddLifecycle(name string, lifecycle NamespacedBasicAuthLifecycle)
+	AddClusterScopedHandler(name, clusterName string, sync NamespacedBasicAuthHandlerFunc)
+	AddClusterScopedLifecycle(name, clusterName string, lifecycle NamespacedBasicAuthLifecycle)
 }
 
 type namespacedBasicAuthLister struct {
@@ -117,6 +120,24 @@ func (c *namespacedBasicAuthController) AddHandler(name string, handler Namespac
 		if !exists {
 			return handler(key, nil)
 		}
+		return handler(key, obj.(*NamespacedBasicAuth))
+	})
+}
+
+func (c *namespacedBasicAuthController) AddClusterScopedHandler(name, cluster string, handler NamespacedBasicAuthHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
+		obj, exists, err := c.Informer().GetStore().GetByKey(key)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return handler(key, nil)
+		}
+
+		if !controller.ObjectInCluster(cluster, obj) {
+			return nil
+		}
+
 		return handler(key, obj.(*NamespacedBasicAuth))
 	})
 }
@@ -217,6 +238,15 @@ func (s *namespacedBasicAuthClient) AddHandler(name string, sync NamespacedBasic
 }
 
 func (s *namespacedBasicAuthClient) AddLifecycle(name string, lifecycle NamespacedBasicAuthLifecycle) {
-	sync := NewNamespacedBasicAuthLifecycleAdapter(name, s, lifecycle)
+	sync := NewNamespacedBasicAuthLifecycleAdapter(name, false, s, lifecycle)
 	s.AddHandler(name, sync)
+}
+
+func (s *namespacedBasicAuthClient) AddClusterScopedHandler(name, clusterName string, sync NamespacedBasicAuthHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+}
+
+func (s *namespacedBasicAuthClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle NamespacedBasicAuthLifecycle) {
+	sync := NewNamespacedBasicAuthLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.AddClusterScopedHandler(name, clusterName, sync)
 }

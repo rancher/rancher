@@ -14,8 +14,7 @@ type ServicesPortRange struct {
 
 type ServicesPortRangeCollection struct {
 	Collection
-	Data   []ServicesPortRange `json:"data,omitempty"`
-	client *ServicesPortRangeClient
+	Data []ServicesPortRange `json:"data,omitempty"`
 }
 
 type ServicesPortRangeClient struct {
@@ -51,18 +50,7 @@ func (c *ServicesPortRangeClient) Update(existing *ServicesPortRange, updates in
 func (c *ServicesPortRangeClient) List(opts *ListOpts) (*ServicesPortRangeCollection, error) {
 	resp := &ServicesPortRangeCollection{}
 	err := c.rancherClient.doList(SERVICES_PORT_RANGE_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ServicesPortRangeCollection) Next() (*ServicesPortRangeCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ServicesPortRangeCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ServicesPortRangeClient) ById(id string) (*ServicesPortRange, error) {

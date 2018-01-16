@@ -19,13 +19,12 @@ type ProcessDefinition struct {
 
 	ResourceType string `json:"resourceType,omitempty" yaml:"resource_type,omitempty"`
 
-	StateTransitions []StateTransition `json:"stateTransitions,omitempty" yaml:"state_transitions,omitempty"`
+	StateTransitions []interface{} `json:"stateTransitions,omitempty" yaml:"state_transitions,omitempty"`
 }
 
 type ProcessDefinitionCollection struct {
 	Collection
-	Data   []ProcessDefinition `json:"data,omitempty"`
-	client *ProcessDefinitionClient
+	Data []ProcessDefinition `json:"data,omitempty"`
 }
 
 type ProcessDefinitionClient struct {
@@ -61,18 +60,7 @@ func (c *ProcessDefinitionClient) Update(existing *ProcessDefinition, updates in
 func (c *ProcessDefinitionClient) List(opts *ListOpts) (*ProcessDefinitionCollection, error) {
 	resp := &ProcessDefinitionCollection{}
 	err := c.rancherClient.doList(PROCESS_DEFINITION_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *ProcessDefinitionCollection) Next() (*ProcessDefinitionCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &ProcessDefinitionCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *ProcessDefinitionClient) ById(id string) (*ProcessDefinition, error) {

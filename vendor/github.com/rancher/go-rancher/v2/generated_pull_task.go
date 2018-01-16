@@ -44,8 +44,7 @@ type PullTask struct {
 
 type PullTaskCollection struct {
 	Collection
-	Data   []PullTask `json:"data,omitempty"`
-	client *PullTaskClient
+	Data []PullTask `json:"data,omitempty"`
 }
 
 type PullTaskClient struct {
@@ -58,10 +57,6 @@ type PullTaskOperations interface {
 	Update(existing *PullTask, updates interface{}) (*PullTask, error)
 	ById(id string) (*PullTask, error)
 	Delete(container *PullTask) error
-
-	ActionCreate(*PullTask) (*GenericObject, error)
-
-	ActionRemove(*PullTask) (*GenericObject, error)
 }
 
 func newPullTaskClient(rancherClient *RancherClient) *PullTaskClient {
@@ -85,18 +80,7 @@ func (c *PullTaskClient) Update(existing *PullTask, updates interface{}) (*PullT
 func (c *PullTaskClient) List(opts *ListOpts) (*PullTaskCollection, error) {
 	resp := &PullTaskCollection{}
 	err := c.rancherClient.doList(PULL_TASK_TYPE, opts, resp)
-	resp.client = c
 	return resp, err
-}
-
-func (cc *PullTaskCollection) Next() (*PullTaskCollection, error) {
-	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &PullTaskCollection{}
-		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
-		resp.client = cc.client
-		return resp, err
-	}
-	return nil, nil
 }
 
 func (c *PullTaskClient) ById(id string) (*PullTask, error) {
@@ -112,22 +96,4 @@ func (c *PullTaskClient) ById(id string) (*PullTask, error) {
 
 func (c *PullTaskClient) Delete(container *PullTask) error {
 	return c.rancherClient.doResourceDelete(PULL_TASK_TYPE, &container.Resource)
-}
-
-func (c *PullTaskClient) ActionCreate(resource *PullTask) (*GenericObject, error) {
-
-	resp := &GenericObject{}
-
-	err := c.rancherClient.doAction(PULL_TASK_TYPE, "create", &resource.Resource, nil, resp)
-
-	return resp, err
-}
-
-func (c *PullTaskClient) ActionRemove(resource *PullTask) (*GenericObject, error) {
-
-	resp := &GenericObject{}
-
-	err := c.rancherClient.doAction(PULL_TASK_TYPE, "remove", &resource.Resource, nil, resp)
-
-	return resp, err
 }
