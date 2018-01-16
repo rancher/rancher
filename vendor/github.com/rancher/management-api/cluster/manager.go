@@ -43,7 +43,7 @@ func (c *Manager) APIServer(ctx context.Context, cluster *client.Cluster) http.H
 	server, err := c.toServer(cluster)
 	if server == nil || err != nil {
 		if err != nil {
-			logrus.Errorf("Failed to load cluster %s: %v", cluster.Name, err)
+			logrus.Errorf("Failed to load cluster %s: %v", cluster.ID, err)
 		}
 		return nil
 	}
@@ -79,7 +79,7 @@ func (c *Manager) toRESTConfig(cluster *client.Cluster) (*rest.Config, error) {
 		return nil, err
 	}
 
-	data, err := base64.StdEncoding.DecodeString(cluster.CACert)
+	caBytes, err := base64.StdEncoding.DecodeString(cluster.CACert)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (c *Manager) toRESTConfig(cluster *client.Cluster) (*rest.Config, error) {
 		Prefix:      u.Path,
 		BearerToken: cluster.ServiceAccountToken,
 		TLSClientConfig: rest.TLSClientConfig{
-			CAData: data,
+			CAData: caBytes,
 		},
 	}, nil
 }
@@ -100,7 +100,7 @@ func (c *Manager) toServer(cluster *client.Cluster) (*record, error) {
 		return nil, err
 	}
 
-	clusterContext, err := config.NewClusterContext(c.ManagementConfig, *kubeConfig, cluster.Name)
+	clusterContext, err := config.NewClusterContext(c.ManagementConfig, *kubeConfig, cluster.ID)
 	if err != nil {
 		return nil, err
 	}

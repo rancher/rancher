@@ -38,36 +38,3 @@ pipeline:
     when:
       branch: master
       event: tag
-
-  publish-rke-certs-deployer:
-    image: plugins/docker
-    dockerfile: package/certs-deployer/Dockerfile
-    repo: rancher/rke-certs-deployer
-    context: package/certs-deployer/
-    tag: ${DRONE_TAG}
-    secrets: [docker_username, docker_password]
-    when:
-      branch: master
-      event: tag
-
-  publish-rke-nginx-proxy:
-    image: plugins/docker
-    dockerfile: package/nginx-proxy/Dockerfile
-    repo: rancher/rke-nginx-proxy
-    context: package/nginx-proxy/
-    tag: ${DRONE_TAG}
-    secrets: [docker_username, docker_password]
-    when:
-      branch: master
-      event: tag
-
-  publish-rke-service-sidekick:
-    image: plugins/docker
-    dockerfile: package/service-sidekick/Dockerfile
-    repo: rancher/rke-service-sidekick
-    context: package/service-sidekick/
-    tag: ${DRONE_TAG}
-    secrets: [docker_username, docker_password]
-    when:
-      branch: master
-      event: tag

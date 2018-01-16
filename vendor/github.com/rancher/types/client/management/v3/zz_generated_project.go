@@ -12,7 +12,6 @@ const (
 	ProjectFieldCreated                     = "created"
 	ProjectFieldCreatorID                   = "creatorId"
 	ProjectFieldDescription                 = "description"
-	ProjectFieldId                          = "id"
 	ProjectFieldLabels                      = "labels"
 	ProjectFieldName                        = "name"
 	ProjectFieldNamespaceId                 = "namespaceId"
@@ -33,7 +32,6 @@ type Project struct {
 	Created                     string             `json:"created,omitempty"`
 	CreatorID                   string             `json:"creatorId,omitempty"`
 	Description                 string             `json:"description,omitempty"`
-	Id                          string             `json:"id,omitempty"`
 	Labels                      map[string]string  `json:"labels,omitempty"`
 	Name                        string             `json:"name,omitempty"`
 	NamespaceId                 string             `json:"namespaceId,omitempty"`

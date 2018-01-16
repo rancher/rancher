@@ -44,7 +44,7 @@ type RoleTemplateLister interface {
 type RoleTemplateController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() RoleTemplateLister
-	AddHandler(handler RoleTemplateHandlerFunc)
+	AddHandler(name string, handler RoleTemplateHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -62,7 +62,7 @@ type RoleTemplateInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() RoleTemplateController
-	AddSyncHandler(sync RoleTemplateHandlerFunc)
+	AddHandler(name string, sync RoleTemplateHandlerFunc)
 	AddLifecycle(name string, lifecycle RoleTemplateLifecycle)
 }
 
@@ -107,8 +107,8 @@ func (c *roleTemplateController) Lister() RoleTemplateLister {
 	}
 }
 
-func (c *roleTemplateController) AddHandler(handler RoleTemplateHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *roleTemplateController) AddHandler(name string, handler RoleTemplateHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -211,11 +211,11 @@ func (s *roleTemplateClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, 
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *roleTemplateClient) AddSyncHandler(sync RoleTemplateHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *roleTemplateClient) AddHandler(name string, sync RoleTemplateHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *roleTemplateClient) AddLifecycle(name string, lifecycle RoleTemplateLifecycle) {
 	sync := NewRoleTemplateLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

@@ -44,7 +44,7 @@ type TemplateVersionLister interface {
 type TemplateVersionController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() TemplateVersionLister
-	AddHandler(handler TemplateVersionHandlerFunc)
+	AddHandler(name string, handler TemplateVersionHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -62,7 +62,7 @@ type TemplateVersionInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() TemplateVersionController
-	AddSyncHandler(sync TemplateVersionHandlerFunc)
+	AddHandler(name string, sync TemplateVersionHandlerFunc)
 	AddLifecycle(name string, lifecycle TemplateVersionLifecycle)
 }
 
@@ -107,8 +107,8 @@ func (c *templateVersionController) Lister() TemplateVersionLister {
 	}
 }
 
-func (c *templateVersionController) AddHandler(handler TemplateVersionHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *templateVersionController) AddHandler(name string, handler TemplateVersionHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -211,11 +211,11 @@ func (s *templateVersionClient) DeleteCollection(deleteOpts *metav1.DeleteOption
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *templateVersionClient) AddSyncHandler(sync TemplateVersionHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *templateVersionClient) AddHandler(name string, sync TemplateVersionHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *templateVersionClient) AddLifecycle(name string, lifecycle TemplateVersionLifecycle) {
 	sync := NewTemplateVersionLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

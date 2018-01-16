@@ -3,7 +3,9 @@ package pki
 const (
 	CertificatesServiceName = "certificates"
 	CrtDownloaderContainer  = "cert-deployer"
+	CertFetcherContainer    = "cert-fetcher"
 	CertificatesSecretName  = "k8s-certs"
+	TempCertPath            = "/etc/kubernetes/.tmp/"
 
 	CACertName    = "kube-ca"
 	CACertENVName = "KUBE_CA"
@@ -58,4 +60,6 @@ const (
 	KubeAdminOrganizationName = "system:masters"
 	KubeAdminConfigPrefix     = ".kube_config_"
 	KubeAdminConfigENVName    = "KUBECFG_ADMIN"
+	KubeAdminCertEnvName      = "KUBE_ADMIN"
+	KubeAdminKeyEnvName       = "KUBE_ADMIN_KEY"
 )

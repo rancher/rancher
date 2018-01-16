@@ -45,6 +45,8 @@ func newTokenRouter(ctx context.Context, mgmtCtx *config.ManagementContext) (*mu
 	router.Methods("GET").Path("/v3/tokens").Handler(http.HandlerFunc(apiServer.listTokens))
 	router.Methods("DELETE").Path("/v3/tokens/{tokenId}").Handler(http.HandlerFunc(apiServer.removeToken))
 
+	router.Methods("GET").Path("/v3/authconfigs").Handler(http.HandlerFunc(apiServer.authConfigs))
+
 	//router.Methods("GET").Path("/v3/identities").Handler(http.HandlerFunc(apiServer.listIdentities))
 	//router.Methods("GET").Path("/v1/identities").Handler(api.ApiHandler(schemas, http.HandlerFunc(SearchIdentities)))
 

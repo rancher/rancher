@@ -10,6 +10,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/rancher/auth/model"
 	"github.com/rancher/auth/util"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
@@ -220,4 +221,18 @@ func (s *tokenAPIServer) removeToken(w http.ResponseWriter, r *http.Request) {
 		util.ReturnHTTPError(w, r, status, fmt.Sprintf("%v", err))
 		return
 	}
+}
+
+func (s *tokenAPIServer) authConfigs(w http.ResponseWriter, r *http.Request) {
+
+	var authConfigs []model.AuthConfig
+
+	authConfigs = append(authConfigs, model.DefaultGithubConfig())
+	authConfigs = append(authConfigs, model.DefaultLocalConfig())
+
+	w.Header().Set("Content-Type", "application/json")
+	enc := json.NewEncoder(w)
+	enc.SetEscapeHTML(false)
+	enc.Encode(authConfigs)
+
 }

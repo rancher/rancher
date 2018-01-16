@@ -61,12 +61,12 @@ func (s *tokenAPIServer) createLoginToken(jsonInput v3.LoginInput) (v3.Token, in
 	logrus.Debugf("Create Token Invoked")
 
 	// Authenticate User
-	userPrincipal, groupPrincipals, status, err := providers.AuthenticateUser(jsonInput)
+	userPrincipal, groupPrincipals, providerInfo, status, err := providers.AuthenticateUser(jsonInput)
 	if status != 0 || err != nil {
 		return v3.Token{}, status, err
 	}
 
-	objs, err := s.userIndexer.ByIndex(userPrincipalIndex, userPrincipal.Name)
+	/*objs, err := s.userIndexer.ByIndex(userPrincipalIndex, userPrincipal.Name)
 	if err != nil {
 		return v3.Token{}, 500, err
 	}
@@ -81,7 +81,7 @@ func (s *tokenAPIServer) createLoginToken(jsonInput v3.LoginInput) (v3.Token, in
 	if !ok {
 		logrus.Errorf("User isnt a user %v", objs[0])
 		return v3.Token{}, 500, fmt.Errorf("fatal error. User is not a user")
-	}
+	}*/
 
 	logrus.Debug("User Authenticated")
 
@@ -101,8 +101,9 @@ func (s *tokenAPIServer) createLoginToken(jsonInput v3.LoginInput) (v3.Token, in
 		GroupPrincipals: groupPrincipals,
 		IsDerived:       false,
 		TTLMillis:       ttl,
-		UserID:          localUser.Name,
+		UserID:          getUserID(userPrincipal.Name),
 		AuthProvider:    getAuthProviderName(userPrincipal.Name),
+		ProviderInfo:    providerInfo,
 	}
 	rToken, err := s.createK8sTokenCR(key, k8sToken)
 	return rToken, 0, err
@@ -136,6 +137,7 @@ func (s *tokenAPIServer) createDerivedToken(jsonInput v3.Token, tokenID string) 
 		TTLMillis:       ttl,
 		UserID:          token.UserID,
 		AuthProvider:    token.AuthProvider,
+		ProviderInfo:    token.ProviderInfo,
 	}
 	rToken, err := s.createK8sTokenCR(key, k8sToken)
 	return rToken, 0, err
@@ -172,7 +174,7 @@ func (s *tokenAPIServer) getK8sTokenCR(tokenID string) (*v3.Token, error) {
 //GetTokens will list all derived tokens of the authenticated user - only derived
 func (s *tokenAPIServer) getTokens(tokenID string) ([]v3.Token, int, error) {
 	logrus.Debug("LIST Tokens Invoked")
-	var tokens []v3.Token
+	tokens := make([]v3.Token, 0)
 
 	storedToken, err := s.tokensClient.Get(tokenID, metav1.GetOptions{})
 	if err != nil {

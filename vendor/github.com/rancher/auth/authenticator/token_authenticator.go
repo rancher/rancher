@@ -8,7 +8,6 @@ import (
 
 	"github.com/rancher/auth/tokens"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -33,18 +32,14 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (bool, string, []st
 	authHeader = strings.TrimPrefix(authHeader, " ")
 
 	if authHeader != "" && strings.HasPrefix(authHeader, authValuePrefix) {
-		logrus.Debugf("Authenticate: auth header: %v", authHeader)
 		tokenID = strings.TrimPrefix(authHeader, authValuePrefix)
 		tokenID = strings.TrimSpace(tokenID)
 	} else {
 		cookie, err := req.Cookie(tokens.CookieName)
 		if err == nil {
-			logrus.Debugf("Authenticate: token cookie: %v %v", cookie.Name, cookie.Value)
 			tokenID = cookie.Value
 		}
 	}
-
-	logrus.Debugf("Authenticate: token ID: %v", tokenID)
 
 	if tokenID == "" {
 		// no cookie or auth header, cannot authenticate
@@ -79,8 +74,6 @@ func (a *tokenAuthenticator) getTokenCR(tokenID string) (*v3.Token, error) {
 		}
 		return nil, fmt.Errorf("failed to retrieve auth token1, error: %v", err)
 	}
-
-	logrus.Debugf("storedToken token resource: %v", storedToken)
 
 	return storedToken, nil
 }

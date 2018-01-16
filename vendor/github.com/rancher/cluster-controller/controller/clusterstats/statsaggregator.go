@@ -35,8 +35,8 @@ func Register(management *config.ManagementContext) {
 		Clusters:          clustersClient,
 	}
 
-	clustersClient.AddSyncHandler(s.sync)
-	machinesClient.AddSyncHandler(s.machineChanged)
+	clustersClient.AddHandler("cluster-stats", s.sync)
+	machinesClient.AddHandler("cluster-stats", s.machineChanged)
 }
 
 func (s *StatsAggregator) sync(key string, cluster *v3.Cluster) error {

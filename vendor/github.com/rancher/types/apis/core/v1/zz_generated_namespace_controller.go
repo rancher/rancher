@@ -45,7 +45,7 @@ type NamespaceLister interface {
 type NamespaceController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() NamespaceLister
-	AddHandler(handler NamespaceHandlerFunc)
+	AddHandler(name string, handler NamespaceHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -63,7 +63,7 @@ type NamespaceInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NamespaceController
-	AddSyncHandler(sync NamespaceHandlerFunc)
+	AddHandler(name string, sync NamespaceHandlerFunc)
 	AddLifecycle(name string, lifecycle NamespaceLifecycle)
 }
 
@@ -108,8 +108,8 @@ func (c *namespaceController) Lister() NamespaceLister {
 	}
 }
 
-func (c *namespaceController) AddHandler(handler NamespaceHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *namespaceController) AddHandler(name string, handler NamespaceHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -212,11 +212,11 @@ func (s *namespaceClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, lis
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *namespaceClient) AddSyncHandler(sync NamespaceHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *namespaceClient) AddHandler(name string, sync NamespaceHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *namespaceClient) AddLifecycle(name string, lifecycle NamespaceLifecycle) {
 	sync := NewNamespaceLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

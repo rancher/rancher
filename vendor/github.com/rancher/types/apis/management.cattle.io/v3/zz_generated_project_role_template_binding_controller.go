@@ -45,7 +45,7 @@ type ProjectRoleTemplateBindingLister interface {
 type ProjectRoleTemplateBindingController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() ProjectRoleTemplateBindingLister
-	AddHandler(handler ProjectRoleTemplateBindingHandlerFunc)
+	AddHandler(name string, handler ProjectRoleTemplateBindingHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -63,7 +63,7 @@ type ProjectRoleTemplateBindingInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ProjectRoleTemplateBindingController
-	AddSyncHandler(sync ProjectRoleTemplateBindingHandlerFunc)
+	AddHandler(name string, sync ProjectRoleTemplateBindingHandlerFunc)
 	AddLifecycle(name string, lifecycle ProjectRoleTemplateBindingLifecycle)
 }
 
@@ -108,8 +108,8 @@ func (c *projectRoleTemplateBindingController) Lister() ProjectRoleTemplateBindi
 	}
 }
 
-func (c *projectRoleTemplateBindingController) AddHandler(handler ProjectRoleTemplateBindingHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *projectRoleTemplateBindingController) AddHandler(name string, handler ProjectRoleTemplateBindingHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -212,11 +212,11 @@ func (s *projectRoleTemplateBindingClient) DeleteCollection(deleteOpts *metav1.D
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *projectRoleTemplateBindingClient) AddSyncHandler(sync ProjectRoleTemplateBindingHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *projectRoleTemplateBindingClient) AddHandler(name string, sync ProjectRoleTemplateBindingHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *projectRoleTemplateBindingClient) AddLifecycle(name string, lifecycle ProjectRoleTemplateBindingLifecycle) {
 	sync := NewProjectRoleTemplateBindingLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

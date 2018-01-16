@@ -44,7 +44,7 @@ type MachineDriverLister interface {
 type MachineDriverController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() MachineDriverLister
-	AddHandler(handler MachineDriverHandlerFunc)
+	AddHandler(name string, handler MachineDriverHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -62,7 +62,7 @@ type MachineDriverInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() MachineDriverController
-	AddSyncHandler(sync MachineDriverHandlerFunc)
+	AddHandler(name string, sync MachineDriverHandlerFunc)
 	AddLifecycle(name string, lifecycle MachineDriverLifecycle)
 }
 
@@ -107,8 +107,8 @@ func (c *machineDriverController) Lister() MachineDriverLister {
 	}
 }
 
-func (c *machineDriverController) AddHandler(handler MachineDriverHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *machineDriverController) AddHandler(name string, handler MachineDriverHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -211,11 +211,11 @@ func (s *machineDriverClient) DeleteCollection(deleteOpts *metav1.DeleteOptions,
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *machineDriverClient) AddSyncHandler(sync MachineDriverHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *machineDriverClient) AddHandler(name string, sync MachineDriverHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *machineDriverClient) AddLifecycle(name string, lifecycle MachineDriverLifecycle) {
 	sync := NewMachineDriverLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

@@ -32,7 +32,7 @@ func Register(ctx context.Context, workload *config.WorkloadContext) {
 			Informer:     workload.Apps.Deployments("").Controller().Informer(),
 		})
 
-	workload.Project.Workloads("").AddSyncHandler(func(key string, obj *v3.Workload) error {
+	workload.Project.Workloads("").AddHandler("workload", func(key string, obj *v3.Workload) error {
 		_, err := r.Changed(key, obj)
 		return err
 	})

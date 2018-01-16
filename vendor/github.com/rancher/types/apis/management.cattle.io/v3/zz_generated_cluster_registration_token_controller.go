@@ -23,8 +23,9 @@ var (
 	ClusterRegistrationTokenResource = metav1.APIResource{
 		Name:         "clusterregistrationtokens",
 		SingularName: "clusterregistrationtoken",
-		Namespaced:   false,
-		Kind:         ClusterRegistrationTokenGroupVersionKind.Kind,
+		Namespaced:   true,
+
+		Kind: ClusterRegistrationTokenGroupVersionKind.Kind,
 	}
 )
 
@@ -44,7 +45,7 @@ type ClusterRegistrationTokenLister interface {
 type ClusterRegistrationTokenController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() ClusterRegistrationTokenLister
-	AddHandler(handler ClusterRegistrationTokenHandlerFunc)
+	AddHandler(name string, handler ClusterRegistrationTokenHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -62,7 +63,7 @@ type ClusterRegistrationTokenInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ClusterRegistrationTokenController
-	AddSyncHandler(sync ClusterRegistrationTokenHandlerFunc)
+	AddHandler(name string, sync ClusterRegistrationTokenHandlerFunc)
 	AddLifecycle(name string, lifecycle ClusterRegistrationTokenLifecycle)
 }
 
@@ -107,8 +108,8 @@ func (c *clusterRegistrationTokenController) Lister() ClusterRegistrationTokenLi
 	}
 }
 
-func (c *clusterRegistrationTokenController) AddHandler(handler ClusterRegistrationTokenHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *clusterRegistrationTokenController) AddHandler(name string, handler ClusterRegistrationTokenHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -211,11 +212,11 @@ func (s *clusterRegistrationTokenClient) DeleteCollection(deleteOpts *metav1.Del
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *clusterRegistrationTokenClient) AddSyncHandler(sync ClusterRegistrationTokenHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *clusterRegistrationTokenClient) AddHandler(name string, sync ClusterRegistrationTokenHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *clusterRegistrationTokenClient) AddLifecycle(name string, lifecycle ClusterRegistrationTokenLifecycle) {
 	sync := NewClusterRegistrationTokenLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

@@ -51,7 +51,7 @@ func Run(ctx context.Context, cacheRoot string, refreshInterval int, management 
 	m := manager.New(management, cacheRoot)
 
 	controller := management.Management.Catalogs("").Controller()
-	controller.AddHandler(m.Sync)
+	controller.AddHandler("catalog", m.Sync)
 
 	go runRefresh(ctx, refreshInterval, controller, m)
 

@@ -45,7 +45,7 @@ type NamespacedSSHAuthLister interface {
 type NamespacedSSHAuthController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() NamespacedSSHAuthLister
-	AddHandler(handler NamespacedSSHAuthHandlerFunc)
+	AddHandler(name string, handler NamespacedSSHAuthHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -63,7 +63,7 @@ type NamespacedSSHAuthInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NamespacedSSHAuthController
-	AddSyncHandler(sync NamespacedSSHAuthHandlerFunc)
+	AddHandler(name string, sync NamespacedSSHAuthHandlerFunc)
 	AddLifecycle(name string, lifecycle NamespacedSSHAuthLifecycle)
 }
 
@@ -108,8 +108,8 @@ func (c *namespacedSshAuthController) Lister() NamespacedSSHAuthLister {
 	}
 }
 
-func (c *namespacedSshAuthController) AddHandler(handler NamespacedSSHAuthHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *namespacedSshAuthController) AddHandler(name string, handler NamespacedSSHAuthHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -212,11 +212,11 @@ func (s *namespacedSshAuthClient) DeleteCollection(deleteOpts *metav1.DeleteOpti
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *namespacedSshAuthClient) AddSyncHandler(sync NamespacedSSHAuthHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *namespacedSshAuthClient) AddHandler(name string, sync NamespacedSSHAuthHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *namespacedSshAuthClient) AddLifecycle(name string, lifecycle NamespacedSSHAuthLifecycle) {
 	sync := NewNamespacedSSHAuthLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

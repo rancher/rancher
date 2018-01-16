@@ -39,7 +39,7 @@ func (s *userStore) Create(apiContext *types.APIContext, schema *types.Schema, d
 		return nil, err
 	}
 
-	if id, ok := created[client.UserFieldId].(string); ok {
+	if id, ok := created[types.ResourceFieldID].(string); ok {
 		var principalIDs []interface{}
 		if pids, ok := created[client.UserFieldPrincipalIDs].([]interface{}); ok {
 			principalIDs = pids
@@ -62,7 +62,7 @@ func (s *userStore) List(apiContext *types.APIContext, schema *types.Schema, opt
 	userID := req.Header.Get("Impersonate-User")
 	if userID != "" {
 		for _, data := range schemaData {
-			id, ok := data[client.UserFieldId].(string)
+			id, ok := data[types.ResourceFieldID].(string)
 			if ok {
 				if id == userID {
 					data["me"] = "true"

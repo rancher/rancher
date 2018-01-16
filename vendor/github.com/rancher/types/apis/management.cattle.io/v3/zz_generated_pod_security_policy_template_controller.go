@@ -44,7 +44,7 @@ type PodSecurityPolicyTemplateLister interface {
 type PodSecurityPolicyTemplateController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() PodSecurityPolicyTemplateLister
-	AddHandler(handler PodSecurityPolicyTemplateHandlerFunc)
+	AddHandler(name string, handler PodSecurityPolicyTemplateHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -62,7 +62,7 @@ type PodSecurityPolicyTemplateInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PodSecurityPolicyTemplateController
-	AddSyncHandler(sync PodSecurityPolicyTemplateHandlerFunc)
+	AddHandler(name string, sync PodSecurityPolicyTemplateHandlerFunc)
 	AddLifecycle(name string, lifecycle PodSecurityPolicyTemplateLifecycle)
 }
 
@@ -107,8 +107,8 @@ func (c *podSecurityPolicyTemplateController) Lister() PodSecurityPolicyTemplate
 	}
 }
 
-func (c *podSecurityPolicyTemplateController) AddHandler(handler PodSecurityPolicyTemplateHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *podSecurityPolicyTemplateController) AddHandler(name string, handler PodSecurityPolicyTemplateHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -211,11 +211,11 @@ func (s *podSecurityPolicyTemplateClient) DeleteCollection(deleteOpts *metav1.De
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *podSecurityPolicyTemplateClient) AddSyncHandler(sync PodSecurityPolicyTemplateHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *podSecurityPolicyTemplateClient) AddHandler(name string, sync PodSecurityPolicyTemplateHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *podSecurityPolicyTemplateClient) AddLifecycle(name string, lifecycle PodSecurityPolicyTemplateLifecycle) {
 	sync := NewPodSecurityPolicyTemplateLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

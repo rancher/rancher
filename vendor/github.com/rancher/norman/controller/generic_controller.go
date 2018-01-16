@@ -23,17 +23,22 @@ type HandlerFunc func(key string) error
 
 type GenericController interface {
 	Informer() cache.SharedIndexInformer
-	AddHandler(handler HandlerFunc)
+	AddHandler(name string, handler HandlerFunc)
 	HandlerCount() int
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
 
+type handlerDef struct {
+	name    string
+	handler HandlerFunc
+}
+
 type genericController struct {
 	sync.Mutex
 	informer cache.SharedIndexInformer
-	handlers []HandlerFunc
+	handlers []handlerDef
 	queue    workqueue.RateLimitingInterface
 	name     string
 	running  bool
@@ -72,8 +77,11 @@ func (g *genericController) Enqueue(namespace, name string) {
 	}
 }
 
-func (g *genericController) AddHandler(handler HandlerFunc) {
-	g.handlers = append(g.handlers, handler)
+func (g *genericController) AddHandler(name string, handler HandlerFunc) {
+	g.handlers = append(g.handlers, handlerDef{
+		name:    name,
+		handler: handler,
+	})
 }
 
 func (g *genericController) Sync(ctx context.Context) error {
@@ -162,23 +170,45 @@ func (g *genericController) processNextWorkItem() bool {
 
 	// do your work on the key.  This method will contains your "do stuff" logic
 	err := g.syncHandler(key.(string))
-	if _, ok := err.(*ForgetError); err == nil || ok {
+	checkErr := err
+	if handlerErr, ok := checkErr.(*handlerError); ok {
+		checkErr = handlerErr.err
+	}
+	if _, ok := checkErr.(*ForgetError); err == nil || ok {
+		if ok {
+			logrus.Infof("%v %v completed with dropped err: %v", g.name, key, err)
+		}
 		g.queue.Forget(key)
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("%v %v failed with : %v", g.name, key, err))
+	utilruntime.HandleError(fmt.Errorf("%v %v %v", g.name, key, err))
 	g.queue.AddRateLimited(key)
 
 	return true
 }
 
-func (g *genericController) syncHandler(s string) error {
+func (g *genericController) syncHandler(s string) (err error) {
+	defer utilruntime.RecoverFromPanic(&err)
+
 	var errs []error
 	for _, handler := range g.handlers {
-		if err := handler(s); err != nil {
-			errs = append(errs, err)
+		if err := handler.handler(s); err != nil {
+			errs = append(errs, &handlerError{
+				name: handler.name,
+				err:  err,
+			})
 		}
 	}
-	return types.NewErrors(errs)
+	err = types.NewErrors(errs)
+	return
+}
+
+type handlerError struct {
+	name string
+	err  error
+}
+
+func (h *handlerError) Error() string {
+	return fmt.Sprintf("[%s] failed with : %v", h.name, h.err)
 }

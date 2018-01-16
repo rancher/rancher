@@ -178,6 +178,8 @@ func generateCerts(ctx context.Context, cpHosts []*hosts.Host, clusterDomain, lo
 		OUName:        KubeAdminOrganizationName,
 		ConfigEnvName: KubeAdminConfigENVName,
 		ConfigPath:    localConfigPath,
+		EnvName:       KubeAdminCertEnvName,
+		KeyEnvName:    KubeAdminKeyEnvName,
 	}
 	return certs, nil
 }

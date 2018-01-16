@@ -45,7 +45,7 @@ type ClusterRoleTemplateBindingLister interface {
 type ClusterRoleTemplateBindingController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() ClusterRoleTemplateBindingLister
-	AddHandler(handler ClusterRoleTemplateBindingHandlerFunc)
+	AddHandler(name string, handler ClusterRoleTemplateBindingHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -63,7 +63,7 @@ type ClusterRoleTemplateBindingInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ClusterRoleTemplateBindingController
-	AddSyncHandler(sync ClusterRoleTemplateBindingHandlerFunc)
+	AddHandler(name string, sync ClusterRoleTemplateBindingHandlerFunc)
 	AddLifecycle(name string, lifecycle ClusterRoleTemplateBindingLifecycle)
 }
 
@@ -108,8 +108,8 @@ func (c *clusterRoleTemplateBindingController) Lister() ClusterRoleTemplateBindi
 	}
 }
 
-func (c *clusterRoleTemplateBindingController) AddHandler(handler ClusterRoleTemplateBindingHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *clusterRoleTemplateBindingController) AddHandler(name string, handler ClusterRoleTemplateBindingHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -212,11 +212,11 @@ func (s *clusterRoleTemplateBindingClient) DeleteCollection(deleteOpts *metav1.D
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *clusterRoleTemplateBindingClient) AddSyncHandler(sync ClusterRoleTemplateBindingHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *clusterRoleTemplateBindingClient) AddHandler(name string, sync ClusterRoleTemplateBindingHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *clusterRoleTemplateBindingClient) AddLifecycle(name string, lifecycle ClusterRoleTemplateBindingLifecycle) {
 	sync := NewClusterRoleTemplateBindingLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

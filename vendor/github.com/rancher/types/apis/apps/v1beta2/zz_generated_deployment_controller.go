@@ -46,7 +46,7 @@ type DeploymentLister interface {
 type DeploymentController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() DeploymentLister
-	AddHandler(handler DeploymentHandlerFunc)
+	AddHandler(name string, handler DeploymentHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -64,7 +64,7 @@ type DeploymentInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() DeploymentController
-	AddSyncHandler(sync DeploymentHandlerFunc)
+	AddHandler(name string, sync DeploymentHandlerFunc)
 	AddLifecycle(name string, lifecycle DeploymentLifecycle)
 }
 
@@ -109,8 +109,8 @@ func (c *deploymentController) Lister() DeploymentLister {
 	}
 }
 
-func (c *deploymentController) AddHandler(handler DeploymentHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *deploymentController) AddHandler(name string, handler DeploymentHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -213,11 +213,11 @@ func (s *deploymentClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, li
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *deploymentClient) AddSyncHandler(sync DeploymentHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *deploymentClient) AddHandler(name string, sync DeploymentHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *deploymentClient) AddLifecycle(name string, lifecycle DeploymentLifecycle) {
 	sync := NewDeploymentLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

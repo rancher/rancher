@@ -22,6 +22,7 @@ func NewScopedStore(key string, store types.Store) *Store {
 				if data == nil {
 					return data, nil
 				}
+				data[key] = data[client.ProjectFieldNamespaceId]
 				data[client.ProjectFieldNamespaceId] = nil
 				return data, nil
 			},

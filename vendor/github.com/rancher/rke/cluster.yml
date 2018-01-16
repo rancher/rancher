@@ -10,8 +10,10 @@ auth:
 # canal
 # weave
 #
-# If you are using calico on AWS, use the network plugin config option:
+# If you are using calico on AWS or GCE, use the network plugin config option:
 # 'calico_cloud_provider: aws'
+# or
+# 'calico_cloud_provider: gce'
 network:
   plugin: flannel
   options:
@@ -71,7 +73,7 @@ services:
 system_images:
   alpine: alpine:latest
   nginx_proxy: rancher/rke-nginx-proxy:0.1.0
-  cert_downloader: rancher/rke-cert-deployer:0.1.0
+  cert_downloader: rancher/rke-cert-deployer:0.1.1
   kubedns_image: gcr.io/google_containers/k8s-dns-kube-dns-amd64:1.14.5
   dnsmasq_image: gcr.io/google_containers/k8s-dns-dnsmasq-nanny-amd64:1.14.5
   kubedns_sidecar_image: gcr.io/google_containers/k8s-dns-sidecar-amd64:1.14.5

@@ -45,7 +45,7 @@ type BasicAuthLister interface {
 type BasicAuthController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() BasicAuthLister
-	AddHandler(handler BasicAuthHandlerFunc)
+	AddHandler(name string, handler BasicAuthHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -63,7 +63,7 @@ type BasicAuthInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() BasicAuthController
-	AddSyncHandler(sync BasicAuthHandlerFunc)
+	AddHandler(name string, sync BasicAuthHandlerFunc)
 	AddLifecycle(name string, lifecycle BasicAuthLifecycle)
 }
 
@@ -108,8 +108,8 @@ func (c *basicAuthController) Lister() BasicAuthLister {
 	}
 }
 
-func (c *basicAuthController) AddHandler(handler BasicAuthHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *basicAuthController) AddHandler(name string, handler BasicAuthHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -212,11 +212,11 @@ func (s *basicAuthClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, lis
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *basicAuthClient) AddSyncHandler(sync BasicAuthHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *basicAuthClient) AddHandler(name string, sync BasicAuthHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *basicAuthClient) AddLifecycle(name string, lifecycle BasicAuthLifecycle) {
 	sync := NewBasicAuthLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

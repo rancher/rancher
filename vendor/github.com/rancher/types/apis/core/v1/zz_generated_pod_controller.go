@@ -46,7 +46,7 @@ type PodLister interface {
 type PodController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() PodLister
-	AddHandler(handler PodHandlerFunc)
+	AddHandler(name string, handler PodHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -64,7 +64,7 @@ type PodInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PodController
-	AddSyncHandler(sync PodHandlerFunc)
+	AddHandler(name string, sync PodHandlerFunc)
 	AddLifecycle(name string, lifecycle PodLifecycle)
 }
 
@@ -109,8 +109,8 @@ func (c *podController) Lister() PodLister {
 	}
 }
 
-func (c *podController) AddHandler(handler PodHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *podController) AddHandler(name string, handler PodHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -213,11 +213,11 @@ func (s *podClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts 
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *podClient) AddSyncHandler(sync PodHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *podClient) AddHandler(name string, sync PodHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *podClient) AddLifecycle(name string, lifecycle PodLifecycle) {
 	sync := NewPodLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

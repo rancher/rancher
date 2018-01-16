@@ -44,7 +44,7 @@ type CatalogLister interface {
 type CatalogController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() CatalogLister
-	AddHandler(handler CatalogHandlerFunc)
+	AddHandler(name string, handler CatalogHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -62,7 +62,7 @@ type CatalogInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() CatalogController
-	AddSyncHandler(sync CatalogHandlerFunc)
+	AddHandler(name string, sync CatalogHandlerFunc)
 	AddLifecycle(name string, lifecycle CatalogLifecycle)
 }
 
@@ -107,8 +107,8 @@ func (c *catalogController) Lister() CatalogLister {
 	}
 }
 
-func (c *catalogController) AddHandler(handler CatalogHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *catalogController) AddHandler(name string, handler CatalogHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -211,11 +211,11 @@ func (s *catalogClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listO
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *catalogClient) AddSyncHandler(sync CatalogHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *catalogClient) AddHandler(name string, sync CatalogHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *catalogClient) AddLifecycle(name string, lifecycle CatalogLifecycle) {
 	sync := NewCatalogLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

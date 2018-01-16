@@ -9,7 +9,6 @@ const (
 	UserFieldAnnotations        = "annotations"
 	UserFieldCreated            = "created"
 	UserFieldCreatorID          = "creatorId"
-	UserFieldId                 = "id"
 	UserFieldLabels             = "labels"
 	UserFieldMe                 = "me"
 	UserFieldMustChangePassword = "mustChangePassword"
@@ -27,7 +26,6 @@ type User struct {
 	Annotations        map[string]string `json:"annotations,omitempty"`
 	Created            string            `json:"created,omitempty"`
 	CreatorID          string            `json:"creatorId,omitempty"`
-	Id                 string            `json:"id,omitempty"`
 	Labels             map[string]string `json:"labels,omitempty"`
 	Me                 *bool             `json:"me,omitempty"`
 	MustChangePassword *bool             `json:"mustChangePassword,omitempty"`

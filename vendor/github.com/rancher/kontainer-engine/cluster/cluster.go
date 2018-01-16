@@ -77,9 +77,6 @@ type ConfigGetter interface {
 // Create creates a cluster
 func (c *Cluster) Create(ctx context.Context) error {
 	if err := c.createInner(ctx); err != nil {
-		if err := c.PersistStore.PersistStatus(*c, Error); err != nil {
-			return err
-		}
 		return err
 	}
 	return c.PersistStore.PersistStatus(*c, Running)
@@ -211,6 +208,7 @@ func transformClusterInfo(c *Cluster, clusterInfo *types.ClusterInfo) {
 	c.NodeCount = clusterInfo.NodeCount
 	c.Metadata = clusterInfo.Metadata
 	c.ServiceAccountToken = clusterInfo.ServiceAccountToken
+	c.Status = clusterInfo.Status
 }
 
 func toInfo(c *Cluster) *types.ClusterInfo {
@@ -225,6 +223,7 @@ func toInfo(c *Cluster) *types.ClusterInfo {
 		NodeCount:           c.NodeCount,
 		Metadata:            c.Metadata,
 		ServiceAccountToken: c.ServiceAccountToken,
+		Status:              c.Status,
 	}
 }
 

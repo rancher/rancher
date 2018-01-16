@@ -171,10 +171,6 @@ func (o *objectLifecycleAdapter) addFinalizer(obj runtime.Object) (runtime.Objec
 		return nil, err
 	}
 
-	if o.objectClient.GroupVersionKind().Kind == "Namespace" {
-		return obj, nil
-	}
-
 	if slice.ContainsString(metadata.GetFinalizers(), o.constructFinalizerKey()) {
 		return obj, nil
 	}

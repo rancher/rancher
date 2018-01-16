@@ -44,7 +44,7 @@ type DynamicSchemaLister interface {
 type DynamicSchemaController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() DynamicSchemaLister
-	AddHandler(handler DynamicSchemaHandlerFunc)
+	AddHandler(name string, handler DynamicSchemaHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -62,7 +62,7 @@ type DynamicSchemaInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() DynamicSchemaController
-	AddSyncHandler(sync DynamicSchemaHandlerFunc)
+	AddHandler(name string, sync DynamicSchemaHandlerFunc)
 	AddLifecycle(name string, lifecycle DynamicSchemaLifecycle)
 }
 
@@ -107,8 +107,8 @@ func (c *dynamicSchemaController) Lister() DynamicSchemaLister {
 	}
 }
 
-func (c *dynamicSchemaController) AddHandler(handler DynamicSchemaHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *dynamicSchemaController) AddHandler(name string, handler DynamicSchemaHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -211,11 +211,11 @@ func (s *dynamicSchemaClient) DeleteCollection(deleteOpts *metav1.DeleteOptions,
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *dynamicSchemaClient) AddSyncHandler(sync DynamicSchemaHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *dynamicSchemaClient) AddHandler(name string, sync DynamicSchemaHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *dynamicSchemaClient) AddLifecycle(name string, lifecycle DynamicSchemaLifecycle) {
 	sync := NewDynamicSchemaLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }

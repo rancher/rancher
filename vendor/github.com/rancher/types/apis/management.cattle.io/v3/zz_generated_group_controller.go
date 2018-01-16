@@ -44,7 +44,7 @@ type GroupLister interface {
 type GroupController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() GroupLister
-	AddHandler(handler GroupHandlerFunc)
+	AddHandler(name string, handler GroupHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -62,7 +62,7 @@ type GroupInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() GroupController
-	AddSyncHandler(sync GroupHandlerFunc)
+	AddHandler(name string, sync GroupHandlerFunc)
 	AddLifecycle(name string, lifecycle GroupLifecycle)
 }
 
@@ -107,8 +107,8 @@ func (c *groupController) Lister() GroupLister {
 	}
 }
 
-func (c *groupController) AddHandler(handler GroupHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *groupController) AddHandler(name string, handler GroupHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -211,11 +211,11 @@ func (s *groupClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpt
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *groupClient) AddSyncHandler(sync GroupHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *groupClient) AddHandler(name string, sync GroupHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *groupClient) AddLifecycle(name string, lifecycle GroupLifecycle) {
 	sync := NewGroupLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	s.AddHandler(name, sync)
 }
