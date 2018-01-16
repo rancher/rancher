@@ -45,6 +45,7 @@ type GroupController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() GroupLister
 	AddHandler(name string, handler GroupHandlerFunc)
+	AddClusterScopedHandler(name, clusterName string, handler GroupHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -64,6 +65,8 @@ type GroupInterface interface {
 	Controller() GroupController
 	AddHandler(name string, sync GroupHandlerFunc)
 	AddLifecycle(name string, lifecycle GroupLifecycle)
+	AddClusterScopedHandler(name, clusterName string, sync GroupHandlerFunc)
+	AddClusterScopedLifecycle(name, clusterName string, lifecycle GroupLifecycle)
 }
 
 type groupLister struct {
@@ -116,6 +119,24 @@ func (c *groupController) AddHandler(name string, handler GroupHandlerFunc) {
 		if !exists {
 			return handler(key, nil)
 		}
+		return handler(key, obj.(*Group))
+	})
+}
+
+func (c *groupController) AddClusterScopedHandler(name, cluster string, handler GroupHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
+		obj, exists, err := c.Informer().GetStore().GetByKey(key)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return handler(key, nil)
+		}
+
+		if !controller.ObjectInCluster(cluster, obj) {
+			return nil
+		}
+
 		return handler(key, obj.(*Group))
 	})
 }
@@ -216,6 +237,15 @@ func (s *groupClient) AddHandler(name string, sync GroupHandlerFunc) {
 }
 
 func (s *groupClient) AddLifecycle(name string, lifecycle GroupLifecycle) {
-	sync := NewGroupLifecycleAdapter(name, s, lifecycle)
+	sync := NewGroupLifecycleAdapter(name, false, s, lifecycle)
 	s.AddHandler(name, sync)
+}
+
+func (s *groupClient) AddClusterScopedHandler(name, clusterName string, sync GroupHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+}
+
+func (s *groupClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle GroupLifecycle) {
+	sync := NewGroupLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.AddClusterScopedHandler(name, clusterName, sync)
 }

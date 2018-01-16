@@ -45,6 +45,7 @@ type GroupMemberController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() GroupMemberLister
 	AddHandler(name string, handler GroupMemberHandlerFunc)
+	AddClusterScopedHandler(name, clusterName string, handler GroupMemberHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -64,6 +65,8 @@ type GroupMemberInterface interface {
 	Controller() GroupMemberController
 	AddHandler(name string, sync GroupMemberHandlerFunc)
 	AddLifecycle(name string, lifecycle GroupMemberLifecycle)
+	AddClusterScopedHandler(name, clusterName string, sync GroupMemberHandlerFunc)
+	AddClusterScopedLifecycle(name, clusterName string, lifecycle GroupMemberLifecycle)
 }
 
 type groupMemberLister struct {
@@ -116,6 +119,24 @@ func (c *groupMemberController) AddHandler(name string, handler GroupMemberHandl
 		if !exists {
 			return handler(key, nil)
 		}
+		return handler(key, obj.(*GroupMember))
+	})
+}
+
+func (c *groupMemberController) AddClusterScopedHandler(name, cluster string, handler GroupMemberHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
+		obj, exists, err := c.Informer().GetStore().GetByKey(key)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return handler(key, nil)
+		}
+
+		if !controller.ObjectInCluster(cluster, obj) {
+			return nil
+		}
+
 		return handler(key, obj.(*GroupMember))
 	})
 }
@@ -216,6 +237,15 @@ func (s *groupMemberClient) AddHandler(name string, sync GroupMemberHandlerFunc)
 }
 
 func (s *groupMemberClient) AddLifecycle(name string, lifecycle GroupMemberLifecycle) {
-	sync := NewGroupMemberLifecycleAdapter(name, s, lifecycle)
+	sync := NewGroupMemberLifecycleAdapter(name, false, s, lifecycle)
 	s.AddHandler(name, sync)
+}
+
+func (s *groupMemberClient) AddClusterScopedHandler(name, clusterName string, sync GroupMemberHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+}
+
+func (s *groupMemberClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle GroupMemberLifecycle) {
+	sync := NewGroupMemberLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.AddClusterScopedHandler(name, clusterName, sync)
 }

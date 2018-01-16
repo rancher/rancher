@@ -39,9 +39,9 @@ func (w *projectLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, e
 	return o, err
 }
 
-func NewProjectLifecycleAdapter(name string, client ProjectInterface, l ProjectLifecycle) ProjectHandlerFunc {
+func NewProjectLifecycleAdapter(name string, clusterScoped bool, client ProjectInterface, l ProjectLifecycle) ProjectHandlerFunc {
 	adapter := &projectLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *Project) error {
 		if obj == nil {
 			return syncFn(key, nil)

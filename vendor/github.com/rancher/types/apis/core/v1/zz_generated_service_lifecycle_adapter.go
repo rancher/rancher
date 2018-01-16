@@ -40,9 +40,9 @@ func (w *serviceLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, e
 	return o, err
 }
 
-func NewServiceLifecycleAdapter(name string, client ServiceInterface, l ServiceLifecycle) ServiceHandlerFunc {
+func NewServiceLifecycleAdapter(name string, clusterScoped bool, client ServiceInterface, l ServiceLifecycle) ServiceHandlerFunc {
 	adapter := &serviceLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *v1.Service) error {
 		if obj == nil {
 			return syncFn(key, nil)

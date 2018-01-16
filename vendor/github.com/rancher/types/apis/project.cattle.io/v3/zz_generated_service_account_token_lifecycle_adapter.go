@@ -39,9 +39,9 @@ func (w *serviceAccountTokenLifecycleAdapter) Updated(obj runtime.Object) (runti
 	return o, err
 }
 
-func NewServiceAccountTokenLifecycleAdapter(name string, client ServiceAccountTokenInterface, l ServiceAccountTokenLifecycle) ServiceAccountTokenHandlerFunc {
+func NewServiceAccountTokenLifecycleAdapter(name string, clusterScoped bool, client ServiceAccountTokenInterface, l ServiceAccountTokenLifecycle) ServiceAccountTokenHandlerFunc {
 	adapter := &serviceAccountTokenLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *ServiceAccountToken) error {
 		if obj == nil {
 			return syncFn(key, nil)

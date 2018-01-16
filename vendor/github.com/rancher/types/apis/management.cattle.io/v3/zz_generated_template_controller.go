@@ -45,6 +45,7 @@ type TemplateController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() TemplateLister
 	AddHandler(name string, handler TemplateHandlerFunc)
+	AddClusterScopedHandler(name, clusterName string, handler TemplateHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -64,6 +65,8 @@ type TemplateInterface interface {
 	Controller() TemplateController
 	AddHandler(name string, sync TemplateHandlerFunc)
 	AddLifecycle(name string, lifecycle TemplateLifecycle)
+	AddClusterScopedHandler(name, clusterName string, sync TemplateHandlerFunc)
+	AddClusterScopedLifecycle(name, clusterName string, lifecycle TemplateLifecycle)
 }
 
 type templateLister struct {
@@ -116,6 +119,24 @@ func (c *templateController) AddHandler(name string, handler TemplateHandlerFunc
 		if !exists {
 			return handler(key, nil)
 		}
+		return handler(key, obj.(*Template))
+	})
+}
+
+func (c *templateController) AddClusterScopedHandler(name, cluster string, handler TemplateHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
+		obj, exists, err := c.Informer().GetStore().GetByKey(key)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return handler(key, nil)
+		}
+
+		if !controller.ObjectInCluster(cluster, obj) {
+			return nil
+		}
+
 		return handler(key, obj.(*Template))
 	})
 }
@@ -216,6 +237,15 @@ func (s *templateClient) AddHandler(name string, sync TemplateHandlerFunc) {
 }
 
 func (s *templateClient) AddLifecycle(name string, lifecycle TemplateLifecycle) {
-	sync := NewTemplateLifecycleAdapter(name, s, lifecycle)
+	sync := NewTemplateLifecycleAdapter(name, false, s, lifecycle)
 	s.AddHandler(name, sync)
+}
+
+func (s *templateClient) AddClusterScopedHandler(name, clusterName string, sync TemplateHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+}
+
+func (s *templateClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle TemplateLifecycle) {
+	sync := NewTemplateLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.AddClusterScopedHandler(name, clusterName, sync)
 }

@@ -40,9 +40,9 @@ func (w *secretLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, er
 	return o, err
 }
 
-func NewSecretLifecycleAdapter(name string, client SecretInterface, l SecretLifecycle) SecretHandlerFunc {
+func NewSecretLifecycleAdapter(name string, clusterScoped bool, client SecretInterface, l SecretLifecycle) SecretHandlerFunc {
 	adapter := &secretLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *v1.Secret) error {
 		if obj == nil {
 			return syncFn(key, nil)

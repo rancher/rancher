@@ -39,9 +39,9 @@ func (w *principalLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object,
 	return o, err
 }
 
-func NewPrincipalLifecycleAdapter(name string, client PrincipalInterface, l PrincipalLifecycle) PrincipalHandlerFunc {
+func NewPrincipalLifecycleAdapter(name string, clusterScoped bool, client PrincipalInterface, l PrincipalLifecycle) PrincipalHandlerFunc {
 	adapter := &principalLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *Principal) error {
 		if obj == nil {
 			return syncFn(key, nil)

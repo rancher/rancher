@@ -45,6 +45,7 @@ type TemplateVersionController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() TemplateVersionLister
 	AddHandler(name string, handler TemplateVersionHandlerFunc)
+	AddClusterScopedHandler(name, clusterName string, handler TemplateVersionHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -64,6 +65,8 @@ type TemplateVersionInterface interface {
 	Controller() TemplateVersionController
 	AddHandler(name string, sync TemplateVersionHandlerFunc)
 	AddLifecycle(name string, lifecycle TemplateVersionLifecycle)
+	AddClusterScopedHandler(name, clusterName string, sync TemplateVersionHandlerFunc)
+	AddClusterScopedLifecycle(name, clusterName string, lifecycle TemplateVersionLifecycle)
 }
 
 type templateVersionLister struct {
@@ -116,6 +119,24 @@ func (c *templateVersionController) AddHandler(name string, handler TemplateVers
 		if !exists {
 			return handler(key, nil)
 		}
+		return handler(key, obj.(*TemplateVersion))
+	})
+}
+
+func (c *templateVersionController) AddClusterScopedHandler(name, cluster string, handler TemplateVersionHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
+		obj, exists, err := c.Informer().GetStore().GetByKey(key)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return handler(key, nil)
+		}
+
+		if !controller.ObjectInCluster(cluster, obj) {
+			return nil
+		}
+
 		return handler(key, obj.(*TemplateVersion))
 	})
 }
@@ -216,6 +237,15 @@ func (s *templateVersionClient) AddHandler(name string, sync TemplateVersionHand
 }
 
 func (s *templateVersionClient) AddLifecycle(name string, lifecycle TemplateVersionLifecycle) {
-	sync := NewTemplateVersionLifecycleAdapter(name, s, lifecycle)
+	sync := NewTemplateVersionLifecycleAdapter(name, false, s, lifecycle)
 	s.AddHandler(name, sync)
+}
+
+func (s *templateVersionClient) AddClusterScopedHandler(name, clusterName string, sync TemplateVersionHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+}
+
+func (s *templateVersionClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle TemplateVersionLifecycle) {
+	sync := NewTemplateVersionLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.AddClusterScopedHandler(name, clusterName, sync)
 }

@@ -39,9 +39,9 @@ func (w *basicAuthLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object,
 	return o, err
 }
 
-func NewBasicAuthLifecycleAdapter(name string, client BasicAuthInterface, l BasicAuthLifecycle) BasicAuthHandlerFunc {
+func NewBasicAuthLifecycleAdapter(name string, clusterScoped bool, client BasicAuthInterface, l BasicAuthLifecycle) BasicAuthHandlerFunc {
 	adapter := &basicAuthLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *BasicAuth) error {
 		if obj == nil {
 			return syncFn(key, nil)

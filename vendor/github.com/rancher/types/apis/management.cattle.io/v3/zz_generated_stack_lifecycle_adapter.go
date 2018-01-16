@@ -39,9 +39,9 @@ func (w *stackLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, err
 	return o, err
 }
 
-func NewStackLifecycleAdapter(name string, client StackInterface, l StackLifecycle) StackHandlerFunc {
+func NewStackLifecycleAdapter(name string, clusterScoped bool, client StackInterface, l StackLifecycle) StackHandlerFunc {
 	adapter := &stackLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *Stack) error {
 		if obj == nil {
 			return syncFn(key, nil)

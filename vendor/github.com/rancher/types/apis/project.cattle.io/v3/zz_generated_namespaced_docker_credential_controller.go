@@ -46,6 +46,7 @@ type NamespacedDockerCredentialController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() NamespacedDockerCredentialLister
 	AddHandler(name string, handler NamespacedDockerCredentialHandlerFunc)
+	AddClusterScopedHandler(name, clusterName string, handler NamespacedDockerCredentialHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -65,6 +66,8 @@ type NamespacedDockerCredentialInterface interface {
 	Controller() NamespacedDockerCredentialController
 	AddHandler(name string, sync NamespacedDockerCredentialHandlerFunc)
 	AddLifecycle(name string, lifecycle NamespacedDockerCredentialLifecycle)
+	AddClusterScopedHandler(name, clusterName string, sync NamespacedDockerCredentialHandlerFunc)
+	AddClusterScopedLifecycle(name, clusterName string, lifecycle NamespacedDockerCredentialLifecycle)
 }
 
 type namespacedDockerCredentialLister struct {
@@ -117,6 +120,24 @@ func (c *namespacedDockerCredentialController) AddHandler(name string, handler N
 		if !exists {
 			return handler(key, nil)
 		}
+		return handler(key, obj.(*NamespacedDockerCredential))
+	})
+}
+
+func (c *namespacedDockerCredentialController) AddClusterScopedHandler(name, cluster string, handler NamespacedDockerCredentialHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
+		obj, exists, err := c.Informer().GetStore().GetByKey(key)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return handler(key, nil)
+		}
+
+		if !controller.ObjectInCluster(cluster, obj) {
+			return nil
+		}
+
 		return handler(key, obj.(*NamespacedDockerCredential))
 	})
 }
@@ -217,6 +238,15 @@ func (s *namespacedDockerCredentialClient) AddHandler(name string, sync Namespac
 }
 
 func (s *namespacedDockerCredentialClient) AddLifecycle(name string, lifecycle NamespacedDockerCredentialLifecycle) {
-	sync := NewNamespacedDockerCredentialLifecycleAdapter(name, s, lifecycle)
+	sync := NewNamespacedDockerCredentialLifecycleAdapter(name, false, s, lifecycle)
 	s.AddHandler(name, sync)
+}
+
+func (s *namespacedDockerCredentialClient) AddClusterScopedHandler(name, clusterName string, sync NamespacedDockerCredentialHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+}
+
+func (s *namespacedDockerCredentialClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle NamespacedDockerCredentialLifecycle) {
+	sync := NewNamespacedDockerCredentialLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.AddClusterScopedHandler(name, clusterName, sync)
 }

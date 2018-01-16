@@ -12,7 +12,7 @@ import (
 	typesrbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
 	"k8s.io/api/rbac/v1"
-	errors2 "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -206,7 +206,7 @@ func (m *manager) reconcileClusterMembershipBindingForDelete(rtbUID string) erro
 
 		if len(crb.Labels) == 0 {
 			if err := m.mgmt.RBAC.ClusterRoleBindings("").Delete(crb.Name, &metav1.DeleteOptions{}); err != nil {
-				if e, ok := err.(*errors2.StatusError); ok && e.ErrStatus.Code == 404 {
+				if apierrors.IsNotFound(err) {
 					continue
 				}
 				return err

@@ -39,9 +39,9 @@ func (w *namespacedServiceAccountTokenLifecycleAdapter) Updated(obj runtime.Obje
 	return o, err
 }
 
-func NewNamespacedServiceAccountTokenLifecycleAdapter(name string, client NamespacedServiceAccountTokenInterface, l NamespacedServiceAccountTokenLifecycle) NamespacedServiceAccountTokenHandlerFunc {
+func NewNamespacedServiceAccountTokenLifecycleAdapter(name string, clusterScoped bool, client NamespacedServiceAccountTokenInterface, l NamespacedServiceAccountTokenLifecycle) NamespacedServiceAccountTokenHandlerFunc {
 	adapter := &namespacedServiceAccountTokenLifecycleAdapter{lifecycle: l}
-	syncFn := lifecycle.NewObjectLifecycleAdapter(name, adapter, client.ObjectClient())
+	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *NamespacedServiceAccountToken) error {
 		if obj == nil {
 			return syncFn(key, nil)
