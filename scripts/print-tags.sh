@@ -8,10 +8,12 @@ else
 fi
 
 CATTLE_VER=$(curl https://raw.githubusercontent.com/rancher/rancher/$tag/server/Dockerfile 2>/dev/null | grep 'ENV CATTLE_CATTLE_VERSION' | awk '{print $3}')
+UI_VER=$(curl https://raw.githubusercontent.com/rancher/rancher/$tag/server/Dockerfile 2>/dev/null | grep 'ENV DEFAULT_CATTLE_API_UI_INDEX' | awk '{print $3}')
 
 echo -e "\nPrinting project/service tag information for Rancher tag $tag. $master"
 
 echo -e "\nCattle Tag: $CATTLE_VER\n"
+echo -e "UI Release: $UI_VER\n"
 
 echo "Other project tags:"
 while read -r l; do 
