@@ -13,6 +13,10 @@ import (
 	"github.com/urfave/cli"
 )
 
+var (
+	VERSION = "dev"
+)
+
 type Config struct {
 	KubeConfig        string
 	HTTPListenPort    int
@@ -33,6 +37,7 @@ func main() {
 	config := Config{}
 
 	app := cli.NewApp()
+	app.Version = VERSION
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:        "kubeconfig",
