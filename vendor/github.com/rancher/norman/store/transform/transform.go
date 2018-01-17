@@ -1,6 +1,9 @@
 package transform
 
-import "github.com/rancher/norman/types"
+import (
+	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
+)
 
 type TransformerFunc func(apiContext *types.APIContext, data map[string]interface{}) (map[string]interface{}, error)
 
@@ -36,18 +39,13 @@ func (t *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt *t
 		return t.StreamTransformer(apiContext, c)
 	}
 
-	result := make(chan map[string]interface{})
-	go func() {
-		for item := range c {
-			item, err := t.Transformer(apiContext, item)
-			if err == nil && item != nil {
-				result <- item
-			}
+	return convert.Chan(c, func(data map[string]interface{}) map[string]interface{} {
+		item, err := t.Transformer(apiContext, data)
+		if err != nil {
+			return nil
 		}
-		close(result)
-	}()
-
-	return result, nil
+		return item
+	}), nil
 }
 
 func (t *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {

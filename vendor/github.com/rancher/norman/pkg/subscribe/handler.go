@@ -33,26 +33,7 @@ func Handler(apiContext *types.APIContext) error {
 	return err
 }
 
-func handler(apiContext *types.APIContext) error {
-	c, err := upgrader.Upgrade(apiContext.Response, apiContext.Request, nil)
-	if err != nil {
-		return err
-	}
-	defer c.Close()
-
-	cancelCtx, cancel := context.WithCancel(apiContext.Request.Context())
-	apiContext.Request = apiContext.Request.WithContext(cancelCtx)
-
-	go func() {
-		for {
-			if _, _, err := c.NextReader(); err != nil {
-				cancel()
-				c.Close()
-				break
-			}
-		}
-	}()
-
+func getMatchingSchemas(apiContext *types.APIContext) []*types.Schema {
 	apiVersions := apiContext.Request.URL.Query()["apiVersions"]
 	resourceTypes := apiContext.Request.URL.Query()["resourceTypes"]
 
@@ -69,11 +50,35 @@ func handler(apiContext *types.APIContext) error {
 		}
 	}
 
+	return schemas
+}
+
+func handler(apiContext *types.APIContext) error {
+	schemas := getMatchingSchemas(apiContext)
 	if len(schemas) == 0 {
 		return httperror.NewAPIError(httperror.NotFound, "no resources types matched")
 	}
 
-	readerGroup, ctx := errgroup.WithContext(apiContext.Request.Context())
+	c, err := upgrader.Upgrade(apiContext.Response, apiContext.Request, nil)
+	if err != nil {
+		return err
+	}
+	defer c.Close()
+
+	cancelCtx, cancel := context.WithCancel(apiContext.Request.Context())
+	readerGroup, ctx := errgroup.WithContext(cancelCtx)
+	apiContext.Request = apiContext.Request.WithContext(ctx)
+
+	go func() {
+		for {
+			if _, _, err := c.NextReader(); err != nil {
+				cancel()
+				c.Close()
+				break
+			}
+		}
+	}()
+
 	events := make(chan map[string]interface{})
 	for _, schema := range schemas {
 		streamStore(ctx, readerGroup, apiContext, schema, events)

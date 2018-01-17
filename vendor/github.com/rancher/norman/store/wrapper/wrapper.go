@@ -3,6 +3,7 @@ package wrapper
 import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 )
 
 func Wrap(store types.Store) types.Store {
@@ -42,20 +43,11 @@ func (s *StoreWrapper) Watch(apiContext *types.APIContext, schema *types.Schema,
 		return nil, err
 	}
 
-	result := make(chan map[string]interface{})
-	go func() {
-		for item := range c {
-			item = apiContext.FilterObject(&types.QueryOptions{
-				Conditions: apiContext.SubContextAttributeProvider.Query(apiContext, schema),
-			}, item)
-			if item != nil {
-				result <- item
-			}
-		}
-		close(result)
-	}()
-
-	return result, nil
+	return convert.Chan(c, func(data map[string]interface{}) map[string]interface{} {
+		return apiContext.FilterObject(&types.QueryOptions{
+			Conditions: apiContext.SubContextAttributeProvider.Query(apiContext, schema),
+		}, data)
+	}), nil
 }
 
 func (s *StoreWrapper) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
