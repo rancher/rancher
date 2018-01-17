@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/definition"
 )
 
@@ -27,17 +28,9 @@ func (p *PrefixTypeStore) Watch(apiContext *types.APIContext, schema *types.Sche
 	if err != nil {
 		return nil, err
 	}
-
-	result := make(chan map[string]interface{})
-
-	go func() {
-		for item := range c {
-			result <- addTypeToID(item)
-		}
-		close(result)
-	}()
-
-	return result, nil
+	return convert.Chan(c, func(data map[string]interface{}) map[string]interface{} {
+		return addTypeToID(data)
+	}), nil
 }
 
 func (p *PrefixTypeStore) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {

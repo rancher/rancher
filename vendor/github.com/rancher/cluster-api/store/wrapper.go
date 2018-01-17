@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/cluster-api/api/namespace"
 	"github.com/rancher/norman/api"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/definition"
 	"github.com/rancher/types/client/project/v3"
 )
@@ -91,22 +92,17 @@ func (p *projectIDSetterStore) Watch(apiContext *types.APIContext, schema *types
 		return nil, err
 	}
 
-	result := make(chan map[string]interface{})
-	go func() {
-		for data := range c {
-			typeName := definition.GetType(data)
-			if strings.Contains(typeName, "namespace") || strings.Contains(typeName, "project") {
-				tempNamespaceMap, err := namespace.ProjectMap(apiContext)
-				if err == nil {
-					namespaceMap = tempNamespaceMap
-				}
+	return convert.Chan(c, func(data map[string]interface{}) map[string]interface{} {
+		typeName := definition.GetType(data)
+		if strings.Contains(typeName, "namespace") || strings.Contains(typeName, "project") {
+			tempNamespaceMap, err := namespace.ProjectMap(apiContext)
+			if err == nil {
+				namespaceMap = tempNamespaceMap
 			}
-			setProjectID(namespaceMap, data)
-			result <- data
 		}
-	}()
-
-	return result, nil
+		setProjectID(namespaceMap, data)
+		return data
+	}), nil
 }
 
 func lookupAndSetProjectID(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
