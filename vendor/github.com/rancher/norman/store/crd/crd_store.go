@@ -105,7 +105,7 @@ func (c *Store) AddSchemas(ctx context.Context, schemas ...*types.Schema) error 
 	var allSchemas []*types.Schema
 
 	for _, schema := range schemas {
-		if schema.Store != nil || !schema.CanList() {
+		if schema.Store != nil || !schema.CanList(nil) {
 			continue
 		}
 

@@ -28,7 +28,7 @@ var transitioningMap = map[string]string{
 	"DefaultNamespaceAssigned": "configuring",
 	"DefaultProjectCreated":    "configuring",
 	"Downloaded":               "downloading",
-	"Inactive":                 "deactivated",
+	"Inactive":                 "deactivating",
 	"Initialized":              "initializing",
 	"MachinesCreated":          "provisioning",
 	"PodScheduled":             "scheduling",
@@ -195,7 +195,6 @@ func Set(data map[string]interface{}) {
 		state = "active"
 	}
 
-	data["state"] = strings.ToLower(state)
 	if error {
 		data["transitioning"] = "error"
 	} else if transitioning {
@@ -204,5 +203,6 @@ func Set(data map[string]interface{}) {
 		data["transitioning"] = "no"
 	}
 
+	data["state"] = strings.ToLower(state)
 	data["transitioningMessage"] = message
 }

@@ -127,15 +127,15 @@ func (j *JSONResponseWriter) addLinks(b *builder.Builder, schema *types.Schema, 
 
 	self := context.URLBuilder.ResourceLink(rawResource)
 	rawResource.Links["self"] = self
-	if schema.CanUpdate() {
+	if context.AccessControl.CanUpdate(context, input, schema) {
 		rawResource.Links["update"] = self
 	}
-	if schema.CanDelete() {
+	if context.AccessControl.CanDelete(context, input, schema) {
 		rawResource.Links["remove"] = self
 	}
 
 	for _, backRef := range context.Schemas.References(schema) {
-		if !backRef.Schema.CanList() {
+		if !backRef.Schema.CanList(context) {
 			continue
 		}
 

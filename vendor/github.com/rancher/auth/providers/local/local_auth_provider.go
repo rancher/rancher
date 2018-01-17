@@ -31,7 +31,7 @@ func userNameIndexer(obj interface{}) ([]string, error) {
 	if !ok {
 		return []string{}, nil
 	}
-	return []string{user.UserName}, nil
+	return []string{user.Username}, nil
 }
 
 func gmPIdIndexer(obj interface{}) ([]string, error) {
@@ -49,7 +49,7 @@ func userSearchIndexer(obj interface{}) ([]string, error) {
 	}
 	var fieldIndexes []string
 
-	fieldIndexes = append(fieldIndexes, indexField(user.UserName, minOf(len(user.UserName), searchIndexDefaultLen))...)
+	fieldIndexes = append(fieldIndexes, indexField(user.Username, minOf(len(user.Username), searchIndexDefaultLen))...)
 	fieldIndexes = append(fieldIndexes, indexField(user.DisplayName, minOf(len(user.DisplayName), searchIndexDefaultLen))...)
 	fieldIndexes = append(fieldIndexes, indexField(user.ObjectMeta.Name, minOf(len(user.ObjectMeta.Name), searchIndexDefaultLen))...)
 
@@ -158,7 +158,7 @@ func (l *LProvider) AuthenticateUser(loginInput v3.LoginInput) (v3.Principal, []
 	userPrincipal = v3.Principal{
 		ObjectMeta:  metav1.ObjectMeta{Name: principalID},
 		DisplayName: user.DisplayName,
-		LoginName:   user.UserName,
+		LoginName:   user.Username,
 		Kind:        "user",
 		Me:          true,
 	}
@@ -245,7 +245,7 @@ func (l *LProvider) SearchPrincipals(searchKey string, myToken v3.Token) ([]v3.P
 		userPrincipal := v3.Principal{
 			ObjectMeta:  metav1.ObjectMeta{Name: principalID},
 			DisplayName: user.DisplayName,
-			LoginName:   user.UserName,
+			LoginName:   user.Username,
 			Kind:        "user",
 			Me:          false,
 		}
@@ -280,7 +280,7 @@ func (l *LProvider) listAllUsersAndGroups(searchKey string) ([]*v3.User, []*v3.G
 		return localUsers, localGroups, err
 	}
 	for _, user := range allUsers {
-		if !(strings.HasPrefix(user.ObjectMeta.Name, searchKey) || strings.HasPrefix(user.UserName, searchKey) || strings.HasPrefix(user.DisplayName, searchKey)) {
+		if !(strings.HasPrefix(user.ObjectMeta.Name, searchKey) || strings.HasPrefix(user.Username, searchKey) || strings.HasPrefix(user.DisplayName, searchKey)) {
 			continue
 		}
 		localUsers = append(localUsers, user)

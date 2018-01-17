@@ -10,7 +10,7 @@ import (
 func ClusterLinks(apiContext *types.APIContext, resource *types.RawResource) {
 	if resource.Type == client.ClusterType {
 		for _, schema := range clusterSchema.Schemas.Schemas() {
-			if !schema.CanList() {
+			if !schema.CanList(apiContext) {
 				continue
 			}
 			resource.Links[schema.PluralName] = apiContext.URLBuilder.Link(schema.PluralName, resource)
@@ -20,7 +20,7 @@ func ClusterLinks(apiContext *types.APIContext, resource *types.RawResource) {
 		resource.Links["schemas"] = apiContext.URLBuilder.Link("schemas", resource)
 
 		for _, schema := range projectSchema.Schemas.Schemas() {
-			if !schema.CanList() {
+			if !schema.CanList(apiContext) {
 				continue
 			}
 			if _, ok := schema.ResourceFields["projectId"]; ok {
@@ -30,7 +30,7 @@ func ClusterLinks(apiContext *types.APIContext, resource *types.RawResource) {
 		}
 	} else if resource.Type == client.ProjectType {
 		for _, schema := range projectSchema.Schemas.Schemas() {
-			if !schema.CanList() {
+			if !schema.CanList(apiContext) {
 				continue
 			}
 			if _, ok := schema.ResourceFields["projectId"]; ok {
