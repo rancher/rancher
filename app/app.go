@@ -84,7 +84,7 @@ func addData(management *config.ManagementContext, local bool) error {
 			Name: "admin",
 		},
 		DisplayName:        "Default Admin",
-		UserName:           "admin",
+		Username:           "admin",
 		Password:           string(hash),
 		MustChangePassword: true,
 	})
