@@ -149,7 +149,7 @@ func SecretTypes(schemas *types.Schemas, management *config.ManagementContext) {
 	for _, secretSubType := range config.ProjectTypes {
 		if secretSubType != projectclient.SecretType {
 			subSchema := schemas.Schema(&projectschema.Version, secretSubType)
-			if subSchema.CanList() {
+			if subSchema.CanList(nil) {
 				subSchema.Store = subtype.NewSubTypeStore(secretSubType, schema.Store)
 			}
 		}

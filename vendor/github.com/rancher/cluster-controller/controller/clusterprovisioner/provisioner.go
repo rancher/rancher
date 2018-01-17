@@ -106,7 +106,11 @@ func (p *Provisioner) Remove(cluster *v3.Cluster) (*v3.Cluster, error) {
 }
 
 func (p *Provisioner) Updated(cluster *v3.Cluster) (*v3.Cluster, error) {
-	return p.reconcileCluster(cluster, false)
+	obj, err := v3.ClusterConditionUpdated.Do(cluster, func() (runtime.Object, error) {
+		return p.reconcileCluster(cluster, false)
+	})
+	cluster, _ = obj.(*v3.Cluster)
+	return cluster, err
 }
 
 func (p *Provisioner) machineChanged(key string, machine *v3.Machine) error {
@@ -167,9 +171,15 @@ func (p *Provisioner) Create(cluster *v3.Cluster) (*v3.Cluster, error) {
 		cluster.Status.ClusterName = cluster.Name
 	}
 
-	v3.ClusterConditionProvisioned.Unknown(cluster)
-	v3.ClusterConditionReady.False(cluster)
-	v3.ClusterConditionReady.Message(cluster, "API not available")
+	// Initialize conditions, be careful to not continually update them
+	v3.ClusterConditionProvisioned.CreateUnknownIfNotExists(cluster)
+	if v3.ClusterConditionReady.GetStatus(cluster) == "" {
+		v3.ClusterConditionReady.False(cluster)
+	}
+	if v3.ClusterConditionReady.GetMessage(cluster) == "" {
+		v3.ClusterConditionReady.Message(cluster, "Waiting for API to be available")
+	}
+
 	obj, err := v3.ClusterConditionProvisioned.DoUntilTrue(cluster, func() (runtime.Object, error) {
 		newCluster, err := p.reconcileCluster(cluster, true)
 		if newCluster != nil {
@@ -179,7 +189,7 @@ func (p *Provisioner) Create(cluster *v3.Cluster) (*v3.Cluster, error) {
 			return cluster, err
 		}
 		if newCluster == nil && err == nil {
-			return cluster, &controller.ForgetError{Err: fmt.Errorf("waiting to provision cluster")}
+			return cluster, &controller.ForgetError{Err: fmt.Errorf("waiting for nodes to provision or a valid configuration")}
 		}
 		return cluster, err
 	})
@@ -382,32 +392,22 @@ func (p *Provisioner) driverCreate(cluster *v3.Cluster, spec v3.ClusterSpec) (ap
 	ctx, logger := p.getCtx(cluster, v3.ClusterConditionProvisioned)
 	defer logger.Close()
 
-	_, err = v3.ClusterConditionProvisioned.DoUntilTrue(cluster, func() (runtime.Object, error) {
-		if newCluster, err := p.Clusters.Update(cluster); err == nil {
-			cluster = newCluster
-		}
+	if newCluster, err := p.Clusters.Update(cluster); err == nil {
+		cluster = newCluster
+	}
 
-		api, token, cert, err = p.Driver.Create(ctx, cluster.Status.ClusterName, spec)
-		return cluster, err
-	})
-
-	return
+	return p.Driver.Create(ctx, cluster.Status.ClusterName, spec)
 }
 
 func (p *Provisioner) driverUpdate(cluster *v3.Cluster, spec v3.ClusterSpec) (api string, token string, cert string, err error) {
 	ctx, logger := p.getCtx(cluster, v3.ClusterConditionUpdated)
 	defer logger.Close()
 
-	_, err = v3.ClusterConditionUpdated.Do(cluster, func() (runtime.Object, error) {
-		if newCluster, err := p.Clusters.Update(cluster); err == nil {
-			cluster = newCluster
-		}
+	if newCluster, err := p.Clusters.Update(cluster); err == nil {
+		cluster = newCluster
+	}
 
-		api, token, cert, err = p.Driver.Update(ctx, cluster.Status.ClusterName, spec)
-		return cluster, err
-	})
-
-	return
+	return p.Driver.Update(ctx, cluster.Status.ClusterName, spec)
 }
 
 func (p *Provisioner) driverRemove(cluster *v3.Cluster) error {

@@ -195,12 +195,12 @@ func (s *Server) handle(rw http.ResponseWriter, req *http.Request) (*types.APICo
 				}
 				handler = apiRequest.Schema.CreateHandler
 			case http.MethodPut:
-				if !apiRequest.AccessControl.CanUpdate(apiRequest, apiRequest.Schema) {
+				if !apiRequest.AccessControl.CanUpdate(apiRequest, nil, apiRequest.Schema) {
 					return apiRequest, httperror.NewAPIError(httperror.PermissionDenied, "Can not update "+apiRequest.Schema.Type)
 				}
 				handler = apiRequest.Schema.UpdateHandler
 			case http.MethodDelete:
-				if !apiRequest.AccessControl.CanDelete(apiRequest, apiRequest.Schema) {
+				if !apiRequest.AccessControl.CanDelete(apiRequest, nil, apiRequest.Schema) {
 					return apiRequest, httperror.NewAPIError(httperror.PermissionDenied, "Can not delete "+apiRequest.Schema.Type)
 				}
 				handler = apiRequest.Schema.DeleteHandler

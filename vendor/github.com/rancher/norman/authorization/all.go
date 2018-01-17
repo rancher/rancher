@@ -18,11 +18,11 @@ func (*AllAccess) CanList(apiContext *types.APIContext, schema *types.Schema) bo
 	return slice.ContainsString(schema.CollectionMethods, http.MethodGet)
 }
 
-func (*AllAccess) CanUpdate(apiContext *types.APIContext, schema *types.Schema) bool {
+func (*AllAccess) CanUpdate(apiContext *types.APIContext, obj map[string]interface{}, schema *types.Schema) bool {
 	return slice.ContainsString(schema.ResourceMethods, http.MethodPut)
 }
 
-func (*AllAccess) CanDelete(apiContext *types.APIContext, schema *types.Schema) bool {
+func (*AllAccess) CanDelete(apiContext *types.APIContext, obj map[string]interface{}, schema *types.Schema) bool {
 	return slice.ContainsString(schema.ResourceMethods, http.MethodDelete)
 }
 

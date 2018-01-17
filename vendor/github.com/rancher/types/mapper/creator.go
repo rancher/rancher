@@ -22,7 +22,7 @@ func (c *Creator) ToInternal(data map[string]interface{}) {
 }
 
 func (c *Creator) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {
-	if schema.CanList() && schema.CanCreate() {
+	if schema.CanList(nil) && schema.CanCreate(nil) {
 		schema.ResourceFields["creatorId"] = types.Field{
 			Type:     "reference[user]",
 			CodeName: "CreatorID",

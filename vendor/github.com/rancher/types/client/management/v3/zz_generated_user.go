@@ -17,7 +17,7 @@ const (
 	UserFieldPassword           = "password"
 	UserFieldPrincipalIDs       = "principalIds"
 	UserFieldRemoved            = "removed"
-	UserFieldUserName           = "userName"
+	UserFieldUsername           = "username"
 	UserFieldUuid               = "uuid"
 )
 
@@ -34,7 +34,7 @@ type User struct {
 	Password           string            `json:"password,omitempty"`
 	PrincipalIDs       []string          `json:"principalIds,omitempty"`
 	Removed            string            `json:"removed,omitempty"`
-	UserName           string            `json:"userName,omitempty"`
+	Username           string            `json:"username,omitempty"`
 	Uuid               string            `json:"uuid,omitempty"`
 }
 type UserCollection struct {
