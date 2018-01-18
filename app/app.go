@@ -114,13 +114,15 @@ func addData(management *config.ManagementContext, local bool) error {
 
 	rb.addRole("User", "user").addRule().apiGroups("management.cattle.io").resources("principals", "roletemplates").verbs("get", "list").
 		addRule().apiGroups("management.cattle.io").resources("users").verbs("get", "list").
+		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("templates", "templateversions").verbs("get", "list").
 		addRule().apiGroups("management.cattle.io").resources("machinedrivers").verbs("get", "list").
 		addRule().apiGroups("management.cattle.io").resources("machinetemplates").verbs("*")
 
 	rb.addRole("User Base", "user-base").addRule().apiGroups("management.cattle.io").resources("principals", "roletemplates").verbs("get", "list").
-		addRule().apiGroups("management.cattle.io").resources("users").verbs("get", "list")
+		addRule().apiGroups("management.cattle.io").resources("users").verbs("get", "list").
+		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*")
 
 	// TODO user should be dynamically authorized to only see herself
 	// TODO Need "self-service" for machinetemplates such that a user can create them, but only RUD their own
@@ -140,7 +142,8 @@ func addData(management *config.ManagementContext, local bool) error {
 	rb.addRoleTemplate("Kubernetes view", "view", "project", true, true, true)
 
 	rb.addRoleTemplate("Cluster Owner", "cluster-owner", "cluster", true, false, false).
-		setRoleTemplateNames("cluster-admin")
+		addRule().apiGroups("*").resources("*").verbs("*").
+		addRule().apiGroups().nonResourceURLs("*").verbs("*")
 
 	rb.addRoleTemplate("Create Projects", "create-projects", "cluster", true, false, false).
 		addRule().apiGroups("management.cattle.io").resources("projects").verbs("create")
