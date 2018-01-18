@@ -13,4 +13,4 @@
 ./tests/.venv
 **/*.pyc
 **/__pycache__
-management-state/
+./management-state/
