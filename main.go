@@ -1,11 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"context"
-
+	"io"
 	"os"
+	ossignal "os/signal"
+	"runtime"
+	"syscall"
 
 	"github.com/docker/docker/pkg/reexec"
+	"github.com/maruel/panicparse/stack"
 	"github.com/rancher/norman/signal"
 	"github.com/rancher/rancher/app"
 	"github.com/rancher/rancher/k8s"
@@ -91,6 +96,8 @@ func run(cfg Config) error {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 
+	setupGoroutineDump()
+
 	ctx := signal.SigTermCancelContext(context.Background())
 
 	os.Args = []string{os.Args[0]}
@@ -100,4 +107,37 @@ func run(cfg Config) error {
 	}
 
 	return app.Run(ctx, *kubeConfig, cfg.HTTPListenPort, local)
+}
+
+func setupGoroutineDump() {
+	c := make(chan os.Signal, 1)
+	ossignal.Notify(c, syscall.SIGUSR1, syscall.SIGILL)
+	go func() {
+		for range c {
+			var (
+				buf       []byte
+				stackSize int
+			)
+			bufferLen := 16384
+			for stackSize == len(buf) {
+				buf = make([]byte, bufferLen)
+				stackSize = runtime.Stack(buf, true)
+				bufferLen *= 2
+			}
+			buf = buf[:stackSize]
+			src := bytes.NewBuffer(buf)
+			if goroutines, err := stack.ParseDump(src, os.Stderr); err == nil {
+				buckets := stack.SortBuckets(stack.Bucketize(goroutines, stack.AnyValue))
+				srcLen, pkgLen := stack.CalcLengths(buckets, true)
+				p := &stack.Palette{}
+				for _, bucket := range buckets {
+					_, _ = io.WriteString(os.Stderr, p.BucketHeader(&bucket, true, len(buckets) > 1))
+					_, _ = io.WriteString(os.Stderr, p.StackLines(&bucket.Signature, srcLen, pkgLen, true))
+				}
+			} else {
+				io.Copy(os.Stderr, src)
+
+			}
+		}
+	}()
 }
