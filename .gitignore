@@ -14,3 +14,4 @@
 /default.etcd
 *.pyc
 __pycache__
+management-state/
