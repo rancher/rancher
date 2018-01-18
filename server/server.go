@@ -10,7 +10,6 @@ import (
 	managementapi "github.com/rancher/management-api/server"
 	"github.com/rancher/rancher/server/proxy"
 	"github.com/rancher/rancher/server/ui"
-	"github.com/rancher/rancher/server/capabilities"
 	managementSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/config"
 )
@@ -60,9 +59,7 @@ func newAuthed(tokenAPI http.Handler, managementAPI http.Handler) *mux.Router {
 	authed.PathPrefix("/v3/token").Handler(tokenAPI)
 	authed.PathPrefix("/v3/identit").Handler(tokenAPI)
 	authed.PathPrefix("/meta").Handler(managementAPI)
-	authed.PathPrefix("/v3/gkeCapabilities").Handler(capabilities.NewGKECapabilitiesHandler())
 	authed.PathPrefix(managementSchema.Version.Path).Handler(managementAPI)
-
 	return authed
 }
 
