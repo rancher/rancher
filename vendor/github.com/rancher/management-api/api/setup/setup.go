@@ -7,6 +7,7 @@ import (
 
 	"github.com/rancher/management-api/api/authn"
 	"github.com/rancher/management-api/api/catalog"
+	"github.com/rancher/management-api/api/cluster"
 	"github.com/rancher/management-api/api/machine"
 	"github.com/rancher/management-api/api/project"
 	clustermanager "github.com/rancher/management-api/cluster"
@@ -42,6 +43,7 @@ func Schemas(ctx context.Context, management *config.ManagementContext, schemas 
 	Catalog(schemas)
 	SecretTypes(schemas, management)
 	MachineTypes(schemas, management)
+	ClusterTypes(schemas)
 
 	crdStore, err := crd.NewCRDStoreFromConfig(management.RESTConfig)
 	if err != nil {
@@ -174,4 +176,18 @@ func MachineTypes(schemas *types.Schemas, management *config.ManagementContext) 
 	}
 	schema.Formatter = handlers.Formatter
 	schema.ActionHandler = handlers.ActionHandler
+
+	schema = schemas.Schema(&managementschema.Version, client.MachineType)
+	schema.Validator = machine.Validator
+	schema.Formatter = machine.Formatter
+
+	schema = schemas.Schema(&managementschema.Version, client.MachineConfigType)
+	schema.Validator = machine.Validator
+
+}
+
+func ClusterTypes(schemas *types.Schemas) {
+	schema := schemas.Schema(&managementschema.Version, client.ClusterType)
+	schema.Validator = cluster.Validator
+
 }

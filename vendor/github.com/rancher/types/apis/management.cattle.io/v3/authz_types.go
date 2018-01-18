@@ -77,6 +77,7 @@ type RoleTemplate struct {
 	Builtin           bool                `json:"builtin"`
 	External          bool                `json:"external"`
 	Hidden            bool                `json:"hidden"`
+	Context           string              `json:"context"`
 	RoleTemplateNames []string            `json:"roleTemplateNames,omitempty" norman:"type=array[reference[roleTemplate]]"`
 }
 

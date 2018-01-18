@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
@@ -59,10 +60,6 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 	if err != nil {
 		return errors.Wrapf(err, "couldn't list namespaces with project ID %v", binding.ProjectName)
 	}
-	if len(namespaces) == 0 {
-		return nil
-	}
-
 	roles := map[string]*v3.RoleTemplate{}
 	if err := p.m.gatherRoles(rt, roles); err != nil {
 		return err
@@ -81,7 +78,7 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 		}
 	}
 
-	return p.reconcileProjectNSGetAccess(binding)
+	return p.reconcileProjectNSAccess(binding, roles)
 }
 
 func (p *prtbLifecycle) ensurePRTBDelete(binding *v3.ProjectRoleTemplateBinding) error {
@@ -109,13 +106,31 @@ func (p *prtbLifecycle) ensurePRTBDelete(binding *v3.ProjectRoleTemplateBinding)
 		}
 	}
 
-	return p.reconcileProjectNSGetAccessForDelete(binding)
+	return p.reconcileProjectNSAccessForDelete(binding)
 }
 
-func (p *prtbLifecycle) reconcileProjectNSGetAccess(binding *v3.ProjectRoleTemplateBinding) error {
+func (p *prtbLifecycle) reconcileProjectNSAccess(binding *v3.ProjectRoleTemplateBinding, rts map[string]*v3.RoleTemplate) error {
 	var role string
+	var createNSPerms bool
 	if parts := strings.SplitN(binding.ProjectName, ":", 2); len(parts) == 2 && len(parts[1]) > 0 {
-		role = fmt.Sprintf(projectNSGetClusterRoleNameFmt, parts[1])
+		var roleVerb, roleSuffix string
+		for _, r := range rts {
+			for _, rule := range r.Rules {
+				if slice.ContainsString(rule.Resources, "namespaces") && len(rule.ResourceNames) == 0 {
+					if slice.ContainsString(rule.Verbs, "*") || slice.ContainsString(rule.Verbs, "create") {
+						roleVerb = "*"
+						createNSPerms = true
+						break
+					}
+				}
+
+			}
+		}
+		if roleVerb == "" {
+			roleVerb = "get"
+		}
+		roleSuffix = projectNSVerbToSuffix[roleVerb]
+		role = fmt.Sprintf(projectNSGetClusterRoleNameFmt, parts[1], roleSuffix)
 	}
 
 	if role == "" {
@@ -123,52 +138,64 @@ func (p *prtbLifecycle) reconcileProjectNSGetAccess(binding *v3.ProjectRoleTempl
 	}
 
 	bindingCli := p.m.workload.K8sClient.RbacV1().ClusterRoleBindings()
-	bindingName := role + "-" + binding.Subject.Name
 
-	rtbUID := string(binding.UID)
-	crb, _ := p.m.crbLister.Get("", bindingName)
-	if crb == nil {
-		_, err := bindingCli.Create(&rbacv1.ClusterRoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: bindingName,
-				Labels: map[string]string{
-					rtbUID: owner,
-				},
-			},
-			Subjects: []rbacv1.Subject{binding.Subject},
-			RoleRef: rbacv1.RoleRef{
-				Kind: "ClusterRole",
-				Name: role,
-			},
-		})
-		return err
-	}
-
-	for owner := range crb.Labels {
-		if rtbUID == owner {
-			return nil
+	roles := map[string]string{role: role + "-" + binding.Subject.Name}
+	if createNSPerms {
+		roles["create-ns"] = "create-ns-" + binding.Subject.Name
+		if nsRole, _ := p.m.crLister.Get("", "create-ns"); nsRole == nil {
+			createNSRT, err := p.m.rtLister.Get("", "create-ns")
+			if err != nil {
+				return err
+			}
+			if err := p.m.ensureRoles(map[string]*v3.RoleTemplate{"create-ns": createNSRT}); err != nil && !apierrors.IsAlreadyExists(err) {
+				return err
+			}
 		}
 	}
 
-	crb = crb.DeepCopy()
-	if crb.Labels == nil {
-		crb.Labels = map[string]string{}
+	rtbUID := string(binding.UID)
+	for role, bindingName := range roles {
+		crb, _ := p.m.crbLister.Get("", bindingName)
+		if crb == nil {
+			_, err := bindingCli.Create(&rbacv1.ClusterRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: bindingName,
+					Labels: map[string]string{
+						rtbUID: owner,
+					},
+				},
+				Subjects: []rbacv1.Subject{binding.Subject},
+				RoleRef: rbacv1.RoleRef{
+					Kind: "ClusterRole",
+					Name: role,
+				},
+			})
+			if err != nil {
+				return err
+			}
+			continue
+		}
+
+		for owner := range crb.Labels {
+			if rtbUID == owner {
+				continue
+			}
+		}
+
+		crb = crb.DeepCopy()
+		if crb.Labels == nil {
+			crb.Labels = map[string]string{}
+		}
+		crb.Labels[rtbUID] = owner
+		_, err := bindingCli.Update(crb)
+		if err != nil {
+			return err
+		}
 	}
-	crb.Labels[rtbUID] = owner
-	_, err := bindingCli.Update(crb)
-	return err
+	return nil
 }
 
-func (p *prtbLifecycle) reconcileProjectNSGetAccessForDelete(binding *v3.ProjectRoleTemplateBinding) error {
-	var role string
-	if parts := strings.SplitN(binding.ProjectName, ":", 2); len(parts) == 2 && len(parts[1]) > 0 {
-		role = fmt.Sprintf(projectNSGetClusterRoleNameFmt, parts[1])
-	}
-
-	if role == "" {
-		return nil
-	}
-
+func (p *prtbLifecycle) reconcileProjectNSAccessForDelete(binding *v3.ProjectRoleTemplateBinding) error {
 	prtbs, err := p.m.prtbIndexer.ByIndex(prtbByProjectUserIndex, getPRTBProjectAndUserKey(binding))
 	if err != nil {
 		return err

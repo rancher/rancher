@@ -8,6 +8,7 @@ const (
 	RoleTemplateType                 = "roleTemplate"
 	RoleTemplateFieldAnnotations     = "annotations"
 	RoleTemplateFieldBuiltin         = "builtin"
+	RoleTemplateFieldContext         = "context"
 	RoleTemplateFieldCreated         = "created"
 	RoleTemplateFieldCreatorID       = "creatorId"
 	RoleTemplateFieldDescription     = "description"
@@ -26,6 +27,7 @@ type RoleTemplate struct {
 	types.Resource
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	Builtin         *bool             `json:"builtin,omitempty"`
+	Context         string            `json:"context,omitempty"`
 	Created         string            `json:"created,omitempty"`
 	CreatorID       string            `json:"creatorId,omitempty"`
 	Description     string            `json:"description,omitempty"`

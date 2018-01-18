@@ -5,7 +5,9 @@ import (
 
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/client/management/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -42,7 +44,16 @@ func (h *Handlers) ActionHandler(actionName string, action *types.Action, apiCon
 	return nil
 }
 
+// Formatter for MachineDriver
 func (h *Handlers) Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(apiContext, "activate")
 	resource.AddAction(apiContext, "deactivate")
+}
+
+// Formatter for Machine
+func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
+	roles := convert.ToStringSlice(resource.Values[client.MachineFieldRole])
+	if len(roles) == 0 {
+		resource.Values[client.MachineFieldRole] = []string{"worker"}
+	}
 }
