@@ -1,6 +1,8 @@
 FROM ubuntu:17.10
 RUN apt-get update && apt-get install -y git curl ca-certificates unzip xz-utils && \
-    curl -sL https://github.com/rancher/machine-package/releases/download/v0.12.2/docker-machine.tar.gz | tar xvzf - -C /usr/bin && \
+    curl -sL https://github.com/rancher/machine-package/releases/download/v0.13.0-rancher1/docker-machine.tar.gz | tar xvzf - -C /usr/bin && \
+    curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.8.6/bin/linux/amd64/kubectl > /usr/bin/kubectl && \
+    chmod +x /usr/bin/kubectl && \
     useradd rancher && \
     mkdir -p /var/lib/rancher/etcd /var/lib/cattle && \
     chown -R rancher /var/lib/rancher /var/lib/cattle /usr/local/bin
