@@ -111,6 +111,14 @@ func addData(management *config.ManagementContext, local bool) error {
 		addRule().apiGroups("management.cattle.io").resources("machinetemplates").verbs("*")
 	rb.addRole("Admin", "admin").addRule().apiGroups("*").resources("*").verbs("*").
 		addRule().apiGroups().nonResourceURLs("*").verbs("*")
+
+	rb.addRole("User", "user").addRule().apiGroups("management.cattle.io").resources("principals", "roletemplates").verbs("get", "list").
+		addRule().apiGroups("management.cattle.io").resources("users").verbs("get", "list").
+		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("create").
+		addRule().apiGroups("management.cattle.io").resources("templates", "templateversions").verbs("get", "list").
+		addRule().apiGroups("management.cattle.io").resources("machinedrivers").verbs("get", "list").
+		addRule().apiGroups("management.cattle.io").resources("machinetemplates").verbs("*")
+
 	rb.addRole("User Base", "user-base").addRule().apiGroups("management.cattle.io").resources("principals", "roletemplates").verbs("get", "list").
 		addRule().apiGroups("management.cattle.io").resources("users").verbs("get", "list")
 
@@ -126,29 +134,33 @@ func addData(management *config.ManagementContext, local bool) error {
 	rb = newRoleBuilder()
 
 	// K8s default roles
-	rb.addRoleTemplate("Kubernetes cluster-admin", "cluster-admin", true, true, true)
-	rb.addRoleTemplate("Kubernetes admin", "admin", true, true, true)
-	rb.addRoleTemplate("Kubernetes edit", "edit", true, true, true)
-	rb.addRoleTemplate("Kubernetes view", "view", true, true, true)
+	rb.addRoleTemplate("Kubernetes cluster-admin", "cluster-admin", "cluster", true, true, true)
+	rb.addRoleTemplate("Kubernetes admin", "admin", "project", true, true, true)
+	rb.addRoleTemplate("Kubernetes edit", "edit", "project", true, true, true)
+	rb.addRoleTemplate("Kubernetes view", "view", "project", true, true, true)
 
-	rb.addRoleTemplate("Cluster Owner", "cluster-owner", true, false, false).
+	rb.addRoleTemplate("Cluster Owner", "cluster-owner", "cluster", true, false, false).
 		setRoleTemplateNames("cluster-admin")
 
-	rb.addRoleTemplate("Project Owner", "project-owner", true, false, false).
-		addRule().apiGroups("management.cattle.io").resources("projectroletemplatebindings").verbs("*").
-		addRule().apiGroups("project.cattle.io").resources("worklods").verbs("*").
-		setRoleTemplateNames("admin")
-
-	rb.addRoleTemplate("Cluster Member", "cluster-member", true, false, false).
+	rb.addRoleTemplate("Create Projects", "create-projects", "cluster", true, false, false).
 		addRule().apiGroups("management.cattle.io").resources("projects").verbs("create")
 
-	rb.addRoleTemplate("Project Member", "project-member", true, false, false).
+	rb.addRoleTemplate("Project Owner", "project-owner", "project", true, false, false).
+		addRule().apiGroups("management.cattle.io").resources("projectroletemplatebindings").verbs("*").
 		addRule().apiGroups("project.cattle.io").resources("worklods").verbs("*").
-		setRoleTemplateNames("edit")
+		addRule().apiGroups("").resources("namespaces").verbs("create").
+		setRoleTemplateNames("admin", "create-ns")
 
-	rb.addRoleTemplate("Read-only", "read-only", true, false, false).
+	rb.addRoleTemplate("Project Member", "project-member", "project", true, false, false).
+		addRule().apiGroups("project.cattle.io").resources("worklods").verbs("*").
+		setRoleTemplateNames("edit", "create-ns")
+
+	rb.addRoleTemplate("Read-only", "read-only", "project", true, false, false).
 		addRule().apiGroups("project.cattle.io").resources("worklods").verbs("get", "list").
 		setRoleTemplateNames("view")
+
+	rb.addRoleTemplate("Create Namespaces", "create-ns", "project", true, false, true).
+		addRule().apiGroups("").resources("namespaces").verbs("create")
 
 	if err := rb.reconcileRoleTemplates(management); err != nil {
 		return errors.Wrap(err, "problem reconciling role templates")
