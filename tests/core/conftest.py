@@ -45,7 +45,7 @@ def cc(url, auth_url, chngpwd):
         },
         'responseType': 'json',
     })
-    client = cattle.Client(url=url, token=r.json()['metadata']['name'])
+    client = cattle.Client(url=url, token=r.json()['id'])
     cluster = client.by_id_cluster('local')
     return ClusterContext(cluster, client)
 
