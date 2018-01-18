@@ -34,9 +34,9 @@ type errorResponse struct {
 }
 
 type requestBody struct {
-	Key       string `json:"key"`
-	Zone      string `json:"zone"`
-	ProjectId string `json:"projectId"`
+	Credentials string `json:"credentials"`
+	Zone        string `json:"zone"`
+	ProjectId   string `json:"projectId"`
 }
 
 func (g *gkeVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
@@ -49,8 +49,6 @@ func (g *gkeVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Requ
 
 	raw, err := ioutil.ReadAll(req.Body)
 
-	fmt.Println(string(raw))
-
 	var body requestBody
 	err = json.Unmarshal(raw, &body)
 
@@ -60,7 +58,7 @@ func (g *gkeVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	key := body.Key
+	credentials := body.Credentials
 	projectId := body.ProjectId
 	zone := body.Zone
 
@@ -76,13 +74,13 @@ func (g *gkeVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	if key == "" {
+	if credentials == "" {
 		writer.WriteHeader(http.StatusBadRequest)
-		g.handleErr(writer, fmt.Errorf("invalid key"))
+		g.handleErr(writer, fmt.Errorf("invalid credentials"))
 		return
 	}
 
-	client, err := g.getServiceClient(context.Background(), key)
+	client, err := g.getServiceClient(context.Background(), credentials)
 
 	if err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
