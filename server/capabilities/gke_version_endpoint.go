@@ -8,19 +8,20 @@ import (
 	"golang.org/x/oauth2/google"
 	"context"
 	"google.golang.org/api/container/v1"
-	"sync"
 	"io/ioutil"
 	"io"
 	"encoding/json"
 	"fmt"
 	"github.com/sirupsen/logrus"
+	"github.com/rancher/kontainer-engine/service"
+	"sync"
 )
 
 const (
 	defaultCredentialEnv = "GOOGLE_APPLICATION_CREDENTIALS"
 )
 
-var mutex = &sync.Mutex{}
+var mutex = service.Drivers["gke"].(sync.Locker)
 
 func NewGKECapabilitiesHandler() *gkeVersionHandler {
 	return &gkeVersionHandler{}
