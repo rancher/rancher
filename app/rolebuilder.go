@@ -24,6 +24,7 @@ type roleBuilder struct {
 	next              *roleBuilder
 	name              string
 	displayName       string
+	context           string
 	builtin           bool
 	external          bool
 	hidden            bool
@@ -39,8 +40,9 @@ func newRoleBuilder() *roleBuilder {
 	return &roleBuilder{}
 }
 
-func (rb *roleBuilder) addRoleTemplate(displayName, name string, builtin, external, hidden bool) *roleBuilder {
+func (rb *roleBuilder) addRoleTemplate(displayName, name, context string, builtin, external, hidden bool) *roleBuilder {
 	r := rb.addRole(displayName, name)
+	r.context = context
 	r.builtin = builtin
 	r.external = external
 	r.hidden = hidden
@@ -131,8 +133,8 @@ func (r *ruleBuilder) nonResourceURLs(u ...string) *ruleBuilder {
 	return r
 }
 
-func (r *ruleBuilder) addRoleTemplate(diplsayName, name string, builtin, external, hidden bool) *roleBuilder {
-	return r.rb.addRoleTemplate(diplsayName, name, builtin, external, hidden)
+func (r *ruleBuilder) addRoleTemplate(diplsayName, name, context string, builtin, external, hidden bool) *roleBuilder {
+	return r.rb.addRoleTemplate(diplsayName, name, context, builtin, external, hidden)
 }
 
 func (r *ruleBuilder) addRole(diplsayName, name string) *roleBuilder {
@@ -278,6 +280,7 @@ func (rb *roleBuilder) reconcileRoleTemplates(mgmt *config.ManagementContext) er
 			Builtin:           current.builtin,
 			External:          current.external,
 			Hidden:            current.hidden,
+			Context:           current.context,
 			Rules:             current.policyRules(),
 			RoleTemplateNames: current.roleTemplateNames,
 		}
@@ -309,7 +312,7 @@ func (rb *roleBuilder) reconcileRoleTemplates(mgmt *config.ManagementContext) er
 
 		equal := haveRT.DisplayName == wantRT.DisplayName && reflect.DeepEqual(haveRT.Rules, wantRT.Rules) &&
 			reflect.DeepEqual(haveRT.RoleTemplateNames, wantRT.RoleTemplateNames) && haveRT.Builtin != wantRT.Builtin &&
-			haveRT.External && wantRT.External && haveRT.Hidden && wantRT.Hidden
+			haveRT.External == wantRT.External && haveRT.Hidden == wantRT.Hidden && haveRT.Context == wantRT.Context
 
 		haveRT.DisplayName = wantRT.DisplayName
 		haveRT.Rules = wantRT.Rules
@@ -317,6 +320,7 @@ func (rb *roleBuilder) reconcileRoleTemplates(mgmt *config.ManagementContext) er
 		haveRT.Builtin = wantRT.Builtin
 		haveRT.External = wantRT.External
 		haveRT.Hidden = wantRT.Hidden
+		haveRT.Context = wantRT.Context
 
 		return equal, haveRT, nil
 	}

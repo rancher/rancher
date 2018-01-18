@@ -28,9 +28,10 @@ const (
 	defaultCredentialEnv = "GOOGLE_APPLICATION_CREDENTIALS"
 )
 
+var EnvMutex sync.Mutex
+
 // Driver defines the struct of gke driver
 type Driver struct {
-	sync.Mutex
 }
 
 type state struct {
@@ -474,7 +475,7 @@ func (d *Driver) Remove(ctx context.Context, info *types.ClusterInfo) error {
 func (d *Driver) getServiceClient(ctx context.Context, state state) (*raw.Service, error) {
 	// The google SDK has no sane way to pass in a TokenSource give all the different types (user, service account, etc)
 	// So we actually set an environment variable and then unset it
-	d.Lock()
+	EnvMutex.Lock()
 	locked := true
 	setEnv := false
 	cleanup := func() {
@@ -483,7 +484,7 @@ func (d *Driver) getServiceClient(ctx context.Context, state state) (*raw.Servic
 		}
 
 		if locked {
-			d.Unlock()
+			EnvMutex.Unlock()
 			locked = false
 		}
 	}

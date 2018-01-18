@@ -18,16 +18,20 @@ type pLifecycle struct {
 }
 
 func (p *pLifecycle) Create(project *v3.Project) (*v3.Project, error) {
-	roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, project.Name)
-	_, err := p.m.crLister.Get("", roleName)
-	if err == nil || !apierrors.IsNotFound(err) {
-		return project, err
+	for verb, suffix := range projectNSVerbToSuffix {
+		roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, project.Name, suffix)
+		_, err := p.m.crLister.Get("", roleName)
+		if err == nil || !apierrors.IsNotFound(err) {
+			continue
+		}
+
+		err = p.m.createProjectNSRole(roleName, verb, "")
+		if err != nil {
+			return project, err
+		}
+
 	}
-
-	err = p.m.createProjectNSRole(roleName, "")
-
-	// TODO enqueue any existing NS with this project
-	return project, err
+	return project, nil
 }
 
 func (p *pLifecycle) Updated(project *v3.Project) (*v3.Project, error) {
@@ -35,11 +39,13 @@ func (p *pLifecycle) Updated(project *v3.Project) (*v3.Project, error) {
 }
 
 func (p *pLifecycle) Remove(project *v3.Project) (*v3.Project, error) {
-	roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, project.Name)
+	for _, suffix := range projectNSVerbToSuffix {
+		roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, project.Name, suffix)
 
-	err := p.m.workload.RBAC.ClusterRoles("").Delete(roleName, &v1.DeleteOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
-		return project, err
+		err := p.m.workload.RBAC.ClusterRoles("").Delete(roleName, &v1.DeleteOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return project, err
+		}
 	}
 
 	projectID := project.Namespace + ":" + project.Name

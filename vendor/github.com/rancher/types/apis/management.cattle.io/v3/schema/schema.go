@@ -96,7 +96,14 @@ func authzTypes(schemas *types.Schemas) *types.Schemas {
 		}).
 		MustImport(&Version, v3.GlobalRole{}).
 		MustImport(&Version, v3.GlobalRoleBinding{}).
-		MustImport(&Version, v3.RoleTemplate{}).
+		MustImportAndCustomize(&Version, v3.RoleTemplate{}, func(schema *types.Schema) {
+			schema.MustCustomizeField("context", func(field types.Field) types.Field {
+				field.Type = "enum"
+				field.Options = []string{"cluster", "project"}
+				field.Nullable = false
+				return field
+			})
+		}).
 		MustImport(&Version, v3.PodSecurityPolicyTemplate{}).
 		MustImportAndCustomize(&Version, v3.ClusterRoleTemplateBinding{}, func(schema *types.Schema) {
 			schema.MustCustomizeField("subjectKind", func(field types.Field) types.Field {
