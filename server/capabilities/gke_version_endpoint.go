@@ -13,15 +13,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/sirupsen/logrus"
-	"github.com/rancher/kontainer-engine/service"
-	"sync"
+	"github.com/rancher/kontainer-engine/drivers/gke"
 )
 
 const (
 	defaultCredentialEnv = "GOOGLE_APPLICATION_CREDENTIALS"
 )
-
-var mutex = service.Drivers["gke"].(sync.Locker)
 
 func NewGKECapabilitiesHandler() *gkeVersionHandler {
 	return &gkeVersionHandler{}
@@ -60,10 +57,10 @@ func (g *gkeVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Requ
 	}
 
 	credentials := body.Credentials
-	projectId := body.ProjectId
+	projectID := body.ProjectId
 	zone := body.Zone
 
-	if projectId == "" {
+	if projectID == "" {
 		writer.WriteHeader(http.StatusBadRequest)
 		g.handleErr(writer, fmt.Errorf("invalid projectId"))
 		return
@@ -89,7 +86,7 @@ func (g *gkeVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	result, err := client.Projects.Zones.GetServerconfig(projectId, zone).Do()
+	result, err := client.Projects.Zones.GetServerconfig(projectID, zone).Do()
 
 	if err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
@@ -111,7 +108,7 @@ func (g *gkeVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Requ
 func (g *gkeVersionHandler) handleErr(writer http.ResponseWriter, originalErr error) {
 	resp := errorResponse{originalErr.Error()}
 
-	asJson, err := json.Marshal(resp)
+	asJSON, err := json.Marshal(resp)
 
 	if err != nil {
 		logrus.Error("error while marshalling error message '" + originalErr.Error() + "' error was '" + err.Error() + "'")
@@ -119,13 +116,13 @@ func (g *gkeVersionHandler) handleErr(writer http.ResponseWriter, originalErr er
 		return
 	}
 
-	writer.Write([]byte(asJson))
+	writer.Write([]byte(asJSON))
 }
 
 func (g *gkeVersionHandler) getServiceClient(ctx context.Context, credentialContent string) (*container.Service, error) {
 	// The google SDK has no sane way to pass in a TokenSource give all the different types (user, service account, etc)
 	// So we actually set an environment variable and then unset it
-	mutex.Lock()
+	gke.EnvMutex.Lock()
 	locked := true
 	setEnv := false
 	cleanup := func() {
@@ -134,7 +131,7 @@ func (g *gkeVersionHandler) getServiceClient(ctx context.Context, credentialCont
 		}
 
 		if locked {
-			mutex.Unlock()
+			gke.EnvMutex.Unlock()
 			locked = false
 		}
 	}
