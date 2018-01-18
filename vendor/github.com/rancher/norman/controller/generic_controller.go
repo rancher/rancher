@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	resyncPeriod = 5 * time.Minute
+	resyncPeriod = 2 * time.Hour
 )
 
 type HandlerFunc func(key string) error

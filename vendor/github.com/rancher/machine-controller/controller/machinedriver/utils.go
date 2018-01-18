@@ -11,6 +11,7 @@ import (
 	cli "github.com/docker/machine/libmachine/mcnflag"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+	"strconv"
 )
 
 func flagToField(flag cli.Flag) (string, v3.Field, error) {
@@ -30,7 +31,7 @@ func flagToField(flag cli.Flag) (string, v3.Field, error) {
 		field.Default.StringValue = v.Value
 	case *cli.IntFlag:
 		field.Description = v.Usage
-		field.Default.IntValue = v.Value
+		field.Default.StringValue = strconv.Itoa(v.Value)
 	case *cli.BoolFlag:
 		field.Type = "boolean"
 		field.Description = v.Usage

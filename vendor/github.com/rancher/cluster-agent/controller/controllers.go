@@ -12,7 +12,7 @@ import (
 	workloadController "github.com/rancher/workload-controller/controller"
 )
 
-func Register(ctx context.Context, cluster *config.ClusterContext) {
+func Register(ctx context.Context, cluster *config.ClusterContext) error {
 	nodesyncer.Register(cluster)
 	healthsyncer.Register(ctx, cluster)
 	authz.Register(cluster)
@@ -20,5 +20,5 @@ func Register(ctx context.Context, cluster *config.ClusterContext) {
 	eventssyncer.Register(cluster)
 
 	workloadContext := cluster.WorkloadContext()
-	workloadController.Register(ctx, workloadContext)
+	return workloadController.Register(ctx, workloadContext)
 }

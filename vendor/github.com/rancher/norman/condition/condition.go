@@ -140,7 +140,11 @@ func (c Cond) doInternal(obj runtime.Object, f func() (runtime.Object, error)) (
 	}
 
 	if err != nil {
-		if _, ok := err.(*controller.ForgetError); !ok {
+		if _, ok := err.(*controller.ForgetError); ok {
+			if c.IsFalse(obj) {
+				c.Unknown(obj)
+			}
+		} else {
 			c.False(obj)
 		}
 		c.ReasonAndMessageFromError(obj, err)

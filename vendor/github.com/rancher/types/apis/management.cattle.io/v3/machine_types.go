@@ -108,7 +108,7 @@ type MachineSpec struct {
 	DisplayName         string      `json:"displayName,omitempty"`
 	RequestedHostname   string      `json:"requestedHostname,omitempty" norman:"noupdate"`
 	ClusterName         string      `json:"clusterName,omitempty" norman:"type=reference[cluster],noupdate,required"`
-	Role                []string    `json:"role,omitempty" norman:"noupdate"`
+	Role                []string    `json:"role,omitempty" norman:"noupdate,type=array[enum],options=etcd|worker|controlplane"`
 	MachineTemplateName string      `json:"machineTemplateName,omitempty" norman:"type=reference[machineTemplate],noupdate"`
 }
 

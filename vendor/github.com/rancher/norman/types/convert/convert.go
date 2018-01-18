@@ -48,7 +48,7 @@ func ToString(value interface{}) string {
 	if single == nil {
 		return ""
 	}
-	return fmt.Sprint(single)
+	return strings.TrimSpace(fmt.Sprint(single))
 }
 
 func ToTimestamp(value interface{}) (int64, error) {
@@ -164,7 +164,7 @@ func ToStringSlice(data interface{}) []string {
 		return v
 	}
 	if v, ok := data.([]interface{}); ok {
-		result := []string{}
+		var result []string
 		for _, item := range v {
 			result = append(result, ToString(item))
 		}

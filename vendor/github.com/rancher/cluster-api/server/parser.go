@@ -15,26 +15,6 @@ import (
 var mgmtSchemas = types.NewSchemas().
 	AddSchemas(managementSchema.Schemas)
 
-func NewResolver(next parse.ResolverFunc) parse.ResolverFunc {
-	return func(typeName string, apiContext *types.APIContext) error {
-		return resolve(next, typeName, apiContext)
-	}
-}
-
-func resolve(next parse.ResolverFunc, typeName string, apiContext *types.APIContext) error {
-	//// Redirect /clusters/namespaces => /projects/namespaces
-	//if apiContext.Version != nil && strings.HasPrefix(typeName, projectClient.NamespaceType) && apiContext.Version.Equals(&clusterSchema.Version) {
-	//	apiContext.Schema = apiContext.Schemas.Schema(&projectSchema.Version, typeName)
-	//	apiContext.Version = &projectSchema.Version
-	//}
-	//
-	//if apiContext.Schema != nil {
-	//	return nil
-	//}
-
-	return next(typeName, apiContext)
-}
-
 func URLParser(clusterName string, schemas *types.Schemas, url *url.URL) (parse.ParsedURL, error) {
 	parsedURL, err := parse.DefaultURLParser(schemas, url)
 	if err != nil {

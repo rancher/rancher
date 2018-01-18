@@ -9,14 +9,33 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/sirupsen/logrus"
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	apiextclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
 )
 
 type Factory struct {
-	APIExtClientSet apiextclientset.Interface
+	APIExtClientSet clientset.Interface
+}
+
+func NewFactoryFromConfig(config rest.Config) (*Factory, error) {
+	dynamicConfig := config
+	if dynamicConfig.NegotiatedSerializer == nil {
+		configConfig := dynamic.ContentConfig()
+		dynamicConfig.NegotiatedSerializer = configConfig.NegotiatedSerializer
+	}
+
+	apiExtClient, err := clientset.NewForConfig(&dynamicConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Factory{
+		APIExtClientSet: apiExtClient,
+	}, nil
 }
 
 func (c *Factory) AddSchemas(ctx context.Context, schemas ...*types.Schema) (map[*types.Schema]*apiext.CustomResourceDefinition, error) {

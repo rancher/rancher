@@ -20,6 +20,7 @@ var (
 type Operation string
 
 type Builder struct {
+	apiContext   *types.APIContext
 	Version      *types.APIVersion
 	Schemas      *types.Schemas
 	RefValidator types.ReferenceValidator
@@ -27,6 +28,7 @@ type Builder struct {
 
 func NewBuilder(apiRequest *types.APIContext) *Builder {
 	return &Builder{
+		apiContext:   apiRequest,
 		Version:      apiRequest.Version,
 		Schemas:      apiRequest.Schemas,
 		RefValidator: apiRequest.ReferenceValidator,
@@ -34,7 +36,16 @@ func NewBuilder(apiRequest *types.APIContext) *Builder {
 }
 
 func (b *Builder) Construct(schema *types.Schema, input map[string]interface{}, op Operation) (map[string]interface{}, error) {
-	return b.copyFields(schema, input, op)
+	result, err := b.copyFields(schema, input, op)
+	if err != nil {
+		return nil, err
+	}
+	if (op == Create || op == Update) && schema.Validator != nil {
+		if err := schema.Validator(b.apiContext, schema, result); err != nil {
+			return nil, err
+		}
+	}
+	return result, nil
 }
 
 func (b *Builder) copyInputs(schema *types.Schema, input map[string]interface{}, op Operation, result map[string]interface{}) error {
@@ -151,7 +162,9 @@ func checkFieldCriteria(fieldName string, field types.Field, value interface{}) 
 	}
 
 	if (value == nil || value == "") && !field.Nullable {
-		return httperror.NewFieldAPIError(httperror.NotNullable, fieldName, "")
+		if field.Default == nil {
+			return httperror.NewFieldAPIError(httperror.NotNullable, fieldName, "")
+		}
 	}
 
 	if isNum {

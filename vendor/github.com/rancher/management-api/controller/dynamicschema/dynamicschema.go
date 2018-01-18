@@ -58,8 +58,15 @@ func (c *Controller) add(dynamicSchema *v3.DynamicSchema) error {
 		// set to nil because if map is len() == 0
 		field.Default = nil
 
-		for _, value := range defMap {
-			field.Default = value
+		switch field.Type {
+		case "string":
+			field.Default = defMap["stringValue"]
+		case "int":
+			field.Default = defMap["intValue"]
+		case "boolean":
+			field.Default = defMap["boolValue"]
+		case "array[string]":
+			field.Default = defMap["stringSliceValue"]
 		}
 
 		schema.ResourceFields[name] = field

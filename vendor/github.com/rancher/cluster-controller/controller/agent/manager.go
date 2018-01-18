@@ -32,7 +32,7 @@ func NewManager(management *config.ManagementContext) *Manager {
 	}
 }
 
-func (m *Manager) Stop(ctx context.Context, cluster *v3.Cluster) {
+func (m *Manager) Stop(cluster *v3.Cluster) {
 	obj, ok := m.controllers.Load(cluster.UID)
 	if !ok {
 		return
@@ -55,16 +55,21 @@ func (m *Manager) Start(ctx context.Context, cluster *v3.Cluster) error {
 
 	obj, loaded := m.controllers.LoadOrStore(cluster.UID, controller)
 	if !loaded {
-		m.doStart(obj.(*record))
+		if err := m.doStart(obj.(*record)); err != nil {
+			m.Stop(cluster)
+			return err
+		}
 	}
 
 	return nil
 }
 
-func (m *Manager) doStart(rec *record) {
+func (m *Manager) doStart(rec *record) error {
 	logrus.Info("Starting cluster agent for", rec.cluster.ClusterName)
-	clusterController.Register(rec.ctx, rec.cluster)
-	rec.cluster.Start(rec.ctx)
+	if err := clusterController.Register(rec.ctx, rec.cluster); err != nil {
+		return err
+	}
+	return rec.cluster.Start(rec.ctx)
 }
 
 func (m *Manager) toRESTConfig(cluster *v3.Cluster) (*rest.Config, error) {

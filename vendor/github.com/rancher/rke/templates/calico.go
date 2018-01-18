@@ -469,7 +469,7 @@ metadata:
   namespace: kube-system
 
 
-{{if ne .CloudProvider ""}}
+{{if ne .CloudProvider "none"}}
 ---
 kind: ConfigMap
 apiVersion: v1
@@ -477,7 +477,7 @@ metadata:
   name: {{.CloudProvider}}-ippool
   namespace: kube-system
 data:
-  aws-ippool: |-
+  {{.CloudProvider}}-ippool: |-
     apiVersion: v1
     kind: ipPool
     metadata:
