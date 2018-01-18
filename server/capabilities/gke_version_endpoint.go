@@ -13,15 +13,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/sirupsen/logrus"
-	"github.com/rancher/kontainer-engine/service"
-	"sync"
+	"github.com/rancher/kontainer-engine/drivers/gke"
 )
 
 const (
 	defaultCredentialEnv = "GOOGLE_APPLICATION_CREDENTIALS"
 )
-
-var mutex = service.Drivers["gke"].(sync.Locker)
 
 func NewGKECapabilitiesHandler() *gkeVersionHandler {
 	return &gkeVersionHandler{}
@@ -125,7 +122,7 @@ func (g *gkeVersionHandler) handleErr(writer http.ResponseWriter, originalErr er
 func (g *gkeVersionHandler) getServiceClient(ctx context.Context, credentialContent string) (*container.Service, error) {
 	// The google SDK has no sane way to pass in a TokenSource give all the different types (user, service account, etc)
 	// So we actually set an environment variable and then unset it
-	mutex.Lock()
+	gke.EnvMutex.Lock()
 	locked := true
 	setEnv := false
 	cleanup := func() {
@@ -134,7 +131,7 @@ func (g *gkeVersionHandler) getServiceClient(ctx context.Context, credentialCont
 		}
 
 		if locked {
-			mutex.Unlock()
+			gke.EnvMutex.Unlock()
 			locked = false
 		}
 	}
