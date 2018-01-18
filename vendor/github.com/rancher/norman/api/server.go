@@ -222,8 +222,10 @@ func (s *Server) handle(rw http.ResponseWriter, req *http.Request) (*types.APICo
 }
 
 func handleAction(action *types.Action, context *types.APIContext) error {
-	if err := access.ByID(context, context.Version, context.Type, context.ID, nil); err != nil {
-		return err
+	if context.ID != "" {
+		if err := access.ByID(context, context.Version, context.Type, context.ID, nil); err != nil {
+			return err
+		}
 	}
 	return context.Schema.ActionHandler(context.Action, action, context)
 }

@@ -298,3 +298,20 @@ func (c *Cluster) ApplyAuthzResources(ctx context.Context) error {
 	}
 	return nil
 }
+
+func (c *Cluster) getUniqueHostList() []*hosts.Host {
+	hostList := []*hosts.Host{}
+	hostList = append(hostList, c.EtcdHosts...)
+	hostList = append(hostList, c.ControlPlaneHosts...)
+	hostList = append(hostList, c.WorkerHosts...)
+	// little trick to get a unique host list
+	uniqHostMap := make(map[*hosts.Host]bool)
+	for _, host := range hostList {
+		uniqHostMap[host] = true
+	}
+	uniqHostList := []*hosts.Host{}
+	for host := range uniqHostMap {
+		uniqHostList = append(uniqHostList, host)
+	}
+	return uniqHostList
+}

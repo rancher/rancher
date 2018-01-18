@@ -50,7 +50,7 @@ type RequestHandler func(request *APIContext) error
 
 type QueryFilter func(opts *QueryOptions, data []map[string]interface{}) []map[string]interface{}
 
-type Validator func(request *APIContext, data map[string]interface{}) error
+type Validator func(request *APIContext, schema *Schema, data map[string]interface{}) error
 
 type Formatter func(request *APIContext, resource *RawResource)
 

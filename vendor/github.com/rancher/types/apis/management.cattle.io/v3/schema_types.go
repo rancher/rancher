@@ -54,10 +54,10 @@ type Field struct {
 }
 
 type Values struct {
-	StringValue      string   `json:"stringValue,omitempty"`
-	IntValue         int      `json:"intValue,omitempty"`
-	BoolValue        bool     `json:"boolValue,omitempty"`
-	StringSliceValue []string `json:"stringSliceValue,omitempty"`
+	StringValue      string   `json:"stringValue"`
+	IntValue         int      `json:"intValue"`
+	BoolValue        bool     `json:"boolValue"`
+	StringSliceValue []string `json:"stringSliceValue"`
 }
 
 type Action struct {

@@ -297,3 +297,8 @@ func ReadFileFromContainer(ctx context.Context, dClient *client.Client, hostname
 	}
 	return string(file), nil
 }
+
+func ReadContainerLogs(ctx context.Context, dClient *client.Client, containerName string) (io.ReadCloser, error) {
+	return dClient.ContainerLogs(ctx, containerName, types.ContainerLogsOptions{ShowStdout: true})
+
+}

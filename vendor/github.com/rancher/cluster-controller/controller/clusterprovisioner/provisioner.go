@@ -107,7 +107,11 @@ func (p *Provisioner) Remove(cluster *v3.Cluster) (*v3.Cluster, error) {
 
 func (p *Provisioner) Updated(cluster *v3.Cluster) (*v3.Cluster, error) {
 	obj, err := v3.ClusterConditionUpdated.Do(cluster, func() (runtime.Object, error) {
-		return p.reconcileCluster(cluster, false)
+		waiting, newObj, err := p.reconcileCluster(cluster, false)
+		if err == nil && waiting {
+			return newObj, &controller.ForgetError{Err: fmt.Errorf("waiting for nodes to provision or a valid configuration")}
+		}
+		return newObj, err
 	})
 	cluster, _ = obj.(*v3.Cluster)
 	return cluster, err
@@ -181,14 +185,14 @@ func (p *Provisioner) Create(cluster *v3.Cluster) (*v3.Cluster, error) {
 	}
 
 	obj, err := v3.ClusterConditionProvisioned.DoUntilTrue(cluster, func() (runtime.Object, error) {
-		newCluster, err := p.reconcileCluster(cluster, true)
+		waiting, newCluster, err := p.reconcileCluster(cluster, true)
 		if newCluster != nil {
 			cluster = newCluster
 		}
 		if err != nil {
 			return cluster, err
 		}
-		if newCluster == nil && err == nil {
+		if waiting {
 			return cluster, &controller.ForgetError{Err: fmt.Errorf("waiting for nodes to provision or a valid configuration")}
 		}
 		return cluster, err
@@ -197,26 +201,27 @@ func (p *Provisioner) Create(cluster *v3.Cluster) (*v3.Cluster, error) {
 	return obj.(*v3.Cluster), err
 }
 
-func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cluster, error) {
+// reconcileCluster returns true if waiting or false if ready to provision
+func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (bool, *v3.Cluster, error) {
 	if !needToProvision(cluster) {
 		v3.ClusterConditionProvisioned.True(cluster)
-		return cluster, nil
+		return false, cluster, nil
 	}
 
 	obj, err := v3.ClusterConditionMachinesCreated.DoUntilTrue(cluster, func() (runtime.Object, error) {
 		return p.createMachines(cluster)
 	})
 	if err != nil {
-		return obj.(*v3.Cluster), err
+		return false, obj.(*v3.Cluster), err
 	}
 
 	var apiEndpoint, serviceAccountToken, caCert string
-	driver, spec, err := p.getSpec(cluster)
+	waiting, driver, spec, err := p.getSpec(cluster)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to construct cluster [%s] spec", cluster.Name)
+		return waiting, nil, errors.Wrapf(err, "failed to construct cluster [%s] spec", cluster.Name)
 	}
-	if spec == nil {
-		return nil, nil
+	if spec == nil || waiting {
+		return waiting, nil, nil
 	}
 
 	logrus.Infof("Provisioning cluster [%s]", cluster.Name)
@@ -237,14 +242,14 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 	// for here out we want to always return the cluster, not just nil, so that the error can be properly
 	// recorded if needs be
 	if err != nil {
-		return cluster, err
+		return false, cluster, err
 	}
 
 	saved := false
 	for i := 0; i < 20; i++ {
 		cluster, err = p.Clusters.Get(cluster.Name, metav1.GetOptions{})
 		if err != nil {
-			return cluster, err
+			return false, cluster, err
 		}
 
 		cluster.Status.AppliedSpec = *spec
@@ -263,18 +268,18 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 	}
 
 	if !saved {
-		return cluster, fmt.Errorf("failed to update cluster")
+		return false, cluster, fmt.Errorf("failed to update cluster")
 	}
 
 	logrus.Infof("Provisioned cluster [%s]", cluster.Name)
-	return cluster, nil
+	return false, cluster, nil
 }
 
 func needToProvision(cluster *v3.Cluster) bool {
 	return !cluster.Spec.Internal
 }
 
-func (p *Provisioner) getConfig(reconcileRKE bool, spec v3.ClusterSpec, clusterName string) (string, *v3.ClusterSpec, interface{}, error) {
+func (p *Provisioner) getConfig(reconcileRKE bool, spec v3.ClusterSpec, clusterName string) (bool, string, *v3.ClusterSpec, interface{}, error) {
 	var (
 		ok    bool
 		err   error
@@ -294,10 +299,10 @@ func (p *Provisioner) getConfig(reconcileRKE bool, spec v3.ClusterSpec, clusterN
 		if driver == RKEDriver && reconcileRKE {
 			ok, nodes, err = p.reconcileRKENodes(clusterName)
 			if err != nil {
-				return "", nil, nil, err
+				return true, "", nil, nil, err
 			}
 			if !ok {
-				return "", nil, nil, nil
+				return true, "", nil, nil, nil
 			}
 			copy := *spec.RancherKubernetesEngineConfig
 			spec.RancherKubernetesEngineConfig = &copy
@@ -306,39 +311,43 @@ func (p *Provisioner) getConfig(reconcileRKE bool, spec v3.ClusterSpec, clusterN
 			v = data[RKEDriverKey]
 		}
 
-		return driver, &spec, v, nil
+		return false, driver, &spec, v, nil
 	}
 
-	return "", nil, nil, nil
+	return false, "", nil, nil, nil
 }
 
-func (p *Provisioner) getSpec(cluster *v3.Cluster) (string, *v3.ClusterSpec, error) {
-	oldDriver, _, oldConfig, err := p.getConfig(false, cluster.Status.AppliedSpec, cluster.Name)
+func (p *Provisioner) getSpec(cluster *v3.Cluster) (bool, string, *v3.ClusterSpec, error) {
+	_, oldDriver, _, oldConfig, err := p.getConfig(false, cluster.Status.AppliedSpec, cluster.Name)
 	if err != nil {
-		return "", nil, err
+		return false, "", nil, err
 	}
-	newDriver, newSpec, newConfig, err := p.getConfig(true, cluster.Spec, cluster.Name)
+	waiting, newDriver, newSpec, newConfig, err := p.getConfig(true, cluster.Spec, cluster.Name)
 	if err != nil {
-		return "", nil, err
+		return false, "", nil, err
+	}
+
+	if waiting {
+		return true, "", nil, nil
 	}
 
 	if oldDriver == "" && newDriver == "" {
-		return "", nil, nil
+		return false, "", nil, nil
 	}
 
 	if oldDriver == "" {
-		return "", newSpec, nil
+		return false, "", newSpec, nil
 	}
 
 	if oldDriver != newDriver {
-		return "", nil, fmt.Errorf("driver change from %s to %s not allowed", oldDriver, newDriver)
+		return false, "", nil, fmt.Errorf("driver change from %s to %s not allowed", oldDriver, newDriver)
 	}
 
 	if reflect.DeepEqual(oldConfig, newConfig) {
-		return "", nil, nil
+		return false, "", nil, nil
 	}
 
-	return newDriver, newSpec, nil
+	return false, newDriver, newSpec, nil
 }
 
 func (p *Provisioner) reconcileRKENodes(clusterName string) (bool, []v3.RKEConfigNode, error) {
@@ -361,6 +370,10 @@ func (p *Provisioner) reconcileRKENodes(clusterName string) (bool, []v3.RKEConfi
 		}
 
 		if len(machine.Status.NodeConfig.Role) == 0 {
+			continue
+		}
+
+		if !v3.MachineConditionProvisioned.IsTrue(machine) {
 			continue
 		}
 

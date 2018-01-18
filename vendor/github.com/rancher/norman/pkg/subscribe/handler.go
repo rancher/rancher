@@ -143,7 +143,7 @@ func writeData(c *websocket.Conn, header string, buf []byte) error {
 	if _, err := messageWriter.Write([]byte(`}`)); err != nil {
 		return err
 	}
-	return nil
+	return messageWriter.Close()
 }
 
 func streamStore(ctx context.Context, eg *errgroup.Group, apiContext *types.APIContext, schema *types.Schema, result chan map[string]interface{}) {

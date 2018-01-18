@@ -27,7 +27,7 @@ func (c *ClusterLifecycle) Create(obj *v3.Cluster) (*v3.Cluster, error) {
 }
 
 func (c *ClusterLifecycle) Remove(obj *v3.Cluster) (*v3.Cluster, error) {
-	c.Manager.Stop(c.ctx, obj)
+	c.Manager.Stop(obj)
 	return nil, nil
 }
 

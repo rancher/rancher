@@ -29,7 +29,7 @@ type RKEConfigNode struct {
 	// Optional - Internal address that will be used for components communication
 	InternalAddress string `yaml:"internal_address" json:"internalAddress,omitempty"`
 	// Node role in kubernetes cluster (controlplane, worker, or etcd)
-	Role []string `yaml:"role" json:"role,omitempty"`
+	Role []string `yaml:"role" json:"role,omitempty" norman:"type=array[enum],options=etcd|worker|controlplane"`
 	// Optional - Hostname of the node
 	HostnameOverride string `yaml:"hostname_override" json:"hostnameOverride,omitempty"`
 	// SSH usesr that will be used by RKE

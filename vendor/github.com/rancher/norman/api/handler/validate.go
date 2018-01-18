@@ -23,11 +23,5 @@ func ParseAndValidateBody(apiContext *types.APIContext, create bool) (map[string
 		return nil, err
 	}
 
-	if apiContext.Schema.Validator != nil {
-		if err := apiContext.Schema.Validator(apiContext, data); err != nil {
-			return nil, err
-		}
-	}
-
 	return data, nil
 }
