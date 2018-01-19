@@ -56,11 +56,11 @@ type RoleBindingController interface {
 type RoleBindingInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*v1.RoleBinding) (*v1.RoleBinding, error)
-	GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1.RoleBinding, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.RoleBinding, error)
 	Get(name string, opts metav1.GetOptions) (*v1.RoleBinding, error)
 	Update(*v1.RoleBinding) (*v1.RoleBinding, error)
 	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
+	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*RoleBindingList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -197,8 +197,8 @@ func (s *roleBindingClient) Get(name string, opts metav1.GetOptions) (*v1.RoleBi
 	return obj.(*v1.RoleBinding), err
 }
 
-func (s *roleBindingClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1.RoleBinding, error) {
-	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+func (s *roleBindingClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.RoleBinding, error) {
+	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
 	return obj.(*v1.RoleBinding), err
 }
 
@@ -211,8 +211,8 @@ func (s *roleBindingClient) Delete(name string, options *metav1.DeleteOptions) e
 	return s.objectClient.Delete(name, options)
 }
 
-func (s *roleBindingClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
-	return s.objectClient.DeleteNamespace(name, namespace, options)
+func (s *roleBindingClient) DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
 func (s *roleBindingClient) List(opts metav1.ListOptions) (*RoleBindingList, error) {

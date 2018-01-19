@@ -56,11 +56,11 @@ type SecretController interface {
 type SecretInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*v1.Secret) (*v1.Secret, error)
-	GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1.Secret, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.Secret, error)
 	Get(name string, opts metav1.GetOptions) (*v1.Secret, error)
 	Update(*v1.Secret) (*v1.Secret, error)
 	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
+	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*SecretList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -197,8 +197,8 @@ func (s *secretClient) Get(name string, opts metav1.GetOptions) (*v1.Secret, err
 	return obj.(*v1.Secret), err
 }
 
-func (s *secretClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1.Secret, error) {
-	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+func (s *secretClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.Secret, error) {
+	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
 	return obj.(*v1.Secret), err
 }
 
@@ -211,8 +211,8 @@ func (s *secretClient) Delete(name string, options *metav1.DeleteOptions) error 
 	return s.objectClient.Delete(name, options)
 }
 
-func (s *secretClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
-	return s.objectClient.DeleteNamespace(name, namespace, options)
+func (s *secretClient) DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
 func (s *secretClient) List(opts metav1.ListOptions) (*SecretList, error) {

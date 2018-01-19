@@ -6,6 +6,7 @@ import (
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
@@ -19,7 +20,7 @@ func Validator(apiContext *types.APIContext, schema *types.Schema, data map[stri
 		return nil
 	}
 
-	if errs := validation.IsDNS1123Subdomain(value.(string)); len(errs) != 0 {
+	if errs := validation.IsDNS1123Subdomain(convert.ToString(value)); len(errs) != 0 {
 		return httperror.NewAPIError(httperror.InvalidFormat, fmt.Sprintf("invalid %s %s: %s", nameField, value,
 			strings.Join(errs, ",")))
 	}

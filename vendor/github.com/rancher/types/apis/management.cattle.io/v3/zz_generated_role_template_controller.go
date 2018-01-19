@@ -54,11 +54,11 @@ type RoleTemplateController interface {
 type RoleTemplateInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*RoleTemplate) (*RoleTemplate, error)
-	GetNamespace(name, namespace string, opts metav1.GetOptions) (*RoleTemplate, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*RoleTemplate, error)
 	Get(name string, opts metav1.GetOptions) (*RoleTemplate, error)
 	Update(*RoleTemplate) (*RoleTemplate, error)
 	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
+	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*RoleTemplateList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -195,8 +195,8 @@ func (s *roleTemplateClient) Get(name string, opts metav1.GetOptions) (*RoleTemp
 	return obj.(*RoleTemplate), err
 }
 
-func (s *roleTemplateClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*RoleTemplate, error) {
-	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+func (s *roleTemplateClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*RoleTemplate, error) {
+	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
 	return obj.(*RoleTemplate), err
 }
 
@@ -209,8 +209,8 @@ func (s *roleTemplateClient) Delete(name string, options *metav1.DeleteOptions) 
 	return s.objectClient.Delete(name, options)
 }
 
-func (s *roleTemplateClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
-	return s.objectClient.DeleteNamespace(name, namespace, options)
+func (s *roleTemplateClient) DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
 func (s *roleTemplateClient) List(opts metav1.ListOptions) (*RoleTemplateList, error) {

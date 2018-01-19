@@ -14,7 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
-	patchtype "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
@@ -37,33 +36,12 @@ type Store struct {
 	kind           string
 	resourcePlural string
 	authContext    map[string]string
-	supportPatch   bool
 }
 
 func NewProxyStore(k8sClient rest.Interface,
 	prefix []string, group, version, kind, resourcePlural string) types.Store {
 	return &errorStore{
 		Store: &Store{
-			supportPatch:   true,
-			k8sClient:      k8sClient,
-			prefix:         prefix,
-			group:          group,
-			version:        version,
-			kind:           kind,
-			resourcePlural: resourcePlural,
-			authContext: map[string]string{
-				"apiGroup": group,
-				"resource": resourcePlural,
-			},
-		},
-	}
-}
-
-func NewProxyStoreForCRD(k8sClient rest.Interface,
-	prefix []string, group, version, kind, resourcePlural string) types.Store {
-	return &errorStore{
-		Store: &Store{
-			supportPatch:   false,
 			k8sClient:      k8sClient,
 			prefix:         prefix,
 			group:          group,
@@ -142,9 +120,12 @@ func (p *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *ty
 func (p *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
 	namespace := getNamespace(apiContext, opt)
 
+	timeout := int64(60 * 60)
 	req := p.common(namespace, p.k8sClient.Get())
 	req.VersionedParams(&metav1.ListOptions{
-		Watch: true,
+		Watch:           true,
+		TimeoutSeconds:  &timeout,
+		ResourceVersion: "0",
 	}, dynamic.VersionedParameterEncoderWithV1Fallback)
 
 	body, err := req.Stream()
@@ -238,38 +219,23 @@ func (p *Store) toInternal(mapper types.Mapper, data map[string]interface{}) {
 }
 
 func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
-	if p.supportPatch {
-		p.toInternal(schema.Mapper, data)
-		namespace, id := splitID(id)
+	namespace, id := splitID(id)
+	req := p.common(namespace, p.k8sClient.Get()).
+		Name(id)
 
-		req := p.common(namespace, p.k8sClient.Patch(patchtype.StrategicMergePatchType)).
-			Body(&unstructured.Unstructured{
-				Object: data,
-			}).
-			Name(id).
-			SetHeader("Content-Type", string(patchtype.StrategicMergePatchType))
-
-		_, result, err := p.singleResult(apiContext, schema, req)
-		return result, err
-	}
-
-	resourceVersion, existing, err := p.byID(apiContext, schema, id)
+	resourceVersion, existing, err := p.singleResultRaw(apiContext, schema, req)
 	if err != nil {
 		return data, nil
 	}
 
-	for k, v := range data {
-		existing[k] = v
-	}
-
-	p.toInternal(schema.Mapper, existing)
-	namespace, id := splitID(id)
+	p.toInternal(schema.Mapper, data)
+	existing = convert.APIUpdateMerge(existing, data, apiContext.Query.Get("_replace") == "true")
 
 	values.PutValue(existing, resourceVersion, "metadata", "resourceVersion")
 	values.PutValue(existing, namespace, "metadata", "namespace")
 	values.PutValue(existing, id, "metadata", "name")
 
-	req := p.common(namespace, p.k8sClient.Put()).
+	req = p.common(namespace, p.k8sClient.Put()).
 		Body(&unstructured.Unstructured{
 			Object: existing,
 		}).
@@ -302,15 +268,22 @@ func (p *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id st
 }
 
 func (p *Store) singleResult(apiContext *types.APIContext, schema *types.Schema, req *rest.Request) (string, map[string]interface{}, error) {
+	version, data, err := p.singleResultRaw(apiContext, schema, req)
+	if err != nil {
+		return "", nil, err
+	}
+	p.fromInternal(schema, data)
+	return version, data, nil
+}
+
+func (p *Store) singleResultRaw(apiContext *types.APIContext, schema *types.Schema, req *rest.Request) (string, map[string]interface{}, error) {
 	result := &unstructured.Unstructured{}
 	err := p.doAuthed(apiContext, req).Into(result)
 	if err != nil {
 		return "", nil, err
 	}
 
-	version := result.GetResourceVersion()
-	p.fromInternal(schema, result.Object)
-	return version, result.Object, nil
+	return result.GetResourceVersion(), result.Object, nil
 }
 
 func splitID(id string) (string, string) {

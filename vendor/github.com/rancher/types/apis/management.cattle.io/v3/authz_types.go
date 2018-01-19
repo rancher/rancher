@@ -56,7 +56,7 @@ type GlobalRole struct {
 	DisplayName string              `json:"displayName,omitempty" norman:"required"`
 	Description string              `json:"description"`
 	Rules       []rbacv1.PolicyRule `json:"rules,omitempty"`
-	Builtin     bool                `json:"builtin"`
+	Builtin     bool                `json:"builtin" norman:"nocreate,noupdate"`
 }
 
 type GlobalRoleBinding struct {
@@ -74,7 +74,7 @@ type RoleTemplate struct {
 	DisplayName       string              `json:"displayName,omitempty" norman:"required"`
 	Description       string              `json:"description"`
 	Rules             []rbacv1.PolicyRule `json:"rules,omitempty"`
-	Builtin           bool                `json:"builtin"`
+	Builtin           bool                `json:"builtin" norman:"nocreate,noupdate"`
 	External          bool                `json:"external"`
 	Hidden            bool                `json:"hidden"`
 	Context           string              `json:"context"`

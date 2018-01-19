@@ -54,11 +54,11 @@ type TemplateController interface {
 type TemplateInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*Template) (*Template, error)
-	GetNamespace(name, namespace string, opts metav1.GetOptions) (*Template, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*Template, error)
 	Get(name string, opts metav1.GetOptions) (*Template, error)
 	Update(*Template) (*Template, error)
 	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
+	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*TemplateList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -195,8 +195,8 @@ func (s *templateClient) Get(name string, opts metav1.GetOptions) (*Template, er
 	return obj.(*Template), err
 }
 
-func (s *templateClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*Template, error) {
-	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+func (s *templateClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*Template, error) {
+	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
 	return obj.(*Template), err
 }
 
@@ -209,8 +209,8 @@ func (s *templateClient) Delete(name string, options *metav1.DeleteOptions) erro
 	return s.objectClient.Delete(name, options)
 }
 
-func (s *templateClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
-	return s.objectClient.DeleteNamespace(name, namespace, options)
+func (s *templateClient) DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
 func (s *templateClient) List(opts metav1.ListOptions) (*TemplateList, error) {

@@ -23,8 +23,10 @@ import (
 const (
 	NetworkPluginResourceName = "rke-network-plugin"
 
-	PortCheckContainer  = "rke-port-checker"
-	PortListenContainer = "rke-port-listener"
+	PortCheckContainer        = "rke-port-checker"
+	EtcdPortListenContainer   = "rke-etcd-port-listener"
+	CPPortListenContainer     = "rke-cp-port-listener"
+	WorkerPortListenContainer = "rke-worker-port-listener"
 
 	KubeAPIPort         = "6443"
 	EtcdPort1           = "2379"
@@ -232,8 +234,20 @@ func (c *Cluster) getNetworkPluginManifest(pluginConfig map[string]string) (stri
 	}
 }
 
-func (c *Cluster) CheckClusterPorts(ctx context.Context) error {
-	if err := c.deployTCPPortListeners(ctx); err != nil {
+func (c *Cluster) CheckClusterPorts(ctx context.Context, currentCluster *Cluster) error {
+	if currentCluster != nil {
+		newEtcdHost := hosts.GetToAddHosts(currentCluster.EtcdHosts, c.EtcdHosts)
+		newControlPlanHosts := hosts.GetToAddHosts(currentCluster.ControlPlaneHosts, c.ControlPlaneHosts)
+		newWorkerHosts := hosts.GetToAddHosts(currentCluster.WorkerHosts, c.WorkerHosts)
+
+		if len(newEtcdHost) == 0 &&
+			len(newWorkerHosts) == 0 &&
+			len(newControlPlanHosts) == 0 {
+			log.Infof(ctx, "[network] No hosts added existing cluster, skipping port check")
+			return nil
+		}
+	}
+	if err := c.deployTCPPortListeners(ctx, currentCluster); err != nil {
 		return err
 	}
 	if err := c.runServicePortChecks(ctx); err != nil {
@@ -259,19 +273,50 @@ func (c *Cluster) checkKubeAPIPort(ctx context.Context) error {
 	return nil
 }
 
-func (c *Cluster) deployTCPPortListeners(ctx context.Context) error {
+func (c *Cluster) deployTCPPortListeners(ctx context.Context, currentCluster *Cluster) error {
 	log.Infof(ctx, "[network] Deploying port listener containers")
-	var errgrp errgroup.Group
 
-	portList := []string{
-		KubeAPIPort,
+	etcdHosts := []*hosts.Host{}
+	cpHosts := []*hosts.Host{}
+	workerHosts := []*hosts.Host{}
+	if currentCluster != nil {
+		etcdHosts = hosts.GetToAddHosts(currentCluster.EtcdHosts, c.EtcdHosts)
+		cpHosts = hosts.GetToAddHosts(currentCluster.ControlPlaneHosts, c.ControlPlaneHosts)
+		workerHosts = hosts.GetToAddHosts(currentCluster.WorkerHosts, c.WorkerHosts)
+	} else {
+		etcdHosts = c.EtcdHosts
+		cpHosts = c.ControlPlaneHosts
+		workerHosts = c.WorkerHosts
+	}
+	// deploy ectd listeners
+	etcdPortList := []string{
 		EtcdPort1,
 		EtcdPort2,
-		ScedulerPort,
-		ControllerPort,
-		KubeletPort,
-		KubeProxyPort,
 	}
+	if err := c.deployListenerOnPlane(ctx, etcdPortList, etcdHosts, EtcdPortListenContainer); err != nil {
+		return err
+	}
+
+	// deploy controlplane listeners
+	controlPlanePortList := []string{
+		KubeAPIPort,
+	}
+	if err := c.deployListenerOnPlane(ctx, controlPlanePortList, cpHosts, CPPortListenContainer); err != nil {
+		return err
+	}
+
+	// deploy worker listeners
+	workerPortList := []string{
+		KubeletPort,
+	}
+	if err := c.deployListenerOnPlane(ctx, workerPortList, workerHosts, WorkerPortListenContainer); err != nil {
+		return err
+	}
+	log.Infof(ctx, "[network] Port listener containers deployed successfully")
+	return nil
+}
+
+func (c *Cluster) deployListenerOnPlane(ctx context.Context, portList []string, holstPlane []*hosts.Host, containerName string) error {
 	portBindingList := []nat.PortBinding{}
 	for _, portNumber := range portList {
 		rawPort := fmt.Sprintf("0.0.0.0:%s:1337/tcp", portNumber)
@@ -293,44 +338,49 @@ func (c *Cluster) deployTCPPortListeners(ctx context.Context) error {
 			"1337/tcp": {},
 		},
 	}
-
 	hostCfg := &container.HostConfig{
 		PortBindings: nat.PortMap{
 			"1337/tcp": portBindingList,
 		},
 	}
 
-	uniqHosts := c.getUniqueHostList()
-	for _, host := range uniqHosts {
+	var errgrp errgroup.Group
+	for _, host := range holstPlane {
 		runHost := host
 		errgrp.Go(func() error {
-			return docker.DoRunContainer(ctx, runHost.DClient, imageCfg, hostCfg, PortListenContainer, runHost.Address, "network")
+			logrus.Debugf("[network] Starting deployListener [%s] on host [%s]", containerName, runHost.Address)
+			return docker.DoRunContainer(ctx, runHost.DClient, imageCfg, hostCfg, containerName, runHost.Address, "network")
 		})
 	}
-	if err := errgrp.Wait(); err != nil {
-		return err
-	}
-	log.Infof(ctx, "[network] Port listener containers deployed successfully")
-	return nil
+	return errgrp.Wait()
 }
+
 func (c *Cluster) removeTCPPortListeners(ctx context.Context) error {
 	log.Infof(ctx, "[network] Removing port listener containers")
-	var errgrp errgroup.Group
 
-	uniqHosts := c.getUniqueHostList()
-	for _, host := range uniqHosts {
-		runHost := host
-		errgrp.Go(func() error {
-			return docker.DoRemoveContainer(ctx, runHost.DClient, PortListenContainer, runHost.Address)
-		})
+	if err := removeListenerFromPlane(ctx, c.EtcdHosts, EtcdPortListenContainer); err != nil {
+		return err
 	}
-	if err := errgrp.Wait(); err != nil {
+	if err := removeListenerFromPlane(ctx, c.ControlPlaneHosts, CPPortListenContainer); err != nil {
+		return err
+	}
+	if err := removeListenerFromPlane(ctx, c.WorkerHosts, WorkerPortListenContainer); err != nil {
 		return err
 	}
 	log.Infof(ctx, "[network] Port listener containers removed successfully")
 	return nil
 }
 
+func removeListenerFromPlane(ctx context.Context, hostPlane []*hosts.Host, containerName string) error {
+	var errgrp errgroup.Group
+	for _, host := range hostPlane {
+		runHost := host
+		errgrp.Go(func() error {
+			return docker.DoRemoveContainer(ctx, runHost.DClient, containerName, runHost.Address)
+		})
+	}
+	return errgrp.Wait()
+}
 func (c *Cluster) runServicePortChecks(ctx context.Context) error {
 	var errgrp errgroup.Group
 	// check etcd <-> etcd
@@ -403,7 +453,7 @@ func (c *Cluster) runServicePortChecks(ctx context.Context) error {
 func checkPlaneTCPPortsFromHost(ctx context.Context, host *hosts.Host, portList []string, planeHosts []*hosts.Host, image string) error {
 	hosts := []string{}
 	for _, host := range planeHosts {
-		hosts = append(hosts, host.Address)
+		hosts = append(hosts, host.InternalAddress)
 	}
 	imageCfg := &container.Config{
 		Image: image,

@@ -55,11 +55,11 @@ type EventController interface {
 type EventInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*v1.Event) (*v1.Event, error)
-	GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1.Event, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.Event, error)
 	Get(name string, opts metav1.GetOptions) (*v1.Event, error)
 	Update(*v1.Event) (*v1.Event, error)
 	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
+	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*EventList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -196,8 +196,8 @@ func (s *eventClient) Get(name string, opts metav1.GetOptions) (*v1.Event, error
 	return obj.(*v1.Event), err
 }
 
-func (s *eventClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1.Event, error) {
-	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+func (s *eventClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.Event, error) {
+	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
 	return obj.(*v1.Event), err
 }
 
@@ -210,8 +210,8 @@ func (s *eventClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
 
-func (s *eventClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
-	return s.objectClient.DeleteNamespace(name, namespace, options)
+func (s *eventClient) DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
 func (s *eventClient) List(opts metav1.ListOptions) (*EventList, error) {

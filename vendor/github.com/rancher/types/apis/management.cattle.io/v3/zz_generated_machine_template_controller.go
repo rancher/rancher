@@ -54,11 +54,11 @@ type MachineTemplateController interface {
 type MachineTemplateInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*MachineTemplate) (*MachineTemplate, error)
-	GetNamespace(name, namespace string, opts metav1.GetOptions) (*MachineTemplate, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*MachineTemplate, error)
 	Get(name string, opts metav1.GetOptions) (*MachineTemplate, error)
 	Update(*MachineTemplate) (*MachineTemplate, error)
 	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
+	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*MachineTemplateList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -195,8 +195,8 @@ func (s *machineTemplateClient) Get(name string, opts metav1.GetOptions) (*Machi
 	return obj.(*MachineTemplate), err
 }
 
-func (s *machineTemplateClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*MachineTemplate, error) {
-	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+func (s *machineTemplateClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*MachineTemplate, error) {
+	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
 	return obj.(*MachineTemplate), err
 }
 
@@ -209,8 +209,8 @@ func (s *machineTemplateClient) Delete(name string, options *metav1.DeleteOption
 	return s.objectClient.Delete(name, options)
 }
 
-func (s *machineTemplateClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
-	return s.objectClient.DeleteNamespace(name, namespace, options)
+func (s *machineTemplateClient) DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
 func (s *machineTemplateClient) List(opts metav1.ListOptions) (*MachineTemplateList, error) {

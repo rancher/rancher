@@ -54,12 +54,12 @@ func ClusterUp(
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
 
-	if err = kubeCluster.CheckClusterPorts(ctx); err != nil {
+	currentCluster, err := kubeCluster.GetClusterState(ctx)
+	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
 
-	currentCluster, err := kubeCluster.GetClusterState(ctx)
-	if err != nil {
+	if err = kubeCluster.CheckClusterPorts(ctx, currentCluster); err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
 

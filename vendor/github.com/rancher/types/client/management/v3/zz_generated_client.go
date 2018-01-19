@@ -31,6 +31,7 @@ type Client struct {
 	User                       UserOperations
 	DynamicSchema              DynamicSchemaOperations
 	Stack                      StackOperations
+	Preference                 PreferenceOperations
 }
 
 func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
@@ -67,6 +68,7 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.User = newUserClient(client)
 	client.DynamicSchema = newDynamicSchemaClient(client)
 	client.Stack = newStackClient(client)
+	client.Preference = newPreferenceClient(client)
 
 	return client, nil
 }

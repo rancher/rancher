@@ -3,7 +3,7 @@ package subscribe
 import (
 	"bytes"
 	"context"
-
+	"errors"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -124,8 +124,8 @@ func handler(apiContext *types.APIContext) error {
 		}
 	}
 
-	// Group is already done at this point because of goroutine above, this is just to send the error if needed
-	return readerGroup.Wait()
+	// no point in ever returning null because the connection is hijacked and we can't write it
+	return nil
 }
 
 func writeData(c *websocket.Conn, header string, buf []byte) error {
@@ -158,7 +158,7 @@ func streamStore(ctx context.Context, eg *errgroup.Group, apiContext *types.APIC
 			result <- e
 		}
 
-		return nil
+		return errors.New("disconnect")
 	})
 }
 

@@ -55,11 +55,11 @@ type WorkloadController interface {
 type WorkloadInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*Workload) (*Workload, error)
-	GetNamespace(name, namespace string, opts metav1.GetOptions) (*Workload, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*Workload, error)
 	Get(name string, opts metav1.GetOptions) (*Workload, error)
 	Update(*Workload) (*Workload, error)
 	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
+	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*WorkloadList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -196,8 +196,8 @@ func (s *workloadClient) Get(name string, opts metav1.GetOptions) (*Workload, er
 	return obj.(*Workload), err
 }
 
-func (s *workloadClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*Workload, error) {
-	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+func (s *workloadClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*Workload, error) {
+	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
 	return obj.(*Workload), err
 }
 
@@ -210,8 +210,8 @@ func (s *workloadClient) Delete(name string, options *metav1.DeleteOptions) erro
 	return s.objectClient.Delete(name, options)
 }
 
-func (s *workloadClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
-	return s.objectClient.DeleteNamespace(name, namespace, options)
+func (s *workloadClient) DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
 func (s *workloadClient) List(opts metav1.ListOptions) (*WorkloadList, error) {

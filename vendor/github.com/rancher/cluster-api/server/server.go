@@ -24,7 +24,7 @@ func New(ctx context.Context, cluster *config.ClusterContext) (http.Handler, err
 	server.URLParser = func(schemas *types.Schemas, url *url.URL) (parse.ParsedURL, error) {
 		return URLParser(cluster.ClusterName, schemas, url)
 	}
-	server.StoreWrapper = store.ProjectSetter(server.StoreWrapper)
+	server.StoreWrapper = store.ProjectSetter(cluster.ClusterName, server.StoreWrapper)
 
 	if err := server.AddSchemas(cluster.Schemas); err != nil {
 		return nil, err

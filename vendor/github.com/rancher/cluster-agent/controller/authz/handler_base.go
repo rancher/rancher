@@ -144,7 +144,7 @@ func (m *manager) ensureBinding(ns, roleName string, binding *v3.ProjectRoleTemp
 }
 
 func bindingParts(roleName, parentUID string, subject rbacv1.Subject) (string, metav1.ObjectMeta, []rbacv1.Subject, rbacv1.RoleRef) {
-	bindingName := strings.ToLower(fmt.Sprintf("%v-%v-%v", roleName, subject.Name, parentUID))
+	bindingName := strings.ToLower(fmt.Sprintf("%v-%v", roleName, subject.Name))
 	return bindingName,
 		metav1.ObjectMeta{
 			Name:   bindingName,

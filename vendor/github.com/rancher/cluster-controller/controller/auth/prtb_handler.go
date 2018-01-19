@@ -16,6 +16,8 @@ const (
 	projectResource = "projects"
 )
 
+var projectManagmentPlanResources = []string{"projectroletemplatebindings", "stacks"}
+
 type prtbLifecycle struct {
 	mgr           *manager
 	projectLister v3.ProjectLister
@@ -48,9 +50,9 @@ func (p *prtbLifecycle) Remove(obj *v3.ProjectRoleTemplateBinding) (*v3.ProjectR
 
 // When a PRTB is created or updated, translate it into several k8s roles and bindings to actually enforce the RBAC.
 // Specifically:
-// - ensure the user can see the project and its parent cluster in the mgmt API
-// - if the user was granted owner permissions for the project, ensure they can create/update/delete the project
-// - if the user was granted user managment privileges for the project, ensure they can create PRTBs in the project's namespace
+// - ensure the subject can see the project and its parent cluster in the mgmt API
+// - if the subject was granted owner permissions for the project, ensure they can create/update/delete the project
+// - if the subject was granted privileges to mgmt plane resources that are scoped to the project, enforce those rules in the project's mgmt plane namespace
 func (p *prtbLifecycle) ensureBindings(binding *v3.ProjectRoleTemplateBinding) error {
 	parts := strings.SplitN(binding.ProjectName, ":", 2)
 	if len(parts) < 2 {
@@ -90,17 +92,23 @@ func (p *prtbLifecycle) ensureBindings(binding *v3.ProjectRoleTemplateBinding) e
 		return err
 	}
 
-	return p.mgr.grantUserManagementPrivilges(binding.RoleTemplateName, "projectroletemplatebindings", binding.Subject, binding)
+	for _, resource := range projectManagmentPlanResources {
+		if err := p.mgr.grantManagementPlanePrivileges(binding.RoleTemplateName, resource, binding.Subject, binding); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-// When a PRTB/CRTB is created that gives a user some permissions in a project or cluster, we need to create a "membership" binding
-// that gives the user access to the the project/cluster custom resource itself
+// When a PRTB is created that gives a subject some permissions in a project or cluster, we need to create a "membership" binding
+// that gives the subject access to the the project/cluster custom resource itself
 func (m *manager) ensureProjectMembershipBinding(roleName, rtbUID, namespace string, project *v3.Project, makeOwner bool, subject v1.Subject) error {
 	if err := m.createProjectMembershipRole(roleName, namespace, project, makeOwner); err != nil {
 		return err
 	}
 
-	name := strings.ToLower(fmt.Sprintf("%v-%v-%v", roleName, subject.Kind, subject.Name))
+	name := strings.ToLower(fmt.Sprintf("%v-%v", roleName, subject.Name))
 	rb, _ := m.rbLister.Get(namespace, name)
 	if rb == nil {
 		_, err := m.mgmt.RBAC.RoleBindings(namespace).Create(&v1.RoleBinding{
@@ -134,7 +142,7 @@ func (m *manager) ensureProjectMembershipBinding(roleName, rtbUID, namespace str
 	return err
 }
 
-// Creates a role that lets the bound user see (if they are an ordinary member) the project in the mgmt api
+// Creates a role that lets the bound subject see (if they are an ordinary member) the project in the mgmt api
 // (or CRUD the project if they are an owner)
 func (m *manager) createProjectMembershipRole(roleName, namespace string, project *v3.Project, makeOwner bool) error {
 	roleCli := m.mgmt.RBAC.Roles(namespace)
@@ -171,8 +179,8 @@ func (m *manager) createProjectMembershipRole(roleName, namespace string, projec
 	return nil
 }
 
-// The PRTB has been deleted, either delete or update the project membership binding so that the user
-// is removed from the project, if they should be
+// The PRTB has been deleted, either delete or update the project membership binding so that the subject
+// is removed from the project if they should be
 func (m *manager) reconcileProjectMembershipBindingForDelete(namespace, rtbUID string) error {
 	set := labels.Set(map[string]string{rtbUID: owner})
 	rbs, err := m.rbLister.List(namespace, set.AsSelector())
