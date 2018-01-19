@@ -3,9 +3,11 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	ossignal "os/signal"
+	"path/filepath"
 	"runtime"
 	"syscall"
 
@@ -38,6 +40,13 @@ func main() {
 
 	os.Unsetenv("SSH_AUTH_SOCK")
 	os.Unsetenv("SSH_AGENT_PID")
+
+	if dir, err := os.Getwd(); err == nil {
+		dmPath := filepath.Join(dir, "management-state", "bin")
+		os.MkdirAll(dmPath, 0700)
+		newPath := fmt.Sprintf("%s%s%s", dmPath, os.PathListSeparator, os.Getenv("PATH"))
+		os.Setenv("PATH", newPath)
+	}
 
 	config := Config{}
 
