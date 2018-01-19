@@ -78,24 +78,6 @@ func addData(management *config.ManagementContext, local bool) error {
 		})
 	}
 
-	hash, _ := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
-	admin, err := management.Management.Users("").Create(&v3.User{
-		ObjectMeta: v1.ObjectMeta{
-			Name: "admin",
-		},
-		DisplayName:        "Default Admin",
-		Username:           "admin",
-		Password:           string(hash),
-		MustChangePassword: true,
-	})
-	if err != nil {
-		admin, _ = management.Management.Users("").Get("admin", v1.GetOptions{})
-	}
-	if len(admin.PrincipalIDs) == 0 {
-		admin.PrincipalIDs = []string{"local://" + admin.Name}
-		management.Management.Users("").Update(admin)
-	}
-
 	rb := newRoleBuilder()
 
 	rb.addRole("Create Clusters", "create-clusters").addRule().apiGroups("management.cattle.io").resources("clusters").verbs("create")
@@ -169,14 +151,32 @@ func addData(management *config.ManagementContext, local bool) error {
 		return errors.Wrap(err, "problem reconciling role templates")
 	}
 
+	hash, _ := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
+	admin, err := management.Management.Users("").Create(&v3.User{
+		ObjectMeta: v1.ObjectMeta{
+			GenerateName: "user-",
+		},
+		DisplayName:        "Default Admin",
+		Username:           "admin",
+		Password:           string(hash),
+		MustChangePassword: true,
+	})
+	if err != nil {
+		admin, _ = management.Management.Users("").Get("admin", v1.GetOptions{})
+	}
+	if len(admin.PrincipalIDs) == 0 {
+		admin.PrincipalIDs = []string{"local://" + admin.Name}
+		management.Management.Users("").Update(admin)
+	}
+
 	management.Management.GlobalRoleBindings("").Create(
 		&v3.GlobalRoleBinding{
 			ObjectMeta: v1.ObjectMeta{
-				Name: "admin",
+				GenerateName: "globalrolebinding-",
 			},
 			Subject: rbacv1.Subject{
 				Kind: "User",
-				Name: "admin",
+				Name: admin.Name,
 			},
 			GlobalRoleName: "admin",
 		})
