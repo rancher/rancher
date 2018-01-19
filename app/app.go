@@ -81,6 +81,8 @@ func addData(management *config.ManagementContext, local bool) error {
 	rb.addRole("Manage Node Templates", "manage-node-templates").addRule().apiGroups("management.cattle.io").resources("machinetemplates").verbs("*")
 	rb.addRole("Use Node Templates", "use-node-templates").addRule().apiGroups("management.cattle.io").resources("machinedrivers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("machinetemplates").verbs("*")
+	rb.addRole("Manage Settings", "manage-settings").addRule().apiGroups("management.cattle.io").resources("settings").verbs("*")
+
 	rb.addRole("Admin", "admin").addRule().apiGroups("*").resources("*").verbs("*").
 		addRule().apiGroups().nonResourceURLs("*").verbs("*")
 
@@ -90,11 +92,13 @@ func addData(management *config.ManagementContext, local bool) error {
 		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("templates", "templateversions").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("machinedrivers").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("machinetemplates").verbs("*")
+		addRule().apiGroups("management.cattle.io").resources("machinetemplates").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch")
 
 	rb.addRole("User Base", "user-base").addRule().apiGroups("management.cattle.io").resources("principals", "roletemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("users").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*")
+		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch")
 
 	// TODO user should be dynamically authorized to only see herself
 	// TODO Need "self-service" for machinetemplates such that a user can create them, but only RUD their own
