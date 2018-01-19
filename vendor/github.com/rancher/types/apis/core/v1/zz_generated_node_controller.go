@@ -55,11 +55,11 @@ type NodeController interface {
 type NodeInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*v1.Node) (*v1.Node, error)
-	GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1.Node, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.Node, error)
 	Get(name string, opts metav1.GetOptions) (*v1.Node, error)
 	Update(*v1.Node) (*v1.Node, error)
 	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
+	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*NodeList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -196,8 +196,8 @@ func (s *nodeClient) Get(name string, opts metav1.GetOptions) (*v1.Node, error) 
 	return obj.(*v1.Node), err
 }
 
-func (s *nodeClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1.Node, error) {
-	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+func (s *nodeClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.Node, error) {
+	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
 	return obj.(*v1.Node), err
 }
 
@@ -210,8 +210,8 @@ func (s *nodeClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
 
-func (s *nodeClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
-	return s.objectClient.DeleteNamespace(name, namespace, options)
+func (s *nodeClient) DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
 func (s *nodeClient) List(opts metav1.ListOptions) (*NodeList, error) {

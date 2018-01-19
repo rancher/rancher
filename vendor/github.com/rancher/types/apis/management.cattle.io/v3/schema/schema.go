@@ -27,7 +27,8 @@ var (
 		Init(catalogTypes).
 		Init(authnTypes).
 		Init(schemaTypes).
-		Init(stackTypes)
+		Init(stackTypes).
+		Init(userTypes)
 )
 
 func schemaTypes(schemas *types.Schemas) *types.Schemas {
@@ -53,7 +54,9 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 			m.DisplayName{},
 		).
 		AddMapperForType(&Version, v3.ClusterStatus{},
+			m.Drop{Field: "serviceAccountToken"},
 			m.Drop{Field: "appliedSpec"},
+			m.Drop{Field: "clusterName"},
 		).
 		AddMapperForType(&Version, v3.ClusterEvent{}, &m.Move{
 			From: "type",
@@ -230,5 +233,20 @@ func stackTypes(schema *types.Schemas) *types.Schemas {
 					Input: "revision",
 				},
 			}
+		})
+}
+
+func userTypes(schema *types.Schemas) *types.Schemas {
+	return schema.
+		AddMapperForType(&Version, v3.Preference{}).
+		MustImportAndCustomize(&Version, v3.Preference{}, func(schema *types.Schema) {
+			schema.MustCustomizeField("name", func(f types.Field) types.Field {
+				f.Required = true
+				return f
+			})
+			schema.MustCustomizeField("namespaceId", func(f types.Field) types.Field {
+				f.Required = false
+				return f
+			})
 		})
 }

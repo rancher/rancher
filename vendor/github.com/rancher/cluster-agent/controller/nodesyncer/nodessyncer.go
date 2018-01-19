@@ -116,9 +116,11 @@ func objectsAreEqual(existing *v3.Machine, toUpdate *v3.Machine) bool {
 	toUpdateToCompare := resetConditions(toUpdate)
 	existingToCompare := resetConditions(existing)
 	statusEqual := reflect.DeepEqual(toUpdateToCompare.Status.NodeStatus, existingToCompare.Status.NodeStatus)
+	labelsEqual := reflect.DeepEqual(toUpdateToCompare.Status.NodeLabels, existing.Status.NodeLabels)
+	annotationsEqual := reflect.DeepEqual(toUpdateToCompare.Status.NodeAnnotations, existing.Status.NodeAnnotations)
 	specEqual := reflect.DeepEqual(toUpdateToCompare.Spec.NodeSpec, existingToCompare.Spec.NodeSpec)
 	nodeNameEqual := toUpdateToCompare.Status.NodeName == existingToCompare.Status.NodeName
-	return statusEqual && specEqual && nodeNameEqual
+	return statusEqual && specEqual && nodeNameEqual && labelsEqual && annotationsEqual
 }
 
 func (n *NodeSyncer) convertNodeToMachine(node *corev1.Node, existing *v3.Machine) (*v3.Machine, error) {
@@ -151,6 +153,8 @@ func (n *NodeSyncer) convertNodeToMachine(node *corev1.Node, existing *v3.Machin
 		machine.Status.Limits = existing.Status.Limits
 	}
 
+	machine.Status.NodeAnnotations = node.Annotations
+	machine.Status.NodeLabels = node.Labels
 	machine.Status.NodeName = node.Name
 	machine.APIVersion = "management.cattle.io/v3"
 	machine.Kind = "Machine"

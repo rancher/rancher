@@ -54,11 +54,11 @@ type PodSecurityPolicyTemplateController interface {
 type PodSecurityPolicyTemplateInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*PodSecurityPolicyTemplate) (*PodSecurityPolicyTemplate, error)
-	GetNamespace(name, namespace string, opts metav1.GetOptions) (*PodSecurityPolicyTemplate, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*PodSecurityPolicyTemplate, error)
 	Get(name string, opts metav1.GetOptions) (*PodSecurityPolicyTemplate, error)
 	Update(*PodSecurityPolicyTemplate) (*PodSecurityPolicyTemplate, error)
 	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
+	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*PodSecurityPolicyTemplateList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -195,8 +195,8 @@ func (s *podSecurityPolicyTemplateClient) Get(name string, opts metav1.GetOption
 	return obj.(*PodSecurityPolicyTemplate), err
 }
 
-func (s *podSecurityPolicyTemplateClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*PodSecurityPolicyTemplate, error) {
-	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+func (s *podSecurityPolicyTemplateClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*PodSecurityPolicyTemplate, error) {
+	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
 	return obj.(*PodSecurityPolicyTemplate), err
 }
 
@@ -209,8 +209,8 @@ func (s *podSecurityPolicyTemplateClient) Delete(name string, options *metav1.De
 	return s.objectClient.Delete(name, options)
 }
 
-func (s *podSecurityPolicyTemplateClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
-	return s.objectClient.DeleteNamespace(name, namespace, options)
+func (s *podSecurityPolicyTemplateClient) DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
 func (s *podSecurityPolicyTemplateClient) List(opts metav1.ListOptions) (*PodSecurityPolicyTemplateList, error) {

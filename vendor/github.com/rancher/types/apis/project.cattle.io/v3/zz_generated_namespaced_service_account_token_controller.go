@@ -55,11 +55,11 @@ type NamespacedServiceAccountTokenController interface {
 type NamespacedServiceAccountTokenInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*NamespacedServiceAccountToken) (*NamespacedServiceAccountToken, error)
-	GetNamespace(name, namespace string, opts metav1.GetOptions) (*NamespacedServiceAccountToken, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*NamespacedServiceAccountToken, error)
 	Get(name string, opts metav1.GetOptions) (*NamespacedServiceAccountToken, error)
 	Update(*NamespacedServiceAccountToken) (*NamespacedServiceAccountToken, error)
 	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
+	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*NamespacedServiceAccountTokenList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -196,8 +196,8 @@ func (s *namespacedServiceAccountTokenClient) Get(name string, opts metav1.GetOp
 	return obj.(*NamespacedServiceAccountToken), err
 }
 
-func (s *namespacedServiceAccountTokenClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*NamespacedServiceAccountToken, error) {
-	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+func (s *namespacedServiceAccountTokenClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*NamespacedServiceAccountToken, error) {
+	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
 	return obj.(*NamespacedServiceAccountToken), err
 }
 
@@ -210,8 +210,8 @@ func (s *namespacedServiceAccountTokenClient) Delete(name string, options *metav
 	return s.objectClient.Delete(name, options)
 }
 
-func (s *namespacedServiceAccountTokenClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
-	return s.objectClient.DeleteNamespace(name, namespace, options)
+func (s *namespacedServiceAccountTokenClient) DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
 func (s *namespacedServiceAccountTokenClient) List(opts metav1.ListOptions) (*NamespacedServiceAccountTokenList, error) {

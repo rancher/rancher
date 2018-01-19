@@ -9,6 +9,7 @@ import (
 	"time"
 
 	clusterapi "github.com/rancher/cluster-api/server"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -16,6 +17,7 @@ import (
 )
 
 type Manager struct {
+	ClusterLister    v3.ClusterLister
 	ManagementConfig rest.Config
 	LocalConfig      *rest.Config
 	servers          sync.Map
@@ -29,6 +31,7 @@ type record struct {
 
 func NewManager(management *config.ManagementContext) *Manager {
 	return &Manager{
+		ClusterLister:    management.Management.Clusters("").Controller().Lister(),
 		ManagementConfig: management.RESTConfig,
 		LocalConfig:      management.LocalConfig,
 	}
@@ -61,25 +64,30 @@ func (c *Manager) APIServer(ctx context.Context, cluster *client.Cluster) http.H
 	return obj.(*record).handler
 }
 
-func (c *Manager) toRESTConfig(cluster *client.Cluster) (*rest.Config, error) {
-	if cluster == nil {
-		return nil, nil
-	}
-
-	if cluster.Internal != nil && *cluster.Internal {
-		return c.LocalConfig, nil
-	}
-
-	if cluster.APIEndpoint == "" || cluster.CACert == "" || cluster.ServiceAccountToken == "" {
-		return nil, nil
-	}
-
-	u, err := url.Parse(cluster.APIEndpoint)
+func (c *Manager) toRESTConfig(publicCluster *client.Cluster) (*rest.Config, error) {
+	cluster, err := c.ClusterLister.Get("", publicCluster.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	caBytes, err := base64.StdEncoding.DecodeString(cluster.CACert)
+	if cluster == nil {
+		return nil, nil
+	}
+
+	if cluster.Spec.Internal {
+		return c.LocalConfig, nil
+	}
+
+	if cluster.Status.APIEndpoint == "" || cluster.Status.CACert == "" || cluster.Status.ServiceAccountToken == "" {
+		return nil, nil
+	}
+
+	u, err := url.Parse(cluster.Status.APIEndpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	caBytes, err := base64.StdEncoding.DecodeString(cluster.Status.CACert)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +95,7 @@ func (c *Manager) toRESTConfig(cluster *client.Cluster) (*rest.Config, error) {
 	return &rest.Config{
 		Host:        u.Host,
 		Prefix:      u.Path,
-		BearerToken: cluster.ServiceAccountToken,
+		BearerToken: cluster.Status.ServiceAccountToken,
 		TLSClientConfig: rest.TLSClientConfig{
 			CAData: caBytes,
 		},

@@ -115,7 +115,7 @@ func (c *Controller) Reconcile(data map[string]interface{}, frontend bool) ([]co
 
 func (c *Controller) remove(service corev1.Service) error {
 	prop := metav1.DeletePropagationForeground
-	return c.serviceClient.DeleteNamespace(service.Name, service.Namespace, &metav1.DeleteOptions{
+	return c.serviceClient.DeleteNamespaced(service.Namespace, service.Name, &metav1.DeleteOptions{
 		PropagationPolicy: &prop,
 	})
 }

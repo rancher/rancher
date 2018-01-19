@@ -300,7 +300,7 @@ func binDir() string {
 	if dest != "" {
 		return dest
 	}
-	return "/usr/local/bin"
+	return "./management-state/bin"
 }
 
 func compare(hash hash.Hash, value string) (string, bool) {

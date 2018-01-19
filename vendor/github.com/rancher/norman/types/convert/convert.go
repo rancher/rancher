@@ -11,6 +11,9 @@ import (
 )
 
 func Chan(c <-chan map[string]interface{}, f func(map[string]interface{}) map[string]interface{}) chan map[string]interface{} {
+	if c == nil {
+		return nil
+	}
 	result := make(chan map[string]interface{})
 	go func() {
 		for data := range c {

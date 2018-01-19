@@ -55,11 +55,11 @@ type NamespacedCertificateController interface {
 type NamespacedCertificateInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*NamespacedCertificate) (*NamespacedCertificate, error)
-	GetNamespace(name, namespace string, opts metav1.GetOptions) (*NamespacedCertificate, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*NamespacedCertificate, error)
 	Get(name string, opts metav1.GetOptions) (*NamespacedCertificate, error)
 	Update(*NamespacedCertificate) (*NamespacedCertificate, error)
 	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
+	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*NamespacedCertificateList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -196,8 +196,8 @@ func (s *namespacedCertificateClient) Get(name string, opts metav1.GetOptions) (
 	return obj.(*NamespacedCertificate), err
 }
 
-func (s *namespacedCertificateClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*NamespacedCertificate, error) {
-	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+func (s *namespacedCertificateClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*NamespacedCertificate, error) {
+	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
 	return obj.(*NamespacedCertificate), err
 }
 
@@ -210,8 +210,8 @@ func (s *namespacedCertificateClient) Delete(name string, options *metav1.Delete
 	return s.objectClient.Delete(name, options)
 }
 
-func (s *namespacedCertificateClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
-	return s.objectClient.DeleteNamespace(name, namespace, options)
+func (s *namespacedCertificateClient) DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
 func (s *namespacedCertificateClient) List(opts metav1.ListOptions) (*NamespacedCertificateList, error) {

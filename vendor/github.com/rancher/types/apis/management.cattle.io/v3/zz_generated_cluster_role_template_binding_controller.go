@@ -55,11 +55,11 @@ type ClusterRoleTemplateBindingController interface {
 type ClusterRoleTemplateBindingInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*ClusterRoleTemplateBinding) (*ClusterRoleTemplateBinding, error)
-	GetNamespace(name, namespace string, opts metav1.GetOptions) (*ClusterRoleTemplateBinding, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*ClusterRoleTemplateBinding, error)
 	Get(name string, opts metav1.GetOptions) (*ClusterRoleTemplateBinding, error)
 	Update(*ClusterRoleTemplateBinding) (*ClusterRoleTemplateBinding, error)
 	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
+	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*ClusterRoleTemplateBindingList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -196,8 +196,8 @@ func (s *clusterRoleTemplateBindingClient) Get(name string, opts metav1.GetOptio
 	return obj.(*ClusterRoleTemplateBinding), err
 }
 
-func (s *clusterRoleTemplateBindingClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*ClusterRoleTemplateBinding, error) {
-	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+func (s *clusterRoleTemplateBindingClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*ClusterRoleTemplateBinding, error) {
+	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
 	return obj.(*ClusterRoleTemplateBinding), err
 }
 
@@ -210,8 +210,8 @@ func (s *clusterRoleTemplateBindingClient) Delete(name string, options *metav1.D
 	return s.objectClient.Delete(name, options)
 }
 
-func (s *clusterRoleTemplateBindingClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
-	return s.objectClient.DeleteNamespace(name, namespace, options)
+func (s *clusterRoleTemplateBindingClient) DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
 func (s *clusterRoleTemplateBindingClient) List(opts metav1.ListOptions) (*ClusterRoleTemplateBindingList, error) {

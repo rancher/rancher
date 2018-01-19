@@ -2,7 +2,6 @@ package statsyncer
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/types/apis/core/v1"
@@ -16,18 +15,12 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-const (
-	syncInterval = 5 * time.Second
-)
-
 type PodsStatsSyncer struct {
-	clusterName      string
 	clusterNamespace string
 	machines         v3.MachineInterface
 }
 
 type MachinesStatsSyncer struct {
-	clusterName      string
 	clusterNamespace string
 	machines         v3.MachineInterface
 	pods             v1.PodInterface
@@ -35,13 +28,11 @@ type MachinesStatsSyncer struct {
 
 func Register(cluster *config.ClusterContext) {
 	sc := &PodsStatsSyncer{
-		clusterName:      cluster.ClusterName,
 		clusterNamespace: cluster.ClusterName,
 		machines:         cluster.Management.Management.Machines(cluster.ClusterName),
 	}
 
 	sy := &MachinesStatsSyncer{
-		clusterName:      cluster.ClusterName,
 		clusterNamespace: cluster.ClusterName,
 		machines:         cluster.Management.Management.Machines(cluster.ClusterName),
 		pods:             cluster.Core.Pods(""),

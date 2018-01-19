@@ -12,7 +12,6 @@ const (
 	ClusterFieldAzureKubernetesServiceConfig        = "azureKubernetesServiceConfig"
 	ClusterFieldCACert                              = "caCert"
 	ClusterFieldCapacity                            = "capacity"
-	ClusterFieldClusterName                         = "clusterName"
 	ClusterFieldComponentStatuses                   = "componentStatuses"
 	ClusterFieldConditions                          = "conditions"
 	ClusterFieldCreated                             = "created"
@@ -31,7 +30,6 @@ const (
 	ClusterFieldRancherKubernetesEngineConfig       = "rancherKubernetesEngineConfig"
 	ClusterFieldRemoved                             = "removed"
 	ClusterFieldRequested                           = "requested"
-	ClusterFieldServiceAccountToken                 = "serviceAccountToken"
 	ClusterFieldState                               = "state"
 	ClusterFieldTransitioning                       = "transitioning"
 	ClusterFieldTransitioningMessage                = "transitioningMessage"
@@ -46,7 +44,6 @@ type Cluster struct {
 	AzureKubernetesServiceConfig        *AzureKubernetesServiceConfig  `json:"azureKubernetesServiceConfig,omitempty"`
 	CACert                              string                         `json:"caCert,omitempty"`
 	Capacity                            map[string]string              `json:"capacity,omitempty"`
-	ClusterName                         string                         `json:"clusterName,omitempty"`
 	ComponentStatuses                   []ClusterComponentStatus       `json:"componentStatuses,omitempty"`
 	Conditions                          []ClusterCondition             `json:"conditions,omitempty"`
 	Created                             string                         `json:"created,omitempty"`
@@ -65,7 +62,6 @@ type Cluster struct {
 	RancherKubernetesEngineConfig       *RancherKubernetesEngineConfig `json:"rancherKubernetesEngineConfig,omitempty"`
 	Removed                             string                         `json:"removed,omitempty"`
 	Requested                           map[string]string              `json:"requested,omitempty"`
-	ServiceAccountToken                 string                         `json:"serviceAccountToken,omitempty"`
 	State                               string                         `json:"state,omitempty"`
 	Transitioning                       string                         `json:"transitioning,omitempty"`
 	TransitioningMessage                string                         `json:"transitioningMessage,omitempty"`

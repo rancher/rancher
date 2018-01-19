@@ -55,11 +55,11 @@ type ClusterRegistrationTokenController interface {
 type ClusterRegistrationTokenInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*ClusterRegistrationToken) (*ClusterRegistrationToken, error)
-	GetNamespace(name, namespace string, opts metav1.GetOptions) (*ClusterRegistrationToken, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*ClusterRegistrationToken, error)
 	Get(name string, opts metav1.GetOptions) (*ClusterRegistrationToken, error)
 	Update(*ClusterRegistrationToken) (*ClusterRegistrationToken, error)
 	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
+	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*ClusterRegistrationTokenList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -196,8 +196,8 @@ func (s *clusterRegistrationTokenClient) Get(name string, opts metav1.GetOptions
 	return obj.(*ClusterRegistrationToken), err
 }
 
-func (s *clusterRegistrationTokenClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*ClusterRegistrationToken, error) {
-	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+func (s *clusterRegistrationTokenClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*ClusterRegistrationToken, error) {
+	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
 	return obj.(*ClusterRegistrationToken), err
 }
 
@@ -210,8 +210,8 @@ func (s *clusterRegistrationTokenClient) Delete(name string, options *metav1.Del
 	return s.objectClient.Delete(name, options)
 }
 
-func (s *clusterRegistrationTokenClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
-	return s.objectClient.DeleteNamespace(name, namespace, options)
+func (s *clusterRegistrationTokenClient) DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
 func (s *clusterRegistrationTokenClient) List(opts metav1.ListOptions) (*ClusterRegistrationTokenList, error) {

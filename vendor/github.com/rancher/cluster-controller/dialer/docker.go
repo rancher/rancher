@@ -32,7 +32,7 @@ func (t *TLSDialerFactory) Build(h *hosts.Host) (func(network, address string) (
 		return nil, fmt.Errorf("invalid name reference %s", h.MachineName)
 	}
 
-	machine, err := t.MachineClient.GetNamespace(parts[1], parts[0], metav1.GetOptions{})
+	machine, err := t.MachineClient.GetNamespaced(parts[0], parts[1], metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}

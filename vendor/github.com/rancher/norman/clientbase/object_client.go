@@ -95,7 +95,7 @@ func (p *ObjectClient) Create(o runtime.Object) (runtime.Object, error) {
 	return result, err
 }
 
-func (p *ObjectClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (runtime.Object, error) {
+func (p *ObjectClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (runtime.Object, error) {
 	result := p.Factory.Object()
 	req := p.restClient.Get().
 		Prefix(p.getAPIPrefix(), p.gvk.Group, p.gvk.Version)
@@ -145,7 +145,7 @@ func (p *ObjectClient) Update(name string, o runtime.Object) (runtime.Object, er
 	return result, err
 }
 
-func (p *ObjectClient) DeleteNamespace(name, namespace string, opts *metav1.DeleteOptions) error {
+func (p *ObjectClient) DeleteNamespaced(namespace, name string, opts *metav1.DeleteOptions) error {
 	req := p.restClient.Delete().
 		Prefix(p.getAPIPrefix(), p.gvk.Group, p.gvk.Version)
 	if namespace != "" {

@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/management-api/api/project"
 	clustermanager "github.com/rancher/management-api/cluster"
 	"github.com/rancher/management-api/store/cert"
+	"github.com/rancher/management-api/store/preference"
 	"github.com/rancher/management-api/store/scoped"
 	"github.com/rancher/norman/api/builtin"
 	"github.com/rancher/norman/pkg/subscribe"
@@ -62,6 +63,7 @@ func Schemas(ctx context.Context, management *config.ManagementContext, schemas 
 	}
 
 	authn.SetUserStore(schemas.Schema(&managementschema.Version, client.UserType))
+	Preference(schemas, management)
 
 	NamespacedTypes(schemas)
 
@@ -167,6 +169,11 @@ func User(schemas *types.Schemas) {
 	schema := schemas.Schema(&managementschema.Version, client.UserType)
 	schema.Formatter = authn.UserFormatter
 	schema.ActionHandler = authn.UserActionHandler
+}
+
+func Preference(schemas *types.Schemas, management *config.ManagementContext) {
+	schema := schemas.Schema(&managementschema.Version, client.PreferenceType)
+	schema.Store = preference.NewStore(management.Core.Namespaces(""), schema.Store)
 }
 
 func MachineTypes(schemas *types.Schemas, management *config.ManagementContext) {

@@ -56,11 +56,11 @@ type EndpointsController interface {
 type EndpointsInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*v1.Endpoints) (*v1.Endpoints, error)
-	GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1.Endpoints, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.Endpoints, error)
 	Get(name string, opts metav1.GetOptions) (*v1.Endpoints, error)
 	Update(*v1.Endpoints) (*v1.Endpoints, error)
 	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
+	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*EndpointsList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -197,8 +197,8 @@ func (s *endpointsClient) Get(name string, opts metav1.GetOptions) (*v1.Endpoint
 	return obj.(*v1.Endpoints), err
 }
 
-func (s *endpointsClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1.Endpoints, error) {
-	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+func (s *endpointsClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.Endpoints, error) {
+	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
 	return obj.(*v1.Endpoints), err
 }
 
@@ -211,8 +211,8 @@ func (s *endpointsClient) Delete(name string, options *metav1.DeleteOptions) err
 	return s.objectClient.Delete(name, options)
 }
 
-func (s *endpointsClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
-	return s.objectClient.DeleteNamespace(name, namespace, options)
+func (s *endpointsClient) DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
 func (s *endpointsClient) List(opts metav1.ListOptions) (*EndpointsList, error) {

@@ -55,11 +55,11 @@ type ProjectRoleTemplateBindingController interface {
 type ProjectRoleTemplateBindingInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*ProjectRoleTemplateBinding) (*ProjectRoleTemplateBinding, error)
-	GetNamespace(name, namespace string, opts metav1.GetOptions) (*ProjectRoleTemplateBinding, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*ProjectRoleTemplateBinding, error)
 	Get(name string, opts metav1.GetOptions) (*ProjectRoleTemplateBinding, error)
 	Update(*ProjectRoleTemplateBinding) (*ProjectRoleTemplateBinding, error)
 	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
+	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*ProjectRoleTemplateBindingList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -196,8 +196,8 @@ func (s *projectRoleTemplateBindingClient) Get(name string, opts metav1.GetOptio
 	return obj.(*ProjectRoleTemplateBinding), err
 }
 
-func (s *projectRoleTemplateBindingClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*ProjectRoleTemplateBinding, error) {
-	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+func (s *projectRoleTemplateBindingClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*ProjectRoleTemplateBinding, error) {
+	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
 	return obj.(*ProjectRoleTemplateBinding), err
 }
 
@@ -210,8 +210,8 @@ func (s *projectRoleTemplateBindingClient) Delete(name string, options *metav1.D
 	return s.objectClient.Delete(name, options)
 }
 
-func (s *projectRoleTemplateBindingClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
-	return s.objectClient.DeleteNamespace(name, namespace, options)
+func (s *projectRoleTemplateBindingClient) DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
 func (s *projectRoleTemplateBindingClient) List(opts metav1.ListOptions) (*ProjectRoleTemplateBindingList, error) {

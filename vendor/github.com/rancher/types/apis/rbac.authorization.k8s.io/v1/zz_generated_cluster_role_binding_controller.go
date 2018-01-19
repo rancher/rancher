@@ -55,11 +55,11 @@ type ClusterRoleBindingController interface {
 type ClusterRoleBindingInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*v1.ClusterRoleBinding) (*v1.ClusterRoleBinding, error)
-	GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1.ClusterRoleBinding, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.ClusterRoleBinding, error)
 	Get(name string, opts metav1.GetOptions) (*v1.ClusterRoleBinding, error)
 	Update(*v1.ClusterRoleBinding) (*v1.ClusterRoleBinding, error)
 	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
+	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*ClusterRoleBindingList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -196,8 +196,8 @@ func (s *clusterRoleBindingClient) Get(name string, opts metav1.GetOptions) (*v1
 	return obj.(*v1.ClusterRoleBinding), err
 }
 
-func (s *clusterRoleBindingClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1.ClusterRoleBinding, error) {
-	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+func (s *clusterRoleBindingClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.ClusterRoleBinding, error) {
+	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
 	return obj.(*v1.ClusterRoleBinding), err
 }
 
@@ -210,8 +210,8 @@ func (s *clusterRoleBindingClient) Delete(name string, options *metav1.DeleteOpt
 	return s.objectClient.Delete(name, options)
 }
 
-func (s *clusterRoleBindingClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
-	return s.objectClient.DeleteNamespace(name, namespace, options)
+func (s *clusterRoleBindingClient) DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
 func (s *clusterRoleBindingClient) List(opts metav1.ListOptions) (*ClusterRoleBindingList, error) {

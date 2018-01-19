@@ -90,6 +90,10 @@ func ValidMod(mod ModifierType) bool {
 	return ok
 }
 
+func EQ(key, value string) *QueryCondition {
+	return NewConditionFromString(key, ModifierEQ, value)
+}
+
 func NewConditionFromString(field string, mod ModifierType, values ...string) *QueryCondition {
 	q := &QueryCondition{
 		Field:         field,

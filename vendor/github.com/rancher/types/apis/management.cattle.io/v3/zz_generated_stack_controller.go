@@ -55,11 +55,11 @@ type StackController interface {
 type StackInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*Stack) (*Stack, error)
-	GetNamespace(name, namespace string, opts metav1.GetOptions) (*Stack, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*Stack, error)
 	Get(name string, opts metav1.GetOptions) (*Stack, error)
 	Update(*Stack) (*Stack, error)
 	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
+	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*StackList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -196,8 +196,8 @@ func (s *stackClient) Get(name string, opts metav1.GetOptions) (*Stack, error) {
 	return obj.(*Stack), err
 }
 
-func (s *stackClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*Stack, error) {
-	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+func (s *stackClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*Stack, error) {
+	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
 	return obj.(*Stack), err
 }
 
@@ -210,8 +210,8 @@ func (s *stackClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
 
-func (s *stackClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
-	return s.objectClient.DeleteNamespace(name, namespace, options)
+func (s *stackClient) DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
 func (s *stackClient) List(opts metav1.ListOptions) (*StackList, error) {

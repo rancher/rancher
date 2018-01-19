@@ -358,7 +358,7 @@ func (w *Reconciliation) deleteChild(reference ObjectReference, object runtime.O
 	}
 
 	policy := metav1.DeletePropagationForeground
-	return childWatcher.ObjectClient.DeleteNamespace(reference.Name, reference.Namespace, &metav1.DeleteOptions{
+	return childWatcher.ObjectClient.DeleteNamespaced(reference.Namespace, reference.Name, &metav1.DeleteOptions{
 		PropagationPolicy: &policy,
 	})
 }

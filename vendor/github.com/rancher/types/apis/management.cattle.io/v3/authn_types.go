@@ -24,6 +24,7 @@ type User struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	DisplayName        string   `json:"displayName,omitempty"`
+	Description        string   `json:"description"`
 	Username           string   `json:"username,omitempty"`
 	Password           string   `json:"password,omitempty" norman:"writeOnly,noupdate"`
 	MustChangePassword bool     `json:"mustChangePassword,omitempty"`
