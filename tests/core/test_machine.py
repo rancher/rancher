@@ -3,6 +3,8 @@ from common import auth_check
 
 def test_machine_fields(cclient):
     fields = {
+        'nodeLabels': 'r',
+        'nodeAnnotations': 'r',
         'namespaceId': 'cr',
         'conditions': 'r',
         'allocatable': 'r',
