@@ -3,36 +3,69 @@ package tokens
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/mux"
 	"io/ioutil"
 	"net/http"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+
+	"github.com/rancher/norman/httperror"
+	"github.com/rancher/norman/types"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 
 	"github.com/rancher/auth/model"
 	"github.com/rancher/auth/util"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 const CookieName = "R_SESS"
 
+func TokenActionHandler(actionName string, action *types.Action, request *types.APIContext) error {
+	logrus.Infof("TokenActionHandler called for action %v", actionName)
+
+	if actionName == "login" {
+		return tokenServer.login(actionName, action, request)
+	} else if actionName == "logout" {
+		return tokenServer.logout(actionName, action, request)
+	}
+	return nil
+}
+
+func TokenCreateHandler(request *types.APIContext) error {
+	logrus.Infof("TokenCreateHandler called")
+	return tokenServer.deriveToken(request)
+}
+
+func TokenListHandler(request *types.APIContext) error {
+	logrus.Infof("TokenListHandler called")
+	if request.ID != "" {
+		return tokenServer.getToken(request)
+	}
+	return tokenServer.listTokens(request)
+}
+
+func TokenDeleteHandler(request *types.APIContext) error {
+	logrus.Infof("TokenDeleteHandler called")
+	return tokenServer.removeToken(request)
+}
+
 //login is a handler for route /tokens?action=login and returns the jwt token after authenticating the user
-func (s *tokenAPIServer) login(w http.ResponseWriter, r *http.Request) {
+func (s *tokenAPIServer) login(actionName string, action *types.Action, request *types.APIContext) error {
+
+	r := request.Request
+	w := request.Response
 
 	bytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		log.Errorf("login failed with error: %v", err)
-		util.ReturnHTTPError(w, r, http.StatusBadRequest, fmt.Sprintf("Error reading input json data: %v", err))
-		return
+		logrus.Errorf("login failed with error: %v", err)
+		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("Error reading input json data: %v", err))
 	}
 	jsonInput := v3.LoginInput{}
 
 	err = json.Unmarshal(bytes, &jsonInput)
 	if err != nil {
-		log.Errorf("unmarshal failed with error: %v", err)
-		util.ReturnHTTPError(w, r, http.StatusBadRequest, fmt.Sprintf("Error unmarshaling input json data: %v", err))
-		return
+		logrus.Errorf("unmarshal failed with error: %v", err)
+		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("Error unmarshaling input json data: %v", err))
 	}
 
 	var token v3.Token
@@ -40,12 +73,11 @@ func (s *tokenAPIServer) login(w http.ResponseWriter, r *http.Request) {
 	token, status, err = s.createLoginToken(jsonInput)
 
 	if err != nil {
-		log.Errorf("Login failed with error: %v", err)
+		logrus.Errorf("Login failed with error: %v", err)
 		if status == 0 {
 			status = http.StatusInternalServerError
 		}
-		util.ReturnHTTPError(w, r, status, fmt.Sprintf("%v", err))
-		return
+		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
 	}
 
 	isSecure := false
@@ -54,7 +86,6 @@ func (s *tokenAPIServer) login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if jsonInput.ResponseType == "cookie" {
-
 		tokenCookie := &http.Cookie{
 			Name:     CookieName,
 			Value:    token.Name,
@@ -64,30 +95,34 @@ func (s *tokenAPIServer) login(w http.ResponseWriter, r *http.Request) {
 		}
 		http.SetCookie(w, tokenCookie)
 	} else {
-
-		enc := json.NewEncoder(w)
-		enc.SetEscapeHTML(false)
-		enc.Encode(token)
+		tokenData, err := getTokenFromStore(request, token.ObjectMeta.Name)
+		if err != nil {
+			return err
+		}
+		request.WriteResponse(http.StatusOK, tokenData)
 	}
+
+	return nil
 }
 
-func (s *tokenAPIServer) deriveToken(w http.ResponseWriter, r *http.Request) {
+func (s *tokenAPIServer) deriveToken(request *types.APIContext) error {
+
+	r := request.Request
 
 	cookie, err := r.Cookie(CookieName)
 	if err != nil {
-		log.Info("Failed to get token cookie: %v", err)
-		util.ReturnHTTPError(w, r, http.StatusUnauthorized, "No valid token cookie")
-		return
+		logrus.Info("Failed to get token cookie: %v", err)
+		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie")
 	}
 	bytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		log.Errorf("GetToken failed with error: %v", err)
+		logrus.Errorf("GetToken failed with error: %v", err)
 	}
 	jsonInput := v3.Token{}
 
 	err = json.Unmarshal(bytes, &jsonInput)
 	if err != nil {
-		log.Errorf("unmarshal failed with error: %v", err)
+		logrus.Errorf("unmarshal failed with error: %v", err)
 	}
 
 	var token v3.Token
@@ -96,50 +131,63 @@ func (s *tokenAPIServer) deriveToken(w http.ResponseWriter, r *http.Request) {
 	// create derived token
 	token, status, err = s.createDerivedToken(jsonInput, cookie.Value)
 	if err != nil {
-		log.Errorf("deriveToken failed with error: %v", err)
+		logrus.Errorf("deriveToken failed with error: %v", err)
 		if status == 0 {
 			status = http.StatusInternalServerError
 		}
-		util.ReturnHTTPError(w, r, status, fmt.Sprintf("%v", err))
-		return
+		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
 	}
-	enc := json.NewEncoder(w)
-	enc.SetEscapeHTML(false)
-	enc.Encode(token)
 
+	tokenData, err := getTokenFromStore(request, token.ObjectMeta.Name)
+	if err != nil {
+		return err
+	}
+
+	request.WriteResponse(http.StatusOK, tokenData)
+
+	return nil
 }
 
-func (s *tokenAPIServer) listTokens(w http.ResponseWriter, r *http.Request) {
+func (s *tokenAPIServer) listTokens(request *types.APIContext) error {
+	r := request.Request
+
 	// TODO switch to X-API-UserId header
 	cookie, err := r.Cookie(CookieName)
 	if err != nil {
-		log.Info("Failed to get token cookie: %v", err)
-		util.ReturnHTTPError(w, r, http.StatusUnauthorized, "Invalid token cookie")
-		return
+		logrus.Info("Failed to get token cookie: %v", err)
+		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie")
 	}
 	//getToken
 	tokens, status, err := s.getTokens(cookie.Value)
 	if err != nil {
-		log.Errorf("GetToken failed with error: %v", err)
+		logrus.Errorf("GetToken failed with error: %v", err)
 		if status == 0 {
 			status = http.StatusInternalServerError
 		}
-		util.ReturnHTTPError(w, r, status, fmt.Sprintf("%v", err))
-		return
+		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
 	}
 
-	enc := json.NewEncoder(w)
-	enc.SetEscapeHTML(false)
-	enc.Encode(tokens)
+	tokensFromStore := make([]map[string]interface{}, len(tokens))
+	for _, token := range tokens {
+		tokenData, err := getTokenFromStore(request, token.ObjectMeta.Name)
+		if err != nil {
+			return err
+		}
+		tokensFromStore = append(tokensFromStore, tokenData)
+	}
 
+	request.WriteResponse(http.StatusOK, tokensFromStore)
+	return nil
 }
 
-func (s *tokenAPIServer) logout(w http.ResponseWriter, r *http.Request) {
+func (s *tokenAPIServer) logout(actionName string, action *types.Action, request *types.APIContext) error {
+	r := request.Request
+	w := request.Response
+
 	cookie, err := r.Cookie(CookieName)
 	if err != nil {
-		log.Info("Failed to get token cookie: %v", err)
-		util.ReturnHTTPError(w, r, http.StatusUnauthorized, "Invalid token cookie")
-		return
+		logrus.Info("Failed to get token cookie: %v", err)
+		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie")
 	}
 
 	isSecure := false
@@ -161,66 +209,97 @@ func (s *tokenAPIServer) logout(w http.ResponseWriter, r *http.Request) {
 	//getToken
 	status, err := s.deleteToken(cookie.Value)
 	if err != nil {
-		log.Errorf("DeleteToken failed with error: %v", err)
+		logrus.Errorf("DeleteToken failed with error: %v", err)
 		if status == 0 {
 			status = http.StatusInternalServerError
 		}
-		util.ReturnHTTPError(w, r, status, fmt.Sprintf("%v", err))
-		return
+		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
 	}
-
+	return nil
 }
 
-func (s *tokenAPIServer) getToken(w http.ResponseWriter, r *http.Request) {
+func (s *tokenAPIServer) getToken(request *types.APIContext) error {
 	// TODO switch to X-API-UserId header
+	r := request.Request
+
 	cookie, err := r.Cookie(CookieName)
 	if err != nil {
-		log.Info("Failed to get token cookie: %v", err)
-		util.ReturnHTTPError(w, r, http.StatusUnauthorized, "Invalid token cookie")
-		return
+		logrus.Info("Failed to get token cookie: %v", err)
+		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie")
 	}
 
-	vars := mux.Vars(r)
-	tokenID := vars["tokenId"]
+	tokenID := request.ID
 
 	//getToken
-	tokens, status, err := s.getDerivedToken(cookie.Value, tokenID)
+	token, status, err := s.getTokenByID(cookie.Value, tokenID)
 	if err != nil {
-		log.Errorf("GetToken failed with error: %v", err)
+		logrus.Errorf("GetToken failed with error: %v", err)
 		if status == 0 {
 			status = http.StatusInternalServerError
 		}
-		util.ReturnHTTPError(w, r, status, fmt.Sprintf("%v", err))
-		return
+		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
 	}
-
-	enc := json.NewEncoder(w)
-	enc.SetEscapeHTML(false)
-	enc.Encode(tokens)
-
+	tokenData, err := getTokenFromStore(request, token.ObjectMeta.Name)
+	if err != nil {
+		return err
+	}
+	request.WriteResponse(http.StatusOK, tokenData)
+	return nil
 }
 
-func (s *tokenAPIServer) removeToken(w http.ResponseWriter, r *http.Request) {
+func (s *tokenAPIServer) removeToken(request *types.APIContext) error {
 	// TODO switch to X-API-UserId header
+	r := request.Request
+
 	cookie, err := r.Cookie(CookieName)
 	if err != nil {
-		log.Info("Failed to get token cookie: %v", err)
-		util.ReturnHTTPError(w, r, http.StatusUnauthorized, "Invalid token cookie")
-		return
+		logrus.Info("Failed to get token cookie: %v", err)
+		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie")
 	}
-	vars := mux.Vars(r)
-	tokenID := vars["tokenId"]
+	tokenID := request.ID
 
-	//deleteToken
-	status, err := s.deleteDerivedToken(cookie.Value, tokenID)
+	//getToken
+	_, status, err := s.getTokenByID(cookie.Value, tokenID)
 	if err != nil {
-		log.Errorf("DeleteToken failed with error: %v", err)
+		logrus.Errorf("DeleteToken Failed to fetch the token to delete with error: %v", err)
 		if status == 0 {
 			status = http.StatusInternalServerError
 		}
-		util.ReturnHTTPError(w, r, status, fmt.Sprintf("%v", err))
-		return
+		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
 	}
+
+	tokenData, err := deleteTokenUsingStore(request, tokenID)
+	if err != nil {
+		return err
+	}
+	request.WriteResponse(http.StatusOK, tokenData)
+	return nil
+}
+
+func getTokenFromStore(request *types.APIContext, tokenID string) (map[string]interface{}, error) {
+	store := request.Schema.Store
+	if store == nil {
+		return nil, errors.New("no token store available")
+	}
+
+	tokenData, err := store.ByID(request, request.Schema, tokenID)
+	if err != nil {
+		return nil, err
+	}
+	return tokenData, nil
+}
+
+func deleteTokenUsingStore(request *types.APIContext, tokenID string) (map[string]interface{}, error) {
+	store := request.Schema.Store
+	if store == nil {
+		return nil, errors.New("no token store available")
+	}
+
+	tokenData, err := store.Delete(request, request.Schema, tokenID)
+	if err != nil {
+		return nil, err
+	}
+	return tokenData, nil
 }
 
 func (s *tokenAPIServer) authConfigs(w http.ResponseWriter, r *http.Request) {

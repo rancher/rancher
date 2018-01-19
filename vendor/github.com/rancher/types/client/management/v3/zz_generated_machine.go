@@ -35,7 +35,6 @@ const (
 	MachineFieldSSHUser              = "sshUser"
 	MachineFieldState                = "state"
 	MachineFieldTaints               = "taints"
-	MachineFieldToken                = "token"
 	MachineFieldTransitioning        = "transitioning"
 	MachineFieldTransitioningMessage = "transitioningMessage"
 	MachineFieldUnschedulable        = "unschedulable"
@@ -75,7 +74,6 @@ type Machine struct {
 	SSHUser              string                    `json:"sshUser,omitempty"`
 	State                string                    `json:"state,omitempty"`
 	Taints               []Taint                   `json:"taints,omitempty"`
-	Token                string                    `json:"token,omitempty"`
 	Transitioning        string                    `json:"transitioning,omitempty"`
 	TransitioningMessage string                    `json:"transitioningMessage,omitempty"`
 	Unschedulable        *bool                     `json:"unschedulable,omitempty"`

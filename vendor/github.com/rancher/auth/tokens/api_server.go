@@ -3,6 +3,8 @@ package tokens
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"time"
 
 	"github.com/rancher/auth/providers"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -29,6 +31,8 @@ type tokenAPIServer struct {
 	userIndexer  cache.Indexer
 }
 
+var tokenServer *tokenAPIServer
+
 func userPrincipalIndexer(obj interface{}) ([]string, error) {
 	user, ok := obj.(*v3.User)
 	if !ok {
@@ -38,22 +42,22 @@ func userPrincipalIndexer(obj interface{}) ([]string, error) {
 	return user.PrincipalIDs, nil
 }
 
-func newTokenAPIServer(ctx context.Context, mgmtCtx *config.ManagementContext) (*tokenAPIServer, error) {
+func NewTokenAPIServer(ctx context.Context, mgmtCtx *config.ManagementContext) error {
 	if mgmtCtx == nil {
-		return nil, fmt.Errorf("failed to build tokenAPIHandler, nil ManagementContext")
+		return fmt.Errorf("failed to build tokenAPIHandler, nil ManagementContext")
 	}
 	providers.Configure(ctx, mgmtCtx)
 
 	informer := mgmtCtx.Management.Users("").Controller().Informer()
 	informer.AddIndexers(map[string]cache.IndexFunc{userPrincipalIndex: userPrincipalIndexer})
-	apiServer := &tokenAPIServer{
+	tokenServer = &tokenAPIServer{
 		ctx:          ctx,
 		client:       mgmtCtx,
 		tokensClient: mgmtCtx.Management.Tokens(""),
 		userIndexer:  informer.GetIndexer(),
 	}
 
-	return apiServer, nil
+	return nil
 }
 
 //createLoginToken will authenticate with provider and creates a token CR
@@ -65,23 +69,6 @@ func (s *tokenAPIServer) createLoginToken(jsonInput v3.LoginInput) (v3.Token, in
 	if status != 0 || err != nil {
 		return v3.Token{}, status, err
 	}
-
-	/*objs, err := s.userIndexer.ByIndex(userPrincipalIndex, userPrincipal.Name)
-	if err != nil {
-		return v3.Token{}, 500, err
-	}
-	if len(objs) == 0 {
-		return v3.Token{}, 403, fmt.Errorf("forbidden")
-	}
-	if len(objs) > 1 {
-		logrus.Errorf("Found more than one user matching %v", userPrincipal.Name)
-		return v3.Token{}, 403, fmt.Errorf("forbidden")
-	}
-	localUser, ok := objs[0].(*v3.User)
-	if !ok {
-		logrus.Errorf("User isnt a user %v", objs[0])
-		return v3.Token{}, 500, fmt.Errorf("fatal error. User is not a user")
-	}*/
 
 	logrus.Debug("User Authenticated")
 
@@ -104,6 +91,7 @@ func (s *tokenAPIServer) createLoginToken(jsonInput v3.LoginInput) (v3.Token, in
 		UserID:          getUserID(userPrincipal.Name),
 		AuthProvider:    getAuthProviderName(userPrincipal.Name),
 		ProviderInfo:    providerInfo,
+		Description:     jsonInput.Description,
 	}
 	rToken, err := s.createK8sTokenCR(key, k8sToken)
 	return rToken, 0, err
@@ -138,8 +126,10 @@ func (s *tokenAPIServer) createDerivedToken(jsonInput v3.Token, tokenID string) 
 		UserID:          token.UserID,
 		AuthProvider:    token.AuthProvider,
 		ProviderInfo:    token.ProviderInfo,
+		Description:     jsonInput.Description,
 	}
 	rToken, err := s.createK8sTokenCR(key, k8sToken)
+
 	return rToken, 0, err
 
 }
@@ -189,11 +179,27 @@ func (s *tokenAPIServer) getTokens(tokenID string) ([]v3.Token, int, error) {
 	}
 
 	for _, t := range tokenList.Items {
-		if t.IsDerived {
+		if isNotExpired(t) {
 			tokens = append(tokens, t)
 		}
 	}
 	return tokens, 0, nil
+}
+
+func isNotExpired(token v3.Token) bool {
+	created := token.ObjectMeta.CreationTimestamp.Time
+	durationElapsed := time.Since(created)
+
+	ttlDuration, err := time.ParseDuration(strconv.Itoa(token.TTLMillis) + "ms")
+	if err != nil {
+		logrus.Errorf("Error parsing ttl %v", err)
+		return false
+	}
+
+	if durationElapsed.Seconds() <= ttlDuration.Seconds() {
+		return true
+	}
+	return false
 }
 
 func (s *tokenAPIServer) deleteToken(tokenKey string) (int, error) {
@@ -210,38 +216,42 @@ func (s *tokenAPIServer) deleteToken(tokenKey string) (int, error) {
 	return 0, nil
 }
 
-//getDerivedToken will get the derived token - only derived
-func (s *tokenAPIServer) getDerivedToken(tokenID string, derivedTokenID string) (v3.Token, int, error) {
-	logrus.Debug("GET Derived Token Invoked")
-	derivedToken := &v3.Token{}
+//getToken will get the token by ID if not expired
+func (s *tokenAPIServer) getTokenByID(tokenKey string, tokenID string) (v3.Token, int, error) {
+	logrus.Debug("GET Token Invoked")
+	token := &v3.Token{}
 
-	storedToken, err := s.getK8sTokenCR(tokenID)
+	storedToken, err := s.getK8sTokenCR(tokenKey)
 	if err != nil {
-		return *derivedToken, 401, err
+		return *token, 401, err
 	}
 
-	derivedToken, err = s.getK8sTokenCR(derivedTokenID)
+	token, err = s.getK8sTokenCR(tokenID)
 
 	if err != nil {
 		return v3.Token{}, 404, err
 	}
 
-	if derivedToken.UserID != storedToken.UserID {
-		return v3.Token{}, 403, fmt.Errorf("access denied: cannot get derived token")
+	if token.UserID != storedToken.UserID {
+		return v3.Token{}, 403, fmt.Errorf("access denied: cannot get token")
 	}
 
-	return *derivedToken, 0, nil
+	if !isNotExpired(*token) {
+		return v3.Token{}, 404, fmt.Errorf("expired token")
+	}
+
+	return *token, 0, nil
 }
 
-//deleteDerivedToken will delete the derived token - only derived
-func (s *tokenAPIServer) deleteDerivedToken(tokenID string, derivedTokenID string) (int, error) {
+//deleteTokenByID will delete the token by ID
+func (s *tokenAPIServer) deleteTokenByID(tokenKey string, tokenID string) (int, error) {
 	logrus.Debug("DELETE Derived Token Invoked")
 
-	_, status, err := s.getDerivedToken(tokenID, derivedTokenID)
+	_, status, err := s.getTokenByID(tokenKey, tokenID)
 
 	if err != nil {
 		return status, err
 	}
 
-	return s.deleteToken(derivedTokenID)
+	return s.deleteToken(tokenID)
 }

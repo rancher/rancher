@@ -1,7 +1,6 @@
 package store
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/rancher/cluster-api/api/namespace"
@@ -12,18 +11,16 @@ import (
 	"github.com/rancher/types/client/project/v3"
 )
 
-func ProjectSetter(clusterName string, wrapper api.StoreWrapper) api.StoreWrapper {
+func ProjectSetter(wrapper api.StoreWrapper) api.StoreWrapper {
 	return func(store types.Store) types.Store {
 		return wrapper(&projectIDSetterStore{
-			ClusterName: clusterName,
-			Store:       store,
+			Store: store,
 		})
 	}
 }
 
 type projectIDSetterStore struct {
 	types.Store
-	ClusterName string
 }
 
 func (p *projectIDSetterStore) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
@@ -32,7 +29,7 @@ func (p *projectIDSetterStore) Create(apiContext *types.APIContext, schema *type
 		return nil, err
 	}
 
-	return p.lookupAndSetProjectID(apiContext, schema, data)
+	return lookupAndSetProjectID(apiContext, schema, data)
 }
 
 func (p *projectIDSetterStore) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
@@ -41,7 +38,7 @@ func (p *projectIDSetterStore) Delete(apiContext *types.APIContext, schema *type
 		return nil, err
 	}
 
-	return p.lookupAndSetProjectID(apiContext, schema, data)
+	return lookupAndSetProjectID(apiContext, schema, data)
 }
 
 func (p *projectIDSetterStore) ByID(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
@@ -50,7 +47,7 @@ func (p *projectIDSetterStore) ByID(apiContext *types.APIContext, schema *types.
 		return nil, err
 	}
 
-	return p.lookupAndSetProjectID(apiContext, schema, data)
+	return lookupAndSetProjectID(apiContext, schema, data)
 }
 
 func (p *projectIDSetterStore) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
@@ -59,7 +56,7 @@ func (p *projectIDSetterStore) Update(apiContext *types.APIContext, schema *type
 		return nil, err
 	}
 
-	return p.lookupAndSetProjectID(apiContext, schema, data)
+	return lookupAndSetProjectID(apiContext, schema, data)
 }
 
 func (p *projectIDSetterStore) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {
@@ -78,7 +75,7 @@ func (p *projectIDSetterStore) List(apiContext *types.APIContext, schema *types.
 	}
 
 	for _, data := range datas {
-		p.setProjectID(namespaceMap, data)
+		setProjectID(namespaceMap, data)
 	}
 
 	return datas, nil
@@ -103,12 +100,12 @@ func (p *projectIDSetterStore) Watch(apiContext *types.APIContext, schema *types
 				namespaceMap = tempNamespaceMap
 			}
 		}
-		p.setProjectID(namespaceMap, data)
+		setProjectID(namespaceMap, data)
 		return data
 	}), nil
 }
 
-func (p *projectIDSetterStore) lookupAndSetProjectID(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
+func lookupAndSetProjectID(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
 	if _, ok := schema.ResourceFields[client.NamespaceFieldProjectID]; !ok || schema.ID == client.NamespaceType {
 		return data, nil
 	}
@@ -118,12 +115,12 @@ func (p *projectIDSetterStore) lookupAndSetProjectID(apiContext *types.APIContex
 		return nil, err
 	}
 
-	p.setProjectID(namespaceMap, data)
+	setProjectID(namespaceMap, data)
 
 	return data, nil
 }
 
-func (p *projectIDSetterStore) setProjectID(namespaceMap map[string]string, data map[string]interface{}) {
+func setProjectID(namespaceMap map[string]string, data map[string]interface{}) {
 	if data == nil {
 		return
 	}
@@ -134,8 +131,5 @@ func (p *projectIDSetterStore) setProjectID(namespaceMap map[string]string, data
 		return
 	}
 
-	v := namespaceMap[namespace]
-	if v != "" {
-		data[client.NamespaceFieldProjectID] = fmt.Sprintf("%s:%s", p.ClusterName, v)
-	}
+	data[client.NamespaceFieldProjectID] = namespaceMap[namespace]
 }

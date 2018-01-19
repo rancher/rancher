@@ -252,54 +252,48 @@ func (m *manager) grantManagementPlanePrivileges(roleTemplateName, resource stri
 	if err := m.gatherRoleTemplates(rt, allRoles); err != nil {
 		return err
 	}
-	mgmtRoles := map[string]*v3.RoleTemplate{}
-	mgmtVerbs := map[string]map[string]bool{}
+
+	//de-dupe
+	roles := map[string]*v3.RoleTemplate{}
 	for _, role := range allRoles {
+		roles[role.Name] = role
+	}
+
+	bindingCli := m.mgmt.RBAC.RoleBindings(namespace)
+	for _, role := range roles {
 		verbs := m.checkForManagementPlaneRules(role, resource)
 		if len(verbs) > 0 {
-			mgmtRoles[role.Name] = role
-			mgmtVerbs[role.Name] = verbs
-		}
-	}
+			if err := m.reconcileManagementPlaneRole(namespace, resource, role, verbs); err != nil {
+				return err
+			}
 
-	// if no roles are for management plane resources, nothing to do
-	if len(mgmtRoles) == 0 {
-		return nil
-	}
+			bindingName := bindingMeta.GetName()
+			if b, _ := m.rbLister.Get(namespace, bindingName); b != nil {
+				continue
+			}
 
-	if err := m.reconcileManagementPlaneRoles(namespace, resource, mgmtRoles, mgmtVerbs); err != nil {
-		return err
-	}
-
-	// creating binding for subject for each role in namespace
-	bindingCli := m.mgmt.RBAC.RoleBindings(namespace)
-	for roleName := range mgmtRoles {
-		bindingName := bindingMeta.GetName()
-		if b, _ := m.rbLister.Get(namespace, bindingName); b != nil {
-			return nil
-		}
-
-		_, err := bindingCli.Create(&v1.RoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: bindingName,
-				OwnerReferences: []metav1.OwnerReference{
-					{
-						APIVersion: bindingTypeMeta.GetAPIVersion(),
-						Kind:       bindingTypeMeta.GetKind(),
-						Name:       bindingMeta.GetName(),
-						UID:        bindingMeta.GetUID(),
+			_, err := bindingCli.Create(&v1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: bindingName,
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion: bindingTypeMeta.GetAPIVersion(),
+							Kind:       bindingTypeMeta.GetKind(),
+							Name:       bindingMeta.GetName(),
+							UID:        bindingMeta.GetUID(),
+						},
 					},
 				},
-			},
-			Subjects: []v1.Subject{subject},
-			RoleRef: v1.RoleRef{
-				Kind: "Role",
-				Name: roleName,
-			},
-		})
+				Subjects: []v1.Subject{subject},
+				RoleRef: v1.RoleRef{
+					Kind: "Role",
+					Name: role.Name,
+				},
+			})
 
-		if err != nil {
-			return errors.Wrapf(err, "couldn't ensure binding %v %v in %v", roleName, subject.Name, namespace)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -311,8 +305,6 @@ func (m *manager) checkForManagementPlaneRules(role *v3.RoleTemplate, managmentP
 	var rules []v1.PolicyRule
 	if !role.External {
 		rules = role.Rules
-	} else if r, _ := m.crLister.Get("", role.Name); r != nil {
-		rules = r.Rules
 	}
 
 	verbs := map[string]bool{}
@@ -327,46 +319,45 @@ func (m *manager) checkForManagementPlaneRules(role *v3.RoleTemplate, managmentP
 	return verbs
 }
 
-func (m *manager) reconcileManagementPlaneRoles(namespace, resource string, rts map[string]*v3.RoleTemplate, roleRTBVerbs map[string]map[string]bool) error {
+func (m *manager) reconcileManagementPlaneRole(namespace, resource string, rt *v3.RoleTemplate, newVerbs map[string]bool) error {
 	roleCli := m.mgmt.RBAC.Roles(namespace)
-	for name, rt := range rts {
-		wantedVerbs, ok := roleRTBVerbs[name]
-		if !ok {
-			return errors.Errorf("couldn't find verbs for %v", name)
+	if role, err := m.rLister.Get(namespace, rt.Name); err == nil && role != nil {
+		currentVerbs := map[string]bool{}
+		for _, rule := range role.Rules {
+			if slice.ContainsString(rule.Resources, resource) {
+				for _, v := range rule.Verbs {
+					currentVerbs[v] = true
+				}
+			}
 		}
 
-		if role, err := m.rLister.Get(namespace, rt.Name); err == nil && role != nil {
-			currentVerbs := map[string]bool{}
-			for _, rule := range role.Rules {
+		if !reflect.DeepEqual(currentVerbs, newVerbs) {
+			role = role.DeepCopy()
+			added := false
+			for i, rule := range role.Rules {
 				if slice.ContainsString(rule.Resources, resource) {
-					for _, v := range rule.Verbs {
-						currentVerbs[v] = true
-					}
+					role.Rules[i] = buildRule(resource, newVerbs)
+					added = true
 				}
 			}
-
-			if !reflect.DeepEqual(currentVerbs, wantedVerbs) {
-				role = role.DeepCopy()
-				rules := buildRules(resource, wantedVerbs)
-				role.Rules = rules
-				_, err := roleCli.Update(role)
-				if err != nil {
-					return errors.Wrapf(err, "couldn't update role %v", rt.Name)
-				}
+			if !added {
+				role.Rules = append(role.Rules, buildRule(resource, newVerbs))
 			}
-			continue
+			_, err := roleCli.Update(role)
+			return err
 		}
+		return nil
+	}
 
-		rules := buildRules(resource, wantedVerbs)
-		_, err := roleCli.Create(&v1.Role{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: rt.Name,
-			},
-			Rules: rules,
-		})
-		if err != nil {
-			return errors.Wrapf(err, "couldn't create role %v", rt.Name)
-		}
+	rules := []v1.PolicyRule{buildRule(resource, newVerbs)}
+	_, err := roleCli.Create(&v1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: rt.Name,
+		},
+		Rules: rules,
+	})
+	if err != nil {
+		return errors.Wrapf(err, "couldn't create role %v", rt.Name)
 	}
 
 	return nil
@@ -388,16 +379,14 @@ func (m *manager) gatherRoleTemplates(rt *v3.RoleTemplate, roleTemplates map[str
 	return nil
 }
 
-func buildRules(resource string, verbs map[string]bool) []v1.PolicyRule {
+func buildRule(resource string, verbs map[string]bool) v1.PolicyRule {
 	var vs []string
 	for v := range verbs {
 		vs = append(vs, v)
 	}
-	return []v1.PolicyRule{
-		{
-			Resources: []string{resource},
-			Verbs:     vs,
-			APIGroups: []string{"*"},
-		},
+	return v1.PolicyRule{
+		Resources: []string{resource},
+		Verbs:     vs,
+		APIGroups: []string{"*"},
 	}
 }
