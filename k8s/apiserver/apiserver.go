@@ -172,6 +172,7 @@ func RunAPIServer(ctx context.Context, apiServer *Options) error {
 	if err != nil {
 		return err
 	}
+	kubeAPIServerConfig.ExtraConfig.EnableCoreControllers = false
 	kubeAPIServerConfig.GenericConfig.Authenticator = apiServer
 	kubeAPIServerConfig.GenericConfig.Authorizer = apiServer.Authorizer(kubeAPIServerConfig.GenericConfig.Authorizer)
 
