@@ -19,8 +19,11 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/rest"
 )
+
+var defaultAdminLabel = map[string]string{"authz.management.cattle.io/bootstrapping": "admin-user"}
 
 func Run(ctx context.Context, kubeConfig rest.Config, listenPort int, local bool) error {
 	management, err := config.NewManagementContext(kubeConfig)
@@ -246,17 +249,32 @@ func addData(management *config.ManagementContext, local bool) error {
 	}
 
 	hash, _ := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
-	admin, err := management.Management.Users("").Create(&v3.User{
-		ObjectMeta: v1.ObjectMeta{
-			GenerateName: "user-",
-		},
-		DisplayName:        "Default Admin",
-		Username:           "admin",
-		Password:           string(hash),
-		MustChangePassword: true,
-	})
-	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrap(err, "can not ensure admin user exists")
+
+	set := labels.Set(defaultAdminLabel)
+	admins, err := management.Management.Users("").List(v1.ListOptions{LabelSelector: set.String()})
+	if err != nil {
+		return err
+	}
+
+	// TODO This logic is going to be a problem in an HA setup because a race will cause more than one admin user to be created
+	var admin *v3.User
+	if len(admins.Items) == 0 {
+		admin, err = management.Management.Users("").Create(&v3.User{
+			ObjectMeta: v1.ObjectMeta{
+				GenerateName: "user-",
+				Labels:       defaultAdminLabel,
+			},
+			DisplayName:        "Default Admin",
+			Username:           "admin",
+			Password:           string(hash),
+			MustChangePassword: true,
+		})
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			return errors.Wrap(err, "can not ensure admin user exists")
+		}
+
+	} else {
+		admin = &admins.Items[0]
 	}
 
 	if len(admin.PrincipalIDs) == 0 {
@@ -264,19 +282,27 @@ func addData(management *config.ManagementContext, local bool) error {
 		management.Management.Users("").Update(admin)
 	}
 
-	management.Management.GlobalRoleBindings("").Create(
-		&v3.GlobalRoleBinding{
-			ObjectMeta: v1.ObjectMeta{
-				GenerateName: "globalrolebinding-",
-			},
-			Subject: rbacv1.Subject{
-				Kind: "User",
-				Name: admin.Name,
-			},
-			GlobalRoleName: "admin",
-		})
+	bindings, err := management.Management.GlobalRoleBindings("").List(v1.ListOptions{LabelSelector: set.String()})
+	if err != nil {
+		return err
+	}
+	if len(bindings.Items) == 0 {
+		management.Management.GlobalRoleBindings("").Create(
+			&v3.GlobalRoleBinding{
+				ObjectMeta: v1.ObjectMeta{
+					GenerateName: "globalrolebinding-",
+					Labels:       defaultAdminLabel,
+				},
+				Subject: rbacv1.Subject{
+					Kind: "User",
+					Name: admin.Name,
+				},
+				GlobalRoleName: "admin",
+			})
+	}
 
 	if local {
+		// TODO If user delets the local cluster, this will recreate it on restart. Need to fix that
 		management.Management.Clusters("").Create(&v3.Cluster{
 			ObjectMeta: v1.ObjectMeta{
 				Name: "local",
