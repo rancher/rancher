@@ -18,8 +18,7 @@ xu9pt0fnxDdrP2NrP6trHq1D+CzPZooLRfmYqbt1xmIb00GpnyiJIUNuMu7GUM3q
 NxWGK3eq+1cyt6xr8nLOC5zaGeSyZikw4+9vqLudNSyYdnw9mdHtrYT0GlcEP1Vc
 NK+yrhDCvEWH6+4+pp8Ve2P2Le5tvbA1m24AxyuC9wHS5bUmiNHweLXNpxLFTjK8
 BBUi6y1Vm9jrDi/LiiHcN4sJEoU=
------END CERTIFICATE-----
-"""
+-----END CERTIFICATE-----"""
 
 KEY = """-----BEGIN RSA PRIVATE KEY-----
 MIIEowIBAAKCAQEAtT0dBIiYzNMGxUJlP8ikm+wLkHc4XVtNsmvkUHvt9fwfrDkz
@@ -47,8 +46,7 @@ Of+xePBeIo5X6XMyPZ7DrTv3d/+fw0maqbsX2mKMQE4KAIGlFQXnxMTjuZP1khiX
 44zG0QKBgGwQ8T4DGZK5ukLQmhLi9npCaAW99s/uuKArMzAG9xd/I8YntM/kVY0V
 VUi3lKqwXhtReYdrqVTPdjnyGIYIGGNRD7EKqQe15IRfbpy536DSN+LvL65Fdyis
 iNITDKNP1H3hedFNFfbTGpueYdRX6QaptK4+NB4+dOm7hn8iqq7U
------END RSA PRIVATE KEY-----
-"""
+-----END RSA PRIVATE KEY-----"""
 
 
 def test_secrets(pc):
