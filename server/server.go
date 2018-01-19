@@ -6,7 +6,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rancher/auth/filter"
-	"github.com/rancher/auth/tokens"
+	"github.com/rancher/auth/server"
 	managementapi "github.com/rancher/management-api/server"
 	"github.com/rancher/rancher/server/proxy"
 	"github.com/rancher/rancher/server/ui"
@@ -29,7 +29,7 @@ var (
 )
 
 func New(ctx context.Context, management *config.ManagementContext) (http.Handler, error) {
-	tokenAPI, err := tokens.NewTokenAPIHandler(ctx, management)
+	tokenAPI, err := server.NewTokenAPIHandler(ctx, management)
 
 	managementAPI, err := managementapi.New(ctx, management)
 	if err != nil {
@@ -43,6 +43,7 @@ func New(ctx context.Context, management *config.ManagementContext) (http.Handle
 
 	unauthed := mux.NewRouter()
 	unauthed.Handle("/", ui.UI(managementAPI))
+	unauthed.Handle("/v3/token", ui.UI(tokenAPI))
 	unauthed.PathPrefix("/v3/token").Queries("action", "login").Handler(tokenAPI)
 	unauthed.PathPrefix("/v3/token").Queries("action", "logout").Handler(tokenAPI)
 	unauthed.NotFoundHandler = ui.UI(http.NotFoundHandler())

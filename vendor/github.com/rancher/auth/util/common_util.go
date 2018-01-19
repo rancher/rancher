@@ -23,3 +23,18 @@ func ReturnHTTPError(w http.ResponseWriter, r *http.Request, httpStatus int, err
 	enc.SetEscapeHTML(false)
 	enc.Encode(err)
 }
+
+func GetHTTPErrorCode(httpStatus int) string {
+	switch httpStatus {
+	case 401:
+		return "Unauthorized"
+	case 404:
+		return "NotFound"
+	case 403:
+		return "PermissionDenied"
+	case 500:
+		return "ServerError"
+	}
+
+	return "ServerError"
+}
