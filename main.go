@@ -44,7 +44,8 @@ func main() {
 	if dir, err := os.Getwd(); err == nil {
 		dmPath := filepath.Join(dir, "management-state", "bin")
 		os.MkdirAll(dmPath, 0700)
-		newPath := fmt.Sprintf("%s%s%s", dmPath, os.PathListSeparator, os.Getenv("PATH"))
+		newPath := fmt.Sprintf("%s%s%s", dmPath, string(os.PathListSeparator), os.Getenv("PATH"))
+
 		os.Setenv("PATH", newPath)
 	}
 
