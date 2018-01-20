@@ -1,44 +1,37 @@
 package capabilities
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
-	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
-
-	"github.com/rancher/kontainer-engine/drivers/gke"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"context"
+	"github.com/sirupsen/logrus"
+	"github.com/rancher/kontainer-engine/drivers/gke"
+	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/container/v1"
+	"io/ioutil"
+	"io"
+	"encoding/json"
+	"fmt"
 )
 
-const (
-	defaultCredentialEnv = "GOOGLE_APPLICATION_CREDENTIALS"
-)
-
-func NewGKECapabilitiesHandler() *GKEVersionHandler {
-	return &GKEVersionHandler{}
+func NewGKEMachineTypesHandler() *gkeMachineTypesHandler {
+	return &gkeMachineTypesHandler{}
 }
 
-type GKEVersionHandler struct {
+type gkeMachineTypesHandler struct {
+	Field string
 }
 
-type errorResponse struct {
-	Error string `json:"error"`
-}
-
-type versionsRequestBody struct {
+type machineTypesRequestBody struct {
 	Credentials string `json:"credentials"`
+	ProjectId   string `json:"projectId"`
 	Zone        string `json:"zone"`
-	ProjectID   string `json:"projectId"`
 }
 
-func (g *gkeVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
+func (g *gkeMachineTypesHandler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodPost {
 		writer.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -48,7 +41,7 @@ func (g *gkeVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Requ
 
 	raw, err := ioutil.ReadAll(req.Body)
 
-	var body versionsRequestBody
+	var body machineTypesRequestBody
 	err = json.Unmarshal(raw, &body)
 
 	if err != nil {
@@ -58,7 +51,7 @@ func (g *gkeVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Requ
 	}
 
 	credentials := body.Credentials
-	projectID := body.ProjectID
+	projectID := body.ProjectId
 	zone := body.Zone
 
 	if projectID == "" {
@@ -87,7 +80,7 @@ func (g *gkeVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	result, err := client.Projects.Zones.GetServerconfig(projectID, zone).Do()
+	result, err := client.MachineTypes.List(projectID, zone).Do()
 
 	if err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
@@ -106,7 +99,7 @@ func (g *gkeVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Requ
 	writer.Write(serialized)
 }
 
-func (g *GKEVersionHandler) handleErr(writer http.ResponseWriter, originalErr error) {
+func (g *gkeMachineTypesHandler) handleErr(writer http.ResponseWriter, originalErr error) {
 	resp := errorResponse{originalErr.Error()}
 
 	asJSON, err := json.Marshal(resp)
@@ -120,7 +113,7 @@ func (g *GKEVersionHandler) handleErr(writer http.ResponseWriter, originalErr er
 	writer.Write([]byte(asJSON))
 }
 
-func (g *GKEVersionHandler) getServiceClient(ctx context.Context, credentialContent string) (*container.Service, error) {
+func (g *gkeMachineTypesHandler) getServiceClient(ctx context.Context, credentialContent string) (*compute.Service, error) {
 	// The google SDK has no sane way to pass in a TokenSource give all the different types (user, service account, etc)
 	// So we actually set an environment variable and then unset it
 	gke.EnvMutex.Lock()
@@ -161,7 +154,7 @@ func (g *GKEVersionHandler) getServiceClient(ctx context.Context, credentialCont
 	cleanup()
 
 	client := oauth2.NewClient(ctx, ts)
-	service, err := container.New(client)
+	service, err := compute.New(client)
 
 	if err != nil {
 		return nil, err
