@@ -317,13 +317,16 @@ func (c *Cluster) deployTCPPortListeners(ctx context.Context, currentCluster *Cl
 }
 
 func (c *Cluster) deployListenerOnPlane(ctx context.Context, portList []string, holstPlane []*hosts.Host, containerName string) error {
-	portBindingList := []nat.PortBinding{}
-	for _, portNumber := range portList {
-		rawPort := fmt.Sprintf("0.0.0.0:%s:1337/tcp", portNumber)
-		portMapping, _ := nat.ParsePortSpec(rawPort)
-		portBindingList = append(portBindingList, portMapping[0].Binding)
+	var errgrp errgroup.Group
+	for _, host := range holstPlane {
+		runHost := host
+		errgrp.Go(func() error {
+			return c.deployListener(ctx, runHost, portList, containerName)
+		})
 	}
-
+	return errgrp.Wait()
+}
+func (c *Cluster) deployListener(ctx context.Context, host *hosts.Host, portList []string, containerName string) error {
 	imageCfg := &container.Config{
 		Image: c.SystemImages[AplineImage],
 		Cmd: []string{
@@ -340,19 +343,19 @@ func (c *Cluster) deployListenerOnPlane(ctx context.Context, portList []string, 
 	}
 	hostCfg := &container.HostConfig{
 		PortBindings: nat.PortMap{
-			"1337/tcp": portBindingList,
+			"1337/tcp": getPortBindings("0.0.0.0", portList),
 		},
 	}
 
-	var errgrp errgroup.Group
-	for _, host := range holstPlane {
-		runHost := host
-		errgrp.Go(func() error {
-			logrus.Debugf("[network] Starting deployListener [%s] on host [%s]", containerName, runHost.Address)
-			return docker.DoRunContainer(ctx, runHost.DClient, imageCfg, hostCfg, containerName, runHost.Address, "network")
-		})
+	logrus.Debugf("[network] Starting deployListener [%s] on host [%s]", containerName, host.Address)
+	if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, containerName, host.Address, "network"); err != nil {
+		if strings.Contains(err.Error(), "bind: address already in use") {
+			logrus.Debugf("[network] Service is already up on host [%s]", host.Address)
+			return nil
+		}
+		return err
 	}
-	return errgrp.Wait()
+	return nil
 }
 
 func (c *Cluster) removeTCPPortListeners(ctx context.Context) error {
@@ -508,4 +511,14 @@ func getPortCheckLogs(reader io.ReadCloser) ([]string, error) {
 		return nil, err
 	}
 	return hostPortLines, nil
+}
+
+func getPortBindings(hostAddress string, portList []string) []nat.PortBinding {
+	portBindingList := []nat.PortBinding{}
+	for _, portNumber := range portList {
+		rawPort := fmt.Sprintf("%s:%s:1337/tcp", hostAddress, portNumber)
+		portMapping, _ := nat.ParsePortSpec(rawPort)
+		portBindingList = append(portBindingList, portMapping[0].Binding)
+	}
+	return portBindingList
 }

@@ -72,7 +72,7 @@ services:
 
 system_images:
   alpine: alpine:latest
-  nginx_proxy: rancher/rke-nginx-proxy:v0.1.0
+  nginx_proxy: rancher/rke-nginx-proxy:v0.1.1
   cert_downloader: rancher/rke-cert-deployer:v0.1.1
   service_sidekick_image: rancher/rke-service-sidekick:v0.1.0
   kubedns_image: gcr.io/google_containers/k8s-dns-kube-dns-amd64:1.14.5
