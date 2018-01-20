@@ -61,7 +61,10 @@ func newAuthed(tokenAPI http.Handler, managementAPI http.Handler) *mux.Router {
 	authed.PathPrefix("/v3/token").Handler(tokenAPI)
 	authed.PathPrefix("/v3/identit").Handler(tokenAPI)
 	authed.PathPrefix("/meta").Handler(managementAPI)
-	authed.PathPrefix("/v3/gkeCapabilities").Handler(capabilities.NewGKECapabilitiesHandler())
+	authed.PathPrefix("/v3/gkeCapabilities").Handler(capabilities.NewGKEVersionsHandler())
+	authed.PathPrefix("/v3/gkeVersions").Handler(capabilities.NewGKEVersionsHandler())
+	authed.PathPrefix("/v3/gkeMachineTypes").Handler(capabilities.NewGKEMachineTypesHandler())
+	authed.PathPrefix("/v3/gkeZones").Handler(capabilities.NewGKEZonesHandler())
 	authed.PathPrefix(managementSchema.Version.Path).Handler(managementAPI)
 
 	return authed
