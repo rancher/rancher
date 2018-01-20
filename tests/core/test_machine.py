@@ -3,6 +3,7 @@ from common import auth_check
 
 def test_machine_fields(cclient):
     fields = {
+        'useInternalIpAddress': 'cr',
         'nodeLabels': 'r',
         'nodeAnnotations': 'r',
         'namespaceId': 'cr',
