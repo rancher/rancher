@@ -32,6 +32,6 @@ def test_machine_fields(cclient):
 
     for name, field in cclient.schema.types['machine'].resourceFields.items():
         if name.endswith("Config"):
-            fields[name] = 'cru'
+            fields[name] = 'cr'
 
     auth_check(cclient.schema, 'machine', 'crud', fields)

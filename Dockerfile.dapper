@@ -5,7 +5,7 @@ ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
 
 RUN apt-get update && \
-    apt-get install -y gcc ca-certificates git wget curl vim less file xz-utils && \
+    apt-get install -y gcc ca-certificates git wget curl vim less file xz-utils unzip && \
     curl -sLf https://github.com/rancher/machine-package/releases/download/v0.13.0-rancher2/docker-machine.tar.gz | tar xvzf - -C /usr/bin && \
     rm -f /bin/sh && ln -s /bin/bash /bin/sh
 
