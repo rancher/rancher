@@ -1,29 +1,31 @@
 package capabilities
 
 import (
-	"net/http"
 	"context"
-	"google.golang.org/api/container/v1"
 	"encoding/json"
 	"fmt"
+	"google.golang.org/api/container/v1"
+	"net/http"
 )
 
 const (
 	defaultCredentialEnv = "GOOGLE_APPLICATION_CREDENTIALS"
 )
 
-func NewGKEVersionsHandler() *gkeVersionHandler {
-	return &gkeVersionHandler{}
+// NewGKEVersionsHandler creates a new GKEVersionsHandler
+func NewGKEVersionsHandler() *GKEVersionHandler {
+	return &GKEVersionHandler{}
 }
 
-type gkeVersionHandler struct {
+// GKEVersionHandler for listing available Kubernetes versions in GKE
+type GKEVersionHandler struct {
 }
 
 type errorResponse struct {
 	Error string `json:"error"`
 }
 
-func (g *gkeVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
+func (g *GKEVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodPost {
 		writer.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -61,7 +63,7 @@ func (g *gkeVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	result, err := client.Projects.Zones.GetServerconfig(body.ProjectId, zone).Do()
+	result, err := client.Projects.Zones.GetServerconfig(body.ProjectID, zone).Do()
 
 	if err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
@@ -80,7 +82,7 @@ func (g *gkeVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Requ
 	writer.Write(serialized)
 }
 
-func (g *gkeVersionHandler) getServiceClient(ctx context.Context, credentialContent string) (*container.Service, error) {
+func (g *GKEVersionHandler) getServiceClient(ctx context.Context, credentialContent string) (*container.Service, error) {
 	client, err := getOAuthClient(ctx, credentialContent)
 
 	if err != nil {
