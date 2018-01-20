@@ -29,13 +29,29 @@ func RunEtcdPlane(ctx context.Context, etcdHosts []*hosts.Host, etcdService v3.E
 	return nil
 }
 
-func RemoveEtcdPlane(ctx context.Context, etcdHosts []*hosts.Host) error {
+func RemoveEtcdPlane(ctx context.Context, etcdHosts []*hosts.Host, force bool) error {
 	log.Infof(ctx, "[%s] Tearing down Etcd Plane..", ETCDRole)
 	for _, host := range etcdHosts {
 		err := docker.DoRemoveContainer(ctx, host.DClient, EtcdContainerName, host.Address)
 		if err != nil {
 			return err
 		}
+		if !host.IsWorker || !host.IsControl || force {
+			// remove unschedulable kubelet on etcd host
+			if err := removeKubelet(ctx, host); err != nil {
+				return err
+			}
+			if err := removeKubeproxy(ctx, host); err != nil {
+				return err
+			}
+			if err := removeNginxProxy(ctx, host); err != nil {
+				return err
+			}
+			if err := removeSidekick(ctx, host); err != nil {
+				return err
+			}
+		}
+
 	}
 	log.Infof(ctx, "[%s] Successfully teared down Etcd Plane..", ETCDRole)
 	return nil

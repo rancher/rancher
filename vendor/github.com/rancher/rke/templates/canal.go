@@ -212,10 +212,13 @@ spec:
         - key: node.cloudprovider.kubernetes.io/uninitialized
           value: "true"
           effect: NoSchedule
-        # Allow the pod to run on the master.  This is required for
+        # Allow the pod to run on the master abd etcd.  This is required for
         # the master to communicate with pods.
         - key: "node-role.kubernetes.io/master"
           operator: "Exists"
+        - key: "node-role.kubernetes.io/etcd"
+          operator: "Exists"
+          effect: "NoSchedule"
         # Mark the pod as a critical add-on for rescheduling.
         - key: "CriticalAddonsOnly"
           operator: "Exists"

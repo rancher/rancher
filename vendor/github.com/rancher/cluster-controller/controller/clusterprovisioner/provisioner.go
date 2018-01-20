@@ -358,7 +358,6 @@ func (p *Provisioner) reconcileRKENodes(clusterName string) (bool, []v3.RKEConfi
 
 	etcd := false
 	controlplane := false
-	worker := false
 	var nodes []v3.RKEConfigNode
 	for _, machine := range machines {
 		if machine.DeletionTimestamp != nil {
@@ -383,14 +382,10 @@ func (p *Provisioner) reconcileRKENodes(clusterName string) (bool, []v3.RKEConfi
 		if slice.ContainsString(machine.Status.NodeConfig.Role, "controlplane") {
 			controlplane = true
 		}
-		if slice.ContainsString(machine.Status.NodeConfig.Role, "worker") {
-			worker = true
-		}
-
 		nodes = append(nodes, *machine.Status.NodeConfig)
 	}
 
-	if !etcd || !controlplane || !worker {
+	if !etcd || !controlplane {
 		return false, nil, nil
 	}
 

@@ -82,6 +82,7 @@ func (c *Cluster) DeployWorkerPlane(ctx context.Context) error {
 	// Deploy Worker Plane
 	if err := services.RunWorkerPlane(ctx, c.ControlPlaneHosts,
 		c.WorkerHosts,
+		c.EtcdHosts,
 		c.Services,
 		c.SystemImages[NginxProxyImage],
 		c.SystemImages[ServiceSidekickImage],

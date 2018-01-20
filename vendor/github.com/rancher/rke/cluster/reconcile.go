@@ -12,6 +12,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+const (
+	taintKey = "node-role.kubernetes.io/etcd"
+)
+
 func ReconcileCluster(ctx context.Context, kubeCluster, currentCluster *Cluster) error {
 	log.Infof(ctx, "[reconcile] Reconciling cluster state")
 	if currentCluster == nil {
@@ -53,6 +57,15 @@ func reconcileWorker(ctx context.Context, currentCluster, kubeCluster *Cluster, 
 		if err := reconcileHost(ctx, toDeleteHost, true, false, currentCluster.SystemImages[AplineImage], currentCluster.DockerDialerFactory); err != nil {
 			log.Warnf(ctx, "[reconcile] Couldn't clean up worker node [%s]: %v", toDeleteHost.Address, err)
 			continue
+		}
+	}
+	// attempt to remove unschedulable taint
+	toAddHosts := hosts.GetToAddHosts(currentCluster.WorkerHosts, kubeCluster.WorkerHosts)
+	for _, host := range toAddHosts {
+		if host.IsEtcd {
+			if err := hosts.RemoveTaintFromHost(ctx, host, taintKey, kubeClient); err != nil {
+				return fmt.Errorf("[reconcile] Failed to remove unschedulable taint from node [%s]", host.Address)
+			}
 		}
 	}
 	return nil
@@ -100,6 +113,15 @@ func reconcileControl(ctx context.Context, currentCluster, kubeCluster *Cluster,
 			return fmt.Errorf("Failed to rolling update Nginx hosts with new control plane hosts")
 		}
 	}
+	// attempt to remove unschedulable taint
+	toAddHosts := hosts.GetToAddHosts(currentCluster.ControlPlaneHosts, kubeCluster.ControlPlaneHosts)
+	for _, host := range toAddHosts {
+		if host.IsEtcd {
+			if err := hosts.RemoveTaintFromHost(ctx, host, taintKey, kubeClient); err != nil {
+				log.Warnf(ctx, "[reconcile] Failed to remove unschedulable taint from node [%s]", host.Address)
+			}
+		}
+	}
 	return nil
 }
 
@@ -115,7 +137,7 @@ func reconcileHost(ctx context.Context, toDeleteHost *hosts.Host, worker, etcd b
 			return fmt.Errorf("Not able to clean the host: %v", err)
 		}
 	} else if etcd {
-		if err := services.RemoveEtcdPlane(ctx, []*hosts.Host{toDeleteHost}); err != nil {
+		if err := services.RemoveEtcdPlane(ctx, []*hosts.Host{toDeleteHost}, false); err != nil {
 			return fmt.Errorf("Couldn't remove etcd plane: %v", err)
 		}
 		if err := toDeleteHost.CleanUpEtcdHost(ctx, cleanerImage); err != nil {
@@ -133,7 +155,7 @@ func reconcileHost(ctx context.Context, toDeleteHost *hosts.Host, worker, etcd b
 }
 
 func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster) error {
-	logrus.Infof("[reconcile] Check etcd hosts to be deleted")
+	log.Infof(ctx, "[reconcile] Check etcd hosts to be deleted")
 	etcdToDelete := hosts.GetToDeleteHosts(currentCluster.EtcdHosts, kubeCluster.EtcdHosts)
 	for _, etcdHost := range etcdToDelete {
 		if err := services.RemoveEtcdMember(ctx, etcdHost, kubeCluster.EtcdHosts, currentCluster.LocalConnDialerFactory); err != nil {
@@ -146,7 +168,7 @@ func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster) er
 			continue
 		}
 	}
-	logrus.Infof("[reconcile] Check etcd hosts to be added")
+	log.Infof(ctx, "[reconcile] Check etcd hosts to be added")
 	etcdToAdd := hosts.GetToAddHosts(currentCluster.EtcdHosts, kubeCluster.EtcdHosts)
 	for _, etcdHost := range etcdToAdd {
 		etcdHost.ToAddEtcdMember = true

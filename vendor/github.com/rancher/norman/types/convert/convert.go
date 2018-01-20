@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -84,6 +85,18 @@ func ToNumber(value interface{}) (int64, error) {
 	i, ok := value.(int64)
 	if ok {
 		return i, nil
+	}
+	f, ok := value.(float64)
+	if ok {
+		return int64(f), nil
+	}
+	if n, ok := value.(json.Number); ok {
+		i, err := n.Int64()
+		if err == nil {
+			return i, nil
+		}
+		f, err := n.Float64()
+		return int64(f), err
 	}
 	return strconv.ParseInt(ToString(value), 10, 64)
 }
@@ -185,10 +198,12 @@ func ToObj(data interface{}, into interface{}) error {
 }
 
 func EncodeToMap(obj interface{}) (map[string]interface{}, error) {
-	bytes, err := json.Marshal(obj)
+	b, err := json.Marshal(obj)
 	if err != nil {
 		return nil, err
 	}
 	result := map[string]interface{}{}
-	return result, json.Unmarshal(bytes, &result)
+	dec := json.NewDecoder(bytes.NewBuffer(b))
+	dec.UseNumber()
+	return result, dec.Decode(&result)
 }

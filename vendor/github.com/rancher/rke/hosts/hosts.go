@@ -137,6 +137,15 @@ func DeleteNode(ctx context.Context, toDeleteHost *Host, kubeClient *kubernetes.
 	return nil
 }
 
+func RemoveTaintFromHost(ctx context.Context, host *Host, taintKey string, kubeClient *kubernetes.Clientset) error {
+	log.Infof(ctx, "[hosts] removing taint [%s] from host [%s]", taintKey, host.Address)
+	if err := k8s.RemoveTaintFromNodeByKey(kubeClient, host.HostnameOverride, taintKey); err != nil {
+		return err
+	}
+	log.Infof(ctx, "[hosts] Successfully deleted taint [%s] from host [%s]", taintKey, host.Address)
+	return nil
+}
+
 func GetToDeleteHosts(currentHosts, configHosts []*Host) []*Host {
 	toDeleteHosts := []*Host{}
 	for _, currentHost := range currentHosts {

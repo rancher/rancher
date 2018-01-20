@@ -80,6 +80,12 @@ func (c *Cluster) SetUpHosts(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		// Deploying worker certs on etcd hosts as well
+		err = pki.DeployCertificatesOnWorkers(ctx, c.EtcdHosts, c.Certificates, c.SystemImages[CertDownloaderImage])
+		if err != nil {
+			return err
+		}
+
 		err = pki.DeployAdminConfig(ctx, c.Certificates[pki.KubeAdminCommonName].Config, c.LocalKubeConfigPath)
 		if err != nil {
 			return err

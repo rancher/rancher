@@ -103,13 +103,14 @@ type MachineConfig struct {
 }
 
 type MachineSpec struct {
-	NodeSpec            v1.NodeSpec `json:"nodeSpec"`
-	Description         string      `json:"description,omitempty"`
-	DisplayName         string      `json:"displayName,omitempty"`
-	RequestedHostname   string      `json:"requestedHostname,omitempty" norman:"noupdate"`
-	ClusterName         string      `json:"clusterName,omitempty" norman:"type=reference[cluster],noupdate,required"`
-	Role                []string    `json:"role,omitempty" norman:"noupdate,type=array[enum],options=etcd|worker|controlplane"`
-	MachineTemplateName string      `json:"machineTemplateName,omitempty" norman:"type=reference[machineTemplate],noupdate"`
+	NodeSpec             v1.NodeSpec `json:"nodeSpec"`
+	Description          string      `json:"description,omitempty"`
+	DisplayName          string      `json:"displayName"`
+	RequestedHostname    string      `json:"requestedHostname,omitempty" norman:"noupdate"`
+	ClusterName          string      `json:"clusterName,omitempty" norman:"type=reference[cluster],noupdate,required"`
+	Role                 []string    `json:"role,omitempty" norman:"noupdate,type=array[enum],options=etcd|worker|controlplane"`
+	MachineTemplateName  string      `json:"machineTemplateName,omitempty" norman:"type=reference[machineTemplate],noupdate"`
+	UseInternalIPAddress bool        `json:"useInternalIpAddress,omitempty" norman:"default=true,noupdate"`
 }
 
 type MachineCommonParams struct {

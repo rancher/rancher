@@ -6,6 +6,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -57,4 +58,43 @@ func IsNodeReady(node v1.Node) bool {
 		}
 	}
 	return false
+}
+
+func RemoveTaintFromNodeByKey(k8sClient *kubernetes.Clientset, nodeName, taintKey string) error {
+	updated := false
+	var err error
+	var node *v1.Node
+	for retries := 0; retries <= 5; retries++ {
+		node, err = GetNode(k8sClient, nodeName)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				logrus.Debugf("[hosts] Can't find node by name [%s]", nodeName)
+				return nil
+			}
+			return err
+		}
+		foundTaint := false
+		for i, taint := range node.Spec.Taints {
+			if taint.Key == taintKey {
+				foundTaint = true
+				node.Spec.Taints = append(node.Spec.Taints[:i], node.Spec.Taints[i+1:]...)
+				break
+			}
+		}
+		if !foundTaint {
+			return nil
+		}
+		_, err = k8sClient.CoreV1().Nodes().Update(node)
+		if err != nil {
+			logrus.Debugf("Error updating node [%s] with new set of taints: %v", node.Name, err)
+			time.Sleep(time.Second * 5)
+			continue
+		}
+		updated = true
+		break
+	}
+	if !updated {
+		return fmt.Errorf("Timeout waiting for node [%s] to be updated with new set of taints: %v", node.Name, err)
+	}
+	return nil
 }

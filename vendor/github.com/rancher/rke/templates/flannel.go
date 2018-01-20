@@ -151,6 +151,9 @@ spec:
       - key: node-role.kubernetes.io/master
         operator: Exists
         effect: NoSchedule
+      - key: "node-role.kubernetes.io/etcd"
+        operator: "Exists"
+        effect: "NoSchedule"
       volumes:
         - name: run
           hostPath:

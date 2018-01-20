@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 
+	"k8s.io/client-go/tools/cache"
+
 	"github.com/rancher/types/config"
 )
 
@@ -12,9 +14,12 @@ type Authenticator interface {
 }
 
 func NewAuthenticator(ctx context.Context, mgmtCtx *config.ManagementContext) Authenticator {
+	tokenInformer := mgmtCtx.Management.Tokens("").Controller().Informer()
+	tokenInformer.AddIndexers(map[string]cache.IndexFunc{tokenKeyIndex: tokenKeyIndexer})
+
 	return &tokenAuthenticator{
-		ctx:         ctx,
-		tokens:      mgmtCtx.Management.Tokens("").Controller().Lister(),
-		tokenClient: mgmtCtx.Management.Tokens(""),
+		ctx:          ctx,
+		tokenIndexer: tokenInformer.GetIndexer(),
+		tokenClient:  mgmtCtx.Management.Tokens(""),
 	}
 }
