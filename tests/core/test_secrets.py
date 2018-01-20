@@ -139,7 +139,7 @@ def test_docker_credential(pc):
     assert cert.type == 'dockerCredential'
     assert cert.name == name
     assert cert.registries['index.docker.io']['username'] == 'foo'
-    assert 'password' not in cert.registries['index.docker.io']
+    assert 'password' in cert.registries['index.docker.io']
     assert cert.namespaceId is None
     assert 'namespace' not in cert
     assert cert.projectId == pc.project.id
@@ -186,7 +186,7 @@ def test_basic_auth(pc):
     assert cert.type == 'basicAuth'
     assert cert.name == name
     assert cert.username == 'foo'
-    assert 'password' not in cert
+    assert 'password' in cert
     assert cert.namespaceId is None
     assert 'namespace' not in cert
     assert cert.projectId == pc.project.id
@@ -226,7 +226,7 @@ def test_ssh_auth(pc):
     assert cert.baseType == 'secret'
     assert cert.type == 'sshAuth'
     assert cert.name == name
-    assert 'privateKey' not in cert
+    assert 'privateKey' in cert
     assert cert.namespaceId is None
     assert 'namespace' not in cert
     assert cert.projectId == pc.project.id

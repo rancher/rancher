@@ -105,7 +105,7 @@ def test_namespaced_docker_credential(pc):
     assert cert.type == 'namespacedDockerCredential'
     assert cert.name == name
     assert cert.registries['index.docker.io']['username'] == 'foo'
-    assert 'password' not in cert.registries['index.docker.io']
+    assert 'password' in cert.registries['index.docker.io']
     assert cert.namespaceId == ns.id
     assert cert.projectId == pc.project.id
 
@@ -154,7 +154,7 @@ def test_namespaced_basic_auth(pc):
     assert cert.type == 'namespacedBasicAuth'
     assert cert.name == name
     assert cert.username == 'foo'
-    assert 'password' not in cert
+    assert 'password' in cert
     assert cert.namespaceId == ns.id
     assert 'namespace' not in cert
     assert cert.projectId == pc.project.id
@@ -197,7 +197,7 @@ def test_namespaced_ssh_auth(pc):
     assert cert.baseType == 'secret'
     assert cert.type == 'namespacedSshAuth'
     assert cert.name == name
-    assert 'privateKey' not in cert
+    assert 'privateKey' in cert
     assert cert.namespaceId == ns.id
     assert 'namespace' not in cert
     assert cert.projectId == pc.project.id
