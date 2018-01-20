@@ -1,17 +1,19 @@
 package capabilities
 
 import (
-	"net/http"
 	"context"
-	"google.golang.org/api/compute/v1"
 	"encoding/json"
+	"google.golang.org/api/compute/v1"
+	"net/http"
 )
 
-func NewGKEZonesHandler() *gkeZonesHandler {
-	return &gkeZonesHandler{}
+// NewGKEZonesHandler creates a new GKEZonesHandler
+func NewGKEZonesHandler() *GKEZonesHandler {
+	return &GKEZonesHandler{}
 }
 
-type gkeZonesHandler struct {
+// GKEZonesHandler for listing available GKE zones
+type GKEZonesHandler struct {
 	Field string
 }
 
@@ -20,7 +22,7 @@ type zoneCapabilitiesRequestBody struct {
 	Zone string `json:"zone"`
 }
 
-func (g *gkeZonesHandler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
+func (g *GKEZonesHandler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodPost {
 		writer.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -51,7 +53,7 @@ func (g *gkeZonesHandler) ServeHTTP(writer http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	result, err := client.Zones.List(body.ProjectId).Do()
+	result, err := client.Zones.List(body.ProjectID).Do()
 
 	if err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
@@ -70,7 +72,7 @@ func (g *gkeZonesHandler) ServeHTTP(writer http.ResponseWriter, req *http.Reques
 	writer.Write(serialized)
 }
 
-func (g *gkeZonesHandler) getServiceClient(ctx context.Context, credentialContent string) (*compute.Service, error) {
+func (g *GKEZonesHandler) getServiceClient(ctx context.Context, credentialContent string) (*compute.Service, error) {
 	client, err := getOAuthClient(ctx, credentialContent)
 
 	if err != nil {

@@ -1,29 +1,29 @@
 package capabilities
 
 import (
-	"github.com/rancher/kontainer-engine/drivers/gke"
-	"os"
-	"strings"
-	"golang.org/x/oauth2/google"
 	"context"
-	"net/http"
-	"io/ioutil"
-	"io"
-	"google.golang.org/api/container/v1"
-	"golang.org/x/oauth2"
-	"github.com/sirupsen/logrus"
 	"encoding/json"
 	"fmt"
+	"github.com/rancher/kontainer-engine/drivers/gke"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	"google.golang.org/api/container/v1"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"os"
+	"strings"
 )
 
 type capabilitiesRequestBody struct {
 	Credentials string `json:"credentials"`
-	ProjectId   string `json:"projectId"`
+	ProjectID   string `json:"projectId"`
 }
 
 func validateRequestBody(writer http.ResponseWriter, body *capabilitiesRequestBody) error {
 	credentials := body.Credentials
-	projectID := body.ProjectId
+	projectID := body.ProjectID
 
 	if projectID == "" {
 		writer.WriteHeader(http.StatusBadRequest)
