@@ -31,7 +31,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/rancher/norman/signal"
-	"github.com/rancher/norman/types/slice"
+	"github.com/rancher/rancher/k8s/apiserver/auth"
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -42,8 +42,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
@@ -137,22 +135,6 @@ func NewAPIServerOptions() *Options {
 	}
 }
 
-func (a *Options) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
-	return &user.DefaultInfo{
-		Name:   "admin",
-		Groups: []string{"system:masters", "system:authenticated"},
-	}, true, nil
-}
-
-func (a *Options) Authorizer(next authorizer.Authorizer) authorizer.Authorizer {
-	return authorizer.AuthorizerFunc(func(a authorizer.Attributes) (bool, string, error) {
-		if a.GetUser() != nil && slice.ContainsString(a.GetUser().GetGroups(), "system:masters") {
-			return true, "", nil
-		}
-		return next.Authorize(a)
-	})
-}
-
 func RunAPIServer(ctx context.Context, apiServer *Options) error {
 	runOptions := options.NewServerRunOptions()
 	runOptions.Authentication.ServiceAccounts.Lookup = false
@@ -173,8 +155,8 @@ func RunAPIServer(ctx context.Context, apiServer *Options) error {
 		return err
 	}
 	kubeAPIServerConfig.ExtraConfig.EnableCoreControllers = false
-	kubeAPIServerConfig.GenericConfig.Authenticator = apiServer
-	kubeAPIServerConfig.GenericConfig.Authorizer = apiServer.Authorizer(kubeAPIServerConfig.GenericConfig.Authorizer)
+	kubeAPIServerConfig.GenericConfig.Authenticator = auth.NewAuthentication()
+	kubeAPIServerConfig.GenericConfig.Authorizer = auth.NewAuthorizer(kubeAPIServerConfig.GenericConfig.Authorizer)
 
 	apiExtensionsConfig, err := createAPIExtensionsConfig(*kubeAPIServerConfig.GenericConfig, versionedInformers, runOptions)
 	if err != nil {
