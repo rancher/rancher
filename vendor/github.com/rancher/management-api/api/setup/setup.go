@@ -40,7 +40,7 @@ func Schemas(ctx context.Context, management *config.ManagementContext, schemas 
 	Templates(schemas)
 	TemplateVersion(schemas)
 	ClusterRegistrationTokens(schemas)
-	User(schemas)
+	User(schemas, management)
 	Catalog(schemas)
 	SecretTypes(schemas, management)
 	MachineTypes(schemas, management)
@@ -165,10 +165,14 @@ func SecretTypes(schemas *types.Schemas, management *config.ManagementContext) {
 	}
 }
 
-func User(schemas *types.Schemas) {
+func User(schemas *types.Schemas, management *config.ManagementContext) {
 	schema := schemas.Schema(&managementschema.Version, client.UserType)
 	schema.Formatter = authn.UserFormatter
-	schema.ActionHandler = authn.UserActionHandler
+	schema.CollectionFormatter = authn.CollectionFormatter
+	handler := &authn.Handler{
+		UserClient: management.Management.Users(""),
+	}
+	schema.ActionHandler = handler.Actions
 }
 
 func Preference(schemas *types.Schemas, management *config.ManagementContext) {

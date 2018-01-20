@@ -55,6 +55,8 @@ type Validator func(request *APIContext, schema *Schema, data map[string]interfa
 
 type Formatter func(request *APIContext, resource *RawResource)
 
+type CollectionFormatter func(request *APIContext, collection *GenericCollection)
+
 type ErrorHandler func(request *APIContext, err error)
 
 type SubContextAttributeProvider interface {
@@ -166,6 +168,7 @@ type ReferenceValidator interface {
 type URLBuilder interface {
 	Current() string
 	Collection(schema *Schema, versionOverride *APIVersion) string
+	CollectionAction(schema *Schema, versionOverride *APIVersion, action string) string
 	SubContextCollection(subContext *Schema, contextName string, schema *Schema) string
 	SchemaLink(schema *Schema) string
 	ResourceLink(resource *RawResource) string

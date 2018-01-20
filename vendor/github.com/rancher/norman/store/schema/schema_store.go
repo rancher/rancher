@@ -120,5 +120,17 @@ func (s *Store) traverseAndAdd(apiContext *types.APIContext, schema *types.Schem
 		}
 	}
 
+	for _, action := range schema.CollectionActions {
+		for _, t := range []string{action.Output, action.Input} {
+			if t == "" {
+				continue
+			}
+
+			if refSchema, ok := schemaMap[t]; ok && !included[t] {
+				schemas = s.addSchema(apiContext, refSchema, schemaMap, schemas, included)
+			}
+		}
+	}
+
 	return schemas
 }

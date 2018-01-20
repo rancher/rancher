@@ -262,3 +262,8 @@ func parseResponseURLBase(requestURL string, r *http.Request) (string, error) {
 func (u *urlBuilder) Action(action string, resource *types.RawResource) string {
 	return u.constructBasicURL(resource.Schema.Version, resource.Schema.PluralName, resource.ID) + "?action=" + url.QueryEscape(action)
 }
+
+func (u *urlBuilder) CollectionAction(schema *types.Schema, versionOverride *types.APIVersion, action string) string {
+	collectionURL := u.Collection(schema, versionOverride)
+	return collectionURL + "?action=" + url.QueryEscape(action)
+}

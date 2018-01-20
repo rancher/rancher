@@ -20,13 +20,21 @@ func hashPassword(data map[string]interface{}) error {
 	if !ok {
 		return errors.New("password not a string")
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
+	hashed, err := hashPasswordString(pass)
 	if err != nil {
-		return errors.Wrap(err, "problem encrypting password")
+		return err
 	}
-	data[client.UserFieldPassword] = string(hash)
+	data[client.UserFieldPassword] = string(hashed)
 
 	return nil
+}
+
+func hashPasswordString(password string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", errors.Wrap(err, "problem encrypting password")
+	}
+	return string(hash), nil
 }
 
 func (s *userStore) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
