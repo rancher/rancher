@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/auth/filter"
 	"github.com/rancher/auth/server"
 	managementapi "github.com/rancher/management-api/server"
+	k8sProxy "github.com/rancher/rancher/k8s/proxy"
 	"github.com/rancher/rancher/server/capabilities"
 	"github.com/rancher/rancher/server/proxy"
 	"github.com/rancher/rancher/server/ui"
@@ -36,7 +37,13 @@ func New(ctx context.Context, management *config.ManagementContext) (http.Handle
 		return nil, err
 	}
 
-	authedHandler, err := filter.NewAuthenticationFilter(ctx, management, newAuthed(tokenAPI, managementAPI))
+	k8sProxy, err := k8sProxy.New(management)
+	if err != nil {
+		return nil, err
+	}
+
+	authedHandler, err := filter.NewAuthenticationFilter(ctx, management,
+		newAuthed(tokenAPI, managementAPI, k8sProxy))
 	if err != nil {
 		return nil, err
 	}
@@ -49,21 +56,23 @@ func New(ctx context.Context, management *config.ManagementContext) (http.Handle
 	unauthed.NotFoundHandler = ui.UI(http.NotFoundHandler())
 	unauthed.PathPrefix("/v3").Handler(authedHandler)
 	unauthed.PathPrefix("/meta").Handler(authedHandler)
+	unauthed.PathPrefix("/k8s/clusters/").Handler(authedHandler)
 
 	registerHealth(unauthed)
 
 	return unauthed, nil
 }
 
-func newAuthed(tokenAPI http.Handler, managementAPI http.Handler) *mux.Router {
+func newAuthed(tokenAPI http.Handler, managementAPI http.Handler, k8sproxy http.Handler) *mux.Router {
 	authed := mux.NewRouter()
 	authed.PathPrefix("/meta/proxy").Handler(newProxy())
-	authed.PathPrefix("/v3/token").Handler(tokenAPI)
-	authed.PathPrefix("/v3/identit").Handler(tokenAPI)
 	authed.PathPrefix("/meta").Handler(managementAPI)
-	authed.PathPrefix("/v3/gkeVersions").Handler(capabilities.NewGKEVersionsHandler())
 	authed.PathPrefix("/v3/gkeMachineTypes").Handler(capabilities.NewGKEMachineTypesHandler())
+	authed.PathPrefix("/v3/gkeVersions").Handler(capabilities.NewGKEVersionsHandler())
 	authed.PathPrefix("/v3/gkeZones").Handler(capabilities.NewGKEZonesHandler())
+	authed.PathPrefix("/v3/identit").Handler(tokenAPI)
+	authed.PathPrefix("/v3/token").Handler(tokenAPI)
+	authed.PathPrefix("/k8s/clusters/").Handler(k8sproxy)
 	authed.PathPrefix(managementSchema.Version.Path).Handler(managementAPI)
 
 	return authed
