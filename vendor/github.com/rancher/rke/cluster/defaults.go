@@ -19,7 +19,7 @@ const (
 
 	DefaultInfraContainerImage  = "gcr.io/google_containers/pause-amd64:3.0"
 	DefaultAplineImage          = "alpine:latest"
-	DefaultNginxProxyImage      = "rancher/rke-nginx-proxy:v0.1.0"
+	DefaultNginxProxyImage      = "rancher/rke-nginx-proxy:v0.1.1"
 	DefaultCertDownloaderImage  = "rancher/rke-cert-deployer:v0.1.1"
 	DefaultServiceSidekickImage = "rancher/rke-service-sidekick:v0.1.0"
 
