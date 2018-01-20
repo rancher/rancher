@@ -200,7 +200,7 @@ func (m *Lifecycle) createOrUpdateMachineForEmbeddedTypeWithParents(embeddedType
 			machineSchema.Spec.ResourceFields[fieldName] = v3.Field{
 				Create:   true,
 				Nullable: true,
-				Update:   true,
+				Update:   false,
 				Type:     embeddedType,
 			}
 			shouldUpdate = true
