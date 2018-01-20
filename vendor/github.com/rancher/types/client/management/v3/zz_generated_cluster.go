@@ -20,6 +20,8 @@ const (
 	ClusterFieldDefaultPodSecurityPolicyTemplateId  = "defaultPodSecurityPolicyTemplateId"
 	ClusterFieldDescription                         = "description"
 	ClusterFieldDriver                              = "driver"
+	ClusterFieldEmbedded                            = "embedded"
+	ClusterFieldEmbeddedConfig                      = "embeddedConfig"
 	ClusterFieldGoogleKubernetesEngineConfig        = "googleKubernetesEngineConfig"
 	ClusterFieldInternal                            = "internal"
 	ClusterFieldLabels                              = "labels"
@@ -52,6 +54,8 @@ type Cluster struct {
 	DefaultPodSecurityPolicyTemplateId  string                         `json:"defaultPodSecurityPolicyTemplateId,omitempty"`
 	Description                         string                         `json:"description,omitempty"`
 	Driver                              string                         `json:"driver,omitempty"`
+	Embedded                            *bool                          `json:"embedded,omitempty"`
+	EmbeddedConfig                      *K8sServerConfig               `json:"embeddedConfig,omitempty"`
 	GoogleKubernetesEngineConfig        *GoogleKubernetesEngineConfig  `json:"googleKubernetesEngineConfig,omitempty"`
 	Internal                            *bool                          `json:"internal,omitempty"`
 	Labels                              map[string]string              `json:"labels,omitempty"`

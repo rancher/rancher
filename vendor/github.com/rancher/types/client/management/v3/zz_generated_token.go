@@ -20,6 +20,7 @@ const (
 	TokenFieldProviderInfo    = "providerInfo"
 	TokenFieldRemoved         = "removed"
 	TokenFieldTTLMillis       = "ttl"
+	TokenFieldToken           = "token"
 	TokenFieldUserID          = "userId"
 	TokenFieldUserPrincipal   = "userPrincipal"
 	TokenFieldUuid            = "uuid"
@@ -41,6 +42,7 @@ type Token struct {
 	ProviderInfo    map[string]string `json:"providerInfo,omitempty"`
 	Removed         string            `json:"removed,omitempty"`
 	TTLMillis       *int64            `json:"ttl,omitempty"`
+	Token           string            `json:"token,omitempty"`
 	UserID          string            `json:"userId,omitempty"`
 	UserPrincipal   string            `json:"userPrincipal,omitempty"`
 	Uuid            string            `json:"uuid,omitempty"`

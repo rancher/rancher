@@ -95,7 +95,11 @@ func (j *JSONResponseWriter) convert(b *builder.Builder, context *types.APIConte
 	if schema == nil {
 		return nil
 	}
-	data, err := b.Construct(schema, input, builder.List)
+	op := builder.List
+	if context.Method == http.MethodPost {
+		op = builder.ListForCreate
+	}
+	data, err := b.Construct(schema, input, op)
 	if err != nil {
 		logrus.Errorf("Failed to construct object on output: %v", err)
 		return nil

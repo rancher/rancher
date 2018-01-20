@@ -18,13 +18,13 @@ func ErrorHandler(request *types.APIContext, err error) {
 	}
 
 	data := toError(error)
-	request.WriteResponse(error.code.status, data)
+	request.WriteResponse(error.code.Status, data)
 }
 
 func toError(apiError *APIError) map[string]interface{} {
 	e := map[string]interface{}{
 		"type":    "/meta/schemas/error",
-		"status":  apiError.code.status,
+		"status":  apiError.code.Status,
 		"code":    apiError.code.code,
 		"message": apiError.message,
 	}

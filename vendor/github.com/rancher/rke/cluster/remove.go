@@ -20,7 +20,7 @@ func (c *Cluster) ClusterRemove(ctx context.Context) error {
 	}
 
 	// Remove Etcd Plane
-	if err := services.RemoveEtcdPlane(ctx, c.EtcdHosts); err != nil {
+	if err := services.RemoveEtcdPlane(ctx, c.EtcdHosts, true); err != nil {
 		return err
 	}
 

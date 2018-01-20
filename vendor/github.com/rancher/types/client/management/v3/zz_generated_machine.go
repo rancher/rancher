@@ -38,6 +38,7 @@ const (
 	MachineFieldTransitioning        = "transitioning"
 	MachineFieldTransitioningMessage = "transitioningMessage"
 	MachineFieldUnschedulable        = "unschedulable"
+	MachineFieldUseInternalIPAddress = "useInternalIpAddress"
 	MachineFieldUuid                 = "uuid"
 	MachineFieldVolumesAttached      = "volumesAttached"
 	MachineFieldVolumesInUse         = "volumesInUse"
@@ -77,6 +78,7 @@ type Machine struct {
 	Transitioning        string                    `json:"transitioning,omitempty"`
 	TransitioningMessage string                    `json:"transitioningMessage,omitempty"`
 	Unschedulable        *bool                     `json:"unschedulable,omitempty"`
+	UseInternalIPAddress *bool                     `json:"useInternalIpAddress,omitempty"`
 	Uuid                 string                    `json:"uuid,omitempty"`
 	VolumesAttached      map[string]AttachedVolume `json:"volumesAttached,omitempty"`
 	VolumesInUse         []string                  `json:"volumesInUse,omitempty"`

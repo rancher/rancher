@@ -12,6 +12,7 @@ import (
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 
 	"github.com/rancher/auth/model"
@@ -88,18 +89,19 @@ func (s *tokenAPIServer) login(actionName string, action *types.Action, request 
 	if jsonInput.ResponseType == "cookie" {
 		tokenCookie := &http.Cookie{
 			Name:     CookieName,
-			Value:    token.Name,
+			Value:    token.ObjectMeta.Name + ":" + token.Token,
 			Secure:   isSecure,
 			Path:     "/",
 			HttpOnly: true,
 		}
 		http.SetCookie(w, tokenCookie)
 	} else {
-		tokenData, err := getTokenFromStore(request, token.ObjectMeta.Name)
+		tokenData, err := convertTokenResource(request, token)
 		if err != nil {
 			return err
 		}
-		request.WriteResponse(http.StatusOK, tokenData)
+		tokenData["token"] = token.ObjectMeta.Name + ":" + token.Token
+		request.WriteResponse(http.StatusCreated, tokenData)
 	}
 
 	return nil
@@ -111,7 +113,7 @@ func (s *tokenAPIServer) deriveToken(request *types.APIContext) error {
 
 	cookie, err := r.Cookie(CookieName)
 	if err != nil {
-		logrus.Info("Failed to get token cookie: %v", err)
+		logrus.Infof("Failed to get token cookie: %v", err)
 		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie")
 	}
 	bytes, err := ioutil.ReadAll(r.Body)
@@ -138,12 +140,13 @@ func (s *tokenAPIServer) deriveToken(request *types.APIContext) error {
 		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
 	}
 
-	tokenData, err := getTokenFromStore(request, token.ObjectMeta.Name)
+	tokenData, err := convertTokenResource(request, token)
 	if err != nil {
 		return err
 	}
+	tokenData["token"] = token.ObjectMeta.Name + ":" + token.Token
 
-	request.WriteResponse(http.StatusOK, tokenData)
+	request.WriteResponse(http.StatusCreated, tokenData)
 
 	return nil
 }
@@ -154,7 +157,7 @@ func (s *tokenAPIServer) listTokens(request *types.APIContext) error {
 	// TODO switch to X-API-UserId header
 	cookie, err := r.Cookie(CookieName)
 	if err != nil {
-		logrus.Info("Failed to get token cookie: %v", err)
+		logrus.Infof("Failed to get token cookie: %v", err)
 		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie")
 	}
 	//getToken
@@ -169,10 +172,11 @@ func (s *tokenAPIServer) listTokens(request *types.APIContext) error {
 
 	tokensFromStore := make([]map[string]interface{}, len(tokens))
 	for _, token := range tokens {
-		tokenData, err := getTokenFromStore(request, token.ObjectMeta.Name)
+		tokenData, err := convertTokenResource(request, token)
 		if err != nil {
 			return err
 		}
+
 		tokensFromStore = append(tokensFromStore, tokenData)
 	}
 
@@ -186,7 +190,7 @@ func (s *tokenAPIServer) logout(actionName string, action *types.Action, request
 
 	cookie, err := r.Cookie(CookieName)
 	if err != nil {
-		logrus.Info("Failed to get token cookie: %v", err)
+		logrus.Infof("Failed to get token cookie: %v", err)
 		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie")
 	}
 
@@ -224,7 +228,7 @@ func (s *tokenAPIServer) getToken(request *types.APIContext) error {
 
 	cookie, err := r.Cookie(CookieName)
 	if err != nil {
-		logrus.Info("Failed to get token cookie: %v", err)
+		logrus.Infof("Failed to get token cookie: %v", err)
 		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie")
 	}
 
@@ -239,7 +243,7 @@ func (s *tokenAPIServer) getToken(request *types.APIContext) error {
 		}
 		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
 	}
-	tokenData, err := getTokenFromStore(request, token.ObjectMeta.Name)
+	tokenData, err := convertTokenResource(request, token)
 	if err != nil {
 		return err
 	}
@@ -253,7 +257,7 @@ func (s *tokenAPIServer) removeToken(request *types.APIContext) error {
 
 	cookie, err := r.Cookie(CookieName)
 	if err != nil {
-		logrus.Info("Failed to get token cookie: %v", err)
+		logrus.Infof("Failed to get token cookie: %v", err)
 		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie")
 	}
 	tokenID := request.ID
@@ -286,6 +290,21 @@ func getTokenFromStore(request *types.APIContext, tokenID string) (map[string]in
 	if err != nil {
 		return nil, err
 	}
+
+	return tokenData, nil
+}
+
+func convertTokenResource(request *types.APIContext, token v3.Token) (map[string]interface{}, error) {
+	tokenData, err := convert.EncodeToMap(token)
+	if err != nil {
+		return nil, err
+	}
+	mapper := request.Schema.Mapper
+	if mapper == nil {
+		return nil, errors.New("no schema mapper available")
+	}
+	mapper.FromInternal(tokenData)
+
 	return tokenData, nil
 }
 

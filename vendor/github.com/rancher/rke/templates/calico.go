@@ -192,6 +192,9 @@ spec:
           operator: "Exists"
         - key: "node-role.kubernetes.io/master"
           operator: "Exists"
+        - key: "node-role.kubernetes.io/etcd"
+          operator: "Exists"
+          effect: "NoSchedule"
       containers:
         # Runs calico/node container on each Kubernetes node.  This
         # container programs network policy and routes on each
@@ -375,6 +378,9 @@ spec:
           operator: "Exists"
         - key: "node-role.kubernetes.io/master"
           operator: "Exists"
+        - key: "node-role.kubernetes.io/etcd"
+          operator: "Exists"
+          effect: "NoSchedule"
       containers:
         - name: calico-kube-controllers
           image: {{.ControllersImage}}

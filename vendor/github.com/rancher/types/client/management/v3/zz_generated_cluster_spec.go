@@ -7,6 +7,8 @@ const (
 	ClusterSpecFieldDefaultPodSecurityPolicyTemplateId  = "defaultPodSecurityPolicyTemplateId"
 	ClusterSpecFieldDescription                         = "description"
 	ClusterSpecFieldDisplayName                         = "displayName"
+	ClusterSpecFieldEmbedded                            = "embedded"
+	ClusterSpecFieldEmbeddedConfig                      = "embeddedConfig"
 	ClusterSpecFieldGoogleKubernetesEngineConfig        = "googleKubernetesEngineConfig"
 	ClusterSpecFieldInternal                            = "internal"
 	ClusterSpecFieldNodes                               = "nodes"
@@ -19,6 +21,8 @@ type ClusterSpec struct {
 	DefaultPodSecurityPolicyTemplateId  string                         `json:"defaultPodSecurityPolicyTemplateId,omitempty"`
 	Description                         string                         `json:"description,omitempty"`
 	DisplayName                         string                         `json:"displayName,omitempty"`
+	Embedded                            *bool                          `json:"embedded,omitempty"`
+	EmbeddedConfig                      *K8sServerConfig               `json:"embeddedConfig,omitempty"`
 	GoogleKubernetesEngineConfig        *GoogleKubernetesEngineConfig  `json:"googleKubernetesEngineConfig,omitempty"`
 	Internal                            *bool                          `json:"internal,omitempty"`
 	Nodes                               []MachineConfig                `json:"nodes,omitempty"`

@@ -2,10 +2,10 @@ package nodesyncer
 
 import (
 	"fmt"
-
 	"reflect"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -15,49 +15,202 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+const (
+	allMachineKey = "_machine_all_"
+)
+
 type NodeSyncer struct {
 	machinesClient   v3.MachineInterface
-	machines         v3.MachineLister
-	clusters         v3.ClusterLister
+	clusterNamespace string
+}
+
+type PodsStatsSyncer struct {
 	clusterName      string
+	clusterNamespace string
+	machinesClient   v3.MachineInterface
+}
+
+type MachinesSyncer struct {
+	machinesClient   v3.MachineInterface
+	machines         v3.MachineLister
+	nodes            v1.NodeLister
+	clusters         v3.ClusterLister
+	pods             v1.PodLister
 	clusterNamespace string
 }
 
 func Register(cluster *config.ClusterContext) {
 	n := &NodeSyncer{
-		clusterName:      cluster.ClusterName,
+		clusterNamespace: cluster.ClusterName,
+		machinesClient:   cluster.Management.Management.Machines(cluster.ClusterName),
+	}
+
+	m := &MachinesSyncer{
 		clusterNamespace: cluster.ClusterName,
 		machinesClient:   cluster.Management.Management.Machines(cluster.ClusterName),
 		machines:         cluster.Management.Management.Machines(cluster.ClusterName).Controller().Lister(),
 		clusters:         cluster.Management.Management.Clusters("").Controller().Lister(),
+		nodes:            cluster.Core.Nodes("").Controller().Lister(),
+		pods:             cluster.Core.Pods("").Controller().Lister(),
 	}
-	cluster.Core.Nodes("").AddLifecycle("nodesSyncer", n)
+
+	p := &PodsStatsSyncer{
+		clusterNamespace: cluster.ClusterName,
+		machinesClient:   cluster.Management.Management.Machines(cluster.ClusterName),
+	}
+
+	cluster.Core.Nodes("").Controller().AddHandler("nodesSyncer", n.sync)
+	cluster.Management.Management.Machines(cluster.ClusterName).Controller().AddHandler("machinesSyncer", m.sync)
+	cluster.Core.Pods("").Controller().AddHandler("podsStatsSyncer", p.sync)
 }
 
-func (n *NodeSyncer) Remove(node *corev1.Node) (*corev1.Node, error) {
-	machine, err := n.getMachine(node.Name)
-	if err != nil {
-		return nil, err
-	}
-	logrus.Infof("Deleting cluster node [%s]", node.Name)
+func (n *NodeSyncer) sync(key string, node *corev1.Node) error {
+	n.machinesClient.Controller().Enqueue(n.clusterNamespace, allMachineKey)
+	return nil
+}
 
+func (p *PodsStatsSyncer) sync(key string, pod *corev1.Pod) error {
+	p.machinesClient.Controller().Enqueue(p.clusterNamespace, allMachineKey)
+	return nil
+}
+
+func (m *MachinesSyncer) sync(key string, machine *v3.Machine) error {
+	if key == fmt.Sprintf("%s/%s", m.clusterNamespace, allMachineKey) {
+		return m.reconcileAll()
+	}
+	return nil
+}
+
+func (m *MachinesSyncer) reconcileAll() error {
+	nodes, err := m.nodes.List("", labels.NewSelector())
+	if err != nil {
+		return err
+	}
+
+	nodeMap := make(map[string]*corev1.Node)
+	for _, node := range nodes {
+		nodeMap[node.Name] = node
+	}
+
+	machines, err := m.machines.List(m.clusterNamespace, labels.NewSelector())
+	machineMap := make(map[string]*v3.Machine)
+	for _, machine := range machines {
+		nodeName := getNodeNameFromMachine(machine)
+		if nodeName == "" {
+			logrus.Warnf("Failed to get nodeName from machine [%s]", machine.Name)
+			continue
+		}
+		machineMap[nodeName] = machine
+	}
+	nodeToPodMap, err := m.getNonTerminatedPods()
+	if err != nil {
+		return err
+	}
+
+	// reconcile machines for existing nodes
+	for name, node := range nodeMap {
+		machine, _ := machineMap[name]
+		remove := false
+		if node.DeletionTimestamp != nil {
+			if machine == nil {
+				// machine is already removed
+				continue
+			}
+			remove = true
+		}
+
+		err = m.reconcileMachineForNode(machine, remove, node, nodeToPodMap)
+		if err != nil {
+			return err
+		}
+	}
+	// run the logic for machine to remove
+	for name, machine := range machineMap {
+		if _, ok := nodeMap[name]; !ok {
+			m.reconcileMachineForNode(machine, true, nil, nil)
+		}
+	}
+
+	return nil
+}
+
+func (m *MachinesSyncer) reconcileMachineForNode(machine *v3.Machine, remove bool, node *corev1.Node, pods map[string][]*corev1.Pod) error {
+	if remove {
+		return m.removeMachine(machine)
+	}
 	if machine == nil {
-		logrus.Debugf("Cluster node [%s] is already deleted")
-		return nil, nil
+		return m.createMachine(node, pods)
 	}
-	err = n.machinesClient.Delete(machine.ObjectMeta.Name, nil)
-	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to delete cluster node [%s]", node.Name)
-	}
-	logrus.Infof("Deleted cluster node [%s]", node.Name)
-	return nil, nil
+	return m.updateMachine(machine, node, pods)
 }
 
-func (n *NodeSyncer) getMachine(nodeName string) (*v3.Machine, error) {
-	machines, err := n.machines.List(n.clusterNamespace, labels.NewSelector())
+func (m *MachinesSyncer) removeMachine(machine *v3.Machine) error {
+	err := m.machinesClient.Delete(machine.ObjectMeta.Name, nil)
 	if err != nil {
-		return nil, err
+		return errors.Wrapf(err, "Failed to delete machine [%s]", machine.Name)
 	}
+	logrus.Infof("Deleted cluster node [%s]", machine.Name)
+	return nil
+}
+
+func (m *MachinesSyncer) updateMachine(existing *v3.Machine, node *corev1.Node, pods map[string][]*corev1.Pod) error {
+	toUpdate, err := m.convertNodeToMachine(node, existing, pods)
+	if err != nil {
+		return err
+	}
+	// update only when nothing changed
+	if objectsAreEqual(existing, toUpdate) {
+		return nil
+	}
+	logrus.Debugf("Updating machine for node [%s]", node.Name)
+	_, err = m.machinesClient.Update(toUpdate)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to update machine for node [%s]", node.Name)
+	}
+	logrus.Debugf("Updated machine for node [%s]", node.Name)
+	return nil
+}
+
+func (m *MachinesSyncer) createMachine(node *corev1.Node, pods map[string][]*corev1.Pod) error {
+	// try to get machine from api, in case cache didn't get the update
+	existing, err := m.getMachineForNode(node.Name, false)
+	if err != nil {
+		return err
+	}
+	if existing != nil {
+		return nil
+	}
+	machine, err := m.convertNodeToMachine(node, existing, pods)
+	if err != nil {
+		return err
+	}
+
+	_, err = m.machinesClient.Create(machine)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to create machine for node [%s]", node.Name)
+	}
+	logrus.Infof("Created machine for node [%s]", node.Name)
+	return nil
+}
+
+func (m *MachinesSyncer) getMachineForNode(nodeName string, cache bool) (*v3.Machine, error) {
+	var machines []*v3.Machine
+	var err error
+	if cache {
+		machines, err = m.machines.List(m.clusterNamespace, labels.NewSelector())
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		machinelist, err := m.machinesClient.List(metav1.ListOptions{})
+		if err != nil {
+			return nil, err
+		}
+		for _, machine := range machinelist.Items {
+			machines = append(machines, &machine)
+		}
+	}
+
 	for _, machine := range machines {
 		if machine.Status.NodeName == nodeName {
 			return machine, nil
@@ -71,6 +224,19 @@ func (n *NodeSyncer) getMachine(nodeName string) (*v3.Machine, error) {
 	}
 
 	return nil, nil
+}
+
+func getNodeNameFromMachine(machine *v3.Machine) string {
+	if machine.Status.NodeName != "" {
+		return machine.Status.NodeName
+	}
+	// to handle the case when machine was provisioned first
+	if machine.Status.NodeConfig != nil {
+		if machine.Status.NodeConfig.HostnameOverride != "" {
+			return machine.Status.NodeConfig.HostnameOverride
+		}
+	}
+	return ""
 }
 
 func resetConditions(machine *v3.Machine) *v3.Machine {
@@ -89,28 +255,6 @@ func resetConditions(machine *v3.Machine) *v3.Machine {
 	return updated
 }
 
-func (n *NodeSyncer) Updated(node *corev1.Node) (*corev1.Node, error) {
-	existing, err := n.getMachine(node.Name)
-	if err != nil || existing == nil {
-		return nil, err
-	}
-	toUpdate, err := n.convertNodeToMachine(node, existing)
-	if err != nil {
-		return nil, err
-	}
-	// update only when nothing changed
-	if objectsAreEqual(existing, toUpdate) {
-		return nil, nil
-	}
-	logrus.Debugf("Updating cluster node [%s]", node.Name)
-	_, err = n.machinesClient.Update(toUpdate)
-	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to update cluster node [%s]", node.Name)
-	}
-	logrus.Debugf("Updated cluster node [%s]", node.Name)
-	return nil, nil
-}
-
 func objectsAreEqual(existing *v3.Machine, toUpdate *v3.Machine) bool {
 	// we are updating spec and status only, so compare them
 	toUpdateToCompare := resetConditions(toUpdate)
@@ -120,18 +264,12 @@ func objectsAreEqual(existing *v3.Machine, toUpdate *v3.Machine) bool {
 	annotationsEqual := reflect.DeepEqual(toUpdateToCompare.Status.NodeAnnotations, existing.Status.NodeAnnotations)
 	specEqual := reflect.DeepEqual(toUpdateToCompare.Spec.NodeSpec, existingToCompare.Spec.NodeSpec)
 	nodeNameEqual := toUpdateToCompare.Status.NodeName == existingToCompare.Status.NodeName
-	return statusEqual && specEqual && nodeNameEqual && labelsEqual && annotationsEqual
+	requestsEqual := isEqual(toUpdateToCompare.Status.Requested, existingToCompare.Status.Requested)
+	limitsEqual := isEqual(toUpdateToCompare.Status.Limits, existingToCompare.Status.Limits)
+	return statusEqual && specEqual && nodeNameEqual && labelsEqual && annotationsEqual && requestsEqual && limitsEqual
 }
 
-func (n *NodeSyncer) convertNodeToMachine(node *corev1.Node, existing *v3.Machine) (*v3.Machine, error) {
-	cluster, err := n.clusters.Get("", n.clusterName)
-	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to get cluster [%s]", n.clusterName)
-	}
-	if cluster.ObjectMeta.DeletionTimestamp != nil {
-		return nil, fmt.Errorf("Failed to find cluster [%s]", n.clusterName)
-	}
-
+func (m *MachinesSyncer) convertNodeToMachine(node *corev1.Node, existing *v3.Machine, pods map[string][]*corev1.Pod) (*v3.Machine, error) {
 	var machine *v3.Machine
 	if existing == nil {
 		machine = &v3.Machine{
@@ -140,7 +278,7 @@ func (n *NodeSyncer) convertNodeToMachine(node *corev1.Node, existing *v3.Machin
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "machine-"},
 		}
-		machine.Namespace = n.clusterNamespace
+		machine.Namespace = m.clusterNamespace
 		machine.Status.Requested = make(map[corev1.ResourceName]resource.Quantity)
 		machine.Status.Limits = make(map[corev1.ResourceName]resource.Quantity)
 		machine.Spec.NodeSpec = *node.Spec.DeepCopy()
@@ -149,8 +287,21 @@ func (n *NodeSyncer) convertNodeToMachine(node *corev1.Node, existing *v3.Machin
 		machine = existing.DeepCopy()
 		machine.Spec.NodeSpec = *node.Spec.DeepCopy()
 		machine.Status.NodeStatus = *node.Status.DeepCopy()
-		machine.Status.Requested = existing.Status.Requested
-		machine.Status.Limits = existing.Status.Limits
+	}
+
+	requests, limits := aggregateRequestAndLimitsForNode(pods[node.Name])
+	if machine.Status.Requested == nil {
+		machine.Status.Requested = corev1.ResourceList{}
+	}
+	if machine.Status.Limits == nil {
+		machine.Status.Limits = corev1.ResourceList{}
+	}
+
+	for name, quantity := range requests {
+		machine.Status.Requested[name] = quantity
+	}
+	for name, quantity := range limits {
+		machine.Status.Limits[name] = quantity
 	}
 
 	machine.Status.NodeAnnotations = node.Annotations
@@ -161,21 +312,109 @@ func (n *NodeSyncer) convertNodeToMachine(node *corev1.Node, existing *v3.Machin
 	return machine, nil
 }
 
-func (n *NodeSyncer) Create(node *corev1.Node) (*corev1.Node, error) {
-	existing, err := n.getMachine(node.Name)
-	if err != nil || existing != nil {
-		return nil, err
-	}
-	machine, err := n.convertNodeToMachine(node, nil)
+func (m *MachinesSyncer) getNonTerminatedPods() (map[string][]*corev1.Pod, error) {
+	pods := make(map[string][]*corev1.Pod)
+	fromCache, err := m.pods.List("", labels.NewSelector())
 	if err != nil {
-		return nil, err
+		return pods, err
 	}
 
-	logrus.Infof("Creating cluster node [%s]", node.Name)
-	_, err = n.machinesClient.Create(machine)
-	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to create cluster node [%s]", node.Name)
+	for _, pod := range fromCache {
+		if pod.Spec.NodeName == "" || pod.DeletionTimestamp != nil {
+			continue
+		}
+		// kubectl uses this cache to filter out the pods
+		if pod.Status.Phase == "Succeeded" || pod.Status.Phase == "Failed" {
+			continue
+		}
+		var nodePods []*corev1.Pod
+		if fromMap, ok := pods[pod.Spec.NodeName]; ok {
+			nodePods = fromMap
+		}
+		nodePods = append(nodePods, pod)
+		pods[pod.Spec.NodeName] = nodePods
 	}
-	logrus.Infof("Created cluster node [%s]", node.Name)
-	return nil, nil
+	return pods, nil
+}
+
+func aggregateRequestAndLimitsForNode(pods []*corev1.Pod) (map[corev1.ResourceName]resource.Quantity, map[corev1.ResourceName]resource.Quantity) {
+	requests, limits := map[corev1.ResourceName]resource.Quantity{}, map[corev1.ResourceName]resource.Quantity{}
+	podsData := make(map[string]map[string]map[corev1.ResourceName]resource.Quantity)
+	if pods != nil {
+		//podName -> req/limit -> data
+		for _, pod := range pods {
+			podsData[pod.Name] = make(map[string]map[corev1.ResourceName]resource.Quantity)
+			requests, limits := getPodData(pod)
+			podsData[pod.Name]["requests"] = requests
+			podsData[pod.Name]["limits"] = limits
+		}
+		requests[corev1.ResourcePods] = *resource.NewQuantity(int64(len(pods)), resource.DecimalSI)
+	}
+	for _, podData := range podsData {
+		podRequests, podLimits := podData["requests"], podData["limits"]
+		addMap(podRequests, requests)
+		addMap(podLimits, limits)
+	}
+	return requests, limits
+}
+
+func isEqual(data1 map[corev1.ResourceName]resource.Quantity, data2 map[corev1.ResourceName]resource.Quantity) bool {
+	if data1 == nil && data2 == nil {
+		return true
+	}
+	if data1 == nil || data2 == nil {
+		return false
+	}
+	for key, value := range data1 {
+		if _, exists := data2[key]; !exists {
+			return false
+		}
+		value2 := data2[key]
+		if value.Value() != value2.Value() {
+			return false
+		}
+	}
+	return true
+}
+
+func getPodData(pod *corev1.Pod) (map[corev1.ResourceName]resource.Quantity, map[corev1.ResourceName]resource.Quantity) {
+	requests, limits := map[corev1.ResourceName]resource.Quantity{}, map[corev1.ResourceName]resource.Quantity{}
+	for _, container := range pod.Spec.Containers {
+		addMap(container.Resources.Requests, requests)
+		addMap(container.Resources.Limits, limits)
+	}
+
+	for _, container := range pod.Spec.InitContainers {
+		addMapForInit(container.Resources.Requests, requests)
+		addMapForInit(container.Resources.Limits, limits)
+	}
+	return requests, limits
+}
+
+func machineRequestAndLimitsChanged(cnode *v3.Machine, requests map[corev1.ResourceName]resource.Quantity, limits map[corev1.ResourceName]resource.Quantity) bool {
+	return !isEqual(requests, cnode.Status.Requested) || !isEqual(limits, cnode.Status.Limits)
+}
+
+func addMap(data1 map[corev1.ResourceName]resource.Quantity, data2 map[corev1.ResourceName]resource.Quantity) {
+	for name, quantity := range data1 {
+		if value, ok := data2[name]; !ok {
+			data2[name] = *quantity.Copy()
+		} else {
+			value.Add(quantity)
+			data2[name] = value
+		}
+	}
+}
+
+func addMapForInit(data1 map[corev1.ResourceName]resource.Quantity, data2 map[corev1.ResourceName]resource.Quantity) {
+	for name, quantity := range data1 {
+		value, ok := data2[name]
+		if !ok {
+			data2[name] = *quantity.Copy()
+			continue
+		}
+		if quantity.Cmp(value) > 0 {
+			data2[name] = *quantity.Copy()
+		}
+	}
 }

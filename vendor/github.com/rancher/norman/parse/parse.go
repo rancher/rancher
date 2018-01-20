@@ -69,14 +69,9 @@ func DefaultURLParser(schemas *types.Schemas, url *url.URL) (ParsedURL, error) {
 func Parse(rw http.ResponseWriter, req *http.Request, schemas *types.Schemas, urlParser URLParser, resolverFunc ResolverFunc) (*types.APIContext, error) {
 	var err error
 
-	result := &types.APIContext{
-		Schemas:        schemas,
-		Request:        req,
-		Response:       rw,
-		Method:         parseMethod(req),
-		ResponseFormat: parseResponseFormat(req),
-	}
-
+	result := types.NewAPIContext(req, rw, schemas)
+	result.Method = parseMethod(req)
+	result.ResponseFormat = parseResponseFormat(req)
 	result.URLBuilder, _ = urlbuilder.New(req, types.APIVersion{}, schemas)
 
 	// The response format is guarenteed to be set even in the event of an error

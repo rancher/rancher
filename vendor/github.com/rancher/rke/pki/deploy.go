@@ -176,7 +176,8 @@ func FetchCertificatesFromHost(ctx context.Context, host *hosts.Host, image, loc
 		certificate := CertificatePKI{}
 		crt, err := fetchFileFromHost(ctx, getTempPath(certEnv[0]), image, host)
 		if err != nil {
-			if strings.Contains(err.Error(), "no such file or directory") {
+			if strings.Contains(err.Error(), "no such file or directory") ||
+				strings.Contains(err.Error(), "Could not find the file") {
 				return nil, nil
 			}
 			return nil, err

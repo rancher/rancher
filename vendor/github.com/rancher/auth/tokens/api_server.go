@@ -3,17 +3,17 @@ package tokens
 import (
 	"context"
 	"fmt"
-	"strconv"
-	"time"
+
+	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/tools/cache"
 
 	"github.com/rancher/auth/providers"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
-	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
 )
 
 // TODO Cleanup error logging. If error is being returned, use errors.wrap to return and dont log here
@@ -22,6 +22,7 @@ const (
 	defaultTokenTTL    = 57600000
 	userPrincipalIndex = "authn.management.cattle.io/user-principal-index"
 	userIDLabel        = "authn.management.cattle.io/token-userId"
+	tokenKeyIndex      = "authn.management.cattle.io/token-key-index"
 )
 
 type tokenAPIServer struct {
@@ -29,6 +30,7 @@ type tokenAPIServer struct {
 	client       *config.ManagementContext
 	tokensClient v3.TokenInterface
 	userIndexer  cache.Indexer
+	tokenIndexer cache.Indexer
 }
 
 var tokenServer *tokenAPIServer
@@ -42,6 +44,15 @@ func userPrincipalIndexer(obj interface{}) ([]string, error) {
 	return user.PrincipalIDs, nil
 }
 
+func tokenKeyIndexer(obj interface{}) ([]string, error) {
+	token, ok := obj.(*v3.Token)
+	if !ok {
+		return []string{}, nil
+	}
+
+	return []string{token.Token}, nil
+}
+
 func NewTokenAPIServer(ctx context.Context, mgmtCtx *config.ManagementContext) error {
 	if mgmtCtx == nil {
 		return fmt.Errorf("failed to build tokenAPIHandler, nil ManagementContext")
@@ -50,11 +61,14 @@ func NewTokenAPIServer(ctx context.Context, mgmtCtx *config.ManagementContext) e
 
 	informer := mgmtCtx.Management.Users("").Controller().Informer()
 	informer.AddIndexers(map[string]cache.IndexFunc{userPrincipalIndex: userPrincipalIndexer})
+	tokenInformer := mgmtCtx.Management.Tokens("").Controller().Informer()
+	tokenInformer.AddIndexers(map[string]cache.IndexFunc{tokenKeyIndex: tokenKeyIndexer})
 	tokenServer = &tokenAPIServer{
 		ctx:          ctx,
 		client:       mgmtCtx,
 		tokensClient: mgmtCtx.Management.Tokens(""),
 		userIndexer:  informer.GetIndexer(),
+		tokenIndexer: tokenInformer.GetIndexer(),
 	}
 
 	return nil
@@ -98,11 +112,11 @@ func (s *tokenAPIServer) createLoginToken(jsonInput v3.LoginInput) (v3.Token, in
 }
 
 //CreateDerivedToken will create a jwt token for the authenticated user
-func (s *tokenAPIServer) createDerivedToken(jsonInput v3.Token, tokenID string) (v3.Token, int, error) {
+func (s *tokenAPIServer) createDerivedToken(jsonInput v3.Token, tokenAuthValue string) (v3.Token, int, error) {
 
 	logrus.Debug("Create Derived Token Invoked")
 
-	token, err := s.getK8sTokenCR(tokenID)
+	token, err := s.getK8sTokenCR(tokenAuthValue)
 	if err != nil {
 		return v3.Token{}, 401, err
 	}
@@ -140,33 +154,63 @@ func (s *tokenAPIServer) createK8sTokenCR(key string, k8sToken *v3.Token) (v3.To
 
 	k8sToken.APIVersion = "management.cattle.io/v3"
 	k8sToken.Kind = "Token"
+	k8sToken.Token = key
 	k8sToken.ObjectMeta = metav1.ObjectMeta{
-		Name:   key,
-		Labels: labels,
+		GenerateName: "token-",
+		Labels:       labels,
 	}
 	createdToken, err := s.tokensClient.Create(k8sToken)
 
 	if err != nil {
 		return v3.Token{}, err
 	}
+
 	return *createdToken, nil
 }
 
-func (s *tokenAPIServer) getK8sTokenCR(tokenID string) (*v3.Token, error) {
-	storedToken, err := s.tokensClient.Get(tokenID, metav1.GetOptions{})
+func (s *tokenAPIServer) getK8sTokenCR(tokenAuthValue string) (*v3.Token, error) {
+	tokenName, tokenKey := SplitTokenParts(tokenAuthValue)
+
+	lookupUsingClient := false
+
+	objs, err := s.tokenIndexer.ByIndex(tokenKeyIndex, tokenKey)
 	if err != nil {
-		return nil, err
+		if apierrors.IsNotFound(err) {
+			lookupUsingClient = true
+		} else {
+			return nil, fmt.Errorf("failed to retrieve auth token from cache, error: %v", err)
+		}
+	} else if len(objs) == 0 {
+		lookupUsingClient = true
+	}
+
+	storedToken := &v3.Token{}
+	if lookupUsingClient {
+		storedToken, err = s.tokensClient.Get(tokenName, metav1.GetOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("failed to retrieve auth token, error: %#v", err)
+		}
+	} else {
+		storedToken = objs[0].(*v3.Token)
+	}
+
+	if storedToken.Token != tokenKey || storedToken.ObjectMeta.Name != tokenName {
+		return nil, fmt.Errorf("Invalid auth token value")
+	}
+
+	if !IsNotExpired(*storedToken) {
+		return nil, fmt.Errorf("Auth Token has expired")
 	}
 
 	return storedToken, nil
 }
 
 //GetTokens will list all derived tokens of the authenticated user - only derived
-func (s *tokenAPIServer) getTokens(tokenID string) ([]v3.Token, int, error) {
+func (s *tokenAPIServer) getTokens(tokenAuthValue string) ([]v3.Token, int, error) {
 	logrus.Debug("LIST Tokens Invoked")
 	tokens := make([]v3.Token, 0)
 
-	storedToken, err := s.tokensClient.Get(tokenID, metav1.GetOptions{})
+	storedToken, err := s.getK8sTokenCR(tokenAuthValue)
 	if err != nil {
 		return tokens, 401, err
 	}
@@ -179,33 +223,21 @@ func (s *tokenAPIServer) getTokens(tokenID string) ([]v3.Token, int, error) {
 	}
 
 	for _, t := range tokenList.Items {
-		if isNotExpired(t) {
+		if IsNotExpired(t) {
 			tokens = append(tokens, t)
 		}
 	}
 	return tokens, 0, nil
 }
 
-func isNotExpired(token v3.Token) bool {
-	created := token.ObjectMeta.CreationTimestamp.Time
-	durationElapsed := time.Since(created)
-
-	ttlDuration, err := time.ParseDuration(strconv.Itoa(token.TTLMillis) + "ms")
-	if err != nil {
-		logrus.Errorf("Error parsing ttl %v", err)
-		return false
-	}
-
-	if durationElapsed.Seconds() <= ttlDuration.Seconds() {
-		return true
-	}
-	return false
-}
-
-func (s *tokenAPIServer) deleteToken(tokenKey string) (int, error) {
+func (s *tokenAPIServer) deleteToken(tokenAuthValue string) (int, error) {
 	logrus.Debug("DELETE Token Invoked")
 
-	err := s.tokensClient.Delete(tokenKey, &metav1.DeleteOptions{})
+	storedToken, err := s.getK8sTokenCR(tokenAuthValue)
+	if err != nil {
+		return 401, err
+	}
+	err = s.tokensClient.Delete(storedToken.ObjectMeta.Name, &metav1.DeleteOptions{})
 	if err != nil {
 		if e2, ok := err.(*errors.StatusError); ok && e2.Status().Code == 404 {
 			return 0, nil
@@ -217,17 +249,16 @@ func (s *tokenAPIServer) deleteToken(tokenKey string) (int, error) {
 }
 
 //getToken will get the token by ID if not expired
-func (s *tokenAPIServer) getTokenByID(tokenKey string, tokenID string) (v3.Token, int, error) {
+func (s *tokenAPIServer) getTokenByID(tokenAuthValue string, tokenID string) (v3.Token, int, error) {
 	logrus.Debug("GET Token Invoked")
 	token := &v3.Token{}
 
-	storedToken, err := s.getK8sTokenCR(tokenKey)
+	storedToken, err := s.getK8sTokenCR(tokenAuthValue)
 	if err != nil {
 		return *token, 401, err
 	}
 
-	token, err = s.getK8sTokenCR(tokenID)
-
+	token, err = s.tokensClient.Get(tokenID, metav1.GetOptions{})
 	if err != nil {
 		return v3.Token{}, 404, err
 	}
@@ -236,22 +267,9 @@ func (s *tokenAPIServer) getTokenByID(tokenKey string, tokenID string) (v3.Token
 		return v3.Token{}, 403, fmt.Errorf("access denied: cannot get token")
 	}
 
-	if !isNotExpired(*token) {
+	if !IsNotExpired(*token) {
 		return v3.Token{}, 404, fmt.Errorf("expired token")
 	}
 
 	return *token, 0, nil
-}
-
-//deleteTokenByID will delete the token by ID
-func (s *tokenAPIServer) deleteTokenByID(tokenKey string, tokenID string) (int, error) {
-	logrus.Debug("DELETE Derived Token Invoked")
-
-	_, status, err := s.getTokenByID(tokenKey, tokenID)
-
-	if err != nil {
-		return status, err
-	}
-
-	return s.deleteToken(tokenID)
 }

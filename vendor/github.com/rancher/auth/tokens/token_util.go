@@ -2,8 +2,13 @@ package tokens
 
 import (
 	"crypto/rand"
+	"github.com/sirupsen/logrus"
 	"math/big"
+	"strconv"
 	"strings"
+	"time"
+
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 const (
@@ -35,4 +40,28 @@ func getAuthProviderName(principalID string) string {
 func getUserID(principalID string) string {
 	parts := strings.Split(principalID, "://")
 	return parts[1]
+}
+
+func SplitTokenParts(tokenID string) (string, string) {
+	parts := strings.Split(tokenID, ":")
+	if len(parts) != 2 {
+		return parts[0], ""
+	}
+	return parts[0], parts[1]
+}
+
+func IsNotExpired(token v3.Token) bool {
+	created := token.ObjectMeta.CreationTimestamp.Time
+	durationElapsed := time.Since(created)
+
+	ttlDuration, err := time.ParseDuration(strconv.Itoa(token.TTLMillis) + "ms")
+	if err != nil {
+		logrus.Errorf("Error parsing ttl %v", err)
+		return false
+	}
+
+	if durationElapsed.Seconds() <= ttlDuration.Seconds() {
+		return true
+	}
+	return false
 }
