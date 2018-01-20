@@ -3,27 +3,24 @@ package capabilities
 import (
 	"net/http"
 	"context"
-	"google.golang.org/api/container/v1"
+	"google.golang.org/api/compute/v1"
 	"encoding/json"
-	"fmt"
 )
 
-const (
-	defaultCredentialEnv = "GOOGLE_APPLICATION_CREDENTIALS"
-)
-
-func NewGKEVersionsHandler() *gkeVersionHandler {
-	return &gkeVersionHandler{}
+func NewGKEZonesHandler() *gkeZonesHandler {
+	return &gkeZonesHandler{}
 }
 
-type gkeVersionHandler struct {
+type gkeZonesHandler struct {
+	Field string
 }
 
-type errorResponse struct {
-	Error string `json:"error"`
+type zoneCapabilitiesRequestBody struct {
+	capabilitiesRequestBody
+	Zone string `json:"zone"`
 }
 
-func (g *gkeVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
+func (g *gkeZonesHandler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodPost {
 		writer.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -46,13 +43,6 @@ func (g *gkeVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	zone := body.Zone
-	if zone == "" {
-		writer.WriteHeader(http.StatusBadRequest)
-		handleErr(writer, fmt.Errorf("invalid zone"))
-		return
-	}
-
 	client, err := g.getServiceClient(context.Background(), body.Credentials)
 
 	if err != nil {
@@ -61,7 +51,7 @@ func (g *gkeVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	result, err := client.Projects.Zones.GetServerconfig(body.ProjectId, zone).Do()
+	result, err := client.Zones.List(body.ProjectId).Do()
 
 	if err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
@@ -80,14 +70,14 @@ func (g *gkeVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Requ
 	writer.Write(serialized)
 }
 
-func (g *gkeVersionHandler) getServiceClient(ctx context.Context, credentialContent string) (*container.Service, error) {
+func (g *gkeZonesHandler) getServiceClient(ctx context.Context, credentialContent string) (*compute.Service, error) {
 	client, err := getOAuthClient(ctx, credentialContent)
 
 	if err != nil {
 		return nil, err
 	}
 
-	service, err := container.New(client)
+	service, err := compute.New(client)
 
 	if err != nil {
 		return nil, err
