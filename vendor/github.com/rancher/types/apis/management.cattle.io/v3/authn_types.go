@@ -83,5 +83,10 @@ type GithubCredential struct {
 }
 
 type ChangePasswordInput struct {
-	NewPassword string `json:"newPassword"`
+	CurrentPassword string `json:"currentPassword" norman:"type=string,required"`
+	NewPassword     string `json:"newPassword" norman:"type=string,required"`
+}
+
+type SetPasswordInput struct {
+	NewPassword string `json:"newPassword" norman:"type=string,required"`
 }

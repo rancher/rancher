@@ -103,18 +103,19 @@ type Schema struct {
 	CollectionFilters map[string]Filter `json:"collectionFilters,omitempty"`
 	Scope             TypeScope         `json:"-"`
 
-	InternalSchema *Schema        `json:"-"`
-	Mapper         Mapper         `json:"-"`
-	ActionHandler  ActionHandler  `json:"-"`
-	LinkHandler    RequestHandler `json:"-"`
-	ListHandler    RequestHandler `json:"-"`
-	CreateHandler  RequestHandler `json:"-"`
-	DeleteHandler  RequestHandler `json:"-"`
-	UpdateHandler  RequestHandler `json:"-"`
-	Formatter      Formatter      `json:"-"`
-	ErrorHandler   ErrorHandler   `json:"-"`
-	Validator      Validator      `json:"-"`
-	Store          Store          `json:"-"`
+	InternalSchema      *Schema             `json:"-"`
+	Mapper              Mapper              `json:"-"`
+	ActionHandler       ActionHandler       `json:"-"`
+	LinkHandler         RequestHandler      `json:"-"`
+	ListHandler         RequestHandler      `json:"-"`
+	CreateHandler       RequestHandler      `json:"-"`
+	DeleteHandler       RequestHandler      `json:"-"`
+	UpdateHandler       RequestHandler      `json:"-"`
+	Formatter           Formatter           `json:"-"`
+	CollectionFormatter CollectionFormatter `json:"-"`
+	ErrorHandler        ErrorHandler        `json:"-"`
+	Validator           Validator           `json:"-"`
+	Store               Store               `json:"-"`
 }
 
 type Field struct {
@@ -147,4 +148,8 @@ type Filter struct {
 
 type ListOpts struct {
 	Filters map[string]interface{}
+}
+
+func (c *Collection) AddAction(apiContext *APIContext, name string) {
+	c.Actions[name] = apiContext.URLBuilder.CollectionAction(apiContext.Schema, nil, name)
 }

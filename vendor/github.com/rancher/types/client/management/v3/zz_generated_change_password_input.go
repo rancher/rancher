@@ -1,10 +1,12 @@
 package client
 
 const (
-	ChangePasswordInputType             = "changePasswordInput"
-	ChangePasswordInputFieldNewPassword = "newPassword"
+	ChangePasswordInputType                 = "changePasswordInput"
+	ChangePasswordInputFieldCurrentPassword = "currentPassword"
+	ChangePasswordInputFieldNewPassword     = "newPassword"
 )
 
 type ChangePasswordInput struct {
-	NewPassword string `json:"newPassword,omitempty"`
+	CurrentPassword string `json:"currentPassword,omitempty"`
+	NewPassword     string `json:"newPassword,omitempty"`
 }

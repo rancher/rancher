@@ -56,7 +56,7 @@ type UserOperations interface {
 	ByID(id string) (*User, error)
 	Delete(container *User) error
 
-	ActionChangepassword(*User, *ChangePasswordInput) (*User, error)
+	ActionSetpassword(*User, *SetPasswordInput) (*User, error)
 }
 
 func newUserClient(apiClient *Client) *UserClient {
@@ -104,11 +104,11 @@ func (c *UserClient) Delete(container *User) error {
 	return c.apiClient.Ops.DoResourceDelete(UserType, &container.Resource)
 }
 
-func (c *UserClient) ActionChangepassword(resource *User, input *ChangePasswordInput) (*User, error) {
+func (c *UserClient) ActionSetpassword(resource *User, input *SetPasswordInput) (*User, error) {
 
 	resp := &User{}
 
-	err := c.apiClient.Ops.DoAction(UserType, "changepassword", &resource.Resource, input, resp)
+	err := c.apiClient.Ops.DoAction(UserType, "setpassword", &resource.Resource, input, resp)
 
 	return resp, err
 }
