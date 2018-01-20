@@ -110,16 +110,7 @@ func (m *MachinesSyncer) reconcileAll() error {
 	// reconcile machines for existing nodes
 	for name, node := range nodeMap {
 		machine, _ := machineMap[name]
-		remove := false
-		if node.DeletionTimestamp != nil {
-			if machine == nil {
-				// machine is already removed
-				continue
-			}
-			remove = true
-		}
-
-		err = m.reconcileMachineForNode(machine, remove, node, nodeToPodMap)
+		err = m.reconcileMachineForNode(machine, node, nodeToPodMap)
 		if err != nil {
 			return err
 		}
@@ -127,17 +118,16 @@ func (m *MachinesSyncer) reconcileAll() error {
 	// run the logic for machine to remove
 	for name, machine := range machineMap {
 		if _, ok := nodeMap[name]; !ok {
-			m.reconcileMachineForNode(machine, true, nil, nil)
+			if err := m.removeMachine(machine); err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
 }
 
-func (m *MachinesSyncer) reconcileMachineForNode(machine *v3.Machine, remove bool, node *corev1.Node, pods map[string][]*corev1.Pod) error {
-	if remove {
-		return m.removeMachine(machine)
-	}
+func (m *MachinesSyncer) reconcileMachineForNode(machine *v3.Machine, node *corev1.Node, pods map[string][]*corev1.Pod) error {
 	if machine == nil {
 		return m.createMachine(node, pods)
 	}
@@ -145,6 +135,10 @@ func (m *MachinesSyncer) reconcileMachineForNode(machine *v3.Machine, remove boo
 }
 
 func (m *MachinesSyncer) removeMachine(machine *v3.Machine) error {
+	// never delete RKE node
+	if machine.Spec.MachineTemplateName != "" {
+		return nil
+	}
 	err := m.machinesClient.Delete(machine.ObjectMeta.Name, nil)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to delete machine [%s]", machine.Name)
