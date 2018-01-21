@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/juju/ratelimit"
 	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/types"
 	"github.com/sirupsen/logrus"
@@ -53,11 +54,16 @@ func NewGenericController(name string, objectClient *clientbase.ObjectClient) Ge
 		},
 		objectClient.Factory.Object(), resyncPeriod, cache.Indexers{})
 
+	rl := workqueue.NewMaxOfRateLimiter(
+		workqueue.NewItemExponentialFailureRateLimiter(500*time.Millisecond, 1000*time.Second),
+		// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
+		&workqueue.BucketRateLimiter{Bucket: ratelimit.NewBucketWithRate(float64(10), int64(100))},
+	)
+
 	return &genericController{
 		informer: informer,
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(),
-			name),
-		name: name,
+		queue:    workqueue.NewNamedRateLimitingQueue(rl, name),
+		name:     name,
 	}
 }
 
