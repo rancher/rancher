@@ -259,14 +259,17 @@ func (b *Builder) convert(fieldType string, value interface{}, op Operation) (in
 	case "string":
 		return convert.ToString(value), nil
 	case "dnsLabel":
-		value := convert.ToString(value)
+		str := convert.ToString(value)
+		if str == "" {
+			return "", nil
+		}
 		if op == Create || op == Update {
-			if errs := validation.IsDNS1123Subdomain(convert.ToString(value)); len(errs) != 0 {
+			if errs := validation.IsDNS1123Subdomain(str); len(errs) != 0 {
 				return value, httperror.NewAPIError(httperror.InvalidFormat, fmt.Sprintf("invalid value %s: %s", value,
 					strings.Join(errs, ",")))
 			}
 		}
-		return value, nil
+		return str, nil
 	case "intOrString":
 		num, err := convert.ToNumber(value)
 		if err == nil {
