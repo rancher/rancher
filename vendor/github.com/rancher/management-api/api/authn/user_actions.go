@@ -62,10 +62,6 @@ func (h *Handler) changePassword(actionName string, action *types.Action, reques
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid new password")
 	}
 
-	if currentPass == newPass {
-		return httperror.NewAPIError(httperror.InvalidBodyContent, "new password must be different from current")
-	}
-
 	user, err := h.UserClient.Get(userID, v1.GetOptions{})
 	if err != nil {
 		return err

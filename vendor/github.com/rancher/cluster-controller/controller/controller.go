@@ -15,7 +15,9 @@ import (
 )
 
 func Register(ctx context.Context, management *config.ManagementContext) {
-	auth.Register(ctx, management)
+	// auth handlers need to run early to create namespaces that back clusters and projects
+	// also, these handlers are purely in the mgmt plane, so they are lightweight compared to those that interact with machines and clusters
+	auth.RegisterEarly(ctx, management)
 	agent.Register(ctx, management)
 	machineController.Register(management)
 	catalogController.Register(ctx, management)
@@ -23,5 +25,6 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	clusterstats.Register(management)
 	clusterevents.Register(ctx, management)
 	clusterprovisioner.Register(management)
+	auth.RegisterLate(ctx, management)
 	registerClusterScopedGC(ctx, management)
 }

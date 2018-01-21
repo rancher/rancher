@@ -188,36 +188,42 @@ func (m *MachinesSyncer) createMachine(node *corev1.Node, pods map[string][]*cor
 }
 
 func (m *MachinesSyncer) getMachineForNode(nodeName string, cache bool) (*v3.Machine, error) {
-	var machines []*v3.Machine
-	var err error
 	if cache {
-		machines, err = m.machines.List(m.clusterNamespace, labels.NewSelector())
+		machines, err := m.machines.List(m.clusterNamespace, labels.NewSelector())
 		if err != nil {
 			return nil, err
+		}
+		for _, machine := range machines {
+			if isMachineForNode(nodeName, machine) {
+				return machine, nil
+			}
 		}
 	} else {
-		machinelist, err := m.machinesClient.List(metav1.ListOptions{})
+		machines, err := m.machinesClient.List(metav1.ListOptions{})
 		if err != nil {
 			return nil, err
 		}
-		for _, machine := range machinelist.Items {
-			machines = append(machines, &machine)
-		}
-	}
-
-	for _, machine := range machines {
-		if machine.Status.NodeName == nodeName {
-			return machine, nil
-		}
-		// to handle the case when machine was provisioned first
-		if machine.Status.NodeConfig != nil {
-			if machine.Status.NodeConfig.HostnameOverride == nodeName {
-				return machine, nil
+		for _, machine := range machines.Items {
+			if isMachineForNode(nodeName, &machine) {
+				return &machine, nil
 			}
 		}
 	}
 
 	return nil, nil
+}
+
+func isMachineForNode(nodeName string, machine *v3.Machine) bool {
+	if machine.Status.NodeName == nodeName {
+		return true
+	}
+	// to handle the case when machine was provisioned first
+	if machine.Status.NodeConfig != nil {
+		if machine.Status.NodeConfig.HostnameOverride == nodeName {
+			return true
+		}
+	}
+	return false
 }
 
 func getNodeNameFromMachine(machine *v3.Machine) string {

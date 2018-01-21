@@ -13,7 +13,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
@@ -50,55 +49,11 @@ func (n *nsLifecycle) Remove(obj *v1.Namespace) (*v1.Namespace, error) {
 }
 
 func (n *nsLifecycle) syncNS(obj *v1.Namespace) error {
-	if err := n.ensureDefaultNamespaceAssigned(obj); err != nil {
-		return err
-	}
-
 	if err := n.ensurePRTBAddToNamespace(obj); err != nil {
 		return err
 	}
 
 	return n.reconcileNamespaceProjectClusterRole(obj)
-}
-
-func (n *nsLifecycle) ensureDefaultNamespaceAssigned(ns *v1.Namespace) error {
-	if ns.Name != "default" {
-		return nil
-	}
-
-	cluster, err := n.m.clusterLister.Get("", n.m.clusterName)
-	if err != nil {
-		return err
-	}
-	if cluster == nil {
-		return errors.Errorf("couldn't find cluster %v", n.m.clusterName)
-	}
-
-	updateCluster := false
-	c, err := v3.ClusterConditionDefaultNamespaceAssigned.DoUntilTrue(cluster.DeepCopy(), func() (runtime.Object, error) {
-		updateCluster = true
-		projectID := ns.Annotations[projectIDAnnotation]
-		if projectID != "" {
-			return nil, nil
-		}
-
-		ns = ns.DeepCopy()
-		if ns.Annotations == nil {
-			ns.Annotations = map[string]string{}
-		}
-		ns.Annotations[projectIDAnnotation] = fmt.Sprintf("%v:rancher-default", n.m.clusterName)
-		if _, err := n.m.workload.Core.Namespaces(n.m.clusterName).Update(ns); err != nil {
-			return nil, err
-		}
-
-		return nil, nil
-	})
-	if updateCluster {
-		if _, err := n.m.workload.Management.Management.Clusters("").ObjectClient().Update(cluster.Name, c); err != nil {
-			return err
-		}
-	}
-	return err
 }
 
 func (n *nsLifecycle) ensurePRTBAddToNamespace(obj *v1.Namespace) error {
