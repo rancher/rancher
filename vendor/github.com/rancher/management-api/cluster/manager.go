@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/rest"
 )
 
@@ -24,9 +25,15 @@ type Manager struct {
 }
 
 type record struct {
-	handler http.Handler
-	ctx     context.Context
-	cancel  context.CancelFunc
+	handler        http.Handler
+	cluster        *v3.Cluster
+	clusterContext *config.ClusterContext
+	ctx            context.Context
+	cancel         context.CancelFunc
+}
+
+func (r *record) start() {
+	r.clusterContext.Start(r.ctx)
 }
 
 func NewManager(management *config.ManagementContext) *Manager {
@@ -40,7 +47,11 @@ func NewManager(management *config.ManagementContext) *Manager {
 func (c *Manager) APIServer(ctx context.Context, cluster *client.Cluster) http.Handler {
 	obj, ok := c.servers.Load(cluster.Uuid)
 	if ok {
-		return obj.(*record).handler
+		r := obj.(*record)
+		if !c.changed(r) {
+			return obj.(*record).handler
+		}
+		c.stop(r)
 	}
 
 	server, err := c.toServer(cluster)
@@ -53,43 +64,75 @@ func (c *Manager) APIServer(ctx context.Context, cluster *client.Cluster) http.H
 
 	obj, loaded := c.servers.LoadOrStore(cluster.Uuid, server)
 	if !loaded {
-		go func() {
-			time.Sleep(10 * time.Minute)
-			c.servers.Delete(cluster.Uuid)
-			time.Sleep(time.Minute)
-			obj.(*record).cancel()
-		}()
+		r := obj.(*record)
+		go r.start()
+		go c.watch(r)
 	}
 
 	return obj.(*record).handler
 }
 
-func (c *Manager) toRESTConfig(publicCluster *client.Cluster) (*rest.Config, error) {
+func (c *Manager) changed(r *record) bool {
+	existing, err := c.ClusterLister.Get("", r.cluster.Name)
+	if errors.IsNotFound(err) {
+		return true
+	} else if err != nil {
+		return false
+	}
+
+	if existing.Status.APIEndpoint != r.cluster.Status.APIEndpoint ||
+		existing.Status.ServiceAccountToken != r.cluster.Status.ServiceAccountToken ||
+		existing.Status.CACert != r.cluster.Status.CACert {
+		return true
+	}
+
+	return false
+}
+
+func (c *Manager) watch(r *record) {
+	for {
+		time.Sleep(15 * time.Second)
+		if c.changed(r) {
+			c.stop(r)
+			break
+		}
+	}
+}
+
+func (c *Manager) stop(r *record) {
+	c.servers.Delete(r.cluster.UID)
+	go func() {
+		time.Sleep(time.Minute)
+		r.cancel()
+	}()
+}
+
+func (c *Manager) toRESTConfig(publicCluster *client.Cluster) (*rest.Config, *v3.Cluster, error) {
 	cluster, err := c.ClusterLister.Get("", publicCluster.ID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if cluster == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	if cluster.Spec.Internal {
-		return c.LocalConfig, nil
+		return c.LocalConfig, cluster, nil
 	}
 
 	if cluster.Status.APIEndpoint == "" || cluster.Status.CACert == "" || cluster.Status.ServiceAccountToken == "" {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	u, err := url.Parse(cluster.Status.APIEndpoint)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	caBytes, err := base64.StdEncoding.DecodeString(cluster.Status.CACert)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	return &rest.Config{
@@ -99,11 +142,11 @@ func (c *Manager) toRESTConfig(publicCluster *client.Cluster) (*rest.Config, err
 		TLSClientConfig: rest.TLSClientConfig{
 			CAData: caBytes,
 		},
-	}, nil
+	}, cluster, nil
 }
 
 func (c *Manager) toServer(cluster *client.Cluster) (*record, error) {
-	kubeConfig, err := c.toRESTConfig(cluster)
+	kubeConfig, clusterInternal, err := c.toRESTConfig(cluster)
 	if kubeConfig == nil || err != nil {
 		return nil, err
 	}
@@ -121,8 +164,7 @@ func (c *Manager) toServer(cluster *client.Cluster) (*record, error) {
 		return nil, err
 	}
 
-	if err := clusterContext.Start(s.ctx); err != nil {
-		return s, err
-	}
+	s.clusterContext = clusterContext
+	s.cluster = clusterInternal.DeepCopy()
 	return s, nil
 }

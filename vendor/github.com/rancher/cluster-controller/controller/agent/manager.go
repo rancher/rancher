@@ -20,9 +20,10 @@ type Manager struct {
 }
 
 type record struct {
-	cluster *config.ClusterContext
-	ctx     context.Context
-	cancel  context.CancelFunc
+	clusterRec *v3.Cluster
+	cluster    *config.ClusterContext
+	ctx        context.Context
+	cancel     context.CancelFunc
 }
 
 func NewManager(management *config.ManagementContext) *Manager {
@@ -45,7 +46,10 @@ func (m *Manager) Stop(cluster *v3.Cluster) {
 func (m *Manager) Start(ctx context.Context, cluster *v3.Cluster) error {
 	obj, ok := m.controllers.Load(cluster.UID)
 	if ok {
-		return nil
+		if !m.changed(obj.(*record), cluster) {
+			return nil
+		}
+		m.Stop(obj.(*record).clusterRec)
 	}
 
 	controller, err := m.toRecord(ctx, cluster)
@@ -55,13 +59,25 @@ func (m *Manager) Start(ctx context.Context, cluster *v3.Cluster) error {
 
 	obj, loaded := m.controllers.LoadOrStore(cluster.UID, controller)
 	if !loaded {
-		if err := m.doStart(obj.(*record)); err != nil {
-			m.Stop(cluster)
-			return err
-		}
+		go func() {
+			if err := m.doStart(obj.(*record)); err != nil {
+				m.Stop(cluster)
+			}
+		}()
 	}
 
 	return nil
+}
+
+func (m *Manager) changed(r *record, cluster *v3.Cluster) bool {
+	existing := r.clusterRec
+	if existing.Status.APIEndpoint != cluster.Status.APIEndpoint ||
+		existing.Status.ServiceAccountToken != cluster.Status.ServiceAccountToken ||
+		existing.Status.CACert != cluster.Status.CACert {
+		return true
+	}
+
+	return false
 }
 
 func (m *Manager) doStart(rec *record) error {
@@ -117,7 +133,8 @@ func (m *Manager) toRecord(ctx context.Context, cluster *v3.Cluster) (*record, e
 	}
 
 	s := &record{
-		cluster: clusterContext,
+		cluster:    clusterContext,
+		clusterRec: cluster,
 	}
 	s.ctx, s.cancel = context.WithCancel(ctx)
 

@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"reflect"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/condition"
 	corev1 "github.com/rancher/types/apis/core/v1"
@@ -12,10 +14,13 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const creatorIDAnn = "field.cattle.io/creatorId"
+
+var defaultProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/default-project": "true"})
 
 func newPandCLifecycles(management *config.ManagementContext) (*projectLifecycle, *clusterLifecycle) {
 	m := &mgr{
@@ -38,22 +43,37 @@ type projectLifecycle struct {
 	mgr *mgr
 }
 
-func (l *projectLifecycle) Create(obj *v3.Project) (*v3.Project, error) {
-	_, err := l.mgr.reconcileResourceToNamespace(obj)
+func (l *projectLifecycle) sync(key string, orig *v3.Project) error {
+	obj := orig.DeepCopyObject()
+
+	obj, err := l.mgr.reconcileResourceToNamespace(obj)
 	if err != nil {
-		return obj, err
+		return err
 	}
 
-	_, err = l.mgr.reconcileCreatorRTB(obj)
-	return obj, err
+	obj, err = l.mgr.reconcileCreatorRTB(obj)
+	if err != nil {
+		return err
+	}
+
+	// update if it has changed
+	if obj != nil && !reflect.DeepEqual(orig, obj) {
+		_, err = l.mgr.mgmt.Management.Projects("").ObjectClient().Update(orig.Name, obj)
+		if err != nil {
+			return err
+		}
+	}
+	return err
+}
+
+func (l *projectLifecycle) Create(obj *v3.Project) (*v3.Project, error) {
+	// no-op because the sync function will take care of it
+	return obj, nil
 }
 
 func (l *projectLifecycle) Updated(obj *v3.Project) (*v3.Project, error) {
-	_, err := l.mgr.reconcileResourceToNamespace(obj)
-	if err != nil {
-		return obj, err
-	}
-	return obj, err
+	// no-op because the sync function will take care of it
+	return obj, nil
 }
 
 func (l *projectLifecycle) Remove(obj *v3.Project) (*v3.Project, error) {
@@ -65,29 +85,41 @@ type clusterLifecycle struct {
 	mgr *mgr
 }
 
+func (l *clusterLifecycle) sync(key string, orig *v3.Cluster) error {
+	obj := orig.DeepCopyObject()
+	obj, err := l.mgr.reconcileResourceToNamespace(obj)
+	if err != nil {
+		return err
+	}
+
+	obj, err = l.mgr.createDefaultProject(obj)
+	if err != nil {
+		return err
+	}
+
+	obj, err = l.mgr.reconcileCreatorRTB(obj)
+	if err != nil {
+		return err
+	}
+
+	// update if it has changed
+	if obj != nil && !reflect.DeepEqual(orig, obj) {
+		_, err = l.mgr.mgmt.Management.Clusters("").ObjectClient().Update(orig.Name, obj)
+		if err != nil {
+			return err
+		}
+	}
+	return err
+}
+
 func (l *clusterLifecycle) Create(obj *v3.Cluster) (*v3.Cluster, error) {
-	_, err := l.mgr.reconcileResourceToNamespace(obj)
-	if err != nil {
-		return obj, err
-	}
-
-	_, err = l.mgr.createDefaultProject(obj)
-	if err != nil {
-		return obj, err
-	}
-
-	_, err = l.mgr.reconcileCreatorRTB(obj)
-	return obj, err
+	// no-op because the sync function will take care of it
+	return obj, nil
 }
 
 func (l *clusterLifecycle) Updated(obj *v3.Cluster) (*v3.Cluster, error) {
-	_, err := l.mgr.reconcileResourceToNamespace(obj)
-	if err != nil {
-		return obj, err
-	}
-
-	_, err = l.mgr.createDefaultProject(obj)
-	return obj, err
+	// no-op because the sync function will take care of it
+	return obj, nil
 }
 
 func (l *clusterLifecycle) Remove(obj *v3.Cluster) (*v3.Cluster, error) {
@@ -104,16 +136,19 @@ type mgr struct {
 	crtbLister v3.ClusterRoleTemplateBindingLister
 }
 
-func (m *mgr) createDefaultProject(obj *v3.Cluster) (runtime.Object, error) {
+func (m *mgr) createDefaultProject(obj runtime.Object) (runtime.Object, error) {
 	return v3.ClusterConditionconditionDefautlProjectCreated.DoUntilTrue(obj, func() (runtime.Object, error) {
-		projectName := "rancher-default"
-		p, _ := m.projectLister.Get(obj.Name, projectName)
-		if p != nil {
-			return obj, nil
-		}
 		metaAccessor, err := meta.Accessor(obj)
 		if err != nil {
 			return obj, err
+		}
+
+		projects, err := m.projectLister.List(metaAccessor.GetName(), defaultProjectLabels.AsSelector())
+		if err != nil {
+			return obj, err
+		}
+		if len(projects) > 0 {
+			return obj, nil
 		}
 
 		creatorID, ok := metaAccessor.GetAnnotations()[creatorIDAnn]
@@ -122,17 +157,18 @@ func (m *mgr) createDefaultProject(obj *v3.Cluster) (runtime.Object, error) {
 			return obj, nil
 		}
 
-		_, err = m.mgmt.Management.Projects(obj.Name).Create(&v3.Project{
+		_, err = m.mgmt.Management.Projects(metaAccessor.GetName()).Create(&v3.Project{
 			ObjectMeta: v1.ObjectMeta{
-				Name: projectName,
+				GenerateName: "project-",
 				Annotations: map[string]string{
 					creatorIDAnn: creatorID,
 				},
+				Labels: defaultProjectLabels,
 			},
 			Spec: v3.ProjectSpec{
 				DisplayName: "Default",
 				Description: "Default project created for the cluster",
-				ClusterName: obj.Name,
+				ClusterName: metaAccessor.GetName(),
 			},
 		})
 
@@ -141,7 +177,7 @@ func (m *mgr) createDefaultProject(obj *v3.Cluster) (runtime.Object, error) {
 }
 
 func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
-	return v3.CreatorMadeOwner.Do(obj, func() (runtime.Object, error) {
+	return v3.CreatorMadeOwner.DoUntilTrue(obj, func() (runtime.Object, error) {
 		metaAccessor, err := meta.Accessor(obj)
 		if err != nil {
 			return obj, err
