@@ -29,23 +29,27 @@ var (
 	}
 )
 
-func New(ctx context.Context, management *config.ManagementContext) (http.Handler, error) {
+func New(ctx context.Context, httpPort, httpsPort int, management *config.ManagementContext) error {
+	var result http.Handler
 	tokenAPI, err := server.NewTokenAPIHandler(ctx, management)
 
-	managementAPI, err := managementapi.New(ctx, management)
+	managementAPI, err := managementapi.New(ctx, httpPort, httpsPort, management, func() http.Handler {
+		return result
+	})
+
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	k8sProxy, err := k8sProxy.New(management)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	authedHandler, err := filter.NewAuthenticationFilter(ctx, management,
 		newAuthed(tokenAPI, managementAPI, k8sProxy))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	unauthed := mux.NewRouter()
@@ -60,7 +64,8 @@ func New(ctx context.Context, management *config.ManagementContext) (http.Handle
 
 	registerHealth(unauthed)
 
-	return unauthed, nil
+	result = unauthed
+	return nil
 }
 
 func newAuthed(tokenAPI http.Handler, managementAPI http.Handler, k8sproxy http.Handler) *mux.Router {

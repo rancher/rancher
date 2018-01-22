@@ -2,10 +2,7 @@ package app
 
 import (
 	"context"
-	"fmt"
 	"log"
-	"net/http"
-	"os"
 
 	"time"
 
@@ -21,16 +18,34 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/cert"
 )
+
+type Config struct {
+	HTTPOnly          bool
+	ACMEDomains       []string
+	KubeConfig        string
+	HTTPListenPort    int
+	HTTPSListenPort   int
+	InteralListenPort int
+	K8sMode           string
+	AddLocal          bool
+	Debug             bool
+	ListenConfig      *v3.ListenConfig
+}
 
 var defaultAdminLabel = map[string]string{"authz.management.cattle.io/bootstrapping": "admin-user"}
 
-func Run(ctx context.Context, kubeConfig rest.Config, listenPort int, local bool) error {
+func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 	management, err := config.NewManagementContext(kubeConfig)
 	if err != nil {
 		return err
 	}
 	management.LocalConfig = &kubeConfig
+
+	if err := ReadTLSConfig(cfg); err != nil {
+		return err
+	}
 
 	for {
 		_, err := management.K8sClient.Discovery().ServerVersion()
@@ -41,33 +56,82 @@ func Run(ctx context.Context, kubeConfig rest.Config, listenPort int, local bool
 		time.Sleep(2 * time.Second)
 	}
 
-	handler, err := server.New(context.Background(), management)
-	if err != nil {
+	if err := server.New(ctx, cfg.HTTPListenPort, cfg.HTTPSListenPort, management); err != nil {
 		return err
 	}
-
-	go func() {
-		<-ctx.Done()
-		if ctx.Err() != nil {
-			log.Fatal(ctx.Err())
-		}
-		os.Exit(1)
-	}()
 
 	managementController.Register(ctx, management)
-
-	management.Start(ctx)
-
-	if err := addData(management, local); err != nil {
+	if err := management.Start(ctx); err != nil {
 		return err
 	}
 
-	fmt.Printf("Listening on 0.0.0.0:%d\n", listenPort)
-	return http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", listenPort), handler)
+	if err := addData(management, *cfg); err != nil {
+		return err
+	}
+
+	<-ctx.Done()
+	if ctx.Err() != nil {
+		log.Fatal(ctx.Err())
+	}
+
+	return ctx.Err()
 }
 
-func addData(management *config.ManagementContext, local bool) error {
+func addData(management *config.ManagementContext, cfg Config) error {
+	if err := addListenConfig(management, cfg); err != nil {
+		return err
+	}
 
+	if err := addRoles(management, cfg.AddLocal); err != nil {
+		return err
+	}
+
+	return addMachineDrivers(management)
+}
+
+func addListenConfig(management *config.ManagementContext, cfg Config) error {
+	existing, err := management.Management.ListenConfigs("").Get(cfg.ListenConfig.Name, v1.GetOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	if apierrors.IsNotFound(err) {
+		existing = nil
+	}
+
+	if existing != nil {
+		if cfg.ListenConfig.CACerts == "" {
+			cfg.ListenConfig.CACerts = existing.CACerts
+		}
+		if cfg.ListenConfig.Key == "" {
+			cfg.ListenConfig.Key = existing.Key
+		}
+		if cfg.ListenConfig.Cert == "" {
+			cfg.ListenConfig.Cert = existing.Cert
+		}
+	}
+
+	if cfg.ListenConfig.Key == "" || cfg.ListenConfig.Cert == "" {
+		cert, key, err := cert.GenerateSelfSignedCertKey("rancher", nil, nil)
+		if err != nil {
+			return err
+		}
+
+		cfg.ListenConfig.Cert = string(cert)
+		cfg.ListenConfig.CACerts = string(cert)
+		cfg.ListenConfig.Key = string(key)
+	}
+
+	if existing == nil {
+		_, err := management.Management.ListenConfigs("").Create(cfg.ListenConfig)
+		return err
+	}
+
+	cfg.ListenConfig.ResourceVersion = existing.ResourceVersion
+	_, err = management.Management.ListenConfigs("").Update(cfg.ListenConfig)
+	return err
+}
+
+func addRoles(management *config.ManagementContext, local bool) error {
 	rb := newRoleBuilder()
 
 	rb.addRole("Create Clusters", "create-clusters").addRule().apiGroups("management.cattle.io").resources("clusters").verbs("create")
@@ -321,7 +385,7 @@ func addData(management *config.ManagementContext, local bool) error {
 		})
 	}
 
-	return addMachineDrivers(management)
+	return nil
 }
 
 func addMachineDrivers(management *config.ManagementContext) error {

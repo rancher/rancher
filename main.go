@@ -1,18 +1,13 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"os"
-	ossignal "os/signal"
 	"path/filepath"
-	"runtime"
 	"syscall"
 
 	"github.com/docker/docker/pkg/reexec"
-	"github.com/maruel/panicparse/stack"
 	"github.com/rancher/norman/signal"
 	"github.com/rancher/rancher/app"
 	"github.com/rancher/rancher/k8s"
@@ -23,15 +18,6 @@ import (
 var (
 	VERSION = "dev"
 )
-
-type Config struct {
-	KubeConfig        string
-	HTTPListenPort    int
-	InteralListenPort int
-	K8sMode           string
-	AddLocal          bool
-	Debug             bool
-}
 
 func main() {
 	if reexec.Init() {
@@ -49,7 +35,9 @@ func main() {
 		os.Setenv("PATH", newPath)
 	}
 
-	config := Config{}
+	config := app.Config{
+		InteralListenPort: 8081,
+	}
 
 	app := cli.NewApp()
 	app.Version = VERSION
@@ -77,10 +65,10 @@ func main() {
 			Destination: &config.HTTPListenPort,
 		},
 		cli.IntFlag{
-			Name:        "internal-api-listen-port",
-			Usage:       "Listen port to embedded k8s API server",
-			Value:       8081,
-			Destination: &config.InteralListenPort,
+			Name:        "https-listen-port",
+			Usage:       "HTTPS listen port",
+			Value:       8443,
+			Destination: &config.HTTPSListenPort,
 		},
 		cli.StringFlag{
 			Name:        "k8s-mode",
@@ -88,9 +76,19 @@ func main() {
 			Value:       "internal",
 			Destination: &config.K8sMode,
 		},
+		cli.StringSliceFlag{
+			Name:  "acme-domain",
+			Usage: "Domain to register with LetsEncrypt",
+		},
+		cli.BoolFlag{
+			Name:        "http-only",
+			Usage:       "Disable HTTPS",
+			Destination: &config.HTTPOnly,
+		},
 	}
 
 	app.Action = func(c *cli.Context) error {
+		config.ACMEDomains = c.GlobalStringSlice("acme-domains")
 		return run(config)
 	}
 
@@ -101,13 +99,12 @@ func main() {
 	app.Run(os.Args)
 }
 
-func run(cfg Config) error {
+func run(cfg app.Config) error {
 	if cfg.Debug {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 
-	setupGoroutineDump()
-
+	signal.GoroutineDumpOn(syscall.SIGUSR1, syscall.SIGILL)
 	ctx := signal.SigTermCancelContext(context.Background())
 
 	os.Args = []string{os.Args[0]}
@@ -116,38 +113,7 @@ func run(cfg Config) error {
 		return err
 	}
 
-	return app.Run(ctx, *kubeConfig, cfg.HTTPListenPort, local)
-}
+	cfg.AddLocal = local
 
-func setupGoroutineDump() {
-	c := make(chan os.Signal, 1)
-	ossignal.Notify(c, syscall.SIGUSR1, syscall.SIGILL)
-	go func() {
-		for range c {
-			var (
-				buf       []byte
-				stackSize int
-			)
-			bufferLen := 16384
-			for stackSize == len(buf) {
-				buf = make([]byte, bufferLen)
-				stackSize = runtime.Stack(buf, true)
-				bufferLen *= 2
-			}
-			buf = buf[:stackSize]
-			src := bytes.NewBuffer(buf)
-			if goroutines, err := stack.ParseDump(src, os.Stderr); err == nil {
-				buckets := stack.SortBuckets(stack.Bucketize(goroutines, stack.AnyValue))
-				srcLen, pkgLen := stack.CalcLengths(buckets, true)
-				p := &stack.Palette{}
-				for _, bucket := range buckets {
-					_, _ = io.WriteString(os.Stderr, p.BucketHeader(&bucket, true, len(buckets) > 1))
-					_, _ = io.WriteString(os.Stderr, p.StackLines(&bucket.Signature, srcLen, pkgLen, true))
-				}
-			} else {
-				io.Copy(os.Stderr, src)
-
-			}
-		}
-	}()
+	return app.Run(ctx, *kubeConfig, &cfg)
 }
