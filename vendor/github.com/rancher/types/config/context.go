@@ -294,6 +294,10 @@ func NewWorkloadContext(config rest.Config, clusterName string) (*WorkloadContex
 	context := &WorkloadContext{
 		RESTConfig:  config,
 		ClusterName: clusterName,
+		Schemas: types.NewSchemas().
+			AddSchemas(managementSchema.Schemas).
+			AddSchemas(clusterSchema.Schemas).
+			AddSchemas(projectSchema.Schemas),
 	}
 
 	context.K8sClient, err = kubernetes.NewForConfig(&config)
