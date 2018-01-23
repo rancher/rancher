@@ -13,6 +13,7 @@ const (
 	MachineFieldConditions           = "conditions"
 	MachineFieldCreated              = "created"
 	MachineFieldCreatorID            = "creatorId"
+	MachineFieldCustomConfig         = "customConfig"
 	MachineFieldDescription          = "description"
 	MachineFieldHostname             = "hostname"
 	MachineFieldIPAddress            = "ipAddress"
@@ -54,6 +55,7 @@ type Machine struct {
 	Conditions           []MachineCondition        `json:"conditions,omitempty"`
 	Created              string                    `json:"created,omitempty"`
 	CreatorID            string                    `json:"creatorId,omitempty"`
+	CustomConfig         *CustomConfig             `json:"customConfig,omitempty"`
 	Description          string                    `json:"description,omitempty"`
 	Hostname             string                    `json:"hostname,omitempty"`
 	IPAddress            string                    `json:"ipAddress,omitempty"`

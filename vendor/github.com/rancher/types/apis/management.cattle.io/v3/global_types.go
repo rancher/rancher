@@ -8,9 +8,9 @@ type Setting struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Value     string `json:"value" norman:"required"`
-	HideValue bool   `json:"hideValue" norman:"noupdate"`
-	ReadOnly  bool   `json:"readOnly" norman:"nocreate,noupdate"`
+	Value      string `json:"value" norman:"required"`
+	Default    string `json:"default" norman:"nocreate,noupdate"`
+	Customized bool   `json:"customized" norman:"nocreate,noupdate"`
 }
 
 type ListenConfig struct {
@@ -21,6 +21,8 @@ type ListenConfig struct {
 	Description string   `json:"description,omitempty"`
 	Mode        string   `json:"mode,omitempty" norman:"type=enum,options=https|http|acme"`
 	CACerts     string   `json:"caCerts,omitempty"`
+	CACert      string   `json:"caCert,omitempty"`
+	CAKey       string   `json:"caKey,omitempty"`
 	Cert        string   `json:"cert,omitempty"`
 	Key         string   `json:"key,omitempty" norman:"writeOnly"`
 	Domains     []string `json:"domains,omitempty"`

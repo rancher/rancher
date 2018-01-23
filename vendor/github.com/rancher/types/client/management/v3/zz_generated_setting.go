@@ -9,11 +9,11 @@ const (
 	SettingFieldAnnotations     = "annotations"
 	SettingFieldCreated         = "created"
 	SettingFieldCreatorID       = "creatorId"
-	SettingFieldHideValue       = "hideValue"
+	SettingFieldCustomized      = "customized"
+	SettingFieldDefault         = "default"
 	SettingFieldLabels          = "labels"
 	SettingFieldName            = "name"
 	SettingFieldOwnerReferences = "ownerReferences"
-	SettingFieldReadOnly        = "readOnly"
 	SettingFieldRemoved         = "removed"
 	SettingFieldUuid            = "uuid"
 	SettingFieldValue           = "value"
@@ -24,11 +24,11 @@ type Setting struct {
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	Created         string            `json:"created,omitempty"`
 	CreatorID       string            `json:"creatorId,omitempty"`
-	HideValue       *bool             `json:"hideValue,omitempty"`
+	Customized      *bool             `json:"customized,omitempty"`
+	Default         string            `json:"default,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`
 	Name            string            `json:"name,omitempty"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
-	ReadOnly        *bool             `json:"readOnly,omitempty"`
 	Removed         string            `json:"removed,omitempty"`
 	Uuid            string            `json:"uuid,omitempty"`
 	Value           string            `json:"value,omitempty"`

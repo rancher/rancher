@@ -103,15 +103,29 @@ type MachineConfig struct {
 	Annotations map[string]string `json:"annotations"`
 }
 
+type CustomConfig struct {
+	// IP or FQDN that is fully resolvable and used for SSH communication
+	Address string `yaml:"address" json:"address,omitempty"`
+	// Optional - Internal address that will be used for components communication
+	InternalAddress string `yaml:"internal_address" json:"internalAddress,omitempty"`
+	// SSH user that will be used by RKE
+	User string `yaml:"user" json:"user,omitempty"`
+	// Optional - Docker socket on the node that will be used in tunneling
+	DockerSocket string `yaml:"docker_socket" json:"dockerSocket,omitempty"`
+	// SSH Private Key
+	SSHKey string `yaml:"ssh_key" json:"sshKey,omitempty"`
+}
+
 type MachineSpec struct {
-	NodeSpec             v1.NodeSpec `json:"nodeSpec"`
-	Description          string      `json:"description,omitempty"`
-	DisplayName          string      `json:"displayName"`
-	RequestedHostname    string      `json:"requestedHostname,omitempty" norman:"noupdate"`
-	ClusterName          string      `json:"clusterName,omitempty" norman:"type=reference[cluster],noupdate,required"`
-	Role                 []string    `json:"role,omitempty" norman:"noupdate,type=array[enum],options=etcd|worker|controlplane"`
-	MachineTemplateName  string      `json:"machineTemplateName,omitempty" norman:"type=reference[machineTemplate],noupdate"`
-	UseInternalIPAddress bool        `json:"useInternalIpAddress,omitempty" norman:"default=true,noupdate"`
+	NodeSpec             v1.NodeSpec   `json:"nodeSpec"`
+	CustomConfig         *CustomConfig `json:"customConfig"`
+	Description          string        `json:"description,omitempty"`
+	DisplayName          string        `json:"displayName"`
+	RequestedHostname    string        `json:"requestedHostname,omitempty" norman:"noupdate"`
+	ClusterName          string        `json:"clusterName,omitempty" norman:"type=reference[cluster],noupdate,required"`
+	Role                 []string      `json:"role,omitempty" norman:"noupdate,type=array[enum],options=etcd|worker|controlplane"`
+	MachineTemplateName  string        `json:"machineTemplateName,omitempty" norman:"type=reference[machineTemplate],noupdate"`
+	UseInternalIPAddress bool          `json:"useInternalIpAddress,omitempty" norman:"default=true,noupdate"`
 }
 
 type MachineCommonParams struct {

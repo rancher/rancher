@@ -47,14 +47,17 @@ type ClusterSpec struct {
 	DisplayName                          string                         `json:"displayName"`
 	Description                          string                         `json:"description"`
 	Internal                             bool                           `json:"internal" norman:"nocreate,noupdate"`
-	Imported                             bool                           `json:"imported" norman:"noupdate"`
-	Embedded                             bool                           `json:"embedded" norman:"noupdate"`
-	EmbeddedConfig                       *K8sServerConfig               `json:"embeddedConfig"`
+	ImportedConfig                       *ImportedConfig                `json:"importedConfig" norman:"noupdate"`
+	EmbeddedConfig                       *K8sServerConfig               `json:"embeddedConfig" norman:"noupdate"`
 	GoogleKubernetesEngineConfig         *GoogleKubernetesEngineConfig  `json:"googleKubernetesEngineConfig,omitempty"`
 	AzureKubernetesServiceConfig         *AzureKubernetesServiceConfig  `json:"azureKubernetesServiceConfig,omitempty"`
 	RancherKubernetesEngineConfig        *RancherKubernetesEngineConfig `json:"rancherKubernetesEngineConfig,omitempty"`
 	DefaultPodSecurityPolicyTemplateName string                         `json:"defaultPodSecurityPolicyTemplateName,omitempty" norman:"type=reference[podSecurityPolicyTemplate]"`
 	DefaultClusterRoleForProjectMembers  string                         `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
+}
+
+type ImportedConfig struct {
+	KubeConfig string `json:"kubeConfig"`
 }
 
 type K8sServerConfig struct {

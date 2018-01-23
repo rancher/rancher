@@ -71,7 +71,7 @@ func (s *Factory) Get(req *http.Request) (*v3.Cluster, http.Handler, error) {
 }
 
 func (s *Factory) newServer(c *v3.Cluster) (Server, error) {
-	if c.Spec.Embedded {
+	if c.Spec.EmbeddedConfig != nil {
 		//return embedded.New(s.config, c, s.config.Lookup)
 		return nil, nil
 	}

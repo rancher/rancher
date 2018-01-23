@@ -7,6 +7,7 @@ import (
 
 	"github.com/rancher/management-api/pkg/cert"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/settings"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"k8s.io/apimachinery/pkg/labels"
@@ -77,6 +78,7 @@ func (c *Controller) enable(listener *v3.ListenConfig) error {
 }
 
 func (c *Controller) updateCurrent(listener *v3.ListenConfig) error {
+	settings.CACerts.Set(listener.CACerts)
 	if listener.Key != "" && listener.CACerts != "" && listener.Cert != "" {
 		certInfo, err := cert.Info(listener.Cert+"\n"+listener.CACerts, listener.Key)
 		if err != nil {

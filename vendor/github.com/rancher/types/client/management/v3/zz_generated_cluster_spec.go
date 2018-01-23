@@ -7,10 +7,9 @@ const (
 	ClusterSpecFieldDefaultPodSecurityPolicyTemplateId  = "defaultPodSecurityPolicyTemplateId"
 	ClusterSpecFieldDescription                         = "description"
 	ClusterSpecFieldDisplayName                         = "displayName"
-	ClusterSpecFieldEmbedded                            = "embedded"
 	ClusterSpecFieldEmbeddedConfig                      = "embeddedConfig"
 	ClusterSpecFieldGoogleKubernetesEngineConfig        = "googleKubernetesEngineConfig"
-	ClusterSpecFieldImported                            = "imported"
+	ClusterSpecFieldImportedConfig                      = "importedConfig"
 	ClusterSpecFieldInternal                            = "internal"
 	ClusterSpecFieldNodes                               = "nodes"
 	ClusterSpecFieldRancherKubernetesEngineConfig       = "rancherKubernetesEngineConfig"
@@ -22,10 +21,9 @@ type ClusterSpec struct {
 	DefaultPodSecurityPolicyTemplateId  string                         `json:"defaultPodSecurityPolicyTemplateId,omitempty"`
 	Description                         string                         `json:"description,omitempty"`
 	DisplayName                         string                         `json:"displayName,omitempty"`
-	Embedded                            *bool                          `json:"embedded,omitempty"`
 	EmbeddedConfig                      *K8sServerConfig               `json:"embeddedConfig,omitempty"`
 	GoogleKubernetesEngineConfig        *GoogleKubernetesEngineConfig  `json:"googleKubernetesEngineConfig,omitempty"`
-	Imported                            *bool                          `json:"imported,omitempty"`
+	ImportedConfig                      *ImportedConfig                `json:"importedConfig,omitempty"`
 	Internal                            *bool                          `json:"internal,omitempty"`
 	Nodes                               []MachineConfig                `json:"nodes,omitempty"`
 	RancherKubernetesEngineConfig       *RancherKubernetesEngineConfig `json:"rancherKubernetesEngineConfig,omitempty"`
