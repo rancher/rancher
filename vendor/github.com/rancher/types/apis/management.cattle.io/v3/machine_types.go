@@ -72,6 +72,7 @@ type MachineStatus struct {
 	NodeAnnotations     map[string]string    `json:"nodeAnnotations,omitempty"`
 	NodeLabels          map[string]string    `json:"nodeLabels,omitempty"`
 	Token               string               `json:"token"`
+	NodeTaints          []v1.Taint           `json:"nodeTaints,omitempty"`
 }
 
 var (

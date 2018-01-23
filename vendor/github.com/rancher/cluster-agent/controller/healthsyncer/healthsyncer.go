@@ -24,16 +24,16 @@ const (
 
 type HealthSyncer struct {
 	clusterName       string
-	clusters          v3.ClusterLister
-	clustersClient    v3.ClusterInterface
+	clusterLister     v3.ClusterLister
+	clusters          v3.ClusterInterface
 	componentStatuses corev1.ComponentStatusInterface
 }
 
 func Register(ctx context.Context, workload *config.ClusterContext) {
 	h := &HealthSyncer{
 		clusterName:       workload.ClusterName,
-		clusters:          workload.Management.Management.Clusters("").Controller().Lister(),
-		clustersClient:    workload.Management.Management.Clusters(""),
+		clusterLister:     workload.Management.Management.Clusters("").Controller().Lister(),
+		clusters:          workload.Management.Management.Clusters(""),
 		componentStatuses: workload.Core.ComponentStatuses(""),
 	}
 
@@ -76,7 +76,7 @@ func (h *HealthSyncer) updateClusterHealth() error {
 		return cluster, nil
 	})
 
-	_, err = h.clustersClient.Update(newObj.(*v3.Cluster))
+	_, err = h.clusters.Update(newObj.(*v3.Cluster))
 	if err != nil {
 		return fmt.Errorf("Failed to update cluster [%s] %v", cluster.Name, err)
 	}
@@ -86,7 +86,7 @@ func (h *HealthSyncer) updateClusterHealth() error {
 }
 
 func (h *HealthSyncer) getCluster() (*v3.Cluster, error) {
-	return h.clusters.Get("", h.clusterName)
+	return h.clusterLister.Get("", h.clusterName)
 }
 
 func convertToClusterComponentStatus(cs *v1.ComponentStatus) *v3.ClusterComponentStatus {

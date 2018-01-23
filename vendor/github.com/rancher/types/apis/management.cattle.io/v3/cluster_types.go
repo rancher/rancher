@@ -17,6 +17,7 @@ const (
 	ClusterConditionProvisioned condition.Cond = "Provisioned"
 	ClusterConditionUpdated     condition.Cond = "Updated"
 	ClusterConditionRemoved     condition.Cond = "Removed"
+	ClusterConditionRegistered  condition.Cond = "Registered"
 	// ClusterConditionNoDiskPressure true when all cluster nodes have sufficient disk
 	ClusterConditionNoDiskPressure condition.Cond = "NoDiskPressure"
 	// ClusterConditionNoMemoryPressure true when all cluster nodes have sufficient memory
@@ -46,7 +47,8 @@ type ClusterSpec struct {
 	DisplayName                          string                         `json:"displayName"`
 	Description                          string                         `json:"description"`
 	Internal                             bool                           `json:"internal" norman:"nocreate,noupdate"`
-	Embedded                             bool                           `json:"embedded"`
+	Imported                             bool                           `json:"imported" norman:"noupdate"`
+	Embedded                             bool                           `json:"embedded" norman:"noupdate"`
 	EmbeddedConfig                       *K8sServerConfig               `json:"embeddedConfig"`
 	GoogleKubernetesEngineConfig         *GoogleKubernetesEngineConfig  `json:"googleKubernetesEngineConfig,omitempty"`
 	AzureKubernetesServiceConfig         *AzureKubernetesServiceConfig  `json:"azureKubernetesServiceConfig,omitempty"`

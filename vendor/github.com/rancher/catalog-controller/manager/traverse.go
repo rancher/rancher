@@ -23,14 +23,14 @@ func traverseFiles(repoPath, kind, catalogName string, catalogType CatalogType) 
 	}
 	if kind == HelmTemplateType {
 		if catalogType == CatalogTypeHelmGitRepo {
-			return traverseHelmGitFiles(repoPath)
+			return traverseHelmGitFiles(repoPath, catalogName)
 		}
-		return traverseHelmFiles(repoPath)
+		return traverseHelmFiles(repoPath, catalogName)
 	}
 	return nil, nil, fmt.Errorf("Unknown kind %s", kind)
 }
 
-func traverseHelmGitFiles(repoPath string) ([]v3.Template, []error, error) {
+func traverseHelmGitFiles(repoPath, catalogName string) ([]v3.Template, []error, error) {
 	fullpath := path.Join(repoPath, "stable")
 
 	templates := []v3.Template{}
@@ -75,6 +75,7 @@ func traverseHelmGitFiles(repoPath string) ([]v3.Template, []error, error) {
 			template.Spec.Icon = iconData
 			template.Spec.IconFilename = iconFilename
 			template.Spec.FolderName = components[0]
+			template.Spec.CatalogID = catalogName
 			template.Name = components[0]
 			template.Spec.Versions[0].Revision = &rev
 			template.Spec.Versions[0].Version = metadata.Version
@@ -98,7 +99,7 @@ func traverseHelmGitFiles(repoPath string) ([]v3.Template, []error, error) {
 	return templates, errors, err
 }
 
-func traverseHelmFiles(repoPath string) ([]v3.Template, []error, error) {
+func traverseHelmFiles(repoPath, catalogName string) ([]v3.Template, []error, error) {
 	index, err := helm.LoadIndex(repoPath)
 	if err != nil {
 		return nil, nil, err
@@ -124,10 +125,10 @@ func traverseHelmFiles(repoPath string) ([]v3.Template, []error, error) {
 		template.Spec.Icon = iconData
 		template.Spec.IconFilename = iconFilename
 		template.Spec.Base = HelmTemplateBaseType
+		template.Spec.FolderName = chart
 		versions := make([]v3.TemplateVersionSpec, 0)
-		for i, version := range metadata {
+		for _, version := range metadata {
 			v := v3.TemplateVersionSpec{
-				Revision: &i,
 				Version:  version.Version,
 			}
 			files, err := helm.FetchFiles(version.URLs)
@@ -145,10 +146,21 @@ func traverseHelmFiles(repoPath string) ([]v3.Template, []error, error) {
 				filesToAdd = append(filesToAdd, file)
 			}
 			v.Files = filesToAdd
+			v.UpgradeVersionLinks = map[string]string{}
+			for _, versionSpec := range template.Spec.Versions {
+				if showUpgradeLinks(v.Version, versionSpec.Version, versionSpec.UpgradeFrom) {
+					revision := versionSpec.Version
+					if v.Revision != nil {
+						revision = strconv.Itoa(*versionSpec.Revision)
+					}
+					v.UpgradeVersionLinks[versionSpec.Version] = fmt.Sprintf("%s-%s", template.Name, revision)
+				}
+			}
+			v.ExternalID = fmt.Sprintf("catalog://?catalog=%s&base=%s&template=%s&version=%s", catalogName, template.Spec.Base, template.Spec.FolderName, v.Version)
 			versions = append(versions, v)
 		}
-		template.Spec.FolderName = chart
 		template.Spec.Versions = versions
+		template.Spec.CatalogID = catalogName
 
 		templates = append(templates, template)
 	}

@@ -38,6 +38,8 @@ type Interface interface {
 	DynamicSchemasGetter
 	StacksGetter
 	PreferencesGetter
+	ListenConfigsGetter
+	SettingsGetter
 }
 
 type Client struct {
@@ -69,6 +71,8 @@ type Client struct {
 	dynamicSchemaControllers              map[string]DynamicSchemaController
 	stackControllers                      map[string]StackController
 	preferenceControllers                 map[string]PreferenceController
+	listenConfigControllers               map[string]ListenConfigController
+	settingControllers                    map[string]SettingController
 }
 
 func NewForConfig(config rest.Config) (Interface, error) {
@@ -109,6 +113,8 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		dynamicSchemaControllers:              map[string]DynamicSchemaController{},
 		stackControllers:                      map[string]StackController{},
 		preferenceControllers:                 map[string]PreferenceController{},
+		listenConfigControllers:               map[string]ListenConfigController{},
+		settingControllers:                    map[string]SettingController{},
 	}, nil
 }
 
@@ -430,6 +436,32 @@ type PreferencesGetter interface {
 func (c *Client) Preferences(namespace string) PreferenceInterface {
 	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &PreferenceResource, PreferenceGroupVersionKind, preferenceFactory{})
 	return &preferenceClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type ListenConfigsGetter interface {
+	ListenConfigs(namespace string) ListenConfigInterface
+}
+
+func (c *Client) ListenConfigs(namespace string) ListenConfigInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &ListenConfigResource, ListenConfigGroupVersionKind, listenConfigFactory{})
+	return &listenConfigClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type SettingsGetter interface {
+	Settings(namespace string) SettingInterface
+}
+
+func (c *Client) Settings(namespace string) SettingInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &SettingResource, SettingGroupVersionKind, settingFactory{})
+	return &settingClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

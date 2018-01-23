@@ -65,7 +65,7 @@ func checkDockerVersion(ctx context.Context, h *Host) error {
 		return fmt.Errorf("Error while determining supported Docker version [%s]: %v", info.ServerVersion, err)
 	}
 
-	if !isvalid && h.EnforceDockerVersion {
+	if !isvalid && !h.IgnoreDockerVersion {
 		return fmt.Errorf("Unsupported Docker version found [%s], supported versions are %v", info.ServerVersion, docker.K8sDockerVersions[K8sVersion])
 	} else if !isvalid {
 		log.Warnf(ctx, "Unsupported Docker version found [%s], supported versions are %v", info.ServerVersion, docker.K8sDockerVersions[K8sVersion])

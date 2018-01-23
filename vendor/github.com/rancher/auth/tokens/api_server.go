@@ -116,7 +116,7 @@ func (s *tokenAPIServer) createDerivedToken(jsonInput v3.Token, tokenAuthValue s
 
 	logrus.Debug("Create Derived Token Invoked")
 
-	token, err := s.getK8sTokenCR(tokenAuthValue)
+	token, _, err := s.getK8sTokenCR(tokenAuthValue)
 	if err != nil {
 		return v3.Token{}, 401, err
 	}
@@ -168,7 +168,7 @@ func (s *tokenAPIServer) createK8sTokenCR(key string, k8sToken *v3.Token) (v3.To
 	return *createdToken, nil
 }
 
-func (s *tokenAPIServer) getK8sTokenCR(tokenAuthValue string) (*v3.Token, error) {
+func (s *tokenAPIServer) getK8sTokenCR(tokenAuthValue string) (*v3.Token, int, error) {
 	tokenName, tokenKey := SplitTokenParts(tokenAuthValue)
 
 	lookupUsingClient := false
@@ -178,7 +178,7 @@ func (s *tokenAPIServer) getK8sTokenCR(tokenAuthValue string) (*v3.Token, error)
 		if apierrors.IsNotFound(err) {
 			lookupUsingClient = true
 		} else {
-			return nil, fmt.Errorf("failed to retrieve auth token from cache, error: %v", err)
+			return nil, 0, fmt.Errorf("failed to retrieve auth token from cache, error: %v", err)
 		}
 	} else if len(objs) == 0 {
 		lookupUsingClient = true
@@ -188,21 +188,21 @@ func (s *tokenAPIServer) getK8sTokenCR(tokenAuthValue string) (*v3.Token, error)
 	if lookupUsingClient {
 		storedToken, err = s.tokensClient.Get(tokenName, metav1.GetOptions{})
 		if err != nil {
-			return nil, fmt.Errorf("failed to retrieve auth token, error: %#v", err)
+			return nil, 404, fmt.Errorf("failed to retrieve auth token, error: %#v", err)
 		}
 	} else {
 		storedToken = objs[0].(*v3.Token)
 	}
 
 	if storedToken.Token != tokenKey || storedToken.ObjectMeta.Name != tokenName {
-		return nil, fmt.Errorf("Invalid auth token value")
+		return nil, 0, fmt.Errorf("Invalid auth token value")
 	}
 
 	if !IsNotExpired(*storedToken) {
-		return nil, fmt.Errorf("Auth Token has expired")
+		return storedToken, 410, fmt.Errorf("Auth Token has expired")
 	}
 
-	return storedToken, nil
+	return storedToken, 0, nil
 }
 
 //GetTokens will list all derived tokens of the authenticated user - only derived
@@ -210,7 +210,7 @@ func (s *tokenAPIServer) getTokens(tokenAuthValue string) ([]v3.Token, int, erro
 	logrus.Debug("LIST Tokens Invoked")
 	tokens := make([]v3.Token, 0)
 
-	storedToken, err := s.getK8sTokenCR(tokenAuthValue)
+	storedToken, _, err := s.getK8sTokenCR(tokenAuthValue)
 	if err != nil {
 		return tokens, 401, err
 	}
@@ -233,9 +233,13 @@ func (s *tokenAPIServer) getTokens(tokenAuthValue string) ([]v3.Token, int, erro
 func (s *tokenAPIServer) deleteToken(tokenAuthValue string) (int, error) {
 	logrus.Debug("DELETE Token Invoked")
 
-	storedToken, err := s.getK8sTokenCR(tokenAuthValue)
+	storedToken, status, err := s.getK8sTokenCR(tokenAuthValue)
 	if err != nil {
-		return 401, err
+		if status == 404 {
+			return 0, nil
+		} else if status != 410 {
+			return 401, err
+		}
 	}
 	err = s.tokensClient.Delete(storedToken.ObjectMeta.Name, &metav1.DeleteOptions{})
 	if err != nil {
@@ -253,7 +257,7 @@ func (s *tokenAPIServer) getTokenByID(tokenAuthValue string, tokenID string) (v3
 	logrus.Debug("GET Token Invoked")
 	token := &v3.Token{}
 
-	storedToken, err := s.getK8sTokenCR(tokenAuthValue)
+	storedToken, _, err := s.getK8sTokenCR(tokenAuthValue)
 	if err != nil {
 		return *token, 401, err
 	}
@@ -268,7 +272,7 @@ func (s *tokenAPIServer) getTokenByID(tokenAuthValue string, tokenID string) (v3
 	}
 
 	if !IsNotExpired(*token) {
-		return v3.Token{}, 404, fmt.Errorf("expired token")
+		return v3.Token{}, 410, fmt.Errorf("expired token")
 	}
 
 	return *token, 0, nil

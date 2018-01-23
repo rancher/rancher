@@ -18,7 +18,7 @@ type RancherKubernetesEngineConfig struct {
 	// Authorization mode configuration used in the cluster
 	Authorization AuthzConfig `yaml:"authorization" json:"authorization,omitempty"`
 	// Enable/disable strict docker version checking
-	EnforceDockerVersion bool `yaml:"enforce_docker_version" json:"enforceDockerVersion"`
+	IgnoreDockerVersion bool `yaml:"ignore_docker_version" json:"ignoreDockerVersion"`
 }
 
 type RKEConfigNode struct {

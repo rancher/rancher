@@ -25,6 +25,7 @@ type CertificateInfo struct {
 	KeySize                 int       `json:"keySize"`
 	SerialNumber            string    `json:"serialNumber"`
 	SubjectAlternativeNames []string  `json:"subjectAlternativeNames"`
+	Version                 int       `json:"version"`
 }
 
 func Info(pemCerts, pemKey string) (*CertificateInfo, error) {
@@ -69,6 +70,7 @@ func Info(pemCerts, pemKey string) (*CertificateInfo, error) {
 		certInfo.Issuer = cert.Issuer.CommonName
 		certInfo.KeySize = len(key.N.Bytes())
 		certInfo.SerialNumber = cert.SerialNumber.String()
+		certInfo.Version = cert.Version
 
 		for _, name := range cert.DNSNames {
 			certInfo.SubjectAlternativeNames = append(certInfo.SubjectAlternativeNames, name)

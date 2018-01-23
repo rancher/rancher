@@ -47,7 +47,7 @@ func (c *Cluster) InvertIndexHosts() error {
 			RKEConfigNode: host,
 		}
 
-		newHost.EnforceDockerVersion = c.EnforceDockerVersion
+		newHost.IgnoreDockerVersion = c.IgnoreDockerVersion
 
 		for _, role := range host.Role {
 			logrus.Debugf("Host: " + host.Address + " has role: " + role)

@@ -25,6 +25,7 @@ const (
 	MachineFieldNodeAnnotations      = "nodeAnnotations"
 	MachineFieldNodeLabels           = "nodeLabels"
 	MachineFieldNodeName             = "nodeName"
+	MachineFieldNodeTaints           = "nodeTaints"
 	MachineFieldOwnerReferences      = "ownerReferences"
 	MachineFieldPodCidr              = "podCidr"
 	MachineFieldProviderId           = "providerId"
@@ -65,6 +66,7 @@ type Machine struct {
 	NodeAnnotations      map[string]string         `json:"nodeAnnotations,omitempty"`
 	NodeLabels           map[string]string         `json:"nodeLabels,omitempty"`
 	NodeName             string                    `json:"nodeName,omitempty"`
+	NodeTaints           []Taint                   `json:"nodeTaints,omitempty"`
 	OwnerReferences      []OwnerReference          `json:"ownerReferences,omitempty"`
 	PodCidr              string                    `json:"podCidr,omitempty"`
 	ProviderId           string                    `json:"providerId,omitempty"`

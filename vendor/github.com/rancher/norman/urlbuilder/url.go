@@ -192,7 +192,11 @@ func parseRequestURL(r *http.Request) string {
 	}
 
 	// Use incoming url
-	return fmt.Sprintf("http://%s%s", r.Host, r.URL.Path)
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	return fmt.Sprintf("%s://%s%s", scheme, r.Host, r.URL.Path)
 }
 
 func getURLFromStandardHeaders(r *http.Request) string {

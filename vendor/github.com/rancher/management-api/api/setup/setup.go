@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/management-api/api/cluster"
 	"github.com/rancher/management-api/api/machine"
 	"github.com/rancher/management-api/api/project"
+	"github.com/rancher/management-api/api/stack"
 	clustermanager "github.com/rancher/management-api/cluster"
 	"github.com/rancher/management-api/store/cert"
 	"github.com/rancher/management-api/store/preference"
@@ -45,6 +46,7 @@ func Schemas(ctx context.Context, management *config.ManagementContext, schemas 
 	SecretTypes(schemas, management)
 	MachineTypes(schemas, management)
 	ClusterTypes(schemas)
+	Stack(schemas, management)
 
 	crdStore, err := crd.NewCRDStoreFromConfig(management.RESTConfig)
 	if err != nil {
@@ -62,7 +64,7 @@ func Schemas(ctx context.Context, management *config.ManagementContext, schemas 
 		return err
 	}
 
-	authn.SetUserStore(schemas.Schema(&managementschema.Version, client.UserType))
+	authn.SetUserStore(schemas.Schema(&managementschema.Version, client.UserType), management)
 	Preference(schemas, management)
 
 	NamespacedTypes(schemas)
@@ -200,5 +202,12 @@ func MachineTypes(schemas *types.Schemas, management *config.ManagementContext) 
 func ClusterTypes(schemas *types.Schemas) {
 	schema := schemas.Schema(&managementschema.Version, client.ClusterType)
 	schema.Validator = cluster.Validator
+}
 
+func Stack(schemas *types.Schemas, management *config.ManagementContext) {
+	schema := schemas.Schema(&managementschema.Version, client.StackType)
+	actionWrapper := stack.ActionWrapper{
+		Management: *management,
+	}
+	schema.ActionHandler = actionWrapper.ActionHandler
 }

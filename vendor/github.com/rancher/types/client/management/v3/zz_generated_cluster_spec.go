@@ -10,6 +10,7 @@ const (
 	ClusterSpecFieldEmbedded                            = "embedded"
 	ClusterSpecFieldEmbeddedConfig                      = "embeddedConfig"
 	ClusterSpecFieldGoogleKubernetesEngineConfig        = "googleKubernetesEngineConfig"
+	ClusterSpecFieldImported                            = "imported"
 	ClusterSpecFieldInternal                            = "internal"
 	ClusterSpecFieldNodes                               = "nodes"
 	ClusterSpecFieldRancherKubernetesEngineConfig       = "rancherKubernetesEngineConfig"
@@ -24,6 +25,7 @@ type ClusterSpec struct {
 	Embedded                            *bool                          `json:"embedded,omitempty"`
 	EmbeddedConfig                      *K8sServerConfig               `json:"embeddedConfig,omitempty"`
 	GoogleKubernetesEngineConfig        *GoogleKubernetesEngineConfig  `json:"googleKubernetesEngineConfig,omitempty"`
+	Imported                            *bool                          `json:"imported,omitempty"`
 	Internal                            *bool                          `json:"internal,omitempty"`
 	Nodes                               []MachineConfig                `json:"nodes,omitempty"`
 	RancherKubernetesEngineConfig       *RancherKubernetesEngineConfig `json:"rancherKubernetesEngineConfig,omitempty"`

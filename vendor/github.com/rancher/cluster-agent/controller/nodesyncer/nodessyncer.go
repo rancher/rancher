@@ -20,7 +20,7 @@ const (
 )
 
 type NodeSyncer struct {
-	machinesClient   v3.MachineInterface
+	machines         v3.MachineInterface
 	clusterNamespace string
 }
 
@@ -31,27 +31,25 @@ type PodsStatsSyncer struct {
 }
 
 type MachinesSyncer struct {
-	machinesClient   v3.MachineInterface
-	machines         v3.MachineLister
-	nodes            v1.NodeLister
-	clusters         v3.ClusterLister
-	pods             v1.PodLister
+	machines         v3.MachineInterface
+	machineLister    v3.MachineLister
+	nodeLister       v1.NodeLister
+	podLister        v1.PodLister
 	clusterNamespace string
 }
 
 func Register(cluster *config.ClusterContext) {
 	n := &NodeSyncer{
 		clusterNamespace: cluster.ClusterName,
-		machinesClient:   cluster.Management.Management.Machines(cluster.ClusterName),
+		machines:         cluster.Management.Management.Machines(cluster.ClusterName),
 	}
 
 	m := &MachinesSyncer{
 		clusterNamespace: cluster.ClusterName,
-		machinesClient:   cluster.Management.Management.Machines(cluster.ClusterName),
-		machines:         cluster.Management.Management.Machines(cluster.ClusterName).Controller().Lister(),
-		clusters:         cluster.Management.Management.Clusters("").Controller().Lister(),
-		nodes:            cluster.Core.Nodes("").Controller().Lister(),
-		pods:             cluster.Core.Pods("").Controller().Lister(),
+		machines:         cluster.Management.Management.Machines(cluster.ClusterName),
+		machineLister:    cluster.Management.Management.Machines(cluster.ClusterName).Controller().Lister(),
+		nodeLister:       cluster.Core.Nodes("").Controller().Lister(),
+		podLister:        cluster.Core.Pods("").Controller().Lister(),
 	}
 
 	p := &PodsStatsSyncer{
@@ -65,7 +63,7 @@ func Register(cluster *config.ClusterContext) {
 }
 
 func (n *NodeSyncer) sync(key string, node *corev1.Node) error {
-	n.machinesClient.Controller().Enqueue(n.clusterNamespace, allMachineKey)
+	n.machines.Controller().Enqueue(n.clusterNamespace, allMachineKey)
 	return nil
 }
 
@@ -82,7 +80,7 @@ func (m *MachinesSyncer) sync(key string, machine *v3.Machine) error {
 }
 
 func (m *MachinesSyncer) reconcileAll() error {
-	nodes, err := m.nodes.List("", labels.NewSelector())
+	nodes, err := m.nodeLister.List("", labels.NewSelector())
 	if err != nil {
 		return err
 	}
@@ -92,7 +90,7 @@ func (m *MachinesSyncer) reconcileAll() error {
 		nodeMap[node.Name] = node
 	}
 
-	machines, err := m.machines.List(m.clusterNamespace, labels.NewSelector())
+	machines, err := m.machineLister.List(m.clusterNamespace, labels.NewSelector())
 	machineMap := make(map[string]*v3.Machine)
 	for _, machine := range machines {
 		nodeName := getNodeNameFromMachine(machine)
@@ -139,7 +137,7 @@ func (m *MachinesSyncer) removeMachine(machine *v3.Machine) error {
 	if machine.Spec.MachineTemplateName != "" {
 		return nil
 	}
-	err := m.machinesClient.Delete(machine.ObjectMeta.Name, nil)
+	err := m.machines.Delete(machine.ObjectMeta.Name, nil)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to delete machine [%s]", machine.Name)
 	}
@@ -157,7 +155,7 @@ func (m *MachinesSyncer) updateMachine(existing *v3.Machine, node *corev1.Node, 
 		return nil
 	}
 	logrus.Debugf("Updating machine for node [%s]", node.Name)
-	_, err = m.machinesClient.Update(toUpdate)
+	_, err = m.machines.Update(toUpdate)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to update machine for node [%s]", node.Name)
 	}
@@ -179,7 +177,7 @@ func (m *MachinesSyncer) createMachine(node *corev1.Node, pods map[string][]*cor
 		return err
 	}
 
-	_, err = m.machinesClient.Create(machine)
+	_, err = m.machines.Create(machine)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to create machine for node [%s]", node.Name)
 	}
@@ -189,7 +187,7 @@ func (m *MachinesSyncer) createMachine(node *corev1.Node, pods map[string][]*cor
 
 func (m *MachinesSyncer) getMachineForNode(nodeName string, cache bool) (*v3.Machine, error) {
 	if cache {
-		machines, err := m.machines.List(m.clusterNamespace, labels.NewSelector())
+		machines, err := m.machineLister.List(m.clusterNamespace, labels.NewSelector())
 		if err != nil {
 			return nil, err
 		}
@@ -199,7 +197,7 @@ func (m *MachinesSyncer) getMachineForNode(nodeName string, cache bool) (*v3.Mac
 			}
 		}
 	} else {
-		machines, err := m.machinesClient.List(metav1.ListOptions{})
+		machines, err := m.machines.List(metav1.ListOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -314,7 +312,7 @@ func (m *MachinesSyncer) convertNodeToMachine(node *corev1.Node, existing *v3.Ma
 
 func (m *MachinesSyncer) getNonTerminatedPods() (map[string][]*corev1.Pod, error) {
 	pods := make(map[string][]*corev1.Pod)
-	fromCache, err := m.pods.List("", labels.NewSelector())
+	fromCache, err := m.podLister.List("", labels.NewSelector())
 	if err != nil {
 		return pods, err
 	}
