@@ -223,9 +223,6 @@ func addRoles(management *config.ManagementContext, local bool) error {
 	rb.addRoleTemplate("View Cluster Members", "view-cluster-members", "cluster", true, false, false).
 		addRule().apiGroups("management.cattle.io").resources("clusterroletemplatebindings").verbs("get", "list", "watch")
 
-	rb.addRoleTemplate("Impersonate", "impersonate", "cluster", true, false, false).
-		addRule().apiGroups("*").resources("users", "groups", "serviceaccounts").verbs("impersonate")
-
 	// Project roles
 	rb.addRoleTemplate("Project Owner", "project-owner", "project", true, false, false).
 		addRule().apiGroups("management.cattle.io").resources("projectroletemplatebindings").verbs("*").
