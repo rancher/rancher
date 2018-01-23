@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/docker/docker/pkg/reexec"
+	"github.com/rancher/norman/pkg/dump"
 	"github.com/rancher/norman/signal"
 	"github.com/rancher/rancher/app"
 	"github.com/rancher/rancher/k8s"
@@ -104,7 +105,7 @@ func run(cfg app.Config) error {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 
-	signal.GoroutineDumpOn(syscall.SIGUSR1, syscall.SIGILL)
+	dump.GoroutineDumpOn(syscall.SIGUSR1, syscall.SIGILL)
 	ctx := signal.SigTermCancelContext(context.Background())
 
 	os.Args = []string{os.Args[0]}
