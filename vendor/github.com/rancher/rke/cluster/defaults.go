@@ -24,7 +24,7 @@ const (
 	DefaultServiceSidekickImage = "rancher/rke-service-sidekick:v0.1.0"
 
 	DefaultEtcdImage = "quay.io/coreos/etcd:latest"
-	DefaultK8sImage  = "rancher/k8s:v1.8.3-rancher2"
+	DefaultK8sImage  = "rancher/k8s:v1.8.5-rancher4"
 
 	DefaultFlannelImage    = "quay.io/coreos/flannel:v0.9.1"
 	DefaultFlannelCNIImage = "quay.io/coreos/flannel-cni:v0.2.0"

@@ -27,14 +27,22 @@ const (
 	projectNamespaceAnnotation = "management.cattle.io/system-namespace"
 )
 
+type Controller struct {
+	secrets                   v1.SecretInterface
+	clusterNamespaceLister    v1.NamespaceLister
+	managementNamespaceLister v1.NamespaceLister
+	projectLister             v3.ProjectLister
+	clusterName               string
+}
+
 func Register(cluster *config.ClusterContext) {
 	clusterSecretsClient := cluster.Core.Secrets("")
 	s := &Controller{
-		clusterSecretsClient: clusterSecretsClient,
-		clusterNamespaces:    cluster.Core.Namespaces("").Controller().Lister(),
-		managementNamespaces: cluster.Management.Core.Namespaces("").Controller().Lister(),
-		projects:             cluster.Management.Management.Projects("").Controller().Lister(),
-		clusterName:          cluster.ClusterName,
+		secrets:                   clusterSecretsClient,
+		clusterNamespaceLister:    cluster.Core.Namespaces("").Controller().Lister(),
+		managementNamespaceLister: cluster.Management.Core.Namespaces("").Controller().Lister(),
+		projectLister:             cluster.Management.Management.Projects("").Controller().Lister(),
+		clusterName:               cluster.ClusterName,
 	}
 
 	n := &NamespaceController{
@@ -43,14 +51,6 @@ func Register(cluster *config.ClusterContext) {
 	}
 	cluster.Core.Namespaces("").AddHandler("secretsController", n.sync)
 	cluster.Management.Core.Secrets("").AddLifecycle("secretsController", s)
-}
-
-type Controller struct {
-	clusterSecretsClient v1.SecretInterface
-	clusterNamespaces    v1.NamespaceLister
-	managementNamespaces v1.NamespaceLister
-	projects             v3.ProjectLister
-	clusterName          string
 }
 
 type NamespaceController struct {
@@ -105,7 +105,7 @@ func (s *Controller) Remove(obj *corev1.Secret) (*corev1.Secret, error) {
 
 	for _, namespace := range clusterNamespaces {
 		logrus.Infof("Deleting secret [%s] in namespace [%s]", obj.Name, namespace.Name)
-		if err := s.clusterSecretsClient.DeleteNamespaced(namespace.Name, obj.Name, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+		if err := s.secrets.DeleteNamespaced(namespace.Name, obj.Name, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 			return nil, err
 		}
 	}
@@ -114,7 +114,7 @@ func (s *Controller) Remove(obj *corev1.Secret) (*corev1.Secret, error) {
 
 func (s *Controller) getClusterNamespaces(obj *corev1.Secret) ([]*corev1.Namespace, error) {
 	var toReturn []*corev1.Namespace
-	projectNamespace, err := s.managementNamespaces.Get("", obj.Namespace)
+	projectNamespace, err := s.managementNamespaceLister.Get("", obj.Namespace)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			logrus.Warnf("Project namespace [%s] can't be found", obj.Namespace)
@@ -130,7 +130,7 @@ func (s *Controller) getClusterNamespaces(obj *corev1.Secret) ([]*corev1.Namespa
 	}
 
 	// Ignore projects from other clusters. Project namespace name = project name, so use it to locate the project
-	_, err = s.projects.Get(s.clusterName, projectNamespace.Name)
+	_, err = s.projectLister.Get(s.clusterName, projectNamespace.Name)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			logrus.Warnf("Project [%s] can't be found", projectNamespace.Name)
@@ -139,7 +139,7 @@ func (s *Controller) getClusterNamespaces(obj *corev1.Secret) ([]*corev1.Namespa
 		return toReturn, err
 	}
 
-	namespaces, err := s.clusterNamespaces.List("", labels.NewSelector())
+	namespaces, err := s.clusterNamespaceLister.List("", labels.NewSelector())
 	if err != nil {
 		return toReturn, err
 	}
@@ -173,16 +173,16 @@ func (s *Controller) createOrUpdate(obj *corev1.Secret, action string) error {
 		switch action {
 		case create:
 			logrus.Infof("Copying secret [%s] into namespace [%s]", namespacedSecret.Name, namespace.Name)
-			_, err := s.clusterSecretsClient.Create(namespacedSecret)
+			_, err := s.secrets.Create(namespacedSecret)
 			if err != nil && !errors.IsAlreadyExists(err) {
 				return err
 			}
 		case update:
-			_, err := s.clusterSecretsClient.Update(namespacedSecret)
+			_, err := s.secrets.Update(namespacedSecret)
 			if err != nil && !errors.IsNotFound(err) {
 				return err
 			} else if errors.IsNotFound(err) {
-				_, err := s.clusterSecretsClient.Create(namespacedSecret)
+				_, err := s.secrets.Create(namespacedSecret)
 				if err != nil {
 					return err
 				}

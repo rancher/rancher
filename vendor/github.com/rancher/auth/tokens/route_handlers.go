@@ -240,6 +240,8 @@ func (s *tokenAPIServer) getToken(request *types.APIContext) error {
 		logrus.Errorf("GetToken failed with error: %v", err)
 		if status == 0 {
 			status = http.StatusInternalServerError
+		} else if status == 410 {
+			status = http.StatusNotFound
 		}
 		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
 	}
@@ -265,11 +267,13 @@ func (s *tokenAPIServer) removeToken(request *types.APIContext) error {
 	//getToken
 	_, status, err := s.getTokenByID(cookie.Value, tokenID)
 	if err != nil {
-		logrus.Errorf("DeleteToken Failed to fetch the token to delete with error: %v", err)
-		if status == 0 {
-			status = http.StatusInternalServerError
+		if status != 410 {
+			logrus.Errorf("DeleteToken Failed to fetch the token to delete with error: %v", err)
+			if status == 0 {
+				status = http.StatusInternalServerError
+			}
+			return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
 		}
-		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
 	}
 
 	tokenData, err := deleteTokenUsingStore(request, tokenID)

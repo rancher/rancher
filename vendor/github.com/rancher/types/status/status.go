@@ -34,6 +34,7 @@ var transitioningMap = map[string]string{
 	"PodScheduled":             "scheduling",
 	"Progressing":              "updating",
 	"Provisioned":              "provisioning",
+	"Registered":               "waiting",
 	"Removed":                  "removing",
 	"Saved":                    "saving",
 	"Updated":                  "updating",

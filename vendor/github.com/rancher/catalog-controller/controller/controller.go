@@ -16,7 +16,7 @@ import (
 
 func Register(ctx context.Context, management *config.ManagementContext) {
 	// TODO: Get values from settings
-	if err := Run(ctx, "", 60, management); err != nil {
+	if err := Run(ctx, "", 3600, management); err != nil {
 		panic(err)
 	}
 }

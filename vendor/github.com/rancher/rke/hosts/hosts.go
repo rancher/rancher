@@ -16,15 +16,15 @@ import (
 
 type Host struct {
 	v3.RKEConfigNode
-	DClient              *client.Client
-	LocalConnPort        int
-	IsControl            bool
-	IsWorker             bool
-	IsEtcd               bool
-	EnforceDockerVersion bool
-	ToAddEtcdMember      bool
-	ExistingEtcdCluster  bool
-	SavedKeyPhrase       string
+	DClient             *client.Client
+	LocalConnPort       int
+	IsControl           bool
+	IsWorker            bool
+	IsEtcd              bool
+	IgnoreDockerVersion bool
+	ToAddEtcdMember     bool
+	ExistingEtcdCluster bool
+	SavedKeyPhrase      string
 }
 
 const (

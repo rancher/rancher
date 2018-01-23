@@ -61,14 +61,23 @@ func (c Cond) Reason(obj runtime.Object, reason string) {
 	getFieldValue(cond, "Reason").SetString(reason)
 }
 
+func (c Cond) SetMessageIfBlank(obj runtime.Object, message string) {
+	if c.GetMessage(obj) == "" {
+		c.Message(obj, message)
+	}
+}
+
 func (c Cond) Message(obj runtime.Object, message string) {
 	cond := findOrCreateCond(obj, string(c))
 	setValue(cond, "Message", message)
 }
 
 func (c Cond) GetMessage(obj runtime.Object) string {
-	cond := findOrCreateCond(obj, string(c))
-	return getFieldValue(cond, "Message").String()
+	cond := findOrNotCreateCond(obj, string(c))
+	if cond == nil {
+		return ""
+	}
+	return getFieldValue(*cond, "Message").String()
 }
 
 func (c Cond) ReasonAndMessageFromError(obj runtime.Object, err error) {
@@ -85,8 +94,11 @@ func (c Cond) ReasonAndMessageFromError(obj runtime.Object, err error) {
 }
 
 func (c Cond) GetReason(obj runtime.Object) string {
-	cond := findOrCreateCond(obj, string(c))
-	return getFieldValue(cond, "Reason").String()
+	cond := findOrNotCreateCond(obj, string(c))
+	if cond == nil {
+		return ""
+	}
+	return getFieldValue(*cond, "Reason").String()
 }
 
 func (c Cond) Once(obj runtime.Object, f func() (runtime.Object, error)) (runtime.Object, error) {
@@ -162,8 +174,11 @@ func touchTS(value reflect.Value) {
 }
 
 func getStatus(obj interface{}, condName string) string {
-	cond := findOrCreateCond(obj, condName)
-	return getFieldValue(cond, "Status").String()
+	cond := findOrNotCreateCond(obj, condName)
+	if cond == nil {
+		return ""
+	}
+	return getFieldValue(*cond, "Status").String()
 }
 
 func setTS(obj interface{}, condName, ts string) {
@@ -172,8 +187,11 @@ func setTS(obj interface{}, condName, ts string) {
 }
 
 func getTS(obj interface{}, condName string) string {
-	cond := findOrCreateCond(obj, condName)
-	return getFieldValue(cond, "LastUpdateTime").String()
+	cond := findOrNotCreateCond(obj, condName)
+	if cond == nil {
+		return ""
+	}
+	return getFieldValue(*cond, "LastUpdateTime").String()
 }
 
 func setStatus(obj interface{}, condName, status string) {
@@ -187,6 +205,11 @@ func setValue(cond reflect.Value, fieldName, newValue string) {
 		value.SetString(newValue)
 		touchTS(cond)
 	}
+}
+
+func findOrNotCreateCond(obj interface{}, condName string) *reflect.Value {
+	condSlice := getValue(obj, "Status", "Conditions")
+	return findCond(condSlice, condName)
 }
 
 func findOrCreateCond(obj interface{}, condName string) reflect.Value {
@@ -216,6 +239,9 @@ func findCond(val reflect.Value, name string) *reflect.Value {
 }
 
 func getValue(obj interface{}, name ...string) reflect.Value {
+	if obj == nil {
+		return reflect.Value{}
+	}
 	v := reflect.ValueOf(obj)
 	t := v.Type()
 	if t.Kind() == reflect.Ptr {

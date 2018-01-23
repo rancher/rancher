@@ -40,11 +40,11 @@ func (p *prtbLifecycle) Remove(obj *v3.ProjectRoleTemplateBinding) (*v3.ProjectR
 		return nil, errors.Errorf("cannot determine project and cluster from %v", obj.ProjectName)
 	}
 	clusterName := parts[0]
-	err := p.mgr.reconcileProjectMembershipBindingForDelete(clusterName, string(obj.UID))
+	err := p.mgr.reconcileProjectMembershipBindingForDelete(clusterName, "", string(obj.UID))
 	if err != nil {
 		return nil, err
 	}
-	err = p.mgr.reconcileClusterMembershipBindingForDelete(string(obj.UID))
+	err = p.mgr.reconcileClusterMembershipBindingForDelete("", string(obj.UID))
 	return nil, err
 }
 
@@ -58,6 +58,7 @@ func (p *prtbLifecycle) ensureBindings(binding *v3.ProjectRoleTemplateBinding) e
 	if len(parts) < 2 {
 		return errors.Errorf("cannot determine project and cluster from %v", binding.ProjectName)
 	}
+
 	clusterName := parts[0]
 	projectName := parts[1]
 	proj, err := p.projectLister.Get(clusterName, projectName)
@@ -92,13 +93,7 @@ func (p *prtbLifecycle) ensureBindings(binding *v3.ProjectRoleTemplateBinding) e
 		return err
 	}
 
-	for _, resource := range projectManagmentPlanResources {
-		if err := p.mgr.grantManagementPlanePrivileges(binding.RoleTemplateName, resource, binding.Subject, binding); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return p.mgr.grantManagementPlanePrivileges(binding.RoleTemplateName, projectManagmentPlanResources, binding.Subject, binding)
 }
 
 // When a PRTB is created that gives a subject some permissions in a project or cluster, we need to create a "membership" binding
@@ -109,7 +104,27 @@ func (m *manager) ensureProjectMembershipBinding(roleName, rtbUID, namespace str
 	}
 
 	name := strings.ToLower(fmt.Sprintf("%v-%v", roleName, subject.Name))
-	rb, _ := m.rbLister.Get(namespace, name)
+	set := labels.Set(map[string]string{rtbUID: owner})
+	rbs, err := m.rbLister.List("", set.AsSelector())
+	if err != nil {
+		return err
+	}
+	var rb *v1.RoleBinding
+	for _, iRB := range rbs {
+		if iRB.Name == name {
+			rb = iRB
+			continue
+		}
+		if err := m.reconcileProjectMembershipBindingForDelete(namespace, roleName, rtbUID); err != nil {
+			return err
+		}
+	}
+
+	if rb != nil {
+		return nil
+	}
+
+	rb, _ = m.rbLister.Get(namespace, name)
 	if rb == nil {
 		_, err := m.mgmt.RBAC.RoleBindings(namespace).Create(&v1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
@@ -138,7 +153,7 @@ func (m *manager) ensureProjectMembershipBinding(roleName, rtbUID, namespace str
 		rb.Labels = map[string]string{}
 	}
 	rb.Labels[rtbUID] = owner
-	_, err := m.mgmt.RBAC.RoleBindings(namespace).Update(rb)
+	_, err = m.mgmt.RBAC.RoleBindings(namespace).Update(rb)
 	return err
 }
 
@@ -181,7 +196,7 @@ func (m *manager) createProjectMembershipRole(roleName, namespace string, projec
 
 // The PRTB has been deleted, either delete or update the project membership binding so that the subject
 // is removed from the project if they should be
-func (m *manager) reconcileProjectMembershipBindingForDelete(namespace, rtbUID string) error {
+func (m *manager) reconcileProjectMembershipBindingForDelete(namespace, roleToKeep, rtbUID string) error {
 	set := labels.Set(map[string]string{rtbUID: owner})
 	rbs, err := m.rbLister.List(namespace, set.AsSelector())
 	if err != nil {
@@ -189,6 +204,10 @@ func (m *manager) reconcileProjectMembershipBindingForDelete(namespace, rtbUID s
 	}
 
 	for _, rb := range rbs {
+		if rb.RoleRef.Name == roleToKeep {
+			continue
+		}
+
 		rb = rb.DeepCopy()
 		for k, v := range rb.Labels {
 			if k == rtbUID && v == owner {

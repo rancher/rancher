@@ -23,6 +23,7 @@ const (
 	ClusterFieldEmbedded                            = "embedded"
 	ClusterFieldEmbeddedConfig                      = "embeddedConfig"
 	ClusterFieldGoogleKubernetesEngineConfig        = "googleKubernetesEngineConfig"
+	ClusterFieldImported                            = "imported"
 	ClusterFieldInternal                            = "internal"
 	ClusterFieldLabels                              = "labels"
 	ClusterFieldLimits                              = "limits"
@@ -57,6 +58,7 @@ type Cluster struct {
 	Embedded                            *bool                          `json:"embedded,omitempty"`
 	EmbeddedConfig                      *K8sServerConfig               `json:"embeddedConfig,omitempty"`
 	GoogleKubernetesEngineConfig        *GoogleKubernetesEngineConfig  `json:"googleKubernetesEngineConfig,omitempty"`
+	Imported                            *bool                          `json:"imported,omitempty"`
 	Internal                            *bool                          `json:"internal,omitempty"`
 	Labels                              map[string]string              `json:"labels,omitempty"`
 	Limits                              map[string]string              `json:"limits,omitempty"`

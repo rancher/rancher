@@ -12,6 +12,7 @@ const (
 	MachineStatusFieldNodeAnnotations = "nodeAnnotations"
 	MachineStatusFieldNodeLabels      = "nodeLabels"
 	MachineStatusFieldNodeName        = "nodeName"
+	MachineStatusFieldNodeTaints      = "nodeTaints"
 	MachineStatusFieldRequested       = "requested"
 	MachineStatusFieldSSHUser         = "sshUser"
 	MachineStatusFieldVolumesAttached = "volumesAttached"
@@ -29,6 +30,7 @@ type MachineStatus struct {
 	NodeAnnotations map[string]string         `json:"nodeAnnotations,omitempty"`
 	NodeLabels      map[string]string         `json:"nodeLabels,omitempty"`
 	NodeName        string                    `json:"nodeName,omitempty"`
+	NodeTaints      []Taint                   `json:"nodeTaints,omitempty"`
 	Requested       map[string]string         `json:"requested,omitempty"`
 	SSHUser         string                    `json:"sshUser,omitempty"`
 	VolumesAttached map[string]AttachedVolume `json:"volumesAttached,omitempty"`

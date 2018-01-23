@@ -57,29 +57,60 @@ func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding) error {
 		return errors.Wrap(err, "couldn't ensure roles")
 	}
 
-	for _, role := range roles {
-		if err := c.ensureClusterBinding(role.Name, binding); err != nil {
-			return errors.Wrapf(err, "couldn't ensure cluster binding %v %v", role.Name, binding.Subject.Name)
-		}
+	if err := c.ensureClusterBinding(roles, binding); err != nil {
+		return errors.Wrapf(err, "couldn't ensure cluster bindings for %v", binding.Subject.Name)
 	}
 
 	return nil
 }
 
-func (c *crtbLifecycle) ensureClusterBinding(roleName string, binding *v3.ClusterRoleTemplateBinding) error {
-	bindingCli := c.m.workload.K8sClient.RbacV1().ClusterRoleBindings()
-	bindingName, objectMeta, subjects, roleRef := bindingParts(roleName, string(binding.UID), binding.Subject)
-	if c, _ := c.m.crbLister.Get("", bindingName); c != nil {
-		return nil
+func (c *crtbLifecycle) ensureClusterBinding(roles map[string]*v3.RoleTemplate, binding *v3.ClusterRoleTemplateBinding) error {
+	roleBindings := c.m.workload.K8sClient.RbacV1().ClusterRoleBindings()
+
+	set := labels.Set(map[string]string{rtbOwnerLabel: string(binding.UID)})
+	desiredRBs := map[string]*rbacv1.ClusterRoleBinding{}
+	for roleName := range roles {
+		bindingName, objectMeta, subjects, roleRef := bindingParts(roleName, string(binding.UID), binding.Subject)
+		desiredRBs[bindingName] = &rbacv1.ClusterRoleBinding{
+			ObjectMeta: objectMeta,
+			Subjects:   subjects,
+			RoleRef:    roleRef,
+		}
 	}
 
-	_, err := bindingCli.Create(&rbacv1.ClusterRoleBinding{
-		ObjectMeta: objectMeta,
-		Subjects:   subjects,
-		RoleRef:    roleRef,
-	})
+	currentRBs, err := c.m.crbLister.List("", set.AsSelector())
+	if err != nil {
+		return err
+	}
+	rbsToDelete := map[string]bool{}
+	processed := map[string]bool{}
+	for _, rb := range currentRBs {
+		// protect against an rb being in the list more than once (shouldn't happen, but just to be safe)
+		if ok := processed[rb.Name]; ok {
+			continue
+		}
+		processed[rb.Name] = true
 
-	return err
+		if _, ok := desiredRBs[rb.Name]; ok {
+			delete(desiredRBs, rb.Name)
+		} else {
+			rbsToDelete[rb.Name] = true
+		}
+	}
+
+	for _, rb := range desiredRBs {
+		_, err := roleBindings.Create(rb)
+		if err != nil {
+			return err
+		}
+	}
+
+	for name := range rbsToDelete {
+		if err := roleBindings.Delete(name, &metav1.DeleteOptions{}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (c *crtbLifecycle) ensureCRTBDelete(binding *v3.ClusterRoleTemplateBinding) error {

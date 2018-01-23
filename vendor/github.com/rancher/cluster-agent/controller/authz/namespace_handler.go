@@ -92,10 +92,8 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(obj *v1.Namespace) error {
 			return errors.Wrap(err, "couldn't ensure roles")
 		}
 
-		for _, role := range roles {
-			if err := n.m.ensureBinding(obj.Name, role.Name, prtb); err != nil {
-				return errors.Wrapf(err, "couldn't ensure binding %v %v in %v", role.Name, prtb.Subject.Name, obj.Name)
-			}
+		if err := n.m.ensureBindings(obj.Name, roles, prtb); err != nil {
+			return errors.Wrapf(err, "couldn't ensure bindings for %v in %v", prtb.Subject.Name, obj.Name)
 		}
 	}
 	return nil

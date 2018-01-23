@@ -71,10 +71,8 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 
 	for _, n := range namespaces {
 		ns := n.(*v1.Namespace)
-		for _, role := range roles {
-			if err := p.m.ensureBinding(ns.Name, role.Name, binding); err != nil {
-				return errors.Wrapf(err, "couldn't ensure binding %v %v in %v", role.Name, binding.Subject.Name, ns.Name)
-			}
+		if err := p.m.ensureBindings(ns.Name, roles, binding); err != nil {
+			return errors.Wrapf(err, "couldn't ensure bindings for %v in %v", binding.Subject.Name, ns.Name)
 		}
 	}
 

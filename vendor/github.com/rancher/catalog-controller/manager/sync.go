@@ -13,7 +13,7 @@ func (m *Manager) Sync(key string, catalog *v3.Catalog) error {
 	// if catalog was deleted, do nothing
 	if catalog == nil || catalog.DeletionTimestamp != nil {
 		// remove all the templates associated with catalog
-		logrus.Debugf("Cleaning up catalog %s", key)
+		logrus.Infof("Cleaning up catalog %s", key)
 		templates, err := m.templateClient.List(metav1.ListOptions{
 			LabelSelector: fmt.Sprintf("%s=%s", CatalogNameLabel, key),
 		})
@@ -21,7 +21,7 @@ func (m *Manager) Sync(key string, catalog *v3.Catalog) error {
 			return err
 		}
 		for _, template := range templates.Items {
-			logrus.Debugf("Cleaning up template %s", template.Name)
+			logrus.Infof("Cleaning up template %s", template.Name)
 			if err := m.templateClient.Delete(template.Name, &metav1.DeleteOptions{}); err != nil {
 				return err
 			}

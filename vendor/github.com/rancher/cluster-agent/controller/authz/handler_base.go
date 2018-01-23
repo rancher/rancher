@@ -13,6 +13,7 @@ import (
 	"k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -132,18 +133,53 @@ func (m *manager) gatherRoles(rt *v3.RoleTemplate, roleTemplates map[string]*v3.
 	return nil
 }
 
-func (m *manager) ensureBinding(ns, roleName string, binding *v3.ProjectRoleTemplateBinding) error {
-	bindingCli := m.workload.K8sClient.RbacV1().RoleBindings(ns)
-	bindingName, objectMeta, subjects, roleRef := bindingParts(roleName, string(binding.UID), binding.Subject)
-	if b, _ := m.rbLister.Get(ns, bindingName); b != nil {
-		return nil
+func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, binding *v3.ProjectRoleTemplateBinding) error {
+	roleBindings := m.workload.K8sClient.RbacV1().RoleBindings(ns)
+
+	set := labels.Set(map[string]string{rtbOwnerLabel: string(binding.UID)})
+	desiredRBs := map[string]*rbacv1.RoleBinding{}
+	for roleName := range roles {
+		bindingName, objectMeta, subjects, roleRef := bindingParts(roleName, string(binding.UID), binding.Subject)
+		desiredRBs[bindingName] = &rbacv1.RoleBinding{
+			ObjectMeta: objectMeta,
+			Subjects:   subjects,
+			RoleRef:    roleRef,
+		}
 	}
-	_, err := bindingCli.Create(&rbacv1.RoleBinding{
-		ObjectMeta: objectMeta,
-		Subjects:   subjects,
-		RoleRef:    roleRef,
-	})
-	return err
+
+	currentRBs, err := m.rbLister.List(ns, set.AsSelector())
+	if err != nil {
+		return err
+	}
+	rbsToDelete := map[string]bool{}
+	processed := map[string]bool{}
+	for _, rb := range currentRBs {
+		// protect against an rb being in the list more than once (shouldn't happen, but just to be safe)
+		if ok := processed[rb.Name]; ok {
+			continue
+		}
+		processed[rb.Name] = true
+
+		if _, ok := desiredRBs[rb.Name]; ok {
+			delete(desiredRBs, rb.Name)
+		} else {
+			rbsToDelete[rb.Name] = true
+		}
+	}
+
+	for _, rb := range desiredRBs {
+		_, err := roleBindings.Create(rb)
+		if err != nil {
+			return err
+		}
+	}
+
+	for name := range rbsToDelete {
+		if err := roleBindings.Delete(name, &metav1.DeleteOptions{}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func bindingParts(roleName, parentUID string, subject rbacv1.Subject) (string, metav1.ObjectMeta, []rbacv1.Subject, rbacv1.RoleRef) {
