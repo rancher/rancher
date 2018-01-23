@@ -313,7 +313,7 @@ func applyTag(structField *reflect.StructField, field *Field) error {
 			field.CodeName = value
 		case "default":
 			field.Default = value
-		case "nullabled":
+		case "nullable":
 			field.Nullable = true
 		case "nocreate":
 			field.Create = false
