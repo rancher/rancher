@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/management-api/api/setup"
 	"github.com/rancher/management-api/controller/dynamicschema"
 	"github.com/rancher/management-api/controller/listener"
+	"github.com/rancher/management-api/controller/settings"
 	"github.com/rancher/norman-rbac"
 	normanapi "github.com/rancher/norman/api"
 	"github.com/rancher/norman/parse"
@@ -34,8 +35,9 @@ func New(ctx context.Context, httpPort, httpsPort int, management *config.Manage
 
 	dynamicschema.Register(management, server.Schemas)
 	listener.Register(ctx, management, httpPort, httpsPort, getter)
+	err := settings.Register(management)
 
-	return server, nil
+	return server, err
 }
 
 func urlParser(next parse.URLParser) parse.URLParser {

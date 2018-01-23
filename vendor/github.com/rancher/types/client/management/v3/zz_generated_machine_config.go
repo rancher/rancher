@@ -3,6 +3,7 @@ package client
 const (
 	MachineConfigType                      = "machineConfig"
 	MachineConfigFieldAnnotations          = "annotations"
+	MachineConfigFieldCustomConfig         = "customConfig"
 	MachineConfigFieldDescription          = "description"
 	MachineConfigFieldDisplayName          = "displayName"
 	MachineConfigFieldLabels               = "labels"
@@ -15,6 +16,7 @@ const (
 
 type MachineConfig struct {
 	Annotations          map[string]string `json:"annotations,omitempty"`
+	CustomConfig         *CustomConfig     `json:"customConfig,omitempty"`
 	Description          string            `json:"description,omitempty"`
 	DisplayName          string            `json:"displayName,omitempty"`
 	Labels               map[string]string `json:"labels,omitempty"`
