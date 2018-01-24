@@ -107,7 +107,10 @@ func (h Handler) LinkHandler(apiContext *types.APIContext) error {
 		if parts[3] == "config.json" {
 			continue
 		}
-		file, err := w.Create(fmt.Sprintf("%s/%s", parts[2], parts[3]))
+		fh := &zip.FileHeader{}
+		fh.Name = fmt.Sprintf("%s/%s", parts[2], parts[3])
+		fh.SetMode(0400)
+		file, err := w.CreateHeader(fh)
 		if err != nil {
 			return err
 		}

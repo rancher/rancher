@@ -41,12 +41,13 @@ func buildKubeAPIConfig(host *hosts.Host, kubeAPIService v3.KubeAPIService, etcd
 			"--runtime-config=batch/v2alpha1",
 			"--runtime-config=authentication.k8s.io/v1beta1=true",
 			"--storage-backend=etcd3",
-			"--etcd-servers=" + etcdConnString,
 			"--client-ca-file=" + pki.CACertPath,
 			"--tls-cert-file=" + pki.KubeAPICertPath,
 			"--tls-private-key-file=" + pki.KubeAPIKeyPath,
 			"--service-account-key-file=" + pki.KubeAPIKeyPath},
 	}
+	imageCfg.Cmd = append(imageCfg.Cmd, "--etcd-servers="+etcdConnString)
+
 	if authorizationMode == RBACAuthorizationMode {
 		imageCfg.Cmd = append(imageCfg.Cmd, "--authorization-mode=RBAC")
 	}
