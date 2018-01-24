@@ -89,7 +89,7 @@ func main() {
 	}
 
 	app.Action = func(c *cli.Context) error {
-		config.ACMEDomains = c.GlobalStringSlice("acme-domains")
+		config.ACMEDomains = c.GlobalStringSlice("acme-domain")
 		return run(config)
 	}
 

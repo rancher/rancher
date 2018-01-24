@@ -118,6 +118,9 @@ func addListenConfig(management *config.ManagementContext, cfg Config) error {
 		if cfg.ListenConfig.CACert == "" {
 			cfg.ListenConfig.CACert = existing.CACert
 		}
+		if len(cfg.ListenConfig.KnownIPs) == 0 {
+			cfg.ListenConfig.KnownIPs = existing.KnownIPs
+		}
 	}
 
 	if (cfg.ListenConfig.Key == "" || cfg.ListenConfig.Cert == "") && cfg.ListenConfig.CACert == "" && cfg.ListenConfig.Mode != "acme" {
