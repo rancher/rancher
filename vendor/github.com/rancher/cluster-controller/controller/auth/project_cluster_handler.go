@@ -44,6 +44,10 @@ type projectLifecycle struct {
 }
 
 func (l *projectLifecycle) sync(key string, orig *v3.Project) error {
+	if orig == nil {
+		return nil
+	}
+
 	obj := orig.DeepCopyObject()
 
 	obj, err := l.mgr.reconcileResourceToNamespace(obj)
