@@ -1807,6 +1807,11 @@ func (in *ListenConfig) DeepCopyInto(out *ListenConfig) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.KnownIPs != nil {
+		in, out := &in.KnownIPs, &out.KnownIPs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.SubjectAlternativeNames != nil {
 		in, out := &in.SubjectAlternativeNames, &out.SubjectAlternativeNames
 		*out = make([]string, len(*in))

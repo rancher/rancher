@@ -22,6 +22,7 @@ const (
 	ListenConfigFieldIssuer                  = "issuer"
 	ListenConfigFieldKey                     = "key"
 	ListenConfigFieldKeySize                 = "keySize"
+	ListenConfigFieldKnownIPs                = "knownIps"
 	ListenConfigFieldLabels                  = "labels"
 	ListenConfigFieldMode                    = "mode"
 	ListenConfigFieldName                    = "name"
@@ -52,6 +53,7 @@ type ListenConfig struct {
 	Issuer                  string            `json:"issuer,omitempty"`
 	Key                     string            `json:"key,omitempty"`
 	KeySize                 *int64            `json:"keySize,omitempty"`
+	KnownIPs                []string          `json:"knownIps,omitempty"`
 	Labels                  map[string]string `json:"labels,omitempty"`
 	Mode                    string            `json:"mode,omitempty"`
 	Name                    string            `json:"name,omitempty"`

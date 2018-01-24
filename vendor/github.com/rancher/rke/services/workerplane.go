@@ -69,7 +69,7 @@ func RemoveWorkerPlane(ctx context.Context, workerHosts []*hosts.Host, force boo
 		if err := removeSidekick(ctx, host); err != nil {
 			return err
 		}
-		log.Infof(ctx, "[%s] Successfully teared down Worker Plane..", WorkerRole)
+		log.Infof(ctx, "[%s] Successfully tore down Worker Plane..", WorkerRole)
 	}
 
 	return nil

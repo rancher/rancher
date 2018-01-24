@@ -55,7 +55,33 @@ type Lifecycle struct {
 	logger                       event.Logger
 }
 
+func (m *Lifecycle) setupCustom(obj *v3.Machine) {
+	obj.Status.NodeConfig = &v3.RKEConfigNode{
+		MachineName:      obj.Spec.ClusterName + ":" + obj.Name,
+		Role:             obj.Spec.Role,
+		HostnameOverride: obj.Spec.RequestedHostname,
+		Address:          obj.Spec.CustomConfig.Address,
+		InternalAddress:  obj.Spec.CustomConfig.InternalAddress,
+		User:             obj.Spec.CustomConfig.User,
+		DockerSocket:     obj.Spec.CustomConfig.DockerSocket,
+		SSHKey:           obj.Spec.CustomConfig.SSHKey,
+	}
+
+	obj.Status.SSHUser = obj.Status.NodeConfig.User
+	if obj.Status.SSHUser == "" {
+		obj.Status.SSHUser = "root"
+	}
+}
+
+func isCustom(obj *v3.Machine) bool {
+	return obj.Spec.CustomConfig != nil && obj.Spec.CustomConfig.Address != ""
+}
+
 func (m *Lifecycle) Create(obj *v3.Machine) (*v3.Machine, error) {
+	if isCustom(obj) {
+		m.setupCustom(obj)
+	}
+
 	if obj.Spec.MachineTemplateName == "" {
 		return obj, nil
 	}

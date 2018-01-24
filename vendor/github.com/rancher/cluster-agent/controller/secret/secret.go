@@ -50,7 +50,7 @@ func Register(cluster *config.ClusterContext) {
 		managementSecrets:    cluster.Management.Core.Secrets("").Controller().Lister(),
 	}
 	cluster.Core.Namespaces("").AddHandler("secretsController", n.sync)
-	cluster.Management.Core.Secrets("").AddLifecycle("secretsController", s)
+	cluster.Management.Core.Secrets("").AddClusterScopedLifecycle("secretsController", cluster.ClusterName, s)
 }
 
 type NamespaceController struct {

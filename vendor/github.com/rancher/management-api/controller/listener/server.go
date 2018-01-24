@@ -11,11 +11,15 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"time"
 
+	"github.com/hashicorp/golang-lru"
+	"github.com/rancher/norman/types/set"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/acme/autocert"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/cert"
 )
 
@@ -28,9 +32,11 @@ const (
 type Server struct {
 	sync.Mutex
 
+	listenConfigs       v3.ListenConfigInterface
 	handler             HandlerGetter
 	httpPort, httpsPort int
 	certs               map[string]*tls.Certificate
+	ips                 *lru.Cache
 
 	listeners    []net.Listener
 	servers      []*http.Server
@@ -46,12 +52,66 @@ type Server struct {
 	tosAll      bool
 }
 
-func NewServer(handler HandlerGetter, httpPort, httpsPort int) *Server {
-	return &Server{
-		handler:   handler,
-		httpPort:  httpPort,
-		httpsPort: httpsPort,
-		certs:     map[string]*tls.Certificate{},
+func NewServer(ctx context.Context, listenConfigs v3.ListenConfigInterface, handler HandlerGetter, httpPort, httpsPort int) *Server {
+	s := &Server{
+		listenConfigs: listenConfigs,
+		handler:       handler,
+		httpPort:      httpPort,
+		httpsPort:     httpsPort,
+		certs:         map[string]*tls.Certificate{},
+	}
+
+	s.ips, _ = lru.New(20)
+
+	go s.start(ctx)
+	return s
+}
+
+func (s *Server) updateIPs(savedIPs map[string]bool) map[string]bool {
+	if s.activeCert != nil {
+		return savedIPs
+	}
+
+	allIPs := map[string]bool{}
+	for _, k := range s.ips.Keys() {
+		s, ok := k.(string)
+		if ok {
+			allIPs[s] = true
+		}
+	}
+
+	a, b, _ := set.Diff(allIPs, savedIPs)
+	if len(a) == 0 && len(b) == 0 {
+		return savedIPs
+	}
+
+	cfg, err := s.listenConfigs.Get(s.activeConfig.Name, v1.GetOptions{})
+	if err != nil {
+		return savedIPs
+	}
+
+	cfg.KnownIPs = nil
+	for k := range allIPs {
+		cfg.KnownIPs = append(cfg.KnownIPs, k)
+	}
+
+	_, err = s.listenConfigs.Update(cfg)
+	if err != nil {
+		return savedIPs
+	}
+
+	return allIPs
+}
+
+func (s *Server) start(ctx context.Context) {
+	savedIPs := map[string]bool{}
+	for {
+		savedIPs = s.updateIPs(savedIPs)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(5 * time.Second):
+		}
 	}
 }
 
@@ -168,13 +228,19 @@ func (s *Server) reload(config *v3.ListenConfig) error {
 		}
 	}
 
+	for _, ipStr := range config.KnownIPs {
+		ip := net.ParseIP(ipStr)
+		if len(ip) > 0 {
+			s.ips.ContainsOrAdd(ipStr, ip)
+		}
+	}
+
 	s.activeMode = config.Mode
 	s.activeConfig = config
 	return nil
 }
 
 func (s *Server) getCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
-	fmt.Println("!!!!!", hello.ServerName)
 	s.Lock()
 	defer s.Unlock()
 
@@ -182,21 +248,40 @@ func (s *Server) getCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, e
 		return s.activeCert, nil
 	}
 
-	serverNameCert, ok := s.certs[hello.ServerName]
+	mapKey := hello.ServerName
+	cn := hello.ServerName
+	dnsNames := []string{cn}
+	ipBased := false
+	var ips []net.IP
+
+	if cn == "" {
+		mapKey = fmt.Sprintf("local/%d", s.ips.Len())
+		ipBased = true
+	}
+
+	serverNameCert, ok := s.certs[mapKey]
 	if ok {
 		return serverNameCert, nil
 	}
 
-	ipAddr := net.ParseIP(hello.ServerName)
+	if ipBased {
+		cn = "localhost"
+		for _, ipStr := range s.ips.Keys() {
+			ip := net.ParseIP(ipStr.(string))
+			if len(ip) > 0 {
+				ips = append(ips, ip)
+			}
+		}
+	}
+
 	cfg := cert.Config{
-		CommonName:   hello.ServerName,
+		CommonName:   cn,
 		Organization: s.activeCA.Subject.Organization,
 		Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-	}
-	if len(ipAddr) > 0 {
-		cfg.AltNames.IPs = []net.IP{ipAddr}
-	} else {
-		cfg.AltNames.DNSNames = []string{hello.ServerName}
+		AltNames: cert.AltNames{
+			DNSNames: dnsNames,
+			IPs:      ips,
+		},
 	}
 
 	key, err := cert.NewPrivateKey()
@@ -216,8 +301,21 @@ func (s *Server) getCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, e
 		PrivateKey: key,
 	}
 
-	s.certs[hello.ServerName] = tlsCert
+	s.certs[mapKey] = tlsCert
 	return tlsCert, nil
+}
+
+func (s *Server) cacheIPHandler(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+		h, _, err := net.SplitHostPort(req.Host)
+		if err == nil {
+			ip := net.ParseIP(h)
+			if len(ip) > 0 {
+				s.ips.ContainsOrAdd(h, ip)
+			}
+		}
+		handler.ServeHTTP(resp, req)
+	})
 }
 
 func (s *Server) serveHTTPS(config *v3.ListenConfig) error {
@@ -238,6 +336,10 @@ func (s *Server) serveHTTPS(config *v3.ListenConfig) error {
 		Handler: s.Handler(),
 	}
 
+	if s.activeConfig == nil {
+		server.Handler = s.cacheIPHandler(server.Handler)
+	}
+
 	s.servers = append(s.servers, server)
 	s.startServer(listener, server)
 
@@ -249,6 +351,10 @@ func (s *Server) serveHTTPS(config *v3.ListenConfig) error {
 
 	httpServer := &http.Server{
 		Handler: http.HandlerFunc(httpRedirect),
+	}
+
+	if s.activeConfig == nil {
+		httpServer.Handler = s.cacheIPHandler(httpServer.Handler)
 	}
 
 	s.servers = append(s.servers, httpServer)
@@ -278,7 +384,7 @@ func manglePort(hostport string) string {
 		return hostport
 	}
 
-	portInt = (portInt / 1000) + 443
+	portInt = ((portInt / 1000) * 1000) + 443
 
 	return net.JoinHostPort(host, strconv.Itoa(portInt))
 }

@@ -35,7 +35,7 @@ func GoroutineDumpOn(signals ...os.Signal) {
 					_, _ = io.WriteString(os.Stderr, p.BucketHeader(&bucket, true, len(buckets) > 1))
 					_, _ = io.WriteString(os.Stderr, p.StackLines(&bucket.Signature, srcLen, pkgLen, true))
 				}
-				io.Copy(os.Stderr, src)
+				io.Copy(os.Stderr, bytes.NewBuffer(buf))
 			} else {
 				io.Copy(os.Stderr, src)
 			}
