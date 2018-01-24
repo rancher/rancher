@@ -11,5 +11,15 @@ RUN curl -sLf https://github.com/rancher/machine-package/releases/download/v0.13
 VOLUME /var/lib/rancher
 ENV ETCD_ARGS "--data-dir /var/lib/rancher/etcd"
 WORKDIR /var/lib/rancher
+
+ENV CATTLE_UI_VERSION v2.0.14
+RUN mkdir -p ui && \
+    cd ui && \
+    curl -sL https://releases.rancher.com/ui/${CATTLE_UI_VERSION}.tar.gz | tar xvzf - --strip-components=1
+
+ARG VERSION=dev
+ENV CATTLE_SERVER_VERSION ${VERSION}
 COPY rancher /usr/bin/
+
+ENV CATTLE_SERVER_IMAGE rancher/server
 ENTRYPOINT ["rancher", "--k8s-mode=exec", "--http-listen-port=80", "--https-listen-port=443"]
