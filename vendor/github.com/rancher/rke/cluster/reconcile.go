@@ -24,13 +24,13 @@ func ReconcileCluster(ctx context.Context, kubeCluster, currentCluster *Cluster)
 		return nil
 	}
 
-	if err := reconcileEtcd(ctx, currentCluster, kubeCluster); err != nil {
-		return fmt.Errorf("Failed to reconcile etcd plane: %v", err)
-	}
-
 	kubeClient, err := k8s.NewClient(kubeCluster.LocalKubeConfigPath)
 	if err != nil {
 		return fmt.Errorf("Failed to initialize new kubernetes client: %v", err)
+	}
+
+	if err := reconcileEtcd(ctx, currentCluster, kubeCluster, kubeClient); err != nil {
+		return fmt.Errorf("Failed to reconcile etcd plane: %v", err)
 	}
 
 	if err := reconcileWorker(ctx, currentCluster, kubeCluster, kubeClient); err != nil {
@@ -154,12 +154,16 @@ func reconcileHost(ctx context.Context, toDeleteHost *hosts.Host, worker, etcd b
 	return nil
 }
 
-func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster) error {
+func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, kubeClient *kubernetes.Clientset) error {
 	log.Infof(ctx, "[reconcile] Check etcd hosts to be deleted")
 	etcdToDelete := hosts.GetToDeleteHosts(currentCluster.EtcdHosts, kubeCluster.EtcdHosts)
 	for _, etcdHost := range etcdToDelete {
 		if err := services.RemoveEtcdMember(ctx, etcdHost, kubeCluster.EtcdHosts, currentCluster.LocalConnDialerFactory); err != nil {
 			log.Warnf(ctx, "[reconcile] %v", err)
+			continue
+		}
+		if err := hosts.DeleteNode(ctx, etcdHost, kubeClient, etcdHost.IsControl); err != nil {
+			log.Warnf(ctx, "Failed to delete etcd node %s from cluster", etcdHost.Address)
 			continue
 		}
 		// attempting to clean services/files on the host

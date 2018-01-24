@@ -139,7 +139,7 @@ func (s *Server) Enable(config *v3.ListenConfig) (bool, error) {
 	}
 
 	s.tos = config.TOS
-	s.tosAll = slice.ContainsString(config.TOS, "auto") || slice.ContainsString(config.TOS, "")
+	s.tosAll = len(config.TOS) == 0 || slice.ContainsString(config.TOS, "auto")
 
 	if config.Key != "" && config.Cert != "" {
 		cert, err := tls.X509KeyPair([]byte(config.Cert), []byte(config.Key))
@@ -265,7 +265,7 @@ func (s *Server) getCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, e
 	}
 
 	if ipBased {
-		cn = "localhost"
+		cn = "cattle"
 		for _, ipStr := range s.ips.Keys() {
 			ip := net.ParseIP(ipStr.(string))
 			if len(ip) > 0 {
@@ -308,12 +308,15 @@ func (s *Server) getCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, e
 func (s *Server) cacheIPHandler(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 		h, _, err := net.SplitHostPort(req.Host)
-		if err == nil {
-			ip := net.ParseIP(h)
-			if len(ip) > 0 {
-				s.ips.ContainsOrAdd(h, ip)
-			}
+		if err != nil {
+			h = req.Host
 		}
+
+		ip := net.ParseIP(h)
+		if len(ip) > 0 {
+			s.ips.ContainsOrAdd(h, ip)
+		}
+
 		handler.ServeHTTP(resp, req)
 	})
 }
@@ -322,15 +325,10 @@ func (s *Server) serveHTTPS(config *v3.ListenConfig) error {
 	conf := &tls.Config{
 		GetCertificate: s.getCertificate,
 	}
-	addr := fmt.Sprintf(":%d", s.httpsPort)
-
-	listener, err := tls.Listen("tcp", addr, conf)
+	listener, err := s.newListener(s.httpsPort, conf)
 	if err != nil {
 		return err
 	}
-
-	s.listeners = append(s.listeners)
-	logrus.Info("Listening on ", addr)
 
 	server := &http.Server{
 		Handler: s.Handler(),
@@ -343,11 +341,10 @@ func (s *Server) serveHTTPS(config *v3.ListenConfig) error {
 	s.servers = append(s.servers, server)
 	s.startServer(listener, server)
 
-	httpListener, err := s.newListener(s.httpPort)
+	httpListener, err := s.newListener(s.httpPort, nil)
 	if err != nil {
 		return err
 	}
-	s.listeners = append(s.listeners, httpListener)
 
 	httpServer := &http.Server{
 		Handler: http.HandlerFunc(httpRedirect),
@@ -390,7 +387,7 @@ func manglePort(hostport string) string {
 }
 
 func (s *Server) serveHTTP(config *v3.ListenConfig) error {
-	listener, err := s.newListener(s.httpPort)
+	listener, err := s.newListener(s.httpPort, nil)
 	if err != nil {
 		return err
 	}
@@ -421,15 +418,21 @@ func (s *Server) Handler() http.Handler {
 	})
 }
 
-func (s *Server) newListener(port int) (net.Listener, error) {
+func (s *Server) newListener(port int, config *tls.Config) (net.Listener, error) {
 	addr := fmt.Sprintf(":%d", port)
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		return nil, err
 	}
+
+	l = tcpKeepAliveListener{l.(*net.TCPListener)}
+
+	if config != nil {
+		l = tls.NewListener(l, config)
+	}
+
 	s.listeners = append(s.listeners, l)
 	logrus.Info("Listening on ", addr)
-
 	return l, nil
 }
 
@@ -444,15 +447,12 @@ func (s *Server) serveACME(config *v3.ListenConfig) error {
 		NextProtos:     []string{"h2", "http/1.1"},
 	}
 
-	addr := fmt.Sprintf(":%d", s.httpsPort)
-	httpsListener, err := tls.Listen("tcp", addr, conf)
+	httpsListener, err := s.newListener(s.httpsPort, conf)
 	if err != nil {
 		return err
 	}
-	s.listeners = append(s.listeners, httpsListener)
-	logrus.Info("Listening on ", addr)
 
-	httpListener, err := s.newListener(s.httpPort)
+	httpListener, err := s.newListener(s.httpPort, nil)
 	if err != nil {
 		return err
 	}
@@ -478,4 +478,18 @@ func (s *Server) serveACME(config *v3.ListenConfig) error {
 	}()
 
 	return nil
+}
+
+type tcpKeepAliveListener struct {
+	*net.TCPListener
+}
+
+func (ln tcpKeepAliveListener) Accept() (c net.Conn, err error) {
+	tc, err := ln.AcceptTCP()
+	if err != nil {
+		return
+	}
+	tc.SetKeepAlive(true)
+	tc.SetKeepAlivePeriod(3 * time.Minute)
+	return tc, nil
 }

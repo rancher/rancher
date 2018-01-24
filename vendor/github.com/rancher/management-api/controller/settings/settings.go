@@ -1,6 +1,9 @@
 package settings
 
 import (
+	"os"
+	"strings"
+
 	"github.com/rancher/settings"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -45,7 +48,10 @@ func (s *settingsProvider) Set(name, value string) error {
 }
 
 func (s *settingsProvider) SetAll(settings map[string]settings.Setting) error {
-	for _, setting := range settings {
+	for name, setting := range settings {
+		key := "CATTLE_" + strings.ToUpper(strings.Replace(name, "-", "_", -1))
+		value := os.Getenv(key)
+
 		obj, err := s.settings.Get(setting.Name, v1.GetOptions{})
 		if errors.IsNotFound(err) {
 			newSetting := &v3.Setting{
@@ -54,17 +60,30 @@ func (s *settingsProvider) SetAll(settings map[string]settings.Setting) error {
 				},
 				Default: setting.Default,
 			}
+			if value != "" {
+				newSetting.Value = value
+			}
 			_, err := s.settings.Create(newSetting)
 			if err != nil {
 				return err
 			}
 		} else if err != nil {
 			return err
-		} else if obj.Default != setting.Default {
-			obj.Default = setting.Default
-			_, err := s.settings.Update(obj)
-			if err != nil {
-				return err
+		} else {
+			update := false
+			if obj.Default != setting.Default {
+				obj.Default = setting.Default
+				update = true
+			}
+			if value != "" && obj.Value != value {
+				obj.Value = value
+				update = true
+			}
+			if update {
+				_, err := s.settings.Update(obj)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
