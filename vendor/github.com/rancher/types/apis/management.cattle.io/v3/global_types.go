@@ -27,6 +27,7 @@ type ListenConfig struct {
 	Key         string   `json:"key,omitempty" norman:"writeOnly"`
 	Domains     []string `json:"domains,omitempty"`
 	TOS         []string `json:"tos,omitempty" norman:"default=auto"`
+	KnownIPs    []string `json:"knownIps" norman:"nocreate,noupdate"`
 	Enabled     bool     `json:"enabled,omitempty" norman:"default=true"`
 
 	CertFingerprint         string   `json:"certFingerprint,omitempty" norman:"nocreate,noupdate"`

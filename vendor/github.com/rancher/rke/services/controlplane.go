@@ -78,6 +78,6 @@ func RemoveControlPlane(ctx context.Context, controlHosts []*hosts.Host, force b
 			}
 		}
 	}
-	log.Infof(ctx, "[%s] Successfully teared down Controller Plane..", ControlRole)
+	log.Infof(ctx, "[%s] Successfully tore down Controller Plane..", ControlRole)
 	return nil
 }

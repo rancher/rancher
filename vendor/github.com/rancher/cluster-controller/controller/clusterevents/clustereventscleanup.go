@@ -18,14 +18,14 @@ const (
 )
 
 type Cleaner struct {
-	clusterEventsClient v3.ClusterEventInterface
-	clusterEvents       v3.ClusterEventLister
+	clusterEvents       v3.ClusterEventInterface
+	clusterEventsLister v3.ClusterEventLister
 }
 
 func Register(ctx context.Context, management *config.ManagementContext) {
 	c := &Cleaner{
-		clusterEventsClient: management.Management.ClusterEvents(""),
-		clusterEvents:       management.Management.ClusterEvents("").Controller().Lister(),
+		clusterEvents:       management.Management.ClusterEvents(""),
+		clusterEventsLister: management.Management.ClusterEvents("").Controller().Lister(),
 	}
 	go c.sync(ctx, syncInterval)
 }
@@ -41,7 +41,7 @@ func (c *Cleaner) sync(ctx context.Context, syncInterval time.Duration) {
 
 func (c *Cleaner) cleanup() error {
 	logrus.Infof("Running cluster events cleanup")
-	events, err := c.clusterEvents.List("", labels.NewSelector())
+	events, err := c.clusterEventsLister.List("", labels.NewSelector())
 	if err != nil {
 		return err
 	}
@@ -49,7 +49,7 @@ func (c *Cleaner) cleanup() error {
 		created := event.CreationTimestamp.Time
 		if time.Now().Sub(created) >= TTL {
 			logrus.Debugf("Cleaninig up cluster event %s", event.Message)
-			err := c.clusterEventsClient.Delete(event.Name, &metav1.DeleteOptions{})
+			err := c.clusterEvents.Delete(event.Name, &metav1.DeleteOptions{})
 			if err != nil {
 				// just log the error, retry will happen as a part of the next run
 				logrus.Errorf("Error deleting cluster event %s: %v", event.Message, err)

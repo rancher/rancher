@@ -11,9 +11,8 @@ import (
 )
 
 type StatsAggregator struct {
-	Machines          v3.MachineLister
-	ClusterController v3.ClusterController
-	Clusters          v3.ClusterInterface
+	MachinesLister v3.MachineLister
+	Clusters       v3.ClusterInterface
 }
 
 type ClusterNodeData struct {
@@ -30,9 +29,8 @@ func Register(management *config.ManagementContext) {
 	machinesClient := management.Management.Machines("")
 
 	s := &StatsAggregator{
-		Machines:          machinesClient.Controller().Lister(),
-		ClusterController: clustersClient.Controller(),
-		Clusters:          clustersClient,
+		MachinesLister: machinesClient.Controller().Lister(),
+		Clusters:       clustersClient,
 	}
 
 	clustersClient.AddHandler("cluster-stats", s.sync)
@@ -48,7 +46,7 @@ func (s *StatsAggregator) sync(key string, cluster *v3.Cluster) error {
 }
 
 func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) error {
-	machines, err := s.Machines.List(cluster.Name, labels.Everything())
+	machines, err := s.MachinesLister.List(cluster.Name, labels.Everything())
 	if err != nil {
 		return err
 	}
@@ -126,7 +124,7 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 
 func (s *StatsAggregator) machineChanged(key string, machine *v3.Machine) error {
 	if machine != nil {
-		s.ClusterController.Enqueue("", machine.Namespace)
+		s.Clusters.Controller().Enqueue("", machine.Namespace)
 	}
 	return nil
 }

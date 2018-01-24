@@ -202,8 +202,10 @@ func (m *MachinesSyncer) getMachineForNode(nodeName string, cache bool) (*v3.Mac
 			return nil, err
 		}
 		for _, machine := range machines.Items {
-			if isMachineForNode(nodeName, &machine) {
-				return &machine, nil
+			if machine.Namespace == m.clusterNamespace {
+				if isMachineForNode(nodeName, &machine) {
+					return &machine, nil
+				}
 			}
 		}
 	}

@@ -86,6 +86,10 @@ type clusterLifecycle struct {
 }
 
 func (l *clusterLifecycle) sync(key string, orig *v3.Cluster) error {
+	if orig == nil {
+		return nil
+	}
+
 	obj := orig.DeepCopyObject()
 	obj, err := l.mgr.reconcileResourceToNamespace(obj)
 	if err != nil {

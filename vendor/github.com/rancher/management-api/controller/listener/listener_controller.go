@@ -23,7 +23,7 @@ type Controller struct {
 
 func Register(ctx context.Context, context *config.ManagementContext, httpPort, httpsPort int, getter HandlerGetter) {
 	c := &Controller{
-		server:             NewServer(getter, httpPort, httpsPort),
+		server:             NewServer(ctx, context.Management.ListenConfigs(""), getter, httpPort, httpsPort),
 		listenConfig:       context.Management.ListenConfigs(""),
 		listenConfigLister: context.Management.ListenConfigs("").Controller().Lister(),
 	}

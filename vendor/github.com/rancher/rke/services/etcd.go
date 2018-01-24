@@ -53,7 +53,7 @@ func RemoveEtcdPlane(ctx context.Context, etcdHosts []*hosts.Host, force bool) e
 		}
 
 	}
-	log.Infof(ctx, "[%s] Successfully teared down Etcd Plane..", ETCDRole)
+	log.Infof(ctx, "[%s] Successfully tore down Etcd Plane..", ETCDRole)
 	return nil
 }
 
