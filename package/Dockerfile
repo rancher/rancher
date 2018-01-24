@@ -11,7 +11,7 @@ RUN curl -sLf https://github.com/rancher/machine-package/releases/download/v0.13
 ENV ETCD_ARGS "--data-dir /var/lib/rancher/etcd"
 WORKDIR /var/lib/rancher
 
-ENV CATTLE_UI_VERSION 2.0.15
+ENV CATTLE_UI_VERSION 2.0.16
 RUN mkdir -p /usr/share/rancher/ui && \
     cd /usr/share/rancher/ui && \
     curl -sL https://releases.rancher.com/ui/${CATTLE_UI_VERSION}.tar.gz | tar xvzf - --strip-components=1 && \
