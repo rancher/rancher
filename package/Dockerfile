@@ -10,7 +10,6 @@ RUN curl -sLf https://github.com/rancher/machine-package/releases/download/v0.13
     chmod +x /usr/bin/kubectl /usr/bin/tiller /usr/bin/helm
 VOLUME /var/lib/rancher
 ENV ETCD_ARGS "--data-dir /var/lib/rancher/etcd"
-USER rancher
 WORKDIR /var/lib/rancher
 COPY rancher /usr/bin/
-ENTRYPOINT ["rancher", "--k8s-mode=exec"]
+ENTRYPOINT ["rancher", "--k8s-mode=exec", "--http-listen-port=80", "--https-listen-port=443"]
