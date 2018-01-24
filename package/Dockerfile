@@ -12,7 +12,7 @@ VOLUME /var/lib/rancher
 ENV ETCD_ARGS "--data-dir /var/lib/rancher/etcd"
 WORKDIR /var/lib/rancher
 
-ENV CATTLE_UI_VERSION v2.0.14
+ENV CATTLE_UI_VERSION 2.0.15
 RUN mkdir -p ui && \
     cd ui && \
     curl -sL https://releases.rancher.com/ui/${CATTLE_UI_VERSION}.tar.gz | tar xvzf - --strip-components=1
