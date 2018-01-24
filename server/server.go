@@ -54,13 +54,19 @@ func New(ctx context.Context, httpPort, httpsPort int, management *config.Manage
 
 	unauthed := mux.NewRouter()
 	unauthed.Handle("/", ui.UI(managementAPI))
-	unauthed.Handle("/v3/token", ui.UI(tokenAPI))
-	unauthed.PathPrefix("/v3/token").Queries("action", "login").Handler(tokenAPI)
-	unauthed.PathPrefix("/v3/token").Queries("action", "logout").Handler(tokenAPI)
+	unauthed.PathPrefix("/v3/token").Handler(tokenAPI)
 	unauthed.NotFoundHandler = ui.UI(http.NotFoundHandler())
 	unauthed.PathPrefix("/v3").Handler(authedHandler)
 	unauthed.PathPrefix("/meta").Handler(authedHandler)
 	unauthed.PathPrefix("/k8s/clusters/").Handler(authedHandler)
+
+	uiContent := ui.Content()
+	unauthed.PathPrefix("/assets").Handler(uiContent)
+	unauthed.PathPrefix("/translations").Handler(uiContent)
+	unauthed.Handle("humans.txt", uiContent)
+	unauthed.Handle("index.html", uiContent)
+	unauthed.Handle("robots.txt", uiContent)
+	unauthed.Handle("VERSION.txt", uiContent)
 
 	registerHealth(unauthed)
 
