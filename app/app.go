@@ -2,9 +2,13 @@ package app
 
 import (
 	"context"
+	"crypto/x509"
 	"log"
 
 	"time"
+
+	"bytes"
+	"encoding/pem"
 
 	"github.com/pkg/errors"
 	managementController "github.com/rancher/cluster-controller/controller"
@@ -108,17 +112,51 @@ func addListenConfig(management *config.ManagementContext, cfg Config) error {
 		if cfg.ListenConfig.Cert == "" {
 			cfg.ListenConfig.Cert = existing.Cert
 		}
+		if cfg.ListenConfig.CAKey == "" {
+			cfg.ListenConfig.CAKey = existing.CAKey
+		}
+		if cfg.ListenConfig.CACert == "" {
+			cfg.ListenConfig.CACert = existing.CACert
+		}
 	}
 
-	if cfg.ListenConfig.Key == "" || cfg.ListenConfig.Cert == "" {
-		cert, key, err := cert.GenerateSelfSignedCertKey("rancher", nil, nil)
+	if (cfg.ListenConfig.Key == "" || cfg.ListenConfig.Cert == "") && cfg.ListenConfig.CACert == "" && cfg.ListenConfig.Mode != "acme" {
+		caKey, err := cert.NewPrivateKey()
 		if err != nil {
 			return err
 		}
 
-		cfg.ListenConfig.Cert = string(cert)
-		cfg.ListenConfig.CACerts = string(cert)
-		cfg.ListenConfig.Key = string(key)
+		caCert, err := cert.NewSelfSignedCACert(cert.Config{
+			CommonName:   "cattle-ca",
+			Organization: []string{"the-rancher"},
+		}, caKey)
+		if err != nil {
+			return err
+		}
+
+		caCertBuffer := bytes.Buffer{}
+		if err := pem.Encode(&caCertBuffer, &pem.Block{
+			Type:  cert.CertificateBlockType,
+			Bytes: caCert.Raw,
+		}); err != nil {
+			return err
+		}
+
+		caKeyBuffer := bytes.Buffer{}
+		if err := pem.Encode(&caKeyBuffer, &pem.Block{
+			Type:  cert.RSAPrivateKeyBlockType,
+			Bytes: x509.MarshalPKCS1PrivateKey(caKey),
+		}); err != nil {
+			return err
+		}
+
+		cfg.ListenConfig.CACert = string(caCertBuffer.Bytes())
+		cfg.ListenConfig.CACerts = cfg.ListenConfig.CACert
+		cfg.ListenConfig.CAKey = string(caKeyBuffer.Bytes())
+	}
+
+	if cfg.ListenConfig.Mode == "acme" {
+		cfg.ListenConfig.CACerts = ""
 	}
 
 	if existing == nil {
