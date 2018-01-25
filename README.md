@@ -4,9 +4,9 @@ Rancher is an open source project that provides a complete platform for operatin
 
 ## Latest Release
 
-* Beta - v1.6.12 - `rancher/server:latest` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v1.6.12).
+* Beta - v1.6.14 - `rancher/server:latest` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v1.6.14).
 
-* Stable - v1.6.12 - `rancher/server:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v1.6.12).
+* Stable - v1.6.14 - `rancher/server:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v1.6.14).
 
 To get automated notifications of our latest release, you can watch the announcements category in our [forums](http://forums.rancher.com/c/announcements), or subscribe to the RSS feed `https://forums.rancher.com/c/announcements.rss`.
 
@@ -43,7 +43,7 @@ This repo is a meta-repo used for packaging.  The source code for Rancher is in 
 ## Support, Discussion, and Community
 If you need any help with Rancher or RancherOS, please join us at either our [Rancher forums](http://forums.rancher.com/), [#rancher IRC channel](http://webchat.freenode.net/?channels=rancher) or [Slack](https://slack.rancher.io/) where most of our team hangs out at.
 
-Please submit any **Rancher** bugs, issues, and feature requests to [rancher/rancher](//github.com/rancher/rancher/issues).
+Please submit any **Rancher** bugs, issues, and feature requests to [rancher/rancher](//github.com/rancher/rancher/issues). 
 
 Please submit any **RancherOS** bugs, issues, and feature requests to [rancher/os](//github.com/rancher/os/issues).
 
