@@ -1,5 +1,5 @@
 FROM microsoft/nanoserver:10.0.14393.1593
-ENV RANCHER_AGENT_WINDOWS_IMAGE rancher/agent-windows:v0.2.0
+ENV RANCHER_AGENT_WINDOWS_IMAGE rancher/agent-windows:v0.2.0-rc1
 ENV TOOLS_LIST "devcon.exe,startup.ps1,cleanup.ps1,rancher-tools.psm1"
 RUN mkdir "c:/program files/rancher"
 VOLUME [ "c:/program files/rancher" ]
