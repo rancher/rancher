@@ -1,13 +1,10 @@
 $IMAGE=$(get-item env:IMAGE -ErrorAction Ignore)
 
-Invoke-WebRequest -Uri "https://github.com/rancher/windows-binaries/releases/download/v0.0.1/devcon.exe" -OutFile devcon.exe
-Invoke-WebRequest -Uri "https://github.com/rancher/windows-binaries/releases/download/v0.0.1/MD5SUM" -OutFile "MD5SUM"
-
-$md5 = New-Object -TypeName System.Security.Cryptography.MD5CryptoServiceProvider
-$hashBuilder = New-Object System.Text.StringBuilder
-$md5.ComputeHash([System.IO.File]::ReadAllBytes($pwd.Path+"/devcon.exe")) | ForEach-Object { [void]$hashBuilder.Append($_.ToString("x2")) }
-$targetHash = Get-Content -Path "$($pwd.Path)/MD5SUM"
-if($hashBuilder.ToString() -ne "$targetHash"){
+Invoke-WebRequest -Uri "https://github.com/rancher/windows-binaries/releases/download/v0.0.1/devcon.exe" -OutFile "tools/devcon.exe"
+$byteArray=(Invoke-WebRequest -Uri "https://github.com/rancher/windows-binaries/releases/download/v0.0.1/MD5SUM").Content
+$tarMD5=[System.Text.Encoding]::ASCII.GetString($byteArray).ToUpper()
+$fileHash=(Get-FileHash -Path "tools/devcon.exe" -Algorithm MD5).Hash
+if("$fileHash" -ne "$tarMD5"){
     Write-Host "MD5SUM of devcon.exe mismatch between local and remote storage."
     Exit 1
 }
@@ -19,5 +16,4 @@ if($IMAGE -eq $null){
 write-host "Building $IMAGE"
 docker build -t ${IMAGE} .
 
-remove-item -Path "$($pwd.Path)/devcon.exe"
-remove-item -Path "$($pwd.Path)/MD5SUM"
+remove-item -Path "$pwd/tools/devcon.exe"
