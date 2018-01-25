@@ -17,7 +17,6 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
-	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -399,10 +398,7 @@ func addRoles(management *config.ManagementContext, local bool) error {
 					GenerateName: "globalrolebinding-",
 					Labels:       defaultAdminLabel,
 				},
-				Subject: rbacv1.Subject{
-					Kind: "User",
-					Name: admin.Name,
-				},
+				UserName:       admin.Name,
 				GlobalRoleName: "admin",
 			})
 	}
