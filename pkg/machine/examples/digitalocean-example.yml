@@ -1,0 +1,14 @@
+apiVersion: management.cattle.io/v3
+kind: Machine
+metadata:
+  name: daishan-test5
+spec:
+  driver: digitalocean
+  engineInstallUrl: https://releases.rancher.com/install-docker/1.12.sh
+  digitaloceanConfig:
+    image: ubuntu-16-04-x64
+    region: nyc3
+    size: 1gb
+    sshPort: "22"
+    sshUser: root
+    accessToken: ???

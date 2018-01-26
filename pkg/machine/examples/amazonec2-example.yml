@@ -1,0 +1,22 @@
+apiVersion: management.cattle.io/v3
+kind: Machine
+metadata:
+  name: daishan-dev15
+spec:
+  driver: amazonec2
+  engineInstallUrl: https://releases.rancher.com/install-docker/1.12.sh
+  amazonEC2Config:
+    accessKey: ???
+    secretKey: ???
+    deviceName: /dev/sda1
+    instanceType: t2.micro
+    region: us-west-2
+    retries: "5"
+    rootSize: "16"
+    spotPrice: "0.50"
+    sshUser: ubuntu
+    volumeType: gp2
+    vpcId: vpc-16885b73
+    zone: a
+    securityGroup:
+    - rancher-machine
