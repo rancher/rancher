@@ -1,8 +1,8 @@
 package controller
 
 import (
-	"github.com/rancher/machine-controller/controller/machine"
-	"github.com/rancher/machine-controller/controller/machinedriver"
+	"github.com/rancher/rancher/pkg/machine/controller/machine"
+	"github.com/rancher/rancher/pkg/machine/controller/machinedriver"
 	"github.com/rancher/types/config"
 )
 

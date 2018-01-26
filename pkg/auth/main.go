@@ -8,7 +8,7 @@ import (
 
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/rancher/auth/server"
+	"github.com/rancher/rancher/pkg/auth/server"
 	"github.com/rancher/types/config"
 )
 

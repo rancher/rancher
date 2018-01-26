@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/cluster-agent/utils"
+	"github.com/rancher/rancher/pkg/cluster/utils"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"

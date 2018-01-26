@@ -1,10 +1,10 @@
 package project
 
 import (
-	"github.com/rancher/management-api/cluster"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/api/management/cluster"
 	"github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/client/management/v3"
 )

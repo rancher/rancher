@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	clusterapi "github.com/rancher/cluster-api/server"
+	clusterapi "github.com/rancher/rancher/pkg/api/cluster/server"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"

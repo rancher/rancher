@@ -3,15 +3,16 @@ package github
 import (
 	"context"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"net/http"
 	"strconv"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/rancher/auth/model"
+	"github.com/rancher/rancher/pkg/auth/model"
 )
 
 //Constants for github

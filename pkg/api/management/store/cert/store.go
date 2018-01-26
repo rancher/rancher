@@ -3,10 +3,10 @@ package cert
 import (
 	"time"
 
-	"github.com/rancher/management-api/pkg/cert"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/cert"
 	"github.com/rancher/types/client/project/v3"
 )
 

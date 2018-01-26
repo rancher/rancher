@@ -8,7 +8,7 @@ import (
 	"strconv"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/catalog-controller/utils"
+	"github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -138,7 +138,7 @@ func (m *Manager) updateTemplate(name string, existingTemplate v3.Template, temp
 	}
 	updateTemplate.Spec = template.Spec
 	template.Spec.Versions = updateTemplate.Spec.Versions
-		modifiedVersionFiles := []v3.TemplateVersionSpec{}
+	modifiedVersionFiles := []v3.TemplateVersionSpec{}
 	for _, version := range updateTemplate.Spec.Versions {
 		version.Files = nil
 		version.Readme = ""

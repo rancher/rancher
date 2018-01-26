@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/rancher/management-api/server"
+	"github.com/rancher/rancher/pkg/api/management/server"
 	"github.com/rancher/types/config"
 	"k8s.io/client-go/tools/clientcmd"
 )

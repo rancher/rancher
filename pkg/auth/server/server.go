@@ -9,8 +9,8 @@ import (
 	managementSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/config"
 
-	"github.com/rancher/auth/api/setup"
-	"github.com/rancher/auth/tokens"
+	"github.com/rancher/rancher/pkg/auth/api/setup"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 )
 
 var crdVersions = []*types.APIVersion{

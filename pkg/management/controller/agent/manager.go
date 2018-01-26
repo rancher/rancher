@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"sync"
 
-	clusterController "github.com/rancher/cluster-agent/controller"
+	clusterController "github.com/rancher/rancher/pkg/cluster/controller"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"

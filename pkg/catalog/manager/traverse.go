@@ -11,8 +11,8 @@ import (
 	"strings"
 
 	"github.com/blang/semver"
-	"github.com/rancher/catalog-controller/helm"
-	"github.com/rancher/catalog-controller/parse"
+	"github.com/rancher/rancher/pkg/catalog/helm"
+	"github.com/rancher/rancher/pkg/catalog/parse"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -129,7 +129,7 @@ func traverseHelmFiles(repoPath, catalogName string) ([]v3.Template, []error, er
 		versions := make([]v3.TemplateVersionSpec, 0)
 		for _, version := range metadata {
 			v := v3.TemplateVersionSpec{
-				Version:  version.Version,
+				Version: version.Version,
 			}
 			files, err := helm.FetchFiles(version.URLs)
 			if err != nil {

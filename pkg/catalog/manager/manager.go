@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/catalog-controller/git"
-	"github.com/rancher/catalog-controller/helm"
+	"github.com/rancher/rancher/pkg/catalog/git"
+	"github.com/rancher/rancher/pkg/catalog/helm"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"

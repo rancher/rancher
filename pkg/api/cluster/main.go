@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/rancher/cluster-api/server"
+	"github.com/rancher/rancher/pkg/api/cluster/server"
 	"github.com/rancher/types/config"
 	"k8s.io/client-go/tools/clientcmd"
 )

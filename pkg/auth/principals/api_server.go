@@ -3,15 +3,16 @@ package principals
 import (
 	"context"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 
-	"github.com/rancher/auth/providers"
+	"github.com/rancher/rancher/pkg/auth/providers"
 )
 
 type principalAPIServer struct {

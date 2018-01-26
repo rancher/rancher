@@ -5,7 +5,7 @@ import (
 
 	"context"
 
-	"github.com/rancher/catalog-controller/controller"
+	"github.com/rancher/rancher/pkg/catalog/controller"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"

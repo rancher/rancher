@@ -1,7 +1,7 @@
 package parse
 
 import (
-	"github.com/rancher/catalog-controller/utils"
+	"github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	yaml "gopkg.in/yaml.v2"
 )

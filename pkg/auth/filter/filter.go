@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/rancher/auth/authenticator"
-	"github.com/rancher/auth/util"
+	"github.com/rancher/rancher/pkg/auth/authenticator"
+	"github.com/rancher/rancher/pkg/auth/util"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 )

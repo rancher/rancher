@@ -11,7 +11,7 @@ import (
 	"encoding/pem"
 
 	"github.com/pkg/errors"
-	managementController "github.com/rancher/cluster-controller/controller"
+	managementController "github.com/rancher/rancher/pkg/management/controller"
 	"github.com/rancher/rancher/server"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"

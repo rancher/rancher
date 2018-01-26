@@ -9,7 +9,7 @@ import (
 	"github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
 
-	"github.com/rancher/auth/tokens"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 )
 
 var (

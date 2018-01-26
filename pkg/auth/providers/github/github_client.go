@@ -13,7 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/tomnomnom/linkheader"
 
-	"github.com/rancher/auth/model"
+	"github.com/rancher/rancher/pkg/auth/model"
 )
 
 const (

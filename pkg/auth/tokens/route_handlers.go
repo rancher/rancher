@@ -15,8 +15,8 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 
-	"github.com/rancher/auth/model"
-	"github.com/rancher/auth/util"
+	"github.com/rancher/rancher/pkg/auth/model"
+	"github.com/rancher/rancher/pkg/auth/util"
 )
 
 const (

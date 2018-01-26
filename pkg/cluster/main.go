@@ -4,7 +4,7 @@ import (
 	"context"
 	"os"
 
-	controller "github.com/rancher/cluster-agent/controller"
+	controller "github.com/rancher/rancher/pkg/cluster/controller"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
