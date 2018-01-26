@@ -1,6 +1,0 @@
-package: github.com/rancher/helm-controller
-import:
-- package: github.com/rancher/norman
-  version: a212c8c192b7438fd0504acba339028477a1fcd6
-- package: github.com/rancher/types
-  version: c833e41eb4edb96e6c106f7844a6861fb328bc18
