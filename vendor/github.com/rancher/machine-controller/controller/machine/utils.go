@@ -51,10 +51,12 @@ func buildCreateCommand(machine *v3.Machine, configMap map[string]interface{}) [
 		case int64:
 			cmd = append(cmd, dmField, strconv.FormatInt(v.(int64), 10))
 		case string:
-			cmd = append(cmd, dmField, v.(string))
+			if v.(string) != "" {
+				cmd = append(cmd, dmField, v.(string))
+			}
 		case bool:
 			if v.(bool) {
-				cmd = append(cmd, dmField, strconv.FormatBool(v.(bool)))
+				cmd = append(cmd, dmField)
 			}
 		case []interface{}:
 			for _, s := range v.([]interface{}) {

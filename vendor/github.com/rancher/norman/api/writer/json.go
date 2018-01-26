@@ -205,7 +205,7 @@ func newCollection(apiContext *types.APIContext) *types.GenericCollection {
 		}
 	}
 
-	if result.Pagination.Partial {
+	if result.Pagination != nil && result.Pagination.Partial {
 		if result.Pagination.Next != "" {
 			result.Pagination.Next = apiContext.URLBuilder.Marker(result.Pagination.Next)
 		}
