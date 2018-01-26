@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
@@ -21,7 +22,7 @@ func SetUpAuthentication(ctx context.Context, kubeCluster, currentCluster *Clust
 			kubeCluster.Certificates = currentCluster.Certificates
 		} else {
 			log.Infof(ctx, "[certificates] Attempting to recover certificates from backup on host [%s]", kubeCluster.EtcdHosts[0].Address)
-			kubeCluster.Certificates, err = pki.FetchCertificatesFromHost(ctx, kubeCluster.EtcdHosts[0], kubeCluster.SystemImages[AplineImage], kubeCluster.LocalKubeConfigPath)
+			kubeCluster.Certificates, err = pki.FetchCertificatesFromHost(ctx, kubeCluster.EtcdHosts, kubeCluster.EtcdHosts[0], kubeCluster.SystemImages[AplineImage], kubeCluster.LocalKubeConfigPath)
 			if err != nil {
 				return err
 			}
@@ -33,7 +34,7 @@ func SetUpAuthentication(ctx context.Context, kubeCluster, currentCluster *Clust
 
 			kubeCluster.Certificates, err = pki.StartCertificatesGeneration(ctx,
 				kubeCluster.ControlPlaneHosts,
-				kubeCluster.WorkerHosts,
+				kubeCluster.EtcdHosts,
 				kubeCluster.ClusterDomain,
 				kubeCluster.LocalKubeConfigPath,
 				kubeCluster.KubernetesServiceIP)
@@ -41,7 +42,7 @@ func SetUpAuthentication(ctx context.Context, kubeCluster, currentCluster *Clust
 				return fmt.Errorf("Failed to generate Kubernetes certificates: %v", err)
 			}
 			log.Infof(ctx, "[certificates] Temporarily saving certs to etcd host [%s]", kubeCluster.EtcdHosts[0].Address)
-			if err := pki.DeployCertificatesOnHost(ctx, kubeCluster.EtcdHosts[0], kubeCluster.Certificates, kubeCluster.SystemImages[CertDownloaderImage]); err != nil {
+			if err := pki.DeployCertificatesOnHost(ctx, kubeCluster.EtcdHosts, kubeCluster.EtcdHosts[0], kubeCluster.Certificates, kubeCluster.SystemImages[CertDownloaderImage], pki.TempCertPath); err != nil {
 				return err
 			}
 			log.Infof(ctx, "[certificates] Saved certs to etcd host [%s]", kubeCluster.EtcdHosts[0].Address)
@@ -56,32 +57,31 @@ func regenerateAPICertificate(c *Cluster, certificates map[string]pki.Certificat
 	caCrt := certificates[pki.CACertName].Certificate
 	caKey := certificates[pki.CACertName].Key
 	kubeAPIKey := certificates[pki.KubeAPICertName].Key
-	kubeAPICert, err := pki.GenerateCertWithKey(pki.KubeAPICertName, kubeAPIKey, caCrt, caKey, kubeAPIAltNames)
+	kubeAPICert, _, err := pki.GenerateSignedCertAndKey(caCrt, caKey, true, pki.KubeAPICertName, kubeAPIAltNames, kubeAPIKey, nil)
 	if err != nil {
 		return nil, err
 	}
-	certificates[pki.KubeAPICertName] = pki.CertificatePKI{
-		Certificate:   kubeAPICert,
-		Key:           kubeAPIKey,
-		Config:        certificates[pki.KubeAPICertName].Config,
-		EnvName:       certificates[pki.KubeAPICertName].EnvName,
-		ConfigEnvName: certificates[pki.KubeAPICertName].ConfigEnvName,
-		KeyEnvName:    certificates[pki.KubeAPICertName].KeyEnvName,
-	}
+	certificates[pki.KubeAPICertName] = pki.ToCertObject(pki.KubeAPICertName, "", "", kubeAPICert, kubeAPIKey)
 	return certificates, nil
 }
 
-func getClusterCerts(ctx context.Context, kubeClient *kubernetes.Clientset) (map[string]pki.CertificatePKI, error) {
+func getClusterCerts(ctx context.Context, kubeClient *kubernetes.Clientset, etcdHosts []*hosts.Host) (map[string]pki.CertificatePKI, error) {
 	log.Infof(ctx, "[certificates] Getting Cluster certificates from Kubernetes")
 	certificatesNames := []string{
 		pki.CACertName,
 		pki.KubeAPICertName,
-		pki.KubeNodeName,
-		pki.KubeProxyName,
-		pki.KubeControllerName,
-		pki.KubeSchedulerName,
-		pki.KubeAdminCommonName,
+		pki.KubeNodeCertName,
+		pki.KubeProxyCertName,
+		pki.KubeControllerCertName,
+		pki.KubeSchedulerCertName,
+		pki.KubeAdminCertName,
 	}
+
+	for _, etcdHost := range etcdHosts {
+		etcdName := pki.GetEtcdCrtName(etcdHost.InternalAddress)
+		certificatesNames = append(certificatesNames, etcdName)
+	}
+
 	certMap := make(map[string]pki.CertificatePKI)
 	for _, certName := range certificatesNames {
 		secret, err := k8s.GetSecret(kubeClient, certName)

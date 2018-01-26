@@ -7,9 +7,11 @@ import (
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
+	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/cert"
 )
 
 const (
@@ -155,10 +157,14 @@ func reconcileHost(ctx context.Context, toDeleteHost *hosts.Host, worker, etcd b
 }
 
 func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, kubeClient *kubernetes.Clientset) error {
-	log.Infof(ctx, "[reconcile] Check etcd hosts to be deleted")
+	logrus.Infof("[reconcile] Check etcd hosts to be deleted")
+	// get tls for the first current etcd host
+	clientCert := cert.EncodeCertPEM(currentCluster.Certificates[pki.KubeNodeCertName].Certificate)
+	clientkey := cert.EncodePrivateKeyPEM(currentCluster.Certificates[pki.KubeNodeCertName].Key)
+
 	etcdToDelete := hosts.GetToDeleteHosts(currentCluster.EtcdHosts, kubeCluster.EtcdHosts)
 	for _, etcdHost := range etcdToDelete {
-		if err := services.RemoveEtcdMember(ctx, etcdHost, kubeCluster.EtcdHosts, currentCluster.LocalConnDialerFactory); err != nil {
+		if err := services.RemoveEtcdMember(ctx, etcdHost, kubeCluster.EtcdHosts, currentCluster.LocalConnDialerFactory, clientCert, clientkey); err != nil {
 			log.Warnf(ctx, "[reconcile] %v", err)
 			continue
 		}
@@ -174,15 +180,34 @@ func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, ku
 	}
 	log.Infof(ctx, "[reconcile] Check etcd hosts to be added")
 	etcdToAdd := hosts.GetToAddHosts(currentCluster.EtcdHosts, kubeCluster.EtcdHosts)
+	crtMap := currentCluster.Certificates
+	var err error
 	for _, etcdHost := range etcdToAdd {
 		etcdHost.ToAddEtcdMember = true
+		// Generate new certificate for the new etcd member
+		crtMap, err = pki.RegenerateEtcdCertificate(
+			ctx,
+			crtMap,
+			etcdHost,
+			kubeCluster.EtcdHosts,
+			kubeCluster.ClusterDomain,
+			kubeCluster.KubernetesServiceIP)
+		if err != nil {
+			return err
+		}
 	}
+	currentCluster.Certificates = crtMap
 	for _, etcdHost := range etcdToAdd {
-		if err := services.AddEtcdMember(ctx, etcdHost, kubeCluster.EtcdHosts, currentCluster.LocalConnDialerFactory); err != nil {
+		// deploy certificates on new etcd host
+		if err := pki.DeployCertificatesOnHost(ctx, kubeCluster.EtcdHosts, etcdHost, currentCluster.Certificates, kubeCluster.SystemImages[CertDownloaderImage], pki.CertPathPrefix); err != nil {
+			return err
+		}
+
+		if err := services.AddEtcdMember(ctx, etcdHost, kubeCluster.EtcdHosts, currentCluster.LocalConnDialerFactory, clientCert, clientkey); err != nil {
 			return err
 		}
 		etcdHost.ToAddEtcdMember = false
-		if err := services.ReloadEtcdCluster(ctx, kubeCluster.EtcdHosts, kubeCluster.Services.Etcd, currentCluster.LocalConnDialerFactory); err != nil {
+		if err := services.ReloadEtcdCluster(ctx, kubeCluster.EtcdHosts, kubeCluster.Services.Etcd, currentCluster.LocalConnDialerFactory, clientCert, clientkey); err != nil {
 			return err
 		}
 	}

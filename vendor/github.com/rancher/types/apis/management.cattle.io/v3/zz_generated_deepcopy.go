@@ -949,7 +949,6 @@ func (in *ClusterRoleTemplateBinding) DeepCopyInto(out *ClusterRoleTemplateBindi
 	out.Namespaced = in.Namespaced
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
-	out.Subject = in.Subject
 	return
 }
 
@@ -1423,7 +1422,6 @@ func (in *GlobalRoleBinding) DeepCopyInto(out *GlobalRoleBinding) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
-	out.Subject = in.Subject
 	return
 }
 
@@ -2705,7 +2703,6 @@ func (in *ProjectRoleTemplateBinding) DeepCopyInto(out *ProjectRoleTemplateBindi
 	out.Namespaced = in.Namespaced
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
-	out.Subject = in.Subject
 	return
 }
 

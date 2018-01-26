@@ -31,7 +31,7 @@ func buildSchedulerConfig(host *hosts.Host, schedulerService v3.SchedulerService
 			"--leader-elect=true",
 			"--v=2",
 			"--address=0.0.0.0",
-			"--kubeconfig=" + pki.KubeSchedulerConfigPath,
+			"--kubeconfig=" + pki.GetConfigPath(pki.KubeSchedulerCertName),
 		},
 	}
 	hostCfg := &container.HostConfig{

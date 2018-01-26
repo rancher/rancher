@@ -24,10 +24,10 @@ func DeployCertificatesOnMasters(ctx context.Context, cpHosts []*hosts.Host, crt
 	crtList := []string{
 		CACertName,
 		KubeAPICertName,
-		KubeControllerName,
-		KubeSchedulerName,
-		KubeProxyName,
-		KubeNodeName,
+		KubeControllerCertName,
+		KubeSchedulerCertName,
+		KubeProxyCertName,
+		KubeNodeCertName,
 	}
 	env := []string{}
 	for _, crtName := range crtList {
@@ -48,8 +48,8 @@ func DeployCertificatesOnWorkers(ctx context.Context, workerHosts []*hosts.Host,
 	// list of certificates that should be deployed on the workers
 	crtList := []string{
 		CACertName,
-		KubeProxyName,
-		KubeNodeName,
+		KubeProxyCertName,
+		KubeNodeCertName,
 	}
 	env := []string{}
 	for _, crtName := range crtList {
@@ -59,6 +59,31 @@ func DeployCertificatesOnWorkers(ctx context.Context, workerHosts []*hosts.Host,
 
 	for i := range workerHosts {
 		err := doRunDeployer(ctx, workerHosts[i], env, certDownloaderImage)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func DeployCertificatesOnEtcd(ctx context.Context, etcdHosts []*hosts.Host, crtMap map[string]CertificatePKI, certDownloaderImage string) error {
+	// list of certificates that should be deployed on the etcd
+	crtList := []string{
+		CACertName,
+		KubeProxyCertName,
+		KubeNodeCertName,
+	}
+	for _, host := range etcdHosts {
+		crtList = append(crtList, GetEtcdCrtName(host.InternalAddress))
+	}
+	env := []string{}
+	for _, crtName := range crtList {
+		c := crtMap[crtName]
+		env = append(env, c.ToEnv()...)
+	}
+
+	for i := range etcdHosts {
+		err := doRunDeployer(ctx, etcdHosts[i], env, certDownloaderImage)
 		if err != nil {
 			return err
 		}
@@ -135,19 +160,22 @@ func RemoveAdminConfig(ctx context.Context, localConfigPath string) {
 	log.Infof(ctx, "Local admin Kubeconfig removed successfully")
 }
 
-func DeployCertificatesOnHost(ctx context.Context, host *hosts.Host, crtMap map[string]CertificatePKI, certDownloaderImage string) error {
+func DeployCertificatesOnHost(ctx context.Context, extraHosts []*hosts.Host, host *hosts.Host, crtMap map[string]CertificatePKI, certDownloaderImage, certPath string) error {
 	crtList := []string{
 		CACertName,
 		KubeAPICertName,
-		KubeControllerName,
-		KubeSchedulerName,
-		KubeProxyName,
-		KubeNodeName,
-		KubeAdminCommonName,
+		KubeControllerCertName,
+		KubeSchedulerCertName,
+		KubeProxyCertName,
+		KubeNodeCertName,
+		KubeAdminCertName,
 	}
-
+	for _, host := range extraHosts {
+		// Deploy etcd certificates
+		crtList = append(crtList, GetEtcdCrtName(host.InternalAddress))
+	}
 	env := []string{
-		"CRTS_DEPLOY_PATH=" + TempCertPath,
+		"CRTS_DEPLOY_PATH=" + certPath,
 	}
 	for _, crtName := range crtList {
 		c := crtMap[crtName]
@@ -157,24 +185,27 @@ func DeployCertificatesOnHost(ctx context.Context, host *hosts.Host, crtMap map[
 	return doRunDeployer(ctx, host, env, certDownloaderImage)
 }
 
-func FetchCertificatesFromHost(ctx context.Context, host *hosts.Host, image, localConfigPath string) (map[string]CertificatePKI, error) {
+func FetchCertificatesFromHost(ctx context.Context, extraHosts []*hosts.Host, host *hosts.Host, image, localConfigPath string) (map[string]CertificatePKI, error) {
 	// rebuilding the certificates. This should look better after refactoring pki
 	tmpCerts := make(map[string]CertificatePKI)
 
-	certEnvMap := map[string][]string{
-		CACertName:          []string{CACertPath, CAKeyPath},
-		KubeAPICertName:     []string{KubeAPICertPath, KubeAPIKeyPath},
-		KubeControllerName:  []string{KubeControllerCertPath, KubeControllerKeyPath, KubeControllerConfigPath},
-		KubeSchedulerName:   []string{KubeSchedulerCertPath, KubeSchedulerKeyPath, KubeSchedulerConfigPath},
-		KubeProxyName:       []string{KubeProxyCertPath, KubeProxyKeyPath, KubeProxyConfigPath},
-		KubeNodeName:        []string{KubeNodeCertPath, KubeNodeKeyPath, KubeNodeConfigPath},
-		KubeAdminCommonName: []string{"kube-admin.pem", "kube-admin-key.pem", "kubecfg-admin.yaml"},
+	crtList := map[string]bool{
+		CACertName:             false,
+		KubeAPICertName:        false,
+		KubeControllerCertName: true,
+		KubeSchedulerCertName:  true,
+		KubeProxyCertName:      true,
+		KubeNodeCertName:       true,
+		KubeAdminCertName:      true,
 	}
-	// get files from hosts
+	for _, etcdHost := range extraHosts {
+		// Fetch etcd certificates
+		crtList[GetEtcdCrtName(etcdHost.InternalAddress)] = false
+	}
 
-	for crtName, certEnv := range certEnvMap {
+	for certName, config := range crtList {
 		certificate := CertificatePKI{}
-		crt, err := fetchFileFromHost(ctx, getTempPath(certEnv[0]), image, host)
+		crt, err := fetchFileFromHost(ctx, GetCertTempPath(certName), image, host)
 		if err != nil {
 			if strings.Contains(err.Error(), "no such file or directory") ||
 				strings.Contains(err.Error(), "Could not find the file") {
@@ -182,10 +213,10 @@ func FetchCertificatesFromHost(ctx context.Context, host *hosts.Host, image, loc
 			}
 			return nil, err
 		}
-		key, err := fetchFileFromHost(ctx, getTempPath(certEnv[1]), image, host)
+		key, err := fetchFileFromHost(ctx, GetKeyTempPath(certName), image, host)
 
-		if len(certEnv) > 2 {
-			config, err := fetchFileFromHost(ctx, getTempPath(certEnv[2]), image, host)
+		if config {
+			config, err := fetchFileFromHost(ctx, GetConfigTempPath(certName), image, host)
 			if err != nil {
 				return nil, err
 			}
@@ -201,14 +232,14 @@ func FetchCertificatesFromHost(ctx context.Context, host *hosts.Host, image, loc
 		}
 		certificate.Certificate = parsedCert[0]
 		certificate.Key = parsedKey.(*rsa.PrivateKey)
-		tmpCerts[crtName] = certificate
-		logrus.Debugf("[certificates] Recovered certificate: %s", crtName)
+		tmpCerts[certName] = certificate
+		logrus.Debugf("[certificates] Recovered certificate: %s", certName)
 	}
 
 	if err := docker.RemoveContainer(ctx, host.DClient, host.Address, CertFetcherContainer); err != nil {
 		return nil, err
 	}
-	return populateCertMap(tmpCerts, localConfigPath), nil
+	return populateCertMap(tmpCerts, localConfigPath, extraHosts), nil
 
 }
 
@@ -244,96 +275,31 @@ func getTempPath(s string) string {
 	return TempCertPath + path.Base(s)
 }
 
-func populateCertMap(tmpCerts map[string]CertificatePKI, localConfigPath string) map[string]CertificatePKI {
+func populateCertMap(tmpCerts map[string]CertificatePKI, localConfigPath string, extraHosts []*hosts.Host) map[string]CertificatePKI {
 	certs := make(map[string]CertificatePKI)
-	//CACert
-	certs[CACertName] = CertificatePKI{
-		Certificate: tmpCerts[CACertName].Certificate,
-		Key:         tmpCerts[CACertName].Key,
-		Name:        CACertName,
-		EnvName:     CACertENVName,
-		KeyEnvName:  CAKeyENVName,
-		Path:        CACertPath,
-		KeyPath:     CAKeyPath,
-	}
-	//KubeAPI
-	certs[KubeAPICertName] = CertificatePKI{
-		Certificate: tmpCerts[KubeAPICertName].Certificate,
-		Key:         tmpCerts[KubeAPICertName].Key,
-		Name:        KubeAPICertName,
-		EnvName:     KubeAPICertENVName,
-		KeyEnvName:  KubeAPIKeyENVName,
-		Path:        KubeAPICertPath,
-		KeyPath:     KubeAPIKeyPath,
-	}
-	//kubeController
-	certs[KubeControllerName] = CertificatePKI{
-		Certificate:   tmpCerts[KubeControllerName].Certificate,
-		Key:           tmpCerts[KubeControllerName].Key,
-		Config:        tmpCerts[KubeControllerName].Config,
-		Name:          KubeControllerName,
-		CommonName:    KubeControllerCommonName,
-		EnvName:       KubeControllerCertENVName,
-		KeyEnvName:    KubeControllerKeyENVName,
-		Path:          KubeControllerCertPath,
-		KeyPath:       KubeControllerKeyPath,
-		ConfigEnvName: KubeControllerConfigENVName,
-		ConfigPath:    KubeControllerConfigPath,
-	}
-	//KubeScheduler
-	certs[KubeSchedulerName] = CertificatePKI{
-		Certificate:   tmpCerts[KubeSchedulerName].Certificate,
-		Key:           tmpCerts[KubeSchedulerName].Key,
-		Config:        tmpCerts[KubeSchedulerName].Config,
-		Name:          KubeSchedulerName,
-		CommonName:    KubeSchedulerCommonName,
-		EnvName:       KubeSchedulerCertENVName,
-		KeyEnvName:    KubeSchedulerKeyENVName,
-		Path:          KubeSchedulerCertPath,
-		KeyPath:       KubeSchedulerKeyPath,
-		ConfigEnvName: KubeSchedulerConfigENVName,
-		ConfigPath:    KubeSchedulerConfigPath,
-	}
+	// CACert
+	certs[CACertName] = ToCertObject(CACertName, "", "", tmpCerts[CACertName].Certificate, tmpCerts[CACertName].Key)
+	// KubeAPI
+	certs[KubeAPICertName] = ToCertObject(KubeAPICertName, "", "", tmpCerts[KubeAPICertName].Certificate, tmpCerts[KubeAPICertName].Key)
+	// kubeController
+	certs[KubeControllerCertName] = ToCertObject(KubeControllerCertName, "", "", tmpCerts[KubeControllerCertName].Certificate, tmpCerts[KubeControllerCertName].Key)
+	// KubeScheduler
+	certs[KubeSchedulerCertName] = ToCertObject(KubeSchedulerCertName, "", "", tmpCerts[KubeSchedulerCertName].Certificate, tmpCerts[KubeSchedulerCertName].Key)
 	// KubeProxy
-	certs[KubeProxyName] = CertificatePKI{
-		Certificate:   tmpCerts[KubeProxyName].Certificate,
-		Key:           tmpCerts[KubeProxyName].Key,
-		Config:        tmpCerts[KubeProxyName].Config,
-		Name:          KubeProxyName,
-		CommonName:    KubeProxyCommonName,
-		EnvName:       KubeProxyCertENVName,
-		Path:          KubeProxyCertPath,
-		KeyEnvName:    KubeProxyKeyENVName,
-		KeyPath:       KubeProxyKeyPath,
-		ConfigEnvName: KubeProxyConfigENVName,
-		ConfigPath:    KubeProxyConfigPath,
-	}
+	certs[KubeProxyCertName] = ToCertObject(KubeProxyCertName, "", "", tmpCerts[KubeProxyCertName].Certificate, tmpCerts[KubeProxyCertName].Key)
 	// KubeNode
-	certs[KubeNodeName] = CertificatePKI{
-		Certificate:   tmpCerts[KubeNodeName].Certificate,
-		Key:           tmpCerts[KubeNodeName].Key,
-		Config:        tmpCerts[KubeNodeName].Config,
-		Name:          KubeNodeName,
-		CommonName:    KubeNodeCommonName,
-		OUName:        KubeNodeOrganizationName,
-		EnvName:       KubeNodeCertENVName,
-		KeyEnvName:    KubeNodeKeyENVName,
-		Path:          KubeNodeCertPath,
-		KeyPath:       KubeNodeKeyPath,
-		ConfigEnvName: KubeNodeConfigENVName,
-		ConfigPath:    KubeNodeCommonName,
+	certs[KubeNodeCertName] = ToCertObject(KubeNodeCertName, KubeNodeCommonName, KubeNodeOrganizationName, tmpCerts[KubeNodeCertName].Certificate, tmpCerts[KubeNodeCertName].Key)
+	// KubeAdmin
+	kubeAdminCertObj := ToCertObject(KubeAdminCertName, KubeAdminCertName, KubeAdminOrganizationName, tmpCerts[KubeAdminCertName].Certificate, tmpCerts[KubeAdminCertName].Key)
+	kubeAdminCertObj.Config = tmpCerts[KubeAdminCertName].Config
+	kubeAdminCertObj.ConfigPath = localConfigPath
+	certs[KubeAdminCertName] = kubeAdminCertObj
+	// etcd
+	for _, host := range extraHosts {
+		etcdName := GetEtcdCrtName(host.InternalAddress)
+		etcdCrt, etcdKey := tmpCerts[etcdName].Certificate, tmpCerts[etcdName].Key
+		certs[etcdName] = ToCertObject(etcdName, "", "", etcdCrt, etcdKey)
 	}
 
-	certs[KubeAdminCommonName] = CertificatePKI{
-		Certificate:   tmpCerts[KubeAdminCommonName].Certificate,
-		Key:           tmpCerts[KubeAdminCommonName].Key,
-		Config:        tmpCerts[KubeAdminCommonName].Config,
-		CommonName:    KubeAdminCommonName,
-		OUName:        KubeAdminOrganizationName,
-		ConfigEnvName: KubeAdminConfigENVName,
-		ConfigPath:    localConfigPath,
-		EnvName:       KubeAdminCertEnvName,
-		KeyEnvName:    KubeAdminKeyEnvName,
-	}
 	return certs
 }

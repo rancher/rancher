@@ -86,14 +86,15 @@ func (p *prtbLifecycle) ensureBindings(binding *v3.ProjectRoleTemplateBinding) e
 		projectRoleName = strings.ToLower(fmt.Sprintf("%v-projectmember", projectName))
 	}
 
-	if err := p.mgr.ensureProjectMembershipBinding(projectRoleName, string(binding.UID), clusterName, proj, isOwnerRole, binding.Subject); err != nil {
+	subject := buildSubjectFromPRTB(binding)
+	if err := p.mgr.ensureProjectMembershipBinding(projectRoleName, string(binding.UID), clusterName, proj, isOwnerRole, subject); err != nil {
 		return err
 	}
-	if err := p.mgr.ensureClusterMembershipBinding(roleName, clusterName, string(binding.UID), false, binding.Subject); err != nil {
+	if err := p.mgr.ensureClusterMembershipBinding(roleName, clusterName, string(binding.UID), false, subject); err != nil {
 		return err
 	}
 
-	return p.mgr.grantManagementPlanePrivileges(binding.RoleTemplateName, projectManagmentPlanResources, binding.Subject, binding)
+	return p.mgr.grantManagementPlanePrivileges(binding.RoleTemplateName, projectManagmentPlanResources, subject, binding)
 }
 
 // When a PRTB is created that gives a subject some permissions in a project or cluster, we need to create a "membership" binding
@@ -230,4 +231,11 @@ func (m *manager) reconcileProjectMembershipBindingForDelete(namespace, roleToKe
 	}
 
 	return nil
+}
+
+func buildSubjectFromPRTB(binding *v3.ProjectRoleTemplateBinding) v1.Subject {
+	return v1.Subject{
+		Kind: "User",
+		Name: binding.UserName,
+	}
 }

@@ -32,7 +32,7 @@ type DeployConfig struct {
 type DeploymentParallelConfig struct {
 	StartFirst              bool  `json:"startFirst"`
 	MinReadySeconds         int64 `json:"minReadySeconds"`
-	ProgressDeadlineSeconds int64 `json:"processDeadlineSeconds"`
+	ProgressDeadlineSeconds int64 `json:"progressDeadlineSeconds"`
 }
 
 type DeploymentJobConfig struct {

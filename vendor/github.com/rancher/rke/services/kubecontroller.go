@@ -31,7 +31,7 @@ func buildKubeControllerConfig(kubeControllerService v3.KubeControllerService, a
 			"--address=0.0.0.0",
 			"--cloud-provider=",
 			"--leader-elect=true",
-			"--kubeconfig=" + pki.KubeControllerConfigPath,
+			"--kubeconfig=" + pki.GetConfigPath(pki.KubeControllerCertName),
 			"--enable-hostpath-provisioner=false",
 			"--node-monitor-grace-period=40s",
 			"--pod-eviction-timeout=5m0s",
@@ -39,8 +39,8 @@ func buildKubeControllerConfig(kubeControllerService v3.KubeControllerService, a
 			"--allocate-node-cidrs=true",
 			"--cluster-cidr=" + kubeControllerService.ClusterCIDR,
 			"--service-cluster-ip-range=" + kubeControllerService.ServiceClusterIPRange,
-			"--service-account-private-key-file=" + pki.KubeAPIKeyPath,
-			"--root-ca-file=" + pki.CACertPath,
+			"--service-account-private-key-file=" + pki.GetKeyPath(pki.KubeAPICertName),
+			"--root-ca-file=" + pki.GetCertPath(pki.CACertName),
 		},
 	}
 	if authorizationMode == RBACAuthorizationMode {

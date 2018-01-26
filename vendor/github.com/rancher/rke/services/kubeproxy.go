@@ -30,7 +30,7 @@ func buildKubeproxyConfig(host *hosts.Host, kubeproxyService v3.KubeproxyService
 			"kube-proxy",
 			"--v=2",
 			"--healthz-bind-address=0.0.0.0",
-			"--kubeconfig=" + pki.KubeProxyConfigPath,
+			"--kubeconfig=" + pki.GetConfigPath(pki.KubeProxyCertName),
 		},
 	}
 	hostCfg := &container.HostConfig{

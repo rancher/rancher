@@ -23,13 +23,11 @@ type updateData struct {
 	lastUpdateTime time.Time
 }
 
-var (
-	clusterToLastUpdated map[string]*updateData
-	mapLock              = sync.Mutex{}
-)
+var clusterToLastUpdated sync.Map
 
 type HeartBeatSyncer struct {
 	ClusterLister v3.ClusterLister
+	Clusters      v3.ClusterInterface
 }
 
 func Register(ctx context.Context, management *config.ManagementContext) {
@@ -37,59 +35,43 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 
 	h := &HeartBeatSyncer{
 		ClusterLister: clustersClient.Controller().Lister(),
+		Clusters:      clustersClient,
 	}
-	clustersClient.AddLifecycle(h.GetName(), h)
+	clustersClient.Controller().AddHandler(h.GetName(), h.sync)
 
-	clusterToLastUpdated = make(map[string]*updateData)
 	go h.syncHeartBeat(ctx, syncInterval)
 }
 
-func (h *HeartBeatSyncer) Create(cluster *v3.Cluster) (*v3.Cluster, error) {
-	h.storeLastUpdateTime(cluster)
-	return nil, nil
-}
+func (h *HeartBeatSyncer) sync(key string, cluster *v3.Cluster) error {
+	if cluster == nil {
+		clusterToLastUpdated.Delete(key)
+	} else {
+		h.storeLastUpdateTime(key, cluster)
 
-func (h *HeartBeatSyncer) Updated(cluster *v3.Cluster) (*v3.Cluster, error) {
-	h.storeLastUpdateTime(cluster)
-	return nil, nil
-}
-
-func (h *HeartBeatSyncer) Remove(cluster *v3.Cluster) (*v3.Cluster, error) {
-	mapLock.Lock()
-	defer mapLock.Unlock()
-
-	key := cluster.Name
-	if _, exists := clusterToLastUpdated[key]; exists {
-		delete(clusterToLastUpdated, key)
-		logrus.Debugf("Cluster [%s] deleted", key)
 	}
-	return nil, nil
+	return nil
 }
 
-func isChanged(cluster *v3.Cluster) (bool, time.Time) {
+func isChanged(key string, cluster *v3.Cluster) (bool, time.Time) {
 	condition := getConditionIfReady(cluster)
 	if condition != nil {
 		lastUpdateTime, _ := time.Parse(time.RFC3339, condition.LastUpdateTime)
-		if lastUpdateTime != clusterToLastUpdated[cluster.Name].lastUpdateTime {
+		value, ok := clusterToLastUpdated.Load(key)
+		if !ok || lastUpdateTime != value.(updateData).lastUpdateTime {
 			return true, lastUpdateTime
 		}
 	}
 	return false, time.Now()
 }
 
-func (h *HeartBeatSyncer) storeLastUpdateTime(cluster *v3.Cluster) {
-	mapLock.Lock()
-	defer mapLock.Unlock()
-
-	key := cluster.Name
-	if _, exists := clusterToLastUpdated[key]; !exists {
-		clusterToLastUpdated[key] = &updateData{}
-	}
-	changed, lastUpdateTime := isChanged(cluster)
+func (h *HeartBeatSyncer) storeLastUpdateTime(key string, cluster *v3.Cluster) {
+	changed, lastUpdateTime := isChanged(key, cluster)
 	if changed {
-		clusterToLastUpdated[key].lastUpdateTime = lastUpdateTime
-		clusterToLastUpdated[key].updated = true
-
+		newData := updateData{
+			lastUpdateTime: lastUpdateTime,
+			updated:        true,
+		}
+		clusterToLastUpdated.Store(key, newData)
 		logrus.Debugf("Synced cluster [%s] successfully", key)
 	}
 }
@@ -103,26 +85,31 @@ func (h *HeartBeatSyncer) syncHeartBeat(ctx context.Context, syncInterval time.D
 }
 
 func (h *HeartBeatSyncer) checkHeartBeat() {
-	mapLock.Lock()
-	defer mapLock.Unlock()
-
-	for clusterName := range clusterToLastUpdated {
-		if !clusterToLastUpdated[clusterName].updated {
-			cluster, err := h.ClusterLister.Get("", clusterName)
-			if err != nil {
-				logrus.Errorf("Error getting Cluster [%s] - %v", clusterName, err)
-				continue
-			}
-
-			v3.ClusterConditionReady.False(cluster)
-			v3.ClusterConditionReady.Message(cluster, msgBehindOnPing)
-			v3.ClusterConditionReady.Reason(cluster, reasonBehindOnPing)
-
-			logrus.Debugf("Cluster [%s] condition status unknown", clusterName)
-		} else {
-			clusterToLastUpdated[clusterName].updated = false
+	clusterToLastUpdated.Range(func(k, v interface{}) bool {
+		u := v.(updateData)
+		if u.updated {
+			u.updated = false
+			clusterToLastUpdated.Store(k, u)
+			return true
 		}
-	}
+		clusterName := k.(string)
+		cluster, err := h.ClusterLister.Get("", clusterName)
+		if err != nil {
+			logrus.Errorf("Error getting Cluster [%s] - %v", clusterName, err)
+			return true
+		}
+
+		v3.ClusterConditionReady.False(cluster)
+		v3.ClusterConditionReady.Message(cluster, msgBehindOnPing)
+		v3.ClusterConditionReady.Reason(cluster, reasonBehindOnPing)
+		_, err = h.Clusters.Update(cluster)
+		if err != nil {
+			logrus.Errorf("Error updating Cluster [%s] - %v", clusterName, err)
+		} else {
+			logrus.Debugf("Cluster [%s] condition status unknown", clusterName)
+		}
+		return true
+	})
 }
 
 // Condition is Ready if conditionType is Ready and conditionStatus is True

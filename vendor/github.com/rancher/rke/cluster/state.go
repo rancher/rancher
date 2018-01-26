@@ -58,7 +58,10 @@ func (c *Cluster) GetClusterState(ctx context.Context) (*Cluster, error) {
 		currentCluster = getStateFromKubernetes(ctx, c.KubeClient, c.LocalKubeConfigPath)
 		// Get previous kubernetes certificates
 		if currentCluster != nil {
-			currentCluster.Certificates, err = getClusterCerts(ctx, c.KubeClient)
+			if err := currentCluster.InvertIndexHosts(); err != nil {
+				return nil, fmt.Errorf("Failed to classify hosts from fetched cluster: %v", err)
+			}
+			currentCluster.Certificates, err = getClusterCerts(ctx, c.KubeClient, currentCluster.EtcdHosts)
 			currentCluster.DockerDialerFactory = c.DockerDialerFactory
 			if err != nil {
 				return nil, fmt.Errorf("Failed to Get Kubernetes certificates: %v", err)
@@ -66,9 +69,6 @@ func (c *Cluster) GetClusterState(ctx context.Context) (*Cluster, error) {
 			// setting cluster defaults for the fetched cluster as well
 			currentCluster.setClusterDefaults(ctx)
 
-			if err := currentCluster.InvertIndexHosts(); err != nil {
-				return nil, fmt.Errorf("Failed to classify hosts from fetched cluster: %v", err)
-			}
 			currentCluster.Certificates, err = regenerateAPICertificate(c, currentCluster.Certificates)
 			if err != nil {
 				return nil, fmt.Errorf("Failed to regenerate KubeAPI certificate %v", err)
