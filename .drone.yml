@@ -14,7 +14,18 @@ pipeline:
     - cp -r ./bin/* ./package/
     when:
       branch: master
-      event: tag
+      event: [push,tag]
+
+  docker-publish-master:
+    image: plugins/docker
+    dockerfile: package/Dockerfile
+    repo: rancher/server
+    context: package/
+    tag: master
+    secrets: [docker_username, docker_password]
+    when:
+      branch: master
+      event: push
 
   docker-publish:
     image: plugins/docker
@@ -27,3 +38,21 @@ pipeline:
       branch: master
       event: tag
 
+
+  slack-notification-failure:
+    image: plugins/slack
+    channel: engineering
+    secrets: [ slack_webhook ]
+    when:
+      status: failure
+      branch: master
+      event: [push, tag]
+
+  slack-new-build:
+    image: plugins/slack
+    channel: engineering
+    secrets: [ slack_webhook ]
+    when:
+      status: success
+      branch: master
+      event: tag
