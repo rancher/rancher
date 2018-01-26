@@ -90,10 +90,7 @@ func installCharts(rootDir, port string, obj *v3.Stack) error {
 	if err := cmd.Start(); err != nil {
 		return err
 	}
-	if err := cmd.Wait(); err != nil {
-		return err
-	}
-	return nil
+	return cmd.Wait()
 }
 
 func deleteCharts(port string, obj *v3.Stack) error {
@@ -104,8 +101,5 @@ func deleteCharts(port string, obj *v3.Stack) error {
 	if err := cmd.Start(); err != nil {
 		return err
 	}
-	if err := cmd.Wait(); err != nil {
-		return err
-	}
-	return nil
+	return cmd.Wait()
 }
