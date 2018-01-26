@@ -3,14 +3,14 @@ package controller
 import (
 	"context"
 
-	"github.com/rancher/cluster-agent/controller/authz"
-	"github.com/rancher/cluster-agent/controller/eventssyncer"
-	"github.com/rancher/cluster-agent/controller/healthsyncer"
-	"github.com/rancher/cluster-agent/controller/nodesyncer"
-	"github.com/rancher/cluster-agent/controller/secret"
-	helmController "github.com/rancher/helm-controller/controller"
+	"github.com/rancher/rancher/pkg/cluster/controller/authz"
+	"github.com/rancher/rancher/pkg/cluster/controller/eventssyncer"
+	"github.com/rancher/rancher/pkg/cluster/controller/healthsyncer"
+	"github.com/rancher/rancher/pkg/cluster/controller/nodesyncer"
+	"github.com/rancher/rancher/pkg/cluster/controller/secret"
+	helmController "github.com/rancher/rancher/pkg/helm/controller"
+	workloadController "github.com/rancher/rancher/pkg/workload/controller"
 	"github.com/rancher/types/config"
-	workloadController "github.com/rancher/workload-controller/controller"
 )
 
 func Register(ctx context.Context, cluster *config.ClusterContext) error {

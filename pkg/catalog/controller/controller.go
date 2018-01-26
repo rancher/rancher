@@ -8,7 +8,7 @@ import (
 
 	"time"
 
-	"github.com/rancher/catalog-controller/manager"
+	"github.com/rancher/rancher/pkg/catalog/manager"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"

@@ -3,9 +3,9 @@ package pod
 import (
 	"strings"
 
-	"github.com/rancher/cluster-api/api/workload"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/definition"
+	"github.com/rancher/rancher/pkg/api/cluster/api/workload"
 )
 
 func Transform(context *types.APIContext, data map[string]interface{}) (map[string]interface{}, error) {

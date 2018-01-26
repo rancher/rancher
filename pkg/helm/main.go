@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/rancher/helm-controller/controller"
+	"github.com/rancher/rancher/pkg/helm/controller"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"

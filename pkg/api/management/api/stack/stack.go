@@ -15,11 +15,11 @@ import (
 	"encoding/base64"
 	"net/url"
 
-	hutils "github.com/rancher/helm-controller/utils"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	hutils "github.com/rancher/rancher/pkg/helm/utils"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	client "github.com/rancher/types/client/management/v3"
 	managementv3 "github.com/rancher/types/client/management/v3"

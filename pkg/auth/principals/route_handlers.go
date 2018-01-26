@@ -3,12 +3,13 @@ package principals
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
 
-	"github.com/rancher/auth/tokens"
-	"github.com/rancher/auth/util"
+	"github.com/sirupsen/logrus"
+
+	"github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/pkg/auth/util"
 )
 
 func (server *principalAPIServer) listPrincipals(w http.ResponseWriter, r *http.Request) {

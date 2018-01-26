@@ -10,10 +10,10 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/workload/controller/dnsrecord"
 	"github.com/rancher/types/apis/apps/v1beta2"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/config"
-	"github.com/rancher/workload-controller/controller/dnsrecord"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"

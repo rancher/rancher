@@ -8,8 +8,8 @@ import (
 
 	"fmt"
 
-	"github.com/rancher/machine-controller/store"
-	"github.com/rancher/machine-controller/store/config"
+	"github.com/rancher/rancher/pkg/machine/store"
+	"github.com/rancher/rancher/pkg/machine/store/config"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

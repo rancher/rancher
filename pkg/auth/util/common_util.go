@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/rancher/auth/model"
+	"github.com/rancher/rancher/pkg/auth/model"
 )
 
 //ReturnHTTPError handles sending out Error response

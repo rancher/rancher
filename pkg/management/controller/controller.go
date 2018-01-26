@@ -3,14 +3,14 @@ package controller
 import (
 	"context"
 
-	catalogController "github.com/rancher/catalog-controller/controller"
-	"github.com/rancher/cluster-controller/controller/agent"
-	"github.com/rancher/cluster-controller/controller/auth"
-	"github.com/rancher/cluster-controller/controller/clusterevents"
-	"github.com/rancher/cluster-controller/controller/clusterheartbeat"
-	"github.com/rancher/cluster-controller/controller/clusterprovisioner"
-	"github.com/rancher/cluster-controller/controller/clusterstats"
-	machineController "github.com/rancher/machine-controller/controller"
+	catalogController "github.com/rancher/rancher/pkg/catalog/controller"
+	machineController "github.com/rancher/rancher/pkg/machine/controller"
+	"github.com/rancher/rancher/pkg/management/controller/agent"
+	"github.com/rancher/rancher/pkg/management/controller/auth"
+	"github.com/rancher/rancher/pkg/management/controller/clusterevents"
+	"github.com/rancher/rancher/pkg/management/controller/clusterheartbeat"
+	"github.com/rancher/rancher/pkg/management/controller/clusterprovisioner"
+	"github.com/rancher/rancher/pkg/management/controller/clusterstats"
 	"github.com/rancher/types/config"
 )
 

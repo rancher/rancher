@@ -7,8 +7,8 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/cluster-agent/utils"
 	"github.com/rancher/norman/condition"
+	"github.com/rancher/rancher/pkg/cluster/utils"
 	corev1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"

@@ -3,8 +3,8 @@ package ingress
 import (
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/workload/controller/ingress"
 	"github.com/rancher/types/config"
-	"github.com/rancher/workload-controller/controller/ingress"
 	"github.com/satori/uuid"
 )
 

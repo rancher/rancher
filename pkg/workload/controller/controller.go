@@ -4,12 +4,12 @@ import (
 	"context"
 
 	"github.com/rancher/norman/store/crd"
+	"github.com/rancher/rancher/pkg/workload/controller/dnsrecord"
+	"github.com/rancher/rancher/pkg/workload/controller/workload"
+	"github.com/rancher/rancher/pkg/workload/controller/workloadservice"
 	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	"github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/config"
-	"github.com/rancher/workload-controller/controller/dnsrecord"
-	"github.com/rancher/workload-controller/controller/workload"
-	"github.com/rancher/workload-controller/controller/workloadservice"
 )
 
 func Register(ctx context.Context, workloadContext *config.WorkloadContext) error {

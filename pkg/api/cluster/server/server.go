@@ -5,12 +5,12 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/rancher/cluster-api/api/setup"
-	"github.com/rancher/cluster-api/store"
-	"github.com/rancher/norman-rbac"
 	normanapi "github.com/rancher/norman/api"
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/api/cluster/api/setup"
+	"github.com/rancher/rancher/pkg/api/cluster/store"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/types/config"
 )
 

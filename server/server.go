@@ -5,10 +5,10 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/rancher/auth/filter"
-	"github.com/rancher/auth/server"
-	managementapi "github.com/rancher/management-api/server"
 	k8sProxy "github.com/rancher/rancher/k8s/proxy"
+	managementapi "github.com/rancher/rancher/pkg/api/management/server"
+	"github.com/rancher/rancher/pkg/auth/filter"
+	"github.com/rancher/rancher/pkg/auth/server"
 	"github.com/rancher/rancher/server/capabilities"
 	"github.com/rancher/rancher/server/proxy"
 	"github.com/rancher/rancher/server/ui"

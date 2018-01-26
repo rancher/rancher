@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/rancher/machine-controller/controller"
+	"github.com/rancher/rancher/pkg/machine/controller"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"

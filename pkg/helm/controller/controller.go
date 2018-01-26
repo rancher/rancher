@@ -12,8 +12,10 @@ import (
 
 	"strings"
 
-	hutils "github.com/rancher/helm-controller/utils"
+	"net/url"
+
 	"github.com/rancher/norman/types/slice"
+	hutils "github.com/rancher/rancher/pkg/helm/utils"
 	core "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -23,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"net/url"
 )
 
 const (
@@ -223,7 +224,7 @@ func (l *Lifecycle) ensureNamespace(obj *v3.Stack) error {
 	} else if errors.IsNotFound(err) {
 		if _, err := l.Management.Core.Namespaces("").Create(&v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:        obj.Spec.InstallNamespace,
+				Name: obj.Spec.InstallNamespace,
 				Annotations: map[string]string{
 					projectIDLabel: obj.Spec.ProjectName,
 				},

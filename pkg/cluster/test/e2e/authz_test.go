@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/rancher/cluster-agent/controller/authz"
 	"github.com/rancher/norman/types/slice"
+	"github.com/rancher/rancher/pkg/cluster/controller/authz"
 	authzv1 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"gopkg.in/check.v1"

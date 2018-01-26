@@ -6,8 +6,8 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 
-	"github.com/rancher/auth/providers/github"
-	"github.com/rancher/auth/providers/local"
+	"github.com/rancher/rancher/pkg/auth/providers/github"
+	"github.com/rancher/rancher/pkg/auth/providers/local"
 )
 
 //Providers map

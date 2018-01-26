@@ -4,8 +4,8 @@ import (
 	"context"
 	"os"
 
+	"github.com/rancher/rancher/pkg/workload/controller"
 	"github.com/rancher/types/config"
-	"github.com/rancher/workload-controller/controller"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"k8s.io/client-go/tools/clientcmd"

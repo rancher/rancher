@@ -4,11 +4,11 @@ import (
 	"context"
 
 	"github.com/rancher/norman/offspring"
+	"github.com/rancher/rancher/pkg/workload/converttypes"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	"github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/config"
-	"github.com/rancher/workload-controller/converttypes"
 	"k8s.io/api/apps/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
