@@ -20,9 +20,7 @@ type tokenAuthenticator struct {
 }
 
 const (
-	authHeaderName  = "Authorization"
-	authValuePrefix = "Bearer "
-	tokenKeyIndex   = "authn.management.cattle.io/token-key-index"
+	tokenKeyIndex = "authn.management.cattle.io/token-key-index"
 )
 
 func tokenKeyIndexer(obj interface{}) ([]string, error) {
@@ -36,20 +34,7 @@ func tokenKeyIndexer(obj interface{}) ([]string, error) {
 
 func (a *tokenAuthenticator) Authenticate(req *http.Request) (bool, string, []string, error) {
 	//check if token cookie or authorization header
-	var tokenAuthValue string
-
-	authHeader := req.Header.Get(authHeaderName)
-	authHeader = strings.TrimPrefix(authHeader, " ")
-
-	if authHeader != "" && strings.HasPrefix(authHeader, authValuePrefix) {
-		tokenAuthValue = strings.TrimPrefix(authHeader, authValuePrefix)
-		tokenAuthValue = strings.TrimSpace(tokenAuthValue)
-	} else {
-		cookie, err := req.Cookie(tokens.CookieName)
-		if err == nil {
-			tokenAuthValue = cookie.Value
-		}
-	}
+	tokenAuthValue := tokens.GetTokenAuthFromRequest(req)
 
 	if tokenAuthValue == "" {
 		// no cookie or auth header, cannot authenticate

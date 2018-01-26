@@ -156,9 +156,9 @@ data:
                 "policy": {
                     "type": "k8s",
                     "k8s_api_root": "{{.APIRoot}}",
-                    "k8s_client_certificate": "{{.ClientCert}}",
-                    "k8s_client_key": "{{.ClientKey}}",
-                    "k8s_certificate_authority": "{{.ClientCA}}"
+                    "k8s_client_certificate": "{{.ClientCertPath}}",
+                    "k8s_client_key": "{{.ClientKeyPath}}",
+                    "k8s_certificate_authority": "{{.ClientCAPath}}"
                 },
                 "kubernetes": {
                     "kubeconfig": "{{.KubeCfg}}"

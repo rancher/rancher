@@ -5,39 +5,35 @@ import (
 )
 
 const (
-	ProjectRoleTemplateBindingType                  = "projectRoleTemplateBinding"
-	ProjectRoleTemplateBindingFieldAnnotations      = "annotations"
-	ProjectRoleTemplateBindingFieldCreated          = "created"
-	ProjectRoleTemplateBindingFieldCreatorID        = "creatorId"
-	ProjectRoleTemplateBindingFieldLabels           = "labels"
-	ProjectRoleTemplateBindingFieldName             = "name"
-	ProjectRoleTemplateBindingFieldNamespaceId      = "namespaceId"
-	ProjectRoleTemplateBindingFieldOwnerReferences  = "ownerReferences"
-	ProjectRoleTemplateBindingFieldProjectId        = "projectId"
-	ProjectRoleTemplateBindingFieldRemoved          = "removed"
-	ProjectRoleTemplateBindingFieldRoleTemplateId   = "roleTemplateId"
-	ProjectRoleTemplateBindingFieldSubjectKind      = "subjectKind"
-	ProjectRoleTemplateBindingFieldSubjectName      = "subjectName"
-	ProjectRoleTemplateBindingFieldSubjectNamespace = "subjectNamespace"
-	ProjectRoleTemplateBindingFieldUuid             = "uuid"
+	ProjectRoleTemplateBindingType                 = "projectRoleTemplateBinding"
+	ProjectRoleTemplateBindingFieldAnnotations     = "annotations"
+	ProjectRoleTemplateBindingFieldCreated         = "created"
+	ProjectRoleTemplateBindingFieldCreatorID       = "creatorId"
+	ProjectRoleTemplateBindingFieldLabels          = "labels"
+	ProjectRoleTemplateBindingFieldName            = "name"
+	ProjectRoleTemplateBindingFieldNamespaceId     = "namespaceId"
+	ProjectRoleTemplateBindingFieldOwnerReferences = "ownerReferences"
+	ProjectRoleTemplateBindingFieldProjectId       = "projectId"
+	ProjectRoleTemplateBindingFieldRemoved         = "removed"
+	ProjectRoleTemplateBindingFieldRoleTemplateId  = "roleTemplateId"
+	ProjectRoleTemplateBindingFieldUserId          = "userId"
+	ProjectRoleTemplateBindingFieldUuid            = "uuid"
 )
 
 type ProjectRoleTemplateBinding struct {
 	types.Resource
-	Annotations      map[string]string `json:"annotations,omitempty"`
-	Created          string            `json:"created,omitempty"`
-	CreatorID        string            `json:"creatorId,omitempty"`
-	Labels           map[string]string `json:"labels,omitempty"`
-	Name             string            `json:"name,omitempty"`
-	NamespaceId      string            `json:"namespaceId,omitempty"`
-	OwnerReferences  []OwnerReference  `json:"ownerReferences,omitempty"`
-	ProjectId        string            `json:"projectId,omitempty"`
-	Removed          string            `json:"removed,omitempty"`
-	RoleTemplateId   string            `json:"roleTemplateId,omitempty"`
-	SubjectKind      string            `json:"subjectKind,omitempty"`
-	SubjectName      string            `json:"subjectName,omitempty"`
-	SubjectNamespace string            `json:"subjectNamespace,omitempty"`
-	Uuid             string            `json:"uuid,omitempty"`
+	Annotations     map[string]string `json:"annotations,omitempty"`
+	Created         string            `json:"created,omitempty"`
+	CreatorID       string            `json:"creatorId,omitempty"`
+	Labels          map[string]string `json:"labels,omitempty"`
+	Name            string            `json:"name,omitempty"`
+	NamespaceId     string            `json:"namespaceId,omitempty"`
+	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
+	ProjectId       string            `json:"projectId,omitempty"`
+	Removed         string            `json:"removed,omitempty"`
+	RoleTemplateId  string            `json:"roleTemplateId,omitempty"`
+	UserId          string            `json:"userId,omitempty"`
+	Uuid            string            `json:"uuid,omitempty"`
 }
 type ProjectRoleTemplateBindingCollection struct {
 	types.Collection

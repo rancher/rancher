@@ -42,7 +42,7 @@ func buildKubeletConfig(host *hosts.Host, kubeletService v3.KubeletService, unsc
 			"--resolv-conf=/etc/resolv.conf",
 			"--allow-privileged=true",
 			"--cloud-provider=",
-			"--kubeconfig=" + pki.KubeNodeConfigPath,
+			"--kubeconfig=" + pki.GetConfigPath(pki.KubeNodeCertName),
 			"--require-kubeconfig=True",
 		},
 	}

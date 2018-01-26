@@ -8,6 +8,8 @@ import (
 	"net"
 	"strings"
 
+	b64 "encoding/base64"
+
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/rancher/rke/docker"
@@ -18,6 +20,7 @@ import (
 	"github.com/rancher/rke/templates"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+	"k8s.io/client-go/util/cert"
 )
 
 const (
@@ -66,10 +69,14 @@ const (
 	APIRoot = "APIRoot"
 	// kubernetes client certificates and kubeconfig paths
 
-	ClientCert = "ClientCert"
-	ClientKey  = "ClientKey"
-	ClientCA   = "ClientCA"
-	KubeCfg    = "KubeCfg"
+	ClientCert     = "ClientCert"
+	ClientCertPath = "ClientCertPath"
+	ClientKey      = "ClientKey"
+	ClientKeyPath  = "ClientKeyPath"
+	ClientCA       = "ClientCA"
+	ClientCAPath   = "ClientCAPath"
+
+	KubeCfg = "KubeCfg"
 
 	ClusterCIDR = "ClusterCIDR"
 	// Images key names
@@ -120,13 +127,20 @@ func (c *Cluster) doFlannelDeploy(ctx context.Context) error {
 }
 
 func (c *Cluster) doCalicoDeploy(ctx context.Context) error {
+	clientCert := b64.StdEncoding.EncodeToString(cert.EncodeCertPEM(c.Certificates[pki.KubeNodeCertName].Certificate))
+	clientkey := b64.StdEncoding.EncodeToString(cert.EncodePrivateKeyPEM(c.Certificates[pki.KubeNodeCertName].Key))
+	clientConfig := pki.GetConfigPath(pki.KubeNodeCertName)
+	caCert := b64.StdEncoding.EncodeToString(cert.EncodeCertPEM(c.Certificates[pki.CACertName].Certificate))
 	calicoConfig := map[string]string{
 		EtcdEndpoints:    services.GetEtcdConnString(c.EtcdHosts),
 		APIRoot:          "https://127.0.0.1:6443",
-		ClientCert:       pki.KubeNodeCertPath,
-		ClientKey:        pki.KubeNodeKeyPath,
-		ClientCA:         pki.CACertPath,
-		KubeCfg:          pki.KubeNodeConfigPath,
+		ClientCert:       clientCert,
+		ClientCertPath:   pki.GetCertPath(pki.KubeNodeCertName),
+		ClientKey:        clientkey,
+		ClientKeyPath:    pki.GetKeyPath(pki.KubeNodeCertName),
+		ClientCA:         caCert,
+		ClientCAPath:     pki.GetCertPath(pki.CACertName),
+		KubeCfg:          clientConfig,
 		ClusterCIDR:      c.ClusterCIDR,
 		CNIImage:         c.Network.Options[CalicoCNIImage],
 		NodeImage:        c.Network.Options[CalicoNodeImage],
@@ -143,12 +157,13 @@ func (c *Cluster) doCalicoDeploy(ctx context.Context) error {
 }
 
 func (c *Cluster) doCanalDeploy(ctx context.Context) error {
+	clientConfig := pki.GetConfigPath(pki.KubeNodeCertName)
 	canalConfig := map[string]string{
-		ClientCert:      pki.KubeNodeCertPath,
+		ClientCertPath:  pki.GetCertPath(pki.KubeNodeCertName),
 		APIRoot:         "https://127.0.0.1:6443",
-		ClientKey:       pki.KubeNodeKeyPath,
-		ClientCA:        pki.CACertPath,
-		KubeCfg:         pki.KubeNodeConfigPath,
+		ClientKeyPath:   pki.GetKeyPath(pki.KubeNodeCertName),
+		ClientCAPath:    pki.GetCertPath(pki.CACertName),
+		KubeCfg:         clientConfig,
 		ClusterCIDR:     c.ClusterCIDR,
 		NodeImage:       c.Network.Options[CanalNodeImage],
 		CNIImage:        c.Network.Options[CanalCNIImage],
