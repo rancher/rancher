@@ -41,6 +41,7 @@ func Register(management *config.ManagementContext) {
 		machineTemplateGenericClient: management.Management.MachineTemplates("").ObjectClient().UnstructuredClient(),
 		configMapGetter:              management.K8sClient.CoreV1(),
 		logger:                       management.EventLogger,
+		clusterLister:                management.Management.Clusters("").Controller().Lister(),
 	}
 
 	machineClient.AddLifecycle("machine-controller", machineLifecycle)
@@ -53,6 +54,7 @@ type Lifecycle struct {
 	machineTemplateClient        v3.MachineTemplateInterface
 	configMapGetter              typedv1.ConfigMapsGetter
 	logger                       event.Logger
+	clusterLister                v3.ClusterLister
 }
 
 func (m *Lifecycle) setupCustom(obj *v3.Machine) {
@@ -135,7 +137,13 @@ func (m *Lifecycle) Remove(obj *v3.Machine) (*v3.Machine, error) {
 	if obj.Status.MachineTemplateSpec == nil {
 		return obj, nil
 	}
-
+	found, err := m.isNodeInAppliedSpec(obj)
+	if err != nil {
+		return obj, err
+	}
+	if found {
+		return obj, fmt.Errorf("Machine [%s] still not deleted from cluster spec", obj.Name)
+	}
 	config, err := machineconfig.NewMachineConfig(m.secretStore, obj)
 	if err != nil {
 		return obj, err
@@ -153,7 +161,7 @@ func (m *Lifecycle) Remove(obj *v3.Machine) (*v3.Machine, error) {
 	if mExists {
 		m.logger.Infof(obj, "Removing machine %s", obj.Spec.RequestedHostname)
 		if err := deleteMachine(config.Dir(), obj); err != nil {
-			return nil, err
+			return obj, err
 		}
 		m.logger.Infof(obj, "Removing machine %s done", obj.Spec.RequestedHostname)
 	}
@@ -299,4 +307,31 @@ func (m *Lifecycle) saveConfig(config *machineconfig.MachineConfig, machineDir s
 	}
 
 	return obj, nil
+}
+
+func (m *Lifecycle) isNodeInAppliedSpec(machine *v3.Machine) (bool, error) {
+	cluster, err := m.clusterLister.Get("", machine.Spec.ClusterName)
+	if err != nil {
+		return false, err
+	}
+	if cluster == nil {
+		return false, nil
+	}
+	if cluster.DeletionTimestamp != nil {
+		return false, nil
+	}
+	if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig == nil {
+		return false, nil
+	}
+
+	for _, node := range cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.Nodes {
+		machineName := node.MachineName
+		if len(machineName) == 0 {
+			continue
+		}
+		if machineName == fmt.Sprintf("%s:%s", machine.Namespace, machine.Name) {
+			return true, nil
+		}
+	}
+	return false, nil
 }

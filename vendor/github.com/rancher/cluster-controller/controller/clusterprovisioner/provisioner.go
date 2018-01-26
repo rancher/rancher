@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"net/url"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/cluster-controller/dialer"
 	"github.com/rancher/kontainer-engine/drivers"
@@ -30,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -118,6 +121,7 @@ func (p *Provisioner) Updated(cluster *v3.Cluster) (*v3.Cluster, error) {
 		return newObj, err
 	})
 	cluster, _ = obj.(*v3.Cluster)
+
 	return cluster, err
 }
 
@@ -233,6 +237,10 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (bool, 
 	if create {
 		logrus.Infof("Creating cluster [%s]", cluster.Name)
 		apiEndpoint, serviceAccountToken, caCert, err = p.driverCreate(cluster, *spec)
+		// valiate token
+		if err == nil {
+			err = validateClient(apiEndpoint, serviceAccountToken, caCert)
+		}
 	} else {
 		logrus.Infof("Updating cluster [%s]", cluster.Name)
 		apiEndpoint, serviceAccountToken, caCert, err = p.driverUpdate(cluster, *spec)
@@ -277,6 +285,31 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (bool, 
 
 	logrus.Infof("Provisioned cluster [%s]", cluster.Name)
 	return false, cluster, nil
+}
+
+func validateClient(api string, token string, cert string) error {
+	u, err := url.Parse(api)
+	if err != nil {
+		return err
+	}
+	caBytes, err := base64.StdEncoding.DecodeString(cert)
+	if err != nil {
+		return err
+	}
+	config := &rest.Config{
+		Host:        u.Host,
+		Prefix:      u.Path,
+		BearerToken: token,
+		TLSClientConfig: rest.TLSClientConfig{
+			CAData: caBytes,
+		},
+	}
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+	_, err = clientset.Discovery().ServerVersion()
+	return err
 }
 
 func needToProvision(cluster *v3.Cluster) bool {

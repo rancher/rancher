@@ -108,7 +108,7 @@ func (m *Lifecycle) download(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
 	dynamicSchema.Labels[driverNameLabel] = obj.Spec.DisplayName
 	_, err = m.schemaClient.Create(dynamicSchema)
 	if err != nil && !errors.IsAlreadyExists(err) {
-		return nil, err
+		return obj, err
 	}
 	return obj, nil
 }
@@ -137,17 +137,17 @@ func (m *Lifecycle) Remove(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
 		LabelSelector: fmt.Sprintf("%s=%s", driverNameLabel, obj.Spec.DisplayName),
 	})
 	if err != nil {
-		return nil, err
+		return obj, err
 	}
 	for _, schema := range schemas.Items {
 		logrus.Infof("Deleting schema %s", schema.Name)
 		if err := m.schemaClient.Delete(schema.Name, &metav1.DeleteOptions{}); err != nil {
-			return nil, err
+			return obj, err
 		}
 		logrus.Infof("Deleting schema %s done", schema.Name)
 	}
 	if err := m.createOrUpdateMachineForEmbeddedType(obj.Spec.DisplayName+"config", obj.Spec.DisplayName+"Config", false); err != nil {
-		return nil, err
+		return obj, err
 	}
 	return obj, nil
 }
