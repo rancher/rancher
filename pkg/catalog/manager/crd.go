@@ -157,10 +157,7 @@ func (m *Manager) updateTemplate(name string, existingTemplate v3.Template, temp
 	if err := m.deleteTemplateVersions(*result); err != nil {
 		return err
 	}
-	if err := m.createTemplateVersions(template.Spec.Versions, *result); err != nil {
-		return err
-	}
-	return nil
+	return m.createTemplateVersions(template.Spec.Versions, *result)
 }
 
 func (m *Manager) createTemplateVersions(versionsSpec []v3.TemplateVersionSpec, template v3.Template) error {
