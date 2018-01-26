@@ -52,9 +52,13 @@ func (grb *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBind
 	if !ok {
 		crbName = crbNamePrefix + globalRoleBinding.Name
 	}
+	subject := v1.Subject{
+		Kind: "User",
+		Name: globalRoleBinding.UserName,
+	}
 	crb, _ := grb.crbLister.Get("", crbName)
 	if crb != nil {
-		subjects := []v1.Subject{globalRoleBinding.Subject}
+		subjects := []v1.Subject{subject}
 		updateSubject := !reflect.DeepEqual(subjects, crb.Subjects)
 
 		updateRoleRef := false
@@ -104,7 +108,7 @@ func (grb *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBind
 			},
 			Labels: globalRoleBindingLabel,
 		},
-		Subjects: []v1.Subject{globalRoleBinding.Subject},
+		Subjects: []v1.Subject{subject},
 		RoleRef: v1.RoleRef{
 			Name: crName,
 			Kind: clusterRoleKind,

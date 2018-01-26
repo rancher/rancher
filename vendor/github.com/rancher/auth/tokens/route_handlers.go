@@ -19,10 +19,15 @@ import (
 	"github.com/rancher/auth/util"
 )
 
-const CookieName = "R_SESS"
+const (
+	CookieName      = "R_SESS"
+	AuthHeaderName  = "Authorization"
+	AuthValuePrefix = "Bearer"
+	BasicAuthPrefix = "Basic"
+)
 
 func TokenActionHandler(actionName string, action *types.Action, request *types.APIContext) error {
-	logrus.Infof("TokenActionHandler called for action %v", actionName)
+	logrus.Debugf("TokenActionHandler called for action %v", actionName)
 
 	if actionName == "login" {
 		return tokenServer.login(actionName, action, request)
@@ -33,12 +38,12 @@ func TokenActionHandler(actionName string, action *types.Action, request *types.
 }
 
 func TokenCreateHandler(request *types.APIContext) error {
-	logrus.Infof("TokenCreateHandler called")
+	logrus.Debugf("TokenCreateHandler called")
 	return tokenServer.deriveToken(request)
 }
 
 func TokenListHandler(request *types.APIContext) error {
-	logrus.Infof("TokenListHandler called")
+	logrus.Debugf("TokenListHandler called")
 	if request.ID != "" {
 		return tokenServer.getToken(request)
 	}
@@ -46,7 +51,7 @@ func TokenListHandler(request *types.APIContext) error {
 }
 
 func TokenDeleteHandler(request *types.APIContext) error {
-	logrus.Infof("TokenDeleteHandler called")
+	logrus.Debugf("TokenDeleteHandler called")
 	return tokenServer.removeToken(request)
 }
 
@@ -111,11 +116,12 @@ func (s *tokenAPIServer) deriveToken(request *types.APIContext) error {
 
 	r := request.Request
 
-	cookie, err := r.Cookie(CookieName)
-	if err != nil {
-		logrus.Infof("Failed to get token cookie: %v", err)
-		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie")
+	tokenAuthValue := GetTokenAuthFromRequest(r)
+	if tokenAuthValue == "" {
+		// no cookie or auth header, cannot authenticate
+		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie or auth header")
 	}
+
 	bytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		logrus.Errorf("GetToken failed with error: %v", err)
@@ -131,7 +137,7 @@ func (s *tokenAPIServer) deriveToken(request *types.APIContext) error {
 	var status int
 
 	// create derived token
-	token, status, err = s.createDerivedToken(jsonInput, cookie.Value)
+	token, status, err = s.createDerivedToken(jsonInput, tokenAuthValue)
 	if err != nil {
 		logrus.Errorf("deriveToken failed with error: %v", err)
 		if status == 0 {
@@ -155,13 +161,13 @@ func (s *tokenAPIServer) listTokens(request *types.APIContext) error {
 	r := request.Request
 
 	// TODO switch to X-API-UserId header
-	cookie, err := r.Cookie(CookieName)
-	if err != nil {
-		logrus.Infof("Failed to get token cookie: %v", err)
-		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie")
+	tokenAuthValue := GetTokenAuthFromRequest(r)
+	if tokenAuthValue == "" {
+		// no cookie or auth header, cannot authenticate
+		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie or auth header")
 	}
 	//getToken
-	tokens, status, err := s.getTokens(cookie.Value)
+	tokens, status, err := s.getTokens(tokenAuthValue)
 	if err != nil {
 		logrus.Errorf("GetToken failed with error: %v", err)
 		if status == 0 {
@@ -188,10 +194,10 @@ func (s *tokenAPIServer) logout(actionName string, action *types.Action, request
 	r := request.Request
 	w := request.Response
 
-	cookie, err := r.Cookie(CookieName)
-	if err != nil {
-		logrus.Infof("Failed to get token cookie: %v", err)
-		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie")
+	tokenAuthValue := GetTokenAuthFromRequest(r)
+	if tokenAuthValue == "" {
+		// no cookie or auth header, cannot authenticate
+		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie or auth header")
 	}
 
 	isSecure := false
@@ -211,7 +217,7 @@ func (s *tokenAPIServer) logout(actionName string, action *types.Action, request
 	http.SetCookie(w, tokenCookie)
 
 	//getToken
-	status, err := s.deleteToken(cookie.Value)
+	status, err := s.deleteToken(tokenAuthValue)
 	if err != nil {
 		logrus.Errorf("DeleteToken failed with error: %v", err)
 		if status == 0 {
@@ -226,16 +232,16 @@ func (s *tokenAPIServer) getToken(request *types.APIContext) error {
 	// TODO switch to X-API-UserId header
 	r := request.Request
 
-	cookie, err := r.Cookie(CookieName)
-	if err != nil {
-		logrus.Infof("Failed to get token cookie: %v", err)
-		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie")
+	tokenAuthValue := GetTokenAuthFromRequest(r)
+	if tokenAuthValue == "" {
+		// no cookie or auth header, cannot authenticate
+		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie or auth header")
 	}
 
 	tokenID := request.ID
 
 	//getToken
-	token, status, err := s.getTokenByID(cookie.Value, tokenID)
+	token, status, err := s.getTokenByID(tokenAuthValue, tokenID)
 	if err != nil {
 		logrus.Errorf("GetToken failed with error: %v", err)
 		if status == 0 {
@@ -257,15 +263,15 @@ func (s *tokenAPIServer) removeToken(request *types.APIContext) error {
 	// TODO switch to X-API-UserId header
 	r := request.Request
 
-	cookie, err := r.Cookie(CookieName)
-	if err != nil {
-		logrus.Infof("Failed to get token cookie: %v", err)
-		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie")
+	tokenAuthValue := GetTokenAuthFromRequest(r)
+	if tokenAuthValue == "" {
+		// no cookie or auth header, cannot authenticate
+		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie or auth header")
 	}
 	tokenID := request.ID
 
 	//getToken
-	_, status, err := s.getTokenByID(cookie.Value, tokenID)
+	_, status, err := s.getTokenByID(tokenAuthValue, tokenID)
 	if err != nil {
 		if status != 410 {
 			logrus.Errorf("DeleteToken Failed to fetch the token to delete with error: %v", err)

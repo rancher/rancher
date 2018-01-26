@@ -8,8 +8,6 @@ import (
 	"github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/config"
 	"github.com/rancher/workload-controller/controller/dnsrecord"
-	"github.com/rancher/workload-controller/controller/endpoint"
-	"github.com/rancher/workload-controller/controller/podtoworkload"
 	"github.com/rancher/workload-controller/controller/workload"
 	"github.com/rancher/workload-controller/controller/workloadservice"
 )
@@ -27,9 +25,7 @@ func Register(ctx context.Context, workloadContext *config.WorkloadContext) erro
 	workload.Register(ctx, workloadContext)
 
 	dnsrecord.Register(ctx, workloadContext)
-	endpoint.Register(ctx, workloadContext)
 	workloadservice.Register(ctx, workloadContext)
-	podtoworkload.Register(ctx, workloadContext)
 
 	return nil
 }

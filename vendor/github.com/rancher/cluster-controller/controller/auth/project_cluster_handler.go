@@ -10,7 +10,6 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	v12 "k8s.io/api/core/v1"
-	v13 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -207,10 +206,6 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 			Name:      rtbName,
 			Namespace: metaAccessor.GetName(),
 		}
-		subject := v13.Subject{
-			Kind: "User",
-			Name: creatorID,
-		}
 
 		switch typeAccessor.GetKind() {
 		case v3.ProjectGroupVersionKind.Kind:
@@ -221,7 +216,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 				ObjectMeta:       om,
 				ProjectName:      metaAccessor.GetNamespace() + ":" + metaAccessor.GetName(),
 				RoleTemplateName: "project-owner",
-				Subject:          subject,
+				UserName:         creatorID,
 			}); err != nil {
 				return obj, err
 			}
@@ -233,7 +228,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 				ObjectMeta:       om,
 				ClusterName:      metaAccessor.GetName(),
 				RoleTemplateName: "cluster-owner",
-				Subject:          subject,
+				UserName:         creatorID,
 			}); err != nil {
 				return obj, err
 			}

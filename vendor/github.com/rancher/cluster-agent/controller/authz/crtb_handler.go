@@ -38,7 +38,7 @@ func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding) error {
 		logrus.Warnf("ClusterRoleTemplateBinding %v has no role template set. Skipping.", binding.Name)
 		return nil
 	}
-	if binding.Subject.Name == "" {
+	if binding.UserName == "" {
 		logrus.Warnf("Binding %v has no subject. Skipping", binding.Name)
 		return nil
 	}
@@ -58,7 +58,7 @@ func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding) error {
 	}
 
 	if err := c.ensureClusterBinding(roles, binding); err != nil {
-		return errors.Wrapf(err, "couldn't ensure cluster bindings for %v", binding.Subject.Name)
+		return errors.Wrapf(err, "couldn't ensure cluster bindings for %v", binding.UserName)
 	}
 
 	return nil
@@ -69,8 +69,9 @@ func (c *crtbLifecycle) ensureClusterBinding(roles map[string]*v3.RoleTemplate, 
 
 	set := labels.Set(map[string]string{rtbOwnerLabel: string(binding.UID)})
 	desiredRBs := map[string]*rbacv1.ClusterRoleBinding{}
+	subject := buildSubjectFromCRTB(binding)
 	for roleName := range roles {
-		bindingName, objectMeta, subjects, roleRef := bindingParts(roleName, string(binding.UID), binding.Subject)
+		bindingName, objectMeta, subjects, roleRef := bindingParts(roleName, string(binding.UID), subject)
 		desiredRBs[bindingName] = &rbacv1.ClusterRoleBinding{
 			ObjectMeta: objectMeta,
 			Subjects:   subjects,

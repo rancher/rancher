@@ -45,8 +45,8 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 		logrus.Warnf("ProjectRoleTemplateBinding %v has no role template set. Skipping.", binding.Name)
 		return nil
 	}
-	if binding.Subject.Name == "" {
-		logrus.Warnf("Binding %v has no subject. Skipping", binding.Name)
+	if binding.UserName == "" {
+		logrus.Warnf("Binding %v has no user. Skipping", binding.Name)
 		return nil
 	}
 
@@ -72,7 +72,7 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 	for _, n := range namespaces {
 		ns := n.(*v1.Namespace)
 		if err := p.m.ensureBindings(ns.Name, roles, binding); err != nil {
-			return errors.Wrapf(err, "couldn't ensure bindings for %v in %v", binding.Subject.Name, ns.Name)
+			return errors.Wrapf(err, "couldn't ensure bindings for %v in %v", binding.UserName, ns.Name)
 		}
 	}
 
@@ -111,6 +111,7 @@ func (p *prtbLifecycle) reconcileProjectNSAccess(binding *v3.ProjectRoleTemplate
 	var role string
 	var createNSPerms bool
 	if parts := strings.SplitN(binding.ProjectName, ":", 2); len(parts) == 2 && len(parts[1]) > 0 {
+		projectName := parts[1]
 		var roleVerb, roleSuffix string
 		for _, r := range rts {
 			for _, rule := range r.Rules {
@@ -128,7 +129,7 @@ func (p *prtbLifecycle) reconcileProjectNSAccess(binding *v3.ProjectRoleTemplate
 			roleVerb = "get"
 		}
 		roleSuffix = projectNSVerbToSuffix[roleVerb]
-		role = fmt.Sprintf(projectNSGetClusterRoleNameFmt, parts[1], roleSuffix)
+		role = fmt.Sprintf(projectNSGetClusterRoleNameFmt, projectName, roleSuffix)
 	}
 
 	if role == "" {
@@ -137,9 +138,9 @@ func (p *prtbLifecycle) reconcileProjectNSAccess(binding *v3.ProjectRoleTemplate
 
 	bindingCli := p.m.workload.K8sClient.RbacV1().ClusterRoleBindings()
 
-	roles := map[string]string{role: role + "-" + binding.Subject.Name}
+	roles := map[string]string{role: role + "-" + binding.UserName}
 	if createNSPerms {
-		roles["create-ns"] = "create-ns-" + binding.Subject.Name
+		roles["create-ns"] = "create-ns-" + binding.UserName
 		if nsRole, _ := p.m.crLister.Get("", "create-ns"); nsRole == nil {
 			createNSRT, err := p.m.rtLister.Get("", "create-ns")
 			if err != nil {
@@ -152,6 +153,7 @@ func (p *prtbLifecycle) reconcileProjectNSAccess(binding *v3.ProjectRoleTemplate
 	}
 
 	rtbUID := string(binding.UID)
+	subject := buildSubjectFromPRTB(binding)
 	for role, bindingName := range roles {
 		crb, _ := p.m.crbLister.Get("", bindingName)
 		if crb == nil {
@@ -162,7 +164,7 @@ func (p *prtbLifecycle) reconcileProjectNSAccess(binding *v3.ProjectRoleTemplate
 						rtbUID: owner,
 					},
 				},
-				Subjects: []rbacv1.Subject{binding.Subject},
+				Subjects: []rbacv1.Subject{subject},
 				RoleRef: rbacv1.RoleRef{
 					Kind: "ClusterRole",
 					Name: role,

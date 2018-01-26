@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -14,36 +15,48 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func getEtcdClient(ctx context.Context, etcdHost *hosts.Host, localConnDialerFactory hosts.DialerFactory) (etcdclient.Client, error) {
+func getEtcdClient(ctx context.Context, etcdHost *hosts.Host, localConnDialerFactory hosts.DialerFactory, cert, key []byte) (etcdclient.Client, error) {
 	dialer, err := getEtcdDialer(localConnDialerFactory, etcdHost)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create a dialer for host [%s]: %v", etcdHost.Address, err)
 	}
+	tlsConfig, err := getEtcdTLSConfig(cert, key)
+	if err != nil {
+		return nil, err
+	}
 
 	var DefaultEtcdTransport etcdclient.CancelableTransport = &http.Transport{
-		Dial: dialer,
+		Dial:                dialer,
+		TLSClientConfig:     tlsConfig,
+		TLSHandshakeTimeout: 10 * time.Second,
 	}
 
 	cfg := etcdclient.Config{
-		Endpoints: []string{"http://127.0.0.1:2379"},
+		Endpoints: []string{"https://127.0.0.1:2379"},
 		Transport: DefaultEtcdTransport,
 	}
 
 	return etcdclient.New(cfg)
 }
 
-func isEtcdHealthy(ctx context.Context, localConnDialerFactory hosts.DialerFactory, host *hosts.Host) bool {
+func isEtcdHealthy(ctx context.Context, localConnDialerFactory hosts.DialerFactory, host *hosts.Host, cert, key []byte) bool {
 	logrus.Debugf("[etcd] Check etcd cluster health")
 	for i := 0; i < 3; i++ {
 		dialer, err := getEtcdDialer(localConnDialerFactory, host)
 		if err != nil {
-			logrus.Debugf("Failed to create a dialer for host [%s]: %v", host.Address, err)
-			time.Sleep(5 * time.Second)
-			continue
+			return false
 		}
+		tlsConfig, err := getEtcdTLSConfig(cert, key)
+		if err != nil {
+			logrus.Debugf("[etcd] Failed to create etcd tls config for host [%s]: %v", host.Address, err)
+			return false
+		}
+
 		hc := http.Client{
 			Transport: &http.Transport{
-				Dial: dialer,
+				Dial:                dialer,
+				TLSClientConfig:     tlsConfig,
+				TLSHandshakeTimeout: 10 * time.Second,
 			},
 		}
 		healthy, err := getHealthEtcd(hc, host)
@@ -62,7 +75,7 @@ func isEtcdHealthy(ctx context.Context, localConnDialerFactory hosts.DialerFacto
 
 func getHealthEtcd(hc http.Client, host *hosts.Host) (string, error) {
 	healthy := struct{ Health string }{}
-	resp, err := hc.Get("http://127.0.0.1:2379/health")
+	resp, err := hc.Get("https://127.0.0.1:2379/health")
 	if err != nil {
 		return healthy.Health, fmt.Errorf("Failed to get /health for host [%s]: %v", host.Address, err)
 	}
@@ -80,7 +93,7 @@ func getHealthEtcd(hc http.Client, host *hosts.Host) (string, error) {
 func getEtcdInitialCluster(hosts []*hosts.Host) string {
 	initialCluster := ""
 	for i, host := range hosts {
-		initialCluster += fmt.Sprintf("etcd-%s=http://%s:2380", host.HostnameOverride, host.InternalAddress)
+		initialCluster += fmt.Sprintf("etcd-%s=https://%s:2380", host.HostnameOverride, host.InternalAddress)
 		if i < (len(hosts) - 1) {
 			initialCluster += ","
 		}
@@ -102,10 +115,27 @@ func getEtcdDialer(localConnDialerFactory hosts.DialerFactory, etcdHost *hosts.H
 func GetEtcdConnString(hosts []*hosts.Host) string {
 	connString := ""
 	for i, host := range hosts {
-		connString += "http://" + host.InternalAddress + ":2379"
+		connString += "https://" + host.InternalAddress + ":2379"
 		if i < (len(hosts) - 1) {
 			connString += ","
 		}
 	}
 	return connString
+}
+
+func getEtcdTLSConfig(certificate, key []byte) (*tls.Config, error) {
+	// get tls config
+	x509Pair, err := tls.X509KeyPair([]byte(certificate), []byte(key))
+	if err != nil {
+		return nil, err
+
+	}
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: true,
+		Certificates:       []tls.Certificate{x509Pair},
+	}
+	if err != nil {
+		return nil, err
+	}
+	return tlsConfig, nil
 }

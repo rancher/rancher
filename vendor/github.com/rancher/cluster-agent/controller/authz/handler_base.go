@@ -138,8 +138,9 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 
 	set := labels.Set(map[string]string{rtbOwnerLabel: string(binding.UID)})
 	desiredRBs := map[string]*rbacv1.RoleBinding{}
+	subject := buildSubjectFromPRTB(binding)
 	for roleName := range roles {
-		bindingName, objectMeta, subjects, roleRef := bindingParts(roleName, string(binding.UID), binding.Subject)
+		bindingName, objectMeta, subjects, roleRef := bindingParts(roleName, string(binding.UID), subject)
 		desiredRBs[bindingName] = &rbacv1.RoleBinding{
 			ObjectMeta: objectMeta,
 			Subjects:   subjects,
@@ -196,6 +197,20 @@ func bindingParts(roleName, parentUID string, subject rbacv1.Subject) (string, m
 		}
 }
 
+func buildSubjectFromCRTB(binding *v3.ClusterRoleTemplateBinding) rbacv1.Subject {
+	return rbacv1.Subject{
+		Kind: "User",
+		Name: binding.UserName,
+	}
+}
+
+func buildSubjectFromPRTB(binding *v3.ProjectRoleTemplateBinding) rbacv1.Subject {
+	return rbacv1.Subject{
+		Kind: "User",
+		Name: binding.UserName,
+	}
+}
+
 func prtbByProjectName(obj interface{}) ([]string, error) {
 	prtb, ok := obj.(*v3.ProjectRoleTemplateBinding)
 	if !ok {
@@ -206,7 +221,7 @@ func prtbByProjectName(obj interface{}) ([]string, error) {
 }
 
 func getPRTBProjectAndUserKey(prtb *v3.ProjectRoleTemplateBinding) string {
-	return prtb.ProjectName + "." + prtb.Subject.Kind + "." + prtb.Subject.Name
+	return prtb.ProjectName + "." + prtb.UserName
 }
 
 func prtbByProjectAndUser(obj interface{}) ([]string, error) {

@@ -16,22 +16,29 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-// This controller is responsible for monitoring DNSRecord services
-// and populating the endpoint based on target service endpoints.
-// The controller DOES NOT monitor the changes to the target endpoints;
-// that would be handled in the separate controller
-
 const (
 	DNSAnnotation       = "field.cattle.io/targetDNSRecordIds"
 	ProjectIDAnnotation = "field.cattle.io/projectId"
 )
 
-var ServiceUUIDToTargetEndpointUUIDs sync.Map
+var dnsServiceUUIDToTargetEndpointUUIDs sync.Map
 
+// Controller is responsible for monitoring DNSRecord services
+// and populating the endpoint based on target service endpoints.
+// The controller DOES NOT monitor the changes to the target endpoints;
+// that would be handled in the by EndpointController
 type Controller struct {
 	endpoints       v1.EndpointsInterface
 	endpointLister  v1.EndpointsLister
 	namespaceLister v1.NamespaceLister
+}
+
+// EndpointController is responsible for monitoring endpoints
+// finding out if they are the part of DNSRecord service
+// and calling the update on the target service
+type EndpointController struct {
+	serviceController v1.ServiceController
+	serviceLister     v1.ServiceLister
 }
 
 func Register(ctx context.Context, workload *config.WorkloadContext) {
@@ -40,17 +47,20 @@ func Register(ctx context.Context, workload *config.WorkloadContext) {
 		endpointLister:  workload.Core.Endpoints("").Controller().Lister(),
 		namespaceLister: workload.Core.Namespaces("").Controller().Lister(),
 	}
-	workload.Core.Services("").AddHandler(c.GetName(), c.sync)
-}
 
-func (c *Controller) GetName() string {
-	return "dnsRecordController"
+	e := &EndpointController{
+		serviceController: workload.Core.Services("").Controller(),
+		serviceLister:     workload.Core.Services("").Controller().Lister(),
+	}
+	workload.Core.Services("").AddHandler("dnsRecordController", c.sync)
+	workload.Core.Endpoints("").AddHandler("dnsRecordEndpointsController", e.reconcileServicesForEndpoint)
+
 }
 
 func (c *Controller) sync(key string, obj *corev1.Service) error {
 	// no need to handle the remove
 	if obj == nil || obj.DeletionTimestamp != nil {
-		ServiceUUIDToTargetEndpointUUIDs.Delete(key)
+		dnsServiceUUIDToTargetEndpointUUIDs.Delete(key)
 		return nil
 	}
 	return c.reconcileEndpoints(key, obj)
@@ -107,7 +117,7 @@ func (c *Controller) reconcileEndpoints(key string, obj *corev1.Service) error {
 		targetEndpointUUID := fmt.Sprintf("%s/%s", targetEndpoint.Namespace, targetEndpoint.Name)
 		targetEndpointUUIDs[targetEndpointUUID] = true
 	}
-	ServiceUUIDToTargetEndpointUUIDs.Store(key, targetEndpointUUIDs)
+	dnsServiceUUIDToTargetEndpointUUIDs.Store(key, targetEndpointUUIDs)
 
 	ep, err := c.endpointLister.Get(obj.Namespace, obj.Name)
 	if err != nil {
@@ -154,4 +164,23 @@ func GetProjectNamespaces(lister v1.NamespaceLister, obj *corev1.Service) (map[s
 		}
 	}
 	return namespaces, nil
+}
+
+func (c *EndpointController) reconcileServicesForEndpoint(key string, obj *corev1.Endpoints) error {
+	var dnsRecordServicesToReconcile []string
+	dnsServiceUUIDToTargetEndpointUUIDs.Range(func(k, v interface{}) bool {
+		if _, ok := v.(map[string]bool)[key]; ok {
+			dnsRecordServicesToReconcile = append(dnsRecordServicesToReconcile, k.(string))
+		}
+		return true
+	})
+
+	for _, dnsRecordServiceToReconcile := range dnsRecordServicesToReconcile {
+		splitted := strings.Split(dnsRecordServiceToReconcile, "/")
+		namespace := splitted[0]
+		serviceName := splitted[1]
+		c.serviceController.Enqueue(namespace, serviceName)
+	}
+
+	return nil
 }

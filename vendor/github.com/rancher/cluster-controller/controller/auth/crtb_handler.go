@@ -99,11 +99,12 @@ func (c *crtbLifecycle) ensureBindings(binding *v3.ClusterRoleTemplateBinding) e
 		clusterRoleName = strings.ToLower(fmt.Sprintf("%v-clustermember", clusterName))
 	}
 
-	if err := c.mgr.ensureClusterMembershipBinding(clusterRoleName, clusterName, string(binding.UID), isOwnerRole, binding.Subject); err != nil {
+	subject := buildSubjectFromCRTB(binding)
+	if err := c.mgr.ensureClusterMembershipBinding(clusterRoleName, clusterName, string(binding.UID), isOwnerRole, subject); err != nil {
 		return err
 	}
 
-	return c.mgr.grantManagementPlanePrivileges(binding.RoleTemplateName, clusterManagmentPlaneResources, binding.Subject, binding)
+	return c.mgr.grantManagementPlanePrivileges(binding.RoleTemplateName, clusterManagmentPlaneResources, subject, binding)
 }
 
 type manager struct {
@@ -468,5 +469,12 @@ func buildRule(resource string, verbs map[string]bool) v1.PolicyRule {
 		Resources: []string{resource},
 		Verbs:     vs,
 		APIGroups: []string{"*"},
+	}
+}
+
+func buildSubjectFromCRTB(binding *v3.ClusterRoleTemplateBinding) v1.Subject {
+	return v1.Subject{
+		Kind: "User",
+		Name: binding.UserName,
 	}
 }

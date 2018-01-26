@@ -8,7 +8,6 @@ import (
 	machineconfig "github.com/rancher/machine-controller/store/config"
 	"github.com/rancher/management-api/api/authn"
 	"github.com/rancher/management-api/api/catalog"
-	"github.com/rancher/management-api/api/cluster"
 	"github.com/rancher/management-api/api/machine"
 	"github.com/rancher/management-api/api/project"
 	"github.com/rancher/management-api/api/setting"
@@ -46,7 +45,6 @@ func Schemas(ctx context.Context, management *config.ManagementContext, schemas 
 	User(schemas, management)
 	Catalog(schemas)
 	SecretTypes(schemas, management)
-	ClusterTypes(schemas)
 	Stack(schemas, management)
 	Setting(schemas)
 
@@ -203,17 +201,11 @@ func MachineTypes(schemas *types.Schemas, management *config.ManagementContext, 
 	}
 
 	schema = schemas.Schema(&managementschema.Version, client.MachineType)
-	schema.Validator = machine.Validator
 	schema.Formatter = machine.Formatter
 	schema.LinkHandler = machineHandler.LinkHandler
 
 	schema = schemas.Schema(&managementschema.Version, client.MachineConfigType)
-	schema.Validator = machine.Validator
-}
 
-func ClusterTypes(schemas *types.Schemas) {
-	schema := schemas.Schema(&managementschema.Version, client.ClusterType)
-	schema.Validator = cluster.Validator
 }
 
 func Stack(schemas *types.Schemas, management *config.ManagementContext) {

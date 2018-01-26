@@ -121,7 +121,7 @@ type MachineSpec struct {
 	CustomConfig         *CustomConfig `json:"customConfig"`
 	Description          string        `json:"description,omitempty"`
 	DisplayName          string        `json:"displayName"`
-	RequestedHostname    string        `json:"requestedHostname,omitempty" norman:"noupdate"`
+	RequestedHostname    string        `json:"requestedHostname,omitempty" norman:"type=dnsLabel,nullable,noupdate"`
 	ClusterName          string        `json:"clusterName,omitempty" norman:"type=reference[cluster],noupdate,required"`
 	Role                 []string      `json:"role,omitempty" norman:"noupdate,type=array[enum],options=etcd|worker|controlplane"`
 	MachineTemplateName  string        `json:"machineTemplateName,omitempty" norman:"type=reference[machineTemplate],noupdate"`
