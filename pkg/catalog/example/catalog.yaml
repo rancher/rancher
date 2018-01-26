@@ -1,0 +1,8 @@
+apiVersion: catalog.cattle.io/v1
+kind: Catalog
+metadata:
+  name: test
+spec:
+  branch: v1.6-development
+  url: https://github.com/rancher/rancher-catalog.git
+  catalogKind: native

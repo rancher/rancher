@@ -1,0 +1,8 @@
+apiVersion: management.cattle.io/v3
+kind: MachineDriver
+metadata:
+  name: amazonec2
+spec:
+  url: local://,
+  builtin: true
+  active: true
