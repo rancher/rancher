@@ -108,7 +108,7 @@ function getBinary{
 
 $key,$secret,$url,$this_ip=$(register $RegisterUrl)
 if ($AgentIp -ne $null) { $this_ip=$AgentIp}
-Remove-Item -Path "$rancherBaseDir/$downloadFolder" -Confirm:$false -Recurse
+if ($(Test-Path "$rancherBaseDir/$downloadFolder")){Remove-Item -Path "$rancherBaseDir/$downloadFolder" -Confirm:$false -Recurse }
 New-Item -ItemType Directory -Path "$rancherBaseDir/$downloadFolder" > $null
 getBinary $key $secret $url
 
