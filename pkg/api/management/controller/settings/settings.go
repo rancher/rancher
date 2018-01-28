@@ -23,12 +23,13 @@ func Register(context *config.ManagementContext) error {
 type settingsProvider struct {
 	settings       v3.SettingInterface
 	settingsLister v3.SettingLister
+	fallback       map[string]string
 }
 
 func (s *settingsProvider) Get(name string) string {
 	obj, err := s.settingsLister.Get("", name)
 	if err != nil {
-		return ""
+		return s.fallback[name]
 	}
 	if obj.Value == "" {
 		return obj.Default
@@ -48,6 +49,8 @@ func (s *settingsProvider) Set(name, value string) error {
 }
 
 func (s *settingsProvider) SetAll(settings map[string]settings.Setting) error {
+	fallback := map[string]string{}
+
 	for name, setting := range settings {
 		key := "CATTLE_" + strings.ToUpper(strings.Replace(name, "-", "_", -1))
 		value := os.Getenv(key)
@@ -63,6 +66,7 @@ func (s *settingsProvider) SetAll(settings map[string]settings.Setting) error {
 			if value != "" {
 				newSetting.Value = value
 			}
+			fallback[newSetting.Name] = newSetting.Value
 			_, err := s.settings.Create(newSetting)
 			if err != nil {
 				return err
@@ -79,6 +83,7 @@ func (s *settingsProvider) SetAll(settings map[string]settings.Setting) error {
 				obj.Value = value
 				update = true
 			}
+			fallback[obj.Name] = obj.Value
 			if update {
 				_, err := s.settings.Update(obj)
 				if err != nil {
@@ -87,6 +92,8 @@ func (s *settingsProvider) SetAll(settings map[string]settings.Setting) error {
 			}
 		}
 	}
+
+	s.fallback = fallback
 
 	return nil
 }
