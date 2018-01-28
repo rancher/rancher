@@ -38,6 +38,8 @@ type Interface interface {
 	DynamicSchemasGetter
 	StacksGetter
 	PreferencesGetter
+	ClusterLoggingsGetter
+	ProjectLoggingsGetter
 	ListenConfigsGetter
 	SettingsGetter
 }
@@ -71,6 +73,8 @@ type Client struct {
 	dynamicSchemaControllers              map[string]DynamicSchemaController
 	stackControllers                      map[string]StackController
 	preferenceControllers                 map[string]PreferenceController
+	clusterLoggingControllers             map[string]ClusterLoggingController
+	projectLoggingControllers             map[string]ProjectLoggingController
 	listenConfigControllers               map[string]ListenConfigController
 	settingControllers                    map[string]SettingController
 }
@@ -113,6 +117,8 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		dynamicSchemaControllers:              map[string]DynamicSchemaController{},
 		stackControllers:                      map[string]StackController{},
 		preferenceControllers:                 map[string]PreferenceController{},
+		clusterLoggingControllers:             map[string]ClusterLoggingController{},
+		projectLoggingControllers:             map[string]ProjectLoggingController{},
 		listenConfigControllers:               map[string]ListenConfigController{},
 		settingControllers:                    map[string]SettingController{},
 	}, nil
@@ -436,6 +442,32 @@ type PreferencesGetter interface {
 func (c *Client) Preferences(namespace string) PreferenceInterface {
 	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &PreferenceResource, PreferenceGroupVersionKind, preferenceFactory{})
 	return &preferenceClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type ClusterLoggingsGetter interface {
+	ClusterLoggings(namespace string) ClusterLoggingInterface
+}
+
+func (c *Client) ClusterLoggings(namespace string) ClusterLoggingInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &ClusterLoggingResource, ClusterLoggingGroupVersionKind, clusterLoggingFactory{})
+	return &clusterLoggingClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type ProjectLoggingsGetter interface {
+	ProjectLoggings(namespace string) ProjectLoggingInterface
+}
+
+func (c *Client) ProjectLoggings(namespace string) ProjectLoggingInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &ProjectLoggingResource, ProjectLoggingGroupVersionKind, projectLoggingFactory{})
+	return &projectLoggingClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,
