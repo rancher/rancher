@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/rancher/norman/parse"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 )
 
@@ -21,6 +22,10 @@ func UI(next http.Handler) http.Handler {
 	_, err := os.Stat("ui/index.html")
 	if err == nil {
 		local = true
+	}
+
+	if local && settings.ServerVersion.Get() == "master" {
+		local = false
 	}
 
 	return http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
