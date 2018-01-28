@@ -29,6 +29,7 @@ var (
 		Init(schemaTypes).
 		Init(stackTypes).
 		Init(userTypes).
+		Init(logTypes).
 		Init(globalTypes)
 )
 
@@ -192,6 +193,16 @@ func userTypes(schema *types.Schemas) *types.Schemas {
 				return f
 			})
 		})
+}
+
+func logTypes(schema *types.Schemas) *types.Schemas {
+	return schema.
+		AddMapperForType(&Version, &v3.ClusterLogging{},
+			m.DisplayName{}).
+		AddMapperForType(&Version, &v3.ProjectLogging{},
+			m.DisplayName{}).
+		MustImport(&Version, v3.ClusterLogging{}).
+		MustImport(&Version, v3.ProjectLogging{})
 }
 
 func globalTypes(schema *types.Schemas) *types.Schemas {

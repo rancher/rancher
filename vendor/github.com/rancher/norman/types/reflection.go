@@ -315,6 +315,8 @@ func applyTag(structField *reflect.StructField, field *Field) error {
 			field.Default = value
 		case "nullable":
 			field.Nullable = true
+		case "notnullable":
+			field.Nullable = false
 		case "nocreate":
 			field.Create = false
 		case "writeOnly":

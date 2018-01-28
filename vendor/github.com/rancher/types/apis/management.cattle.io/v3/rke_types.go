@@ -19,6 +19,8 @@ type RancherKubernetesEngineConfig struct {
 	Authorization AuthzConfig `yaml:"authorization" json:"authorization,omitempty"`
 	// Enable/disable strict docker version checking
 	IgnoreDockerVersion bool `yaml:"ignore_docker_version" json:"ignoreDockerVersion"`
+	// Kubernetes version to use (overrides individual Images)
+	Version string `yaml:"kubernetesVersion"`
 }
 
 type RKEConfigNode struct {

@@ -1,5 +1,4 @@
-rke
-========
+# rke
 
 Rancher Kubernetes Engine, an extremely simple, lightning fast Kubernetes installer that works everywhere.
 
@@ -12,14 +11,21 @@ Please check the [releases](https://github.com/rancher/rke/releases/) page.
 - Docker versions 1.12.6, 1.13.1, or 17.03 should be installed for Kubernetes 1.8.
 - OpenSSH 7.0+ must be installed on each node for stream local forwarding to work.
 - The SSH user used for node access must be a member of the `docker` group:
+
 ```bash
 usermod -aG docker <user_name>
 ```
+
 - Ports 6443, 2379, and 2380 should be opened between cluster nodes.
 
 ## Getting Started
 
+Starting out with RKE? Check out this [blog post](http://rancher.com/an-introduction-to-rke/).
+
+## Using RKE
+
 Standing up a Kubernetes is as simple as creating a `cluster.yml` configuration file and running the command:
+
 ```bash
 ./rke up --config cluster.yml
 ```
@@ -29,7 +35,8 @@ Standing up a Kubernetes is as simple as creating a `cluster.yml` configuration 
 You can view full sample of cluster.yml [here](https://github.com/rancher/rke/blob/master/cluster.yml).
 
 ### Minimal `cluster.yml` example
-```
+
+```yaml
 nodes:
   - address: 1.1.1.1
     user: ubuntu
@@ -60,7 +67,8 @@ RKE supports the following network plugins:
 - Weave
 
 To use specific network plugin configure `cluster.yml` to include:
-```
+
+```yaml
 network:
   plugin: flannel
 ```
@@ -97,16 +105,18 @@ There are extra options that can be specified for each network plugin:
 ## Addons
 
 RKE support pluggable addons on cluster bootstrap, user can specify the addon yaml in the cluster.yml file, and when running
-```
+
+```yaml
 rke up --config cluster.yml
 ```
+
 RKE will deploy the addons yaml after the cluster starts, RKE first uploads this yaml file as a configmap in kubernetes cluster and then run a kubernetes job that mounts this config map and deploy the addons.
 
 > Note that RKE doesn't support yet removal of the addons, so once they are deployed the first time you can't change them using rke
 
 To start using addons use `addons:` option in the `cluster.yml` file for example:
-```
 
+```yaml
 addons: |-
     ---
     apiVersion: v1
@@ -153,18 +163,20 @@ Note that this command is irreversible and will destroy the kubernetes cluster e
 ## Cluster Upgrade
 
 RKE support kubernetes cluster upgrade through changing the image version of services, in order to do that change the image option for each services, for example:
-```
+
+```yaml
 image: rancher/k8s:v1.8.2-rancher1
 ```
+
 TO
 
-```
+```yaml
 image: rancher/k8s:v1.8.3-rancher2
 ```
 
 And then run:
 
-```
+```bash
 rke up --config cluster.yml
 ```
 
@@ -175,17 +187,15 @@ RKE will first look for the local `.kube_config_cluster.yml` and then tries to u
 ## RKE Config
 
 RKE support command `rke config` which generates a cluster config template for the user, to start using this command just write:
-```
+
+```bash
 rke config --name mycluster.yml
 ```
+
 RKE will ask some questions around the cluster file like number of the hosts, ips, ssh users, etc, `--empty` option will generate an empty cluster.yml file, also if you just want to print on the screen and not save it in a file you can use `--print`.
 
-## More details
-
-More information about RKE design, configuration and usage can be found in this [blog post](http://rancher.com/an-introduction-to-rke/).
-
-
 ## License
+
 Copyright (c) 2017 [Rancher Labs, Inc.](http://rancher.com)
 
 Licensed under the Apache License, Version 2.0 (the "License");
