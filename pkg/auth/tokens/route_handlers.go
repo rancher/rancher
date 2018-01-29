@@ -86,16 +86,11 @@ func (s *tokenAPIServer) login(actionName string, action *types.Action, request 
 		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
 	}
 
-	isSecure := false
-	if r.URL.Scheme == "https" {
-		isSecure = true
-	}
-
 	if jsonInput.ResponseType == "cookie" {
 		tokenCookie := &http.Cookie{
 			Name:     CookieName,
 			Value:    token.ObjectMeta.Name + ":" + token.Token,
-			Secure:   isSecure,
+			Secure:   true,
 			Path:     "/",
 			HttpOnly: true,
 		}
