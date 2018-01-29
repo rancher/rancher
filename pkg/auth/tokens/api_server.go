@@ -12,6 +12,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/rancher/rancher/pkg/auth/providers"
+	"github.com/rancher/rancher/pkg/randomtoken"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 )
@@ -86,7 +87,7 @@ func (s *tokenAPIServer) createLoginToken(jsonInput v3.LoginInput) (v3.Token, in
 
 	logrus.Debug("User Authenticated")
 
-	key, err := generateKey()
+	key, err := randomtoken.Generate()
 	if err != nil {
 		logrus.Errorf("Failed to generate token key: %v", err)
 		return v3.Token{}, 0, fmt.Errorf("failed to generate token key")
@@ -121,7 +122,7 @@ func (s *tokenAPIServer) createDerivedToken(jsonInput v3.Token, tokenAuthValue s
 		return v3.Token{}, 401, err
 	}
 
-	key, err := generateKey()
+	key, err := randomtoken.Generate()
 	if err != nil {
 		logrus.Errorf("Failed to generate token key: %v", err)
 		return v3.Token{}, 0, fmt.Errorf("failed to generate token key")
