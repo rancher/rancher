@@ -3,8 +3,8 @@ package ui
 import (
 	"io"
 	"net/http"
-
 	"os"
+	"strings"
 
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/rancher/pkg/settings"
@@ -24,7 +24,7 @@ func UI(next http.Handler) http.Handler {
 		local = true
 	}
 
-	if local && settings.ServerVersion.Get() == "master" {
+	if local && !strings.HasPrefix(settings.ServerVersion.Get(), "v") {
 		local = false
 	}
 
