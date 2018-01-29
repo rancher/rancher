@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/management/api/stack"
 	clustermanager "github.com/rancher/rancher/pkg/api/management/cluster"
 	"github.com/rancher/rancher/pkg/api/management/store/cert"
+	"github.com/rancher/rancher/pkg/api/management/store/cluster"
 	"github.com/rancher/rancher/pkg/api/management/store/preference"
 	"github.com/rancher/rancher/pkg/api/management/store/scoped"
 	"github.com/rancher/rancher/pkg/machine/store"
@@ -41,7 +42,6 @@ func Schemas(ctx context.Context, management *config.ManagementContext, schemas 
 	ProjectLinks(schemas, management)
 	Templates(schemas)
 	TemplateVersion(schemas)
-	ClusterRegistrationTokens(schemas)
 	User(schemas, management)
 	Catalog(schemas)
 	SecretTypes(schemas, management)
@@ -72,6 +72,7 @@ func Schemas(ctx context.Context, management *config.ManagementContext, schemas 
 
 	authn.SetUserStore(schemas.Schema(&managementschema.Version, client.UserType), management)
 	Preference(schemas, management)
+	ClusterRegistrationTokens(schemas)
 
 	NamespacedTypes(schemas)
 
@@ -127,6 +128,9 @@ func Catalog(schemas *types.Schemas) {
 
 func ClusterRegistrationTokens(schemas *types.Schemas) {
 	schema := schemas.Schema(&managementschema.Version, client.ClusterRegistrationTokenType)
+	schema.Store = &cluster.RegistrationTokenStore{
+		Store: schema.Store,
+	}
 	schema.Formatter = func(request *types.APIContext, resource *types.RawResource) {
 		token := base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(uuid.NewV4().Bytes())
 		url := request.URLBuilder.RelativeToRoot("/" + token + ".yaml")
