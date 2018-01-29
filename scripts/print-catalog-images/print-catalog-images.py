@@ -27,6 +27,11 @@ parser.add_argument('-u', '--url',
                     help='Rancher catalog URL accessible in airgap environment')
 parser.add_argument('-b', '--branch',
                     help='Rancher catalog branch accessible in airgap environment')
+parser.add_argument('-k', '--k8saddons', action='store_true',
+                    help='Print k8s addon images')
+parser.add_argument('-ku', '--k8surl',
+                    default='https://github.com/rancher/kubernetes-package',
+                    help='Rancher URL for kubernetes-package accessible in airgap environment')
 parser.add_argument('-v', '--version',
                     required=True,
                     help='Rancher Server version')
@@ -119,6 +124,29 @@ def optimal_version_dir(rancher_version, service_dir):
     else:
         return "", ""
 
+def version_pod_images(k8s_addons_dir):
+    images = sets.Set()
+    if os.path.isfile(k8s_addons_dir + "/addon-templates/README.md"):
+        k8saddonsreadme = open(k8s_addons_dir + "/addon-templates/README.md", 'r').read().splitlines()
+        for line in k8saddonsreadme:
+            match = re.search("^\s+-\s+(.*?:(v|\d+).*)$", line)
+            if match:
+                image = match.group(1)
+                images.add(image)
+    else:
+        for root, dirs, files in os.walk(k8s_addons_dir + "/addon-templates"):
+            for f in files:
+                fullpath = os.path.join(root, f)
+                if fullpath.endswith(".yaml") or fullpath.endswith(".yaml.sed"):
+                    with open(fullpath, 'r') as f:
+                        filedata = f.read()
+                        for line in filedata.splitlines():
+                            match = re.search("image: (.*?)$", line)
+                            if match:
+                                image = match.group(1)
+                                image = image.replace('"','')
+                                images.add(image)
+    return images
 
 def version_images(service_version_dir):
     images = sets.Set()
@@ -190,5 +218,18 @@ for infra_service in os.listdir(infra_dir):
             print infra_service + ": " + template_ver
             for image in version_images(service_dir + "/" + version_dir):
                 print "    - " + image
+            if infra_service == "k8s":
+                if args.k8saddons == True:
+                    k8s_addons_dir = str(uuid.uuid4())
+                    try:
+                        subprocess.check_call(["git", "clone", args.k8surl,
+                           "--quiet", "--single-branch", "-c", "advice.detachedHead=false", "--branch", template_ver,
+                           k8s_addons_dir])
+                    except subprocess.CalledProcessError:
+                        sys.exit(1)
+                    for image in version_pod_images(k8s_addons_dir):
+                        print "    - " + image
 
 subprocess.call(["rm", "-rf", catalog_dir])
+if args.k8saddons == True:
+    subprocess.call(["rm", "-rf", k8s_addons_dir])
