@@ -10,7 +10,7 @@ import (
 )
 
 func NewClusterRouterLinkHandler(manager *cluster.Manager) types.RequestHandler {
-	return func(apiContext *types.APIContext) error {
+	return func(apiContext *types.APIContext, next types.RequestHandler) error {
 		return clusterRouterLinkHandler(apiContext, manager)
 	}
 }

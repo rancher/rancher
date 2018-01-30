@@ -37,12 +37,12 @@ func TokenActionHandler(actionName string, action *types.Action, request *types.
 	return nil
 }
 
-func TokenCreateHandler(request *types.APIContext) error {
+func TokenCreateHandler(request *types.APIContext, _ types.RequestHandler) error {
 	logrus.Debugf("TokenCreateHandler called")
 	return tokenServer.deriveToken(request)
 }
 
-func TokenListHandler(request *types.APIContext) error {
+func TokenListHandler(request *types.APIContext, _ types.RequestHandler) error {
 	logrus.Debugf("TokenListHandler called")
 	if request.ID != "" {
 		return tokenServer.getToken(request)
@@ -50,7 +50,7 @@ func TokenListHandler(request *types.APIContext) error {
 	return tokenServer.listTokens(request)
 }
 
-func TokenDeleteHandler(request *types.APIContext) error {
+func TokenDeleteHandler(request *types.APIContext, _ types.RequestHandler) error {
 	logrus.Debugf("TokenDeleteHandler called")
 	return tokenServer.removeToken(request)
 }

@@ -39,7 +39,7 @@ var (
 
 func Schemas(ctx context.Context, management *config.ManagementContext, schemas *types.Schemas) error {
 	subscribe.Register(&builtin.Version, schemas)
-	ProjectLinks(schemas, management)
+	SubAPIs(schemas, management)
 	Templates(schemas)
 	TemplateVersion(schemas)
 	User(schemas, management)
@@ -140,17 +140,19 @@ func ClusterRegistrationTokens(schemas *types.Schemas) {
 	}
 }
 
-func ProjectLinks(schemas *types.Schemas, management *config.ManagementContext) {
+func SubAPIs(schemas *types.Schemas, management *config.ManagementContext) {
 	clusterManager := clustermanager.NewManager(management)
 	linkHandler := project.NewClusterRouterLinkHandler(clusterManager)
 
 	schema := schemas.Schema(&managementschema.Version, client.ProjectType)
 	schema.Formatter = project.ClusterLinks
 	schema.LinkHandler = linkHandler
+	schema.ListHandler = project.ListHandler
 
 	schema = schemas.Schema(&managementschema.Version, client.ClusterType)
 	schema.Formatter = project.ClusterLinks
 	schema.LinkHandler = linkHandler
+	schema.ListHandler = project.ListHandler
 }
 
 func SecretTypes(schemas *types.Schemas, management *config.ManagementContext) {

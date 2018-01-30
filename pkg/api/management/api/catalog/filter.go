@@ -119,7 +119,7 @@ func extractVersionLinks(apiContext *types.APIContext, resource *types.RawResour
 	return r
 }
 
-func TemplateIconHandler(apiContext *types.APIContext) error {
+func TemplateIconHandler(apiContext *types.APIContext, next types.RequestHandler) error {
 	switch apiContext.Link {
 	case "icon":
 		template := &client.Template{}
@@ -139,7 +139,7 @@ func TemplateIconHandler(apiContext *types.APIContext) error {
 	}
 }
 
-func TemplateVersionReadmeHandler(apiContext *types.APIContext) error {
+func TemplateVersionReadmeHandler(apiContext *types.APIContext, next types.RequestHandler) error {
 	switch apiContext.Link {
 	case "readme":
 		templateVersion := &client.TemplateVersion{}
