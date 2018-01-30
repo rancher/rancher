@@ -21,6 +21,7 @@ const (
 	NodeFieldOwnerReferences      = "ownerReferences"
 	NodeFieldPodCidr              = "podCidr"
 	NodeFieldProviderId           = "providerId"
+	NodeFieldPublicEndpoints      = "publicEndpoints"
 	NodeFieldRemoved              = "removed"
 	NodeFieldState                = "state"
 	NodeFieldTaints               = "taints"
@@ -49,6 +50,7 @@ type Node struct {
 	OwnerReferences      []OwnerReference          `json:"ownerReferences,omitempty"`
 	PodCidr              string                    `json:"podCidr,omitempty"`
 	ProviderId           string                    `json:"providerId,omitempty"`
+	PublicEndpoints      []PublicEndpoint          `json:"publicEndpoints,omitempty"`
 	Removed              string                    `json:"removed,omitempty"`
 	State                string                    `json:"state,omitempty"`
 	Taints               []Taint                   `json:"taints,omitempty"`

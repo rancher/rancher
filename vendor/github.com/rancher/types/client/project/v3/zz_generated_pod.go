@@ -29,6 +29,7 @@ const (
 	PodFieldPriority                      = "priority"
 	PodFieldPriorityClassName             = "priorityClassName"
 	PodFieldProjectID                     = "projectId"
+	PodFieldPublicEndpoints               = "publicEndpoints"
 	PodFieldPullPolicy                    = "pullPolicy"
 	PodFieldPullSecrets                   = "pullSecrets"
 	PodFieldRemoved                       = "removed"
@@ -74,6 +75,7 @@ type Pod struct {
 	Priority                      *int64                 `json:"priority,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty"`
 	ProjectID                     string                 `json:"projectId,omitempty"`
+	PublicEndpoints               []PublicEndpoint       `json:"publicEndpoints,omitempty"`
 	PullPolicy                    string                 `json:"pullPolicy,omitempty"`
 	PullSecrets                   []LocalObjectReference `json:"pullSecrets,omitempty"`
 	Removed                       string                 `json:"removed,omitempty"`

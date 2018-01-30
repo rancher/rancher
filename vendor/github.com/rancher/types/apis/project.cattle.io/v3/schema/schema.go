@@ -295,8 +295,10 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 		AddMapperForType(&Version, v1.ResourceRequirements{},
 			mapper.PivotMapper{Plural: true},
 		).
+		MustImport(&Version, v3.PublicEndpoint{}).
 		AddMapperForType(&Version, v1.Pod{},
 			&m.AnnotationField{Field: "description"},
+			&m.AnnotationField{Field: "publicEndpoints", List: true},
 		).
 		// Must import handlers before Container
 		MustImport(&Version, v1.Capabilities{}, struct {
@@ -320,8 +322,9 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 			PullPolicy string `norman:"type=enum,options=Always|Never|IfNotPresent,default=IfNotPresent"`
 		}{}).
 		MustImport(&Version, v1.Pod{}, projectOverride{}, struct {
-			Description string `json:"description"`
-			WorkloadID  string `norman:"type=reference[workload]"`
+			Description     string `json:"description"`
+			WorkloadID      string `norman:"type=reference[workload]"`
+			PublicEndpoints string `json:"publicEndpoints" norman:"type=array[publicEndpoint],nocreate,noupdate"`
 		}{})
 }
 
@@ -368,6 +371,7 @@ func addServiceOrDNSRecord(dns bool) types.SchemasInitFunc {
 				&m.AnnotationField{Field: "ipAddresses", List: true},
 				&m.AnnotationField{Field: "targetWorkloadIds", List: true},
 				&m.AnnotationField{Field: "targetDnsRecordIds", List: true},
+				&m.AnnotationField{Field: "publicEndpoints", List: true},
 				&m.Move{From: "serviceKind", To: "kind"},
 			)
 
@@ -402,6 +406,7 @@ func addServiceOrDNSRecord(dns bool) types.SchemasInitFunc {
 			WorkloadID         string   `json:"workloadId" norman:"type=reference[workload],nocreate,noupdate"`
 			TargetWorkloadIDs  string   `json:"targetWorkloadIds" norman:"type=array[reference[workload]]"`
 			TargetDNSRecordIDs string   `json:"targetDnsRecordIds" norman:"type=array[reference[dnsRecord]]"`
+			PublicEndpoints    string   `json:"publicEndpoints" norman:"type=array[publicEndpoint],nocreate,noupdate"`
 		}{})
 	}
 }
