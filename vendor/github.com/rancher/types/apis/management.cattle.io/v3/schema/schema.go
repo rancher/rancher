@@ -26,11 +26,15 @@ var (
 		Init(clusterTypes).
 		Init(catalogTypes).
 		Init(authnTypes).
+		Init(tokens).
 		Init(schemaTypes).
 		Init(stackTypes).
 		Init(userTypes).
 		Init(logTypes).
 		Init(globalTypes)
+
+	TokenSchema = factory.Schemas(&Version).
+			Init(tokens)
 )
 
 func schemaTypes(schemas *types.Schemas) *types.Schemas {
@@ -131,18 +135,11 @@ func machineTypes(schemas *types.Schemas) *types.Schemas {
 
 }
 
-func authnTypes(schemas *types.Schemas) *types.Schemas {
+func tokens(schemas *types.Schemas) *types.Schemas {
 	return schemas.
-		AddMapperForType(&Version, v3.User{}, m.DisplayName{}).
-		AddMapperForType(&Version, v3.Group{}, m.DisplayName{}).
-		MustImport(&Version, v3.Group{}).
-		MustImport(&Version, v3.GroupMember{}).
-		MustImport(&Version, v3.Principal{}).
 		MustImport(&Version, v3.LoginInput{}).
 		MustImport(&Version, v3.LocalCredential{}).
 		MustImport(&Version, v3.GithubCredential{}).
-		MustImport(&Version, v3.ChangePasswordInput{}).
-		MustImport(&Version, v3.SetPasswordInput{}).
 		MustImportAndCustomize(&Version, v3.Token{}, func(schema *types.Schema) {
 			schema.CollectionActions = map[string]types.Action{
 				"login": {
@@ -151,7 +148,18 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 				},
 				"logout": {},
 			}
-		}).
+		})
+}
+
+func authnTypes(schemas *types.Schemas) *types.Schemas {
+	return schemas.
+		AddMapperForType(&Version, v3.User{}, m.DisplayName{}).
+		AddMapperForType(&Version, v3.Group{}, m.DisplayName{}).
+		MustImport(&Version, v3.Group{}).
+		MustImport(&Version, v3.GroupMember{}).
+		MustImport(&Version, v3.Principal{}).
+		MustImport(&Version, v3.ChangePasswordInput{}).
+		MustImport(&Version, v3.SetPasswordInput{}).
 		MustImportAndCustomize(&Version, v3.User{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
 				"setpassword": {
@@ -164,6 +172,25 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 					Input: "changePasswordInput",
 				},
 			}
+		}).
+		MustImport(&Version, v3.AuthConfig{}).
+		MustImportAndCustomize(&Version, v3.GithubConfig{}, func(schema *types.Schema) {
+			schema.BaseType = "authConfig"
+			schema.ResourceActions = map[string]types.Action{
+				"configureTest": {
+					Input:  "githubConfigTestInput",
+					Output: "githubConfig",
+				},
+				"testAndApply": {
+					Input:  "githubConfigApplyInput",
+					Output: "githubConfig",
+				},
+			}
+		}).
+		MustImport(&Version, v3.GithubConfigTestInput{}).
+		MustImport(&Version, v3.GithubConfigApplyInput{}).
+		MustImportAndCustomize(&Version, v3.LocalConfig{}, func(schema *types.Schema) {
+			schema.BaseType = "authConfig"
 		})
 }
 
