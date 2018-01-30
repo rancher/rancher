@@ -68,7 +68,7 @@ type Handler struct {
 	SecretStore *store.GenericEncryptedStore
 }
 
-func (h Handler) LinkHandler(apiContext *types.APIContext) error {
+func (h Handler) LinkHandler(apiContext *types.APIContext, next types.RequestHandler) error {
 	var machine client.Machine
 	if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, &machine); err != nil {
 		return err
