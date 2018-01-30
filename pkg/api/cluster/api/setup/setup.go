@@ -6,7 +6,6 @@ import (
 	"github.com/rancher/norman/pkg/subscribe"
 	"github.com/rancher/norman/store/crd"
 	"github.com/rancher/norman/store/proxy"
-	"github.com/rancher/norman/store/subtype"
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/api/cluster/api/pod"
@@ -192,7 +191,7 @@ func Secret(k8sClient rest.Interface, schemas *types.Schemas) {
 
 	for _, subSchema := range schemas.Schemas() {
 		if subSchema.BaseType == "secret" && subSchema.ID != "namespacedSecret" && subSchema.ID != "secret" {
-			subSchema.Store = subtype.NewSubTypeStore(subSchema.ID, schema.Store)
+			subSchema.Store = secret.NewSecretSubtypeStore(subSchema.ID, schema.Store)
 		}
 	}
 }

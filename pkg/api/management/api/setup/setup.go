@@ -8,8 +8,8 @@ import (
 	"github.com/rancher/norman/pkg/subscribe"
 	"github.com/rancher/norman/store/crd"
 	"github.com/rancher/norman/store/proxy"
-	"github.com/rancher/norman/store/subtype"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/api/cluster/store/secret"
 	"github.com/rancher/rancher/pkg/api/management/api/authn"
 	"github.com/rancher/rancher/pkg/api/management/api/catalog"
 	"github.com/rancher/rancher/pkg/api/management/api/machine"
@@ -44,6 +44,7 @@ func Schemas(ctx context.Context, management *config.ManagementContext, schemas 
 	TemplateVersion(schemas)
 	User(schemas, management)
 	Catalog(schemas)
+	AuthConfigs(schemas)
 	SecretTypes(schemas, management)
 	Stack(schemas, management)
 	Setting(schemas)
@@ -166,7 +167,7 @@ func SecretTypes(schemas *types.Schemas, management *config.ManagementContext) {
 		if secretSubType != projectclient.SecretType {
 			subSchema := schemas.Schema(&projectschema.Version, secretSubType)
 			if subSchema.CanList(nil) {
-				subSchema.Store = subtype.NewSubTypeStore(secretSubType, schema.Store)
+				subSchema.Store = secret.NewSecretSubtypeStore(secretSubType, schema.Store)
 			}
 		}
 	}
@@ -175,6 +176,12 @@ func SecretTypes(schemas *types.Schemas, management *config.ManagementContext) {
 	schema.Store = &cert.Store{
 		Store: schema.Store,
 	}
+}
+
+func AuthConfigs(schemas *types.Schemas) {
+	schema := schemas.Schema(&managementschema.Version, client.GithubConfigType)
+	schema.Formatter = authn.GithubConfigFormatter
+	schema.ActionHandler = authn.GithubConfigActionHandler
 }
 
 func User(schemas *types.Schemas, management *config.ManagementContext) {

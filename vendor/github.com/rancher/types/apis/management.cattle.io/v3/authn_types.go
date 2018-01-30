@@ -90,3 +90,43 @@ type ChangePasswordInput struct {
 type SetPasswordInput struct {
 	NewPassword string `json:"newPassword" norman:"type=string,required"`
 }
+
+//AuthConfig structure contains the AuthConfig definition
+type AuthConfig struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Type string `json:"type"`
+}
+
+//GithubConfig structure contains the github config definition
+type GithubConfig struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	AuthConfig        `json:",inline"`
+
+	Hostname     string `json:"hostname,omitempty"`
+	Scheme       string `json:"scheme,omitempty"`
+	ClientID     string `json:"clientId,omitempty"`
+	ClientSecret string `json:"clientSecret,omitempty"`
+	Enabled      bool   `json:"enabled,omitempty"`
+}
+
+//LocalConfig structure contains the local config definition
+type LocalConfig struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+}
+
+//GithubConfigTestInput structure defines all properties that can be sent by client to configure github
+type GithubConfigTestInput struct {
+	GithubConfig GithubConfig `json:"githubConfig, omitempty"`
+	Enabled      bool         `json:"enabled,omitempty"`
+}
+
+//GithubConfigApplyInput structure defines all properties that can be sent by client to configure github
+type GithubConfigApplyInput struct {
+	GithubConfig     GithubConfig     `json:"githubConfig, omitempty"`
+	GithubCredential GithubCredential `json:"githubCredential, omitempty"`
+	Enabled          bool             `json:"enabled,omitempty"`
+}

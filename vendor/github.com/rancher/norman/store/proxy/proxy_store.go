@@ -100,6 +100,10 @@ func (p *Store) byID(apiContext *types.APIContext, schema *types.Schema, id stri
 func (p *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {
 	namespace := getNamespace(apiContext, opt)
 
+	if !strings.EqualFold(schema.ID, p.kind) {
+		opt.Conditions = append(opt.Conditions, types.NewConditionFromString("type", types.ModifierEQ, schema.ID))
+	}
+
 	req := p.common(namespace, p.k8sClient.Get())
 
 	resultList := &unstructured.UnstructuredList{}
@@ -111,7 +115,7 @@ func (p *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *ty
 	var result []map[string]interface{}
 
 	for _, obj := range resultList.Items {
-		result = append(result, p.fromInternal(schema, obj.Object))
+		result = append(result, p.fromInternal(schema, apiContext, obj.Object))
 	}
 
 	return apiContext.AccessControl.FilterList(apiContext, result, p.authContext), nil
@@ -119,6 +123,10 @@ func (p *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *ty
 
 func (p *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
 	namespace := getNamespace(apiContext, opt)
+
+	if !strings.EqualFold(schema.ID, p.kind) {
+		opt.Conditions = append(opt.Conditions, types.NewConditionFromString("type", types.ModifierEQ, schema.ID))
+	}
 
 	timeout := int64(60 * 60)
 	req := p.common(namespace, p.k8sClient.Get())
@@ -146,7 +154,7 @@ func (p *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt *t
 	go func() {
 		for event := range watcher.ResultChan() {
 			data := event.Object.(*unstructured.Unstructured)
-			p.fromInternal(schema, data.Object)
+			p.fromInternal(schema, apiContext, data.Object)
 			if event.Type == watch.Deleted && data.Object != nil {
 				data.Object[".removed"] = true
 			}
@@ -184,7 +192,7 @@ func getNamespace(apiContext *types.APIContext, opt *types.QueryOptions) string 
 
 func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
 	namespace, _ := data["namespaceId"].(string)
-	p.toInternal(schema.Mapper, data)
+	p.toInternal(schema.Mapper, schema, data)
 
 	values.PutValue(data, p.getUser(apiContext), "metadata", "annotations", "field.cattle.io/creatorId")
 
@@ -205,7 +213,7 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	return result, err
 }
 
-func (p *Store) toInternal(mapper types.Mapper, data map[string]interface{}) {
+func (p *Store) toInternal(mapper types.Mapper, schema *types.Schema, data map[string]interface{}) {
 	if mapper != nil {
 		mapper.ToInternal(data)
 	}
@@ -216,6 +224,9 @@ func (p *Store) toInternal(mapper types.Mapper, data map[string]interface{}) {
 		data["apiVersion"] = p.group + "/" + p.version
 	}
 	data["kind"] = p.kind
+	if !strings.EqualFold(schema.ID, p.kind) {
+		data["type"] = schema.ID
+	}
 }
 
 func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
@@ -228,7 +239,7 @@ func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		return data, nil
 	}
 
-	p.toInternal(schema.Mapper, data)
+	p.toInternal(schema.Mapper, schema, data)
 	existing = convert.APIUpdateMerge(existing, data, apiContext.Query.Get("_replace") == "true")
 
 	values.PutValue(existing, resourceVersion, "metadata", "resourceVersion")
@@ -272,7 +283,7 @@ func (p *Store) singleResult(apiContext *types.APIContext, schema *types.Schema,
 	if err != nil {
 		return "", nil, err
 	}
-	p.fromInternal(schema, data)
+	p.fromInternal(schema, apiContext, data)
 	return version, data, nil
 }
 
@@ -313,9 +324,18 @@ func (p *Store) common(namespace string, req *rest.Request) *rest.Request {
 	return req
 }
 
-func (p *Store) fromInternal(schema *types.Schema, data map[string]interface{}) map[string]interface{} {
-	if schema.Mapper != nil {
-		schema.Mapper.FromInternal(data)
+func (p *Store) fromInternal(schema *types.Schema, apiContext *types.APIContext, data map[string]interface{}) map[string]interface{} {
+	mapperSchema := schema
+	// if type on resource doesn't match schema.Type, the resource is a subtype and the provided schema is for the baseType
+	// get the mapper for the actual subtype schema
+	if resourceType, ok := data["type"].(string); ok && resourceType != schema.ID {
+		if s := apiContext.Schemas.Schema(apiContext.Version, resourceType); s != nil && s.BaseType == schema.ID {
+			mapperSchema = s
+		}
+	}
+
+	if mapperSchema.Mapper != nil {
+		mapperSchema.Mapper.FromInternal(data)
 	}
 
 	return data

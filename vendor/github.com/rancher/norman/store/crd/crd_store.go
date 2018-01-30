@@ -3,6 +3,8 @@ package crd
 import (
 	"context"
 
+	"strings"
+
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/types"
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -49,6 +51,9 @@ func NewCRDStoreFromClients(apiExtClientSet apiextclientset.Interface, k8sClient
 }
 
 func key(schema *types.Schema) string {
+	if !strings.EqualFold(schema.BaseType, schema.ID) {
+		return schema.Version.Path + "/" + schema.BaseType
+	}
 	return schema.Version.Path + "/" + schema.ID
 }
 
@@ -110,6 +115,12 @@ func (c *Store) AddSchemas(ctx context.Context, schemas ...*types.Schema) error 
 		}
 
 		schema.Store = c
+
+		if !strings.EqualFold(schema.BaseType, schema.ID) {
+			// subtypes get the CRD store, but should not have their own CRD created
+			continue
+		}
+
 		allSchemas = append(allSchemas, schema)
 	}
 
