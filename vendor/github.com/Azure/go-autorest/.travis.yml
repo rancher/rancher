@@ -2,9 +2,10 @@ sudo: false
 
 language: go
 
-go: 
-  - 1.7
+go:
+  - 1.9
   - 1.8
+  - 1.7
 
 install:
   - go get -u github.com/golang/lint/golint
@@ -14,6 +15,7 @@ install:
   - glide install
 
 script:
+  - grep -L -r --include *.go --exclude-dir vendor -P "Copyright (\d{4}|\(c\)) Microsoft" ./ | tee /dev/stderr | test -z "$(< /dev/stdin)"
   - test -z "$(gofmt -s -l -w ./autorest/. | tee /dev/stderr)"
   - test -z "$(golint ./autorest/... |  tee /dev/stderr)"
   - go vet ./autorest/...

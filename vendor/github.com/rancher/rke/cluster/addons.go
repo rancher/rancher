@@ -40,10 +40,10 @@ func (c *Cluster) deployKubeDNS(ctx context.Context) error {
 	kubeDNSConfig := map[string]string{
 		addons.KubeDNSServer:          c.ClusterDNSServer,
 		addons.KubeDNSClusterDomain:   c.ClusterDomain,
-		addons.KubeDNSImage:           c.SystemImages[KubeDNSImage],
-		addons.DNSMasqImage:           c.SystemImages[DNSMasqImage],
-		addons.KubeDNSSidecarImage:    c.SystemImages[KubeDNSSidecarImage],
-		addons.KubeDNSAutoScalerImage: c.SystemImages[KubeDNSAutoScalerImage],
+		addons.KubeDNSImage:           c.SystemImages.KubeDNS,
+		addons.DNSMasqImage:           c.SystemImages.DNSmasq,
+		addons.KubeDNSSidecarImage:    c.SystemImages.KubeDNSSidecar,
+		addons.KubeDNSAutoScalerImage: c.SystemImages.KubeDNSAutoscaler,
 	}
 	kubeDNSYaml, err := addons.GetKubeDNSManifest(kubeDNSConfig)
 	if err != nil {

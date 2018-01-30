@@ -25,7 +25,7 @@ func (c *Cluster) ClusterRemove(ctx context.Context) error {
 	}
 
 	// Clean up all hosts
-	if err := cleanUpHosts(ctx, c.ControlPlaneHosts, c.WorkerHosts, c.EtcdHosts, c.SystemImages[AplineImage]); err != nil {
+	if err := cleanUpHosts(ctx, c.ControlPlaneHosts, c.WorkerHosts, c.EtcdHosts, c.SystemImages.Alpine); err != nil {
 		return err
 	}
 

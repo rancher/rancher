@@ -54,6 +54,22 @@ func (s *GrpcServer) PostCheck(ctx context.Context, clusterInfo *ClusterInfo) (*
 	return s.driver.PostCheck(getCtx(ctx), clusterInfo)
 }
 
+func (s *GrpcServer) GetVersion(ctx context.Context, clusterInfo *ClusterInfo) (*KubernetesVersion, error) {
+	return s.driver.GetVersion(getCtx(ctx), clusterInfo)
+}
+
+func (s *GrpcServer) SetVersion(ctx context.Context, request *SetVersionRequest) (*Empty, error) {
+	return &Empty{}, s.driver.SetVersion(getCtx(ctx), request.Info, request.Version)
+}
+
+func (s *GrpcServer) GetNodeCount(ctx context.Context, clusterInfo *ClusterInfo) (*NodeCount, error) {
+	return s.driver.GetClusterSize(getCtx(ctx), clusterInfo)
+}
+
+func (s *GrpcServer) SetNodeCount(ctx context.Context, request *SetNodeCountRequest) (*Empty, error) {
+	return &Empty{}, s.driver.SetClusterSize(getCtx(ctx), request.Info, request.Count)
+}
+
 // Remove implements grpc method
 func (s *GrpcServer) Remove(ctx context.Context, clusterInfo *ClusterInfo) (*Empty, error) {
 	return &Empty{}, s.driver.Remove(getCtx(ctx), clusterInfo)
@@ -73,6 +89,10 @@ func getCtx(ctx context.Context) context.Context {
 		return ctx
 	}
 	return log.SetLogger(ctx, logger)
+}
+
+func (s *GrpcServer) GetCapabilities(ctx context.Context, in *Empty) (*Capabilities, error) {
+	return s.driver.GetCapabilities(ctx)
 }
 
 // Serve serves a grpc server

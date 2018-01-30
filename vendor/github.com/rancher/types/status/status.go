@@ -181,7 +181,8 @@ func Set(data map[string]interface{}) {
 		}
 	}
 
-	if state == "" && len(conditions) == 0 {
+	apiVersion, _ := values.GetValueN(data, "apiVersion").(string)
+	if state == "" && len(conditions) == 0 && strings.Contains(apiVersion, "cattle.io") {
 		if val, ok := values.GetValue(data, "metadata", "created"); ok {
 			if i, err := convert.ToTimestamp(val); err == nil {
 				if time.Unix(i/1000, 0).Add(5 * time.Second).After(time.Now()) {

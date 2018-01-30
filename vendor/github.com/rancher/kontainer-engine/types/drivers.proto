@@ -9,6 +9,12 @@ service Driver {
     rpc Remove (ClusterInfo) returns (Empty) {}
     rpc GetDriverCreateOptions (Empty) returns (DriverFlags) {}
     rpc GetDriverUpdateOptions (Empty) returns (DriverFlags) {}
+    rpc GetVersion (ClusterInfo) returns (KubernetesVersion) {}
+    rpc SetVersion (SetVersionRequest) returns (Empty) {}
+    rpc GetNodeCount (ClusterInfo) returns (NodeCount) {}
+    rpc SetNodeCount (SetNodeCountRequest) returns (Empty) {}
+
+    rpc GetCapabilities(Empty) returns (Capabilities) {}
 }
 
 message Empty {
@@ -64,7 +70,29 @@ message ClusterInfo {
     string status = 11;
 }
 
+message KubernetesVersion {
+    string version = 1;
+}
+
+message NodeCount {
+    int64 count = 1;
+}
+
+message Capabilities {
+    map<int64, bool> capabilities = 1;
+}
+
 message UpdateRequest {
     ClusterInfo cluster_info = 1;
     DriverOptions driver_options = 2;
+}
+
+message SetVersionRequest {
+    ClusterInfo info = 1;
+    KubernetesVersion version = 2;
+}
+
+message SetNodeCountRequest {
+    ClusterInfo info = 1;
+    NodeCount count = 2;
 }

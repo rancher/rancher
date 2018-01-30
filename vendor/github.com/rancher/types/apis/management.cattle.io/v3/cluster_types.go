@@ -176,7 +176,7 @@ type ClusterRegistrationToken struct {
 }
 
 type ClusterRegistrationTokenSpec struct {
-	ClusterName string `json:"clusterName" norman:"type=reference[cluster]"`
+	ClusterName string `json:"clusterName" norman:"required,type=reference[cluster]"`
 }
 
 type ClusterRegistrationTokenStatus struct {

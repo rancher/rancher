@@ -43,6 +43,18 @@ Before running gke driver, make sure you have the credential. To get the credent
 
 `./bin/kontainer-engine`
 
+## Tests
+
+Run tests with:
+
+```
+    ./run_integration_tests
+```
+
+You must have Go and [Bats](https://github.com/sstephenson/bats) installed for the tests to run.
+
+If you are adding new tests, note that they must have a `.bats` extension to be recognized by the runner.
+
 ## License
 Copyright (c) 2014-2016 [Rancher Labs, Inc.](http://rancher.com)
 

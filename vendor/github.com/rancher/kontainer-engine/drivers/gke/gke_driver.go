@@ -32,6 +32,7 @@ var EnvMutex sync.Mutex
 
 // Driver defines the struct of gke driver
 type Driver struct {
+	driverCapabilities types.Capabilities
 }
 
 type state struct {
@@ -85,7 +86,18 @@ type state struct {
 
 // NewDriver creates a gke Driver
 func NewDriver() *Driver {
-	return &Driver{}
+	driver := &Driver{
+		driverCapabilities: types.Capabilities{
+			Capabilities: make(map[int64]bool),
+		},
+	}
+
+	driver.driverCapabilities.AddCapability(types.GetVersionCapability)
+	driver.driverCapabilities.AddCapability(types.SetVersionCapability)
+	driver.driverCapabilities.AddCapability(types.GetClusterSizeCapability)
+	driver.driverCapabilities.AddCapability(types.SetClusterSizeCapability)
+
+	return driver
 }
 
 // GetDriverCreateOptions implements driver interface
@@ -555,7 +567,7 @@ func generateServiceAccountTokenForGke(cluster *raw.Cluster) (string, error) {
 func (d *Driver) waitCluster(ctx context.Context, svc *raw.Service, state *state) error {
 	lastMsg := ""
 	for {
-		cluster, err := svc.Projects.Zones.Clusters.Get(state.ProjectID, state.Zone, state.Name).Context(context.TODO()).Do()
+		cluster, err := svc.Projects.Zones.Clusters.Get(state.ProjectID, state.Zone, state.Name).Context(ctx).Do()
 		if err != nil {
 			return err
 		}
@@ -588,4 +600,152 @@ func (d *Driver) waitNodePool(ctx context.Context, svc *raw.Service, state *stat
 		}
 		time.Sleep(time.Second * 5)
 	}
+}
+
+func (d *Driver) getClusterStats(ctx context.Context, info *types.ClusterInfo) (*raw.Cluster, error) {
+	state, err := getState(info)
+
+	if err != nil {
+		return nil, err
+	}
+
+	svc, err := d.getServiceClient(ctx, state)
+
+	if err != nil {
+		return nil, err
+	}
+
+	cluster, err := svc.Projects.Zones.Clusters.Get(state.ProjectID, state.Zone, state.Name).Context(ctx).Do()
+
+	if err != nil {
+		return nil, fmt.Errorf("error getting cluster info: %v", err)
+	}
+
+	return cluster, nil
+}
+
+func (d *Driver) GetClusterSize(ctx context.Context, info *types.ClusterInfo) (*types.NodeCount, error) {
+	cluster, err := d.getClusterStats(ctx, info)
+
+	if err != nil {
+		return nil, err
+	}
+
+	version := &types.NodeCount{Count: int64(cluster.NodePools[0].InitialNodeCount)}
+
+	return version, nil
+}
+
+func (d *Driver) GetVersion(ctx context.Context, info *types.ClusterInfo) (*types.KubernetesVersion, error) {
+	cluster, err := d.getClusterStats(ctx, info)
+
+	if err != nil {
+		return nil, err
+	}
+
+	version := &types.KubernetesVersion{Version: cluster.CurrentMasterVersion}
+
+	return version, nil
+}
+
+func (d *Driver) SetClusterSize(ctx context.Context, info *types.ClusterInfo, count *types.NodeCount) error {
+	cluster, err := d.getClusterStats(ctx, info)
+
+	if err != nil {
+		return err
+	}
+
+	state, err := getState(info)
+
+	if err != nil {
+		return err
+	}
+
+	client, err := d.getServiceClient(ctx, state)
+
+	if err != nil {
+		return err
+	}
+
+	logrus.Info("updating cluster size")
+
+	_, err = client.Projects.Zones.Clusters.NodePools.SetSize(state.ProjectID, state.Zone, cluster.Name, cluster.NodePools[0].Name, &raw.SetNodePoolSizeRequest{
+		NodeCount: count.Count,
+	}).Context(ctx).Do()
+
+	if err != nil {
+		return err
+	}
+
+	err = d.waitCluster(ctx, client, &state)
+
+	if err != nil {
+		return err
+	}
+
+	logrus.Info("cluster size updated successfully")
+
+	return nil
+}
+
+func (d *Driver) SetVersion(ctx context.Context, info *types.ClusterInfo, version *types.KubernetesVersion) error {
+	logrus.Info("updating master version")
+
+	err := d.updateAndWait(ctx, info, &raw.UpdateClusterRequest{
+		Update: &raw.ClusterUpdate{
+			DesiredMasterVersion: version.Version,
+		}})
+
+	if err != nil {
+		return err
+	}
+
+	logrus.Info("master version updated successfully")
+	logrus.Info("updating node version")
+
+	err = d.updateAndWait(ctx, info, &raw.UpdateClusterRequest{
+		Update: &raw.ClusterUpdate{
+			DesiredNodeVersion: version.Version,
+		},
+	})
+
+	if err != nil {
+		return err
+	}
+
+	logrus.Info("node version updated successfully")
+
+	return nil
+}
+
+func (d *Driver) updateAndWait(ctx context.Context, info *types.ClusterInfo, updateRequest *raw.UpdateClusterRequest) error {
+	cluster, err := d.getClusterStats(ctx, info)
+
+	if err != nil {
+		return err
+	}
+
+	state, err := getState(info)
+
+	if err != nil {
+		return err
+	}
+
+	client, err := d.getServiceClient(ctx, state)
+
+	if err != nil {
+		return err
+	}
+
+	_, err = client.Projects.Zones.Clusters.Update(state.ProjectID, state.Zone, cluster.Name, updateRequest).Context(ctx).Do()
+
+	if err != nil {
+		return fmt.Errorf("error while updating cluster: %v", err)
+	}
+
+	return d.waitCluster(ctx, client, &state)
+}
+
+func (d *Driver) GetCapabilities(ctx context.Context) (*types.Capabilities, error) {
+	return &d.driverCapabilities, nil
 }

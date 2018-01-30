@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rke/cmd"
 	"github.com/rancher/rke/hosts"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -25,12 +26,31 @@ const (
 
 // Driver is the struct of rke driver
 type Driver struct {
-	DockerDialer hosts.DialerFactory
+	DockerDialer       hosts.DialerFactory
+	driverCapabilities types.Capabilities
+
+	types.UnimplementedVersionAccess
+	types.UnimplementedClusterSizeAccess
 }
 
 // NewDriver creates a new rke driver
 func NewDriver() *Driver {
-	return &Driver{}
+	d := &Driver{
+		driverCapabilities: types.Capabilities{
+			Capabilities: make(map[int64]bool),
+		},
+	}
+
+	d.driverCapabilities.AddCapability(types.GetVersionCapability)
+	d.driverCapabilities.AddCapability(types.SetVersionCapability)
+
+	d.driverCapabilities.AddCapability(types.GetClusterSizeCapability)
+
+	return d
+}
+
+func (d *Driver) GetCapabilities(ctx context.Context) (*types.Capabilities, error) {
+	return &d.driverCapabilities, nil
 }
 
 // GetDriverCreateOptions returns create flags for rke driver
@@ -141,8 +161,7 @@ func (d *Driver) Update(ctx context.Context, clusterInfo *types.ClusterInfo, opt
 	return d.save(clusterInfo, stateDir), nil
 }
 
-// PostCheck does post action
-func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types.ClusterInfo, error) {
+func (d *Driver) getCilentset(info *types.ClusterInfo) (*kubernetes.Clientset, error) {
 	info.Endpoint = info.Metadata["Endpoint"]
 	info.ClientCertificate = info.Metadata["ClientCert"]
 	info.ClientKey = info.Metadata["ClientKey"]
@@ -174,7 +193,12 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 		},
 	}
 
-	clientset, err := kubernetes.NewForConfig(config)
+	return kubernetes.NewForConfig(config)
+}
+
+// PostCheck does post action
+func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types.ClusterInfo, error) {
+	clientset, err := d.getCilentset(info)
 	if err != nil {
 		return nil, err
 	}
@@ -194,6 +218,60 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 
 	info.NodeCount, err = nodeCount(info)
 	return info, err
+}
+
+func (d *Driver) GetVersion(ctx context.Context, info *types.ClusterInfo) (*types.KubernetesVersion, error) {
+	clientset, err := d.getCilentset(info)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create clientset: %v", err)
+	}
+
+	serviceVersion, err := clientset.DiscoveryClient.ServerVersion()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get server version: %v", err)
+	}
+
+	return &types.KubernetesVersion{Version: serviceVersion.String()}, nil
+}
+
+func (d *Driver) SetVersion(ctx context.Context, info *types.ClusterInfo, version *types.KubernetesVersion) error {
+	config, err := drivers.ConvertToRkeConfig(info.Metadata["Config"])
+
+	if err != nil {
+		return err
+	}
+
+	config.Version = version.Version
+
+	stateDir, err := d.restore(info)
+
+	if err != nil {
+		return err
+	}
+
+	_, _, _, _, err = cmd.ClusterUp(ctx, &config, d.DockerDialer, nil, false, stateDir)
+
+	if err != nil {
+		return err
+	}
+
+	d.save(info, stateDir)
+
+	return nil
+}
+
+func (d *Driver) GetClusterSize(ctx context.Context, info *types.ClusterInfo) (*types.NodeCount, error) {
+	clientset, err := d.getCilentset(info)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create clientset: %v", err)
+	}
+
+	nodeList, err := clientset.CoreV1().Nodes().List(v1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get server version: %v", err)
+	}
+
+	return &types.NodeCount{Count: int64(len(nodeList.Items))}, nil
 }
 
 func nodeCount(info *types.ClusterInfo) (int64, error) {

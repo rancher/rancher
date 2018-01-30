@@ -32,4 +32,37 @@ type Driver interface {
 
 	// Remove removes the cluster
 	Remove(ctx context.Context, clusterInfo *ClusterInfo) error
+
+	GetVersion(ctx context.Context, clusterInfo *ClusterInfo) (*KubernetesVersion, error)
+	SetVersion(ctx context.Context, clusterInfo *ClusterInfo, version *KubernetesVersion) error
+	GetClusterSize(ctx context.Context, clusterInfo *ClusterInfo) (*NodeCount, error)
+	SetClusterSize(ctx context.Context, clusterInfo *ClusterInfo, count *NodeCount) error
+
+	// Get driver capabilities
+	GetCapabilities(ctx context.Context) (*Capabilities, error)
+}
+
+type UnimplementedVersionAccess struct {
+}
+
+func (u *UnimplementedVersionAccess) GetVersion(ctx context.Context, info *ClusterInfo) (*KubernetesVersion, error) {
+	return nil, nil
+}
+
+func (u *UnimplementedVersionAccess) SetVersion(ctx context.Context, info *ClusterInfo, version *KubernetesVersion) error {
+	return nil
+
+}
+
+type UnimplementedClusterSizeAccess struct {
+}
+
+func (u *UnimplementedClusterSizeAccess) GetClusterSize(ctx context.Context, info *ClusterInfo) (*NodeCount, error) {
+	return nil, nil
+
+}
+
+func (u *UnimplementedClusterSizeAccess) SetClusterSize(ctx context.Context, info *ClusterInfo, count *NodeCount) error {
+	return nil
+
 }

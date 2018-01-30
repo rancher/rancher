@@ -3,3 +3,6 @@
 /dist
 *.swp
 /.trash-cache
+/.home
+/.kontainer
+kontainer-engine
