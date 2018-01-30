@@ -56,7 +56,7 @@ func reconcileWorker(ctx context.Context, currentCluster, kubeCluster *Cluster, 
 			return fmt.Errorf("Failed to delete worker node %s from cluster", toDeleteHost.Address)
 		}
 		// attempting to clean services/files on the host
-		if err := reconcileHost(ctx, toDeleteHost, true, false, currentCluster.SystemImages[AplineImage], currentCluster.DockerDialerFactory); err != nil {
+		if err := reconcileHost(ctx, toDeleteHost, true, false, currentCluster.SystemImages.Alpine, currentCluster.DockerDialerFactory); err != nil {
 			log.Warnf(ctx, "[reconcile] Couldn't clean up worker node [%s]: %v", toDeleteHost.Address, err)
 			continue
 		}
@@ -97,7 +97,7 @@ func reconcileControl(ctx context.Context, currentCluster, kubeCluster *Cluster,
 			return fmt.Errorf("Failed to delete controlplane node %s from cluster", toDeleteHost.Address)
 		}
 		// attempting to clean services/files on the host
-		if err := reconcileHost(ctx, toDeleteHost, false, false, currentCluster.SystemImages[AplineImage], currentCluster.DockerDialerFactory); err != nil {
+		if err := reconcileHost(ctx, toDeleteHost, false, false, currentCluster.SystemImages.Alpine, currentCluster.DockerDialerFactory); err != nil {
 			log.Warnf(ctx, "[reconcile] Couldn't clean up controlplane node [%s]: %v", toDeleteHost.Address, err)
 			continue
 		}
@@ -110,7 +110,7 @@ func reconcileControl(ctx context.Context, currentCluster, kubeCluster *Cluster,
 	cpChanged := hosts.IsHostListChanged(currentCluster.ControlPlaneHosts, kubeCluster.ControlPlaneHosts)
 	if cpChanged {
 		log.Infof(ctx, "[reconcile] Rolling update nginx hosts with new list of control plane hosts")
-		err := services.RollingUpdateNginxProxy(ctx, kubeCluster.ControlPlaneHosts, kubeCluster.WorkerHosts, currentCluster.SystemImages[NginxProxyImage])
+		err := services.RollingUpdateNginxProxy(ctx, kubeCluster.ControlPlaneHosts, kubeCluster.WorkerHosts, currentCluster.SystemImages.NginxProxy)
 		if err != nil {
 			return fmt.Errorf("Failed to rolling update Nginx hosts with new control plane hosts")
 		}
@@ -173,7 +173,7 @@ func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, ku
 			continue
 		}
 		// attempting to clean services/files on the host
-		if err := reconcileHost(ctx, etcdHost, false, true, currentCluster.SystemImages[AplineImage], currentCluster.DockerDialerFactory); err != nil {
+		if err := reconcileHost(ctx, etcdHost, false, true, currentCluster.SystemImages.Alpine, currentCluster.DockerDialerFactory); err != nil {
 			log.Warnf(ctx, "[reconcile] Couldn't clean up etcd node [%s]: %v", etcdHost.Address, err)
 			continue
 		}
@@ -199,7 +199,7 @@ func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, ku
 	currentCluster.Certificates = crtMap
 	for _, etcdHost := range etcdToAdd {
 		// deploy certificates on new etcd host
-		if err := pki.DeployCertificatesOnHost(ctx, kubeCluster.EtcdHosts, etcdHost, currentCluster.Certificates, kubeCluster.SystemImages[CertDownloaderImage], pki.CertPathPrefix); err != nil {
+		if err := pki.DeployCertificatesOnHost(ctx, kubeCluster.EtcdHosts, etcdHost, currentCluster.Certificates, kubeCluster.SystemImages.CertDownloader, pki.CertPathPrefix); err != nil {
 			return err
 		}
 

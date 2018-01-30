@@ -197,6 +197,22 @@ func (c *Cluster) Update(ctx context.Context) error {
 	return c.postCheck(ctx)
 }
 
+func (c *Cluster) GetVersion(ctx context.Context) (*types.KubernetesVersion, error) {
+	return c.Driver.GetVersion(ctx, toInfo(c))
+}
+
+func (c *Cluster) SetVersion(ctx context.Context, version *types.KubernetesVersion) error {
+	return c.Driver.SetVersion(ctx, toInfo(c), version)
+}
+
+func (c *Cluster) GetClusterSize(ctx context.Context) (*types.NodeCount, error) {
+	return c.Driver.GetClusterSize(ctx, toInfo(c))
+}
+
+func (c *Cluster) SetClusterSize(ctx context.Context, count *types.NodeCount) error {
+	return c.Driver.SetClusterSize(ctx, toInfo(c), count)
+}
+
 func transformClusterInfo(c *Cluster, clusterInfo *types.ClusterInfo) {
 	c.ClientCertificate = clusterInfo.ClientCertificate
 	c.ClientKey = clusterInfo.ClientKey
@@ -237,6 +253,10 @@ func (c *Cluster) Remove(ctx context.Context) error {
 	}
 
 	return c.Driver.Remove(ctx, toInfo(c))
+}
+
+func (c *Cluster) GetCapabilities(ctx context.Context) (*types.Capabilities, error) {
+	return c.Driver.GetCapabilities(ctx)
 }
 
 func (c *Cluster) getState() (string, error) {

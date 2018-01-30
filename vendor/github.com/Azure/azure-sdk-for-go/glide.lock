@@ -1,21 +1,29 @@
-hash: fc11c273a4bfae9a077f2238a4693fa3af3d815dfc1b1e9ec75d9eb8e6428993
-updated: 2017-05-04T15:24:51.52099-07:00
+hash: 89ce55e6c7f1b051fb8b671957c141129046cf31f44d15d049edd022c6aa51fb
+updated: 2017-12-12T12:57:00.4343955-08:00
 imports:
 - name: github.com/Azure/go-autorest
-  version: 58f6f26e200fa5dfb40c9cd1c83f3e2c860d779d
+  version: 40e67ab508b948cd6ab4b4108ea42f3793ca19e3
   subpackages:
   - autorest
+  - autorest/adal
   - autorest/azure
   - autorest/date
   - autorest/to
   - autorest/validation
-  - autorest/adal
 - name: github.com/dgrijalva/jwt-go
-  version: 2268707a8f0843315e2004ee4f1d021dc08baedf
+  version: a539ee1a749a2b895533f979515ac7e6e0f5b650
 - name: github.com/howeyc/gopass
   version: bf9dde6d0d2c004a008c27aaee91170c786f6db8
+- name: github.com/marstr/collection
+  version: e631537cb8c24c0ae72749bbf505cff6e692b6aa
+- name: github.com/marstr/goalias
+  version: 3026ca7e18e829805b990b41e4ce28c92cb80caa
+  subpackages:
+  - model
+- name: github.com/marstr/randname
+  version: 3ef1f47af99e66171417047e6f6fa334345e95e7
 - name: github.com/mattn/go-colorable
-  version: ded68f7a9561c023e790de24279db7ebf473ea80
+  version: 6df6d4d004b64986bbb0d1b25945f42b44787e90
 - name: github.com/mattn/go-isatty
   version: fc9e8d8ef48496124e79ae0df75490096eccf6fe
 - name: github.com/mgutz/ansi
@@ -30,20 +38,23 @@ imports:
   version: 4748e29d5718c2df4028a6543edf86fd8cc0f881
 - name: github.com/nozzle/throttler
   version: d9b45f19996c645d38c9266d1f5cf1990e930119
+- name: github.com/satori/go.uuid
+  version: 879c5887cd475cd7864858769793b2ceb0d44feb
 - name: github.com/satori/uuid
   version: 5bf94b69c6b68ee1b541973bb8e1144db23a194b
 - name: github.com/shopspring/decimal
-  version: 3526cd0bdb7f64e1178943b7dee81a0cc3d86a69
+  version: 3c692774ac4c47c7a296ec96e553719dba1a68fc
 - name: golang.org/x/crypto
-  version: 5a033cc77e57eca05bdb50522851d29e03569cbe
+  version: b176d7def5d71bdd214203491f89843ed217f420
   subpackages:
   - pkcs12
   - pkcs12/internal/rc2
   - ssh/terminal
 - name: golang.org/x/sys
-  version: 9ccfe848b9db8435a24c424abbc07a921adf1df5
+  version: 2d3e384235de683634e9080b58f757466840aa48
   subpackages:
   - unix
+  - windows
 - name: gopkg.in/check.v1
   version: 20d25e2804050c1cd24a7eea1e7a6447dd0e74ec
 - name: gopkg.in/godo.v2
@@ -60,4 +71,4 @@ testImports:
   - cassette
   - recorder
 - name: gopkg.in/yaml.v2
-  version: cd8b52f8269e0feb286dfeef29f8fe4d5b397e0b
+  version: eb3733d160e74a9c7e442f435eb3bea458e1d19f

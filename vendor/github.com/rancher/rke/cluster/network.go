@@ -343,7 +343,7 @@ func (c *Cluster) deployListenerOnPlane(ctx context.Context, portList []string, 
 }
 func (c *Cluster) deployListener(ctx context.Context, host *hosts.Host, portList []string, containerName string) error {
 	imageCfg := &container.Config{
-		Image: c.SystemImages[AplineImage],
+		Image: c.SystemImages.Alpine,
 		Cmd: []string{
 			"nc",
 			"-kl",
@@ -412,7 +412,7 @@ func (c *Cluster) runServicePortChecks(ctx context.Context) error {
 		for _, host := range c.EtcdHosts {
 			runHost := host
 			errgrp.Go(func() error {
-				return checkPlaneTCPPortsFromHost(ctx, runHost, etcdPortList, c.EtcdHosts, c.SystemImages[AplineImage])
+				return checkPlaneTCPPortsFromHost(ctx, runHost, etcdPortList, c.EtcdHosts, c.SystemImages.Alpine)
 			})
 		}
 		if err := errgrp.Wait(); err != nil {
@@ -424,7 +424,7 @@ func (c *Cluster) runServicePortChecks(ctx context.Context) error {
 	for _, host := range c.ControlPlaneHosts {
 		runHost := host
 		errgrp.Go(func() error {
-			return checkPlaneTCPPortsFromHost(ctx, runHost, etcdPortList, c.EtcdHosts, c.SystemImages[AplineImage])
+			return checkPlaneTCPPortsFromHost(ctx, runHost, etcdPortList, c.EtcdHosts, c.SystemImages.Alpine)
 		})
 	}
 	if err := errgrp.Wait(); err != nil {
@@ -434,7 +434,7 @@ func (c *Cluster) runServicePortChecks(ctx context.Context) error {
 	for _, host := range c.WorkerHosts {
 		runHost := host
 		errgrp.Go(func() error {
-			return checkPlaneTCPPortsFromHost(ctx, runHost, etcdPortList, c.EtcdHosts, c.SystemImages[AplineImage])
+			return checkPlaneTCPPortsFromHost(ctx, runHost, etcdPortList, c.EtcdHosts, c.SystemImages.Alpine)
 		})
 	}
 	if err := errgrp.Wait(); err != nil {
@@ -448,7 +448,7 @@ func (c *Cluster) runServicePortChecks(ctx context.Context) error {
 	for _, host := range c.ControlPlaneHosts {
 		runHost := host
 		errgrp.Go(func() error {
-			return checkPlaneTCPPortsFromHost(ctx, runHost, workerPortList, c.WorkerHosts, c.SystemImages[AplineImage])
+			return checkPlaneTCPPortsFromHost(ctx, runHost, workerPortList, c.WorkerHosts, c.SystemImages.Alpine)
 		})
 	}
 	if err := errgrp.Wait(); err != nil {
@@ -462,7 +462,7 @@ func (c *Cluster) runServicePortChecks(ctx context.Context) error {
 	for _, host := range c.WorkerHosts {
 		runHost := host
 		errgrp.Go(func() error {
-			return checkPlaneTCPPortsFromHost(ctx, runHost, controlPlanePortList, c.ControlPlaneHosts, c.SystemImages[AplineImage])
+			return checkPlaneTCPPortsFromHost(ctx, runHost, controlPlanePortList, c.ControlPlaneHosts, c.SystemImages.Alpine)
 		})
 	}
 	return errgrp.Wait()

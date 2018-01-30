@@ -17,11 +17,11 @@ const (
 	DefaultNetworkPlugin        = "flannel"
 	DefaultNetworkCloudProvider = "none"
 
-	DefaultInfraContainerImage  = "gcr.io/google_containers/pause-amd64:3.0"
-	DefaultAplineImage          = "alpine:latest"
-	DefaultNginxProxyImage      = "rancher/rke-nginx-proxy:v0.1.1"
-	DefaultCertDownloaderImage  = "rancher/rke-cert-deployer:v0.1.1"
-	DefaultServiceSidekickImage = "rancher/rke-service-sidekick:v0.1.0"
+	DefaultInfraContainerImage            = "gcr.io/google_containers/pause-amd64:3.0"
+	DefaultAplineImage                    = "alpine:latest"
+	DefaultNginxProxyImage                = "rancher/rke-nginx-proxy:v0.1.1"
+	DefaultCertDownloaderImage            = "rancher/rke-cert-deployer:v0.1.1"
+	DefaultKubernetesServicesSidecarImage = "rancher/rke-service-sidekick:v0.1.0"
 
 	DefaultEtcdImage = "quay.io/coreos/etcd:latest"
 	DefaultK8sImage  = "rancher/k8s:v1.8.5-rancher4"
@@ -42,7 +42,7 @@ const (
 	DefaultCanalFlannelImage = "quay.io/coreos/flannel:v0.9.1"
 
 	DefaultKubeDNSImage           = "gcr.io/google_containers/k8s-dns-kube-dns-amd64:1.14.5"
-	DefaultDNSMasqImage           = "gcr.io/google_containers/k8s-dns-dnsmasq-nanny-amd64:1.14.5"
+	DefaultDNSmasqImage           = "gcr.io/google_containers/k8s-dns-dnsmasq-nanny-amd64:1.14.5"
 	DefaultKubeDNSSidecarImage    = "gcr.io/google_containers/k8s-dns-sidecar-amd64:1.14.5"
 	DefaultKubeDNSAutoScalerImage = "gcr.io/google_containers/cluster-proportional-autoscaler-amd64:1.0.0"
 )

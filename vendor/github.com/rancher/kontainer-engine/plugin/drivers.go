@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"github.com/rancher/kontainer-engine/drivers/aks"
 	"github.com/rancher/kontainer-engine/drivers/gke"
 	"github.com/rancher/kontainer-engine/drivers/rke"
 	"github.com/rancher/kontainer-engine/types"
@@ -12,6 +13,7 @@ var (
 	BuiltInDrivers = map[string]bool{
 		"gke": true,
 		"rke": true,
+		"aks": true,
 	}
 )
 
@@ -23,6 +25,8 @@ func Run(driverName string, addrChan chan string) (types.Driver, error) {
 		driver = gke.NewDriver()
 	case "rke":
 		driver = rke.NewDriver()
+	case "aks":
+		driver = aks.NewDriver()
 	default:
 		addrChan <- ""
 	}

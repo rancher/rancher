@@ -43,14 +43,6 @@ const (
 	UpdateStateTimeout         = 30
 	GetStateTimeout            = 30
 	KubernetesClientTimeOut    = 30
-	AplineImage                = "alpine"
-	NginxProxyImage            = "nginx_proxy"
-	CertDownloaderImage        = "cert_downloader"
-	KubeDNSImage               = "kubedns_image"
-	DNSMasqImage               = "dnsmasq_image"
-	KubeDNSSidecarImage        = "kubedns_sidecar_image"
-	KubeDNSAutoScalerImage     = "kubedns_autoscaler_image"
-	ServiceSidekickImage       = "service_sidekick_image"
 	NoneAuthorizationMode      = "none"
 	LocalNodeAddress           = "127.0.0.1"
 	LocalNodeHostname          = "localhost"
@@ -66,7 +58,7 @@ func (c *Cluster) DeployControlPlane(ctx context.Context) error {
 	if err := services.RunControlPlane(ctx, c.ControlPlaneHosts,
 		c.EtcdHosts,
 		c.Services,
-		c.SystemImages[ServiceSidekickImage],
+		c.SystemImages.KubernetesServicesSidecar,
 		c.Authorization.Mode,
 		c.LocalConnDialerFactory); err != nil {
 		return fmt.Errorf("[controlPlane] Failed to bring up Control Plane: %v", err)
@@ -84,8 +76,8 @@ func (c *Cluster) DeployWorkerPlane(ctx context.Context) error {
 		c.WorkerHosts,
 		c.EtcdHosts,
 		c.Services,
-		c.SystemImages[NginxProxyImage],
-		c.SystemImages[ServiceSidekickImage],
+		c.SystemImages.NginxProxy,
+		c.SystemImages.KubernetesServicesSidecar,
 		c.LocalConnDialerFactory); err != nil {
 		return fmt.Errorf("[workerPlane] Failed to bring up Worker Plane: %v", err)
 	}
@@ -189,22 +181,19 @@ func (c *Cluster) setClusterServicesDefaults() {
 }
 
 func (c *Cluster) setClusterImageDefaults() {
-	if c.SystemImages == nil {
-		// don't break if the user didn't define rke_images
-		c.SystemImages = make(map[string]string)
-	}
-	systemImagesDefaultsMap := map[string]string{
-		AplineImage:            DefaultAplineImage,
-		NginxProxyImage:        DefaultNginxProxyImage,
-		CertDownloaderImage:    DefaultCertDownloaderImage,
-		KubeDNSImage:           DefaultKubeDNSImage,
-		DNSMasqImage:           DefaultDNSMasqImage,
-		KubeDNSSidecarImage:    DefaultKubeDNSSidecarImage,
-		KubeDNSAutoScalerImage: DefaultKubeDNSAutoScalerImage,
-		ServiceSidekickImage:   DefaultServiceSidekickImage,
+
+	systemImagesDefaultsMap := map[*string]string{
+		&c.SystemImages.Alpine:                    DefaultAplineImage,
+		&c.SystemImages.NginxProxy:                DefaultNginxProxyImage,
+		&c.SystemImages.CertDownloader:            DefaultCertDownloaderImage,
+		&c.SystemImages.KubeDNS:                   DefaultKubeDNSImage,
+		&c.SystemImages.KubeDNSSidecar:            DefaultKubeDNSSidecarImage,
+		&c.SystemImages.DNSmasq:                   DefaultDNSmasqImage,
+		&c.SystemImages.KubeDNSAutoscaler:         DefaultKubeDNSAutoScalerImage,
+		&c.SystemImages.KubernetesServicesSidecar: DefaultKubernetesServicesSidecarImage,
 	}
 	for k, v := range systemImagesDefaultsMap {
-		setDefaultIfEmptyMapValue(c.SystemImages, k, v)
+		setDefaultIfEmpty(k, v)
 	}
 }
 

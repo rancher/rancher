@@ -72,14 +72,14 @@ func (c *Cluster) InvertIndexHosts() error {
 func (c *Cluster) SetUpHosts(ctx context.Context) error {
 	if c.Authentication.Strategy == X509AuthenticationProvider {
 		log.Infof(ctx, "[certificates] Deploying kubernetes certificates to Cluster nodes")
-		if err := pki.DeployCertificatesOnMasters(ctx, c.ControlPlaneHosts, c.Certificates, c.SystemImages[CertDownloaderImage]); err != nil {
+		if err := pki.DeployCertificatesOnMasters(ctx, c.ControlPlaneHosts, c.Certificates, c.SystemImages.CertDownloader); err != nil {
 			return err
 		}
-		if err := pki.DeployCertificatesOnWorkers(ctx, c.WorkerHosts, c.Certificates, c.SystemImages[CertDownloaderImage]); err != nil {
+		if err := pki.DeployCertificatesOnWorkers(ctx, c.WorkerHosts, c.Certificates, c.SystemImages.CertDownloader); err != nil {
 			return err
 		}
 		// Deploying etcd certificates
-		if err := pki.DeployCertificatesOnEtcd(ctx, c.EtcdHosts, c.Certificates, c.SystemImages[CertDownloaderImage]); err != nil {
+		if err := pki.DeployCertificatesOnEtcd(ctx, c.EtcdHosts, c.Certificates, c.SystemImages.CertDownloader); err != nil {
 			return err
 		}
 

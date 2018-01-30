@@ -67,6 +67,30 @@ func (rpc *grpcClient) GetDriverUpdateOptions(ctx context.Context) (*DriverFlags
 	return o, handlErr(err)
 }
 
+func (rpc *grpcClient) GetVersion(ctx context.Context, info *ClusterInfo) (*KubernetesVersion, error) {
+	version, err := rpc.client.GetVersion(ctx, info)
+	return version, handlErr(err)
+}
+
+func (rpc *grpcClient) SetVersion(ctx context.Context, info *ClusterInfo, version *KubernetesVersion) error {
+	_, err := rpc.client.SetVersion(ctx, &SetVersionRequest{Info: info, Version: version})
+	return handlErr(err)
+}
+
+func (rpc *grpcClient) GetClusterSize(ctx context.Context, info *ClusterInfo) (*NodeCount, error) {
+	size, err := rpc.client.GetNodeCount(ctx, info)
+	return size, handlErr(err)
+}
+
+func (rpc *grpcClient) SetClusterSize(ctx context.Context, info *ClusterInfo, count *NodeCount) error {
+	_, err := rpc.client.SetNodeCount(ctx, &SetNodeCountRequest{Info: info, Count: count})
+	return handlErr(err)
+}
+
+func (rpc *grpcClient) GetCapabilities(ctx context.Context) (*Capabilities, error) {
+	return rpc.client.GetCapabilities(ctx, &Empty{})
+}
+
 func handlErr(err error) error {
 	if st, ok := status.FromError(err); ok {
 		if st.Code() == codes.Unknown && st.Message() != "" {
