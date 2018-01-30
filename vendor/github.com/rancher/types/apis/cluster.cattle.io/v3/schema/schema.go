@@ -3,6 +3,7 @@ package schema
 import (
 	"github.com/rancher/norman/types"
 	m "github.com/rancher/norman/types/mapper"
+	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	"github.com/rancher/types/factory"
 	"github.com/rancher/types/mapper"
@@ -56,6 +57,7 @@ func NodeTypes(version *types.APIVersion, schemas *types.Schemas) *types.Schemas
 			}}).
 		AddMapperForType(version, v1.Node{},
 			&m.AnnotationField{Field: "description"},
+			&m.AnnotationField{Field: "publicEndpoints", List: true},
 			&m.Embed{Field: "status"},
 		).
 		MustImport(version, v1.NodeStatus{}, struct {
@@ -63,8 +65,10 @@ func NodeTypes(version *types.APIVersion, schemas *types.Schemas) *types.Schemas
 			Hostname  string
 			Info      NodeInfo
 		}{}).
+		MustImport(version, v3.PublicEndpoint{}).
 		MustImport(version, v1.Node{}, struct {
-			Description string `json:"description"`
+			Description     string `json:"description"`
+			PublicEndpoints string `json:"publicEndpoints" norman:"type=array[publicEndpoint],nocreate,noupdate"`
 		}{})
 }
 

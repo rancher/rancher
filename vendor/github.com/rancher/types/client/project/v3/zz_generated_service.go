@@ -25,6 +25,7 @@ const (
 	ServiceFieldOwnerReferences          = "ownerReferences"
 	ServiceFieldPorts                    = "ports"
 	ServiceFieldProjectID                = "projectId"
+	ServiceFieldPublicEndpoints          = "publicEndpoints"
 	ServiceFieldPublishNotReadyAddresses = "publishNotReadyAddresses"
 	ServiceFieldRemoved                  = "removed"
 	ServiceFieldSelector                 = "selector"
@@ -60,6 +61,7 @@ type Service struct {
 	OwnerReferences          []OwnerReference       `json:"ownerReferences,omitempty"`
 	Ports                    []ServicePort          `json:"ports,omitempty"`
 	ProjectID                string                 `json:"projectId,omitempty"`
+	PublicEndpoints          []PublicEndpoint       `json:"publicEndpoints,omitempty"`
 	PublishNotReadyAddresses *bool                  `json:"publishNotReadyAddresses,omitempty"`
 	Removed                  string                 `json:"removed,omitempty"`
 	Selector                 map[string]string      `json:"selector,omitempty"`

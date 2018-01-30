@@ -141,3 +141,15 @@ type SSHAuth struct {
 	Fingerprint string `json:"certFingerprint" norman:"nocreate,noupdate"`
 }
 type NamespacedSSHAuth SSHAuth
+
+type PublicEndpoint struct {
+	Node     string `json:"node,omitempty" norman:"type=reference[node],nocreate,noupdate"`
+	Address  string `json:"address,omitempty" norman:"nocreate,noupdate"`
+	Port     int32  `json:"port,omitempty" norman:"nocreate,noupdate"`
+	Protocol string `json:"protocol,omitempty" norman:"nocreate,noupdate"`
+	// for node port service
+	Service string `json:"service,omitempty" norman:"type=reference[service],nocreate,noupdate"`
+	// for host port
+	Pod string `json:"pod,omitempty" norman:"type=reference[pod],nocreate,noupdate"`
+	//serviceName and podName are mutually exclusive
+}
