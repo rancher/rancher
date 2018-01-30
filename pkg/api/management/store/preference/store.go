@@ -68,6 +68,9 @@ func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	if err != nil {
 		s.nsClient.Create(&corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					"management.cattle.io/system-namespace": "true",
+				},
 				Name: ns,
 			},
 		})
