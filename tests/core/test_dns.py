@@ -12,6 +12,7 @@ def test_dns_fields(client):
         'targetWorkloadIds': 'cru',
         'workloadId': 'r',
         'targetDnsRecordIds': 'cru',
+        'publicEndpoints': 'r',
     })
 
 
