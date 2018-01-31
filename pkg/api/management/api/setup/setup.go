@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/api/management/api/authn"
 	"github.com/rancher/rancher/pkg/api/management/api/catalog"
+	apicluster "github.com/rancher/rancher/pkg/api/management/api/cluster"
 	"github.com/rancher/rancher/pkg/api/management/api/machine"
 	"github.com/rancher/rancher/pkg/api/management/api/project"
 	"github.com/rancher/rancher/pkg/api/management/api/setting"
@@ -47,6 +48,7 @@ func Schemas(ctx context.Context, management *config.ManagementContext, schemas 
 	SecretTypes(schemas, management)
 	Stack(schemas, management)
 	Setting(schemas)
+	ClusterTypes(schemas)
 
 	secretStore, err := machineconfig.NewStore(management)
 	if err != nil {
@@ -225,4 +227,9 @@ func Stack(schemas *types.Schemas, management *config.ManagementContext) {
 func Setting(schemas *types.Schemas) {
 	schema := schemas.Schema(&managementschema.Version, client.SettingType)
 	schema.Formatter = setting.Formatter
+}
+
+func ClusterTypes(schemas *types.Schemas) {
+	schema := schemas.Schema(&managementschema.Version, client.ClusterType)
+	schema.Validator = apicluster.Validator
 }
