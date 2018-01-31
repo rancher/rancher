@@ -419,6 +419,26 @@ func addRoles(management *config.ManagementContext, local bool) error {
 		})
 	}
 
+	if err := addAuthConfig("github", "githubConfig", management); err != nil {
+		return err
+	}
+
+	return addAuthConfig("local", "localConfig", management)
+}
+
+func addAuthConfig(name, aType string, management *config.ManagementContext) error {
+	_, err := management.Management.AuthConfigs("").ObjectClient().Create(&v3.GithubConfig{
+		ObjectMeta: v1.ObjectMeta{
+			Name: name,
+		},
+		AuthConfig: v3.AuthConfig{
+			Type: aType,
+		},
+	})
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+
 	return nil
 }
 
