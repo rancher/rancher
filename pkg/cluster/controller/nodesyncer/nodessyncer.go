@@ -16,7 +16,8 @@ import (
 )
 
 const (
-	allMachineKey = "_machine_all_"
+	allMachineKey  = "_machine_all_"
+	annotationName = "management.cattle.io/nodesyncer"
 )
 
 type NodeSyncer struct {
@@ -133,10 +134,14 @@ func (m *MachinesSyncer) reconcileMachineForNode(machine *v3.Machine, node *core
 }
 
 func (m *MachinesSyncer) removeMachine(machine *v3.Machine) error {
-	// never delete RKE node
-	if machine.Spec.MachineTemplateName != "" {
+	if machine.Annotations == nil {
 		return nil
 	}
+
+	if _, ok := machine.Annotations[annotationName]; !ok {
+		return nil
+	}
+
 	err := m.machines.Delete(machine.ObjectMeta.Name, nil)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to delete machine [%s]", machine.Name)
@@ -175,6 +180,11 @@ func (m *MachinesSyncer) createMachine(node *corev1.Node, pods map[string][]*cor
 	machine, err := m.convertNodeToMachine(node, existing, pods)
 	if err != nil {
 		return err
+	}
+
+	if machine.Annotations == nil {
+		machine.Annotations = make(map[string]string)
+		machine.Annotations[annotationName] = "true"
 	}
 
 	_, err = m.machines.Create(machine)
