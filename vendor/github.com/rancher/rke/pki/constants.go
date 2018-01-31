@@ -21,5 +21,5 @@ const (
 
 	KubeAdminCertName         = "kube-admin"
 	KubeAdminOrganizationName = "system:masters"
-	KubeAdminConfigPrefix     = ".kube_config_"
+	KubeAdminConfigPrefix     = "kube_config_"
 )

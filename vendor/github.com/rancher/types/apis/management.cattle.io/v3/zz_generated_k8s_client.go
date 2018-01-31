@@ -33,8 +33,11 @@ type Interface interface {
 	GroupsGetter
 	GroupMembersGetter
 	PrincipalsGetter
-	TokensGetter
 	UsersGetter
+	AuthConfigsGetter
+	GithubConfigsGetter
+	LocalConfigsGetter
+	TokensGetter
 	DynamicSchemasGetter
 	StacksGetter
 	PreferencesGetter
@@ -68,8 +71,11 @@ type Client struct {
 	groupControllers                      map[string]GroupController
 	groupMemberControllers                map[string]GroupMemberController
 	principalControllers                  map[string]PrincipalController
-	tokenControllers                      map[string]TokenController
 	userControllers                       map[string]UserController
+	authConfigControllers                 map[string]AuthConfigController
+	githubConfigControllers               map[string]GithubConfigController
+	localConfigControllers                map[string]LocalConfigController
+	tokenControllers                      map[string]TokenController
 	dynamicSchemaControllers              map[string]DynamicSchemaController
 	stackControllers                      map[string]StackController
 	preferenceControllers                 map[string]PreferenceController
@@ -112,8 +118,11 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		groupControllers:                      map[string]GroupController{},
 		groupMemberControllers:                map[string]GroupMemberController{},
 		principalControllers:                  map[string]PrincipalController{},
-		tokenControllers:                      map[string]TokenController{},
 		userControllers:                       map[string]UserController{},
+		authConfigControllers:                 map[string]AuthConfigController{},
+		githubConfigControllers:               map[string]GithubConfigController{},
+		localConfigControllers:                map[string]LocalConfigController{},
+		tokenControllers:                      map[string]TokenController{},
 		dynamicSchemaControllers:              map[string]DynamicSchemaController{},
 		stackControllers:                      map[string]StackController{},
 		preferenceControllers:                 map[string]PreferenceController{},
@@ -383,19 +392,6 @@ func (c *Client) Principals(namespace string) PrincipalInterface {
 	}
 }
 
-type TokensGetter interface {
-	Tokens(namespace string) TokenInterface
-}
-
-func (c *Client) Tokens(namespace string) TokenInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &TokenResource, TokenGroupVersionKind, tokenFactory{})
-	return &tokenClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
 type UsersGetter interface {
 	Users(namespace string) UserInterface
 }
@@ -403,6 +399,58 @@ type UsersGetter interface {
 func (c *Client) Users(namespace string) UserInterface {
 	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &UserResource, UserGroupVersionKind, userFactory{})
 	return &userClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type AuthConfigsGetter interface {
+	AuthConfigs(namespace string) AuthConfigInterface
+}
+
+func (c *Client) AuthConfigs(namespace string) AuthConfigInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &AuthConfigResource, AuthConfigGroupVersionKind, authConfigFactory{})
+	return &authConfigClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type GithubConfigsGetter interface {
+	GithubConfigs(namespace string) GithubConfigInterface
+}
+
+func (c *Client) GithubConfigs(namespace string) GithubConfigInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &GithubConfigResource, GithubConfigGroupVersionKind, githubConfigFactory{})
+	return &githubConfigClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type LocalConfigsGetter interface {
+	LocalConfigs(namespace string) LocalConfigInterface
+}
+
+func (c *Client) LocalConfigs(namespace string) LocalConfigInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &LocalConfigResource, LocalConfigGroupVersionKind, localConfigFactory{})
+	return &localConfigClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type TokensGetter interface {
+	Tokens(namespace string) TokenInterface
+}
+
+func (c *Client) Tokens(namespace string) TokenInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &TokenResource, TokenGroupVersionKind, tokenFactory{})
+	return &tokenClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,
