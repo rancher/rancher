@@ -23,14 +23,14 @@ func NewTokenAPIHandler(ctx context.Context, mgmtCtx *config.ManagementContext) 
 		return nil, err
 	}
 
-	handler, err := new(ctx, mgmtCtx)
+	handler, err := newHandler(ctx, mgmtCtx)
 	if err != nil {
 		return nil, err
 	}
 	return handler, nil
 }
 
-func new(ctx context.Context, mgmtCtx *config.ManagementContext) (http.Handler, error) {
+func newHandler(ctx context.Context, mgmtCtx *config.ManagementContext) (http.Handler, error) {
 	schemas := types.NewSchemas().AddSchemas(managementSchema.Schemas)
 
 	if err := setup.Schemas(ctx, mgmtCtx, schemas); err != nil {
