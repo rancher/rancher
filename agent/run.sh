@@ -67,7 +67,7 @@ check_and_add_conf()
 
 print_url()
 {
-    local url=$(echo "$1"| sed -e 's!/v1/scripts.*!/v1!')
+    local url=$(echo "$1"| sed -e 's!/v1.*/scripts.*!/v1!')
     echo $url
 }
 
