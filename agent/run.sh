@@ -303,7 +303,7 @@ run()
     mount --rbind /host/dev /dev
     while true; do
         run_bootstrap "$@" || true
-        sleep 5
+	 sleep 60
     done
 }
 
