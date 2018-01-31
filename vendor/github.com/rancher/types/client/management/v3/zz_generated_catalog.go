@@ -8,10 +8,10 @@ const (
 	CatalogType                      = "catalog"
 	CatalogFieldAnnotations          = "annotations"
 	CatalogFieldBranch               = "branch"
-	CatalogFieldCatalogKind          = "catalogKind"
 	CatalogFieldCreated              = "created"
 	CatalogFieldCreatorID            = "creatorId"
 	CatalogFieldDescription          = "description"
+	CatalogFieldKind                 = "kind"
 	CatalogFieldLabels               = "labels"
 	CatalogFieldName                 = "name"
 	CatalogFieldOwnerReferences      = "ownerReferences"
@@ -28,10 +28,10 @@ type Catalog struct {
 	types.Resource
 	Annotations          map[string]string `json:"annotations,omitempty"`
 	Branch               string            `json:"branch,omitempty"`
-	CatalogKind          string            `json:"catalogKind,omitempty"`
 	Created              string            `json:"created,omitempty"`
 	CreatorID            string            `json:"creatorId,omitempty"`
 	Description          string            `json:"description,omitempty"`
+	Kind                 string            `json:"kind,omitempty"`
 	Labels               map[string]string `json:"labels,omitempty"`
 	Name                 string            `json:"name,omitempty"`
 	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty"`

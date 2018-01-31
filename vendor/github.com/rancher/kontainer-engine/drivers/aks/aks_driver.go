@@ -15,6 +15,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/Azure/go-autorest/autorest/utils"
 	"github.com/rancher/kontainer-engine/types"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
@@ -24,40 +25,13 @@ type Driver struct {
 }
 
 type state struct {
-	// Subscription credentials which uniquely identify Microsoft Azure subscription. The subscription ID forms part of the URI for every service call.
-	SubscriptionID string
-	// The name of the resource group.
-	ResourceGroup string
-	// The name of the managed cluster resource.
-	Name string
-	// Resource location
-	Location string
-	// Resource tags
-	Tag map[string]string
-	// Number of agents (VMs) to host docker containers. Allowed values must be in the range of 1 to 100 (inclusive). The default value is 1.
-	Count int64
-	// DNS prefix to be used to create the FQDN for the agent pool.
-	AgentDNSPrefix string
-	// FDQN for the agent pool
-	AgentPoolName string
-	// OS Disk Size in GB to be used to specify the disk size for every machine in this master/agent pool. If you specify 0, it will apply the default osDisk size according to the vmSize specified.
-	OsDiskSizeGB int64
-	// Size of agent VMs
-	AgentVMSize string
-	// Version of Kubernetes specified when creating the managed cluster
-	KubernetesVersion string
 	// Path to the public key to use for SSH into cluster
-	SSHPublicKeyPath string
-	// Kubernetes Master DNS prefix (must be unique within Azure)
-	MasterDNSPrefix string
-	// Kubernetes admin username
-	AdminUsername string
-	// Different Base URL if required, usually needed for testing purposes
-	BaseURL string
-	// Azure Client ID to use
-	ClientID string
-	// Secret associated with the Client ID
-	ClientSecret string
+	SSHPublicKeyPath string `json:"sshPublicKeyPath,omitempty"`
+
+	v3.AzureKubernetesServiceConfig
+
+	// Cluster Name
+	Name string
 
 	// Cluster info
 	ClusterInfo types.ClusterInfo
@@ -179,21 +153,22 @@ func (d *Driver) GetDriverUpdateOptions(ctx context.Context) (*types.DriverFlags
 func getStateFromOptions(driverOptions *types.DriverOptions) (state, error) {
 	state := state{}
 	state.Name = getValueFromDriverOptions(driverOptions, types.StringType, "name").(string)
-	state.AgentDNSPrefix = getValueFromDriverOptions(driverOptions, types.StringType, "node-dns-prefix").(string)
-	state.AgentVMSize = getValueFromDriverOptions(driverOptions, types.StringType, "node-vm-size").(string)
-	state.Count = getValueFromDriverOptions(driverOptions, types.IntType, "node-count").(int64)
-	state.KubernetesVersion = getValueFromDriverOptions(driverOptions, types.StringType, "kubernetes-version").(string)
+	state.AgentDNSPrefix = getValueFromDriverOptions(driverOptions, types.StringType, "node-dns-prefix", "agentDnsPrefix").(string)
+	state.AgentVMSize = getValueFromDriverOptions(driverOptions, types.StringType, "node-vm-size", "agentVmSize").(string)
+	state.Count = getValueFromDriverOptions(driverOptions, types.IntType, "node-count", "count").(int64)
+	state.KubernetesVersion = getValueFromDriverOptions(driverOptions, types.StringType, "kubernetes-version", "kubernetesVersion").(string)
 	state.Location = getValueFromDriverOptions(driverOptions, types.StringType, "location").(string)
-	state.OsDiskSizeGB = getValueFromDriverOptions(driverOptions, types.IntType, "os-disk-size").(int64)
-	state.SubscriptionID = getValueFromDriverOptions(driverOptions, types.StringType, "subscription-id").(string)
-	state.ResourceGroup = getValueFromDriverOptions(driverOptions, types.StringType, "resource-group").(string)
-	state.AgentPoolName = getValueFromDriverOptions(driverOptions, types.StringType, "node-pool-name").(string)
-	state.MasterDNSPrefix = getValueFromDriverOptions(driverOptions, types.StringType, "master-dns-prefix").(string)
+	state.OsDiskSizeGB = getValueFromDriverOptions(driverOptions, types.IntType, "os-disk-size", "osDiskSizeGb").(int64)
+	state.SubscriptionID = getValueFromDriverOptions(driverOptions, types.StringType, "subscription-id", "subscriptionId").(string)
+	state.ResourceGroup = getValueFromDriverOptions(driverOptions, types.StringType, "resource-group", "resourceGroup").(string)
+	state.AgentPoolName = getValueFromDriverOptions(driverOptions, types.StringType, "node-pool-name", "agentPoolName").(string)
+	state.MasterDNSPrefix = getValueFromDriverOptions(driverOptions, types.StringType, "master-dns-prefix", "masterDnsPrefix").(string)
 	state.SSHPublicKeyPath = getValueFromDriverOptions(driverOptions, types.StringType, "public-key").(string)
-	state.AdminUsername = getValueFromDriverOptions(driverOptions, types.StringType, "admin-username").(string)
+	state.SSHPublicKeyContents = getValueFromDriverOptions(driverOptions, types.StringType, "sshPublicKeyContents").(string)
+	state.AdminUsername = getValueFromDriverOptions(driverOptions, types.StringType, "admin-username", "adminUsername").(string)
 	state.BaseURL = getValueFromDriverOptions(driverOptions, types.StringType, "base-url").(string)
-	state.ClientID = getValueFromDriverOptions(driverOptions, types.StringType, "client-id").(string)
-	state.ClientSecret = getValueFromDriverOptions(driverOptions, types.StringType, "client-secret").(string)
+	state.ClientID = getValueFromDriverOptions(driverOptions, types.StringType, "client-id", "clientId").(string)
+	state.ClientSecret = getValueFromDriverOptions(driverOptions, types.StringType, "client-secret", "clientSecret").(string)
 	tagValues := getValueFromDriverOptions(driverOptions, types.StringSliceType).(*types.StringSlice)
 	for _, part := range tagValues.Value {
 		kv := strings.Split(part, "=")
@@ -247,8 +222,8 @@ func (state *state) validate() error {
 		return fmt.Errorf("resource group is required")
 	}
 
-	if state.SSHPublicKeyPath == "" {
-		return fmt.Errorf("path to ssh public key is required")
+	if state.SSHPublicKeyPath == "" && state.SSHPublicKeyContents == "" {
+		return fmt.Errorf("path to ssh public key or public key contents is required")
 	}
 
 	if state.ClientID == "" {
@@ -291,7 +266,12 @@ func newAzureClient(state state) (*containerservice.ManagedClustersClient, error
 		return nil, err
 	}
 
-	client := containerservice.NewManagedClustersClientWithBaseURI(state.BaseURL, state.SubscriptionID)
+	baseURL := state.BaseURL
+	if baseURL == "" {
+		baseURL = containerservice.DefaultBaseURI
+	}
+
+	client := containerservice.NewManagedClustersClientWithBaseURI(baseURL, state.SubscriptionID)
 	client.Authorizer = authorizer
 
 	return &client, nil
@@ -327,7 +307,13 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions) (*typ
 		agentDNSPrefix = driverState.getDefaultDNSPrefix() + "-agent"
 	}
 
-	publicKey, err := ioutil.ReadFile(driverState.SSHPublicKeyPath)
+	var publicKey []byte
+
+	if driverState.SSHPublicKeyContents == "" {
+		publicKey, err = ioutil.ReadFile(driverState.SSHPublicKeyPath)
+	} else {
+		publicKey = []byte(driverState.SSHPublicKeyContents)
+	}
 
 	if err != nil {
 		return nil, err

@@ -486,10 +486,13 @@ func checkPlaneTCPPortsFromHost(ctx context.Context, host *hosts.Host, portList 
 			"for host in $HOSTS; do for port in $PORTS ; do nc -z $host $port > /dev/null || echo $host $port ; done; done",
 		},
 	}
+	hostCfg := &container.HostConfig{
+		NetworkMode: "host",
+	}
 	if err := docker.DoRemoveContainer(ctx, host.DClient, PortCheckContainer, host.Address); err != nil {
 		return err
 	}
-	if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, nil, PortCheckContainer, host.Address, "network"); err != nil {
+	if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, PortCheckContainer, host.Address, "network"); err != nil {
 		return err
 	}
 	if err := docker.WaitForContainer(ctx, host.DClient, PortCheckContainer); err != nil {
@@ -509,7 +512,7 @@ func checkPlaneTCPPortsFromHost(ctx context.Context, host *hosts.Host, portList 
 	}
 	if len(portCheckLogs) > 0 {
 
-		return fmt.Errorf("[netwok] Port check for ports: [%s] failed on host: [%s]", strings.Join(portCheckLogs, ", "), host.Address)
+		return fmt.Errorf("[network] Port check for ports: [%s] failed on host: [%s]", strings.Join(portCheckLogs, ", "), host.Address)
 
 	}
 	return nil

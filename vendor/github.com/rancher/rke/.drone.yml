@@ -34,6 +34,8 @@ pipeline:
     files:
      - bin/*
      - build/bin/rke_*
+    checksum:
+     - sha256
     secrets: [github_token]
     when:
       branch: master

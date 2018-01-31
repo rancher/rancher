@@ -64,7 +64,15 @@ func (c controllerConfigGetter) GetConfig() (types.DriverOptions, error) {
 			return driverOptions, err
 		}
 		driverOptions.StringOptions["rkeConfig"] = string(config)
+	case "aks":
+		config, err := toMap(c.clusterSpec.AzureKubernetesServiceConfig, "json")
+		if err != nil {
+			return driverOptions, err
+		}
+		data = config
+		flatten(data, &driverOptions)
 	}
+
 	driverOptions.StringOptions["name"] = c.clusterName
 
 	return driverOptions, nil

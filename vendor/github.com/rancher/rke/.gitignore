@@ -3,4 +3,4 @@
 /dist
 *.swp
 /.trash-cache
-admin.config
+kube_config*

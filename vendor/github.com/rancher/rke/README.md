@@ -17,6 +17,7 @@ usermod -aG docker <user_name>
 ```
 
 - Ports 6443, 2379, and 2380 should be opened between cluster nodes.
+- Swap disabled on worker nodes.
 
 ## Getting Started
 
@@ -180,7 +181,7 @@ And then run:
 rke up --config cluster.yml
 ```
 
-RKE will first look for the local `.kube_config_cluster.yml` and then tries to upgrade each service to the latest image.
+RKE will first look for the local `kube_config_cluster.yml` and then tries to upgrade each service to the latest image.
 
 > Note that rollback isn't supported in RKE and may lead to unxpected results
 
