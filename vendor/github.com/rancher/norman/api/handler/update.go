@@ -6,7 +6,7 @@ import (
 	"github.com/rancher/norman/types"
 )
 
-func UpdateHandler(apiContext *types.APIContext) error {
+func UpdateHandler(apiContext *types.APIContext, next types.RequestHandler) error {
 	data, err := ParseAndValidateBody(apiContext, false)
 	if err != nil {
 		return err

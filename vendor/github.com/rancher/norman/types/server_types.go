@@ -47,7 +47,7 @@ func (r *RawResource) MarshalJSON() ([]byte, error) {
 
 type ActionHandler func(actionName string, action *Action, request *APIContext) error
 
-type RequestHandler func(request *APIContext) error
+type RequestHandler func(request *APIContext, next RequestHandler) error
 
 type QueryFilter func(opts *QueryOptions, data []map[string]interface{}) []map[string]interface{}
 
@@ -87,6 +87,7 @@ type APIContext struct {
 	Schema                      *Schema
 	Schemas                     *Schemas
 	Version                     *APIVersion
+	SchemasVersion              *APIVersion
 	Query                       url.Values
 	ResponseFormat              string
 	ReferenceValidator          ReferenceValidator

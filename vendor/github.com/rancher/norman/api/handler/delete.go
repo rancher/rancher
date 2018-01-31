@@ -6,7 +6,7 @@ import (
 	"github.com/rancher/norman/types"
 )
 
-func DeleteHandler(request *types.APIContext) error {
+func DeleteHandler(request *types.APIContext, next types.RequestHandler) error {
 	store := request.Schema.Store
 	if store == nil {
 		request.WriteResponse(http.StatusNoContent, nil)

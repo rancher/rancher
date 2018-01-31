@@ -16,7 +16,12 @@ func addSchemasHeader(apiContext *types.APIContext) error {
 		return nil
 	}
 
-	apiContext.Response.Header().Set("X-Api-Schemas", apiContext.URLBuilder.Collection(schema, apiContext.Version))
+	version := apiContext.SchemasVersion
+	if version == nil {
+		version = apiContext.Version
+	}
+
+	apiContext.Response.Header().Set("X-Api-Schemas", apiContext.URLBuilder.Collection(schema, version))
 	return nil
 }
 

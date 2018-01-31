@@ -25,7 +25,7 @@ type Subscribe struct {
 	ProjectID     string `norman:"type=reference[project]"`
 }
 
-func Handler(apiContext *types.APIContext) error {
+func Handler(apiContext *types.APIContext, _ types.RequestHandler) error {
 	err := handler(apiContext)
 	if err != nil {
 		logrus.Errorf("Error during subscribe %v", err)

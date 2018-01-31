@@ -61,7 +61,7 @@ func NewAPIServer() *Server {
 			DeleteHandler: handler.DeleteHandler,
 			UpdateHandler: handler.UpdateHandler,
 			ListHandler:   handler.ListHandler,
-			LinkHandler: func(*types.APIContext) error {
+			LinkHandler: func(*types.APIContext, types.RequestHandler) error {
 				return httperror.NewAPIError(httperror.NotFound, "Link not found")
 			},
 			ErrorHandler: httperror.ErrorHandler,
@@ -182,6 +182,7 @@ func (s *Server) handle(rw http.ResponseWriter, req *http.Request) (*types.APICo
 
 	if action == nil && apiRequest.Type != "" {
 		var handler types.RequestHandler
+		var nextHandler types.RequestHandler
 		if apiRequest.Link == "" {
 			switch apiRequest.Method {
 			case http.MethodGet:
@@ -189,31 +190,36 @@ func (s *Server) handle(rw http.ResponseWriter, req *http.Request) (*types.APICo
 					return apiRequest, httperror.NewAPIError(httperror.PermissionDenied, "Can not list "+apiRequest.Schema.Type)
 				}
 				handler = apiRequest.Schema.ListHandler
+				nextHandler = s.Defaults.ListHandler
 			case http.MethodPost:
 				if !apiRequest.AccessControl.CanCreate(apiRequest, apiRequest.Schema) {
 					return apiRequest, httperror.NewAPIError(httperror.PermissionDenied, "Can not create "+apiRequest.Schema.Type)
 				}
 				handler = apiRequest.Schema.CreateHandler
+				nextHandler = s.Defaults.CreateHandler
 			case http.MethodPut:
 				if !apiRequest.AccessControl.CanUpdate(apiRequest, nil, apiRequest.Schema) {
 					return apiRequest, httperror.NewAPIError(httperror.PermissionDenied, "Can not update "+apiRequest.Schema.Type)
 				}
 				handler = apiRequest.Schema.UpdateHandler
+				nextHandler = s.Defaults.UpdateHandler
 			case http.MethodDelete:
 				if !apiRequest.AccessControl.CanDelete(apiRequest, nil, apiRequest.Schema) {
 					return apiRequest, httperror.NewAPIError(httperror.PermissionDenied, "Can not delete "+apiRequest.Schema.Type)
 				}
 				handler = apiRequest.Schema.DeleteHandler
+				nextHandler = s.Defaults.DeleteHandler
 			}
 		} else {
 			handler = apiRequest.Schema.ListHandler
+			nextHandler = s.Defaults.ListHandler
 		}
 
 		if handler == nil {
 			return apiRequest, httperror.NewAPIError(httperror.NotFound, "")
 		}
 
-		return apiRequest, handler(apiRequest)
+		return apiRequest, handler(apiRequest, nextHandler)
 	} else if action != nil {
 		return apiRequest, handleAction(action, apiRequest)
 	}
