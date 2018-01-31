@@ -7,7 +7,7 @@ import (
 	"github.com/rancher/norman/types"
 )
 
-func ListHandler(request *types.APIContext) error {
+func ListHandler(request *types.APIContext, next types.RequestHandler) error {
 	var (
 		err  error
 		data interface{}
@@ -24,7 +24,7 @@ func ListHandler(request *types.APIContext) error {
 	} else if request.Link == "" {
 		data, err = store.ByID(request, request.Schema, request.ID)
 	} else {
-		return request.Schema.LinkHandler(request)
+		return request.Schema.LinkHandler(request, nil)
 	}
 
 	if err != nil {
