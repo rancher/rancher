@@ -33,11 +33,16 @@ var (
 		Init(stackTypes).
 		Init(userTypes).
 		Init(logTypes).
-		Init(globalTypes)
+		Init(globalTypes).
+		Init(rkeTypes)
 
 	TokenSchema = factory.Schemas(&Version).
 			Init(tokens)
 )
+
+func rkeTypes(schemas *types.Schemas) *types.Schemas {
+	return schemas.AddMapperForType(&Version, v3.BaseService{}, m.Drop{Field: "image"})
+}
 
 func schemaTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
