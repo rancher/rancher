@@ -25,6 +25,12 @@ type CatalogSpec struct {
 type CatalogStatus struct {
 	LastRefreshTimestamp string `json:"lastRefreshTimestamp,omitempty"`
 	Commit               string `json:"commit,omitempty"`
+	// helmVersionCommits records hash of each helm template version
+	HelmVersionCommits map[string]VersionCommits `json:"helmVersionCommits,omitempty"`
+}
+
+type VersionCommits struct {
+	Value map[string]string `json:"Value,omitempty"`
 }
 
 type Template struct {

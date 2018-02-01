@@ -5,16 +5,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type Stack struct {
+type App struct {
 	types.Namespaced
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   StackSpec   `json:"spec,omitempty"`
-	Status StackStatus `json:"status,omitempty"`
+	Spec   AppSpec   `json:"spec,omitempty"`
+	Status AppStatus `json:"status,omitempty"`
 }
 
-type StackSpec struct {
+type AppSpec struct {
 	ProjectName      string            `json:"projectName,omitempty" norman:"type=reference[project]"`
 	Description      string            `json:"description,omitempty"`
 	InstallNamespace string            `json:"installNamespace,omitempty"`
@@ -27,7 +27,7 @@ type StackSpec struct {
 	Groups           []string          `json:"groups,omitempty"`
 }
 
-type StackStatus struct {
+type AppStatus struct {
 	Releases []ReleaseInfo `json:"releases,omitempty"`
 }
 

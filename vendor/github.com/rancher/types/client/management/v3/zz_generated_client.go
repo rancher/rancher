@@ -31,7 +31,7 @@ type Client struct {
 	AuthConfig                 AuthConfigOperations
 	Token                      TokenOperations
 	DynamicSchema              DynamicSchemaOperations
-	Stack                      StackOperations
+	App                        AppOperations
 	Preference                 PreferenceOperations
 	ClusterLogging             ClusterLoggingOperations
 	ProjectLogging             ProjectLoggingOperations
@@ -73,7 +73,7 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.AuthConfig = newAuthConfigClient(client)
 	client.Token = newTokenClient(client)
 	client.DynamicSchema = newDynamicSchemaClient(client)
-	client.Stack = newStackClient(client)
+	client.App = newAppClient(client)
 	client.Preference = newPreferenceClient(client)
 	client.ClusterLogging = newClusterLoggingClient(client)
 	client.ProjectLogging = newProjectLoggingClient(client)
