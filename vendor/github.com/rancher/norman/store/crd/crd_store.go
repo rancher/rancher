@@ -2,6 +2,7 @@ package crd
 
 import (
 	"context"
+	"strings"
 
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/types"
@@ -49,6 +50,10 @@ func NewCRDStoreFromClients(apiExtClientSet apiextclientset.Interface, k8sClient
 }
 
 func key(schema *types.Schema) string {
+	if !strings.EqualFold(schema.BaseType, schema.ID) {
+		return schema.Version.Path + "/" + schema.BaseType
+	}
+
 	return schema.Version.Path + "/" + schema.ID
 }
 
@@ -105,7 +110,7 @@ func (c *Store) AddSchemas(ctx context.Context, schemas ...*types.Schema) error 
 	var allSchemas []*types.Schema
 
 	for _, schema := range schemas {
-		if schema.Store != nil || !schema.CanList(nil) {
+		if schema.Store != nil || !schema.CanList(nil) || !strings.EqualFold(schema.BaseType, schema.ID) {
 			continue
 		}
 

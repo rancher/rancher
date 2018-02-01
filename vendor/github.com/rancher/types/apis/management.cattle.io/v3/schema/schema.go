@@ -1,6 +1,8 @@
 package schema
 
 import (
+	"net/http"
+
 	"github.com/rancher/norman/types"
 	m "github.com/rancher/norman/types/mapper"
 	"github.com/rancher/types/apis/cluster.cattle.io/v3/schema"
@@ -176,7 +178,9 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 				},
 			}
 		}).
-		MustImport(&Version, v3.AuthConfig{}).
+		MustImportAndCustomize(&Version, v3.AuthConfig{}, func(schema *types.Schema) {
+			schema.CollectionMethods = []string{http.MethodGet}
+		}).
 		MustImportAndCustomize(&Version, v3.GithubConfig{}, func(schema *types.Schema) {
 			schema.BaseType = "authConfig"
 			schema.ResourceActions = map[string]types.Action{
@@ -189,11 +193,15 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 					Output: "githubConfig",
 				},
 			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet}
 		}).
 		MustImport(&Version, v3.GithubConfigTestInput{}).
 		MustImport(&Version, v3.GithubConfigApplyInput{}).
 		MustImportAndCustomize(&Version, v3.LocalConfig{}, func(schema *types.Schema) {
 			schema.BaseType = "authConfig"
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet}
 		})
 }
 

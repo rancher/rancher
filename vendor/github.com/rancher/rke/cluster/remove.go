@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 func (c *Cluster) ClusterRemove(ctx context.Context) error {
@@ -25,7 +26,7 @@ func (c *Cluster) ClusterRemove(ctx context.Context) error {
 	}
 
 	// Clean up all hosts
-	if err := cleanUpHosts(ctx, c.ControlPlaneHosts, c.WorkerHosts, c.EtcdHosts, c.SystemImages.Alpine); err != nil {
+	if err := cleanUpHosts(ctx, c.ControlPlaneHosts, c.WorkerHosts, c.EtcdHosts, c.SystemImages.Alpine, c.PrivateRegistriesMap); err != nil {
 		return err
 	}
 
@@ -33,14 +34,14 @@ func (c *Cluster) ClusterRemove(ctx context.Context) error {
 	return nil
 }
 
-func cleanUpHosts(ctx context.Context, cpHosts, workerHosts, etcdHosts []*hosts.Host, cleanerImage string) error {
+func cleanUpHosts(ctx context.Context, cpHosts, workerHosts, etcdHosts []*hosts.Host, cleanerImage string, prsMap map[string]v3.PrivateRegistry) error {
 	allHosts := []*hosts.Host{}
 	allHosts = append(allHosts, cpHosts...)
 	allHosts = append(allHosts, workerHosts...)
 	allHosts = append(allHosts, etcdHosts...)
 
 	for _, host := range allHosts {
-		if err := host.CleanUpAll(ctx, cleanerImage); err != nil {
+		if err := host.CleanUpAll(ctx, cleanerImage, prsMap); err != nil {
 			return err
 		}
 	}

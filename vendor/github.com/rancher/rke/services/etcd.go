@@ -16,13 +16,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func RunEtcdPlane(ctx context.Context, etcdHosts []*hosts.Host, etcdService v3.ETCDService, localConnDialerFactory hosts.DialerFactory) error {
+func RunEtcdPlane(ctx context.Context, etcdHosts []*hosts.Host, etcdService v3.ETCDService, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry) error {
 	log.Infof(ctx, "[%s] Building up Etcd Plane..", ETCDRole)
 	initCluster := getEtcdInitialCluster(etcdHosts)
 	for _, host := range etcdHosts {
+
 		nodeName := pki.GetEtcdCrtName(host.InternalAddress)
 		imageCfg, hostCfg := buildEtcdConfig(host, etcdService, initCluster, nodeName)
-		err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, EtcdContainerName, host.Address, ETCDRole)
+		err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, EtcdContainerName, host.Address, ETCDRole, prsMap)
 		if err != nil {
 			return err
 		}
@@ -163,7 +164,7 @@ func RemoveEtcdMember(ctx context.Context, etcdHost *hosts.Host, etcdHosts []*ho
 	return nil
 }
 
-func ReloadEtcdCluster(ctx context.Context, etcdHosts []*hosts.Host, etcdService v3.ETCDService, localConnDialerFactory hosts.DialerFactory, cert, key []byte) error {
+func ReloadEtcdCluster(ctx context.Context, etcdHosts []*hosts.Host, etcdService v3.ETCDService, localConnDialerFactory hosts.DialerFactory, cert, key []byte, prsMap map[string]v3.PrivateRegistry) error {
 	readyEtcdHosts := []*hosts.Host{}
 	for _, host := range etcdHosts {
 		if !host.ToAddEtcdMember {
@@ -174,7 +175,7 @@ func ReloadEtcdCluster(ctx context.Context, etcdHosts []*hosts.Host, etcdService
 	initCluster := getEtcdInitialCluster(readyEtcdHosts)
 	for _, host := range readyEtcdHosts {
 		imageCfg, hostCfg := buildEtcdConfig(host, etcdService, initCluster, pki.GetEtcdCrtName(host.InternalAddress))
-		if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, EtcdContainerName, host.Address, ETCDRole); err != nil {
+		if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, EtcdContainerName, host.Address, ETCDRole, prsMap); err != nil {
 			return err
 		}
 	}

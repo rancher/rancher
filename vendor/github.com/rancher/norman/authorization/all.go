@@ -14,6 +14,10 @@ func (*AllAccess) CanCreate(apiContext *types.APIContext, schema *types.Schema) 
 	return slice.ContainsString(schema.CollectionMethods, http.MethodPost)
 }
 
+func (*AllAccess) CanGet(apiContext *types.APIContext, schema *types.Schema) bool {
+	return slice.ContainsString(schema.ResourceMethods, http.MethodGet)
+}
+
 func (*AllAccess) CanList(apiContext *types.APIContext, schema *types.Schema) bool {
 	return slice.ContainsString(schema.CollectionMethods, http.MethodGet)
 }

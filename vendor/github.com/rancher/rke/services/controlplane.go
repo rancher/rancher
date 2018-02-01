@@ -8,7 +8,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
-func RunControlPlane(ctx context.Context, controlHosts, etcdHosts []*hosts.Host, controlServices v3.RKEConfigServices, sidekickImage, authorizationMode string, localConnDialerFactory hosts.DialerFactory) error {
+func RunControlPlane(ctx context.Context, controlHosts, etcdHosts []*hosts.Host, controlServices v3.RKEConfigServices, sidekickImage, authorizationMode string, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry) error {
 	log.Infof(ctx, "[%s] Building up Controller Plane..", ControlRole)
 	for _, host := range controlHosts {
 
@@ -18,21 +18,21 @@ func RunControlPlane(ctx context.Context, controlHosts, etcdHosts []*hosts.Host,
 			}
 		}
 		// run sidekick
-		if err := runSidekick(ctx, host, sidekickImage); err != nil {
+		if err := runSidekick(ctx, host, sidekickImage, prsMap); err != nil {
 			return err
 		}
 		// run kubeapi
-		err := runKubeAPI(ctx, host, etcdHosts, controlServices.KubeAPI, authorizationMode, localConnDialerFactory)
+		err := runKubeAPI(ctx, host, etcdHosts, controlServices.KubeAPI, authorizationMode, localConnDialerFactory, prsMap)
 		if err != nil {
 			return err
 		}
 		// run kubecontroller
-		err = runKubeController(ctx, host, controlServices.KubeController, authorizationMode, localConnDialerFactory)
+		err = runKubeController(ctx, host, controlServices.KubeController, authorizationMode, localConnDialerFactory, prsMap)
 		if err != nil {
 			return err
 		}
 		// run scheduler
-		err = runScheduler(ctx, host, controlServices.Scheduler, localConnDialerFactory)
+		err = runScheduler(ctx, host, controlServices.Scheduler, localConnDialerFactory, prsMap)
 		if err != nil {
 			return err
 		}

@@ -35,8 +35,6 @@ type Interface interface {
 	PrincipalsGetter
 	UsersGetter
 	AuthConfigsGetter
-	GithubConfigsGetter
-	LocalConfigsGetter
 	TokensGetter
 	DynamicSchemasGetter
 	StacksGetter
@@ -73,8 +71,6 @@ type Client struct {
 	principalControllers                  map[string]PrincipalController
 	userControllers                       map[string]UserController
 	authConfigControllers                 map[string]AuthConfigController
-	githubConfigControllers               map[string]GithubConfigController
-	localConfigControllers                map[string]LocalConfigController
 	tokenControllers                      map[string]TokenController
 	dynamicSchemaControllers              map[string]DynamicSchemaController
 	stackControllers                      map[string]StackController
@@ -120,8 +116,6 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		principalControllers:                  map[string]PrincipalController{},
 		userControllers:                       map[string]UserController{},
 		authConfigControllers:                 map[string]AuthConfigController{},
-		githubConfigControllers:               map[string]GithubConfigController{},
-		localConfigControllers:                map[string]LocalConfigController{},
 		tokenControllers:                      map[string]TokenController{},
 		dynamicSchemaControllers:              map[string]DynamicSchemaController{},
 		stackControllers:                      map[string]StackController{},
@@ -412,32 +406,6 @@ type AuthConfigsGetter interface {
 func (c *Client) AuthConfigs(namespace string) AuthConfigInterface {
 	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &AuthConfigResource, AuthConfigGroupVersionKind, authConfigFactory{})
 	return &authConfigClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type GithubConfigsGetter interface {
-	GithubConfigs(namespace string) GithubConfigInterface
-}
-
-func (c *Client) GithubConfigs(namespace string) GithubConfigInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &GithubConfigResource, GithubConfigGroupVersionKind, githubConfigFactory{})
-	return &githubConfigClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type LocalConfigsGetter interface {
-	LocalConfigs(namespace string) LocalConfigInterface
-}
-
-func (c *Client) LocalConfigs(namespace string) LocalConfigInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &LocalConfigResource, LocalConfigGroupVersionKind, localConfigFactory{})
-	return &localConfigClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

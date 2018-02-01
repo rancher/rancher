@@ -186,26 +186,32 @@ func (s *Server) handle(rw http.ResponseWriter, req *http.Request) (*types.APICo
 		if apiRequest.Link == "" {
 			switch apiRequest.Method {
 			case http.MethodGet:
-				if !apiRequest.AccessControl.CanList(apiRequest, apiRequest.Schema) {
-					return apiRequest, httperror.NewAPIError(httperror.PermissionDenied, "Can not list "+apiRequest.Schema.Type)
+				if apiRequest.ID == "" {
+					if !apiRequest.AccessControl.CanList(apiRequest, apiRequest.Schema) {
+						return apiRequest, httperror.NewAPIError(httperror.PermissionDenied, "Can not list "+apiRequest.Schema.ID)
+					}
+				} else {
+					if !apiRequest.AccessControl.CanGet(apiRequest, apiRequest.Schema) {
+						return apiRequest, httperror.NewAPIError(httperror.PermissionDenied, "Can not get "+apiRequest.Schema.ID)
+					}
 				}
 				handler = apiRequest.Schema.ListHandler
 				nextHandler = s.Defaults.ListHandler
 			case http.MethodPost:
 				if !apiRequest.AccessControl.CanCreate(apiRequest, apiRequest.Schema) {
-					return apiRequest, httperror.NewAPIError(httperror.PermissionDenied, "Can not create "+apiRequest.Schema.Type)
+					return apiRequest, httperror.NewAPIError(httperror.PermissionDenied, "Can not create "+apiRequest.Schema.ID)
 				}
 				handler = apiRequest.Schema.CreateHandler
 				nextHandler = s.Defaults.CreateHandler
 			case http.MethodPut:
 				if !apiRequest.AccessControl.CanUpdate(apiRequest, nil, apiRequest.Schema) {
-					return apiRequest, httperror.NewAPIError(httperror.PermissionDenied, "Can not update "+apiRequest.Schema.Type)
+					return apiRequest, httperror.NewAPIError(httperror.PermissionDenied, "Can not update "+apiRequest.Schema.ID)
 				}
 				handler = apiRequest.Schema.UpdateHandler
 				nextHandler = s.Defaults.UpdateHandler
 			case http.MethodDelete:
 				if !apiRequest.AccessControl.CanDelete(apiRequest, nil, apiRequest.Schema) {
-					return apiRequest, httperror.NewAPIError(httperror.PermissionDenied, "Can not delete "+apiRequest.Schema.Type)
+					return apiRequest, httperror.NewAPIError(httperror.PermissionDenied, "Can not delete "+apiRequest.Schema.ID)
 				}
 				handler = apiRequest.Schema.DeleteHandler
 				nextHandler = s.Defaults.DeleteHandler

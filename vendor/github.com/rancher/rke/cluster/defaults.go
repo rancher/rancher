@@ -23,7 +23,7 @@ const (
 	DefaultCertDownloaderImage            = "rancher/rke-cert-deployer:v0.1.1"
 	DefaultKubernetesServicesSidecarImage = "rancher/rke-service-sidekick:v0.1.0"
 
-	DefaultEtcdImage = "quay.io/coreos/etcd:latest"
+	DefaultEtcdImage = "quay.io/coreos/etcd:v3.0.17"
 	DefaultK8sImage  = "rancher/k8s:v1.8.5-rancher4"
 
 	DefaultFlannelImage    = "quay.io/coreos/flannel:v0.9.1"
