@@ -78,6 +78,9 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 			From: "type",
 			To:   "eventType",
 		}).
+		AddMapperForType(&Version, v3.ClusterRegistrationToken{},
+			&m.Embed{Field: "status"},
+		).
 		MustImportAndCustomize(&Version, v3.Cluster{}, func(schema *types.Schema) {
 			schema.SubContext = "clusters"
 		}).
@@ -119,7 +122,6 @@ func machineTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
 		AddMapperForType(&Version, v3.MachineSpec{}, &m.Embed{Field: "nodeSpec"}).
 		AddMapperForType(&Version, v3.MachineStatus{},
-			&m.Drop{Field: "token"},
 			&m.Drop{Field: "rkeNode"},
 			&m.Drop{Field: "machineTemplateSpec"},
 			&m.Drop{Field: "machineDriverConfig"},

@@ -23,6 +23,8 @@ type RancherKubernetesEngineConfig struct {
 	Version string `yaml:"kubernetes_version" json:"kubernetesVersion,omitempty"`
 	// List of private registries and their credentials
 	PrivateRegistries []PrivateRegistry `yaml:"private_registries" json:"privateRegistries,omitempty"`
+	// Ingress controller used in the cluster
+	Ingress IngressConfig `yaml:"ingress" json:"ingress,omitempty"`
 }
 
 type PrivateRegistry struct {
@@ -76,6 +78,8 @@ type RKEConfigNode struct {
 	SSHKey string `yaml:"ssh_key" json:"sshKey,omitempty"`
 	// SSH Private Key Path
 	SSHKeyPath string `yaml:"ssh_key_path" json:"sshKeyPath,omitempty"`
+	// Node Labels
+	Labels map[string]string `yaml:"labels" json:"labels,omitempty"`
 }
 
 type RKEConfigServices struct {
@@ -163,4 +167,13 @@ type AuthzConfig struct {
 	Mode string `yaml:"mode" json:"mode,omitempty"`
 	// Authorization mode options
 	Options map[string]string `yaml:"options" json:"options,omitempty"`
+}
+
+type IngressConfig struct {
+	// Ingress controller type used by kubernetes
+	Type string `yaml:"type" json:"type,omitempty"`
+	// Ingress controller options
+	Options map[string]string `yaml:"options" json:"options,omitempty"`
+	// NodeSelector key pair
+	NodeSelector map[string]string `yaml:"node_selector" json:"nodeSelector,omitempty"`
 }
