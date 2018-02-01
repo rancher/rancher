@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+	kerror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -312,6 +313,9 @@ func (m *Lifecycle) saveConfig(config *machineconfig.MachineConfig, machineDir s
 func (m *Lifecycle) isNodeInAppliedSpec(machine *v3.Machine) (bool, error) {
 	cluster, err := m.clusterLister.Get("", machine.Spec.ClusterName)
 	if err != nil {
+		if kerror.IsNotFound(err) {
+			return false, nil
+		}
 		return false, err
 	}
 	if cluster == nil {
