@@ -71,6 +71,7 @@ type ResponseWriter interface {
 type AccessControl interface {
 	CanCreate(apiContext *APIContext, schema *Schema) bool
 	CanList(apiContext *APIContext, schema *Schema) bool
+	CanGet(apiContext *APIContext, schema *Schema) bool
 	CanUpdate(apiContext *APIContext, obj map[string]interface{}, schema *Schema) bool
 	CanDelete(apiContext *APIContext, obj map[string]interface{}, schema *Schema) bool
 

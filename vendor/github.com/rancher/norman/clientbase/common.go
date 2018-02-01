@@ -2,6 +2,8 @@ package clientbase
 
 import (
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -32,6 +34,7 @@ type ClientOpts struct {
 	SecretKey  string
 	Timeout    time.Duration
 	HTTPClient *http.Client
+	CACerts    string
 }
 
 type APIError struct {
@@ -146,6 +149,20 @@ func NewAPIClient(opts *ClientOpts) (APIBaseClient, error) {
 	}
 
 	client.Timeout = opts.Timeout
+
+	if opts.CACerts != "" {
+		roots := x509.NewCertPool()
+		ok := roots.AppendCertsFromPEM([]byte(opts.CACerts))
+		if !ok {
+			return result, err
+		}
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{
+				RootCAs: roots,
+			},
+		}
+		client.Transport = tr
+	}
 
 	req, err := http.NewRequest("GET", opts.URL, nil)
 	if err != nil {

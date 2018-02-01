@@ -28,6 +28,13 @@ func (s *Schema) CanList(context *APIContext) bool {
 	return context.AccessControl.CanList(context, s)
 }
 
+func (s *Schema) CanGet(context *APIContext) bool {
+	if context == nil {
+		return slice.ContainsString(s.ResourceMethods, http.MethodGet)
+	}
+	return context.AccessControl.CanGet(context, s)
+}
+
 func (s *Schema) CanCreate(context *APIContext) bool {
 	if context == nil {
 		return slice.ContainsString(s.CollectionMethods, http.MethodPost)

@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 const (
@@ -60,7 +61,7 @@ func buildSidekickConfig(sidekickImage string) (*container.Config, *container.Ho
 	return imageCfg, hostCfg
 }
 
-func runSidekick(ctx context.Context, host *hosts.Host, sidekickImage string) error {
+func runSidekick(ctx context.Context, host *hosts.Host, sidekickImage string, prsMap map[string]v3.PrivateRegistry) error {
 	isRunning, err := docker.IsContainerRunning(ctx, host.DClient, host.Address, SidekickContainerName, true)
 	if err != nil {
 		return err
@@ -70,7 +71,7 @@ func runSidekick(ctx context.Context, host *hosts.Host, sidekickImage string) er
 		return nil
 	}
 	imageCfg, hostCfg := buildSidekickConfig(sidekickImage)
-	if err := docker.UseLocalOrPull(ctx, host.DClient, host.Address, sidekickImage, SidekickServiceName); err != nil {
+	if err := docker.UseLocalOrPull(ctx, host.DClient, host.Address, sidekickImage, SidekickServiceName, prsMap); err != nil {
 		return err
 	}
 	if _, err := docker.CreateContiner(ctx, host.DClient, host.Address, SidekickContainerName, imageCfg, hostCfg); err != nil {

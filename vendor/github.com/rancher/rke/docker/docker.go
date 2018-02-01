@@ -3,6 +3,8 @@ package docker
 import (
 	"archive/tar"
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -10,24 +12,30 @@ import (
 	"reflect"
 	"regexp"
 
+	ref "github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/rancher/rke/log"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+)
+
+const (
+	DockerRegistryURL = "docker.io"
 )
 
 var K8sDockerVersions = map[string][]string{
 	"1.8": {"1.12.6", "1.13.1", "17.03.2"},
 }
 
-func DoRunContainer(ctx context.Context, dClient *client.Client, imageCfg *container.Config, hostCfg *container.HostConfig, containerName string, hostname string, plane string) error {
+func DoRunContainer(ctx context.Context, dClient *client.Client, imageCfg *container.Config, hostCfg *container.HostConfig, containerName string, hostname string, plane string, prsMap map[string]v3.PrivateRegistry) error {
 	container, err := dClient.ContainerInspect(ctx, containerName)
 	if err != nil {
 		if !client.IsErrNotFound(err) {
 			return err
 		}
-		if err := UseLocalOrPull(ctx, dClient, hostname, imageCfg.Image, plane); err != nil {
+		if err := UseLocalOrPull(ctx, dClient, hostname, imageCfg.Image, plane, prsMap); err != nil {
 			return err
 		}
 		resp, err := dClient.ContainerCreate(ctx, imageCfg, hostCfg, nil, containerName)
@@ -48,7 +56,7 @@ func DoRunContainer(ctx context.Context, dClient *client.Client, imageCfg *conta
 			return err
 		}
 		if isUpgradable {
-			return DoRollingUpdateContainer(ctx, dClient, imageCfg, hostCfg, containerName, hostname, plane)
+			return DoRollingUpdateContainer(ctx, dClient, imageCfg, hostCfg, containerName, hostname, plane, prsMap)
 		}
 		return nil
 	}
@@ -62,7 +70,7 @@ func DoRunContainer(ctx context.Context, dClient *client.Client, imageCfg *conta
 	return nil
 }
 
-func DoRollingUpdateContainer(ctx context.Context, dClient *client.Client, imageCfg *container.Config, hostCfg *container.HostConfig, containerName, hostname, plane string) error {
+func DoRollingUpdateContainer(ctx context.Context, dClient *client.Client, imageCfg *container.Config, hostCfg *container.HostConfig, containerName, hostname, plane string, prsMap map[string]v3.PrivateRegistry) error {
 	logrus.Debugf("[%s] Checking for deployed [%s]", plane, containerName)
 	isRunning, err := IsContainerRunning(ctx, dClient, hostname, containerName, false)
 	if err != nil {
@@ -72,7 +80,7 @@ func DoRollingUpdateContainer(ctx context.Context, dClient *client.Client, image
 		logrus.Debugf("[%s] Container %s is not running on host [%s]", plane, containerName, hostname)
 		return nil
 	}
-	err = UseLocalOrPull(ctx, dClient, hostname, imageCfg.Image, plane)
+	err = UseLocalOrPull(ctx, dClient, hostname, imageCfg.Image, plane, prsMap)
 	if err != nil {
 		return err
 	}
@@ -150,8 +158,32 @@ func localImageExists(ctx context.Context, dClient *client.Client, hostname stri
 	return true, nil
 }
 
-func pullImage(ctx context.Context, dClient *client.Client, hostname string, containerImage string) error {
-	out, err := dClient.ImagePull(ctx, containerImage, types.ImagePullOptions{})
+func pullImage(ctx context.Context, dClient *client.Client, hostname string, containerImage string, prsMap map[string]v3.PrivateRegistry) error {
+
+	pullOptions := types.ImagePullOptions{}
+	containerNamed, err := ref.ParseNormalizedNamed(containerImage)
+	if err != nil {
+		return err
+	}
+
+	regURL := ref.Domain(containerNamed)
+	if pr, ok := prsMap[regURL]; ok {
+		// We do this if we have some docker.io login information
+		if pr.URL == DockerRegistryURL {
+			regAuth, err := getRegistryAuth(pr)
+			if err != nil {
+				return err
+			}
+			pullOptions.RegistryAuth = regAuth
+		} else {
+			// We have a registry, but it's not docker.io
+			// this could be public or private, ImagePull() can handle it
+			// if we provide a PrivilegeFunc
+			pullOptions.PrivilegeFunc = tryRegistryAuth(pr)
+		}
+	}
+
+	out, err := dClient.ImagePull(ctx, containerImage, pullOptions)
 	if err != nil {
 		return fmt.Errorf("Can't pull Docker image [%s] for host [%s]: %v", containerImage, hostname, err)
 	}
@@ -165,7 +197,7 @@ func pullImage(ctx context.Context, dClient *client.Client, hostname string, con
 	return nil
 }
 
-func UseLocalOrPull(ctx context.Context, dClient *client.Client, hostname string, containerImage string, plane string) error {
+func UseLocalOrPull(ctx context.Context, dClient *client.Client, hostname string, containerImage string, plane string, prsMap map[string]v3.PrivateRegistry) error {
 	logrus.Debugf("[%s] Checking image [%s] on host [%s]", plane, containerImage, hostname)
 	imageExists, err := localImageExists(ctx, dClient, hostname, containerImage)
 	if err != nil {
@@ -176,7 +208,7 @@ func UseLocalOrPull(ctx context.Context, dClient *client.Client, hostname string
 		return nil
 	}
 	logrus.Debugf("[%s] Pulling image [%s] on host [%s]", plane, containerImage, hostname)
-	if err := pullImage(ctx, dClient, hostname, containerImage); err != nil {
+	if err := pullImage(ctx, dClient, hostname, containerImage, prsMap); err != nil {
 		return err
 	}
 	log.Infof(ctx, "[%s] Successfully pulled image [%s] on host [%s]", plane, containerImage, hostname)
@@ -261,7 +293,9 @@ func IsContainerUpgradable(ctx context.Context, dClient *client.Client, imageCfg
 	if err != nil {
 		return false, err
 	}
-	if containerInspect.Config.Image != imageCfg.Image || !reflect.DeepEqual(containerInspect.Config.Cmd, imageCfg.Cmd) {
+	if containerInspect.Config.Image != imageCfg.Image ||
+		!reflect.DeepEqual(containerInspect.Config.Cmd, imageCfg.Cmd) ||
+		!reflect.DeepEqual(containerInspect.Config.Env, imageCfg.Env) {
 		logrus.Debugf("[%s] Container [%s] is eligible for updgrade on host [%s]", plane, containerName, hostname)
 		return true, nil
 	}
@@ -301,4 +335,22 @@ func ReadFileFromContainer(ctx context.Context, dClient *client.Client, hostname
 func ReadContainerLogs(ctx context.Context, dClient *client.Client, containerName string) (io.ReadCloser, error) {
 	return dClient.ContainerLogs(ctx, containerName, types.ContainerLogsOptions{ShowStdout: true})
 
+}
+
+func tryRegistryAuth(pr v3.PrivateRegistry) types.RequestPrivilegeFunc {
+	return func() (string, error) {
+		return getRegistryAuth(pr)
+	}
+}
+
+func getRegistryAuth(pr v3.PrivateRegistry) (string, error) {
+	authConfig := types.AuthConfig{
+		Username: pr.User,
+		Password: pr.Password,
+	}
+	encodedJSON, err := json.Marshal(authConfig)
+	if err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(encodedJSON), nil
 }

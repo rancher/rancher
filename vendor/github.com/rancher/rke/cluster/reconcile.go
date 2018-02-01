@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/cert"
@@ -56,7 +57,7 @@ func reconcileWorker(ctx context.Context, currentCluster, kubeCluster *Cluster, 
 			return fmt.Errorf("Failed to delete worker node %s from cluster", toDeleteHost.Address)
 		}
 		// attempting to clean services/files on the host
-		if err := reconcileHost(ctx, toDeleteHost, true, false, currentCluster.SystemImages.Alpine, currentCluster.DockerDialerFactory); err != nil {
+		if err := reconcileHost(ctx, toDeleteHost, true, false, currentCluster.SystemImages.Alpine, currentCluster.DockerDialerFactory, currentCluster.PrivateRegistriesMap); err != nil {
 			log.Warnf(ctx, "[reconcile] Couldn't clean up worker node [%s]: %v", toDeleteHost.Address, err)
 			continue
 		}
@@ -97,7 +98,7 @@ func reconcileControl(ctx context.Context, currentCluster, kubeCluster *Cluster,
 			return fmt.Errorf("Failed to delete controlplane node %s from cluster", toDeleteHost.Address)
 		}
 		// attempting to clean services/files on the host
-		if err := reconcileHost(ctx, toDeleteHost, false, false, currentCluster.SystemImages.Alpine, currentCluster.DockerDialerFactory); err != nil {
+		if err := reconcileHost(ctx, toDeleteHost, false, false, currentCluster.SystemImages.Alpine, currentCluster.DockerDialerFactory, currentCluster.PrivateRegistriesMap); err != nil {
 			log.Warnf(ctx, "[reconcile] Couldn't clean up controlplane node [%s]: %v", toDeleteHost.Address, err)
 			continue
 		}
@@ -105,15 +106,6 @@ func reconcileControl(ctx context.Context, currentCluster, kubeCluster *Cluster,
 	// rebuilding local admin config to enable saving cluster state
 	if err := rebuildLocalAdminConfig(ctx, kubeCluster); err != nil {
 		return err
-	}
-	// Rolling update on change for nginx Proxy
-	cpChanged := hosts.IsHostListChanged(currentCluster.ControlPlaneHosts, kubeCluster.ControlPlaneHosts)
-	if cpChanged {
-		log.Infof(ctx, "[reconcile] Rolling update nginx hosts with new list of control plane hosts")
-		err := services.RollingUpdateNginxProxy(ctx, kubeCluster.ControlPlaneHosts, kubeCluster.WorkerHosts, currentCluster.SystemImages.NginxProxy)
-		if err != nil {
-			return fmt.Errorf("Failed to rolling update Nginx hosts with new control plane hosts")
-		}
 	}
 	// attempt to remove unschedulable taint
 	toAddHosts := hosts.GetToAddHosts(currentCluster.ControlPlaneHosts, kubeCluster.ControlPlaneHosts)
@@ -127,7 +119,7 @@ func reconcileControl(ctx context.Context, currentCluster, kubeCluster *Cluster,
 	return nil
 }
 
-func reconcileHost(ctx context.Context, toDeleteHost *hosts.Host, worker, etcd bool, cleanerImage string, dialerFactory hosts.DialerFactory) error {
+func reconcileHost(ctx context.Context, toDeleteHost *hosts.Host, worker, etcd bool, cleanerImage string, dialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry) error {
 	if err := toDeleteHost.TunnelUp(ctx, dialerFactory); err != nil {
 		return fmt.Errorf("Not able to reach the host: %v", err)
 	}
@@ -135,21 +127,21 @@ func reconcileHost(ctx context.Context, toDeleteHost *hosts.Host, worker, etcd b
 		if err := services.RemoveWorkerPlane(ctx, []*hosts.Host{toDeleteHost}, false); err != nil {
 			return fmt.Errorf("Couldn't remove worker plane: %v", err)
 		}
-		if err := toDeleteHost.CleanUpWorkerHost(ctx, cleanerImage); err != nil {
+		if err := toDeleteHost.CleanUpWorkerHost(ctx, cleanerImage, prsMap); err != nil {
 			return fmt.Errorf("Not able to clean the host: %v", err)
 		}
 	} else if etcd {
 		if err := services.RemoveEtcdPlane(ctx, []*hosts.Host{toDeleteHost}, false); err != nil {
 			return fmt.Errorf("Couldn't remove etcd plane: %v", err)
 		}
-		if err := toDeleteHost.CleanUpEtcdHost(ctx, cleanerImage); err != nil {
+		if err := toDeleteHost.CleanUpEtcdHost(ctx, cleanerImage, prsMap); err != nil {
 			return fmt.Errorf("Not able to clean the host: %v", err)
 		}
 	} else {
 		if err := services.RemoveControlPlane(ctx, []*hosts.Host{toDeleteHost}, false); err != nil {
 			return fmt.Errorf("Couldn't remove control plane: %v", err)
 		}
-		if err := toDeleteHost.CleanUpControlHost(ctx, cleanerImage); err != nil {
+		if err := toDeleteHost.CleanUpControlHost(ctx, cleanerImage, prsMap); err != nil {
 			return fmt.Errorf("Not able to clean the host: %v", err)
 		}
 	}
@@ -173,7 +165,7 @@ func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, ku
 			continue
 		}
 		// attempting to clean services/files on the host
-		if err := reconcileHost(ctx, etcdHost, false, true, currentCluster.SystemImages.Alpine, currentCluster.DockerDialerFactory); err != nil {
+		if err := reconcileHost(ctx, etcdHost, false, true, currentCluster.SystemImages.Alpine, currentCluster.DockerDialerFactory, currentCluster.PrivateRegistriesMap); err != nil {
 			log.Warnf(ctx, "[reconcile] Couldn't clean up etcd node [%s]: %v", etcdHost.Address, err)
 			continue
 		}
@@ -199,7 +191,7 @@ func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, ku
 	currentCluster.Certificates = crtMap
 	for _, etcdHost := range etcdToAdd {
 		// deploy certificates on new etcd host
-		if err := pki.DeployCertificatesOnHost(ctx, kubeCluster.EtcdHosts, etcdHost, currentCluster.Certificates, kubeCluster.SystemImages.CertDownloader, pki.CertPathPrefix); err != nil {
+		if err := pki.DeployCertificatesOnHost(ctx, kubeCluster.EtcdHosts, etcdHost, currentCluster.Certificates, kubeCluster.SystemImages.CertDownloader, pki.CertPathPrefix, kubeCluster.PrivateRegistriesMap); err != nil {
 			return err
 		}
 
@@ -207,7 +199,7 @@ func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, ku
 			return err
 		}
 		etcdHost.ToAddEtcdMember = false
-		if err := services.ReloadEtcdCluster(ctx, kubeCluster.EtcdHosts, kubeCluster.Services.Etcd, currentCluster.LocalConnDialerFactory, clientCert, clientkey); err != nil {
+		if err := services.ReloadEtcdCluster(ctx, kubeCluster.EtcdHosts, kubeCluster.Services.Etcd, currentCluster.LocalConnDialerFactory, clientCert, clientkey, currentCluster.PrivateRegistriesMap); err != nil {
 			return err
 		}
 	}

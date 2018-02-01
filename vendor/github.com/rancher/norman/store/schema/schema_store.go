@@ -74,7 +74,7 @@ func (s *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *ty
 			continue
 		}
 
-		if schema.CanList(apiContext) {
+		if schema.CanList(apiContext) || schema.CanGet(apiContext) {
 			schemas = s.addSchema(apiContext, schema, schemaMap, schemas, included)
 		}
 	}

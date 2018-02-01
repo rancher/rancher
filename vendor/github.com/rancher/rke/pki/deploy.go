@@ -15,11 +15,12 @@ import (
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/util/cert"
 )
 
-func DeployCertificatesOnMasters(ctx context.Context, cpHosts []*hosts.Host, crtMap map[string]CertificatePKI, certDownloaderImage string) error {
+func DeployCertificatesOnMasters(ctx context.Context, cpHosts []*hosts.Host, crtMap map[string]CertificatePKI, certDownloaderImage string, prsMap map[string]v3.PrivateRegistry) error {
 	// list of certificates that should be deployed on the masters
 	crtList := []string{
 		CACertName,
@@ -36,7 +37,7 @@ func DeployCertificatesOnMasters(ctx context.Context, cpHosts []*hosts.Host, crt
 	}
 
 	for i := range cpHosts {
-		err := doRunDeployer(ctx, cpHosts[i], env, certDownloaderImage)
+		err := doRunDeployer(ctx, cpHosts[i], env, certDownloaderImage, prsMap)
 		if err != nil {
 			return err
 		}
@@ -44,7 +45,7 @@ func DeployCertificatesOnMasters(ctx context.Context, cpHosts []*hosts.Host, crt
 	return nil
 }
 
-func DeployCertificatesOnWorkers(ctx context.Context, workerHosts []*hosts.Host, crtMap map[string]CertificatePKI, certDownloaderImage string) error {
+func DeployCertificatesOnWorkers(ctx context.Context, workerHosts []*hosts.Host, crtMap map[string]CertificatePKI, certDownloaderImage string, prsMap map[string]v3.PrivateRegistry) error {
 	// list of certificates that should be deployed on the workers
 	crtList := []string{
 		CACertName,
@@ -58,7 +59,7 @@ func DeployCertificatesOnWorkers(ctx context.Context, workerHosts []*hosts.Host,
 	}
 
 	for i := range workerHosts {
-		err := doRunDeployer(ctx, workerHosts[i], env, certDownloaderImage)
+		err := doRunDeployer(ctx, workerHosts[i], env, certDownloaderImage, prsMap)
 		if err != nil {
 			return err
 		}
@@ -66,7 +67,7 @@ func DeployCertificatesOnWorkers(ctx context.Context, workerHosts []*hosts.Host,
 	return nil
 }
 
-func DeployCertificatesOnEtcd(ctx context.Context, etcdHosts []*hosts.Host, crtMap map[string]CertificatePKI, certDownloaderImage string) error {
+func DeployCertificatesOnEtcd(ctx context.Context, etcdHosts []*hosts.Host, crtMap map[string]CertificatePKI, certDownloaderImage string, prsMap map[string]v3.PrivateRegistry) error {
 	// list of certificates that should be deployed on the etcd
 	crtList := []string{
 		CACertName,
@@ -83,7 +84,7 @@ func DeployCertificatesOnEtcd(ctx context.Context, etcdHosts []*hosts.Host, crtM
 	}
 
 	for i := range etcdHosts {
-		err := doRunDeployer(ctx, etcdHosts[i], env, certDownloaderImage)
+		err := doRunDeployer(ctx, etcdHosts[i], env, certDownloaderImage, prsMap)
 		if err != nil {
 			return err
 		}
@@ -91,7 +92,7 @@ func DeployCertificatesOnEtcd(ctx context.Context, etcdHosts []*hosts.Host, crtM
 	return nil
 }
 
-func doRunDeployer(ctx context.Context, host *hosts.Host, containerEnv []string, certDownloaderImage string) error {
+func doRunDeployer(ctx context.Context, host *hosts.Host, containerEnv []string, certDownloaderImage string, prsMap map[string]v3.PrivateRegistry) error {
 	// remove existing container. Only way it's still here is if previous deployment failed
 	isRunning := false
 	isRunning, err := docker.IsContainerRunning(ctx, host.DClient, host.Address, CrtDownloaderContainer, true)
@@ -103,7 +104,7 @@ func doRunDeployer(ctx context.Context, host *hosts.Host, containerEnv []string,
 			return err
 		}
 	}
-	if err := docker.UseLocalOrPull(ctx, host.DClient, host.Address, certDownloaderImage, CertificatesServiceName); err != nil {
+	if err := docker.UseLocalOrPull(ctx, host.DClient, host.Address, certDownloaderImage, CertificatesServiceName, prsMap); err != nil {
 		return err
 	}
 	imageCfg := &container.Config{
@@ -160,7 +161,7 @@ func RemoveAdminConfig(ctx context.Context, localConfigPath string) {
 	log.Infof(ctx, "Local admin Kubeconfig removed successfully")
 }
 
-func DeployCertificatesOnHost(ctx context.Context, extraHosts []*hosts.Host, host *hosts.Host, crtMap map[string]CertificatePKI, certDownloaderImage, certPath string) error {
+func DeployCertificatesOnHost(ctx context.Context, extraHosts []*hosts.Host, host *hosts.Host, crtMap map[string]CertificatePKI, certDownloaderImage, certPath string, prsMap map[string]v3.PrivateRegistry) error {
 	crtList := []string{
 		CACertName,
 		KubeAPICertName,
@@ -182,10 +183,10 @@ func DeployCertificatesOnHost(ctx context.Context, extraHosts []*hosts.Host, hos
 		// We don't need to edit the cert paths, they are not used in deployment
 		env = append(env, c.ToEnv()...)
 	}
-	return doRunDeployer(ctx, host, env, certDownloaderImage)
+	return doRunDeployer(ctx, host, env, certDownloaderImage, prsMap)
 }
 
-func FetchCertificatesFromHost(ctx context.Context, extraHosts []*hosts.Host, host *hosts.Host, image, localConfigPath string) (map[string]CertificatePKI, error) {
+func FetchCertificatesFromHost(ctx context.Context, extraHosts []*hosts.Host, host *hosts.Host, image, localConfigPath string, prsMap map[string]v3.PrivateRegistry) (map[string]CertificatePKI, error) {
 	// rebuilding the certificates. This should look better after refactoring pki
 	tmpCerts := make(map[string]CertificatePKI)
 
@@ -205,7 +206,7 @@ func FetchCertificatesFromHost(ctx context.Context, extraHosts []*hosts.Host, ho
 
 	for certName, config := range crtList {
 		certificate := CertificatePKI{}
-		crt, err := fetchFileFromHost(ctx, GetCertTempPath(certName), image, host)
+		crt, err := fetchFileFromHost(ctx, GetCertTempPath(certName), image, host, prsMap)
 		if err != nil {
 			if strings.Contains(err.Error(), "no such file or directory") ||
 				strings.Contains(err.Error(), "Could not find the file") {
@@ -213,10 +214,10 @@ func FetchCertificatesFromHost(ctx context.Context, extraHosts []*hosts.Host, ho
 			}
 			return nil, err
 		}
-		key, err := fetchFileFromHost(ctx, GetKeyTempPath(certName), image, host)
+		key, err := fetchFileFromHost(ctx, GetKeyTempPath(certName), image, host, prsMap)
 
 		if config {
-			config, err := fetchFileFromHost(ctx, GetConfigTempPath(certName), image, host)
+			config, err := fetchFileFromHost(ctx, GetConfigTempPath(certName), image, host, prsMap)
 			if err != nil {
 				return nil, err
 			}
@@ -243,7 +244,7 @@ func FetchCertificatesFromHost(ctx context.Context, extraHosts []*hosts.Host, ho
 
 }
 
-func fetchFileFromHost(ctx context.Context, filePath, image string, host *hosts.Host) (string, error) {
+func fetchFileFromHost(ctx context.Context, filePath, image string, host *hosts.Host, prsMap map[string]v3.PrivateRegistry) (string, error) {
 
 	imageCfg := &container.Config{
 		Image: image,
@@ -259,7 +260,7 @@ func fetchFileFromHost(ctx context.Context, filePath, image string, host *hosts.
 		return "", err
 	}
 	if !isRunning {
-		if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, CertFetcherContainer, host.Address, "certificates"); err != nil {
+		if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, CertFetcherContainer, host.Address, "certificates", prsMap); err != nil {
 			return "", err
 		}
 	}

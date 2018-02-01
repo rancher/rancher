@@ -7,7 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	ref "github.com/docker/distribution/reference"
 	"github.com/rancher/rke/authz"
+	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
@@ -35,6 +37,7 @@ type Cluster struct {
 	ClusterDNSServer                 string
 	DockerDialerFactory              hosts.DialerFactory
 	LocalConnDialerFactory           hosts.DialerFactory
+	PrivateRegistriesMap             map[string]v3.PrivateRegistry
 }
 
 const (
@@ -51,7 +54,7 @@ const (
 
 func (c *Cluster) DeployControlPlane(ctx context.Context) error {
 	// Deploy Etcd Plane
-	if err := services.RunEtcdPlane(ctx, c.EtcdHosts, c.Services.Etcd, c.LocalConnDialerFactory); err != nil {
+	if err := services.RunEtcdPlane(ctx, c.EtcdHosts, c.Services.Etcd, c.LocalConnDialerFactory, c.PrivateRegistriesMap); err != nil {
 		return fmt.Errorf("[etcd] Failed to bring up Etcd Plane: %v", err)
 	}
 	// Deploy Control plane
@@ -60,7 +63,8 @@ func (c *Cluster) DeployControlPlane(ctx context.Context) error {
 		c.Services,
 		c.SystemImages.KubernetesServicesSidecar,
 		c.Authorization.Mode,
-		c.LocalConnDialerFactory); err != nil {
+		c.LocalConnDialerFactory,
+		c.PrivateRegistriesMap); err != nil {
 		return fmt.Errorf("[controlPlane] Failed to bring up Control Plane: %v", err)
 	}
 	// Apply Authz configuration after deploying controlplane
@@ -78,7 +82,8 @@ func (c *Cluster) DeployWorkerPlane(ctx context.Context) error {
 		c.Services,
 		c.SystemImages.NginxProxy,
 		c.SystemImages.KubernetesServicesSidecar,
-		c.LocalConnDialerFactory); err != nil {
+		c.LocalConnDialerFactory,
+		c.PrivateRegistriesMap); err != nil {
 		return fmt.Errorf("[workerPlane] Failed to bring up Worker Plane: %v", err)
 	}
 	return nil
@@ -105,6 +110,7 @@ func ParseCluster(
 		ConfigPath:                    clusterFilePath,
 		DockerDialerFactory:           dockerDialerFactory,
 		LocalConnDialerFactory:        localConnDialerFactory,
+		PrivateRegistriesMap:          make(map[string]v3.PrivateRegistry),
 	}
 	// Setting cluster Defaults
 	c.setClusterDefaults(ctx)
@@ -128,6 +134,14 @@ func ParseCluster(
 		c.ConfigPath = DefaultClusterConfig
 	}
 	c.LocalKubeConfigPath = GetLocalKubeConfig(c.ConfigPath, configDir)
+
+	for _, pr := range c.PrivateRegistries {
+		if pr.URL == "" {
+			pr.URL = docker.DockerRegistryURL
+		}
+		c.PrivateRegistriesMap[pr.URL] = pr
+	}
+
 	return c, nil
 }
 
@@ -154,9 +168,24 @@ func (c *Cluster) setClusterDefaults(ctx context.Context) {
 		log.Warnf(ctx, "PodSecurityPolicy can't be enabled with RBAC support disabled")
 		c.Services.KubeAPI.PodSecurityPolicy = false
 	}
+	c.setClusterImageDefaults()
+	c.setClusterKubernetesImageVersion(ctx)
 	c.setClusterServicesDefaults()
 	c.setClusterNetworkDefaults()
-	c.setClusterImageDefaults()
+}
+
+func (c *Cluster) setClusterKubernetesImageVersion(ctx context.Context) {
+	k8sImageNamed, _ := ref.ParseNormalizedNamed(c.SystemImages.Kubernetes)
+	// Kubernetes image is already set by c.setClusterImageDefaults(),
+	// I will override it here if Version is set.
+	var VersionedImageNamed ref.NamedTagged
+	if c.Version != "" {
+		VersionedImageNamed, _ = ref.WithTag(ref.TrimNamed(k8sImageNamed), c.Version)
+		c.SystemImages.Kubernetes = VersionedImageNamed.String()
+	}
+	if c.SystemImages.Kubernetes != k8sImageNamed.String() {
+		log.Infof(ctx, "Overrding Kubernetes image [%s] with tag [%s]", VersionedImageNamed.Name(), VersionedImageNamed.Tag())
+	}
 }
 
 func (c *Cluster) setClusterServicesDefaults() {
@@ -168,12 +197,12 @@ func (c *Cluster) setClusterServicesDefaults() {
 		&c.Services.Kubelet.ClusterDomain:                DefaultClusterDomain,
 		&c.Services.Kubelet.InfraContainerImage:          DefaultInfraContainerImage,
 		&c.Authentication.Strategy:                       DefaultAuthStrategy,
-		&c.Services.KubeAPI.Image:                        DefaultK8sImage,
-		&c.Services.Scheduler.Image:                      DefaultK8sImage,
-		&c.Services.KubeController.Image:                 DefaultK8sImage,
-		&c.Services.Kubelet.Image:                        DefaultK8sImage,
-		&c.Services.Kubeproxy.Image:                      DefaultK8sImage,
-		&c.Services.Etcd.Image:                           DefaultEtcdImage,
+		&c.Services.KubeAPI.Image:                        c.SystemImages.Kubernetes,
+		&c.Services.Scheduler.Image:                      c.SystemImages.Kubernetes,
+		&c.Services.KubeController.Image:                 c.SystemImages.Kubernetes,
+		&c.Services.Kubelet.Image:                        c.SystemImages.Kubernetes,
+		&c.Services.Kubeproxy.Image:                      c.SystemImages.Kubernetes,
+		&c.Services.Etcd.Image:                           c.SystemImages.Etcd,
 	}
 	for k, v := range serviceConfigDefaultsMap {
 		setDefaultIfEmpty(k, v)
@@ -191,6 +220,8 @@ func (c *Cluster) setClusterImageDefaults() {
 		&c.SystemImages.DNSmasq:                   DefaultDNSmasqImage,
 		&c.SystemImages.KubeDNSAutoscaler:         DefaultKubeDNSAutoScalerImage,
 		&c.SystemImages.KubernetesServicesSidecar: DefaultKubernetesServicesSidecarImage,
+		&c.SystemImages.Etcd:                      DefaultEtcdImage,
+		&c.SystemImages.Kubernetes:                DefaultK8sImage,
 	}
 	for k, v := range systemImagesDefaultsMap {
 		setDefaultIfEmpty(k, v)
