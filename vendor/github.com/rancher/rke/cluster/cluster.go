@@ -183,7 +183,8 @@ func (c *Cluster) setClusterKubernetesImageVersion(ctx context.Context) {
 		VersionedImageNamed, _ = ref.WithTag(ref.TrimNamed(k8sImageNamed), c.Version)
 		c.SystemImages.Kubernetes = VersionedImageNamed.String()
 	}
-	if c.SystemImages.Kubernetes != k8sImageNamed.String() {
+	normalizedSystemImage, _ := ref.ParseNormalizedNamed(c.SystemImages.Kubernetes)
+	if normalizedSystemImage.String() != k8sImageNamed.String() {
 		log.Infof(ctx, "Overrding Kubernetes image [%s] with tag [%s]", VersionedImageNamed.Name(), VersionedImageNamed.Tag())
 	}
 }
