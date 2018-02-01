@@ -8,15 +8,17 @@ const (
 	ClusterRegistrationTokenType                      = "clusterRegistrationToken"
 	ClusterRegistrationTokenFieldAnnotations          = "annotations"
 	ClusterRegistrationTokenFieldClusterId            = "clusterId"
+	ClusterRegistrationTokenFieldCommand              = "command"
 	ClusterRegistrationTokenFieldCreated              = "created"
 	ClusterRegistrationTokenFieldCreatorID            = "creatorId"
 	ClusterRegistrationTokenFieldLabels               = "labels"
+	ClusterRegistrationTokenFieldManifestURL          = "manifestUrl"
 	ClusterRegistrationTokenFieldName                 = "name"
 	ClusterRegistrationTokenFieldNamespaceId          = "namespaceId"
 	ClusterRegistrationTokenFieldOwnerReferences      = "ownerReferences"
 	ClusterRegistrationTokenFieldRemoved              = "removed"
 	ClusterRegistrationTokenFieldState                = "state"
-	ClusterRegistrationTokenFieldStatus               = "status"
+	ClusterRegistrationTokenFieldToken                = "token"
 	ClusterRegistrationTokenFieldTransitioning        = "transitioning"
 	ClusterRegistrationTokenFieldTransitioningMessage = "transitioningMessage"
 	ClusterRegistrationTokenFieldUuid                 = "uuid"
@@ -24,20 +26,22 @@ const (
 
 type ClusterRegistrationToken struct {
 	types.Resource
-	Annotations          map[string]string               `json:"annotations,omitempty"`
-	ClusterId            string                          `json:"clusterId,omitempty"`
-	Created              string                          `json:"created,omitempty"`
-	CreatorID            string                          `json:"creatorId,omitempty"`
-	Labels               map[string]string               `json:"labels,omitempty"`
-	Name                 string                          `json:"name,omitempty"`
-	NamespaceId          string                          `json:"namespaceId,omitempty"`
-	OwnerReferences      []OwnerReference                `json:"ownerReferences,omitempty"`
-	Removed              string                          `json:"removed,omitempty"`
-	State                string                          `json:"state,omitempty"`
-	Status               *ClusterRegistrationTokenStatus `json:"status,omitempty"`
-	Transitioning        string                          `json:"transitioning,omitempty"`
-	TransitioningMessage string                          `json:"transitioningMessage,omitempty"`
-	Uuid                 string                          `json:"uuid,omitempty"`
+	Annotations          map[string]string `json:"annotations,omitempty"`
+	ClusterId            string            `json:"clusterId,omitempty"`
+	Command              string            `json:"command,omitempty"`
+	Created              string            `json:"created,omitempty"`
+	CreatorID            string            `json:"creatorId,omitempty"`
+	Labels               map[string]string `json:"labels,omitempty"`
+	ManifestURL          string            `json:"manifestUrl,omitempty"`
+	Name                 string            `json:"name,omitempty"`
+	NamespaceId          string            `json:"namespaceId,omitempty"`
+	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty"`
+	Removed              string            `json:"removed,omitempty"`
+	State                string            `json:"state,omitempty"`
+	Token                string            `json:"token,omitempty"`
+	Transitioning        string            `json:"transitioning,omitempty"`
+	TransitioningMessage string            `json:"transitioningMessage,omitempty"`
+	Uuid                 string            `json:"uuid,omitempty"`
 }
 type ClusterRegistrationTokenCollection struct {
 	types.Collection

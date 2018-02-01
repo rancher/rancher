@@ -6,6 +6,7 @@ const (
 	MachineConfigFieldCustomConfig         = "customConfig"
 	MachineConfigFieldDescription          = "description"
 	MachineConfigFieldDisplayName          = "displayName"
+	MachineConfigFieldImported             = "imported"
 	MachineConfigFieldLabels               = "labels"
 	MachineConfigFieldMachineTemplateId    = "machineTemplateId"
 	MachineConfigFieldNodeSpec             = "nodeSpec"
@@ -19,6 +20,7 @@ type MachineConfig struct {
 	CustomConfig         *CustomConfig     `json:"customConfig,omitempty"`
 	Description          string            `json:"description,omitempty"`
 	DisplayName          string            `json:"displayName,omitempty"`
+	Imported             *bool             `json:"imported,omitempty"`
 	Labels               map[string]string `json:"labels,omitempty"`
 	MachineTemplateId    string            `json:"machineTemplateId,omitempty"`
 	NodeSpec             *NodeSpec         `json:"nodeSpec,omitempty"`

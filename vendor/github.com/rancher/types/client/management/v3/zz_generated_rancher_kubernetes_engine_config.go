@@ -6,6 +6,7 @@ const (
 	RancherKubernetesEngineConfigFieldAuthentication      = "authentication"
 	RancherKubernetesEngineConfigFieldAuthorization       = "authorization"
 	RancherKubernetesEngineConfigFieldIgnoreDockerVersion = "ignoreDockerVersion"
+	RancherKubernetesEngineConfigFieldIngress             = "ingress"
 	RancherKubernetesEngineConfigFieldNetwork             = "network"
 	RancherKubernetesEngineConfigFieldNodes               = "nodes"
 	RancherKubernetesEngineConfigFieldPrivateRegistries   = "privateRegistries"
@@ -20,6 +21,7 @@ type RancherKubernetesEngineConfig struct {
 	Authentication      *AuthnConfig       `json:"authentication,omitempty"`
 	Authorization       *AuthzConfig       `json:"authorization,omitempty"`
 	IgnoreDockerVersion *bool              `json:"ignoreDockerVersion,omitempty"`
+	Ingress             *IngressConfig     `json:"ingress,omitempty"`
 	Network             *NetworkConfig     `json:"network,omitempty"`
 	Nodes               []RKEConfigNode    `json:"nodes,omitempty"`
 	PrivateRegistries   []PrivateRegistry  `json:"privateRegistries,omitempty"`
