@@ -55,6 +55,10 @@ func TokenDeleteHandler(request *types.APIContext, _ types.RequestHandler) error
 	return tokenServer.removeToken(request)
 }
 
+func CreateTokenCR(k8sToken *v3.Token) (v3.Token, error) {
+	return tokenServer.createK8sTokenCR(k8sToken)
+}
+
 //login is a handler for route /tokens?action=login and returns the jwt token after authenticating the user
 func (s *tokenAPIServer) login(actionName string, action *types.Action, request *types.APIContext) error {
 

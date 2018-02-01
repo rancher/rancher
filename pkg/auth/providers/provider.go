@@ -2,6 +2,7 @@ package providers
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -24,6 +25,15 @@ type PrincipalProvider interface {
 	GetName() string
 	AuthenticateUser(jsonInput v3.LoginInput) (v3.Principal, []v3.Principal, map[string]string, int, error)
 	SearchPrincipals(name string, myToken v3.Token) ([]v3.Principal, int, error)
+}
+
+func GetProvider(providerName string) (PrincipalProvider, error) {
+	if provider, ok := providers[providerName]; ok {
+		if provider != nil {
+			return provider, nil
+		}
+	}
+	return nil, fmt.Errorf("No such provider '%s'", providerName)
 }
 
 func Configure(ctx context.Context, mgmtCtx *config.ManagementContext) {
