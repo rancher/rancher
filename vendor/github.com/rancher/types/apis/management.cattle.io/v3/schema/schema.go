@@ -214,7 +214,7 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 
 func stackTypes(schema *types.Schemas) *types.Schemas {
 	return schema.
-		MustImportAndCustomize(&Version, v3.Stack{}, func(schema *types.Schema) {
+		MustImportAndCustomize(&Version, v3.App{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
 				"upgrade": {
 					Input: "templateVersionId",

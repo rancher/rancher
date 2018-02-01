@@ -37,7 +37,7 @@ type Interface interface {
 	AuthConfigsGetter
 	TokensGetter
 	DynamicSchemasGetter
-	StacksGetter
+	AppsGetter
 	PreferencesGetter
 	ClusterLoggingsGetter
 	ProjectLoggingsGetter
@@ -73,7 +73,7 @@ type Client struct {
 	authConfigControllers                 map[string]AuthConfigController
 	tokenControllers                      map[string]TokenController
 	dynamicSchemaControllers              map[string]DynamicSchemaController
-	stackControllers                      map[string]StackController
+	appControllers                        map[string]AppController
 	preferenceControllers                 map[string]PreferenceController
 	clusterLoggingControllers             map[string]ClusterLoggingController
 	projectLoggingControllers             map[string]ProjectLoggingController
@@ -118,7 +118,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		authConfigControllers:                 map[string]AuthConfigController{},
 		tokenControllers:                      map[string]TokenController{},
 		dynamicSchemaControllers:              map[string]DynamicSchemaController{},
-		stackControllers:                      map[string]StackController{},
+		appControllers:                        map[string]AppController{},
 		preferenceControllers:                 map[string]PreferenceController{},
 		clusterLoggingControllers:             map[string]ClusterLoggingController{},
 		projectLoggingControllers:             map[string]ProjectLoggingController{},
@@ -438,13 +438,13 @@ func (c *Client) DynamicSchemas(namespace string) DynamicSchemaInterface {
 	}
 }
 
-type StacksGetter interface {
-	Stacks(namespace string) StackInterface
+type AppsGetter interface {
+	Apps(namespace string) AppInterface
 }
 
-func (c *Client) Stacks(namespace string) StackInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &StackResource, StackGroupVersionKind, stackFactory{})
-	return &stackClient{
+func (c *Client) Apps(namespace string) AppInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &AppResource, AppGroupVersionKind, appFactory{})
+	return &appClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

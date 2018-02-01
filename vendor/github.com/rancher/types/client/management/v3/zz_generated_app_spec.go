@@ -1,20 +1,20 @@
 package client
 
 const (
-	StackSpecType                  = "stackSpec"
-	StackSpecFieldAnswers          = "answers"
-	StackSpecFieldDescription      = "description"
-	StackSpecFieldExternalID       = "externalId"
-	StackSpecFieldGroups           = "groups"
-	StackSpecFieldInstallNamespace = "installNamespace"
-	StackSpecFieldProjectId        = "projectId"
-	StackSpecFieldPrune            = "prune"
-	StackSpecFieldTag              = "tag"
-	StackSpecFieldTemplates        = "templates"
-	StackSpecFieldUser             = "user"
+	AppSpecType                  = "appSpec"
+	AppSpecFieldAnswers          = "answers"
+	AppSpecFieldDescription      = "description"
+	AppSpecFieldExternalID       = "externalId"
+	AppSpecFieldGroups           = "groups"
+	AppSpecFieldInstallNamespace = "installNamespace"
+	AppSpecFieldProjectId        = "projectId"
+	AppSpecFieldPrune            = "prune"
+	AppSpecFieldTag              = "tag"
+	AppSpecFieldTemplates        = "templates"
+	AppSpecFieldUser             = "user"
 )
 
-type StackSpec struct {
+type AppSpec struct {
 	Answers          map[string]string `json:"answers,omitempty"`
 	Description      string            `json:"description,omitempty"`
 	ExternalID       string            `json:"externalId,omitempty"`
