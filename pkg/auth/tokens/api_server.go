@@ -87,28 +87,8 @@ func (s *tokenAPIServer) createLoginToken(jsonInput v3.LoginInput) (v3.Token, in
 
 	logrus.Debug("User Authenticated")
 
-	key, err := randomtoken.Generate()
-	if err != nil {
-		logrus.Errorf("Failed to generate token key: %v", err)
-		return v3.Token{}, 0, fmt.Errorf("failed to generate token key")
-	}
-
-	ttl := jsonInput.TTLMillis
-	if ttl == 0 {
-		ttl = defaultTokenTTL //16 hrs
-	}
-
-	k8sToken := &v3.Token{
-		UserPrincipal:   userPrincipal,
-		GroupPrincipals: groupPrincipals,
-		IsDerived:       false,
-		TTLMillis:       ttl,
-		UserID:          getUserID(userPrincipal.Name),
-		AuthProvider:    getAuthProviderName(userPrincipal.Name),
-		ProviderInfo:    providerInfo,
-		Description:     jsonInput.Description,
-	}
-	rToken, err := s.createK8sTokenCR(key, k8sToken)
+	k8sToken := GenerateNewLoginToken(userPrincipal, groupPrincipals, providerInfo, jsonInput.TTLMillis, jsonInput.Description)
+	rToken, err := s.createK8sTokenCR(&k8sToken)
 	return rToken, 0, err
 }
 
@@ -120,12 +100,6 @@ func (s *tokenAPIServer) createDerivedToken(jsonInput v3.Token, tokenAuthValue s
 	token, _, err := s.getK8sTokenCR(tokenAuthValue)
 	if err != nil {
 		return v3.Token{}, 401, err
-	}
-
-	key, err := randomtoken.Generate()
-	if err != nil {
-		logrus.Errorf("Failed to generate token key: %v", err)
-		return v3.Token{}, 0, fmt.Errorf("failed to generate token key")
 	}
 
 	ttl := jsonInput.TTLMillis
@@ -143,13 +117,19 @@ func (s *tokenAPIServer) createDerivedToken(jsonInput v3.Token, tokenAuthValue s
 		ProviderInfo:    token.ProviderInfo,
 		Description:     jsonInput.Description,
 	}
-	rToken, err := s.createK8sTokenCR(key, k8sToken)
+	rToken, err := s.createK8sTokenCR(k8sToken)
 
 	return rToken, 0, err
 
 }
 
-func (s *tokenAPIServer) createK8sTokenCR(key string, k8sToken *v3.Token) (v3.Token, error) {
+func (s *tokenAPIServer) createK8sTokenCR(k8sToken *v3.Token) (v3.Token, error) {
+	key, err := randomtoken.Generate()
+	if err != nil {
+		logrus.Errorf("Failed to generate token key: %v", err)
+		return v3.Token{}, fmt.Errorf("failed to generate token key")
+	}
+
 	labels := make(map[string]string)
 	labels[userIDLabel] = k8sToken.UserID
 

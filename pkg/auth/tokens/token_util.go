@@ -77,3 +77,21 @@ func GetTokenAuthFromRequest(req *http.Request) string {
 	}
 	return tokenAuthValue
 }
+
+func GenerateNewLoginToken(userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerInfo map[string]string, ttl int, description string) v3.Token {
+	if ttl == 0 {
+		ttl = defaultTokenTTL //16 hrs
+	}
+
+	k8sToken := v3.Token{
+		UserPrincipal:   userPrincipal,
+		GroupPrincipals: groupPrincipals,
+		IsDerived:       false,
+		TTLMillis:       ttl,
+		UserID:          getUserID(userPrincipal.Name),
+		AuthProvider:    getAuthProviderName(userPrincipal.Name),
+		ProviderInfo:    providerInfo,
+		Description:     description,
+	}
+	return k8sToken
+}
