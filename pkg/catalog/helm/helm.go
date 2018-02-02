@@ -14,6 +14,7 @@ import (
 	yaml "gopkg.in/yaml.v2"
 
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 )
 
 func DownloadIndex(indexURL string) (*RepoIndex, error) {
@@ -90,6 +91,7 @@ func FetchFiles(urls []string) ([]v3.File, error) {
 
 	files := []v3.File{}
 	for _, url := range urls {
+		logrus.Infof("Fetching file %s", url)
 		resp, err := http.Get(url)
 		if err != nil {
 			return nil, err

@@ -10,13 +10,13 @@ import (
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/store/subtype"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/api/management/api/app"
 	"github.com/rancher/rancher/pkg/api/management/api/authn"
 	"github.com/rancher/rancher/pkg/api/management/api/catalog"
 	apicluster "github.com/rancher/rancher/pkg/api/management/api/cluster"
 	"github.com/rancher/rancher/pkg/api/management/api/machine"
 	"github.com/rancher/rancher/pkg/api/management/api/project"
 	"github.com/rancher/rancher/pkg/api/management/api/setting"
-	"github.com/rancher/rancher/pkg/api/management/api/stack"
 	clustermanager "github.com/rancher/rancher/pkg/api/management/cluster"
 	"github.com/rancher/rancher/pkg/api/management/store/cert"
 	"github.com/rancher/rancher/pkg/api/management/store/cluster"
@@ -46,7 +46,7 @@ func Schemas(ctx context.Context, management *config.ManagementContext, schemas 
 	User(schemas, management)
 	Catalog(schemas)
 	SecretTypes(schemas, management)
-	Stack(schemas, management)
+	App(schemas, management)
 	Setting(schemas)
 	ClusterTypes(schemas)
 
@@ -231,11 +231,12 @@ func MachineTypes(schemas *types.Schemas, management *config.ManagementContext, 
 
 }
 
-func Stack(schemas *types.Schemas, management *config.ManagementContext) {
-	schema := schemas.Schema(&managementschema.Version, client.StackType)
-	actionWrapper := stack.ActionWrapper{
+func App(schemas *types.Schemas, management *config.ManagementContext) {
+	schema := schemas.Schema(&managementschema.Version, client.AppType)
+	actionWrapper := app.ActionWrapper{
 		Management: *management,
 	}
+	schema.Formatter = app.Formatter
 	schema.ActionHandler = actionWrapper.ActionHandler
 }
 

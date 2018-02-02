@@ -21,8 +21,6 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v2"
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -33,7 +31,7 @@ const (
 )
 
 func Register(management *config.ClusterContext) {
-	stackClient := management.Management.Management.Stacks("")
+	stackClient := management.Management.Management.Apps("")
 	stackLifecycle := &Lifecycle{
 		NameSpaceClient:       management.Core.Namespaces(""),
 		K8sClient:             management.K8sClient,
@@ -52,15 +50,12 @@ type Lifecycle struct {
 	CacheRoot             string
 }
 
-func (l *Lifecycle) Create(obj *v3.Stack) (*v3.Stack, error) {
+func (l *Lifecycle) Create(obj *v3.App) (*v3.App, error) {
 	if !l.isCurrentProject(obj) {
 		return obj, nil
 	}
 	externalID := obj.Spec.ExternalID
 	if externalID != "" {
-		if err := l.ensureNamespace(obj); err != nil {
-			return obj, err
-		}
 		templateVersionID, err := parseExternalID(externalID)
 		if err != nil {
 			return obj, err
@@ -89,15 +84,12 @@ func (l *Lifecycle) Create(obj *v3.Stack) (*v3.Stack, error) {
 	return obj, nil
 }
 
-func (l *Lifecycle) Updated(obj *v3.Stack) (*v3.Stack, error) {
+func (l *Lifecycle) Updated(obj *v3.App) (*v3.App, error) {
 	if !l.isCurrentProject(obj) {
 		return obj, nil
 	}
 	externalID := obj.Spec.ExternalID
 	if externalID != "" {
-		if err := l.ensureNamespace(obj); err != nil {
-			return obj, err
-		}
 		templateVersionID, err := parseExternalID(externalID)
 		if err != nil {
 			return obj, err
@@ -138,7 +130,7 @@ func (l *Lifecycle) Updated(obj *v3.Stack) (*v3.Stack, error) {
 	return obj, nil
 }
 
-func (l *Lifecycle) Remove(obj *v3.Stack) (*v3.Stack, error) {
+func (l *Lifecycle) Remove(obj *v3.App) (*v3.App, error) {
 	if !l.isCurrentProject(obj) {
 		return obj, nil
 	}
@@ -155,7 +147,7 @@ func (l *Lifecycle) Remove(obj *v3.Stack) (*v3.Stack, error) {
 	return obj, nil
 }
 
-func (l *Lifecycle) Run(obj *v3.Stack, action, templateVersionID string) error {
+func (l *Lifecycle) Run(obj *v3.App, action, templateVersionID string) error {
 	templateVersion, err := l.TemplateVersionClient.Get(templateVersionID, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -199,7 +191,7 @@ func (l *Lifecycle) Run(obj *v3.Stack, action, templateVersionID string) error {
 	return nil
 }
 
-func (l *Lifecycle) saveTemplates(obj *v3.Stack, templateVersion *v3.TemplateVersion) error {
+func (l *Lifecycle) saveTemplates(obj *v3.App, templateVersion *v3.TemplateVersion) error {
 	templates := map[string]string{}
 	for _, file := range templateVersion.Spec.Files {
 		templates[file.Name] = file.Contents
@@ -208,32 +200,13 @@ func (l *Lifecycle) saveTemplates(obj *v3.Stack, templateVersion *v3.TemplateVer
 	return nil
 }
 
-func (l *Lifecycle) isCurrentProject(obj *v3.Stack) bool {
+func (l *Lifecycle) isCurrentProject(obj *v3.App) bool {
 	projectID := obj.Spec.ProjectName
 	clusterName := strings.Split(projectID, ":")[0]
 	if clusterName == l.Management.ClusterName {
 		return true
 	}
 	return false
-}
-
-func (l *Lifecycle) ensureNamespace(obj *v3.Stack) error {
-	_, err := l.Management.Core.Namespaces("").Get(obj.Spec.InstallNamespace, metav1.GetOptions{})
-	if err != nil && !errors.IsNotFound(err) {
-		return err
-	} else if errors.IsNotFound(err) {
-		if _, err := l.Management.Core.Namespaces("").Create(&v1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: obj.Spec.InstallNamespace,
-				Annotations: map[string]string{
-					projectIDLabel: obj.Spec.ProjectName,
-				},
-			},
-		}); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func parseExternalID(externalID string) (string, error) {

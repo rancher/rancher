@@ -2,11 +2,8 @@ package git
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
-
-	log "github.com/sirupsen/logrus"
 )
 
 func Clone(path, url, branch string) error {
@@ -33,9 +30,5 @@ func IsValid(url string) bool {
 
 func runcmd(name string, arg ...string) error {
 	cmd := exec.Command(name, arg...)
-	if log.GetLevel() >= log.DebugLevel {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-	}
 	return cmd.Run()
 }

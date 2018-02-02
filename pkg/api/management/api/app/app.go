@@ -1,4 +1,4 @@
-package stack
+package app
 
 import (
 	"context"
@@ -41,9 +41,14 @@ type ActionWrapper struct {
 	Management config.ManagementContext
 }
 
+func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
+	resource.AddAction(apiContext, "upgrade")
+	resource.AddAction(apiContext, "rollback")
+}
+
 func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
-	var stack managementv3.Stack
-	if err := access.ByID(apiContext, &managementschema.Version, managementv3.StackType, apiContext.ID, &stack); err != nil {
+	var stack managementv3.App
+	if err := access.ByID(apiContext, &managementschema.Version, managementv3.AppType, apiContext.ID, &stack); err != nil {
 		return err
 	}
 	clusterName := strings.Split(stack.ProjectId, ":")[0]
