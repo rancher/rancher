@@ -8,15 +8,15 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
-
 	"github.com/rancher/rancher/pkg/auth/model"
 	"github.com/rancher/rancher/pkg/auth/util"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
+	publicschema "github.com/rancher/types/apis/management.cattle.io/v3public/schema"
+	"github.com/rancher/types/client/management/v3"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -26,15 +26,16 @@ const (
 	BasicAuthPrefix = "Basic"
 )
 
+func Login(actionName string, action *types.Action, request *types.APIContext) error {
+	return tokenServer.login(actionName, action, request)
+}
+
 func TokenActionHandler(actionName string, action *types.Action, request *types.APIContext) error {
 	logrus.Debugf("TokenActionHandler called for action %v", actionName)
-
-	if actionName == "login" {
-		return tokenServer.login(actionName, action, request)
-	} else if actionName == "logout" {
+	if actionName == "logout" {
 		return tokenServer.logout(actionName, action, request)
 	}
-	return nil
+	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
 func TokenCreateHandler(request *types.APIContext, _ types.RequestHandler) error {
@@ -61,26 +62,11 @@ func CreateTokenCR(k8sToken *v3.Token) (v3.Token, error) {
 
 //login is a handler for route /tokens?action=login and returns the jwt token after authenticating the user
 func (s *tokenAPIServer) login(actionName string, action *types.Action, request *types.APIContext) error {
-
-	r := request.Request
 	w := request.Response
-
-	bytes, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		logrus.Errorf("login failed with error: %v", err)
-		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("Error reading input json data: %v", err))
-	}
-	jsonInput := v3.LoginInput{}
-
-	err = json.Unmarshal(bytes, &jsonInput)
-	if err != nil {
-		logrus.Errorf("unmarshal failed with error: %v", err)
-		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("Error unmarshaling input json data: %v", err))
-	}
 
 	var token v3.Token
 	var status int
-	token, status, err = s.createLoginToken(jsonInput)
+	token, responseType, status, err := s.createLoginToken(request)
 
 	if err != nil {
 		logrus.Errorf("Login failed with error: %v", err)
@@ -90,7 +76,7 @@ func (s *tokenAPIServer) login(actionName string, action *types.Action, request 
 		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
 	}
 
-	if jsonInput.ResponseType == "cookie" {
+	if responseType == "cookie" {
 		tokenCookie := &http.Cookie{
 			Name:     CookieName,
 			Value:    token.ObjectMeta.Name + ":" + token.Token,
@@ -100,7 +86,7 @@ func (s *tokenAPIServer) login(actionName string, action *types.Action, request 
 		}
 		http.SetCookie(w, tokenCookie)
 	} else {
-		tokenData, err := convertTokenResource(request, token)
+		tokenData, err := convertTokenResource(request.Schemas.Schema(&publicschema.PublicVersion, client.TokenType), token)
 		if err != nil {
 			return err
 		}
@@ -145,7 +131,7 @@ func (s *tokenAPIServer) deriveToken(request *types.APIContext) error {
 		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
 	}
 
-	tokenData, err := convertTokenResource(request, token)
+	tokenData, err := convertTokenResource(request.Schema, token)
 	if err != nil {
 		return err
 	}
@@ -177,7 +163,7 @@ func (s *tokenAPIServer) listTokens(request *types.APIContext) error {
 
 	tokensFromStore := make([]map[string]interface{}, len(tokens))
 	for _, token := range tokens {
-		tokenData, err := convertTokenResource(request, token)
+		tokenData, err := convertTokenResource(request.Schema, token)
 		if err != nil {
 			return err
 		}
@@ -250,7 +236,7 @@ func (s *tokenAPIServer) getToken(request *types.APIContext) error {
 		}
 		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
 	}
-	tokenData, err := convertTokenResource(request, token)
+	tokenData, err := convertTokenResource(request.Schema, token)
 	if err != nil {
 		return err
 	}
@@ -303,12 +289,12 @@ func getTokenFromStore(request *types.APIContext, tokenID string) (map[string]in
 	return tokenData, nil
 }
 
-func convertTokenResource(request *types.APIContext, token v3.Token) (map[string]interface{}, error) {
+func convertTokenResource(schema *types.Schema, token v3.Token) (map[string]interface{}, error) {
 	tokenData, err := convert.EncodeToMap(token)
 	if err != nil {
 		return nil, err
 	}
-	mapper := request.Schema.Mapper
+	mapper := schema.Mapper
 	if mapper == nil {
 		return nil, errors.New("no schema mapper available")
 	}

@@ -24,8 +24,8 @@ def url():
 
 
 @pytest.fixture
-def auth_url(url):
-    return url + '/tokens?action=login'
+def auth_url():
+    return 'http://localhost:8080/v3-public/localproviders/local?action=login'
 
 
 @pytest.fixture
@@ -39,10 +39,8 @@ def cc(url, auth_url, chngpwd):
         'newPassword': 'admin',
     })
     r = requests.post(auth_url, json={
-        'localCredential': {
-            'username': 'admin',
-            'password': 'admin',
-        },
+        'username': 'admin',
+        'password': 'admin',
         'responseType': 'json',
     })
     client = cattle.Client(url=url, token=r.json()['token'])
