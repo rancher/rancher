@@ -113,6 +113,10 @@ func (m *Lifecycle) Create(obj *v3.Machine) (*v3.Machine, error) {
 			return obj, fmt.Errorf("machine config not specified")
 		}
 
+		for k, v := range template.Spec.SecretValues {
+			convert.ToMapInterface(rawConfig)[k] = v
+		}
+
 		sshUser, ok := convert.ToMapInterface(rawConfig)["sshUser"]
 		if ok {
 			obj.Status.SSHUser = convert.ToString(sshUser)
