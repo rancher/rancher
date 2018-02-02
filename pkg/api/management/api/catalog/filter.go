@@ -76,6 +76,7 @@ func TemplateVersionFormatter(apiContext *types.APIContext, resource *types.RawR
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(apiContext, "refresh")
+	delete(resource.Values, "status")
 }
 
 func RefreshActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {

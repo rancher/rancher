@@ -21,7 +21,7 @@ const (
 )
 
 // update will sync templates with catalog without costing too much
-func (m *Manager) update(catalog *v3.Catalog, templates []v3.Template) error {
+func (m *Manager) update(catalog *v3.Catalog, templates []v3.Template, updateOnly bool) error {
 	logrus.Debugf("Syncing catalog %s with templates", catalog.Name)
 	existingTemplates, err := m.templateClient.List(metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", CatalogNameLabel, catalog.Name),
@@ -50,11 +50,10 @@ func (m *Manager) update(catalog *v3.Catalog, templates []v3.Template) error {
 
 	// templates is the one we should update, so for all the templates that were in existingTemplates
 	// 1. if it doesn't exist in templates, delete them
-	// 2. if it exists but has changed, update it
-	// 3. if it exists but not changed, keep it unmodified
+	// 2. if it exists, update it
 	var errs []error
 	for name, existingTemplate := range existingTemplatesByName {
-		err := m.updateTemplate(name, existingTemplate, templatesByName)
+		err := m.updateTemplate(name, existingTemplate, templatesByName, updateOnly)
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -81,10 +80,11 @@ func (m *Manager) createTemplate(name string, template v3.Template, existingTemp
 	if _, ok := existingTemplatesByName[name]; !ok {
 		template.OwnerReferences = []metav1.OwnerReference{
 			{
-				APIVersion: catalog.APIVersion,
-				Kind:       catalog.Kind,
-				Name:       catalog.Name,
-				UID:        catalog.UID,
+				APIVersion:         catalog.APIVersion,
+				Kind:               catalog.Kind,
+				Name:               catalog.Name,
+				UID:                catalog.UID,
+				BlockOwnerDeletion: &[]bool{true}[0],
 			},
 		}
 		template.Kind = v3.TemplateGroupVersionKind.Kind
@@ -100,7 +100,7 @@ func (m *Manager) createTemplate(name string, template v3.Template, existingTemp
 			modifiedVersionFiles = append(modifiedVersionFiles, version)
 		}
 		template.Spec.Versions = modifiedVersionFiles
-		logrus.Debugf("Creating template %s", template.Name)
+		logrus.Infof("Creating template %s", template.Name)
 		createdTemplate, err := m.templateClient.Create(&template)
 		if err != nil {
 			// hack for the image size that are too big
@@ -117,17 +117,19 @@ func (m *Manager) createTemplate(name string, template v3.Template, existingTemp
 	return nil
 }
 
-func (m *Manager) updateTemplate(name string, existingTemplate v3.Template, templatesByName map[string]v3.Template) error {
+func (m *Manager) updateTemplate(name string, existingTemplate v3.Template, templatesByName map[string]v3.Template, updateOnly bool) error {
 	template, ok := templatesByName[name]
-	if !ok {
+	if !ok && !updateOnly {
 		// delete the template
-		logrus.Debugf("Deleting templates %s", name)
+		logrus.Infof("Deleting templates %s", name)
 		if err := m.templateClient.Delete(name, &metav1.DeleteOptions{}); err != nil {
 			return errors.Wrapf(err, "failed to delete template %s", template.Name)
 		}
 		if err := m.deleteTemplateVersions(existingTemplate); err != nil {
 			return errors.Wrapf(err, "failed to delete templateVersion with template %s", template.Name)
 		}
+	} else if !ok && updateOnly {
+		return nil
 	}
 
 	updateTemplate, err := m.templateClient.Get(name, metav1.GetOptions{})
@@ -145,7 +147,7 @@ func (m *Manager) updateTemplate(name string, existingTemplate v3.Template, temp
 		modifiedVersionFiles = append(modifiedVersionFiles, version)
 	}
 	updateTemplate.Spec.Versions = modifiedVersionFiles
-	logrus.Debugf("Updating template %s", name)
+	logrus.Infof("Updating template %s", name)
 	result, err := m.templateClient.Update(updateTemplate)
 	if err != nil {
 		if strings.Contains(err.Error(), "request is too large") || strings.Contains(err.Error(), "exceeding the max size") {
@@ -177,13 +179,14 @@ func (m *Manager) createTemplateVersions(versionsSpec []v3.TemplateVersionSpec, 
 		templateVersion.Labels[TemplateNameLabel] = template.Name
 		templateVersion.OwnerReferences = []metav1.OwnerReference{
 			{
-				APIVersion: template.APIVersion,
-				Kind:       template.Kind,
-				Name:       template.Name,
-				UID:        template.UID,
+				APIVersion:         template.APIVersion,
+				Kind:               template.Kind,
+				Name:               template.Name,
+				UID:                template.UID,
+				BlockOwnerDeletion: &[]bool{true}[0],
 			},
 		}
-		logrus.Debugf("Creating templateVersion %s", templateVersion.Name)
+		logrus.Infof("Creating templateVersion %s", templateVersion.Name)
 		_, err := m.templateVersionClient.Create(&templateVersion)
 		if err != nil {
 			logrus.Error(err)
@@ -214,7 +217,7 @@ func (m *Manager) deleteTemplateVersions(template v3.Template) error {
 		return err
 	}
 	for _, version := range templateVersions.Items {
-		logrus.Debugf("Deleting templateVersion %s", version.Name)
+		logrus.Infof("Deleting templateVersion %s", version.Name)
 		if err := m.templateVersionClient.Delete(version.Name, &metav1.DeleteOptions{}); err != nil && !kerrors.IsNotFound(err) {
 			return err
 		}

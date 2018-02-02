@@ -1,34 +1,14 @@
 package manager
 
 import (
-	"fmt"
-
 	"github.com/pkg/errors"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func (m *Manager) Sync(key string, catalog *v3.Catalog) error {
 	// if catalog was deleted, do nothing
 	if catalog == nil || catalog.DeletionTimestamp != nil {
-		// remove all the templates associated with catalog
-		logrus.Infof("Cleaning up catalog %s", key)
-		templates, err := m.templateClient.List(metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%s=%s", CatalogNameLabel, key),
-		})
-		if err != nil {
-			return err
-		}
-		for _, template := range templates.Items {
-			logrus.Infof("Cleaning up template %s", template.Name)
-			if err := m.templateClient.Delete(template.Name, &metav1.DeleteOptions{}); err != nil {
-				return err
-			}
-			if err := m.deleteTemplateVersions(template); err != nil {
-				return err
-			}
-		}
 		return nil
 	}
 	catalogCopy := catalog.DeepCopy()
@@ -38,7 +18,7 @@ func (m *Manager) Sync(key string, catalog *v3.Catalog) error {
 		return nil
 	}
 	catalogCopy.Status.Commit = commit
-	templates, errs, err := traverseFiles(repoPath, catalog.Spec.CatalogKind, catalog.Name, catalogType)
+	templates, errs, err := traverseFiles(repoPath, catalogCopy, catalogType)
 	if err != nil {
 		return errors.Wrap(err, "Repo traversal failed")
 	}
@@ -46,6 +26,11 @@ func (m *Manager) Sync(key string, catalog *v3.Catalog) error {
 		logrus.Errorf("Errors while parsing repo: %v", errs)
 	}
 
-	logrus.Debugf("Updating catalog %s", catalog.Name)
-	return m.update(catalogCopy, templates)
+	logrus.Infof("Updating catalog %s", catalog.Name)
+	// since helm catalog is purely additive, we add update only flag
+	updateOnly := false
+	if catalogType == CatalogTypeHelmObjectRepo {
+		updateOnly = true
+	}
+	return m.update(catalogCopy, templates, updateOnly)
 }

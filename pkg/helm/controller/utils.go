@@ -70,7 +70,7 @@ func generateRandomPort() string {
 	return strconv.Itoa(port)
 }
 
-func installCharts(rootDir, port string, obj *v3.Stack) error {
+func installCharts(rootDir, port string, obj *v3.App) error {
 	setValues := []string{}
 	if obj.Spec.Answers != nil {
 		answers := obj.Spec.Answers
@@ -93,7 +93,7 @@ func installCharts(rootDir, port string, obj *v3.Stack) error {
 	return cmd.Wait()
 }
 
-func deleteCharts(port string, obj *v3.Stack) error {
+func deleteCharts(port string, obj *v3.App) error {
 	cmd := exec.Command(helmName, "delete", "--purge", obj.Name)
 	cmd.Env = []string{fmt.Sprintf("%s=%s", "HELM_HOST", "127.0.0.1:"+port)}
 	cmd.Stdout = os.Stdout

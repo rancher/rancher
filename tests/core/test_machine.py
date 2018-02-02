@@ -29,6 +29,8 @@ def test_machine_fields(cclient):
         'unschedulable': 'ru',
         'providerId': 'r',
         'sshUser': 'r',
+        'imported': "cru",
+        'externalId': "r",
     }
 
     for name, field in cclient.schema.types['machine'].resourceFields.items():

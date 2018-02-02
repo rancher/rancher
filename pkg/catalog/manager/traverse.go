@@ -14,20 +14,21 @@ import (
 	"github.com/rancher/rancher/pkg/catalog/helm"
 	"github.com/rancher/rancher/pkg/catalog/parse"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func traverseFiles(repoPath, kind, catalogName string, catalogType CatalogType) ([]v3.Template, []error, error) {
-	if kind == "" || kind == RancherTemplateType {
-		return traverseGitFiles(repoPath, catalogName)
+func traverseFiles(repoPath string, catalog *v3.Catalog, catalogType CatalogType) ([]v3.Template, []error, error) {
+	if catalog.Spec.CatalogKind == "" || catalog.Spec.CatalogKind == RancherTemplateType {
+		return traverseGitFiles(repoPath, catalog.Name)
 	}
-	if kind == HelmTemplateType {
+	if catalog.Spec.CatalogKind == HelmTemplateType {
 		if catalogType == CatalogTypeHelmGitRepo {
-			return traverseHelmGitFiles(repoPath, catalogName)
+			return traverseHelmGitFiles(repoPath, catalog.Name)
 		}
-		return traverseHelmFiles(repoPath, catalogName)
+		return traverseHelmFiles(repoPath, catalog)
 	}
-	return nil, nil, fmt.Errorf("Unknown kind %s", kind)
+	return nil, nil, fmt.Errorf("Unknown kind %s", catalog.Spec.CatalogKind)
 }
 
 func traverseHelmGitFiles(repoPath, catalogName string) ([]v3.Template, []error, error) {
@@ -99,11 +100,12 @@ func traverseHelmGitFiles(repoPath, catalogName string) ([]v3.Template, []error,
 	return templates, errors, err
 }
 
-func traverseHelmFiles(repoPath, catalogName string) ([]v3.Template, []error, error) {
+func traverseHelmFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []error, error) {
 	index, err := helm.LoadIndex(repoPath)
 	if err != nil {
 		return nil, nil, err
 	}
+	newHelmVersionCommits := make(map[string]v3.VersionCommits)
 
 	templates := []v3.Template{}
 	var errors []error
@@ -127,6 +129,26 @@ func traverseHelmFiles(repoPath, catalogName string) ([]v3.Template, []error, er
 		template.Spec.Base = HelmTemplateBaseType
 		template.Spec.FolderName = chart
 		versions := make([]v3.TemplateVersionSpec, 0)
+
+		newHelmVersionCommits[chart] = v3.VersionCommits{
+			Value: map[string]string{},
+		}
+		existingHelmVersionCommits := map[string]string{}
+		if catalog.Status.HelmVersionCommits[chart].Value != nil {
+			existingHelmVersionCommits = catalog.Status.HelmVersionCommits[chart].Value
+		}
+		// comparing version commit with the previous commit to detect if a template has been changed.
+		hasChanged := false
+		for _, version := range metadata {
+			newHelmVersionCommits[chart].Value[version.Version] = version.Digest
+			if digest, ok := existingHelmVersionCommits[version.Version]; !ok || digest != version.Digest {
+				hasChanged = true
+			}
+		}
+		if !hasChanged {
+			logrus.Debugf("chart %s has not been changed. Skipping generating templates for it", chart)
+			continue
+		}
 		for _, version := range metadata {
 			v := v3.TemplateVersionSpec{
 				Version: version.Version,
@@ -156,14 +178,15 @@ func traverseHelmFiles(repoPath, catalogName string) ([]v3.Template, []error, er
 					v.UpgradeVersionLinks[versionSpec.Version] = fmt.Sprintf("%s-%s", template.Name, revision)
 				}
 			}
-			v.ExternalID = fmt.Sprintf("catalog://?catalog=%s&base=%s&template=%s&version=%s", catalogName, template.Spec.Base, template.Spec.FolderName, v.Version)
+			v.ExternalID = fmt.Sprintf("catalog://?catalog=%s&base=%s&template=%s&version=%s", catalog.Name, template.Spec.Base, template.Spec.FolderName, v.Version)
 			versions = append(versions, v)
 		}
 		template.Spec.Versions = versions
-		template.Spec.CatalogID = catalogName
+		template.Spec.CatalogID = catalog.Name
 
 		templates = append(templates, template)
 	}
+	catalog.Status.HelmVersionCommits = newHelmVersionCommits
 	return templates, nil, nil
 }
 
