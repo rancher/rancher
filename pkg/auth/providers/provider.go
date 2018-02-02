@@ -23,7 +23,7 @@ func init() {
 //PrincipalProvider interfacse defines what methods an identity provider should implement
 type PrincipalProvider interface {
 	GetName() string
-	AuthenticateUser(jsonInput v3.LoginInput) (v3.Principal, []v3.Principal, map[string]string, int, error)
+	AuthenticateUser(input interface{}) (v3.Principal, []v3.Principal, map[string]string, int, error)
 	SearchPrincipals(name string, myToken v3.Token) ([]v3.Principal, int, error)
 }
 
@@ -49,21 +49,14 @@ func Configure(ctx context.Context, mgmtCtx *config.ManagementContext) {
 	}
 }
 
-func AuthenticateUser(jsonInput v3.LoginInput) (v3.Principal, []v3.Principal, map[string]string, int, error) {
+func AuthenticateUser(input interface{}, providerName string) (v3.Principal, []v3.Principal, map[string]string, int, error) {
 	var groupPrincipals []v3.Principal
 	var userPrincipal v3.Principal
 	var providerInfo = make(map[string]string)
 	var status int
 	var err error
-	var providerName string
 
-	if jsonInput.GithubCredential.Code != "" {
-		providerName = "github"
-	} else if jsonInput.LocalCredential.Username != "" {
-		providerName = "local"
-	}
-
-	userPrincipal, groupPrincipals, providerInfo, status, err = providers[providerName].AuthenticateUser(jsonInput)
+	userPrincipal, groupPrincipals, providerInfo, status, err = providers[providerName].AuthenticateUser(input)
 
 	return userPrincipal, groupPrincipals, providerInfo, status, err
 }

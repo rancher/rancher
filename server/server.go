@@ -38,6 +38,7 @@ type Server struct {
 func New(ctx context.Context, httpPort, httpsPort int, management *config.ManagementContext) (*Server, error) {
 	var result http.Handler
 	tokenAPI, err := server.NewTokenAPIHandler(ctx, management)
+	publicAPI, err := server.NewAuthProviderAPIHandler(ctx, management)
 
 	managementAPI, err := managementapi.New(ctx, httpPort, httpsPort, management, func() http.Handler {
 		return result
@@ -64,7 +65,7 @@ func New(ctx context.Context, httpPort, httpsPort int, management *config.Manage
 	unauthed := mux.NewRouter()
 	unauthed.Handle("/", ui.UI(managementAPI))
 	unauthed.Handle("/v3/settings/cacerts", authedAPIs).Methods(http.MethodGet)
-	unauthed.PathPrefix("/v3/token").Handler(tokenAPI)
+	unauthed.PathPrefix("/v3-public").Handler(publicAPI)
 	unauthed.NotFoundHandler = ui.UI(http.NotFoundHandler())
 	unauthed.PathPrefix("/v3/connect").Handler(tunnel)
 	unauthed.PathPrefix("/v3").Handler(authedHandler)

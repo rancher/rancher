@@ -2,7 +2,9 @@ package tokens
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -11,9 +13,13 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 
+	"github.com/rancher/norman/httperror"
+	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/randomtoken"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/apis/management.cattle.io/v3public"
+	"github.com/rancher/types/client/management/v3public"
 	"github.com/rancher/types/config"
 )
 
@@ -55,6 +61,10 @@ func tokenKeyIndexer(obj interface{}) ([]string, error) {
 }
 
 func NewTokenAPIServer(ctx context.Context, mgmtCtx *config.ManagementContext) error {
+	if tokenServer != nil {
+		return nil
+	}
+
 	if mgmtCtx == nil {
 		return fmt.Errorf("failed to build tokenAPIHandler, nil ManagementContext")
 	}
@@ -76,20 +86,60 @@ func NewTokenAPIServer(ctx context.Context, mgmtCtx *config.ManagementContext) e
 }
 
 //createLoginToken will authenticate with provider and creates a token CR
-func (s *tokenAPIServer) createLoginToken(jsonInput v3.LoginInput) (v3.Token, int, error) {
+func (s *tokenAPIServer) createLoginToken(request *types.APIContext) (v3.Token, string, int, error) {
 	logrus.Debugf("Create Token Invoked")
 
+	bytes, err := ioutil.ReadAll(request.Request.Body)
+	if err != nil {
+		logrus.Errorf("login failed with error: %v", err)
+		return v3.Token{}, "", httperror.InvalidBodyContent.Status, httperror.NewAPIError(httperror.InvalidBodyContent, "")
+	}
+
+	generic := &v3public.GenericLogin{}
+	err = json.Unmarshal(bytes, generic)
+	if err != nil {
+		logrus.Errorf("unmarshal failed with error: %v", err)
+		return v3.Token{}, "", httperror.InvalidBodyContent.Status, httperror.NewAPIError(httperror.InvalidBodyContent, "")
+	}
+	responseType := generic.ResponseType
+	description := generic.Description
+	ttl := generic.TTLMillis
+	if ttl == 0 {
+		ttl = defaultTokenTTL //16 hrs
+	}
+
+	var input interface{}
+	var providerName string
+	switch request.Type {
+	case client.GithubProviderType:
+		gInput := &v3public.GithubLogin{}
+		input = gInput
+		providerName = "github"
+	case client.LocalProviderType:
+		lInput := &v3public.LocalLogin{}
+		input = lInput
+		providerName = "local"
+	default:
+		return v3.Token{}, "", httperror.ServerError.Status, httperror.NewAPIError(httperror.ServerError, "Unknown login type")
+	}
+
+	err = json.Unmarshal(bytes, input)
+	if err != nil {
+		logrus.Errorf("unmarshal failed with error: %v", err)
+		return v3.Token{}, "", httperror.InvalidBodyContent.Status, httperror.NewAPIError(httperror.InvalidBodyContent, "")
+	}
+
 	// Authenticate User
-	userPrincipal, groupPrincipals, providerInfo, status, err := providers.AuthenticateUser(jsonInput)
+	userPrincipal, groupPrincipals, providerInfo, status, err := providers.AuthenticateUser(input, providerName)
 	if status != 0 || err != nil {
-		return v3.Token{}, status, err
+		return v3.Token{}, "", status, err
 	}
 
 	logrus.Debug("User Authenticated")
 
-	k8sToken := GenerateNewLoginToken(userPrincipal, groupPrincipals, providerInfo, jsonInput.TTLMillis, jsonInput.Description)
+	k8sToken := GenerateNewLoginToken(userPrincipal, groupPrincipals, providerInfo, ttl, description)
 	rToken, err := s.createK8sTokenCR(&k8sToken)
-	return rToken, 0, err
+	return rToken, responseType, 0, err
 }
 
 //CreateDerivedToken will create a jwt token for the authenticated user

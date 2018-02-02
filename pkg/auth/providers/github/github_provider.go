@@ -3,15 +3,16 @@ package github
 import (
 	"context"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"net/http"
 	"strconv"
 
 	"github.com/mitchellh/mapstructure"
-
+	"github.com/pkg/errors"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/apis/management.cattle.io/v3public"
 	"github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -91,11 +92,16 @@ func (g *GProvider) SaveGithubConfig(config *v3.GithubConfig) error {
 	return nil
 }
 
-func (g *GProvider) AuthenticateUser(loginInput v3.LoginInput) (v3.Principal, []v3.Principal, map[string]string, int, error) {
-	return g.LoginUser(loginInput.GithubCredential, nil)
+func (g *GProvider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Principal, map[string]string, int, error) {
+	login, ok := input.(*v3public.GithubLogin)
+	if !ok {
+		return v3.Principal{}, nil, nil, 500, errors.New("unexpected input type")
+	}
+
+	return g.LoginUser(login, nil)
 }
 
-func (g *GProvider) LoginUser(githubCredential v3.GithubCredential, config *v3.GithubConfig) (v3.Principal, []v3.Principal, map[string]string, int, error) {
+func (g *GProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v3.GithubConfig) (v3.Principal, []v3.Principal, map[string]string, int, error) {
 	var groupPrincipals []v3.Principal
 	var userPrincipal v3.Principal
 	var providerInfo = make(map[string]string)

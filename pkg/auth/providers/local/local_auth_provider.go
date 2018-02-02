@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/apis/management.cattle.io/v3public"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
@@ -121,14 +123,19 @@ func (l *LProvider) GetName() string {
 	return "local"
 }
 
-func (l *LProvider) AuthenticateUser(loginInput v3.LoginInput) (v3.Principal, []v3.Principal, map[string]string, int, error) {
+func (l *LProvider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Principal, map[string]string, int, error) {
+	localInput, ok := input.(*v3public.LocalLogin)
+	if !ok {
+		return v3.Principal{}, nil, nil, 500, errors.New("unexpected input type")
+	}
+
 	// TODO fix responses to be json
 	var groupPrincipals []v3.Principal
 	var userPrincipal v3.Principal
 	var providerInfo = make(map[string]string)
 
-	username := loginInput.LocalCredential.Username
-	pwd := loginInput.LocalCredential.Password
+	username := localInput.Username
+	pwd := localInput.Password
 
 	objs, err := l.userIndexer.ByIndex(userNameIndex, username)
 	if err != nil {

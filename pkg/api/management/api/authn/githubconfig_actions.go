@@ -3,8 +3,9 @@ package authn
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"net/http"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -13,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/types/apis/management.cattle.io/v3public"
 )
 
 const (
@@ -67,7 +69,6 @@ func formGithubRedirectURL(githubConfig v3.GithubConfig) string {
 
 func GithubConfigTestApply(actionName string, action *types.Action, request *types.APIContext) error {
 	var githubConfig v3.GithubConfig
-	var githubCredential v3.GithubCredential
 	githubConfigApplyInput := v3.GithubConfigApplyInput{}
 
 	if err := json.NewDecoder(request.Request.Body).Decode(&githubConfigApplyInput); err != nil {
@@ -76,7 +77,9 @@ func GithubConfigTestApply(actionName string, action *types.Action, request *typ
 	}
 
 	githubConfig = githubConfigApplyInput.GithubConfig
-	githubCredential = githubConfigApplyInput.GithubCredential
+	githubLogin := &v3public.GithubLogin{
+		Code: githubConfigApplyInput.Code,
+	}
 
 	//Call provider to testLogin
 	p, err := providers.GetProvider("github")
@@ -88,7 +91,7 @@ func GithubConfigTestApply(actionName string, action *types.Action, request *typ
 		return fmt.Errorf("No github provider")
 	}
 
-	userPrincipal, groupPrincipals, providerInfo, status, err := githubProvider.LoginUser(githubCredential, &githubConfig)
+	userPrincipal, groupPrincipals, providerInfo, status, err := githubProvider.LoginUser(githubLogin, &githubConfig)
 	if err != nil {
 		if status == 0 || status == 500 {
 			status = http.StatusInternalServerError
