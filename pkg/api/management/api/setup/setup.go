@@ -182,12 +182,16 @@ func SecretTypes(schemas *types.Schemas, management *config.ManagementContext) {
 	}
 }
 
-var authConfigTypes = []string{client.GithubConfigType, client.LocalConfigType}
+var authConfigTypes = []string{client.GithubConfigType, client.LocalConfigType, client.ActiveDirectoryConfigType}
 
 func AuthConfigs(schemas *types.Schemas) {
-	schema := schemas.Schema(&managementschema.Version, client.GithubConfigType)
-	schema.Formatter = authn.GithubConfigFormatter
-	schema.ActionHandler = authn.GithubConfigActionHandler
+	gSchema := schemas.Schema(&managementschema.Version, client.GithubConfigType)
+	gSchema.Formatter = authn.GithubConfigFormatter
+	gSchema.ActionHandler = authn.GithubConfigActionHandler
+
+	adSchema := schemas.Schema(&managementschema.Version, client.ActiveDirectoryConfigType)
+	adSchema.Formatter = authn.ActiveDirectoryConfigFormatter
+	adSchema.ActionHandler = authn.ActiveDirectoryConfigActionHandler
 
 	authConfigBaseSchema := schemas.Schema(&managementschema.Version, client.AuthConfigType)
 	for _, authConfigSubtype := range authConfigTypes {
