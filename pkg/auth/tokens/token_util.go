@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func getAuthProviderName(principalID string) string {
@@ -31,7 +33,23 @@ func SplitTokenParts(tokenID string) (string, string) {
 	return parts[0], parts[1]
 }
 
+func SetTokenExpiresAt(token *v3.Token) {
+	if token.TTLMillis != 0 && token.ExpiresAt == "" {
+		created := token.ObjectMeta.CreationTimestamp.Time
+		ttlDuration, err := time.ParseDuration(strconv.Itoa(token.TTLMillis) + "ms")
+		if err != nil {
+			logrus.Errorf("Error parsing ttl, cannot calculate expiresAt %v", err)
+		} else {
+			expiresAtTime := created.Add(ttlDuration)
+			token.ExpiresAt = expiresAtTime.UTC().Format(time.RFC3339)
+		}
+	}
+}
+
 func IsNotExpired(token v3.Token) bool {
+	if token.TTLMillis == 0 {
+		return true
+	}
 	created := token.ObjectMeta.CreationTimestamp.Time
 	durationElapsed := time.Since(created)
 
@@ -79,10 +97,6 @@ func GetTokenAuthFromRequest(req *http.Request) string {
 }
 
 func GenerateNewLoginToken(userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerInfo map[string]string, ttl int, description string) v3.Token {
-	if ttl == 0 {
-		ttl = defaultTokenTTL //16 hrs
-	}
-
 	k8sToken := v3.Token{
 		UserPrincipal:   userPrincipal,
 		GroupPrincipals: groupPrincipals,
@@ -94,4 +108,27 @@ func GenerateNewLoginToken(userPrincipal v3.Principal, groupPrincipals []v3.Prin
 		Description:     description,
 	}
 	return k8sToken
+}
+
+func PurgeExpiredTokens(management *config.ManagementContext) error {
+	tokens := management.Management.Tokens("")
+	alltokens, err := tokens.List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, token := range alltokens.Items {
+		expiry, err := time.Parse(time.RFC3339, token.ExpiresAt)
+		if err != nil {
+			continue
+		}
+		if expiry.Before(time.Now().UTC()) {
+			//delete token
+			err = tokens.Delete(token.ObjectMeta.Name, &metav1.DeleteOptions{})
+			if err != nil {
+				logrus.Errorf("Error: %v while deleting expired token: %v", err, token.ObjectMeta.Name)
+			}
+		}
+	}
+
+	return nil
 }

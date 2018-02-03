@@ -11,6 +11,7 @@ import (
 	"encoding/pem"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	managementController "github.com/rancher/rancher/pkg/management/controller"
 	"github.com/rancher/rancher/server"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -39,6 +40,10 @@ type Config struct {
 
 var defaultAdminLabel = map[string]string{"authz.management.cattle.io/bootstrapping": "admin-user"}
 
+const (
+	defaultTokenPurgeIntervalHours = 24
+)
+
 func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 	management, err := config.NewManagementContext(kubeConfig)
 	if err != nil {
@@ -62,6 +67,8 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 	if err := server.New(ctx, cfg.HTTPListenPort, cfg.HTTPSListenPort, management); err != nil {
 		return err
 	}
+
+	go startTokenPurgeThread(management)
 
 	managementController.Register(ctx, management)
 	if err := management.Start(ctx); err != nil {
@@ -517,4 +524,14 @@ func addMachineDriver(name, url, checksum string, active, builtin bool, manageme
 	})
 
 	return err
+}
+
+func startTokenPurgeThread(management *config.ManagementContext) {
+	for {
+		err := tokens.PurgeExpiredTokens(management)
+		if err != nil {
+			logrus.Errorf("Error: %v while deleting expired tokens", err)
+		}
+		time.Sleep(time.Duration(defaultTokenPurgeIntervalHours) * time.Hour)
+	}
 }
