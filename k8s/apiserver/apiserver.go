@@ -141,7 +141,7 @@ func RunAPIServer(ctx context.Context, apiServer *Options) error {
 	runOptions.Authorization.Mode = modes.ModeRBAC
 	runOptions.InsecureServing.BindPort = apiServer.ListenPort
 	runOptions.SecureServing.BindPort = 0
-	runOptions.Etcd.StorageConfig.ServerList = []string{"http://127.0.0.1:2379"}
+	runOptions.Etcd.StorageConfig.ServerList = []string{"http://127.0.0.1:2381"}
 	runOptions.EnableAggregatorRouting = false
 
 	_, ipNet, err := net.ParseCIDR("10.0.0.0/24")

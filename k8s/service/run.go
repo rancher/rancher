@@ -24,6 +24,10 @@ var (
 )
 
 func init() {
+	if os.Getenv("ETCD_ARGS") == "" {
+		os.Setenv("ETCD_ARGS", "--advertise-client-urls http://localhost:2382 --listen-peer-urls http://localhost:2382 --listen-client-urls http://localhost:2381")
+	}
+
 	for name, f := range funcs {
 		reexec.Register(name, f)
 	}
@@ -84,5 +88,12 @@ func (p processExec) run(ctx context.Context) {
 }
 
 func (p processFunc) run(ctx context.Context) {
+	args := []string{p.name}
+	argStr := os.Getenv(strings.ToUpper(fmt.Sprintf("%s_ARGS", p.name)))
+	if argStr != "" {
+		args = append(args, strings.Split(argStr, " ")...)
+		os.Args = args
+	}
+
 	funcs[p.name]()
 }
