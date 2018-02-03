@@ -18,6 +18,8 @@ type Token struct {
 	LastUpdateTime  string            `json:"lastUpdateTime"`
 	IsDerived       bool              `json:"isDerived"`
 	Description     string            `json:"description"`
+	Expired         bool              `json:"expired"`
+	ExpiresAt       string            `json:"expiresAt"`
 }
 
 type User struct {
