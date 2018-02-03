@@ -223,7 +223,7 @@ func findOrCreateCond(obj interface{}, condName string) reflect.Value {
 	newCond.FieldByName("Type").SetString(condName)
 	newCond.FieldByName("Status").SetString("Unknown")
 	condSlice.Set(reflect.Append(condSlice, newCond))
-	return newCond
+	return *findCond(condSlice, condName)
 }
 
 func findCond(val reflect.Value, name string) *reflect.Value {
