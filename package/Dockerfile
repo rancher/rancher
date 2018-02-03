@@ -8,7 +8,7 @@ RUN curl -sLf https://github.com/rancher/machine-package/releases/download/v0.13
     curl -sLf https://github.com/rancher/helm/releases/download/v2.8.0-rancher1/helm > /usr/bin/helm && \
     curl -sLf https://github.com/rancher/helm/releases/download/v2.8.0-rancher1/tiller > /usr/bin/tiller && \
     chmod +x /usr/bin/kubectl /usr/bin/tiller /usr/bin/helm
-ENV ETCD_ARGS "--data-dir /var/lib/rancher/etcd"
+ENV ETCD_ARGS "--data-dir /var/lib/rancher/etcd --listen-peer-urls http://localhost:2382 --listen-client-urls http://localhost:2381"
 WORKDIR /var/lib/rancher
 
 ENV CATTLE_UI_VERSION 2.0.16
