@@ -36,7 +36,7 @@ var (
 		Init(globalTypes).
 		Init(rkeTypes)
 
-	TokenSchema = factory.Schemas(&Version).
+	TokenSchemas = factory.Schemas(&Version).
 			Init(tokens)
 )
 
@@ -149,15 +149,8 @@ func machineTypes(schemas *types.Schemas) *types.Schemas {
 
 func tokens(schemas *types.Schemas) *types.Schemas {
 	return schemas.
-		MustImport(&Version, v3.LoginInput{}).
-		MustImport(&Version, v3.LocalCredential{}).
-		MustImport(&Version, v3.GithubCredential{}).
 		MustImportAndCustomize(&Version, v3.Token{}, func(schema *types.Schema) {
 			schema.CollectionActions = map[string]types.Action{
-				"login": {
-					Input:  "loginInput",
-					Output: "token",
-				},
 				"logout": {},
 			}
 		})
