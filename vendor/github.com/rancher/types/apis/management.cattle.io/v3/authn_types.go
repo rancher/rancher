@@ -64,11 +64,12 @@ type Principal struct {
 
 //LoginInput structure defines all properties that can be sent by client to create a token
 type LoginInput struct {
-	TTLMillis        int              `json:"ttl,omitempty"`
-	Description      string           `json:"description,omitempty"`
-	ResponseType     string           `json:"responseType,omitempty"` //json or cookie
-	LocalCredential  LocalCredential  `json:"localCredential, omitempty"`
-	GithubCredential GithubCredential `json:"githubCredential, omitempty"`
+	TTLMillis                 int                       `json:"ttl,omitempty"`
+	Description               string                    `json:"description,omitempty"`
+	ResponseType              string                    `json:"responseType,omitempty"` //json or cookie
+	LocalCredential           LocalCredential           `json:"localCredential, omitempty"`
+	GithubCredential          GithubCredential          `json:"githubCredential, omitempty"`
+	ActiveDirectoryCredential ActiveDirectoryCredential `json:"activeDirectoryCredential, omitempty"`
 }
 
 //LocalCredential stores the local auth creds
@@ -108,7 +109,7 @@ type GithubConfig struct {
 	Hostname     string `json:"hostname,omitempty"`
 	Scheme       string `json:"scheme,omitempty"`
 	ClientID     string `json:"clientId,omitempty"`
-	ClientSecret string `json:"clientSecret,omitempty"`
+	ClientSecret string `json:"clientSecret,omitempty" norman:"writeOnly"`
 	Enabled      bool   `json:"enabled,omitempty"`
 }
 
@@ -129,4 +130,47 @@ type GithubConfigApplyInput struct {
 	GithubConfig     GithubConfig     `json:"githubConfig, omitempty"`
 	GithubCredential GithubCredential `json:"githubCredential, omitempty"`
 	Enabled          bool             `json:"enabled,omitempty"`
+}
+
+//ActiveDirectoryCredential stores the ActiveDirectory auth creds
+type ActiveDirectoryCredential struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+//ActiveDirectoryConfig structure contains the ActiveDirectory config definition
+type ActiveDirectoryConfig struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	AuthConfig        `json:",inline"`
+
+	Server                      string `json:"server,omitempty"`
+	Port                        int64  `json:"port,omitempty"`
+	UserDisabledBitMask         int64  `json:"userDisabledBitMask,omitempty"`
+	LoginDomain                 string `json:"loginDomain,omitempty"`
+	Domain                      string `json:"domain,omitempty"`
+	GroupSearchDomain           string `json:"groupSearchDomain,omitempty"`
+	ServiceAccountUsername      string `json:"serviceAccountUsername,omitempty"`
+	ServiceAccountPassword      string `json:"serviceAccountPassword,omitempty" norman:"writeOnly"`
+	TLS                         bool   `json:"tls,omitempty"`
+	UserSearchField             string `json:"userSearchField,omitempty"`
+	UserLoginField              string `json:"userLoginField,omitempty"`
+	UserObjectClass             string `json:"userObjectClass,omitempty"`
+	UserNameField               string `json:"userNameField,omitempty"`
+	UserEnabledAttribute        string `json:"userEnabledAttribute,omitempty"`
+	GroupSearchField            string `json:"groupSearchField,omitempty"`
+	GroupObjectClass            string `json:"groupObjectClass,omitempty"`
+	GroupNameField              string `json:"groupNameField,omitempty"`
+	GroupDNField                string `json:"groupDNField,omitempty"`
+	GroupMemberUserAttribute    string `json:"groupMemberUserAttribute,omitempty"`
+	GroupMemberMappingAttribute string `json:"groupMemberMappingAttribute,omitempty"`
+	ConnectionTimeout           int64  `json:"connectionTimeout,omitempty"`
+	Enabled                     bool   `json:"enabled,omitempty"`
+}
+
+//ActiveDirectoryConfigApplyInput structure defines all properties that can be sent by client to configure activedirectory
+type ActiveDirectoryConfigApplyInput struct {
+	ActiveDirectoryConfig     ActiveDirectoryConfig     `json:"activeDirectoryConfig, omitempty"`
+	ActiveDirectoryCredential ActiveDirectoryCredential `json:"activeDirectoryCredential, omitempty"`
+	Enabled                   bool                      `json:"enabled,omitempty"`
 }

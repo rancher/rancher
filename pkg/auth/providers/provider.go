@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/types/config"
 
 	"github.com/rancher/rancher/pkg/auth/providers/github"
+	"github.com/rancher/rancher/pkg/auth/providers/ldap/activedirectory"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
 )
 
@@ -16,7 +17,7 @@ var providers map[string]PrincipalProvider
 var providerOrderList []string
 
 func init() {
-	providerOrderList = []string{"github", "local"}
+	providerOrderList = []string{"github", "activedirectory", "local"}
 	providers = make(map[string]PrincipalProvider)
 }
 
@@ -44,6 +45,8 @@ func Configure(ctx context.Context, mgmtCtx *config.ManagementContext) {
 				providers[providerName] = local.Configure(ctx, mgmtCtx)
 			case "github":
 				providers[providerName] = github.Configure(ctx, mgmtCtx)
+			case "activedirectory":
+				providers[providerName] = activedirectory.Configure(ctx, mgmtCtx)
 			}
 		}
 	}
@@ -59,6 +62,8 @@ func AuthenticateUser(jsonInput v3.LoginInput) (v3.Principal, []v3.Principal, ma
 
 	if jsonInput.GithubCredential.Code != "" {
 		providerName = "github"
+	} else if jsonInput.ActiveDirectoryCredential.Username != "" {
+		providerName = "activedirectory"
 	} else if jsonInput.LocalCredential.Username != "" {
 		providerName = "local"
 	}

@@ -423,6 +423,10 @@ func addRoles(management *config.ManagementContext, local bool) error {
 		return err
 	}
 
+	if err := addAuthConfig("activedirectory", "activeDirectoryConfig", management); err != nil {
+		return err
+	}
+
 	return addAuthConfig("local", "localConfig", management)
 }
 

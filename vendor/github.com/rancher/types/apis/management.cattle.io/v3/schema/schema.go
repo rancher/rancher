@@ -152,6 +152,7 @@ func tokens(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.LoginInput{}).
 		MustImport(&Version, v3.LocalCredential{}).
 		MustImport(&Version, v3.GithubCredential{}).
+		MustImport(&Version, v3.ActiveDirectoryCredential{}).
 		MustImportAndCustomize(&Version, v3.Token{}, func(schema *types.Schema) {
 			schema.CollectionActions = map[string]types.Action{
 				"login": {
@@ -209,7 +210,19 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 			schema.BaseType = "authConfig"
 			schema.CollectionMethods = []string{}
 			schema.ResourceMethods = []string{http.MethodGet}
-		})
+		}).
+		MustImportAndCustomize(&Version, v3.ActiveDirectoryConfig{}, func(schema *types.Schema) {
+			schema.BaseType = "authConfig"
+			schema.ResourceActions = map[string]types.Action{
+				"testAndApply": {
+					Input:  "activeDirectoryConfigApplyInput",
+					Output: "activeDirectoryConfig",
+				},
+			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet}
+		}).
+		MustImport(&Version, v3.ActiveDirectoryConfigApplyInput{})
 }
 
 func stackTypes(schema *types.Schemas) *types.Schemas {
