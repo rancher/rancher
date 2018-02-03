@@ -83,6 +83,8 @@ func isCustom(obj *v3.Machine) bool {
 func (m *Lifecycle) Create(obj *v3.Machine) (*v3.Machine, error) {
 	if isCustom(obj) {
 		m.setupCustom(obj)
+		v3.MachineConditionReady.True(obj)
+		return obj, nil
 	}
 
 	if obj.Spec.MachineTemplateName == "" {
@@ -260,7 +262,7 @@ func (m *Lifecycle) Updated(obj *v3.Machine) (*v3.Machine, error) {
 		return obj, nil
 	}
 
-	newObj, err := v3.MachineConditionConfigReady.Once(obj, func() (runtime.Object, error) {
+	newObj, err := v3.MachineConditionReady.Once(obj, func() (runtime.Object, error) {
 		return m.ready(obj)
 	})
 	obj = newObj.(*v3.Machine)

@@ -9,6 +9,8 @@ import (
 	managementapi "github.com/rancher/rancher/pkg/api/management/server"
 	"github.com/rancher/rancher/pkg/auth/filter"
 	"github.com/rancher/rancher/pkg/auth/server"
+	"github.com/rancher/rancher/pkg/remotedialer"
+	"github.com/rancher/rancher/pkg/tunnel"
 	"github.com/rancher/rancher/server/capabilities"
 	"github.com/rancher/rancher/server/proxy"
 	"github.com/rancher/rancher/server/ui"
@@ -29,7 +31,11 @@ var (
 	}
 )
 
-func New(ctx context.Context, httpPort, httpsPort int, management *config.ManagementContext) error {
+type Server struct {
+	Tunneler *remotedialer.Server
+}
+
+func New(ctx context.Context, httpPort, httpsPort int, management *config.ManagementContext) (*Server, error) {
 	var result http.Handler
 	tokenAPI, err := server.NewTokenAPIHandler(ctx, management)
 
@@ -38,24 +44,29 @@ func New(ctx context.Context, httpPort, httpsPort int, management *config.Manage
 	})
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	k8sProxy, err := k8sProxy.New(management)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	authedHandler, err := filter.NewAuthenticationFilter(ctx, management,
-		newAuthed(tokenAPI, managementAPI, k8sProxy))
+	tunnel := tunnel.NewTunneler(management)
+
+	authedAPIs := newAuthed(tokenAPI, managementAPI, k8sProxy)
+
+	authedHandler, err := filter.NewAuthenticationFilter(ctx, management, authedAPIs)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	unauthed := mux.NewRouter()
 	unauthed.Handle("/", ui.UI(managementAPI))
+	unauthed.Handle("/v3/settings/cacerts", authedAPIs).Methods(http.MethodGet)
 	unauthed.PathPrefix("/v3/token").Handler(tokenAPI)
 	unauthed.NotFoundHandler = ui.UI(http.NotFoundHandler())
+	unauthed.PathPrefix("/v3/connect").Handler(tunnel)
 	unauthed.PathPrefix("/v3").Handler(authedHandler)
 	unauthed.PathPrefix("/meta").Handler(authedHandler)
 	unauthed.PathPrefix("/k8s/clusters/").Handler(authedHandler)
@@ -71,7 +82,9 @@ func New(ctx context.Context, httpPort, httpsPort int, management *config.Manage
 	registerHealth(unauthed)
 
 	result = unauthed
-	return nil
+	return &Server{
+		Tunneler: tunnel,
+	}, nil
 }
 
 func newAuthed(tokenAPI http.Handler, managementAPI http.Handler, k8sproxy http.Handler) *mux.Router {
