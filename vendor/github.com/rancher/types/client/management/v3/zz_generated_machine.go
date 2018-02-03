@@ -15,7 +15,6 @@ const (
 	MachineFieldCreatorID            = "creatorId"
 	MachineFieldCustomConfig         = "customConfig"
 	MachineFieldDescription          = "description"
-	MachineFieldExternalID           = "externalId"
 	MachineFieldHostname             = "hostname"
 	MachineFieldIPAddress            = "ipAddress"
 	MachineFieldImported             = "imported"
@@ -59,7 +58,6 @@ type Machine struct {
 	CreatorID            string                    `json:"creatorId,omitempty"`
 	CustomConfig         *CustomConfig             `json:"customConfig,omitempty"`
 	Description          string                    `json:"description,omitempty"`
-	ExternalID           string                    `json:"externalId,omitempty"`
 	Hostname             string                    `json:"hostname,omitempty"`
 	IPAddress            string                    `json:"ipAddress,omitempty"`
 	Imported             *bool                     `json:"imported,omitempty"`

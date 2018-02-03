@@ -27,7 +27,7 @@ func runHealthcheck(ctx context.Context, host *hosts.Host, port int, useTLS bool
 		return fmt.Errorf("Failed to initiate new HTTP client for service [%s] for host [%s]", serviceName, host.Address)
 	}
 	for retries := 0; retries < 10; retries++ {
-		if err = getHealthz(client, useTLS, serviceName, host.Address); err != nil {
+		if err = getHealthz(client, useTLS, serviceName, host.Address, port); err != nil {
 			logrus.Debugf("[healthcheck] %v", err)
 			time.Sleep(5 * time.Second)
 			continue
@@ -58,12 +58,12 @@ func getHealthCheckHTTPClient(host *hosts.Host, port int, localConnDialerFactory
 	}, nil
 }
 
-func getHealthz(client *http.Client, useTLS bool, serviceName, hostAddress string) error {
+func getHealthz(client *http.Client, useTLS bool, serviceName, hostAddress string, port int) error {
 	proto := HTTPProtoPrefix
 	if useTLS {
 		proto = HTTPSProtoPrefix
 	}
-	resp, err := client.Get(fmt.Sprintf("%s%s%s", proto, HealthzAddress, HealthzEndpoint))
+	resp, err := client.Get(fmt.Sprintf("%s%s:%d%s", proto, HealthzAddress, port, HealthzEndpoint))
 	if err != nil {
 		return fmt.Errorf("Failed to check %s for service [%s] on host [%s]: %v", HealthzEndpoint, serviceName, hostAddress, err)
 	}

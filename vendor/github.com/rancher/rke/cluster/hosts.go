@@ -10,6 +10,13 @@ import (
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
+)
+
+const (
+	etcdRoleLabel   = "node-role.kubernetes.io/etcd"
+	masterRoleLabel = "node-role.kubernetes.io/master"
+	workerRoleLabel = "node-role.kubernetes.io/worker"
 )
 
 func (c *Cluster) TunnelHosts(ctx context.Context, local bool) error {
@@ -45,8 +52,14 @@ func (c *Cluster) InvertIndexHosts() error {
 	for _, host := range c.Nodes {
 		newHost := hosts.Host{
 			RKEConfigNode: host,
+			ToAddLabels:   map[string]string{},
+			ToDelLabels:   map[string]string{},
+			ToAddTaints:   []string{},
+			ToDelTaints:   []string{},
 		}
-
+		for k, v := range host.Labels {
+			newHost.ToAddLabels[k] = v
+		}
 		newHost.IgnoreDockerVersion = c.IgnoreDockerVersion
 
 		for _, role := range host.Role {
@@ -54,16 +67,28 @@ func (c *Cluster) InvertIndexHosts() error {
 			switch role {
 			case services.ETCDRole:
 				newHost.IsEtcd = true
+				newHost.ToAddLabels[etcdRoleLabel] = "true"
 				c.EtcdHosts = append(c.EtcdHosts, &newHost)
 			case services.ControlRole:
 				newHost.IsControl = true
+				newHost.ToAddLabels[masterRoleLabel] = "true"
 				c.ControlPlaneHosts = append(c.ControlPlaneHosts, &newHost)
 			case services.WorkerRole:
 				newHost.IsWorker = true
+				newHost.ToAddLabels[workerRoleLabel] = "true"
 				c.WorkerHosts = append(c.WorkerHosts, &newHost)
 			default:
 				return fmt.Errorf("Failed to recognize host [%s] role %s", host.Address, role)
 			}
+		}
+		if !newHost.IsEtcd {
+			newHost.ToDelLabels[etcdRoleLabel] = "true"
+		}
+		if !newHost.IsControl {
+			newHost.ToDelLabels[masterRoleLabel] = "true"
+		}
+		if !newHost.IsWorker {
+			newHost.ToDelLabels[workerRoleLabel] = "true"
 		}
 	}
 	return nil
@@ -72,14 +97,16 @@ func (c *Cluster) InvertIndexHosts() error {
 func (c *Cluster) SetUpHosts(ctx context.Context) error {
 	if c.Authentication.Strategy == X509AuthenticationProvider {
 		log.Infof(ctx, "[certificates] Deploying kubernetes certificates to Cluster nodes")
-		if err := pki.DeployCertificatesOnMasters(ctx, c.ControlPlaneHosts, c.Certificates, c.SystemImages.CertDownloader, c.PrivateRegistriesMap); err != nil {
-			return err
+		hosts := c.getUniqueHostList()
+		var errgrp errgroup.Group
+
+		for _, host := range hosts {
+			runHost := host
+			errgrp.Go(func() error {
+				return pki.DeployCertificatesOnPlaneHost(ctx, runHost, c.EtcdHosts, c.Certificates, c.SystemImages.CertDownloader, c.PrivateRegistriesMap)
+			})
 		}
-		if err := pki.DeployCertificatesOnWorkers(ctx, c.WorkerHosts, c.Certificates, c.SystemImages.CertDownloader, c.PrivateRegistriesMap); err != nil {
-			return err
-		}
-		// Deploying etcd certificates
-		if err := pki.DeployCertificatesOnEtcd(ctx, c.EtcdHosts, c.Certificates, c.SystemImages.CertDownloader, c.PrivateRegistriesMap); err != nil {
+		if err := errgrp.Wait(); err != nil {
 			return err
 		}
 

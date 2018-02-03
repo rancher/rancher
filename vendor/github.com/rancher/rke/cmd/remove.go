@@ -46,7 +46,7 @@ func ClusterRemove(
 	dialerFactory hosts.DialerFactory,
 	local bool, configDir string) error {
 
-	logrus.Infof("Tearing down Kubernetes cluster")
+	log.Infof(ctx, "Tearing down Kubernetes cluster")
 	kubeCluster, err := cluster.ParseCluster(ctx, rkeConfig, clusterFilePath, configDir, dialerFactory, nil)
 	if err != nil {
 		return err
@@ -98,6 +98,17 @@ func clusterRemoveFromCli(ctx *cli.Context) error {
 
 func clusterRemoveLocal(ctx *cli.Context) error {
 	var rkeConfig *v3.RancherKubernetesEngineConfig
-	rkeConfig = cluster.GetLocalRKEConfig()
+	clusterFile, filePath, err := resolveClusterFile(ctx)
+	if err != nil {
+		log.Infof(context.Background(), "Failed to resolve cluster file, using default cluster instead")
+		rkeConfig = cluster.GetLocalRKEConfig()
+	} else {
+		clusterFilePath = filePath
+		rkeConfig, err = cluster.ParseConfig(clusterFile)
+		if err != nil {
+			return fmt.Errorf("Failed to parse cluster file: %v", err)
+		}
+		rkeConfig.Nodes = []v3.RKEConfigNode{*cluster.GetLocalRKENodeConfig()}
+	}
 	return ClusterRemove(context.Background(), rkeConfig, nil, true, "")
 }

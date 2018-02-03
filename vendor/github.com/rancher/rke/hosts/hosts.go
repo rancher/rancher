@@ -25,6 +25,10 @@ type Host struct {
 	ToAddEtcdMember     bool
 	ExistingEtcdCluster bool
 	SavedKeyPhrase      string
+	ToAddLabels         map[string]string
+	ToDelLabels         map[string]string
+	ToAddTaints         []string
+	ToDelTaints         []string
 }
 
 const (

@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	taintKey = "node-role.kubernetes.io/etcd"
+	unschedulableEtcdTaint = "node-role.kubernetes.io/etcd=true:NoExecute"
 )
 
 func ReconcileCluster(ctx context.Context, kubeCluster, currentCluster *Cluster) error {
@@ -31,6 +31,8 @@ func ReconcileCluster(ctx context.Context, kubeCluster, currentCluster *Cluster)
 	if err != nil {
 		return fmt.Errorf("Failed to initialize new kubernetes client: %v", err)
 	}
+	// sync node labels to define the toDelete labels
+	syncLabels(ctx, currentCluster, kubeCluster)
 
 	if err := reconcileEtcd(ctx, currentCluster, kubeCluster, kubeClient); err != nil {
 		return fmt.Errorf("Failed to reconcile etcd plane: %v", err)
@@ -66,9 +68,7 @@ func reconcileWorker(ctx context.Context, currentCluster, kubeCluster *Cluster, 
 	toAddHosts := hosts.GetToAddHosts(currentCluster.WorkerHosts, kubeCluster.WorkerHosts)
 	for _, host := range toAddHosts {
 		if host.IsEtcd {
-			if err := hosts.RemoveTaintFromHost(ctx, host, taintKey, kubeClient); err != nil {
-				return fmt.Errorf("[reconcile] Failed to remove unschedulable taint from node [%s]", host.Address)
-			}
+			host.ToDelTaints = append(host.ToDelTaints, unschedulableEtcdTaint)
 		}
 	}
 	return nil
@@ -111,9 +111,7 @@ func reconcileControl(ctx context.Context, currentCluster, kubeCluster *Cluster,
 	toAddHosts := hosts.GetToAddHosts(currentCluster.ControlPlaneHosts, kubeCluster.ControlPlaneHosts)
 	for _, host := range toAddHosts {
 		if host.IsEtcd {
-			if err := hosts.RemoveTaintFromHost(ctx, host, taintKey, kubeClient); err != nil {
-				log.Warnf(ctx, "[reconcile] Failed to remove unschedulable taint from node [%s]", host.Address)
-			}
+			host.ToDelTaints = append(host.ToDelTaints, unschedulableEtcdTaint)
 		}
 	}
 	return nil
@@ -149,7 +147,7 @@ func reconcileHost(ctx context.Context, toDeleteHost *hosts.Host, worker, etcd b
 }
 
 func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, kubeClient *kubernetes.Clientset) error {
-	logrus.Infof("[reconcile] Check etcd hosts to be deleted")
+	log.Infof(ctx, "[reconcile] Check etcd hosts to be deleted")
 	// get tls for the first current etcd host
 	clientCert := cert.EncodeCertPEM(currentCluster.Certificates[pki.KubeNodeCertName].Certificate)
 	clientkey := cert.EncodePrivateKeyPEM(currentCluster.Certificates[pki.KubeNodeCertName].Key)
@@ -204,4 +202,21 @@ func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, ku
 		}
 	}
 	return nil
+}
+
+func syncLabels(ctx context.Context, currentCluster, kubeCluster *Cluster) {
+	currentHosts := currentCluster.getUniqueHostList()
+	configHosts := kubeCluster.getUniqueHostList()
+	for _, host := range configHosts {
+		for _, currentHost := range currentHosts {
+			if host.Address == currentHost.Address {
+				for k, v := range currentHost.Labels {
+					if _, ok := host.Labels[k]; !ok {
+						host.ToDelLabels[k] = v
+					}
+				}
+				break
+			}
+		}
+	}
 }

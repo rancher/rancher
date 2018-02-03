@@ -13,11 +13,20 @@ import (
 const (
 	KubeDNSAddonResourceName = "rke-kubedns-addon"
 	UserAddonResourceName    = "rke-user-addon"
+	IngressAddonResourceName = "rke-ingress-controller"
 )
 
+type ingressOptions struct {
+	RBACConfig   string
+	Options      map[string]string
+	NodeSelector map[string]string
+}
+
 func (c *Cluster) DeployK8sAddOns(ctx context.Context) error {
-	err := c.deployKubeDNS(ctx)
-	return err
+	if err := c.deployKubeDNS(ctx); err != nil {
+		return err
+	}
+	return c.deployIngress(ctx)
 }
 
 func (c *Cluster) DeployUserAddOns(ctx context.Context) error {
@@ -111,5 +120,28 @@ func (c *Cluster) ApplySystemAddonExcuteJob(addonJob string) error {
 		fmt.Println(err)
 		return err
 	}
+	return nil
+}
+
+func (c *Cluster) deployIngress(ctx context.Context) error {
+	log.Infof(ctx, "[ingress] Setting up %s ingress controller", c.Ingress.Type)
+	if c.Ingress.Type == "none" {
+		log.Infof(ctx, "[ingress] ingress controller is not defined")
+		return nil
+	}
+	ingressConfig := ingressOptions{
+		RBACConfig:   c.Authorization.Mode,
+		Options:      c.Ingress.Options,
+		NodeSelector: c.Ingress.NodeSelector,
+	}
+	// Currently only deploying nginx ingress controller
+	ingressYaml, err := addons.GetNginxIngressManifest(ingressConfig)
+	if err != nil {
+		return err
+	}
+	if err := c.doAddonDeploy(ctx, ingressYaml, IngressAddonResourceName); err != nil {
+		return err
+	}
+	log.Infof(ctx, "[ingress] ingress controller %s is successfully deployed", c.Ingress.Type)
 	return nil
 }

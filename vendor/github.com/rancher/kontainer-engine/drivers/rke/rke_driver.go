@@ -27,6 +27,7 @@ const (
 // Driver is the struct of rke driver
 type Driver struct {
 	DockerDialer       hosts.DialerFactory
+	LocalDialer        hosts.DialerFactory
 	driverCapabilities types.Capabilities
 
 	types.UnimplementedVersionAccess
@@ -106,7 +107,7 @@ func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions) (*types.
 	if err != nil {
 		return nil, err
 	}
-	APIURL, caCrt, clientCert, clientKey, err := cmd.ClusterUp(ctx, &rkeConfig, d.DockerDialer, nil, false, stateDir)
+	APIURL, caCrt, clientCert, clientKey, err := cmd.ClusterUp(ctx, &rkeConfig, d.DockerDialer, d.LocalDialer, false, stateDir)
 	if err != nil {
 		return d.save(&types.ClusterInfo{
 			Metadata: map[string]string{
@@ -143,7 +144,7 @@ func (d *Driver) Update(ctx context.Context, clusterInfo *types.ClusterInfo, opt
 		return nil, err
 	}
 
-	APIURL, caCrt, clientCert, clientKey, err := cmd.ClusterUp(ctx, &rkeConfig, d.DockerDialer, nil, false, stateDir)
+	APIURL, caCrt, clientCert, clientKey, err := cmd.ClusterUp(ctx, &rkeConfig, d.DockerDialer, d.LocalDialer, false, stateDir)
 	if err != nil {
 		return nil, err
 	}

@@ -20,76 +20,35 @@ import (
 	"k8s.io/client-go/util/cert"
 )
 
-func DeployCertificatesOnMasters(ctx context.Context, cpHosts []*hosts.Host, crtMap map[string]CertificatePKI, certDownloaderImage string, prsMap map[string]v3.PrivateRegistry) error {
-	// list of certificates that should be deployed on the masters
-	crtList := []string{
-		CACertName,
-		KubeAPICertName,
-		KubeControllerCertName,
-		KubeSchedulerCertName,
-		KubeProxyCertName,
-		KubeNodeCertName,
+func DeployCertificatesOnPlaneHost(ctx context.Context, host *hosts.Host, etcdHosts []*hosts.Host, crtMap map[string]CertificatePKI, certDownloaderImage string, prsMap map[string]v3.PrivateRegistry) error {
+	certList := []string{}
+	if host.IsControl {
+		certList = []string{
+			CACertName,
+			KubeAPICertName,
+			KubeControllerCertName,
+			KubeSchedulerCertName,
+			KubeProxyCertName,
+			KubeNodeCertName,
+		}
+	} else {
+		certList = []string{
+			CACertName,
+			KubeProxyCertName,
+			KubeNodeCertName,
+		}
+	}
+	if host.IsEtcd {
+		for _, host := range etcdHosts {
+			certList = append(certList, GetEtcdCrtName(host.InternalAddress))
+		}
 	}
 	env := []string{}
-	for _, crtName := range crtList {
+	for _, crtName := range certList {
 		c := crtMap[crtName]
 		env = append(env, c.ToEnv()...)
 	}
-
-	for i := range cpHosts {
-		err := doRunDeployer(ctx, cpHosts[i], env, certDownloaderImage, prsMap)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func DeployCertificatesOnWorkers(ctx context.Context, workerHosts []*hosts.Host, crtMap map[string]CertificatePKI, certDownloaderImage string, prsMap map[string]v3.PrivateRegistry) error {
-	// list of certificates that should be deployed on the workers
-	crtList := []string{
-		CACertName,
-		KubeProxyCertName,
-		KubeNodeCertName,
-	}
-	env := []string{}
-	for _, crtName := range crtList {
-		c := crtMap[crtName]
-		env = append(env, c.ToEnv()...)
-	}
-
-	for i := range workerHosts {
-		err := doRunDeployer(ctx, workerHosts[i], env, certDownloaderImage, prsMap)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func DeployCertificatesOnEtcd(ctx context.Context, etcdHosts []*hosts.Host, crtMap map[string]CertificatePKI, certDownloaderImage string, prsMap map[string]v3.PrivateRegistry) error {
-	// list of certificates that should be deployed on the etcd
-	crtList := []string{
-		CACertName,
-		KubeProxyCertName,
-		KubeNodeCertName,
-	}
-	for _, host := range etcdHosts {
-		crtList = append(crtList, GetEtcdCrtName(host.InternalAddress))
-	}
-	env := []string{}
-	for _, crtName := range crtList {
-		c := crtMap[crtName]
-		env = append(env, c.ToEnv()...)
-	}
-
-	for i := range etcdHosts {
-		err := doRunDeployer(ctx, etcdHosts[i], env, certDownloaderImage, prsMap)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return doRunDeployer(ctx, host, env, certDownloaderImage, prsMap)
 }
 
 func doRunDeployer(ctx context.Context, host *hosts.Host, containerEnv []string, certDownloaderImage string, prsMap map[string]v3.PrivateRegistry) error {

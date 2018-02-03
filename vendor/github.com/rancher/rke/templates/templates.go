@@ -5,7 +5,7 @@ import (
 	"text/template"
 )
 
-func CompileTemplateFromMap(tmplt string, configMap map[string]string) (string, error) {
+func CompileTemplateFromMap(tmplt string, configMap interface{}) (string, error) {
 	out := new(bytes.Buffer)
 	t := template.Must(template.New("compiled_template").Parse(tmplt))
 	if err := t.Execute(out, configMap); err != nil {

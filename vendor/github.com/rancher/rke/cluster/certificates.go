@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/cert"
 )
@@ -106,11 +107,17 @@ func getClusterCerts(ctx context.Context, kubeClient *kubernetes.Clientset, etcd
 
 func saveClusterCerts(ctx context.Context, kubeClient *kubernetes.Clientset, crts map[string]pki.CertificatePKI) error {
 	log.Infof(ctx, "[certificates] Save kubernetes certificates as secrets")
+	var errgrp errgroup.Group
 	for crtName, crt := range crts {
-		err := saveCertToKubernetes(kubeClient, crtName, crt)
-		if err != nil {
-			return fmt.Errorf("Failed to save certificate [%s] to kubernetes: %v", crtName, err)
-		}
+		name := crtName
+		certificate := crt
+		errgrp.Go(func() error {
+			return saveCertToKubernetes(kubeClient, name, certificate)
+		})
+	}
+	if err := errgrp.Wait(); err != nil {
+		return err
+
 	}
 	log.Infof(ctx, "[certificates] Successfully saved certificates as kubernetes secret [%s]", pki.CertificatesSecretName)
 	return nil
@@ -119,39 +126,24 @@ func saveClusterCerts(ctx context.Context, kubeClient *kubernetes.Clientset, crt
 func saveCertToKubernetes(kubeClient *kubernetes.Clientset, crtName string, crt pki.CertificatePKI) error {
 	logrus.Debugf("[certificates] Saving certificate [%s] to kubernetes", crtName)
 	timeout := make(chan bool, 1)
+
+	// build secret Data
+	secretData := map[string][]byte{
+		"Certificate": cert.EncodeCertPEM(crt.Certificate),
+		"Key":         cert.EncodePrivateKeyPEM(crt.Key),
+		"EnvName":     []byte(crt.EnvName),
+		"KeyEnvName":  []byte(crt.KeyEnvName),
+	}
+	if len(crt.Config) > 0 {
+		secretData["ConfigEnvName"] = []byte(crt.ConfigEnvName)
+		secretData["Config"] = []byte(crt.Config)
+	}
 	go func() {
 		for {
-			err := k8s.UpdateSecret(kubeClient, "Certificate", cert.EncodeCertPEM(crt.Certificate), crtName)
+			err := k8s.UpdateSecret(kubeClient, secretData, crtName)
 			if err != nil {
 				time.Sleep(time.Second * 5)
 				continue
-			}
-			err = k8s.UpdateSecret(kubeClient, "Key", cert.EncodePrivateKeyPEM(crt.Key), crtName)
-			if err != nil {
-				time.Sleep(time.Second * 5)
-				continue
-			}
-			err = k8s.UpdateSecret(kubeClient, "EnvName", []byte(crt.EnvName), crtName)
-			if err != nil {
-				time.Sleep(time.Second * 5)
-				continue
-			}
-			err = k8s.UpdateSecret(kubeClient, "KeyEnvName", []byte(crt.KeyEnvName), crtName)
-			if err != nil {
-				time.Sleep(time.Second * 5)
-				continue
-			}
-			if len(crt.Config) > 0 {
-				err = k8s.UpdateSecret(kubeClient, "ConfigEnvName", []byte(crt.ConfigEnvName), crtName)
-				if err != nil {
-					time.Sleep(time.Second * 5)
-					continue
-				}
-				err = k8s.UpdateSecret(kubeClient, "Config", []byte(crt.Config), crtName)
-				if err != nil {
-					time.Sleep(time.Second * 5)
-					continue
-				}
 			}
 			timeout <- true
 			break
