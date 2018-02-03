@@ -62,26 +62,6 @@ type Principal struct {
 	ExtraInfo      map[string]string `json:"extraInfo,omitempty"`
 }
 
-//LoginInput structure defines all properties that can be sent by client to create a token
-type LoginInput struct {
-	TTLMillis        int              `json:"ttl,omitempty"`
-	Description      string           `json:"description,omitempty"`
-	ResponseType     string           `json:"responseType,omitempty"` //json or cookie
-	LocalCredential  LocalCredential  `json:"localCredential, omitempty"`
-	GithubCredential GithubCredential `json:"githubCredential, omitempty"`
-}
-
-//LocalCredential stores the local auth creds
-type LocalCredential struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
-//GithubCredential stores the github auth creds
-type GithubCredential struct {
-	Code string `json:"code"`
-}
-
 type ChangePasswordInput struct {
 	CurrentPassword string `json:"currentPassword" norman:"type=string,required"`
 	NewPassword     string `json:"newPassword" norman:"type=string,required"`
@@ -126,7 +106,7 @@ type GithubConfigTestInput struct {
 
 //GithubConfigApplyInput structure defines all properties that can be sent by client to configure github
 type GithubConfigApplyInput struct {
-	GithubConfig     GithubConfig     `json:"githubConfig, omitempty"`
-	GithubCredential GithubCredential `json:"githubCredential, omitempty"`
-	Enabled          bool             `json:"enabled,omitempty"`
+	GithubConfig GithubConfig `json:"githubConfig, omitempty"`
+	Code         string       `json:"code,omitempty"`
+	Enabled      bool         `json:"enabled,omitempty"`
 }
