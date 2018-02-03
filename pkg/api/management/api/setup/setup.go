@@ -2,7 +2,6 @@ package setup
 
 import (
 	"context"
-	"encoding/base64"
 
 	"github.com/rancher/norman/api/builtin"
 	"github.com/rancher/norman/pkg/subscribe"
@@ -29,7 +28,6 @@ import (
 	"github.com/rancher/types/client/management/v3"
 	projectclient "github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/config"
-	"github.com/satori/uuid"
 )
 
 var (
@@ -135,11 +133,13 @@ func ClusterRegistrationTokens(schemas *types.Schemas) {
 		Store: schema.Store,
 	}
 	schema.Formatter = func(request *types.APIContext, resource *types.RawResource) {
-		token := base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(uuid.NewV4().Bytes())
-		url := request.URLBuilder.RelativeToRoot("/" + token + ".yaml")
-		resource.Values["command"] = "kubectl apply -f " + url
-		resource.Values["token"] = token
-		resource.Values["manifestUrl"] = url
+		token, _ := resource.Values["token"].(string)
+		if token != "" {
+			url := request.URLBuilder.RelativeToRoot("/" + token + ".yaml")
+			resource.Values["command"] = "kubectl apply -f " + url
+			resource.Values["token"] = token
+			resource.Values["manifestUrl"] = url
+		}
 	}
 }
 
