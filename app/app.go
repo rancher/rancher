@@ -1,16 +1,16 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"crypto/x509"
-	"log"
-
+	"encoding/pem"
 	"time"
 
-	"bytes"
-	"encoding/pem"
+	"fmt"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/dialer"
 	managementController "github.com/rancher/rancher/pkg/management/controller"
 	"github.com/rancher/rancher/server"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -56,14 +56,24 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 			break
 		}
 		logrus.Infof("Waiting for server to become available: %v", err)
-		time.Sleep(2 * time.Second)
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("startup canceled")
+		case <-time.After(2 * time.Second):
+		}
 	}
 
-	if err := server.New(ctx, cfg.HTTPListenPort, cfg.HTTPSListenPort, management); err != nil {
+	server, err := server.New(ctx, cfg.HTTPListenPort, cfg.HTTPSListenPort, management)
+	if err != nil {
 		return err
 	}
 
-	managementController.Register(ctx, management)
+	dialerFactory, err := dialer.NewFactory(management, server.Tunneler)
+	if err != nil {
+		return err
+	}
+
+	managementController.Register(ctx, management, dialerFactory)
 	if err := management.Start(ctx); err != nil {
 		return err
 	}
@@ -73,10 +83,6 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 	}
 
 	<-ctx.Done()
-	if ctx.Err() != nil {
-		log.Fatal(ctx.Err())
-	}
-
 	return ctx.Err()
 }
 

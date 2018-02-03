@@ -4,7 +4,9 @@ import (
 	"context"
 	"os"
 
+	"github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/management/controller"
+	"github.com/rancher/rancher/pkg/tunnel"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -43,7 +45,14 @@ func run(kubeConfigFile string) error {
 		return err
 	}
 
-	controller.Register(context.Background(), management)
+	tunneler := tunnel.NewTunneler(management)
+
+	d, err := dialer.NewFactory(management, tunneler)
+	if err != nil {
+		return err
+	}
+
+	controller.Register(context.Background(), management, d)
 
 	return management.StartAndWait()
 }

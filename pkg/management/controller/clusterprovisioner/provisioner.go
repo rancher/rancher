@@ -4,12 +4,15 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"net/url"
 	"reflect"
 	"sort"
 	"strings"
 	"time"
 
-	"net/url"
+	"io"
+
+	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/kontainer-engine/drivers"
@@ -21,9 +24,8 @@ import (
 	"github.com/rancher/norman/event"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
+	"github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/machine/store"
-	machineconfig "github.com/rancher/rancher/pkg/machine/store/config"
-	"github.com/rancher/rancher/pkg/management/dialer"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -50,7 +52,7 @@ type Provisioner struct {
 	EventLogger       event.Logger
 }
 
-func Register(management *config.ManagementContext) {
+func Register(management *config.ManagementContext, dialerFactory dialer.Factory) {
 	store, err := store.NewGenericEncrypedStore("c-", "", management.Core.Namespaces(""),
 		management.K8sClient.CoreV1())
 	if err != nil {
@@ -72,21 +74,18 @@ func Register(management *config.ManagementContext) {
 	p.Clusters.AddLifecycle("cluster-provisioner-controller", p)
 	management.Management.Machines("").AddHandler("cluster-provisioner-controller", p.machineChanged)
 
-	// Setup custom dialer to RKE
-	secretStore, err := machineconfig.NewStore(management)
-	if err != nil {
-		logrus.Fatal(err)
+	local := &RKEDialerFactory{
+		Factory: dialerFactory,
 	}
-
-	d := &dialer.TLSDialerFactory{
-		Store:           secretStore,
-		MachineClient:   management.Management.Machines(""),
-		ConfigMapGetter: management.K8sClient.CoreV1(),
+	docker := &RKEDialerFactory{
+		Factory: dialerFactory,
+		Docker:  true,
 	}
 
 	driver := service.Drivers["rke"]
 	rkeDriver := driver.(*rke.Driver)
-	rkeDriver.DockerDialer = d.Build
+	rkeDriver.DockerDialer = docker.Build
+	rkeDriver.LocalDialer = local.Build
 }
 
 func (p *Provisioner) Remove(cluster *v3.Cluster) (*v3.Cluster, error) {
@@ -409,7 +408,7 @@ func (p *Provisioner) reconcileRKENodes(clusterName string) (bool, []v3.RKEConfi
 			continue
 		}
 
-		if !v3.MachineConditionProvisioned.IsTrue(machine) {
+		if !v3.MachineConditionReady.IsTrue(machine) {
 			continue
 		}
 
@@ -419,7 +418,17 @@ func (p *Provisioner) reconcileRKENodes(clusterName string) (bool, []v3.RKEConfi
 		if slice.ContainsString(machine.Status.NodeConfig.Role, "controlplane") {
 			controlplane = true
 		}
-		nodes = append(nodes, *machine.Status.NodeConfig)
+		node := *machine.Status.NodeConfig
+		if node.User == "" {
+			node.User = "root"
+		}
+		if len(node.Role) == 0 {
+			node.Role = []string{"worker"}
+		}
+		if node.MachineName == "" {
+			node.MachineName = fmt.Sprintf("%s:%s", machine.Namespace, machine.Name)
+		}
+		nodes = append(nodes, node)
 	}
 
 	if !etcd || !controlplane {
@@ -510,36 +519,59 @@ func (p *Provisioner) driverRemove(cluster *v3.Cluster) error {
 	return err
 }
 
-func (p *Provisioner) getCtx(cluster *v3.Cluster, cond condition.Cond) (context.Context, logstream.LoggerStream) {
+func (p *Provisioner) logEvent(cluster *v3.Cluster, event logstream.LogEvent, cond condition.Cond) *v3.Cluster {
+	if event.Error {
+		p.EventLogger.Error(cluster, event.Message)
+		logrus.Errorf("cluster [%s] provisioning: %s", cluster.Name, event.Message)
+	} else {
+		p.EventLogger.Info(cluster, event.Message)
+		logrus.Infof("cluster [%s] provisioning: %s", cluster.Name, event.Message)
+	}
+	if cond.GetMessage(cluster) != event.Message {
+		updated := false
+		for i := 0; i < 2 && !updated; i++ {
+			if event.Error {
+				cond.False(cluster)
+			} else {
+				cond.Unknown(cluster)
+			}
+			cond.Message(cluster, event.Message)
+			if newCluster, err := p.Clusters.Update(cluster); err == nil {
+				updated = true
+				cluster = newCluster
+			} else {
+				newCluster, err = p.Clusters.Get(cluster.Name, metav1.GetOptions{})
+				if err == nil {
+					cluster = newCluster
+				}
+			}
+		}
+	}
+	return cluster
+}
+
+func (p *Provisioner) getCtx(cluster *v3.Cluster, cond condition.Cond) (context.Context, io.Closer) {
 	logger := logstream.NewLogStream()
 	ctx := metadata.NewOutgoingContext(context.Background(), metadata.New(map[string]string{
 		"log-id": logger.ID(),
 	}))
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
 	go func() {
+		defer wg.Done()
 		for event := range logger.Stream() {
-			if event.Error {
-				p.EventLogger.Error(cluster, event.Message)
-				logrus.Errorf("cluster [%s] provisioning: %s", cluster.Name, event.Message)
-			} else {
-				p.EventLogger.Info(cluster, event.Message)
-				logrus.Infof("cluster [%s] provisioning: %s", cluster.Name, event.Message)
-			}
-			if cond.GetMessage(cluster) != event.Message {
-				updated := false
-				for i := 0; i < 2 && !updated; i++ {
-					cond.Message(cluster, event.Message)
-					if newCluster, err := p.Clusters.Update(cluster); err == nil {
-						updated = true
-						cluster = newCluster
-					} else {
-						newCluster, err = p.Clusters.Get(cluster.Name, metav1.GetOptions{})
-						if err == nil {
-							cluster = newCluster
-						}
-					}
-				}
-			}
+			cluster = p.logEvent(cluster, event, cond)
 		}
 	}()
-	return ctx, logger
+
+	return ctx, closerFunc(func() error {
+		logger.Close()
+		wg.Wait()
+		return nil
+	})
 }
+
+type closerFunc func() error
+
+func (f closerFunc) Close() error { return f() }

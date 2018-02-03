@@ -151,9 +151,13 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.Links["machineConfig"] = apiContext.URLBuilder.Link("machineConfig", resource)
 
 	// remove link
-	machineTemplateID, ok := resource.Values["machineTemplateId"]
-	if !ok || machineTemplateID == nil {
-		delete(resource.Links, "remove")
+	machineTemplateID := resource.Values["machineTemplateId"]
+	customConfig := resource.Values["customConfig"]
+	if machineTemplateID == nil {
 		delete(resource.Links, "machineConfig")
+	}
+
+	if machineTemplateID == nil && customConfig == nil {
+		delete(resource.Links, "remove")
 	}
 }
