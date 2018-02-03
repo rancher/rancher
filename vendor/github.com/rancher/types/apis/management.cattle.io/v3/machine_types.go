@@ -72,14 +72,13 @@ type MachineStatus struct {
 	NodeAnnotations     map[string]string    `json:"nodeAnnotations,omitempty"`
 	NodeLabels          map[string]string    `json:"nodeLabels,omitempty"`
 	NodeTaints          []v1.Taint           `json:"nodeTaints,omitempty"`
-	ExternalID          string               `json:"externalId,omitempty"`
 }
 
 var (
 	MachineConditionInitialized condition.Cond = "Initialized"
 	MachineConditionProvisioned condition.Cond = "Provisioned"
 	MachineConditionConfigSaved condition.Cond = "Saved"
-	MachineConditionConfigReady condition.Cond = "Ready"
+	MachineConditionReady       condition.Cond = "Ready"
 )
 
 type MachineCondition struct {

@@ -8,7 +8,6 @@ import (
 
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
-	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/util/cert"
 )
 
@@ -29,7 +28,7 @@ type CertificatePKI struct {
 
 // StartCertificatesGeneration ...
 func StartCertificatesGeneration(ctx context.Context, cpHosts, etcdHosts []*hosts.Host, clusterDomain, localConfigPath string, KubernetesServiceIP net.IP) (map[string]CertificatePKI, error) {
-	logrus.Infof("[certificates] Generating kubernetes certificates")
+	log.Infof(ctx, "[certificates] Generating kubernetes certificates")
 	certs, err := generateCerts(ctx, cpHosts, etcdHosts, clusterDomain, localConfigPath, KubernetesServiceIP)
 	if err != nil {
 		return nil, err
@@ -89,7 +88,7 @@ func generateCerts(ctx context.Context, cpHosts, etcdHosts []*hosts.Host, cluste
 	certs[KubeNodeCertName] = ToCertObject(KubeNodeCertName, KubeNodeCommonName, KubeNodeOrganizationName, nodeCrt, nodeKey)
 
 	// generate Admin certificate and key
-	logrus.Infof("[certificates] Generating admin certificates and kubeconfig")
+	log.Infof(ctx, "[certificates] Generating admin certificates and kubeconfig")
 	kubeAdminCrt, kubeAdminKey, err := GenerateSignedCertAndKey(caCrt, caKey, false, KubeAdminCertName, nil, nil, []string{KubeAdminOrganizationName})
 	if err != nil {
 		return nil, err
@@ -108,7 +107,7 @@ func generateCerts(ctx context.Context, cpHosts, etcdHosts []*hosts.Host, cluste
 
 	etcdAltNames := GetAltNames(etcdHosts, clusterDomain, KubernetesServiceIP)
 	for _, host := range etcdHosts {
-		logrus.Infof("[certificates] Generating etcd-%s certificate and key", host.InternalAddress)
+		log.Infof(ctx, "[certificates] Generating etcd-%s certificate and key", host.InternalAddress)
 		etcdCrt, etcdKey, err := GenerateSignedCertAndKey(caCrt, caKey, true, EtcdCertName, etcdAltNames, nil, nil)
 		if err != nil {
 			return nil, err

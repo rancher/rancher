@@ -186,7 +186,7 @@ spec:
           operator: "Exists"
         - key: "node-role.kubernetes.io/etcd"
           operator: "Exists"
-          effect: "NoSchedule"
+          effect: "NoExecute"
       containers:
         # Runs calico/node container on each Kubernetes node.  This
         # container programs network policy and routes on each

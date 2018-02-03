@@ -31,6 +31,11 @@ func (c *Cluster) ValidateCluster() error {
 		return err
 	}
 
+	// validate Ingress options
+	if err := validateIngressOptions(c); err != nil {
+		return err
+	}
+
 	// validate services options
 	return validateServicesOptions(c)
 }
@@ -88,6 +93,14 @@ func validateServicesOptions(c *Cluster) error {
 		if len(OptionValue) == 0 {
 			return fmt.Errorf("%s can't be empty", strings.Join(strings.Split(optionName, "_"), " "))
 		}
+	}
+	return nil
+}
+
+func validateIngressOptions(c *Cluster) error {
+	// Should be changed when adding more ingress types
+	if c.Ingress.Type != DefaultIngressController && c.Ingress.Type != "none" {
+		return fmt.Errorf("Ingress controller %s is incorrect", c.Ingress.Type)
 	}
 	return nil
 }

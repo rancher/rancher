@@ -9,15 +9,23 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+const (
+	unschedulableEtcdTaint = "node-role.kubernetes.io/etcd=true:NoExecute"
+)
+
 func RunWorkerPlane(ctx context.Context, controlHosts, workerHosts, etcdHosts []*hosts.Host, workerServices v3.RKEConfigServices, nginxProxyImage, sidekickImage string, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry) error {
 	log.Infof(ctx, "[%s] Building up Worker Plane..", WorkerRole)
 	var errgrp errgroup.Group
 
 	// Deploy worker components on etcd hosts
 	for _, host := range etcdHosts {
+		if !host.IsControl && !host.IsWorker {
+			// Add unschedulable taint
+			host.ToAddTaints = append(host.ToAddTaints, unschedulableEtcdTaint)
+		}
 		etcdHost := host
 		errgrp.Go(func() error {
-			return doDeployWorkerPlane(ctx, etcdHost, workerServices, nginxProxyImage, sidekickImage, localConnDialerFactory, controlHosts, true, prsMap)
+			return doDeployWorkerPlane(ctx, etcdHost, workerServices, nginxProxyImage, sidekickImage, localConnDialerFactory, controlHosts, prsMap)
 		})
 	}
 	if err := errgrp.Wait(); err != nil {
@@ -28,7 +36,7 @@ func RunWorkerPlane(ctx context.Context, controlHosts, workerHosts, etcdHosts []
 	for _, host := range controlHosts {
 		controlHost := host
 		errgrp.Go(func() error {
-			return doDeployWorkerPlane(ctx, controlHost, workerServices, nginxProxyImage, sidekickImage, localConnDialerFactory, controlHosts, false, prsMap)
+			return doDeployWorkerPlane(ctx, controlHost, workerServices, nginxProxyImage, sidekickImage, localConnDialerFactory, controlHosts, prsMap)
 		})
 	}
 	if err := errgrp.Wait(); err != nil {
@@ -38,7 +46,7 @@ func RunWorkerPlane(ctx context.Context, controlHosts, workerHosts, etcdHosts []
 	for _, host := range workerHosts {
 		workerHost := host
 		errgrp.Go(func() error {
-			return doDeployWorkerPlane(ctx, workerHost, workerServices, nginxProxyImage, sidekickImage, localConnDialerFactory, controlHosts, false, prsMap)
+			return doDeployWorkerPlane(ctx, workerHost, workerServices, nginxProxyImage, sidekickImage, localConnDialerFactory, controlHosts, prsMap)
 		})
 	}
 	if err := errgrp.Wait(); err != nil {
@@ -80,16 +88,8 @@ func doDeployWorkerPlane(ctx context.Context, host *hosts.Host,
 	nginxProxyImage, sidekickImage string,
 	localConnDialerFactory hosts.DialerFactory,
 	controlHosts []*hosts.Host,
-	unschedulable bool, prsMap map[string]v3.PrivateRegistry) error {
+	prsMap map[string]v3.PrivateRegistry) error {
 
-	// skipping deploying unschedulable kubelet on etcd node
-	if unschedulable && host.IsWorker {
-		log.Infof(ctx, "[%s] Host [%s] is already worker host, skipping deploying unschedulable kubelet", WorkerRole, host.Address)
-		return nil
-	} else if unschedulable && host.IsControl {
-		log.Infof(ctx, "[%s] Host [%s] is already control host, skipping deploying unschedulable kubelet", WorkerRole, host.Address)
-		return nil
-	}
 	// run nginx proxy
 	if !host.IsControl {
 		if err := runNginxProxy(ctx, host, controlHosts, nginxProxyImage, prsMap); err != nil {
@@ -101,7 +101,7 @@ func doDeployWorkerPlane(ctx context.Context, host *hosts.Host,
 		return err
 	}
 	// run kubelet
-	if err := runKubelet(ctx, host, workerServices.Kubelet, localConnDialerFactory, unschedulable, prsMap); err != nil {
+	if err := runKubelet(ctx, host, workerServices.Kubelet, localConnDialerFactory, prsMap); err != nil {
 		return err
 	}
 	return runKubeproxy(ctx, host, workerServices.Kubeproxy, localConnDialerFactory, prsMap)

@@ -218,7 +218,7 @@ spec:
           operator: "Exists"
         - key: "node-role.kubernetes.io/etcd"
           operator: "Exists"
-          effect: "NoSchedule"
+          effect: "NoExecute"
         # Mark the pod as a critical add-on for rescheduling.
         - key: "CriticalAddonsOnly"
           operator: "Exists"

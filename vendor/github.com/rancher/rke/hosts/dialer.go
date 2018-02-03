@@ -73,7 +73,7 @@ func (d *dialer) DialLocalConn(network, addr string) (net.Conn, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Failed to dial ssh using address [%s]: %v", sshAddr, err)
 	}
-	remote, err := conn.Dial("tcp", fmt.Sprintf("localhost:%d", d.host.LocalConnPort))
+	remote, err := conn.Dial(network, addr)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to dial to Local Port [%d] on host [%s]: %v", d.host.LocalConnPort, d.host.Address, err)
 	}

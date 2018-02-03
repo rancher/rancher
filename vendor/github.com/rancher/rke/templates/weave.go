@@ -87,7 +87,7 @@ items:
             seLinuxOptions: {}
           serviceAccountName: weave-net
           tolerations:
-            - effect: NoSchedule
+            - effect: NoExecute
               operator: Exists
           volumes:
             - name: weavedb

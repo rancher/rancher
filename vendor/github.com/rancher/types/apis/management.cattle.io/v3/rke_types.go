@@ -129,6 +129,8 @@ type KubeletService struct {
 	InfraContainerImage string `yaml:"infra_container_image" json:"infraContainerImage,omitempty"`
 	// Cluster DNS service ip
 	ClusterDNSServer string `yaml:"cluster_dns_server" json:"clusterDnsServer,omitempty"`
+	// Fail if swap is enabled
+	FailSwapOn bool `yaml:"fail_swap_on" json:"failSwapOn,omitempty"`
 }
 
 type KubeproxyService struct {

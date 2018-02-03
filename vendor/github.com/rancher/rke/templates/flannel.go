@@ -153,7 +153,7 @@ spec:
         effect: NoSchedule
       - key: node-role.kubernetes.io/etcd
         operator: Exists
-        effect: NoSchedule
+        effect: NoExecute
       volumes:
         - name: run
           hostPath:
