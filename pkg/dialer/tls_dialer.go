@@ -40,7 +40,7 @@ type tlsDialer struct {
 }
 
 func (t *tlsDialer) Dial(network, address string) (net.Conn, error) {
-	if !strings.HasSuffix(address, "docker.sock") {
+	if !strings.Contains(address, "docker.sock") {
 		return nil, errors.New("only docker.sock connections are supported for this node")
 	}
 	return tls.Dial("tcp", t.Address, t.Config)
