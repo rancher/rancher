@@ -10,12 +10,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/rancher/pkg/auth/model"
 	"github.com/rancher/rancher/pkg/auth/util"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
-	publicschema "github.com/rancher/types/apis/management.cattle.io/v3public/schema"
-	"github.com/rancher/types/client/management/v3"
 	"github.com/sirupsen/logrus"
 )
 
@@ -26,11 +22,7 @@ const (
 	BasicAuthPrefix = "Basic"
 )
 
-func Login(actionName string, action *types.Action, request *types.APIContext) error {
-	return tokenServer.login(actionName, action, request)
-}
-
-func TokenActionHandler(actionName string, action *types.Action, request *types.APIContext) error {
+func tokenActionHandler(actionName string, action *types.Action, request *types.APIContext) error {
 	logrus.Debugf("TokenActionHandler called for action %v", actionName)
 	if actionName == "logout" {
 		return tokenServer.logout(actionName, action, request)
@@ -38,12 +30,12 @@ func TokenActionHandler(actionName string, action *types.Action, request *types.
 	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
-func TokenCreateHandler(request *types.APIContext, _ types.RequestHandler) error {
+func tokenCreateHandler(request *types.APIContext, _ types.RequestHandler) error {
 	logrus.Debugf("TokenCreateHandler called")
 	return tokenServer.deriveToken(request)
 }
 
-func TokenListHandler(request *types.APIContext, _ types.RequestHandler) error {
+func tokenListHandler(request *types.APIContext, _ types.RequestHandler) error {
 	logrus.Debugf("TokenListHandler called")
 	if request.ID != "" {
 		return tokenServer.getToken(request)
@@ -51,50 +43,13 @@ func TokenListHandler(request *types.APIContext, _ types.RequestHandler) error {
 	return tokenServer.listTokens(request)
 }
 
-func TokenDeleteHandler(request *types.APIContext, _ types.RequestHandler) error {
+func tokenDeleteHandler(request *types.APIContext, _ types.RequestHandler) error {
 	logrus.Debugf("TokenDeleteHandler called")
 	return tokenServer.removeToken(request)
 }
 
 func CreateTokenCR(k8sToken *v3.Token) (v3.Token, error) {
 	return tokenServer.createK8sTokenCR(k8sToken)
-}
-
-//login is a handler for route /tokens?action=login and returns the jwt token after authenticating the user
-func (s *tokenAPIServer) login(actionName string, action *types.Action, request *types.APIContext) error {
-	w := request.Response
-
-	var token v3.Token
-	var status int
-	token, responseType, status, err := s.createLoginToken(request)
-
-	if err != nil {
-		logrus.Errorf("Login failed with error: %v", err)
-		if status == 0 {
-			status = http.StatusInternalServerError
-		}
-		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
-	}
-
-	if responseType == "cookie" {
-		tokenCookie := &http.Cookie{
-			Name:     CookieName,
-			Value:    token.ObjectMeta.Name + ":" + token.Token,
-			Secure:   true,
-			Path:     "/",
-			HttpOnly: true,
-		}
-		http.SetCookie(w, tokenCookie)
-	} else {
-		tokenData, err := convertTokenResource(request.Schemas.Schema(&publicschema.PublicVersion, client.TokenType), token)
-		if err != nil {
-			return err
-		}
-		tokenData["token"] = token.ObjectMeta.Name + ":" + token.Token
-		request.WriteResponse(http.StatusCreated, tokenData)
-	}
-
-	return nil
 }
 
 func (s *tokenAPIServer) deriveToken(request *types.APIContext) error {
@@ -131,7 +86,7 @@ func (s *tokenAPIServer) deriveToken(request *types.APIContext) error {
 		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
 	}
 
-	tokenData, err := convertTokenResource(request.Schema, token)
+	tokenData, err := ConvertTokenResource(request.Schema, token)
 	if err != nil {
 		return err
 	}
@@ -163,7 +118,7 @@ func (s *tokenAPIServer) listTokens(request *types.APIContext) error {
 
 	tokensFromStore := make([]map[string]interface{}, len(tokens))
 	for _, token := range tokens {
-		tokenData, err := convertTokenResource(request.Schema, token)
+		tokenData, err := ConvertTokenResource(request.Schema, token)
 		if err != nil {
 			return err
 		}
@@ -236,7 +191,7 @@ func (s *tokenAPIServer) getToken(request *types.APIContext) error {
 		}
 		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
 	}
-	tokenData, err := convertTokenResource(request.Schema, token)
+	tokenData, err := ConvertTokenResource(request.Schema, token)
 	if err != nil {
 		return err
 	}
@@ -289,20 +244,6 @@ func getTokenFromStore(request *types.APIContext, tokenID string) (map[string]in
 	return tokenData, nil
 }
 
-func convertTokenResource(schema *types.Schema, token v3.Token) (map[string]interface{}, error) {
-	tokenData, err := convert.EncodeToMap(token)
-	if err != nil {
-		return nil, err
-	}
-	mapper := schema.Mapper
-	if mapper == nil {
-		return nil, errors.New("no schema mapper available")
-	}
-	mapper.FromInternal(tokenData)
-
-	return tokenData, nil
-}
-
 func deleteTokenUsingStore(request *types.APIContext, tokenID string) (map[string]interface{}, error) {
 	store := request.Schema.Store
 	if store == nil {
@@ -314,18 +255,4 @@ func deleteTokenUsingStore(request *types.APIContext, tokenID string) (map[strin
 		return nil, err
 	}
 	return tokenData, nil
-}
-
-func (s *tokenAPIServer) authConfigs(w http.ResponseWriter, r *http.Request) {
-
-	var authConfigs []model.AuthConfig
-
-	authConfigs = append(authConfigs, model.DefaultGithubConfig())
-	authConfigs = append(authConfigs, model.DefaultLocalConfig())
-
-	w.Header().Set("Content-Type", "application/json")
-	enc := json.NewEncoder(w)
-	enc.SetEscapeHTML(false)
-	enc.Encode(authConfigs)
-
 }
