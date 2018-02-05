@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/rpc"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/docker/machine/libmachine/drivers/plugin/localbinary"
@@ -11,7 +12,26 @@ import (
 	cli "github.com/docker/machine/libmachine/mcnflag"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
-	"strconv"
+)
+
+var (
+	// secretFields lists all the hard-coded fields that should hidden as password
+	secretFields = map[string]struct{}{
+		// ec2
+		"secretKey": {},
+		// digitalOcean
+		"accessToken": {},
+		// azure
+		"clientSecret": {},
+		// packet, rackspace, softlayer
+		"apiKey": {},
+		// vSphere, openstack, vmwarevcloudair
+		"password": {},
+		// exoscale
+		"apiSecretKey": {},
+		// otc
+		"accessKeySecret": {},
+	}
 )
 
 func flagToField(flag cli.Flag) (string, v3.Field, error) {
@@ -27,6 +47,9 @@ func flagToField(flag cli.Flag) (string, v3.Field, error) {
 
 	switch v := flag.(type) {
 	case *cli.StringFlag:
+		if isPassword(name) {
+			field.Type = "password"
+		}
 		field.Description = v.Usage
 		field.Default.StringValue = v.Value
 	case *cli.IntFlag:
@@ -44,6 +67,11 @@ func flagToField(flag cli.Flag) (string, v3.Field, error) {
 	}
 
 	return name, field, nil
+}
+
+func isPassword(key string) bool {
+	_, ok := secretFields[key]
+	return ok
 }
 
 func toLowerCamelCase(machineFlagName string) (string, error) {
