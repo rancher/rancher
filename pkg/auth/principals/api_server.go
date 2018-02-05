@@ -11,8 +11,6 @@ import (
 
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
-
-	"github.com/rancher/rancher/pkg/auth/providers"
 )
 
 type principalAPIServer struct {
@@ -26,7 +24,7 @@ func newPrincipalAPIServer(ctx context.Context, mgmtCtx *config.ManagementContex
 	if mgmtCtx == nil {
 		return nil, fmt.Errorf("Failed to build tokenAPIHandler, nil ManagementContext")
 	}
-	providers.Configure(ctx, mgmtCtx)
+	config.Configure(ctx, mgmtCtx)
 
 	apiServer := &principalAPIServer{
 		ctx:              ctx,
@@ -63,7 +61,7 @@ func (s *principalAPIServer) findPrincipals(tokenKey string, name string) ([]v3.
 	if err != nil {
 		return principals, 401, err
 	}
-	principals, status, err = providers.SearchPrincipals(name, *token)
+	principals, status, err = config.SearchPrincipals(name, *token)
 
 	return principals, status, err
 }

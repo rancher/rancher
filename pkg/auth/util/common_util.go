@@ -4,16 +4,15 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
-
-	"github.com/rancher/rancher/pkg/auth/model"
 )
 
 //ReturnHTTPError handles sending out Error response
+// TODO Use the Norman API error framework instead
 func ReturnHTTPError(w http.ResponseWriter, r *http.Request, httpStatus int, errorMessage string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(httpStatus)
 
-	err := model.AuthError{
+	err := AuthError{
 		Status:  strconv.Itoa(httpStatus),
 		Message: errorMessage,
 		Type:    "error",
@@ -37,4 +36,11 @@ func GetHTTPErrorCode(httpStatus int) string {
 	}
 
 	return "ServerError"
+}
+
+//AuthError structure contains the error resource definition
+type AuthError struct {
+	Type    string `json:"type"`
+	Status  string `json:"status"`
+	Message string `json:"message"`
 }

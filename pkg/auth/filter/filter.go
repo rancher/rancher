@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/rancher/rancher/pkg/auth/authenticator"
 	"github.com/rancher/rancher/pkg/auth/util"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -15,7 +14,7 @@ func NewAuthenticationFilter(ctx context.Context, managementContext *config.Mana
 	if managementContext == nil {
 		return nil, fmt.Errorf("Failed to build NewAuthenticationFilter, nil ManagementContext")
 	}
-	auth := authenticator.NewAuthenticator(ctx, managementContext)
+	auth := newAuthenticator(ctx, managementContext)
 	return &authHeaderHandler{
 		auth: auth,
 		next: next,
@@ -23,12 +22,12 @@ func NewAuthenticationFilter(ctx context.Context, managementContext *config.Mana
 }
 
 type authHeaderHandler struct {
-	auth authenticator.Authenticator
+	auth authenticator
 	next http.Handler
 }
 
 func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	authed, user, groups, err := h.auth.Authenticate(req)
+	authed, user, groups, err := h.auth.authenticate(req)
 	if err != nil || !authed {
 		util.ReturnHTTPError(rw, req, 401, err.Error())
 		return

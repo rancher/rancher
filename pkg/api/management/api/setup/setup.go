@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/management/store/cluster"
 	"github.com/rancher/rancher/pkg/api/management/store/preference"
 	"github.com/rancher/rancher/pkg/api/management/store/scoped"
+	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/machine/store"
 	machineconfig "github.com/rancher/rancher/pkg/machine/store/config"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
@@ -70,7 +71,7 @@ func Schemas(ctx context.Context, management *config.ManagementContext, schemas 
 		return err
 	}
 
-	AuthConfigs(schemas)
+	providers.SetupAuthConfig(ctx, management, schemas)
 	authn.SetUserStore(schemas.Schema(&managementschema.Version, client.UserType), management)
 	Preference(schemas, management)
 	ClusterRegistrationTokens(schemas)
@@ -179,20 +180,6 @@ func SecretTypes(schemas *types.Schemas, management *config.ManagementContext) {
 	schema = schemas.Schema(&projectschema.Version, projectclient.CertificateType)
 	schema.Store = &cert.Store{
 		Store: schema.Store,
-	}
-}
-
-var authConfigTypes = []string{client.GithubConfigType, client.LocalConfigType}
-
-func AuthConfigs(schemas *types.Schemas) {
-	schema := schemas.Schema(&managementschema.Version, client.GithubConfigType)
-	schema.Formatter = authn.GithubConfigFormatter
-	schema.ActionHandler = authn.GithubConfigActionHandler
-
-	authConfigBaseSchema := schemas.Schema(&managementschema.Version, client.AuthConfigType)
-	for _, authConfigSubtype := range authConfigTypes {
-		subSchema := schemas.Schema(&managementschema.Version, authConfigSubtype)
-		subSchema.Store = subtype.NewSubTypeStore(authConfigSubtype, authConfigBaseSchema.Store)
 	}
 }
 

@@ -1,4 +1,4 @@
-package setup
+package publicapi
 
 import (
 	"strings"

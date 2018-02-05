@@ -1,4 +1,4 @@
-package authn
+package github
 
 import (
 	"encoding/json"
@@ -11,32 +11,26 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 
-	"github.com/rancher/rancher/pkg/auth/providers"
-	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
 )
 
-const (
-	githubDefaultHostName = "https://github.com"
-)
-
-func GithubConfigFormatter(apiContext *types.APIContext, resource *types.RawResource) {
+func ConfigFormatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(apiContext, "configureTest")
 	resource.AddAction(apiContext, "testAndApply")
 }
 
-func GithubConfigActionHandler(actionName string, action *types.Action, request *types.APIContext) error {
+func (g *GProvider) ConfigActionHandler(actionName string, action *types.Action, request *types.APIContext) error {
 	if actionName == "configureTest" {
-		return GithubConfigureTest(actionName, action, request)
+		return g.configureTest(actionName, action, request)
 	} else if actionName == "testAndApply" {
-		return GithubConfigTestApply(actionName, action, request)
+		return g.configTestApply(actionName, action, request)
 	}
 
-	return nil
+	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
-func GithubConfigureTest(actionName string, action *types.Action, request *types.APIContext) error {
+func (g *GProvider) configureTest(actionName string, action *types.Action, request *types.APIContext) error {
 	var githubConfig v3.GithubConfig
 	githubConfigTestInput := v3.GithubConfigTestInput{}
 
@@ -67,7 +61,7 @@ func formGithubRedirectURL(githubConfig v3.GithubConfig) string {
 	return redirect
 }
 
-func GithubConfigTestApply(actionName string, action *types.Action, request *types.APIContext) error {
+func (g *GProvider) configTestApply(actionName string, action *types.Action, request *types.APIContext) error {
 	var githubConfig v3.GithubConfig
 	githubConfigApplyInput := v3.GithubConfigApplyInput{}
 
@@ -82,16 +76,7 @@ func GithubConfigTestApply(actionName string, action *types.Action, request *typ
 	}
 
 	//Call provider to testLogin
-	p, err := providers.GetProvider("github")
-	if err != nil {
-		return err
-	}
-	githubProvider, ok := p.(*github.GProvider)
-	if !ok {
-		return fmt.Errorf("No github provider")
-	}
-
-	userPrincipal, groupPrincipals, providerInfo, status, err := githubProvider.LoginUser(githubLogin, &githubConfig)
+	userPrincipal, groupPrincipals, providerInfo, status, err := g.LoginUser(githubLogin, &githubConfig)
 	if err != nil {
 		if status == 0 || status == 500 {
 			status = http.StatusInternalServerError
@@ -103,7 +88,7 @@ func GithubConfigTestApply(actionName string, action *types.Action, request *typ
 
 	//if this works, save githubConfig CR adding enabled flag
 	githubConfig.Enabled = githubConfigApplyInput.Enabled
-	err = githubProvider.SaveGithubConfig(&githubConfig)
+	err = g.SaveGithubConfig(&githubConfig)
 	if err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to save github config: %v", err))
 	}

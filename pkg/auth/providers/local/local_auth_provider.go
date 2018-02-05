@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/httperror"
+	"github.com/rancher/norman/types"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
 	"github.com/rancher/types/config"
@@ -361,4 +363,8 @@ func (l *LProvider) isMemberOf(myGroups []v3.Principal, other v3.Principal) bool
 		}
 	}
 	return false
+}
+
+func (l *LProvider) ConfigActionHandler(actionName string, action *types.Action, request *types.APIContext) error {
+	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }

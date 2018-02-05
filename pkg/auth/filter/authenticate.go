@@ -1,17 +1,35 @@
-package authenticator
+package filter
 
 import (
 	"context"
-	"fmt"
 	"net/http"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/cache"
+
+	"fmt"
 	"strings"
 
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/cache"
+	"github.com/rancher/types/config"
 )
+
+type authenticator interface {
+	authenticate(req *http.Request) (authed bool, user string, groups []string, err error)
+}
+
+func newAuthenticator(ctx context.Context, mgmtCtx *config.ManagementContext) authenticator {
+	tokenInformer := mgmtCtx.Management.Tokens("").Controller().Informer()
+	tokenInformer.AddIndexers(map[string]cache.IndexFunc{tokenKeyIndex: tokenKeyIndexer})
+
+	return &tokenAuthenticator{
+		ctx:          ctx,
+		tokenIndexer: tokenInformer.GetIndexer(),
+		tokenClient:  mgmtCtx.Management.Tokens(""),
+	}
+}
 
 type tokenAuthenticator struct {
 	ctx          context.Context
@@ -32,7 +50,7 @@ func tokenKeyIndexer(obj interface{}) ([]string, error) {
 	return []string{token.Token}, nil
 }
 
-func (a *tokenAuthenticator) Authenticate(req *http.Request) (bool, string, []string, error) {
+func (a *tokenAuthenticator) authenticate(req *http.Request) (bool, string, []string, error) {
 	//check if token cookie or authorization header
 	tokenAuthValue := tokens.GetTokenAuthFromRequest(req)
 

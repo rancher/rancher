@@ -7,6 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
+	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
@@ -94,4 +97,19 @@ func GenerateNewLoginToken(userPrincipal v3.Principal, groupPrincipals []v3.Prin
 		Description:     description,
 	}
 	return k8sToken
+}
+
+func ConvertTokenResource(schema *types.Schema, token v3.Token) (map[string]interface{}, error) {
+	tokenData, err := convert.EncodeToMap(token)
+	if err != nil {
+		return nil, err
+	}
+	mapper := schema.Mapper
+	if mapper == nil {
+
+		return nil, errors.New("no schema mapper available")
+	}
+	mapper.FromInternal(tokenData)
+
+	return tokenData, nil
 }
