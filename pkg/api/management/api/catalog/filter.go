@@ -45,8 +45,14 @@ func TemplateVersionFormatter(apiContext *types.APIContext, resource *types.RawR
 	delete(resource.Values, "files")
 	fileMap := map[string]string{}
 	for _, file := range files.([]interface{}) {
-		m := file.(map[string]interface{})
-		fileMap[m["name"].(string)] = m["contents"].(string)
+		m, ok := file.(map[string]interface{})
+		if ok {
+			if k, ok := m["name"].(string); ok {
+				if v, ok := m["contents"].(string); ok {
+					fileMap[k] = v
+				}
+			}
+		}
 	}
 	resource.Values["files"] = fileMap
 

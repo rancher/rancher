@@ -104,11 +104,13 @@ func (m *Manager) createTemplate(name string, template v3.Template, existingTemp
 		createdTemplate, err := m.templateClient.Create(&template)
 		if err != nil {
 			// hack for the image size that are too big
-			if strings.Contains(err.Error(), "request is too large") || strings.Contains(err.Error(), "exceeding the max size") {
+			if strings.Contains(err.Error(), "request is too large") ||
+				strings.Contains(err.Error(), "exceeding the max size") ||
+				strings.Contains(err.Error(), "received message larger than max") {
 				logrus.Warnf("Template %s size is too large. Skipping", template.Name)
 				return nil
 			}
-			return err
+			return errors.Wrapf(err, "failed to create template %s", template.Name)
 		}
 		if err := m.createTemplateVersions(versionFiles, *createdTemplate); err != nil {
 			return err
@@ -134,7 +136,7 @@ func (m *Manager) updateTemplate(name string, existingTemplate v3.Template, temp
 
 	updateTemplate, err := m.templateClient.Get(name, metav1.GetOptions{})
 	if err != nil && !kerrors.IsNotFound(err) {
-		return err
+		return errors.Wrapf(err, "failed to get template %s", name)
 	} else if kerrors.IsNotFound(err) {
 		return nil
 	}
@@ -196,15 +198,14 @@ func (m *Manager) createTemplateVersions(versionsSpec []v3.TemplateVersionSpec, 
 		createdTemplates = append(createdTemplates, templateVersion.Name)
 	}
 	if rollback {
-		logrus.Debug("Rollback TemplateVersion")
+		logrus.Info("Rollback TemplateVersion")
 		for _, name := range createdTemplates {
-			logrus.Debugf("Deleting templateVersion %s", name)
+			logrus.Infof("Deleting templateVersion %s", name)
 			err := m.templateVersionClient.Delete(name, &metav1.DeleteOptions{})
 			if err != nil && !kerrors.IsNotFound(err) {
-				return err
+				return errors.Wrapf(err, "failed to rollback and delete templateVersion %s", name)
 			}
 		}
-		return nil
 	}
 	return nil
 }
@@ -214,7 +215,7 @@ func (m *Manager) deleteTemplateVersions(template v3.Template) error {
 		LabelSelector: fmt.Sprintf("%s=%s", TemplateNameLabel, template.Name),
 	})
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to list templateVersions")
 	}
 	for _, version := range templateVersions.Items {
 		logrus.Infof("Deleting templateVersion %s", version.Name)
