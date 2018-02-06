@@ -17,19 +17,19 @@ type logger struct {
 }
 
 func (l *logger) Info(obj runtime.Object, message string) {
-	l.recorder.Event(obj, "Normal", "Message", message)
+	//l.recorder.Event(obj, "Normal", "Message", message)
 }
 
 func (l *logger) Infof(obj runtime.Object, messagefmt string, args ...interface{}) {
-	l.recorder.Eventf(obj, "Normal", "Message", messagefmt, args...)
+	//l.recorder.Eventf(obj, "Normal", "Message", messagefmt, args...)
 }
 
 func (l *logger) Error(obj runtime.Object, message string) {
-	l.recorder.Event(obj, "Warning", "Message", message)
+	//l.recorder.Event(obj, "Warning", "Message", message)
 }
 
 func (l *logger) Errorf(obj runtime.Object, messagefmt string, args ...interface{}) {
-	l.recorder.Eventf(obj, "Warning", "Message", messagefmt, args...)
+	//l.recorder.Eventf(obj, "Warning", "Message", messagefmt, args...)
 }
 
 func NewLogger(recorder record.EventRecorder) Logger {

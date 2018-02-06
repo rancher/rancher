@@ -17,18 +17,19 @@ type ListenConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	DisplayName string   `json:"displayName,omitempty"`
-	Description string   `json:"description,omitempty"`
-	Mode        string   `json:"mode,omitempty" norman:"type=enum,options=https|http|acme"`
-	CACerts     string   `json:"caCerts,omitempty"`
-	CACert      string   `json:"caCert,omitempty"`
-	CAKey       string   `json:"caKey,omitempty"`
-	Cert        string   `json:"cert,omitempty"`
-	Key         string   `json:"key,omitempty" norman:"writeOnly"`
-	Domains     []string `json:"domains,omitempty"`
-	TOS         []string `json:"tos,omitempty" norman:"default=auto"`
-	KnownIPs    []string `json:"knownIps" norman:"nocreate,noupdate"`
-	Enabled     bool     `json:"enabled,omitempty" norman:"default=true"`
+	DisplayName    string            `json:"displayName,omitempty"`
+	Description    string            `json:"description,omitempty"`
+	Mode           string            `json:"mode,omitempty" norman:"type=enum,options=https|http|acme"`
+	CACerts        string            `json:"caCerts,omitempty"`
+	CACert         string            `json:"caCert,omitempty"`
+	CAKey          string            `json:"caKey,omitempty"`
+	Cert           string            `json:"cert,omitempty"`
+	Key            string            `json:"key,omitempty" norman:"writeOnly"`
+	Domains        []string          `json:"domains,omitempty"`
+	TOS            []string          `json:"tos,omitempty" norman:"default=auto"`
+	KnownIPs       []string          `json:"knownIps" norman:"nocreate,noupdate"`
+	GeneratedCerts map[string]string `json:"generatedCerts" norman:"nocreate,noupdate"`
+	Enabled        bool              `json:"enabled,omitempty" norman:"default=true"`
 
 	CertFingerprint         string   `json:"certFingerprint,omitempty" norman:"nocreate,noupdate"`
 	CN                      string   `json:"cn,omitempty" norman:"nocreate,noupdate"`

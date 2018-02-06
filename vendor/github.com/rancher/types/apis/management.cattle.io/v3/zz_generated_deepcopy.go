@@ -1508,6 +1508,15 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 		}
 	}
 	in.AppliedSpec.DeepCopyInto(&out.AppliedSpec)
+	if in.FailedSpec != nil {
+		in, out := &in.FailedSpec, &out.FailedSpec
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(ClusterSpec)
+			(*in).DeepCopyInto(*out)
+		}
+	}
 	if in.Requested != nil {
 		in, out := &in.Requested, &out.Requested
 		*out = make(v1.ResourceList, len(*in))
@@ -2356,6 +2365,13 @@ func (in *ListenConfig) DeepCopyInto(out *ListenConfig) {
 		in, out := &in.KnownIPs, &out.KnownIPs
 		*out = make([]string, len(*in))
 		copy(*out, *in)
+	}
+	if in.GeneratedCerts != nil {
+		in, out := &in.GeneratedCerts, &out.GeneratedCerts
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
 	}
 	if in.SubjectAlternativeNames != nil {
 		in, out := &in.SubjectAlternativeNames, &out.SubjectAlternativeNames

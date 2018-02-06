@@ -21,6 +21,7 @@ const (
 	ClusterFieldDescription                         = "description"
 	ClusterFieldDriver                              = "driver"
 	ClusterFieldEmbeddedConfig                      = "embeddedConfig"
+	ClusterFieldFailedSpec                          = "failedSpec"
 	ClusterFieldGoogleKubernetesEngineConfig        = "googleKubernetesEngineConfig"
 	ClusterFieldImportedConfig                      = "importedConfig"
 	ClusterFieldInternal                            = "internal"
@@ -55,6 +56,7 @@ type Cluster struct {
 	Description                         string                         `json:"description,omitempty"`
 	Driver                              string                         `json:"driver,omitempty"`
 	EmbeddedConfig                      *K8sServerConfig               `json:"embeddedConfig,omitempty"`
+	FailedSpec                          *ClusterSpec                   `json:"failedSpec,omitempty"`
 	GoogleKubernetesEngineConfig        *GoogleKubernetesEngineConfig  `json:"googleKubernetesEngineConfig,omitempty"`
 	ImportedConfig                      *ImportedConfig                `json:"importedConfig,omitempty"`
 	Internal                            *bool                          `json:"internal,omitempty"`

@@ -153,12 +153,12 @@ func (c Cond) doInternal(obj runtime.Object, f func() (runtime.Object, error)) (
 
 	if err != nil {
 		if _, ok := err.(*controller.ForgetError); ok {
-			if c.IsFalse(obj) {
-				c.Unknown(obj)
+			if c.GetMessage(obj) == "" {
+				c.ReasonAndMessageFromError(obj, err)
 			}
-		} else {
-			c.False(obj)
+			return obj, err
 		}
+		c.False(obj)
 		c.ReasonAndMessageFromError(obj, err)
 		return obj, err
 	}

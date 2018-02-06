@@ -9,6 +9,7 @@ const (
 	ClusterStatusFieldComponentStatuses = "componentStatuses"
 	ClusterStatusFieldConditions        = "conditions"
 	ClusterStatusFieldDriver            = "driver"
+	ClusterStatusFieldFailedSpec        = "failedSpec"
 	ClusterStatusFieldLimits            = "limits"
 	ClusterStatusFieldRequested         = "requested"
 )
@@ -21,6 +22,7 @@ type ClusterStatus struct {
 	ComponentStatuses []ClusterComponentStatus `json:"componentStatuses,omitempty"`
 	Conditions        []ClusterCondition       `json:"conditions,omitempty"`
 	Driver            string                   `json:"driver,omitempty"`
+	FailedSpec        *ClusterSpec             `json:"failedSpec,omitempty"`
 	Limits            map[string]string        `json:"limits,omitempty"`
 	Requested         map[string]string        `json:"requested,omitempty"`
 }
