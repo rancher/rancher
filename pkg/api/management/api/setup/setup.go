@@ -216,6 +216,9 @@ func MachineTypes(schemas *types.Schemas, management *config.ManagementContext, 
 
 	schema = schemas.Schema(&managementschema.Version, client.MachineConfigType)
 
+	schema = schemas.Schema(&managementschema.Version, client.MachineTemplateType)
+	schema.Formatter = machine.TemplateFormatter
+
 }
 
 func App(schemas *types.Schemas, management *config.ManagementContext) {
