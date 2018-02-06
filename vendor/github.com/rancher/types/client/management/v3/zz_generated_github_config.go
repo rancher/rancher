@@ -13,7 +13,7 @@ const (
 	GithubConfigFieldName            = "name"
 	GithubConfigFieldOwnerReferences = "ownerReferences"
 	GithubConfigFieldRemoved         = "removed"
-	GithubConfigFieldScheme          = "scheme"
+	GithubConfigFieldTLS             = "tls"
 	GithubConfigFieldType            = "type"
 	GithubConfigFieldUuid            = "uuid"
 )
@@ -30,7 +30,7 @@ type GithubConfig struct {
 	Name            string            `json:"name,omitempty"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
 	Removed         string            `json:"removed,omitempty"`
-	Scheme          string            `json:"scheme,omitempty"`
+	TLS             bool              `json:"tls,omitempty"`
 	Type            string            `json:"type,omitempty"`
 	Uuid            string            `json:"uuid,omitempty"`
 }

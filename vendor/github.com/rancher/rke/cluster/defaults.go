@@ -32,7 +32,7 @@ const (
 	DefaultKubernetesServicesSidecarImage = "rancher/rke-service-sidekick:v0.1.0"
 	DefaultIngressController              = "nginx"
 
-	DefaultEtcdImage = "quay.io/coreos/etcd:v3.0.17"
+	DefaultEtcdImage = "rancher/etcd:v3.0.17"
 	DefaultK8sImage  = "rancher/k8s:v1.8.5-rancher4"
 
 	DefaultFlannelImage    = "quay.io/coreos/flannel:v0.9.1"
@@ -50,10 +50,10 @@ const (
 	DefaultCanalCNIImage     = "quay.io/calico/cni:v1.11.0"
 	DefaultCanalFlannelImage = "quay.io/coreos/flannel:v0.9.1"
 
-	DefaultKubeDNSImage           = "gcr.io/google_containers/k8s-dns-kube-dns-amd64:1.14.5"
-	DefaultDNSmasqImage           = "gcr.io/google_containers/k8s-dns-dnsmasq-nanny-amd64:1.14.5"
-	DefaultKubeDNSSidecarImage    = "gcr.io/google_containers/k8s-dns-sidecar-amd64:1.14.5"
-	DefaultKubeDNSAutoScalerImage = "gcr.io/google_containers/cluster-proportional-autoscaler-amd64:1.0.0"
+	DefaultKubeDNSImage           = "rancher/k8s-dns-kube-dns-amd64:1.14.5"
+	DefaultDNSmasqImage           = "rancher/k8s-dns-dnsmasq-nanny-amd64:1.14.5"
+	DefaultKubeDNSSidecarImage    = "rancher/k8s-dns-sidecar-amd64:1.14.5"
+	DefaultKubeDNSAutoScalerImage = "rancher/cluster-proportional-autoscaler-amd64:1.0.0"
 )
 
 func setDefaultIfEmptyMapValue(configMap map[string]string, key string, value string) {

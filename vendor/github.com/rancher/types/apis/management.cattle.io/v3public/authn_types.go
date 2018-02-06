@@ -15,6 +15,8 @@ type GithubProvider struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	AuthProvider      `json:",inline"`
+
+	RedirectURL string `json:"redirectUrl"`
 }
 
 type LocalProvider struct {

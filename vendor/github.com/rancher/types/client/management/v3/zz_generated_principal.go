@@ -19,6 +19,7 @@ const (
 	PrincipalFieldOwnerReferences = "ownerReferences"
 	PrincipalFieldProfilePicture  = "profilePicture"
 	PrincipalFieldProfileURL      = "profileURL"
+	PrincipalFieldProvider        = "provider"
 	PrincipalFieldRemoved         = "removed"
 	PrincipalFieldUuid            = "uuid"
 )
@@ -38,6 +39,7 @@ type Principal struct {
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
 	ProfilePicture  string            `json:"profilePicture,omitempty"`
 	ProfileURL      string            `json:"profileURL,omitempty"`
+	Provider        string            `json:"provider,omitempty"`
 	Removed         string            `json:"removed,omitempty"`
 	Uuid            string            `json:"uuid,omitempty"`
 }

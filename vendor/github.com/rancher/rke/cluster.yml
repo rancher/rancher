@@ -79,16 +79,16 @@ services:
 
 
 system_images:
-  etcd: quay.io/coreos/etcd:v3.0.17
+  etcd: rancher/etcd:v3.0.17
   kubernetes: rancher/k8s:v1.8.5-rancher4
   alpine: alpine:latest
   nginx_proxy: rancher/rke-nginx-proxy:v0.1.1
   cert_downloader: rancher/rke-cert-deployer:v0.1.1
   kubernetes_services_sidecar: rancher/rke-service-sidekick:v0.1.0
-  kubedns: gcr.io/google_containers/k8s-dns-kube-dns-amd64:1.14.5
-  dnsmasq: gcr.io/google_containers/k8s-dns-dnsmasq-nanny-amd64:1.14.5
-  kubedns_sidecar: gcr.io/google_containers/k8s-dns-sidecar-amd64:1.14.5
-  kubedns_autoscaler: gcr.io/google_containers/cluster-proportional-autoscaler-amd64:1.0.0
+  kubedns: rancher/k8s-dns-kube-dns-amd64:1.14.5
+  dnsmasq: rancher/k8s-dns-dnsmasq-nanny-amd64:1.14.5
+  kubedns_sidecar: rancher/k8s-dns-sidecar-amd64:1.14.5
+  kubedns_autoscaler: rancher/cluster-proportional-autoscaler-amd64:1.0.0
 
 # all addon manifests MUST specify a namespace
 addons: |-
