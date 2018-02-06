@@ -4,7 +4,7 @@ var (
 	settings = map[string]Setting{}
 	provider Provider
 
-	AgentImage           = newSetting("agent-image", "rancher/agent")
+	AgentImage           = newSetting("agent-image", "rancher/agent:v2.0.2-rc1")
 	CACerts              = newSetting("cacerts", "")
 	EngineInstallURL     = newSetting("engine-install-url", "https://releases.rancher.com/install-docker/17.03.sh")
 	EngineNewestVersion  = newSetting("engine-newest-version", "v17.03.0")
