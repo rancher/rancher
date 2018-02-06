@@ -108,22 +108,12 @@ func addListenConfig(management *config.ManagementContext, cfg Config) error {
 	}
 
 	if existing != nil {
-		if cfg.ListenConfig.CACerts == "" {
-			cfg.ListenConfig.CACerts = existing.CACerts
-		}
-		if cfg.ListenConfig.Key == "" {
-			cfg.ListenConfig.Key = existing.Key
-		}
 		if cfg.ListenConfig.Cert == "" {
 			cfg.ListenConfig.Cert = existing.Cert
-		}
-		if cfg.ListenConfig.CAKey == "" {
+			cfg.ListenConfig.CACerts = existing.CACerts
+			cfg.ListenConfig.Key = existing.Key
 			cfg.ListenConfig.CAKey = existing.CAKey
-		}
-		if cfg.ListenConfig.CACert == "" {
 			cfg.ListenConfig.CACert = existing.CACert
-		}
-		if len(cfg.ListenConfig.KnownIPs) == 0 {
 			cfg.ListenConfig.KnownIPs = existing.KnownIPs
 		}
 	}
@@ -136,7 +126,7 @@ func addListenConfig(management *config.ManagementContext, cfg Config) error {
 
 		caCert, err := cert.NewSelfSignedCACert(cert.Config{
 			CommonName:   "cattle-ca",
-			Organization: []string{"the-rancher"},
+			Organization: []string{"the-ranch"},
 		}, caKey)
 		if err != nil {
 			return err

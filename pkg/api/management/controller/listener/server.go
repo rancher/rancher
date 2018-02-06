@@ -5,11 +5,14 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net"
 	"net/http"
+	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -68,8 +71,27 @@ func NewServer(ctx context.Context, listenConfigs v3.ListenConfigInterface, hand
 }
 
 func (s *Server) updateIPs(savedIPs map[string]bool) map[string]bool {
-	if s.activeCert != nil {
+	if s.activeCert != nil || s.activeConfig == nil {
 		return savedIPs
+	}
+
+	cfg, err := s.listenConfigs.Get(s.activeConfig.Name, v1.GetOptions{})
+	if err != nil {
+		return savedIPs
+	}
+
+	certs := map[string]string{}
+	for key, cert := range s.certs {
+		certs[key] = certToString(cert)
+	}
+
+	if !reflect.DeepEqual(certs, cfg.GeneratedCerts) {
+		cfg = cfg.DeepCopy()
+		cfg.GeneratedCerts = certs
+		cfg, err = s.listenConfigs.Update(cfg)
+		if err != nil {
+			return savedIPs
+		}
 	}
 
 	allIPs := map[string]bool{}
@@ -85,13 +107,9 @@ func (s *Server) updateIPs(savedIPs map[string]bool) map[string]bool {
 		return savedIPs
 	}
 
-	cfg, err := s.listenConfigs.Get(s.activeConfig.Name, v1.GetOptions{})
-	if err != nil {
-		return savedIPs
-	}
-
 	cfg.KnownIPs = nil
 	for k := range allIPs {
+		cfg = cfg.DeepCopy()
 		cfg.KnownIPs = append(cfg.KnownIPs, k)
 	}
 
@@ -232,6 +250,13 @@ func (s *Server) reload(config *v3.ListenConfig) error {
 		ip := net.ParseIP(ipStr)
 		if len(ip) > 0 {
 			s.ips.ContainsOrAdd(ipStr, ip)
+		}
+	}
+
+	for key, certString := range config.GeneratedCerts {
+		cert := stringToCert(certString)
+		if cert != nil {
+			s.certs[key] = cert
 		}
 	}
 
@@ -478,6 +503,40 @@ func (s *Server) serveACME(config *v3.ListenConfig) error {
 	}()
 
 	return nil
+}
+
+func stringToCert(certString string) *tls.Certificate {
+	parts := strings.Split(certString, "#")
+	if len(parts) != 2 {
+		return nil
+	}
+
+	cert, key := parts[0], parts[1]
+	keyBytes, err := base64.StdEncoding.DecodeString(key)
+	if err != nil {
+		return nil
+	}
+
+	rsaKey, err := x509.ParsePKCS1PrivateKey(keyBytes)
+	if err != nil {
+		return nil
+	}
+
+	certBytes, err := base64.StdEncoding.DecodeString(cert)
+	if err != nil {
+		return nil
+	}
+
+	return &tls.Certificate{
+		Certificate: [][]byte{certBytes},
+		PrivateKey:  rsaKey,
+	}
+}
+
+func certToString(cert *tls.Certificate) string {
+	certString := base64.StdEncoding.EncodeToString(cert.Certificate[0])
+	keyString := base64.StdEncoding.EncodeToString(x509.MarshalPKCS1PrivateKey(cert.PrivateKey.(*rsa.PrivateKey)))
+	return certString + "#" + keyString
 }
 
 type tcpKeepAliveListener struct {
