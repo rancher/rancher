@@ -115,8 +115,8 @@ func (c *Cluster) DeployNetworkPlugin(ctx context.Context) error {
 func (c *Cluster) doFlannelDeploy(ctx context.Context) error {
 	flannelConfig := map[string]string{
 		ClusterCIDR:      c.ClusterCIDR,
-		Image:            c.Network.Options[FlannelImage],
-		CNIImage:         c.Network.Options[FlannelCNIImage],
+		Image:            c.SystemImages.Flannel,
+		CNIImage:         c.SystemImages.FlannelCNI,
 		FlannelInterface: c.Network.Options[FlannelIface],
 		RBACConfig:       c.Authorization.Mode,
 	}
@@ -143,10 +143,10 @@ func (c *Cluster) doCalicoDeploy(ctx context.Context) error {
 		ClientCAPath:     pki.GetCertPath(pki.CACertName),
 		KubeCfg:          clientConfig,
 		ClusterCIDR:      c.ClusterCIDR,
-		CNIImage:         c.Network.Options[CalicoCNIImage],
-		NodeImage:        c.Network.Options[CalicoNodeImage],
-		ControllersImage: c.Network.Options[CalicoControllersImage],
-		Calicoctl:        c.Network.Options[CalicoctlImage],
+		CNIImage:         c.SystemImages.CalicoCNI,
+		NodeImage:        c.SystemImages.CalicoNode,
+		ControllersImage: c.SystemImages.CalicoControllers,
+		Calicoctl:        c.SystemImages.CalicoCtl,
 		CloudProvider:    c.Network.Options[CalicoCloudProvider],
 		RBACConfig:       c.Authorization.Mode,
 	}
@@ -166,9 +166,9 @@ func (c *Cluster) doCanalDeploy(ctx context.Context) error {
 		ClientCAPath:    pki.GetCertPath(pki.CACertName),
 		KubeCfg:         clientConfig,
 		ClusterCIDR:     c.ClusterCIDR,
-		NodeImage:       c.Network.Options[CanalNodeImage],
-		CNIImage:        c.Network.Options[CanalCNIImage],
-		CanalFlannelImg: c.Network.Options[CanalFlannelImage],
+		NodeImage:       c.SystemImages.CanalNode,
+		CNIImage:        c.SystemImages.CanalCNI,
+		CanalFlannelImg: c.SystemImages.CanalFlannel,
 		RBACConfig:      c.Authorization.Mode,
 	}
 	pluginYaml, err := c.getNetworkPluginManifest(canalConfig)
@@ -181,8 +181,8 @@ func (c *Cluster) doCanalDeploy(ctx context.Context) error {
 func (c *Cluster) doWeaveDeploy(ctx context.Context) error {
 	weaveConfig := map[string]string{
 		ClusterCIDR: c.ClusterCIDR,
-		Image:       c.Network.Options[WeaveImage],
-		CNIImage:    c.Network.Options[WeaveCNIImage],
+		Image:       c.SystemImages.WeaveNode,
+		CNIImage:    c.SystemImages.WeaveCNI,
 		RBACConfig:  c.Authorization.Mode,
 	}
 	pluginYaml, err := c.getNetworkPluginManifest(weaveConfig)
@@ -190,49 +190,6 @@ func (c *Cluster) doWeaveDeploy(ctx context.Context) error {
 		return err
 	}
 	return c.doAddonDeploy(ctx, pluginYaml, NetworkPluginResourceName)
-}
-
-func (c *Cluster) setClusterNetworkDefaults() {
-	setDefaultIfEmpty(&c.Network.Plugin, DefaultNetworkPlugin)
-
-	if c.Network.Options == nil {
-		// don't break if the user didn't define options
-		c.Network.Options = make(map[string]string)
-	}
-	networkPluginConfigDefaultsMap := make(map[string]string)
-	switch c.Network.Plugin {
-	case FlannelNetworkPlugin:
-		networkPluginConfigDefaultsMap = map[string]string{
-			FlannelImage:    DefaultFlannelImage,
-			FlannelCNIImage: DefaultFlannelCNIImage,
-		}
-
-	case CalicoNetworkPlugin:
-		networkPluginConfigDefaultsMap = map[string]string{
-			CalicoCNIImage:         DefaultCalicoCNIImage,
-			CalicoNodeImage:        DefaultCalicoNodeImage,
-			CalicoControllersImage: DefaultCalicoControllersImage,
-			CalicoCloudProvider:    DefaultNetworkCloudProvider,
-			CalicoctlImage:         DefaultCalicoctlImage,
-		}
-
-	case CanalNetworkPlugin:
-		networkPluginConfigDefaultsMap = map[string]string{
-			CanalCNIImage:     DefaultCanalCNIImage,
-			CanalNodeImage:    DefaultCanalNodeImage,
-			CanalFlannelImage: DefaultCanalFlannelImage,
-		}
-
-	case WeaveNetworkPlugin:
-		networkPluginConfigDefaultsMap = map[string]string{
-			WeaveImage:    DefaultWeaveImage,
-			WeaveCNIImage: DefaultWeaveCNIImage,
-		}
-	}
-	for k, v := range networkPluginConfigDefaultsMap {
-		setDefaultIfEmptyMapValue(c.Network.Options, k, v)
-	}
-
 }
 
 func (c *Cluster) getNetworkPluginManifest(pluginConfig map[string]string) (string, error) {
