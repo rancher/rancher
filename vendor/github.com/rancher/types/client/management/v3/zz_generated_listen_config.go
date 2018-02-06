@@ -18,6 +18,7 @@ const (
 	ListenConfigFieldDomains                 = "domains"
 	ListenConfigFieldEnabled                 = "enabled"
 	ListenConfigFieldExpiresAt               = "expiresAt"
+	ListenConfigFieldGeneratedCerts          = "generatedCerts"
 	ListenConfigFieldIssuedAt                = "issuedAt"
 	ListenConfigFieldIssuer                  = "issuer"
 	ListenConfigFieldKey                     = "key"
@@ -49,6 +50,7 @@ type ListenConfig struct {
 	Domains                 []string          `json:"domains,omitempty"`
 	Enabled                 *bool             `json:"enabled,omitempty"`
 	ExpiresAt               string            `json:"expiresAt,omitempty"`
+	GeneratedCerts          map[string]string `json:"generatedCerts,omitempty"`
 	IssuedAt                string            `json:"issuedAt,omitempty"`
 	Issuer                  string            `json:"issuer,omitempty"`
 	Key                     string            `json:"key,omitempty"`
