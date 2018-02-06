@@ -25,7 +25,7 @@ const (
 	DefaultNetworkPlugin        = "flannel"
 	DefaultNetworkCloudProvider = "none"
 
-	DefaultInfraContainerImage            = "gcr.io/google_containers/pause-amd64:3.0"
+	DefaultInfraContainerImage            = "rancher/pause-amd64:3.0"
 	DefaultAplineImage                    = "alpine:latest"
 	DefaultNginxProxyImage                = "rancher/rke-nginx-proxy:v0.1.1"
 	DefaultCertDownloaderImage            = "rancher/rke-cert-deployer:v0.1.1"
@@ -35,20 +35,20 @@ const (
 	DefaultEtcdImage = "rancher/etcd:v3.0.17"
 	DefaultK8sImage  = "rancher/k8s:v1.8.5-rancher4"
 
-	DefaultFlannelImage    = "quay.io/coreos/flannel:v0.9.1"
-	DefaultFlannelCNIImage = "quay.io/coreos/flannel-cni:v0.2.0"
+	DefaultFlannelImage    = "rancher/coreos-flannel:v0.9.1"
+	DefaultFlannelCNIImage = "rancher/coreos-flannel-cni:v0.2.0"
 
-	DefaultCalicoNodeImage        = "quay.io/calico/node:v2.6.2"
-	DefaultCalicoCNIImage         = "quay.io/calico/cni:v1.11.0"
-	DefaultCalicoControllersImage = "quay.io/calico/kube-controllers:v1.0.0"
-	DefaultCalicoctlImage         = "quay.io/calico/ctl:v1.6.2"
+	DefaultCalicoNodeImage        = "rancher/calico-node:v2.6.2"
+	DefaultCalicoCNIImage         = "rancher/calico-cni:v1.11.0"
+	DefaultCalicoControllersImage = "rancher/calico-kube-controllers:v1.0.0"
+	DefaultCalicoctlImage         = "rancher/calico-ctl:v1.6.2"
 
 	DefaultWeaveImage    = "weaveworks/weave-kube:2.1.2"
 	DefaultWeaveCNIImage = "weaveworks/weave-npc:2.1.2"
 
-	DefaultCanalNodeImage    = "quay.io/calico/node:v2.6.2"
-	DefaultCanalCNIImage     = "quay.io/calico/cni:v1.11.0"
-	DefaultCanalFlannelImage = "quay.io/coreos/flannel:v0.9.1"
+	DefaultCanalNodeImage    = "rancher/calico-node:v2.6.2"
+	DefaultCanalCNIImage     = "rancher/calico-cni:v1.11.0"
+	DefaultCanalFlannelImage = "rancher/coreos-flannel:v0.9.1"
 
 	DefaultKubeDNSImage           = "rancher/k8s-dns-kube-dns-amd64:1.14.5"
 	DefaultDNSmasqImage           = "rancher/k8s-dns-dnsmasq-nanny-amd64:1.14.5"
@@ -123,7 +123,7 @@ func (c *Cluster) setClusterServicesDefaults() {
 		&c.Services.KubeController.ClusterCIDR:           DefaultClusterCIDR,
 		&c.Services.Kubelet.ClusterDNSServer:             DefaultClusterDNSService,
 		&c.Services.Kubelet.ClusterDomain:                DefaultClusterDomain,
-		&c.Services.Kubelet.InfraContainerImage:          DefaultInfraContainerImage,
+		&c.Services.Kubelet.InfraContainerImage:          c.SystemImages.PodInfraContainer,
 		&c.Authentication.Strategy:                       DefaultAuthStrategy,
 		&c.Services.KubeAPI.Image:                        c.SystemImages.Kubernetes,
 		&c.Services.Scheduler.Image:                      c.SystemImages.Kubernetes,
@@ -150,8 +150,41 @@ func (c *Cluster) setClusterImageDefaults() {
 		&c.SystemImages.KubernetesServicesSidecar: DefaultKubernetesServicesSidecarImage,
 		&c.SystemImages.Etcd:                      DefaultEtcdImage,
 		&c.SystemImages.Kubernetes:                DefaultK8sImage,
+		&c.SystemImages.PodInfraContainer:         DefaultInfraContainerImage,
+		&c.SystemImages.Flannel:                   DefaultFlannelImage,
+		&c.SystemImages.FlannelCNI:                DefaultFlannelCNIImage,
+		&c.SystemImages.CalicoNode:                DefaultCalicoNodeImage,
+		&c.SystemImages.CalicoCNI:                 DefaultCalicoCNIImage,
+		&c.SystemImages.CalicoControllers:         DefaultCalicoControllersImage,
+		&c.SystemImages.CalicoCtl:                 DefaultCalicoctlImage,
+		&c.SystemImages.CanalNode:                 DefaultCanalNodeImage,
+		&c.SystemImages.CanalCNI:                  DefaultCanalCNIImage,
+		&c.SystemImages.CanalFlannel:              DefaultCanalFlannelImage,
+		&c.SystemImages.WeaveNode:                 DefaultWeaveImage,
+		&c.SystemImages.WeaveCNI:                  DefaultWeaveCNIImage,
 	}
 	for k, v := range systemImagesDefaultsMap {
 		setDefaultIfEmpty(k, v)
 	}
+}
+
+func (c *Cluster) setClusterNetworkDefaults() {
+	setDefaultIfEmpty(&c.Network.Plugin, DefaultNetworkPlugin)
+
+	if c.Network.Options == nil {
+		// don't break if the user didn't define options
+		c.Network.Options = make(map[string]string)
+	}
+	networkPluginConfigDefaultsMap := make(map[string]string)
+	switch c.Network.Plugin {
+
+	case CalicoNetworkPlugin:
+		networkPluginConfigDefaultsMap = map[string]string{
+			CalicoCloudProvider: DefaultNetworkCloudProvider,
+		}
+	}
+	for k, v := range networkPluginConfigDefaultsMap {
+		setDefaultIfEmptyMapValue(c.Network.Options, k, v)
+	}
+
 }

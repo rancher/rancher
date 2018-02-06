@@ -57,6 +57,30 @@ type RKESystemImages struct {
 	KubeDNSAutoscaler string `yaml:"kubedns_autoscaler" json:"kubednsAutoscaler,omitempty" norman:"default=gcr.io/google_containers/cluster-proportional-autoscaler-amd64:1.0.0"`
 	// Kubernetes image
 	Kubernetes string `yaml:"kubernetes" json:"kubernetes,omitempty" norman:"default=rancher/k8s:v1.8.5-rancher4"`
+	// Flannel image
+	Flannel string `yaml:"flannel" json:"flannel,omitempty"`
+	// Flannel CNI image
+	FlannelCNI string `yaml:"flannel_cni" json:"flannelCni,omitempty"`
+	// Calico Node image
+	CalicoNode string `yaml:"calico_node" json:"calicoNode,omitempty"`
+	// Calico CNI image
+	CalicoCNI string `yaml:"calico_cni" json:"calicoCni,omitempty"`
+	// Calico Controllers image
+	CalicoControllers string `yaml:"calico_controllers" json:"calicoControllers,omitempty"`
+	// Calicoctl image
+	CalicoCtl string `yaml:"calico_ctl" json:"calicoCtl,omitempty"`
+	// Canal Node Image
+	CanalNode string `yaml:"canal_node" json:"canalNode,omitempty"`
+	// Canal CNI image
+	CanalCNI string `yaml:"canal_cni" json:"canalCni,omitempty"`
+	//CanalFlannel image
+	CanalFlannel string `yaml:"canal_flannel" json:"canalFlannel,omitempty"`
+	// Weave Node image
+	WeaveNode string `yaml:"wave_node" json:"weaveNode,omitempty"`
+	// Weave CNI image
+	WeaveCNI string `yaml:"weave_cni" json:"weaveCni,omitempty"`
+	// Pod infra container image
+	PodInfraContainer string `yaml:"pod_infra_container" json:"podInfraContainer,omitempty"`
 }
 
 type RKEConfigNode struct {

@@ -3,6 +3,7 @@ package clusterprovisioner
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"reflect"
@@ -14,6 +15,7 @@ import (
 
 	"sync"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/kontainer-engine/drivers"
 	"github.com/rancher/kontainer-engine/drivers/rke"
@@ -26,6 +28,7 @@ import (
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/machine/store"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -263,7 +266,7 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (bool, 
 	if create {
 		logrus.Infof("Creating cluster [%s]", cluster.Name)
 		apiEndpoint, serviceAccountToken, caCert, err = p.driverCreate(cluster, *spec)
-		// valiate token
+		// validate token
 		if err == nil {
 			err = validateClient(apiEndpoint, serviceAccountToken, caCert)
 		}
@@ -369,9 +372,17 @@ func (p *Provisioner) getConfig(reconcileRKE bool, spec v3.ClusterSpec, clusterN
 			if !ok {
 				return true, "", nil, nil, nil
 			}
+
+			systemImages, err := getSystemImages(spec)
+			if err != nil {
+				return true, "", nil, nil, err
+			}
+
 			copy := *spec.RancherKubernetesEngineConfig
 			spec.RancherKubernetesEngineConfig = &copy
 			spec.RancherKubernetesEngineConfig.Nodes = nodes
+			spec.RancherKubernetesEngineConfig.SystemImages = *systemImages
+
 			data, _ = convert.EncodeToMap(spec)
 			v = data[RKEDriverKey]
 		}
@@ -380,6 +391,48 @@ func (p *Provisioner) getConfig(reconcileRKE bool, spec v3.ClusterSpec, clusterN
 	}
 
 	return false, "", nil, nil, nil
+}
+
+func getSystemImages(spec v3.ClusterSpec) (*v3.RKESystemImages, error) {
+	// fetch system images from settings
+	systemImagesStr := settings.KubernetesVersionToSystemImages.Get()
+	if systemImagesStr == "" {
+		return nil, fmt.Errorf("Failed to load setting %s", settings.KubernetesVersionToSystemImages.Name)
+	}
+	systemImagesMap := make(map[string]v3.RKESystemImages)
+	if err := json.Unmarshal([]byte(systemImagesStr), &systemImagesMap); err != nil {
+		return nil, err
+	}
+
+	version := spec.RancherKubernetesEngineConfig.Version
+	if version == "" {
+		version = settings.KubernetesVersion.Get()
+	}
+
+	systemImages, ok := systemImagesMap[version]
+	if !ok {
+		return nil, fmt.Errorf("Failed to find system images for version %v", version)
+	}
+
+	if len(spec.RancherKubernetesEngineConfig.PrivateRegistries) == 0 {
+		return &systemImages, nil
+	}
+
+	// prepend private repo
+	privateRegistry := spec.RancherKubernetesEngineConfig.PrivateRegistries[0]
+	imagesMap, err := convert.EncodeToMap(systemImages)
+	if err != nil {
+		return nil, err
+	}
+	updatedMap := make(map[string]interface{})
+	for key, value := range imagesMap {
+		newValue := fmt.Sprintf("%s/%s", privateRegistry.URL, value)
+		updatedMap[key] = newValue
+	}
+	if err := mapstructure.Decode(updatedMap, &systemImages); err != nil {
+		return nil, err
+	}
+	return &systemImages, nil
 }
 
 func (p *Provisioner) getSpec(cluster *v3.Cluster) (bool, string, *v3.ClusterSpec, error) {
