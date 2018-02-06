@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/flowcontrol"
 )
 
 const (
@@ -50,6 +51,7 @@ type Provisioner struct {
 	MachineClient     v3.MachineInterface
 	Driver            service.EngineService
 	EventLogger       event.Logger
+	backoff           *flowcontrol.Backoff
 }
 
 func Register(management *config.ManagementContext, dialerFactory dialer.Factory) {
@@ -68,6 +70,7 @@ func Register(management *config.ManagementContext, dialerFactory dialer.Factory
 		Machines:          management.Management.Machines("").Controller().Lister(),
 		MachineClient:     management.Management.Machines(""),
 		EventLogger:       management.EventLogger,
+		backoff:           flowcontrol.NewBackOff(time.Minute, 10*time.Minute),
 	}
 
 	// Add handlers
@@ -208,6 +211,26 @@ func (p *Provisioner) Create(cluster *v3.Cluster) (*v3.Cluster, error) {
 	return obj.(*v3.Cluster), err
 }
 
+func (p *Provisioner) backoffFailure(cluster *v3.Cluster, spec *v3.ClusterSpec) bool {
+	if cluster.Status.FailedSpec == nil {
+		return false
+	}
+
+	if !reflect.DeepEqual(cluster.Status.FailedSpec, spec) {
+		return false
+	}
+
+	if p.backoff.IsInBackOffSinceUpdate(cluster.Name, time.Now()) {
+		go func() {
+			time.Sleep(p.backoff.Get(cluster.Name))
+			p.ClusterController.Enqueue("", cluster.Name)
+		}()
+		return true
+	}
+
+	return false
+}
+
 // reconcileCluster returns true if waiting or false if ready to provision
 func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (bool, *v3.Cluster, error) {
 	if !needToProvision(cluster) {
@@ -231,6 +254,10 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (bool, 
 		return waiting, nil, nil
 	}
 
+	if p.backoffFailure(cluster, spec) {
+		return false, nil, &controller.ForgetError{Err: errors.New("backing off failure")}
+	}
+
 	logrus.Infof("Provisioning cluster [%s]", cluster.Name)
 
 	if create {
@@ -249,6 +276,8 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (bool, 
 	if newCluster, reloadErr := p.Clusters.Get(cluster.Name, metav1.GetOptions{}); reloadErr == nil {
 		cluster = newCluster
 	}
+
+	cluster = p.recordFailure(cluster, *spec, err)
 
 	// for here out we want to always return the cluster, not just nil, so that the error can be properly
 	// recorded if needs be
@@ -532,8 +561,6 @@ func (p *Provisioner) logEvent(cluster *v3.Cluster, event logstream.LogEvent, co
 		for i := 0; i < 2 && !updated; i++ {
 			if event.Error {
 				cond.False(cluster)
-			} else {
-				cond.Unknown(cluster)
 			}
 			cond.Message(cluster, event.Message)
 			if newCluster, err := p.Clusters.Update(cluster); err == nil {
@@ -570,6 +597,33 @@ func (p *Provisioner) getCtx(cluster *v3.Cluster, cond condition.Cond) (context.
 		wg.Wait()
 		return nil
 	})
+}
+
+func (p *Provisioner) recordFailure(cluster *v3.Cluster, spec v3.ClusterSpec, err error) *v3.Cluster {
+	if err == nil {
+		p.backoff.DeleteEntry(cluster.Name)
+		if cluster.Status.FailedSpec == nil {
+			return cluster
+		}
+
+		cluster.Status.FailedSpec = nil
+		newCluster, err := p.Clusters.Update(cluster)
+		if err == nil {
+			return newCluster
+		}
+		// mask the error
+		return cluster
+	}
+
+	p.backoff.Next(cluster.Name, time.Now())
+	cluster.Status.FailedSpec = &spec
+	newCluster, err := p.Clusters.Update(cluster)
+	if err == nil {
+		return newCluster
+	}
+
+	// mask the error
+	return cluster
 }
 
 type closerFunc func() error
