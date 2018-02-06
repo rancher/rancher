@@ -137,6 +137,7 @@ func traverseHelmFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []e
 		if catalog.Status.HelmVersionCommits[chart].Value != nil {
 			existingHelmVersionCommits = catalog.Status.HelmVersionCommits[chart].Value
 		}
+		keywords := map[string]struct{}{}
 		// comparing version commit with the previous commit to detect if a template has been changed.
 		hasChanged := false
 		for _, version := range metadata {
@@ -152,6 +153,9 @@ func traverseHelmFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []e
 		for _, version := range metadata {
 			v := v3.TemplateVersionSpec{
 				Version: version.Version,
+			}
+			for _, k := range version.Keywords {
+				keywords[k] = struct{}{}
 			}
 			files, err := helm.FetchFiles(version.URLs)
 			if err != nil {
@@ -181,6 +185,11 @@ func traverseHelmFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []e
 			v.ExternalID = fmt.Sprintf("catalog://?catalog=%s&base=%s&template=%s&version=%s", catalog.Name, template.Spec.Base, template.Spec.FolderName, v.Version)
 			versions = append(versions, v)
 		}
+		categories := []string{}
+		for k := range keywords {
+			categories = append(categories, k)
+		}
+		template.Spec.Categories = categories
 		template.Spec.Versions = versions
 		template.Spec.CatalogID = catalog.Name
 
