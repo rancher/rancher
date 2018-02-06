@@ -10,14 +10,17 @@ import (
 
 	"sync"
 
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
 )
 
 //Providers map
-var providers map[string]PrincipalProvider
-var providerOrderList []string
-var confMu sync.Mutex
+var (
+	providers         map[string]PrincipalProvider
+	providerOrderList []string
+	confMu            sync.Mutex
+)
 
 func init() {
 	providerOrderList = []string{"github", "local"}
@@ -41,39 +44,26 @@ func GetProvider(providerName string) (PrincipalProvider, error) {
 	return nil, fmt.Errorf("No such provider '%s'", providerName)
 }
 
-func Configure(ctx context.Context, mgmtCtx *config.ManagementContext) {
+func Configure(ctx context.Context, mgmt *config.ManagementContext) {
 	confMu.Lock()
 	defer confMu.Unlock()
+	userMGR := common.NewUserManager(mgmt)
 	for _, providerName := range providerOrderList {
 		if _, exists := providers[providerName]; !exists {
 			switch providerName {
 			case "local":
-				providers[providerName] = local.Configure(ctx, mgmtCtx)
+				providers[providerName] = local.Configure(ctx, mgmt)
 			case "github":
-				providers[providerName] = github.Configure(ctx, mgmtCtx)
+				providers[providerName] = github.Configure(ctx, mgmt, userMGR)
 			}
 		}
 	}
 }
 
 func AuthenticateUser(input interface{}, providerName string) (v3.Principal, []v3.Principal, map[string]string, int, error) {
-	var groupPrincipals []v3.Principal
-	var userPrincipal v3.Principal
-	var providerInfo = make(map[string]string)
-	var status int
-	var err error
-
-	userPrincipal, groupPrincipals, providerInfo, status, err = providers[providerName].AuthenticateUser(input)
-
-	return userPrincipal, groupPrincipals, providerInfo, status, err
+	return providers[providerName].AuthenticateUser(input)
 }
 
 func SearchPrincipals(name string, myToken v3.Token) ([]v3.Principal, int, error) {
-	principals := make([]v3.Principal, 0)
-	var status int
-	var err error
-
-	principals, status, err = providers[myToken.AuthProvider].SearchPrincipals(name, myToken)
-
-	return principals, status, err
+	return providers[myToken.AuthProvider].SearchPrincipals(name, myToken)
 }

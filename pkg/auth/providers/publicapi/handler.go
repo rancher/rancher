@@ -32,7 +32,7 @@ var authProviderTypes = []string{v3public.LocalProviderType, v3public.GithubProv
 func authProviderSchemas(ctx context.Context, management *config.ManagementContext, schemas *types.Schemas) error {
 	schema := schemas.Schema(&publicSchema.PublicVersion, v3public.AuthProviderType)
 	setAuthProvidersStore(schema, management)
-	lh := &loginHandler{}
+	lh := newLoginHandler(management)
 	schema.ActionHandler = lh.login
 	schema.Formatter = loginActionFormatter
 
