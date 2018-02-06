@@ -24,44 +24,46 @@ func (g *GProvider) ConfigActionHandler(actionName string, action *types.Action,
 	if actionName == "configureTest" {
 		return g.configureTest(actionName, action, request)
 	} else if actionName == "testAndApply" {
-		return g.configTestApply(actionName, action, request)
+		return g.testAndApply(actionName, action, request)
 	}
 
 	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
 func (g *GProvider) configureTest(actionName string, action *types.Action, request *types.APIContext) error {
-	var githubConfig v3.GithubConfig
-	githubConfigTestInput := v3.GithubConfigTestInput{}
-
-	if err := json.NewDecoder(request.Request.Body).Decode(&githubConfigTestInput); err != nil {
+	githubConfig := &v3.GithubConfig{}
+	if err := json.NewDecoder(request.Request.Body).Decode(&githubConfig); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("Failed to parse body: %v", err))
 	}
+	redirectURL := FormGithubRedirectURL(githubConfig)
 
-	githubConfig = githubConfigTestInput.GithubConfig
-	redirectURL := formGithubRedirectURL(githubConfig)
+	data := map[string]interface{}{
+		"redirectUrl": redirectURL,
+		"type":        "githubConfigTestOutput",
+	}
 
-	logrus.Debugf("redirecting the user to %v", redirectURL)
-	http.Redirect(request.Response, request.Request, redirectURL, http.StatusFound)
-
+	request.WriteResponse(http.StatusOK, data)
 	return nil
-
 }
 
-func formGithubRedirectURL(githubConfig v3.GithubConfig) string {
+func FormGithubRedirectURL(githubConfig *v3.GithubConfig) string {
 	redirect := ""
 	if githubConfig.Hostname != "" {
-		redirect = githubConfig.Scheme + githubConfig.Hostname
+		scheme := "http://"
+		if githubConfig.TLS {
+			scheme = "https://"
+		}
+		redirect = scheme + githubConfig.Hostname
 	} else {
 		redirect = githubDefaultHostName
 	}
-	redirect = redirect + "/login/oauth/authorize?client_id=" + githubConfig.ClientID + "&scope=read:org"
+	redirect = redirect + "/login/oauth/authorize?client_id=" + githubConfig.ClientID
 
 	return redirect
 }
 
-func (g *GProvider) configTestApply(actionName string, action *types.Action, request *types.APIContext) error {
+func (g *GProvider) testAndApply(actionName string, action *types.Action, request *types.APIContext) error {
 	var githubConfig v3.GithubConfig
 	githubConfigApplyInput := v3.GithubConfigApplyInput{}
 
@@ -93,10 +95,13 @@ func (g *GProvider) configTestApply(actionName string, action *types.Action, req
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to save github config: %v", err))
 	}
 
-	//TODO: create new user or update existing local User with github principals and use that userID in the token below.
+	user, err := g.userMGR.SetPrincipalOnCurrentUser(request, userPrincipal)
+	if err != nil {
+		return err
+	}
 
 	//create a new token, set this token as the cookie and return 200
-	token := tokens.GenerateNewLoginToken(userPrincipal, groupPrincipals, providerInfo, 0, "Token via Github Configuration")
+	token := tokens.GenerateNewLoginToken(user.Name, userPrincipal, groupPrincipals, providerInfo, 0, "Token via Github Configuration")
 	token, err = tokens.CreateTokenCR(&token)
 	if err != nil {
 		logrus.Errorf("Failed creating token with error: %v", err)

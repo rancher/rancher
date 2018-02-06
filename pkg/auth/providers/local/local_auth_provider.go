@@ -169,6 +169,7 @@ func (l *LProvider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Prin
 		DisplayName: user.DisplayName,
 		LoginName:   user.Username,
 		Kind:        "user",
+		Provider:    "local",
 		Me:          true,
 	}
 
@@ -219,6 +220,7 @@ func (l *LProvider) getGroupPrincipals(user *v3.User) ([]v3.Principal, int, erro
 				ObjectMeta:  metav1.ObjectMeta{Name: Name + "://" + localGroup.Name},
 				DisplayName: localGroup.DisplayName,
 				Kind:        "group",
+				Provider:    "local",
 			}
 			groupPrincipals = append(groupPrincipals, groupPrincipal)
 		}
@@ -256,6 +258,7 @@ func (l *LProvider) SearchPrincipals(searchKey string, myToken v3.Token) ([]v3.P
 			DisplayName: user.DisplayName,
 			LoginName:   user.Username,
 			Kind:        "user",
+			Provider:    "local",
 			Me:          false,
 		}
 		if l.isThisUserMe(myToken.UserPrincipal, userPrincipal) {
@@ -269,6 +272,7 @@ func (l *LProvider) SearchPrincipals(searchKey string, myToken v3.Token) ([]v3.P
 			ObjectMeta:  metav1.ObjectMeta{Name: Name + "://" + group.Name},
 			DisplayName: group.DisplayName,
 			Kind:        "group",
+			Provider:    "local",
 		}
 		if l.isMemberOf(myToken.GroupPrincipals, groupPrincipal) {
 			groupPrincipal.MemberOf = true

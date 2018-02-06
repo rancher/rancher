@@ -8,6 +8,7 @@ const (
 	GithubProviderFieldLabels          = "labels"
 	GithubProviderFieldName            = "name"
 	GithubProviderFieldOwnerReferences = "ownerReferences"
+	GithubProviderFieldRedirectURL     = "redirectUrl"
 	GithubProviderFieldRemoved         = "removed"
 	GithubProviderFieldType            = "type"
 	GithubProviderFieldUuid            = "uuid"
@@ -20,6 +21,7 @@ type GithubProvider struct {
 	Labels          map[string]string `json:"labels,omitempty"`
 	Name            string            `json:"name,omitempty"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
+	RedirectURL     string            `json:"redirectUrl,omitempty"`
 	Removed         string            `json:"removed,omitempty"`
 	Type            string            `json:"type,omitempty"`
 	Uuid            string            `json:"uuid,omitempty"`

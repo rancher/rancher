@@ -59,6 +59,7 @@ type Principal struct {
 	Kind           string            `json:"kind,omitempty"`
 	Me             bool              `json:"me,omitempty"`
 	MemberOf       bool              `json:"memberOf,omitempty"`
+	Provider       string            `json:"provider,omitempty"`
 	ExtraInfo      map[string]string `json:"extraInfo,omitempty"`
 }
 
@@ -76,32 +77,31 @@ type AuthConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Type string `json:"type"`
+	Type    string `json:"type"`
+	Enabled bool   `json:"enabled,omitempty"`
 }
 
 //GithubConfig structure contains the github config definition
 type GithubConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	AuthConfig        `json:",inline"`
+	AuthConfig        `json:",inline" mapstructure:",squash"`
 
-	Hostname     string `json:"hostname,omitempty"`
-	Scheme       string `json:"scheme,omitempty"`
+	Hostname     string `json:"hostname,omitempty" norman:"default=github.com"`
+	TLS          bool   `json:"tls,omitempty" norman:"notnullable,default=true"`
 	ClientID     string `json:"clientId,omitempty"`
 	ClientSecret string `json:"clientSecret,omitempty"`
-	Enabled      bool   `json:"enabled,omitempty"`
 }
 
 //LocalConfig structure contains the local config definition
 type LocalConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
+	AuthConfig        `json:",inline" mapstructure:",squash"`
 }
 
-//GithubConfigTestInput structure defines all properties that can be sent by client to configure github
-type GithubConfigTestInput struct {
-	GithubConfig GithubConfig `json:"githubConfig, omitempty"`
-	Enabled      bool         `json:"enabled,omitempty"`
+type GithubConfigTestOutput struct {
+	RedirectURL string `json:"redirectUrl"`
 }
 
 //GithubConfigApplyInput structure defines all properties that can be sent by client to configure github

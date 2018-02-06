@@ -8,6 +8,7 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
 	"github.com/rancher/types/client/management/v3"
@@ -19,7 +20,7 @@ import (
 
 //Constants for github
 const (
-	Name = "github"
+	Github = "github"
 )
 
 //GProvider implements an PrincipalProvider for github
@@ -27,9 +28,10 @@ type GProvider struct {
 	ctx          context.Context
 	authConfigs  v3.AuthConfigInterface
 	githubClient *GClient
+	userMGR      common.UserManager
 }
 
-func Configure(ctx context.Context, mgmtCtx *config.ManagementContext) *GProvider {
+func Configure(ctx context.Context, mgmtCtx *config.ManagementContext, userMGR common.UserManager) *GProvider {
 	githubClient := &GClient{
 		httpClient: &http.Client{},
 	}
@@ -38,12 +40,13 @@ func Configure(ctx context.Context, mgmtCtx *config.ManagementContext) *GProvide
 		ctx:          ctx,
 		authConfigs:  mgmtCtx.Management.AuthConfigs(""),
 		githubClient: githubClient,
+		userMGR:      userMGR,
 	}
 }
 
 //GetName returns the name of the provider
 func (g *GProvider) GetName() string {
-	return Name
+	return Github
 }
 
 func (g *GProvider) getGithubConfigCR() (*v3.GithubConfig, error) {
@@ -131,10 +134,11 @@ func (g *GProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v3
 		return userPrincipal, groupPrincipals, providerInfo, 401, fmt.Errorf("Error getting github user %v", err)
 	}
 	userPrincipal = v3.Principal{
-		ObjectMeta:  metav1.ObjectMeta{Name: Name + "_user://" + strconv.Itoa(user.ID)},
+		ObjectMeta:  metav1.ObjectMeta{Name: Github + "_user://" + strconv.Itoa(user.ID)},
 		DisplayName: user.Name,
 		LoginName:   user.Login,
 		Kind:        "user",
+		Provider:    Github,
 		Me:          true,
 	}
 
@@ -146,9 +150,10 @@ func (g *GProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v3
 
 	for _, orgAcct := range orgAccts {
 		groupPrincipal := v3.Principal{
-			ObjectMeta:  metav1.ObjectMeta{Name: Name + "_org://" + strconv.Itoa(orgAcct.ID)},
+			ObjectMeta:  metav1.ObjectMeta{Name: Github + "_org://" + strconv.Itoa(orgAcct.ID)},
 			DisplayName: orgAcct.Name,
 			Kind:        "group",
+			Provider:    Github,
 		}
 		groupPrincipals = append(groupPrincipals, groupPrincipal)
 	}
@@ -160,9 +165,10 @@ func (g *GProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v3
 	}
 	for _, teamAcct := range teamAccts {
 		groupPrincipal := v3.Principal{
-			ObjectMeta:  metav1.ObjectMeta{Name: Name + "_team://" + strconv.Itoa(teamAcct.ID)},
+			ObjectMeta:  metav1.ObjectMeta{Name: Github + "_team://" + strconv.Itoa(teamAcct.ID)},
 			DisplayName: teamAcct.Name,
 			Kind:        "group",
+			Provider:    Github,
 		}
 		groupPrincipals = append(groupPrincipals, groupPrincipal)
 	}
@@ -188,10 +194,11 @@ func (g *GProvider) SearchPrincipals(searchKey string, myToken v3.Token) ([]v3.P
 	user, err := g.githubClient.getGithubUserByName(searchKey, accessToken, config)
 	if err == nil {
 		userPrincipal := v3.Principal{
-			ObjectMeta:  metav1.ObjectMeta{Name: Name + "_user://" + strconv.Itoa(user.ID)},
+			ObjectMeta:  metav1.ObjectMeta{Name: Github + "_user://" + strconv.Itoa(user.ID)},
 			DisplayName: user.Name,
 			LoginName:   user.Login,
 			Kind:        "user",
+			Provider:    Github,
 			Me:          false,
 		}
 		if g.isThisUserMe(myToken.UserPrincipal, userPrincipal) {
@@ -203,9 +210,10 @@ func (g *GProvider) SearchPrincipals(searchKey string, myToken v3.Token) ([]v3.P
 	orgAcct, err := g.githubClient.getGithubOrgByName(searchKey, accessToken, config)
 	if err == nil {
 		groupPrincipal := v3.Principal{
-			ObjectMeta:  metav1.ObjectMeta{Name: Name + "_org://" + strconv.Itoa(orgAcct.ID)},
+			ObjectMeta:  metav1.ObjectMeta{Name: Github + "_org://" + strconv.Itoa(orgAcct.ID)},
 			DisplayName: orgAcct.Name,
 			Kind:        "group",
+			Provider:    Github,
 		}
 		if g.isMemberOf(myToken.GroupPrincipals, groupPrincipal) {
 			groupPrincipal.MemberOf = true

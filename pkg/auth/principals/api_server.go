@@ -5,12 +5,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/sirupsen/logrus"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
+	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type principalAPIServer struct {
@@ -24,7 +23,7 @@ func newPrincipalAPIServer(ctx context.Context, mgmtCtx *config.ManagementContex
 	if mgmtCtx == nil {
 		return nil, fmt.Errorf("Failed to build tokenAPIHandler, nil ManagementContext")
 	}
-	config.Configure(ctx, mgmtCtx)
+	providers.Configure(ctx, mgmtCtx)
 
 	apiServer := &principalAPIServer{
 		ctx:              ctx,
@@ -61,7 +60,7 @@ func (s *principalAPIServer) findPrincipals(tokenKey string, name string) ([]v3.
 	if err != nil {
 		return principals, 401, err
 	}
-	principals, status, err = config.SearchPrincipals(name, *token)
+	principals, status, err = providers.SearchPrincipals(name, *token)
 
 	return principals, status, err
 }

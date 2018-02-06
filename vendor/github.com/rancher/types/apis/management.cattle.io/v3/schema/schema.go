@@ -185,18 +185,17 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 			schema.BaseType = "authConfig"
 			schema.ResourceActions = map[string]types.Action{
 				"configureTest": {
-					Input:  "githubConfigTestInput",
-					Output: "githubConfig",
+					Input:  "githubConfig",
+					Output: "githubConfigTestOutput",
 				},
 				"testAndApply": {
-					Input:  "githubConfigApplyInput",
-					Output: "githubConfig",
+					Input: "githubConfigApplyInput",
 				},
 			}
 			schema.CollectionMethods = []string{}
 			schema.ResourceMethods = []string{http.MethodGet}
 		}).
-		MustImport(&Version, v3.GithubConfigTestInput{}).
+		MustImport(&Version, v3.GithubConfigTestOutput{}).
 		MustImport(&Version, v3.GithubConfigApplyInput{}).
 		MustImportAndCustomize(&Version, v3.LocalConfig{}, func(schema *types.Schema) {
 			schema.BaseType = "authConfig"

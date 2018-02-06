@@ -503,9 +503,30 @@ spec:
         configMapKeyRef:
           name: calico-config
           key: etcd_endpoints
+    # Location of the CA certificate for etcd.
+    - name: ETCD_CA_CERT_FILE
+      valueFrom:
+        configMapKeyRef:
+          name: calico-config
+          key: etcd_ca
+    # Location of the client key for etcd.
+    - name: ETCD_KEY_FILE
+      valueFrom:
+        configMapKeyRef:
+          name: calico-config
+          key: etcd_key
+    # Location of the client certificate for etcd.
+    - name: ETCD_CERT_FILE
+      valueFrom:
+        configMapKeyRef:
+          name: calico-config
+          key: etcd_cert
     volumeMounts:
     - name: ippool-config
       mountPath: /root/
+    # Mount in the etcd TLS secrets.
+    - mountPath: /calico-secrets
+      name: etcd-certs
   volumes:
   - name: ippool-config
     configMap:
@@ -513,5 +534,9 @@ spec:
       items:
         - key: {{.CloudProvider}}-ippool
           path: {{.CloudProvider}}-ippool.yaml
+  # Mount in the etcd TLS secrets.
+  - name: etcd-certs
+    secret:
+      secretName: calico-etcd-secrets
           {{end}}
 `

@@ -383,11 +383,15 @@ func (g *GClient) getURL(endpoint string, config *v3.GithubConfig) string {
 	var hostName, apiEndpoint, toReturn string
 
 	if config.Hostname != "" {
-		hostName = config.Scheme + config.Hostname
+		scheme := "http://"
+		if config.TLS {
+			scheme = "https://"
+		}
+		hostName = scheme + config.Hostname
 		if hostName == githubDefaultHostName {
 			apiEndpoint = githubAPI
 		} else {
-			apiEndpoint = config.Scheme + config.Hostname + gheAPI
+			apiEndpoint = scheme + config.Hostname + gheAPI
 		}
 	} else {
 		hostName = githubDefaultHostName
