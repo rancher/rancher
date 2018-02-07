@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/management/store/cluster"
 	"github.com/rancher/rancher/pkg/api/management/store/preference"
 	"github.com/rancher/rancher/pkg/api/management/store/scoped"
+	"github.com/rancher/rancher/pkg/auth/principals"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/machine/store"
 	machineconfig "github.com/rancher/rancher/pkg/machine/store/config"
@@ -48,6 +49,7 @@ func Schemas(ctx context.Context, management *config.ManagementContext, schemas 
 	App(schemas, management)
 	Setting(schemas)
 	ClusterTypes(schemas)
+	principals.Schema(ctx, management, schemas)
 
 	secretStore, err := machineconfig.NewStore(management)
 	if err != nil {

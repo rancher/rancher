@@ -106,7 +106,6 @@ func ConvertTokenResource(schema *types.Schema, token v3.Token) (map[string]inte
 	}
 	mapper := schema.Mapper
 	if mapper == nil {
-
 		return nil, errors.New("no schema mapper available")
 	}
 	mapper.FromInternal(tokenData)
