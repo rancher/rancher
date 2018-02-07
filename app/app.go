@@ -10,8 +10,8 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+	managementController "github.com/rancher/rancher/pkg/controllers/management"
 	"github.com/rancher/rancher/pkg/dialer"
-	managementController "github.com/rancher/rancher/pkg/management/controller"
 	"github.com/rancher/rancher/server"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"

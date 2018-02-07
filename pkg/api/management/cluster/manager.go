@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	clusterapi "github.com/rancher/rancher/pkg/api/cluster/server"
+	clusterapi "github.com/rancher/rancher/pkg/api/user/server"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
@@ -27,7 +27,7 @@ type Manager struct {
 type record struct {
 	handler        http.Handler
 	cluster        *v3.Cluster
-	clusterContext *config.ClusterContext
+	clusterContext *config.UserContext
 	ctx            context.Context
 	cancel         context.CancelFunc
 }
@@ -151,7 +151,7 @@ func (c *Manager) toServer(cluster *client.Cluster) (*record, error) {
 		return nil, err
 	}
 
-	clusterContext, err := config.NewClusterContext(c.ManagementConfig, *kubeConfig, cluster.ID)
+	clusterContext, err := config.NewUserContext(c.ManagementConfig, *kubeConfig, cluster.ID)
 	if err != nil {
 		return nil, err
 	}
