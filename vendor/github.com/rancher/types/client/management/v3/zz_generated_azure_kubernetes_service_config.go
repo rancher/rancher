@@ -18,6 +18,7 @@ const (
 	AzureKubernetesServiceConfigFieldSSHPublicKeyContents = "sshPublicKeyContents"
 	AzureKubernetesServiceConfigFieldSubscriptionID       = "subscriptionId"
 	AzureKubernetesServiceConfigFieldTag                  = "tags"
+	AzureKubernetesServiceConfigFieldTenantID             = "tenantId"
 )
 
 type AzureKubernetesServiceConfig struct {
@@ -37,4 +38,5 @@ type AzureKubernetesServiceConfig struct {
 	SSHPublicKeyContents string            `json:"sshPublicKeyContents,omitempty"`
 	SubscriptionID       string            `json:"subscriptionId,omitempty"`
 	Tag                  map[string]string `json:"tags,omitempty"`
+	TenantID             string            `json:"tenantId,omitempty"`
 }

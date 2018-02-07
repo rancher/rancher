@@ -184,6 +184,8 @@ type AzureKubernetesServiceConfig struct {
 	ClientID string `json:"clientId,omitempty" norman:"required"`
 	// Secret associated with the Client ID
 	ClientSecret string `json:"clientSecret,omitempty" norman:"required"`
+	// Tenant ID to create the cluster under
+	TenantID string `json:"tenantId,omitempty" norman:"required"`
 }
 
 type ClusterEvent struct {
