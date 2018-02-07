@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	kubeConfigFile = ".kube_config_cluster.yml"
+	kubeConfigFile = "kube_config_cluster.yml"
 	rancherPath    = "./management-state/rke/"
 )
 
@@ -317,7 +317,7 @@ func (d *Driver) restore(info *types.ClusterInfo) (string, error) {
 	if info != nil {
 		state := info.Metadata["state"]
 		if state != "" {
-			ioutil.WriteFile(filepath.Join(dir, kubeConfigFile), []byte(state), 0600)
+			ioutil.WriteFile(kubeConfig(dir), []byte(state), 0600)
 		}
 	}
 
