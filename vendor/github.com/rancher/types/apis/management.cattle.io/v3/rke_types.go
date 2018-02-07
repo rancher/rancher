@@ -38,23 +38,23 @@ type PrivateRegistry struct {
 
 type RKESystemImages struct {
 	// etcd image
-	Etcd string `yaml:"etcd" json:"etcd,omitempty" norman:"default=quay.io/coreos/etcd:v3.0.17"`
+	Etcd string `yaml:"etcd" json:"etcd,omitempty"`
 	// Alpine image
-	Alpine string `yaml:"alpine" json:"alpine,omitempty" norman:"default=alpine"`
+	Alpine string `yaml:"alpine" json:"alpine,omitempty"`
 	// rke-nginx-proxy image
-	NginxProxy string `yaml:"nginx_proxy" json:"nginxProxy,omitempty" norman:"default=rancher/rke-nginx-proxy:v0.1.1"`
+	NginxProxy string `yaml:"nginx_proxy" json:"nginxProxy,omitempty"`
 	// rke-cert-deployer image
-	CertDownloader string `yaml:"cert_downloader" json:"certDownloader,omitempty" norman:"default=rancher/rke-cert-deployer:v0.1.1"`
+	CertDownloader string `yaml:"cert_downloader" json:"certDownloader,omitempty"`
 	// rke-service-sidekick image
-	KubernetesServicesSidecar string `yaml:"kubernetes_services_sidecar" json:"kubernetesServicesSidecar,omitempty" norman:"default=rancher/rke-service-sidekick:v0.1.0"`
+	KubernetesServicesSidecar string `yaml:"kubernetes_services_sidecar" json:"kubernetesServicesSidecar,omitempty"`
 	// KubeDNS image
-	KubeDNS string `yaml:"kubedns" json:"kubedns,omitempty" norman:"default=gcr.io/google_containers/k8s-dns-kube-dns-amd64:1.14.5"`
+	KubeDNS string `yaml:"kubedns" json:"kubedns,omitempty"`
 	// DNSMasq image
-	DNSmasq string `yaml:"dnsmasq" json:"dnsmasq,omitempty" norman:"default=gcr.io/google_containers/k8s-dns-dnsmasq-nanny-amd64:1.14.5"`
+	DNSmasq string `yaml:"dnsmasq" json:"dnsmasq,omitempty"`
 	// KubeDNS side car image
-	KubeDNSSidecar string `yaml:"kubedns_sidecar" json:"kubednsSidecar,omitempty" norman:"default=gcr.io/google_containers/k8s-dns-sidecar-amd64:1.14.5"`
+	KubeDNSSidecar string `yaml:"kubedns_sidecar" json:"kubednsSidecar,omitempty"`
 	// KubeDNS autoscaler image
-	KubeDNSAutoscaler string `yaml:"kubedns_autoscaler" json:"kubednsAutoscaler,omitempty" norman:"default=gcr.io/google_containers/cluster-proportional-autoscaler-amd64:1.0.0"`
+	KubeDNSAutoscaler string `yaml:"kubedns_autoscaler" json:"kubednsAutoscaler,omitempty"`
 	// Kubernetes image
 	Kubernetes string `yaml:"kubernetes" json:"kubernetes,omitempty" norman:"default=rancher/k8s:v1.8.5-rancher4"`
 	// Flannel image
