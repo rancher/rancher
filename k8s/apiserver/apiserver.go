@@ -291,7 +291,7 @@ func startGarbageCollectorController(hookContext genericapiserver.PostStartHookC
 	}
 
 	// Start the garbage collector.
-	go garbageCollector.Run(5, hookContext.StopCh)
+	go garbageCollector.Run(20, hookContext.StopCh)
 
 	// Periodically refresh the RESTMapper with new discovery information and sync
 	// the garbage collector.
