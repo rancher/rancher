@@ -65,7 +65,7 @@ func (c *ManagementContext) controllers() []controller.Starter {
 	}
 }
 
-type ClusterContext struct {
+type UserContext struct {
 	Schemas           *types.Schemas
 	Management        *ManagementContext
 	ClusterName       string
@@ -80,7 +80,7 @@ type ClusterContext struct {
 	Extensions extv1beta1.Interface
 }
 
-func (w *ClusterContext) controllers() []controller.Starter {
+func (w *UserContext) controllers() []controller.Starter {
 	return []controller.Starter{
 		w.Apps,
 		w.Project,
@@ -90,8 +90,8 @@ func (w *ClusterContext) controllers() []controller.Starter {
 	}
 }
 
-func (w *ClusterContext) WorkloadContext() *WorkloadContext {
-	return &WorkloadContext{
+func (w *UserContext) UserOnlyContext() *UserOnlyContext {
+	return &UserOnlyContext{
 		Schemas:           w.Schemas,
 		ClusterName:       w.ClusterName,
 		RESTConfig:        w.RESTConfig,
@@ -106,7 +106,7 @@ func (w *ClusterContext) WorkloadContext() *WorkloadContext {
 	}
 }
 
-type WorkloadContext struct {
+type UserOnlyContext struct {
 	Schemas           *types.Schemas
 	ClusterName       string
 	RESTConfig        rest.Config
@@ -120,7 +120,7 @@ type WorkloadContext struct {
 	Extensions extv1beta1.Interface
 }
 
-func (w *WorkloadContext) controllers() []controller.Starter {
+func (w *UserOnlyContext) controllers() []controller.Starter {
 	return []controller.Starter{
 		w.Apps,
 		w.Project,
@@ -210,9 +210,9 @@ func (c *ManagementContext) StartAndWait() error {
 	return ctx.Err()
 }
 
-func NewClusterContext(managementConfig, config rest.Config, clusterName string) (*ClusterContext, error) {
+func NewUserContext(managementConfig, config rest.Config, clusterName string) (*UserContext, error) {
 	var err error
-	context := &ClusterContext{
+	context := &UserContext{
 		RESTConfig:  config,
 		ClusterName: clusterName,
 		Schemas: types.NewSchemas().
@@ -275,81 +275,26 @@ func NewClusterContext(managementConfig, config rest.Config, clusterName string)
 	return context, err
 }
 
-func (w *ClusterContext) Start(ctx context.Context) error {
+func (w *UserContext) Start(ctx context.Context) error {
 	logrus.Info("Starting cluster controllers for ", w.ClusterName)
 	controllers := w.Management.controllers()
 	controllers = append(controllers, w.controllers()...)
 	return controller.SyncThenStart(ctx, 5, controllers...)
 }
 
-func (w *ClusterContext) StartAndWait(ctx context.Context) error {
+func (w *UserContext) StartAndWait(ctx context.Context) error {
 	ctx = signal.SigTermCancelContext(ctx)
 	w.Start(ctx)
 	<-ctx.Done()
 	return ctx.Err()
 }
 
-func NewWorkloadContext(config rest.Config, clusterName string) (*WorkloadContext, error) {
-	var err error
-	context := &WorkloadContext{
-		RESTConfig:  config,
-		ClusterName: clusterName,
-		Schemas: types.NewSchemas().
-			AddSchemas(managementSchema.Schemas).
-			AddSchemas(clusterSchema.Schemas).
-			AddSchemas(projectSchema.Schemas),
-	}
-
-	context.K8sClient, err = kubernetes.NewForConfig(&config)
-	if err != nil {
-		return nil, err
-	}
-
-	context.Apps, err = appsv1beta2.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-
-	context.Core, err = corev1.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-
-	context.Project, err = projectv3.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-
-	context.RBAC, err = rbacv1.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-
-	context.Extensions, err = extv1beta1.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-
-	dynamicConfig := config
-	if dynamicConfig.NegotiatedSerializer == nil {
-		configConfig := dynamic.ContentConfig()
-		dynamicConfig.NegotiatedSerializer = configConfig.NegotiatedSerializer
-	}
-
-	context.UnversionedClient, err = rest.UnversionedRESTClientFor(&dynamicConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	return context, err
-}
-
-func (w *WorkloadContext) Start(ctx context.Context) error {
+func (w *UserOnlyContext) Start(ctx context.Context) error {
 	logrus.Info("Starting workload controllers")
 	return controller.SyncThenStart(ctx, 5, w.controllers()...)
 }
 
-func (w *WorkloadContext) StartAndWait(ctx context.Context) error {
+func (w *UserOnlyContext) StartAndWait(ctx context.Context) error {
 	ctx = signal.SigTermCancelContext(ctx)
 	w.Start(ctx)
 	<-ctx.Done()
