@@ -11,12 +11,12 @@ RUN curl -sLf https://github.com/rancher/machine-package/releases/download/v0.13
 ENV ETCD_ARGS "--data-dir /var/lib/rancher/etcd --listen-peer-urls http://localhost:2382 --advertise-client-urls http://localhost:2382 --listen-client-urls http://localhost:2381"
 WORKDIR /var/lib/rancher
 
+ENV CATTLE_UI_PATH /usr/share/rancher/ui
 ENV CATTLE_UI_VERSION 2.0.16
 RUN mkdir -p /usr/share/rancher/ui && \
     cd /usr/share/rancher/ui && \
     curl -sL https://releases.rancher.com/ui/${CATTLE_UI_VERSION}.tar.gz | tar xvzf - --strip-components=1 && \
-    cd /var/lib/rancher && \
-    ln -s /usr/share/rancher/ui ui
+    cd /var/lib/rancher
 
 ARG VERSION=dev
 ENV CATTLE_SERVER_VERSION ${VERSION}

@@ -6,20 +6,20 @@ import (
 	"os"
 	"strings"
 
+	"path/filepath"
+
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 )
 
-var uiURL = "https://releases.rancher.com/ui/latest2/index.html"
-
 func Content() http.Handler {
-	return http.FileServer(http.Dir("ui"))
+	return http.FileServer(http.Dir(settings.UIPath.Get()))
 }
 
 func UI(next http.Handler) http.Handler {
 	local := false
-	_, err := os.Stat("ui/index.html")
+	_, err := os.Stat(indexHTML())
 	if err == nil {
 		local = true
 	}
@@ -31,7 +31,7 @@ func UI(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 		if parse.IsBrowser(req, true) {
 			if local {
-				http.ServeFile(resp, req, "ui/index.html")
+				http.ServeFile(resp, req, indexHTML())
 			} else {
 				ui(resp, req)
 			}
@@ -39,6 +39,10 @@ func UI(next http.Handler) http.Handler {
 			next.ServeHTTP(resp, req)
 		}
 	})
+}
+
+func indexHTML() string {
+	return filepath.Join(settings.UIPath.Get(), "index.html")
 }
 
 func ui(resp http.ResponseWriter, req *http.Request) {
@@ -49,7 +53,7 @@ func ui(resp http.ResponseWriter, req *http.Request) {
 }
 
 func serveIndex(resp http.ResponseWriter, req *http.Request) error {
-	r, err := http.Get(uiURL)
+	r, err := http.Get(settings.UIIndex.Get())
 	if err != nil {
 		return err
 	}
