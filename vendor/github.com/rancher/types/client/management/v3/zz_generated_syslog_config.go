@@ -2,15 +2,15 @@ package client
 
 const (
 	SyslogConfigType          = "syslogConfig"
-	SyslogConfigFieldHost     = "host"
-	SyslogConfigFieldPort     = "port"
+	SyslogConfigFieldEndpoint = "endpoint"
 	SyslogConfigFieldProgram  = "program"
+	SyslogConfigFieldProtocol = "protocol"
 	SyslogConfigFieldSeverity = "severity"
 )
 
 type SyslogConfig struct {
-	Host     string `json:"host,omitempty"`
-	Port     *int64 `json:"port,omitempty"`
+	Endpoint string `json:"endpoint,omitempty"`
 	Program  string `json:"program,omitempty"`
+	Protocol string `json:"protocol,omitempty"`
 	Severity string `json:"severity,omitempty"`
 }

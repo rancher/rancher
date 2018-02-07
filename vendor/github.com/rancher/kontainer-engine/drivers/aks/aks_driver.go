@@ -11,13 +11,17 @@ import (
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2017-08-31/containerservice"
+	"github.com/Azure/go-autorest/autorest"
+	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/Azure/go-autorest/autorest/utils"
+	"github.com/rancher/kontainer-engine/drivers"
 	"github.com/rancher/kontainer-engine/types"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 type Driver struct {
@@ -128,6 +132,10 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 		Type:  types.StringType,
 		Usage: "Client secret associated with the client-id",
 	}
+	driverFlag.Options["tenant-id"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "Azure tenant id to use",
+	}
 
 	return &driverFlag, nil
 }
@@ -168,6 +176,7 @@ func getStateFromOptions(driverOptions *types.DriverOptions) (state, error) {
 	state.AdminUsername = getValueFromDriverOptions(driverOptions, types.StringType, "admin-username", "adminUsername").(string)
 	state.BaseURL = getValueFromDriverOptions(driverOptions, types.StringType, "base-url").(string)
 	state.ClientID = getValueFromDriverOptions(driverOptions, types.StringType, "client-id", "clientId").(string)
+	state.TenantID = getValueFromDriverOptions(driverOptions, types.StringType, "tenant-id", "tenantId").(string)
 	state.ClientSecret = getValueFromDriverOptions(driverOptions, types.StringType, "client-secret", "clientSecret").(string)
 	tagValues := getValueFromDriverOptions(driverOptions, types.StringSliceType).(*types.StringSlice)
 	for _, part := range tagValues.Value {
@@ -260,11 +269,18 @@ func (state *state) getDefaultDNSPrefix() string {
 }
 
 func newAzureClient(state state) (*containerservice.ManagedClustersClient, error) {
-	authorizer, err := utils.GetAuthorizer(azure.PublicCloud)
+	oauthConfig, err := adal.NewOAuthConfig(azure.PublicCloud.ActiveDirectoryEndpoint, state.TenantID)
+	if err != nil {
+		return nil, err
+	}
+
+	spToken, err := adal.NewServicePrincipalToken(*oauthConfig, state.ClientID, state.ClientSecret, azure.PublicCloud.ResourceManagerEndpoint)
 
 	if err != nil {
 		return nil, err
 	}
+
+	authorizer := autorest.NewBearerAuthorizer(spToken)
 
 	baseURL := state.BaseURL
 	if baseURL == "" {
@@ -280,6 +296,7 @@ func newAzureClient(state state) (*containerservice.ManagedClustersClient, error
 const failedStatus = "Failed"
 const succeededStatus = "Succeeded"
 const creatingStatus = "Creating"
+const updatingStatus = "Updating"
 
 const pollInterval = 30
 
@@ -359,6 +376,8 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions) (*typ
 
 	logrus.Info("Request submitted, waiting for cluster to finish creating")
 
+	failedCount := 0
+
 	for {
 		result, err := client.Get(ctx, driverState.ResourceGroup, driverState.Name)
 
@@ -369,7 +388,14 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions) (*typ
 		state := *result.ProvisioningState
 
 		if state == failedStatus {
-			return nil, fmt.Errorf("cluster create has completed with status of 'Failed'")
+			if failedCount > 3 {
+				logrus.Errorf("cluster recovery failed, retries depleted")
+				return nil, fmt.Errorf("cluster create has completed with status of 'Failed'")
+			}
+
+			failedCount = failedCount + 1
+			logrus.Infof("cluster marked as failed but waiting for recovery: retries left %v", 3-failedCount)
+			time.Sleep(pollInterval * time.Second)
 		}
 
 		if state == succeededStatus {
@@ -377,14 +403,10 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions) (*typ
 			info := &types.ClusterInfo{}
 			err := storeState(info, driverState)
 
-			fmt.Println("********")
-			fmt.Println(info.Metadata["state"])
-			fmt.Println("********")
-
 			return info, err
 		}
 
-		if state != creatingStatus {
+		if state != creatingStatus && state != updatingStatus {
 			return nil, fmt.Errorf("unexpected state %v", state)
 		}
 
@@ -577,7 +599,11 @@ type UserInfo struct {
 	Token                 string `yaml:"token"`
 }
 
+const retries = 5
+
 func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types.ClusterInfo, error) {
+	logrus.Info("starting post-check")
+
 	state, err := getState(info)
 
 	if err != nil {
@@ -600,14 +626,14 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 	l, err := base64.StdEncoding.Decode(decoded, []byte(*result.KubeConfig))
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode kubeconfig: %v", err)
 	}
 
 	clusterConfig := KubeConfig{}
 	err = yaml.Unmarshal(decoded[:l], &clusterConfig)
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal kubeconfig: %v", err)
 	}
 
 	singleCluster := clusterConfig.Clusters[0]
@@ -615,11 +641,67 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 
 	info.Version = clusterConfig.APIVersion
 	info.Endpoint = singleCluster.ClusterInfo.Server
-	info.Username = state.AdminUsername
 	info.Password = singleUser.UserInfo.Token
 	info.RootCaCertificate = singleCluster.ClusterInfo.CertificateAuthorityData
 	info.ClientCertificate = singleUser.UserInfo.ClientCertificateData
 	info.ClientKey = singleUser.UserInfo.ClientKeyData
+
+	capem, err := base64.StdEncoding.DecodeString(singleCluster.ClusterInfo.CertificateAuthorityData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode CA: %v", err)
+	}
+
+	key, err := base64.StdEncoding.DecodeString(singleUser.UserInfo.ClientKeyData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode client key: %v", err)
+	}
+
+	cert, err := base64.StdEncoding.DecodeString(singleUser.UserInfo.ClientCertificateData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode client cert: %v", err)
+	}
+
+	host := singleCluster.ClusterInfo.Server
+	if !strings.HasPrefix(host, "https://") {
+		host = fmt.Sprintf("https://%s", host)
+	}
+
+	config := &rest.Config{
+		Host: host,
+		TLSClientConfig: rest.TLSClientConfig{
+			CAData:   capem,
+			KeyData:  key,
+			CertData: cert,
+		},
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating clientset: %v", err)
+	}
+
+	failureCount := 0
+
+	for {
+		info.ServiceAccountToken, err = drivers.GenerateServiceAccountToken(clientset)
+
+		if err == nil {
+			logrus.Info("service account token generated successfully")
+			break
+		} else {
+			if failureCount < retries {
+				logrus.Infof("service account token generation failed, retries left: %v", retries-failureCount)
+				failureCount = failureCount + 1
+
+				time.Sleep(pollInterval * time.Second)
+			} else {
+				logrus.Error("retries exceeded, failing post-check")
+				return nil, err
+			}
+		}
+	}
+
+	logrus.Info("post-check completed successfully")
 
 	return info, nil
 }

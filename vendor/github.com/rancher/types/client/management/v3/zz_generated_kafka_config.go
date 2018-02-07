@@ -1,18 +1,14 @@
 package client
 
 const (
-	KafkaConfigType                = "kafkaConfig"
-	KafkaConfigFieldBroker         = "broker"
-	KafkaConfigFieldDataType       = "dataType"
-	KafkaConfigFieldMaxSendRetries = "maxSendRetries"
-	KafkaConfigFieldTopic          = "topic"
-	KafkaConfigFieldZookeeper      = "zookeeper"
+	KafkaConfigType                   = "kafkaConfig"
+	KafkaConfigFieldBrokerEndpoints   = "brokerEndpoints"
+	KafkaConfigFieldTopic             = "topic"
+	KafkaConfigFieldZookeeperEndpoint = "zookeeperEndpoint"
 )
 
 type KafkaConfig struct {
-	Broker         *BrokerList `json:"broker,omitempty"`
-	DataType       string      `json:"dataType,omitempty"`
-	MaxSendRetries *int64      `json:"maxSendRetries,omitempty"`
-	Topic          string      `json:"topic,omitempty"`
-	Zookeeper      *Zookeeper  `json:"zookeeper,omitempty"`
+	BrokerEndpoints   []string `json:"brokerEndpoints,omitempty"`
+	Topic             string   `json:"topic,omitempty"`
+	ZookeeperEndpoint string   `json:"zookeeperEndpoint,omitempty"`
 }
