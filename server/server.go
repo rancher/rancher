@@ -83,10 +83,10 @@ func New(ctx context.Context, httpPort, httpsPort int, management *config.Manage
 	uiContent := ui.Content()
 	unauthed.PathPrefix("/assets").Handler(uiContent)
 	unauthed.PathPrefix("/translations").Handler(uiContent)
-	unauthed.Handle("humans.txt", uiContent)
-	unauthed.Handle("index.html", uiContent)
-	unauthed.Handle("robots.txt", uiContent)
-	unauthed.Handle("VERSION.txt", uiContent)
+	unauthed.Handle("/humans.txt", uiContent)
+	unauthed.Handle("/index.html", uiContent)
+	unauthed.Handle("/robots.txt", uiContent)
+	unauthed.Handle("/VERSION.txt", uiContent)
 
 	registerHealth(unauthed)
 
