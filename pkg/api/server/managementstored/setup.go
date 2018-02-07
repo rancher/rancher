@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/authn"
 	"github.com/rancher/rancher/pkg/api/customization/catalog"
 	apicluster "github.com/rancher/rancher/pkg/api/customization/cluster"
+	"github.com/rancher/rancher/pkg/api/customization/logging"
 	"github.com/rancher/rancher/pkg/api/customization/machine"
 	"github.com/rancher/rancher/pkg/api/customization/setting"
 	"github.com/rancher/rancher/pkg/api/store/cert"
@@ -78,6 +79,7 @@ func Setup(ctx context.Context, management *config.ManagementContext) error {
 	ClusterTypes(schemas)
 	Preference(schemas, management)
 	ClusterRegistrationTokens(schemas)
+	LoggingTypes(schemas, management)
 
 	if err := MachineTypes(schemas, management); err != nil {
 		return err
@@ -233,4 +235,17 @@ func Setting(schemas *types.Schemas) {
 func ClusterTypes(schemas *types.Schemas) {
 	schema := schemas.Schema(&managementschema.Version, client.ClusterType)
 	schema.Validator = apicluster.Validator
+}
+
+func LoggingTypes(schemas *types.Schemas, management *config.ManagementContext) {
+	loggingHandler := logging.ClusterLoggingHandler{
+		ClusterLoggingClient: management.Management.ClusterLoggings(""),
+		CoreV1:               management.Core,
+	}
+	schema := schemas.Schema(&managementschema.Version, client.ClusterLoggingType)
+	schema.Validator = logging.ClusterLoggingValidator
+	schema.ListHandler = loggingHandler.ListHandler
+
+	schema = schemas.Schema(&managementschema.Version, client.ProjectLoggingType)
+	schema.Validator = logging.ProjectLoggingValidator
 }
