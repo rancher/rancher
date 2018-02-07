@@ -63,6 +63,10 @@ type Principal struct {
 	ExtraInfo      map[string]string `json:"extraInfo,omitempty"`
 }
 
+type SearchPrincipalsInput struct {
+	Name string `json:"name" norman:"type=string,required,notnullable"`
+}
+
 type ChangePasswordInput struct {
 	CurrentPassword string `json:"currentPassword" norman:"type=string,required"`
 	NewPassword     string `json:"newPassword" norman:"type=string,required"`

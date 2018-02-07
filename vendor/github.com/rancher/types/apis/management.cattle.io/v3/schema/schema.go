@@ -166,6 +166,17 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.Group{}).
 		MustImport(&Version, v3.GroupMember{}).
 		MustImport(&Version, v3.Principal{}).
+		MustImportAndCustomize(&Version, v3.Principal{}, func(schema *types.Schema) {
+			schema.CollectionMethods = []string{http.MethodGet}
+			schema.ResourceMethods = []string{}
+			schema.CollectionActions = map[string]types.Action{
+				"search": {
+					Input:  "searchPrincipalsInput",
+					Output: "collection",
+				},
+			}
+		}).
+		MustImport(&Version, v3.SearchPrincipalsInput{}).
 		MustImport(&Version, v3.ChangePasswordInput{}).
 		MustImport(&Version, v3.SetPasswordInput{}).
 		MustImportAndCustomize(&Version, v3.User{}, func(schema *types.Schema) {
