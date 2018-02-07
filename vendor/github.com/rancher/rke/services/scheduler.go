@@ -39,7 +39,7 @@ func buildSchedulerConfig(host *hosts.Host, schedulerService v3.SchedulerService
 			SidekickContainerName,
 		},
 		Binds: []string{
-			"/etc/kubernetes:/etc/kubernetes",
+			"/etc/kubernetes:/etc/kubernetes:z",
 		},
 		NetworkMode:   "host",
 		RestartPolicy: container.RestartPolicy{Name: "always"},

@@ -51,7 +51,7 @@ func buildKubeControllerConfig(kubeControllerService v3.KubeControllerService, a
 			SidekickContainerName,
 		},
 		Binds: []string{
-			"/etc/kubernetes:/etc/kubernetes",
+			"/etc/kubernetes:/etc/kubernetes:z",
 		},
 		NetworkMode:   "host",
 		RestartPolicy: container.RestartPolicy{Name: "always"},

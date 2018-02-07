@@ -294,8 +294,7 @@ func IsContainerUpgradable(ctx context.Context, dClient *client.Client, imageCfg
 		return false, err
 	}
 	if containerInspect.Config.Image != imageCfg.Image ||
-		!reflect.DeepEqual(containerInspect.Config.Cmd, imageCfg.Cmd) ||
-		!reflect.DeepEqual(containerInspect.Config.Env, imageCfg.Env) {
+		!reflect.DeepEqual(containerInspect.Config.Cmd, imageCfg.Cmd) {
 		logrus.Debugf("[%s] Container [%s] is eligible for updgrade on host [%s]", plane, containerName, hostname)
 		return true, nil
 	}
