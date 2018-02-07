@@ -59,7 +59,9 @@ func (o *objectLifecycleAdapter) sync(key string, obj runtime.Object) error {
 
 	copyObj := obj.DeepCopyObject()
 	newObj, err := o.lifecycle.Updated(copyObj)
-	o.update(metadata.GetName(), obj, newObj)
+	if newObj != nil {
+		o.update(metadata.GetName(), obj, newObj)
+	}
 	return err
 }
 
@@ -82,7 +84,9 @@ func (o *objectLifecycleAdapter) finalize(metadata metav1.Object, obj runtime.Ob
 
 	copyObj := obj.DeepCopyObject()
 	if newObj, err := o.lifecycle.Finalize(copyObj); err != nil {
-		o.update(metadata.GetName(), obj, newObj)
+		if newObj != nil {
+			o.update(metadata.GetName(), obj, newObj)
+		}
 		return false, err
 	} else if newObj != nil {
 		copyObj = newObj
