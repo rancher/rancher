@@ -107,6 +107,8 @@ func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions) (*types.
 	if err != nil {
 		return nil, err
 	}
+	defer d.cleanup(stateDir)
+
 	APIURL, caCrt, clientCert, clientKey, err := cmd.ClusterUp(ctx, &rkeConfig, d.DockerDialer, d.LocalDialer, false, stateDir)
 	if err != nil {
 		return d.save(&types.ClusterInfo{
@@ -143,6 +145,7 @@ func (d *Driver) Update(ctx context.Context, clusterInfo *types.ClusterInfo, opt
 	if err != nil {
 		return nil, err
 	}
+	defer d.cleanup(stateDir)
 
 	APIURL, caCrt, clientCert, clientKey, err := cmd.ClusterUp(ctx, &rkeConfig, d.DockerDialer, d.LocalDialer, false, stateDir)
 	if err != nil {
@@ -162,7 +165,7 @@ func (d *Driver) Update(ctx context.Context, clusterInfo *types.ClusterInfo, opt
 	return d.save(clusterInfo, stateDir), nil
 }
 
-func (d *Driver) getCilentset(info *types.ClusterInfo) (*kubernetes.Clientset, error) {
+func (d *Driver) getClientset(info *types.ClusterInfo) (*kubernetes.Clientset, error) {
 	info.Endpoint = info.Metadata["Endpoint"]
 	info.ClientCertificate = info.Metadata["ClientCert"]
 	info.ClientKey = info.Metadata["ClientKey"]
@@ -199,7 +202,7 @@ func (d *Driver) getCilentset(info *types.ClusterInfo) (*kubernetes.Clientset, e
 
 // PostCheck does post action
 func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types.ClusterInfo, error) {
-	clientset, err := d.getCilentset(info)
+	clientset, err := d.getClientset(info)
 	if err != nil {
 		return nil, err
 	}
@@ -222,7 +225,7 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 }
 
 func (d *Driver) GetVersion(ctx context.Context, info *types.ClusterInfo) (*types.KubernetesVersion, error) {
-	clientset, err := d.getCilentset(info)
+	clientset, err := d.getClientset(info)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create clientset: %v", err)
 	}
@@ -245,12 +248,12 @@ func (d *Driver) SetVersion(ctx context.Context, info *types.ClusterInfo, versio
 	config.Version = version.Version
 
 	stateDir, err := d.restore(info)
-
 	if err != nil {
 		return err
 	}
+	defer d.cleanup(stateDir)
 
-	_, _, _, _, err = cmd.ClusterUp(ctx, &config, d.DockerDialer, nil, false, stateDir)
+	_, _, _, _, err = cmd.ClusterUp(ctx, &config, d.DockerDialer, d.LocalDialer, false, stateDir)
 
 	if err != nil {
 		return err
@@ -262,7 +265,7 @@ func (d *Driver) SetVersion(ctx context.Context, info *types.ClusterInfo, versio
 }
 
 func (d *Driver) GetClusterSize(ctx context.Context, info *types.ClusterInfo) (*types.NodeCount, error) {
-	clientset, err := d.getCilentset(info)
+	clientset, err := d.getClientset(info)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create clientset: %v", err)
 	}
@@ -335,15 +338,22 @@ func (d *Driver) save(info *types.ClusterInfo, stateDir string) *types.ClusterIn
 		}
 	}
 
-	if strings.HasPrefix(stateDir, rancherPath) && strings.HasSuffix(stateDir, "/cluster.yml") && !strings.Contains(stateDir, "..") {
-		os.Remove(stateDir)
-		os.Remove(kubeConfig(stateDir))
-		os.Remove(filepath.Dir(stateDir))
-	}
+	d.cleanup(stateDir)
 
 	return info
 }
 
+func (d *Driver) cleanup(stateDir string) {
+	if strings.HasSuffix(stateDir, "/cluster.yml") && !strings.Contains(stateDir, "..") {
+		os.Remove(stateDir)
+		os.Remove(kubeConfig(stateDir))
+		os.Remove(filepath.Dir(stateDir))
+	}
+}
+
 func kubeConfig(stateDir string) string {
-	return filepath.Join(filepath.Dir(stateDir), kubeConfigFile)
+	if strings.HasSuffix(stateDir, "/cluster.yml") {
+		return filepath.Join(filepath.Dir(stateDir), kubeConfigFile)
+	}
+	return filepath.Join(stateDir, kubeConfigFile)
 }
