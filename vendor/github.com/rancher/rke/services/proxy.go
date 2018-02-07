@@ -40,6 +40,7 @@ func buildNginxProxyConfig(host *hosts.Host, nginxProxyEnv, nginxProxyImage stri
 	imageCfg := &container.Config{
 		Image: nginxProxyImage,
 		Env:   []string{fmt.Sprintf("%s=%s", NginxProxyEnvName, nginxProxyEnv)},
+		Cmd:   []string{fmt.Sprintf("%s=%s", NginxProxyEnvName, nginxProxyEnv)},
 	}
 	hostCfg := &container.HostConfig{
 		NetworkMode:   "host",

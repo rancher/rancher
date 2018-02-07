@@ -38,7 +38,7 @@ func buildKubeproxyConfig(host *hosts.Host, kubeproxyService v3.KubeproxyService
 			SidekickContainerName,
 		},
 		Binds: []string{
-			"/etc/kubernetes:/etc/kubernetes",
+			"/etc/kubernetes:/etc/kubernetes:z",
 		},
 		NetworkMode:   "host",
 		RestartPolicy: container.RestartPolicy{Name: "always"},

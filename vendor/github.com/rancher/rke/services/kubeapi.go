@@ -62,7 +62,7 @@ func buildKubeAPIConfig(host *hosts.Host, kubeAPIService v3.KubeAPIService, etcd
 			SidekickContainerName,
 		},
 		Binds: []string{
-			"/etc/kubernetes:/etc/kubernetes",
+			"/etc/kubernetes:/etc/kubernetes:z",
 		},
 		NetworkMode:   "host",
 		RestartPolicy: container.RestartPolicy{Name: "always"},

@@ -197,7 +197,7 @@ type AuthzConfig struct {
 
 type IngressConfig struct {
 	// Ingress controller type used by kubernetes
-	Type string `yaml:"type" json:"type,omitempty"`
+	Provider string `yaml:"provider" json:"provider,omitempty"`
 	// Ingress controller options
 	Options map[string]string `yaml:"options" json:"options,omitempty"`
 	// NodeSelector key pair

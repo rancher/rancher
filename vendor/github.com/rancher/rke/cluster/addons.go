@@ -124,8 +124,8 @@ func (c *Cluster) ApplySystemAddonExcuteJob(addonJob string) error {
 }
 
 func (c *Cluster) deployIngress(ctx context.Context) error {
-	log.Infof(ctx, "[ingress] Setting up %s ingress controller", c.Ingress.Type)
-	if c.Ingress.Type == "none" {
+	log.Infof(ctx, "[ingress] Setting up %s ingress controller", c.Ingress.Provider)
+	if c.Ingress.Provider == "none" {
 		log.Infof(ctx, "[ingress] ingress controller is not defined")
 		return nil
 	}
@@ -142,6 +142,6 @@ func (c *Cluster) deployIngress(ctx context.Context) error {
 	if err := c.doAddonDeploy(ctx, ingressYaml, IngressAddonResourceName); err != nil {
 		return err
 	}
-	log.Infof(ctx, "[ingress] ingress controller %s is successfully deployed", c.Ingress.Type)
+	log.Infof(ctx, "[ingress] ingress controller %s is successfully deployed", c.Ingress.Provider)
 	return nil
 }

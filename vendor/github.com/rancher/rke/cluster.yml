@@ -1,6 +1,6 @@
 ---
 
-kubernetes_version: v1.8.5-rancher4
+kubernetes_version: v1.8.7-rancher1-1
 
 auth:
   strategy: x509
@@ -33,7 +33,7 @@ network:
   options:
 
 ssh_key_path: ~/.ssh/test
-enforce_docker_version: false
+ignore_docker_version: false
 # Kubernetes authorization mode; currently only `rbac` is supported and enabled by default.
 # Use `mode: none` to disable authorization
 authorization:
@@ -89,7 +89,7 @@ services:
 
 system_images:
   etcd: rancher/etcd:v3.0.17
-  kubernetes: rancher/k8s:v1.8.5-rancher4
+  kubernetes: rancher/k8s:v1.8.7-rancher1-1
   alpine: alpine:latest
   nginx_proxy: rancher/rke-nginx-proxy:v0.1.1
   cert_downloader: rancher/rke-cert-deployer:v0.1.1

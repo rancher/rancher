@@ -99,8 +99,8 @@ func validateServicesOptions(c *Cluster) error {
 
 func validateIngressOptions(c *Cluster) error {
 	// Should be changed when adding more ingress types
-	if c.Ingress.Type != DefaultIngressController && c.Ingress.Type != "none" {
-		return fmt.Errorf("Ingress controller %s is incorrect", c.Ingress.Type)
+	if c.Ingress.Provider != DefaultIngressController && c.Ingress.Provider != "none" {
+		return fmt.Errorf("Ingress controller %s is incorrect", c.Ingress.Provider)
 	}
 	return nil
 }

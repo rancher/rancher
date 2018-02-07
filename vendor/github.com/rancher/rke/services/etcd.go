@@ -90,8 +90,8 @@ func buildEtcdConfig(host *hosts.Host, etcdService v3.ETCDService, initCluster, 
 	hostCfg := &container.HostConfig{
 		RestartPolicy: container.RestartPolicy{Name: "always"},
 		Binds: []string{
-			"/var/lib/etcd:/etcd-data",
-			"/etc/kubernetes:/etc/kubernetes",
+			"/var/lib/etcd:/etcd-data:z",
+			"/etc/kubernetes:/etc/kubernetes:z",
 		},
 		NetworkMode: "host",
 	}

@@ -33,7 +33,7 @@ const (
 	DefaultIngressController              = "nginx"
 
 	DefaultEtcdImage = "rancher/etcd:v3.0.17"
-	DefaultK8sImage  = "rancher/k8s:v1.8.5-rancher4"
+	DefaultK8sImage  = "rancher/k8s:v1.8.7-rancher1-1"
 
 	DefaultFlannelImage    = "rancher/coreos-flannel:v0.9.1"
 	DefaultFlannelCNIImage = "rancher/coreos-flannel-cni:v0.2.0"
@@ -91,8 +91,8 @@ func (c *Cluster) setClusterDefaults(ctx context.Context) {
 		log.Warnf(ctx, "PodSecurityPolicy can't be enabled with RBAC support disabled")
 		c.Services.KubeAPI.PodSecurityPolicy = false
 	}
-	if len(c.Ingress.Type) == 0 {
-		c.Ingress.Type = DefaultIngressController
+	if len(c.Ingress.Provider) == 0 {
+		c.Ingress.Provider = DefaultIngressController
 	}
 
 	c.setClusterImageDefaults()
