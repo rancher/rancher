@@ -34,12 +34,15 @@ type ServicesController struct {
 	serviceLister  v1.ServiceLister
 	nodeController v1.NodeController
 	nodeLister     v1.NodeLister
+	podLister      v1.PodLister
+	podController  v1.PodController
 }
 
 type PodsController struct {
 	nodeLister     v1.NodeLister
 	nodeController v1.NodeController
 	pods           v1.PodInterface
+	serviceLister  v1.ServiceLister
 }
 
 func Register(ctx context.Context, workload *config.WorkloadContext) {
@@ -58,6 +61,8 @@ func Register(ctx context.Context, workload *config.WorkloadContext) {
 		serviceLister:  workload.Core.Services("").Controller().Lister(),
 		nodeLister:     workload.Core.Nodes("").Controller().Lister(),
 		nodeController: workload.Core.Nodes("").Controller(),
+		podLister:      workload.Core.Pods("").Controller().Lister(),
+		podController:  workload.Core.Pods("").Controller(),
 	}
 	workload.Core.Services("").AddHandler("servicesEndpointsController", s.sync)
 
@@ -65,12 +70,22 @@ func Register(ctx context.Context, workload *config.WorkloadContext) {
 		nodeLister:     workload.Core.Nodes("").Controller().Lister(),
 		nodeController: workload.Core.Nodes("").Controller(),
 		pods:           workload.Core.Pods(""),
+		serviceLister:  workload.Core.Services("").Controller().Lister(),
 	}
 	workload.Core.Pods("").AddHandler("hostPortEndpointsController", p.sync)
 }
 
 func (s *PodsController) sync(key string, obj *corev1.Pod) error {
 	if obj == nil {
+		return nil
+	}
+
+	if obj.Spec.NodeName == "" {
+		return nil
+	}
+
+	if obj.DeletionTimestamp != nil {
+		s.nodeController.Enqueue("", obj.Spec.NodeName)
 		return nil
 	}
 
@@ -83,14 +98,37 @@ func (s *PodsController) sync(key string, obj *corev1.Pod) error {
 		}
 	}
 
-	if len(ports) == 0 {
-		return nil
-	}
-
 	// 1. update pod with endpoints
+	// a) from hostPort
 	newPublicEps, err := convertHostPortToEndpoint(obj)
 	if err != nil {
 		return err
+	}
+	// b) from NodePort service
+	node, err := s.nodeLister.Get("", obj.Spec.NodeName)
+	if err != nil {
+		return err
+	}
+
+	services, err := s.serviceLister.List(obj.Namespace, labels.NewSelector())
+	if err != nil {
+		return err
+	}
+	for _, svc := range services {
+		if svc.Spec.Type == "NodePort" {
+			set := labels.Set{}
+			for key, val := range svc.Spec.Selector {
+				set[key] = val
+			}
+			selector := labels.SelectorFromSet(set)
+			if selector.Matches(labels.Set(obj.Labels)) {
+				eps, err := convertServiceToPublicEndpoints([]*corev1.Node{node}, svc)
+				if err != nil {
+					return err
+				}
+				newPublicEps = append(newPublicEps, eps...)
+			}
+		}
 	}
 
 	existingPublicEps := getPublicEndpointsFromAnnotations(obj.Annotations)
@@ -138,19 +176,22 @@ func (s *ServicesController) sync(key string, obj *corev1.Service) error {
 		nodePortSvcs = append(nodePortSvcs, *obj)
 	}
 
-	enqueueAll := false
-	var err error
+	enqueueAllNodes := false
 	for _, svc := range nodePortSvcs {
 		if svc.DeletionTimestamp != nil {
-			enqueueAll = true
+			enqueueAllNodes = true
 			continue
 		}
-		if enqueueAll, err = s.reconcileEndpointsForService(&svc); err != nil {
+		changed, err := s.reconcileEndpointsForService(&svc)
+		if err != nil {
 			return err
+		}
+		if changed {
+			enqueueAllNodes = true
 		}
 	}
 
-	if enqueueAll {
+	if enqueueAllNodes {
 		s.nodeController.Enqueue("", allEndpoints)
 	}
 	return nil
@@ -187,7 +228,20 @@ func (s *ServicesController) reconcileEndpointsForService(svc *corev1.Service) (
 	if err != nil {
 		return false, err
 	}
-	// 2. push changes to all the nodes (only in case service got an update!)
+
+	// 2. Push changes for pods behind nodePort service
+	set := labels.Set{}
+	for key, val := range svc.Spec.Selector {
+		set[key] = val
+	}
+	pods, err := s.podLister.List(svc.Namespace, labels.SelectorFromSet(set))
+	if err != nil {
+		return false, err
+	}
+	for _, pod := range pods {
+		s.podController.Enqueue(pod.Namespace, pod.Name)
+	}
+
 	return true, nil
 }
 
@@ -210,18 +264,22 @@ func (n *NodesController) sync(key string, obj *corev1.Node) error {
 		nodesToSync = append(nodesToSync, *obj)
 	}
 
-	enqueueAll := false
-	var err error
+	enqueueAllServices := false
 	for _, node := range nodesToSync {
 		if node.DeletionTimestamp != nil {
-			enqueueAll = true
+			enqueueAllServices = true
 			continue
 		}
-		if enqueueAll, err = n.reconcileEndpontsForNode(&node); err != nil {
+		changed, err := n.reconcileEndpontsForNode(&node)
+		if err != nil {
 			return err
 		}
+		if changed {
+			enqueueAllServices = true
+		}
+
 	}
-	if enqueueAll {
+	if enqueueAllServices {
 		n.serviceController.Enqueue("", allEndpoints)
 	}
 	return nil
@@ -239,7 +297,7 @@ func (n *NodesController) reconcileEndpontsForNode(node *corev1.Node) (bool, err
 		if svc.DeletionTimestamp != nil {
 			continue
 		}
-		if svc.Spec.Type == "NodePort" || svc.Spec.Type == "LoadBalancer" {
+		if svc.Spec.Type == "NodePort" {
 			pEps, err := convertServiceToPublicEndpoints([]*corev1.Node{node}, svc)
 			if err != nil {
 				return false, err
@@ -358,11 +416,11 @@ func convertServiceToPublicEndpoints(nodes []*corev1.Node, svc *corev1.Service) 
 				continue
 			}
 			p := v3.PublicEndpoint{
-				Node:     nodeName,
-				Address:  nodeIP,
-				Port:     port.NodePort,
-				Protocol: string(port.Protocol),
-				Service:  fmt.Sprintf("%s/%s", svc.Namespace, svc.Name),
+				NodeName:    nodeName,
+				Address:     nodeIP,
+				Port:        port.NodePort,
+				Protocol:    string(port.Protocol),
+				ServiceName: fmt.Sprintf("%s/%s", svc.Namespace, svc.Name),
 			}
 			eps = append(eps, p)
 		}
@@ -381,11 +439,11 @@ func convertHostPortToEndpoint(pod *corev1.Pod) ([]v3.PublicEndpoint, error) {
 				continue
 			}
 			p := v3.PublicEndpoint{
-				Node:     nodeName,
+				NodeName: nodeName,
 				Address:  pod.Status.HostIP,
 				Port:     p.HostPort,
 				Protocol: string(p.Protocol),
-				Pod:      fmt.Sprintf("%s/%s", pod.Namespace, pod.Name),
+				PodName:  fmt.Sprintf("%s/%s", pod.Namespace, pod.Name),
 			}
 			eps = append(eps, p)
 		}
@@ -395,5 +453,5 @@ func convertHostPortToEndpoint(pod *corev1.Pod) ([]v3.PublicEndpoint, error) {
 }
 
 func publicEndpointToString(p v3.PublicEndpoint) string {
-	return fmt.Sprintf("%s_%s_%v_%s_%s_%s", p.Node, p.Address, p.Port, p.Protocol, p.Service, p.Pod)
+	return fmt.Sprintf("%s_%s_%v_%s_%s_%s", p.NodeName, p.Address, p.Port, p.Protocol, p.ServiceName, p.PodName)
 }
