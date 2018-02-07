@@ -63,6 +63,7 @@ func (c *Cluster) GetClusterState(ctx context.Context) (*Cluster, error) {
 			}
 			currentCluster.Certificates, err = getClusterCerts(ctx, c.KubeClient, currentCluster.EtcdHosts)
 			currentCluster.DockerDialerFactory = c.DockerDialerFactory
+			currentCluster.LocalConnDialerFactory = c.LocalConnDialerFactory
 			if err != nil {
 				return nil, fmt.Errorf("Failed to Get Kubernetes certificates: %v", err)
 			}
