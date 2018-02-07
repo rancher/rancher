@@ -1,4 +1,4 @@
-package filter
+package requests
 
 import (
 	"context"
@@ -16,11 +16,12 @@ import (
 	"github.com/rancher/types/config"
 )
 
-type authenticator interface {
-	authenticate(req *http.Request) (authed bool, user string, groups []string, err error)
+type Authenticator interface {
+	Authenticate(req *http.Request) (authed bool, user string, groups []string, err error)
+	TokenFromRequest(req *http.Request) (*v3.Token, error)
 }
 
-func newAuthenticator(ctx context.Context, mgmtCtx *config.ManagementContext) authenticator {
+func NewAuthenticator(ctx context.Context, mgmtCtx *config.ManagementContext) Authenticator {
 	tokenInformer := mgmtCtx.Management.Tokens("").Controller().Informer()
 	tokenInformer.AddIndexers(map[string]cache.IndexFunc{tokenKeyIndex: tokenKeyIndexer})
 
@@ -50,16 +51,8 @@ func tokenKeyIndexer(obj interface{}) ([]string, error) {
 	return []string{token.Token}, nil
 }
 
-func (a *tokenAuthenticator) authenticate(req *http.Request) (bool, string, []string, error) {
-	//check if token cookie or authorization header
-	tokenAuthValue := tokens.GetTokenAuthFromRequest(req)
-
-	if tokenAuthValue == "" {
-		// no cookie or auth header, cannot authenticate
-		return false, "", []string{}, fmt.Errorf("failed to find auth cookie or headers")
-	}
-
-	token, err := a.getTokenCR(tokenAuthValue)
+func (a *tokenAuthenticator) Authenticate(req *http.Request) (bool, string, []string, error) {
+	token, err := a.TokenFromRequest(req)
 	if err != nil {
 		return false, "", []string{}, err
 	}
@@ -74,11 +67,14 @@ func (a *tokenAuthenticator) authenticate(req *http.Request) (bool, string, []st
 	return true, token.UserID, groups, nil
 }
 
-func (a *tokenAuthenticator) getTokenCR(tokenAuthValue string) (*v3.Token, error) {
+func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (*v3.Token, error) {
+	tokenAuthValue := tokens.GetTokenAuthFromRequest(req)
+	if tokenAuthValue == "" {
+		return nil, fmt.Errorf("must log in")
+	}
+
 	tokenName, tokenKey := tokens.SplitTokenParts(tokenAuthValue)
-
 	lookupUsingClient := false
-
 	objs, err := a.tokenIndexer.ByIndex(tokenKeyIndex, tokenKey)
 	if err != nil {
 		if apierrors.IsNotFound(err) {

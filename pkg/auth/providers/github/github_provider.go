@@ -134,12 +134,13 @@ func (g *GProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v3
 		return userPrincipal, groupPrincipals, providerInfo, 401, fmt.Errorf("Error getting github user %v", err)
 	}
 	userPrincipal = v3.Principal{
-		ObjectMeta:  metav1.ObjectMeta{Name: Github + "_user://" + strconv.Itoa(user.ID)},
-		DisplayName: user.Name,
-		LoginName:   user.Login,
-		Kind:        "user",
-		Provider:    Github,
-		Me:          true,
+		ObjectMeta:     metav1.ObjectMeta{Name: Github + "_user://" + strconv.Itoa(user.ID)},
+		DisplayName:    user.Name,
+		LoginName:      user.Login,
+		Kind:           "user",
+		Provider:       Github,
+		Me:             true,
+		ProfilePicture: user.AvatarURL,
 	}
 
 	orgAccts, err := g.githubClient.getGithubOrgs(accessToken, config)
@@ -149,11 +150,16 @@ func (g *GProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v3
 	}
 
 	for _, orgAcct := range orgAccts {
+		name := orgAcct.Name
+		if name == "" {
+			name = orgAcct.Login
+		}
 		groupPrincipal := v3.Principal{
-			ObjectMeta:  metav1.ObjectMeta{Name: Github + "_org://" + strconv.Itoa(orgAcct.ID)},
-			DisplayName: orgAcct.Name,
-			Kind:        "group",
-			Provider:    Github,
+			ObjectMeta:     metav1.ObjectMeta{Name: Github + "_org://" + strconv.Itoa(orgAcct.ID)},
+			DisplayName:    name,
+			Kind:           "group",
+			Provider:       Github,
+			ProfilePicture: orgAcct.AvatarURL,
 		}
 		groupPrincipals = append(groupPrincipals, groupPrincipal)
 	}
@@ -165,10 +171,11 @@ func (g *GProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v3
 	}
 	for _, teamAcct := range teamAccts {
 		groupPrincipal := v3.Principal{
-			ObjectMeta:  metav1.ObjectMeta{Name: Github + "_team://" + strconv.Itoa(teamAcct.ID)},
-			DisplayName: teamAcct.Name,
-			Kind:        "group",
-			Provider:    Github,
+			ObjectMeta:     metav1.ObjectMeta{Name: Github + "_team://" + strconv.Itoa(teamAcct.ID)},
+			DisplayName:    teamAcct.Name,
+			Kind:           "group",
+			Provider:       Github,
+			ProfilePicture: teamAcct.AvatarURL,
 		}
 		groupPrincipals = append(groupPrincipals, groupPrincipal)
 	}

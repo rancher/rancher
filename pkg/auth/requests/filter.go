@@ -1,4 +1,4 @@
-package filter
+package requests
 
 import (
 	"context"
@@ -14,7 +14,7 @@ func NewAuthenticationFilter(ctx context.Context, managementContext *config.Mana
 	if managementContext == nil {
 		return nil, fmt.Errorf("Failed to build NewAuthenticationFilter, nil ManagementContext")
 	}
-	auth := newAuthenticator(ctx, managementContext)
+	auth := NewAuthenticator(ctx, managementContext)
 	return &authHeaderHandler{
 		auth: auth,
 		next: next,
@@ -22,12 +22,12 @@ func NewAuthenticationFilter(ctx context.Context, managementContext *config.Mana
 }
 
 type authHeaderHandler struct {
-	auth authenticator
+	auth Authenticator
 	next http.Handler
 }
 
 func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	authed, user, groups, err := h.auth.authenticate(req)
+	authed, user, groups, err := h.auth.Authenticate(req)
 	if err != nil || !authed {
 		util.ReturnHTTPError(rw, req, 401, err.Error())
 		return

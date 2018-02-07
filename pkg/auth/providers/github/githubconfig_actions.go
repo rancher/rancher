@@ -32,7 +32,7 @@ func (g *GProvider) ConfigActionHandler(actionName string, action *types.Action,
 
 func (g *GProvider) configureTest(actionName string, action *types.Action, request *types.APIContext) error {
 	githubConfig := &v3.GithubConfig{}
-	if err := json.NewDecoder(request.Request.Body).Decode(&githubConfig); err != nil {
+	if err := json.NewDecoder(request.Request.Body).Decode(githubConfig); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("Failed to parse body: %v", err))
 	}
@@ -65,9 +65,9 @@ func FormGithubRedirectURL(githubConfig *v3.GithubConfig) string {
 
 func (g *GProvider) testAndApply(actionName string, action *types.Action, request *types.APIContext) error {
 	var githubConfig v3.GithubConfig
-	githubConfigApplyInput := v3.GithubConfigApplyInput{}
+	githubConfigApplyInput := &v3.GithubConfigApplyInput{}
 
-	if err := json.NewDecoder(request.Request.Body).Decode(&githubConfigApplyInput); err != nil {
+	if err := json.NewDecoder(request.Request.Body).Decode(githubConfigApplyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("Failed to parse body: %v", err))
 	}

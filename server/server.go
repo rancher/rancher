@@ -7,8 +7,8 @@ import (
 	"github.com/gorilla/mux"
 	k8sProxy "github.com/rancher/rancher/k8s/proxy"
 	managementapi "github.com/rancher/rancher/pkg/api/management/server"
-	authfilter "github.com/rancher/rancher/pkg/auth/filter"
 	"github.com/rancher/rancher/pkg/auth/providers/publicapi"
+	authrequests "github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/remotedialer"
 	"github.com/rancher/rancher/pkg/tunnel"
@@ -39,7 +39,14 @@ type Server struct {
 func New(ctx context.Context, httpPort, httpsPort int, management *config.ManagementContext) (*Server, error) {
 	var result http.Handler
 	tokenAPI, err := tokens.NewAPIHandler(ctx, management)
+	if err != nil {
+		return nil, err
+	}
+
 	publicAPI, err := publicapi.NewHandler(ctx, management)
+	if err != nil {
+		return nil, err
+	}
 
 	managementAPI, err := managementapi.New(ctx, httpPort, httpsPort, management, func() http.Handler {
 		return result
@@ -58,7 +65,7 @@ func New(ctx context.Context, httpPort, httpsPort int, management *config.Manage
 
 	authedAPIs := newAuthed(tokenAPI, managementAPI, k8sProxy)
 
-	authedHandler, err := authfilter.NewAuthenticationFilter(ctx, management, authedAPIs)
+	authedHandler, err := authrequests.NewAuthenticationFilter(ctx, management, authedAPIs)
 	if err != nil {
 		return nil, err
 	}

@@ -2,44 +2,115 @@ package principals
 
 import (
 	"context"
-	"github.com/gorilla/mux"
+	"encoding/json"
+
 	"net/http"
 
+	"fmt"
+
+	"github.com/pkg/errors"
+	"github.com/rancher/norman/httperror"
+	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/auth/providers"
+	"github.com/rancher/rancher/pkg/auth/requests"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 )
 
-//principalAPIHandler is a wrapper over the mux router serving /v3/principals API
-type principalAPIHandler struct {
-	principalRouter http.Handler
+type principalsHandler struct {
+	ctx              context.Context
+	client           *config.ManagementContext
+	principalsClient v3.PrincipalInterface
+	tokensClient     v3.TokenInterface
+	auth             requests.Authenticator
 }
 
-func (h *principalAPIHandler) getRouter() http.Handler {
-	return h.principalRouter
+func newPrincipalsHandler(ctx context.Context, mgmt *config.ManagementContext) *principalsHandler {
+	providers.Configure(ctx, mgmt)
+	return &principalsHandler{
+		ctx:              ctx,
+		client:           mgmt,
+		principalsClient: mgmt.Management.Principals(""),
+		tokensClient:     mgmt.Management.Tokens(""),
+		auth:             requests.NewAuthenticator(ctx, mgmt),
+	}
 }
 
-func (h *principalAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	h.getRouter().ServeHTTP(w, r)
+func (h *principalsHandler) actions(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	if actionName != "search" {
+		return httperror.NewAPIError(httperror.ActionNotAvailable, "")
+	}
+
+	input := &v3.SearchPrincipalsInput{}
+	if err := json.NewDecoder(apiContext.Request.Body).Decode(input); err != nil {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("Failed to parse body: %v", err))
+	}
+
+	token, err := h.getToken(apiContext.Request)
+	if err != nil {
+		return err
+	}
+
+	ps, _, err := providers.SearchPrincipals(input.Name, *token)
+	if err != nil {
+		return err
+	}
+
+	principals := []map[string]interface{}{}
+	for _, p := range ps {
+		x, err := convertPrincipal(apiContext.Schema, p)
+		if err != nil {
+			return err
+		}
+		principals = append(principals, x)
+	}
+
+	apiContext.WriteResponse(200, principals)
+	return nil
 }
 
-func NewPrincipalAPIHandler(ctx context.Context, mgmtCtx *config.ManagementContext) (http.Handler, error) {
-	router, err := newPrincipalRouter(ctx, mgmtCtx)
+func (h *principalsHandler) list(apiContext *types.APIContext, next types.RequestHandler) error {
+	principals := []map[string]interface{}{}
+
+	token, err := h.getToken(apiContext.Request)
+	if err != nil {
+		return err
+	}
+
+	p, err := convertPrincipal(apiContext.Schema, token.UserPrincipal)
+	if err != nil {
+		return err
+	}
+	principals = append(principals, p)
+
+	for _, p := range token.GroupPrincipals {
+		x, err := convertPrincipal(apiContext.Schema, p)
+		if err != nil {
+			return err
+		}
+		principals = append(principals, x)
+	}
+
+	apiContext.WriteResponse(200, principals)
+	return nil
+}
+
+func convertPrincipal(schema *types.Schema, principal v3.Principal) (map[string]interface{}, error) {
+	data, err := convert.EncodeToMap(principal)
 	if err != nil {
 		return nil, err
 	}
-	return &principalAPIHandler{principalRouter: router}, nil
+	mapper := schema.Mapper
+	if mapper == nil {
+		return nil, errors.New("no schema mapper available")
+	}
+	mapper.FromInternal(data)
+
+	return data, nil
 }
 
-//newPrincipalRouter creates and configures a mux router for /v3/principals APIs
-func newPrincipalRouter(ctx context.Context, mgmtCtx *config.ManagementContext) (*mux.Router, error) {
-	apiServer, err := newPrincipalAPIServer(ctx, mgmtCtx)
-	if err != nil {
-		return nil, err
-	}
-
-	router := mux.NewRouter().StrictSlash(true)
-	// Application routes
-	router.Methods("GET").Path("/v3/principals").Handler(http.HandlerFunc(apiServer.listPrincipals))
-	router.Methods("POST").Path("/v3/principals").Queries("action", "search").Handler(http.HandlerFunc(apiServer.searchPrincipals))
-
-	return router, nil
+func (h *principalsHandler) getToken(request *http.Request) (*v3.Token, error) {
+	token, err := h.auth.TokenFromRequest(request)
+	return token, errors.Wrap(err, "must log in")
 }
