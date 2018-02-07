@@ -26,7 +26,7 @@ echo Running tests
 rm -rf build/testdata
 mkdir -p build/testdata
 cd build/testdata
-KUBECONFIG= ../../$CMD --add-local --http-only &
+KUBECONFIG= ../../$CMD --add-local &
 PID=$!
 trap cleanup exit
 cd ../..

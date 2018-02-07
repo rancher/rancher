@@ -1,5 +1,5 @@
 cattle==0.5.3
-git+https://github.com/ibuildthecloud/gdapi-python.git@3b34a117b1f3c1b37c15b9a981f832e2c5983302
+git+https://github.com/ibuildthecloud/gdapi-python.git@5d2e8addde38b24533c434c348d778439f87b122
 websocket-client==0.23.0
 PyJWT==1.4.0
 

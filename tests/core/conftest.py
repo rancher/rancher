@@ -20,12 +20,12 @@ class ProjectContext:
 
 @pytest.fixture
 def url():
-    return 'http://localhost:8080/v3'
+    return 'https://localhost:8443/v3'
 
 
 @pytest.fixture
 def auth_url():
-    return 'http://localhost:8080/v3-public/localproviders/local?action=login'
+    return 'https://localhost:8443/v3-public/localproviders/local?action=login'
 
 
 @pytest.fixture
@@ -37,13 +37,13 @@ def chngpwd(url):
 def cc(url, auth_url, chngpwd):
     requests.post(chngpwd, json={
         'newPassword': 'admin',
-    })
+    }, verify=False)
     r = requests.post(auth_url, json={
         'username': 'admin',
         'password': 'admin',
         'responseType': 'json',
-    })
-    client = cattle.Client(url=url, token=r.json()['token'])
+    }, verify=False)
+    client = cattle.Client(url=url, token=r.json()['token'], verify=False)
     cluster = client.by_id_cluster('local')
     return ClusterContext(cluster, client)
 
@@ -57,6 +57,7 @@ def pc(request, cc):
     request.addfinalizer(lambda: cc.client.delete(p))
     url = p.links['self'] + '/schemas'
     return ProjectContext(cc, p, cattle.Client(url=url,
+                                               verify=False,
                                                token=cc.client._token))
 
 
