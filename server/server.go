@@ -29,6 +29,7 @@ var (
 		"api.digitalocean.com",
 		"*.otc.t-systems.com",
 		"api.profitbricks.com",
+		"api.packet.net",
 	}
 )
 
