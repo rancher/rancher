@@ -6,7 +6,7 @@ import (
 
 	"github.com/gorilla/mux"
 	k8sProxy "github.com/rancher/rancher/k8s/proxy"
-	managementapi "github.com/rancher/rancher/pkg/api/management/server"
+	managementapi "github.com/rancher/rancher/pkg/api/server"
 	"github.com/rancher/rancher/pkg/auth/providers/publicapi"
 	authrequests "github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/rancher/kontainer-engine/cluster"
-	"github.com/rancher/rancher/pkg/machine/store"
+	"github.com/rancher/rancher/pkg/encryptedstore"
 )
 
 const (
@@ -12,7 +12,7 @@ const (
 )
 
 type engineStore struct {
-	store *store.GenericEncryptedStore
+	store *encryptedstore.GenericEncryptedStore
 }
 
 func (s *engineStore) GetStatus(name string) (string, error) {

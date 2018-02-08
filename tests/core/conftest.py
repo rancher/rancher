@@ -5,8 +5,14 @@ import requests
 from common import random_str
 
 
+class ManagementContext:
+    def __init__(self, client):
+        self.client = client
+
+
 class ClusterContext:
-    def __init__(self, cluster, client):
+    def __init__(self, management, cluster, client):
+        self.management = management
         self.cluster = cluster
         self.client = client
 
@@ -34,7 +40,7 @@ def chngpwd(url):
 
 
 @pytest.fixture
-def cc(url, auth_url, chngpwd):
+def mc(url, auth_url, chngpwd):
     requests.post(chngpwd, json={
         'newPassword': 'admin',
     }, verify=False)
@@ -44,17 +50,26 @@ def cc(url, auth_url, chngpwd):
         'responseType': 'json',
     }, verify=False)
     client = cattle.Client(url=url, token=r.json()['token'], verify=False)
-    cluster = client.by_id_cluster('local')
-    return ClusterContext(cluster, client)
+    return ManagementContext(client)
+
+
+@pytest.fixture
+def cc(mc):
+    cluster = mc.client.by_id_cluster('local')
+    url = cluster.links['self'] + '/schemas'
+    client = cattle.Client(url=url,
+                           verify=False,
+                           token=mc.client._token)
+    return ClusterContext(mc, cluster, client)
 
 
 @pytest.fixture
 def pc(request, cc):
-    p = cc.client.create_project(name='test-' + random_str(),
-                                 clusterId=cc.cluster.id)
-    p = cc.client.wait_success(p)
+    p = cc.management.client.create_project(name='test-' + random_str(),
+                                            clusterId=cc.cluster.id)
+    p = cc.management.client.wait_success(p)
     assert p.state == 'active'
-    request.addfinalizer(lambda: cc.client.delete(p))
+    request.addfinalizer(lambda: cc.management.client.delete(p))
     url = p.links['self'] + '/schemas'
     return ProjectContext(cc, p, cattle.Client(url=url,
                                                verify=False,

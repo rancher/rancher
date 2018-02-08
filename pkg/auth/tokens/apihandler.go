@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	normanapi "github.com/rancher/norman/api"
-	"github.com/rancher/norman/store/crd"
 	"github.com/rancher/norman/types"
 	managementSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/client/management/v3"
@@ -47,15 +46,5 @@ func tokenSchema(ctx context.Context, management *config.ManagementContext, sche
 	schema.CreateHandler = tokenCreateHandler
 	schema.DeleteHandler = tokenDeleteHandler
 
-	crdStore, err := crd.NewCRDStoreFromConfig(management.RESTConfig)
-	if err != nil {
-		return err
-	}
-
-	var crdSchemas []*types.Schema
-	for _, schema := range schemas.SchemasForVersion(managementSchema.Version) {
-		crdSchemas = append(crdSchemas, schema)
-	}
-
-	return crdStore.AddSchemas(ctx, crdSchemas...)
+	return nil
 }

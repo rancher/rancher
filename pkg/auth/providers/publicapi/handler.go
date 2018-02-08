@@ -5,10 +5,8 @@ import (
 	"net/http"
 
 	normanapi "github.com/rancher/norman/api"
-	"github.com/rancher/norman/store/crd"
 	"github.com/rancher/norman/store/subtype"
 	"github.com/rancher/norman/types"
-	managementSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	publicSchema "github.com/rancher/types/apis/management.cattle.io/v3public/schema"
 	v3public "github.com/rancher/types/client/management/v3public"
 	"github.com/rancher/types/config"
@@ -43,17 +41,7 @@ func authProviderSchemas(ctx context.Context, management *config.ManagementConte
 		subSchema.Formatter = loginActionFormatter
 	}
 
-	crdStore, err := crd.NewCRDStoreFromConfig(management.RESTConfig)
-	if err != nil {
-		return err
-	}
-
-	var crdSchemas []*types.Schema
-	for _, schema := range schemas.SchemasForVersion(managementSchema.Version) {
-		crdSchemas = append(crdSchemas, schema)
-	}
-
-	return crdStore.AddSchemas(ctx, crdSchemas...)
+	return nil
 }
 
 func loginActionFormatter(apiContext *types.APIContext, resource *types.RawResource) {

@@ -2,8 +2,8 @@ import pytest
 from cattle import ApiError
 
 
-def test_auth_configs(cc):
-    client = cc.client
+def test_auth_configs(mc):
+    client = mc.client
 
     with pytest.raises(AttributeError) as e:
         client.list_github_config()

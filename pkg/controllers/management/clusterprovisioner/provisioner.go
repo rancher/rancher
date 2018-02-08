@@ -27,7 +27,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/dialer"
-	"github.com/rancher/rancher/pkg/machine/store"
+	"github.com/rancher/rancher/pkg/encryptedstore"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -58,7 +58,7 @@ type Provisioner struct {
 }
 
 func Register(management *config.ManagementContext, dialerFactory dialer.Factory) {
-	store, err := store.NewGenericEncrypedStore("c-", "", management.Core.Namespaces(""),
+	store, err := encryptedstore.NewGenericEncrypedStore("c-", "", management.Core.Namespaces(""),
 		management.K8sClient.CoreV1())
 	if err != nil {
 		logrus.Fatal(err)

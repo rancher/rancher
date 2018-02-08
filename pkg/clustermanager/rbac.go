@@ -1,0 +1,81 @@
+package clustermanager
+
+import (
+	"github.com/rancher/norman/types"
+	"github.com/sirupsen/logrus"
+)
+
+func (m *Manager) CanCreate(apiContext *types.APIContext, schema *types.Schema) bool {
+	ac, err := m.getAccessControl(apiContext, schema)
+	if err != nil {
+		logrus.Warnf("failed to find access control: %v", err)
+		return false
+	}
+	return ac.CanCreate(apiContext, schema)
+}
+
+func (m *Manager) CanList(apiContext *types.APIContext, schema *types.Schema) bool {
+	ac, err := m.getAccessControl(apiContext, schema)
+	if err != nil {
+		logrus.Warnf("failed to find access control: %v", err)
+		return false
+	}
+	return ac.CanList(apiContext, schema)
+}
+
+func (m *Manager) CanGet(apiContext *types.APIContext, schema *types.Schema) bool {
+	ac, err := m.getAccessControl(apiContext, schema)
+	if err != nil {
+		logrus.Warnf("failed to find access control: %v", err)
+		return false
+	}
+	return ac.CanGet(apiContext, schema)
+}
+
+func (m *Manager) CanUpdate(apiContext *types.APIContext, obj map[string]interface{}, schema *types.Schema) bool {
+	ac, err := m.getAccessControl(apiContext, schema)
+	if err != nil {
+		logrus.Warnf("failed to find access control: %v", err)
+		return false
+	}
+	return ac.CanUpdate(apiContext, obj, schema)
+}
+
+func (m *Manager) CanDelete(apiContext *types.APIContext, obj map[string]interface{}, schema *types.Schema) bool {
+	ac, err := m.getAccessControl(apiContext, schema)
+	if err != nil {
+		logrus.Warnf("failed to find access control: %v", err)
+		return false
+	}
+	return ac.CanDelete(apiContext, obj, schema)
+}
+
+func (m *Manager) Filter(apiContext *types.APIContext, obj map[string]interface{}, context map[string]string) map[string]interface{} {
+	ac, err := m.getAccessControl(apiContext, apiContext.Schema)
+	if err != nil {
+		logrus.Warnf("failed to find access control: %v", err)
+		return nil
+	}
+
+	return ac.Filter(apiContext, obj, context)
+}
+
+func (m *Manager) FilterList(apiContext *types.APIContext, obj []map[string]interface{}, context map[string]string) []map[string]interface{} {
+	ac, err := m.getAccessControl(apiContext, apiContext.Schema)
+	if err != nil {
+		logrus.Warnf("failed to find access control: %v", err)
+		return nil
+	}
+	return ac.FilterList(apiContext, obj, context)
+}
+
+func (m *Manager) getAccessControl(apiContext *types.APIContext, schema *types.Schema) (types.AccessControl, error) {
+	return m.AccessControl(apiContext, getContext(schema))
+}
+
+func getContext(schema *types.Schema) types.StorageContext {
+	if schema == nil || schema.Store == nil {
+		return types.DefaultStorageContext
+	}
+	return schema.Store.Context()
+}

@@ -17,7 +17,8 @@ import (
 	"github.com/rancher/norman/types/slice"
 	hutils "github.com/rancher/rancher/pkg/controllers/user/helm/utils"
 	core "github.com/rancher/types/apis/core/v1"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
@@ -26,12 +27,11 @@ import (
 )
 
 const (
-	cacheRoot      = "helm-controller"
-	projectIDLabel = "field.cattle.io/projectId"
+	cacheRoot = "helm-controller"
 )
 
 func Register(management *config.UserContext) {
-	stackClient := management.Management.Management.Apps("")
+	stackClient := management.Project.Apps("")
 	stackLifecycle := &Lifecycle{
 		NameSpaceClient:       management.Core.Namespaces(""),
 		K8sClient:             management.K8sClient,
@@ -45,7 +45,7 @@ func Register(management *config.UserContext) {
 type Lifecycle struct {
 	Management            *config.UserContext
 	NameSpaceClient       core.NamespaceInterface
-	TemplateVersionClient v3.TemplateVersionInterface
+	TemplateVersionClient mgmtv3.TemplateVersionInterface
 	K8sClient             kubernetes.Interface
 	CacheRoot             string
 }
@@ -191,7 +191,7 @@ func (l *Lifecycle) Run(obj *v3.App, action, templateVersionID string) error {
 	return nil
 }
 
-func (l *Lifecycle) saveTemplates(obj *v3.App, templateVersion *v3.TemplateVersion) error {
+func (l *Lifecycle) saveTemplates(obj *v3.App, templateVersion *mgmtv3.TemplateVersion) error {
 	templates := map[string]string{}
 	for _, file := range templateVersion.Spec.Files {
 		templates[file.Name] = file.Contents

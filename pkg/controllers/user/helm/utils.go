@@ -1,21 +1,19 @@
 package helm
 
 import (
+	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"net/url"
-	"path/filepath"
-	"time"
-
 	"os"
 	"os/exec"
-
+	"path/filepath"
 	"strconv"
-
-	"fmt"
 	"strings"
+	"time"
 
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"golang.org/x/net/context"
 )
 
@@ -26,7 +24,7 @@ const (
 	helmName   = "helm"
 )
 
-func (l *Lifecycle) writeTempFolder(templateVersion *v3.TemplateVersion) (string, error) {
+func (l *Lifecycle) writeTempFolder(templateVersion *mgmtv3.TemplateVersion) (string, error) {
 	files := templateVersion.Spec.Files
 	externalID := templateVersion.Spec.ExternalID
 	query, err := url.ParseQuery(externalID)
