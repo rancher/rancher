@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/crypto/ssh"
 	kerror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -83,8 +84,13 @@ func isCustom(obj *v3.Machine) bool {
 func (m *Lifecycle) Create(obj *v3.Machine) (*v3.Machine, error) {
 	if isCustom(obj) {
 		m.setupCustom(obj)
-		v3.MachineConditionReady.True(obj)
-		return obj, nil
+		newObj, err := v3.MachineConditionInitialized.Once(obj, func() (runtime.Object, error) {
+			if err := validateCustomHost(obj); err != nil {
+				return obj, err
+			}
+			return obj, nil
+		})
+		return newObj.(*v3.Machine), err
 	}
 
 	if obj.Spec.MachineTemplateName == "" {
@@ -340,4 +346,27 @@ func (m *Lifecycle) isNodeInAppliedSpec(machine *v3.Machine) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+func validateCustomHost(obj *v3.Machine) error {
+	if obj.Spec.CustomConfig != nil && obj.Spec.CustomConfig.Address != "" {
+		customConfig := obj.Spec.CustomConfig
+		signer, err := ssh.ParsePrivateKey([]byte(customConfig.SSHKey))
+		if err != nil {
+			return errors.Wrapf(err, "sshKey format is invalid")
+		}
+		config := &ssh.ClientConfig{
+			User: customConfig.User,
+			Auth: []ssh.AuthMethod{
+				ssh.PublicKeys(signer),
+			},
+			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		}
+		conn, err := ssh.Dial("tcp", customConfig.Address+":22", config)
+		if err != nil {
+			return errors.Wrapf(err, "Failed to validate ssh connection to address [%s]", customConfig.Address)
+		}
+		conn.Close()
+	}
+	return nil
 }
