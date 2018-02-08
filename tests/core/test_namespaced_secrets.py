@@ -4,7 +4,8 @@ from common import random_str
 def test_namespaced_secrets(pc):
     client = pc.client
 
-    ns = client.create_namespace(name=random_str())
+    ns = pc.cluster.client.create_namespace(name=random_str(),
+                                            projectId=pc.project.id)
 
     name = random_str()
     secret = client.create_namespaced_secret(name=name, namespaceId=ns.id,
@@ -12,7 +13,7 @@ def test_namespaced_secrets(pc):
                                                  'foo': 'bar'
                                              })
 
-    assert secret.baseType == 'secret'
+    assert secret.baseType == 'namespacedSecret'
     assert secret.type == 'namespacedSecret'
     assert secret.kind == 'Opaque'
     assert secret.name == name
@@ -23,7 +24,7 @@ def test_namespaced_secrets(pc):
     assert secret is not None
     secret = client.reload(secret)
 
-    assert secret.baseType == 'secret'
+    assert secret.baseType == 'namespacedSecret'
     assert secret.type == 'namespacedSecret'
     assert secret.kind == 'Opaque'
     assert secret.name == name
@@ -47,13 +48,14 @@ def test_namespaced_secrets(pc):
 def test_namespaced_certificates(pc):
     client = pc.client
 
-    ns = client.create_namespace(name=random_str())
+    ns = pc.cluster.client.create_namespace(name=random_str(),
+                                            projectId=pc.project.id)
 
     name = random_str()
     cert = client.create_namespaced_certificate(name=name, key='keydata',
                                                 namespaceId=ns.id,
                                                 certs='certdata')
-    assert cert.baseType == 'secret'
+    assert cert.baseType == 'namespacedSecret'
     assert cert.type == 'namespacedCertificate'
     assert cert.name == name
     assert cert.certs == 'certdata'
@@ -67,7 +69,7 @@ def test_namespaced_certificates(pc):
 
     cert = client.reload(cert)
 
-    assert cert.baseType == 'secret'
+    assert cert.baseType == 'namespacedSecret'
     assert cert.type == 'namespacedCertificate'
     assert cert.name == name
     assert cert.certs == 'certdata2'
@@ -91,7 +93,8 @@ def test_namespaced_certificates(pc):
 def test_namespaced_docker_credential(pc):
     client = pc.client
 
-    ns = client.create_namespace(name=random_str())
+    ns = pc.cluster.client.create_namespace(name=random_str(),
+                                            projectId=pc.project.id)
 
     name = random_str()
     registries = {'index.docker.io': {
@@ -101,7 +104,7 @@ def test_namespaced_docker_credential(pc):
     cert = client.create_namespaced_docker_credential(name=name,
                                                       namespaceId=ns.id,
                                                       registries=registries)
-    assert cert.baseType == 'secret'
+    assert cert.baseType == 'namespacedSecret'
     assert cert.type == 'namespacedDockerCredential'
     assert cert.name == name
     assert cert.registries['index.docker.io']['username'] == 'foo'
@@ -116,7 +119,7 @@ def test_namespaced_docker_credential(pc):
     cert = client.update(cert, registries=registries)
     cert = client.reload(cert)
 
-    assert cert.baseType == 'secret'
+    assert cert.baseType == 'namespacedSecret'
     assert cert.type == 'namespacedDockerCredential'
     assert cert.name == name
     assert cert.registries['index.docker.io']['username'] == 'foo'
@@ -143,14 +146,15 @@ def test_namespaced_docker_credential(pc):
 def test_namespaced_basic_auth(pc):
     client = pc.client
 
-    ns = client.create_namespace(name=random_str())
+    ns = pc.cluster.client.create_namespace(name=random_str(),
+                                            projectId=pc.project.id)
 
     name = random_str()
     cert = client.create_namespaced_basic_auth(name=name,
                                                namespaceId=ns.id,
                                                username='foo',
                                                password='bar')
-    assert cert.baseType == 'secret'
+    assert cert.baseType == 'namespacedSecret'
     assert cert.type == 'namespacedBasicAuth'
     assert cert.name == name
     assert cert.username == 'foo'
@@ -162,7 +166,7 @@ def test_namespaced_basic_auth(pc):
     cert = client.update(cert, username='foo2')
     cert = client.reload(cert)
 
-    assert cert.baseType == 'secret'
+    assert cert.baseType == 'namespacedSecret'
     assert cert.type == 'namespacedBasicAuth'
     assert cert.name == name
     assert cert.username == 'foo2'
@@ -188,13 +192,14 @@ def test_namespaced_basic_auth(pc):
 def test_namespaced_ssh_auth(pc):
     client = pc.client
 
-    ns = client.create_namespace(name=random_str())
+    ns = pc.cluster.client.create_namespace(name=random_str(),
+                                            projectId=pc.project.id)
 
     name = random_str()
     cert = client.create_namespaced_ssh_auth(name=name,
                                              namespaceId=ns.id,
                                              privateKey='foo')
-    assert cert.baseType == 'secret'
+    assert cert.baseType == 'namespacedSecret'
     assert cert.type == 'namespacedSshAuth'
     assert cert.name == name
     assert 'privateKey' in cert
@@ -204,7 +209,7 @@ def test_namespaced_ssh_auth(pc):
 
     cert = client.update(cert, privateKey='foo2')
     cert = client.reload(cert)
-    assert cert.baseType == 'secret'
+    assert cert.baseType == 'namespacedSecret'
     assert cert.type == 'namespacedSshAuth'
     assert cert.name == name
     assert 'privateKey' not in cert

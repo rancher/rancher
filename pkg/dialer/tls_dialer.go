@@ -6,12 +6,12 @@ import (
 	"net"
 	"strings"
 
-	"github.com/rancher/rancher/pkg/machine/store/config"
+	"github.com/rancher/rancher/pkg/machineconfig"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 func (f *factory) tlsDialer(machine *v3.Machine) (Dialer, error) {
-	config, err := config.NewMachineConfig(f.store, machine)
+	config, err := machineconfig.NewMachineConfig(f.store, machine)
 	if err != nil {
 		return nil, err
 	}

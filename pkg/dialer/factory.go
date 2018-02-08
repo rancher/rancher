@@ -5,8 +5,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/rancher/rancher/pkg/machine/store"
-	machineconfig "github.com/rancher/rancher/pkg/machine/store/config"
+	"github.com/rancher/rancher/pkg/encryptedstore"
+	"github.com/rancher/rancher/pkg/machineconfig"
 	"github.com/rancher/rancher/pkg/remotedialer"
 	"github.com/rancher/rancher/pkg/tunnel"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -33,7 +33,7 @@ func NewFactory(management *config.ManagementContext, tunneler *remotedialer.Ser
 type factory struct {
 	machineLister v3.MachineLister
 	tunneler      *remotedialer.Server
-	store         *store.GenericEncryptedStore
+	store         *encryptedstore.GenericEncryptedStore
 }
 
 func (f *factory) ClusterDialer(clusterName string) (Dialer, error) {

@@ -19,7 +19,8 @@ def test_dns_fields(client):
 def test_dns_hostname(pc):
     client = pc.client
 
-    ns = client.create_namespace(name=random_str())
+    ns = pc.cluster.client.create_namespace(name=random_str(),
+                                            projectId=pc.project.id)
 
     name = random_str()
     dns_record = client.create_dns_record(name=name,
@@ -63,7 +64,8 @@ def test_dns_hostname(pc):
 def test_dns_ips(pc):
     client = pc.client
 
-    ns = client.create_namespace(name=random_str())
+    ns = pc.cluster.client.create_namespace(name=random_str(),
+                                            projectId=pc.project.id)
 
     name = random_str()
     dns_record = client.create_dns_record(name=name,

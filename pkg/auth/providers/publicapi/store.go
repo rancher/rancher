@@ -23,6 +23,10 @@ type authProvidersStore struct {
 	mgmt *config.ManagementContext
 }
 
+func (s *authProvidersStore) Context() types.StorageContext {
+	return types.DefaultStorageContext
+}
+
 func (s *authProvidersStore) ByID(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
 	if id == "github" {
 		gh, err := s.getGithub()

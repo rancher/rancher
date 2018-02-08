@@ -1,7 +1,8 @@
 from common import auth_check
 
 
-def test_machine_fields(cclient):
+def test_machine_fields(mc):
+    cclient = mc.client
     fields = {
         'useInternalIpAddress': 'cr',
         'nodeTaints': 'r',

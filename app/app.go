@@ -10,6 +10,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/clustermanager"
 	managementController "github.com/rancher/rancher/pkg/controllers/management"
 	"github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/server"
@@ -63,6 +64,10 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 		}
 	}
 
+	manager := clustermanager.NewManager(management)
+	management.AccessControl = manager
+	management.ClientGetter = manager
+
 	server, err := server.New(ctx, cfg.HTTPListenPort, cfg.HTTPSListenPort, management)
 	if err != nil {
 		return err
@@ -73,7 +78,7 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 		return err
 	}
 
-	managementController.Register(ctx, management, dialerFactory)
+	managementController.Register(ctx, management, manager, dialerFactory)
 	if err := management.Start(ctx); err != nil {
 		return err
 	}

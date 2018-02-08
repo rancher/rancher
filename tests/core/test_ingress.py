@@ -28,27 +28,28 @@ def test_ingress_fields(client):
 def test_ingress(pc):
     client = pc.client
 
-    ns = client.create_namespace(name=random_str())
-    wl = client.create_workload(namespaceId=ns.id,
-                                scale=1,
-                                containers=[{
-                                    'name': 'one',
-                                    'image': 'nginx',
-                                }])
+    ns = pc.cluster.client.create_namespace(name=random_str(),
+                                            projectId=pc.project.id)
+    # wl = client.create_workload(namespaceId=ns.id,
+    #                             scale=1,
+    #                             containers=[{
+    #                                 'name': 'one',
+    #                                 'image': 'nginx',
+    #                             }])
 
-    name = random_str()
-    client.create_ingress(name=name,
-                          namespaceId=ns.id,
-                          rules=[
-                              {
-                                  'paths': {
-                                      '/': {
-                                          'targetPort': 80,
-                                          'workloadIds': [wl.id],
-                                      }
-                                  }
-                              },
-                          ])
+    # name = random_str()
+    # client.create_ingress(name=name,
+    #                       namespaceId=ns.id,
+    #                       rules=[
+    #                           {
+    #                               'paths': {
+    #                                   '/': {
+    #                                       'targetPort': 80,
+    #                                       'workloadIds': [wl.id],
+    #                                   }
+    #                               }
+    #                           },
+    #                       ])
 
     # assert ingress.rules[0]['paths']['/'] == {
     #     'targetPort': 80,
