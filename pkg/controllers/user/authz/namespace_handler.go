@@ -56,9 +56,9 @@ func (n *nsLifecycle) syncNS(obj *v1.Namespace) error {
 	return n.reconcileNamespaceProjectClusterRole(obj)
 }
 
-func (n *nsLifecycle) ensurePRTBAddToNamespace(obj *v1.Namespace) error {
+func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) error {
 	// Get project that contain this namespace
-	projectID := obj.Annotations[projectIDAnnotation]
+	projectID := ns.Annotations[projectIDAnnotation]
 	if len(projectID) == 0 {
 		return nil
 	}
@@ -71,6 +71,10 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(obj *v1.Namespace) error {
 		prtb, ok := prtb.(*v3.ProjectRoleTemplateBinding)
 		if !ok {
 			return errors.Wrapf(err, "object %v is not valid project role template binding", prtb)
+		}
+
+		if prtb.UserName == "" && prtb.GroupPrincipalName == "" && prtb.GroupName == "" {
+			continue
 		}
 
 		if prtb.RoleTemplateName == "" {
@@ -92,8 +96,8 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(obj *v1.Namespace) error {
 			return errors.Wrap(err, "couldn't ensure roles")
 		}
 
-		if err := n.m.ensureBindings(obj.Name, roles, prtb); err != nil {
-			return errors.Wrapf(err, "couldn't ensure bindings for %v in %v", prtb.UserName, obj.Name)
+		if err := n.m.ensureRoleBindings(ns.Name, roles, prtb); err != nil {
+			return errors.Wrapf(err, "couldn't ensure binding %v in %v", prtb.Name, ns.Name)
 		}
 	}
 	return nil

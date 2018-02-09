@@ -179,6 +179,15 @@ func (g *GProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v3
 		}
 		groupPrincipals = append(groupPrincipals, groupPrincipal)
 	}
+
+	allowed, err := g.userMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipal, groupPrincipals)
+	if err != nil {
+		return v3.Principal{}, nil, nil, 500, err
+	}
+	if !allowed {
+		return v3.Principal{}, nil, nil, 401, errors.Errorf("unauthorized")
+	}
+
 	return userPrincipal, groupPrincipals, providerInfo, 0, nil
 }
 
