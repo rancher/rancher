@@ -70,7 +70,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (bool, string, []st
 func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (*v3.Token, error) {
 	tokenAuthValue := tokens.GetTokenAuthFromRequest(req)
 	if tokenAuthValue == "" {
-		return nil, fmt.Errorf("must log in")
+		return nil, fmt.Errorf("must authenticate")
 	}
 
 	tokenName, tokenKey := tokens.SplitTokenParts(tokenAuthValue)

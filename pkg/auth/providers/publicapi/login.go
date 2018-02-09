@@ -6,13 +6,10 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"encoding/base32"
-
-	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/auth/providers"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/util"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -21,32 +18,22 @@ import (
 	"github.com/rancher/types/client/management/v3public"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
 )
 
 const (
-	CookieName           = "R_SESS"
-	userByPrincipalIndex = "auth.management.cattle.io/userByPrincipal"
+	CookieName = "R_SESS"
 )
 
 func newLoginHandler(mgmt *config.ManagementContext) *loginHandler {
-	userInformer := mgmt.Management.Users("").Controller().Informer()
-	userIndexers := map[string]cache.IndexFunc{
-		userByPrincipalIndex: userByPrincipal,
-	}
-	userInformer.AddIndexers(userIndexers)
-
 	return &loginHandler{
-		userIndexer: userInformer.GetIndexer(),
-		mgmt:        mgmt,
+		mgmt: mgmt,
+		mgr:  common.NewUserManager(mgmt),
 	}
 }
 
 type loginHandler struct {
-	mgmt        *config.ManagementContext
-	userIndexer cache.Indexer
+	mgmt *config.ManagementContext
+	mgr  common.UserManager
 }
 
 func (h *loginHandler) login(actionName string, action *types.Action, request *types.APIContext) error {
@@ -134,7 +121,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 
 	logrus.Debug("User Authenticated")
 
-	user, err := h.ensureUser(userPrincipal)
+	user, err := h.mgr.EnsureUser(userPrincipal.Name, userPrincipal.DisplayName)
 	if err != nil {
 		return v3.Token{}, "", 500, err
 	}
@@ -142,112 +129,4 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	k8sToken := tokens.GenerateNewLoginToken(user.Name, userPrincipal, groupPrincipals, providerInfo, ttl, description)
 	rToken, err := tokens.CreateTokenCR(&k8sToken)
 	return rToken, responseType, 0, err
-}
-
-func (h *loginHandler) ensureUser(principal v3.Principal) (*v3.User, error) {
-	// First check the local cache
-	u, err := h.checkCache(principal)
-	if err != nil {
-		return nil, err
-	}
-	if u != nil {
-		return u, nil
-	}
-
-	// Not in cache, query API by label
-	u, labelSet, err := h.checkLabels(principal)
-	if err != nil {
-		return nil, err
-	}
-	if u != nil {
-		return u, nil
-	}
-
-	// Doesn't exist, create user
-	user := &v3.User{
-		ObjectMeta: v1.ObjectMeta{
-			GenerateName: "user-",
-			Labels:       labelSet,
-		},
-		DisplayName:  principal.DisplayName,
-		PrincipalIDs: []string{principal.Name},
-	}
-
-	created, err := h.mgmt.Management.Users("").Create(user)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = h.mgmt.Management.GlobalRoleBindings("").Create(&v3.GlobalRoleBinding{
-		ObjectMeta: v1.ObjectMeta{
-			GenerateName: "globalrolebinding-",
-		},
-		UserName:       created.Name,
-		GlobalRoleName: "user",
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	localPrincipal := "local://" + created.Name
-	if !slice.ContainsString(created.PrincipalIDs, localPrincipal) {
-		created.PrincipalIDs = append(created.PrincipalIDs, localPrincipal)
-		return h.mgmt.Management.Users("").Update(created)
-	}
-
-	return created, nil
-}
-
-func (h *loginHandler) checkCache(userPrincipal v3.Principal) (*v3.User, error) {
-	users, err := h.userIndexer.ByIndex(userByPrincipalIndex, userPrincipal.Name)
-	if err != nil {
-		return nil, err
-	}
-	if len(users) > 1 {
-		return nil, errors.Errorf("can't find unique user for principal %v", userPrincipal.Name)
-	}
-	if len(users) == 1 {
-		u := users[0].(*v3.User)
-		return u.DeepCopy(), nil
-	}
-	return nil, nil
-}
-
-func (h *loginHandler) checkLabels(principal v3.Principal) (*v3.User, labels.Set, error) {
-	encodedPrincipalID := base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString([]byte(principal.Name))
-	if len(encodedPrincipalID) > 63 {
-		encodedPrincipalID = encodedPrincipalID[:63]
-	}
-	labelKey := fmt.Sprintf("authn.managment.cattle.io/%v-principalId", principal.Provider)
-	set := labels.Set(map[string]string{labelKey: encodedPrincipalID})
-	users, err := h.mgmt.Management.Users("").List(v1.ListOptions{LabelSelector: set.String()})
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if len(users.Items) == 0 {
-		return nil, set, nil
-	}
-
-	var match *v3.User
-	for _, u := range users.Items {
-		if slice.ContainsString(u.PrincipalIDs, principal.Name) {
-			if match != nil {
-				// error out on duplicates
-				return nil, nil, errors.Errorf("can't find unique user for principal %v", principal.Name)
-			}
-			match = &u
-		}
-	}
-
-	return match, set, nil
-}
-
-func userByPrincipal(obj interface{}) ([]string, error) {
-	u, ok := obj.(*v3.User)
-	if !ok {
-		return []string{}, nil
-	}
-
-	return u.PrincipalIDs, nil
 }

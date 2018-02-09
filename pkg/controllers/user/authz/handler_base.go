@@ -1,37 +1,39 @@
 package authz
 
 import (
-	"fmt"
 	"reflect"
-	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/clientbase"
 	typescorev1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	typesrbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
 	"k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 )
 
 const (
-	rtbOwnerLabel          = "authz.cluster.cattle.io/rtb-owner"
-	projectIDAnnotation    = "field.cattle.io/projectId"
-	prtbByProjectIndex     = "authz.cluster.cattle.io/prtb-by-project"
-	prtbByProjectUserIndex = "authz.cluster.cattle.io/prtb-by-project-user"
-	nsByProjectIndex       = "authz.cluster.cattle.io/ns-by-project"
-	crByNSIndex            = "authz.cluster.cattle.io/cr-by-ns"
+	rtbOwnerLabel            = "authz.cluster.cattle.io/rtb-owner"
+	projectIDAnnotation      = "field.cattle.io/projectId"
+	prtbByProjectIndex       = "authz.cluster.cattle.io/prtb-by-project"
+	prtbByProjecSubjectIndex = "authz.cluster.cattle.io/prtb-by-project-subject"
+	nsByProjectIndex         = "authz.cluster.cattle.io/ns-by-project"
+	crByNSIndex              = "authz.cluster.cattle.io/cr-by-ns"
+	crbByRoleAndSubjectIndex = "authz.cluster.cattle.io/crb-by-role-and-subject"
 )
 
 func Register(workload *config.UserContext) {
 	// Add cache informer to project role template bindings
 	informer := workload.Management.Management.ProjectRoleTemplateBindings("").Controller().Informer()
 	indexers := map[string]cache.IndexFunc{
-		prtbByProjectIndex:     prtbByProjectName,
-		prtbByProjectUserIndex: prtbByProjectAndUser,
+		prtbByProjectIndex:       prtbByProjectName,
+		prtbByProjecSubjectIndex: prtbByProjectAndSubject,
 	}
 	informer.AddIndexers(indexers)
 
@@ -49,11 +51,19 @@ func Register(workload *config.UserContext) {
 	}
 	crInformer.AddIndexers(crIndexers)
 
+	// Get ClusterRoleBindings by subject name and kind
+	crbInformer := workload.RBAC.ClusterRoleBindings("").Controller().Informer()
+	crbIndexers := map[string]cache.IndexFunc{
+		crbByRoleAndSubjectIndex: crbByRoleAndSubject,
+	}
+	crbInformer.AddIndexers(crbIndexers)
+
 	r := &manager{
 		workload:      workload,
 		prtbIndexer:   informer.GetIndexer(),
 		nsIndexer:     nsInformer.GetIndexer(),
 		crIndexer:     crInformer.GetIndexer(),
+		crbIndexer:    crbInformer.GetIndexer(),
 		rtLister:      workload.Management.Management.RoleTemplates("").Controller().Lister(),
 		rbLister:      workload.RBAC.RoleBindings("").Controller().Lister(),
 		crbLister:     workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
@@ -75,6 +85,7 @@ type manager struct {
 	prtbIndexer   cache.Indexer
 	nsIndexer     cache.Indexer
 	crIndexer     cache.Indexer
+	crbIndexer    cache.Indexer
 	crLister      typesrbacv1.ClusterRoleLister
 	crbLister     typesrbacv1.ClusterRoleBindingLister
 	rbLister      typesrbacv1.RoleBindingLister
@@ -133,82 +144,187 @@ func (m *manager) gatherRoles(rt *v3.RoleTemplate, roleTemplates map[string]*v3.
 	return nil
 }
 
-func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, binding *v3.ProjectRoleTemplateBinding) error {
-	roleBindings := m.workload.K8sClient.RbacV1().RoleBindings(ns)
-
-	set := labels.Set(map[string]string{rtbOwnerLabel: string(binding.UID)})
-	desiredRBs := map[string]*rbacv1.RoleBinding{}
-	subject := buildSubjectFromPRTB(binding)
-	for roleName := range roles {
-		bindingName, objectMeta, subjects, roleRef := bindingParts(roleName, string(binding.UID), subject)
-		desiredRBs[bindingName] = &rbacv1.RoleBinding{
+func (m *manager) ensureClusterBindings(roles map[string]*v3.RoleTemplate, binding *v3.ClusterRoleTemplateBinding) error {
+	create := func(objectMeta metav1.ObjectMeta, subjects []rbacv1.Subject, roleRef rbacv1.RoleRef) runtime.Object {
+		return &rbacv1.ClusterRoleBinding{
 			ObjectMeta: objectMeta,
 			Subjects:   subjects,
 			RoleRef:    roleRef,
 		}
 	}
 
-	currentRBs, err := m.rbLister.List(ns, set.AsSelector())
+	list := func(ns string, selector labels.Selector) ([]interface{}, error) {
+		currentRBs, err := m.crbLister.List(ns, selector)
+		if err != nil {
+			return nil, err
+		}
+		var items []interface{}
+		for _, c := range currentRBs {
+			items = append(items, c)
+		}
+		return items, nil
+	}
+
+	convert := func(i interface{}) (string, string, []rbacv1.Subject) {
+		crb, _ := i.(*rbacv1.ClusterRoleBinding)
+		return crb.Name, crb.RoleRef.Name, crb.Subjects
+	}
+
+	return m.ensureBindings("", roles, binding, m.workload.RBAC.ClusterRoleBindings("").ObjectClient(), create, list, convert)
+}
+
+func (m *manager) ensureRoleBindings(ns string, roles map[string]*v3.RoleTemplate, binding *v3.ProjectRoleTemplateBinding) error {
+	create := func(objectMeta metav1.ObjectMeta, subjects []rbacv1.Subject, roleRef rbacv1.RoleRef) runtime.Object {
+		return &rbacv1.RoleBinding{
+			ObjectMeta: objectMeta,
+			Subjects:   subjects,
+			RoleRef:    roleRef,
+		}
+	}
+
+	list := func(ns string, selector labels.Selector) ([]interface{}, error) {
+		currentRBs, err := m.rbLister.List(ns, selector)
+		if err != nil {
+			return nil, err
+		}
+		var items []interface{}
+		for _, c := range currentRBs {
+			items = append(items, c)
+		}
+		return items, nil
+	}
+
+	convert := func(i interface{}) (string, string, []rbacv1.Subject) {
+		rb, _ := i.(*rbacv1.RoleBinding)
+		return rb.Name, rb.RoleRef.Name, rb.Subjects
+	}
+
+	return m.ensureBindings(ns, roles, binding, m.workload.RBAC.RoleBindings(ns).ObjectClient(), create, list, convert)
+}
+
+type createFn func(objectMeta metav1.ObjectMeta, subjects []rbacv1.Subject, roleRef rbacv1.RoleRef) runtime.Object
+type listFn func(ns string, selector labels.Selector) ([]interface{}, error)
+type convertFn func(i interface{}) (string, string, []rbacv1.Subject)
+
+func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, binding interface{}, client *clientbase.ObjectClient,
+	create createFn, list listFn, convert convertFn) error {
+	meta, err := meta.Accessor(binding)
+	if err != nil {
+		return err
+	}
+
+	desiredRBs := map[string]runtime.Object{}
+	subject, err := buildSubjectFromRTB(binding)
+	if err != nil {
+		return err
+	}
+	for roleName := range roles {
+		rbKey, objectMeta, subjects, roleRef := bindingParts(roleName, string(meta.GetUID()), subject)
+		desiredRBs[rbKey] = create(objectMeta, subjects, roleRef)
+	}
+
+	set := labels.Set(map[string]string{rtbOwnerLabel: string(meta.GetUID())})
+	currentRBs, err := list(ns, set.AsSelector())
 	if err != nil {
 		return err
 	}
 	rbsToDelete := map[string]bool{}
 	processed := map[string]bool{}
 	for _, rb := range currentRBs {
+		rbName, roleName, subjects := convert(rb)
 		// protect against an rb being in the list more than once (shouldn't happen, but just to be safe)
-		if ok := processed[rb.Name]; ok {
+		if ok := processed[rbName]; ok {
 			continue
 		}
-		processed[rb.Name] = true
+		processed[rbName] = true
 
-		if _, ok := desiredRBs[rb.Name]; ok {
-			delete(desiredRBs, rb.Name)
+		if len(subjects) != 1 {
+			rbsToDelete[rbName] = true
+			continue
+		}
+
+		crbKey := rbRoleSubjectKey(roleName, subjects[0])
+		if _, ok := desiredRBs[crbKey]; ok {
+			delete(desiredRBs, crbKey)
 		} else {
-			rbsToDelete[rb.Name] = true
+			rbsToDelete[rbName] = true
 		}
 	}
 
 	for _, rb := range desiredRBs {
-		_, err := roleBindings.Create(rb)
+		_, err := client.Create(rb)
 		if err != nil {
 			return err
 		}
 	}
 
 	for name := range rbsToDelete {
-		if err := roleBindings.Delete(name, &metav1.DeleteOptions{}); err != nil {
+		if err := client.Delete(name, &metav1.DeleteOptions{}); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
+func buildSubjectFromRTB(binding interface{}) (rbacv1.Subject, error) {
+	// TODO This is a duplicate of the same method that lives in the management context. When a place for common
+	// code exists, move it there and reuse it
+	var userName, groupPrincipalName, groupName, name, kind string
+	if rtb, ok := binding.(*v3.ProjectRoleTemplateBinding); ok {
+		userName = rtb.UserName
+		groupPrincipalName = rtb.GroupPrincipalName
+		groupName = rtb.GroupName
+	} else if rtb, ok := binding.(*v3.ClusterRoleTemplateBinding); ok {
+		userName = rtb.UserName
+		groupPrincipalName = rtb.GroupPrincipalName
+		groupName = rtb.GroupName
+	} else {
+		return rbacv1.Subject{}, errors.Errorf("unrecognized roleTemplateBinding type: %v", binding)
+	}
+
+	if userName != "" {
+		name = userName
+		kind = "User"
+	}
+
+	if groupPrincipalName != "" {
+		if name != "" {
+			return rbacv1.Subject{}, errors.Errorf("roletemplatebinding has more than one subject fields set: %v", binding)
+		}
+		name = groupPrincipalName
+		kind = "Group"
+	}
+
+	if groupName != "" {
+		if name != "" {
+			return rbacv1.Subject{}, errors.Errorf("roletemplatebinding has more than one subject fields set: %v", binding)
+		}
+		name = groupName
+		kind = "Group"
+	}
+
+	if name == "" {
+		return rbacv1.Subject{}, errors.Errorf("roletemplatebinding doesn't have any subject fields set: %v", binding)
+	}
+
+	return rbacv1.Subject{
+		Kind: kind,
+		Name: name,
+	}, nil
+}
+
 func bindingParts(roleName, parentUID string, subject rbacv1.Subject) (string, metav1.ObjectMeta, []rbacv1.Subject, rbacv1.RoleRef) {
-	bindingName := strings.ToLower(fmt.Sprintf("%v-%v", roleName, subject.Name))
-	return bindingName,
+	crbKey := rbRoleSubjectKey(roleName, subject)
+	return crbKey,
 		metav1.ObjectMeta{
-			Name:   bindingName,
-			Labels: map[string]string{rtbOwnerLabel: parentUID},
+			GenerateName: "clusterrolebinding-",
+			Labels:       map[string]string{rtbOwnerLabel: parentUID},
 		},
 		[]rbacv1.Subject{subject},
 		rbacv1.RoleRef{
 			Kind: "ClusterRole",
 			Name: roleName,
 		}
-}
-
-func buildSubjectFromCRTB(binding *v3.ClusterRoleTemplateBinding) rbacv1.Subject {
-	return rbacv1.Subject{
-		Kind: "User",
-		Name: binding.UserName,
-	}
-}
-
-func buildSubjectFromPRTB(binding *v3.ProjectRoleTemplateBinding) rbacv1.Subject {
-	return rbacv1.Subject{
-		Kind: "User",
-		Name: binding.UserName,
-	}
 }
 
 func prtbByProjectName(obj interface{}) ([]string, error) {
@@ -220,17 +336,27 @@ func prtbByProjectName(obj interface{}) ([]string, error) {
 	return []string{prtb.ProjectName}, nil
 }
 
-func getPRTBProjectAndUserKey(prtb *v3.ProjectRoleTemplateBinding) string {
-	return prtb.ProjectName + "." + prtb.UserName
+func getPRTBProjectAndSubjectKey(prtb *v3.ProjectRoleTemplateBinding) string {
+	var name string
+	if prtb.UserName != "" {
+		name = prtb.UserName
+	} else if prtb.UserPrincipalName != "" {
+		name = prtb.UserPrincipalName
+	} else if prtb.GroupName != "" {
+		name = prtb.GroupName
+	} else {
+		name = prtb.GroupPrincipalName
+	}
+	return prtb.ProjectName + "." + name
 }
 
-func prtbByProjectAndUser(obj interface{}) ([]string, error) {
+func prtbByProjectAndSubject(obj interface{}) ([]string, error) {
 	prtb, ok := obj.(*v3.ProjectRoleTemplateBinding)
 	if !ok {
 		return []string{}, nil
 	}
 
-	return []string{getPRTBProjectAndUserKey(prtb)}, nil
+	return []string{getPRTBProjectAndSubjectKey(prtb)}, nil
 }
 
 func nsByProjectID(obj interface{}) ([]string, error) {
@@ -244,4 +370,26 @@ func nsByProjectID(obj interface{}) ([]string, error) {
 	}
 
 	return []string{}, nil
+}
+
+func crbRoleSubjectKeys(roleName string, subjects []rbacv1.Subject) []string {
+	var keys []string
+	for _, s := range subjects {
+		keys = append(keys, rbRoleSubjectKey(roleName, s))
+	}
+	return keys
+}
+
+func rbRoleSubjectKey(roleName string, subject rbacv1.Subject) string {
+	return roleName + "." + subject.Kind + "." + subject.Name
+
+}
+
+func crbByRoleAndSubject(obj interface{}) ([]string, error) {
+	crb, ok := obj.(*rbacv1.ClusterRoleBinding)
+	if !ok {
+		return []string{}, nil
+	}
+
+	return crbRoleSubjectKeys(crb.RoleRef.Name, crb.Subjects), nil
 }

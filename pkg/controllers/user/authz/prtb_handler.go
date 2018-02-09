@@ -15,7 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-const owner = "owner"
+const owner = "owner-user"
 
 func newPRTBLifecycle(m *manager) *prtbLifecycle {
 	return &prtbLifecycle{m: m}
@@ -45,8 +45,7 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 		logrus.Warnf("ProjectRoleTemplateBinding %v has no role template set. Skipping.", binding.Name)
 		return nil
 	}
-	if binding.UserName == "" {
-		logrus.Warnf("Binding %v has no user. Skipping", binding.Name)
+	if binding.UserName == "" && binding.GroupPrincipalName == "" && binding.GroupName == "" {
 		return nil
 	}
 
@@ -71,8 +70,8 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 
 	for _, n := range namespaces {
 		ns := n.(*v1.Namespace)
-		if err := p.m.ensureBindings(ns.Name, roles, binding); err != nil {
-			return errors.Wrapf(err, "couldn't ensure bindings for %v in %v", binding.UserName, ns.Name)
+		if err := p.m.ensureRoleBindings(ns.Name, roles, binding); err != nil {
+			return errors.Wrapf(err, "couldn't ensure binding %v in %v", binding.Name, ns.Name)
 		}
 	}
 
@@ -138,9 +137,9 @@ func (p *prtbLifecycle) reconcileProjectNSAccess(binding *v3.ProjectRoleTemplate
 
 	bindingCli := p.m.workload.K8sClient.RbacV1().ClusterRoleBindings()
 
-	roles := map[string]string{role: role + "-" + binding.UserName}
+	roles := []string{role}
 	if createNSPerms {
-		roles["create-ns"] = "create-ns-" + binding.UserName
+		roles = append(roles, "create-ns")
 		if nsRole, _ := p.m.crLister.Get("", "create-ns"); nsRole == nil {
 			createNSRT, err := p.m.rtLister.Get("", "create-ns")
 			if err != nil {
@@ -153,13 +152,17 @@ func (p *prtbLifecycle) reconcileProjectNSAccess(binding *v3.ProjectRoleTemplate
 	}
 
 	rtbUID := string(binding.UID)
-	subject := buildSubjectFromPRTB(binding)
-	for role, bindingName := range roles {
-		crb, _ := p.m.crbLister.Get("", bindingName)
-		if crb == nil {
+	subject, err := buildSubjectFromRTB(binding)
+	if err != nil {
+		return err
+	}
+	for _, role := range roles {
+		crbKey := rbRoleSubjectKey(role, subject)
+		crbs, _ := p.m.crbIndexer.ByIndex(crbByRoleAndSubjectIndex, crbKey)
+		if len(crbs) == 0 {
 			_, err := bindingCli.Create(&rbacv1.ClusterRoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: bindingName,
+					GenerateName: "clusterrolebinding-",
 					Labels: map[string]string{
 						rtbUID: owner,
 					},
@@ -173,30 +176,38 @@ func (p *prtbLifecycle) reconcileProjectNSAccess(binding *v3.ProjectRoleTemplate
 			if err != nil {
 				return err
 			}
-			continue
-		}
+		} else {
+		CRBs:
+			for _, obj := range crbs {
+				crb, ok := obj.(*rbacv1.ClusterRoleBinding)
+				if !ok {
+					continue
+				}
 
-		for owner := range crb.Labels {
-			if rtbUID == owner {
-				continue
+				for owner := range crb.Labels {
+					if rtbUID == owner {
+						continue CRBs
+					}
+				}
+
+				crb = crb.DeepCopy()
+				if crb.Labels == nil {
+					crb.Labels = map[string]string{}
+				}
+				crb.Labels[rtbUID] = owner
+				_, err := bindingCli.Update(crb)
+				if err != nil {
+					return err
+				}
 			}
 		}
 
-		crb = crb.DeepCopy()
-		if crb.Labels == nil {
-			crb.Labels = map[string]string{}
-		}
-		crb.Labels[rtbUID] = owner
-		_, err := bindingCli.Update(crb)
-		if err != nil {
-			return err
-		}
 	}
 	return nil
 }
 
 func (p *prtbLifecycle) reconcileProjectNSAccessForDelete(binding *v3.ProjectRoleTemplateBinding) error {
-	prtbs, err := p.m.prtbIndexer.ByIndex(prtbByProjectUserIndex, getPRTBProjectAndUserKey(binding))
+	prtbs, err := p.m.prtbIndexer.ByIndex(prtbByProjecSubjectIndex, getPRTBProjectAndSubjectKey(binding))
 	if err != nil {
 		return err
 	}
