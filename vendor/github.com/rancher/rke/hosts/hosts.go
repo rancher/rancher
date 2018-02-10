@@ -227,3 +227,36 @@ func buildCleanerConfig(host *Host, toCleanDirs []string, cleanerImage string) (
 	}
 	return imageCfg, hostCfg
 }
+
+func NodesToHosts(rkeNodes []v3.RKEConfigNode, nodeRole string) []*Host {
+	hostList := make([]*Host, 0)
+	for _, node := range rkeNodes {
+		for _, role := range node.Role {
+			if role == nodeRole {
+				newHost := Host{
+					RKEConfigNode: node,
+				}
+				hostList = append(hostList, &newHost)
+				break
+			}
+		}
+	}
+	return hostList
+}
+
+func GetUniqueHostList(etcdHosts, cpHosts, workerHosts []*Host) []*Host {
+	hostList := []*Host{}
+	hostList = append(hostList, etcdHosts...)
+	hostList = append(hostList, cpHosts...)
+	hostList = append(hostList, workerHosts...)
+	// little trick to get a unique host list
+	uniqHostMap := make(map[*Host]bool)
+	for _, host := range hostList {
+		uniqHostMap[host] = true
+	}
+	uniqHostList := []*Host{}
+	for host := range uniqHostMap {
+		uniqHostList = append(uniqHostList, host)
+	}
+	return uniqHostList
+}

@@ -33,17 +33,12 @@ func SetUpAuthentication(ctx context.Context, kubeCluster, currentCluster *Clust
 			}
 			log.Infof(ctx, "[certificates] No Certificate backup found on host [%s]", kubeCluster.EtcdHosts[0].Address)
 
-			kubeCluster.Certificates, err = pki.StartCertificatesGeneration(ctx,
-				kubeCluster.ControlPlaneHosts,
-				kubeCluster.EtcdHosts,
-				kubeCluster.ClusterDomain,
-				kubeCluster.LocalKubeConfigPath,
-				kubeCluster.KubernetesServiceIP)
+			kubeCluster.Certificates, err = pki.GenerateRKECerts(ctx, kubeCluster.RancherKubernetesEngineConfig, kubeCluster.LocalKubeConfigPath, "")
 			if err != nil {
 				return fmt.Errorf("Failed to generate Kubernetes certificates: %v", err)
 			}
 			log.Infof(ctx, "[certificates] Temporarily saving certs to etcd host [%s]", kubeCluster.EtcdHosts[0].Address)
-			if err := pki.DeployCertificatesOnHost(ctx, kubeCluster.EtcdHosts, kubeCluster.EtcdHosts[0], kubeCluster.Certificates, kubeCluster.SystemImages.CertDownloader, pki.TempCertPath, kubeCluster.PrivateRegistriesMap); err != nil {
+			if err := pki.DeployCertificatesOnHost(ctx, kubeCluster.EtcdHosts[0], kubeCluster.Certificates, kubeCluster.SystemImages.CertDownloader, pki.TempCertPath, kubeCluster.PrivateRegistriesMap); err != nil {
 				return err
 			}
 			log.Infof(ctx, "[certificates] Saved certs to etcd host [%s]", kubeCluster.EtcdHosts[0].Address)

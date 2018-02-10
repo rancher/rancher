@@ -56,8 +56,8 @@ func (s SchedulingMapper) FromInternal(data map[string]interface{}) {
 
 func (s SchedulingMapper) nodeAffinity(data map[string]interface{}, nodeAffinity *v1.NodeAffinity) {
 	var requireAll []string
-	requireAny := []string{}
-	preferred := []string{}
+	var requireAny []string
+	var preferred []string
 
 	if nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
 		for _, term := range nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {

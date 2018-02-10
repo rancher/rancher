@@ -16,37 +16,15 @@ const (
 func RunWorkerPlane(ctx context.Context, controlHosts, workerHosts, etcdHosts []*hosts.Host, workerServices v3.RKEConfigServices, nginxProxyImage, sidekickImage string, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry) error {
 	log.Infof(ctx, "[%s] Building up Worker Plane..", WorkerRole)
 	var errgrp errgroup.Group
-
-	// Deploy worker components on etcd hosts
-	for _, host := range etcdHosts {
+	allHosts := hosts.GetUniqueHostList(etcdHosts, controlHosts, workerHosts)
+	for _, host := range allHosts {
 		if !host.IsControl && !host.IsWorker {
 			// Add unschedulable taint
 			host.ToAddTaints = append(host.ToAddTaints, unschedulableEtcdTaint)
 		}
-		etcdHost := host
+		runHost := host
 		errgrp.Go(func() error {
-			return doDeployWorkerPlane(ctx, etcdHost, workerServices, nginxProxyImage, sidekickImage, localConnDialerFactory, controlHosts, prsMap)
-		})
-	}
-	if err := errgrp.Wait(); err != nil {
-		return err
-	}
-
-	// Deploy worker components on control hosts
-	for _, host := range controlHosts {
-		controlHost := host
-		errgrp.Go(func() error {
-			return doDeployWorkerPlane(ctx, controlHost, workerServices, nginxProxyImage, sidekickImage, localConnDialerFactory, controlHosts, prsMap)
-		})
-	}
-	if err := errgrp.Wait(); err != nil {
-		return err
-	}
-	// Deploy worker components on worker hosts
-	for _, host := range workerHosts {
-		workerHost := host
-		errgrp.Go(func() error {
-			return doDeployWorkerPlane(ctx, workerHost, workerServices, nginxProxyImage, sidekickImage, localConnDialerFactory, controlHosts, prsMap)
+			return doDeployWorkerPlane(ctx, runHost, workerServices, nginxProxyImage, sidekickImage, localConnDialerFactory, controlHosts, prsMap)
 		})
 	}
 	if err := errgrp.Wait(); err != nil {

@@ -57,7 +57,7 @@ type ClusterSpec struct {
 }
 
 type ImportedConfig struct {
-	KubeConfig string `json:"kubeConfig"`
+	KubeConfig string `json:"kubeConfig" norman:"type=password"`
 }
 
 type K8sServerConfig struct {
@@ -128,7 +128,7 @@ type GoogleKubernetesEngineConfig struct {
 	// to each node.
 	Labels map[string]string `json:"labels,omitempty"`
 	// The content of the credential file(key.json)
-	Credential string `json:"credential,omitempty" norman:"required"`
+	Credential string `json:"credential,omitempty" norman:"required,type=password"`
 	// Enable alpha feature
 	EnableAlphaFeature bool `json:"enableAlphaFeature,omitempty"`
 	// Configuration for the HTTP (L7) load balancing controller addon
@@ -182,10 +182,10 @@ type AzureKubernetesServiceConfig struct {
 	BaseURL string `json:"baseUrl,omitempty"`
 	// Azure Client ID to use
 	ClientID string `json:"clientId,omitempty" norman:"required"`
-	// Secret associated with the Client ID
-	ClientSecret string `json:"clientSecret,omitempty" norman:"required"`
 	// Tenant ID to create the cluster under
 	TenantID string `json:"tenantId,omitempty" norman:"required"`
+	// Secret associated with the Client ID
+	ClientSecret string `json:"clientSecret,omitempty" norman:"required,type=password"`
 }
 
 type ClusterEvent struct {

@@ -90,6 +90,9 @@ func Set(data map[string]interface{}) {
 		data["transitioning"] = "yes"
 
 		finalizers, ok := values.GetStringSlice(data, "metadata", "finalizers")
+		if !ok {
+			finalizers, ok = values.GetStringSlice(data, "spec", "finalizers")
+		}
 		if ok && len(finalizers) > 0 {
 			data["transitioningMessage"] = "Waiting on " + finalizers[0]
 			if i, err := convert.ToTimestamp(val); err == nil {

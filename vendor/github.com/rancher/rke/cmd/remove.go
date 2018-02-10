@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
+	"github.com/rancher/rke/pki"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -20,7 +21,7 @@ func RemoveCommand() cli.Command {
 		cli.StringFlag{
 			Name:   "config",
 			Usage:  "Specify an alternate cluster YAML file",
-			Value:  cluster.DefaultClusterConfig,
+			Value:  pki.ClusterConfig,
 			EnvVar: "RKE_CONFIG",
 		},
 		cli.BoolFlag{

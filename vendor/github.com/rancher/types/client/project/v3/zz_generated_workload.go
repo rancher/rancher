@@ -9,40 +9,51 @@ const (
 	WorkloadFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	WorkloadFieldAnnotations                   = "annotations"
 	WorkloadFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
-	WorkloadFieldBatchSize                     = "batchSize"
+	WorkloadFieldBackoffLimit                  = "backoffLimit"
+	WorkloadFieldCompletions                   = "completions"
 	WorkloadFieldContainers                    = "containers"
 	WorkloadFieldCreated                       = "created"
 	WorkloadFieldCreatorID                     = "creatorId"
+	WorkloadFieldCronJob                       = "cronJob"
+	WorkloadFieldCronJobStatus                 = "cronJobStatus"
 	WorkloadFieldDNSPolicy                     = "dnsPolicy"
-	WorkloadFieldDeploymentStrategy            = "deploymentStrategy"
-	WorkloadFieldDescription                   = "description"
+	WorkloadFieldDaemonSet                     = "daemonSet"
+	WorkloadFieldDaemonSetStatus               = "daemonSetStatus"
+	WorkloadFieldDeployment                    = "deployment"
+	WorkloadFieldDeploymentStatus              = "deploymentStatus"
 	WorkloadFieldFsgid                         = "fsgid"
 	WorkloadFieldGids                          = "gids"
 	WorkloadFieldHostAliases                   = "hostAliases"
+	WorkloadFieldHostIPC                       = "hostIPC"
+	WorkloadFieldHostNetwork                   = "hostNetwork"
+	WorkloadFieldHostPID                       = "hostPID"
 	WorkloadFieldHostname                      = "hostname"
-	WorkloadFieldIPC                           = "ipc"
+	WorkloadFieldImagePullSecrets              = "imagePullSecrets"
+	WorkloadFieldJobStatus                     = "jobStatus"
 	WorkloadFieldLabels                        = "labels"
+	WorkloadFieldManualSelector                = "manualSelector"
 	WorkloadFieldName                          = "name"
 	WorkloadFieldNamespaceId                   = "namespaceId"
-	WorkloadFieldNet                           = "net"
 	WorkloadFieldNodeId                        = "nodeId"
+	WorkloadFieldObjectMeta                    = "metadata"
 	WorkloadFieldOwnerReferences               = "ownerReferences"
-	WorkloadFieldPID                           = "pid"
+	WorkloadFieldParallelism                   = "parallelism"
 	WorkloadFieldPriority                      = "priority"
 	WorkloadFieldPriorityClassName             = "priorityClassName"
 	WorkloadFieldProjectID                     = "projectId"
-	WorkloadFieldPullPolicy                    = "pullPolicy"
-	WorkloadFieldPullSecrets                   = "pullSecrets"
 	WorkloadFieldRemoved                       = "removed"
-	WorkloadFieldRestart                       = "restart"
+	WorkloadFieldReplicationController         = "replicationController"
+	WorkloadFieldReplicationControllerStatus   = "replicationControllerStatus"
+	WorkloadFieldRestartPolicy                 = "restartPolicy"
 	WorkloadFieldRunAsNonRoot                  = "runAsNonRoot"
 	WorkloadFieldScale                         = "scale"
 	WorkloadFieldSchedulerName                 = "schedulerName"
 	WorkloadFieldScheduling                    = "scheduling"
+	WorkloadFieldSelector                      = "selector"
 	WorkloadFieldServiceAccountName            = "serviceAccountName"
-	WorkloadFieldServiceLinks                  = "serviceLinks"
 	WorkloadFieldState                         = "state"
-	WorkloadFieldStatus                        = "status"
+	WorkloadFieldStatefulSet                   = "statefulSet"
+	WorkloadFieldStatefulSetStatus             = "statefulSetStatus"
 	WorkloadFieldSubdomain                     = "subdomain"
 	WorkloadFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
 	WorkloadFieldTransitioning                 = "transitioning"
@@ -50,58 +61,65 @@ const (
 	WorkloadFieldUid                           = "uid"
 	WorkloadFieldUuid                          = "uuid"
 	WorkloadFieldVolumes                       = "volumes"
-	WorkloadFieldWorkloadAnnotations           = "workloadAnnotations"
-	WorkloadFieldWorkloadLabels                = "workloadLabels"
 )
 
 type Workload struct {
 	types.Resource
-	ActiveDeadlineSeconds         *int64                 `json:"activeDeadlineSeconds,omitempty"`
-	Annotations                   map[string]string      `json:"annotations,omitempty"`
-	AutomountServiceAccountToken  *bool                  `json:"automountServiceAccountToken,omitempty"`
-	BatchSize                     string                 `json:"batchSize,omitempty"`
-	Containers                    []Container            `json:"containers,omitempty"`
-	Created                       string                 `json:"created,omitempty"`
-	CreatorID                     string                 `json:"creatorId,omitempty"`
-	DNSPolicy                     string                 `json:"dnsPolicy,omitempty"`
-	DeploymentStrategy            *DeployStrategy        `json:"deploymentStrategy,omitempty"`
-	Description                   string                 `json:"description,omitempty"`
-	Fsgid                         *int64                 `json:"fsgid,omitempty"`
-	Gids                          []int64                `json:"gids,omitempty"`
-	HostAliases                   map[string]HostAlias   `json:"hostAliases,omitempty"`
-	Hostname                      string                 `json:"hostname,omitempty"`
-	IPC                           string                 `json:"ipc,omitempty"`
-	Labels                        map[string]string      `json:"labels,omitempty"`
-	Name                          string                 `json:"name,omitempty"`
-	NamespaceId                   string                 `json:"namespaceId,omitempty"`
-	Net                           string                 `json:"net,omitempty"`
-	NodeId                        string                 `json:"nodeId,omitempty"`
-	OwnerReferences               []OwnerReference       `json:"ownerReferences,omitempty"`
-	PID                           string                 `json:"pid,omitempty"`
-	Priority                      *int64                 `json:"priority,omitempty"`
-	PriorityClassName             string                 `json:"priorityClassName,omitempty"`
-	ProjectID                     string                 `json:"projectId,omitempty"`
-	PullPolicy                    string                 `json:"pullPolicy,omitempty"`
-	PullSecrets                   []LocalObjectReference `json:"pullSecrets,omitempty"`
-	Removed                       string                 `json:"removed,omitempty"`
-	Restart                       string                 `json:"restart,omitempty"`
-	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty"`
-	Scale                         *int64                 `json:"scale,omitempty"`
-	SchedulerName                 string                 `json:"schedulerName,omitempty"`
-	Scheduling                    *Scheduling            `json:"scheduling,omitempty"`
-	ServiceAccountName            string                 `json:"serviceAccountName,omitempty"`
-	ServiceLinks                  []Link                 `json:"serviceLinks,omitempty"`
-	State                         string                 `json:"state,omitempty"`
-	Status                        *WorkloadStatus        `json:"status,omitempty"`
-	Subdomain                     string                 `json:"subdomain,omitempty"`
-	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty"`
-	Transitioning                 string                 `json:"transitioning,omitempty"`
-	TransitioningMessage          string                 `json:"transitioningMessage,omitempty"`
-	Uid                           *int64                 `json:"uid,omitempty"`
-	Uuid                          string                 `json:"uuid,omitempty"`
-	Volumes                       map[string]Volume      `json:"volumes,omitempty"`
-	WorkloadAnnotations           map[string]string      `json:"workloadAnnotations,omitempty"`
-	WorkloadLabels                map[string]string      `json:"workloadLabels,omitempty"`
+	ActiveDeadlineSeconds         *int64                       `json:"activeDeadlineSeconds,omitempty"`
+	Annotations                   map[string]string            `json:"annotations,omitempty"`
+	AutomountServiceAccountToken  *bool                        `json:"automountServiceAccountToken,omitempty"`
+	BackoffLimit                  *int64                       `json:"backoffLimit,omitempty"`
+	Completions                   *int64                       `json:"completions,omitempty"`
+	Containers                    []Container                  `json:"containers,omitempty"`
+	Created                       string                       `json:"created,omitempty"`
+	CreatorID                     string                       `json:"creatorId,omitempty"`
+	CronJob                       *CronJobConfig               `json:"cronJob,omitempty"`
+	CronJobStatus                 *CronJobStatus               `json:"cronJobStatus,omitempty"`
+	DNSPolicy                     string                       `json:"dnsPolicy,omitempty"`
+	DaemonSet                     *DaemonSetConfig             `json:"daemonSet,omitempty"`
+	DaemonSetStatus               *DaemonSetStatus             `json:"daemonSetStatus,omitempty"`
+	Deployment                    *DeploymentConfig            `json:"deployment,omitempty"`
+	DeploymentStatus              *DeploymentStatus            `json:"deploymentStatus,omitempty"`
+	Fsgid                         *int64                       `json:"fsgid,omitempty"`
+	Gids                          []int64                      `json:"gids,omitempty"`
+	HostAliases                   []HostAlias                  `json:"hostAliases,omitempty"`
+	HostIPC                       *bool                        `json:"hostIPC,omitempty"`
+	HostNetwork                   *bool                        `json:"hostNetwork,omitempty"`
+	HostPID                       *bool                        `json:"hostPID,omitempty"`
+	Hostname                      string                       `json:"hostname,omitempty"`
+	ImagePullSecrets              []LocalObjectReference       `json:"imagePullSecrets,omitempty"`
+	JobStatus                     *JobStatus                   `json:"jobStatus,omitempty"`
+	Labels                        map[string]string            `json:"labels,omitempty"`
+	ManualSelector                *bool                        `json:"manualSelector,omitempty"`
+	Name                          string                       `json:"name,omitempty"`
+	NamespaceId                   string                       `json:"namespaceId,omitempty"`
+	NodeId                        string                       `json:"nodeId,omitempty"`
+	ObjectMeta                    *ObjectMeta                  `json:"metadata,omitempty"`
+	OwnerReferences               []OwnerReference             `json:"ownerReferences,omitempty"`
+	Parallelism                   *int64                       `json:"parallelism,omitempty"`
+	Priority                      *int64                       `json:"priority,omitempty"`
+	PriorityClassName             string                       `json:"priorityClassName,omitempty"`
+	ProjectID                     string                       `json:"projectId,omitempty"`
+	Removed                       string                       `json:"removed,omitempty"`
+	ReplicationController         *ReplicationControllerConfig `json:"replicationController,omitempty"`
+	ReplicationControllerStatus   *ReplicationControllerStatus `json:"replicationControllerStatus,omitempty"`
+	RestartPolicy                 string                       `json:"restartPolicy,omitempty"`
+	RunAsNonRoot                  *bool                        `json:"runAsNonRoot,omitempty"`
+	Scale                         *int64                       `json:"scale,omitempty"`
+	SchedulerName                 string                       `json:"schedulerName,omitempty"`
+	Scheduling                    *Scheduling                  `json:"scheduling,omitempty"`
+	Selector                      *LabelSelector               `json:"selector,omitempty"`
+	ServiceAccountName            string                       `json:"serviceAccountName,omitempty"`
+	State                         string                       `json:"state,omitempty"`
+	StatefulSet                   *StatefulSetConfig           `json:"statefulSet,omitempty"`
+	StatefulSetStatus             *StatefulSetStatus           `json:"statefulSetStatus,omitempty"`
+	Subdomain                     string                       `json:"subdomain,omitempty"`
+	TerminationGracePeriodSeconds *int64                       `json:"terminationGracePeriodSeconds,omitempty"`
+	Transitioning                 string                       `json:"transitioning,omitempty"`
+	TransitioningMessage          string                       `json:"transitioningMessage,omitempty"`
+	Uid                           *int64                       `json:"uid,omitempty"`
+	Uuid                          string                       `json:"uuid,omitempty"`
+	Volumes                       []Volume                     `json:"volumes,omitempty"`
 }
 type WorkloadCollection struct {
 	types.Collection

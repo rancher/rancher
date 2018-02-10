@@ -4,30 +4,27 @@ const (
 	DeploymentSpecType                               = "deploymentSpec"
 	DeploymentSpecFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	DeploymentSpecFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
-	DeploymentSpecFieldBatchSize                     = "batchSize"
 	DeploymentSpecFieldContainers                    = "containers"
 	DeploymentSpecFieldDNSPolicy                     = "dnsPolicy"
-	DeploymentSpecFieldDeploymentStrategy            = "deploymentStrategy"
+	DeploymentSpecFieldDeployment                    = "deployment"
 	DeploymentSpecFieldFsgid                         = "fsgid"
 	DeploymentSpecFieldGids                          = "gids"
 	DeploymentSpecFieldHostAliases                   = "hostAliases"
+	DeploymentSpecFieldHostIPC                       = "hostIPC"
+	DeploymentSpecFieldHostNetwork                   = "hostNetwork"
+	DeploymentSpecFieldHostPID                       = "hostPID"
 	DeploymentSpecFieldHostname                      = "hostname"
-	DeploymentSpecFieldIPC                           = "ipc"
-	DeploymentSpecFieldNet                           = "net"
+	DeploymentSpecFieldImagePullSecrets              = "imagePullSecrets"
 	DeploymentSpecFieldNodeId                        = "nodeId"
 	DeploymentSpecFieldObjectMeta                    = "metadata"
-	DeploymentSpecFieldPID                           = "pid"
-	DeploymentSpecFieldPaused                        = "paused"
 	DeploymentSpecFieldPriority                      = "priority"
 	DeploymentSpecFieldPriorityClassName             = "priorityClassName"
-	DeploymentSpecFieldPullPolicy                    = "pullPolicy"
-	DeploymentSpecFieldPullSecrets                   = "pullSecrets"
-	DeploymentSpecFieldRestart                       = "restart"
-	DeploymentSpecFieldRevisionHistoryLimit          = "revisionHistoryLimit"
+	DeploymentSpecFieldRestartPolicy                 = "restartPolicy"
 	DeploymentSpecFieldRunAsNonRoot                  = "runAsNonRoot"
 	DeploymentSpecFieldScale                         = "scale"
 	DeploymentSpecFieldSchedulerName                 = "schedulerName"
 	DeploymentSpecFieldScheduling                    = "scheduling"
+	DeploymentSpecFieldSelector                      = "selector"
 	DeploymentSpecFieldServiceAccountName            = "serviceAccountName"
 	DeploymentSpecFieldSubdomain                     = "subdomain"
 	DeploymentSpecFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
@@ -38,33 +35,30 @@ const (
 type DeploymentSpec struct {
 	ActiveDeadlineSeconds         *int64                 `json:"activeDeadlineSeconds,omitempty"`
 	AutomountServiceAccountToken  *bool                  `json:"automountServiceAccountToken,omitempty"`
-	BatchSize                     string                 `json:"batchSize,omitempty"`
 	Containers                    []Container            `json:"containers,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty"`
-	DeploymentStrategy            *DeployStrategy        `json:"deploymentStrategy,omitempty"`
+	Deployment                    *DeploymentConfig      `json:"deployment,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty"`
-	HostAliases                   map[string]HostAlias   `json:"hostAliases,omitempty"`
+	HostAliases                   []HostAlias            `json:"hostAliases,omitempty"`
+	HostIPC                       *bool                  `json:"hostIPC,omitempty"`
+	HostNetwork                   *bool                  `json:"hostNetwork,omitempty"`
+	HostPID                       *bool                  `json:"hostPID,omitempty"`
 	Hostname                      string                 `json:"hostname,omitempty"`
-	IPC                           string                 `json:"ipc,omitempty"`
-	Net                           string                 `json:"net,omitempty"`
+	ImagePullSecrets              []LocalObjectReference `json:"imagePullSecrets,omitempty"`
 	NodeId                        string                 `json:"nodeId,omitempty"`
 	ObjectMeta                    *ObjectMeta            `json:"metadata,omitempty"`
-	PID                           string                 `json:"pid,omitempty"`
-	Paused                        *bool                  `json:"paused,omitempty"`
 	Priority                      *int64                 `json:"priority,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty"`
-	PullPolicy                    string                 `json:"pullPolicy,omitempty"`
-	PullSecrets                   []LocalObjectReference `json:"pullSecrets,omitempty"`
-	Restart                       string                 `json:"restart,omitempty"`
-	RevisionHistoryLimit          *int64                 `json:"revisionHistoryLimit,omitempty"`
+	RestartPolicy                 string                 `json:"restartPolicy,omitempty"`
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty"`
 	Scale                         *int64                 `json:"scale,omitempty"`
 	SchedulerName                 string                 `json:"schedulerName,omitempty"`
 	Scheduling                    *Scheduling            `json:"scheduling,omitempty"`
+	Selector                      *LabelSelector         `json:"selector,omitempty"`
 	ServiceAccountName            string                 `json:"serviceAccountName,omitempty"`
 	Subdomain                     string                 `json:"subdomain,omitempty"`
 	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty"`
 	Uid                           *int64                 `json:"uid,omitempty"`
-	Volumes                       map[string]Volume      `json:"volumes,omitempty"`
+	Volumes                       []Volume               `json:"volumes,omitempty"`
 }

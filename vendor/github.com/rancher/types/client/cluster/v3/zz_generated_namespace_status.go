@@ -1,8 +1,10 @@
 package client
 
 const (
-	NamespaceStatusType = "namespaceStatus"
+	NamespaceStatusType       = "namespaceStatus"
+	NamespaceStatusFieldPhase = "phase"
 )
 
 type NamespaceStatus struct {
+	Phase string `json:"phase,omitempty"`
 }

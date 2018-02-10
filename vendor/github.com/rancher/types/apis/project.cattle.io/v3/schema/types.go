@@ -3,7 +3,6 @@ package schema
 import (
 	"github.com/rancher/norman/types"
 	m "github.com/rancher/norman/types/mapper"
-	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -71,10 +70,6 @@ type NodeScheduling struct {
 	RequireAll []string
 	RequireAny []string
 	Preferred  []string
-}
-
-type deployOverride struct {
-	v3.DeployConfig
 }
 
 type projectOverride struct {

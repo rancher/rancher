@@ -4,7 +4,6 @@ import (
 	"github.com/rancher/norman/types"
 	m "github.com/rancher/norman/types/mapper"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
-	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	"github.com/rancher/types/factory"
 	"github.com/rancher/types/mapper"
 	"k8s.io/api/core/v1"
@@ -26,7 +25,19 @@ var (
 )
 
 func namespaceTypes(schemas *types.Schemas) *types.Schemas {
-	return schema.NamespaceTypes(&Version, schemas)
+	return schemas.
+		AddMapperForType(&Version, v1.NamespaceSpec{},
+			&m.Drop{Field: "finalizers"},
+		).
+		AddMapperForType(&Version, v1.Namespace{},
+			&m.AnnotationField{Field: "description"},
+			&m.AnnotationField{Field: "projectId"},
+			&m.Drop{Field: "status"},
+		).
+		MustImport(&Version, v1.Namespace{}, struct {
+			Description string `json:"description"`
+			ProjectID   string `norman:"type=reference[/v3/schemas/project]"`
+		}{})
 }
 
 func nodeTypes(schemas *types.Schemas) *types.Schemas {

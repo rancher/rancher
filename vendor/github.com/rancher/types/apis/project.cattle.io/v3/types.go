@@ -2,66 +2,8 @@ package v3
 
 import (
 	"github.com/rancher/norman/types"
-	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-type WorkloadSpec struct {
-	Description  string             `json:"description"`
-	DeployConfig DeployConfig       `json:"deployConfig"`
-	Template     v1.PodTemplateSpec `json:"template"`
-	ServiceLinks []Link             `json:"serviceLinks"`
-}
-
-type WorkloadStatus struct {
-}
-
-type Workload struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              WorkloadSpec    `json:"spec"`
-	Status            *WorkloadStatus `json:"status"`
-}
-
-type DeployConfig struct {
-	Scale              int64           `json:"scale"`
-	BatchSize          string          `json:"batchSize"`
-	DeploymentStrategy *DeployStrategy `json:"deploymentStrategy"`
-}
-
-type DeploymentParallelConfig struct {
-	StartFirst              bool  `json:"startFirst"`
-	MinReadySeconds         int64 `json:"minReadySeconds"`
-	ProgressDeadlineSeconds int64 `json:"progressDeadlineSeconds"`
-}
-
-type DeploymentJobConfig struct {
-	BatchLimit            int64 `json:"batchLimit"`
-	ActiveDeadlineSeconds int64 `json:"activeDeadlineSeconds"`
-	OnDelete              bool  `json:"onDelete"`
-}
-
-type DeploymentOrderedConfig struct {
-	PartitionSize int64 `json:"partitionSize"`
-	OnDelete      bool  `json:"onDelete"`
-}
-
-type DeploymentGlobalConfig struct {
-	OnDelete bool `json:"onDelete"`
-}
-
-type DeployStrategy struct {
-	Kind           string                    `json:"kind"`
-	ParallelConfig *DeploymentParallelConfig `json:"parallelConfig"`
-	JobConfig      *DeploymentJobConfig      `json:"jobConfig"`
-	OrderedConfig  *DeploymentOrderedConfig  `json:"orderedConfig"`
-	GlobalConfig   *DeploymentGlobalConfig   `json:"globalConfig"`
-}
-
-type Link struct {
-	Name  string `json:"name"`
-	Alias string `json:"alias"`
-}
 
 type ServiceAccountToken struct {
 	types.Namespaced
@@ -143,13 +85,18 @@ type SSHAuth struct {
 type NamespacedSSHAuth SSHAuth
 
 type PublicEndpoint struct {
-	NodeName string `json:"node,omitempty" norman:"type=reference[node],nocreate,noupdate"`
+	NodeName string `json:"nodeName,omitempty" norman:"type=reference[node],nocreate,noupdate"`
 	Address  string `json:"address,omitempty" norman:"nocreate,noupdate"`
 	Port     int32  `json:"port,omitempty" norman:"nocreate,noupdate"`
 	Protocol string `json:"protocol,omitempty" norman:"nocreate,noupdate"`
 	// for node port service
-	ServiceName string `json:"service,omitempty" norman:"type=reference[service],nocreate,noupdate"`
+	ServiceName string `json:"serviceName,omitempty" norman:"type=reference[service],nocreate,noupdate"`
 	// for host port
-	PodName string `json:"pod,omitempty" norman:"type=reference[pod],nocreate,noupdate"`
+	PodName string `json:"podName,omitempty" norman:"type=reference[pod],nocreate,noupdate"`
 	//serviceName and podName are mutually exclusive
+}
+
+type Workload struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 }

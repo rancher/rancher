@@ -9,105 +9,89 @@ const (
 	StatefulSetFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	StatefulSetFieldAnnotations                   = "annotations"
 	StatefulSetFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
-	StatefulSetFieldBatchSize                     = "batchSize"
 	StatefulSetFieldContainers                    = "containers"
 	StatefulSetFieldCreated                       = "created"
 	StatefulSetFieldCreatorID                     = "creatorId"
 	StatefulSetFieldDNSPolicy                     = "dnsPolicy"
-	StatefulSetFieldDeploymentStrategy            = "deploymentStrategy"
 	StatefulSetFieldFsgid                         = "fsgid"
 	StatefulSetFieldGids                          = "gids"
 	StatefulSetFieldHostAliases                   = "hostAliases"
+	StatefulSetFieldHostIPC                       = "hostIPC"
+	StatefulSetFieldHostNetwork                   = "hostNetwork"
+	StatefulSetFieldHostPID                       = "hostPID"
 	StatefulSetFieldHostname                      = "hostname"
-	StatefulSetFieldIPC                           = "ipc"
+	StatefulSetFieldImagePullSecrets              = "imagePullSecrets"
 	StatefulSetFieldLabels                        = "labels"
 	StatefulSetFieldName                          = "name"
 	StatefulSetFieldNamespaceId                   = "namespaceId"
-	StatefulSetFieldNet                           = "net"
 	StatefulSetFieldNodeId                        = "nodeId"
+	StatefulSetFieldObjectMeta                    = "metadata"
 	StatefulSetFieldOwnerReferences               = "ownerReferences"
-	StatefulSetFieldPID                           = "pid"
-	StatefulSetFieldPodManagementPolicy           = "podManagementPolicy"
 	StatefulSetFieldPriority                      = "priority"
 	StatefulSetFieldPriorityClassName             = "priorityClassName"
 	StatefulSetFieldProjectID                     = "projectId"
-	StatefulSetFieldPullPolicy                    = "pullPolicy"
-	StatefulSetFieldPullSecrets                   = "pullSecrets"
 	StatefulSetFieldRemoved                       = "removed"
-	StatefulSetFieldRestart                       = "restart"
-	StatefulSetFieldRevisionHistoryLimit          = "revisionHistoryLimit"
+	StatefulSetFieldRestartPolicy                 = "restartPolicy"
 	StatefulSetFieldRunAsNonRoot                  = "runAsNonRoot"
-	StatefulSetFieldScale                         = "scale"
 	StatefulSetFieldSchedulerName                 = "schedulerName"
 	StatefulSetFieldScheduling                    = "scheduling"
+	StatefulSetFieldSelector                      = "selector"
 	StatefulSetFieldServiceAccountName            = "serviceAccountName"
-	StatefulSetFieldServiceName                   = "serviceName"
 	StatefulSetFieldState                         = "state"
-	StatefulSetFieldStatus                        = "status"
+	StatefulSetFieldStatefulSet                   = "statefulSet"
+	StatefulSetFieldStatefulSetStatus             = "statefulSetStatus"
 	StatefulSetFieldSubdomain                     = "subdomain"
 	StatefulSetFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
 	StatefulSetFieldTransitioning                 = "transitioning"
 	StatefulSetFieldTransitioningMessage          = "transitioningMessage"
 	StatefulSetFieldUid                           = "uid"
-	StatefulSetFieldUpdateStrategy                = "updateStrategy"
 	StatefulSetFieldUuid                          = "uuid"
-	StatefulSetFieldVolumeClaimTemplates          = "volumeClaimTemplates"
 	StatefulSetFieldVolumes                       = "volumes"
-	StatefulSetFieldWorkloadAnnotations           = "workloadAnnotations"
-	StatefulSetFieldWorkloadLabels                = "workloadLabels"
 )
 
 type StatefulSet struct {
 	types.Resource
-	ActiveDeadlineSeconds         *int64                     `json:"activeDeadlineSeconds,omitempty"`
-	Annotations                   map[string]string          `json:"annotations,omitempty"`
-	AutomountServiceAccountToken  *bool                      `json:"automountServiceAccountToken,omitempty"`
-	BatchSize                     string                     `json:"batchSize,omitempty"`
-	Containers                    []Container                `json:"containers,omitempty"`
-	Created                       string                     `json:"created,omitempty"`
-	CreatorID                     string                     `json:"creatorId,omitempty"`
-	DNSPolicy                     string                     `json:"dnsPolicy,omitempty"`
-	DeploymentStrategy            *DeployStrategy            `json:"deploymentStrategy,omitempty"`
-	Fsgid                         *int64                     `json:"fsgid,omitempty"`
-	Gids                          []int64                    `json:"gids,omitempty"`
-	HostAliases                   map[string]HostAlias       `json:"hostAliases,omitempty"`
-	Hostname                      string                     `json:"hostname,omitempty"`
-	IPC                           string                     `json:"ipc,omitempty"`
-	Labels                        map[string]string          `json:"labels,omitempty"`
-	Name                          string                     `json:"name,omitempty"`
-	NamespaceId                   string                     `json:"namespaceId,omitempty"`
-	Net                           string                     `json:"net,omitempty"`
-	NodeId                        string                     `json:"nodeId,omitempty"`
-	OwnerReferences               []OwnerReference           `json:"ownerReferences,omitempty"`
-	PID                           string                     `json:"pid,omitempty"`
-	PodManagementPolicy           string                     `json:"podManagementPolicy,omitempty"`
-	Priority                      *int64                     `json:"priority,omitempty"`
-	PriorityClassName             string                     `json:"priorityClassName,omitempty"`
-	ProjectID                     string                     `json:"projectId,omitempty"`
-	PullPolicy                    string                     `json:"pullPolicy,omitempty"`
-	PullSecrets                   []LocalObjectReference     `json:"pullSecrets,omitempty"`
-	Removed                       string                     `json:"removed,omitempty"`
-	Restart                       string                     `json:"restart,omitempty"`
-	RevisionHistoryLimit          *int64                     `json:"revisionHistoryLimit,omitempty"`
-	RunAsNonRoot                  *bool                      `json:"runAsNonRoot,omitempty"`
-	Scale                         *int64                     `json:"scale,omitempty"`
-	SchedulerName                 string                     `json:"schedulerName,omitempty"`
-	Scheduling                    *Scheduling                `json:"scheduling,omitempty"`
-	ServiceAccountName            string                     `json:"serviceAccountName,omitempty"`
-	ServiceName                   string                     `json:"serviceName,omitempty"`
-	State                         string                     `json:"state,omitempty"`
-	Status                        *StatefulSetStatus         `json:"status,omitempty"`
-	Subdomain                     string                     `json:"subdomain,omitempty"`
-	TerminationGracePeriodSeconds *int64                     `json:"terminationGracePeriodSeconds,omitempty"`
-	Transitioning                 string                     `json:"transitioning,omitempty"`
-	TransitioningMessage          string                     `json:"transitioningMessage,omitempty"`
-	Uid                           *int64                     `json:"uid,omitempty"`
-	UpdateStrategy                *StatefulSetUpdateStrategy `json:"updateStrategy,omitempty"`
-	Uuid                          string                     `json:"uuid,omitempty"`
-	VolumeClaimTemplates          []PersistentVolumeClaim    `json:"volumeClaimTemplates,omitempty"`
-	Volumes                       map[string]Volume          `json:"volumes,omitempty"`
-	WorkloadAnnotations           map[string]string          `json:"workloadAnnotations,omitempty"`
-	WorkloadLabels                map[string]string          `json:"workloadLabels,omitempty"`
+	ActiveDeadlineSeconds         *int64                 `json:"activeDeadlineSeconds,omitempty"`
+	Annotations                   map[string]string      `json:"annotations,omitempty"`
+	AutomountServiceAccountToken  *bool                  `json:"automountServiceAccountToken,omitempty"`
+	Containers                    []Container            `json:"containers,omitempty"`
+	Created                       string                 `json:"created,omitempty"`
+	CreatorID                     string                 `json:"creatorId,omitempty"`
+	DNSPolicy                     string                 `json:"dnsPolicy,omitempty"`
+	Fsgid                         *int64                 `json:"fsgid,omitempty"`
+	Gids                          []int64                `json:"gids,omitempty"`
+	HostAliases                   []HostAlias            `json:"hostAliases,omitempty"`
+	HostIPC                       *bool                  `json:"hostIPC,omitempty"`
+	HostNetwork                   *bool                  `json:"hostNetwork,omitempty"`
+	HostPID                       *bool                  `json:"hostPID,omitempty"`
+	Hostname                      string                 `json:"hostname,omitempty"`
+	ImagePullSecrets              []LocalObjectReference `json:"imagePullSecrets,omitempty"`
+	Labels                        map[string]string      `json:"labels,omitempty"`
+	Name                          string                 `json:"name,omitempty"`
+	NamespaceId                   string                 `json:"namespaceId,omitempty"`
+	NodeId                        string                 `json:"nodeId,omitempty"`
+	ObjectMeta                    *ObjectMeta            `json:"metadata,omitempty"`
+	OwnerReferences               []OwnerReference       `json:"ownerReferences,omitempty"`
+	Priority                      *int64                 `json:"priority,omitempty"`
+	PriorityClassName             string                 `json:"priorityClassName,omitempty"`
+	ProjectID                     string                 `json:"projectId,omitempty"`
+	Removed                       string                 `json:"removed,omitempty"`
+	RestartPolicy                 string                 `json:"restartPolicy,omitempty"`
+	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty"`
+	SchedulerName                 string                 `json:"schedulerName,omitempty"`
+	Scheduling                    *Scheduling            `json:"scheduling,omitempty"`
+	Selector                      *LabelSelector         `json:"selector,omitempty"`
+	ServiceAccountName            string                 `json:"serviceAccountName,omitempty"`
+	State                         string                 `json:"state,omitempty"`
+	StatefulSet                   *StatefulSetConfig     `json:"statefulSet,omitempty"`
+	StatefulSetStatus             *StatefulSetStatus     `json:"statefulSetStatus,omitempty"`
+	Subdomain                     string                 `json:"subdomain,omitempty"`
+	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty"`
+	Transitioning                 string                 `json:"transitioning,omitempty"`
+	TransitioningMessage          string                 `json:"transitioningMessage,omitempty"`
+	Uid                           *int64                 `json:"uid,omitempty"`
+	Uuid                          string                 `json:"uuid,omitempty"`
+	Volumes                       []Volume               `json:"volumes,omitempty"`
 }
 type StatefulSetCollection struct {
 	types.Collection

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/rancher/rke/cluster"
+	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -30,7 +31,7 @@ func ConfigCommand() cli.Command {
 			cli.StringFlag{
 				Name:  "name,n",
 				Usage: "Name of the configuration file",
-				Value: cluster.DefaultClusterConfig,
+				Value: pki.ClusterConfig,
 			},
 			cli.BoolFlag{
 				Name:  "empty,e",

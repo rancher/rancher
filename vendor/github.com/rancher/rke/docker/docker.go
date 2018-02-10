@@ -169,17 +169,19 @@ func pullImage(ctx context.Context, dClient *client.Client, hostname string, con
 	regURL := ref.Domain(containerNamed)
 	if pr, ok := prsMap[regURL]; ok {
 		// We do this if we have some docker.io login information
+		regAuth, err := getRegistryAuth(pr)
+		if err != nil {
+			return err
+		}
 		if pr.URL == DockerRegistryURL {
-			regAuth, err := getRegistryAuth(pr)
-			if err != nil {
-				return err
-			}
 			pullOptions.RegistryAuth = regAuth
 		} else {
 			// We have a registry, but it's not docker.io
 			// this could be public or private, ImagePull() can handle it
 			// if we provide a PrivilegeFunc
+
 			pullOptions.PrivilegeFunc = tryRegistryAuth(pr)
+			pullOptions.RegistryAuth = regAuth
 		}
 	}
 

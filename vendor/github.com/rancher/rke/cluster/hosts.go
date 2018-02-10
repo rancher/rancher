@@ -97,13 +97,13 @@ func (c *Cluster) InvertIndexHosts() error {
 func (c *Cluster) SetUpHosts(ctx context.Context) error {
 	if c.Authentication.Strategy == X509AuthenticationProvider {
 		log.Infof(ctx, "[certificates] Deploying kubernetes certificates to Cluster nodes")
-		hosts := c.getUniqueHostList()
+		hosts := hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts)
 		var errgrp errgroup.Group
 
 		for _, host := range hosts {
 			runHost := host
 			errgrp.Go(func() error {
-				return pki.DeployCertificatesOnPlaneHost(ctx, runHost, c.EtcdHosts, c.Certificates, c.SystemImages.CertDownloader, c.PrivateRegistriesMap)
+				return pki.DeployCertificatesOnPlaneHost(ctx, runHost, c.RancherKubernetesEngineConfig, c.Certificates, c.SystemImages.CertDownloader, c.PrivateRegistriesMap)
 			})
 		}
 		if err := errgrp.Wait(); err != nil {

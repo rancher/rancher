@@ -182,7 +182,7 @@ type MachineDriverCondition struct {
 type MachineDriverSpec struct {
 	DisplayName string `json:"displayName"`
 	Description string `json:"description"`
-	URL         string `json:"url"`
+	URL         string `json:"url" norman:"required"`
 	ExternalID  string `json:"externalId"`
 	Builtin     bool   `json:"builtin"`
 	Active      bool   `json:"active"`
