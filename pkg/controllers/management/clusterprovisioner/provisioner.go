@@ -48,8 +48,8 @@ const (
 type Provisioner struct {
 	ClusterController v3.ClusterController
 	Clusters          v3.ClusterInterface
-	Machines          v3.MachineLister
-	MachineClient     v3.MachineInterface
+	Nodes             v3.NodeLister
+	NodeClient        v3.NodeInterface
 	Driver            service.EngineService
 	EventLogger       event.Logger
 	backoff           *flowcontrol.Backoff
@@ -68,15 +68,15 @@ func Register(management *config.ManagementContext, dialerFactory dialer.Factory
 		}),
 		Clusters:          management.Management.Clusters(""),
 		ClusterController: management.Management.Clusters("").Controller(),
-		Machines:          management.Management.Machines("").Controller().Lister(),
-		MachineClient:     management.Management.Machines(""),
+		Nodes:             management.Management.Nodes("").Controller().Lister(),
+		NodeClient:        management.Management.Nodes(""),
 		EventLogger:       management.EventLogger,
 		backoff:           flowcontrol.NewBackOff(time.Minute, 10*time.Minute),
 	}
 
 	// Add handlers
 	p.Clusters.AddLifecycle("cluster-provisioner-controller", p)
-	management.Management.Machines("").AddHandler("cluster-provisioner-controller", p.machineChanged)
+	management.Management.Nodes("").AddHandler("cluster-provisioner-controller", p.machineChanged)
 
 	local := &RKEDialerFactory{
 		Factory: dialerFactory,
@@ -128,7 +128,7 @@ func (p *Provisioner) Updated(cluster *v3.Cluster) (*v3.Cluster, error) {
 	return cluster, err
 }
 
-func (p *Provisioner) machineChanged(key string, machine *v3.Machine) error {
+func (p *Provisioner) machineChanged(key string, machine *v3.Node) error {
 	if machine == nil {
 		return nil
 	}
@@ -140,14 +140,14 @@ func (p *Provisioner) machineChanged(key string, machine *v3.Machine) error {
 	return nil
 }
 
-func (p *Provisioner) createMachines(cluster *v3.Cluster) (*v3.Cluster, error) {
-	toCreate := map[string]v3.MachineConfig{}
+func (p *Provisioner) createNodes(cluster *v3.Cluster) (*v3.Cluster, error) {
+	toCreate := map[string]v3.NodeConfig{}
 
 	for _, machine := range cluster.Spec.Nodes {
 		toCreate[machine.RequestedHostname] = machine
 	}
 
-	machines, err := p.Machines.List(cluster.Name, labels.Everything())
+	machines, err := p.Nodes.List(cluster.Name, labels.Everything())
 	if err != nil {
 		return nil, err
 	}
@@ -157,15 +157,15 @@ func (p *Provisioner) createMachines(cluster *v3.Cluster) (*v3.Cluster, error) {
 	}
 
 	for _, machine := range toCreate {
-		newMachine := &v3.Machine{}
-		newMachine.GenerateName = "machine-"
-		newMachine.Namespace = cluster.Name
-		newMachine.Spec = machine.MachineSpec
-		newMachine.Spec.ClusterName = cluster.Name
-		newMachine.Labels = machine.Labels
-		newMachine.Annotations = machine.Annotations
+		newNode := &v3.Node{}
+		newNode.GenerateName = "machine-"
+		newNode.Namespace = cluster.Name
+		newNode.Spec = machine.NodeSpec
+		newNode.Spec.ClusterName = cluster.Name
+		newNode.Labels = machine.Labels
+		newNode.Annotations = machine.Annotations
 
-		_, err := p.MachineClient.Create(newMachine)
+		_, err := p.NodeClient.Create(newNode)
 		if err != nil {
 			return nil, err
 		}
@@ -239,8 +239,8 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (bool, 
 		return false, cluster, nil
 	}
 
-	obj, err := v3.ClusterConditionMachinesCreated.DoUntilTrue(cluster, func() (runtime.Object, error) {
-		return p.createMachines(cluster)
+	obj, err := v3.ClusterConditionNodesCreated.DoUntilTrue(cluster, func() (runtime.Object, error) {
+		return p.createNodes(cluster)
 	})
 	if err != nil {
 		return false, obj.(*v3.Cluster), err
@@ -467,7 +467,7 @@ func (p *Provisioner) getSpec(cluster *v3.Cluster) (bool, string, *v3.ClusterSpe
 }
 
 func (p *Provisioner) reconcileRKENodes(clusterName string) (bool, []v3.RKEConfigNode, error) {
-	machines, err := p.Machines.List(clusterName, labels.Everything())
+	machines, err := p.Nodes.List(clusterName, labels.Everything())
 	if err != nil {
 		return false, nil, err
 	}
@@ -488,7 +488,7 @@ func (p *Provisioner) reconcileRKENodes(clusterName string) (bool, []v3.RKEConfi
 			continue
 		}
 
-		if !v3.MachineConditionReady.IsTrue(machine) {
+		if !v3.NodeConditionReady.IsTrue(machine) {
 			continue
 		}
 
@@ -505,8 +505,8 @@ func (p *Provisioner) reconcileRKENodes(clusterName string) (bool, []v3.RKEConfi
 		if len(node.Role) == 0 {
 			node.Role = []string{"worker"}
 		}
-		if node.MachineName == "" {
-			node.MachineName = fmt.Sprintf("%s:%s", machine.Namespace, machine.Name)
+		if node.NodeName == "" {
+			node.NodeName = fmt.Sprintf("%s:%s", machine.Namespace, machine.Name)
 		}
 		nodes = append(nodes, node)
 	}
@@ -516,7 +516,7 @@ func (p *Provisioner) reconcileRKENodes(clusterName string) (bool, []v3.RKEConfi
 	}
 
 	sort.Slice(nodes, func(i, j int) bool {
-		return nodes[i].MachineName < nodes[j].MachineName
+		return nodes[i].NodeName < nodes[j].NodeName
 	})
 
 	return true, nodes, nil

@@ -11,8 +11,8 @@ import (
 )
 
 type StatsAggregator struct {
-	MachinesLister v3.MachineLister
-	Clusters       v3.ClusterInterface
+	NodesLister v3.NodeLister
+	Clusters    v3.ClusterInterface
 }
 
 type ClusterNodeData struct {
@@ -26,11 +26,11 @@ type ClusterNodeData struct {
 
 func Register(management *config.ManagementContext) {
 	clustersClient := management.Management.Clusters("")
-	machinesClient := management.Management.Machines("")
+	machinesClient := management.Management.Nodes("")
 
 	s := &StatsAggregator{
-		MachinesLister: machinesClient.Controller().Lister(),
-		Clusters:       clustersClient,
+		NodesLister: machinesClient.Controller().Lister(),
+		Clusters:    clustersClient,
 	}
 
 	clustersClient.AddHandler("cluster-stats", s.sync)
@@ -46,7 +46,7 @@ func (s *StatsAggregator) sync(key string, cluster *v3.Cluster) error {
 }
 
 func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) error {
-	machines, err := s.MachinesLister.List(cluster.Name, labels.Everything())
+	machines, err := s.NodesLister.List(cluster.Name, labels.Everything())
 	if err != nil {
 		return err
 	}
@@ -122,7 +122,7 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 	return nil
 }
 
-func (s *StatsAggregator) machineChanged(key string, machine *v3.Machine) error {
+func (s *StatsAggregator) machineChanged(key string, machine *v3.Node) error {
 	if machine != nil {
 		s.Clusters.Controller().Enqueue("", machine.Namespace)
 	}

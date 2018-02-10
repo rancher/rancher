@@ -1,4 +1,4 @@
-package machineconfig
+package nodeconfig
 
 import (
 	"archive/tar"

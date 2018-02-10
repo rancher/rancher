@@ -1,4 +1,4 @@
-package machine
+package node
 
 import (
 	"encoding/json"
@@ -12,7 +12,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/encryptedstore"
-	"github.com/rancher/rancher/pkg/machineconfig"
+	"github.com/rancher/rancher/pkg/nodeconfig"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -29,39 +29,39 @@ const (
 )
 
 func Register(management *config.ManagementContext) {
-	secretStore, err := machineconfig.NewStore(management)
+	secretStore, err := nodeconfig.NewStore(management)
 	if err != nil {
 		logrus.Fatal(err)
 	}
 
-	machineClient := management.Management.Machines("")
+	nodeClient := management.Management.Nodes("")
 
-	machineLifecycle := &Lifecycle{
-		secretStore:                  secretStore,
-		machineClient:                machineClient,
-		machineTemplateClient:        management.Management.MachineTemplates(""),
-		machineTemplateGenericClient: management.Management.MachineTemplates("").ObjectClient().UnstructuredClient(),
-		configMapGetter:              management.K8sClient.CoreV1(),
-		logger:                       management.EventLogger,
-		clusterLister:                management.Management.Clusters("").Controller().Lister(),
+	nodeLifecycle := &Lifecycle{
+		secretStore:               secretStore,
+		nodeClient:                nodeClient,
+		nodeTemplateClient:        management.Management.NodeTemplates(""),
+		nodeTemplateGenericClient: management.Management.NodeTemplates("").ObjectClient().UnstructuredClient(),
+		configMapGetter:           management.K8sClient.CoreV1(),
+		logger:                    management.EventLogger,
+		clusterLister:             management.Management.Clusters("").Controller().Lister(),
 	}
 
-	machineClient.AddLifecycle("machine-controller", machineLifecycle)
+	nodeClient.AddLifecycle("node-controller", nodeLifecycle)
 }
 
 type Lifecycle struct {
-	secretStore                  *encryptedstore.GenericEncryptedStore
-	machineTemplateGenericClient *clientbase.ObjectClient
-	machineClient                v3.MachineInterface
-	machineTemplateClient        v3.MachineTemplateInterface
-	configMapGetter              typedv1.ConfigMapsGetter
-	logger                       event.Logger
-	clusterLister                v3.ClusterLister
+	secretStore               *encryptedstore.GenericEncryptedStore
+	nodeTemplateGenericClient *clientbase.ObjectClient
+	nodeClient                v3.NodeInterface
+	nodeTemplateClient        v3.NodeTemplateInterface
+	configMapGetter           typedv1.ConfigMapsGetter
+	logger                    event.Logger
+	clusterLister             v3.ClusterLister
 }
 
-func (m *Lifecycle) setupCustom(obj *v3.Machine) {
+func (m *Lifecycle) setupCustom(obj *v3.Node) {
 	obj.Status.NodeConfig = &v3.RKEConfigNode{
-		MachineName:      obj.Spec.ClusterName + ":" + obj.Name,
+		NodeName:         obj.Spec.ClusterName + ":" + obj.Name,
 		Role:             obj.Spec.Role,
 		HostnameOverride: obj.Spec.RequestedHostname,
 		Address:          obj.Spec.CustomConfig.Address,
@@ -77,48 +77,48 @@ func (m *Lifecycle) setupCustom(obj *v3.Machine) {
 	}
 }
 
-func isCustom(obj *v3.Machine) bool {
+func isCustom(obj *v3.Node) bool {
 	return obj.Spec.CustomConfig != nil && obj.Spec.CustomConfig.Address != ""
 }
 
-func (m *Lifecycle) Create(obj *v3.Machine) (*v3.Machine, error) {
+func (m *Lifecycle) Create(obj *v3.Node) (*v3.Node, error) {
 	if isCustom(obj) {
 		m.setupCustom(obj)
-		newObj, err := v3.MachineConditionInitialized.Once(obj, func() (runtime.Object, error) {
+		newObj, err := v3.NodeConditionInitialized.Once(obj, func() (runtime.Object, error) {
 			if err := validateCustomHost(obj); err != nil {
 				return obj, err
 			}
 			return obj, nil
 		})
-		return newObj.(*v3.Machine), err
+		return newObj.(*v3.Node), err
 	}
 
-	if obj.Spec.MachineTemplateName == "" {
+	if obj.Spec.NodeTemplateName == "" {
 		return obj, nil
 	}
 
-	newObj, err := v3.MachineConditionInitialized.Once(obj, func() (runtime.Object, error) {
-		template, err := m.machineTemplateClient.Get(obj.Spec.MachineTemplateName, metav1.GetOptions{})
+	newObj, err := v3.NodeConditionInitialized.Once(obj, func() (runtime.Object, error) {
+		template, err := m.nodeTemplateClient.Get(obj.Spec.NodeTemplateName, metav1.GetOptions{})
 		if err != nil {
 			return obj, err
 		}
-		obj.Status.MachineTemplateSpec = &template.Spec
+		obj.Status.NodeTemplateSpec = &template.Spec
 		if obj.Spec.RequestedHostname == "" {
 			obj.Spec.RequestedHostname = obj.Name
 		}
 
-		if obj.Status.MachineTemplateSpec.EngineInstallURL == "" {
-			obj.Status.MachineTemplateSpec.EngineInstallURL = defaultEngineInstallURL
+		if obj.Status.NodeTemplateSpec.EngineInstallURL == "" {
+			obj.Status.NodeTemplateSpec.EngineInstallURL = defaultEngineInstallURL
 		}
 
-		rawTemplate, err := m.machineTemplateGenericClient.Get(obj.Spec.MachineTemplateName, metav1.GetOptions{})
+		rawTemplate, err := m.nodeTemplateGenericClient.Get(obj.Spec.NodeTemplateName, metav1.GetOptions{})
 		if err != nil {
 			return obj, err
 		}
 
 		rawConfig, ok := values.GetValue(rawTemplate.(*unstructured.Unstructured).Object, template.Spec.Driver+"Config")
 		if !ok {
-			return obj, fmt.Errorf("machine config not specified")
+			return obj, fmt.Errorf("node config not specified")
 		}
 
 		sshUser, ok := convert.ToMapInterface(rawConfig)["sshUser"]
@@ -132,18 +132,18 @@ func (m *Lifecycle) Create(obj *v3.Machine) (*v3.Machine, error) {
 
 		bytes, err := json.Marshal(rawConfig)
 		if err != nil {
-			return obj, errors.Wrap(err, "failed to marshal machine driver confg")
+			return obj, errors.Wrap(err, "failed to marshal node driver confg")
 		}
 
-		obj.Status.MachineDriverConfig = string(bytes)
+		obj.Status.NodeDriverConfig = string(bytes)
 		return obj, nil
 	})
 
-	return newObj.(*v3.Machine), err
+	return newObj.(*v3.Node), err
 }
 
-func (m *Lifecycle) Remove(obj *v3.Machine) (*v3.Machine, error) {
-	if obj.Status.MachineTemplateSpec == nil {
+func (m *Lifecycle) Remove(obj *v3.Node) (*v3.Node, error) {
+	if obj.Status.NodeTemplateSpec == nil {
 		return obj, nil
 	}
 	found, err := m.isNodeInAppliedSpec(obj)
@@ -151,9 +151,9 @@ func (m *Lifecycle) Remove(obj *v3.Machine) (*v3.Machine, error) {
 		return obj, err
 	}
 	if found {
-		return obj, fmt.Errorf("Machine [%s] still not deleted from cluster spec", obj.Name)
+		return obj, fmt.Errorf("Node [%s] still not deleted from cluster spec", obj.Name)
 	}
-	config, err := machineconfig.NewMachineConfig(m.secretStore, obj)
+	config, err := nodeconfig.NewNodeConfig(m.secretStore, obj)
 	if err != nil {
 		return obj, err
 	}
@@ -162,37 +162,37 @@ func (m *Lifecycle) Remove(obj *v3.Machine) (*v3.Machine, error) {
 	}
 	defer config.Remove()
 
-	mExists, err := machineExists(config.Dir(), obj.Spec.RequestedHostname)
+	mExists, err := nodeExists(config.Dir(), obj.Spec.RequestedHostname)
 	if err != nil {
 		return obj, err
 	}
 
 	if mExists {
-		m.logger.Infof(obj, "Removing machine %s", obj.Spec.RequestedHostname)
-		if err := deleteMachine(config.Dir(), obj); err != nil {
+		m.logger.Infof(obj, "Removing node %s", obj.Spec.RequestedHostname)
+		if err := deleteNode(config.Dir(), obj); err != nil {
 			return obj, err
 		}
-		m.logger.Infof(obj, "Removing machine %s done", obj.Spec.RequestedHostname)
+		m.logger.Infof(obj, "Removing node %s done", obj.Spec.RequestedHostname)
 	}
 
 	return obj, nil
 }
 
-func (m *Lifecycle) provision(machineDir string, obj *v3.Machine) (*v3.Machine, error) {
+func (m *Lifecycle) provision(nodeDir string, obj *v3.Node) (*v3.Node, error) {
 	configRawMap := map[string]interface{}{}
-	if err := json.Unmarshal([]byte(obj.Status.MachineDriverConfig), &configRawMap); err != nil {
-		return obj, errors.Wrap(err, "failed to unmarshal machine config")
+	if err := json.Unmarshal([]byte(obj.Status.NodeDriverConfig), &configRawMap); err != nil {
+		return obj, errors.Wrap(err, "failed to unmarshal node config")
 	}
 
 	// Since we know this will take a long time persist so user sees status
-	obj, err := m.machineClient.Update(obj)
+	obj, err := m.nodeClient.Update(obj)
 	if err != nil {
 		return obj, err
 	}
 
 	createCommandsArgs := buildCreateCommand(obj, configRawMap)
-	cmd := buildCommand(machineDir, createCommandsArgs)
-	m.logger.Infof(obj, "Provisioning machine %s", obj.Spec.RequestedHostname)
+	cmd := buildCommand(nodeDir, createCommandsArgs)
+	m.logger.Infof(obj, "Provisioning node %s", obj.Spec.RequestedHostname)
 
 	stdoutReader, stderrReader, err := startReturnOutput(cmd)
 	if err != nil {
@@ -217,12 +217,12 @@ func (m *Lifecycle) provision(machineDir string, obj *v3.Machine) (*v3.Machine, 
 		return obj, err
 	}
 
-	m.logger.Infof(obj, "Provisioning machine %s done", obj.Spec.RequestedHostname)
+	m.logger.Infof(obj, "Provisioning node %s done", obj.Spec.RequestedHostname)
 	return obj, nil
 }
 
-func (m *Lifecycle) ready(obj *v3.Machine) (*v3.Machine, error) {
-	config, err := machineconfig.NewMachineConfig(m.secretStore, obj)
+func (m *Lifecycle) ready(obj *v3.Node) (*v3.Node, error) {
+	config, err := nodeconfig.NewNodeConfig(m.secretStore, obj)
 	if err != nil {
 		return obj, err
 	}
@@ -235,10 +235,10 @@ func (m *Lifecycle) ready(obj *v3.Machine) (*v3.Machine, error) {
 	// Provision in the background so we can poll and save the config
 	done := make(chan error)
 	go func() {
-		newObj, err := v3.MachineConditionProvisioned.Once(obj, func() (runtime.Object, error) {
+		newObj, err := v3.NodeConditionProvisioned.Once(obj, func() (runtime.Object, error) {
 			return m.provision(config.Dir(), obj)
 		})
-		obj = newObj.(*v3.Machine)
+		obj = newObj.(*v3.Node)
 		done <- err
 	}()
 
@@ -253,31 +253,31 @@ outer:
 		}
 	}
 
-	newObj, saveError := v3.MachineConditionConfigSaved.Once(obj, func() (runtime.Object, error) {
+	newObj, saveError := v3.NodeConditionConfigSaved.Once(obj, func() (runtime.Object, error) {
 		return m.saveConfig(config, config.Dir(), obj)
 	})
-	obj = newObj.(*v3.Machine)
+	obj = newObj.(*v3.Node)
 	if err == nil {
 		return obj, saveError
 	}
 	return obj, err
 }
 
-func (m *Lifecycle) Updated(obj *v3.Machine) (*v3.Machine, error) {
-	if obj.Status.MachineTemplateSpec == nil {
+func (m *Lifecycle) Updated(obj *v3.Node) (*v3.Node, error) {
+	if obj.Status.NodeTemplateSpec == nil {
 		return obj, nil
 	}
 
-	newObj, err := v3.MachineConditionReady.Once(obj, func() (runtime.Object, error) {
+	newObj, err := v3.NodeConditionReady.Once(obj, func() (runtime.Object, error) {
 		return m.ready(obj)
 	})
-	obj = newObj.(*v3.Machine)
+	obj = newObj.(*v3.Node)
 
 	return obj, err
 }
 
-func (m *Lifecycle) saveConfig(config *machineconfig.MachineConfig, machineDir string, obj *v3.Machine) (*v3.Machine, error) {
-	logrus.Infof("Generating and uploading machine config %s", obj.Spec.RequestedHostname)
+func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, obj *v3.Node) (*v3.Node, error) {
+	logrus.Infof("Generating and uploading node config %s", obj.Spec.RequestedHostname)
 	if err := config.Save(); err != nil {
 		return obj, err
 	}
@@ -292,7 +292,7 @@ func (m *Lifecycle) saveConfig(config *machineconfig.MachineConfig, machineDir s
 		return obj, err
 	}
 
-	sshKey, err := getSSHKey(machineDir, obj)
+	sshKey, err := getSSHKey(nodeDir, obj)
 	if err != nil {
 		return obj, err
 	}
@@ -302,7 +302,7 @@ func (m *Lifecycle) saveConfig(config *machineconfig.MachineConfig, machineDir s
 	}
 
 	obj.Status.NodeConfig = &v3.RKEConfigNode{
-		MachineName:      obj.Spec.ClusterName + ":" + obj.Name,
+		NodeName:         obj.Spec.ClusterName + ":" + obj.Name,
 		Address:          ip,
 		InternalAddress:  interalAddress,
 		User:             obj.Status.SSHUser,
@@ -318,8 +318,8 @@ func (m *Lifecycle) saveConfig(config *machineconfig.MachineConfig, machineDir s
 	return obj, nil
 }
 
-func (m *Lifecycle) isNodeInAppliedSpec(machine *v3.Machine) (bool, error) {
-	cluster, err := m.clusterLister.Get("", machine.Spec.ClusterName)
+func (m *Lifecycle) isNodeInAppliedSpec(node *v3.Node) (bool, error) {
+	cluster, err := m.clusterLister.Get("", node.Spec.ClusterName)
 	if err != nil {
 		if kerror.IsNotFound(err) {
 			return false, nil
@@ -336,19 +336,19 @@ func (m *Lifecycle) isNodeInAppliedSpec(machine *v3.Machine) (bool, error) {
 		return false, nil
 	}
 
-	for _, node := range cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.Nodes {
-		machineName := node.MachineName
-		if len(machineName) == 0 {
+	for _, rkeNode := range cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.Nodes {
+		nodeName := rkeNode.NodeName
+		if len(nodeName) == 0 {
 			continue
 		}
-		if machineName == fmt.Sprintf("%s:%s", machine.Namespace, machine.Name) {
+		if nodeName == fmt.Sprintf("%s:%s", node.Namespace, node.Name) {
 			return true, nil
 		}
 	}
 	return false, nil
 }
 
-func validateCustomHost(obj *v3.Machine) error {
+func validateCustomHost(obj *v3.Node) error {
 	if obj.Spec.CustomConfig != nil && obj.Spec.CustomConfig.Address != "" {
 		customConfig := obj.Spec.CustomConfig
 		signer, err := ssh.ParsePrivateKey([]byte(customConfig.SSHKey))

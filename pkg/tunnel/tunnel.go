@@ -38,8 +38,8 @@ func newAuthorizer(context *config.ManagementContext) remotedialer.Authorizer {
 	auth := &Authorizer{
 		crtIndexer:    context.Management.ClusterRegistrationTokens("").Controller().Informer().GetIndexer(),
 		clusterLister: context.Management.Clusters("").Controller().Lister(),
-		machineLister: context.Management.Machines("").Controller().Lister(),
-		machines:      context.Management.Machines(""),
+		machineLister: context.Management.Nodes("").Controller().Lister(),
+		machines:      context.Management.Nodes(""),
 	}
 	context.Management.ClusterRegistrationTokens("").Controller().Informer().AddIndexers(map[string]cache.IndexFunc{
 		crtKeyIndex: auth.crtIndex,
@@ -50,8 +50,8 @@ func newAuthorizer(context *config.ManagementContext) remotedialer.Authorizer {
 type Authorizer struct {
 	crtIndexer    cache.Indexer
 	clusterLister v3.ClusterLister
-	machineLister v3.MachineLister
-	machines      v3.MachineInterface
+	machineLister v3.NodeLister
+	machines      v3.NodeInterface
 }
 
 func (t *Authorizer) authorize(req *http.Request) (string, bool, error) {
@@ -65,16 +65,16 @@ func (t *Authorizer) authorize(req *http.Request) (string, bool, error) {
 		return "", false, err
 	}
 
-	inMachine, err := t.readMachine(cluster, req)
+	inNode, err := t.readNode(cluster, req)
 	if err != nil {
 		return "", false, err
 	}
 
-	machineName := machineName(inMachine)
+	machineName := machineName(inNode)
 
 	machine, err := t.machineLister.Get(cluster.Name, machineName)
 	if apierrors.IsNotFound(err) {
-		machine, err = t.createMachine(inMachine, cluster, req)
+		machine, err = t.createNode(inNode, cluster, req)
 		if err != nil {
 			return "", false, err
 		}
@@ -85,8 +85,8 @@ func (t *Authorizer) authorize(req *http.Request) (string, bool, error) {
 	return machine.Name, true, nil
 }
 
-func (t *Authorizer) createMachine(inMachine *client.Machine, cluster *v3.Cluster, req *http.Request) (*v3.Machine, error) {
-	customConfig := t.toCustomConfig(inMachine)
+func (t *Authorizer) createNode(inNode *client.Node, cluster *v3.Cluster, req *http.Request) (*v3.Node, error) {
+	customConfig := t.toCustomConfig(inNode)
 	if customConfig == nil {
 		return nil, errors.New("invalid input, missing custom config")
 	}
@@ -95,17 +95,17 @@ func (t *Authorizer) createMachine(inMachine *client.Machine, cluster *v3.Cluste
 		return nil, errors.New("invalid input, address empty")
 	}
 
-	name := machineName(inMachine)
+	name := machineName(inNode)
 
-	machine := &v3.Machine{
+	machine := &v3.Node{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      name,
 			Namespace: cluster.Name,
 		},
-		Spec: v3.MachineSpec{
+		Spec: v3.NodeSpec{
 			ClusterName:       cluster.Name,
-			RequestedHostname: inMachine.RequestedHostname,
-			Role:              inMachine.Role,
+			RequestedHostname: inNode.RequestedHostname,
+			Role:              inNode.Role,
 			CustomConfig:      customConfig,
 			Imported:          true,
 		},
@@ -114,27 +114,27 @@ func (t *Authorizer) createMachine(inMachine *client.Machine, cluster *v3.Cluste
 	return t.machines.Create(machine)
 }
 
-func (t *Authorizer) readMachine(cluster *v3.Cluster, req *http.Request) (*client.Machine, error) {
+func (t *Authorizer) readNode(cluster *v3.Cluster, req *http.Request) (*client.Node, error) {
 	params := req.Header.Get(Params)
-	var inMachine client.Machine
+	var inNode client.Node
 
 	bytes, err := base64.StdEncoding.DecodeString(params)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := json.Unmarshal(bytes, &inMachine); err != nil {
+	if err := json.Unmarshal(bytes, &inNode); err != nil {
 		return nil, err
 	}
 
-	if inMachine.RequestedHostname == "" {
+	if inNode.RequestedHostname == "" {
 		return nil, errors.New("invalid input, hostname empty")
 	}
 
-	return &inMachine, nil
+	return &inNode, nil
 }
 
-func machineName(machine *client.Machine) string {
+func machineName(machine *client.Node) string {
 	digest := md5.Sum([]byte(machine.RequestedHostname))
 	return "m-" + hex.EncodeToString(digest[:])[:12]
 }
@@ -158,7 +158,7 @@ func (t *Authorizer) crtIndex(obj interface{}) ([]string, error) {
 	return []string{crt.Status.Token}, nil
 }
 
-func (t *Authorizer) toCustomConfig(machine *client.Machine) *v3.CustomConfig {
+func (t *Authorizer) toCustomConfig(machine *client.Node) *v3.CustomConfig {
 	if machine == nil || machine.CustomConfig == nil {
 		return nil
 	}

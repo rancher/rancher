@@ -7,7 +7,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
-func (f *factory) sshDialer(machine *v3.Machine) (Dialer, error) {
+func (f *factory) sshDialer(machine *v3.Node) (Dialer, error) {
 	if machine.Status.NodeConfig == nil {
 		return nil, fmt.Errorf("waiting to provision %s", machine.Name)
 	}
@@ -22,7 +22,7 @@ func (f *factory) sshDialer(machine *v3.Machine) (Dialer, error) {
 	return sshFactory, nil
 }
 
-func (f *factory) sshLocalDialer(machine *v3.Machine) (Dialer, error) {
+func (f *factory) sshLocalDialer(machine *v3.Node) (Dialer, error) {
 	if machine.Status.NodeConfig == nil {
 		return nil, fmt.Errorf("waiting to provision %s", machine.Name)
 	}

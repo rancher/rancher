@@ -15,13 +15,13 @@ type RKEDialerFactory struct {
 }
 
 func (t *RKEDialerFactory) Build(h *hosts.Host) (func(network, address string) (net.Conn, error), error) {
-	if h.MachineName == "" {
+	if h.NodeName == "" {
 		return hosts.SSHFactory(h)
 	}
 
-	parts := strings.SplitN(h.MachineName, ":", 2)
+	parts := strings.SplitN(h.NodeName, ":", 2)
 	if len(parts) != 2 {
-		return nil, fmt.Errorf("invalid name reference %s", h.MachineName)
+		return nil, fmt.Errorf("invalid name reference %s", h.NodeName)
 	}
 
 	if t.Docker {

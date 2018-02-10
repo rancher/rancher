@@ -1,4 +1,4 @@
-package machineconfig
+package nodeconfig
 
 import (
 	"os"
@@ -18,7 +18,7 @@ const (
 	defaultCattleHome = "./management-state"
 )
 
-type MachineConfig struct {
+type NodeConfig struct {
 	store   *encryptedstore.GenericEncryptedStore
 	baseDir string
 	id      string
@@ -30,41 +30,41 @@ func NewStore(management *config.ManagementContext) (*encryptedstore.GenericEncr
 		management.K8sClient.CoreV1())
 }
 
-func NewMachineConfig(store *encryptedstore.GenericEncryptedStore, machine *v3.Machine) (*MachineConfig, error) {
-	machineDir, err := buildBaseHostDir(machine.Spec.RequestedHostname)
+func NewNodeConfig(store *encryptedstore.GenericEncryptedStore, node *v3.Node) (*NodeConfig, error) {
+	nodeDir, err := buildBaseHostDir(node.Spec.RequestedHostname)
 	if err != nil {
 		return nil, err
 	}
-	logrus.Debugf("Created machine storage directory %s", machineDir)
+	logrus.Debugf("Created node storage directory %s", nodeDir)
 
-	return &MachineConfig{
+	return &NodeConfig{
 		store:   store,
-		id:      machine.Name,
-		baseDir: machineDir,
+		id:      node.Name,
+		baseDir: nodeDir,
 	}, nil
 }
 
-func (m *MachineConfig) Dir() string {
+func (m *NodeConfig) Dir() string {
 	return m.baseDir
 }
 
-func (m *MachineConfig) Cleanup() error {
+func (m *NodeConfig) Cleanup() error {
 	return os.RemoveAll(m.baseDir)
 }
 
-func (m *MachineConfig) Remove() error {
+func (m *NodeConfig) Remove() error {
 	m.Cleanup()
 	return m.store.Remove(m.id)
 }
 
-func (m *MachineConfig) TLSConfig() (*TLSConfig, error) {
+func (m *NodeConfig) TLSConfig() (*TLSConfig, error) {
 	if err := m.loadConfig(); err != nil {
 		return nil, err
 	}
 	return extractTLS(m.cm[configKey])
 }
 
-func (m *MachineConfig) IP() (string, error) {
+func (m *NodeConfig) IP() (string, error) {
 	config, err := m.getConfig()
 	if err != nil {
 		return "", err
@@ -73,7 +73,7 @@ func (m *MachineConfig) IP() (string, error) {
 	return convert.ToString(values.GetValueN(config, "Driver", "IPAddress")), nil
 }
 
-func (m *MachineConfig) InternalIP() (string, error) {
+func (m *NodeConfig) InternalIP() (string, error) {
 	config, err := m.getConfig()
 	if err != nil {
 		return "", err
@@ -82,7 +82,7 @@ func (m *MachineConfig) InternalIP() (string, error) {
 	return convert.ToString(values.GetValueN(config, "Driver", "PrivateIPAddress")), nil
 }
 
-func (m *MachineConfig) Save() error {
+func (m *NodeConfig) Save() error {
 	extractedConfig, err := compressConfig(m.baseDir)
 	if err != nil {
 		return err
@@ -106,7 +106,7 @@ func (m *MachineConfig) Save() error {
 	return nil
 }
 
-func (m *MachineConfig) Restore() error {
+func (m *NodeConfig) Restore() error {
 	if err := m.loadConfig(); err != nil {
 		return err
 	}
@@ -119,7 +119,7 @@ func (m *MachineConfig) Restore() error {
 	return extractConfig(m.baseDir, data)
 }
 
-func (m *MachineConfig) loadConfig() error {
+func (m *NodeConfig) loadConfig() error {
 	if m.cm != nil {
 		return nil
 	}
@@ -137,7 +137,7 @@ func (m *MachineConfig) loadConfig() error {
 	return nil
 }
 
-func (m *MachineConfig) getConfigMap() (map[string]string, error) {
+func (m *NodeConfig) getConfigMap() (map[string]string, error) {
 	configMap, err := m.store.Get(m.id)
 	if errors.IsNotFound(err) {
 		return nil, nil
@@ -149,7 +149,7 @@ func (m *MachineConfig) getConfigMap() (map[string]string, error) {
 	return configMap, nil
 }
 
-func (m *MachineConfig) getConfig() (map[string]interface{}, error) {
+func (m *NodeConfig) getConfig() (map[string]interface{}, error) {
 	if err := m.loadConfig(); err != nil {
 		return nil, err
 	}
@@ -162,9 +162,9 @@ func (m *MachineConfig) getConfig() (map[string]interface{}, error) {
 	return extractConfigJSON(data)
 }
 
-func buildBaseHostDir(machineName string) (string, error) {
-	machineDir := filepath.Join(getWorkDir(), "machines", machineName)
-	return machineDir, os.MkdirAll(machineDir, 0740)
+func buildBaseHostDir(nodeName string) (string, error) {
+	nodeDir := filepath.Join(getWorkDir(), "nodes", nodeName)
+	return nodeDir, os.MkdirAll(nodeDir, 0740)
 }
 
 func getWorkDir() string {
@@ -175,5 +175,5 @@ func getWorkDir() string {
 	if workDir == "" {
 		workDir = defaultCattleHome
 	}
-	return filepath.Join(workDir, "machine")
+	return filepath.Join(workDir, "node")
 }

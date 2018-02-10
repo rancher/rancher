@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/encryptedstore"
-	"github.com/rancher/rancher/pkg/machineconfig"
+	"github.com/rancher/rancher/pkg/nodeconfig"
 	"github.com/rancher/rancher/pkg/remotedialer"
 	"github.com/rancher/rancher/pkg/tunnel"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -18,20 +18,20 @@ func NewFactory(management *config.ManagementContext, tunneler *remotedialer.Ser
 		tunneler = tunnel.NewTunneler(management)
 	}
 
-	secretStore, err := machineconfig.NewStore(management)
+	secretStore, err := nodeconfig.NewStore(management)
 	if err != nil {
 		return nil, err
 	}
 
 	return &factory{
-		machineLister: management.Management.Machines("").Controller().Lister(),
+		machineLister: management.Management.Nodes("").Controller().Lister(),
 		tunneler:      tunneler,
 		store:         secretStore,
 	}, nil
 }
 
 type factory struct {
-	machineLister v3.MachineLister
+	machineLister v3.NodeLister
 	tunneler      *remotedialer.Server
 	store         *encryptedstore.GenericEncryptedStore
 }
@@ -57,7 +57,7 @@ func (f *factory) DockerDialer(clusterName, machineName string) (Dialer, error) 
 		return f.sshDialer(machine)
 	}
 
-	if machine.Spec.MachineTemplateName != "" {
+	if machine.Spec.NodeTemplateName != "" {
 		return f.tlsDialer(machine)
 	}
 
@@ -80,7 +80,7 @@ func (f *factory) NodeDialer(clusterName, machineName string) (Dialer, error) {
 		return f.sshLocalDialer(machine)
 	}
 
-	if machine.Spec.MachineTemplateName != "" {
+	if machine.Spec.NodeTemplateName != "" {
 		return f.sshLocalDialer(machine)
 	}
 

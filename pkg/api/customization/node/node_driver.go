@@ -1,4 +1,4 @@
-package machine
+package node
 
 import (
 	"archive/tar"
@@ -26,11 +26,11 @@ const (
 )
 
 type DriverHandlers struct {
-	MachineDriverClient v3.MachineDriverInterface
+	NodeDriverClient v3.NodeDriverInterface
 }
 
 func (h *DriverHandlers) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
-	m, err := h.MachineDriverClient.GetNamespaced("", apiContext.ID, metav1.GetOptions{})
+	m, err := h.NodeDriverClient.GetNamespaced("", apiContext.ID, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -38,13 +38,13 @@ func (h *DriverHandlers) ActionHandler(actionName string, action *types.Action, 
 	switch actionName {
 	case "activate":
 		m.Spec.Active = true
-		v3.MachineDriverConditionActive.Unknown(m)
+		v3.NodeDriverConditionActive.Unknown(m)
 	case "deactivate":
 		m.Spec.Active = false
-		v3.MachineDriverConditionInactive.Unknown(m)
+		v3.NodeDriverConditionInactive.Unknown(m)
 	}
 
-	_, err = h.MachineDriverClient.Update(m)
+	_, err = h.NodeDriverClient.Update(m)
 	if err != nil {
 		return err
 	}
@@ -58,7 +58,7 @@ func (h *DriverHandlers) ActionHandler(actionName string, action *types.Action, 
 	return nil
 }
 
-// Formatter for MachineDriver
+// Formatter for NodeDriver
 func (h *DriverHandlers) Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(apiContext, "activate")
 	resource.AddAction(apiContext, "deactivate")
@@ -69,7 +69,7 @@ type Handler struct {
 }
 
 func (h Handler) LinkHandler(apiContext *types.APIContext, next types.RequestHandler) error {
-	var machine client.Machine
+	var machine client.Node
 	if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, &machine); err != nil {
 		return err
 	}
@@ -140,11 +140,11 @@ func (h Handler) LinkHandler(apiContext *types.APIContext, next types.RequestHan
 	return nil
 }
 
-// Formatter for Machine
+// Formatter for Node
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
-	roles := convert.ToStringSlice(resource.Values[client.MachineFieldRole])
+	roles := convert.ToStringSlice(resource.Values[client.NodeFieldRole])
 	if len(roles) == 0 {
-		resource.Values[client.MachineFieldRole] = []string{"worker"}
+		resource.Values[client.NodeFieldRole] = []string{"worker"}
 	}
 
 	// add machineConfig action

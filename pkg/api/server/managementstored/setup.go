@@ -13,7 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/catalog"
 	apicluster "github.com/rancher/rancher/pkg/api/customization/cluster"
 	"github.com/rancher/rancher/pkg/api/customization/logging"
-	"github.com/rancher/rancher/pkg/api/customization/machine"
+	"github.com/rancher/rancher/pkg/api/customization/node"
 	"github.com/rancher/rancher/pkg/api/customization/setting"
 	"github.com/rancher/rancher/pkg/api/store/cert"
 	"github.com/rancher/rancher/pkg/api/store/cluster"
@@ -21,7 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/store/scoped"
 	"github.com/rancher/rancher/pkg/auth/principals"
 	"github.com/rancher/rancher/pkg/auth/providers"
-	"github.com/rancher/rancher/pkg/machineconfig"
+	"github.com/rancher/rancher/pkg/nodeconfig"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	projectschema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	"github.com/rancher/types/client/management/v3"
@@ -50,9 +50,9 @@ func Setup(ctx context.Context, management *config.ManagementContext) error {
 		client.GroupMemberType,
 		client.GroupType,
 		client.ListenConfigType,
-		client.MachineType,
-		client.MachineDriverType,
-		client.MachineTemplateType,
+		client.NodeType,
+		client.NodeDriverType,
+		client.NodeTemplateType,
 		client.PodSecurityPolicyTemplateType,
 		client.PreferenceType,
 		client.ProjectLoggingType,
@@ -81,7 +81,7 @@ func Setup(ctx context.Context, management *config.ManagementContext) error {
 	ClusterRegistrationTokens(schemas)
 	LoggingTypes(schemas, management)
 
-	if err := MachineTypes(schemas, management); err != nil {
+	if err := NodeTypes(schemas, management); err != nil {
 		return err
 	}
 
@@ -192,28 +192,28 @@ func Preference(schemas *types.Schemas, management *config.ManagementContext) {
 	schema.Store = preference.NewStore(management.Core.Namespaces(""), schema.Store)
 }
 
-func MachineTypes(schemas *types.Schemas, management *config.ManagementContext) error {
-	secretStore, err := machineconfig.NewStore(management)
+func NodeTypes(schemas *types.Schemas, management *config.ManagementContext) error {
+	secretStore, err := nodeconfig.NewStore(management)
 	if err != nil {
 		return err
 	}
 
-	schema := schemas.Schema(&managementschema.Version, client.MachineDriverType)
-	machineDriverHandlers := &machine.DriverHandlers{
-		MachineDriverClient: management.Management.MachineDrivers(""),
+	schema := schemas.Schema(&managementschema.Version, client.NodeDriverType)
+	machineDriverHandlers := &node.DriverHandlers{
+		NodeDriverClient: management.Management.NodeDrivers(""),
 	}
 	schema.Formatter = machineDriverHandlers.Formatter
 	schema.ActionHandler = machineDriverHandlers.ActionHandler
 
-	machineHandler := &machine.Handler{
+	machineHandler := &node.Handler{
 		SecretStore: secretStore,
 	}
 
-	schema = schemas.Schema(&managementschema.Version, client.MachineType)
-	schema.Formatter = machine.Formatter
+	schema = schemas.Schema(&managementschema.Version, client.NodeType)
+	schema.Formatter = node.Formatter
 	schema.LinkHandler = machineHandler.LinkHandler
 
-	schema = schemas.Schema(&managementschema.Version, client.MachineConfigType)
+	schema = schemas.Schema(&managementschema.Version, client.NodeConfigType)
 
 	return nil
 }

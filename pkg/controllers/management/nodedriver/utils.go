@@ -1,4 +1,4 @@
-package machinedriver
+package nodedriver
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/docker/machine/libmachine/drivers/plugin/localbinary"
-	rpcdriver "github.com/docker/machine/libmachine/drivers/rpc"
+	"github.com/docker/machine/libmachine/drivers/rpc"
 	cli "github.com/docker/machine/libmachine/mcnflag"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -74,10 +74,10 @@ func isPassword(key string) bool {
 	return ok
 }
 
-func toLowerCamelCase(machineFlagName string) (string, error) {
-	parts := strings.SplitN(machineFlagName, "-", 2)
+func toLowerCamelCase(nodeFlagName string) (string, error) {
+	parts := strings.SplitN(nodeFlagName, "-", 2)
 	if len(parts) != 2 {
-		return "", fmt.Errorf("parameter %s does not follow expected naming convention [DRIVER]-[FLAG-NAME]", machineFlagName)
+		return "", fmt.Errorf("parameter %s does not follow expected naming convention [DRIVER]-[FLAG-NAME]", nodeFlagName)
 	}
 	flagNameParts := strings.Split(parts[1], "-")
 	flagName := flagNameParts[0]
