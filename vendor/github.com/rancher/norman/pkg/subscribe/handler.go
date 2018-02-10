@@ -34,14 +34,10 @@ func Handler(apiContext *types.APIContext, _ types.RequestHandler) error {
 }
 
 func getMatchingSchemas(apiContext *types.APIContext) []*types.Schema {
-	apiVersions := apiContext.Request.URL.Query()["apiVersions"]
 	resourceTypes := apiContext.Request.URL.Query()["resourceTypes"]
 
 	var schemas []*types.Schema
-	for _, schema := range apiContext.Schemas.Schemas() {
-		if !matches(apiVersions, schema.Version.Path) {
-			continue
-		}
+	for _, schema := range apiContext.Schemas.SchemasForVersion(*apiContext.Version) {
 		if !matches(resourceTypes, schema.ID) {
 			continue
 		}
@@ -151,8 +147,13 @@ func streamStore(ctx context.Context, eg *errgroup.Group, apiContext *types.APIC
 		opts := parse.QueryOptions(apiContext, schema)
 		events, err := schema.Store.Watch(apiContext, schema, &opts)
 		if err != nil || events == nil {
+			if err != nil {
+				logrus.Errorf("failed on subscribe %s: %v", schema.ID, err)
+			}
 			return err
 		}
+
+		logrus.Debugf("watching %s", schema.ID)
 
 		for e := range events {
 			result <- e

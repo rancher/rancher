@@ -8,6 +8,8 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
+	"github.com/sirupsen/logrus"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,8 +30,57 @@ var (
 	}
 )
 
+type ClientGetter interface {
+	Config(apiContext *types.APIContext, context types.StorageContext) (rest.Config, error)
+	UnversionedClient(apiContext *types.APIContext, context types.StorageContext) (rest.Interface, error)
+	APIExtClient(apiContext *types.APIContext, context types.StorageContext) (clientset.Interface, error)
+}
+
+type simpleClientGetter struct {
+	restConfig   rest.Config
+	client       rest.Interface
+	apiExtClient clientset.Interface
+}
+
+func NewClientGetterFromConfig(config rest.Config) (ClientGetter, error) {
+	dynamicConfig := config
+	if dynamicConfig.NegotiatedSerializer == nil {
+		configConfig := dynamic.ContentConfig()
+		dynamicConfig.NegotiatedSerializer = configConfig.NegotiatedSerializer
+	}
+
+	unversionedClient, err := rest.UnversionedRESTClientFor(&dynamicConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	apiExtClient, err := clientset.NewForConfig(&dynamicConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return &simpleClientGetter{
+		restConfig:   config,
+		client:       unversionedClient,
+		apiExtClient: apiExtClient,
+	}, nil
+}
+
+func (s *simpleClientGetter) Config(apiContext *types.APIContext, context types.StorageContext) (rest.Config, error) {
+	return s.restConfig, nil
+}
+
+func (s *simpleClientGetter) UnversionedClient(apiContext *types.APIContext, context types.StorageContext) (rest.Interface, error) {
+	return s.client, nil
+}
+
+func (s *simpleClientGetter) APIExtClient(apiContext *types.APIContext, context types.StorageContext) (clientset.Interface, error) {
+	return s.apiExtClient, nil
+}
+
 type Store struct {
-	k8sClient      rest.Interface
+	clientGetter   ClientGetter
+	storageContext types.StorageContext
 	prefix         []string
 	group          string
 	version        string
@@ -38,11 +89,12 @@ type Store struct {
 	authContext    map[string]string
 }
 
-func NewProxyStore(k8sClient rest.Interface,
+func NewProxyStore(clientGetter ClientGetter, storageContext types.StorageContext,
 	prefix []string, group, version, kind, resourcePlural string) types.Store {
 	return &errorStore{
 		Store: &Store{
-			k8sClient:      k8sClient,
+			clientGetter:   clientGetter,
+			storageContext: storageContext,
 			prefix:         prefix,
 			group:          group,
 			version:        version,
@@ -56,10 +108,11 @@ func NewProxyStore(k8sClient rest.Interface,
 	}
 }
 
-func NewRawProxyStore(k8sClient rest.Interface,
+func NewRawProxyStore(clientGetter ClientGetter, storageContext types.StorageContext,
 	prefix []string, group, version, kind, resourcePlural string) *Store {
 	return &Store{
-		k8sClient:      k8sClient,
+		clientGetter:   clientGetter,
+		storageContext: storageContext,
 		prefix:         prefix,
 		group:          group,
 		version:        version,
@@ -83,6 +136,10 @@ func (p *Store) doAuthed(apiContext *types.APIContext, request *rest.Request) re
 	return request.Do()
 }
 
+func (p *Store) k8sClient(apiContext *types.APIContext) (rest.Interface, error) {
+	return p.clientGetter.UnversionedClient(apiContext, p.storageContext)
+}
+
 func (p *Store) ByID(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
 	_, result, err := p.byID(apiContext, schema, id)
 	return result, err
@@ -91,19 +148,33 @@ func (p *Store) ByID(apiContext *types.APIContext, schema *types.Schema, id stri
 func (p *Store) byID(apiContext *types.APIContext, schema *types.Schema, id string) (string, map[string]interface{}, error) {
 	namespace, id := splitID(id)
 
-	req := p.common(namespace, p.k8sClient.Get()).
+	k8sClient, err := p.k8sClient(apiContext)
+	if err != nil {
+		return "", nil, err
+	}
+
+	req := p.common(namespace, k8sClient.Get()).
 		Name(id)
 
 	return p.singleResult(apiContext, schema, req)
 }
 
+func (p *Store) Context() types.StorageContext {
+	return p.storageContext
+}
+
 func (p *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {
 	namespace := getNamespace(apiContext, opt)
 
-	req := p.common(namespace, p.k8sClient.Get())
+	k8sClient, err := p.k8sClient(apiContext)
+	if err != nil {
+		return nil, err
+	}
+
+	req := p.common(namespace, k8sClient.Get())
 
 	resultList := &unstructured.UnstructuredList{}
-	err := req.Do().Into(resultList)
+	err = req.Do().Into(resultList)
 	if err != nil {
 		return nil, err
 	}
@@ -120,8 +191,13 @@ func (p *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *ty
 func (p *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
 	namespace := getNamespace(apiContext, opt)
 
+	k8sClient, err := p.k8sClient(apiContext)
+	if err != nil {
+		return nil, err
+	}
+
 	timeout := int64(60 * 60)
-	req := p.common(namespace, p.k8sClient.Get())
+	req := p.common(namespace, k8sClient.Get())
 	req.VersionedParams(&metav1.ListOptions{
 		Watch:           true,
 		TimeoutSeconds:  &timeout,
@@ -139,6 +215,7 @@ func (p *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt *t
 
 	go func() {
 		<-apiContext.Request.Context().Done()
+		logrus.Debugf("stopping watcher for %s", schema.ID)
 		watcher.Stop()
 	}()
 
@@ -152,6 +229,7 @@ func (p *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt *t
 			}
 			result <- apiContext.AccessControl.Filter(apiContext, data.Object, p.authContext)
 		}
+		logrus.Debugf("closing watcher for %s", schema.ID)
 		close(result)
 	}()
 
@@ -196,7 +274,12 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		}
 	}
 
-	req := p.common(namespace, p.k8sClient.Post()).
+	k8sClient, err := p.k8sClient(apiContext)
+	if err != nil {
+		return nil, err
+	}
+
+	req := p.common(namespace, k8sClient.Post()).
 		Body(&unstructured.Unstructured{
 			Object: data,
 		})
@@ -219,8 +302,13 @@ func (p *Store) toInternal(mapper types.Mapper, data map[string]interface{}) {
 }
 
 func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
+	k8sClient, err := p.k8sClient(apiContext)
+	if err != nil {
+		return nil, err
+	}
+
 	namespace, id := splitID(id)
-	req := p.common(namespace, p.k8sClient.Get()).
+	req := p.common(namespace, k8sClient.Get()).
 		Name(id)
 
 	resourceVersion, existing, err := p.singleResultRaw(apiContext, schema, req)
@@ -235,7 +323,7 @@ func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	values.PutValue(existing, namespace, "metadata", "namespace")
 	values.PutValue(existing, id, "metadata", "name")
 
-	req = p.common(namespace, p.k8sClient.Put()).
+	req = p.common(namespace, k8sClient.Put()).
 		Body(&unstructured.Unstructured{
 			Object: existing,
 		}).
@@ -246,16 +334,21 @@ func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 }
 
 func (p *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
+	k8sClient, err := p.k8sClient(apiContext)
+	if err != nil {
+		return nil, err
+	}
+
 	namespace, id := splitID(id)
 
 	prop := metav1.DeletePropagationForeground
-	req := p.common(namespace, p.k8sClient.Delete()).
+	req := p.common(namespace, k8sClient.Delete()).
 		Body(&metav1.DeleteOptions{
 			PropagationPolicy: &prop,
 		}).
 		Name(id)
 
-	err := p.doAuthed(apiContext, req).Error()
+	err = p.doAuthed(apiContext, req).Error()
 	if err != nil {
 		return nil, err
 	}

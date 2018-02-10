@@ -7,6 +7,10 @@ import (
 type Store struct {
 }
 
+func (e *Store) Context() types.StorageContext {
+	return types.DefaultStorageContext
+}
+
 func (e *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
 	return nil, nil
 }

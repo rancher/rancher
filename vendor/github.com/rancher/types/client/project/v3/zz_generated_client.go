@@ -7,7 +7,6 @@ import (
 type Client struct {
 	clientbase.APIBaseClient
 
-	Namespace                     NamespaceOperations
 	PersistentVolumeClaim         PersistentVolumeClaimOperations
 	Ingress                       IngressOperations
 	Secret                        SecretOperations
@@ -31,6 +30,7 @@ type Client struct {
 	ReplicationController         ReplicationControllerOperations
 	DaemonSet                     DaemonSetOperations
 	Workload                      WorkloadOperations
+	App                           AppOperations
 	ConfigMap                     ConfigMapOperations
 }
 
@@ -44,7 +44,6 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 		APIBaseClient: baseClient,
 	}
 
-	client.Namespace = newNamespaceClient(client)
 	client.PersistentVolumeClaim = newPersistentVolumeClaimClient(client)
 	client.Ingress = newIngressClient(client)
 	client.Secret = newSecretClient(client)
@@ -68,6 +67,7 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.ReplicationController = newReplicationControllerClient(client)
 	client.DaemonSet = newDaemonSetClient(client)
 	client.Workload = newWorkloadClient(client)
+	client.App = newAppClient(client)
 	client.ConfigMap = newConfigMapClient(client)
 
 	return client, nil

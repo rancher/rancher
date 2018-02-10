@@ -5,6 +5,9 @@ import (
 	"strings"
 	"time"
 
+	"fmt"
+
+	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/sirupsen/logrus"
@@ -13,48 +16,58 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/rest"
 )
 
 type Factory struct {
-	APIExtClientSet clientset.Interface
+	ClientGetter proxy.ClientGetter
 }
 
-func NewFactoryFromConfig(config rest.Config) (*Factory, error) {
-	dynamicConfig := config
-	if dynamicConfig.NegotiatedSerializer == nil {
-		configConfig := dynamic.ContentConfig()
-		dynamicConfig.NegotiatedSerializer = configConfig.NegotiatedSerializer
+func (c *Factory) AssignStores(ctx context.Context, storageContext types.StorageContext, schemas ...*types.Schema) error {
+	schemaStatus, err := c.CreateCRDs(ctx, storageContext, schemas...)
+	if err != nil {
+		return err
 	}
 
-	apiExtClient, err := clientset.NewForConfig(&dynamicConfig)
+	for _, schema := range schemas {
+		crd, ok := schemaStatus[schema]
+		if !ok {
+			return fmt.Errorf("failed to create create/find CRD for %s", schema.ID)
+		}
+
+		schema.Store = proxy.NewProxyStore(c.ClientGetter,
+			storageContext,
+			[]string{"apis"},
+			crd.Spec.Group,
+			crd.Spec.Version,
+			crd.Status.AcceptedNames.Kind,
+			crd.Status.AcceptedNames.Plural)
+	}
+
+	return nil
+}
+
+func (c *Factory) CreateCRDs(ctx context.Context, storageContext types.StorageContext, schemas ...*types.Schema) (map[*types.Schema]*apiext.CustomResourceDefinition, error) {
+	schemaStatus := map[*types.Schema]*apiext.CustomResourceDefinition{}
+
+	apiClient, err := c.ClientGetter.APIExtClient(nil, storageContext)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Factory{
-		APIExtClientSet: apiExtClient,
-	}, nil
-}
-
-func (c *Factory) AddSchemas(ctx context.Context, schemas ...*types.Schema) (map[*types.Schema]*apiext.CustomResourceDefinition, error) {
-	schemaStatus := map[*types.Schema]*apiext.CustomResourceDefinition{}
-
-	ready, err := c.getReadyCRDs()
+	ready, err := c.getReadyCRDs(apiClient)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, schema := range schemas {
-		crd, err := c.createCRD(schema, ready)
+		crd, err := c.createCRD(apiClient, schema, ready)
 		if err != nil {
 			return nil, err
 		}
 		schemaStatus[schema] = crd
 	}
 
-	ready, err = c.getReadyCRDs()
+	ready, err = c.getReadyCRDs(apiClient)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +76,7 @@ func (c *Factory) AddSchemas(ctx context.Context, schemas ...*types.Schema) (map
 		if readyCrd, ok := ready[crd.Name]; ok {
 			schemaStatus[schema] = readyCrd
 		} else {
-			if err := c.waitCRD(ctx, crd.Name, schema, schemaStatus); err != nil {
+			if err := c.waitCRD(ctx, apiClient, crd.Name, schema, schemaStatus); err != nil {
 				return nil, err
 			}
 		}
@@ -72,7 +85,7 @@ func (c *Factory) AddSchemas(ctx context.Context, schemas ...*types.Schema) (map
 	return schemaStatus, nil
 }
 
-func (c *Factory) waitCRD(ctx context.Context, crdName string, schema *types.Schema, schemaStatus map[*types.Schema]*apiext.CustomResourceDefinition) error {
+func (c *Factory) waitCRD(ctx context.Context, apiClient clientset.Interface, crdName string, schema *types.Schema, schemaStatus map[*types.Schema]*apiext.CustomResourceDefinition) error {
 	logrus.Infof("Waiting for CRD %s to become available", crdName)
 	defer logrus.Infof("Done waiting for CRD %s to become available", crdName)
 
@@ -83,7 +96,7 @@ func (c *Factory) waitCRD(ctx context.Context, crdName string, schema *types.Sch
 		}
 		first = false
 
-		crd, err := c.APIExtClientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crdName, metav1.GetOptions{})
+		crd, err := apiClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crdName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -106,7 +119,7 @@ func (c *Factory) waitCRD(ctx context.Context, crdName string, schema *types.Sch
 	})
 }
 
-func (c *Factory) createCRD(schema *types.Schema, ready map[string]*apiext.CustomResourceDefinition) (*apiext.CustomResourceDefinition, error) {
+func (c *Factory) createCRD(apiClient clientset.Interface, schema *types.Schema, ready map[string]*apiext.CustomResourceDefinition) (*apiext.CustomResourceDefinition, error) {
 	plural := strings.ToLower(schema.PluralName)
 	name := strings.ToLower(plural + "." + schema.Version.Group)
 
@@ -136,15 +149,15 @@ func (c *Factory) createCRD(schema *types.Schema, ready map[string]*apiext.Custo
 	}
 
 	logrus.Infof("Creating CRD %s", name)
-	crd, err := c.APIExtClientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
+	crd, err := apiClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
 	if errors.IsAlreadyExists(err) {
 		return crd, nil
 	}
 	return crd, err
 }
 
-func (c *Factory) getReadyCRDs() (map[string]*apiext.CustomResourceDefinition, error) {
-	list, err := c.APIExtClientSet.ApiextensionsV1beta1().CustomResourceDefinitions().List(metav1.ListOptions{})
+func (c *Factory) getReadyCRDs(apiClient clientset.Interface) (map[string]*apiext.CustomResourceDefinition, error) {
+	list, err := apiClient.ApiextensionsV1beta1().CustomResourceDefinitions().List(metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

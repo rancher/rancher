@@ -94,9 +94,12 @@ type ProjectRoleTemplateBinding struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	UserName         string `json:"userName,omitempty" norman:"required,type=reference[user]"`
-	ProjectName      string `json:"projectName,omitempty" norman:"required,type=reference[project]"`
-	RoleTemplateName string `json:"roleTemplateName,omitempty" norman:"required,type=reference[roleTemplate]"`
+	UserName           string `json:"userName,omitempty" norman:"type=reference[user]"`
+	UserPrincipalName  string `json:"userPrincipalName,omitempty" norman:"type=reference[principal]"`
+	GroupName          string `json:"groupName,omitempty" norman:"type=reference[group]"`
+	GroupPrincipalName string `json:"groupPrincipalName,omitempty" norman:"type=reference[principal]"`
+	ProjectName        string `json:"projectName,omitempty" norman:"required,type=reference[project]"`
+	RoleTemplateName   string `json:"roleTemplateName,omitempty" norman:"required,type=reference[roleTemplate]"`
 }
 
 type ClusterRoleTemplateBinding struct {
@@ -104,7 +107,10 @@ type ClusterRoleTemplateBinding struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	UserName         string `json:"userName,omitempty" norman:"required,type=reference[user]"`
-	ClusterName      string `json:"clusterName,omitempty" norman:"required,type=reference[cluster]"`
-	RoleTemplateName string `json:"roleTemplateName,omitempty" norman:"required,type=reference[roleTemplate]"`
+	UserName           string `json:"userName,omitempty" norman:"type=reference[user]"`
+	UserPrincipalName  string `json:"userPrincipalName,omitempty" norman:"type=reference[principal]"`
+	GroupName          string `json:"groupName,omitempty" norman:"type=reference[group]"`
+	GroupPrincipalName string `json:"groupPrincipalName,omitempty" norman:"type=reference[principal]"`
+	ClusterName        string `json:"clusterName,omitempty" norman:"required,type=reference[cluster]"`
+	RoleTemplateName   string `json:"roleTemplateName,omitempty" norman:"required,type=reference[roleTemplate]"`
 }

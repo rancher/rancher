@@ -131,10 +131,6 @@ func (s *Schemas) MustCustomizeType(version *APIVersion, obj interface{}, f func
 
 	f(schema)
 
-	if schema.SubContext != "" {
-		s.schemasBySubContext[schema.SubContext] = schema
-	}
-
 	return s
 }
 

@@ -147,15 +147,24 @@ func (j *JSONResponseWriter) addLinks(b *builder.Builder, schema *types.Schema, 
 		rawResource.Links["remove"] = self
 	}
 
+	subContextVersion := context.Schemas.SubContextVersionForSchema(schema)
 	for _, backRef := range context.Schemas.References(schema) {
 		if !backRef.Schema.CanList(context) {
 			continue
 		}
 
-		if schema.SubContext == "" {
+		if subContextVersion == nil {
 			rawResource.Links[backRef.Schema.PluralName] = context.URLBuilder.FilterLink(backRef.Schema, backRef.FieldName, rawResource.ID)
 		} else {
 			rawResource.Links[backRef.Schema.PluralName] = context.URLBuilder.SubContextCollection(schema, rawResource.ID, backRef.Schema)
+		}
+	}
+
+	if subContextVersion != nil {
+		for _, subSchema := range context.Schemas.SchemasForVersion(*subContextVersion) {
+			if subSchema.CanList(context) {
+				rawResource.Links[subSchema.PluralName] = context.URLBuilder.SubContextCollection(schema, rawResource.ID, subSchema)
+			}
 		}
 	}
 }

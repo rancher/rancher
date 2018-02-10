@@ -29,8 +29,8 @@ func (d *DefaultSubContextAttributeProvider) Create(apiContext *types.APIContext
 func (d *DefaultSubContextAttributeProvider) create(apiContext *types.APIContext, schema *types.Schema) map[string]string {
 	result := map[string]string{}
 
-	for subContext, value := range apiContext.SubContext {
-		subContextSchema := apiContext.Schemas.SubContext(subContext)
+	for subContextSchemaID, value := range apiContext.SubContext {
+		subContextSchema := apiContext.Schemas.Schema(nil, subContextSchemaID)
 		if subContextSchema == nil {
 			continue
 		}

@@ -69,10 +69,11 @@ type Resource struct {
 }
 
 type APIVersion struct {
-	Group       string          `json:"group,omitempty"`
-	Version     string          `json:"version,omitempty"`
-	Path        string          `json:"path,omitempty"`
-	SubContexts map[string]bool `json:"subContext,omitempty"`
+	Group            string `json:"group,omitempty"`
+	Version          string `json:"version,omitempty"`
+	Path             string `json:"path,omitempty"`
+	SubContext       bool   `json:"subContext,omitempty"`
+	SubContextSchema string `json:"filterField,omitempty"`
 }
 
 type Namespaced struct{}
@@ -90,7 +91,6 @@ type Schema struct {
 	PkgName           string            `json:"-"`
 	Type              string            `json:"type,omitempty"`
 	BaseType          string            `json:"baseType,omitempty"`
-	SubContext        string            `json:"-,omitempty"`
 	Links             map[string]string `json:"links"`
 	Version           APIVersion        `json:"version"`
 	PluralName        string            `json:"pluralName,omitempty"`
