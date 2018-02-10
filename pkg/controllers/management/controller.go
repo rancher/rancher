@@ -10,8 +10,8 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clustergc"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstats"
-	"github.com/rancher/rancher/pkg/controllers/management/machine"
-	"github.com/rancher/rancher/pkg/controllers/management/machinedriver"
+	"github.com/rancher/rancher/pkg/controllers/management/node"
+	"github.com/rancher/rancher/pkg/controllers/management/nodedriver"
 	"github.com/rancher/rancher/pkg/controllers/management/usercontrollers"
 	"github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/types/config"
@@ -27,7 +27,7 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	clusterprovisioner.Register(management, dialerFactory)
 	auth.RegisterLate(ctx, management)
 	clustergc.Register(management)
-	machine.Register(management)
-	machinedriver.Register(management)
+	node.Register(management)
+	nodedriver.Register(management)
 	usercontrollers.Register(ctx, management, manager)
 }

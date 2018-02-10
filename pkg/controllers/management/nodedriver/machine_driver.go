@@ -1,4 +1,4 @@
-package machinedriver
+package nodedriver
 
 import (
 	"fmt"
@@ -18,34 +18,34 @@ var (
 )
 
 const (
-	driverNameLabel = "io.cattle.machine_driver.name"
+	driverNameLabel = "io.cattle.node_driver.name"
 )
 
 func Register(management *config.ManagementContext) {
-	machineDriverClient := management.Management.MachineDrivers("")
-	machineDriverLifecycle := &Lifecycle{
-		machineDriverClient: machineDriverClient,
-		schemaClient:        management.Management.DynamicSchemas(""),
-		schemaLister:        management.Management.DynamicSchemas("").Controller().Lister(),
+	nodeDriverClient := management.Management.NodeDrivers("")
+	nodeDriverLifecycle := &Lifecycle{
+		nodeDriverClient: nodeDriverClient,
+		schemaClient:     management.Management.DynamicSchemas(""),
+		schemaLister:     management.Management.DynamicSchemas("").Controller().Lister(),
 	}
 
-	machineDriverClient.
-		AddLifecycle("machine-driver-controller", machineDriverLifecycle)
+	nodeDriverClient.
+		AddLifecycle("node-driver-controller", nodeDriverLifecycle)
 }
 
 type Lifecycle struct {
-	machineDriverClient v3.MachineDriverInterface
-	schemaClient        v3.DynamicSchemaInterface
-	schemaLister        v3.DynamicSchemaLister
+	nodeDriverClient v3.NodeDriverInterface
+	schemaClient     v3.DynamicSchemaInterface
+	schemaLister     v3.DynamicSchemaLister
 }
 
-func (m *Lifecycle) Create(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
+func (m *Lifecycle) Create(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 	return m.download(obj)
 }
 
-func (m *Lifecycle) download(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
+func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 	var err error
-	// if machine driver was created, we also activate the driver by default
+	// if node driver was created, we also activate the driver by default
 	driver := NewDriver(obj.Spec.Builtin, obj.Spec.DisplayName, obj.Spec.URL, obj.Spec.Checksum)
 	schemaName := obj.Name + "config"
 	_, err = m.schemaLister.Get("", schemaName)
@@ -54,9 +54,9 @@ func (m *Lifecycle) download(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
 		return obj, nil
 	}
 
-	_, err = v3.MachineDriverConditionDownloaded.Do(obj, func() (runtime.Object, error) {
+	_, err = v3.NodeDriverConditionDownloaded.Do(obj, func() (runtime.Object, error) {
 		// update status
-		obj, err = m.machineDriverClient.Update(obj)
+		obj, err = m.nodeDriverClient.Update(obj)
 		if err != nil {
 			return nil, err
 		}
@@ -113,7 +113,7 @@ func (m *Lifecycle) download(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
 	return obj, nil
 }
 
-func (m *Lifecycle) Updated(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
+func (m *Lifecycle) Updated(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 	var err error
 
 	obj, err = m.download(obj)
@@ -121,18 +121,18 @@ func (m *Lifecycle) Updated(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
 		return obj, err
 	}
 
-	if err := m.createOrUpdateMachineForEmbeddedType(obj.Spec.DisplayName+"config", obj.Spec.DisplayName+"Config", obj.Spec.Active); err != nil {
+	if err := m.createOrUpdateNodeForEmbeddedType(obj.Spec.DisplayName+"config", obj.Spec.DisplayName+"Config", obj.Spec.Active); err != nil {
 		return obj, err
 	}
 
-	v3.MachineDriverConditionActive.True(obj)
-	v3.MachineDriverConditionInactive.True(obj)
-	v3.MachineDriverConditionDownloaded.True(obj)
+	v3.NodeDriverConditionActive.True(obj)
+	v3.NodeDriverConditionInactive.True(obj)
+	v3.NodeDriverConditionDownloaded.True(obj)
 
 	return obj, nil
 }
 
-func (m *Lifecycle) Remove(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
+func (m *Lifecycle) Remove(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 	schemas, err := m.schemaClient.List(metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", driverNameLabel, obj.Spec.DisplayName),
 	})
@@ -146,25 +146,25 @@ func (m *Lifecycle) Remove(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
 		}
 		logrus.Infof("Deleting schema %s done", schema.Name)
 	}
-	if err := m.createOrUpdateMachineForEmbeddedType(obj.Spec.DisplayName+"config", obj.Spec.DisplayName+"Config", false); err != nil {
+	if err := m.createOrUpdateNodeForEmbeddedType(obj.Spec.DisplayName+"config", obj.Spec.DisplayName+"Config", false); err != nil {
 		return obj, err
 	}
 	return obj, nil
 }
 
-func (m *Lifecycle) createOrUpdateMachineForEmbeddedType(embeddedType, fieldName string, embedded bool) error {
+func (m *Lifecycle) createOrUpdateNodeForEmbeddedType(embeddedType, fieldName string, embedded bool) error {
 	schemaLock.Lock()
 	defer schemaLock.Unlock()
 
-	if err := m.createOrUpdateMachineForEmbeddedTypeWithParents(embeddedType, fieldName, "machineconfig", "machine", embedded); err != nil {
+	if err := m.createOrUpdateNodeForEmbeddedTypeWithParents(embeddedType, fieldName, "nodeconfig", "node", embedded); err != nil {
 		return err
 	}
 
-	return m.createOrUpdateMachineForEmbeddedTypeWithParents(embeddedType, fieldName, "machinetemplateconfig", "machineTemplate", embedded)
+	return m.createOrUpdateNodeForEmbeddedTypeWithParents(embeddedType, fieldName, "nodetemplateconfig", "nodeTemplate", embedded)
 }
 
-func (m *Lifecycle) createOrUpdateMachineForEmbeddedTypeWithParents(embeddedType, fieldName, schemaID, parentID string, embedded bool) error {
-	machineSchema, err := m.schemaLister.Get("", schemaID)
+func (m *Lifecycle) createOrUpdateNodeForEmbeddedTypeWithParents(embeddedType, fieldName, schemaID, parentID string, embedded bool) error {
+	nodeSchema, err := m.schemaLister.Get("", schemaID)
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	} else if errors.IsNotFound(err) {
@@ -191,13 +191,13 @@ func (m *Lifecycle) createOrUpdateMachineForEmbeddedTypeWithParents(embeddedType
 
 	shouldUpdate := false
 	if embedded {
-		if machineSchema.Spec.ResourceFields == nil {
-			machineSchema.Spec.ResourceFields = map[string]v3.Field{}
+		if nodeSchema.Spec.ResourceFields == nil {
+			nodeSchema.Spec.ResourceFields = map[string]v3.Field{}
 		}
-		if _, ok := machineSchema.Spec.ResourceFields[fieldName]; !ok {
+		if _, ok := nodeSchema.Spec.ResourceFields[fieldName]; !ok {
 			// if embedded we add the type to schema
-			logrus.Infof("uploading %s to machine schema", fieldName)
-			machineSchema.Spec.ResourceFields[fieldName] = v3.Field{
+			logrus.Infof("uploading %s to node schema", fieldName)
+			nodeSchema.Spec.ResourceFields[fieldName] = v3.Field{
 				Create:   true,
 				Nullable: true,
 				Update:   false,
@@ -207,15 +207,15 @@ func (m *Lifecycle) createOrUpdateMachineForEmbeddedTypeWithParents(embeddedType
 		}
 	} else {
 		// if not we delete it from schema
-		if _, ok := machineSchema.Spec.ResourceFields[fieldName]; ok {
-			logrus.Infof("deleting %s from machine schema", fieldName)
-			delete(machineSchema.Spec.ResourceFields, fieldName)
+		if _, ok := nodeSchema.Spec.ResourceFields[fieldName]; ok {
+			logrus.Infof("deleting %s from node schema", fieldName)
+			delete(nodeSchema.Spec.ResourceFields, fieldName)
 			shouldUpdate = true
 		}
 	}
 
 	if shouldUpdate {
-		_, err = m.schemaClient.Update(machineSchema)
+		_, err = m.schemaClient.Update(nodeSchema)
 		if err != nil {
 			return err
 		}

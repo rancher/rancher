@@ -30,14 +30,14 @@ const (
 	cacheRoot = "helm-controller"
 )
 
-func Register(management *config.UserContext) {
-	stackClient := management.Management.Project.Apps("")
+func Register(user *config.UserContext) {
+	stackClient := user.Project.Apps("")
 	stackLifecycle := &Lifecycle{
-		NameSpaceClient:       management.Core.Namespaces(""),
-		K8sClient:             management.K8sClient,
-		TemplateVersionClient: management.Management.Management.TemplateVersions(""),
+		NameSpaceClient:       user.Core.Namespaces(""),
+		K8sClient:             user.K8sClient,
+		TemplateVersionClient: user.Management.Management.TemplateVersions(""),
 		CacheRoot:             filepath.Join(os.Getenv("HOME"), cacheRoot),
-		Management:            management,
+		Management:            user,
 	}
 	stackClient.AddLifecycle("helm-controller", stackLifecycle)
 }

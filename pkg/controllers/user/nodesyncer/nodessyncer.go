@@ -16,24 +16,24 @@ import (
 )
 
 const (
-	allMachineKey  = "_machine_all_"
+	allNodeKey     = "_machine_all_"
 	annotationName = "management.cattle.io/nodesyncer"
 )
 
 type NodeSyncer struct {
-	machines         v3.MachineInterface
+	machines         v3.NodeInterface
 	clusterNamespace string
 }
 
 type PodsStatsSyncer struct {
 	clusterName      string
 	clusterNamespace string
-	machinesClient   v3.MachineInterface
+	machinesClient   v3.NodeInterface
 }
 
-type MachinesSyncer struct {
-	machines         v3.MachineInterface
-	machineLister    v3.MachineLister
+type NodesSyncer struct {
+	machines         v3.NodeInterface
+	machineLister    v3.NodeLister
 	nodeLister       v1.NodeLister
 	podLister        v1.PodLister
 	clusterNamespace string
@@ -42,45 +42,45 @@ type MachinesSyncer struct {
 func Register(cluster *config.UserContext) {
 	n := &NodeSyncer{
 		clusterNamespace: cluster.ClusterName,
-		machines:         cluster.Management.Management.Machines(cluster.ClusterName),
+		machines:         cluster.Management.Management.Nodes(cluster.ClusterName),
 	}
 
-	m := &MachinesSyncer{
+	m := &NodesSyncer{
 		clusterNamespace: cluster.ClusterName,
-		machines:         cluster.Management.Management.Machines(cluster.ClusterName),
-		machineLister:    cluster.Management.Management.Machines(cluster.ClusterName).Controller().Lister(),
+		machines:         cluster.Management.Management.Nodes(cluster.ClusterName),
+		machineLister:    cluster.Management.Management.Nodes(cluster.ClusterName).Controller().Lister(),
 		nodeLister:       cluster.Core.Nodes("").Controller().Lister(),
 		podLister:        cluster.Core.Pods("").Controller().Lister(),
 	}
 
 	p := &PodsStatsSyncer{
 		clusterNamespace: cluster.ClusterName,
-		machinesClient:   cluster.Management.Management.Machines(cluster.ClusterName),
+		machinesClient:   cluster.Management.Management.Nodes(cluster.ClusterName),
 	}
 
 	cluster.Core.Nodes("").Controller().AddHandler("nodesSyncer", n.sync)
-	cluster.Management.Management.Machines(cluster.ClusterName).Controller().AddHandler("machinesSyncer", m.sync)
+	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler("machinesSyncer", m.sync)
 	cluster.Core.Pods("").Controller().AddHandler("podsStatsSyncer", p.sync)
 }
 
 func (n *NodeSyncer) sync(key string, node *corev1.Node) error {
-	n.machines.Controller().Enqueue(n.clusterNamespace, allMachineKey)
+	n.machines.Controller().Enqueue(n.clusterNamespace, allNodeKey)
 	return nil
 }
 
 func (p *PodsStatsSyncer) sync(key string, pod *corev1.Pod) error {
-	p.machinesClient.Controller().Enqueue(p.clusterNamespace, allMachineKey)
+	p.machinesClient.Controller().Enqueue(p.clusterNamespace, allNodeKey)
 	return nil
 }
 
-func (m *MachinesSyncer) sync(key string, machine *v3.Machine) error {
-	if key == fmt.Sprintf("%s/%s", m.clusterNamespace, allMachineKey) {
+func (m *NodesSyncer) sync(key string, machine *v3.Node) error {
+	if key == fmt.Sprintf("%s/%s", m.clusterNamespace, allNodeKey) {
 		return m.reconcileAll()
 	}
 	return nil
 }
 
-func (m *MachinesSyncer) reconcileAll() error {
+func (m *NodesSyncer) reconcileAll() error {
 	nodes, err := m.nodeLister.List("", labels.NewSelector())
 	if err != nil {
 		return err
@@ -92,9 +92,9 @@ func (m *MachinesSyncer) reconcileAll() error {
 	}
 
 	machines, err := m.machineLister.List(m.clusterNamespace, labels.NewSelector())
-	machineMap := make(map[string]*v3.Machine)
+	machineMap := make(map[string]*v3.Node)
 	for _, machine := range machines {
-		nodeName := getNodeNameFromMachine(machine)
+		nodeName := getNodeNameFromNode(machine)
 		if nodeName == "" {
 			logrus.Warnf("Failed to get nodeName from machine [%s]", machine.Name)
 			continue
@@ -109,7 +109,7 @@ func (m *MachinesSyncer) reconcileAll() error {
 	// reconcile machines for existing nodes
 	for name, node := range nodeMap {
 		machine, _ := machineMap[name]
-		err = m.reconcileMachineForNode(machine, node, nodeToPodMap)
+		err = m.reconcileNodeForNode(machine, node, nodeToPodMap)
 		if err != nil {
 			return err
 		}
@@ -117,7 +117,7 @@ func (m *MachinesSyncer) reconcileAll() error {
 	// run the logic for machine to remove
 	for name, machine := range machineMap {
 		if _, ok := nodeMap[name]; !ok {
-			if err := m.removeMachine(machine); err != nil {
+			if err := m.removeNode(machine); err != nil {
 				return err
 			}
 		}
@@ -126,14 +126,14 @@ func (m *MachinesSyncer) reconcileAll() error {
 	return nil
 }
 
-func (m *MachinesSyncer) reconcileMachineForNode(machine *v3.Machine, node *corev1.Node, pods map[string][]*corev1.Pod) error {
+func (m *NodesSyncer) reconcileNodeForNode(machine *v3.Node, node *corev1.Node, pods map[string][]*corev1.Pod) error {
 	if machine == nil {
-		return m.createMachine(node, pods)
+		return m.createNode(node, pods)
 	}
-	return m.updateMachine(machine, node, pods)
+	return m.updateNode(machine, node, pods)
 }
 
-func (m *MachinesSyncer) removeMachine(machine *v3.Machine) error {
+func (m *NodesSyncer) removeNode(machine *v3.Node) error {
 	if machine.Annotations == nil {
 		return nil
 	}
@@ -150,8 +150,8 @@ func (m *MachinesSyncer) removeMachine(machine *v3.Machine) error {
 	return nil
 }
 
-func (m *MachinesSyncer) updateMachine(existing *v3.Machine, node *corev1.Node, pods map[string][]*corev1.Pod) error {
-	toUpdate, err := m.convertNodeToMachine(node, existing, pods)
+func (m *NodesSyncer) updateNode(existing *v3.Node, node *corev1.Node, pods map[string][]*corev1.Pod) error {
+	toUpdate, err := m.convertNodeToNode(node, existing, pods)
 	if err != nil {
 		return err
 	}
@@ -168,16 +168,16 @@ func (m *MachinesSyncer) updateMachine(existing *v3.Machine, node *corev1.Node, 
 	return nil
 }
 
-func (m *MachinesSyncer) createMachine(node *corev1.Node, pods map[string][]*corev1.Pod) error {
+func (m *NodesSyncer) createNode(node *corev1.Node, pods map[string][]*corev1.Pod) error {
 	// try to get machine from api, in case cache didn't get the update
-	existing, err := m.getMachineForNode(node.Name, false)
+	existing, err := m.getNodeForNode(node.Name, false)
 	if err != nil {
 		return err
 	}
 	if existing != nil {
 		return nil
 	}
-	machine, err := m.convertNodeToMachine(node, existing, pods)
+	machine, err := m.convertNodeToNode(node, existing, pods)
 	if err != nil {
 		return err
 	}
@@ -195,14 +195,14 @@ func (m *MachinesSyncer) createMachine(node *corev1.Node, pods map[string][]*cor
 	return nil
 }
 
-func (m *MachinesSyncer) getMachineForNode(nodeName string, cache bool) (*v3.Machine, error) {
+func (m *NodesSyncer) getNodeForNode(nodeName string, cache bool) (*v3.Node, error) {
 	if cache {
 		machines, err := m.machineLister.List(m.clusterNamespace, labels.NewSelector())
 		if err != nil {
 			return nil, err
 		}
 		for _, machine := range machines {
-			if isMachineForNode(nodeName, machine) {
+			if isNodeForNode(nodeName, machine) {
 				return machine, nil
 			}
 		}
@@ -213,7 +213,7 @@ func (m *MachinesSyncer) getMachineForNode(nodeName string, cache bool) (*v3.Mac
 		}
 		for _, machine := range machines.Items {
 			if machine.Namespace == m.clusterNamespace {
-				if isMachineForNode(nodeName, &machine) {
+				if isNodeForNode(nodeName, &machine) {
 					return &machine, nil
 				}
 			}
@@ -223,7 +223,7 @@ func (m *MachinesSyncer) getMachineForNode(nodeName string, cache bool) (*v3.Mac
 	return nil, nil
 }
 
-func isMachineForNode(nodeName string, machine *v3.Machine) bool {
+func isNodeForNode(nodeName string, machine *v3.Node) bool {
 	if machine.Status.NodeName == nodeName {
 		return true
 	}
@@ -236,7 +236,7 @@ func isMachineForNode(nodeName string, machine *v3.Machine) bool {
 	return false
 }
 
-func getNodeNameFromMachine(machine *v3.Machine) string {
+func getNodeNameFromNode(machine *v3.Node) string {
 	if machine.Status.NodeName != "" {
 		return machine.Status.NodeName
 	}
@@ -249,7 +249,7 @@ func getNodeNameFromMachine(machine *v3.Machine) string {
 	return ""
 }
 
-func resetConditions(machine *v3.Machine) *v3.Machine {
+func resetConditions(machine *v3.Node) *v3.Node {
 	if machine.Status.NodeStatus.Conditions == nil {
 		return machine
 	}
@@ -265,7 +265,7 @@ func resetConditions(machine *v3.Machine) *v3.Machine {
 	return updated
 }
 
-func objectsAreEqual(existing *v3.Machine, toUpdate *v3.Machine) bool {
+func objectsAreEqual(existing *v3.Node, toUpdate *v3.Node) bool {
 	// we are updating spec and status only, so compare them
 	toUpdateToCompare := resetConditions(toUpdate)
 	existingToCompare := resetConditions(existing)
@@ -279,12 +279,12 @@ func objectsAreEqual(existing *v3.Machine, toUpdate *v3.Machine) bool {
 	return statusEqual && specEqual && nodeNameEqual && labelsEqual && annotationsEqual && requestsEqual && limitsEqual
 }
 
-func (m *MachinesSyncer) convertNodeToMachine(node *corev1.Node, existing *v3.Machine, pods map[string][]*corev1.Pod) (*v3.Machine, error) {
-	var machine *v3.Machine
+func (m *NodesSyncer) convertNodeToNode(node *corev1.Node, existing *v3.Node, pods map[string][]*corev1.Pod) (*v3.Node, error) {
+	var machine *v3.Node
 	if existing == nil {
-		machine = &v3.Machine{
-			Spec:   v3.MachineSpec{},
-			Status: v3.MachineStatus{},
+		machine = &v3.Node{
+			Spec:   v3.NodeSpec{},
+			Status: v3.NodeStatus{},
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "machine-"},
 		}
@@ -318,11 +318,11 @@ func (m *MachinesSyncer) convertNodeToMachine(node *corev1.Node, existing *v3.Ma
 	machine.Status.NodeLabels = node.Labels
 	machine.Status.NodeName = node.Name
 	machine.APIVersion = "management.cattle.io/v3"
-	machine.Kind = "Machine"
+	machine.Kind = "Node"
 	return machine, nil
 }
 
-func (m *MachinesSyncer) getNonTerminatedPods() (map[string][]*corev1.Pod, error) {
+func (m *NodesSyncer) getNonTerminatedPods() (map[string][]*corev1.Pod, error) {
 	pods := make(map[string][]*corev1.Pod)
 	fromCache, err := m.podLister.List("", labels.NewSelector())
 	if err != nil {
@@ -399,10 +399,6 @@ func getPodData(pod *corev1.Pod) (map[corev1.ResourceName]resource.Quantity, map
 		addMapForInit(container.Resources.Limits, limits)
 	}
 	return requests, limits
-}
-
-func machineRequestAndLimitsChanged(cnode *v3.Machine, requests map[corev1.ResourceName]resource.Quantity, limits map[corev1.ResourceName]resource.Quantity) bool {
-	return !isEqual(requests, cnode.Status.Requested) || !isEqual(limits, cnode.Status.Limits)
 }
 
 func addMap(data1 map[corev1.ResourceName]resource.Quantity, data2 map[corev1.ResourceName]resource.Quantity) {

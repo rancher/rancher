@@ -180,15 +180,15 @@ func addRoles(management *config.ManagementContext, local bool) error {
 
 	rb.addRole("Create Clusters", "create-clusters").addRule().apiGroups("management.cattle.io").resources("clusters").verbs("create")
 	rb.addRole("Manage All Clusters", "manage-clusters").addRule().apiGroups("management.cattle.io").resources("clusters").verbs("*")
-	rb.addRole("Manage Node Drivers", "manage-node-drivers").addRule().apiGroups("management.cattle.io").resources("machinedrivers").verbs("*")
+	rb.addRole("Manage Node Drivers", "manage-node-drivers").addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("*")
 	rb.addRole("Manage Catalogs", "manage-catalogs").addRule().apiGroups("management.cattle.io").resources("catalogs", "templates", "templateversions").verbs("*")
 	rb.addRole("Use Catalog Templates", "use-catalogs").addRule().apiGroups("management.cattle.io").resources("templates", "templateversions").verbs("get", "list", "watch")
 	rb.addRole("Manage Users", "manage-users").addRule().apiGroups("management.cattle.io").resources("users", "globalroles", "globalrolebindings").verbs("*")
 	rb.addRole("Manage Roles", "manage-roles").addRule().apiGroups("management.cattle.io").resources("roletemplates").verbs("*")
 	rb.addRole("Manage Authentication", "manage-authn").addRule().apiGroups("management.cattle.io").resources("authconfigs").verbs("get", "list", "watch", "update")
-	rb.addRole("Manage Node Templates", "manage-node-templates").addRule().apiGroups("management.cattle.io").resources("machinetemplates").verbs("*")
-	rb.addRole("Use Node Templates", "use-node-templates").addRule().apiGroups("management.cattle.io").resources("machinedrivers").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("machinetemplates").verbs("*")
+	rb.addRole("Manage Node Templates", "manage-node-templates").addRule().apiGroups("management.cattle.io").resources("nodetemplates").verbs("*")
+	rb.addRole("Use Node Templates", "use-node-templates").addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("nodetemplates").verbs("*")
 	rb.addRole("Manage Settings", "manage-settings").addRule().apiGroups("management.cattle.io").resources("settings").verbs("*")
 
 	rb.addRole("Admin", "admin").addRule().apiGroups("*").resources("*").verbs("*").
@@ -199,8 +199,8 @@ func addRoles(management *config.ManagementContext, local bool) error {
 		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("templates", "templateversions").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("machinedrivers").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("machinetemplates").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("nodetemplates").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch")
 
 	rb.addRole("User Base", "user-base").addRule().apiGroups("management.cattle.io").resources("principals", "roletemplates").verbs("get", "list", "watch").
@@ -209,7 +209,7 @@ func addRoles(management *config.ManagementContext, local bool) error {
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch")
 
 	// TODO user should be dynamically authorized to only see herself
-	// TODO Need "self-service" for machinetemplates such that a user can create them, but only RUD their own
+	// TODO Need "self-service" for nodetemplates such that a user can create them, but only RUD their own
 	// TODO enable when groups are "in". they need to be self-service
 
 	if err := rb.reconcileGlobalRoles(management); err != nil {
@@ -233,7 +233,7 @@ func addRoles(management *config.ManagementContext, local bool) error {
 	rb.addRoleTemplate("Cluster Member", "cluster-member", "cluster", true, false, false).
 		addRule().apiGroups("management.cattle.io").resources("clusterroletemplatebindings").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("projects").verbs("create").
-		addRule().apiGroups("management.cattle.io").resources("machines").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("nodes").verbs("get", "list", "watch").
 		addRule().apiGroups("*").resources("nodes").verbs("get", "list", "watch").
 		addRule().apiGroups("*").resources("persistentvolumes").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clusterevents").verbs("get", "list", "watch")
@@ -248,11 +248,11 @@ func addRoles(management *config.ManagementContext, local bool) error {
 		addRule().apiGroups("management.cattle.io").resources("projects").verbs("get", "list", "watch")
 
 	rb.addRoleTemplate("Manage Nodes", "manage-nodes", "cluster", true, false, false).
-		addRule().apiGroups("management.cattle.io").resources("machines").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("nodes").verbs("*").
 		addRule().apiGroups("*").resources("nodes").verbs("*")
 
 	rb.addRoleTemplate("View Nodes", "view-nodes", "cluster", true, false, false).
-		addRule().apiGroups("management.cattle.io").resources("machines").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("nodes").verbs("get", "list", "watch").
 		addRule().apiGroups("*").resources("nodes").verbs("get", "list", "watch")
 
 	rb.addRoleTemplate("Manage Volumes", "manage-volumes", "cluster", true, false, false).
@@ -489,12 +489,12 @@ func addMachineDrivers(management *config.ManagementContext) error {
 }
 
 func addMachineDriver(name, url, checksum string, active, builtin bool, management *config.ManagementContext) error {
-	lister := management.Management.MachineDrivers("").Controller().Lister()
-	cli := management.Management.MachineDrivers("")
+	lister := management.Management.NodeDrivers("").Controller().Lister()
+	cli := management.Management.NodeDrivers("")
 	m, _ := lister.Get("", name)
 	if m != nil {
 		if m.Spec.Builtin != builtin || m.Spec.URL != url || m.Spec.Checksum != checksum || m.Spec.DisplayName != name {
-			logrus.Infof("Updating machine driver %v", name)
+			logrus.Infof("Updating node driver %v", name)
 			m.Spec.Builtin = builtin
 			m.Spec.URL = url
 			m.Spec.Checksum = checksum
@@ -505,12 +505,12 @@ func addMachineDriver(name, url, checksum string, active, builtin bool, manageme
 		return nil
 	}
 
-	logrus.Infof("Creating machine driver %v", name)
-	_, err := cli.Create(&v3.MachineDriver{
+	logrus.Infof("Creating node driver %v", name)
+	_, err := cli.Create(&v3.NodeDriver{
 		ObjectMeta: v1.ObjectMeta{
 			Name: name,
 		},
-		Spec: v3.MachineDriverSpec{
+		Spec: v3.NodeDriverSpec{
 			Active:      active,
 			Builtin:     builtin,
 			URL:         url,
