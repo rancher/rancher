@@ -79,8 +79,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&TokenList{},
 		&DynamicSchema{},
 		&DynamicSchemaList{},
-		&App{},
-		&AppList{},
 		&Preference{},
 		&PreferenceList{},
 		&ClusterLogging{},

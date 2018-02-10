@@ -6,7 +6,10 @@ import (
 	"regexp"
 	"strings"
 
+	"sort"
+
 	"github.com/rancher/norman/api/builtin"
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/urlbuilder"
 )
@@ -42,16 +45,13 @@ type URLParser func(schema *types.Schemas, url *url.URL) (ParsedURL, error)
 func DefaultURLParser(schemas *types.Schemas, url *url.URL) (ParsedURL, error) {
 	result := ParsedURL{}
 
-	version := Version(schemas, url.Path)
+	path := url.Path
+	path = multiSlashRegexp.ReplaceAllString(path, "/")
+	version, prefix, parts, subContext := parseVersionAndSubContext(schemas, path)
+
 	if version == nil {
 		return result, nil
 	}
-
-	path := url.Path
-	path = multiSlashRegexp.ReplaceAllString(path, "/")
-
-	parts := strings.SplitN(path[len(version.Path):], "/", 4)
-	prefix, parts, subContext := parseSubContext(schemas, version, parts)
 
 	result.Version = version.Path
 	result.SubContext = subContext
@@ -59,9 +59,9 @@ func DefaultURLParser(schemas *types.Schemas, url *url.URL) (ParsedURL, error) {
 	result.Action, result.Method = parseAction(url)
 	result.Query = url.Query()
 
-	result.Type = safeIndex(parts, 1)
-	result.ID = safeIndex(parts, 2)
-	result.Link = safeIndex(parts, 3)
+	result.Type = safeIndex(parts, 0)
+	result.ID = safeIndex(parts, 1)
+	result.Link = safeIndex(parts, 2)
 
 	return result, nil
 }
@@ -121,11 +121,14 @@ func Parse(rw http.ResponseWriter, req *http.Request, schemas *types.Schemas, ur
 	}
 
 	if result.Schema == nil {
+		if result.Type != "" {
+			err = httperror.NewAPIError(httperror.NotFound, "failed to find schema "+result.Type)
+		}
 		result.Method = http.MethodGet
 		result.Type = "apiRoot"
 		result.Schema = result.Schemas.Schema(&builtin.Version, "apiRoot")
 		result.ID = result.Version.Path
-		return result, nil
+		return result, err
 	}
 
 	result.Type = result.Schema.ID
@@ -137,29 +140,61 @@ func Parse(rw http.ResponseWriter, req *http.Request, schemas *types.Schemas, ur
 	return result, nil
 }
 
-func parseSubContext(schemas *types.Schemas, version *types.APIVersion, parts []string) (string, []string, map[string]string) {
-	subContext := ""
-	result := map[string]string{}
-
-	for len(parts) > 3 && version != nil && parts[3] != "" {
-		resourceType := parts[1]
-		resourceID := parts[2]
-
-		if !version.SubContexts[resourceType] {
-			break
+func versionsForPath(schemas *types.Schemas, path string) []types.APIVersion {
+	var matchedVersion []types.APIVersion
+	for _, version := range schemas.Versions() {
+		if strings.HasPrefix(path, version.Path) {
+			matchedVersion = append(matchedVersion, version)
 		}
+	}
+	sort.Slice(matchedVersion, func(i, j int) bool {
+		return len(matchedVersion[i].Path) > len(matchedVersion[j].Path)
+	})
+	return matchedVersion
+}
 
-		subSchema := schemas.Schema(version, parts[3])
-		if subSchema == nil {
-			break
-		}
+func parseVersionAndSubContext(schemas *types.Schemas, path string) (*types.APIVersion, string, []string, map[string]string) {
+	versions := versionsForPath(schemas, path)
+	if len(versions) == 0 {
+		return nil, "", nil, nil
+	}
+	version := &versions[0]
 
-		result[resourceType] = resourceID
-		subContext = subContext + "/" + resourceType + "/" + resourceID
-		parts = append(parts[:1], parts[3:]...)
+	if strings.HasSuffix(path, "/") {
+		path = path[:len(path)-1]
 	}
 
-	return subContext, parts, result
+	versionParts := strings.Split(version.Path, "/")
+	pathParts := strings.Split(path, "/")
+	paths := pathParts[len(versionParts):]
+
+	if !version.SubContext || len(versions) < 2 {
+		return version, "", paths, nil
+	}
+
+	if len(paths) < 2 {
+		// Handle case like /v3/clusters/foo where /v3 and /v3/clusters are API versions.
+		// In this situation you want the version to be /v3 and the path "clusters", "foo"
+		return &versions[1], "", pathParts[len(versionParts)-1:], nil
+	}
+
+	// Length is always >= 3
+
+	attrs := map[string]string{
+		version.SubContextSchema: paths[0],
+	}
+
+	for i, version := range versions {
+		schema := schemas.Schema(&version, paths[1])
+		if schema != nil {
+			if i == 0 {
+				break
+			}
+			return &version, "", paths[1:], attrs
+		}
+	}
+
+	return version, "/" + paths[0], paths[1:], attrs
 }
 
 func DefaultResolver(typeName string, apiContext *types.APIContext) error {
@@ -221,20 +256,6 @@ func parseAction(url *url.URL) (string, string) {
 	}
 
 	return action, ""
-}
-
-func Version(schemas *types.Schemas, path string) *types.APIVersion {
-	path = multiSlashRegexp.ReplaceAllString(path, "/")
-	for _, version := range schemas.Versions() {
-		if version.Path == "" {
-			continue
-		}
-		if strings.HasPrefix(path, version.Path) {
-			return &version
-		}
-	}
-
-	return nil
 }
 
 func Body(req *http.Request) (map[string]interface{}, error) {

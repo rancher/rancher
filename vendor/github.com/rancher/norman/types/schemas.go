@@ -29,28 +29,26 @@ type BackReference struct {
 
 type Schemas struct {
 	sync.Mutex
-	typeNames           map[reflect.Type]string
-	schemasByPath       map[string]map[string]*Schema
-	schemasBySubContext map[string]*Schema
-	mappers             map[string]map[string][]Mapper
-	references          map[string][]BackReference
-	embedded            map[string]*Schema
-	DefaultMappers      MappersFactory
-	DefaultPostMappers  MappersFactory
-	versions            []APIVersion
-	schemas             []*Schema
-	AddHook             SchemaHook
-	errors              []error
+	typeNames          map[reflect.Type]string
+	schemasByPath      map[string]map[string]*Schema
+	mappers            map[string]map[string][]Mapper
+	references         map[string][]BackReference
+	embedded           map[string]*Schema
+	DefaultMappers     MappersFactory
+	DefaultPostMappers MappersFactory
+	versions           []APIVersion
+	schemas            []*Schema
+	AddHook            SchemaHook
+	errors             []error
 }
 
 func NewSchemas() *Schemas {
 	return &Schemas{
-		typeNames:           map[reflect.Type]string{},
-		schemasByPath:       map[string]map[string]*Schema{},
-		schemasBySubContext: map[string]*Schema{},
-		mappers:             map[string]map[string][]Mapper{},
-		references:          map[string][]BackReference{},
-		embedded:            map[string]*Schema{},
+		typeNames:     map[reflect.Type]string{},
+		schemasByPath: map[string]map[string]*Schema{},
+		mappers:       map[string]map[string][]Mapper{},
+		references:    map[string][]BackReference{},
+		embedded:      map[string]*Schema{},
 	}
 }
 
@@ -60,12 +58,6 @@ func (s *Schemas) Init(initFunc SchemasInitFunc) *Schemas {
 
 func (s *Schemas) Err() error {
 	return NewErrors(s.errors)
-}
-
-func (s *Schemas) SubContext(subContext string) *Schema {
-	s.Lock()
-	defer s.Unlock()
-	return s.schemasBySubContext[subContext]
 }
 
 func (s *Schemas) AddSchemas(schema *Schemas) *Schemas {
@@ -85,8 +77,6 @@ func (s *Schemas) doRemoveSchema(schema Schema) *Schemas {
 	delete(s.schemasByPath[schema.Version.Path], schema.ID)
 
 	s.removeReferences(&schema)
-
-	delete(s.schemasBySubContext, schema.SubContext)
 
 	if schema.Embed {
 		s.removeEmbed(&schema)
@@ -143,10 +133,6 @@ func (s *Schemas) doAddSchema(schema Schema) *Schemas {
 		if !schema.Embed {
 			s.addReferences(&schema)
 		}
-	}
-
-	if schema.SubContext != "" {
-		s.schemasBySubContext[schema.SubContext] = &schema
 	}
 
 	if schema.Embed {
@@ -340,6 +326,16 @@ func (s *Schemas) doSchema(version *APIVersion, name string, lock bool) *Schema 
 		}
 	}
 
+	return nil
+}
+
+func (s *Schemas) SubContextVersionForSchema(schema *Schema) *APIVersion {
+	fullName := fmt.Sprintf("%s/schemas/%s", schema.Version.Path, schema.ID)
+	for _, version := range s.Versions() {
+		if version.SubContextSchema == fullName {
+			return &version
+		}
+	}
 	return nil
 }
 

@@ -16,9 +16,6 @@ var (
 		Version: "v3",
 		Group:   "management.cattle.io",
 		Path:    "/v3",
-		SubContexts: map[string]bool{
-			"clusters": true,
-		},
 	}
 
 	Schemas = factory.Schemas(&Version).
@@ -30,7 +27,6 @@ var (
 		Init(authnTypes).
 		Init(tokens).
 		Init(schemaTypes).
-		Init(stackTypes).
 		Init(userTypes).
 		Init(logTypes).
 		Init(globalTypes).
@@ -84,9 +80,7 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 		AddMapperForType(&Version, v3.RancherKubernetesEngineConfig{},
 			m.Drop{Field: "systemImages"},
 		).
-		MustImportAndCustomize(&Version, v3.Cluster{}, func(schema *types.Schema) {
-			schema.SubContext = "clusters"
-		}).
+		MustImport(&Version, v3.Cluster{}).
 		MustImport(&Version, v3.ClusterEvent{}).
 		MustImport(&Version, v3.ClusterRegistrationToken{}).
 		MustImportAndCustomize(&Version, v3.Cluster{}, func(schema *types.Schema) {
@@ -109,9 +103,7 @@ func authzTypes(schemas *types.Schemas) *types.Schemas {
 		AddMapperForType(&Version, v3.ProjectRoleTemplateBinding{},
 			&mapper.NamespaceIDMapper{},
 		).
-		MustImportAndCustomize(&Version, v3.Project{}, func(schema *types.Schema) {
-			schema.SubContext = "projects"
-		}).
+		MustImport(&Version, v3.Project{}).
 		MustImport(&Version, v3.GlobalRole{}).
 		MustImport(&Version, v3.GlobalRoleBinding{}).
 		MustImport(&Version, v3.RoleTemplate{}).
@@ -215,20 +207,6 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 			schema.BaseType = "authConfig"
 			schema.CollectionMethods = []string{}
 			schema.ResourceMethods = []string{http.MethodGet}
-		})
-}
-
-func stackTypes(schema *types.Schemas) *types.Schemas {
-	return schema.
-		MustImportAndCustomize(&Version, v3.App{}, func(schema *types.Schema) {
-			schema.ResourceActions = map[string]types.Action{
-				"upgrade": {
-					Input: "templateVersionId",
-				},
-				"rollback": {
-					Input: "revision",
-				},
-			}
 		})
 }
 

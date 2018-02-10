@@ -25,6 +25,7 @@ type Interface interface {
 	NamespacedBasicAuthsGetter
 	NamespacedSSHAuthsGetter
 	WorkloadsGetter
+	AppsGetter
 }
 
 type Client struct {
@@ -43,6 +44,7 @@ type Client struct {
 	namespacedBasicAuthControllers           map[string]NamespacedBasicAuthController
 	namespacedSshAuthControllers             map[string]NamespacedSSHAuthController
 	workloadControllers                      map[string]WorkloadController
+	appControllers                           map[string]AppController
 }
 
 func NewForConfig(config rest.Config) (Interface, error) {
@@ -70,6 +72,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		namespacedBasicAuthControllers:           map[string]NamespacedBasicAuthController{},
 		namespacedSshAuthControllers:             map[string]NamespacedSSHAuthController{},
 		workloadControllers:                      map[string]WorkloadController{},
+		appControllers:                           map[string]AppController{},
 	}, nil
 }
 
@@ -222,6 +225,19 @@ type WorkloadsGetter interface {
 func (c *Client) Workloads(namespace string) WorkloadInterface {
 	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &WorkloadResource, WorkloadGroupVersionKind, workloadFactory{})
 	return &workloadClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type AppsGetter interface {
+	Apps(namespace string) AppInterface
+}
+
+func (c *Client) Apps(namespace string) AppInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &AppResource, AppGroupVersionKind, appFactory{})
+	return &appClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

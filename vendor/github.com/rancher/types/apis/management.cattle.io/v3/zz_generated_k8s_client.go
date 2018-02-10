@@ -37,7 +37,6 @@ type Interface interface {
 	AuthConfigsGetter
 	TokensGetter
 	DynamicSchemasGetter
-	AppsGetter
 	PreferencesGetter
 	ClusterLoggingsGetter
 	ProjectLoggingsGetter
@@ -73,7 +72,6 @@ type Client struct {
 	authConfigControllers                 map[string]AuthConfigController
 	tokenControllers                      map[string]TokenController
 	dynamicSchemaControllers              map[string]DynamicSchemaController
-	appControllers                        map[string]AppController
 	preferenceControllers                 map[string]PreferenceController
 	clusterLoggingControllers             map[string]ClusterLoggingController
 	projectLoggingControllers             map[string]ProjectLoggingController
@@ -118,7 +116,6 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		authConfigControllers:                 map[string]AuthConfigController{},
 		tokenControllers:                      map[string]TokenController{},
 		dynamicSchemaControllers:              map[string]DynamicSchemaController{},
-		appControllers:                        map[string]AppController{},
 		preferenceControllers:                 map[string]PreferenceController{},
 		clusterLoggingControllers:             map[string]ClusterLoggingController{},
 		projectLoggingControllers:             map[string]ProjectLoggingController{},
@@ -432,19 +429,6 @@ type DynamicSchemasGetter interface {
 func (c *Client) DynamicSchemas(namespace string) DynamicSchemaInterface {
 	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &DynamicSchemaResource, DynamicSchemaGroupVersionKind, dynamicSchemaFactory{})
 	return &dynamicSchemaClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type AppsGetter interface {
-	Apps(namespace string) AppInterface
-}
-
-func (c *Client) Apps(namespace string) AppInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &AppResource, AppGroupVersionKind, appFactory{})
-	return &appClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

@@ -122,7 +122,7 @@ func (u *urlBuilder) Collection(schema *types.Schema, versionOverride *types.API
 }
 
 func (u *urlBuilder) SubContextCollection(subContext *types.Schema, contextName string, schema *types.Schema) string {
-	return u.constructBasicURL(schema.Version, subContext.SubContext, contextName, u.getPluralName(schema))
+	return u.constructBasicURL(subContext.Version, subContext.PluralName, contextName, u.getPluralName(schema))
 }
 
 func (u *urlBuilder) Version(version types.APIVersion) string {

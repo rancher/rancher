@@ -5,35 +5,41 @@ import (
 )
 
 const (
-	ClusterRoleTemplateBindingType                 = "clusterRoleTemplateBinding"
-	ClusterRoleTemplateBindingFieldAnnotations     = "annotations"
-	ClusterRoleTemplateBindingFieldClusterId       = "clusterId"
-	ClusterRoleTemplateBindingFieldCreated         = "created"
-	ClusterRoleTemplateBindingFieldCreatorID       = "creatorId"
-	ClusterRoleTemplateBindingFieldLabels          = "labels"
-	ClusterRoleTemplateBindingFieldName            = "name"
-	ClusterRoleTemplateBindingFieldNamespaceId     = "namespaceId"
-	ClusterRoleTemplateBindingFieldOwnerReferences = "ownerReferences"
-	ClusterRoleTemplateBindingFieldRemoved         = "removed"
-	ClusterRoleTemplateBindingFieldRoleTemplateId  = "roleTemplateId"
-	ClusterRoleTemplateBindingFieldUserId          = "userId"
-	ClusterRoleTemplateBindingFieldUuid            = "uuid"
+	ClusterRoleTemplateBindingType                  = "clusterRoleTemplateBinding"
+	ClusterRoleTemplateBindingFieldAnnotations      = "annotations"
+	ClusterRoleTemplateBindingFieldClusterId        = "clusterId"
+	ClusterRoleTemplateBindingFieldCreated          = "created"
+	ClusterRoleTemplateBindingFieldCreatorID        = "creatorId"
+	ClusterRoleTemplateBindingFieldGroupId          = "groupId"
+	ClusterRoleTemplateBindingFieldGroupPrincipalId = "groupPrincipalId"
+	ClusterRoleTemplateBindingFieldLabels           = "labels"
+	ClusterRoleTemplateBindingFieldName             = "name"
+	ClusterRoleTemplateBindingFieldNamespaceId      = "namespaceId"
+	ClusterRoleTemplateBindingFieldOwnerReferences  = "ownerReferences"
+	ClusterRoleTemplateBindingFieldRemoved          = "removed"
+	ClusterRoleTemplateBindingFieldRoleTemplateId   = "roleTemplateId"
+	ClusterRoleTemplateBindingFieldUserId           = "userId"
+	ClusterRoleTemplateBindingFieldUserPrincipalId  = "userPrincipalId"
+	ClusterRoleTemplateBindingFieldUuid             = "uuid"
 )
 
 type ClusterRoleTemplateBinding struct {
 	types.Resource
-	Annotations     map[string]string `json:"annotations,omitempty"`
-	ClusterId       string            `json:"clusterId,omitempty"`
-	Created         string            `json:"created,omitempty"`
-	CreatorID       string            `json:"creatorId,omitempty"`
-	Labels          map[string]string `json:"labels,omitempty"`
-	Name            string            `json:"name,omitempty"`
-	NamespaceId     string            `json:"namespaceId,omitempty"`
-	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
-	Removed         string            `json:"removed,omitempty"`
-	RoleTemplateId  string            `json:"roleTemplateId,omitempty"`
-	UserId          string            `json:"userId,omitempty"`
-	Uuid            string            `json:"uuid,omitempty"`
+	Annotations      map[string]string `json:"annotations,omitempty"`
+	ClusterId        string            `json:"clusterId,omitempty"`
+	Created          string            `json:"created,omitempty"`
+	CreatorID        string            `json:"creatorId,omitempty"`
+	GroupId          string            `json:"groupId,omitempty"`
+	GroupPrincipalId string            `json:"groupPrincipalId,omitempty"`
+	Labels           map[string]string `json:"labels,omitempty"`
+	Name             string            `json:"name,omitempty"`
+	NamespaceId      string            `json:"namespaceId,omitempty"`
+	OwnerReferences  []OwnerReference  `json:"ownerReferences,omitempty"`
+	Removed          string            `json:"removed,omitempty"`
+	RoleTemplateId   string            `json:"roleTemplateId,omitempty"`
+	UserId           string            `json:"userId,omitempty"`
+	UserPrincipalId  string            `json:"userPrincipalId,omitempty"`
+	Uuid             string            `json:"uuid,omitempty"`
 }
 type ClusterRoleTemplateBindingCollection struct {
 	types.Collection

@@ -16,6 +16,10 @@ type StoreWrapper struct {
 	store types.Store
 }
 
+func (s *StoreWrapper) Context() types.StorageContext {
+	return s.store.Context()
+}
+
 func (s *StoreWrapper) ByID(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
 	data, err := s.store.ByID(apiContext, schema, id)
 	if err != nil {

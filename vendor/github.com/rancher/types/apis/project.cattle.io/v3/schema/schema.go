@@ -13,17 +13,15 @@ import (
 
 var (
 	Version = types.APIVersion{
-		Version: "v3",
-		Group:   "project.cattle.io",
-		Path:    "/v3/projects",
-		SubContexts: map[string]bool{
-			"projects": true,
-		},
+		Version:          "v3",
+		Group:            "project.cattle.io",
+		Path:             "/v3/project",
+		SubContext:       true,
+		SubContextSchema: "/v3/schemas/project",
 	}
 
 	Schemas = factory.Schemas(&Version).
 		// Namespace must be first
-		Init(namespaceTypes).
 		// volume before pod types.  pod types uses volume things, so need to register mapper
 		Init(volumeTypes).
 		Init(ingressTypes).
@@ -36,6 +34,7 @@ var (
 		Init(replicationController).
 		Init(daemonSet).
 		Init(workloadTypes).
+		Init(appTypes).
 		Init(configMapTypes)
 )
 
@@ -69,7 +68,7 @@ func NamespaceTypes(version *types.APIVersion, schemas *types.Schemas) *types.Sc
 		).
 		MustImport(version, v1.Namespace{}, struct {
 			Description string                 `json:"description"`
-			ProjectID   string                 `norman:"type=reference[/v3/schemas/project]"`
+			ProjectID   string                 `norman:"type=reference[/v3/schemas/project],required"`
 			Templates   map[string]string      `json:"templates"`
 			Answers     map[string]interface{} `json:"answers"`
 			Prune       bool                   `json:"prune"`
@@ -453,4 +452,18 @@ func ingressTypes(schemas *types.Schemas) *types.Schemas {
 func volumeTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
 		MustImport(&Version, v1.PersistentVolumeClaim{}, projectOverride{})
+}
+
+func appTypes(schema *types.Schemas) *types.Schemas {
+	return schema.
+		MustImportAndCustomize(&Version, v3.App{}, func(schema *types.Schema) {
+			schema.ResourceActions = map[string]types.Action{
+				"upgrade": {
+					Input: "templateVersionId",
+				},
+				"rollback": {
+					Input: "revision",
+				},
+			}
+		})
 }

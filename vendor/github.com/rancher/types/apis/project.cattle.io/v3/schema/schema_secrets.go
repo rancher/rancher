@@ -246,6 +246,7 @@ func addSecretSubtypes(schemas *types.Schemas, objs ...interface{}) *types.Schem
 	for _, name := range namespaced {
 		baseSchema := schemas.Schema(&Version, name)
 
+		// Make non-namespaced have namespaceId not required
 		newFields := map[string]types.Field{}
 		for name, field := range baseSchema.ResourceFields {
 			if name == "namespaceId" {
@@ -259,6 +260,7 @@ func addSecretSubtypes(schemas *types.Schemas, objs ...interface{}) *types.Schem
 		schema.PluralName = "namespaced" + convert.Capitalize(schema.PluralName)
 		schema.CodeName = "Namespaced" + schema.CodeName
 		schema.CodeNamePlural = "Namespaced" + schema.CodeNamePlural
+		schema.BaseType = "namespacedSecret"
 		schemas.AddSchema(schema)
 
 		baseSchema.ResourceFields = newFields

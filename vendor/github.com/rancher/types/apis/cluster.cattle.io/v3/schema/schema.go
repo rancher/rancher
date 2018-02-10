@@ -12,9 +12,11 @@ import (
 
 var (
 	Version = types.APIVersion{
-		Version: "v3",
-		Group:   "cluster.cattle.io",
-		Path:    "/v3/clusters",
+		Version:          "v3",
+		Group:            "cluster.cattle.io",
+		Path:             "/v3/cluster",
+		SubContext:       true,
+		SubContextSchema: "/v3/schemas/cluster",
 	}
 
 	Schemas = factory.Schemas(&Version).

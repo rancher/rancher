@@ -55,6 +55,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&NamespacedSSHAuthList{},
 		&Workload{},
 		&WorkloadList{},
+		&App{},
+		&AppList{},
 	)
 	return nil
 }
