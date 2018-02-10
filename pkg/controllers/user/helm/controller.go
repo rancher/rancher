@@ -31,7 +31,7 @@ const (
 )
 
 func Register(management *config.UserContext) {
-	stackClient := management.Project.Apps("")
+	stackClient := management.Management.Project.Apps("")
 	stackLifecycle := &Lifecycle{
 		NameSpaceClient:       management.Core.Namespaces(""),
 		K8sClient:             management.K8sClient,
