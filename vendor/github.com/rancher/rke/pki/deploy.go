@@ -20,33 +20,11 @@ import (
 	"k8s.io/client-go/util/cert"
 )
 
-func DeployCertificatesOnPlaneHost(ctx context.Context, host *hosts.Host, etcdHosts []*hosts.Host, crtMap map[string]CertificatePKI, certDownloaderImage string, prsMap map[string]v3.PrivateRegistry) error {
-	certList := []string{}
-	if host.IsControl {
-		certList = []string{
-			CACertName,
-			KubeAPICertName,
-			KubeControllerCertName,
-			KubeSchedulerCertName,
-			KubeProxyCertName,
-			KubeNodeCertName,
-		}
-	} else {
-		certList = []string{
-			CACertName,
-			KubeProxyCertName,
-			KubeNodeCertName,
-		}
-	}
-	if host.IsEtcd {
-		for _, host := range etcdHosts {
-			certList = append(certList, GetEtcdCrtName(host.InternalAddress))
-		}
-	}
+func DeployCertificatesOnPlaneHost(ctx context.Context, host *hosts.Host, rkeConfig v3.RancherKubernetesEngineConfig, crtMap map[string]CertificatePKI, certDownloaderImage string, prsMap map[string]v3.PrivateRegistry) error {
+	crtBundle := GenerateRKENodeCerts(ctx, rkeConfig, host.Address, crtMap)
 	env := []string{}
-	for _, crtName := range certList {
-		c := crtMap[crtName]
-		env = append(env, c.ToEnv()...)
+	for _, crt := range crtBundle {
+		env = append(env, crt.ToEnv()...)
 	}
 	return doRunDeployer(ctx, host, env, certDownloaderImage, prsMap)
 }
@@ -120,27 +98,13 @@ func RemoveAdminConfig(ctx context.Context, localConfigPath string) {
 	log.Infof(ctx, "Local admin Kubeconfig removed successfully")
 }
 
-func DeployCertificatesOnHost(ctx context.Context, extraHosts []*hosts.Host, host *hosts.Host, crtMap map[string]CertificatePKI, certDownloaderImage, certPath string, prsMap map[string]v3.PrivateRegistry) error {
-	crtList := []string{
-		CACertName,
-		KubeAPICertName,
-		KubeControllerCertName,
-		KubeSchedulerCertName,
-		KubeProxyCertName,
-		KubeNodeCertName,
-		KubeAdminCertName,
-	}
-	for _, host := range extraHosts {
-		// Deploy etcd certificates
-		crtList = append(crtList, GetEtcdCrtName(host.InternalAddress))
-	}
+func DeployCertificatesOnHost(ctx context.Context, host *hosts.Host, crtMap map[string]CertificatePKI, certDownloaderImage, certPath string, prsMap map[string]v3.PrivateRegistry) error {
 	env := []string{
 		"CRTS_DEPLOY_PATH=" + certPath,
 	}
-	for _, crtName := range crtList {
-		c := crtMap[crtName]
-		// We don't need to edit the cert paths, they are not used in deployment
-		env = append(env, c.ToEnv()...)
+	for _, crt := range crtMap {
+
+		env = append(env, crt.ToEnv()...)
 	}
 	return doRunDeployer(ctx, host, env, certDownloaderImage, prsMap)
 }

@@ -25,10 +25,12 @@ type Client struct {
 	DNSRecord                     DNSRecordOperations
 	Pod                           PodOperations
 	Deployment                    DeploymentOperations
-	StatefulSet                   StatefulSetOperations
-	ReplicaSet                    ReplicaSetOperations
 	ReplicationController         ReplicationControllerOperations
+	ReplicaSet                    ReplicaSetOperations
+	StatefulSet                   StatefulSetOperations
 	DaemonSet                     DaemonSetOperations
+	CronJob                       CronJobOperations
+	Job                           JobOperations
 	Workload                      WorkloadOperations
 	App                           AppOperations
 	ConfigMap                     ConfigMapOperations
@@ -62,10 +64,12 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.DNSRecord = newDNSRecordClient(client)
 	client.Pod = newPodClient(client)
 	client.Deployment = newDeploymentClient(client)
-	client.StatefulSet = newStatefulSetClient(client)
-	client.ReplicaSet = newReplicaSetClient(client)
 	client.ReplicationController = newReplicationControllerClient(client)
+	client.ReplicaSet = newReplicaSetClient(client)
+	client.StatefulSet = newStatefulSetClient(client)
 	client.DaemonSet = newDaemonSetClient(client)
+	client.CronJob = newCronJobClient(client)
+	client.Job = newJobClient(client)
 	client.Workload = newWorkloadClient(client)
 	client.App = newAppClient(client)
 	client.ConfigMap = newConfigMapClient(client)

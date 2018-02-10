@@ -189,7 +189,7 @@ func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, ku
 	currentCluster.Certificates = crtMap
 	for _, etcdHost := range etcdToAdd {
 		// deploy certificates on new etcd host
-		if err := pki.DeployCertificatesOnHost(ctx, kubeCluster.EtcdHosts, etcdHost, currentCluster.Certificates, kubeCluster.SystemImages.CertDownloader, pki.CertPathPrefix, kubeCluster.PrivateRegistriesMap); err != nil {
+		if err := pki.DeployCertificatesOnHost(ctx, etcdHost, currentCluster.Certificates, kubeCluster.SystemImages.CertDownloader, pki.CertPathPrefix, kubeCluster.PrivateRegistriesMap); err != nil {
 			return err
 		}
 
@@ -205,8 +205,8 @@ func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, ku
 }
 
 func syncLabels(ctx context.Context, currentCluster, kubeCluster *Cluster) {
-	currentHosts := currentCluster.getUniqueHostList()
-	configHosts := kubeCluster.getUniqueHostList()
+	currentHosts := hosts.GetUniqueHostList(currentCluster.EtcdHosts, currentCluster.ControlPlaneHosts, currentCluster.WorkerHosts)
+	configHosts := hosts.GetUniqueHostList(kubeCluster.EtcdHosts, kubeCluster.ControlPlaneHosts, kubeCluster.WorkerHosts)
 	for _, host := range configHosts {
 		for _, currentHost := range currentHosts {
 			if host.Address == currentHost.Address {

@@ -19,6 +19,7 @@ const (
 	VolumeFieldHostPath              = "hostPath"
 	VolumeFieldISCSI                 = "iscsi"
 	VolumeFieldNFS                   = "nfs"
+	VolumeFieldName                  = "name"
 	VolumeFieldPersistentVolumeClaim = "persistentVolumeClaim"
 	VolumeFieldPhotonPersistentDisk  = "photonPersistentDisk"
 	VolumeFieldPortworxVolume        = "portworxVolume"
@@ -49,6 +50,7 @@ type Volume struct {
 	HostPath              *HostPathVolumeSource              `json:"hostPath,omitempty"`
 	ISCSI                 *ISCSIVolumeSource                 `json:"iscsi,omitempty"`
 	NFS                   *NFSVolumeSource                   `json:"nfs,omitempty"`
+	Name                  string                             `json:"name,omitempty"`
 	PersistentVolumeClaim *PersistentVolumeClaimVolumeSource `json:"persistentVolumeClaim,omitempty"`
 	PhotonPersistentDisk  *PhotonPersistentDiskVolumeSource  `json:"photonPersistentDisk,omitempty"`
 	PortworxVolume        *PortworxVolumeSource              `json:"portworxVolume,omitempty"`

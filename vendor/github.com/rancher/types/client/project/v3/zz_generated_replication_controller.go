@@ -9,38 +9,37 @@ const (
 	ReplicationControllerFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	ReplicationControllerFieldAnnotations                   = "annotations"
 	ReplicationControllerFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
-	ReplicationControllerFieldBatchSize                     = "batchSize"
 	ReplicationControllerFieldContainers                    = "containers"
 	ReplicationControllerFieldCreated                       = "created"
 	ReplicationControllerFieldCreatorID                     = "creatorId"
 	ReplicationControllerFieldDNSPolicy                     = "dnsPolicy"
-	ReplicationControllerFieldDeploymentStrategy            = "deploymentStrategy"
 	ReplicationControllerFieldFsgid                         = "fsgid"
 	ReplicationControllerFieldGids                          = "gids"
 	ReplicationControllerFieldHostAliases                   = "hostAliases"
+	ReplicationControllerFieldHostIPC                       = "hostIPC"
+	ReplicationControllerFieldHostNetwork                   = "hostNetwork"
+	ReplicationControllerFieldHostPID                       = "hostPID"
 	ReplicationControllerFieldHostname                      = "hostname"
-	ReplicationControllerFieldIPC                           = "ipc"
+	ReplicationControllerFieldImagePullSecrets              = "imagePullSecrets"
 	ReplicationControllerFieldLabels                        = "labels"
 	ReplicationControllerFieldName                          = "name"
 	ReplicationControllerFieldNamespaceId                   = "namespaceId"
-	ReplicationControllerFieldNet                           = "net"
 	ReplicationControllerFieldNodeId                        = "nodeId"
+	ReplicationControllerFieldObjectMeta                    = "metadata"
 	ReplicationControllerFieldOwnerReferences               = "ownerReferences"
-	ReplicationControllerFieldPID                           = "pid"
 	ReplicationControllerFieldPriority                      = "priority"
 	ReplicationControllerFieldPriorityClassName             = "priorityClassName"
 	ReplicationControllerFieldProjectID                     = "projectId"
-	ReplicationControllerFieldPullPolicy                    = "pullPolicy"
-	ReplicationControllerFieldPullSecrets                   = "pullSecrets"
 	ReplicationControllerFieldRemoved                       = "removed"
-	ReplicationControllerFieldRestart                       = "restart"
+	ReplicationControllerFieldReplicationController         = "replicationController"
+	ReplicationControllerFieldReplicationControllerStatus   = "replicationControllerStatus"
+	ReplicationControllerFieldRestartPolicy                 = "restartPolicy"
 	ReplicationControllerFieldRunAsNonRoot                  = "runAsNonRoot"
-	ReplicationControllerFieldScale                         = "scale"
 	ReplicationControllerFieldSchedulerName                 = "schedulerName"
 	ReplicationControllerFieldScheduling                    = "scheduling"
+	ReplicationControllerFieldSelector                      = "selector"
 	ReplicationControllerFieldServiceAccountName            = "serviceAccountName"
 	ReplicationControllerFieldState                         = "state"
-	ReplicationControllerFieldStatus                        = "status"
 	ReplicationControllerFieldSubdomain                     = "subdomain"
 	ReplicationControllerFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
 	ReplicationControllerFieldTransitioning                 = "transitioning"
@@ -48,8 +47,6 @@ const (
 	ReplicationControllerFieldUid                           = "uid"
 	ReplicationControllerFieldUuid                          = "uuid"
 	ReplicationControllerFieldVolumes                       = "volumes"
-	ReplicationControllerFieldWorkloadAnnotations           = "workloadAnnotations"
-	ReplicationControllerFieldWorkloadLabels                = "workloadLabels"
 )
 
 type ReplicationController struct {
@@ -57,47 +54,44 @@ type ReplicationController struct {
 	ActiveDeadlineSeconds         *int64                       `json:"activeDeadlineSeconds,omitempty"`
 	Annotations                   map[string]string            `json:"annotations,omitempty"`
 	AutomountServiceAccountToken  *bool                        `json:"automountServiceAccountToken,omitempty"`
-	BatchSize                     string                       `json:"batchSize,omitempty"`
 	Containers                    []Container                  `json:"containers,omitempty"`
 	Created                       string                       `json:"created,omitempty"`
 	CreatorID                     string                       `json:"creatorId,omitempty"`
 	DNSPolicy                     string                       `json:"dnsPolicy,omitempty"`
-	DeploymentStrategy            *DeployStrategy              `json:"deploymentStrategy,omitempty"`
 	Fsgid                         *int64                       `json:"fsgid,omitempty"`
 	Gids                          []int64                      `json:"gids,omitempty"`
-	HostAliases                   map[string]HostAlias         `json:"hostAliases,omitempty"`
+	HostAliases                   []HostAlias                  `json:"hostAliases,omitempty"`
+	HostIPC                       *bool                        `json:"hostIPC,omitempty"`
+	HostNetwork                   *bool                        `json:"hostNetwork,omitempty"`
+	HostPID                       *bool                        `json:"hostPID,omitempty"`
 	Hostname                      string                       `json:"hostname,omitempty"`
-	IPC                           string                       `json:"ipc,omitempty"`
+	ImagePullSecrets              []LocalObjectReference       `json:"imagePullSecrets,omitempty"`
 	Labels                        map[string]string            `json:"labels,omitempty"`
 	Name                          string                       `json:"name,omitempty"`
 	NamespaceId                   string                       `json:"namespaceId,omitempty"`
-	Net                           string                       `json:"net,omitempty"`
 	NodeId                        string                       `json:"nodeId,omitempty"`
+	ObjectMeta                    *ObjectMeta                  `json:"metadata,omitempty"`
 	OwnerReferences               []OwnerReference             `json:"ownerReferences,omitempty"`
-	PID                           string                       `json:"pid,omitempty"`
 	Priority                      *int64                       `json:"priority,omitempty"`
 	PriorityClassName             string                       `json:"priorityClassName,omitempty"`
 	ProjectID                     string                       `json:"projectId,omitempty"`
-	PullPolicy                    string                       `json:"pullPolicy,omitempty"`
-	PullSecrets                   []LocalObjectReference       `json:"pullSecrets,omitempty"`
 	Removed                       string                       `json:"removed,omitempty"`
-	Restart                       string                       `json:"restart,omitempty"`
+	ReplicationController         *ReplicationControllerConfig `json:"replicationController,omitempty"`
+	ReplicationControllerStatus   *ReplicationControllerStatus `json:"replicationControllerStatus,omitempty"`
+	RestartPolicy                 string                       `json:"restartPolicy,omitempty"`
 	RunAsNonRoot                  *bool                        `json:"runAsNonRoot,omitempty"`
-	Scale                         *int64                       `json:"scale,omitempty"`
 	SchedulerName                 string                       `json:"schedulerName,omitempty"`
 	Scheduling                    *Scheduling                  `json:"scheduling,omitempty"`
+	Selector                      map[string]string            `json:"selector,omitempty"`
 	ServiceAccountName            string                       `json:"serviceAccountName,omitempty"`
 	State                         string                       `json:"state,omitempty"`
-	Status                        *ReplicationControllerStatus `json:"status,omitempty"`
 	Subdomain                     string                       `json:"subdomain,omitempty"`
 	TerminationGracePeriodSeconds *int64                       `json:"terminationGracePeriodSeconds,omitempty"`
 	Transitioning                 string                       `json:"transitioning,omitempty"`
 	TransitioningMessage          string                       `json:"transitioningMessage,omitempty"`
 	Uid                           *int64                       `json:"uid,omitempty"`
 	Uuid                          string                       `json:"uuid,omitempty"`
-	Volumes                       map[string]Volume            `json:"volumes,omitempty"`
-	WorkloadAnnotations           map[string]string            `json:"workloadAnnotations,omitempty"`
-	WorkloadLabels                map[string]string            `json:"workloadLabels,omitempty"`
+	Volumes                       []Volume                     `json:"volumes,omitempty"`
 }
 type ReplicationControllerCollection struct {
 	types.Collection

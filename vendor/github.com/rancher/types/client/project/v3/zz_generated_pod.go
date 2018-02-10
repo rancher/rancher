@@ -17,23 +17,22 @@ const (
 	PodFieldFsgid                         = "fsgid"
 	PodFieldGids                          = "gids"
 	PodFieldHostAliases                   = "hostAliases"
+	PodFieldHostIPC                       = "hostIPC"
+	PodFieldHostNetwork                   = "hostNetwork"
+	PodFieldHostPID                       = "hostPID"
 	PodFieldHostname                      = "hostname"
-	PodFieldIPC                           = "ipc"
+	PodFieldImagePullSecrets              = "imagePullSecrets"
 	PodFieldLabels                        = "labels"
 	PodFieldName                          = "name"
 	PodFieldNamespaceId                   = "namespaceId"
-	PodFieldNet                           = "net"
 	PodFieldNodeId                        = "nodeId"
 	PodFieldOwnerReferences               = "ownerReferences"
-	PodFieldPID                           = "pid"
 	PodFieldPriority                      = "priority"
 	PodFieldPriorityClassName             = "priorityClassName"
 	PodFieldProjectID                     = "projectId"
 	PodFieldPublicEndpoints               = "publicEndpoints"
-	PodFieldPullPolicy                    = "pullPolicy"
-	PodFieldPullSecrets                   = "pullSecrets"
 	PodFieldRemoved                       = "removed"
-	PodFieldRestart                       = "restart"
+	PodFieldRestartPolicy                 = "restartPolicy"
 	PodFieldRunAsNonRoot                  = "runAsNonRoot"
 	PodFieldSchedulerName                 = "schedulerName"
 	PodFieldScheduling                    = "scheduling"
@@ -62,24 +61,23 @@ type Pod struct {
 	Description                   string                 `json:"description,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty"`
-	HostAliases                   map[string]HostAlias   `json:"hostAliases,omitempty"`
+	HostAliases                   []HostAlias            `json:"hostAliases,omitempty"`
+	HostIPC                       *bool                  `json:"hostIPC,omitempty"`
+	HostNetwork                   *bool                  `json:"hostNetwork,omitempty"`
+	HostPID                       *bool                  `json:"hostPID,omitempty"`
 	Hostname                      string                 `json:"hostname,omitempty"`
-	IPC                           string                 `json:"ipc,omitempty"`
+	ImagePullSecrets              []LocalObjectReference `json:"imagePullSecrets,omitempty"`
 	Labels                        map[string]string      `json:"labels,omitempty"`
 	Name                          string                 `json:"name,omitempty"`
 	NamespaceId                   string                 `json:"namespaceId,omitempty"`
-	Net                           string                 `json:"net,omitempty"`
 	NodeId                        string                 `json:"nodeId,omitempty"`
 	OwnerReferences               []OwnerReference       `json:"ownerReferences,omitempty"`
-	PID                           string                 `json:"pid,omitempty"`
 	Priority                      *int64                 `json:"priority,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty"`
 	ProjectID                     string                 `json:"projectId,omitempty"`
 	PublicEndpoints               []PublicEndpoint       `json:"publicEndpoints,omitempty"`
-	PullPolicy                    string                 `json:"pullPolicy,omitempty"`
-	PullSecrets                   []LocalObjectReference `json:"pullSecrets,omitempty"`
 	Removed                       string                 `json:"removed,omitempty"`
-	Restart                       string                 `json:"restart,omitempty"`
+	RestartPolicy                 string                 `json:"restartPolicy,omitempty"`
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty"`
 	SchedulerName                 string                 `json:"schedulerName,omitempty"`
 	Scheduling                    *Scheduling            `json:"scheduling,omitempty"`
@@ -92,7 +90,7 @@ type Pod struct {
 	TransitioningMessage          string                 `json:"transitioningMessage,omitempty"`
 	Uid                           *int64                 `json:"uid,omitempty"`
 	Uuid                          string                 `json:"uuid,omitempty"`
-	Volumes                       map[string]Volume      `json:"volumes,omitempty"`
+	Volumes                       []Volume               `json:"volumes,omitempty"`
 	WorkloadID                    string                 `json:"workloadId,omitempty"`
 }
 type PodCollection struct {

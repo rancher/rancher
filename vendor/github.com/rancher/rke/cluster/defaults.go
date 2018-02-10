@@ -9,8 +9,6 @@ import (
 )
 
 const (
-	DefaultClusterConfig = "cluster.yml"
-
 	DefaultServiceClusterIPRange = "10.233.0.0/18"
 	DefaultClusterCIDR           = "10.233.64.0/18"
 	DefaultClusterDNSService     = "10.233.0.3"

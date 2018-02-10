@@ -9,17 +9,16 @@ const (
 	PodTemplateSpecFieldFsgid                         = "fsgid"
 	PodTemplateSpecFieldGids                          = "gids"
 	PodTemplateSpecFieldHostAliases                   = "hostAliases"
+	PodTemplateSpecFieldHostIPC                       = "hostIPC"
+	PodTemplateSpecFieldHostNetwork                   = "hostNetwork"
+	PodTemplateSpecFieldHostPID                       = "hostPID"
 	PodTemplateSpecFieldHostname                      = "hostname"
-	PodTemplateSpecFieldIPC                           = "ipc"
-	PodTemplateSpecFieldNet                           = "net"
+	PodTemplateSpecFieldImagePullSecrets              = "imagePullSecrets"
 	PodTemplateSpecFieldNodeId                        = "nodeId"
 	PodTemplateSpecFieldObjectMeta                    = "metadata"
-	PodTemplateSpecFieldPID                           = "pid"
 	PodTemplateSpecFieldPriority                      = "priority"
 	PodTemplateSpecFieldPriorityClassName             = "priorityClassName"
-	PodTemplateSpecFieldPullPolicy                    = "pullPolicy"
-	PodTemplateSpecFieldPullSecrets                   = "pullSecrets"
-	PodTemplateSpecFieldRestart                       = "restart"
+	PodTemplateSpecFieldRestartPolicy                 = "restartPolicy"
 	PodTemplateSpecFieldRunAsNonRoot                  = "runAsNonRoot"
 	PodTemplateSpecFieldSchedulerName                 = "schedulerName"
 	PodTemplateSpecFieldScheduling                    = "scheduling"
@@ -37,18 +36,17 @@ type PodTemplateSpec struct {
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty"`
-	HostAliases                   map[string]HostAlias   `json:"hostAliases,omitempty"`
+	HostAliases                   []HostAlias            `json:"hostAliases,omitempty"`
+	HostIPC                       *bool                  `json:"hostIPC,omitempty"`
+	HostNetwork                   *bool                  `json:"hostNetwork,omitempty"`
+	HostPID                       *bool                  `json:"hostPID,omitempty"`
 	Hostname                      string                 `json:"hostname,omitempty"`
-	IPC                           string                 `json:"ipc,omitempty"`
-	Net                           string                 `json:"net,omitempty"`
+	ImagePullSecrets              []LocalObjectReference `json:"imagePullSecrets,omitempty"`
 	NodeId                        string                 `json:"nodeId,omitempty"`
 	ObjectMeta                    *ObjectMeta            `json:"metadata,omitempty"`
-	PID                           string                 `json:"pid,omitempty"`
 	Priority                      *int64                 `json:"priority,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty"`
-	PullPolicy                    string                 `json:"pullPolicy,omitempty"`
-	PullSecrets                   []LocalObjectReference `json:"pullSecrets,omitempty"`
-	Restart                       string                 `json:"restart,omitempty"`
+	RestartPolicy                 string                 `json:"restartPolicy,omitempty"`
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty"`
 	SchedulerName                 string                 `json:"schedulerName,omitempty"`
 	Scheduling                    *Scheduling            `json:"scheduling,omitempty"`
@@ -56,5 +54,5 @@ type PodTemplateSpec struct {
 	Subdomain                     string                 `json:"subdomain,omitempty"`
 	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty"`
 	Uid                           *int64                 `json:"uid,omitempty"`
-	Volumes                       map[string]Volume      `json:"volumes,omitempty"`
+	Volumes                       []Volume               `json:"volumes,omitempty"`
 }

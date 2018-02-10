@@ -9,99 +9,89 @@ const (
 	DaemonSetFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	DaemonSetFieldAnnotations                   = "annotations"
 	DaemonSetFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
-	DaemonSetFieldBatchSize                     = "batchSize"
 	DaemonSetFieldContainers                    = "containers"
 	DaemonSetFieldCreated                       = "created"
 	DaemonSetFieldCreatorID                     = "creatorId"
 	DaemonSetFieldDNSPolicy                     = "dnsPolicy"
-	DaemonSetFieldDeploymentStrategy            = "deploymentStrategy"
+	DaemonSetFieldDaemonSet                     = "daemonSet"
+	DaemonSetFieldDaemonSetStatus               = "daemonSetStatus"
 	DaemonSetFieldFsgid                         = "fsgid"
 	DaemonSetFieldGids                          = "gids"
 	DaemonSetFieldHostAliases                   = "hostAliases"
+	DaemonSetFieldHostIPC                       = "hostIPC"
+	DaemonSetFieldHostNetwork                   = "hostNetwork"
+	DaemonSetFieldHostPID                       = "hostPID"
 	DaemonSetFieldHostname                      = "hostname"
-	DaemonSetFieldIPC                           = "ipc"
+	DaemonSetFieldImagePullSecrets              = "imagePullSecrets"
 	DaemonSetFieldLabels                        = "labels"
 	DaemonSetFieldName                          = "name"
 	DaemonSetFieldNamespaceId                   = "namespaceId"
-	DaemonSetFieldNet                           = "net"
 	DaemonSetFieldNodeId                        = "nodeId"
+	DaemonSetFieldObjectMeta                    = "metadata"
 	DaemonSetFieldOwnerReferences               = "ownerReferences"
-	DaemonSetFieldPID                           = "pid"
 	DaemonSetFieldPriority                      = "priority"
 	DaemonSetFieldPriorityClassName             = "priorityClassName"
 	DaemonSetFieldProjectID                     = "projectId"
-	DaemonSetFieldPullPolicy                    = "pullPolicy"
-	DaemonSetFieldPullSecrets                   = "pullSecrets"
 	DaemonSetFieldRemoved                       = "removed"
-	DaemonSetFieldRestart                       = "restart"
-	DaemonSetFieldRevisionHistoryLimit          = "revisionHistoryLimit"
+	DaemonSetFieldRestartPolicy                 = "restartPolicy"
 	DaemonSetFieldRunAsNonRoot                  = "runAsNonRoot"
-	DaemonSetFieldScale                         = "scale"
 	DaemonSetFieldSchedulerName                 = "schedulerName"
 	DaemonSetFieldScheduling                    = "scheduling"
+	DaemonSetFieldSelector                      = "selector"
 	DaemonSetFieldServiceAccountName            = "serviceAccountName"
 	DaemonSetFieldState                         = "state"
-	DaemonSetFieldStatus                        = "status"
 	DaemonSetFieldSubdomain                     = "subdomain"
 	DaemonSetFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
 	DaemonSetFieldTransitioning                 = "transitioning"
 	DaemonSetFieldTransitioningMessage          = "transitioningMessage"
 	DaemonSetFieldUid                           = "uid"
-	DaemonSetFieldUpdateStrategy                = "updateStrategy"
 	DaemonSetFieldUuid                          = "uuid"
 	DaemonSetFieldVolumes                       = "volumes"
-	DaemonSetFieldWorkloadAnnotations           = "workloadAnnotations"
-	DaemonSetFieldWorkloadLabels                = "workloadLabels"
 )
 
 type DaemonSet struct {
 	types.Resource
-	ActiveDeadlineSeconds         *int64                   `json:"activeDeadlineSeconds,omitempty"`
-	Annotations                   map[string]string        `json:"annotations,omitempty"`
-	AutomountServiceAccountToken  *bool                    `json:"automountServiceAccountToken,omitempty"`
-	BatchSize                     string                   `json:"batchSize,omitempty"`
-	Containers                    []Container              `json:"containers,omitempty"`
-	Created                       string                   `json:"created,omitempty"`
-	CreatorID                     string                   `json:"creatorId,omitempty"`
-	DNSPolicy                     string                   `json:"dnsPolicy,omitempty"`
-	DeploymentStrategy            *DeployStrategy          `json:"deploymentStrategy,omitempty"`
-	Fsgid                         *int64                   `json:"fsgid,omitempty"`
-	Gids                          []int64                  `json:"gids,omitempty"`
-	HostAliases                   map[string]HostAlias     `json:"hostAliases,omitempty"`
-	Hostname                      string                   `json:"hostname,omitempty"`
-	IPC                           string                   `json:"ipc,omitempty"`
-	Labels                        map[string]string        `json:"labels,omitempty"`
-	Name                          string                   `json:"name,omitempty"`
-	NamespaceId                   string                   `json:"namespaceId,omitempty"`
-	Net                           string                   `json:"net,omitempty"`
-	NodeId                        string                   `json:"nodeId,omitempty"`
-	OwnerReferences               []OwnerReference         `json:"ownerReferences,omitempty"`
-	PID                           string                   `json:"pid,omitempty"`
-	Priority                      *int64                   `json:"priority,omitempty"`
-	PriorityClassName             string                   `json:"priorityClassName,omitempty"`
-	ProjectID                     string                   `json:"projectId,omitempty"`
-	PullPolicy                    string                   `json:"pullPolicy,omitempty"`
-	PullSecrets                   []LocalObjectReference   `json:"pullSecrets,omitempty"`
-	Removed                       string                   `json:"removed,omitempty"`
-	Restart                       string                   `json:"restart,omitempty"`
-	RevisionHistoryLimit          *int64                   `json:"revisionHistoryLimit,omitempty"`
-	RunAsNonRoot                  *bool                    `json:"runAsNonRoot,omitempty"`
-	Scale                         *int64                   `json:"scale,omitempty"`
-	SchedulerName                 string                   `json:"schedulerName,omitempty"`
-	Scheduling                    *Scheduling              `json:"scheduling,omitempty"`
-	ServiceAccountName            string                   `json:"serviceAccountName,omitempty"`
-	State                         string                   `json:"state,omitempty"`
-	Status                        *DaemonSetStatus         `json:"status,omitempty"`
-	Subdomain                     string                   `json:"subdomain,omitempty"`
-	TerminationGracePeriodSeconds *int64                   `json:"terminationGracePeriodSeconds,omitempty"`
-	Transitioning                 string                   `json:"transitioning,omitempty"`
-	TransitioningMessage          string                   `json:"transitioningMessage,omitempty"`
-	Uid                           *int64                   `json:"uid,omitempty"`
-	UpdateStrategy                *DaemonSetUpdateStrategy `json:"updateStrategy,omitempty"`
-	Uuid                          string                   `json:"uuid,omitempty"`
-	Volumes                       map[string]Volume        `json:"volumes,omitempty"`
-	WorkloadAnnotations           map[string]string        `json:"workloadAnnotations,omitempty"`
-	WorkloadLabels                map[string]string        `json:"workloadLabels,omitempty"`
+	ActiveDeadlineSeconds         *int64                 `json:"activeDeadlineSeconds,omitempty"`
+	Annotations                   map[string]string      `json:"annotations,omitempty"`
+	AutomountServiceAccountToken  *bool                  `json:"automountServiceAccountToken,omitempty"`
+	Containers                    []Container            `json:"containers,omitempty"`
+	Created                       string                 `json:"created,omitempty"`
+	CreatorID                     string                 `json:"creatorId,omitempty"`
+	DNSPolicy                     string                 `json:"dnsPolicy,omitempty"`
+	DaemonSet                     *DaemonSetConfig       `json:"daemonSet,omitempty"`
+	DaemonSetStatus               *DaemonSetStatus       `json:"daemonSetStatus,omitempty"`
+	Fsgid                         *int64                 `json:"fsgid,omitempty"`
+	Gids                          []int64                `json:"gids,omitempty"`
+	HostAliases                   []HostAlias            `json:"hostAliases,omitempty"`
+	HostIPC                       *bool                  `json:"hostIPC,omitempty"`
+	HostNetwork                   *bool                  `json:"hostNetwork,omitempty"`
+	HostPID                       *bool                  `json:"hostPID,omitempty"`
+	Hostname                      string                 `json:"hostname,omitempty"`
+	ImagePullSecrets              []LocalObjectReference `json:"imagePullSecrets,omitempty"`
+	Labels                        map[string]string      `json:"labels,omitempty"`
+	Name                          string                 `json:"name,omitempty"`
+	NamespaceId                   string                 `json:"namespaceId,omitempty"`
+	NodeId                        string                 `json:"nodeId,omitempty"`
+	ObjectMeta                    *ObjectMeta            `json:"metadata,omitempty"`
+	OwnerReferences               []OwnerReference       `json:"ownerReferences,omitempty"`
+	Priority                      *int64                 `json:"priority,omitempty"`
+	PriorityClassName             string                 `json:"priorityClassName,omitempty"`
+	ProjectID                     string                 `json:"projectId,omitempty"`
+	Removed                       string                 `json:"removed,omitempty"`
+	RestartPolicy                 string                 `json:"restartPolicy,omitempty"`
+	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty"`
+	SchedulerName                 string                 `json:"schedulerName,omitempty"`
+	Scheduling                    *Scheduling            `json:"scheduling,omitempty"`
+	Selector                      *LabelSelector         `json:"selector,omitempty"`
+	ServiceAccountName            string                 `json:"serviceAccountName,omitempty"`
+	State                         string                 `json:"state,omitempty"`
+	Subdomain                     string                 `json:"subdomain,omitempty"`
+	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty"`
+	Transitioning                 string                 `json:"transitioning,omitempty"`
+	TransitioningMessage          string                 `json:"transitioningMessage,omitempty"`
+	Uid                           *int64                 `json:"uid,omitempty"`
+	Uuid                          string                 `json:"uuid,omitempty"`
+	Volumes                       []Volume               `json:"volumes,omitempty"`
 }
 type DaemonSetCollection struct {
 	types.Collection

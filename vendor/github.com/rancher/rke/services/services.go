@@ -2,8 +2,6 @@ package services
 
 import (
 	"context"
-	"fmt"
-	"net"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/rancher/rke/docker"
@@ -35,21 +33,6 @@ const (
 	KubeletPort        = 10250
 	KubeproxyPort      = 10256
 )
-
-func GetKubernetesServiceIP(serviceClusterRange string) (net.IP, error) {
-	ip, ipnet, err := net.ParseCIDR(serviceClusterRange)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to get kubernetes service IP from Kube API option [service_cluster_ip_range]: %v", err)
-	}
-	ip = ip.Mask(ipnet.Mask)
-	for j := len(ip) - 1; j >= 0; j-- {
-		ip[j]++
-		if ip[j] > 0 {
-			break
-		}
-	}
-	return ip, nil
-}
 
 func buildSidekickConfig(sidekickImage string) (*container.Config, *container.HostConfig) {
 	imageCfg := &container.Config{

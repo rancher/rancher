@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"path/filepath"
 	"strings"
 
 	"github.com/rancher/rke/authz"
@@ -124,7 +123,7 @@ func ParseCluster(
 		return nil, fmt.Errorf("Failed to validate cluster: %v", err)
 	}
 
-	c.KubernetesServiceIP, err = services.GetKubernetesServiceIP(c.Services.KubeAPI.ServiceClusterIPRange)
+	c.KubernetesServiceIP, err = pki.GetKubernetesServiceIP(c.Services.KubeAPI.ServiceClusterIPRange)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get Kubernetes Service IP: %v", err)
 	}
@@ -132,9 +131,9 @@ func ParseCluster(
 	c.ClusterCIDR = c.Services.KubeController.ClusterCIDR
 	c.ClusterDNSServer = c.Services.Kubelet.ClusterDNSServer
 	if len(c.ConfigPath) == 0 {
-		c.ConfigPath = DefaultClusterConfig
+		c.ConfigPath = pki.ClusterConfig
 	}
-	c.LocalKubeConfigPath = GetLocalKubeConfig(c.ConfigPath, configDir)
+	c.LocalKubeConfigPath = pki.GetLocalKubeConfig(c.ConfigPath, configDir)
 
 	for _, pr := range c.PrivateRegistries {
 		if pr.URL == "" {
@@ -144,16 +143,6 @@ func ParseCluster(
 	}
 
 	return c, nil
-}
-
-func GetLocalKubeConfig(configPath, configDir string) string {
-	baseDir := filepath.Dir(configPath)
-	if len(configDir) > 0 {
-		baseDir = filepath.Dir(configDir)
-	}
-	fileName := filepath.Base(configPath)
-	baseDir += "/"
-	return fmt.Sprintf("%s%s%s", baseDir, pki.KubeAdminConfigPrefix, fileName)
 }
 
 func rebuildLocalAdminConfig(ctx context.Context, kubeCluster *Cluster) error {
@@ -238,28 +227,11 @@ func (c *Cluster) ApplyAuthzResources(ctx context.Context) error {
 	return nil
 }
 
-func (c *Cluster) getUniqueHostList() []*hosts.Host {
-	hostList := []*hosts.Host{}
-	hostList = append(hostList, c.EtcdHosts...)
-	hostList = append(hostList, c.ControlPlaneHosts...)
-	hostList = append(hostList, c.WorkerHosts...)
-	// little trick to get a unique host list
-	uniqHostMap := make(map[*hosts.Host]bool)
-	for _, host := range hostList {
-		uniqHostMap[host] = true
-	}
-	uniqHostList := []*hosts.Host{}
-	for host := range uniqHostMap {
-		uniqHostList = append(uniqHostList, host)
-	}
-	return uniqHostList
-}
-
-func (c *Cluster) DeployAddons(ctx context.Context) error {
-	if err := c.DeployK8sAddOns(ctx); err != nil {
+func (c *Cluster) deployAddons(ctx context.Context) error {
+	if err := c.deployK8sAddOns(ctx); err != nil {
 		return err
 	}
-	return c.DeployUserAddOns(ctx)
+	return c.deployUserAddOns(ctx)
 }
 
 func (c *Cluster) SyncLabelsAndTaints(ctx context.Context) error {
@@ -268,7 +240,7 @@ func (c *Cluster) SyncLabelsAndTaints(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("Failed to initialize new kubernetes client: %v", err)
 	}
-	for _, host := range c.getUniqueHostList() {
+	for _, host := range hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts) {
 		if err := k8s.SyncLabels(k8sClient, host.HostnameOverride, host.ToAddLabels, host.ToDelLabels); err != nil {
 			return err
 		}
@@ -284,7 +256,7 @@ func (c *Cluster) SyncLabelsAndTaints(ctx context.Context) error {
 func (c *Cluster) PrePullK8sImages(ctx context.Context) error {
 	log.Infof(ctx, "Pre-pulling kubernetes images")
 	var errgrp errgroup.Group
-	hosts := c.getUniqueHostList()
+	hosts := hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts)
 	for _, host := range hosts {
 		runHost := host
 		errgrp.Go(func() error {
@@ -296,4 +268,19 @@ func (c *Cluster) PrePullK8sImages(ctx context.Context) error {
 	}
 	log.Infof(ctx, "Kubernetes images pulled successfully")
 	return nil
+}
+
+func ConfigureCluster(ctx context.Context, rkeConfig v3.RancherKubernetesEngineConfig, crtBundle map[string]pki.CertificatePKI, clusterFilePath, configDir string) error {
+	// dialer factories are not needed here since we are not uses docker only k8s jobs
+	kubeCluster, err := ParseCluster(ctx, &rkeConfig, clusterFilePath, configDir, nil, nil)
+	if err != nil {
+		return err
+	}
+	kubeCluster.Certificates = crtBundle
+	err = kubeCluster.deployNetworkPlugin(ctx)
+	if err != nil {
+		return err
+	}
+
+	return kubeCluster.deployAddons(ctx)
 }

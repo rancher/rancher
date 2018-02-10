@@ -22,14 +22,14 @@ type ingressOptions struct {
 	NodeSelector map[string]string
 }
 
-func (c *Cluster) DeployK8sAddOns(ctx context.Context) error {
+func (c *Cluster) deployK8sAddOns(ctx context.Context) error {
 	if err := c.deployKubeDNS(ctx); err != nil {
 		return err
 	}
 	return c.deployIngress(ctx)
 }
 
-func (c *Cluster) DeployUserAddOns(ctx context.Context) error {
+func (c *Cluster) deployUserAddOns(ctx context.Context) error {
 	log.Infof(ctx, "[addons] Setting up user addons..")
 	if c.Addons == "" {
 		log.Infof(ctx, "[addons] No user addons configured..")

@@ -10,11 +10,11 @@ type EnvironmentMapper struct {
 }
 
 func (e EnvironmentMapper) FromInternal(data map[string]interface{}) {
-	env := []v1.EnvVar{}
-	envFrom := []v1.EnvFromSource{}
+	var env []v1.EnvVar
+	var envFrom []v1.EnvFromSource
 
 	envMap := map[string]interface{}{}
-	envFromMaps := []map[string]interface{}{}
+	var envFromMaps []map[string]interface{}
 
 	if err := convert.ToObj(data["env"], &env); err == nil {
 		for _, envVar := range env {

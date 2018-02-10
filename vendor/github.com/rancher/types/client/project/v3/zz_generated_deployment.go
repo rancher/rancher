@@ -9,40 +9,38 @@ const (
 	DeploymentFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	DeploymentFieldAnnotations                   = "annotations"
 	DeploymentFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
-	DeploymentFieldBatchSize                     = "batchSize"
 	DeploymentFieldContainers                    = "containers"
 	DeploymentFieldCreated                       = "created"
 	DeploymentFieldCreatorID                     = "creatorId"
 	DeploymentFieldDNSPolicy                     = "dnsPolicy"
-	DeploymentFieldDeploymentStrategy            = "deploymentStrategy"
+	DeploymentFieldDeployment                    = "deployment"
+	DeploymentFieldDeploymentStatus              = "deploymentStatus"
 	DeploymentFieldFsgid                         = "fsgid"
 	DeploymentFieldGids                          = "gids"
 	DeploymentFieldHostAliases                   = "hostAliases"
+	DeploymentFieldHostIPC                       = "hostIPC"
+	DeploymentFieldHostNetwork                   = "hostNetwork"
+	DeploymentFieldHostPID                       = "hostPID"
 	DeploymentFieldHostname                      = "hostname"
-	DeploymentFieldIPC                           = "ipc"
+	DeploymentFieldImagePullSecrets              = "imagePullSecrets"
 	DeploymentFieldLabels                        = "labels"
 	DeploymentFieldName                          = "name"
 	DeploymentFieldNamespaceId                   = "namespaceId"
-	DeploymentFieldNet                           = "net"
 	DeploymentFieldNodeId                        = "nodeId"
+	DeploymentFieldObjectMeta                    = "metadata"
 	DeploymentFieldOwnerReferences               = "ownerReferences"
-	DeploymentFieldPID                           = "pid"
-	DeploymentFieldPaused                        = "paused"
 	DeploymentFieldPriority                      = "priority"
 	DeploymentFieldPriorityClassName             = "priorityClassName"
 	DeploymentFieldProjectID                     = "projectId"
-	DeploymentFieldPullPolicy                    = "pullPolicy"
-	DeploymentFieldPullSecrets                   = "pullSecrets"
 	DeploymentFieldRemoved                       = "removed"
-	DeploymentFieldRestart                       = "restart"
-	DeploymentFieldRevisionHistoryLimit          = "revisionHistoryLimit"
+	DeploymentFieldRestartPolicy                 = "restartPolicy"
 	DeploymentFieldRunAsNonRoot                  = "runAsNonRoot"
 	DeploymentFieldScale                         = "scale"
 	DeploymentFieldSchedulerName                 = "schedulerName"
 	DeploymentFieldScheduling                    = "scheduling"
+	DeploymentFieldSelector                      = "selector"
 	DeploymentFieldServiceAccountName            = "serviceAccountName"
 	DeploymentFieldState                         = "state"
-	DeploymentFieldStatus                        = "status"
 	DeploymentFieldSubdomain                     = "subdomain"
 	DeploymentFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
 	DeploymentFieldTransitioning                 = "transitioning"
@@ -50,8 +48,6 @@ const (
 	DeploymentFieldUid                           = "uid"
 	DeploymentFieldUuid                          = "uuid"
 	DeploymentFieldVolumes                       = "volumes"
-	DeploymentFieldWorkloadAnnotations           = "workloadAnnotations"
-	DeploymentFieldWorkloadLabels                = "workloadLabels"
 )
 
 type Deployment struct {
@@ -59,49 +55,45 @@ type Deployment struct {
 	ActiveDeadlineSeconds         *int64                 `json:"activeDeadlineSeconds,omitempty"`
 	Annotations                   map[string]string      `json:"annotations,omitempty"`
 	AutomountServiceAccountToken  *bool                  `json:"automountServiceAccountToken,omitempty"`
-	BatchSize                     string                 `json:"batchSize,omitempty"`
 	Containers                    []Container            `json:"containers,omitempty"`
 	Created                       string                 `json:"created,omitempty"`
 	CreatorID                     string                 `json:"creatorId,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty"`
-	DeploymentStrategy            *DeployStrategy        `json:"deploymentStrategy,omitempty"`
+	Deployment                    *DeploymentConfig      `json:"deployment,omitempty"`
+	DeploymentStatus              *DeploymentStatus      `json:"deploymentStatus,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty"`
-	HostAliases                   map[string]HostAlias   `json:"hostAliases,omitempty"`
+	HostAliases                   []HostAlias            `json:"hostAliases,omitempty"`
+	HostIPC                       *bool                  `json:"hostIPC,omitempty"`
+	HostNetwork                   *bool                  `json:"hostNetwork,omitempty"`
+	HostPID                       *bool                  `json:"hostPID,omitempty"`
 	Hostname                      string                 `json:"hostname,omitempty"`
-	IPC                           string                 `json:"ipc,omitempty"`
+	ImagePullSecrets              []LocalObjectReference `json:"imagePullSecrets,omitempty"`
 	Labels                        map[string]string      `json:"labels,omitempty"`
 	Name                          string                 `json:"name,omitempty"`
 	NamespaceId                   string                 `json:"namespaceId,omitempty"`
-	Net                           string                 `json:"net,omitempty"`
 	NodeId                        string                 `json:"nodeId,omitempty"`
+	ObjectMeta                    *ObjectMeta            `json:"metadata,omitempty"`
 	OwnerReferences               []OwnerReference       `json:"ownerReferences,omitempty"`
-	PID                           string                 `json:"pid,omitempty"`
-	Paused                        *bool                  `json:"paused,omitempty"`
 	Priority                      *int64                 `json:"priority,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty"`
 	ProjectID                     string                 `json:"projectId,omitempty"`
-	PullPolicy                    string                 `json:"pullPolicy,omitempty"`
-	PullSecrets                   []LocalObjectReference `json:"pullSecrets,omitempty"`
 	Removed                       string                 `json:"removed,omitempty"`
-	Restart                       string                 `json:"restart,omitempty"`
-	RevisionHistoryLimit          *int64                 `json:"revisionHistoryLimit,omitempty"`
+	RestartPolicy                 string                 `json:"restartPolicy,omitempty"`
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty"`
 	Scale                         *int64                 `json:"scale,omitempty"`
 	SchedulerName                 string                 `json:"schedulerName,omitempty"`
 	Scheduling                    *Scheduling            `json:"scheduling,omitempty"`
+	Selector                      *LabelSelector         `json:"selector,omitempty"`
 	ServiceAccountName            string                 `json:"serviceAccountName,omitempty"`
 	State                         string                 `json:"state,omitempty"`
-	Status                        *DeploymentStatus      `json:"status,omitempty"`
 	Subdomain                     string                 `json:"subdomain,omitempty"`
 	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty"`
 	Transitioning                 string                 `json:"transitioning,omitempty"`
 	TransitioningMessage          string                 `json:"transitioningMessage,omitempty"`
 	Uid                           *int64                 `json:"uid,omitempty"`
 	Uuid                          string                 `json:"uuid,omitempty"`
-	Volumes                       map[string]Volume      `json:"volumes,omitempty"`
-	WorkloadAnnotations           map[string]string      `json:"workloadAnnotations,omitempty"`
-	WorkloadLabels                map[string]string      `json:"workloadLabels,omitempty"`
+	Volumes                       []Volume               `json:"volumes,omitempty"`
 }
 type DeploymentCollection struct {
 	types.Collection

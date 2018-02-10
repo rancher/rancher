@@ -96,7 +96,7 @@ const (
 	RBACConfig       = "RBACConfig"
 )
 
-func (c *Cluster) DeployNetworkPlugin(ctx context.Context) error {
+func (c *Cluster) deployNetworkPlugin(ctx context.Context) error {
 	log.Infof(ctx, "[network] Setting up network plugin: %s", c.Network.Plugin)
 	switch c.Network.Plugin {
 	case FlannelNetworkPlugin:

@@ -9,16 +9,17 @@ const (
 	ContainerFieldEntrypoint               = "entrypoint"
 	ContainerFieldEnvironment              = "environment"
 	ContainerFieldEnvironmentFrom          = "environmentFrom"
-	ContainerFieldHealthcheck              = "healthcheck"
 	ContainerFieldImage                    = "image"
+	ContainerFieldImagePullPolicy          = "imagePullPolicy"
 	ContainerFieldInitContainer            = "initContainer"
+	ContainerFieldLivenessProbe            = "livenessProbe"
 	ContainerFieldName                     = "name"
 	ContainerFieldPorts                    = "ports"
 	ContainerFieldPostStart                = "postStart"
 	ContainerFieldPreStop                  = "preStop"
 	ContainerFieldPrivileged               = "privileged"
 	ContainerFieldReadOnly                 = "readOnly"
-	ContainerFieldReadycheck               = "readycheck"
+	ContainerFieldReadinessProbe           = "readinessProbe"
 	ContainerFieldResources                = "resources"
 	ContainerFieldRunAsNonRoot             = "runAsNonRoot"
 	ContainerFieldStdin                    = "stdin"
@@ -39,16 +40,17 @@ type Container struct {
 	Entrypoint               []string          `json:"entrypoint,omitempty"`
 	Environment              map[string]string `json:"environment,omitempty"`
 	EnvironmentFrom          []EnvironmentFrom `json:"environmentFrom,omitempty"`
-	Healthcheck              *Probe            `json:"healthcheck,omitempty"`
 	Image                    string            `json:"image,omitempty"`
+	ImagePullPolicy          string            `json:"imagePullPolicy,omitempty"`
 	InitContainer            *bool             `json:"initContainer,omitempty"`
+	LivenessProbe            *Probe            `json:"livenessProbe,omitempty"`
 	Name                     string            `json:"name,omitempty"`
 	Ports                    []ContainerPort   `json:"ports,omitempty"`
 	PostStart                *Handler          `json:"postStart,omitempty"`
 	PreStop                  *Handler          `json:"preStop,omitempty"`
 	Privileged               *bool             `json:"privileged,omitempty"`
 	ReadOnly                 *bool             `json:"readOnly,omitempty"`
-	Readycheck               *Probe            `json:"readycheck,omitempty"`
+	ReadinessProbe           *Probe            `json:"readinessProbe,omitempty"`
 	Resources                *Resources        `json:"resources,omitempty"`
 	RunAsNonRoot             *bool             `json:"runAsNonRoot,omitempty"`
 	Stdin                    *bool             `json:"stdin,omitempty"`
