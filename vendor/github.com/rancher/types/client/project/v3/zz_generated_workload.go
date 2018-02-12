@@ -9,8 +9,6 @@ const (
 	WorkloadFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	WorkloadFieldAnnotations                   = "annotations"
 	WorkloadFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
-	WorkloadFieldBackoffLimit                  = "backoffLimit"
-	WorkloadFieldCompletions                   = "completions"
 	WorkloadFieldContainers                    = "containers"
 	WorkloadFieldCreated                       = "created"
 	WorkloadFieldCreatorID                     = "creatorId"
@@ -29,14 +27,13 @@ const (
 	WorkloadFieldHostPID                       = "hostPID"
 	WorkloadFieldHostname                      = "hostname"
 	WorkloadFieldImagePullSecrets              = "imagePullSecrets"
+	WorkloadFieldJob                           = "job"
 	WorkloadFieldJobStatus                     = "jobStatus"
 	WorkloadFieldLabels                        = "labels"
-	WorkloadFieldManualSelector                = "manualSelector"
 	WorkloadFieldName                          = "name"
 	WorkloadFieldNamespaceId                   = "namespaceId"
 	WorkloadFieldNodeId                        = "nodeId"
 	WorkloadFieldOwnerReferences               = "ownerReferences"
-	WorkloadFieldParallelism                   = "parallelism"
 	WorkloadFieldPriority                      = "priority"
 	WorkloadFieldPriorityClassName             = "priorityClassName"
 	WorkloadFieldProjectID                     = "projectId"
@@ -69,8 +66,6 @@ type Workload struct {
 	ActiveDeadlineSeconds         *int64                       `json:"activeDeadlineSeconds,omitempty"`
 	Annotations                   map[string]string            `json:"annotations,omitempty"`
 	AutomountServiceAccountToken  *bool                        `json:"automountServiceAccountToken,omitempty"`
-	BackoffLimit                  *int64                       `json:"backoffLimit,omitempty"`
-	Completions                   *int64                       `json:"completions,omitempty"`
 	Containers                    []Container                  `json:"containers,omitempty"`
 	Created                       string                       `json:"created,omitempty"`
 	CreatorID                     string                       `json:"creatorId,omitempty"`
@@ -89,14 +84,13 @@ type Workload struct {
 	HostPID                       *bool                        `json:"hostPID,omitempty"`
 	Hostname                      string                       `json:"hostname,omitempty"`
 	ImagePullSecrets              []LocalObjectReference       `json:"imagePullSecrets,omitempty"`
+	Job                           *JobConfig                   `json:"job,omitempty"`
 	JobStatus                     *JobStatus                   `json:"jobStatus,omitempty"`
 	Labels                        map[string]string            `json:"labels,omitempty"`
-	ManualSelector                *bool                        `json:"manualSelector,omitempty"`
 	Name                          string                       `json:"name,omitempty"`
 	NamespaceId                   string                       `json:"namespaceId,omitempty"`
 	NodeId                        string                       `json:"nodeId,omitempty"`
 	OwnerReferences               []OwnerReference             `json:"ownerReferences,omitempty"`
-	Parallelism                   *int64                       `json:"parallelism,omitempty"`
 	Priority                      *int64                       `json:"priority,omitempty"`
 	PriorityClassName             string                       `json:"priorityClassName,omitempty"`
 	ProjectID                     string                       `json:"projectId,omitempty"`

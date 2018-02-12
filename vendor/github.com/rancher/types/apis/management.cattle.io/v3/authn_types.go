@@ -64,7 +64,8 @@ type Principal struct {
 }
 
 type SearchPrincipalsInput struct {
-	Name string `json:"name" norman:"type=string,required,notnullable"`
+	Name          string `json:"name" norman:"type=string,required,notnullable"`
+	PrincipalType string `json:"principalType,omitempty" norman:"type=enum,options=user|group"`
 }
 
 type ChangePasswordInput struct {

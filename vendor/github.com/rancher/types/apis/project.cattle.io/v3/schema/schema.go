@@ -34,8 +34,8 @@ var (
 		Init(replicaSetTypes).
 		Init(statefulSetTypes).
 		Init(daemonSetTypes).
-		Init(cronJobTypes).
 		Init(jobTypes).
+		Init(cronJobTypes).
 		Init(podTemplateSpecTypes).
 		Init(workloadTypes).
 		Init(appTypes).
@@ -106,9 +106,7 @@ func workloadTypes(schemas *types.Schemas) *types.Schemas {
 					continue
 				}
 				for name, field := range baseSchema.ResourceFields {
-					if name != "template" {
-						schema.ResourceFields[name] = field
-					}
+					schema.ResourceFields[name] = field
 				}
 			}
 		})
@@ -273,6 +271,7 @@ func jobTypes(schemas *types.Schemas) *types.Schemas {
 				From: "status",
 				To:   "jobStatus",
 			},
+			NewWorkloadTypeMapper(),
 		).
 		MustImport(&Version, batchv1.JobSpec{}, jobOverride{}).
 		MustImportAndCustomize(&Version, batchv1.Job{}, func(schema *types.Schema) {
@@ -307,43 +306,20 @@ func cronJobTypes(schemas *types.Schemas) *types.Schemas {
 				From: "failedJobsHistoryLimit",
 				To:   "cronJob/failedJobsHistoryLimit",
 			},
+			// TODO - embed jobTemplate field. Now it fails due to jobTemplate.spec and jobTemplate.spec.template.spec
+			// name conflict
 			&m.Move{
-				From: "jobTemplate/spec/selector",
-				To:   "selector",
+				From: "jobTemplate",
+				To:   "cronJob/jobTemplate",
 			},
-			&m.Move{
-				From: "jobTemplate/spec/template",
-				To:   "template",
-			},
-			&m.Move{
-				From: "jobTemplate/spec/parallelism",
-				To:   "cronJob/parallelism",
-			},
-			&m.Move{
-				From: "jobTemplate/spec/completions",
-				To:   "cronJob/completions",
-			},
-			&m.Move{
-				From: "jobTemplate/spec/activeDeadlineSeconds",
-				To:   "cronJob/activeDeadlineSeconds",
-			},
-			&m.Move{
-				From: "jobTemplate/spec/backoffLimit",
-				To:   "cronJob/backoffLimit",
-			},
-			&m.Move{
-				From: "jobTemplate/spec/manualSelector",
-				To:   "cronJob/manualSelector",
-			},
-			&m.Drop{Field: "jobTemplate"},
-			&m.Embed{Field: "template"},
 		).
 		AddMapperForType(&Version, batchv1beta1.CronJob{},
 			&m.Move{
 				From: "status",
 				To:   "cronJobStatus",
 			},
-			NewWorkloadTypeMapper(),
+			// TODO resolve once proper embedding for jobTemplate is done
+			//NewWorkloadTypeMapper(),
 		).
 		MustImport(&Version, batchv1beta1.CronJobSpec{}, cronJobOverride{}).
 		MustImportAndCustomize(&Version, batchv1beta1.CronJob{}, func(schema *types.Schema) {
