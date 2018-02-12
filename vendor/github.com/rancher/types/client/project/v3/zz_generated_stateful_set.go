@@ -25,7 +25,6 @@ const (
 	StatefulSetFieldName                          = "name"
 	StatefulSetFieldNamespaceId                   = "namespaceId"
 	StatefulSetFieldNodeId                        = "nodeId"
-	StatefulSetFieldObjectMeta                    = "metadata"
 	StatefulSetFieldOwnerReferences               = "ownerReferences"
 	StatefulSetFieldPriority                      = "priority"
 	StatefulSetFieldPriorityClassName             = "priorityClassName"
@@ -47,6 +46,8 @@ const (
 	StatefulSetFieldUid                           = "uid"
 	StatefulSetFieldUuid                          = "uuid"
 	StatefulSetFieldVolumes                       = "volumes"
+	StatefulSetFieldWorkloadAnnotations           = "workloadAnnotations"
+	StatefulSetFieldWorkloadLabels                = "workloadLabels"
 )
 
 type StatefulSet struct {
@@ -70,7 +71,6 @@ type StatefulSet struct {
 	Name                          string                 `json:"name,omitempty"`
 	NamespaceId                   string                 `json:"namespaceId,omitempty"`
 	NodeId                        string                 `json:"nodeId,omitempty"`
-	ObjectMeta                    *ObjectMeta            `json:"metadata,omitempty"`
 	OwnerReferences               []OwnerReference       `json:"ownerReferences,omitempty"`
 	Priority                      *int64                 `json:"priority,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty"`
@@ -92,6 +92,8 @@ type StatefulSet struct {
 	Uid                           *int64                 `json:"uid,omitempty"`
 	Uuid                          string                 `json:"uuid,omitempty"`
 	Volumes                       []Volume               `json:"volumes,omitempty"`
+	WorkloadAnnotations           map[string]string      `json:"workloadAnnotations,omitempty"`
+	WorkloadLabels                map[string]string      `json:"workloadLabels,omitempty"`
 }
 type StatefulSetCollection struct {
 	types.Collection

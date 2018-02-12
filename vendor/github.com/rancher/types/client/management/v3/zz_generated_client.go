@@ -36,6 +36,9 @@ type Client struct {
 	ProjectLogging             ProjectLoggingOperations
 	ListenConfig               ListenConfigOperations
 	Setting                    SettingOperations
+	Notifier                   NotifierOperations
+	ClusterAlert               ClusterAlertOperations
+	ProjectAlert               ProjectAlertOperations
 }
 
 func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
@@ -77,6 +80,9 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.ProjectLogging = newProjectLoggingClient(client)
 	client.ListenConfig = newListenConfigClient(client)
 	client.Setting = newSettingClient(client)
+	client.Notifier = newNotifierClient(client)
+	client.ClusterAlert = newClusterAlertClient(client)
+	client.ProjectAlert = newProjectAlertClient(client)
 
 	return client, nil
 }

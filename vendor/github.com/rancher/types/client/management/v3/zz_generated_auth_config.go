@@ -5,31 +5,35 @@ import (
 )
 
 const (
-	AuthConfigType                 = "authConfig"
-	AuthConfigFieldAnnotations     = "annotations"
-	AuthConfigFieldCreated         = "created"
-	AuthConfigFieldCreatorID       = "creatorId"
-	AuthConfigFieldEnabled         = "enabled"
-	AuthConfigFieldLabels          = "labels"
-	AuthConfigFieldName            = "name"
-	AuthConfigFieldOwnerReferences = "ownerReferences"
-	AuthConfigFieldRemoved         = "removed"
-	AuthConfigFieldType            = "type"
-	AuthConfigFieldUuid            = "uuid"
+	AuthConfigType                     = "authConfig"
+	AuthConfigFieldAccessMode          = "accessMode"
+	AuthConfigFieldAllowedPrincipalIDs = "allowedPrincipalIds"
+	AuthConfigFieldAnnotations         = "annotations"
+	AuthConfigFieldCreated             = "created"
+	AuthConfigFieldCreatorID           = "creatorId"
+	AuthConfigFieldEnabled             = "enabled"
+	AuthConfigFieldLabels              = "labels"
+	AuthConfigFieldName                = "name"
+	AuthConfigFieldOwnerReferences     = "ownerReferences"
+	AuthConfigFieldRemoved             = "removed"
+	AuthConfigFieldType                = "type"
+	AuthConfigFieldUuid                = "uuid"
 )
 
 type AuthConfig struct {
 	types.Resource
-	Annotations     map[string]string `json:"annotations,omitempty"`
-	Created         string            `json:"created,omitempty"`
-	CreatorID       string            `json:"creatorId,omitempty"`
-	Enabled         *bool             `json:"enabled,omitempty"`
-	Labels          map[string]string `json:"labels,omitempty"`
-	Name            string            `json:"name,omitempty"`
-	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
-	Removed         string            `json:"removed,omitempty"`
-	Type            string            `json:"type,omitempty"`
-	Uuid            string            `json:"uuid,omitempty"`
+	AccessMode          string            `json:"accessMode,omitempty"`
+	AllowedPrincipalIDs []string          `json:"allowedPrincipalIds,omitempty"`
+	Annotations         map[string]string `json:"annotations,omitempty"`
+	Created             string            `json:"created,omitempty"`
+	CreatorID           string            `json:"creatorId,omitempty"`
+	Enabled             *bool             `json:"enabled,omitempty"`
+	Labels              map[string]string `json:"labels,omitempty"`
+	Name                string            `json:"name,omitempty"`
+	OwnerReferences     []OwnerReference  `json:"ownerReferences,omitempty"`
+	Removed             string            `json:"removed,omitempty"`
+	Type                string            `json:"type,omitempty"`
+	Uuid                string            `json:"uuid,omitempty"`
 }
 type AuthConfigCollection struct {
 	types.Collection

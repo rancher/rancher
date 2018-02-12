@@ -35,7 +35,6 @@ const (
 	WorkloadFieldName                          = "name"
 	WorkloadFieldNamespaceId                   = "namespaceId"
 	WorkloadFieldNodeId                        = "nodeId"
-	WorkloadFieldObjectMeta                    = "metadata"
 	WorkloadFieldOwnerReferences               = "ownerReferences"
 	WorkloadFieldParallelism                   = "parallelism"
 	WorkloadFieldPriority                      = "priority"
@@ -61,6 +60,8 @@ const (
 	WorkloadFieldUid                           = "uid"
 	WorkloadFieldUuid                          = "uuid"
 	WorkloadFieldVolumes                       = "volumes"
+	WorkloadFieldWorkloadAnnotations           = "workloadAnnotations"
+	WorkloadFieldWorkloadLabels                = "workloadLabels"
 )
 
 type Workload struct {
@@ -94,7 +95,6 @@ type Workload struct {
 	Name                          string                       `json:"name,omitempty"`
 	NamespaceId                   string                       `json:"namespaceId,omitempty"`
 	NodeId                        string                       `json:"nodeId,omitempty"`
-	ObjectMeta                    *ObjectMeta                  `json:"metadata,omitempty"`
 	OwnerReferences               []OwnerReference             `json:"ownerReferences,omitempty"`
 	Parallelism                   *int64                       `json:"parallelism,omitempty"`
 	Priority                      *int64                       `json:"priority,omitempty"`
@@ -120,6 +120,8 @@ type Workload struct {
 	Uid                           *int64                       `json:"uid,omitempty"`
 	Uuid                          string                       `json:"uuid,omitempty"`
 	Volumes                       []Volume                     `json:"volumes,omitempty"`
+	WorkloadAnnotations           map[string]string            `json:"workloadAnnotations,omitempty"`
+	WorkloadLabels                map[string]string            `json:"workloadLabels,omitempty"`
 }
 type WorkloadCollection struct {
 	types.Collection

@@ -25,7 +25,6 @@ const (
 	ReplicaSetFieldName                          = "name"
 	ReplicaSetFieldNamespaceId                   = "namespaceId"
 	ReplicaSetFieldNodeId                        = "nodeId"
-	ReplicaSetFieldObjectMeta                    = "metadata"
 	ReplicaSetFieldOwnerReferences               = "ownerReferences"
 	ReplicaSetFieldPriority                      = "priority"
 	ReplicaSetFieldPriorityClassName             = "priorityClassName"
@@ -47,6 +46,8 @@ const (
 	ReplicaSetFieldUid                           = "uid"
 	ReplicaSetFieldUuid                          = "uuid"
 	ReplicaSetFieldVolumes                       = "volumes"
+	ReplicaSetFieldWorkloadAnnotations           = "workloadAnnotations"
+	ReplicaSetFieldWorkloadLabels                = "workloadLabels"
 )
 
 type ReplicaSet struct {
@@ -70,7 +71,6 @@ type ReplicaSet struct {
 	Name                          string                 `json:"name,omitempty"`
 	NamespaceId                   string                 `json:"namespaceId,omitempty"`
 	NodeId                        string                 `json:"nodeId,omitempty"`
-	ObjectMeta                    *ObjectMeta            `json:"metadata,omitempty"`
 	OwnerReferences               []OwnerReference       `json:"ownerReferences,omitempty"`
 	Priority                      *int64                 `json:"priority,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty"`
@@ -92,6 +92,8 @@ type ReplicaSet struct {
 	Uid                           *int64                 `json:"uid,omitempty"`
 	Uuid                          string                 `json:"uuid,omitempty"`
 	Volumes                       []Volume               `json:"volumes,omitempty"`
+	WorkloadAnnotations           map[string]string      `json:"workloadAnnotations,omitempty"`
+	WorkloadLabels                map[string]string      `json:"workloadLabels,omitempty"`
 }
 type ReplicaSetCollection struct {
 	types.Collection

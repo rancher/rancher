@@ -27,7 +27,6 @@ const (
 	CronJobFieldName                          = "name"
 	CronJobFieldNamespaceId                   = "namespaceId"
 	CronJobFieldNodeId                        = "nodeId"
-	CronJobFieldObjectMeta                    = "metadata"
 	CronJobFieldOwnerReferences               = "ownerReferences"
 	CronJobFieldPriority                      = "priority"
 	CronJobFieldPriorityClassName             = "priorityClassName"
@@ -47,6 +46,8 @@ const (
 	CronJobFieldUid                           = "uid"
 	CronJobFieldUuid                          = "uuid"
 	CronJobFieldVolumes                       = "volumes"
+	CronJobFieldWorkloadAnnotations           = "workloadAnnotations"
+	CronJobFieldWorkloadLabels                = "workloadLabels"
 )
 
 type CronJob struct {
@@ -72,7 +73,6 @@ type CronJob struct {
 	Name                          string                 `json:"name,omitempty"`
 	NamespaceId                   string                 `json:"namespaceId,omitempty"`
 	NodeId                        string                 `json:"nodeId,omitempty"`
-	ObjectMeta                    *ObjectMeta            `json:"metadata,omitempty"`
 	OwnerReferences               []OwnerReference       `json:"ownerReferences,omitempty"`
 	Priority                      *int64                 `json:"priority,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty"`
@@ -92,6 +92,8 @@ type CronJob struct {
 	Uid                           *int64                 `json:"uid,omitempty"`
 	Uuid                          string                 `json:"uuid,omitempty"`
 	Volumes                       []Volume               `json:"volumes,omitempty"`
+	WorkloadAnnotations           map[string]string      `json:"workloadAnnotations,omitempty"`
+	WorkloadLabels                map[string]string      `json:"workloadLabels,omitempty"`
 }
 type CronJobCollection struct {
 	types.Collection
