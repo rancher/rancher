@@ -3,6 +3,7 @@ package plugin
 import (
 	"github.com/rancher/kontainer-engine/drivers/aks"
 	"github.com/rancher/kontainer-engine/drivers/gke"
+	"github.com/rancher/kontainer-engine/drivers/import"
 	"github.com/rancher/kontainer-engine/drivers/rke"
 	"github.com/rancher/kontainer-engine/types"
 	"github.com/sirupsen/logrus"
@@ -11,9 +12,10 @@ import (
 var (
 	// BuiltInDrivers includes all the buildin supported drivers
 	BuiltInDrivers = map[string]bool{
-		"gke": true,
-		"rke": true,
-		"aks": true,
+		"gke":    true,
+		"rke":    true,
+		"aks":    true,
+		"import": true,
 	}
 )
 
@@ -27,6 +29,8 @@ func Run(driverName string, addrChan chan string) (types.Driver, error) {
 		driver = rke.NewDriver()
 	case "aks":
 		driver = aks.NewDriver()
+	case "import":
+		driver = kubeimport.NewDriver()
 	default:
 		addrChan <- ""
 	}
