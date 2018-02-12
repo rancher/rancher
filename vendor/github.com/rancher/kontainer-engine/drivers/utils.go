@@ -28,7 +28,7 @@ func GenerateServiceAccountToken(clientset *kubernetes.Clientset) (string, error
 
 	_, err := clientset.CoreV1().ServiceAccounts(defaultNamespace).Create(serviceAccount)
 	if err != nil && !errors.IsAlreadyExists(err) {
-		return "", err
+		return "", fmt.Errorf("error creating service account: %v", err)
 	}
 
 	adminRole := &v1beta1.ClusterRole{
@@ -51,7 +51,7 @@ func GenerateServiceAccountToken(clientset *kubernetes.Clientset) (string, error
 	if err != nil {
 		clusterAdminRole, err = clientset.RbacV1beta1().ClusterRoles().Create(adminRole)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("error creating admin role: %v", err)
 		}
 	}
 
@@ -74,18 +74,18 @@ func GenerateServiceAccountToken(clientset *kubernetes.Clientset) (string, error
 		},
 	}
 	if _, err = clientset.RbacV1beta1().ClusterRoleBindings().Create(clusterRoleBinding); err != nil && !errors.IsAlreadyExists(err) {
-		return "", err
+		return "", fmt.Errorf("error creating role bindings: %v", err)
 	}
 
 	if serviceAccount, err = clientset.CoreV1().ServiceAccounts(defaultNamespace).Get(serviceAccount.Name, metav1.GetOptions{}); err != nil {
-		return "", err
+		return "", fmt.Errorf("error getting service account: %v", err)
 	}
 
 	if len(serviceAccount.Secrets) > 0 {
 		secret := serviceAccount.Secrets[0]
 		secretObj, err := clientset.CoreV1().Secrets(defaultNamespace).Get(secret.Name, metav1.GetOptions{})
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("error getting secret: %v", err)
 		}
 		if token, ok := secretObj.Data["token"]; ok {
 			return string(token), nil
