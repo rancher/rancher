@@ -81,8 +81,10 @@ type AuthConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Type    string `json:"type"`
-	Enabled bool   `json:"enabled,omitempty"`
+	Type                string   `json:"type"`
+	Enabled             bool     `json:"enabled,omitempty"`
+	AccessMode          string   `json:"accessMode,omitempty" norman:"required,notnullable,type=enum,options=required|restricted|unrestricted"`
+	AllowedPrincipalIDs []string `json:"allowedPrincipalIds,omitempty" norman:"type=array[reference[Principal]]"`
 }
 
 //GithubConfig structure contains the github config definition

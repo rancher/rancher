@@ -106,16 +106,10 @@ func workloadTypes(schemas *types.Schemas) *types.Schemas {
 					continue
 				}
 				for name, field := range baseSchema.ResourceFields {
-					if name == "template" {
-						templateSchema := schemas.Schema(&Version, field.Type)
-						for name, field := range templateSchema.ResourceFields {
-							schema.ResourceFields[name] = field
-						}
-					} else {
+					if name != "template" {
 						schema.ResourceFields[name] = field
 					}
 				}
-
 			}
 		})
 }
@@ -159,6 +153,7 @@ func statefulSetTypes(schemas *types.Schemas) *types.Schemas {
 				From: "status",
 				To:   "statefulSetStatus",
 			},
+			NewWorkloadTypeMapper(),
 		).
 		MustImport(&Version, v1beta2.StatefulSetSpec{}, statefulSetConfigOverride{}).
 		MustImport(&Version, v1beta2.StatefulSet{}, projectOverride{})
@@ -183,6 +178,7 @@ func replicaSetTypes(schemas *types.Schemas) *types.Schemas {
 				To:   "replicaSetStatus",
 			},
 			&m.Embed{Field: "template"},
+			NewWorkloadTypeMapper(),
 		).
 		MustImport(&Version, v1beta1.ReplicaSetSpec{}, replicaSetConfigOverride{}).
 		MustImportAndCustomize(&Version, v1beta1.ReplicaSet{}, func(schema *types.Schema) {
@@ -209,6 +205,7 @@ func replicationControllerTypes(schemas *types.Schemas) *types.Schemas {
 				From: "status",
 				To:   "replicationControllerStatus",
 			},
+			NewWorkloadTypeMapper(),
 		).
 		MustImport(&Version, v1.ReplicationControllerSpec{}, replicationControllerConfigOverride{}).
 		MustImportAndCustomize(&Version, v1.ReplicationController{}, func(schema *types.Schema) {
@@ -238,6 +235,7 @@ func daemonSetTypes(schemas *types.Schemas) *types.Schemas {
 				From: "status",
 				To:   "daemonSetStatus",
 			},
+			NewWorkloadTypeMapper(),
 		).
 		MustImport(&Version, v1beta2.DaemonSetSpec{}, daemonSetOverride{}).
 		MustImportAndCustomize(&Version, v1beta2.DaemonSet{}, func(schema *types.Schema) {
@@ -345,6 +343,7 @@ func cronJobTypes(schemas *types.Schemas) *types.Schemas {
 				From: "status",
 				To:   "cronJobStatus",
 			},
+			NewWorkloadTypeMapper(),
 		).
 		MustImport(&Version, batchv1beta1.CronJobSpec{}, cronJobOverride{}).
 		MustImportAndCustomize(&Version, batchv1beta1.CronJob{}, func(schema *types.Schema) {
@@ -386,6 +385,7 @@ func deploymentTypes(schemas *types.Schemas) *types.Schemas {
 				From: "status",
 				To:   "deploymentStatus",
 			},
+			NewWorkloadTypeMapper(),
 		).
 		MustImport(&Version, v1beta2.DeploymentSpec{}, deploymentConfigOverride{}).
 		MustImportAndCustomize(&Version, v1beta2.Deployment{}, func(schema *types.Schema) {
@@ -616,4 +616,14 @@ func appTypes(schema *types.Schemas) *types.Schemas {
 func podTemplateSpecTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
 		MustImport(&Version, v1.PodTemplateSpec{})
+}
+
+func NewWorkloadTypeMapper() types.Mapper {
+	return &types.Mappers{
+		&m.Move{From: "labels", To: "workloadLabels"},
+		&m.Move{From: "annotations", To: "workloadAnnotations"},
+		&m.Move{From: "metadata/labels", To: "labels", NoDeleteFromField: true},
+		&m.Move{From: "metadata/annotations", To: "annotations", NoDeleteFromField: true},
+		&m.Drop{Field: "metadata"},
+	}
 }

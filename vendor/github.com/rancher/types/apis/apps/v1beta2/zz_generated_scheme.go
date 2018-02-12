@@ -35,6 +35,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 
 		&DeploymentList{},
 		&DaemonSetList{},
+		&StatefulSetList{},
 	)
 	return nil
 }

@@ -61,6 +61,7 @@ func (c *ManagementContext) controllers() []controller.Starter {
 		c.Project,
 		c.RBAC,
 		c.Core,
+		c.Project,
 	}
 }
 
@@ -157,6 +158,10 @@ func NewManagementContext(config rest.Config) (*ManagementContext, error) {
 	}
 
 	context.Core, err = corev1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+	context.Project, err = projectv3.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
