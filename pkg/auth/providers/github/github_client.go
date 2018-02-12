@@ -69,7 +69,7 @@ func (g *GClient) getAccessToken(code string, config *v3.GithubConfig) (string, 
 	return acessToken, nil
 }
 
-func (g *GClient) getGithubUser(githubAccessToken string, config *v3.GithubConfig) (Account, error) {
+func (g *GClient) getUser(githubAccessToken string, config *v3.GithubConfig) (Account, error) {
 
 	url := g.getURL("USER_INFO", config)
 	resp, err := g.getFromGithub(githubAccessToken, url)
@@ -94,7 +94,7 @@ func (g *GClient) getGithubUser(githubAccessToken string, config *v3.GithubConfi
 	return githubAcct, nil
 }
 
-func (g *GClient) getGithubOrgs(githubAccessToken string, config *v3.GithubConfig) ([]Account, error) {
+func (g *GClient) getOrgs(githubAccessToken string, config *v3.GithubConfig) ([]Account, error) {
 	var orgs []Account
 
 	url := g.getURL("ORG_INFO", config)
@@ -124,7 +124,7 @@ func (g *GClient) getGithubOrgs(githubAccessToken string, config *v3.GithubConfi
 	return orgs, nil
 }
 
-func (g *GClient) getGithubTeams(githubAccessToken string, config *v3.GithubConfig) ([]Account, error) {
+func (g *GClient) getTeams(githubAccessToken string, config *v3.GithubConfig) ([]Account, error) {
 	var teams []Account
 
 	url := g.getURL("TEAMS", config)
@@ -233,9 +233,9 @@ func (g *GClient) nextGithubPage(response *http.Response) string {
 	return ""
 }
 
-func (g *GClient) getGithubUserByName(username string, githubAccessToken string, config *v3.GithubConfig) (Account, error) {
+func (g *GClient) getUserByName(username string, githubAccessToken string, config *v3.GithubConfig) (Account, error) {
 
-	_, err := g.getGithubOrgByName(username, githubAccessToken, config)
+	_, err := g.getOrgByName(username, githubAccessToken, config)
 	if err == nil {
 		return Account{}, fmt.Errorf("There is a org by this name, not looking fo the user entity by name %v", username)
 	}
@@ -265,7 +265,7 @@ func (g *GClient) getGithubUserByName(username string, githubAccessToken string,
 	return githubAcct, nil
 }
 
-func (g *GClient) getGithubOrgByName(org string, githubAccessToken string, config *v3.GithubConfig) (Account, error) {
+func (g *GClient) getOrgByName(org string, githubAccessToken string, config *v3.GithubConfig) (Account, error) {
 	org = URLEncoded(org)
 	url := g.getURL("ORGS", config) + org
 

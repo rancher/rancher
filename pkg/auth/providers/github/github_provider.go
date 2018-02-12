@@ -129,7 +129,7 @@ func (g *GProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v3
 
 	providerInfo["access_token"] = accessToken
 
-	user, err := g.githubClient.getGithubUser(accessToken, config)
+	user, err := g.githubClient.getUser(accessToken, config)
 	if err != nil {
 		return userPrincipal, groupPrincipals, providerInfo, 401, fmt.Errorf("Error getting github user %v", err)
 	}
@@ -143,7 +143,7 @@ func (g *GProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v3
 		ProfilePicture: user.AvatarURL,
 	}
 
-	orgAccts, err := g.githubClient.getGithubOrgs(accessToken, config)
+	orgAccts, err := g.githubClient.getOrgs(accessToken, config)
 	if err != nil {
 		logrus.Errorf("Failed to get orgs for github user: %v, err: %v", user.Name, err)
 		return userPrincipal, groupPrincipals, providerInfo, 500, fmt.Errorf("Error getting orgs for github user %v", err)
@@ -164,7 +164,7 @@ func (g *GProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v3
 		groupPrincipals = append(groupPrincipals, groupPrincipal)
 	}
 
-	teamAccts, err := g.githubClient.getGithubTeams(accessToken, config)
+	teamAccts, err := g.githubClient.getTeams(accessToken, config)
 	if err != nil {
 		logrus.Errorf("Failed to get teams for github user: %v, err: %v", user.Name, err)
 		return userPrincipal, groupPrincipals, providerInfo, 500, fmt.Errorf("Error getting teams for github user %v", err)
@@ -191,7 +191,7 @@ func (g *GProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v3
 	return userPrincipal, groupPrincipals, providerInfo, 0, nil
 }
 
-func (g *GProvider) SearchPrincipals(searchKey string, myToken v3.Token) ([]v3.Principal, int, error) {
+func (g *GProvider) SearchPrincipals(searchKey, principalType string, myToken v3.Token) ([]v3.Principal, int, error) {
 	var principals []v3.Principal
 	var err error
 
@@ -207,34 +207,38 @@ func (g *GProvider) SearchPrincipals(searchKey string, myToken v3.Token) ([]v3.P
 
 	accessToken := myToken.ProviderInfo["access_token"]
 
-	user, err := g.githubClient.getGithubUserByName(searchKey, accessToken, config)
-	if err == nil {
-		userPrincipal := v3.Principal{
-			ObjectMeta:  metav1.ObjectMeta{Name: Github + "_user://" + strconv.Itoa(user.ID)},
-			DisplayName: user.Name,
-			LoginName:   user.Login,
-			Kind:        "user",
-			Provider:    Github,
-			Me:          false,
+	if principalType == "" || principalType == "user" {
+		user, err := g.githubClient.getUserByName(searchKey, accessToken, config)
+		if err == nil {
+			userPrincipal := v3.Principal{
+				ObjectMeta:  metav1.ObjectMeta{Name: Github + "_user://" + strconv.Itoa(user.ID)},
+				DisplayName: user.Name,
+				LoginName:   user.Login,
+				Kind:        "user",
+				Provider:    Github,
+				Me:          false,
+			}
+			if g.isThisUserMe(myToken.UserPrincipal, userPrincipal) {
+				userPrincipal.Me = true
+			}
+			principals = append(principals, userPrincipal)
 		}
-		if g.isThisUserMe(myToken.UserPrincipal, userPrincipal) {
-			userPrincipal.Me = true
-		}
-		principals = append(principals, userPrincipal)
 	}
 
-	orgAcct, err := g.githubClient.getGithubOrgByName(searchKey, accessToken, config)
-	if err == nil {
-		groupPrincipal := v3.Principal{
-			ObjectMeta:  metav1.ObjectMeta{Name: Github + "_org://" + strconv.Itoa(orgAcct.ID)},
-			DisplayName: orgAcct.Name,
-			Kind:        "group",
-			Provider:    Github,
+	if principalType == "" || principalType == "group" {
+		orgAcct, err := g.githubClient.getOrgByName(searchKey, accessToken, config)
+		if err == nil {
+			groupPrincipal := v3.Principal{
+				ObjectMeta:  metav1.ObjectMeta{Name: Github + "_org://" + strconv.Itoa(orgAcct.ID)},
+				DisplayName: orgAcct.Name,
+				Kind:        "group",
+				Provider:    Github,
+			}
+			if g.isMemberOf(myToken.GroupPrincipals, groupPrincipal) {
+				groupPrincipal.MemberOf = true
+			}
+			principals = append(principals, groupPrincipal)
 		}
-		if g.isMemberOf(myToken.GroupPrincipals, groupPrincipal) {
-			groupPrincipal.MemberOf = true
-		}
-		principals = append(principals, groupPrincipal)
 	}
 
 	return principals, 0, nil

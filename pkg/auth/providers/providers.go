@@ -31,7 +31,7 @@ func init() {
 type PrincipalProvider interface {
 	GetName() string
 	AuthenticateUser(input interface{}) (v3.Principal, []v3.Principal, map[string]string, int, error)
-	SearchPrincipals(name string, myToken v3.Token) ([]v3.Principal, int, error)
+	SearchPrincipals(name, principalType string, myToken v3.Token) ([]v3.Principal, int, error)
 	ConfigActionHandler(actionName string, action *types.Action, request *types.APIContext) error
 }
 
@@ -64,6 +64,6 @@ func AuthenticateUser(input interface{}, providerName string) (v3.Principal, []v
 	return providers[providerName].AuthenticateUser(input)
 }
 
-func SearchPrincipals(name string, myToken v3.Token) ([]v3.Principal, int, error) {
-	return providers[myToken.AuthProvider].SearchPrincipals(name, myToken)
+func SearchPrincipals(name, principalType string, myToken v3.Token) ([]v3.Principal, int, error) {
+	return providers[myToken.AuthProvider].SearchPrincipals(name, principalType, myToken)
 }
