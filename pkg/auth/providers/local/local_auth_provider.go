@@ -229,7 +229,7 @@ func (l *LProvider) getGroupPrincipals(user *v3.User) ([]v3.Principal, int, erro
 	return groupPrincipals, 0, nil
 }
 
-func (l *LProvider) SearchPrincipals(searchKey string, myToken v3.Token) ([]v3.Principal, int, error) {
+func (l *LProvider) SearchPrincipals(searchKey, principalType string, myToken v3.Token) ([]v3.Principal, int, error) {
 	var principals []v3.Principal
 	var localUsers []*v3.User
 	var localGroups []*v3.Group
@@ -251,33 +251,37 @@ func (l *LProvider) SearchPrincipals(searchKey string, myToken v3.Token) ([]v3.P
 		return principals, 0, err
 	}
 
-	for _, user := range localUsers {
-		principalID := getLocalPrincipalID(user)
-		userPrincipal := v3.Principal{
-			ObjectMeta:  metav1.ObjectMeta{Name: principalID},
-			DisplayName: user.DisplayName,
-			LoginName:   user.Username,
-			Kind:        "user",
-			Provider:    "local",
-			Me:          false,
+	if principalType == "" || principalType == "user" {
+		for _, user := range localUsers {
+			principalID := getLocalPrincipalID(user)
+			userPrincipal := v3.Principal{
+				ObjectMeta:  metav1.ObjectMeta{Name: principalID},
+				DisplayName: user.DisplayName,
+				LoginName:   user.Username,
+				Kind:        "user",
+				Provider:    "local",
+				Me:          false,
+			}
+			if l.isThisUserMe(myToken.UserPrincipal, userPrincipal) {
+				userPrincipal.Me = true
+			}
+			principals = append(principals, userPrincipal)
 		}
-		if l.isThisUserMe(myToken.UserPrincipal, userPrincipal) {
-			userPrincipal.Me = true
-		}
-		principals = append(principals, userPrincipal)
 	}
 
-	for _, group := range localGroups {
-		groupPrincipal := v3.Principal{
-			ObjectMeta:  metav1.ObjectMeta{Name: Name + "://" + group.Name},
-			DisplayName: group.DisplayName,
-			Kind:        "group",
-			Provider:    "local",
+	if principalType == "" || principalType == "group" {
+		for _, group := range localGroups {
+			groupPrincipal := v3.Principal{
+				ObjectMeta:  metav1.ObjectMeta{Name: Name + "://" + group.Name},
+				DisplayName: group.DisplayName,
+				Kind:        "group",
+				Provider:    "local",
+			}
+			if l.isMemberOf(myToken.GroupPrincipals, groupPrincipal) {
+				groupPrincipal.MemberOf = true
+			}
+			principals = append(principals, groupPrincipal)
 		}
-		if l.isMemberOf(myToken.GroupPrincipals, groupPrincipal) {
-			groupPrincipal.MemberOf = true
-		}
-		principals = append(principals, groupPrincipal)
 	}
 
 	return principals, 0, nil
