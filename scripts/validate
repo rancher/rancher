@@ -5,7 +5,7 @@ cd $(dirname $0)/..
 
 echo Running validation
 
-PACKAGES=". $(find -name '*.go' | xargs -I{} dirname {} |  cut -f2 -d/ | sort -u | grep -Ev '(^\.$|.git|.trash-cache|vendor|bin)' | sed -e 's!^!./!' -e 's!$!/...!')"
+PACKAGES=". $(find . -name '*.go' | xargs -I{} dirname {} |  cut -f2 -d/ | sort -u | grep -Ev '(^\.$|.git|.trash-cache|vendor|bin)' | sed -e 's!^!./!' -e 's!$!/...!')"
 
 echo Running: go vet
 go vet ${PACKAGES}

@@ -17,7 +17,6 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
-	"github.com/rancher/kontainer-engine/drivers"
 	"github.com/rancher/kontainer-engine/drivers/rke"
 	"github.com/rancher/kontainer-engine/logstream"
 	"github.com/rancher/kontainer-engine/service"
@@ -38,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/flowcontrol"
 )
 
@@ -524,39 +522,7 @@ func (p *Provisioner) reconcileRKENodes(clusterName string) (bool, []v3.RKEConfi
 	return true, nodes, nil
 }
 
-func isImported(cluster *v3.Cluster) bool {
-	return cluster.Spec.ImportedConfig != nil && cluster.Spec.ImportedConfig.KubeConfig != ""
-}
-
-func (p *Provisioner) createImported(cluster *v3.Cluster) (string, string, string, error) {
-	cfg, err := clientcmd.Load([]byte(cluster.Spec.ImportedConfig.KubeConfig))
-	if err != nil {
-		return "", "", "", err
-	}
-	clientConfig := clientcmd.NewDefaultClientConfig(*cfg, &clientcmd.ConfigOverrides{})
-	restConfig, err := clientConfig.ClientConfig()
-	if err != nil {
-		return "", "", "", err
-	}
-
-	clientset, err := kubernetes.NewForConfig(restConfig)
-	if err != nil {
-		return "", "", "", err
-	}
-
-	token, err := drivers.GenerateServiceAccountToken(clientset)
-	if err != nil {
-		return "", "", "", err
-	}
-
-	return restConfig.Host, token, base64.StdEncoding.EncodeToString(restConfig.TLSClientConfig.CAData), nil
-}
-
 func (p *Provisioner) driverCreate(cluster *v3.Cluster, spec v3.ClusterSpec) (api string, token string, cert string, err error) {
-	if isImported(cluster) {
-		return p.createImported(cluster)
-	}
-
 	ctx, logger := p.getCtx(cluster, v3.ClusterConditionProvisioned)
 	defer logger.Close()
 
@@ -568,10 +534,6 @@ func (p *Provisioner) driverCreate(cluster *v3.Cluster, spec v3.ClusterSpec) (ap
 }
 
 func (p *Provisioner) driverUpdate(cluster *v3.Cluster, spec v3.ClusterSpec) (api string, token string, cert string, err error) {
-	if isImported(cluster) {
-		return p.createImported(cluster)
-	}
-
 	ctx, logger := p.getCtx(cluster, v3.ClusterConditionUpdated)
 	defer logger.Close()
 
@@ -583,10 +545,6 @@ func (p *Provisioner) driverUpdate(cluster *v3.Cluster, spec v3.ClusterSpec) (ap
 }
 
 func (p *Provisioner) driverRemove(cluster *v3.Cluster) error {
-	if isImported(cluster) {
-		return nil
-	}
-
 	ctx, logger := p.getCtx(cluster, v3.ClusterConditionRemoved)
 	defer logger.Close()
 
