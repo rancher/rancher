@@ -2,7 +2,6 @@ package managementstored
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/rancher/norman/store/crd"
@@ -13,6 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/app"
 	"github.com/rancher/rancher/pkg/api/customization/authn"
 	"github.com/rancher/rancher/pkg/api/customization/catalog"
+	"github.com/rancher/rancher/pkg/api/customization/clusteregistrationtokens"
 	"github.com/rancher/rancher/pkg/api/customization/logging"
 	"github.com/rancher/rancher/pkg/api/customization/node"
 	"github.com/rancher/rancher/pkg/api/customization/setting"
@@ -23,7 +23,6 @@ import (
 	"github.com/rancher/rancher/pkg/auth/principals"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/nodeconfig"
-	"github.com/rancher/rancher/pkg/settings"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	projectschema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	"github.com/rancher/types/client/management/v3"
@@ -149,20 +148,7 @@ func ClusterRegistrationTokens(schemas *types.Schemas) {
 	schema.Store = &cluster.RegistrationTokenStore{
 		Store: schema.Store,
 	}
-	schema.Formatter = func(request *types.APIContext, resource *types.RawResource) {
-		token, _ := resource.Values["token"].(string)
-		if token != "" {
-			url := request.URLBuilder.RelativeToRoot("/" + token + ".yaml")
-			resource.Values["command"] = "kubectl apply -f " + url
-			resource.Values["nodeCommand"] = fmt.Sprintf("docker run -d --restart=unless-stopped --net=host %s --server %s --token %s --ca-checksum \"%s\"",
-				settings.AgentImage.Get(),
-				request.URLBuilder.RelativeToRoot(""),
-				token,
-				settings.CACerts.Get())
-			resource.Values["token"] = token
-			resource.Values["manifestUrl"] = url
-		}
-	}
+	schema.Formatter = clusteregistrationtokens.Formatter
 }
 
 func SecretTypes(schemas *types.Schemas, management *config.ManagementContext) {

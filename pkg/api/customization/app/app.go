@@ -226,7 +226,7 @@ func (a ActionWrapper) toRESTConfig(cluster *client.Cluster) (*rest.Config, erro
 		return nil, nil
 	}
 
-	if cluster.Internal != nil && *cluster.Internal {
+	if cluster.Internal {
 		return a.Management.LocalConfig, nil
 	}
 
