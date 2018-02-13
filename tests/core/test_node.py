@@ -1,10 +1,9 @@
 from common import auth_check
 
 
-def test_machine_fields(mc):
+def test_node_fields(mc):
     cclient = mc.client
     fields = {
-        'useInternalIpAddress': 'cr',
         'nodeTaints': 'r',
         'nodeLabels': 'r',
         'nodeAnnotations': 'r',
@@ -16,13 +15,16 @@ def test_machine_fields(mc):
         'info': 'r',
         'ipAddress': 'r',
         'limits': 'r',
+        'nodePoolUuid': 'r',
         'nodeName': 'r',
         'requested': 'r',
         'clusterId': 'cr',
-        'role': 'cr',
+        'etcd': 'cru',
+        'controlPlane': 'cru',
+        'worker': 'cru',
         'requestedHostname': 'cr',
         'volumesAttached': 'r',
-        'machineTemplateId': 'cr',
+        'nodeTemplateId': 'cr',
         'volumesInUse': 'r',
         'podCidr': 'r',
         'name': 'cru',
@@ -33,10 +35,10 @@ def test_machine_fields(mc):
         'imported': "cru",
     }
 
-    for name, field in cclient.schema.types['machine'].resourceFields.items():
+    for name, field in cclient.schema.types['node'].resourceFields.items():
         if name.endswith("Config"):
             fields[name] = 'cr'
 
     fields['customConfig'] = 'cru'
 
-    auth_check(cclient.schema, 'machine', 'crud', fields)
+    auth_check(cclient.schema, 'node', 'crud', fields)
