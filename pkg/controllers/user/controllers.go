@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/controllers/user/alert"
 	"github.com/rancher/rancher/pkg/controllers/user/authz"
+	"github.com/rancher/rancher/pkg/controllers/user/authz/podsecuritypolicy"
 	"github.com/rancher/rancher/pkg/controllers/user/dnsrecord"
 	"github.com/rancher/rancher/pkg/controllers/user/endpoints"
 	"github.com/rancher/rancher/pkg/controllers/user/healthsyncer"
@@ -30,6 +31,10 @@ func Register(ctx context.Context, cluster *config.UserContext) error {
 	alert.Register(ctx, cluster)
 	nslabels.Register(cluster)
 	pipeline.Register(ctx, cluster)
+	podsecuritypolicy.RegisterServiceAccount(cluster)
+	podsecuritypolicy.RegisterTemplate(cluster)
+	podsecuritypolicy.RegisterCluster(cluster)
+	podsecuritypolicy.RegisterProject(cluster)
 
 	userOnlyContext := cluster.UserOnlyContext()
 	dnsrecord.Register(ctx, userOnlyContext)
