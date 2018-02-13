@@ -8,9 +8,8 @@ type Client struct {
 	clientbase.APIBaseClient
 
 	Node                       NodeOperations
-	Machine                    MachineOperations
-	MachineDriver              MachineDriverOperations
-	MachineTemplate            MachineTemplateOperations
+	NodeDriver                 NodeDriverOperations
+	NodeTemplate               NodeTemplateOperations
 	Project                    ProjectOperations
 	GlobalRole                 GlobalRoleOperations
 	GlobalRoleBinding          GlobalRoleBindingOperations
@@ -52,9 +51,8 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	}
 
 	client.Node = newNodeClient(client)
-	client.Machine = newMachineClient(client)
-	client.MachineDriver = newMachineDriverClient(client)
-	client.MachineTemplate = newMachineTemplateClient(client)
+	client.NodeDriver = newNodeDriverClient(client)
+	client.NodeTemplate = newNodeTemplateClient(client)
 	client.Project = newProjectClient(client)
 	client.GlobalRole = newGlobalRoleClient(client)
 	client.GlobalRoleBinding = newGlobalRoleBindingClient(client)

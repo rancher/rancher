@@ -71,14 +71,7 @@ func (s *Factory) Get(req *http.Request) (*v3.Cluster, http.Handler, error) {
 }
 
 func (s *Factory) newServer(c *v3.Cluster) (Server, error) {
-	if c.Spec.EmbeddedConfig != nil {
-		//return embedded.New(s.config, c, s.config.Lookup)
-		return nil, nil
-	}
-
-	if c.Spec.Internal {
-
-	} else {
+	if !c.Spec.Internal {
 		return proxy.New(c, s.dialerFactory)
 	}
 

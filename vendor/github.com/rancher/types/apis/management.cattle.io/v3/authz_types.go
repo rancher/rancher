@@ -16,6 +16,7 @@ var (
 
 type Project struct {
 	types.Namespaced
+
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 

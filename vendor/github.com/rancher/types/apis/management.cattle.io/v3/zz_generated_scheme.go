@@ -33,12 +33,12 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	// TODO this gets cleaned up when the types are fixed
 	scheme.AddKnownTypes(SchemeGroupVersion,
 
-		&Machine{},
-		&MachineList{},
-		&MachineDriver{},
-		&MachineDriverList{},
-		&MachineTemplate{},
-		&MachineTemplateList{},
+		&Node{},
+		&NodeList{},
+		&NodeDriver{},
+		&NodeDriverList{},
+		&NodeTemplate{},
+		&NodeTemplateList{},
 		&Project{},
 		&ProjectList{},
 		&GlobalRole{},

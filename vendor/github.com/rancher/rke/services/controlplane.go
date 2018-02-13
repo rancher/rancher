@@ -9,13 +9,13 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func RunControlPlane(ctx context.Context, controlHosts, etcdHosts []*hosts.Host, controlServices v3.RKEConfigServices, sidekickImage, authorizationMode string, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry) error {
+func RunControlPlane(ctx context.Context, controlHosts []*hosts.Host, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, processMap map[string]v3.Process) error {
 	log.Infof(ctx, "[%s] Building up Controller Plane..", ControlRole)
 	var errgrp errgroup.Group
 	for _, host := range controlHosts {
 		runHost := host
 		errgrp.Go(func() error {
-			return doDeployControlHost(ctx, runHost, etcdHosts, controlServices, sidekickImage, authorizationMode, localConnDialerFactory, prsMap)
+			return doDeployControlHost(ctx, runHost, localConnDialerFactory, prsMap, processMap)
 		})
 	}
 	if err := errgrp.Wait(); err != nil {
@@ -66,24 +66,24 @@ func RemoveControlPlane(ctx context.Context, controlHosts []*hosts.Host, force b
 	return nil
 }
 
-func doDeployControlHost(ctx context.Context, host *hosts.Host, etcdHosts []*hosts.Host, controlServices v3.RKEConfigServices, sidekickImage, authorizationMode string, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry) error {
+func doDeployControlHost(ctx context.Context, host *hosts.Host, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, processMap map[string]v3.Process) error {
 	if host.IsWorker {
 		if err := removeNginxProxy(ctx, host); err != nil {
 			return err
 		}
 	}
 	// run sidekick
-	if err := runSidekick(ctx, host, sidekickImage, prsMap); err != nil {
+	if err := runSidekick(ctx, host, prsMap, processMap[SidekickContainerName]); err != nil {
 		return err
 	}
 	// run kubeapi
-	if err := runKubeAPI(ctx, host, etcdHosts, controlServices.KubeAPI, authorizationMode, localConnDialerFactory, prsMap); err != nil {
+	if err := runKubeAPI(ctx, host, localConnDialerFactory, prsMap, processMap[KubeAPIContainerName]); err != nil {
 		return err
 	}
 	// run kubecontroller
-	if err := runKubeController(ctx, host, controlServices.KubeController, authorizationMode, localConnDialerFactory, prsMap); err != nil {
+	if err := runKubeController(ctx, host, localConnDialerFactory, prsMap, processMap[KubeControllerContainerName]); err != nil {
 		return err
 	}
 	// run scheduler
-	return runScheduler(ctx, host, controlServices.Scheduler, localConnDialerFactory, prsMap)
+	return runScheduler(ctx, host, localConnDialerFactory, prsMap, processMap[SchedulerContainerName])
 }

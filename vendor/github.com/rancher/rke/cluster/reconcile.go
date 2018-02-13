@@ -197,7 +197,10 @@ func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, ku
 			return err
 		}
 		etcdHost.ToAddEtcdMember = false
-		if err := services.ReloadEtcdCluster(ctx, kubeCluster.EtcdHosts, kubeCluster.Services.Etcd, currentCluster.LocalConnDialerFactory, clientCert, clientkey, currentCluster.PrivateRegistriesMap); err != nil {
+		readyHosts := getReadyEtcdHosts(kubeCluster.EtcdHosts)
+		etcdProcessHostMap := kubeCluster.getEtcdProcessHostMap(readyHosts)
+
+		if err := services.ReloadEtcdCluster(ctx, readyHosts, currentCluster.LocalConnDialerFactory, clientCert, clientkey, currentCluster.PrivateRegistriesMap, etcdProcessHostMap); err != nil {
 			return err
 		}
 	}
@@ -219,4 +222,15 @@ func syncLabels(ctx context.Context, currentCluster, kubeCluster *Cluster) {
 			}
 		}
 	}
+}
+
+func getReadyEtcdHosts(etcdHosts []*hosts.Host) []*hosts.Host {
+	readyEtcdHosts := []*hosts.Host{}
+	for _, host := range etcdHosts {
+		if !host.ToAddEtcdMember {
+			readyEtcdHosts = append(readyEtcdHosts, host)
+			host.ExistingEtcdCluster = true
+		}
+	}
+	return readyEtcdHosts
 }

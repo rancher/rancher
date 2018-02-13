@@ -39,7 +39,7 @@ func getEtcdClient(ctx context.Context, etcdHost *hosts.Host, localConnDialerFac
 	return etcdclient.New(cfg)
 }
 
-func isEtcdHealthy(ctx context.Context, localConnDialerFactory hosts.DialerFactory, host *hosts.Host, cert, key []byte) bool {
+func isEtcdHealthy(ctx context.Context, localConnDialerFactory hosts.DialerFactory, host *hosts.Host, cert, key []byte, url string) bool {
 	logrus.Debugf("[etcd] Check etcd cluster health")
 	for i := 0; i < 3; i++ {
 		dialer, err := getEtcdDialer(localConnDialerFactory, host)
@@ -59,7 +59,7 @@ func isEtcdHealthy(ctx context.Context, localConnDialerFactory hosts.DialerFacto
 				TLSHandshakeTimeout: 10 * time.Second,
 			},
 		}
-		healthy, err := getHealthEtcd(hc, host)
+		healthy, err := getHealthEtcd(hc, host, url)
 		if err != nil {
 			logrus.Debug(err)
 			time.Sleep(5 * time.Second)
@@ -73,9 +73,9 @@ func isEtcdHealthy(ctx context.Context, localConnDialerFactory hosts.DialerFacto
 	return false
 }
 
-func getHealthEtcd(hc http.Client, host *hosts.Host) (string, error) {
+func getHealthEtcd(hc http.Client, host *hosts.Host, url string) (string, error) {
 	healthy := struct{ Health string }{}
-	resp, err := hc.Get("https://127.0.0.1:2379/health")
+	resp, err := hc.Get(url)
 	if err != nil {
 		return healthy.Health, fmt.Errorf("Failed to get /health for host [%s]: %v", host.Address, err)
 	}
@@ -90,7 +90,7 @@ func getHealthEtcd(hc http.Client, host *hosts.Host) (string, error) {
 	return healthy.Health, nil
 }
 
-func getEtcdInitialCluster(hosts []*hosts.Host) string {
+func GetEtcdInitialCluster(hosts []*hosts.Host) string {
 	initialCluster := ""
 	for i, host := range hosts {
 		initialCluster += fmt.Sprintf("etcd-%s=https://%s:2380", host.HostnameOverride, host.InternalAddress)

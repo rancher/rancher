@@ -9,20 +9,35 @@ const (
 	NodeFieldAllocatable          = "allocatable"
 	NodeFieldAnnotations          = "annotations"
 	NodeFieldCapacity             = "capacity"
+	NodeFieldClusterId            = "clusterId"
+	NodeFieldConditions           = "conditions"
+	NodeFieldControlPlane         = "controlPlane"
 	NodeFieldCreated              = "created"
 	NodeFieldCreatorID            = "creatorId"
+	NodeFieldCustomConfig         = "customConfig"
 	NodeFieldDescription          = "description"
+	NodeFieldEtcd                 = "etcd"
 	NodeFieldHostname             = "hostname"
 	NodeFieldIPAddress            = "ipAddress"
+	NodeFieldImported             = "imported"
 	NodeFieldInfo                 = "info"
 	NodeFieldLabels               = "labels"
+	NodeFieldLimits               = "limits"
 	NodeFieldName                 = "name"
-	NodeFieldNodeConditions       = "nodeConditions"
+	NodeFieldNamespaceId          = "namespaceId"
+	NodeFieldNodeAnnotations      = "nodeAnnotations"
+	NodeFieldNodeLabels           = "nodeLabels"
+	NodeFieldNodeName             = "nodeName"
+	NodeFieldNodePoolUUID         = "nodePoolUuid"
+	NodeFieldNodeTaints           = "nodeTaints"
+	NodeFieldNodeTemplateId       = "nodeTemplateId"
 	NodeFieldOwnerReferences      = "ownerReferences"
 	NodeFieldPodCidr              = "podCidr"
 	NodeFieldProviderId           = "providerId"
-	NodeFieldPublicEndpoints      = "publicEndpoints"
 	NodeFieldRemoved              = "removed"
+	NodeFieldRequested            = "requested"
+	NodeFieldRequestedHostname    = "requestedHostname"
+	NodeFieldSshUser              = "sshUser"
 	NodeFieldState                = "state"
 	NodeFieldTaints               = "taints"
 	NodeFieldTransitioning        = "transitioning"
@@ -31,6 +46,7 @@ const (
 	NodeFieldUuid                 = "uuid"
 	NodeFieldVolumesAttached      = "volumesAttached"
 	NodeFieldVolumesInUse         = "volumesInUse"
+	NodeFieldWorker               = "worker"
 )
 
 type Node struct {
@@ -38,20 +54,35 @@ type Node struct {
 	Allocatable          map[string]string         `json:"allocatable,omitempty"`
 	Annotations          map[string]string         `json:"annotations,omitempty"`
 	Capacity             map[string]string         `json:"capacity,omitempty"`
+	ClusterId            string                    `json:"clusterId,omitempty"`
+	Conditions           []NodeCondition           `json:"conditions,omitempty"`
+	ControlPlane         *bool                     `json:"controlPlane,omitempty"`
 	Created              string                    `json:"created,omitempty"`
 	CreatorID            string                    `json:"creatorId,omitempty"`
+	CustomConfig         *CustomConfig             `json:"customConfig,omitempty"`
 	Description          string                    `json:"description,omitempty"`
+	Etcd                 *bool                     `json:"etcd,omitempty"`
 	Hostname             string                    `json:"hostname,omitempty"`
 	IPAddress            string                    `json:"ipAddress,omitempty"`
+	Imported             *bool                     `json:"imported,omitempty"`
 	Info                 *NodeInfo                 `json:"info,omitempty"`
 	Labels               map[string]string         `json:"labels,omitempty"`
+	Limits               map[string]string         `json:"limits,omitempty"`
 	Name                 string                    `json:"name,omitempty"`
-	NodeConditions       []NodeCondition           `json:"nodeConditions,omitempty"`
+	NamespaceId          string                    `json:"namespaceId,omitempty"`
+	NodeAnnotations      map[string]string         `json:"nodeAnnotations,omitempty"`
+	NodeLabels           map[string]string         `json:"nodeLabels,omitempty"`
+	NodeName             string                    `json:"nodeName,omitempty"`
+	NodePoolUUID         string                    `json:"nodePoolUuid,omitempty"`
+	NodeTaints           []Taint                   `json:"nodeTaints,omitempty"`
+	NodeTemplateId       string                    `json:"nodeTemplateId,omitempty"`
 	OwnerReferences      []OwnerReference          `json:"ownerReferences,omitempty"`
 	PodCidr              string                    `json:"podCidr,omitempty"`
 	ProviderId           string                    `json:"providerId,omitempty"`
-	PublicEndpoints      []PublicEndpoint          `json:"publicEndpoints,omitempty"`
 	Removed              string                    `json:"removed,omitempty"`
+	Requested            map[string]string         `json:"requested,omitempty"`
+	RequestedHostname    string                    `json:"requestedHostname,omitempty"`
+	SshUser              string                    `json:"sshUser,omitempty"`
 	State                string                    `json:"state,omitempty"`
 	Taints               []Taint                   `json:"taints,omitempty"`
 	Transitioning        string                    `json:"transitioning,omitempty"`
@@ -60,6 +91,7 @@ type Node struct {
 	Uuid                 string                    `json:"uuid,omitempty"`
 	VolumesAttached      map[string]AttachedVolume `json:"volumesAttached,omitempty"`
 	VolumesInUse         []string                  `json:"volumesInUse,omitempty"`
+	Worker               *bool                     `json:"worker,omitempty"`
 }
 type NodeCollection struct {
 	types.Collection

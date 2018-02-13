@@ -1,18 +1,18 @@
 package client
 
 const (
-	NodeStatusType                 = "nodeStatus"
-	NodeStatusFieldAllocatable     = "allocatable"
-	NodeStatusFieldCapacity        = "capacity"
-	NodeStatusFieldHostname        = "hostname"
-	NodeStatusFieldIPAddress       = "ipAddress"
-	NodeStatusFieldInfo            = "info"
-	NodeStatusFieldNodeConditions  = "nodeConditions"
-	NodeStatusFieldVolumesAttached = "volumesAttached"
-	NodeStatusFieldVolumesInUse    = "volumesInUse"
+	InternalNodeStatusType                 = "internalNodeStatus"
+	InternalNodeStatusFieldAllocatable     = "allocatable"
+	InternalNodeStatusFieldCapacity        = "capacity"
+	InternalNodeStatusFieldHostname        = "hostname"
+	InternalNodeStatusFieldIPAddress       = "ipAddress"
+	InternalNodeStatusFieldInfo            = "info"
+	InternalNodeStatusFieldNodeConditions  = "nodeConditions"
+	InternalNodeStatusFieldVolumesAttached = "volumesAttached"
+	InternalNodeStatusFieldVolumesInUse    = "volumesInUse"
 )
 
-type NodeStatus struct {
+type InternalNodeStatus struct {
 	Allocatable     map[string]string         `json:"allocatable,omitempty"`
 	Capacity        map[string]string         `json:"capacity,omitempty"`
 	Hostname        string                    `json:"hostname,omitempty"`
