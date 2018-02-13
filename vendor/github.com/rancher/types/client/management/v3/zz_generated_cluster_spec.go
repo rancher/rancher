@@ -22,7 +22,7 @@ type ClusterSpec struct {
 	DisplayName                         string                         `json:"displayName,omitempty"`
 	GoogleKubernetesEngineConfig        *GoogleKubernetesEngineConfig  `json:"googleKubernetesEngineConfig,omitempty"`
 	ImportedConfig                      *ImportedConfig                `json:"importedConfig,omitempty"`
-	Internal                            *bool                          `json:"internal,omitempty"`
+	Internal                            bool                           `json:"internal,omitempty"`
 	NodePools                           []NodePool                     `json:"nodePools,omitempty"`
 	RancherKubernetesEngineConfig       *RancherKubernetesEngineConfig `json:"rancherKubernetesEngineConfig,omitempty"`
 }

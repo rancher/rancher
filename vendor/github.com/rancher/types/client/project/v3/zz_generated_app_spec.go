@@ -21,7 +21,7 @@ type AppSpec struct {
 	Groups           []string          `json:"groups,omitempty"`
 	InstallNamespace string            `json:"installNamespace,omitempty"`
 	ProjectId        string            `json:"projectId,omitempty"`
-	Prune            *bool             `json:"prune,omitempty"`
+	Prune            bool              `json:"prune,omitempty"`
 	Tag              map[string]string `json:"tag,omitempty"`
 	Templates        map[string]string `json:"templates,omitempty"`
 	User             string            `json:"user,omitempty"`

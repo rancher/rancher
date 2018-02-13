@@ -42,7 +42,7 @@ type Container struct {
 	EnvironmentFrom          []EnvironmentFrom `json:"environmentFrom,omitempty"`
 	Image                    string            `json:"image,omitempty"`
 	ImagePullPolicy          string            `json:"imagePullPolicy,omitempty"`
-	InitContainer            *bool             `json:"initContainer,omitempty"`
+	InitContainer            bool              `json:"initContainer,omitempty"`
 	LivenessProbe            *Probe            `json:"livenessProbe,omitempty"`
 	Name                     string            `json:"name,omitempty"`
 	Ports                    []ContainerPort   `json:"ports,omitempty"`
@@ -53,9 +53,9 @@ type Container struct {
 	ReadinessProbe           *Probe            `json:"readinessProbe,omitempty"`
 	Resources                *Resources        `json:"resources,omitempty"`
 	RunAsNonRoot             *bool             `json:"runAsNonRoot,omitempty"`
-	Stdin                    *bool             `json:"stdin,omitempty"`
-	StdinOnce                *bool             `json:"stdinOnce,omitempty"`
-	TTY                      *bool             `json:"tty,omitempty"`
+	Stdin                    bool              `json:"stdin,omitempty"`
+	StdinOnce                bool              `json:"stdinOnce,omitempty"`
+	TTY                      bool              `json:"tty,omitempty"`
 	TerminationMessagePath   string            `json:"terminationMessagePath,omitempty"`
 	TerminationMessagePolicy string            `json:"terminationMessagePolicy,omitempty"`
 	Uid                      *int64            `json:"uid,omitempty"`

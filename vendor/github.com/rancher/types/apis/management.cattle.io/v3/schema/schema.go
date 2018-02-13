@@ -32,7 +32,8 @@ var (
 		Init(logTypes).
 		Init(globalTypes).
 		Init(rkeTypes).
-		Init(alertTypes)
+		Init(alertTypes).
+		Init(pipelineTypes)
 
 	TokenSchemas = factory.Schemas(&Version).
 			Init(tokens)
@@ -328,5 +329,59 @@ func alertTypes(schema *types.Schemas) *types.Schemas {
 				"unmute":     {},
 			}
 		})
+
+}
+
+func pipelineTypes(schema *types.Schemas) *types.Schemas {
+	return schema.
+		AddMapperForType(&Version, &v3.ClusterPipeline{},
+			m.DisplayName{}).
+		AddMapperForType(&Version, &v3.Pipeline{},
+			&m.Embed{Field: "status"},
+			m.DisplayName{}).
+		AddMapperForType(&Version, &v3.PipelineExecution{},
+			&m.Embed{Field: "status"},
+			m.DisplayName{}).
+		AddMapperForType(&Version, &v3.SourceCodeCredential{},
+			m.DisplayName{}).
+		AddMapperForType(&Version, &v3.SourceCodeRepository{}, m.DisplayName{}).
+		AddMapperForType(&Version, &v3.PipelineExecutionLog{}).
+		MustImport(&Version, v3.AuthAppInput{}).
+		MustImport(&Version, v3.AuthUserInput{}).
+		MustImportAndCustomize(&Version, v3.SourceCodeCredential{}, func(schema *types.Schema) {
+			schema.ResourceActions = map[string]types.Action{
+				"refreshrepos": {},
+			}
+		}).
+		MustImportAndCustomize(&Version, v3.ClusterPipeline{}, func(schema *types.Schema) {
+			schema.ResourceActions = map[string]types.Action{
+				"deploy":  {},
+				"destroy": {},
+				"authapp": {
+					Input:  "authAppInput",
+					Output: "cluterPipeline",
+				},
+				"revokeapp": {},
+				"authuser": {
+					Input:  "authUserInput",
+					Output: "sourceCodeCredential",
+				},
+			}
+		}).
+		MustImportAndCustomize(&Version, v3.Pipeline{}, func(schema *types.Schema) {
+			schema.ResourceActions = map[string]types.Action{
+				"activate":   {},
+				"deactivate": {},
+				"run":        {},
+			}
+		}).
+		MustImportAndCustomize(&Version, v3.PipelineExecution{}, func(schema *types.Schema) {
+			schema.ResourceActions = map[string]types.Action{
+				"stop":  {},
+				"rerun": {},
+			}
+		}).
+		MustImport(&Version, v3.SourceCodeRepository{}).
+		MustImport(&Version, v3.PipelineExecutionLog{})
 
 }

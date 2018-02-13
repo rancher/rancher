@@ -21,18 +21,18 @@ const (
 
 type NodeSpec struct {
 	ClusterId         string        `json:"clusterId,omitempty"`
-	ControlPlane      *bool         `json:"controlPlane,omitempty"`
+	ControlPlane      bool          `json:"controlPlane,omitempty"`
 	CustomConfig      *CustomConfig `json:"customConfig,omitempty"`
 	Description       string        `json:"description,omitempty"`
 	DisplayName       string        `json:"displayName,omitempty"`
-	Etcd              *bool         `json:"etcd,omitempty"`
-	Imported          *bool         `json:"imported,omitempty"`
+	Etcd              bool          `json:"etcd,omitempty"`
+	Imported          bool          `json:"imported,omitempty"`
 	NodePoolUUID      string        `json:"nodePoolUuid,omitempty"`
 	NodeTemplateId    string        `json:"nodeTemplateId,omitempty"`
 	PodCidr           string        `json:"podCidr,omitempty"`
 	ProviderId        string        `json:"providerId,omitempty"`
 	RequestedHostname string        `json:"requestedHostname,omitempty"`
 	Taints            []Taint       `json:"taints,omitempty"`
-	Unschedulable     *bool         `json:"unschedulable,omitempty"`
-	Worker            *bool         `json:"worker,omitempty"`
+	Unschedulable     bool          `json:"unschedulable,omitempty"`
+	Worker            bool          `json:"worker,omitempty"`
 }

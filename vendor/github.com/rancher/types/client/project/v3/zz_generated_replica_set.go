@@ -62,9 +62,9 @@ type ReplicaSet struct {
 	Fsgid                         *int64                 `json:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty"`
 	HostAliases                   []HostAlias            `json:"hostAliases,omitempty"`
-	HostIPC                       *bool                  `json:"hostIPC,omitempty"`
-	HostNetwork                   *bool                  `json:"hostNetwork,omitempty"`
-	HostPID                       *bool                  `json:"hostPID,omitempty"`
+	HostIPC                       bool                   `json:"hostIPC,omitempty"`
+	HostNetwork                   bool                   `json:"hostNetwork,omitempty"`
+	HostPID                       bool                   `json:"hostPID,omitempty"`
 	Hostname                      string                 `json:"hostname,omitempty"`
 	ImagePullSecrets              []LocalObjectReference `json:"imagePullSecrets,omitempty"`
 	Labels                        map[string]string      `json:"labels,omitempty"`

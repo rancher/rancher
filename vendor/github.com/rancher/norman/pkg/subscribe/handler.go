@@ -22,7 +22,7 @@ var upgrader = websocket.Upgrader{}
 type Subscribe struct {
 	ResourceTypes []string
 	APIVersions   []string
-	ProjectID     string `norman:"type=reference[project]"`
+	ProjectID     string `norman:"type=reference[/v3/schemas/project]"`
 }
 
 func Handler(apiContext *types.APIContext, _ types.RequestHandler) error {

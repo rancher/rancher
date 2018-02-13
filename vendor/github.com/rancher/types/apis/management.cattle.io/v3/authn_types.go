@@ -9,10 +9,10 @@ type Token struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Token           string            `json:"token" norman:"writeOnly,noupdate"`
-	UserPrincipal   Principal         `json:"userPrincipal" norman:"type=reference[Principal]"`
-	GroupPrincipals []Principal       `json:"groupPrincipals" norman:"type=array[reference[Principal]]"`
+	UserPrincipal   Principal         `json:"userPrincipal" norman:"type=reference[principal]"`
+	GroupPrincipals []Principal       `json:"groupPrincipals" norman:"type=array[reference[principal]]"`
 	ProviderInfo    map[string]string `json:"providerInfo,omitempty"`
-	UserID          string            `json:"userId" norman:"type=reference[User]"`
+	UserID          string            `json:"userId" norman:"type=reference[user]"`
 	AuthProvider    string            `json:"authProvider"`
 	TTLMillis       int               `json:"ttl"`
 	LastUpdateTime  string            `json:"lastUpdateTime"`
@@ -29,7 +29,7 @@ type User struct {
 	Username           string   `json:"username,omitempty"`
 	Password           string   `json:"password,omitempty" norman:"writeOnly,noupdate"`
 	MustChangePassword bool     `json:"mustChangePassword,omitempty"`
-	PrincipalIDs       []string `json:"principalIds,omitempty" norman:"type=array[reference[Principal]]"`
+	PrincipalIDs       []string `json:"principalIds,omitempty" norman:"type=array[reference[principal]]"`
 	Me                 bool     `json:"me,omitempty"`
 }
 
@@ -45,7 +45,7 @@ type GroupMember struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	GroupName   string `json:"groupName,omitempty" norman:"type=reference[group]"`
-	PrincipalID string `json:"principalId,omitempty" norman:"type=reference[Principal]"`
+	PrincipalID string `json:"principalId,omitempty" norman:"type=reference[principal]"`
 }
 
 type Principal struct {
@@ -85,7 +85,7 @@ type AuthConfig struct {
 	Type                string   `json:"type"`
 	Enabled             bool     `json:"enabled,omitempty"`
 	AccessMode          string   `json:"accessMode,omitempty" norman:"required,notnullable,type=enum,options=required|restricted|unrestricted"`
-	AllowedPrincipalIDs []string `json:"allowedPrincipalIds,omitempty" norman:"type=array[reference[Principal]]"`
+	AllowedPrincipalIDs []string `json:"allowedPrincipalIds,omitempty" norman:"type=array[reference[principal]]"`
 }
 
 //GithubConfig structure contains the github config definition

@@ -19,7 +19,7 @@ type RancherKubernetesEngineConfig struct {
 	Addons              string             `json:"addons,omitempty"`
 	Authentication      *AuthnConfig       `json:"authentication,omitempty"`
 	Authorization       *AuthzConfig       `json:"authorization,omitempty"`
-	IgnoreDockerVersion *bool              `json:"ignoreDockerVersion,omitempty"`
+	IgnoreDockerVersion bool               `json:"ignoreDockerVersion,omitempty"`
 	Ingress             *IngressConfig     `json:"ingress,omitempty"`
 	Network             *NetworkConfig     `json:"network,omitempty"`
 	Nodes               []RKEConfigNode    `json:"nodes,omitempty"`

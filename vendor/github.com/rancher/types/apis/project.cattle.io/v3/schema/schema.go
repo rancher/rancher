@@ -439,7 +439,7 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 		}{}).
 		MustImport(&Version, v1.PodSpec{}, struct {
 			Scheduling *Scheduling
-			NodeName   string `norman:"type=reference[node]"`
+			NodeName   string `norman:"type=reference[/v3/schemas/node]"`
 		}{}).
 		MustImport(&Version, v1.Pod{}, projectOverride{}, struct {
 			Description     string `json:"description"`

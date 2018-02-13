@@ -46,15 +46,15 @@ type PodSecurityPolicyTemplate struct {
 	DefaultAllowPrivilegeEscalation *bool                              `json:"defaultAllowPrivilegeEscalation,omitempty"`
 	Description                     string                             `json:"description,omitempty"`
 	FSGroup                         *FSGroupStrategyOptions            `json:"fsGroup,omitempty"`
-	HostIPC                         *bool                              `json:"hostIPC,omitempty"`
-	HostNetwork                     *bool                              `json:"hostNetwork,omitempty"`
-	HostPID                         *bool                              `json:"hostPID,omitempty"`
+	HostIPC                         bool                               `json:"hostIPC,omitempty"`
+	HostNetwork                     bool                               `json:"hostNetwork,omitempty"`
+	HostPID                         bool                               `json:"hostPID,omitempty"`
 	HostPorts                       []HostPortRange                    `json:"hostPorts,omitempty"`
 	Labels                          map[string]string                  `json:"labels,omitempty"`
 	Name                            string                             `json:"name,omitempty"`
 	OwnerReferences                 []OwnerReference                   `json:"ownerReferences,omitempty"`
-	Privileged                      *bool                              `json:"privileged,omitempty"`
-	ReadOnlyRootFilesystem          *bool                              `json:"readOnlyRootFilesystem,omitempty"`
+	Privileged                      bool                               `json:"privileged,omitempty"`
+	ReadOnlyRootFilesystem          bool                               `json:"readOnlyRootFilesystem,omitempty"`
 	Removed                         string                             `json:"removed,omitempty"`
 	RequiredDropCapabilities        []string                           `json:"requiredDropCapabilities,omitempty"`
 	RunAsUser                       *RunAsUserStrategyOptions          `json:"runAsUser,omitempty"`

@@ -13,6 +13,6 @@ type FlexVolumeSource struct {
 	Driver    string                `json:"driver,omitempty"`
 	FSType    string                `json:"fsType,omitempty"`
 	Options   map[string]string     `json:"options,omitempty"`
-	ReadOnly  *bool                 `json:"readOnly,omitempty"`
+	ReadOnly  bool                  `json:"readOnly,omitempty"`
 	SecretRef *LocalObjectReference `json:"secretRef,omitempty"`
 }

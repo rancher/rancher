@@ -5,16 +5,14 @@ const (
 	CustomConfigFieldAddress         = "address"
 	CustomConfigFieldDockerSocket    = "dockerSocket"
 	CustomConfigFieldInternalAddress = "internalAddress"
-	CustomConfigFieldRoles           = "roles"
 	CustomConfigFieldSSHKey          = "sshKey"
 	CustomConfigFieldUser            = "user"
 )
 
 type CustomConfig struct {
-	Address         string   `json:"address,omitempty"`
-	DockerSocket    string   `json:"dockerSocket,omitempty"`
-	InternalAddress string   `json:"internalAddress,omitempty"`
-	Roles           []string `json:"roles,omitempty"`
-	SSHKey          string   `json:"sshKey,omitempty"`
-	User            string   `json:"user,omitempty"`
+	Address         string `json:"address,omitempty"`
+	DockerSocket    string `json:"dockerSocket,omitempty"`
+	InternalAddress string `json:"internalAddress,omitempty"`
+	SSHKey          string `json:"sshKey,omitempty"`
+	User            string `json:"user,omitempty"`
 }

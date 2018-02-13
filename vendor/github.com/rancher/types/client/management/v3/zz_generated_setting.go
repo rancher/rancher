@@ -24,7 +24,7 @@ type Setting struct {
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	Created         string            `json:"created,omitempty"`
 	CreatorID       string            `json:"creatorId,omitempty"`
-	Customized      *bool             `json:"customized,omitempty"`
+	Customized      bool              `json:"customized,omitempty"`
 	Default         string            `json:"default,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`
 	Name            string            `json:"name,omitempty"`
