@@ -1,0 +1,17 @@
+sudo: false
+language: go
+
+services:
+- docker
+
+go:
+- 1.8.1
+
+script:
+# test front-end
+- make clean
+- cd ui/app/ && make && cd ../..
+- make assets
+- git diff --exit-code
+# test back-end
+- make
