@@ -99,7 +99,7 @@ func workloadTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.MustImportAndCustomize(&Version, v3.Workload{},
 		func(schema *types.Schema) {
 			toInclude := []string{"deployment", "replicationController", "statefulSet",
-				"daemonSet", "job", "cronJob"}
+				"daemonSet", "job", "cronJob", "replicaSet"}
 			for _, name := range toInclude {
 				baseSchema := schemas.Schema(&Version, name)
 				if baseSchema == nil {
