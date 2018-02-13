@@ -31,8 +31,6 @@ func authProviderSchemas(ctx context.Context, management *config.ManagementConte
 	schema := schemas.Schema(&publicSchema.PublicVersion, v3public.AuthProviderType)
 	setAuthProvidersStore(schema, management)
 	lh := newLoginHandler(management)
-	schema.ActionHandler = lh.login
-	schema.Formatter = loginActionFormatter
 
 	for _, apSubtype := range authProviderTypes {
 		subSchema := schemas.Schema(&publicSchema.PublicVersion, apSubtype)

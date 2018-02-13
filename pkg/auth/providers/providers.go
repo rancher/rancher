@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/rancher/norman/types"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 
@@ -13,29 +12,18 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
+	"github.com/rancher/types/client/management/v3"
+	publicclient "github.com/rancher/types/client/management/v3public"
 )
 
 //Providers map
 var (
-	providers         map[string]PrincipalProvider
-	providerOrderList []string
-	confMu            sync.Mutex
+	providers       = make(map[string]common.AuthProvider)
+	providersByType = make(map[string]common.AuthProvider)
+	confMu          sync.Mutex
 )
 
-func init() {
-	providerOrderList = []string{"github", "local"}
-	providers = make(map[string]PrincipalProvider)
-}
-
-//PrincipalProvider interfacse defines what methods an identity provider should implement
-type PrincipalProvider interface {
-	GetName() string
-	AuthenticateUser(input interface{}) (v3.Principal, []v3.Principal, map[string]string, int, error)
-	SearchPrincipals(name, principalType string, myToken v3.Token) ([]v3.Principal, int, error)
-	ConfigActionHandler(actionName string, action *types.Action, request *types.APIContext) error
-}
-
-func GetProvider(providerName string) (PrincipalProvider, error) {
+func GetProvider(providerName string) (common.AuthProvider, error) {
 	if provider, ok := providers[providerName]; ok {
 		if provider != nil {
 			return provider, nil
@@ -44,20 +32,24 @@ func GetProvider(providerName string) (PrincipalProvider, error) {
 	return nil, fmt.Errorf("No such provider '%s'", providerName)
 }
 
+func GetProviderByType(configType string) common.AuthProvider {
+	return providersByType[configType]
+}
+
 func Configure(ctx context.Context, mgmt *config.ManagementContext) {
 	confMu.Lock()
 	defer confMu.Unlock()
 	userMGR := common.NewUserManager(mgmt)
-	for _, providerName := range providerOrderList {
-		if _, exists := providers[providerName]; !exists {
-			switch providerName {
-			case "local":
-				providers[providerName] = local.Configure(ctx, mgmt)
-			case "github":
-				providers[providerName] = github.Configure(ctx, mgmt, userMGR)
-			}
-		}
-	}
+	var p common.AuthProvider
+	p = local.Configure(ctx, mgmt)
+	providers[local.Name] = p
+	providersByType[client.LocalConfigType] = p
+	providersByType[publicclient.LocalProviderType] = p
+
+	p = github.Configure(ctx, mgmt, userMGR)
+	providers[github.Name] = p
+	providersByType[client.GithubConfigType] = p
+	providersByType[publicclient.GithubProviderType] = p
 }
 
 func AuthenticateUser(input interface{}, providerName string) (v3.Principal, []v3.Principal, map[string]string, int, error) {

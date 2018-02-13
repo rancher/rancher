@@ -10,11 +10,14 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/auth/providers/github"
+	localprovider "github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	managementController "github.com/rancher/rancher/pkg/controllers/management"
 	"github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/server"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
@@ -420,11 +423,11 @@ func addRoles(management *config.ManagementContext, local bool) error {
 		})
 	}
 
-	if err := addAuthConfig("github", "githubConfig", false, management); err != nil {
+	if err := addAuthConfig(github.Name, client.GithubConfigType, false, management); err != nil {
 		return err
 	}
 
-	return addAuthConfig("local", "localConfig", true, management)
+	return addAuthConfig(localprovider.Name, client.LocalConfigType, true, management)
 }
 
 func addAuthConfig(name, aType string, enabled bool, management *config.ManagementContext) error {

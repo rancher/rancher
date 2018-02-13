@@ -8,35 +8,35 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
 	"github.com/rancher/types/client/management/v3"
+	publicclient "github.com/rancher/types/client/management/v3public"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-//Constants for github
 const (
-	Github = "github"
+	Name = "github"
 )
 
-//GProvider implements an PrincipalProvider for github
-type GProvider struct {
+type ghProvider struct {
 	ctx          context.Context
 	authConfigs  v3.AuthConfigInterface
 	githubClient *GClient
 	userMGR      common.UserManager
 }
 
-func Configure(ctx context.Context, mgmtCtx *config.ManagementContext, userMGR common.UserManager) *GProvider {
+func Configure(ctx context.Context, mgmtCtx *config.ManagementContext, userMGR common.UserManager) common.AuthProvider {
 	githubClient := &GClient{
 		httpClient: &http.Client{},
 	}
 
-	return &GProvider{
+	return &ghProvider{
 		ctx:          ctx,
 		authConfigs:  mgmtCtx.Management.AuthConfigs(""),
 		githubClient: githubClient,
@@ -44,14 +44,23 @@ func Configure(ctx context.Context, mgmtCtx *config.ManagementContext, userMGR c
 	}
 }
 
-//GetName returns the name of the provider
-func (g *GProvider) GetName() string {
-	return Github
+func (g *ghProvider) GetName() string {
+	return Name
 }
 
-func (g *GProvider) getGithubConfigCR() (*v3.GithubConfig, error) {
+func (g *ghProvider) CustomizeSchema(schema *types.Schema) {
+	schema.ActionHandler = g.actionHandler
+	schema.Formatter = g.formatter
+}
 
-	authConfigObj, err := g.authConfigs.ObjectClient().UnstructuredClient().Get("github", metav1.GetOptions{})
+func (g *ghProvider) TransformToAuthProvider(authConfig map[string]interface{}) map[string]interface{} {
+	p := common.TransformToAuthProvider(authConfig)
+	p[publicclient.GithubProviderFieldRedirectURL] = formGithubRedirectURLFromMap(authConfig)
+	return p
+}
+
+func (g *ghProvider) getGithubConfigCR() (*v3.GithubConfig, error) {
+	authConfigObj, err := g.authConfigs.ObjectClient().UnstructuredClient().Get(Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve GithubConfig, error: %v", err)
 	}
@@ -77,7 +86,7 @@ func (g *GProvider) getGithubConfigCR() (*v3.GithubConfig, error) {
 	return storedGithubConfig, nil
 }
 
-func (g *GProvider) SaveGithubConfig(config *v3.GithubConfig) error {
+func (g *ghProvider) saveGithubConfig(config *v3.GithubConfig) error {
 	storedGithubConfig, err := g.getGithubConfigCR()
 	if err != nil {
 		return err
@@ -95,7 +104,7 @@ func (g *GProvider) SaveGithubConfig(config *v3.GithubConfig) error {
 	return nil
 }
 
-func (g *GProvider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Principal, map[string]string, int, error) {
+func (g *ghProvider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Principal, map[string]string, int, error) {
 	login, ok := input.(*v3public.GithubLogin)
 	if !ok {
 		return v3.Principal{}, nil, nil, 500, errors.New("unexpected input type")
@@ -104,7 +113,7 @@ func (g *GProvider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Prin
 	return g.LoginUser(login, nil)
 }
 
-func (g *GProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v3.GithubConfig) (v3.Principal, []v3.Principal, map[string]string, int, error) {
+func (g *ghProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v3.GithubConfig) (v3.Principal, []v3.Principal, map[string]string, int, error) {
 	var groupPrincipals []v3.Principal
 	var userPrincipal v3.Principal
 	var providerInfo = make(map[string]string)
@@ -134,11 +143,11 @@ func (g *GProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v3
 		return userPrincipal, groupPrincipals, providerInfo, 401, fmt.Errorf("Error getting github user %v", err)
 	}
 	userPrincipal = v3.Principal{
-		ObjectMeta:     metav1.ObjectMeta{Name: Github + "_user://" + strconv.Itoa(user.ID)},
+		ObjectMeta:     metav1.ObjectMeta{Name: Name + "_user://" + strconv.Itoa(user.ID)},
 		DisplayName:    user.Name,
 		LoginName:      user.Login,
 		Kind:           "user",
-		Provider:       Github,
+		Provider:       Name,
 		Me:             true,
 		ProfilePicture: user.AvatarURL,
 	}
@@ -155,10 +164,10 @@ func (g *GProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v3
 			name = orgAcct.Login
 		}
 		groupPrincipal := v3.Principal{
-			ObjectMeta:     metav1.ObjectMeta{Name: Github + "_org://" + strconv.Itoa(orgAcct.ID)},
+			ObjectMeta:     metav1.ObjectMeta{Name: Name + "_org://" + strconv.Itoa(orgAcct.ID)},
 			DisplayName:    name,
 			Kind:           "group",
-			Provider:       Github,
+			Provider:       Name,
 			ProfilePicture: orgAcct.AvatarURL,
 		}
 		groupPrincipals = append(groupPrincipals, groupPrincipal)
@@ -171,10 +180,10 @@ func (g *GProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v3
 	}
 	for _, teamAcct := range teamAccts {
 		groupPrincipal := v3.Principal{
-			ObjectMeta:     metav1.ObjectMeta{Name: Github + "_team://" + strconv.Itoa(teamAcct.ID)},
+			ObjectMeta:     metav1.ObjectMeta{Name: Name + "_team://" + strconv.Itoa(teamAcct.ID)},
 			DisplayName:    teamAcct.Name,
 			Kind:           "group",
-			Provider:       Github,
+			Provider:       Name,
 			ProfilePicture: teamAcct.AvatarURL,
 		}
 		groupPrincipals = append(groupPrincipals, groupPrincipal)
@@ -191,14 +200,9 @@ func (g *GProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v3
 	return userPrincipal, groupPrincipals, providerInfo, 0, nil
 }
 
-func (g *GProvider) SearchPrincipals(searchKey, principalType string, myToken v3.Token) ([]v3.Principal, int, error) {
+func (g *ghProvider) SearchPrincipals(searchKey, principalType string, myToken v3.Token) ([]v3.Principal, int, error) {
 	var principals []v3.Principal
 	var err error
-
-	//is this github token?
-	if myToken.AuthProvider != g.GetName() {
-		return principals, 0, nil
-	}
 
 	config, err := g.getGithubConfigCR()
 	if err != nil {
@@ -211,11 +215,11 @@ func (g *GProvider) SearchPrincipals(searchKey, principalType string, myToken v3
 		user, err := g.githubClient.getUserByName(searchKey, accessToken, config)
 		if err == nil {
 			userPrincipal := v3.Principal{
-				ObjectMeta:  metav1.ObjectMeta{Name: Github + "_user://" + strconv.Itoa(user.ID)},
+				ObjectMeta:  metav1.ObjectMeta{Name: Name + "_user://" + strconv.Itoa(user.ID)},
 				DisplayName: user.Name,
 				LoginName:   user.Login,
 				Kind:        "user",
-				Provider:    Github,
+				Provider:    Name,
 				Me:          false,
 			}
 			if g.isThisUserMe(myToken.UserPrincipal, userPrincipal) {
@@ -229,10 +233,10 @@ func (g *GProvider) SearchPrincipals(searchKey, principalType string, myToken v3
 		orgAcct, err := g.githubClient.getOrgByName(searchKey, accessToken, config)
 		if err == nil {
 			groupPrincipal := v3.Principal{
-				ObjectMeta:  metav1.ObjectMeta{Name: Github + "_org://" + strconv.Itoa(orgAcct.ID)},
+				ObjectMeta:  metav1.ObjectMeta{Name: Name + "_org://" + strconv.Itoa(orgAcct.ID)},
 				DisplayName: orgAcct.Name,
 				Kind:        "group",
-				Provider:    Github,
+				Provider:    Name,
 			}
 			if g.isMemberOf(myToken.GroupPrincipals, groupPrincipal) {
 				groupPrincipal.MemberOf = true
@@ -244,7 +248,7 @@ func (g *GProvider) SearchPrincipals(searchKey, principalType string, myToken v3
 	return principals, 0, nil
 }
 
-func (g *GProvider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
+func (g *ghProvider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
 
 	if me.ObjectMeta.Name == other.ObjectMeta.Name && me.LoginName == other.LoginName && me.Kind == other.Kind {
 		return true
@@ -252,7 +256,7 @@ func (g *GProvider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
 	return false
 }
 
-func (g *GProvider) isMemberOf(myGroups []v3.Principal, other v3.Principal) bool {
+func (g *ghProvider) isMemberOf(myGroups []v3.Principal, other v3.Principal) bool {
 
 	for _, mygroup := range myGroups {
 		if mygroup.ObjectMeta.Name == other.ObjectMeta.Name && mygroup.Kind == other.Kind {

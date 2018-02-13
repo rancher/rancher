@@ -10,6 +10,8 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/providers/github"
+	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/util"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -95,14 +97,12 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	var input interface{}
 	var providerName string
 	switch request.Type {
-	case client.GithubProviderType:
-		gInput := &v3public.GithubLogin{}
-		input = gInput
-		providerName = "github"
 	case client.LocalProviderType:
-		lInput := &v3public.LocalLogin{}
-		input = lInput
-		providerName = "local"
+		input = &v3public.LocalLogin{}
+		providerName = local.Name
+	case client.GithubProviderType:
+		input = &v3public.GithubLogin{}
+		providerName = github.Name
 	default:
 		return v3.Token{}, "", httperror.ServerError.Status, httperror.NewAPIError(httperror.ServerError, "Unknown login type")
 	}
