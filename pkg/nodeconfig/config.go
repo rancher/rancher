@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"encoding/json"
+
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/encryptedstore"
@@ -15,6 +17,7 @@ import (
 
 const (
 	configKey         = "extractedConfig"
+	driverKey         = "driverConfig"
 	defaultCattleHome = "./management-state"
 )
 
@@ -42,6 +45,36 @@ func NewNodeConfig(store *encryptedstore.GenericEncryptedStore, node *v3.Node) (
 		id:      node.Name,
 		baseDir: nodeDir,
 	}, nil
+}
+
+func (m *NodeConfig) SetDriverConfig(config string) error {
+	if err := m.loadConfig(); err != nil {
+		return err
+	}
+	m.cm[driverKey] = config
+	return nil
+}
+
+func (m *NodeConfig) DriverConfig() (string, error) {
+	if err := m.loadConfig(); err != nil {
+		return "", err
+	}
+	return m.cm[driverKey], nil
+}
+
+func (m *NodeConfig) SSHUser() (string, error) {
+	if err := m.loadConfig(); err != nil {
+		return "", err
+	}
+	data := map[string]interface{}{}
+	if err := json.Unmarshal([]byte(m.cm[driverKey]), &data); err != nil {
+		return "", err
+	}
+	user, _ := data["sshUser"].(string)
+	if user == "" {
+		user = "root"
+	}
+	return user, nil
 }
 
 func (m *NodeConfig) Dir() string {
