@@ -22,7 +22,6 @@ func Register(ctx context.Context, cluster *config.UserContext) error {
 	helm.Register(cluster)
 
 	userOnlyContext := cluster.UserOnlyContext()
-	//workload.Register(ctx, userOnlyContext)
 	dnsrecord.Register(ctx, userOnlyContext)
 	workloadservice.Register(ctx, userOnlyContext)
 	endpoints.Register(ctx, userOnlyContext)
