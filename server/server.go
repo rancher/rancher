@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/publicapi"
 	authrequests "github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/pkg/controllers/user/pipeline/hooks"
 	"github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/dynamiclistener"
 	"github.com/rancher/rancher/pkg/httpproxy"
@@ -59,6 +60,8 @@ func Start(ctx context.Context, httpPort, httpsPort int, apiContext *config.Scal
 		return err
 	}
 
+	webhookHandler := hooks.New(apiContext)
+
 	root := mux.NewRouter()
 	root.Handle("/", ui.UI(managementAPI))
 	root.Handle("/v3/settings/cacerts", authedAPIs).Methods(http.MethodGet)
@@ -70,6 +73,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, apiContext *config.Scal
 	root.PathPrefix("/v3").Handler(authedHandler)
 	root.PathPrefix("/meta").Handler(authedHandler)
 	root.PathPrefix("/k8s/clusters/").Handler(authedHandler)
+	root.PathPrefix("/hooks").Handler(webhookHandler)
 	root.NotFoundHandler = ui.UI(http.NotFoundHandler())
 
 	// UI

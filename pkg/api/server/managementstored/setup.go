@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/logging"
 	"github.com/rancher/rancher/pkg/api/customization/node"
 	"github.com/rancher/rancher/pkg/api/customization/nodetemplate"
+	"github.com/rancher/rancher/pkg/api/customization/pipeline"
 	"github.com/rancher/rancher/pkg/api/customization/setting"
 	"github.com/rancher/rancher/pkg/api/store/cert"
 	"github.com/rancher/rancher/pkg/api/store/cluster"
@@ -69,6 +70,12 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext) error {
 		client.SettingType,
 		client.TemplateType,
 		client.TemplateVersionType,
+		client.ClusterPipelineType,
+		client.PipelineType,
+		client.PipelineExecutionType,
+		client.PipelineExecutionLogType,
+		client.SourceCodeCredentialType,
+		client.SourceCodeRepositoryType,
 		client.TokenType,
 		client.UserType)
 	createCrd(ctx, wg, factory, schemas, &projectschema.Version,
@@ -88,6 +95,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext) error {
 	NodeTemplates(schemas, apiContext)
 	LoggingTypes(schemas, apiContext)
 	Alert(schemas, apiContext)
+	Pipeline(schemas, apiContext)
 
 	if err := NodeTypes(schemas, apiContext); err != nil {
 		return err
@@ -268,4 +276,40 @@ func Alert(schemas *types.Schemas, management *config.ScaledContext) {
 	schema.CollectionFormatter = alert.NotifierCollectionFormatter
 	schema.Formatter = alert.NotifierFormatter
 	schema.ActionHandler = handler.NotifierActionHandler
+
+}
+
+func Pipeline(schemas *types.Schemas, management *config.ScaledContext) {
+
+	clusterPipelineHandler := &pipeline.ClusterPipelineHandler{
+		ClusterPipelines:      management.Management.ClusterPipelines(""),
+		SourceCodeCredentials: management.Management.SourceCodeCredentials(""),
+	}
+	schema := schemas.Schema(&managementschema.Version, client.ClusterPipelineType)
+	schema.Formatter = pipeline.ClusterPipelineFormatter
+	schema.ActionHandler = clusterPipelineHandler.ActionHandler
+	schema.LinkHandler = clusterPipelineHandler.LinkHandler
+	pipelineHandler := &pipeline.Handler{
+		Pipelines:          management.Management.Pipelines(""),
+		PipelineExecutions: management.Management.PipelineExecutions(""),
+	}
+	schema = schemas.Schema(&managementschema.Version, client.PipelineType)
+	schema.Formatter = pipeline.Formatter
+	schema.ActionHandler = pipelineHandler.ActionHandler
+	schema.CreateHandler = pipelineHandler.CreateHandler
+
+	pipelineExecutionHandler := &pipeline.ExecutionHandler{}
+	schema = schemas.Schema(&managementschema.Version, client.PipelineExecutionType)
+	schema.Formatter = pipelineExecutionHandler.ExecutionFormatter
+	schema.LinkHandler = pipelineExecutionHandler.LinkHandler
+	schema.ActionHandler = pipelineExecutionHandler.ActionHandler
+
+	sourceCodeCredentialHandler := &pipeline.SourceCodeCredentialHandler{
+		SourceCodeCredentials:  management.Management.SourceCodeCredentials(""),
+		SourceCodeRepositories: management.Management.SourceCodeRepositories(""),
+	}
+	schema = schemas.Schema(&managementschema.Version, client.SourceCodeCredentialType)
+	schema.Formatter = pipeline.SourceCodeCredentialFormatter
+	schema.ActionHandler = sourceCodeCredentialHandler.ActionHandler
+	schema.LinkHandler = sourceCodeCredentialHandler.LinkHandler
 }

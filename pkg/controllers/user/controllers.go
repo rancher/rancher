@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/logging"
 	"github.com/rancher/rancher/pkg/controllers/user/nodesyncer"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
+	"github.com/rancher/rancher/pkg/controllers/user/pipeline"
 	"github.com/rancher/rancher/pkg/controllers/user/secret"
 	"github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/rancher/pkg/controllers/user/workloadservice"
@@ -28,6 +29,7 @@ func Register(ctx context.Context, cluster *config.UserContext) error {
 	logging.Register(cluster)
 	alert.Register(ctx, cluster)
 	nslabels.Register(cluster)
+	pipeline.Register(ctx, cluster)
 
 	userOnlyContext := cluster.UserOnlyContext()
 	dnsrecord.Register(ctx, userOnlyContext)
