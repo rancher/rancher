@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/endpoints"
 	"github.com/rancher/rancher/pkg/controllers/user/healthsyncer"
 	"github.com/rancher/rancher/pkg/controllers/user/helm"
+	"github.com/rancher/rancher/pkg/controllers/user/logging"
 	"github.com/rancher/rancher/pkg/controllers/user/nodesyncer"
 	"github.com/rancher/rancher/pkg/controllers/user/secret"
 	"github.com/rancher/rancher/pkg/controllers/user/workloadservice"
@@ -20,6 +21,8 @@ func Register(ctx context.Context, cluster *config.UserContext) error {
 	authz.Register(cluster)
 	secret.Register(cluster)
 	helm.Register(cluster)
+	helm.Register(cluster)
+	logging.Register(cluster)
 
 	userOnlyContext := cluster.UserOnlyContext()
 	dnsrecord.Register(ctx, userOnlyContext)
