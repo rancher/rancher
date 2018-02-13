@@ -38,6 +38,8 @@ const (
 	WorkloadFieldPriorityClassName             = "priorityClassName"
 	WorkloadFieldProjectID                     = "projectId"
 	WorkloadFieldRemoved                       = "removed"
+	WorkloadFieldReplicaSet                    = "replicaSet"
+	WorkloadFieldReplicaSetStatus              = "replicaSetStatus"
 	WorkloadFieldReplicationController         = "replicationController"
 	WorkloadFieldReplicationControllerStatus   = "replicationControllerStatus"
 	WorkloadFieldRestartPolicy                 = "restartPolicy"
@@ -95,6 +97,8 @@ type Workload struct {
 	PriorityClassName             string                       `json:"priorityClassName,omitempty"`
 	ProjectID                     string                       `json:"projectId,omitempty"`
 	Removed                       string                       `json:"removed,omitempty"`
+	ReplicaSet                    *ReplicaSetConfig            `json:"replicaSet,omitempty"`
+	ReplicaSetStatus              *ReplicaSetStatus            `json:"replicaSetStatus,omitempty"`
 	ReplicationController         *ReplicationControllerConfig `json:"replicationController,omitempty"`
 	ReplicationControllerStatus   *ReplicationControllerStatus `json:"replicationControllerStatus,omitempty"`
 	RestartPolicy                 string                       `json:"restartPolicy,omitempty"`

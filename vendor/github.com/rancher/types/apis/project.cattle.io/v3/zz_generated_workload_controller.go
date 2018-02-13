@@ -23,8 +23,9 @@ var (
 	WorkloadResource = metav1.APIResource{
 		Name:         "workloads",
 		SingularName: "workload",
-		Namespaced:   false,
-		Kind:         WorkloadGroupVersionKind.Kind,
+		Namespaced:   true,
+
+		Kind: WorkloadGroupVersionKind.Kind,
 	}
 )
 

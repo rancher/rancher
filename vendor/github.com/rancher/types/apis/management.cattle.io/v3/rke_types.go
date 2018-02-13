@@ -203,3 +203,56 @@ type IngressConfig struct {
 	// NodeSelector key pair
 	NodeSelector map[string]string `yaml:"node_selector" json:"nodeSelector,omitempty"`
 }
+
+type RKEPlan struct {
+	// List of node Plans
+	Nodes []RKEConfigNodePlan `json:"nodes,omitempty"`
+}
+
+type RKEConfigNodePlan struct {
+	// Node address
+	Address string `json:"address,omitempty"`
+	// List of processes that should run on the node
+	Processes []Process `json:"processes,omitempty"`
+	// List of portchecks that should be open on the node
+	PortChecks []PortCheck `json:"portChecks,omitempty"`
+}
+
+type Process struct {
+	// Process Entrypoint command
+	Command []string `json:"command,omitempty"`
+	// Process args
+	Args []string `json:"args,omitempty"`
+	// Environment variables list
+	Env []string `json:"env,omitempty"`
+	// Process docker image
+	Image string `json:"image,omitempty"`
+	// Process docker image VolumesFrom
+	VolumesFrom []string `json:"volumesFrom,omitempty"`
+	// Process docker container bind mounts
+	Binds []string `json:"binds,omitempty"`
+	// Process docker container netwotk mode
+	NetworkMode string `json:"networkMode,omitempty"`
+	// Process container restart policy
+	RestartPolicy string `json:"restartPolicy,omitempty"`
+	// Process container pid mode
+	PidMode string `json:"pidMode,omitempty"`
+	// Run process in privileged container
+	Privileged bool `json:"privileged,omitempty"`
+	// Process healthcheck
+	HealthCheck HealthCheck `json:"healthCheck,omitempty"`
+}
+
+type HealthCheck struct {
+	// Healthcheck URL
+	URL string `json:"url,omitempty"`
+}
+
+type PortCheck struct {
+	// Portcheck address to check.
+	Address string `json:"address,omitempty"`
+	// Port number
+	Port int `json:"port,omitempty"`
+	// Port Protocol
+	Protocol string `json:"protocol,omitempty"`
+}

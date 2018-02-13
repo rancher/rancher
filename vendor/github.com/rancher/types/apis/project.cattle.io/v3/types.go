@@ -97,6 +97,7 @@ type PublicEndpoint struct {
 }
 
 type Workload struct {
+	types.Namespaced
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 }
