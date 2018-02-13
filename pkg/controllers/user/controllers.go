@@ -21,7 +21,6 @@ func Register(ctx context.Context, cluster *config.UserContext) error {
 	authz.Register(cluster)
 	secret.Register(cluster)
 	helm.Register(cluster)
-	helm.Register(cluster)
 	logging.Register(cluster)
 
 	userOnlyContext := cluster.UserOnlyContext()
