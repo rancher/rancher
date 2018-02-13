@@ -142,9 +142,11 @@ func (h Handler) LinkHandler(apiContext *types.APIContext, next types.RequestHan
 
 // Formatter for Node
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
-	roles := convert.ToStringSlice(resource.Values[client.NodeFieldRole])
-	if len(roles) == 0 {
-		resource.Values[client.NodeFieldRole] = []string{"worker"}
+	etcd := convert.ToBool(resource.Values[client.NodeFieldEtcd])
+	cp := convert.ToBool(resource.Values[client.NodeFieldControlPlane])
+	worker := convert.ToBool(resource.Values[client.NodeFieldWorker])
+	if !etcd && !cp && !worker {
+		resource.Values[client.NodeFieldWorker] = true
 	}
 
 	// add machineConfig action

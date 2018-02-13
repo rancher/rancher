@@ -2,6 +2,7 @@ package managementstored
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/rancher/norman/store/crd"
@@ -11,7 +12,6 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/app"
 	"github.com/rancher/rancher/pkg/api/customization/authn"
 	"github.com/rancher/rancher/pkg/api/customization/catalog"
-	apicluster "github.com/rancher/rancher/pkg/api/customization/cluster"
 	"github.com/rancher/rancher/pkg/api/customization/logging"
 	"github.com/rancher/rancher/pkg/api/customization/node"
 	"github.com/rancher/rancher/pkg/api/customization/setting"
@@ -22,6 +22,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/principals"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/nodeconfig"
+	"github.com/rancher/rancher/pkg/settings"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	projectschema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	"github.com/rancher/types/client/management/v3"
@@ -76,7 +77,6 @@ func Setup(ctx context.Context, management *config.ManagementContext) error {
 	SecretTypes(schemas, management)
 	App(schemas, management)
 	Setting(schemas)
-	ClusterTypes(schemas)
 	Preference(schemas, management)
 	ClusterRegistrationTokens(schemas)
 	LoggingTypes(schemas, management)
@@ -149,6 +149,11 @@ func ClusterRegistrationTokens(schemas *types.Schemas) {
 		if token != "" {
 			url := request.URLBuilder.RelativeToRoot("/" + token + ".yaml")
 			resource.Values["command"] = "kubectl apply -f " + url
+			resource.Values["nodeCommand"] = fmt.Sprintf("docker run -d --restart=unless-stopped --net=host %s --server %s --token %s --ca-checksum \"%s\"",
+				settings.AgentImage.Get(),
+				request.URLBuilder.RelativeToRoot(""),
+				token,
+				settings.CACerts.Get())
 			resource.Values["token"] = token
 			resource.Values["manifestUrl"] = url
 		}
@@ -213,8 +218,6 @@ func NodeTypes(schemas *types.Schemas, management *config.ManagementContext) err
 	schema.Formatter = node.Formatter
 	schema.LinkHandler = machineHandler.LinkHandler
 
-	schema = schemas.Schema(&managementschema.Version, client.NodeConfigType)
-
 	return nil
 }
 
@@ -230,11 +233,6 @@ func App(schemas *types.Schemas, management *config.ManagementContext) {
 func Setting(schemas *types.Schemas) {
 	schema := schemas.Schema(&managementschema.Version, client.SettingType)
 	schema.Formatter = setting.Formatter
-}
-
-func ClusterTypes(schemas *types.Schemas) {
-	schema := schemas.Schema(&managementschema.Version, client.ClusterType)
-	schema.Validator = apicluster.Validator
 }
 
 func LoggingTypes(schemas *types.Schemas, management *config.ManagementContext) {

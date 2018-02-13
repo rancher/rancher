@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/event"
-	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/encryptedstore"
 	"github.com/rancher/rancher/pkg/nodeconfig"
@@ -51,7 +50,7 @@ func Register(management *config.ManagementContext) {
 
 type Lifecycle struct {
 	secretStore               *encryptedstore.GenericEncryptedStore
-	nodeTemplateGenericClient *clientbase.ObjectClient
+	nodeTemplateGenericClient clientbase.GenericClient
 	nodeClient                v3.NodeInterface
 	nodeTemplateClient        v3.NodeTemplateInterface
 	configMapGetter           typedv1.ConfigMapsGetter
@@ -62,18 +61,17 @@ type Lifecycle struct {
 func (m *Lifecycle) setupCustom(obj *v3.Node) {
 	obj.Status.NodeConfig = &v3.RKEConfigNode{
 		NodeName:         obj.Spec.ClusterName + ":" + obj.Name,
-		Role:             obj.Spec.Role,
 		HostnameOverride: obj.Spec.RequestedHostname,
 		Address:          obj.Spec.CustomConfig.Address,
 		InternalAddress:  obj.Spec.CustomConfig.InternalAddress,
 		User:             obj.Spec.CustomConfig.User,
 		DockerSocket:     obj.Spec.CustomConfig.DockerSocket,
 		SSHKey:           obj.Spec.CustomConfig.SSHKey,
+		Role:             obj.Spec.CustomConfig.Roles,
 	}
 
-	obj.Status.SSHUser = obj.Status.NodeConfig.User
-	if obj.Status.SSHUser == "" {
-		obj.Status.SSHUser = "root"
+	if obj.Status.NodeConfig.User == "" {
+		obj.Status.NodeConfig.User = "root"
 	}
 }
 
@@ -121,22 +119,20 @@ func (m *Lifecycle) Create(obj *v3.Node) (*v3.Node, error) {
 			return obj, fmt.Errorf("node config not specified")
 		}
 
-		sshUser, ok := convert.ToMapInterface(rawConfig)["sshUser"]
-		if ok {
-			obj.Status.SSHUser = convert.ToString(sshUser)
-		}
-
-		if obj.Status.SSHUser == "" {
-			obj.Status.SSHUser = "root"
-		}
-
 		bytes, err := json.Marshal(rawConfig)
 		if err != nil {
 			return obj, errors.Wrap(err, "failed to marshal node driver confg")
 		}
 
-		obj.Status.NodeDriverConfig = string(bytes)
-		return obj, nil
+		config, err := nodeconfig.NewNodeConfig(m.secretStore, obj)
+		if err != nil {
+			return obj, errors.Wrap(err, "failed to save node driver config")
+		}
+		defer config.Cleanup()
+
+		config.SetDriverConfig(string(bytes))
+
+		return obj, config.Save()
 	})
 
 	return newObj.(*v3.Node), err
@@ -178,9 +174,9 @@ func (m *Lifecycle) Remove(obj *v3.Node) (*v3.Node, error) {
 	return obj, nil
 }
 
-func (m *Lifecycle) provision(nodeDir string, obj *v3.Node) (*v3.Node, error) {
+func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *v3.Node) (*v3.Node, error) {
 	configRawMap := map[string]interface{}{}
-	if err := json.Unmarshal([]byte(obj.Status.NodeDriverConfig), &configRawMap); err != nil {
+	if err := json.Unmarshal([]byte(driverConfig), &configRawMap); err != nil {
 		return obj, errors.Wrap(err, "failed to unmarshal node config")
 	}
 
@@ -232,11 +228,16 @@ func (m *Lifecycle) ready(obj *v3.Node) (*v3.Node, error) {
 		return obj, err
 	}
 
+	driverConfig, err := config.DriverConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	// Provision in the background so we can poll and save the config
 	done := make(chan error)
 	go func() {
 		newObj, err := v3.NodeConditionProvisioned.Once(obj, func() (runtime.Object, error) {
-			return m.provision(config.Dir(), obj)
+			return m.provision(driverConfig, config.Dir(), obj)
 		})
 		obj = newObj.(*v3.Node)
 		done <- err
@@ -297,6 +298,11 @@ func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, ob
 		return obj, err
 	}
 
+	sshUser, err := config.SSHUser()
+	if err != nil {
+		return obj, err
+	}
+
 	if err := config.Save(); err != nil {
 		return obj, err
 	}
@@ -305,8 +311,8 @@ func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, ob
 		NodeName:         obj.Spec.ClusterName + ":" + obj.Name,
 		Address:          ip,
 		InternalAddress:  interalAddress,
-		User:             obj.Status.SSHUser,
-		Role:             obj.Spec.Role,
+		User:             sshUser,
+		Role:             roles(obj),
 		HostnameOverride: obj.Spec.RequestedHostname,
 		SSHKey:           sshKey,
 	}
@@ -369,4 +375,21 @@ func validateCustomHost(obj *v3.Node) error {
 		conn.Close()
 	}
 	return nil
+}
+
+func roles(node *v3.Node) []string {
+	var roles []string
+	if node.Spec.Etcd {
+		roles = append(roles, "etcd")
+	}
+	if node.Spec.ControlPlane {
+		roles = append(roles, "controlplane")
+	}
+	if node.Spec.Worker {
+		roles = append(roles, "worker")
+	}
+	if len(roles) == 0 {
+		return []string{"worker"}
+	}
+	return roles
 }

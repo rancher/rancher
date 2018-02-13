@@ -105,7 +105,6 @@ func (t *Authorizer) createNode(inNode *client.Node, cluster *v3.Cluster, req *h
 		Spec: v3.NodeSpec{
 			ClusterName:       cluster.Name,
 			RequestedHostname: inNode.RequestedHostname,
-			Role:              inNode.Role,
 			CustomConfig:      customConfig,
 			Imported:          true,
 		},

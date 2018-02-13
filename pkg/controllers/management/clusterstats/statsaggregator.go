@@ -66,13 +66,13 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 	condMem := v1.ConditionTrue
 
 	for _, machine := range machines {
-		capacity := machine.Status.NodeStatus.Capacity
+		capacity := machine.Status.InternalNodeStatus.Capacity
 		if capacity != nil {
 			pods.Add(*capacity.Pods())
 			mem.Add(*capacity.Memory())
 			cpu.Add(*capacity.Cpu())
 		}
-		allocatable := machine.Status.NodeStatus.Allocatable
+		allocatable := machine.Status.InternalNodeStatus.Allocatable
 		if allocatable != nil {
 			apods.Add(*allocatable.Pods())
 			amem.Add(*allocatable.Memory())

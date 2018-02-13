@@ -250,18 +250,18 @@ func getNodeNameFromNode(machine *v3.Node) string {
 }
 
 func resetConditions(machine *v3.Node) *v3.Node {
-	if machine.Status.NodeStatus.Conditions == nil {
+	if machine.Status.InternalNodeStatus.Conditions == nil {
 		return machine
 	}
 	updated := machine.DeepCopy()
 	var toUpdateConds []corev1.NodeCondition
-	for _, cond := range machine.Status.NodeStatus.Conditions {
+	for _, cond := range machine.Status.InternalNodeStatus.Conditions {
 		toUpdateCond := cond.DeepCopy()
 		toUpdateCond.LastHeartbeatTime = metav1.Time{}
 		toUpdateCond.LastTransitionTime = metav1.Time{}
 		toUpdateConds = append(toUpdateConds, *toUpdateCond)
 	}
-	updated.Status.NodeStatus.Conditions = toUpdateConds
+	updated.Status.InternalNodeStatus.Conditions = toUpdateConds
 	return updated
 }
 
@@ -269,10 +269,10 @@ func objectsAreEqual(existing *v3.Node, toUpdate *v3.Node) bool {
 	// we are updating spec and status only, so compare them
 	toUpdateToCompare := resetConditions(toUpdate)
 	existingToCompare := resetConditions(existing)
-	statusEqual := reflect.DeepEqual(toUpdateToCompare.Status.NodeStatus, existingToCompare.Status.NodeStatus)
+	statusEqual := reflect.DeepEqual(toUpdateToCompare.Status.InternalNodeStatus, existingToCompare.Status.InternalNodeStatus)
 	labelsEqual := reflect.DeepEqual(toUpdateToCompare.Status.NodeLabels, existing.Status.NodeLabels)
 	annotationsEqual := reflect.DeepEqual(toUpdateToCompare.Status.NodeAnnotations, existing.Status.NodeAnnotations)
-	specEqual := reflect.DeepEqual(toUpdateToCompare.Spec.NodeSpec, existingToCompare.Spec.NodeSpec)
+	specEqual := reflect.DeepEqual(toUpdateToCompare.Spec.InternalNodeSpec, existingToCompare.Spec.InternalNodeSpec)
 	nodeNameEqual := toUpdateToCompare.Status.NodeName == existingToCompare.Status.NodeName
 	requestsEqual := isEqual(toUpdateToCompare.Status.Requested, existingToCompare.Status.Requested)
 	limitsEqual := isEqual(toUpdateToCompare.Status.Limits, existingToCompare.Status.Limits)
@@ -291,12 +291,12 @@ func (m *NodesSyncer) convertNodeToNode(node *corev1.Node, existing *v3.Node, po
 		machine.Namespace = m.clusterNamespace
 		machine.Status.Requested = make(map[corev1.ResourceName]resource.Quantity)
 		machine.Status.Limits = make(map[corev1.ResourceName]resource.Quantity)
-		machine.Spec.NodeSpec = *node.Spec.DeepCopy()
-		machine.Status.NodeStatus = *node.Status.DeepCopy()
+		machine.Spec.InternalNodeSpec = *node.Spec.DeepCopy()
+		machine.Status.InternalNodeStatus = *node.Status.DeepCopy()
 	} else {
 		machine = existing.DeepCopy()
-		machine.Spec.NodeSpec = *node.Spec.DeepCopy()
-		machine.Status.NodeStatus = *node.Status.DeepCopy()
+		machine.Spec.InternalNodeSpec = *node.Spec.DeepCopy()
+		machine.Status.InternalNodeStatus = *node.Status.DeepCopy()
 	}
 
 	requests, limits := aggregateRequestAndLimitsForNode(pods[node.Name])
