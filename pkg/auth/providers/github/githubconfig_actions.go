@@ -13,14 +13,15 @@ import (
 
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
+	"github.com/rancher/types/client/management/v3"
 )
 
-func ConfigFormatter(apiContext *types.APIContext, resource *types.RawResource) {
+func (g *ghProvider) formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(apiContext, "configureTest")
 	resource.AddAction(apiContext, "testAndApply")
 }
 
-func (g *GProvider) ConfigActionHandler(actionName string, action *types.Action, request *types.APIContext) error {
+func (g *ghProvider) actionHandler(actionName string, action *types.Action, request *types.APIContext) error {
 	if actionName == "configureTest" {
 		return g.configureTest(actionName, action, request)
 	} else if actionName == "testAndApply" {
@@ -30,13 +31,13 @@ func (g *GProvider) ConfigActionHandler(actionName string, action *types.Action,
 	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
-func (g *GProvider) configureTest(actionName string, action *types.Action, request *types.APIContext) error {
+func (g *ghProvider) configureTest(actionName string, action *types.Action, request *types.APIContext) error {
 	githubConfig := &v3.GithubConfig{}
 	if err := json.NewDecoder(request.Request.Body).Decode(githubConfig); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("Failed to parse body: %v", err))
 	}
-	redirectURL := FormGithubRedirectURL(githubConfig)
+	redirectURL := formGithubRedirectURL(githubConfig)
 
 	data := map[string]interface{}{
 		"redirectUrl": redirectURL,
@@ -47,23 +48,33 @@ func (g *GProvider) configureTest(actionName string, action *types.Action, reque
 	return nil
 }
 
-func FormGithubRedirectURL(githubConfig *v3.GithubConfig) string {
+func formGithubRedirectURL(githubConfig *v3.GithubConfig) string {
+	return githubRedirectURL(githubConfig.Hostname, githubConfig.ClientID, githubConfig.TLS)
+}
+
+func formGithubRedirectURLFromMap(config map[string]interface{}) string {
+	hostname, _ := config[client.GithubConfigFieldHostname].(string)
+	clientID, _ := config[client.GithubConfigFieldClientID].(string)
+	tls, _ := config[client.GithubConfigFieldTLS].(bool)
+	return githubRedirectURL(hostname, clientID, tls)
+}
+
+func githubRedirectURL(hostname, clientID string, tls bool) string {
 	redirect := ""
-	if githubConfig.Hostname != "" {
+	if hostname != "" {
 		scheme := "http://"
-		if githubConfig.TLS {
+		if tls {
 			scheme = "https://"
 		}
-		redirect = scheme + githubConfig.Hostname
+		redirect = scheme + hostname
 	} else {
 		redirect = githubDefaultHostName
 	}
-	redirect = redirect + "/login/oauth/authorize?client_id=" + githubConfig.ClientID
-
+	redirect = redirect + "/login/oauth/authorize?client_id=" + clientID
 	return redirect
 }
 
-func (g *GProvider) testAndApply(actionName string, action *types.Action, request *types.APIContext) error {
+func (g *ghProvider) testAndApply(actionName string, action *types.Action, request *types.APIContext) error {
 	var githubConfig v3.GithubConfig
 	githubConfigApplyInput := &v3.GithubConfigApplyInput{}
 
@@ -90,7 +101,7 @@ func (g *GProvider) testAndApply(actionName string, action *types.Action, reques
 
 	//if this works, save githubConfig CR adding enabled flag
 	githubConfig.Enabled = githubConfigApplyInput.Enabled
-	err = g.SaveGithubConfig(&githubConfig)
+	err = g.saveGithubConfig(&githubConfig)
 	if err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to save github config: %v", err))
 	}
