@@ -11,13 +11,12 @@ type ClusterConditionType string
 
 const (
 	// ClusterConditionReady Cluster ready to serve API (healthy when true, unhealthy when false)
-	ClusterConditionReady           condition.Cond = "Ready"
-	ClusterConditionMachinesCreated condition.Cond = "MachinesCreated"
+	ClusterConditionReady   condition.Cond = "Ready"
+	ClusterConditionPending condition.Cond = "Pending"
 	// ClusterConditionProvisioned Cluster is provisioned
 	ClusterConditionProvisioned condition.Cond = "Provisioned"
 	ClusterConditionUpdated     condition.Cond = "Updated"
 	ClusterConditionRemoved     condition.Cond = "Removed"
-	ClusterConditionRegistered  condition.Cond = "Registered"
 	// ClusterConditionNoDiskPressure true when all cluster nodes have sufficient disk
 	ClusterConditionNoDiskPressure condition.Cond = "NoDiskPressure"
 	// ClusterConditionNoMemoryPressure true when all cluster nodes have sufficient memory
@@ -43,12 +42,11 @@ type Cluster struct {
 }
 
 type ClusterSpec struct {
-	Nodes                                []MachineConfig                `json:"nodes"`
+	NodePools                            []NodePool                     `json:"nodePools"`
 	DisplayName                          string                         `json:"displayName"`
 	Description                          string                         `json:"description"`
 	Internal                             bool                           `json:"internal" norman:"nocreate,noupdate"`
-	ImportedConfig                       *ImportedConfig                `json:"importedConfig" norman:"noupdate"`
-	EmbeddedConfig                       *K8sServerConfig               `json:"embeddedConfig" norman:"noupdate"`
+	ImportedConfig                       *ImportedConfig                `json:"importedConfig,omitempty" norman:"nocreate,noupdate"`
 	GoogleKubernetesEngineConfig         *GoogleKubernetesEngineConfig  `json:"googleKubernetesEngineConfig,omitempty"`
 	AzureKubernetesServiceConfig         *AzureKubernetesServiceConfig  `json:"azureKubernetesServiceConfig,omitempty"`
 	RancherKubernetesEngineConfig        *RancherKubernetesEngineConfig `json:"rancherKubernetesEngineConfig,omitempty"`
@@ -58,11 +56,6 @@ type ClusterSpec struct {
 
 type ImportedConfig struct {
 	KubeConfig string `json:"kubeConfig" norman:"type=password"`
-}
-
-type K8sServerConfig struct {
-	AdmissionControllers []string `json:"admissionControllers,omitempty"`
-	ServiceNetCIDR       string   `json:"serviceNetCidr,omitempty"`
 }
 
 type ClusterStatus struct {
@@ -215,6 +208,7 @@ type ClusterRegistrationTokenSpec struct {
 
 type ClusterRegistrationTokenStatus struct {
 	Command     string `json:"command"`
+	NodeCommand string `json:"nodeCommand"`
 	ManifestURL string `json:"manifestUrl"`
 	Token       string `json:"token"`
 }

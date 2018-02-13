@@ -10,8 +10,11 @@ import (
 	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/types"
 	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 )
@@ -31,6 +34,12 @@ type GenericController interface {
 	Start(ctx context.Context, threadiness int) error
 }
 
+type Backend interface {
+	List(opts metav1.ListOptions) (runtime.Object, error)
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
+	ObjectFactory() clientbase.ObjectFactory
+}
+
 type handlerDef struct {
 	name    string
 	handler HandlerFunc
@@ -46,13 +55,13 @@ type genericController struct {
 	synced   bool
 }
 
-func NewGenericController(name string, objectClient *clientbase.ObjectClient) GenericController {
+func NewGenericController(name string, genericClient Backend) GenericController {
 	informer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc:  objectClient.List,
-			WatchFunc: objectClient.Watch,
+			ListFunc:  genericClient.List,
+			WatchFunc: genericClient.Watch,
 		},
-		objectClient.Factory.Object(), resyncPeriod, cache.Indexers{})
+		genericClient.ObjectFactory().Object(), resyncPeriod, cache.Indexers{})
 
 	rl := workqueue.NewMaxOfRateLimiter(
 		workqueue.NewItemExponentialFailureRateLimiter(500*time.Millisecond, 1000*time.Second),

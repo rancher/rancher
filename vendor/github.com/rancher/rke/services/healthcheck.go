@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/rancher/rke/hosts"
@@ -20,14 +22,18 @@ const (
 	HTTPSProtoPrefix = "https://"
 )
 
-func runHealthcheck(ctx context.Context, host *hosts.Host, port int, useTLS bool, serviceName string, localConnDialerFactory hosts.DialerFactory) error {
+func runHealthcheck(ctx context.Context, host *hosts.Host, serviceName string, localConnDialerFactory hosts.DialerFactory, url string) error {
 	log.Infof(ctx, "[healthcheck] Start Healthcheck on service [%s] on host [%s]", serviceName, host.Address)
+	port, err := getPortFromURL(url)
+	if err != nil {
+		return err
+	}
 	client, err := getHealthCheckHTTPClient(host, port, localConnDialerFactory)
 	if err != nil {
 		return fmt.Errorf("Failed to initiate new HTTP client for service [%s] for host [%s]", serviceName, host.Address)
 	}
 	for retries := 0; retries < 10; retries++ {
-		if err = getHealthz(client, useTLS, serviceName, host.Address, port); err != nil {
+		if err = getHealthz(client, serviceName, host.Address, url); err != nil {
 			logrus.Debugf("[healthcheck] %v", err)
 			time.Sleep(5 * time.Second)
 			continue
@@ -58,18 +64,23 @@ func getHealthCheckHTTPClient(host *hosts.Host, port int, localConnDialerFactory
 	}, nil
 }
 
-func getHealthz(client *http.Client, useTLS bool, serviceName, hostAddress string, port int) error {
-	proto := HTTPProtoPrefix
-	if useTLS {
-		proto = HTTPSProtoPrefix
-	}
-	resp, err := client.Get(fmt.Sprintf("%s%s:%d%s", proto, HealthzAddress, port, HealthzEndpoint))
+func getHealthz(client *http.Client, serviceName, hostAddress, url string) error {
+	resp, err := client.Get(url)
 	if err != nil {
-		return fmt.Errorf("Failed to check %s for service [%s] on host [%s]: %v", HealthzEndpoint, serviceName, hostAddress, err)
+		return fmt.Errorf("Failed to check %s for service [%s] on host [%s]: %v", url, serviceName, hostAddress, err)
 	}
 	if resp.StatusCode != http.StatusOK {
 		statusBody, _ := ioutil.ReadAll(resp.Body)
 		return fmt.Errorf("service [%s] is not healthy response code: [%d], response body: %s", serviceName, resp.StatusCode, statusBody)
 	}
 	return nil
+}
+
+func getPortFromURL(url string) (int, error) {
+	port := strings.Split(strings.Split(url, ":")[2], "/")[0]
+	intPort, err := strconv.Atoi(port)
+	if err != nil {
+		return 0, err
+	}
+	return intPort, nil
 }

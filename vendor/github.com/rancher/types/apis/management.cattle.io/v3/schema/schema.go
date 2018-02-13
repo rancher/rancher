@@ -3,9 +3,10 @@ package schema
 import (
 	"net/http"
 
+	"k8s.io/api/core/v1"
+
 	"github.com/rancher/norman/types"
 	m "github.com/rancher/norman/types/mapper"
-	"github.com/rancher/types/apis/cluster.cattle.io/v3/schema"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/factory"
 	"github.com/rancher/types/mapper"
@@ -19,8 +20,8 @@ var (
 	}
 
 	Schemas = factory.Schemas(&Version).
+		Init(nativeNodeTypes).
 		Init(nodeTypes).
-		Init(machineTypes).
 		Init(authzTypes).
 		Init(clusterTypes).
 		Init(catalogTypes).
@@ -56,8 +57,44 @@ func catalogTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.TemplateVersion{})
 }
 
-func nodeTypes(schemas *types.Schemas) *types.Schemas {
-	return schema.NodeTypes(&Version, schemas)
+func nativeNodeTypes(schemas *types.Schemas) *types.Schemas {
+	return schemas.
+		TypeName("internalNodeStatus", v1.NodeStatus{}).
+		TypeName("internalNodeSpec", v1.NodeSpec{}).
+		AddMapperForType(&Version, v1.NodeStatus{},
+			&mapper.NodeAddressMapper{},
+			&mapper.OSInfo{},
+			&m.Drop{Field: "addresses"},
+			&m.Drop{Field: "daemonEndpoints"},
+			&m.Drop{Field: "images"},
+			&m.Drop{Field: "nodeInfo"},
+			&m.Move{From: "conditions", To: "nodeConditions"},
+			&m.Drop{Field: "phase"},
+			&m.SliceToMap{Field: "volumesAttached", Key: "devicePath"},
+		).
+		AddMapperForType(&Version, v1.NodeSpec{},
+			&m.Drop{Field: "externalID"},
+			&m.Drop{Field: "configSource"},
+			&m.Move{From: "providerID", To: "providerId"},
+			&m.Move{From: "podCIDR", To: "podCidr"},
+			m.Access{Fields: map[string]string{
+				"podCidr":       "r",
+				"providerId":    "r",
+				"taints":        "ru",
+				"unschedulable": "ru",
+			}}).
+		MustImportAndCustomize(&Version, v1.NodeSpec{}, func(schema *types.Schema) {
+			schema.CodeName = "InternalNodeSpec"
+			schema.CodeNamePlural = "InternalNodeSpecs"
+		}).
+		MustImportAndCustomize(&Version, v1.NodeStatus{}, func(schema *types.Schema) {
+			schema.CodeName = "InternalNodeStatus"
+			schema.CodeNamePlural = "InternalNodeStatuses"
+		}, struct {
+			IPAddress string
+			Hostname  string
+			Info      NodeInfo
+		}{})
 }
 
 func clusterTypes(schemas *types.Schemas) *types.Schemas {
@@ -114,32 +151,31 @@ func authzTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.GlobalRoleBinding{})
 }
 
-func machineTypes(schemas *types.Schemas) *types.Schemas {
+func nodeTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
-		AddMapperForType(&Version, v3.MachineSpec{}, &m.Embed{Field: "nodeSpec"}).
-		AddMapperForType(&Version, v3.MachineStatus{},
-			&m.Drop{Field: "rkeNode"},
-			&m.Drop{Field: "machineTemplateSpec"},
-			&m.Drop{Field: "machineDriverConfig"},
-			&m.Embed{Field: "nodeStatus"},
+		AddMapperForType(&Version, v3.NodeSpec{}, &m.Embed{Field: "internalNodeSpec"}).
+		AddMapperForType(&Version, v3.NodeStatus{},
+			&m.Drop{Field: "nodeTemplateSpec"},
+			&m.Embed{Field: "internalNodeStatus"},
 			&m.SliceMerge{From: []string{"conditions", "nodeConditions"}, To: "conditions"}).
-		AddMapperForType(&Version, v3.MachineConfig{},
-			&m.Drop{Field: "clusterName"}).
-		AddMapperForType(&Version, v3.Machine{},
+		AddMapperForType(&Version, v3.Node{},
 			&m.Embed{Field: "status"},
+			&m.Move{From: "rkeNode/user", To: "sshUser"},
+			&m.ReadOnly{Field: "sshUser"},
+			&m.Drop{Field: "rkeNode"},
 			m.DisplayName{}).
-		AddMapperForType(&Version, v3.MachineDriver{}, m.DisplayName{}).
-		AddMapperForType(&Version, v3.MachineTemplate{}, m.DisplayName{}).
-		MustImport(&Version, v3.Machine{}).
-		MustImportAndCustomize(&Version, v3.MachineDriver{}, func(schema *types.Schema) {
+		AddMapperForType(&Version, v3.NodeDriver{}, m.DisplayName{}).
+		AddMapperForType(&Version, v3.NodeTemplate{}, m.DisplayName{}).
+		MustImport(&Version, v3.Node{}).
+		MustImportAndCustomize(&Version, v3.NodeDriver{}, func(schema *types.Schema) {
 			schema.ResourceActions["activate"] = types.Action{
-				Output: "machineDriver",
+				Output: "nodeDriver",
 			}
 			schema.ResourceActions["deactivate"] = types.Action{
-				Output: "machineDriver",
+				Output: "nodeDriver",
 			}
 		}).
-		MustImport(&Version, v3.MachineTemplate{})
+		MustImport(&Version, v3.NodeTemplate{})
 
 }
 

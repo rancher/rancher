@@ -15,6 +15,7 @@ const (
 	ClusterRegistrationTokenFieldManifestURL          = "manifestUrl"
 	ClusterRegistrationTokenFieldName                 = "name"
 	ClusterRegistrationTokenFieldNamespaceId          = "namespaceId"
+	ClusterRegistrationTokenFieldNodeCommand          = "nodeCommand"
 	ClusterRegistrationTokenFieldOwnerReferences      = "ownerReferences"
 	ClusterRegistrationTokenFieldRemoved              = "removed"
 	ClusterRegistrationTokenFieldState                = "state"
@@ -35,6 +36,7 @@ type ClusterRegistrationToken struct {
 	ManifestURL          string            `json:"manifestUrl,omitempty"`
 	Name                 string            `json:"name,omitempty"`
 	NamespaceId          string            `json:"namespaceId,omitempty"`
+	NodeCommand          string            `json:"nodeCommand,omitempty"`
 	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty"`
 	Removed              string            `json:"removed,omitempty"`
 	State                string            `json:"state,omitempty"`

@@ -31,6 +31,22 @@ func (u *UnstructuredObjectFactory) List() runtime.Object {
 	return &unstructured.UnstructuredList{}
 }
 
+type GenericClient interface {
+	UnstructuredClient() GenericClient
+	GroupVersionKind() schema.GroupVersionKind
+	Create(o runtime.Object) (runtime.Object, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (runtime.Object, error)
+	Get(name string, opts metav1.GetOptions) (runtime.Object, error)
+	Update(name string, o runtime.Object) (runtime.Object, error)
+	DeleteNamespaced(namespace, name string, opts *metav1.DeleteOptions) error
+	Delete(name string, opts *metav1.DeleteOptions) error
+	List(opts metav1.ListOptions) (runtime.Object, error)
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
+	DeleteCollection(deleteOptions *metav1.DeleteOptions, listOptions metav1.ListOptions) error
+	Patch(name string, o runtime.Object, data []byte, subresources ...string) (runtime.Object, error)
+	ObjectFactory() ObjectFactory
+}
+
 type ObjectClient struct {
 	restClient rest.Interface
 	resource   *metav1.APIResource
@@ -49,7 +65,7 @@ func NewObjectClient(namespace string, restClient rest.Interface, apiResource *m
 	}
 }
 
-func (p *ObjectClient) UnstructuredClient() *ObjectClient {
+func (p *ObjectClient) UnstructuredClient() GenericClient {
 	return &ObjectClient{
 		restClient: p.restClient,
 		resource:   p.resource,
@@ -228,6 +244,10 @@ func (p *ObjectClient) Patch(name string, o runtime.Object, data []byte, subreso
 		Do().
 		Into(result)
 	return result, err
+}
+
+func (p *ObjectClient) ObjectFactory() ObjectFactory {
+	return p.Factory
 }
 
 type dynamicDecoder struct {

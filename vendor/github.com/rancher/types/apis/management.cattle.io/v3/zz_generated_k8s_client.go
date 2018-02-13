@@ -14,9 +14,9 @@ type Interface interface {
 	RESTClient() rest.Interface
 	controller.Starter
 
-	MachinesGetter
-	MachineDriversGetter
-	MachineTemplatesGetter
+	NodesGetter
+	NodeDriversGetter
+	NodeTemplatesGetter
 	ProjectsGetter
 	GlobalRolesGetter
 	GlobalRoleBindingsGetter
@@ -52,9 +52,9 @@ type Client struct {
 	restClient rest.Interface
 	starters   []controller.Starter
 
-	machineControllers                    map[string]MachineController
-	machineDriverControllers              map[string]MachineDriverController
-	machineTemplateControllers            map[string]MachineTemplateController
+	nodeControllers                       map[string]NodeController
+	nodeDriverControllers                 map[string]NodeDriverController
+	nodeTemplateControllers               map[string]NodeTemplateController
 	projectControllers                    map[string]ProjectController
 	globalRoleControllers                 map[string]GlobalRoleController
 	globalRoleBindingControllers          map[string]GlobalRoleBindingController
@@ -99,9 +99,9 @@ func NewForConfig(config rest.Config) (Interface, error) {
 	return &Client{
 		restClient: restClient,
 
-		machineControllers:                    map[string]MachineController{},
-		machineDriverControllers:              map[string]MachineDriverController{},
-		machineTemplateControllers:            map[string]MachineTemplateController{},
+		nodeControllers:                       map[string]NodeController{},
+		nodeDriverControllers:                 map[string]NodeDriverController{},
+		nodeTemplateControllers:               map[string]NodeTemplateController{},
 		projectControllers:                    map[string]ProjectController{},
 		globalRoleControllers:                 map[string]GlobalRoleController{},
 		globalRoleBindingControllers:          map[string]GlobalRoleBindingController{},
@@ -145,39 +145,39 @@ func (c *Client) Start(ctx context.Context, threadiness int) error {
 	return controller.Start(ctx, threadiness, c.starters...)
 }
 
-type MachinesGetter interface {
-	Machines(namespace string) MachineInterface
+type NodesGetter interface {
+	Nodes(namespace string) NodeInterface
 }
 
-func (c *Client) Machines(namespace string) MachineInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &MachineResource, MachineGroupVersionKind, machineFactory{})
-	return &machineClient{
+func (c *Client) Nodes(namespace string) NodeInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &NodeResource, NodeGroupVersionKind, nodeFactory{})
+	return &nodeClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,
 	}
 }
 
-type MachineDriversGetter interface {
-	MachineDrivers(namespace string) MachineDriverInterface
+type NodeDriversGetter interface {
+	NodeDrivers(namespace string) NodeDriverInterface
 }
 
-func (c *Client) MachineDrivers(namespace string) MachineDriverInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &MachineDriverResource, MachineDriverGroupVersionKind, machineDriverFactory{})
-	return &machineDriverClient{
+func (c *Client) NodeDrivers(namespace string) NodeDriverInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &NodeDriverResource, NodeDriverGroupVersionKind, nodeDriverFactory{})
+	return &nodeDriverClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,
 	}
 }
 
-type MachineTemplatesGetter interface {
-	MachineTemplates(namespace string) MachineTemplateInterface
+type NodeTemplatesGetter interface {
+	NodeTemplates(namespace string) NodeTemplateInterface
 }
 
-func (c *Client) MachineTemplates(namespace string) MachineTemplateInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &MachineTemplateResource, MachineTemplateGroupVersionKind, machineTemplateFactory{})
-	return &machineTemplateClient{
+func (c *Client) NodeTemplates(namespace string) NodeTemplateInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &NodeTemplateResource, NodeTemplateGroupVersionKind, nodeTemplateFactory{})
+	return &nodeTemplateClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

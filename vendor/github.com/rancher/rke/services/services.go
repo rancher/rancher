@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/rancher/rke/docker"
@@ -34,17 +35,7 @@ const (
 	KubeproxyPort      = 10256
 )
 
-func buildSidekickConfig(sidekickImage string) (*container.Config, *container.HostConfig) {
-	imageCfg := &container.Config{
-		Image: sidekickImage,
-	}
-	hostCfg := &container.HostConfig{
-		NetworkMode: "none",
-	}
-	return imageCfg, hostCfg
-}
-
-func runSidekick(ctx context.Context, host *hosts.Host, sidekickImage string, prsMap map[string]v3.PrivateRegistry) error {
+func runSidekick(ctx context.Context, host *hosts.Host, prsMap map[string]v3.PrivateRegistry, sidecarProcess v3.Process) error {
 	isRunning, err := docker.IsContainerRunning(ctx, host.DClient, host.Address, SidekickContainerName, true)
 	if err != nil {
 		return err
@@ -53,8 +44,10 @@ func runSidekick(ctx context.Context, host *hosts.Host, sidekickImage string, pr
 		log.Infof(ctx, "[%s] Sidekick container already created on host [%s]", SidekickServiceName, host.Address)
 		return nil
 	}
-	imageCfg, hostCfg := buildSidekickConfig(sidekickImage)
-	if err := docker.UseLocalOrPull(ctx, host.DClient, host.Address, sidekickImage, SidekickServiceName, prsMap); err != nil {
+
+	imageCfg, hostCfg, _ := getProcessConfig(sidecarProcess)
+	sidecarImage := sidecarProcess.Image
+	if err := docker.UseLocalOrPull(ctx, host.DClient, host.Address, sidecarImage, SidekickServiceName, prsMap); err != nil {
 		return err
 	}
 	if _, err := docker.CreateContiner(ctx, host.DClient, host.Address, SidekickContainerName, imageCfg, hostCfg); err != nil {
@@ -65,4 +58,33 @@ func runSidekick(ctx context.Context, host *hosts.Host, sidekickImage string, pr
 
 func removeSidekick(ctx context.Context, host *hosts.Host) error {
 	return docker.DoRemoveContainer(ctx, host.DClient, SidekickContainerName, host.Address)
+}
+
+func getProcessConfig(process v3.Process) (*container.Config, *container.HostConfig, string) {
+	imageCfg := &container.Config{
+		Entrypoint: process.Command,
+		Cmd:        process.Args,
+		Env:        process.Env,
+		Image:      process.Image,
+	}
+	// var pidMode container.PidMode
+	// pidMode = process.PidMode
+	hostCfg := &container.HostConfig{
+		VolumesFrom: process.VolumesFrom,
+		Binds:       process.Binds,
+		NetworkMode: container.NetworkMode(process.NetworkMode),
+		PidMode:     container.PidMode(process.PidMode),
+		Privileged:  process.Privileged,
+	}
+	if len(process.RestartPolicy) > 0 {
+		hostCfg.RestartPolicy = container.RestartPolicy{Name: process.RestartPolicy}
+	}
+	return imageCfg, hostCfg, process.HealthCheck.URL
+}
+
+func GetHealthCheckURL(useTLS bool, port int) string {
+	if useTLS {
+		return fmt.Sprintf("%s%s:%d%s", HTTPSProtoPrefix, HealthzAddress, port, HealthzEndpoint)
+	}
+	return fmt.Sprintf("%s%s:%d%s", HTTPProtoPrefix, HealthzAddress, port, HealthzEndpoint)
 }

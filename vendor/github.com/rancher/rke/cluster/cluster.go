@@ -54,17 +54,22 @@ const (
 
 func (c *Cluster) DeployControlPlane(ctx context.Context) error {
 	// Deploy Etcd Plane
-	if err := services.RunEtcdPlane(ctx, c.EtcdHosts, c.Services.Etcd, c.LocalConnDialerFactory, c.PrivateRegistriesMap); err != nil {
+	etcdProcessHostMap := c.getEtcdProcessHostMap(nil)
+
+	if err := services.RunEtcdPlane(ctx, c.EtcdHosts, etcdProcessHostMap, c.LocalConnDialerFactory, c.PrivateRegistriesMap); err != nil {
 		return fmt.Errorf("[etcd] Failed to bring up Etcd Plane: %v", err)
 	}
 	// Deploy Control plane
+	processMap := map[string]v3.Process{
+		services.SidekickContainerName:       c.BuildSidecarProcess(),
+		services.KubeAPIContainerName:        c.BuildKubeAPIProcess(),
+		services.KubeControllerContainerName: c.BuildKubeControllerProcess(),
+		services.SchedulerContainerName:      c.BuildSchedulerProcess(),
+	}
 	if err := services.RunControlPlane(ctx, c.ControlPlaneHosts,
-		c.EtcdHosts,
-		c.Services,
-		c.SystemImages.KubernetesServicesSidecar,
-		c.Authorization.Mode,
 		c.LocalConnDialerFactory,
-		c.PrivateRegistriesMap); err != nil {
+		c.PrivateRegistriesMap,
+		processMap); err != nil {
 		return fmt.Errorf("[controlPlane] Failed to bring up Control Plane: %v", err)
 	}
 	// Apply Authz configuration after deploying controlplane
@@ -76,14 +81,22 @@ func (c *Cluster) DeployControlPlane(ctx context.Context) error {
 
 func (c *Cluster) DeployWorkerPlane(ctx context.Context) error {
 	// Deploy Worker Plane
-	if err := services.RunWorkerPlane(ctx, c.ControlPlaneHosts,
-		c.WorkerHosts,
-		c.EtcdHosts,
-		c.Services,
-		c.SystemImages.NginxProxy,
-		c.SystemImages.KubernetesServicesSidecar,
+	processMap := map[string]v3.Process{
+		services.SidekickContainerName:   c.BuildSidecarProcess(),
+		services.KubeproxyContainerName:  c.BuildKubeProxyProcess(),
+		services.NginxProxyContainerName: c.BuildProxyProcess(),
+	}
+	kubeletProcessHostMap := make(map[*hosts.Host]v3.Process)
+	for _, host := range hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts) {
+		kubeletProcessHostMap[host] = c.BuildKubeletProcess(host)
+	}
+	allHosts := hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts)
+	if err := services.RunWorkerPlane(ctx, allHosts,
 		c.LocalConnDialerFactory,
-		c.PrivateRegistriesMap); err != nil {
+		c.PrivateRegistriesMap,
+		processMap,
+		kubeletProcessHostMap,
+	); err != nil {
 		return fmt.Errorf("[workerPlane] Failed to bring up Worker Plane: %v", err)
 	}
 	return nil
@@ -283,4 +296,12 @@ func ConfigureCluster(ctx context.Context, rkeConfig v3.RancherKubernetesEngineC
 	}
 
 	return kubeCluster.deployAddons(ctx)
+}
+
+func (c *Cluster) getEtcdProcessHostMap(readyEtcdHosts []*hosts.Host) map[*hosts.Host]v3.Process {
+	etcdProcessHostMap := make(map[*hosts.Host]v3.Process)
+	for _, host := range c.EtcdHosts {
+		etcdProcessHostMap[host] = c.BuildEtcdProcess(host, readyEtcdHosts)
+	}
+	return etcdProcessHostMap
 }

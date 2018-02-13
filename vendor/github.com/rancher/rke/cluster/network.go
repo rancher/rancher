@@ -41,6 +41,9 @@ const (
 	KubeProxyPort       = "10256"
 	FlannetVXLANPortUDP = "8472"
 
+	ProtocolTCP = "TCP"
+	ProtocolUDP = "UDP"
+
 	FlannelNetworkPlugin = "flannel"
 	FlannelImage         = "flannel_image"
 	FlannelCNIImage      = "flannel_cni_image"
@@ -95,6 +98,19 @@ const (
 	AWSCloudProvider = "aws"
 	RBACConfig       = "RBACConfig"
 )
+
+var EtcdPortList = []string{
+	EtcdPort1,
+	EtcdPort2,
+}
+
+var ControlPlanePortList = []string{
+	KubeAPIPort,
+}
+
+var WorkerPortList = []string{
+	KubeletPort,
+}
 
 func (c *Cluster) deployNetworkPlugin(ctx context.Context) error {
 	log.Infof(ctx, "[network] Setting up network plugin: %s", c.Network.Plugin)
@@ -262,27 +278,17 @@ func (c *Cluster) deployTCPPortListeners(ctx context.Context, currentCluster *Cl
 		workerHosts = c.WorkerHosts
 	}
 	// deploy ectd listeners
-	etcdPortList := []string{
-		EtcdPort1,
-		EtcdPort2,
-	}
-	if err := c.deployListenerOnPlane(ctx, etcdPortList, etcdHosts, EtcdPortListenContainer); err != nil {
+	if err := c.deployListenerOnPlane(ctx, EtcdPortList, etcdHosts, EtcdPortListenContainer); err != nil {
 		return err
 	}
 
 	// deploy controlplane listeners
-	controlPlanePortList := []string{
-		KubeAPIPort,
-	}
-	if err := c.deployListenerOnPlane(ctx, controlPlanePortList, cpHosts, CPPortListenContainer); err != nil {
+	if err := c.deployListenerOnPlane(ctx, ControlPlanePortList, cpHosts, CPPortListenContainer); err != nil {
 		return err
 	}
 
 	// deploy worker listeners
-	workerPortList := []string{
-		KubeletPort,
-	}
-	if err := c.deployListenerOnPlane(ctx, workerPortList, workerHosts, WorkerPortListenContainer); err != nil {
+	if err := c.deployListenerOnPlane(ctx, WorkerPortList, workerHosts, WorkerPortListenContainer); err != nil {
 		return err
 	}
 	log.Infof(ctx, "[network] Port listener containers deployed successfully")
@@ -360,17 +366,13 @@ func removeListenerFromPlane(ctx context.Context, hostPlane []*hosts.Host, conta
 func (c *Cluster) runServicePortChecks(ctx context.Context) error {
 	var errgrp errgroup.Group
 	// check etcd <-> etcd
-	etcdPortList := []string{
-		EtcdPort1,
-		EtcdPort2,
-	}
 	// one etcd host is a pass
 	if len(c.EtcdHosts) > 1 {
 		log.Infof(ctx, "[network] Running etcd <-> etcd port checks")
 		for _, host := range c.EtcdHosts {
 			runHost := host
 			errgrp.Go(func() error {
-				return checkPlaneTCPPortsFromHost(ctx, runHost, etcdPortList, c.EtcdHosts, c.SystemImages.Alpine, c.PrivateRegistriesMap)
+				return checkPlaneTCPPortsFromHost(ctx, runHost, EtcdPortList, c.EtcdHosts, c.SystemImages.Alpine, c.PrivateRegistriesMap)
 			})
 		}
 		if err := errgrp.Wait(); err != nil {
@@ -382,7 +384,7 @@ func (c *Cluster) runServicePortChecks(ctx context.Context) error {
 	for _, host := range c.ControlPlaneHosts {
 		runHost := host
 		errgrp.Go(func() error {
-			return checkPlaneTCPPortsFromHost(ctx, runHost, etcdPortList, c.EtcdHosts, c.SystemImages.Alpine, c.PrivateRegistriesMap)
+			return checkPlaneTCPPortsFromHost(ctx, runHost, EtcdPortList, c.EtcdHosts, c.SystemImages.Alpine, c.PrivateRegistriesMap)
 		})
 	}
 	if err := errgrp.Wait(); err != nil {
@@ -392,7 +394,7 @@ func (c *Cluster) runServicePortChecks(ctx context.Context) error {
 	for _, host := range c.WorkerHosts {
 		runHost := host
 		errgrp.Go(func() error {
-			return checkPlaneTCPPortsFromHost(ctx, runHost, etcdPortList, c.EtcdHosts, c.SystemImages.Alpine, c.PrivateRegistriesMap)
+			return checkPlaneTCPPortsFromHost(ctx, runHost, EtcdPortList, c.EtcdHosts, c.SystemImages.Alpine, c.PrivateRegistriesMap)
 		})
 	}
 	if err := errgrp.Wait(); err != nil {
@@ -400,13 +402,10 @@ func (c *Cluster) runServicePortChecks(ctx context.Context) error {
 	}
 	// check controle plane -> Workers
 	log.Infof(ctx, "[network] Running control plane -> etcd port checks")
-	workerPortList := []string{
-		KubeletPort,
-	}
 	for _, host := range c.ControlPlaneHosts {
 		runHost := host
 		errgrp.Go(func() error {
-			return checkPlaneTCPPortsFromHost(ctx, runHost, workerPortList, c.WorkerHosts, c.SystemImages.Alpine, c.PrivateRegistriesMap)
+			return checkPlaneTCPPortsFromHost(ctx, runHost, WorkerPortList, c.WorkerHosts, c.SystemImages.Alpine, c.PrivateRegistriesMap)
 		})
 	}
 	if err := errgrp.Wait(); err != nil {
@@ -414,13 +413,10 @@ func (c *Cluster) runServicePortChecks(ctx context.Context) error {
 	}
 	// check workers -> control plane
 	log.Infof(ctx, "[network] Running workers -> control plane port checks")
-	controlPlanePortList := []string{
-		KubeAPIPort,
-	}
 	for _, host := range c.WorkerHosts {
 		runHost := host
 		errgrp.Go(func() error {
-			return checkPlaneTCPPortsFromHost(ctx, runHost, controlPlanePortList, c.ControlPlaneHosts, c.SystemImages.Alpine, c.PrivateRegistriesMap)
+			return checkPlaneTCPPortsFromHost(ctx, runHost, ControlPlanePortList, c.ControlPlaneHosts, c.SystemImages.Alpine, c.PrivateRegistriesMap)
 		})
 	}
 	return errgrp.Wait()
