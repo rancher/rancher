@@ -355,25 +355,27 @@ func (m *Lifecycle) isNodeInAppliedSpec(node *v3.Node) (bool, error) {
 }
 
 func validateCustomHost(obj *v3.Node) error {
-	if obj.Spec.CustomConfig != nil && obj.Spec.CustomConfig.Address != "" {
-		customConfig := obj.Spec.CustomConfig
-		signer, err := ssh.ParsePrivateKey([]byte(customConfig.SSHKey))
-		if err != nil {
-			return errors.Wrapf(err, "sshKey format is invalid")
-		}
-		config := &ssh.ClientConfig{
-			User: customConfig.User,
-			Auth: []ssh.AuthMethod{
-				ssh.PublicKeys(signer),
-			},
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		}
-		conn, err := ssh.Dial("tcp", customConfig.Address+":22", config)
-		if err != nil {
-			return errors.Wrapf(err, "Failed to validate ssh connection to address [%s]", customConfig.Address)
-		}
-		conn.Close()
+	if obj.Spec.Imported {
+		return nil
 	}
+
+	customConfig := obj.Spec.CustomConfig
+	signer, err := ssh.ParsePrivateKey([]byte(customConfig.SSHKey))
+	if err != nil {
+		return errors.Wrapf(err, "sshKey format is invalid")
+	}
+	config := &ssh.ClientConfig{
+		User: customConfig.User,
+		Auth: []ssh.AuthMethod{
+			ssh.PublicKeys(signer),
+		},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	}
+	conn, err := ssh.Dial("tcp", customConfig.Address+":22", config)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to validate ssh connection to address [%s]", customConfig.Address)
+	}
+	defer conn.Close()
 	return nil
 }
 
