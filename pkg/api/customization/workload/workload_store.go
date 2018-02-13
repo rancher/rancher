@@ -7,46 +7,26 @@ import (
 
 func ConfigureStore(schemas *types.Schemas) {
 	workloadSchema := schemas.Schema(&schema.Version, "workload")
-
-	store := types.Store(&PrefixTypeStore{
-		Store: workloadSchema.Store,
-	})
-	workloadSchema.Store = store
-
-	store = NewAggregateStore(store,
-		workloadSchema,
+	store := NewAggregateStore(
 		schemas.Schema(&schema.Version, "deployment"),
 		schemas.Schema(&schema.Version, "replicaSet"),
 		schemas.Schema(&schema.Version, "replicationController"),
 		schemas.Schema(&schema.Version, "daemonSet"),
-		schemas.Schema(&schema.Version, "statefulSet"))
+		schemas.Schema(&schema.Version, "statefulSet"),
+		schemas.Schema(&schema.Version, "job"),
+		schemas.Schema(&schema.Version, "cronJob"))
 
-	workloadSchema.Store = &workloadStore{
-		Store: store,
+	for _, s := range store.Schemas {
+		s.Formatter = workloadFormatter
 	}
+
+	workloadSchema.Store = store
 }
 
-type workloadStore struct {
-	types.Store
-}
-
-func (w *workloadStore) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {
-	data, err := w.Store.List(apiContext, schema, opt)
-	if err != nil {
-		return nil, err
-	}
-
-	if opt.Options["hidden"] == "true" {
-		return data, err
-	}
-
-	var result []map[string]interface{}
-	for _, item := range data {
-		if item["ownerReferences"] != nil {
-			continue
-		}
-		result = append(result, item)
-	}
-
-	return result, nil
+func workloadFormatter(apiContext *types.APIContext, resource *types.RawResource) {
+	workloadID := resource.ID
+	workloadSchema := apiContext.Schemas.Schema(&schema.Version, "workload")
+	resource.Links["self"] = apiContext.URLBuilder.ResourceLinkByID(workloadSchema, workloadID)
+	resource.Links["remove"] = apiContext.URLBuilder.ResourceLinkByID(workloadSchema, workloadID)
+	resource.Links["update"] = apiContext.URLBuilder.ResourceLinkByID(workloadSchema, workloadID)
 }

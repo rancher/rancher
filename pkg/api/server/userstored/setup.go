@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/norman/store/subtype"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/api/customization/workload"
 	"github.com/rancher/rancher/pkg/api/store/namespace"
 	"github.com/rancher/rancher/pkg/api/store/pod"
 	"github.com/rancher/rancher/pkg/api/store/projectsetter"
@@ -28,6 +29,8 @@ func Setup(ctx context.Context, mgmt *config.ManagementContext) error {
 	addProxyStore(schemas, mgmt, client.ReplicationControllerType, "v1", nil)
 	addProxyStore(schemas, mgmt, client.ServiceType, "v1", nil)
 	addProxyStore(schemas, mgmt, client.StatefulSetType, "apps/v1beta2", nil)
+	addProxyStore(schemas, mgmt, client.JobType, "batch/v1", nil)
+	addProxyStore(schemas, mgmt, client.CronJobType, "batch/v1beta1", nil)
 	addProxyStore(schemas, mgmt, clusterClient.NamespaceType, "v1", namespace.New)
 	addProxyStore(schemas, mgmt, clusterClient.PersistentVolumeType, "v1", nil)
 	addProxyStore(schemas, mgmt, client.IngressType, "extensions/v1beta1", nil)
@@ -64,7 +67,7 @@ func SetProjectID(schemas *types.Schemas) {
 }
 
 func Workload(schemas *types.Schemas) {
-	//workload.ConfigureStore(schemas)
+	workload.ConfigureStore(schemas)
 }
 
 func Service(schemas *types.Schemas) {
