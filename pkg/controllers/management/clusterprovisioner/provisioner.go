@@ -83,7 +83,9 @@ func Register(management *config.ManagementContext, dialerFactory dialer.Factory
 
 func (p *Provisioner) Remove(cluster *v3.Cluster) (*v3.Cluster, error) {
 	logrus.Infof("Deleting cluster [%s]", cluster.Name)
-	if !needToProvision(cluster) {
+	if !needToProvision(cluster) ||
+		cluster.Status.Driver == "" ||
+		cluster.Status.Driver == "imported" {
 		return nil, nil
 	}
 

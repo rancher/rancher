@@ -67,7 +67,7 @@ func (m *Lifecycle) setupCustom(obj *v3.Node) {
 		User:             obj.Spec.CustomConfig.User,
 		DockerSocket:     obj.Spec.CustomConfig.DockerSocket,
 		SSHKey:           obj.Spec.CustomConfig.SSHKey,
-		Role:             obj.Spec.CustomConfig.Roles,
+		Role:             roles(obj),
 	}
 
 	if obj.Status.NodeConfig.User == "" {
