@@ -104,9 +104,9 @@ data:
         {
             "type": "calico",
             "etcd_endpoints": "{{.EtcdEndpoints}}",
-            "etcd_key_file": "{{.ClientKeyPath}}",
-            "etcd_cert_file": "{{.ClientCertPath}}",
-            "etcd_ca_cert_file": "{{.ClientCAPath}}",
+            "etcd_key_file": "{{.EtcdClientKeyPath}}",
+            "etcd_cert_file": "{{.EtcdClientCertPath}}",
+            "etcd_ca_cert_file": "{{.EtcdClientCAPath}}",
             "log_level": "info",
             "mtu": 1500,
             "ipam": {
@@ -114,10 +114,8 @@ data:
             },
             "policy": {
                 "type": "k8s",
-                "k8s_api_root": "{{.APIRoot}}",
-                "k8s_client_certificate": "{{.ClientCertPath}}",
-                "k8s_client_key": "{{.ClientKeyPath}}",
-                "k8s_certificate_authority": "{{.ClientCAPath}}"
+                "k8s_api_root": "https://__KUBERNETES_SERVICE_HOST__:__KUBERNETES_SERVICE_PORT__",
+                "k8s_auth_token": "__SERVICEACCOUNT_TOKEN__"
             },
             "kubernetes": {
                 "kubeconfig": "{{.KubeCfg}}"
@@ -144,9 +142,9 @@ metadata:
   name: calico-etcd-secrets
   namespace: kube-system
 data:
-  etcd-key: {{.ClientKey}}
-  etcd-cert: {{.ClientCert}}
-  etcd-ca:  {{.ClientCA}}
+  etcd-key: {{.EtcdClientKey}}
+  etcd-cert: {{.EtcdClientCert}}
+  etcd-ca:  {{.EtcdClientCA}}
 
 ---
 

@@ -73,11 +73,15 @@ const (
 	APIRoot = "APIRoot"
 	// kubernetes client certificates and kubeconfig paths
 
-	ClientCert     = "ClientCert"
+	EtcdClientCert     = "EtcdClientCert"
+	EtcdClientKey      = "EtcdClientKey"
+	EtcdClientCA       = "EtcdClientCA"
+	EtcdClientCertPath = "EtcdClientCertPath"
+	EtcdClientKeyPath  = "EtcdClientKeyPath"
+	EtcdClientCAPath   = "EtcdClientCAPath"
+
 	ClientCertPath = "ClientCertPath"
-	ClientKey      = "ClientKey"
 	ClientKeyPath  = "ClientKeyPath"
-	ClientCA       = "ClientCA"
 	ClientCAPath   = "ClientCAPath"
 
 	KubeCfg = "KubeCfg"
@@ -144,27 +148,36 @@ func (c *Cluster) doFlannelDeploy(ctx context.Context) error {
 }
 
 func (c *Cluster) doCalicoDeploy(ctx context.Context) error {
-	clientCert := b64.StdEncoding.EncodeToString(cert.EncodeCertPEM(c.Certificates[pki.KubeNodeCertName].Certificate))
-	clientkey := b64.StdEncoding.EncodeToString(cert.EncodePrivateKeyPEM(c.Certificates[pki.KubeNodeCertName].Key))
+
+	etcdEndpoints := services.GetEtcdConnString(c.EtcdHosts)
+	etcdClientCert := b64.StdEncoding.EncodeToString(cert.EncodeCertPEM(c.Certificates[pki.KubeNodeCertName].Certificate))
+	etcdClientkey := b64.StdEncoding.EncodeToString(cert.EncodePrivateKeyPEM(c.Certificates[pki.KubeNodeCertName].Key))
+	etcdCaCert := b64.StdEncoding.EncodeToString(cert.EncodeCertPEM(c.Certificates[pki.CACertName].Certificate))
 	clientConfig := pki.GetConfigPath(pki.KubeNodeCertName)
-	caCert := b64.StdEncoding.EncodeToString(cert.EncodeCertPEM(c.Certificates[pki.CACertName].Certificate))
+	// handling external etcd
+	if len(c.Services.Etcd.ExternalURLs) > 0 {
+		etcdClientCert = b64.StdEncoding.EncodeToString([]byte(c.Services.Etcd.Cert))
+		etcdClientkey = b64.StdEncoding.EncodeToString([]byte(c.Services.Etcd.Key))
+		etcdCaCert = b64.StdEncoding.EncodeToString([]byte(c.Services.Etcd.CACert))
+		etcdEndpoints = strings.Join(c.Services.Etcd.ExternalURLs, ",")
+	}
 	calicoConfig := map[string]string{
-		EtcdEndpoints:    services.GetEtcdConnString(c.EtcdHosts),
-		APIRoot:          "https://127.0.0.1:6443",
-		ClientCert:       clientCert,
-		ClientCertPath:   pki.GetCertPath(pki.KubeNodeCertName),
-		ClientKey:        clientkey,
-		ClientKeyPath:    pki.GetKeyPath(pki.KubeNodeCertName),
-		ClientCA:         caCert,
-		ClientCAPath:     pki.GetCertPath(pki.CACertName),
-		KubeCfg:          clientConfig,
-		ClusterCIDR:      c.ClusterCIDR,
-		CNIImage:         c.SystemImages.CalicoCNI,
-		NodeImage:        c.SystemImages.CalicoNode,
-		ControllersImage: c.SystemImages.CalicoControllers,
-		Calicoctl:        c.SystemImages.CalicoCtl,
-		CloudProvider:    c.Network.Options[CalicoCloudProvider],
-		RBACConfig:       c.Authorization.Mode,
+		EtcdEndpoints:      etcdEndpoints,
+		APIRoot:            "https://127.0.0.1:6443",
+		EtcdClientCA:       etcdCaCert,
+		EtcdClientCert:     etcdClientCert,
+		EtcdClientKey:      etcdClientkey,
+		EtcdClientKeyPath:  pki.GetKeyPath(pki.EtcdClientCertName),
+		EtcdClientCertPath: pki.GetCertPath(pki.EtcdClientCertName),
+		EtcdClientCAPath:   pki.GetCertPath(pki.EtcdClientCACertName),
+		KubeCfg:            clientConfig,
+		ClusterCIDR:        c.ClusterCIDR,
+		CNIImage:           c.SystemImages.CalicoCNI,
+		NodeImage:          c.SystemImages.CalicoNode,
+		ControllersImage:   c.SystemImages.CalicoControllers,
+		Calicoctl:          c.SystemImages.CalicoCtl,
+		CloudProvider:      c.Network.Options[CalicoCloudProvider],
+		RBACConfig:         c.Authorization.Mode,
 	}
 	pluginYaml, err := c.getNetworkPluginManifest(calicoConfig)
 	if err != nil {

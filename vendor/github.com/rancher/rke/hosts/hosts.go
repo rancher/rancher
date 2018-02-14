@@ -41,15 +41,17 @@ const (
 	CleanerContainerName = "kube-cleaner"
 )
 
-func (h *Host) CleanUpAll(ctx context.Context, cleanerImage string, prsMap map[string]v3.PrivateRegistry) error {
+func (h *Host) CleanUpAll(ctx context.Context, cleanerImage string, prsMap map[string]v3.PrivateRegistry, externalEtcd bool) error {
 	log.Infof(ctx, "[hosts] Cleaning up host [%s]", h.Address)
 	toCleanPaths := []string{
-		ToCleanEtcdDir,
 		ToCleanSSLDir,
 		ToCleanCNIConf,
 		ToCleanCNIBin,
 		ToCleanCalicoRun,
 		ToCleanTempCertPath,
+	}
+	if externalEtcd {
+		toCleanPaths = append(toCleanPaths, ToCleanEtcdDir)
 	}
 	return h.CleanUp(ctx, toCleanPaths, cleanerImage, prsMap)
 }

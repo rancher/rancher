@@ -22,26 +22,26 @@ func SetUpAuthentication(ctx context.Context, kubeCluster, currentCluster *Clust
 		if currentCluster != nil {
 			kubeCluster.Certificates = currentCluster.Certificates
 		} else {
-			log.Infof(ctx, "[certificates] Attempting to recover certificates from backup on host [%s]", kubeCluster.EtcdHosts[0].Address)
-			kubeCluster.Certificates, err = pki.FetchCertificatesFromHost(ctx, kubeCluster.EtcdHosts, kubeCluster.EtcdHosts[0], kubeCluster.SystemImages.Alpine, kubeCluster.LocalKubeConfigPath, kubeCluster.PrivateRegistriesMap)
+			log.Infof(ctx, "[certificates] Attempting to recover certificates from backup on host [%s]", kubeCluster.ControlPlaneHosts[0].Address)
+			kubeCluster.Certificates, err = pki.FetchCertificatesFromHost(ctx, kubeCluster.EtcdHosts, kubeCluster.ControlPlaneHosts[0], kubeCluster.SystemImages.Alpine, kubeCluster.LocalKubeConfigPath, kubeCluster.PrivateRegistriesMap)
 			if err != nil {
 				return err
 			}
 			if kubeCluster.Certificates != nil {
-				log.Infof(ctx, "[certificates] Certificate backup found on host [%s]", kubeCluster.EtcdHosts[0].Address)
+				log.Infof(ctx, "[certificates] Certificate backup found on host [%s]", kubeCluster.ControlPlaneHosts[0].Address)
 				return nil
 			}
-			log.Infof(ctx, "[certificates] No Certificate backup found on host [%s]", kubeCluster.EtcdHosts[0].Address)
+			log.Infof(ctx, "[certificates] No Certificate backup found on host [%s]", kubeCluster.ControlPlaneHosts[0].Address)
 
 			kubeCluster.Certificates, err = pki.GenerateRKECerts(ctx, kubeCluster.RancherKubernetesEngineConfig, kubeCluster.LocalKubeConfigPath, "")
 			if err != nil {
 				return fmt.Errorf("Failed to generate Kubernetes certificates: %v", err)
 			}
-			log.Infof(ctx, "[certificates] Temporarily saving certs to etcd host [%s]", kubeCluster.EtcdHosts[0].Address)
-			if err := pki.DeployCertificatesOnHost(ctx, kubeCluster.EtcdHosts[0], kubeCluster.Certificates, kubeCluster.SystemImages.CertDownloader, pki.TempCertPath, kubeCluster.PrivateRegistriesMap); err != nil {
+			log.Infof(ctx, "[certificates] Temporarily saving certs to control host [%s]", kubeCluster.ControlPlaneHosts[0].Address)
+			if err := pki.DeployCertificatesOnHost(ctx, kubeCluster.ControlPlaneHosts[0], kubeCluster.Certificates, kubeCluster.SystemImages.CertDownloader, pki.TempCertPath, kubeCluster.PrivateRegistriesMap); err != nil {
 				return err
 			}
-			log.Infof(ctx, "[certificates] Saved certs to etcd host [%s]", kubeCluster.EtcdHosts[0].Address)
+			log.Infof(ctx, "[certificates] Saved certs to control host [%s]", kubeCluster.ControlPlaneHosts[0].Address)
 		}
 	}
 	return nil
@@ -123,11 +123,14 @@ func saveCertToKubernetes(kubeClient *kubernetes.Clientset, crtName string, crt 
 	timeout := make(chan bool, 1)
 
 	// build secret Data
-	secretData := map[string][]byte{
-		"Certificate": cert.EncodeCertPEM(crt.Certificate),
-		"Key":         cert.EncodePrivateKeyPEM(crt.Key),
-		"EnvName":     []byte(crt.EnvName),
-		"KeyEnvName":  []byte(crt.KeyEnvName),
+	secretData := make(map[string][]byte)
+	if crt.Certificate != nil {
+		secretData["Certificate"] = cert.EncodeCertPEM(crt.Certificate)
+		secretData["EnvName"] = []byte(crt.EnvName)
+	}
+	if crt.Key != nil {
+		secretData["Key"] = cert.EncodePrivateKeyPEM(crt.Key)
+		secretData["KeyEnvName"] = []byte(crt.KeyEnvName)
 	}
 	if len(crt.Config) > 0 {
 		secretData["ConfigEnvName"] = []byte(crt.ConfigEnvName)
