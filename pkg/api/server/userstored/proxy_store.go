@@ -45,5 +45,9 @@ func addProxyStore(schemas *types.Schemas, context *config.ManagementContext, sc
 		kind,
 		plural)
 
+	if storeWrapper != nil {
+		s.Store = storeWrapper(s.Store)
+	}
+
 	return s
 }
