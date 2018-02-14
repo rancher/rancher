@@ -271,10 +271,6 @@ func (p *Provisioner) Create(cluster *v3.Cluster) (*v3.Cluster, error) {
 		v3.ClusterConditionReady.Message(cluster, "Waiting for API to be available")
 	}
 
-	if !needToProvision(cluster) {
-		return cluster, nil
-	}
-
 	cluster, err = p.pending(cluster)
 	if err != nil {
 		return cluster, err
@@ -285,6 +281,10 @@ func (p *Provisioner) Create(cluster *v3.Cluster) (*v3.Cluster, error) {
 
 func (p *Provisioner) pending(cluster *v3.Cluster) (*v3.Cluster, error) {
 	obj, err := v3.ClusterConditionPending.DoUntilTrue(cluster, func() (runtime.Object, error) {
+		if !needToProvision(cluster) {
+			return cluster, nil
+		}
+
 		driver, err := validateDriver(cluster)
 		if err != nil {
 			return cluster, err
