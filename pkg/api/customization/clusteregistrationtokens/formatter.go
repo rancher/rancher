@@ -1,11 +1,10 @@
 package clusteregistrationtokens
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
-
 	"strings"
-
-	"encoding/base64"
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/settings"
@@ -13,7 +12,7 @@ import (
 
 const (
 	commandFormat     = "kubectl apply -f %s"
-	nodeCommandFormat = "docker run -d --restart=unless-stopped --net=host %s --server %s --token %s hecksum \"%s\""
+	nodeCommandFormat = "docker run -d --restart=unless-stopped --net=host -v /var/run/docker.sock:/var/run/docker.sock %s --server %s --token %s%s"
 )
 
 func Formatter(request *types.APIContext, resource *types.RawResource) {
@@ -22,8 +21,8 @@ func Formatter(request *types.APIContext, resource *types.RawResource) {
 		if !strings.HasSuffix(ca, "\n") {
 			ca += "\n"
 		}
-		ca = base64.StdEncoding.EncodeToString([]byte(ca))
-		ca = " --ca-checkum " + ca
+		digest := sha256.Sum256([]byte(ca))
+		ca = " --ca-checksum " + hex.EncodeToString(digest[:])
 	}
 
 	token, _ := resource.Values["token"].(string)
