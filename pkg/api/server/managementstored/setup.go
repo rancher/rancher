@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/store/subtype"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/api/customization/alert"
 	"github.com/rancher/rancher/pkg/api/customization/app"
 	"github.com/rancher/rancher/pkg/api/customization/authn"
 	"github.com/rancher/rancher/pkg/api/customization/catalog"
@@ -38,6 +39,9 @@ func Setup(ctx context.Context, management *config.ManagementContext) error {
 
 	createCrd(ctx, wg, factory, schemas, &managementschema.Version,
 		client.AuthConfigType,
+		client.ClusterAlertType,
+		client.ProjectAlertType,
+		client.NotifierType,
 		client.CatalogType,
 		client.ClusterEventType,
 		client.ClusterLoggingType,
@@ -79,6 +83,7 @@ func Setup(ctx context.Context, management *config.ManagementContext) error {
 	Preference(schemas, management)
 	ClusterRegistrationTokens(schemas)
 	LoggingTypes(schemas, management)
+	Alert(schemas, management)
 
 	if err := NodeTypes(schemas, management); err != nil {
 		return err
@@ -232,4 +237,23 @@ func LoggingTypes(schemas *types.Schemas, management *config.ManagementContext) 
 
 	schema = schemas.Schema(&managementschema.Version, client.ProjectLoggingType)
 	schema.Validator = logging.ProjectLoggingValidator
+}
+
+func Alert(schemas *types.Schemas, management *config.ManagementContext) {
+	handler := &alert.Handler{
+		Management: *management,
+	}
+
+	schema := schemas.Schema(&managementschema.Version, client.ClusterAlertType)
+	schema.Formatter = alert.Formatter
+	schema.ActionHandler = handler.ClusterActionHandler
+
+	schema = schemas.Schema(&managementschema.Version, client.ProjectAlertType)
+	schema.Formatter = alert.Formatter
+	schema.ActionHandler = handler.ProjectActionHandler
+
+	schema = schemas.Schema(&managementschema.Version, client.NotifierType)
+	schema.CollectionFormatter = alert.NotifierCollectionFormatter
+	schema.Formatter = alert.NotifierFormatter
+	schema.ActionHandler = handler.NotifierActionHandler
 }
