@@ -40,7 +40,7 @@ type NodeTemplateCondition struct {
 type NodeTemplateSpec struct {
 	DisplayName      string `json:"displayName"`
 	Description      string `json:"description"`
-	Driver           string `json:"driver"`
+	Driver           string `json:"driver" norman:"nocreate,noupdate"`
 	NodeCommonParams `json:",inline"`
 }
 
@@ -118,9 +118,9 @@ type CustomConfig struct {
 }
 
 type CommonNodeSpec struct {
-	Etcd             bool   `json:"etcd"`
-	ControlPlane     bool   `json:"controlPlane"`
-	Worker           bool   `json:"worker"`
+	Etcd             bool   `json:"etcd" norman:"noupdate"`
+	ControlPlane     bool   `json:"controlPlane" norman:"noupdate"`
+	Worker           bool   `json:"worker" norman:"noupdate"`
 	NodeTemplateName string `json:"nodeTemplateName,omitempty" norman:"type=reference[nodeTemplate],noupdate"`
 }
 

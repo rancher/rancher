@@ -124,8 +124,8 @@ type RKEConfigServices struct {
 type ETCDService struct {
 	// Base service properties
 	BaseService `yaml:",inline" json:",inline"`
-	// Comma separated list of etcd urls
-	EtcdServers string `yaml:"etcd_servers" json:"etcdServers,omitempty"`
+	// List of etcd urls
+	ExternalURLs []string `yaml:"external_urls" json:"externalUrls,omitempty"`
 	// External CA certificate
 	CACert string `yaml:"ca_cert" json:"caCert,omitempty"`
 	// External Client certificate

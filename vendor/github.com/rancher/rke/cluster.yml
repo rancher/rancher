@@ -68,9 +68,24 @@ nodes:
 
 services:
   etcd:
+    # if external etcd is used
+    # path: /etcdcluster
+    # external_urls:
+    #   - https://etcd-example.com:2379
+    # ca_cert: |-
+    #   -----BEGIN CERTIFICATE-----
+    #   xxxxxxxxxx
+    #   -----END CERTIFICATE-----
+    # cert: |-
+    #   -----BEGIN CERTIFICATE-----
+    #   xxxxxxxxxx
+    #   -----END CERTIFICATE-----
+    # key: |-
+    #   -----BEGIN PRIVATE KEY-----
+    #   xxxxxxxxxx
+    #   -----END PRIVATE KEY-----
 
   kube-api:
-
     service_cluster_ip_range: 10.233.0.0/18
     pod_security_policy: false
     extra_args:

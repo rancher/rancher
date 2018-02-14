@@ -12,8 +12,11 @@ func (c *Cluster) ValidateCluster() error {
 	if len(c.ControlPlaneHosts) == 0 {
 		return fmt.Errorf("Cluster must have at least one control plane host")
 	}
-	if len(c.EtcdHosts) == 0 {
+	if len(c.EtcdHosts) == 0 && len(c.Services.Etcd.ExternalURLs) == 0 {
 		return fmt.Errorf("Cluster must have at least one etcd plane host")
+	}
+	if len(c.EtcdHosts) > 0 && len(c.Services.Etcd.ExternalURLs) > 0 {
+		return fmt.Errorf("Cluster can't have both internal and external etcd")
 	}
 
 	// validate hosts options
@@ -92,6 +95,21 @@ func validateServicesOptions(c *Cluster) error {
 	for optionName, OptionValue := range servicesOptions {
 		if len(OptionValue) == 0 {
 			return fmt.Errorf("%s can't be empty", strings.Join(strings.Split(optionName, "_"), " "))
+		}
+	}
+	// Validate external etcd information
+	if len(c.Services.Etcd.ExternalURLs) > 0 {
+		if len(c.Services.Etcd.CACert) == 0 {
+			return fmt.Errorf("External CA Certificate for etcd can't be empty")
+		}
+		if len(c.Services.Etcd.Cert) == 0 {
+			return fmt.Errorf("External Client Certificate for etcd can't be empty")
+		}
+		if len(c.Services.Etcd.Key) == 0 {
+			return fmt.Errorf("External Client Key for etcd can't be empty")
+		}
+		if len(c.Services.Etcd.Path) == 0 {
+			return fmt.Errorf("External etcd path can't be empty")
 		}
 	}
 	return nil

@@ -4,11 +4,16 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+)
+
+const (
+	EtcdPathPrefix = "/registry"
 )
 
 func GeneratePlan(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig) (v3.RKEPlan, error) {
@@ -55,8 +60,20 @@ func BuildRKEConfigNodePlan(ctx context.Context, myCluster *Cluster, host *hosts
 }
 
 func (c *Cluster) BuildKubeAPIProcess() v3.Process {
-	etcdConnString := services.GetEtcdConnString(c.EtcdHosts)
-	args := []string{}
+	// check if external etcd is used
+	etcdConnectionString := services.GetEtcdConnString(c.EtcdHosts)
+	etcdPathPrefix := EtcdPathPrefix
+	etcdClientCert := pki.GetCertPath(pki.KubeNodeCertName)
+	etcdClientKey := pki.GetKeyPath(pki.KubeNodeCertName)
+	etcdCAClientCert := pki.GetCertPath(pki.CACertName)
+	if len(c.Services.Etcd.ExternalURLs) > 0 {
+		etcdConnectionString = strings.Join(c.Services.Etcd.ExternalURLs, ",")
+		etcdPathPrefix = c.Services.Etcd.Path
+		etcdClientCert = pki.GetCertPath(pki.EtcdClientCertName)
+		etcdClientKey = pki.GetKeyPath(pki.EtcdClientCertName)
+		etcdCAClientCert = pki.GetCertPath(pki.EtcdClientCACertName)
+	}
+
 	Command := []string{
 		"/opt/rke/entrypoint.sh",
 		"kube-apiserver",
@@ -76,11 +93,14 @@ func (c *Cluster) BuildKubeAPIProcess() v3.Process {
 		"--tls-cert-file=" + pki.GetCertPath(pki.KubeAPICertName),
 		"--tls-private-key-file=" + pki.GetKeyPath(pki.KubeAPICertName),
 		"--service-account-key-file=" + pki.GetKeyPath(pki.KubeAPICertName),
-		"--etcd-cafile=" + pki.GetCertPath(pki.CACertName),
-		"--etcd-certfile=" + pki.GetCertPath(pki.KubeAPICertName),
-		"--etcd-keyfile=" + pki.GetKeyPath(pki.KubeAPICertName),
 	}
-	args = append(args, "--etcd-servers="+etcdConnString)
+	args := []string{
+		"--etcd-cafile=" + etcdCAClientCert,
+		"--etcd-certfile=" + etcdClientCert,
+		"--etcd-keyfile=" + etcdClientKey,
+		"--etcd-servers=" + etcdConnectionString,
+		"--etcd-prefix=" + etcdPathPrefix,
+	}
 
 	if c.Authorization.Mode == services.RBACAuthorizationMode {
 		args = append(args, "--authorization-mode=RBAC")

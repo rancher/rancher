@@ -107,11 +107,14 @@ func GetAltNames(cpHosts []*hosts.Host, clusterDomain string, KubernetesServiceI
 }
 
 func (c *CertificatePKI) ToEnv() []string {
-	env := []string{
-		c.CertToEnv(),
-		c.KeyToEnv(),
+	env := []string{}
+	if c.Key != nil {
+		env = append(env, c.KeyToEnv())
 	}
-	if c.Config != "" {
+	if c.Certificate != nil {
+		env = append(env, c.CertToEnv())
+	}
+	if c.Config != "" && c.ConfigEnvName != "" {
 		env = append(env, c.ConfigToEnv())
 	}
 	return env
@@ -218,6 +221,8 @@ func getControlCertKeys() []string {
 		KubeSchedulerCertName,
 		KubeProxyCertName,
 		KubeNodeCertName,
+		EtcdClientCertName,
+		EtcdClientCACertName,
 	}
 }
 
@@ -226,6 +231,8 @@ func getWorkerCertKeys() []string {
 		CACertName,
 		KubeProxyCertName,
 		KubeNodeCertName,
+		EtcdClientCertName,
+		EtcdClientCACertName,
 	}
 }
 
@@ -266,4 +273,13 @@ func GetLocalKubeConfig(configPath, configDir string) string {
 	fileName := filepath.Base(configPath)
 	baseDir += "/"
 	return fmt.Sprintf("%s%s%s", baseDir, KubeAdminConfigPrefix, fileName)
+}
+
+func strCrtToEnv(crtName, crt string) string {
+	return fmt.Sprintf("%s=%s", getEnvFromName(crtName), crt)
+}
+
+func strKeyToEnv(crtName, key string) string {
+	envName := getEnvFromName(crtName)
+	return fmt.Sprintf("%s=%s", getKeyEnvFromEnv(envName), key)
 }

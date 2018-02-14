@@ -55,10 +55,14 @@ const (
 func (c *Cluster) DeployControlPlane(ctx context.Context) error {
 	// Deploy Etcd Plane
 	etcdProcessHostMap := c.getEtcdProcessHostMap(nil)
-
-	if err := services.RunEtcdPlane(ctx, c.EtcdHosts, etcdProcessHostMap, c.LocalConnDialerFactory, c.PrivateRegistriesMap); err != nil {
-		return fmt.Errorf("[etcd] Failed to bring up Etcd Plane: %v", err)
+	if len(c.Services.Etcd.ExternalURLs) > 0 {
+		log.Infof(ctx, "[etcd] External etcd connection string has been specified, skipping etcd plane")
+	} else {
+		if err := services.RunEtcdPlane(ctx, c.EtcdHosts, etcdProcessHostMap, c.LocalConnDialerFactory, c.PrivateRegistriesMap); err != nil {
+			return fmt.Errorf("[etcd] Failed to bring up Etcd Plane: %v", err)
+		}
 	}
+
 	// Deploy Control plane
 	processMap := map[string]v3.Process{
 		services.SidekickContainerName:       c.BuildSidecarProcess(),

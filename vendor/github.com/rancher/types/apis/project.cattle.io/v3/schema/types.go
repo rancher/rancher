@@ -38,7 +38,7 @@ type handlerOverride struct {
 }
 
 type EnvironmentFrom struct {
-	Source     string
+	Source     string `norman:"type=enum,options=field|resource|configMap|secret"`
 	SourceName string
 	SourceKey  string
 	Prefix     string

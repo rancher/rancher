@@ -21,7 +21,7 @@ const (
 
 func (c *Cluster) TunnelHosts(ctx context.Context, local bool) error {
 	if local {
-		if err := c.EtcdHosts[0].TunnelUpLocal(ctx); err != nil {
+		if err := c.ControlPlaneHosts[0].TunnelUpLocal(ctx); err != nil {
 			return fmt.Errorf("Failed to connect to docker for local host [%s]: %v", c.EtcdHosts[0].Address, err)
 		}
 		return nil

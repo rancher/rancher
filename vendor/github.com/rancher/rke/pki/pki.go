@@ -111,9 +111,27 @@ func GenerateRKECerts(ctx context.Context, rkeConfig v3.RancherKubernetesEngineC
 	kubeAdminCertObj := ToCertObject(KubeAdminCertName, KubeAdminCertName, KubeAdminOrganizationName, kubeAdminCrt, kubeAdminKey)
 	kubeAdminCertObj.Config = kubeAdminConfig
 	kubeAdminCertObj.ConfigPath = localKubeConfigPath
+	kubeAdminCertObj.ConfigEnvName = ""
 	certs[KubeAdminCertName] = kubeAdminCertObj
 
 	// generate etcd certificate and key
+	if len(rkeConfig.Services.Etcd.ExternalURLs) > 0 {
+		clientCert, err := cert.ParseCertsPEM([]byte(rkeConfig.Services.Etcd.Cert))
+		if err != nil {
+			return nil, err
+		}
+		clientKey, err := cert.ParsePrivateKeyPEM([]byte(rkeConfig.Services.Etcd.Key))
+		if err != nil {
+			return nil, err
+		}
+		certs[EtcdClientCertName] = ToCertObject(EtcdClientCertName, "", "", clientCert[0], clientKey.(*rsa.PrivateKey))
+
+		caCert, err := cert.ParseCertsPEM([]byte(rkeConfig.Services.Etcd.CACert))
+		if err != nil {
+			return nil, err
+		}
+		certs[EtcdClientCACertName] = ToCertObject(EtcdClientCACertName, "", "", caCert[0], nil)
+	}
 	etcdHosts := hosts.NodesToHosts(rkeConfig.Nodes, etcdRole)
 	etcdAltNames := GetAltNames(etcdHosts, clusterDomain, kubernetesServiceIP)
 	for _, host := range etcdHosts {

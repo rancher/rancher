@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/store/empty"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/definition"
@@ -32,7 +33,7 @@ func (s *Store) ByID(apiContext *types.APIContext, schema *types.Schema, id stri
 			return schemaData, json.Unmarshal(data, &schemaData)
 		}
 	}
-	return nil, nil
+	return nil, httperror.NewAPIError(httperror.NotFound, "no such schema")
 }
 
 func (s *Store) modifyForAccessControl(context *types.APIContext, schema types.Schema) *types.Schema {

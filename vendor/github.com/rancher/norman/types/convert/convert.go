@@ -198,6 +198,10 @@ func ToObj(data interface{}, into interface{}) error {
 }
 
 func EncodeToMap(obj interface{}) (map[string]interface{}, error) {
+	if m, ok := obj.(map[string]interface{}); ok {
+		return m, nil
+	}
+
 	b, err := json.Marshal(obj)
 	if err != nil {
 		return nil, err

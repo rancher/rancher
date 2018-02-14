@@ -402,6 +402,7 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 		).
 		AddMapperForType(&Version, v1.ContainerPort{},
 			m.Move{From: "hostIP", To: "hostIp"},
+			m.Drop{Field: "hostPort"},
 		).
 		AddMapperForType(&Version, v1.Handler{}, handlerMapper).
 		AddMapperForType(&Version, v1.Probe{}, handlerMapper).
@@ -419,16 +420,24 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 		AddMapperForType(&Version, v1.ResourceRequirements{},
 			mapper.PivotMapper{Plural: true},
 		).
-		MustImport(&Version, v3.PublicEndpoint{}).
 		AddMapperForType(&Version, v1.Pod{},
 			&m.AnnotationField{Field: "description"},
 			&m.AnnotationField{Field: "publicEndpoints", List: true},
+			mapper.ContainerPorts{},
 		).
 		// Must import handlers before Container
+		MustImport(&Version, v1.ContainerPort{}, struct {
+			Kind       string `json:"kind,omitempty" norman:"type=enum,options=HostPort|NodePort|ClusterIP|LoadBalancer"`
+			SourcePort int    `json:"sourcePort,omitempty"`
+			DNSName    string `json:"dnsName,omitempty"`
+			Name       string `json:"name,omitempty"`
+			Protocol   string `json:"protocol,omitempty"`
+		}{}).
 		MustImport(&Version, v1.Capabilities{}, struct {
 			Add  []string `norman:"type=array[enum],options=AUDIT_CONTROL|AUDIT_WRITE|BLOCK_SUSPEND|CHOWN|DAC_OVERRIDE|DAC_READ_SEARCH|FOWNER|FSETID|IPC_LOCK|IPC_OWNER|KILL|LEASE|LINUX_IMMUTABLE|MAC_ADMIN|MAC_OVERRIDE|MKNOD|NET_ADMIN|NET_BIND_SERVICE|NET_BROADCAST|NET_RAW|SETFCAP|SETGID|SETPCAP|SETUID|SYSLOG|SYS_ADMIN|SYS_BOOT|SYS_CHROOT|SYS_MODULE|SYS_NICE|SYS_PACCT|SYS_PTRACE|SYS_RAWIO|SYS_RESOURCE|SYS_TIME|SYS_TTY_CONFIG|WAKE_ALARM"`
 			Drop []string `norman:"type=array[enum],options=AUDIT_CONTROL|AUDIT_WRITE|BLOCK_SUSPEND|CHOWN|DAC_OVERRIDE|DAC_READ_SEARCH|FOWNER|FSETID|IPC_LOCK|IPC_OWNER|KILL|LEASE|LINUX_IMMUTABLE|MAC_ADMIN|MAC_OVERRIDE|MKNOD|NET_ADMIN|NET_BIND_SERVICE|NET_BROADCAST|NET_RAW|SETFCAP|SETGID|SETPCAP|SETUID|SYSLOG|SYS_ADMIN|SYS_BOOT|SYS_CHROOT|SYS_MODULE|SYS_NICE|SYS_PACCT|SYS_PTRACE|SYS_RAWIO|SYS_RESOURCE|SYS_TIME|SYS_TTY_CONFIG|WAKE_ALARM"`
 		}{}).
+		MustImport(&Version, v3.PublicEndpoint{}).
 		MustImport(&Version, v1.Handler{}, handlerOverride{}).
 		MustImport(&Version, v1.Probe{}, handlerOverride{}).
 		MustImport(&Version, v1.Container{}, struct {
@@ -620,5 +629,6 @@ func NewWorkloadTypeMapper() types.Mapper {
 		&m.Move{From: "metadata/labels", To: "labels", NoDeleteFromField: true},
 		&m.Move{From: "metadata/annotations", To: "annotations", NoDeleteFromField: true},
 		&m.Drop{Field: "metadata"},
+		mapper.ContainerPorts{},
 	}
 }

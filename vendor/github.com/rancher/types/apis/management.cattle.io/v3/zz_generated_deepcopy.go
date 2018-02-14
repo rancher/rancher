@@ -2055,6 +2055,11 @@ func (in *DynamicSchemaStatus) DeepCopy() *DynamicSchemaStatus {
 func (in *ETCDService) DeepCopyInto(out *ETCDService) {
 	*out = *in
 	in.BaseService.DeepCopyInto(&out.BaseService)
+	if in.ExternalURLs != nil {
+		in, out := &in.ExternalURLs, &out.ExternalURLs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
