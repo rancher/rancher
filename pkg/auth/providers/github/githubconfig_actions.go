@@ -11,17 +11,27 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
 	"github.com/rancher/types/client/management/v3"
 )
 
 func (g *ghProvider) formatter(apiContext *types.APIContext, resource *types.RawResource) {
+	common.AddCommonActions(apiContext, resource)
 	resource.AddAction(apiContext, "configureTest")
 	resource.AddAction(apiContext, "testAndApply")
 }
 
 func (g *ghProvider) actionHandler(actionName string, action *types.Action, request *types.APIContext) error {
+	handled, err := common.HandleCommonAction(actionName, action, request, Name, g.authConfigs)
+	if err != nil {
+		return err
+	}
+	if handled {
+		return nil
+	}
+
 	if actionName == "configureTest" {
 		return g.configureTest(actionName, action, request)
 	} else if actionName == "testAndApply" {
