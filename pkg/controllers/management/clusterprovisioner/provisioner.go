@@ -271,6 +271,10 @@ func (p *Provisioner) Create(cluster *v3.Cluster) (*v3.Cluster, error) {
 		v3.ClusterConditionReady.Message(cluster, "Waiting for API to be available")
 	}
 
+	if !needToProvision(cluster) {
+		return cluster, nil
+	}
+
 	cluster, err = p.pending(cluster)
 	if err != nil {
 		return cluster, err
