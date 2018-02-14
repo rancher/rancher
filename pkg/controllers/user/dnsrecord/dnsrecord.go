@@ -13,7 +13,6 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
 )
 
 const (
@@ -87,11 +86,6 @@ func (c *Controller) reconcileEndpoints(key string, obj *corev1.Service) error {
 	records := strings.Split(value, ",")
 	var newEndpointSubsets []corev1.EndpointSubset
 	targetEndpointUUIDs := make(map[string]bool)
-	// filter out project namespaces
-	namespaces, err := GetProjectNamespaces(c.namespaceLister, obj)
-	if err != nil {
-		return err
-	}
 	for _, record := range records {
 		groomed := strings.TrimSpace(record)
 		namespaceService := strings.Split(groomed, ":")
@@ -99,10 +93,6 @@ func (c *Controller) reconcileEndpoints(key string, obj *corev1.Service) error {
 			return fmt.Errorf("Wrong format for dns record [%s]", groomed)
 		}
 		namespace := namespaceService[0]
-		if _, ok := namespaces[namespace]; !ok {
-			logrus.Warnf("Failed to find namespace [%s] for DNSRecord service [%s]", namespace, groomed)
-			continue
-		}
 		service := namespaceService[1]
 		targetEndpoint, err := c.endpointLister.Get(namespace, service)
 		if err != nil {
@@ -137,33 +127,6 @@ func (c *Controller) reconcileEndpoints(key string, obj *corev1.Service) error {
 	}
 
 	return nil
-}
-
-func GetProjectNamespaces(lister v1.NamespaceLister, obj *corev1.Service) (map[string]bool, error) {
-	namespaces := make(map[string]bool)
-	selfNamespace, err := lister.Get("", obj.Namespace)
-	if err != nil {
-		return namespaces, errors.Wrapf(err, "Failed to find endpoint for DNSRecord service [%s]", obj.Name)
-	}
-	if selfNamespace == nil {
-		return namespaces, fmt.Errorf("Failed to find namespace for for DNSRecord service [%s]", obj.Name)
-	}
-
-	selfProjectID := getNamespaceProjectID(selfNamespace)
-	if selfProjectID == "" {
-		return namespaces, fmt.Errorf("Failed to get projectID for for DNSRecord service [%s]", obj.Name)
-	}
-
-	nss, err := lister.List("", labels.NewSelector())
-	if err != nil {
-		return namespaces, errors.Wrapf(err, "Failed to fetch namespaces as a part of DNSRecord service [%s] reconcilation", obj.Name)
-	}
-	for _, ns := range nss {
-		if getNamespaceProjectID(ns) == selfProjectID {
-			namespaces[ns.Name] = true
-		}
-	}
-	return namespaces, nil
 }
 
 func (c *EndpointController) reconcileServicesForEndpoint(key string, obj *corev1.Endpoints) error {

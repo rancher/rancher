@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/norman/store/subtype"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/api/customization/workload"
+	"github.com/rancher/rancher/pkg/api/store/ingress"
 	"github.com/rancher/rancher/pkg/api/store/namespace"
 	"github.com/rancher/rancher/pkg/api/store/pod"
 	"github.com/rancher/rancher/pkg/api/store/projectsetter"
@@ -33,7 +34,7 @@ func Setup(ctx context.Context, mgmt *config.ManagementContext) error {
 	addProxyStore(schemas, mgmt, client.CronJobType, "batch/v1beta1", workload.New)
 	addProxyStore(schemas, mgmt, clusterClient.NamespaceType, "v1", namespace.New)
 	addProxyStore(schemas, mgmt, clusterClient.PersistentVolumeType, "v1", nil)
-	addProxyStore(schemas, mgmt, client.IngressType, "extensions/v1beta1", nil)
+	addProxyStore(schemas, mgmt, client.IngressType, "extensions/v1beta1", ingress.Wrap)
 
 	Secret(mgmt, schemas)
 	Service(schemas)
