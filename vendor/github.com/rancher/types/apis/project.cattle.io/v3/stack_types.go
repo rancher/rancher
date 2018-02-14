@@ -15,7 +15,7 @@ type App struct {
 }
 
 type AppSpec struct {
-	ProjectName      string            `json:"projectName,omitempty" norman:"type=reference[project]"`
+	ProjectName      string            `json:"projectName,omitempty" norman:"type=reference[/v3/schemas/project]"`
 	Description      string            `json:"description,omitempty"`
 	InstallNamespace string            `json:"installNamespace,omitempty"`
 	ExternalID       string            `json:"externalId,omitempty"`

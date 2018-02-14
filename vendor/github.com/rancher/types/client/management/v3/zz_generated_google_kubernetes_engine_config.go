@@ -30,18 +30,18 @@ type GoogleKubernetesEngineConfig struct {
 	Credential               string            `json:"credential,omitempty"`
 	Description              string            `json:"description,omitempty"`
 	DiskSizeGb               *int64            `json:"diskSizeGb,omitempty"`
-	EnableAlphaFeature       *bool             `json:"enableAlphaFeature,omitempty"`
-	HTTPLoadBalancing        *bool             `json:"httpLoadBalancing,omitempty"`
-	HorizontalPodAutoscaling *bool             `json:"horizontalPodAutoscaling,omitempty"`
+	EnableAlphaFeature       bool              `json:"enableAlphaFeature,omitempty"`
+	HTTPLoadBalancing        bool              `json:"httpLoadBalancing,omitempty"`
+	HorizontalPodAutoscaling bool              `json:"horizontalPodAutoscaling,omitempty"`
 	ImageType                string            `json:"imageType,omitempty"`
-	KubernetesDashboard      *bool             `json:"kubernetesDashboard,omitempty"`
+	KubernetesDashboard      bool              `json:"kubernetesDashboard,omitempty"`
 	Labels                   map[string]string `json:"labels,omitempty"`
-	LegacyAbac               *bool             `json:"legacyAbac,omitempty"`
+	LegacyAbac               bool              `json:"legacyAbac,omitempty"`
 	Locations                []string          `json:"locations,omitempty"`
 	MachineType              string            `json:"machineType,omitempty"`
 	MasterVersion            string            `json:"masterVersion,omitempty"`
 	Network                  string            `json:"network,omitempty"`
-	NetworkPolicyConfig      *bool             `json:"networkPolicyConfig,omitempty"`
+	NetworkPolicyConfig      bool              `json:"networkPolicyConfig,omitempty"`
 	NodeCount                *int64            `json:"nodeCount,omitempty"`
 	NodeVersion              string            `json:"nodeVersion,omitempty"`
 	ProjectID                string            `json:"projectId,omitempty"`

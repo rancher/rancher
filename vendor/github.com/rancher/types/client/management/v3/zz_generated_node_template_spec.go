@@ -32,5 +32,5 @@ type NodeTemplateSpec struct {
 	EngineOpt                map[string]string `json:"engineOpt,omitempty"`
 	EngineRegistryMirror     []string          `json:"engineRegistryMirror,omitempty"`
 	EngineStorageDriver      string            `json:"engineStorageDriver,omitempty"`
-	UseInternalIPAddress     *bool             `json:"useInternalIpAddress,omitempty"`
+	UseInternalIPAddress     bool              `json:"useInternalIpAddress,omitempty"`
 }

@@ -11,7 +11,7 @@ const (
 )
 
 type EnvironmentFrom struct {
-	Optional   *bool  `json:"optional,omitempty"`
+	Optional   bool   `json:"optional,omitempty"`
 	Prefix     string `json:"prefix,omitempty"`
 	Source     string `json:"source,omitempty"`
 	SourceKey  string `json:"sourceKey,omitempty"`

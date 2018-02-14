@@ -46,7 +46,7 @@ type App struct {
 	NamespaceId          string            `json:"namespaceId,omitempty"`
 	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty"`
 	ProjectId            string            `json:"projectId,omitempty"`
-	Prune                *bool             `json:"prune,omitempty"`
+	Prune                bool              `json:"prune,omitempty"`
 	Removed              string            `json:"removed,omitempty"`
 	State                string            `json:"state,omitempty"`
 	Status               *AppStatus        `json:"status,omitempty"`

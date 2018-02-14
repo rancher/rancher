@@ -19,6 +19,6 @@ type RBDVolumeSource struct {
 	RBDImage     string                `json:"image,omitempty"`
 	RBDPool      string                `json:"pool,omitempty"`
 	RadosUser    string                `json:"user,omitempty"`
-	ReadOnly     *bool                 `json:"readOnly,omitempty"`
+	ReadOnly     bool                  `json:"readOnly,omitempty"`
 	SecretRef    *LocalObjectReference `json:"secretRef,omitempty"`
 }

@@ -62,7 +62,7 @@ type Service struct {
 	Ports                    []ServicePort          `json:"ports,omitempty"`
 	ProjectID                string                 `json:"projectId,omitempty"`
 	PublicEndpoints          []PublicEndpoint       `json:"publicEndpoints,omitempty"`
-	PublishNotReadyAddresses *bool                  `json:"publishNotReadyAddresses,omitempty"`
+	PublishNotReadyAddresses bool                   `json:"publishNotReadyAddresses,omitempty"`
 	Removed                  string                 `json:"removed,omitempty"`
 	Selector                 map[string]string      `json:"selector,omitempty"`
 	SessionAffinity          string                 `json:"sessionAffinity,omitempty"`

@@ -28,12 +28,12 @@ type PodSecurityPolicySpec struct {
 	DefaultAddCapabilities          []string                           `json:"defaultAddCapabilities,omitempty"`
 	DefaultAllowPrivilegeEscalation *bool                              `json:"defaultAllowPrivilegeEscalation,omitempty"`
 	FSGroup                         *FSGroupStrategyOptions            `json:"fsGroup,omitempty"`
-	HostIPC                         *bool                              `json:"hostIPC,omitempty"`
-	HostNetwork                     *bool                              `json:"hostNetwork,omitempty"`
-	HostPID                         *bool                              `json:"hostPID,omitempty"`
+	HostIPC                         bool                               `json:"hostIPC,omitempty"`
+	HostNetwork                     bool                               `json:"hostNetwork,omitempty"`
+	HostPID                         bool                               `json:"hostPID,omitempty"`
 	HostPorts                       []HostPortRange                    `json:"hostPorts,omitempty"`
-	Privileged                      *bool                              `json:"privileged,omitempty"`
-	ReadOnlyRootFilesystem          *bool                              `json:"readOnlyRootFilesystem,omitempty"`
+	Privileged                      bool                               `json:"privileged,omitempty"`
+	ReadOnlyRootFilesystem          bool                               `json:"readOnlyRootFilesystem,omitempty"`
 	RequiredDropCapabilities        []string                           `json:"requiredDropCapabilities,omitempty"`
 	RunAsUser                       *RunAsUserStrategyOptions          `json:"runAsUser,omitempty"`
 	SELinux                         *SELinuxStrategyOptions            `json:"seLinux,omitempty"`

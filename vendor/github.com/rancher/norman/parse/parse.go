@@ -27,7 +27,8 @@ var (
 )
 
 type ParsedURL struct {
-	Version          string
+	Version          *types.APIVersion
+	SchemasVersion   *types.APIVersion
 	Type             string
 	ID               string
 	Link             string
@@ -47,13 +48,14 @@ func DefaultURLParser(schemas *types.Schemas, url *url.URL) (ParsedURL, error) {
 
 	path := url.Path
 	path = multiSlashRegexp.ReplaceAllString(path, "/")
-	version, prefix, parts, subContext := parseVersionAndSubContext(schemas, path)
+	schemaVersion, version, prefix, parts, subContext := parseVersionAndSubContext(schemas, path)
 
 	if version == nil {
 		return result, nil
 	}
 
-	result.Version = version.Path
+	result.Version = version
+	result.SchemasVersion = schemaVersion
 	result.SubContext = subContext
 	result.SubContextPrefix = prefix
 	result.Action, result.Method = parseAction(url)
@@ -88,12 +90,8 @@ func Parse(rw http.ResponseWriter, req *http.Request, schemas *types.Schemas, ur
 		result.Method = parsedURL.Method
 	}
 
-	for i, version := range schemas.Versions() {
-		if version.Path == parsedURL.Version {
-			result.Version = &schemas.Versions()[i]
-			break
-		}
-	}
+	result.Version = parsedURL.Version
+	result.SchemasVersion = parsedURL.SchemasVersion
 
 	if err != nil {
 		return result, err
@@ -153,10 +151,10 @@ func versionsForPath(schemas *types.Schemas, path string) []types.APIVersion {
 	return matchedVersion
 }
 
-func parseVersionAndSubContext(schemas *types.Schemas, path string) (*types.APIVersion, string, []string, map[string]string) {
+func parseVersionAndSubContext(schemas *types.Schemas, path string) (*types.APIVersion, *types.APIVersion, string, []string, map[string]string) {
 	versions := versionsForPath(schemas, path)
 	if len(versions) == 0 {
-		return nil, "", nil, nil
+		return nil, nil, "", nil, nil
 	}
 	version := &versions[0]
 
@@ -169,13 +167,19 @@ func parseVersionAndSubContext(schemas *types.Schemas, path string) (*types.APIV
 	paths := pathParts[len(versionParts):]
 
 	if !version.SubContext || len(versions) < 2 {
-		return version, "", paths, nil
+		return nil, version, "", paths, nil
+	}
+
+	// Handle the special case of /v3/clusters/schema(s)
+	if len(paths) >= 1 && (paths[0] == "schema" || paths[0] == "schemas") {
+		return nil, version, "", paths, nil
 	}
 
 	if len(paths) < 2 {
 		// Handle case like /v3/clusters/foo where /v3 and /v3/clusters are API versions.
 		// In this situation you want the version to be /v3 and the path "clusters", "foo"
-		return &versions[1], "", pathParts[len(versionParts)-1:], nil
+
+		return &versions[0], &versions[1], "", pathParts[len(versionParts)-1:], nil
 	}
 
 	// Length is always >= 3
@@ -190,11 +194,11 @@ func parseVersionAndSubContext(schemas *types.Schemas, path string) (*types.APIV
 			if i == 0 {
 				break
 			}
-			return &version, "", paths[1:], attrs
+			return nil, &version, "", paths[1:], attrs
 		}
 	}
 
-	return version, "/" + paths[0], paths[1:], attrs
+	return nil, version, "/" + paths[0], paths[1:], attrs
 }
 
 func DefaultResolver(typeName string, apiContext *types.APIContext) error {

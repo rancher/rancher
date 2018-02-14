@@ -14,7 +14,7 @@ type KubeletService struct {
 	ClusterDNSServer    string            `json:"clusterDnsServer,omitempty"`
 	ClusterDomain       string            `json:"clusterDomain,omitempty"`
 	ExtraArgs           map[string]string `json:"extraArgs,omitempty"`
-	FailSwapOn          *bool             `json:"failSwapOn,omitempty"`
+	FailSwapOn          bool              `json:"failSwapOn,omitempty"`
 	Image               string            `json:"image,omitempty"`
 	InfraContainerImage string            `json:"infraContainerImage,omitempty"`
 }

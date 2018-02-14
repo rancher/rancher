@@ -27,7 +27,7 @@ func (n *NamespaceIDMapper) ModifySchema(schema *types.Schema, schemas *types.Sc
 		return nil
 	}
 
-	field.Type = "reference[namespace]"
+	field.Type = "reference[/v3/clusters/schemas/namespace]"
 	field.Required = true
 	field.Update = false
 	schema.ResourceFields["namespace"] = field
