@@ -29,8 +29,8 @@ type User struct {
 	CreatorID          string            `json:"creatorId,omitempty"`
 	Description        string            `json:"description,omitempty"`
 	Labels             map[string]string `json:"labels,omitempty"`
-	Me                 *bool             `json:"me,omitempty"`
-	MustChangePassword *bool             `json:"mustChangePassword,omitempty"`
+	Me                 bool              `json:"me,omitempty"`
+	MustChangePassword bool              `json:"mustChangePassword,omitempty"`
 	Name               string            `json:"name,omitempty"`
 	OwnerReferences    []OwnerReference  `json:"ownerReferences,omitempty"`
 	Password           string            `json:"password,omitempty"`

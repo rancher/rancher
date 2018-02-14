@@ -20,7 +20,7 @@ type DynamicSchemaSpec struct {
 	CollectionFields  map[string]Field  `json:"collectionFields,omitempty"`
 	CollectionFilters map[string]Filter `json:"collectionFilters,omitempty"`
 	CollectionMethods []string          `json:"collectionMethods,omitempty"`
-	Embed             *bool             `json:"embed,omitempty"`
+	Embed             bool              `json:"embed,omitempty"`
 	EmbedType         string            `json:"embedType,omitempty"`
 	IncludeableLinks  []string          `json:"includeableLinks,omitempty"`
 	PluralName        string            `json:"pluralName,omitempty"`

@@ -10,5 +10,5 @@ const (
 type GlusterfsVolumeSource struct {
 	EndpointsName string `json:"endpoints,omitempty"`
 	Path          string `json:"path,omitempty"`
-	ReadOnly      *bool  `json:"readOnly,omitempty"`
+	ReadOnly      bool   `json:"readOnly,omitempty"`
 }

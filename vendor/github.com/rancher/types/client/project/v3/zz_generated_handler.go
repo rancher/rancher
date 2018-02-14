@@ -20,5 +20,5 @@ type Handler struct {
 	Path        string             `json:"path,omitempty"`
 	Port        intstr.IntOrString `json:"port,omitempty"`
 	Scheme      string             `json:"scheme,omitempty"`
-	TCP         *bool              `json:"tcp,omitempty"`
+	TCP         bool               `json:"tcp,omitempty"`
 }

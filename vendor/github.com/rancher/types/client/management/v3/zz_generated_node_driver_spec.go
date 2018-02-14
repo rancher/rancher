@@ -13,8 +13,8 @@ const (
 )
 
 type NodeDriverSpec struct {
-	Active      *bool  `json:"active,omitempty"`
-	Builtin     *bool  `json:"builtin,omitempty"`
+	Active      bool   `json:"active,omitempty"`
+	Builtin     bool   `json:"builtin,omitempty"`
 	Checksum    string `json:"checksum,omitempty"`
 	Description string `json:"description,omitempty"`
 	DisplayName string `json:"displayName,omitempty"`

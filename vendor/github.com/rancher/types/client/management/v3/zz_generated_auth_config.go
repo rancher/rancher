@@ -27,7 +27,7 @@ type AuthConfig struct {
 	Annotations         map[string]string `json:"annotations,omitempty"`
 	Created             string            `json:"created,omitempty"`
 	CreatorID           string            `json:"creatorId,omitempty"`
-	Enabled             *bool             `json:"enabled,omitempty"`
+	Enabled             bool              `json:"enabled,omitempty"`
 	Labels              map[string]string `json:"labels,omitempty"`
 	Name                string            `json:"name,omitempty"`
 	OwnerReferences     []OwnerReference  `json:"ownerReferences,omitempty"`

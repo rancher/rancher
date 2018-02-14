@@ -18,8 +18,8 @@ type ScaleIOVolumeSource struct {
 	FSType           string                `json:"fsType,omitempty"`
 	Gateway          string                `json:"gateway,omitempty"`
 	ProtectionDomain string                `json:"protectionDomain,omitempty"`
-	ReadOnly         *bool                 `json:"readOnly,omitempty"`
-	SSLEnabled       *bool                 `json:"sslEnabled,omitempty"`
+	ReadOnly         bool                  `json:"readOnly,omitempty"`
+	SSLEnabled       bool                  `json:"sslEnabled,omitempty"`
 	SecretRef        *LocalObjectReference `json:"secretRef,omitempty"`
 	StorageMode      string                `json:"storageMode,omitempty"`
 	StoragePool      string                `json:"storagePool,omitempty"`

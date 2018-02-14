@@ -22,7 +22,7 @@ const (
 type GlobalRole struct {
 	types.Resource
 	Annotations     map[string]string `json:"annotations,omitempty"`
-	Builtin         *bool             `json:"builtin,omitempty"`
+	Builtin         bool              `json:"builtin,omitempty"`
 	Created         string            `json:"created,omitempty"`
 	CreatorID       string            `json:"creatorId,omitempty"`
 	Description     string            `json:"description,omitempty"`

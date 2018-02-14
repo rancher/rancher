@@ -48,7 +48,7 @@ type ListenConfig struct {
 	CreatorID               string            `json:"creatorId,omitempty"`
 	Description             string            `json:"description,omitempty"`
 	Domains                 []string          `json:"domains,omitempty"`
-	Enabled                 *bool             `json:"enabled,omitempty"`
+	Enabled                 bool              `json:"enabled,omitempty"`
 	ExpiresAt               string            `json:"expiresAt,omitempty"`
 	GeneratedCerts          map[string]string `json:"generatedCerts,omitempty"`
 	IssuedAt                string            `json:"issuedAt,omitempty"`

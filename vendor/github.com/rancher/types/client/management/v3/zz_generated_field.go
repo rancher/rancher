@@ -20,7 +20,7 @@ const (
 )
 
 type Field struct {
-	Create       *bool    `json:"create,omitempty"`
+	Create       bool     `json:"create,omitempty"`
 	Default      *Values  `json:"default,omitempty"`
 	Description  string   `json:"description,omitempty"`
 	InvalidChars string   `json:"invalidChars,omitempty"`
@@ -28,11 +28,11 @@ type Field struct {
 	MaxLength    *int64   `json:"maxLength,omitempty"`
 	Min          *int64   `json:"min,omitempty"`
 	MinLength    *int64   `json:"minLength,omitempty"`
-	Nullable     *bool    `json:"nullable,omitempty"`
+	Nullable     bool     `json:"nullable,omitempty"`
 	Options      []string `json:"options,omitempty"`
-	Required     *bool    `json:"required,omitempty"`
+	Required     bool     `json:"required,omitempty"`
 	Type         string   `json:"type,omitempty"`
-	Unique       *bool    `json:"unique,omitempty"`
-	Update       *bool    `json:"update,omitempty"`
+	Unique       bool     `json:"unique,omitempty"`
+	Update       bool     `json:"update,omitempty"`
 	ValidChars   string   `json:"validChars,omitempty"`
 }

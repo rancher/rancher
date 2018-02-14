@@ -85,7 +85,7 @@ type SSHAuth struct {
 type NamespacedSSHAuth SSHAuth
 
 type PublicEndpoint struct {
-	NodeName string `json:"nodeName,omitempty" norman:"type=reference[node],nocreate,noupdate"`
+	NodeName string `json:"nodeName,omitempty" norman:"type=reference[/v3/schemas/node],nocreate,noupdate"`
 	Address  string `json:"address,omitempty" norman:"nocreate,noupdate"`
 	Port     int32  `json:"port,omitempty" norman:"nocreate,noupdate"`
 	Protocol string `json:"protocol,omitempty" norman:"nocreate,noupdate"`

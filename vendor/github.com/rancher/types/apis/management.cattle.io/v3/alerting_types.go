@@ -74,7 +74,7 @@ type TargetNode struct {
 }
 
 type TargetPod struct {
-	PodName                string `json:"podName,omitempty" norman:"required,type=reference[pod]"`
+	PodName                string `json:"podName,omitempty" norman:"required,type=reference[/v3/projects/schemas/pod]"`
 	Condition              string `json:"condition,omitempty" norman:"required,options=notrunning|notscheduled|restarts,default=notrunning"`
 	RestartTimes           int    `json:"restartTimes,omitempty" norman:"min=1"`
 	RestartIntervalSeconds int    `json:"restartIntervalSeconds,omitempty"  norman:"min=1"`
