@@ -43,6 +43,9 @@ func (s *Store) modifyForAccessControl(context *types.APIContext, schema types.S
 	if slice.ContainsString(schema.ResourceMethods, http.MethodDelete) && schema.CanDelete(context) {
 		resourceMethods = append(resourceMethods, http.MethodDelete)
 	}
+	if slice.ContainsString(schema.ResourceMethods, http.MethodGet) && schema.CanGet(context) {
+		resourceMethods = append(resourceMethods, http.MethodGet)
+	}
 
 	var collectionMethods []string
 	if slice.ContainsString(schema.CollectionMethods, http.MethodPost) && schema.CanCreate(context) {
