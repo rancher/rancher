@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -17,6 +16,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/client"
+	"github.com/rancher/rancher/pkg/configfield"
 	"github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/encryptedstore"
 	"github.com/rancher/rancher/pkg/settings"
@@ -440,18 +440,7 @@ func (p *Provisioner) getConfig(reconcileRKE bool, spec v3.ClusterSpec, driverNa
 }
 
 func getDriver(spec v3.ClusterSpec) string {
-	// ignore error, not sure how this could ever fail
-	data, _ := convert.EncodeToMap(spec)
-	driver := ""
-
-	for k, v := range data {
-		if !strings.HasSuffix(k, "Config") || convert.IsEmpty(v) {
-			continue
-		}
-
-		driver = strings.TrimSuffix(k, "Config")
-		break
-	}
+	driver := configfield.GetDriver(&spec)
 
 	if driver == "" {
 		if len(spec.NodePools) > 0 {
