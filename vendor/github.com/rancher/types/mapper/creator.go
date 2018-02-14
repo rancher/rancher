@@ -24,7 +24,7 @@ func (c *Creator) ToInternal(data map[string]interface{}) {
 func (c *Creator) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {
 	if schema.CanList(nil) && schema.CanCreate(nil) {
 		schema.ResourceFields["creatorId"] = types.Field{
-			Type:     "reference[user]",
+			Type:     "reference[/v3/schemas/user]",
 			CodeName: "CreatorID",
 		}
 		c.m = &mapper.AnnotationField{Field: "creatorId"}

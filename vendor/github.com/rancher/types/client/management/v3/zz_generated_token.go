@@ -34,7 +34,7 @@ type Token struct {
 	CreatorID       string            `json:"creatorId,omitempty"`
 	Description     string            `json:"description,omitempty"`
 	GroupPrincipals []string          `json:"groupPrincipals,omitempty"`
-	IsDerived       *bool             `json:"isDerived,omitempty"`
+	IsDerived       bool              `json:"isDerived,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`
 	LastUpdateTime  string            `json:"lastUpdateTime,omitempty"`
 	Name            string            `json:"name,omitempty"`

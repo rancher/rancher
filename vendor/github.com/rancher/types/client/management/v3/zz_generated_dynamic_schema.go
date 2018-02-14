@@ -40,7 +40,7 @@ type DynamicSchema struct {
 	CollectionMethods    []string             `json:"collectionMethods,omitempty"`
 	Created              string               `json:"created,omitempty"`
 	CreatorID            string               `json:"creatorId,omitempty"`
-	Embed                *bool                `json:"embed,omitempty"`
+	Embed                bool                 `json:"embed,omitempty"`
 	EmbedType            string               `json:"embedType,omitempty"`
 	IncludeableLinks     []string             `json:"includeableLinks,omitempty"`
 	Labels               map[string]string    `json:"labels,omitempty"`

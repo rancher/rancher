@@ -18,7 +18,7 @@ type ContainerStatus struct {
 	ImageID              string          `json:"imageID,omitempty"`
 	LastTerminationState *ContainerState `json:"lastState,omitempty"`
 	Name                 string          `json:"name,omitempty"`
-	Ready                *bool           `json:"ready,omitempty"`
+	Ready                bool            `json:"ready,omitempty"`
 	RestartCount         *int64          `json:"restartCount,omitempty"`
 	State                *ContainerState `json:"state,omitempty"`
 }

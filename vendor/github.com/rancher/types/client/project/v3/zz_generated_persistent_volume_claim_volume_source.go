@@ -8,5 +8,5 @@ const (
 
 type PersistentVolumeClaimVolumeSource struct {
 	ClaimName string `json:"claimName,omitempty"`
-	ReadOnly  *bool  `json:"readOnly,omitempty"`
+	ReadOnly  bool   `json:"readOnly,omitempty"`
 }

@@ -66,7 +66,7 @@ type Scheduling struct {
 }
 
 type NodeScheduling struct {
-	NodeName   string `json:"nodeName" norman:"type=reference[node]"`
+	NodeName   string `json:"nodeName" norman:"type=reference[/v3/schemas/node]"`
 	RequireAll []string
 	RequireAny []string
 	Preferred  []string

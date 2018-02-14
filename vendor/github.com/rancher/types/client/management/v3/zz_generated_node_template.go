@@ -58,7 +58,7 @@ type NodeTemplate struct {
 	Status                   *NodeTemplateStatus `json:"status,omitempty"`
 	Transitioning            string              `json:"transitioning,omitempty"`
 	TransitioningMessage     string              `json:"transitioningMessage,omitempty"`
-	UseInternalIPAddress     *bool               `json:"useInternalIpAddress,omitempty"`
+	UseInternalIPAddress     bool                `json:"useInternalIpAddress,omitempty"`
 	Uuid                     string              `json:"uuid,omitempty"`
 }
 type NodeTemplateCollection struct {

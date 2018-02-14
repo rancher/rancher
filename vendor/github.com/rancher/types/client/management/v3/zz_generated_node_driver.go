@@ -29,9 +29,9 @@ const (
 
 type NodeDriver struct {
 	types.Resource
-	Active               *bool             `json:"active,omitempty"`
+	Active               bool              `json:"active,omitempty"`
 	Annotations          map[string]string `json:"annotations,omitempty"`
-	Builtin              *bool             `json:"builtin,omitempty"`
+	Builtin              bool              `json:"builtin,omitempty"`
 	Checksum             string            `json:"checksum,omitempty"`
 	Created              string            `json:"created,omitempty"`
 	CreatorID            string            `json:"creatorId,omitempty"`

@@ -29,6 +29,6 @@ type Probe struct {
 	Port                intstr.IntOrString `json:"port,omitempty"`
 	Scheme              string             `json:"scheme,omitempty"`
 	SuccessThreshold    *int64             `json:"successThreshold,omitempty"`
-	TCP                 *bool              `json:"tcp,omitempty"`
+	TCP                 bool               `json:"tcp,omitempty"`
 	TimeoutSeconds      *int64             `json:"timeoutSeconds,omitempty"`
 }

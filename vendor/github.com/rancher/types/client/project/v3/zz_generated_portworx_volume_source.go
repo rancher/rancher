@@ -9,6 +9,6 @@ const (
 
 type PortworxVolumeSource struct {
 	FSType   string `json:"fsType,omitempty"`
-	ReadOnly *bool  `json:"readOnly,omitempty"`
+	ReadOnly bool   `json:"readOnly,omitempty"`
 	VolumeID string `json:"volumeID,omitempty"`
 }

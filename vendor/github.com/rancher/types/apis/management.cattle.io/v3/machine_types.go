@@ -115,8 +115,6 @@ type CustomConfig struct {
 	DockerSocket string `yaml:"docker_socket" json:"dockerSocket,omitempty"`
 	// SSH Private Key
 	SSHKey string `yaml:"ssh_key" json:"sshKey,omitempty"`
-	// Roles
-	Roles []string `yaml:"roles" json:"roles,omitempty"`
 }
 
 type CommonNodeSpec struct {

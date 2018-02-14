@@ -29,7 +29,7 @@ type Question struct {
 	Min          *int64   `json:"min,omitempty"`
 	MinLength    *int64   `json:"minLength,omitempty"`
 	Options      []string `json:"options,omitempty"`
-	Required     *bool    `json:"required,omitempty"`
+	Required     bool     `json:"required,omitempty"`
 	Type         string   `json:"type,omitempty"`
 	ValidChars   string   `json:"validChars,omitempty"`
 	Variable     string   `json:"variable,omitempty"`

@@ -56,15 +56,15 @@ type Node struct {
 	Capacity             map[string]string         `json:"capacity,omitempty"`
 	ClusterId            string                    `json:"clusterId,omitempty"`
 	Conditions           []NodeCondition           `json:"conditions,omitempty"`
-	ControlPlane         *bool                     `json:"controlPlane,omitempty"`
+	ControlPlane         bool                      `json:"controlPlane,omitempty"`
 	Created              string                    `json:"created,omitempty"`
 	CreatorID            string                    `json:"creatorId,omitempty"`
 	CustomConfig         *CustomConfig             `json:"customConfig,omitempty"`
 	Description          string                    `json:"description,omitempty"`
-	Etcd                 *bool                     `json:"etcd,omitempty"`
+	Etcd                 bool                      `json:"etcd,omitempty"`
 	Hostname             string                    `json:"hostname,omitempty"`
 	IPAddress            string                    `json:"ipAddress,omitempty"`
-	Imported             *bool                     `json:"imported,omitempty"`
+	Imported             bool                      `json:"imported,omitempty"`
 	Info                 *NodeInfo                 `json:"info,omitempty"`
 	Labels               map[string]string         `json:"labels,omitempty"`
 	Limits               map[string]string         `json:"limits,omitempty"`
@@ -87,11 +87,11 @@ type Node struct {
 	Taints               []Taint                   `json:"taints,omitempty"`
 	Transitioning        string                    `json:"transitioning,omitempty"`
 	TransitioningMessage string                    `json:"transitioningMessage,omitempty"`
-	Unschedulable        *bool                     `json:"unschedulable,omitempty"`
+	Unschedulable        bool                      `json:"unschedulable,omitempty"`
 	Uuid                 string                    `json:"uuid,omitempty"`
 	VolumesAttached      map[string]AttachedVolume `json:"volumesAttached,omitempty"`
 	VolumesInUse         []string                  `json:"volumesInUse,omitempty"`
-	Worker               *bool                     `json:"worker,omitempty"`
+	Worker               bool                      `json:"worker,omitempty"`
 }
 type NodeCollection struct {
 	types.Collection

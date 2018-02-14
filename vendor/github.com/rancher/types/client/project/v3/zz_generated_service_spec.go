@@ -26,7 +26,7 @@ type ServiceSpec struct {
 	LoadBalancerIP           string                 `json:"loadBalancerIP,omitempty"`
 	LoadBalancerSourceRanges []string               `json:"loadBalancerSourceRanges,omitempty"`
 	Ports                    []ServicePort          `json:"ports,omitempty"`
-	PublishNotReadyAddresses *bool                  `json:"publishNotReadyAddresses,omitempty"`
+	PublishNotReadyAddresses bool                   `json:"publishNotReadyAddresses,omitempty"`
 	Selector                 map[string]string      `json:"selector,omitempty"`
 	ServiceKind              string                 `json:"serviceKind,omitempty"`
 	SessionAffinity          string                 `json:"sessionAffinity,omitempty"`

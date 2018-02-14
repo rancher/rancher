@@ -11,7 +11,7 @@ const (
 
 type DeploymentConfig struct {
 	MinReadySeconds         *int64              `json:"minReadySeconds,omitempty"`
-	Paused                  *bool               `json:"paused,omitempty"`
+	Paused                  bool                `json:"paused,omitempty"`
 	ProgressDeadlineSeconds *int64              `json:"progressDeadlineSeconds,omitempty"`
 	RevisionHistoryLimit    *int64              `json:"revisionHistoryLimit,omitempty"`
 	Strategy                *DeploymentStrategy `json:"strategy,omitempty"`
