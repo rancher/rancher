@@ -1,249 +1,142 @@
 package ingress
 
 import (
-	"crypto/md5"
+	"context"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
+
 	"strconv"
-	"strings"
 
 	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/norman/types/convert/schemaconvert"
-	"github.com/rancher/norman/types/set"
-	"github.com/rancher/norman/types/values"
+	"github.com/rancher/rancher/pkg/controllers/user/util"
 	"github.com/rancher/types/apis/core/v1"
-	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
-	"github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/api/extensions/v1beta1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-var (
-	serviceSchema = schema.Schemas.Schema(&schema.Version, client.ServiceType)
-)
+//TODO fix the workload services cleanup
 
 type Controller struct {
-	serviceClient v1.ServiceInterface
-	namespaces    v1.NamespaceLister
-	services      v1.ServiceLister
+	serviceLister v1.ServiceLister
+	services      v1.ServiceInterface
 }
 
-func NewIngressWorkloadController(workload *config.UserOnlyContext) *Controller {
-	return &Controller{
-		serviceClient: workload.Core.Services(""),
-		namespaces:    workload.Core.Namespaces("").Controller().Lister(),
-		services:      workload.Core.Services("").Controller().Lister(),
+func Register(ctx context.Context, workload *config.UserOnlyContext) {
+	c := &Controller{
+		services:      workload.Core.Services(""),
+		serviceLister: workload.Core.Services("").Controller().Lister(),
 	}
+	workload.Extensions.Ingresses("").AddHandler("ingressWorkloadController", c.sync)
 }
 
-func (c *Controller) Reconcile(data map[string]interface{}, frontend bool) ([]corev1.Service, error) {
-	oldState := getState(data)
-	paths, ok := getPaths(data)
-	if !ok || len(paths) == 0 {
-		return nil, nil
+func (c *Controller) sync(key string, obj *v1beta1.Ingress) error {
+	if obj == nil || obj.DeletionTimestamp != nil {
+		return nil
 	}
-
-	ingressName, _ := data["name"].(string)
-	uid, _ := data["uuid"].(string)
-
-	newState := map[string]bool{}
-	for _, target := range paths {
-		targetData := convert.ToMapInterface(target)
-		port, _ := targetData["targetPort"]
-		serviceID, _ := targetData["serviceId"].(string)
-		workloadIDs := convert.ToStringSlice(targetData["workloadIds"])
-
-		if len(workloadIDs) == 0 || convert.IsEmpty(port) {
-			if !frontend {
-				for oldServiceKey := range oldState {
-					if getServiceID(oldServiceKey) == serviceID {
-						newState[oldServiceKey] = true
-					}
-				}
+	state := getIngressState(obj)
+	if state == nil {
+		return nil
+	}
+	serviceToPort := make(map[string]string)
+	serviceToKey := make(map[string]string)
+	for _, r := range obj.Spec.Rules {
+		host := r.Host
+		for _, b := range r.HTTP.Paths {
+			path := b.Path
+			port := b.Backend.ServicePort.IntVal
+			key := getStateKey(host, path, convert.ToString(port))
+			if _, ok := state[key]; ok {
+				serviceToKey[b.Backend.ServiceName] = key
+				serviceToPort[b.Backend.ServiceName] = convert.ToString(port)
 			}
-			continue
 		}
-
-		stateKey := getStateKey(convert.ToString(port), workloadIDs)
-		newState[stateKey] = true
-		targetData["serviceId"] = getServiceID(stateKey)
+	}
+	if obj.Spec.Backend != nil {
+		serviceName := obj.Spec.Backend.ServiceName
+		portStr := convert.ToString(obj.Spec.Backend.ServicePort.IntVal)
+		key := getStateKey("", "", portStr)
+		if _, ok := state[key]; ok {
+			serviceToKey[serviceName] = key
+			serviceToPort[serviceName] = portStr
+		}
 	}
 
-	setState(data, newState)
-	toCreate, toDelete, same := set.Diff(newState, oldState)
-	toCreate = append(toCreate, same...)
-
-	var lastErr error
-
-	if frontend {
-		for _, deleteServiceKey := range toDelete {
-			service, err := toService(data, deleteServiceKey)
+	for serviceName, portStr := range serviceToPort {
+		workloadIDs := state[serviceToKey[serviceName]]
+		existing, err := c.serviceLister.Get(obj.Namespace, serviceName)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+		if existing == nil {
+			ownerRef := metav1.OwnerReference{
+				Name:       serviceName,
+				APIVersion: "v1beta1/extensions",
+				UID:        obj.UID,
+				Kind:       "Ingress",
+			}
+			port, err := strconv.ParseInt(portStr, 10, 64)
 			if err != nil {
-				lastErr = err
-				continue
+				return err
 			}
-			if err := c.remove(service); err != nil {
-				lastErr = err
+			servicePorts := []corev1.ServicePort{
+				{
+					Port:       int32(port),
+					TargetPort: intstr.Parse(portStr),
+					Protocol:   "TCP",
+				},
 			}
-		}
-	}
-
-	var result []corev1.Service
-	for _, serviceKey := range toCreate {
-		service, err := toService(data, serviceKey)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		result = append(result, service)
-		if frontend {
-			if err := c.create(ingressName, uid, service); err != nil {
-				lastErr = err
+			annotations := make(map[string]string)
+			annotations[util.WorkloadAnnotation] = workloadIDs
+			service := &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            serviceName,
+					OwnerReferences: []metav1.OwnerReference{ownerRef},
+					Namespace:       obj.Namespace,
+					Annotations:     annotations,
+				},
+				Spec: corev1.ServiceSpec{
+					ClusterIP: "None",
+					Type:      "ClusterIP",
+					Ports:     servicePorts,
+				},
 			}
-		}
-	}
-
-	return result, lastErr
-}
-
-func (c *Controller) remove(service corev1.Service) error {
-	prop := metav1.DeletePropagationForeground
-	return c.serviceClient.DeleteNamespaced(service.Namespace, service.Name, &metav1.DeleteOptions{
-		PropagationPolicy: &prop,
-	})
-}
-
-func (c *Controller) create(ingressParent, uid string, service corev1.Service) error {
-	_, err := c.services.Get(service.Namespace, service.Name)
-	if !errors.IsNotFound(err) {
-		return err
-	}
-
-	t := true
-	service.OwnerReferences = append(service.OwnerReferences, metav1.OwnerReference{
-		Name:               ingressParent,
-		APIVersion:         "v1beta1/extensions",
-		UID:                types.UID(uid),
-		Kind:               "Ingress",
-		BlockOwnerDeletion: &t,
-	})
-
-	_, err = c.serviceClient.Create(&service)
-	return err
-}
-
-func toService(data map[string]interface{}, serviceKey string) (corev1.Service, error) {
-	var result corev1.Service
-
-	name := getServiceID(serviceKey)
-	namespace, _ := data["namespaceId"].(string)
-
-	bytes, err := base64.URLEncoding.DecodeString(serviceKey)
-	if err != nil {
-		return result, err
-	}
-
-	parts := strings.Split(string(bytes), "/")
-	if len(parts) == 1 {
-		return result, fmt.Errorf("invalid service key: %v", serviceKey)
-	}
-
-	workloadIDs := parts[:len(parts)-1]
-	portString := parts[len(parts)-1]
-	port, err := strconv.ParseInt(portString, 10, 64)
-	if err != nil {
-		return result, fmt.Errorf("invalid port number: %v", portString)
-	}
-
-	service := client.Service{
-		Name:              name,
-		NamespaceId:       namespace,
-		TargetWorkloadIDs: workloadIDs,
-		ClusterIp:         "",
-		Kind:              "ClusterIP",
-		Ports: []client.ServicePort{
-			{
-				Port:       &port,
-				TargetPort: intstr.Parse(portString),
-				Protocol:   "TCP",
-			},
-		},
-	}
-
-	return result, schemaconvert.ToInternal(service, serviceSchema, &result)
-}
-
-func getServiceID(stateKey string) string {
-	bytes, err := base64.URLEncoding.DecodeString(stateKey)
-	if err != nil {
-		return ""
-	}
-
-	sum := md5.Sum(bytes)
-	hex := "ingress-" + hex.EncodeToString(sum[:])
-
-	return hex
-}
-
-func getPaths(data map[string]interface{}) ([]map[string]interface{}, bool) {
-	v, ok := values.GetValue(data, "rules")
-	if !ok {
-		return nil, false
-	}
-
-	var result []map[string]interface{}
-	for _, rule := range convert.ToMapSlice(v) {
-		paths, ok := convert.ToMapInterface(rule)["paths"]
-		if ok {
-			for _, target := range convert.ToMapInterface(paths) {
-				result = append(result, convert.ToMapInterface(target))
+			logrus.Infof("Creating headless service %s for ingress %s, port %s", serviceName, key, portStr)
+			if _, err := c.services.Create(service); err != nil {
+				return err
+			}
+		} else {
+			// TODO - fix so the update is done as needed
+			toUpdate := existing.DeepCopy()
+			toUpdate.Annotations[util.WorkloadAnnotation] = workloadIDs
+			if _, err := c.services.Update(toUpdate); err != nil {
+				return err
 			}
 		}
 	}
 
-	return result, true
+	return nil
 }
 
-func getStateKey(port string, workloadIDs []string) string {
-	key := fmt.Sprintf("%s/%s", strings.Join(workloadIDs, "/"), port)
+func getStateKey(host string, path string, port string) string {
+	key := fmt.Sprintf("%s/%s/%s", host, path, port)
 	return base64.URLEncoding.EncodeToString([]byte(key))
 }
 
-func setState(data map[string]interface{}, stateMap map[string]bool) {
-	var state []string
-
-	for key := range stateMap {
-		state = append(state, key)
+func getIngressState(obj *v1beta1.Ingress) map[string]string {
+	annotations := obj.Annotations
+	if annotations == nil {
+		return nil
 	}
-
-	content, err := json.Marshal(state)
-	if err != nil {
-		logrus.Errorf("failed to save state on ingress: %v", data["id"])
-		return
-	}
-
-	values.PutValue(data, string(content), "annotations", "ingress.cattle.io/state")
-}
-
-func getState(data map[string]interface{}) map[string]bool {
-	var state []string
-
-	v, ok := values.GetValue(data, "annotations", "ingress.cattle.io/state")
-	if ok {
+	if v, ok := annotations["ingress.cattle.io/state"]; ok {
+		state := make(map[string]string)
 		json.Unmarshal([]byte(convert.ToString(v)), &state)
+		return state
 	}
-
-	result := map[string]bool{}
-	for _, v := range state {
-		result[v] = true
-	}
-
-	return result
+	return nil
 }

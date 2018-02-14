@@ -10,8 +10,7 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/controllers/user/dnsrecord"
-	"github.com/rancher/types/apis/apps/v1beta2"
+	"github.com/rancher/rancher/pkg/controllers/user/util"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -23,38 +22,33 @@ import (
 // locating corresponding pods, and marking them with the label to satisfy service selector
 
 const (
-	WorkloadAnnotation    = "field.cattle.io/targetWorkloadIds"
 	WorkloadIDLabelPrefix = "workloadID"
 )
 
 var workloadServiceUUIDToDeploymentUUIDs sync.Map
 
 type Controller struct {
-	pods             v1.PodInterface
-	deploymentLister v1beta2.DeploymentLister
-	podLister        v1.PodLister
-	namespaceLister  v1.NamespaceLister
-	services         v1.ServiceInterface
+	pods            v1.PodInterface
+	workloadLister  util.WorkloadLister
+	podLister       v1.PodLister
+	namespaceLister v1.NamespaceLister
 }
 
 type PodController struct {
-	pods             v1.PodInterface
-	deploymentLister v1beta2.DeploymentLister
-	serviceLister    v1.ServiceLister
+	pods           v1.PodInterface
+	workloadLister util.WorkloadLister
 }
 
 func Register(ctx context.Context, workload *config.UserOnlyContext) {
 	c := &Controller{
-		pods:             workload.Core.Pods(""),
-		deploymentLister: workload.Apps.Deployments("").Controller().Lister(),
-		podLister:        workload.Core.Pods("").Controller().Lister(),
-		namespaceLister:  workload.Core.Namespaces("").Controller().Lister(),
-		services:         workload.Core.Services(""),
+		pods:            workload.Core.Pods(""),
+		workloadLister:  util.NewWorkloadLister(workload),
+		podLister:       workload.Core.Pods("").Controller().Lister(),
+		namespaceLister: workload.Core.Namespaces("").Controller().Lister(),
 	}
 	p := &PodController{
-		deploymentLister: workload.Apps.Deployments("").Controller().Lister(),
-		serviceLister:    workload.Core.Services("").Controller().Lister(),
-		pods:             workload.Core.Pods(""),
+		workloadLister: util.NewWorkloadLister(workload),
+		pods:           workload.Core.Pods(""),
 	}
 	workload.Core.Services("").AddHandler("workloadServiceController", c.sync)
 	workload.Core.Pods("").AddHandler("podToWorkloadServiceController", p.sync)
@@ -74,8 +68,8 @@ func (c *Controller) reconcilePods(key string, obj *corev1.Service) error {
 	if obj.Annotations == nil {
 		return nil
 	}
-	value, ok := obj.Annotations[WorkloadAnnotation]
-	if !ok {
+	value, ok := obj.Annotations[util.WorkloadAnnotation]
+	if !ok || value == "" {
 		return nil
 	}
 	workdloadIDs := strings.Split(value, ",")
@@ -93,7 +87,7 @@ func (c *Controller) reconcilePods(key string, obj *corev1.Service) error {
 		return err
 	}
 	if toUpdate != nil {
-		_, err := c.services.Update(toUpdate)
+		_, err := c.workloadLister.Services.Update(toUpdate)
 		if err != nil {
 			return err
 		}
@@ -101,12 +95,7 @@ func (c *Controller) reconcilePods(key string, obj *corev1.Service) error {
 	return nil
 }
 
-func (c *Controller) updatePods(key string, obj *corev1.Service, workloadIDs []string) error {
-	// filter out project namespaces
-	namespaces, err := dnsrecord.GetProjectNamespaces(c.namespaceLister, obj)
-	if err != nil {
-		return err
-	}
+func (c *Controller) updatePods(serviceName string, obj *corev1.Service, workloadIDs []string) error {
 	var podsToUpdate []*corev1.Pod
 	set := labels.Set{}
 	for key, val := range obj.Spec.Selector {
@@ -115,24 +104,9 @@ func (c *Controller) updatePods(key string, obj *corev1.Service, workloadIDs []s
 	// reset the map
 	targetWorkloadUUIDs := make(map[string]bool)
 	for _, workloadID := range workloadIDs {
-		groomed := strings.TrimSpace(workloadID)
-		namespaceService := strings.Split(groomed, ":")
-		if len(namespaceService) < 2 {
-			return fmt.Errorf("Wrong format for workloadID [%s]", groomed)
-		}
-		namespace := namespaceService[0]
-		if _, ok := namespaces[namespace]; !ok {
-			logrus.Warnf("Failed to find namespace [%s] for workloadID [%s]", namespace, groomed)
-			continue
-		}
-		workloadName := namespaceService[1]
-		targetWorkload, err := c.deploymentLister.Get(namespace, workloadName)
+		targetWorkload, err := c.workloadLister.GetByName(workloadID)
 		if err != nil {
-			logrus.Warnf("Failed to fetch workload [%s]: [%v]", groomed, err)
-			continue
-		}
-		if targetWorkload.DeletionTimestamp != nil {
-			logrus.Warnf("Failed to fetch workload [%s]: workload is being removed", groomed)
+			logrus.Warnf("Failed to fetch workload [%s]: [%v]", workloadID, err)
 			continue
 		}
 
@@ -142,13 +116,13 @@ func (c *Controller) updatePods(key string, obj *corev1.Service, workloadIDs []s
 
 		// Find all the pods satisfying deployments' selectors
 		set := labels.Set{}
-		for key, val := range targetWorkload.Spec.Selector.MatchLabels {
+		for key, val := range targetWorkload.SelectorLabels {
 			set[key] = val
 		}
 		workloadSelector := labels.SelectorFromSet(set)
 		pods, err := c.podLister.List(targetWorkload.Namespace, workloadSelector)
 		if err != nil {
-			return errors.Wrapf(err, "Failed to list pods for target workload [%s]", groomed)
+			return errors.Wrapf(err, "Failed to list pods for target workload [%s]", workloadID)
 		}
 		for _, pod := range pods {
 			if pod.DeletionTimestamp != nil {
@@ -169,11 +143,11 @@ func (c *Controller) updatePods(key string, obj *corev1.Service, workloadIDs []s
 				toUpdate.Labels[svcSelectorKey] = svcSelectorValue
 			}
 			if _, err := c.pods.Update(toUpdate); err != nil {
-				return errors.Wrapf(err, "Failed to update pod [%s] for target workload [%s]", pod.Name, groomed)
+				return errors.Wrapf(err, "Failed to update pod [%s] for target workload [%s]", pod.Name, workloadID)
 			}
 		}
 	}
-	workloadServiceUUIDToDeploymentUUIDs.Store(key, targetWorkloadUUIDs)
+	workloadServiceUUIDToDeploymentUUIDs.Store(serviceName, targetWorkloadUUIDs)
 	return nil
 }
 
@@ -185,30 +159,27 @@ func (c *PodController) sync(key string, obj *corev1.Pod) error {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil
 	}
-	// filter out deployments that are match for the pod
-	deployments, err := c.deploymentLister.List(obj.Namespace, labels.NewSelector())
+	// filter out deployments that are match for the pods
+	workloads, err := c.workloadLister.GetBySelectorMatch(obj.Namespace, obj.Labels)
 	if err != nil {
 		return err
 	}
 
-	var workloadServiceUUIDToAdd []string
-	for _, d := range deployments {
-		selector := labels.SelectorFromSet(d.Spec.Selector.MatchLabels)
-		if selector.Matches(labels.Set(obj.Labels)) {
-			deploymentUUID := fmt.Sprintf("%s/%s", d.Namespace, d.Name)
-			workloadServiceUUIDToDeploymentUUIDs.Range(func(k, v interface{}) bool {
-				if _, ok := v.(map[string]bool)[deploymentUUID]; ok {
-					workloadServiceUUIDToAdd = append(workloadServiceUUIDToAdd, k.(string))
-				}
-				return true
-			})
-		}
+	workloadServiceUUIDToAdd := []string{}
+	for _, d := range workloads {
+		deploymentUUID := fmt.Sprintf("%s/%s", d.Namespace, d.Name)
+		workloadServiceUUIDToDeploymentUUIDs.Range(func(k, v interface{}) bool {
+			if _, ok := v.(map[string]bool)[deploymentUUID]; ok {
+				workloadServiceUUIDToAdd = append(workloadServiceUUIDToAdd, k.(string))
+			}
+			return true
+		})
 	}
 
 	workloadServicesLabels := make(map[string]string)
 	for _, workloadServiceUUID := range workloadServiceUUIDToAdd {
 		splitted := strings.Split(workloadServiceUUID, "/")
-		workload, err := c.serviceLister.Get(obj.Namespace, splitted[1])
+		workload, err := c.workloadLister.ServiceLister.Get(obj.Namespace, splitted[1])
 		if err != nil {
 			return err
 		}

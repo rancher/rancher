@@ -9,9 +9,11 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/endpoints"
 	"github.com/rancher/rancher/pkg/controllers/user/healthsyncer"
 	"github.com/rancher/rancher/pkg/controllers/user/helm"
+	"github.com/rancher/rancher/pkg/controllers/user/ingress"
 	"github.com/rancher/rancher/pkg/controllers/user/logging"
 	"github.com/rancher/rancher/pkg/controllers/user/nodesyncer"
 	"github.com/rancher/rancher/pkg/controllers/user/secret"
+	"github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/rancher/pkg/controllers/user/workloadservice"
 	"github.com/rancher/types/config"
 )
@@ -29,6 +31,8 @@ func Register(ctx context.Context, cluster *config.UserContext) error {
 	dnsrecord.Register(ctx, userOnlyContext)
 	workloadservice.Register(ctx, userOnlyContext)
 	endpoints.Register(ctx, userOnlyContext)
+	workload.Register(ctx, userOnlyContext)
+	ingress.Register(ctx, userOnlyContext)
 
 	return nil
 }
