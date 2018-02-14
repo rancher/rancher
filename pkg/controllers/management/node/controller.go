@@ -265,11 +265,11 @@ outer:
 }
 
 func (m *Lifecycle) Updated(obj *v3.Node) (*v3.Node, error) {
-	if obj.Status.NodeTemplateSpec == nil {
-		return obj, nil
-	}
-
 	newObj, err := v3.NodeConditionReady.Once(obj, func() (runtime.Object, error) {
+		if obj.Status.NodeTemplateSpec == nil {
+			return obj, nil
+		}
+
 		return m.ready(obj)
 	})
 	obj = newObj.(*v3.Node)
