@@ -1,4 +1,4 @@
-package v1beta2
+package v1beta1
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
@@ -6,8 +6,8 @@ import (
 )
 
 const (
-	GroupName = "apps"
-	Version   = "v1beta2"
+	GroupName = "batch"
+	Version   = "v1beta1"
 )
 
 // SchemeGroupVersion is group version used to register these objects
@@ -33,10 +33,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	// TODO this gets cleaned up when the types are fixed
 	scheme.AddKnownTypes(SchemeGroupVersion,
 
-		&DeploymentList{},
-		&DaemonSetList{},
-		&StatefulSetList{},
-		&ReplicaSetList{},
+		&CronJobList{},
 	)
 	return nil
 }

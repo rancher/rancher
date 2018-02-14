@@ -24,6 +24,7 @@ type Interface interface {
 	SecretsGetter
 	ConfigMapsGetter
 	ServiceAccountsGetter
+	ReplicationControllersGetter
 }
 
 type Client struct {
@@ -31,16 +32,17 @@ type Client struct {
 	restClient rest.Interface
 	starters   []controller.Starter
 
-	nodeControllers            map[string]NodeController
-	componentStatusControllers map[string]ComponentStatusController
-	namespaceControllers       map[string]NamespaceController
-	eventControllers           map[string]EventController
-	endpointsControllers       map[string]EndpointsController
-	podControllers             map[string]PodController
-	serviceControllers         map[string]ServiceController
-	secretControllers          map[string]SecretController
-	configMapControllers       map[string]ConfigMapController
-	serviceAccountControllers  map[string]ServiceAccountController
+	nodeControllers                  map[string]NodeController
+	componentStatusControllers       map[string]ComponentStatusController
+	namespaceControllers             map[string]NamespaceController
+	eventControllers                 map[string]EventController
+	endpointsControllers             map[string]EndpointsController
+	podControllers                   map[string]PodController
+	serviceControllers               map[string]ServiceController
+	secretControllers                map[string]SecretController
+	configMapControllers             map[string]ConfigMapController
+	serviceAccountControllers        map[string]ServiceAccountController
+	replicationControllerControllers map[string]ReplicationControllerController
 }
 
 func NewForConfig(config rest.Config) (Interface, error) {
@@ -57,16 +59,17 @@ func NewForConfig(config rest.Config) (Interface, error) {
 	return &Client{
 		restClient: restClient,
 
-		nodeControllers:            map[string]NodeController{},
-		componentStatusControllers: map[string]ComponentStatusController{},
-		namespaceControllers:       map[string]NamespaceController{},
-		eventControllers:           map[string]EventController{},
-		endpointsControllers:       map[string]EndpointsController{},
-		podControllers:             map[string]PodController{},
-		serviceControllers:         map[string]ServiceController{},
-		secretControllers:          map[string]SecretController{},
-		configMapControllers:       map[string]ConfigMapController{},
-		serviceAccountControllers:  map[string]ServiceAccountController{},
+		nodeControllers:                  map[string]NodeController{},
+		componentStatusControllers:       map[string]ComponentStatusController{},
+		namespaceControllers:             map[string]NamespaceController{},
+		eventControllers:                 map[string]EventController{},
+		endpointsControllers:             map[string]EndpointsController{},
+		podControllers:                   map[string]PodController{},
+		serviceControllers:               map[string]ServiceController{},
+		secretControllers:                map[string]SecretController{},
+		configMapControllers:             map[string]ConfigMapController{},
+		serviceAccountControllers:        map[string]ServiceAccountController{},
+		replicationControllerControllers: map[string]ReplicationControllerController{},
 	}, nil
 }
 
@@ -206,6 +209,19 @@ type ServiceAccountsGetter interface {
 func (c *Client) ServiceAccounts(namespace string) ServiceAccountInterface {
 	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &ServiceAccountResource, ServiceAccountGroupVersionKind, serviceAccountFactory{})
 	return &serviceAccountClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type ReplicationControllersGetter interface {
+	ReplicationControllers(namespace string) ReplicationControllerInterface
+}
+
+func (c *Client) ReplicationControllers(namespace string) ReplicationControllerInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &ReplicationControllerResource, ReplicationControllerGroupVersionKind, replicationControllerFactory{})
+	return &replicationControllerClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

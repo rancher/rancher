@@ -20,11 +20,11 @@ const (
 	PersistentVolumeClaimFieldSelector             = "selector"
 	PersistentVolumeClaimFieldState                = "state"
 	PersistentVolumeClaimFieldStatus               = "status"
-	PersistentVolumeClaimFieldStorageClassName     = "storageClassName"
+	PersistentVolumeClaimFieldStorageClassId       = "storageClassId"
 	PersistentVolumeClaimFieldTransitioning        = "transitioning"
 	PersistentVolumeClaimFieldTransitioningMessage = "transitioningMessage"
 	PersistentVolumeClaimFieldUuid                 = "uuid"
-	PersistentVolumeClaimFieldVolumeName           = "volumeName"
+	PersistentVolumeClaimFieldVolumeId             = "volumeId"
 )
 
 type PersistentVolumeClaim struct {
@@ -43,11 +43,11 @@ type PersistentVolumeClaim struct {
 	Selector             *LabelSelector               `json:"selector,omitempty"`
 	State                string                       `json:"state,omitempty"`
 	Status               *PersistentVolumeClaimStatus `json:"status,omitempty"`
-	StorageClassName     string                       `json:"storageClassName,omitempty"`
+	StorageClassId       string                       `json:"storageClassId,omitempty"`
 	Transitioning        string                       `json:"transitioning,omitempty"`
 	TransitioningMessage string                       `json:"transitioningMessage,omitempty"`
 	Uuid                 string                       `json:"uuid,omitempty"`
-	VolumeName           string                       `json:"volumeName,omitempty"`
+	VolumeId             string                       `json:"volumeId,omitempty"`
 }
 type PersistentVolumeClaimCollection struct {
 	types.Collection

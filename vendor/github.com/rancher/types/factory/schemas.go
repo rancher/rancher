@@ -19,6 +19,8 @@ func Schemas(version *types.APIVersion) *types.Schemas {
 			Mappers: []types.Mapper{
 				&mapper.NamespaceIDMapper{},
 			},
+		}, &mapper.NamespaceReference{
+			VersionPath: "/v3/project",
 		})
 		return mappers
 	}
