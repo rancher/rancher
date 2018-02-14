@@ -178,8 +178,11 @@ func parseVersionAndSubContext(schemas *types.Schemas, path string) (*types.APIV
 	if len(paths) < 2 {
 		// Handle case like /v3/clusters/foo where /v3 and /v3/clusters are API versions.
 		// In this situation you want the version to be /v3 and the path "clusters", "foo"
-
-		return &versions[0], &versions[1], "", pathParts[len(versionParts)-1:], nil
+		newVersion := versions[0]
+		if len(paths) > 0 {
+			newVersion.Path = newVersion.Path + "/" + paths[0]
+		}
+		return &newVersion, &versions[1], "", pathParts[len(versionParts)-1:], nil
 	}
 
 	// Length is always >= 3

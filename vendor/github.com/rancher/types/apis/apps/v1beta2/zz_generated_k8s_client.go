@@ -17,6 +17,7 @@ type Interface interface {
 	DeploymentsGetter
 	DaemonSetsGetter
 	StatefulSetsGetter
+	ReplicaSetsGetter
 }
 
 type Client struct {
@@ -27,6 +28,7 @@ type Client struct {
 	deploymentControllers  map[string]DeploymentController
 	daemonSetControllers   map[string]DaemonSetController
 	statefulSetControllers map[string]StatefulSetController
+	replicaSetControllers  map[string]ReplicaSetController
 }
 
 func NewForConfig(config rest.Config) (Interface, error) {
@@ -46,6 +48,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		deploymentControllers:  map[string]DeploymentController{},
 		daemonSetControllers:   map[string]DaemonSetController{},
 		statefulSetControllers: map[string]StatefulSetController{},
+		replicaSetControllers:  map[string]ReplicaSetController{},
 	}, nil
 }
 
@@ -94,6 +97,19 @@ type StatefulSetsGetter interface {
 func (c *Client) StatefulSets(namespace string) StatefulSetInterface {
 	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &StatefulSetResource, StatefulSetGroupVersionKind, statefulSetFactory{})
 	return &statefulSetClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type ReplicaSetsGetter interface {
+	ReplicaSets(namespace string) ReplicaSetInterface
+}
+
+func (c *Client) ReplicaSets(namespace string) ReplicaSetInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &ReplicaSetResource, ReplicaSetGroupVersionKind, replicaSetFactory{})
+	return &replicaSetClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

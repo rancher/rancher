@@ -124,6 +124,16 @@ type RKEConfigServices struct {
 type ETCDService struct {
 	// Base service properties
 	BaseService `yaml:",inline" json:",inline"`
+	// Comma separated list of etcd urls
+	EtcdServers string `yaml:"etcd_servers" json:"etcdServers,omitempty"`
+	// External CA certificate
+	CACert string `yaml:"ca_cert" json:"caCert,omitempty"`
+	// External Client certificate
+	Cert string `yaml:"cert" json:"cert,omitempty"`
+	// External Client key
+	Key string `yaml:"key" json:"key,omitempty"`
+	// External etcd prefix
+	Path string `yaml:"path" json:"path,omitempty"`
 }
 
 type KubeAPIService struct {

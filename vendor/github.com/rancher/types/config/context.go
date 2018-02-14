@@ -10,6 +10,8 @@ import (
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/types"
 	appsv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
+	batchv1 "github.com/rancher/types/apis/batch/v1"
+	batchv1beta1 "github.com/rancher/types/apis/batch/v1beta1"
 	clusterSchema "github.com/rancher/types/apis/cluster.cattle.io/v3/schema"
 	corev1 "github.com/rancher/types/apis/core/v1"
 	extv1beta1 "github.com/rancher/types/apis/extensions/v1beta1"
@@ -73,11 +75,13 @@ type UserContext struct {
 	APIExtClient      clientset.Interface
 	K8sClient         kubernetes.Interface
 
-	Apps       appsv1beta2.Interface
-	Project    projectv3.Interface
-	Core       corev1.Interface
-	RBAC       rbacv1.Interface
-	Extensions extv1beta1.Interface
+	Apps         appsv1beta2.Interface
+	Project      projectv3.Interface
+	Core         corev1.Interface
+	RBAC         rbacv1.Interface
+	Extensions   extv1beta1.Interface
+	BatchV1      batchv1.Interface
+	BatchV1Beta1 batchv1beta1.Interface
 }
 
 func (w *UserContext) controllers() []controller.Starter {
@@ -87,6 +91,8 @@ func (w *UserContext) controllers() []controller.Starter {
 		w.Core,
 		w.RBAC,
 		w.Extensions,
+		w.BatchV1,
+		w.BatchV1Beta1,
 	}
 }
 
@@ -98,11 +104,13 @@ func (w *UserContext) UserOnlyContext() *UserOnlyContext {
 		UnversionedClient: w.UnversionedClient,
 		K8sClient:         w.K8sClient,
 
-		Apps:       w.Apps,
-		Project:    w.Project,
-		Core:       w.Core,
-		RBAC:       w.RBAC,
-		Extensions: w.Extensions,
+		Apps:         w.Apps,
+		Project:      w.Project,
+		Core:         w.Core,
+		RBAC:         w.RBAC,
+		Extensions:   w.Extensions,
+		BatchV1:      w.BatchV1,
+		BatchV1Beta1: w.BatchV1Beta1,
 	}
 }
 
@@ -113,11 +121,13 @@ type UserOnlyContext struct {
 	UnversionedClient rest.Interface
 	K8sClient         kubernetes.Interface
 
-	Apps       appsv1beta2.Interface
-	Project    projectv3.Interface
-	Core       corev1.Interface
-	RBAC       rbacv1.Interface
-	Extensions extv1beta1.Interface
+	Apps         appsv1beta2.Interface
+	Project      projectv3.Interface
+	Core         corev1.Interface
+	RBAC         rbacv1.Interface
+	Extensions   extv1beta1.Interface
+	BatchV1      batchv1.Interface
+	BatchV1Beta1 batchv1beta1.Interface
 }
 
 func (w *UserOnlyContext) controllers() []controller.Starter {
@@ -127,6 +137,8 @@ func (w *UserOnlyContext) controllers() []controller.Starter {
 		w.Core,
 		w.RBAC,
 		w.Extensions,
+		w.BatchV1,
+		w.BatchV1Beta1,
 	}
 }
 
@@ -265,6 +277,16 @@ func NewUserContext(managementConfig, config rest.Config, clusterName string) (*
 	}
 
 	context.Extensions, err = extv1beta1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	context.BatchV1, err = batchv1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	context.BatchV1Beta1, err = batchv1beta1.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}

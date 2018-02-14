@@ -163,7 +163,7 @@ func ToMapSlice(obj interface{}) []map[string]interface{} {
 		return v
 	}
 	vs, _ := obj.([]interface{})
-	result := []map[string]interface{}{}
+	var result []map[string]interface{}
 	for _, item := range vs {
 		if v, ok := item.(map[string]interface{}); ok {
 			result = append(result, v)

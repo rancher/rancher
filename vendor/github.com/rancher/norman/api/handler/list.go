@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/types"
 )
@@ -15,7 +16,7 @@ func ListHandler(request *types.APIContext, next types.RequestHandler) error {
 
 	store := request.Schema.Store
 	if store == nil {
-		return nil
+		return httperror.NewAPIError(httperror.NotFound, "no store found")
 	}
 
 	if request.ID == "" {
