@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/clusteregistrationtokens"
 	"github.com/rancher/rancher/pkg/api/customization/logging"
 	"github.com/rancher/rancher/pkg/api/customization/node"
+	"github.com/rancher/rancher/pkg/api/customization/nodetemplate"
 	"github.com/rancher/rancher/pkg/api/customization/setting"
 	"github.com/rancher/rancher/pkg/api/store/cert"
 	"github.com/rancher/rancher/pkg/api/store/cluster"
@@ -82,6 +83,7 @@ func Setup(ctx context.Context, management *config.ManagementContext) error {
 	Setting(schemas)
 	Preference(schemas, management)
 	ClusterRegistrationTokens(schemas)
+	NodeTemplates(schemas)
 	LoggingTypes(schemas, management)
 	Alert(schemas, management)
 
@@ -149,6 +151,11 @@ func ClusterRegistrationTokens(schemas *types.Schemas) {
 		Store: schema.Store,
 	}
 	schema.Formatter = clusteregistrationtokens.Formatter
+}
+
+func NodeTemplates(schemas *types.Schemas) {
+	schema := schemas.Schema(&managementschema.Version, client.NodeTemplateType)
+	schema.Validator = nodetemplate.Validator
 }
 
 func SecretTypes(schemas *types.Schemas, management *config.ManagementContext) {
