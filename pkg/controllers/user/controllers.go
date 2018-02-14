@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 
+	"github.com/rancher/rancher/pkg/controllers/user/alert"
 	"github.com/rancher/rancher/pkg/controllers/user/authz"
 	"github.com/rancher/rancher/pkg/controllers/user/dnsrecord"
 	"github.com/rancher/rancher/pkg/controllers/user/endpoints"
@@ -21,8 +22,8 @@ func Register(ctx context.Context, cluster *config.UserContext) error {
 	authz.Register(cluster)
 	secret.Register(cluster)
 	helm.Register(cluster)
-	helm.Register(cluster)
 	logging.Register(cluster)
+	alert.Register(ctx, cluster)
 
 	userOnlyContext := cluster.UserOnlyContext()
 	dnsrecord.Register(ctx, userOnlyContext)
