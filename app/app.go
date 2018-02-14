@@ -449,19 +449,10 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver("amazonec2", "local://", "", true, true, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver("azure", "local://", "", true, true, management); err != nil {
-		return err
-	}
 	if err := addMachineDriver("digitalocean", "local://", "", true, true, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver("exoscale", "local://", "", false, true, management); err != nil {
-		return err
-	}
-	if err := addMachineDriver("generic", "local://", "", false, true, management); err != nil {
-		return err
-	}
-	if err := addMachineDriver("google", "local://", "", false, true, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver("openstack", "local://", "", false, true, management); err != nil {
@@ -479,9 +470,6 @@ func addMachineDrivers(management *config.ManagementContext) error {
 		return err
 	}
 	if err := addMachineDriver("softlayer", "local://", "", false, true, management); err != nil {
-		return err
-	}
-	if err := addMachineDriver("vmwarevcloudair", "local://", "", false, true, management); err != nil {
 		return err
 	}
 
