@@ -111,7 +111,6 @@ func GenerateRKECerts(ctx context.Context, rkeConfig v3.RancherKubernetesEngineC
 	kubeAdminCertObj := ToCertObject(KubeAdminCertName, KubeAdminCertName, KubeAdminOrganizationName, kubeAdminCrt, kubeAdminKey)
 	kubeAdminCertObj.Config = kubeAdminConfig
 	kubeAdminCertObj.ConfigPath = localKubeConfigPath
-	kubeAdminCertObj.ConfigEnvName = ""
 	certs[KubeAdminCertName] = kubeAdminCertObj
 
 	// generate etcd certificate and key
