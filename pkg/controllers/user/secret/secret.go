@@ -25,6 +25,7 @@ const (
 	create                     = "create"
 	update                     = "update"
 	projectNamespaceAnnotation = "management.cattle.io/system-namespace"
+	userSecretAnnotation       = "secret.user.cattle.io/secret"
 )
 
 type Controller struct {
@@ -66,19 +67,13 @@ func (n *NamespaceController) sync(key string, obj *corev1.Namespace) error {
 	if obj.Annotations[projectIDLabel] != "" {
 		parts := strings.Split(obj.Annotations[projectIDLabel], ":")
 		if len(parts) == 2 {
-			// on the managemenet side, secret's namespace name equals to project name
+			// on the management side, secret's namespace name equals to project name
 			secrets, err := n.managementSecrets.List(parts[1], labels.NewSelector())
 			if err != nil {
 				return err
 			}
 			for _, secret := range secrets {
-				namespacedSecret := &corev1.Secret{}
-				namespacedSecret.Name = secret.Name
-				namespacedSecret.Annotations = secret.Annotations
-				namespacedSecret.Data = secret.Data
-				namespacedSecret.StringData = secret.StringData
-				namespacedSecret.Type = secret.Type
-				namespacedSecret.Namespace = obj.Name
+				namespacedSecret := getNamespacedSecret(secret, obj.Name)
 				_, err := n.clusterSecretsClient.Create(namespacedSecret)
 				if err != nil && !errors.IsAlreadyExists(err) {
 					return err
@@ -162,14 +157,7 @@ func (s *Controller) createOrUpdate(obj *corev1.Secret, action string) error {
 	}
 	for _, namespace := range clusterNamespaces {
 		// copy the secret into namespace
-		namespacedSecret := &corev1.Secret{}
-		namespacedSecret.Name = obj.Name
-		namespacedSecret.Annotations = obj.Annotations
-		namespacedSecret.Kind = obj.Kind
-		namespacedSecret.Data = obj.Data
-		namespacedSecret.StringData = obj.StringData
-		namespacedSecret.Type = obj.Type
-		namespacedSecret.Namespace = namespace.Name
+		namespacedSecret := getNamespacedSecret(obj, namespace.Name)
 		switch action {
 		case create:
 			logrus.Infof("Copying secret [%s] into namespace [%s]", namespacedSecret.Name, namespace.Name)
@@ -191,4 +179,24 @@ func (s *Controller) createOrUpdate(obj *corev1.Secret, action string) error {
 	}
 
 	return nil
+}
+
+func getNamespacedSecret(obj *corev1.Secret, namespace string) *corev1.Secret {
+	namespacedSecret := &corev1.Secret{}
+	namespacedSecret.Name = obj.Name
+	namespacedSecret.Kind = obj.Kind
+	namespacedSecret.Data = obj.Data
+	namespacedSecret.StringData = obj.StringData
+	namespacedSecret.Namespace = namespace
+	namespacedSecret.Type = obj.Type
+	namespacedSecret.Annotations = make(map[string]string)
+	copyMap(obj.Annotations, namespacedSecret.Annotations)
+	namespacedSecret.Annotations[userSecretAnnotation] = "true"
+	return namespacedSecret
+}
+
+func copyMap(src map[string]string, dst map[string]string) {
+	for k, v := range src {
+		dst[k] = v
+	}
 }

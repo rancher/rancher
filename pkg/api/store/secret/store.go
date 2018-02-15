@@ -36,6 +36,21 @@ func NewNamespacedSecretStore(clientGetter proxy.ClientGetter) *Store {
 				if data == nil {
 					return data, nil
 				}
+				anns, _ := data["annotations"].(map[string]interface{})
+				if anns["secret.user.cattle.io/secret"] == "true" {
+					return nil, nil
+				}
+				if data["projectId"] != nil {
+					fieldProjectID, _ := data["projectId"].(string)
+					projectID := strings.Split(fieldProjectID, ":")
+					id := ""
+					if len(projectID) == 2 {
+						id = projectID[1]
+					}
+					if id == data["namespaceId"] {
+						return nil, nil
+					}
+				}
 				parts := strings.Split(convert.ToString(data["type"]), "/")
 				parts[len(parts)-1] = "namespaced" + convert.Capitalize(parts[len(parts)-1])
 				data["type"] = strings.Join(parts, "/")
