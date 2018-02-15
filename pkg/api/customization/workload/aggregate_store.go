@@ -2,6 +2,7 @@ package workload
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/rancher/norman/httperror"
@@ -118,21 +119,23 @@ func (a *AggregateStore) Create(apiContext *types.APIContext, schema *types.Sche
 		}
 	}
 
-	setData(data)
+	setData(toSchema.ID, data)
 
 	return toStore.Create(apiContext, toSchema, data)
 }
 
-func setData(data map[string]interface{}) map[string]interface{} {
+func setData(schemaID string, data map[string]interface{}) map[string]interface{} {
 	setSelector := true
 	if _, ok := data["selector"]; ok {
 		setSelector = false
 	}
 	if setSelector {
+		workloadID := resolveWorkloadID(schemaID, data)
+		logrus.Errorf("workload id is %v", workloadID)
 		// set selector
 		data["selector"] = map[string]interface{}{
 			"matchLabels": map[string]interface{}{
-				SelectorLabel: data["id"],
+				SelectorLabel: workloadID,
 			},
 		}
 
@@ -141,7 +144,7 @@ func setData(data map[string]interface{}) map[string]interface{} {
 		if workloadLabels == nil {
 			workloadLabels = make(map[string]interface{})
 		}
-		workloadLabels[SelectorLabel] = data["id"]
+		workloadLabels[SelectorLabel] = workloadID
 		data["workloadLabels"] = workloadLabels
 
 		// set labels
@@ -149,10 +152,14 @@ func setData(data map[string]interface{}) map[string]interface{} {
 		if labels == nil {
 			labels = make(map[string]interface{})
 		}
-		labels[SelectorLabel] = data["id"]
+		labels[SelectorLabel] = workloadID
 		data["labels"] = labels
 	}
 	return data
+}
+
+func resolveWorkloadID(schemaID string, data map[string]interface{}) string {
+	return fmt.Sprintf("%s-%s-%s", schemaID, data["namespaceId"], data["name"])
 }
 
 func (a *AggregateStore) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
