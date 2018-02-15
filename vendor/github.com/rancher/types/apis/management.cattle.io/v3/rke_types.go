@@ -85,7 +85,7 @@ type RKESystemImages struct {
 
 type RKEConfigNode struct {
 	// Name of the host provisioned via docker machine
-	NodeName string `yaml:"-" json:"-" norman:"type=reference[node]"`
+	NodeName string `yaml:"-" json:"nodeName,omitempty" norman:"type=reference[node]"`
 	// IP or FQDN that is fully resolvable and used for SSH communication
 	Address string `yaml:"address" json:"address,omitempty"`
 	// Optional - Internal address that will be used for components communication
