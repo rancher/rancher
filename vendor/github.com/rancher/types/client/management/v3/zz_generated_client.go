@@ -31,6 +31,7 @@ type Client struct {
 	Token                      TokenOperations
 	DynamicSchema              DynamicSchemaOperations
 	Preference                 PreferenceOperations
+	ProjectNetworkPolicy       ProjectNetworkPolicyOperations
 	ClusterLogging             ClusterLoggingOperations
 	ProjectLogging             ProjectLoggingOperations
 	ListenConfig               ListenConfigOperations
@@ -80,6 +81,7 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.Token = newTokenClient(client)
 	client.DynamicSchema = newDynamicSchemaClient(client)
 	client.Preference = newPreferenceClient(client)
+	client.ProjectNetworkPolicy = newProjectNetworkPolicyClient(client)
 	client.ClusterLogging = newClusterLoggingClient(client)
 	client.ProjectLogging = newProjectLoggingClient(client)
 	client.ListenConfig = newListenConfigClient(client)

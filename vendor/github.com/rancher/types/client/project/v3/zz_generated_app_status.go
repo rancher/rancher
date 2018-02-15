@@ -1,10 +1,12 @@
 package client
 
 const (
-	AppStatusType          = "appStatus"
-	AppStatusFieldReleases = "releases"
+	AppStatusType            = "appStatus"
+	AppStatusFieldConditions = "conditions"
+	AppStatusFieldReleases   = "releases"
 )
 
 type AppStatus struct {
-	Releases []ReleaseInfo `json:"releases,omitempty"`
+	Conditions []AppCondition `json:"conditions,omitempty"`
+	Releases   []ReleaseInfo  `json:"releases,omitempty"`
 }

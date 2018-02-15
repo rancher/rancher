@@ -81,6 +81,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&DynamicSchemaList{},
 		&Preference{},
 		&PreferenceList{},
+		&ProjectNetworkPolicy{},
+		&ProjectNetworkPolicyList{},
 		&ClusterLogging{},
 		&ClusterLoggingList{},
 		&ProjectLogging{},
