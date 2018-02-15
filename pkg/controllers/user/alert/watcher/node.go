@@ -48,6 +48,9 @@ func (w *NodeWatcher) watch(ctx context.Context, interval time.Duration) {
 }
 
 func (w *NodeWatcher) watchRule() error {
+	if w.alertManager.IsDeploy == false {
+		return nil
+	}
 
 	clusterAlerts, err := w.clusterAlertLister.List("", labels.NewSelector())
 	if err != nil {

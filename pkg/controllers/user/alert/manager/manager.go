@@ -84,6 +84,7 @@ type Manager struct {
 	nodeLister v1.NodeLister
 	svcLister  v1.ServiceLister
 	podLister  v1.PodLister
+	IsDeploy   bool
 }
 
 func NewManager(cluster *config.UserContext) *Manager {
@@ -91,6 +92,7 @@ func NewManager(cluster *config.UserContext) *Manager {
 		nodeLister: cluster.Core.Nodes("").Controller().Lister(),
 		svcLister:  cluster.Core.Services("").Controller().Lister(),
 		podLister:  cluster.Core.Pods("").Controller().Lister(),
+		IsDeploy:   false,
 	}
 }
 
