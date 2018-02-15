@@ -2,13 +2,10 @@ package userscope
 
 import (
 	"fmt"
-
 	"strings"
 
 	"github.com/rancher/norman/httperror"
-	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/client/management/v3"
 	corev1 "k8s.io/api/core/v1"
@@ -26,10 +23,7 @@ type Store struct {
 
 func NewStore(nsClient v1.NamespaceInterface, store types.Store) *Store {
 	return &Store{
-		Store: &transform.Store{
-			Store:       store,
-			Transformer: transformer,
-		},
+		Store:    store,
 		nsClient: nsClient,
 	}
 }
@@ -133,21 +127,5 @@ func addNamespace(user, id string) string {
 }
 
 func getNamespace(user string) string {
-	return fmt.Sprintf("user-%s", user)
-}
-
-func transformer(apiContext *types.APIContext, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
-	if data == nil {
-		return nil, nil
-	}
-
-	ns := convert.ToString(data[NamespaceID])
-	id := convert.ToString(data[types.ResourceFieldID])
-
-	id = strings.TrimPrefix(id, ns+":")
-
-	data[client.PreferenceFieldName] = id
-	data[types.ResourceFieldID] = id
-
-	return data, nil
+	return user
 }

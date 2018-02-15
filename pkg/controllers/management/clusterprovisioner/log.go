@@ -65,31 +65,22 @@ func (p *Provisioner) getCtx(cluster *v3.Cluster, cond condition.Cond) (context.
 	})
 }
 
-func (p *Provisioner) recordFailure(cluster *v3.Cluster, spec v3.ClusterSpec, err error) *v3.Cluster {
+func (p *Provisioner) recordFailure(cluster *v3.Cluster, spec v3.ClusterSpec, err error) (*v3.Cluster, error) {
 	if err == nil {
 		p.backoff.DeleteEntry(cluster.Name)
 		if cluster.Status.FailedSpec == nil {
-			return cluster
+			return cluster, nil
 		}
 
 		cluster.Status.FailedSpec = nil
-		newCluster, err := p.Clusters.Update(cluster)
-		if err == nil {
-			return newCluster
-		}
-		// mask the error
-		return cluster
+		return p.Clusters.Update(cluster)
 	}
 
 	p.backoff.Next(cluster.Name, time.Now())
 	cluster.Status.FailedSpec = &spec
-	newCluster, err := p.Clusters.Update(cluster)
-	if err == nil {
-		return newCluster
-	}
-
+	newCluster, _ := p.Clusters.Update(cluster)
 	// mask the error
-	return cluster
+	return newCluster, nil
 }
 
 type closerFunc func() error

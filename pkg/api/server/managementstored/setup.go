@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/setting"
 	"github.com/rancher/rancher/pkg/api/store/cert"
 	"github.com/rancher/rancher/pkg/api/store/cluster"
+	"github.com/rancher/rancher/pkg/api/store/preference"
 	"github.com/rancher/rancher/pkg/api/store/scoped"
 	"github.com/rancher/rancher/pkg/api/store/userscope"
 	"github.com/rancher/rancher/pkg/auth/principals"
@@ -193,7 +194,7 @@ func User(schemas *types.Schemas, management *config.ManagementContext) {
 
 func Preference(schemas *types.Schemas, management *config.ManagementContext) {
 	schema := schemas.Schema(&managementschema.Version, client.PreferenceType)
-	schema.Store = userscope.NewStore(management.Core.Namespaces(""), schema.Store)
+	schema.Store = preference.NewStore(management.Core.Namespaces(""), schema.Store)
 }
 
 func NodeTypes(schemas *types.Schemas, management *config.ManagementContext) error {
