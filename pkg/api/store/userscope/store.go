@@ -1,4 +1,4 @@
-package preference
+package userscope
 
 import (
 	"fmt"
@@ -103,7 +103,17 @@ func (s *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id st
 }
 
 func (s *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
-	return nil, nil
+	user, err := getUser(apiContext)
+	if err != nil {
+		return nil, err
+	}
+
+	if opt == nil {
+		return nil, nil
+	}
+
+	opt.Conditions = append(opt.Conditions, types.EQ(NamespaceID, getNamespace(user)))
+	return s.Store.Watch(apiContext, schema, opt)
 }
 
 func getUser(apiContext *types.APIContext) (string, error) {
