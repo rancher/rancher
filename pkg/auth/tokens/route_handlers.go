@@ -48,10 +48,6 @@ func tokenDeleteHandler(request *types.APIContext, _ types.RequestHandler) error
 	return tokenServer.removeToken(request)
 }
 
-func CreateTokenCR(k8sToken *v3.Token) (v3.Token, error) {
-	return tokenServer.createK8sTokenCR(k8sToken)
-}
-
 func (s *tokenAPIServer) deriveToken(request *types.APIContext) error {
 
 	r := request.Request
@@ -228,20 +224,6 @@ func (s *tokenAPIServer) removeToken(request *types.APIContext) error {
 	}
 	request.WriteResponse(http.StatusOK, tokenData)
 	return nil
-}
-
-func getTokenFromStore(request *types.APIContext, tokenID string) (map[string]interface{}, error) {
-	store := request.Schema.Store
-	if store == nil {
-		return nil, errors.New("no token store available")
-	}
-
-	tokenData, err := store.ByID(request, request.Schema, tokenID)
-	if err != nil {
-		return nil, err
-	}
-
-	return tokenData, nil
 }
 
 func deleteTokenUsingStore(request *types.APIContext, tokenID string) (map[string]interface{}, error) {

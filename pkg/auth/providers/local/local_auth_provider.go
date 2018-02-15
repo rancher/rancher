@@ -72,7 +72,7 @@ func (l *lProvider) TransformToAuthProvider(authConfig map[string]interface{}) m
 }
 
 func (l *lProvider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Principal, map[string]string, int, error) {
-	localInput, ok := input.(*v3public.LocalLogin)
+	localInput, ok := input.(*v3public.BasicLogin)
 	if !ok {
 		return v3.Principal{}, nil, nil, 500, errors.New("unexpected input type")
 	}

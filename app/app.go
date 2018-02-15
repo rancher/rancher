@@ -10,6 +10,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	localprovider "github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/clustermanager"
@@ -424,6 +425,10 @@ func addRoles(management *config.ManagementContext, local bool) error {
 	}
 
 	if err := addAuthConfig(github.Name, client.GithubConfigType, false, management); err != nil {
+		return err
+	}
+
+	if err := addAuthConfig(activedirectory.Name, client.ActiveDirectoryConfigType, false, management); err != nil {
 		return err
 	}
 

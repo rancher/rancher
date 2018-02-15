@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers"
+	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
@@ -98,13 +99,16 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	var providerName string
 	switch request.Type {
 	case client.LocalProviderType:
-		input = &v3public.LocalLogin{}
+		input = &v3public.BasicLogin{}
 		providerName = local.Name
 	case client.GithubProviderType:
 		input = &v3public.GithubLogin{}
 		providerName = github.Name
+	case client.ActiveDirectoryProviderType:
+		input = &v3public.BasicLogin{}
+		providerName = activedirectory.Name
 	default:
-		return v3.Token{}, "", httperror.ServerError.Status, httperror.NewAPIError(httperror.ServerError, "Unknown login type")
+		return v3.Token{}, "", httperror.ServerError.Status, httperror.NewAPIError(httperror.ServerError, "unknown authentication provider")
 	}
 
 	err = json.Unmarshal(bytes, input)
@@ -126,7 +130,6 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		return v3.Token{}, "", 500, err
 	}
 
-	k8sToken := tokens.GenerateNewLoginToken(user.Name, userPrincipal, groupPrincipals, providerInfo, ttl, description)
-	rToken, err := tokens.CreateTokenCR(&k8sToken)
+	rToken, err := tokens.NewLoginToken(user.Name, userPrincipal, groupPrincipals, providerInfo, ttl, description)
 	return rToken, responseType, 0, err
 }

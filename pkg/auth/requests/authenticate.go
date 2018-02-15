@@ -74,6 +74,10 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (*v3.Token, err
 	}
 
 	tokenName, tokenKey := tokens.SplitTokenParts(tokenAuthValue)
+	if tokenName == "" || tokenKey == "" {
+		return nil, fmt.Errorf("must authenticate")
+	}
+
 	lookupUsingClient := false
 	objs, err := a.tokenIndexer.ByIndex(tokenKeyIndex, tokenKey)
 	if err != nil {
@@ -90,6 +94,9 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (*v3.Token, err
 	if lookupUsingClient {
 		storedToken, err = a.tokenClient.Get(tokenName, metav1.GetOptions{})
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil, fmt.Errorf("must authenticate")
+			}
 			return nil, fmt.Errorf("failed to retrieve auth token, error: %#v", err)
 		}
 	} else {
@@ -97,11 +104,11 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (*v3.Token, err
 	}
 
 	if storedToken.Token != tokenKey || storedToken.ObjectMeta.Name != tokenName {
-		return nil, fmt.Errorf("Invalid auth token value")
+		return nil, fmt.Errorf("must authenticate")
 	}
 
 	if !tokens.IsNotExpired(*storedToken) {
-		return nil, fmt.Errorf("Auth Token has expired")
+		return nil, fmt.Errorf("must authenticate")
 	}
 
 	return storedToken, nil

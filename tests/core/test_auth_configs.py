@@ -12,24 +12,26 @@ def test_auth_configs(mc):
         client.create_auth_config({})
 
     configs = client.list_auth_config()
-    assert len(configs) == 2
+    assert len(configs) == 3
     gh = None
     local = None
+    ad = None
     for c in configs:
         if c.type == "githubConfig":
             gh = c
         elif c.type == "localConfig":
             local = c
+        elif c.type == "activeDirectoryConfig":
+            ad = c
 
-    for x in [gh, local]:
+    for x in [gh, local, ad]:
         assert x is not None
         config = client.by_id_auth_config(x.id)
         with pytest.raises(ApiError) as e:
             client.delete(config)
         assert e.value.error.status == 405
-        with pytest.raises(ApiError) as e:
-            client.update(gh, hostname="xyz")
-        assert e.value.error.status == 405
 
     assert gh.actions['testAndApply']
     assert gh.actions['configureTest']
+
+    assert ad.actions['testAndApply']
