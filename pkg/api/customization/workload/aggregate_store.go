@@ -6,8 +6,6 @@ import (
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/norman/types/definition"
 	"github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -46,8 +44,7 @@ func (a *AggregateStore) ByID(apiContext *types.APIContext, schema *types.Schema
 		return nil, err
 	}
 	_, shortID := splitTypeAndID(id)
-	data, err := store.ByID(apiContext, a.Schemas[schemaType], shortID)
-	return addTypeToID(data), err
+	return store.ByID(apiContext, a.Schemas[schemaType], shortID)
 }
 
 func (a *AggregateStore) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
@@ -63,9 +60,7 @@ func (a *AggregateStore) Watch(apiContext *types.APIContext, schema *types.Schem
 		readerGroup.Wait()
 		close(events)
 	}()
-	return convert.Chan(events, func(data map[string]interface{}) map[string]interface{} {
-		return addTypeToID(data)
-	}), nil
+	return events, nil
 }
 
 func (a *AggregateStore) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {
@@ -77,14 +72,7 @@ func (a *AggregateStore) List(apiContext *types.APIContext, schema *types.Schema
 			if err != nil {
 				return err
 			}
-			hide := false
-			if opt.Options["hidden"] == "true" {
-				hide = true
-			}
 			for _, item := range data {
-				if !hide && item["ownerReferences"] != nil {
-					continue
-				}
 				select {
 				case items <- item:
 				case <-ctx.Done():
@@ -109,7 +97,7 @@ func (a *AggregateStore) List(apiContext *types.APIContext, schema *types.Schema
 		result = append(result, item)
 	}
 
-	return addListTypeToID(result), g.Wait()
+	return result, g.Wait()
 }
 
 func (a *AggregateStore) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
@@ -125,8 +113,7 @@ func (a *AggregateStore) Create(apiContext *types.APIContext, schema *types.Sche
 		}
 	}
 
-	data, err := toStore.Create(apiContext, toSchema, data)
-	return addTypeToID(data), err
+	return toStore.Create(apiContext, toSchema, data)
 }
 
 func (a *AggregateStore) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
@@ -135,8 +122,7 @@ func (a *AggregateStore) Update(apiContext *types.APIContext, schema *types.Sche
 		return nil, err
 	}
 	_, shortID := splitTypeAndID(id)
-	data, err = store.Update(apiContext, a.Schemas[schemaType], data, shortID)
-	return addTypeToID(data), err
+	return store.Update(apiContext, a.Schemas[schemaType], data, shortID)
 }
 
 func (a *AggregateStore) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
@@ -184,21 +170,4 @@ func splitTypeAndID(id string) (string, string) {
 		return "", ""
 	}
 	return parts[0], parts[1]
-}
-
-func addTypeToID(data map[string]interface{}) map[string]interface{} {
-	typeName := definition.GetType(data)
-	id, _ := data["id"].(string)
-	if typeName != "" && id != "" {
-		data["id"] = strings.ToLower(typeName) + ":" + id
-	}
-	return data
-}
-
-func addListTypeToID(data []map[string]interface{}) []map[string]interface{} {
-	var result []map[string]interface{}
-	for _, item := range data {
-		result = append(result, addTypeToID(item))
-	}
-	return result
 }
