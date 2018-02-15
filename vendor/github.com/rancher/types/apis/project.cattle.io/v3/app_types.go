@@ -1,7 +1,9 @@
 package v3
 
 import (
+	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -27,8 +29,28 @@ type AppSpec struct {
 	Groups           []string          `json:"groups,omitempty"`
 }
 
+var (
+	AppConditionInstalled condition.Cond = "installed"
+)
+
 type AppStatus struct {
-	Releases []ReleaseInfo `json:"releases,omitempty"`
+	Releases   []ReleaseInfo  `json:"releases,omitempty"`
+	Conditions []AppCondition `json:"conditions,omitempty"`
+}
+
+type AppCondition struct {
+	// Type of cluster condition.
+	Type condition.Cond `json:"type"`
+	// Status of the condition, one of True, False, Unknown.
+	Status v1.ConditionStatus `json:"status"`
+	// The last time this condition was updated.
+	LastUpdateTime string `json:"lastUpdateTime,omitempty"`
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime string `json:"lastTransitionTime,omitempty"`
+	// The reason for the condition's last transition.
+	Reason string `json:"reason,omitempty"`
+	// Human-readable message indicating details about last transition
+	Message string `json:"message,omitempty"`
 }
 
 type ReleaseInfo struct {

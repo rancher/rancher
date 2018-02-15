@@ -29,6 +29,7 @@ var (
 		Init(tokens).
 		Init(schemaTypes).
 		Init(userTypes).
+		Init(projectNetworkPolicyTypes).
 		Init(logTypes).
 		Init(globalTypes).
 		Init(rkeTypes).
@@ -260,6 +261,14 @@ func userTypes(schema *types.Schemas) *types.Schemas {
 				f.Required = false
 				return f
 			})
+		})
+}
+
+func projectNetworkPolicyTypes(schema *types.Schemas) *types.Schemas {
+	return schema.
+		MustImportAndCustomize(&Version, v3.ProjectNetworkPolicy{}, func(schema *types.Schema) {
+			schema.CollectionMethods = []string{http.MethodGet}
+			schema.ResourceMethods = []string{http.MethodGet}
 		})
 }
 
