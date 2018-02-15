@@ -285,7 +285,7 @@ func (p *Provisioner) pending(cluster *v3.Cluster) (*v3.Cluster, error) {
 			return cluster, nil
 		}
 
-		driver, err := validateDriver(cluster)
+		driver, err := p.validateDriver(cluster)
 		if err != nil {
 			return cluster, err
 		}
@@ -439,11 +439,16 @@ func (p *Provisioner) getConfig(reconcileRKE bool, spec v3.ClusterSpec, driverNa
 	return &spec, v, nil
 }
 
-func getDriver(spec v3.ClusterSpec) string {
-	driver := configfield.GetDriver(&spec)
+func (p *Provisioner) getDriver(cluster *v3.Cluster) string {
+	driver := configfield.GetDriver(&cluster.Spec)
 
 	if driver == "" {
-		if len(spec.NodePools) > 0 {
+		if len(cluster.Spec.NodePools) > 0 {
+			return RKEDriver
+		}
+
+		nodes, err := p.reconcileRKENodes(cluster.Name)
+		if err == nil && len(nodes) > 0 {
 			return RKEDriver
 		}
 	}
@@ -451,9 +456,9 @@ func getDriver(spec v3.ClusterSpec) string {
 	return driver
 }
 
-func validateDriver(cluster *v3.Cluster) (string, error) {
+func (p *Provisioner) validateDriver(cluster *v3.Cluster) (string, error) {
 	oldDriver := cluster.Status.Driver
-	newDriver := getDriver(cluster.Spec)
+	newDriver := p.getDriver(cluster)
 
 	if oldDriver == "" && newDriver == "" {
 		return newDriver, nil
@@ -461,6 +466,10 @@ func validateDriver(cluster *v3.Cluster) (string, error) {
 
 	if oldDriver == "" {
 		return newDriver, nil
+	}
+
+	if newDriver == "" {
+		return "", &controller.ForgetError{Err: fmt.Errorf("waiting for nodes")}
 	}
 
 	if oldDriver != newDriver {
@@ -513,7 +522,7 @@ func getSystemImages(spec v3.ClusterSpec) (*v3.RKESystemImages, error) {
 }
 
 func (p *Provisioner) getSpec(cluster *v3.Cluster) (*v3.ClusterSpec, error) {
-	driverName, err := validateDriver(cluster)
+	driverName, err := p.validateDriver(cluster)
 	if err != nil {
 		return nil, err
 	}
