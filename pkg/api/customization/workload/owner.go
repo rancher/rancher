@@ -33,7 +33,6 @@ func OwnerMap(context *types.APIContext) (map[string]string, error) {
 			}
 		}
 	}
-
 	return result, nil
 }
 

@@ -18,7 +18,7 @@ func New(store types.Store) types.Store {
 	}
 }
 
-func transformer(context *types.APIContext, data map[string]interface{}) (map[string]interface{}, error) {
+func transformer(context *types.APIContext, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
 	if data == nil {
 		return data, nil
 	}
@@ -53,7 +53,7 @@ func listTransform(context *types.APIContext, data []map[string]interface{}) ([]
 	return result, nil
 }
 
-func streamTransform(context *types.APIContext, data chan map[string]interface{}) (chan map[string]interface{}, error) {
+func streamTransform(context *types.APIContext, data chan map[string]interface{}, opt *types.QueryOptions) (chan map[string]interface{}, error) {
 	mapping, err := workload.OwnerMap(context)
 	if err != nil {
 		return nil, err
