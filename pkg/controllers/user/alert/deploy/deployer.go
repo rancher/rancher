@@ -2,16 +2,19 @@ package deploy
 
 import (
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/controller"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/manager"
 	"github.com/rancher/types/apis/apps/v1beta2"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+
 	yaml "gopkg.in/yaml.v2"
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 const (
@@ -20,28 +23,99 @@ const (
 
 func NewDeployer(cluster *config.UserContext, manager *manager.Manager) *Deployer {
 	return &Deployer{
-		nsClient:     cluster.Core.Namespaces(""),
-		appsClient:   cluster.Apps.Deployments(""),
-		secretClient: cluster.Core.Secrets(""),
-		svcClient:    cluster.Core.Services(""),
-		alertManager: manager,
+		nsClient:           cluster.Core.Namespaces(""),
+		appsClient:         cluster.Apps.Deployments(""),
+		secretClient:       cluster.Core.Secrets(""),
+		svcClient:          cluster.Core.Services(""),
+		clusterAlertLister: cluster.Management.Management.ClusterAlerts(cluster.ClusterName).Controller().Lister(),
+		projectAlertLister: cluster.Management.Management.ProjectAlerts("").Controller().Lister(),
+		notifierLister:     cluster.Management.Management.Notifiers(cluster.ClusterName).Controller().Lister(),
+		alertManager:       manager,
+		clusterName:        cluster.ClusterName,
 	}
 }
 
 type Deployer struct {
-	nsClient     v1.NamespaceInterface
-	appsClient   v1beta2.DeploymentInterface
-	secretClient v1.SecretInterface
-	svcClient    v1.ServiceInterface
-	alertManager *manager.Manager
+	nsClient           v1.NamespaceInterface
+	appsClient         v1beta2.DeploymentInterface
+	secretClient       v1.SecretInterface
+	svcClient          v1.ServiceInterface
+	projectAlertLister v3.ProjectAlertLister
+	clusterAlertLister v3.ClusterAlertLister
+	notifierLister     v3.NotifierLister
+	alertManager       *manager.Manager
+	clusterName        string
 }
 
 func (d *Deployer) ProjectSync(key string, alert *v3.ProjectAlert) error {
-	return d.deploy()
+	return d.sync()
 }
 
 func (d *Deployer) ClusterSync(key string, alert *v3.ClusterAlert) error {
-	return d.deploy()
+	return d.sync()
+}
+
+func (d *Deployer) sync() error {
+	needDeploy, err := d.needDeploy()
+	if err != nil {
+		return errors.Wrapf(err, "Check alertmanager deployment")
+	}
+
+	if needDeploy {
+		return d.deploy()
+	}
+
+	return d.cleanup()
+}
+
+//only deploy the alertmanager when notifier is configured and alert is using it.
+func (d *Deployer) needDeploy() (bool, error) {
+	notifiers, err := d.notifierLister.List("", labels.NewSelector())
+	if err != nil {
+		return false, err
+	}
+
+	if len(notifiers) == 0 {
+		return false, err
+	}
+
+	clusterAlerts, err := d.clusterAlertLister.List("", labels.NewSelector())
+	if err != nil {
+		return false, err
+	}
+
+	for _, alert := range clusterAlerts {
+		if len(alert.Spec.Recipients) > 0 {
+			return true, nil
+		}
+	}
+
+	projectAlerts, err := d.projectAlertLister.List("", labels.NewSelector())
+	if err != nil {
+		return false, nil
+	}
+
+	for _, alert := range projectAlerts {
+		if controller.ObjectInCluster(d.clusterName, alert) {
+			if len(alert.Spec.Recipients) > 0 {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
+
+}
+
+func (d *Deployer) cleanup() error {
+
+	err := d.nsClient.Delete("cattle-alerting", &metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	d.alertManager.IsDeploy = false
+	return nil
 }
 
 func (d *Deployer) deploy() error {
@@ -70,6 +144,8 @@ func (d *Deployer) deploy() error {
 	if _, err := d.svcClient.Create(service); err != nil && !apierrors.IsAlreadyExists(err) {
 		return errors.Wrapf(err, "Creating service")
 	}
+
+	d.alertManager.IsDeploy = true
 
 	return nil
 }

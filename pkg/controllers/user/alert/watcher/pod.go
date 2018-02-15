@@ -78,6 +78,9 @@ func (l *ProjectAlertLifecycle) Remove(obj *v3.ProjectAlert) (*v3.ProjectAlert, 
 }
 
 func (w *PodWatcher) watchRule() error {
+	if w.alertManager.IsDeploy == false {
+		return nil
+	}
 	projectAlerts, err := w.projectAlertLister.List("", labels.NewSelector())
 	if err != nil {
 		return err

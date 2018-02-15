@@ -46,6 +46,10 @@ func (w *SysComponentWatcher) watch(ctx context.Context, interval time.Duration)
 }
 
 func (w *SysComponentWatcher) watchRule() error {
+	if w.alertManager.IsDeploy == false {
+		return nil
+	}
+
 	clusterAlerts, err := w.clusterAlertLister.List("", labels.NewSelector())
 	if err != nil {
 		return err

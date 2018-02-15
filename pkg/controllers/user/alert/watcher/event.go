@@ -32,6 +32,10 @@ func StartEventWatcher(cluster *config.UserContext, manager *manager.Manager) {
 }
 
 func (l *EventWatcher) Sync(key string, obj *v3.ClusterEvent) error {
+	if l.alertManager.IsDeploy == false {
+		return nil
+	}
+
 	clusterAlerts, err := l.clusterAlertLister.List("", labels.NewSelector())
 	if err != nil {
 		return err

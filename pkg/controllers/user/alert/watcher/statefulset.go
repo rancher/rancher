@@ -48,6 +48,9 @@ func (w *StatefulsetWatcher) watch(ctx context.Context, interval time.Duration) 
 }
 
 func (w *StatefulsetWatcher) watchRule() error {
+	if w.alertManager.IsDeploy == false {
+		return nil
+	}
 	projectAlerts, err := w.projectAlertLister.List("", labels.NewSelector())
 	if err != nil {
 		return err

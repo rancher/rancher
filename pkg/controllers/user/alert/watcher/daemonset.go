@@ -53,6 +53,10 @@ func (w *DaemonsetWatcher) watch(ctx context.Context, interval time.Duration) {
 }
 
 func (w *DaemonsetWatcher) watchRule() error {
+	if w.alertManager.IsDeploy == false {
+		return nil
+	}
+
 	projectAlerts, err := w.projectAlertLister.List("", labels.NewSelector())
 	if err != nil {
 		return err

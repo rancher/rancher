@@ -25,10 +25,7 @@ func StartStateSyncer(ctx context.Context, cluster *config.UserContext, manager 
 
 func (s *StateSyncer) watch(ctx context.Context, interval time.Duration) {
 	for range ticker.Context(ctx, interval) {
-		err := s.syncState()
-		if err != nil {
-			logrus.Infof("Failed to sync alert state", err)
-		}
+		s.syncState()
 	}
 }
 
@@ -40,6 +37,10 @@ type StateSyncer struct {
 }
 
 func (s *StateSyncer) syncState() error {
+
+	if s.alertManager.IsDeploy == false {
+		return nil
+	}
 
 	apiAlerts, err := s.alertManager.GetAlertList()
 	if err == nil {

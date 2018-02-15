@@ -54,6 +54,11 @@ func (d *ConfigSyncer) NotifierSync(key string, alert *v3.Notifier) error {
 }
 
 func (d *ConfigSyncer) sync() error {
+
+	if d.alertManager.IsDeploy == false {
+		return nil
+	}
+
 	notifiers, err := d.notifierLister.List("", labels.NewSelector())
 	if err != nil {
 		return errors.Wrapf(err, "List notifiers")
