@@ -28,9 +28,9 @@ var (
 )
 
 const (
-	errorCreatingNode = "Error creating node: "
+	errorCreatingNode = "Error creating machine: "
 	nodeDirEnvKey     = "MACHINE_STORAGE_PATH="
-	nodeCmd           = "docker-node"
+	nodeCmd           = "docker-machine"
 )
 
 func buildCreateCommand(node *v3.Node, configMap map[string]interface{}) []string {
@@ -229,7 +229,7 @@ func deleteNode(nodeDir string, node *v3.Node) error {
 }
 
 func getSSHPrivateKey(nodeDir string, node *v3.Node) (string, error) {
-	keyPath := filepath.Join(nodeDir, "nodes", node.Spec.RequestedHostname, "id_rsa")
+	keyPath := filepath.Join(nodeDir, "machines", node.Spec.RequestedHostname, "id_rsa")
 	data, err := ioutil.ReadFile(keyPath)
 	if err != nil {
 		return "", nil
@@ -238,11 +238,11 @@ func getSSHPrivateKey(nodeDir string, node *v3.Node) (string, error) {
 }
 
 func waitUntilSSHKey(nodeDir string, node *v3.Node) error {
-	keyPath := filepath.Join(nodeDir, "nodes", node.Spec.RequestedHostname, "id_rsa")
+	keyPath := filepath.Join(nodeDir, "machines", node.Spec.RequestedHostname, "id_rsa")
 	startTime := time.Now()
 	increments := 1
 	for {
-		if time.Now().After(startTime.Add(time.Minute * 3)) {
+		if time.Now().After(startTime.Add(15 * time.Second)) {
 			return errors.New("Timeout waiting for ssh key")
 		}
 		if _, err := os.Stat(keyPath); err != nil {

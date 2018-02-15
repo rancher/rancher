@@ -7,8 +7,10 @@ import (
 	"sort"
 	"time"
 
+	"strings"
+
 	"github.com/mitchellh/mapstructure"
-	"github.com/pkg/errors"
+	"github.com/pborman/uuid"
 	"github.com/rancher/kontainer-engine/drivers/rke"
 	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/norman/controller"
@@ -106,34 +108,30 @@ func (p *Provisioner) Remove(cluster *v3.Cluster) (*v3.Cluster, error) {
 }
 
 func (p *Provisioner) Updated(cluster *v3.Cluster) (*v3.Cluster, error) {
-	return p.update(cluster, false)
-}
-
-func (p *Provisioner) update(cluster *v3.Cluster, create bool) (*v3.Cluster, error) {
 	obj, err := v3.ClusterConditionUpdated.Do(cluster, func() (runtime.Object, error) {
-		if err := p.createNodes(cluster); err != nil {
-			return cluster, err
-		}
-
-		cluster, err := p.reconcileCluster(cluster, create)
-		if err != nil {
-			return cluster, err
-		}
-
-		v3.ClusterConditionProvisioned.True(cluster)
-		return cluster, nil
+		return p.update(cluster, false)
 	})
-
 	return obj.(*v3.Cluster), err
 }
 
-func (p *Provisioner) machineChanged(key string, machine *v3.Node) error {
-	if machine == nil {
-		return nil
+func (p *Provisioner) update(cluster *v3.Cluster, create bool) (*v3.Cluster, error) {
+	if err := p.createNodes(cluster); err != nil {
+		return cluster, err
 	}
 
-	if machine.Status.NodeConfig != nil {
-		p.ClusterController.Enqueue("", machine.Namespace)
+	cluster, err := p.reconcileCluster(cluster, create)
+	if err != nil {
+		return cluster, err
+	}
+
+	v3.ClusterConditionProvisioned.True(cluster)
+	return cluster, nil
+}
+
+func (p *Provisioner) machineChanged(key string, machine *v3.Node) error {
+	parts := strings.SplitN(key, "/", 2)
+	if machine == nil || machine.Status.NodeConfig != nil {
+		p.ClusterController.Enqueue("", parts[0])
 	}
 
 	return nil
@@ -141,7 +139,7 @@ func (p *Provisioner) machineChanged(key string, machine *v3.Node) error {
 
 func (p *Provisioner) createNode(name string, cluster *v3.Cluster, nodePool v3.NodePool) (*v3.Node, error) {
 	newNode := &v3.Node{}
-	newNode.GenerateName = "machine-"
+	newNode.GenerateName = "m-"
 	newNode.Namespace = cluster.Name
 	newNode.Spec = v3.NodeSpec{
 		CommonNodeSpec: v3.CommonNodeSpec{
@@ -175,19 +173,37 @@ func (p *Provisioner) createNodes(cluster *v3.Cluster) error {
 	byUUID := map[string][]*v3.Node{}
 	byName := map[string]bool{}
 
+	changed := false
+	for i, nodePool := range cluster.Spec.NodePools {
+		if nodePool.UUID == "" {
+			changed = true
+			cluster.Spec.NodePools[i].UUID = uuid.New()
+		}
+	}
+
+	if changed {
+		_, err := p.Clusters.Update(cluster)
+		if err != nil {
+			return err
+		}
+	}
+
 	nodes, err := p.NodeLister.List(cluster.Name, labels.Everything())
 	if err != nil {
 		return err
 	}
 
+	waiting := false
 	for _, node := range nodes {
+		if v3.NodeConditionProvisioned.IsUnknown(node) {
+			waiting = true
+		}
+
 		if v3.NodeConditionProvisioned.IsFalse(node) {
 			p.deleteNodeLater(node)
 		}
 		byName[node.Spec.RequestedHostname] = true
-		if node.Spec.NodePoolUUID != "" {
-			byUUID[node.Spec.NodePoolUUID] = append(byUUID[node.Spec.NodePoolUUID], node)
-		}
+		byUUID[node.Spec.NodePoolUUID] = append(byUUID[node.Spec.NodePoolUUID], node)
 	}
 
 	for _, nodePool := range cluster.Spec.NodePools {
@@ -203,6 +219,13 @@ func (p *Provisioner) createNodes(cluster *v3.Cluster) error {
 		}
 
 		for i := 1; len(nodes) < nodePool.Quantity; i++ {
+			if waiting {
+				// I do this so we don't get in a tight loop of creating nodes by accident
+				return &controller.ForgetError{
+					Err: fmt.Errorf("waiting on nodes to provision"),
+				}
+			}
+
 			name := fmt.Sprintf("%s%02d", nodePool.HostnamePrefix, i)
 			if byName[name] {
 				continue
@@ -276,7 +299,14 @@ func (p *Provisioner) Create(cluster *v3.Cluster) (*v3.Cluster, error) {
 		return cluster, err
 	}
 
-	return p.update(cluster, true)
+	return p.provision(cluster)
+}
+
+func (p *Provisioner) provision(cluster *v3.Cluster) (*v3.Cluster, error) {
+	obj, err := v3.ClusterConditionProvisioned.Do(cluster, func() (runtime.Object, error) {
+		return p.update(cluster, true)
+	})
+	return obj.(*v3.Cluster), err
 }
 
 func (p *Provisioner) pending(cluster *v3.Cluster) (*v3.Cluster, error) {
@@ -308,13 +338,13 @@ func (p *Provisioner) pending(cluster *v3.Cluster) (*v3.Cluster, error) {
 	return obj.(*v3.Cluster), err
 }
 
-func (p *Provisioner) backoffFailure(cluster *v3.Cluster, spec *v3.ClusterSpec) bool {
+func (p *Provisioner) backoffFailure(cluster *v3.Cluster, spec *v3.ClusterSpec) (bool, time.Duration) {
 	if cluster.Status.FailedSpec == nil {
-		return false
+		return false, 0
 	}
 
 	if !reflect.DeepEqual(cluster.Status.FailedSpec, spec) {
-		return false
+		return false, 0
 	}
 
 	if p.backoff.IsInBackOffSinceUpdate(cluster.Name, time.Now()) {
@@ -322,10 +352,10 @@ func (p *Provisioner) backoffFailure(cluster *v3.Cluster, spec *v3.ClusterSpec) 
 			time.Sleep(p.backoff.Get(cluster.Name))
 			p.ClusterController.Enqueue("", cluster.Name)
 		}()
-		return true
+		return true, p.backoff.Get(cluster.Name)
 	}
 
-	return false
+	return false, 0
 }
 
 // reconcileCluster returns true if waiting or false if ready to provision
@@ -344,8 +374,8 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 		return cluster, err
 	}
 
-	if p.backoffFailure(cluster, spec) {
-		return cluster, &controller.ForgetError{Err: errors.New("backing off failure")}
+	if ok, delay := p.backoffFailure(cluster, spec); ok {
+		return cluster, &controller.ForgetError{Err: fmt.Errorf("backing off failure, delay: %v", delay)}
 	}
 
 	logrus.Infof("Provisioning cluster [%s]", cluster.Name)
@@ -367,7 +397,10 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 		cluster = newCluster
 	}
 
-	cluster = p.recordFailure(cluster, *spec, err)
+	cluster, recordErr := p.recordFailure(cluster, *spec, err)
+	if recordErr != nil {
+		return cluster, recordErr
+	}
 
 	// for here out we want to always return the cluster, not just nil, so that the error can be properly
 	// recorded if needs be
@@ -593,7 +626,9 @@ func (p *Provisioner) reconcileRKENodes(clusterName string) ([]v3.RKEConfigNode,
 	}
 
 	if !etcd || !controlplane {
-		return nil, fmt.Errorf("waiting for etcd and controlplane nodes to be registered")
+		return nil, &controller.ForgetError{
+			Err: fmt.Errorf("waiting for etcd and controlplane nodes to be registered"),
+		}
 	}
 
 	sort.Slice(nodes, func(i, j int) bool {

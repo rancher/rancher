@@ -96,7 +96,7 @@ func (m *Lifecycle) Create(obj *v3.Node) (*v3.Node, error) {
 	}
 
 	newObj, err := v3.NodeConditionInitialized.Once(obj, func() (runtime.Object, error) {
-		template, err := m.nodeTemplateClient.Get(obj.Spec.NodeTemplateName, metav1.GetOptions{})
+		template, err := m.getNodeTemplate(obj.Spec.NodeTemplateName)
 		if err != nil {
 			return obj, err
 		}
@@ -109,7 +109,7 @@ func (m *Lifecycle) Create(obj *v3.Node) (*v3.Node, error) {
 			obj.Status.NodeTemplateSpec.EngineInstallURL = defaultEngineInstallURL
 		}
 
-		rawTemplate, err := m.nodeTemplateGenericClient.Get(obj.Spec.NodeTemplateName, metav1.GetOptions{})
+		rawTemplate, err := m.nodeTemplateGenericClient.GetNamespaced(template.Namespace, template.Name, metav1.GetOptions{})
 		if err != nil {
 			return obj, err
 		}
@@ -136,6 +136,15 @@ func (m *Lifecycle) Create(obj *v3.Node) (*v3.Node, error) {
 	})
 
 	return newObj.(*v3.Node), err
+}
+
+func (m *Lifecycle) getNodeTemplate(nodeTemplateName string) (*v3.NodeTemplate, error) {
+	parts := strings.SplitN(nodeTemplateName, ":", 2)
+	if len(parts) == 1 {
+		return nil, fmt.Errorf("failed to find node template %s", nodeTemplateName)
+	}
+
+	return m.nodeTemplateClient.GetNamespaced(parts[0], parts[1], metav1.GetOptions{})
 }
 
 func (m *Lifecycle) Remove(obj *v3.Node) (*v3.Node, error) {

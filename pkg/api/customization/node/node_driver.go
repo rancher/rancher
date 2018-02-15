@@ -69,12 +69,12 @@ type Handler struct {
 }
 
 func (h Handler) LinkHandler(apiContext *types.APIContext, next types.RequestHandler) error {
-	var machine client.Node
-	if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, &machine); err != nil {
+	var node client.Node
+	if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, &node); err != nil {
 		return err
 	}
-	machineID := strings.Split(machine.ID, ":")[1]
-	secret, err := h.SecretStore.Get(machineID)
+	nodeID := strings.Split(node.ID, ":")[1]
+	secret, err := h.SecretStore.Get(nodeID)
 	if err != nil {
 		return err
 	}
@@ -129,7 +129,7 @@ func (h Handler) LinkHandler(apiContext *types.APIContext, next types.RequestHan
 	}
 	apiContext.Response.Header().Set("Content-Length", strconv.Itoa(len(buf.Bytes())))
 	apiContext.Response.Header().Set("Content-Type", "application/octet-stream")
-	apiContext.Response.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.zip", machine.Name))
+	apiContext.Response.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.zip", node.RequestedHostname))
 	apiContext.Response.Header().Set("Cache-Control", "private")
 	apiContext.Response.Header().Set("Pragma", "private")
 	apiContext.Response.Header().Set("Expires", "Wed 24 Feb 1982 18:42:00 GMT")
@@ -149,17 +149,17 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 		resource.Values[client.NodeFieldWorker] = true
 	}
 
-	// add machineConfig action
-	resource.Links["machineConfig"] = apiContext.URLBuilder.Link("machineConfig", resource)
+	// add nodeConfig action
+	resource.Links["nodeConfig"] = apiContext.URLBuilder.Link("nodeConfig", resource)
 
 	// remove link
-	machineTemplateID := resource.Values["machineTemplateId"]
+	nodeTemplateID := resource.Values["nodeTemplateId"]
 	customConfig := resource.Values["customConfig"]
-	if machineTemplateID == nil {
-		delete(resource.Links, "machineConfig")
+	if nodeTemplateID == nil {
+		delete(resource.Links, "nodeConfig")
 	}
 
-	if machineTemplateID == nil && customConfig == nil {
+	if nodeTemplateID == nil && customConfig == nil {
 		delete(resource.Links, "remove")
 	}
 }
