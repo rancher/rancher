@@ -6,10 +6,15 @@ import (
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+)
+
+const (
+	SelectorLabel = "workload.user.cattle.io/workloadselector"
 )
 
 type AggregateStore struct {
@@ -113,7 +118,41 @@ func (a *AggregateStore) Create(apiContext *types.APIContext, schema *types.Sche
 		}
 	}
 
+	setData(data)
+
 	return toStore.Create(apiContext, toSchema, data)
+}
+
+func setData(data map[string]interface{}) map[string]interface{} {
+	setSelector := true
+	if _, ok := data["selector"]; ok {
+		setSelector = false
+	}
+	if setSelector {
+		// set selector
+		data["selector"] = map[string]interface{}{
+			"matchLabels": map[string]interface{}{
+				SelectorLabel: data["id"],
+			},
+		}
+
+		// set workload labels
+		workloadLabels := convert.ToMapInterface(data["workloadLabels"])
+		if workloadLabels == nil {
+			workloadLabels = make(map[string]interface{})
+		}
+		workloadLabels[SelectorLabel] = data["id"]
+		data["workloadLabels"] = workloadLabels
+
+		// set labels
+		labels := convert.ToMapInterface(data["labels"])
+		if labels == nil {
+			labels = make(map[string]interface{})
+		}
+		labels[SelectorLabel] = data["id"]
+		data["labels"] = labels
+	}
+	return data
 }
 
 func (a *AggregateStore) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
