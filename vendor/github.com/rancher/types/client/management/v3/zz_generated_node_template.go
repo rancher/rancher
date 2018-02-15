@@ -23,7 +23,6 @@ const (
 	NodeTemplateFieldEngineStorageDriver      = "engineStorageDriver"
 	NodeTemplateFieldLabels                   = "labels"
 	NodeTemplateFieldName                     = "name"
-	NodeTemplateFieldNamespaceId              = "namespaceId"
 	NodeTemplateFieldOwnerReferences          = "ownerReferences"
 	NodeTemplateFieldRemoved                  = "removed"
 	NodeTemplateFieldState                    = "state"
@@ -53,7 +52,6 @@ type NodeTemplate struct {
 	EngineStorageDriver      string              `json:"engineStorageDriver,omitempty"`
 	Labels                   map[string]string   `json:"labels,omitempty"`
 	Name                     string              `json:"name,omitempty"`
-	NamespaceId              string              `json:"namespaceId,omitempty"`
 	OwnerReferences          []OwnerReference    `json:"ownerReferences,omitempty"`
 	Removed                  string              `json:"removed,omitempty"`
 	State                    string              `json:"state,omitempty"`

@@ -46,7 +46,7 @@ authorization:
 private_registries:
   - url: registry.com
     user: Username
-    passowrd: password
+    password: password
 
 nodes:
   - address: 1.1.1.1

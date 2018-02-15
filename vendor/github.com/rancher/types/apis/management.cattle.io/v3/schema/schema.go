@@ -177,8 +177,9 @@ func nodeTypes(schemas *types.Schemas) *types.Schemas {
 				Output: "nodeDriver",
 			}
 		}).
-		MustImport(&Version, v3.NodeTemplate{})
-
+		MustImportAndCustomize(&Version, v3.NodeTemplate{}, func(schema *types.Schema) {
+			delete(schema.ResourceFields, "namespaceId")
+		})
 }
 
 func tokens(schemas *types.Schemas) *types.Schemas {
