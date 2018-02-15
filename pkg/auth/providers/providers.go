@@ -9,6 +9,7 @@ import (
 
 	"sync"
 
+	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
@@ -16,7 +17,6 @@ import (
 	publicclient "github.com/rancher/types/client/management/v3public"
 )
 
-//Providers map
 var (
 	providers       = make(map[string]common.AuthProvider)
 	providersByType = make(map[string]common.AuthProvider)
@@ -50,6 +50,11 @@ func Configure(ctx context.Context, mgmt *config.ManagementContext) {
 	providers[github.Name] = p
 	providersByType[client.GithubConfigType] = p
 	providersByType[publicclient.GithubProviderType] = p
+
+	p = activedirectory.Configure(ctx, mgmt, userMGR)
+	providers[activedirectory.Name] = p
+	providersByType[client.ActiveDirectoryConfigType] = p
+	providersByType[publicclient.ActiveDirectoryProviderType] = p
 }
 
 func AuthenticateUser(input interface{}, providerName string) (v3.Principal, []v3.Principal, map[string]string, int, error) {

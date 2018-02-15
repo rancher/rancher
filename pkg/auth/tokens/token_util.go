@@ -7,7 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"fmt"
+
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -81,12 +84,37 @@ func GetTokenAuthFromRequest(req *http.Request) string {
 	return tokenAuthValue
 }
 
-func GenerateNewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerInfo map[string]string, ttl int, description string) v3.Token {
+func CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerInfo map[string]string, ttl int, description string, request *types.APIContext) error {
+	token, err := NewLoginToken(userID, userPrincipal, groupPrincipals, providerInfo, 0, description)
+	if err != nil {
+		logrus.Errorf("Failed creating token with error: %v", err)
+		return httperror.NewAPIErrorLong(500, "", fmt.Sprintf("Failed creating token with error: %v", err))
+	}
+
+	isSecure := false
+	if request.Request.URL.Scheme == "https" {
+		isSecure = true
+	}
+
+	tokenCookie := &http.Cookie{
+		Name:     CookieName,
+		Value:    token.ObjectMeta.Name + ":" + token.Token,
+		Secure:   isSecure,
+		Path:     "/",
+		HttpOnly: true,
+	}
+	http.SetCookie(request.Response, tokenCookie)
+	request.WriteResponse(http.StatusOK, nil)
+
+	return nil
+}
+
+func NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerInfo map[string]string, ttl int, description string) (v3.Token, error) {
 	if ttl == 0 {
 		ttl = defaultTokenTTL //16 hrs
 	}
 
-	k8sToken := v3.Token{
+	token := &v3.Token{
 		UserPrincipal:   userPrincipal,
 		GroupPrincipals: groupPrincipals,
 		IsDerived:       false,
@@ -96,7 +124,7 @@ func GenerateNewLoginToken(userID string, userPrincipal v3.Principal, groupPrinc
 		ProviderInfo:    providerInfo,
 		Description:     description,
 	}
-	return k8sToken
+	return tokenServer.createK8sTokenCR(token)
 }
 
 func ConvertTokenResource(schema *types.Schema, token v3.Token) (map[string]interface{}, error) {

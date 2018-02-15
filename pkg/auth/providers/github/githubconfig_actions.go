@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -121,28 +119,5 @@ func (g *ghProvider) testAndApply(actionName string, action *types.Action, reque
 		return err
 	}
 
-	//create a new token, set this token as the cookie and return 200
-	token := tokens.GenerateNewLoginToken(user.Name, userPrincipal, groupPrincipals, providerInfo, 0, "Token via Github Configuration")
-	token, err = tokens.CreateTokenCR(&token)
-	if err != nil {
-		logrus.Errorf("Failed creating token with error: %v", err)
-		return httperror.NewAPIErrorLong(status, "", fmt.Sprintf("Failed creating token with error: %v", err))
-	}
-
-	isSecure := false
-	if request.Request.URL.Scheme == "https" {
-		isSecure = true
-	}
-
-	tokenCookie := &http.Cookie{
-		Name:     tokens.CookieName,
-		Value:    token.ObjectMeta.Name + ":" + token.Token,
-		Secure:   isSecure,
-		Path:     "/",
-		HttpOnly: true,
-	}
-	http.SetCookie(request.Response, tokenCookie)
-	request.WriteResponse(http.StatusOK, nil)
-
-	return nil
+	return tokens.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerInfo, 0, "Token via Githu Configuration", request)
 }
