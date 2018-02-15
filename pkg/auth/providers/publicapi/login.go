@@ -2,7 +2,6 @@ package publicapi
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 
@@ -14,7 +13,6 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	"github.com/rancher/rancher/pkg/auth/util"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
 	"github.com/rancher/types/apis/management.cattle.io/v3public/schema"
@@ -46,13 +44,14 @@ func (h *loginHandler) login(actionName string, action *types.Action, request *t
 
 	w := request.Response
 
-	token, responseType, status, err := h.createLoginToken(request)
+	token, responseType, err := h.createLoginToken(request)
 	if err != nil {
-		logrus.Errorf("Login failed with error: %v", err)
-		if status == 0 {
-			status = http.StatusInternalServerError
+		// if user fails to authenticate, hide the details of the exact error. bad credentials will already be APIErrors
+		// otherwise, return a generic error message
+		if httperror.IsAPIError(err) {
+			return err
 		}
-		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
+		return httperror.WrapAPIError(err, httperror.ServerError, "Server error while authenticating")
 	}
 
 	if responseType == "cookie" {
@@ -67,7 +66,7 @@ func (h *loginHandler) login(actionName string, action *types.Action, request *t
 	} else {
 		tokenData, err := tokens.ConvertTokenResource(request.Schemas.Schema(&schema.PublicVersion, client.TokenType), token)
 		if err != nil {
-			return err
+			return httperror.WrapAPIError(err, httperror.ServerError, "Server error while authenticating")
 		}
 		tokenData["token"] = token.ObjectMeta.Name + ":" + token.Token
 		request.WriteResponse(http.StatusCreated, tokenData)
@@ -76,20 +75,20 @@ func (h *loginHandler) login(actionName string, action *types.Action, request *t
 	return nil
 }
 
-func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, string, int, error) {
+func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, string, error) {
 	logrus.Debugf("Create Token Invoked")
 
 	bytes, err := ioutil.ReadAll(request.Request.Body)
 	if err != nil {
 		logrus.Errorf("login failed with error: %v", err)
-		return v3.Token{}, "", httperror.InvalidBodyContent.Status, httperror.NewAPIError(httperror.InvalidBodyContent, "")
+		return v3.Token{}, "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
 	}
 
 	generic := &v3public.GenericLogin{}
 	err = json.Unmarshal(bytes, generic)
 	if err != nil {
 		logrus.Errorf("unmarshal failed with error: %v", err)
-		return v3.Token{}, "", httperror.InvalidBodyContent.Status, httperror.NewAPIError(httperror.InvalidBodyContent, "")
+		return v3.Token{}, "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
 	}
 	responseType := generic.ResponseType
 	description := generic.Description
@@ -108,28 +107,28 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		input = &v3public.BasicLogin{}
 		providerName = activedirectory.Name
 	default:
-		return v3.Token{}, "", httperror.ServerError.Status, httperror.NewAPIError(httperror.ServerError, "unknown authentication provider")
+		return v3.Token{}, "", httperror.NewAPIError(httperror.ServerError, "unknown authentication provider")
 	}
 
 	err = json.Unmarshal(bytes, input)
 	if err != nil {
 		logrus.Errorf("unmarshal failed with error: %v", err)
-		return v3.Token{}, "", httperror.InvalidBodyContent.Status, httperror.NewAPIError(httperror.InvalidBodyContent, "")
+		return v3.Token{}, "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
 	}
 
 	// Authenticate User
-	userPrincipal, groupPrincipals, providerInfo, status, err := providers.AuthenticateUser(input, providerName)
-	if status != 0 || err != nil {
-		return v3.Token{}, "", status, err
+	userPrincipal, groupPrincipals, providerInfo, err := providers.AuthenticateUser(input, providerName)
+	if err != nil {
+		return v3.Token{}, "", err
 	}
 
 	logrus.Debug("User Authenticated")
 
 	user, err := h.mgr.EnsureUser(userPrincipal.Name, userPrincipal.DisplayName)
 	if err != nil {
-		return v3.Token{}, "", 500, err
+		return v3.Token{}, "", err
 	}
 
 	rToken, err := tokens.NewLoginToken(user.Name, userPrincipal, groupPrincipals, providerInfo, ttl, description)
-	return rToken, responseType, 0, err
+	return rToken, responseType, err
 }

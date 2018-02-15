@@ -57,10 +57,10 @@ func Configure(ctx context.Context, mgmt *config.ManagementContext) {
 	providersByType[publicclient.ActiveDirectoryProviderType] = p
 }
 
-func AuthenticateUser(input interface{}, providerName string) (v3.Principal, []v3.Principal, map[string]string, int, error) {
+func AuthenticateUser(input interface{}, providerName string) (v3.Principal, []v3.Principal, map[string]string, error) {
 	return providers[providerName].AuthenticateUser(input)
 }
 
-func SearchPrincipals(name, principalType string, myToken v3.Token) ([]v3.Principal, int, error) {
+func SearchPrincipals(name, principalType string, myToken v3.Token) ([]v3.Principal, error) {
 	return providers[myToken.AuthProvider].SearchPrincipals(name, principalType, myToken)
 }
