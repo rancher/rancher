@@ -39,7 +39,7 @@ func assignID(data map[string]interface{}, mapping map[string]string) map[string
 	return data
 }
 
-func listTransform(context *types.APIContext, data []map[string]interface{}) ([]map[string]interface{}, error) {
+func listTransform(context *types.APIContext, data []map[string]interface{}, opt *types.QueryOptions) ([]map[string]interface{}, error) {
 	mapping, err := workload.OwnerMap(context)
 	if err != nil {
 		return nil, err
