@@ -18,7 +18,7 @@ func NewScopedStore(key string, store types.Store) *Store {
 	return &Store{
 		Store: &transform.Store{
 			Store: store,
-			Transformer: func(apiContext *types.APIContext, data map[string]interface{}) (map[string]interface{}, error) {
+			Transformer: func(apiContext *types.APIContext, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
 				if data == nil {
 					return data, nil
 				}

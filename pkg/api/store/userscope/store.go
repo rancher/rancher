@@ -136,7 +136,7 @@ func getNamespace(user string) string {
 	return fmt.Sprintf("user-%s", user)
 }
 
-func transformer(apiContext *types.APIContext, data map[string]interface{}) (map[string]interface{}, error) {
+func transformer(apiContext *types.APIContext, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
 	if data == nil {
 		return nil, nil
 	}

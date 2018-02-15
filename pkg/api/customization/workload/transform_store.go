@@ -11,8 +11,12 @@ import (
 func New(store types.Store) types.Store {
 	return &transform.Store{
 		Store: store,
-		Transformer: func(apiContext *types.APIContext, data map[string]interface{}) (map[string]interface{}, error) {
-			if data["ownerReferences"] != nil {
+		Transformer: func(apiContext *types.APIContext, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
+			hide := true
+			if opt != nil && opt.Options["hidden"] == "true" {
+				hide = false
+			}
+			if hide && data["ownerReferences"] != nil {
 				return nil, nil
 			}
 			typeName := definition.GetType(data)
