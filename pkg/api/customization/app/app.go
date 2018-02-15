@@ -2,18 +2,14 @@ package app
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
-	"time"
-
-	"encoding/base64"
-	"net/url"
 
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/parse"
@@ -32,11 +28,8 @@ import (
 )
 
 const (
-	base       = 32768
-	end        = 61000
-	tillerName = "tiller"
-	helmName   = "helm"
-	cacheRoot  = "helm-controller"
+	helmName  = "helm"
+	cacheRoot = "helm-controller"
 )
 
 type ActionWrapper struct {
@@ -49,11 +42,11 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 }
 
 func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
-	var stack projectv3.App
-	if err := access.ByID(apiContext, &projectschema.Version, projectv3.AppType, apiContext.ID, &stack); err != nil {
+	var app projectv3.App
+	if err := access.ByID(apiContext, &projectschema.Version, projectv3.AppType, apiContext.ID, &app); err != nil {
 		return err
 	}
-	clusterName := strings.Split(stack.ProjectId, ":")[0]
+	clusterName := strings.Split(app.ProjectId, ":")[0]
 	var cluster managementv3.Cluster
 	if err := access.ByID(apiContext, &managementschema.Version, managementv3.ClusterType, clusterName, &cluster); err != nil {
 		return err
@@ -66,13 +59,11 @@ func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 	if err != nil {
 		return err
 	}
-	// todo: remove
-	fmt.Println(string(data))
 	rootDir := filepath.Join(os.Getenv("HOME"), cacheRoot)
-	if err := os.MkdirAll(filepath.Join(rootDir, stack.Name), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(rootDir, app.Name), 0755); err != nil {
 		return err
 	}
-	kubeConfigPath := filepath.Join(rootDir, stack.Name, ".kubeconfig")
+	kubeConfigPath := filepath.Join(rootDir, app.Name, ".kubeconfig")
 	if err := ioutil.WriteFile(kubeConfigPath, data, 0755); err != nil {
 		return err
 	}
@@ -82,9 +73,9 @@ func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 	case "upgrade":
 		cont, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		addr := generateRandomPort()
-		probeAddr := generateRandomPort()
-		go startTiller(cont, addr, probeAddr, stack.InstallNamespace, kubeConfigPath, stack.User, stack.Groups)
+		addr := hutils.GenerateRandomPort()
+		probeAddr := hutils.GenerateRandomPort()
+		go hutils.StartTiller(cont, addr, probeAddr, app.InstallNamespace, kubeConfigPath, app.User, app.Groups)
 		actionInput, err := parse.ReadBody(apiContext.Request)
 		if err != nil {
 			return err
@@ -96,7 +87,7 @@ func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 		if err != nil {
 			return err
 		}
-		templateVersionID, err := parseExternalID(convert.ToString(externalID))
+		templateVersionID, err := hutils.ParseExternalID(convert.ToString(externalID))
 		if err != nil {
 			return err
 		}
@@ -104,13 +95,17 @@ func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 		if err := access.ByID(apiContext, &managementschema.Version, managementv3.TemplateVersionType, templateVersionID, &templateVersion); err != nil {
 			return err
 		}
-		files := convertTemplates(templateVersion.Files)
-		rootDir := filepath.Join(os.Getenv("HOME"), cacheRoot)
-		tempDir, err := writeTempDir(rootDir, files)
+		files, err := hutils.ConvertTemplates(templateVersion.Files)
 		if err != nil {
 			return err
 		}
-		if err := upgradeCharts(tempDir, addr, stack.Name); err != nil {
+		rootDir := filepath.Join("./management-state", cacheRoot)
+		tempDir, err := hutils.WriteTempDir(rootDir, files)
+		if err != nil {
+			return err
+		}
+		defer os.RemoveAll(tempDir)
+		if err := upgradeCharts(tempDir, addr, app.Name); err != nil {
 			return err
 		}
 		_, err = store.Update(apiContext, apiContext.Schema, updateData, apiContext.ID)
@@ -121,15 +116,15 @@ func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 	case "rollback":
 		cont, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		addr := generateRandomPort()
-		probeAddr := generateRandomPort()
-		go startTiller(cont, addr, probeAddr, stack.InstallNamespace, kubeConfigPath, stack.User, stack.Groups)
+		addr := hutils.GenerateRandomPort()
+		probeAddr := hutils.GenerateRandomPort()
+		go hutils.StartTiller(cont, addr, probeAddr, app.InstallNamespace, kubeConfigPath, app.User, app.Groups)
 		actionInput, err := parse.ReadBody(apiContext.Request)
 		if err != nil {
 			return err
 		}
 		revision := actionInput["revision"]
-		if err := rollbackCharts(addr, stack.Name, convert.ToString(revision)); err != nil {
+		if err := rollbackCharts(addr, app.Name, convert.ToString(revision)); err != nil {
 			return err
 		}
 		data := map[string]interface{}{
@@ -142,33 +137,6 @@ func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 		return nil
 	}
 	return nil
-}
-
-func writeTempDir(rootDir string, files map[string]string) (string, error) {
-	for name, content := range files {
-		fp := filepath.Join(rootDir, name)
-		if err := os.MkdirAll(filepath.Dir(fp), 0755); err != nil {
-			return "", err
-		}
-		if err := ioutil.WriteFile(fp, []byte(content), 0755); err != nil {
-			return "", err
-		}
-	}
-	for name := range files {
-		parts := strings.Split(name, "/")
-		if len(parts) > 0 {
-			return filepath.Join(rootDir, parts[0]), nil
-		}
-	}
-	return "", nil
-}
-
-func convertTemplates(files []managementv3.File) map[string]string {
-	templates := map[string]string{}
-	for _, f := range files {
-		templates[f.Name] = f.Contents
-	}
-	return templates
 }
 
 func upgradeCharts(rootDir, port, releaseName string) error {
@@ -191,30 +159,6 @@ func rollbackCharts(port, releaseName, revision string) error {
 		return err
 	}
 	return cmd.Wait()
-}
-
-func generateRandomPort() string {
-	s1 := rand.NewSource(time.Now().UnixNano())
-	r1 := rand.New(s1)
-	port := base + r1.Intn(end-base+1)
-	return strconv.Itoa(port)
-}
-
-// startTiller start tiller server and return the listening address of the grpc address
-func startTiller(context context.Context, port, probePort, namespace, kubeConfigPath, user string, groups []string) error {
-	groupsAsString := strings.Join(groups, ",")
-	cmd := exec.Command(tillerName, "--listen", ":"+port, "--probe", ":"+probePort, "--user", user, "--groups", groupsAsString)
-	cmd.Env = []string{fmt.Sprintf("%s=%s", "KUBECONFIG", kubeConfigPath), fmt.Sprintf("%s=%s", "TILLER_NAMESPACE", namespace)}
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-	defer cmd.Wait()
-	select {
-	case <-context.Done():
-		return cmd.Process.Kill()
-	}
 }
 
 func (a ActionWrapper) toRESTConfig(cluster *client.Cluster) (*rest.Config, error) {
@@ -252,16 +196,4 @@ func (a ActionWrapper) toRESTConfig(cluster *client.Cluster) (*rest.Config, erro
 			CAData: data,
 		},
 	}, nil
-}
-
-func parseExternalID(externalID string) (string, error) {
-	values, err := url.ParseQuery(externalID)
-	if err != nil {
-		return "", err
-	}
-	catalog := values.Get("catalog://?catalog")
-	base := values.Get("base")
-	template := values.Get("template")
-	version := values.Get("version")
-	return strings.Join([]string{catalog, base, template, version}, "-"), nil
 }
