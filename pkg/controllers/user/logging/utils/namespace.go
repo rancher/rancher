@@ -9,13 +9,20 @@ import (
 )
 
 func IniteNamespace(ns rv1.NamespaceInterface) error {
-	initNamespace := v1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: loggingconfig.LoggingNamespace,
-		},
-	}
-	if _, err := ns.Create(&initNamespace); err != nil && !apierrors.IsAlreadyExists(err) {
-		return err
+	if _, err := ns.Controller().Lister().Get(loggingconfig.LoggingNamespace, loggingconfig.LoggingNamespace); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+
+		initNamespace := v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: loggingconfig.LoggingNamespace,
+			},
+		}
+
+		if _, err := ns.Create(&initNamespace); err != nil && !apierrors.IsAlreadyExists(err) {
+			return err
+		}
 	}
 	return nil
 }
