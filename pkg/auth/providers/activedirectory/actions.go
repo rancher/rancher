@@ -3,8 +3,8 @@ package activedirectory
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
 
+	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -53,14 +53,12 @@ func (p *adProvider) testAndApply(actionName string, action *types.Action, reque
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "multiple servers not yet supported")
 	}
 
-	userPrincipal, groupPrincipals, providerInfo, status, err := p.loginUser(login, config, caPool)
+	userPrincipal, groupPrincipals, providerInfo, err := p.loginUser(login, config, caPool)
 	if err != nil {
-		if status == 0 || status == 500 {
-			status = http.StatusInternalServerError
-			return httperror.NewAPIErrorLong(status, "ServerError", fmt.Sprintf("Failed to login to activedirectory: %v", err))
+		if httperror.IsAPIError(err) {
+			return err
 		}
-		return httperror.NewAPIErrorLong(status, "",
-			fmt.Sprintf("Failed to login to ActiveDirectory: %v", err))
+		return errors.Wrap(err, "server error while authenticating")
 	}
 
 	//if this works, save adConfig CR adding enabled flag

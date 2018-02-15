@@ -64,21 +64,21 @@ func (p *adProvider) TransformToAuthProvider(authConfig map[string]interface{}) 
 	return ap
 }
 
-func (p *adProvider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Principal, map[string]string, int, error) {
-	localInput, ok := input.(*v3public.BasicLogin)
+func (p *adProvider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Principal, map[string]string, error) {
+	login, ok := input.(*v3public.BasicLogin)
 	if !ok {
-		return v3.Principal{}, nil, nil, 500, errors.New("unexpected input type")
+		return v3.Principal{}, nil, nil, errors.New("unexpected input type")
 	}
 
 	config, caPool, err := p.getActiveDirectoryConfig()
 	if err != nil {
-		return v3.Principal{}, nil, nil, 500, errors.New("can't find authprovider")
+		return v3.Principal{}, nil, nil, errors.New("can't find authprovider")
 	}
 
-	return p.loginUser(localInput, config, caPool)
+	return p.loginUser(login, config, caPool)
 }
 
-func (p *adProvider) SearchPrincipals(searchKey, principalType string, myToken v3.Token) ([]v3.Principal, int, error) {
+func (p *adProvider) SearchPrincipals(searchKey, principalType string, myToken v3.Token) ([]v3.Principal, error) {
 	var principals []v3.Principal
 	var err error
 
@@ -86,7 +86,7 @@ func (p *adProvider) SearchPrincipals(searchKey, principalType string, myToken v
 
 	config, caPool, err := p.getActiveDirectoryConfig()
 	if err != nil {
-		return principals, 0, nil
+		return principals, nil
 	}
 
 	principals, err = p.searchPrincipals(searchKey, principalType, true, config, caPool)
@@ -104,7 +104,7 @@ func (p *adProvider) SearchPrincipals(searchKey, principalType string, myToken v
 		}
 	}
 
-	return principals, 0, nil
+	return principals, nil
 }
 
 func (p *adProvider) isThisUserMe(me v3.Principal, other v3.Principal) bool {

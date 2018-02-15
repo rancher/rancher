@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/pkg/errors"
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -16,35 +16,28 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) (v3.Principal, []v3.Principal, map[string]string, int, error) {
+func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) (v3.Principal, []v3.Principal, map[string]string, error) {
 	logrus.Debug("Now generating Ldap token")
-	var status int
 
 	username := adCredential.Username
 	password := adCredential.Password
 	externalID := ldap.GetUserExternalID(username, config.DefaultLoginDomain)
-	if password == "" {
-		return v3.Principal{}, nil, nil, 401, fmt.Errorf("Failed to login, password not provided")
-	}
 
 	lConn, err := ldap.NewLDAPConn(config, caPool)
 	defer lConn.Close()
 	if err != nil {
-		return v3.Principal{}, nil, nil, 0, err
+		return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.ServerError, "error creating connection")
 	}
 
 	if !config.Enabled { // TODO testing for enabled here might not be correct. Might be better to pass in an explicit testSvcAccount bool
 		logrus.Debug("Bind service account username password")
-		if config.ServiceAccountPassword == "" {
-			return v3.Principal{}, nil, nil, 401, fmt.Errorf("Failed to login, service account password not provided")
-		}
 		sausername := ldap.GetUserExternalID(config.ServiceAccountUsername, config.DefaultLoginDomain)
 		err = lConn.Bind(sausername, config.ServiceAccountPassword)
 		if err != nil {
 			if ldapv2.IsErrorWithCode(err, ldapv2.LDAPResultInvalidCredentials) {
-				status = 401
+				return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
 			}
-			return v3.Principal{}, nil, nil, status, fmt.Errorf("Error in ldap bind of service account: %v", err)
+			return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.ServerError, "server error while authenticating")
 		}
 	}
 
@@ -52,9 +45,9 @@ func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.Act
 	err = lConn.Bind(externalID, password)
 	if err != nil {
 		if ldapv2.IsErrorWithCode(err, ldapv2.LDAPResultInvalidCredentials) {
-			status = 401
+			return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
 		}
-		return v3.Principal{}, nil, nil, status, fmt.Errorf("Error in ldap bind: %v", err)
+		return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.ServerError, "server error while authenticating")
 	}
 
 	samName := username
@@ -72,13 +65,13 @@ func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.Act
 
 	allowed, err := p.userMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipal, groupPrincipals)
 	if err != nil {
-		return v3.Principal{}, nil, nil, 500, err
+		return v3.Principal{}, nil, nil, err
 	}
 	if !allowed {
-		return v3.Principal{}, nil, nil, 401, errors.Errorf("unauthorized")
+		return v3.Principal{}, nil, nil, httperror.NewAPIError(httperror.Unauthorized, "unauthorized")
 	}
 
-	return userPrincipal, groupPrincipals, map[string]string{}, 0, err
+	return userPrincipal, groupPrincipals, map[string]string{}, err
 }
 
 func (p *adProvider) userRecord(search *ldapv2.SearchRequest, lConn *ldapv2.Conn, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) (v3.Principal, []v3.Principal, error) {

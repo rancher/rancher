@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -97,14 +98,12 @@ func (g *ghProvider) testAndApply(actionName string, action *types.Action, reque
 	}
 
 	//Call provider to testLogin
-	userPrincipal, groupPrincipals, providerInfo, status, err := g.LoginUser(githubLogin, &githubConfig)
+	userPrincipal, groupPrincipals, providerInfo, err := g.LoginUser(githubLogin, &githubConfig)
 	if err != nil {
-		if status == 0 || status == 500 {
-			status = http.StatusInternalServerError
-			return httperror.NewAPIErrorLong(status, "ServerError", fmt.Sprintf("Failed to login to github: %v", err))
+		if httperror.IsAPIError(err) {
+			return err
 		}
-		return httperror.NewAPIErrorLong(status, "",
-			fmt.Sprintf("Failed to login to github: %v", err))
+		return errors.Wrap(err, "server error while authenticating")
 	}
 
 	//if this works, save githubConfig CR adding enabled flag
