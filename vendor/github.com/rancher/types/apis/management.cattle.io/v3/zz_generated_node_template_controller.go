@@ -23,8 +23,9 @@ var (
 	NodeTemplateResource = metav1.APIResource{
 		Name:         "nodetemplates",
 		SingularName: "nodetemplate",
-		Namespaced:   false,
-		Kind:         NodeTemplateGroupVersionKind.Kind,
+		Namespaced:   true,
+
+		Kind: NodeTemplateGroupVersionKind.Kind,
 	}
 )
 
