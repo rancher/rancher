@@ -372,7 +372,7 @@ func (s *Server) serveHTTPS(config *v3.ListenConfig) error {
 	}
 
 	httpServer := &http.Server{
-		Handler: http.HandlerFunc(httpRedirect),
+		Handler: httpRedirect(s.Handler()),
 	}
 
 	if s.activeConfig == nil {
@@ -386,13 +386,20 @@ func (s *Server) serveHTTPS(config *v3.ListenConfig) error {
 }
 
 // Approach taken from letsencrypt, except manglePort is specific to us
-func httpRedirect(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" && r.Method != "HEAD" {
-		http.Error(w, "Use HTTPS", http.StatusBadRequest)
-		return
-	}
-	target := "https://" + manglePort(r.Host) + r.URL.RequestURI()
-	http.Redirect(w, r, target, http.StatusFound)
+func httpRedirect(next http.Handler) http.Handler {
+	return http.HandlerFunc(
+		func(rw http.ResponseWriter, r *http.Request) {
+			if r.Header.Get("x-Forwarded-Proto") == "https" {
+				next.ServeHTTP(rw, r)
+				return
+			}
+			if r.Method != "GET" && r.Method != "HEAD" {
+				http.Error(rw, "Use HTTPS", http.StatusBadRequest)
+				return
+			}
+			target := "https://" + manglePort(r.Host) + r.URL.RequestURI()
+			http.Redirect(rw, r, target, http.StatusFound)
+		})
 }
 
 func manglePort(hostport string) string {
