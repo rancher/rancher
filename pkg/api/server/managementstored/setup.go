@@ -19,8 +19,8 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/setting"
 	"github.com/rancher/rancher/pkg/api/store/cert"
 	"github.com/rancher/rancher/pkg/api/store/cluster"
-	"github.com/rancher/rancher/pkg/api/store/preference"
 	"github.com/rancher/rancher/pkg/api/store/scoped"
+	"github.com/rancher/rancher/pkg/api/store/userscope"
 	"github.com/rancher/rancher/pkg/auth/principals"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/nodeconfig"
@@ -83,7 +83,7 @@ func Setup(ctx context.Context, management *config.ManagementContext) error {
 	Setting(schemas)
 	Preference(schemas, management)
 	ClusterRegistrationTokens(schemas)
-	NodeTemplates(schemas)
+	NodeTemplates(schemas, management)
 	LoggingTypes(schemas, management)
 	Alert(schemas, management)
 
@@ -153,8 +153,9 @@ func ClusterRegistrationTokens(schemas *types.Schemas) {
 	schema.Formatter = clusteregistrationtokens.Formatter
 }
 
-func NodeTemplates(schemas *types.Schemas) {
+func NodeTemplates(schemas *types.Schemas, management *config.ManagementContext) {
 	schema := schemas.Schema(&managementschema.Version, client.NodeTemplateType)
+	schema.Store = userscope.NewStore(management.Core.Namespaces(""), schema.Store)
 	schema.Validator = nodetemplate.Validator
 }
 
@@ -192,7 +193,7 @@ func User(schemas *types.Schemas, management *config.ManagementContext) {
 
 func Preference(schemas *types.Schemas, management *config.ManagementContext) {
 	schema := schemas.Schema(&managementschema.Version, client.PreferenceType)
-	schema.Store = preference.NewStore(management.Core.Namespaces(""), schema.Store)
+	schema.Store = userscope.NewStore(management.Core.Namespaces(""), schema.Store)
 }
 
 func NodeTypes(schemas *types.Schemas, management *config.ManagementContext) error {
