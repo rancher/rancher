@@ -13,6 +13,8 @@ import (
 
 	yaml "gopkg.in/yaml.v2"
 
+	"encoding/base64"
+
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
@@ -128,7 +130,7 @@ func FetchFiles(urls []string) ([]v3.File, error) {
 				}
 				files = append(files, filterFile(v3.File{
 					Name:     name,
-					Contents: string(contents),
+					Contents: base64.StdEncoding.EncodeToString(contents),
 				}))
 			}
 		}
@@ -160,7 +162,7 @@ func LoadFile(path string) (*v3.File, error) {
 	}
 	filteredFile := filterFile(v3.File{
 		Name:     f.Name(),
-		Contents: string(data),
+		Contents: base64.StdEncoding.EncodeToString(data),
 	})
 	return &filteredFile, nil
 }

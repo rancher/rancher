@@ -2,7 +2,6 @@ package catalog
 
 import (
 	"context"
-	"os"
 	"path"
 	"time"
 
@@ -42,7 +41,7 @@ func runRefresh(ctx context.Context, interval int, controller v3.CatalogControll
 
 func Run(ctx context.Context, cacheRoot string, refreshInterval int, management *config.ManagementContext) error {
 	if cacheRoot == "" {
-		cacheRoot = path.Join(os.Getenv("HOME"), ".catalog-controller", "cache")
+		cacheRoot = path.Join("./management-state", "catalog-controller", "cache")
 	}
 
 	logrus.Infof("Starting catalog controller")

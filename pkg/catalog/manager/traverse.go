@@ -159,7 +159,6 @@ func traverseHelmFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []e
 			}
 			files, err := helm.FetchFiles(version.URLs)
 			if err != nil {
-				fmt.Println(err)
 				errors = append(errors, err)
 				continue
 			}
