@@ -296,6 +296,9 @@ func (p *Provisioner) pending(cluster *v3.Cluster) (*v3.Cluster, error) {
 
 		if driver != cluster.Status.Driver {
 			cluster.Status.Driver = driver
+			if driver == RKEDriver && cluster.Spec.RancherKubernetesEngineConfig == nil {
+				cluster.Spec.RancherKubernetesEngineConfig = &v3.RancherKubernetesEngineConfig{}
+			}
 			return p.Clusters.Update(cluster)
 		}
 
