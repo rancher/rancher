@@ -15,6 +15,7 @@ type Interface interface {
 	controller.Starter
 
 	PodSecurityPoliciesGetter
+	IngressesGetter
 }
 
 type Client struct {
@@ -23,6 +24,7 @@ type Client struct {
 	starters   []controller.Starter
 
 	podSecurityPolicyControllers map[string]PodSecurityPolicyController
+	ingressControllers           map[string]IngressController
 }
 
 func NewForConfig(config rest.Config) (Interface, error) {
@@ -40,6 +42,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		restClient: restClient,
 
 		podSecurityPolicyControllers: map[string]PodSecurityPolicyController{},
+		ingressControllers:           map[string]IngressController{},
 	}, nil
 }
 
@@ -62,6 +65,19 @@ type PodSecurityPoliciesGetter interface {
 func (c *Client) PodSecurityPolicies(namespace string) PodSecurityPolicyInterface {
 	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &PodSecurityPolicyResource, PodSecurityPolicyGroupVersionKind, podSecurityPolicyFactory{})
 	return &podSecurityPolicyClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type IngressesGetter interface {
+	Ingresses(namespace string) IngressInterface
+}
+
+func (c *Client) Ingresses(namespace string) IngressInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &IngressResource, IngressGroupVersionKind, ingressFactory{})
+	return &ingressClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

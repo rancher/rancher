@@ -9,7 +9,6 @@ const (
 	PrincipalFieldAnnotations     = "annotations"
 	PrincipalFieldCreated         = "created"
 	PrincipalFieldCreatorID       = "creatorId"
-	PrincipalFieldDisplayName     = "displayName"
 	PrincipalFieldExtraInfo       = "extraInfo"
 	PrincipalFieldLabels          = "labels"
 	PrincipalFieldLoginName       = "loginName"
@@ -29,7 +28,6 @@ type Principal struct {
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	Created         string            `json:"created,omitempty"`
 	CreatorID       string            `json:"creatorId,omitempty"`
-	DisplayName     string            `json:"displayName,omitempty"`
 	ExtraInfo       map[string]string `json:"extraInfo,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`
 	LoginName       string            `json:"loginName,omitempty"`

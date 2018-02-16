@@ -197,15 +197,15 @@ RKE will ask some questions around the cluster file like number of the hosts, ip
 
 ## Ingress Controller
 
-RKE will deploy Nginx controller by default, user can disable this by specifying `none` to `ingress` option in the cluster configuration, user also can specify list of options fo nginx config map listed in this [docs](https://github.com/kubernetes/ingress-nginx/blob/master/docs/user-guide/configmap.md), for example:
+RKE will deploy Nginx controller by default, user can disable this by specifying `none` to ingress `provider` option in the cluster configuration, user also can specify list of options for nginx config map listed in this [doc](https://github.com/kubernetes/ingress-nginx/blob/master/docs/user-guide/configmap.md), for example:
 ```
 ingress:
-  type: nginx
+  provider: nginx
   options:
     map-hash-bucket-size: "128"
     ssl-protocols: SSLv2
 ```
-RKE will deploy ingress controller on all schedulable nodes (controlplane and workers), to specify only certain nodes for ingress controller to be deployed user has to specify `node_selector` for the ingress and the right label on the node, for example:
+By default, RKE will deploy ingress controller on all schedulable nodes (controlplane and workers), to specify only certain nodes for ingress controller to be deployed, user has to specify `node_selector` for the ingress and the right label on the node, for example:
 ```
 nodes:
   - address: 1.1.1.1
@@ -215,7 +215,7 @@ nodes:
       app: ingress
 
 ingress:
-  type: nginx
+  provider: nginx
   node_selector:
     app: ingress
 ```

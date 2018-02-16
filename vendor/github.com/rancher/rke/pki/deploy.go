@@ -80,6 +80,9 @@ func doRunDeployer(ctx context.Context, host *hosts.Host, containerEnv []string,
 }
 
 func DeployAdminConfig(ctx context.Context, kubeConfig, localConfigPath string) error {
+	if len(kubeConfig) == 0 {
+		return nil
+	}
 	logrus.Debugf("Deploying admin Kubeconfig locally: %s", kubeConfig)
 	err := ioutil.WriteFile(localConfigPath, []byte(kubeConfig), 0640)
 	if err != nil {
@@ -120,8 +123,9 @@ func FetchCertificatesFromHost(ctx context.Context, extraHosts []*hosts.Host, ho
 		KubeSchedulerCertName:  true,
 		KubeProxyCertName:      true,
 		KubeNodeCertName:       true,
-		KubeAdminCertName:      true,
+		KubeAdminCertName:      false,
 	}
+
 	for _, etcdHost := range extraHosts {
 		// Fetch etcd certificates
 		crtList[GetEtcdCrtName(etcdHost.InternalAddress)] = false

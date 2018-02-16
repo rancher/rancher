@@ -197,7 +197,7 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 		AddMapperForType(&Version, v3.Group{}, m.DisplayName{}).
 		MustImport(&Version, v3.Group{}).
 		MustImport(&Version, v3.GroupMember{}).
-		MustImport(&Version, v3.Principal{}).
+		AddMapperForType(&Version, v3.Principal{}, m.DisplayName{}).
 		MustImportAndCustomize(&Version, v3.Principal{}, func(schema *types.Schema) {
 			schema.CollectionMethods = []string{http.MethodGet}
 			schema.ResourceMethods = []string{}
@@ -227,6 +227,13 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 		MustImportAndCustomize(&Version, v3.AuthConfig{}, func(schema *types.Schema) {
 			schema.CollectionMethods = []string{http.MethodGet}
 		}).
+		// Local Config
+		MustImportAndCustomize(&Version, v3.LocalConfig{}, func(schema *types.Schema) {
+			schema.BaseType = "authConfig"
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet}
+		}).
+		//Github Config
 		MustImportAndCustomize(&Version, v3.GithubConfig{}, func(schema *types.Schema) {
 			schema.BaseType = "authConfig"
 			schema.ResourceActions = map[string]types.Action{
@@ -240,15 +247,23 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 				},
 			}
 			schema.CollectionMethods = []string{}
-			schema.ResourceMethods = []string{http.MethodGet}
+			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
 		}).
 		MustImport(&Version, v3.GithubConfigTestOutput{}).
 		MustImport(&Version, v3.GithubConfigApplyInput{}).
-		MustImportAndCustomize(&Version, v3.LocalConfig{}, func(schema *types.Schema) {
+		// Active Directory Config
+		MustImportAndCustomize(&Version, v3.ActiveDirectoryConfig{}, func(schema *types.Schema) {
 			schema.BaseType = "authConfig"
+			schema.ResourceActions = map[string]types.Action{
+				"testAndApply": {
+					Input: "activeDirectoryTestAndApplyInput",
+				},
+			}
 			schema.CollectionMethods = []string{}
-			schema.ResourceMethods = []string{http.MethodGet}
-		})
+			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
+		}).
+		MustImport(&Version, v3.ActiveDirectoryTestAndApplyInput{})
+
 }
 
 func userTypes(schema *types.Schemas) *types.Schemas {

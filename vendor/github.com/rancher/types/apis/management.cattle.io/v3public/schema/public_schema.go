@@ -22,9 +22,28 @@ var (
 
 func authProvidersTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
+		MustImportAndCustomize(&PublicVersion, v3.Token{}, func(schema *types.Schema) {
+			// No collection methods causes the store to not create a CRD for it
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{}
+		}).
 		MustImportAndCustomize(&PublicVersion, v3public.AuthProvider{}, func(schema *types.Schema) {
 			schema.CollectionMethods = []string{http.MethodGet}
 		}).
+		// Local provider
+		MustImportAndCustomize(&PublicVersion, v3public.LocalProvider{}, func(schema *types.Schema) {
+			schema.BaseType = "authProvider"
+			schema.ResourceActions = map[string]types.Action{
+				"login": {
+					Input:  "basicLogin",
+					Output: "token",
+				},
+			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet}
+		}).
+		MustImport(&PublicVersion, v3public.BasicLogin{}).
+		// Github provider
 		MustImportAndCustomize(&PublicVersion, v3public.GithubProvider{}, func(schema *types.Schema) {
 			schema.BaseType = "authProvider"
 			schema.ResourceActions = map[string]types.Action{
@@ -36,22 +55,17 @@ func authProvidersTypes(schemas *types.Schemas) *types.Schemas {
 			schema.CollectionMethods = []string{}
 			schema.ResourceMethods = []string{http.MethodGet}
 		}).
-		MustImportAndCustomize(&PublicVersion, v3public.LocalProvider{}, func(schema *types.Schema) {
+		MustImport(&PublicVersion, v3public.GithubLogin{}).
+		// Active Directory provider
+		MustImportAndCustomize(&PublicVersion, v3public.ActiveDirectoryProvider{}, func(schema *types.Schema) {
 			schema.BaseType = "authProvider"
 			schema.ResourceActions = map[string]types.Action{
 				"login": {
-					Input:  "localLogin",
+					Input:  "basicLogin",
 					Output: "token",
 				},
 			}
 			schema.CollectionMethods = []string{}
 			schema.ResourceMethods = []string{http.MethodGet}
-		}).
-		MustImport(&PublicVersion, v3public.GithubLogin{}).
-		MustImport(&PublicVersion, v3public.LocalLogin{}).
-		MustImportAndCustomize(&PublicVersion, v3.Token{}, func(schema *types.Schema) {
-			// No collection methods causes the store to not create a CRD for it
-			schema.CollectionMethods = []string{}
-			schema.ResourceMethods = []string{}
 		})
 }

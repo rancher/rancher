@@ -11,12 +11,16 @@ type AuthProvider struct {
 	Type string `json:"type"`
 }
 
-type GithubProvider struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	AuthProvider      `json:",inline"`
+type GenericLogin struct {
+	TTLMillis    int    `json:"ttl,omitempty"`
+	Description  string `json:"description,omitempty" norman:"type=string,required"`
+	ResponseType string `json:"responseType,omitempty" norman:"type=string,required"` //json or cookie
+}
 
-	RedirectURL string `json:"redirectUrl"`
+type BasicLogin struct {
+	GenericLogin `json:",inline"`
+	Username     string `json:"username" norman:"type=string,required"`
+	Password     string `json:"password" norman:"type=string,required"`
 }
 
 type LocalProvider struct {
@@ -25,10 +29,12 @@ type LocalProvider struct {
 	AuthProvider      `json:",inline"`
 }
 
-type GenericLogin struct {
-	TTLMillis    int    `json:"ttl,omitempty"`
-	Description  string `json:"description,omitempty" norman:"type=string,required"`
-	ResponseType string `json:"responseType,omitempty" norman:"type=string,required"` //json or cookie
+type GithubProvider struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	AuthProvider      `json:",inline"`
+
+	RedirectURL string `json:"redirectUrl"`
 }
 
 type GithubLogin struct {
@@ -36,8 +42,10 @@ type GithubLogin struct {
 	Code         string `json:"code" norman:"type=string,required"`
 }
 
-type LocalLogin struct {
-	GenericLogin `json:",inline"`
-	Username     string `json:"username" norman:"type=string,required"`
-	Password     string `json:"password" norman:"type=string,required"`
+type ActiveDirectoryProvider struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	AuthProvider      `json:",inline"`
+
+	DefaultLoginDomain string `json:"defaultLoginDomain,omitempty"`
 }

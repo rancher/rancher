@@ -16,19 +16,21 @@ import (
 )
 
 func (c *Cluster) SaveClusterState(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig) error {
-	// Reinitialize kubernetes Client
-	var err error
-	c.KubeClient, err = k8s.NewClient(c.LocalKubeConfigPath)
-	if err != nil {
-		return fmt.Errorf("Failed to re-initialize Kubernetes Client: %v", err)
-	}
-	err = saveClusterCerts(ctx, c.KubeClient, c.Certificates)
-	if err != nil {
-		return fmt.Errorf("[certificates] Failed to Save Kubernetes certificates: %v", err)
-	}
-	err = saveStateToKubernetes(ctx, c.KubeClient, c.LocalKubeConfigPath, rkeConfig)
-	if err != nil {
-		return fmt.Errorf("[state] Failed to save configuration state: %v", err)
+	if len(c.ControlPlaneHosts) > 0 {
+		// Reinitialize kubernetes Client
+		var err error
+		c.KubeClient, err = k8s.NewClient(c.LocalKubeConfigPath)
+		if err != nil {
+			return fmt.Errorf("Failed to re-initialize Kubernetes Client: %v", err)
+		}
+		err = saveClusterCerts(ctx, c.KubeClient, c.Certificates)
+		if err != nil {
+			return fmt.Errorf("[certificates] Failed to Save Kubernetes certificates: %v", err)
+		}
+		err = saveStateToKubernetes(ctx, c.KubeClient, c.LocalKubeConfigPath, rkeConfig)
+		if err != nil {
+			return fmt.Errorf("[state] Failed to save configuration state: %v", err)
+		}
 	}
 	return nil
 }

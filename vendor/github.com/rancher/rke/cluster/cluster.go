@@ -76,9 +76,11 @@ func (c *Cluster) DeployControlPlane(ctx context.Context) error {
 		processMap); err != nil {
 		return fmt.Errorf("[controlPlane] Failed to bring up Control Plane: %v", err)
 	}
-	// Apply Authz configuration after deploying controlplane
-	if err := c.ApplyAuthzResources(ctx); err != nil {
-		return fmt.Errorf("[auths] Failed to apply RBAC resources: %v", err)
+	if len(c.ControlPlaneHosts) > 0 {
+		// Apply Authz configuration after deploying controlplane
+		if err := c.ApplyAuthzResources(ctx); err != nil {
+			return fmt.Errorf("[auths] Failed to apply RBAC resources: %v", err)
+		}
 	}
 	return nil
 }
@@ -163,6 +165,9 @@ func ParseCluster(
 }
 
 func rebuildLocalAdminConfig(ctx context.Context, kubeCluster *Cluster) error {
+	if len(kubeCluster.ControlPlaneHosts) == 0 {
+		return nil
+	}
 	log.Infof(ctx, "[reconcile] Rebuilding and updating local kube config")
 	var workingConfig, newConfig string
 	currentKubeConfig := kubeCluster.Certificates[pki.KubeAdminCertName]
@@ -212,6 +217,9 @@ func getLocalConfigAddress(localConfigPath string) (string, error) {
 
 func getLocalAdminConfigWithNewAddress(localConfigPath, cpAddress string) string {
 	config, _ := clientcmd.BuildConfigFromFlags("", localConfigPath)
+	if config == nil {
+		return ""
+	}
 	config.Host = fmt.Sprintf("https://%s:6443", cpAddress)
 	return pki.GetKubeConfigX509WithData(
 		"https://"+cpAddress+":6443",
@@ -252,21 +260,23 @@ func (c *Cluster) deployAddons(ctx context.Context) error {
 }
 
 func (c *Cluster) SyncLabelsAndTaints(ctx context.Context) error {
-	log.Infof(ctx, "[sync] Syncing nodes Labels and Taints")
-	k8sClient, err := k8s.NewClient(c.LocalKubeConfigPath)
-	if err != nil {
-		return fmt.Errorf("Failed to initialize new kubernetes client: %v", err)
-	}
-	for _, host := range hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts) {
-		if err := k8s.SyncLabels(k8sClient, host.HostnameOverride, host.ToAddLabels, host.ToDelLabels); err != nil {
-			return err
+	if len(c.ControlPlaneHosts) > 0 {
+		log.Infof(ctx, "[sync] Syncing nodes Labels and Taints")
+		k8sClient, err := k8s.NewClient(c.LocalKubeConfigPath)
+		if err != nil {
+			return fmt.Errorf("Failed to initialize new kubernetes client: %v", err)
 		}
-		// Taints are not being added by user
-		if err := k8s.SyncTaints(k8sClient, host.HostnameOverride, host.ToAddTaints, host.ToDelTaints); err != nil {
-			return err
+		for _, host := range hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts) {
+			if err := k8s.SyncLabels(k8sClient, host.HostnameOverride, host.ToAddLabels, host.ToDelLabels); err != nil {
+				return err
+			}
+			// Taints are not being added by user
+			if err := k8s.SyncTaints(k8sClient, host.HostnameOverride, host.ToAddTaints, host.ToDelTaints); err != nil {
+				return err
+			}
 		}
+		log.Infof(ctx, "[sync] Successfully synced nodes Labels and Taints")
 	}
-	log.Infof(ctx, "[sync] Successfully synced nodes Labels and Taints")
 	return nil
 }
 
@@ -293,13 +303,14 @@ func ConfigureCluster(ctx context.Context, rkeConfig v3.RancherKubernetesEngineC
 	if err != nil {
 		return err
 	}
-	kubeCluster.Certificates = crtBundle
-	err = kubeCluster.deployNetworkPlugin(ctx)
-	if err != nil {
-		return err
+	if len(kubeCluster.ControlPlaneHosts) > 0 {
+		kubeCluster.Certificates = crtBundle
+		if err := kubeCluster.deployNetworkPlugin(ctx); err != nil {
+			return err
+		}
+		return kubeCluster.deployAddons(ctx)
 	}
-
-	return kubeCluster.deployAddons(ctx)
+	return nil
 }
 
 func (c *Cluster) getEtcdProcessHostMap(readyEtcdHosts []*hosts.Host) map[*hosts.Host]v3.Process {

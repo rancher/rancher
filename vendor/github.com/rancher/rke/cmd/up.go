@@ -106,11 +106,12 @@ func ClusterUp(
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
-
-	APIURL = fmt.Sprintf("https://" + kubeCluster.ControlPlaneHosts[0].Address + ":6443")
+	if len(kubeCluster.ControlPlaneHosts) > 0 {
+		APIURL = fmt.Sprintf("https://" + kubeCluster.ControlPlaneHosts[0].Address + ":6443")
+		clientCert = string(cert.EncodeCertPEM(kubeCluster.Certificates[pki.KubeAdminCertName].Certificate))
+		clientKey = string(cert.EncodePrivateKeyPEM(kubeCluster.Certificates[pki.KubeAdminCertName].Key))
+	}
 	caCrt = string(cert.EncodeCertPEM(kubeCluster.Certificates[pki.CACertName].Certificate))
-	clientCert = string(cert.EncodeCertPEM(kubeCluster.Certificates[pki.KubeAdminCertName].Certificate))
-	clientKey = string(cert.EncodePrivateKeyPEM(kubeCluster.Certificates[pki.KubeAdminCertName].Key))
 
 	log.Infof(ctx, "Finished building Kubernetes cluster successfully")
 	return APIURL, caCrt, clientCert, clientKey, nil
