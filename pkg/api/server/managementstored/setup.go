@@ -62,6 +62,7 @@ func Setup(ctx context.Context, management *config.ManagementContext) error {
 		client.PodSecurityPolicyTemplateType,
 		client.PreferenceType,
 		client.ProjectLoggingType,
+		client.ProjectNetworkPolicyType,
 		client.ProjectRoleTemplateBindingType,
 		client.ProjectType,
 		client.RoleTemplateType,
