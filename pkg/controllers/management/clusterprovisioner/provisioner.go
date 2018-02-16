@@ -156,6 +156,11 @@ func (p *Provisioner) createNode(name string, cluster *v3.Cluster, nodePool v3.N
 	newNode.Labels = nodePool.Labels
 	newNode.Annotations = nodePool.Annotations
 
+	if newNode.Spec.NodeTemplateName == "" || nodePool.HostnamePrefix == "" {
+		logrus.Warnf("invalid node pool on cluster [%s], not creating node", cluster.Name)
+		return newNode, nil
+	}
+
 	return p.Nodes.Create(newNode)
 }
 
@@ -170,6 +175,10 @@ func (p *Provisioner) deleteNodeLater(node *v3.Node) {
 }
 
 func (p *Provisioner) createNodes(cluster *v3.Cluster) error {
+	if cluster.Status.Driver != RKEDriver {
+		return nil
+	}
+
 	byUUID := map[string][]*v3.Node{}
 	byName := map[string]bool{}
 
