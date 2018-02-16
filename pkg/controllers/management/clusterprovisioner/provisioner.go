@@ -203,7 +203,9 @@ func (p *Provisioner) createNodes(cluster *v3.Cluster) error {
 			p.deleteNodeLater(node)
 		}
 		byName[node.Spec.RequestedHostname] = true
-		byUUID[node.Spec.NodePoolUUID] = append(byUUID[node.Spec.NodePoolUUID], node)
+		if node.Spec.NodePoolUUID != "" {
+			byUUID[node.Spec.NodePoolUUID] = append(byUUID[node.Spec.NodePoolUUID], node)
+		}
 	}
 
 	for _, nodePool := range cluster.Spec.NodePools {
