@@ -389,7 +389,7 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 }
 
 func apiServicesToRegister(delegateAPIServer genericapiserver.DelegationTarget, registration autoregister.AutoAPIServiceRegistration) []*apiregistration.APIService {
-	apiServices := []*apiregistration.APIService{}
+	var apiServices []*apiregistration.APIService
 
 	for _, curr := range delegateAPIServer.ListedPaths() {
 		if curr == "/api/v1" {

@@ -57,7 +57,7 @@ func (h *principalsHandler) actions(actionName string, action *types.Action, api
 		return err
 	}
 
-	principals := []map[string]interface{}{}
+	var principals []map[string]interface{}
 	for _, p := range ps {
 		x, err := convertPrincipal(apiContext.Schema, p)
 		if err != nil {
@@ -71,7 +71,7 @@ func (h *principalsHandler) actions(actionName string, action *types.Action, api
 }
 
 func (h *principalsHandler) list(apiContext *types.APIContext, next types.RequestHandler) error {
-	principals := []map[string]interface{}{}
+	var principals []map[string]interface{}
 
 	token, err := h.getToken(apiContext.Request)
 	if err != nil {

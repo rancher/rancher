@@ -34,9 +34,9 @@ func traverseFiles(repoPath string, catalog *v3.Catalog, catalogType CatalogType
 func traverseHelmGitFiles(repoPath, catalogName string) ([]v3.Template, []error, error) {
 	fullpath := path.Join(repoPath, "stable")
 
-	templates := []v3.Template{}
+	var templates []v3.Template
 	var template *v3.Template
-	errors := []error{}
+	var errors []error
 	err := filepath.Walk(fullpath, func(path string, info os.FileInfo, err error) error {
 		if len(path) == len(fullpath) {
 			return nil
@@ -107,7 +107,7 @@ func traverseHelmFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []e
 	}
 	newHelmVersionCommits := make(map[string]v3.VersionCommits)
 
-	templates := []v3.Template{}
+	var templates []v3.Template
 	var errors []error
 	for chart, metadata := range index.IndexFile.Entries {
 		template := v3.Template{
@@ -162,7 +162,7 @@ func traverseHelmFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []e
 				errors = append(errors, err)
 				continue
 			}
-			filesToAdd := []v3.File{}
+			var filesToAdd []v3.File
 			for _, file := range files {
 				if strings.EqualFold(fmt.Sprintf("%s/%s", chart, "readme.md"), file.Name) {
 					v.Readme = file.Contents
@@ -184,7 +184,7 @@ func traverseHelmFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []e
 			v.ExternalID = fmt.Sprintf("catalog://?catalog=%s&base=%s&template=%s&version=%s", catalog.Name, template.Spec.Base, template.Spec.FolderName, v.Version)
 			versions = append(versions, v)
 		}
-		categories := []string{}
+		var categories []string
 		for k := range keywords {
 			categories = append(categories, k)
 		}
@@ -228,7 +228,7 @@ func traverseGitFiles(repoPath, catalogName string) ([]v3.Template, []error, err
 		return nil, nil, err
 	}
 
-	templates := []v3.Template{}
+	var templates []v3.Template
 	for _, template := range templateIndex {
 		for i, version := range template.Spec.Versions {
 			var readme string
