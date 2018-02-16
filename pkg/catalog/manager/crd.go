@@ -93,7 +93,7 @@ func (m *Manager) createTemplate(name string, template v3.Template, existingTemp
 		template.Labels[CatalogNameLabel] = catalog.Name
 		versionFiles := template.Spec.Versions
 		// we are removing file fields so that the big chunk of data doesn't get stored in two places
-		modifiedVersionFiles := []v3.TemplateVersionSpec{}
+		var modifiedVersionFiles []v3.TemplateVersionSpec
 		for _, version := range template.Spec.Versions {
 			version.Files = nil
 			version.Readme = ""
@@ -142,7 +142,7 @@ func (m *Manager) updateTemplate(name string, existingTemplate v3.Template, temp
 	}
 	updateTemplate.Spec = template.Spec
 	template.Spec.Versions = updateTemplate.Spec.Versions
-	modifiedVersionFiles := []v3.TemplateVersionSpec{}
+	var modifiedVersionFiles []v3.TemplateVersionSpec
 	for _, version := range updateTemplate.Spec.Versions {
 		version.Files = nil
 		version.Readme = ""
@@ -165,7 +165,7 @@ func (m *Manager) updateTemplate(name string, existingTemplate v3.Template, temp
 }
 
 func (m *Manager) createTemplateVersions(versionsSpec []v3.TemplateVersionSpec, template v3.Template) error {
-	createdTemplates := []string{}
+	var createdTemplates []string
 	rollback := false
 	for _, spec := range versionsSpec {
 		templateVersion := v3.TemplateVersion{}

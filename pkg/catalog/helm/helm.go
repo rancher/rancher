@@ -91,7 +91,7 @@ func FetchFiles(urls []string) ([]v3.File, error) {
 		return nil, nil
 	}
 
-	files := []v3.File{}
+	var files []v3.File
 	for _, url := range urls {
 		logrus.Infof("Fetching file %s", url)
 		resp, err := http.Get(url)

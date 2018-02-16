@@ -11,7 +11,7 @@ func crtbByPrincipal(obj interface{}) ([]string, error) {
 		return []string{}, nil
 	}
 
-	principals := []string{}
+	var principals []string
 	if crtb.UserPrincipalName != "" {
 		principals = append(principals, crtb.UserPrincipalName)
 	}
@@ -28,7 +28,7 @@ func prtbByPrincipal(obj interface{}) ([]string, error) {
 		return []string{}, nil
 	}
 
-	principals := []string{}
+	var principals []string
 	if prtb.UserPrincipalName != "" {
 		principals = append(principals, prtb.UserPrincipalName)
 	}

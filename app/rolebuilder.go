@@ -88,7 +88,7 @@ func (rb *roleBuilder) first() *roleBuilder {
 }
 
 func (rb *roleBuilder) policyRules() []rbacv1.PolicyRule {
-	prs := []rbacv1.PolicyRule{}
+	var prs []rbacv1.PolicyRule
 	for _, r := range rb.rules {
 		prs = append(prs, r.toPolicyRule())
 	}

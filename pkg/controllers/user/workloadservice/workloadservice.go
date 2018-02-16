@@ -191,7 +191,7 @@ func (c *PodController) sync(key string, obj *corev1.Pod) error {
 		return err
 	}
 
-	workloadServiceUUIDToAdd := []string{}
+	var workloadServiceUUIDToAdd []string
 	for _, d := range deployments {
 		selector := labels.SelectorFromSet(d.Spec.Selector.MatchLabels)
 		if selector.Matches(labels.Set(obj.Labels)) {
