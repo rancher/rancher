@@ -260,7 +260,7 @@ func (w *WorkloadLister) CreateServiceForWorkload(workload *Workload) error {
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName:    "service-",
+			GenerateName:    "workload-",
 			OwnerReferences: []metav1.OwnerReference{ownerRef},
 			Namespace:       workload.Namespace,
 			Annotations:     annotations,
