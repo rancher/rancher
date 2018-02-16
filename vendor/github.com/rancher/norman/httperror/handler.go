@@ -8,6 +8,10 @@ import (
 func ErrorHandler(request *types.APIContext, err error) {
 	var error *APIError
 	if apiError, ok := err.(*APIError); ok {
+		if apiError.Cause != nil {
+			logrus.Errorf("API error response %v for %v %v. Cause: %v", apiError.code.Status, request.Request.Method,
+				request.Request.RequestURI, apiError.Cause)
+		}
 		error = apiError
 	} else {
 		logrus.Errorf("Unknown error: %v", err)

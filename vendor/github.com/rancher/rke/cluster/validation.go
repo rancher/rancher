@@ -9,9 +9,7 @@ import (
 
 func (c *Cluster) ValidateCluster() error {
 	// make sure cluster has at least one controlplane/etcd host
-	if len(c.ControlPlaneHosts) == 0 {
-		return fmt.Errorf("Cluster must have at least one control plane host")
-	}
+
 	if len(c.EtcdHosts) == 0 && len(c.Services.Etcd.ExternalURLs) == 0 {
 		return fmt.Errorf("Cluster must have at least one etcd plane host")
 	}

@@ -22,26 +22,42 @@ func SetUpAuthentication(ctx context.Context, kubeCluster, currentCluster *Clust
 		if currentCluster != nil {
 			kubeCluster.Certificates = currentCluster.Certificates
 		} else {
-			log.Infof(ctx, "[certificates] Attempting to recover certificates from backup on host [%s]", kubeCluster.ControlPlaneHosts[0].Address)
-			kubeCluster.Certificates, err = pki.FetchCertificatesFromHost(ctx, kubeCluster.EtcdHosts, kubeCluster.ControlPlaneHosts[0], kubeCluster.SystemImages.Alpine, kubeCluster.LocalKubeConfigPath, kubeCluster.PrivateRegistriesMap)
+			var backupHost *hosts.Host
+			if len(kubeCluster.Services.Etcd.ExternalURLs) > 0 {
+				backupHost = kubeCluster.ControlPlaneHosts[0]
+			} else {
+				backupHost = kubeCluster.EtcdHosts[0]
+			}
+			log.Infof(ctx, "[certificates] Attempting to recover certificates from backup on host [%s]", backupHost.Address)
+			kubeCluster.Certificates, err = pki.FetchCertificatesFromHost(ctx, kubeCluster.EtcdHosts, backupHost, kubeCluster.SystemImages.Alpine, kubeCluster.LocalKubeConfigPath, kubeCluster.PrivateRegistriesMap)
 			if err != nil {
 				return err
 			}
 			if kubeCluster.Certificates != nil {
-				log.Infof(ctx, "[certificates] Certificate backup found on host [%s]", kubeCluster.ControlPlaneHosts[0].Address)
+				log.Infof(ctx, "[certificates] Certificate backup found on host [%s]", backupHost.Address)
+				// this is the case of adding controlplane node on empty cluster with only etcd nodes
+				if kubeCluster.Certificates[pki.KubeAdminCertName].Config == "" && len(kubeCluster.ControlPlaneHosts) > 0 {
+					if err := rebuildLocalAdminConfig(ctx, kubeCluster); err != nil {
+						return err
+					}
+					kubeCluster.Certificates, err = regenerateAPICertificate(kubeCluster, kubeCluster.Certificates)
+					if err != nil {
+						return fmt.Errorf("Failed to regenerate KubeAPI certificate %v", err)
+					}
+				}
 				return nil
 			}
-			log.Infof(ctx, "[certificates] No Certificate backup found on host [%s]", kubeCluster.ControlPlaneHosts[0].Address)
+			log.Infof(ctx, "[certificates] No Certificate backup found on host [%s]", backupHost.Address)
 
 			kubeCluster.Certificates, err = pki.GenerateRKECerts(ctx, kubeCluster.RancherKubernetesEngineConfig, kubeCluster.LocalKubeConfigPath, "")
 			if err != nil {
 				return fmt.Errorf("Failed to generate Kubernetes certificates: %v", err)
 			}
-			log.Infof(ctx, "[certificates] Temporarily saving certs to control host [%s]", kubeCluster.ControlPlaneHosts[0].Address)
-			if err := pki.DeployCertificatesOnHost(ctx, kubeCluster.ControlPlaneHosts[0], kubeCluster.Certificates, kubeCluster.SystemImages.CertDownloader, pki.TempCertPath, kubeCluster.PrivateRegistriesMap); err != nil {
+			log.Infof(ctx, "[certificates] Temporarily saving certs to control host [%s]", backupHost.Address)
+			if err := pki.DeployCertificatesOnHost(ctx, backupHost, kubeCluster.Certificates, kubeCluster.SystemImages.CertDownloader, pki.TempCertPath, kubeCluster.PrivateRegistriesMap); err != nil {
 				return err
 			}
-			log.Infof(ctx, "[certificates] Saved certs to control host [%s]", kubeCluster.ControlPlaneHosts[0].Address)
+			log.Infof(ctx, "[certificates] Saved certs to control host [%s]", backupHost.Address)
 		}
 	}
 	return nil

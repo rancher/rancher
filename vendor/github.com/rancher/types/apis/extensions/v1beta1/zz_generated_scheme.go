@@ -34,6 +34,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 
 		&PodSecurityPolicyList{},
+		&IngressList{},
 	)
 	return nil
 }

@@ -5,6 +5,11 @@ import (
 )
 
 var (
+	Unauthorized     = ErrorCode{"Unauthorized", 401}
+	PermissionDenied = ErrorCode{"PermissionDenied", 403}
+	NotFound         = ErrorCode{"NotFound", 404}
+	MethodNotAllowed = ErrorCode{"MethodNotAllow", 405}
+
 	InvalidDateFormat  = ErrorCode{"InvalidDateFormat", 422}
 	InvalidFormat      = ErrorCode{"InvalidFormat", 422}
 	InvalidReference   = ErrorCode{"InvalidReference", 422}
@@ -23,12 +28,9 @@ var (
 	InvalidType        = ErrorCode{"InvalidType", 422}
 	ActionNotAvailable = ErrorCode{"ActionNotAvailable", 404}
 	InvalidState       = ErrorCode{"InvalidState", 422}
+
 	ServerError        = ErrorCode{"ServerError", 500}
 	ClusterUnavailable = ErrorCode{"ClusterUnavailable", 503}
-	PermissionDenied   = ErrorCode{"PermissionDenied", 403}
-
-	MethodNotAllowed = ErrorCode{"MethodNotAllow", 405}
-	NotFound         = ErrorCode{"NotFound", 404}
 )
 
 type ErrorCode struct {
@@ -69,6 +71,8 @@ func NewFieldAPIError(code ErrorCode, fieldName, message string) error {
 	}
 }
 
+// WrapFieldAPIError will cause the API framework to log the underlying err before returning the APIError as a response.
+// err WILL NOT be in the API response
 func WrapFieldAPIError(err error, code ErrorCode, fieldName, message string) error {
 	return &APIError{
 		Cause:     err,
@@ -78,6 +82,8 @@ func WrapFieldAPIError(err error, code ErrorCode, fieldName, message string) err
 	}
 }
 
+// WrapAPIError will cause the API framework to log the underlying err before returning the APIError as a response.
+// err WILL NOT be in the API response
 func WrapAPIError(err error, code ErrorCode, message string) error {
 	return &APIError{
 		code:    code,
@@ -91,4 +97,9 @@ func (a *APIError) Error() string {
 		return fmt.Sprintf("%s=%s: %s", a.fieldName, a.code, a.message)
 	}
 	return fmt.Sprintf("%s: %s", a.code, a.message)
+}
+
+func IsAPIError(err error) bool {
+	_, ok := err.(*APIError)
+	return ok
 }

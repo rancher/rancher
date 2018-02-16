@@ -36,6 +36,7 @@ const (
 	ToCleanSSLDir        = "/etc/kubernetes/ssl"
 	ToCleanCNIConf       = "/etc/cni"
 	ToCleanCNIBin        = "/opt/cni"
+	ToCleanCNILib        = "/var/lib/cni"
 	ToCleanCalicoRun     = "/var/run/calico"
 	ToCleanTempCertPath  = "/etc/kubernetes/.tmp/"
 	CleanerContainerName = "kube-cleaner"
@@ -49,6 +50,7 @@ func (h *Host) CleanUpAll(ctx context.Context, cleanerImage string, prsMap map[s
 		ToCleanCNIBin,
 		ToCleanCalicoRun,
 		ToCleanTempCertPath,
+		ToCleanCNILib,
 	}
 	if externalEtcd {
 		toCleanPaths = append(toCleanPaths, ToCleanEtcdDir)
@@ -57,8 +59,8 @@ func (h *Host) CleanUpAll(ctx context.Context, cleanerImage string, prsMap map[s
 }
 
 func (h *Host) CleanUpWorkerHost(ctx context.Context, cleanerImage string, prsMap map[string]v3.PrivateRegistry) error {
-	if h.IsControl {
-		log.Infof(ctx, "[hosts] Host [%s] is already a controlplane host, skipping cleanup.", h.Address)
+	if h.IsControl || h.IsEtcd {
+		log.Infof(ctx, "[hosts] Host [%s] is already a controlplane or etcd host, skipping cleanup.", h.Address)
 		return nil
 	}
 	toCleanPaths := []string{
@@ -66,13 +68,14 @@ func (h *Host) CleanUpWorkerHost(ctx context.Context, cleanerImage string, prsMa
 		ToCleanCNIConf,
 		ToCleanCNIBin,
 		ToCleanCalicoRun,
+		ToCleanCNILib,
 	}
 	return h.CleanUp(ctx, toCleanPaths, cleanerImage, prsMap)
 }
 
 func (h *Host) CleanUpControlHost(ctx context.Context, cleanerImage string, prsMap map[string]v3.PrivateRegistry) error {
-	if h.IsWorker {
-		log.Infof(ctx, "[hosts] Host [%s] is already a worker host, skipping cleanup.", h.Address)
+	if h.IsWorker || h.IsEtcd {
+		log.Infof(ctx, "[hosts] Host [%s] is already a worker or etcd host, skipping cleanup.", h.Address)
 		return nil
 	}
 	toCleanPaths := []string{
@@ -80,6 +83,7 @@ func (h *Host) CleanUpControlHost(ctx context.Context, cleanerImage string, prsM
 		ToCleanCNIConf,
 		ToCleanCNIBin,
 		ToCleanCalicoRun,
+		ToCleanCNILib,
 	}
 	return h.CleanUp(ctx, toCleanPaths, cleanerImage, prsMap)
 }

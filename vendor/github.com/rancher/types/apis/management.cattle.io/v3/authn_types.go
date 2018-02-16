@@ -77,43 +77,75 @@ type SetPasswordInput struct {
 	NewPassword string `json:"newPassword" norman:"type=string,required"`
 }
 
-//AuthConfig structure contains the AuthConfig definition
 type AuthConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Type                string   `json:"type"`
-	Enabled             bool     `json:"enabled,omitempty"`
+	Type                string   `json:"type" norman:"noupdate"`
+	Enabled             bool     `json:"enabled,omitempty" norman:"noupdate"`
 	AccessMode          string   `json:"accessMode,omitempty" norman:"required,notnullable,type=enum,options=required|restricted|unrestricted"`
 	AllowedPrincipalIDs []string `json:"allowedPrincipalIds,omitempty" norman:"type=array[reference[principal]]"`
 }
 
-//GithubConfig structure contains the github config definition
-type GithubConfig struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	AuthConfig        `json:",inline" mapstructure:",squash"`
-
-	Hostname     string `json:"hostname,omitempty" norman:"default=github.com"`
-	TLS          bool   `json:"tls,omitempty" norman:"notnullable,default=true"`
-	ClientID     string `json:"clientId,omitempty"`
-	ClientSecret string `json:"clientSecret,omitempty"`
-}
-
-//LocalConfig structure contains the local config definition
 type LocalConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	AuthConfig        `json:",inline" mapstructure:",squash"`
 }
 
+type GithubConfig struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	AuthConfig        `json:",inline" mapstructure:",squash"`
+
+	Hostname     string `json:"hostname,omitempty" norman:"default=github.com" norman:"noupdate"`
+	TLS          bool   `json:"tls,omitempty" norman:"notnullable,default=true" norman:"noupdate"`
+	ClientID     string `json:"clientId,omitempty" norman:"noupdate"`
+	ClientSecret string `json:"clientSecret,omitempty" norman:"noupdate,type=password"`
+}
+
 type GithubConfigTestOutput struct {
 	RedirectURL string `json:"redirectUrl"`
 }
 
-//GithubConfigApplyInput structure defines all properties that can be sent by client to configure github
 type GithubConfigApplyInput struct {
 	GithubConfig GithubConfig `json:"githubConfig, omitempty"`
 	Code         string       `json:"code,omitempty"`
 	Enabled      bool         `json:"enabled,omitempty"`
+}
+
+type ActiveDirectoryConfig struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	AuthConfig        `json:",inline" mapstructure:",squash"`
+
+	Servers                     []string `json:"servers,omitempty" norman:"noupdate"`
+	Port                        int64    `json:"port,omitempty" norman:"noupdate"`
+	TLS                         bool     `json:"tls,omitempty" norman:"noupdate"`
+	Certificate                 string   `json:"certificate,omitempty" norman:"noupdate"`
+	DefaultLoginDomain          string   `json:"defaultLoginDomain,omitempty" norman:"noupdate"`
+	ServiceAccountUsername      string   `json:"serviceAccountUsername,omitempty" norman:"noupdate"`
+	ServiceAccountPassword      string   `json:"serviceAccountPassword,omitempty" norman:"noupdate,type=password"`
+	UserDisabledBitMask         int64    `json:"userDisabledBitMask,omitempty" norman:"noupdate"`
+	UserSearchBase              string   `json:"userSearchBase,omitempty" norman:"noupdate"`
+	UserSearchAttribute         string   `json:"userSearchAttribute,omitempty" norman:"noupdate"`
+	UserLoginAttribute          string   `json:"userLoginAttribute,omitempty" norman:"noupdate"`
+	UserObjectClass             string   `json:"userObjectClass,omitempty" norman:"noupdate"`
+	UserNameAttribute           string   `json:"userNameAttribute,omitempty" norman:"noupdate"`
+	UserEnabledAttribute        string   `json:"userEnabledAttribute,omitempty" norman:"noupdate"`
+	GroupSearchBase             string   `json:"groupSearchBase,omitempty" norman:"noupdate"`
+	GroupSearchAttribute        string   `json:"groupSearchAttribute,omitempty" norman:"noupdate"`
+	GroupObjectClass            string   `json:"groupObjectClass,omitempty" norman:"noupdate"`
+	GroupNameAttribute          string   `json:"groupNameAttribute,omitempty" norman:"noupdate"`
+	GroupDNAttribute            string   `json:"groupDNAttribute,omitempty" norman:"noupdate"`
+	GroupMemberUserAttribute    string   `json:"groupMemberUserAttribute,omitempty" norman:"noupdate"`
+	GroupMemberMappingAttribute string   `json:"groupMemberMappingAttribute,omitempty" norman:"noupdate"`
+	ConnectionTimeout           int64    `json:"connectionTimeout,omitempty" norman:"noupdate"`
+}
+
+type ActiveDirectoryTestAndApplyInput struct {
+	ActiveDirectoryConfig ActiveDirectoryConfig `json:"activeDirectoryConfig, omitempty"`
+	Username              string                `json:"username"`
+	Password              string                `json:"password"`
+	Enabled               bool                  `json:"enabled,omitempty"`
 }

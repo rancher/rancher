@@ -101,18 +101,20 @@ func GenerateRKECerts(ctx context.Context, rkeConfig v3.RancherKubernetesEngineC
 	if err != nil {
 		return nil, err
 	}
-	kubeAdminConfig := GetKubeConfigX509WithData(
-		"https://"+cpHosts[0].Address+":6443",
-		KubeAdminCertName,
-		string(cert.EncodeCertPEM(caCrt)),
-		string(cert.EncodeCertPEM(kubeAdminCrt)),
-		string(cert.EncodePrivateKeyPEM(kubeAdminKey)))
-
 	kubeAdminCertObj := ToCertObject(KubeAdminCertName, KubeAdminCertName, KubeAdminOrganizationName, kubeAdminCrt, kubeAdminKey)
-	kubeAdminCertObj.Config = kubeAdminConfig
-	kubeAdminCertObj.ConfigPath = localKubeConfigPath
+	if len(cpHosts) > 0 {
+		kubeAdminConfig := GetKubeConfigX509WithData(
+			"https://"+cpHosts[0].Address+":6443",
+			KubeAdminCertName,
+			string(cert.EncodeCertPEM(caCrt)),
+			string(cert.EncodeCertPEM(kubeAdminCrt)),
+			string(cert.EncodePrivateKeyPEM(kubeAdminKey)))
+		kubeAdminCertObj.Config = kubeAdminConfig
+		kubeAdminCertObj.ConfigPath = localKubeConfigPath
+	} else {
+		kubeAdminCertObj.Config = ""
+	}
 	certs[KubeAdminCertName] = kubeAdminCertObj
-
 	// generate etcd certificate and key
 	if len(rkeConfig.Services.Etcd.ExternalURLs) > 0 {
 		clientCert, err := cert.ParseCertsPEM([]byte(rkeConfig.Services.Etcd.Cert))
