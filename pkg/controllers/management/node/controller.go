@@ -80,6 +80,9 @@ func isCustom(obj *v3.Node) bool {
 }
 
 func (m *Lifecycle) Create(obj *v3.Node) (*v3.Node, error) {
+	v3.NodeConditionRegistered.IsUnknown(obj)
+	v3.NodeConditionRegistered.Message(obj, "waiting to register with Kubernetes")
+
 	if isCustom(obj) {
 		m.setupCustom(obj)
 		newObj, err := v3.NodeConditionInitialized.Once(obj, func() (runtime.Object, error) {
@@ -245,10 +248,8 @@ func (m *Lifecycle) ready(obj *v3.Node) (*v3.Node, error) {
 	// Provision in the background so we can poll and save the config
 	done := make(chan error)
 	go func() {
-		newObj, err := v3.NodeConditionProvisioned.Once(obj, func() (runtime.Object, error) {
-			return m.provision(driverConfig, config.Dir(), obj)
-		})
-		obj = newObj.(*v3.Node)
+		newObj, err := m.provision(driverConfig, config.Dir(), obj)
+		obj = newObj
 		done <- err
 	}()
 
@@ -274,7 +275,7 @@ outer:
 }
 
 func (m *Lifecycle) Updated(obj *v3.Node) (*v3.Node, error) {
-	newObj, err := v3.NodeConditionReady.Once(obj, func() (runtime.Object, error) {
+	newObj, err := v3.NodeConditionProvisioned.Once(obj, func() (runtime.Object, error) {
 		if obj.Status.NodeTemplateSpec == nil {
 			return obj, nil
 		}
