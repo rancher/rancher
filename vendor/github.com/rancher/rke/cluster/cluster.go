@@ -316,7 +316,9 @@ func ConfigureCluster(ctx context.Context, rkeConfig v3.RancherKubernetesEngineC
 func (c *Cluster) getEtcdProcessHostMap(readyEtcdHosts []*hosts.Host) map[*hosts.Host]v3.Process {
 	etcdProcessHostMap := make(map[*hosts.Host]v3.Process)
 	for _, host := range c.EtcdHosts {
-		etcdProcessHostMap[host] = c.BuildEtcdProcess(host, readyEtcdHosts)
+		if !host.ToAddEtcdMember {
+			etcdProcessHostMap[host] = c.BuildEtcdProcess(host, readyEtcdHosts)
+		}
 	}
 	return etcdProcessHostMap
 }
