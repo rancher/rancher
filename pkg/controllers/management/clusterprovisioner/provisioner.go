@@ -137,7 +137,7 @@ func (p *Provisioner) machineChanged(key string, machine *v3.Node) error {
 	return nil
 }
 
-func (p *Provisioner) createNode(name string, cluster *v3.Cluster, nodePool v3.NodePool) (*v3.Node, error) {
+func (p *Provisioner) createNode(name string, cluster *v3.Cluster, nodePool v3.NodePool, simulate bool) (*v3.Node, error) {
 	newNode := &v3.Node{}
 	newNode.GenerateName = "m-"
 	newNode.Namespace = cluster.Name
@@ -155,6 +155,10 @@ func (p *Provisioner) createNode(name string, cluster *v3.Cluster, nodePool v3.N
 	newNode.Spec.ClusterName = cluster.Name
 	newNode.Labels = nodePool.Labels
 	newNode.Annotations = nodePool.Annotations
+
+	if simulate {
+		return newNode, nil
+	}
 
 	if newNode.Spec.NodeTemplateName == "" || nodePool.HostnamePrefix == "" {
 		logrus.Warnf("invalid node pool on cluster [%s], not creating node", cluster.Name)
@@ -179,9 +183,6 @@ func (p *Provisioner) createNodes(cluster *v3.Cluster) error {
 		return nil
 	}
 
-	byUUID := map[string][]*v3.Node{}
-	byName := map[string]bool{}
-
 	changed := false
 	for i, nodePool := range cluster.Spec.NodePools {
 		if nodePool.UUID == "" {
@@ -197,19 +198,51 @@ func (p *Provisioner) createNodes(cluster *v3.Cluster) error {
 		}
 	}
 
-	nodes, err := p.NodeLister.List(cluster.Name, labels.Everything())
+	changed, err := p.createOrCheckNodes(cluster, true)
 	if err != nil {
 		return err
 	}
 
-	waiting := false
-	for _, node := range nodes {
-		if v3.NodeConditionProvisioned.IsUnknown(node) {
-			waiting = true
-		}
+	if changed {
+		_, err = p.createOrCheckNodes(cluster, false)
+	}
 
+	return err
+}
+
+func (p *Provisioner) createOrCheckNodes(cluster *v3.Cluster, simulate bool) (bool, error) {
+	byUUID := map[string][]*v3.Node{}
+	byName := map[string]bool{}
+	changed := false
+
+	var (
+		err   error
+		nodes []*v3.Node
+	)
+
+	if simulate {
+		nodes, err = p.NodeLister.List(cluster.Name, labels.Everything())
+		if err != nil {
+			return false, err
+		}
+	} else {
+		nodeList, err := p.Nodes.List(metav1.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+		for i := range nodeList.Items {
+			if nodeList.Items[i].Namespace == cluster.Name {
+				nodes = append(nodes, &nodeList.Items[i])
+			}
+		}
+	}
+
+	for _, node := range nodes {
 		if v3.NodeConditionProvisioned.IsFalse(node) {
-			p.deleteNodeLater(node)
+			changed = true
+			if !simulate {
+				p.deleteNodeLater(node)
+			}
 		}
 		byName[node.Spec.RequestedHostname] = true
 		if node.Spec.NodePoolUUID != "" {
@@ -230,21 +263,15 @@ func (p *Provisioner) createNodes(cluster *v3.Cluster) error {
 		}
 
 		for i := 1; len(nodes) < nodePool.Quantity; i++ {
-			if waiting {
-				// I do this so we don't get in a tight loop of creating nodes by accident
-				return &controller.ForgetError{
-					Err: fmt.Errorf("waiting on nodes to provision"),
-				}
-			}
-
 			name := fmt.Sprintf("%s%02d", nodePool.HostnamePrefix, i)
 			if byName[name] {
 				continue
 			}
 
-			newNode, err := p.createNode(name, cluster, nodePool)
+			changed = true
+			newNode, err := p.createNode(name, cluster, nodePool, simulate)
 			if err != nil {
-				return err
+				return false, err
 			}
 
 			byName[newNode.Spec.RequestedHostname] = true
@@ -258,12 +285,15 @@ func (p *Provisioner) createNodes(cluster *v3.Cluster) error {
 
 			toDelete := nodes[len(nodes)-1]
 
-			prop := metav1.DeletePropagationForeground
-			err := p.Nodes.DeleteNamespaced(toDelete.Namespace, toDelete.Name, &metav1.DeleteOptions{
-				PropagationPolicy: &prop,
-			})
-			if err != nil {
-				return err
+			changed = true
+			if !simulate {
+				prop := metav1.DeletePropagationForeground
+				err := p.Nodes.DeleteNamespaced(toDelete.Namespace, toDelete.Name, &metav1.DeleteOptions{
+					PropagationPolicy: &prop,
+				})
+				if err != nil {
+					return false, err
+				}
 			}
 
 			nodes = nodes[:len(nodes)-1]
@@ -273,17 +303,20 @@ func (p *Provisioner) createNodes(cluster *v3.Cluster) error {
 
 	for _, nodes := range byUUID {
 		for _, node := range nodes {
-			prop := metav1.DeletePropagationForeground
-			err := p.Nodes.DeleteNamespaced(node.Namespace, node.Name, &metav1.DeleteOptions{
-				PropagationPolicy: &prop,
-			})
-			if err != nil {
-				return err
+			changed = true
+			if !simulate {
+				prop := metav1.DeletePropagationForeground
+				err := p.Nodes.DeleteNamespaced(node.Namespace, node.Name, &metav1.DeleteOptions{
+					PropagationPolicy: &prop,
+				})
+				if err != nil {
+					return false, err
+				}
 			}
 		}
 	}
 
-	return nil
+	return changed, nil
 }
 
 func (p *Provisioner) Create(cluster *v3.Cluster) (*v3.Cluster, error) {
