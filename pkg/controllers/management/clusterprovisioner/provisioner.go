@@ -613,7 +613,7 @@ func (p *Provisioner) reconcileRKENodes(clusterName string) ([]v3.RKEConfigNode,
 			continue
 		}
 
-		if !v3.NodeConditionReady.IsTrue(machine) {
+		if !v3.NodeConditionProvisioned.IsTrue(machine) {
 			continue
 		}
 

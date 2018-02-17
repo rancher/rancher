@@ -319,6 +319,7 @@ func (m *NodesSyncer) convertNodeToNode(node *corev1.Node, existing *v3.Node, po
 	machine.Status.NodeName = node.Name
 	machine.APIVersion = "management.cattle.io/v3"
 	machine.Kind = "Node"
+	v3.NodeConditionRegistered.True(machine)
 	return machine, nil
 }
 
