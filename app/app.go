@@ -6,6 +6,7 @@ import (
 
 	"fmt"
 
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	managementController "github.com/rancher/rancher/pkg/controllers/management"
 	"github.com/rancher/rancher/pkg/dialer"
@@ -68,6 +69,8 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 	if err != nil {
 		return err
 	}
+
+	tokens.StartPurgeDaemon(ctx, management)
 
 	managementController.Register(ctx, management, manager, dialerFactory)
 	if err := management.Start(ctx); err != nil {

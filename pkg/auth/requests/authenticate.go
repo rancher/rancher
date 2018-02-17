@@ -107,7 +107,7 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (*v3.Token, err
 		return nil, fmt.Errorf("must authenticate")
 	}
 
-	if !tokens.IsNotExpired(*storedToken) {
+	if tokens.IsExpired(*storedToken) {
 		return nil, fmt.Errorf("must authenticate")
 	}
 

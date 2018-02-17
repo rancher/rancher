@@ -2,12 +2,10 @@ package tokens
 
 import (
 	"encoding/base64"
+	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
-
-	"fmt"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
@@ -20,6 +18,7 @@ import (
 func getAuthProviderName(principalID string) string {
 	parts := strings.Split(principalID, "://")
 	externalType := parts[0]
+
 	providerParts := strings.Split(externalType, "_")
 	return providerParts[0]
 }
@@ -37,20 +36,25 @@ func SplitTokenParts(tokenID string) (string, string) {
 	return parts[0], parts[1]
 }
 
-func IsNotExpired(token v3.Token) bool {
-	created := token.ObjectMeta.CreationTimestamp.Time
-	durationElapsed := time.Since(created)
+func SetTokenExpiresAt(token *v3.Token) {
+	if token.TTLMillis != 0 {
+		created := token.ObjectMeta.CreationTimestamp.Time
+		ttlDuration := time.Duration(token.TTLMillis) * time.Millisecond
+		expiresAtTime := created.Add(ttlDuration)
+		token.ExpiresAt = expiresAtTime.UTC().Format(time.RFC3339)
+	}
+}
 
-	ttlDuration, err := time.ParseDuration(strconv.Itoa(token.TTLMillis) + "ms")
-	if err != nil {
-		logrus.Errorf("Error parsing ttl %v", err)
+func IsExpired(token v3.Token) bool {
+	if token.TTLMillis == 0 {
 		return false
 	}
 
-	if durationElapsed.Seconds() <= ttlDuration.Seconds() {
-		return true
-	}
-	return false
+	created := token.ObjectMeta.CreationTimestamp.Time
+	durationElapsed := time.Since(created)
+
+	ttlDuration := time.Duration(token.TTLMillis) * time.Millisecond
+	return durationElapsed.Seconds() >= ttlDuration.Seconds()
 }
 
 func GetTokenAuthFromRequest(req *http.Request) string {
@@ -109,11 +113,7 @@ func CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPri
 	return nil
 }
 
-func NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerInfo map[string]string, ttl int, description string) (v3.Token, error) {
-	if ttl == 0 {
-		ttl = defaultTokenTTL //16 hrs
-	}
-
+func NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerInfo map[string]string, ttl int64, description string) (v3.Token, error) {
 	token := &v3.Token{
 		UserPrincipal:   userPrincipal,
 		GroupPrincipals: groupPrincipals,

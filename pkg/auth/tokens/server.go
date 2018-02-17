@@ -18,7 +18,6 @@ import (
 // TODO Cleanup error logging. If error is being returned, use errors.wrap to return and dont log here
 
 const (
-	defaultTokenTTL    = 57600000
 	userPrincipalIndex = "authn.management.cattle.io/user-principal-index"
 	userIDLabel        = "authn.management.cattle.io/token-userId"
 	tokenKeyIndex      = "authn.management.cattle.io/token-key-index"
@@ -86,16 +85,11 @@ func (s *tokenAPIServer) createDerivedToken(jsonInput v3.Token, tokenAuthValue s
 		return v3.Token{}, 401, err
 	}
 
-	ttl := jsonInput.TTLMillis
-	if ttl == 0 {
-		ttl = defaultTokenTTL //16 hrs
-	}
-
 	k8sToken := &v3.Token{
 		UserPrincipal:   token.UserPrincipal,
 		GroupPrincipals: token.GroupPrincipals,
 		IsDerived:       true,
-		TTLMillis:       ttl,
+		TTLMillis:       jsonInput.TTLMillis,
 		UserID:          token.UserID,
 		AuthProvider:    token.AuthProvider,
 		ProviderInfo:    token.ProviderInfo,
@@ -163,14 +157,14 @@ func (s *tokenAPIServer) getK8sTokenCR(tokenAuthValue string) (*v3.Token, int, e
 		return nil, 0, fmt.Errorf("Invalid auth token value")
 	}
 
-	if !IsNotExpired(*storedToken) {
+	if IsExpired(*storedToken) {
 		return storedToken, 410, fmt.Errorf("Auth Token has expired")
 	}
 
 	return storedToken, 0, nil
 }
 
-//GetTokens will list all derived tokens of the authenticated user - only derived
+//GetTokens will list all(login and derived, and even expired) tokens of the authenticated user
 func (s *tokenAPIServer) getTokens(tokenAuthValue string) ([]v3.Token, int, error) {
 	logrus.Debug("LIST Tokens Invoked")
 	tokens := make([]v3.Token, 0)
@@ -188,9 +182,11 @@ func (s *tokenAPIServer) getTokens(tokenAuthValue string) ([]v3.Token, int, erro
 	}
 
 	for _, t := range tokenList.Items {
-		if IsNotExpired(t) {
-			tokens = append(tokens, t)
+		SetTokenExpiresAt(&t)
+		if IsExpired(t) {
+			t.Expired = true
 		}
+		tokens = append(tokens, t)
 	}
 	return tokens, 0, nil
 }
@@ -217,7 +213,7 @@ func (s *tokenAPIServer) deleteToken(tokenAuthValue string) (int, error) {
 	return 0, nil
 }
 
-//getToken will get the token by ID if not expired
+//getToken will get the token by ID
 func (s *tokenAPIServer) getTokenByID(tokenAuthValue string, tokenID string) (v3.Token, int, error) {
 	logrus.Debug("GET Token Invoked")
 	token := &v3.Token{}
@@ -236,9 +232,11 @@ func (s *tokenAPIServer) getTokenByID(tokenAuthValue string, tokenID string) (v3
 		return v3.Token{}, 403, fmt.Errorf("access denied: cannot get token")
 	}
 
-	if !IsNotExpired(*token) {
-		return v3.Token{}, 410, fmt.Errorf("expired token")
+	if IsExpired(*token) {
+		token.Expired = true
 	}
+
+	SetTokenExpiresAt(token)
 
 	return *token, 0, nil
 }
