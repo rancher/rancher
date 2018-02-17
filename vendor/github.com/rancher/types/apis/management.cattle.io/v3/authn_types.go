@@ -14,10 +14,12 @@ type Token struct {
 	ProviderInfo    map[string]string `json:"providerInfo,omitempty"`
 	UserID          string            `json:"userId" norman:"type=reference[user]"`
 	AuthProvider    string            `json:"authProvider"`
-	TTLMillis       int               `json:"ttl"`
+	TTLMillis       int64             `json:"ttl"`
 	LastUpdateTime  string            `json:"lastUpdateTime"`
 	IsDerived       bool              `json:"isDerived"`
 	Description     string            `json:"description"`
+	Expired         bool              `json:"expired"`
+	ExpiresAt       string            `json:"expiresAt"`
 }
 
 type User struct {

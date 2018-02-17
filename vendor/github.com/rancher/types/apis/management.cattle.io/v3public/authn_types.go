@@ -12,7 +12,7 @@ type AuthProvider struct {
 }
 
 type GenericLogin struct {
-	TTLMillis    int    `json:"ttl,omitempty"`
+	TTLMillis    int64  `json:"ttl,omitempty"`
 	Description  string `json:"description,omitempty" norman:"type=string,required"`
 	ResponseType string `json:"responseType,omitempty" norman:"type=string,required"` //json or cookie
 }

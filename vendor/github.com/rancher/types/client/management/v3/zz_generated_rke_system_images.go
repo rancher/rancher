@@ -15,6 +15,8 @@ const (
 	RKESystemImagesFieldEtcd                      = "etcd"
 	RKESystemImagesFieldFlannel                   = "flannel"
 	RKESystemImagesFieldFlannelCNI                = "flannelCni"
+	RKESystemImagesFieldIngress                   = "ingress"
+	RKESystemImagesFieldIngressBackend            = "ingressBackend"
 	RKESystemImagesFieldKubeDNS                   = "kubedns"
 	RKESystemImagesFieldKubeDNSAutoscaler         = "kubednsAutoscaler"
 	RKESystemImagesFieldKubeDNSSidecar            = "kubednsSidecar"
@@ -40,6 +42,8 @@ type RKESystemImages struct {
 	Etcd                      string `json:"etcd,omitempty"`
 	Flannel                   string `json:"flannel,omitempty"`
 	FlannelCNI                string `json:"flannelCni,omitempty"`
+	Ingress                   string `json:"ingress,omitempty"`
+	IngressBackend            string `json:"ingressBackend,omitempty"`
 	KubeDNS                   string `json:"kubedns,omitempty"`
 	KubeDNSAutoscaler         string `json:"kubednsAutoscaler,omitempty"`
 	KubeDNSSidecar            string `json:"kubednsSidecar,omitempty"`
