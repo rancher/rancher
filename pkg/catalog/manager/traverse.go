@@ -89,8 +89,11 @@ func traverseHelmGitFiles(repoPath, catalogName string) ([]v3.Template, []error,
 		file.Name = relPath
 
 		if strings.HasSuffix(info.Name(), "README.md") {
-			template.Spec.Versions[0].Readme = file.Contents
-			return nil
+			contents, err := base64.StdEncoding.DecodeString(file.Contents)
+			if err != nil {
+				return err
+			}
+			template.Spec.Versions[0].Readme = string(contents)
 		}
 
 		template.Spec.Versions[0].Files = append(template.Spec.Versions[0].Files, *file)
@@ -165,7 +168,11 @@ func traverseHelmFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []e
 			var filesToAdd []v3.File
 			for _, file := range files {
 				if strings.EqualFold(fmt.Sprintf("%s/%s", chart, "readme.md"), file.Name) {
-					v.Readme = file.Contents
+					contents, err := base64.StdEncoding.DecodeString(file.Contents)
+					if err != nil {
+						return nil, nil, err
+					}
+					v.Readme = string(contents)
 					continue
 				}
 				filesToAdd = append(filesToAdd, file)

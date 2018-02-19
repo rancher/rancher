@@ -143,6 +143,7 @@ func LoadMetadata(path string) (*ChartMetadata, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
 	data, err := ioutil.ReadAll(f)
 	if err != nil {
 		return nil, err
@@ -156,6 +157,7 @@ func LoadFile(path string) (*v3.File, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
 	data, err := ioutil.ReadAll(f)
 	if err != nil {
 		return nil, err
