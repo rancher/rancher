@@ -96,7 +96,7 @@ func (m *NodesSyncer) reconcileAll() error {
 	for _, machine := range machines {
 		nodeName := getNodeNameFromNode(machine)
 		if nodeName == "" {
-			logrus.Warnf("Failed to get nodeName from machine [%s]", machine.Name)
+			logrus.Debugf("Failed to get nodeName from machine [%s]", machine.Name)
 			continue
 		}
 		machineMap[nodeName] = machine
