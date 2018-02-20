@@ -229,11 +229,13 @@ func (w *WorkloadLister) CreateServiceForWorkload(workload *Workload) error {
 	if s != nil {
 		return nil
 	}
+	controller := true
 	ownerRef := metav1.OwnerReference{
 		Name:       workload.Name,
 		APIVersion: workload.APIVersion,
 		UID:        workload.UUID,
 		Kind:       workload.Kind,
+		Controller: &controller,
 	}
 
 	var servicePorts []corev1.ServicePort
