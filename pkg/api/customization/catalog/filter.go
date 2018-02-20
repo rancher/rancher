@@ -139,7 +139,11 @@ func TemplateIconHandler(apiContext *types.APIContext, next types.RequestHandler
 			return err
 		}
 		iconReader := bytes.NewReader(icon)
-		http.ServeContent(apiContext.Response, apiContext.Request, template.IconFilename, time.Time{}, iconReader)
+		t, err := time.Parse(time.RFC3339, template.Created)
+		if err != nil {
+			return err
+		}
+		http.ServeContent(apiContext.Response, apiContext.Request, template.IconFilename, t, iconReader)
 		return nil
 	default:
 		return httperror.NewAPIError(httperror.NotFound, "not found")
@@ -153,8 +157,13 @@ func TemplateVersionReadmeHandler(apiContext *types.APIContext, next types.Reque
 		if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, templateVersion); err != nil {
 			return err
 		}
-		iconReader := bytes.NewReader([]byte(templateVersion.Readme))
-		http.ServeContent(apiContext.Response, apiContext.Request, "readme", time.Time{}, iconReader)
+		readmeReader := bytes.NewReader([]byte(templateVersion.Readme))
+		t, err := time.Parse(time.RFC3339, templateVersion.Created)
+		if err != nil {
+			return err
+		}
+		apiContext.Response.Header().Set("Content-Type", "text/plain")
+		http.ServeContent(apiContext.Response, apiContext.Request, "readme", t, readmeReader)
 		return nil
 	default:
 		return httperror.NewAPIError(httperror.NotFound, "not found")
