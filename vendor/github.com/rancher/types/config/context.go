@@ -20,6 +20,7 @@ import (
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	projectSchema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	rbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
+	"github.com/rancher/types/config/dialer"
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -36,6 +37,106 @@ var (
 	ManagementStorageContext types.StorageContext = "mgmt"
 )
 
+type ManagementGetter interface {
+	GetManagement() managementv3.Interface
+}
+
+type ScaledContext struct {
+	ClientGetter      proxy.ClientGetter
+	LocalConfig       *rest.Config
+	RESTConfig        rest.Config
+	UnversionedClient rest.Interface
+	K8sClient         kubernetes.Interface
+	APIExtClient      clientset.Interface
+	Schemas           *types.Schemas
+	AccessControl     types.AccessControl
+	Dialer            dialer.Factory
+	Leader            bool
+
+	Management managementv3.Interface
+	Project    projectv3.Interface
+	RBAC       rbacv1.Interface
+	Core       corev1.Interface
+}
+
+func (c *ScaledContext) controllers() []controller.Starter {
+	return []controller.Starter{
+		c.Management,
+		c.Project,
+		c.RBAC,
+		c.Core,
+	}
+}
+
+func (c *ScaledContext) GetManagement() managementv3.Interface {
+	return c.Management
+}
+
+func NewScaledContext(config rest.Config) (*ScaledContext, error) {
+	var err error
+
+	context := &ScaledContext{
+		RESTConfig: config,
+	}
+
+	context.Management, err = managementv3.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	context.Project, err = projectv3.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	context.K8sClient, err = kubernetes.NewForConfig(&config)
+	if err != nil {
+		return nil, err
+	}
+
+	context.RBAC, err = rbacv1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	context.Core, err = corev1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+	context.Project, err = projectv3.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	dynamicConfig := config
+	if dynamicConfig.NegotiatedSerializer == nil {
+		configConfig := dynamic.ContentConfig()
+		dynamicConfig.NegotiatedSerializer = configConfig.NegotiatedSerializer
+	}
+
+	context.UnversionedClient, err = rest.UnversionedRESTClientFor(&dynamicConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	context.APIExtClient, err = clientset.NewForConfig(&dynamicConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	context.Schemas = types.NewSchemas().
+		AddSchemas(managementSchema.Schemas).
+		AddSchemas(clusterSchema.Schemas).
+		AddSchemas(projectSchema.Schemas)
+
+	return context, err
+}
+
+func (c *ScaledContext) Start(ctx context.Context) error {
+	logrus.Info("Starting API controllers")
+	return controller.SyncThenStart(ctx, 5, c.controllers()...)
+}
+
 type ManagementContext struct {
 	eventBroadcaster record.EventBroadcaster
 
@@ -49,7 +150,7 @@ type ManagementContext struct {
 	EventLogger       event.Logger
 	Schemas           *types.Schemas
 	Scheme            *runtime.Scheme
-	AccessControl     types.AccessControl
+	Dialer            dialer.Factory
 
 	Management managementv3.Interface
 	Project    projectv3.Interface
@@ -63,8 +164,11 @@ func (c *ManagementContext) controllers() []controller.Starter {
 		c.Project,
 		c.RBAC,
 		c.Core,
-		c.Project,
 	}
+}
+
+func (c *ManagementContext) GetManagement() managementv3.Interface {
+	return c.Management
 }
 
 type UserContext struct {

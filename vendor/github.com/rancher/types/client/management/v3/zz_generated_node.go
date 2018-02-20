@@ -25,10 +25,8 @@ const (
 	NodeFieldLimits               = "limits"
 	NodeFieldName                 = "name"
 	NodeFieldNamespaceId          = "namespaceId"
-	NodeFieldNodeAnnotations      = "nodeAnnotations"
-	NodeFieldNodeLabels           = "nodeLabels"
 	NodeFieldNodeName             = "nodeName"
-	NodeFieldNodePoolUUID         = "nodePoolUuid"
+	NodeFieldNodePoolName         = "nodePoolUuid"
 	NodeFieldNodeTaints           = "nodeTaints"
 	NodeFieldNodeTemplateId       = "nodeTemplateId"
 	NodeFieldOwnerReferences      = "ownerReferences"
@@ -70,10 +68,8 @@ type Node struct {
 	Limits               map[string]string         `json:"limits,omitempty"`
 	Name                 string                    `json:"name,omitempty"`
 	NamespaceId          string                    `json:"namespaceId,omitempty"`
-	NodeAnnotations      map[string]string         `json:"nodeAnnotations,omitempty"`
-	NodeLabels           map[string]string         `json:"nodeLabels,omitempty"`
 	NodeName             string                    `json:"nodeName,omitempty"`
-	NodePoolUUID         string                    `json:"nodePoolUuid,omitempty"`
+	NodePoolName         string                    `json:"nodePoolUuid,omitempty"`
 	NodeTaints           []Taint                   `json:"nodeTaints,omitempty"`
 	NodeTemplateId       string                    `json:"nodeTemplateId,omitempty"`
 	OwnerReferences      []OwnerReference          `json:"ownerReferences,omitempty"`

@@ -6,5 +6,5 @@ const (
 )
 
 type NodeDriverStatus struct {
-	Conditions []NodeDriverCondition `json:"conditions,omitempty"`
+	Conditions []Condition `json:"conditions,omitempty"`
 }

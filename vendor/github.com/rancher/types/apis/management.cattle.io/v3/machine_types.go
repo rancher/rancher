@@ -77,6 +77,8 @@ type NodeStatus struct {
 var (
 	NodeConditionInitialized condition.Cond = "Initialized"
 	NodeConditionProvisioned condition.Cond = "Provisioned"
+	NodeConditionRegistered  condition.Cond = "Registered"
+	NodeConditionRemoved     condition.Cond = "Removed"
 	NodeConditionConfigSaved condition.Cond = "Saved"
 	NodeConditionReady       condition.Cond = "Ready"
 )
@@ -96,14 +98,39 @@ type NodeCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
-type NodePool struct {
-	CommonNodeSpec
+var (
+	NodePoolConditionUpdated condition.Cond = "Updated"
+)
 
-	UUID           string            `json:"uuid" norman:"nocreate,noupdate"`
-	HostnamePrefix string            `json:"hostnamePrefix" norman:"required"`
-	Quantity       int               `json:"quantity" norman:"required,default=1"`
-	Labels         map[string]string `json:"labels"`
-	Annotations    map[string]string `json:"annotations"`
+type NodePool struct {
+	types.Namespaced
+
+	metav1.TypeMeta `json:",inline"`
+	// Standard object’s metadata. More info:
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   NodePoolSpec   `json:"spec"`
+	Status NodePoolStatus `json:"status"`
+}
+
+type NodePoolSpec struct {
+	Etcd             bool   `json:"etcd"`
+	ControlPlane     bool   `json:"controlPlane"`
+	Worker           bool   `json:"worker"`
+	NodeTemplateName string `json:"nodeTemplateName,omitempty" norman:"type=reference[nodeTemplate],required,notnullable"`
+
+	HostnamePrefix  string            `json:"hostnamePrefix" norman:"required,notnullable"`
+	Quantity        int               `json:"quantity" norman:"required,default=1"`
+	NodeLabels      map[string]string `json:"nodeLabels"`
+	NodeAnnotations map[string]string `json:"nodeAnnotations"`
+
+	DisplayName string `json:"displayName"`
+	ClusterName string `json:"clusterName,omitempty" norman:"type=reference[cluster],noupdate,required"`
+}
+
+type NodePoolStatus struct {
+	Conditions []Condition `json:"conditions"`
 }
 
 type CustomConfig struct {
@@ -119,16 +146,15 @@ type CustomConfig struct {
 	SSHKey string `yaml:"ssh_key" json:"sshKey,omitempty"`
 }
 
-type CommonNodeSpec struct {
-	Etcd             bool   `json:"etcd"`
-	ControlPlane     bool   `json:"controlPlane"`
-	Worker           bool   `json:"worker"`
-	NodeTemplateName string `json:"nodeTemplateName,omitempty" norman:"type=reference[nodeTemplate]"`
-}
-
 type NodeSpec struct {
-	CommonNodeSpec    `json:",inline"`
-	NodePoolUUID      string        `json:"nodePoolUuid" norman:"nocreate,noupdate"`
+	// Common fields.  They aren't in a shared struct because the annotations are different
+
+	Etcd             bool   `json:"etcd" norman:"noupdate"`
+	ControlPlane     bool   `json:"controlPlane" norman:"noupdate"`
+	Worker           bool   `json:"worker" norman:"noupdate"`
+	NodeTemplateName string `json:"nodeTemplateName,omitempty" norman:"type=reference[nodeTemplate],noupdate"`
+
+	NodePoolName      string        `json:"nodePoolUuid" norman:"type=reference[nodePool],nocreate,noupdate"`
 	CustomConfig      *CustomConfig `json:"customConfig"`
 	Imported          bool          `json:"imported"`
 	Description       string        `json:"description,omitempty"`
@@ -166,7 +192,7 @@ type NodeDriver struct {
 }
 
 type NodeDriverStatus struct {
-	Conditions []NodeDriverCondition `json:"conditions"`
+	Conditions []Condition `json:"conditions"`
 }
 
 var (
@@ -175,7 +201,7 @@ var (
 	NodeDriverConditionInactive   condition.Cond = "Inactive"
 )
 
-type NodeDriverCondition struct {
+type Condition struct {
 	// Type of cluster condition.
 	Type string `json:"type"`
 	// Status of the condition, one of True, False, Unknown.

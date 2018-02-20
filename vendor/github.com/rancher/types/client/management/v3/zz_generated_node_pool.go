@@ -1,26 +1,121 @@
 package client
 
+import (
+	"github.com/rancher/norman/types"
+)
+
 const (
-	NodePoolType                = "nodePool"
-	NodePoolFieldAnnotations    = "annotations"
-	NodePoolFieldControlPlane   = "controlPlane"
-	NodePoolFieldEtcd           = "etcd"
-	NodePoolFieldHostnamePrefix = "hostnamePrefix"
-	NodePoolFieldLabels         = "labels"
-	NodePoolFieldNodeTemplateId = "nodeTemplateId"
-	NodePoolFieldQuantity       = "quantity"
-	NodePoolFieldUUID           = "uuid"
-	NodePoolFieldWorker         = "worker"
+	NodePoolType                      = "nodePool"
+	NodePoolFieldAnnotations          = "annotations"
+	NodePoolFieldClusterId            = "clusterId"
+	NodePoolFieldControlPlane         = "controlPlane"
+	NodePoolFieldCreated              = "created"
+	NodePoolFieldCreatorID            = "creatorId"
+	NodePoolFieldDisplayName          = "displayName"
+	NodePoolFieldEtcd                 = "etcd"
+	NodePoolFieldHostnamePrefix       = "hostnamePrefix"
+	NodePoolFieldLabels               = "labels"
+	NodePoolFieldName                 = "name"
+	NodePoolFieldNamespaceId          = "namespaceId"
+	NodePoolFieldNodeAnnotations      = "nodeAnnotations"
+	NodePoolFieldNodeLabels           = "nodeLabels"
+	NodePoolFieldNodeTemplateId       = "nodeTemplateId"
+	NodePoolFieldOwnerReferences      = "ownerReferences"
+	NodePoolFieldQuantity             = "quantity"
+	NodePoolFieldRemoved              = "removed"
+	NodePoolFieldState                = "state"
+	NodePoolFieldStatus               = "status"
+	NodePoolFieldTransitioning        = "transitioning"
+	NodePoolFieldTransitioningMessage = "transitioningMessage"
+	NodePoolFieldUuid                 = "uuid"
+	NodePoolFieldWorker               = "worker"
 )
 
 type NodePool struct {
-	Annotations    map[string]string `json:"annotations,omitempty"`
-	ControlPlane   bool              `json:"controlPlane,omitempty"`
-	Etcd           bool              `json:"etcd,omitempty"`
-	HostnamePrefix string            `json:"hostnamePrefix,omitempty"`
-	Labels         map[string]string `json:"labels,omitempty"`
-	NodeTemplateId string            `json:"nodeTemplateId,omitempty"`
-	Quantity       *int64            `json:"quantity,omitempty"`
-	UUID           string            `json:"uuid,omitempty"`
-	Worker         bool              `json:"worker,omitempty"`
+	types.Resource
+	Annotations          map[string]string `json:"annotations,omitempty"`
+	ClusterId            string            `json:"clusterId,omitempty"`
+	ControlPlane         bool              `json:"controlPlane,omitempty"`
+	Created              string            `json:"created,omitempty"`
+	CreatorID            string            `json:"creatorId,omitempty"`
+	DisplayName          string            `json:"displayName,omitempty"`
+	Etcd                 bool              `json:"etcd,omitempty"`
+	HostnamePrefix       string            `json:"hostnamePrefix,omitempty"`
+	Labels               map[string]string `json:"labels,omitempty"`
+	Name                 string            `json:"name,omitempty"`
+	NamespaceId          string            `json:"namespaceId,omitempty"`
+	NodeAnnotations      map[string]string `json:"nodeAnnotations,omitempty"`
+	NodeLabels           map[string]string `json:"nodeLabels,omitempty"`
+	NodeTemplateId       string            `json:"nodeTemplateId,omitempty"`
+	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty"`
+	Quantity             *int64            `json:"quantity,omitempty"`
+	Removed              string            `json:"removed,omitempty"`
+	State                string            `json:"state,omitempty"`
+	Status               *NodePoolStatus   `json:"status,omitempty"`
+	Transitioning        string            `json:"transitioning,omitempty"`
+	TransitioningMessage string            `json:"transitioningMessage,omitempty"`
+	Uuid                 string            `json:"uuid,omitempty"`
+	Worker               bool              `json:"worker,omitempty"`
+}
+type NodePoolCollection struct {
+	types.Collection
+	Data   []NodePool `json:"data,omitempty"`
+	client *NodePoolClient
+}
+
+type NodePoolClient struct {
+	apiClient *Client
+}
+
+type NodePoolOperations interface {
+	List(opts *types.ListOpts) (*NodePoolCollection, error)
+	Create(opts *NodePool) (*NodePool, error)
+	Update(existing *NodePool, updates interface{}) (*NodePool, error)
+	ByID(id string) (*NodePool, error)
+	Delete(container *NodePool) error
+}
+
+func newNodePoolClient(apiClient *Client) *NodePoolClient {
+	return &NodePoolClient{
+		apiClient: apiClient,
+	}
+}
+
+func (c *NodePoolClient) Create(container *NodePool) (*NodePool, error) {
+	resp := &NodePool{}
+	err := c.apiClient.Ops.DoCreate(NodePoolType, container, resp)
+	return resp, err
+}
+
+func (c *NodePoolClient) Update(existing *NodePool, updates interface{}) (*NodePool, error) {
+	resp := &NodePool{}
+	err := c.apiClient.Ops.DoUpdate(NodePoolType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *NodePoolClient) List(opts *types.ListOpts) (*NodePoolCollection, error) {
+	resp := &NodePoolCollection{}
+	err := c.apiClient.Ops.DoList(NodePoolType, opts, resp)
+	resp.client = c
+	return resp, err
+}
+
+func (cc *NodePoolCollection) Next() (*NodePoolCollection, error) {
+	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
+		resp := &NodePoolCollection{}
+		err := cc.client.apiClient.Ops.DoNext(cc.Pagination.Next, resp)
+		resp.client = cc.client
+		return resp, err
+	}
+	return nil, nil
+}
+
+func (c *NodePoolClient) ByID(id string) (*NodePool, error) {
+	resp := &NodePool{}
+	err := c.apiClient.Ops.DoByID(NodePoolType, id, resp)
+	return resp, err
+}
+
+func (c *NodePoolClient) Delete(container *NodePool) error {
+	return c.apiClient.Ops.DoResourceDelete(NodePoolType, &container.Resource)
 }
