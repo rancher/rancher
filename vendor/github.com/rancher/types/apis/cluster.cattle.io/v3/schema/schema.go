@@ -5,7 +5,7 @@ import (
 	m "github.com/rancher/norman/types/mapper"
 	"github.com/rancher/types/factory"
 	"k8s.io/api/core/v1"
-	"k8s.io/api/storage/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 )
 
 var (
@@ -46,7 +46,7 @@ func persistentVolumeTypes(schemas *types.Schemas) *types.Schemas {
 
 func storageClassTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
-		MustImport(&Version, v1beta1.StorageClass{}, struct {
+		MustImport(&Version, storagev1.StorageClass{}, struct {
 			ReclaimPolicy string `json:"reclaimPolicy,omitempty" norman:"type=enum,options=Recycle|Delete|Retain"`
 		}{})
 }
