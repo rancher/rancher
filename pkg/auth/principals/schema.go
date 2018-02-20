@@ -9,7 +9,7 @@ import (
 	"github.com/rancher/types/config"
 )
 
-func Schema(ctx context.Context, management *config.ManagementContext, schemas *types.Schemas) error {
+func Schema(ctx context.Context, management *config.ScaledContext, schemas *types.Schemas) error {
 	p := newPrincipalsHandler(ctx, management)
 	schema := schemas.Schema(&managementSchema.Version, client.PrincipalType)
 	schema.ActionHandler = p.actions

@@ -9,10 +9,11 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/encryptedstore"
+	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
+	v12 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 const (
@@ -28,9 +29,8 @@ type NodeConfig struct {
 	cm      map[string]string
 }
 
-func NewStore(management *config.ManagementContext) (*encryptedstore.GenericEncryptedStore, error) {
-	return encryptedstore.NewGenericEncrypedStore("mc-", "", management.Core.Namespaces(""),
-		management.K8sClient.CoreV1())
+func NewStore(namespaceInterface v1.NamespaceInterface, v1Interface v12.CoreV1Interface) (*encryptedstore.GenericEncryptedStore, error) {
+	return encryptedstore.NewGenericEncrypedStore("mc-", "", namespaceInterface, v1Interface)
 }
 
 func NewNodeConfig(store *encryptedstore.GenericEncryptedStore, node *v3.Node) (*NodeConfig, error) {

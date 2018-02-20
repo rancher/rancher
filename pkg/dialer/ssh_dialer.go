@@ -5,9 +5,10 @@ import (
 
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/config/dialer"
 )
 
-func (f *factory) sshDialer(machine *v3.Node) (Dialer, error) {
+func (f *Factory) sshDialer(machine *v3.Node) (dialer.Dialer, error) {
 	if machine.Status.NodeConfig == nil {
 		return nil, fmt.Errorf("waiting to provision %s", machine.Name)
 	}
@@ -22,7 +23,7 @@ func (f *factory) sshDialer(machine *v3.Node) (Dialer, error) {
 	return sshFactory, nil
 }
 
-func (f *factory) sshLocalDialer(machine *v3.Node) (Dialer, error) {
+func (f *Factory) sshLocalDialer(machine *v3.Node) (dialer.Dialer, error) {
 	if machine.Status.NodeConfig == nil {
 		return nil, fmt.Errorf("waiting to provision %s", machine.Name)
 	}

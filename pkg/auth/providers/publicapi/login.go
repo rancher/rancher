@@ -25,16 +25,14 @@ const (
 	CookieName = "R_SESS"
 )
 
-func newLoginHandler(mgmt *config.ManagementContext) *loginHandler {
+func newLoginHandler(mgmt *config.ScaledContext) *loginHandler {
 	return &loginHandler{
-		mgmt: mgmt,
-		mgr:  common.NewUserManager(mgmt),
+		mgr: common.NewUserManager(mgmt),
 	}
 }
 
 type loginHandler struct {
-	mgmt *config.ManagementContext
-	mgr  common.UserManager
+	mgr common.UserManager
 }
 
 func (h *loginHandler) login(actionName string, action *types.Action, request *types.APIContext) error {

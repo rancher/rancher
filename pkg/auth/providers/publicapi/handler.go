@@ -12,7 +12,7 @@ import (
 	"github.com/rancher/types/config"
 )
 
-func NewHandler(ctx context.Context, mgmtCtx *config.ManagementContext) (http.Handler, error) {
+func NewHandler(ctx context.Context, mgmtCtx *config.ScaledContext) (http.Handler, error) {
 	schemas := types.NewSchemas().AddSchemas(publicSchema.PublicSchemas)
 	if err := authProviderSchemas(ctx, mgmtCtx, schemas); err != nil {
 		return nil, err
@@ -27,7 +27,7 @@ func NewHandler(ctx context.Context, mgmtCtx *config.ManagementContext) (http.Ha
 
 var authProviderTypes = []string{v3public.LocalProviderType, v3public.GithubProviderType, v3public.ActiveDirectoryProviderType}
 
-func authProviderSchemas(ctx context.Context, management *config.ManagementContext, schemas *types.Schemas) error {
+func authProviderSchemas(ctx context.Context, management *config.ScaledContext, schemas *types.Schemas) error {
 	schema := schemas.Schema(&publicSchema.PublicVersion, v3public.AuthProviderType)
 	setAuthProvidersStore(schema, management)
 	lh := newLoginHandler(management)

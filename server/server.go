@@ -6,13 +6,14 @@ import (
 
 	"github.com/gorilla/mux"
 	k8sProxy "github.com/rancher/rancher/k8s/proxy"
+	"github.com/rancher/rancher/pkg/api/customization/clusteregistrationtokens"
 	managementapi "github.com/rancher/rancher/pkg/api/server"
 	"github.com/rancher/rancher/pkg/auth/providers/publicapi"
 	authrequests "github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	"github.com/rancher/rancher/pkg/proxy"
-	"github.com/rancher/rancher/pkg/remotedialer"
-	"github.com/rancher/rancher/pkg/tunnel"
+	"github.com/rancher/rancher/pkg/dialer"
+	"github.com/rancher/rancher/pkg/dynamiclistener"
+	"github.com/rancher/rancher/pkg/httpproxy"
 	"github.com/rancher/rancher/server/capabilities"
 	"github.com/rancher/rancher/server/ui"
 	managementSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
@@ -33,68 +34,57 @@ var (
 	}
 )
 
-type Server struct {
-	Tunneler *remotedialer.Server
-}
-
-func New(ctx context.Context, httpPort, httpsPort int, management *config.ManagementContext) (*Server, error) {
-	var result http.Handler
-	tokenAPI, err := tokens.NewAPIHandler(ctx, management)
+func Start(ctx context.Context, httpPort, httpsPort int, apiContext *config.ScaledContext) error {
+	tokenAPI, err := tokens.NewAPIHandler(ctx, apiContext)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	publicAPI, err := publicapi.NewHandler(ctx, management)
+	publicAPI, err := publicapi.NewHandler(ctx, apiContext)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	managementAPI, err := managementapi.New(ctx, httpPort, httpsPort, management, func() http.Handler {
-		return result
-	})
-
+	managementAPI, err := managementapi.New(ctx, apiContext)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	k8sProxy, err := k8sProxy.New(management)
-	if err != nil {
-		return nil, err
-	}
-
-	tunnel := tunnel.NewTunneler(management)
+	k8sProxy := k8sProxy.New(apiContext, apiContext.Dialer)
 
 	authedAPIs := newAuthed(tokenAPI, managementAPI, k8sProxy)
 
-	authedHandler, err := authrequests.NewAuthenticationFilter(ctx, management, authedAPIs)
+	authedHandler, err := authrequests.NewAuthenticationFilter(ctx, apiContext, authedAPIs)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	unauthed := mux.NewRouter()
-	unauthed.Handle("/", ui.UI(managementAPI))
-	unauthed.Handle("/v3/settings/cacerts", authedAPIs).Methods(http.MethodGet)
-	unauthed.PathPrefix("/v3-public").Handler(publicAPI)
-	unauthed.NotFoundHandler = ui.UI(http.NotFoundHandler())
-	unauthed.PathPrefix("/v3/connect").Handler(tunnel)
-	unauthed.PathPrefix("/v3").Handler(authedHandler)
-	unauthed.PathPrefix("/meta").Handler(authedHandler)
-	unauthed.PathPrefix("/k8s/clusters/").Handler(authedHandler)
+	root := mux.NewRouter()
+	root.Handle("/", ui.UI(managementAPI))
+	root.Handle("/v3/settings/cacerts", authedAPIs).Methods(http.MethodGet)
+	root.PathPrefix("/v3-public").Handler(publicAPI)
+	root.Handle("/v3/import/{token}.yaml", http.HandlerFunc(clusteregistrationtokens.ClusterImportHandler))
+	if f, ok := apiContext.Dialer.(*dialer.Factory); ok {
+		root.PathPrefix("/v3/connect").Handler(f.TunnelServer)
+	}
+	root.PathPrefix("/v3").Handler(authedHandler)
+	root.PathPrefix("/meta").Handler(authedHandler)
+	root.PathPrefix("/k8s/clusters/").Handler(authedHandler)
+	root.NotFoundHandler = ui.UI(http.NotFoundHandler())
 
+	// UI
 	uiContent := ui.Content()
-	unauthed.PathPrefix("/assets").Handler(uiContent)
-	unauthed.PathPrefix("/translations").Handler(uiContent)
-	unauthed.Handle("/humans.txt", uiContent)
-	unauthed.Handle("/index.html", uiContent)
-	unauthed.Handle("/robots.txt", uiContent)
-	unauthed.Handle("/VERSION.txt", uiContent)
+	root.PathPrefix("/assets").Handler(uiContent)
+	root.PathPrefix("/translations").Handler(uiContent)
+	root.Handle("/humans.txt", uiContent)
+	root.Handle("/index.html", uiContent)
+	root.Handle("/robots.txt", uiContent)
+	root.Handle("/VERSION.txt", uiContent)
 
-	registerHealth(unauthed)
+	registerHealth(root)
 
-	result = unauthed
-	return &Server{
-		Tunneler: tunnel,
-	}, nil
+	dynamiclistener.Start(ctx, apiContext, httpPort, httpsPort, root)
+	return nil
 }
 
 func newAuthed(tokenAPI http.Handler, managementAPI http.Handler, k8sproxy http.Handler) *mux.Router {
@@ -113,7 +103,7 @@ func newAuthed(tokenAPI http.Handler, managementAPI http.Handler, k8sproxy http.
 }
 
 func newProxy() http.Handler {
-	return proxy.NewProxy("/proxy/", func() []string {
+	return httpproxy.NewProxy("/proxy/", func() []string {
 		return whiteList
 	})
 }

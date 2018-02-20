@@ -1,4 +1,4 @@
-package tunnel
+package tunnelserver
 
 import (
 	"crypto/md5"
@@ -19,27 +19,42 @@ import (
 )
 
 const (
-	crtKeyIndex = "crtKeyIndex"
+	crtKeyIndex    = "crtKeyIndex"
+	importedDriver = "imported"
 
 	Token  = "X-API-Tunnel-Token"
 	Params = "X-API-Tunnel-Params"
 )
 
-func NewTunneler(context *config.ManagementContext) *remotedialer.Server {
+type cluster struct {
+	Address string `json:"address"`
+	Token   string `json:"token"`
+	CACert  string `json:"caCert"`
+}
+
+type input struct {
+	Node    *client.Node `json:"node"`
+	Cluster *cluster     `json:"cluster"`
+}
+
+func NewTunnelServer(context *config.ScaledContext) *remotedialer.Server {
 	auth := newAuthorizer(context)
+	ready := func() bool {
+		return context.Leader
+	}
 	return remotedialer.New(auth, func(rw http.ResponseWriter, req *http.Request, code int, err error) {
 		rw.WriteHeader(code)
 		rw.Write([]byte(err.Error()))
-	})
-
+	}, ready)
 }
 
-func newAuthorizer(context *config.ManagementContext) remotedialer.Authorizer {
+func newAuthorizer(context *config.ScaledContext) remotedialer.Authorizer {
 	auth := &Authorizer{
 		crtIndexer:    context.Management.ClusterRegistrationTokens("").Controller().Informer().GetIndexer(),
 		clusterLister: context.Management.Clusters("").Controller().Lister(),
 		machineLister: context.Management.Nodes("").Controller().Lister(),
 		machines:      context.Management.Nodes(""),
+		clusters:      context.Management.Clusters(""),
 	}
 	context.Management.ClusterRegistrationTokens("").Controller().Informer().AddIndexers(map[string]cache.IndexFunc{
 		crtKeyIndex: auth.crtIndex,
@@ -52,6 +67,7 @@ type Authorizer struct {
 	clusterLister v3.ClusterLister
 	machineLister v3.NodeLister
 	machines      v3.NodeInterface
+	clusters      v3.ClusterInterface
 }
 
 func (t *Authorizer) authorize(req *http.Request) (string, bool, error) {
@@ -65,11 +81,23 @@ func (t *Authorizer) authorize(req *http.Request) (string, bool, error) {
 		return "", false, err
 	}
 
-	inNode, err := t.readNode(cluster, req)
+	input, err := t.readInput(cluster, req)
 	if err != nil {
 		return "", false, err
 	}
 
+	if input.Node != nil {
+		return t.authorizeNode(cluster, input.Node, req)
+	}
+
+	if input.Cluster != nil {
+		return t.authorizeCluster(cluster, input.Cluster, req)
+	}
+
+	return "", false, nil
+}
+
+func (t *Authorizer) authorizeNode(cluster *v3.Cluster, inNode *client.Node, req *http.Request) (string, bool, error) {
 	machineName := machineName(inNode)
 
 	machine, err := t.machineLister.Get(cluster.Name, machineName)
@@ -103,11 +131,9 @@ func (t *Authorizer) createNode(inNode *client.Node, cluster *v3.Cluster, req *h
 			Namespace: cluster.Name,
 		},
 		Spec: v3.NodeSpec{
-			CommonNodeSpec: v3.CommonNodeSpec{
-				Etcd:         inNode.Etcd,
-				ControlPlane: inNode.ControlPlane,
-				Worker:       inNode.Worker,
-			},
+			Etcd:              inNode.Etcd,
+			ControlPlane:      inNode.ControlPlane,
+			Worker:            inNode.Worker,
 			ClusterName:       cluster.Name,
 			RequestedHostname: inNode.RequestedHostname,
 			CustomConfig:      customConfig,
@@ -118,24 +144,75 @@ func (t *Authorizer) createNode(inNode *client.Node, cluster *v3.Cluster, req *h
 	return t.machines.Create(machine)
 }
 
-func (t *Authorizer) readNode(cluster *v3.Cluster, req *http.Request) (*client.Node, error) {
+func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, req *http.Request) (string, bool, error) {
+	var (
+		err error
+	)
+
+	if cluster.Status.Driver != importedDriver && cluster.Status.Driver != "" {
+		return cluster.Name, true, nil
+	}
+
+	changed := false
+	if cluster.Status.Driver == "" {
+		cluster.Status.Driver = importedDriver
+		changed = true
+	}
+
+	apiEndpoint := "https://" + inCluster.Address
+	token := inCluster.Token
+	caCert := inCluster.CACert
+
+	if cluster.Status.APIEndpoint != apiEndpoint ||
+		cluster.Status.ServiceAccountToken != token ||
+		cluster.Status.CACert != caCert {
+		cluster.Status.APIEndpoint = apiEndpoint
+		cluster.Status.ServiceAccountToken = token
+		cluster.Status.CACert = caCert
+		changed = true
+	}
+
+	if changed {
+		_, err = t.clusters.Update(cluster)
+	}
+
+	return cluster.Name, true, err
+}
+
+func (t *Authorizer) readInput(cluster *v3.Cluster, req *http.Request) (*input, error) {
 	params := req.Header.Get(Params)
-	var inNode client.Node
+	var input input
 
 	bytes, err := base64.StdEncoding.DecodeString(params)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := json.Unmarshal(bytes, &inNode); err != nil {
+	if err := json.Unmarshal(bytes, &input); err != nil {
 		return nil, err
 	}
 
-	if inNode.RequestedHostname == "" {
+	if input.Node == nil && input.Cluster == nil {
+		return nil, errors.New("missing node or cluster registration info")
+	}
+
+	if input.Node != nil && input.Node.RequestedHostname == "" {
 		return nil, errors.New("invalid input, hostname empty")
 	}
 
-	return &inNode, nil
+	if input.Cluster != nil && input.Cluster.Address == "" {
+		return nil, errors.New("invalid input, address empty")
+	}
+
+	if input.Cluster != nil && input.Cluster.Token == "" {
+		return nil, errors.New("invalid input, token empty")
+	}
+
+	if input.Cluster != nil && input.Cluster.CACert == "" {
+		return nil, errors.New("invalid input, caCert empty")
+	}
+
+	return &input, nil
 }
 
 func machineName(machine *client.Node) string {

@@ -1,4 +1,4 @@
-package listener
+package dynamiclistener
 
 import (
 	"context"
@@ -32,11 +32,11 @@ const (
 	acmeMode  = "acme"
 )
 
-type Server struct {
+type server struct {
 	sync.Mutex
 
 	listenConfigs       v3.ListenConfigInterface
-	handler             HandlerGetter
+	handler             http.Handler
 	httpPort, httpsPort int
 	certs               map[string]*tls.Certificate
 	ips                 *lru.Cache
@@ -55,8 +55,8 @@ type Server struct {
 	tosAll      bool
 }
 
-func NewServer(ctx context.Context, listenConfigs v3.ListenConfigInterface, handler HandlerGetter, httpPort, httpsPort int) *Server {
-	s := &Server{
+func newServer(ctx context.Context, listenConfigs v3.ListenConfigInterface, handler http.Handler, httpPort, httpsPort int) *server {
+	s := &server{
 		listenConfigs: listenConfigs,
 		handler:       handler,
 		httpPort:      httpPort,
@@ -70,7 +70,7 @@ func NewServer(ctx context.Context, listenConfigs v3.ListenConfigInterface, hand
 	return s
 }
 
-func (s *Server) updateIPs(savedIPs map[string]bool) map[string]bool {
+func (s *server) updateIPs(savedIPs map[string]bool) map[string]bool {
 	if s.activeCert != nil || s.activeConfig == nil {
 		return savedIPs
 	}
@@ -121,7 +121,7 @@ func (s *Server) updateIPs(savedIPs map[string]bool) map[string]bool {
 	return allIPs
 }
 
-func (s *Server) start(ctx context.Context) {
+func (s *server) start(ctx context.Context) {
 	savedIPs := map[string]bool{}
 	for {
 		savedIPs = s.updateIPs(savedIPs)
@@ -133,7 +133,7 @@ func (s *Server) start(ctx context.Context) {
 	}
 }
 
-func (s *Server) Disable(config *v3.ListenConfig) {
+func (s *server) Disable(config *v3.ListenConfig) {
 	if s.activeConfig == nil {
 		return
 	}
@@ -143,7 +143,7 @@ func (s *Server) Disable(config *v3.ListenConfig) {
 	}
 }
 
-func (s *Server) Enable(config *v3.ListenConfig) (bool, error) {
+func (s *server) Enable(config *v3.ListenConfig) (bool, error) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -188,7 +188,7 @@ func (s *Server) Enable(config *v3.ListenConfig) (bool, error) {
 	return true, nil
 }
 
-func (s *Server) hostPolicy(ctx context.Context, host string) error {
+func (s *server) hostPolicy(ctx context.Context, host string) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -199,7 +199,7 @@ func (s *Server) hostPolicy(ctx context.Context, host string) error {
 	return errors.New("acme/autocert: host not configured")
 }
 
-func (s *Server) prompt(tos string) bool {
+func (s *server) prompt(tos string) bool {
 	s.Lock()
 	defer s.Unlock()
 
@@ -210,7 +210,7 @@ func (s *Server) prompt(tos string) bool {
 	return slice.ContainsString(s.tos, tos)
 }
 
-func (s *Server) Shutdown() error {
+func (s *server) Shutdown() error {
 	for _, listener := range s.listeners {
 		if err := listener.Close(); err != nil {
 			return err
@@ -226,7 +226,7 @@ func (s *Server) Shutdown() error {
 	return nil
 }
 
-func (s *Server) reload(config *v3.ListenConfig) error {
+func (s *server) reload(config *v3.ListenConfig) error {
 	if err := s.Shutdown(); err != nil {
 		return err
 	}
@@ -265,7 +265,7 @@ func (s *Server) reload(config *v3.ListenConfig) error {
 	return nil
 }
 
-func (s *Server) getCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+func (s *server) getCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -330,7 +330,7 @@ func (s *Server) getCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, e
 	return tlsCert, nil
 }
 
-func (s *Server) cacheIPHandler(handler http.Handler) http.Handler {
+func (s *server) cacheIPHandler(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 		h, _, err := net.SplitHostPort(req.Host)
 		if err != nil {
@@ -346,7 +346,7 @@ func (s *Server) cacheIPHandler(handler http.Handler) http.Handler {
 	})
 }
 
-func (s *Server) serveHTTPS(config *v3.ListenConfig) error {
+func (s *server) serveHTTPS(config *v3.ListenConfig) error {
 	conf := &tls.Config{
 		GetCertificate: s.getCertificate,
 	}
@@ -418,7 +418,7 @@ func manglePort(hostport string) string {
 	return net.JoinHostPort(host, strconv.Itoa(portInt))
 }
 
-func (s *Server) serveHTTP(config *v3.ListenConfig) error {
+func (s *server) serveHTTP(config *v3.ListenConfig) error {
 	listener, err := s.newListener(s.httpPort, nil)
 	if err != nil {
 		return err
@@ -431,7 +431,7 @@ func (s *Server) serveHTTP(config *v3.ListenConfig) error {
 	return nil
 }
 
-func (s *Server) startServer(listener net.Listener, server *http.Server) {
+func (s *server) startServer(listener net.Listener, server *http.Server) {
 	go func() {
 		if err := server.Serve(listener); err != nil {
 			logrus.Errorf("server on %v returned err: %v", listener.Addr(), err)
@@ -439,18 +439,11 @@ func (s *Server) startServer(listener net.Listener, server *http.Server) {
 	}()
 }
 
-func (s *Server) Handler() http.Handler {
-	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		h := s.handler()
-		if h == nil {
-			rw.WriteHeader(http.StatusServiceUnavailable)
-		} else {
-			h.ServeHTTP(rw, req)
-		}
-	})
+func (s *server) Handler() http.Handler {
+	return s.handler
 }
 
-func (s *Server) newListener(port int, config *tls.Config) (net.Listener, error) {
+func (s *server) newListener(port int, config *tls.Config) (net.Listener, error) {
 	addr := fmt.Sprintf(":%d", port)
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -468,7 +461,7 @@ func (s *Server) newListener(port int, config *tls.Config) (net.Listener, error)
 	return l, nil
 }
 
-func (s *Server) serveACME(config *v3.ListenConfig) error {
+func (s *server) serveACME(config *v3.ListenConfig) error {
 	manager := autocert.Manager{
 		Cache:      autocert.DirCache("certs-cache"),
 		Prompt:     s.prompt,

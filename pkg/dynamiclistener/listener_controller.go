@@ -1,4 +1,4 @@
-package listener
+package dynamiclistener
 
 import (
 	"net/http"
@@ -18,12 +18,12 @@ type HandlerGetter func() http.Handler
 type Controller struct {
 	listenConfig       v3.ListenConfigInterface
 	listenConfigLister v3.ListenConfigLister
-	server             *Server
+	server             *server
 }
 
-func Register(ctx context.Context, context *config.ManagementContext, httpPort, httpsPort int, getter HandlerGetter) {
+func Start(ctx context.Context, context *config.ScaledContext, httpPort, httpsPort int, handler http.Handler) {
 	c := &Controller{
-		server:             NewServer(ctx, context.Management.ListenConfigs(""), getter, httpPort, httpsPort),
+		server:             newServer(ctx, context.Management.ListenConfigs(""), handler, httpPort, httpsPort),
 		listenConfig:       context.Management.ListenConfigs(""),
 		listenConfigLister: context.Management.ListenConfigs("").Controller().Lister(),
 	}

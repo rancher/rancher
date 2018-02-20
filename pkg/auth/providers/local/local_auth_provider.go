@@ -36,7 +36,7 @@ type lProvider struct {
 	groupIndexer cache.Indexer
 }
 
-func Configure(ctx context.Context, mgmtCtx *config.ManagementContext) common.AuthProvider {
+func Configure(ctx context.Context, mgmtCtx *config.ScaledContext) common.AuthProvider {
 	informer := mgmtCtx.Management.Users("").Controller().Informer()
 	indexers := map[string]cache.IndexFunc{userNameIndex: userNameIndexer, userSearchIndex: userSearchIndexer}
 	informer.AddIndexers(indexers)

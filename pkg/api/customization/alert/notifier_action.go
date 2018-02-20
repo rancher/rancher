@@ -59,7 +59,7 @@ func (h *Handler) testNotifier(actionName string, action *types.Action, apiConte
 		parts := strings.Split(apiContext.ID, ":")
 		ns := parts[0]
 		id := parts[1]
-		notifier, err := h.Management.Management.Notifiers("").GetNamespaced(ns, id, metav1.GetOptions{})
+		notifier, err := h.Notifiers.GetNamespaced(ns, id, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}

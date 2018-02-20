@@ -320,6 +320,7 @@ func (m *NodesSyncer) convertNodeToNode(node *corev1.Node, existing *v3.Node, po
 	machine.APIVersion = "management.cattle.io/v3"
 	machine.Kind = "Node"
 	v3.NodeConditionRegistered.True(machine)
+	v3.NodeConditionRegistered.Message(machine, "registered with kubernetes")
 	return machine, nil
 }
 

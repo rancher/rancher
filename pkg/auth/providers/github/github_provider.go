@@ -32,7 +32,7 @@ type ghProvider struct {
 	userMGR      common.UserManager
 }
 
-func Configure(ctx context.Context, mgmtCtx *config.ManagementContext, userMGR common.UserManager) common.AuthProvider {
+func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR common.UserManager) common.AuthProvider {
 	githubClient := &GClient{
 		httpClient: &http.Client{},
 	}

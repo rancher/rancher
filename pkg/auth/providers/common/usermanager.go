@@ -25,22 +25,24 @@ type UserManager interface {
 	CheckAccess(accessMode string, allowedPrincipalIDs []string, user v3.Principal, groups []v3.Principal) (bool, error)
 }
 
-func NewUserManager(mgmt *config.ManagementContext) UserManager {
-	userInformer := mgmt.Management.Users("").Controller().Informer()
+func NewUserManager(context config.ManagementGetter) UserManager {
+	userInformer := context.GetManagement().Users("").Controller().Informer()
 	userIndexers := map[string]cache.IndexFunc{
 		userByPrincipalIndex: userByPrincipal,
 	}
 	userInformer.AddIndexers(userIndexers)
 
 	return &userManager{
-		mgmt:        mgmt,
-		userIndexer: userInformer.GetIndexer(),
+		users:              context.GetManagement().Users(""),
+		userIndexer:        userInformer.GetIndexer(),
+		globalRoleBindings: context.GetManagement().GlobalRoleBindings(""),
 	}
 }
 
 type userManager struct {
-	mgmt        *config.ManagementContext
-	userIndexer cache.Indexer
+	users              v3.UserInterface
+	globalRoleBindings v3.GlobalRoleBindingInterface
+	userIndexer        cache.Indexer
 }
 
 func (m *userManager) SetPrincipalOnCurrentUser(apiContext *types.APIContext, principal v3.Principal) (*v3.User, error) {
@@ -49,14 +51,14 @@ func (m *userManager) SetPrincipalOnCurrentUser(apiContext *types.APIContext, pr
 		return nil, errors.New("user not provided")
 	}
 
-	user, err := m.mgmt.Management.Users("").Get(userID, v1.GetOptions{})
+	user, err := m.users.Get(userID, v1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
 
 	if !slice.ContainsString(user.PrincipalIDs, principal.Name) {
 		user.PrincipalIDs = append(user.PrincipalIDs, principal.Name)
-		return m.mgmt.Management.Users("").Update(user)
+		return m.users.Update(user)
 	}
 	return user, nil
 }
@@ -132,12 +134,12 @@ func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, e
 		PrincipalIDs: []string{principalName},
 	}
 
-	created, err := m.mgmt.Management.Users("").Create(user)
+	created, err := m.users.Create(user)
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = m.mgmt.Management.GlobalRoleBindings("").Create(&v3.GlobalRoleBinding{
+	_, err = m.globalRoleBindings.Create(&v3.GlobalRoleBinding{
 		ObjectMeta: v1.ObjectMeta{
 			GenerateName: "globalrolebinding-",
 		},
@@ -151,7 +153,7 @@ func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, e
 	localPrincipal := "local://" + created.Name
 	if !slice.ContainsString(created.PrincipalIDs, localPrincipal) {
 		created.PrincipalIDs = append(created.PrincipalIDs, localPrincipal)
-		return m.mgmt.Management.Users("").Update(created)
+		return m.users.Update(created)
 	}
 
 	return created, nil
@@ -178,7 +180,7 @@ func (m *userManager) checkLabels(principalName string) (*v3.User, labels.Set, e
 		encodedPrincipalID = encodedPrincipalID[:63]
 	}
 	set := labels.Set(map[string]string{encodedPrincipalID: "hashed-principal-name"})
-	users, err := m.mgmt.Management.Users("").List(v1.ListOptions{LabelSelector: set.String()})
+	users, err := m.users.List(v1.ListOptions{LabelSelector: set.String()})
 	if err != nil {
 		return nil, nil, err
 	}

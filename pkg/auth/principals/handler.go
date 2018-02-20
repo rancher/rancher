@@ -19,18 +19,14 @@ import (
 )
 
 type principalsHandler struct {
-	ctx              context.Context
-	client           *config.ManagementContext
 	principalsClient v3.PrincipalInterface
 	tokensClient     v3.TokenInterface
 	auth             requests.Authenticator
 }
 
-func newPrincipalsHandler(ctx context.Context, mgmt *config.ManagementContext) *principalsHandler {
+func newPrincipalsHandler(ctx context.Context, mgmt *config.ScaledContext) *principalsHandler {
 	providers.Configure(ctx, mgmt)
 	return &principalsHandler{
-		ctx:              ctx,
-		client:           mgmt,
 		principalsClient: mgmt.Management.Principals(""),
 		tokensClient:     mgmt.Management.Tokens(""),
 		auth:             requests.NewAuthenticator(ctx, mgmt),

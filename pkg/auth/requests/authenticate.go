@@ -21,7 +21,7 @@ type Authenticator interface {
 	TokenFromRequest(req *http.Request) (*v3.Token, error)
 }
 
-func NewAuthenticator(ctx context.Context, mgmtCtx *config.ManagementContext) Authenticator {
+func NewAuthenticator(ctx context.Context, mgmtCtx *config.ScaledContext) Authenticator {
 	tokenInformer := mgmtCtx.Management.Tokens("").Controller().Informer()
 	tokenInformer.AddIndexers(map[string]cache.IndexFunc{tokenKeyIndex: tokenKeyIndexer})
 
