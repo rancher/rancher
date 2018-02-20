@@ -79,33 +79,7 @@ func newSetting(name, def string) Setting {
 }
 
 func getSystemImages() string {
-	v1SystemImages := v3.RKESystemImages{
-		Etcd:                      "rancher/coreos-etcd:v3.0.17",
-		Kubernetes:                "rancher/k8s:v1.8.7-rancher1-1",
-		Alpine:                    "alpine:latest",
-		NginxProxy:                "rancher/rke-nginx-proxy:v0.1.1",
-		CertDownloader:            "rancher/rke-cert-deployer:v0.1.1",
-		KubernetesServicesSidecar: "rancher/rke-service-sidekick:v0.1.0",
-		KubeDNS:                   "rancher/k8s-dns-kube-dns-amd64:1.14.5",
-		DNSmasq:                   "rancher/k8s-dns-dnsmasq-nanny-amd64:1.14.5",
-		KubeDNSSidecar:            "rancher/k8s-dns-sidecar-amd64:1.14.5",
-		KubeDNSAutoscaler:         "rancher/cluster-proportional-autoscaler-amd64:1.0.0",
-		Flannel:                   "rancher/coreos-flannel:v0.9.1",
-		FlannelCNI:                "rancher/coreos-flannel-cni:v0.2.0",
-		CalicoNode:                "rancher/calico-node:v2.6.2",
-		CalicoCNI:                 "rancher/calico-cni:v1.11.0",
-		CalicoControllers:         "rancher/calico-kube-controllers:v1.0.0",
-		CalicoCtl:                 "rancher/calico-ctl:v1.6.2",
-		CanalNode:                 "rancher/calico-node:v2.6.2",
-		CanalCNI:                  "rancher/calico-cni:v1.11.0",
-		CanalFlannel:              "rancher/coreos-flannel:v0.9.1",
-		WeaveNode:                 "weaveworks/weave-kube:2.1.2",
-		WeaveCNI:                  "weaveworks/weave-npc:2.1.2",
-		PodInfraContainer:         "rancher/pause-amd64:3.0",
-	}
-	versionToSystemImages := map[string]v3.RKESystemImages{
-		"v1.8.7-rancher1-1": v1SystemImages,
-	}
+	versionToSystemImages := v3.K8sVersionToRKESystemImages
 
 	data, err := json.Marshal(versionToSystemImages)
 	if err != nil {
