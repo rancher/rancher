@@ -165,9 +165,14 @@ func nodeTypes(schemas *types.Schemas) *types.Schemas {
 			&m.Move{From: "rkeNode/user", To: "sshUser"},
 			&m.ReadOnly{Field: "sshUser"},
 			&m.Drop{Field: "rkeNode"},
+			&m.Drop{Field: "labels"},
+			&m.Drop{Field: "annotations"},
+			&m.Move{From: "nodeLabels", To: "labels"},
+			&m.Move{From: "nodeAnnotations", To: "annotations"},
 			m.DisplayName{}).
 		AddMapperForType(&Version, v3.NodeDriver{}, m.DisplayName{}).
 		AddMapperForType(&Version, v3.NodeTemplate{}, m.DisplayName{}).
+		MustImport(&Version, v3.NodePool{}).
 		MustImport(&Version, v3.Node{}).
 		MustImportAndCustomize(&Version, v3.NodeDriver{}, func(schema *types.Schema) {
 			schema.ResourceActions["activate"] = types.Action{

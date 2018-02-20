@@ -37,7 +37,7 @@ var transitioningMap = map[string]string{
 	"Progressing":              "updating",
 	"DockerProvisioned":        "provisioning",
 	"Provisioned":              "provisioning",
-	"Registered":               "waiting",
+	"Registered":               "registering",
 	"Removed":                  "removing",
 	"Saved":                    "saving",
 	"Updated":                  "updating",
@@ -66,7 +66,7 @@ var errorMapping = map[string]bool{
 
 // True ==
 // False == transitioning
-// Unknown ==
+// Unknown == error
 var doneMap = map[string]string{
 	"Completed": "activating",
 	"Ready":     "unavailable",
@@ -87,6 +87,10 @@ func Set(data map[string]interface{}) {
 		return
 	}
 
+	val, conditionsOk := values.GetValue(data, "status", "conditions")
+	var conditions []condition
+	convert.ToObj(val, &conditions)
+
 	val, ok := values.GetValue(data, "metadata", "removed")
 	if ok && val != "" && val != nil {
 		data["state"] = "removing"
@@ -96,8 +100,21 @@ func Set(data map[string]interface{}) {
 		if !ok {
 			finalizers, ok = values.GetStringSlice(data, "spec", "finalizers")
 		}
+
+		msg := ""
+		for _, cond := range conditions {
+			if cond.Type == "Removed" && (cond.Status == "Unknown" || cond.Status == "False") && cond.Message != "" {
+				msg = cond.Message
+			}
+		}
+
 		if ok && len(finalizers) > 0 {
-			data["transitioningMessage"] = "Waiting on " + finalizers[0]
+			if len(msg) > 0 {
+				msg = msg + "; waiting on " + finalizers[0]
+			} else {
+				msg = "waiting on " + finalizers[0]
+			}
+			data["transitioningMessage"] = msg
 			if i, err := convert.ToTimestamp(val); err == nil {
 				if time.Unix(i/1000, 0).Add(5 * time.Minute).Before(time.Now()) {
 					data["transitioning"] = "error"
@@ -105,13 +122,6 @@ func Set(data map[string]interface{}) {
 			}
 		}
 
-		return
-	}
-
-	val, conditionsOk := values.GetValue(data, "status", "conditions")
-	var conditions []condition
-	if err := convert.ToObj(val, &conditions); err != nil {
-		// ignore error
 		return
 	}
 
@@ -164,6 +174,10 @@ func Set(data map[string]interface{}) {
 		}
 		if c.Status == "False" {
 			transitioning = true
+			state = newState
+			message = concat(message, c.Message)
+		} else if c.Status == "Unknown" {
+			error = true
 			state = newState
 			message = concat(message, c.Message)
 		}

@@ -25,7 +25,9 @@ const (
 	ClusterConditionconditionDefautlProjectCreated condition.Cond = "DefaultProjectCreated"
 	// ClusterConditionDefaultNamespaceAssigned true when cluster's default namespace has been initially assigned
 	ClusterConditionDefaultNamespaceAssigned condition.Cond = "DefaultNamespaceAssigned"
-	// More conditions can be added if unredlying controllers request it
+
+	ClusterDriverImported = "imported"
+	ClusterDriverRKE      = "rancherKubernetesEngine"
 )
 
 type Cluster struct {
@@ -42,7 +44,6 @@ type Cluster struct {
 }
 
 type ClusterSpec struct {
-	NodePools                            []NodePool                     `json:"nodePools"`
 	DisplayName                          string                         `json:"displayName"`
 	Description                          string                         `json:"description"`
 	Internal                             bool                           `json:"internal" norman:"nocreate,noupdate"`
@@ -207,8 +208,9 @@ type ClusterRegistrationTokenSpec struct {
 }
 
 type ClusterRegistrationTokenStatus struct {
-	Command     string `json:"command"`
-	NodeCommand string `json:"nodeCommand"`
-	ManifestURL string `json:"manifestUrl"`
-	Token       string `json:"token"`
+	InsecureCommand string `json:"insecureCommand"`
+	Command         string `json:"command"`
+	NodeCommand     string `json:"nodeCommand"`
+	ManifestURL     string `json:"manifestUrl"`
+	Token           string `json:"token"`
 }

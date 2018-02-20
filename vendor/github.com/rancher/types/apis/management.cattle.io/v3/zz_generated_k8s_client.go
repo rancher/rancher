@@ -14,6 +14,7 @@ type Interface interface {
 	RESTClient() rest.Interface
 	controller.Starter
 
+	NodePoolsGetter
 	NodesGetter
 	NodeDriversGetter
 	NodeTemplatesGetter
@@ -59,6 +60,7 @@ type Client struct {
 	restClient rest.Interface
 	starters   []controller.Starter
 
+	nodePoolControllers                   map[string]NodePoolController
 	nodeControllers                       map[string]NodeController
 	nodeDriverControllers                 map[string]NodeDriverController
 	nodeTemplateControllers               map[string]NodeTemplateController
@@ -113,6 +115,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 	return &Client{
 		restClient: restClient,
 
+		nodePoolControllers:                   map[string]NodePoolController{},
 		nodeControllers:                       map[string]NodeController{},
 		nodeDriverControllers:                 map[string]NodeDriverController{},
 		nodeTemplateControllers:               map[string]NodeTemplateController{},
@@ -164,6 +167,19 @@ func (c *Client) Sync(ctx context.Context) error {
 
 func (c *Client) Start(ctx context.Context, threadiness int) error {
 	return controller.Start(ctx, threadiness, c.starters...)
+}
+
+type NodePoolsGetter interface {
+	NodePools(namespace string) NodePoolInterface
+}
+
+func (c *Client) NodePools(namespace string) NodePoolInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &NodePoolResource, NodePoolGroupVersionKind, nodePoolFactory{})
+	return &nodePoolClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
 }
 
 type NodesGetter interface {

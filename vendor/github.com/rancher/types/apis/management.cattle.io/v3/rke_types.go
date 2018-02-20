@@ -36,6 +36,29 @@ type PrivateRegistry struct {
 	Password string `yaml:"password" json:"password,omitempty"`
 }
 
+type RancherSystemImages struct {
+	// RKE system images
+	RKESystemImages `yaml:",inline" json:",inline"`
+	// Kubectld image
+	Kubectld string `yaml:"kubectld" json:"kubectld,omitempty"`
+	// Etc host updater image
+	EtcHostUpdater string `yaml:"etc_host_updater" json:"etcHostUpdater,omitempty"`
+	// Kubernetes agent image
+	K8sAgent string `yaml:"k8s_agent" json:"k8sAgent,omitempty"`
+	// Kubernetes auth service agent
+	K8sAuth string `yaml:"k8s_auth" json:"k8sAuth,omitempty"`
+	// Kubernetes Dashboard image
+	Dashboard string `yaml:"dashboard" json:"dashboard,omitempty"`
+	// Heapster addon image
+	Heapster string `yaml:"heapster" json:"heapster,omitempty"`
+	// Grafana image for heapster addon
+	Grafana string `yaml:"grafana" json:"grafana,omitempty"`
+	// Influxdb image for heapster addon
+	Influxdb string `yaml:"influxdb" json:"influxdb,omitempty"`
+	// Tiller addon image
+	Tiller string `yaml:"tiller" json:"tiller,omitempty"`
+}
+
 type RKESystemImages struct {
 	// etcd image
 	Etcd string `yaml:"etcd" json:"etcd,omitempty"`
