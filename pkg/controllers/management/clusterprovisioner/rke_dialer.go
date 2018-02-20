@@ -5,8 +5,8 @@ import (
 	"net"
 	"strings"
 
-	"github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rke/hosts"
+	"github.com/rancher/types/config/dialer"
 )
 
 type RKEDialerFactory struct {

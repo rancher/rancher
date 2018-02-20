@@ -10,7 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func NewAuthenticationFilter(ctx context.Context, managementContext *config.ManagementContext, next http.Handler) (http.Handler, error) {
+func NewAuthenticationFilter(ctx context.Context, managementContext *config.ScaledContext, next http.Handler) (http.Handler, error) {
 	if managementContext == nil {
 		return nil, fmt.Errorf("Failed to build NewAuthenticationFilter, nil ManagementContext")
 	}

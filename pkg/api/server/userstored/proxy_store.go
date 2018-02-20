@@ -12,7 +12,7 @@ import (
 
 type storeWrapperFunc func(types.Store) types.Store
 
-func addProxyStore(schemas *types.Schemas, context *config.ManagementContext, schemaType, apiVersion string, storeWrapper storeWrapperFunc) *types.Schema {
+func addProxyStore(schemas *types.Schemas, context *config.ScaledContext, schemaType, apiVersion string, storeWrapper storeWrapperFunc) *types.Schema {
 	s := schemas.Schema(&schema.Version, schemaType)
 	if s == nil {
 		s = schemas.Schema(&clusterSchema.Version, schemaType)

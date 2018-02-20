@@ -3,7 +3,6 @@ package node
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -12,10 +11,12 @@ import (
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/encryptedstore"
 	"github.com/rancher/rancher/pkg/nodeconfig"
+	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
+	"k8s.io/api/core/v1"
 	kerror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -28,7 +29,7 @@ const (
 )
 
 func Register(management *config.ManagementContext) {
-	secretStore, err := nodeconfig.NewStore(management)
+	secretStore, err := nodeconfig.NewStore(management.Core.Namespaces(""), management.K8sClient.CoreV1())
 	if err != nil {
 		logrus.Fatal(err)
 	}
@@ -79,16 +80,19 @@ func isCustom(obj *v3.Node) bool {
 	return obj.Spec.CustomConfig != nil && obj.Spec.CustomConfig.Address != ""
 }
 
-func (m *Lifecycle) Create(obj *v3.Node) (*v3.Node, error) {
-	v3.NodeConditionRegistered.IsUnknown(obj)
-	v3.NodeConditionRegistered.Message(obj, "waiting to register with Kubernetes")
+func (m *Lifecycle) setWaiting(node *v3.Node) {
+	v3.NodeConditionRegistered.IsUnknown(node)
+	v3.NodeConditionRegistered.Message(node, "waiting to register with Kubernetes")
+}
 
+func (m *Lifecycle) Create(obj *v3.Node) (*v3.Node, error) {
 	if isCustom(obj) {
 		m.setupCustom(obj)
 		newObj, err := v3.NodeConditionInitialized.Once(obj, func() (runtime.Object, error) {
 			if err := validateCustomHost(obj); err != nil {
 				return obj, err
 			}
+			m.setWaiting(obj)
 			return obj, nil
 		})
 		return newObj.(*v3.Node), err
@@ -142,48 +146,49 @@ func (m *Lifecycle) Create(obj *v3.Node) (*v3.Node, error) {
 }
 
 func (m *Lifecycle) getNodeTemplate(nodeTemplateName string) (*v3.NodeTemplate, error) {
-	parts := strings.SplitN(nodeTemplateName, ":", 2)
-	if len(parts) == 1 {
-		return nil, fmt.Errorf("failed to find node template %s", nodeTemplateName)
-	}
-
-	return m.nodeTemplateClient.GetNamespaced(parts[0], parts[1], metav1.GetOptions{})
+	ns, n := ref.Parse(nodeTemplateName)
+	return m.nodeTemplateClient.GetNamespaced(ns, n, metav1.GetOptions{})
 }
 
 func (m *Lifecycle) Remove(obj *v3.Node) (*v3.Node, error) {
 	if obj.Status.NodeTemplateSpec == nil {
 		return obj, nil
 	}
-	found, err := m.isNodeInAppliedSpec(obj)
-	if err != nil {
-		return obj, err
-	}
-	if found {
-		return obj, fmt.Errorf("Node [%s] still not deleted from cluster spec", obj.Name)
-	}
-	config, err := nodeconfig.NewNodeConfig(m.secretStore, obj)
-	if err != nil {
-		return obj, err
-	}
-	if err := config.Restore(); err != nil {
-		return obj, err
-	}
-	defer config.Remove()
 
-	mExists, err := nodeExists(config.Dir(), obj.Spec.RequestedHostname)
-	if err != nil {
-		return obj, err
-	}
-
-	if mExists {
-		m.logger.Infof(obj, "Removing node %s", obj.Spec.RequestedHostname)
-		if err := deleteNode(config.Dir(), obj); err != nil {
+	newObj, err := v3.NodeConditionRemoved.DoUntilTrue(obj, func() (runtime.Object, error) {
+		found, err := m.isNodeInAppliedSpec(obj)
+		if err != nil {
 			return obj, err
 		}
-		m.logger.Infof(obj, "Removing node %s done", obj.Spec.RequestedHostname)
-	}
+		if found {
+			return obj, errors.New("waiting for node to be removed from cluster")
+		}
+		config, err := nodeconfig.NewNodeConfig(m.secretStore, obj)
+		if err != nil {
+			return obj, err
+		}
+		if err := config.Restore(); err != nil {
+			return obj, err
+		}
+		defer config.Remove()
 
-	return obj, nil
+		mExists, err := nodeExists(config.Dir(), obj.Spec.RequestedHostname)
+		if err != nil {
+			return obj, err
+		}
+
+		if mExists {
+			m.logger.Infof(obj, "Removing node %s", obj.Spec.RequestedHostname)
+			if err := deleteNode(config.Dir(), obj); err != nil {
+				return obj, err
+			}
+			m.logger.Infof(obj, "Removing node %s done", obj.Spec.RequestedHostname)
+		}
+
+		return obj, nil
+	})
+
+	return newObj.(*v3.Node), err
 }
 
 func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *v3.Node) (*v3.Node, error) {
@@ -210,18 +215,12 @@ func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *v3.Node) (*v3.N
 	defer stderrReader.Close()
 	defer cmd.Wait()
 
-	hostExist := false
 	obj, err = m.reportStatus(stdoutReader, stderrReader, obj)
 	if err != nil {
-		if strings.Contains(err.Error(), "Host already exists") {
-			hostExist = true
-		}
-		if !hostExist {
-			return obj, err
-		}
+		return obj, err
 	}
 
-	if err := cmd.Wait(); err != nil && !hostExist {
+	if err := cmd.Wait(); err != nil {
 		return obj, err
 	}
 
@@ -277,14 +276,17 @@ outer:
 func (m *Lifecycle) Updated(obj *v3.Node) (*v3.Node, error) {
 	newObj, err := v3.NodeConditionProvisioned.Once(obj, func() (runtime.Object, error) {
 		if obj.Status.NodeTemplateSpec == nil {
+			m.setWaiting(obj)
 			return obj, nil
 		}
 
-		return m.ready(obj)
+		obj, err := m.ready(obj)
+		if err == nil {
+			m.setWaiting(obj)
+		}
+		return obj, err
 	})
-	obj = newObj.(*v3.Node)
-
-	return obj, err
+	return newObj.(*v3.Node), err
 }
 
 func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, obj *v3.Node) (*v3.Node, error) {
@@ -326,6 +328,12 @@ func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, ob
 		HostnameOverride: obj.Spec.RequestedHostname,
 		SSHKey:           sshKey,
 	}
+	obj.Status.InternalNodeStatus.Addresses = []v1.NodeAddress{
+		{
+			Type:    v1.NodeInternalIP,
+			Address: obj.Status.NodeConfig.Address,
+		},
+	}
 
 	if len(obj.Status.NodeConfig.Role) == 0 {
 		obj.Status.NodeConfig.Role = []string{"worker"}
@@ -335,6 +343,11 @@ func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, ob
 }
 
 func (m *Lifecycle) isNodeInAppliedSpec(node *v3.Node) (bool, error) {
+	// worker nodes can just be immediately deleted
+	if !node.Spec.Etcd && !node.Spec.ControlPlane {
+		return false, nil
+	}
+
 	cluster, err := m.clusterLister.Get("", node.Spec.ClusterName)
 	if err != nil {
 		if kerror.IsNotFound(err) {

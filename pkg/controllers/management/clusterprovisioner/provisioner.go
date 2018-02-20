@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 	"time"
 
-	"strings"
-
 	"github.com/mitchellh/mapstructure"
-	"github.com/pborman/uuid"
 	"github.com/rancher/kontainer-engine/drivers/rke"
 	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/norman/controller"
@@ -19,7 +17,7 @@ import (
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/client"
 	"github.com/rancher/rancher/pkg/configfield"
-	"github.com/rancher/rancher/pkg/dialer"
+	"github.com/rancher/rancher/pkg/controllers/management/nodepool"
 	"github.com/rancher/rancher/pkg/encryptedstore"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -32,7 +30,6 @@ import (
 )
 
 const (
-	RKEDriver    = "rancherKubernetesEngine"
 	RKEDriverKey = "rancherKubernetesEngineConfig"
 )
 
@@ -40,13 +37,12 @@ type Provisioner struct {
 	ClusterController v3.ClusterController
 	Clusters          v3.ClusterInterface
 	NodeLister        v3.NodeLister
-	Nodes             v3.NodeInterface
 	Driver            service.EngineService
 	EventLogger       event.Logger
 	backoff           *flowcontrol.Backoff
 }
 
-func Register(management *config.ManagementContext, dialerFactory dialer.Factory) {
+func Register(management *config.ManagementContext) {
 	store, err := encryptedstore.NewGenericEncrypedStore("c-", "", management.Core.Namespaces(""),
 		management.K8sClient.CoreV1())
 	if err != nil {
@@ -60,9 +56,8 @@ func Register(management *config.ManagementContext, dialerFactory dialer.Factory
 		Clusters:          management.Management.Clusters(""),
 		ClusterController: management.Management.Clusters("").Controller(),
 		NodeLister:        management.Management.Nodes("").Controller().Lister(),
-		Nodes:             management.Management.Nodes(""),
 		EventLogger:       management.EventLogger,
-		backoff:           flowcontrol.NewBackOff(time.Minute, 10*time.Minute),
+		backoff:           flowcontrol.NewBackOff(30*time.Second, 10*time.Minute),
 	}
 
 	// Add handlers
@@ -70,10 +65,10 @@ func Register(management *config.ManagementContext, dialerFactory dialer.Factory
 	management.Management.Nodes("").AddHandler("cluster-provisioner-controller", p.machineChanged)
 
 	local := &RKEDialerFactory{
-		Factory: dialerFactory,
+		Factory: management.Dialer,
 	}
 	docker := &RKEDialerFactory{
-		Factory: dialerFactory,
+		Factory: management.Dialer,
 		Docker:  true,
 	}
 
@@ -85,9 +80,8 @@ func Register(management *config.ManagementContext, dialerFactory dialer.Factory
 
 func (p *Provisioner) Remove(cluster *v3.Cluster) (*v3.Cluster, error) {
 	logrus.Infof("Deleting cluster [%s]", cluster.Name)
-	if !needToProvision(cluster) ||
-		cluster.Status.Driver == "" ||
-		cluster.Status.Driver == "imported" {
+	if skipProvisioning(cluster) ||
+		cluster.Status.Driver == "" {
 		return nil, nil
 	}
 
@@ -115,10 +109,6 @@ func (p *Provisioner) Updated(cluster *v3.Cluster) (*v3.Cluster, error) {
 }
 
 func (p *Provisioner) update(cluster *v3.Cluster, create bool) (*v3.Cluster, error) {
-	if err := p.createNodes(cluster); err != nil {
-		return cluster, err
-	}
-
 	cluster, err := p.reconcileCluster(cluster, create)
 	if err != nil {
 		return cluster, err
@@ -135,188 +125,6 @@ func (p *Provisioner) machineChanged(key string, machine *v3.Node) error {
 	}
 
 	return nil
-}
-
-func (p *Provisioner) createNode(name string, cluster *v3.Cluster, nodePool v3.NodePool, simulate bool) (*v3.Node, error) {
-	newNode := &v3.Node{}
-	newNode.GenerateName = "m-"
-	newNode.Namespace = cluster.Name
-	newNode.Spec = v3.NodeSpec{
-		CommonNodeSpec: v3.CommonNodeSpec{
-			Etcd:             nodePool.Etcd,
-			ControlPlane:     nodePool.ControlPlane,
-			Worker:           nodePool.Worker,
-			NodeTemplateName: nodePool.NodeTemplateName,
-		},
-		NodePoolUUID:      nodePool.UUID,
-		RequestedHostname: name,
-		ClusterName:       cluster.Name,
-	}
-	newNode.Spec.ClusterName = cluster.Name
-	newNode.Labels = nodePool.Labels
-	newNode.Annotations = nodePool.Annotations
-
-	if simulate {
-		return newNode, nil
-	}
-
-	if newNode.Spec.NodeTemplateName == "" || nodePool.HostnamePrefix == "" {
-		logrus.Warnf("invalid node pool on cluster [%s], not creating node", cluster.Name)
-		return newNode, nil
-	}
-
-	return p.Nodes.Create(newNode)
-}
-
-func (p *Provisioner) deleteNodeLater(node *v3.Node) {
-	go func() {
-		time.Sleep(2 * time.Minute)
-		f := metav1.DeletePropagationForeground
-		p.Nodes.DeleteNamespaced(node.Namespace, node.Name, &metav1.DeleteOptions{
-			PropagationPolicy: &f,
-		})
-	}()
-}
-
-func (p *Provisioner) createNodes(cluster *v3.Cluster) error {
-	if cluster.Status.Driver != RKEDriver {
-		return nil
-	}
-
-	changed := false
-	for i, nodePool := range cluster.Spec.NodePools {
-		if nodePool.UUID == "" {
-			changed = true
-			cluster.Spec.NodePools[i].UUID = uuid.New()
-		}
-	}
-
-	if changed {
-		_, err := p.Clusters.Update(cluster)
-		if err != nil {
-			return err
-		}
-	}
-
-	changed, err := p.createOrCheckNodes(cluster, true)
-	if err != nil {
-		return err
-	}
-
-	if changed {
-		_, err = p.createOrCheckNodes(cluster, false)
-	}
-
-	return err
-}
-
-func (p *Provisioner) createOrCheckNodes(cluster *v3.Cluster, simulate bool) (bool, error) {
-	byUUID := map[string][]*v3.Node{}
-	byName := map[string]bool{}
-	changed := false
-
-	var (
-		err   error
-		nodes []*v3.Node
-	)
-
-	if simulate {
-		nodes, err = p.NodeLister.List(cluster.Name, labels.Everything())
-		if err != nil {
-			return false, err
-		}
-	} else {
-		nodeList, err := p.Nodes.List(metav1.ListOptions{})
-		if err != nil {
-			return false, err
-		}
-		for i := range nodeList.Items {
-			if nodeList.Items[i].Namespace == cluster.Name {
-				nodes = append(nodes, &nodeList.Items[i])
-			}
-		}
-	}
-
-	for _, node := range nodes {
-		if v3.NodeConditionProvisioned.IsFalse(node) {
-			changed = true
-			if !simulate {
-				p.deleteNodeLater(node)
-			}
-		}
-		byName[node.Spec.RequestedHostname] = true
-		if node.Spec.NodePoolUUID != "" {
-			byUUID[node.Spec.NodePoolUUID] = append(byUUID[node.Spec.NodePoolUUID], node)
-		}
-	}
-
-	for _, nodePool := range cluster.Spec.NodePools {
-		nodes := byUUID[nodePool.UUID]
-		delete(byUUID, nodePool.UUID)
-
-		if nodePool.Quantity <= 0 {
-			nodePool.Quantity = 0
-		}
-
-		if len(nodes) == nodePool.Quantity {
-			continue
-		}
-
-		for i := 1; len(nodes) < nodePool.Quantity; i++ {
-			name := fmt.Sprintf("%s%02d", nodePool.HostnamePrefix, i)
-			if byName[name] {
-				continue
-			}
-
-			changed = true
-			newNode, err := p.createNode(name, cluster, nodePool, simulate)
-			if err != nil {
-				return false, err
-			}
-
-			byName[newNode.Spec.RequestedHostname] = true
-			nodes = append(nodes, newNode)
-		}
-
-		for len(nodes) > nodePool.Quantity {
-			sort.Slice(nodes, func(i, j int) bool {
-				return nodes[i].Spec.RequestedHostname < nodes[j].Spec.RequestedHostname
-			})
-
-			toDelete := nodes[len(nodes)-1]
-
-			changed = true
-			if !simulate {
-				prop := metav1.DeletePropagationForeground
-				err := p.Nodes.DeleteNamespaced(toDelete.Namespace, toDelete.Name, &metav1.DeleteOptions{
-					PropagationPolicy: &prop,
-				})
-				if err != nil {
-					return false, err
-				}
-			}
-
-			nodes = nodes[:len(nodes)-1]
-			delete(byName, toDelete.Spec.RequestedHostname)
-		}
-	}
-
-	for _, nodes := range byUUID {
-		for _, node := range nodes {
-			changed = true
-			if !simulate {
-				prop := metav1.DeletePropagationForeground
-				err := p.Nodes.DeleteNamespaced(node.Namespace, node.Name, &metav1.DeleteOptions{
-					PropagationPolicy: &prop,
-				})
-				if err != nil {
-					return false, err
-				}
-			}
-		}
-	}
-
-	return changed, nil
 }
 
 func (p *Provisioner) Create(cluster *v3.Cluster) (*v3.Cluster, error) {
@@ -355,7 +163,7 @@ func (p *Provisioner) provision(cluster *v3.Cluster) (*v3.Cluster, error) {
 
 func (p *Provisioner) pending(cluster *v3.Cluster) (*v3.Cluster, error) {
 	obj, err := v3.ClusterConditionPending.DoUntilTrue(cluster, func() (runtime.Object, error) {
-		if !needToProvision(cluster) {
+		if skipProvisioning(cluster) {
 			return cluster, nil
 		}
 
@@ -370,7 +178,7 @@ func (p *Provisioner) pending(cluster *v3.Cluster) (*v3.Cluster, error) {
 
 		if driver != cluster.Status.Driver {
 			cluster.Status.Driver = driver
-			if driver == RKEDriver && cluster.Spec.RancherKubernetesEngineConfig == nil {
+			if driver == v3.ClusterDriverRKE && cluster.Spec.RancherKubernetesEngineConfig == nil {
 				cluster.Spec.RancherKubernetesEngineConfig = &v3.RancherKubernetesEngineConfig{}
 			}
 			return p.Clusters.Update(cluster)
@@ -404,7 +212,7 @@ func (p *Provisioner) backoffFailure(cluster *v3.Cluster, spec *v3.ClusterSpec) 
 
 // reconcileCluster returns true if waiting or false if ready to provision
 func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cluster, error) {
-	if !needToProvision(cluster) {
+	if skipProvisioning(cluster) {
 		return cluster, nil
 	}
 
@@ -481,8 +289,8 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 	return cluster, nil
 }
 
-func needToProvision(cluster *v3.Cluster) bool {
-	return !cluster.Spec.Internal
+func skipProvisioning(cluster *v3.Cluster) bool {
+	return cluster.Spec.Internal || cluster.Status.Driver == v3.ClusterDriverImported
 }
 
 func (p *Provisioner) getConfig(reconcileRKE bool, spec v3.ClusterSpec, driverName, clusterName string) (*v3.ClusterSpec, interface{}, error) {
@@ -496,7 +304,7 @@ func (p *Provisioner) getConfig(reconcileRKE bool, spec v3.ClusterSpec, driverNa
 		v = map[string]interface{}{}
 	}
 
-	if driverName == RKEDriver && reconcileRKE {
+	if driverName == v3.ClusterDriverRKE && reconcileRKE {
 		nodes, err := p.reconcileRKENodes(clusterName)
 		if err != nil {
 			return nil, nil, err
@@ -523,13 +331,9 @@ func (p *Provisioner) getDriver(cluster *v3.Cluster) string {
 	driver := configfield.GetDriver(&cluster.Spec)
 
 	if driver == "" {
-		if len(cluster.Spec.NodePools) > 0 {
-			return RKEDriver
-		}
-
 		nodes, err := p.reconcileRKENodes(cluster.Name)
 		if err == nil && len(nodes) > 0 {
-			return RKEDriver
+			return v3.ClusterDriverRKE
 		}
 	}
 
@@ -648,6 +452,16 @@ func (p *Provisioner) reconcileRKENodes(clusterName string) ([]v3.RKEConfigNode,
 
 		if !v3.NodeConditionProvisioned.IsTrue(machine) {
 			continue
+		}
+
+		if nodepool.IsNodeStatusUnknown(machine) {
+			continue
+		}
+
+		if v3.NodeConditionProvisioned.IsUnknown(machine) {
+			return nil, &controller.ForgetError{
+				Err: fmt.Errorf("waiting for %s to finish provisioning", machine.Spec.RequestedHostname),
+			}
 		}
 
 		if slice.ContainsString(machine.Status.NodeConfig.Role, "etcd") {

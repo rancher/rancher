@@ -18,13 +18,15 @@ type Authorizer func(req *http.Request) (clientKey string, authed bool, err erro
 type ErrorWriter func(rw http.ResponseWriter, req *http.Request, code int, err error)
 
 type Server struct {
+	ready       func() bool
 	authorizer  Authorizer
 	errorWriter ErrorWriter
 	sessions    *sessionManager
 }
 
-func New(auth Authorizer, errorWriter ErrorWriter) *Server {
+func New(auth Authorizer, errorWriter ErrorWriter, ready func() bool) *Server {
 	return &Server{
+		ready:       ready,
 		authorizer:  auth,
 		errorWriter: errorWriter,
 		sessions:    newSessionManager(),
@@ -32,6 +34,11 @@ func New(auth Authorizer, errorWriter ErrorWriter) *Server {
 }
 
 func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	if !s.ready() {
+		s.errorWriter(rw, req, 503, errors.New("tunnel server not active"))
+		return
+	}
+
 	logrus.Infof("Handling backend connection request.")
 	clientKey, authed, err := s.authorizer(req)
 	if err != nil {

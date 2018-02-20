@@ -1,7 +1,6 @@
 package remotedialer
 
 import (
-	"net"
 	"time"
 )
 
@@ -10,5 +9,3 @@ var (
 	PingWriteInterval = time.Duration(5 * time.Second)
 	MaxRead           = 8192
 )
-
-type Dialer func(proto, address string) (net.Conn, error)

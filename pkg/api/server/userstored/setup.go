@@ -18,7 +18,7 @@ import (
 	"github.com/rancher/types/config"
 )
 
-func Setup(ctx context.Context, mgmt *config.ManagementContext) error {
+func Setup(ctx context.Context, mgmt *config.ScaledContext) error {
 	// Here we setup all types that will be stored in the User cluster
 
 	schemas := mgmt.Schemas
@@ -78,7 +78,7 @@ func Service(schemas *types.Schemas) {
 	dnsSchema.Store = serviceSchema.Store
 }
 
-func Secret(management *config.ManagementContext, schemas *types.Schemas) {
+func Secret(management *config.ScaledContext, schemas *types.Schemas) {
 	schema := schemas.Schema(&schema.Version, "namespacedSecret")
 	schema.Store = secret.NewNamespacedSecretStore(management.ClientGetter)
 

@@ -16,12 +16,12 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	hutils "github.com/rancher/rancher/pkg/controllers/user/helm/utils"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	projectschema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	"github.com/rancher/types/client/management/v3"
 	managementv3 "github.com/rancher/types/client/management/v3"
 	projectv3 "github.com/rancher/types/client/project/v3"
-	"github.com/rancher/types/config"
 	"gopkg.in/yaml.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
@@ -33,7 +33,7 @@ const (
 )
 
 type ActionWrapper struct {
-	Management config.ManagementContext
+	Clusters v3.ClusterInterface
 }
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -162,7 +162,7 @@ func rollbackCharts(port, releaseName, revision string) error {
 }
 
 func (a ActionWrapper) toRESTConfig(cluster *client.Cluster) (*rest.Config, error) {
-	cls, err := a.Management.Management.Clusters("").Get(cluster.ID, metav1.GetOptions{})
+	cls, err := a.Clusters.Get(cluster.ID, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -170,9 +170,9 @@ func (a ActionWrapper) toRESTConfig(cluster *client.Cluster) (*rest.Config, erro
 		return nil, nil
 	}
 
-	if cluster.Internal {
-		return a.Management.LocalConfig, nil
-	}
+	//if cluster.Internal {
+	//	return a.LocalConfig, nil
+	//}
 
 	if cluster.APIEndpoint == "" || cluster.CACert == "" || cls.Status.ServiceAccountToken == "" {
 		return nil, nil

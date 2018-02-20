@@ -6,13 +6,15 @@ import (
 	"strings"
 
 	"github.com/rancher/norman/types"
-	"github.com/rancher/types/config"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type Handler struct {
-	Management config.ManagementContext
+	ClusterAlerts v3.ClusterAlertInterface
+	ProjectAlerts v3.ProjectAlertInterface
+	Notifiers     v3.NotifierInterface
 }
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -23,14 +25,11 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 }
 
 func (h *Handler) ClusterActionHandler(actionName string, action *types.Action, request *types.APIContext) error {
-
-	alertClient := h.Management.Management.ClusterAlerts("")
-
 	parts := strings.Split(request.ID, ":")
 	ns := parts[0]
 	id := parts[1]
 
-	alert, err := alertClient.GetNamespaced(ns, id, metav1.GetOptions{})
+	alert, err := h.ClusterAlerts.GetNamespaced(ns, id, metav1.GetOptions{})
 	if err != nil {
 		logrus.Errorf("Error while getting alert for %s :%v", request.ID, err)
 		return err
@@ -66,7 +65,7 @@ func (h *Handler) ClusterActionHandler(actionName string, action *types.Action, 
 		}
 	}
 
-	alert, err = alertClient.Update(alert)
+	alert, err = h.ClusterAlerts.Update(alert)
 	if err != nil {
 		logrus.Errorf("Error while updating alert:%v", err)
 		return err
@@ -78,12 +77,11 @@ func (h *Handler) ClusterActionHandler(actionName string, action *types.Action, 
 }
 
 func (h *Handler) ProjectActionHandler(actionName string, action *types.Action, request *types.APIContext) error {
-	alertClient := h.Management.Management.ProjectAlerts("")
 	parts := strings.Split(request.ID, ":")
 	ns := parts[0]
 	id := parts[1]
 
-	alert, err := alertClient.GetNamespaced(ns, id, metav1.GetOptions{})
+	alert, err := h.ProjectAlerts.GetNamespaced(ns, id, metav1.GetOptions{})
 	if err != nil {
 		logrus.Errorf("Error while getting alert for %s :%v", request.ID, err)
 		return err
@@ -119,7 +117,7 @@ func (h *Handler) ProjectActionHandler(actionName string, action *types.Action, 
 		}
 	}
 
-	alert, err = alertClient.Update(alert)
+	alert, err = h.ProjectAlerts.Update(alert)
 	if err != nil {
 		logrus.Errorf("Error while updating alert:%v", err)
 		return err

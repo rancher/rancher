@@ -11,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func Register(context *config.ManagementContext) error {
+func Register(context *config.ScaledContext) error {
 	sp := &settingsProvider{
 		settings:       context.Management.Settings(""),
 		settingsLister: context.Management.Settings("").Controller().Lister(),

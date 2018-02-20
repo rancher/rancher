@@ -21,7 +21,7 @@ type userStore struct {
 	userIndexer cache.Indexer
 }
 
-func SetUserStore(schema *types.Schema, mgmt *config.ManagementContext) {
+func SetUserStore(schema *types.Schema, mgmt *config.ScaledContext) {
 	userInformer := mgmt.Management.Users("").Controller().Informer()
 	userIndexers := map[string]cache.IndexFunc{
 		userByUsernameIndex: userByUsername,

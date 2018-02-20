@@ -37,7 +37,7 @@ type adProvider struct {
 	caPool      *x509.CertPool
 }
 
-func Configure(ctx context.Context, mgmtCtx *config.ManagementContext, userMGR common.UserManager) common.AuthProvider {
+func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR common.UserManager) common.AuthProvider {
 	return &adProvider{
 		ctx:         ctx,
 		authConfigs: mgmtCtx.Management.AuthConfigs(""),

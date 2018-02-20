@@ -36,7 +36,7 @@ func GetProviderByType(configType string) common.AuthProvider {
 	return providersByType[configType]
 }
 
-func Configure(ctx context.Context, mgmt *config.ManagementContext) {
+func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	confMu.Lock()
 	defer confMu.Unlock()
 	userMGR := common.NewUserManager(mgmt)

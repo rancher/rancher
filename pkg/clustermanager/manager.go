@@ -8,22 +8,26 @@ import (
 	"strings"
 	"sync"
 
+	"net/http"
+
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	clusterController "github.com/rancher/rancher/pkg/controllers/user"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/config/dialer"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/rest"
 )
 
 type Manager struct {
-	ManagementContext *config.ManagementContext
-	clusterLister     v3.ClusterLister
-	controllers       sync.Map
-	accessControl     types.AccessControl
+	APIContext    *config.ScaledContext
+	clusterLister v3.ClusterLister
+	controllers   sync.Map
+	accessControl types.AccessControl
+	dialer        dialer.Factory
 }
 
 type record struct {
@@ -34,11 +38,12 @@ type record struct {
 	cancel        context.CancelFunc
 }
 
-func NewManager(management *config.ManagementContext) *Manager {
+func NewManager(context *config.ScaledContext) *Manager {
 	return &Manager{
-		ManagementContext: management,
-		accessControl:     rbac.NewAccessControl(management.RBAC),
-		clusterLister:     management.Management.Clusters("").Controller().Lister(),
+		APIContext:    context,
+		dialer:        context.Dialer,
+		accessControl: rbac.NewAccessControl(context.RBAC),
+		clusterLister: context.Management.Clusters("").Controller().Lister(),
 	}
 }
 
@@ -55,6 +60,16 @@ func (m *Manager) Stop(cluster *v3.Cluster) {
 func (m *Manager) Start(ctx context.Context, cluster *v3.Cluster) error {
 	_, err := m.start(ctx, cluster)
 	return err
+}
+
+func (m *Manager) RESTConfig(ctx context.Context, cluster *v3.Cluster) (rest.Config, error) {
+	obj, ok := m.controllers.Load(cluster.UID)
+	if !ok {
+		return rest.Config{}, fmt.Errorf("cluster record not found %s %s", cluster.Name, cluster.UID)
+	}
+
+	record := obj.(*record)
+	return record.cluster.RESTConfig, nil
 }
 
 func (m *Manager) start(ctx context.Context, cluster *v3.Cluster) (*record, error) {
@@ -108,7 +123,7 @@ func (m *Manager) toRESTConfig(cluster *v3.Cluster) (*rest.Config, error) {
 	}
 
 	if cluster.Spec.Internal {
-		return m.ManagementContext.LocalConfig, nil
+		return m.APIContext.LocalConfig, nil
 	}
 
 	if cluster.Status.APIEndpoint == "" || cluster.Status.CACert == "" || cluster.Status.ServiceAccountToken == "" {
@@ -129,12 +144,25 @@ func (m *Manager) toRESTConfig(cluster *v3.Cluster) (*rest.Config, error) {
 		return nil, err
 	}
 
+	dialer, err := m.dialer.ClusterDialer(cluster.Name)
+	if err != nil {
+		return nil, err
+	}
+
 	return &rest.Config{
 		Host:        u.Host,
 		Prefix:      u.Path,
 		BearerToken: cluster.Status.ServiceAccountToken,
 		TLSClientConfig: rest.TLSClientConfig{
 			CAData: caBytes,
+		},
+		WrapTransport: func(rt http.RoundTripper) http.RoundTripper {
+			if ht, ok := rt.(*http.Transport); ok {
+				ht.DialContext = nil
+				ht.DialTLS = nil
+				ht.Dial = dialer
+			}
+			return rt
 		},
 	}, nil
 }
@@ -145,7 +173,7 @@ func (m *Manager) toRecord(ctx context.Context, cluster *v3.Cluster) (*record, e
 		return nil, err
 	}
 
-	clusterContext, err := config.NewUserContext(m.ManagementContext.RESTConfig, *kubeConfig, cluster.Name)
+	clusterContext, err := config.NewUserContext(m.APIContext.RESTConfig, *kubeConfig, cluster.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +205,7 @@ func (m *Manager) Config(apiContext *types.APIContext, storageContext types.Stor
 		return rest.Config{}, err
 	}
 	if record == nil {
-		return m.ManagementContext.RESTConfig, nil
+		return m.APIContext.RESTConfig, nil
 	}
 	return record.cluster.RESTConfig, nil
 }
@@ -188,7 +216,7 @@ func (m *Manager) UnversionedClient(apiContext *types.APIContext, storageContext
 		return nil, err
 	}
 	if record == nil {
-		return m.ManagementContext.UnversionedClient, nil
+		return m.APIContext.UnversionedClient, nil
 	}
 	return record.cluster.UnversionedClient, nil
 }
@@ -199,7 +227,7 @@ func (m *Manager) APIExtClient(apiContext *types.APIContext, storageContext type
 		return nil, err
 	}
 	if record == nil {
-		return m.ManagementContext.APIExtClient, nil
+		return m.APIContext.APIExtClient, nil
 	}
 	return record.cluster.APIExtClient, nil
 }

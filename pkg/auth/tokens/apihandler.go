@@ -15,15 +15,15 @@ var crdVersions = []*types.APIVersion{
 	&managementSchema.Version,
 }
 
-func NewAPIHandler(ctx context.Context, mgmtCtx *config.ManagementContext) (http.Handler, error) {
-	err := NewTokenAPIServer(ctx, mgmtCtx)
+func NewAPIHandler(ctx context.Context, apiContext *config.ScaledContext) (http.Handler, error) {
+	err := NewTokenAPIServer(ctx, apiContext)
 	if err != nil {
 		return nil, err
 	}
 
 	schemas := types.NewSchemas().AddSchemas(managementSchema.TokenSchemas)
 
-	if err := tokenSchema(ctx, mgmtCtx, schemas); err != nil {
+	if err := tokenSchema(ctx, schemas); err != nil {
 		return nil, err
 	}
 
@@ -36,7 +36,7 @@ func NewAPIHandler(ctx context.Context, mgmtCtx *config.ManagementContext) (http
 	return server, nil
 }
 
-func tokenSchema(ctx context.Context, management *config.ManagementContext, schemas *types.Schemas) error {
+func tokenSchema(ctx context.Context, schemas *types.Schemas) error {
 	schema := schemas.Schema(&managementSchema.Version, client.TokenType)
 	schema.CollectionActions = map[string]types.Action{
 		"logout": {},

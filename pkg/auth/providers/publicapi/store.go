@@ -1,7 +1,9 @@
 package publicapi
 
 import (
+	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/httperror"
+	"github.com/rancher/norman/store/empty"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/types/config"
@@ -10,22 +12,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func setAuthProvidersStore(schema *types.Schema, mgmt *config.ManagementContext) {
+func setAuthProvidersStore(schema *types.Schema, apiContext *config.ScaledContext) {
 	schema.Store = &authProvidersStore{
-		mgmt: mgmt,
+		authConfigsRaw: apiContext.Management.AuthConfigs("").ObjectClient().UnstructuredClient(),
 	}
 }
 
 type authProvidersStore struct {
-	mgmt *config.ManagementContext
-}
-
-func (s *authProvidersStore) Context() types.StorageContext {
-	return types.DefaultStorageContext
+	empty.Store
+	authConfigsRaw clientbase.GenericClient
 }
 
 func (s *authProvidersStore) ByID(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
-	o, err := s.mgmt.Management.AuthConfigs("").ObjectClient().UnstructuredClient().Get(id, v1.GetOptions{})
+	o, err := s.authConfigsRaw.Get(id, v1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +38,7 @@ func (s *authProvidersStore) ByID(apiContext *types.APIContext, schema *types.Sc
 }
 
 func (s *authProvidersStore) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {
-	rrr, _ := s.mgmt.Management.AuthConfigs("").ObjectClient().UnstructuredClient().List(v1.ListOptions{})
+	rrr, _ := s.authConfigsRaw.List(v1.ListOptions{})
 	var result []map[string]interface{}
 	list, _ := rrr.(*unstructured.UnstructuredList)
 	for _, i := range list.Items {
@@ -50,20 +49,4 @@ func (s *authProvidersStore) List(apiContext *types.APIContext, schema *types.Sc
 		}
 	}
 	return result, nil
-}
-
-func (s *authProvidersStore) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
-	return nil, httperror.NewAPIError(httperror.MethodNotAllowed, "Method not allowed")
-}
-
-func (s *authProvidersStore) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
-	return nil, httperror.NewAPIError(httperror.MethodNotAllowed, "Method not allowed")
-}
-
-func (s *authProvidersStore) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
-	return nil, httperror.NewAPIError(httperror.MethodNotAllowed, "Method not allowed")
-}
-
-func (s *authProvidersStore) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
-	return nil, httperror.NewAPIError(httperror.MethodNotAllowed, "Method not allowed")
 }

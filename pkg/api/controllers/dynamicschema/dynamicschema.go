@@ -17,7 +17,7 @@ type Controller struct {
 	known   map[string]bool
 }
 
-func Register(management *config.ManagementContext, schemas *types.Schemas) {
+func Register(management *config.ScaledContext, schemas *types.Schemas) {
 	c := &Controller{
 		Schemas: schemas,
 	}

@@ -12,7 +12,7 @@ import (
 
 var authConfigTypes = []string{client.GithubConfigType, client.LocalConfigType, client.ActiveDirectoryConfigType}
 
-func SetupAuthConfig(ctx context.Context, management *config.ManagementContext, schemas *types.Schemas) {
+func SetupAuthConfig(ctx context.Context, management *config.ScaledContext, schemas *types.Schemas) {
 	Configure(ctx, management)
 
 	authConfigBaseSchema := schemas.Schema(&managementschema.Version, client.AuthConfigType)

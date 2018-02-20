@@ -25,7 +25,6 @@ const (
 
 type tokenAPIServer struct {
 	ctx          context.Context
-	client       *config.ManagementContext
 	tokensClient v3.TokenInterface
 	userIndexer  cache.Indexer
 	tokenIndexer cache.Indexer
@@ -51,23 +50,22 @@ func tokenKeyIndexer(obj interface{}) ([]string, error) {
 	return []string{token.Token}, nil
 }
 
-func NewTokenAPIServer(ctx context.Context, mgmtCtx *config.ManagementContext) error {
+func NewTokenAPIServer(ctx context.Context, apiContext *config.ScaledContext) error {
 	if tokenServer != nil {
 		return nil
 	}
 
-	if mgmtCtx == nil {
+	if apiContext == nil {
 		return fmt.Errorf("failed to build tokenAPIHandler, nil ManagementContext")
 	}
 
-	informer := mgmtCtx.Management.Users("").Controller().Informer()
+	informer := apiContext.Management.Users("").Controller().Informer()
 	informer.AddIndexers(map[string]cache.IndexFunc{userPrincipalIndex: userPrincipalIndexer})
-	tokenInformer := mgmtCtx.Management.Tokens("").Controller().Informer()
+	tokenInformer := apiContext.Management.Tokens("").Controller().Informer()
 	tokenInformer.AddIndexers(map[string]cache.IndexFunc{tokenKeyIndex: tokenKeyIndexer})
 	tokenServer = &tokenAPIServer{
 		ctx:          ctx,
-		client:       mgmtCtx,
-		tokensClient: mgmtCtx.Management.Tokens(""),
+		tokensClient: apiContext.Management.Tokens(""),
 		userIndexer:  informer.GetIndexer(),
 		tokenIndexer: tokenInformer.GetIndexer(),
 	}

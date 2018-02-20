@@ -32,12 +32,12 @@ import (
 	"github.com/rancher/types/config"
 )
 
-func Setup(ctx context.Context, management *config.ManagementContext) error {
+func Setup(ctx context.Context, apiContext *config.ScaledContext) error {
 	// Here we setup all types that will be stored in the Management cluster
-	schemas := management.Schemas
+	schemas := apiContext.Schemas
 
 	wg := &sync.WaitGroup{}
-	factory := &crd.Factory{ClientGetter: management.ClientGetter}
+	factory := &crd.Factory{ClientGetter: apiContext.ClientGetter}
 
 	createCrd(ctx, wg, factory, schemas, &managementschema.Version,
 		client.AuthConfigType,
@@ -57,6 +57,7 @@ func Setup(ctx context.Context, management *config.ManagementContext) error {
 		client.GroupType,
 		client.ListenConfigType,
 		client.NodeType,
+		client.NodePoolType,
 		client.NodeDriverType,
 		client.NodeTemplateType,
 		client.PodSecurityPolicyTemplateType,
@@ -77,24 +78,24 @@ func Setup(ctx context.Context, management *config.ManagementContext) error {
 
 	Templates(schemas)
 	TemplateVersion(schemas)
-	User(schemas, management)
+	User(schemas, apiContext)
 	Catalog(schemas)
-	SecretTypes(schemas, management)
-	App(schemas, management)
+	SecretTypes(schemas, apiContext)
+	App(schemas, apiContext)
 	Setting(schemas)
-	Preference(schemas, management)
+	Preference(schemas, apiContext)
 	ClusterRegistrationTokens(schemas)
-	NodeTemplates(schemas, management)
-	LoggingTypes(schemas, management)
-	Alert(schemas, management)
+	NodeTemplates(schemas, apiContext)
+	LoggingTypes(schemas, apiContext)
+	Alert(schemas, apiContext)
 
-	if err := NodeTypes(schemas, management); err != nil {
+	if err := NodeTypes(schemas, apiContext); err != nil {
 		return err
 	}
 
-	principals.Schema(ctx, management, schemas)
-	providers.SetupAuthConfig(ctx, management, schemas)
-	authn.SetUserStore(schemas.Schema(&managementschema.Version, client.UserType), management)
+	principals.Schema(ctx, apiContext, schemas)
+	providers.SetupAuthConfig(ctx, apiContext, schemas)
+	authn.SetUserStore(schemas.Schema(&managementschema.Version, client.UserType), apiContext)
 
 	setupScopedTypes(schemas)
 
@@ -154,13 +155,13 @@ func ClusterRegistrationTokens(schemas *types.Schemas) {
 	schema.Formatter = clusteregistrationtokens.Formatter
 }
 
-func NodeTemplates(schemas *types.Schemas, management *config.ManagementContext) {
+func NodeTemplates(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.NodeTemplateType)
 	schema.Store = userscope.NewStore(management.Core.Namespaces(""), schema.Store)
 	schema.Validator = nodetemplate.Validator
 }
 
-func SecretTypes(schemas *types.Schemas, management *config.ManagementContext) {
+func SecretTypes(schemas *types.Schemas, management *config.ScaledContext) {
 	secretSchema := schemas.Schema(&projectschema.Version, projectclient.SecretType)
 	secretSchema.Store = proxy.NewProxyStore(management.ClientGetter,
 		config.ManagementStorageContext,
@@ -182,7 +183,7 @@ func SecretTypes(schemas *types.Schemas, management *config.ManagementContext) {
 	secretSchema.Store = cert.Wrap(secretSchema.Store)
 }
 
-func User(schemas *types.Schemas, management *config.ManagementContext) {
+func User(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.UserType)
 	schema.Formatter = authn.UserFormatter
 	schema.CollectionFormatter = authn.CollectionFormatter
@@ -192,13 +193,13 @@ func User(schemas *types.Schemas, management *config.ManagementContext) {
 	schema.ActionHandler = handler.Actions
 }
 
-func Preference(schemas *types.Schemas, management *config.ManagementContext) {
+func Preference(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.PreferenceType)
 	schema.Store = preference.NewStore(management.Core.Namespaces(""), schema.Store)
 }
 
-func NodeTypes(schemas *types.Schemas, management *config.ManagementContext) error {
-	secretStore, err := nodeconfig.NewStore(management)
+func NodeTypes(schemas *types.Schemas, management *config.ScaledContext) error {
+	secretStore, err := nodeconfig.NewStore(management.Core.Namespaces(""), management.K8sClient.CoreV1())
 	if err != nil {
 		return err
 	}
@@ -221,10 +222,10 @@ func NodeTypes(schemas *types.Schemas, management *config.ManagementContext) err
 	return nil
 }
 
-func App(schemas *types.Schemas, management *config.ManagementContext) {
+func App(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&projectschema.Version, projectclient.AppType)
 	actionWrapper := app.ActionWrapper{
-		Management: *management,
+		Clusters: management.Management.Clusters(""),
 	}
 	schema.Formatter = app.Formatter
 	schema.ActionHandler = actionWrapper.ActionHandler
@@ -235,7 +236,7 @@ func Setting(schemas *types.Schemas) {
 	schema.Formatter = setting.Formatter
 }
 
-func LoggingTypes(schemas *types.Schemas, management *config.ManagementContext) {
+func LoggingTypes(schemas *types.Schemas, management *config.ScaledContext) {
 	loggingHandler := logging.ClusterLoggingHandler{
 		ClusterLoggingClient: management.Management.ClusterLoggings(""),
 		CoreV1:               management.Core,
@@ -248,9 +249,10 @@ func LoggingTypes(schemas *types.Schemas, management *config.ManagementContext) 
 	schema.Validator = logging.ProjectLoggingValidator
 }
 
-func Alert(schemas *types.Schemas, management *config.ManagementContext) {
+func Alert(schemas *types.Schemas, management *config.ScaledContext) {
 	handler := &alert.Handler{
-		Management: *management,
+		ProjectAlerts: management.Management.ProjectAlerts(""),
+		ClusterAlerts: management.Management.ClusterAlerts(""),
 	}
 
 	schema := schemas.Schema(&managementschema.Version, client.ClusterAlertType)

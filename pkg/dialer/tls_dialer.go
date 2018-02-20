@@ -8,9 +8,10 @@ import (
 
 	"github.com/rancher/rancher/pkg/nodeconfig"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/config/dialer"
 )
 
-func (f *factory) tlsDialer(machine *v3.Node) (Dialer, error) {
+func (f *Factory) tlsDialer(machine *v3.Node) (dialer.Dialer, error) {
 	config, err := nodeconfig.NewNodeConfig(f.store, machine)
 	if err != nil {
 		return nil, err
