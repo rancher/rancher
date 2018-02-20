@@ -100,6 +100,7 @@ def auth_check(schema, id, access, props=None):
         if 'writeOnly' in field and field.writeOnly:
             prop_actual.add('o')
 
-        assert prop_actual == prop
+        if prop_actual != prop:
+            assert prop_actual == prop
 
     return 1

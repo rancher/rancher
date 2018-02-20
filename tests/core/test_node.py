@@ -4,9 +4,9 @@ from common import auth_check
 def test_node_fields(mc):
     cclient = mc.client
     fields = {
+        'annotations': 'r',
+        'labels': 'r',
         'nodeTaints': 'r',
-        'nodeLabels': 'r',
-        'nodeAnnotations': 'r',
         'namespaceId': 'cr',
         'conditions': 'r',
         'allocatable': 'r',
@@ -19,12 +19,12 @@ def test_node_fields(mc):
         'nodeName': 'r',
         'requested': 'r',
         'clusterId': 'cr',
-        'etcd': 'cru',
-        'controlPlane': 'cru',
-        'worker': 'cru',
+        'etcd': 'cr',
+        'controlPlane': 'cr',
+        'worker': 'cr',
         'requestedHostname': 'cr',
         'volumesAttached': 'r',
-        'nodeTemplateId': 'cru',
+        'nodeTemplateId': 'cr',
         'volumesInUse': 'r',
         'podCidr': 'r',
         'name': 'cru',
