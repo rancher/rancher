@@ -33,7 +33,7 @@ func Setup(ctx context.Context, mgmt *config.ScaledContext) error {
 	addProxyStore(schemas, mgmt, client.ReplicaSetType, "apps/v1beta2", workload.New)
 	addProxyStore(schemas, mgmt, client.ReplicationControllerType, "v1", workload.New)
 	addProxyStore(schemas, mgmt, client.ServiceType, "v1", service.New)
-	addProxyStore(schemas, mgmt, client.StatefulSetType, "apps/v1beta2", nil)
+	addProxyStore(schemas, mgmt, client.StatefulSetType, "apps/v1beta2", workload.New)
 	addProxyStore(schemas, mgmt, clusterClient.NamespaceType, "v1", namespace.New)
 	addProxyStore(schemas, mgmt, clusterClient.PersistentVolumeType, "v1", nil)
 	addProxyStore(schemas, mgmt, clusterClient.StorageClassType, "storage.k8s.io/v1", nil)
