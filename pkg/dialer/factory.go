@@ -56,7 +56,7 @@ func (f *Factory) ClusterDialer(clusterName string) (dialer.Dialer, error) {
 
 		for _, node := range nodes {
 			if node.Spec.Imported && node.DeletionTimestamp == nil && v3.NodeConditionProvisioned.IsTrue(node) {
-				return f.DockerDialer(clusterName, node.Name)
+				return f.NodeDialer(clusterName, node.Name)
 			}
 		}
 	}

@@ -74,6 +74,13 @@ func (m *Lifecycle) setupCustom(obj *v3.Node) {
 	if obj.Status.NodeConfig.User == "" {
 		obj.Status.NodeConfig.User = "root"
 	}
+
+	obj.Status.InternalNodeStatus.Addresses = []v1.NodeAddress{
+		{
+			Type:    v1.NodeInternalIP,
+			Address: obj.Status.NodeConfig.Address,
+		},
+	}
 }
 
 func isCustom(obj *v3.Node) bool {
