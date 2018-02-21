@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	hutils "github.com/rancher/rancher/pkg/controllers/user/helm/utils"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
@@ -51,23 +52,20 @@ func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 	if err := access.ByID(apiContext, &managementschema.Version, managementv3.ClusterType, clusterName, &cluster); err != nil {
 		return err
 	}
-	clusterRestConfig, err := a.toRESTConfig(&cluster)
+	tokenAuthValue := tokens.GetTokenAuthFromRequest(apiContext.Request)
+	data, err := yaml.Marshal(hutils.RestToRaw(tokenAuthValue, cluster.ID))
 	if err != nil {
 		return err
 	}
-	data, err := yaml.Marshal(hutils.RestToRaw(*clusterRestConfig))
+	rootDir, err := ioutil.TempDir("", "helm-")
 	if err != nil {
 		return err
 	}
-	rootDir := filepath.Join(os.Getenv("HOME"), cacheRoot)
-	if err := os.MkdirAll(filepath.Join(rootDir, app.Name), 0755); err != nil {
-		return err
-	}
-	kubeConfigPath := filepath.Join(rootDir, app.Name, ".kubeconfig")
+	defer os.RemoveAll(rootDir)
+	kubeConfigPath := filepath.Join(rootDir, ".kubeconfig")
 	if err := ioutil.WriteFile(kubeConfigPath, data, 0755); err != nil {
 		return err
 	}
-	defer os.RemoveAll(kubeConfigPath)
 	store := apiContext.Schema.Store
 	switch actionName {
 	case "upgrade":
@@ -99,7 +97,6 @@ func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 		if err != nil {
 			return err
 		}
-		rootDir := filepath.Join("./management-state", cacheRoot)
 		tempDir, err := hutils.WriteTempDir(rootDir, files)
 		if err != nil {
 			return err

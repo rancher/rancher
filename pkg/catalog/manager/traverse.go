@@ -32,31 +32,49 @@ func traverseFiles(repoPath string, catalog *v3.Catalog, catalogType CatalogType
 }
 
 func traverseHelmGitFiles(repoPath, catalogName string) ([]v3.Template, []error, error) {
-	fullpath := path.Join(repoPath, "stable")
+	fullpath := repoPath
 
+	templatesByName := map[string]*v3.Template{}
+	templateByVersion := map[string]map[string]*v3.TemplateVersionSpec{}
 	var templates []v3.Template
 	var template *v3.Template
+	var templateVersionSpec *v3.TemplateVersionSpec
 	var errors []error
 	err := filepath.Walk(fullpath, func(path string, info os.FileInfo, err error) error {
 		if len(path) == len(fullpath) {
 			return nil
 		}
 		relPath := path[len(fullpath)+1:]
-		components := strings.Split(relPath, "/")
-		if len(components) == 1 {
-			if template != nil {
-				templates = append(templates, *template)
-			}
-			template = new(v3.Template)
-			template.Spec.Versions = make([]v3.TemplateVersionSpec, 0)
-			template.Spec.Versions = append(template.Spec.Versions, v3.TemplateVersionSpec{
-				Files: make([]v3.File, 0),
-			})
-			template.Spec.Base = HelmTemplateBaseType
+		if strings.HasPrefix(relPath, ".git/") {
+			return nil
 		}
 		if info.IsDir() {
 			return nil
 		}
+		chartPath := ChartsPath(path)
+		if chartPath == "" {
+			return nil
+		}
+		metadata, err := helm.LoadMetadata(chartPath)
+		if err != nil {
+			return err
+		}
+		if _, ok := templatesByName[metadata.Name]; !ok {
+			template = new(v3.Template)
+			template.Spec.Versions = make([]v3.TemplateVersionSpec, 0)
+			template.Spec.Base = HelmTemplateBaseType
+			templatesByName[metadata.Name] = template
+		}
+		template = templatesByName[metadata.Name]
+		if templateByVersion[metadata.Name] == nil {
+			templateByVersion[metadata.Name] = map[string]*v3.TemplateVersionSpec{}
+		}
+
+		if _, ok := templateByVersion[metadata.Name][metadata.Version]; !ok {
+			templateVersionSpec = new(v3.TemplateVersionSpec)
+			templateByVersion[metadata.Name][metadata.Version] = templateVersionSpec
+		}
+		templateVersionSpec = templateByVersion[metadata.Name][metadata.Version]
 
 		if strings.HasSuffix(info.Name(), "Chart.yaml") {
 			metadata, err := helm.LoadMetadata(path)
@@ -72,35 +90,54 @@ func traverseHelmGitFiles(repoPath, catalogName string) ([]v3.Template, []error,
 			if err != nil {
 				errors = append(errors, err)
 			}
-			rev := 0
 			template.Spec.Icon = iconData
 			template.Spec.IconFilename = iconFilename
-			template.Spec.FolderName = components[0]
+			template.Spec.FolderName = metadata.Name
 			template.Spec.CatalogID = catalogName
-			template.Name = components[0]
-			template.Spec.Versions[0].Revision = &rev
-			template.Spec.Versions[0].Version = metadata.Version
+			template.Name = metadata.Name
+			templateVersionSpec.Version = metadata.Version
 		}
 		file, err := helm.LoadFile(path)
 		if err != nil {
 			return err
 		}
-
-		file.Name = relPath
+		topDir := filepath.Dir(chartPath)
+		file.Name = filepath.Join(metadata.Name, path[len(topDir)+1:])
 
 		if strings.HasSuffix(info.Name(), "README.md") {
 			contents, err := base64.StdEncoding.DecodeString(file.Contents)
 			if err != nil {
 				return err
 			}
-			template.Spec.Versions[0].Readme = string(contents)
+			templateVersionSpec.Readme = string(contents)
 		}
+		templateVersionSpec.Files = append(templateVersionSpec.Files, *file)
 
-		template.Spec.Versions[0].Files = append(template.Spec.Versions[0].Files, *file)
-
+		templateByVersion[metadata.Name][metadata.Version] = templateVersionSpec
 		return nil
 	})
+	for name, template := range templatesByName {
+		for _, templateVersionSpec := range templateByVersion[name] {
+			template.Spec.Versions = append(template.Spec.Versions, *templateVersionSpec)
+		}
+		templates = append(templates, *template)
+	}
 	return templates, errors, err
+}
+
+func ChartsPath(path string) string {
+	dirPath := filepath.Dir(path)
+	if filepath.Base(dirPath) == "templates" {
+		topDir := filepath.Dir(dirPath)
+		_, err := os.Stat(filepath.Join(topDir, "Chart.yaml"))
+		if err == nil {
+			return filepath.Join(topDir, "Chart.yaml")
+		}
+	}
+	if _, err := os.Stat(filepath.Join(dirPath, "Chart.yaml")); err == nil {
+		return filepath.Join(dirPath, "Chart.yaml")
+	}
+	return ""
 }
 
 func traverseHelmFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []error, error) {
