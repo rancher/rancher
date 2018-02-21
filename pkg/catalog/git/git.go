@@ -25,7 +25,7 @@ func HeadCommit(path string) (string, error) {
 
 func IsValid(url string) bool {
 	err := runcmd("git", "ls-remote", url)
-	return (err == nil)
+	return err == nil
 }
 
 func runcmd(name string, arg ...string) error {
