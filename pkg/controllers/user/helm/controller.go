@@ -10,37 +10,44 @@ import (
 	"time"
 
 	"github.com/rancher/norman/types/slice"
+	"github.com/rancher/rancher/pkg/auth/providers/local"
 	hutils "github.com/rancher/rancher/pkg/controllers/user/helm/utils"
+	"github.com/rancher/rancher/pkg/randomtoken"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 )
 
 const (
-	cacheRoot = "helm-controller"
+	helmTokenPrefix = "helm-token-"
 )
 
 func Register(user *config.UserContext) {
 	appClient := user.Management.Project.Apps("")
 	stackLifecycle := &Lifecycle{
+		TokenClient:           user.Management.Management.Tokens(""),
+		UserClient:            user.Management.Management.Users(""),
 		K8sClient:             user.K8sClient,
 		TemplateVersionClient: user.Management.Management.TemplateVersions(""),
-		CacheRoot:             filepath.Join("./management-state", cacheRoot),
-		Management:            user,
+		ListenConfigClient:    user.Management.Management.ListenConfigs(""),
+		ClusterName:           user.ClusterName,
 	}
 	appClient.AddClusterScopedLifecycle("helm-controller", user.ClusterName, stackLifecycle)
 }
 
 type Lifecycle struct {
-	Management            *config.UserContext
+	TokenClient           mgmtv3.TokenInterface
+	UserClient            mgmtv3.UserInterface
 	TemplateVersionClient mgmtv3.TemplateVersionInterface
 	K8sClient             kubernetes.Interface
-	CacheRoot             string
+	ListenConfigClient    mgmtv3.ListenConfigInterface
+	ClusterName           string
 }
 
 func (l *Lifecycle) Create(obj *v3.App) (*v3.App, error) {
@@ -149,7 +156,11 @@ func (l *Lifecycle) Run(obj *v3.App, action, templateVersionID string) error {
 		}
 		files[file.Name] = string(content)
 	}
-	dir, err := hutils.WriteTempDir(l.CacheRoot, files)
+	tempDir, err := ioutil.TempDir("", "helm-")
+	if err != nil {
+		return err
+	}
+	dir, err := hutils.WriteTempDir(tempDir, files)
 	defer os.RemoveAll(dir)
 	if err != nil {
 		return err
@@ -159,14 +170,31 @@ func (l *Lifecycle) Run(obj *v3.App, action, templateVersionID string) error {
 	defer cancel()
 	addr := hutils.GenerateRandomPort()
 	probeAddr := hutils.GenerateRandomPort()
-	data, err := yaml.Marshal(hutils.RestToRaw(l.Management.RESTConfig))
+	userID := obj.Annotations["field.cattle.io/creatorId"]
+	user, err := l.UserClient.Get(userID, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Join(l.CacheRoot, obj.Namespace), 0755); err != nil {
+	token := ""
+	if t, err := l.TokenClient.Get(helmTokenPrefix+user.Name, metav1.GetOptions{}); err != nil && !errors.IsNotFound(err) {
+		return err
+	} else if errors.IsNotFound(err) {
+		token, err = l.generateToken(user)
+		if err != nil {
+			return err
+		}
+	} else {
+		token = t.Name + ":" + t.Token
+	}
+
+	data, err := yaml.Marshal(hutils.RestToRaw(token, l.ClusterName))
+	if err != nil {
 		return err
 	}
-	kubeConfigPath := filepath.Join(l.CacheRoot, obj.Namespace, ".kubeconfig")
+	if err := os.MkdirAll(filepath.Join(tempDir, obj.Namespace), 0755); err != nil {
+		return err
+	}
+	kubeConfigPath := filepath.Join(tempDir, obj.Namespace, ".kubeconfig")
 	if err := ioutil.WriteFile(kubeConfigPath, data, 0755); err != nil {
 		return err
 	}
@@ -183,6 +211,40 @@ func (l *Lifecycle) Run(obj *v3.App, action, templateVersionID string) error {
 		}
 	}
 	return nil
+}
+
+const userIDLabel = "authn.management.cattle.io/token-userId"
+
+// this might be pretty hacky, need to revisit
+func (l *Lifecycle) generateToken(user *mgmtv3.User) (string, error) {
+	token := mgmtv3.Token{
+		TTLMillis:    0,
+		Description:  "token for helm chart deployment",
+		UserID:       user.Name,
+		AuthProvider: local.Name,
+		IsDerived:    false,
+	}
+	key, err := randomtoken.Generate()
+	if err != nil {
+		return "", fmt.Errorf("failed to generate token key")
+	}
+
+	labels := make(map[string]string)
+	labels[userIDLabel] = token.UserID
+
+	token.APIVersion = "management.cattle.io/v3"
+	token.Kind = "Token"
+	token.Token = key
+	token.ObjectMeta = metav1.ObjectMeta{
+		Name:   helmTokenPrefix + user.Name,
+		Labels: labels,
+	}
+	createdToken, err := l.TokenClient.Create(&token)
+
+	if err != nil {
+		return "", err
+	}
+	return createdToken.Name + ":" + createdToken.Token, nil
 }
 
 func (l *Lifecycle) saveTemplates(obj *v3.App, templateVersion *mgmtv3.TemplateVersion) error {

@@ -17,7 +17,6 @@ import (
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	managementv3 "github.com/rancher/types/client/management/v3"
 	"golang.org/x/net/context"
-	"k8s.io/client-go/rest"
 )
 
 const (
@@ -27,12 +26,9 @@ const (
 	helmName   = "helm"
 )
 
-func RestToRaw(config rest.Config) KubeConfig {
+func RestToRaw(token, clusterID string) KubeConfig {
 	rawConfig := KubeConfig{}
-	host := config.Host
-	if !strings.HasPrefix(host, "https://") {
-		host = "https://" + host
-	}
+	host := fmt.Sprintf("https://localhost:8443/k8s/clusters/%s", clusterID)
 	rawConfig.CurrentContext = "default"
 	rawConfig.APIVersion = "v1"
 	rawConfig.Kind = "Config"
@@ -41,7 +37,7 @@ func RestToRaw(config rest.Config) KubeConfig {
 			Name: "default",
 			Cluster: dataCluster{
 				Server: host,
-				CertificateAuthorityData: base64.StdEncoding.EncodeToString(config.TLSClientConfig.CAData),
+				InsecureSkipVerifyTls: true,
 			},
 		},
 	}
@@ -49,16 +45,16 @@ func RestToRaw(config rest.Config) KubeConfig {
 		{
 			Name: "default",
 			Context: contextData{
-				User:    "kube-admin",
+				User:    "admin",
 				Cluster: "default",
 			},
 		},
 	}
 	rawConfig.Users = []configUser{
 		{
-			Name: "kube-admin",
+			Name: "admin",
 			User: userData{
-				Token: config.BearerToken,
+				Token: token,
 			},
 		},
 	}
