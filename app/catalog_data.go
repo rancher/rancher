@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	defaultUrl = "https://kubernetes-charts.storage.googleapis.com/"
+	defaultURL = "https://kubernetes-charts.storage.googleapis.com/"
 )
 
 func addCatalogs(management *config.ManagementContext) error {
@@ -22,7 +22,7 @@ func addCatalogs(management *config.ManagementContext) error {
 				Name: "helm",
 			},
 			Spec: v3.CatalogSpec{
-				URL:         defaultUrl,
+				URL:         defaultURL,
 				CatalogKind: "helm",
 			},
 		}

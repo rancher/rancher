@@ -36,8 +36,8 @@ func RestToRaw(token, clusterID string) KubeConfig {
 		{
 			Name: "default",
 			Cluster: dataCluster{
-				Server: host,
-				InsecureSkipVerifyTls: true,
+				Server:                host,
+				InsecureSkipVerifyTLS: true,
 			},
 		},
 	}
