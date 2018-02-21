@@ -74,11 +74,13 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) error {
 			return err
 		}
 		if existing == nil {
+			controller := true
 			ownerRef := metav1.OwnerReference{
 				Name:       serviceName,
 				APIVersion: "v1beta1/extensions",
 				UID:        obj.UID,
 				Kind:       "Ingress",
+				Controller: &controller,
 			}
 			port, err := strconv.ParseInt(portStr, 10, 64)
 			if err != nil {

@@ -33,7 +33,7 @@ func Register(ctx context.Context, workload *config.UserOnlyContext) {
 }
 
 func getName() string {
-	return "headlessServiceGenerationController"
+	return "workloadServiceGenerationController"
 }
 
 func (c *Controller) syncDeployments(key string, obj *v1beta2.Deployment) error {
