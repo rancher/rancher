@@ -6,6 +6,8 @@
 # pip install -r requirements.txt
 
 import argparse
+import collections
+import json
 import os
 import re
 import semver
@@ -35,6 +37,8 @@ parser.add_argument('-ku', '--k8surl',
 parser.add_argument('-v', '--version',
                     required=True,
                     help='Rancher Server version')
+parser.add_argument('-j', '--json', action='store_true',
+                    help='Print JSON output')
 args = parser.parse_args()
 
 
@@ -108,7 +112,8 @@ def optimal_version_dir(rancher_version, service_dir):
                     if 'version' in catalog and catalog['version'] == version:
                         return key, value['.catalog']['version']
     except yaml.YAMLError, exc:
-        print "Error in config.yml file: ", exc
+        if args.json == False:
+            print "Error in config.yml file: ", exc
 
     # Choose the highest ordinal value
     maxkey = -1
@@ -186,7 +191,8 @@ def version_images(service_version_dir):
                 images.add(service['image'])
 
     except yaml.YAMLError, exc:
-        print "Error in docker-compose.yml file: ", exc
+        if args.json == False:
+            print "Error in docker-compose.yml file: ", exc
 
     return images
 
@@ -195,10 +201,11 @@ version = args.version.lstrip('v')
 if args.branch is None:
     args.branch = get_catalog_branch(version)
 
-print 'Rancher Version: ' + version
-print 'Catalog URL: ' + args.url
-print 'Catalog Branch: ' + args.branch
-print
+if args.json == False:
+    print 'Rancher Version: ' + version
+    print 'Catalog URL: ' + args.url
+    print 'Catalog Branch: ' + args.branch
+    print
 
 catalog_dir = str(uuid.uuid4())
 try:
@@ -209,15 +216,25 @@ except subprocess.CalledProcessError:
     sys.exit(1)
 
 
+jsondata = collections.defaultdict(list)
+jsondata['services'] = {}
 infra_dir = catalog_dir + "/infra-templates"
 for infra_service in os.listdir(infra_dir):
     service_dir = infra_dir + "/" + infra_service
     if os.path.isdir(service_dir):
         version_dir, template_ver = optimal_version_dir(version, service_dir)
         if version_dir != "":
-            print infra_service + ": " + template_ver
+            if args.json == True:
+                jsondata['services'][infra_service] = {}
+                jsondata['services'][infra_service]['version'] = template_ver
+                jsondata['services'][infra_service]['images'] = list()
+            else:
+                print infra_service + ": " + template_ver
             for image in version_images(service_dir + "/" + version_dir):
-                print "    - " + image
+                if args.json == True:
+                    jsondata['services'][infra_service]['images'].append(image)
+                else:
+                    print "    - " + image
             if infra_service == "k8s":
                 if args.k8saddons == True:
                     k8s_addons_dir = str(uuid.uuid4())
@@ -228,7 +245,13 @@ for infra_service in os.listdir(infra_dir):
                     except subprocess.CalledProcessError:
                         sys.exit(1)
                     for image in version_pod_images(k8s_addons_dir):
-                        print "    - " + image
+                        if args.json == True:
+                            jsondata['services'][infra_service]['images'].append(image)
+                        else:
+                            print "    - " + image
+
+if args.json == True:
+    print json.dumps(jsondata)
 
 subprocess.call(["rm", "-rf", catalog_dir])
 if args.k8saddons == True:
