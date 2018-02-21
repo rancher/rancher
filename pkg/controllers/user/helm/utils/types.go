@@ -18,7 +18,7 @@ type configCluster struct {
 type dataCluster struct {
 	CertificateAuthorityData string `yaml:"certificate-authority-data,omitempty"`
 	Server                   string `yaml:"server,omitempty"`
-	InsecureSkipVerifyTls    bool   `yaml:"insecure-skip-tls-verify,omitempty"`
+	InsecureSkipVerifyTLS    bool   `yaml:"insecure-skip-tls-verify,omitempty"`
 }
 
 type configContext struct {
