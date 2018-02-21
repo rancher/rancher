@@ -4,13 +4,24 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 
-	"path/filepath"
+	"crypto/tls"
 
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
+)
+
+var (
+	insecureClient = &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+	}
 )
 
 func Content() http.Handler {
@@ -53,7 +64,7 @@ func ui(resp http.ResponseWriter, req *http.Request) {
 }
 
 func serveIndex(resp http.ResponseWriter, req *http.Request) error {
-	r, err := http.Get(settings.UIIndex.Get())
+	r, err := insecureClient.Get(settings.UIIndex.Get())
 	if err != nil {
 		return err
 	}

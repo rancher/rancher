@@ -76,6 +76,7 @@ func Register(management *config.ManagementContext) {
 	rkeDriver := driver.(*rke.Driver)
 	rkeDriver.DockerDialer = docker.Build
 	rkeDriver.LocalDialer = local.Build
+	rkeDriver.WrapTransportFactory = docker.WrapTransport
 }
 
 func (p *Provisioner) Remove(cluster *v3.Cluster) (*v3.Cluster, error) {
