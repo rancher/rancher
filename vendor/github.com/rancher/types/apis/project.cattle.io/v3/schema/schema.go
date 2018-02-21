@@ -154,7 +154,9 @@ func statefulSetTypes(schemas *types.Schemas) *types.Schemas {
 			NewWorkloadTypeMapper(),
 		).
 		MustImport(&Version, v1beta2.StatefulSetSpec{}, statefulSetConfigOverride{}).
-		MustImport(&Version, v1beta2.StatefulSet{}, projectOverride{})
+		MustImportAndCustomize(&Version, v1beta2.StatefulSet{}, func(schema *types.Schema) {
+			schema.BaseType = "workload"
+		}, projectOverride{})
 }
 
 func replicaSetTypes(schemas *types.Schemas) *types.Schemas {
