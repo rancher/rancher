@@ -188,7 +188,7 @@ func (m *Manager) createTemplateVersions(versionsSpec []v3.TemplateVersionSpec, 
 				BlockOwnerDeletion: &[]bool{true}[0],
 			},
 		}
-		logrus.Infof("Creating templateVersion %s", templateVersion.Name)
+		logrus.Debugf("Creating templateVersion %s", templateVersion.Name)
 		_, err := m.templateVersionClient.Create(&templateVersion)
 		if err != nil {
 			logrus.Error(err)

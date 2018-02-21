@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	defaultURL = "https://kubernetes-charts.storage.googleapis.com/"
+	defaultURL = "https://github.com/ibuildthecloud/rancher-charts"
 )
 
 func addCatalogs(management *config.ManagementContext) error {

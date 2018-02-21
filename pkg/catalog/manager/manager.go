@@ -4,12 +4,11 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"os"
-	"path"
-
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -23,19 +22,7 @@ import (
 )
 
 const (
-	HelmTemplateType     = "helm"
-	RancherTemplateType  = "native"
 	HelmTemplateBaseType = "kubernetes"
-	ProjectLabel         = "io.cattle.catalog.project_id"
-)
-
-type CatalogType int
-
-const (
-	CatalogTypeRancher CatalogType = iota
-	CatalogTypeHelmObjectRepo
-	CatalogTypeHelmGitRepo
-	CatalogTypeInvalid
 )
 
 type Manager struct {
@@ -71,72 +58,70 @@ func (m *Manager) GetCatalogs() ([]v3.Catalog, error) {
 	return list.Items, nil
 }
 
-func (m *Manager) prepareRepoPath(catalog v3.Catalog, update bool) (string, string, CatalogType, error) {
-	if catalog.Spec.CatalogKind == "" || catalog.Spec.CatalogKind == RancherTemplateType {
-		return m.prepareGitRepoPath(catalog, update, CatalogTypeRancher)
+func (m *Manager) prepareRepoPath(catalog v3.Catalog) (path string, commit string, err error) {
+	if git.IsValid(catalog.Spec.URL) {
+		path, commit, err = m.prepareGitRepoPath(catalog)
+	} else {
+		path, commit, err = m.prepareHelmRepoPath(catalog)
 	}
-	if catalog.Spec.CatalogKind == HelmTemplateType {
-		if git.IsValid(catalog.Spec.URL) {
-			return m.prepareGitRepoPath(catalog, update, CatalogTypeHelmGitRepo)
-		}
-		return m.prepareHelmRepoPath(catalog, update)
-	}
-	return "", "", CatalogTypeInvalid, fmt.Errorf("Unknown catalog kind=%s", catalog.Kind)
+	return
 }
 
-func (m *Manager) prepareHelmRepoPath(catalog v3.Catalog, update bool) (string, string, CatalogType, error) {
+func (m *Manager) prepareHelmRepoPath(catalog v3.Catalog) (string, string, error) {
 	index, err := helm.DownloadIndex(catalog.Spec.URL)
 	if err != nil {
-		return "", "", CatalogTypeInvalid, err
+		return "", "", err
 	}
 
-	repoPath := path.Join(m.cacheRoot, catalog.Labels[ProjectLabel], index.Hash)
+	repoPath := path.Join(m.cacheRoot, catalog.Namespace, index.Hash)
 	if err := os.MkdirAll(repoPath, 0755); err != nil {
-		return "", "", CatalogTypeInvalid, err
+		return "", "", err
 	}
 
 	if err := helm.SaveIndex(index, repoPath); err != nil {
-		return "", "", CatalogTypeInvalid, err
+		return "", "", err
 	}
 
-	return repoPath, index.Hash, CatalogTypeHelmObjectRepo, nil
+	return repoPath, index.Hash, nil
 }
 
-func (m *Manager) prepareGitRepoPath(catalog v3.Catalog, update bool, catalogType CatalogType) (string, string, CatalogType, error) {
+func hash(content string) string {
+	sum := md5.Sum([]byte(content))
+	return hex.EncodeToString(sum[:])
+}
+
+func (m *Manager) prepareGitRepoPath(catalog v3.Catalog) (string, string, error) {
 	branch := catalog.Spec.Branch
-	if catalog.Spec.Branch == "" {
+	if branch == "" {
 		branch = "master"
 	}
 
-	sum := md5.Sum([]byte(catalog.Spec.URL + branch))
-	repoBranchHash := hex.EncodeToString(sum[:])
-	repoPath := path.Join(m.cacheRoot, catalog.Labels[ProjectLabel], repoBranchHash)
+	repoBranchHash := hash(catalog.Spec.URL + branch)
+	repoPath := path.Join(m.cacheRoot, catalog.Namespace, repoBranchHash)
 
 	if err := os.MkdirAll(repoPath, 0755); err != nil {
-		return "", "", catalogType, errors.Wrap(err, "mkdir failed")
+		return "", "", err
 	}
 
 	empty, err := dirEmpty(repoPath)
 	if err != nil {
-		return "", "", catalogType, errors.Wrap(err, "Empty directory check failed")
+		return "", "", errors.Wrap(err, "Empty directory check failed")
 	}
 
 	if empty {
 		if err = git.Clone(repoPath, catalog.Spec.URL, branch); err != nil {
-			return "", "", catalogType, errors.Wrap(err, "Clone failed")
+			return "", "", errors.Wrap(err, "Clone failed")
 		}
 	} else {
-		if update {
-			changed, err := m.remoteShaChanged(catalog.Spec.URL, catalog.Spec.Branch, catalog.Status.Commit, m.uuid)
-			if err != nil {
-				return "", "", catalogType, errors.Wrap(err, "Remote commit check failed")
+		changed, err := m.remoteShaChanged(catalog.Spec.URL, catalog.Spec.Branch, catalog.Status.Commit, m.uuid)
+		if err != nil {
+			return "", "", errors.Wrap(err, "Remote commit check failed")
+		}
+		if changed {
+			if err = git.Update(repoPath, branch); err != nil {
+				return "", "", errors.Wrap(err, "Update failed")
 			}
-			if changed {
-				if err = git.Update(repoPath, branch); err != nil {
-					return "", "", catalogType, errors.Wrap(err, "Update failed")
-				}
-				logrus.Debugf("catalog-service: updated catalog '%v'", catalog.Name)
-			}
+			logrus.Debugf("catalog-service: updated catalog '%v'", catalog.Name)
 		}
 	}
 
@@ -144,7 +129,7 @@ func (m *Manager) prepareGitRepoPath(catalog v3.Catalog, update bool, catalogTyp
 	if err != nil {
 		err = errors.Wrap(err, "Retrieving head commit failed")
 	}
-	return repoPath, commit, catalogType, err
+	return repoPath, commit, err
 }
 
 func formatGitURL(endpoint, branch string) string {
@@ -206,6 +191,7 @@ func dirEmpty(dir string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	defer f.Close()
 
 	_, err = f.Readdirnames(1)
 	if err == io.EOF {
