@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/controllers/user/util"
+	util "github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -104,7 +104,7 @@ func (c *Controller) updatePods(serviceName string, obj *corev1.Service, workloa
 	// reset the map
 	targetWorkloadUUIDs := make(map[string]bool)
 	for _, workloadID := range workloadIDs {
-		targetWorkload, err := c.workloadLister.GetByName(workloadID)
+		targetWorkload, err := c.workloadLister.GetByWorkloadId(workloadID)
 		if err != nil {
 			logrus.Warnf("Failed to fetch workload [%s]: [%v]", workloadID, err)
 			continue

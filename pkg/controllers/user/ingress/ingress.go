@@ -9,7 +9,7 @@ import (
 	"strconv"
 
 	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/rancher/pkg/controllers/user/util"
+	util "github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -21,6 +21,11 @@ import (
 )
 
 //TODO fix the workload services cleanup
+
+// This controller is responsible for monitoring ingress and
+// creating services for them if the service is missing
+// Creation would only happen if the service reference was put by Rancher API based on
+// ingress.backend.workloadId. This information is stored in state field in the annotation
 
 type Controller struct {
 	serviceLister v1.ServiceLister

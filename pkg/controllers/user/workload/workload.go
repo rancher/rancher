@@ -5,9 +5,6 @@ import (
 
 	"strings"
 
-	"fmt"
-
-	"github.com/rancher/rancher/pkg/controllers/user/util"
 	"github.com/rancher/types/config"
 	"k8s.io/api/apps/v1beta2"
 	batchv1 "k8s.io/api/batch/v1"
@@ -15,13 +12,18 @@ import (
 	"k8s.io/api/core/v1"
 )
 
+// This controller is responsible for monitoring workloads and
+// creating services for them
+// a) when rancher ports annotation is present, create service based on annotation ports
+// b) when annotation is missing, create a headless service
+
 type Controller struct {
-	workloadLister util.WorkloadLister
+	workloadLister WorkloadLister
 }
 
 func Register(ctx context.Context, workload *config.UserOnlyContext) {
 	c := &Controller{
-		workloadLister: util.NewWorkloadLister(workload),
+		workloadLister: NewWorkloadLister(workload),
 	}
 	workload.Apps.Deployments("").AddHandler(getName(), c.syncDeployments)
 	workload.Core.ReplicationControllers("").AddHandler(getName(), c.syncReplicationControllers)
@@ -90,7 +92,7 @@ func (c *Controller) createService(key string, objectType string) error {
 	namespace := splitted[0]
 	name := splitted[1]
 
-	workload, err := c.workloadLister.GetByName(fmt.Sprintf("%s:%s:%s", objectType, namespace, name))
+	workload, err := c.workloadLister.GetByWorkloadId(GetWorkloadID(objectType, namespace, name))
 	if err != nil {
 		return err
 	}
