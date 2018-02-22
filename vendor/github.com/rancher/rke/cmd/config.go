@@ -160,6 +160,12 @@ func getHostConfig(reader *bufio.Reader, index int, clusterSSHKeyPath string) (*
 	}
 	host.Address = address
 
+	port, err := getConfig(reader, fmt.Sprintf("SSH Port of host (%d)", index+1), cluster.DefaultSSHPort)
+	if err != nil {
+		return nil, err
+	}
+	host.Port = port
+
 	sshKeyPath, err := getConfig(reader, fmt.Sprintf("SSH Private Key Path of host (%s)", address), "")
 	if err != nil {
 		return nil, err

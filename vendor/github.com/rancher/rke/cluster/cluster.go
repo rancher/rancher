@@ -29,6 +29,7 @@ type Cluster struct {
 	EtcdHosts                        []*hosts.Host
 	WorkerHosts                      []*hosts.Host
 	ControlPlaneHosts                []*hosts.Host
+	InactiveHosts                    []*hosts.Host
 	KubeClient                       *kubernetes.Clientset
 	KubernetesServiceIP              net.IP
 	Certificates                     map[string]pki.CertificatePKI
@@ -38,6 +39,7 @@ type Cluster struct {
 	DockerDialerFactory              hosts.DialerFactory
 	LocalConnDialerFactory           hosts.DialerFactory
 	PrivateRegistriesMap             map[string]v3.PrivateRegistry
+	K8sWrapTransport                 k8s.WrapTransport
 }
 
 const (
@@ -122,7 +124,8 @@ func ParseCluster(
 	rkeConfig *v3.RancherKubernetesEngineConfig,
 	clusterFilePath, configDir string,
 	dockerDialerFactory,
-	localConnDialerFactory hosts.DialerFactory) (*Cluster, error) {
+	localConnDialerFactory hosts.DialerFactory,
+	k8sWrapTransport k8s.WrapTransport) (*Cluster, error) {
 	var err error
 	c := &Cluster{
 		RancherKubernetesEngineConfig: *rkeConfig,
@@ -130,6 +133,7 @@ func ParseCluster(
 		DockerDialerFactory:           dockerDialerFactory,
 		LocalConnDialerFactory:        localConnDialerFactory,
 		PrivateRegistriesMap:          make(map[string]v3.PrivateRegistry),
+		K8sWrapTransport:              k8sWrapTransport,
 	}
 	// Setting cluster Defaults
 	c.setClusterDefaults(ctx)
@@ -187,7 +191,7 @@ func rebuildLocalAdminConfig(ctx context.Context, kubeCluster *Cluster) error {
 			return fmt.Errorf("Failed to redeploy local admin config with new host")
 		}
 		workingConfig = newConfig
-		if _, err := GetK8sVersion(kubeCluster.LocalKubeConfigPath); err == nil {
+		if _, err := GetK8sVersion(kubeCluster.LocalKubeConfigPath, kubeCluster.K8sWrapTransport); err == nil {
 			log.Infof(ctx, "[reconcile] host [%s] is active master on the cluster", cpHost.Address)
 			break
 		}
@@ -197,8 +201,8 @@ func rebuildLocalAdminConfig(ctx context.Context, kubeCluster *Cluster) error {
 	return nil
 }
 
-func isLocalConfigWorking(ctx context.Context, localKubeConfigPath string) bool {
-	if _, err := GetK8sVersion(localKubeConfigPath); err != nil {
+func isLocalConfigWorking(ctx context.Context, localKubeConfigPath string, k8sWrapTransport k8s.WrapTransport) bool {
+	if _, err := GetK8sVersion(localKubeConfigPath, k8sWrapTransport); err != nil {
 		log.Infof(ctx, "[reconcile] Local config is not vaild, rebuilding admin config")
 		return false
 	}
@@ -230,22 +234,22 @@ func getLocalAdminConfigWithNewAddress(localConfigPath, cpAddress string) string
 }
 
 func (c *Cluster) ApplyAuthzResources(ctx context.Context) error {
-	if err := authz.ApplyJobDeployerServiceAccount(ctx, c.LocalKubeConfigPath); err != nil {
+	if err := authz.ApplyJobDeployerServiceAccount(ctx, c.LocalKubeConfigPath, c.K8sWrapTransport); err != nil {
 		return fmt.Errorf("Failed to apply the ServiceAccount needed for job execution: %v", err)
 	}
 	if c.Authorization.Mode == NoneAuthorizationMode {
 		return nil
 	}
 	if c.Authorization.Mode == services.RBACAuthorizationMode {
-		if err := authz.ApplySystemNodeClusterRoleBinding(ctx, c.LocalKubeConfigPath); err != nil {
+		if err := authz.ApplySystemNodeClusterRoleBinding(ctx, c.LocalKubeConfigPath, c.K8sWrapTransport); err != nil {
 			return fmt.Errorf("Failed to apply the ClusterRoleBinding needed for node authorization: %v", err)
 		}
 	}
 	if c.Authorization.Mode == services.RBACAuthorizationMode && c.Services.KubeAPI.PodSecurityPolicy {
-		if err := authz.ApplyDefaultPodSecurityPolicy(ctx, c.LocalKubeConfigPath); err != nil {
+		if err := authz.ApplyDefaultPodSecurityPolicy(ctx, c.LocalKubeConfigPath, c.K8sWrapTransport); err != nil {
 			return fmt.Errorf("Failed to apply default PodSecurityPolicy: %v", err)
 		}
-		if err := authz.ApplyDefaultPodSecurityPolicyRole(ctx, c.LocalKubeConfigPath); err != nil {
+		if err := authz.ApplyDefaultPodSecurityPolicyRole(ctx, c.LocalKubeConfigPath, c.K8sWrapTransport); err != nil {
 			return fmt.Errorf("Failed to apply default PodSecurityPolicy ClusterRole and ClusterRoleBinding: %v", err)
 		}
 	}
@@ -262,7 +266,7 @@ func (c *Cluster) deployAddons(ctx context.Context) error {
 func (c *Cluster) SyncLabelsAndTaints(ctx context.Context) error {
 	if len(c.ControlPlaneHosts) > 0 {
 		log.Infof(ctx, "[sync] Syncing nodes Labels and Taints")
-		k8sClient, err := k8s.NewClient(c.LocalKubeConfigPath)
+		k8sClient, err := k8s.NewClient(c.LocalKubeConfigPath, c.K8sWrapTransport)
 		if err != nil {
 			return fmt.Errorf("Failed to initialize new kubernetes client: %v", err)
 		}
@@ -297,9 +301,9 @@ func (c *Cluster) PrePullK8sImages(ctx context.Context) error {
 	return nil
 }
 
-func ConfigureCluster(ctx context.Context, rkeConfig v3.RancherKubernetesEngineConfig, crtBundle map[string]pki.CertificatePKI, clusterFilePath, configDir string) error {
+func ConfigureCluster(ctx context.Context, rkeConfig v3.RancherKubernetesEngineConfig, crtBundle map[string]pki.CertificatePKI, clusterFilePath, configDir string, k8sWrapTransport k8s.WrapTransport) error {
 	// dialer factories are not needed here since we are not uses docker only k8s jobs
-	kubeCluster, err := ParseCluster(ctx, &rkeConfig, clusterFilePath, configDir, nil, nil)
+	kubeCluster, err := ParseCluster(ctx, &rkeConfig, clusterFilePath, configDir, nil, nil, k8sWrapTransport)
 	if err != nil {
 		return err
 	}

@@ -60,6 +60,7 @@ func checkDockerVersion(ctx context.Context, h *Host) error {
 		return fmt.Errorf("Can't retrieve Docker Info: %v", err)
 	}
 	logrus.Debugf("Docker Info found: %#v", info)
+	h.DockerInfo = info
 	isvalid, err := docker.IsSupportedDockerVersion(info, K8sVersion)
 	if err != nil {
 		return fmt.Errorf("Error while determining supported Docker version [%s]: %v", info.ServerVersion, err)

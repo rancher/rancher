@@ -27,7 +27,8 @@ func VersionCommand() cli.Command {
 
 func getClusterVersion(ctx *cli.Context) error {
 	localKubeConfig := pki.GetLocalKubeConfig(ctx.String("config"), "")
-	serverVersion, err := cluster.GetK8sVersion(localKubeConfig)
+	// not going to use a k8s dialer here.. this is a CLI command
+	serverVersion, err := cluster.GetK8sVersion(localKubeConfig, nil)
 	if err != nil {
 		return err
 	}

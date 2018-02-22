@@ -9,12 +9,13 @@ import (
 
 func (c *Cluster) ValidateCluster() error {
 	// make sure cluster has at least one controlplane/etcd host
-
-	if len(c.EtcdHosts) == 0 && len(c.Services.Etcd.ExternalURLs) == 0 {
-		return fmt.Errorf("Cluster must have at least one etcd plane host")
+	if err := ValidateHostCount(c); err != nil {
+		return err
 	}
-	if len(c.EtcdHosts) > 0 && len(c.Services.Etcd.ExternalURLs) > 0 {
-		return fmt.Errorf("Cluster can't have both internal and external etcd")
+
+	// validate duplicate nodes
+	if err := validateDuplicateNodes(c); err != nil {
+		return err
 	}
 
 	// validate hosts options
@@ -117,6 +118,33 @@ func validateIngressOptions(c *Cluster) error {
 	// Should be changed when adding more ingress types
 	if c.Ingress.Provider != DefaultIngressController && c.Ingress.Provider != "none" {
 		return fmt.Errorf("Ingress controller %s is incorrect", c.Ingress.Provider)
+	}
+	return nil
+}
+
+func ValidateHostCount(c *Cluster) error {
+	if len(c.EtcdHosts) == 0 && len(c.Services.Etcd.ExternalURLs) == 0 {
+		return fmt.Errorf("Cluster must have at least one etcd plane host")
+	}
+	if len(c.EtcdHosts) > 0 && len(c.Services.Etcd.ExternalURLs) > 0 {
+		return fmt.Errorf("Cluster can't have both internal and external etcd")
+	}
+	return nil
+}
+
+func validateDuplicateNodes(c *Cluster) error {
+	for i := range c.Nodes {
+		for j := range c.Nodes {
+			if i == j {
+				continue
+			}
+			if c.Nodes[i].Address == c.Nodes[j].Address {
+				return fmt.Errorf("Cluster can't have duplicate node: %s", c.Nodes[i].Address)
+			}
+			if c.Nodes[i].HostnameOverride == c.Nodes[j].HostnameOverride {
+				return fmt.Errorf("Cluster can't have duplicate node: %s", c.Nodes[i].HostnameOverride)
+			}
+		}
 	}
 	return nil
 }

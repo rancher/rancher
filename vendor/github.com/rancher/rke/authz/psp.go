@@ -8,9 +8,9 @@ import (
 	"github.com/rancher/rke/templates"
 )
 
-func ApplyDefaultPodSecurityPolicy(ctx context.Context, kubeConfigPath string) error {
+func ApplyDefaultPodSecurityPolicy(ctx context.Context, kubeConfigPath string, k8sWrapTransport k8s.WrapTransport) error {
 	log.Infof(ctx, "[authz] Applying default PodSecurityPolicy")
-	k8sClient, err := k8s.NewClient(kubeConfigPath)
+	k8sClient, err := k8s.NewClient(kubeConfigPath, k8sWrapTransport)
 	if err != nil {
 		return err
 	}
@@ -21,9 +21,9 @@ func ApplyDefaultPodSecurityPolicy(ctx context.Context, kubeConfigPath string) e
 	return nil
 }
 
-func ApplyDefaultPodSecurityPolicyRole(ctx context.Context, kubeConfigPath string) error {
+func ApplyDefaultPodSecurityPolicyRole(ctx context.Context, kubeConfigPath string, k8sWrapTransport k8s.WrapTransport) error {
 	log.Infof(ctx, "[authz] Applying default PodSecurityPolicy Role and RoleBinding")
-	k8sClient, err := k8s.NewClient(kubeConfigPath)
+	k8sClient, err := k8s.NewClient(kubeConfigPath, k8sWrapTransport)
 	if err != nil {
 		return err
 	}

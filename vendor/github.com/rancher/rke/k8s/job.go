@@ -12,7 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func ApplyK8sSystemJob(jobYaml, kubeConfigPath string) error {
+func ApplyK8sSystemJob(jobYaml, kubeConfigPath string, k8sWrapTransport WrapTransport) error {
 	job := v1.Job{}
 	if err := decodeYamlResource(&job, jobYaml); err != nil {
 		return err
@@ -20,7 +20,7 @@ func ApplyK8sSystemJob(jobYaml, kubeConfigPath string) error {
 	if job.Namespace == metav1.NamespaceNone {
 		job.Namespace = metav1.NamespaceSystem
 	}
-	k8sClient, err := NewClient(kubeConfigPath)
+	k8sClient, err := NewClient(kubeConfigPath, k8sWrapTransport)
 	if err != nil {
 		return err
 	}

@@ -188,14 +188,14 @@ spec:
         - sh
         - -c
         - sysctl -w net.core.somaxconn=32768; sysctl -w net.ipv4.ip_local_port_range="1024 65535"
-        image: alpine:3.6
+        image: {{.AlpineImage}}
         imagePullPolicy: IfNotPresent
         name: sysctl
         securityContext:
           privileged: true
       containers:
         - name: nginx-ingress-controller
-          image: quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.10.2
+          image: {{.IngressImage}}
           args:
             - /nginx-ingress-controller
             - --default-backend-service=$(POD_NAMESPACE)/default-http-backend
@@ -257,7 +257,7 @@ spec:
         # Any image is permissable as long as:
         # 1. It serves a 404 page at /
         # 2. It serves 200 on a /healthz endpoint
-        image: gcr.io/google_containers/defaultbackend:1.4
+        image: {{.IngressBackend}}
         livenessProbe:
           httpGet:
             path: /healthz
