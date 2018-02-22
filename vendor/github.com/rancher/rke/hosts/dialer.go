@@ -40,7 +40,7 @@ func LocalConnFactory(h *Host) (func(network, address string) (net.Conn, error),
 }
 
 func (d *dialer) DialDocker(network, addr string) (net.Conn, error) {
-	sshAddr := d.host.Address + ":22"
+	sshAddr := fmt.Sprintf("%s:%s", d.host.Address, d.host.Port)
 	// Build SSH client configuration
 	cfg, err := makeSSHConfig(d.host.User, d.signer)
 	if err != nil {
@@ -62,7 +62,7 @@ func (d *dialer) DialDocker(network, addr string) (net.Conn, error) {
 }
 
 func (d *dialer) DialLocalConn(network, addr string) (net.Conn, error) {
-	sshAddr := d.host.Address + ":22"
+	sshAddr := fmt.Sprintf("%s:%s", d.host.Address, d.host.Port)
 	// Build SSH client configuration
 	cfg, err := makeSSHConfig(d.host.User, d.signer)
 	if err != nil {

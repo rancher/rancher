@@ -2,6 +2,7 @@ package k8s
 
 import (
 	"bytes"
+	"net/http"
 	"time"
 
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
@@ -16,11 +17,16 @@ const (
 
 type k8sCall func(*kubernetes.Clientset, interface{}) error
 
-func NewClient(kubeConfigPath string) (*kubernetes.Clientset, error) {
+type WrapTransport func(rt http.RoundTripper) http.RoundTripper
+
+func NewClient(kubeConfigPath string, k8sWrapTransport WrapTransport) (*kubernetes.Clientset, error) {
 	// use the current admin kubeconfig
 	config, err := clientcmd.BuildConfigFromFlags("", kubeConfigPath)
 	if err != nil {
 		return nil, err
+	}
+	if k8sWrapTransport != nil {
+		config.WrapTransport = k8sWrapTransport
 	}
 	K8sClientSet, err := kubernetes.NewForConfig(config)
 	if err != nil {

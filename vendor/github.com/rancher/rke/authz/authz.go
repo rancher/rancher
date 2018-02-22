@@ -8,9 +8,9 @@ import (
 	"github.com/rancher/rke/templates"
 )
 
-func ApplyJobDeployerServiceAccount(ctx context.Context, kubeConfigPath string) error {
+func ApplyJobDeployerServiceAccount(ctx context.Context, kubeConfigPath string, k8sWrapTransport k8s.WrapTransport) error {
 	log.Infof(ctx, "[authz] Creating rke-job-deployer ServiceAccount")
-	k8sClient, err := k8s.NewClient(kubeConfigPath)
+	k8sClient, err := k8s.NewClient(kubeConfigPath, k8sWrapTransport)
 	if err != nil {
 		return err
 	}
@@ -24,9 +24,9 @@ func ApplyJobDeployerServiceAccount(ctx context.Context, kubeConfigPath string) 
 	return nil
 }
 
-func ApplySystemNodeClusterRoleBinding(ctx context.Context, kubeConfigPath string) error {
+func ApplySystemNodeClusterRoleBinding(ctx context.Context, kubeConfigPath string, k8sWrapTransport k8s.WrapTransport) error {
 	log.Infof(ctx, "[authz] Creating system:node ClusterRoleBinding")
-	k8sClient, err := k8s.NewClient(kubeConfigPath)
+	k8sClient, err := k8s.NewClient(kubeConfigPath, k8sWrapTransport)
 	if err != nil {
 		return err
 	}

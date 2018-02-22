@@ -68,6 +68,7 @@ nodes:
     user: ubuntu
     role: [controlplane, etcd]
     ssh_key_path: /home/user/.ssh/id_rsa
+    port: 2222
   - address: 2.2.2.2
     user: ubuntu
     role: [worker]

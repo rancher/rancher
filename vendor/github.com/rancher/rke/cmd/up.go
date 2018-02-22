@@ -6,6 +6,7 @@ import (
 
 	"github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/hosts"
+	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -40,11 +41,12 @@ func ClusterUp(
 	ctx context.Context,
 	rkeConfig *v3.RancherKubernetesEngineConfig,
 	dockerDialerFactory, localConnDialerFactory hosts.DialerFactory,
+	k8sWrapTransport k8s.WrapTransport,
 	local bool, configDir string) (string, string, string, string, error) {
 
 	log.Infof(ctx, "Building Kubernetes cluster")
 	var APIURL, caCrt, clientCert, clientKey string
-	kubeCluster, err := cluster.ParseCluster(ctx, rkeConfig, clusterFilePath, configDir, dockerDialerFactory, localConnDialerFactory)
+	kubeCluster, err := cluster.ParseCluster(ctx, rkeConfig, clusterFilePath, configDir, dockerDialerFactory, localConnDialerFactory, k8sWrapTransport)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
@@ -102,7 +104,7 @@ func ClusterUp(
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
 
-	err = cluster.ConfigureCluster(ctx, kubeCluster.RancherKubernetesEngineConfig, kubeCluster.Certificates, clusterFilePath, configDir)
+	err = cluster.ConfigureCluster(ctx, kubeCluster.RancherKubernetesEngineConfig, kubeCluster.Certificates, clusterFilePath, configDir, k8sWrapTransport)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
@@ -131,7 +133,7 @@ func clusterUpFromCli(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("Failed to parse cluster file: %v", err)
 	}
-	_, _, _, _, err = ClusterUp(context.Background(), rkeConfig, nil, nil, false, "")
+	_, _, _, _, err = ClusterUp(context.Background(), rkeConfig, nil, nil, nil, false, "")
 	return err
 }
 
@@ -149,6 +151,6 @@ func clusterUpLocal(ctx *cli.Context) error {
 		}
 		rkeConfig.Nodes = []v3.RKEConfigNode{*cluster.GetLocalRKENodeConfig()}
 	}
-	_, _, _, _, err = ClusterUp(context.Background(), rkeConfig, nil, hosts.LocalHealthcheckFactory, true, "")
+	_, _, _, _, err = ClusterUp(context.Background(), rkeConfig, nil, hosts.LocalHealthcheckFactory, nil, true, "")
 	return err
 }

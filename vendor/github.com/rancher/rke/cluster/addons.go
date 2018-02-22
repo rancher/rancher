@@ -17,9 +17,12 @@ const (
 )
 
 type ingressOptions struct {
-	RBACConfig   string
-	Options      map[string]string
-	NodeSelector map[string]string
+	RBACConfig     string
+	Options        map[string]string
+	NodeSelector   map[string]string
+	AlpineImage    string
+	IngressImage   string
+	IngressBackend string
 }
 
 func (c *Cluster) deployK8sAddOns(ctx context.Context) error {
@@ -88,7 +91,7 @@ func (c *Cluster) doAddonDeploy(ctx context.Context, addonYaml, resourceName str
 
 func (c *Cluster) StoreAddonConfigMap(ctx context.Context, addonYaml string, addonName string) error {
 	log.Infof(ctx, "[addons] Saving addon ConfigMap to Kubernetes")
-	kubeClient, err := k8s.NewClient(c.LocalKubeConfigPath)
+	kubeClient, err := k8s.NewClient(c.LocalKubeConfigPath, c.K8sWrapTransport)
 	if err != nil {
 		return err
 	}
@@ -116,7 +119,7 @@ func (c *Cluster) StoreAddonConfigMap(ctx context.Context, addonYaml string, add
 
 func (c *Cluster) ApplySystemAddonExcuteJob(addonJob string) error {
 
-	if err := k8s.ApplyK8sSystemJob(addonJob, c.LocalKubeConfigPath); err != nil {
+	if err := k8s.ApplyK8sSystemJob(addonJob, c.LocalKubeConfigPath, c.K8sWrapTransport); err != nil {
 		fmt.Println(err)
 		return err
 	}
@@ -130,9 +133,12 @@ func (c *Cluster) deployIngress(ctx context.Context) error {
 		return nil
 	}
 	ingressConfig := ingressOptions{
-		RBACConfig:   c.Authorization.Mode,
-		Options:      c.Ingress.Options,
-		NodeSelector: c.Ingress.NodeSelector,
+		RBACConfig:     c.Authorization.Mode,
+		Options:        c.Ingress.Options,
+		NodeSelector:   c.Ingress.NodeSelector,
+		AlpineImage:    c.SystemImages.Alpine,
+		IngressImage:   c.SystemImages.Ingress,
+		IngressBackend: c.SystemImages.IngressBackend,
 	}
 	// Currently only deploying nginx ingress controller
 	ingressYaml, err := addons.GetNginxIngressManifest(ingressConfig)

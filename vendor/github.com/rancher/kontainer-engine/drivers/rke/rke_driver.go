@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +15,8 @@ import (
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rke/cmd"
 	"github.com/rancher/rke/hosts"
+	"github.com/rancher/rke/k8s"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -25,10 +28,14 @@ const (
 )
 
 // Driver is the struct of rke driver
+
+type WrapTransportFactory func(config *v3.RancherKubernetesEngineConfig) k8s.WrapTransport
+
 type Driver struct {
-	DockerDialer       hosts.DialerFactory
-	LocalDialer        hosts.DialerFactory
-	driverCapabilities types.Capabilities
+	DockerDialer         hosts.DialerFactory
+	LocalDialer          hosts.DialerFactory
+	WrapTransportFactory WrapTransportFactory
+	driverCapabilities   types.Capabilities
 
 	types.UnimplementedVersionAccess
 	types.UnimplementedClusterSizeAccess
@@ -48,6 +55,21 @@ func NewDriver() *Driver {
 	d.driverCapabilities.AddCapability(types.GetClusterSizeCapability)
 
 	return d
+}
+
+func (d *Driver) wrapTransport(config *v3.RancherKubernetesEngineConfig) k8s.WrapTransport {
+	if d.WrapTransportFactory == nil {
+		return nil
+	}
+
+	return k8s.WrapTransport(func(rt http.RoundTripper) http.RoundTripper {
+		fn := d.WrapTransportFactory(config)
+		if fn == nil {
+			return rt
+		}
+		return fn(rt)
+	})
+
 }
 
 func (d *Driver) GetCapabilities(ctx context.Context) (*types.Capabilities, error) {
@@ -109,7 +131,8 @@ func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions) (*types.
 	}
 	defer d.cleanup(stateDir)
 
-	APIURL, caCrt, clientCert, clientKey, err := cmd.ClusterUp(ctx, &rkeConfig, d.DockerDialer, d.LocalDialer, false, stateDir)
+	APIURL, caCrt, clientCert, clientKey, err := cmd.ClusterUp(ctx, &rkeConfig, d.DockerDialer, d.LocalDialer,
+		d.wrapTransport(&rkeConfig), false, stateDir)
 	if err != nil {
 		return d.save(&types.ClusterInfo{
 			Metadata: map[string]string{
@@ -147,7 +170,8 @@ func (d *Driver) Update(ctx context.Context, clusterInfo *types.ClusterInfo, opt
 	}
 	defer d.cleanup(stateDir)
 
-	APIURL, caCrt, clientCert, clientKey, err := cmd.ClusterUp(ctx, &rkeConfig, d.DockerDialer, d.LocalDialer, false, stateDir)
+	APIURL, caCrt, clientCert, clientKey, err := cmd.ClusterUp(ctx, &rkeConfig, d.DockerDialer, d.LocalDialer,
+		d.wrapTransport(&rkeConfig), false, stateDir)
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +277,8 @@ func (d *Driver) SetVersion(ctx context.Context, info *types.ClusterInfo, versio
 	}
 	defer d.cleanup(stateDir)
 
-	_, _, _, _, err = cmd.ClusterUp(ctx, &config, d.DockerDialer, d.LocalDialer, false, stateDir)
+	_, _, _, _, err = cmd.ClusterUp(ctx, &config, d.DockerDialer, d.LocalDialer,
+		d.wrapTransport(&config), false, stateDir)
 
 	if err != nil {
 		return err
@@ -307,7 +332,7 @@ func (d *Driver) Remove(ctx context.Context, clusterInfo *types.ClusterInfo) err
 	}
 	stateDir, _ := d.restore(clusterInfo)
 	defer d.save(nil, stateDir)
-	return cmd.ClusterRemove(ctx, &rkeConfig, d.DockerDialer, false, stateDir)
+	return cmd.ClusterRemove(ctx, &rkeConfig, d.DockerDialer, d.wrapTransport(&rkeConfig), false, stateDir)
 }
 
 func (d *Driver) restore(info *types.ClusterInfo) (string, error) {

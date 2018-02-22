@@ -27,7 +27,7 @@ func ReconcileCluster(ctx context.Context, kubeCluster, currentCluster *Cluster)
 		return nil
 	}
 
-	kubeClient, err := k8s.NewClient(kubeCluster.LocalKubeConfigPath)
+	kubeClient, err := k8s.NewClient(kubeCluster.LocalKubeConfigPath, kubeCluster.K8sWrapTransport)
 	if err != nil {
 		return fmt.Errorf("Failed to initialize new kubernetes client: %v", err)
 	}
@@ -52,7 +52,7 @@ func ReconcileCluster(ctx context.Context, kubeCluster, currentCluster *Cluster)
 func reconcileWorker(ctx context.Context, currentCluster, kubeCluster *Cluster, kubeClient *kubernetes.Clientset) error {
 	// worker deleted first to avoid issues when worker+controller on same host
 	logrus.Debugf("[reconcile] Check worker hosts to be deleted")
-	wpToDelete := hosts.GetToDeleteHosts(currentCluster.WorkerHosts, kubeCluster.WorkerHosts)
+	wpToDelete := hosts.GetToDeleteHosts(currentCluster.WorkerHosts, kubeCluster.WorkerHosts, kubeCluster.InactiveHosts)
 	for _, toDeleteHost := range wpToDelete {
 		toDeleteHost.IsWorker = false
 		if err := hosts.DeleteNode(ctx, toDeleteHost, kubeClient, toDeleteHost.IsControl); err != nil {
@@ -80,7 +80,7 @@ func reconcileControl(ctx context.Context, currentCluster, kubeCluster *Cluster,
 	if err != nil {
 		return err
 	}
-	cpToDelete := hosts.GetToDeleteHosts(currentCluster.ControlPlaneHosts, kubeCluster.ControlPlaneHosts)
+	cpToDelete := hosts.GetToDeleteHosts(currentCluster.ControlPlaneHosts, kubeCluster.ControlPlaneHosts, kubeCluster.InactiveHosts)
 	// move the current host in local kubeconfig to the end of the list
 	for i, toDeleteHost := range cpToDelete {
 		if toDeleteHost.Address == selfDeleteAddress {
@@ -90,7 +90,7 @@ func reconcileControl(ctx context.Context, currentCluster, kubeCluster *Cluster,
 	}
 
 	for _, toDeleteHost := range cpToDelete {
-		kubeClient, err := k8s.NewClient(kubeCluster.LocalKubeConfigPath)
+		kubeClient, err := k8s.NewClient(kubeCluster.LocalKubeConfigPath, kubeCluster.K8sWrapTransport)
 		if err != nil {
 			return fmt.Errorf("Failed to initialize new kubernetes client: %v", err)
 		}
@@ -152,7 +152,7 @@ func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, ku
 	clientCert := cert.EncodeCertPEM(currentCluster.Certificates[pki.KubeNodeCertName].Certificate)
 	clientkey := cert.EncodePrivateKeyPEM(currentCluster.Certificates[pki.KubeNodeCertName].Key)
 
-	etcdToDelete := hosts.GetToDeleteHosts(currentCluster.EtcdHosts, kubeCluster.EtcdHosts)
+	etcdToDelete := hosts.GetToDeleteHosts(currentCluster.EtcdHosts, kubeCluster.EtcdHosts, kubeCluster.InactiveHosts)
 	for _, etcdHost := range etcdToDelete {
 		if err := services.RemoveEtcdMember(ctx, etcdHost, kubeCluster.EtcdHosts, currentCluster.LocalConnDialerFactory, clientCert, clientkey); err != nil {
 			log.Warnf(ctx, "[reconcile] %v", err)

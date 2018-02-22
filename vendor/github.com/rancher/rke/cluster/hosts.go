@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -26,23 +27,23 @@ func (c *Cluster) TunnelHosts(ctx context.Context, local bool) error {
 		}
 		return nil
 	}
-	for i := range c.EtcdHosts {
-		if err := c.EtcdHosts[i].TunnelUp(ctx, c.DockerDialerFactory); err != nil {
-			return fmt.Errorf("Failed to set up SSH tunneling for Etcd host [%s]: %v", c.EtcdHosts[i].Address, err)
+	c.InactiveHosts = make([]*hosts.Host, 0)
+	uniqueHosts := hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts)
+	for i := range uniqueHosts {
+		if err := uniqueHosts[i].TunnelUp(ctx, c.DockerDialerFactory); err != nil {
+			log.Warnf(ctx, "Failed to set up SSH tunneling for host [%s]: %v", uniqueHosts[i].Address, err)
+			c.InactiveHosts = append(c.InactiveHosts, uniqueHosts[i])
 		}
 	}
-	for i := range c.ControlPlaneHosts {
-		err := c.ControlPlaneHosts[i].TunnelUp(ctx, c.DockerDialerFactory)
-		if err != nil {
-			return fmt.Errorf("Failed to set up SSH tunneling for Control host [%s]: %v", c.ControlPlaneHosts[i].Address, err)
-		}
+	for _, host := range c.InactiveHosts {
+		log.Warnf(ctx, "Removing host [%s] from node lists", host.Address)
+		c.EtcdHosts = removeFromHosts(host, c.EtcdHosts)
+		c.ControlPlaneHosts = removeFromHosts(host, c.ControlPlaneHosts)
+		c.WorkerHosts = removeFromHosts(host, c.WorkerHosts)
+		c.RancherKubernetesEngineConfig.Nodes = removeFromRKENodes(host.RKEConfigNode, c.RancherKubernetesEngineConfig.Nodes)
 	}
-	for i := range c.WorkerHosts {
-		if err := c.WorkerHosts[i].TunnelUp(ctx, c.DockerDialerFactory); err != nil {
-			return fmt.Errorf("Failed to set up SSH tunneling for Worker host [%s]: %v", c.WorkerHosts[i].Address, err)
-		}
-	}
-	return nil
+	return ValidateHostCount(c)
+
 }
 
 func (c *Cluster) InvertIndexHosts() error {
@@ -126,4 +127,22 @@ func CheckEtcdHostsChanged(kubeCluster, currentCluster *Cluster) error {
 		}
 	}
 	return nil
+}
+
+func removeFromHosts(hostToRemove *hosts.Host, hostList []*hosts.Host) []*hosts.Host {
+	for i := range hostList {
+		if hostToRemove.Address == hostList[i].Address {
+			return append(hostList[:i], hostList[i+1:]...)
+		}
+	}
+	return hostList
+}
+
+func removeFromRKENodes(nodeToRemove v3.RKEConfigNode, nodeList []v3.RKEConfigNode) []v3.RKEConfigNode {
+	for i := range nodeList {
+		if nodeToRemove.Address == nodeList[i].Address {
+			return append(nodeList[:i], nodeList[i+1:]...)
+		}
+	}
+	return nodeList
 }

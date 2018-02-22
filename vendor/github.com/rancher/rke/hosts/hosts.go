@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+
 	"github.com/docker/docker/client"
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/k8s"
@@ -29,6 +31,7 @@ type Host struct {
 	ToDelLabels         map[string]string
 	ToAddTaints         []string
 	ToDelTaints         []string
+	DockerInfo          types.Info
 }
 
 const (
@@ -52,7 +55,7 @@ func (h *Host) CleanUpAll(ctx context.Context, cleanerImage string, prsMap map[s
 		ToCleanTempCertPath,
 		ToCleanCNILib,
 	}
-	if externalEtcd {
+	if !externalEtcd {
 		toCleanPaths = append(toCleanPaths, ToCleanEtcdDir)
 	}
 	return h.CleanUp(ctx, toCleanPaths, cleanerImage, prsMap)
@@ -156,7 +159,7 @@ func RemoveTaintFromHost(ctx context.Context, host *Host, taintKey string, kubeC
 	return nil
 }
 
-func GetToDeleteHosts(currentHosts, configHosts []*Host) []*Host {
+func GetToDeleteHosts(currentHosts, configHosts, inactiveHosts []*Host) []*Host {
 	toDeleteHosts := []*Host{}
 	for _, currentHost := range currentHosts {
 		found := false
@@ -166,7 +169,16 @@ func GetToDeleteHosts(currentHosts, configHosts []*Host) []*Host {
 			}
 		}
 		if !found {
-			toDeleteHosts = append(toDeleteHosts, currentHost)
+			inactive := false
+			for _, inactiveHost := range inactiveHosts {
+				if inactiveHost.Address == currentHost.Address {
+					inactive = true
+					break
+				}
+			}
+			if !inactive {
+				toDeleteHosts = append(toDeleteHosts, currentHost)
+			}
 		}
 	}
 	return toDeleteHosts
