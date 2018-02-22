@@ -284,6 +284,19 @@ func (s *Schemas) readFields(schema *Schema, t reflect.Type) error {
 			schemaField.Type = inferedType
 		}
 
+		if schemaField.Default != nil {
+			switch schemaField.Type {
+			case "int":
+				n, err := convert.ToNumber(schemaField.Default)
+				if err != nil {
+					return err
+				}
+				schemaField.Default = n
+			case "boolean":
+				schemaField.Default = convert.ToBool(schemaField.Default)
+			}
+		}
+
 		logrus.Debugf("Setting field %s.%s: %#v", schema.ID, fieldName, schemaField)
 		schema.ResourceFields[fieldName] = schemaField
 	}
