@@ -334,10 +334,15 @@ func (w *WorkloadLister) CreateServiceForWorkload(workload *Workload) error {
 			//TODO - implement update once workload upgrade is supported
 			continue
 		}
-
+		serviceType := toCreate.Type
+		if toCreate.ClusterIP == "None" {
+			serviceType = "Headless"
+		}
 		service := &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName:    "workload-",
+				// can't use generated name as have to guard against the duplicates
+				// when subsequent update is triggered right after create, but before the cache is updated
+				Name:            fmt.Sprintf("workload-%s-%s", strings.ToLower(workload.Name), strings.ToLower(string(serviceType))),
 				OwnerReferences: []metav1.OwnerReference{ownerRef},
 				Namespace:       workload.Namespace,
 				Annotations:     serviceAnnotations,
@@ -349,10 +354,6 @@ func (w *WorkloadLister) CreateServiceForWorkload(workload *Workload) error {
 			},
 		}
 
-		serviceType := toCreate.Type
-		if toCreate.ClusterIP == "None" {
-			serviceType = "Headless"
-		}
 		logrus.Infof("Creating [%s] service with ports [%v] for workload %s", serviceType, toCreate.ServicePorts, workload.getKey())
 		_, err = w.Services.Create(service)
 		if err != nil {
