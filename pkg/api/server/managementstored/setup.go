@@ -253,6 +253,7 @@ func Alert(schemas *types.Schemas, management *config.ScaledContext) {
 	handler := &alert.Handler{
 		ProjectAlerts: management.Management.ProjectAlerts(""),
 		ClusterAlerts: management.Management.ClusterAlerts(""),
+		Notifiers:     management.Management.Notifiers(""),
 	}
 
 	schema := schemas.Schema(&managementschema.Version, client.ClusterAlertType)

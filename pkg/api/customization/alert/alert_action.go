@@ -1,13 +1,15 @@
 package alert
 
 import (
-	"errors"
 	"net/http"
 	"strings"
 
+	"github.com/rancher/norman/api/access"
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -40,28 +42,28 @@ func (h *Handler) ClusterActionHandler(actionName string, action *types.Action, 
 		if alert.Status.AlertState == "inactive" {
 			alert.Status.AlertState = "active"
 		} else {
-			return errors.New("the alert state is not inactive")
+			return httperror.NewAPIError(httperror.ActionNotAvailable, "state is not inactive")
 		}
 
 	case "deactivate":
 		if alert.Status.AlertState == "active" {
 			alert.Status.AlertState = "inactive"
 		} else {
-			return errors.New("the alert state is not active")
+			return httperror.NewAPIError(httperror.ActionNotAvailable, "state is not active")
 		}
 
 	case "mute":
 		if alert.Status.AlertState == "alerting" {
 			alert.Status.AlertState = "muted"
 		} else {
-			return errors.New("the alert state is not alerting")
+			return httperror.NewAPIError(httperror.ActionNotAvailable, "state is not alerting")
 		}
 
 	case "unmute":
 		if alert.Status.AlertState == "muted" {
 			alert.Status.AlertState = "alerting"
 		} else {
-			return errors.New("the alert state is not muted")
+			return httperror.NewAPIError(httperror.ActionNotAvailable, "state is not muted")
 		}
 	}
 
@@ -71,8 +73,11 @@ func (h *Handler) ClusterActionHandler(actionName string, action *types.Action, 
 		return err
 	}
 
-	//TODO: how to write data back
-	request.WriteResponse(http.StatusOK, alert)
+	data := map[string]interface{}{}
+	if err := access.ByID(request, request.Version, request.Type, request.ID, &data); err != nil {
+		return err
+	}
+	request.WriteResponse(http.StatusOK, data)
 	return nil
 }
 
@@ -92,28 +97,28 @@ func (h *Handler) ProjectActionHandler(actionName string, action *types.Action, 
 		if alert.Status.AlertState == "inactive" {
 			alert.Status.AlertState = "active"
 		} else {
-			return errors.New("the alert state is not inactive")
+			return httperror.NewAPIError(httperror.ActionNotAvailable, "state is not inactive")
 		}
 
 	case "deactivate":
 		if alert.Status.AlertState == "active" {
 			alert.Status.AlertState = "inactive"
 		} else {
-			return errors.New("the alert state is not active")
+			return httperror.NewAPIError(httperror.ActionNotAvailable, "state is not active")
 		}
 
 	case "mute":
 		if alert.Status.AlertState == "alerting" {
 			alert.Status.AlertState = "muted"
 		} else {
-			return errors.New("the alert state is not alerting")
+			return httperror.NewAPIError(httperror.ActionNotAvailable, "state is not alerting")
 		}
 
 	case "unmute":
 		if alert.Status.AlertState == "muted" {
 			alert.Status.AlertState = "alerting"
 		} else {
-			return errors.New("the alert state is not muted")
+			return httperror.NewAPIError(httperror.ActionNotAvailable, "state is not muted")
 		}
 	}
 
@@ -123,7 +128,10 @@ func (h *Handler) ProjectActionHandler(actionName string, action *types.Action, 
 		return err
 	}
 
-	//TODO: how to write data back
-	request.WriteResponse(http.StatusOK, alert)
+	data := map[string]interface{}{}
+	if err := access.ByID(request, request.Version, request.Type, request.ID, &data); err != nil {
+		return err
+	}
+	request.WriteResponse(http.StatusOK, data)
 	return nil
 }

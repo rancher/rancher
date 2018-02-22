@@ -82,7 +82,7 @@ func (w *NodeWatcher) watchRule() error {
 			selector := labels.NewSelector()
 			for key, value := range alert.Spec.TargetNode.Selector {
 				r, _ := labels.NewRequirement(key, selection.Equals, []string{value})
-				selector.Add(*r)
+				selector = selector.Add(*r)
 			}
 			nodes, err := w.nodeLister.List("", selector)
 			if err != nil {

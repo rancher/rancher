@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rancher/norman/controller"
@@ -23,7 +24,7 @@ type PodWatcher struct {
 	alertManager       *manager.Manager
 	projectAlertLister v3.ProjectAlertLister
 	clusterName        string
-	podRestartTrack    map[string][]restartTrack
+	podRestartTrack    sync.Map
 }
 
 type restartTrack struct {
@@ -39,7 +40,7 @@ func StartPodWatcher(ctx context.Context, cluster *config.UserContext, manager *
 		projectAlertLister: projectAlerts.Controller().Lister(),
 		alertManager:       manager,
 		clusterName:        cluster.ClusterName,
-		podRestartTrack:    map[string][]restartTrack{},
+		podRestartTrack:    sync.Map{},
 	}
 
 	projectAlertLifecycle := &ProjectAlertLifecycle{
@@ -64,7 +65,7 @@ type ProjectAlertLifecycle struct {
 }
 
 func (l *ProjectAlertLifecycle) Create(obj *v3.ProjectAlert) (*v3.ProjectAlert, error) {
-	l.podWatcher.podRestartTrack[obj.Namespace+":"+obj.Name] = make([]restartTrack, 0)
+	l.podWatcher.podRestartTrack.Store(obj.Namespace+":"+obj.Name, make([]restartTrack, 0))
 	return obj, nil
 }
 
@@ -73,7 +74,7 @@ func (l *ProjectAlertLifecycle) Updated(obj *v3.ProjectAlert) (*v3.ProjectAlert,
 }
 
 func (l *ProjectAlertLifecycle) Remove(obj *v3.ProjectAlert) (*v3.ProjectAlert, error) {
-	l.podWatcher.podRestartTrack[obj.Namespace+":"+obj.Name] = nil
+	l.podWatcher.podRestartTrack.Delete(obj.Namespace + ":" + obj.Name)
 	return obj, nil
 }
 
@@ -151,12 +152,18 @@ func (w *PodWatcher) checkPodRestarts(pod *corev1.Pod, alert *v3.ProjectAlert) {
 }
 
 func (w *PodWatcher) getRestartTimeFromTrack(alert *v3.ProjectAlert, curCount int32) int32 {
-	tracks := w.podRestartTrack[alert.Namespace+":"+alert.Name]
+
+	obj, ok := w.podRestartTrack.Load(alert.Namespace + ":" + alert.Name)
+	if !ok {
+		return curCount
+	}
+	tracks := obj.([]restartTrack)
+
 	now := time.Now()
 
 	if len(tracks) == 0 {
 		tracks = append(tracks, restartTrack{Count: curCount, Time: now})
-		w.podRestartTrack[alert.Namespace+":"+alert.Name] = tracks
+		w.podRestartTrack.Store(alert.Namespace+":"+alert.Name, tracks)
 		return curCount
 	}
 
@@ -164,12 +171,12 @@ func (w *PodWatcher) getRestartTimeFromTrack(alert *v3.ProjectAlert, curCount in
 		if now.Sub(track.Time).Seconds() < float64(alert.Spec.TargetPod.RestartIntervalSeconds) {
 			tracks = tracks[i:]
 			tracks = append(tracks, restartTrack{Count: curCount, Time: now})
-			w.podRestartTrack[alert.Namespace+":"+alert.Name] = tracks
+			w.podRestartTrack.Store(alert.Namespace+":"+alert.Name, tracks)
 			return track.Count
 		}
 	}
 
-	w.podRestartTrack[alert.Namespace+":"+alert.Name] = []restartTrack{}
+	w.podRestartTrack.Store(alert.Namespace+":"+alert.Name, []restartTrack{})
 	return curCount
 }
 
