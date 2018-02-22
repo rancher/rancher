@@ -154,7 +154,7 @@ type NodeSpec struct {
 	Worker           bool   `json:"worker" norman:"noupdate"`
 	NodeTemplateName string `json:"nodeTemplateName,omitempty" norman:"type=reference[nodeTemplate],noupdate"`
 
-	NodePoolName      string        `json:"nodePoolUuid" norman:"type=reference[nodePool],nocreate,noupdate"`
+	NodePoolName      string        `json:"nodePoolName" norman:"type=reference[nodePool],nocreate,noupdate"`
 	CustomConfig      *CustomConfig `json:"customConfig"`
 	Imported          bool          `json:"imported"`
 	Description       string        `json:"description,omitempty"`

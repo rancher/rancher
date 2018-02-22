@@ -69,19 +69,19 @@ type TargetNode struct {
 	NodeName     string            `json:"nodeName,omitempty" norman:"type=reference[node]"`
 	Selector     map[string]string `json:"selector,omitempty"`
 	Condition    string            `json:"condition,omitempty" norman:"required,options=notready|mem|cpu,default=notready"`
-	MemThreshold int               `json:"memThreshold,omitempty" norman:"min=1,max=100"`
-	CPUThreshold int               `json:"cpuThreshold,omitempty" norman:"min=1"`
+	MemThreshold int               `json:"memThreshold,omitempty" norman:"min=1,max=100,default=70"`
+	CPUThreshold int               `json:"cpuThreshold,omitempty" norman:"min=1,default=70"`
 }
 
 type TargetPod struct {
 	PodName                string `json:"podName,omitempty" norman:"required,type=reference[/v3/projects/schemas/pod]"`
 	Condition              string `json:"condition,omitempty" norman:"required,options=notrunning|notscheduled|restarts,default=notrunning"`
-	RestartTimes           int    `json:"restartTimes,omitempty" norman:"min=1"`
-	RestartIntervalSeconds int    `json:"restartIntervalSeconds,omitempty"  norman:"min=1"`
+	RestartTimes           int    `json:"restartTimes,omitempty" norman:"min=1,default=3"`
+	RestartIntervalSeconds int    `json:"restartIntervalSeconds,omitempty"  norman:"min=1,default=300"`
 }
 
 type TargetEvent struct {
-	Type         string `json:"type,omitempty" norman:"required,options=Normal|Warning,default=warning"`
+	Type         string `json:"type,omitempty" norman:"required,options=Normal|Warning,default=Warning"`
 	ResourceKind string `json:"resourceKind,omitempty" norman:"required,options=Pod|Node|Deployment|Statefulset|Daemonset"`
 }
 
@@ -89,7 +89,7 @@ type TargetWorkload struct {
 	WorkloadID          string            `json:"workloadId,omitempty"`
 	Type                string            `json:"type,omitempty" norman:"required,options=deployment|statefulset|daemonset,default=deployment"`
 	Selector            map[string]string `json:"selector,omitempty"`
-	AvailablePercentage int               `json:"availablePercentage,omitempty" norman:"required,min=1,max=100"`
+	AvailablePercentage int               `json:"availablePercentage,omitempty" norman:"required,min=1,max=100,default=70"`
 }
 
 type TargetSystemService struct {
@@ -97,7 +97,7 @@ type TargetSystemService struct {
 }
 
 type AlertStatus struct {
-	State string `json:"state,omitempty" norman:"required,options=active|inactive|alerting|muted,default=active"`
+	AlertState string `json:"alertState,omitempty" norman:"options=active|inactive|alerting|muted,default=active"`
 }
 
 type Notifier struct {

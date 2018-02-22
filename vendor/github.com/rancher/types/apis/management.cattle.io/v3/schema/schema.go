@@ -295,9 +295,9 @@ func projectNetworkPolicyTypes(schema *types.Schemas) *types.Schemas {
 
 func logTypes(schema *types.Schemas) *types.Schemas {
 	return schema.
-		AddMapperForType(&Version, &v3.ClusterLogging{},
+		AddMapperForType(&Version, v3.ClusterLogging{},
 			m.DisplayName{}).
-		AddMapperForType(&Version, &v3.ProjectLogging{},
+		AddMapperForType(&Version, v3.ProjectLogging{},
 			m.DisplayName{}).
 		MustImport(&Version, v3.ClusterLogging{}).
 		MustImport(&Version, v3.ProjectLogging{})
@@ -321,12 +321,12 @@ func globalTypes(schema *types.Schemas) *types.Schemas {
 
 func alertTypes(schema *types.Schemas) *types.Schemas {
 	return schema.
-		AddMapperForType(&Version, &v3.Notifier{},
+		AddMapperForType(&Version, v3.Notifier{},
 			m.DisplayName{}).
-		AddMapperForType(&Version, &v3.ClusterAlert{},
+		AddMapperForType(&Version, v3.ClusterAlert{},
 			&m.Embed{Field: "status"},
 			m.DisplayName{}).
-		AddMapperForType(&Version, &v3.ProjectAlert{},
+		AddMapperForType(&Version, v3.ProjectAlert{},
 			&m.Embed{Field: "status"},
 			m.DisplayName{}).
 		MustImport(&Version, v3.Notification{}).
@@ -365,18 +365,15 @@ func alertTypes(schema *types.Schemas) *types.Schemas {
 
 func pipelineTypes(schema *types.Schemas) *types.Schemas {
 	return schema.
-		AddMapperForType(&Version, &v3.ClusterPipeline{},
-			m.DisplayName{}).
-		AddMapperForType(&Version, &v3.Pipeline{},
+		AddMapperForType(&Version, v3.ClusterPipeline{}).
+		AddMapperForType(&Version, v3.Pipeline{},
 			&m.Embed{Field: "status"},
 			m.DisplayName{}).
-		AddMapperForType(&Version, &v3.PipelineExecution{},
-			&m.Embed{Field: "status"},
-			m.DisplayName{}).
-		AddMapperForType(&Version, &v3.SourceCodeCredential{},
-			m.DisplayName{}).
-		AddMapperForType(&Version, &v3.SourceCodeRepository{}, m.DisplayName{}).
-		AddMapperForType(&Version, &v3.PipelineExecutionLog{}).
+		AddMapperForType(&Version, v3.PipelineExecution{},
+			&m.Embed{Field: "status"}).
+		AddMapperForType(&Version, v3.SourceCodeCredential{}).
+		AddMapperForType(&Version, v3.SourceCodeRepository{}).
+		AddMapperForType(&Version, v3.PipelineExecutionLog{}).
 		MustImport(&Version, v3.AuthAppInput{}).
 		MustImport(&Version, v3.AuthUserInput{}).
 		MustImportAndCustomize(&Version, v3.SourceCodeCredential{}, func(schema *types.Schema) {

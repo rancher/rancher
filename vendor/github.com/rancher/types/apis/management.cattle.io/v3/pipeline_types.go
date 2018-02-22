@@ -78,7 +78,7 @@ type GithubClusterConfig struct {
 }
 
 type PipelineStatus struct {
-	State           string `json:"state,omitempty" norman:"required,options=active|inactive,default=active"`
+	PipelineState   string `json:"pipelineState,omitempty" norman:"required,options=active|inactive,default=active"`
 	NextRun         int    `json:"nextRun" yaml:"nextRun,omitempty" norman:"default=1,min=1"`
 	LastExecutionID string `json:"lastExecutionId,omitempty" yaml:"lastExecutionId,omitempty"`
 	LastRunState    string `json:"lastRunState,omitempty" yaml:"lastRunState,omitempty"`
@@ -144,11 +144,11 @@ type PipelineExecutionSpec struct {
 }
 
 type PipelineExecutionStatus struct {
-	Commit  string        `json:"commit,omitempty"`
-	State   string        `json:"state,omitempty"`
-	Started string        `json:"started,omitempty"`
-	Ended   string        `json:"ended,omitempty"`
-	Stages  []StageStatus `json:"stages,omitempty"`
+	Commit         string        `json:"commit,omitempty"`
+	ExecutionState string        `json:"executionState,omitempty"`
+	Started        string        `json:"started,omitempty"`
+	Ended          string        `json:"ended,omitempty"`
+	Stages         []StageStatus `json:"stages,omitempty"`
 }
 
 type StageStatus struct {

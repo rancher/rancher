@@ -9,22 +9,28 @@ const (
 	PipelineFieldAnnotations           = "annotations"
 	PipelineFieldCreated               = "created"
 	PipelineFieldCreatorID             = "creatorId"
-	PipelineFieldDisplayName           = "displayName"
 	PipelineFieldLabels                = "labels"
+	PipelineFieldLastExecutionID       = "lastExecutionId"
+	PipelineFieldLastRunState          = "lastRunState"
+	PipelineFieldLastStarted           = "lastStarted"
 	PipelineFieldName                  = "name"
 	PipelineFieldNamespaceId           = "namespaceId"
+	PipelineFieldNextRun               = "nextRun"
+	PipelineFieldNextStart             = "nextStart"
 	PipelineFieldOwnerReferences       = "ownerReferences"
+	PipelineFieldPipelineState         = "pipelineState"
 	PipelineFieldProjectId             = "projectId"
 	PipelineFieldRemoved               = "removed"
 	PipelineFieldStages                = "stages"
 	PipelineFieldState                 = "state"
-	PipelineFieldStatus                = "status"
+	PipelineFieldToken                 = "token"
 	PipelineFieldTransitioning         = "transitioning"
 	PipelineFieldTransitioningMessage  = "transitioningMessage"
 	PipelineFieldTriggerCronExpression = "triggerCronExpression"
 	PipelineFieldTriggerCronTimezone   = "triggerCronTimezone"
 	PipelineFieldTriggerWebhook        = "triggerWebhook"
 	PipelineFieldUuid                  = "uuid"
+	PipelineFieldWebHookID             = "webhookId"
 )
 
 type Pipeline struct {
@@ -32,22 +38,28 @@ type Pipeline struct {
 	Annotations           map[string]string `json:"annotations,omitempty"`
 	Created               string            `json:"created,omitempty"`
 	CreatorID             string            `json:"creatorId,omitempty"`
-	DisplayName           string            `json:"displayName,omitempty"`
 	Labels                map[string]string `json:"labels,omitempty"`
+	LastExecutionID       string            `json:"lastExecutionId,omitempty"`
+	LastRunState          string            `json:"lastRunState,omitempty"`
+	LastStarted           string            `json:"lastStarted,omitempty"`
 	Name                  string            `json:"name,omitempty"`
 	NamespaceId           string            `json:"namespaceId,omitempty"`
+	NextRun               *int64            `json:"nextRun,omitempty"`
+	NextStart             string            `json:"nextStart,omitempty"`
 	OwnerReferences       []OwnerReference  `json:"ownerReferences,omitempty"`
+	PipelineState         string            `json:"pipelineState,omitempty"`
 	ProjectId             string            `json:"projectId,omitempty"`
 	Removed               string            `json:"removed,omitempty"`
 	Stages                []Stage           `json:"stages,omitempty"`
 	State                 string            `json:"state,omitempty"`
-	Status                *PipelineStatus   `json:"status,omitempty"`
+	Token                 string            `json:"token,omitempty"`
 	Transitioning         string            `json:"transitioning,omitempty"`
 	TransitioningMessage  string            `json:"transitioningMessage,omitempty"`
 	TriggerCronExpression string            `json:"triggerCronExpression,omitempty"`
 	TriggerCronTimezone   string            `json:"triggerCronTimezone,omitempty"`
 	TriggerWebhook        bool              `json:"triggerWebhook,omitempty"`
 	Uuid                  string            `json:"uuid,omitempty"`
+	WebHookID             string            `json:"webhookId,omitempty"`
 }
 type PipelineCollection struct {
 	types.Collection

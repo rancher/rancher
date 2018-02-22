@@ -1,10 +1,10 @@
 package client
 
 const (
-	AlertStatusType       = "alertStatus"
-	AlertStatusFieldState = "state"
+	AlertStatusType            = "alertStatus"
+	AlertStatusFieldAlertState = "alertState"
 )
 
 type AlertStatus struct {
-	State string `json:"state,omitempty"`
+	AlertState string `json:"alertState,omitempty"`
 }
