@@ -39,6 +39,7 @@ const (
 	WorkloadAnnotation   = "field.cattle.io/targetWorkloadIds"
 	PortsAnnotation      = "field.cattle.io/ports"
 	ClusterIPServiceType = "ClusterIP"
+	WorkloadLabel        = "workload.user.cattle.io/workload"
 )
 
 type Workload struct {
@@ -192,12 +193,13 @@ func getSelectorLables(s *metav1.LabelSelector) map[string]string {
 }
 
 func (w WorkloadLister) serviceExistsForWorkload(workload *Workload, service *Service) (bool, error) {
-	services, err := w.ServiceLister.List(workload.Namespace, labels.NewSelector())
+	labels := fmt.Sprintf("%s=%s", WorkloadLabel, workload.Namespace)
+	services, err := w.Services.List(metav1.ListOptions{LabelSelector: labels})
 	if err != nil {
 		return false, err
 	}
 
-	for _, s := range services {
+	for _, s := range services.Items {
 		if s.DeletionTimestamp != nil {
 			continue
 		}
@@ -324,6 +326,8 @@ func (w *WorkloadLister) CreateServiceForWorkload(workload *Workload) error {
 	}
 	serviceAnnotations := map[string]string{}
 	serviceAnnotations[WorkloadAnnotation] = workload.getKey()
+	serviceLabels := map[string]string{}
+	serviceLabels[WorkloadLabel] = workload.Namespace
 
 	for kind, toCreate := range services {
 		exists, err := w.serviceExistsForWorkload(workload, &toCreate)
@@ -340,12 +344,11 @@ func (w *WorkloadLister) CreateServiceForWorkload(workload *Workload) error {
 		}
 		service := &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
-				// can't use generated name as have to guard against the duplicates
-				// when subsequent update is triggered right after create, but before the cache is updated
-				Name:            fmt.Sprintf("workload-%s-%s", strings.ToLower(workload.Name), strings.ToLower(string(serviceType))),
+				GenerateName:    "workload-",
 				OwnerReferences: []metav1.OwnerReference{ownerRef},
 				Namespace:       workload.Namespace,
 				Annotations:     serviceAnnotations,
+				Labels:          serviceLabels,
 			},
 			Spec: corev1.ServiceSpec{
 				ClusterIP: toCreate.ClusterIP,
