@@ -88,7 +88,7 @@ func (w *DeploymentWatcher) watchRule() error {
 				selector := labels.NewSelector()
 				for key, value := range alert.Spec.TargetWorkload.Selector {
 					r, _ := labels.NewRequirement(key, selection.Equals, []string{value})
-					selector.Add(*r)
+					selector = selector.Add(*r)
 				}
 				deps, err := w.deploymentLister.List("", selector)
 				if err != nil {

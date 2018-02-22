@@ -91,7 +91,7 @@ func (w *DaemonsetWatcher) watchRule() error {
 				selector := labels.NewSelector()
 				for key, value := range alert.Spec.TargetWorkload.Selector {
 					r, _ := labels.NewRequirement(key, selection.Equals, []string{value})
-					selector.Add(*r)
+					selector = selector.Add(*r)
 				}
 				dsList, err := w.daemonsetLister.List("", selector)
 				if err != nil {

@@ -101,7 +101,7 @@ func (m *Manager) getAlertManagerEndpoint() (string, error) {
 
 	selector := labels.NewSelector()
 	r, _ := labels.NewRequirement("app", selection.Equals, []string{"alertmanager"})
-	selector.Add(*r)
+	selector = selector.Add(*r)
 	pods, err := m.podLister.List("cattle-alerting", selector)
 	if err != nil {
 		return "", err
@@ -156,7 +156,7 @@ func (m *Manager) GetDefaultConfig() *alertconfig.Config {
 	config.Receivers = receivers
 
 	groupWait, _ := model.ParseDuration("1m")
-	groupInterval, _ := model.ParseDuration("0m")
+	groupInterval, _ := model.ParseDuration("10s")
 	repeatInterval, _ := model.ParseDuration("1h")
 
 	config.Route = &alertconfig.Route{
