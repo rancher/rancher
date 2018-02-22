@@ -1,4 +1,4 @@
-package util
+package workload
 
 import (
 	"reflect"
@@ -80,7 +80,7 @@ func NewWorkloadLister(workload *config.UserOnlyContext) WorkloadLister {
 	}
 }
 
-func (w WorkloadLister) GetByName(key string) (*Workload, error) {
+func (w WorkloadLister) GetByWorkloadId(key string) (*Workload, error) {
 	splitted := strings.Split(key, ":")
 	if len(splitted) != 3 {
 		return nil, fmt.Errorf("workload name [%s] is invalid", key)
@@ -172,20 +172,26 @@ func getWorkload(namespace string, name string, kind string, apiVersion string, 
 }
 
 func (w WorkloadLister) GetBySelectorMatch(namespace string, selectorLabels map[string]string) ([]*Workload, error) {
+	var allWorkloads []*Workload
 	var workloads []*Workload
+
+	//TODO - do for other types
 	deployments, err := w.DeploymentLister.List(namespace, labels.NewSelector())
 	if err != nil {
 		return workloads, err
 	}
 
 	for _, d := range deployments {
-		selector := labels.SelectorFromSet(d.Spec.Selector.MatchLabels)
-		if selector.Matches(labels.Set(selectorLabels)) {
-			workloads = append(workloads, &Workload{
-				Name:           d.Name,
-				Namespace:      d.Namespace,
-				SelectorLabels: getSelectorLables(d.Spec.Selector),
-			})
+		workload, err := w.GetByWorkloadId(GetWorkloadID("deployment", d.Namespace, d.Name))
+		if err != nil {
+			return workloads, err
+		}
+		allWorkloads = append(allWorkloads, workload)
+	}
+	for _, workload := range allWorkloads {
+		workloadSelector := labels.SelectorFromSet(workload.SelectorLabels)
+		if workloadSelector.Matches(labels.Set(selectorLabels)) {
+			workloads = append(workloads, workload)
 		}
 	}
 
@@ -380,4 +386,8 @@ func (w *WorkloadLister) CreateServiceForWorkload(workload *Workload) error {
 
 func (wk Workload) getKey() string {
 	return fmt.Sprintf("%s:%s:%s", wk.Kind, wk.Namespace, wk.Name)
+}
+
+func GetWorkloadID(objectType string, namespace string, name string) string {
+	return fmt.Sprintf("%s:%s:%s", objectType, namespace, name)
 }
