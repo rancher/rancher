@@ -9,7 +9,7 @@ const (
 	NodeSpecFieldDisplayName       = "displayName"
 	NodeSpecFieldEtcd              = "etcd"
 	NodeSpecFieldImported          = "imported"
-	NodeSpecFieldNodePoolName      = "nodePoolUuid"
+	NodeSpecFieldNodePoolId        = "nodePoolId"
 	NodeSpecFieldNodeTemplateId    = "nodeTemplateId"
 	NodeSpecFieldPodCidr           = "podCidr"
 	NodeSpecFieldProviderId        = "providerId"
@@ -27,7 +27,7 @@ type NodeSpec struct {
 	DisplayName       string        `json:"displayName,omitempty"`
 	Etcd              bool          `json:"etcd,omitempty"`
 	Imported          bool          `json:"imported,omitempty"`
-	NodePoolName      string        `json:"nodePoolUuid,omitempty"`
+	NodePoolId        string        `json:"nodePoolId,omitempty"`
 	NodeTemplateId    string        `json:"nodeTemplateId,omitempty"`
 	PodCidr           string        `json:"podCidr,omitempty"`
 	ProviderId        string        `json:"providerId,omitempty"`

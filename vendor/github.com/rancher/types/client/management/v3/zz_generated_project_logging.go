@@ -9,7 +9,6 @@ const (
 	ProjectLoggingFieldAnnotations          = "annotations"
 	ProjectLoggingFieldCreated              = "created"
 	ProjectLoggingFieldCreatorID            = "creatorId"
-	ProjectLoggingFieldDisplayName          = "displayName"
 	ProjectLoggingFieldElasticsearchConfig  = "elasticsearchConfig"
 	ProjectLoggingFieldKafkaConfig          = "kafkaConfig"
 	ProjectLoggingFieldLabels               = "labels"
@@ -34,7 +33,6 @@ type ProjectLogging struct {
 	Annotations          map[string]string    `json:"annotations,omitempty"`
 	Created              string               `json:"created,omitempty"`
 	CreatorID            string               `json:"creatorId,omitempty"`
-	DisplayName          string               `json:"displayName,omitempty"`
 	ElasticsearchConfig  *ElasticsearchConfig `json:"elasticsearchConfig,omitempty"`
 	KafkaConfig          *KafkaConfig         `json:"kafkaConfig,omitempty"`
 	Labels               map[string]string    `json:"labels,omitempty"`

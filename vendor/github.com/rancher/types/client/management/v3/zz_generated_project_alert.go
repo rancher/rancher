@@ -6,11 +6,11 @@ import (
 
 const (
 	ProjectAlertType                       = "projectAlert"
+	ProjectAlertFieldAlertState            = "alertState"
 	ProjectAlertFieldAnnotations           = "annotations"
 	ProjectAlertFieldCreated               = "created"
 	ProjectAlertFieldCreatorID             = "creatorId"
 	ProjectAlertFieldDescription           = "description"
-	ProjectAlertFieldDisplayName           = "displayName"
 	ProjectAlertFieldInitialWaitSeconds    = "initialWaitSeconds"
 	ProjectAlertFieldLabels                = "labels"
 	ProjectAlertFieldName                  = "name"
@@ -22,7 +22,6 @@ const (
 	ProjectAlertFieldRepeatIntervalSeconds = "repeatIntervalSeconds"
 	ProjectAlertFieldSeverity              = "severity"
 	ProjectAlertFieldState                 = "state"
-	ProjectAlertFieldStatus                = "status"
 	ProjectAlertFieldTargetPod             = "targetPod"
 	ProjectAlertFieldTargetWorkload        = "targetWorkload"
 	ProjectAlertFieldTransitioning         = "transitioning"
@@ -32,11 +31,11 @@ const (
 
 type ProjectAlert struct {
 	types.Resource
+	AlertState            string            `json:"alertState,omitempty"`
 	Annotations           map[string]string `json:"annotations,omitempty"`
 	Created               string            `json:"created,omitempty"`
 	CreatorID             string            `json:"creatorId,omitempty"`
 	Description           string            `json:"description,omitempty"`
-	DisplayName           string            `json:"displayName,omitempty"`
 	InitialWaitSeconds    *int64            `json:"initialWaitSeconds,omitempty"`
 	Labels                map[string]string `json:"labels,omitempty"`
 	Name                  string            `json:"name,omitempty"`
@@ -48,7 +47,6 @@ type ProjectAlert struct {
 	RepeatIntervalSeconds *int64            `json:"repeatIntervalSeconds,omitempty"`
 	Severity              string            `json:"severity,omitempty"`
 	State                 string            `json:"state,omitempty"`
-	Status                *AlertStatus      `json:"status,omitempty"`
 	TargetPod             *TargetPod        `json:"targetPod,omitempty"`
 	TargetWorkload        *TargetWorkload   `json:"targetWorkload,omitempty"`
 	Transitioning         string            `json:"transitioning,omitempty"`

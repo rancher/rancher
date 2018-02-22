@@ -26,7 +26,7 @@ const (
 	NodeFieldName                 = "name"
 	NodeFieldNamespaceId          = "namespaceId"
 	NodeFieldNodeName             = "nodeName"
-	NodeFieldNodePoolName         = "nodePoolUuid"
+	NodeFieldNodePoolId           = "nodePoolId"
 	NodeFieldNodeTaints           = "nodeTaints"
 	NodeFieldNodeTemplateId       = "nodeTemplateId"
 	NodeFieldOwnerReferences      = "ownerReferences"
@@ -69,7 +69,7 @@ type Node struct {
 	Name                 string                    `json:"name,omitempty"`
 	NamespaceId          string                    `json:"namespaceId,omitempty"`
 	NodeName             string                    `json:"nodeName,omitempty"`
-	NodePoolName         string                    `json:"nodePoolUuid,omitempty"`
+	NodePoolId           string                    `json:"nodePoolId,omitempty"`
 	NodeTaints           []Taint                   `json:"nodeTaints,omitempty"`
 	NodeTemplateId       string                    `json:"nodeTemplateId,omitempty"`
 	OwnerReferences      []OwnerReference          `json:"ownerReferences,omitempty"`

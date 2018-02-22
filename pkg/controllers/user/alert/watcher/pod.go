@@ -94,7 +94,7 @@ func (w *PodWatcher) watchRule() error {
 	}
 
 	for _, alert := range pAlerts {
-		if alert.Status.State == "inactive" {
+		if alert.Status.AlertState == "inactive" {
 			continue
 		}
 

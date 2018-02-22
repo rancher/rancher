@@ -70,6 +70,9 @@ func initClusterPreCanAlerts(clusterAlerts v3.ClusterAlertInterface, clusterName
 				Condition: "etcd",
 			},
 		},
+		Status: v3.AlertStatus{
+			AlertState: "active",
+		},
 	}
 
 	if _, err := clusterAlerts.Create(etcdRule); err != nil && !apierrors.IsAlreadyExists(err) {
@@ -93,6 +96,9 @@ func initClusterPreCanAlerts(clusterAlerts v3.ClusterAlertInterface, clusterName
 				Condition: "controller-manager",
 			},
 		},
+		Status: v3.AlertStatus{
+			AlertState: "active",
+		},
 	}
 
 	if _, err := clusterAlerts.Create(cmRule); err != nil && !apierrors.IsAlreadyExists(err) {
@@ -115,6 +121,9 @@ func initClusterPreCanAlerts(clusterAlerts v3.ClusterAlertInterface, clusterName
 			TargetSystemService: v3.TargetSystemService{
 				Condition: "scheduler",
 			},
+		},
+		Status: v3.AlertStatus{
+			AlertState: "active",
 		},
 	}
 
@@ -143,6 +152,9 @@ func initClusterPreCanAlerts(clusterAlerts v3.ClusterAlertInterface, clusterName
 				},
 			},
 		},
+		Status: v3.AlertStatus{
+			AlertState: "active",
+		},
 	}
 
 	if _, err := clusterAlerts.Create(nodeRule); err != nil && !apierrors.IsAlreadyExists(err) {
@@ -164,8 +176,11 @@ func initClusterPreCanAlerts(clusterAlerts v3.ClusterAlertInterface, clusterName
 			},
 			TargetEvent: v3.TargetEvent{
 				Type:         "Warning",
-				ResourceKind: "Deployemnt",
+				ResourceKind: "Deployment",
 			},
+		},
+		Status: v3.AlertStatus{
+			AlertState: "active",
 		},
 	}
 
@@ -203,6 +218,9 @@ func (l *ProjectLifecycle) Create(obj *v3.Project) (*v3.Project, error) {
 				AvailablePercentage: 50,
 			},
 		},
+		Status: v3.AlertStatus{
+			AlertState: "active",
+		},
 	}
 
 	if _, err := l.projectAlerts.Create(deploymentAlert); err != nil && !apierrors.IsAlreadyExists(err) {
@@ -230,6 +248,9 @@ func (l *ProjectLifecycle) Create(obj *v3.Project) (*v3.Project, error) {
 				},
 				AvailablePercentage: 50,
 			},
+		},
+		Status: v3.AlertStatus{
+			AlertState: "active",
 		},
 	}
 
@@ -259,6 +280,9 @@ func (l *ProjectLifecycle) Create(obj *v3.Project) (*v3.Project, error) {
 				},
 				AvailablePercentage: 50,
 			},
+		},
+		Status: v3.AlertStatus{
+			AlertState: "active",
 		},
 	}
 

@@ -37,29 +37,29 @@ func (h *Handler) ClusterActionHandler(actionName string, action *types.Action, 
 
 	switch actionName {
 	case "activate":
-		if alert.Status.State == "inactive" {
-			alert.Status.State = "active"
+		if alert.Status.AlertState == "inactive" {
+			alert.Status.AlertState = "active"
 		} else {
 			return errors.New("the alert state is not inactive")
 		}
 
 	case "deactivate":
-		if alert.Status.State == "active" {
-			alert.Status.State = "inactive"
+		if alert.Status.AlertState == "active" {
+			alert.Status.AlertState = "inactive"
 		} else {
 			return errors.New("the alert state is not active")
 		}
 
 	case "mute":
-		if alert.Status.State == "alerting" {
-			alert.Status.State = "muted"
+		if alert.Status.AlertState == "alerting" {
+			alert.Status.AlertState = "muted"
 		} else {
 			return errors.New("the alert state is not alerting")
 		}
 
 	case "unmute":
-		if alert.Status.State == "muted" {
-			alert.Status.State = "alerting"
+		if alert.Status.AlertState == "muted" {
+			alert.Status.AlertState = "alerting"
 		} else {
 			return errors.New("the alert state is not muted")
 		}
@@ -89,29 +89,29 @@ func (h *Handler) ProjectActionHandler(actionName string, action *types.Action, 
 
 	switch actionName {
 	case "activate":
-		if alert.Status.State == "inactive" {
-			alert.Status.State = "active"
+		if alert.Status.AlertState == "inactive" {
+			alert.Status.AlertState = "active"
 		} else {
 			return errors.New("the alert state is not inactive")
 		}
 
 	case "deactivate":
-		if alert.Status.State == "active" {
-			alert.Status.State = "inactive"
+		if alert.Status.AlertState == "active" {
+			alert.Status.AlertState = "inactive"
 		} else {
 			return errors.New("the alert state is not active")
 		}
 
 	case "mute":
-		if alert.Status.State == "alerting" {
-			alert.Status.State = "muted"
+		if alert.Status.AlertState == "alerting" {
+			alert.Status.AlertState = "muted"
 		} else {
 			return errors.New("the alert state is not alerting")
 		}
 
 	case "unmute":
-		if alert.Status.State == "muted" {
-			alert.Status.State = "alerting"
+		if alert.Status.AlertState == "muted" {
+			alert.Status.AlertState = "alerting"
 		} else {
 			return errors.New("the alert state is not muted")
 		}

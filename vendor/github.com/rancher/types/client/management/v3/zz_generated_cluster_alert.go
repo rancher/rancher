@@ -6,12 +6,12 @@ import (
 
 const (
 	ClusterAlertType                       = "clusterAlert"
+	ClusterAlertFieldAlertState            = "alertState"
 	ClusterAlertFieldAnnotations           = "annotations"
 	ClusterAlertFieldClusterId             = "clusterId"
 	ClusterAlertFieldCreated               = "created"
 	ClusterAlertFieldCreatorID             = "creatorId"
 	ClusterAlertFieldDescription           = "description"
-	ClusterAlertFieldDisplayName           = "displayName"
 	ClusterAlertFieldInitialWaitSeconds    = "initialWaitSeconds"
 	ClusterAlertFieldLabels                = "labels"
 	ClusterAlertFieldName                  = "name"
@@ -22,7 +22,6 @@ const (
 	ClusterAlertFieldRepeatIntervalSeconds = "repeatIntervalSeconds"
 	ClusterAlertFieldSeverity              = "severity"
 	ClusterAlertFieldState                 = "state"
-	ClusterAlertFieldStatus                = "status"
 	ClusterAlertFieldTargetEvent           = "targetEvent"
 	ClusterAlertFieldTargetNode            = "targetNode"
 	ClusterAlertFieldTargetSystemService   = "targetSystemService"
@@ -33,12 +32,12 @@ const (
 
 type ClusterAlert struct {
 	types.Resource
+	AlertState            string               `json:"alertState,omitempty"`
 	Annotations           map[string]string    `json:"annotations,omitempty"`
 	ClusterId             string               `json:"clusterId,omitempty"`
 	Created               string               `json:"created,omitempty"`
 	CreatorID             string               `json:"creatorId,omitempty"`
 	Description           string               `json:"description,omitempty"`
-	DisplayName           string               `json:"displayName,omitempty"`
 	InitialWaitSeconds    *int64               `json:"initialWaitSeconds,omitempty"`
 	Labels                map[string]string    `json:"labels,omitempty"`
 	Name                  string               `json:"name,omitempty"`
@@ -49,7 +48,6 @@ type ClusterAlert struct {
 	RepeatIntervalSeconds *int64               `json:"repeatIntervalSeconds,omitempty"`
 	Severity              string               `json:"severity,omitempty"`
 	State                 string               `json:"state,omitempty"`
-	Status                *AlertStatus         `json:"status,omitempty"`
 	TargetEvent           *TargetEvent         `json:"targetEvent,omitempty"`
 	TargetNode            *TargetNode          `json:"targetNode,omitempty"`
 	TargetSystemService   *TargetSystemService `json:"targetSystemService,omitempty"`

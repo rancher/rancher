@@ -42,7 +42,7 @@ func (l *EventWatcher) Sync(key string, obj *v3.ClusterEvent) error {
 	}
 
 	for _, alert := range clusterAlerts {
-		if alert.Status.State == "inactive" {
+		if alert.Status.AlertState == "inactive" {
 			continue
 		}
 		alertID := alert.Namespace + "-" + alert.Name

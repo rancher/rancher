@@ -10,7 +10,6 @@ const (
 	ClusterLoggingFieldClusterId            = "clusterId"
 	ClusterLoggingFieldCreated              = "created"
 	ClusterLoggingFieldCreatorID            = "creatorId"
-	ClusterLoggingFieldDisplayName          = "displayName"
 	ClusterLoggingFieldElasticsearchConfig  = "elasticsearchConfig"
 	ClusterLoggingFieldEmbeddedConfig       = "embeddedConfig"
 	ClusterLoggingFieldKafkaConfig          = "kafkaConfig"
@@ -36,7 +35,6 @@ type ClusterLogging struct {
 	ClusterId            string               `json:"clusterId,omitempty"`
 	Created              string               `json:"created,omitempty"`
 	CreatorID            string               `json:"creatorId,omitempty"`
-	DisplayName          string               `json:"displayName,omitempty"`
 	ElasticsearchConfig  *ElasticsearchConfig `json:"elasticsearchConfig,omitempty"`
 	EmbeddedConfig       *EmbeddedConfig      `json:"embeddedConfig,omitempty"`
 	KafkaConfig          *KafkaConfig         `json:"kafkaConfig,omitempty"`
