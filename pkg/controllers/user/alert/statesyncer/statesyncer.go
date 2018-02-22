@@ -64,10 +64,10 @@ func (s *StateSyncer) syncState() error {
 		for _, alert := range clusterAlerts {
 			alertID := alert.Namespace + "-" + alert.Name
 			state := s.alertManager.GetState(alertID, apiAlerts)
-			needUpdate := s.doSync(alertID, alert.Status.State, state)
+			needUpdate := s.doSync(alertID, alert.Status.AlertState, state)
 
 			if needUpdate {
-				alert.Status.State = state
+				alert.Status.AlertState = state
 				_, err := s.clusterAlertClient.Update(alert)
 				if err != nil {
 					logrus.Errorf("Error occurred while updating alert state : %v", err)
@@ -78,10 +78,10 @@ func (s *StateSyncer) syncState() error {
 		for _, alert := range pAlerts {
 			alertID := alert.Namespace + "-" + alert.Name
 			state := s.alertManager.GetState(alertID, apiAlerts)
-			needUpdate := s.doSync(alertID, alert.Status.State, state)
+			needUpdate := s.doSync(alertID, alert.Status.AlertState, state)
 
 			if needUpdate {
-				alert.Status.State = state
+				alert.Status.AlertState = state
 				_, err := s.projectAlertClient.Update(alert)
 				if err != nil {
 					logrus.Errorf("Error occurred while updating alert state and time: %v", err)

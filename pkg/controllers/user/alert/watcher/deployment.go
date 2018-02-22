@@ -66,7 +66,7 @@ func (w *DeploymentWatcher) watchRule() error {
 	}
 
 	for _, alert := range pAlerts {
-		if alert.Status.State == "inactive" {
+		if alert.Status.AlertState == "inactive" {
 			continue
 		}
 		if alert.Spec.TargetWorkload.Type == "deployment" {

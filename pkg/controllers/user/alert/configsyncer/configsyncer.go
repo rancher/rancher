@@ -127,7 +127,7 @@ func (d *ConfigSyncer) getNotifier(id string, notifiers []*v3.Notifier) *v3.Noti
 
 func (d *ConfigSyncer) addProjectAlert2Config(config *alertconfig.Config, alerts []*v3.ProjectAlert, notifiers []*v3.Notifier) {
 	for _, alert := range alerts {
-		if alert.Status.State == "inactive" {
+		if alert.Status.AlertState == "inactive" {
 			continue
 		}
 
@@ -145,7 +145,7 @@ func (d *ConfigSyncer) addProjectAlert2Config(config *alertconfig.Config, alerts
 
 func (d *ConfigSyncer) addClusterAlert2Config(config *alertconfig.Config, alerts []*v3.ClusterAlert, notifiers []*v3.Notifier) {
 	for _, alert := range alerts {
-		if alert.Status.State == "inactive" {
+		if alert.Status.AlertState == "inactive" {
 			continue
 		}
 

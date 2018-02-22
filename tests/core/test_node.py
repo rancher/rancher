@@ -15,7 +15,7 @@ def test_node_fields(mc):
         'info': 'r',
         'ipAddress': 'r',
         'limits': 'r',
-        'nodePoolUuid': 'r',
+        'nodePoolId': 'r',
         'nodeName': 'r',
         'requested': 'r',
         'clusterId': 'cr',
