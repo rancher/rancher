@@ -29,6 +29,7 @@ const (
 	ReplicaSetFieldPriority                      = "priority"
 	ReplicaSetFieldPriorityClassName             = "priorityClassName"
 	ReplicaSetFieldProjectID                     = "projectId"
+	ReplicaSetFieldPublicEndpoints               = "publicEndpoints"
 	ReplicaSetFieldRemoved                       = "removed"
 	ReplicaSetFieldReplicaSet                    = "replicaSet"
 	ReplicaSetFieldReplicaSetStatus              = "replicaSetStatus"
@@ -75,6 +76,7 @@ type ReplicaSet struct {
 	Priority                      *int64                 `json:"priority,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty"`
 	ProjectID                     string                 `json:"projectId,omitempty"`
+	PublicEndpoints               []PublicEndpoint       `json:"publicEndpoints,omitempty"`
 	Removed                       string                 `json:"removed,omitempty"`
 	ReplicaSet                    *ReplicaSetConfig      `json:"replicaSet,omitempty"`
 	ReplicaSetStatus              *ReplicaSetStatus      `json:"replicaSetStatus,omitempty"`

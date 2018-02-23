@@ -31,6 +31,7 @@ const (
 	JobFieldPriority                      = "priority"
 	JobFieldPriorityClassName             = "priorityClassName"
 	JobFieldProjectID                     = "projectId"
+	JobFieldPublicEndpoints               = "publicEndpoints"
 	JobFieldRemoved                       = "removed"
 	JobFieldRestartPolicy                 = "restartPolicy"
 	JobFieldRunAsNonRoot                  = "runAsNonRoot"
@@ -77,6 +78,7 @@ type Job struct {
 	Priority                      *int64                 `json:"priority,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty"`
 	ProjectID                     string                 `json:"projectId,omitempty"`
+	PublicEndpoints               []PublicEndpoint       `json:"publicEndpoints,omitempty"`
 	Removed                       string                 `json:"removed,omitempty"`
 	RestartPolicy                 string                 `json:"restartPolicy,omitempty"`
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty"`

@@ -31,6 +31,7 @@ const (
 	DaemonSetFieldPriority                      = "priority"
 	DaemonSetFieldPriorityClassName             = "priorityClassName"
 	DaemonSetFieldProjectID                     = "projectId"
+	DaemonSetFieldPublicEndpoints               = "publicEndpoints"
 	DaemonSetFieldRemoved                       = "removed"
 	DaemonSetFieldRestartPolicy                 = "restartPolicy"
 	DaemonSetFieldRunAsNonRoot                  = "runAsNonRoot"
@@ -77,6 +78,7 @@ type DaemonSet struct {
 	Priority                      *int64                 `json:"priority,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty"`
 	ProjectID                     string                 `json:"projectId,omitempty"`
+	PublicEndpoints               []PublicEndpoint       `json:"publicEndpoints,omitempty"`
 	Removed                       string                 `json:"removed,omitempty"`
 	RestartPolicy                 string                 `json:"restartPolicy,omitempty"`
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty"`
