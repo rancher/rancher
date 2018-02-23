@@ -25,4 +25,4 @@ COPY rancher /usr/bin/
 ENV CATTLE_AGENT_IMAGE rancher/agent:v2.0.3-rc3
 ENV CATTLE_SERVER_IMAGE rancher/server
 VOLUME /var/lib/rancher
-ENTRYPOINT ["rancher", "--k8s-mode=exec", "--http-listen-port=80", "--https-listen-port=443"]
+ENTRYPOINT ["rancher", "--http-listen-port=80", "--https-listen-port=443"]

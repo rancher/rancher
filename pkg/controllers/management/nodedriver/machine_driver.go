@@ -44,6 +44,10 @@ func (m *Lifecycle) Create(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 }
 
 func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
+	if !obj.Spec.Active {
+		return obj, nil
+	}
+
 	var err error
 	// if node driver was created, we also activate the driver by default
 	driver := NewDriver(obj.Spec.Builtin, obj.Spec.DisplayName, obj.Spec.URL, obj.Spec.Checksum)

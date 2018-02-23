@@ -37,18 +37,17 @@ type input struct {
 	Cluster *cluster     `json:"cluster"`
 }
 
-func NewTunnelServer(context *config.ScaledContext) *remotedialer.Server {
-	auth := newAuthorizer(context)
+func NewTunnelServer(context *config.ScaledContext, authorizer *Authorizer) *remotedialer.Server {
 	ready := func() bool {
 		return context.Leader
 	}
-	return remotedialer.New(auth, func(rw http.ResponseWriter, req *http.Request, code int, err error) {
+	return remotedialer.New(authorizer.authorizeTunnel, func(rw http.ResponseWriter, req *http.Request, code int, err error) {
 		rw.WriteHeader(code)
 		rw.Write([]byte(err.Error()))
 	}, ready)
 }
 
-func newAuthorizer(context *config.ScaledContext) remotedialer.Authorizer {
+func NewAuthorizer(context *config.ScaledContext) *Authorizer {
 	auth := &Authorizer{
 		crtIndexer:    context.Management.ClusterRegistrationTokens("").Controller().Informer().GetIndexer(),
 		clusterLister: context.Management.Clusters("").Controller().Lister(),
@@ -59,7 +58,7 @@ func newAuthorizer(context *config.ScaledContext) remotedialer.Authorizer {
 	context.Management.ClusterRegistrationTokens("").Controller().Informer().AddIndexers(map[string]cache.IndexFunc{
 		crtKeyIndex: auth.crtIndex,
 	})
-	return auth.authorize
+	return auth
 }
 
 type Authorizer struct {
@@ -70,47 +69,89 @@ type Authorizer struct {
 	clusters      v3.ClusterInterface
 }
 
-func (t *Authorizer) authorize(req *http.Request) (string, bool, error) {
+type Client struct {
+	Cluster *v3.Cluster
+	Node    *v3.Node
+	Token   string
+	Server  string
+}
+
+func (t *Authorizer) authorizeTunnel(req *http.Request) (string, bool, error) {
+	client, ok, err := t.Authorize(req)
+	if client != nil && client.Node != nil {
+		return client.Node.Name, ok, err
+	} else if client != nil && client.Cluster != nil {
+		return client.Cluster.Name, ok, err
+	}
+
+	return "", false, err
+}
+
+func (t *Authorizer) AuthorizeLocalNode(username, password string) (string, []string, *v3.Cluster, bool) {
+	cluster, err := t.getClusterByToken(password)
+	if err != nil || cluster == nil || cluster.Status.Driver != v3.ClusterDriverLocal {
+		return "", nil, nil, false
+	}
+	return "system:node:" + username, []string{"system:nodes"}, cluster, true
+}
+
+func (t *Authorizer) Authorize(req *http.Request) (*Client, bool, error) {
 	token := req.Header.Get(Token)
 	if token == "" {
-		return "", false, nil
+		return nil, false, nil
 	}
 
 	cluster, err := t.getClusterByToken(token)
 	if err != nil || cluster == nil {
-		return "", false, err
+		return nil, false, err
 	}
 
 	input, err := t.readInput(cluster, req)
 	if err != nil {
-		return "", false, err
+		return nil, false, err
 	}
 
 	if input.Node != nil {
-		return t.authorizeNode(cluster, input.Node, req)
+		node, ok, err := t.authorizeNode(cluster, input.Node, req)
+		if node.Status.NodeConfig != nil && input.Node.CustomConfig != nil {
+			node = node.DeepCopy()
+			node.Status.NodeConfig.Address = input.Node.CustomConfig.Address
+			node.Status.NodeConfig.InternalAddress = input.Node.CustomConfig.InternalAddress
+		}
+		return &Client{
+			Cluster: cluster,
+			Node:    node,
+			Token:   token,
+			Server:  req.Host,
+		}, ok, err
 	}
 
 	if input.Cluster != nil {
-		return t.authorizeCluster(cluster, input.Cluster, req)
+		cluster, ok, err := t.authorizeCluster(cluster, input.Cluster, req)
+		return &Client{
+			Cluster: cluster,
+			Token:   token,
+			Server:  req.Host,
+		}, ok, err
 	}
 
-	return "", false, nil
+	return nil, false, nil
 }
 
-func (t *Authorizer) authorizeNode(cluster *v3.Cluster, inNode *client.Node, req *http.Request) (string, bool, error) {
+func (t *Authorizer) authorizeNode(cluster *v3.Cluster, inNode *client.Node, req *http.Request) (*v3.Node, bool, error) {
 	machineName := machineName(inNode)
 
 	machine, err := t.machineLister.Get(cluster.Name, machineName)
 	if apierrors.IsNotFound(err) {
 		machine, err = t.createNode(inNode, cluster, req)
 		if err != nil {
-			return "", false, err
+			return nil, false, err
 		}
 	} else if err != nil && machine == nil {
-		return "", false, err
+		return nil, false, err
 	}
 
-	return machine.Name, true, nil
+	return machine, true, nil
 }
 
 func (t *Authorizer) createNode(inNode *client.Node, cluster *v3.Cluster, req *http.Request) (*v3.Node, error) {
@@ -144,13 +185,13 @@ func (t *Authorizer) createNode(inNode *client.Node, cluster *v3.Cluster, req *h
 	return t.machines.Create(machine)
 }
 
-func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, req *http.Request) (string, bool, error) {
+func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, req *http.Request) (*v3.Cluster, bool, error) {
 	var (
 		err error
 	)
 
 	if cluster.Status.Driver != importedDriver && cluster.Status.Driver != "" {
-		return cluster.Name, true, nil
+		return cluster, true, nil
 	}
 
 	changed := false
@@ -176,7 +217,7 @@ func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, r
 		_, err = t.clusters.Update(cluster)
 	}
 
-	return cluster.Name, true, err
+	return cluster, true, err
 }
 
 func (t *Authorizer) readInput(cluster *v3.Cluster, req *http.Request) (*input, error) {

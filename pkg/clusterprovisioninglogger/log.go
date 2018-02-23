@@ -1,20 +1,47 @@
-package clusterprovisioner
+package clusterprovisioninglogger
 
 import (
 	"context"
 	"io"
 	"sync"
-	"time"
 
 	"github.com/rancher/kontainer-engine/logstream"
 	"github.com/rancher/norman/condition"
+	"github.com/rancher/norman/event"
+	"github.com/rancher/rke/log"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/metadata"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (p *Provisioner) logEvent(cluster *v3.Cluster, event logstream.LogEvent, cond condition.Cond) *v3.Cluster {
+type logger struct {
+	EventLogger event.Logger
+	Clusters    v3.ClusterInterface
+}
+
+func NewLogger(clusters v3.ClusterInterface, eventLogger event.Logger, cluster *v3.Cluster, cond condition.Cond) (context.Context, io.Closer) {
+	l := &logger{
+		EventLogger: eventLogger,
+		Clusters:    clusters,
+	}
+
+	_, ctx, logger := l.getCtx(cluster, cond)
+	return ctx, logger
+}
+
+func NewNonRPCLogger(clusters v3.ClusterInterface, eventLogger event.Logger, cluster *v3.Cluster, cond condition.Cond) (context.Context, io.Closer) {
+	l := &logger{
+		EventLogger: eventLogger,
+		Clusters:    clusters,
+	}
+
+	logID, ctx, logger := l.getCtx(cluster, cond)
+	targetLogger := logstream.GetLogStream(logID)
+	return log.SetLogger(ctx, targetLogger), logger
+}
+
+func (p *logger) logEvent(cluster *v3.Cluster, event logstream.LogEvent, cond condition.Cond) *v3.Cluster {
 	if event.Error {
 		p.EventLogger.Error(cluster, event.Message)
 		logrus.Errorf("cluster [%s] provisioning: %s", cluster.Name, event.Message)
@@ -43,10 +70,11 @@ func (p *Provisioner) logEvent(cluster *v3.Cluster, event logstream.LogEvent, co
 	return cluster
 }
 
-func (p *Provisioner) getCtx(cluster *v3.Cluster, cond condition.Cond) (context.Context, io.Closer) {
+func (p *logger) getCtx(cluster *v3.Cluster, cond condition.Cond) (string, context.Context, io.Closer) {
 	logger := logstream.NewLogStream()
+	logID := logger.ID()
 	ctx := metadata.NewOutgoingContext(context.Background(), metadata.New(map[string]string{
-		"log-id": logger.ID(),
+		"log-id": logID,
 	}))
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -58,29 +86,11 @@ func (p *Provisioner) getCtx(cluster *v3.Cluster, cond condition.Cond) (context.
 		}
 	}()
 
-	return ctx, closerFunc(func() error {
+	return logID, ctx, closerFunc(func() error {
 		logger.Close()
 		wg.Wait()
 		return nil
 	})
-}
-
-func (p *Provisioner) recordFailure(cluster *v3.Cluster, spec v3.ClusterSpec, err error) (*v3.Cluster, error) {
-	if err == nil {
-		p.backoff.DeleteEntry(cluster.Name)
-		if cluster.Status.FailedSpec == nil {
-			return cluster, nil
-		}
-
-		cluster.Status.FailedSpec = nil
-		return p.Clusters.Update(cluster)
-	}
-
-	p.backoff.Next(cluster.Name, time.Now())
-	cluster.Status.FailedSpec = &spec
-	newCluster, _ := p.Clusters.Update(cluster)
-	// mask the error
-	return newCluster, nil
 }
 
 type closerFunc func() error

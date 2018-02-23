@@ -10,12 +10,14 @@ import (
 
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config/dialer"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/proxy"
+	"k8s.io/client-go/rest"
 )
 
 type RemoteService struct {
 	cluster   *v3.Cluster
-	transport *http.Transport
+	transport http.RoundTripper
 	url       *url.URL
 	auth      string
 }
@@ -36,7 +38,33 @@ func prefix(cluster *v3.Cluster) string {
 	return "/k8s/clusters/" + cluster.Name
 }
 
-func New(cluster *v3.Cluster, factory dialer.Factory) (*RemoteService, error) {
+func New(localConfig *rest.Config, cluster *v3.Cluster, factory dialer.Factory) (*RemoteService, error) {
+	if cluster.Status.Driver == v3.ClusterDriverLocal {
+		return NewLocal(localConfig, cluster)
+	}
+	return NewRemote(cluster, factory)
+}
+
+func NewLocal(localConfig *rest.Config, cluster *v3.Cluster) (*RemoteService, error) {
+	// the gvk is ignored by us, so just pass in any gvk
+	hostURL, _, err := rest.DefaultServerURL(localConfig.Host, localConfig.APIPath, schema.GroupVersion{}, true)
+	if err != nil {
+		return nil, err
+	}
+
+	transport, err := rest.TransportFor(localConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return &RemoteService{
+		cluster:   cluster,
+		url:       hostURL,
+		transport: transport,
+	}, nil
+}
+
+func NewRemote(cluster *v3.Cluster, factory dialer.Factory) (*RemoteService, error) {
 	transport := &http.Transport{}
 
 	if factory != nil {
@@ -94,7 +122,9 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	req.URL.Host = req.Host
-	req.Header.Set("Authorization", r.auth)
+	if r.auth != "" {
+		req.Header.Set("Authorization", r.auth)
+	}
 
 	httpProxy := proxy.NewUpgradeAwareHandler(&u, r.transport, true, false, er)
 	httpProxy.ServeHTTP(rw, req)

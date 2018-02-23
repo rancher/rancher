@@ -10,7 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-func addRoles(management *config.ManagementContext, local bool) error {
+func addRoles(management *config.ManagementContext) (string, error) {
 	rb := newRoleBuilder()
 
 	rb.addRole("Create Clusters", "create-clusters").addRule().apiGroups("management.cattle.io").resources("clusters").verbs("create")
@@ -48,7 +48,7 @@ func addRoles(management *config.ManagementContext, local bool) error {
 	// TODO enable when groups are "in". they need to be self-service
 
 	if err := rb.reconcileGlobalRoles(management); err != nil {
-		return errors.Wrap(err, "problem reconciling globl roles")
+		return "", errors.Wrap(err, "problem reconciling globl roles")
 	}
 
 	// RoleTemplates to be used inside of clusters
@@ -189,7 +189,7 @@ func addRoles(management *config.ManagementContext, local bool) error {
 		addRule().apiGroups("management.cattle.io").resources("clusterevents").verbs("get", "list", "watch")
 
 	if err := rb.reconcileRoleTemplates(management); err != nil {
-		return errors.Wrap(err, "problem reconciling role templates")
+		return "", errors.Wrap(err, "problem reconciling role templates")
 	}
 
 	hash, _ := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
@@ -197,7 +197,7 @@ func addRoles(management *config.ManagementContext, local bool) error {
 	set := labels.Set(defaultAdminLabel)
 	admins, err := management.Management.Users("").List(v1.ListOptions{LabelSelector: set.String()})
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// TODO This logic is going to be a problem in an HA setup because a race will cause more than one admin user to be created
@@ -214,7 +214,7 @@ func addRoles(management *config.ManagementContext, local bool) error {
 			MustChangePassword: true,
 		})
 		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return errors.Wrap(err, "can not ensure admin user exists")
+			return "", errors.Wrap(err, "can not ensure admin user exists")
 		}
 
 	} else {
@@ -228,7 +228,7 @@ func addRoles(management *config.ManagementContext, local bool) error {
 
 	bindings, err := management.Management.GlobalRoleBindings("").List(v1.ListOptions{LabelSelector: set.String()})
 	if err != nil {
-		return err
+		return "", err
 	}
 	if len(bindings.Items) == 0 {
 		management.Management.GlobalRoleBindings("").Create(
@@ -242,21 +242,5 @@ func addRoles(management *config.ManagementContext, local bool) error {
 			})
 	}
 
-	if local {
-		// TODO If user delets the local cluster, this will recreate it on restart. Need to fix that
-		management.Management.Clusters("").Create(&v3.Cluster{
-			ObjectMeta: v1.ObjectMeta{
-				Name: "local",
-				Annotations: map[string]string{
-					"field.cattle.io/creatorId": admin.Name,
-				},
-			},
-			Spec: v3.ClusterSpec{
-				DisplayName: "local",
-				Internal:    true,
-			},
-		})
-	}
-
-	return nil
+	return admin.Name, nil
 }

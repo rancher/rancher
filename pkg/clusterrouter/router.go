@@ -6,6 +6,7 @@ import (
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/types/config/dialer"
+	"k8s.io/client-go/rest"
 )
 
 type Router struct {
@@ -13,8 +14,8 @@ type Router struct {
 	serverFactory *factory
 }
 
-func New(lookup ClusterLookup, dialer dialer.Factory) http.Handler {
-	serverFactory := newFactory(dialer, lookup)
+func New(localConfig *rest.Config, lookup ClusterLookup, dialer dialer.Factory) http.Handler {
+	serverFactory := newFactory(localConfig, dialer, lookup)
 	return &Router{
 		serverFactory: serverFactory,
 	}

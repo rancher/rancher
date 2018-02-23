@@ -122,7 +122,7 @@ func (m *Manager) toRESTConfig(cluster *v3.Cluster) (*rest.Config, error) {
 		return nil, nil
 	}
 
-	if cluster.Spec.Internal {
+	if cluster.Status.Driver == v3.ClusterDriverLocal {
 		return m.APIContext.LocalConfig, nil
 	}
 

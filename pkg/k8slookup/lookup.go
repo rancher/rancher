@@ -1,4 +1,4 @@
-package lookup
+package k8slookup
 
 import (
 	"net/http"
@@ -13,16 +13,18 @@ import (
 	"github.com/rancher/types/config"
 )
 
-func New(context *config.ScaledContext) clusterrouter.ClusterLookup {
+func New(context *config.ScaledContext, validate bool) clusterrouter.ClusterLookup {
 	return &lookup{
 		clusterLister: context.Management.Clusters("").Controller().Lister(),
 		schemas:       context.Schemas,
+		validate:      validate,
 	}
 }
 
 type lookup struct {
 	clusterLister v3.ClusterLister
 	schemas       *types.Schemas
+	validate      bool
 }
 
 func (l *lookup) Lookup(req *http.Request) (*v3.Cluster, error) {
@@ -32,9 +34,11 @@ func (l *lookup) Lookup(req *http.Request) (*v3.Cluster, error) {
 		return nil, httperror.NewAPIError(httperror.NotFound, "failed to find cluster")
 	}
 
-	// check access
-	if err := access.ByID(apiContext, &schema.Version, client.ClusterType, clusterID, &client.Cluster{}); err != nil {
-		return nil, err
+	if l.validate {
+		// check access
+		if err := access.ByID(apiContext, &schema.Version, client.ClusterType, clusterID, &client.Cluster{}); err != nil {
+			return nil, err
+		}
 	}
 
 	return l.clusterLister.Get("", clusterID)
