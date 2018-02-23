@@ -1,62 +1,45 @@
 package endpoints
 
 import (
+	workloadutil "github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-// This controller is responsible for monitoring NodePort services
-// and setting public endpoints on them.
+// This controller is responsible for monitoring services
+// and setting public endpoints on them (if they are of type NodePort or LoadBalancer)
 
 type ServicesController struct {
-	services       v1.ServiceInterface
-	serviceLister  v1.ServiceLister
-	nodeController v1.NodeController
-	nodeLister     v1.NodeLister
-	podLister      v1.PodLister
-	podController  v1.PodController
+	services           v1.ServiceInterface
+	serviceLister      v1.ServiceLister
+	nodeController     v1.NodeController
+	nodeLister         v1.NodeLister
+	podLister          v1.PodLister
+	podController      v1.PodController
+	workloadController workloadutil.CommonController
 }
 
 func (s *ServicesController) sync(key string, obj *corev1.Service) error {
-	if obj == nil {
+	if obj == nil || obj.DeletionTimestamp != nil {
+		namespace := ""
+		if obj != nil {
+			namespace = obj.Namespace
+		}
+		// push changes to all the nodes and pods, so service
+		// endpoints can be removed from there
+		s.nodeController.Enqueue("", allEndpoints)
+		//since service is removed, there is no way to narrow down the pod/workload search
+		s.podController.Enqueue(namespace, allEndpoints)
+		s.workloadController.EnqueueAllWorkloads(namespace)
 		return nil
 	}
-
-	var nodePortSvcs []corev1.Service
-	if key == allEndpoints {
-		svcs, err := s.serviceLister.List("", labels.NewSelector())
-		if err != nil {
-			return err
-		}
-		for _, svc := range svcs {
-			if svc.Spec.Type == "NodePort" || svc.Spec.Type == "LoadBalancer" {
-				nodePortSvcs = append(nodePortSvcs, *svc)
-			}
-		}
-	} else {
-		nodePortSvcs = append(nodePortSvcs, *obj)
+	_, err := s.reconcileEndpointsForService(obj)
+	if err != nil {
+		return err
 	}
 
-	enqueueAllNodes := false
-	for _, svc := range nodePortSvcs {
-		if svc.DeletionTimestamp != nil {
-			enqueueAllNodes = true
-			continue
-		}
-		changed, err := s.reconcileEndpointsForService(&svc)
-		if err != nil {
-			return err
-		}
-		if changed {
-			enqueueAllNodes = true
-		}
-	}
-
-	if enqueueAllNodes {
-		s.nodeController.Enqueue("", allEndpoints)
-	}
 	return nil
 }
 
@@ -87,17 +70,27 @@ func (s *ServicesController) reconcileEndpointsForService(svc *corev1.Service) (
 		return false, err
 	}
 
-	// 2. Push changes for pods behind nodePort service
+	// 2. Push changes for pods behind the service
+	var pods []*corev1.Pod
 	set := labels.Set{}
 	for key, val := range svc.Spec.Selector {
 		set[key] = val
 	}
-	pods, err := s.podLister.List(svc.Namespace, labels.SelectorFromSet(set))
+	pods, err = s.podLister.List(svc.Namespace, labels.SelectorFromSet(set))
 	if err != nil {
 		return false, err
 	}
 	for _, pod := range pods {
 		s.podController.Enqueue(pod.Namespace, pod.Name)
+	}
+
+	// 3. Push changes to workload behind the service
+	workloads, err := s.workloadController.GetWorkloadsMatchingSelector(svc.Namespace, svc.Spec.Selector)
+	if err != nil {
+		return false, err
+	}
+	for _, w := range workloads {
+		s.workloadController.EnqueueWorkload(w)
 	}
 
 	return true, nil

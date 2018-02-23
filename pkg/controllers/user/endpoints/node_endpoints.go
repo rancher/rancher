@@ -10,15 +10,13 @@ import (
 
 // This controller is responsible for monitoring nodes
 // and setting public endpoints on them based on HostPort pods
-// and NodePort services
+// and NodePort/LoadBalancer services
 
 type NodesController struct {
-	nodes             v1.NodeInterface
-	nodeLister        v1.NodeLister
-	serviceLister     v1.ServiceLister
-	serviceController v1.ServiceController
-	podLister         v1.PodLister
-	podController     v1.PodController
+	nodes         v1.NodeInterface
+	nodeLister    v1.NodeLister
+	serviceLister v1.ServiceLister
+	podLister     v1.PodLister
 }
 
 func (n *NodesController) sync(key string, obj *corev1.Node) error {
@@ -40,23 +38,14 @@ func (n *NodesController) sync(key string, obj *corev1.Node) error {
 		nodesToSync = append(nodesToSync, *obj)
 	}
 
-	enqueueAllServices := false
 	for _, node := range nodesToSync {
 		if node.DeletionTimestamp != nil {
-			enqueueAllServices = true
 			continue
 		}
-		changed, err := n.reconcileEndpontsForNode(&node)
+		_, err := n.reconcileEndpontsForNode(&node)
 		if err != nil {
 			return err
 		}
-		if changed {
-			enqueueAllServices = true
-		}
-
-	}
-	if enqueueAllServices {
-		n.serviceController.Enqueue("", allEndpoints)
 	}
 	return nil
 }
@@ -73,16 +62,11 @@ func (n *NodesController) reconcileEndpontsForNode(node *corev1.Node) (bool, err
 		if svc.DeletionTimestamp != nil {
 			continue
 		}
-		if svc.Spec.Type == "NodePort" {
-			pEps, err := convertServiceToPublicEndpoints(svc, node)
-			if err != nil {
-				return false, err
-			}
-			if len(pEps) == 0 {
-				continue
-			}
-			newPublicEps = append(newPublicEps, pEps...)
+		pEps, err := convertServiceToPublicEndpoints(svc, node)
+		if err != nil {
+			return false, err
 		}
+		newPublicEps = append(newPublicEps, pEps...)
 	}
 
 	// Get endpoint from hostPort pods
@@ -91,26 +75,12 @@ func (n *NodesController) reconcileEndpontsForNode(node *corev1.Node) (bool, err
 		if pod.DeletionTimestamp != nil || pod.Spec.NodeName != node.Name {
 			continue
 		}
-		for _, c := range pod.Spec.Containers {
-			found := false
-			for _, p := range c.Ports {
-				if p.HostPort != 0 {
-					pEps, err := convertHostPortToEndpoint(pod)
-					if err != nil {
-						return false, err
-					}
-					if len(pEps) == 0 {
-						continue
-					}
-					newPublicEps = append(newPublicEps, pEps...)
-					found = true
-					break
-				}
-			}
-			if found {
-				break
-			}
+
+		pEps, err := convertHostPortToEndpoint(pod)
+		if err != nil {
+			return false, err
 		}
+		newPublicEps = append(newPublicEps, pEps...)
 	}
 
 	// 1. update node with endpoints
