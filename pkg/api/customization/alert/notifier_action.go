@@ -52,7 +52,10 @@ func (h *Handler) testNotifier(actionName string, action *types.Action, apiConte
 	msg := ""
 	msgInf, exist := actionInput["message"]
 	if exist {
-		msg = msgInf.(string)
+		message, ok := msgInf.(string)
+		if ok {
+			msg = message
+		}
 	}
 
 	if apiContext.ID != "" {
@@ -65,7 +68,7 @@ func (h *Handler) testNotifier(actionName string, action *types.Action, apiConte
 		}
 
 		if notifier.Spec.SlackConfig != nil {
-			return testSlack(notifier.Spec.SlackConfig.URL, msg)
+			return testSlack(notifier.Spec.SlackConfig.URL, notifier.Spec.SlackConfig.DefaultRecipient, msg)
 		}
 
 		if notifier.Spec.SMTPConfig != nil {
@@ -88,7 +91,8 @@ func (h *Handler) testNotifier(actionName string, action *types.Action, apiConte
 			slackConfig := convert.ToMapInterface(slackConfigInterface)
 			url, ok := slackConfig["url"].(string)
 			if ok {
-				return testSlack(url, msg)
+				channel := slackConfig["defaultRecipient"].(string)
+				return testSlack(url, channel, msg)
 			}
 		}
 
@@ -124,6 +128,7 @@ func (h *Handler) testNotifier(actionName string, action *types.Action, apiConte
 			}
 		}
 
+		return httperror.NewAPIError(httperror.ErrorCode{Status: 400}, "Notifier not configured")
 	}
 
 	return nil
@@ -204,15 +209,17 @@ func testWebhook(url, msg string) error {
 	return nil
 }
 
-func testSlack(url, msg string) error {
+func testSlack(url, channel, msg string) error {
 	if msg == "" {
 		msg = "test slack webhook"
 	}
 	req := struct {
-		Text string `json:"text"`
+		Text    string `json:"text"`
+		Channel string `json:"channel"`
 	}{}
 
 	req.Text = msg
+	req.Channel = channel
 
 	data, err := json.Marshal(req)
 	if err != nil {
