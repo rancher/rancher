@@ -478,6 +478,9 @@ func (p *Provisioner) reconcileRKENodes(clusterName string) ([]v3.RKEConfigNode,
 		if len(node.Role) == 0 {
 			node.Role = []string{"worker"}
 		}
+		if node.Port == "" {
+			node.Port = "22"
+		}
 		if node.NodeName == "" {
 			node.NodeName = fmt.Sprintf("%s:%s", machine.Namespace, machine.Name)
 		}

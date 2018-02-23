@@ -31,6 +31,10 @@ func (f *Factory) sshLocalDialer(machine *v3.Node) (dialer.Dialer, error) {
 		RKEConfigNode: *machine.Status.NodeConfig,
 	}
 
+	if host.Port == "" {
+		host.Port = "22"
+	}
+
 	sshFactory, err := hosts.LocalConnFactory(host)
 	if err != nil {
 		return nil, err
