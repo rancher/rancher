@@ -29,6 +29,7 @@ const (
 	StatefulSetFieldPriority                      = "priority"
 	StatefulSetFieldPriorityClassName             = "priorityClassName"
 	StatefulSetFieldProjectID                     = "projectId"
+	StatefulSetFieldPublicEndpoints               = "publicEndpoints"
 	StatefulSetFieldRemoved                       = "removed"
 	StatefulSetFieldRestartPolicy                 = "restartPolicy"
 	StatefulSetFieldRunAsNonRoot                  = "runAsNonRoot"
@@ -75,6 +76,7 @@ type StatefulSet struct {
 	Priority                      *int64                 `json:"priority,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty"`
 	ProjectID                     string                 `json:"projectId,omitempty"`
+	PublicEndpoints               []PublicEndpoint       `json:"publicEndpoints,omitempty"`
 	Removed                       string                 `json:"removed,omitempty"`
 	RestartPolicy                 string                 `json:"restartPolicy,omitempty"`
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty"`

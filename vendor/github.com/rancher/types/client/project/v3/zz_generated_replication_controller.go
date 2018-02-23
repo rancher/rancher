@@ -29,6 +29,7 @@ const (
 	ReplicationControllerFieldPriority                      = "priority"
 	ReplicationControllerFieldPriorityClassName             = "priorityClassName"
 	ReplicationControllerFieldProjectID                     = "projectId"
+	ReplicationControllerFieldPublicEndpoints               = "publicEndpoints"
 	ReplicationControllerFieldRemoved                       = "removed"
 	ReplicationControllerFieldReplicationController         = "replicationController"
 	ReplicationControllerFieldReplicationControllerStatus   = "replicationControllerStatus"
@@ -75,6 +76,7 @@ type ReplicationController struct {
 	Priority                      *int64                       `json:"priority,omitempty"`
 	PriorityClassName             string                       `json:"priorityClassName,omitempty"`
 	ProjectID                     string                       `json:"projectId,omitempty"`
+	PublicEndpoints               []PublicEndpoint             `json:"publicEndpoints,omitempty"`
 	Removed                       string                       `json:"removed,omitempty"`
 	ReplicationController         *ReplicationControllerConfig `json:"replicationController,omitempty"`
 	ReplicationControllerStatus   *ReplicationControllerStatus `json:"replicationControllerStatus,omitempty"`
