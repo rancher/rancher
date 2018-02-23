@@ -13,31 +13,39 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/config/dialer"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/tools/cache"
 )
 
-func NewFactory(apiContext *config.ScaledContext, tunneler *remotedialer.Server) (dialer.Factory, error) {
-	if tunneler == nil {
-		tunneler = tunnelserver.NewTunnelServer(apiContext)
-	}
+func NewFactory(apiContext *config.ScaledContext) (dialer.Factory, error) {
+	authorizer := tunnelserver.NewAuthorizer(apiContext)
+	tunneler := tunnelserver.NewTunnelServer(apiContext, authorizer)
 
 	secretStore, err := nodeconfig.NewStore(apiContext.Core.Namespaces(""), apiContext.K8sClient.CoreV1())
 	if err != nil {
 		return nil, err
 	}
 
+	apiContext.Management.Nodes("local").Controller().Informer().AddIndexers(cache.Indexers{
+		nodeAccessIndexer: nodeIndexer,
+	})
+
 	return &Factory{
-		clusterLister: apiContext.Management.Clusters("").Controller().Lister(),
-		nodeLister:    apiContext.Management.Nodes("").Controller().Lister(),
-		TunnelServer:  tunneler,
-		store:         secretStore,
+		clusterLister:       apiContext.Management.Clusters("").Controller().Lister(),
+		localNodeController: apiContext.Management.Nodes("local").Controller(),
+		nodeLister:          apiContext.Management.Nodes("").Controller().Lister(),
+		TunnelServer:        tunneler,
+		TunnelAuthorizer:    authorizer,
+		store:               secretStore,
 	}, nil
 }
 
 type Factory struct {
-	nodeLister    v3.NodeLister
-	clusterLister v3.ClusterLister
-	TunnelServer  *remotedialer.Server
-	store         *encryptedstore.GenericEncryptedStore
+	localNodeController v3.NodeController
+	nodeLister          v3.NodeLister
+	clusterLister       v3.ClusterLister
+	TunnelServer        *remotedialer.Server
+	TunnelAuthorizer    *tunnelserver.Authorizer
+	store               *encryptedstore.GenericEncryptedStore
 }
 
 func (f *Factory) ClusterDialer(clusterName string) (dialer.Dialer, error) {

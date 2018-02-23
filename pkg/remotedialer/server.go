@@ -65,6 +65,7 @@ func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	session := s.sessions.add(clientKey, wsConn)
 	defer s.sessions.remove(session)
 
+	// Don't need to associate req.Context() to the session, it will cancel otherwise
 	code, err := session.serve()
 	if err != nil {
 		// Hijacked so we can't write to the client

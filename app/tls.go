@@ -41,9 +41,7 @@ func ReadTLSConfig(config *Config) error {
 	}
 
 	lc.Mode = "https"
-	if config.HTTPOnly {
-		lc.Mode = "http"
-	} else if len(config.ACMEDomains) > 0 {
+	if len(config.ACMEDomains) > 0 {
 		lc.Mode = "acme"
 		lc.Domains = config.ACMEDomains
 	}

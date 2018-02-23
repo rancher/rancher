@@ -11,7 +11,7 @@ echo Running: go vet
 go vet ${PACKAGES}
 echo Running: golint
 for i in ${PACKAGES}; do
-    if [ -n "$(golint $i | grep -v 'should have comment.*or be unexported' | tee /dev/stderr)" ]; then
+    if [ -n "$(golint $i | grep -Ev 'hyperkube|should have comment.*or be unexported' | tee /dev/stderr)" ]; then
         failed=true
     fi
 done

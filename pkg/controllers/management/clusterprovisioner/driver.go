@@ -1,12 +1,13 @@
 package clusterprovisioner
 
 import (
+	"github.com/rancher/rancher/pkg/clusterprovisioninglogger"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func (p *Provisioner) driverCreate(cluster *v3.Cluster, spec v3.ClusterSpec) (api string, token string, cert string, err error) {
-	ctx, logger := p.getCtx(cluster, v3.ClusterConditionProvisioned)
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.EventLogger, cluster, v3.ClusterConditionProvisioned)
 	defer logger.Close()
 
 	if newCluster, err := p.Clusters.Update(cluster); err == nil {
@@ -17,7 +18,7 @@ func (p *Provisioner) driverCreate(cluster *v3.Cluster, spec v3.ClusterSpec) (ap
 }
 
 func (p *Provisioner) driverUpdate(cluster *v3.Cluster, spec v3.ClusterSpec) (api string, token string, cert string, err error) {
-	ctx, logger := p.getCtx(cluster, v3.ClusterConditionUpdated)
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.EventLogger, cluster, v3.ClusterConditionProvisioned)
 	defer logger.Close()
 
 	if newCluster, err := p.Clusters.Update(cluster); err == nil {
@@ -28,7 +29,7 @@ func (p *Provisioner) driverUpdate(cluster *v3.Cluster, spec v3.ClusterSpec) (ap
 }
 
 func (p *Provisioner) driverRemove(cluster *v3.Cluster) error {
-	ctx, logger := p.getCtx(cluster, v3.ClusterConditionRemoved)
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.EventLogger, cluster, v3.ClusterConditionProvisioned)
 	defer logger.Close()
 
 	_, err := v3.ClusterConditionUpdated.Do(cluster, func() (runtime.Object, error) {

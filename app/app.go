@@ -2,33 +2,28 @@ package app
 
 import (
 	"context"
-	"fmt"
-	"time"
 
 	"github.com/rancher/norman/leader"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	managementController "github.com/rancher/rancher/pkg/controllers/management"
 	"github.com/rancher/rancher/pkg/dialer"
-	"github.com/rancher/rancher/pkg/tunnelserver"
+	"github.com/rancher/rancher/pkg/k8scheck"
 	"github.com/rancher/rancher/server"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
-	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/rest"
 )
 
 type Config struct {
-	HTTPOnly          bool
-	ACMEDomains       []string
-	KubeConfig        string
-	HTTPListenPort    int
-	HTTPSListenPort   int
-	InteralListenPort int
-	K8sMode           string
-	AddLocal          bool
-	Debug             bool
-	ListenConfig      *v3.ListenConfig
+	ACMEDomains     []string
+	AddLocal        bool
+	KubeConfig      string
+	HTTPListenPort  int
+	HTTPSListenPort int
+	K8sMode         string
+	Debug           bool
+	ListenConfig    *v3.ListenConfig
 }
 
 var defaultAdminLabel = map[string]string{"authz.management.cattle.io/bootstrapping": "admin-user"}
@@ -53,21 +48,11 @@ func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config
 		return nil, err
 	}
 
-	for {
-		_, err := scaledContext.K8sClient.Discovery().ServerVersion()
-		if err == nil {
-			break
-		}
-		logrus.Infof("Waiting for server to become available: %v", err)
-		select {
-		case <-ctx.Done():
-			return nil, fmt.Errorf("startup canceled")
-		case <-time.After(2 * time.Second):
-		}
+	if err := k8scheck.Wait(ctx, kubeConfig); err != nil {
+		return nil, err
 	}
 
-	tunnelServer := tunnelserver.NewTunnelServer(scaledContext)
-	dialerFactory, err := dialer.NewFactory(scaledContext, tunnelServer)
+	dialerFactory, err := dialer.NewFactory(scaledContext)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +111,12 @@ func addData(management *config.ManagementContext, cfg Config) error {
 		return err
 	}
 
-	if err := addRoles(management, cfg.AddLocal); err != nil {
+	adminName, err := addRoles(management)
+	if err != nil {
+		return err
+	}
+
+	if err := addClusters(cfg.AddLocal, adminName, management); err != nil {
 		return err
 	}
 

@@ -36,9 +36,7 @@ func main() {
 		os.Setenv("PATH", newPath)
 	}
 
-	config := app.Config{
-		InteralListenPort: 8081,
-	}
+	var config app.Config
 
 	app := cli.NewApp()
 	app.Version = VERSION
@@ -50,14 +48,14 @@ func main() {
 			Destination: &config.KubeConfig,
 		},
 		cli.BoolFlag{
-			Name:        "add-local",
-			Usage:       "Add local cluster to management server",
-			Destination: &config.AddLocal,
-		},
-		cli.BoolFlag{
 			Name:        "debug",
 			Usage:       "Enable debug logs",
 			Destination: &config.Debug,
+		},
+		cli.BoolFlag{
+			Name:        "add-local",
+			Usage:       "Add local cluster",
+			Destination: &config.AddLocal,
 		},
 		cli.IntFlag{
 			Name:        "http-listen-port",
@@ -73,23 +71,24 @@ func main() {
 		},
 		cli.StringFlag{
 			Name:        "k8s-mode",
-			Usage:       "Mode to run or access k8s API server for management API (internal, exec)",
-			Value:       "internal",
+			Usage:       "Mode to run or access k8s API server for management API (embedded, external, auto)",
+			Value:       "auto",
 			Destination: &config.K8sMode,
+		},
+		cli.StringFlag{
+			Name:  "log-format",
+			Usage: "Log formatter used (json, text, simple)",
+			Value: "simple",
 		},
 		cli.StringSliceFlag{
 			Name:  "acme-domain",
 			Usage: "Domain to register with LetsEncrypt",
 		},
-		cli.BoolFlag{
-			Name:        "http-only",
-			Usage:       "Disable HTTPS",
-			Destination: &config.HTTPOnly,
-		},
 	}
 
 	app.Action = func(c *cli.Context) error {
 		config.ACMEDomains = c.GlobalStringSlice("acme-domain")
+		initLogs(c, config)
 		return run(config)
 	}
 
@@ -100,21 +99,31 @@ func main() {
 	app.Run(os.Args)
 }
 
-func run(cfg app.Config) error {
+func initLogs(c *cli.Context, cfg app.Config) {
 	if cfg.Debug {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 
+	switch c.String("log-format") {
+	//case "simple":
+	//	logrus.SetFormatter(&simplelog.StandardFormatter{})
+	case "text":
+		logrus.SetFormatter(&logrus.TextFormatter{})
+	case "json":
+		logrus.SetFormatter(&logrus.JSONFormatter{})
+	}
+	logrus.SetOutput(os.Stdout)
+	//server.StartServerWithDefaults()
+}
+
+func run(cfg app.Config) error {
 	dump.GoroutineDumpOn(syscall.SIGUSR1, syscall.SIGILL)
 	ctx := signal.SigTermCancelContext(context.Background())
 
-	os.Args = []string{os.Args[0]}
-	kubeConfig, local, err := k8s.GetConfig(ctx, cfg.K8sMode, cfg.AddLocal, cfg.KubeConfig, cfg.InteralListenPort)
+	ctx, kubeConfig, err := k8s.GetConfig(ctx, cfg.K8sMode, cfg.KubeConfig)
 	if err != nil {
 		return err
 	}
-
-	cfg.AddLocal = local
 
 	return app.Run(ctx, *kubeConfig, &cfg)
 }

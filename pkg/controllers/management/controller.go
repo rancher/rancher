@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/catalog"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterevents"
 	"github.com/rancher/rancher/pkg/controllers/management/clustergc"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterlocal"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstats"
 	"github.com/rancher/rancher/pkg/controllers/management/node"
@@ -21,14 +22,18 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	// auth handlers need to run early to create namespaces that back clusters and projects
 	// also, these handlers are purely in the mgmt plane, so they are lightweight compared to those that interact with machines and clusters
 	auth.RegisterEarly(ctx, management)
+
+	// a-z
 	catalog.Register(ctx, management)
-	clusterstats.Register(management)
 	clusterevents.Register(ctx, management)
-	clusterprovisioner.Register(management)
-	auth.RegisterLate(ctx, management)
 	clustergc.Register(management)
-	node.Register(management)
+	clusterlocal.Register(management)
+	clusterprovisioner.Register(management)
+	clusterstats.Register(management)
 	nodedriver.Register(management)
 	nodepool.Register(management)
+	node.Register(management)
 	usercontrollers.Register(ctx, management, manager)
+
+	auth.RegisterLate(ctx, management)
 }

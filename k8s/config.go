@@ -1,41 +1,46 @@
-// +build k8s
-
 package k8s
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/rancher/rancher/k8s/service"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-func GetConfig(ctx context.Context, k8sMode string, addLocal bool, kubeConfig string, internalAPIPort int) (*rest.Config, bool, error) {
-	if kubeConfig == "" {
-		if config, err := rest.InClusterConfig(); err == nil {
-			return config, true, nil
-		}
-		switch k8sMode {
-		case "internal":
-			return runServices(ctx, true, internalAPIPort), addLocal, nil
-		case "exec":
-			return runServices(ctx, false, internalAPIPort), addLocal, nil
-		default:
-			return nil, false, fmt.Errorf("invalid k8s-mode: %s", k8sMode)
-		}
-	} else {
-		cfg, err := clientcmd.BuildConfigFromFlags("", kubeConfig)
-		return cfg, addLocal, err
+func GetConfig(ctx context.Context, k8sMode string, kubeConfig string) (context.Context, *rest.Config, error) {
+	var (
+		cfg *rest.Config
+		err error
+	)
+
+	switch k8sMode {
+	case "auto":
+		return getAuto(ctx, kubeConfig)
+	case "embedded":
+		return getEmbedded(ctx)
+	case "external":
+		cfg, err = getExternal(kubeConfig)
+	default:
+		return nil, nil, fmt.Errorf("invalid k8s-mode %s", k8sMode)
 	}
 
+	return ctx, cfg, err
 }
 
-func runServices(ctx context.Context, internal bool, internalAPIPort int) *rest.Config {
-	go service.Service(ctx, internal, "etcd")
-	go service.Service(ctx, internal, "api-server")
-
-	return &rest.Config{
-		Host: fmt.Sprintf("http://localhost:%d", internalAPIPort),
+func getAuto(ctx context.Context, kubeConfig string) (context.Context, *rest.Config, error) {
+	if kubeConfig != "" {
+		cfg, err := getExternal(kubeConfig)
+		return ctx, cfg, err
 	}
+
+	if config, err := rest.InClusterConfig(); err == nil {
+		return ctx, config, nil
+	}
+
+	return getEmbedded(ctx)
+}
+
+func getExternal(kubeConfig string) (*rest.Config, error) {
+	return clientcmd.BuildConfigFromFlags("", kubeConfig)
 }

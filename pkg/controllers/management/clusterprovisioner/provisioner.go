@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/configfield"
 	"github.com/rancher/rancher/pkg/controllers/management/nodepool"
 	"github.com/rancher/rancher/pkg/encryptedstore"
+	"github.com/rancher/rancher/pkg/rkedialerfactory"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -64,10 +65,10 @@ func Register(management *config.ManagementContext) {
 	p.Clusters.AddLifecycle("cluster-provisioner-controller", p)
 	management.Management.Nodes("").AddHandler("cluster-provisioner-controller", p.machineChanged)
 
-	local := &RKEDialerFactory{
+	local := &rkedialerfactory.RKEDialerFactory{
 		Factory: management.Dialer,
 	}
-	docker := &RKEDialerFactory{
+	docker := &rkedialerfactory.RKEDialerFactory{
 		Factory: management.Dialer,
 		Docker:  true,
 	}
@@ -291,7 +292,7 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 }
 
 func skipProvisioning(cluster *v3.Cluster) bool {
-	return cluster.Spec.Internal || cluster.Status.Driver == v3.ClusterDriverImported
+	return cluster.Status.Driver == v3.ClusterDriverLocal || cluster.Status.Driver == v3.ClusterDriverImported
 }
 
 func (p *Provisioner) getConfig(reconcileRKE bool, spec v3.ClusterSpec, driverName, clusterName string) (*v3.ClusterSpec, interface{}, error) {
@@ -498,4 +499,22 @@ func (p *Provisioner) reconcileRKENodes(clusterName string) ([]v3.RKEConfigNode,
 	})
 
 	return nodes, nil
+}
+
+func (p *Provisioner) recordFailure(cluster *v3.Cluster, spec v3.ClusterSpec, err error) (*v3.Cluster, error) {
+	if err == nil {
+		p.backoff.DeleteEntry(cluster.Name)
+		if cluster.Status.FailedSpec == nil {
+			return cluster, nil
+		}
+
+		cluster.Status.FailedSpec = nil
+		return p.Clusters.Update(cluster)
+	}
+
+	p.backoff.Next(cluster.Name, time.Now())
+	cluster.Status.FailedSpec = &spec
+	newCluster, _ := p.Clusters.Update(cluster)
+	// mask the error
+	return newCluster, nil
 }

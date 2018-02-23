@@ -28,7 +28,6 @@ import (
 
 const (
 	httpsMode = "https"
-	httpMode  = "http"
 	acmeMode  = "acme"
 )
 
@@ -236,10 +235,6 @@ func (s *server) reload(config *v3.ListenConfig) error {
 		if err := s.serveACME(config); err != nil {
 			return err
 		}
-	case httpMode:
-		if err := s.serveHTTP(config); err != nil {
-			return err
-		}
 	case httpsMode:
 		if err := s.serveHTTPS(config); err != nil {
 			return err
@@ -416,19 +411,6 @@ func manglePort(hostport string) string {
 	portInt = ((portInt / 1000) * 1000) + 443
 
 	return net.JoinHostPort(host, strconv.Itoa(portInt))
-}
-
-func (s *server) serveHTTP(config *v3.ListenConfig) error {
-	listener, err := s.newListener(s.httpPort, nil)
-	if err != nil {
-		return err
-	}
-	server := &http.Server{
-		Handler: s.Handler(),
-	}
-	s.servers = append(s.servers, server)
-	s.startServer(listener, server)
-	return nil
 }
 
 func (s *server) startServer(listener net.Listener, server *http.Server) {

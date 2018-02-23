@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/clusterrouter/proxy"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config/dialer"
+	"k8s.io/client-go/rest"
 )
 
 type factory struct {
@@ -16,13 +17,15 @@ type factory struct {
 	clusters      sync.Map
 	serverLock    *locker.Locker
 	servers       sync.Map
+	localConfig   *rest.Config
 }
 
-func newFactory(dialer dialer.Factory, lookup ClusterLookup) *factory {
+func newFactory(localConfig *rest.Config, dialer dialer.Factory, lookup ClusterLookup) *factory {
 	return &factory{
 		dialerFactory: dialer,
 		serverLock:    locker.New(),
 		clusterLookup: lookup,
+		localConfig:   localConfig,
 	}
 }
 
@@ -68,5 +71,5 @@ func (s *factory) get(req *http.Request) (*v3.Cluster, http.Handler, error) {
 }
 
 func (s *factory) newServer(c *v3.Cluster) (server, error) {
-	return proxy.New(c, s.dialerFactory)
+	return proxy.New(s.localConfig, c, s.dialerFactory)
 }

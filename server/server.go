@@ -5,20 +5,24 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	k8sProxy "github.com/rancher/rancher/k8s/proxy"
 	"github.com/rancher/rancher/pkg/api/customization/clusteregistrationtokens"
 	managementapi "github.com/rancher/rancher/pkg/api/server"
 	"github.com/rancher/rancher/pkg/auth/providers/publicapi"
 	authrequests "github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/hooks"
-	"github.com/rancher/rancher/pkg/dialer"
+	rancherdialer "github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/dynamiclistener"
 	"github.com/rancher/rancher/pkg/httpproxy"
+	k8sProxy "github.com/rancher/rancher/pkg/k8sproxy"
+	"github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/rancher/server/capabilities"
 	"github.com/rancher/rancher/server/ui"
 	managementSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/config/dialer"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 )
 
 var (
@@ -51,29 +55,35 @@ func Start(ctx context.Context, httpPort, httpsPort int, apiContext *config.Scal
 		return err
 	}
 
+	root := mux.NewRouter()
+
+	app.DefaultProxyDialer = utilnet.DialFunc(apiContext.Dialer.LocalClusterDialer())
+
+	localClusterAuth := k8sProxy.NewLocalProxy(apiContext, apiContext.Dialer, root)
+
 	k8sProxy := k8sProxy.New(apiContext, apiContext.Dialer)
 
-	authedAPIs := newAuthed(tokenAPI, managementAPI, k8sProxy)
+	rawAuthedAPIs := newAuthed(tokenAPI, managementAPI, k8sProxy)
 
-	authedHandler, err := authrequests.NewAuthenticationFilter(ctx, apiContext, authedAPIs)
+	authedHandler, err := authrequests.NewAuthenticationFilter(ctx, apiContext, rawAuthedAPIs)
 	if err != nil {
 		return err
 	}
 
 	webhookHandler := hooks.New(apiContext)
 
-	root := mux.NewRouter()
+	connectHandler, connectConfigHandler := connectHandlers(apiContext.Dialer)
+
 	root.Handle("/", ui.UI(managementAPI))
-	root.Handle("/v3/settings/cacerts", authedAPIs).Methods(http.MethodGet)
 	root.PathPrefix("/v3-public").Handler(publicAPI)
 	root.Handle("/v3/import/{token}.yaml", http.HandlerFunc(clusteregistrationtokens.ClusterImportHandler))
-	if f, ok := apiContext.Dialer.(*dialer.Factory); ok {
-		root.PathPrefix("/v3/connect").Handler(f.TunnelServer)
-	}
+	root.Handle("/v3/connect", connectHandler)
+	root.Handle("/v3/connect/config", connectConfigHandler)
+	root.Handle("/v3/settings/cacerts", rawAuthedAPIs).Methods(http.MethodGet)
 	root.PathPrefix("/v3").Handler(authedHandler)
-	root.PathPrefix("/meta").Handler(authedHandler)
-	root.PathPrefix("/k8s/clusters/").Handler(authedHandler)
 	root.PathPrefix("/hooks").Handler(webhookHandler)
+	root.PathPrefix("/k8s/clusters/").Handler(authedHandler)
+	root.PathPrefix("/meta").Handler(authedHandler)
 	root.NotFoundHandler = ui.UI(http.NotFoundHandler())
 
 	// UI
@@ -87,7 +97,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, apiContext *config.Scal
 
 	registerHealth(root)
 
-	dynamiclistener.Start(ctx, apiContext, httpPort, httpsPort, root)
+	dynamiclistener.Start(ctx, apiContext, httpPort, httpsPort, localClusterAuth)
 	return nil
 }
 
@@ -104,6 +114,14 @@ func newAuthed(tokenAPI http.Handler, managementAPI http.Handler, k8sproxy http.
 	authed.PathPrefix(managementSchema.Version.Path).Handler(managementAPI)
 
 	return authed
+}
+
+func connectHandlers(dialer dialer.Factory) (http.Handler, http.Handler) {
+	if f, ok := dialer.(*rancherdialer.Factory); ok {
+		return f.TunnelServer, rkenodeconfigserver.Handler(f.TunnelAuthorizer)
+	}
+
+	return http.NotFoundHandler(), http.NotFoundHandler()
 }
 
 func newProxy() http.Handler {
