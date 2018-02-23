@@ -49,6 +49,7 @@ func formatData(data map[string]interface{}, forFrontend bool) {
 	}
 
 	setState(data, newState)
+
 }
 func updateRule(target map[string]interface{}, hostpath string, forFrontend bool, data map[string]interface{}, oldState map[string]string, newState map[string]string) {
 	targetData := convert.ToMapInterface(target)
@@ -57,12 +58,11 @@ func updateRule(target map[string]interface{}, hostpath string, forFrontend bool
 	stateKey := getStateKey(hostpath, convert.ToString(port))
 	if forFrontend {
 		isService := true
-		for oldServiceKey, oldServiceValue := range oldState {
-			if oldServiceKey == stateKey {
-				targetData["workloadIds"] = strings.Split(oldServiceValue, "/")
-				isService = false
-			}
+		if serviceValue, ok := oldState[stateKey]; ok && !convert.IsEmpty(serviceValue) {
+			targetData["workloadIds"] = strings.Split(serviceValue, "/")
+			isService = false
 		}
+
 		if isService {
 			targetData["serviceId"] = fmt.Sprintf("%s/%s", data["namespaceId"].(string), serviceID)
 		} else {
