@@ -1,7 +1,6 @@
 package workload
 
 import (
-	"reflect"
 	"strconv"
 	"strings"
 
@@ -14,12 +13,33 @@ import (
 	"github.com/rancher/types/apis/batch/v1beta1"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/config"
-	"github.com/sirupsen/logrus"
+	corev1beta2 "k8s.io/api/apps/v1beta2"
+	corebatchv1 "k8s.io/api/batch/v1"
+	corebatchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+)
+
+const (
+	AppVersion                = "apps/v1beta2"
+	BatchBetaVersion          = "batch/v1beta1"
+	BatchVersion              = "batch/v1"
+	WorkloadAnnotation        = "field.cattle.io/targetWorkloadIds"
+	PortsAnnotation           = "field.cattle.io/ports"
+	ClusterIPServiceType      = "ClusterIP"
+	WorkloadLabel             = "workload.user.cattle.io/workload"
+	AllWorkloads              = "_all_workloads_"
+	DeploymentType            = "deployment"
+	ReplicationControllerType = "replicationcontroller"
+	ReplicaSetType            = "replicaset"
+	DaemonSetType             = "daemonset"
+	StatefulSetType           = "statefulset"
+	JobType                   = "job"
+	CronJobType               = "cronJob"
 )
 
 var WorkloadKinds = map[string]bool{
@@ -32,16 +52,6 @@ var WorkloadKinds = map[string]bool{
 	"CronJob":               true,
 }
 
-const (
-	AppVersion           = "apps/v1beta2"
-	BatchBetaVersion     = "batch/v1beta1"
-	BatchVersion         = "batch/v1"
-	WorkloadAnnotation   = "field.cattle.io/targetWorkloadIds"
-	PortsAnnotation      = "field.cattle.io/ports"
-	ClusterIPServiceType = "ClusterIP"
-	WorkloadLabel        = "workload.user.cattle.io/workload"
-)
-
 type Workload struct {
 	Name            string
 	Namespace       string
@@ -52,9 +62,11 @@ type Workload struct {
 	Kind            string
 	APIVersion      string
 	OwnerReferences []metav1.OwnerReference
+	Labels          map[string]string
+	Key             string
 }
 
-type WorkloadLister struct {
+type CommonController struct {
 	DeploymentLister            v1beta2.DeploymentLister
 	ReplicationControllerLister v1.ReplicationControllerLister
 	ReplicaSetLister            v1beta2.ReplicaSetLister
@@ -62,12 +74,18 @@ type WorkloadLister struct {
 	StatefulSetLister           v1beta2.StatefulSetLister
 	JobLister                   batchv1.JobLister
 	CronJobLister               v1beta1.CronJobLister
-	ServiceLister               v1.ServiceLister
-	Services                    v1.ServiceInterface
+	Deployments                 v1beta2.DeploymentInterface
+	ReplicationControllers      v1.ReplicationControllerInterface
+	ReplicaSes                  v1beta2.ReplicaSetInterface
+	DaemonSets                  v1beta2.DaemonSetInterface
+	StatefulSets                v1beta2.StatefulSetInterface
+	Jobs                        batchv1.JobInterface
+	CronJobs                    v1beta1.CronJobInterface
+	Sync                        func(key string, w *Workload) error
 }
 
-func NewWorkloadLister(workload *config.UserOnlyContext) WorkloadLister {
-	return WorkloadLister{
+func NewWorkloadController(workload *config.UserOnlyContext, f func(key string, w *Workload) error) CommonController {
+	c := CommonController{
 		DeploymentLister:            workload.Apps.Deployments("").Controller().Lister(),
 		ReplicationControllerLister: workload.Core.ReplicationControllers("").Controller().Lister(),
 		ReplicaSetLister:            workload.Apps.ReplicaSets("").Controller().Lister(),
@@ -75,12 +93,117 @@ func NewWorkloadLister(workload *config.UserOnlyContext) WorkloadLister {
 		StatefulSetLister:           workload.Apps.StatefulSets("").Controller().Lister(),
 		JobLister:                   workload.BatchV1.Jobs("").Controller().Lister(),
 		CronJobLister:               workload.BatchV1Beta1.CronJobs("").Controller().Lister(),
-		ServiceLister:               workload.Core.Services("").Controller().Lister(),
-		Services:                    workload.Core.Services(""),
+		Deployments:                 workload.Apps.Deployments(""),
+		ReplicationControllers:      workload.Core.ReplicationControllers(""),
+		ReplicaSes:                  workload.Apps.ReplicaSets(""),
+		DaemonSets:                  workload.Apps.DaemonSets(""),
+		StatefulSets:                workload.Apps.StatefulSets(""),
+		Jobs:                        workload.BatchV1.Jobs(""),
+		CronJobs:                    workload.BatchV1Beta1.CronJobs(""),
+		Sync:                        f,
 	}
+	if f != nil {
+		workload.Apps.Deployments("").AddHandler(getName(), c.syncDeployments)
+		workload.Core.ReplicationControllers("").AddHandler(getName(), c.syncReplicationControllers)
+		workload.Apps.ReplicaSets("").AddHandler(getName(), c.syncReplicaSet)
+		workload.Apps.DaemonSets("").AddHandler(getName(), c.syncDaemonSet)
+		workload.Apps.StatefulSets("").AddHandler(getName(), c.syncStatefulSet)
+		workload.BatchV1.Jobs("").AddHandler(getName(), c.syncJob)
+		workload.BatchV1Beta1.CronJobs("").AddHandler(getName(), c.syncCronJob)
+	}
+	return c
 }
 
-func (w WorkloadLister) GetByWorkloadId(key string) (*Workload, error) {
+func (c *CommonController) syncDeployments(key string, obj *corev1beta2.Deployment) error {
+	if obj == nil || obj.DeletionTimestamp != nil {
+		return nil
+	}
+	var w *Workload
+	var err error
+	if key != AllWorkloads {
+		w, err = c.getWorkload(key, DeploymentType)
+		if err != nil {
+			return err
+		}
+	}
+
+	return c.Sync(key, w)
+}
+
+func (c *CommonController) syncReplicationControllers(key string, obj *corev1.ReplicationController) error {
+	if obj == nil || obj.DeletionTimestamp != nil {
+		return nil
+	}
+	w, err := c.getWorkload(key, ReplicationControllerType)
+	if err != nil {
+		return err
+	}
+	return c.Sync(key, w)
+}
+
+func (c *CommonController) syncReplicaSet(key string, obj *corev1beta2.ReplicaSet) error {
+	if obj == nil || obj.DeletionTimestamp != nil {
+		return nil
+	}
+	w, err := c.getWorkload(key, ReplicaSetType)
+	if err != nil {
+		return err
+	}
+	return c.Sync(key, w)
+}
+
+func (c *CommonController) syncDaemonSet(key string, obj *corev1beta2.DaemonSet) error {
+	if obj == nil || obj.DeletionTimestamp != nil {
+		return nil
+	}
+	w, err := c.getWorkload(key, DaemonSetType)
+	if err != nil {
+		return err
+	}
+	return c.Sync(key, w)
+}
+
+func (c *CommonController) syncStatefulSet(key string, obj *corev1beta2.StatefulSet) error {
+	if obj == nil || obj.DeletionTimestamp != nil {
+		return nil
+	}
+	w, err := c.getWorkload(key, StatefulSetType)
+	if err != nil {
+		return err
+	}
+	return c.Sync(key, w)
+}
+
+func (c *CommonController) syncJob(key string, obj *corebatchv1.Job) error {
+	if obj == nil || obj.DeletionTimestamp != nil {
+		return nil
+	}
+	w, err := c.getWorkload(key, JobType)
+	if err != nil {
+		return err
+	}
+	return c.Sync(key, w)
+}
+
+func (c *CommonController) syncCronJob(key string, obj *corebatchv1beta1.CronJob) error {
+	if obj == nil || obj.DeletionTimestamp != nil {
+		return nil
+	}
+	w, err := c.getWorkload(key, CronJobType)
+	if err != nil {
+		return err
+	}
+	return c.Sync(key, w)
+}
+
+func (c CommonController) getWorkload(key string, objectType string) (*Workload, error) {
+	splitted := strings.Split(key, "/")
+	namespace := splitted[0]
+	name := splitted[1]
+	return c.GetByWorkloadID(getWorkloadID(objectType, namespace, name))
+}
+
+func (c CommonController) GetByWorkloadID(key string) (*Workload, error) {
 	splitted := strings.Split(key, ":")
 	if len(splitted) != 3 {
 		return nil, fmt.Errorf("workload name [%s] is invalid", key)
@@ -90,38 +213,38 @@ func (w WorkloadLister) GetByWorkloadId(key string) (*Workload, error) {
 	name := splitted[2]
 	var workload *Workload
 	switch workloadType {
-	case "replicationcontroller":
-		o, err := w.ReplicationControllerLister.Get(namespace, name)
+	case ReplicationControllerType:
+		o, err := c.ReplicationControllerLister.Get(namespace, name)
 		if err != nil || o.DeletionTimestamp != nil {
 			return nil, err
 		}
 		labelSelector := &metav1.LabelSelector{
 			MatchLabels: o.Spec.Selector,
 		}
-		workload = getWorkload(namespace, name, workloadType, AppVersion, o.UID, labelSelector, o.Annotations, o.Spec.Template, o.OwnerReferences)
-	case "replicaset":
-		o, err := w.ReplicaSetLister.Get(namespace, name)
+		workload = getWorkload(namespace, name, workloadType, AppVersion, o.UID, labelSelector, o.Annotations, o.Spec.Template, o.OwnerReferences, o.Labels)
+	case ReplicaSetType:
+		o, err := c.ReplicaSetLister.Get(namespace, name)
 		if err != nil || o.DeletionTimestamp != nil {
 			return nil, err
 		}
 
-		workload = getWorkload(namespace, name, workloadType, AppVersion, o.UID, o.Spec.Selector, o.Annotations, &o.Spec.Template, o.OwnerReferences)
-	case "daemonset":
-		o, err := w.DaemonSetLister.Get(namespace, name)
+		workload = getWorkload(namespace, name, workloadType, AppVersion, o.UID, o.Spec.Selector, o.Annotations, &o.Spec.Template, o.OwnerReferences, o.Labels)
+	case DaemonSetType:
+		o, err := c.DaemonSetLister.Get(namespace, name)
 		if err != nil || o.DeletionTimestamp != nil {
 			return nil, err
 		}
 
-		workload = getWorkload(namespace, name, workloadType, AppVersion, o.UID, o.Spec.Selector, o.Annotations, &o.Spec.Template, o.OwnerReferences)
-	case "statefulset":
-		o, err := w.StatefulSetLister.Get(namespace, name)
+		workload = getWorkload(namespace, name, workloadType, AppVersion, o.UID, o.Spec.Selector, o.Annotations, &o.Spec.Template, o.OwnerReferences, o.Labels)
+	case StatefulSetType:
+		o, err := c.StatefulSetLister.Get(namespace, name)
 		if err != nil || o.DeletionTimestamp != nil {
 			return nil, err
 		}
 
-		workload = getWorkload(namespace, name, workloadType, AppVersion, o.UID, o.Spec.Selector, o.Annotations, &o.Spec.Template, o.OwnerReferences)
-	case "job":
-		o, err := w.JobLister.Get(namespace, name)
+		workload = getWorkload(namespace, name, workloadType, AppVersion, o.UID, o.Spec.Selector, o.Annotations, &o.Spec.Template, o.OwnerReferences, o.Labels)
+	case JobType:
+		o, err := c.JobLister.Get(namespace, name)
 		if err != nil || o.DeletionTimestamp != nil {
 			return nil, err
 		}
@@ -132,9 +255,9 @@ func (w WorkloadLister) GetByWorkloadId(key string) (*Workload, error) {
 			}
 		}
 
-		workload = getWorkload(namespace, name, workloadType, BatchVersion, o.UID, labelSelector, o.Annotations, &o.Spec.Template, o.OwnerReferences)
-	case "cronjob":
-		o, err := w.CronJobLister.Get(namespace, name)
+		workload = getWorkload(namespace, name, workloadType, BatchVersion, o.UID, labelSelector, o.Annotations, &o.Spec.Template, o.OwnerReferences, o.Labels)
+	case CronJobType:
+		o, err := c.CronJobLister.Get(namespace, name)
 		if err != nil || o.DeletionTimestamp != nil {
 			return nil, err
 		}
@@ -145,19 +268,20 @@ func (w WorkloadLister) GetByWorkloadId(key string) (*Workload, error) {
 			}
 		}
 
-		workload = getWorkload(namespace, name, workloadType, BatchBetaVersion, o.UID, labelSelector, o.Annotations, &o.Spec.JobTemplate.Spec.Template, o.OwnerReferences)
+		workload = getWorkload(namespace, name, workloadType, BatchBetaVersion, o.UID, labelSelector, o.Annotations, &o.Spec.JobTemplate.Spec.Template, o.OwnerReferences, o.Labels)
 	default:
-		o, err := w.DeploymentLister.Get(namespace, name)
+		o, err := c.DeploymentLister.Get(namespace, name)
 		if err != nil || o.DeletionTimestamp != nil {
 			return nil, err
 		}
 
-		workload = getWorkload(namespace, name, "deployment", AppVersion, o.UID, o.Spec.Selector, o.Annotations, &o.Spec.Template, o.OwnerReferences)
+		workload = getWorkload(namespace, name, DeploymentType, AppVersion, o.UID, o.Spec.Selector, o.Annotations, &o.Spec.Template, o.OwnerReferences, o.Labels)
 	}
 	return workload, nil
 }
 
-func getWorkload(namespace string, name string, kind string, apiVersion string, UUID types.UID, selectorLabels *metav1.LabelSelector, annotations map[string]string, podTemplateSpec *corev1.PodTemplateSpec, ownerRefs []metav1.OwnerReference) *Workload {
+func getWorkload(namespace string, name string, kind string, apiVersion string, UUID types.UID, selectorLabels *metav1.LabelSelector,
+	annotations map[string]string, podTemplateSpec *corev1.PodTemplateSpec, ownerRefs []metav1.OwnerReference, labels map[string]string) *Workload {
 	return &Workload{
 		Name:            name,
 		Namespace:       namespace,
@@ -168,29 +292,142 @@ func getWorkload(namespace string, name string, kind string, apiVersion string, 
 		OwnerReferences: ownerRefs,
 		Kind:            kind,
 		APIVersion:      apiVersion,
+		Labels:          labels,
+		Key:             fmt.Sprintf("%s/%s", namespace, name),
 	}
 }
 
-func (w WorkloadLister) GetBySelectorMatch(namespace string, selectorLabels map[string]string) ([]*Workload, error) {
-	var allWorkloads []*Workload
+func (c CommonController) GetAllWorkloads(namespace string) ([]*Workload, error) {
 	var workloads []*Workload
 
-	//TODO - do for other types
-	deployments, err := w.DeploymentLister.List(namespace, labels.NewSelector())
+	// deployments
+	ds, err := c.DeploymentLister.List(namespace, labels.NewSelector())
 	if err != nil {
 		return workloads, err
 	}
 
-	for _, d := range deployments {
-		workload, err := w.GetByWorkloadId(GetWorkloadID("deployment", d.Namespace, d.Name))
+	for _, o := range ds {
+		workload, err := c.GetByWorkloadID(getWorkloadID(DeploymentType, o.Namespace, o.Name))
 		if err != nil {
 			return workloads, err
 		}
-		allWorkloads = append(allWorkloads, workload)
+		workloads = append(workloads, workload)
 	}
+
+	// replication controllers
+	rcs, err := c.ReplicationControllerLister.List(namespace, labels.NewSelector())
+	if err != nil {
+		return workloads, err
+	}
+
+	for _, o := range rcs {
+		workload, err := c.GetByWorkloadID(getWorkloadID(ReplicationControllerType, o.Namespace, o.Name))
+		if err != nil {
+			return workloads, err
+		}
+		workloads = append(workloads, workload)
+	}
+
+	// replica sets
+	rss, err := c.ReplicaSetLister.List(namespace, labels.NewSelector())
+	if err != nil {
+		return workloads, err
+	}
+
+	for _, o := range rss {
+		workload, err := c.GetByWorkloadID(getWorkloadID(ReplicaSetType, o.Namespace, o.Name))
+		if err != nil {
+			return workloads, err
+		}
+		workloads = append(workloads, workload)
+	}
+
+	// daemon sets
+	dss, err := c.DaemonSetLister.List(namespace, labels.NewSelector())
+	if err != nil {
+		return workloads, err
+	}
+
+	for _, o := range dss {
+		workload, err := c.GetByWorkloadID(getWorkloadID(DaemonSetType, o.Namespace, o.Name))
+		if err != nil {
+			return workloads, err
+		}
+		workloads = append(workloads, workload)
+	}
+
+	// stateful sets
+	sts, err := c.StatefulSetLister.List(namespace, labels.NewSelector())
+	if err != nil {
+		return workloads, err
+	}
+
+	for _, o := range sts {
+		workload, err := c.GetByWorkloadID(getWorkloadID(StatefulSetType, o.Namespace, o.Name))
+		if err != nil {
+			return workloads, err
+		}
+		workloads = append(workloads, workload)
+	}
+
+	// jobs
+	jobs, err := c.JobLister.List(namespace, labels.NewSelector())
+	if err != nil {
+		return workloads, err
+	}
+
+	for _, o := range jobs {
+		workload, err := c.GetByWorkloadID(getWorkloadID(JobType, o.Namespace, o.Name))
+		if err != nil {
+			return workloads, err
+		}
+		workloads = append(workloads, workload)
+	}
+
+	// cron jobs
+	cronJobs, err := c.CronJobLister.List(namespace, labels.NewSelector())
+	if err != nil {
+		return workloads, err
+	}
+
+	for _, o := range cronJobs {
+		workload, err := c.GetByWorkloadID(getWorkloadID(CronJobType, o.Namespace, o.Name))
+		if err != nil {
+			return workloads, err
+		}
+		workloads = append(workloads, workload)
+	}
+
+	return workloads, nil
+}
+
+func (c CommonController) GetWorkloadsMatchingLabels(namespace string, targetLabels map[string]string) ([]*Workload, error) {
+	var workloads []*Workload
+	allWorkloads, err := c.GetAllWorkloads(namespace)
+	if err != nil {
+		return workloads, err
+	}
+
 	for _, workload := range allWorkloads {
 		workloadSelector := labels.SelectorFromSet(workload.SelectorLabels)
-		if workloadSelector.Matches(labels.Set(selectorLabels)) {
+		if workloadSelector.Matches(labels.Set(targetLabels)) {
+			workloads = append(workloads, workload)
+		}
+	}
+
+	return workloads, nil
+}
+
+func (c CommonController) GetWorkloadsMatchingSelector(namespace string, selectorLabels map[string]string) ([]*Workload, error) {
+	var workloads []*Workload
+	allWorkloads, err := c.GetAllWorkloads(namespace)
+	if err != nil {
+		return workloads, err
+	}
+
+	selector := labels.SelectorFromSet(selectorLabels)
+	for _, workload := range allWorkloads {
+		if selector.Matches(labels.Set(workload.Labels)) {
 			workloads = append(workloads, workload)
 		}
 	}
@@ -207,29 +444,6 @@ func getSelectorLables(s *metav1.LabelSelector) map[string]string {
 		selectorLabels[key] = value
 	}
 	return selectorLabels
-}
-
-func (w WorkloadLister) serviceExistsForWorkload(workload *Workload, service *Service) (bool, error) {
-	labels := fmt.Sprintf("%s=%s", WorkloadLabel, workload.Namespace)
-	services, err := w.Services.List(metav1.ListOptions{LabelSelector: labels})
-	if err != nil {
-		return false, err
-	}
-
-	for _, s := range services.Items {
-		if s.DeletionTimestamp != nil {
-			continue
-		}
-		if s.Spec.Type != service.Type {
-			continue
-		}
-		for _, ref := range s.OwnerReferences {
-			if reflect.DeepEqual(ref.UID, workload.UUID) {
-				return true, nil
-			}
-		}
-	}
-	return false, nil
 }
 
 type Service struct {
@@ -312,82 +526,145 @@ func generateServicesFromPortsAnnotation(portAnnotation string) ([]Service, erro
 	return services, nil
 }
 
-func (w *WorkloadLister) CreateServiceForWorkload(workload *Workload) error {
-	// do not create if object is "owned" by other workload
-	for _, o := range workload.OwnerReferences {
-		if ok := WorkloadKinds[o.Kind]; ok {
-			return nil
-		}
-	}
-
-	services := map[corev1.ServiceType]Service{}
-	if val, ok := workload.TemplateSpec.Annotations[PortsAnnotation]; ok {
-		svcs, err := generateServicesFromPortsAnnotation(val)
-		if err != nil {
-			return err
-		}
-		for _, service := range svcs {
-			services[service.Type] = service
-		}
-	} else {
-		service := generateServiceFromContainers(workload)
-		services[service.Type] = *service
-	}
-	controller := true
-	ownerRef := metav1.OwnerReference{
-		Name:       workload.Name,
-		APIVersion: workload.APIVersion,
-		UID:        workload.UUID,
-		Kind:       workload.Kind,
-		Controller: &controller,
-	}
-	serviceAnnotations := map[string]string{}
-	serviceAnnotations[WorkloadAnnotation] = workload.getKey()
-	serviceLabels := map[string]string{}
-	serviceLabels[WorkloadLabel] = workload.Namespace
-
-	for kind, toCreate := range services {
-		exists, err := w.serviceExistsForWorkload(workload, &toCreate)
-		if err != nil {
-			return err
-		}
-		if exists {
-			//TODO - implement update once workload upgrade is supported
-			continue
-		}
-		serviceType := toCreate.Type
-		if toCreate.ClusterIP == "None" {
-			serviceType = "Headless"
-		}
-		service := &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName:    "workload-",
-				OwnerReferences: []metav1.OwnerReference{ownerRef},
-				Namespace:       workload.Namespace,
-				Annotations:     serviceAnnotations,
-				Labels:          serviceLabels,
-			},
-			Spec: corev1.ServiceSpec{
-				ClusterIP: toCreate.ClusterIP,
-				Type:      kind,
-				Ports:     toCreate.ServicePorts,
-			},
-		}
-
-		logrus.Infof("Creating [%s] service with ports [%v] for workload %s", serviceType, toCreate.ServicePorts, workload.getKey())
-		_, err = w.Services.Create(service)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func (wk Workload) getKey() string {
 	return fmt.Sprintf("%s:%s:%s", wk.Kind, wk.Namespace, wk.Name)
 }
 
-func GetWorkloadID(objectType string, namespace string, name string) string {
+func getWorkloadID(objectType string, namespace string, name string) string {
 	return fmt.Sprintf("%s:%s:%s", objectType, namespace, name)
+}
+
+func (c CommonController) UpdateWorkload(w *Workload) error {
+	// only annotations updates are supported
+	switch w.Kind {
+	case DeploymentType:
+		o, err := c.DeploymentLister.Get(w.Namespace, w.Name)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		toUpdate := o.DeepCopy()
+		toUpdate.Annotations = w.Annotations
+		_, err = c.Deployments.Update(toUpdate)
+		if err != nil {
+			return err
+		}
+	case ReplicationControllerType:
+		o, err := c.ReplicationControllerLister.Get(w.Namespace, w.Name)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		toUpdate := o.DeepCopy()
+		toUpdate.Annotations = w.Annotations
+		_, err = c.ReplicationControllers.Update(toUpdate)
+		if err != nil {
+			return err
+		}
+	case ReplicaSetType:
+		o, err := c.ReplicaSetLister.Get(w.Namespace, w.Name)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		toUpdate := o.DeepCopy()
+		toUpdate.Annotations = w.Annotations
+		_, err = c.ReplicaSes.Update(toUpdate)
+		if err != nil {
+			return err
+		}
+	case DaemonSetType:
+		o, err := c.DaemonSetLister.Get(w.Namespace, w.Name)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		toUpdate := o.DeepCopy()
+		toUpdate.Annotations = w.Annotations
+		_, err = c.DaemonSets.Update(toUpdate)
+		if err != nil {
+			return err
+		}
+	case StatefulSetType:
+		o, err := c.StatefulSetLister.Get(w.Namespace, w.Name)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		toUpdate := o.DeepCopy()
+		toUpdate.Annotations = w.Annotations
+		_, err = c.StatefulSets.Update(toUpdate)
+		if err != nil {
+			return err
+		}
+	case JobType:
+		o, err := c.JobLister.Get(w.Namespace, w.Name)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		toUpdate := o.DeepCopy()
+		toUpdate.Annotations = w.Annotations
+		_, err = c.Jobs.Update(toUpdate)
+		if err != nil {
+			return err
+		}
+	case CronJobType:
+		o, err := c.CronJobLister.Get(w.Namespace, w.Name)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		toUpdate := o.DeepCopy()
+		toUpdate.Annotations = w.Annotations
+		_, err = c.CronJobs.Update(toUpdate)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c CommonController) EnqueueWorkload(w *Workload) {
+	switch w.Kind {
+	case DeploymentType:
+		c.Deployments.Controller().Enqueue(w.Namespace, w.Name)
+	case ReplicationControllerType:
+		c.ReplicationControllers.Controller().Enqueue(w.Namespace, w.Name)
+	case ReplicaSetType:
+		c.ReplicaSes.Controller().Enqueue(w.Namespace, w.Name)
+	case DaemonSetType:
+		c.DaemonSets.Controller().Enqueue(w.Namespace, w.Name)
+	case StatefulSetType:
+		c.StatefulSets.Controller().Enqueue(w.Namespace, w.Name)
+	case JobType:
+		c.Jobs.Controller().Enqueue(w.Namespace, w.Name)
+	case CronJobType:
+		c.CronJobs.Controller().Enqueue(w.Namespace, w.Name)
+	}
+}
+
+func (c CommonController) EnqueueAllWorkloads(namespace string) error {
+	ws, err := c.GetAllWorkloads(namespace)
+	if err != nil {
+		return err
+	}
+	for _, w := range ws {
+		c.EnqueueWorkload(w)
+	}
+	return nil
 }

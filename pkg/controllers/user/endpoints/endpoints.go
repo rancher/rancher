@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"reflect"
 
+	workloadUtil "github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -20,32 +21,39 @@ const (
 
 func Register(ctx context.Context, workload *config.UserOnlyContext) {
 	n := &NodesController{
-		nodes:             workload.Core.Nodes(""),
-		serviceLister:     workload.Core.Services("").Controller().Lister(),
-		serviceController: workload.Core.Services("").Controller(),
-		nodeLister:        workload.Core.Nodes("").Controller().Lister(),
-		podLister:         workload.Core.Pods("").Controller().Lister(),
-		podController:     workload.Core.Pods("").Controller(),
+		nodes:         workload.Core.Nodes(""),
+		serviceLister: workload.Core.Services("").Controller().Lister(),
+		nodeLister:    workload.Core.Nodes("").Controller().Lister(),
+		podLister:     workload.Core.Pods("").Controller().Lister(),
 	}
 	workload.Core.Nodes("").AddHandler("nodesEndpointsController", n.sync)
 
 	s := &ServicesController{
-		services:       workload.Core.Services(""),
-		serviceLister:  workload.Core.Services("").Controller().Lister(),
-		nodeLister:     workload.Core.Nodes("").Controller().Lister(),
-		nodeController: workload.Core.Nodes("").Controller(),
-		podLister:      workload.Core.Pods("").Controller().Lister(),
-		podController:  workload.Core.Pods("").Controller(),
+		services:           workload.Core.Services(""),
+		serviceLister:      workload.Core.Services("").Controller().Lister(),
+		nodeLister:         workload.Core.Nodes("").Controller().Lister(),
+		nodeController:     workload.Core.Nodes("").Controller(),
+		podLister:          workload.Core.Pods("").Controller().Lister(),
+		podController:      workload.Core.Pods("").Controller(),
+		workloadController: workloadUtil.NewWorkloadController(workload, nil),
 	}
 	workload.Core.Services("").AddHandler("servicesEndpointsController", s.sync)
 
 	p := &PodsController{
-		nodeLister:     workload.Core.Nodes("").Controller().Lister(),
-		nodeController: workload.Core.Nodes("").Controller(),
-		pods:           workload.Core.Pods(""),
-		serviceLister:  workload.Core.Services("").Controller().Lister(),
+		nodeLister:         workload.Core.Nodes("").Controller().Lister(),
+		nodeController:     workload.Core.Nodes("").Controller(),
+		pods:               workload.Core.Pods(""),
+		serviceLister:      workload.Core.Services("").Controller().Lister(),
+		podLister:          workload.Core.Pods("").Controller().Lister(),
+		workloadController: workloadUtil.NewWorkloadController(workload, nil),
 	}
 	workload.Core.Pods("").AddHandler("hostPortEndpointsController", p.sync)
+
+	w := &WorkloadEndpointsController{
+		serviceLister: workload.Core.Services("").Controller().Lister(),
+		podLister:     workload.Core.Pods("").Controller().Lister(),
+	}
+	w.WorkloadController = workloadUtil.NewWorkloadController(workload, w.UpdateEndpoints)
 }
 
 func areEqualEndpoints(one []v3.PublicEndpoint, two []v3.PublicEndpoint) bool {
@@ -85,11 +93,16 @@ func getPublicEndpointsFromAnnotations(annotations map[string]string) []v3.Publi
 
 func convertServiceToPublicEndpoints(svc *corev1.Service, node *corev1.Node) ([]v3.PublicEndpoint, error) {
 	var eps []v3.PublicEndpoint
-	if svc.Spec.Type != "NodePort" {
+	if svc.DeletionTimestamp != nil {
+		return eps, nil
+	}
+	if !(svc.Spec.Type == "NodePort" || svc.Spec.Type == "LoadBalancer") {
 		return eps, nil
 	}
 	var address string
 	var nodeName string
+
+	nodePort := svc.Spec.Type == "NodePort"
 
 	if node != nil {
 		if val, ok := node.Annotations["alpha.kubernetes.io/provided-node-ip"]; ok {
@@ -101,22 +114,41 @@ func convertServiceToPublicEndpoints(svc *corev1.Service, node *corev1.Node) ([]
 			}
 		}
 		nodeName = node.Name
-	} else if svc.Spec.Type == "NodePort" {
+	} else if nodePort {
 		address = "NodePort"
 	}
 
-	for _, port := range svc.Spec.Ports {
-		if port.NodePort == 0 {
-			continue
+	if nodePort {
+		for _, port := range svc.Spec.Ports {
+			if port.NodePort == 0 {
+				continue
+			}
+			p := v3.PublicEndpoint{
+				NodeName:    nodeName,
+				Address:     address,
+				Port:        port.NodePort,
+				Protocol:    string(port.Protocol),
+				ServiceName: fmt.Sprintf("%s/%s", svc.Namespace, svc.Name),
+			}
+			eps = append(eps, p)
 		}
-		p := v3.PublicEndpoint{
-			NodeName:    nodeName,
-			Address:     address,
-			Port:        port.NodePort,
-			Protocol:    string(port.Protocol),
-			ServiceName: fmt.Sprintf("%s/%s", svc.Namespace, svc.Name),
+	} else {
+		for _, port := range svc.Spec.Ports {
+			for _, ingressEp := range svc.Status.LoadBalancer.Ingress {
+				address := ingressEp.Hostname
+				if address == "" {
+					address = ingressEp.IP
+				}
+				p := v3.PublicEndpoint{
+					NodeName:    "",
+					Address:     address,
+					Port:        port.Port,
+					Protocol:    string(port.Protocol),
+					ServiceName: fmt.Sprintf("%s/%s", svc.Namespace, svc.Name),
+				}
+				eps = append(eps, p)
+			}
 		}
-		eps = append(eps, p)
 	}
 
 	return eps, nil
@@ -124,6 +156,9 @@ func convertServiceToPublicEndpoints(svc *corev1.Service, node *corev1.Node) ([]
 
 func convertHostPortToEndpoint(pod *corev1.Pod) ([]v3.PublicEndpoint, error) {
 	var eps []v3.PublicEndpoint
+	if pod.DeletionTimestamp != nil {
+		return eps, nil
+	}
 	nodeName := pod.Spec.NodeName
 
 	for _, c := range pod.Spec.Containers {

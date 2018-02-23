@@ -1,6 +1,11 @@
 package endpoints
 
 import (
+	"strings"
+
+	"fmt"
+
+	workloadutil "github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -9,51 +14,111 @@ import (
 
 // This controller is responsible for monitoring pods
 // and setting public endpoints on them based on HostPort pods
-// and NodePort services
+// and NodePort/LoadBalancer services backing up the pod
 
 type PodsController struct {
-	nodeLister     v1.NodeLister
-	nodeController v1.NodeController
-	pods           v1.PodInterface
-	serviceLister  v1.ServiceLister
+	nodeLister         v1.NodeLister
+	nodeController     v1.NodeController
+	pods               v1.PodInterface
+	podLister          v1.PodLister
+	serviceLister      v1.ServiceLister
+	workloadController workloadutil.CommonController
 }
 
-func (s *PodsController) sync(key string, obj *corev1.Pod) error {
-	if obj == nil {
+func (c *PodsController) sync(key string, obj *corev1.Pod) error {
+	if obj == nil && !strings.HasSuffix(key, allEndpoints) {
 		return nil
 	}
 
-	if obj.Spec.NodeName == "" {
-		return nil
+	var pods []*corev1.Pod
+	var services []*corev1.Service
+	var err error
+	if strings.HasSuffix(key, allEndpoints) {
+		namespace := ""
+		if !strings.EqualFold(key, allEndpoints) {
+			namespace = strings.TrimSuffix(key, fmt.Sprintf("/%s", allEndpoints))
+		}
+		pods, err = c.podLister.List(namespace, labels.NewSelector())
+		if err != nil {
+			return err
+		}
+		services, err = c.serviceLister.List(namespace, labels.NewSelector())
+		if err != nil {
+			return err
+		}
+	} else {
+		services, err = c.serviceLister.List(obj.Namespace, labels.NewSelector())
+		if err != nil {
+			return err
+		}
+		pods = append(pods, obj)
 	}
 
-	if obj.DeletionTimestamp != nil {
-		s.nodeController.Enqueue("", obj.Spec.NodeName)
-		return nil
+	nodesToUpdate := map[string]bool{}
+	workloadsToUpdate := map[string]*workloadutil.Workload{}
+	for _, pod := range pods {
+		updated, err := c.updatePodEndpoints(pod, services)
+		if err != nil {
+			return err
+		}
+		if updated {
+			if pod.Spec.NodeName != "" && podHasHostPort(pod) {
+				nodesToUpdate[pod.Spec.NodeName] = true
+				workloads, err := c.workloadController.GetWorkloadsMatchingLabels(pod.Namespace, pod.Labels)
+				if err != nil {
+					return err
+				}
+				for _, w := range workloads {
+					workloadsToUpdate[key] = w
+				}
+			}
+		}
 	}
 
-	var ports []int32
+	// push changes to hosts
+	for nodeName := range nodesToUpdate {
+		c.nodeController.Enqueue("", nodeName)
+	}
+	// push changes to workload
+	for _, w := range workloadsToUpdate {
+		c.workloadController.EnqueueWorkload(w)
+	}
+
+	return nil
+}
+
+func podHasHostPort(obj *corev1.Pod) bool {
 	for _, c := range obj.Spec.Containers {
 		for _, p := range c.Ports {
 			if p.HostPort != 0 {
-				ports = append(ports, p.HostPort)
+				return true
 			}
 		}
+	}
+	return false
+}
+
+func (c *PodsController) updatePodEndpoints(obj *corev1.Pod, services []*corev1.Service) (updated bool, err error) {
+
+	if obj.Spec.NodeName == "" {
+		return false, nil
+	}
+
+	if obj.DeletionTimestamp != nil {
+		return true, nil
 	}
 
 	// 1. update pod with endpoints
 	// a) from HostPort
 	newPublicEps, err := convertHostPortToEndpoint(obj)
 	if err != nil {
-		return err
+		return false, err
 	}
-	// b) from NodePort services
-	services, err := s.serviceLister.List(obj.Namespace, labels.NewSelector())
-	if err != nil {
-		return err
-	}
-
+	// b) from services
 	for _, svc := range services {
+		if svc.Namespace != obj.Namespace {
+			continue
+		}
 		set := labels.Set{}
 		for key, val := range svc.Spec.Selector {
 			set[key] = val
@@ -62,7 +127,7 @@ func (s *PodsController) sync(key string, obj *corev1.Pod) error {
 		if selector.Matches(labels.Set(obj.Labels)) {
 			eps, err := convertServiceToPublicEndpoints(svc, nil)
 			if err != nil {
-				return err
+				return false, err
 			}
 			newPublicEps = append(newPublicEps, eps...)
 		}
@@ -70,25 +135,22 @@ func (s *PodsController) sync(key string, obj *corev1.Pod) error {
 
 	existingPublicEps := getPublicEndpointsFromAnnotations(obj.Annotations)
 	if areEqualEndpoints(existingPublicEps, newPublicEps) {
-		return nil
+		return false, nil
 	}
 	toUpdate := obj.DeepCopy()
 	epsToUpdate, err := publicEndpointsToString(newPublicEps)
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	logrus.Infof("Updating pod [%s] with public endpoints [%v]", key, epsToUpdate)
+	logrus.Infof("Updating pod [%s/%s] with public endpoints [%v]", obj.Namespace, obj.Name, epsToUpdate)
 	if toUpdate.Annotations == nil {
 		toUpdate.Annotations = make(map[string]string)
 	}
 	toUpdate.Annotations[endpointsAnnotation] = epsToUpdate
-	_, err = s.pods.Update(toUpdate)
+	_, err = c.pods.Update(toUpdate)
 	if err != nil {
-		return err
+		return false, err
 	}
-	// 2. push changes to host (only when pod got updates)
-	s.nodeController.Enqueue("", obj.Spec.NodeName)
-
-	return nil
+	return true, nil
 }

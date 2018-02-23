@@ -29,26 +29,34 @@ var workloadServiceUUIDToDeploymentUUIDs sync.Map
 
 type Controller struct {
 	pods            v1.PodInterface
-	workloadLister  util.WorkloadLister
+	workloadLister  util.CommonController
 	podLister       v1.PodLister
 	namespaceLister v1.NamespaceLister
+	serviceLister   v1.ServiceLister
+	services        v1.ServiceInterface
 }
 
 type PodController struct {
 	pods           v1.PodInterface
-	workloadLister util.WorkloadLister
+	workloadLister util.CommonController
+	serviceLister  v1.ServiceLister
+	services       v1.ServiceInterface
 }
 
 func Register(ctx context.Context, workload *config.UserOnlyContext) {
 	c := &Controller{
 		pods:            workload.Core.Pods(""),
-		workloadLister:  util.NewWorkloadLister(workload),
+		workloadLister:  util.NewWorkloadController(workload, nil),
 		podLister:       workload.Core.Pods("").Controller().Lister(),
 		namespaceLister: workload.Core.Namespaces("").Controller().Lister(),
+		serviceLister:   workload.Core.Services("").Controller().Lister(),
+		services:        workload.Core.Services(""),
 	}
 	p := &PodController{
-		workloadLister: util.NewWorkloadLister(workload),
+		workloadLister: util.NewWorkloadController(workload, nil),
 		pods:           workload.Core.Pods(""),
+		serviceLister:  workload.Core.Services("").Controller().Lister(),
+		services:       workload.Core.Services(""),
 	}
 	workload.Core.Services("").AddHandler("workloadServiceController", c.sync)
 	workload.Core.Pods("").AddHandler("podToWorkloadServiceController", p.sync)
@@ -87,7 +95,7 @@ func (c *Controller) reconcilePods(key string, obj *corev1.Service) error {
 		return err
 	}
 	if toUpdate != nil {
-		_, err := c.workloadLister.Services.Update(toUpdate)
+		_, err := c.services.Update(toUpdate)
 		if err != nil {
 			return err
 		}
@@ -104,7 +112,7 @@ func (c *Controller) updatePods(serviceName string, obj *corev1.Service, workloa
 	// reset the map
 	targetWorkloadUUIDs := make(map[string]bool)
 	for _, workloadID := range workloadIDs {
-		targetWorkload, err := c.workloadLister.GetByWorkloadId(workloadID)
+		targetWorkload, err := c.workloadLister.GetByWorkloadID(workloadID)
 		if err != nil {
 			logrus.Warnf("Failed to fetch workload [%s]: [%v]", workloadID, err)
 			continue
@@ -160,7 +168,7 @@ func (c *PodController) sync(key string, obj *corev1.Pod) error {
 		return nil
 	}
 	// filter out deployments that are match for the pods
-	workloads, err := c.workloadLister.GetBySelectorMatch(obj.Namespace, obj.Labels)
+	workloads, err := c.workloadLister.GetWorkloadsMatchingLabels(obj.Namespace, obj.Labels)
 	if err != nil {
 		return err
 	}
@@ -179,7 +187,7 @@ func (c *PodController) sync(key string, obj *corev1.Pod) error {
 	workloadServicesLabels := make(map[string]string)
 	for _, workloadServiceUUID := range workloadServiceUUIDToAdd {
 		splitted := strings.Split(workloadServiceUUID, "/")
-		workload, err := c.workloadLister.ServiceLister.Get(obj.Namespace, splitted[1])
+		workload, err := c.serviceLister.Get(obj.Namespace, splitted[1])
 		if err != nil {
 			return err
 		}
