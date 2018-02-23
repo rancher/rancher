@@ -119,19 +119,20 @@ func (a *AggregateStore) Create(apiContext *types.APIContext, schema *types.Sche
 		}
 	}
 
-	setData(toSchema.ID, data)
+	setSelector(toSchema.ID, data)
+	setWorkloadSpecificDefaults(toSchema.ID, data)
 
 	return toStore.Create(apiContext, toSchema, data)
 }
 
-func setData(schemaID string, data map[string]interface{}) map[string]interface{} {
-	setSelector := true
-	if _, ok := data["selector"]; ok {
-		setSelector = false
+func setSelector(schemaID string, data map[string]interface{}) {
+	setSelector := false
+	isJob := strings.EqualFold(schemaID, "job") || strings.EqualFold(schemaID, "cronJob")
+	if convert.IsEmpty(data["selector"]) && !isJob {
+		setSelector = true
 	}
 	if setSelector {
 		workloadID := resolveWorkloadID(schemaID, data)
-		logrus.Errorf("workload id is %v", workloadID)
 		// set selector
 		data["selector"] = map[string]interface{}{
 			"matchLabels": map[string]interface{}{
@@ -155,7 +156,16 @@ func setData(schemaID string, data map[string]interface{}) map[string]interface{
 		labels[SelectorLabel] = workloadID
 		data["labels"] = labels
 	}
-	return data
+}
+
+func setWorkloadSpecificDefaults(schemaID string, data map[string]interface{}) {
+	if strings.EqualFold(schemaID, "job") || strings.EqualFold(schemaID, "cronJob") {
+		// job has different defaults
+		if _, ok := data["restartPolicy"]; !ok {
+			logrus.Info("Setting restart policy")
+			data["restartPolicy"] = "OnFailure"
+		}
+	}
 }
 
 func resolveWorkloadID(schemaID string, data map[string]interface{}) string {

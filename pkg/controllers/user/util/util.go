@@ -125,18 +125,26 @@ func (w WorkloadLister) GetByName(key string) (*Workload, error) {
 		if err != nil || o.DeletionTimestamp != nil {
 			return nil, err
 		}
-		labelSelector := &metav1.LabelSelector{
-			MatchLabels: o.Spec.Selector.MatchLabels,
+		var labelSelector *metav1.LabelSelector
+		if o.Spec.Selector != nil {
+			labelSelector = &metav1.LabelSelector{
+				MatchLabels: o.Spec.Selector.MatchLabels,
+			}
 		}
+
 		workload = getWorkload(namespace, name, workloadType, BatchVersion, o.UID, labelSelector, o.Annotations, &o.Spec.Template, o.OwnerReferences)
 	case "cronjob":
 		o, err := w.CronJobLister.Get(namespace, name)
 		if err != nil || o.DeletionTimestamp != nil {
 			return nil, err
 		}
-		labelSelector := &metav1.LabelSelector{
-			MatchLabels: o.Spec.JobTemplate.Spec.Selector.MatchLabels,
+		var labelSelector *metav1.LabelSelector
+		if o.Spec.JobTemplate.Spec.Selector != nil {
+			labelSelector = &metav1.LabelSelector{
+				MatchLabels: o.Spec.JobTemplate.Spec.Selector.MatchLabels,
+			}
 		}
+
 		workload = getWorkload(namespace, name, workloadType, BatchBetaVersion, o.UID, labelSelector, o.Annotations, &o.Spec.JobTemplate.Spec.Template, o.OwnerReferences)
 	default:
 		o, err := w.DeploymentLister.Get(namespace, name)
@@ -185,6 +193,9 @@ func (w WorkloadLister) GetBySelectorMatch(namespace string, selectorLabels map[
 }
 
 func getSelectorLables(s *metav1.LabelSelector) map[string]string {
+	if s == nil {
+		return nil
+	}
 	selectorLabels := map[string]string{}
 	for key, value := range s.MatchLabels {
 		selectorLabels[key] = value
