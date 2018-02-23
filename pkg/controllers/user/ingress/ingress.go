@@ -113,11 +113,23 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) error {
 				return err
 			}
 		} else {
-			// TODO - fix so the update is done as needed
-			toUpdate := existing.DeepCopy()
-			toUpdate.Annotations[util.WorkloadAnnotation] = workloadIDs
-			if _, err := c.services.Update(toUpdate); err != nil {
-				return err
+			ingressManaged := false
+			for _, o := range existing.OwnerReferences {
+				if o.UID == obj.UID {
+					ingressManaged = true
+					break
+				}
+			}
+			if ingressManaged {
+				// TODO - fix so the update is done only when workload ids are changed
+				toUpdate := existing.DeepCopy()
+				if toUpdate.Annotations == nil {
+					toUpdate.Annotations = map[string]string{}
+				}
+				toUpdate.Annotations[util.WorkloadAnnotation] = workloadIDs
+				if _, err := c.services.Update(toUpdate); err != nil {
+					return err
+				}
 			}
 		}
 	}
