@@ -112,7 +112,7 @@ func getPaths(data map[string]interface{}) (map[string]map[string]interface{}, b
 		paths, ok := converted["paths"]
 		if ok {
 			for path, target := range convert.ToMapInterface(paths) {
-				result[fmt.Sprintf("%s/%s", converted["host"].(string), path)] = convert.ToMapInterface(target)
+				result[fmt.Sprintf("%s/%s", convert.ToString(converted["host"]), path)] = convert.ToMapInterface(target)
 			}
 		}
 	}
