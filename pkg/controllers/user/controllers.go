@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/helm"
 	"github.com/rancher/rancher/pkg/controllers/user/ingress"
 	"github.com/rancher/rancher/pkg/controllers/user/logging"
+	"github.com/rancher/rancher/pkg/controllers/user/networkpolicy"
 	"github.com/rancher/rancher/pkg/controllers/user/nodesyncer"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline"
@@ -35,6 +36,7 @@ func Register(ctx context.Context, cluster *config.UserContext) error {
 	podsecuritypolicy.RegisterTemplate(cluster)
 	podsecuritypolicy.RegisterCluster(cluster)
 	podsecuritypolicy.RegisterProject(cluster)
+	networkpolicy.Register(cluster)
 
 	userOnlyContext := cluster.UserOnlyContext()
 	dnsrecord.Register(ctx, userOnlyContext)

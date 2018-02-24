@@ -64,6 +64,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext) error {
 		client.PodSecurityPolicyTemplateType,
 		client.PreferenceType,
 		client.ProjectLoggingType,
+		client.ProjectNetworkPolicyType,
 		client.ProjectRoleTemplateBindingType,
 		client.ProjectType,
 		client.RoleTemplateType,

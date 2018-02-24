@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	projectIDField = "field.cattle.io/projectId"
+	ProjectIDFieldLabel = "field.cattle.io/projectId"
 )
 
 type namespaceHandler struct {
@@ -32,7 +32,7 @@ func (nsh *namespaceHandler) Sync(key string, ns *corev1.Namespace) error {
 	}
 	logrus.Debugf("namespaceHandler Sync key=%v, ns=%+v", key, *ns)
 
-	field, ok := ns.Annotations[projectIDField]
+	field, ok := ns.Annotations[ProjectIDFieldLabel]
 	if !ok {
 		return nil
 	}
@@ -56,13 +56,13 @@ func (nsh *namespaceHandler) addProjectIDLabelToNamespace(ns *corev1.Namespace, 
 	if ns == nil {
 		return fmt.Errorf("cannot add label to nil namespace")
 	}
-	if ns.Labels[projectIDField] != projectID {
-		logrus.Infof("adding label %v=%v to namespace=%v", projectIDField, projectID, ns.Name)
+	if ns.Labels[ProjectIDFieldLabel] != projectID {
+		logrus.Infof("adding label %v=%v to namespace=%v", ProjectIDFieldLabel, projectID, ns.Name)
 		nscopy := ns.DeepCopy()
 		if nscopy.Labels == nil {
 			nscopy.Labels = map[string]string{}
 		}
-		nscopy.Labels[projectIDField] = projectID
+		nscopy.Labels[ProjectIDFieldLabel] = projectID
 		if _, err := nsh.nsClient.Update(nscopy); err != nil {
 			return err
 		}
