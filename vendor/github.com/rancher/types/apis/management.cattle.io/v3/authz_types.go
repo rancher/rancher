@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	NamespaceBackedResource condition.Cond = "BackingNamespaceCreated"
-	CreatorMadeOwner        condition.Cond = "CreatorMadeOwner"
+	NamespaceBackedResource     condition.Cond = "BackingNamespaceCreated"
+	CreatorMadeOwner            condition.Cond = "CreatorMadeOwner"
+	DefaultNetworkPolicyCreated condition.Cond = "DefaultNetworkPolicyCreated"
 )
 
 type Project struct {
