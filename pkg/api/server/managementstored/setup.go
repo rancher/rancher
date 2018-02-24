@@ -246,8 +246,9 @@ func Setting(schemas *types.Schemas) {
 
 func LoggingTypes(schemas *types.Schemas, management *config.ScaledContext) {
 	loggingHandler := logging.ClusterLoggingHandler{
-		ClusterLoggingClient: management.Management.ClusterLoggings(""),
-		CoreV1:               management.Core,
+		ClusterLoggingLister: management.Management.ClusterLoggings("").Controller().Lister(),
+		PodLister:            management.Core.Pods("").Controller().Lister(),
+		ServiceLister:        management.Core.Services("").Controller().Lister(),
 	}
 	schema := schemas.Schema(&managementschema.Version, client.ClusterLoggingType)
 	schema.Validator = logging.ClusterLoggingValidator
