@@ -38,22 +38,22 @@ func InitConfigMap(cm rv1.ConfigMapInterface) error {
 func UpdateConfigMap(configPath, loggingName, level string, configmaps rv1.ConfigMapInterface) error {
 	configMap, err := buildConfigMap(configPath, loggingconfig.LoggingNamespace, loggingName, level)
 	if err != nil {
-		return errors.Wrap(err, "buildConfigMap failed")
+		return errors.Wrapf(err, "build configmap %s:%s failed", loggingconfig.LoggingNamespace, loggingName)
 	}
-	existConfig, err := configmaps.Controller().Lister().Get(loggingconfig.LoggingNamespace, loggingName)
+	existConfig, err := configmaps.Get(loggingName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			if _, err = configmaps.Create(configMap); err != nil && !apierrors.IsAlreadyExists(err) {
-				return errors.Wrap(err, "create configmap failed")
+			if existConfig, err = configmaps.Create(configMap); err != nil && !apierrors.IsAlreadyExists(err) {
+				return errors.Wrapf(err, "create configmap %s:%s failed", existConfig.Namespace, existConfig.Name)
 			}
-			return nil
+		} else {
+			return errors.Wrapf(err, "get configmap %s:%s failed", loggingconfig.LoggingNamespace, loggingName)
 		}
 		return errors.Wrap(err, "list configmap failed")
 	}
-	newConfigMap := existConfig.DeepCopy()
-	newConfigMap.Data = configMap.Data
-	if _, err = configmaps.Update(newConfigMap); err != nil {
-		errors.Wrap(err, "update configmap failed")
+	existConfig.Data = configMap.Data
+	if _, err = configmaps.Update(existConfig); err != nil {
+		return errors.Wrapf(err, "update configmap %s:%s failed", existConfig.Namespace, existConfig.Name)
 	}
 	return nil
 }
@@ -75,12 +75,12 @@ func RemoveConfigMap(configmaps rv1.ConfigMapInterface) error {
 func buildConfigMap(configPath, namespace, name, level string) (*v1.ConfigMap, error) {
 	file, err := os.Open(configPath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "find cluster logging configuration file failed")
+		return nil, errors.Wrapf(err, "find %s logging configuration file %s failed", level, configPath)
 	}
 	defer file.Close()
 	buf, err := ioutil.ReadAll(file)
 	if err != nil {
-		return nil, errors.Wrapf(err, "read cluster logging configuration file failed")
+		return nil, errors.Wrapf(err, "read %s logging configuration file %s failed", level, configPath)
 	}
 	configFile := string(buf)
 
