@@ -27,9 +27,7 @@ type ExecutionLogSyncer struct {
 
 func (s *ExecutionLogSyncer) sync(ctx context.Context, syncInterval time.Duration) {
 	for range ticker.Context(ctx, syncInterval) {
-		logrus.Debugf("Start sync pipeline execution log")
 		s.syncLogs()
-		logrus.Debugf("Sync pipeline execution log complete")
 	}
 
 }
@@ -88,4 +86,5 @@ func (s *ExecutionLogSyncer) syncLogs() {
 			return
 		}
 	}
+	logrus.Debugf("Sync pipeline execution log complete")
 }

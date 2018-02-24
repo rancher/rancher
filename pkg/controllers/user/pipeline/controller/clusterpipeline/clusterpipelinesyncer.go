@@ -90,10 +90,10 @@ func Register(cluster *config.UserContext) {
 
 func (s *Syncer) Sync(key string, obj *v3.ClusterPipeline) error {
 	//ensure clusterpipeline singleton in the cluster
-	utils.InitClusterPipeline(s.clusterPipelines, obj.ClusterName)
+	utils.InitClusterPipeline(s.clusterPipelines, obj.Spec.ClusterName)
 
 	if obj.Spec.GithubConfig == nil {
-		if err := s.cleanUp(obj.ClusterName); err != nil {
+		if err := s.cleanUp(obj.Spec.ClusterName); err != nil {
 			return err
 		}
 	}
@@ -180,6 +180,9 @@ func (s *Syncer) cleanUp(clusterName string) error {
 		return err
 	}
 	for _, repo := range repositories {
+		if repo.Spec.ClusterName != clusterName {
+			continue
+		}
 		if err := s.sourceCodeRepositories.DeleteNamespaced(repo.Namespace, repo.Name, &metav1.DeleteOptions{}); err != nil {
 			return err
 		}

@@ -26,9 +26,7 @@ type CronSyncer struct {
 
 func (s *CronSyncer) sync(ctx context.Context, syncInterval time.Duration) {
 	for range ticker.Context(ctx, syncInterval) {
-		logrus.Debugf("Start sync pipeline cron")
 		s.syncCron()
-		logrus.Debugf("Sync pipeline cron complete")
 	}
 }
 
@@ -86,6 +84,7 @@ func (s *CronSyncer) checkCron(pipeline *v3.Pipeline) {
 			logrus.Errorf("Error run pipeline - %v", err)
 			return
 		}
+		logrus.Debugf("Triggered pipeline '%s' by cron", pipeline.Spec.DisplayName)
 	} else {
 		//stale nextStart
 		logrus.Errorf("Found stale next run for %s on %s, abandom it", pipeline.Spec.DisplayName, nextStartTime)
