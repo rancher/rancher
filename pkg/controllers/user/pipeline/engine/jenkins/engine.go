@@ -28,9 +28,8 @@ type Engine struct {
 	NodeLister    v1.NodeLister
 	ServiceLister v1.ServiceLister
 
-	//Secrets                    v1.SecretInterface
-	//FIXME secretLister issue
-	Core                       v1.Interface
+	Secrets                    v1.SecretInterface
+	SecretLister               v1.SecretLister
 	SourceCodeCredentialLister v3.SourceCodeCredentialLister
 }
 
@@ -70,7 +69,12 @@ func (j *Engine) PreCheck() error {
 		return err
 	}
 	user := JenkinsDefaultUser
-	token := JenkinsDefaultToken
+	secret, err := j.SecretLister.Get(utils.PipelineNamespace, "jenkins")
+	if err != nil || secret.Data == nil {
+		return fmt.Errorf("error get jenkins token - %v", err)
+	}
+	token := string(secret.Data["jenkins-admin-password"])
+
 	client, err := New(url, user, token)
 	if err != nil {
 		return err
@@ -127,13 +131,13 @@ func (j *Engine) prepareRegistryCredential(pipeline *v3.Pipeline, stage int, ste
 	publishImageStep := pipeline.Spec.Stages[stage].Steps[step]
 	registry, _, _ := utils.SplitImageTag(publishImageStep.PublishImageConfig.Tag)
 
-	secretList, err := j.Core.Secrets(pipeline.Namespace).List(metav1.ListOptions{})
+	secrets, err := j.SecretLister.List(pipeline.Namespace, labels.Everything())
 	if err != nil {
 		return err
 	}
 	username := ""
 	password := ""
-	for _, s := range secretList.Items {
+	for _, s := range secrets {
 		if s.Type == "kubernetes.io/dockerconfigjson" {
 			m := map[string]interface{}{}
 			if err := json.Unmarshal(s.Data[".dockerconfigjson"], &m); err != nil {
@@ -171,10 +175,9 @@ func (j *Engine) prepareRegistryCredential(pipeline *v3.Pipeline, stage int, ste
 			"password": []byte(password),
 		},
 	}
-	secrets := j.Core.Secrets("")
-	_, err = secrets.Create(secret)
+	_, err = j.Secrets.Create(secret)
 	if apierrors.IsAlreadyExists(err) {
-		if _, err := secrets.Update(secret); err != nil {
+		if _, err := j.Secrets.Update(secret); err != nil {
 			return err
 		}
 		return nil

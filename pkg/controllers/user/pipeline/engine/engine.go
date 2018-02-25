@@ -19,12 +19,14 @@ func New(cluster *config.UserContext) PipelineEngine {
 
 	nodeLister := cluster.Core.Nodes("").Controller().Lister()
 	serviceLister := cluster.Core.Services("").Controller().Lister()
-	core := cluster.Management.Core
+	secrets := cluster.Management.Core.Secrets("")
+	secretLister := secrets.Controller().Lister()
 	sourceCodeCredentialLister := cluster.Management.Management.SourceCodeCredentials("").Controller().Lister()
 	engine := &jenkins.Engine{
-		NodeLister:    nodeLister,
-		ServiceLister: serviceLister,
-		Core:          core,
+		NodeLister:                 nodeLister,
+		ServiceLister:              serviceLister,
+		Secrets:                    secrets,
+		SecretLister:               secretLister,
 		SourceCodeCredentialLister: sourceCodeCredentialLister,
 	}
 	return engine

@@ -3,6 +3,8 @@ package clusterpipeline
 import (
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/engine/jenkins"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/utils"
+	"github.com/rancher/rancher/pkg/randomtoken"
+	"github.com/sirupsen/logrus"
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -14,13 +16,18 @@ const (
 )
 
 func getSecret() *corev1.Secret {
+	token, err := randomtoken.Generate()
+	if err != nil {
+		logrus.Warningf("warning generate random token got - %v, use default instead", err)
+		token = jenkins.JenkinsDefaultToken
+	}
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: utils.PipelineNamespace,
 			Name:      "jenkins",
 		},
 		Data: map[string][]byte{
-			"jenkins-admin-password": []byte(jenkins.JenkinsDefaultToken),
+			"jenkins-admin-password": []byte(token),
 			"jenkins-admin-user":     []byte(jenkins.JenkinsDefaultUser),
 		},
 	}
@@ -78,7 +85,7 @@ func getConfigMap() *corev1.ConfigMap {
 			"config.xml":      JenkinsConfig,
 			"apply_config.sh": JenkinsApplyConfig,
 			"plugins.txt":     JenkinsPlugins,
-			"user-config.xml": JenkinsUserConfig,
+			"init.groovy":     InitGroovy,
 		},
 	}
 }
@@ -155,8 +162,6 @@ func getJenkinsDeployment() *appsv1beta2.Deployment {
 							Name:            "jenkins",
 							Image:           JenkinsImage,
 							ImagePullPolicy: corev1.PullAlways,
-							Args: []string{"--argumentsRealm.passwd.$(ADMIN_USER)=$(ADMIN_PASSWORD)",
-								"--argumentsRealm.roles.$(ADMIN_USER)=admin"},
 							Env: []corev1.EnvVar{
 								{
 									Name: "ADMIN_PASSWORD",
@@ -234,14 +239,12 @@ func getJenkinsDeployment() *appsv1beta2.Deployment {
 	}
 }
 
-const JenkinsConfig = `
-<?xml version='1.0' encoding='UTF-8'?>
+const JenkinsConfig = `<?xml version='1.0' encoding='UTF-8'?>
 <hudson>
   <disabledAdministrativeMonitors/>
   <version>lts</version>
   <numExecutors>0</numExecutors>
   <mode>NORMAL</mode>
-  <useSecurity>false</useSecurity>
   <authorizationStrategy class="hudson.security.FullControlOnceLoggedInAuthorizationStrategy">
     <denyAnonymousReadAccess>true</denyAnonymousReadAccess>
   </authorizationStrategy>
@@ -328,61 +331,25 @@ const JenkinsConfig = `
   <noUsageStatistics>true</noUsageStatistics>
 </hudson>`
 
-const JenkinsUserConfig = `
-<?xml version='1.0' encoding='UTF-8'?>
-<user>
-  <fullName>admin</fullName>
-  <description></description>
-  <properties>
-    <jenkins.security.ApiTokenProperty>
-      <apiToken>{AQAAABAAAAAwiN1imgMxTBKVZ2f+imk9dhgpJb7NzJw6jaFz6YyP90wF2YLBWfsA5g+F6zeqXejv8y74WxKuWMcgzJ3bMhkTyw==}</apiToken>
-    </jenkins.security.ApiTokenProperty>
-    <com.cloudbees.plugins.credentials.UserCredentialsProvider_-UserCredentialsProperty plugin="credentials@2.1.14">
-      <domainCredentialsMap class="hudson.util.CopyOnWriteMap$Hash"/>
-    </com.cloudbees.plugins.credentials.UserCredentialsProvider_-UserCredentialsProperty>
-    <hudson.tasks.Mailer_-UserProperty plugin="mailer@1.20">
-      <emailAddress></emailAddress>
-    </hudson.tasks.Mailer_-UserProperty>
-    <hudson.plugins.emailext.watching.EmailExtWatchAction_-UserProperty plugin="email-ext@2.58">
-      <triggers/>
-    </hudson.plugins.emailext.watching.EmailExtWatchAction_-UserProperty>
-    <jenkins.security.LastGrantedAuthoritiesProperty>
-      <roles>
-        <string>authenticated</string>
-      </roles>
-      <timestamp>1501052657373</timestamp>
-    </jenkins.security.LastGrantedAuthoritiesProperty>
-    <hudson.model.MyViewsProperty>
-      <primaryViewName></primaryViewName>
-      <views>
-        <hudson.model.AllView>
-          <owner class="hudson.model.MyViewsProperty" reference="../../.."/>
-          <name>all</name>
-          <filterExecutors>false</filterExecutors>
-          <filterQueue>false</filterQueue>
-          <properties class="hudson.model.View$PropertyList"/>
-        </hudson.model.AllView>
-      </views>
-    </hudson.model.MyViewsProperty>
-    <org.jenkinsci.plugins.displayurlapi.user.PreferredProviderUserProperty plugin="display-url-api@2.0">
-      <providerId>default</providerId>
-    </org.jenkinsci.plugins.displayurlapi.user.PreferredProviderUserProperty>
-    <hudson.model.PaneStatusProperties>
-      <collapsed/>
-    </hudson.model.PaneStatusProperties>
-    <hudson.security.HudsonPrivateSecurityRealm_-Details>
-      <passwordHash>#jbcrypt:$2a$10$arbwzkBe0Uo6VrXUs//U3eL7k/tEtr2MayybwOP72Et7qTjeENqvK</passwordHash>
-    </hudson.security.HudsonPrivateSecurityRealm_-Details>
-    <org.jenkinsci.main.modules.cli.auth.ssh.UserPropertyImpl>
-      <authorizedKeys></authorizedKeys>
-    </org.jenkinsci.main.modules.cli.auth.ssh.UserPropertyImpl>
-    <hudson.search.UserSearchProperty>
-      <insensitiveSearch>true</insensitiveSearch>
-    </hudson.search.UserSearchProperty>
-  </properties>
-</user>`
+const InitGroovy = `
+import jenkins.model.*
+import hudson.security.*
+
+def instance = Jenkins.getInstance()
+def hudsonRealm = new HudsonPrivateSecurityRealm(false)
+def env = System.getenv()
+def user = env['ADMIN_USER']
+def passowrd = env['ADMIN_PASSWORD']
+hudsonRealm.createAccount(user,passowrd)
+instance.setSecurityRealm(hudsonRealm)
+def strategy = new hudson.security.FullControlOnceLoggedInAuthorizationStrategy()
+strategy.setAllowAnonymousRead(false)
+instance.setAuthorizationStrategy(strategy)
+instance.save()
+`
 const JenkinsApplyConfig = `
-mkdir -p /var/jenkins_home/users/admin && cp /var/jenkins_config/user-config.xml /var/jenkins_home/users/admin
+mkdir -p /var/jenkins_home/init.groovy.d
+cp /var/jenkins_config/init.groovy /var/jenkins_home/init.groovy.d
 cp -n /var/jenkins_config/config.xml /var/jenkins_home;
 cp /var/jenkins_config/plugins.txt /var/jenkins_home;
 rm -rf /usr/share/jenkins/ref/plugins/*.lock
