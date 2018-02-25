@@ -11,6 +11,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+//Lifecycle is responsible for watching pipelines and handling webhook management
+//in source code repository. It also helps to maintain labels on pipelines.
 type Lifecycle struct {
 	pipelines                  v3.PipelineInterface
 	pipelineLister             v3.PipelineLister

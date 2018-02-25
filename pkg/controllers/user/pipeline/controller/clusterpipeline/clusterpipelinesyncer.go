@@ -15,6 +15,9 @@ import (
 	rbactypev1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 )
 
+//Syncer is responsible for watching cluterpipeline config and enable/disable the pipeline.
+//It creates cattle-pipeline namespace and deploys workloads in it when the pipeline is enabled.
+//It removes cattle-pipeline namespace and cleans up related data when the pipeline is disabled.
 type Syncer struct {
 	namespaces          v1.NamespaceInterface
 	secrets             v1.SecretInterface
