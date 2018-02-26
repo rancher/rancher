@@ -13,14 +13,17 @@ import (
 	"github.com/rancher/types/client/management/v3"
 	"github.com/sirupsen/logrus"
 	"io/ioutil"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/http"
 	"strings"
 )
 
 type ClusterPipelineHandler struct {
-	ClusterPipelines      v3.ClusterPipelineInterface
-	SourceCodeCredentials v3.SourceCodeCredentialInterface
+	ClusterPipelines           v3.ClusterPipelineInterface
+	ClusterPipelineLister      v3.ClusterPipelineLister
+	SourceCodeCredentials      v3.SourceCodeCredentialInterface
+	SourceCodeCredentialLister v3.SourceCodeCredentialLister
+	SourceCodeRepositories     v3.SourceCodeRepositoryInterface
+	SourceCodeRepositoryLister v3.SourceCodeRepositoryLister
 }
 
 func ClusterPipelineFormatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -71,7 +74,7 @@ func (h *ClusterPipelineHandler) deploy(apiContext *types.APIContext) error {
 	}
 	ns := parts[0]
 	name := parts[1]
-	clusterPipeline, err := h.ClusterPipelines.GetNamespaced(ns, name, metav1.GetOptions{})
+	clusterPipeline, err := h.ClusterPipelineLister.Get(ns, name)
 	if err != nil {
 		return err
 	}
@@ -96,7 +99,7 @@ func (h *ClusterPipelineHandler) destroy(apiContext *types.APIContext) error {
 	}
 	ns := parts[0]
 	name := parts[1]
-	clusterPipeline, err := h.ClusterPipelines.GetNamespaced(ns, name, metav1.GetOptions{})
+	clusterPipeline, err := h.ClusterPipelineLister.Get(ns, name)
 	if err != nil {
 		return err
 	}
@@ -131,7 +134,7 @@ func (h *ClusterPipelineHandler) authapp(apiContext *types.APIContext) error {
 	if err := json.Unmarshal(requestBytes, &authAppInput); err != nil {
 		return err
 	}
-	clusterPipeline, err := h.ClusterPipelines.GetNamespaced(ns, name, metav1.GetOptions{})
+	clusterPipeline, err := h.ClusterPipelineLister.Get(ns, name)
 	if err != nil {
 		return err
 	}
@@ -149,7 +152,8 @@ func (h *ClusterPipelineHandler) authapp(apiContext *types.APIContext) error {
 	}
 	//oauth and add user
 	userName := apiContext.Request.Header.Get("Impersonate-User")
-	if _, err := h.authAddAccount(clusterPipeline, authAppInput.SourceCodeType, userName, authAppInput.RedirectURL, authAppInput.Code); err != nil {
+	sourceCodeCredential, err := h.authAddAccount(clusterPipeline, authAppInput.SourceCodeType, userName, authAppInput.RedirectURL, authAppInput.Code)
+	if err != nil {
 		return err
 	}
 	//update cluster pipeline config
@@ -161,6 +165,8 @@ func (h *ClusterPipelineHandler) authapp(apiContext *types.APIContext) error {
 	if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, &data); err != nil {
 		return err
 	}
+
+	go refreshReposByCredential(h.SourceCodeRepositories, h.SourceCodeRepositoryLister, sourceCodeCredential)
 
 	apiContext.WriteResponse(http.StatusOK, data)
 	return nil
@@ -184,7 +190,7 @@ func (h *ClusterPipelineHandler) authuser(apiContext *types.APIContext) error {
 		return err
 	}
 
-	clusterPipeline, err := h.ClusterPipelines.GetNamespaced(ns, name, metav1.GetOptions{})
+	clusterPipeline, err := h.ClusterPipelineLister.Get(ns, name)
 	if err != nil {
 		return err
 	}
@@ -204,6 +210,9 @@ func (h *ClusterPipelineHandler) authuser(apiContext *types.APIContext) error {
 	if err := access.ByID(apiContext, apiContext.Version, client.SourceCodeCredentialType, account.Name, &data); err != nil {
 		return err
 	}
+
+	go refreshReposByCredential(h.SourceCodeRepositories, h.SourceCodeRepositoryLister, account)
+
 	apiContext.WriteResponse(http.StatusOK, data)
 	return nil
 }
@@ -217,7 +226,7 @@ func (h *ClusterPipelineHandler) revokeapp(apiContext *types.APIContext) error {
 	ns := parts[0]
 	name := parts[1]
 
-	clusterPipeline, err := h.ClusterPipelines.GetNamespaced(ns, name, metav1.GetOptions{})
+	clusterPipeline, err := h.ClusterPipelineLister.Get(ns, name)
 	if err != nil {
 		return err
 	}

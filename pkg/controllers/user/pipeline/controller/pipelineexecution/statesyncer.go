@@ -29,9 +29,7 @@ type ExecutionStateSyncer struct {
 
 func (s *ExecutionStateSyncer) sync(ctx context.Context, syncInterval time.Duration) {
 	for range ticker.Context(ctx, syncInterval) {
-		logrus.Debugf("Start sync pipeline execution state")
 		s.syncState()
-		logrus.Debugf("Sync pipeline execution state complete")
 	}
 
 }
@@ -91,4 +89,5 @@ func (s *ExecutionStateSyncer) syncState() {
 			}
 		}
 	}
+	logrus.Debugf("Sync pipeline execution state complete")
 }

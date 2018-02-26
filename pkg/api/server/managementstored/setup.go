@@ -283,8 +283,12 @@ func Alert(schemas *types.Schemas, management *config.ScaledContext) {
 func Pipeline(schemas *types.Schemas, management *config.ScaledContext) {
 
 	clusterPipelineHandler := &pipeline.ClusterPipelineHandler{
-		ClusterPipelines:      management.Management.ClusterPipelines(""),
-		SourceCodeCredentials: management.Management.SourceCodeCredentials(""),
+		ClusterPipelines:           management.Management.ClusterPipelines(""),
+		ClusterPipelineLister:      management.Management.ClusterPipelines("").Controller().Lister(),
+		SourceCodeCredentials:      management.Management.SourceCodeCredentials(""),
+		SourceCodeCredentialLister: management.Management.SourceCodeCredentials("").Controller().Lister(),
+		SourceCodeRepositories:     management.Management.SourceCodeRepositories(""),
+		SourceCodeRepositoryLister: management.Management.SourceCodeRepositories("").Controller().Lister(),
 	}
 	schema := schemas.Schema(&managementschema.Version, client.ClusterPipelineType)
 	schema.Formatter = pipeline.ClusterPipelineFormatter
@@ -292,6 +296,7 @@ func Pipeline(schemas *types.Schemas, management *config.ScaledContext) {
 	schema.LinkHandler = clusterPipelineHandler.LinkHandler
 	pipelineHandler := &pipeline.Handler{
 		Pipelines:          management.Management.Pipelines(""),
+		PipelineLister:     management.Management.Pipelines("").Controller().Lister(),
 		PipelineExecutions: management.Management.PipelineExecutions(""),
 	}
 	schema = schemas.Schema(&managementschema.Version, client.PipelineType)
@@ -306,8 +311,10 @@ func Pipeline(schemas *types.Schemas, management *config.ScaledContext) {
 	schema.ActionHandler = pipelineExecutionHandler.ActionHandler
 
 	sourceCodeCredentialHandler := &pipeline.SourceCodeCredentialHandler{
-		SourceCodeCredentials:  management.Management.SourceCodeCredentials(""),
-		SourceCodeRepositories: management.Management.SourceCodeRepositories(""),
+		SourceCodeCredentials:      management.Management.SourceCodeCredentials(""),
+		SourceCodeCredentialLister: management.Management.SourceCodeCredentials("").Controller().Lister(),
+		SourceCodeRepositories:     management.Management.SourceCodeRepositories(""),
+		SourceCodeRepositoryLister: management.Management.SourceCodeRepositories("").Controller().Lister(),
 	}
 	schema = schemas.Schema(&managementschema.Version, client.SourceCodeCredentialType)
 	schema.Formatter = pipeline.SourceCodeCredentialFormatter

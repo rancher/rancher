@@ -4,18 +4,18 @@ import (
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/rancher/pkg/controllers/user/pipeline/remote"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
-	"github.com/satori/uuid"
 	"github.com/sirupsen/logrus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"net/http"
 )
 
 type SourceCodeCredentialHandler struct {
-	SourceCodeCredentials  v3.SourceCodeCredentialInterface
-	SourceCodeRepositories v3.SourceCodeRepositoryInterface
+	SourceCodeCredentials      v3.SourceCodeCredentialInterface
+	SourceCodeCredentialLister v3.SourceCodeCredentialLister
+	SourceCodeRepositories     v3.SourceCodeRepositoryInterface
+	SourceCodeRepositoryLister v3.SourceCodeRepositoryLister
 }
 
 func SourceCodeCredentialFormatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -26,7 +26,7 @@ func SourceCodeCredentialFormatter(apiContext *types.APIContext, resource *types
 func (h SourceCodeCredentialHandler) LinkHandler(apiContext *types.APIContext, next types.RequestHandler) error {
 
 	if apiContext.Link == "repos" {
-		repos, err := h.getReposByID(apiContext.ID)
+		repos, err := h.getReposByCredentialID(apiContext.ID)
 		if err != nil {
 			return err
 		}
@@ -37,7 +37,7 @@ func (h SourceCodeCredentialHandler) LinkHandler(apiContext *types.APIContext, n
 		data := []map[string]interface{}{}
 		option := &types.QueryOptions{
 			Conditions: []*types.QueryCondition{
-				types.NewConditionFromString("sourceCodeCredentialName", types.ModifierEQ, []string{apiContext.ID}...),
+				types.NewConditionFromString("sourceCodeCredentialId", types.ModifierEQ, []string{apiContext.ID}...),
 			},
 		}
 
@@ -64,14 +64,17 @@ func (h *SourceCodeCredentialHandler) ActionHandler(actionName string, action *t
 
 func (h *SourceCodeCredentialHandler) refreshrepos(apiContext *types.APIContext) error {
 
-	_, err := h.refreshReposByID(apiContext.ID)
+	credential, err := h.SourceCodeCredentialLister.Get("", apiContext.ID)
 	if err != nil {
+		return err
+	}
+	if _, err := refreshReposByCredential(h.SourceCodeRepositories, h.SourceCodeRepositoryLister, credential); err != nil {
 		return err
 	}
 	data := []map[string]interface{}{}
 	option := &types.QueryOptions{
 		Conditions: []*types.QueryCondition{
-			types.NewConditionFromString("sourceCodeCredentialName", types.ModifierEQ, []string{apiContext.ID}...),
+			types.NewConditionFromString("sourceCodeCredentialId", types.ModifierEQ, []string{apiContext.ID}...),
 		},
 	}
 
@@ -83,66 +86,16 @@ func (h *SourceCodeCredentialHandler) refreshrepos(apiContext *types.APIContext)
 	return nil
 }
 
-func (h *SourceCodeCredentialHandler) getReposByID(sourceCodeCredentialID string) ([]v3.SourceCodeRepository, error) {
-	result := []v3.SourceCodeRepository{}
-	repoList, err := h.SourceCodeRepositories.List(metav1.ListOptions{})
+func (h *SourceCodeCredentialHandler) getReposByCredentialID(sourceCodeCredentialID string) ([]*v3.SourceCodeRepository, error) {
+	result := []*v3.SourceCodeRepository{}
+	repositories, err := h.SourceCodeRepositoryLister.List("", labels.Everything())
 	if err != nil {
 		return nil, err
 	}
-	for _, repo := range repoList.Items {
+	for _, repo := range repositories {
 		if repo.Spec.SourceCodeCredentialName == sourceCodeCredentialID {
 			result = append(result, repo)
 		}
 	}
 	return result, nil
-}
-
-func (h *SourceCodeCredentialHandler) refreshReposByID(sourceCodeCredentialID string) ([]v3.SourceCodeRepository, error) {
-
-	credential, err := h.SourceCodeCredentials.Get(sourceCodeCredentialID, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	remoteType := credential.Spec.SourceCodeType
-
-	mockConfig := v3.ClusterPipeline{
-		Spec: v3.ClusterPipelineSpec{
-			GithubConfig: &v3.GithubClusterConfig{},
-		},
-	}
-	remote, err := remote.New(mockConfig, remoteType)
-	if err != nil {
-		return nil, err
-	}
-	repos, err := remote.Repos(credential)
-	if err != nil {
-		return nil, err
-	}
-
-	//remove old repos
-	repoList, err := h.SourceCodeRepositories.List(metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	for _, repo := range repoList.Items {
-		if repo.Spec.SourceCodeCredentialName == credential.Name {
-			if err := h.SourceCodeRepositories.Delete(repo.Name, &metav1.DeleteOptions{}); err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	//store new repos
-	for _, repo := range repos {
-		repo.Spec.SourceCodeCredentialName = sourceCodeCredentialID
-		repo.Spec.ClusterName = credential.Spec.ClusterName
-		repo.Spec.UserName = credential.Spec.UserName
-		repo.Name = uuid.NewV4().String()
-		if _, err := h.SourceCodeRepositories.Create(&repo); err != nil {
-			return nil, err
-		}
-	}
-
-	return repos, nil
 }

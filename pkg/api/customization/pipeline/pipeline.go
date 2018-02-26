@@ -12,12 +12,12 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/http"
 )
 
 type Handler struct {
 	Pipelines          v3.PipelineInterface
+	PipelineLister     v3.PipelineLister
 	PipelineExecutions v3.PipelineExecutionInterface
 }
 
@@ -54,7 +54,7 @@ func (h *Handler) changeState(apiContext *types.APIContext, curState, newState s
 	ns := parts[0]
 	name := parts[1]
 
-	pipeline, err := h.Pipelines.GetNamespaced(ns, name, v1.GetOptions{})
+	pipeline, err := h.PipelineLister.Get(ns, name)
 	if err != nil {
 		return err
 	}
@@ -81,7 +81,7 @@ func (h *Handler) run(apiContext *types.APIContext) error {
 	parts := strings.Split(apiContext.ID, ":")
 	ns := parts[0]
 	name := parts[1]
-	pipeline, err := h.Pipelines.GetNamespaced(ns, name, v1.GetOptions{})
+	pipeline, err := h.PipelineLister.Get(ns, name)
 	if err != nil {
 		return err
 	}
