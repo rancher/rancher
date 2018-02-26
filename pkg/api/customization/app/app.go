@@ -73,7 +73,7 @@ func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 		defer cancel()
 		addr := hutils.GenerateRandomPort()
 		probeAddr := hutils.GenerateRandomPort()
-		go hutils.StartTiller(cont, addr, probeAddr, app.InstallNamespace, kubeConfigPath, app.User, app.Groups)
+		go hutils.StartTiller(cont, addr, probeAddr, app.InstallNamespace, kubeConfigPath)
 		actionInput, err := parse.ReadBody(apiContext.Request)
 		if err != nil {
 			return err
@@ -115,7 +115,7 @@ func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 		defer cancel()
 		addr := hutils.GenerateRandomPort()
 		probeAddr := hutils.GenerateRandomPort()
-		go hutils.StartTiller(cont, addr, probeAddr, app.InstallNamespace, kubeConfigPath, app.User, app.Groups)
+		go hutils.StartTiller(cont, addr, probeAddr, app.InstallNamespace, kubeConfigPath)
 		actionInput, err := parse.ReadBody(apiContext.Request)
 		if err != nil {
 			return err

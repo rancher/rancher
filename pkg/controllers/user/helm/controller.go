@@ -199,7 +199,7 @@ func (l *Lifecycle) Run(obj *v3.App, action, templateVersionID string) error {
 		return err
 	}
 	defer os.RemoveAll(kubeConfigPath)
-	go hutils.StartTiller(cont, addr, probeAddr, obj.Spec.InstallNamespace, kubeConfigPath, obj.Spec.User, obj.Spec.Groups)
+	go hutils.StartTiller(cont, addr, probeAddr, obj.Spec.InstallNamespace, kubeConfigPath)
 	switch action {
 	case "install":
 		if err := hutils.InstallCharts(dir, addr, obj); err != nil {

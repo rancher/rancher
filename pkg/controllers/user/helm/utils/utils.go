@@ -93,9 +93,8 @@ func ConvertTemplates(files []managementv3.File) (map[string]string, error) {
 }
 
 // StartTiller start tiller server and return the listening address of the grpc address
-func StartTiller(context context.Context, port, probePort, namespace, kubeConfigPath, user string, groups []string) error {
-	groupsAsString := strings.Join(groups, ",")
-	cmd := exec.Command(tillerName, "--listen", ":"+port, "--probe", ":"+probePort, "--user", user, "--groups", groupsAsString)
+func StartTiller(context context.Context, port, probePort, namespace, kubeConfigPath string) error {
+	cmd := exec.Command(tillerName, "--listen", ":"+port, "--probe", ":"+probePort)
 	cmd.Env = []string{fmt.Sprintf("%s=%s", "KUBECONFIG", kubeConfigPath), fmt.Sprintf("%s=%s", "TILLER_NAMESPACE", namespace)}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -118,7 +117,17 @@ func GenerateRandomPort() string {
 
 func InstallCharts(rootDir, port string, obj *v3.App) error {
 	setValues := []string{}
-	if obj.Spec.Answers != nil {
+	if obj.Spec.AnswerValues != "" {
+		tempFile, err := ioutil.TempFile("", "temp-answer")
+		if err != nil {
+			return err
+		}
+		defer os.RemoveAll(tempFile.Name())
+		if err := ioutil.WriteFile(tempFile.Name(), []byte(obj.Spec.AnswerValues), 0755); err != nil {
+			return err
+		}
+		setValues = append([]string{"-f"}, tempFile.Name())
+	} else if obj.Spec.Answers != nil {
 		answers := obj.Spec.Answers
 		result := []string{}
 		for k, v := range answers {

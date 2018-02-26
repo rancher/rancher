@@ -16,7 +16,9 @@ func (m *Manager) Sync(key string, catalog *v3.Catalog) error {
 	repoPath, commit, err := m.prepareRepoPath(*catalog)
 	if commit == catalog.Status.Commit {
 		logrus.Debugf("Catalog %s is already up to date", catalog.Name)
-		return nil
+		v3.CatalogConditionRefreshed.True(catalog)
+		_, err := m.catalogClient.Update(catalog)
+		return err
 	}
 
 	catalog.Status.Commit = commit

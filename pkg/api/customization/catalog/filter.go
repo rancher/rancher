@@ -3,20 +3,19 @@ package catalog
 import (
 	"bytes"
 	"encoding/base64"
-	"net/http"
-	"time"
-
 	"fmt"
-
-	"strings"
-
+	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/client/management/v3"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TemplateFormatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -82,25 +81,43 @@ func TemplateVersionFormatter(apiContext *types.APIContext, resource *types.RawR
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(apiContext, "refresh")
-	delete(resource.Values, "status")
 }
 
-func RefreshActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
+func CollectionFormatter(request *types.APIContext, collection *types.GenericCollection) {
+	collection.AddAction(request, "refresh")
+}
+
+type ActionHandler struct {
+	CatalogClient v3.CatalogInterface
+}
+
+func (a ActionHandler) RefreshActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
 	if actionName != "refresh" {
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
 
-	store := apiContext.Schema.Store
-
-	data, err := store.ByID(apiContext, apiContext.Schema, apiContext.ID)
-	if err != nil {
-		return err
+	catalogs := []*v3.Catalog{}
+	if apiContext.ID != "" {
+		catalog, err := a.CatalogClient.Get(apiContext.ID, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		catalogs = append(catalogs, catalog)
+	} else {
+		catalogList, err := a.CatalogClient.List(metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		for _, catalog := range catalogList.Items {
+			catalogs = append(catalogs, &catalog)
+		}
 	}
-	data["lastRefreshTimestamp"] = time.Now().Format(time.RFC3339)
-
-	_, err = store.Update(apiContext, apiContext.Schema, data, apiContext.ID)
-	if err != nil {
-		return err
+	for _, catalog := range catalogs {
+		catalog.Status.LastRefreshTimestamp = time.Now().Format(time.RFC3339)
+		v3.CatalogConditionRefreshed.Unknown(catalog)
+		if _, err := a.CatalogClient.Update(catalog); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -143,6 +160,7 @@ func TemplateIconHandler(apiContext *types.APIContext, next types.RequestHandler
 		if err != nil {
 			return err
 		}
+		apiContext.Response.Header().Set("Cache-Control", "private, max-age=604800")
 		http.ServeContent(apiContext.Response, apiContext.Request, template.IconFilename, t, iconReader)
 		return nil
 	default:
