@@ -11,6 +11,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+//Lifecycle is responsible for initializing logs for pipeline execution
+//and calling the run for the execution.
 type Lifecycle struct {
 	pipelineExecutionLogs v3.PipelineExecutionLogInterface
 	pipelineEngine        engine.PipelineEngine

@@ -15,6 +15,8 @@ const (
 	syncLogInterval = 10 * time.Second
 )
 
+//ExecutionLogSyncer is responsible for updating pipeline execution logs that are in building state
+//by syncing with the pipeline engine
 type ExecutionLogSyncer struct {
 	clusterName           string
 	clusterPipelineLister v3.ClusterPipelineLister

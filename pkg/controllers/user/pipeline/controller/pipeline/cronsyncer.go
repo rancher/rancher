@@ -15,6 +15,8 @@ const (
 	syncInterval = 60 * time.Second
 )
 
+//CronSyncer is responsible for watching pipelines with cron trigger set
+//and triggering a pipeline execution when the cron conditions meet
 type CronSyncer struct {
 	clusterName           string
 	clusterPipelineLister v3.ClusterPipelineLister

@@ -14,6 +14,8 @@ const (
 	syncStateInterval = 10 * time.Second
 )
 
+//ExecutionStateSyncer is responsible for updating pipeline execution states
+//by syncing with the pipeline engine
 type ExecutionStateSyncer struct {
 	clusterName           string
 	clusterPipelineLister v3.ClusterPipelineLister
