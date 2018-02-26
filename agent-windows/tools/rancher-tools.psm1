@@ -2,7 +2,7 @@
 
 $AgentBinary="agent"
 $PerHostSubnetBinary="per-host-subnet"
-$rancherCompomentList="$PerHostSubnetBinary","$AgentBinary"
+$rancherComponentList="$PerHostSubnetBinary","$AgentBinary"
 $startupPrefix="startup_"
 $downloadFolder="download"
 $rancherBaseDir="rancher"
@@ -12,8 +12,8 @@ function Update-Binaries  {
     param(
         [string]$target=""
     )
-    for($i=0;$i -lt $rancherCompomentList.Count;$i++){ 
-        $listTar=$rancherCompomentList[$i]
+    for($i=0;$i -lt $rancherComponentList.Count;$i++){ 
+        $listTar=$rancherComponentList[$i]
         if(("$target" -eq "$listTar") -or ("$target" -eq "")){
             Copy-Item -Path "$BasicLocation/$downloadFolder/$rancherBaseDir/$listTar.exe" -Destination "$BasicLocation/$listTar.exe"
             Copy-Item -Path "$BasicLocation/$downloadFolder/$rancherBaseDir/$startupPrefix$listTar.ps1" -Destination "$BasicLocation/$startupPrefix$listTar.ps1"
@@ -26,8 +26,8 @@ function Test-RancherComponent {
         [string]$target=""
     )
     $rtn=$true
-    for($i=0;$i -lt $rancherCompomentList.Count;$i++){ 
-        $listTar=$rancherCompomentList[$i]
+    for($i=0;$i -lt $rancherComponentList.Count;$i++){ 
+        $listTar=$rancherComponentList[$i]
         if(("$target" -eq "$listTar") -or ("$target" -eq "")){
             if($(Test-Path "$BasicLocation/$startupPrefix$listTar.ps1") -and $(Test-Path "$BasicLocation/$listTar.exe")){
                 $rtn = $rtn -and $true
@@ -202,11 +202,11 @@ function Get-DownloadListByTarget{
     }
 }
 
-function Get-RancherCompomentList {
-    return $rancherCompomentList
+function Get-RancherComponentList {
+    return $rancherComponentList
 }
 
-function Start-RancherCompoment  {
+function Start-RancherComponent  {
     param(
         [string]$tar,
         [string]$inputStr
@@ -261,8 +261,8 @@ Export-ModuleMember -Function Get-RancherBasicAuth
 Export-ModuleMember -Function Update-Binaries
 Export-ModuleMember -Function Test-RancherComponent
 Export-ModuleMember -Function Get-DownloadList
-Export-ModuleMember -Function Get-RancherCompomentList
-Export-ModuleMember -Function Start-RancherCompoment 
+Export-ModuleMember -Function Get-RancherComponentList
+Export-ModuleMember -Function Start-RancherComponent 
 Export-ModuleMember -Function Add-DebugContent
 Export-ModuleMember -Function Add-LogContent
 Export-ModuleMember -Function Register-Node

@@ -43,7 +43,7 @@ catch {
 }
 finally{
     Add-LogContent "$target" "prepare to start $target"
-    Start-RancherCompoment $target $inputStr
+    Start-RancherComponent $target $inputStr
 }
 
 Remove-Item $lockFileName
