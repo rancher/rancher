@@ -1,86 +1,24 @@
 ---
-
-kubernetes_version: v1.8.7-rancher1-1
-
-auth:
-  strategy: x509
-  options:
-    foo: bar
-
-# supported plugins are:
-# flannel
-# calico
-# canal
-# weave
-#
-# If you are using calico on AWS or GCE, use the network plugin config option:
-# 'calico_cloud_provider: aws'
-# or
-# 'calico_cloud_provider: gce'
-# network:
-#   plugin: calico
-#   options:
-#     calico_cloud_provider: aws
-#
-# To specify flannel interface, you can use the 'flannel_iface' option:
-# network:
-#   plugin: flannel
-#   options:
-#     flannel_iface: eth1
-
-network:
-  plugin: flannel
-  options:
-
-# Default ingress provider is nginx, To disable ingress, use
-# provider: none
-
-ingress:
-  provider: nginx
-  node_selector:
-    app: ingress
-  options:
-    map-hash-bucket-size: "128"
-    ssl-protocols: SSLv2
-
-ssh_key_path: ~/.ssh/test
-
-# ignore_docker_version toggle will enforce docker version support.
-# If ignore is enabled (true), rke will print out a non-fatal warning instead of error
-ignore_docker_version: false
-
-# Kubernetes authorization mode; currently only `rbac` is supported and enabled by default.
-# Use `mode: none` to disable authorization
-authorization:
-  mode: rbac
-  options:
-
-
-# List of registry credentials, if you are using a Docker Hub registry,
-# you can omit the `url` or set it to `docker.io`
-private_registries:
-  - url: registry.com
-    user: Username
-    password: password
-
 nodes:
   - address: 1.1.1.1
     user: ubuntu
-    role: [controlplane, etcd]
+    role:
+    - controlplane
+    - etcd
     ssh_key_path: /home/user/.ssh/id_rsa
     port: 2222
   - address: 2.2.2.2
     user: ubuntu
-    role: [worker]
-    labels:
-      app: ingress
+    role:
+    - worker
     ssh_key: |-
       -----BEGIN RSA PRIVATE KEY-----
 
       -----END RSA PRIVATE KEY-----
   - address: example.com
     user: ubuntu
-    role: [worker]
+    role:
+    - role
     hostname_override: node3
     internal_address: 192.168.1.6
     labels:
@@ -104,7 +42,6 @@ services:
     #   -----BEGIN PRIVATE KEY-----
     #   xxxxxxxxxx
     #   -----END PRIVATE KEY-----
-
   kube-api:
     service_cluster_ip_range: 10.233.0.0/18
     pod_security_policy: false
@@ -120,19 +57,24 @@ services:
     infra_container_image: gcr.io/google_containers/pause-amd64:3.0
   kubeproxy:
 
+# supported plugins are:
+# flannel
+# calico
+# canal
+# weave
+#
+# If you are using calico on AWS or GCE, use the network plugin config option:
+# 'calico_cloud_provider: aws'
+# or
+# 'calico_cloud_provider: gce'
+network:
+  plugin: flannel
+  options:
+    flannel_image: quay.io/coreos/flannel:v0.9.1
+    flannel_cni_image: quay.io/coreos/flannel-cni:v0.2.0
 
-
-system_images:
-  etcd: rancher/etcd:v3.0.17
-  kubernetes: rancher/k8s:v1.8.7-rancher1-1
-  alpine: alpine:latest
-  nginx_proxy: rancher/rke-nginx-proxy:v0.1.1
-  cert_downloader: rancher/rke-cert-deployer:v0.1.1
-  kubernetes_services_sidecar: rancher/rke-service-sidekick:v0.1.0
-  kubedns: rancher/k8s-dns-kube-dns-amd64:1.14.5
-  dnsmasq: rancher/k8s-dns-dnsmasq-nanny-amd64:1.14.5
-  kubedns_sidecar: rancher/k8s-dns-sidecar-amd64:1.14.5
-  kubedns_autoscaler: rancher/cluster-proportional-autoscaler-amd64:1.0.0
+authentication:
+  strategy: x509
 
 # all addon manifests MUST specify a namespace
 addons: |-
@@ -148,3 +90,35 @@ addons: |-
         image: nginx
         ports:
         - containerPort: 80
+
+system_images:
+  etcd: rancher/etcd:v3.0.17
+  kubernetes: rancher/k8s:v1.8.7-rancher1-1
+  alpine: alpine:latest
+  nginx_proxy: rancher/rke-nginx-proxy:v0.1.1
+  cert_downloader: rancher/rke-cert-deployer:v0.1.1
+  kubernetes_services_sidecar: rancher/rke-service-sidekick:v0.1.0
+  kubedns: rancher/k8s-dns-kube-dns-amd64:1.14.5
+  dnsmasq: rancher/k8s-dns-dnsmasq-nanny-amd64:1.14.5
+  kubedns_sidecar: rancher/k8s-dns-sidecar-amd64:1.14.5
+  kubedns_autoscaler: rancher/cluster-proportional-autoscaler-amd64:1.0.0
+
+ssh_key_path: ~/.ssh/test
+
+# Kubernetes authorization mode
+# Use `mode: rbac` to enable RBAC
+# Use `mode: none` to disable authorization
+authorization:
+  mode: rbac
+
+# If set to true, rke won't fail when unsupported Docker version is found
+ignore_docker_version: false
+
+kubernetes_version: v1.8.7-rancher1-1
+
+# List of registry credentials, if you are using a Docker Hub registry,
+# you can omit the `url` or set it to `docker.io`
+private_registries:
+  - url: registry.com
+    user: Username
+    password: password

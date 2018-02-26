@@ -4838,9 +4838,9 @@ func (in *RKEConfigNodePlan) DeepCopyInto(out *RKEConfigNodePlan) {
 	*out = *in
 	if in.Processes != nil {
 		in, out := &in.Processes, &out.Processes
-		*out = make([]Process, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
+		*out = make(map[string]Process, len(*in))
+		for key, val := range *in {
+			(*out)[key] = *val.DeepCopy()
 		}
 	}
 	if in.PortChecks != nil {

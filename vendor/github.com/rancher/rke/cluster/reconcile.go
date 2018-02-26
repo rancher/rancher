@@ -193,8 +193,15 @@ func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, ku
 			return err
 		}
 
-		if err := services.AddEtcdMember(ctx, etcdHost, kubeCluster.EtcdHosts, currentCluster.LocalConnDialerFactory, clientCert, clientkey); err != nil {
+		// Check if the host already part of the cluster -- this will cover cluster with lost quorum
+		isEtcdMember, err := services.IsEtcdMember(ctx, etcdHost, kubeCluster.EtcdHosts, currentCluster.LocalConnDialerFactory, clientCert, clientkey)
+		if err != nil {
 			return err
+		}
+		if !isEtcdMember {
+			if err := services.AddEtcdMember(ctx, etcdHost, kubeCluster.EtcdHosts, currentCluster.LocalConnDialerFactory, clientCert, clientkey); err != nil {
+				return err
+			}
 		}
 		etcdHost.ToAddEtcdMember = false
 		readyHosts := getReadyEtcdHosts(kubeCluster.EtcdHosts)

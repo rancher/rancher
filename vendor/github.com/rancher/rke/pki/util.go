@@ -231,8 +231,6 @@ func getWorkerCertKeys() []string {
 		CACertName,
 		KubeProxyCertName,
 		KubeNodeCertName,
-		EtcdClientCertName,
-		EtcdClientCACertName,
 	}
 }
 

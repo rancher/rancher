@@ -251,13 +251,15 @@ type RKEPlan struct {
 type RKEConfigNodePlan struct {
 	// Node address
 	Address string `json:"address,omitempty"`
-	// List of processes that should run on the node
-	Processes []Process `json:"processes,omitempty"`
+	// map of named processes that should run on the node
+	Processes map[string]Process `json:"processes,omitempty"`
 	// List of portchecks that should be open on the node
 	PortChecks []PortCheck `json:"portChecks,omitempty"`
 }
 
 type Process struct {
+	// Process name, this should be the container name
+	Name string `json:"name,omitempty"`
 	// Process Entrypoint command
 	Command []string `json:"command,omitempty"`
 	// Process args

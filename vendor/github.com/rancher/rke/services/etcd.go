@@ -2,11 +2,13 @@ package services
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"context"
 
 	etcdclient "github.com/coreos/etcd/client"
+	"github.com/pkg/errors"
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
@@ -59,11 +61,14 @@ func RemoveEtcdPlane(ctx context.Context, etcdHosts []*hosts.Host, force bool) e
 	return nil
 }
 
-func AddEtcdMember(ctx context.Context, etcdHost *hosts.Host, etcdHosts []*hosts.Host, localConnDialerFactory hosts.DialerFactory, cert, key []byte) error {
-	log.Infof(ctx, "[add/%s] Adding member [etcd-%s] to etcd cluster", ETCDRole, etcdHost.HostnameOverride)
-	peerURL := fmt.Sprintf("https://%s:2380", etcdHost.InternalAddress)
+func AddEtcdMember(ctx context.Context, toAddEtcdHost *hosts.Host, etcdHosts []*hosts.Host, localConnDialerFactory hosts.DialerFactory, cert, key []byte) error {
+	log.Infof(ctx, "[add/%s] Adding member [etcd-%s] to etcd cluster", ETCDRole, toAddEtcdHost.HostnameOverride)
+	peerURL := fmt.Sprintf("https://%s:2380", toAddEtcdHost.InternalAddress)
 	added := false
 	for _, host := range etcdHosts {
+		if host.Address == toAddEtcdHost.Address {
+			continue
+		}
 		etcdClient, err := getEtcdClient(ctx, host, localConnDialerFactory, cert, key)
 		if err != nil {
 			logrus.Debugf("Failed to create etcd client for host [%s]: %v", host.Address, err)
@@ -71,16 +76,16 @@ func AddEtcdMember(ctx context.Context, etcdHost *hosts.Host, etcdHosts []*hosts
 		}
 		memAPI := etcdclient.NewMembersAPI(etcdClient)
 		if _, err := memAPI.Add(ctx, peerURL); err != nil {
-			logrus.Debugf("Failed to list etcd members from host [%s]: %v", host.Address, err)
+			logrus.Debugf("Failed to Add etcd member [%s] from host: %v", host.Address, err)
 			continue
 		}
 		added = true
 		break
 	}
 	if !added {
-		return fmt.Errorf("Failed to add etcd member [etcd-%s] from etcd cluster", etcdHost.HostnameOverride)
+		return fmt.Errorf("Failed to add etcd member [etcd-%s] to etcd cluster", toAddEtcdHost.HostnameOverride)
 	}
-	log.Infof(ctx, "[add/%s] Successfully Added member [etcd-%s] to etcd cluster", ETCDRole, etcdHost.HostnameOverride)
+	log.Infof(ctx, "[add/%s] Successfully Added member [etcd-%s] to etcd cluster", ETCDRole, toAddEtcdHost.HostnameOverride)
 	return nil
 }
 
@@ -139,4 +144,37 @@ func ReloadEtcdCluster(ctx context.Context, readyEtcdHosts []*hosts.Host, localC
 		return fmt.Errorf("[etcd] Etcd Cluster is not healthy")
 	}
 	return nil
+}
+
+func IsEtcdMember(ctx context.Context, etcdHost *hosts.Host, etcdHosts []*hosts.Host, localConnDialerFactory hosts.DialerFactory, cert, key []byte) (bool, error) {
+	var listErr error
+	peerURL := fmt.Sprintf("https://%s:2380", etcdHost.InternalAddress)
+	for _, host := range etcdHosts {
+		if host.Address == etcdHost.Address {
+			continue
+		}
+		etcdClient, err := getEtcdClient(ctx, host, localConnDialerFactory, cert, key)
+		if err != nil {
+			listErr = errors.Wrapf(err, "Failed to create etcd client for host [%s]", host.Address)
+			logrus.Debugf("Failed to create etcd client for host [%s]: %v", host.Address, err)
+			continue
+		}
+		memAPI := etcdclient.NewMembersAPI(etcdClient)
+		members, err := memAPI.List(ctx)
+		if err != nil {
+			listErr = errors.Wrapf(err, "Failed to create etcd client for host [%s]", host.Address)
+			logrus.Debugf("Failed to list etcd cluster members [%s]: %v", etcdHost.Address, err)
+			continue
+		}
+		for _, member := range members {
+			if strings.Contains(member.PeerURLs[0], peerURL) {
+				logrus.Infof("[etcd] member [%s] is already part of the etcd cluster", etcdHost.Address)
+				return true, nil
+			}
+		}
+	}
+	if listErr != nil {
+		return false, listErr
+	}
+	return false, nil
 }

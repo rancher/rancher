@@ -8,20 +8,16 @@ import (
 	"net"
 	"strings"
 
-	b64 "encoding/base64"
-
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
-	"github.com/rancher/rke/services"
 	"github.com/rancher/rke/templates"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
-	"k8s.io/client-go/util/cert"
 )
 
 const (
@@ -148,36 +144,15 @@ func (c *Cluster) doFlannelDeploy(ctx context.Context) error {
 }
 
 func (c *Cluster) doCalicoDeploy(ctx context.Context) error {
-
-	etcdEndpoints := services.GetEtcdConnString(c.EtcdHosts)
-	etcdClientCert := b64.StdEncoding.EncodeToString(cert.EncodeCertPEM(c.Certificates[pki.KubeNodeCertName].Certificate))
-	etcdClientkey := b64.StdEncoding.EncodeToString(cert.EncodePrivateKeyPEM(c.Certificates[pki.KubeNodeCertName].Key))
-	etcdCaCert := b64.StdEncoding.EncodeToString(cert.EncodeCertPEM(c.Certificates[pki.CACertName].Certificate))
 	clientConfig := pki.GetConfigPath(pki.KubeNodeCertName)
-	// handling external etcd
-	if len(c.Services.Etcd.ExternalURLs) > 0 {
-		etcdClientCert = b64.StdEncoding.EncodeToString([]byte(c.Services.Etcd.Cert))
-		etcdClientkey = b64.StdEncoding.EncodeToString([]byte(c.Services.Etcd.Key))
-		etcdCaCert = b64.StdEncoding.EncodeToString([]byte(c.Services.Etcd.CACert))
-		etcdEndpoints = strings.Join(c.Services.Etcd.ExternalURLs, ",")
-	}
 	calicoConfig := map[string]string{
-		EtcdEndpoints:      etcdEndpoints,
-		APIRoot:            "https://127.0.0.1:6443",
-		EtcdClientCA:       etcdCaCert,
-		EtcdClientCert:     etcdClientCert,
-		EtcdClientKey:      etcdClientkey,
-		EtcdClientKeyPath:  pki.GetKeyPath(pki.EtcdClientCertName),
-		EtcdClientCertPath: pki.GetCertPath(pki.EtcdClientCertName),
-		EtcdClientCAPath:   pki.GetCertPath(pki.EtcdClientCACertName),
-		KubeCfg:            clientConfig,
-		ClusterCIDR:        c.ClusterCIDR,
-		CNIImage:           c.SystemImages.CalicoCNI,
-		NodeImage:          c.SystemImages.CalicoNode,
-		ControllersImage:   c.SystemImages.CalicoControllers,
-		Calicoctl:          c.SystemImages.CalicoCtl,
-		CloudProvider:      c.Network.Options[CalicoCloudProvider],
-		RBACConfig:         c.Authorization.Mode,
+		KubeCfg:       clientConfig,
+		ClusterCIDR:   c.ClusterCIDR,
+		CNIImage:      c.SystemImages.CalicoCNI,
+		NodeImage:     c.SystemImages.CalicoNode,
+		Calicoctl:     c.SystemImages.CalicoCtl,
+		CloudProvider: c.Network.Options[CalicoCloudProvider],
+		RBACConfig:    c.Authorization.Mode,
 	}
 	pluginYaml, err := c.getNetworkPluginManifest(calicoConfig)
 	if err != nil {
