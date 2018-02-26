@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/authz/podsecuritypolicy"
 	"github.com/rancher/rancher/pkg/controllers/user/dnsrecord"
 	"github.com/rancher/rancher/pkg/controllers/user/endpoints"
+	"github.com/rancher/rancher/pkg/controllers/user/externalservice"
 	"github.com/rancher/rancher/pkg/controllers/user/healthsyncer"
 	"github.com/rancher/rancher/pkg/controllers/user/helm"
 	"github.com/rancher/rancher/pkg/controllers/user/ingress"
@@ -44,6 +45,7 @@ func Register(ctx context.Context, cluster *config.UserContext) error {
 	endpoints.Register(ctx, userOnlyContext)
 	workload.Register(ctx, userOnlyContext)
 	ingress.Register(ctx, userOnlyContext)
+	externalservice.Register(ctx, userOnlyContext)
 
 	return nil
 }
