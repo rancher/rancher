@@ -118,7 +118,7 @@ func (c *Controller) reconcileEndpoints(key string, obj *corev1.Service) error {
 		logrus.Debugf("Endpoints are up to date for DNSRecord service [%s]", obj.Name)
 		return nil
 	}
-	logrus.Infof("Updating endpoints for DNSREcord service [%s]. Old: [%v], new: [%v]", obj.Name, ep.Subsets, newEndpointSubsets)
+	logrus.Infof("Updating endpoints for DNSRecord service [%s]. Old: [%v], new: [%v]", obj.Name, ep.Subsets, newEndpointSubsets)
 	toUpdate := ep.DeepCopy()
 	toUpdate.Subsets = newEndpointSubsets
 	_, err = c.endpoints.Update(toUpdate)
