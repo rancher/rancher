@@ -6,6 +6,7 @@ import (
 	ref "github.com/docker/distribution/reference"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/services"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 const (
@@ -14,6 +15,8 @@ const (
 	DefaultClusterDNSService     = "10.233.0.3"
 	DefaultClusterDomain         = "cluster.local"
 	DefaultClusterSSHKeyPath     = "~/.ssh/id_rsa"
+
+	DefaultK8sVersion = "v1.8.7-rancher1-1"
 
 	DefaultSSHPort        = "22"
 	DefaultDockerSockPath = "/var/run/docker.sock"
@@ -24,38 +27,7 @@ const (
 	DefaultNetworkPlugin        = "flannel"
 	DefaultNetworkCloudProvider = "none"
 
-	DefaultInfraContainerImage            = "rancher/pause-amd64:3.0"
-	DefaultAplineImage                    = "alpine:latest"
-	DefaultNginxProxyImage                = "rancher/rke-nginx-proxy:v0.1.1"
-	DefaultCertDownloaderImage            = "rancher/rke-cert-deployer:v0.1.1"
-	DefaultKubernetesServicesSidecarImage = "rancher/rke-service-sidekick:v0.1.0"
-
-	DefaultIngressController   = "nginx"
-	DefaultIngressImage        = "rancher/nginx-ingress-controller:0.10.2"
-	DefaultIngressBackendImage = "rancher/nginx-ingress-controller-defaultbackend:1.4"
-
-	DefaultEtcdImage = "rancher/etcd:v3.0.17"
-	DefaultK8sImage  = "rancher/k8s:v1.8.7-rancher1-1"
-
-	DefaultFlannelImage    = "rancher/coreos-flannel:v0.9.1"
-	DefaultFlannelCNIImage = "rancher/coreos-flannel-cni:v0.2.0"
-
-	DefaultCalicoNodeImage        = "rancher/calico-node:v2.6.2"
-	DefaultCalicoCNIImage         = "rancher/calico-cni:v1.11.0"
-	DefaultCalicoControllersImage = "rancher/calico-kube-controllers:v1.0.0"
-	DefaultCalicoctlImage         = "rancher/calico-ctl:v1.6.2"
-
-	DefaultWeaveImage    = "weaveworks/weave-kube:2.1.2"
-	DefaultWeaveCNIImage = "weaveworks/weave-npc:2.1.2"
-
-	DefaultCanalNodeImage    = "rancher/calico-node:v2.6.2"
-	DefaultCanalCNIImage     = "rancher/calico-cni:v1.11.0"
-	DefaultCanalFlannelImage = "rancher/coreos-flannel:v0.9.1"
-
-	DefaultKubeDNSImage           = "rancher/k8s-dns-kube-dns-amd64:1.14.5"
-	DefaultDNSmasqImage           = "rancher/k8s-dns-dnsmasq-nanny-amd64:1.14.5"
-	DefaultKubeDNSSidecarImage    = "rancher/k8s-dns-sidecar-amd64:1.14.5"
-	DefaultKubeDNSAutoScalerImage = "rancher/cluster-proportional-autoscaler-amd64:1.0.0"
+	DefaultIngressController = "nginx"
 )
 
 func setDefaultIfEmptyMapValue(configMap map[string]string, key string, value string) {
@@ -143,33 +115,37 @@ func (c *Cluster) setClusterServicesDefaults() {
 }
 
 func (c *Cluster) setClusterImageDefaults() {
+	imageDefaults, ok := v3.K8sVersionToRKESystemImages[c.Version]
+	if !ok {
+		imageDefaults = v3.K8sVersionToRKESystemImages[DefaultK8sVersion]
+	}
 
 	systemImagesDefaultsMap := map[*string]string{
-		&c.SystemImages.Alpine:                    DefaultAplineImage,
-		&c.SystemImages.NginxProxy:                DefaultNginxProxyImage,
-		&c.SystemImages.CertDownloader:            DefaultCertDownloaderImage,
-		&c.SystemImages.KubeDNS:                   DefaultKubeDNSImage,
-		&c.SystemImages.KubeDNSSidecar:            DefaultKubeDNSSidecarImage,
-		&c.SystemImages.DNSmasq:                   DefaultDNSmasqImage,
-		&c.SystemImages.KubeDNSAutoscaler:         DefaultKubeDNSAutoScalerImage,
-		&c.SystemImages.KubernetesServicesSidecar: DefaultKubernetesServicesSidecarImage,
-		&c.SystemImages.Etcd:                      DefaultEtcdImage,
-		&c.SystemImages.Kubernetes:                DefaultK8sImage,
-		&c.SystemImages.PodInfraContainer:         DefaultInfraContainerImage,
-		&c.SystemImages.Flannel:                   DefaultFlannelImage,
-		&c.SystemImages.FlannelCNI:                DefaultFlannelCNIImage,
-		&c.SystemImages.CalicoNode:                DefaultCalicoNodeImage,
-		&c.SystemImages.CalicoCNI:                 DefaultCalicoCNIImage,
-		&c.SystemImages.CalicoControllers:         DefaultCalicoControllersImage,
-		&c.SystemImages.CalicoCtl:                 DefaultCalicoctlImage,
-		&c.SystemImages.CanalNode:                 DefaultCanalNodeImage,
-		&c.SystemImages.CanalCNI:                  DefaultCanalCNIImage,
-		&c.SystemImages.CanalFlannel:              DefaultCanalFlannelImage,
-		&c.SystemImages.WeaveNode:                 DefaultWeaveImage,
-		&c.SystemImages.WeaveCNI:                  DefaultWeaveCNIImage,
-		&c.SystemImages.Ingress:                   DefaultIngressImage,
-		&c.SystemImages.IngressBackend:            DefaultIngressBackendImage,
+		&c.SystemImages.Alpine:                    imageDefaults.Alpine,
+		&c.SystemImages.NginxProxy:                imageDefaults.NginxProxy,
+		&c.SystemImages.CertDownloader:            imageDefaults.CertDownloader,
+		&c.SystemImages.KubeDNS:                   imageDefaults.KubeDNS,
+		&c.SystemImages.KubeDNSSidecar:            imageDefaults.KubeDNSSidecar,
+		&c.SystemImages.DNSmasq:                   imageDefaults.DNSmasq,
+		&c.SystemImages.KubeDNSAutoscaler:         imageDefaults.KubeDNSAutoscaler,
+		&c.SystemImages.KubernetesServicesSidecar: imageDefaults.KubernetesServicesSidecar,
+		&c.SystemImages.Etcd:                      imageDefaults.Etcd,
+		&c.SystemImages.Kubernetes:                imageDefaults.Kubernetes,
+		&c.SystemImages.PodInfraContainer:         imageDefaults.PodInfraContainer,
+		&c.SystemImages.Flannel:                   imageDefaults.Flannel,
+		&c.SystemImages.FlannelCNI:                imageDefaults.FlannelCNI,
+		&c.SystemImages.CalicoNode:                imageDefaults.CalicoNode,
+		&c.SystemImages.CalicoCNI:                 imageDefaults.CalicoCNI,
+		&c.SystemImages.CalicoCtl:                 imageDefaults.CalicoCtl,
+		&c.SystemImages.CanalNode:                 imageDefaults.CanalNode,
+		&c.SystemImages.CanalCNI:                  imageDefaults.CanalCNI,
+		&c.SystemImages.CanalFlannel:              imageDefaults.CanalFlannel,
+		&c.SystemImages.WeaveNode:                 imageDefaults.WeaveNode,
+		&c.SystemImages.WeaveCNI:                  imageDefaults.WeaveCNI,
+		&c.SystemImages.Ingress:                   imageDefaults.Ingress,
+		&c.SystemImages.IngressBackend:            imageDefaults.IngressBackend,
 	}
+
 	for k, v := range systemImagesDefaultsMap {
 		setDefaultIfEmpty(k, v)
 	}

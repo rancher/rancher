@@ -7,10 +7,12 @@ import (
 
 func GetLocalRKEConfig() *v3.RancherKubernetesEngineConfig {
 	rkeLocalNode := GetLocalRKENodeConfig()
+	imageDefaults := v3.K8sVersionToRKESystemImages[DefaultK8sVersion]
+
 	rkeServices := v3.RKEConfigServices{
 		Kubelet: v3.KubeletService{
 			BaseService: v3.BaseService{
-				Image:     DefaultK8sImage,
+				Image:     imageDefaults.Kubernetes,
 				ExtraArgs: map[string]string{"fail-swap-on": "false"},
 			},
 		},

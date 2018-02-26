@@ -151,6 +151,7 @@ func GenerateRKECerts(ctx context.Context, rkeConfig v3.RancherKubernetesEngineC
 func GenerateRKENodeCerts(ctx context.Context, rkeConfig v3.RancherKubernetesEngineConfig, nodeAddress string, certBundle map[string]CertificatePKI) map[string]CertificatePKI {
 	crtMap := make(map[string]CertificatePKI)
 	crtKeys := []string{}
+	removeCAKey := true
 	for _, node := range rkeConfig.Nodes {
 		if node.Address == nodeAddress {
 			for _, role := range node.Role {
@@ -158,6 +159,7 @@ func GenerateRKENodeCerts(ctx context.Context, rkeConfig v3.RancherKubernetesEng
 				case controlRole:
 					keys := getControlCertKeys()
 					crtKeys = append(crtKeys, keys...)
+					removeCAKey = false
 				case workerRole:
 					keys := getWorkerCertKeys()
 					crtKeys = append(crtKeys, keys...)
@@ -171,6 +173,13 @@ func GenerateRKENodeCerts(ctx context.Context, rkeConfig v3.RancherKubernetesEng
 	}
 	for _, key := range crtKeys {
 		crtMap[key] = certBundle[key]
+	}
+	if removeCAKey {
+		caCert := crtMap[CACertName]
+		caCert.Key = nil
+		caCert.KeyEnvName = ""
+		caCert.KeyPath = ""
+		crtMap[CACertName] = caCert
 	}
 	return crtMap
 }

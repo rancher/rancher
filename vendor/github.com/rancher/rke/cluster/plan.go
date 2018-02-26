@@ -28,27 +28,27 @@ func GeneratePlan(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConf
 }
 
 func BuildRKEConfigNodePlan(ctx context.Context, myCluster *Cluster, host *hosts.Host) v3.RKEConfigNodePlan {
-	processes := []v3.Process{}
+	processes := map[string]v3.Process{}
 	portChecks := []v3.PortCheck{}
 	// Everybody gets a sidecar and a kubelet..
-	processes = append(processes, myCluster.BuildSidecarProcess())
-	processes = append(processes, myCluster.BuildKubeletProcess(host))
-	processes = append(processes, myCluster.BuildKubeProxyProcess())
+	processes[services.SidekickContainerName] = myCluster.BuildSidecarProcess()
+	processes[services.KubeletContainerName] = myCluster.BuildKubeletProcess(host)
+	processes[services.KubeproxyContainerName] = myCluster.BuildKubeProxyProcess()
 
 	portChecks = append(portChecks, BuildPortChecksFromPortList(host, WorkerPortList, ProtocolTCP)...)
 	// Do we need an nginxProxy for this one ?
 	if host.IsWorker && !host.IsControl {
-		processes = append(processes, myCluster.BuildProxyProcess())
+		processes[services.NginxProxyContainerName] = myCluster.BuildProxyProcess()
 	}
 	if host.IsControl {
-		processes = append(processes, myCluster.BuildKubeAPIProcess())
-		processes = append(processes, myCluster.BuildKubeControllerProcess())
-		processes = append(processes, myCluster.BuildSchedulerProcess())
+		processes[services.KubeAPIContainerName] = myCluster.BuildKubeAPIProcess()
+		processes[services.KubeControllerContainerName] = myCluster.BuildKubeControllerProcess()
+		processes[services.SchedulerContainerName] = myCluster.BuildSchedulerProcess()
 
 		portChecks = append(portChecks, BuildPortChecksFromPortList(host, ControlPlanePortList, ProtocolTCP)...)
 	}
 	if host.IsEtcd {
-		processes = append(processes, myCluster.BuildEtcdProcess(host, nil))
+		processes[services.EtcdContainerName] = myCluster.BuildEtcdProcess(host, nil)
 
 		portChecks = append(portChecks, BuildPortChecksFromPortList(host, EtcdPortList, ProtocolTCP)...)
 	}
@@ -103,7 +103,7 @@ func (c *Cluster) BuildKubeAPIProcess() v3.Process {
 	}
 
 	if c.Authorization.Mode == services.RBACAuthorizationMode {
-		args = append(args, "--authorization-mode=RBAC")
+		args = append(args, "--authorization-mode=Node,RBAC")
 	}
 	if c.Services.KubeAPI.PodSecurityPolicy {
 		args = append(args, "--runtime-config=extensions/v1beta1/podsecuritypolicy=true", "--admission-control=PodSecurityPolicy")
@@ -124,6 +124,7 @@ func (c *Cluster) BuildKubeAPIProcess() v3.Process {
 		URL: services.GetHealthCheckURL(true, services.KubeAPIPort),
 	}
 	return v3.Process{
+		Name:          services.KubeAPIContainerName,
 		Command:       Command,
 		Args:          args,
 		VolumesFrom:   VolumesFrom,
@@ -171,6 +172,7 @@ func (c *Cluster) BuildKubeControllerProcess() v3.Process {
 		URL: services.GetHealthCheckURL(false, services.KubeControllerPort),
 	}
 	return v3.Process{
+		Name:          services.KubeControllerContainerName,
 		Command:       Command,
 		Args:          args,
 		VolumesFrom:   VolumesFrom,
@@ -234,6 +236,7 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host) v3.Process {
 		URL: services.GetHealthCheckURL(true, services.KubeletPort),
 	}
 	return v3.Process{
+		Name:          services.KubeletContainerName,
 		Command:       Command,
 		VolumesFrom:   VolumesFrom,
 		Binds:         Binds,
@@ -268,6 +271,7 @@ func (c *Cluster) BuildKubeProxyProcess() v3.Process {
 		URL: services.GetHealthCheckURL(false, services.KubeproxyPort),
 	}
 	return v3.Process{
+		Name:          services.KubeproxyContainerName,
 		Command:       Command,
 		VolumesFrom:   VolumesFrom,
 		Binds:         Binds,
@@ -291,6 +295,7 @@ func (c *Cluster) BuildProxyProcess() v3.Process {
 	Env := []string{fmt.Sprintf("%s=%s", services.NginxProxyEnvName, nginxProxyEnv)}
 
 	return v3.Process{
+		Name:          services.NginxProxyContainerName,
 		Env:           Env,
 		Args:          Env,
 		NetworkMode:   "host",
@@ -323,6 +328,7 @@ func (c *Cluster) BuildSchedulerProcess() v3.Process {
 		URL: services.GetHealthCheckURL(false, services.SchedulerPort),
 	}
 	return v3.Process{
+		Name:          services.SchedulerContainerName,
 		Command:       Command,
 		Binds:         Binds,
 		VolumesFrom:   VolumesFrom,
@@ -334,8 +340,8 @@ func (c *Cluster) BuildSchedulerProcess() v3.Process {
 }
 
 func (c *Cluster) BuildSidecarProcess() v3.Process {
-
 	return v3.Process{
+		Name:        services.SidekickContainerName,
 		NetworkMode: "none",
 		Image:       c.SystemImages.KubernetesServicesSidecar,
 		HealthCheck: v3.HealthCheck{},
@@ -357,7 +363,7 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host) v3
 	}
 	args := []string{"/usr/local/bin/etcd",
 		"--name=etcd-" + host.HostnameOverride,
-		"--data-dir=/etcd-data",
+		"--data-dir=/var/lib/rancher/etcd",
 		"--advertise-client-urls=https://" + host.InternalAddress + ":2379,https://" + host.InternalAddress + ":4001",
 		"--listen-client-urls=https://0.0.0.0:2379",
 		"--initial-advertise-peer-urls=https://" + host.InternalAddress + ":2380",
@@ -376,7 +382,7 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host) v3
 	}
 
 	Binds := []string{
-		"/var/lib/etcd:/etcd-data:z",
+		"/var/lib/etcd:/var/lib/rancher/etcd:z",
 		"/etc/kubernetes:/etc/kubernetes:z",
 	}
 	for arg, value := range c.Services.Etcd.ExtraArgs {
@@ -387,6 +393,7 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host) v3
 		URL: services.EtcdHealthCheckURL,
 	}
 	return v3.Process{
+		Name:        services.EtcdContainerName,
 		Args:        args,
 		Binds:       Binds,
 		NetworkMode: "host",

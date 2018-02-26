@@ -85,7 +85,7 @@ type PipelineStatus struct {
 	LastStarted     string `json:"lastStarted,omitempty" yaml:"lastStarted,omitempty"`
 	NextStart       string `json:"nextStart,omitempty" yaml:"nextStart,omitempty"`
 	WebHookID       string `json:"webhookId,omitempty" yaml:"webhookId,omitempty"`
-	Token           string `json:"token,omitempty" yaml:"token,omitempty"`
+	Token           string `json:"token,omitempty" yaml:"token,omitempty" norman:"writeOnly,noupdate"`
 }
 
 type PipelineSpec struct {
@@ -172,7 +172,7 @@ type SourceCodeCredentialSpec struct {
 	AvatarURL      string `json:"avatarUrl,omitempty"`
 	HTMLURL        string `json:"htmlUrl,omitempty"`
 	LoginName      string `json:"loginName,omitempty"`
-	AccessToken    string `json:"accessToken,omitempty"`
+	AccessToken    string `json:"accessToken,omitempty" norman:"writeOnly,noupdate"`
 }
 
 type SourceCodeCredentialStatus struct {
