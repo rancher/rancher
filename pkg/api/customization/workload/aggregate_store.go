@@ -5,13 +5,19 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/docker/distribution/reference"
+	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/norman/types/values"
+	projectschema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	"github.com/rancher/types/client/project/v3"
+	projectclient "github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+	corev1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -121,6 +127,7 @@ func (a *AggregateStore) Create(apiContext *types.APIContext, schema *types.Sche
 
 	setSelector(toSchema.ID, data)
 	setWorkloadSpecificDefaults(toSchema.ID, data)
+	setSecrets(apiContext, data)
 
 	return toStore.Create(apiContext, toSchema, data)
 }
@@ -165,6 +172,37 @@ func setWorkloadSpecificDefaults(schemaID string, data map[string]interface{}) {
 			logrus.Info("Setting restart policy")
 			data["restartPolicy"] = "OnFailure"
 		}
+	}
+}
+
+func setSecrets(apiContext *types.APIContext, data map[string]interface{}) {
+	if _, ok := values.GetValue(data, "imagePullSecrets"); ok {
+		return
+	}
+	var imagePullSecrets []corev1.LocalObjectReference
+
+	if containers, ok := values.GetSlice(data, "containers"); ok {
+		imageToSecret := make(map[string]*corev1.LocalObjectReference)
+		imagePullSecrets, _ = data["imagePullSecrets"].([]corev1.LocalObjectReference)
+
+		for _, container := range containers {
+			if image := convert.ToString(container["image"]); image != "" {
+				if secretRef, ok := imageToSecret[image]; ok {
+					imagePullSecrets = append(imagePullSecrets, *secretRef)
+					continue
+				}
+				if name := getRepo(image); name != "" {
+					if gotSecret(data["projectId"], data["namespaceId"], apiContext, name) {
+						secretRef := &corev1.LocalObjectReference{}
+						secretRef.Name = name
+						imagePullSecrets = append(imagePullSecrets, *secretRef)
+					}
+				}
+			}
+		}
+	}
+	if imagePullSecrets != nil {
+		values.PutValue(data, imagePullSecrets, "imagePullSecrets")
 	}
 }
 
@@ -226,4 +264,47 @@ func splitTypeAndID(id string) (string, string) {
 		return "", ""
 	}
 	return parts[0], parts[1]
+}
+
+func gotSecret(projectID interface{}, namespaceID interface{}, apiContext *types.APIContext, repoName string) bool {
+	if project := convert.ToString(projectID); project != "" {
+		splitID := strings.Split(project, ":")
+		if len(splitID) == 2 {
+			projectName := splitID[1]
+			if err := getSecret(projectName, repoName, projectclient.SecretType, apiContext); err == nil {
+				return true
+			}
+		}
+	}
+	if namespace := convert.ToString(namespaceID); namespace != "" {
+		if err := getSecret(namespace, repoName, "namespacedSecret", apiContext); err == nil {
+			return true
+		}
+	}
+	logrus.Warnf("couldn't find secret [%s]", repoName)
+	return false
+}
+
+func getSecret(prefix string, repoName string, datatype string, apiContext *types.APIContext) error {
+	secretName := fmt.Sprintf("%s:%s", prefix, repoName)
+	var secret interface{}
+	return access.ByID(apiContext, &projectschema.Version, datatype, secretName, &secret)
+}
+
+func getRepo(image string) string {
+	var repo string
+	named, err := reference.ParseNormalizedNamed(image)
+	if err != nil {
+		logrus.Warn(err)
+		return repo
+	}
+	path := reference.Path(named)
+	parts := strings.Split(path, "/")
+	if len(parts) == 1 {
+		return path
+	}
+	if len(parts) == 2 {
+		return parts[1]
+	}
+	return repo
 }
