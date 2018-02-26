@@ -82,6 +82,7 @@ func (r *RemoteService) Handler() http.Handler {
 func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	u := *r.url
 	u.Path = strings.TrimPrefix(req.URL.Path, prefix(r.cluster))
+	u.RawQuery = req.URL.RawQuery
 
 	proto := req.Header.Get("X-Forwarded-Proto")
 	if proto != "" {
