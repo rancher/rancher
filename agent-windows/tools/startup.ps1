@@ -7,7 +7,7 @@ $rancherBaseDir="rancher"
 $BasicLocation="c:\program files\$rancherBaseDir"
 Import-Module -Name "c:\program files\$rancherBaseDir\rancher-tools.psm1" -Verbose
 
-$rancherCompomentList=Get-RancherCompomentList
+$rancherComponentList=Get-RancherComponentList
 $strs=$inputStr.Split(",")
 $RegisterUrl=$strs[0].Trim("`"")
 $HostLabels=$strs[1].Trim("`"")
@@ -30,7 +30,7 @@ try {
     if (Test-Path "$downloadFolder"){Remove-Item -Path "$downloadFolder" -Confirm:$false -Recurse -Force }
     New-Item -ItemType Directory -Path "$downloadFolder" > $null
     
-    foreach($compoment in $rancherCompomentList){
+    foreach($compoment in $rancherComponentList){
         $downloadList=Get-DownloadListByTarget $compoment
         foreach($target in $downloadList.Keys){
             $zipFile=$downloadList[$target]
@@ -40,12 +40,12 @@ try {
         }
     }
 
-    for($i=0;$i -lt $rancherCompomentList.Count;$i++){
-        $listTar=$rancherCompomentList[$i]
+    for($i=0;$i -lt $rancherComponentList.Count;$i++){
+        $listTar=$rancherComponentList[$i]
         Write-Host "checking $listTar update"
         if(-not $(Test-RancherComponent "$listTar")){
             Update-Binaries "$listTar"
-            Start-RancherCompoment $listTar $inputStr
+            Start-RancherComponent $listTar $inputStr
             Write-Host "create or update $listTar success"
         } else{
             Write-Host "version of $listTar is the same, do nothing"
