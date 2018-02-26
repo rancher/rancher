@@ -70,6 +70,7 @@ func (m *Manager) update(catalog *v3.Catalog, templates []v3.Template, updateOnl
 		return errors.Errorf("Multiple errors happens: %v", errs)
 	}
 
+	v3.CatalogConditionRefreshed.True(catalog)
 	if _, err := m.catalogClient.Update(catalog); err != nil {
 		return err
 	}

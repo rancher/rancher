@@ -97,7 +97,7 @@ func (m *Manager) prepareGitRepoPath(catalog v3.Catalog) (string, string, error)
 	}
 
 	repoBranchHash := hash(catalog.Spec.URL + branch)
-	repoPath := path.Join(m.cacheRoot, catalog.Namespace, repoBranchHash)
+	repoPath := path.Join(m.cacheRoot, repoBranchHash)
 
 	if err := os.MkdirAll(repoPath, 0755); err != nil {
 		return "", "", err

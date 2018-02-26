@@ -87,7 +87,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext) error {
 	Templates(schemas)
 	TemplateVersion(schemas)
 	User(schemas, apiContext)
-	Catalog(schemas)
+	Catalog(schemas, apiContext)
 	SecretTypes(schemas, apiContext)
 	App(schemas, apiContext)
 	Setting(schemas)
@@ -147,13 +147,14 @@ func TemplateVersion(schemas *types.Schemas) {
 	schema.LinkHandler = catalog.TemplateVersionReadmeHandler
 }
 
-func Catalog(schemas *types.Schemas) {
+func Catalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.CatalogType)
-	schema.ResourceActions = map[string]types.Action{
-		"refresh": {},
-	}
 	schema.Formatter = catalog.Formatter
-	schema.ActionHandler = catalog.RefreshActionHandler
+	handler := catalog.ActionHandler{
+		CatalogClient: managementContext.Management.Catalogs(""),
+	}
+	schema.ActionHandler = handler.RefreshActionHandler
+	schema.CollectionFormatter = catalog.CollectionFormatter
 }
 
 func ClusterRegistrationTokens(schemas *types.Schemas) {
