@@ -4,6 +4,8 @@ $AgentBinary="agent"
 $PerHostSubnetBinary="per-host-subnet"
 $rancherComponentList="$PerHostSubnetBinary","$AgentBinary"
 $startupPrefix="startup_"
+$stopPrefix="stop_"
+$servicePrefix="rancher-"
 $downloadFolder="download"
 $rancherBaseDir="rancher"
 $BasicLocation="c:\program files\$rancherBaseDir"
@@ -84,6 +86,7 @@ function getToken {
     for ($i = 0; $i -lt 16; $i++) {
         $output+=$(-join ((48..57) + (65..90) + (97..122) | Get-Random -Count 8 | ForEach-Object {[char]$_}))
     }
+    mkdir C:\ProgramData\rancher
     set-content C:\ProgramData\rancher\registrationToken -Value $output
     return $output
 }
@@ -227,6 +230,23 @@ function Start-RancherComponent  {
     } 
 }
 
+function Stop-RancherComponent {
+    param(
+        [string]$tar
+    )
+    $serviceName="$servicePrefix"+"$tar"
+    $stopScript="$BasicLocation"+"\"+"$stopPrefix"+"$tar"+".ps1"
+    if(Test-Path "$stopScript"){
+        Invoke-Expression "$stopScript"
+    }else{
+        $tarService=get-service "$servicename" -ErrorAction Ignore
+        if($tarService -ne $null){
+            $tarService | Set-Service -StartupType Manual -ErrorAction Ignore
+            Stop-Service "$servicename" -ErrorAction Ignore
+        }
+    }
+}
+
 function Add-LogContent  {
     param(
         [string]$target,
@@ -263,6 +283,7 @@ Export-ModuleMember -Function Test-RancherComponent
 Export-ModuleMember -Function Get-DownloadList
 Export-ModuleMember -Function Get-RancherComponentList
 Export-ModuleMember -Function Start-RancherComponent 
+Export-ModuleMember -Function Stop-RancherComponent 
 Export-ModuleMember -Function Add-DebugContent
 Export-ModuleMember -Function Add-LogContent
 Export-ModuleMember -Function Register-Node

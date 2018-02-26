@@ -44,6 +44,7 @@ try {
         $listTar=$rancherComponentList[$i]
         Write-Host "checking $listTar update"
         if(-not $(Test-RancherComponent "$listTar")){
+            Stop-RancherComponent "$listTar"
             Update-Binaries "$listTar"
             Start-RancherComponent $listTar $inputStr
             Write-Host "create or update $listTar success"
