@@ -1,6 +1,7 @@
 import cattle
 import pytest
 import requests
+import time
 
 from common import random_str
 
@@ -68,12 +69,45 @@ def pc(request, cc):
     p = cc.management.client.create_project(name='test-' + random_str(),
                                             clusterId=cc.cluster.id)
     p = cc.management.client.wait_success(p)
+    wait_for_condition("BackingNamespaceCreated", "True",
+                       cc.management.client, p)
     assert p.state == 'active'
     request.addfinalizer(lambda: cc.management.client.delete(p))
     url = p.links['self'] + '/schemas'
     return ProjectContext(cc, p, cattle.Client(url=url,
                                                verify=False,
                                                token=cc.client._token))
+
+
+def wait_for_condition(type, status, client, obj):
+    timeout = 45
+    start = time.time()
+    obj = client.reload(obj)
+    sleep = 0.01
+    while not find_condition(type, status, obj):
+        time.sleep(sleep)
+        sleep *= 2
+        if sleep > 2:
+            sleep = 2
+        obj = client.reload(obj)
+        delta = time.time() - start
+        if delta > timeout:
+            msg = 'Timeout waiting for [{}:{}] for condition after {}' \
+              ' seconds'.format(obj.type, obj.id, delta)
+            raise Exception(msg)
+
+
+def find_condition(type, status, obj):
+    if not hasattr(obj, "conditions"):
+        return False
+
+    if obj.conditions is None:
+        return False
+
+    for condition in obj.conditions:
+        if condition.type == type and condition.status == status:
+            return True
+    return False
 
 
 @pytest.fixture
