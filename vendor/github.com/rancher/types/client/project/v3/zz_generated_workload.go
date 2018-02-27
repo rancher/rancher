@@ -12,12 +12,12 @@ const (
 	WorkloadFieldContainers                    = "containers"
 	WorkloadFieldCreated                       = "created"
 	WorkloadFieldCreatorID                     = "creatorId"
-	WorkloadFieldCronJob                       = "cronJob"
+	WorkloadFieldCronJobConfig                 = "cronJobConfig"
 	WorkloadFieldCronJobStatus                 = "cronJobStatus"
 	WorkloadFieldDNSPolicy                     = "dnsPolicy"
-	WorkloadFieldDaemonSet                     = "daemonSet"
+	WorkloadFieldDaemonSetConfig               = "daemonSetConfig"
 	WorkloadFieldDaemonSetStatus               = "daemonSetStatus"
-	WorkloadFieldDeployment                    = "deployment"
+	WorkloadFieldDeploymentConfig              = "deploymentConfig"
 	WorkloadFieldDeploymentStatus              = "deploymentStatus"
 	WorkloadFieldFsgid                         = "fsgid"
 	WorkloadFieldGids                          = "gids"
@@ -27,7 +27,7 @@ const (
 	WorkloadFieldHostPID                       = "hostPID"
 	WorkloadFieldHostname                      = "hostname"
 	WorkloadFieldImagePullSecrets              = "imagePullSecrets"
-	WorkloadFieldJob                           = "job"
+	WorkloadFieldJobConfig                     = "jobConfig"
 	WorkloadFieldJobStatus                     = "jobStatus"
 	WorkloadFieldLabels                        = "labels"
 	WorkloadFieldName                          = "name"
@@ -39,9 +39,9 @@ const (
 	WorkloadFieldProjectID                     = "projectId"
 	WorkloadFieldPublicEndpoints               = "publicEndpoints"
 	WorkloadFieldRemoved                       = "removed"
-	WorkloadFieldReplicaSet                    = "replicaSet"
+	WorkloadFieldReplicaSetConfig              = "replicaSetConfig"
 	WorkloadFieldReplicaSetStatus              = "replicaSetStatus"
-	WorkloadFieldReplicationController         = "replicationController"
+	WorkloadFieldReplicationControllerConfig   = "replicationControllerConfig"
 	WorkloadFieldReplicationControllerStatus   = "replicationControllerStatus"
 	WorkloadFieldRestartPolicy                 = "restartPolicy"
 	WorkloadFieldRunAsNonRoot                  = "runAsNonRoot"
@@ -51,7 +51,7 @@ const (
 	WorkloadFieldSelector                      = "selector"
 	WorkloadFieldServiceAccountName            = "serviceAccountName"
 	WorkloadFieldState                         = "state"
-	WorkloadFieldStatefulSet                   = "statefulSet"
+	WorkloadFieldStatefulSetConfig             = "statefulSetConfig"
 	WorkloadFieldStatefulSetStatus             = "statefulSetStatus"
 	WorkloadFieldSubdomain                     = "subdomain"
 	WorkloadFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
@@ -72,12 +72,12 @@ type Workload struct {
 	Containers                    []Container                  `json:"containers,omitempty"`
 	Created                       string                       `json:"created,omitempty"`
 	CreatorID                     string                       `json:"creatorId,omitempty"`
-	CronJob                       *CronJobConfig               `json:"cronJob,omitempty"`
+	CronJobConfig                 *CronJobConfig               `json:"cronJobConfig,omitempty"`
 	CronJobStatus                 *CronJobStatus               `json:"cronJobStatus,omitempty"`
 	DNSPolicy                     string                       `json:"dnsPolicy,omitempty"`
-	DaemonSet                     *DaemonSetConfig             `json:"daemonSet,omitempty"`
+	DaemonSetConfig               *DaemonSetConfig             `json:"daemonSetConfig,omitempty"`
 	DaemonSetStatus               *DaemonSetStatus             `json:"daemonSetStatus,omitempty"`
-	Deployment                    *DeploymentConfig            `json:"deployment,omitempty"`
+	DeploymentConfig              *DeploymentConfig            `json:"deploymentConfig,omitempty"`
 	DeploymentStatus              *DeploymentStatus            `json:"deploymentStatus,omitempty"`
 	Fsgid                         *int64                       `json:"fsgid,omitempty"`
 	Gids                          []int64                      `json:"gids,omitempty"`
@@ -87,7 +87,7 @@ type Workload struct {
 	HostPID                       bool                         `json:"hostPID,omitempty"`
 	Hostname                      string                       `json:"hostname,omitempty"`
 	ImagePullSecrets              []LocalObjectReference       `json:"imagePullSecrets,omitempty"`
-	Job                           *JobConfig                   `json:"job,omitempty"`
+	JobConfig                     *JobConfig                   `json:"jobConfig,omitempty"`
 	JobStatus                     *JobStatus                   `json:"jobStatus,omitempty"`
 	Labels                        map[string]string            `json:"labels,omitempty"`
 	Name                          string                       `json:"name,omitempty"`
@@ -99,9 +99,9 @@ type Workload struct {
 	ProjectID                     string                       `json:"projectId,omitempty"`
 	PublicEndpoints               []PublicEndpoint             `json:"publicEndpoints,omitempty"`
 	Removed                       string                       `json:"removed,omitempty"`
-	ReplicaSet                    *ReplicaSetConfig            `json:"replicaSet,omitempty"`
+	ReplicaSetConfig              *ReplicaSetConfig            `json:"replicaSetConfig,omitempty"`
 	ReplicaSetStatus              *ReplicaSetStatus            `json:"replicaSetStatus,omitempty"`
-	ReplicationController         *ReplicationControllerConfig `json:"replicationController,omitempty"`
+	ReplicationControllerConfig   *ReplicationControllerConfig `json:"replicationControllerConfig,omitempty"`
 	ReplicationControllerStatus   *ReplicationControllerStatus `json:"replicationControllerStatus,omitempty"`
 	RestartPolicy                 string                       `json:"restartPolicy,omitempty"`
 	RunAsNonRoot                  *bool                        `json:"runAsNonRoot,omitempty"`
@@ -111,7 +111,7 @@ type Workload struct {
 	Selector                      *LabelSelector               `json:"selector,omitempty"`
 	ServiceAccountName            string                       `json:"serviceAccountName,omitempty"`
 	State                         string                       `json:"state,omitempty"`
-	StatefulSet                   *StatefulSetConfig           `json:"statefulSet,omitempty"`
+	StatefulSetConfig             *StatefulSetConfig           `json:"statefulSetConfig,omitempty"`
 	StatefulSetStatus             *StatefulSetStatus           `json:"statefulSetStatus,omitempty"`
 	Subdomain                     string                       `json:"subdomain,omitempty"`
 	TerminationGracePeriodSeconds *int64                       `json:"terminationGracePeriodSeconds,omitempty"`

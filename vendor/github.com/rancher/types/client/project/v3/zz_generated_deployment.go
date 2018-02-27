@@ -13,7 +13,7 @@ const (
 	DeploymentFieldCreated                       = "created"
 	DeploymentFieldCreatorID                     = "creatorId"
 	DeploymentFieldDNSPolicy                     = "dnsPolicy"
-	DeploymentFieldDeployment                    = "deployment"
+	DeploymentFieldDeploymentConfig              = "deploymentConfig"
 	DeploymentFieldDeploymentStatus              = "deploymentStatus"
 	DeploymentFieldFsgid                         = "fsgid"
 	DeploymentFieldGids                          = "gids"
@@ -61,7 +61,7 @@ type Deployment struct {
 	Created                       string                 `json:"created,omitempty"`
 	CreatorID                     string                 `json:"creatorId,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty"`
-	Deployment                    *DeploymentConfig      `json:"deployment,omitempty"`
+	DeploymentConfig              *DeploymentConfig      `json:"deploymentConfig,omitempty"`
 	DeploymentStatus              *DeploymentStatus      `json:"deploymentStatus,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty"`

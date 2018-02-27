@@ -6,7 +6,7 @@ const (
 	DeploymentSpecFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
 	DeploymentSpecFieldContainers                    = "containers"
 	DeploymentSpecFieldDNSPolicy                     = "dnsPolicy"
-	DeploymentSpecFieldDeployment                    = "deployment"
+	DeploymentSpecFieldDeploymentConfig              = "deploymentConfig"
 	DeploymentSpecFieldFsgid                         = "fsgid"
 	DeploymentSpecFieldGids                          = "gids"
 	DeploymentSpecFieldHostAliases                   = "hostAliases"
@@ -37,7 +37,7 @@ type DeploymentSpec struct {
 	AutomountServiceAccountToken  *bool                  `json:"automountServiceAccountToken,omitempty"`
 	Containers                    []Container            `json:"containers,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty"`
-	Deployment                    *DeploymentConfig      `json:"deployment,omitempty"`
+	DeploymentConfig              *DeploymentConfig      `json:"deploymentConfig,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty"`
 	HostAliases                   []HostAlias            `json:"hostAliases,omitempty"`

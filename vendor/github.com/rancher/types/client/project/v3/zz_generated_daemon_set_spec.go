@@ -6,7 +6,7 @@ const (
 	DaemonSetSpecFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
 	DaemonSetSpecFieldContainers                    = "containers"
 	DaemonSetSpecFieldDNSPolicy                     = "dnsPolicy"
-	DaemonSetSpecFieldDaemonSet                     = "daemonSet"
+	DaemonSetSpecFieldDaemonSetConfig               = "daemonSetConfig"
 	DaemonSetSpecFieldFsgid                         = "fsgid"
 	DaemonSetSpecFieldGids                          = "gids"
 	DaemonSetSpecFieldHostAliases                   = "hostAliases"
@@ -36,7 +36,7 @@ type DaemonSetSpec struct {
 	AutomountServiceAccountToken  *bool                  `json:"automountServiceAccountToken,omitempty"`
 	Containers                    []Container            `json:"containers,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty"`
-	DaemonSet                     *DaemonSetConfig       `json:"daemonSet,omitempty"`
+	DaemonSetConfig               *DaemonSetConfig       `json:"daemonSetConfig,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty"`
 	HostAliases                   []HostAlias            `json:"hostAliases,omitempty"`

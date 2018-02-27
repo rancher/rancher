@@ -18,7 +18,7 @@ const (
 	ReplicationControllerSpecFieldObjectMeta                    = "metadata"
 	ReplicationControllerSpecFieldPriority                      = "priority"
 	ReplicationControllerSpecFieldPriorityClassName             = "priorityClassName"
-	ReplicationControllerSpecFieldReplicationController         = "replicationController"
+	ReplicationControllerSpecFieldReplicationControllerConfig   = "replicationControllerConfig"
 	ReplicationControllerSpecFieldRestartPolicy                 = "restartPolicy"
 	ReplicationControllerSpecFieldRunAsNonRoot                  = "runAsNonRoot"
 	ReplicationControllerSpecFieldSchedulerName                 = "schedulerName"
@@ -48,7 +48,7 @@ type ReplicationControllerSpec struct {
 	ObjectMeta                    *ObjectMeta                  `json:"metadata,omitempty"`
 	Priority                      *int64                       `json:"priority,omitempty"`
 	PriorityClassName             string                       `json:"priorityClassName,omitempty"`
-	ReplicationController         *ReplicationControllerConfig `json:"replicationController,omitempty"`
+	ReplicationControllerConfig   *ReplicationControllerConfig `json:"replicationControllerConfig,omitempty"`
 	RestartPolicy                 string                       `json:"restartPolicy,omitempty"`
 	RunAsNonRoot                  *bool                        `json:"runAsNonRoot,omitempty"`
 	SchedulerName                 string                       `json:"schedulerName,omitempty"`

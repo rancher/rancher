@@ -12,7 +12,7 @@ const (
 	CronJobFieldContainers                    = "containers"
 	CronJobFieldCreated                       = "created"
 	CronJobFieldCreatorID                     = "creatorId"
-	CronJobFieldCronJob                       = "cronJob"
+	CronJobFieldCronJobConfig                 = "cronJobConfig"
 	CronJobFieldCronJobStatus                 = "cronJobStatus"
 	CronJobFieldDNSPolicy                     = "dnsPolicy"
 	CronJobFieldFsgid                         = "fsgid"
@@ -59,7 +59,7 @@ type CronJob struct {
 	Containers                    []Container            `json:"containers,omitempty"`
 	Created                       string                 `json:"created,omitempty"`
 	CreatorID                     string                 `json:"creatorId,omitempty"`
-	CronJob                       *CronJobConfig         `json:"cronJob,omitempty"`
+	CronJobConfig                 *CronJobConfig         `json:"cronJobConfig,omitempty"`
 	CronJobStatus                 *CronJobStatus         `json:"cronJobStatus,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty"`

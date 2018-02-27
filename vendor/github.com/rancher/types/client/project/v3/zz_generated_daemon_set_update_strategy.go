@@ -1,12 +1,14 @@
 package client
 
+import "k8s.io/apimachinery/pkg/util/intstr"
+
 const (
-	DaemonSetUpdateStrategyType               = "daemonSetUpdateStrategy"
-	DaemonSetUpdateStrategyFieldRollingUpdate = "rollingUpdate"
-	DaemonSetUpdateStrategyFieldType          = "type"
+	DaemonSetUpdateStrategyType                = "daemonSetUpdateStrategy"
+	DaemonSetUpdateStrategyFieldMaxUnavailable = "maxUnavailable"
+	DaemonSetUpdateStrategyFieldStrategy       = "strategy"
 )
 
 type DaemonSetUpdateStrategy struct {
-	RollingUpdate *RollingUpdateDaemonSet `json:"rollingUpdate,omitempty"`
-	Type          string                  `json:"type,omitempty"`
+	MaxUnavailable intstr.IntOrString `json:"maxUnavailable,omitempty"`
+	Strategy       string             `json:"strategy,omitempty"`
 }

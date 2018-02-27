@@ -70,31 +70,31 @@ type JobConfig struct {
 }
 
 type deploymentConfigOverride struct {
-	Deployment DeploymentConfig
+	DeploymentConfig DeploymentConfig
 }
 
 type statefulSetConfigOverride struct {
-	StatefulSet StatefulSetConfig
+	StatefulSetConfig StatefulSetConfig
 }
 
 type replicaSetConfigOverride struct {
-	ReplicaSet ReplicaSetConfig
+	ReplicaSetConfig ReplicaSetConfig
 }
 
 type replicationControllerConfigOverride struct {
-	ReplicationController ReplicationControllerConfig
+	ReplicationControllerConfig ReplicationControllerConfig
 }
 
 type daemonSetOverride struct {
-	DaemonSet DaemonSetConfig
+	DaemonSetConfig DaemonSetConfig
 }
 
 type cronJobOverride struct {
-	CronJob CronJobConfig
+	CronJobConfig CronJobConfig
 }
 
 type jobOverride struct {
-	Job JobConfig
+	JobConfig JobConfig
 }
 
 func workloadTypes(schemas *types.Schemas) *types.Schemas {
@@ -122,35 +122,38 @@ func workloadTypes(schemas *types.Schemas) *types.Schemas {
 
 func statefulSetTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
+		AddMapperForType(&Version, v1beta2.StatefulSetUpdateStrategy{},
+			&m.Embed{Field: "rollingUpdate"},
+			m.Enum{Field: "type", Options: []string{
+				"RollingUpdate",
+				"OnDelete",
+			}},
+			m.Move{From: "type", To: "strategy"},
+		).
 		AddMapperForType(&Version, v1beta2.StatefulSetSpec{},
 			&m.Move{
 				From:        "replicas",
 				To:          "scale",
 				DestDefined: true,
 			},
-			&m.Move{
-				From: "updateStrategy/rollingUpdate/partition",
-				To:   "statefulSet/partition",
+			&m.Embed{Field: "updateStrategy"},
+			&m.Enum{
+				Field: "podManagementPolicy",
+				Options: []string{
+					"OrderedReady",
+					"Parallel",
+				},
 			},
-			&m.Move{
-				From: "volumeClaimTemplates",
-				To:   "statefulSet/volumeClaimTemplates",
-			},
-			&m.Move{
-				From: "serviceName",
-				To:   "statefulSet/serviceName",
-			},
-			&m.Move{
-				From: "revisionHistoryLimit",
-				To:   "statefulSet/revisionHistoryLimit",
-			},
-			&m.Move{
-				From: "podManagementPolicy",
-				To:   "statefulSet/podManagementPolicy",
-			},
-			&m.Move{
-				From: "updateStrategy",
-				To:   "statefulSet/updateStrategy",
+			&m.BatchMove{
+				From: []string{
+					"partition",
+					"strategy",
+					"volumeClaimTemplates",
+					"serviceName",
+					"revisionHistoryLimit",
+					"podManagementPolicy",
+				},
+				To: "statefulSetConfig",
 			},
 			&m.Embed{Field: "template"},
 		).
@@ -179,7 +182,7 @@ func replicaSetTypes(schemas *types.Schemas) *types.Schemas {
 			},
 			&m.Move{
 				From: "minReadySeconds",
-				To:   "replicaSet/minReadySeconds",
+				To:   "replicaSetConfig/minReadySeconds",
 			},
 		).
 		AddMapperForType(&Version, v1beta1.ReplicaSet{},
@@ -208,7 +211,7 @@ func replicationControllerTypes(schemas *types.Schemas) *types.Schemas {
 			},
 			&m.Move{
 				From: "minReadySeconds",
-				To:   "replicationController/minReadySeconds",
+				To:   "replicationControllerConfig/minReadySeconds",
 			},
 			&m.Embed{Field: "template"},
 		).
@@ -231,18 +234,24 @@ func replicationControllerTypes(schemas *types.Schemas) *types.Schemas {
 
 func daemonSetTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
+		AddMapperForType(&Version, v1beta2.DaemonSetUpdateStrategy{},
+			&m.Embed{Field: "rollingUpdate"},
+			m.Enum{Field: "type", Options: []string{
+				"RollingUpdate",
+				"OnDelete",
+			}},
+			m.Move{From: "type", To: "strategy"},
+		).
 		AddMapperForType(&Version, v1beta2.DaemonSetSpec{},
-			&m.Move{
-				From: "minReadySeconds",
-				To:   "daemonSet/minReadySeconds",
-			},
-			&m.Move{
-				From: "updateStrategy",
-				To:   "daemonSet/updateStrategy",
-			},
-			&m.Move{
-				From: "revisionHistoryLimit",
-				To:   "daemonSet/revisionHistoryLimit",
+			&m.Embed{Field: "updateStrategy"},
+			&m.BatchMove{
+				From: []string{
+					"strategy",
+					"maxUnavailable",
+					"minReadySeconds",
+					"revisionHistoryLimit",
+				},
+				To: "daemonSetConfig",
 			},
 			&m.Embed{Field: "template"},
 		).
@@ -264,25 +273,14 @@ func daemonSetTypes(schemas *types.Schemas) *types.Schemas {
 func jobTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
 		AddMapperForType(&Version, batchv1.JobSpec{},
-			&m.Move{
-				From: "parallelism",
-				To:   "job/parallelism",
-			},
-			&m.Move{
-				From: "completions",
-				To:   "job/completions",
-			},
-			&m.Move{
-				From: "activeDeadlineSeconds",
-				To:   "job/activeDeadlineSeconds",
-			},
-			&m.Move{
-				From: "backoffLimit",
-				To:   "job/backoffLimit",
-			},
-			&m.Move{
-				From: "manualSelector",
-				To:   "job/manualSelector",
+			&m.BatchMove{
+				From: []string{"parallelism",
+					"completions",
+					"activeDeadlineSeconds",
+					"backoffLimit",
+					"manualSelector",
+				},
+				To: "jobConfig",
 			},
 			&m.Embed{Field: "template"},
 		).
@@ -311,45 +309,29 @@ func cronJobTypes(schemas *types.Schemas) *types.Schemas {
 			&m.Embed{Field: "spec"},
 		).
 		AddMapperForType(&Version, batchv1beta1.CronJobSpec{},
-			&m.Move{
-				From: "schedule",
-				To:   "cronJob/schedule",
-			},
-			&m.Move{
-				From: "startingDeadlineSeconds",
-				To:   "cronJob/startingDeadlineSeconds",
-			},
-			&m.Move{
-				From: "concurrencyPolicy",
-				To:   "cronJob/concurrencyPolicy",
-			},
-			&m.Move{
-				From: "suspend",
-				To:   "cronJob/suspend",
-			},
-			&m.Move{
-				From: "successfulJobsHistoryLimit",
-				To:   "cronJob/successfulJobsHistoryLimit",
-			},
-			&m.Move{
-				From: "failedJobsHistoryLimit",
-				To:   "cronJob/failedJobsHistoryLimit",
-			},
 			&m.Embed{
 				Field: "jobTemplate",
 			},
-			&m.Move{
-				From: "job",
-				To:   "cronJob/job",
+			&m.BatchMove{
+				From: []string{
+					"schedule",
+					"startingDeadlineSeconds",
+					"concurrencyPolicy",
+					"suspend",
+					"successfulJobsHistoryLimit",
+					"failedJobsHistoryLimit",
+					"jobConfig",
+				},
+				To: "cronJobConfig",
 			},
 			&m.Move{
 				From:              "jobMetadata/labels",
-				To:                "cronJob/jobLabels",
+				To:                "cronJobConfig/jobLabels",
 				NoDeleteFromField: true,
 			},
 			&m.Move{
 				From:              "jobMetadata/annotations",
-				To:                "cronJob/jobAnnotations",
+				To:                "cronJobConfig/jobAnnotations",
 				NoDeleteFromField: true,
 			},
 			&m.Drop{Field: "jobMetadata"},
@@ -372,30 +354,31 @@ func cronJobTypes(schemas *types.Schemas) *types.Schemas {
 
 func deploymentTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
+		AddMapperForType(&Version, v1beta2.DeploymentStrategy{},
+			&m.Embed{Field: "rollingUpdate"},
+			m.Enum{Field: "type", Options: []string{
+				"Recreate",
+				"RollingUpdate",
+			}},
+			m.Move{From: "type", To: "strategy"},
+		).
 		AddMapperForType(&Version, v1beta2.DeploymentSpec{},
+			&m.Embed{Field: "strategy"},
 			&m.Move{
 				From: "replicas",
 				To:   "scale",
 			},
-			&m.Move{
-				From: "minReadySeconds",
-				To:   "deployment/minReadySeconds",
-			},
-			&m.Move{
-				From: "strategy",
-				To:   "deployment/strategy",
-			},
-			&m.Move{
-				From: "revisionHistoryLimit",
-				To:   "deployment/revisionHistoryLimit",
-			},
-			&m.Move{
-				From: "paused",
-				To:   "deployment/paused",
-			},
-			&m.Move{
-				From: "progressDeadlineSeconds",
-				To:   "deployment/progressDeadlineSeconds",
+			&m.BatchMove{
+				From: []string{
+					"minReadySeconds",
+					"strategy",
+					"revisionHistoryLimit",
+					"paused",
+					"progressDeadlineSeconds",
+					"maxUnavailable",
+					"maxSurge",
+				},
+				To: "deploymentConfig",
 			},
 			&m.Embed{Field: "template"},
 		).

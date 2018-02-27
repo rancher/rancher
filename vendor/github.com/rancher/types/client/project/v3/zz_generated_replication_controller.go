@@ -31,7 +31,7 @@ const (
 	ReplicationControllerFieldProjectID                     = "projectId"
 	ReplicationControllerFieldPublicEndpoints               = "publicEndpoints"
 	ReplicationControllerFieldRemoved                       = "removed"
-	ReplicationControllerFieldReplicationController         = "replicationController"
+	ReplicationControllerFieldReplicationControllerConfig   = "replicationControllerConfig"
 	ReplicationControllerFieldReplicationControllerStatus   = "replicationControllerStatus"
 	ReplicationControllerFieldRestartPolicy                 = "restartPolicy"
 	ReplicationControllerFieldRunAsNonRoot                  = "runAsNonRoot"
@@ -78,7 +78,7 @@ type ReplicationController struct {
 	ProjectID                     string                       `json:"projectId,omitempty"`
 	PublicEndpoints               []PublicEndpoint             `json:"publicEndpoints,omitempty"`
 	Removed                       string                       `json:"removed,omitempty"`
-	ReplicationController         *ReplicationControllerConfig `json:"replicationController,omitempty"`
+	ReplicationControllerConfig   *ReplicationControllerConfig `json:"replicationControllerConfig,omitempty"`
 	ReplicationControllerStatus   *ReplicationControllerStatus `json:"replicationControllerStatus,omitempty"`
 	RestartPolicy                 string                       `json:"restartPolicy,omitempty"`
 	RunAsNonRoot                  *bool                        `json:"runAsNonRoot,omitempty"`
