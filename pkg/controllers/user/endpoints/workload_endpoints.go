@@ -26,6 +26,16 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 	if obj == nil && key != workloadutil.AllWorkloads {
 		return nil
 	}
+	// do not update endpoints for job, cronJob and for workload owned by controller (ReplicaSet)
+	if strings.EqualFold(obj.Kind, "job") || strings.EqualFold(obj.Kind, "cronJob") {
+		return nil
+	}
+	for _, o := range obj.OwnerReferences {
+		if *o.Controller {
+			return nil
+		}
+	}
+
 	var workloads []*workloadutil.Workload
 	var services []*corev1.Service
 	var err error

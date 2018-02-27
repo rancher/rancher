@@ -558,7 +558,6 @@ func addServiceOrDNSRecord(dns bool) types.SchemasInitFunc {
 					&m.Drop{Field: "healthCheckNodePort"},
 					&m.Drop{Field: "loadBalancerIP"},
 					&m.Drop{Field: "loadBalancerSourceRanges"},
-					&m.Drop{Field: "ports"},
 					&m.Drop{Field: "publishNotReadyAddresses"},
 					&m.Drop{Field: "sessionAffinity"},
 					&m.Drop{Field: "sessionAffinityConfig"},
@@ -569,6 +568,11 @@ func addServiceOrDNSRecord(dns bool) types.SchemasInitFunc {
 			if dns {
 				schema.CodeName = "DNSRecord"
 				schema.MustCustomizeField("clusterIp", func(f types.Field) types.Field {
+					f.Create = false
+					f.Update = false
+					return f
+				})
+				schema.MustCustomizeField("ports", func(f types.Field) types.Field {
 					f.Create = false
 					f.Update = false
 					return f

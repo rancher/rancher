@@ -479,6 +479,17 @@ func generateServiceFromContainers(workload *Workload) *Service {
 		}
 	}
 
+	// append default port as sky dns won't work w/o at least one port being set
+	if len(servicePorts) == 0 {
+		servicePort := corev1.ServicePort{
+			Port:       42,
+			TargetPort: intstr.Parse(strconv.FormatInt(42, 10)),
+			Protocol:   corev1.Protocol(corev1.ProtocolTCP),
+			Name:       "default",
+		}
+		servicePorts = append(servicePorts, servicePort)
+	}
+
 	return &Service{
 		Type:         ClusterIPServiceType,
 		ClusterIP:    "None",
@@ -514,6 +525,16 @@ func generateServicesFromPortsAnnotation(portAnnotation string) ([]Service, erro
 			}
 			servicePorts = append(servicePorts, servicePort)
 		}
+		// append default port as sky dns won't work w/o at least one port being set
+		if len(servicePorts) == 0 {
+			servicePort := corev1.ServicePort{
+				Port:       42,
+				TargetPort: intstr.Parse(strconv.FormatInt(42, 10)),
+				Protocol:   corev1.Protocol(corev1.ProtocolTCP),
+				Name:       "default",
+			}
+			servicePorts = append(servicePorts, servicePort)
+		}
 		services = append(services, Service{
 			Type:         svcType,
 			ServicePorts: servicePorts,
@@ -532,11 +553,6 @@ func getWorkloadID(objectType string, namespace string, name string) string {
 }
 
 func (c CommonController) UpdateWorkload(w *Workload) error {
-	for _, o := range w.OwnerReferences {
-		if *o.Controller {
-			return nil
-		}
-	}
 	// only annotations updates are supported
 	switch w.Kind {
 	case DeploymentType:

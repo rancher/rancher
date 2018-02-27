@@ -97,14 +97,14 @@ func (c *Controller) sync(key string, obj *corev1.Service) error {
 			},
 			Subsets: newSubsets,
 		}
-		logrus.Infof("Creating endpoints for external ip service [%s]", key)
+		logrus.Infof("Creating endpoints for external ip service [%s]: %v", key, ep.Subsets)
 		if _, err := c.endpoints.Create(ep); err != nil {
 			return err
 		}
 	} else if subsetsChanged(newSubsets, existing.Subsets) {
 		toUpdate := existing.DeepCopy()
 		toUpdate.Subsets = newSubsets
-		logrus.Infof("Updating endpoints for external ip service [%s]", key)
+		logrus.Infof("Updating endpoints for external ip service [%s]: %v", key, toUpdate.Subsets)
 		if _, err := c.endpoints.Update(toUpdate); err != nil {
 			return err
 		}

@@ -13,6 +13,7 @@ def test_dns_fields(client):
         'workloadId': 'r',
         'targetDnsRecordIds': 'cru',
         'publicEndpoints': 'r',
+        'ports': 'r',
     })
 
 

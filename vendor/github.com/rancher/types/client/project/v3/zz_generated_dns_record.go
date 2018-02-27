@@ -17,6 +17,7 @@ const (
 	DNSRecordFieldName                 = "name"
 	DNSRecordFieldNamespaceId          = "namespaceId"
 	DNSRecordFieldOwnerReferences      = "ownerReferences"
+	DNSRecordFieldPorts                = "ports"
 	DNSRecordFieldProjectID            = "projectId"
 	DNSRecordFieldPublicEndpoints      = "publicEndpoints"
 	DNSRecordFieldRemoved              = "removed"
@@ -43,6 +44,7 @@ type DNSRecord struct {
 	Name                 string            `json:"name,omitempty"`
 	NamespaceId          string            `json:"namespaceId,omitempty"`
 	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty"`
+	Ports                []ServicePort     `json:"ports,omitempty"`
 	ProjectID            string            `json:"projectId,omitempty"`
 	PublicEndpoints      []PublicEndpoint  `json:"publicEndpoints,omitempty"`
 	Removed              string            `json:"removed,omitempty"`
