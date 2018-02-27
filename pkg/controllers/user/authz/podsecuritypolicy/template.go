@@ -15,7 +15,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+// RegisterTemplate propagates updates to pod security policy templates to their associated pod security policies.
+// Ignores pod security policy templates not assigned to a cluster or project.
 func RegisterTemplate(context *config.UserContext) {
+	logrus.Infof("registering podsecuritypolicy template handler for cluster %v", context.ClusterName)
+
 	m := &templateManager{
 		policies:     context.Extensions.PodSecurityPolicies(""),
 		policyLister: context.Extensions.PodSecurityPolicies("").Controller().Lister(),
@@ -51,7 +55,7 @@ func (m *templateManager) sync(key string, obj *v3.PodSecurityPolicyTemplate) er
 
 	for _, policy := range childPolicies {
 		if policy.Annotations[podSecurityVersionAnnotation] != obj.ResourceVersion {
-			_, err := FromTemplateExplicitName(m.policies, m.policyLister, policy.Name, obj)
+			_, err := fromTemplateExplicitName(m.policies, m.policyLister, policy.Name, obj)
 			if err != nil {
 				return err
 			}
@@ -60,13 +64,14 @@ func (m *templateManager) sync(key string, obj *v3.PodSecurityPolicyTemplate) er
 
 	return nil
 }
-func FromTemplate(policies v1beta12.PodSecurityPolicyInterface, policyLister v1beta12.PodSecurityPolicyLister,
+func fromTemplate(policies v1beta12.PodSecurityPolicyInterface, policyLister v1beta12.PodSecurityPolicyLister,
 	key string, originalTemplate *v3.PodSecurityPolicyTemplate) (*v1beta1.PodSecurityPolicy, error) {
-	return FromTemplateExplicitName(policies, policyLister, KeyToPolicyName(key), originalTemplate)
+	return fromTemplateExplicitName(policies, policyLister, keyToPolicyName(key), originalTemplate)
 }
 
-func FromTemplateExplicitName(policies v1beta12.PodSecurityPolicyInterface, policyLister v1beta12.PodSecurityPolicyLister,
-	key string, originalTemplate *v3.PodSecurityPolicyTemplate) (*v1beta1.PodSecurityPolicy, error) {
+func fromTemplateExplicitName(policies v1beta12.PodSecurityPolicyInterface,
+	policyLister v1beta12.PodSecurityPolicyLister, key string,
+	originalTemplate *v3.PodSecurityPolicyTemplate) (*v1beta1.PodSecurityPolicy, error) {
 	template := originalTemplate.DeepCopy()
 
 	objectMeta := v1.ObjectMeta{}
@@ -87,7 +92,7 @@ func FromTemplateExplicitName(policies v1beta12.PodSecurityPolicyInterface, poli
 	var policy *v1beta1.PodSecurityPolicy
 	var err error
 
-	if !DoesPolicyExist(policyLister, key) {
+	if !doesPolicyExist(policyLister, key) {
 		policy, err = policies.Create(psp)
 	} else {
 		policy, err = policies.Update(psp)
@@ -102,13 +107,13 @@ func FromTemplateExplicitName(policies v1beta12.PodSecurityPolicyInterface, poli
 	return policy, nil
 }
 
-func DoesPolicyExist(policyLister v1beta12.PodSecurityPolicyLister, name string) bool {
+func doesPolicyExist(policyLister v1beta12.PodSecurityPolicyLister, name string) bool {
 	_, err := policyLister.Get("", name)
 
 	return !errors.IsNotFound(err)
 }
 
-func GetPodSecurityPolicyTemplateID(projectLister v3.ProjectLister, clusterLister v3.ClusterLister, projectID string,
+func getPodSecurityPolicyTemplateID(projectLister v3.ProjectLister, clusterLister v3.ClusterLister, projectID string,
 	clusterName string) (string, error) {
 	projects, err := projectLister.List("", labels.Everything())
 	if err != nil {
@@ -124,6 +129,10 @@ func GetPodSecurityPolicyTemplateID(projectLister v3.ProjectLister, clusterListe
 		}
 	}
 
+	if project == nil {
+		return "", nil
+	}
+
 	podSecurityPolicyTemplateID := project.Spec.PodSecurityPolicyTemplateName
 
 	if podSecurityPolicyTemplateID == "" {
@@ -136,7 +145,8 @@ func GetPodSecurityPolicyTemplateID(projectLister v3.ProjectLister, clusterListe
 		podSecurityPolicyTemplateID = cluster.Spec.DefaultPodSecurityPolicyTemplateName
 
 		if podSecurityPolicyTemplateID == "" {
-			logrus.Debugf("No PSPTs found for project %v and cluster %v", projectID, clusterName)
+			logrus.Debugf("No pod security policy templates found for project %v and cluster %v", projectID,
+				clusterName)
 			return "", nil
 		}
 	}
@@ -144,6 +154,28 @@ func GetPodSecurityPolicyTemplateID(projectLister v3.ProjectLister, clusterListe
 	return podSecurityPolicyTemplateID, nil
 }
 
-func KeyToPolicyName(key string) string {
+func keyToPolicyName(key string) string {
 	return fmt.Sprintf("%v-psp", strings.Replace(key, "/", "-", -1))
+}
+
+func updatePolicyIfOutdated(templateLister v3.PodSecurityPolicyTemplateLister,
+	policies v1beta12.PodSecurityPolicyInterface, policyLister v1beta12.PodSecurityPolicyLister, id string) error {
+	template, err := templateLister.Get("", id)
+	if err != nil {
+		return err
+	}
+
+	policy, err := policyLister.Get("", id)
+	if err != nil {
+		return err
+	}
+
+	if policy.Annotations[podSecurityVersionAnnotation] != template.ResourceVersion {
+		_, err = fromTemplate(policies, policyLister, policy.Name, template)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

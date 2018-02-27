@@ -17,8 +17,14 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+// RegisterServiceAccount ensures that:
+// 	1. Each namespace has a pod security policy assigned to a role if:
+//		a. its project has a PSPT assigned to it
+//		OR
+//		b. its cluster has a default PSPT assigned to it
+//  2. PSPs are bound to their associated service accounts via a cluster role binding
 func RegisterServiceAccount(context *config.UserContext) {
-	logrus.Infof("registering serviceaccount handler for cluster %v", context.ClusterName)
+	logrus.Infof("registering podsecuritypolicy serviceaccount handler for cluster %v", context.ClusterName)
 
 	m := &serviceAccountManager{
 		clusters: context.Management.Management.Clusters(""),
@@ -60,13 +66,6 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 
 	namespaceName := obj.Namespace
 
-	logrus.Infof("svc acct name: %v namespace: %v", obj.Name, namespaceName)
-
-	bindings, err := m.bindingLister.List("", labels.Everything())
-	if err != nil {
-		return fmt.Errorf("error getting role bindings: %v", err)
-	}
-
 	// get PSPT
 	// if no PSPT then get default
 	// if no default then exit
@@ -86,12 +85,12 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 	split := strings.SplitN(annotation, ":", 2)
 
 	if len(split) != 2 {
-		return fmt.Errorf("could not parse project id annotation: %v", annotation)
+		return fmt.Errorf("could not parse handler key: %v got len %v", annotation, len(split))
 	}
 
 	clusterName, projectID := split[0], split[1]
 
-	podSecurityPolicyTemplateID, err := GetPodSecurityPolicyTemplateID(m.projectLister, m.clusterLister, projectID,
+	podSecurityPolicyTemplateID, err := getPodSecurityPolicyTemplateID(m.projectLister, m.clusterLister, projectID,
 		clusterName)
 	if err != nil {
 		return err
@@ -99,6 +98,7 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 
 	if podSecurityPolicyTemplateID == "" {
 		// Do nothing
+		logrus.Debugf("no matching pod security policy template")
 		return nil
 	}
 
@@ -121,7 +121,7 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 			return fmt.Errorf("error getting pod security policy templates: %v", err)
 		}
 
-		policy, err = FromTemplate(m.policies, m.policyLister, key, template)
+		policy, err = fromTemplate(m.policies, m.policyLister, key, template)
 		if err != nil {
 			return err
 		}
@@ -169,9 +169,12 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 		}
 	}
 
-	// check if binding exists between service account and PSP
-	// if binding does not exist, create it
-	bindings, err = m.bindingLister.List("", labels.Everything())
+	return createBindingIfNotExists(m.bindings, m.bindingLister, obj, role.Name, policy.Name)
+}
+
+func createBindingIfNotExists(bindings2 v12.RoleBindingInterface, bindingLister v12.RoleBindingLister,
+	serviceAccount *v1.ServiceAccount, roleName string, policyName string) error {
+	bindings, err := bindingLister.List("", labels.Everything())
 	if err != nil {
 		return fmt.Errorf("error getting bindings: %v", err)
 	}
@@ -179,45 +182,67 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 	bindingExists := false
 
 	for _, binding := range bindings {
-		if binding.Annotations[podSecurityTemplateParentAnnotation] == policy.Name {
+		if binding.Annotations[podSecurityTemplateParentAnnotation] == policyName {
 			bindingExists = true
 		}
 	}
 
 	if !bindingExists {
 		// create binding
-		newBinding := &rbac.RoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("%v-%v-binding", obj.Name, policy.Name),
-				Namespace: namespaceName,
-				Annotations: map[string]string{
-					podSecurityTemplateParentAnnotation: policy.Name,
-				},
-			},
-			TypeMeta: metav1.TypeMeta{
-				Kind: "ClusterRoleBinding",
-			},
-			RoleRef: rbac.RoleRef{
-				APIGroup: apiGroup,
-				Name:     role.Name,
-				Kind:     "ClusterRole",
-			},
-			Subjects: []rbac.Subject{
-				{
-					Kind:      "ServiceAccount",
-					Name:      obj.Name,
-					Namespace: obj.Namespace,
-				},
-			},
-		}
-
-		_, err := m.bindings.Create(newBinding)
+		err = createBinding(bindings2, serviceAccount, roleName, policyName)
 		if err != nil {
-			logrus.Errorf("error creating binding '%v' error was '%v' ", newBinding, err)
-			return fmt.Errorf("error creating role binding: %v", err)
+			return err
 		}
 	}
 
 	return nil
+}
 
+func createBinding(bindings v12.RoleBindingInterface, serviceAccount *v1.ServiceAccount, roleName string,
+	policyName string) error {
+	newBinding := &rbac.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%v-%v-binding", roleName, policyName),
+			Namespace: serviceAccount.Namespace,
+			Annotations: map[string]string{
+				podSecurityTemplateParentAnnotation: policyName,
+			},
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "ClusterRoleBinding",
+		},
+		RoleRef: rbac.RoleRef{
+			APIGroup: apiGroup,
+			Name:     roleName,
+			Kind:     "ClusterRole",
+		},
+		Subjects: []rbac.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      serviceAccount.Name,
+				Namespace: serviceAccount.Namespace,
+			},
+		},
+	}
+
+	_, err := bindings.Create(newBinding)
+	if err != nil {
+		return fmt.Errorf("error creating role binding for %v error was: %v", newBinding, err)
+	}
+
+	return nil
+}
+
+func resyncServiceAccounts(serviceAccountLister v13.ServiceAccountLister,
+	serviceAccountController v13.ServiceAccountController, namespace string) error {
+	serviceAccounts, err := serviceAccountLister.List(namespace, labels.Everything())
+	if err != nil {
+		return fmt.Errorf("error getting service accounts: %v", err)
+	}
+
+	for _, account := range serviceAccounts {
+		serviceAccountController.Enqueue(account.Namespace, account.Name)
+	}
+
+	return nil
 }
