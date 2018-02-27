@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/ticker"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+	"strings"
 	"time"
 )
 
@@ -52,7 +53,17 @@ func (s *ExecutionLogSyncer) syncLogs() {
 		return
 	}
 	for _, e := range Logs {
-		execution, err := s.pipelineExecutionLister.Get(e.Namespace, e.Spec.PipelineExecutionName)
+		parts := strings.Split(e.Spec.PipelineExecutionName, ":")
+		if len(parts) != 2 {
+			e.Spec.Message += fmt.Sprintf("\nInvalid pipeline execution name - %s", e.Spec.PipelineExecutionName)
+			e.Labels["pipeline.management.cattle.io/finish"] = "true"
+			if _, err := s.pipelineExecutionLogs.Update(e); err != nil {
+				logrus.Errorf("Error update pipeline execution log - %v", err)
+				return
+			}
+			continue
+		}
+		execution, err := s.pipelineExecutionLister.Get(e.Namespace, parts[1])
 		if err != nil {
 			logrus.Errorf("Error get pipeline execution - %v", err)
 			e.Spec.Message += fmt.Sprintf("\nError get pipeline execution - %v", err)

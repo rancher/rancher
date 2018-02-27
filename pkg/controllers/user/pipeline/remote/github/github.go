@@ -14,7 +14,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"strings"
 )
 
 const (
@@ -183,7 +182,6 @@ func convertAccount(gitaccount *github.User) *v3.SourceCodeCredential {
 	}
 	if gitaccount.Name != nil {
 		account.Spec.DisplayName = *gitaccount.Name
-		account.Name = strings.ToLower(*gitaccount.Login)
 	}
 	return account
 

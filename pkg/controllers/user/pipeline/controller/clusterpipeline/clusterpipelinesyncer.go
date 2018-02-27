@@ -92,6 +92,9 @@ func Register(cluster *config.UserContext) {
 }
 
 func (s *Syncer) Sync(key string, obj *v3.ClusterPipeline) error {
+	if obj == nil || obj.Spec.ClusterName != obj.Name {
+		return nil
+	}
 	//ensure clusterpipeline singleton in the cluster
 	utils.InitClusterPipeline(s.clusterPipelines, obj.Spec.ClusterName)
 

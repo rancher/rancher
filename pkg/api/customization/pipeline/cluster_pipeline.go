@@ -260,6 +260,7 @@ func (h *ClusterPipelineHandler) authAddAccount(clusterPipeline *v3.ClusterPipel
 	if err != nil {
 		return nil, err
 	}
+	account.Name = fmt.Sprintf("%s-%s-%s", clusterPipeline.Spec.ClusterName, remoteType, account.Spec.LoginName)
 	account.Spec.UserName = userID
 	account.Spec.ClusterName = clusterPipeline.Spec.ClusterName
 	account, err = h.SourceCodeCredentials.Create(account)

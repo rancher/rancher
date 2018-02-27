@@ -108,7 +108,7 @@ func (l *Lifecycle) initLogs(obj *v3.PipelineExecution) error {
 				},
 				Spec: v3.PipelineExecutionLogSpec{
 					ProjectName:           pipeline.Spec.ProjectName,
-					PipelineExecutionName: obj.Name,
+					PipelineExecutionName: obj.Namespace + ":" + obj.Name,
 					Stage: j,
 					Step:  k,
 				},
