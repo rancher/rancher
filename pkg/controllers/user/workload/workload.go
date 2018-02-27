@@ -38,7 +38,7 @@ func getName() string {
 }
 
 func (c *Controller) CreateService(key string, w *Workload) error {
-	// do npt create service for job, cronJob and for workload owned by controller (ReplicaSet)
+	// do not create service for job, cronJob and for workload owned by controller (ReplicaSet)
 	if strings.EqualFold(w.Kind, "job") || strings.EqualFold(w.Kind, "cronJob") {
 		return nil
 	}
@@ -74,13 +74,6 @@ func (c *Controller) serviceExistsForWorkload(workload *Workload, service *Servi
 }
 
 func (c *Controller) CreateServiceForWorkload(workload *Workload) error {
-	// do not create if object is "owned" by other workload
-	for _, o := range workload.OwnerReferences {
-		if ok := WorkloadKinds[o.Kind]; ok {
-			return nil
-		}
-	}
-
 	services := map[corev1.ServiceType]Service{}
 	if val, ok := workload.TemplateSpec.Annotations[PortsAnnotation]; ok {
 		svcs, err := generateServicesFromPortsAnnotation(val)
@@ -128,7 +121,7 @@ func (c *Controller) CreateServiceForWorkload(workload *Workload) error {
 
 func (c *Controller) updateService(toUpdate Service, existing *corev1.Service) error {
 	existing.Spec.Ports = toUpdate.ServicePorts
-	logrus.Infof("Updating [%s] service with ports [%v]", existing.Spec.Type, toUpdate.ServicePorts)
+	logrus.Infof("Updating [%s/%s] service with ports [%v]", existing.Namespace, existing.Name, toUpdate.ServicePorts)
 	_, err := c.services.Update(existing)
 	if err != nil {
 		return err
@@ -185,7 +178,7 @@ func arePortsEqual(one []corev1.ServicePort, two []corev1.ServicePort) bool {
 	for _, o := range one {
 		found := false
 		for _, t := range two {
-			if reflect.DeepEqual(o, t) {
+			if o.TargetPort == t.TargetPort && o.Protocol == t.Protocol && o.Port == t.Port {
 				found = true
 				break
 			}
