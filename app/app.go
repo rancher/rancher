@@ -18,6 +18,7 @@ import (
 type Config struct {
 	ACMEDomains     []string
 	AddLocal        bool
+	Embedded        bool
 	KubeConfig      string
 	HTTPListenPort  int
 	HTTPSListenPort int
@@ -116,7 +117,7 @@ func addData(management *config.ManagementContext, cfg Config) error {
 		return err
 	}
 
-	if err := addClusters(cfg.AddLocal, adminName, management); err != nil {
+	if err := addClusters(cfg.AddLocal, cfg.Embedded, adminName, management); err != nil {
 		return err
 	}
 

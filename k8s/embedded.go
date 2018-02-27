@@ -16,12 +16,12 @@ func init() {
 	reexec.Register("kubectl", kubectl.Main)
 }
 
-func getEmbedded(ctx context.Context) (context.Context, *rest.Config, error) {
+func getEmbedded(ctx context.Context) (bool, context.Context, *rest.Config, error) {
 	ctx, kubeConfig, err := embedded.Run(ctx)
 	if err != nil {
-		return ctx, nil, err
+		return true, ctx, nil, err
 	}
 
 	restConfig, err := getExternal(kubeConfig)
-	return ctx, restConfig, err
+	return true, ctx, restConfig, err
 }

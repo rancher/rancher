@@ -8,7 +8,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-func GetConfig(ctx context.Context, k8sMode string, kubeConfig string) (context.Context, *rest.Config, error) {
+func GetConfig(ctx context.Context, k8sMode string, kubeConfig string) (bool, context.Context, *rest.Config, error) {
 	var (
 		cfg *rest.Config
 		err error
@@ -22,20 +22,20 @@ func GetConfig(ctx context.Context, k8sMode string, kubeConfig string) (context.
 	case "external":
 		cfg, err = getExternal(kubeConfig)
 	default:
-		return nil, nil, fmt.Errorf("invalid k8s-mode %s", k8sMode)
+		return false, nil, nil, fmt.Errorf("invalid k8s-mode %s", k8sMode)
 	}
 
-	return ctx, cfg, err
+	return false, ctx, cfg, err
 }
 
-func getAuto(ctx context.Context, kubeConfig string) (context.Context, *rest.Config, error) {
+func getAuto(ctx context.Context, kubeConfig string) (bool, context.Context, *rest.Config, error) {
 	if kubeConfig != "" {
 		cfg, err := getExternal(kubeConfig)
-		return ctx, cfg, err
+		return false, ctx, cfg, err
 	}
 
 	if config, err := rest.InClusterConfig(); err == nil {
-		return ctx, config, nil
+		return false, ctx, config, nil
 	}
 
 	return getEmbedded(ctx)
