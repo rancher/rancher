@@ -143,6 +143,7 @@ func TemplateIconHandler(apiContext *types.APIContext, next types.RequestHandler
 		if err != nil {
 			return err
 		}
+		apiContext.Response.Header().Set("Cache-Control", "private, max-age=604800")
 		http.ServeContent(apiContext.Response, apiContext.Request, template.IconFilename, t, iconReader)
 		return nil
 	default:

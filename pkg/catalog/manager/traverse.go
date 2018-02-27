@@ -61,6 +61,7 @@ func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []error
 		template.Spec.IconFilename = iconFilename
 		template.Spec.Base = HelmTemplateBaseType
 		template.Spec.FolderName = chart
+		template.Spec.DisplayName = chart
 		var versions []v3.TemplateVersionSpec
 
 		for _, version := range metadata {
