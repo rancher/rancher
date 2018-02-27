@@ -51,7 +51,7 @@ func Register(cluster *config.UserContext) {
 		managementSecrets:    cluster.Management.Core.Secrets("").Controller().Lister(),
 	}
 	cluster.Core.Namespaces("").AddHandler("secretsController", n.sync)
-	cluster.Management.Core.Secrets("").AddClusterScopedLifecycle("secretsController", cluster.ClusterName, s)
+	cluster.Management.Core.Secrets("").AddLifecycle("secretsController", s)
 }
 
 type NamespaceController struct {
@@ -151,6 +151,14 @@ func (s *Controller) getClusterNamespaces(obj *corev1.Secret) ([]*corev1.Namespa
 }
 
 func (s *Controller) createOrUpdate(obj *corev1.Secret, action string) error {
+	if obj.Annotations[projectIDLabel] != "" {
+		parts := strings.Split(obj.Annotations[projectIDLabel], ":")
+		if len(parts) == 2 {
+			if parts[0] != s.clusterName {
+				return nil
+			}
+		}
+	}
 	clusterNamespaces, err := s.getClusterNamespaces(obj)
 	if err != nil {
 		return err
