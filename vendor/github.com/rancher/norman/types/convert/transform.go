@@ -27,7 +27,7 @@ func Transform(data map[string]interface{}, path []string, transformer Transform
 
 	// You can't end a path with ARRAY/MAP.  Not supported right now
 	if len(path) > 1 {
-		switch path[1] {
+		switch path[0] {
 		case ArrayKey:
 			for _, valueMap := range ToMapSlice(value) {
 				Transform(valueMap, path[1:], transformer)
