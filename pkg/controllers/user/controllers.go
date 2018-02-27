@@ -37,6 +37,7 @@ func Register(ctx context.Context, cluster *config.UserContext) error {
 	podsecuritypolicy.RegisterTemplate(cluster)
 	podsecuritypolicy.RegisterCluster(cluster)
 	podsecuritypolicy.RegisterProject(cluster)
+	podsecuritypolicy.RegisterNamespace(cluster)
 	networkpolicy.Register(cluster)
 
 	userOnlyContext := cluster.UserOnlyContext()
