@@ -122,7 +122,7 @@ func (c *CommonController) syncDeployments(key string, obj *corev1beta2.Deployme
 	var err error
 	if key != AllWorkloads {
 		w, err = c.getWorkload(key, DeploymentType)
-		if err != nil {
+		if err != nil || w == nil {
 			return err
 		}
 	}
@@ -135,7 +135,7 @@ func (c *CommonController) syncReplicationControllers(key string, obj *corev1.Re
 		return nil
 	}
 	w, err := c.getWorkload(key, ReplicationControllerType)
-	if err != nil {
+	if err != nil || w == nil {
 		return err
 	}
 	return c.Sync(key, w)
@@ -146,7 +146,7 @@ func (c *CommonController) syncReplicaSet(key string, obj *corev1beta2.ReplicaSe
 		return nil
 	}
 	w, err := c.getWorkload(key, ReplicaSetType)
-	if err != nil {
+	if err != nil || w == nil {
 		return err
 	}
 	return c.Sync(key, w)
@@ -157,7 +157,7 @@ func (c *CommonController) syncDaemonSet(key string, obj *corev1beta2.DaemonSet)
 		return nil
 	}
 	w, err := c.getWorkload(key, DaemonSetType)
-	if err != nil {
+	if err != nil || w == nil {
 		return err
 	}
 	return c.Sync(key, w)
@@ -168,7 +168,7 @@ func (c *CommonController) syncStatefulSet(key string, obj *corev1beta2.Stateful
 		return nil
 	}
 	w, err := c.getWorkload(key, StatefulSetType)
-	if err != nil {
+	if err != nil || w == nil {
 		return err
 	}
 	return c.Sync(key, w)
@@ -179,7 +179,7 @@ func (c *CommonController) syncJob(key string, obj *corebatchv1.Job) error {
 		return nil
 	}
 	w, err := c.getWorkload(key, JobType)
-	if err != nil {
+	if err != nil || w == nil {
 		return err
 	}
 	return c.Sync(key, w)
@@ -190,7 +190,7 @@ func (c *CommonController) syncCronJob(key string, obj *corebatchv1beta1.CronJob
 		return nil
 	}
 	w, err := c.getWorkload(key, CronJobType)
-	if err != nil {
+	if err != nil || w == nil {
 		return err
 	}
 	return c.Sync(key, w)
@@ -308,7 +308,7 @@ func (c CommonController) GetAllWorkloads(namespace string) ([]*Workload, error)
 
 	for _, o := range ds {
 		workload, err := c.GetByWorkloadID(getWorkloadID(DeploymentType, o.Namespace, o.Name))
-		if err != nil {
+		if err != nil || workload == nil {
 			return workloads, err
 		}
 		workloads = append(workloads, workload)
@@ -322,7 +322,7 @@ func (c CommonController) GetAllWorkloads(namespace string) ([]*Workload, error)
 
 	for _, o := range rcs {
 		workload, err := c.GetByWorkloadID(getWorkloadID(ReplicationControllerType, o.Namespace, o.Name))
-		if err != nil {
+		if err != nil || workload == nil {
 			return workloads, err
 		}
 		workloads = append(workloads, workload)
@@ -336,7 +336,7 @@ func (c CommonController) GetAllWorkloads(namespace string) ([]*Workload, error)
 
 	for _, o := range rss {
 		workload, err := c.GetByWorkloadID(getWorkloadID(ReplicaSetType, o.Namespace, o.Name))
-		if err != nil {
+		if err != nil || workload == nil {
 			return workloads, err
 		}
 		workloads = append(workloads, workload)
@@ -350,7 +350,7 @@ func (c CommonController) GetAllWorkloads(namespace string) ([]*Workload, error)
 
 	for _, o := range dss {
 		workload, err := c.GetByWorkloadID(getWorkloadID(DaemonSetType, o.Namespace, o.Name))
-		if err != nil {
+		if err != nil || workload == nil {
 			return workloads, err
 		}
 		workloads = append(workloads, workload)
@@ -364,7 +364,7 @@ func (c CommonController) GetAllWorkloads(namespace string) ([]*Workload, error)
 
 	for _, o := range sts {
 		workload, err := c.GetByWorkloadID(getWorkloadID(StatefulSetType, o.Namespace, o.Name))
-		if err != nil {
+		if err != nil || workload == nil {
 			return workloads, err
 		}
 		workloads = append(workloads, workload)
@@ -378,7 +378,7 @@ func (c CommonController) GetAllWorkloads(namespace string) ([]*Workload, error)
 
 	for _, o := range jobs {
 		workload, err := c.GetByWorkloadID(getWorkloadID(JobType, o.Namespace, o.Name))
-		if err != nil {
+		if err != nil || workload == nil {
 			return workloads, err
 		}
 		workloads = append(workloads, workload)
@@ -392,7 +392,7 @@ func (c CommonController) GetAllWorkloads(namespace string) ([]*Workload, error)
 
 	for _, o := range cronJobs {
 		workload, err := c.GetByWorkloadID(getWorkloadID(CronJobType, o.Namespace, o.Name))
-		if err != nil {
+		if err != nil || workload == nil {
 			return workloads, err
 		}
 		workloads = append(workloads, workload)
