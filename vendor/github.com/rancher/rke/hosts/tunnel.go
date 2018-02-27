@@ -7,14 +7,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 
 	"github.com/docker/docker/client"
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/log"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/crypto/ssh/agent"
+	"net"
 )
 
 const (
@@ -82,54 +82,37 @@ func parsePrivateKeyWithPassPhrase(keyBuff string, passphrase []byte) (ssh.Signe
 	return ssh.ParsePrivateKeyWithPassphrase([]byte(keyBuff), passphrase)
 }
 
-func makeSSHConfig(user string, signer ssh.Signer) (*ssh.ClientConfig, error) {
-	config := ssh.ClientConfig{
-		User: user,
-		Auth: []ssh.AuthMethod{
-			ssh.PublicKeys(signer),
-		},
+func getSSHConfig(username, sshPrivateKeyString string, passphrase []byte) (*ssh.ClientConfig, error) {
+	config := &ssh.ClientConfig{
+		User:            username,
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
-	return &config, nil
+	if sshAgentSock := os.Getenv("SSH_AUTH_SOCK"); sshAgentSock != "" {
+		sshAgent, err := net.Dial("unix", sshAgentSock)
+		if err != nil {
+			return config, fmt.Errorf("Cannot connect to SSH Auth socket %q: %s", sshAgentSock, err)
+		}
+
+		config.Auth = append(config.Auth, ssh.PublicKeysCallback(agent.NewClient(sshAgent).Signers))
+
+		logrus.Debugf("using %q SSH_AUTH_SOCK", sshAgentSock)
+		return config, nil
+	}
+
+	signer, err := getPrivateKeySigner(sshPrivateKeyString, passphrase)
+	if err != nil {
+		return config, err
+	}
+	config.Auth = append(config.Auth, ssh.PublicKeys(signer))
+
+	return config, nil
 }
 
-func (h *Host) checkEncryptedKey() (ssh.Signer, error) {
-	logrus.Debugf("[ssh] Checking private key")
-	var err error
-	var key ssh.Signer
-	if len(h.SSHKey) > 0 {
-		key, err = parsePrivateKey(h.SSHKey)
-	} else {
-		key, err = parsePrivateKey(privateKeyPath(h.SSHKeyPath))
-	}
-	if err == nil {
-		return key, nil
-	}
-
-	// parse encrypted key
-	if strings.Contains(err.Error(), "decode encrypted private keys") {
-		var passphrase []byte
-		if len(h.SavedKeyPhrase) == 0 {
-			fmt.Printf("Passphrase for Private SSH Key: ")
-			passphrase, err = terminal.ReadPassword(int(syscall.Stdin))
-			fmt.Printf("\n")
-			if err != nil {
-				return nil, err
-			}
-			h.SavedKeyPhrase = string(passphrase)
-		} else {
-			passphrase = []byte(h.SavedKeyPhrase)
-		}
-
-		if len(h.SSHKey) > 0 {
-			key, err = parsePrivateKeyWithPassPhrase(h.SSHKey, passphrase)
-		} else {
-			key, err = parsePrivateKeyWithPassPhrase(privateKeyPath(h.SSHKeyPath), passphrase)
-		}
-		if err != nil {
-			return nil, err
-		}
+func getPrivateKeySigner(sshPrivateKeyString string, passphrase []byte) (ssh.Signer, error) {
+	key, err := parsePrivateKey(sshPrivateKeyString)
+	if err != nil && strings.Contains(err.Error(), "decode encrypted private keys") {
+		key, err = parsePrivateKeyWithPassPhrase(sshPrivateKeyString, passphrase)
 	}
 	return key, err
 }

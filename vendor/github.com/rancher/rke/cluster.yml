@@ -67,12 +67,21 @@ services:
 # 'calico_cloud_provider: aws'
 # or
 # 'calico_cloud_provider: gce'
+# network:
+#   plugin: calico
+#   options:
+#     calico_cloud_provider: aws
+#
+# To specify flannel interface, you can use the 'flannel_iface' option:
+# network:
+#   plugin: flannel
+#   options:
+#     flannel_iface: eth1
+
 network:
   plugin: flannel
   options:
-    flannel_image: quay.io/coreos/flannel:v0.9.1
-    flannel_cni_image: quay.io/coreos/flannel-cni:v0.2.0
-
+    
 authentication:
   strategy: x509
 
@@ -102,6 +111,9 @@ system_images:
   dnsmasq: rancher/k8s-dns-dnsmasq-nanny-amd64:1.14.5
   kubedns_sidecar: rancher/k8s-dns-sidecar-amd64:1.14.5
   kubedns_autoscaler: rancher/cluster-proportional-autoscaler-amd64:1.0.0
+  flannel: rancher/coreos-flannel:v0.9.1
+  flannel_cni: rancher/coreos-flannel-cni:v0.2.0
+
 
 ssh_key_path: ~/.ssh/test
 

@@ -12,6 +12,15 @@ func ParseAndValidateBody(apiContext *types.APIContext, create bool) (map[string
 		return nil, err
 	}
 
+	if create {
+		for key, value := range apiContext.SubContextAttributeProvider.Create(apiContext, apiContext.Schema) {
+			if data == nil {
+				data = map[string]interface{}{}
+			}
+			data[key] = value
+		}
+	}
+
 	b := builder.NewBuilder(apiContext)
 
 	op := builder.Create

@@ -1,5 +1,9 @@
 package v3
 
+const (
+	K8sV1_8 = "v1.8.7-rancher1-1"
+)
+
 var (
 	K8sVersionToRKESystemImages = map[string]RKESystemImages{
 		"v1.8.7-rancher1-1": v187SystemImages,

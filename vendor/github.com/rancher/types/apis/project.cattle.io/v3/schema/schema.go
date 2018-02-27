@@ -1,6 +1,8 @@
 package schema
 
 import (
+	"net/http"
+
 	"github.com/rancher/norman/types"
 	m "github.com/rancher/norman/types/mapper"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
@@ -220,6 +222,8 @@ func replicationControllerTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v1.ReplicationControllerSpec{}, replicationControllerConfigOverride{}).
 		MustImportAndCustomize(&Version, v1.ReplicationController{}, func(schema *types.Schema) {
 			schema.BaseType = "workload"
+			schema.CollectionMethods = []string{http.MethodGet}
+			schema.ResourceMethods = []string{http.MethodGet}
 		}, projectOverride{}, struct {
 			PublicEndpoints string `json:"publicEndpoints" norman:"type=array[publicEndpoint],nocreate,noupdate"`
 		}{})

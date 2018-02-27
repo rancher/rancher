@@ -7,54 +7,48 @@ import (
 const (
 	AppType                      = "app"
 	AppFieldAnnotations          = "annotations"
+	AppFieldAnswerValues         = "answerValues"
 	AppFieldAnswers              = "answers"
 	AppFieldCreated              = "created"
 	AppFieldCreatorID            = "creatorId"
 	AppFieldDescription          = "description"
 	AppFieldExternalID           = "externalId"
-	AppFieldGroups               = "groups"
 	AppFieldInstallNamespace     = "installNamespace"
 	AppFieldLabels               = "labels"
 	AppFieldName                 = "name"
 	AppFieldNamespaceId          = "namespaceId"
 	AppFieldOwnerReferences      = "ownerReferences"
 	AppFieldProjectId            = "projectId"
-	AppFieldPrune                = "prune"
 	AppFieldRemoved              = "removed"
 	AppFieldState                = "state"
 	AppFieldStatus               = "status"
-	AppFieldTag                  = "tag"
 	AppFieldTemplates            = "templates"
 	AppFieldTransitioning        = "transitioning"
 	AppFieldTransitioningMessage = "transitioningMessage"
-	AppFieldUser                 = "user"
 	AppFieldUuid                 = "uuid"
 )
 
 type App struct {
 	types.Resource
 	Annotations          map[string]string `json:"annotations,omitempty"`
+	AnswerValues         string            `json:"answerValues,omitempty"`
 	Answers              map[string]string `json:"answers,omitempty"`
 	Created              string            `json:"created,omitempty"`
 	CreatorID            string            `json:"creatorId,omitempty"`
 	Description          string            `json:"description,omitempty"`
 	ExternalID           string            `json:"externalId,omitempty"`
-	Groups               []string          `json:"groups,omitempty"`
 	InstallNamespace     string            `json:"installNamespace,omitempty"`
 	Labels               map[string]string `json:"labels,omitempty"`
 	Name                 string            `json:"name,omitempty"`
 	NamespaceId          string            `json:"namespaceId,omitempty"`
 	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty"`
 	ProjectId            string            `json:"projectId,omitempty"`
-	Prune                bool              `json:"prune,omitempty"`
 	Removed              string            `json:"removed,omitempty"`
 	State                string            `json:"state,omitempty"`
 	Status               *AppStatus        `json:"status,omitempty"`
-	Tag                  map[string]string `json:"tag,omitempty"`
 	Templates            map[string]string `json:"templates,omitempty"`
 	Transitioning        string            `json:"transitioning,omitempty"`
 	TransitioningMessage string            `json:"transitioningMessage,omitempty"`
-	User                 string            `json:"user,omitempty"`
 	Uuid                 string            `json:"uuid,omitempty"`
 }
 type AppCollection struct {

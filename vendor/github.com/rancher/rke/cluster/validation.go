@@ -59,7 +59,7 @@ func validateNetworkOptions(c *Cluster) error {
 func validateHostsOptions(c *Cluster) error {
 	for i, host := range c.Nodes {
 		if len(host.Address) == 0 {
-			return fmt.Errorf("User for host (%d) is not provided", i+1)
+			return fmt.Errorf("Address for host (%d) is not provided", i+1)
 		}
 		if len(host.User) == 0 {
 			return fmt.Errorf("User for host (%d) is not provided", i+1)

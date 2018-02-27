@@ -8,16 +8,18 @@ const (
 	CatalogType                      = "catalog"
 	CatalogFieldAnnotations          = "annotations"
 	CatalogFieldBranch               = "branch"
+	CatalogFieldCommit               = "commit"
+	CatalogFieldConditions           = "conditions"
 	CatalogFieldCreated              = "created"
 	CatalogFieldCreatorID            = "creatorId"
 	CatalogFieldDescription          = "description"
 	CatalogFieldKind                 = "kind"
 	CatalogFieldLabels               = "labels"
+	CatalogFieldLastRefreshTimestamp = "lastRefreshTimestamp"
 	CatalogFieldName                 = "name"
 	CatalogFieldOwnerReferences      = "ownerReferences"
 	CatalogFieldRemoved              = "removed"
 	CatalogFieldState                = "state"
-	CatalogFieldStatus               = "status"
 	CatalogFieldTransitioning        = "transitioning"
 	CatalogFieldTransitioningMessage = "transitioningMessage"
 	CatalogFieldURL                  = "url"
@@ -26,22 +28,24 @@ const (
 
 type Catalog struct {
 	types.Resource
-	Annotations          map[string]string `json:"annotations,omitempty"`
-	Branch               string            `json:"branch,omitempty"`
-	Created              string            `json:"created,omitempty"`
-	CreatorID            string            `json:"creatorId,omitempty"`
-	Description          string            `json:"description,omitempty"`
-	Kind                 string            `json:"kind,omitempty"`
-	Labels               map[string]string `json:"labels,omitempty"`
-	Name                 string            `json:"name,omitempty"`
-	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty"`
-	Removed              string            `json:"removed,omitempty"`
-	State                string            `json:"state,omitempty"`
-	Status               *CatalogStatus    `json:"status,omitempty"`
-	Transitioning        string            `json:"transitioning,omitempty"`
-	TransitioningMessage string            `json:"transitioningMessage,omitempty"`
-	URL                  string            `json:"url,omitempty"`
-	Uuid                 string            `json:"uuid,omitempty"`
+	Annotations          map[string]string  `json:"annotations,omitempty"`
+	Branch               string             `json:"branch,omitempty"`
+	Commit               string             `json:"commit,omitempty"`
+	Conditions           []CatalogCondition `json:"conditions,omitempty"`
+	Created              string             `json:"created,omitempty"`
+	CreatorID            string             `json:"creatorId,omitempty"`
+	Description          string             `json:"description,omitempty"`
+	Kind                 string             `json:"kind,omitempty"`
+	Labels               map[string]string  `json:"labels,omitempty"`
+	LastRefreshTimestamp string             `json:"lastRefreshTimestamp,omitempty"`
+	Name                 string             `json:"name,omitempty"`
+	OwnerReferences      []OwnerReference   `json:"ownerReferences,omitempty"`
+	Removed              string             `json:"removed,omitempty"`
+	State                string             `json:"state,omitempty"`
+	Transitioning        string             `json:"transitioning,omitempty"`
+	TransitioningMessage string             `json:"transitioningMessage,omitempty"`
+	URL                  string             `json:"url,omitempty"`
+	Uuid                 string             `json:"uuid,omitempty"`
 }
 type CatalogCollection struct {
 	types.Collection

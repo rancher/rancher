@@ -393,12 +393,13 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host) v3
 		URL: services.EtcdHealthCheckURL,
 	}
 	return v3.Process{
-		Name:        services.EtcdContainerName,
-		Args:        args,
-		Binds:       Binds,
-		NetworkMode: "host",
-		Image:       c.Services.Etcd.Image,
-		HealthCheck: healthCheck,
+		Name:          services.EtcdContainerName,
+		Args:          args,
+		Binds:         Binds,
+		NetworkMode:   "host",
+		RestartPolicy: "always",
+		Image:         c.Services.Etcd.Image,
+		HealthCheck:   healthCheck,
 	}
 }
 

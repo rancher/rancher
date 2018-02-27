@@ -19,11 +19,11 @@ const (
 	SidekickServiceName   = "sidekick"
 	RBACAuthorizationMode = "rbac"
 
-	KubeAPIContainerName        = "kube-api"
+	KubeAPIContainerName        = "kube-apiserver"
 	KubeletContainerName        = "kubelet"
 	KubeproxyContainerName      = "kube-proxy"
-	KubeControllerContainerName = "kube-controller"
-	SchedulerContainerName      = "scheduler"
+	KubeControllerContainerName = "kube-controller-manager"
+	SchedulerContainerName      = "kube-scheduler"
 	EtcdContainerName           = "etcd"
 	NginxProxyContainerName     = "nginx-proxy"
 	SidekickContainerName       = "service-sidekick"
@@ -45,7 +45,7 @@ func runSidekick(ctx context.Context, host *hosts.Host, prsMap map[string]v3.Pri
 		return nil
 	}
 
-	imageCfg, hostCfg, _ := getProcessConfig(sidecarProcess)
+	imageCfg, hostCfg, _ := GetProcessConfig(sidecarProcess)
 	sidecarImage := sidecarProcess.Image
 	if err := docker.UseLocalOrPull(ctx, host.DClient, host.Address, sidecarImage, SidekickServiceName, prsMap); err != nil {
 		return err
@@ -60,7 +60,7 @@ func removeSidekick(ctx context.Context, host *hosts.Host) error {
 	return docker.DoRemoveContainer(ctx, host.DClient, SidekickContainerName, host.Address)
 }
 
-func getProcessConfig(process v3.Process) (*container.Config, *container.HostConfig, string) {
+func GetProcessConfig(process v3.Process) (*container.Config, *container.HostConfig, string) {
 	imageCfg := &container.Config{
 		Entrypoint: process.Command,
 		Cmd:        process.Args,

@@ -1,0 +1,7 @@
+query.log
+Corefile
+*.swp
+coredns
+kubectl
+go-test-tmpfile*
+coverage.txt

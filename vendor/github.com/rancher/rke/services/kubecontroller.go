@@ -9,7 +9,7 @@ import (
 )
 
 func runKubeController(ctx context.Context, host *hosts.Host, df hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, controllerProcess v3.Process) error {
-	imageCfg, hostCfg, healthCheckURL := getProcessConfig(controllerProcess)
+	imageCfg, hostCfg, healthCheckURL := GetProcessConfig(controllerProcess)
 	if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, KubeControllerContainerName, host.Address, ControlRole, prsMap); err != nil {
 		return err
 	}
