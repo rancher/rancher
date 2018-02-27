@@ -1,4 +1,4 @@
-package workloadservice
+package targetworkloadservice
 
 import (
 	"context"

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"strings"
+
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -36,14 +38,23 @@ func getName() string {
 }
 
 func (c *Controller) CreateService(key string, w *Workload) error {
+	// do npt create service for job, cronJob and for workload owned by controller (ReplicaSet)
+	if strings.EqualFold(w.Kind, "job") || strings.EqualFold(w.Kind, "cronJob") {
+		return nil
+	}
+	for _, o := range w.OwnerReferences {
+		if *o.Controller {
+			return nil
+		}
+	}
 	return c.CreateServiceForWorkload(w)
 }
 
-func (c *Controller) serviceExistsForWorkload(workload *Workload, service *Service) (bool, error) {
+func (c *Controller) serviceExistsForWorkload(workload *Workload, service *Service) (*corev1.Service, error) {
 	labels := fmt.Sprintf("%s=%s", WorkloadLabel, workload.Namespace)
 	services, err := c.services.List(metav1.ListOptions{LabelSelector: labels})
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
 	for _, s := range services.Items {
@@ -55,11 +66,11 @@ func (c *Controller) serviceExistsForWorkload(workload *Workload, service *Servi
 		}
 		for _, ref := range s.OwnerReferences {
 			if reflect.DeepEqual(ref.UID, workload.UUID) {
-				return true, nil
+				return &s, nil
 			}
 		}
 	}
-	return false, nil
+	return nil, nil
 }
 
 func (c *Controller) CreateServiceForWorkload(workload *Workload) error {
@@ -83,14 +94,7 @@ func (c *Controller) CreateServiceForWorkload(workload *Workload) error {
 		service := generateServiceFromContainers(workload)
 		services[service.Type] = *service
 	}
-	controller := true
-	ownerRef := metav1.OwnerReference{
-		Name:       workload.Name,
-		APIVersion: workload.APIVersion,
-		UID:        workload.UUID,
-		Kind:       workload.Kind,
-		Controller: &controller,
-	}
+
 	// we use workload annotation instead of service.selector (based off workload.labels)
 	// to avoid service recreate on user label change
 	serviceAnnotations := map[string]string{}
@@ -99,41 +103,97 @@ func (c *Controller) CreateServiceForWorkload(workload *Workload) error {
 	serviceLabels := map[string]string{}
 	serviceLabels[WorkloadLabel] = workload.Namespace
 
-	for kind, toCreate := range services {
-		exists, err := c.serviceExistsForWorkload(workload, &toCreate)
+	for _, toCreate := range services {
+		existing, err := c.serviceExistsForWorkload(workload, &toCreate)
 		if err != nil {
 			return err
 		}
-		if exists {
-			//TODO - implement update once workload upgrade is supported
-			continue
-		}
-		serviceType := toCreate.Type
-		if toCreate.ClusterIP == "None" {
-			serviceType = "Headless"
-			serviceAnnotations[WorkloadAnnotation] = workload.getKey()
-		}
-		service := &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName:    "workload-",
-				OwnerReferences: []metav1.OwnerReference{ownerRef},
-				Namespace:       workload.Namespace,
-				Annotations:     serviceAnnotations,
-				Labels:          serviceLabels,
-			},
-			Spec: corev1.ServiceSpec{
-				ClusterIP: toCreate.ClusterIP,
-				Type:      kind,
-				Ports:     toCreate.ServicePorts,
-			},
-		}
+		if existing == nil {
+			if err := c.createService(toCreate, workload); err != nil {
+				return err
+			}
 
-		logrus.Infof("Creating [%s] service with ports [%v] for workload %s", serviceType, toCreate.ServicePorts, workload.getKey())
-		_, err = c.services.Create(service)
-		if err != nil {
-			return err
+		} else {
+			if arePortsEqual(toCreate.ServicePorts, existing.Spec.Ports) {
+				continue
+			}
+			if err := c.updateService(toCreate, existing); err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
+}
+
+func (c *Controller) updateService(toUpdate Service, existing *corev1.Service) error {
+	existing.Spec.Ports = toUpdate.ServicePorts
+	logrus.Infof("Updating [%s] service with ports [%v]", existing.Spec.Type, toUpdate.ServicePorts)
+	_, err := c.services.Update(existing)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Controller) createService(toCreate Service, workload *Workload) error {
+	controller := true
+	ownerRef := metav1.OwnerReference{
+		Name:       workload.Name,
+		APIVersion: workload.APIVersion,
+		UID:        workload.UUID,
+		Kind:       workload.Kind,
+		Controller: &controller,
+	}
+
+	// we use workload annotation instead of service.selector (based off workload.labels)
+	// to avoid service recreate on user label change
+	serviceAnnotations := map[string]string{}
+	serviceAnnotations[WorkloadAnnotation] = workload.getKey()
+	// labels are used so it is easy to filter out the service when query from cache
+	serviceLabels := map[string]string{}
+	serviceLabels[WorkloadLabel] = workload.Namespace
+
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName:    "workload-",
+			OwnerReferences: []metav1.OwnerReference{ownerRef},
+			Namespace:       workload.Namespace,
+			Annotations:     serviceAnnotations,
+			Labels:          serviceLabels,
+		},
+		Spec: corev1.ServiceSpec{
+			ClusterIP: toCreate.ClusterIP,
+			Type:      toCreate.Type,
+			Ports:     toCreate.ServicePorts,
+		},
+	}
+
+	logrus.Infof("Creating [%s] service with ports [%v] for workload %s", service.Spec.Type, toCreate.ServicePorts, workload.getKey())
+	_, err := c.services.Create(service)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func arePortsEqual(one []corev1.ServicePort, two []corev1.ServicePort) bool {
+	if len(one) != len(two) {
+		return false
+	}
+
+	for _, o := range one {
+		found := false
+		for _, t := range two {
+			if reflect.DeepEqual(o, t) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+
+	return true
 }

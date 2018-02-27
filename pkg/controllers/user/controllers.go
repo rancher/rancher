@@ -18,8 +18,8 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline"
 	"github.com/rancher/rancher/pkg/controllers/user/secret"
+	"github.com/rancher/rancher/pkg/controllers/user/targetworkloadservice"
 	"github.com/rancher/rancher/pkg/controllers/user/workload"
-	"github.com/rancher/rancher/pkg/controllers/user/workloadservice"
 	"github.com/rancher/types/config"
 )
 
@@ -41,7 +41,7 @@ func Register(ctx context.Context, cluster *config.UserContext) error {
 
 	userOnlyContext := cluster.UserOnlyContext()
 	dnsrecord.Register(ctx, userOnlyContext)
-	workloadservice.Register(ctx, userOnlyContext)
+	targetworkloadservice.Register(ctx, userOnlyContext)
 	endpoints.Register(ctx, userOnlyContext)
 	workload.Register(ctx, userOnlyContext)
 	ingress.Register(ctx, userOnlyContext)
