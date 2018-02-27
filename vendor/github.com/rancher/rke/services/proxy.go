@@ -14,7 +14,7 @@ const (
 )
 
 func runNginxProxy(ctx context.Context, host *hosts.Host, prsMap map[string]v3.PrivateRegistry, proxyProcess v3.Process) error {
-	imageCfg, hostCfg, _ := getProcessConfig(proxyProcess)
+	imageCfg, hostCfg, _ := GetProcessConfig(proxyProcess)
 	return docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, NginxProxyContainerName, host.Address, WorkerRole, prsMap)
 }
 

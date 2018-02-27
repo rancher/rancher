@@ -23,10 +23,7 @@ type AppSpec struct {
 	ExternalID       string            `json:"externalId,omitempty"`
 	Templates        map[string]string `json:"templates,omitempty"`
 	Answers          map[string]string `json:"answers,omitempty"`
-	Prune            bool              `json:"prune,omitempty"`
-	Tag              map[string]string `json:"tag,omitempty"`
-	User             string            `json:"user,omitempty"`
-	Groups           []string          `json:"groups,omitempty"`
+	AnswerValues     string            `json:"answerValues,omitempty"`
 }
 
 var (

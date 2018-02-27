@@ -23,7 +23,7 @@ const (
 func RunEtcdPlane(ctx context.Context, etcdHosts []*hosts.Host, etcdProcessHostMap map[*hosts.Host]v3.Process, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry) error {
 	log.Infof(ctx, "[%s] Building up Etcd Plane..", ETCDRole)
 	for _, host := range etcdHosts {
-		imageCfg, hostCfg, _ := getProcessConfig(etcdProcessHostMap[host])
+		imageCfg, hostCfg, _ := GetProcessConfig(etcdProcessHostMap[host])
 		err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, EtcdContainerName, host.Address, ETCDRole, prsMap)
 		if err != nil {
 			return err
@@ -127,7 +127,7 @@ func RemoveEtcdMember(ctx context.Context, etcdHost *hosts.Host, etcdHosts []*ho
 
 func ReloadEtcdCluster(ctx context.Context, readyEtcdHosts []*hosts.Host, localConnDialerFactory hosts.DialerFactory, cert, key []byte, prsMap map[string]v3.PrivateRegistry, etcdProcessHostMap map[*hosts.Host]v3.Process) error {
 	for host, process := range etcdProcessHostMap {
-		imageCfg, hostCfg, _ := getProcessConfig(process)
+		imageCfg, hostCfg, _ := GetProcessConfig(process)
 		if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, EtcdContainerName, host.Address, ETCDRole, prsMap); err != nil {
 			return err
 		}
@@ -135,7 +135,7 @@ func ReloadEtcdCluster(ctx context.Context, readyEtcdHosts []*hosts.Host, localC
 	time.Sleep(10 * time.Second)
 	var healthy bool
 	for _, host := range readyEtcdHosts {
-		_, _, healthCheckURL := getProcessConfig(etcdProcessHostMap[host])
+		_, _, healthCheckURL := GetProcessConfig(etcdProcessHostMap[host])
 		if healthy = isEtcdHealthy(ctx, localConnDialerFactory, host, cert, key, healthCheckURL); healthy {
 			break
 		}

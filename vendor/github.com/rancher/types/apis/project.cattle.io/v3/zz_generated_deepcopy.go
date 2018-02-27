@@ -237,18 +237,6 @@ func (in *AppSpec) DeepCopyInto(out *AppSpec) {
 			(*out)[key] = val
 		}
 	}
-	if in.Tag != nil {
-		in, out := &in.Tag, &out.Tag
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
-	}
-	if in.Groups != nil {
-		in, out := &in.Groups, &out.Groups
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	}
 	return
 }
 

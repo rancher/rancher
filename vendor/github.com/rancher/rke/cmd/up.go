@@ -89,6 +89,12 @@ func ClusterUp(
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
 
+	// Apply Authz configuration after deploying controlplane
+	err = cluster.ApplyAuthzResources(ctx, kubeCluster.RancherKubernetesEngineConfig, clusterFilePath, configDir, k8sWrapTransport)
+	if err != nil {
+		return APIURL, caCrt, clientCert, clientKey, err
+	}
+
 	err = kubeCluster.SaveClusterState(ctx, rkeConfig)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err

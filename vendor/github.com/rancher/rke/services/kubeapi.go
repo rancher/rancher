@@ -10,7 +10,7 @@ import (
 
 func runKubeAPI(ctx context.Context, host *hosts.Host, df hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, kubeAPIProcess v3.Process) error {
 
-	imageCfg, hostCfg, healthCheckURL := getProcessConfig(kubeAPIProcess)
+	imageCfg, hostCfg, healthCheckURL := GetProcessConfig(kubeAPIProcess)
 	if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, KubeAPIContainerName, host.Address, ControlRole, prsMap); err != nil {
 		return err
 	}

@@ -108,23 +108,6 @@ func NewProxyStore(clientGetter ClientGetter, storageContext types.StorageContex
 	}
 }
 
-func NewRawProxyStore(clientGetter ClientGetter, storageContext types.StorageContext,
-	prefix []string, group, version, kind, resourcePlural string) *Store {
-	return &Store{
-		clientGetter:   clientGetter,
-		storageContext: storageContext,
-		prefix:         prefix,
-		group:          group,
-		version:        version,
-		kind:           kind,
-		resourcePlural: resourcePlural,
-		authContext: map[string]string{
-			"apiGroup": group,
-			"resource": resourcePlural,
-		},
-	}
-}
-
 func (p *Store) getUser(apiContext *types.APIContext) string {
 	return apiContext.Request.Header.Get(userAuthHeader)
 }

@@ -53,8 +53,17 @@ func catalogTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
 		AddMapperForType(&Version, v3.Catalog{},
 			&m.Move{From: "catalogKind", To: "kind"},
+			&m.Embed{Field: "status"},
+			&m.Drop{Field: "helmVersionCommits"},
 		).
-		MustImport(&Version, v3.Catalog{}).
+		MustImportAndCustomize(&Version, v3.Catalog{}, func(schema *types.Schema) {
+			schema.ResourceActions = map[string]types.Action{
+				"refresh": {},
+			}
+			schema.CollectionActions = map[string]types.Action{
+				"refresh": {},
+			}
+		}).
 		MustImport(&Version, v3.Template{}).
 		MustImport(&Version, v3.TemplateVersion{})
 }
@@ -260,6 +269,7 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 		MustImportAndCustomize(&Version, v3.ActiveDirectoryConfig{}, func(schema *types.Schema) {
 			schema.BaseType = "authConfig"
 			schema.ResourceActions = map[string]types.Action{
+				"disable": {},
 				"testAndApply": {
 					Input: "activeDirectoryTestAndApplyInput",
 				},

@@ -11,82 +11,92 @@ import (
 type DialerFactory func(h *Host) (func(network, address string) (net.Conn, error), error)
 
 type dialer struct {
-	host   *Host
-	signer ssh.Signer
+	signer        ssh.Signer
+	sshKeyString  string
+	sshAddress    string
+	sshPassphrase []byte
+	username      string
+	netConn       string
+	dockerSocket  string
+}
+
+func newDialer(h *Host, kind string) (*dialer, error) {
+	dialer := &dialer{
+		sshAddress:    fmt.Sprintf("%s:%s", h.Address, h.Port),
+		username:      h.User,
+		dockerSocket:  h.DockerSocket,
+		sshKeyString:  h.SSHKey,
+		netConn:       "unix",
+		sshPassphrase: []byte(h.SavedKeyPhrase),
+	}
+
+	if dialer.sshKeyString == "" {
+		dialer.sshKeyString = privateKeyPath(h.SSHKeyPath)
+	}
+
+	switch kind {
+	case "network", "health":
+		dialer.netConn = "tcp"
+	}
+
+	if len(dialer.dockerSocket) == 0 {
+		dialer.dockerSocket = "/var/run/docker.sock"
+	}
+
+	return dialer, nil
 }
 
 func SSHFactory(h *Host) (func(network, address string) (net.Conn, error), error) {
-	key, err := h.checkEncryptedKey()
-	if err != nil {
-		return nil, fmt.Errorf("Failed to parse the private key: %v", err)
-	}
-	dialer := &dialer{
-		host:   h,
-		signer: key,
-	}
-	return dialer.DialDocker, nil
+	dialer, err := newDialer(h, "docker")
+	return dialer.Dial, err
 }
 
 func LocalConnFactory(h *Host) (func(network, address string) (net.Conn, error), error) {
-	key, err := h.checkEncryptedKey()
-	if err != nil {
-		return nil, fmt.Errorf("Failed to parse the private key: %v", err)
-	}
-	dialer := &dialer{
-		host:   h,
-		signer: key,
-	}
-	return dialer.DialLocalConn, nil
+	dialer, err := newDialer(h, "network")
+	return dialer.Dial, err
 }
 
 func (d *dialer) DialDocker(network, addr string) (net.Conn, error) {
-	sshAddr := fmt.Sprintf("%s:%s", d.host.Address, d.host.Port)
-	// Build SSH client configuration
-	cfg, err := makeSSHConfig(d.host.User, d.signer)
-	if err != nil {
-		return nil, fmt.Errorf("Error configuring SSH: %v", err)
-	}
-	// Establish connection with SSH server
-	conn, err := ssh.Dial("tcp", sshAddr, cfg)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to dial ssh using address [%s]: %v", sshAddr, err)
-	}
-	if len(d.host.DockerSocket) == 0 {
-		d.host.DockerSocket = "/var/run/docker.sock"
-	}
-	remote, err := conn.Dial("unix", d.host.DockerSocket)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to dial to Docker socket: %v", err)
-	}
-	return remote, err
+	return d.Dial(network, addr)
 }
 
 func (d *dialer) DialLocalConn(network, addr string) (net.Conn, error) {
-	sshAddr := fmt.Sprintf("%s:%s", d.host.Address, d.host.Port)
-	// Build SSH client configuration
-	cfg, err := makeSSHConfig(d.host.User, d.signer)
+	return d.Dial(network, addr)
+}
+
+func (d *dialer) Dial(network, addr string) (net.Conn, error) {
+	conn, err := d.getSSHTunnelConnection()
 	if err != nil {
-		return nil, fmt.Errorf("Error configuring SSH: %v", err)
+		return nil, fmt.Errorf("Failed to dial ssh using address [%s]: %v", d.sshAddress, err)
 	}
-	// Establish connection with SSH server
-	conn, err := ssh.Dial("tcp", sshAddr, cfg)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to dial ssh using address [%s]: %v", sshAddr, err)
+
+	// Docker Socket....
+	if d.netConn == "unix" {
+		addr = d.dockerSocket
+		network = d.netConn
 	}
+
 	remote, err := conn.Dial(network, addr)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to dial to Local Port [%d] on host [%s]: %v", d.host.LocalConnPort, d.host.Address, err)
+		return nil, fmt.Errorf("Failed to dial to %s: %v", addr, err)
 	}
 	return remote, err
 }
 
-func (h *Host) newHTTPClient(dialerFactory DialerFactory) (*http.Client, error) {
-	var factory DialerFactory
+func (d *dialer) getSSHTunnelConnection() (*ssh.Client, error) {
+	cfg, err := getSSHConfig(d.username, d.sshKeyString, d.sshPassphrase)
+	if err != nil {
+		return nil, fmt.Errorf("Error configuring SSH: %v", err)
+	}
 
-	if dialerFactory == nil {
+	// Establish connection with SSH server
+	return ssh.Dial("tcp", d.sshAddress, cfg)
+}
+
+func (h *Host) newHTTPClient(dialerFactory DialerFactory) (*http.Client, error) {
+	factory := dialerFactory
+	if factory == nil {
 		factory = SSHFactory
-	} else {
-		factory = dialerFactory
 	}
 
 	dialer, err := factory(h)

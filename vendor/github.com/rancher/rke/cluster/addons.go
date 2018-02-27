@@ -1,8 +1,11 @@
 package cluster
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
 	"time"
 
 	"github.com/rancher/rke/addons"
@@ -66,10 +69,21 @@ func (c *Cluster) deployKubeDNS(ctx context.Context) error {
 	}
 	log.Infof(ctx, "[addons] KubeDNS deployed successfully..")
 	return nil
+}
 
+func (c *Cluster) deployWithKubectl(ctx context.Context, addonYaml string) error {
+	buf := bytes.NewBufferString(addonYaml)
+	cmd := exec.Command("kubectl", "--kubeconfig", c.LocalKubeConfigPath, "apply", "-f", "-")
+	cmd.Stdin = buf
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 func (c *Cluster) doAddonDeploy(ctx context.Context, addonYaml, resourceName string) error {
+	if c.UseKubectlDeploy {
+		return c.deployWithKubectl(ctx, addonYaml)
+	}
 
 	err := c.StoreAddonConfigMap(ctx, addonYaml, resourceName)
 	if err != nil {

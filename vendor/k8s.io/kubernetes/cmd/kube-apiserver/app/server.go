@@ -91,6 +91,10 @@ import (
 const etcdRetryLimit = 60
 const etcdRetryInterval = 1 * time.Second
 
+var (
+	DefaultProxyDialer utilnet.DialFunc
+)
+
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
 func NewAPIServerCommand() *cobra.Command {
 	s := options.NewServerRunOptions()
@@ -209,7 +213,7 @@ func CreateKubeAPIServer(kubeAPIServerConfig *master.Config, delegateAPIServer g
 func CreateNodeDialer(s *options.ServerRunOptions) (tunneler.Tunneler, *http.Transport, error) {
 	// Setup nodeTunneler if needed
 	var nodeTunneler tunneler.Tunneler
-	var proxyDialerFn utilnet.DialFunc
+	proxyDialerFn := DefaultProxyDialer
 	if len(s.SSHUser) > 0 {
 		// Get ssh key distribution func, if supported
 		var installSSHKey tunneler.InstallSSHKey
