@@ -91,8 +91,11 @@ func (c *Controller) CreateServiceForWorkload(workload *Workload) error {
 		Kind:       workload.Kind,
 		Controller: &controller,
 	}
+	// we use workload annotation instead of service.selector (based off workload.labels)
+	// to avoid service recreate on user label change
 	serviceAnnotations := map[string]string{}
 	serviceAnnotations[WorkloadAnnotation] = workload.getKey()
+	// labels are used so it is easy to filter out the service when query from cache
 	serviceLabels := map[string]string{}
 	serviceLabels[WorkloadLabel] = workload.Namespace
 
@@ -108,6 +111,7 @@ func (c *Controller) CreateServiceForWorkload(workload *Workload) error {
 		serviceType := toCreate.Type
 		if toCreate.ClusterIP == "None" {
 			serviceType = "Headless"
+			serviceAnnotations[WorkloadAnnotation] = workload.getKey()
 		}
 		service := &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
