@@ -118,13 +118,10 @@ func (c *CommonController) syncDeployments(key string, obj *corev1beta2.Deployme
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil
 	}
-	var w *Workload
-	var err error
-	if key != AllWorkloads {
-		w, err = c.getWorkload(key, DeploymentType)
-		if err != nil || w == nil {
-			return err
-		}
+
+	w, err := c.getWorkload(key, DeploymentType)
+	if err != nil || w == nil {
+		return err
 	}
 
 	return c.Sync(key, w)
@@ -535,6 +532,11 @@ func getWorkloadID(objectType string, namespace string, name string) string {
 }
 
 func (c CommonController) UpdateWorkload(w *Workload) error {
+	for _, o := range w.OwnerReferences {
+		if *o.Controller {
+			return nil
+		}
+	}
 	// only annotations updates are supported
 	switch w.Kind {
 	case DeploymentType:

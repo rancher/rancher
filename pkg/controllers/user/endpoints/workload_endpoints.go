@@ -39,9 +39,13 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 			return err
 		}
 		services, err = c.serviceLister.List(namespace, labels.NewSelector())
+
 	} else {
 		services, err = c.serviceLister.List(obj.Namespace, labels.NewSelector())
 		workloads = append(workloads, obj)
+	}
+	if err != nil {
+		return err
 	}
 
 	for _, w := range workloads {
@@ -53,7 +57,31 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 				set[key] = val
 			}
 			selector := labels.SelectorFromSet(set)
+			found := false
 			if selector.Matches(labels.Set(w.Labels)) {
+				// direct selector match
+				found = true
+			} else {
+				// match based off the workload
+				value, ok := svc.Annotations[workloadutil.WorkloadAnnotation]
+				if !ok || value == "" {
+					continue
+				}
+				workloadIDs := strings.Split(value, ",")
+				for _, workloadID := range workloadIDs {
+					splitted := strings.Split(workloadID, ":")
+					if len(splitted) != 3 {
+						continue
+					}
+					namespace := splitted[1]
+					name := splitted[2]
+					if w.Name == name && w.Namespace == namespace {
+						found = true
+						break
+					}
+				}
+			}
+			if found {
 				eps, err := convertServiceToPublicEndpoints(svc, nil)
 				if err != nil {
 					return err
