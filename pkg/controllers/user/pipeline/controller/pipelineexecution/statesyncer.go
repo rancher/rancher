@@ -73,7 +73,7 @@ func (s *ExecutionStateSyncer) syncState() {
 					logrus.Errorf("Error get pipeline - %v", err)
 					continue
 				}
-				if p.Status.LastExecutionID == e.Name {
+				if p.Status.LastExecutionID == e.Namespace+":"+e.Name {
 					p.Status.LastRunState = e.Status.ExecutionState
 					if _, err := s.pipelines.Update(p); err != nil {
 						logrus.Errorf("Error update pipeline - %v", err)

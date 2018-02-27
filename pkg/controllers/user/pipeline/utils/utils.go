@@ -54,7 +54,7 @@ func InitExecution(p *v3.Pipeline, triggerType string) *v3.PipelineExecution {
 		},
 		Spec: v3.PipelineExecutionSpec{
 			ProjectName:  p.Spec.ProjectName,
-			PipelineName: p.Name,
+			PipelineName: p.Namespace + ":" + p.Name,
 			Run:          p.Status.NextRun,
 			TriggeredBy:  triggerType,
 			Pipeline:     *p,
@@ -129,7 +129,7 @@ func GenerateExecution(pipelines v3.PipelineInterface, executions v3.PipelineExe
 
 	//update pipeline status
 	pipeline.Status.NextRun++
-	pipeline.Status.LastExecutionID = execution.Name
+	pipeline.Status.LastExecutionID = pipeline.Namespace + ":" + execution.Name
 	pipeline.Status.LastStarted = time.Now().Format(time.RFC3339)
 
 	_, err = pipelines.Update(pipeline)
