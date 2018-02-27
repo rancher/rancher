@@ -53,6 +53,8 @@ func (d *ConfigSyncer) NotifierSync(key string, alert *v3.Notifier) error {
 	return d.sync()
 }
 
+//sync: update the secret which store the configuration of alertmanager given the latest configured notifiers and alerts rules.
+//For each alert, it will generate a route and a receiver in the alertmanager's configuration file.
 func (d *ConfigSyncer) sync() error {
 
 	if d.alertManager.IsDeploy == false {

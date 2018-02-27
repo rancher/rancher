@@ -195,6 +195,7 @@ type ProjectLifecycle struct {
 	clusterName   string
 }
 
+//Create pre-can project alerts
 func (l *ProjectLifecycle) Create(obj *v3.Project) (*v3.Project, error) {
 	deploymentAlert := &v3.ProjectAlert{
 		ObjectMeta: metav1.ObjectMeta{

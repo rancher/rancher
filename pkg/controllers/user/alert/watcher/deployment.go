@@ -87,7 +87,11 @@ func (w *DeploymentWatcher) watchRule() error {
 
 				selector := labels.NewSelector()
 				for key, value := range alert.Spec.TargetWorkload.Selector {
-					r, _ := labels.NewRequirement(key, selection.Equals, []string{value})
+					r, err := labels.NewRequirement(key, selection.Equals, []string{value})
+					if err != nil {
+						logrus.Warnf("Fail to create new requirement foo %s: %v", key, err)
+						continue
+					}
 					selector = selector.Add(*r)
 				}
 				deps, err := w.deploymentLister.List("", selector)

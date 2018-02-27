@@ -55,6 +55,7 @@ func (d *Deployer) ClusterSync(key string, alert *v3.ClusterAlert) error {
 	return d.sync()
 }
 
+//deploy or clean up resources(alertmanager deployment, service, namespace) required by alerting.
 func (d *Deployer) sync() error {
 	needDeploy, err := d.needDeploy()
 	if err != nil {
