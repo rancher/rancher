@@ -271,40 +271,39 @@ func gotSecret(projectID interface{}, namespaceID interface{}, apiContext *types
 		splitID := strings.Split(project, ":")
 		if len(splitID) == 2 {
 			projectName := splitID[1]
-			if err := getSecret(projectName, repoName, projectclient.SecretType, apiContext); err == nil {
+			if ok := foundSecret(projectName, repoName, projectclient.SecretType, apiContext); ok {
 				return true
 			}
 		}
 	}
 	if namespace := convert.ToString(namespaceID); namespace != "" {
-		if err := getSecret(namespace, repoName, "namespacedSecret", apiContext); err == nil {
+		if ok := foundSecret(namespace, repoName, "namespacedSecret", apiContext); ok {
 			return true
 		}
 	}
-	logrus.Warnf("couldn't find secret [%s]", repoName)
+	logrus.Debugf("couldn't find secret [%s]", repoName)
 	return false
 }
 
-func getSecret(prefix string, repoName string, datatype string, apiContext *types.APIContext) error {
+func foundSecret(prefix string, repoName string, datatype string, apiContext *types.APIContext) bool {
 	secretName := fmt.Sprintf("%s:%s", prefix, repoName)
 	var secret interface{}
-	return access.ByID(apiContext, &projectschema.Version, datatype, secretName, &secret)
+	if err := access.ByID(apiContext, &projectschema.Version, datatype, secretName, &secret); err == nil {
+		if secretMap := convert.ToMapInterface(secret); secretMap != nil {
+			if val, _ := secretMap["type"]; convert.ToString(val) == "dockerCredential" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func getRepo(image string) string {
 	var repo string
 	named, err := reference.ParseNormalizedNamed(image)
 	if err != nil {
-		logrus.Warn(err)
+		logrus.Debug(err)
 		return repo
 	}
-	path := reference.Path(named)
-	parts := strings.Split(path, "/")
-	if len(parts) == 1 {
-		return path
-	}
-	if len(parts) == 2 {
-		return parts[1]
-	}
-	return repo
+	return reference.Domain(named)
 }
