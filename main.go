@@ -120,10 +120,11 @@ func run(cfg app.Config) error {
 	dump.GoroutineDumpOn(syscall.SIGUSR1, syscall.SIGILL)
 	ctx := signal.SigTermCancelContext(context.Background())
 
-	ctx, kubeConfig, err := k8s.GetConfig(ctx, cfg.K8sMode, cfg.KubeConfig)
+	embedded, ctx, kubeConfig, err := k8s.GetConfig(ctx, cfg.K8sMode, cfg.KubeConfig)
 	if err != nil {
 		return err
 	}
+	cfg.Embedded = embedded
 
 	return app.Run(ctx, *kubeConfig, &cfg)
 }

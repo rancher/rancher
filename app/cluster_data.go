@@ -6,10 +6,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func addClusters(addLocal bool, adminName string, management *config.ManagementContext) error {
+func addClusters(addLocal, embedded bool, adminName string, management *config.ManagementContext) error {
 	if addLocal {
 		// Ignore error
-		management.Management.Clusters("").Create(&v3.Cluster{
+		c := &v3.Cluster{
 			ObjectMeta: v1.ObjectMeta{
 				Name: "local",
 				Annotations: map[string]string{
@@ -17,12 +17,19 @@ func addClusters(addLocal bool, adminName string, management *config.ManagementC
 				},
 			},
 			Spec: v3.ClusterSpec{
+				Internal:    true,
 				DisplayName: "local",
 			},
 			Status: v3.ClusterStatus{
-				Driver: "local",
+				Driver: v3.ClusterDriverImported,
 			},
-		})
+		}
+		if embedded {
+			c.Status.Driver = v3.ClusterDriverLocal
+		}
+
+		management.Management.Clusters("").Create(c)
 	}
+
 	return nil
 }
