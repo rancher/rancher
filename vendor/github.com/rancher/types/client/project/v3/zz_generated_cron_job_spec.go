@@ -5,7 +5,7 @@ const (
 	CronJobSpecFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	CronJobSpecFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
 	CronJobSpecFieldContainers                    = "containers"
-	CronJobSpecFieldCronJob                       = "cronJob"
+	CronJobSpecFieldCronJobConfig                 = "cronJobConfig"
 	CronJobSpecFieldDNSPolicy                     = "dnsPolicy"
 	CronJobSpecFieldFsgid                         = "fsgid"
 	CronJobSpecFieldGids                          = "gids"
@@ -35,7 +35,7 @@ type CronJobSpec struct {
 	ActiveDeadlineSeconds         *int64                 `json:"activeDeadlineSeconds,omitempty"`
 	AutomountServiceAccountToken  *bool                  `json:"automountServiceAccountToken,omitempty"`
 	Containers                    []Container            `json:"containers,omitempty"`
-	CronJob                       *CronJobConfig         `json:"cronJob,omitempty"`
+	CronJobConfig                 *CronJobConfig         `json:"cronJobConfig,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty"`

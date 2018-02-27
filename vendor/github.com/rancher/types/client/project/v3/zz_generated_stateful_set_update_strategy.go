@@ -1,12 +1,12 @@
 package client
 
 const (
-	StatefulSetUpdateStrategyType               = "statefulSetUpdateStrategy"
-	StatefulSetUpdateStrategyFieldRollingUpdate = "rollingUpdate"
-	StatefulSetUpdateStrategyFieldType          = "type"
+	StatefulSetUpdateStrategyType           = "statefulSetUpdateStrategy"
+	StatefulSetUpdateStrategyFieldPartition = "partition"
+	StatefulSetUpdateStrategyFieldStrategy  = "strategy"
 )
 
 type StatefulSetUpdateStrategy struct {
-	RollingUpdate *RollingUpdateStatefulSetStrategy `json:"rollingUpdate,omitempty"`
-	Type          string                            `json:"type,omitempty"`
+	Partition *int64 `json:"partition,omitempty"`
+	Strategy  string `json:"strategy,omitempty"`
 }

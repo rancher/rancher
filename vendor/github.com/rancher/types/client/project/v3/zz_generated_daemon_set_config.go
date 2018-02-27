@@ -1,14 +1,18 @@
 package client
 
+import "k8s.io/apimachinery/pkg/util/intstr"
+
 const (
 	DaemonSetConfigType                      = "daemonSetConfig"
+	DaemonSetConfigFieldMaxUnavailable       = "maxUnavailable"
 	DaemonSetConfigFieldMinReadySeconds      = "minReadySeconds"
 	DaemonSetConfigFieldRevisionHistoryLimit = "revisionHistoryLimit"
-	DaemonSetConfigFieldUpdateStrategy       = "updateStrategy"
+	DaemonSetConfigFieldStrategy             = "strategy"
 )
 
 type DaemonSetConfig struct {
-	MinReadySeconds      *int64                   `json:"minReadySeconds,omitempty"`
-	RevisionHistoryLimit *int64                   `json:"revisionHistoryLimit,omitempty"`
-	UpdateStrategy       *DaemonSetUpdateStrategy `json:"updateStrategy,omitempty"`
+	MaxUnavailable       intstr.IntOrString `json:"maxUnavailable,omitempty"`
+	MinReadySeconds      *int64             `json:"minReadySeconds,omitempty"`
+	RevisionHistoryLimit *int64             `json:"revisionHistoryLimit,omitempty"`
+	Strategy             string             `json:"strategy,omitempty"`
 }

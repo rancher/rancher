@@ -13,7 +13,7 @@ const (
 	DaemonSetFieldCreated                       = "created"
 	DaemonSetFieldCreatorID                     = "creatorId"
 	DaemonSetFieldDNSPolicy                     = "dnsPolicy"
-	DaemonSetFieldDaemonSet                     = "daemonSet"
+	DaemonSetFieldDaemonSetConfig               = "daemonSetConfig"
 	DaemonSetFieldDaemonSetStatus               = "daemonSetStatus"
 	DaemonSetFieldFsgid                         = "fsgid"
 	DaemonSetFieldGids                          = "gids"
@@ -60,7 +60,7 @@ type DaemonSet struct {
 	Created                       string                 `json:"created,omitempty"`
 	CreatorID                     string                 `json:"creatorId,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty"`
-	DaemonSet                     *DaemonSetConfig       `json:"daemonSet,omitempty"`
+	DaemonSetConfig               *DaemonSetConfig       `json:"daemonSetConfig,omitempty"`
 	DaemonSetStatus               *DaemonSetStatus       `json:"daemonSetStatus,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty"`

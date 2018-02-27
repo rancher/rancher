@@ -59,6 +59,7 @@ func (e *Embed) ModifySchema(schema *types.Schema, schemas *types.Schemas) error
 		return fmt.Errorf("failed to find schema %s for embedding", embeddedSchemaID)
 	}
 
+	deleteField := true
 	for name, field := range embeddedSchema.ResourceFields {
 		for _, ignore := range e.Ignore {
 			if ignore == name {
@@ -66,20 +67,29 @@ func (e *Embed) ModifySchema(schema *types.Schema, schemas *types.Schemas) error
 			}
 		}
 
-		if !e.ignoreOverride {
-			if _, ok := schema.ResourceFields[name]; ok {
-				return fmt.Errorf("embedding field %s on %s will overwrite the field %s",
-					e.Field, schema.ID, name)
+		if name == e.Field {
+			deleteField = false
+		} else {
+			if !e.ignoreOverride {
+				if _, ok := schema.ResourceFields[name]; ok {
+					return fmt.Errorf("embedding field %s on %s will overwrite the field %s",
+						e.Field, schema.ID, name)
+				}
 			}
 		}
+
 		if e.ReadOnly {
 			field.Create = false
 			field.Update = false
 		}
+
 		schema.ResourceFields[name] = field
 		e.embeddedFields = append(e.embeddedFields, name)
 	}
 
-	delete(schema.ResourceFields, e.Field)
+	if deleteField {
+		delete(schema.ResourceFields, e.Field)
+	}
+
 	return nil
 }

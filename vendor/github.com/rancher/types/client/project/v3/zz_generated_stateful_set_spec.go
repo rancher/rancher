@@ -24,7 +24,7 @@ const (
 	StatefulSetSpecFieldScheduling                    = "scheduling"
 	StatefulSetSpecFieldSelector                      = "selector"
 	StatefulSetSpecFieldServiceAccountName            = "serviceAccountName"
-	StatefulSetSpecFieldStatefulSet                   = "statefulSet"
+	StatefulSetSpecFieldStatefulSetConfig             = "statefulSetConfig"
 	StatefulSetSpecFieldSubdomain                     = "subdomain"
 	StatefulSetSpecFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
 	StatefulSetSpecFieldUid                           = "uid"
@@ -54,7 +54,7 @@ type StatefulSetSpec struct {
 	Scheduling                    *Scheduling            `json:"scheduling,omitempty"`
 	Selector                      *LabelSelector         `json:"selector,omitempty"`
 	ServiceAccountName            string                 `json:"serviceAccountName,omitempty"`
-	StatefulSet                   *StatefulSetConfig     `json:"statefulSet,omitempty"`
+	StatefulSetConfig             *StatefulSetConfig     `json:"statefulSetConfig,omitempty"`
 	Subdomain                     string                 `json:"subdomain,omitempty"`
 	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty"`
 	Uid                           *int64                 `json:"uid,omitempty"`

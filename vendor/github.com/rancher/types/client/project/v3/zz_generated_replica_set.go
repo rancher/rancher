@@ -31,7 +31,7 @@ const (
 	ReplicaSetFieldProjectID                     = "projectId"
 	ReplicaSetFieldPublicEndpoints               = "publicEndpoints"
 	ReplicaSetFieldRemoved                       = "removed"
-	ReplicaSetFieldReplicaSet                    = "replicaSet"
+	ReplicaSetFieldReplicaSetConfig              = "replicaSetConfig"
 	ReplicaSetFieldReplicaSetStatus              = "replicaSetStatus"
 	ReplicaSetFieldRestartPolicy                 = "restartPolicy"
 	ReplicaSetFieldRunAsNonRoot                  = "runAsNonRoot"
@@ -78,7 +78,7 @@ type ReplicaSet struct {
 	ProjectID                     string                 `json:"projectId,omitempty"`
 	PublicEndpoints               []PublicEndpoint       `json:"publicEndpoints,omitempty"`
 	Removed                       string                 `json:"removed,omitempty"`
-	ReplicaSet                    *ReplicaSetConfig      `json:"replicaSet,omitempty"`
+	ReplicaSetConfig              *ReplicaSetConfig      `json:"replicaSetConfig,omitempty"`
 	ReplicaSetStatus              *ReplicaSetStatus      `json:"replicaSetStatus,omitempty"`
 	RestartPolicy                 string                 `json:"restartPolicy,omitempty"`
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty"`

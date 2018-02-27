@@ -38,7 +38,7 @@ const (
 	StatefulSetFieldSelector                      = "selector"
 	StatefulSetFieldServiceAccountName            = "serviceAccountName"
 	StatefulSetFieldState                         = "state"
-	StatefulSetFieldStatefulSet                   = "statefulSet"
+	StatefulSetFieldStatefulSetConfig             = "statefulSetConfig"
 	StatefulSetFieldStatefulSetStatus             = "statefulSetStatus"
 	StatefulSetFieldSubdomain                     = "subdomain"
 	StatefulSetFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
@@ -85,7 +85,7 @@ type StatefulSet struct {
 	Selector                      *LabelSelector         `json:"selector,omitempty"`
 	ServiceAccountName            string                 `json:"serviceAccountName,omitempty"`
 	State                         string                 `json:"state,omitempty"`
-	StatefulSet                   *StatefulSetConfig     `json:"statefulSet,omitempty"`
+	StatefulSetConfig             *StatefulSetConfig     `json:"statefulSetConfig,omitempty"`
 	StatefulSetStatus             *StatefulSetStatus     `json:"statefulSetStatus,omitempty"`
 	Subdomain                     string                 `json:"subdomain,omitempty"`
 	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty"`

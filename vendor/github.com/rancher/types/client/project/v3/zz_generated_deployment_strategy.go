@@ -1,12 +1,16 @@
 package client
 
+import "k8s.io/apimachinery/pkg/util/intstr"
+
 const (
-	DeploymentStrategyType               = "deploymentStrategy"
-	DeploymentStrategyFieldRollingUpdate = "rollingUpdate"
-	DeploymentStrategyFieldType          = "type"
+	DeploymentStrategyType                = "deploymentStrategy"
+	DeploymentStrategyFieldMaxSurge       = "maxSurge"
+	DeploymentStrategyFieldMaxUnavailable = "maxUnavailable"
+	DeploymentStrategyFieldStrategy       = "strategy"
 )
 
 type DeploymentStrategy struct {
-	RollingUpdate *RollingUpdateDeployment `json:"rollingUpdate,omitempty"`
-	Type          string                   `json:"type,omitempty"`
+	MaxSurge       intstr.IntOrString `json:"maxSurge,omitempty"`
+	MaxUnavailable intstr.IntOrString `json:"maxUnavailable,omitempty"`
+	Strategy       string             `json:"strategy,omitempty"`
 }

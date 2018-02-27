@@ -21,7 +21,7 @@ const (
 	JobFieldHostPID                       = "hostPID"
 	JobFieldHostname                      = "hostname"
 	JobFieldImagePullSecrets              = "imagePullSecrets"
-	JobFieldJob                           = "job"
+	JobFieldJobConfig                     = "jobConfig"
 	JobFieldJobStatus                     = "jobStatus"
 	JobFieldLabels                        = "labels"
 	JobFieldName                          = "name"
@@ -68,7 +68,7 @@ type Job struct {
 	HostPID                       bool                   `json:"hostPID,omitempty"`
 	Hostname                      string                 `json:"hostname,omitempty"`
 	ImagePullSecrets              []LocalObjectReference `json:"imagePullSecrets,omitempty"`
-	Job                           *JobConfig             `json:"job,omitempty"`
+	JobConfig                     *JobConfig             `json:"jobConfig,omitempty"`
 	JobStatus                     *JobStatus             `json:"jobStatus,omitempty"`
 	Labels                        map[string]string      `json:"labels,omitempty"`
 	Name                          string                 `json:"name,omitempty"`

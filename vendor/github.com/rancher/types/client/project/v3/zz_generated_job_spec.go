@@ -14,7 +14,7 @@ const (
 	JobSpecFieldHostPID                       = "hostPID"
 	JobSpecFieldHostname                      = "hostname"
 	JobSpecFieldImagePullSecrets              = "imagePullSecrets"
-	JobSpecFieldJob                           = "job"
+	JobSpecFieldJobConfig                     = "jobConfig"
 	JobSpecFieldNodeId                        = "nodeId"
 	JobSpecFieldObjectMeta                    = "metadata"
 	JobSpecFieldPriority                      = "priority"
@@ -44,7 +44,7 @@ type JobSpec struct {
 	HostPID                       bool                   `json:"hostPID,omitempty"`
 	Hostname                      string                 `json:"hostname,omitempty"`
 	ImagePullSecrets              []LocalObjectReference `json:"imagePullSecrets,omitempty"`
-	Job                           *JobConfig             `json:"job,omitempty"`
+	JobConfig                     *JobConfig             `json:"jobConfig,omitempty"`
 	NodeId                        string                 `json:"nodeId,omitempty"`
 	ObjectMeta                    *ObjectMeta            `json:"metadata,omitempty"`
 	Priority                      *int64                 `json:"priority,omitempty"`
