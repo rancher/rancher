@@ -5,6 +5,7 @@ import (
 	"reflect"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -94,7 +95,7 @@ func (m *NodesSyncer) reconcileAll() error {
 	machines, err := m.machineLister.List(m.clusterNamespace, labels.NewSelector())
 	machineMap := make(map[string]*v3.Node)
 	for _, machine := range machines {
-		nodeName := getNodeNameFromNode(machine)
+		nodeName := node.GetNodeName(machine)
 		if nodeName == "" {
 			logrus.Debugf("Failed to get nodeName from machine [%s]", machine.Name)
 			continue
@@ -234,19 +235,6 @@ func isNodeForNode(nodeName string, machine *v3.Node) bool {
 		}
 	}
 	return false
-}
-
-func getNodeNameFromNode(machine *v3.Node) string {
-	if machine.Status.NodeName != "" {
-		return machine.Status.NodeName
-	}
-	// to handle the case when machine was provisioned first
-	if machine.Status.NodeConfig != nil {
-		if machine.Status.NodeConfig.HostnameOverride != "" {
-			return machine.Status.NodeConfig.HostnameOverride
-		}
-	}
-	return ""
 }
 
 func resetConditions(machine *v3.Node) *v3.Node {

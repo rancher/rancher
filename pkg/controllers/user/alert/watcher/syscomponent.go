@@ -85,11 +85,8 @@ func (w *SysComponentWatcher) checkComponentHealthy(statuses *v1.ComponentStatus
 						}
 						return
 					}
-
 				}
-
 			}
-
 		}
 	}
 
