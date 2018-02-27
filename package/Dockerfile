@@ -5,10 +5,9 @@ RUN apt-get update && apt-get install -y git curl ca-certificates unzip xz-utils
     chown -R rancher /var/lib/rancher /var/lib/cattle /usr/local/bin
 RUN curl -sLf https://github.com/rancher/machine-package/releases/download/v0.13.0-rancher4-1/docker-machine.tar.gz | tar xvzf - -C /usr/bin && \
     curl -sLf https://storage.googleapis.com/kubernetes-release/release/v1.8.6/bin/linux/amd64/kubectl > /usr/bin/kubectl && \
-    curl -sLf https://github.com/rancher/helm/releases/download/v2.8.0-rancher1/helm > /usr/bin/helm && \
-    curl -sLf https://github.com/rancher/helm/releases/download/v2.8.0-rancher1/tiller > /usr/bin/tiller && \
+    curl -sLf https://github.com/rancher/helm/releases/download/v2.8.0-rancher2/helm > /usr/bin/helm && \
+    curl -sLf https://github.com/rancher/helm/releases/download/v2.8.0-rancher2/tiller > /usr/bin/tiller && \
     chmod +x /usr/bin/kubectl /usr/bin/tiller /usr/bin/helm
-ENV ETCD_ARGS "--data-dir /var/lib/rancher/etcd --listen-peer-urls http://localhost:2382 --advertise-client-urls http://localhost:2382 --listen-client-urls http://localhost:2381"
 WORKDIR /var/lib/rancher
 
 ENV CATTLE_UI_PATH /usr/share/rancher/ui
