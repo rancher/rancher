@@ -137,10 +137,10 @@ func (c *Controller) createService(toCreate Service, workload *Workload) error {
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName:    "workload-",
 			OwnerReferences: []metav1.OwnerReference{ownerRef},
 			Namespace:       workload.Namespace,
 			Labels:          serviceLabels,
+			Name:            workload.Name,
 		},
 		Spec: corev1.ServiceSpec{
 			ClusterIP: toCreate.ClusterIP,
