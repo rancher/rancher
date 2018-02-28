@@ -2,7 +2,7 @@ package workload
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 	"reflect"
 
 	"strings"
@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -51,32 +52,25 @@ func (c *Controller) CreateService(key string, w *Workload) error {
 }
 
 func (c *Controller) serviceExistsForWorkload(workload *Workload, service *Service) (*corev1.Service, error) {
-	labels := fmt.Sprintf("%s=%s", WorkloadLabel, workload.Namespace)
-	services, err := c.services.List(metav1.ListOptions{LabelSelector: labels})
+	s, err := c.serviceLister.Get(workload.Namespace, service.Name)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 
-	for _, s := range services.Items {
-		if s.DeletionTimestamp != nil {
-			continue
-		}
-		if s.Spec.Type != service.Type {
-			continue
-		}
-		for _, ref := range s.OwnerReferences {
-			if reflect.DeepEqual(ref.UID, workload.UUID) {
-				return &s, nil
-			}
-		}
+	if s.DeletionTimestamp != nil {
+		return nil, nil
 	}
-	return nil, nil
+
+	return s, nil
 }
 
 func (c *Controller) CreateServiceForWorkload(workload *Workload) error {
 	services := map[corev1.ServiceType]Service{}
-	if val, ok := workload.TemplateSpec.Annotations[PortsAnnotation]; ok {
-		svcs, err := generateServicesFromPortsAnnotation(val)
+	if _, ok := workload.TemplateSpec.Annotations[PortsAnnotation]; ok {
+		svcs, err := generateServicesFromPortsAnnotation(workload)
 		if err != nil {
 			return err
 		}
@@ -93,12 +87,30 @@ func (c *Controller) CreateServiceForWorkload(workload *Workload) error {
 		if err != nil {
 			return err
 		}
+
 		if existing == nil {
 			if err := c.createService(toCreate, workload); err != nil {
 				return err
 			}
 
 		} else {
+			// check if the port of the same type
+			if existing.Spec.Type != toCreate.Type {
+				logrus.Warnf("Service [%s/%s] already exists but with diff type. Expected type [%s], actual type [%v]", existing.Name, existing.Namespace, toCreate.Type, existing.Spec.Type)
+				return nil
+			}
+			isOwner := false
+			for _, ref := range existing.OwnerReferences {
+				if reflect.DeepEqual(ref.UID, workload.UUID) {
+					isOwner = true
+					break
+				}
+			}
+			if !isOwner {
+				logrus.Warnf("Service [%s/%s] already exists but with diff owner", existing.Name, existing.Namespace)
+				return nil
+			}
+
 			if arePortsEqual(toCreate.ServicePorts, existing.Spec.Ports) {
 				continue
 			}
@@ -131,16 +143,20 @@ func (c *Controller) createService(toCreate Service, workload *Workload) error {
 		Controller: &controller,
 	}
 
-	// labels are used so it is easy to filter out the service when query from API
-	serviceLabels := map[string]string{}
-	serviceLabels[WorkloadLabel] = workload.Namespace
+	serviceAnnotations := map[string]string{}
+	workloadAnnotationValue, err := workloadAnnotationToString(workload.getKey())
+	if err != nil {
+		return err
+	}
+	serviceAnnotations[WorkloadAnnotation] = workloadAnnotationValue
+	serviceAnnotations[WorkloadAnnotatioNoop] = "true"
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			OwnerReferences: []metav1.OwnerReference{ownerRef},
 			Namespace:       workload.Namespace,
-			Labels:          serviceLabels,
 			Name:            workload.Name,
+			Annotations:     serviceAnnotations,
 		},
 		Spec: corev1.ServiceSpec{
 			ClusterIP: toCreate.ClusterIP,
@@ -151,7 +167,7 @@ func (c *Controller) createService(toCreate Service, workload *Workload) error {
 	}
 
 	logrus.Infof("Creating [%s] service with ports [%v] for workload %s", service.Spec.Type, toCreate.ServicePorts, workload.getKey())
-	_, err := c.services.Create(service)
+	_, err = c.services.Create(service)
 	if err != nil {
 		return err
 	}
@@ -177,4 +193,13 @@ func arePortsEqual(one []corev1.ServicePort, two []corev1.ServicePort) bool {
 	}
 
 	return true
+}
+
+func workloadAnnotationToString(workloadID string) (string, error) {
+	ws := []string{workloadID}
+	b, err := json.Marshal(ws)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }

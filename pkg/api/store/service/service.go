@@ -3,34 +3,16 @@ package service
 import (
 	"strconv"
 
-	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/norman/types/values"
 	v3 "github.com/rancher/types/client/project/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 func New(store types.Store) types.Store {
-	return &transform.Store{
-		Store: &Store{
-			store,
-		},
-		Transformer: func(apiContext *types.APIContext, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
-			ownerReferences, ok := values.GetSlice(data, "ownerReferences")
-			if !ok {
-				return data, nil
-			}
-
-			for _, ownerReference := range ownerReferences {
-				controller, _ := ownerReference["controller"].(bool)
-				if controller {
-					return nil, nil
-				}
-			}
-			return data, nil
-		},
+	return &Store{
+		store,
 	}
 }
 
