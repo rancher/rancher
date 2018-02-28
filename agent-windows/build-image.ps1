@@ -1,5 +1,6 @@
 $IMAGE=$(get-item env:IMAGE -ErrorAction Ignore)
 
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 Invoke-WebRequest -Uri "https://github.com/rancher/windows-binaries/releases/download/v0.0.1/devcon.exe" -OutFile "tools/devcon.exe"
 $byteArray=(Invoke-WebRequest -Uri "https://github.com/rancher/windows-binaries/releases/download/v0.0.1/MD5SUM").Content
 $tarMD5=[System.Text.Encoding]::ASCII.GetString($byteArray).ToUpper()
