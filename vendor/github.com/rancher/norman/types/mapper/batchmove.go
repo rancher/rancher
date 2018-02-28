@@ -21,7 +21,7 @@ func (b *BatchMove) FromInternal(data map[string]interface{}) {
 }
 
 func (b *BatchMove) ToInternal(data map[string]interface{}) {
-	for i := len(b.moves) - 1; i >= 0; i++ {
+	for i := len(b.moves) - 1; i >= 0; i-- {
 		b.moves[i].ToInternal(data)
 	}
 }
