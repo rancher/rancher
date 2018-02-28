@@ -444,7 +444,7 @@ func NewESDeployment(namespace string) *v1beta2.Deployment {
 									//CPU is always requested as an absolute quantity, never as a relative quantity; 0.1 is the same amount of CPU on a single-core, dual-core, or 48-core machine
 									v1.ResourceCPU: *resource.NewMilliQuantity(int64(2000), resource.DecimalSI),
 									//Limits and requests for memory are measured in bytes.
-									v1.ResourceMemory: *resource.NewQuantity(int64(4*1024*1024*1024), resource.DecimalSI), // unit is byte
+									v1.ResourceMemory: *resource.NewQuantity(int64(500*1024*1024), resource.DecimalSI), // unit is byte
 								},
 							},
 							VolumeMounts: []v1.VolumeMount{
