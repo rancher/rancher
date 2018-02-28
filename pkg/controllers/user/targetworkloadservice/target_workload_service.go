@@ -80,6 +80,11 @@ func (c *Controller) reconcilePods(key string, obj *corev1.Service) error {
 	if !ok || value == "" {
 		return nil
 	}
+	noop, ok := obj.Annotations[util.WorkloadAnnotatioNoop]
+	if ok && noop == "true" {
+		return nil
+	}
+
 	workdloadIDs := strings.Split(value, ",")
 
 	if obj.Spec.Selector == nil {

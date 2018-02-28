@@ -31,7 +31,6 @@ const (
 	WorkloadAnnotation        = "field.cattle.io/targetWorkloadIds"
 	PortsAnnotation           = "field.cattle.io/ports"
 	ClusterIPServiceType      = "ClusterIP"
-	WorkloadLabel             = "workload.user.cattle.io/workload"
 	AllWorkloads              = "_all_workloads_"
 	DeploymentType            = "deployment"
 	ReplicationControllerType = "replicationcontroller"
@@ -40,6 +39,7 @@ const (
 	StatefulSetType           = "statefulset"
 	JobType                   = "job"
 	CronJobType               = "cronJob"
+	WorkloadAnnotatioNoop     = "targetWorkloadIdNoop"
 )
 
 var WorkloadKinds = map[string]bool{
@@ -447,6 +447,7 @@ type Service struct {
 	Type         corev1.ServiceType
 	ClusterIP    string
 	ServicePorts []corev1.ServicePort
+	Name         string
 }
 
 type ContainerPort struct {
@@ -494,13 +495,18 @@ func generateServiceFromContainers(workload *Workload) *Service {
 		Type:         ClusterIPServiceType,
 		ClusterIP:    "None",
 		ServicePorts: servicePorts,
+		Name:         workload.Name,
 	}
 }
 
-func generateServicesFromPortsAnnotation(portAnnotation string) ([]Service, error) {
+func generateServicesFromPortsAnnotation(workload *Workload) ([]Service, error) {
 	var services []Service
+	val, ok := workload.TemplateSpec.Annotations[PortsAnnotation]
+	if !ok {
+		return services, nil
+	}
 	var portList [][]ContainerPort
-	err := json.Unmarshal([]byte(portAnnotation), &portList)
+	err := json.Unmarshal([]byte(val), &portList)
 	if err != nil {
 		return services, err
 	}
@@ -517,7 +523,7 @@ func generateServicesFromPortsAnnotation(portAnnotation string) ([]Service, erro
 	}
 
 	for svcType, ports := range svcTypeToPort {
-		var servicePorts []corev1.ServicePort
+		servicePorts := map[string][]corev1.ServicePort{}
 		for _, p := range ports {
 			var nodePort int32
 			var clusterIPPort int32
@@ -538,7 +544,11 @@ func generateServicesFromPortsAnnotation(portAnnotation string) ([]Service, erro
 				Protocol:   corev1.Protocol(p.Protocol),
 				Name:       p.Name,
 			}
-			servicePorts = append(servicePorts, servicePort)
+			dnsName := p.DNSName
+			if dnsName == "" {
+				dnsName = workload.Name
+			}
+			servicePorts[dnsName] = append(servicePorts[dnsName], servicePort)
 		}
 		// append default port as sky dns won't work w/o at least one port being set
 		if len(servicePorts) == 0 {
@@ -548,12 +558,17 @@ func generateServicesFromPortsAnnotation(portAnnotation string) ([]Service, erro
 				Protocol:   corev1.Protocol(corev1.ProtocolTCP),
 				Name:       "default",
 			}
-			servicePorts = append(servicePorts, servicePort)
+			servicePorts[workload.Name] = append(servicePorts[workload.Name], servicePort)
 		}
-		services = append(services, Service{
-			Type:         svcType,
-			ServicePorts: servicePorts,
-		})
+
+		for dnsName, servicePorts := range servicePorts {
+			services = append(services, Service{
+				Type:         svcType,
+				ServicePorts: servicePorts,
+				Name:         dnsName,
+			})
+		}
+
 	}
 
 	return services, nil
