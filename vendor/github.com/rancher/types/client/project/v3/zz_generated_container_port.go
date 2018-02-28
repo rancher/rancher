@@ -12,11 +12,11 @@ const (
 )
 
 type ContainerPort struct {
-	ContainerPort *int64 `json:"containerPort,omitempty"`
-	DNSName       string `json:"dnsName,omitempty"`
-	HostIp        string `json:"hostIp,omitempty"`
-	Kind          string `json:"kind,omitempty"`
-	Name          string `json:"name,omitempty"`
-	Protocol      string `json:"protocol,omitempty"`
-	SourcePort    *int64 `json:"sourcePort,omitempty"`
+	ContainerPort *int64 `json:"containerPort,omitempty" yaml:"containerPort,omitempty"`
+	DNSName       string `json:"dnsName,omitempty" yaml:"dnsName,omitempty"`
+	HostIp        string `json:"hostIp,omitempty" yaml:"hostIp,omitempty"`
+	Kind          string `json:"kind,omitempty" yaml:"kind,omitempty"`
+	Name          string `json:"name,omitempty" yaml:"name,omitempty"`
+	Protocol      string `json:"protocol,omitempty" yaml:"protocol,omitempty"`
+	SourcePort    *int64 `json:"sourcePort,omitempty" yaml:"sourcePort,omitempty"`
 }

@@ -23,19 +23,19 @@ const (
 
 type StorageClass struct {
 	types.Resource
-	AllowVolumeExpansion *bool             `json:"allowVolumeExpansion,omitempty"`
-	Annotations          map[string]string `json:"annotations,omitempty"`
-	Created              string            `json:"created,omitempty"`
-	CreatorID            string            `json:"creatorId,omitempty"`
-	Labels               map[string]string `json:"labels,omitempty"`
-	MountOptions         []string          `json:"mountOptions,omitempty"`
-	Name                 string            `json:"name,omitempty"`
-	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty"`
-	Parameters           map[string]string `json:"parameters,omitempty"`
-	Provisioner          string            `json:"provisioner,omitempty"`
-	ReclaimPolicy        string            `json:"reclaimPolicy,omitempty"`
-	Removed              string            `json:"removed,omitempty"`
-	Uuid                 string            `json:"uuid,omitempty"`
+	AllowVolumeExpansion *bool             `json:"allowVolumeExpansion,omitempty" yaml:"allowVolumeExpansion,omitempty"`
+	Annotations          map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Created              string            `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID            string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	MountOptions         []string          `json:"mountOptions,omitempty" yaml:"mountOptions,omitempty"`
+	Name                 string            `json:"name,omitempty" yaml:"name,omitempty"`
+	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Parameters           map[string]string `json:"parameters,omitempty" yaml:"parameters,omitempty"`
+	Provisioner          string            `json:"provisioner,omitempty" yaml:"provisioner,omitempty"`
+	ReclaimPolicy        string            `json:"reclaimPolicy,omitempty" yaml:"reclaimPolicy,omitempty"`
+	Removed              string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	Uuid                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 type StorageClassCollection struct {
 	types.Collection

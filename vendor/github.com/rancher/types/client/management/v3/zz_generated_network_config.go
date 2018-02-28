@@ -7,6 +7,6 @@ const (
 )
 
 type NetworkConfig struct {
-	Options map[string]string `json:"options,omitempty"`
-	Plugin  string            `json:"plugin,omitempty"`
+	Options map[string]string `json:"options,omitempty" yaml:"options,omitempty"`
+	Plugin  string            `json:"plugin,omitempty" yaml:"plugin,omitempty"`
 }

@@ -18,17 +18,17 @@ const (
 )
 
 type ServiceSpec struct {
-	ClusterIp                string                 `json:"clusterIp,omitempty"`
-	ExternalIPs              []string               `json:"externalIPs,omitempty"`
-	ExternalTrafficPolicy    string                 `json:"externalTrafficPolicy,omitempty"`
-	HealthCheckNodePort      *int64                 `json:"healthCheckNodePort,omitempty"`
-	Hostname                 string                 `json:"hostname,omitempty"`
-	LoadBalancerIP           string                 `json:"loadBalancerIP,omitempty"`
-	LoadBalancerSourceRanges []string               `json:"loadBalancerSourceRanges,omitempty"`
-	Ports                    []ServicePort          `json:"ports,omitempty"`
-	PublishNotReadyAddresses bool                   `json:"publishNotReadyAddresses,omitempty"`
-	Selector                 map[string]string      `json:"selector,omitempty"`
-	ServiceKind              string                 `json:"serviceKind,omitempty"`
-	SessionAffinity          string                 `json:"sessionAffinity,omitempty"`
-	SessionAffinityConfig    *SessionAffinityConfig `json:"sessionAffinityConfig,omitempty"`
+	ClusterIp                string                 `json:"clusterIp,omitempty" yaml:"clusterIp,omitempty"`
+	ExternalIPs              []string               `json:"externalIPs,omitempty" yaml:"externalIPs,omitempty"`
+	ExternalTrafficPolicy    string                 `json:"externalTrafficPolicy,omitempty" yaml:"externalTrafficPolicy,omitempty"`
+	HealthCheckNodePort      *int64                 `json:"healthCheckNodePort,omitempty" yaml:"healthCheckNodePort,omitempty"`
+	Hostname                 string                 `json:"hostname,omitempty" yaml:"hostname,omitempty"`
+	LoadBalancerIP           string                 `json:"loadBalancerIP,omitempty" yaml:"loadBalancerIP,omitempty"`
+	LoadBalancerSourceRanges []string               `json:"loadBalancerSourceRanges,omitempty" yaml:"loadBalancerSourceRanges,omitempty"`
+	Ports                    []ServicePort          `json:"ports,omitempty" yaml:"ports,omitempty"`
+	PublishNotReadyAddresses bool                   `json:"publishNotReadyAddresses,omitempty" yaml:"publishNotReadyAddresses,omitempty"`
+	Selector                 map[string]string      `json:"selector,omitempty" yaml:"selector,omitempty"`
+	ServiceKind              string                 `json:"serviceKind,omitempty" yaml:"serviceKind,omitempty"`
+	SessionAffinity          string                 `json:"sessionAffinity,omitempty" yaml:"sessionAffinity,omitempty"`
+	SessionAffinityConfig    *SessionAffinityConfig `json:"sessionAffinityConfig,omitempty" yaml:"sessionAffinityConfig,omitempty"`
 }

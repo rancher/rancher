@@ -6,5 +6,5 @@ const (
 )
 
 type NodePoolStatus struct {
-	Conditions []Condition `json:"conditions,omitempty"`
+	Conditions []Condition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 }

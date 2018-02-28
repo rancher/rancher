@@ -10,9 +10,9 @@ const (
 )
 
 type PipelineExecutionStatus struct {
-	Commit         string        `json:"commit,omitempty"`
-	Ended          string        `json:"ended,omitempty"`
-	ExecutionState string        `json:"executionState,omitempty"`
-	Stages         []StageStatus `json:"stages,omitempty"`
-	Started        string        `json:"started,omitempty"`
+	Commit         string        `json:"commit,omitempty" yaml:"commit,omitempty"`
+	Ended          string        `json:"ended,omitempty" yaml:"ended,omitempty"`
+	ExecutionState string        `json:"executionState,omitempty" yaml:"executionState,omitempty"`
+	Stages         []StageStatus `json:"stages,omitempty" yaml:"stages,omitempty"`
+	Started        string        `json:"started,omitempty" yaml:"started,omitempty"`
 }

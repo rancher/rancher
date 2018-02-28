@@ -30,26 +30,26 @@ const (
 
 type SourceCodeCredential struct {
 	types.Resource
-	AccessToken          string                      `json:"accessToken,omitempty"`
-	Annotations          map[string]string           `json:"annotations,omitempty"`
-	AvatarURL            string                      `json:"avatarUrl,omitempty"`
-	ClusterId            string                      `json:"clusterId,omitempty"`
-	Created              string                      `json:"created,omitempty"`
-	CreatorID            string                      `json:"creatorId,omitempty"`
-	DisplayName          string                      `json:"displayName,omitempty"`
-	HTMLURL              string                      `json:"htmlUrl,omitempty"`
-	Labels               map[string]string           `json:"labels,omitempty"`
-	LoginName            string                      `json:"loginName,omitempty"`
-	Name                 string                      `json:"name,omitempty"`
-	OwnerReferences      []OwnerReference            `json:"ownerReferences,omitempty"`
-	Removed              string                      `json:"removed,omitempty"`
-	SourceCodeType       string                      `json:"sourceCodeType,omitempty"`
-	State                string                      `json:"state,omitempty"`
-	Status               *SourceCodeCredentialStatus `json:"status,omitempty"`
-	Transitioning        string                      `json:"transitioning,omitempty"`
-	TransitioningMessage string                      `json:"transitioningMessage,omitempty"`
-	UserId               string                      `json:"userId,omitempty"`
-	Uuid                 string                      `json:"uuid,omitempty"`
+	AccessToken          string                      `json:"accessToken,omitempty" yaml:"accessToken,omitempty"`
+	Annotations          map[string]string           `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	AvatarURL            string                      `json:"avatarUrl,omitempty" yaml:"avatarUrl,omitempty"`
+	ClusterId            string                      `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	Created              string                      `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID            string                      `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DisplayName          string                      `json:"displayName,omitempty" yaml:"displayName,omitempty"`
+	HTMLURL              string                      `json:"htmlUrl,omitempty" yaml:"htmlUrl,omitempty"`
+	Labels               map[string]string           `json:"labels,omitempty" yaml:"labels,omitempty"`
+	LoginName            string                      `json:"loginName,omitempty" yaml:"loginName,omitempty"`
+	Name                 string                      `json:"name,omitempty" yaml:"name,omitempty"`
+	OwnerReferences      []OwnerReference            `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Removed              string                      `json:"removed,omitempty" yaml:"removed,omitempty"`
+	SourceCodeType       string                      `json:"sourceCodeType,omitempty" yaml:"sourceCodeType,omitempty"`
+	State                string                      `json:"state,omitempty" yaml:"state,omitempty"`
+	Status               *SourceCodeCredentialStatus `json:"status,omitempty" yaml:"status,omitempty"`
+	Transitioning        string                      `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage string                      `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	UserId               string                      `json:"userId,omitempty" yaml:"userId,omitempty"`
+	Uuid                 string                      `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 type SourceCodeCredentialCollection struct {
 	types.Collection

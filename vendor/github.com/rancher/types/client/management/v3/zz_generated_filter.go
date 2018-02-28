@@ -6,5 +6,5 @@ const (
 )
 
 type Filter struct {
-	Modifiers []string `json:"modifiers,omitempty"`
+	Modifiers []string `json:"modifiers,omitempty" yaml:"modifiers,omitempty"`
 }

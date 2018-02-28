@@ -6,5 +6,5 @@ const (
 )
 
 type PagerdutyConfig struct {
-	ServiceKey string `json:"serviceKey,omitempty"`
+	ServiceKey string `json:"serviceKey,omitempty" yaml:"serviceKey,omitempty"`
 }

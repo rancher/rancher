@@ -10,9 +10,9 @@ const (
 )
 
 type ElasticsearchConfig struct {
-	AuthPassword string `json:"authPassword,omitempty"`
-	AuthUserName string `json:"authUsername,omitempty"`
-	DateFormat   string `json:"dateFormat,omitempty"`
-	Endpoint     string `json:"endpoint,omitempty"`
-	IndexPrefix  string `json:"indexPrefix,omitempty"`
+	AuthPassword string `json:"authPassword,omitempty" yaml:"authPassword,omitempty"`
+	AuthUserName string `json:"authUsername,omitempty" yaml:"authUsername,omitempty"`
+	DateFormat   string `json:"dateFormat,omitempty" yaml:"dateFormat,omitempty"`
+	Endpoint     string `json:"endpoint,omitempty" yaml:"endpoint,omitempty"`
+	IndexPrefix  string `json:"indexPrefix,omitempty" yaml:"indexPrefix,omitempty"`
 }

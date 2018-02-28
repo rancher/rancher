@@ -9,8 +9,8 @@ const (
 )
 
 type CatalogSpec struct {
-	Branch      string `json:"branch,omitempty"`
-	CatalogKind string `json:"catalogKind,omitempty"`
-	Description string `json:"description,omitempty"`
-	URL         string `json:"url,omitempty"`
+	Branch      string `json:"branch,omitempty" yaml:"branch,omitempty"`
+	CatalogKind string `json:"catalogKind,omitempty" yaml:"catalogKind,omitempty"`
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+	URL         string `json:"url,omitempty" yaml:"url,omitempty"`
 }

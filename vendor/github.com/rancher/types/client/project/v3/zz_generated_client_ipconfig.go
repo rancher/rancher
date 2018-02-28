@@ -6,5 +6,5 @@ const (
 )
 
 type ClientIPConfig struct {
-	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty"`
+	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty" yaml:"timeoutSeconds,omitempty"`
 }

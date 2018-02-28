@@ -18,14 +18,14 @@ const (
 
 type Group struct {
 	types.Resource
-	Annotations     map[string]string `json:"annotations,omitempty"`
-	Created         string            `json:"created,omitempty"`
-	CreatorID       string            `json:"creatorId,omitempty"`
-	Labels          map[string]string `json:"labels,omitempty"`
-	Name            string            `json:"name,omitempty"`
-	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
-	Removed         string            `json:"removed,omitempty"`
-	Uuid            string            `json:"uuid,omitempty"`
+	Annotations     map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Created         string            `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID       string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Labels          map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name            string            `json:"name,omitempty" yaml:"name,omitempty"`
+	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 type GroupCollection struct {
 	types.Collection

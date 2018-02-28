@@ -8,7 +8,7 @@ const (
 )
 
 type IngressConfig struct {
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-	Options      map[string]string `json:"options,omitempty"`
-	Provider     string            `json:"provider,omitempty"`
+	NodeSelector map[string]string `json:"nodeSelector,omitempty" yaml:"nodeSelector,omitempty"`
+	Options      map[string]string `json:"options,omitempty" yaml:"options,omitempty"`
+	Provider     string            `json:"provider,omitempty" yaml:"provider,omitempty"`
 }

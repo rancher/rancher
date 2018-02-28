@@ -6,5 +6,5 @@ const (
 )
 
 type ClusterRegistrationTokenSpec struct {
-	ClusterId string `json:"clusterId,omitempty"`
+	ClusterId string `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 }

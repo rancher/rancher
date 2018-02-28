@@ -7,6 +7,6 @@ const (
 )
 
 type IDRange struct {
-	Max *int64 `json:"max,omitempty"`
-	Min *int64 `json:"min,omitempty"`
+	Max *int64 `json:"max,omitempty" yaml:"max,omitempty"`
+	Min *int64 `json:"min,omitempty" yaml:"min,omitempty"`
 }

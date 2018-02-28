@@ -21,17 +21,17 @@ const (
 
 type Setting struct {
 	types.Resource
-	Annotations     map[string]string `json:"annotations,omitempty"`
-	Created         string            `json:"created,omitempty"`
-	CreatorID       string            `json:"creatorId,omitempty"`
-	Customized      bool              `json:"customized,omitempty"`
-	Default         string            `json:"default,omitempty"`
-	Labels          map[string]string `json:"labels,omitempty"`
-	Name            string            `json:"name,omitempty"`
-	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
-	Removed         string            `json:"removed,omitempty"`
-	Uuid            string            `json:"uuid,omitempty"`
-	Value           string            `json:"value,omitempty"`
+	Annotations     map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Created         string            `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID       string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Customized      bool              `json:"customized,omitempty" yaml:"customized,omitempty"`
+	Default         string            `json:"default,omitempty" yaml:"default,omitempty"`
+	Labels          map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name            string            `json:"name,omitempty" yaml:"name,omitempty"`
+	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Value           string            `json:"value,omitempty" yaml:"value,omitempty"`
 }
 type SettingCollection struct {
 	types.Collection

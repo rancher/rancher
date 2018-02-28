@@ -7,6 +7,6 @@ const (
 )
 
 type File struct {
-	Contents string `json:"contents,omitempty"`
-	Name     string `json:"name,omitempty"`
+	Contents string `json:"contents,omitempty" yaml:"contents,omitempty"`
+	Name     string `json:"name,omitempty" yaml:"name,omitempty"`
 }

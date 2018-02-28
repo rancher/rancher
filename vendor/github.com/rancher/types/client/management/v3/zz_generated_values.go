@@ -9,8 +9,8 @@ const (
 )
 
 type Values struct {
-	BoolValue        bool     `json:"boolValue,omitempty"`
-	IntValue         *int64   `json:"intValue,omitempty"`
-	StringSliceValue []string `json:"stringSliceValue,omitempty"`
-	StringValue      string   `json:"stringValue,omitempty"`
+	BoolValue        bool     `json:"boolValue,omitempty" yaml:"boolValue,omitempty"`
+	IntValue         *int64   `json:"intValue,omitempty" yaml:"intValue,omitempty"`
+	StringSliceValue []string `json:"stringSliceValue,omitempty" yaml:"stringSliceValue,omitempty"`
+	StringValue      string   `json:"stringValue,omitempty" yaml:"stringValue,omitempty"`
 }

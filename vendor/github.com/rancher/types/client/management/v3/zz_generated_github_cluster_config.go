@@ -10,9 +10,9 @@ const (
 )
 
 type GithubClusterConfig struct {
-	ClientID     string `json:"clientId,omitempty"`
-	ClientSecret string `json:"clientSecret,omitempty"`
-	Host         string `json:"host,omitempty"`
-	RedirectURL  string `json:"redirectUrl,omitempty"`
-	TLS          bool   `json:"tls,omitempty"`
+	ClientID     string `json:"clientId,omitempty" yaml:"clientId,omitempty"`
+	ClientSecret string `json:"clientSecret,omitempty" yaml:"clientSecret,omitempty"`
+	Host         string `json:"host,omitempty" yaml:"host,omitempty"`
+	RedirectURL  string `json:"redirectUrl,omitempty" yaml:"redirectUrl,omitempty"`
+	TLS          bool   `json:"tls,omitempty" yaml:"tls,omitempty"`
 }

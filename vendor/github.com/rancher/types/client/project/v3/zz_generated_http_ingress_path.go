@@ -10,7 +10,7 @@ const (
 )
 
 type HTTPIngressPath struct {
-	ServiceId   string             `json:"serviceId,omitempty"`
-	TargetPort  intstr.IntOrString `json:"targetPort,omitempty"`
-	WorkloadIDs []string           `json:"workloadIds,omitempty"`
+	ServiceId   string             `json:"serviceId,omitempty" yaml:"serviceId,omitempty"`
+	TargetPort  intstr.IntOrString `json:"targetPort,omitempty" yaml:"targetPort,omitempty"`
+	WorkloadIDs []string           `json:"workloadIds,omitempty" yaml:"workloadIds,omitempty"`
 }

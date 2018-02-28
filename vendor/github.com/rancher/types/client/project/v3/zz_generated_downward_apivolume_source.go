@@ -7,6 +7,6 @@ const (
 )
 
 type DownwardAPIVolumeSource struct {
-	DefaultMode *int64                  `json:"defaultMode,omitempty"`
-	Items       []DownwardAPIVolumeFile `json:"items,omitempty"`
+	DefaultMode *int64                  `json:"defaultMode,omitempty" yaml:"defaultMode,omitempty"`
+	Items       []DownwardAPIVolumeFile `json:"items,omitempty" yaml:"items,omitempty"`
 }

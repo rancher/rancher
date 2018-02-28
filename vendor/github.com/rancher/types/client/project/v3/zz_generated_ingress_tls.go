@@ -7,6 +7,6 @@ const (
 )
 
 type IngressTLS struct {
-	CertificateId string   `json:"certificateId,omitempty"`
-	Hosts         []string `json:"hosts,omitempty"`
+	CertificateId string   `json:"certificateId,omitempty" yaml:"certificateId,omitempty"`
+	Hosts         []string `json:"hosts,omitempty" yaml:"hosts,omitempty"`
 }

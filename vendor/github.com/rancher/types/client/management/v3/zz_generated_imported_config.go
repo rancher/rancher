@@ -6,5 +6,5 @@ const (
 )
 
 type ImportedConfig struct {
-	KubeConfig string `json:"kubeConfig,omitempty"`
+	KubeConfig string `json:"kubeConfig,omitempty" yaml:"kubeConfig,omitempty"`
 }

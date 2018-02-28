@@ -7,6 +7,6 @@ const (
 )
 
 type Initializers struct {
-	Pending []Initializer `json:"pending,omitempty"`
-	Result  *Status       `json:"result,omitempty"`
+	Pending []Initializer `json:"pending,omitempty" yaml:"pending,omitempty"`
+	Result  *Status       `json:"result,omitempty" yaml:"result,omitempty"`
 }

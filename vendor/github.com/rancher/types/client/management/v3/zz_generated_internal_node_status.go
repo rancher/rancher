@@ -13,12 +13,12 @@ const (
 )
 
 type InternalNodeStatus struct {
-	Allocatable     map[string]string         `json:"allocatable,omitempty"`
-	Capacity        map[string]string         `json:"capacity,omitempty"`
-	Hostname        string                    `json:"hostname,omitempty"`
-	IPAddress       string                    `json:"ipAddress,omitempty"`
-	Info            *NodeInfo                 `json:"info,omitempty"`
-	NodeConditions  []NodeCondition           `json:"nodeConditions,omitempty"`
-	VolumesAttached map[string]AttachedVolume `json:"volumesAttached,omitempty"`
-	VolumesInUse    []string                  `json:"volumesInUse,omitempty"`
+	Allocatable     map[string]string         `json:"allocatable,omitempty" yaml:"allocatable,omitempty"`
+	Capacity        map[string]string         `json:"capacity,omitempty" yaml:"capacity,omitempty"`
+	Hostname        string                    `json:"hostname,omitempty" yaml:"hostname,omitempty"`
+	IPAddress       string                    `json:"ipAddress,omitempty" yaml:"ipAddress,omitempty"`
+	Info            *NodeInfo                 `json:"info,omitempty" yaml:"info,omitempty"`
+	NodeConditions  []NodeCondition           `json:"nodeConditions,omitempty" yaml:"nodeConditions,omitempty"`
+	VolumesAttached map[string]AttachedVolume `json:"volumesAttached,omitempty" yaml:"volumesAttached,omitempty"`
+	VolumesInUse    []string                  `json:"volumesInUse,omitempty" yaml:"volumesInUse,omitempty"`
 }

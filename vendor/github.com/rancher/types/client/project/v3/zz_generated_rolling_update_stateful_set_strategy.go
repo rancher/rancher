@@ -6,5 +6,5 @@ const (
 )
 
 type RollingUpdateStatefulSetStrategy struct {
-	Partition *int64 `json:"partition,omitempty"`
+	Partition *int64 `json:"partition,omitempty" yaml:"partition,omitempty"`
 }

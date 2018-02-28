@@ -36,32 +36,32 @@ const (
 
 type PodSecurityPolicyTemplate struct {
 	types.Resource
-	AllowPrivilegeEscalation        *bool                              `json:"allowPrivilegeEscalation,omitempty"`
-	AllowedCapabilities             []string                           `json:"allowedCapabilities,omitempty"`
-	AllowedHostPaths                []AllowedHostPath                  `json:"allowedHostPaths,omitempty"`
-	Annotations                     map[string]string                  `json:"annotations,omitempty"`
-	Created                         string                             `json:"created,omitempty"`
-	CreatorID                       string                             `json:"creatorId,omitempty"`
-	DefaultAddCapabilities          []string                           `json:"defaultAddCapabilities,omitempty"`
-	DefaultAllowPrivilegeEscalation *bool                              `json:"defaultAllowPrivilegeEscalation,omitempty"`
-	Description                     string                             `json:"description,omitempty"`
-	FSGroup                         *FSGroupStrategyOptions            `json:"fsGroup,omitempty"`
-	HostIPC                         bool                               `json:"hostIPC,omitempty"`
-	HostNetwork                     bool                               `json:"hostNetwork,omitempty"`
-	HostPID                         bool                               `json:"hostPID,omitempty"`
-	HostPorts                       []HostPortRange                    `json:"hostPorts,omitempty"`
-	Labels                          map[string]string                  `json:"labels,omitempty"`
-	Name                            string                             `json:"name,omitempty"`
-	OwnerReferences                 []OwnerReference                   `json:"ownerReferences,omitempty"`
-	Privileged                      bool                               `json:"privileged,omitempty"`
-	ReadOnlyRootFilesystem          bool                               `json:"readOnlyRootFilesystem,omitempty"`
-	Removed                         string                             `json:"removed,omitempty"`
-	RequiredDropCapabilities        []string                           `json:"requiredDropCapabilities,omitempty"`
-	RunAsUser                       *RunAsUserStrategyOptions          `json:"runAsUser,omitempty"`
-	SELinux                         *SELinuxStrategyOptions            `json:"seLinux,omitempty"`
-	SupplementalGroups              *SupplementalGroupsStrategyOptions `json:"supplementalGroups,omitempty"`
-	Uuid                            string                             `json:"uuid,omitempty"`
-	Volumes                         []string                           `json:"volumes,omitempty"`
+	AllowPrivilegeEscalation        *bool                              `json:"allowPrivilegeEscalation,omitempty" yaml:"allowPrivilegeEscalation,omitempty"`
+	AllowedCapabilities             []string                           `json:"allowedCapabilities,omitempty" yaml:"allowedCapabilities,omitempty"`
+	AllowedHostPaths                []AllowedHostPath                  `json:"allowedHostPaths,omitempty" yaml:"allowedHostPaths,omitempty"`
+	Annotations                     map[string]string                  `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Created                         string                             `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID                       string                             `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DefaultAddCapabilities          []string                           `json:"defaultAddCapabilities,omitempty" yaml:"defaultAddCapabilities,omitempty"`
+	DefaultAllowPrivilegeEscalation *bool                              `json:"defaultAllowPrivilegeEscalation,omitempty" yaml:"defaultAllowPrivilegeEscalation,omitempty"`
+	Description                     string                             `json:"description,omitempty" yaml:"description,omitempty"`
+	FSGroup                         *FSGroupStrategyOptions            `json:"fsGroup,omitempty" yaml:"fsGroup,omitempty"`
+	HostIPC                         bool                               `json:"hostIPC,omitempty" yaml:"hostIPC,omitempty"`
+	HostNetwork                     bool                               `json:"hostNetwork,omitempty" yaml:"hostNetwork,omitempty"`
+	HostPID                         bool                               `json:"hostPID,omitempty" yaml:"hostPID,omitempty"`
+	HostPorts                       []HostPortRange                    `json:"hostPorts,omitempty" yaml:"hostPorts,omitempty"`
+	Labels                          map[string]string                  `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name                            string                             `json:"name,omitempty" yaml:"name,omitempty"`
+	OwnerReferences                 []OwnerReference                   `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Privileged                      bool                               `json:"privileged,omitempty" yaml:"privileged,omitempty"`
+	ReadOnlyRootFilesystem          bool                               `json:"readOnlyRootFilesystem,omitempty" yaml:"readOnlyRootFilesystem,omitempty"`
+	Removed                         string                             `json:"removed,omitempty" yaml:"removed,omitempty"`
+	RequiredDropCapabilities        []string                           `json:"requiredDropCapabilities,omitempty" yaml:"requiredDropCapabilities,omitempty"`
+	RunAsUser                       *RunAsUserStrategyOptions          `json:"runAsUser,omitempty" yaml:"runAsUser,omitempty"`
+	SELinux                         *SELinuxStrategyOptions            `json:"seLinux,omitempty" yaml:"seLinux,omitempty"`
+	SupplementalGroups              *SupplementalGroupsStrategyOptions `json:"supplementalGroups,omitempty" yaml:"supplementalGroups,omitempty"`
+	Uuid                            string                             `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Volumes                         []string                           `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 }
 type PodSecurityPolicyTemplateCollection struct {
 	types.Collection

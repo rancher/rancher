@@ -7,6 +7,6 @@ const (
 )
 
 type SecretEnvSource struct {
-	Name     string `json:"name,omitempty"`
-	Optional *bool  `json:"optional,omitempty"`
+	Name     string `json:"name,omitempty" yaml:"name,omitempty"`
+	Optional *bool  `json:"optional,omitempty" yaml:"optional,omitempty"`
 }

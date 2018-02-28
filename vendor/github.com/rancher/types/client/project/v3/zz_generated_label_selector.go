@@ -7,6 +7,6 @@ const (
 )
 
 type LabelSelector struct {
-	MatchExpressions []LabelSelectorRequirement `json:"matchExpressions,omitempty"`
-	MatchLabels      map[string]string          `json:"matchLabels,omitempty"`
+	MatchExpressions []LabelSelectorRequirement `json:"matchExpressions,omitempty" yaml:"matchExpressions,omitempty"`
+	MatchLabels      map[string]string          `json:"matchLabels,omitempty" yaml:"matchLabels,omitempty"`
 }

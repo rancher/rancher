@@ -10,9 +10,9 @@ const (
 )
 
 type BasicLogin struct {
-	Description  string `json:"description,omitempty"`
-	Password     string `json:"password,omitempty"`
-	ResponseType string `json:"responseType,omitempty"`
-	TTLMillis    *int64 `json:"ttl,omitempty"`
-	Username     string `json:"username,omitempty"`
+	Description  string `json:"description,omitempty" yaml:"description,omitempty"`
+	Password     string `json:"password,omitempty" yaml:"password,omitempty"`
+	ResponseType string `json:"responseType,omitempty" yaml:"responseType,omitempty"`
+	TTLMillis    *int64 `json:"ttl,omitempty" yaml:"ttl,omitempty"`
+	Username     string `json:"username,omitempty" yaml:"username,omitempty"`
 }

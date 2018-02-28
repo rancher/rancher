@@ -14,13 +14,13 @@ const (
 )
 
 type ObjectMeta struct {
-	Annotations     map[string]string `json:"annotations,omitempty"`
-	Created         string            `json:"created,omitempty"`
-	Finalizers      []string          `json:"finalizers,omitempty"`
-	Labels          map[string]string `json:"labels,omitempty"`
-	Name            string            `json:"name,omitempty"`
-	Namespace       string            `json:"namespace,omitempty"`
-	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
-	Removed         string            `json:"removed,omitempty"`
-	Uuid            string            `json:"uuid,omitempty"`
+	Annotations     map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Created         string            `json:"created,omitempty" yaml:"created,omitempty"`
+	Finalizers      []string          `json:"finalizers,omitempty" yaml:"finalizers,omitempty"`
+	Labels          map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name            string            `json:"name,omitempty" yaml:"name,omitempty"`
+	Namespace       string            `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }

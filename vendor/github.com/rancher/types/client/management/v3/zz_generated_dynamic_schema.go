@@ -33,29 +33,29 @@ const (
 
 type DynamicSchema struct {
 	types.Resource
-	Annotations          map[string]string    `json:"annotations,omitempty"`
-	CollectionActions    map[string]Action    `json:"collectionActions,omitempty"`
-	CollectionFields     map[string]Field     `json:"collectionFields,omitempty"`
-	CollectionFilters    map[string]Filter    `json:"collectionFilters,omitempty"`
-	CollectionMethods    []string             `json:"collectionMethods,omitempty"`
-	Created              string               `json:"created,omitempty"`
-	CreatorID            string               `json:"creatorId,omitempty"`
-	Embed                bool                 `json:"embed,omitempty"`
-	EmbedType            string               `json:"embedType,omitempty"`
-	IncludeableLinks     []string             `json:"includeableLinks,omitempty"`
-	Labels               map[string]string    `json:"labels,omitempty"`
-	Name                 string               `json:"name,omitempty"`
-	OwnerReferences      []OwnerReference     `json:"ownerReferences,omitempty"`
-	PluralName           string               `json:"pluralName,omitempty"`
-	Removed              string               `json:"removed,omitempty"`
-	ResourceActions      map[string]Action    `json:"resourceActions,omitempty"`
-	ResourceFields       map[string]Field     `json:"resourceFields,omitempty"`
-	ResourceMethods      []string             `json:"resourceMethods,omitempty"`
-	State                string               `json:"state,omitempty"`
-	Status               *DynamicSchemaStatus `json:"status,omitempty"`
-	Transitioning        string               `json:"transitioning,omitempty"`
-	TransitioningMessage string               `json:"transitioningMessage,omitempty"`
-	Uuid                 string               `json:"uuid,omitempty"`
+	Annotations          map[string]string    `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	CollectionActions    map[string]Action    `json:"collectionActions,omitempty" yaml:"collectionActions,omitempty"`
+	CollectionFields     map[string]Field     `json:"collectionFields,omitempty" yaml:"collectionFields,omitempty"`
+	CollectionFilters    map[string]Filter    `json:"collectionFilters,omitempty" yaml:"collectionFilters,omitempty"`
+	CollectionMethods    []string             `json:"collectionMethods,omitempty" yaml:"collectionMethods,omitempty"`
+	Created              string               `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID            string               `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Embed                bool                 `json:"embed,omitempty" yaml:"embed,omitempty"`
+	EmbedType            string               `json:"embedType,omitempty" yaml:"embedType,omitempty"`
+	IncludeableLinks     []string             `json:"includeableLinks,omitempty" yaml:"includeableLinks,omitempty"`
+	Labels               map[string]string    `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name                 string               `json:"name,omitempty" yaml:"name,omitempty"`
+	OwnerReferences      []OwnerReference     `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	PluralName           string               `json:"pluralName,omitempty" yaml:"pluralName,omitempty"`
+	Removed              string               `json:"removed,omitempty" yaml:"removed,omitempty"`
+	ResourceActions      map[string]Action    `json:"resourceActions,omitempty" yaml:"resourceActions,omitempty"`
+	ResourceFields       map[string]Field     `json:"resourceFields,omitempty" yaml:"resourceFields,omitempty"`
+	ResourceMethods      []string             `json:"resourceMethods,omitempty" yaml:"resourceMethods,omitempty"`
+	State                string               `json:"state,omitempty" yaml:"state,omitempty"`
+	Status               *DynamicSchemaStatus `json:"status,omitempty" yaml:"status,omitempty"`
+	Transitioning        string               `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage string               `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	Uuid                 string               `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 type DynamicSchemaCollection struct {
 	types.Collection

@@ -6,5 +6,5 @@ const (
 )
 
 type VersionCommits struct {
-	Value map[string]string `json:"Value,omitempty"`
+	Value map[string]string `json:"Value,omitempty" yaml:"Value,omitempty"`
 }

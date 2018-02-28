@@ -7,6 +7,6 @@ const (
 )
 
 type PreferredSchedulingTerm struct {
-	Preference *NodeSelectorTerm `json:"preference,omitempty"`
-	Weight     *int64            `json:"weight,omitempty"`
+	Preference *NodeSelectorTerm `json:"preference,omitempty" yaml:"preference,omitempty"`
+	Weight     *int64            `json:"weight,omitempty" yaml:"weight,omitempty"`
 }

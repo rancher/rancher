@@ -9,8 +9,8 @@ const (
 )
 
 type NodeScheduling struct {
-	NodeId     string   `json:"nodeId,omitempty"`
-	Preferred  []string `json:"preferred,omitempty"`
-	RequireAll []string `json:"requireAll,omitempty"`
-	RequireAny []string `json:"requireAny,omitempty"`
+	NodeId     string   `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
+	Preferred  []string `json:"preferred,omitempty" yaml:"preferred,omitempty"`
+	RequireAll []string `json:"requireAll,omitempty" yaml:"requireAll,omitempty"`
+	RequireAny []string `json:"requireAny,omitempty" yaml:"requireAny,omitempty"`
 }

@@ -7,6 +7,6 @@ const (
 )
 
 type LoadBalancerIngress struct {
-	Hostname string `json:"hostname,omitempty"`
-	IP       string `json:"ip,omitempty"`
+	Hostname string `json:"hostname,omitempty" yaml:"hostname,omitempty"`
+	IP       string `json:"ip,omitempty" yaml:"ip,omitempty"`
 }

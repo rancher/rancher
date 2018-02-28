@@ -23,19 +23,19 @@ const (
 
 type NamespacedBasicAuth struct {
 	types.Resource
-	Annotations     map[string]string `json:"annotations,omitempty"`
-	Created         string            `json:"created,omitempty"`
-	CreatorID       string            `json:"creatorId,omitempty"`
-	Description     string            `json:"description,omitempty"`
-	Labels          map[string]string `json:"labels,omitempty"`
-	Name            string            `json:"name,omitempty"`
-	NamespaceId     string            `json:"namespaceId,omitempty"`
-	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
-	Password        string            `json:"password,omitempty"`
-	ProjectID       string            `json:"projectId,omitempty"`
-	Removed         string            `json:"removed,omitempty"`
-	Username        string            `json:"username,omitempty"`
-	Uuid            string            `json:"uuid,omitempty"`
+	Annotations     map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Created         string            `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID       string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Description     string            `json:"description,omitempty" yaml:"description,omitempty"`
+	Labels          map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name            string            `json:"name,omitempty" yaml:"name,omitempty"`
+	NamespaceId     string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
+	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Password        string            `json:"password,omitempty" yaml:"password,omitempty"`
+	ProjectID       string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
+	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	Username        string            `json:"username,omitempty" yaml:"username,omitempty"`
+	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 type NamespacedBasicAuthCollection struct {
 	types.Collection

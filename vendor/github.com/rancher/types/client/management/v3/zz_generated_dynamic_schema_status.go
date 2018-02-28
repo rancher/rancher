@@ -6,5 +6,5 @@ const (
 )
 
 type DynamicSchemaStatus struct {
-	Fake string `json:"fake,omitempty"`
+	Fake string `json:"fake,omitempty" yaml:"fake,omitempty"`
 }

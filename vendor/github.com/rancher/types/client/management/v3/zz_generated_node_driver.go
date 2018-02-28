@@ -29,25 +29,25 @@ const (
 
 type NodeDriver struct {
 	types.Resource
-	Active               bool              `json:"active,omitempty"`
-	Annotations          map[string]string `json:"annotations,omitempty"`
-	Builtin              bool              `json:"builtin,omitempty"`
-	Checksum             string            `json:"checksum,omitempty"`
-	Created              string            `json:"created,omitempty"`
-	CreatorID            string            `json:"creatorId,omitempty"`
-	Description          string            `json:"description,omitempty"`
-	ExternalID           string            `json:"externalId,omitempty"`
-	Labels               map[string]string `json:"labels,omitempty"`
-	Name                 string            `json:"name,omitempty"`
-	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty"`
-	Removed              string            `json:"removed,omitempty"`
-	State                string            `json:"state,omitempty"`
-	Status               *NodeDriverStatus `json:"status,omitempty"`
-	Transitioning        string            `json:"transitioning,omitempty"`
-	TransitioningMessage string            `json:"transitioningMessage,omitempty"`
-	UIURL                string            `json:"uiUrl,omitempty"`
-	URL                  string            `json:"url,omitempty"`
-	Uuid                 string            `json:"uuid,omitempty"`
+	Active               bool              `json:"active,omitempty" yaml:"active,omitempty"`
+	Annotations          map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Builtin              bool              `json:"builtin,omitempty" yaml:"builtin,omitempty"`
+	Checksum             string            `json:"checksum,omitempty" yaml:"checksum,omitempty"`
+	Created              string            `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID            string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Description          string            `json:"description,omitempty" yaml:"description,omitempty"`
+	ExternalID           string            `json:"externalId,omitempty" yaml:"externalId,omitempty"`
+	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name                 string            `json:"name,omitempty" yaml:"name,omitempty"`
+	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Removed              string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	State                string            `json:"state,omitempty" yaml:"state,omitempty"`
+	Status               *NodeDriverStatus `json:"status,omitempty" yaml:"status,omitempty"`
+	Transitioning        string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	UIURL                string            `json:"uiUrl,omitempty" yaml:"uiUrl,omitempty"`
+	URL                  string            `json:"url,omitempty" yaml:"url,omitempty"`
+	Uuid                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 type NodeDriverCollection struct {
 	types.Collection

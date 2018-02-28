@@ -14,11 +14,11 @@ const (
 )
 
 type Handler struct {
-	Command     []string           `json:"command,omitempty"`
-	HTTPHeaders []HTTPHeader       `json:"httpHeaders,omitempty"`
-	Host        string             `json:"host,omitempty"`
-	Path        string             `json:"path,omitempty"`
-	Port        intstr.IntOrString `json:"port,omitempty"`
-	Scheme      string             `json:"scheme,omitempty"`
-	TCP         bool               `json:"tcp,omitempty"`
+	Command     []string           `json:"command,omitempty" yaml:"command,omitempty"`
+	HTTPHeaders []HTTPHeader       `json:"httpHeaders,omitempty" yaml:"httpHeaders,omitempty"`
+	Host        string             `json:"host,omitempty" yaml:"host,omitempty"`
+	Path        string             `json:"path,omitempty" yaml:"path,omitempty"`
+	Port        intstr.IntOrString `json:"port,omitempty" yaml:"port,omitempty"`
+	Scheme      string             `json:"scheme,omitempty" yaml:"scheme,omitempty"`
+	TCP         bool               `json:"tcp,omitempty" yaml:"tcp,omitempty"`
 }

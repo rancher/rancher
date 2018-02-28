@@ -7,6 +7,6 @@ const (
 )
 
 type AuthzConfig struct {
-	Mode    string            `json:"mode,omitempty"`
-	Options map[string]string `json:"options,omitempty"`
+	Mode    string            `json:"mode,omitempty" yaml:"mode,omitempty"`
+	Options map[string]string `json:"options,omitempty" yaml:"options,omitempty"`
 }

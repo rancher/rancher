@@ -7,6 +7,6 @@ const (
 )
 
 type SearchPrincipalsInput struct {
-	Name          string `json:"name,omitempty"`
-	PrincipalType string `json:"principalType,omitempty"`
+	Name          string `json:"name,omitempty" yaml:"name,omitempty"`
+	PrincipalType string `json:"principalType,omitempty" yaml:"principalType,omitempty"`
 }

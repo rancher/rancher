@@ -6,5 +6,5 @@ const (
 )
 
 type CPUInfo struct {
-	Count *int64 `json:"count,omitempty"`
+	Count *int64 `json:"count,omitempty" yaml:"count,omitempty"`
 }

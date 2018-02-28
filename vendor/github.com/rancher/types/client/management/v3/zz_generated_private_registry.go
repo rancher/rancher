@@ -8,7 +8,7 @@ const (
 )
 
 type PrivateRegistry struct {
-	Password string `json:"password,omitempty"`
-	URL      string `json:"url,omitempty"`
-	User     string `json:"user,omitempty"`
+	Password string `json:"password,omitempty" yaml:"password,omitempty"`
+	URL      string `json:"url,omitempty" yaml:"url,omitempty"`
+	User     string `json:"user,omitempty" yaml:"user,omitempty"`
 }

@@ -7,6 +7,6 @@ const (
 )
 
 type HostAlias struct {
-	Hostnames []string `json:"hostnames,omitempty"`
-	IP        string   `json:"ip,omitempty"`
+	Hostnames []string `json:"hostnames,omitempty" yaml:"hostnames,omitempty"`
+	IP        string   `json:"ip,omitempty" yaml:"ip,omitempty"`
 }

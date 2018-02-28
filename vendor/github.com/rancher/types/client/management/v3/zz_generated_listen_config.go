@@ -38,34 +38,34 @@ const (
 
 type ListenConfig struct {
 	types.Resource
-	Algorithm               string            `json:"algorithm,omitempty"`
-	Annotations             map[string]string `json:"annotations,omitempty"`
-	CACerts                 string            `json:"caCerts,omitempty"`
-	CN                      string            `json:"cn,omitempty"`
-	Cert                    string            `json:"cert,omitempty"`
-	CertFingerprint         string            `json:"certFingerprint,omitempty"`
-	Created                 string            `json:"created,omitempty"`
-	CreatorID               string            `json:"creatorId,omitempty"`
-	Description             string            `json:"description,omitempty"`
-	Domains                 []string          `json:"domains,omitempty"`
-	Enabled                 bool              `json:"enabled,omitempty"`
-	ExpiresAt               string            `json:"expiresAt,omitempty"`
-	GeneratedCerts          map[string]string `json:"generatedCerts,omitempty"`
-	IssuedAt                string            `json:"issuedAt,omitempty"`
-	Issuer                  string            `json:"issuer,omitempty"`
-	Key                     string            `json:"key,omitempty"`
-	KeySize                 *int64            `json:"keySize,omitempty"`
-	KnownIPs                []string          `json:"knownIps,omitempty"`
-	Labels                  map[string]string `json:"labels,omitempty"`
-	Mode                    string            `json:"mode,omitempty"`
-	Name                    string            `json:"name,omitempty"`
-	OwnerReferences         []OwnerReference  `json:"ownerReferences,omitempty"`
-	Removed                 string            `json:"removed,omitempty"`
-	SerialNumber            string            `json:"serialNumber,omitempty"`
-	SubjectAlternativeNames []string          `json:"subjectAlternativeNames,omitempty"`
-	TOS                     []string          `json:"tos,omitempty"`
-	Uuid                    string            `json:"uuid,omitempty"`
-	Version                 *int64            `json:"version,omitempty"`
+	Algorithm               string            `json:"algorithm,omitempty" yaml:"algorithm,omitempty"`
+	Annotations             map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	CACerts                 string            `json:"caCerts,omitempty" yaml:"caCerts,omitempty"`
+	CN                      string            `json:"cn,omitempty" yaml:"cn,omitempty"`
+	Cert                    string            `json:"cert,omitempty" yaml:"cert,omitempty"`
+	CertFingerprint         string            `json:"certFingerprint,omitempty" yaml:"certFingerprint,omitempty"`
+	Created                 string            `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID               string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Description             string            `json:"description,omitempty" yaml:"description,omitempty"`
+	Domains                 []string          `json:"domains,omitempty" yaml:"domains,omitempty"`
+	Enabled                 bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+	ExpiresAt               string            `json:"expiresAt,omitempty" yaml:"expiresAt,omitempty"`
+	GeneratedCerts          map[string]string `json:"generatedCerts,omitempty" yaml:"generatedCerts,omitempty"`
+	IssuedAt                string            `json:"issuedAt,omitempty" yaml:"issuedAt,omitempty"`
+	Issuer                  string            `json:"issuer,omitempty" yaml:"issuer,omitempty"`
+	Key                     string            `json:"key,omitempty" yaml:"key,omitempty"`
+	KeySize                 *int64            `json:"keySize,omitempty" yaml:"keySize,omitempty"`
+	KnownIPs                []string          `json:"knownIps,omitempty" yaml:"knownIps,omitempty"`
+	Labels                  map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Mode                    string            `json:"mode,omitempty" yaml:"mode,omitempty"`
+	Name                    string            `json:"name,omitempty" yaml:"name,omitempty"`
+	OwnerReferences         []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Removed                 string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	SerialNumber            string            `json:"serialNumber,omitempty" yaml:"serialNumber,omitempty"`
+	SubjectAlternativeNames []string          `json:"subjectAlternativeNames,omitempty" yaml:"subjectAlternativeNames,omitempty"`
+	TOS                     []string          `json:"tos,omitempty" yaml:"tos,omitempty"`
+	Uuid                    string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Version                 *int64            `json:"version,omitempty" yaml:"version,omitempty"`
 }
 type ListenConfigCollection struct {
 	types.Collection

@@ -7,6 +7,6 @@ const (
 )
 
 type ClusterComponentStatus struct {
-	Conditions []ComponentCondition `json:"conditions,omitempty"`
-	Name       string               `json:"name,omitempty"`
+	Conditions []ComponentCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+	Name       string               `json:"name,omitempty" yaml:"name,omitempty"`
 }

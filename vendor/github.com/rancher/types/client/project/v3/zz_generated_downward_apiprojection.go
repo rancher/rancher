@@ -6,5 +6,5 @@ const (
 )
 
 type DownwardAPIProjection struct {
-	Items []DownwardAPIVolumeFile `json:"items,omitempty"`
+	Items []DownwardAPIVolumeFile `json:"items,omitempty" yaml:"items,omitempty"`
 }

@@ -20,16 +20,16 @@ const (
 
 type GlobalRoleBinding struct {
 	types.Resource
-	Annotations     map[string]string `json:"annotations,omitempty"`
-	Created         string            `json:"created,omitempty"`
-	CreatorID       string            `json:"creatorId,omitempty"`
-	GlobalRoleId    string            `json:"globalRoleId,omitempty"`
-	Labels          map[string]string `json:"labels,omitempty"`
-	Name            string            `json:"name,omitempty"`
-	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
-	Removed         string            `json:"removed,omitempty"`
-	UserId          string            `json:"userId,omitempty"`
-	Uuid            string            `json:"uuid,omitempty"`
+	Annotations     map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Created         string            `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID       string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	GlobalRoleId    string            `json:"globalRoleId,omitempty" yaml:"globalRoleId,omitempty"`
+	Labels          map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name            string            `json:"name,omitempty" yaml:"name,omitempty"`
+	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	UserId          string            `json:"userId,omitempty" yaml:"userId,omitempty"`
+	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 type GlobalRoleBindingCollection struct {
 	types.Collection

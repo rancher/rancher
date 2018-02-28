@@ -16,15 +16,15 @@ const (
 )
 
 type RancherKubernetesEngineConfig struct {
-	Addons              string             `json:"addons,omitempty"`
-	Authentication      *AuthnConfig       `json:"authentication,omitempty"`
-	Authorization       *AuthzConfig       `json:"authorization,omitempty"`
-	IgnoreDockerVersion bool               `json:"ignoreDockerVersion,omitempty"`
-	Ingress             *IngressConfig     `json:"ingress,omitempty"`
-	Network             *NetworkConfig     `json:"network,omitempty"`
-	Nodes               []RKEConfigNode    `json:"nodes,omitempty"`
-	PrivateRegistries   []PrivateRegistry  `json:"privateRegistries,omitempty"`
-	SSHKeyPath          string             `json:"sshKeyPath,omitempty"`
-	Services            *RKEConfigServices `json:"services,omitempty"`
-	Version             string             `json:"kubernetesVersion,omitempty"`
+	Addons              string             `json:"addons,omitempty" yaml:"addons,omitempty"`
+	Authentication      *AuthnConfig       `json:"authentication,omitempty" yaml:"authentication,omitempty"`
+	Authorization       *AuthzConfig       `json:"authorization,omitempty" yaml:"authorization,omitempty"`
+	IgnoreDockerVersion bool               `json:"ignoreDockerVersion,omitempty" yaml:"ignoreDockerVersion,omitempty"`
+	Ingress             *IngressConfig     `json:"ingress,omitempty" yaml:"ingress,omitempty"`
+	Network             *NetworkConfig     `json:"network,omitempty" yaml:"network,omitempty"`
+	Nodes               []RKEConfigNode    `json:"nodes,omitempty" yaml:"nodes,omitempty"`
+	PrivateRegistries   []PrivateRegistry  `json:"privateRegistries,omitempty" yaml:"privateRegistries,omitempty"`
+	SSHKeyPath          string             `json:"sshKeyPath,omitempty" yaml:"sshKeyPath,omitempty"`
+	Services            *RKEConfigServices `json:"services,omitempty" yaml:"services,omitempty"`
+	Version             string             `json:"kubernetesVersion,omitempty" yaml:"kubernetesVersion,omitempty"`
 }

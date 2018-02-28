@@ -8,7 +8,7 @@ const (
 )
 
 type AuthUserInput struct {
-	Code           string `json:"code,omitempty"`
-	RedirectURL    string `json:"redirectUrl,omitempty"`
-	SourceCodeType string `json:"sourceCodeType,omitempty"`
+	Code           string `json:"code,omitempty" yaml:"code,omitempty"`
+	RedirectURL    string `json:"redirectUrl,omitempty" yaml:"redirectUrl,omitempty"`
+	SourceCodeType string `json:"sourceCodeType,omitempty" yaml:"sourceCodeType,omitempty"`
 }

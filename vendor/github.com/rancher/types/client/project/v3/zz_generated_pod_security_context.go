@@ -9,8 +9,8 @@ const (
 )
 
 type PodSecurityContext struct {
-	Fsgid        *int64  `json:"fsgid,omitempty"`
-	Gids         []int64 `json:"gids,omitempty"`
-	RunAsNonRoot *bool   `json:"runAsNonRoot,omitempty"`
-	Uid          *int64  `json:"uid,omitempty"`
+	Fsgid        *int64  `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
+	Gids         []int64 `json:"gids,omitempty" yaml:"gids,omitempty"`
+	RunAsNonRoot *bool   `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
+	Uid          *int64  `json:"uid,omitempty" yaml:"uid,omitempty"`
 }

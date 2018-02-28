@@ -26,22 +26,22 @@ const (
 
 type Project struct {
 	types.Resource
-	Annotations                 map[string]string  `json:"annotations,omitempty"`
-	ClusterId                   string             `json:"clusterId,omitempty"`
-	Conditions                  []ProjectCondition `json:"conditions,omitempty"`
-	Created                     string             `json:"created,omitempty"`
-	CreatorID                   string             `json:"creatorId,omitempty"`
-	Description                 string             `json:"description,omitempty"`
-	Labels                      map[string]string  `json:"labels,omitempty"`
-	Name                        string             `json:"name,omitempty"`
-	NamespaceId                 string             `json:"namespaceId,omitempty"`
-	OwnerReferences             []OwnerReference   `json:"ownerReferences,omitempty"`
-	PodSecurityPolicyTemplateId string             `json:"podSecurityPolicyTemplateId,omitempty"`
-	Removed                     string             `json:"removed,omitempty"`
-	State                       string             `json:"state,omitempty"`
-	Transitioning               string             `json:"transitioning,omitempty"`
-	TransitioningMessage        string             `json:"transitioningMessage,omitempty"`
-	Uuid                        string             `json:"uuid,omitempty"`
+	Annotations                 map[string]string  `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	ClusterId                   string             `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	Conditions                  []ProjectCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+	Created                     string             `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID                   string             `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Description                 string             `json:"description,omitempty" yaml:"description,omitempty"`
+	Labels                      map[string]string  `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name                        string             `json:"name,omitempty" yaml:"name,omitempty"`
+	NamespaceId                 string             `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
+	OwnerReferences             []OwnerReference   `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	PodSecurityPolicyTemplateId string             `json:"podSecurityPolicyTemplateId,omitempty" yaml:"podSecurityPolicyTemplateId,omitempty"`
+	Removed                     string             `json:"removed,omitempty" yaml:"removed,omitempty"`
+	State                       string             `json:"state,omitempty" yaml:"state,omitempty"`
+	Transitioning               string             `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage        string             `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	Uuid                        string             `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 type ProjectCollection struct {
 	types.Collection

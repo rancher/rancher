@@ -33,29 +33,29 @@ const (
 
 type NamespacedCertificate struct {
 	types.Resource
-	Algorithm               string            `json:"algorithm,omitempty"`
-	Annotations             map[string]string `json:"annotations,omitempty"`
-	CN                      string            `json:"cn,omitempty"`
-	CertFingerprint         string            `json:"certFingerprint,omitempty"`
-	Certs                   string            `json:"certs,omitempty"`
-	Created                 string            `json:"created,omitempty"`
-	CreatorID               string            `json:"creatorId,omitempty"`
-	Description             string            `json:"description,omitempty"`
-	ExpiresAt               string            `json:"expiresAt,omitempty"`
-	IssuedAt                string            `json:"issuedAt,omitempty"`
-	Issuer                  string            `json:"issuer,omitempty"`
-	Key                     string            `json:"key,omitempty"`
-	KeySize                 string            `json:"keySize,omitempty"`
-	Labels                  map[string]string `json:"labels,omitempty"`
-	Name                    string            `json:"name,omitempty"`
-	NamespaceId             string            `json:"namespaceId,omitempty"`
-	OwnerReferences         []OwnerReference  `json:"ownerReferences,omitempty"`
-	ProjectID               string            `json:"projectId,omitempty"`
-	Removed                 string            `json:"removed,omitempty"`
-	SerialNumber            string            `json:"serialNumber,omitempty"`
-	SubjectAlternativeNames []string          `json:"subjectAlternativeNames,omitempty"`
-	Uuid                    string            `json:"uuid,omitempty"`
-	Version                 string            `json:"version,omitempty"`
+	Algorithm               string            `json:"algorithm,omitempty" yaml:"algorithm,omitempty"`
+	Annotations             map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	CN                      string            `json:"cn,omitempty" yaml:"cn,omitempty"`
+	CertFingerprint         string            `json:"certFingerprint,omitempty" yaml:"certFingerprint,omitempty"`
+	Certs                   string            `json:"certs,omitempty" yaml:"certs,omitempty"`
+	Created                 string            `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID               string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Description             string            `json:"description,omitempty" yaml:"description,omitempty"`
+	ExpiresAt               string            `json:"expiresAt,omitempty" yaml:"expiresAt,omitempty"`
+	IssuedAt                string            `json:"issuedAt,omitempty" yaml:"issuedAt,omitempty"`
+	Issuer                  string            `json:"issuer,omitempty" yaml:"issuer,omitempty"`
+	Key                     string            `json:"key,omitempty" yaml:"key,omitempty"`
+	KeySize                 string            `json:"keySize,omitempty" yaml:"keySize,omitempty"`
+	Labels                  map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name                    string            `json:"name,omitempty" yaml:"name,omitempty"`
+	NamespaceId             string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
+	OwnerReferences         []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	ProjectID               string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
+	Removed                 string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	SerialNumber            string            `json:"serialNumber,omitempty" yaml:"serialNumber,omitempty"`
+	SubjectAlternativeNames []string          `json:"subjectAlternativeNames,omitempty" yaml:"subjectAlternativeNames,omitempty"`
+	Uuid                    string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Version                 string            `json:"version,omitempty" yaml:"version,omitempty"`
 }
 type NamespacedCertificateCollection struct {
 	types.Collection

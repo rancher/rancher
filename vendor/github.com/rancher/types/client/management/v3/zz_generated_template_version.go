@@ -32,28 +32,28 @@ const (
 
 type TemplateVersion struct {
 	types.Resource
-	Annotations           map[string]string      `json:"annotations,omitempty"`
-	Created               string                 `json:"created,omitempty"`
-	CreatorID             string                 `json:"creatorId,omitempty"`
-	ExternalID            string                 `json:"externalId,omitempty"`
-	Files                 []File                 `json:"files,omitempty"`
-	Labels                map[string]string      `json:"labels,omitempty"`
-	MaximumRancherVersion string                 `json:"maximumRancherVersion,omitempty"`
-	MinimumRancherVersion string                 `json:"minimumRancherVersion,omitempty"`
-	Name                  string                 `json:"name,omitempty"`
-	OwnerReferences       []OwnerReference       `json:"ownerReferences,omitempty"`
-	Questions             []Question             `json:"questions,omitempty"`
-	Readme                string                 `json:"readme,omitempty"`
-	Removed               string                 `json:"removed,omitempty"`
-	Revision              *int64                 `json:"revision,omitempty"`
-	State                 string                 `json:"state,omitempty"`
-	Status                *TemplateVersionStatus `json:"status,omitempty"`
-	Transitioning         string                 `json:"transitioning,omitempty"`
-	TransitioningMessage  string                 `json:"transitioningMessage,omitempty"`
-	UpgradeFrom           string                 `json:"upgradeFrom,omitempty"`
-	UpgradeVersionLinks   map[string]string      `json:"upgradeVersionLinks,omitempty"`
-	Uuid                  string                 `json:"uuid,omitempty"`
-	Version               string                 `json:"version,omitempty"`
+	Annotations           map[string]string      `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Created               string                 `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID             string                 `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	ExternalID            string                 `json:"externalId,omitempty" yaml:"externalId,omitempty"`
+	Files                 []File                 `json:"files,omitempty" yaml:"files,omitempty"`
+	Labels                map[string]string      `json:"labels,omitempty" yaml:"labels,omitempty"`
+	MaximumRancherVersion string                 `json:"maximumRancherVersion,omitempty" yaml:"maximumRancherVersion,omitempty"`
+	MinimumRancherVersion string                 `json:"minimumRancherVersion,omitempty" yaml:"minimumRancherVersion,omitempty"`
+	Name                  string                 `json:"name,omitempty" yaml:"name,omitempty"`
+	OwnerReferences       []OwnerReference       `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Questions             []Question             `json:"questions,omitempty" yaml:"questions,omitempty"`
+	Readme                string                 `json:"readme,omitempty" yaml:"readme,omitempty"`
+	Removed               string                 `json:"removed,omitempty" yaml:"removed,omitempty"`
+	Revision              *int64                 `json:"revision,omitempty" yaml:"revision,omitempty"`
+	State                 string                 `json:"state,omitempty" yaml:"state,omitempty"`
+	Status                *TemplateVersionStatus `json:"status,omitempty" yaml:"status,omitempty"`
+	Transitioning         string                 `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage  string                 `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	UpgradeFrom           string                 `json:"upgradeFrom,omitempty" yaml:"upgradeFrom,omitempty"`
+	UpgradeVersionLinks   map[string]string      `json:"upgradeVersionLinks,omitempty" yaml:"upgradeVersionLinks,omitempty"`
+	Uuid                  string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Version               string                 `json:"version,omitempty" yaml:"version,omitempty"`
 }
 type TemplateVersionCollection struct {
 	types.Collection

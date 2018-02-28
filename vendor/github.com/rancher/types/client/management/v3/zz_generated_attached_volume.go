@@ -6,5 +6,5 @@ const (
 )
 
 type AttachedVolume struct {
-	Name string `json:"name,omitempty"`
+	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 }

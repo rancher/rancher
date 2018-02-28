@@ -6,5 +6,5 @@ const (
 )
 
 type LoadBalancerStatus struct {
-	Ingress []LoadBalancerIngress `json:"ingress,omitempty"`
+	Ingress []LoadBalancerIngress `json:"ingress,omitempty" yaml:"ingress,omitempty"`
 }

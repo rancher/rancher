@@ -25,24 +25,24 @@ const (
 )
 
 type Token struct {
-	Annotations     map[string]string `json:"annotations,omitempty"`
-	AuthProvider    string            `json:"authProvider,omitempty"`
-	Created         string            `json:"created,omitempty"`
-	CreatorID       string            `json:"creatorId,omitempty"`
-	Description     string            `json:"description,omitempty"`
-	Expired         bool              `json:"expired,omitempty"`
-	ExpiresAt       string            `json:"expiresAt,omitempty"`
-	GroupPrincipals []string          `json:"groupPrincipals,omitempty"`
-	IsDerived       bool              `json:"isDerived,omitempty"`
-	Labels          map[string]string `json:"labels,omitempty"`
-	LastUpdateTime  string            `json:"lastUpdateTime,omitempty"`
-	Name            string            `json:"name,omitempty"`
-	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
-	ProviderInfo    map[string]string `json:"providerInfo,omitempty"`
-	Removed         string            `json:"removed,omitempty"`
-	TTLMillis       *int64            `json:"ttl,omitempty"`
-	Token           string            `json:"token,omitempty"`
-	UserID          string            `json:"userId,omitempty"`
-	UserPrincipal   string            `json:"userPrincipal,omitempty"`
-	Uuid            string            `json:"uuid,omitempty"`
+	Annotations     map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	AuthProvider    string            `json:"authProvider,omitempty" yaml:"authProvider,omitempty"`
+	Created         string            `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID       string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Description     string            `json:"description,omitempty" yaml:"description,omitempty"`
+	Expired         bool              `json:"expired,omitempty" yaml:"expired,omitempty"`
+	ExpiresAt       string            `json:"expiresAt,omitempty" yaml:"expiresAt,omitempty"`
+	GroupPrincipals []string          `json:"groupPrincipals,omitempty" yaml:"groupPrincipals,omitempty"`
+	IsDerived       bool              `json:"isDerived,omitempty" yaml:"isDerived,omitempty"`
+	Labels          map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	LastUpdateTime  string            `json:"lastUpdateTime,omitempty" yaml:"lastUpdateTime,omitempty"`
+	Name            string            `json:"name,omitempty" yaml:"name,omitempty"`
+	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	ProviderInfo    map[string]string `json:"providerInfo,omitempty" yaml:"providerInfo,omitempty"`
+	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	TTLMillis       *int64            `json:"ttl,omitempty" yaml:"ttl,omitempty"`
+	Token           string            `json:"token,omitempty" yaml:"token,omitempty"`
+	UserID          string            `json:"userId,omitempty" yaml:"userId,omitempty"`
+	UserPrincipal   string            `json:"userPrincipal,omitempty" yaml:"userPrincipal,omitempty"`
+	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }

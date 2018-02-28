@@ -8,7 +8,7 @@ const (
 )
 
 type Recipient struct {
-	NotifierId   string `json:"notifierId,omitempty"`
-	NotifierType string `json:"notifierType,omitempty"`
-	Recipient    string `json:"recipient,omitempty"`
+	NotifierId   string `json:"notifierId,omitempty" yaml:"notifierId,omitempty"`
+	NotifierType string `json:"notifierType,omitempty" yaml:"notifierType,omitempty"`
+	Recipient    string `json:"recipient,omitempty" yaml:"recipient,omitempty"`
 }
