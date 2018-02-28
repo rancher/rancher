@@ -36,6 +36,7 @@ type ClientOpts struct {
 	Timeout    time.Duration
 	HTTPClient *http.Client
 	CACerts    string
+	Insecure   bool
 }
 
 func (c *ClientOpts) getAuthHeader() string {
@@ -171,6 +172,15 @@ func NewAPIClient(opts *ClientOpts) (APIBaseClient, error) {
 		tr := &http.Transport{
 			TLSClientConfig: &tls.Config{
 				RootCAs: roots,
+			},
+		}
+		client.Transport = tr
+	}
+
+	if opts.Insecure {
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: opts.Insecure,
 			},
 		}
 		client.Transport = tr

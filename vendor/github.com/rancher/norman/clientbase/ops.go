@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"regexp"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
@@ -170,16 +169,9 @@ func (a *APIOperations) DoCreate(schemaType string, createObj interface{}, respO
 		return errors.New("Resource type [" + schemaType + "] is not creatable")
 	}
 
-	var collectionURL string
-	collectionURL, ok = schema.Links[COLLECTION]
-	if !ok {
-		// return errors.New("Failed to find collection URL for [" + schemaType + "]")
-		// This is a hack to address https://github.com/rancher/cattle/issues/254
-		re := regexp.MustCompile("schemas.*")
-		collectionURL = re.ReplaceAllString(schema.Links[SELF], schema.PluralName)
-	}
-
-	return a.DoModify("POST", collectionURL, createObj, respObject)
+	// using collection link to post doesn't help the resources under project or cluster, because they need a projectId or clusterId in the path
+	// for example, v3/projects/foo/apps, v3/cluster/bar/namespaces
+	return a.DoModify("POST", a.Opts.URL+"/"+schemaType, createObj, respObject)
 }
 
 func (a *APIOperations) DoUpdate(schemaType string, existing *types.Resource, updates interface{}, respObject interface{}) error {
