@@ -127,11 +127,11 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 		}
 
 		logrus.Infof("Updating workload [%s] with public endpoints [%v]", key, epsToUpdate)
-		if w.Annotations == nil {
-			w.Annotations = make(map[string]string)
+
+		annotations := map[string]string{
+			endpointsAnnotation: epsToUpdate,
 		}
-		w.Annotations[endpointsAnnotation] = epsToUpdate
-		if err = c.WorkloadController.UpdateWorkload(w); err != nil {
+		if err = c.WorkloadController.UpdateWorkload(w, annotations); err != nil {
 			return err
 		}
 	}
