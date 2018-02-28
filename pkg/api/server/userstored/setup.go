@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/norman/store/subtype"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/api/customization/workload"
+	"github.com/rancher/rancher/pkg/api/store/cert"
 	"github.com/rancher/rancher/pkg/api/store/ingress"
 	"github.com/rancher/rancher/pkg/api/store/namespace"
 	"github.com/rancher/rancher/pkg/api/store/pod"
@@ -88,4 +89,7 @@ func Secret(management *config.ScaledContext, schemas *types.Schemas) {
 			subSchema.Store = subtype.NewSubTypeStore(subSchema.ID, schema.Store)
 		}
 	}
+
+	schema = schemas.Schema(&schema.Version, "namespacedCertificate")
+	schema.Store = cert.Wrap(schema.Store)
 }

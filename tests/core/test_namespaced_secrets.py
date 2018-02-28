@@ -1,4 +1,25 @@
 from common import random_str
+from test_secrets import CERT, KEY
+
+UPDATED_CERT = """-----BEGIN CERTIFICATE-----
+MIIDEDCCAfgCCQC+HwE8rpMN7jANBgkqhkiG9w0BAQUFADBKMQswCQYDVQQGEwJV
+UzEQMA4GA1UECBMHQXJpem9uYTEVMBMGA1UEChMMUmFuY2hlciBMYWJzMRIwEAYD
+VQQDEwlsb2NhbGhvc3QwHhcNMTYwNjMwMDExMzMyWhcNMjYwNjI4MDExMzMyWjBK
+MQswCQYDVQQGEwJVUzEQMA4GA1UECBMHQXJpem9uYTEVMBMGA1UEChMMUmFuY2hl
+ciBMYWJzMRIwEAYDVQQDEwlsb2NhbGhvc3QwggEiMA0GCSqGSIb3DQEBAQUAA4IB
+DwAwggEKAoIBAQC1PR0EiJjM0wbFQmU/yKSb7AuQdzhdW02ya+RQe+31/B+sOTMr
+z9b473KCKf8LiFKFOIQUhR5fPvwyrrIWKCEV9pCp/wM474fX32j0zYaH6ezZjL0r
+L6hTeGFScGse3dk7ej2+6nNWexpujos0djFi9Gu11iVHIJyT2Sx66kPPPZVRkJO9
+5Pfetm5SLIQtJHUwy5iWv5Br+AbdXlUAjTYUqS4mhKIIbblAPbOKrYRxGXX/6oDV
+J5OGLle8Uvlb8poxqmy67FPyMObNHhjggKwboXhmNuuT2OGf/VeZANMYubs4JP2V
+ZLs3U/1tFMAOaQM+PbT9JuwMSmGYFX0Qiuh/AgMBAAEwDQYJKoZIhvcNAQEFBQAD
+ggEBACpkRCQpCn/zmTOwboBckkOFeqMVo9cvSu0Sez6EPED4WUv/6q5tlJeHekQm
+6YVcsXeOMkpfZ7qtGmBDwR+ly7D43dCiPKplm0uApO1CkogG5ePv0agvKHEybd36
+xu9pt0fnxDdrP2NrP6trHq1D+CzPZooLRfmYqbt1xmIb00GpnyiJIUNuMu7GUM3q
+NxWGK3eq+1cyt6xr8nLOC5zaGeSyZikw4+9vqLudNSyYdnw9mdHtrYT0GlcEP1Vc
+NK+yrhDCvEWH6+4+pp8Ve2P2Le5tvbA1m24AxyuC9wHS5bUmiNHweLXNpxLFTjK8
+BBUi6y1Vm9jrDi/LiiHcN4sJEoP=
+-----END CERTIFICATE-----"""
 
 
 def test_namespaced_secrets(pc):
@@ -52,18 +73,18 @@ def test_namespaced_certificates(pc):
                                             projectId=pc.project.id)
 
     name = random_str()
-    cert = client.create_namespaced_certificate(name=name, key='keydata',
+    cert = client.create_namespaced_certificate(name=name, key=KEY,
                                                 namespaceId=ns.id,
-                                                certs='certdata')
+                                                certs=CERT)
     assert cert.baseType == 'namespacedSecret'
     assert cert.type == 'namespacedCertificate'
     assert cert.name == name
-    assert cert.certs == 'certdata'
+    assert cert.certs == CERT
     assert cert.namespaceId == ns.id
     assert cert.projectId == pc.project.id
     assert 'namespace' not in cert
 
-    cert = client.update(cert, certs='certdata2')
+    cert = client.update(cert, certs=UPDATED_CERT)
     assert cert.namespaceId == ns.id
     assert cert.projectId == pc.project.id
 
@@ -72,7 +93,7 @@ def test_namespaced_certificates(pc):
     assert cert.baseType == 'namespacedSecret'
     assert cert.type == 'namespacedCertificate'
     assert cert.name == name
-    assert cert.certs == 'certdata2'
+    assert cert.certs == UPDATED_CERT
     assert cert.namespaceId == ns.id
     assert cert.projectId == pc.project.id
 
