@@ -79,7 +79,7 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 		Usage: "Resource tags. For example, foo=bar",
 	}
 	driverFlag.Options["node-count"] = &types.Flag{
-		Type:  types.StringType,
+		Type:  types.IntType,
 		Usage: "Number of agents (VMs) to host docker containers. Allowed values must be in the range of 1 to 100 (inclusive)",
 		Value: "1",
 	}
@@ -361,6 +361,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions) (*typ
 					DNSPrefix: to.StringPtr(agentDNSPrefix),
 					Name:      to.StringPtr(driverState.AgentPoolName),
 					VMSize:    containerservice.VMSizeTypes(driverState.AgentVMSize),
+					Count:     to.Int32Ptr(int32(driverState.Count)),
 				},
 			},
 			ServicePrincipalProfile: &containerservice.ServicePrincipalProfile{
