@@ -3,6 +3,7 @@ package workload
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/docker/distribution/reference"
@@ -129,6 +130,7 @@ func (a *AggregateStore) Create(apiContext *types.APIContext, schema *types.Sche
 	setSelector(toSchema.ID, data)
 	setWorkloadSpecificDefaults(toSchema.ID, data)
 	setSecrets(apiContext, data)
+	setPorts(data)
 
 	return toStore.Create(apiContext, toSchema, data)
 }
@@ -183,6 +185,42 @@ func store(registries map[string]projectclient.RegistryCredential, domainToCreds
 			domainToCreds[registry] = append(domainToCreds[registry], secretRef)
 		} else {
 			domainToCreds[registry] = []corev1.LocalObjectReference{secretRef}
+		}
+	}
+}
+
+func setPorts(data map[string]interface{}) {
+	containers, ok := values.GetValue(data, "containers")
+	if !ok {
+		return
+	}
+
+	for _, c := range convert.ToInterfaceSlice(containers) {
+		cMap, err := convert.EncodeToMap(c)
+		if err != nil {
+			logrus.Warnf("Failed to transform container to map: %v", err)
+			continue
+		}
+		v, ok := values.GetValue(cMap, "ports")
+
+		if ok {
+			ports := convert.ToInterfaceSlice(v)
+			if len(ports) > 1 {
+				for _, p := range ports {
+					port, err := convert.EncodeToMap(p)
+					if err != nil {
+						logrus.Warnf("Failed to transform port to map %v", err)
+						continue
+					}
+					if convert.IsEmpty(port["name"]) {
+						containerPort, err := convert.ToNumber(port["containerPort"])
+						if err != nil {
+							logrus.Warnf("Failed to transform container port [%v] to number: %v", port["containerPort"], err)
+						}
+						port["name"] = fmt.Sprintf("%s%s", strings.ToLower(convert.ToString(port["protocol"])), strconv.Itoa(int(containerPort)))
+					}
+				}
+			}
 		}
 	}
 }
