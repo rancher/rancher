@@ -54,7 +54,7 @@ func (f *Factory) ClusterDialer(clusterName string) (dialer.Dialer, error) {
 		return nil, err
 	}
 
-	if cluster.Status.Driver == v3.ClusterDriverImported && (cluster.Spec.ImportedConfig == nil || cluster.Spec.ImportedConfig.KubeConfig == "") {
+	if cluster.Status.Driver == v3.ClusterDriverImported && !cluster.Spec.Internal && (cluster.Spec.ImportedConfig == nil || cluster.Spec.ImportedConfig.KubeConfig == "") {
 		return f.TunnelServer.Dialer(cluster.Name, 15*time.Second), nil
 	} else if cluster.Status.Driver == v3.ClusterDriverRKE {
 		nodes, err := f.nodeLister.List(cluster.Name, labels.Everything())
