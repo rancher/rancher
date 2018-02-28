@@ -88,14 +88,6 @@ func (c *Controller) CreateServiceForWorkload(workload *Workload) error {
 		services[service.Type] = *service
 	}
 
-	// we use workload annotation instead of service.selector (based off workload.labels)
-	// to avoid service recreate on user label change
-	serviceAnnotations := map[string]string{}
-	serviceAnnotations[WorkloadAnnotation] = workload.getKey()
-	// labels are used so it is easy to filter out the service when query from cache
-	serviceLabels := map[string]string{}
-	serviceLabels[WorkloadLabel] = workload.Namespace
-
 	for _, toCreate := range services {
 		existing, err := c.serviceExistsForWorkload(workload, &toCreate)
 		if err != nil {
@@ -139,11 +131,7 @@ func (c *Controller) createService(toCreate Service, workload *Workload) error {
 		Controller: &controller,
 	}
 
-	// we use workload annotation instead of service.selector (based off workload.labels)
-	// to avoid service recreate on user label change
-	serviceAnnotations := map[string]string{}
-	serviceAnnotations[WorkloadAnnotation] = workload.getKey()
-	// labels are used so it is easy to filter out the service when query from cache
+	// labels are used so it is easy to filter out the service when query from API
 	serviceLabels := map[string]string{}
 	serviceLabels[WorkloadLabel] = workload.Namespace
 
@@ -152,13 +140,13 @@ func (c *Controller) createService(toCreate Service, workload *Workload) error {
 			GenerateName:    "workload-",
 			OwnerReferences: []metav1.OwnerReference{ownerRef},
 			Namespace:       workload.Namespace,
-			Annotations:     serviceAnnotations,
 			Labels:          serviceLabels,
 		},
 		Spec: corev1.ServiceSpec{
 			ClusterIP: toCreate.ClusterIP,
 			Type:      toCreate.Type,
 			Ports:     toCreate.ServicePorts,
+			Selector:  workload.SelectorLabels,
 		},
 	}
 
