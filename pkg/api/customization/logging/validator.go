@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 
 	"github.com/rancher/rancher/pkg/controllers/user/logging/utils"
 )
@@ -22,6 +23,7 @@ func ClusterLoggingValidator(resquest *types.APIContext, schema *types.Schema, d
 	}
 
 	if err := wp.Validate(); err != nil {
+		logrus.Warnf("clusterlogging %s input validate failed, %v", resquest.ID, err)
 		return httperror.NewAPIError(httperror.InvalidFormat, fmt.Sprintf("%v", err))
 	}
 	return nil
@@ -38,6 +40,7 @@ func ProjectLoggingValidator(resquest *types.APIContext, schema *types.Schema, d
 	}
 
 	if err := wp.Validate(); err != nil {
+		logrus.Warnf("projectlogging %s input validate failed, %v", resquest.ID, err)
 		return httperror.NewAPIError(httperror.InvalidFormat, fmt.Sprintf("%v", err))
 	}
 	return nil

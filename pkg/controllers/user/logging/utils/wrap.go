@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
@@ -67,15 +69,18 @@ func (w *WrapClusterLogging) Validate() error {
 	if curtg == "" {
 		return fmt.Errorf("one of the target must set")
 	}
-	return err
+	return nil
 }
 
 func (w *WrapProjectLogging) Validate() error {
 	curtg, _, _, _, _, err := getWrapConfig(w.ElasticsearchConfig, w.SplunkConfig, w.SyslogConfig, w.KafkaConfig)
+	if err != nil {
+		return err
+	}
 	if curtg == "" {
 		return fmt.Errorf("one of the target must set")
 	}
-	return err
+	return nil
 }
 
 func ToWrapClusterLogging(clusterLogging v3.ClusterLoggingSpec) (*WrapClusterLogging, error) {
@@ -122,34 +127,33 @@ func ToWrapProjectLogging(grepNamespace string, projectLogging v3.ProjectLogging
 
 func getWrapConfig(es *v3.ElasticsearchConfig, sp *v3.SplunkConfig, sl *v3.SyslogConfig, kf *v3.KafkaConfig) (currentTarget string, wes WrapElasticsearch, wsp WrapSplunk, wsl WrapSyslog, wkf WrapKafka, err error) {
 	if es != nil {
-		currentTarget = loggingconfig.Elasticsearch
-		var u *url.URL
-		u, err = url.Parse(es.Endpoint)
+		var h, s string
+		h, s, err = parseEndpoint(es.Endpoint)
 		if err != nil {
 			return
 		}
 		wes = WrapElasticsearch{
-			Host:       u.Host,
-			Scheme:     u.Scheme,
+			Host:       h,
+			Scheme:     s,
 			DateFormat: getDateFormat(es.DateFormat),
 		}
+		currentTarget = loggingconfig.Elasticsearch
 	}
 
 	if sp != nil {
-		currentTarget = loggingconfig.Splunk
-		var u *url.URL
-		u, err = url.Parse(sp.Endpoint)
+		var h, s string
+		h, s, err = parseEndpoint(sp.Endpoint)
 		if err != nil {
 			return
 		}
 		wsp = WrapSplunk{
-			Server: u.Host,
-			Scheme: u.Scheme,
+			Server: h,
+			Scheme: s,
 		}
+		currentTarget = loggingconfig.Splunk
 	}
 
 	if sl != nil {
-		currentTarget = loggingconfig.Syslog
 		var host, port string
 		host, port, err = net.SplitHostPort(sl.Endpoint)
 		if err != nil {
@@ -159,15 +163,50 @@ func getWrapConfig(es *v3.ElasticsearchConfig, sp *v3.SplunkConfig, sl *v3.Syslo
 			Host: host,
 			Port: port,
 		}
+		currentTarget = loggingconfig.Syslog
 	}
 
-	if kf != nil && len(kf.BrokerEndpoints) != 0 {
-		currentTarget = loggingconfig.Kafka
-		wkf = WrapKafka{
-			Brokers: strings.Join(kf.BrokerEndpoints, ","),
+	if kf != nil {
+		if len(kf.BrokerEndpoints) == 0 && kf.ZookeeperEndpoint == "" {
+			err = errors.New("one of the kafka endpoint must be set")
+			return
 		}
+		if len(kf.BrokerEndpoints) != 0 {
+			var bs []string
+			var h string
+			for _, v := range kf.BrokerEndpoints {
+				h, _, err = parseEndpoint(v)
+				if err != nil {
+					return
+				}
+				bs = append(bs, h)
+			}
+			wkf = WrapKafka{
+				Brokers: strings.Join(bs, ","),
+			}
+		} else {
+			if kf.ZookeeperEndpoint != "" {
+				if _, _, err = parseEndpoint(kf.ZookeeperEndpoint); err != nil {
+					return
+				}
+			}
+		}
+		currentTarget = loggingconfig.Kafka
 	}
 	return
+}
+
+func parseEndpoint(endpoint string) (host string, scheme string, err error) {
+	u, err := url.ParseRequestURI(endpoint)
+	if err != nil {
+		return "", "", errors.Wrapf(err, "invalid endpoint %s", endpoint)
+	}
+
+	if u.Host == "" || u.Scheme == "" {
+		return "", "", fmt.Errorf("invalid endpoint %s, empty host or schema", endpoint)
+	}
+
+	return u.Host, u.Scheme, nil
 }
 
 func getDateFormat(dateformat string) string {
