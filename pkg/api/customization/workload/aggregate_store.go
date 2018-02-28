@@ -40,7 +40,8 @@ func NewAggregateStore(schemas ...*types.Schema) *AggregateStore {
 	for _, schema := range schemas {
 		a.Schemas[strings.ToLower(schema.ID)] = schema
 		a.Stores[strings.ToLower(schema.ID)] = schema.Store
-		a.FieldToSchemaID[schema.ID] = strings.ToLower(schema.ID)
+		fieldKey := fmt.Sprintf("%sConfig", schema.ID)
+		a.FieldToSchemaID[fieldKey] = strings.ToLower(schema.ID)
 	}
 
 	return a
