@@ -519,9 +519,22 @@ func generateServicesFromPortsAnnotation(portAnnotation string) ([]Service, erro
 	for svcType, ports := range svcTypeToPort {
 		var servicePorts []corev1.ServicePort
 		for _, p := range ports {
+			var nodePort int32
+			var clusterIPPort int32
+			if svcType == corev1.ServiceTypeNodePort {
+				nodePort = int32(p.SourcePort)
+				clusterIPPort = p.ContainerPort
+			} else {
+				if p.SourcePort == 0 {
+					clusterIPPort = p.ContainerPort
+				} else {
+					clusterIPPort = int32(p.SourcePort)
+				}
+			}
 			servicePort := corev1.ServicePort{
-				Port:       p.ContainerPort,
+				Port:       clusterIPPort,
 				TargetPort: intstr.Parse(strconv.FormatInt(int64(p.ContainerPort), 10)),
+				NodePort:   nodePort,
 				Protocol:   corev1.Protocol(p.Protocol),
 				Name:       p.Name,
 			}
