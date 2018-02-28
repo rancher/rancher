@@ -9,8 +9,8 @@ const (
 )
 
 type TargetWorkload struct {
-	AvailablePercentage *int64            `json:"availablePercentage,omitempty"`
-	Selector            map[string]string `json:"selector,omitempty"`
-	Type                string            `json:"type,omitempty"`
-	WorkloadID          string            `json:"workloadId,omitempty"`
+	AvailablePercentage *int64            `json:"availablePercentage,omitempty" yaml:"availablePercentage,omitempty"`
+	Selector            map[string]string `json:"selector,omitempty" yaml:"selector,omitempty"`
+	Type                string            `json:"type,omitempty" yaml:"type,omitempty"`
+	WorkloadID          string            `json:"workloadId,omitempty" yaml:"workloadId,omitempty"`
 }

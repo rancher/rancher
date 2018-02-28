@@ -6,5 +6,5 @@ const (
 )
 
 type ServiceStatus struct {
-	LoadBalancer *LoadBalancerStatus `json:"loadBalancer,omitempty"`
+	LoadBalancer *LoadBalancerStatus `json:"loadBalancer,omitempty" yaml:"loadBalancer,omitempty"`
 }

@@ -29,25 +29,25 @@ const (
 
 type Notifier struct {
 	types.Resource
-	Annotations          map[string]string `json:"annotations,omitempty"`
-	ClusterId            string            `json:"clusterId,omitempty"`
-	Created              string            `json:"created,omitempty"`
-	CreatorID            string            `json:"creatorId,omitempty"`
-	Description          string            `json:"description,omitempty"`
-	Labels               map[string]string `json:"labels,omitempty"`
-	Name                 string            `json:"name,omitempty"`
-	NamespaceId          string            `json:"namespaceId,omitempty"`
-	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty"`
-	PagerdutyConfig      *PagerdutyConfig  `json:"pagerdutyConfig,omitempty"`
-	Removed              string            `json:"removed,omitempty"`
-	SMTPConfig           *SMTPConfig       `json:"smtpConfig,omitempty"`
-	SlackConfig          *SlackConfig      `json:"slackConfig,omitempty"`
-	State                string            `json:"state,omitempty"`
-	Status               *NotifierStatus   `json:"status,omitempty"`
-	Transitioning        string            `json:"transitioning,omitempty"`
-	TransitioningMessage string            `json:"transitioningMessage,omitempty"`
-	Uuid                 string            `json:"uuid,omitempty"`
-	WebhookConfig        *WebhookConfig    `json:"webhookConfig,omitempty"`
+	Annotations          map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	ClusterId            string            `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	Created              string            `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID            string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Description          string            `json:"description,omitempty" yaml:"description,omitempty"`
+	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name                 string            `json:"name,omitempty" yaml:"name,omitempty"`
+	NamespaceId          string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
+	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	PagerdutyConfig      *PagerdutyConfig  `json:"pagerdutyConfig,omitempty" yaml:"pagerdutyConfig,omitempty"`
+	Removed              string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	SMTPConfig           *SMTPConfig       `json:"smtpConfig,omitempty" yaml:"smtpConfig,omitempty"`
+	SlackConfig          *SlackConfig      `json:"slackConfig,omitempty" yaml:"slackConfig,omitempty"`
+	State                string            `json:"state,omitempty" yaml:"state,omitempty"`
+	Status               *NotifierStatus   `json:"status,omitempty" yaml:"status,omitempty"`
+	Transitioning        string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	Uuid                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	WebhookConfig        *WebhookConfig    `json:"webhookConfig,omitempty" yaml:"webhookConfig,omitempty"`
 }
 type NotifierCollection struct {
 	types.Collection

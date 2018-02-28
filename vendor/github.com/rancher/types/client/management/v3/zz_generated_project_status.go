@@ -6,5 +6,5 @@ const (
 )
 
 type ProjectStatus struct {
-	Conditions []ProjectCondition `json:"conditions,omitempty"`
+	Conditions []ProjectCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 }

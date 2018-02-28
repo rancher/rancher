@@ -6,5 +6,5 @@ const (
 )
 
 type AlertStatus struct {
-	AlertState string `json:"alertState,omitempty"`
+	AlertState string `json:"alertState,omitempty" yaml:"alertState,omitempty"`
 }

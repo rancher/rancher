@@ -12,11 +12,11 @@ const (
 )
 
 type ObjectReference struct {
-	APIVersion      string `json:"apiVersion,omitempty"`
-	FieldPath       string `json:"fieldPath,omitempty"`
-	Kind            string `json:"kind,omitempty"`
-	Name            string `json:"name,omitempty"`
-	Namespace       string `json:"namespace,omitempty"`
-	ResourceVersion string `json:"resourceVersion,omitempty"`
-	UID             string `json:"uid,omitempty"`
+	APIVersion      string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+	FieldPath       string `json:"fieldPath,omitempty" yaml:"fieldPath,omitempty"`
+	Kind            string `json:"kind,omitempty" yaml:"kind,omitempty"`
+	Name            string `json:"name,omitempty" yaml:"name,omitempty"`
+	Namespace       string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+	ResourceVersion string `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
+	UID             string `json:"uid,omitempty" yaml:"uid,omitempty"`
 }

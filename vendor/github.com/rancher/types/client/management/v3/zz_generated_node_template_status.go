@@ -6,5 +6,5 @@ const (
 )
 
 type NodeTemplateStatus struct {
-	Conditions []NodeTemplateCondition `json:"conditions,omitempty"`
+	Conditions []NodeTemplateCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 }

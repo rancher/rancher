@@ -6,5 +6,5 @@ const (
 )
 
 type LoggingStatus struct {
-	Conditions []LoggingCondition `json:"conditions,omitempty"`
+	Conditions []LoggingCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 }

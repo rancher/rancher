@@ -7,6 +7,6 @@ const (
 )
 
 type KubernetesInfo struct {
-	KubeProxyVersion string `json:"kubeProxyVersion,omitempty"`
-	KubeletVersion   string `json:"kubeletVersion,omitempty"`
+	KubeProxyVersion string `json:"kubeProxyVersion,omitempty" yaml:"kubeProxyVersion,omitempty"`
+	KubeletVersion   string `json:"kubeletVersion,omitempty" yaml:"kubeletVersion,omitempty"`
 }

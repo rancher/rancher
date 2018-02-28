@@ -28,24 +28,24 @@ const (
 
 type Catalog struct {
 	types.Resource
-	Annotations          map[string]string  `json:"annotations,omitempty"`
-	Branch               string             `json:"branch,omitempty"`
-	Commit               string             `json:"commit,omitempty"`
-	Conditions           []CatalogCondition `json:"conditions,omitempty"`
-	Created              string             `json:"created,omitempty"`
-	CreatorID            string             `json:"creatorId,omitempty"`
-	Description          string             `json:"description,omitempty"`
-	Kind                 string             `json:"kind,omitempty"`
-	Labels               map[string]string  `json:"labels,omitempty"`
-	LastRefreshTimestamp string             `json:"lastRefreshTimestamp,omitempty"`
-	Name                 string             `json:"name,omitempty"`
-	OwnerReferences      []OwnerReference   `json:"ownerReferences,omitempty"`
-	Removed              string             `json:"removed,omitempty"`
-	State                string             `json:"state,omitempty"`
-	Transitioning        string             `json:"transitioning,omitempty"`
-	TransitioningMessage string             `json:"transitioningMessage,omitempty"`
-	URL                  string             `json:"url,omitempty"`
-	Uuid                 string             `json:"uuid,omitempty"`
+	Annotations          map[string]string  `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Branch               string             `json:"branch,omitempty" yaml:"branch,omitempty"`
+	Commit               string             `json:"commit,omitempty" yaml:"commit,omitempty"`
+	Conditions           []CatalogCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+	Created              string             `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID            string             `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Description          string             `json:"description,omitempty" yaml:"description,omitempty"`
+	Kind                 string             `json:"kind,omitempty" yaml:"kind,omitempty"`
+	Labels               map[string]string  `json:"labels,omitempty" yaml:"labels,omitempty"`
+	LastRefreshTimestamp string             `json:"lastRefreshTimestamp,omitempty" yaml:"lastRefreshTimestamp,omitempty"`
+	Name                 string             `json:"name,omitempty" yaml:"name,omitempty"`
+	OwnerReferences      []OwnerReference   `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Removed              string             `json:"removed,omitempty" yaml:"removed,omitempty"`
+	State                string             `json:"state,omitempty" yaml:"state,omitempty"`
+	Transitioning        string             `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage string             `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	URL                  string             `json:"url,omitempty" yaml:"url,omitempty"`
+	Uuid                 string             `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 type CatalogCollection struct {
 	types.Collection

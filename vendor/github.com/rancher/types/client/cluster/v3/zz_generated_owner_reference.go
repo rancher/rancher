@@ -11,10 +11,10 @@ const (
 )
 
 type OwnerReference struct {
-	APIVersion         string `json:"apiVersion,omitempty"`
-	BlockOwnerDeletion *bool  `json:"blockOwnerDeletion,omitempty"`
-	Controller         *bool  `json:"controller,omitempty"`
-	Kind               string `json:"kind,omitempty"`
-	Name               string `json:"name,omitempty"`
-	UID                string `json:"uid,omitempty"`
+	APIVersion         string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+	BlockOwnerDeletion *bool  `json:"blockOwnerDeletion,omitempty" yaml:"blockOwnerDeletion,omitempty"`
+	Controller         *bool  `json:"controller,omitempty" yaml:"controller,omitempty"`
+	Kind               string `json:"kind,omitempty" yaml:"kind,omitempty"`
+	Name               string `json:"name,omitempty" yaml:"name,omitempty"`
+	UID                string `json:"uid,omitempty" yaml:"uid,omitempty"`
 }

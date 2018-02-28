@@ -9,6 +9,6 @@ const (
 )
 
 type TCPSocketAction struct {
-	Host string             `json:"host,omitempty"`
-	Port intstr.IntOrString `json:"port,omitempty"`
+	Host string             `json:"host,omitempty" yaml:"host,omitempty"`
+	Port intstr.IntOrString `json:"port,omitempty" yaml:"port,omitempty"`
 }

@@ -9,8 +9,8 @@ const (
 )
 
 type ComponentCondition struct {
-	Error   string `json:"error,omitempty"`
-	Message string `json:"message,omitempty"`
-	Status  string `json:"status,omitempty"`
-	Type    string `json:"type,omitempty"`
+	Error   string `json:"error,omitempty" yaml:"error,omitempty"`
+	Message string `json:"message,omitempty" yaml:"message,omitempty"`
+	Status  string `json:"status,omitempty" yaml:"status,omitempty"`
+	Type    string `json:"type,omitempty" yaml:"type,omitempty"`
 }

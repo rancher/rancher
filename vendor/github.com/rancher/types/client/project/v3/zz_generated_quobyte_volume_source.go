@@ -10,9 +10,9 @@ const (
 )
 
 type QuobyteVolumeSource struct {
-	Group    string `json:"group,omitempty"`
-	ReadOnly bool   `json:"readOnly,omitempty"`
-	Registry string `json:"registry,omitempty"`
-	User     string `json:"user,omitempty"`
-	Volume   string `json:"volume,omitempty"`
+	Group    string `json:"group,omitempty" yaml:"group,omitempty"`
+	ReadOnly bool   `json:"readOnly,omitempty" yaml:"readOnly,omitempty"`
+	Registry string `json:"registry,omitempty" yaml:"registry,omitempty"`
+	User     string `json:"user,omitempty" yaml:"user,omitempty"`
+	Volume   string `json:"volume,omitempty" yaml:"volume,omitempty"`
 }

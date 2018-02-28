@@ -6,5 +6,5 @@ const (
 )
 
 type ContainerStateRunning struct {
-	StartedAt string `json:"startedAt,omitempty"`
+	StartedAt string `json:"startedAt,omitempty" yaml:"startedAt,omitempty"`
 }

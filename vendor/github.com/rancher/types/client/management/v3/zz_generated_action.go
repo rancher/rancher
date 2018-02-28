@@ -7,6 +7,6 @@ const (
 )
 
 type Action struct {
-	Input  string `json:"input,omitempty"`
-	Output string `json:"output,omitempty"`
+	Input  string `json:"input,omitempty" yaml:"input,omitempty"`
+	Output string `json:"output,omitempty" yaml:"output,omitempty"`
 }

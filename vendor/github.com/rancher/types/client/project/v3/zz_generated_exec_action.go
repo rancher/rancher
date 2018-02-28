@@ -6,5 +6,5 @@ const (
 )
 
 type ExecAction struct {
-	Command []string `json:"command,omitempty"`
+	Command []string `json:"command,omitempty" yaml:"command,omitempty"`
 }

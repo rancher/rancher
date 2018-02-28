@@ -29,25 +29,25 @@ const (
 
 type PersistentVolumeClaim struct {
 	types.Resource
-	AccessModes          []string                     `json:"accessModes,omitempty"`
-	Annotations          map[string]string            `json:"annotations,omitempty"`
-	Created              string                       `json:"created,omitempty"`
-	CreatorID            string                       `json:"creatorId,omitempty"`
-	Labels               map[string]string            `json:"labels,omitempty"`
-	Name                 string                       `json:"name,omitempty"`
-	NamespaceId          string                       `json:"namespaceId,omitempty"`
-	OwnerReferences      []OwnerReference             `json:"ownerReferences,omitempty"`
-	ProjectID            string                       `json:"projectId,omitempty"`
-	Removed              string                       `json:"removed,omitempty"`
-	Resources            *ResourceRequirements        `json:"resources,omitempty"`
-	Selector             *LabelSelector               `json:"selector,omitempty"`
-	State                string                       `json:"state,omitempty"`
-	Status               *PersistentVolumeClaimStatus `json:"status,omitempty"`
-	StorageClassId       string                       `json:"storageClassId,omitempty"`
-	Transitioning        string                       `json:"transitioning,omitempty"`
-	TransitioningMessage string                       `json:"transitioningMessage,omitempty"`
-	Uuid                 string                       `json:"uuid,omitempty"`
-	VolumeId             string                       `json:"volumeId,omitempty"`
+	AccessModes          []string                     `json:"accessModes,omitempty" yaml:"accessModes,omitempty"`
+	Annotations          map[string]string            `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Created              string                       `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID            string                       `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Labels               map[string]string            `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name                 string                       `json:"name,omitempty" yaml:"name,omitempty"`
+	NamespaceId          string                       `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
+	OwnerReferences      []OwnerReference             `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	ProjectID            string                       `json:"projectId,omitempty" yaml:"projectId,omitempty"`
+	Removed              string                       `json:"removed,omitempty" yaml:"removed,omitempty"`
+	Resources            *ResourceRequirements        `json:"resources,omitempty" yaml:"resources,omitempty"`
+	Selector             *LabelSelector               `json:"selector,omitempty" yaml:"selector,omitempty"`
+	State                string                       `json:"state,omitempty" yaml:"state,omitempty"`
+	Status               *PersistentVolumeClaimStatus `json:"status,omitempty" yaml:"status,omitempty"`
+	StorageClassId       string                       `json:"storageClassId,omitempty" yaml:"storageClassId,omitempty"`
+	Transitioning        string                       `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage string                       `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	Uuid                 string                       `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	VolumeId             string                       `json:"volumeId,omitempty" yaml:"volumeId,omitempty"`
 }
 type PersistentVolumeClaimCollection struct {
 	types.Collection

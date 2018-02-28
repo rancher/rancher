@@ -8,7 +8,7 @@ const (
 )
 
 type Resources struct {
-	CPU       *ResourceRequest `json:"cpu,omitempty"`
-	Memory    *ResourceRequest `json:"memory,omitempty"`
-	NvidiaGPU *ResourceRequest `json:"nvidiaGPU,omitempty"`
+	CPU       *ResourceRequest `json:"cpu,omitempty" yaml:"cpu,omitempty"`
+	Memory    *ResourceRequest `json:"memory,omitempty" yaml:"memory,omitempty"`
+	NvidiaGPU *ResourceRequest `json:"nvidiaGPU,omitempty" yaml:"nvidiaGPU,omitempty"`
 }

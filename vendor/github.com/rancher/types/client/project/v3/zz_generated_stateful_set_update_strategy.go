@@ -7,6 +7,6 @@ const (
 )
 
 type StatefulSetUpdateStrategy struct {
-	Partition *int64 `json:"partition,omitempty"`
-	Strategy  string `json:"strategy,omitempty"`
+	Partition *int64 `json:"partition,omitempty" yaml:"partition,omitempty"`
+	Strategy  string `json:"strategy,omitempty" yaml:"strategy,omitempty"`
 }

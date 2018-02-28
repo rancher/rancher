@@ -7,6 +7,6 @@ const (
 )
 
 type TargetEvent struct {
-	ResourceKind string `json:"resourceKind,omitempty"`
-	Type         string `json:"type,omitempty"`
+	ResourceKind string `json:"resourceKind,omitempty" yaml:"resourceKind,omitempty"`
+	Type         string `json:"type,omitempty" yaml:"type,omitempty"`
 }

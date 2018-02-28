@@ -6,5 +6,5 @@ const (
 )
 
 type TargetSystemService struct {
-	Condition string `json:"condition,omitempty"`
+	Condition string `json:"condition,omitempty" yaml:"condition,omitempty"`
 }

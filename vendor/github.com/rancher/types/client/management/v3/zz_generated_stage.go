@@ -7,6 +7,6 @@ const (
 )
 
 type Stage struct {
-	Name  string `json:"name,omitempty"`
-	Steps []Step `json:"steps,omitempty"`
+	Name  string `json:"name,omitempty" yaml:"name,omitempty"`
+	Steps []Step `json:"steps,omitempty" yaml:"steps,omitempty"`
 }

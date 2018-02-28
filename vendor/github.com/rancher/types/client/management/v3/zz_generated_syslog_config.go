@@ -9,8 +9,8 @@ const (
 )
 
 type SyslogConfig struct {
-	Endpoint string `json:"endpoint,omitempty"`
-	Program  string `json:"program,omitempty"`
-	Protocol string `json:"protocol,omitempty"`
-	Severity string `json:"severity,omitempty"`
+	Endpoint string `json:"endpoint,omitempty" yaml:"endpoint,omitempty"`
+	Program  string `json:"program,omitempty" yaml:"program,omitempty"`
+	Protocol string `json:"protocol,omitempty" yaml:"protocol,omitempty"`
+	Severity string `json:"severity,omitempty" yaml:"severity,omitempty"`
 }

@@ -10,9 +10,9 @@ const (
 )
 
 type CustomConfig struct {
-	Address         string `json:"address,omitempty"`
-	DockerSocket    string `json:"dockerSocket,omitempty"`
-	InternalAddress string `json:"internalAddress,omitempty"`
-	SSHKey          string `json:"sshKey,omitempty"`
-	User            string `json:"user,omitempty"`
+	Address         string `json:"address,omitempty" yaml:"address,omitempty"`
+	DockerSocket    string `json:"dockerSocket,omitempty" yaml:"dockerSocket,omitempty"`
+	InternalAddress string `json:"internalAddress,omitempty" yaml:"internalAddress,omitempty"`
+	SSHKey          string `json:"sshKey,omitempty" yaml:"sshKey,omitempty"`
+	User            string `json:"user,omitempty" yaml:"user,omitempty"`
 }

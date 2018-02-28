@@ -54,50 +54,50 @@ const (
 
 type Deployment struct {
 	types.Resource
-	ActiveDeadlineSeconds         *int64                 `json:"activeDeadlineSeconds,omitempty"`
-	Annotations                   map[string]string      `json:"annotations,omitempty"`
-	AutomountServiceAccountToken  *bool                  `json:"automountServiceAccountToken,omitempty"`
-	Containers                    []Container            `json:"containers,omitempty"`
-	Created                       string                 `json:"created,omitempty"`
-	CreatorID                     string                 `json:"creatorId,omitempty"`
-	DNSPolicy                     string                 `json:"dnsPolicy,omitempty"`
-	DeploymentConfig              *DeploymentConfig      `json:"deploymentConfig,omitempty"`
-	DeploymentStatus              *DeploymentStatus      `json:"deploymentStatus,omitempty"`
-	Fsgid                         *int64                 `json:"fsgid,omitempty"`
-	Gids                          []int64                `json:"gids,omitempty"`
-	HostAliases                   []HostAlias            `json:"hostAliases,omitempty"`
-	HostIPC                       bool                   `json:"hostIPC,omitempty"`
-	HostNetwork                   bool                   `json:"hostNetwork,omitempty"`
-	HostPID                       bool                   `json:"hostPID,omitempty"`
-	Hostname                      string                 `json:"hostname,omitempty"`
-	ImagePullSecrets              []LocalObjectReference `json:"imagePullSecrets,omitempty"`
-	Labels                        map[string]string      `json:"labels,omitempty"`
-	Name                          string                 `json:"name,omitempty"`
-	NamespaceId                   string                 `json:"namespaceId,omitempty"`
-	NodeId                        string                 `json:"nodeId,omitempty"`
-	OwnerReferences               []OwnerReference       `json:"ownerReferences,omitempty"`
-	Priority                      *int64                 `json:"priority,omitempty"`
-	PriorityClassName             string                 `json:"priorityClassName,omitempty"`
-	ProjectID                     string                 `json:"projectId,omitempty"`
-	PublicEndpoints               []PublicEndpoint       `json:"publicEndpoints,omitempty"`
-	Removed                       string                 `json:"removed,omitempty"`
-	RestartPolicy                 string                 `json:"restartPolicy,omitempty"`
-	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty"`
-	Scale                         *int64                 `json:"scale,omitempty"`
-	SchedulerName                 string                 `json:"schedulerName,omitempty"`
-	Scheduling                    *Scheduling            `json:"scheduling,omitempty"`
-	Selector                      *LabelSelector         `json:"selector,omitempty"`
-	ServiceAccountName            string                 `json:"serviceAccountName,omitempty"`
-	State                         string                 `json:"state,omitempty"`
-	Subdomain                     string                 `json:"subdomain,omitempty"`
-	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty"`
-	Transitioning                 string                 `json:"transitioning,omitempty"`
-	TransitioningMessage          string                 `json:"transitioningMessage,omitempty"`
-	Uid                           *int64                 `json:"uid,omitempty"`
-	Uuid                          string                 `json:"uuid,omitempty"`
-	Volumes                       []Volume               `json:"volumes,omitempty"`
-	WorkloadAnnotations           map[string]string      `json:"workloadAnnotations,omitempty"`
-	WorkloadLabels                map[string]string      `json:"workloadLabels,omitempty"`
+	ActiveDeadlineSeconds         *int64                 `json:"activeDeadlineSeconds,omitempty" yaml:"activeDeadlineSeconds,omitempty"`
+	Annotations                   map[string]string      `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	AutomountServiceAccountToken  *bool                  `json:"automountServiceAccountToken,omitempty" yaml:"automountServiceAccountToken,omitempty"`
+	Containers                    []Container            `json:"containers,omitempty" yaml:"containers,omitempty"`
+	Created                       string                 `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID                     string                 `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DNSPolicy                     string                 `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
+	DeploymentConfig              *DeploymentConfig      `json:"deploymentConfig,omitempty" yaml:"deploymentConfig,omitempty"`
+	DeploymentStatus              *DeploymentStatus      `json:"deploymentStatus,omitempty" yaml:"deploymentStatus,omitempty"`
+	Fsgid                         *int64                 `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
+	Gids                          []int64                `json:"gids,omitempty" yaml:"gids,omitempty"`
+	HostAliases                   []HostAlias            `json:"hostAliases,omitempty" yaml:"hostAliases,omitempty"`
+	HostIPC                       bool                   `json:"hostIPC,omitempty" yaml:"hostIPC,omitempty"`
+	HostNetwork                   bool                   `json:"hostNetwork,omitempty" yaml:"hostNetwork,omitempty"`
+	HostPID                       bool                   `json:"hostPID,omitempty" yaml:"hostPID,omitempty"`
+	Hostname                      string                 `json:"hostname,omitempty" yaml:"hostname,omitempty"`
+	ImagePullSecrets              []LocalObjectReference `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
+	Labels                        map[string]string      `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name                          string                 `json:"name,omitempty" yaml:"name,omitempty"`
+	NamespaceId                   string                 `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
+	NodeId                        string                 `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
+	OwnerReferences               []OwnerReference       `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Priority                      *int64                 `json:"priority,omitempty" yaml:"priority,omitempty"`
+	PriorityClassName             string                 `json:"priorityClassName,omitempty" yaml:"priorityClassName,omitempty"`
+	ProjectID                     string                 `json:"projectId,omitempty" yaml:"projectId,omitempty"`
+	PublicEndpoints               []PublicEndpoint       `json:"publicEndpoints,omitempty" yaml:"publicEndpoints,omitempty"`
+	Removed                       string                 `json:"removed,omitempty" yaml:"removed,omitempty"`
+	RestartPolicy                 string                 `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
+	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
+	Scale                         *int64                 `json:"scale,omitempty" yaml:"scale,omitempty"`
+	SchedulerName                 string                 `json:"schedulerName,omitempty" yaml:"schedulerName,omitempty"`
+	Scheduling                    *Scheduling            `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
+	Selector                      *LabelSelector         `json:"selector,omitempty" yaml:"selector,omitempty"`
+	ServiceAccountName            string                 `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`
+	State                         string                 `json:"state,omitempty" yaml:"state,omitempty"`
+	Subdomain                     string                 `json:"subdomain,omitempty" yaml:"subdomain,omitempty"`
+	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`
+	Transitioning                 string                 `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage          string                 `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	Uid                           *int64                 `json:"uid,omitempty" yaml:"uid,omitempty"`
+	Uuid                          string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Volumes                       []Volume               `json:"volumes,omitempty" yaml:"volumes,omitempty"`
+	WorkloadAnnotations           map[string]string      `json:"workloadAnnotations,omitempty" yaml:"workloadAnnotations,omitempty"`
+	WorkloadLabels                map[string]string      `json:"workloadLabels,omitempty" yaml:"workloadLabels,omitempty"`
 }
 type DeploymentCollection struct {
 	types.Collection

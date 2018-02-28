@@ -8,7 +8,7 @@ const (
 )
 
 type EnvFromSource struct {
-	ConfigMapRef *ConfigMapEnvSource `json:"configMapRef,omitempty"`
-	Prefix       string              `json:"prefix,omitempty"`
-	SecretRef    *SecretEnvSource    `json:"secretRef,omitempty"`
+	ConfigMapRef *ConfigMapEnvSource `json:"configMapRef,omitempty" yaml:"configMapRef,omitempty"`
+	Prefix       string              `json:"prefix,omitempty" yaml:"prefix,omitempty"`
+	SecretRef    *SecretEnvSource    `json:"secretRef,omitempty" yaml:"secretRef,omitempty"`
 }

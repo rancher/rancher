@@ -8,7 +8,7 @@ const (
 )
 
 type RepoPerm struct {
-	Admin bool `json:"admin,omitempty"`
-	Pull  bool `json:"pull,omitempty"`
-	Push  bool `json:"push,omitempty"`
+	Admin bool `json:"admin,omitempty" yaml:"admin,omitempty"`
+	Pull  bool `json:"pull,omitempty" yaml:"pull,omitempty"`
+	Push  bool `json:"push,omitempty" yaml:"push,omitempty"`
 }

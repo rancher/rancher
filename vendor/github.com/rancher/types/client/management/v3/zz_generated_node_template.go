@@ -35,31 +35,31 @@ const (
 
 type NodeTemplate struct {
 	types.Resource
-	Annotations              map[string]string   `json:"annotations,omitempty"`
-	AuthCertificateAuthority string              `json:"authCertificateAuthority,omitempty"`
-	AuthKey                  string              `json:"authKey,omitempty"`
-	Created                  string              `json:"created,omitempty"`
-	CreatorID                string              `json:"creatorId,omitempty"`
-	Description              string              `json:"description,omitempty"`
-	DockerVersion            string              `json:"dockerVersion,omitempty"`
-	Driver                   string              `json:"driver,omitempty"`
-	EngineEnv                map[string]string   `json:"engineEnv,omitempty"`
-	EngineInsecureRegistry   []string            `json:"engineInsecureRegistry,omitempty"`
-	EngineInstallURL         string              `json:"engineInstallURL,omitempty"`
-	EngineLabel              map[string]string   `json:"engineLabel,omitempty"`
-	EngineOpt                map[string]string   `json:"engineOpt,omitempty"`
-	EngineRegistryMirror     []string            `json:"engineRegistryMirror,omitempty"`
-	EngineStorageDriver      string              `json:"engineStorageDriver,omitempty"`
-	Labels                   map[string]string   `json:"labels,omitempty"`
-	Name                     string              `json:"name,omitempty"`
-	OwnerReferences          []OwnerReference    `json:"ownerReferences,omitempty"`
-	Removed                  string              `json:"removed,omitempty"`
-	State                    string              `json:"state,omitempty"`
-	Status                   *NodeTemplateStatus `json:"status,omitempty"`
-	Transitioning            string              `json:"transitioning,omitempty"`
-	TransitioningMessage     string              `json:"transitioningMessage,omitempty"`
-	UseInternalIPAddress     bool                `json:"useInternalIpAddress,omitempty"`
-	Uuid                     string              `json:"uuid,omitempty"`
+	Annotations              map[string]string   `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	AuthCertificateAuthority string              `json:"authCertificateAuthority,omitempty" yaml:"authCertificateAuthority,omitempty"`
+	AuthKey                  string              `json:"authKey,omitempty" yaml:"authKey,omitempty"`
+	Created                  string              `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID                string              `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Description              string              `json:"description,omitempty" yaml:"description,omitempty"`
+	DockerVersion            string              `json:"dockerVersion,omitempty" yaml:"dockerVersion,omitempty"`
+	Driver                   string              `json:"driver,omitempty" yaml:"driver,omitempty"`
+	EngineEnv                map[string]string   `json:"engineEnv,omitempty" yaml:"engineEnv,omitempty"`
+	EngineInsecureRegistry   []string            `json:"engineInsecureRegistry,omitempty" yaml:"engineInsecureRegistry,omitempty"`
+	EngineInstallURL         string              `json:"engineInstallURL,omitempty" yaml:"engineInstallURL,omitempty"`
+	EngineLabel              map[string]string   `json:"engineLabel,omitempty" yaml:"engineLabel,omitempty"`
+	EngineOpt                map[string]string   `json:"engineOpt,omitempty" yaml:"engineOpt,omitempty"`
+	EngineRegistryMirror     []string            `json:"engineRegistryMirror,omitempty" yaml:"engineRegistryMirror,omitempty"`
+	EngineStorageDriver      string              `json:"engineStorageDriver,omitempty" yaml:"engineStorageDriver,omitempty"`
+	Labels                   map[string]string   `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name                     string              `json:"name,omitempty" yaml:"name,omitempty"`
+	OwnerReferences          []OwnerReference    `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Removed                  string              `json:"removed,omitempty" yaml:"removed,omitempty"`
+	State                    string              `json:"state,omitempty" yaml:"state,omitempty"`
+	Status                   *NodeTemplateStatus `json:"status,omitempty" yaml:"status,omitempty"`
+	Transitioning            string              `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage     string              `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	UseInternalIPAddress     bool                `json:"useInternalIpAddress,omitempty" yaml:"useInternalIpAddress,omitempty"`
+	Uuid                     string              `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 type NodeTemplateCollection struct {
 	types.Collection

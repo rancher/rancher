@@ -8,7 +8,7 @@ const (
 )
 
 type IngressSpec struct {
-	Backend *IngressBackend `json:"backend,omitempty"`
-	Rules   []IngressRule   `json:"rules,omitempty"`
-	TLS     []IngressTLS    `json:"tls,omitempty"`
+	Backend *IngressBackend `json:"backend,omitempty" yaml:"backend,omitempty"`
+	Rules   []IngressRule   `json:"rules,omitempty" yaml:"rules,omitempty"`
+	TLS     []IngressTLS    `json:"tls,omitempty" yaml:"tls,omitempty"`
 }

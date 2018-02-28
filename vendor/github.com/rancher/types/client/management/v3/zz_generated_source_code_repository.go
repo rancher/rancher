@@ -29,25 +29,25 @@ const (
 
 type SourceCodeRepository struct {
 	types.Resource
-	Annotations            map[string]string           `json:"annotations,omitempty"`
-	ClusterId              string                      `json:"clusterId,omitempty"`
-	Created                string                      `json:"created,omitempty"`
-	CreatorID              string                      `json:"creatorId,omitempty"`
-	Labels                 map[string]string           `json:"labels,omitempty"`
-	Language               string                      `json:"language,omitempty"`
-	Name                   string                      `json:"name,omitempty"`
-	OwnerReferences        []OwnerReference            `json:"ownerReferences,omitempty"`
-	Permissions            *RepoPerm                   `json:"permissions,omitempty"`
-	Removed                string                      `json:"removed,omitempty"`
-	SourceCodeCredentialId string                      `json:"sourceCodeCredentialId,omitempty"`
-	SourceCodeType         string                      `json:"sourceCodeType,omitempty"`
-	State                  string                      `json:"state,omitempty"`
-	Status                 *SourceCodeRepositoryStatus `json:"status,omitempty"`
-	Transitioning          string                      `json:"transitioning,omitempty"`
-	TransitioningMessage   string                      `json:"transitioningMessage,omitempty"`
-	URL                    string                      `json:"url,omitempty"`
-	UserId                 string                      `json:"userId,omitempty"`
-	Uuid                   string                      `json:"uuid,omitempty"`
+	Annotations            map[string]string           `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	ClusterId              string                      `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	Created                string                      `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID              string                      `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Labels                 map[string]string           `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Language               string                      `json:"language,omitempty" yaml:"language,omitempty"`
+	Name                   string                      `json:"name,omitempty" yaml:"name,omitempty"`
+	OwnerReferences        []OwnerReference            `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Permissions            *RepoPerm                   `json:"permissions,omitempty" yaml:"permissions,omitempty"`
+	Removed                string                      `json:"removed,omitempty" yaml:"removed,omitempty"`
+	SourceCodeCredentialId string                      `json:"sourceCodeCredentialId,omitempty" yaml:"sourceCodeCredentialId,omitempty"`
+	SourceCodeType         string                      `json:"sourceCodeType,omitempty" yaml:"sourceCodeType,omitempty"`
+	State                  string                      `json:"state,omitempty" yaml:"state,omitempty"`
+	Status                 *SourceCodeRepositoryStatus `json:"status,omitempty" yaml:"status,omitempty"`
+	Transitioning          string                      `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage   string                      `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	URL                    string                      `json:"url,omitempty" yaml:"url,omitempty"`
+	UserId                 string                      `json:"userId,omitempty" yaml:"userId,omitempty"`
+	Uuid                   string                      `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 type SourceCodeRepositoryCollection struct {
 	types.Collection

@@ -6,5 +6,5 @@ const (
 )
 
 type LocalVolumeSource struct {
-	Path string `json:"path,omitempty"`
+	Path string `json:"path,omitempty" yaml:"path,omitempty"`
 }

@@ -8,7 +8,7 @@ const (
 )
 
 type NodeConfigSource struct {
-	APIVersion   string           `json:"apiVersion,omitempty"`
-	ConfigMapRef *ObjectReference `json:"configMapRef,omitempty"`
-	Kind         string           `json:"kind,omitempty"`
+	APIVersion   string           `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+	ConfigMapRef *ObjectReference `json:"configMapRef,omitempty" yaml:"configMapRef,omitempty"`
+	Kind         string           `json:"kind,omitempty" yaml:"kind,omitempty"`
 }

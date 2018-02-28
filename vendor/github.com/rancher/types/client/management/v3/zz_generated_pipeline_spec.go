@@ -11,10 +11,10 @@ const (
 )
 
 type PipelineSpec struct {
-	DisplayName           string  `json:"displayName,omitempty"`
-	ProjectId             string  `json:"projectId,omitempty"`
-	Stages                []Stage `json:"stages,omitempty"`
-	TriggerCronExpression string  `json:"triggerCronExpression,omitempty"`
-	TriggerCronTimezone   string  `json:"triggerCronTimezone,omitempty"`
-	TriggerWebhook        bool    `json:"triggerWebhook,omitempty"`
+	DisplayName           string  `json:"displayName,omitempty" yaml:"displayName,omitempty"`
+	ProjectId             string  `json:"projectId,omitempty" yaml:"projectId,omitempty"`
+	Stages                []Stage `json:"stages,omitempty" yaml:"stages,omitempty"`
+	TriggerCronExpression string  `json:"triggerCronExpression,omitempty" yaml:"triggerCronExpression,omitempty"`
+	TriggerCronTimezone   string  `json:"triggerCronTimezone,omitempty" yaml:"triggerCronTimezone,omitempty"`
+	TriggerWebhook        bool    `json:"triggerWebhook,omitempty" yaml:"triggerWebhook,omitempty"`
 }

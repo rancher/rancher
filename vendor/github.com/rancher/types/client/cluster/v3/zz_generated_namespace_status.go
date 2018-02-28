@@ -6,5 +6,5 @@ const (
 )
 
 type NamespaceStatus struct {
-	Phase string `json:"phase,omitempty"`
+	Phase string `json:"phase,omitempty" yaml:"phase,omitempty"`
 }

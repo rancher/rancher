@@ -7,6 +7,6 @@ const (
 )
 
 type ObjectFieldSelector struct {
-	APIVersion string `json:"apiVersion,omitempty"`
-	FieldPath  string `json:"fieldPath,omitempty"`
+	APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+	FieldPath  string `json:"fieldPath,omitempty" yaml:"fieldPath,omitempty"`
 }

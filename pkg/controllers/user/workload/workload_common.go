@@ -499,19 +499,21 @@ func generateServiceFromContainers(workload *Workload) *Service {
 
 func generateServicesFromPortsAnnotation(portAnnotation string) ([]Service, error) {
 	var services []Service
-	var ports []ContainerPort
-	err := json.Unmarshal([]byte(portAnnotation), &ports)
+	var portList [][]ContainerPort
+	err := json.Unmarshal([]byte(portAnnotation), &portList)
 	if err != nil {
 		return services, err
 	}
 
 	svcTypeToPort := map[corev1.ServiceType][]ContainerPort{}
-	for _, port := range ports {
-		if port.Kind == "HostPort" {
-			continue
+	for _, l := range portList {
+		for _, port := range l {
+			if port.Kind == "HostPort" {
+				continue
+			}
+			svcType := corev1.ServiceType(port.Kind)
+			svcTypeToPort[svcType] = append(svcTypeToPort[svcType], port)
 		}
-		svcType := corev1.ServiceType(port.Kind)
-		svcTypeToPort[svcType] = append(svcTypeToPort[svcType], port)
 	}
 
 	for svcType, ports := range svcTypeToPort {

@@ -8,7 +8,7 @@ const (
 )
 
 type ListMeta struct {
-	Continue        string `json:"continue,omitempty"`
-	ResourceVersion string `json:"resourceVersion,omitempty"`
-	SelfLink        string `json:"selfLink,omitempty"`
+	Continue        string `json:"continue,omitempty" yaml:"continue,omitempty"`
+	ResourceVersion string `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
+	SelfLink        string `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
 }

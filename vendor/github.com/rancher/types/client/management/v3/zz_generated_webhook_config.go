@@ -6,5 +6,5 @@ const (
 )
 
 type WebhookConfig struct {
-	URL string `json:"url,omitempty"`
+	URL string `json:"url,omitempty" yaml:"url,omitempty"`
 }

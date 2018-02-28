@@ -25,21 +25,21 @@ const (
 
 type PipelineExecutionLog struct {
 	types.Resource
-	Annotations         map[string]string `json:"annotations,omitempty"`
-	Created             string            `json:"created,omitempty"`
-	CreatorID           string            `json:"creatorId,omitempty"`
-	Labels              map[string]string `json:"labels,omitempty"`
-	Line                *int64            `json:"line,omitempty"`
-	Message             string            `json:"message,omitempty"`
-	Name                string            `json:"name,omitempty"`
-	NamespaceId         string            `json:"namespaceId,omitempty"`
-	OwnerReferences     []OwnerReference  `json:"ownerReferences,omitempty"`
-	PipelineExecutionId string            `json:"pipelineExecutionId,omitempty"`
-	ProjectId           string            `json:"projectId,omitempty"`
-	Removed             string            `json:"removed,omitempty"`
-	Stage               *int64            `json:"stage,omitempty"`
-	Step                *int64            `json:"step,omitempty"`
-	Uuid                string            `json:"uuid,omitempty"`
+	Annotations         map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Created             string            `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID           string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Labels              map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Line                *int64            `json:"line,omitempty" yaml:"line,omitempty"`
+	Message             string            `json:"message,omitempty" yaml:"message,omitempty"`
+	Name                string            `json:"name,omitempty" yaml:"name,omitempty"`
+	NamespaceId         string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
+	OwnerReferences     []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	PipelineExecutionId string            `json:"pipelineExecutionId,omitempty" yaml:"pipelineExecutionId,omitempty"`
+	ProjectId           string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
+	Removed             string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	Stage               *int64            `json:"stage,omitempty" yaml:"stage,omitempty"`
+	Step                *int64            `json:"step,omitempty" yaml:"step,omitempty"`
+	Uuid                string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 type PipelineExecutionLogCollection struct {
 	types.Collection

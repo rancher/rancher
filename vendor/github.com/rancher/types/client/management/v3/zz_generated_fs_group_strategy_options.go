@@ -7,6 +7,6 @@ const (
 )
 
 type FSGroupStrategyOptions struct {
-	Ranges []IDRange `json:"ranges,omitempty"`
-	Rule   string    `json:"rule,omitempty"`
+	Ranges []IDRange `json:"ranges,omitempty" yaml:"ranges,omitempty"`
+	Rule   string    `json:"rule,omitempty" yaml:"rule,omitempty"`
 }

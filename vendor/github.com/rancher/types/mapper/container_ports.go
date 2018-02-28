@@ -37,7 +37,7 @@ func (n ContainerPorts) ToInternal(data map[string]interface{}) {
 	path := []string{"containers", "{ARRAY}", "ports"}
 	convert.Transform(data, path, func(obj interface{}) interface{} {
 		if l, ok := obj.([]interface{}); ok {
-			ports = append(ports, l...)
+			ports = append(ports, l)
 		}
 		return obj
 	})

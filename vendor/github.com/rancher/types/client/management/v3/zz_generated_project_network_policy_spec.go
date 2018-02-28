@@ -7,6 +7,6 @@ const (
 )
 
 type ProjectNetworkPolicySpec struct {
-	Description string `json:"description,omitempty"`
-	ProjectId   string `json:"projectId,omitempty"`
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+	ProjectId   string `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 }

@@ -8,7 +8,7 @@ const (
 )
 
 type VolumeProjection struct {
-	ConfigMap   *ConfigMapProjection   `json:"configMap,omitempty"`
-	DownwardAPI *DownwardAPIProjection `json:"downwardAPI,omitempty"`
-	Secret      *SecretProjection      `json:"secret,omitempty"`
+	ConfigMap   *ConfigMapProjection   `json:"configMap,omitempty" yaml:"configMap,omitempty"`
+	DownwardAPI *DownwardAPIProjection `json:"downwardAPI,omitempty" yaml:"downwardAPI,omitempty"`
+	Secret      *SecretProjection      `json:"secret,omitempty" yaml:"secret,omitempty"`
 }

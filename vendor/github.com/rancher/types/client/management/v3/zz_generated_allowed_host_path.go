@@ -6,5 +6,5 @@ const (
 )
 
 type AllowedHostPath struct {
-	PathPrefix string `json:"pathPrefix,omitempty"`
+	PathPrefix string `json:"pathPrefix,omitempty" yaml:"pathPrefix,omitempty"`
 }

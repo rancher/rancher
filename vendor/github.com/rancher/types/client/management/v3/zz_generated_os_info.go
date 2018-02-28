@@ -8,7 +8,7 @@ const (
 )
 
 type OSInfo struct {
-	DockerVersion   string `json:"dockerVersion,omitempty"`
-	KernelVersion   string `json:"kernelVersion,omitempty"`
-	OperatingSystem string `json:"operatingSystem,omitempty"`
+	DockerVersion   string `json:"dockerVersion,omitempty" yaml:"dockerVersion,omitempty"`
+	KernelVersion   string `json:"kernelVersion,omitempty" yaml:"kernelVersion,omitempty"`
+	OperatingSystem string `json:"operatingSystem,omitempty" yaml:"operatingSystem,omitempty"`
 }

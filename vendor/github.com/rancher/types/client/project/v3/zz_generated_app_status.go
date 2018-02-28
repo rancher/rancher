@@ -7,6 +7,6 @@ const (
 )
 
 type AppStatus struct {
-	Conditions []AppCondition `json:"conditions,omitempty"`
-	Releases   []ReleaseInfo  `json:"releases,omitempty"`
+	Conditions []AppCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+	Releases   []ReleaseInfo  `json:"releases,omitempty" yaml:"releases,omitempty"`
 }

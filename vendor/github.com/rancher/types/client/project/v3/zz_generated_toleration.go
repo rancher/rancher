@@ -10,9 +10,9 @@ const (
 )
 
 type Toleration struct {
-	Effect            string `json:"effect,omitempty"`
-	Key               string `json:"key,omitempty"`
-	Operator          string `json:"operator,omitempty"`
-	TolerationSeconds *int64 `json:"tolerationSeconds,omitempty"`
-	Value             string `json:"value,omitempty"`
+	Effect            string `json:"effect,omitempty" yaml:"effect,omitempty"`
+	Key               string `json:"key,omitempty" yaml:"key,omitempty"`
+	Operator          string `json:"operator,omitempty" yaml:"operator,omitempty"`
+	TolerationSeconds *int64 `json:"tolerationSeconds,omitempty" yaml:"tolerationSeconds,omitempty"`
+	Value             string `json:"value,omitempty" yaml:"value,omitempty"`
 }

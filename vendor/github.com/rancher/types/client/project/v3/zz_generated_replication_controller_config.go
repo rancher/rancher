@@ -6,5 +6,5 @@ const (
 )
 
 type ReplicationControllerConfig struct {
-	MinReadySeconds *int64 `json:"minReadySeconds,omitempty"`
+	MinReadySeconds *int64 `json:"minReadySeconds,omitempty" yaml:"minReadySeconds,omitempty"`
 }

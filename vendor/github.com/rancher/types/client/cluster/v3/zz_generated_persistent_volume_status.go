@@ -8,7 +8,7 @@ const (
 )
 
 type PersistentVolumeStatus struct {
-	Message string `json:"message,omitempty"`
-	Phase   string `json:"phase,omitempty"`
-	Reason  string `json:"reason,omitempty"`
+	Message string `json:"message,omitempty" yaml:"message,omitempty"`
+	Phase   string `json:"phase,omitempty" yaml:"phase,omitempty"`
+	Reason  string `json:"reason,omitempty" yaml:"reason,omitempty"`
 }

@@ -28,24 +28,24 @@ const (
 
 type ClusterRegistrationToken struct {
 	types.Resource
-	Annotations          map[string]string `json:"annotations,omitempty"`
-	ClusterId            string            `json:"clusterId,omitempty"`
-	Command              string            `json:"command,omitempty"`
-	Created              string            `json:"created,omitempty"`
-	CreatorID            string            `json:"creatorId,omitempty"`
-	InsecureCommand      string            `json:"insecureCommand,omitempty"`
-	Labels               map[string]string `json:"labels,omitempty"`
-	ManifestURL          string            `json:"manifestUrl,omitempty"`
-	Name                 string            `json:"name,omitempty"`
-	NamespaceId          string            `json:"namespaceId,omitempty"`
-	NodeCommand          string            `json:"nodeCommand,omitempty"`
-	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty"`
-	Removed              string            `json:"removed,omitempty"`
-	State                string            `json:"state,omitempty"`
-	Token                string            `json:"token,omitempty"`
-	Transitioning        string            `json:"transitioning,omitempty"`
-	TransitioningMessage string            `json:"transitioningMessage,omitempty"`
-	Uuid                 string            `json:"uuid,omitempty"`
+	Annotations          map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	ClusterId            string            `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	Command              string            `json:"command,omitempty" yaml:"command,omitempty"`
+	Created              string            `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID            string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	InsecureCommand      string            `json:"insecureCommand,omitempty" yaml:"insecureCommand,omitempty"`
+	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	ManifestURL          string            `json:"manifestUrl,omitempty" yaml:"manifestUrl,omitempty"`
+	Name                 string            `json:"name,omitempty" yaml:"name,omitempty"`
+	NamespaceId          string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
+	NodeCommand          string            `json:"nodeCommand,omitempty" yaml:"nodeCommand,omitempty"`
+	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Removed              string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	State                string            `json:"state,omitempty" yaml:"state,omitempty"`
+	Token                string            `json:"token,omitempty" yaml:"token,omitempty"`
+	Transitioning        string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	Uuid                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 type ClusterRegistrationTokenCollection struct {
 	types.Collection

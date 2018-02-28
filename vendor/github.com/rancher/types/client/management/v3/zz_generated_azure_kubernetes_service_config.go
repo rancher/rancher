@@ -22,21 +22,21 @@ const (
 )
 
 type AzureKubernetesServiceConfig struct {
-	AdminUsername        string            `json:"adminUsername,omitempty"`
-	AgentDNSPrefix       string            `json:"agentDnsPrefix,omitempty"`
-	AgentPoolName        string            `json:"agentPoolName,omitempty"`
-	AgentVMSize          string            `json:"agentVmSize,omitempty"`
-	BaseURL              string            `json:"baseUrl,omitempty"`
-	ClientID             string            `json:"clientId,omitempty"`
-	ClientSecret         string            `json:"clientSecret,omitempty"`
-	Count                *int64            `json:"count,omitempty"`
-	KubernetesVersion    string            `json:"kubernetesVersion,omitempty"`
-	Location             string            `json:"location,omitempty"`
-	MasterDNSPrefix      string            `json:"masterDnsPrefix,omitempty"`
-	OsDiskSizeGB         *int64            `json:"osDiskSizeGb,omitempty"`
-	ResourceGroup        string            `json:"resourceGroup,omitempty"`
-	SSHPublicKeyContents string            `json:"sshPublicKeyContents,omitempty"`
-	SubscriptionID       string            `json:"subscriptionId,omitempty"`
-	Tag                  map[string]string `json:"tags,omitempty"`
-	TenantID             string            `json:"tenantId,omitempty"`
+	AdminUsername        string            `json:"adminUsername,omitempty" yaml:"adminUsername,omitempty"`
+	AgentDNSPrefix       string            `json:"agentDnsPrefix,omitempty" yaml:"agentDnsPrefix,omitempty"`
+	AgentPoolName        string            `json:"agentPoolName,omitempty" yaml:"agentPoolName,omitempty"`
+	AgentVMSize          string            `json:"agentVmSize,omitempty" yaml:"agentVmSize,omitempty"`
+	BaseURL              string            `json:"baseUrl,omitempty" yaml:"baseUrl,omitempty"`
+	ClientID             string            `json:"clientId,omitempty" yaml:"clientId,omitempty"`
+	ClientSecret         string            `json:"clientSecret,omitempty" yaml:"clientSecret,omitempty"`
+	Count                *int64            `json:"count,omitempty" yaml:"count,omitempty"`
+	KubernetesVersion    string            `json:"kubernetesVersion,omitempty" yaml:"kubernetesVersion,omitempty"`
+	Location             string            `json:"location,omitempty" yaml:"location,omitempty"`
+	MasterDNSPrefix      string            `json:"masterDnsPrefix,omitempty" yaml:"masterDnsPrefix,omitempty"`
+	OsDiskSizeGB         *int64            `json:"osDiskSizeGb,omitempty" yaml:"osDiskSizeGb,omitempty"`
+	ResourceGroup        string            `json:"resourceGroup,omitempty" yaml:"resourceGroup,omitempty"`
+	SSHPublicKeyContents string            `json:"sshPublicKeyContents,omitempty" yaml:"sshPublicKeyContents,omitempty"`
+	SubscriptionID       string            `json:"subscriptionId,omitempty" yaml:"subscriptionId,omitempty"`
+	Tag                  map[string]string `json:"tags,omitempty" yaml:"tags,omitempty"`
+	TenantID             string            `json:"tenantId,omitempty" yaml:"tenantId,omitempty"`
 }

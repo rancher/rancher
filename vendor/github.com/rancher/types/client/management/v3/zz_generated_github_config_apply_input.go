@@ -8,7 +8,7 @@ const (
 )
 
 type GithubConfigApplyInput struct {
-	Code         string        `json:"code,omitempty"`
-	Enabled      bool          `json:"enabled,omitempty"`
-	GithubConfig *GithubConfig `json:"githubConfig,omitempty"`
+	Code         string        `json:"code,omitempty" yaml:"code,omitempty"`
+	Enabled      bool          `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+	GithubConfig *GithubConfig `json:"githubConfig,omitempty" yaml:"githubConfig,omitempty"`
 }

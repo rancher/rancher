@@ -42,38 +42,38 @@ const (
 
 type Service struct {
 	types.Resource
-	Annotations              map[string]string      `json:"annotations,omitempty"`
-	ClusterIp                string                 `json:"clusterIp,omitempty"`
-	Created                  string                 `json:"created,omitempty"`
-	CreatorID                string                 `json:"creatorId,omitempty"`
-	Description              string                 `json:"description,omitempty"`
-	ExternalIPs              []string               `json:"externalIPs,omitempty"`
-	ExternalTrafficPolicy    string                 `json:"externalTrafficPolicy,omitempty"`
-	HealthCheckNodePort      *int64                 `json:"healthCheckNodePort,omitempty"`
-	Hostname                 string                 `json:"hostname,omitempty"`
-	IPAddresses              []string               `json:"ipAddresses,omitempty"`
-	Kind                     string                 `json:"kind,omitempty"`
-	Labels                   map[string]string      `json:"labels,omitempty"`
-	LoadBalancerIP           string                 `json:"loadBalancerIP,omitempty"`
-	LoadBalancerSourceRanges []string               `json:"loadBalancerSourceRanges,omitempty"`
-	Name                     string                 `json:"name,omitempty"`
-	NamespaceId              string                 `json:"namespaceId,omitempty"`
-	OwnerReferences          []OwnerReference       `json:"ownerReferences,omitempty"`
-	Ports                    []ServicePort          `json:"ports,omitempty"`
-	ProjectID                string                 `json:"projectId,omitempty"`
-	PublicEndpoints          []PublicEndpoint       `json:"publicEndpoints,omitempty"`
-	PublishNotReadyAddresses bool                   `json:"publishNotReadyAddresses,omitempty"`
-	Removed                  string                 `json:"removed,omitempty"`
-	Selector                 map[string]string      `json:"selector,omitempty"`
-	SessionAffinity          string                 `json:"sessionAffinity,omitempty"`
-	SessionAffinityConfig    *SessionAffinityConfig `json:"sessionAffinityConfig,omitempty"`
-	State                    string                 `json:"state,omitempty"`
-	TargetDNSRecordIDs       []string               `json:"targetDnsRecordIds,omitempty"`
-	TargetWorkloadIDs        []string               `json:"targetWorkloadIds,omitempty"`
-	Transitioning            string                 `json:"transitioning,omitempty"`
-	TransitioningMessage     string                 `json:"transitioningMessage,omitempty"`
-	Uuid                     string                 `json:"uuid,omitempty"`
-	WorkloadID               string                 `json:"workloadId,omitempty"`
+	Annotations              map[string]string      `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	ClusterIp                string                 `json:"clusterIp,omitempty" yaml:"clusterIp,omitempty"`
+	Created                  string                 `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID                string                 `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Description              string                 `json:"description,omitempty" yaml:"description,omitempty"`
+	ExternalIPs              []string               `json:"externalIPs,omitempty" yaml:"externalIPs,omitempty"`
+	ExternalTrafficPolicy    string                 `json:"externalTrafficPolicy,omitempty" yaml:"externalTrafficPolicy,omitempty"`
+	HealthCheckNodePort      *int64                 `json:"healthCheckNodePort,omitempty" yaml:"healthCheckNodePort,omitempty"`
+	Hostname                 string                 `json:"hostname,omitempty" yaml:"hostname,omitempty"`
+	IPAddresses              []string               `json:"ipAddresses,omitempty" yaml:"ipAddresses,omitempty"`
+	Kind                     string                 `json:"kind,omitempty" yaml:"kind,omitempty"`
+	Labels                   map[string]string      `json:"labels,omitempty" yaml:"labels,omitempty"`
+	LoadBalancerIP           string                 `json:"loadBalancerIP,omitempty" yaml:"loadBalancerIP,omitempty"`
+	LoadBalancerSourceRanges []string               `json:"loadBalancerSourceRanges,omitempty" yaml:"loadBalancerSourceRanges,omitempty"`
+	Name                     string                 `json:"name,omitempty" yaml:"name,omitempty"`
+	NamespaceId              string                 `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
+	OwnerReferences          []OwnerReference       `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Ports                    []ServicePort          `json:"ports,omitempty" yaml:"ports,omitempty"`
+	ProjectID                string                 `json:"projectId,omitempty" yaml:"projectId,omitempty"`
+	PublicEndpoints          []PublicEndpoint       `json:"publicEndpoints,omitempty" yaml:"publicEndpoints,omitempty"`
+	PublishNotReadyAddresses bool                   `json:"publishNotReadyAddresses,omitempty" yaml:"publishNotReadyAddresses,omitempty"`
+	Removed                  string                 `json:"removed,omitempty" yaml:"removed,omitempty"`
+	Selector                 map[string]string      `json:"selector,omitempty" yaml:"selector,omitempty"`
+	SessionAffinity          string                 `json:"sessionAffinity,omitempty" yaml:"sessionAffinity,omitempty"`
+	SessionAffinityConfig    *SessionAffinityConfig `json:"sessionAffinityConfig,omitempty" yaml:"sessionAffinityConfig,omitempty"`
+	State                    string                 `json:"state,omitempty" yaml:"state,omitempty"`
+	TargetDNSRecordIDs       []string               `json:"targetDnsRecordIds,omitempty" yaml:"targetDnsRecordIds,omitempty"`
+	TargetWorkloadIDs        []string               `json:"targetWorkloadIds,omitempty" yaml:"targetWorkloadIds,omitempty"`
+	Transitioning            string                 `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage     string                 `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	Uuid                     string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	WorkloadID               string                 `json:"workloadId,omitempty" yaml:"workloadId,omitempty"`
 }
 type ServiceCollection struct {
 	types.Collection

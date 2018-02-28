@@ -8,7 +8,7 @@ const (
 )
 
 type AzureFileVolumeSource struct {
-	ReadOnly   bool   `json:"readOnly,omitempty"`
-	SecretName string `json:"secretName,omitempty"`
-	ShareName  string `json:"shareName,omitempty"`
+	ReadOnly   bool   `json:"readOnly,omitempty" yaml:"readOnly,omitempty"`
+	SecretName string `json:"secretName,omitempty" yaml:"secretName,omitempty"`
+	ShareName  string `json:"shareName,omitempty" yaml:"shareName,omitempty"`
 }
