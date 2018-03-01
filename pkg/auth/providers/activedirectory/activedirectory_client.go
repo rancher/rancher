@@ -24,10 +24,10 @@ func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.Act
 	externalID := ldap.GetUserExternalID(username, config.DefaultLoginDomain)
 
 	lConn, err := ldap.NewLDAPConn(config, caPool)
-	defer lConn.Close()
 	if err != nil {
 		return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.ServerError, "error creating connection")
 	}
+	defer lConn.Close()
 
 	if !config.Enabled { // TODO testing for enabled here might not be correct. Might be better to pass in an explicit testSvcAccount bool
 		logrus.Debug("Bind service account username password")
