@@ -51,9 +51,9 @@ func (l *Lifecycle) Create(obj *v3.Pipeline) (*v3.Pipeline, error) {
 		obj.Status.Token = uuid.NewV4().String()
 	}
 	if obj.Spec.TriggerCronExpression != "" {
-		obj.SetLabels(utils.PipelineHasCronLabel)
+		obj.Labels = map[string]string{utils.PipelineCronLabel: "true"}
 	} else {
-		obj.SetLabels(utils.PipelineNoCronLabel)
+		obj.Labels = map[string]string{utils.PipelineCronLabel: "false"}
 	}
 
 	if obj.Spec.TriggerWebhook && obj.Status.WebHookID == "" {
@@ -79,9 +79,9 @@ func (l *Lifecycle) Updated(obj *v3.Pipeline) (*v3.Pipeline, error) {
 	}
 
 	if obj.Spec.TriggerCronExpression != "" {
-		obj.SetLabels(utils.PipelineHasCronLabel)
+		obj.Labels = map[string]string{utils.PipelineCronLabel: "true"}
 	} else {
-		obj.SetLabels(utils.PipelineNoCronLabel)
+		obj.Labels = map[string]string{utils.PipelineCronLabel: "false"}
 	}
 
 	//handle webhook

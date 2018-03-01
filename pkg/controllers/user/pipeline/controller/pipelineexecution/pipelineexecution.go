@@ -69,6 +69,7 @@ func (l *Lifecycle) Create(obj *v3.PipelineExecution) (*v3.PipelineExecution, er
 	if err := l.initLogs(obj); err != nil {
 		return obj, err
 	}
+	obj.Status.ExecutionState = utils.StateBuilding
 	if err := l.pipelineEngine.PreCheck(); err != nil {
 		logrus.Errorf("Error get Jenkins engine - %v", err)
 		obj.Status.ExecutionState = utils.StateFail
@@ -104,7 +105,7 @@ func (l *Lifecycle) initLogs(obj *v3.PipelineExecution) error {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-%d-%d", obj.Name, j, k),
 					Namespace: obj.Namespace,
-					Labels:    utils.PipelineInprogressLabel,
+					Labels:    map[string]string{utils.PipelineFinishLabel: "false"},
 				},
 				Spec: v3.PipelineExecutionLogSpec{
 					ProjectName:           pipeline.Spec.ProjectName,

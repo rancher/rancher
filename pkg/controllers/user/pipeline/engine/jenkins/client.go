@@ -221,6 +221,9 @@ func (c *Client) getBuildInfo(jobname string) (*BuildInfo, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
+		if resp.StatusCode == 404 {
+			return nil, ErrNotFound
+		}
 		return nil, ErrGetBuildInfoFail
 	}
 	buildInfo := &BuildInfo{}

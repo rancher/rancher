@@ -6,18 +6,12 @@ import (
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"net/url"
 	"strings"
 	"time"
 )
 
 var CIEndpoint = ""
-
-var PipelineFinishLabel = labels.Set(map[string]string{"pipeline.management.cattle.io/finish": "true"})
-var PipelineInprogressLabel = labels.Set(map[string]string{"pipeline.management.cattle.io/finish": "false"})
-var PipelineHasCronLabel = labels.Set(map[string]string{"pipeline.management.cattle.io/cron": "true"})
-var PipelineNoCronLabel = labels.Set(map[string]string{"pipeline.management.cattle.io/cron": "false"})
 
 func InitClusterPipeline(clusterPipelines v3.ClusterPipelineInterface, clusterName string) error {
 	clusterPipeline := &v3.ClusterPipeline{
@@ -50,7 +44,7 @@ func InitExecution(p *v3.Pipeline, triggerType string) *v3.PipelineExecution {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      getNextExecutionName(p),
 			Namespace: p.Namespace,
-			Labels:    PipelineInprogressLabel,
+			Labels:    map[string]string{PipelineFinishLabel: "false"},
 		},
 		Spec: v3.PipelineExecutionSpec{
 			ProjectName:  p.Spec.ProjectName,
@@ -131,7 +125,7 @@ func GenerateExecution(pipelines v3.PipelineInterface, executions v3.PipelineExe
 	pipeline.Status.NextRun++
 	pipeline.Status.LastExecutionID = pipeline.Namespace + ":" + execution.Name
 	pipeline.Status.LastStarted = time.Now().Format(time.RFC3339)
-
+	pipeline.Status.LastRunState = StateWaiting
 	_, err = pipelines.Update(pipeline)
 	if err != nil {
 		return nil, err
