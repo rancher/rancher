@@ -2,6 +2,7 @@ package targetworkloadservice
 
 import (
 	"context"
+	"encoding/json"
 
 	"fmt"
 
@@ -104,7 +105,11 @@ func (c *Controller) reconcilePods(key string, obj *corev1.Service) error {
 		return nil
 	}
 
-	workdloadIDs := strings.Split(value, ",")
+	var workloadIDs []string
+	err := json.Unmarshal([]byte(value), &workloadIDs)
+	if err != nil {
+		return err
+	}
 
 	if obj.Spec.Selector == nil {
 		obj.Spec.Selector = make(map[string]string)
@@ -115,7 +120,7 @@ func (c *Controller) reconcilePods(key string, obj *corev1.Service) error {
 		toUpdate = obj.DeepCopy()
 		toUpdate.Spec.Selector[selectorToAdd] = "true"
 	}
-	if err := c.updatePods(key, obj, workdloadIDs); err != nil {
+	if err := c.updatePods(key, obj, workloadIDs); err != nil {
 		return err
 	}
 	if toUpdate != nil {
