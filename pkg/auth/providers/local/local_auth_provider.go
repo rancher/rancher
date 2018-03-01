@@ -219,6 +219,10 @@ func (l *lProvider) SearchPrincipals(searchKey, principalType string, myToken v3
 	return principals, nil
 }
 
+func (l *lProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
+	return v3.Principal{}, nil
+}
+
 func (l *lProvider) listAllUsersAndGroups(searchKey string) ([]*v3.User, []*v3.Group, error) {
 	var localUsers []*v3.User
 	var localGroups []*v3.Group
