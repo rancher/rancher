@@ -62,6 +62,9 @@ func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.Act
 		ldap.GetUserSearchAttributes(MemberOfAttribute, ObjectClassAttribute, config), nil)
 
 	userPrincipal, groupPrincipals, err := p.userRecord(search, lConn, config, caPool)
+	if err != nil {
+		return v3.Principal{}, nil, nil, err
+	}
 
 	allowed, err := p.userMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipal, groupPrincipals)
 	if err != nil {
