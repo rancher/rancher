@@ -32,6 +32,12 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	return data, err
 }
 
+func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
+	formatData(data, false)
+	data, err := p.Store.Create(apiContext, schema, data)
+	return data, err
+}
+
 func formatData(data map[string]interface{}, forFrontend bool) {
 	oldState := getState(data)
 	newState := map[string]string{}
