@@ -278,6 +278,7 @@ func (p *adProvider) attributesToPrincipal(attribs []*ldapv2.EntryAttribute, dnS
 		DisplayName: accountName,
 		LoginName:   login,
 		Kind:        kind,
+		Provider:    Name,
 	}
 
 	return principal, nil
