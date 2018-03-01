@@ -48,9 +48,11 @@ func formatData(data map[string]interface{}, forFrontend bool) {
 		}
 	}
 
+	updateCerts(data, forFrontend, oldState, newState)
 	setState(data, newState)
 
 }
+
 func updateRule(target map[string]interface{}, hostpath string, forFrontend bool, data map[string]interface{}, oldState map[string]string, newState map[string]string) {
 	targetData := convert.ToMapInterface(target)
 	port, _ := targetData["targetPort"]
@@ -100,6 +102,10 @@ func getStateKey(hostpath string, port string) string {
 	return base64.URLEncoding.EncodeToString([]byte(key))
 }
 
+func getCertKey(key string) string {
+	return base64.URLEncoding.EncodeToString([]byte(key))
+}
+
 func getPaths(data map[string]interface{}) (map[string]map[string]interface{}, bool) {
 	v, ok := values.GetValue(data, "rules")
 	if !ok {
@@ -139,6 +145,31 @@ func getState(data map[string]interface{}) map[string]string {
 	}
 
 	return state
+}
+
+func updateCerts(data map[string]interface{}, forFrontend bool, oldState map[string]string, newState map[string]string) {
+	if forFrontend {
+		if certs, _ := values.GetSlice(data, "tls"); len(certs) > 0 {
+			for _, cert := range certs {
+				certName := convert.ToString(cert["certificateId"])
+				certKey := getCertKey(certName)
+				cert["certificateId"] = oldState[certKey]
+			}
+		}
+	} else {
+		if certs, _ := values.GetSlice(data, "tls"); len(certs) > 0 {
+			for _, cert := range certs {
+				certificateID := convert.ToString(cert["certificateId"])
+				id := strings.Split(certificateID, ":")
+				if len(id) == 2 {
+					certName := id[1]
+					certKey := getCertKey(certName)
+					newState[certKey] = certificateID
+					cert["certificateId"] = certName
+				}
+			}
+		}
+	}
 }
 
 func New(store types.Store) types.Store {
