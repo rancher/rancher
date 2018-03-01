@@ -6,19 +6,22 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (m *Manager) Sync(key string, catalog *v3.Catalog) error {
+func (m *Manager) Sync(key string, obj *v3.Catalog) error {
 	// if catalog was deleted, do nothing
-	if catalog == nil || catalog.DeletionTimestamp != nil {
+	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil
 	}
 
-	catalog = catalog.DeepCopy()
+	catalog := obj.DeepCopy()
+
 	repoPath, commit, err := m.prepareRepoPath(*catalog)
 	if commit == catalog.Status.Commit {
 		logrus.Debugf("Catalog %s is already up to date", catalog.Name)
-		v3.CatalogConditionRefreshed.True(catalog)
-		_, err := m.catalogClient.Update(catalog)
-		return err
+		if v3.CatalogConditionRefreshed.IsUnknown(catalog) {
+			v3.CatalogConditionRefreshed.True(catalog)
+			m.catalogClient.Update(catalog)
+		}
+		return nil
 	}
 
 	catalog.Status.Commit = commit

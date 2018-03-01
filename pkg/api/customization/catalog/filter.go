@@ -96,26 +96,26 @@ func (a ActionHandler) RefreshActionHandler(actionName string, action *types.Act
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
 
-	catalogs := []*v3.Catalog{}
+	catalogs := []v3.Catalog{}
 	if apiContext.ID != "" {
 		catalog, err := a.CatalogClient.Get(apiContext.ID, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
-		catalogs = append(catalogs, catalog)
+		catalogs = append(catalogs, *catalog)
 	} else {
 		catalogList, err := a.CatalogClient.List(metav1.ListOptions{})
 		if err != nil {
 			return err
 		}
 		for _, catalog := range catalogList.Items {
-			catalogs = append(catalogs, &catalog)
+			catalogs = append(catalogs, catalog)
 		}
 	}
 	for _, catalog := range catalogs {
 		catalog.Status.LastRefreshTimestamp = time.Now().Format(time.RFC3339)
-		v3.CatalogConditionRefreshed.Unknown(catalog)
-		if _, err := a.CatalogClient.Update(catalog); err != nil {
+		v3.CatalogConditionRefreshed.Unknown(&catalog)
+		if _, err := a.CatalogClient.Update(&catalog); err != nil {
 			return err
 		}
 	}
