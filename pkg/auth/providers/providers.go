@@ -61,6 +61,10 @@ func AuthenticateUser(input interface{}, providerName string) (v3.Principal, []v
 	return providers[providerName].AuthenticateUser(input)
 }
 
+func GetPrincipal(principalID string, myToken v3.Token) (v3.Principal, error) {
+	return providers[myToken.AuthProvider].GetPrincipal(principalID, myToken)
+}
+
 func SearchPrincipals(name, principalType string, myToken v3.Token) ([]v3.Principal, error) {
 	return providers[myToken.AuthProvider].SearchPrincipals(name, principalType, myToken)
 }

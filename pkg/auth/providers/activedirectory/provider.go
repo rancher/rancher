@@ -107,6 +107,10 @@ func (p *adProvider) SearchPrincipals(searchKey, principalType string, myToken v
 	return principals, nil
 }
 
+func (p *adProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
+	return v3.Principal{}, nil
+}
+
 func (p *adProvider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
 	if me.ObjectMeta.Name == other.ObjectMeta.Name && me.LoginName == other.LoginName && me.Kind == other.Kind {
 		return true

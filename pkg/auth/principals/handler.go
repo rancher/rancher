@@ -74,6 +74,19 @@ func (h *principalsHandler) list(apiContext *types.APIContext, next types.Reques
 		return err
 	}
 
+	if apiContext.ID != "" {
+		princ, err := providers.GetPrincipal(apiContext.ID, *token)
+		if err != nil {
+			return err
+		}
+		p, err := convertPrincipal(apiContext.Schema, princ)
+		if err != nil {
+			return err
+		}
+		apiContext.WriteResponse(200, p)
+		return nil
+	}
+
 	p, err := convertPrincipal(apiContext.Schema, token.UserPrincipal)
 	if err != nil {
 		return err
