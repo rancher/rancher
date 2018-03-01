@@ -75,14 +75,15 @@ func AgentConfig(ctx context.Context, node v3.RKEConfigNode, server, token strin
 		return nil, err
 	}
 
-	certs, err := buildCerts(rkeConfig, &rkeConfig.Nodes[1], server, token)
+	certs, err := buildCerts(rkeConfig, &rkeConfig.Nodes[len(rkeConfig.Nodes)-1], server, token)
 	if err != nil {
 		return nil, err
 	}
 
 	return &rkeworker.NodeConfig{
-		Certs:     certs,
-		Processes: processes,
+		APIProxyAddress: "10.233.0.1:6443",
+		Certs:           certs,
+		Processes:       processes,
 	}, nil
 }
 

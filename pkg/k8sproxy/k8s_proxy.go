@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/rancher/rancher/pkg/clusterrouter"
+	"github.com/rancher/rancher/pkg/clusterrouter/proxy"
 	rdialer "github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/k8slookup"
 	"github.com/rancher/rancher/pkg/tunnelserver"
@@ -15,29 +16,47 @@ func New(scaledContext *config.ScaledContext, dialer dialer.Factory) http.Handle
 	return clusterrouter.New(scaledContext.LocalConfig, k8slookup.New(scaledContext, true), dialer)
 }
 
-func NewLocalProxy(scaledContext *config.ScaledContext, dialer dialer.Factory, next http.Handler) http.Handler {
+func NewLocalProxy(scaledContext *config.ScaledContext, dialer dialer.Factory, next http.Handler) (http.Handler, error) {
+	passThrough, err := proxy.NewSimpleProxy(scaledContext.LocalConfig.Host, scaledContext.LocalConfig.CAData)
+	if err != nil {
+		return nil, err
+	}
 	lp := &localProxy{
-		next:   next,
-		router: clusterrouter.New(scaledContext.LocalConfig, k8slookup.New(scaledContext, false), dialer),
+		passThrough: passThrough,
+		next:        next,
+		router:      clusterrouter.New(scaledContext.LocalConfig, k8slookup.New(scaledContext, false), dialer),
 	}
 
 	if rd, ok := dialer.(*rdialer.Factory); ok {
 		lp.auth = rd.TunnelAuthorizer
 	}
 
-	return lp
+	return lp, nil
 }
 
 type localProxy struct {
-	next   http.Handler
-	auth   *tunnelserver.Authorizer
-	router http.Handler
+	passThrough http.Handler
+	next        http.Handler
+	auth        *tunnelserver.Authorizer
+	router      http.Handler
 }
 
 func (l *localProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	if l.pass(rw, req) {
+		return
+	}
+
 	if !l.proxy(rw, req) {
 		l.next.ServeHTTP(rw, req)
 	}
+}
+
+func (l *localProxy) pass(rw http.ResponseWriter, req *http.Request) bool {
+	if req.Header.Get("X-API-K8s-Node-Client") == "true" {
+		l.passThrough.ServeHTTP(rw, req)
+		return true
+	}
+	return false
 }
 
 func (l *localProxy) proxy(rw http.ResponseWriter, req *http.Request) bool {

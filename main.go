@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/docker/docker/pkg/reexec"
+	"github.com/ehazlett/simplelog"
 	"github.com/rancher/norman/pkg/dump"
 	"github.com/rancher/norman/signal"
 	"github.com/rancher/rancher/app"
@@ -52,9 +53,9 @@ func main() {
 			Usage:       "Enable debug logs",
 			Destination: &config.Debug,
 		},
-		cli.BoolFlag{
+		cli.StringFlag{
 			Name:        "add-local",
-			Usage:       "Add local cluster",
+			Usage:       "Add local cluster (true, false, auto)",
 			Destination: &config.AddLocal,
 		},
 		cli.IntFlag{
@@ -105,8 +106,8 @@ func initLogs(c *cli.Context, cfg app.Config) {
 	}
 
 	switch c.String("log-format") {
-	//case "simple":
-	//	logrus.SetFormatter(&simplelog.StandardFormatter{})
+	case "simple":
+		logrus.SetFormatter(&simplelog.StandardFormatter{})
 	case "text":
 		logrus.SetFormatter(&logrus.TextFormatter{})
 	case "json":

@@ -14,6 +14,8 @@ import (
 func init() {
 	reexec.Register("/usr/bin/kubectl", kubectl.Main)
 	reexec.Register("kubectl", kubectl.Main)
+	reexec.Register("kubelet", kubectl.Main)
+	reexec.Register("kube-proxy", kubectl.Main)
 }
 
 func getEmbedded(ctx context.Context) (bool, context.Context, *rest.Config, error) {

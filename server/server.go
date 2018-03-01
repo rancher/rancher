@@ -60,7 +60,10 @@ func Start(ctx context.Context, httpPort, httpsPort int, apiContext *config.Scal
 
 	app.DefaultProxyDialer = utilnet.DialFunc(apiContext.Dialer.LocalClusterDialer())
 
-	localClusterAuth := k8sProxy.NewLocalProxy(apiContext, apiContext.Dialer, root)
+	localClusterAuth, err := k8sProxy.NewLocalProxy(apiContext, apiContext.Dialer, root)
+	if err != nil {
+		return err
+	}
 
 	k8sProxy := k8sProxy.New(apiContext, apiContext.Dialer)
 

@@ -92,6 +92,9 @@ func (t *Authorizer) AuthorizeLocalNode(username, password string) (string, []st
 	if err != nil || cluster == nil || cluster.Status.Driver != v3.ClusterDriverLocal {
 		return "", nil, nil, false
 	}
+	if username == "kube-proxy" {
+		return "system:kube-proxy", nil, cluster, true
+	}
 	return "system:node:" + username, []string{"system:nodes"}, cluster, true
 }
 

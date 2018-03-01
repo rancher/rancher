@@ -26,9 +26,10 @@ const (
 )
 
 var (
-	kubeconfigReplace = map[string]bool{
-		"/etc/kubernetes/ssl/kubecfg-kube-node.yaml":  true,
-		"/etc/kubernetes/ssl/kubecfg-kube-proxy.yaml": true,
+	nodeCfg   = "/etc/kubernetes/ssl/kubecfg-kube-node.yaml"
+	proxyCfg  = "/etc/kubernetes/ssl/kubecfg-kube-proxy.yaml"
+	copyCerts = []string{
+		"kube-apiserver",
 	}
 )
 
@@ -143,15 +144,29 @@ func (b *Bundle) save(w io.Writer) error {
 func (b *Bundle) ForNode(config *v3.RancherKubernetesEngineConfig, node *v3.RKEConfigNode, server, token string) (*Bundle, error) {
 	certs := pki.GenerateRKENodeCerts(context.Background(), *config, node.Address, b.certs)
 
+	updates := map[string]string{}
+	nameToUser := map[string]string{
+		nodeCfg:  node.HostnameOverride,
+		proxyCfg: "kube-proxy",
+	}
+
+	for name, user := range nameToUser {
+		newCfg, err := kubeconfig.ForBasic(server, user, token)
+		if err != nil {
+			return nil, err
+		}
+		updates[name] = newCfg
+	}
+
 	for name, cert := range certs {
-		if kubeconfigReplace[cert.ConfigPath] {
-			newCfg, err := kubeconfig.ForBasic(server, node.HostnameOverride, token)
-			if err != nil {
-				return nil, err
-			}
+		if newCfg, ok := updates[cert.ConfigPath]; ok {
 			cert.Config = newCfg
 			certs[name] = cert
 		}
+	}
+
+	for _, name := range copyCerts {
+		certs[name] = b.certs[name]
 	}
 
 	return &Bundle{

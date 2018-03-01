@@ -1,0 +1,38 @@
+FROM rancher/k8s:v1.8.7-rancher1-1 as k8s
+FROM rancher/rke-service-sidekick:v0.1.0 as sidekick
+
+FROM ubuntu:17.10
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl ca-certificates jq iproute2 && \
+    curl -sLf https://get.docker.com/builds/Linux/x86_64/docker-1.10.3 > /usr/bin/docker && \
+    chmod +x /usr/bin/docker
+ARG VERSION=dev
+ENV AGENT_IMAGE rancher/agent:${VERSION}
+RUN mkdir /opt/rke
+COPY --from=sidekick /opt/rke /opt/rke
+COPY --from=k8s /usr/bin/kubectl /usr/bin/kubelet /usr/bin/kube-proxy /usr/bin/
+
+RUN DEBIAN_FRONTEND=noninteractive apt-get update -y \
+    && DEBIAN_FRONTEND=noninteractive apt-get -yy -q \
+    install \
+    iptables \
+    ca-certificates \
+    file \
+    util-linux \
+    socat \
+    curl \
+    ethtool \
+    nfs-common \
+    jq \
+    unzip \
+    git \
+    wget \
+    conntrack \
+    netcat-openbsd \
+    && DEBIAN_FRONTEND=noninteractive apt-get autoremove -y \
+    && DEBIAN_FRONTEND=noninteractive apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+ENV SSL_CERT_DIR /etc/kubernetes/ssl/certs
+COPY agent run.sh /usr/bin/
+
+ENTRYPOINT ["run.sh"]
