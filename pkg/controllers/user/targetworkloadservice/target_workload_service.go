@@ -9,6 +9,8 @@ import (
 
 	"sync"
 
+	"reflect"
+
 	"github.com/pkg/errors"
 	util "github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/types/apis/core/v1"
@@ -63,9 +65,26 @@ func Register(ctx context.Context, workload *config.UserOnlyContext) {
 }
 
 func (c *Controller) sync(key string, obj *corev1.Service) error {
-	if obj == nil {
+	if obj == nil || obj.DeletionTimestamp != nil {
+		if _, ok := workloadServiceUUIDToDeploymentUUIDs.Load(key); ok {
+			// update all pods having the label, so the label gets removed
+			splitted := strings.Split(key, "/")
+			namespace := splitted[0]
+			serviceName := splitted[1]
+			selectorToCheck := getServiceSelector(serviceName)
+			pods, err := c.podLister.List(namespace, labels.SelectorFromSet(labels.Set{selectorToCheck: "true"}))
+			if err != nil {
+				return err
+			}
+
+			for _, pod := range pods {
+				c.pods.Controller().Enqueue(namespace, pod.Name)
+			}
+		}
+
 		// delete from the workload map
 		workloadServiceUUIDToDeploymentUUIDs.Delete(key)
+
 		return nil
 	}
 
@@ -90,7 +109,7 @@ func (c *Controller) reconcilePods(key string, obj *corev1.Service) error {
 	if obj.Spec.Selector == nil {
 		obj.Spec.Selector = make(map[string]string)
 	}
-	selectorToAdd := getServiceSelector(obj)
+	selectorToAdd := getServiceSelector(obj.Name)
 	var toUpdate *corev1.Service
 	if _, ok := obj.Spec.Selector[selectorToAdd]; !ok {
 		toUpdate = obj.DeepCopy()
@@ -164,8 +183,8 @@ func (c *Controller) updatePods(serviceName string, obj *corev1.Service, workloa
 	return nil
 }
 
-func getServiceSelector(obj *corev1.Service) string {
-	return fmt.Sprintf("%s_%s", WorkloadIDLabelPrefix, obj.Name)
+func getServiceSelector(serviceName string) string {
+	return fmt.Sprintf("%s_%s", WorkloadIDLabelPrefix, serviceName)
 }
 
 func (c *PodController) sync(key string, obj *corev1.Pod) error {
@@ -178,7 +197,7 @@ func (c *PodController) sync(key string, obj *corev1.Pod) error {
 		return err
 	}
 
-	workloadServiceUUIDToAdd := []string{}
+	var workloadServiceUUIDToAdd []string
 	for _, d := range workloads {
 		deploymentUUID := fmt.Sprintf("%s/%s", d.Namespace, d.Name)
 		workloadServiceUUIDToDeploymentUUIDs.Range(func(k, v interface{}) bool {
@@ -200,12 +219,27 @@ func (c *PodController) sync(key string, obj *corev1.Pod) error {
 			workloadServicesLabels[key] = value
 		}
 	}
-	if len(workloadServicesLabels) == 0 {
-		return nil
-	}
+
 	toUpdate := obj.DeepCopy()
+	// remove old labels
+	labels := map[string]string{}
+	for key, value := range toUpdate.Labels {
+		if strings.HasPrefix(key, WorkloadIDLabelPrefix) {
+			if _, ok := workloadServicesLabels[key]; !ok {
+				continue
+			}
+		}
+		labels[key] = value
+	}
+
+	// add new labels
 	for key, value := range workloadServicesLabels {
-		toUpdate.Labels[key] = value
+		labels[key] = value
+	}
+
+	toUpdate.Labels = labels
+	if reflect.DeepEqual(obj.Labels, labels) {
+		return nil
 	}
 	_, err = c.pods.Update(toUpdate)
 	if err != nil {
