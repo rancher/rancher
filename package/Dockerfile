@@ -8,6 +8,8 @@ RUN curl -sLf https://github.com/rancher/machine-package/releases/download/v0.13
     curl -sLf https://github.com/rancher/helm/releases/download/v2.8.0-rancher2/helm > /usr/bin/helm && \
     curl -sLf https://github.com/rancher/helm/releases/download/v2.8.0-rancher2/tiller > /usr/bin/tiller && \
     chmod +x /usr/bin/kubectl /usr/bin/tiller /usr/bin/helm
+RUN mkdir /root/.kube && \
+    ln -s /var/lib/rancher/kube_config_cluster.yml /root/.kube/config
 WORKDIR /var/lib/rancher
 
 ENV CATTLE_UI_PATH /usr/share/rancher/ui
