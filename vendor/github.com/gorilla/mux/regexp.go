@@ -10,7 +10,22 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
+)
+
+type routeRegexpOptions struct {
+	strictSlash    bool
+	useEncodedPath bool
+}
+
+type regexpType int
+
+const (
+	regexpTypePath   regexpType = 0
+	regexpTypeHost   regexpType = 1
+	regexpTypePrefix regexpType = 2
+	regexpTypeQuery  regexpType = 3
 )
 
 // newRouteRegexp parses a route template and returns a routeRegexp,
@@ -23,7 +38,7 @@ import (
 // Previously we accepted only Python-like identifiers for variable
 // names ([a-zA-Z_][a-zA-Z0-9_]*), but currently the only restriction is that
 // name and pattern can't be empty, and names can't contain a colon.
-func newRouteRegexp(tpl string, matchHost, matchPrefix, matchQuery, strictSlash bool) (*routeRegexp, error) {
+func newRouteRegexp(tpl string, typ regexpType, options routeRegexpOptions) (*routeRegexp, error) {
 	// Check if it is well-formed.
 	idxs, errBraces := braceIndices(tpl)
 	if errBraces != nil {
@@ -33,29 +48,25 @@ func newRouteRegexp(tpl string, matchHost, matchPrefix, matchQuery, strictSlash 
 	template := tpl
 	// Now let's parse it.
 	defaultPattern := "[^/]+"
-	if matchQuery {
-		defaultPattern = "[^?&]+"
-		matchPrefix = true
-	} else if matchHost {
+	if typ == regexpTypeQuery {
+		defaultPattern = ".*"
+	} else if typ == regexpTypeHost {
 		defaultPattern = "[^.]+"
-		matchPrefix = false
 	}
 	// Only match strict slash if not matching
-	if matchPrefix || matchHost || matchQuery {
-		strictSlash = false
+	if typ != regexpTypePath {
+		options.strictSlash = false
 	}
 	// Set a flag for strictSlash.
 	endSlash := false
-	if strictSlash && strings.HasSuffix(tpl, "/") {
+	if options.strictSlash && strings.HasSuffix(tpl, "/") {
 		tpl = tpl[:len(tpl)-1]
 		endSlash = true
 	}
 	varsN := make([]string, len(idxs)/2)
 	varsR := make([]*regexp.Regexp, len(idxs)/2)
 	pattern := bytes.NewBufferString("")
-	if !matchQuery {
-		pattern.WriteByte('^')
-	}
+	pattern.WriteByte('^')
 	reverse := bytes.NewBufferString("")
 	var end int
 	var err error
@@ -75,9 +86,11 @@ func newRouteRegexp(tpl string, matchHost, matchPrefix, matchQuery, strictSlash 
 				tpl[idxs[i]:end])
 		}
 		// Build the regexp pattern.
-		fmt.Fprintf(pattern, "%s(%s)", regexp.QuoteMeta(raw), patt)
+		fmt.Fprintf(pattern, "%s(?P<%s>%s)", regexp.QuoteMeta(raw), varGroupName(i/2), patt)
+
 		// Build the reverse template.
 		fmt.Fprintf(reverse, "%s%%s", raw)
+
 		// Append variable name and compiled pattern.
 		varsN[i/2] = name
 		varsR[i/2], err = regexp.Compile(fmt.Sprintf("^%s$", patt))
@@ -88,10 +101,16 @@ func newRouteRegexp(tpl string, matchHost, matchPrefix, matchQuery, strictSlash 
 	// Add the remaining.
 	raw := tpl[end:]
 	pattern.WriteString(regexp.QuoteMeta(raw))
-	if strictSlash {
+	if options.strictSlash {
 		pattern.WriteString("[/]?")
 	}
-	if !matchPrefix {
+	if typ == regexpTypeQuery {
+		// Add the default pattern if the query value is empty
+		if queryVal := strings.SplitN(template, "=", 2)[1]; queryVal == "" {
+			pattern.WriteString(defaultPattern)
+		}
+	}
+	if typ != regexpTypePrefix {
 		pattern.WriteByte('$')
 	}
 	reverse.WriteString(raw)
@@ -103,16 +122,22 @@ func newRouteRegexp(tpl string, matchHost, matchPrefix, matchQuery, strictSlash 
 	if errCompile != nil {
 		return nil, errCompile
 	}
+
+	// Check for capturing groups which used to work in older versions
+	if reg.NumSubexp() != len(idxs)/2 {
+		panic(fmt.Sprintf("route %s contains capture groups in its regexp. ", template) +
+			"Only non-capturing groups are accepted: e.g. (?:pattern) instead of (pattern)")
+	}
+
 	// Done!
 	return &routeRegexp{
-		template:    template,
-		matchHost:   matchHost,
-		matchQuery:  matchQuery,
-		strictSlash: strictSlash,
-		regexp:      reg,
-		reverse:     reverse.String(),
-		varsN:       varsN,
-		varsR:       varsR,
+		template:   template,
+		regexpType: typ,
+		options:    options,
+		regexp:     reg,
+		reverse:    reverse.String(),
+		varsN:      varsN,
+		varsR:      varsR,
 	}, nil
 }
 
@@ -121,12 +146,10 @@ func newRouteRegexp(tpl string, matchHost, matchPrefix, matchQuery, strictSlash 
 type routeRegexp struct {
 	// The unmodified template.
 	template string
-	// True for host match, false for path or query string match.
-	matchHost bool
-	// True for query string match, false for path and host match.
-	matchQuery bool
-	// The strictSlash value defined on the route, but disabled if PathPrefix was used.
-	strictSlash bool
+	// The type of match
+	regexpType regexpType
+	// Options for matching
+	options routeRegexpOptions
 	// Expanded regexp.
 	regexp *regexp.Regexp
 	// Reverse template.
@@ -139,13 +162,17 @@ type routeRegexp struct {
 
 // Match matches the regexp against the URL host or path.
 func (r *routeRegexp) Match(req *http.Request, match *RouteMatch) bool {
-	if !r.matchHost {
-		if r.matchQuery {
-			return r.regexp.MatchString(req.URL.RawQuery)
-		} else {
-			return r.regexp.MatchString(req.URL.Path)
+	if r.regexpType != regexpTypeHost {
+		if r.regexpType == regexpTypeQuery {
+			return r.matchQueryString(req)
 		}
+		path := req.URL.Path
+		if r.options.useEncodedPath {
+			path = req.URL.EscapedPath()
+		}
+		return r.regexp.MatchString(path)
 	}
+
 	return r.regexp.MatchString(getHost(req))
 }
 
@@ -156,6 +183,9 @@ func (r *routeRegexp) url(values map[string]string) (string, error) {
 		value, ok := values[v]
 		if !ok {
 			return "", fmt.Errorf("mux: missing route variable %q", v)
+		}
+		if r.regexpType == regexpTypeQuery {
+			value = url.QueryEscape(value)
 		}
 		urlValues[k] = value
 	}
@@ -175,11 +205,31 @@ func (r *routeRegexp) url(values map[string]string) (string, error) {
 	return rv, nil
 }
 
+// getURLQuery returns a single query parameter from a request URL.
+// For a URL with foo=bar&baz=ding, we return only the relevant key
+// value pair for the routeRegexp.
+func (r *routeRegexp) getURLQuery(req *http.Request) string {
+	if r.regexpType != regexpTypeQuery {
+		return ""
+	}
+	templateKey := strings.SplitN(r.template, "=", 2)[0]
+	for key, vals := range req.URL.Query() {
+		if key == templateKey && len(vals) > 0 {
+			return key + "=" + vals[0]
+		}
+	}
+	return ""
+}
+
+func (r *routeRegexp) matchQueryString(req *http.Request) bool {
+	return r.regexp.MatchString(r.getURLQuery(req))
+}
+
 // braceIndices returns the first level curly brace indices from a string.
 // It returns an error in case of unbalanced braces.
 func braceIndices(s string) ([]int, error) {
 	var level, idx int
-	idxs := make([]int, 0)
+	var idxs []int
 	for i := 0; i < len(s); i++ {
 		switch s[i] {
 		case '{':
@@ -200,6 +250,11 @@ func braceIndices(s string) ([]int, error) {
 	return idxs, nil
 }
 
+// varGroupName builds a capturing group name for the indexed variable.
+func varGroupName(idx int) string {
+	return "v" + strconv.Itoa(idx)
+}
+
 // ----------------------------------------------------------------------------
 // routeRegexpGroup
 // ----------------------------------------------------------------------------
@@ -215,23 +270,24 @@ type routeRegexpGroup struct {
 func (v *routeRegexpGroup) setMatch(req *http.Request, m *RouteMatch, r *Route) {
 	// Store host variables.
 	if v.host != nil {
-		hostVars := v.host.regexp.FindStringSubmatch(getHost(req))
-		if hostVars != nil {
-			for k, v := range v.host.varsN {
-				m.Vars[v] = hostVars[k+1]
-			}
+		host := getHost(req)
+		matches := v.host.regexp.FindStringSubmatchIndex(host)
+		if len(matches) > 0 {
+			extractVars(host, matches, v.host.varsN, m.Vars)
 		}
+	}
+	path := req.URL.Path
+	if r.useEncodedPath {
+		path = req.URL.EscapedPath()
 	}
 	// Store path variables.
 	if v.path != nil {
-		pathVars := v.path.regexp.FindStringSubmatch(req.URL.Path)
-		if pathVars != nil {
-			for k, v := range v.path.varsN {
-				m.Vars[v] = pathVars[k+1]
-			}
+		matches := v.path.regexp.FindStringSubmatchIndex(path)
+		if len(matches) > 0 {
+			extractVars(path, matches, v.path.varsN, m.Vars)
 			// Check if we should redirect.
-			if v.path.strictSlash {
-				p1 := strings.HasSuffix(req.URL.Path, "/")
+			if v.path.options.strictSlash {
+				p1 := strings.HasSuffix(path, "/")
 				p2 := strings.HasSuffix(v.path.template, "/")
 				if p1 != p2 {
 					u, _ := url.Parse(req.URL.String())
@@ -246,13 +302,11 @@ func (v *routeRegexpGroup) setMatch(req *http.Request, m *RouteMatch, r *Route) 
 		}
 	}
 	// Store query string variables.
-	rawQuery := req.URL.RawQuery
 	for _, q := range v.queries {
-		queryVars := q.regexp.FindStringSubmatch(rawQuery)
-		if queryVars != nil {
-			for k, v := range q.varsN {
-				m.Vars[v] = queryVars[k+1]
-			}
+		queryURL := q.getURLQuery(req)
+		matches := q.regexp.FindStringSubmatchIndex(queryURL)
+		if len(matches) > 0 {
+			extractVars(queryURL, matches, q.varsN, m.Vars)
 		}
 	}
 }
@@ -269,4 +323,10 @@ func getHost(r *http.Request) string {
 	}
 	return host
 
+}
+
+func extractVars(input string, matches []int, names []string, output map[string]string) {
+	for i, name := range names {
+		output[name] = input[matches[2*i+2]:matches[2*i+3]]
+	}
 }
