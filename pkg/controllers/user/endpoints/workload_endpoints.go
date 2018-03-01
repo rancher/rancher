@@ -126,6 +126,8 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 			return err
 		}
 
+		logrus.Errorf("New eps are %v; old eps are %v", newPublicEps, existingPublicEps)
+
 		logrus.Infof("Updating workload [%s] with public endpoints [%v]", key, epsToUpdate)
 
 		annotations := map[string]string{

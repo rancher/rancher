@@ -159,6 +159,9 @@ func convertHostPortToEndpoint(pod *corev1.Pod) ([]v3.PublicEndpoint, error) {
 	if pod.DeletionTimestamp != nil {
 		return eps, nil
 	}
+	if pod.Status.Phase != corev1.PodRunning {
+		return eps, nil
+	}
 	nodeName := pod.Spec.NodeName
 
 	for _, c := range pod.Spec.Containers {
@@ -166,9 +169,13 @@ func convertHostPortToEndpoint(pod *corev1.Pod) ([]v3.PublicEndpoint, error) {
 			if p.HostPort == 0 {
 				continue
 			}
+			address := p.HostIP
+			if address == "" {
+				address = pod.Status.HostIP
+			}
 			p := v3.PublicEndpoint{
 				NodeName: nodeName,
-				Address:  pod.Status.HostIP,
+				Address:  address,
 				Port:     p.HostPort,
 				Protocol: string(p.Protocol),
 				PodName:  fmt.Sprintf("%s/%s", pod.Namespace, pod.Name),

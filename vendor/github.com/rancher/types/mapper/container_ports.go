@@ -4,6 +4,8 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/mapper"
+	"github.com/sirupsen/logrus"
+	"strings"
 )
 
 type ContainerPorts struct {
@@ -37,6 +39,18 @@ func (n ContainerPorts) ToInternal(data map[string]interface{}) {
 	path := []string{"containers", "{ARRAY}", "ports"}
 	convert.Transform(data, path, func(obj interface{}) interface{} {
 		if l, ok := obj.([]interface{}); ok {
+			for _, p := range l {
+				mapped, err := convert.EncodeToMap(p)
+				if err != nil {
+					logrus.Warnf("Failed to encode port: %v", err)
+					return obj
+				}
+				if strings.EqualFold(convert.ToString(mapped["kind"]), "HostPort") {
+					if _, ok := mapped["sourcePort"]; ok {
+						mapped["hostPort"] = mapped["sourcePort"]
+					}
+				}
+			}
 			ports = append(ports, l)
 		}
 		return obj
