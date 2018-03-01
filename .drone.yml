@@ -27,10 +27,36 @@ pipeline:
       branch: master
       event: push
 
+  docker-publish-master-agent:
+    image: plugins/docker
+    dockerfile: package/Dockerfile.agent
+    repo: rancher/agent
+    context: package/
+    tag: master
+    secrets: [docker_username, docker_password]
+    build_args:
+    - VERSION=master
+    when:
+      branch: master
+      event: push
+
   docker-publish:
     image: plugins/docker
     dockerfile: package/Dockerfile
     repo: rancher/server
+    context: package/
+    tag: ${DRONE_TAG}
+    secrets: [docker_username, docker_password]
+    build_args:
+    - VERSION=${DRONE_TAG}
+    when:
+      branch: master
+      event: tag
+
+  docker-publish-agent:
+    image: plugins/docker
+    dockerfile: package/Dockerfile.agent
+    repo: rancher/agent
     context: package/
     tag: ${DRONE_TAG}
     secrets: [docker_username, docker_password]
