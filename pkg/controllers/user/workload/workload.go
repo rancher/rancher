@@ -13,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 // This controller is responsible for monitoring workloads and
@@ -54,6 +55,11 @@ func (c *Controller) CreateService(key string, w *Workload) error {
 	}
 
 	if _, ok := w.Annotations[creatorIDAnnotation]; !ok {
+		return nil
+	}
+
+	if errs := validation.IsDNS1123Subdomain(w.Name); len(errs) != 0 {
+		logrus.Debugf("Not creating service for workload [%s]: dns name is invalid", w.Name)
 		return nil
 	}
 
@@ -178,6 +184,9 @@ func (c *Controller) createService(toCreate Service, workload *Workload) error {
 	logrus.Infof("Creating [%s] service with ports [%v] for workload %s", service.Spec.Type, toCreate.ServicePorts, workload.getKey())
 	_, err = c.services.Create(service)
 	if err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			return nil
+		}
 		return err
 	}
 	return nil
