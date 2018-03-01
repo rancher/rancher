@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2017-08-31/containerservice"
+	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2017-05-10/resources"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -275,7 +276,6 @@ func newAzureClient(state state) (*containerservice.ManagedClustersClient, error
 	}
 
 	spToken, err := adal.NewServicePrincipalToken(*oauthConfig, state.ClientID, state.ClientSecret, azure.PublicCloud.ResourceManagerEndpoint)
-
 	if err != nil {
 		return nil, err
 	}
@@ -293,6 +293,30 @@ func newAzureClient(state state) (*containerservice.ManagedClustersClient, error
 	return &client, nil
 }
 
+func newResourcesClient(state state) (*resources.GroupsClient, error) {
+	oauthConfig, err := adal.NewOAuthConfig(azure.PublicCloud.ActiveDirectoryEndpoint, state.TenantID)
+	if err != nil {
+		return nil, err
+	}
+
+	spToken, err := adal.NewServicePrincipalToken(*oauthConfig, state.ClientID, state.ClientSecret, azure.PublicCloud.ResourceManagerEndpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	authorizer := autorest.NewBearerAuthorizer(spToken)
+
+	baseURL := state.BaseURL
+	if baseURL == "" {
+		baseURL = containerservice.DefaultBaseURI
+	}
+
+	client := resources.NewGroupsClientWithBaseURI(baseURL, state.SubscriptionID)
+	client.Authorizer = authorizer
+
+	return &client, nil
+}
+
 const failedStatus = "Failed"
 const succeededStatus = "Succeeded"
 const creatingStatus = "Creating"
@@ -303,13 +327,16 @@ const pollInterval = 30
 // Create implements driver interface
 func (d *Driver) Create(ctx context.Context, options *types.DriverOptions) (*types.ClusterInfo, error) {
 	driverState, err := getStateFromOptions(options)
-
 	if err != nil {
 		return nil, err
 	}
 
-	client, err := newAzureClient(driverState)
+	clustersClient, err := newAzureClient(driverState)
+	if err != nil {
+		return nil, err
+	}
 
+	resourcesClient, err := newResourcesClient(driverState)
 	if err != nil {
 		return nil, err
 	}
@@ -337,10 +364,21 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions) (*typ
 	}
 
 	publicKeyContents := string(publicKey)
-
 	tags := make(map[string]*string)
+	exists, err := d.resourceGroupExists(ctx, resourcesClient, driverState.ResourceGroup)
+	if err != nil {
+		return nil, err
+	}
 
-	_, err = client.CreateOrUpdate(ctx, driverState.ResourceGroup, driverState.Name, containerservice.ManagedCluster{
+	if !exists {
+		logrus.Infof("resource group %v does not exist, creating", driverState.ResourceGroup)
+		err = d.createResourceGroup(ctx, resourcesClient, driverState)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	_, err = clustersClient.CreateOrUpdate(ctx, driverState.ResourceGroup, driverState.Name, containerservice.ManagedCluster{
 		Location: to.StringPtr(driverState.Location),
 		Tags:     &tags,
 		ManagedClusterProperties: &containerservice.ManagedClusterProperties{
@@ -370,7 +408,6 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions) (*typ
 			},
 		},
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -380,8 +417,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions) (*typ
 	failedCount := 0
 
 	for {
-		result, err := client.Get(ctx, driverState.ResourceGroup, driverState.Name)
-
+		result, err := clustersClient.Get(ctx, driverState.ResourceGroup, driverState.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -415,6 +451,27 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions) (*typ
 
 		time.Sleep(pollInterval * time.Second)
 	}
+}
+
+func (d *Driver) resourceGroupExists(ctx context.Context, client *resources.GroupsClient, groupName string) (bool, error) {
+	resp, err := client.CheckExistence(ctx, groupName)
+	if err != nil {
+		return false, fmt.Errorf("error getting resource group %v: %v", groupName, err)
+	}
+
+	return resp.StatusCode == 204, nil
+}
+
+func (d *Driver) createResourceGroup(ctx context.Context, client *resources.GroupsClient, state state) error {
+	_, err := client.CreateOrUpdate(ctx, state.ResourceGroup, resources.Group{
+		Name:     to.StringPtr(state.ResourceGroup),
+		Location: to.StringPtr(state.Location),
+	})
+	if err != nil {
+		return fmt.Errorf("error creating resource group %v: %v", state.ResourceGroup, err)
+	}
+
+	return nil
 }
 
 func storeState(info *types.ClusterInfo, state state) error {
