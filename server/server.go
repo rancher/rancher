@@ -56,6 +56,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, apiContext *config.Scal
 	}
 
 	root := mux.NewRouter()
+	root.UseEncodedPath()
 
 	app.DefaultProxyDialer = utilnet.DialFunc(apiContext.Dialer.LocalClusterDialer())
 
@@ -103,6 +104,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, apiContext *config.Scal
 
 func newAuthed(tokenAPI http.Handler, managementAPI http.Handler, k8sproxy http.Handler) *mux.Router {
 	authed := mux.NewRouter()
+	authed.UseEncodedPath()
 	authed.PathPrefix("/meta/proxy").Handler(newProxy())
 	authed.PathPrefix("/meta").Handler(managementAPI)
 	authed.PathPrefix("/v3/gkeMachineTypes").Handler(capabilities.NewGKEMachineTypesHandler())
