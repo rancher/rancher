@@ -128,21 +128,21 @@ type ActiveDirectoryConfig struct {
 	DefaultLoginDomain          string   `json:"defaultLoginDomain,omitempty" norman:"noupdate"`
 	ServiceAccountUsername      string   `json:"serviceAccountUsername,omitempty" norman:"noupdate"`
 	ServiceAccountPassword      string   `json:"serviceAccountPassword,omitempty" norman:"noupdate,type=password"`
-	UserDisabledBitMask         int64    `json:"userDisabledBitMask,omitempty" norman:"noupdate"`
+	UserDisabledBitMask         int64    `json:"userDisabledBitMask,omitempty" norman:"default=2,noupdate"`
 	UserSearchBase              string   `json:"userSearchBase,omitempty" norman:"noupdate"`
-	UserSearchAttribute         string   `json:"userSearchAttribute,omitempty" norman:"noupdate"`
-	UserLoginAttribute          string   `json:"userLoginAttribute,omitempty" norman:"noupdate"`
-	UserObjectClass             string   `json:"userObjectClass,omitempty" norman:"noupdate"`
-	UserNameAttribute           string   `json:"userNameAttribute,omitempty" norman:"noupdate"`
-	UserEnabledAttribute        string   `json:"userEnabledAttribute,omitempty" norman:"noupdate"`
+	UserSearchAttribute         string   `json:"userSearchAttribute,omitempty" norman:"default=sAMAccountName,noupdate"`
+	UserLoginAttribute          string   `json:"userLoginAttribute,omitempty" norman:"default=sAMAccountName,noupdate"`
+	UserObjectClass             string   `json:"userObjectClass,omitempty" norman:"default=person,noupdate"`
+	UserNameAttribute           string   `json:"userNameAttribute,omitempty" norman:"default=name,noupdate"`
+	UserEnabledAttribute        string   `json:"userEnabledAttribute,omitempty" norman:"default=userAccountControl,noupdate"`
 	GroupSearchBase             string   `json:"groupSearchBase,omitempty" norman:"noupdate"`
-	GroupSearchAttribute        string   `json:"groupSearchAttribute,omitempty" norman:"noupdate"`
-	GroupObjectClass            string   `json:"groupObjectClass,omitempty" norman:"noupdate"`
-	GroupNameAttribute          string   `json:"groupNameAttribute,omitempty" norman:"noupdate"`
-	GroupDNAttribute            string   `json:"groupDNAttribute,omitempty" norman:"noupdate"`
-	GroupMemberUserAttribute    string   `json:"groupMemberUserAttribute,omitempty" norman:"noupdate"`
+	GroupSearchAttribute        string   `json:"groupSearchAttribute,omitempty" norman:"default=sAMAccountName,noupdate"`
+	GroupObjectClass            string   `json:"groupObjectClass,omitempty" norman:"default=group,noupdate"`
+	GroupNameAttribute          string   `json:"groupNameAttribute,omitempty" norman:"default=name,noupdate"`
+	GroupDNAttribute            string   `json:"groupDNAttribute,omitempty" norman:"default=distinguishedName,noupdate"`
+	GroupMemberUserAttribute    string   `json:"groupMemberUserAttribute,omitempty" norman:"default=distinguishedName,noupdate"`
 	GroupMemberMappingAttribute string   `json:"groupMemberMappingAttribute,omitempty" norman:"noupdate"`
-	ConnectionTimeout           int64    `json:"connectionTimeout,omitempty" norman:"noupdate"`
+	ConnectionTimeout           int64    `json:"connectionTimeout,omitempty" norman:"default=5000,noupdate"`
 }
 
 type ActiveDirectoryTestAndApplyInput struct {
