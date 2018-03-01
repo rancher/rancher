@@ -17,7 +17,7 @@ const (
 	crtbByPrincipalIndex    = "auth.management.cattle.io/crtb-by-principal"
 )
 
-var clusterManagmentPlaneResources = []string{"clusterroletemplatebindings", "machines", "clusterevents", "projects", "clusterregistrationtokens"}
+var clusterManagmentPlaneResources = []string{"clusterroletemplatebindings", "nodes", "nodepools", "clusterevents", "projects", "clusterregistrationtokens"}
 
 type crtbLifecycle struct {
 	mgr           *manager

@@ -68,7 +68,7 @@ func addRoles(management *config.ManagementContext) (string, error) {
 	rb.addRoleTemplate("Cluster Member", "cluster-member", "cluster", true, false, false).
 		addRule().apiGroups("management.cattle.io").resources("clusterroletemplatebindings").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("projects").verbs("create").
-		addRule().apiGroups("management.cattle.io").resources("nodes").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("nodes", "nodepools").verbs("get", "list", "watch").
 		addRule().apiGroups("*").resources("nodes").verbs("get", "list", "watch").
 		addRule().apiGroups("*").resources("persistentvolumes").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clusterevents").verbs("get", "list", "watch")
@@ -83,11 +83,11 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("projects").verbs("get", "list", "watch")
 
 	rb.addRoleTemplate("Manage Nodes", "manage-nodes", "cluster", true, false, false).
-		addRule().apiGroups("management.cattle.io").resources("nodes").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("nodes", "nodepools").verbs("*").
 		addRule().apiGroups("*").resources("nodes").verbs("*")
 
 	rb.addRoleTemplate("View Nodes", "view-nodes", "cluster", true, false, false).
-		addRule().apiGroups("management.cattle.io").resources("nodes").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("nodes", "nodepools").verbs("get", "list", "watch").
 		addRule().apiGroups("*").resources("nodes").verbs("get", "list", "watch")
 
 	rb.addRoleTemplate("Manage Volumes", "manage-volumes", "cluster", true, false, false).
