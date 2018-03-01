@@ -31,7 +31,7 @@ def test_dns_hostname(pc):
     assert dns_record.type == 'dnsRecord'
     assert dns_record.name == name
     assert dns_record.hostname == 'target'
-    assert dns_record.clusterIp is None
+    assert "clusterIp" not in dns_record
     assert dns_record.namespaceId == ns.id
     assert 'namespace' not in dns_record
     assert dns_record.projectId == pc.project.id
@@ -43,7 +43,7 @@ def test_dns_hostname(pc):
     assert dns_record.type == 'dnsRecord'
     assert dns_record.name == name
     assert dns_record.hostname == 'target2'
-    assert dns_record.clusterIp is None
+    assert "clusterIp" not in dns_record
     assert dns_record.namespaceId == ns.id
     assert 'namespace' not in dns_record
     assert dns_record.projectId == pc.project.id
