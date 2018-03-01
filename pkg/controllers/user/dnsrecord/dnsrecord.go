@@ -2,6 +2,7 @@ package dnsrecord
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -13,11 +14,12 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
-	DNSAnnotation       = "field.cattle.io/targetDNSRecordIds"
-	ProjectIDAnnotation = "field.cattle.io/projectId"
+	DNSAnnotation = "field.cattle.io/targetDnsRecordIds"
 )
 
 var dnsServiceUUIDToTargetEndpointUUIDs sync.Map
@@ -65,14 +67,6 @@ func (c *Controller) sync(key string, obj *corev1.Service) error {
 	return c.reconcileEndpoints(key, obj)
 }
 
-func getNamespaceProjectID(ns *corev1.Namespace) string {
-	parts := strings.Split(ns.Annotations[ProjectIDAnnotation], ":")
-	if len(parts) == 2 {
-		return parts[1]
-	}
-	return ""
-}
-
 func (c *Controller) reconcileEndpoints(key string, obj *corev1.Service) error {
 	// only process services having targetDNSRecordIds in annotation
 	if obj.Annotations == nil {
@@ -83,14 +77,19 @@ func (c *Controller) reconcileEndpoints(key string, obj *corev1.Service) error {
 		return nil
 	}
 
-	records := strings.Split(value, ",")
+	var records []string
+	err := json.Unmarshal([]byte(value), &records)
+	if err != nil {
+		return err
+	}
+
 	var newEndpointSubsets []corev1.EndpointSubset
 	targetEndpointUUIDs := make(map[string]bool)
 	for _, record := range records {
 		groomed := strings.TrimSpace(record)
 		namespaceService := strings.Split(groomed, ":")
 		if len(namespaceService) < 2 {
-			return fmt.Errorf("Wrong format for dns record [%s]", groomed)
+			return fmt.Errorf("wrong format for dns record [%s]", groomed)
 		}
 		namespace := namespaceService[0]
 		service := namespaceService[1]
@@ -110,20 +109,44 @@ func (c *Controller) reconcileEndpoints(key string, obj *corev1.Service) error {
 	dnsServiceUUIDToTargetEndpointUUIDs.Store(key, targetEndpointUUIDs)
 
 	ep, err := c.endpointLister.Get(obj.Namespace, obj.Name)
-	if err != nil {
+	if err != nil && !apierrors.IsNotFound(err) {
 		return errors.Wrapf(err, "Failed to fetch endpoints for DNSRecord service [%s] in namespace [%s]", obj.Name, obj.Namespace)
 	}
 
-	if reflect.DeepEqual(ep.Subsets, newEndpointSubsets) {
-		logrus.Debugf("Endpoints are up to date for DNSRecord service [%s]", obj.Name)
-		return nil
-	}
-	logrus.Infof("Updating endpoints for DNSRecord service [%s]. Old: [%v], new: [%v]", obj.Name, ep.Subsets, newEndpointSubsets)
-	toUpdate := ep.DeepCopy()
-	toUpdate.Subsets = newEndpointSubsets
-	_, err = c.endpoints.Update(toUpdate)
-	if err != nil {
-		return errors.Wrapf(err, "Failed to update endpoint for DNSRecord service [%s]", obj.Name)
+	if ep == nil {
+		controller := true
+		ownerRef := metav1.OwnerReference{
+			Name:       obj.Name,
+			APIVersion: "v1",
+			UID:        obj.UID,
+			Kind:       "Service",
+			Controller: &controller,
+		}
+
+		ep := &corev1.Endpoints{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            obj.Name,
+				OwnerReferences: []metav1.OwnerReference{ownerRef},
+				Namespace:       obj.Namespace,
+			},
+			Subsets: newEndpointSubsets,
+		}
+		logrus.Infof("Creating endpoints for targetDnsRecordIds service [%s]: %v", key, ep.Subsets)
+		if _, err := c.endpoints.Create(ep); err != nil {
+			return err
+		}
+	} else {
+		if reflect.DeepEqual(ep.Subsets, newEndpointSubsets) {
+			logrus.Debugf("Endpoints are up to date for DNSRecord service [%s]", obj.Name)
+			return nil
+		}
+		logrus.Infof("Updating endpoints for DNSRecord service [%s]. Old: [%v], new: [%v]", obj.Name, ep.Subsets, newEndpointSubsets)
+		toUpdate := ep.DeepCopy()
+		toUpdate.Subsets = newEndpointSubsets
+		_, err = c.endpoints.Update(toUpdate)
+		if err != nil {
+			return errors.Wrapf(err, "Failed to update endpoint for DNSRecord service [%s]", obj.Name)
+		}
 	}
 
 	return nil
