@@ -125,7 +125,7 @@ func (h *ClusterLoggingHandler) setEmbeddedEndpoint(cl *v3.ClusterLogging) error
 	} else {
 		espod := espods[0]
 		if espod.Status.Phase == running {
-			cl.Spec.EmbeddedConfig.ElasticsearchEndpoint = fmt.Sprintf("%s:%v", espod.Status.HostIP, esPort)
+			cl.Spec.EmbeddedConfig.ElasticsearchEndpoint = fmt.Sprintf("http://%s:%v", espod.Status.HostIP, esPort)
 		} else {
 			cl.Spec.EmbeddedConfig.ElasticsearchEndpoint = fmt.Sprintf("%s", espod.Status.Phase)
 		}
@@ -153,7 +153,7 @@ func (h *ClusterLoggingHandler) setEmbeddedEndpoint(cl *v3.ClusterLogging) error
 	} else {
 		kibanapod := kibanapods[0]
 		if kibanapod.Status.Phase == running {
-			cl.Spec.EmbeddedConfig.KibanaEndpoint = fmt.Sprintf("%s:%v", kibanapod.Status.HostIP, esPort)
+			cl.Spec.EmbeddedConfig.KibanaEndpoint = fmt.Sprintf("http://%s:%v", kibanapod.Status.HostIP, kibanaservice.Spec.Ports[0].NodePort)
 		} else {
 			cl.Spec.EmbeddedConfig.KibanaEndpoint = fmt.Sprintf("%s", kibanapod.Status.Phase)
 		}

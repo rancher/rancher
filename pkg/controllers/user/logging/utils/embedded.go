@@ -23,132 +23,132 @@ func CreateEmbeddedTarget(dep rv1beta2.DeploymentInterface, sa rv1.ServiceAccoun
 	_, err := dep.Controller().Lister().Get(loggingconfig.EmbeddedESName, loggingconfig.EmbeddedESName)
 	if err != nil {
 		logrus.Infof("get embedded es error: %v", err)
-		if apierrors.IsNotFound(err) {
-			logrus.Infof("get embedded es error is not found")
-			// create service account, role and rolebinding
-			sc := newESServiceAccount(namespace)
-			role := newESRole(namespace)
-			roleBind := newESRoleBinding(namespace)
-
-			defer func() {
-				if err != nil {
-					sa.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{})
-				}
-			}()
-			_, err = sa.Create(sc)
-			if err != nil {
-				return errors.Wrapf(err, "create service account %s fail", loggingconfig.EmbeddedESName)
-			}
-
-			defer func() {
-				if err != nil {
-					ro.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{})
-				}
-			}()
-			_, err = ro.Create(role)
-			if err != nil {
-				return errors.Wrapf(err, "create role %s fail", loggingconfig.EmbeddedESName)
-			}
-
-			defer func() {
-				if err != nil {
-					rb.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{})
-				}
-			}()
-			_, err = rb.Create(roleBind)
-			if err != nil {
-				return errors.Wrapf(err, "create role %s fail", loggingconfig.EmbeddedESName)
-			}
-
-			// create service and deployment
-			defer func() {
-				if err != nil {
-					se.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{})
-				}
-			}()
-			newService := NewESService(namespace)
-			_, err = se.Create(newService)
-			if err != nil {
-				return errors.Wrapf(err, "create service %s fail", loggingconfig.EmbeddedESName)
-			}
-
-			defer func() {
-				if err != nil {
-					dep.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{})
-				}
-			}()
-			esDeployment := NewESDeployment(namespace)
-			_, err = dep.Create(esDeployment)
-			if err != nil {
-				return errors.Wrapf(err, "create deployment %s fail", loggingconfig.EmbeddedESName)
-			}
+		if !apierrors.IsNotFound(err) {
+			return errors.Wrapf(err, "get deployment %s fail", loggingconfig.EmbeddedESName)
 		}
-		return errors.Wrapf(err, "get deployment %s fail", loggingconfig.EmbeddedESName)
+		logrus.Infof("get embedded es error is not found")
+		// create service account, role and rolebinding
+		sc := newESServiceAccount(namespace)
+		role := newESRole(namespace)
+		roleBind := newESRoleBinding(namespace)
+
+		defer func() {
+			if err != nil {
+				sa.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{})
+			}
+		}()
+		_, err = sa.Create(sc)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			return errors.Wrapf(err, "create service account %s fail", loggingconfig.EmbeddedESName)
+		}
+
+		defer func() {
+			if err != nil {
+				ro.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{})
+			}
+		}()
+		_, err = ro.Create(role)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			return errors.Wrapf(err, "create role %s fail", loggingconfig.EmbeddedESName)
+		}
+
+		defer func() {
+			if err != nil {
+				rb.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{})
+			}
+		}()
+		_, err = rb.Create(roleBind)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			return errors.Wrapf(err, "create role %s fail", loggingconfig.EmbeddedESName)
+		}
+
+		// create service and deployment
+		defer func() {
+			if err != nil {
+				se.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{})
+			}
+		}()
+		newService := NewESService(namespace)
+		_, err = se.Create(newService)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			return errors.Wrapf(err, "create service %s fail", loggingconfig.EmbeddedESName)
+		}
+
+		defer func() {
+			if err != nil {
+				dep.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{})
+			}
+		}()
+		esDeployment := NewESDeployment(namespace)
+		_, err = dep.Create(esDeployment)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			return errors.Wrapf(err, "create deployment %s fail", loggingconfig.EmbeddedESName)
+		}
 	}
 
 	// create kibana deployment
 	_, err = dep.Controller().Lister().Get(loggingconfig.LoggingNamespace, loggingconfig.EmbeddedKibanaName)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			// create service account, role and rolebinding
-			sc := newKibanaServiceAccount(namespace)
-			role := newKibanaRole(namespace)
-			roleBind := newKibanaRoleBinding(namespace)
-
-			defer func() {
-				if err != nil {
-					sa.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{})
-				}
-			}()
-			_, err = sa.Create(sc)
-			if err != nil {
-				return errors.Wrapf(err, "create service account  %s fail", loggingconfig.EmbeddedKibanaName)
-			}
-
-			defer func() {
-				if err != nil {
-					ro.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{})
-				}
-			}()
-			_, err = ro.Create(role)
-			if err != nil {
-
-				return errors.Wrapf(err, "create role %s fail", loggingconfig.EmbeddedKibanaName)
-			}
-
-			defer func() {
-				if err != nil {
-					rb.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{})
-				}
-			}()
-			_, err = rb.Create(roleBind)
-			if err != nil {
-				return errors.Wrapf(err, "create role %s fail", loggingconfig.EmbeddedKibanaName)
-			}
-
-			defer func() {
-				if err != nil {
-					se.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{})
-				}
-			}()
-			newService := NewKibanaService(namespace)
-			_, err = se.Create(newService)
-			if err != nil {
-				return errors.Wrapf(err, "create service %s fail", loggingconfig.EmbeddedKibanaName)
-			}
-
-			defer func() {
-				if err != nil {
-					dep.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{})
-				}
-			}()
-			kibanaDeployment := NewKibanaDeployment(namespace)
-			_, err = dep.Create(kibanaDeployment)
-			if err != nil {
-				return errors.Wrapf(err, "create deployment %s fail", loggingconfig.EmbeddedKibanaName)
-			}
+		if !apierrors.IsNotFound(err) {
+			return errors.Wrapf(err, "get deployment %s fail", loggingconfig.EmbeddedKibanaName)
 		}
-		return errors.Wrapf(err, "get deployment %s fail", loggingconfig.EmbeddedKibanaName)
+
+		// create service account, role and rolebinding
+		sc := newKibanaServiceAccount(namespace)
+		role := newKibanaRole(namespace)
+		roleBind := newKibanaRoleBinding(namespace)
+
+		defer func() {
+			if err != nil {
+				sa.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{})
+			}
+		}()
+		_, err = sa.Create(sc)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			return errors.Wrapf(err, "create service account  %s fail", loggingconfig.EmbeddedKibanaName)
+		}
+
+		defer func() {
+			if err != nil {
+				ro.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{})
+			}
+		}()
+		_, err = ro.Create(role)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			return errors.Wrapf(err, "create role %s fail", loggingconfig.EmbeddedKibanaName)
+		}
+
+		defer func() {
+			if err != nil {
+				rb.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{})
+			}
+		}()
+		_, err = rb.Create(roleBind)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			return errors.Wrapf(err, "create role %s fail", loggingconfig.EmbeddedKibanaName)
+		}
+
+		defer func() {
+			if err != nil {
+				se.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{})
+			}
+		}()
+		newService := NewKibanaService(namespace)
+		_, err = se.Create(newService)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			return errors.Wrapf(err, "create service %s fail", loggingconfig.EmbeddedKibanaName)
+		}
+
+		defer func() {
+			if err != nil {
+				dep.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{})
+			}
+		}()
+		kibanaDeployment := NewKibanaDeployment(namespace)
+		_, err = dep.Create(kibanaDeployment)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			return errors.Wrapf(err, "create deployment %s fail", loggingconfig.EmbeddedKibanaName)
+		}
 	}
 	return nil
 }
