@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/utils"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/http"
@@ -67,12 +68,13 @@ func (g GithubDriver) Execute(req *http.Request) (int, error) {
 	if len(pipeline.Spec.Stages) < 1 || len(pipeline.Spec.Stages[0].Steps) < 1 || pipeline.Spec.Stages[0].Steps[0].SourceCodeConfig == nil {
 		return http.StatusInternalServerError, errors.New("Error invalid pipeline definition")
 	}
-
 	if !VerifyRef(pipeline.Spec.Stages[0].Steps[0].SourceCodeConfig, payload.GetRef()) {
 		return http.StatusUnprocessableEntity, errors.New("Error Ref is not match")
 	}
 
-	if _, err := utils.GenerateExecution(g.Pipelines, g.PipelineExecutions, pipeline, utils.TriggerTypeWebhook); err != nil {
+	branch := strings.TrimLeft(payload.GetRef(), "refs/heads/")
+	logrus.Debugf("receieve github webhook, triggered '%s' on branch '%s'", pipeline.Spec.DisplayName, branch)
+	if _, err := utils.GenerateExecution(g.Pipelines, g.PipelineExecutions, pipeline, utils.TriggerTypeWebhook, "", branch); err != nil {
 		return http.StatusInternalServerError, err
 	}
 	return http.StatusOK, nil

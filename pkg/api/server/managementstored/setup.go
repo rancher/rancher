@@ -304,6 +304,7 @@ func Pipeline(schemas *types.Schemas, management *config.ScaledContext) {
 		SourceCodeCredentialLister: management.Management.SourceCodeCredentials("").Controller().Lister(),
 		SourceCodeRepositories:     management.Management.SourceCodeRepositories(""),
 		SourceCodeRepositoryLister: management.Management.SourceCodeRepositories("").Controller().Lister(),
+		AuthConfigs:                management.Management.AuthConfigs(""),
 	}
 	schema := schemas.Schema(&managementschema.Version, client.ClusterPipelineType)
 	schema.Formatter = pipeline.ClusterPipelineFormatter
@@ -318,6 +319,8 @@ func Pipeline(schemas *types.Schemas, management *config.ScaledContext) {
 	schema.Formatter = pipeline.Formatter
 	schema.ActionHandler = pipelineHandler.ActionHandler
 	schema.CreateHandler = pipelineHandler.CreateHandler
+	schema.UpdateHandler = pipelineHandler.UpdateHandler
+	schema.Validator = pipeline.Validator
 
 	pipelineExecutionHandler := &pipeline.ExecutionHandler{}
 	schema = schemas.Schema(&managementschema.Version, client.PipelineExecutionType)

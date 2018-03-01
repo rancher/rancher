@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/satori/uuid"
 	"github.com/sirupsen/logrus"
+	"time"
 )
 
 //Lifecycle is responsible for watching pipelines and handling webhook management
@@ -67,29 +68,29 @@ func (l *Lifecycle) Create(obj *v3.Pipeline) (*v3.Pipeline, error) {
 }
 
 func (l *Lifecycle) Updated(obj *v3.Pipeline) (*v3.Pipeline, error) {
-	previous, err := l.pipelineLister.Get(obj.Namespace, obj.Name)
-	if err != nil {
-		return obj, err
-	}
-	//handle cron update
-	if (obj.Spec.TriggerCronExpression != previous.Spec.TriggerCronExpression) ||
-		(obj.Spec.TriggerCronTimezone != previous.Spec.TriggerCronTimezone) {
-		//cron trigger changed, reset
-		obj.Status.NextStart = ""
-	}
 
-	if obj.Spec.TriggerCronExpression != "" {
-		obj.Labels = map[string]string{utils.PipelineCronLabel: "true"}
+	//handle cron
+	if obj.Spec.TriggerCronExpression == "" {
+		obj.Labels = map[string]string{utils.PipelineCronLabel: "false"}
+		if obj.Status.NextStart != "" {
+			obj.Status.NextStart = ""
+		}
 	} else {
 		obj.Labels = map[string]string{utils.PipelineCronLabel: "false"}
+		nextStart, err := getNextStartTime(obj.Spec.TriggerCronExpression, obj.Spec.TriggerCronTimezone, time.Now())
+		if err != nil {
+			return obj, err
+		}
+		obj.Status.NextStart = nextStart
 	}
 
 	//handle webhook
-	if previous.Spec.TriggerWebhook && previous.Status.WebHookID != "" && !obj.Spec.TriggerWebhook {
-		if err := l.deleteHook(previous); err != nil {
-			logrus.Errorf("fail to delete previous set webhook")
+	if obj.Status.WebHookID != "" && !obj.Spec.TriggerWebhook {
+		if err := l.deleteHook(obj); err != nil {
+			logrus.Warningf("fail to delete previous set webhook of pipeline '%s'", obj.Spec.DisplayName)
 		}
-	} else if !previous.Spec.TriggerWebhook && obj.Spec.TriggerWebhook && obj.Status.WebHookID == "" {
+		obj.Status.WebHookID = ""
+	} else if obj.Spec.TriggerWebhook && obj.Status.WebHookID == "" {
 		id, err := l.createHook(obj)
 		if err != nil {
 			return obj, err

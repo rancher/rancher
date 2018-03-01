@@ -3,15 +3,20 @@ package pipeline
 import (
 	"strings"
 
+	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/utils"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
+	"github.com/robfig/cron"
 	"github.com/sirupsen/logrus"
+	"io/ioutil"
 	"net/http"
 )
 
@@ -27,6 +32,33 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(apiContext, "run")
 }
 
+func Validator(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
+	pipelineSpec := v3.PipelineSpec{}
+	if err := convert.ToObj(data, &pipelineSpec); err != nil {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
+	}
+
+	if !validSourceCodeConfig(pipelineSpec) {
+		return httperror.NewAPIError(httperror.InvalidBodyContent,
+			"invalid pipeline definition, expected sourceCode step at the start")
+	}
+
+	if pipelineSpec.TriggerCronExpression != "" {
+		sourceCodeConfig := pipelineSpec.Stages[0].Steps[0].SourceCodeConfig
+		if sourceCodeConfig.BranchCondition == "all" || sourceCodeConfig.BranchCondition == "except" {
+			return httperror.NewAPIError(httperror.InvalidBodyContent,
+				"cron trigger only works for only branch option")
+		}
+		_, err := cron.ParseStandard(pipelineSpec.TriggerCronExpression)
+		if err != nil {
+			return httperror.NewAPIError(httperror.InvalidBodyContent,
+				"error parse cron trigger")
+		}
+	}
+
+	return nil
+}
+
 func (h *Handler) CreateHandler(apiContext *types.APIContext, next types.RequestHandler) error {
 	//update hooks endpoint for webhook
 	if err := utils.UpdateEndpoint(apiContext.URLBuilder.Current()); err != nil {
@@ -35,6 +67,13 @@ func (h *Handler) CreateHandler(apiContext *types.APIContext, next types.Request
 	return handler.CreateHandler(apiContext, next)
 }
 
+func (h *Handler) UpdateHandler(apiContext *types.APIContext, next types.RequestHandler) error {
+	//update hooks endpoint for webhook
+	if err := utils.UpdateEndpoint(apiContext.URLBuilder.Current()); err != nil {
+		return err
+	}
+	return handler.UpdateHandler(apiContext, next)
+}
 func (h *Handler) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
 	logrus.Debugf("do pipeline action:%s", actionName)
 
@@ -85,7 +124,31 @@ func (h *Handler) run(apiContext *types.APIContext) error {
 	if err != nil {
 		return err
 	}
-	execution, err := utils.GenerateExecution(h.Pipelines, h.PipelineExecutions, pipeline, utils.TriggerTypeUser)
+	runPipelineInput := v3.RunPipelineInput{}
+	requestBytes, err := ioutil.ReadAll(apiContext.Request.Body)
+	if err != nil {
+		return err
+	}
+	if string(requestBytes) != "" {
+		if err := json.Unmarshal(requestBytes, &runPipelineInput); err != nil {
+			return err
+		}
+	}
+	if !validSourceCodeConfig(pipeline.Spec) {
+		return errors.New("Error invalid pipeline definition")
+	}
+	branch := runPipelineInput.Branch
+	branchCondition := pipeline.Spec.Stages[0].Steps[0].SourceCodeConfig.BranchCondition
+	if branchCondition == "except" || branchCondition == "all" {
+		if branch == "" {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, "Error branch is not specified for the pipeline to run")
+		}
+	} else {
+		branch = ""
+	}
+
+	userName := apiContext.Request.Header.Get("Impersonate-User")
+	execution, err := utils.GenerateExecution(h.Pipelines, h.PipelineExecutions, pipeline, utils.TriggerTypeUser, userName, runPipelineInput.Branch)
 	if err != nil {
 		return err
 	}
@@ -97,4 +160,13 @@ func (h *Handler) run(apiContext *types.APIContext) error {
 
 	apiContext.WriteResponse(http.StatusOK, data)
 	return err
+}
+
+func validSourceCodeConfig(spec v3.PipelineSpec) bool {
+	if len(spec.Stages) < 1 ||
+		len(spec.Stages[0].Steps) < 1 ||
+		spec.Stages[0].Steps[0].SourceCodeConfig == nil {
+		return false
+	}
+	return true
 }
