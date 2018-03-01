@@ -560,6 +560,12 @@ func addServiceOrDNSRecord(dns bool) types.SchemasInitFunc {
 					f.Update = false
 					return f
 				})
+				schema.MustCustomizeField("name", func(field types.Field) types.Field {
+					field.Type = "dnsLabel"
+					field.Nullable = false
+					field.Required = true
+					return field
+				})
 			}
 		}, projectOverride{}, struct {
 			Description        string   `json:"description"`
