@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/app"
 	"github.com/rancher/rancher/pkg/api/customization/authn"
 	"github.com/rancher/rancher/pkg/api/customization/catalog"
+	ccluster "github.com/rancher/rancher/pkg/api/customization/cluster"
 	"github.com/rancher/rancher/pkg/api/customization/clusteregistrationtokens"
 	"github.com/rancher/rancher/pkg/api/customization/logging"
 	"github.com/rancher/rancher/pkg/api/customization/node"
@@ -84,6 +85,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext) error {
 
 	wg.Wait()
 
+	Clusters(schemas)
 	Templates(schemas)
 	TemplateVersion(schemas)
 	User(schemas, apiContext)
@@ -133,6 +135,12 @@ func setupScopedTypes(schemas *types.Schemas) {
 			break
 		}
 	}
+}
+
+func Clusters(schemas *types.Schemas) {
+	schema := schemas.Schema(&managementschema.Version, client.ClusterType)
+	schema.Formatter = ccluster.Formatter
+	schema.LinkHandler = ccluster.LinkHandler
 }
 
 func Templates(schemas *types.Schemas) {

@@ -275,7 +275,7 @@ func (m *Manager) cluster(apiContext *types.APIContext, context types.StorageCon
 	}
 
 	if clusterID == "" {
-		return nil, fmt.Errorf("failed to find cluster ID")
+		return nil, nil
 	}
 
 	return m.clusterLister.Get("", clusterID)

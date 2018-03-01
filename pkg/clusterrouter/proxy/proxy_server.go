@@ -133,3 +133,40 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 func (r *RemoteService) Cluster() *v3.Cluster {
 	return r.cluster
 }
+
+type SimpleProxy struct {
+	url       *url.URL
+	transport http.RoundTripper
+}
+
+func NewSimpleProxy(host string, caData []byte) (*SimpleProxy, error) {
+	hostURL, _, err := rest.DefaultServerURL(host, "", schema.GroupVersion{}, true)
+	if err != nil {
+		return nil, err
+	}
+
+	ht := &http.Transport{}
+	if len(caData) > 0 {
+		certPool := x509.NewCertPool()
+		certPool.AppendCertsFromPEM(caData)
+		ht.TLSClientConfig = &tls.Config{
+			RootCAs: certPool,
+		}
+	}
+
+	return &SimpleProxy{
+		url:       hostURL,
+		transport: ht,
+	}, nil
+}
+
+func (s *SimpleProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	u := *s.url
+	u.Path = req.URL.Path
+	u.RawQuery = req.URL.RawQuery
+	req.URL.Scheme = "https"
+	req.URL.Host = req.Host
+	httpProxy := proxy.NewUpgradeAwareHandler(&u, s.transport, true, false, er)
+	httpProxy.ServeHTTP(rw, req)
+
+}

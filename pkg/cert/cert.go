@@ -1,16 +1,15 @@
 package cert
 
 import (
+	"bytes"
 	"crypto/rsa"
+	"crypto/sha1"
 	"crypto/x509"
+	"encoding/hex"
 	"encoding/pem"
 	"fmt"
-	"time"
-
-	"bytes"
-	"crypto/sha1"
-	"encoding/hex"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 )

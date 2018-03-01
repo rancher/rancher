@@ -12,8 +12,9 @@ import (
 )
 
 type NodeConfig struct {
-	Certs     string                `json:"certs"`
-	Processes map[string]v3.Process `json:"processes"`
+	APIProxyAddress string                `json:"apiProxyAddress"`
+	Certs           string                `json:"certs"`
+	Processes       map[string]v3.Process `json:"processes"`
 }
 
 func runProcess(ctx context.Context, name string, p v3.Process) error {
@@ -66,6 +67,7 @@ func runProcess(ctx context.Context, name string, p v3.Process) error {
 		config.Labels = map[string]string{}
 	}
 	config.Labels["io.cattle.process.name"] = name
+	hostConfig.VolumesFrom = nil
 
 	newContainer, err := c.ContainerCreate(ctx, config, hostConfig, nil, name)
 	if err == nil {

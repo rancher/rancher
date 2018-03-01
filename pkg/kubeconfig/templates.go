@@ -33,7 +33,6 @@ clusters:
   cluster:
     server: "https://{{.Host}}"
     api-version: v1
-    certificate-authority-data: "{{.Cert}}"
 
 users:
 - name: "{{.User}}"

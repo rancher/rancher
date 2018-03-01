@@ -26,7 +26,7 @@ func ConfigClient(ctx context.Context, url string, header http.Header) error {
 		}
 
 		if nc != nil {
-			return rkeworker.ExecutePlan(ctx, nc)
+			return rkeworker.ExecutePlan(ctx, url, nc)
 		}
 
 		logrus.Infof("waiting for node to register")

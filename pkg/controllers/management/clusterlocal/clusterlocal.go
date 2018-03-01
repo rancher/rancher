@@ -135,5 +135,6 @@ func (cl *clusterLocal) deploy(c *v3.Cluster) error {
 		bundle.Certs(),
 		"",
 		"",
-		cl.rkeDialer.WrapTransport(rkeConfig))
+		cl.rkeDialer.WrapTransport(rkeConfig),
+		true)
 }
