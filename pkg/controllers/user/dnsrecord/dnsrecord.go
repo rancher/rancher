@@ -80,7 +80,9 @@ func (c *Controller) reconcileEndpoints(key string, obj *corev1.Service) error {
 	var records []string
 	err := json.Unmarshal([]byte(value), &records)
 	if err != nil {
-		return err
+		// just log the error, can't really do anything here.
+		logrus.Warnf("Failed to unmarshal targetDnsRecordIds", err)
+		return nil
 	}
 
 	var newEndpointSubsets []corev1.EndpointSubset
