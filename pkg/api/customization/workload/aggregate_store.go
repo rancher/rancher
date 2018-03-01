@@ -1,6 +1,8 @@
 package workload
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -12,7 +14,9 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
+	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	projectschema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
+	managementv3 "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/client/project/v3"
 	projectclient "github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/config"
@@ -131,6 +135,7 @@ func (a *AggregateStore) Create(apiContext *types.APIContext, schema *types.Sche
 	setWorkloadSpecificDefaults(toSchema.ID, data)
 	setSecrets(apiContext, data)
 	setPorts(data)
+	setScheduling(apiContext, data)
 
 	return toStore.Create(apiContext, toSchema, data)
 }
@@ -265,6 +270,25 @@ func setSecrets(apiContext *types.APIContext, data map[string]interface{}) {
 	}
 }
 
+func setScheduling(apiContext *types.APIContext, data map[string]interface{}) {
+	if nodeID := convert.ToString(values.GetValueN(data, "scheduling", "node", "nodeId")); nodeID != "" {
+		nodeName := getNodeName(apiContext, nodeID)
+		values.PutValue(data, nodeName, "scheduling", "node", "nodeId")
+		state := getState(data)
+		state[getKey(nodeName)] = nodeID
+		setState(data, state)
+	}
+}
+
+func getNodeName(apiContext *types.APIContext, nodeID string) string {
+	var node managementv3.Node
+	var nodeName string
+	if err := access.ByID(apiContext, &managementschema.Version, managementv3.NodeType, nodeID, &node); err == nil {
+		nodeName = node.NodeName
+	}
+	return nodeName
+}
+
 func resolveWorkloadID(schemaID string, data map[string]interface{}) string {
 	return fmt.Sprintf("%s-%s-%s", schemaID, data["namespaceId"], data["name"])
 }
@@ -337,4 +361,29 @@ func getDomain(image string) string {
 		return "index.docker.io"
 	}
 	return domain
+}
+
+func setState(data map[string]interface{}, stateMap map[string]string) {
+	content, err := json.Marshal(stateMap)
+	if err != nil {
+		logrus.Errorf("failed to save state on workload: %v", data["id"])
+		return
+	}
+
+	values.PutValue(data, string(content), "annotations", "workload.cattle.io/state")
+}
+
+func getState(data map[string]interface{}) map[string]string {
+	state := map[string]string{}
+
+	v, ok := values.GetValue(data, "annotations", "workload.cattle.io/state")
+	if ok {
+		json.Unmarshal([]byte(convert.ToString(v)), &state)
+	}
+
+	return state
+}
+
+func getKey(key string) string {
+	return base64.URLEncoding.EncodeToString([]byte(key))
 }

@@ -143,7 +143,7 @@ func setState(data map[string]interface{}, stateMap map[string]string) {
 }
 
 func getState(data map[string]interface{}) map[string]string {
-	state := make(map[string]string)
+	state := map[string]string{}
 
 	v, ok := values.GetValue(data, "annotations", "ingress.cattle.io/state")
 	if ok {
