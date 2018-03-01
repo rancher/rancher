@@ -108,7 +108,9 @@ func (c *Controller) reconcilePods(key string, obj *corev1.Service) error {
 	var workloadIDs []string
 	err := json.Unmarshal([]byte(value), &workloadIDs)
 	if err != nil {
-		return err
+		// just log the error, can't really do anything here.
+		logrus.Warnf("Failed to unmarshal targetWorkloadIds", err)
+		return nil
 	}
 
 	if obj.Spec.Selector == nil {
