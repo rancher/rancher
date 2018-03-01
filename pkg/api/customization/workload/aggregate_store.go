@@ -175,34 +175,52 @@ func setWorkloadSpecificDefaults(schemaID string, data map[string]interface{}) {
 	}
 }
 
+func store(registries map[string]projectclient.RegistryCredential, domainToCreds map[string][]corev1.LocalObjectReference, name string) {
+	for registry := range registries {
+		secretRef := corev1.LocalObjectReference{Name: name}
+		if _, ok := domainToCreds[registry]; ok {
+			domainToCreds[registry] = append(domainToCreds[registry], secretRef)
+		} else {
+			domainToCreds[registry] = []corev1.LocalObjectReference{secretRef}
+		}
+	}
+}
+
+func getCreds(apiContext *types.APIContext) map[string][]corev1.LocalObjectReference {
+	domainToCreds := make(map[string][]corev1.LocalObjectReference)
+	var namespacedCreds []projectclient.NamespacedDockerCredential
+	if err := access.List(apiContext, &projectschema.Version, "namespacedDockerCredential", &types.QueryOptions{}, &namespacedCreds); err == nil {
+		for _, cred := range namespacedCreds {
+			store(cred.Registries, domainToCreds, cred.Name)
+		}
+	}
+	var creds []projectclient.DockerCredential
+	if err := access.List(apiContext, &projectschema.Version, "dockerCredential", &types.QueryOptions{}, &creds); err == nil {
+		for _, cred := range creds {
+			store(cred.Registries, domainToCreds, cred.Name)
+		}
+	}
+	return domainToCreds
+}
+
 func setSecrets(apiContext *types.APIContext, data map[string]interface{}) {
-	if _, ok := values.GetValue(data, "imagePullSecrets"); ok {
+	if val, _ := values.GetValue(data, "imagePullSecrets"); val != nil {
 		return
 	}
-	var imagePullSecrets []corev1.LocalObjectReference
-
-	if containers, ok := values.GetSlice(data, "containers"); ok {
-		imageToSecret := make(map[string]*corev1.LocalObjectReference)
-		imagePullSecrets, _ = data["imagePullSecrets"].([]corev1.LocalObjectReference)
-
+	if containers, _ := values.GetSlice(data, "containers"); len(containers) > 0 {
+		imagePullSecrets, _ := data["imagePullSecrets"].([]corev1.LocalObjectReference)
+		domainToCreds := getCreds(apiContext)
 		for _, container := range containers {
 			if image := convert.ToString(container["image"]); image != "" {
-				if secretRef, ok := imageToSecret[image]; ok {
-					imagePullSecrets = append(imagePullSecrets, *secretRef)
-					continue
-				}
-				if name := getRepo(image); name != "" {
-					if gotSecret(data["projectId"], data["namespaceId"], apiContext, name) {
-						secretRef := &corev1.LocalObjectReference{}
-						secretRef.Name = name
-						imagePullSecrets = append(imagePullSecrets, *secretRef)
-					}
+				domain := getDomain(image)
+				if secrets, ok := domainToCreds[domain]; ok {
+					imagePullSecrets = append(imagePullSecrets, secrets...)
 				}
 			}
 		}
-	}
-	if imagePullSecrets != nil {
-		values.PutValue(data, imagePullSecrets, "imagePullSecrets")
+		if imagePullSecrets != nil {
+			values.PutValue(data, imagePullSecrets, "imagePullSecrets")
+		}
 	}
 }
 
@@ -266,44 +284,16 @@ func splitTypeAndID(id string) (string, string) {
 	return parts[0], parts[1]
 }
 
-func gotSecret(projectID interface{}, namespaceID interface{}, apiContext *types.APIContext, repoName string) bool {
-	if project := convert.ToString(projectID); project != "" {
-		splitID := strings.Split(project, ":")
-		if len(splitID) == 2 {
-			projectName := splitID[1]
-			if ok := foundSecret(projectName, repoName, projectclient.SecretType, apiContext); ok {
-				return true
-			}
-		}
-	}
-	if namespace := convert.ToString(namespaceID); namespace != "" {
-		if ok := foundSecret(namespace, repoName, "namespacedSecret", apiContext); ok {
-			return true
-		}
-	}
-	logrus.Debugf("couldn't find secret [%s]", repoName)
-	return false
-}
-
-func foundSecret(prefix string, repoName string, datatype string, apiContext *types.APIContext) bool {
-	secretName := fmt.Sprintf("%s:%s", prefix, repoName)
-	var secret interface{}
-	if err := access.ByID(apiContext, &projectschema.Version, datatype, secretName, &secret); err == nil {
-		if secretMap := convert.ToMapInterface(secret); secretMap != nil {
-			if val, _ := secretMap["type"]; convert.ToString(val) == "dockerCredential" {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func getRepo(image string) string {
+func getDomain(image string) string {
 	var repo string
 	named, err := reference.ParseNormalizedNamed(image)
 	if err != nil {
 		logrus.Debug(err)
 		return repo
 	}
-	return reference.Domain(named)
+	domain := reference.Domain(named)
+	if domain == "docker.io" {
+		return "index.docker.io"
+	}
+	return domain
 }
