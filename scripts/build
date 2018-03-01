@@ -1,10 +1,5 @@
 #!/bin/bash
 set -e
 
-source $(dirname $0)/version
-
-cd $(dirname $0)/..
-
-mkdir -p bin
-[ "$(uname)" != "Darwin" ] && LINKFLAGS="-linkmode external -extldflags -static -s"
-CGO_ENABLED=0 go build -tags k8s -ldflags "-X main.VERSION=$VERSION $LINKFLAGS" -o bin/rancher
+$(dirname $0)/build-server
+$(dirname $0)/build-agent
