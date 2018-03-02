@@ -668,6 +668,7 @@ func NewWorkloadTypeMapper() types.Mapper {
 		&m.Move{From: "metadata/annotations", To: "annotations", NoDeleteFromField: true},
 		&m.Drop{Field: "metadata"},
 		mapper.ContainerPorts{},
+		mapper.WorkloadAnnotations{},
 		&m.AnnotationField{Field: "publicEndpoints", List: true},
 	}
 }

@@ -594,14 +594,10 @@ func (c CommonController) UpdateWorkload(w *Workload, annotations map[string]str
 			return err
 		}
 		toUpdate := o.DeepCopy()
-		if toUpdate.Spec.Template.Annotations == nil {
-			toUpdate.Spec.Template.Annotations = make(map[string]string)
-		}
 		if toUpdate.Annotations == nil {
 			toUpdate.Annotations = make(map[string]string)
 		}
 		for key, value := range annotations {
-			toUpdate.Spec.Template.Annotations[key] = value
 			toUpdate.Annotations[key] = value
 		}
 
@@ -618,14 +614,10 @@ func (c CommonController) UpdateWorkload(w *Workload, annotations map[string]str
 			return err
 		}
 		toUpdate := o.DeepCopy()
-		if toUpdate.Spec.Template.Annotations == nil {
-			toUpdate.Spec.Template.Annotations = make(map[string]string)
-		}
 		if toUpdate.Annotations == nil {
 			toUpdate.Annotations = make(map[string]string)
 		}
 		for key, value := range annotations {
-			toUpdate.Spec.Template.Annotations[key] = value
 			toUpdate.Annotations[key] = value
 		}
 		_, err = c.ReplicationControllers.Update(toUpdate)
@@ -641,14 +633,10 @@ func (c CommonController) UpdateWorkload(w *Workload, annotations map[string]str
 			return err
 		}
 		toUpdate := o.DeepCopy()
-		if toUpdate.Spec.Template.Annotations == nil {
-			toUpdate.Spec.Template.Annotations = make(map[string]string)
-		}
 		if toUpdate.Annotations == nil {
 			toUpdate.Annotations = make(map[string]string)
 		}
 		for key, value := range annotations {
-			toUpdate.Spec.Template.Annotations[key] = value
 			toUpdate.Annotations[key] = value
 		}
 		_, err = c.ReplicaSes.Update(toUpdate)
@@ -664,14 +652,10 @@ func (c CommonController) UpdateWorkload(w *Workload, annotations map[string]str
 			return err
 		}
 		toUpdate := o.DeepCopy()
-		if toUpdate.Spec.Template.Annotations == nil {
-			toUpdate.Spec.Template.Annotations = make(map[string]string)
-		}
 		if toUpdate.Annotations == nil {
 			toUpdate.Annotations = make(map[string]string)
 		}
 		for key, value := range annotations {
-			toUpdate.Spec.Template.Annotations[key] = value
 			toUpdate.Annotations[key] = value
 		}
 		_, err = c.DaemonSets.Update(toUpdate)
@@ -687,14 +671,10 @@ func (c CommonController) UpdateWorkload(w *Workload, annotations map[string]str
 			return err
 		}
 		toUpdate := o.DeepCopy()
-		if toUpdate.Spec.Template.Annotations == nil {
-			toUpdate.Spec.Template.Annotations = make(map[string]string)
-		}
 		if toUpdate.Annotations == nil {
 			toUpdate.Annotations = make(map[string]string)
 		}
 		for key, value := range annotations {
-			toUpdate.Spec.Template.Annotations[key] = value
 			toUpdate.Annotations[key] = value
 		}
 		_, err = c.StatefulSets.Update(toUpdate)
@@ -710,14 +690,10 @@ func (c CommonController) UpdateWorkload(w *Workload, annotations map[string]str
 			return err
 		}
 		toUpdate := o.DeepCopy()
-		if toUpdate.Spec.Template.Annotations == nil {
-			toUpdate.Spec.Template.Annotations = make(map[string]string)
-		}
 		if toUpdate.Annotations == nil {
 			toUpdate.Annotations = make(map[string]string)
 		}
 		for key, value := range annotations {
-			toUpdate.Spec.Template.Annotations[key] = value
 			toUpdate.Annotations[key] = value
 		}
 		_, err = c.Jobs.Update(toUpdate)
@@ -733,14 +709,10 @@ func (c CommonController) UpdateWorkload(w *Workload, annotations map[string]str
 			return err
 		}
 		toUpdate := o.DeepCopy()
-		if toUpdate.Spec.JobTemplate.Spec.Template.Annotations == nil {
-			toUpdate.Spec.JobTemplate.Spec.Template.Annotations = make(map[string]string)
-		}
 		if toUpdate.Annotations == nil {
 			toUpdate.Annotations = make(map[string]string)
 		}
 		for key, value := range annotations {
-			toUpdate.Spec.JobTemplate.Spec.Template.Annotations[key] = value
 			toUpdate.Annotations[key] = value
 		}
 		_, err = c.CronJobs.Update(toUpdate)
