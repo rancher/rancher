@@ -115,9 +115,10 @@ func convertServiceToPublicEndpoints(svc *corev1.Service, node *corev1.Node) ([]
 		}
 		nodeName = node.Name
 	} else if nodePort {
-		address = "NodePort"
+		address = ""
 	}
 
+	svcName := fmt.Sprintf("%s:%s", svc.Namespace, svc.Name)
 	if nodePort {
 		for _, port := range svc.Spec.Ports {
 			if port.NodePort == 0 {
@@ -128,7 +129,7 @@ func convertServiceToPublicEndpoints(svc *corev1.Service, node *corev1.Node) ([]
 				Address:     address,
 				Port:        port.NodePort,
 				Protocol:    string(port.Protocol),
-				ServiceName: fmt.Sprintf("%s/%s", svc.Namespace, svc.Name),
+				ServiceName: svcName,
 			}
 			eps = append(eps, p)
 		}
@@ -144,7 +145,7 @@ func convertServiceToPublicEndpoints(svc *corev1.Service, node *corev1.Node) ([]
 					Address:     address,
 					Port:        port.Port,
 					Protocol:    string(port.Protocol),
-					ServiceName: fmt.Sprintf("%s/%s", svc.Namespace, svc.Name),
+					ServiceName: svcName,
 				}
 				eps = append(eps, p)
 			}
