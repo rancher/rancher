@@ -151,19 +151,29 @@ func versionsForPath(schemas *types.Schemas, path string) []types.APIVersion {
 	return matchedVersion
 }
 
-func parseVersionAndSubContext(schemas *types.Schemas, path string) (*types.APIVersion, *types.APIVersion, string, []string, map[string]string) {
-	versions := versionsForPath(schemas, path)
+func parseVersionAndSubContext(schemas *types.Schemas, escapedPath string) (*types.APIVersion, *types.APIVersion, string, []string, map[string]string) {
+	versions := versionsForPath(schemas, escapedPath)
 	if len(versions) == 0 {
 		return nil, nil, "", nil, nil
 	}
 	version := &versions[0]
 
-	if strings.HasSuffix(path, "/") {
-		path = path[:len(path)-1]
+	if strings.HasSuffix(escapedPath, "/") {
+		escapedPath = escapedPath[:len(escapedPath)-1]
 	}
 
 	versionParts := strings.Split(version.Path, "/")
-	pathParts := strings.Split(path, "/")
+	pp := strings.Split(escapedPath, "/")
+	var pathParts []string
+	for _, p := range pp {
+		part, err := url.PathUnescape(p)
+		if err == nil {
+			pathParts = append(pathParts, part)
+		} else {
+			pathParts = append(pathParts, p)
+		}
+	}
+
 	paths := pathParts[len(versionParts):]
 
 	if !version.SubContext || len(versions) < 2 {
