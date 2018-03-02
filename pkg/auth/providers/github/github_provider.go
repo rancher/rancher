@@ -144,33 +144,20 @@ func (g *ghProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v
 	if err != nil {
 		return v3.Principal{}, nil, nil, err
 	}
-	userPrincipal = v3.Principal{
-		ObjectMeta:     metav1.ObjectMeta{Name: Name + "_user://" + strconv.Itoa(user.ID)},
-		DisplayName:    user.Name,
-		LoginName:      user.Login,
-		PrincipalType:  "user",
-		Provider:       Name,
-		Me:             true,
-		ProfilePicture: user.AvatarURL,
-	}
+	userPrincipal = g.toPrincipal(userType, user, nil)
+	userPrincipal.Me = true
 
 	orgAccts, err := g.githubClient.getOrgs(accessToken, config)
 	if err != nil {
 		return v3.Principal{}, nil, nil, err
 	}
-
 	for _, orgAcct := range orgAccts {
 		name := orgAcct.Name
 		if name == "" {
 			name = orgAcct.Login
 		}
-		groupPrincipal := v3.Principal{
-			ObjectMeta:     metav1.ObjectMeta{Name: Name + "_org://" + strconv.Itoa(orgAcct.ID)},
-			DisplayName:    name,
-			PrincipalType:  "group",
-			Provider:       Name,
-			ProfilePicture: orgAcct.AvatarURL,
-		}
+		groupPrincipal := g.toPrincipal(orgType, orgAcct, nil)
+		groupPrincipal.MemberOf = true
 		groupPrincipals = append(groupPrincipals, groupPrincipal)
 	}
 
@@ -179,13 +166,8 @@ func (g *ghProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v
 		return v3.Principal{}, nil, nil, err
 	}
 	for _, teamAcct := range teamAccts {
-		groupPrincipal := v3.Principal{
-			ObjectMeta:     metav1.ObjectMeta{Name: Name + "_team://" + strconv.Itoa(teamAcct.ID)},
-			DisplayName:    teamAcct.Name,
-			PrincipalType:  "group",
-			Provider:       Name,
-			ProfilePicture: teamAcct.AvatarURL,
-		}
+		groupPrincipal := g.toPrincipal(teamType, teamAcct, nil)
+		groupPrincipal.MemberOf = true
 		groupPrincipals = append(groupPrincipals, groupPrincipal)
 	}
 
@@ -200,7 +182,7 @@ func (g *ghProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v
 	return userPrincipal, groupPrincipals, providerInfo, nil
 }
 
-func (g *ghProvider) SearchPrincipals(searchKey, principalType string, myToken v3.Token) ([]v3.Principal, error) {
+func (g *ghProvider) SearchPrincipals(searchKey, principalType string, token v3.Token) ([]v3.Principal, error) {
 	var principals []v3.Principal
 	var err error
 
@@ -209,40 +191,20 @@ func (g *ghProvider) SearchPrincipals(searchKey, principalType string, myToken v
 		return principals, err
 	}
 
-	accessToken := myToken.ProviderInfo["access_token"]
+	accessToken := token.ProviderInfo["access_token"]
 
-	if principalType == "" || principalType == "user" {
-		user, err := g.githubClient.getUserByName(searchKey, accessToken, config)
+	if principalType == "" || principalType == userType {
+		acct, err := g.githubClient.getUserByName(searchKey, accessToken, config)
 		if err == nil {
-			userPrincipal := v3.Principal{
-				ObjectMeta:     metav1.ObjectMeta{Name: Name + "_user://" + strconv.Itoa(user.ID)},
-				DisplayName:    user.Name,
-				LoginName:      user.Login,
-				PrincipalType:  "user",
-				Provider:       Name,
-				Me:             false,
-				ProfilePicture: user.AvatarURL,
-			}
-			if g.isThisUserMe(myToken.UserPrincipal, userPrincipal) {
-				userPrincipal.Me = true
-			}
+			userPrincipal := g.toPrincipal(userType, acct, &token)
 			principals = append(principals, userPrincipal)
 		}
 	}
 
 	if principalType == "" || principalType == "group" {
-		orgAcct, err := g.githubClient.getOrgByName(searchKey, accessToken, config)
+		acct, err := g.githubClient.getOrgByName(searchKey, accessToken, config)
 		if err == nil {
-			groupPrincipal := v3.Principal{
-				ObjectMeta:     metav1.ObjectMeta{Name: Name + "_org://" + strconv.Itoa(orgAcct.ID)},
-				DisplayName:    orgAcct.Name,
-				PrincipalType:  "group",
-				Provider:       Name,
-				ProfilePicture: orgAcct.AvatarURL,
-			}
-			if g.isMemberOf(myToken.GroupPrincipals, groupPrincipal) {
-				groupPrincipal.MemberOf = true
-			}
+			groupPrincipal := g.toPrincipal(orgType, acct, &token)
 			principals = append(principals, groupPrincipal)
 		}
 	}
@@ -275,56 +237,58 @@ func (g *ghProvider) GetPrincipal(principalID string, token v3.Token) (v3.Princi
 	if len(parts) != 2 {
 		return v3.Principal{}, errors.Errorf("invalid id %v", principalID)
 	}
+
 	principalType := parts[1]
-
-	isUser := false
-
+	var acct Account
 	switch principalType {
 	case userType:
-		isUser = true
 		fallthrough
 	case orgType:
-		acct, err := g.githubClient.getUserOrgByID(externalID, accessToken, config)
+		acct, err = g.githubClient.getUserOrgByID(externalID, accessToken, config)
 		if err != nil {
 			return v3.Principal{}, err
 		}
-
-		princ := v3.Principal{
-			ObjectMeta:     metav1.ObjectMeta{Name: Name + "_" + principalType + "://" + strconv.Itoa(acct.ID)},
-			DisplayName:    acct.Name,
-			LoginName:      acct.Login,
-			Provider:       Name,
-			Me:             false,
-			ProfilePicture: acct.AvatarURL,
-		}
-		if isUser {
-			princ.Me = g.isThisUserMe(token.UserPrincipal, princ)
-			princ.PrincipalType = "user"
-		} else {
-			princ.MemberOf = g.isMemberOf(token.GroupPrincipals, princ)
-			princ.PrincipalType = "group"
-		}
-		return princ, nil
 	case teamType:
-		acct, err := g.githubClient.getTeamByID(externalID, accessToken, config)
+		acct, err = g.githubClient.getTeamByID(externalID, accessToken, config)
 		if err != nil {
 			return v3.Principal{}, err
 		}
-
-		princ := v3.Principal{
-			ObjectMeta:     metav1.ObjectMeta{Name: Name + "_" + teamType + "://" + strconv.Itoa(acct.ID)},
-			DisplayName:    acct.Name,
-			PrincipalType:  "group",
-			Provider:       Name,
-			ProfilePicture: acct.AvatarURL,
-		}
-		if g.isMemberOf(token.GroupPrincipals, princ) {
-			princ.MemberOf = true
-		}
-		return princ, nil
 	default:
 		return v3.Principal{}, fmt.Errorf("Cannot get the github account due to invalid externalIDType %v", principalType)
 	}
+
+	princ := g.toPrincipal(principalType, acct, &token)
+	return princ, nil
+}
+
+func (g *ghProvider) toPrincipal(principalType string, acct Account, token *v3.Token) v3.Principal {
+	displayName := acct.Name
+	if displayName == "" {
+		displayName = acct.Login
+	}
+
+	princ := v3.Principal{
+		ObjectMeta:     metav1.ObjectMeta{Name: Name + "_" + principalType + "://" + strconv.Itoa(acct.ID)},
+		DisplayName:    displayName,
+		LoginName:      acct.Login,
+		Provider:       Name,
+		Me:             false,
+		ProfilePicture: acct.AvatarURL,
+	}
+
+	if principalType == userType {
+		princ.PrincipalType = "user"
+		if token != nil {
+			princ.Me = g.isThisUserMe(token.UserPrincipal, princ)
+		}
+	} else {
+		princ.PrincipalType = "group"
+		if token != nil {
+			princ.MemberOf = g.isMemberOf(token.GroupPrincipals, princ)
+		}
+	}
+
+	return princ
 }
 
 func (g *ghProvider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
