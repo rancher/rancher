@@ -5,7 +5,7 @@ def test_node_fields(mc):
     cclient = mc.client
     fields = {
         'annotations': 'r',
-        'labels': 'r',
+        'labels': 'cru',
         'nodeTaints': 'r',
         'namespaceId': 'cr',
         'conditions': 'r',
