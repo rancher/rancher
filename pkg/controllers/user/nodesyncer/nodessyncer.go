@@ -36,6 +36,7 @@ type NodesSyncer struct {
 	machines         v3.NodeInterface
 	machineLister    v3.NodeLister
 	nodeLister       v1.NodeLister
+	nodeClient       v1.NodeInterface
 	podLister        v1.PodLister
 	clusterNamespace string
 }
@@ -51,6 +52,7 @@ func Register(cluster *config.UserContext) {
 		machines:         cluster.Management.Management.Nodes(cluster.ClusterName),
 		machineLister:    cluster.Management.Management.Nodes(cluster.ClusterName).Controller().Lister(),
 		nodeLister:       cluster.Core.Nodes("").Controller().Lister(),
+		nodeClient:       cluster.Core.Nodes(""),
 		podLister:        cluster.Core.Pods("").Controller().Lister(),
 	}
 
@@ -61,6 +63,7 @@ func Register(cluster *config.UserContext) {
 
 	cluster.Core.Nodes("").Controller().AddHandler("nodesSyncer", n.sync)
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler("machinesSyncer", m.sync)
+	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler("machinesLabelSyncer", m.syncLabels)
 	cluster.Core.Pods("").Controller().AddHandler("podsStatsSyncer", p.sync)
 }
 
@@ -78,6 +81,54 @@ func (m *NodesSyncer) sync(key string, machine *v3.Node) error {
 	if key == fmt.Sprintf("%s/%s", m.clusterNamespace, allNodeKey) {
 		return m.reconcileAll()
 	}
+	return nil
+}
+
+func (m *NodesSyncer) syncLabels(key string, obj *v3.Node) error {
+	if obj == nil {
+		return nil
+	}
+
+	if obj.Spec.DesiredNodeAnnotations == nil && obj.Spec.DesiredNodeLabels == nil {
+		return nil
+	}
+
+	machine := obj.DeepCopy()
+	nodeName := node.GetNodeName(machine)
+	if nodeName == "" {
+		logrus.Debugf("Failed to get nodeName from machine [%s]", machine.Name)
+		return nil
+	}
+	node, err := m.nodeClient.Get(nodeName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	shouldUpdate := false
+	// set annotations
+	if !reflect.DeepEqual(node.Annotations, machine.Spec.DesiredNodeAnnotations) && machine.Spec.DesiredNodeAnnotations != nil {
+		node.Annotations = machine.Spec.DesiredNodeAnnotations
+		shouldUpdate = true
+	}
+	// set labels
+	if !reflect.DeepEqual(node.Labels, machine.Spec.DesiredNodeLabels) && machine.Spec.DesiredNodeLabels != nil {
+		node.Labels = machine.Spec.DesiredNodeLabels
+		shouldUpdate = true
+	}
+
+	if shouldUpdate {
+		if _, err := m.nodeClient.Update(node); err != nil {
+			return err
+		}
+	}
+
+	// in the end we reset all desired fields
+	machine.Spec.DesiredNodeAnnotations = nil
+	machine.Spec.DesiredNodeLabels = nil
+	if _, err := m.machines.Update(machine); err != nil {
+		return err
+	}
+
 	return nil
 }
 

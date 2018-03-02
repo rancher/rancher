@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/setting"
 	"github.com/rancher/rancher/pkg/api/store/cert"
 	"github.com/rancher/rancher/pkg/api/store/cluster"
+	nodeStore "github.com/rancher/rancher/pkg/api/store/node"
 	"github.com/rancher/rancher/pkg/api/store/preference"
 	"github.com/rancher/rancher/pkg/api/store/scoped"
 	"github.com/rancher/rancher/pkg/api/store/userscope"
@@ -107,6 +108,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext) error {
 	principals.Schema(ctx, apiContext, schemas)
 	providers.SetupAuthConfig(ctx, apiContext, schemas)
 	authn.SetUserStore(schemas.Schema(&managementschema.Version, client.UserType), apiContext)
+	nodeStore.SetupStore(schemas.Schema(&managementschema.Version, client.NodeType))
 
 	setupScopedTypes(schemas)
 
@@ -229,7 +231,7 @@ func NodeTypes(schemas *types.Schemas, management *config.ScaledContext) error {
 	schema.Formatter = machineDriverHandlers.Formatter
 	schema.ActionHandler = machineDriverHandlers.ActionHandler
 
-	machineHandler := &node.Handler{
+	machineHandler := &node.DriverHandler{
 		SecretStore: secretStore,
 	}
 

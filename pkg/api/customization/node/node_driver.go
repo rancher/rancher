@@ -14,7 +14,6 @@ import (
 
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/encryptedstore"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
@@ -64,11 +63,11 @@ func (h *DriverHandlers) Formatter(apiContext *types.APIContext, resource *types
 	resource.AddAction(apiContext, "deactivate")
 }
 
-type Handler struct {
+type DriverHandler struct {
 	SecretStore *encryptedstore.GenericEncryptedStore
 }
 
-func (h Handler) LinkHandler(apiContext *types.APIContext, next types.RequestHandler) error {
+func (h DriverHandler) LinkHandler(apiContext *types.APIContext, next types.RequestHandler) error {
 	var node client.Node
 	if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, &node); err != nil {
 		return err
@@ -138,28 +137,4 @@ func (h Handler) LinkHandler(apiContext *types.APIContext, next types.RequestHan
 		return err
 	}
 	return nil
-}
-
-// Formatter for Node
-func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
-	etcd := convert.ToBool(resource.Values[client.NodeFieldEtcd])
-	cp := convert.ToBool(resource.Values[client.NodeFieldControlPlane])
-	worker := convert.ToBool(resource.Values[client.NodeFieldWorker])
-	if !etcd && !cp && !worker {
-		resource.Values[client.NodeFieldWorker] = true
-	}
-
-	// add nodeConfig action
-	resource.Links["nodeConfig"] = apiContext.URLBuilder.Link("nodeConfig", resource)
-
-	// remove link
-	nodeTemplateID := resource.Values["nodeTemplateId"]
-	customConfig := resource.Values["customConfig"]
-	if nodeTemplateID == nil {
-		delete(resource.Links, "nodeConfig")
-	}
-
-	if nodeTemplateID == nil && customConfig == nil {
-		delete(resource.Links, "remove")
-	}
 }
