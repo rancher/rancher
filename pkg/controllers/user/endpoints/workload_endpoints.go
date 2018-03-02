@@ -36,6 +36,14 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 		}
 	}
 
+	if obj.Annotations == nil {
+		return nil
+	}
+
+	if _, ok := obj.Annotations[workloadutil.CreatorIDAnnotation]; !ok {
+		return nil
+	}
+
 	var workloads []*workloadutil.Workload
 	var services []*corev1.Service
 	var err error

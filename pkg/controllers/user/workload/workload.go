@@ -21,10 +21,6 @@ import (
 // a) when rancher ports annotation is present, create service based on annotation ports
 // b) when annotation is missing, create a headless service
 
-const (
-	creatorIDAnnotation = "field.cattle.io/creatorId"
-)
-
 type Controller struct {
 	workloadController CommonController
 	serviceLister      v1.ServiceLister
@@ -54,7 +50,11 @@ func (c *Controller) CreateService(key string, w *Workload) error {
 		}
 	}
 
-	if _, ok := w.Annotations[creatorIDAnnotation]; !ok {
+	if w.Annotations == nil {
+		return nil
+	}
+
+	if _, ok := w.Annotations[CreatorIDAnnotation]; !ok {
 		return nil
 	}
 
