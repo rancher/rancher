@@ -270,7 +270,7 @@ func (g *ghProvider) GetPrincipal(principalID string, token v3.Token) (v3.Princi
 	if len(parts) != 2 {
 		return v3.Principal{}, errors.Errorf("invalid id %v", principalID)
 	}
-	externalID = strings.TrimPrefix(parts[1], "%2F%2F")
+	externalID = strings.TrimPrefix(parts[1], "//")
 	parts = strings.SplitN(parts[0], "_", 2)
 	if len(parts) != 2 {
 		return v3.Principal{}, errors.Errorf("invalid id %v", principalID)
