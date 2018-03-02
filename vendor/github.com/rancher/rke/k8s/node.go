@@ -139,10 +139,6 @@ func SyncTaints(k8sClient *kubernetes.Clientset, nodeName string, toAddTaints, t
 
 func doSyncLabels(k8sClient *kubernetes.Clientset, nodeName string, toAddLabels, toDelLabels map[string]string) error {
 	node, err := GetNode(k8sClient, nodeName)
-	oldLabels := make(map[string]string)
-	for k, v := range node.Labels {
-		oldLabels[k] = v
-	}
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			logrus.Debugf("[hosts] Can't find node by name [%s]", nodeName)
@@ -150,6 +146,15 @@ func doSyncLabels(k8sClient *kubernetes.Clientset, nodeName string, toAddLabels,
 		}
 		return err
 	}
+	oldLabels := map[string]string{}
+	if node.Labels == nil {
+		node.Labels = map[string]string{}
+	}
+
+	for k, v := range node.Labels {
+		oldLabels[k] = v
+	}
+
 	// Delete Labels
 	for key := range toDelLabels {
 		if _, ok := node.Labels[key]; ok {
