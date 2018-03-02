@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -88,6 +91,11 @@ func main() {
 	}
 
 	app.Action = func(c *cli.Context) error {
+		// enable profiler
+		go func() {
+			log.Println(http.ListenAndServe("localhost:6060", nil))
+		}()
+
 		config.ACMEDomains = c.GlobalStringSlice("acme-domain")
 		initLogs(c, config)
 		return run(config)
