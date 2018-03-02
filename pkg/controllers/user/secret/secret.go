@@ -128,7 +128,6 @@ func (s *Controller) getClusterNamespaces(obj *corev1.Secret) ([]*corev1.Namespa
 	_, err = s.projectLister.Get(s.clusterName, projectNamespace.Name)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			logrus.Warnf("Project [%s] can't be found", projectNamespace.Name)
 			return toReturn, nil
 		}
 		return toReturn, err
