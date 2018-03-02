@@ -178,11 +178,18 @@ func nodeTypes(schemas *types.Schemas) *types.Schemas {
 			&m.Drop{Field: "annotations"},
 			&m.Move{From: "nodeLabels", To: "labels"},
 			&m.Move{From: "nodeAnnotations", To: "annotations"},
+			&m.Drop{Field: "desiredNodeLabels"},
+			&m.Drop{Field: "desiredNodeAnnotations"},
 			m.DisplayName{}).
 		AddMapperForType(&Version, v3.NodeDriver{}, m.DisplayName{}).
 		AddMapperForType(&Version, v3.NodeTemplate{}, m.DisplayName{}).
 		MustImport(&Version, v3.NodePool{}).
-		MustImport(&Version, v3.Node{}).
+		MustImportAndCustomize(&Version, v3.Node{}, func(schema *types.Schema) {
+			labelField := schema.ResourceFields["labels"]
+			labelField.Create = true
+			labelField.Update = true
+			schema.ResourceFields["labels"] = labelField
+		}).
 		MustImportAndCustomize(&Version, v3.NodeDriver{}, func(schema *types.Schema) {
 			schema.ResourceActions["activate"] = types.Action{
 				Output: "nodeDriver",

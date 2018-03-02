@@ -3388,6 +3388,20 @@ func (in *NodeSpec) DeepCopyInto(out *NodeSpec) {
 		}
 	}
 	in.InternalNodeSpec.DeepCopyInto(&out.InternalNodeSpec)
+	if in.DesiredNodeLabels != nil {
+		in, out := &in.DesiredNodeLabels, &out.DesiredNodeLabels
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.DesiredNodeAnnotations != nil {
+		in, out := &in.DesiredNodeAnnotations, &out.DesiredNodeAnnotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 
