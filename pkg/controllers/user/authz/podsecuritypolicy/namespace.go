@@ -32,5 +32,5 @@ func (m *namespaceManager) sync(key string, obj *v1.Namespace) error {
 		return nil
 	}
 
-	return resyncServiceAccounts(m.serviceAccountLister, m.serviceAccountsController, obj.Namespace)
+	return resyncServiceAccounts(m.serviceAccountLister, m.serviceAccountsController, obj.Name)
 }

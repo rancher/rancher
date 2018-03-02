@@ -74,24 +74,22 @@ func (m *projectManager) sync(key string, obj *v3.Project) error {
 
 	if !doesPolicyExist(m.policyLister, keyToPolicyName(key)) {
 		policy, err = fromTemplate(m.policies, m.policyLister, key, template)
-
 		if err != nil {
 			return err
 		}
-	}
-
-	policy, err = m.policyLister.Get("", keyToPolicyName(key))
-	if err != nil {
-		return fmt.Errorf("error getting pod security policy: %v", err)
+	} else {
+		policy, err = m.policyLister.Get("", keyToPolicyName(key))
+		if err != nil {
+			return fmt.Errorf("error getting pod security policy: %v", err)
+		}
 	}
 
 	if template.ResourceVersion != policy.Annotations[podSecurityVersionAnnotation] {
 		_, err := fromTemplate(m.policies, m.policyLister, key, template)
-
 		if err != nil {
 			return err
 		}
 	}
 
-	return resyncServiceAccounts(m.serviceAccountLister, m.serviceAccounts, obj.Namespace)
+	return resyncServiceAccounts(m.serviceAccountLister, m.serviceAccounts, "")
 }
