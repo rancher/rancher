@@ -21,6 +21,7 @@ import (
 	projectSchema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	rbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config/dialer"
+	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -37,10 +38,6 @@ var (
 	ManagementStorageContext types.StorageContext = "mgmt"
 )
 
-type ManagementGetter interface {
-	GetManagement() managementv3.Interface
-}
-
 type ScaledContext struct {
 	ClientGetter      proxy.ClientGetter
 	LocalConfig       *rest.Config
@@ -51,6 +48,7 @@ type ScaledContext struct {
 	Schemas           *types.Schemas
 	AccessControl     types.AccessControl
 	Dialer            dialer.Factory
+	UserManager       user.Manager
 	Leader            bool
 
 	Management managementv3.Interface
@@ -66,10 +64,6 @@ func (c *ScaledContext) controllers() []controller.Starter {
 		c.RBAC,
 		c.Core,
 	}
-}
-
-func (c *ScaledContext) GetManagement() managementv3.Interface {
-	return c.Management
 }
 
 func NewScaledContext(config rest.Config) (*ScaledContext, error) {
@@ -151,6 +145,7 @@ type ManagementContext struct {
 	Schemas           *types.Schemas
 	Scheme            *runtime.Scheme
 	Dialer            dialer.Factory
+	UserManager       user.Manager
 
 	Management managementv3.Interface
 	Project    projectv3.Interface
@@ -165,10 +160,6 @@ func (c *ManagementContext) controllers() []controller.Starter {
 		c.RBAC,
 		c.Core,
 	}
-}
-
-func (c *ManagementContext) GetManagement() managementv3.Interface {
-	return c.Management
 }
 
 type UserContext struct {
