@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
 	"github.com/rancher/types/client/management/v3public"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/user"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -32,12 +33,12 @@ var scopes = []string{UserScope, GroupScope}
 type adProvider struct {
 	ctx         context.Context
 	authConfigs v3.AuthConfigInterface
-	userMGR     common.UserManager
+	userMGR     user.Manager
 	certs       string
 	caPool      *x509.CertPool
 }
 
-func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR common.UserManager) common.AuthProvider {
+func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager) common.AuthProvider {
 	return &adProvider{
 		ctx:         ctx,
 		authConfigs: mgmtCtx.Management.AuthConfigs(""),

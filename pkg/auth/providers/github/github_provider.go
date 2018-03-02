@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/types/client/management/v3"
 	publicclient "github.com/rancher/types/client/management/v3public"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,10 +31,10 @@ type ghProvider struct {
 	ctx          context.Context
 	authConfigs  v3.AuthConfigInterface
 	githubClient *GClient
-	userMGR      common.UserManager
+	userMGR      user.Manager
 }
 
-func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR common.UserManager) common.AuthProvider {
+func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager) common.AuthProvider {
 	githubClient := &GClient{
 		httpClient: &http.Client{},
 	}

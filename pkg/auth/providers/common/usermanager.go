@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/user"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
@@ -18,25 +19,20 @@ const (
 	userByPrincipalIndex = "auth.management.cattle.io/userByPrincipal"
 )
 
-type UserManager interface {
-	SetPrincipalOnCurrentUser(apiContext *types.APIContext, principal v3.Principal) (*v3.User, error)
-	GetUser(apiContext *types.APIContext) string
-	EnsureUser(principalName, displayName string) (*v3.User, error)
-	CheckAccess(accessMode string, allowedPrincipalIDs []string, user v3.Principal, groups []v3.Principal) (bool, error)
-}
-
-func NewUserManager(context config.ManagementGetter) UserManager {
-	userInformer := context.GetManagement().Users("").Controller().Informer()
+func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
+	userInformer := scaledContext.Management.Users("").Controller().Informer()
 	userIndexers := map[string]cache.IndexFunc{
 		userByPrincipalIndex: userByPrincipal,
 	}
-	userInformer.AddIndexers(userIndexers)
+	if err := userInformer.AddIndexers(userIndexers); err != nil {
+		return nil, err
+	}
 
 	return &userManager{
-		users:              context.GetManagement().Users(""),
+		users:              scaledContext.Management.Users(""),
 		userIndexer:        userInformer.GetIndexer(),
-		globalRoleBindings: context.GetManagement().GlobalRoleBindings(""),
-	}
+		globalRoleBindings: scaledContext.Management.GlobalRoleBindings(""),
+	}, nil
 }
 
 type userManager struct {
