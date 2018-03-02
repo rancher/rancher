@@ -89,6 +89,7 @@ func (w *NodeWatcher) watchRule() error {
 			}
 			nodes, err := w.nodeLister.List("", selector)
 			if err != nil {
+				logrus.Warnf("Fail to list node: %v", err)
 				continue
 			}
 			for _, node := range nodes {

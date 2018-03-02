@@ -43,9 +43,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	watcher.StartSysComponentWatcher(ctx, cluster, alertmanager)
 	watcher.StartPodWatcher(ctx, cluster, alertmanager)
 	watcher.StartNodeWatcher(ctx, cluster, alertmanager)
-	watcher.StartStatefulsetWatcher(ctx, cluster, alertmanager)
-	watcher.StartDeploymentWatcher(ctx, cluster, alertmanager)
-	watcher.StartDaemonsetWatcher(ctx, cluster, alertmanager)
+	watcher.StartWorkloadWatcher(ctx, cluster, alertmanager)
 	watcher.StartEventWatcher(cluster, alertmanager)
 
 	initClusterPreCanAlerts(clusterAlerts, cluster.ClusterName)
@@ -199,22 +197,21 @@ type ProjectLifecycle struct {
 func (l *ProjectLifecycle) Create(obj *v3.Project) (*v3.Project, error) {
 	deploymentAlert := &v3.ProjectAlert{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "projectalert-deploment",
+			Name:      "projectalert-workload",
 			Namespace: obj.Name,
 		},
 		Spec: v3.ProjectAlertSpec{
 			ProjectName: l.clusterName + ":" + obj.Name,
 			AlertCommonSpec: v3.AlertCommonSpec{
-				DisplayName:           "Alert for Deployment",
-				Description:           "Pre-can Alert for Deployment",
+				DisplayName:           "Alert for Workload",
+				Description:           "Pre-can Alert for Workload",
 				Severity:              "critical",
 				InitialWaitSeconds:    180,
 				RepeatIntervalSeconds: 3600,
 			},
 			TargetWorkload: v3.TargetWorkload{
-				Type: "deployment",
 				Selector: map[string]string{
-					"app": "deployment",
+					"app": "workload",
 				},
 				AvailablePercentage: 50,
 			},
@@ -226,69 +223,6 @@ func (l *ProjectLifecycle) Create(obj *v3.Project) (*v3.Project, error) {
 
 	if _, err := l.projectAlerts.Create(deploymentAlert); err != nil && !apierrors.IsAlreadyExists(err) {
 		logrus.Warnf("Failed to create pre-can rules for deployment: %v", err)
-	}
-
-	dsAlert := &v3.ProjectAlert{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "projectalert-daemonset",
-			Namespace: obj.Name,
-		},
-		Spec: v3.ProjectAlertSpec{
-			ProjectName: l.clusterName + ":" + obj.Name,
-			AlertCommonSpec: v3.AlertCommonSpec{
-				DisplayName:           "Alert for Daemonset",
-				Description:           "Pre-can Alert for Daemonset",
-				Severity:              "critical",
-				InitialWaitSeconds:    180,
-				RepeatIntervalSeconds: 3600,
-			},
-			TargetWorkload: v3.TargetWorkload{
-				Type: "daemonset",
-				Selector: map[string]string{
-					"app": "daemonset",
-				},
-				AvailablePercentage: 50,
-			},
-		},
-		Status: v3.AlertStatus{
-			AlertState: "active",
-		},
-	}
-
-	if _, err := l.projectAlerts.Create(dsAlert); err != nil && !apierrors.IsAlreadyExists(err) {
-
-		logrus.Warnf("Failed to create pre-can rules for daemonset: %v", err)
-	}
-
-	ssAlert := &v3.ProjectAlert{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "projectalert-statefuleset",
-			Namespace: obj.Name,
-		},
-		Spec: v3.ProjectAlertSpec{
-			ProjectName: l.clusterName + ":" + obj.Name,
-			AlertCommonSpec: v3.AlertCommonSpec{
-				DisplayName:           "Alert for StatefulSet",
-				Description:           "Pre-can Alert for StatefulSet",
-				Severity:              "critical",
-				InitialWaitSeconds:    180,
-				RepeatIntervalSeconds: 3600,
-			},
-			TargetWorkload: v3.TargetWorkload{
-				Type: "statefulset",
-				Selector: map[string]string{
-					"app": "statefulset",
-				},
-				AvailablePercentage: 50,
-			},
-		},
-		Status: v3.AlertStatus{
-			AlertState: "active",
-		},
-	}
-
-	if _, err := l.projectAlerts.Create(ssAlert); err != nil && !apierrors.IsAlreadyExists(err) {
-		logrus.Warnf("Failed to create pre-can rules for daemonset: %v", err)
 	}
 
 	return obj, nil
