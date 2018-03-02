@@ -16,6 +16,7 @@ const (
 	PrincipalFieldMemberOf        = "memberOf"
 	PrincipalFieldName            = "name"
 	PrincipalFieldOwnerReferences = "ownerReferences"
+	PrincipalFieldPrincipalType   = "principalType"
 	PrincipalFieldProfilePicture  = "profilePicture"
 	PrincipalFieldProfileURL      = "profileURL"
 	PrincipalFieldProvider        = "provider"
@@ -35,6 +36,7 @@ type Principal struct {
 	MemberOf        bool              `json:"memberOf,omitempty" yaml:"memberOf,omitempty"`
 	Name            string            `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	PrincipalType   string            `json:"principalType,omitempty" yaml:"principalType,omitempty"`
 	ProfilePicture  string            `json:"profilePicture,omitempty" yaml:"profilePicture,omitempty"`
 	ProfileURL      string            `json:"profileURL,omitempty" yaml:"profileURL,omitempty"`
 	Provider        string            `json:"provider,omitempty" yaml:"provider,omitempty"`

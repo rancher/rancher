@@ -58,7 +58,7 @@ type Principal struct {
 	LoginName      string            `json:"loginName,omitempty"`
 	ProfilePicture string            `json:"profilePicture,omitempty"`
 	ProfileURL     string            `json:"profileURL,omitempty"`
-	Kind           string            `json:"kind,omitempty"`
+	PrincipalType  string            `json:"principalType,omitempty"`
 	Me             bool              `json:"me,omitempty"`
 	MemberOf       bool              `json:"memberOf,omitempty"`
 	Provider       string            `json:"provider,omitempty"`
