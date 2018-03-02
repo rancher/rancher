@@ -103,12 +103,12 @@ func (l *lProvider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Prin
 
 	principalID := getLocalPrincipalID(user)
 	userPrincipal := v3.Principal{
-		ObjectMeta:  metav1.ObjectMeta{Name: principalID},
-		DisplayName: user.DisplayName,
-		LoginName:   user.Username,
-		Kind:        "user",
-		Provider:    Name,
-		Me:          true,
+		ObjectMeta:    metav1.ObjectMeta{Name: principalID},
+		DisplayName:   user.DisplayName,
+		LoginName:     user.Username,
+		PrincipalType: "user",
+		Provider:      Name,
+		Me:            true,
 	}
 
 	groupPrincipals, err := l.getGroupPrincipals(user)
@@ -154,10 +154,10 @@ func (l *lProvider) getGroupPrincipals(user *v3.User) ([]v3.Principal, error) {
 			}
 
 			groupPrincipal := v3.Principal{
-				ObjectMeta:  metav1.ObjectMeta{Name: Name + "://" + localGroup.Name},
-				DisplayName: localGroup.DisplayName,
-				Kind:        "group",
-				Provider:    Name,
+				ObjectMeta:    metav1.ObjectMeta{Name: Name + "://" + localGroup.Name},
+				DisplayName:   localGroup.DisplayName,
+				PrincipalType: "group",
+				Provider:      Name,
 			}
 			groupPrincipals = append(groupPrincipals, groupPrincipal)
 		}
@@ -187,12 +187,12 @@ func (l *lProvider) SearchPrincipals(searchKey, principalType string, myToken v3
 		for _, user := range localUsers {
 			principalID := getLocalPrincipalID(user)
 			userPrincipal := v3.Principal{
-				ObjectMeta:  metav1.ObjectMeta{Name: principalID},
-				DisplayName: user.DisplayName,
-				LoginName:   user.Username,
-				Kind:        "user",
-				Provider:    Name,
-				Me:          false,
+				ObjectMeta:    metav1.ObjectMeta{Name: principalID},
+				DisplayName:   user.DisplayName,
+				LoginName:     user.Username,
+				PrincipalType: "user",
+				Provider:      Name,
+				Me:            false,
 			}
 			if l.isThisUserMe(myToken.UserPrincipal, userPrincipal) {
 				userPrincipal.Me = true
@@ -204,10 +204,10 @@ func (l *lProvider) SearchPrincipals(searchKey, principalType string, myToken v3
 	if principalType == "" || principalType == "group" {
 		for _, group := range localGroups {
 			groupPrincipal := v3.Principal{
-				ObjectMeta:  metav1.ObjectMeta{Name: Name + "://" + group.Name},
-				DisplayName: group.DisplayName,
-				Kind:        "group",
-				Provider:    Name,
+				ObjectMeta:    metav1.ObjectMeta{Name: Name + "://" + group.Name},
+				DisplayName:   group.DisplayName,
+				PrincipalType: "group",
+				Provider:      Name,
 			}
 			if l.isMemberOf(myToken.GroupPrincipals, groupPrincipal) {
 				groupPrincipal.MemberOf = true
@@ -293,7 +293,7 @@ func (l *lProvider) listUsersAndGroupsByIndex(searchKey string) ([]*v3.User, []*
 
 func (l *lProvider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
 
-	if me.ObjectMeta.Name == other.ObjectMeta.Name && me.LoginName == other.LoginName && me.Kind == other.Kind {
+	if me.ObjectMeta.Name == other.ObjectMeta.Name && me.LoginName == other.LoginName && me.PrincipalType == other.PrincipalType {
 		return true
 	}
 	return false
@@ -302,7 +302,7 @@ func (l *lProvider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
 func (l *lProvider) isMemberOf(myGroups []v3.Principal, other v3.Principal) bool {
 
 	for _, mygroup := range myGroups {
-		if mygroup.ObjectMeta.Name == other.ObjectMeta.Name && mygroup.Kind == other.Kind {
+		if mygroup.ObjectMeta.Name == other.ObjectMeta.Name && mygroup.PrincipalType == other.PrincipalType {
 			return true
 		}
 	}

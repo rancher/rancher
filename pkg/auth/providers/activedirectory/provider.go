@@ -92,11 +92,11 @@ func (p *adProvider) SearchPrincipals(searchKey, principalType string, myToken v
 	principals, err = p.searchPrincipals(searchKey, principalType, true, config, caPool)
 	if err == nil {
 		for _, principal := range principals {
-			if principal.Kind == "user" {
+			if principal.PrincipalType == "user" {
 				if p.isThisUserMe(myToken.UserPrincipal, principal) {
 					principal.Me = true
 				}
-			} else if principal.Kind == "group" {
+			} else if principal.PrincipalType == "group" {
 				if p.isMemberOf(myToken.GroupPrincipals, principal) {
 					principal.MemberOf = true
 				}
@@ -112,7 +112,7 @@ func (p *adProvider) GetPrincipal(principalID string, token v3.Token) (v3.Princi
 }
 
 func (p *adProvider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
-	if me.ObjectMeta.Name == other.ObjectMeta.Name && me.LoginName == other.LoginName && me.Kind == other.Kind {
+	if me.ObjectMeta.Name == other.ObjectMeta.Name && me.LoginName == other.LoginName && me.PrincipalType == other.PrincipalType {
 		return true
 	}
 	return false
@@ -121,7 +121,7 @@ func (p *adProvider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
 func (p *adProvider) isMemberOf(myGroups []v3.Principal, other v3.Principal) bool {
 
 	for _, mygroup := range myGroups {
-		if mygroup.ObjectMeta.Name == other.ObjectMeta.Name && mygroup.Kind == other.Kind {
+		if mygroup.ObjectMeta.Name == other.ObjectMeta.Name && mygroup.PrincipalType == other.PrincipalType {
 			return true
 		}
 	}

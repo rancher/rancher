@@ -2,7 +2,6 @@ package principals
 
 import (
 	"context"
-
 	"net/url"
 
 	"github.com/rancher/norman/types"
