@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -149,7 +148,7 @@ func (g *ghProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v
 		ObjectMeta:     metav1.ObjectMeta{Name: Name + "_user://" + strconv.Itoa(user.ID)},
 		DisplayName:    user.Name,
 		LoginName:      user.Login,
-		Kind:           "user",
+		PrincipalType:  "user",
 		Provider:       Name,
 		Me:             true,
 		ProfilePicture: user.AvatarURL,
@@ -168,7 +167,7 @@ func (g *ghProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v
 		groupPrincipal := v3.Principal{
 			ObjectMeta:     metav1.ObjectMeta{Name: Name + "_org://" + strconv.Itoa(orgAcct.ID)},
 			DisplayName:    name,
-			Kind:           "group",
+			PrincipalType:  "group",
 			Provider:       Name,
 			ProfilePicture: orgAcct.AvatarURL,
 		}
@@ -183,7 +182,7 @@ func (g *ghProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v
 		groupPrincipal := v3.Principal{
 			ObjectMeta:     metav1.ObjectMeta{Name: Name + "_team://" + strconv.Itoa(teamAcct.ID)},
 			DisplayName:    teamAcct.Name,
-			Kind:           "group",
+			PrincipalType:  "group",
 			Provider:       Name,
 			ProfilePicture: teamAcct.AvatarURL,
 		}
@@ -219,7 +218,7 @@ func (g *ghProvider) SearchPrincipals(searchKey, principalType string, myToken v
 				ObjectMeta:     metav1.ObjectMeta{Name: Name + "_user://" + strconv.Itoa(user.ID)},
 				DisplayName:    user.Name,
 				LoginName:      user.Login,
-				Kind:           "user",
+				PrincipalType:  "user",
 				Provider:       Name,
 				Me:             false,
 				ProfilePicture: user.AvatarURL,
@@ -237,7 +236,7 @@ func (g *ghProvider) SearchPrincipals(searchKey, principalType string, myToken v
 			groupPrincipal := v3.Principal{
 				ObjectMeta:     metav1.ObjectMeta{Name: Name + "_org://" + strconv.Itoa(orgAcct.ID)},
 				DisplayName:    orgAcct.Name,
-				Kind:           "group",
+				PrincipalType:  "group",
 				Provider:       Name,
 				ProfilePicture: orgAcct.AvatarURL,
 			}
@@ -300,10 +299,10 @@ func (g *ghProvider) GetPrincipal(principalID string, token v3.Token) (v3.Princi
 		}
 		if isUser {
 			princ.Me = g.isThisUserMe(token.UserPrincipal, princ)
-			princ.Kind = "user"
+			princ.PrincipalType = "user"
 		} else {
 			princ.MemberOf = g.isMemberOf(token.GroupPrincipals, princ)
-			princ.Kind = "group"
+			princ.PrincipalType = "group"
 		}
 		return princ, nil
 	case teamType:
@@ -315,7 +314,7 @@ func (g *ghProvider) GetPrincipal(principalID string, token v3.Token) (v3.Princi
 		princ := v3.Principal{
 			ObjectMeta:     metav1.ObjectMeta{Name: Name + "_" + teamType + "://" + strconv.Itoa(acct.ID)},
 			DisplayName:    acct.Name,
-			Kind:           "group",
+			PrincipalType:  "group",
 			Provider:       Name,
 			ProfilePicture: acct.AvatarURL,
 		}
@@ -330,7 +329,7 @@ func (g *ghProvider) GetPrincipal(principalID string, token v3.Token) (v3.Princi
 
 func (g *ghProvider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
 
-	if me.ObjectMeta.Name == other.ObjectMeta.Name && me.LoginName == other.LoginName && me.Kind == other.Kind {
+	if me.ObjectMeta.Name == other.ObjectMeta.Name && me.LoginName == other.LoginName && me.PrincipalType == other.PrincipalType {
 		return true
 	}
 	return false
@@ -339,7 +338,7 @@ func (g *ghProvider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
 func (g *ghProvider) isMemberOf(myGroups []v3.Principal, other v3.Principal) bool {
 
 	for _, mygroup := range myGroups {
-		if mygroup.ObjectMeta.Name == other.ObjectMeta.Name && mygroup.Kind == other.Kind {
+		if mygroup.ObjectMeta.Name == other.ObjectMeta.Name && mygroup.PrincipalType == other.PrincipalType {
 			return true
 		}
 	}

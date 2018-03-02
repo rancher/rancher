@@ -181,10 +181,10 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 				kind = "group"
 			}
 			principal := &v3.Principal{
-				ObjectMeta:  metav1.ObjectMeta{Name: scope + "://" + distinguishedName},
-				DisplayName: distinguishedName,
-				LoginName:   distinguishedName,
-				Kind:        kind,
+				ObjectMeta:    metav1.ObjectMeta{Name: scope + "://" + distinguishedName},
+				DisplayName:   distinguishedName,
+				LoginName:     distinguishedName,
+				PrincipalType: kind,
 			}
 
 			return principal, nil
@@ -274,11 +274,11 @@ func (p *adProvider) attributesToPrincipal(attribs []*ldapv2.EntryAttribute, dnS
 	}
 
 	principal := &v3.Principal{
-		ObjectMeta:  metav1.ObjectMeta{Name: externalIDType + "://" + login}, //TODO: Change to {externalIDType + "://" + externalID} when user auto-creation is added
-		DisplayName: accountName,
-		LoginName:   login,
-		Kind:        kind,
-		Provider:    Name,
+		ObjectMeta:    metav1.ObjectMeta{Name: externalIDType + "://" + login}, //TODO: Change to {externalIDType + "://" + externalID} when user auto-creation is added
+		DisplayName:   accountName,
+		LoginName:     login,
+		PrincipalType: kind,
+		Provider:      Name,
 	}
 
 	return principal, nil
