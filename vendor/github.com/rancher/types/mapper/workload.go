@@ -13,6 +13,9 @@ func (n WorkloadAnnotations) FromInternal(data map[string]interface{}) {
 	v, ok := values.RemoveValue(data, "workloadAnnotations", "field.cattle.io/publicEndpoints")
 	if ok {
 		annotations := convert.ToMapInterface(data["annotations"])
+		if annotations == nil {
+			annotations = map[string]interface{}{}
+		}
 		annotations["field.cattle.io/publicEndpoints"] = v
 	}
 }
