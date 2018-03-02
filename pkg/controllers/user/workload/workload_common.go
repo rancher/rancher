@@ -40,6 +40,7 @@ const (
 	JobType                   = "job"
 	CronJobType               = "cronJob"
 	WorkloadAnnotatioNoop     = "targetWorkloadIdNoop"
+	CreatorIDAnnotation       = "field.cattle.io/creatorId"
 )
 
 var WorkloadKinds = map[string]bool{
