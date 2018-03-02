@@ -57,13 +57,12 @@ func (p *prtbLifecycle) reconcileSubject(binding *v3.ProjectRoleTemplateBinding)
 		return binding, nil
 	}
 
-	if binding.UserPrincipalName != "" {
+	if binding.UserPrincipalName != "" && binding.UserName == "" {
 		user, err := p.mgr.userMGR.EnsureUser(binding.UserPrincipalName, "")
 		if err != nil {
 			return binding, err
 		}
 
-		binding.UserPrincipalName = ""
 		binding.UserName = user.Name
 		return binding, nil
 	}

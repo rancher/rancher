@@ -1,43 +1,8 @@
 package auth
 
 import (
-	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"k8s.io/api/rbac/v1"
 )
-
-func crtbByPrincipal(obj interface{}) ([]string, error) {
-	crtb, ok := obj.(*v3.ClusterRoleTemplateBinding)
-	if !ok {
-		return []string{}, nil
-	}
-
-	var principals []string
-	if crtb.UserPrincipalName != "" {
-		principals = append(principals, crtb.UserPrincipalName)
-	}
-	if crtb.GroupPrincipalName != "" {
-		principals = append(principals, crtb.GroupPrincipalName)
-	}
-
-	return principals, nil
-}
-
-func prtbByPrincipal(obj interface{}) ([]string, error) {
-	prtb, ok := obj.(*v3.ProjectRoleTemplateBinding)
-	if !ok {
-		return []string{}, nil
-	}
-
-	var principals []string
-	if prtb.UserPrincipalName != "" {
-		principals = append(principals, prtb.UserPrincipalName)
-	}
-	if prtb.GroupPrincipalName != "" {
-		principals = append(principals, prtb.GroupPrincipalName)
-	}
-
-	return principals, nil
-}
 
 func rbByOwner(obj interface{}) ([]string, error) {
 	rb, ok := obj.(*v1.RoleBinding)

@@ -13,8 +13,6 @@ const (
 	membershipBindingOwner  = "memberhsip-binding-owner"
 	rbByOwnerIndex          = "auth.management.cattle.io/rb-by-owner"
 	rbByRoleAndSubjectIndex = "auth.management.cattle.io/crb-by-role-and-subject"
-	prtbByPrincipalIndex    = "auth.management.cattle.io/prtb-by-principal"
-	crtbByPrincipalIndex    = "auth.management.cattle.io/crtb-by-principal"
 )
 
 var clusterManagmentPlaneResources = []string{"clusterroletemplatebindings", "nodes", "nodepools", "clusterevents", "projects", "clusterregistrationtokens"}
@@ -52,13 +50,12 @@ func (c *crtbLifecycle) reconcileSubject(binding *v3.ClusterRoleTemplateBinding)
 		return binding, nil
 	}
 
-	if binding.UserPrincipalName != "" {
+	if binding.UserPrincipalName != "" && binding.UserName == "" {
 		user, err := c.mgr.userMGR.EnsureUser(binding.UserPrincipalName, "")
 		if err != nil {
 			return binding, err
 		}
 
-		binding.UserPrincipalName = ""
 		binding.UserName = user.Name
 		return binding, nil
 	}

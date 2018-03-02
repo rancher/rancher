@@ -34,31 +34,17 @@ func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *cr
 	}
 	rbInformer.AddIndexers(rbIndexers)
 
-	prtbInformer := management.Management.ProjectRoleTemplateBindings("").Controller().Informer()
-	prtbIndexers := map[string]cache.IndexFunc{
-		prtbByPrincipalIndex: prtbByPrincipal,
-	}
-	prtbInformer.AddIndexers(prtbIndexers)
-
-	crtbInformer := management.Management.ClusterRoleTemplateBindings("").Controller().Informer()
-	crtbIndexers := map[string]cache.IndexFunc{
-		crtbByPrincipalIndex: crtbByPrincipal,
-	}
-	crtbInformer.AddIndexers(crtbIndexers)
-
 	mgr := &manager{
-		mgmt:        management,
-		crbLister:   management.RBAC.ClusterRoleBindings("").Controller().Lister(),
-		crLister:    management.RBAC.ClusterRoles("").Controller().Lister(),
-		rLister:     management.RBAC.Roles("").Controller().Lister(),
-		rbLister:    management.RBAC.RoleBindings("").Controller().Lister(),
-		rtLister:    management.Management.RoleTemplates("").Controller().Lister(),
-		nsLister:    management.Core.Namespaces("").Controller().Lister(),
-		rbIndexer:   rbInformer.GetIndexer(),
-		crbIndexer:  crbInformer.GetIndexer(),
-		prtbIndexer: prtbInformer.GetIndexer(),
-		crtbIndexer: crtbInformer.GetIndexer(),
-		userMGR:     management.UserManager,
+		mgmt:       management,
+		crbLister:  management.RBAC.ClusterRoleBindings("").Controller().Lister(),
+		crLister:   management.RBAC.ClusterRoles("").Controller().Lister(),
+		rLister:    management.RBAC.Roles("").Controller().Lister(),
+		rbLister:   management.RBAC.RoleBindings("").Controller().Lister(),
+		rtLister:   management.Management.RoleTemplates("").Controller().Lister(),
+		nsLister:   management.Core.Namespaces("").Controller().Lister(),
+		rbIndexer:  rbInformer.GetIndexer(),
+		crbIndexer: crbInformer.GetIndexer(),
+		userMGR:    management.UserManager,
 	}
 	prtb := &prtbLifecycle{
 		mgr:           mgr,
@@ -73,18 +59,16 @@ func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *cr
 }
 
 type manager struct {
-	crLister    typesrbacv1.ClusterRoleLister
-	rLister     typesrbacv1.RoleLister
-	rbLister    typesrbacv1.RoleBindingLister
-	crbLister   typesrbacv1.ClusterRoleBindingLister
-	rtLister    v3.RoleTemplateLister
-	nsLister    v13.NamespaceLister
-	rbIndexer   cache.Indexer
-	crbIndexer  cache.Indexer
-	prtbIndexer cache.Indexer
-	crtbIndexer cache.Indexer
-	mgmt        *config.ManagementContext
-	userMGR     user.Manager
+	crLister   typesrbacv1.ClusterRoleLister
+	rLister    typesrbacv1.RoleLister
+	rbLister   typesrbacv1.RoleBindingLister
+	crbLister  typesrbacv1.ClusterRoleBindingLister
+	rtLister   v3.RoleTemplateLister
+	nsLister   v13.NamespaceLister
+	rbIndexer  cache.Indexer
+	crbIndexer cache.Indexer
+	mgmt       *config.ManagementContext
+	userMGR    user.Manager
 }
 
 // When a CRTB is created that gives a subject some permissions in a project or cluster, we need to create a "membership" binding
