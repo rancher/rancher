@@ -21,6 +21,9 @@ const (
 	StateAbort    = "Abort"
 	StatePending  = "Pending"
 	StateDenied   = "Denied"
+
+	PipelineFinishLabel = "pipeline.management.cattle.io/finish"
+	PipelineCronLabel   = "pipeline.management.cattle.io/cron"
 )
 
 var PreservedEnvVars = []string{"CICD_PIPELINE_NAME", "CICD_RUN_NUMBER"}

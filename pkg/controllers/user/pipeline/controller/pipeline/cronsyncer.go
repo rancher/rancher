@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/robfig/cron"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/labels"
 	"time"
 )
 
@@ -37,7 +38,8 @@ func (s *CronSyncer) syncCron() {
 		return
 	}
 
-	pipelines, err := s.pipelineLister.List("", utils.PipelineHasCronLabel.AsSelector())
+	set := labels.Set(map[string]string{utils.PipelineCronLabel: "true"})
+	pipelines, err := s.pipelineLister.List("", set.AsSelector())
 	if err != nil {
 		logrus.Errorf("Error listing pipelines")
 		return

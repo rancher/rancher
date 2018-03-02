@@ -8,12 +8,13 @@ import (
 	"github.com/rancher/rancher/pkg/ticker"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/labels"
 	"strings"
 	"time"
 )
 
 const (
-	syncLogInterval = 10 * time.Second
+	syncLogInterval = 5 * time.Second
 )
 
 //ExecutionLogSyncer is responsible for updating pipeline execution logs that are in building state
@@ -40,7 +41,8 @@ func (s *ExecutionLogSyncer) syncLogs() {
 		return
 	}
 
-	Logs, err := s.pipelineExecutionLogLister.List("", utils.PipelineInprogressLabel.AsSelector())
+	set := labels.Set(map[string]string{utils.PipelineFinishLabel: "false"})
+	Logs, err := s.pipelineExecutionLogLister.List("", set.AsSelector())
 	if err != nil {
 		logrus.Errorf("Error listing PipelineExecutionLogs - %v", err)
 		return
@@ -50,54 +52,71 @@ func (s *ExecutionLogSyncer) syncLogs() {
 	}
 	if err := s.pipelineEngine.PreCheck(); err != nil {
 		logrus.Errorf("Error get Jenkins engine - %v", err)
+		for _, log := range Logs {
+			log.Spec.Message += fmt.Sprintf("Error get Jenkins engine - %v", err)
+			if err := s.finishExecutionLog(log); err != nil {
+				logrus.Errorf("Error update pipeline execution log - %v", err)
+				return
+			}
+		}
 		return
 	}
-	for _, e := range Logs {
-		parts := strings.Split(e.Spec.PipelineExecutionName, ":")
+	for _, log := range Logs {
+		parts := strings.Split(log.Spec.PipelineExecutionName, ":")
 		if len(parts) != 2 {
-			e.Spec.Message += fmt.Sprintf("\nInvalid pipeline execution name - %s", e.Spec.PipelineExecutionName)
-			e.Labels["pipeline.management.cattle.io/finish"] = "true"
-			if _, err := s.pipelineExecutionLogs.Update(e); err != nil {
+			log.Spec.Message += fmt.Sprintf("\nInvalid pipeline execution name - %s", log.Spec.PipelineExecutionName)
+			if err := s.finishExecutionLog(log); err != nil {
 				logrus.Errorf("Error update pipeline execution log - %v", err)
 				return
 			}
 			continue
 		}
-		execution, err := s.pipelineExecutionLister.Get(e.Namespace, parts[1])
+		execution, err := s.pipelineExecutionLister.Get(log.Namespace, parts[1])
 		if err != nil {
 			logrus.Errorf("Error get pipeline execution - %v", err)
-			e.Spec.Message += fmt.Sprintf("\nError get pipeline execution - %v", err)
-			e.Labels["pipeline.management.cattle.io/finish"] = "true"
-			if _, err := s.pipelineExecutionLogs.Update(e); err != nil {
+			log.Spec.Message += fmt.Sprintf("\nError get pipeline execution - %v", err)
+			if err := s.finishExecutionLog(log); err != nil {
 				logrus.Errorf("Error update pipeline execution log - %v", err)
 				return
 			}
 			continue
 		}
 		//get log if the step started
-		if execution.Status.Stages[e.Spec.Stage].Steps[e.Spec.Step].State == utils.StateWaiting {
+		if execution.Status.Stages[log.Spec.Stage].Steps[log.Spec.Step].State == utils.StateWaiting {
 			continue
 		}
-		logText, err := s.pipelineEngine.GetStepLog(execution, e.Spec.Stage, e.Spec.Step)
+		logText, err := s.pipelineEngine.GetStepLog(execution, log.Spec.Stage, log.Spec.Step)
 		if err != nil {
 			logrus.Errorf("Error get pipeline execution log - %v", err)
-			e.Spec.Message += fmt.Sprintf("\nError get pipeline execution log - %v", err)
-			e.Labels["pipeline.management.cattle.io/finish"] = "true"
-			if _, err := s.pipelineExecutionLogs.Update(e); err != nil {
+			log.Spec.Message += fmt.Sprintf("\nError get pipeline execution log - %v", err)
+			if err := s.finishExecutionLog(log); err != nil {
 				logrus.Errorf("Error update pipeline execution log - %v", err)
+				return
 			}
 			continue
 		}
 
-		e.Spec.Message = logText
-		stepState := execution.Status.Stages[e.Spec.Stage].Steps[e.Spec.Step].State
+		stepState := execution.Status.Stages[log.Spec.Stage].Steps[log.Spec.Step].State
 		if stepState != utils.StateWaiting && stepState != utils.StateBuilding {
-			e.Labels["pipeline.management.cattle.io/finish"] = "true"
+			log.Labels[utils.PipelineFinishLabel] = "true"
 		}
-		if _, err := s.pipelineExecutionLogs.Update(e); err != nil {
+
+		if log.Spec.Message == logText {
+			//only do update on changes
+			continue
+		}
+		log.Spec.Message = logText
+		if _, err := s.pipelineExecutionLogs.Update(log); err != nil {
 			logrus.Errorf("Error update pipeline execution log - %v", err)
 			return
 		}
 	}
 	logrus.Debugf("Sync pipeline execution log complete")
+}
+
+func (s *ExecutionLogSyncer) finishExecutionLog(log *v3.PipelineExecutionLog) error {
+	log.Labels[utils.PipelineFinishLabel] = "true"
+	_, err := s.pipelineExecutionLogs.Update(log)
+	return err
+
 }

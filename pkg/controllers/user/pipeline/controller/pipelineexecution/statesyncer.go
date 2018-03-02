@@ -7,11 +7,13 @@ import (
 	"github.com/rancher/rancher/pkg/ticker"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"time"
 )
 
 const (
-	syncStateInterval = 10 * time.Second
+	syncStateInterval = 5 * time.Second
 )
 
 //ExecutionStateSyncer is responsible for updating pipeline execution states
@@ -39,7 +41,8 @@ func (s *ExecutionStateSyncer) syncState() {
 		return
 	}
 
-	executions, err := s.pipelineExecutionLister.List("", utils.PipelineInprogressLabel.AsSelector())
+	set := labels.Set(map[string]string{utils.PipelineFinishLabel: "false"})
+	executions, err := s.pipelineExecutionLister.List("", set.AsSelector())
 	if err != nil {
 		logrus.Errorf("Error listing PipelineExecutions - %v", err)
 		return
@@ -48,7 +51,15 @@ func (s *ExecutionStateSyncer) syncState() {
 		return
 	}
 	if err := s.pipelineEngine.PreCheck(); err != nil {
+		//fail to connect engine, mark the remaining executions as failed
 		logrus.Errorf("Error get Jenkins engine - %v", err)
+		for _, e := range executions {
+			e.Status.ExecutionState = utils.StateFail
+			if err := s.updateExecutionAndLastRunState(e); err != nil {
+				logrus.Errorf("Error update pipeline execution - %v", err)
+				return
+			}
+		}
 		return
 	}
 	for _, e := range executions {
@@ -57,37 +68,47 @@ func (s *ExecutionStateSyncer) syncState() {
 			if err != nil {
 				logrus.Errorf("Error sync pipeline execution - %v", err)
 				e.Status.ExecutionState = utils.StateFail
-				if _, err := s.pipelineExecutions.Update(e); err != nil {
+				updated = true
+			}
+			if updated {
+				if err := s.updateExecutionAndLastRunState(e); err != nil {
 					logrus.Errorf("Error update pipeline execution - %v", err)
 					return
-				}
-			} else if updated {
-				if _, err := s.pipelineExecutions.Update(e); err != nil {
-					logrus.Errorf("Error update pipeline execution - %v", err)
-					return
-				}
-
-				//update lastrunstate of the pipeline
-				p, err := s.pipelineLister.Get(e.Spec.Pipeline.Namespace, e.Spec.Pipeline.Name)
-				if err != nil {
-					logrus.Errorf("Error get pipeline - %v", err)
-					continue
-				}
-				if p.Status.LastExecutionID == e.Namespace+":"+e.Name {
-					p.Status.LastRunState = e.Status.ExecutionState
-					if _, err := s.pipelines.Update(p); err != nil {
-						logrus.Errorf("Error update pipeline - %v", err)
-						return
-					}
 				}
 			}
 		} else {
-			e.Labels["pipeline.management.cattle.io/finish"] = "true"
-			if _, err := s.pipelineExecutions.Update(e); err != nil {
+			if err := s.updateExecutionAndLastRunState(e); err != nil {
 				logrus.Errorf("Error update pipeline execution - %v", err)
 				return
 			}
 		}
 	}
 	logrus.Debugf("Sync pipeline execution state complete")
+}
+
+func (s *ExecutionStateSyncer) updateExecutionAndLastRunState(execution *v3.PipelineExecution) error {
+	if execution.Status.ExecutionState != utils.StateWaiting && execution.Status.ExecutionState != utils.StateBuilding {
+		execution.Labels[utils.PipelineFinishLabel] = "true"
+	}
+	if _, err := s.pipelineExecutions.Update(execution); err != nil {
+		return err
+	}
+
+	//check and update lastrunstate of the pipeline when necessary
+	p, err := s.pipelineLister.Get(execution.Spec.Pipeline.Namespace, execution.Spec.Pipeline.Name)
+	if apierrors.IsNotFound(err) {
+		logrus.Warningf("pipeline of execution '%s' is not found", execution.Name)
+		return nil
+	} else if err != nil {
+		return err
+	}
+
+	if p.Status.LastExecutionID == execution.Namespace+":"+execution.Name &&
+		p.Status.LastRunState != execution.Status.ExecutionState {
+		p.Status.LastRunState = execution.Status.ExecutionState
+		if _, err := s.pipelines.Update(p); err != nil {
+			return err
+		}
+	}
+	return nil
 }

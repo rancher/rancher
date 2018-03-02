@@ -30,6 +30,7 @@ type Engine struct {
 
 	Secrets                    v1.SecretInterface
 	SecretLister               v1.SecretLister
+	ManagementSecretLister     v1.SecretLister
 	SourceCodeCredentialLister v3.SourceCodeCredentialLister
 }
 
@@ -131,7 +132,7 @@ func (j *Engine) prepareRegistryCredential(pipeline *v3.Pipeline, stage int, ste
 	publishImageStep := pipeline.Spec.Stages[stage].Steps[step]
 	registry, _, _ := utils.SplitImageTag(publishImageStep.PublishImageConfig.Tag)
 
-	secrets, err := j.SecretLister.List(pipeline.Namespace, labels.Everything())
+	secrets, err := j.ManagementSecretLister.List(pipeline.Namespace, labels.Everything())
 	if err != nil {
 		return err
 	}
@@ -252,6 +253,18 @@ func (j *Engine) SyncExecution(execution *v3.PipelineExecution) (bool, error) {
 	jobName := getJobName(&execution.Spec.Pipeline)
 	if execution.Status.Commit == "" {
 		buildinfo, err := j.Client.getBuildInfo(jobName)
+		if err == ErrNotFound {
+			//there is a chance that Jenkins job is created but build info is not available
+			//forgive the notfound in this case
+			startTime, err := time.Parse(time.RFC3339, execution.Status.Started)
+			if err != nil {
+				return false, err
+			}
+			if time.Now().Before(startTime.Add(15 * time.Second)) {
+				return false, nil
+			}
+			return false, ErrGetBuildInfoFail
+		}
 		if err != nil {
 			return false, err
 		}
@@ -298,11 +311,11 @@ func (j *Engine) SyncExecution(execution *v3.PipelineExecution) (bool, error) {
 
 	if info.Status == "SUCCESS" && execution.Status.ExecutionState != utils.StateSuccess {
 		updated = true
-		execution.Labels["pipeline.management.cattle.io/finish"] = "true"
+		execution.Labels[utils.PipelineFinishLabel] = "true"
 		execution.Status.ExecutionState = utils.StateSuccess
 	} else if info.Status == "FAILED" && execution.Status.ExecutionState != utils.StateFail {
 		updated = true
-		execution.Labels["pipeline.management.cattle.io/finish"] = "true"
+		execution.Labels[utils.PipelineFinishLabel] = "true"
 		execution.Status.ExecutionState = utils.StateFail
 	} else if info.Status == "IN_PROGRESS" && execution.Status.ExecutionState != utils.StateBuilding {
 		updated = true
@@ -368,8 +381,14 @@ func buildingStep(execution *v3.PipelineExecution, stage int, step int, jenkinsS
 	if execution.Status.Stages[stage].Steps[step].Started == "" {
 		execution.Status.Stages[stage].Steps[step].Started = startTime
 	}
+	if execution.Status.Stages[stage].State == utils.StateWaiting {
+		execution.Status.Stages[stage].State = utils.StateBuilding
+	}
 	if execution.Status.Stages[stage].Started == "" {
 		execution.Status.Stages[stage].Started = startTime
+	}
+	if execution.Status.ExecutionState == utils.StateWaiting {
+		execution.Status.ExecutionState = utils.StateBuilding
 	}
 	if execution.Status.Started == "" {
 		execution.Status.Started = startTime
