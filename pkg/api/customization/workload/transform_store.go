@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/definition"
+	"github.com/rancher/norman/types/values"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	managementv3 "github.com/rancher/types/client/management/v3"
 	"github.com/sirupsen/logrus"
@@ -30,6 +31,11 @@ func New(store types.Store) types.Store {
 				data["id"] = strings.ToLower(typeName) + ":" + id
 			}
 			setNodeName(apiContext, data)
+			nodeName := convert.ToString(values.GetValueN(data, "nodeId"))
+			if nodeName != "" {
+				state := getState(data)
+				data["nodeId"] = state[getKey(nodeName)]
+			}
 			return data, nil
 		},
 	}
