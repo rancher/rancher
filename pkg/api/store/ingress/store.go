@@ -34,7 +34,7 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 
 func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
 	formatData(data, false)
-	data, err := p.Store.Create(apiContext, schema, data)
+	data, err := p.Store.Update(apiContext, schema, data, id)
 	return data, err
 }
 
