@@ -39,7 +39,7 @@ func GetProviderByType(configType string) common.AuthProvider {
 func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	confMu.Lock()
 	defer confMu.Unlock()
-	userMGR := common.NewUserManager(mgmt)
+	userMGR := mgmt.UserManager
 	var p common.AuthProvider
 	p = local.Configure(ctx, mgmt)
 	providers[local.Name] = p

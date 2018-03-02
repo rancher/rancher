@@ -6,11 +6,11 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/types/slice"
-	"github.com/rancher/rancher/pkg/auth/providers/common"
 	v13 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	typesrbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/user"
 	"k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -58,7 +58,7 @@ func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *cr
 		crbIndexer:  crbInformer.GetIndexer(),
 		prtbIndexer: prtbInformer.GetIndexer(),
 		crtbIndexer: crtbInformer.GetIndexer(),
-		userMGR:     common.NewUserManager(management),
+		userMGR:     management.UserManager,
 	}
 	prtb := &prtbLifecycle{
 		mgr:           mgr,
@@ -84,7 +84,7 @@ type manager struct {
 	prtbIndexer cache.Indexer
 	crtbIndexer cache.Indexer
 	mgmt        *config.ManagementContext
-	userMGR     common.UserManager
+	userMGR     user.Manager
 }
 
 // When a CRTB is created that gives a subject some permissions in a project or cluster, we need to create a "membership" binding

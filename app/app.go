@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/rancher/norman/leader"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	managementController "github.com/rancher/rancher/pkg/controllers/management"
@@ -35,6 +36,7 @@ func buildManagement(scaledContext *config.ScaledContext) (*config.ManagementCon
 		return nil, err
 	}
 	management.Dialer = scaledContext.Dialer
+	management.UserManager = scaledContext.UserManager
 	return management, nil
 }
 
@@ -63,6 +65,13 @@ func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config
 	manager := clustermanager.NewManager(scaledContext)
 	scaledContext.AccessControl = manager
 	scaledContext.ClientGetter = manager
+
+	userManager, err := common.NewUserManager(scaledContext)
+	if err != nil {
+		return nil, err
+	}
+
+	scaledContext.UserManager = userManager
 
 	return scaledContext, nil
 }

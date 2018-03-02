@@ -9,7 +9,6 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
-	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -18,6 +17,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3public/schema"
 	"github.com/rancher/types/client/management/v3public"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
 )
 
@@ -27,12 +27,12 @@ const (
 
 func newLoginHandler(mgmt *config.ScaledContext) *loginHandler {
 	return &loginHandler{
-		mgr: common.NewUserManager(mgmt),
+		mgr: mgmt.UserManager,
 	}
 }
 
 type loginHandler struct {
-	mgr common.UserManager
+	mgr user.Manager
 }
 
 func (h *loginHandler) login(actionName string, action *types.Action, request *types.APIContext) error {
