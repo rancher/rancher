@@ -222,7 +222,7 @@ func (l *Lifecycle) generateToken(user *mgmtv3.User) (string, error) {
 		Description:  "token for helm chart deployment",
 		UserID:       user.Name,
 		AuthProvider: local.Name,
-		IsDerived:    false,
+		IsDerived:    true,
 	}
 	key, err := randomtoken.Generate()
 	if err != nil {
@@ -232,8 +232,6 @@ func (l *Lifecycle) generateToken(user *mgmtv3.User) (string, error) {
 	labels := make(map[string]string)
 	labels[userIDLabel] = token.UserID
 
-	token.APIVersion = "management.cattle.io/v3"
-	token.Kind = "Token"
 	token.Token = key
 	token.ObjectMeta = metav1.ObjectMeta{
 		Name:   helmTokenPrefix + user.Name,
