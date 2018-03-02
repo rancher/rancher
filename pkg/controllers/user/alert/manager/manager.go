@@ -121,7 +121,7 @@ func (m *Manager) getAlertManagerEndpoint() (string, error) {
 		return "", err
 	}
 	ip := node.Status.Addresses[0].Address
-	svc, err := m.svcLister.Get("cattle-alerting", "alertmanager")
+	svc, err := m.svcLister.Get("cattle-alerting", "alertmanager-svc")
 	if err != nil {
 		return "", fmt.Errorf("Failed to get service for alertmanager")
 	}

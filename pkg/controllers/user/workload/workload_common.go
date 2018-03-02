@@ -64,6 +64,12 @@ type Workload struct {
 	OwnerReferences []metav1.OwnerReference
 	Labels          map[string]string
 	Key             string
+	Status          *Status
+}
+
+type Status struct {
+	Replicas          int32
+	AvailableReplicas int32
 }
 
 type CommonController struct {
@@ -218,28 +224,28 @@ func (c CommonController) GetByWorkloadID(key string) (*Workload, error) {
 		labelSelector := &metav1.LabelSelector{
 			MatchLabels: o.Spec.Selector,
 		}
-		workload = getWorkload(namespace, name, workloadType, AppVersion, o.UID, labelSelector, o.Annotations, o.Spec.Template, o.OwnerReferences, o.Labels)
+		workload = getWorkload(namespace, name, workloadType, AppVersion, o.UID, labelSelector, o.Annotations, o.Spec.Template, o.OwnerReferences, o.Labels, o.Status.Replicas, o.Status.AvailableReplicas)
 	case ReplicaSetType:
 		o, err := c.ReplicaSetLister.Get(namespace, name)
 		if err != nil || o.DeletionTimestamp != nil {
 			return nil, err
 		}
 
-		workload = getWorkload(namespace, name, workloadType, AppVersion, o.UID, o.Spec.Selector, o.Annotations, &o.Spec.Template, o.OwnerReferences, o.Labels)
+		workload = getWorkload(namespace, name, workloadType, AppVersion, o.UID, o.Spec.Selector, o.Annotations, &o.Spec.Template, o.OwnerReferences, o.Labels, o.Status.Replicas, o.Status.AvailableReplicas)
 	case DaemonSetType:
 		o, err := c.DaemonSetLister.Get(namespace, name)
 		if err != nil || o.DeletionTimestamp != nil {
 			return nil, err
 		}
 
-		workload = getWorkload(namespace, name, workloadType, AppVersion, o.UID, o.Spec.Selector, o.Annotations, &o.Spec.Template, o.OwnerReferences, o.Labels)
+		workload = getWorkload(namespace, name, workloadType, AppVersion, o.UID, o.Spec.Selector, o.Annotations, &o.Spec.Template, o.OwnerReferences, o.Labels, o.Status.DesiredNumberScheduled, o.Status.NumberAvailable)
 	case StatefulSetType:
 		o, err := c.StatefulSetLister.Get(namespace, name)
 		if err != nil || o.DeletionTimestamp != nil {
 			return nil, err
 		}
 
-		workload = getWorkload(namespace, name, workloadType, AppVersion, o.UID, o.Spec.Selector, o.Annotations, &o.Spec.Template, o.OwnerReferences, o.Labels)
+		workload = getWorkload(namespace, name, workloadType, AppVersion, o.UID, o.Spec.Selector, o.Annotations, &o.Spec.Template, o.OwnerReferences, o.Labels, o.Status.Replicas, o.Status.ReadyReplicas)
 	case JobType:
 		o, err := c.JobLister.Get(namespace, name)
 		if err != nil || o.DeletionTimestamp != nil {
@@ -252,7 +258,7 @@ func (c CommonController) GetByWorkloadID(key string) (*Workload, error) {
 			}
 		}
 
-		workload = getWorkload(namespace, name, workloadType, BatchVersion, o.UID, labelSelector, o.Annotations, &o.Spec.Template, o.OwnerReferences, o.Labels)
+		workload = getWorkload(namespace, name, workloadType, BatchVersion, o.UID, labelSelector, o.Annotations, &o.Spec.Template, o.OwnerReferences, o.Labels, 0, 0)
 	case CronJobType:
 		o, err := c.CronJobLister.Get(namespace, name)
 		if err != nil || o.DeletionTimestamp != nil {
@@ -265,20 +271,21 @@ func (c CommonController) GetByWorkloadID(key string) (*Workload, error) {
 			}
 		}
 
-		workload = getWorkload(namespace, name, workloadType, BatchBetaVersion, o.UID, labelSelector, o.Annotations, &o.Spec.JobTemplate.Spec.Template, o.OwnerReferences, o.Labels)
+		workload = getWorkload(namespace, name, workloadType, BatchBetaVersion, o.UID, labelSelector, o.Annotations, &o.Spec.JobTemplate.Spec.Template, o.OwnerReferences, o.Labels, 0, 0)
 	default:
 		o, err := c.DeploymentLister.Get(namespace, name)
 		if err != nil || o.DeletionTimestamp != nil {
 			return nil, err
 		}
 
-		workload = getWorkload(namespace, name, DeploymentType, AppVersion, o.UID, o.Spec.Selector, o.Annotations, &o.Spec.Template, o.OwnerReferences, o.Labels)
+		workload = getWorkload(namespace, name, DeploymentType, AppVersion, o.UID, o.Spec.Selector, o.Annotations, &o.Spec.Template, o.OwnerReferences, o.Labels, o.Status.Replicas, o.Status.AvailableReplicas)
 	}
 	return workload, nil
 }
 
 func getWorkload(namespace string, name string, kind string, apiVersion string, UUID types.UID, selectorLabels *metav1.LabelSelector,
-	annotations map[string]string, podTemplateSpec *corev1.PodTemplateSpec, ownerRefs []metav1.OwnerReference, labels map[string]string) *Workload {
+	annotations map[string]string, podTemplateSpec *corev1.PodTemplateSpec, ownerRefs []metav1.OwnerReference, labels map[string]string,
+	replicas, availableReplicas int32) *Workload {
 	return &Workload{
 		Name:            name,
 		Namespace:       namespace,
@@ -291,6 +298,10 @@ func getWorkload(namespace string, name string, kind string, apiVersion string, 
 		APIVersion:      apiVersion,
 		Labels:          labels,
 		Key:             fmt.Sprintf("%s/%s", namespace, name),
+		Status: &Status{
+			Replicas:          replicas,
+			AvailableReplicas: availableReplicas,
+		},
 	}
 }
 

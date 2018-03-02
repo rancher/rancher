@@ -7,11 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"mime/multipart"
+	"net"
 	"net/http"
-	"net/mail"
 	"net/smtp"
-	"net/textproto"
 	"strconv"
 	"strings"
 	"time"
@@ -252,8 +250,9 @@ func testEmail(host, password, username string, port int, requireTLS bool, msg, 
 	var c *smtp.Client
 	smartHost := host + ":" + strconv.Itoa(port)
 
+	timeout := 15 * time.Second
 	if requireTLS {
-		conn, err := tls.Dial("tcp", smartHost, &tls.Config{ServerName: host})
+		conn, err := tls.DialWithDialer(&net.Dialer{Timeout: timeout}, "tcp", smartHost, &tls.Config{ServerName: host})
 		if err != nil {
 			return err
 		}
@@ -263,13 +262,17 @@ func testEmail(host, password, username string, port int, requireTLS bool, msg, 
 		}
 
 	} else {
-		// Connect to the SMTP smarthost.
-		c, err := smtp.Dial(smartHost)
+		conn, err := net.DialTimeout("tcp", smartHost, timeout)
 		if err != nil {
 			return err
 		}
-		defer c.Quit()
+		c, err = smtp.NewClient(conn, smartHost)
+		if err != nil {
+			return err
+		}
 	}
+	defer c.Quit()
+
 	if ok, mech := c.Extension("AUTH"); ok {
 		auth, err := auth(mech, username, password)
 		if err != nil {
@@ -282,61 +285,27 @@ func testEmail(host, password, username string, port int, requireTLS bool, msg, 
 		}
 	}
 
-	if msg == "" {
-		msg = "smtp server configuation validation"
-	}
-
-	addrs, err := mail.ParseAddressList(username)
-	if err != nil {
-		return fmt.Errorf("parsing from addresses: %s", err)
-	}
-	if len(addrs) != 1 {
-		return fmt.Errorf("must be exactly one from address")
-	}
-	if err := c.Mail(addrs[0].Address); err != nil {
-		return fmt.Errorf("sending mail from: %s", err)
-	}
-	addrs, err = mail.ParseAddressList(receiver)
-	if err != nil {
-		return fmt.Errorf("parsing to addresses: %s", err)
-	}
-	for _, addr := range addrs {
-		if err := c.Rcpt(addr.Address); err != nil {
-			return fmt.Errorf("sending rcpt to: %s", err)
+	if msg != "" {
+		if err := c.Mail(username); err != nil {
+			return fmt.Errorf("fail to set sender: %v", err)
 		}
-	}
 
-	// Send the email body.
-	wc, err := c.Data()
-	if err != nil {
-		return err
-	}
-	defer wc.Close()
+		if err := c.Rcpt(receiver); err != nil {
+			return fmt.Errorf("fail to set recipient: %v", err)
+		}
 
-	buffer := &bytes.Buffer{}
-	multipartWriter := multipart.NewWriter(buffer)
-
-	fmt.Fprintf(wc, "Date: %s\r\n", time.Now().Format(time.RFC1123Z))
-	fmt.Fprintf(wc, "Content-Type: multipart/alternative;  boundary=%s\r\n", multipartWriter.Boundary())
-	fmt.Fprintf(wc, "MIME-Version: 1.0\r\n")
-
-	fmt.Fprintf(wc, "\r\n")
-
-	if len(msg) > 0 {
-		// Text template
-		w, err := multipartWriter.CreatePart(textproto.MIMEHeader{"Content-Type": {"text/plain; charset=UTF-8"}})
+		// Data
+		w, err := c.Data()
 		if err != nil {
-			return fmt.Errorf("creating part for text template: %s", err)
+			return err
 		}
+		defer w.Close()
 
 		_, err = w.Write([]byte(msg))
 		if err != nil {
 			return err
 		}
 	}
-
-	multipartWriter.Close()
-	wc.Write(buffer.Bytes())
 
 	return nil
 }

@@ -174,7 +174,7 @@ func getService() *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "cattle-alerting",
-			Name:      "alertmanager",
+			Name:      "alertmanager-svc",
 		},
 		Spec: corev1.ServiceSpec{
 			Type: corev1.ServiceTypeNodePort,
