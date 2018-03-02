@@ -55,5 +55,5 @@ func (m *clusterManager) sync(key string, obj *v3.Cluster) error {
 		return err
 	}
 
-	return resyncServiceAccounts(m.serviceAccountLister, m.serviceAccountsController, obj.Namespace)
+	return resyncServiceAccounts(m.serviceAccountLister, m.serviceAccountsController, "")
 }
