@@ -46,7 +46,7 @@ type URLParser func(schema *types.Schemas, url *url.URL) (ParsedURL, error)
 func DefaultURLParser(schemas *types.Schemas, url *url.URL) (ParsedURL, error) {
 	result := ParsedURL{}
 
-	path := url.Path
+	path := url.EscapedPath()
 	path = multiSlashRegexp.ReplaceAllString(path, "/")
 	schemaVersion, version, prefix, parts, subContext := parseVersionAndSubContext(schemas, path)
 

@@ -88,7 +88,11 @@ func (b *Builder) copyInputs(schema *types.Schema, input map[string]interface{},
 					}
 				}
 			}
-			result[fieldName] = value
+
+			// Don't copy empty strings
+			if !(value == "" && field.Type == "string") {
+				result[fieldName] = value
+			}
 
 			if op.IsList() && field.Type == "date" && value != "" {
 				ts, err := convert.ToTimestamp(value)

@@ -214,7 +214,7 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 		AddMapperForType(&Version, v3.Principal{}, m.DisplayName{}).
 		MustImportAndCustomize(&Version, v3.Principal{}, func(schema *types.Schema) {
 			schema.CollectionMethods = []string{http.MethodGet}
-			schema.ResourceMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet}
 			schema.CollectionActions = map[string]types.Action{
 				"search": {
 					Input:  "searchPrincipalsInput",

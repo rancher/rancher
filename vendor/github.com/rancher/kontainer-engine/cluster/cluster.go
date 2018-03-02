@@ -147,7 +147,8 @@ func (c *Cluster) createInner(ctx context.Context) error {
 
 	if c.Status == Updating || c.Status == Running {
 		logrus.Infof("Cluster %s already exists.", c.Name)
-		return nil
+		// This error is checked in rancher, don't change the string
+		return fmt.Errorf("cluster already exists")
 	}
 
 	if err := c.create(ctx); err != nil {
