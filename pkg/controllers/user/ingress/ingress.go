@@ -8,6 +8,8 @@ import (
 
 	"strconv"
 
+	"strings"
+
 	"github.com/rancher/norman/types/convert"
 	util "github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/types/apis/core/v1"
@@ -73,7 +75,12 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) error {
 	}
 
 	for serviceName, portStr := range serviceToPort {
-		workloadIDs := state[serviceToKey[serviceName]]
+		workloadIDsStr := state[serviceToKey[serviceName]]
+		b, err := json.Marshal(strings.Split(workloadIDsStr, "/"))
+		if err != nil {
+			return err
+		}
+		workloadIDs := string(b)
 		existing, err := c.serviceLister.Get(obj.Namespace, serviceName)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
@@ -99,6 +106,7 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) error {
 				},
 			}
 			annotations := make(map[string]string)
+
 			annotations[util.WorkloadAnnotation] = workloadIDs
 			service := &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
