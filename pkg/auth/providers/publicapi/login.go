@@ -122,7 +122,11 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 
 	logrus.Debug("User Authenticated")
 
-	user, err := h.mgr.EnsureUser(userPrincipal.Name, userPrincipal.DisplayName)
+	displayName := userPrincipal.DisplayName
+	if displayName == "" {
+		displayName = userPrincipal.LoginName
+	}
+	user, err := h.mgr.EnsureUser(userPrincipal.Name, displayName)
 	if err != nil {
 		return v3.Token{}, "", err
 	}
