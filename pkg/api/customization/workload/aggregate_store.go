@@ -225,12 +225,14 @@ func setPorts(data map[string]interface{}) {
 	}
 }
 
-func getCreds(apiContext *types.APIContext) map[string][]corev1.LocalObjectReference {
+func getCreds(apiContext *types.APIContext, namespaceID string) map[string][]corev1.LocalObjectReference {
 	domainToCreds := make(map[string][]corev1.LocalObjectReference)
 	var namespacedCreds []projectclient.NamespacedDockerCredential
 	if err := access.List(apiContext, &projectschema.Version, "namespacedDockerCredential", &types.QueryOptions{}, &namespacedCreds); err == nil {
 		for _, cred := range namespacedCreds {
-			store(cred.Registries, domainToCreds, cred.Name)
+			if cred.NamespaceId == namespaceID {
+				store(cred.Registries, domainToCreds, cred.Name)
+			}
 		}
 	}
 	var creds []projectclient.DockerCredential
@@ -248,7 +250,7 @@ func setSecrets(apiContext *types.APIContext, data map[string]interface{}) {
 	}
 	if containers, _ := values.GetSlice(data, "containers"); len(containers) > 0 {
 		imagePullSecrets, _ := data["imagePullSecrets"].([]corev1.LocalObjectReference)
-		domainToCreds := getCreds(apiContext)
+		domainToCreds := getCreds(apiContext, convert.ToString(data["namespaceId"]))
 		for _, container := range containers {
 			if image := convert.ToString(container["image"]); image != "" {
 				domain := getDomain(image)
