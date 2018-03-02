@@ -14,7 +14,7 @@ func Register(userContext *config.UserContext) {
 	nsh := &nodeRemove{
 		userNodes: userContext.Core.Nodes(""),
 	}
-	userContext.Management.Management.Nodes(userContext.ClusterName).AddLifecycle("user-node-remove", nsh)
+	userContext.Management.Management.Nodes(userContext.ClusterName).AddClusterScopedLifecycle("user-node-remove", userContext.ClusterName, nsh)
 }
 
 func (n *nodeRemove) Create(obj *v3.Node) (*v3.Node, error) {
@@ -23,8 +23,7 @@ func (n *nodeRemove) Create(obj *v3.Node) (*v3.Node, error) {
 
 func (n *nodeRemove) Remove(obj *v3.Node) (*v3.Node, error) {
 	if obj.Status.NodeName != "" {
-		err := n.userNodes.Delete(obj.Status.NodeName, nil)
-		return obj, err
+		n.userNodes.Delete(obj.Status.NodeName, nil)
 	}
 	return obj, nil
 }
