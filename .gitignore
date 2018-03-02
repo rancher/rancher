@@ -6,6 +6,7 @@
 /.trash-cache
 /.idea
 /package/rancher
+/package/agent
 /tests/MANIFEST
 /tests/.cache
 /tests/.tox
