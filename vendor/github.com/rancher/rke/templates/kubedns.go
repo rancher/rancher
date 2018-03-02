@@ -15,6 +15,7 @@ spec:
       labels:
         k8s-app: kube-dns-autoscaler
     spec:
+      serviceAccountName: kube-dns-autoscaler
       containers:
       - name: autoscaler
         image: {{.KubeDNSAutoScalerImage}}
@@ -32,7 +33,46 @@ spec:
           - --default-params={"linear":{"coresPerReplica":128,"nodesPerReplica":4,"min":1}}
           - --logtostderr=true
           - --v=2
-
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kube-dns-autoscaler
+  namespace: kube-system
+  labels: 
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: system:kube-dns-autoscaler
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["list"]
+  - apiGroups: [""]
+    resources: ["replicationcontrollers/scale"]
+    verbs: ["get", "update"]
+  - apiGroups: ["extensions"]
+    resources: ["deployments/scale", "replicasets/scale"]
+    verbs: ["get", "update"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "create"]
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: system:kube-dns-autoscaler
+subjects:
+  - kind: ServiceAccount
+    name: kube-dns-autoscaler
+    namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: system:kube-dns-autoscaler
+  apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: v1
 kind: ServiceAccount

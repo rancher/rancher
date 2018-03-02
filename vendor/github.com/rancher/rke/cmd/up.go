@@ -110,7 +110,7 @@ func ClusterUp(
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
 
-	err = cluster.ConfigureCluster(ctx, kubeCluster.RancherKubernetesEngineConfig, kubeCluster.Certificates, clusterFilePath, configDir, k8sWrapTransport)
+	err = cluster.ConfigureCluster(ctx, kubeCluster.RancherKubernetesEngineConfig, kubeCluster.Certificates, clusterFilePath, configDir, k8sWrapTransport, false)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
