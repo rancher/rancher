@@ -62,6 +62,10 @@ func (g *GenericEncryptedStore) getKey(name string) string {
 }
 
 func (g *GenericEncryptedStore) Set(name string, data map[string]string) error {
+	return g.set(name, data, 0)
+}
+
+func (g *GenericEncryptedStore) set(name string, data map[string]string, try int) error {
 	sec, err := g.secrets.Secrets(g.namespace).Get(g.getKey(name), metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		sec = &corev1.Secret{}
@@ -83,6 +87,9 @@ func (g *GenericEncryptedStore) Set(name string, data map[string]string) error {
 
 	if !reflect.DeepEqual(orig, sec) {
 		_, err = g.secrets.Secrets(g.namespace).Update(sec)
+		if err != nil && try < 5 {
+			return g.set(name, data, try+1)
+		}
 	}
 	return err
 }
