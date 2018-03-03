@@ -21,7 +21,7 @@ func NewAccessControl(rbacClient v1.Interface) *AccessControl {
 	}
 }
 
-func (a *AccessControl) Filter(apiContext *types.APIContext, obj map[string]interface{}, context map[string]string) map[string]interface{} {
+func (a *AccessControl) Filter(apiContext *types.APIContext, schema *types.Schema, obj map[string]interface{}, context map[string]string) map[string]interface{} {
 	apiGroup := context["apiGroup"]
 	resource := context["resource"]
 
@@ -46,7 +46,7 @@ func (a *AccessControl) canAccess(obj map[string]interface{}, permset ListPermis
 	return permset.Access(namespace, strings.TrimPrefix(id, namespace+":"))
 }
 
-func (a *AccessControl) FilterList(apiContext *types.APIContext, objs []map[string]interface{}, context map[string]string) []map[string]interface{} {
+func (a *AccessControl) FilterList(apiContext *types.APIContext, schema *types.Schema, objs []map[string]interface{}, context map[string]string) []map[string]interface{} {
 	apiGroup := context["apiGroup"]
 	resource := context["resource"]
 
