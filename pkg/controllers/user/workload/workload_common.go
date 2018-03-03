@@ -38,7 +38,7 @@ const (
 	DaemonSetType             = "daemonset"
 	StatefulSetType           = "statefulset"
 	JobType                   = "job"
-	CronJobType               = "cronJob"
+	CronJobType               = "cronjob"
 	WorkloadAnnotatioNoop     = "targetWorkloadIdNoop"
 )
 
