@@ -86,8 +86,6 @@ func (c *Cluster) BuildKubeAPIProcess() v3.Process {
 		"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
 		"--service-cluster-ip-range=" + c.Services.KubeAPI.ServiceClusterIPRange,
 		"--admission-control=ServiceAccount,NamespaceLifecycle,LimitRanger,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
-		"--runtime-config=batch/v2alpha1",
-		"--runtime-config=authentication.k8s.io/v1beta1=true",
 		"--storage-backend=etcd3",
 		"--client-ca-file=" + pki.GetCertPath(pki.CACertName),
 		"--tls-cert-file=" + pki.GetCertPath(pki.KubeAPICertName),
