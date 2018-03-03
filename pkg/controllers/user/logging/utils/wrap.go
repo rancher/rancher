@@ -49,7 +49,8 @@ type WrapSplunk struct {
 }
 
 type WrapKafka struct {
-	Brokers string
+	Brokers   string
+	Zookeeper string
 }
 
 type WrapSyslog struct {
@@ -186,8 +187,12 @@ func getWrapConfig(es *v3.ElasticsearchConfig, sp *v3.SplunkConfig, sl *v3.Syslo
 			}
 		} else {
 			if kf.ZookeeperEndpoint != "" {
-				if _, _, err = parseEndpoint(kf.ZookeeperEndpoint); err != nil {
+				var h string
+				if h, _, err = parseEndpoint(kf.ZookeeperEndpoint); err != nil {
 					return
+				}
+				wkf = WrapKafka{
+					Zookeeper: h,
 				}
 			}
 		}

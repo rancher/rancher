@@ -71,7 +71,7 @@ var ClusterTemplate = `{{ if ne .clusterTarget.CurrentTarget "none" }}
     {{ if eq .clusterTarget.CurrentTarget "kafka"}}
     @type kafka_buffered
     {{ if .clusterTarget.KafkaConfig.ZookeeperEndpoint }}
-    zookeeper {{.clusterTarget.KafkaConfig.ZookeeperEndpoint}}
+    zookeeper {{.clusterTarget.WrapKafka.Zookeeper}}
     {{else}}
     brokers {{.clusterTarget.WrapKafka.Brokers}}
     {{end}}
