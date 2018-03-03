@@ -316,13 +316,21 @@ func cronJobTypes(schemas *types.Schemas) *types.Schemas {
 				From: []string{
 					"schedule",
 					"startingDeadlineSeconds",
-					"concurrencyPolicy",
 					"suspend",
 					"successfulJobsHistoryLimit",
 					"failedJobsHistoryLimit",
 					"jobConfig",
 				},
 				To: "cronJobConfig",
+			},
+			&m.Enum{Field: "concurrencyPolicy", Options: []string{
+				"Allow",
+				"Forbid",
+				"Replace",
+			}},
+			&m.Move{
+				From: "concurrencyPolicy",
+				To:   "cronJobConfig/concurrencyPolicy",
 			},
 			&m.Move{
 				From:              "jobMetadata/labels",
