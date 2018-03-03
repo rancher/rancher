@@ -71,9 +71,9 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
     {{ if eq $store.CurrentTarget "kafka"}}
     @type kafka_buffered
     {{ if $store.KafkaConfig.ZookeeperEndpoint }}
-    zookeeper {{$store.KafkaConfig.ZookeeperEndpoint}}
+    zookeeper {{$store.WrapKafka.Zookeeper}}
     {{else}}
-    brokers {{$store.KafkaConfig.BrokerEndpoints}}
+    brokers {{$store.WrapKafka.Brokers}}
     {{end}}
     default_topic {{$store.KafkaConfig.Topic}}
     output_data_type  "json"
