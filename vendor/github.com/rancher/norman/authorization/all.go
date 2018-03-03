@@ -30,10 +30,10 @@ func (*AllAccess) CanDelete(apiContext *types.APIContext, obj map[string]interfa
 	return slice.ContainsString(schema.ResourceMethods, http.MethodDelete)
 }
 
-func (*AllAccess) Filter(apiContext *types.APIContext, obj map[string]interface{}, context map[string]string) map[string]interface{} {
+func (*AllAccess) Filter(apiContext *types.APIContext, schema *types.Schema, obj map[string]interface{}, context map[string]string) map[string]interface{} {
 	return obj
 }
 
-func (*AllAccess) FilterList(apiContext *types.APIContext, obj []map[string]interface{}, context map[string]string) []map[string]interface{} {
+func (*AllAccess) FilterList(apiContext *types.APIContext, schema *types.Schema, obj []map[string]interface{}, context map[string]string) []map[string]interface{} {
 	return obj
 }
