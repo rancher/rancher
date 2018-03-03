@@ -81,7 +81,7 @@ services:
 network:
   plugin: flannel
   options:
-    
+
 authentication:
   strategy: x509
 
@@ -134,3 +134,24 @@ private_registries:
   - url: registry.com
     user: Username
     password: password
+
+# Currently only nginx ingress provider is supported.
+# To disable ingress controller, set `provider: none`
+# To enable ingress on specific nodes, use the node_selector, eg:
+# nodes:
+#   - address: example.com
+#     user: ubuntu
+#     role:
+#     - role
+#     hostname_override: node3
+#     internal_address: 192.168.1.6
+#     labels:
+#       app: ingress
+#
+# ingress:
+#   provider: nginx
+#   node_selector:
+#     app: ingress
+
+ingress:
+  provider: nginx
