@@ -251,23 +251,28 @@ func (j *Engine) SyncExecution(execution *v3.PipelineExecution) (bool, error) {
 	updated := false
 
 	jobName := getJobName(&execution.Spec.Pipeline)
-	if execution.Status.Commit == "" {
-		buildinfo, err := j.Client.getBuildInfo(jobName)
-		if err == ErrNotFound {
-			//there is a chance that Jenkins job is created but build info is not available
-			//forgive the notfound in this case
-			startTime, err := time.Parse(time.RFC3339, execution.Status.Started)
-			if err != nil {
-				return false, err
-			}
-			if time.Now().Before(startTime.Add(15 * time.Second)) {
-				return false, nil
-			}
-			return false, ErrGetBuildInfoFail
-		}
+	buildinfo, err := j.Client.getBuildInfo(jobName)
+	if err == ErrNotFound {
+		//there is a chance that Jenkins job is created but build info is not available
+		//forgive the notfound in this case
+		startTime, err := time.Parse(time.RFC3339, execution.Status.Started)
 		if err != nil {
 			return false, err
 		}
+		if time.Now().Before(startTime.Add(15 * time.Second)) {
+			return false, nil
+		}
+		return false, ErrGetBuildInfoFail
+	}
+	if err != nil {
+		return false, err
+	}
+	if buildinfo.Result == "FAILURE" {
+		//some errors are disclosed in buildinfo but not in wfbuildinfo
+		execution.Status.ExecutionState = utils.StateFail
+		updated = true
+	}
+	if execution.Status.Commit == "" {
 		for _, action := range buildinfo.Actions {
 			if action.LastBuiltRevision.SHA1 != "" {
 				execution.Status.Commit = action.LastBuiltRevision.SHA1
