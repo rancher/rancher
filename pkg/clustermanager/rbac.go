@@ -50,23 +50,23 @@ func (m *Manager) CanDelete(apiContext *types.APIContext, obj map[string]interfa
 	return ac.CanDelete(apiContext, obj, schema)
 }
 
-func (m *Manager) Filter(apiContext *types.APIContext, obj map[string]interface{}, context map[string]string) map[string]interface{} {
-	ac, err := m.getAccessControl(apiContext, apiContext.Schema)
+func (m *Manager) Filter(apiContext *types.APIContext, schema *types.Schema, obj map[string]interface{}, context map[string]string) map[string]interface{} {
+	ac, err := m.getAccessControl(apiContext, schema)
 	if err != nil {
 		logrus.Warnf("failed to find access control: %v", err)
 		return nil
 	}
 
-	return ac.Filter(apiContext, obj, context)
+	return ac.Filter(apiContext, schema, obj, context)
 }
 
-func (m *Manager) FilterList(apiContext *types.APIContext, obj []map[string]interface{}, context map[string]string) []map[string]interface{} {
-	ac, err := m.getAccessControl(apiContext, apiContext.Schema)
+func (m *Manager) FilterList(apiContext *types.APIContext, schema *types.Schema, obj []map[string]interface{}, context map[string]string) []map[string]interface{} {
+	ac, err := m.getAccessControl(apiContext, schema)
 	if err != nil {
 		logrus.Warnf("failed to find access control: %v", err)
 		return nil
 	}
-	return ac.FilterList(apiContext, obj, context)
+	return ac.FilterList(apiContext, schema, obj, context)
 }
 
 func (m *Manager) getAccessControl(apiContext *types.APIContext, schema *types.Schema) (types.AccessControl, error) {
