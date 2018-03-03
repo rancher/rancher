@@ -29,8 +29,8 @@ const (
 )
 
 type lProvider struct {
-	users        v3.UserLister
-	groups       v3.GroupLister
+	userLister   v3.UserLister
+	groupLister  v3.GroupLister
 	userIndexer  cache.Indexer
 	gmIndexer    cache.Indexer
 	groupIndexer cache.Indexer
@@ -52,9 +52,9 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext) common.AuthPr
 	l := &lProvider{
 		userIndexer:  informer.GetIndexer(),
 		gmIndexer:    gmInformer.GetIndexer(),
-		groups:       mgmtCtx.Management.Groups("").Controller().Lister(),
+		groupLister:  mgmtCtx.Management.Groups("").Controller().Lister(),
 		groupIndexer: gInformer.GetIndexer(),
-		users:        mgmtCtx.Management.Users("").Controller().Lister(),
+		userLister:   mgmtCtx.Management.Users("").Controller().Lister(),
 	}
 	return l
 }
@@ -102,14 +102,8 @@ func (l *lProvider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Prin
 	}
 
 	principalID := getLocalPrincipalID(user)
-	userPrincipal := v3.Principal{
-		ObjectMeta:    metav1.ObjectMeta{Name: principalID},
-		DisplayName:   user.DisplayName,
-		LoginName:     user.Username,
-		PrincipalType: "user",
-		Provider:      Name,
-		Me:            true,
-	}
+	userPrincipal := l.toPrincipal("user", user.DisplayName, user.Username, principalID, nil)
+	userPrincipal.Me = true
 
 	groupPrincipals, err := l.getGroupPrincipals(user)
 	if err != nil {
@@ -146,19 +140,14 @@ func (l *lProvider) getGroupPrincipals(user *v3.User) ([]v3.Principal, error) {
 			}
 
 			//find group for this member mapping
-			localGroup, err := l.groups.Get("", gm.GroupName)
-
+			localGroup, err := l.groupLister.Get("", gm.GroupName)
 			if err != nil {
 				logrus.Errorf("Failed to get Group resource %v: %v", gm.GroupName, err)
 				continue
 			}
 
-			groupPrincipal := v3.Principal{
-				ObjectMeta:    metav1.ObjectMeta{Name: Name + "://" + localGroup.Name},
-				DisplayName:   localGroup.DisplayName,
-				PrincipalType: "group",
-				Provider:      Name,
-			}
+			groupPrincipal := l.toPrincipal("group", localGroup.DisplayName, "", Name+"://"+localGroup.Name, nil)
+			groupPrincipal.MemberOf = true
 			groupPrincipals = append(groupPrincipals, groupPrincipal)
 		}
 	}
@@ -186,32 +175,14 @@ func (l *lProvider) SearchPrincipals(searchKey, principalType string, myToken v3
 	if principalType == "" || principalType == "user" {
 		for _, user := range localUsers {
 			principalID := getLocalPrincipalID(user)
-			userPrincipal := v3.Principal{
-				ObjectMeta:    metav1.ObjectMeta{Name: principalID},
-				DisplayName:   user.DisplayName,
-				LoginName:     user.Username,
-				PrincipalType: "user",
-				Provider:      Name,
-				Me:            false,
-			}
-			if l.isThisUserMe(myToken.UserPrincipal, userPrincipal) {
-				userPrincipal.Me = true
-			}
+			userPrincipal := l.toPrincipal("user", user.DisplayName, user.Username, principalID, &myToken)
 			principals = append(principals, userPrincipal)
 		}
 	}
 
 	if principalType == "" || principalType == "group" {
 		for _, group := range localGroups {
-			groupPrincipal := v3.Principal{
-				ObjectMeta:    metav1.ObjectMeta{Name: Name + "://" + group.Name},
-				DisplayName:   group.DisplayName,
-				PrincipalType: "group",
-				Provider:      Name,
-			}
-			if l.isMemberOf(myToken.GroupPrincipals, groupPrincipal) {
-				groupPrincipal.MemberOf = true
-			}
+			groupPrincipal := l.toPrincipal("group", group.DisplayName, "", Name+"://"+group.Name, &myToken)
 			principals = append(principals, groupPrincipal)
 		}
 	}
@@ -219,15 +190,59 @@ func (l *lProvider) SearchPrincipals(searchKey, principalType string, myToken v3
 	return principals, nil
 }
 
+func (l *lProvider) toPrincipal(principalType, displayName, loginName, id string, token *v3.Token) v3.Principal {
+	if displayName == "" {
+		displayName = loginName
+	}
+
+	princ := v3.Principal{
+		ObjectMeta:  metav1.ObjectMeta{Name: id},
+		DisplayName: displayName,
+		LoginName:   loginName,
+		Provider:    Name,
+		Me:          false,
+	}
+
+	if principalType == "user" {
+		princ.PrincipalType = "user"
+		if token != nil {
+			princ.Me = l.isThisUserMe(token.UserPrincipal, princ)
+		}
+	} else {
+		princ.PrincipalType = "group"
+		if token != nil {
+			princ.MemberOf = l.isMemberOf(token.GroupPrincipals, princ)
+		}
+	}
+
+	return princ
+}
+
 func (l *lProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
-	return v3.Principal{}, nil
+	// TODO implement group lookup (local groups currently not implemented, so we can skip)
+	// parsing id to get the external id and type. id looks like github_[user|org|team]://12345
+	var name string
+	parts := strings.SplitN(principalID, ":", 2)
+	if len(parts) != 2 {
+		return v3.Principal{}, errors.Errorf("invalid id %v", principalID)
+	}
+	name = strings.TrimPrefix(parts[1], "//")
+
+	user, err := l.userLister.Get("", name)
+	if err != nil {
+		return v3.Principal{}, err
+	}
+
+	princID := getLocalPrincipalID(user)
+	princ := l.toPrincipal("user", user.DisplayName, user.Username, princID, &token)
+	return princ, nil
 }
 
 func (l *lProvider) listAllUsersAndGroups(searchKey string) ([]*v3.User, []*v3.Group, error) {
 	var localUsers []*v3.User
 	var localGroups []*v3.Group
 
-	allUsers, err := l.users.List("", labels.NewSelector())
+	allUsers, err := l.userLister.List("", labels.NewSelector())
 	if err != nil {
 		logrus.Infof("Failed to search User resources for %v: %v", searchKey, err)
 		return localUsers, localGroups, err
@@ -239,7 +254,7 @@ func (l *lProvider) listAllUsersAndGroups(searchKey string) ([]*v3.User, []*v3.G
 		localUsers = append(localUsers, user)
 	}
 
-	allGroups, err := l.groups.List("", labels.NewSelector())
+	allGroups, err := l.groupLister.List("", labels.NewSelector())
 	if err != nil {
 		logrus.Infof("Failed to search group resources for %v: %v", searchKey, err)
 		return localUsers, localGroups, err
