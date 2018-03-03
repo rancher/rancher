@@ -1,11 +1,8 @@
 package pod
 
 import (
-	"strings"
-
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/norman/types/definition"
 	"github.com/rancher/rancher/pkg/api/customization/workload"
 )
 
@@ -62,12 +59,9 @@ func streamTransform(context *types.APIContext, data chan map[string]interface{}
 	result := make(chan map[string]interface{})
 	go func() {
 		for item := range data {
-			typeName := definition.GetType(item)
-			if strings.Contains(typeName, "replica") || strings.Contains(typeName, "deployment") {
-				tempMapping, err := workload.OwnerMap(context)
-				if err == nil {
-					mapping = tempMapping
-				}
+			tempMapping, err := workload.OwnerMap(context)
+			if err == nil {
+				mapping = tempMapping
 			}
 
 			result <- assignID(item, mapping)

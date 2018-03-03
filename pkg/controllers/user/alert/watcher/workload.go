@@ -73,7 +73,7 @@ func (w *WorkloadWatcher) watchRule() error {
 		if alert.Spec.TargetWorkload.WorkloadID != "" {
 
 			wl, err := w.workloadController.GetByWorkloadID(alert.Spec.TargetWorkload.WorkloadID)
-			if err != nil {
+			if err != nil || wl == nil {
 				logrus.Warnf("Fail to get workload for %s, %v", alert.Spec.TargetWorkload.WorkloadID, err)
 				continue
 			}
@@ -112,7 +112,7 @@ func (w *WorkloadWatcher) checkWorkloadCondition(wl *workload.Workload, alert *v
 	availableThreshold := int32(percentage) * (wl.Status.Replicas) / 100
 
 	if wl.Status.AvailableReplicas <= availableThreshold {
-		title := fmt.Sprintf("The wordload %s has available replicas less than  %s%%", wl.Name, strconv.Itoa(percentage))
+		title := fmt.Sprintf("The workload %s has available replicas less than  %s%%", wl.Name, strconv.Itoa(percentage))
 		desc := fmt.Sprintf("*Alert Name*: %s\n*Cluster Name*: %s\n*Available Replicas*: %s\n*Desired Replicas*: %s", alert.Spec.DisplayName, w.clusterName, strconv.Itoa(int(wl.Status.AvailableReplicas)),
 			strconv.Itoa(int(wl.Status.Replicas)))
 
