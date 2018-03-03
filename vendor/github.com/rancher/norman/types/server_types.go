@@ -75,8 +75,8 @@ type AccessControl interface {
 	CanUpdate(apiContext *APIContext, obj map[string]interface{}, schema *Schema) bool
 	CanDelete(apiContext *APIContext, obj map[string]interface{}, schema *Schema) bool
 
-	Filter(apiContext *APIContext, obj map[string]interface{}, context map[string]string) map[string]interface{}
-	FilterList(apiContext *APIContext, obj []map[string]interface{}, context map[string]string) []map[string]interface{}
+	Filter(apiContext *APIContext, schema *Schema, obj map[string]interface{}, context map[string]string) map[string]interface{}
+	FilterList(apiContext *APIContext, schema *Schema, obj []map[string]interface{}, context map[string]string) []map[string]interface{}
 }
 
 type APIContext struct {
