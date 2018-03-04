@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/controller"
 	"github.com/rancher/types/apis/apps/v1beta2"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -21,8 +22,10 @@ const (
 	ProjectIDAnnotation = "field.cattle.io/projectId"
 )
 
+// ProjectLoggingSyncer listens for projectLogging CRD in management API
+// and update the changes to configmap, deploy fluentd
+
 type ProjectLoggingSyncer struct {
-	management           config.ManagementContext
 	projectLoggings      v3.ProjectLoggingInterface
 	clusterLoggingLister v3.ClusterLoggingLister
 	namespaces           v1.NamespaceInterface
@@ -30,12 +33,12 @@ type ProjectLoggingSyncer struct {
 	configmaps           v1.ConfigMapInterface
 	daemonsets           v1beta2.DaemonSetInterface
 	clusterRoleBindings  rbacv1.ClusterRoleBindingInterface
+	clusterName          string
 }
 
 func registerProjectLogging(cluster *config.UserContext) {
 	projectLoggings := cluster.Management.Management.ProjectLoggings("")
 	syncer := &ProjectLoggingSyncer{
-		management:           *cluster.Management,
 		projectLoggings:      projectLoggings,
 		clusterLoggingLister: cluster.Management.Management.ClusterLoggings("").Controller().Lister(),
 		serviceAccounts:      cluster.Core.ServiceAccounts(loggingconfig.LoggingNamespace),
@@ -43,6 +46,7 @@ func registerProjectLogging(cluster *config.UserContext) {
 		configmaps:           cluster.Core.ConfigMaps(loggingconfig.LoggingNamespace),
 		daemonsets:           cluster.Apps.DaemonSets(loggingconfig.LoggingNamespace),
 		clusterRoleBindings:  cluster.RBAC.ClusterRoleBindings(loggingconfig.LoggingNamespace),
+		clusterName:          cluster.ClusterName,
 	}
 	projectLoggings.AddClusterScopedHandler("project-logging-controller", cluster.ClusterName, syncer.Sync)
 }
@@ -92,20 +96,21 @@ func (c *ProjectLoggingSyncer) createOrUpdateProjectConfigMap() error {
 	}
 	var wl []utils.WrapProjectLogging
 	for _, v := range projectLoggings {
-		var grepNamespace []string
-		for _, v2 := range ns {
-			nsProjectName := v2.Annotations[ProjectIDAnnotation]
-			if nsProjectName == v.Spec.ProjectName {
-				grepNamespace = append(grepNamespace, v2.Name)
+		if controller.ObjectInCluster(c.clusterName, v) {
+			var grepNamespace []string
+			for _, v2 := range ns {
+				if nsProjectName, ok := v2.Annotations[ProjectIDAnnotation]; ok && nsProjectName == v.Spec.ProjectName {
+					grepNamespace = append(grepNamespace, v2.Name)
+				}
 			}
-		}
 
-		formatgrepNamespace := fmt.Sprintf("(%s)", strings.Join(grepNamespace, "|"))
-		projectLogging, err := utils.ToWrapProjectLogging(formatgrepNamespace, v.Spec)
-		if err != nil {
-			return err
+			formatgrepNamespace := fmt.Sprintf("(%s)", strings.Join(grepNamespace, "|"))
+			projectLogging, err := utils.ToWrapProjectLogging(formatgrepNamespace, v.Spec)
+			if err != nil {
+				return err
+			}
+			wl = append(wl, *projectLogging)
 		}
-		wl = append(wl, *projectLogging)
 	}
 	conf := make(map[string]interface{})
 	conf["projectTargets"] = wl

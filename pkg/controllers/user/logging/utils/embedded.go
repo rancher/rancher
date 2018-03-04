@@ -1,11 +1,13 @@
 package utils
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 	rv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
 	rv1 "github.com/rancher/types/apis/core/v1"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	rrbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	v1beta2 "k8s.io/api/apps/v1beta2"
 	v1 "k8s.io/api/core/v1"
@@ -13,27 +15,31 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
+)
+
+const (
+	running = "Running"
 )
 
 func CreateEmbeddedTarget(dep rv1beta2.DeploymentInterface, sa rv1.ServiceAccountInterface, se rv1.ServiceInterface, ro rrbacv1.RoleInterface, rb rrbacv1.RoleBindingInterface, namespace string) error {
 	// create es deployment
 	_, err := dep.Controller().Lister().Get(loggingconfig.EmbeddedESName, loggingconfig.EmbeddedESName)
 	if err != nil {
-		logrus.Infof("get embedded es error: %v", err)
 		if !apierrors.IsNotFound(err) {
 			return errors.Wrapf(err, "get deployment %s fail", loggingconfig.EmbeddedESName)
 		}
-		logrus.Infof("get embedded es error is not found")
 		// create service account, role and rolebinding
 		sc := newESServiceAccount(namespace)
 		role := newESRole(namespace)
 		roleBind := newESRoleBinding(namespace)
 
 		defer func() {
-			if err != nil {
+			if err != nil && !apierrors.IsAlreadyExists(err) {
 				sa.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{})
 			}
 		}()
@@ -43,7 +49,7 @@ func CreateEmbeddedTarget(dep rv1beta2.DeploymentInterface, sa rv1.ServiceAccoun
 		}
 
 		defer func() {
-			if err != nil {
+			if err != nil && !apierrors.IsAlreadyExists(err) {
 				ro.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{})
 			}
 		}()
@@ -53,7 +59,7 @@ func CreateEmbeddedTarget(dep rv1beta2.DeploymentInterface, sa rv1.ServiceAccoun
 		}
 
 		defer func() {
-			if err != nil {
+			if err != nil && !apierrors.IsAlreadyExists(err) {
 				rb.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{})
 			}
 		}()
@@ -64,18 +70,18 @@ func CreateEmbeddedTarget(dep rv1beta2.DeploymentInterface, sa rv1.ServiceAccoun
 
 		// create service and deployment
 		defer func() {
-			if err != nil {
+			if err != nil && !apierrors.IsAlreadyExists(err) {
 				se.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{})
 			}
 		}()
-		newService := NewESService(namespace)
+		newService := newESService(namespace)
 		_, err = se.Create(newService)
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return errors.Wrapf(err, "create service %s fail", loggingconfig.EmbeddedESName)
 		}
 
 		defer func() {
-			if err != nil {
+			if err != nil && !apierrors.IsAlreadyExists(err) {
 				dep.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{})
 			}
 		}()
@@ -99,7 +105,7 @@ func CreateEmbeddedTarget(dep rv1beta2.DeploymentInterface, sa rv1.ServiceAccoun
 		roleBind := newKibanaRoleBinding(namespace)
 
 		defer func() {
-			if err != nil {
+			if err != nil && !apierrors.IsAlreadyExists(err) {
 				sa.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{})
 			}
 		}()
@@ -109,7 +115,7 @@ func CreateEmbeddedTarget(dep rv1beta2.DeploymentInterface, sa rv1.ServiceAccoun
 		}
 
 		defer func() {
-			if err != nil {
+			if err != nil && !apierrors.IsAlreadyExists(err) {
 				ro.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{})
 			}
 		}()
@@ -119,7 +125,7 @@ func CreateEmbeddedTarget(dep rv1beta2.DeploymentInterface, sa rv1.ServiceAccoun
 		}
 
 		defer func() {
-			if err != nil {
+			if err != nil && !apierrors.IsAlreadyExists(err) {
 				rb.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{})
 			}
 		}()
@@ -129,22 +135,22 @@ func CreateEmbeddedTarget(dep rv1beta2.DeploymentInterface, sa rv1.ServiceAccoun
 		}
 
 		defer func() {
-			if err != nil {
+			if err != nil && !apierrors.IsAlreadyExists(err) {
 				se.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{})
 			}
 		}()
-		newService := NewKibanaService(namespace)
+		newService := newKibanaService(namespace)
 		_, err = se.Create(newService)
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return errors.Wrapf(err, "create service %s fail", loggingconfig.EmbeddedKibanaName)
 		}
 
 		defer func() {
-			if err != nil {
+			if err != nil && !apierrors.IsAlreadyExists(err) {
 				dep.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{})
 			}
 		}()
-		kibanaDeployment := NewKibanaDeployment(namespace)
+		kibanaDeployment := newKibanaDeployment(namespace)
 		_, err = dep.Create(kibanaDeployment)
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return errors.Wrapf(err, "create deployment %s fail", loggingconfig.EmbeddedKibanaName)
@@ -199,6 +205,120 @@ func RemoveEmbeddedTarget(dep rv1beta2.DeploymentInterface, sa rv1.ServiceAccoun
 		return err
 	}
 	return nil
+}
+
+func UpdateEmbeddedEndpoint(podLister rv1.PodLister, serviceLister rv1.ServiceLister, clusterLoggings v3.ClusterLoggingInterface) error {
+	cls, err := clusterLoggings.List(metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("get cluterlogging failed, %v", err)
+	}
+	if len(cls.Items) == 0 {
+		return fmt.Errorf("not clusterlogging found")
+	}
+	cl := cls.Items[0]
+	if cl.Spec.EmbeddedConfig == nil {
+		return fmt.Errorf("embedded configuration should not be nil when update embedded endpoint")
+	}
+
+	updated := false
+	esEndpoint, err := getEmbeddedESEndpoint(podLister, serviceLister)
+	if err != nil {
+		return fmt.Errorf("get elasticsearch endpoint failed, %v", err)
+	}
+
+	if cl.Spec.EmbeddedConfig.ElasticsearchEndpoint != esEndpoint {
+		updated = true
+		cl.Spec.EmbeddedConfig.ElasticsearchEndpoint = esEndpoint
+	}
+
+	kibanaEndpoint, err := getEmbeddedKibanaEndpoint(podLister, serviceLister)
+	if err != nil {
+		return fmt.Errorf("get kibana endpoint failed, %v", err)
+	}
+
+	if cl.Spec.EmbeddedConfig.KibanaEndpoint != kibanaEndpoint {
+		updated = true
+		cl.Spec.EmbeddedConfig.KibanaEndpoint = kibanaEndpoint
+	}
+
+	if !updated {
+		return nil
+	}
+
+	if _, err = clusterLoggings.Update(&cl); err != nil {
+		return fmt.Errorf("update embedded logging endpoint failed, %v", err)
+	}
+
+	if esEndpoint == "" || kibanaEndpoint == "" {
+		return fmt.Errorf("embedded endpoint not set completely")
+	}
+	return nil
+}
+
+func getEmbeddedESEndpoint(podLister rv1.PodLister, serviceLister rv1.ServiceLister) (esEndpoint string, err error) {
+	selector := labels.NewSelector()
+	requirement, err := labels.NewRequirement(loggingconfig.LabelK8sApp, selection.Equals, []string{loggingconfig.EmbeddedESName})
+	if err != nil {
+		return "", err
+	}
+
+	espods, err := podLister.List(loggingconfig.LoggingNamespace, selector.Add(*requirement))
+	if err != nil {
+		return "", err
+	}
+	esservice, err := serviceLister.Get(loggingconfig.LoggingNamespace, loggingconfig.EmbeddedESName)
+	if err != nil {
+		return "", err
+	}
+
+	if len(esservice.Spec.Ports) == 0 {
+		return "", fmt.Errorf("get service %s node port failed", loggingconfig.EmbeddedESName)
+	}
+	var esPort int32
+	for _, v := range esservice.Spec.Ports {
+		if v.Name == "http" {
+			esPort = v.NodePort
+			break
+		}
+	}
+
+	if len(espods) == 0 {
+		return "", fmt.Errorf("deploying %s", loggingconfig.EmbeddedESName)
+	}
+	espod := espods[0]
+	if espod.Status.Phase == running {
+		return fmt.Sprintf("http://%s:%v", espod.Status.HostIP, esPort), nil
+	}
+	return "", fmt.Errorf("got embedded elasticsearch pod status %s", espod.Status.Phase)
+}
+
+func getEmbeddedKibanaEndpoint(podLister rv1.PodLister, serviceLister rv1.ServiceLister) (kibanaEndpoint string, err error) {
+	selector := labels.NewSelector()
+	requirement, err := labels.NewRequirement(loggingconfig.LabelK8sApp, selection.Equals, []string{loggingconfig.EmbeddedKibanaName})
+	if err != nil {
+		return "", err
+	}
+	kibanapods, err := podLister.List(loggingconfig.LoggingNamespace, selector.Add(*requirement))
+	if err != nil {
+		return "", err
+	}
+	kibanaservice, err := serviceLister.Get(loggingconfig.LoggingNamespace, loggingconfig.EmbeddedKibanaName)
+	if err != nil {
+		return "", err
+	}
+	if len(kibanaservice.Spec.Ports) == 0 {
+		return "", fmt.Errorf("get service %s node port failed", loggingconfig.EmbeddedKibanaName)
+	}
+
+	if len(kibanapods) == 0 {
+		return "", fmt.Errorf("deploying %s", loggingconfig.EmbeddedKibanaName)
+	}
+	kibanapod := kibanapods[0]
+	if kibanapod.Status.Phase == running {
+		return fmt.Sprintf("http://%s:%v", kibanapod.Status.HostIP, kibanaservice.Spec.Ports[0].NodePort), nil
+	}
+	return "", fmt.Errorf("got embedded kibana pod status %s", kibanapod.Status.Phase)
+
 }
 
 func newESServiceAccount(namespace string) *v1.ServiceAccount {
@@ -293,7 +413,7 @@ func newKibanaRoleBinding(namespace string) *rbacv1.RoleBinding {
 	}
 }
 
-func NewESService(namespace string) *v1.Service {
+func newESService(namespace string) *v1.Service {
 	return &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
@@ -323,7 +443,7 @@ func NewESService(namespace string) *v1.Service {
 	}
 }
 
-func NewKibanaService(namespace string) *v1.Service {
+func newKibanaService(namespace string) *v1.Service {
 	return &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
@@ -442,7 +562,7 @@ func NewESDeployment(namespace string) *v1beta2.Deployment {
 							Resources: v1.ResourceRequirements{
 								Requests: map[v1.ResourceName]resource.Quantity{
 									//CPU is always requested as an absolute quantity, never as a relative quantity; 0.1 is the same amount of CPU on a single-core, dual-core, or 48-core machine
-									v1.ResourceCPU: *resource.NewMilliQuantity(int64(2000), resource.DecimalSI),
+									v1.ResourceCPU: *resource.NewMilliQuantity(int64(1000), resource.DecimalSI),
 									//Limits and requests for memory are measured in bytes.
 									v1.ResourceMemory: *resource.NewQuantity(int64(500*1024*1024), resource.DecimalSI), // unit is byte
 								},
@@ -471,7 +591,7 @@ func NewESDeployment(namespace string) *v1beta2.Deployment {
 	return deployment
 }
 
-func NewKibanaDeployment(namespace string) *v1beta2.Deployment {
+func newKibanaDeployment(namespace string) *v1beta2.Deployment {
 	deployment := &v1beta2.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
