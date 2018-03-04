@@ -38,6 +38,7 @@ func Register(user *config.UserContext, kubeConfigGetter KubeConfigGetter) {
 		KubeConfigGetter:      kubeConfigGetter,
 		TokenClient:           user.Management.Management.Tokens(""),
 		UserClient:            user.Management.Management.Users(""),
+		UserManager:           user.Management.UserManager,
 		K8sClient:             user.K8sClient,
 		TemplateVersionClient: user.Management.Management.TemplateVersions(""),
 		ListenConfigClient:    user.Management.Management.ListenConfigs(""),
