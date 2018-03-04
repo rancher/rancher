@@ -215,7 +215,7 @@ func (g *genericController) syncHandler(s string) (err error) {
 			})
 		}
 	}
-	err = types.NewErrors(errs)
+	err = types.NewErrors(errs...)
 	return
 }
 

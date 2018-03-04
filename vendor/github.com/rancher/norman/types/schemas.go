@@ -57,7 +57,7 @@ func (s *Schemas) Init(initFunc SchemasInitFunc) *Schemas {
 }
 
 func (s *Schemas) Err() error {
-	return NewErrors(s.errors)
+	return NewErrors(s.errors...)
 }
 
 func (s *Schemas) AddSchemas(schema *Schemas) *Schemas {
@@ -343,7 +343,7 @@ type multiErrors struct {
 	errors []error
 }
 
-func NewErrors(errors []error) error {
+func NewErrors(errors ...error) error {
 	if len(errors) == 0 {
 		return nil
 	} else if len(errors) == 1 {

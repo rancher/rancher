@@ -7,6 +7,7 @@ import (
 const (
 	ClusterType                                     = "cluster"
 	ClusterFieldAPIEndpoint                         = "apiEndpoint"
+	ClusterFieldAgentImage                          = "agentImage"
 	ClusterFieldAllocatable                         = "allocatable"
 	ClusterFieldAnnotations                         = "annotations"
 	ClusterFieldAzureKubernetesServiceConfig        = "azureKubernetesServiceConfig"
@@ -19,6 +20,7 @@ const (
 	ClusterFieldDefaultClusterRoleForProjectMembers = "defaultClusterRoleForProjectMembers"
 	ClusterFieldDefaultPodSecurityPolicyTemplateId  = "defaultPodSecurityPolicyTemplateId"
 	ClusterFieldDescription                         = "description"
+	ClusterFieldDesiredAgentImage                   = "desiredAgentImage"
 	ClusterFieldDriver                              = "driver"
 	ClusterFieldFailedSpec                          = "failedSpec"
 	ClusterFieldGoogleKubernetesEngineConfig        = "googleKubernetesEngineConfig"
@@ -40,6 +42,7 @@ const (
 type Cluster struct {
 	types.Resource
 	APIEndpoint                         string                         `json:"apiEndpoint,omitempty" yaml:"apiEndpoint,omitempty"`
+	AgentImage                          string                         `json:"agentImage,omitempty" yaml:"agentImage,omitempty"`
 	Allocatable                         map[string]string              `json:"allocatable,omitempty" yaml:"allocatable,omitempty"`
 	Annotations                         map[string]string              `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	AzureKubernetesServiceConfig        *AzureKubernetesServiceConfig  `json:"azureKubernetesServiceConfig,omitempty" yaml:"azureKubernetesServiceConfig,omitempty"`
@@ -52,6 +55,7 @@ type Cluster struct {
 	DefaultClusterRoleForProjectMembers string                         `json:"defaultClusterRoleForProjectMembers,omitempty" yaml:"defaultClusterRoleForProjectMembers,omitempty"`
 	DefaultPodSecurityPolicyTemplateId  string                         `json:"defaultPodSecurityPolicyTemplateId,omitempty" yaml:"defaultPodSecurityPolicyTemplateId,omitempty"`
 	Description                         string                         `json:"description,omitempty" yaml:"description,omitempty"`
+	DesiredAgentImage                   string                         `json:"desiredAgentImage,omitempty" yaml:"desiredAgentImage,omitempty"`
 	Driver                              string                         `json:"driver,omitempty" yaml:"driver,omitempty"`
 	FailedSpec                          *ClusterSpec                   `json:"failedSpec,omitempty" yaml:"failedSpec,omitempty"`
 	GoogleKubernetesEngineConfig        *GoogleKubernetesEngineConfig  `json:"googleKubernetesEngineConfig,omitempty" yaml:"googleKubernetesEngineConfig,omitempty"`
