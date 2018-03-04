@@ -8,6 +8,7 @@ import (
 type Manager interface {
 	SetPrincipalOnCurrentUser(apiContext *types.APIContext, principal v3.Principal) (*v3.User, error)
 	GetUser(apiContext *types.APIContext) string
+	EnsureToken(tokenName, description, userName string) (string, error)
 	EnsureUser(principalName, displayName string) (*v3.User, error)
 	CheckAccess(accessMode string, allowedPrincipalIDs []string, user v3.Principal, groups []v3.Principal) (bool, error)
 }

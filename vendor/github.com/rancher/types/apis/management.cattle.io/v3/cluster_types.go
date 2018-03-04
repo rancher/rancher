@@ -26,6 +26,8 @@ const (
 	// ClusterConditionDefaultNamespaceAssigned true when cluster's default namespace has been initially assigned
 	ClusterConditionDefaultNamespaceAssigned condition.Cond = "DefaultNamespaceAssigned"
 	ClusterConditionAddonDeploy              condition.Cond = "AddonDeploy"
+	ClusterConditionSystemAccountCreated     condition.Cond = "SystemAccountCreated"
+	ClusterConditionAgentDeployed            condition.Cond = "AgentDeployed"
 
 	ClusterDriverImported = "imported"
 	ClusterDriverLocal    = "local"
@@ -49,6 +51,7 @@ type ClusterSpec struct {
 	DisplayName                          string                         `json:"displayName"`
 	Description                          string                         `json:"description"`
 	Internal                             bool                           `json:"internal" norman:"nocreate,noupdate"`
+	DesiredAgentImage                    string                         `json:"desiredAgentImage" norman:"nocreate,noupdate"`
 	ImportedConfig                       *ImportedConfig                `json:"importedConfig,omitempty" norman:"nocreate,noupdate"`
 	GoogleKubernetesEngineConfig         *GoogleKubernetesEngineConfig  `json:"googleKubernetesEngineConfig,omitempty"`
 	AzureKubernetesServiceConfig         *AzureKubernetesServiceConfig  `json:"azureKubernetesServiceConfig,omitempty"`
@@ -68,6 +71,7 @@ type ClusterStatus struct {
 	//Component statuses will represent cluster's components (etcd/controller/scheduler) health
 	// https://kubernetes.io/docs/api-reference/v1.8/#componentstatus-v1-core
 	Driver              string                   `json:"driver"`
+	AgentImage          string                   `json:"agentImage"`
 	ComponentStatuses   []ClusterComponentStatus `json:"componentStatuses,omitempty"`
 	APIEndpoint         string                   `json:"apiEndpoint,omitempty"`
 	ServiceAccountToken string                   `json:"serviceAccountToken,omitempty"`
