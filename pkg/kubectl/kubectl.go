@@ -1,25 +1,59 @@
-// +build k8s
-
 package kubectl
 
 import (
-	"context"
+	"io/ioutil"
 	"os"
+	"os/exec"
 
-	"github.com/rancher/rancher/pkg/hyperkube"
-	"github.com/sirupsen/logrus"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-func Main() {
-	hk := hyperkube.HyperKube{
-		Name: "hyperkube",
-		Long: "This is an all-in-one binary that can run any of the various Kubernetes servers.",
+const (
+	tmpDir = "./management-state/tmp"
+)
+
+func Apply(yaml []byte, kubeConfig *clientcmdapi.Config) ([]byte, error) {
+	kubeConfigFile, err := tempFile("kubeconfig-")
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(kubeConfigFile.Name())
+
+	yamlFile, err := tempFile("yaml-")
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(yamlFile.Name())
+
+	if err := ioutil.WriteFile(yamlFile.Name(), yaml, 0600); err != nil {
+		return nil, err
 	}
 
-	hk.AddServer(hyperkube.NewKubectlServer())
-
-	args := os.Args
-	if err := hk.Run(args, context.Background().Done()); err != nil {
-		logrus.Errorf("%s exited with error: %v", args[0], err)
+	if err := clientcmd.WriteToFile(*kubeConfig, kubeConfigFile.Name()); err != nil {
+		return nil, err
 	}
+
+	cmd := exec.Command("kubectl",
+		"--kubeconfig",
+		kubeConfigFile.Name(),
+		"apply",
+		"-f",
+		yamlFile.Name())
+	return cmd.CombinedOutput()
+}
+
+func tempFile(prefix string) (*os.File, error) {
+	if _, err := os.Stat(tmpDir); os.IsNotExist(err) {
+		if err = os.MkdirAll(tmpDir, 0755); err != nil {
+			return nil, err
+		}
+	}
+
+	f, err := ioutil.TempFile(tmpDir, prefix)
+	if err != nil {
+		return nil, err
+	}
+
+	return f, f.Close()
 }

@@ -1,11 +1,9 @@
 package kubeconfig
 
 import (
-	"regexp"
-
 	"bytes"
-
 	"encoding/base64"
+	"regexp"
 
 	"github.com/rancher/rancher/pkg/settings"
 )

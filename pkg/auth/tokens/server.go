@@ -19,7 +19,7 @@ import (
 
 const (
 	userPrincipalIndex = "authn.management.cattle.io/user-principal-index"
-	userIDLabel        = "authn.management.cattle.io/token-userId"
+	UserIDLabel        = "authn.management.cattle.io/token-userId"
 	tokenKeyIndex      = "authn.management.cattle.io/token-key-index"
 )
 
@@ -107,7 +107,7 @@ func (s *tokenAPIServer) createK8sTokenCR(k8sToken *v3.Token) (v3.Token, error) 
 	}
 
 	labels := make(map[string]string)
-	labels[userIDLabel] = k8sToken.UserID
+	labels[UserIDLabel] = k8sToken.UserID
 
 	k8sToken.APIVersion = "management.cattle.io/v3"
 	k8sToken.Kind = "Token"
@@ -173,7 +173,7 @@ func (s *tokenAPIServer) getTokens(tokenAuthValue string) ([]v3.Token, int, erro
 	}
 
 	userID := storedToken.UserID
-	set := labels.Set(map[string]string{userIDLabel: userID})
+	set := labels.Set(map[string]string{UserIDLabel: userID})
 	tokenList, err := s.tokensClient.List(metav1.ListOptions{LabelSelector: set.AsSelector().String()})
 	if err != nil {
 		return tokens, 0, fmt.Errorf("error getting tokens for user: %v selector: %v  err: %v", userID, set.AsSelector().String(), err)

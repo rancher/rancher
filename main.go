@@ -59,6 +59,7 @@ func main() {
 		cli.StringFlag{
 			Name:        "add-local",
 			Usage:       "Add local cluster (true, false, auto)",
+			Value:       "auto",
 			Destination: &config.AddLocal,
 		},
 		cli.IntFlag{
@@ -135,5 +136,6 @@ func run(cfg app.Config) error {
 	}
 	cfg.Embedded = embedded
 
+	os.Unsetenv("KUBECONFIG")
 	return app.Run(ctx, *kubeConfig, &cfg)
 }

@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config/dialer"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,7 +40,7 @@ func prefix(cluster *v3.Cluster) string {
 }
 
 func New(localConfig *rest.Config, cluster *v3.Cluster, factory dialer.Factory) (*RemoteService, error) {
-	if cluster.Status.Driver == v3.ClusterDriverLocal {
+	if cluster.Spec.Internal {
 		return NewLocal(localConfig, cluster)
 	}
 	return NewRemote(cluster, factory)
@@ -65,6 +66,10 @@ func NewLocal(localConfig *rest.Config, cluster *v3.Cluster) (*RemoteService, er
 }
 
 func NewRemote(cluster *v3.Cluster, factory dialer.Factory) (*RemoteService, error) {
+	if !v3.ClusterConditionProvisioned.IsTrue(cluster) {
+		return nil, httperror.NewAPIError(httperror.ClusterUnavailable, "cluster not provisioned")
+	}
+
 	transport := &http.Transport{}
 
 	if factory != nil {

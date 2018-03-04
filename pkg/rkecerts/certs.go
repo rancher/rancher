@@ -241,5 +241,5 @@ func (f *fileWriter) write(path string, content []byte, x509cert *x509.Certifica
 }
 
 func (f *fileWriter) err() error {
-	return types.NewErrors(f.errs)
+	return types.NewErrors(f.errs...)
 }

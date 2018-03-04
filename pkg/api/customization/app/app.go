@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/pkg/controllers/user/helm"
 	hutils "github.com/rancher/rancher/pkg/controllers/user/helm/utils"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
@@ -23,9 +24,9 @@ import (
 	"github.com/rancher/types/client/management/v3"
 	managementv3 "github.com/rancher/types/client/management/v3"
 	projectv3 "github.com/rancher/types/client/project/v3"
-	"gopkg.in/yaml.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 const (
@@ -34,7 +35,8 @@ const (
 )
 
 type ActionWrapper struct {
-	Clusters v3.ClusterInterface
+	Clusters         v3.ClusterInterface
+	KubeConfigGetter helm.KubeConfigGetter
 }
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -53,17 +55,14 @@ func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 		return err
 	}
 	tokenAuthValue := tokens.GetTokenAuthFromRequest(apiContext.Request)
-	data, err := yaml.Marshal(hutils.RestToRaw(tokenAuthValue, cluster.ID))
-	if err != nil {
-		return err
-	}
+	data := a.KubeConfigGetter.KubeConfig(cluster.ID, tokenAuthValue)
 	rootDir, err := ioutil.TempDir("", "helm-")
 	if err != nil {
 		return err
 	}
 	defer os.RemoveAll(rootDir)
 	kubeConfigPath := filepath.Join(rootDir, ".kubeconfig")
-	if err := ioutil.WriteFile(kubeConfigPath, data, 0755); err != nil {
+	if err := clientcmd.WriteToFile(*data, kubeConfigPath); err != nil {
 		return err
 	}
 	store := apiContext.Schema.Store

@@ -107,20 +107,6 @@ func (cl *clusterLocal) deploy(c *v3.Cluster) error {
 	}
 
 	wt := cl.rkeDialer.WrapTransport(rkeConfig)
-
-	rkeCluster, err := cluster.ParseCluster(ctx,
-		rkeConfig,
-		"",
-		"",
-		nil,
-		nil,
-		wt)
-	if err != nil {
-		return err
-	}
-
-	rkeCluster.UseKubectlDeploy = true
-
 	if err := cluster.ApplyAuthzResources(ctx, *rkeConfig, "", "", wt); err != nil {
 		return err
 	}
