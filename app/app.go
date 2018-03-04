@@ -30,16 +30,6 @@ type Config struct {
 
 var defaultAdminLabel = map[string]string{"authz.management.cattle.io/bootstrapping": "admin-user"}
 
-func buildManagement(scaledContext *config.ScaledContext) (*config.ManagementContext, error) {
-	management, err := config.NewManagementContext(scaledContext.RESTConfig)
-	if err != nil {
-		return nil, err
-	}
-	management.Dialer = scaledContext.Dialer
-	management.UserManager = scaledContext.UserManager
-	return management, nil
-}
-
 func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config) (*config.ScaledContext, *clustermanager.Manager, error) {
 	scaledContext, err := config.NewScaledContext(kubeConfig)
 	if err != nil {
@@ -93,7 +83,7 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 	go leader.RunOrDie(ctx, "cattle-controllers", scaledContext.K8sClient, func(ctx context.Context) {
 		scaledContext.Leader = true
 
-		management, err := buildManagement(scaledContext)
+		management, err := scaledContext.NewManagementContext()
 		if err != nil {
 			panic(err)
 		}
