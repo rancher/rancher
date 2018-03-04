@@ -6,6 +6,7 @@ import (
 
 	workloadutil "github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/types/apis/core/v1"
+	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -20,6 +21,8 @@ type WorkloadEndpointsController struct {
 	serviceLister      v1.ServiceLister
 	podLister          v1.PodLister
 	WorkloadController workloadutil.CommonController
+	machinesLister     managementv3.NodeLister
+	clusterName        string
 }
 
 func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadutil.Workload) error {
@@ -57,7 +60,10 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 	if err != nil {
 		return err
 	}
-
+	nodeNameToMachine, err := getNodeNameToMachine(c.clusterName, c.machinesLister)
+	if err != nil {
+		return err
+	}
 	for _, w := range workloads {
 		// 1. Get endpoints from services
 		var newPublicEps []v3.PublicEndpoint
@@ -92,7 +98,7 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 				}
 			}
 			if found {
-				eps, err := convertServiceToPublicEndpoints(svc, nil)
+				eps, err := convertServiceToPublicEndpoints(svc, "", nil)
 				if err != nil {
 					return err
 				}
@@ -110,7 +116,7 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 			return err
 		}
 		for _, pod := range pods {
-			eps, err := convertHostPortToEndpoint(pod)
+			eps, err := convertHostPortToEndpoint(pod, c.clusterName, nodeNameToMachine[pod.Spec.NodeName])
 			if err != nil {
 				return err
 			}

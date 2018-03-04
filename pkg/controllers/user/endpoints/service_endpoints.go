@@ -3,6 +3,7 @@ package endpoints
 import (
 	workloadutil "github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/types/apis/core/v1"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -19,6 +20,7 @@ type ServicesController struct {
 	podLister          v1.PodLister
 	podController      v1.PodController
 	workloadController workloadutil.CommonController
+	machinesLister     v3.NodeLister
 }
 
 func (s *ServicesController) sync(key string, obj *corev1.Service) error {
@@ -45,7 +47,7 @@ func (s *ServicesController) sync(key string, obj *corev1.Service) error {
 
 func (s *ServicesController) reconcileEndpointsForService(svc *corev1.Service) (bool, error) {
 	// 1. update service with endpoints
-	newPublicEps, err := convertServiceToPublicEndpoints(svc, nil)
+	newPublicEps, err := convertServiceToPublicEndpoints(svc, "", nil)
 	if err != nil {
 		return false, err
 	}

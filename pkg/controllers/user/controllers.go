@@ -41,10 +41,10 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 	podsecuritypolicy.RegisterServiceAccount(cluster)
 	podsecuritypolicy.RegisterTemplate(cluster)
 	secret.Register(cluster)
+	endpoints.Register(ctx, cluster)
 
 	userOnlyContext := cluster.UserOnlyContext()
 	dnsrecord.Register(ctx, userOnlyContext)
-	endpoints.Register(ctx, userOnlyContext)
 	externalservice.Register(ctx, userOnlyContext)
 	ingress.Register(ctx, userOnlyContext)
 	targetworkloadservice.Register(ctx, userOnlyContext)
