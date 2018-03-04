@@ -5,7 +5,6 @@ import (
 
 	"github.com/rancher/norman/store/subtype"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/rancher/pkg/api/customization/workload"
 	"github.com/rancher/rancher/pkg/api/store/cert"
 	"github.com/rancher/rancher/pkg/api/store/ingress"
 	"github.com/rancher/rancher/pkg/api/store/namespace"
@@ -13,6 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/store/projectsetter"
 	"github.com/rancher/rancher/pkg/api/store/secret"
 	"github.com/rancher/rancher/pkg/api/store/service"
+	"github.com/rancher/rancher/pkg/api/store/workload"
 	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	clusterClient "github.com/rancher/types/client/cluster/v3"
 	"github.com/rancher/types/client/project/v3"

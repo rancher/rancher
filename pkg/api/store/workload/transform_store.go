@@ -22,6 +22,9 @@ func New(store types.Store) types.Store {
 			if opt != nil && opt.Options["hidden"] == "true" {
 				hide = false
 			}
+			if opt != nil && opt.Options["ByID"] == "true" {
+				hide = false
+			}
 			if hide && data["ownerReferences"] != nil {
 				return nil, nil
 			}
