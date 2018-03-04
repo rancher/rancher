@@ -66,6 +66,16 @@ func (c *ScaledContext) controllers() []controller.Starter {
 	}
 }
 
+func (c *ScaledContext) NewManagementContext() (*ManagementContext, error) {
+	mgmt, err := NewManagementContext(c.RESTConfig)
+	if err != nil {
+		return nil, err
+	}
+	mgmt.Dialer = c.Dialer
+	mgmt.UserManager = c.UserManager
+	return mgmt, nil
+}
+
 func NewScaledContext(config rest.Config) (*ScaledContext, error) {
 	var err error
 
@@ -329,14 +339,14 @@ func (c *ManagementContext) StartAndWait() error {
 	return ctx.Err()
 }
 
-func NewUserContext(managementConfig, config rest.Config, clusterName string) (*UserContext, error) {
+func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterName string) (*UserContext, error) {
 	var err error
 	context := &UserContext{
 		RESTConfig:  config,
 		ClusterName: clusterName,
 	}
 
-	context.Management, err = NewManagementContext(managementConfig)
+	context.Management, err = scaledContext.NewManagementContext()
 	if err != nil {
 		return nil, err
 	}
