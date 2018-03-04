@@ -15,8 +15,10 @@ import (
 )
 
 const (
-	userAuthHeader       = "Impersonate-User"
-	userByPrincipalIndex = "auth.management.cattle.io/userByPrincipal"
+	userAuthHeader         = "Impersonate-User"
+	userByPrincipalIndex   = "auth.management.cattle.io/userByPrincipal"
+	groupPrincpalCRTBIndex = "auth.management.cattle.io/groupPrincipalCRTB"
+	groupPrincpalPRTBIndex = "auth.management.cattle.io/groupPrincipalPRTB"
 )
 
 func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
@@ -28,9 +30,27 @@ func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
 		return nil, err
 	}
 
+	crtbInformer := scaledContext.Management.ClusterRoleTemplateBindings("").Controller().Informer()
+	crtbIndexers := map[string]cache.IndexFunc{
+		groupPrincpalCRTBIndex: groupPrincipalCRTB,
+	}
+	if err := crtbInformer.AddIndexers(crtbIndexers); err != nil {
+		return nil, err
+	}
+
+	prtbInformer := scaledContext.Management.ProjectRoleTemplateBindings("").Controller().Informer()
+	prtbIndexers := map[string]cache.IndexFunc{
+		groupPrincpalPRTBIndex: groupPrincipalPRTB,
+	}
+	if err := prtbInformer.AddIndexers(prtbIndexers); err != nil {
+		return nil, err
+	}
+
 	return &userManager{
 		users:              scaledContext.Management.Users(""),
 		userIndexer:        userInformer.GetIndexer(),
+		crtbIndexer:        crtbInformer.GetIndexer(),
+		prtbIndexer:        prtbInformer.GetIndexer(),
 		globalRoleBindings: scaledContext.Management.GlobalRoleBindings(""),
 	}, nil
 }
@@ -39,6 +59,8 @@ type userManager struct {
 	users              v3.UserInterface
 	globalRoleBindings v3.GlobalRoleBindingInterface
 	userIndexer        cache.Indexer
+	crtbIndexer        cache.Indexer
+	prtbIndexer        cache.Indexer
 }
 
 func (m *userManager) SetPrincipalOnCurrentUser(apiContext *types.APIContext, principal v3.Principal) (*v3.User, error) {
@@ -64,13 +86,13 @@ func (m *userManager) GetUser(apiContext *types.APIContext) string {
 }
 
 // checkis if the supplied principal can login based on the accessMode and allowed principals
-func (m *userManager) CheckAccess(accessMode string, allowedPrincipalIDs []string, user v3.Principal, groups []v3.Principal) (bool, error) {
+func (m *userManager) CheckAccess(accessMode string, allowedPrincipalIDs []string, userPrinc v3.Principal, groups []v3.Principal) (bool, error) {
 	if accessMode == "unrestricted" {
 		return true, nil
 	}
 
 	if accessMode == "required" || accessMode == "restricted" {
-		if slice.ContainsString(allowedPrincipalIDs, user.Name) {
+		if slice.ContainsString(allowedPrincipalIDs, userPrinc.Name) {
 			return true, nil
 		}
 		for _, g := range groups {
@@ -79,7 +101,17 @@ func (m *userManager) CheckAccess(accessMode string, allowedPrincipalIDs []strin
 			}
 		}
 		if accessMode == "restricted" {
-			u, err := m.checkCache(user.Name)
+			// check if any of the groups principals have been assigned to clusters or projects
+			allowed, err := m.hasMemberGroup(groups)
+			if err != nil {
+				return false, err
+			}
+			if allowed {
+				return true, nil
+			}
+
+			// check if user prinicpal exists as a user
+			u, err := m.checkCache(userPrinc.Name)
 			if err != nil {
 				return false, err
 			}
@@ -87,8 +119,8 @@ func (m *userManager) CheckAccess(accessMode string, allowedPrincipalIDs []strin
 				return true, nil
 			}
 
-			// Not in cache, query API by label
-			u, _, err = m.checkLabels(user.Name)
+			// user principal not in cache, query API by label
+			u, _, err = m.checkLabels(userPrinc.Name)
 			if err != nil {
 				return false, err
 			}
@@ -170,6 +202,27 @@ func (m *userManager) checkCache(principalName string) (*v3.User, error) {
 	return nil, nil
 }
 
+func (m *userManager) hasMemberGroup(groupPrincipals []v3.Principal) (bool, error) {
+	for _, g := range groupPrincipals {
+		crtbs, err := m.crtbIndexer.ByIndex(groupPrincpalCRTBIndex, g.Name)
+		if err != nil {
+			return false, err
+		}
+		if len(crtbs) > 0 {
+			return true, nil
+		}
+		prtbs, err := m.prtbIndexer.ByIndex(groupPrincpalPRTBIndex, g.Name)
+		if err != nil {
+			return false, err
+		}
+		if len(prtbs) > 0 {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 func (m *userManager) checkLabels(principalName string) (*v3.User, labels.Set, error) {
 	encodedPrincipalID := base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString([]byte(principalName))
 	if len(encodedPrincipalID) > 63 {
@@ -206,4 +259,28 @@ func userByPrincipal(obj interface{}) ([]string, error) {
 	}
 
 	return u.PrincipalIDs, nil
+}
+
+func groupPrincipalCRTB(obj interface{}) ([]string, error) {
+	var gp []string
+	b, ok := obj.(*v3.ClusterRoleTemplateBinding)
+	if !ok {
+		return []string{}, nil
+	}
+	if b.GroupPrincipalName != "" {
+		gp = append(gp, b.GroupPrincipalName)
+	}
+	return gp, nil
+}
+
+func groupPrincipalPRTB(obj interface{}) ([]string, error) {
+	var gp []string
+	b, ok := obj.(*v3.ProjectRoleTemplateBinding)
+	if !ok {
+		return []string{}, nil
+	}
+	if b.GroupPrincipalName != "" {
+		gp = append(gp, b.GroupPrincipalName)
+	}
+	return gp, nil
 }
