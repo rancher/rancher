@@ -35,6 +35,7 @@ const (
 	ReplicaSetFieldReplicaSetStatus              = "replicaSetStatus"
 	ReplicaSetFieldRestartPolicy                 = "restartPolicy"
 	ReplicaSetFieldRunAsNonRoot                  = "runAsNonRoot"
+	ReplicaSetFieldScale                         = "scale"
 	ReplicaSetFieldSchedulerName                 = "schedulerName"
 	ReplicaSetFieldScheduling                    = "scheduling"
 	ReplicaSetFieldSelector                      = "selector"
@@ -82,6 +83,7 @@ type ReplicaSet struct {
 	ReplicaSetStatus              *ReplicaSetStatus      `json:"replicaSetStatus,omitempty" yaml:"replicaSetStatus,omitempty"`
 	RestartPolicy                 string                 `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
+	Scale                         *int64                 `json:"scale,omitempty" yaml:"scale,omitempty"`
 	SchedulerName                 string                 `json:"schedulerName,omitempty" yaml:"schedulerName,omitempty"`
 	Scheduling                    *Scheduling            `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	Selector                      *LabelSelector         `json:"selector,omitempty" yaml:"selector,omitempty"`

@@ -24,7 +24,19 @@ func (n ContainerPorts) FromInternal(data map[string]interface{}) {
 	for i := 0; i < len(ports) && i < len(containers); i++ {
 		container := convert.ToMapInterface(containers[i])
 		if container != nil {
-			container["ports"] = ports[i]
+			portsSlice := convert.ToInterfaceSlice(ports[i])
+			var containerPorts []interface{}
+			for _, port := range portsSlice {
+				asMap, err := convert.EncodeToMap(port)
+				if err != nil {
+					logrus.Warnf("Failed to convert container port to map %v", err)
+					continue
+				}
+				asMap["type"] = "/v3/project/schemas/containerPort"
+				containerPorts = append(containerPorts, asMap)
+			}
+
+			container["ports"] = containerPorts
 		}
 	}
 }

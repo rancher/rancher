@@ -20,6 +20,7 @@ const (
 	StatefulSetSpecFieldPriorityClassName             = "priorityClassName"
 	StatefulSetSpecFieldRestartPolicy                 = "restartPolicy"
 	StatefulSetSpecFieldRunAsNonRoot                  = "runAsNonRoot"
+	StatefulSetSpecFieldScale                         = "scale"
 	StatefulSetSpecFieldSchedulerName                 = "schedulerName"
 	StatefulSetSpecFieldScheduling                    = "scheduling"
 	StatefulSetSpecFieldSelector                      = "selector"
@@ -50,6 +51,7 @@ type StatefulSetSpec struct {
 	PriorityClassName             string                 `json:"priorityClassName,omitempty" yaml:"priorityClassName,omitempty"`
 	RestartPolicy                 string                 `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
+	Scale                         *int64                 `json:"scale,omitempty" yaml:"scale,omitempty"`
 	SchedulerName                 string                 `json:"schedulerName,omitempty" yaml:"schedulerName,omitempty"`
 	Scheduling                    *Scheduling            `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	Selector                      *LabelSelector         `json:"selector,omitempty" yaml:"selector,omitempty"`

@@ -393,6 +393,7 @@ func pipelineTypes(schema *types.Schemas) *types.Schemas {
 		AddMapperForType(&Version, v3.PipelineExecutionLog{}).
 		MustImport(&Version, v3.AuthAppInput{}).
 		MustImport(&Version, v3.AuthUserInput{}).
+		MustImport(&Version, v3.RunPipelineInput{}).
 		MustImportAndCustomize(&Version, v3.SourceCodeCredential{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
 				"refreshrepos": {},
@@ -417,7 +418,9 @@ func pipelineTypes(schema *types.Schemas) *types.Schemas {
 			schema.ResourceActions = map[string]types.Action{
 				"activate":   {},
 				"deactivate": {},
-				"run":        {},
+				"run": {
+					Input: "runPipelineInput",
+				},
 			}
 		}).
 		MustImportAndCustomize(&Version, v3.PipelineExecution{}, func(schema *types.Schema) {
