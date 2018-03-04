@@ -24,7 +24,7 @@ import (
 
 type Manager struct {
 	httpsPort     int
-	APIContext    *config.ScaledContext
+	ScaledContext *config.ScaledContext
 	clusterLister v3.ClusterLister
 	controllers   sync.Map
 	accessControl types.AccessControl
@@ -42,7 +42,7 @@ type record struct {
 func NewManager(httpsPort int, context *config.ScaledContext) *Manager {
 	return &Manager{
 		httpsPort:     httpsPort,
-		APIContext:    context,
+		ScaledContext: context,
 		dialer:        context.Dialer,
 		accessControl: rbac.NewAccessControl(context.RBAC),
 		clusterLister: context.Management.Clusters("").Controller().Lister(),
@@ -125,7 +125,7 @@ func (m *Manager) toRESTConfig(cluster *v3.Cluster) (*rest.Config, error) {
 	}
 
 	if cluster.Spec.Internal {
-		return m.APIContext.LocalConfig, nil
+		return m.ScaledContext.LocalConfig, nil
 	}
 
 	if cluster.Status.APIEndpoint == "" || cluster.Status.CACert == "" || cluster.Status.ServiceAccountToken == "" {
@@ -175,7 +175,7 @@ func (m *Manager) toRecord(ctx context.Context, cluster *v3.Cluster) (*record, e
 		return nil, err
 	}
 
-	clusterContext, err := config.NewUserContext(m.APIContext.RESTConfig, *kubeConfig, cluster.Name)
+	clusterContext, err := config.NewUserContext(m.ScaledContext, *kubeConfig, cluster.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +207,7 @@ func (m *Manager) Config(apiContext *types.APIContext, storageContext types.Stor
 		return rest.Config{}, err
 	}
 	if record == nil {
-		return m.APIContext.RESTConfig, nil
+		return m.ScaledContext.RESTConfig, nil
 	}
 	return record.cluster.RESTConfig, nil
 }
@@ -218,7 +218,7 @@ func (m *Manager) UnversionedClient(apiContext *types.APIContext, storageContext
 		return nil, err
 	}
 	if record == nil {
-		return m.APIContext.UnversionedClient, nil
+		return m.ScaledContext.UnversionedClient, nil
 	}
 	return record.cluster.UnversionedClient, nil
 }
@@ -229,7 +229,7 @@ func (m *Manager) APIExtClient(apiContext *types.APIContext, storageContext type
 		return nil, err
 	}
 	if record == nil {
-		return m.APIContext.APIExtClient, nil
+		return m.ScaledContext.APIExtClient, nil
 	}
 	return record.cluster.APIExtClient, nil
 }
