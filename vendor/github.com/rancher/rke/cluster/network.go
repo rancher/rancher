@@ -230,9 +230,12 @@ func (c *Cluster) CheckClusterPorts(ctx context.Context, currentCluster *Cluster
 	if err := c.runServicePortChecks(ctx); err != nil {
 		return err
 	}
-	if err := c.checkKubeAPIPort(ctx); err != nil {
-		return err
+	if c.K8sWrapTransport == nil {
+		if err := c.checkKubeAPIPort(ctx); err != nil {
+			return err
+		}
 	}
+
 	return c.removeTCPPortListeners(ctx)
 }
 
