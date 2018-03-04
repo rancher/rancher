@@ -35,6 +35,7 @@ const (
 	ReplicationControllerFieldReplicationControllerStatus   = "replicationControllerStatus"
 	ReplicationControllerFieldRestartPolicy                 = "restartPolicy"
 	ReplicationControllerFieldRunAsNonRoot                  = "runAsNonRoot"
+	ReplicationControllerFieldScale                         = "scale"
 	ReplicationControllerFieldSchedulerName                 = "schedulerName"
 	ReplicationControllerFieldScheduling                    = "scheduling"
 	ReplicationControllerFieldSelector                      = "selector"
@@ -82,6 +83,7 @@ type ReplicationController struct {
 	ReplicationControllerStatus   *ReplicationControllerStatus `json:"replicationControllerStatus,omitempty" yaml:"replicationControllerStatus,omitempty"`
 	RestartPolicy                 string                       `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
 	RunAsNonRoot                  *bool                        `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
+	Scale                         *int64                       `json:"scale,omitempty" yaml:"scale,omitempty"`
 	SchedulerName                 string                       `json:"schedulerName,omitempty" yaml:"schedulerName,omitempty"`
 	Scheduling                    *Scheduling                  `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	Selector                      map[string]string            `json:"selector,omitempty" yaml:"selector,omitempty"`

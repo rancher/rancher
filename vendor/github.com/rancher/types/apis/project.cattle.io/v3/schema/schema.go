@@ -132,9 +132,8 @@ func statefulSetTypes(schemas *types.Schemas) *types.Schemas {
 		).
 		AddMapperForType(&Version, v1beta2.StatefulSetSpec{},
 			&m.Move{
-				From:        "replicas",
-				To:          "scale",
-				DestDefined: true,
+				From: "replicas",
+				To:   "scale",
 			},
 			&m.Embed{Field: "updateStrategy"},
 			&m.Enum{
@@ -176,9 +175,8 @@ func replicaSetTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
 		AddMapperForType(&Version, v1beta1.ReplicaSetSpec{},
 			&m.Move{
-				From:        "replicas",
-				To:          "scale",
-				DestDefined: true,
+				From: "replicas",
+				To:   "scale",
 			},
 			&m.Move{
 				From: "minReadySeconds",
@@ -205,9 +203,8 @@ func replicationControllerTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
 		AddMapperForType(&Version, v1.ReplicationControllerSpec{},
 			&m.Move{
-				From:        "replicas",
-				To:          "scale",
-				DestDefined: true,
+				From: "replicas",
+				To:   "scale",
 			},
 			&m.Move{
 				From: "minReadySeconds",

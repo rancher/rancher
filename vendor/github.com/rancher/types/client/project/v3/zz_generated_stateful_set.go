@@ -33,6 +33,7 @@ const (
 	StatefulSetFieldRemoved                       = "removed"
 	StatefulSetFieldRestartPolicy                 = "restartPolicy"
 	StatefulSetFieldRunAsNonRoot                  = "runAsNonRoot"
+	StatefulSetFieldScale                         = "scale"
 	StatefulSetFieldSchedulerName                 = "schedulerName"
 	StatefulSetFieldScheduling                    = "scheduling"
 	StatefulSetFieldSelector                      = "selector"
@@ -80,6 +81,7 @@ type StatefulSet struct {
 	Removed                       string                 `json:"removed,omitempty" yaml:"removed,omitempty"`
 	RestartPolicy                 string                 `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
+	Scale                         *int64                 `json:"scale,omitempty" yaml:"scale,omitempty"`
 	SchedulerName                 string                 `json:"schedulerName,omitempty" yaml:"schedulerName,omitempty"`
 	Scheduling                    *Scheduling            `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	Selector                      *LabelSelector         `json:"selector,omitempty" yaml:"selector,omitempty"`

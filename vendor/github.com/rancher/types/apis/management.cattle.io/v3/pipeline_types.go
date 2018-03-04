@@ -207,7 +207,12 @@ type PipelineExecutionLogSpec struct {
 	Message               string `json:"message,omitempty"`
 }
 
+type RunPipelineInput struct {
+	Branch string `json:"branch,omitempty"`
+}
+
 type AuthAppInput struct {
+	InheritGlobal  bool   `json:"inheritGlobal,omitempty"`
 	SourceCodeType string `json:"sourceCodeType,omitempty" norman:"type=string,required"`
 	RedirectURL    string `json:"redirectUrl,omitempty" norman:"type=string"`
 	TLS            bool   `json:"tls,omitempty"`
