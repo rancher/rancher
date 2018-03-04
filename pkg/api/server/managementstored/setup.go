@@ -27,6 +27,8 @@ import (
 	"github.com/rancher/rancher/pkg/api/store/userscope"
 	"github.com/rancher/rancher/pkg/auth/principals"
 	"github.com/rancher/rancher/pkg/auth/providers"
+	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/controllers/user/helm"
 	"github.com/rancher/rancher/pkg/nodeconfig"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	projectschema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
@@ -35,7 +37,7 @@ import (
 	"github.com/rancher/types/config"
 )
 
-func Setup(ctx context.Context, apiContext *config.ScaledContext) error {
+func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager *clustermanager.Manager) error {
 	// Here we setup all types that will be stored in the Management cluster
 	schemas := apiContext.Schemas
 
@@ -92,7 +94,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext) error {
 	User(schemas, apiContext)
 	Catalog(schemas, apiContext)
 	SecretTypes(schemas, apiContext)
-	App(schemas, apiContext)
+	App(schemas, apiContext, clusterManager)
 	Setting(schemas)
 	Preference(schemas, apiContext)
 	ClusterRegistrationTokens(schemas)
@@ -242,10 +244,11 @@ func NodeTypes(schemas *types.Schemas, management *config.ScaledContext) error {
 	return nil
 }
 
-func App(schemas *types.Schemas, management *config.ScaledContext) {
+func App(schemas *types.Schemas, management *config.ScaledContext, kubeConfigGetter helm.KubeConfigGetter) {
 	schema := schemas.Schema(&projectschema.Version, projectclient.AppType)
 	actionWrapper := app.ActionWrapper{
-		Clusters: management.Management.Clusters(""),
+		Clusters:         management.Management.Clusters(""),
+		KubeConfigGetter: kubeConfigGetter,
 	}
 	schema.Formatter = app.Formatter
 	schema.ActionHandler = actionWrapper.ActionHandler

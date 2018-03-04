@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/publicapi"
 	authrequests "github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/hooks"
 	rancherdialer "github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/dynamiclistener"
@@ -39,7 +40,7 @@ var (
 	}
 )
 
-func Start(ctx context.Context, httpPort, httpsPort int, apiContext *config.ScaledContext) error {
+func Start(ctx context.Context, httpPort, httpsPort int, apiContext *config.ScaledContext, clusterManager *clustermanager.Manager) error {
 	tokenAPI, err := tokens.NewAPIHandler(ctx, apiContext)
 	if err != nil {
 		return err
@@ -50,7 +51,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, apiContext *config.Scal
 		return err
 	}
 
-	managementAPI, err := managementapi.New(ctx, apiContext)
+	managementAPI, err := managementapi.New(ctx, apiContext, clusterManager)
 	if err != nil {
 		return err
 	}

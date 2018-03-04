@@ -4,11 +4,11 @@ RUN apt-get update && apt-get install -y git curl ca-certificates unzip xz-utils
     mkdir -p /var/lib/rancher/etcd /var/lib/cattle && \
     chown -R rancher /var/lib/rancher /var/lib/cattle /usr/local/bin
 RUN curl -sLf https://github.com/rancher/machine-package/releases/download/v0.13.0-rancher4-1/docker-machine.tar.gz | tar xvzf - -C /usr/bin && \
-    curl -sLf https://storage.googleapis.com/kubernetes-release/release/v1.8.6/bin/linux/amd64/kubectl > /usr/bin/kubectl && \
     curl -sLf https://github.com/rancher/helm/releases/download/v2.8.0-rancher2/helm > /usr/bin/helm && \
     curl -sLf https://github.com/rancher/helm/releases/download/v2.8.0-rancher2/tiller > /usr/bin/tiller && \
-    chmod +x /usr/bin/kubectl /usr/bin/tiller /usr/bin/helm
+    chmod +x /usr/bin/tiller /usr/bin/helm
 RUN mkdir /root/.kube && \
+    ln -s /usr/bin/rancher /usr/bin/kubectl && \
     ln -s /var/lib/rancher/kube_config_cluster.yml /root/.kube/config
 WORKDIR /var/lib/rancher
 

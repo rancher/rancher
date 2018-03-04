@@ -4,11 +4,10 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 	"sync"
-
-	"net/http"
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -20,9 +19,11 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/rest"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 type Manager struct {
+	httpsPort     int
 	APIContext    *config.ScaledContext
 	clusterLister v3.ClusterLister
 	controllers   sync.Map
@@ -38,8 +39,9 @@ type record struct {
 	cancel        context.CancelFunc
 }
 
-func NewManager(context *config.ScaledContext) *Manager {
+func NewManager(httpsPort int, context *config.ScaledContext) *Manager {
 	return &Manager{
+		httpsPort:     httpsPort,
 		APIContext:    context,
 		dialer:        context.Dialer,
 		accessControl: rbac.NewAccessControl(context.RBAC),
@@ -62,7 +64,7 @@ func (m *Manager) Start(ctx context.Context, cluster *v3.Cluster) error {
 	return err
 }
 
-func (m *Manager) RESTConfig(ctx context.Context, cluster *v3.Cluster) (rest.Config, error) {
+func (m *Manager) RESTConfig(cluster *v3.Cluster) (rest.Config, error) {
 	obj, ok := m.controllers.Load(cluster.UID)
 	if !ok {
 		return rest.Config{}, fmt.Errorf("cluster record not found %s %s", cluster.Name, cluster.UID)
@@ -111,7 +113,7 @@ func (m *Manager) changed(r *record, cluster *v3.Cluster) bool {
 
 func (m *Manager) doStart(rec *record) error {
 	logrus.Info("Starting cluster agent for", rec.cluster.ClusterName)
-	if err := clusterController.Register(rec.ctx, rec.cluster); err != nil {
+	if err := clusterController.Register(rec.ctx, rec.cluster, m); err != nil {
 		return err
 	}
 	return rec.cluster.Start(rec.ctx)
@@ -279,4 +281,29 @@ func (m *Manager) cluster(apiContext *types.APIContext, context types.StorageCon
 	}
 
 	return m.clusterLister.Get("", clusterID)
+}
+
+func (m *Manager) KubeConfig(clusterName, token string) *clientcmdapi.Config {
+	return &clientcmdapi.Config{
+		CurrentContext: "default",
+		APIVersion:     "v1",
+		Kind:           "Config",
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"default": {
+				Server:                fmt.Sprintf("https://localhost:%d/k8s/clusters/%s", m.httpsPort, clusterName),
+				InsecureSkipTLSVerify: true,
+			},
+		},
+		Contexts: map[string]*clientcmdapi.Context{
+			"default": {
+				AuthInfo: "user",
+				Cluster:  "default",
+			},
+		},
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+			"user": {
+				Token: token,
+			},
+		},
+	}
 }

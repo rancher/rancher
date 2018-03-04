@@ -24,11 +24,11 @@ import (
 	"github.com/rancher/types/config"
 )
 
-func Register(ctx context.Context, cluster *config.UserContext) error {
+func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter helm.KubeConfigGetter) error {
 	alert.Register(ctx, cluster)
 	authz.Register(cluster)
 	healthsyncer.Register(ctx, cluster)
-	helm.Register(cluster)
+	helm.Register(cluster, kubeConfigGetter)
 	logging.Register(cluster)
 	//networkpolicy.Register(cluster)
 	noderemove.Register(cluster)

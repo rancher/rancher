@@ -3,12 +3,18 @@ package common
 import (
 	"encoding/base32"
 
+	"fmt"
+	"strings"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/slice"
+	"github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/pkg/randomtoken"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
+	errors2 "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
@@ -51,6 +57,8 @@ func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
 		userIndexer:        userInformer.GetIndexer(),
 		crtbIndexer:        crtbInformer.GetIndexer(),
 		prtbIndexer:        prtbInformer.GetIndexer(),
+		tokens:             scaledContext.Management.Tokens(""),
+		tokenLister:        scaledContext.Management.Tokens("").Controller().Lister(),
 		globalRoleBindings: scaledContext.Management.GlobalRoleBindings(""),
 	}, nil
 }
@@ -61,6 +69,8 @@ type userManager struct {
 	userIndexer        cache.Indexer
 	crtbIndexer        cache.Indexer
 	prtbIndexer        cache.Indexer
+	tokenLister        v3.TokenLister
+	tokens             v3.TokenInterface
 }
 
 func (m *userManager) SetPrincipalOnCurrentUser(apiContext *types.APIContext, principal v3.Principal) (*v3.User, error) {
@@ -130,7 +140,51 @@ func (m *userManager) CheckAccess(accessMode string, allowedPrincipalIDs []strin
 		}
 		return false, nil
 	}
-	return false, errors.Errorf("Unsupport accessMode: %v", accessMode)
+	return false, errors.Errorf("Unsupported accessMode: %v", accessMode)
+}
+
+func (m *userManager) EnsureToken(tokenName, description, userName string) (string, error) {
+	if strings.HasPrefix(tokenName, "token-") {
+		return "", errors.New("token names can't start with token-")
+	}
+
+	token, err := m.tokenLister.Get("", tokenName)
+	if errors2.IsNotFound(err) {
+		token, err = nil, nil
+	} else if err != nil {
+		return "", err
+	}
+
+	if token == nil {
+		key, err := randomtoken.Generate()
+		if err != nil {
+			return "", fmt.Errorf("failed to generate token key")
+		}
+
+		token = &v3.Token{
+			ObjectMeta: v1.ObjectMeta{
+				Name: tokenName,
+				Labels: map[string]string{
+					tokens.UserIDLabel: userName,
+				},
+			},
+			TTLMillis:    0,
+			Description:  description,
+			UserID:       userName,
+			AuthProvider: "local",
+			IsDerived:    true,
+			Token:        key,
+		}
+
+		createdToken, err := m.tokens.Create(token)
+		if err != nil {
+			return "", err
+		}
+		token = createdToken
+
+	}
+
+	return token.Name + ":" + token.Token, nil
 }
 
 func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, error) {

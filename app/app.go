@@ -40,49 +40,49 @@ func buildManagement(scaledContext *config.ScaledContext) (*config.ManagementCon
 	return management, nil
 }
 
-func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config) (*config.ScaledContext, error) {
+func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config) (*config.ScaledContext, *clustermanager.Manager, error) {
 	scaledContext, err := config.NewScaledContext(kubeConfig)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	scaledContext.LocalConfig = &kubeConfig
 
 	if err := ReadTLSConfig(cfg); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err := k8scheck.Wait(ctx, kubeConfig); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	dialerFactory, err := dialer.NewFactory(scaledContext)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	scaledContext.Dialer = dialerFactory
 
-	manager := clustermanager.NewManager(scaledContext)
+	manager := clustermanager.NewManager(cfg.HTTPSListenPort, scaledContext)
 	scaledContext.AccessControl = manager
 	scaledContext.ClientGetter = manager
 
 	userManager, err := common.NewUserManager(scaledContext)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	scaledContext.UserManager = userManager
 
-	return scaledContext, nil
+	return scaledContext, manager, nil
 }
 
 func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
-	scaledContext, err := buildScaledContext(ctx, kubeConfig, cfg)
+	scaledContext, clusterManager, err := buildScaledContext(ctx, kubeConfig, cfg)
 	if err != nil {
 		return err
 	}
 
-	if err := server.Start(ctx, cfg.HTTPListenPort, cfg.HTTPSListenPort, scaledContext); err != nil {
+	if err := server.Start(ctx, cfg.HTTPListenPort, cfg.HTTPSListenPort, scaledContext, clusterManager); err != nil {
 		return err
 	}
 
@@ -126,7 +126,7 @@ func addData(management *config.ManagementContext, cfg Config) error {
 		return err
 	}
 
-	if cfg.AddLocal == "true" || (cfg.AddLocal == "auto" && cfg.Embedded) {
+	if cfg.AddLocal == "true" || (cfg.AddLocal == "auto" && !cfg.Embedded) {
 		if err := addLocalCluster(cfg.Embedded, adminName, management); err != nil {
 			return err
 		}

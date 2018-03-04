@@ -26,41 +26,6 @@ const (
 	helmName   = "helm"
 )
 
-func RestToRaw(token, clusterID string) KubeConfig {
-	rawConfig := KubeConfig{}
-	host := fmt.Sprintf("https://localhost:8443/k8s/clusters/%s", clusterID)
-	rawConfig.CurrentContext = "default"
-	rawConfig.APIVersion = "v1"
-	rawConfig.Kind = "Config"
-	rawConfig.Clusters = []configCluster{
-		{
-			Name: "default",
-			Cluster: dataCluster{
-				Server:                host,
-				InsecureSkipVerifyTLS: true,
-			},
-		},
-	}
-	rawConfig.Contexts = []configContext{
-		{
-			Name: "default",
-			Context: contextData{
-				User:    "admin",
-				Cluster: "default",
-			},
-		},
-	}
-	rawConfig.Users = []configUser{
-		{
-			Name: "admin",
-			User: userData{
-				Token: token,
-			},
-		},
-	}
-	return rawConfig
-}
-
 func WriteTempDir(rootDir string, files map[string]string) (string, error) {
 	for name, content := range files {
 		fp := filepath.Join(rootDir, name)
