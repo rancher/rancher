@@ -30,7 +30,11 @@ func (s *Store) ByID(apiContext *types.APIContext, schema *types.Schema, id stri
 	if s.Transformer == nil {
 		return data, nil
 	}
-	return s.Transformer(apiContext, data, nil)
+	return s.Transformer(apiContext, data, &types.QueryOptions{
+		Options: map[string]string{
+			"ByID": "true",
+		},
+	})
 }
 
 func (s *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
