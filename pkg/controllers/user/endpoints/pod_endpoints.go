@@ -7,6 +7,7 @@ import (
 
 	workloadutil "github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/types/apis/core/v1"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -23,6 +24,8 @@ type PodsController struct {
 	podLister          v1.PodLister
 	serviceLister      v1.ServiceLister
 	workloadController workloadutil.CommonController
+	machinesLister     v3.NodeLister
+	clusterName        string
 }
 
 func (c *PodsController) sync(key string, obj *corev1.Pod) error {
@@ -56,8 +59,12 @@ func (c *PodsController) sync(key string, obj *corev1.Pod) error {
 
 	nodesToUpdate := map[string]bool{}
 	workloadsToUpdate := map[string]*workloadutil.Workload{}
+	nodeNameToMachine, err := getNodeNameToMachine(c.clusterName, c.machinesLister)
+	if err != nil {
+		return err
+	}
 	for _, pod := range pods {
-		updated, err := c.updatePodEndpoints(pod, services)
+		updated, err := c.updatePodEndpoints(pod, services, nodeNameToMachine)
 		if err != nil {
 			return err
 		}
@@ -98,8 +105,7 @@ func podHasHostPort(obj *corev1.Pod) bool {
 	return false
 }
 
-func (c *PodsController) updatePodEndpoints(obj *corev1.Pod, services []*corev1.Service) (updated bool, err error) {
-
+func (c *PodsController) updatePodEndpoints(obj *corev1.Pod, services []*corev1.Service, nodeNameToMachine map[string]*v3.Node) (updated bool, err error) {
 	if obj.Spec.NodeName == "" {
 		return false, nil
 	}
@@ -110,7 +116,7 @@ func (c *PodsController) updatePodEndpoints(obj *corev1.Pod, services []*corev1.
 
 	// 1. update pod with endpoints
 	// a) from HostPort
-	newPublicEps, err := convertHostPortToEndpoint(obj)
+	newPublicEps, err := convertHostPortToEndpoint(obj, c.clusterName, nodeNameToMachine[obj.Spec.NodeName])
 	if err != nil {
 		return false, err
 	}
@@ -125,7 +131,7 @@ func (c *PodsController) updatePodEndpoints(obj *corev1.Pod, services []*corev1.
 		}
 		selector := labels.SelectorFromSet(set)
 		if selector.Matches(labels.Set(obj.Labels)) {
-			eps, err := convertServiceToPublicEndpoints(svc, nil)
+			eps, err := convertServiceToPublicEndpoints(svc, "", nil)
 			if err != nil {
 				return false, err
 			}

@@ -2,6 +2,7 @@ package endpoints
 
 import (
 	"github.com/rancher/types/apis/core/v1"
+	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -13,10 +14,12 @@ import (
 // and NodePort/LoadBalancer services
 
 type NodesController struct {
-	nodes         v1.NodeInterface
-	nodeLister    v1.NodeLister
-	serviceLister v1.ServiceLister
-	podLister     v1.PodLister
+	nodes          v1.NodeInterface
+	nodeLister     v1.NodeLister
+	serviceLister  v1.ServiceLister
+	podLister      v1.PodLister
+	machinesLister managementv3.NodeLister
+	clusterName    string
 }
 
 func (n *NodesController) sync(key string, obj *corev1.Node) error {
@@ -58,11 +61,15 @@ func (n *NodesController) reconcileEndpontsForNode(node *corev1.Node) (bool, err
 	if err != nil {
 		return false, err
 	}
+	nodeNameToMachine, err := getNodeNameToMachine(n.clusterName, n.machinesLister)
+	if err != nil {
+		return false, err
+	}
 	for _, svc := range svcs {
 		if svc.DeletionTimestamp != nil {
 			continue
 		}
-		pEps, err := convertServiceToPublicEndpoints(svc, node)
+		pEps, err := convertServiceToPublicEndpoints(svc, n.clusterName, nodeNameToMachine[node.Name])
 		if err != nil {
 			return false, err
 		}
@@ -76,7 +83,7 @@ func (n *NodesController) reconcileEndpontsForNode(node *corev1.Node) (bool, err
 			continue
 		}
 
-		pEps, err := convertHostPortToEndpoint(pod)
+		pEps, err := convertHostPortToEndpoint(pod, n.clusterName, nodeNameToMachine[node.Name])
 		if err != nil {
 			return false, err
 		}
