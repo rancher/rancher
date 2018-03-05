@@ -1,9 +1,10 @@
 package authz
 
 import (
+	"encoding/json"
 	"fmt"
-
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/slice"
@@ -13,11 +14,14 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 const (
 	projectNSGetClusterRoleNameFmt = "%v-namespaces-%v"
 	projectNSAnn                   = "authz.cluster.auth.io/project-namespaces"
+	statusAnn                      = "cattle.io/status"
+	initialRoleCondition           = "InitialRolesPopulated"
 )
 
 var projectNSVerbToSuffix = map[string]string{
@@ -34,12 +38,19 @@ type nsLifecycle struct {
 }
 
 func (n *nsLifecycle) Create(obj *v1.Namespace) (*v1.Namespace, error) {
-	err := n.syncNS(obj)
+	hasPRTBs, err := n.syncNS(obj)
+	if err != nil {
+		return obj, err
+	}
+
+	setRolesPopulatedCondition(obj, 0)
+	go updateStatusAnnotation(hasPRTBs, obj, n.m)
+
 	return obj, err
 }
 
 func (n *nsLifecycle) Updated(obj *v1.Namespace) (*v1.Namespace, error) {
-	err := n.syncNS(obj)
+	_, err := n.syncNS(obj)
 	return obj, err
 }
 
@@ -48,29 +59,36 @@ func (n *nsLifecycle) Remove(obj *v1.Namespace) (*v1.Namespace, error) {
 	return obj, err
 }
 
-func (n *nsLifecycle) syncNS(obj *v1.Namespace) error {
-	if err := n.ensurePRTBAddToNamespace(obj); err != nil {
-		return err
+func (n *nsLifecycle) syncNS(obj *v1.Namespace) (bool, error) {
+	hasPRTBs, err := n.ensurePRTBAddToNamespace(obj)
+	if err != nil {
+		return false, err
 	}
 
-	return n.reconcileNamespaceProjectClusterRole(obj)
+	if err := n.reconcileNamespaceProjectClusterRole(obj); err != nil {
+		return false, err
+	}
+
+	return hasPRTBs, nil
 }
 
-func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) error {
+func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 	// Get project that contain this namespace
 	projectID := ns.Annotations[projectIDAnnotation]
 	if len(projectID) == 0 {
-		return nil
+		return false, nil
 	}
 
 	prtbs, err := n.m.prtbIndexer.ByIndex(prtbByProjectIndex, projectID)
 	if err != nil {
-		return errors.Wrapf(err, "couldn't get project role binding templates associated with project id %s", projectID)
+		return false, errors.Wrapf(err, "couldn't get project role binding templates associated with project id %s", projectID)
 	}
+	hasPRTBs := len(prtbs) > 0
+
 	for _, prtb := range prtbs {
 		prtb, ok := prtb.(*v3.ProjectRoleTemplateBinding)
 		if !ok {
-			return errors.Wrapf(err, "object %v is not valid project role template binding", prtb)
+			return false, errors.Wrapf(err, "object %v is not valid project role template binding", prtb)
 		}
 
 		if prtb.UserName == "" && prtb.GroupPrincipalName == "" && prtb.GroupName == "" {
@@ -84,23 +102,23 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) error {
 
 		rt, err := n.m.rtLister.Get("", prtb.RoleTemplateName)
 		if err != nil {
-			return errors.Wrapf(err, "couldn't get role template %v", prtb.RoleTemplateName)
+			return false, errors.Wrapf(err, "couldn't get role template %v", prtb.RoleTemplateName)
 		}
 
 		roles := map[string]*v3.RoleTemplate{}
 		if err := n.m.gatherRoles(rt, roles); err != nil {
-			return err
+			return false, err
 		}
 
 		if err := n.m.ensureRoles(roles); err != nil {
-			return errors.Wrap(err, "couldn't ensure roles")
+			return false, errors.Wrap(err, "couldn't ensure roles")
 		}
 
 		if err := n.m.ensureRoleBindings(ns.Name, roles, prtb); err != nil {
-			return errors.Wrapf(err, "couldn't ensure binding %v in %v", prtb.Name, ns.Name)
+			return false, errors.Wrapf(err, "couldn't ensure binding %v in %v", prtb.Name, ns.Name)
 		}
 	}
-	return nil
+	return hasPRTBs, nil
 }
 
 // To ensure that all users in a project can do a GET on the namespaces in that project, this
@@ -241,9 +259,123 @@ func crByNS(obj interface{}) ([]string, error) {
 
 	var result []string
 	for _, r := range cr.Rules {
-		if slice.ContainsString(r.Resources, "namespaces") && slice.ContainsString(r.Verbs, "get") {
+		if slice.ContainsString(r.Resources, "namespaces") && (slice.ContainsString(r.Verbs, "get") || slice.ContainsString(r.Verbs, "*")) {
 			result = append(result, r.ResourceNames...)
 		}
 	}
 	return result, nil
+}
+
+func updateStatusAnnotation(hasPRTBs bool, namespace *v1.Namespace, mgr *manager) {
+	if _, ok := namespace.Annotations[projectIDAnnotation]; ok {
+		for i := 0; i < 10; i++ {
+			time.Sleep(time.Millisecond * 500)
+			clusterRoles, err := mgr.crIndexer.ByIndex(crByNSIndex, namespace.Name)
+			if err != nil {
+				logrus.Warnf("error getting cluster roles for ns %v for status update: %v", namespace.Name, err)
+				continue
+			}
+			if len(clusterRoles) < 2 {
+				continue
+			}
+
+			creator := namespace.Annotations["field.cattle.io/creatorId"]
+			if creator != "" {
+				found := false
+				for _, crx := range clusterRoles {
+					cr, _ := crx.(*rbacv1.ClusterRole)
+					crbKey := rbRoleSubjectKey(cr.Name, rbacv1.Subject{Kind: "User", Name: creator})
+					crbs, _ := mgr.crbIndexer.ByIndex(crbByRoleAndSubjectIndex, crbKey)
+					if len(crbs) > 0 {
+						found = true
+						break
+					}
+				}
+				if !found {
+					continue
+				}
+			}
+
+			if hasPRTBs {
+				bindings, err := mgr.rbLister.List(namespace.Name, labels.Everything())
+				if err != nil {
+					logrus.Warnf("error getting bindings for ns %v for status update: %v", namespace.Name, err)
+					continue
+				}
+				if len(bindings) > 0 {
+					break
+				}
+			}
+		}
+	}
+
+	namespace, err := mgr.workload.Core.Namespaces("").Get(namespace.Name, metav1.GetOptions{})
+	if err != nil {
+		logrus.Errorf("error getting ns %v for status update: %v", namespace.Name, err)
+		return
+	}
+	setRolesPopulatedCondition(namespace, time.Second*1)
+	_, err = mgr.workload.Core.Namespaces("").Update(namespace)
+	if err != nil {
+		logrus.Errorf("error updating ns %v status: %v", namespace.Name, err)
+	}
+}
+
+func setRolesPopulatedCondition(namespace *v1.Namespace, d time.Duration) error {
+	if namespace.ObjectMeta.Annotations == nil {
+		namespace.ObjectMeta.Annotations = map[string]string{}
+	}
+
+	ann := namespace.ObjectMeta.Annotations[statusAnn]
+	status := &status{}
+	if ann != "" {
+		err := json.Unmarshal([]byte(ann), status)
+		if err != nil {
+			return err
+		}
+	}
+	if status.Conditions == nil {
+		status.Conditions = []condition{}
+	}
+
+	var idx int
+	found := false
+	for i, c := range status.Conditions {
+		if c.Type == initialRoleCondition {
+			idx = i
+			found = true
+			break
+		}
+	}
+
+	cond := condition{
+		Type:           initialRoleCondition,
+		Status:         "True",
+		LastUpdateTime: time.Now().Add(d).Format(time.RFC3339),
+	}
+
+	if found {
+		status.Conditions[idx] = cond
+	} else {
+		status.Conditions = append(status.Conditions, cond)
+	}
+
+	bAnn, err := json.Marshal(status)
+	if err != nil {
+		return err
+	}
+	namespace.ObjectMeta.Annotations[statusAnn] = string(bAnn)
+
+	return nil
+}
+
+type status struct {
+	Conditions []condition
+}
+
+type condition struct {
+	Type           string
+	Status         string
+	Message        string
+	LastUpdateTime string
 }
