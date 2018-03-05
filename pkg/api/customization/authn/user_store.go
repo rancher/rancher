@@ -47,6 +47,7 @@ func SetUserStore(schema *types.Schema, mgmt *config.ScaledContext) {
 						if opt != nil && opt.Options["ByID"] == "true" {
 							return nil, httperror.NewAPIError(httperror.NotFound, "resource not found")
 						}
+						return nil, nil
 					}
 				}
 			}
