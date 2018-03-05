@@ -16,6 +16,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/pkg/errors"
 	"github.com/rancher/kontainer-engine/drivers"
 	"github.com/rancher/kontainer-engine/types"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -444,7 +445,8 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions) (*typ
 		}
 
 		if state != creatingStatus && state != updatingStatus {
-			return nil, fmt.Errorf("unexpected state %v", state)
+			logrus.Errorf("Azure failed to provision cluster with state: %v", state)
+			return nil, errors.New("Azure failed to provision cluster")
 		}
 
 		logrus.Infof("Cluster has not yet completed provisioning, waiting another %v seconds", pollInterval)
