@@ -327,6 +327,11 @@ func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, ob
 		return obj, err
 	}
 
+	template, err := m.getNodeTemplate(obj.Spec.NodeTemplateName)
+	if err != nil {
+		return obj, err
+	}
+
 	obj.Status.NodeConfig = &v3.RKEConfigNode{
 		NodeName:         obj.Spec.ClusterName + ":" + obj.Name,
 		Address:          ip,
@@ -335,6 +340,7 @@ func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, ob
 		Role:             roles(obj),
 		HostnameOverride: obj.Spec.RequestedHostname,
 		SSHKey:           sshKey,
+		Labels:           template.Labels,
 	}
 	obj.Status.InternalNodeStatus.Addresses = []v1.NodeAddress{
 		{
