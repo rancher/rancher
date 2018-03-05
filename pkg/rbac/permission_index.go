@@ -1,6 +1,8 @@
 package rbac
 
 import (
+	"strings"
+
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -193,7 +195,7 @@ func matches(parts []string, val string) bool {
 		if value == "*" {
 			return true
 		}
-		if value == val {
+		if strings.EqualFold(value, val) {
 			return true
 		}
 	}
