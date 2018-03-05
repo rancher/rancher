@@ -2,6 +2,7 @@ package authz
 
 import (
 	"reflect"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/clientbase"
@@ -100,6 +101,26 @@ func (m *manager) ensureRoles(rts map[string]*v3.RoleTemplate) error {
 		if rt.External {
 			continue
 		}
+		rt = rt.DeepCopy()
+
+		var toLowerRules []rbacv1.PolicyRule
+		for _, r := range rt.Rules {
+			rule := r.DeepCopy()
+
+			var resources []string
+			for _, re := range r.Resources {
+				resources = append(resources, strings.ToLower(re))
+			}
+			rule.Resources = resources
+
+			var verbs []string
+			for _, v := range r.Verbs {
+				verbs = append(verbs, strings.ToLower(v))
+			}
+			rule.Verbs = verbs
+			toLowerRules = append(toLowerRules, *rule)
+		}
+		rt.Rules = toLowerRules
 
 		if role, err := m.crLister.Get("", rt.Name); err == nil && role != nil {
 			if reflect.DeepEqual(role.Rules, rt.Rules) {
