@@ -182,7 +182,10 @@ func createBindingIfNotExists(bindings2 v12.RoleBindingInterface, bindingLister 
 	bindingExists := false
 
 	for _, binding := range bindings {
-		if binding.Annotations[podSecurityTemplateParentAnnotation] == policyName {
+		if binding.Annotations[podSecurityTemplateParentAnnotation] == policyName &&
+			len(binding.Subjects) > 0 && // guard against panic
+			binding.Subjects[0].Name == serviceAccount.Name &&
+			binding.Subjects[0].Namespace == serviceAccount.Namespace {
 			bindingExists = true
 		}
 	}
