@@ -1,10 +1,12 @@
 package authn
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
+	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
@@ -28,11 +30,43 @@ func SetUserStore(schema *types.Schema, mgmt *config.ScaledContext) {
 	}
 	userInformer.AddIndexers(userIndexers)
 
-	schema.Store = &userStore{
+	store := &userStore{
 		Store:       schema.Store,
 		mu:          sync.Mutex{},
 		userIndexer: userInformer.GetIndexer(),
 	}
+
+	t := &transform.Store{
+		Store: store,
+		Transformer: func(apiContext *types.APIContext, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
+			// filter system users out of the api
+			if princIds, ok := data[client.UserFieldPrincipalIDs].([]interface{}); ok {
+				for _, p := range princIds {
+					pid, _ := p.(string)
+					if strings.HasPrefix(pid, "system://") {
+						if opt != nil && opt.Options["ByID"] == "true" {
+							return nil, httperror.NewAPIError(httperror.NotFound, "resource not found")
+						}
+					}
+				}
+			}
+
+			// set "me" field on user
+			userID := apiContext.Request.Header.Get("Impersonate-User")
+			if userID != "" {
+				id, ok := data[types.ResourceFieldID].(string)
+				if ok {
+					if id == userID {
+						data["me"] = "true"
+					}
+				}
+			}
+
+			return data, nil
+		},
+	}
+
+	schema.Store = t
 }
 
 func userByUsername(obj interface{}) ([]string, error) {
@@ -106,26 +140,4 @@ func (s *userStore) create(apiContext *types.APIContext, schema *types.Schema, d
 	}
 
 	return s.Store.Create(apiContext, schema, data)
-}
-
-func (s *userStore) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {
-
-	req := apiContext.Request
-
-	schemaData, err := s.Store.List(apiContext, schema, opt)
-	if err != nil {
-		return nil, err
-	}
-	userID := req.Header.Get("Impersonate-User")
-	if userID != "" {
-		for _, data := range schemaData {
-			id, ok := data[types.ResourceFieldID].(string)
-			if ok {
-				if id == userID {
-					data["me"] = "true"
-				}
-			}
-		}
-	}
-	return schemaData, nil
 }
