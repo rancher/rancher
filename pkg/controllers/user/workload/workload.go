@@ -139,8 +139,29 @@ func (c *Controller) CreateServiceForWorkload(workload *Workload) error {
 }
 
 func (c *Controller) updateService(toUpdate Service, existing *corev1.Service) error {
-	existing.Spec.Ports = toUpdate.ServicePorts
-	logrus.Infof("Updating [%s/%s] service with ports [%v]", existing.Namespace, existing.Name, toUpdate.ServicePorts)
+	existingPortNameToPort := map[string]corev1.ServicePort{}
+	for _, p := range existing.Spec.Ports {
+		existingPortNameToPort[p.Name] = p
+	}
+
+	var portsToUpdate []corev1.ServicePort
+	for _, p := range toUpdate.ServicePorts {
+		if val, ok := existingPortNameToPort[p.Name]; ok {
+			if val.Port == p.Port {
+				// Once switch to k8s 1.9, reset only when p.Nodeport == 0. There is a bug in 1.8
+				// on port update with diff NodePort value resulting in api server crash
+				// https://github.com/kubernetes/kubernetes/issues/58892
+				//if p.NodePort == 0 {
+				//	p.NodePort = val.NodePort
+				//}
+				p.NodePort = val.NodePort
+			}
+		}
+		portsToUpdate = append(portsToUpdate, p)
+	}
+
+	existing.Spec.Ports = portsToUpdate
+	logrus.Infof("Updating [%s/%s] service with ports [%v]", existing.Namespace, existing.Name, portsToUpdate)
 	_, err := c.services.Update(existing)
 	if err != nil {
 		return err
@@ -200,6 +221,9 @@ func arePortsEqual(one []corev1.ServicePort, two []corev1.ServicePort) bool {
 	for _, o := range one {
 		found := false
 		for _, t := range two {
+			// Once switch to k8s 1.9, compare nodePort value as well. There is a bug in 1.8
+			// on port update with diff NodePort value resulting in api server crash
+			// https://github.com/kubernetes/kubernetes/issues/58892
 			if o.TargetPort == t.TargetPort && o.Protocol == t.Protocol && o.Port == t.Port {
 				found = true
 				break
