@@ -177,7 +177,6 @@ func setWorkloadSpecificDefaults(schemaID string, data map[string]interface{}) {
 	if strings.EqualFold(schemaID, "job") || strings.EqualFold(schemaID, "cronJob") {
 		// job has different defaults
 		if _, ok := data["restartPolicy"]; !ok {
-			logrus.Info("Setting restart policy")
 			data["restartPolicy"] = "OnFailure"
 		}
 	}
@@ -210,20 +209,18 @@ func setPorts(data map[string]interface{}) {
 
 		if ok {
 			ports := convert.ToInterfaceSlice(v)
-			if len(ports) > 1 {
-				for _, p := range ports {
-					port, err := convert.EncodeToMap(p)
+			for _, p := range ports {
+				port, err := convert.EncodeToMap(p)
+				if err != nil {
+					logrus.Warnf("Failed to transform port to map %v", err)
+					continue
+				}
+				if convert.IsEmpty(port["name"]) {
+					containerPort, err := convert.ToNumber(port["containerPort"])
 					if err != nil {
-						logrus.Warnf("Failed to transform port to map %v", err)
-						continue
+						logrus.Warnf("Failed to transform container port [%v] to number: %v", port["containerPort"], err)
 					}
-					if convert.IsEmpty(port["name"]) {
-						containerPort, err := convert.ToNumber(port["containerPort"])
-						if err != nil {
-							logrus.Warnf("Failed to transform container port [%v] to number: %v", port["containerPort"], err)
-						}
-						port["name"] = fmt.Sprintf("%s%s", strings.ToLower(convert.ToString(port["protocol"])), strconv.Itoa(int(containerPort)))
-					}
+					port["name"] = fmt.Sprintf("%s%s", strings.ToLower(convert.ToString(port["protocol"])), strconv.Itoa(int(containerPort)))
 				}
 			}
 		}
@@ -299,6 +296,7 @@ func (a *AggregateStore) Update(apiContext *types.APIContext, schema *types.Sche
 		return nil, err
 	}
 	_, shortID := splitTypeAndID(id)
+	setPorts(data)
 	return store.Update(apiContext, a.Schemas[schemaType], data, shortID)
 }
 
