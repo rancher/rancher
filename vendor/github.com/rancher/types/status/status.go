@@ -5,9 +5,16 @@ import (
 
 	"time"
 
+	"encoding/json"
+
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
+	"github.com/sirupsen/logrus"
 )
+
+type status struct {
+	Conditions []condition `json:"conditions"`
+}
 
 type condition struct {
 	Type    string
@@ -44,6 +51,7 @@ var transitioningMap = map[string]string{
 	"Saved":                       "saving",
 	"Updated":                     "updating",
 	"Updating":                    "updating",
+	"InitialRolesPopulated":       "activating",
 }
 
 // True == error
@@ -92,6 +100,21 @@ func Set(data map[string]interface{}) {
 	val, conditionsOk := values.GetValue(data, "status", "conditions")
 	var conditions []condition
 	convert.ToObj(val, &conditions)
+
+	statusAnn, annOK := values.GetValue(data, "metadata", "annotations", "cattle.io/status")
+	if annOK {
+		status := &status{}
+		s, ok := statusAnn.(string)
+		if ok {
+			err := json.Unmarshal([]byte(s), status)
+			if err != nil {
+				logrus.Warnf("Unable to unmarshal cattle status %v. Error: %v", s, err)
+			}
+		}
+		if len(status.Conditions) > 0 {
+			conditions = append(conditions, status.Conditions...)
+		}
+	}
 
 	val, ok := values.GetValue(data, "metadata", "removed")
 	if ok && val != "" && val != nil {
