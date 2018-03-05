@@ -39,7 +39,7 @@ func IsPipelineDeploy(clusterPipelineLister v3.ClusterPipelineLister, clusterNam
 	return clusterPipeline.Spec.Deploy
 }
 
-func InitExecution(p *v3.Pipeline, triggerType string) *v3.PipelineExecution {
+func InitExecution(p *v3.Pipeline, triggerType string, triggerUserName string, branch string) *v3.PipelineExecution {
 	execution := &v3.PipelineExecution{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      getNextExecutionName(p),
@@ -47,12 +47,16 @@ func InitExecution(p *v3.Pipeline, triggerType string) *v3.PipelineExecution {
 			Labels:    map[string]string{PipelineFinishLabel: "false"},
 		},
 		Spec: v3.PipelineExecutionSpec{
-			ProjectName:  p.Spec.ProjectName,
-			PipelineName: p.Namespace + ":" + p.Name,
-			Run:          p.Status.NextRun,
-			TriggeredBy:  triggerType,
-			Pipeline:     *p,
+			ProjectName:     p.Spec.ProjectName,
+			PipelineName:    p.Namespace + ":" + p.Name,
+			Run:             p.Status.NextRun,
+			TriggeredBy:     triggerType,
+			TriggerUserName: triggerUserName,
+			Pipeline:        *p.DeepCopy(),
 		},
+	}
+	if branch != "" {
+		setExecutionBranch(execution, branch)
 	}
 	execution.Status.ExecutionState = StateWaiting
 	execution.Status.Started = time.Now().Format(time.RFC3339)
@@ -76,6 +80,17 @@ func getNextExecutionName(p *v3.Pipeline) string {
 		return ""
 	}
 	return fmt.Sprintf("%s-%d", p.Name, p.Status.NextRun)
+}
+
+func setExecutionBranch(execution *v3.PipelineExecution, branch string) {
+	if len(execution.Spec.Pipeline.Spec.Stages) < 1 ||
+		len(execution.Spec.Pipeline.Spec.Stages[0].Steps) < 1 ||
+		execution.Spec.Pipeline.Spec.Stages[0].Steps[0].SourceCodeConfig == nil {
+		return
+	}
+	sourceCodeconfig := execution.Spec.Pipeline.Spec.Stages[0].Steps[0].SourceCodeConfig
+	sourceCodeconfig.BranchCondition = "only"
+	sourceCodeconfig.Branch = branch
 }
 
 func IsStageSuccess(stage v3.StageStatus) bool {
@@ -112,15 +127,14 @@ func IsExecutionFinish(execution *v3.PipelineExecution) bool {
 	return false
 }
 
-func GenerateExecution(pipelines v3.PipelineInterface, executions v3.PipelineExecutionInterface, pipeline *v3.Pipeline, triggerType string) (*v3.PipelineExecution, error) {
+func GenerateExecution(pipelines v3.PipelineInterface, executions v3.PipelineExecutionInterface, pipeline *v3.Pipeline, triggerType string, triggerUserName string, branch string) (*v3.PipelineExecution, error) {
 
 	//Generate a new pipeline execution
-	execution := InitExecution(pipeline, triggerType)
+	execution := InitExecution(pipeline, triggerType, triggerUserName, branch)
 	execution, err := executions.Create(execution)
 	if err != nil {
 		return nil, err
 	}
-
 	//update pipeline status
 	pipeline.Status.NextRun++
 	pipeline.Status.LastExecutionID = pipeline.Namespace + ":" + execution.Name

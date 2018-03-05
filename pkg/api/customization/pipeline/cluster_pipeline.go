@@ -3,6 +3,7 @@ package pipeline
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
@@ -13,6 +14,8 @@ import (
 	"github.com/rancher/types/client/management/v3"
 	"github.com/sirupsen/logrus"
 	"io/ioutil"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"net/http"
 	"strings"
 )
@@ -24,6 +27,8 @@ type ClusterPipelineHandler struct {
 	SourceCodeCredentialLister v3.SourceCodeCredentialLister
 	SourceCodeRepositories     v3.SourceCodeRepositoryInterface
 	SourceCodeRepositoryLister v3.SourceCodeRepositoryLister
+
+	AuthConfigs v3.AuthConfigInterface
 }
 
 func ClusterPipelineFormatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -147,6 +152,16 @@ func (h *ClusterPipelineHandler) authapp(apiContext *types.APIContext) error {
 			ClientSecret: authAppInput.ClientSecret,
 			RedirectURL:  authAppInput.RedirectURL,
 		}
+		if authAppInput.InheritGlobal {
+			globalConfig, err := h.getGithubConfigCR()
+			if err != nil {
+				return err
+			}
+			clusterPipeline.Spec.GithubConfig.TLS = globalConfig.TLS
+			clusterPipeline.Spec.GithubConfig.Host = globalConfig.Hostname
+			clusterPipeline.Spec.GithubConfig.ClientID = globalConfig.ClientID
+			clusterPipeline.Spec.GithubConfig.ClientSecret = globalConfig.ClientSecret
+		}
 	} else {
 		return fmt.Errorf("Error unsupported source code type %s", authAppInput.SourceCodeType)
 	}
@@ -268,4 +283,31 @@ func (h *ClusterPipelineHandler) authAddAccount(clusterPipeline *v3.ClusterPipel
 		return nil, err
 	}
 	return account, nil
+}
+
+func (h *ClusterPipelineHandler) getGithubConfigCR() (*v3.GithubConfig, error) {
+	authConfigObj, err := h.AuthConfigs.ObjectClient().UnstructuredClient().Get("github", metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve GithubConfig, error: %v", err)
+	}
+
+	u, ok := authConfigObj.(runtime.Unstructured)
+	if !ok {
+		return nil, fmt.Errorf("failed to retrieve GithubConfig, cannot read k8s Unstructured data")
+	}
+	storedGithubConfigMap := u.UnstructuredContent()
+
+	storedGithubConfig := &v3.GithubConfig{}
+	mapstructure.Decode(storedGithubConfigMap, storedGithubConfig)
+
+	metadataMap, ok := storedGithubConfigMap["metadata"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("failed to retrieve GithubConfig metadata, cannot read k8s Unstructured data")
+	}
+
+	typemeta := &metav1.ObjectMeta{}
+	mapstructure.Decode(metadataMap, typemeta)
+	storedGithubConfig.ObjectMeta = *typemeta
+
+	return storedGithubConfig, nil
 }
