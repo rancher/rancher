@@ -15,7 +15,6 @@ import (
 	"github.com/rancher/norman/event"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
-	"github.com/rancher/rancher/pkg/client"
 	"github.com/rancher/rancher/pkg/configfield"
 	"github.com/rancher/rancher/pkg/controllers/management/nodepool"
 	"github.com/rancher/rancher/pkg/encryptedstore"
@@ -240,10 +239,6 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 		if err != nil && err.Error() == "cluster already exists" {
 			logrus.Infof("Create done, Updating cluster [%s]", cluster.Name)
 			apiEndpoint, serviceAccountToken, caCert, err = p.driverUpdate(cluster, *spec)
-		}
-		// validate token
-		if err == nil {
-			err = client.Validate(apiEndpoint, serviceAccountToken, caCert)
 		}
 	} else {
 		logrus.Infof("Updating cluster [%s]", cluster.Name)
