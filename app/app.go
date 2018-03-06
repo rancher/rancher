@@ -28,8 +28,6 @@ type Config struct {
 	ListenConfig    *v3.ListenConfig
 }
 
-var defaultAdminLabel = map[string]string{"authz.management.cattle.io/bootstrapping": "admin-user"}
-
 func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config) (*config.ScaledContext, *clustermanager.Manager, error) {
 	scaledContext, err := config.NewScaledContext(kubeConfig)
 	if err != nil {
