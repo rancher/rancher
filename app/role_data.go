@@ -10,6 +10,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+var defaultAdminLabel = map[string]string{"authz.management.cattle.io/bootstrapping": "admin-user"}
+
 func addRoles(management *config.ManagementContext) (string, error) {
 	rb := newRoleBuilder()
 
@@ -218,11 +220,6 @@ func addRoles(management *config.ManagementContext) (string, error) {
 
 	} else {
 		admin = &admins.Items[0]
-	}
-
-	if len(admin.PrincipalIDs) == 0 {
-		admin.PrincipalIDs = []string{"local://" + admin.Name}
-		management.Management.Users("").Update(admin)
 	}
 
 	bindings, err := management.Management.GlobalRoleBindings("").List(v1.ListOptions{LabelSelector: set.String()})

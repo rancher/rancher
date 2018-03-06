@@ -11,6 +11,7 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext) {
 	gr := newGlobalRoleLifecycle(management)
 	grb := newGlobalRoleBindingLifecycle(management)
 	p, c := newPandCLifecycles(management)
+	u := newUserLifecycle(management)
 
 	management.Management.ProjectRoleTemplateBindings("").AddLifecycle("mgmt-auth-prtb-controller", prtb)
 	management.Management.ClusterRoleTemplateBindings("").AddLifecycle("mgmt-auth-crtb-controller", crtb)
@@ -18,6 +19,7 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext) {
 	management.Management.GlobalRoleBindings("").AddLifecycle("mgmt-auth-grb-controller", grb)
 	management.Management.Projects("").AddHandler("mgmt-project-rbac-create", p.sync)
 	management.Management.Clusters("").AddHandler("mgmt-cluster-rbac-delete", c.sync)
+	management.Management.Users("").AddLifecycle("mgmt-auth-users-controller", u)
 }
 
 func RegisterLate(ctx context.Context, management *config.ManagementContext) {
