@@ -3,7 +3,10 @@ package clusterprovisioner
 import (
 	"encoding/json"
 
+	"fmt"
+
 	"github.com/rancher/kontainer-engine/cluster"
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/rancher/pkg/encryptedstore"
 )
 
@@ -28,6 +31,9 @@ func (s *engineStore) Get(name string) (cluster.Cluster, error) {
 	data, err := s.store.Get(name)
 	if err != nil {
 		return cluster, err
+	}
+	if val, ok := data[dataKey]; !ok || val == "" {
+		return cluster, httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("cluster [%s] is not found", name))
 	}
 	return cluster, json.Unmarshal([]byte(data[dataKey]), &cluster)
 }
