@@ -94,9 +94,14 @@ func convertPipeline(pipeline *v3.Pipeline) string {
 				reg, _ := regexp.Compile("[^a-zA-Z0-9]+")
 				proceccedRegistry := strings.ToLower(reg.ReplaceAllString(registry, ""))
 				secretName := fmt.Sprintf("%s-%s", pipeline.Namespace, proceccedRegistry)
+				pluginRepo := fmt.Sprintf("%s/%s", registry, repo)
+				if registry == utils.DefaultRegistry {
+					//the `plugins/docker` image fails when setting DOCKER_REGISTRY to index.docker.io
+					registry = ""
+				}
 				image = "plugins/docker"
 				publishoption := `, privileged: true, envVars: [
-			envVar(key: 'PLUGIN_REPO', value: '%s/%s'),
+			envVar(key: 'PLUGIN_REPO', value: '%s'),
 			envVar(key: 'PLUGIN_TAG', value: '%s'),
 			envVar(key: 'PLUGIN_DOCKERFILE', value: '%s'),
 			envVar(key: 'PLUGIN_CONTEXT', value: '%s'),
@@ -104,7 +109,7 @@ func convertPipeline(pipeline *v3.Pipeline) string {
             secretEnvVar(key: 'DOCKER_USERNAME', secretName: '%s', secretKey: 'username'),
             secretEnvVar(key: 'DOCKER_PASSWORD', secretName: '%s', secretKey: 'password'),
         ]`
-				options = fmt.Sprintf(publishoption, registry, repo, tag, step.PublishImageConfig.DockerfilePath, step.PublishImageConfig.BuildContext, registry, secretName, secretName)
+				options = fmt.Sprintf(publishoption, pluginRepo, tag, step.PublishImageConfig.DockerfilePath, step.PublishImageConfig.BuildContext, registry, secretName, secretName)
 			} else {
 				return ""
 			}
