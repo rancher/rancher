@@ -74,7 +74,7 @@ func (g *GClient) getUser(githubAccessToken string, config *v3.GithubConfig) (Ac
 	url := g.getURL("USER_INFO", config)
 	resp, err := g.getFromGithub(githubAccessToken, url)
 	if err != nil {
-		// returns an error on searches with no match. ignore
+		logrus.Errorf("Github getGithubUser: GET url %v received error from github, err: %v", url, err)
 		return Account{}, err
 	}
 	defer resp.Body.Close()
@@ -233,11 +233,11 @@ func (g *GClient) nextGithubPage(response *http.Response) string {
 	return ""
 }
 
-func (g *GClient) getUserByName(username string, githubAccessToken string, config *v3.GithubConfig) (Account, error) {
-
+func (g *GClient) getUserByName(username string, githubAccessToken string, config *v3.GithubConfig) (*Account, error) {
 	_, err := g.getOrgByName(username, githubAccessToken, config)
 	if err == nil {
-		return Account{}, fmt.Errorf("There is a org by this name, not looking fo the user entity by name %v", username)
+		logrus.Info("There is a org by this name, not looking fo the user entity by name %v", username)
+		return nil, nil
 	}
 
 	username = URLEncoded(username)
@@ -245,21 +245,19 @@ func (g *GClient) getUserByName(username string, githubAccessToken string, confi
 
 	resp, err := g.getFromGithub(githubAccessToken, url)
 	if err != nil {
-		logrus.Errorf("Github getGithubUserByName: GET url %v received error from github, err: %v", url, err)
-		return Account{}, err
+		// no match on search returns an error. do not log
+		return nil, nil
 	}
 	defer resp.Body.Close()
-	var githubAcct Account
+	githubAcct := &Account{}
 
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		logrus.Errorf("Github getGithubUserByName: error reading response, err: %v", err)
-		return Account{}, err
+		return nil, err
 	}
 
-	if err := json.Unmarshal(b, &githubAcct); err != nil {
-		logrus.Errorf("Github getGithubUserByName: error unmarshalling response, err: %v", err)
-		return Account{}, err
+	if err := json.Unmarshal(b, githubAcct); err != nil {
+		return nil, err
 	}
 
 	return githubAcct, nil
