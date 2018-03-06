@@ -194,23 +194,18 @@ func (g *ghProvider) SearchPrincipals(searchKey, principalType string, token v3.
 
 	accessToken := token.ProviderInfo["access_token"]
 
-	if principalType == "" || principalType == userType {
-		acct, err := g.githubClient.getUserByName(searchKey, accessToken, config)
-		if err != nil {
-			logrus.Errorf("problem searching github: %v", err)
-		}
-		if acct != nil {
-			userPrincipal := g.toPrincipal(userType, *acct, &token)
-			principals = append(principals, userPrincipal)
-		}
+	accts, err := g.githubClient.searchUsers(searchKey, principalType, accessToken, config)
+	if err != nil {
+		logrus.Errorf("problem searching github: %v", err)
 	}
 
-	if principalType == "" || principalType == "group" {
-		acct, err := g.githubClient.getOrgByName(searchKey, accessToken, config)
-		if err == nil {
-			groupPrincipal := g.toPrincipal(orgType, acct, &token)
-			principals = append(principals, groupPrincipal)
+	for _, acct := range accts {
+		pType := strings.ToLower(acct.Type)
+		if pType == "organization" {
+			pType = orgType
 		}
+		p := g.toPrincipal(pType, acct, &token)
+		principals = append(principals, p)
 	}
 
 	return principals, nil

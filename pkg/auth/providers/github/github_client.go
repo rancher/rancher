@@ -233,15 +233,17 @@ func (g *GClient) nextGithubPage(response *http.Response) string {
 	return ""
 }
 
-func (g *GClient) getUserByName(username string, githubAccessToken string, config *v3.GithubConfig) (*Account, error) {
-	_, err := g.getOrgByName(username, githubAccessToken, config)
-	if err == nil {
-		logrus.Info("There is a org by this name, not looking fo the user entity by name %v", username)
-		return nil, nil
+func (g *GClient) searchUsers(searchTerm, searchType string, githubAccessToken string, config *v3.GithubConfig) ([]Account, error) {
+	if searchType == "group" {
+		searchType = orgType
 	}
 
-	username = URLEncoded(username)
-	url := g.getURL("USERS", config) + username
+	search := searchTerm
+	if searchType != "" {
+		search += "+type:" + searchType
+	}
+	search = URLEncoded(search)
+	url := g.getURL("USER_SEARCH", config) + search
 
 	resp, err := g.getFromGithub(githubAccessToken, url)
 	if err != nil {
@@ -249,18 +251,18 @@ func (g *GClient) getUserByName(username string, githubAccessToken string, confi
 		return nil, nil
 	}
 	defer resp.Body.Close()
-	githubAcct := &Account{}
 
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := json.Unmarshal(b, githubAcct); err != nil {
+	result := &searchResult{}
+	if err := json.Unmarshal(b, result); err != nil {
 		return nil, err
 	}
 
-	return githubAcct, nil
+	return result.Items, nil
 }
 
 func (g *GClient) getOrgByName(org string, githubAccessToken string, config *v3.GithubConfig) (Account, error) {
