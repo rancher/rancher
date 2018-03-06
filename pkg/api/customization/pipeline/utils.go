@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/norman/types/mapper"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/remote"
+	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/satori/uuid"
 	"gopkg.in/yaml.v2"
@@ -16,6 +17,8 @@ import (
 func refreshReposByCredential(sourceCodeRepositories v3.SourceCodeRepositoryInterface, sourceCodeRepositoryLister v3.SourceCodeRepositoryLister, credential *v3.SourceCodeCredential) ([]*v3.SourceCodeRepository, error) {
 
 	remoteType := credential.Spec.SourceCodeType
+	namespace := credential.Namespace
+	credentialID := ref.Ref(credential)
 
 	mockConfig := v3.ClusterPipeline{
 		Spec: v3.ClusterPipelineSpec{
@@ -32,13 +35,13 @@ func refreshReposByCredential(sourceCodeRepositories v3.SourceCodeRepositoryInte
 	}
 
 	//remove old repos
-	repositories, err := sourceCodeRepositoryLister.List("", labels.Everything())
+	repositories, err := sourceCodeRepositoryLister.List(namespace, labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 	for _, repo := range repositories {
-		if repo.Spec.SourceCodeCredentialName == credential.Name {
-			if err := sourceCodeRepositories.Delete(repo.Name, &metav1.DeleteOptions{}); err != nil {
+		if repo.Spec.SourceCodeCredentialName == credentialID {
+			if err := sourceCodeRepositories.DeleteNamespaced(namespace, repo.Name, &metav1.DeleteOptions{}); err != nil {
 				return nil, err
 			}
 		}
@@ -46,11 +49,12 @@ func refreshReposByCredential(sourceCodeRepositories v3.SourceCodeRepositoryInte
 
 	//store new repos
 	for _, repo := range repos {
-		repo.Spec.SourceCodeCredentialName = credential.Name
+		repo.Spec.SourceCodeCredentialName = credentialID
 		repo.Spec.ClusterName = credential.Spec.ClusterName
 		repo.Spec.UserName = credential.Spec.UserName
 		repo.Spec.SourceCodeType = credential.Spec.SourceCodeType
 		repo.Name = uuid.NewV4().String()
+		repo.Namespace = namespace
 		if _, err := sourceCodeRepositories.Create(&repo); err != nil {
 			return nil, err
 		}

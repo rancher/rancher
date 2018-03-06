@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/utils"
+	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -439,11 +440,12 @@ func getJobName(pipeline *v3.Pipeline) string {
 }
 
 func (j Engine) setCredential(pipeline *v3.Pipeline) error {
-	if len(pipeline.Spec.Stages) < 1 || len(pipeline.Spec.Stages[0].Steps) < 1 || pipeline.Spec.Stages[0].Steps[0].SourceCodeConfig == nil {
+	if !utils.ValidSourceCodeConfig(pipeline.Spec) {
 		return errors.New("Invalid pipeline definition")
 	}
 	credentialID := pipeline.Spec.Stages[0].Steps[0].SourceCodeConfig.SourceCodeCredentialName
-	souceCodeCredential, err := j.SourceCodeCredentialLister.Get("", credentialID)
+	ns, name := ref.Parse(credentialID)
+	souceCodeCredential, err := j.SourceCodeCredentialLister.Get(ns, name)
 	if err != nil {
 		return err
 	}

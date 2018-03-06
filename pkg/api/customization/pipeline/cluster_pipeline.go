@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/remote"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/utils"
+	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
 	"github.com/sirupsen/logrus"
@@ -17,7 +18,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"net/http"
-	"strings"
 )
 
 type ClusterPipelineHandler struct {
@@ -72,12 +72,8 @@ func (h *ClusterPipelineHandler) ActionHandler(actionName string, action *types.
 }
 
 func (h *ClusterPipelineHandler) deploy(apiContext *types.APIContext) error {
-	parts := strings.Split(apiContext.ID, ":")
-	if len(parts) <= 1 {
-		return errors.New("invalid ID")
-	}
-	ns := parts[0]
-	name := parts[1]
+
+	ns, name := ref.Parse(apiContext.ID)
 	clusterPipeline, err := h.ClusterPipelineLister.Get(ns, name)
 	if err != nil {
 		return err
@@ -97,12 +93,8 @@ func (h *ClusterPipelineHandler) deploy(apiContext *types.APIContext) error {
 }
 
 func (h *ClusterPipelineHandler) destroy(apiContext *types.APIContext) error {
-	parts := strings.Split(apiContext.ID, ":")
-	if len(parts) <= 1 {
-		return errors.New("invalid ID")
-	}
-	ns := parts[0]
-	name := parts[1]
+
+	ns, name := ref.Parse(apiContext.ID)
 	clusterPipeline, err := h.ClusterPipelineLister.Get(ns, name)
 	if err != nil {
 		return err
@@ -123,13 +115,7 @@ func (h *ClusterPipelineHandler) destroy(apiContext *types.APIContext) error {
 
 func (h *ClusterPipelineHandler) authapp(apiContext *types.APIContext) error {
 
-	parts := strings.Split(apiContext.ID, ":")
-	if len(parts) <= 1 {
-		return errors.New("invalid ID")
-	}
-	ns := parts[0]
-	name := parts[1]
-
+	ns, name := ref.Parse(apiContext.ID)
 	authAppInput := v3.AuthAppInput{}
 	requestBytes, err := ioutil.ReadAll(apiContext.Request.Body)
 	if err != nil {
@@ -188,13 +174,7 @@ func (h *ClusterPipelineHandler) authapp(apiContext *types.APIContext) error {
 
 func (h *ClusterPipelineHandler) authuser(apiContext *types.APIContext) error {
 
-	parts := strings.Split(apiContext.ID, ":")
-	if len(parts) <= 1 {
-		return errors.New("invalid ID")
-	}
-	ns := parts[0]
-	name := parts[1]
-
+	ns, name := ref.Parse(apiContext.ID)
 	authUserInput := v3.AuthUserInput{}
 	requestBytes, err := ioutil.ReadAll(apiContext.Request.Body)
 	if err != nil {
@@ -233,13 +213,7 @@ func (h *ClusterPipelineHandler) authuser(apiContext *types.APIContext) error {
 
 func (h *ClusterPipelineHandler) revokeapp(apiContext *types.APIContext) error {
 
-	parts := strings.Split(apiContext.ID, ":")
-	if len(parts) <= 1 {
-		return errors.New("invalid ID")
-	}
-	ns := parts[0]
-	name := parts[1]
-
+	ns, name := ref.Parse(apiContext.ID)
 	clusterPipeline, err := h.ClusterPipelineLister.Get(ns, name)
 	if err != nil {
 		return err
@@ -275,6 +249,7 @@ func (h *ClusterPipelineHandler) authAddAccount(clusterPipeline *v3.ClusterPipel
 		return nil, err
 	}
 	account.Name = fmt.Sprintf("%s-%s-%s", clusterPipeline.Spec.ClusterName, remoteType, account.Spec.LoginName)
+	account.Namespace = userID
 	account.Spec.UserName = userID
 	account.Spec.ClusterName = clusterPipeline.Spec.ClusterName
 	account, err = h.SourceCodeCredentials.Create(account)

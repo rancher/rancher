@@ -4,6 +4,7 @@ import (
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
 	"k8s.io/apimachinery/pkg/labels"
@@ -63,7 +64,8 @@ func (h *SourceCodeCredentialHandler) ActionHandler(actionName string, action *t
 
 func (h *SourceCodeCredentialHandler) refreshrepos(apiContext *types.APIContext) error {
 
-	credential, err := h.SourceCodeCredentialLister.Get("", apiContext.ID)
+	ns, name := ref.Parse(apiContext.ID)
+	credential, err := h.SourceCodeCredentialLister.Get(ns, name)
 	if err != nil {
 		return err
 	}

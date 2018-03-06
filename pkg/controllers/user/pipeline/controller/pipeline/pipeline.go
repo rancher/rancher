@@ -3,8 +3,10 @@ package pipeline
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/remote"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/utils"
+	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/satori/uuid"
@@ -47,27 +49,49 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 
 func (l *Lifecycle) Create(obj *v3.Pipeline) (*v3.Pipeline, error) {
 
-	if obj.Status.Token == "" {
-		//random token for webhook validation
-		obj.Status.Token = uuid.NewV4().String()
-	}
-	if obj.Spec.TriggerCronExpression != "" {
-		obj.Labels = map[string]string{utils.PipelineCronLabel: "true"}
-	} else {
-		obj.Labels = map[string]string{utils.PipelineCronLabel: "false"}
-	}
+	return l.sync(obj)
+}
 
-	if obj.Spec.TriggerWebhook && obj.Status.WebHookID == "" {
-		id, err := l.createHook(obj)
-		if err != nil {
-			return obj, err
+func (l *Lifecycle) Updated(obj *v3.Pipeline) (*v3.Pipeline, error) {
+
+	return l.sync(obj)
+}
+
+func (l *Lifecycle) Remove(obj *v3.Pipeline) (*v3.Pipeline, error) {
+
+	if obj.Status.WebHookID != "" {
+		if err := l.deleteHook(obj); err != nil {
+			//merely log error to avoid deletion block
+			logrus.Warnf("fail to delete previous set webhook for pipeline '%s' - %v", obj.Spec.DisplayName, err)
 		}
-		obj.Status.WebHookID = id
 	}
 	return obj, nil
 }
 
-func (l *Lifecycle) Updated(obj *v3.Pipeline) (*v3.Pipeline, error) {
+func (l *Lifecycle) sync(obj *v3.Pipeline) (*v3.Pipeline, error) {
+
+	if obj.Status.Token == "" {
+		//random token for webhook validation
+		obj.Status.Token = uuid.NewV4().String()
+	}
+
+	//handle sourceCodeCredential info
+	if !utils.ValidSourceCodeConfig(obj.Spec) {
+		return obj, fmt.Errorf("error invalid definition of pipeline '%s'", obj.Spec.DisplayName)
+	}
+	sourceCodeCredentialID := obj.Spec.Stages[0].Steps[0].SourceCodeConfig.SourceCodeCredentialName
+
+	ns, name := ref.Parse(sourceCodeCredentialID)
+	if obj.Status.SourceCodeCredential == nil ||
+		obj.Status.SourceCodeCredential.Namespace != ns ||
+		obj.Status.SourceCodeCredential.Name != name {
+		updatedCred, err := l.sourceCodeCredentialLister.Get(ns, name)
+		if err != nil {
+			return obj, err
+		}
+		updatedCred.Spec.AccessToken = ""
+		obj.Status.SourceCodeCredential = updatedCred
+	}
 
 	//handle cron
 	if obj.Spec.TriggerCronExpression == "" {
@@ -87,7 +111,7 @@ func (l *Lifecycle) Updated(obj *v3.Pipeline) (*v3.Pipeline, error) {
 	//handle webhook
 	if obj.Status.WebHookID != "" && !obj.Spec.TriggerWebhook {
 		if err := l.deleteHook(obj); err != nil {
-			logrus.Warningf("fail to delete previous set webhook of pipeline '%s'", obj.Spec.DisplayName)
+			logrus.Warnf("fail to delete previous set webhook for pipeline '%s' - %v", obj.Spec.DisplayName, err)
 		}
 		obj.Status.WebHookID = ""
 	} else if obj.Spec.TriggerWebhook && obj.Status.WebHookID == "" {
@@ -101,24 +125,14 @@ func (l *Lifecycle) Updated(obj *v3.Pipeline) (*v3.Pipeline, error) {
 	return obj, nil
 }
 
-func (l *Lifecycle) Remove(obj *v3.Pipeline) (*v3.Pipeline, error) {
-
-	if obj.Status.WebHookID != "" {
-		if err := l.deleteHook(obj); err != nil {
-			//merely log error to avoid deletion block
-			logrus.Errorf("Error delete previous set webhook - %v", err)
-			return obj, nil
-		}
-	}
-	return obj, nil
-}
-
 func (l *Lifecycle) createHook(obj *v3.Pipeline) (string, error) {
-	if len(obj.Spec.Stages) <= 0 || len(obj.Spec.Stages[0].Steps) <= 0 || obj.Spec.Stages[0].Steps[0].SourceCodeConfig == nil {
+	if utils.ValidSourceCodeConfig(obj.Spec) {
 		return "", errors.New("invalid pipeline, missing sourcecode step")
 	}
-	credentialName := obj.Spec.Stages[0].Steps[0].SourceCodeConfig.SourceCodeCredentialName
-	credential, err := l.sourceCodeCredentialLister.Get("", credentialName)
+	credentialID := obj.Spec.Stages[0].Steps[0].SourceCodeConfig.SourceCodeCredentialName
+
+	ns, name := ref.Parse(credentialID)
+	credential, err := l.sourceCodeCredentialLister.Get(ns, name)
 	if err != nil {
 		return "", err
 	}
@@ -142,11 +156,13 @@ func (l *Lifecycle) createHook(obj *v3.Pipeline) (string, error) {
 }
 
 func (l *Lifecycle) deleteHook(obj *v3.Pipeline) error {
-	if len(obj.Spec.Stages) <= 0 || len(obj.Spec.Stages[0].Steps) <= 0 || obj.Spec.Stages[0].Steps[0].SourceCodeConfig == nil {
+	if utils.ValidSourceCodeConfig(obj.Spec) {
 		return errors.New("invalid pipeline, missing sourcecode step")
 	}
-	credentialName := obj.Spec.Stages[0].Steps[0].SourceCodeConfig.SourceCodeCredentialName
-	credential, err := l.sourceCodeCredentialLister.Get("", credentialName)
+	credentialID := obj.Spec.Stages[0].Steps[0].SourceCodeConfig.SourceCodeCredentialName
+
+	ns, name := ref.Parse(credentialID)
+	credential, err := l.sourceCodeCredentialLister.Get(ns, name)
 	if err != nil {
 		return err
 	}
