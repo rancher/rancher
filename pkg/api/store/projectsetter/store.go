@@ -66,13 +66,13 @@ func (p *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *ty
 		return datas, nil
 	}
 
-	namespaceMap, err := namespace.ProjectMap(apiContext)
+	namespaceMap, err := namespace.ProjectMap(apiContext, true)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, data := range datas {
-		setProjectID(namespaceMap, data)
+		setProjectID(apiContext, namespaceMap, data)
 	}
 
 	return datas, nil
@@ -84,20 +84,23 @@ func (p *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt *t
 		return nil, err
 	}
 
-	namespaceMap, err := namespace.ProjectMap(apiContext)
+	namespaceMap, err := namespace.ProjectMap(apiContext, true)
 	if err != nil {
 		return nil, err
 	}
 
 	return convert.Chan(c, func(data map[string]interface{}) map[string]interface{} {
 		typeName := definition.GetType(data)
+		refresh := false
 		if strings.Contains(typeName, "namespace") || strings.Contains(typeName, "project") {
-			tempNamespaceMap, err := namespace.ProjectMap(apiContext)
-			if err == nil {
-				namespaceMap = tempNamespaceMap
-			}
+			refresh = true
 		}
-		setProjectID(namespaceMap, data)
+		tempNamespaceMap, err := namespace.ProjectMap(apiContext, refresh)
+		if err == nil {
+			namespaceMap = tempNamespaceMap
+		}
+
+		setProjectID(apiContext, namespaceMap, data)
 		return data
 	}), nil
 }
@@ -107,26 +110,33 @@ func lookupAndSetProjectID(apiContext *types.APIContext, schema *types.Schema, d
 		return data, nil
 	}
 
-	namespaceMap, err := namespace.ProjectMap(apiContext)
+	namespaceMap, err := namespace.ProjectMap(apiContext, true)
 	if err != nil {
 		return nil, err
 	}
 
-	setProjectID(namespaceMap, data)
+	setProjectID(apiContext, namespaceMap, data)
 
 	return data, nil
 }
 
-func setProjectID(namespaceMap map[string]string, data map[string]interface{}) {
+func setProjectID(apiContext *types.APIContext, namespaceMap map[string]string, data map[string]interface{}) {
 	if data == nil {
 		return
 	}
 
-	namespace, _ := data["namespaceId"].(string)
+	ns, _ := data["namespaceId"].(string)
 	projectID, _ := data[client.NamespaceFieldProjectID].(string)
 	if projectID != "" {
 		return
 	}
 
-	data[client.NamespaceFieldProjectID] = namespaceMap[namespace]
+	if _, ok := namespaceMap[ns]; !ok {
+		tempNamespaceMap, err := namespace.ProjectMap(apiContext, true)
+		if err == nil {
+			namespaceMap = tempNamespaceMap
+		}
+	}
+	data[client.NamespaceFieldProjectID] = namespaceMap[ns]
+
 }
