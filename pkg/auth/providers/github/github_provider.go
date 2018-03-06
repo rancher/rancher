@@ -196,8 +196,11 @@ func (g *ghProvider) SearchPrincipals(searchKey, principalType string, token v3.
 
 	if principalType == "" || principalType == userType {
 		acct, err := g.githubClient.getUserByName(searchKey, accessToken, config)
-		if err == nil {
-			userPrincipal := g.toPrincipal(userType, acct, &token)
+		if err != nil {
+			logrus.Errorf("problem searching github: %v", err)
+		}
+		if acct != nil {
+			userPrincipal := g.toPrincipal(userType, *acct, &token)
 			principals = append(principals, userPrincipal)
 		}
 	}
