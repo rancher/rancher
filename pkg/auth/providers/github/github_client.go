@@ -74,7 +74,7 @@ func (g *GClient) getUser(githubAccessToken string, config *v3.GithubConfig) (Ac
 	url := g.getURL("USER_INFO", config)
 	resp, err := g.getFromGithub(githubAccessToken, url)
 	if err != nil {
-		logrus.Errorf("Github getGithubUser: GET url %v received error from github, err: %v", url, err)
+		// returns an error on searches with no match. ignore
 		return Account{}, err
 	}
 	defer resp.Body.Close()
