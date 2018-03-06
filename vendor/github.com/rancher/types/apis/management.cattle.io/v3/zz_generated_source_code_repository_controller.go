@@ -23,8 +23,9 @@ var (
 	SourceCodeRepositoryResource = metav1.APIResource{
 		Name:         "sourcecoderepositories",
 		SingularName: "sourcecoderepository",
-		Namespaced:   false,
-		Kind:         SourceCodeRepositoryGroupVersionKind.Kind,
+		Namespaced:   true,
+
+		Kind: SourceCodeRepositoryGroupVersionKind.Kind,
 	}
 )
 

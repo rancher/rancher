@@ -394,11 +394,6 @@ func pipelineTypes(schema *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.AuthAppInput{}).
 		MustImport(&Version, v3.AuthUserInput{}).
 		MustImport(&Version, v3.RunPipelineInput{}).
-		MustImportAndCustomize(&Version, v3.SourceCodeCredential{}, func(schema *types.Schema) {
-			schema.ResourceActions = map[string]types.Action{
-				"refreshrepos": {},
-			}
-		}).
 		MustImportAndCustomize(&Version, v3.ClusterPipeline{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
 				"deploy":  {},
@@ -429,7 +424,17 @@ func pipelineTypes(schema *types.Schemas) *types.Schemas {
 				"rerun": {},
 			}
 		}).
-		MustImport(&Version, v3.SourceCodeRepository{}).
-		MustImport(&Version, v3.PipelineExecutionLog{})
+		MustImport(&Version, v3.PipelineExecutionLog{}).
+		MustImportAndCustomize(&Version, v3.SourceCodeCredential{}, func(schema *types.Schema) {
+			delete(schema.ResourceFields, "namespaceId")
+			schema.ResourceMethods = []string{http.MethodGet, http.MethodDelete}
+			schema.ResourceActions = map[string]types.Action{
+				"refreshrepos": {},
+			}
+		}).
+		MustImportAndCustomize(&Version, v3.SourceCodeRepository{}, func(schema *types.Schema) {
+			schema.ResourceMethods = []string{http.MethodGet, http.MethodDelete}
+			delete(schema.ResourceFields, "namespaceId")
+		})
 
 }

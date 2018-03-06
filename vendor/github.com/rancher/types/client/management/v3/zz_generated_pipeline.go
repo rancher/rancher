@@ -21,6 +21,7 @@ const (
 	PipelineFieldPipelineState         = "pipelineState"
 	PipelineFieldProjectId             = "projectId"
 	PipelineFieldRemoved               = "removed"
+	PipelineFieldSourceCodeCredential  = "sourceCodeCredential"
 	PipelineFieldStages                = "stages"
 	PipelineFieldState                 = "state"
 	PipelineFieldTemplates             = "templates"
@@ -36,32 +37,33 @@ const (
 
 type Pipeline struct {
 	types.Resource
-	Annotations           map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	Created               string            `json:"created,omitempty" yaml:"created,omitempty"`
-	CreatorID             string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
-	Labels                map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	LastExecutionID       string            `json:"lastExecutionId,omitempty" yaml:"lastExecutionId,omitempty"`
-	LastRunState          string            `json:"lastRunState,omitempty" yaml:"lastRunState,omitempty"`
-	LastStarted           string            `json:"lastStarted,omitempty" yaml:"lastStarted,omitempty"`
-	Name                  string            `json:"name,omitempty" yaml:"name,omitempty"`
-	NamespaceId           string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
-	NextRun               *int64            `json:"nextRun,omitempty" yaml:"nextRun,omitempty"`
-	NextStart             string            `json:"nextStart,omitempty" yaml:"nextStart,omitempty"`
-	OwnerReferences       []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	PipelineState         string            `json:"pipelineState,omitempty" yaml:"pipelineState,omitempty"`
-	ProjectId             string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
-	Removed               string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	Stages                []Stage           `json:"stages,omitempty" yaml:"stages,omitempty"`
-	State                 string            `json:"state,omitempty" yaml:"state,omitempty"`
-	Templates             map[string]string `json:"templates,omitempty" yaml:"templates,omitempty"`
-	Token                 string            `json:"token,omitempty" yaml:"token,omitempty"`
-	Transitioning         string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
-	TransitioningMessage  string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	TriggerCronExpression string            `json:"triggerCronExpression,omitempty" yaml:"triggerCronExpression,omitempty"`
-	TriggerCronTimezone   string            `json:"triggerCronTimezone,omitempty" yaml:"triggerCronTimezone,omitempty"`
-	TriggerWebhook        bool              `json:"triggerWebhook,omitempty" yaml:"triggerWebhook,omitempty"`
-	Uuid                  string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
-	WebHookID             string            `json:"webhookId,omitempty" yaml:"webhookId,omitempty"`
+	Annotations           map[string]string     `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Created               string                `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID             string                `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Labels                map[string]string     `json:"labels,omitempty" yaml:"labels,omitempty"`
+	LastExecutionID       string                `json:"lastExecutionId,omitempty" yaml:"lastExecutionId,omitempty"`
+	LastRunState          string                `json:"lastRunState,omitempty" yaml:"lastRunState,omitempty"`
+	LastStarted           string                `json:"lastStarted,omitempty" yaml:"lastStarted,omitempty"`
+	Name                  string                `json:"name,omitempty" yaml:"name,omitempty"`
+	NamespaceId           string                `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
+	NextRun               *int64                `json:"nextRun,omitempty" yaml:"nextRun,omitempty"`
+	NextStart             string                `json:"nextStart,omitempty" yaml:"nextStart,omitempty"`
+	OwnerReferences       []OwnerReference      `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	PipelineState         string                `json:"pipelineState,omitempty" yaml:"pipelineState,omitempty"`
+	ProjectId             string                `json:"projectId,omitempty" yaml:"projectId,omitempty"`
+	Removed               string                `json:"removed,omitempty" yaml:"removed,omitempty"`
+	SourceCodeCredential  *SourceCodeCredential `json:"sourceCodeCredential,omitempty" yaml:"sourceCodeCredential,omitempty"`
+	Stages                []Stage               `json:"stages,omitempty" yaml:"stages,omitempty"`
+	State                 string                `json:"state,omitempty" yaml:"state,omitempty"`
+	Templates             map[string]string     `json:"templates,omitempty" yaml:"templates,omitempty"`
+	Token                 string                `json:"token,omitempty" yaml:"token,omitempty"`
+	Transitioning         string                `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage  string                `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	TriggerCronExpression string                `json:"triggerCronExpression,omitempty" yaml:"triggerCronExpression,omitempty"`
+	TriggerCronTimezone   string                `json:"triggerCronTimezone,omitempty" yaml:"triggerCronTimezone,omitempty"`
+	TriggerWebhook        bool                  `json:"triggerWebhook,omitempty" yaml:"triggerWebhook,omitempty"`
+	Uuid                  string                `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	WebHookID             string                `json:"webhookId,omitempty" yaml:"webhookId,omitempty"`
 }
 type PipelineCollection struct {
 	types.Collection

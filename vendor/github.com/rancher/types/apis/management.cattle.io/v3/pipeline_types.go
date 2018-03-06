@@ -51,6 +51,8 @@ type PipelineExecutionLog struct {
 }
 
 type SourceCodeCredential struct {
+	types.Namespaced
+
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
@@ -59,6 +61,8 @@ type SourceCodeCredential struct {
 }
 
 type SourceCodeRepository struct {
+	types.Namespaced
+
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
@@ -84,14 +88,15 @@ type GithubClusterConfig struct {
 }
 
 type PipelineStatus struct {
-	PipelineState   string `json:"pipelineState,omitempty" norman:"required,options=active|inactive,default=active"`
-	NextRun         int    `json:"nextRun" yaml:"nextRun,omitempty" norman:"default=1,min=1"`
-	LastExecutionID string `json:"lastExecutionId,omitempty" yaml:"lastExecutionId,omitempty"`
-	LastRunState    string `json:"lastRunState,omitempty" yaml:"lastRunState,omitempty"`
-	LastStarted     string `json:"lastStarted,omitempty" yaml:"lastStarted,omitempty"`
-	NextStart       string `json:"nextStart,omitempty" yaml:"nextStart,omitempty"`
-	WebHookID       string `json:"webhookId,omitempty" yaml:"webhookId,omitempty"`
-	Token           string `json:"token,omitempty" yaml:"token,omitempty" norman:"writeOnly,noupdate"`
+	PipelineState        string                `json:"pipelineState,omitempty" norman:"required,options=active|inactive,default=active"`
+	NextRun              int                   `json:"nextRun" yaml:"nextRun,omitempty" norman:"default=1,min=1"`
+	LastExecutionID      string                `json:"lastExecutionId,omitempty" yaml:"lastExecutionId,omitempty"`
+	LastRunState         string                `json:"lastRunState,omitempty" yaml:"lastRunState,omitempty"`
+	LastStarted          string                `json:"lastStarted,omitempty" yaml:"lastStarted,omitempty"`
+	NextStart            string                `json:"nextStart,omitempty" yaml:"nextStart,omitempty"`
+	WebHookID            string                `json:"webhookId,omitempty" yaml:"webhookId,omitempty"`
+	Token                string                `json:"token,omitempty" yaml:"token,omitempty" norman:"writeOnly,noupdate"`
+	SourceCodeCredential *SourceCodeCredential `json:"sourceCodeCredential,omitempty" yaml:"sourceCodeCredential,omitempty"`
 }
 
 type PipelineSpec struct {
