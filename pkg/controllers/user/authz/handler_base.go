@@ -101,26 +101,6 @@ func (m *manager) ensureRoles(rts map[string]*v3.RoleTemplate) error {
 		if rt.External {
 			continue
 		}
-		rt = rt.DeepCopy()
-
-		var toLowerRules []rbacv1.PolicyRule
-		for _, r := range rt.Rules {
-			rule := r.DeepCopy()
-
-			var resources []string
-			for _, re := range r.Resources {
-				resources = append(resources, strings.ToLower(re))
-			}
-			rule.Resources = resources
-
-			var verbs []string
-			for _, v := range r.Verbs {
-				verbs = append(verbs, strings.ToLower(v))
-			}
-			rule.Verbs = verbs
-			toLowerRules = append(toLowerRules, *rule)
-		}
-		rt.Rules = toLowerRules
 
 		if role, err := m.crLister.Get("", rt.Name); err == nil && role != nil {
 			if reflect.DeepEqual(role.Rules, rt.Rules) {
@@ -150,6 +130,43 @@ func (m *manager) ensureRoles(rts map[string]*v3.RoleTemplate) error {
 }
 
 func (m *manager) gatherRoles(rt *v3.RoleTemplate, roleTemplates map[string]*v3.RoleTemplate) error {
+	err := m.gatherRolesRecurse(rt, roleTemplates)
+	if err != nil {
+		return err
+	}
+
+	// clean the roles for kubeneretes: lowercase resources and verbs
+	for key, rt := range roleTemplates {
+		if rt.External {
+			continue
+		}
+		rt = rt.DeepCopy()
+
+		var toLowerRules []rbacv1.PolicyRule
+		for _, r := range rt.Rules {
+			rule := r.DeepCopy()
+
+			var resources []string
+			for _, re := range r.Resources {
+				resources = append(resources, strings.ToLower(re))
+			}
+			rule.Resources = resources
+
+			var verbs []string
+			for _, v := range r.Verbs {
+				verbs = append(verbs, strings.ToLower(v))
+			}
+			rule.Verbs = verbs
+			toLowerRules = append(toLowerRules, *rule)
+		}
+		rt.Rules = toLowerRules
+		roleTemplates[key] = rt
+	}
+
+	return nil
+}
+
+func (m *manager) gatherRolesRecurse(rt *v3.RoleTemplate, roleTemplates map[string]*v3.RoleTemplate) error {
 	roleTemplates[rt.Name] = rt
 
 	for _, rtName := range rt.RoleTemplateNames {
