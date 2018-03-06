@@ -4,6 +4,10 @@ import (
 	"fmt"
 )
 
+type searchResult struct {
+	Items []Account `json:"items"`
+}
+
 //Account defines properties an account on github has
 type Account struct {
 	ID        int    `json:"id,omitempty"`
@@ -11,6 +15,7 @@ type Account struct {
 	Name      string `json:"name,omitempty"`
 	AvatarURL string `json:"avatar_url,omitempty"`
 	HTMLURL   string `json:"html_url,omitempty"`
+	Type      string `json:"type,omitempty"`
 }
 
 //Team defines properties a team on github has
