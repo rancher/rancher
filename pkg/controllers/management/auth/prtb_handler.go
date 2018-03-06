@@ -58,7 +58,8 @@ func (p *prtbLifecycle) reconcileSubject(binding *v3.ProjectRoleTemplateBinding)
 	}
 
 	if binding.UserPrincipalName != "" && binding.UserName == "" {
-		user, err := p.mgr.userMGR.EnsureUser(binding.UserPrincipalName, "")
+		displayName := binding.Annotations["auth.cattle.io/principal-display-name"]
+		user, err := p.mgr.userMGR.EnsureUser(binding.UserPrincipalName, displayName)
 		if err != nil {
 			return binding, err
 		}

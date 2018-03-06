@@ -51,7 +51,8 @@ func (c *crtbLifecycle) reconcileSubject(binding *v3.ClusterRoleTemplateBinding)
 	}
 
 	if binding.UserPrincipalName != "" && binding.UserName == "" {
-		user, err := c.mgr.userMGR.EnsureUser(binding.UserPrincipalName, "")
+		displayName := binding.Annotations["auth.cattle.io/principal-display-name"]
+		user, err := c.mgr.userMGR.EnsureUser(binding.UserPrincipalName, displayName)
 		if err != nil {
 			return binding, err
 		}
