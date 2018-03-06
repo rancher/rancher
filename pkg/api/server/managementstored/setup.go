@@ -110,8 +110,8 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	principals.Schema(ctx, apiContext, schemas)
 	providers.SetupAuthConfig(ctx, apiContext, schemas)
 	authn.SetUserStore(schemas.Schema(&managementschema.Version, client.UserType), apiContext)
-	authn.SetRTBStore(schemas.Schema(&managementschema.Version, client.ClusterRoleTemplateBindingType), apiContext)
-	authn.SetRTBStore(schemas.Schema(&managementschema.Version, client.ProjectRoleTemplateBindingType), apiContext)
+	authn.SetRTBStore(ctx, schemas.Schema(&managementschema.Version, client.ClusterRoleTemplateBindingType), apiContext)
+	authn.SetRTBStore(ctx, schemas.Schema(&managementschema.Version, client.ProjectRoleTemplateBindingType), apiContext)
 	nodeStore.SetupStore(schemas.Schema(&managementschema.Version, client.NodeType))
 
 	setupScopedTypes(schemas)
