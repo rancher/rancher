@@ -98,7 +98,7 @@ func (g *ghProvider) testAndApply(actionName string, action *types.Action, reque
 	}
 
 	//Call provider to testLogin
-	userPrincipal, groupPrincipals, providerInfo, err := g.LoginUser(githubLogin, &githubConfig)
+	userPrincipal, groupPrincipals, providerInfo, err := g.LoginUser(githubLogin, &githubConfig, true)
 	if err != nil {
 		if httperror.IsAPIError(err) {
 			return err
@@ -107,15 +107,15 @@ func (g *ghProvider) testAndApply(actionName string, action *types.Action, reque
 	}
 
 	//if this works, save githubConfig CR adding enabled flag
+	user, err := g.userMGR.SetPrincipalOnCurrentUser(request, userPrincipal)
+	if err != nil {
+		return err
+	}
+
 	githubConfig.Enabled = githubConfigApplyInput.Enabled
 	err = g.saveGithubConfig(&githubConfig)
 	if err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to save github config: %v", err))
-	}
-
-	user, err := g.userMGR.SetPrincipalOnCurrentUser(request, userPrincipal)
-	if err != nil {
-		return err
 	}
 
 	return tokens.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerInfo, 0, "Token via Githu Configuration", request)

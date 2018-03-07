@@ -113,10 +113,10 @@ func (g *ghProvider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Pri
 		return v3.Principal{}, nil, nil, errors.New("unexpected input type")
 	}
 
-	return g.LoginUser(login, nil)
+	return g.LoginUser(login, nil, false)
 }
 
-func (g *ghProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v3.GithubConfig) (v3.Principal, []v3.Principal, map[string]string, error) {
+func (g *ghProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v3.GithubConfig, test bool) (v3.Principal, []v3.Principal, map[string]string, error) {
 	var groupPrincipals []v3.Principal
 	var userPrincipal v3.Principal
 	var providerInfo = make(map[string]string)
@@ -172,7 +172,12 @@ func (g *ghProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v
 		groupPrincipals = append(groupPrincipals, groupPrincipal)
 	}
 
-	allowed, err := g.userMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipal, groupPrincipals)
+	testAllowedPrincipals := config.AllowedPrincipalIDs
+	if test && config.AccessMode == "restricted" {
+		testAllowedPrincipals = append(testAllowedPrincipals, userPrincipal.Name)
+	}
+
+	allowed, err := g.userMGR.CheckAccess(config.AccessMode, testAllowedPrincipals, userPrincipal, groupPrincipals)
 	if err != nil {
 		return v3.Principal{}, nil, nil, err
 	}
