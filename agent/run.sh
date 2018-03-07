@@ -369,8 +369,14 @@ setup_env()
 {
     if [ "$1" != "upgrade" ]; then
         local env="$(./resolve_url.py $CATTLE_URL)"
-        if ! load "$env" || [ "$(print_url $CATTLE_URL)" != "$(print_url $env)" ]; then
+        info Configured Host Registration URL info: CATTLE_URL=$(print_url $CATTLE_URL) ENV_URL=$(print_url $env)
+        if ! load "$env"; then
             error Failed to load registration env from CATTLE_URL=$(print_url $CATTLE_URL) ENV_URL=$(print_url $env)
+            exit 1
+        fi
+
+        if echo "$(print_url $env)" | grep -q "/v1$" && [ "$(print_url $CATTLE_URL)" != "$(print_url $env)" ]; then
+            error Configured Host Registration URL does not match given URL: CATTLE_URL=$(print_url $CATTLE_URL) ENV_URL=$(print_url $env)
             error Please ensure the proper value for the Host Registration URL is set
             exit 1
         fi
