@@ -45,7 +45,7 @@ func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) error {
 		err, updateErr error
 	)
 
-	if key == "" {
+	if key == "" || cluster == nil {
 		return nil
 	}
 
