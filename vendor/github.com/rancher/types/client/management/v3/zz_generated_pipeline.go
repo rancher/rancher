@@ -23,6 +23,7 @@ const (
 	PipelineFieldRemoved               = "removed"
 	PipelineFieldStages                = "stages"
 	PipelineFieldState                 = "state"
+	PipelineFieldTemplates             = "templates"
 	PipelineFieldToken                 = "token"
 	PipelineFieldTransitioning         = "transitioning"
 	PipelineFieldTransitioningMessage  = "transitioningMessage"
@@ -52,6 +53,7 @@ type Pipeline struct {
 	Removed               string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Stages                []Stage           `json:"stages,omitempty" yaml:"stages,omitempty"`
 	State                 string            `json:"state,omitempty" yaml:"state,omitempty"`
+	Templates             map[string]string `json:"templates,omitempty" yaml:"templates,omitempty"`
 	Token                 string            `json:"token,omitempty" yaml:"token,omitempty"`
 	Transitioning         string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage  string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
