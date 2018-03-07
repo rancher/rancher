@@ -12,6 +12,9 @@ var (
 
 	AgentImage                      = newSetting("agent-image", "rancher/agent:v2.0.3-rc3")
 	CACerts                         = newSetting("cacerts", "")
+	CLIURLDarwin                    = newSetting("cli-url-darwin", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-darwin-amd64-v1.0.0-alpha8.tar.gz")
+	CLIURLLinux                     = newSetting("cli-url-linux", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-linux-amd64-v1.0.0-alpha8.tar.gz")
+	CLIURLWindows                   = newSetting("cli-url-windows", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-windows-386-v1.0.0-alpha8.zip")
 	EngineInstallURL                = newSetting("engine-install-url", "https://releases.rancher.com/install-docker/17.03.sh")
 	EngineNewestVersion             = newSetting("engine-newest-version", "v17.03.0")
 	EngineSupportedRange            = newSetting("engine-supported-range", "~v17.03.0")
