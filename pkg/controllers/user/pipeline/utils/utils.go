@@ -46,8 +46,8 @@ func InitExecution(p *v3.Pipeline, triggerType string, triggerUserName string, b
 			Namespace: p.Namespace,
 			Labels:    map[string]string{PipelineFinishLabel: "false"},
 		},
+		ProjectName: p.ProjectName,
 		Spec: v3.PipelineExecutionSpec{
-			ProjectName:     p.Spec.ProjectName,
 			PipelineName:    p.Namespace + ":" + p.Name,
 			Run:             p.Status.NextRun,
 			TriggeredBy:     triggerType,

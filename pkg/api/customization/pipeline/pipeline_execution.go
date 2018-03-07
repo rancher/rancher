@@ -31,7 +31,6 @@ func (h ExecutionHandler) LinkHandler(apiContext *types.APIContext, next types.R
 }
 
 func (h *ExecutionHandler) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
-	logrus.Debugf("do execution action:%s", actionName)
 
 	switch actionName {
 	case "rerun":
