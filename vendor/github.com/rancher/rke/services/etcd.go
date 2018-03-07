@@ -172,6 +172,9 @@ func IsEtcdMember(ctx context.Context, etcdHost *hosts.Host, etcdHosts []*hosts.
 				return true, nil
 			}
 		}
+		// reset the list of errors to handle new hosts
+		listErr = nil
+		break
 	}
 	if listErr != nil {
 		return false, listErr
