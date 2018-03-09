@@ -30,7 +30,8 @@ const (
 	PipelineFieldTransitioningMessage  = "transitioningMessage"
 	PipelineFieldTriggerCronExpression = "triggerCronExpression"
 	PipelineFieldTriggerCronTimezone   = "triggerCronTimezone"
-	PipelineFieldTriggerWebhook        = "triggerWebhook"
+	PipelineFieldTriggerWebhookPr      = "triggerWebhookPr"
+	PipelineFieldTriggerWebhookPush    = "triggerWebhookPush"
 	PipelineFieldUuid                  = "uuid"
 	PipelineFieldWebHookID             = "webhookId"
 )
@@ -61,7 +62,8 @@ type Pipeline struct {
 	TransitioningMessage  string                `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	TriggerCronExpression string                `json:"triggerCronExpression,omitempty" yaml:"triggerCronExpression,omitempty"`
 	TriggerCronTimezone   string                `json:"triggerCronTimezone,omitempty" yaml:"triggerCronTimezone,omitempty"`
-	TriggerWebhook        bool                  `json:"triggerWebhook,omitempty" yaml:"triggerWebhook,omitempty"`
+	TriggerWebhookPr      bool                  `json:"triggerWebhookPr,omitempty" yaml:"triggerWebhookPr,omitempty"`
+	TriggerWebhookPush    bool                  `json:"triggerWebhookPush,omitempty" yaml:"triggerWebhookPush,omitempty"`
 	Uuid                  string                `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	WebHookID             string                `json:"webhookId,omitempty" yaml:"webhookId,omitempty"`
 }

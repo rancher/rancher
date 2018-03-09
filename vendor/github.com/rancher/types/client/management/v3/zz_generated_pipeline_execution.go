@@ -8,6 +8,7 @@ const (
 	PipelineExecutionType                      = "pipelineExecution"
 	PipelineExecutionFieldAnnotations          = "annotations"
 	PipelineExecutionFieldCommit               = "commit"
+	PipelineExecutionFieldConditions           = "conditions"
 	PipelineExecutionFieldCreated              = "created"
 	PipelineExecutionFieldCreatorID            = "creatorId"
 	PipelineExecutionFieldEnded                = "ended"
@@ -33,29 +34,30 @@ const (
 
 type PipelineExecution struct {
 	types.Resource
-	Annotations          map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	Commit               string            `json:"commit,omitempty" yaml:"commit,omitempty"`
-	Created              string            `json:"created,omitempty" yaml:"created,omitempty"`
-	CreatorID            string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
-	Ended                string            `json:"ended,omitempty" yaml:"ended,omitempty"`
-	ExecutionState       string            `json:"executionState,omitempty" yaml:"executionState,omitempty"`
-	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Name                 string            `json:"name,omitempty" yaml:"name,omitempty"`
-	NamespaceId          string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
-	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	Pipeline             *Pipeline         `json:"pipeline,omitempty" yaml:"pipeline,omitempty"`
-	PipelineId           string            `json:"pipelineId,omitempty" yaml:"pipelineId,omitempty"`
-	ProjectId            string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
-	Removed              string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	Run                  int64             `json:"run,omitempty" yaml:"run,omitempty"`
-	Stages               []StageStatus     `json:"stages,omitempty" yaml:"stages,omitempty"`
-	Started              string            `json:"started,omitempty" yaml:"started,omitempty"`
-	State                string            `json:"state,omitempty" yaml:"state,omitempty"`
-	Transitioning        string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
-	TransitioningMessage string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	TriggerUserId        string            `json:"triggerUserId,omitempty" yaml:"triggerUserId,omitempty"`
-	TriggeredBy          string            `json:"triggeredBy,omitempty" yaml:"triggeredBy,omitempty"`
-	Uuid                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Annotations          map[string]string   `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Commit               string              `json:"commit,omitempty" yaml:"commit,omitempty"`
+	Conditions           []PipelineCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+	Created              string              `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID            string              `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Ended                string              `json:"ended,omitempty" yaml:"ended,omitempty"`
+	ExecutionState       string              `json:"executionState,omitempty" yaml:"executionState,omitempty"`
+	Labels               map[string]string   `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name                 string              `json:"name,omitempty" yaml:"name,omitempty"`
+	NamespaceId          string              `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
+	OwnerReferences      []OwnerReference    `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Pipeline             *Pipeline           `json:"pipeline,omitempty" yaml:"pipeline,omitempty"`
+	PipelineId           string              `json:"pipelineId,omitempty" yaml:"pipelineId,omitempty"`
+	ProjectId            string              `json:"projectId,omitempty" yaml:"projectId,omitempty"`
+	Removed              string              `json:"removed,omitempty" yaml:"removed,omitempty"`
+	Run                  int64               `json:"run,omitempty" yaml:"run,omitempty"`
+	Stages               []StageStatus       `json:"stages,omitempty" yaml:"stages,omitempty"`
+	Started              string              `json:"started,omitempty" yaml:"started,omitempty"`
+	State                string              `json:"state,omitempty" yaml:"state,omitempty"`
+	Transitioning        string              `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage string              `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	TriggerUserId        string              `json:"triggerUserId,omitempty" yaml:"triggerUserId,omitempty"`
+	TriggeredBy          string              `json:"triggeredBy,omitempty" yaml:"triggeredBy,omitempty"`
+	Uuid                 string              `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 type PipelineExecutionCollection struct {
 	types.Collection

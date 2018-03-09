@@ -3,6 +3,7 @@ package client
 const (
 	SourceCodeRepositorySpecType                        = "sourceCodeRepositorySpec"
 	SourceCodeRepositorySpecFieldClusterId              = "clusterId"
+	SourceCodeRepositorySpecFieldDefaultBranch          = "defaultBranch"
 	SourceCodeRepositorySpecFieldLanguage               = "language"
 	SourceCodeRepositorySpecFieldPermissions            = "permissions"
 	SourceCodeRepositorySpecFieldSourceCodeCredentialId = "sourceCodeCredentialId"
@@ -13,6 +14,7 @@ const (
 
 type SourceCodeRepositorySpec struct {
 	ClusterId              string    `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	DefaultBranch          string    `json:"defaultBranch,omitempty" yaml:"defaultBranch,omitempty"`
 	Language               string    `json:"language,omitempty" yaml:"language,omitempty"`
 	Permissions            *RepoPerm `json:"permissions,omitempty" yaml:"permissions,omitempty"`
 	SourceCodeCredentialId string    `json:"sourceCodeCredentialId,omitempty" yaml:"sourceCodeCredentialId,omitempty"`

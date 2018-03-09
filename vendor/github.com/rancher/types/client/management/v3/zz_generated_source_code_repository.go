@@ -10,6 +10,7 @@ const (
 	SourceCodeRepositoryFieldClusterId              = "clusterId"
 	SourceCodeRepositoryFieldCreated                = "created"
 	SourceCodeRepositoryFieldCreatorID              = "creatorId"
+	SourceCodeRepositoryFieldDefaultBranch          = "defaultBranch"
 	SourceCodeRepositoryFieldLabels                 = "labels"
 	SourceCodeRepositoryFieldLanguage               = "language"
 	SourceCodeRepositoryFieldName                   = "name"
@@ -33,6 +34,7 @@ type SourceCodeRepository struct {
 	ClusterId              string                      `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	Created                string                      `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID              string                      `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DefaultBranch          string                      `json:"defaultBranch,omitempty" yaml:"defaultBranch,omitempty"`
 	Labels                 map[string]string           `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Language               string                      `json:"language,omitempty" yaml:"language,omitempty"`
 	Name                   string                      `json:"name,omitempty" yaml:"name,omitempty"`

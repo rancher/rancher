@@ -94,6 +94,9 @@ type PublicEndpoint struct {
 	// for host port
 	PodName string `json:"podName,omitempty" norman:"type=reference[pod],nocreate,noupdate"`
 	//serviceName and podName are mutually exclusive
+	Hostname string `json:"hostname,omitempty" norman:"nocreate,noupdate"`
+	Path     string `json:"path,omitempty" norman:"nocreate,noupdate"`
+	// hostname and part is for global load balancer
 }
 
 type Workload struct {
