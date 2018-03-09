@@ -32,8 +32,7 @@ func (g GithubDriver) Execute(req *http.Request) (int, error) {
 	event := req.Header.Get(GithubWebhookHeader)
 	if event == "ping" {
 		return http.StatusOK, nil
-	} else if event != "push" {
-		//or "pull_request"
+	} else if event != "push" && event != "pull_request" {
 		return http.StatusUnprocessableEntity, fmt.Errorf("not trigger for event:%s", event)
 	}
 
@@ -60,21 +59,40 @@ func (g GithubDriver) Execute(req *http.Request) (int, error) {
 		return http.StatusUnavailableForLegalReasons, errors.New("Pipeline is not active")
 	}
 
-	payload := &github.WebHookPayload{}
-	if err := json.Unmarshal(body, payload); err != nil {
-		return http.StatusUnprocessableEntity, err
+	if (event == "push" && !pipeline.Spec.TriggerWebhookPush) ||
+		(event == "pull_request" && !pipeline.Spec.TriggerWebhookPr) {
+		return http.StatusUnavailableForLegalReasons, fmt.Errorf("trigger for event '%s' is disabled", event)
 	}
 
-	if len(pipeline.Spec.Stages) < 1 || len(pipeline.Spec.Stages[0].Steps) < 1 || pipeline.Spec.Stages[0].Steps[0].SourceCodeConfig == nil {
-		return http.StatusInternalServerError, errors.New("Error invalid pipeline definition")
+	if err := utils.ValidPipelineSpec(pipeline.Spec); err != nil {
+		return http.StatusInternalServerError, err
 	}
-	if !VerifyRef(pipeline.Spec.Stages[0].Steps[0].SourceCodeConfig, payload.GetRef()) {
+
+	ref, branch, commit := "", "", ""
+	if event == "push" {
+		payload := &github.PushEvent{}
+		if err := json.Unmarshal(body, payload); err != nil {
+			return http.StatusUnprocessableEntity, err
+		}
+		ref = payload.GetRef()
+		branch = strings.TrimLeft(payload.GetRef(), "refs/heads/")
+		commit = payload.HeadCommit.GetID()
+	} else if event == "pull_request" {
+		payload := &github.PullRequestEvent{}
+		if err := json.Unmarshal(body, payload); err != nil {
+			return http.StatusUnprocessableEntity, err
+		}
+		ref = fmt.Sprintf("refs/pull/%d/head", payload.PullRequest.GetNumber())
+		branch = payload.PullRequest.Base.GetRef()
+		commit = payload.PullRequest.Head.GetSHA()
+	}
+
+	if !VerifyBranch(pipeline.Spec.Stages[0].Steps[0].SourceCodeConfig, branch) {
 		return http.StatusUnprocessableEntity, errors.New("Error Ref is not match")
 	}
 
-	branch := strings.TrimLeft(payload.GetRef(), "refs/heads/")
-	logrus.Debugf("receieve github webhook, triggered '%s' on branch '%s'", pipeline.Spec.DisplayName, branch)
-	if _, err := utils.GenerateExecution(g.Pipelines, g.PipelineExecutions, pipeline, utils.TriggerTypeWebhook, "", branch); err != nil {
+	logrus.Debugf("receieve github webhook, triggered '%s' on branch '%s'", pipeline.Spec.DisplayName, ref)
+	if _, err := utils.GenerateExecution(g.Pipelines, g.PipelineExecutions, pipeline, utils.TriggerTypeWebhook, "", ref, commit); err != nil {
 		return http.StatusInternalServerError, err
 	}
 	return http.StatusOK, nil
@@ -97,9 +115,7 @@ func VerifyGithubWebhookSignature(secret []byte, signature string, body []byte) 
 	return hmac.Equal([]byte(computed.Sum(nil)), actual)
 }
 
-func VerifyRef(config *v3.SourceCodeConfig, refs string) bool {
-	branch := strings.TrimLeft(refs, "refs/heads/")
-
+func VerifyBranch(config *v3.SourceCodeConfig, branch string) bool {
 	if config.BranchCondition == "all" {
 		return true
 	} else if config.BranchCondition == "except" {

@@ -84,7 +84,8 @@ func (s *CronSyncer) checkCron(pipeline *v3.Pipeline) {
 			return
 		}
 		pipeline.Status.NextStart = nextStart
-		if _, err := utils.GenerateExecution(s.pipelines, s.pipelineExecutions, pipeline, utils.TriggerTypeCron, "", ""); err != nil {
+
+		if _, err := utils.GenerateExecution(s.pipelines, s.pipelineExecutions, pipeline, utils.TriggerTypeCron, "", "", ""); err != nil {
 			logrus.Errorf("Error run pipeline - %v", err)
 			return
 		}

@@ -3,7 +3,6 @@ package pipeline
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/api/handler"
@@ -42,9 +41,8 @@ func Validator(apiContext *types.APIContext, schema *types.Schema, data map[stri
 		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 	}
 
-	if !utils.ValidSourceCodeConfig(pipelineSpec) {
-		return httperror.NewAPIError(httperror.InvalidBodyContent,
-			"invalid pipeline definition, expected sourceCode step at the start")
+	if err := utils.ValidPipelineSpec(pipelineSpec); err != nil {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 	}
 
 	if pipelineSpec.TriggerCronExpression != "" {
@@ -211,8 +209,8 @@ func (h *Handler) run(apiContext *types.APIContext) error {
 			return err
 		}
 	}
-	if !utils.ValidSourceCodeConfig(pipeline.Spec) {
-		return errors.New("Error invalid pipeline definition")
+	if err := utils.ValidPipelineSpec(pipeline.Spec); err != nil {
+		return err
 	}
 	branch := runPipelineInput.Branch
 	branchCondition := pipeline.Spec.Stages[0].Steps[0].SourceCodeConfig.BranchCondition
@@ -225,7 +223,7 @@ func (h *Handler) run(apiContext *types.APIContext) error {
 	}
 
 	userName := apiContext.Request.Header.Get("Impersonate-User")
-	execution, err := utils.GenerateExecution(h.Pipelines, h.PipelineExecutions, pipeline, utils.TriggerTypeUser, userName, runPipelineInput.Branch)
+	execution, err := utils.GenerateExecution(h.Pipelines, h.PipelineExecutions, pipeline, utils.TriggerTypeUser, userName, runPipelineInput.Branch, "")
 	if err != nil {
 		return err
 	}

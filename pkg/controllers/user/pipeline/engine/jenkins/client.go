@@ -41,7 +41,7 @@ func New(api string, user string, token string) (*Client, error) {
 	}
 
 	if err := c.getCSRF(); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "fail to connect Jenkins")
 	}
 	return c, nil
 }

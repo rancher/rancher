@@ -26,4 +26,14 @@ const (
 	PipelineCronLabel   = "pipeline.management.cattle.io/cron"
 )
 
-var PreservedEnvVars = []string{"CICD_PIPELINE_NAME", "CICD_RUN_NUMBER"}
+var PreservedEnvVars = []string{
+	"CICD_GIT_COMMIT",
+	"CICD_GIT_REPO_NAME",
+	"CICD_GIT_BRANCH",
+	"CICD_GIT_URL",
+	"CICD_PIPELINE_ID",
+	"CICD_PIPELINE_NAME",
+	"CICD_TRIGGER_TYPE",
+	"CICD_EXECUTION_ID",
+	"CICD_EXECUTION_SEQUENCE",
+}

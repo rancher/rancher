@@ -7,7 +7,6 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/types/client/management/v3"
-	"github.com/sirupsen/logrus"
 	"net/http"
 )
 
@@ -21,7 +20,6 @@ func (h ExecutionHandler) ExecutionFormatter(apiContext *types.APIContext, resou
 }
 
 func (h ExecutionHandler) LinkHandler(apiContext *types.APIContext, next types.RequestHandler) error {
-	logrus.Debugf("enter link - %v", apiContext.Link)
 	if apiContext.Link == "log" {
 		return h.log(apiContext)
 	}
