@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/norman/api/builtin"
 	"github.com/rancher/norman/pkg/subscribe"
 	"github.com/rancher/rancher/pkg/api/controllers/dynamicschema"
+	"github.com/rancher/rancher/pkg/api/controllers/samlconfig"
 	"github.com/rancher/rancher/pkg/api/controllers/settings"
 	"github.com/rancher/rancher/pkg/api/controllers/whitelistproxy"
 	"github.com/rancher/rancher/pkg/api/server/managementstored"
@@ -43,6 +44,7 @@ func New(ctx context.Context, scaledContext *config.ScaledContext, clusterManage
 
 	dynamicschema.Register(scaledContext, server.Schemas)
 	whitelistproxy.Register(scaledContext)
+	samlconfig.Register(scaledContext)
 	err := settings.Register(scaledContext)
 
 	return server, err

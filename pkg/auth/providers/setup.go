@@ -17,6 +17,7 @@ var authConfigTypes = []string{
 	client.AzureADConfigType,
 	client.OpenLdapConfigType,
 	client.FreeIpaConfigType,
+	client.PingConfigType,
 }
 
 func SetupAuthConfig(ctx context.Context, management *config.ScaledContext, schemas *types.Schemas) {

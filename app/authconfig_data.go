@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	localprovider "github.com/rancher/rancher/pkg/auth/providers/local"
+	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
@@ -31,6 +32,10 @@ func addAuthConfigs(management *config.ManagementContext) error {
 	}
 
 	if err := addAuthConfig(ldap.FreeIpaName, client.FreeIpaConfigType, false, management); err != nil {
+		return err
+	}
+
+	if err := addAuthConfig(saml.PingName, client.PingConfigType, false, management); err != nil {
 		return err
 	}
 

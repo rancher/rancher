@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
 	managementapi "github.com/rancher/rancher/pkg/api/server"
 	"github.com/rancher/rancher/pkg/auth/providers/publicapi"
+	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	authrequests "github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/clustermanager"
@@ -60,6 +61,8 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 
 	connectHandler, connectConfigHandler := connectHandlers(scaledContext)
 
+	samlRoot := saml.AuthHandler()
+
 	root.Handle("/", ui.UI(managementAPI))
 	root.PathPrefix("/v3-public").Handler(publicAPI)
 	root.Handle("/v3/import/{token}.yaml", http.HandlerFunc(clusterregistrationtokens.ClusterImportHandler))
@@ -74,6 +77,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 	root.PathPrefix("/k8s/clusters/").Handler(authedHandler)
 	root.PathPrefix("/meta").Handler(authedHandler)
 	root.NotFoundHandler = ui.UI(http.NotFoundHandler())
+	root.PathPrefix("/v1-saml").Handler(samlRoot)
 
 	// UI
 	uiContent := ui.Content()

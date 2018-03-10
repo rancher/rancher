@@ -96,6 +96,10 @@ func (m *userManager) SetPrincipalOnCurrentUser(apiContext *types.APIContext, pr
 		return nil, errors.New("user not provided")
 	}
 
+	return m.SetPrincipalOnCurrentUserByUserID(userID, principal)
+}
+
+func (m *userManager) SetPrincipalOnCurrentUserByUserID(userID string, principal v3.Principal) (*v3.User, error) {
 	user, err := m.users.Get(userID, v1.GetOptions{})
 	if err != nil {
 		return nil, err

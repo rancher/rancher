@@ -3,10 +3,6 @@ package providers
 import (
 	"context"
 	"fmt"
-
-	"github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
-
 	"sync"
 
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
@@ -15,9 +11,12 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
+	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
 	publicclient "github.com/rancher/types/client/management/v3public"
+	"github.com/rancher/types/config"
 )
 
 var (
@@ -76,6 +75,11 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	providers[ldap.FreeIpaName] = p
 	providersByType[client.FreeIpaConfigType] = p
 	providersByType[publicclient.FreeIpaProviderType] = p
+
+	p = saml.Configure(ctx, mgmt, userMGR, tokenMGR, saml.PingName)
+	providers[saml.PingName] = p
+	providersByType[client.PingConfigType] = p
+	providersByType[publicclient.PingProviderType] = p
 }
 
 func AuthenticateUser(input interface{}, providerName string) (v3.Principal, []v3.Principal, string, error) {
