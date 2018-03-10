@@ -407,7 +407,26 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 				return f
 			})
 		}).
-		MustImport(&Version, v3.FreeIpaTestAndApplyInput{})
+		MustImport(&Version, v3.FreeIpaTestAndApplyInput{}).
+		// Saml Config
+		// Ping-Saml Config
+		MustImportAndCustomize(&Version, v3.PingConfig{}, func(schema *types.Schema) {
+			schema.BaseType = "authConfig"
+			schema.ResourceActions = map[string]types.Action{
+				"disable": {},
+				"configureTest": {
+					Input:  "samlConfig",
+					Output: "samlConfigTestOutput",
+				},
+				"testAndApply": {
+					Input: "samlConfigApplyInput",
+				},
+			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
+		}).
+		MustImport(&Version, v3.SamlConfigApplyInput{}).
+		MustImport(&Version, v3.SamlConfigTestOutput{})
 }
 
 func userTypes(schema *types.Schemas) *types.Schemas {

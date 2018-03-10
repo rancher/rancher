@@ -1,11 +1,10 @@
 package publicapi
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
-
-	"context"
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -15,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
+	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
@@ -67,6 +67,8 @@ func (h *loginHandler) login(actionName string, action *types.Action, request *t
 			HttpOnly: true,
 		}
 		http.SetCookie(w, tokenCookie)
+	} else if responseType == "saml" {
+		return nil
 	} else {
 		tokenData, err := tokens.ConvertTokenResource(request.Schemas.Schema(&schema.PublicVersion, client.TokenType), token)
 		if err != nil {
@@ -80,6 +82,9 @@ func (h *loginHandler) login(actionName string, action *types.Action, request *t
 }
 
 func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, string, error) {
+	var userPrincipal v3.Principal
+	var groupPrincipals []v3.Principal
+	var providerToken string
 	logrus.Debugf("Create Token Invoked")
 
 	bytes, err := ioutil.ReadAll(request.Request.Body)
@@ -119,6 +124,9 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	case client.FreeIpaProviderType:
 		input = &v3public.BasicLogin{}
 		providerName = ldap.FreeIpaName
+	case client.PingProviderType:
+		input = &v3public.SamlLogin{}
+		providerName = saml.PingName
 	default:
 		return v3.Token{}, "", httperror.NewAPIError(httperror.ServerError, "unknown authentication provider")
 	}
@@ -130,7 +138,14 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	}
 
 	// Authenticate User
-	userPrincipal, groupPrincipals, providerToken, err := providers.AuthenticateUser(input, providerName)
+	// SAML's login flow is different from the other providers. Unlike the other providers, it gets the logged in user's data via a POST from
+	// the identity provider on a separate endpoint specifically for that.
+	if providerName == saml.PingName {
+		err = saml.PerformSamlLogin(providerName, request, input)
+		return v3.Token{}, "saml", err
+	}
+
+	userPrincipal, groupPrincipals, providerToken, err = providers.AuthenticateUser(input, providerName)
 	if err != nil {
 		return v3.Token{}, "", err
 	}
