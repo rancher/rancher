@@ -59,7 +59,7 @@ func initClusterPreCanAlerts(clusterAlerts v3.ClusterAlertInterface, clusterName
 			ClusterName: clusterName,
 			AlertCommonSpec: v3.AlertCommonSpec{
 				DisplayName:           "Alert for etcd",
-				Description:           "Pre-can Alert for etcd component",
+				Description:           "Built-in Alert for etcd component",
 				Severity:              "critical",
 				InitialWaitSeconds:    180,
 				RepeatIntervalSeconds: 3600,
@@ -74,7 +74,7 @@ func initClusterPreCanAlerts(clusterAlerts v3.ClusterAlertInterface, clusterName
 	}
 
 	if _, err := clusterAlerts.Create(etcdRule); err != nil && !apierrors.IsAlreadyExists(err) {
-		logrus.Warnf("Failed to create pre-can rules for etcd: %v", err)
+		logrus.Warnf("Failed to create built-in rules for etcd: %v", err)
 	}
 
 	cmRule := &v3.ClusterAlert{
@@ -85,7 +85,7 @@ func initClusterPreCanAlerts(clusterAlerts v3.ClusterAlertInterface, clusterName
 			ClusterName: clusterName,
 			AlertCommonSpec: v3.AlertCommonSpec{
 				DisplayName:           "Alert for controller-manager",
-				Description:           "Pre-can Alert for controller-manager component",
+				Description:           "Built-in Alert for controller-manager component",
 				Severity:              "critical",
 				InitialWaitSeconds:    180,
 				RepeatIntervalSeconds: 3600,
@@ -100,7 +100,7 @@ func initClusterPreCanAlerts(clusterAlerts v3.ClusterAlertInterface, clusterName
 	}
 
 	if _, err := clusterAlerts.Create(cmRule); err != nil && !apierrors.IsAlreadyExists(err) {
-		logrus.Warnf("Failed to create pre-can rules for controller manager: %v", err)
+		logrus.Warnf("Failed to create built-in rules for controller manager: %v", err)
 	}
 
 	schedulerRule := &v3.ClusterAlert{
@@ -111,7 +111,7 @@ func initClusterPreCanAlerts(clusterAlerts v3.ClusterAlertInterface, clusterName
 			ClusterName: clusterName,
 			AlertCommonSpec: v3.AlertCommonSpec{
 				DisplayName:           "Alert for scheduler",
-				Description:           "Pre-can Alert for scheduler component",
+				Description:           "Built-in Alert for scheduler component",
 				Severity:              "critical",
 				InitialWaitSeconds:    180,
 				RepeatIntervalSeconds: 3600,
@@ -126,7 +126,7 @@ func initClusterPreCanAlerts(clusterAlerts v3.ClusterAlertInterface, clusterName
 	}
 
 	if _, err := clusterAlerts.Create(schedulerRule); err != nil && !apierrors.IsAlreadyExists(err) {
-		logrus.Warnf("Failed to create pre-can rules for scheduler: %v", err)
+		logrus.Warnf("Failed to create built-in rules for scheduler: %v", err)
 	}
 
 	nodeRule := &v3.ClusterAlert{
@@ -137,7 +137,7 @@ func initClusterPreCanAlerts(clusterAlerts v3.ClusterAlertInterface, clusterName
 			ClusterName: clusterName,
 			AlertCommonSpec: v3.AlertCommonSpec{
 				DisplayName:           "Alert for Node Memory Usage",
-				Description:           "Pre-can Alert for node mem usage",
+				Description:           "Built-in Alert for node mem usage",
 				Severity:              "critical",
 				InitialWaitSeconds:    180,
 				RepeatIntervalSeconds: 3600,
@@ -156,7 +156,7 @@ func initClusterPreCanAlerts(clusterAlerts v3.ClusterAlertInterface, clusterName
 	}
 
 	if _, err := clusterAlerts.Create(nodeRule); err != nil && !apierrors.IsAlreadyExists(err) {
-		logrus.Warnf("Failed to create pre-can rules for node: %v", err)
+		logrus.Warnf("Failed to create built-in rules for node: %v", err)
 	}
 
 	eventRule := &v3.ClusterAlert{
@@ -167,7 +167,7 @@ func initClusterPreCanAlerts(clusterAlerts v3.ClusterAlertInterface, clusterName
 			ClusterName: clusterName,
 			AlertCommonSpec: v3.AlertCommonSpec{
 				DisplayName:           "Alert for Warning Event of Deployment",
-				Description:           "Pre-can Alert for warning event",
+				Description:           "Built-in Alert for warning event",
 				Severity:              "critical",
 				InitialWaitSeconds:    180,
 				RepeatIntervalSeconds: 3600,
@@ -183,7 +183,7 @@ func initClusterPreCanAlerts(clusterAlerts v3.ClusterAlertInterface, clusterName
 	}
 
 	if _, err := clusterAlerts.Create(eventRule); err != nil && !apierrors.IsAlreadyExists(err) {
-		logrus.Warnf("Failed to create pre-can rules for event: %v", err)
+		logrus.Warnf("Failed to create built-in rules for event: %v", err)
 	}
 
 }
@@ -193,7 +193,7 @@ type ProjectLifecycle struct {
 	clusterName   string
 }
 
-//Create pre-can project alerts
+//Create built-in project alerts
 func (l *ProjectLifecycle) Create(obj *v3.Project) (*v3.Project, error) {
 	deploymentAlert := &v3.ProjectAlert{
 		ObjectMeta: metav1.ObjectMeta{
@@ -204,7 +204,7 @@ func (l *ProjectLifecycle) Create(obj *v3.Project) (*v3.Project, error) {
 			ProjectName: l.clusterName + ":" + obj.Name,
 			AlertCommonSpec: v3.AlertCommonSpec{
 				DisplayName:           "Alert for Workload",
-				Description:           "Pre-can Alert for Workload",
+				Description:           "Built-in Alert for Workload",
 				Severity:              "critical",
 				InitialWaitSeconds:    180,
 				RepeatIntervalSeconds: 3600,
@@ -222,7 +222,7 @@ func (l *ProjectLifecycle) Create(obj *v3.Project) (*v3.Project, error) {
 	}
 
 	if _, err := l.projectAlerts.Create(deploymentAlert); err != nil && !apierrors.IsAlreadyExists(err) {
-		logrus.Warnf("Failed to create pre-can rules for deployment: %v", err)
+		logrus.Warnf("Failed to create built-in rules for deployment: %v", err)
 	}
 
 	return obj, nil

@@ -38,6 +38,10 @@ func (l *EventWatcher) Sync(key string, obj *corev1.Event) error {
 		return nil
 	}
 
+	if obj == nil {
+		return nil
+	}
+
 	clusterAlerts, err := l.clusterAlertLister.List("", labels.NewSelector())
 	if err != nil {
 		return err
