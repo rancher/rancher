@@ -1,7 +1,13 @@
 package logging
 
 import (
+	"context"
+	"time"
+
+	"github.com/sirupsen/logrus"
+
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/ticker"
 	"github.com/rancher/types/apis/apps/v1beta2"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -14,10 +20,16 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/logging/utils"
 )
 
+// ClusterLoggingSyncer listens for clusterLogging CRD in management API
+// and update the changes to configmap, deploy fluentd, embedded elasticsearch, embedded kibana
+
 type ClusterLoggingSyncer struct {
 	clusterLoggings      v3.ClusterLoggingInterface
+	clusterLoggingLister v3.ClusterLoggingLister
 	projectLoggingLister v3.ProjectLoggingLister
+	podLister            v1.PodLister
 	services             v1.ServiceInterface
+	serviceLister        v1.ServiceLister
 	serviceAccounts      v1.ServiceAccountInterface
 	configmaps           v1.ConfigMapInterface
 	namespaces           v1.NamespaceInterface
@@ -29,11 +41,14 @@ type ClusterLoggingSyncer struct {
 }
 
 func registerClusterLogging(cluster *config.UserContext) {
-	clusterloggingClient := cluster.Management.Management.ClusterLoggings("")
+	clusterloggingClient := cluster.Management.Management.ClusterLoggings(cluster.ClusterName)
 	syncer := &ClusterLoggingSyncer{
 		clusterLoggings:      clusterloggingClient,
+		clusterLoggingLister: clusterloggingClient.Controller().Lister(),
 		projectLoggingLister: cluster.Management.Management.ProjectLoggings("").Controller().Lister(),
+		podLister:            cluster.Core.Pods("").Controller().Lister(),
 		services:             cluster.Core.Services(loggingconfig.LoggingNamespace),
+		serviceLister:        cluster.Core.Services("").Controller().Lister(),
 		serviceAccounts:      cluster.Core.ServiceAccounts(loggingconfig.LoggingNamespace),
 		configmaps:           cluster.Core.ConfigMaps(loggingconfig.LoggingNamespace),
 		namespaces:           cluster.Core.Namespaces(""),
@@ -79,6 +94,8 @@ func (c *ClusterLoggingSyncer) Sync(key string, obj *v3.ClusterLogging) error {
 		if err := utils.CreateEmbeddedTarget(c.deployments, c.serviceAccounts, c.services, c.roles, c.rolebindings, loggingconfig.LoggingNamespace); err != nil {
 			return err
 		}
+
+		c.updateEmbeddedEndpoint()
 	} else {
 		if err := utils.RemoveEmbeddedTarget(c.deployments, c.serviceAccounts, c.services, c.roles, c.rolebindings); err != nil {
 			return err
@@ -112,4 +129,20 @@ func (c *ClusterLoggingSyncer) createOrUpdateClusterConfigMap() error {
 		return errors.Wrap(err, "generate cluster config file failed")
 	}
 	return utils.UpdateConfigMap(loggingconfig.ClusterConfigPath, loggingconfig.ClusterLoggingName, "cluster", c.configmaps)
+}
+
+func (c *ClusterLoggingSyncer) updateEmbeddedEndpoint() {
+	timeout := 2 * time.Minute
+	syncInterval := 10 * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	go func(ctx context.Context, cancel context.CancelFunc) {
+		for range ticker.Context(ctx, syncInterval) {
+			err := utils.UpdateEmbeddedEndpoint(c.podLister, c.serviceLister, c.clusterLoggings)
+			if err != nil {
+				logrus.Debugf("updateEmbeddedEndpoint failed, %v", err)
+			} else {
+				cancel()
+			}
+		}
+	}(ctx, cancel)
 }
