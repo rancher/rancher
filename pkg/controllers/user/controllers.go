@@ -13,7 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/helm"
 	"github.com/rancher/rancher/pkg/controllers/user/ingress"
 	"github.com/rancher/rancher/pkg/controllers/user/logging"
-	//"github.com/rancher/rancher/pkg/controllers/user/networkpolicy"
+	"github.com/rancher/rancher/pkg/controllers/user/networkpolicy"
 	"github.com/rancher/rancher/pkg/controllers/user/noderemove"
 	"github.com/rancher/rancher/pkg/controllers/user/nodesyncer"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
@@ -30,7 +30,7 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 	healthsyncer.Register(ctx, cluster)
 	helm.Register(cluster, kubeConfigGetter)
 	logging.Register(cluster)
-	//networkpolicy.Register(cluster)
+	networkpolicy.Register(cluster)
 	noderemove.Register(cluster)
 	nodesyncer.Register(cluster)
 	nslabels.Register(cluster)
