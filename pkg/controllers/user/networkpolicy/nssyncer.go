@@ -15,11 +15,17 @@ func (nss *nsSyncer) Sync(key string, ns *corev1.Namespace) error {
 	if ns == nil {
 		return nil
 	}
-	logrus.Debugf("nss Updated: %+v", *ns)
+	logrus.Debugf("nss Sync: %+v", *ns)
+
+	// program project isolation network policy
 	projectID, ok := ns.Labels[nslabels.ProjectIDFieldLabel]
 	if ok {
-		logrus.Debugf("nss Updated: projectID=%v", projectID)
-		return nss.npmgr.programNetworkPolicy(projectID)
+		logrus.Debugf("nss Sync: projectID=%v", projectID)
+		if err := nss.npmgr.programNetworkPolicy(projectID); err != nil {
+			logrus.Errorf("nsSyncer: Sync: error programming network policy: %v", err)
+		}
 	}
-	return nil
+
+	// handle if hostNetwork policy is needed
+	return nss.npmgr.handleHostNetwork()
 }

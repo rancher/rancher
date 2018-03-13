@@ -14,6 +14,6 @@ func (pnplc *projectNetworkPolicySyncer) Sync(key string, pnp *v3.ProjectNetwork
 	if pnp == nil {
 		return nil
 	}
-	logrus.Debugf("pnplc Updated pnp=%+v", pnp)
+	logrus.Debugf("pnplc Sync pnp=%+v", pnp)
 	return pnplc.npmgr.programNetworkPolicy(pnp.Namespace)
 }
