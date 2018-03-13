@@ -274,7 +274,7 @@ func (p *adProvider) attributesToPrincipal(attribs []*ldapv2.EntryAttribute, dnS
 	}
 
 	principal := &v3.Principal{
-		ObjectMeta:    metav1.ObjectMeta{Name: externalIDType + "://" + login}, //TODO: Change to {externalIDType + "://" + externalID} when user auto-creation is added
+		ObjectMeta:    metav1.ObjectMeta{Name: externalIDType + "://" + externalID},
 		DisplayName:   accountName,
 		LoginName:     login,
 		PrincipalType: kind,
@@ -284,13 +284,13 @@ func (p *adProvider) attributesToPrincipal(attribs []*ldapv2.EntryAttribute, dnS
 	return principal, nil
 }
 
-func (p *adProvider) searchPrincipals(name, principalType string, exactMatch bool, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) ([]v3.Principal, error) {
+func (p *adProvider) searchPrincipals(name, principalType string, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) ([]v3.Principal, error) {
 	name = ldap.EscapeLDAPSearchFilter(name)
 
 	var principals []v3.Principal
 
 	if principalType == "" || principalType == "user" {
-		princs, err := p.searchUser(name, exactMatch, config, caPool)
+		princs, err := p.searchUser(name, config, caPool)
 		if err != nil {
 			return nil, err
 		}
@@ -298,7 +298,7 @@ func (p *adProvider) searchPrincipals(name, principalType string, exactMatch boo
 	}
 
 	if principalType == "" || principalType == "group" {
-		princs, err := p.searchGroup(name, exactMatch, config, caPool)
+		princs, err := p.searchGroup(name, config, caPool)
 		if err != nil {
 			return nil, err
 		}
@@ -308,28 +308,16 @@ func (p *adProvider) searchPrincipals(name, principalType string, exactMatch boo
 	return principals, nil
 }
 
-func (p *adProvider) searchUser(name string, exactMatch bool, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) ([]v3.Principal, error) {
-	var query string
-	if exactMatch {
-		query = "(&(" + config.UserSearchAttribute + "=" + name + ")(" + ObjectClassAttribute + "=" +
-			config.UserObjectClass + "))"
-	} else {
-		query = "(&(" + config.UserSearchAttribute + "=*" + name + "*)(" + ObjectClassAttribute + "=" +
-			config.UserObjectClass + "))"
-	}
+func (p *adProvider) searchUser(name string, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) ([]v3.Principal, error) {
+	query := "(&(" + config.UserSearchAttribute + "=*" + name + "*)(" + ObjectClassAttribute + "=" +
+		config.UserObjectClass + "))"
 	logrus.Debugf("LDAPProvider searchUser query: %s", query)
 	return p.searchLdap(query, UserScope, config, caPool)
 }
 
-func (p *adProvider) searchGroup(name string, exactMatch bool, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) ([]v3.Principal, error) {
-	var query string
-	if exactMatch {
-		query = "(&(" + config.GroupSearchAttribute + "=" + name + ")(" + ObjectClassAttribute + "=" +
-			config.GroupObjectClass + "))"
-	} else {
-		query = "(&(" + config.GroupSearchAttribute + "=*" + name + "*)(" + ObjectClassAttribute + "=" +
-			config.GroupObjectClass + "))"
-	}
+func (p *adProvider) searchGroup(name string, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) ([]v3.Principal, error) {
+	query := "(&(" + config.GroupSearchAttribute + "=*" + name + "*)(" + ObjectClassAttribute + "=" +
+		config.GroupObjectClass + "))"
 	logrus.Debugf("LDAPProvider searchGroup query: %s", query)
 	return p.searchLdap(query, GroupScope, config, caPool)
 }

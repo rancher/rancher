@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/x509"
 	"fmt"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
@@ -90,7 +91,7 @@ func (p *adProvider) SearchPrincipals(searchKey, principalType string, myToken v
 		return principals, nil
 	}
 
-	principals, err = p.searchPrincipals(searchKey, principalType, true, config, caPool)
+	principals, err = p.searchPrincipals(searchKey, principalType, config, caPool)
 	if err == nil {
 		for _, principal := range principals {
 			if principal.PrincipalType == "user" {
@@ -109,7 +110,23 @@ func (p *adProvider) SearchPrincipals(searchKey, principalType string, myToken v
 }
 
 func (p *adProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
-	return v3.Principal{}, nil
+	config, caPool, err := p.getActiveDirectoryConfig()
+	if err != nil {
+		return v3.Principal{}, nil
+	}
+
+	parts := strings.SplitN(principalID, ":", 2)
+	if len(parts) != 2 {
+		return v3.Principal{}, errors.Errorf("invalid id %v", principalID)
+	}
+	scope := parts[0]
+	externalID := strings.TrimPrefix(parts[1], "//")
+
+	principal, err := p.getPrincipal(externalID, scope, config, caPool)
+	if err != nil {
+		return v3.Principal{}, err
+	}
+	return *principal, err
 }
 
 func (p *adProvider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
