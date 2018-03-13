@@ -19,7 +19,7 @@ var (
 	EngineNewestVersion             = newSetting("engine-newest-version", "v17.03.0")
 	EngineSupportedRange            = newSetting("engine-supported-range", "~v17.03.0")
 	HelmVersion                     = newSetting("helm-version", "dev")
-	KubernetesVersion               = newSetting("k8s-version", "v1.8.7-rancher1-1")
+	KubernetesVersion               = newSetting("k8s-version", v3.K8sV18)
 	KubernetesVersionToSystemImages = newSetting("k8s-version-to-images", getSystemImages())
 	MachineVersion                  = newSetting("machine-version", "dev")
 	ServerImage                     = newSetting("server-image", "rancher/server")

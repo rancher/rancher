@@ -1,4 +1,4 @@
-FROM rancher/k8s:v1.8.7-rancher1-1 as k8s
+FROM rancher/k8s:v1.8.9-rancher1-1 as k8s
 FROM rancher/rke-service-sidekick:v0.1.0 as sidekick
 
 FROM ubuntu:17.10
