@@ -11,23 +11,25 @@ import (
 type DialerFactory func(h *Host) (func(network, address string) (net.Conn, error), error)
 
 type dialer struct {
-	signer        ssh.Signer
-	sshKeyString  string
-	sshAddress    string
-	sshPassphrase []byte
-	username      string
-	netConn       string
-	dockerSocket  string
+	signer          ssh.Signer
+	sshKeyString    string
+	sshAddress      string
+	sshPassphrase   []byte
+	username        string
+	netConn         string
+	dockerSocket    string
+	useSSHAgentAuth bool
 }
 
 func newDialer(h *Host, kind string) (*dialer, error) {
 	dialer := &dialer{
-		sshAddress:    fmt.Sprintf("%s:%s", h.Address, h.Port),
-		username:      h.User,
-		dockerSocket:  h.DockerSocket,
-		sshKeyString:  h.SSHKey,
-		netConn:       "unix",
-		sshPassphrase: []byte(h.SavedKeyPhrase),
+		sshAddress:      fmt.Sprintf("%s:%s", h.Address, h.Port),
+		username:        h.User,
+		dockerSocket:    h.DockerSocket,
+		sshKeyString:    h.SSHKey,
+		netConn:         "unix",
+		sshPassphrase:   []byte(h.SavedKeyPhrase),
+		useSSHAgentAuth: h.SSHAgentAuth,
 	}
 
 	if dialer.sshKeyString == "" {
@@ -84,7 +86,7 @@ func (d *dialer) Dial(network, addr string) (net.Conn, error) {
 }
 
 func (d *dialer) getSSHTunnelConnection() (*ssh.Client, error) {
-	cfg, err := getSSHConfig(d.username, d.sshKeyString, d.sshPassphrase)
+	cfg, err := getSSHConfig(d.username, d.sshKeyString, d.sshPassphrase, d.useSSHAgentAuth)
 	if err != nil {
 		return nil, fmt.Errorf("Error configuring SSH: %v", err)
 	}

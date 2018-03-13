@@ -34,6 +34,9 @@ func RemoveCommand() cli.Command {
 			Usage: "Deploy Kubernetes cluster locally",
 		},
 	}
+
+	removeFlags = append(removeFlags, sshCliOptions...)
+
 	return cli.Command{
 		Name:   "remove",
 		Usage:  "Teardown the cluster and clean cluster nodes",
@@ -96,6 +99,12 @@ func clusterRemoveFromCli(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("Failed to parse cluster file: %v", err)
 	}
+
+	rkeConfig, err = setOptionsFromCLI(ctx, rkeConfig)
+	if err != nil {
+		return err
+	}
+
 	return ClusterRemove(context.Background(), rkeConfig, nil, nil, false, "")
 }
 
@@ -113,5 +122,11 @@ func clusterRemoveLocal(ctx *cli.Context) error {
 		}
 		rkeConfig.Nodes = []v3.RKEConfigNode{*cluster.GetLocalRKENodeConfig()}
 	}
+
+	rkeConfig, err = setOptionsFromCLI(ctx, rkeConfig)
+	if err != nil {
+		return err
+	}
+
 	return ClusterRemove(context.Background(), rkeConfig, nil, nil, true, "")
 }

@@ -29,6 +29,9 @@ func UpCommand() cli.Command {
 			Usage: "Deploy Kubernetes cluster locally",
 		},
 	}
+
+	upFlags = append(upFlags, sshCliOptions...)
+
 	return cli.Command{
 		Name:   "up",
 		Usage:  "Bring the cluster up",
@@ -139,6 +142,12 @@ func clusterUpFromCli(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("Failed to parse cluster file: %v", err)
 	}
+
+	rkeConfig, err = setOptionsFromCLI(ctx, rkeConfig)
+	if err != nil {
+		return err
+	}
+
 	_, _, _, _, err = ClusterUp(context.Background(), rkeConfig, nil, nil, nil, false, "")
 	return err
 }

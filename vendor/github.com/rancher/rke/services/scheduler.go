@@ -13,7 +13,7 @@ func runScheduler(ctx context.Context, host *hosts.Host, df hosts.DialerFactory,
 	if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, SchedulerContainerName, host.Address, ControlRole, prsMap); err != nil {
 		return err
 	}
-	return runHealthcheck(ctx, host, SchedulerContainerName, df, healthCheckURL)
+	return runHealthcheck(ctx, host, SchedulerContainerName, df, healthCheckURL, nil)
 }
 
 func removeScheduler(ctx context.Context, host *hosts.Host) error {
