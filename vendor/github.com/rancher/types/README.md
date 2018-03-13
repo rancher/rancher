@@ -7,6 +7,10 @@ API Types for Rancher 2.0
 
 `make`
 
+## Running the code generator
+
+Run `go generate` in the root of the project
+
 ## License
 Copyright (c) 2014-2017 [Rancher Labs, Inc.](http://rancher.com)
 

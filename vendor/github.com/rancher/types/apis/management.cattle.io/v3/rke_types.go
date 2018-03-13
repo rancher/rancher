@@ -15,6 +15,8 @@ type RancherKubernetesEngineConfig struct {
 	SystemImages RKESystemImages `yaml:"system_images" json:"systemImages,omitempty"`
 	// SSH Private Key Path
 	SSHKeyPath string `yaml:"ssh_key_path" json:"sshKeyPath,omitempty"`
+	// SSH Agent Auth enable
+	SSHAgentAuth bool `yaml:"ssh_agent_auth" json:"sshAgentAuth"`
 	// Authorization mode configuration used in the cluster
 	Authorization AuthzConfig `yaml:"authorization" json:"authorization,omitempty"`
 	// Enable/disable strict docker version checking
@@ -127,6 +129,8 @@ type RKEConfigNode struct {
 	User string `yaml:"user" json:"user,omitempty"`
 	// Optional - Docker socket on the node that will be used in tunneling
 	DockerSocket string `yaml:"docker_socket" json:"dockerSocket,omitempty"`
+	// SSH Agent Auth enable
+	SSHAgentAuth bool `yaml:"ssh_agent_auth,omitempty" json:"sshAgentAuth,omitempty"`
 	// SSH Private Key
 	SSHKey string `yaml:"ssh_key" json:"sshKey,omitempty"`
 	// SSH Private Key Path
