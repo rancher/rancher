@@ -103,3 +103,11 @@ func IsAPIError(err error) bool {
 	_, ok := err.(*APIError)
 	return ok
 }
+
+func IsConflict(err error) bool {
+	if apiError, ok := err.(*APIError); ok {
+		return apiError.code.Status == 409
+	}
+
+	return false
+}
