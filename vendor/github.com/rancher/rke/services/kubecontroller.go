@@ -13,7 +13,7 @@ func runKubeController(ctx context.Context, host *hosts.Host, df hosts.DialerFac
 	if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, KubeControllerContainerName, host.Address, ControlRole, prsMap); err != nil {
 		return err
 	}
-	return runHealthcheck(ctx, host, KubeControllerContainerName, df, healthCheckURL)
+	return runHealthcheck(ctx, host, KubeControllerContainerName, df, healthCheckURL, nil)
 }
 
 func removeKubeController(ctx context.Context, host *hosts.Host) error {

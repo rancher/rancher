@@ -90,6 +90,8 @@ func (c *Cluster) BuildKubeAPIProcess() v3.Process {
 		"--client-ca-file=" + pki.GetCertPath(pki.CACertName),
 		"--tls-cert-file=" + pki.GetCertPath(pki.KubeAPICertName),
 		"--tls-private-key-file=" + pki.GetKeyPath(pki.KubeAPICertName),
+		"--kubelet-client-certificate=" + pki.GetCertPath(pki.KubeAPICertName),
+		"--kubelet-client-key=" + pki.GetKeyPath(pki.KubeAPICertName),
 		"--service-account-key-file=" + pki.GetKeyPath(pki.KubeAPICertName),
 	}
 	args := []string{
@@ -201,6 +203,8 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host) v3.Process {
 		"--allow-privileged=true",
 		"--cloud-provider=",
 		"--kubeconfig=" + pki.GetConfigPath(pki.KubeNodeCertName),
+		"--client-ca-file=" + pki.GetCertPath(pki.CACertName),
+		"--anonymous-auth=false",
 		"--volume-plugin-dir=/var/lib/kubelet/volumeplugins",
 		"--require-kubeconfig=True",
 		"--fail-swap-on=" + strconv.FormatBool(c.Services.Kubelet.FailSwapOn),

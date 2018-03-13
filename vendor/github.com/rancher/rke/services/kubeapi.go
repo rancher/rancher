@@ -14,7 +14,7 @@ func runKubeAPI(ctx context.Context, host *hosts.Host, df hosts.DialerFactory, p
 	if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, KubeAPIContainerName, host.Address, ControlRole, prsMap); err != nil {
 		return err
 	}
-	return runHealthcheck(ctx, host, KubeAPIContainerName, df, healthCheckURL)
+	return runHealthcheck(ctx, host, KubeAPIContainerName, df, healthCheckURL, nil)
 }
 
 func removeKubeAPI(ctx context.Context, host *hosts.Host) error {

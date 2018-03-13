@@ -102,7 +102,7 @@ addons: |-
 
 system_images:
   etcd: rancher/etcd:v3.0.17
-  kubernetes: rancher/k8s:v1.8.7-rancher1-1
+  kubernetes: rancher/k8s:v1.8.9-rancher1-1
   alpine: alpine:latest
   nginx_proxy: rancher/rke-nginx-proxy:v0.1.1
   cert_downloader: rancher/rke-cert-deployer:v0.1.1
@@ -126,7 +126,7 @@ authorization:
 # If set to true, rke won't fail when unsupported Docker version is found
 ignore_docker_version: false
 
-kubernetes_version: v1.8.7-rancher1-1
+kubernetes_version: v1.8.9-rancher1-1
 
 # List of registry credentials, if you are using a Docker Hub registry,
 # you can omit the `url` or set it to `docker.io`

@@ -12,7 +12,9 @@ import (
 
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
+	"github.com/rancher/rke/pki"
 	"github.com/sirupsen/logrus"
+	"k8s.io/client-go/util/cert"
 )
 
 const (
@@ -22,13 +24,23 @@ const (
 	HTTPSProtoPrefix = "https://"
 )
 
-func runHealthcheck(ctx context.Context, host *hosts.Host, serviceName string, localConnDialerFactory hosts.DialerFactory, url string) error {
+func runHealthcheck(ctx context.Context, host *hosts.Host, serviceName string, localConnDialerFactory hosts.DialerFactory, url string, certMap map[string]pki.CertificatePKI) error {
 	log.Infof(ctx, "[healthcheck] Start Healthcheck on service [%s] on host [%s]", serviceName, host.Address)
+	var x509Pair tls.Certificate
+
 	port, err := getPortFromURL(url)
 	if err != nil {
 		return err
 	}
-	client, err := getHealthCheckHTTPClient(host, port, localConnDialerFactory)
+	if serviceName == KubeletContainerName {
+		certificate := cert.EncodeCertPEM(certMap[pki.KubeNodeCertName].Certificate)
+		key := cert.EncodePrivateKeyPEM(certMap[pki.KubeNodeCertName].Key)
+		x509Pair, err = tls.X509KeyPair(certificate, key)
+		if err != nil {
+			return err
+		}
+	}
+	client, err := getHealthCheckHTTPClient(host, port, localConnDialerFactory, &x509Pair)
 	if err != nil {
 		return fmt.Errorf("Failed to initiate new HTTP client for service [%s] for host [%s]", serviceName, host.Address)
 	}
@@ -44,7 +56,7 @@ func runHealthcheck(ctx context.Context, host *hosts.Host, serviceName string, l
 	return fmt.Errorf("Failed to verify healthcheck: %v", err)
 }
 
-func getHealthCheckHTTPClient(host *hosts.Host, port int, localConnDialerFactory hosts.DialerFactory) (*http.Client, error) {
+func getHealthCheckHTTPClient(host *hosts.Host, port int, localConnDialerFactory hosts.DialerFactory, x509KeyPair *tls.Certificate) (*http.Client, error) {
 	host.LocalConnPort = port
 	var factory hosts.DialerFactory
 	if localConnDialerFactory == nil {
@@ -56,10 +68,17 @@ func getHealthCheckHTTPClient(host *hosts.Host, port int, localConnDialerFactory
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create a dialer for host [%s]: %v", host.Address, err)
 	}
+	tlsConfig := &tls.Config{InsecureSkipVerify: true}
+	if x509KeyPair != nil {
+		tlsConfig = &tls.Config{
+			InsecureSkipVerify: true,
+			Certificates:       []tls.Certificate{*x509KeyPair},
+		}
+	}
 	return &http.Client{
 		Transport: &http.Transport{
 			Dial:            dialer,
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			TLSClientConfig: tlsConfig,
 		},
 	}, nil
 }

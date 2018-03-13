@@ -82,22 +82,25 @@ func parsePrivateKeyWithPassPhrase(keyBuff string, passphrase []byte) (ssh.Signe
 	return ssh.ParsePrivateKeyWithPassphrase([]byte(keyBuff), passphrase)
 }
 
-func getSSHConfig(username, sshPrivateKeyString string, passphrase []byte) (*ssh.ClientConfig, error) {
+func getSSHConfig(username, sshPrivateKeyString string, passphrase []byte, useAgentAuth bool) (*ssh.ClientConfig, error) {
 	config := &ssh.ClientConfig{
 		User:            username,
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
-	if sshAgentSock := os.Getenv("SSH_AUTH_SOCK"); sshAgentSock != "" {
-		sshAgent, err := net.Dial("unix", sshAgentSock)
-		if err != nil {
-			return config, fmt.Errorf("Cannot connect to SSH Auth socket %q: %s", sshAgentSock, err)
+	// Kind of a double check now.
+	if useAgentAuth {
+		if sshAgentSock := os.Getenv("SSH_AUTH_SOCK"); sshAgentSock != "" {
+			sshAgent, err := net.Dial("unix", sshAgentSock)
+			if err != nil {
+				return config, fmt.Errorf("Cannot connect to SSH Auth socket %q: %s", sshAgentSock, err)
+			}
+
+			config.Auth = append(config.Auth, ssh.PublicKeysCallback(agent.NewClient(sshAgent).Signers))
+
+			logrus.Debugf("using %q SSH_AUTH_SOCK", sshAgentSock)
+			return config, nil
 		}
-
-		config.Auth = append(config.Auth, ssh.PublicKeysCallback(agent.NewClient(sshAgent).Signers))
-
-		logrus.Debugf("using %q SSH_AUTH_SOCK", sshAgentSock)
-		return config, nil
 	}
 
 	signer, err := getPrivateKeySigner(sshPrivateKeyString, passphrase)

@@ -100,6 +100,7 @@ func (c *Cluster) DeployWorkerPlane(ctx context.Context) error {
 		c.PrivateRegistriesMap,
 		processMap,
 		kubeletProcessHostMap,
+		c.Certificates,
 	); err != nil {
 		return fmt.Errorf("[workerPlane] Failed to bring up Worker Plane: %v", err)
 	}
