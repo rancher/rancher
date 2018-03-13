@@ -1,12 +1,12 @@
 package v3
 
 const (
-	K8sV1_8 = "v1.8.7-rancher1-1"
+	K8sV18 = "v1.8.9-rancher1-1"
 )
 
 var (
 	K8sVersionToRKESystemImages = map[string]RKESystemImages{
-		"v1.8.7-rancher1-1": v187SystemImages,
+		"v1.8.9-rancher1-1": v18SystemImages,
 	}
 
 	RancherK8sVersionToSystemImages = map[string]RancherSystemImages{
@@ -14,9 +14,9 @@ var (
 	}
 
 	// v187SystemImages defaults for rke and rancher 2.0
-	v187SystemImages = RKESystemImages{
+	v18SystemImages = RKESystemImages{
 		Etcd:                      "rancher/coreos-etcd:v3.0.17",
-		Kubernetes:                "rancher/k8s:v1.8.7-rancher1-1",
+		Kubernetes:                "rancher/k8s:" + K8sV18,
 		Alpine:                    "alpine:latest",
 		NginxProxy:                "rancher/rke-nginx-proxy:v0.1.1",
 		CertDownloader:            "rancher/rke-cert-deployer:v0.1.1",

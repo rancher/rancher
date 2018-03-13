@@ -10,6 +10,7 @@ const (
 	RancherKubernetesEngineConfigFieldNetwork             = "network"
 	RancherKubernetesEngineConfigFieldNodes               = "nodes"
 	RancherKubernetesEngineConfigFieldPrivateRegistries   = "privateRegistries"
+	RancherKubernetesEngineConfigFieldSSHAgentAuth        = "sshAgentAuth"
 	RancherKubernetesEngineConfigFieldSSHKeyPath          = "sshKeyPath"
 	RancherKubernetesEngineConfigFieldServices            = "services"
 	RancherKubernetesEngineConfigFieldVersion             = "kubernetesVersion"
@@ -24,6 +25,7 @@ type RancherKubernetesEngineConfig struct {
 	Network             *NetworkConfig     `json:"network,omitempty" yaml:"network,omitempty"`
 	Nodes               []RKEConfigNode    `json:"nodes,omitempty" yaml:"nodes,omitempty"`
 	PrivateRegistries   []PrivateRegistry  `json:"privateRegistries,omitempty" yaml:"privateRegistries,omitempty"`
+	SSHAgentAuth        bool               `json:"sshAgentAuth,omitempty" yaml:"sshAgentAuth,omitempty"`
 	SSHKeyPath          string             `json:"sshKeyPath,omitempty" yaml:"sshKeyPath,omitempty"`
 	Services            *RKEConfigServices `json:"services,omitempty" yaml:"services,omitempty"`
 	Version             string             `json:"kubernetesVersion,omitempty" yaml:"kubernetesVersion,omitempty"`

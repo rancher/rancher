@@ -40,7 +40,7 @@ func LocalConfig() (*v3.RancherKubernetesEngineConfig, error) {
 
 	rkeConfig.Services.KubeAPI.ExtraArgs["advertise-address"] = "10.233.0.1"
 	rkeConfig.Services.KubeAPI.ExtraArgs["bind-address"] = "127.0.0.1"
-	rkeConfig.SystemImages = v3.K8sVersionToRKESystemImages[v3.K8sV1_8]
+	rkeConfig.SystemImages = v3.K8sVersionToRKESystemImages[v3.K8sV18]
 	rkeConfig.SystemImages.Kubernetes = settings.AgentImage.Get()
 	rkeConfig.IgnoreDockerVersion = true
 	rkeConfig.Nodes = []v3.RKEConfigNode{
