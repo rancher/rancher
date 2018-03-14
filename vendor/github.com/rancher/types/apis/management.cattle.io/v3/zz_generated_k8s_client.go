@@ -47,12 +47,12 @@ type Interface interface {
 	NotifiersGetter
 	ClusterAlertsGetter
 	ProjectAlertsGetter
-	SourceCodeCredentialsGetter
 	ClusterPipelinesGetter
+	SourceCodeCredentialsGetter
 	PipelinesGetter
 	PipelineExecutionsGetter
-	SourceCodeRepositoriesGetter
 	PipelineExecutionLogsGetter
+	SourceCodeRepositoriesGetter
 }
 
 type Client struct {
@@ -93,12 +93,12 @@ type Client struct {
 	notifierControllers                   map[string]NotifierController
 	clusterAlertControllers               map[string]ClusterAlertController
 	projectAlertControllers               map[string]ProjectAlertController
-	sourceCodeCredentialControllers       map[string]SourceCodeCredentialController
 	clusterPipelineControllers            map[string]ClusterPipelineController
+	sourceCodeCredentialControllers       map[string]SourceCodeCredentialController
 	pipelineControllers                   map[string]PipelineController
 	pipelineExecutionControllers          map[string]PipelineExecutionController
-	sourceCodeRepositoryControllers       map[string]SourceCodeRepositoryController
 	pipelineExecutionLogControllers       map[string]PipelineExecutionLogController
+	sourceCodeRepositoryControllers       map[string]SourceCodeRepositoryController
 }
 
 func NewForConfig(config rest.Config) (Interface, error) {
@@ -148,12 +148,12 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		notifierControllers:                   map[string]NotifierController{},
 		clusterAlertControllers:               map[string]ClusterAlertController{},
 		projectAlertControllers:               map[string]ProjectAlertController{},
-		sourceCodeCredentialControllers:       map[string]SourceCodeCredentialController{},
 		clusterPipelineControllers:            map[string]ClusterPipelineController{},
+		sourceCodeCredentialControllers:       map[string]SourceCodeCredentialController{},
 		pipelineControllers:                   map[string]PipelineController{},
 		pipelineExecutionControllers:          map[string]PipelineExecutionController{},
-		sourceCodeRepositoryControllers:       map[string]SourceCodeRepositoryController{},
 		pipelineExecutionLogControllers:       map[string]PipelineExecutionLogController{},
+		sourceCodeRepositoryControllers:       map[string]SourceCodeRepositoryController{},
 	}, nil
 }
 
@@ -598,19 +598,6 @@ func (c *Client) ProjectAlerts(namespace string) ProjectAlertInterface {
 	}
 }
 
-type SourceCodeCredentialsGetter interface {
-	SourceCodeCredentials(namespace string) SourceCodeCredentialInterface
-}
-
-func (c *Client) SourceCodeCredentials(namespace string) SourceCodeCredentialInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &SourceCodeCredentialResource, SourceCodeCredentialGroupVersionKind, sourceCodeCredentialFactory{})
-	return &sourceCodeCredentialClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
 type ClusterPipelinesGetter interface {
 	ClusterPipelines(namespace string) ClusterPipelineInterface
 }
@@ -618,6 +605,19 @@ type ClusterPipelinesGetter interface {
 func (c *Client) ClusterPipelines(namespace string) ClusterPipelineInterface {
 	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &ClusterPipelineResource, ClusterPipelineGroupVersionKind, clusterPipelineFactory{})
 	return &clusterPipelineClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type SourceCodeCredentialsGetter interface {
+	SourceCodeCredentials(namespace string) SourceCodeCredentialInterface
+}
+
+func (c *Client) SourceCodeCredentials(namespace string) SourceCodeCredentialInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &SourceCodeCredentialResource, SourceCodeCredentialGroupVersionKind, sourceCodeCredentialFactory{})
+	return &sourceCodeCredentialClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,
@@ -650,19 +650,6 @@ func (c *Client) PipelineExecutions(namespace string) PipelineExecutionInterface
 	}
 }
 
-type SourceCodeRepositoriesGetter interface {
-	SourceCodeRepositories(namespace string) SourceCodeRepositoryInterface
-}
-
-func (c *Client) SourceCodeRepositories(namespace string) SourceCodeRepositoryInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &SourceCodeRepositoryResource, SourceCodeRepositoryGroupVersionKind, sourceCodeRepositoryFactory{})
-	return &sourceCodeRepositoryClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
 type PipelineExecutionLogsGetter interface {
 	PipelineExecutionLogs(namespace string) PipelineExecutionLogInterface
 }
@@ -670,6 +657,19 @@ type PipelineExecutionLogsGetter interface {
 func (c *Client) PipelineExecutionLogs(namespace string) PipelineExecutionLogInterface {
 	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &PipelineExecutionLogResource, PipelineExecutionLogGroupVersionKind, pipelineExecutionLogFactory{})
 	return &pipelineExecutionLogClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type SourceCodeRepositoriesGetter interface {
+	SourceCodeRepositories(namespace string) SourceCodeRepositoryInterface
+}
+
+func (c *Client) SourceCodeRepositories(namespace string) SourceCodeRepositoryInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &SourceCodeRepositoryResource, SourceCodeRepositoryGroupVersionKind, sourceCodeRepositoryFactory{})
+	return &sourceCodeRepositoryClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

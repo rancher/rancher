@@ -1,8 +1,6 @@
 package pipeline
 
 import (
-	"strings"
-
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -44,7 +42,7 @@ func Validator(apiContext *types.APIContext, schema *types.Schema, data map[stri
 		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 	}
 
-	if !validSourceCodeConfig(pipelineSpec) {
+	if !utils.ValidSourceCodeConfig(pipelineSpec) {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			"invalid pipeline definition, expected sourceCode step at the start")
 	}
@@ -171,10 +169,8 @@ func (h *Handler) ActionHandler(actionName string, action *types.Action, apiCont
 }
 
 func (h *Handler) changeState(apiContext *types.APIContext, curState, newState string) error {
-	parts := strings.Split(apiContext.ID, ":")
-	ns := parts[0]
-	name := parts[1]
 
+	ns, name := ref.Parse(apiContext.ID)
 	pipeline, err := h.PipelineLister.Get(ns, name)
 	if err != nil {
 		return err
@@ -199,9 +195,8 @@ func (h *Handler) changeState(apiContext *types.APIContext, curState, newState s
 }
 
 func (h *Handler) run(apiContext *types.APIContext) error {
-	parts := strings.Split(apiContext.ID, ":")
-	ns := parts[0]
-	name := parts[1]
+
+	ns, name := ref.Parse(apiContext.ID)
 	pipeline, err := h.PipelineLister.Get(ns, name)
 	if err != nil {
 		return err
@@ -216,7 +211,7 @@ func (h *Handler) run(apiContext *types.APIContext) error {
 			return err
 		}
 	}
-	if !validSourceCodeConfig(pipeline.Spec) {
+	if !utils.ValidSourceCodeConfig(pipeline.Spec) {
 		return errors.New("Error invalid pipeline definition")
 	}
 	branch := runPipelineInput.Branch

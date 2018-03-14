@@ -166,3 +166,12 @@ func SplitImageTag(image string) (string, string, string) {
 	}
 	return registry, repo, tag
 }
+
+func ValidSourceCodeConfig(spec v3.PipelineSpec) bool {
+	if len(spec.Stages) < 1 ||
+		len(spec.Stages[0].Steps) < 1 ||
+		spec.Stages[0].Steps[0].SourceCodeConfig == nil {
+		return false
+	}
+	return true
+}

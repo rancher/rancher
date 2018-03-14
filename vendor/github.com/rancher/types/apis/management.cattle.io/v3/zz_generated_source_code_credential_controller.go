@@ -23,8 +23,9 @@ var (
 	SourceCodeCredentialResource = metav1.APIResource{
 		Name:         "sourcecodecredentials",
 		SingularName: "sourcecodecredential",
-		Namespaced:   false,
-		Kind:         SourceCodeCredentialGroupVersionKind.Kind,
+		Namespaced:   true,
+
+		Kind: SourceCodeCredentialGroupVersionKind.Kind,
 	}
 )
 

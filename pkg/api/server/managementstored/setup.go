@@ -335,6 +335,7 @@ func Pipeline(schemas *types.Schemas, management *config.ScaledContext) {
 	schema.Formatter = pipeline.SourceCodeCredentialFormatter
 	schema.ActionHandler = sourceCodeCredentialHandler.ActionHandler
 	schema.LinkHandler = sourceCodeCredentialHandler.LinkHandler
+	schema.Store = userscope.NewStore(management.Core.Namespaces(""), schema.Store)
 
 	sourceCodeRepositoryHandler := &pipeline.SourceCodeRepositoryHandler{
 		SourceCodeCredentialLister: management.Management.SourceCodeCredentials("").Controller().Lister(),
@@ -342,6 +343,7 @@ func Pipeline(schemas *types.Schemas, management *config.ScaledContext) {
 		ClusterPipelineLister:      management.Management.ClusterPipelines("").Controller().Lister(),
 	}
 	schema = schemas.Schema(&managementschema.Version, client.SourceCodeRepositoryType)
+	schema.Store = userscope.NewStore(management.Core.Namespaces(""), schema.Store)
 	schema.Formatter = pipeline.SourceCodeRepositoryFormatter
 	schema.LinkHandler = sourceCodeRepositoryHandler.LinkHandler
 }
