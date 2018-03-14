@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 
+	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/norman/leader"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -65,6 +66,10 @@ func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config
 }
 
 func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
+	if err := service.Start(); err != nil {
+		return err
+	}
+
 	scaledContext, clusterManager, err := buildScaledContext(ctx, kubeConfig, cfg)
 	if err != nil {
 		return err
