@@ -117,8 +117,13 @@ func (s *userStore) Create(apiContext *types.APIContext, schema *types.Schema, d
 			principalIDs = pids
 		}
 		created[client.UserFieldPrincipalIDs] = append(principalIDs, "local://"+id)
-		return s.Update(apiContext, schema, created, id)
+		created, err = s.Update(apiContext, schema, created, id)
+		if err != nil {
+			return created, err
+		}
 	}
+
+	delete(created, client.UserFieldPassword)
 
 	return created, err
 }
