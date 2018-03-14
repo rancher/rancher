@@ -3,21 +3,25 @@ package pipeline
 import (
 	"strings"
 
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
+	"github.com/rancher/norman/parse"
+	"github.com/rancher/norman/parse/builder"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/utils"
+	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
 	"github.com/robfig/cron"
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
+	"time"
 )
 
 type Handler struct {
@@ -30,6 +34,8 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(apiContext, "activate")
 	resource.AddAction(apiContext, "deactivate")
 	resource.AddAction(apiContext, "run")
+	resource.Links["export"] = apiContext.URLBuilder.Link("export", resource)
+	resource.Links["config"] = apiContext.URLBuilder.Link("config", resource)
 }
 
 func Validator(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
@@ -59,12 +65,88 @@ func Validator(apiContext *types.APIContext, schema *types.Schema, data map[stri
 	return nil
 }
 
+func (h *Handler) LinkHandler(apiContext *types.APIContext, next types.RequestHandler) error {
+
+	ns, name := ref.Parse(apiContext.ID)
+
+	if apiContext.Link == "export" {
+		pipeline, err := h.PipelineLister.Get(ns, name)
+		if err != nil {
+			return err
+		}
+
+		content, err := toYaml(pipeline)
+		if err != nil {
+			return err
+		}
+		fileName := fmt.Sprintf("pipeline-%s.yaml", pipeline.Spec.DisplayName)
+		apiContext.Response.Header().Add("Content-Disposition", "attachment; filename="+fileName)
+		http.ServeContent(apiContext.Response, apiContext.Request, fileName, time.Now(), bytes.NewReader(content))
+		return nil
+	} else if apiContext.Link == "config" {
+		pipeline, err := h.PipelineLister.Get(ns, name)
+		if err != nil {
+			return err
+		}
+
+		content, err := toYaml(pipeline)
+		if err != nil {
+			return err
+		}
+		_, err = apiContext.Response.Write([]byte(content))
+		return err
+	}
+
+	return httperror.NewAPIError(httperror.NotFound, "Link not found")
+}
+
 func (h *Handler) CreateHandler(apiContext *types.APIContext, next types.RequestHandler) error {
 	//update hooks endpoint for webhook
 	if err := utils.UpdateEndpoint(apiContext.URLBuilder.Current()); err != nil {
 		return err
 	}
-	return handler.CreateHandler(apiContext, next)
+	data, err := parse.Body(apiContext.Request)
+	if err != nil {
+		return err
+	}
+	//handler import
+	if data != nil && data["templates"] != nil {
+
+		templates, ok := data["templates"].(map[string]interface{})
+		if !ok {
+			return httperror.NewAPIError(httperror.InvalidBodyContent,
+				"error invalid templates format")
+		}
+
+		store := apiContext.Schema.Store
+		if store == nil {
+			return httperror.NewAPIError(httperror.NotFound, "no store found")
+		}
+
+		for _, val := range templates {
+			valStr, ok := val.(string)
+			if !ok {
+				return httperror.NewAPIError(httperror.InvalidBodyContent,
+					"error invalid template format")
+			}
+
+			pipelineMap, err := fromYaml([]byte(valStr))
+			if err != nil {
+				return err
+			}
+			pipelineMap["projectId"] = data["projectId"]
+
+			if err := createData(apiContext, pipelineMap); err != nil {
+				return err
+			}
+		}
+
+		apiContext.WriteResponse(http.StatusCreated, nil)
+		return nil
+
+	}
+
+	return createData(apiContext, data)
 }
 
 func (h *Handler) UpdateHandler(apiContext *types.APIContext, next types.RequestHandler) error {
@@ -74,8 +156,8 @@ func (h *Handler) UpdateHandler(apiContext *types.APIContext, next types.Request
 	}
 	return handler.UpdateHandler(apiContext, next)
 }
+
 func (h *Handler) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
-	logrus.Debugf("do pipeline action:%s", actionName)
 
 	switch actionName {
 	case "activate":
@@ -169,4 +251,32 @@ func validSourceCodeConfig(spec v3.PipelineSpec) bool {
 		return false
 	}
 	return true
+}
+
+func createData(apiContext *types.APIContext, data map[string]interface{}) error {
+	var err error
+
+	for key, value := range apiContext.SubContextAttributeProvider.Create(apiContext, apiContext.Schema) {
+		if data == nil {
+			data = map[string]interface{}{}
+		}
+		data[key] = value
+	}
+
+	b := builder.NewBuilder(apiContext)
+
+	op := builder.Create
+	data, err = b.Construct(apiContext.Schema, data, op)
+	if err != nil {
+		return err
+	}
+
+	store := apiContext.Schema.Store
+	if store == nil {
+		return httperror.NewAPIError(httperror.NotFound, "no store found")
+	}
+
+	_, err = store.Create(apiContext, apiContext.Schema, data)
+
+	return err
 }

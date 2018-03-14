@@ -6,7 +6,6 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
-	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
 	"net/http"
 )
@@ -51,8 +50,8 @@ func (h SourceCodeCredentialHandler) LinkHandler(apiContext *types.APIContext, n
 
 	return httperror.NewAPIError(httperror.NotFound, "Link not found")
 }
+
 func (h *SourceCodeCredentialHandler) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
-	logrus.Debugf("do sourcecodecredential action:%s", actionName)
 
 	switch actionName {
 	case "refreshrepos":

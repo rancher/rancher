@@ -24,4 +24,8 @@ type Remote interface {
 	DeleteHook(pipeline *v3.Pipeline, accessToken string) error
 
 	ParseHook(r *http.Request)
+
+	GetPipelineFileInRepo(repoURL string, ref string, accessToken string) ([]byte, error)
+
+	GetDefaultBranch(repoURL string, accessToken string) (string, error)
 }

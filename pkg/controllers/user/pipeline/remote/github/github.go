@@ -2,6 +2,7 @@ package github
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/google/go-github/github"
@@ -9,6 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/utils"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 	"github.com/tomnomnom/linkheader"
 	"golang.org/x/oauth2"
 	"io"
@@ -208,6 +210,81 @@ func (c *client) getGithubRepos(githubAccessToken string) ([]v3.SourceCodeReposi
 	}
 
 	return convertRepos(repos), nil
+}
+
+func (c *client) getPipelineContent(owner string, repo string, ref string, githubAccessToken string) (*github.RepositoryContent, error) {
+
+	url := fmt.Sprintf("%s/repos/%s/%s/contents/.pipeline.yml", c.API, owner, repo)
+	if ref != "" {
+		url = url + "?ref=" + ref
+	}
+	resp, err := getFromGithub(githubAccessToken, url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	fileContent := &github.RepositoryContent{}
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := json.Unmarshal(b, fileContent); err != nil {
+		return nil, err
+	}
+	return fileContent, nil
+}
+
+func (c *client) GetPipelineFileInRepo(repoURL string, ref string, accessToken string) ([]byte, error) {
+	owner, repo, err := getUserRepoFromURL(repoURL)
+	if err != nil {
+		return nil, err
+	}
+	content, err := c.getPipelineContent(owner, repo, ref, accessToken)
+	if err != nil {
+		logrus.Debugf("error GetPipelineFileInRepo - %v", err)
+		return nil, nil
+	}
+	if content.Content != nil {
+		b, err := base64.StdEncoding.DecodeString(*content.Content)
+		if err != nil {
+			return nil, err
+		}
+
+		return b, nil
+	}
+	return nil, nil
+}
+
+func (c *client) GetDefaultBranch(repoURL string, accessToken string) (string, error) {
+	owner, repo, err := getUserRepoFromURL(repoURL)
+	if err != nil {
+		return "", err
+	}
+
+	url := fmt.Sprintf("%s/repos/%s/%s", c.API, owner, repo)
+
+	resp, err := getFromGithub(accessToken, url)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	repository := &github.Repository{}
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	if err := json.Unmarshal(b, repository); err != nil {
+		return "", err
+	}
+	if repository.DefaultBranch != nil {
+		return *repository.DefaultBranch, nil
+	}
+	return "", nil
+
 }
 
 func convertRepos(repos []github.Repository) []v3.SourceCodeRepository {

@@ -107,8 +107,8 @@ func (l *Lifecycle) initLogs(obj *v3.PipelineExecution) error {
 					Namespace: obj.Namespace,
 					Labels:    map[string]string{utils.PipelineFinishLabel: "false"},
 				},
+				ProjectName: pipeline.ProjectName,
 				Spec: v3.PipelineExecutionLogSpec{
-					ProjectName:           pipeline.Spec.ProjectName,
 					PipelineExecutionName: obj.Namespace + ":" + obj.Name,
 					Stage: j,
 					Step:  k,

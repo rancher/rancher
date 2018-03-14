@@ -55,7 +55,6 @@ func (h *ClusterPipelineHandler) LinkHandler(apiContext *types.APIContext, next 
 
 func (h *ClusterPipelineHandler) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
 
-	logrus.Debugf("do cluster pipeline action:%s", actionName)
 	switch actionName {
 	case "deploy":
 		return h.deploy(apiContext)
