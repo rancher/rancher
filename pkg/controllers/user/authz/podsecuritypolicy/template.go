@@ -159,13 +159,13 @@ func keyToPolicyName(key string) string {
 }
 
 func updatePolicyIfOutdated(templateLister v3.PodSecurityPolicyTemplateLister,
-	policies v1beta12.PodSecurityPolicyInterface, policyLister v1beta12.PodSecurityPolicyLister, id string) error {
-	template, err := templateLister.Get("", id)
+	policies v1beta12.PodSecurityPolicyInterface, policyLister v1beta12.PodSecurityPolicyLister, templateID string, policyID string) error {
+	template, err := templateLister.Get("", templateID)
 	if err != nil {
 		return err
 	}
 
-	policy, err := policyLister.Get("", id)
+	policy, err := policyLister.Get("", policyID)
 	if err != nil {
 		return err
 	}

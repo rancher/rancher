@@ -1,11 +1,14 @@
 package podsecuritypolicy
 
 import (
+	"fmt"
+
 	v12 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/extensions/v1beta1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 type clusterManager struct {
@@ -50,9 +53,18 @@ func (m *clusterManager) sync(key string, obj *v3.Cluster) error {
 		return nil
 	}
 
-	err := updatePolicyIfOutdated(m.templateLister, m.policies, m.policyLister, id)
+	policies, err := m.policyLister.List("", labels.Everything())
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting policy list: %v", err)
+	}
+
+	for _, policy := range policies {
+		if policy.Annotations[podSecurityTemplateParentAnnotation] == id {
+			err := updatePolicyIfOutdated(m.templateLister, m.policies, m.policyLister, id, policy.Name)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	return resyncServiceAccounts(m.serviceAccountLister, m.serviceAccountsController, "")
