@@ -281,7 +281,7 @@ func Body(req *http.Request) (map[string]interface{}, error) {
 		return valuesToBody(req.MultipartForm.Value), nil
 	}
 
-	if req.Form != nil && len(req.Form) > 0 {
+	if req.PostForm != nil && len(req.PostForm) > 0 {
 		return valuesToBody(map[string][]string(req.Form)), nil
 	}
 

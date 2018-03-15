@@ -34,3 +34,20 @@ func ParseAndValidateBody(apiContext *types.APIContext, create bool) (map[string
 
 	return data, nil
 }
+
+func ParseAndValidateActionBody(apiContext *types.APIContext, actionInputSchema *types.Schema) (map[string]interface{}, error) {
+	data, err := parse.Body(apiContext.Request)
+	if err != nil {
+		return nil, err
+	}
+
+	b := builder.NewBuilder(apiContext)
+
+	op := builder.Create
+	data, err = b.Construct(actionInputSchema, data, op)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
+}

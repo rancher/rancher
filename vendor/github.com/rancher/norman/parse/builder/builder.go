@@ -125,7 +125,7 @@ func (b *Builder) checkDefaultAndRequired(schema *types.Schema, input map[string
 			}
 
 			if definition.IsArrayType(field.Type) {
-				slice, err := b.convertArray(fieldName, result[fieldName], op)
+				slice, err := b.convertArray(field.Type, result[fieldName], op)
 				if err != nil {
 					return err
 				}
