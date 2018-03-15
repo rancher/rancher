@@ -75,33 +75,30 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("*").resources("persistentvolumes").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clusterevents").verbs("get", "list", "watch")
 
-	rb.addRoleTemplate("Manage Projects", "manage-projects", "cluster", true, false, false).
-		addRule().apiGroups("management.cattle.io").resources("projects").verbs("*")
-
-	rb.addRoleTemplate("Create Projects", "create-projects", "cluster", true, false, false).
+	rb.addRoleTemplate("Create Projects", "projects-create", "cluster", true, false, false).
 		addRule().apiGroups("management.cattle.io").resources("projects").verbs("create")
 
-	rb.addRoleTemplate("View Projects", "view-projects", "cluster", true, false, false).
+	rb.addRoleTemplate("View All Projects", "projects-view", "cluster", true, false, false).
 		addRule().apiGroups("management.cattle.io").resources("projects").verbs("get", "list", "watch")
 
-	rb.addRoleTemplate("Manage Nodes", "manage-nodes", "cluster", true, false, false).
+	rb.addRoleTemplate("Manage Nodes", "nodes-manage", "cluster", true, false, false).
 		addRule().apiGroups("management.cattle.io").resources("nodes", "nodepools").verbs("*").
 		addRule().apiGroups("*").resources("nodes").verbs("*")
 
-	rb.addRoleTemplate("View Nodes", "view-nodes", "cluster", true, false, false).
+	rb.addRoleTemplate("View Nodes", "nodes-view", "cluster", true, false, false).
 		addRule().apiGroups("management.cattle.io").resources("nodes", "nodepools").verbs("get", "list", "watch").
 		addRule().apiGroups("*").resources("nodes").verbs("get", "list", "watch")
 
-	rb.addRoleTemplate("Manage Volumes", "manage-volumes", "cluster", true, false, false).
+	rb.addRoleTemplate("Manage Volumes", "volumes-manage", "cluster", true, false, false).
 		addRule().apiGroups("*").resources("persistentvolumes").verbs("*")
 
-	rb.addRoleTemplate("View Volumes", "view-volumes", "cluster", true, false, false).
+	rb.addRoleTemplate("Use Volumes", "volumes-use", "cluster", true, false, false).
 		addRule().apiGroups("*").resources("persistentvolumes").verbs("get", "list", "watch")
 
-	rb.addRoleTemplate("Manage Cluster Members", "manage-cluster-members", "cluster", true, false, false).
+	rb.addRoleTemplate("Manage Cluster Members", "clusterroletemplatebindings-manage", "cluster", true, false, false).
 		addRule().apiGroups("management.cattle.io").resources("clusterroletemplatebindings").verbs("*")
 
-	rb.addRoleTemplate("View Cluster Members", "view-cluster-members", "cluster", true, false, false).
+	rb.addRoleTemplate("View Cluster Members", "clusterroletemplatebindings-view", "cluster", true, false, false).
 		addRule().apiGroups("management.cattle.io").resources("clusterroletemplatebindings").verbs("get", "list", "watch")
 
 	// Project roles
@@ -128,65 +125,65 @@ func addRoles(management *config.ManagementContext) (string, error) {
 	rb.addRoleTemplate("Create Namespaces", "create-ns", "project", true, false, false).
 		addRule().apiGroups("").resources("namespaces").verbs("create")
 
-	rb.addRoleTemplate("Manage Workloads", "manage-workloads", "project", true, false, false).
+	rb.addRoleTemplate("Manage Workloads", "workloads-manage", "project", true, false, false).
 		addRule().apiGroups("*").resources("pods", "pods/attach", "pods/exec", "pods/portforward", "pods/proxy", "replicationcontrollers",
 		"replicationcontrollers/scale", "daemonsets", "deployments", "deployments/rollback", "deployments/scale", "replicasets",
 		"replicasets/scale", "statefulsets", "cronjobs", "jobs", "daemonsets", "deployments", "deployments/rollback", "deployments/scale",
 		"replicasets", "replicasets/scale", "replicationcontrollers/scale", "horizontalpodautoscalers").verbs("*").
 		addRule().apiGroups("*").resources("limitranges", "pods/log", "pods/status", "replicationcontrollers/status", "resourcequotas", "resourcequotas/status", "bindings").verbs("get", "list", "watch")
 
-	rb.addRoleTemplate("View Workloads", "view-workloads", "project", true, false, false).
+	rb.addRoleTemplate("View Workloads", "workloads-view", "project", true, false, false).
 		addRule().apiGroups("*").resources("pods", "pods/attach", "pods/exec", "pods/portforward", "pods/proxy", "replicationcontrollers",
 		"replicationcontrollers/scale", "daemonsets", "deployments", "deployments/rollback", "deployments/scale", "replicasets",
 		"replicasets/scale", "statefulsets", "cronjobs", "jobs", "daemonsets", "deployments", "deployments/rollback", "deployments/scale",
 		"replicasets", "replicasets/scale", "replicationcontrollers/scale", "horizontalpodautoscalers").verbs("get", "list", "watch").
 		addRule().apiGroups("*").resources("limitranges", "pods/log", "pods/status", "replicationcontrollers/status", "resourcequotas", "resourcequotas/status", "bindings").verbs("get", "list", "watch")
 
-	rb.addRoleTemplate("Manage Ingress", "manage-ingress", "project", true, false, false).
+	rb.addRoleTemplate("Manage Ingress", "ingress-manage", "project", true, false, false).
 		addRule().apiGroups("*").resources("ingresses").verbs("*")
 
-	rb.addRoleTemplate("View Ingress", "view-ingress", "project", true, false, false).
+	rb.addRoleTemplate("View Ingress", "ingress-view", "project", true, false, false).
 		addRule().apiGroups("*").resources("ingresses").verbs("get", "list", "watch")
 
-	rb.addRoleTemplate("Manage Service", "manage-service", "project", true, false, false).
+	rb.addRoleTemplate("Manage Services", "services-manage", "project", true, false, false).
 		addRule().apiGroups("*").resources("services", "endpoints").verbs("*")
 
-	rb.addRoleTemplate("View Services", "view-services", "project", true, false, false).
+	rb.addRoleTemplate("View Services", "services-view", "project", true, false, false).
 		addRule().apiGroups("*").resources("services", "endpoints").verbs("get", "list", "watch")
 
-	rb.addRoleTemplate("Manage Secrets", "manage-secrets", "project", true, false, false).
+	rb.addRoleTemplate("Manage Secrets", "secrets-manage", "project", true, false, false).
 		addRule().apiGroups("*").resources("secrets").verbs("*")
 
-	rb.addRoleTemplate("View Secrets", "view-secrets", "project", true, false, false).
+	rb.addRoleTemplate("View Secrets", "secrets-view", "project", true, false, false).
 		addRule().apiGroups("*").resources("secrets").verbs("get", "list", "watch")
 
-	rb.addRoleTemplate("Manage Config Maps", "manage-configmaps", "project", true, false, false).
+	rb.addRoleTemplate("Manage Config Maps", "configmaps-manage", "project", true, false, false).
 		addRule().apiGroups("*").resources("configmaps").verbs("*")
 
-	rb.addRoleTemplate("View Config Maps", "view-configmaps", "project", true, false, false).
+	rb.addRoleTemplate("View Config Maps", "configmaps-view", "project", true, false, false).
 		addRule().apiGroups("*").resources("configmaps").verbs("get", "list", "watch")
 
-	rb.addRoleTemplate("Manage Volumes", "manage-persistentvolumeclaims", "project", true, false, false).
+	rb.addRoleTemplate("Manage Volumes", "persistentvolumeclaims-manage", "project", true, false, false).
 		addRule().apiGroups("*").resources("persistentvolumeclaims").verbs("*")
 
-	rb.addRoleTemplate("View Volumes", "view-persistentvolumeclaims", "project", true, false, false).
+	rb.addRoleTemplate("View Volumes", "persistentvolumeclaims-view", "project", true, false, false).
 		addRule().apiGroups("*").resources("persistentvolumeclaims").verbs("get", "list", "watch")
 
-	rb.addRoleTemplate("Manage Service Accounts", "manage-serviceaccounts", "project", true, false, false).
+	rb.addRoleTemplate("Manage Service Accounts", "serviceaccounts-manage", "project", true, false, false).
 		addRule().apiGroups("*").resources("serviceaccounts").verbs("*")
 
-	rb.addRoleTemplate("View Service Accounts", "view-serviceaccounts", "project", true, false, false).
+	rb.addRoleTemplate("View Service Accounts", "serviceaccounts-view", "project", true, false, false).
 		addRule().apiGroups("*").resources("serviceaccounts").verbs("get", "list", "watch")
 
-	rb.addRoleTemplate("Manage Project Members", "manage-project-members", "project", true, false, false).
+	rb.addRoleTemplate("Manage Project Members", "projectroletemplatebindings-manage", "project", true, false, false).
 		addRule().apiGroups("management.cattle.io").resources("projectroletemplatebindings").verbs("*")
 
-	rb.addRoleTemplate("View Project Members", "view-project-members", "project", true, false, false).
+	rb.addRoleTemplate("View Project Members", "projectroletemplatebindings-view", "project", true, false, false).
 		addRule().apiGroups("management.cattle.io").resources("projectroletemplatebindings").verbs("get", "list", "watch")
 
 	// Not specific to project or cluster
 	// TODO When clusterevents is replaced with events, remove clusterevents
-	rb.addRoleTemplate("View Events", "view-events", "", true, false, false).
+	rb.addRoleTemplate("View Events", "events-view", "", true, false, false).
 		addRule().apiGroups("*").resources("events").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clusterevents").verbs("get", "list", "watch")
 
