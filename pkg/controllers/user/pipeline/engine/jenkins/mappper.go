@@ -169,7 +169,7 @@ const stepBlock = `'%s': {
 const pipelineBlock = `def label = "buildpod.${env.JOB_NAME}.${env.BUILD_NUMBER}".replace('-', '_').replace('/', '_')
 podTemplate(label: label, containers: [
 %s
-containerTemplate(name: 'jnlp', image: 'jenkinsci/jnlp-slave:alpine', envVars: [
+containerTemplate(name: 'jnlp', image: 'jenkins/jnlp-slave:3.10-1-alpine', envVars: [
 envVar(key: 'JENKINS_URL', value: 'http://jenkins:8080')], args: '${computer.jnlpmac} ${computer.name}', ttyEnabled: false)]) {
 node(label) {
 timestamps {
