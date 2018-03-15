@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/pkg/catalog/helm"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -86,6 +87,17 @@ func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []error
 					v.Readme = string(contents)
 					continue
 				}
+				if strings.EqualFold(fmt.Sprintf("%s/%s", chart, "questions.yml"), file.Name) {
+					var value questionYml
+					contents, err := base64.StdEncoding.DecodeString(file.Contents)
+					if err != nil {
+						return nil, nil, err
+					}
+					if err := yaml.Unmarshal([]byte(contents), &value); err != nil {
+						return nil, nil, err
+					}
+					v.Questions = value.Questions
+				}
 				filesToAdd = append(filesToAdd, file)
 			}
 			v.Files = filesToAdd
@@ -114,4 +126,8 @@ func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []error
 	}
 	catalog.Status.HelmVersionCommits = newHelmVersionCommits
 	return templates, nil, nil
+}
+
+type questionYml struct {
+	Questions []v3.Question `yaml:"questions,omitempty"`
 }
