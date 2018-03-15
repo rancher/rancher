@@ -4,6 +4,7 @@
 /build
 *.swp
 /.trash-cache
+/trash.lock
 /.idea
 /package/rancher
 /package/agent
