@@ -121,28 +121,28 @@ type ActiveDirectoryConfig struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	AuthConfig        `json:",inline" mapstructure:",squash"`
 
-	Servers                     []string `json:"servers,omitempty" norman:"noupdate"`
-	Port                        int64    `json:"port,omitempty" norman:"noupdate"`
-	TLS                         bool     `json:"tls,omitempty" norman:"noupdate"`
-	Certificate                 string   `json:"certificate,omitempty" norman:"noupdate"`
-	DefaultLoginDomain          string   `json:"defaultLoginDomain,omitempty" norman:"noupdate"`
-	ServiceAccountUsername      string   `json:"serviceAccountUsername,omitempty" norman:"noupdate"`
-	ServiceAccountPassword      string   `json:"serviceAccountPassword,omitempty" norman:"noupdate,type=password"`
-	UserDisabledBitMask         int64    `json:"userDisabledBitMask,omitempty" norman:"default=2,noupdate"`
-	UserSearchBase              string   `json:"userSearchBase,omitempty" norman:"noupdate"`
-	UserSearchAttribute         string   `json:"userSearchAttribute,omitempty" norman:"default=sAMAccountName,noupdate"`
-	UserLoginAttribute          string   `json:"userLoginAttribute,omitempty" norman:"default=sAMAccountName,noupdate"`
-	UserObjectClass             string   `json:"userObjectClass,omitempty" norman:"default=person,noupdate"`
-	UserNameAttribute           string   `json:"userNameAttribute,omitempty" norman:"default=name,noupdate"`
-	UserEnabledAttribute        string   `json:"userEnabledAttribute,omitempty" norman:"default=userAccountControl,noupdate"`
-	GroupSearchBase             string   `json:"groupSearchBase,omitempty" norman:"noupdate"`
-	GroupSearchAttribute        string   `json:"groupSearchAttribute,omitempty" norman:"default=sAMAccountName,noupdate"`
-	GroupObjectClass            string   `json:"groupObjectClass,omitempty" norman:"default=group,noupdate"`
-	GroupNameAttribute          string   `json:"groupNameAttribute,omitempty" norman:"default=name,noupdate"`
-	GroupDNAttribute            string   `json:"groupDNAttribute,omitempty" norman:"default=distinguishedName,noupdate"`
-	GroupMemberUserAttribute    string   `json:"groupMemberUserAttribute,omitempty" norman:"default=distinguishedName,noupdate"`
-	GroupMemberMappingAttribute string   `json:"groupMemberMappingAttribute,omitempty" norman:"noupdate"`
-	ConnectionTimeout           int64    `json:"connectionTimeout,omitempty" norman:"default=5000,noupdate"`
+	Servers                     []string `json:"servers,omitempty"                     norman:"type=array[string],required"`
+	Port                        int64    `json:"port,omitempty"                        norman:"default=389"`
+	TLS                         bool     `json:"tls,omitempty"                         norman:"default=false"`
+	Certificate                 string   `json:"certificate,omitempty"`
+	DefaultLoginDomain          string   `json:"defaultLoginDomain,omitempty"`
+	ServiceAccountUsername      string   `json:"serviceAccountUsername,omitempty"      norman:"required"`
+	ServiceAccountPassword      string   `json:"serviceAccountPassword,omitempty"      norman:"type=password,required"`
+	UserDisabledBitMask         int64    `json:"userDisabledBitMask,omitempty"         norman:"default=2"`
+	UserSearchBase              string   `json:"userSearchBase,omitempty"              norman:"required"`
+	UserSearchAttribute         string   `json:"userSearchAttribute,omitempty"         norman:"default=sAMAccountName"`
+	UserLoginAttribute          string   `json:"userLoginAttribute,omitempty"          norman:"default=sAMAccountName"`
+	UserObjectClass             string   `json:"userObjectClass,omitempty"             norman:"default=person"`
+	UserNameAttribute           string   `json:"userNameAttribute,omitempty"           norman:"default=name"`
+	UserEnabledAttribute        string   `json:"userEnabledAttribute,omitempty"        norman:"default=userAccountControl"`
+	GroupSearchBase             string   `json:"groupSearchBase,omitempty"`
+	GroupSearchAttribute        string   `json:"groupSearchAttribute,omitempty"        norman:"default=sAMAccountName"`
+	GroupObjectClass            string   `json:"groupObjectClass,omitempty"            norman:"default=group"`
+	GroupNameAttribute          string   `json:"groupNameAttribute,omitempty"          norman:"default=name"`
+	GroupDNAttribute            string   `json:"groupDNAttribute,omitempty"            norman:"default=distinguishedName"`
+	GroupMemberUserAttribute    string   `json:"groupMemberUserAttribute,omitempty"    norman:"default=distinguishedName"`
+	GroupMemberMappingAttribute string   `json:"groupMemberMappingAttribute,omitempty"`
+	ConnectionTimeout           int64    `json:"connectionTimeout,omitempty"           norman:"default=5000"`
 }
 
 type ActiveDirectoryTestAndApplyInput struct {
