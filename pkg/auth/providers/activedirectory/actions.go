@@ -1,15 +1,17 @@
 package activedirectory
 
 import (
-	"encoding/json"
 	"fmt"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
 	"github.com/rancher/types/client/management/v3"
 	"github.com/sirupsen/logrus"
@@ -37,8 +39,13 @@ func (p *adProvider) actionHandler(actionName string, action *types.Action, requ
 }
 
 func (p *adProvider) testAndApply(actionName string, action *types.Action, request *types.APIContext) error {
+	input, err := handler.ParseAndValidateActionBody(request, request.Schemas.Schema(&managementschema.Version,
+		client.ActiveDirectoryTestAndApplyInputType))
+	if err != nil {
+		return err
+	}
 	configApplyInput := &v3.ActiveDirectoryTestAndApplyInput{}
-	if err := json.NewDecoder(request.Request.Body).Decode(configApplyInput); err != nil {
+	if err := mapstructure.Decode(input, configApplyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("Failed to parse body: %v", err))
 	}
