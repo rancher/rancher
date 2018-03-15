@@ -274,7 +274,7 @@ const JenkinsConfig = `<?xml version='1.0' encoding='UTF-8'?>
           <containers>
             <org.csanchez.jenkins.plugins.kubernetes.ContainerTemplate>
               <name>jnlp</name>
-              <image>jenkins/jnlp-slave:3.10-1</image>
+              <image>jenkins/jnlp-slave:3.10-1-alpine</image>
               <privileged>false</privileged>
               <alwaysPullImage>false</alwaysPullImage>
               <workingDir>/home/jenkins</workingDir>
