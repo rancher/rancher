@@ -25,7 +25,7 @@ func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.Act
 
 	lConn, err := ldap.NewLDAPConn(config, caPool)
 	if err != nil {
-		return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.ServerError, "error creating connection")
+		return v3.Principal{}, nil, nil, err
 	}
 	defer lConn.Close()
 
@@ -164,7 +164,7 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 	logrus.Debugf("Query for getPrincipal(%s): %s", distinguishedName, filter)
 	lConn, err := ldap.NewLDAPConn(config, caPool)
 	if err != nil {
-		return nil, fmt.Errorf("Error %v creating connection", err)
+		return nil, err
 	}
 	defer lConn.Close()
 	// Bind before query
@@ -344,7 +344,7 @@ func (p *adProvider) searchLdap(query string, scope string, config *v3.ActiveDir
 
 	lConn, err := ldap.NewLDAPConn(config, caPool)
 	if err != nil {
-		return []v3.Principal{}, fmt.Errorf("Error %v creating connection", err)
+		return []v3.Principal{}, err
 	}
 	// Bind before query
 	serviceAccountUsername := ldap.GetUserExternalID(config.ServiceAccountUsername, config.DefaultLoginDomain)
