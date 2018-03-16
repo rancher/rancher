@@ -55,7 +55,7 @@ func (m *templateManager) sync(key string, obj *v3.PodSecurityPolicyTemplate) er
 
 	for _, policy := range childPolicies {
 		if policy.Annotations[podSecurityVersionAnnotation] != obj.ResourceVersion {
-			_, err := fromTemplateExplicitName(m.policies, m.policyLister, policy.Name, obj)
+			_, err := fromTemplateExplicitName(m.policies, m.policyLister, policy.Name, obj, policy.Name)
 			if err != nil {
 				return err
 			}
@@ -66,12 +66,12 @@ func (m *templateManager) sync(key string, obj *v3.PodSecurityPolicyTemplate) er
 }
 func fromTemplate(policies v1beta12.PodSecurityPolicyInterface, policyLister v1beta12.PodSecurityPolicyLister,
 	key string, originalTemplate *v3.PodSecurityPolicyTemplate) (*v1beta1.PodSecurityPolicy, error) {
-	return fromTemplateExplicitName(policies, policyLister, keyToPolicyName(key), originalTemplate)
+	return fromTemplateExplicitName(policies, policyLister, keyToPolicyName(key), originalTemplate, key)
 }
 
 func fromTemplateExplicitName(policies v1beta12.PodSecurityPolicyInterface,
 	policyLister v1beta12.PodSecurityPolicyLister, key string,
-	originalTemplate *v3.PodSecurityPolicyTemplate) (*v1beta1.PodSecurityPolicy, error) {
+	originalTemplate *v3.PodSecurityPolicyTemplate, originalKey string) (*v1beta1.PodSecurityPolicy, error) {
 	template := originalTemplate.DeepCopy()
 
 	objectMeta := v1.ObjectMeta{}
@@ -79,6 +79,7 @@ func fromTemplateExplicitName(policies v1beta12.PodSecurityPolicyInterface,
 	objectMeta.Annotations = make(map[string]string)
 	objectMeta.Annotations[podSecurityTemplateParentAnnotation] = template.Name
 	objectMeta.Annotations[podSecurityVersionAnnotation] = template.ResourceVersion
+	objectMeta.Annotations[podSecurityPolicyTemplateKey] = originalKey
 
 	psp := &v1beta1.PodSecurityPolicy{
 		TypeMeta: v1.TypeMeta{
@@ -113,27 +114,27 @@ func doesPolicyExist(policyLister v1beta12.PodSecurityPolicyLister, name string)
 	return !errors.IsNotFound(err)
 }
 
-func getPodSecurityPolicyTemplateID(projectLister v3.ProjectLister, clusterLister v3.ClusterLister, projectID string,
+func getPodSecurityPolicyTemplateID(psptcbLister v3.PodSecurityPolicyTemplateProjectBindingLister, clusterLister v3.ClusterLister, projectID string,
 	clusterName string) (string, error) {
-	projects, err := projectLister.List("", labels.Everything())
+	psptpbs, err := psptcbLister.List("", labels.Everything())
 	if err != nil {
 		return "", fmt.Errorf("error getting projects: %v", err)
 	}
 
-	var project *v3.Project
+	var psptpb *v3.PodSecurityPolicyTemplateProjectBinding
 
-	for _, candidate := range projects {
-		if candidate.Name == projectID {
-			project = candidate
+	for _, candidate := range psptpbs {
+		candidateProjectID := strings.Split(candidate.ProjectID, ":")[1]
+		if candidateProjectID == projectID {
+			psptpb = candidate
 			break
 		}
 	}
 
-	if project == nil {
-		return "", nil
+	var podSecurityPolicyTemplateID string
+	if psptpb != nil {
+		podSecurityPolicyTemplateID = psptpb.PodSecurityPolicyTemplateID
 	}
-
-	podSecurityPolicyTemplateID := project.Spec.PodSecurityPolicyTemplateName
 
 	if podSecurityPolicyTemplateID == "" {
 		// check cluster
@@ -159,13 +160,13 @@ func keyToPolicyName(key string) string {
 }
 
 func updatePolicyIfOutdated(templateLister v3.PodSecurityPolicyTemplateLister,
-	policies v1beta12.PodSecurityPolicyInterface, policyLister v1beta12.PodSecurityPolicyLister, id string) error {
-	template, err := templateLister.Get("", id)
+	policies v1beta12.PodSecurityPolicyInterface, policyLister v1beta12.PodSecurityPolicyLister, templateID string, policyID string) error {
+	template, err := templateLister.Get("", templateID)
 	if err != nil {
 		return err
 	}
 
-	policy, err := policyLister.Get("", id)
+	policy, err := policyLister.Get("", policyID)
 	if err != nil {
 		return err
 	}

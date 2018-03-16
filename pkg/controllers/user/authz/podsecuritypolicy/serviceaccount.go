@@ -3,6 +3,7 @@ package podsecuritypolicy
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	v13 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/extensions/v1beta1"
@@ -39,6 +40,8 @@ func RegisterServiceAccount(context *config.UserContext) {
 		roleLister:      context.RBAC.ClusterRoles("").Controller().Lister(),
 		namespaceLister: context.Core.Namespaces("").Controller().Lister(),
 		projectLister:   context.Management.Management.Projects("").Controller().Lister(),
+		psptpbLister: context.Management.Management.PodSecurityPolicyTemplateProjectBindings("").
+			Controller().Lister(),
 	}
 
 	context.Core.ServiceAccounts("").AddHandler("ServiceAccountSyncHandler", m.sync)
@@ -56,6 +59,7 @@ type serviceAccountManager struct {
 	roles           v12.ClusterRoleInterface
 	namespaceLister v13.NamespaceLister
 	projectLister   v3.ProjectLister
+	psptpbLister    v3.PodSecurityPolicyTemplateProjectBindingLister
 }
 
 func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
@@ -90,7 +94,7 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 
 	clusterName, projectID := split[0], split[1]
 
-	podSecurityPolicyTemplateID, err := getPodSecurityPolicyTemplateID(m.projectLister, m.clusterLister, projectID,
+	podSecurityPolicyTemplateID, err := getPodSecurityPolicyTemplateID(m.psptpbLister, m.clusterLister, projectID,
 		clusterName)
 	if err != nil {
 		return err
@@ -98,7 +102,7 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 
 	if podSecurityPolicyTemplateID == "" {
 		// Do nothing
-		logrus.Debugf("no matching pod security policy template")
+		logrus.Debugf("no matching pod security policy template for %v", annotation)
 		return nil
 	}
 
@@ -110,7 +114,8 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 	var policy *v1beta12.PodSecurityPolicy
 
 	for _, candidate := range policies {
-		if candidate.Annotations[podSecurityTemplateParentAnnotation] == podSecurityPolicyTemplateID {
+		if candidate.Annotations[podSecurityTemplateParentAnnotation] == podSecurityPolicyTemplateID &&
+			candidate.Annotations[podSecurityPolicyTemplateKey] == key {
 			policy = candidate
 		}
 	}
@@ -172,8 +177,11 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 	return createBindingIfNotExists(m.bindings, m.bindingLister, obj, role.Name, policy.Name)
 }
 
+var locker = &sync.Mutex{}
+
 func createBindingIfNotExists(bindings2 v12.RoleBindingInterface, bindingLister v12.RoleBindingLister,
 	serviceAccount *v1.ServiceAccount, roleName string, policyName string) error {
+
 	bindings, err := bindingLister.List("", labels.Everything())
 	if err != nil {
 		return fmt.Errorf("error getting bindings: %v", err)
@@ -230,7 +238,7 @@ func createBinding(bindings v12.RoleBindingInterface, serviceAccount *v1.Service
 
 	_, err := bindings.Create(newBinding)
 	if err != nil {
-		return fmt.Errorf("error creating role binding for %v error was: %v", newBinding, err)
+		return fmt.Errorf("error creating role binding: %v", err)
 	}
 
 	return nil

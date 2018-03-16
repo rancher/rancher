@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/node"
 	"github.com/rancher/rancher/pkg/api/customization/nodetemplate"
 	"github.com/rancher/rancher/pkg/api/customization/pipeline"
+	projectaction "github.com/rancher/rancher/pkg/api/customization/project"
 	"github.com/rancher/rancher/pkg/api/customization/setting"
 	"github.com/rancher/rancher/pkg/api/store/cert"
 	"github.com/rancher/rancher/pkg/api/store/cluster"
@@ -66,6 +67,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.NodeDriverType,
 		client.NodeTemplateType,
 		client.PodSecurityPolicyTemplateType,
+		client.PodSecurityPolicyTemplateProjectBindingType,
 		client.PreferenceType,
 		client.ProjectLoggingType,
 		client.ProjectNetworkPolicyType,
@@ -102,6 +104,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	LoggingTypes(schemas)
 	Alert(schemas, apiContext)
 	Pipeline(schemas, apiContext)
+	Project(schemas, apiContext)
 
 	if err := NodeTypes(schemas, apiContext); err != nil {
 		return err
@@ -346,4 +349,13 @@ func Pipeline(schemas *types.Schemas, management *config.ScaledContext) {
 	schema.Store = userscope.NewStore(management.Core.Namespaces(""), schema.Store)
 	schema.Formatter = pipeline.SourceCodeRepositoryFormatter
 	schema.LinkHandler = sourceCodeRepositoryHandler.LinkHandler
+}
+
+func Project(schemas *types.Schemas, management *config.ScaledContext) {
+	schema := schemas.Schema(&managementschema.Version, client.ProjectType)
+	schema.Formatter = projectaction.Formatter
+	handler := &projectaction.Handler{
+		ProjectClient: management.Management.Projects(""),
+	}
+	schema.ActionHandler = handler.Actions
 }

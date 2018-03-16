@@ -2,7 +2,6 @@ package podsecuritypolicy
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/extensions/v1beta1"
@@ -22,13 +21,17 @@ func RegisterProject(context *config.UserContext) {
 		policies:     context.Extensions.PodSecurityPolicies(""),
 		templateLister: context.Management.Management.PodSecurityPolicyTemplates("").Controller().
 			Lister(),
-		projectLister:        context.Management.Management.Projects("").Controller().Lister(),
+		projectLister: context.Management.Management.Projects("").Controller().Lister(),
+		psptpbLister: context.Management.Management.PodSecurityPolicyTemplateProjectBindings("").
+			Controller().Lister(),
+		psptpb:               context.Management.Management.PodSecurityPolicyTemplateProjectBindings(""),
 		clusterLister:        context.Management.Management.Clusters("").Controller().Lister(),
 		serviceAccountLister: context.Core.ServiceAccounts("").Controller().Lister(),
 		serviceAccounts:      context.Core.ServiceAccounts("").Controller(),
 	}
 
-	context.Management.Management.Projects("").AddHandler("ProjectSyncHandler", m.sync)
+	context.Management.Management.PodSecurityPolicyTemplateProjectBindings("").
+		AddHandler("PodSecurityPolicyTemplateProjectBindingsSyncHandler", m.sync)
 }
 
 type projectManager struct {
@@ -36,36 +39,19 @@ type projectManager struct {
 	projectLister        v3.ProjectLister
 	policyLister         v1beta1.PodSecurityPolicyLister
 	policies             v1beta1.PodSecurityPolicyInterface
+	psptpb               v3.PodSecurityPolicyTemplateProjectBindingInterface
+	psptpbLister         v3.PodSecurityPolicyTemplateProjectBindingLister
 	templateLister       v3.PodSecurityPolicyTemplateLister
 	serviceAccountLister v1.ServiceAccountLister
 	serviceAccounts      v1.ServiceAccountController
 }
 
-func (m *projectManager) sync(key string, obj *v3.Project) error {
+func (m *projectManager) sync(key string, obj *v3.PodSecurityPolicyTemplateProjectBinding) error {
 	if obj == nil {
 		return nil
 	}
 
-	split := strings.Split(key, "/")
-
-	if len(split) != 2 {
-		return fmt.Errorf("could not parse project id annotation: %v", key)
-	}
-
-	clusterName, projectID := split[0], split[1]
-
-	podSecurityPolicyTemplateID, err := getPodSecurityPolicyTemplateID(m.projectLister, m.clusterLister, projectID,
-		clusterName)
-	if err != nil {
-		return err
-	}
-
-	if podSecurityPolicyTemplateID == "" {
-		logrus.Debugf("no pod security policy template is assigned to %v", key)
-		return nil
-	}
-
-	template, err := m.templateLister.Get("", podSecurityPolicyTemplateID)
+	template, err := m.templateLister.Get("", obj.PodSecurityPolicyTemplateID)
 	if err != nil {
 		return fmt.Errorf("error getting pod security policy template: %v", err)
 	}

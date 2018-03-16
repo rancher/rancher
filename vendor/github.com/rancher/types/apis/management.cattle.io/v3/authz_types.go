@@ -116,3 +116,7 @@ type ClusterRoleTemplateBinding struct {
 	ClusterName        string `json:"clusterName,omitempty" norman:"required,type=reference[cluster]"`
 	RoleTemplateName   string `json:"roleTemplateName,omitempty" norman:"required,type=reference[roleTemplate]"`
 }
+
+type SetPodSecurityPolicyTemplateInput struct {
+	PodSecurityPolicyTemplate string `json:"podSecurityPolicyTemplate" norman:"required"`
+}
