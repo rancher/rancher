@@ -172,6 +172,9 @@ func convertHostPortToEndpoint(pod *corev1.Pod, clusterName string, node *manage
 	if pod.Status.Phase != corev1.PodRunning {
 		return eps, nil
 	}
+	if node == nil {
+		return eps, nil
+	}
 	for _, c := range pod.Spec.Containers {
 		for _, p := range c.Ports {
 			if p.HostPort == 0 {
