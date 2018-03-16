@@ -51,6 +51,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&RoleTemplateList{},
 		&PodSecurityPolicyTemplate{},
 		&PodSecurityPolicyTemplateList{},
+		&PodSecurityPolicyTemplateProjectBinding{},
+		&PodSecurityPolicyTemplateProjectBindingList{},
 		&ClusterRoleTemplateBinding{},
 		&ClusterRoleTemplateBindingList{},
 		&ProjectRoleTemplateBinding{},
@@ -111,10 +113,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&PipelineExecutionLogList{},
 		&SourceCodeRepository{},
 		&SourceCodeRepositoryList{},
-		&GlobalComposeConfig{},
-		&GlobalComposeConfigList{},
-		&ClusterComposeConfig{},
-		&ClusterComposeConfigList{},
 	)
 	return nil
 }

@@ -39,7 +39,7 @@ const (
 	PersistentVolumeFieldScaleIO                       = "scaleIO"
 	PersistentVolumeFieldState                         = "state"
 	PersistentVolumeFieldStatus                        = "status"
-	PersistentVolumeFieldStorageClassId                = "storageClassId"
+	PersistentVolumeFieldStorageClassName              = "storageClassName"
 	PersistentVolumeFieldStorageOS                     = "storageos"
 	PersistentVolumeFieldTransitioning                 = "transitioning"
 	PersistentVolumeFieldTransitioningMessage          = "transitioningMessage"
@@ -82,7 +82,7 @@ type PersistentVolume struct {
 	ScaleIO                       *ScaleIOVolumeSource              `json:"scaleIO,omitempty" yaml:"scaleIO,omitempty"`
 	State                         string                            `json:"state,omitempty" yaml:"state,omitempty"`
 	Status                        *PersistentVolumeStatus           `json:"status,omitempty" yaml:"status,omitempty"`
-	StorageClassId                string                            `json:"storageClassId,omitempty" yaml:"storageClassId,omitempty"`
+	StorageClassName              string                            `json:"storageClassName,omitempty" yaml:"storageClassName,omitempty"`
 	StorageOS                     *StorageOSPersistentVolumeSource  `json:"storageos,omitempty" yaml:"storageos,omitempty"`
 	Transitioning                 string                            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage          string                            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`

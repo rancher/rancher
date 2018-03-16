@@ -34,8 +34,7 @@ var (
 		Init(globalTypes).
 		Init(rkeTypes).
 		Init(alertTypes).
-		Init(pipelineTypes).
-		Init(composeType)
+		Init(pipelineTypes)
 
 	TokenSchemas = factory.Schemas(&Version).
 			Init(tokens)
@@ -150,6 +149,9 @@ func authzTypes(schemas *types.Schemas) *types.Schemas {
 			&m.Embed{Field: "status"}).
 		AddMapperForType(&Version, v3.GlobalRole{}, m.DisplayName{}).
 		AddMapperForType(&Version, v3.RoleTemplate{}, m.DisplayName{}).
+		AddMapperForType(&Version,
+			v3.PodSecurityPolicyTemplateProjectBinding{},
+			&mapper.NamespaceIDMapper{}).
 		AddMapperForType(&Version, v3.ProjectRoleTemplateBinding{},
 			&mapper.NamespaceIDMapper{},
 		).
@@ -166,6 +168,7 @@ func authzTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.GlobalRoleBinding{}).
 		MustImport(&Version, v3.RoleTemplate{}).
 		MustImport(&Version, v3.PodSecurityPolicyTemplate{}).
+		MustImport(&Version, v3.PodSecurityPolicyTemplateProjectBinding{}).
 		MustImport(&Version, v3.ClusterRoleTemplateBinding{}).
 		MustImport(&Version, v3.ProjectRoleTemplateBinding{}).
 		MustImport(&Version, v3.GlobalRoleBinding{})
@@ -446,9 +449,4 @@ func pipelineTypes(schema *types.Schemas) *types.Schemas {
 			delete(schema.ResourceFields, "namespaceId")
 		})
 
-}
-
-func composeType(schemas *types.Schemas) *types.Schemas {
-	return schemas.MustImport(&Version, v3.GlobalComposeConfig{}).
-		MustImport(&Version, v3.ClusterComposeConfig{})
 }

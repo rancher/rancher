@@ -45,10 +45,9 @@ type ProjectCondition struct {
 }
 
 type ProjectSpec struct {
-	DisplayName                   string `json:"displayName,omitempty" norman:"required"`
-	Description                   string `json:"description"`
-	ClusterName                   string `json:"clusterName,omitempty" norman:"required,type=reference[cluster]"`
-	PodSecurityPolicyTemplateName string `json:"podSecurityPolicyTemplateName,omitempty" norman:"type=reference[podSecurityPolicyTemplate]"`
+	DisplayName string `json:"displayName,omitempty" norman:"required"`
+	Description string `json:"description"`
+	ClusterName string `json:"clusterName,omitempty" norman:"required,type=reference[cluster]"`
 }
 
 type GlobalRole struct {
@@ -89,6 +88,15 @@ type PodSecurityPolicyTemplate struct {
 
 	Description string                      `json:"description"`
 	Spec        extv1.PodSecurityPolicySpec `json:"spec,omitempty"`
+}
+
+type PodSecurityPolicyTemplateProjectBinding struct {
+	types.Namespaced
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	PodSecurityPolicyTemplateID string `json:"podSecurityPolicyTemplate" norman:"required"`
+	ProjectID                   string `json:"projectId" norman:"required"`
 }
 
 type ProjectRoleTemplateBinding struct {

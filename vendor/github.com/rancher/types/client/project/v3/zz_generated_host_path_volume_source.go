@@ -2,11 +2,11 @@ package client
 
 const (
 	HostPathVolumeSourceType      = "hostPathVolumeSource"
-	HostPathVolumeSourceFieldKind = "kind"
 	HostPathVolumeSourceFieldPath = "path"
+	HostPathVolumeSourceFieldType = "type"
 )
 
 type HostPathVolumeSource struct {
-	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
 	Path string `json:"path,omitempty" yaml:"path,omitempty"`
+	Type string `json:"type,omitempty" yaml:"type,omitempty"`
 }
