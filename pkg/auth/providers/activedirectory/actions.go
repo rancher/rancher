@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/mitchellh/mapstructure"
-	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -72,10 +71,7 @@ func (p *adProvider) testAndApply(actionName string, action *types.Action, reque
 
 	userPrincipal, groupPrincipals, providerInfo, err := p.loginUser(login, config, caPool)
 	if err != nil {
-		if httperror.IsAPIError(err) {
-			return err
-		}
-		return errors.Wrap(err, "server error while authenticating")
+		return err
 	}
 
 	//if this works, save adConfig CR adding enabled flag
