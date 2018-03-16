@@ -18,7 +18,7 @@ func NewListPermissionStore(client v1.Interface) *ListPermissionStore {
 
 type ListPermissionSet map[ListPermission]bool
 
-func (l ListPermissionSet) Access(namespace, name string) bool {
+func (l ListPermissionSet) HasAccess(namespace, name string) bool {
 	return l[ListPermission{
 		Namespace: namespace,
 		Name:      name,
@@ -30,17 +30,17 @@ type ListPermission struct {
 	Name      string
 }
 
-func (l *ListPermissionStore) UserPermissions(name, apiGroup, resource string) ListPermissionSet {
-	return getFromIndex(name, apiGroup, resource, l.users)
+func (l *ListPermissionStore) UserPermissions(subjectName, apiGroup, resource string) ListPermissionSet {
+	return getFromIndex(subjectName, apiGroup, resource, l.users)
 }
 
-func (l *ListPermissionStore) GroupPermissions(name, apiGroup, resource string) ListPermissionSet {
-	return getFromIndex(name, apiGroup, resource, l.groups)
+func (l *ListPermissionStore) GroupPermissions(subjectName, apiGroup, resource string) ListPermissionSet {
+	return getFromIndex(subjectName, apiGroup, resource, l.groups)
 }
 
-func getFromIndex(name, apiGroup, resource string, index *permissionIndex) ListPermissionSet {
+func getFromIndex(subjectName, apiGroup, resource string, index *permissionIndex) ListPermissionSet {
 	result := ListPermissionSet{}
-	for _, value := range index.get(name, apiGroup, resource) {
+	for _, value := range index.get(subjectName, apiGroup, resource) {
 		result[value] = true
 	}
 	return result
