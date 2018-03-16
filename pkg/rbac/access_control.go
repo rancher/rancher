@@ -40,10 +40,10 @@ func (a *AccessControl) Filter(apiContext *types.APIContext, schema *types.Schem
 func (a *AccessControl) canAccess(obj map[string]interface{}, permset ListPermissionSet) bool {
 	namespace, _ := obj["namespaceId"].(string)
 	id, _ := obj["id"].(string)
-	if permset.Access(namespace, "*") || permset.Access("*", "*") {
+	if permset.HasAccess(namespace, "*") || permset.HasAccess("*", "*") {
 		return true
 	}
-	return permset.Access(namespace, strings.TrimPrefix(id, namespace+":"))
+	return permset.HasAccess(namespace, strings.TrimPrefix(id, namespace+":"))
 }
 
 func (a *AccessControl) FilterList(apiContext *types.APIContext, schema *types.Schema, objs []map[string]interface{}, context map[string]string) []map[string]interface{} {
@@ -58,7 +58,7 @@ func (a *AccessControl) FilterList(apiContext *types.APIContext, schema *types.S
 
 	result := make([]map[string]interface{}, 0, len(objs))
 
-	all := permset.Access("*", "*")
+	all := permset.HasAccess("*", "*")
 
 	for _, obj := range objs {
 		if all {

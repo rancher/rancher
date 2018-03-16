@@ -17,20 +17,20 @@ func newIndexes(client v1.Interface) (user *permissionIndex, group *permissionIn
 	client.ClusterRoleBindings("").Controller().Informer().
 		AddIndexers(cache.Indexers{
 			"crbUser": func(obj interface{}) ([]string, error) {
-				return clusterRoleBindingIndexer("User", obj)
+				return clusterRoleBindingBySubject("User", obj)
 			},
 			"crbGroup": func(obj interface{}) ([]string, error) {
-				return clusterRoleBindingIndexer("Group", obj)
+				return clusterRoleBindingBySubject("Group", obj)
 			},
 		})
 
 	client.RoleBindings("").Controller().Informer().
 		AddIndexers(cache.Indexers{
 			"rbUser": func(obj interface{}) ([]string, error) {
-				return roleBindingIndexer("User", obj)
+				return roleBindingBySubject("User", obj)
 			},
 			"rbGroup": func(obj interface{}) ([]string, error) {
-				return roleBindingIndexer("Group", obj)
+				return roleBindingBySubject("Group", obj)
 			},
 		})
 
@@ -55,7 +55,7 @@ func newIndexes(client v1.Interface) (user *permissionIndex, group *permissionIn
 	return
 }
 
-func clusterRoleBindingIndexer(kind string, obj interface{}) ([]string, error) {
+func clusterRoleBindingBySubject(kind string, obj interface{}) ([]string, error) {
 	var result []string
 	crb := obj.(*rbacv1.ClusterRoleBinding)
 	for _, subject := range crb.Subjects {
@@ -66,7 +66,7 @@ func clusterRoleBindingIndexer(kind string, obj interface{}) ([]string, error) {
 	return result, nil
 }
 
-func roleBindingIndexer(kind string, obj interface{}) ([]string, error) {
+func roleBindingBySubject(kind string, obj interface{}) ([]string, error) {
 	var result []string
 	crb := obj.(*rbacv1.RoleBinding)
 	for _, subject := range crb.Subjects {
@@ -86,10 +86,10 @@ type permissionIndex struct {
 	clusterRoleIndexKey string
 }
 
-func (p *permissionIndex) get(name, apiGroup, resource string) []ListPermission {
+func (p *permissionIndex) get(subjectName, apiGroup, resource string) []ListPermission {
 	var result []ListPermission
 
-	for _, binding := range p.getRoleBindings(name) {
+	for _, binding := range p.getRoleBindings(subjectName) {
 		if binding.RoleRef.APIGroup != rbacGroup {
 			continue
 		}
@@ -97,7 +97,7 @@ func (p *permissionIndex) get(name, apiGroup, resource string) []ListPermission 
 		result = p.filterPermissions(result, binding.Namespace, binding.RoleRef.Kind, binding.RoleRef.Name, apiGroup, resource)
 	}
 
-	for _, binding := range p.getClusterRoleBindings(name) {
+	for _, binding := range p.getClusterRoleBindings(subjectName) {
 		if binding.RoleRef.APIGroup != rbacGroup {
 			continue
 		}
@@ -141,10 +141,10 @@ func (p *permissionIndex) filterPermissions(result []ListPermission, namespace, 
 	return result
 }
 
-func (p *permissionIndex) getClusterRoleBindings(name string) []*rbacv1.ClusterRoleBinding {
+func (p *permissionIndex) getClusterRoleBindings(subjectName string) []*rbacv1.ClusterRoleBinding {
 	var result []*rbacv1.ClusterRoleBinding
 
-	objs, err := p.crbIndexer.ByIndex(p.clusterRoleIndexKey, name)
+	objs, err := p.crbIndexer.ByIndex(p.clusterRoleIndexKey, subjectName)
 	if err != nil {
 		return result
 	}
@@ -156,10 +156,10 @@ func (p *permissionIndex) getClusterRoleBindings(name string) []*rbacv1.ClusterR
 	return result
 }
 
-func (p *permissionIndex) getRoleBindings(name string) []*rbacv1.RoleBinding {
+func (p *permissionIndex) getRoleBindings(subjectName string) []*rbacv1.RoleBinding {
 	var result []*rbacv1.RoleBinding
 
-	objs, err := p.rbIndexer.ByIndex(p.roleIndexKey, name)
+	objs, err := p.rbIndexer.ByIndex(p.roleIndexKey, subjectName)
 	if err != nil {
 		return result
 	}
