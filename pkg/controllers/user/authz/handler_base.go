@@ -20,23 +20,31 @@ import (
 )
 
 const (
-	rtbOwnerLabel            = "authz.cluster.cattle.io/rtb-owner"
-	projectIDAnnotation      = "field.cattle.io/projectId"
-	prtbByProjectIndex       = "authz.cluster.cattle.io/prtb-by-project"
-	prtbByProjecSubjectIndex = "authz.cluster.cattle.io/prtb-by-project-subject"
-	nsByProjectIndex         = "authz.cluster.cattle.io/ns-by-project"
-	crByNSIndex              = "authz.cluster.cattle.io/cr-by-ns"
-	crbByRoleAndSubjectIndex = "authz.cluster.cattle.io/crb-by-role-and-subject"
+	rtbOwnerLabel                    = "authz.cluster.cattle.io/rtb-owner"
+	projectIDAnnotation              = "field.cattle.io/projectId"
+	prtbByProjectIndex               = "authz.cluster.cattle.io/prtb-by-project"
+	prtbByProjecSubjectIndex         = "authz.cluster.cattle.io/prtb-by-project-subject"
+	rtbByClusterAndRoleTemplateIndex = "authz.cluster.cattle.io/rtb-by-cluster-rt"
+	nsByProjectIndex                 = "authz.cluster.cattle.io/ns-by-project"
+	crByNSIndex                      = "authz.cluster.cattle.io/cr-by-ns"
+	crbByRoleAndSubjectIndex         = "authz.cluster.cattle.io/crb-by-role-and-subject"
 )
 
 func Register(workload *config.UserContext) {
 	// Add cache informer to project role template bindings
 	informer := workload.Management.Management.ProjectRoleTemplateBindings("").Controller().Informer()
 	indexers := map[string]cache.IndexFunc{
-		prtbByProjectIndex:       prtbByProjectName,
-		prtbByProjecSubjectIndex: prtbByProjectAndSubject,
+		prtbByProjectIndex:               prtbByProjectName,
+		prtbByProjecSubjectIndex:         prtbByProjectAndSubject,
+		rtbByClusterAndRoleTemplateIndex: rtbByClusterAndRoleTemplateName,
 	}
 	informer.AddIndexers(indexers)
+
+	crtbInformer := workload.Management.Management.ClusterRoleTemplateBindings("").Controller().Informer()
+	crtbIndexers := map[string]cache.IndexFunc{
+		rtbByClusterAndRoleTemplateIndex: rtbByClusterAndRoleTemplateName,
+	}
+	crtbInformer.AddIndexers(crtbIndexers)
 
 	// Index for looking up namespaces by projectID annotation
 	nsInformer := workload.Core.Namespaces("").Controller().Informer()
@@ -62,6 +70,7 @@ func Register(workload *config.UserContext) {
 	r := &manager{
 		workload:      workload,
 		prtbIndexer:   informer.GetIndexer(),
+		crtbIndexer:   crtbInformer.GetIndexer(),
 		nsIndexer:     nsInformer.GetIndexer(),
 		crIndexer:     crInformer.GetIndexer(),
 		crbIndexer:    crbInformer.GetIndexer(),
@@ -76,7 +85,7 @@ func Register(workload *config.UserContext) {
 	workload.Management.Management.Projects("").AddClusterScopedLifecycle("project-namespace-auth", workload.ClusterName, newProjectLifecycle(r))
 	workload.Management.Management.ProjectRoleTemplateBindings("").AddClusterScopedLifecycle("cluster-prtb-sync", workload.ClusterName, newPRTBLifecycle(r))
 	workload.Management.Management.ClusterRoleTemplateBindings("").AddClusterScopedLifecycle("cluster-crtb-sync", workload.ClusterName, newCRTBLifecycle(r))
-	workload.Management.Management.RoleTemplates("").AddClusterScopedLifecycle("cluster-roletemplate-sync", workload.ClusterName, newRTLifecycle(r))
+	workload.Management.Management.RoleTemplates("").AddLifecycle("cluster-roletemplate-sync", newRTLifecycle(r))
 	workload.Core.Namespaces("").AddLifecycle("namespace-auth", newNamespaceLifecycle(r))
 }
 
@@ -84,6 +93,7 @@ type manager struct {
 	workload      *config.UserContext
 	rtLister      v3.RoleTemplateLister
 	prtbIndexer   cache.Indexer
+	crtbIndexer   cache.Indexer
 	nsIndexer     cache.Indexer
 	crIndexer     cache.Indexer
 	crbIndexer    cache.Indexer
@@ -430,4 +440,26 @@ func crbByRoleAndSubject(obj interface{}) ([]string, error) {
 	}
 
 	return crbRoleSubjectKeys(crb.RoleRef.Name, crb.Subjects), nil
+}
+
+func rtbByClusterAndRoleTemplateName(obj interface{}) ([]string, error) {
+	var idx string
+	switch rtb := obj.(type) {
+	case *v3.ProjectRoleTemplateBinding:
+		if rtb.RoleTemplateName != "" && rtb.ProjectName != "" {
+			parts := strings.SplitN(rtb.ProjectName, ":", 2)
+			if len(parts) == 2 {
+				idx = parts[0] + "-" + rtb.RoleTemplateName
+			}
+		}
+	case *v3.ClusterRoleTemplateBinding:
+		if rtb.RoleTemplateName != "" && rtb.ClusterName != "" {
+			idx = rtb.ClusterName + "-" + rtb.RoleTemplateName
+		}
+	}
+
+	if idx == "" {
+		return []string{}, nil
+	}
+	return []string{idx}, nil
 }

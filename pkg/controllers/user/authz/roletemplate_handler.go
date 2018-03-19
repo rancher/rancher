@@ -11,18 +11,41 @@ func newRTLifecycle(m *manager) *rtLifecycle {
 	return &rtLifecycle{m: m}
 }
 
+// rtLifecycle is responsible for ensuring that roleTemplates and their corresponding clusterRoles stay in sync.
+// This means that if a roleTemplate's rules change, this handler will ensure the corresponding clusterRole's rules are changed
+// and if a roleTemplate is removed, the corresponding clusterROle is removed.
+// This handler does not create new clusterRoles. They are created on the fly when a ProjectRoleTemplateBinding or
+// ClusterRoleTemplateBinding references the roleTemplates. This handler only ensures they remain in-sync after being created
 type rtLifecycle struct {
 	m *manager
 }
 
 func (c *rtLifecycle) Create(obj *v3.RoleTemplate) (*v3.RoleTemplate, error) {
-	err := c.syncRT(obj)
-	return obj, err
+	return obj, nil
 }
 
 func (c *rtLifecycle) Updated(obj *v3.RoleTemplate) (*v3.RoleTemplate, error) {
-	err := c.syncRT(obj)
-	return obj, err
+	// checky if there are any PRTBs/CRTBs referencing this RoleTemplate for this cluster
+	prtbs, err := c.m.prtbIndexer.ByIndex(rtbByClusterAndRoleTemplateIndex, c.m.workload.ClusterName+"-"+obj.Name)
+	if err != nil {
+		return obj, err
+	}
+	hasRTBs := len(prtbs) > 0
+	if !hasRTBs {
+		crtbs, err := c.m.crtbIndexer.ByIndex(rtbByClusterAndRoleTemplateIndex, c.m.workload.ClusterName+"-"+obj.Name)
+		if err != nil {
+			return obj, err
+		}
+		hasRTBs = len(crtbs) > 0
+	}
+
+	// No RTBs referencing this RoleTemplate in this cluster, do not attempt to sync
+	if !hasRTBs {
+		return nil, nil
+	}
+
+	err = c.syncRT(obj)
+	return nil, err
 }
 
 func (c *rtLifecycle) Remove(obj *v3.RoleTemplate) (*v3.RoleTemplate, error) {
@@ -44,17 +67,10 @@ func (c *rtLifecycle) syncRT(template *v3.RoleTemplate) error {
 }
 
 func (c *rtLifecycle) ensureRTDelete(template *v3.RoleTemplate) error {
-	roles := map[string]*v3.RoleTemplate{}
-	if err := c.m.gatherRoles(template, roles); err != nil {
-		return err
-	}
-
 	roleCli := c.m.workload.K8sClient.RbacV1().ClusterRoles()
-	for _, role := range roles {
-		if err := roleCli.Delete(role.Name, &metav1.DeleteOptions{}); err != nil {
-			if !apierrors.IsNotFound(err) {
-				return errors.Wrapf(err, "error deleting clusterrole %v", role.Name)
-			}
+	if err := roleCli.Delete(template.Name, &metav1.DeleteOptions{}); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return errors.Wrapf(err, "error deleting clusterrole %v", template.Name)
 		}
 	}
 
