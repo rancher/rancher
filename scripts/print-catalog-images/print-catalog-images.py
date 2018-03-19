@@ -172,8 +172,14 @@ def version_images(service_version_dir):
                 filedata = re.sub(r'{{' + re.escape(k) + '}}', v, filedata)
             filedata, subs = re.subn('{{[^}]*}}', '', filedata)
     elif os.path.isfile(compose_filepath):
+        newfiledata = ''
         with open(compose_filepath, 'r') as f:
             filedata = f.read()
+            for line in filedata.splitlines():
+                if '{{' in line:
+                    continue
+                newfiledata += line + "\n"
+        filedata = newfiledata
     else:
         print "missing docker-compose.yml[.tpl]"
         return images
