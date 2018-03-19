@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,11 +13,13 @@ import (
 	"strings"
 	"time"
 
-	"net/url"
-
+	"github.com/rancher/rancher/pkg/auth/providers/local"
+	"github.com/rancher/rancher/pkg/randomtoken"
+	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	managementv3 "github.com/rancher/types/client/management/v3"
 	"golang.org/x/net/context"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -133,4 +136,35 @@ func ParseExternalID(externalID string) (string, error) {
 	template := values.Query().Get("template")
 	version := values.Query().Get("version")
 	return strings.Join([]string{catalog, base, template, version}, "-"), nil
+}
+
+const userIDLabel = "authn.management.cattle.io/token-userId"
+
+func GenerateToken(user *mgmtv3.User, prefix string, tokenClient mgmtv3.TokenInterface) (string, error) {
+	token := mgmtv3.Token{
+		TTLMillis:    0,
+		Description:  "token for helm chart deployment",
+		UserID:       user.Name,
+		AuthProvider: local.Name,
+		IsDerived:    true,
+	}
+	key, err := randomtoken.Generate()
+	if err != nil {
+		return "", fmt.Errorf("failed to generate token key")
+	}
+
+	labels := make(map[string]string)
+	labels[userIDLabel] = token.UserID
+
+	token.Token = key
+	token.ObjectMeta = metav1.ObjectMeta{
+		Name:   prefix + user.Name,
+		Labels: labels,
+	}
+	createdToken, err := tokenClient.Create(&token)
+
+	if err != nil {
+		return "", err
+	}
+	return createdToken.Name + ":" + createdToken.Token, nil
 }

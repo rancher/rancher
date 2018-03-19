@@ -16,7 +16,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	"github.com/rancher/rancher/pkg/controllers/user/helm"
+	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	hutils "github.com/rancher/rancher/pkg/controllers/user/helm/utils"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
@@ -36,7 +36,7 @@ const (
 
 type ActionWrapper struct {
 	Clusters         v3.ClusterInterface
-	KubeConfigGetter helm.KubeConfigGetter
+	KubeConfigGetter common.KubeConfigGetter
 }
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {

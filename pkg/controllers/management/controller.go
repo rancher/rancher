@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusterlocal"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstats"
+	"github.com/rancher/rancher/pkg/controllers/management/compose"
 	"github.com/rancher/rancher/pkg/controllers/management/node"
 	"github.com/rancher/rancher/pkg/controllers/management/nodedriver"
 	"github.com/rancher/rancher/pkg/controllers/management/nodepool"
@@ -32,10 +33,10 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	clusterlocal.Register(management)
 	clusterprovisioner.Register(management)
 	clusterstats.Register(management)
+	compose.Register(management, manager)
 	nodedriver.Register(management)
 	nodepool.Register(management)
 	node.Register(management)
 	usercontrollers.Register(ctx, management, manager)
-
 	auth.RegisterLate(ctx, management)
 }
