@@ -29,7 +29,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/principals"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/clustermanager"
-	"github.com/rancher/rancher/pkg/controllers/user/helm"
+	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	"github.com/rancher/rancher/pkg/nodeconfig"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	projectschema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
@@ -57,6 +57,8 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.ClusterRegistrationTokenType,
 		client.ClusterRoleTemplateBindingType,
 		client.ClusterType,
+		client.ClusterComposeConfigType,
+		client.GlobalComposeConfigType,
 		client.DynamicSchemaType,
 		client.GlobalRoleBindingType,
 		client.GlobalRoleType,
@@ -86,7 +88,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.TokenType,
 		client.UserType)
 	createCrd(ctx, wg, factory, schemas, &projectschema.Version,
-		projectclient.AppType)
+		projectclient.AppType, projectclient.NamespaceComposeConfigType)
 
 	wg.Wait()
 
@@ -261,7 +263,7 @@ func NodeTypes(schemas *types.Schemas, management *config.ScaledContext) error {
 	return nil
 }
 
-func App(schemas *types.Schemas, management *config.ScaledContext, kubeConfigGetter helm.KubeConfigGetter) {
+func App(schemas *types.Schemas, management *config.ScaledContext, kubeConfigGetter common.KubeConfigGetter) {
 	schema := schemas.Schema(&projectschema.Version, projectclient.AppType)
 	actionWrapper := app.ActionWrapper{
 		Clusters:         management.Management.Clusters(""),

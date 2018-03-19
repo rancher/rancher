@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/rancher/norman/types/slice"
+	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	hutils "github.com/rancher/rancher/pkg/controllers/user/helm/utils"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
@@ -20,7 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 const (
@@ -28,11 +28,7 @@ const (
 	description     = "token for helm chart deployment"
 )
 
-type KubeConfigGetter interface {
-	KubeConfig(clusterName, token string) *clientcmdapi.Config
-}
-
-func Register(user *config.UserContext, kubeConfigGetter KubeConfigGetter) {
+func Register(user *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
 	appClient := user.Management.Project.Apps("")
 	stackLifecycle := &Lifecycle{
 		KubeConfigGetter:      kubeConfigGetter,
@@ -48,7 +44,7 @@ func Register(user *config.UserContext, kubeConfigGetter KubeConfigGetter) {
 }
 
 type Lifecycle struct {
-	KubeConfigGetter      KubeConfigGetter
+	KubeConfigGetter      common.KubeConfigGetter
 	UserManager           user.Manager
 	TokenClient           mgmtv3.TokenInterface
 	UserClient            mgmtv3.UserInterface
@@ -183,7 +179,6 @@ func (l *Lifecycle) Run(obj *v3.App, action, templateVersionID string) error {
 	if err != nil {
 		return err
 	}
-
 	token, err := l.UserManager.EnsureToken(helmTokenPrefix+user.Name, description, user.Name)
 	if err != nil {
 		return err

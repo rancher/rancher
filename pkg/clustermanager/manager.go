@@ -325,3 +325,7 @@ func (m *Manager) KubeConfig(clusterName, token string) *clientcmdapi.Config {
 		},
 	}
 }
+
+func (m *Manager) GetHTTPSPort() int {
+	return m.httpsPort
+}
