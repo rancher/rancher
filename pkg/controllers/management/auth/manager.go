@@ -35,16 +35,17 @@ func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *cr
 	rbInformer.AddIndexers(rbIndexers)
 
 	mgr := &manager{
-		mgmt:       management,
-		crbLister:  management.RBAC.ClusterRoleBindings("").Controller().Lister(),
-		crLister:   management.RBAC.ClusterRoles("").Controller().Lister(),
-		rLister:    management.RBAC.Roles("").Controller().Lister(),
-		rbLister:   management.RBAC.RoleBindings("").Controller().Lister(),
-		rtLister:   management.Management.RoleTemplates("").Controller().Lister(),
-		nsLister:   management.Core.Namespaces("").Controller().Lister(),
-		rbIndexer:  rbInformer.GetIndexer(),
-		crbIndexer: crbInformer.GetIndexer(),
-		userMGR:    management.UserManager,
+		mgmt:          management,
+		projectLister: management.Management.Projects("").Controller().Lister(),
+		crbLister:     management.RBAC.ClusterRoleBindings("").Controller().Lister(),
+		crLister:      management.RBAC.ClusterRoles("").Controller().Lister(),
+		rLister:       management.RBAC.Roles("").Controller().Lister(),
+		rbLister:      management.RBAC.RoleBindings("").Controller().Lister(),
+		rtLister:      management.Management.RoleTemplates("").Controller().Lister(),
+		nsLister:      management.Core.Namespaces("").Controller().Lister(),
+		rbIndexer:     rbInformer.GetIndexer(),
+		crbIndexer:    crbInformer.GetIndexer(),
+		userMGR:       management.UserManager,
 	}
 	prtb := &prtbLifecycle{
 		mgr:           mgr,
@@ -59,16 +60,17 @@ func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *cr
 }
 
 type manager struct {
-	crLister   typesrbacv1.ClusterRoleLister
-	rLister    typesrbacv1.RoleLister
-	rbLister   typesrbacv1.RoleBindingLister
-	crbLister  typesrbacv1.ClusterRoleBindingLister
-	rtLister   v3.RoleTemplateLister
-	nsLister   v13.NamespaceLister
-	rbIndexer  cache.Indexer
-	crbIndexer cache.Indexer
-	mgmt       *config.ManagementContext
-	userMGR    user.Manager
+	projectLister v3.ProjectLister
+	crLister      typesrbacv1.ClusterRoleLister
+	rLister       typesrbacv1.RoleLister
+	rbLister      typesrbacv1.RoleBindingLister
+	crbLister     typesrbacv1.ClusterRoleBindingLister
+	rtLister      v3.RoleTemplateLister
+	nsLister      v13.NamespaceLister
+	rbIndexer     cache.Indexer
+	crbIndexer    cache.Indexer
+	mgmt          *config.ManagementContext
+	userMGR       user.Manager
 }
 
 // When a CRTB is created that gives a subject some permissions in a project or cluster, we need to create a "membership" binding
@@ -374,20 +376,9 @@ func (m *manager) grantManagementPlanePrivileges(roleTemplateName string, resour
 	}
 	namespace := bindingMeta.GetNamespace()
 
-	// gather roles that have rules for mgmt plane resources
-	rt, err := m.rtLister.Get("", roleTemplateName)
+	roles, err := m.gatherAndDedupeRoles(roleTemplateName)
 	if err != nil {
 		return err
-	}
-	allRoles := map[string]*v3.RoleTemplate{}
-	if err := m.gatherRoleTemplates(rt, allRoles); err != nil {
-		return err
-	}
-
-	//de-dupe
-	roles := map[string]*v3.RoleTemplate{}
-	for _, role := range allRoles {
-		roles[role.Name] = role
 	}
 
 	desiredRBs := map[string]*v1.RoleBinding{}
@@ -435,6 +426,81 @@ func (m *manager) grantManagementPlanePrivileges(roleTemplateName string, resour
 		currentRBs[rb.Name] = rb
 	}
 
+	return m.reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs, roleBindings)
+}
+
+// grantManagementClusterScopedPrivilegesInProjectNamespace ensures that rolebindings for roles like cluster-owner (that should be able to fully
+// manage all projects in a cluster) grant proper permissions to project-scoped resources. Specifically, this satisfies the use case that
+// a cluster owner should be able to manage the members of all projects in their cluster
+func (m *manager) grantManagementClusterScopedPrivilegesInProjectNamespace(roleTemplateName, projectNamespace string, resources []string,
+	subject v1.Subject, binding *v3.ClusterRoleTemplateBinding) error {
+	roles, err := m.gatherAndDedupeRoles(roleTemplateName)
+	if err != nil {
+		return err
+	}
+
+	desiredRBs := map[string]*v1.RoleBinding{}
+	roleBindings := m.mgmt.RBAC.RoleBindings(projectNamespace)
+	for _, role := range roles {
+		for _, resource := range resources {
+			verbs := m.checkForManagementPlaneRules(role, resource)
+			if len(verbs) > 0 {
+				if err := m.reconcileManagementPlaneRole(projectNamespace, resource, role, verbs); err != nil {
+					return err
+				}
+
+				bindingName := binding.Name + "-" + role.Name
+				if _, ok := desiredRBs[bindingName]; !ok {
+					desiredRBs[bindingName] = &v1.RoleBinding{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: bindingName,
+							Labels: map[string]string{
+								string(binding.UID): crtbInProjectBindingOwner,
+							},
+						},
+						Subjects: []v1.Subject{subject},
+						RoleRef: v1.RoleRef{
+							Kind: "Role",
+							Name: role.Name,
+						},
+					}
+				}
+			}
+		}
+	}
+
+	currentRBs := map[string]*v1.RoleBinding{}
+	set := labels.Set(map[string]string{string(binding.UID): crtbInProjectBindingOwner})
+	current, err := m.rbLister.List(projectNamespace, set.AsSelector())
+	if err != nil {
+		return err
+	}
+	for _, rb := range current {
+		currentRBs[rb.Name] = rb
+	}
+
+	return m.reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs, roleBindings)
+}
+
+func (m *manager) gatherAndDedupeRoles(roleTemplateName string) (map[string]*v3.RoleTemplate, error) {
+	rt, err := m.rtLister.Get("", roleTemplateName)
+	if err != nil {
+		return nil, err
+	}
+	allRoles := map[string]*v3.RoleTemplate{}
+	if err := m.gatherRoleTemplates(rt, allRoles); err != nil {
+		return nil, err
+	}
+
+	//de-dupe
+	roles := map[string]*v3.RoleTemplate{}
+	for _, role := range allRoles {
+		roles[role.Name] = role
+	}
+	return roles, nil
+}
+
+func (m *manager) reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs map[string]*v1.RoleBinding, roleBindings typesrbacv1.RoleBindingInterface) error {
 	rbsToDelete := map[string]bool{}
 	processed := map[string]bool{}
 	for _, rb := range currentRBs {
