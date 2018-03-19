@@ -23,7 +23,7 @@ func SetRTBStore(ctx context.Context, schema *types.Schema, mgmt *config.ScaledC
 	t := &transform.Store{
 		Store: schema.Store,
 		Transformer: func(apiContext *types.APIContext, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
-			if id, ok := data[client.ClusterRoleTemplateBindingFieldUserId].(string); ok {
+			if id, ok := data[client.ClusterRoleTemplateBindingFieldUserId].(string); ok && id != "" {
 				u, err := userLister.Get("", id)
 				if err != nil {
 					logrus.Errorf("problem retrieving user for CRTB %v from cache during CRTB transformation: %v", data, err)
