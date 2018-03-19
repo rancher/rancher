@@ -6,13 +6,16 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 const (
-	clusterResource         = "clusters"
-	membershipBindingOwner  = "memberhsip-binding-owner"
-	rbByOwnerIndex          = "auth.management.cattle.io/rb-by-owner"
-	rbByRoleAndSubjectIndex = "auth.management.cattle.io/crb-by-role-and-subject"
+	clusterResource           = "clusters"
+	membershipBindingOwner    = "memberhsip-binding-owner"
+	crtbInProjectBindingOwner = "crtb-in-project-binding-owner"
+	rbByOwnerIndex            = "auth.management.cattle.io/rb-by-owner"
+	rbByRoleAndSubjectIndex   = "auth.management.cattle.io/crb-by-role-and-subject"
 )
 
 var clusterManagmentPlaneResources = []string{"clusterroletemplatebindings", "nodes", "nodepools", "clusterevents", "projects", "clusterregistrationtokens"}
@@ -41,7 +44,10 @@ func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (*v3.Cluster
 }
 
 func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-	err := c.mgr.reconcileClusterMembershipBindingForDelete("", string(obj.UID))
+	if err := c.mgr.reconcileClusterMembershipBindingForDelete("", string(obj.UID)); err != nil {
+		return nil, err
+	}
+	err := c.removeMGMTClusterScopedPrivilegesInProjectNamespace(obj)
 	return nil, err
 }
 
@@ -99,5 +105,39 @@ func (c *crtbLifecycle) reconcilBindings(binding *v3.ClusterRoleTemplateBinding)
 		return err
 	}
 
-	return c.mgr.grantManagementPlanePrivileges(binding.RoleTemplateName, clusterManagmentPlaneResources, subject, binding)
+	err = c.mgr.grantManagementPlanePrivileges(binding.RoleTemplateName, clusterManagmentPlaneResources, subject, binding)
+	if err != nil {
+		return err
+	}
+
+	projects, err := c.mgr.projectLister.List(binding.Namespace, labels.Everything())
+	if err != nil {
+		return err
+	}
+	for _, p := range projects {
+		if err := c.mgr.grantManagementClusterScopedPrivilegesInProjectNamespace(binding.RoleTemplateName, p.Name, projectManagmentPlanResources, subject, binding); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *crtbLifecycle) removeMGMTClusterScopedPrivilegesInProjectNamespace(binding *v3.ClusterRoleTemplateBinding) error {
+	projects, err := c.mgr.projectLister.List(binding.Namespace, labels.Everything())
+	if err != nil {
+		return err
+	}
+	for _, p := range projects {
+		set := labels.Set(map[string]string{string(binding.UID): crtbInProjectBindingOwner})
+		rbs, err := c.mgr.rbLister.List(p.Name, set.AsSelector())
+		if err != nil {
+			return err
+		}
+		for _, rb := range rbs {
+			if err := c.mgr.mgmt.RBAC.RoleBindings(p.Name).Delete(rb.Name, &v1.DeleteOptions{}); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
