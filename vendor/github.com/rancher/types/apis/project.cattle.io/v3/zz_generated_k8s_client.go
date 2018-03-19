@@ -26,6 +26,7 @@ type Interface interface {
 	NamespacedSSHAuthsGetter
 	WorkloadsGetter
 	AppsGetter
+	NamespaceComposeConfigsGetter
 }
 
 type Client struct {
@@ -45,6 +46,7 @@ type Client struct {
 	namespacedSshAuthControllers             map[string]NamespacedSSHAuthController
 	workloadControllers                      map[string]WorkloadController
 	appControllers                           map[string]AppController
+	namespaceComposeConfigControllers        map[string]NamespaceComposeConfigController
 }
 
 func NewForConfig(config rest.Config) (Interface, error) {
@@ -73,6 +75,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		namespacedSshAuthControllers:             map[string]NamespacedSSHAuthController{},
 		workloadControllers:                      map[string]WorkloadController{},
 		appControllers:                           map[string]AppController{},
+		namespaceComposeConfigControllers:        map[string]NamespaceComposeConfigController{},
 	}, nil
 }
 
@@ -238,6 +241,19 @@ type AppsGetter interface {
 func (c *Client) Apps(namespace string) AppInterface {
 	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &AppResource, AppGroupVersionKind, appFactory{})
 	return &appClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type NamespaceComposeConfigsGetter interface {
+	NamespaceComposeConfigs(namespace string) NamespaceComposeConfigInterface
+}
+
+func (c *Client) NamespaceComposeConfigs(namespace string) NamespaceComposeConfigInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &NamespaceComposeConfigResource, NamespaceComposeConfigGroupVersionKind, namespaceComposeConfigFactory{})
+	return &namespaceComposeConfigClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,
