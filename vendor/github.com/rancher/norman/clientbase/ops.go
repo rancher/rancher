@@ -96,12 +96,7 @@ func (a *APIOperations) DoList(schemaType string, opts *types.ListOpts, respObje
 		return errors.New("Resource type [" + schemaType + "] is not listable")
 	}
 
-	collectionURL, ok := schema.Links[COLLECTION]
-	if !ok {
-		return errors.New("Failed to find collection URL for [" + schemaType + "]")
-	}
-
-	return a.DoGet(collectionURL, opts, respObject)
+	return a.DoGet(a.Opts.URL+"/"+schemaType, opts, respObject)
 }
 
 func (a *APIOperations) DoNext(nextURL string, respObject interface{}) error {

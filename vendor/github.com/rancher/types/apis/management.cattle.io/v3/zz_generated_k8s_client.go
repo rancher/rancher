@@ -53,6 +53,8 @@ type Interface interface {
 	PipelineExecutionsGetter
 	PipelineExecutionLogsGetter
 	SourceCodeRepositoriesGetter
+	GlobalComposeConfigsGetter
+	ClusterComposeConfigsGetter
 }
 
 type Client struct {
@@ -99,6 +101,8 @@ type Client struct {
 	pipelineExecutionControllers          map[string]PipelineExecutionController
 	pipelineExecutionLogControllers       map[string]PipelineExecutionLogController
 	sourceCodeRepositoryControllers       map[string]SourceCodeRepositoryController
+	globalComposeConfigControllers        map[string]GlobalComposeConfigController
+	clusterComposeConfigControllers       map[string]ClusterComposeConfigController
 }
 
 func NewForConfig(config rest.Config) (Interface, error) {
@@ -154,6 +158,8 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		pipelineExecutionControllers:          map[string]PipelineExecutionController{},
 		pipelineExecutionLogControllers:       map[string]PipelineExecutionLogController{},
 		sourceCodeRepositoryControllers:       map[string]SourceCodeRepositoryController{},
+		globalComposeConfigControllers:        map[string]GlobalComposeConfigController{},
+		clusterComposeConfigControllers:       map[string]ClusterComposeConfigController{},
 	}, nil
 }
 
@@ -670,6 +676,32 @@ type SourceCodeRepositoriesGetter interface {
 func (c *Client) SourceCodeRepositories(namespace string) SourceCodeRepositoryInterface {
 	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &SourceCodeRepositoryResource, SourceCodeRepositoryGroupVersionKind, sourceCodeRepositoryFactory{})
 	return &sourceCodeRepositoryClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type GlobalComposeConfigsGetter interface {
+	GlobalComposeConfigs(namespace string) GlobalComposeConfigInterface
+}
+
+func (c *Client) GlobalComposeConfigs(namespace string) GlobalComposeConfigInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &GlobalComposeConfigResource, GlobalComposeConfigGroupVersionKind, globalComposeConfigFactory{})
+	return &globalComposeConfigClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type ClusterComposeConfigsGetter interface {
+	ClusterComposeConfigs(namespace string) ClusterComposeConfigInterface
+}
+
+func (c *Client) ClusterComposeConfigs(namespace string) ClusterComposeConfigInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &ClusterComposeConfigResource, ClusterComposeConfigGroupVersionKind, clusterComposeConfigFactory{})
+	return &clusterComposeConfigClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

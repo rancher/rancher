@@ -41,6 +41,9 @@ func namespaceTypes(schemas *types.Schemas) *types.Schemas {
 
 func persistentVolumeTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
+		MustImport(&Version, v1.PersistentVolumeSpec{}, struct {
+			StorageClassName *string `json:"storageClassName,omitempty" norman:"type=reference[storageClass]"`
+		}{}).
 		MustImport(&Version, v1.PersistentVolume{})
 }
 

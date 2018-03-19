@@ -46,6 +46,8 @@ type Client struct {
 	PipelineExecution          PipelineExecutionOperations
 	PipelineExecutionLog       PipelineExecutionLogOperations
 	SourceCodeRepository       SourceCodeRepositoryOperations
+	GlobalComposeConfig        GlobalComposeConfigOperations
+	ClusterComposeConfig       ClusterComposeConfigOperations
 }
 
 func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
@@ -97,6 +99,8 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.PipelineExecution = newPipelineExecutionClient(client)
 	client.PipelineExecutionLog = newPipelineExecutionLogClient(client)
 	client.SourceCodeRepository = newSourceCodeRepositoryClient(client)
+	client.GlobalComposeConfig = newGlobalComposeConfigClient(client)
+	client.ClusterComposeConfig = newClusterComposeConfigClient(client)
 
 	return client, nil
 }

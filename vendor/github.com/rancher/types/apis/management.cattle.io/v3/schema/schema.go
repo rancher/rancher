@@ -34,7 +34,8 @@ var (
 		Init(globalTypes).
 		Init(rkeTypes).
 		Init(alertTypes).
-		Init(pipelineTypes)
+		Init(pipelineTypes).
+		Init(composeType)
 
 	TokenSchemas = factory.Schemas(&Version).
 			Init(tokens)
@@ -437,4 +438,9 @@ func pipelineTypes(schema *types.Schemas) *types.Schemas {
 			delete(schema.ResourceFields, "namespaceId")
 		})
 
+}
+
+func composeType(schemas *types.Schemas) *types.Schemas {
+	return schemas.MustImport(&Version, v3.GlobalComposeConfig{}).
+		MustImport(&Version, v3.ClusterComposeConfig{})
 }
