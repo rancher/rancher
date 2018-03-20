@@ -89,6 +89,8 @@ type ClusterOperations interface {
 	Update(existing *Cluster, updates interface{}) (*Cluster, error)
 	ByID(id string) (*Cluster, error)
 	Delete(container *Cluster) error
+
+	ActionGenerateKubeconfig(*Cluster) (*GenerateKubeConfigOutput, error)
 }
 
 func newClusterClient(apiClient *Client) *ClusterClient {
@@ -134,4 +136,13 @@ func (c *ClusterClient) ByID(id string) (*Cluster, error) {
 
 func (c *ClusterClient) Delete(container *Cluster) error {
 	return c.apiClient.Ops.DoResourceDelete(ClusterType, &container.Resource)
+}
+
+func (c *ClusterClient) ActionGenerateKubeconfig(resource *Cluster) (*GenerateKubeConfigOutput, error) {
+
+	resp := &GenerateKubeConfigOutput{}
+
+	err := c.apiClient.Ops.DoAction(ClusterType, "generateKubeconfig", &resource.Resource, nil, resp)
+
+	return resp, err
 }

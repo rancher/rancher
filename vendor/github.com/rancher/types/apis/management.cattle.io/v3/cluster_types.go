@@ -220,3 +220,7 @@ type ClusterRegistrationTokenStatus struct {
 	ManifestURL     string `json:"manifestUrl"`
 	Token           string `json:"token"`
 }
+
+type GenerateKubeConfigOutput struct {
+	Config string `json:"config"`
+}
