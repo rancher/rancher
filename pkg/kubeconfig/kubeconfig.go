@@ -25,6 +25,7 @@ type data struct {
 	User        string
 	Username    string
 	Password    string
+	Token       string
 }
 
 func ForBasic(host, username, password string) (string, error) {
@@ -68,4 +69,23 @@ func caCertString() string {
 	}
 
 	return buf.String()
+}
+
+func ForTokenBased(clusterName, host, username, token string) (string, error) {
+	data := &data{
+		ClusterName: clusterName,
+		ClusterID:   clusterName,
+		Host:        host,
+		Cert:        caCertString(),
+		User:        username,
+		Token:       token,
+	}
+
+	if data.ClusterName == "" {
+		data.ClusterName = data.ClusterID
+	}
+
+	buf := &bytes.Buffer{}
+	err := tokenTemplate.Execute(buf, data)
+	return buf.String(), err
 }
