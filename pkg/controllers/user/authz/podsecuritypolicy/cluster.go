@@ -12,8 +12,8 @@ import (
 )
 
 type clusterManager struct {
-	clusterLister             v3.ClusterLister
-	clusters                  v3.ClusterInterface
+	// remove unneeded members for clarity
+
 	templateLister            v3.PodSecurityPolicyTemplateLister
 	policyLister              v1beta1.PodSecurityPolicyLister
 	policies                  v1beta1.PodSecurityPolicyInterface
@@ -27,10 +27,8 @@ func RegisterCluster(context *config.UserContext) {
 	logrus.Infof("registering podsecuritypolicy cluster handler for cluster %v", context.ClusterName)
 
 	m := &clusterManager{
-		clusters: context.Management.Management.Clusters(""),
 		policies: context.Extensions.PodSecurityPolicies(""),
 
-		clusterLister:             context.Management.Management.Clusters("").Controller().Lister(),
 		templateLister:            context.Management.Management.PodSecurityPolicyTemplates("").Controller().Lister(),
 		policyLister:              context.Extensions.PodSecurityPolicies("").Controller().Lister(),
 		serviceAccountLister:      context.Core.ServiceAccounts("").Controller().Lister(),
@@ -40,6 +38,8 @@ func RegisterCluster(context *config.UserContext) {
 	context.Management.Management.Clusters("").AddHandler("ClusterSyncHandler", m.sync)
 }
 
+// BUG: this handler will get events for ALL clusters, not just the current user cluster. You need to do a check on
+// obj.Name == context.ClusterName (context being config.UserContext from register function
 func (m *clusterManager) sync(key string, obj *v3.Cluster) error {
 	if obj == nil {
 		// Nothing to do
@@ -58,6 +58,7 @@ func (m *clusterManager) sync(key string, obj *v3.Cluster) error {
 		return fmt.Errorf("error getting policy list: %v", err)
 	}
 
+	// I dont see a need for this logic. policies shoudl be updated via the template handler, not this one
 	for _, policy := range policies {
 		if policy.Annotations[podSecurityTemplateParentAnnotation] == id {
 			err := updatePolicyIfOutdated(m.templateLister, m.policies, m.policyLister, id, policy.Name)
@@ -67,5 +68,7 @@ func (m *clusterManager) sync(key string, obj *v3.Cluster) error {
 		}
 	}
 
+	// will get expensive to do this every time this cluster handler runs. We need to move to a spec & status model
+	// for this field so that we can tell when its changed
 	return resyncServiceAccounts(m.serviceAccountLister, m.serviceAccountsController, "")
 }

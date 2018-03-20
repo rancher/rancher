@@ -34,7 +34,11 @@ type templateManager struct {
 	policyLister v1beta12.PodSecurityPolicyLister
 }
 
+// what happens when a PSPT is deleted? that is unaccounted for
+// this will create a PSP for every PSPT that exists in the mgmt cluster. we should avoid that and only create PSPs when the PSPT is used in this cluster
 func (m *templateManager) sync(key string, obj *v3.PodSecurityPolicyTemplate) error {
+	// this is a good opportunity for a label based search. you would store that podSecurityTemplateParentAnnotation
+	// as a label instead of an annotation and then pass a label set specifying it instad of labels.Everything()
 	policies, err := m.policyLister.List("", labels.Everything())
 	if err != nil {
 		return fmt.Errorf("error getting policies: %v", err)
@@ -48,6 +52,8 @@ func (m *templateManager) sync(key string, obj *v3.PodSecurityPolicyTemplate) er
 		}
 	}
 
+	// you want the check to be on childPolicies, dont you? if so, its basically redundant bc the loop would just
+	// exit immediately anyway
 	if len(policies) == 0 {
 		// this pspt is not used so return immediately
 		return nil
@@ -64,14 +70,29 @@ func (m *templateManager) sync(key string, obj *v3.PodSecurityPolicyTemplate) er
 
 	return nil
 }
+
+// I feel the name of this function is misleading/unclear because it doesnt easily communicate that it is actually
+// creating and/or updating a resource. Can you rename it to something that communicates that?
 func fromTemplate(policies v1beta12.PodSecurityPolicyInterface, policyLister v1beta12.PodSecurityPolicyLister,
 	key string, originalTemplate *v3.PodSecurityPolicyTemplate) (*v1beta1.PodSecurityPolicy, error) {
 	return fromTemplateExplicitName(policies, policyLister, keyToPolicyName(key), originalTemplate, key)
 }
 
+// Almost everything hinges on the logic in this function. So thisll have a lot of comments. Its just going to be  a stream of my thoughts as i hit them
+// 1. we've established that key is wrong bc you assumed it was always project/cluster. not the case. for the purpose of this review,
+//   i'll assume you are consistently passing in cluster + project as the key
+// 2. this function gets called a lot. it gets called every time a svc account or psptb is synced (that will be a lot of times). it blindly
+//   updates the psp if its called. If you were seeing a lot of conflicts, that is probably what was causing it and doing that many updates is an
+//   unnecessary strain on k8s
+// 3. i think we need to go back to 1 psp per pspt and rely solely on the pspt handler for keeping that up-to-date an in sync. this should
+//   hopefully eliminate conflics if you were seeeing a lot of those
+// 4. thats a big change, so i'll attempt to summarize how the other handlers should behave given that change
+// - svc account handler can just skip its logic that ensures the psp exists. it should create the role and rolebinding. template handler
+//   will take care of ensuring the psp exists.
 func fromTemplateExplicitName(policies v1beta12.PodSecurityPolicyInterface,
 	policyLister v1beta12.PodSecurityPolicyLister, key string,
 	originalTemplate *v3.PodSecurityPolicyTemplate, originalKey string) (*v1beta1.PodSecurityPolicy, error) {
+	// template only needs to be deep copied if you are modifying it
 	template := originalTemplate.DeepCopy()
 
 	objectMeta := v1.ObjectMeta{}
@@ -116,6 +137,7 @@ func doesPolicyExist(policyLister v1beta12.PodSecurityPolicyLister, name string)
 
 func getPodSecurityPolicyTemplateID(psptcbLister v3.PodSecurityPolicyTemplateProjectBindingLister, clusterLister v3.ClusterLister, projectID string,
 	clusterName string) (string, error) {
+	// dont pass in "" for the namespace here. PSPTBs are scoped to the cluster. pass in the cluster name (which matches the namesapce
 	psptpbs, err := psptcbLister.List("", labels.Everything())
 	if err != nil {
 		return "", fmt.Errorf("error getting projects: %v", err)

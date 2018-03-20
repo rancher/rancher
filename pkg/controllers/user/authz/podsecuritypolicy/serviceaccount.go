@@ -28,7 +28,6 @@ func RegisterServiceAccount(context *config.UserContext) {
 	logrus.Infof("registering podsecuritypolicy serviceaccount handler for cluster %v", context.ClusterName)
 
 	m := &serviceAccountManager{
-		clusters: context.Management.Management.Clusters(""),
 		bindings: context.RBAC.RoleBindings(""),
 		policies: context.Extensions.PodSecurityPolicies(""),
 		roles:    context.RBAC.ClusterRoles(""),
@@ -39,7 +38,6 @@ func RegisterServiceAccount(context *config.UserContext) {
 		bindingLister:   context.RBAC.RoleBindings("").Controller().Lister(),
 		roleLister:      context.RBAC.ClusterRoles("").Controller().Lister(),
 		namespaceLister: context.Core.Namespaces("").Controller().Lister(),
-		projectLister:   context.Management.Management.Projects("").Controller().Lister(),
 		psptpbLister: context.Management.Management.PodSecurityPolicyTemplateProjectBindings("").
 			Controller().Lister(),
 	}
@@ -49,7 +47,6 @@ func RegisterServiceAccount(context *config.UserContext) {
 
 type serviceAccountManager struct {
 	clusterLister   v3.ClusterLister
-	clusters        v3.ClusterInterface
 	templateLister  v3.PodSecurityPolicyTemplateLister
 	policyLister    v1beta1.PodSecurityPolicyLister
 	bindingLister   v12.RoleBindingLister
@@ -58,7 +55,6 @@ type serviceAccountManager struct {
 	roleLister      v12.ClusterRoleLister
 	roles           v12.ClusterRoleInterface
 	namespaceLister v13.NamespaceLister
-	projectLister   v3.ProjectLister
 	psptpbLister    v3.PodSecurityPolicyTemplateProjectBindingLister
 }
 
@@ -88,6 +84,9 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 
 	split := strings.SplitN(annotation, ":", 2)
 
+	// instead of returning an error, i think you should log a warn level statement and return without error
+	// if an namesapce is in the state and we return an error, it would cause an endless retry of all svc accounts in the ns
+	// better to just log once and the next time the NS is updated (potentially fixing this annotation), these will get reprocessed
 	if len(split) != 2 {
 		return fmt.Errorf("could not parse handler key: %v got len %v", annotation, len(split))
 	}
@@ -132,6 +131,7 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 		}
 	}
 
+	// can you call roleLister either clusterRoleLister or crLister to clarify what is for. role is a separate resource
 	roles, err := m.roleLister.List("", labels.Everything())
 	if err != nil {
 		return fmt.Errorf("error getting cluster roles: %v", err)
@@ -139,6 +139,8 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 
 	var role *rbac.ClusterRole
 
+	// you just need a single role per policy, so can you just use a well-known name like role-<psp name> and then look up
+	// by name instead of listing and filtering on annotation
 	for _, candidate := range roles {
 		if candidate.Annotations[podSecurityTemplateParentAnnotation] == policy.Name {
 			role = candidate
@@ -151,7 +153,7 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations:  map[string]string{},
 				GenerateName: "clusterrole-",
-				Namespace:    namespaceName,
+				Namespace:    namespaceName, // clusterRoles are global scoped. they are not namespaced. drop this field
 			},
 			TypeMeta: metav1.TypeMeta{
 				Kind: "ClusterRole",
@@ -166,6 +168,7 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 			},
 		}
 
+		// im hoping if you use a well known name for the clusterRole, you can eliminate this annotation
 		newRole.Annotations[podSecurityTemplateParentAnnotation] = policy.Name
 
 		role, err = m.roles.Create(newRole)
@@ -174,6 +177,7 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 		}
 	}
 
+	// BIG BUG? I dont see any logic for cleaning up old bindings that pointed at
 	return createBindingIfNotExists(m.bindings, m.bindingLister, obj, role.Name, policy.Name)
 }
 
@@ -189,6 +193,7 @@ func createBindingIfNotExists(bindings2 v12.RoleBindingInterface, bindingLister 
 
 	bindingExists := false
 
+	// Can we just give the binding a well known name like svcAccnt.name-clusterRole.Name and look it up by name?
 	for _, binding := range bindings {
 		if binding.Annotations[podSecurityTemplateParentAnnotation] == policyName &&
 			len(binding.Subjects) > 0 && // guard against panic
@@ -211,6 +216,11 @@ func createBindingIfNotExists(bindings2 v12.RoleBindingInterface, bindingLister 
 
 func createBinding(bindings v12.RoleBindingInterface, serviceAccount *v1.ServiceAccount, roleName string,
 	policyName string) error {
+	// BIG BUG: you are creating a binding with name <role-name>-<policy-name>-binding. But you give it a single subject of the current svc account
+	// that will not work for greater than 1 service account. you need a binding per svc account but this basically limits you to exactly one
+	// this should be fixed by addressing my previous comment of giving the binding a name of <svcAccount.Name-clusterRole.Name>.
+	// I think this is going to mean completley refactoring what you are doing though because if you make that change, it has other implications like
+	// how do you clean up (delet) old bindings
 	newBinding := &rbac.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%v-%v-binding", roleName, policyName),
@@ -220,7 +230,7 @@ func createBinding(bindings v12.RoleBindingInterface, serviceAccount *v1.Service
 			},
 		},
 		TypeMeta: metav1.TypeMeta{
-			Kind: "ClusterRoleBinding",
+			Kind: "ClusterRoleBinding", // wrong type. should be RoleBinding (i think you dont even need this bc its implied by the fact that you are creating a &rbac.RoleBinding{
 		},
 		RoleRef: rbac.RoleRef{
 			APIGroup: apiGroup,

@@ -13,7 +13,7 @@ type namespaceManager struct {
 }
 
 // RegisterNamespace resyncs the current namespace's service accounts.  This is necessary because service accounts
-// determine their parent project via an annotation on the namespace, and the namespace is not always present when the
+// determine their parent project via an annotation on the namespace, and the annotation is not always present when the
 // service account handler is triggered.  So we have this handler to retrigger the serviceaccount handler once the
 // annotation has been added.
 func RegisterNamespace(context *config.UserContext) {
@@ -31,6 +31,6 @@ func (m *namespaceManager) sync(key string, obj *v1.Namespace) error {
 	if obj == nil {
 		return nil
 	}
-
+	// check that the annotation is present on the namespace. if it isnt, dont bother resysncing
 	return resyncServiceAccounts(m.serviceAccountLister, m.serviceAccountsController, obj.Name)
 }

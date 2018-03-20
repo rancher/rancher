@@ -46,6 +46,10 @@ type projectManager struct {
 	serviceAccounts      v1.ServiceAccountController
 }
 
+// What happens when a PSPTPB is deleted? Its not accounted for, but it should be
+// Even though our api action controls just 1 of these existing, the backend code should behave as though more
+// than one per project can exist. That will make it much more robust. This implementation is currently implicitly tied
+// to the valdation of the action, which is brittle
 func (m *projectManager) sync(key string, obj *v3.PodSecurityPolicyTemplateProjectBinding) error {
 	if obj == nil {
 		return nil
