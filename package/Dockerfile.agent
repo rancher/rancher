@@ -1,5 +1,5 @@
-FROM rancher/k8s:v1.8.9-rancher1-1 as k8s
-FROM rancher/rke-service-sidekick:v0.1.0 as sidekick
+FROM rancher/k8s:v1.8.9-rancher1-1 AS k8s
+FROM rancher/rke-service-sidekick:v0.1.0 AS sidekick
 
 FROM ubuntu:17.10
 RUN apt-get update && \
