@@ -133,6 +133,7 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.Cluster{}).
 		MustImport(&Version, v3.ClusterEvent{}).
 		MustImport(&Version, v3.ClusterRegistrationToken{}).
+		MustImport(&Version, v3.GenerateKubeConfigOutput{}).
 		MustImportAndCustomize(&Version, v3.Cluster{}, func(schema *types.Schema) {
 			schema.MustCustomizeField("name", func(field types.Field) types.Field {
 				field.Type = "dnsLabel"
@@ -140,6 +141,9 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 				field.Required = false
 				return field
 			})
+			schema.ResourceActions["generateKubeconfig"] = types.Action{
+				Output: "generateKubeConfigOutput",
+			}
 		})
 }
 

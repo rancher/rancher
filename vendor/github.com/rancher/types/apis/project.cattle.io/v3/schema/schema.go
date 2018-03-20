@@ -451,9 +451,6 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 			&m.Embed{Field: "securityContext"},
 			&m.Drop{Field: "serviceAccount"},
 		).
-		AddMapperForType(&Version, v1.ResourceRequirements{},
-			mapper.PivotMapper{Plural: true},
-		).
 		AddMapperForType(&Version, v1.Pod{},
 			&m.AnnotationField{Field: "description"},
 			&m.AnnotationField{Field: "publicEndpoints", List: true},
@@ -639,9 +636,6 @@ func volumeTypes(schemas *types.Schemas) *types.Schemas {
 				},
 				Field: "kind",
 			},
-		).
-		AddMapperForType(&Version, v1.ResourceRequirements{},
-			mapper.PivotMapper{Plural: true},
 		).
 		AddMapperForType(&Version, v1.PersistentVolumeClaimVolumeSource{},
 			&m.Move{From: "claimName", To: "persistentVolumeClaimName"},
