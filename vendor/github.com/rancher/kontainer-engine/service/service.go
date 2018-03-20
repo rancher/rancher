@@ -19,21 +19,20 @@ var (
 	Drivers       = map[string]types.Driver{}
 )
 
-func init() {
-	go func() {
-		for driver := range plugin.BuiltInDrivers {
-			logrus.Infof("Activating driver %s", driver)
-			addr := make(chan string)
-			rpcDriver, err := plugin.Run(driver, addr)
-			if err != nil {
-				panic(err)
-			}
-			Drivers[driver] = rpcDriver
-			listenAddr := <-addr
-			pluginAddress[driver] = listenAddr
-			logrus.Infof("Activating driver %s done", driver)
+func Start() error {
+	for driver := range plugin.BuiltInDrivers {
+		logrus.Infof("Activating driver %s", driver)
+		addr := make(chan string)
+		rpcDriver, err := plugin.Run(driver, addr)
+		if err != nil {
+			return err
 		}
-	}()
+		Drivers[driver] = rpcDriver
+		listenAddr := <-addr
+		pluginAddress[driver] = listenAddr
+		logrus.Infof("Activating driver %s done", driver)
+	}
+	return nil
 }
 
 type controllerConfigGetter struct {
