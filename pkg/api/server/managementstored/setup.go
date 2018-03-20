@@ -88,7 +88,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 
 	wg.Wait()
 
-	Clusters(schemas)
+	Clusters(schemas, apiContext)
 	Templates(schemas)
 	TemplateVersion(schemas)
 	User(schemas, apiContext)
@@ -143,10 +143,16 @@ func setupScopedTypes(schemas *types.Schemas) {
 	}
 }
 
-func Clusters(schemas *types.Schemas) {
+func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.ClusterType)
 	schema.Formatter = ccluster.Formatter
 	schema.LinkHandler = ccluster.LinkHandler
+	handler := ccluster.ActionHandler{
+		ClusterClient: managementContext.Management.Clusters(""),
+		UserMgr:       managementContext.UserManager,
+	}
+
+	schema.ActionHandler = handler.GenerateKubeconfigActionHandler
 }
 
 func Templates(schemas *types.Schemas) {
