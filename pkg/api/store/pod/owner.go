@@ -17,13 +17,14 @@ import (
 )
 
 var (
-	replicaSetOwnerCache = cache.NewLRUExpireCache(1000)
+	ownerCache = cache.NewLRUExpireCache(1000)
 )
 
 type key struct {
-	SubContext     string
-	Namespace      string
-	ReplicaSetName string
+	SubContext string
+	Namespace  string
+	Kind       string
+	Name       string
 }
 
 type value struct {
@@ -31,7 +32,7 @@ type value struct {
 	Name string
 }
 
-func getReplicaSetOwner(apiContext *types.APIContext, namespace, name string) (string, string, error) {
+func getOwnerWithKind(apiContext *types.APIContext, namespace, ownerKind, name string) (string, string, error) {
 	subContext := apiContext.SubContext["/v3/schemas/project"]
 	if subContext == "" {
 		subContext = apiContext.SubContext["/v3/schemas/cluster"]
@@ -42,25 +43,26 @@ func getReplicaSetOwner(apiContext *types.APIContext, namespace, name string) (s
 	}
 
 	key := key{
-		SubContext:     subContext,
-		Namespace:      namespace,
-		ReplicaSetName: name,
+		SubContext: subContext,
+		Namespace:  namespace,
+		Kind:       ownerKind,
+		Name:       name,
 	}
 
-	val, ok := replicaSetOwnerCache.Get(key)
+	val, ok := ownerCache.Get(key)
 	if ok {
 		value, _ := val.(value)
 		return value.Kind, value.Name, nil
 	}
 
 	data := map[string]interface{}{}
-	if err := access.ByID(apiContext, &schema.Version, workload.ReplicaSetType, ref.FromStrings(namespace, name), &data); err != nil {
+	if err := access.ByID(apiContext, &schema.Version, ownerKind, ref.FromStrings(namespace, name), &data); err != nil {
 		return "", "", err
 	}
 
 	kind, name := getOwner(data)
 
-	replicaSetOwnerCache.Add(key, value{
+	ownerCache.Add(key, value{
 		Kind: kind,
 		Name: name,
 	}, time.Hour)
@@ -96,8 +98,8 @@ func resolveWorkloadID(apiContext *types.APIContext, data map[string]interface{}
 
 	namespace, _ := data["namespaceId"].(string)
 
-	if kind == "ReplicaSet" {
-		k, n, err := getReplicaSetOwner(apiContext, namespace, name)
+	if ownerKind := strings.ToLower(kind); ownerKind == workload.ReplicaSetType || ownerKind == workload.JobType {
+		k, n, err := getOwnerWithKind(apiContext, namespace, ownerKind, name)
 		if err != nil {
 			return ""
 		}
