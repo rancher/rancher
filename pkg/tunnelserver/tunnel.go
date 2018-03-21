@@ -116,6 +116,9 @@ func (t *Authorizer) Authorize(req *http.Request) (*Client, bool, error) {
 
 	if input.Node != nil {
 		node, ok, err := t.authorizeNode(cluster, input.Node, req)
+		if err != nil {
+			return nil, false, err
+		}
 		if node.Status.NodeConfig != nil && input.Node.CustomConfig != nil {
 			node = node.DeepCopy()
 			node.Status.NodeConfig.Address = input.Node.CustomConfig.Address
@@ -154,6 +157,10 @@ func (t *Authorizer) authorizeNode(cluster *v3.Cluster, inNode *client.Node, req
 		return nil, false, err
 	}
 
+	machine, err = t.updateNode(machine, inNode, cluster)
+	if err != nil {
+		return nil, false, err
+	}
 	return machine, true, nil
 }
 
@@ -186,6 +193,13 @@ func (t *Authorizer) createNode(inNode *client.Node, cluster *v3.Cluster, req *h
 	}
 
 	return t.machines.Create(machine)
+}
+
+func (t *Authorizer) updateNode(machine *v3.Node, inNode *client.Node, cluster *v3.Cluster) (*v3.Node, error) {
+	machine.Spec.Etcd = inNode.Etcd
+	machine.Spec.ControlPlane = inNode.ControlPlane
+	machine.Spec.Worker = inNode.Worker
+	return t.machines.Update(machine)
 }
 
 func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, req *http.Request) (*v3.Cluster, bool, error) {
