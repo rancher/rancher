@@ -26,6 +26,7 @@ func Register(management *config.ManagementContext) {
 
 	gc := &gcLifecycle{
 		rtLister:           management.Management.RoleTemplates("").Controller().Lister(),
+		grbLister:          management.Management.GlobalRoleBindings("").Controller().Lister(),
 		projectLister:      management.Management.Projects("").Controller().Lister(),
 		crtbLister:         management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
 		projectAlertLister: management.Management.ProjectAlerts("").Controller().Lister(),
@@ -44,6 +45,7 @@ type gcLifecycle struct {
 	prtbIndexer        cache.Indexer
 	nodeLister         v3.NodeLister
 	rtLister           v3.RoleTemplateLister
+	grbLister          v3.GlobalRoleBindingLister
 	mgmt               *config.ManagementContext
 }
 
@@ -87,6 +89,17 @@ func (c *gcLifecycle) Remove(cluster *v3.Cluster) (*v3.Cluster, error) {
 	oClient := c.mgmt.Management.RoleTemplates("").ObjectClient()
 	for _, rt := range rts {
 		if err := cleanFinalizers(cluster.Name, rt, oClient); err != nil {
+			return cluster, err
+		}
+	}
+
+	grbs, err := c.grbLister.List("", labels.Everything())
+	if err != nil {
+		return cluster, err
+	}
+	oClient = c.mgmt.Management.GlobalRoleBindings("").ObjectClient()
+	for _, grb := range grbs {
+		if err := cleanFinalizers(cluster.Name, grb, oClient); err != nil {
 			return cluster, err
 		}
 	}
