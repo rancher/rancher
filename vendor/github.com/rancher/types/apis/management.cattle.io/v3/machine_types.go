@@ -77,6 +77,7 @@ type NodeStatus struct {
 var (
 	NodeConditionInitialized condition.Cond = "Initialized"
 	NodeConditionProvisioned condition.Cond = "Provisioned"
+	NodeConditionUpdated     condition.Cond = "Updated"
 	NodeConditionRegistered  condition.Cond = "Registered"
 	NodeConditionRemoved     condition.Cond = "Removed"
 	NodeConditionConfigSaved condition.Cond = "Saved"
