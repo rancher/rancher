@@ -8,12 +8,15 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
-func runScheduler(ctx context.Context, host *hosts.Host, df hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, schedulerProcess v3.Process) error {
+func runScheduler(ctx context.Context, host *hosts.Host, df hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, schedulerProcess v3.Process, alpineImage string) error {
 	imageCfg, hostCfg, healthCheckURL := GetProcessConfig(schedulerProcess)
 	if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, SchedulerContainerName, host.Address, ControlRole, prsMap); err != nil {
 		return err
 	}
-	return runHealthcheck(ctx, host, SchedulerContainerName, df, healthCheckURL, nil)
+	if err := runHealthcheck(ctx, host, SchedulerContainerName, df, healthCheckURL, nil); err != nil {
+		return err
+	}
+	return createLogLink(ctx, host, SchedulerContainerName, ControlRole, alpineImage, prsMap)
 }
 
 func removeScheduler(ctx context.Context, host *hosts.Host) error {

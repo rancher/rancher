@@ -3,6 +3,7 @@ package client
 const (
 	RancherKubernetesEngineConfigType                     = "rancherKubernetesEngineConfig"
 	RancherKubernetesEngineConfigFieldAddons              = "addons"
+	RancherKubernetesEngineConfigFieldAddonsInclude       = "addonsInclude"
 	RancherKubernetesEngineConfigFieldAuthentication      = "authentication"
 	RancherKubernetesEngineConfigFieldAuthorization       = "authorization"
 	RancherKubernetesEngineConfigFieldIgnoreDockerVersion = "ignoreDockerVersion"
@@ -18,6 +19,7 @@ const (
 
 type RancherKubernetesEngineConfig struct {
 	Addons              string             `json:"addons,omitempty" yaml:"addons,omitempty"`
+	AddonsInclude       []string           `json:"addonsInclude,omitempty" yaml:"addonsInclude,omitempty"`
 	Authentication      *AuthnConfig       `json:"authentication,omitempty" yaml:"authentication,omitempty"`
 	Authorization       *AuthzConfig       `json:"authorization,omitempty" yaml:"authorization,omitempty"`
 	IgnoreDockerVersion bool               `json:"ignoreDockerVersion,omitempty" yaml:"ignoreDockerVersion,omitempty"`
