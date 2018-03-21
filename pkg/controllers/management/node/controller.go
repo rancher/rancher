@@ -282,7 +282,22 @@ outer:
 }
 
 func (m *Lifecycle) Updated(obj *v3.Node) (*v3.Node, error) {
-	newObj, err := v3.NodeConditionProvisioned.Once(obj, func() (runtime.Object, error) {
+	if isCustom(obj) {
+		m.setupCustom(obj)
+		newObj, err := v3.NodeConditionUpdated.Do(obj, func() (runtime.Object, error) {
+			if err := validateCustomHost(obj); err != nil {
+				return obj, err
+			}
+			return obj, nil
+		})
+		v3.NodeConditionUpdated.Message(obj, "waiting for cluster to finish reconciling")
+		v3.NodeConditionProvisioned.False(obj)
+		if err != nil {
+			return obj, err
+		}
+		obj = newObj.(*v3.Node)
+	}
+	newObj, err := v3.NodeConditionProvisioned.DoUntilTrue(obj, func() (runtime.Object, error) {
 		if obj.Status.NodeTemplateSpec == nil {
 			m.setWaiting(obj)
 			return obj, nil
