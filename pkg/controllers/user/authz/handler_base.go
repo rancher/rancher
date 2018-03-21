@@ -85,8 +85,20 @@ func Register(workload *config.UserContext) {
 	workload.Management.Management.Projects("").AddClusterScopedLifecycle("project-namespace-auth", workload.ClusterName, newProjectLifecycle(r))
 	workload.Management.Management.ProjectRoleTemplateBindings("").AddClusterScopedLifecycle("cluster-prtb-sync", workload.ClusterName, newPRTBLifecycle(r))
 	workload.Management.Management.ClusterRoleTemplateBindings("").AddClusterScopedLifecycle("cluster-crtb-sync", workload.ClusterName, newCRTBLifecycle(r))
-	workload.Management.Management.RoleTemplates("").AddLifecycle("cluster-roletemplate-sync", newRTLifecycle(r))
+	workload.Management.Management.Clusters("").AddHandler("global-admin-cluster-sync", newClusterHandler(workload))
 	workload.Core.Namespaces("").AddLifecycle("namespace-auth", newNamespaceLifecycle(r))
+
+	// This method for creating a lifecycle creates a cluster scoped handler for a non-cluster scoped resource.
+	// This means that when the cluster is deleted, cleanup logic in the mgmt cluster will remove the finalizer added by this
+	// lifecycle, but during normal operation the events received by the handler will not be filtered to match the cluster
+	// (because the resource -roleTemplate and globalRoleBinding- are global resources)
+	rti := workload.Management.Management.RoleTemplates("")
+	rtSync := v3.NewRoleTemplateLifecycleAdapter("cluster-roletemplate-sync_"+workload.ClusterName, true, rti, newRTLifecycle(r))
+	workload.Management.Management.RoleTemplates("").AddHandler("cluster-roletemplate-sync", rtSync)
+
+	grbi := workload.Management.Management.GlobalRoleBindings("")
+	grbSync := v3.NewGlobalRoleBindingLifecycleAdapter("grb-sync_"+workload.ClusterName, true, grbi, newGlobalRoleBindingHandler(workload))
+	workload.Management.Management.GlobalRoleBindings("").AddHandler("grb-sync", grbSync)
 }
 
 type manager struct {
