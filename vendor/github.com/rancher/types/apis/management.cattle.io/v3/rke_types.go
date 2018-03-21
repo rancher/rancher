@@ -11,6 +11,8 @@ type RancherKubernetesEngineConfig struct {
 	Authentication AuthnConfig `yaml:"authentication" json:"authentication,omitempty"`
 	// YAML manifest for user provided addons to be deployed on the cluster
 	Addons string `yaml:"addons" json:"addons,omitempty"`
+	// List of urls or paths for addons
+	AddonsInclude []string `yaml:"addons_include" json:"addonsInclude,omitempty"`
 	// List of images used internally for proxy, cert downlaod and kubedns
 	SystemImages RKESystemImages `yaml:"system_images" json:"systemImages,omitempty"`
 	// SSH Private Key Path

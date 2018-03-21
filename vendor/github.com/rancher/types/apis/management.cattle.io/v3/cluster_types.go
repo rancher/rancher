@@ -28,6 +28,7 @@ const (
 	ClusterConditionAddonDeploy              condition.Cond = "AddonDeploy"
 	ClusterConditionSystemAccountCreated     condition.Cond = "SystemAccountCreated"
 	ClusterConditionAgentDeployed            condition.Cond = "AgentDeployed"
+	ClusterConditionGlobalAdminsSynced       condition.Cond = "GlobalAdminsSynced"
 
 	ClusterDriverImported = "imported"
 	ClusterDriverLocal    = "local"

@@ -28,6 +28,14 @@ func UpCommand() cli.Command {
 			Name:  "local",
 			Usage: "Deploy Kubernetes cluster locally",
 		},
+		cli.BoolFlag{
+			Name:  "update-only",
+			Usage: "Skip idempotent deployment of control and etcd plane",
+		},
+		cli.BoolFlag{
+			Name:  "disable-port-check",
+			Usage: "Disable port check validation between nodes",
+		},
 	}
 
 	upFlags = append(upFlags, sshCliOptions...)
@@ -45,7 +53,7 @@ func ClusterUp(
 	rkeConfig *v3.RancherKubernetesEngineConfig,
 	dockerDialerFactory, localConnDialerFactory hosts.DialerFactory,
 	k8sWrapTransport k8s.WrapTransport,
-	local bool, configDir string) (string, string, string, string, error) {
+	local bool, configDir string, updateOnly, disablePortCheck bool) (string, string, string, string, error) {
 
 	log.Infof(ctx, "Building Kubernetes cluster")
 	var APIURL, caCrt, clientCert, clientKey string
@@ -63,9 +71,10 @@ func ClusterUp(
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
-
-	if err = kubeCluster.CheckClusterPorts(ctx, currentCluster); err != nil {
-		return APIURL, caCrt, clientCert, clientKey, err
+	if !disablePortCheck {
+		if err = kubeCluster.CheckClusterPorts(ctx, currentCluster); err != nil {
+			return APIURL, caCrt, clientCert, clientKey, err
+		}
 	}
 
 	err = cluster.SetUpAuthentication(ctx, kubeCluster, currentCluster)
@@ -73,7 +82,7 @@ func ClusterUp(
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
 
-	err = cluster.ReconcileCluster(ctx, kubeCluster, currentCluster)
+	err = cluster.ReconcileCluster(ctx, kubeCluster, currentCluster, updateOnly)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
@@ -105,6 +114,10 @@ func ClusterUp(
 
 	err = kubeCluster.DeployWorkerPlane(ctx)
 	if err != nil {
+		return APIURL, caCrt, clientCert, clientKey, err
+	}
+
+	if err = kubeCluster.CleanDeadLogs(ctx); err != nil {
 		return APIURL, caCrt, clientCert, clientKey, err
 	}
 
@@ -147,8 +160,10 @@ func clusterUpFromCli(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
+	updateOnly := ctx.Bool("update-only")
+	disablePortCheck := ctx.Bool("disable-port-check")
 
-	_, _, _, _, err = ClusterUp(context.Background(), rkeConfig, nil, nil, nil, false, "")
+	_, _, _, _, err = ClusterUp(context.Background(), rkeConfig, nil, nil, nil, false, "", updateOnly, disablePortCheck)
 	return err
 }
 
@@ -166,6 +181,6 @@ func clusterUpLocal(ctx *cli.Context) error {
 		}
 		rkeConfig.Nodes = []v3.RKEConfigNode{*cluster.GetLocalRKENodeConfig()}
 	}
-	_, _, _, _, err = ClusterUp(context.Background(), rkeConfig, nil, hosts.LocalHealthcheckFactory, nil, true, "")
+	_, _, _, _, err = ClusterUp(context.Background(), rkeConfig, nil, hosts.LocalHealthcheckFactory, nil, true, "", false, false)
 	return err
 }

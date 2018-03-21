@@ -5242,6 +5242,11 @@ func (in *RancherKubernetesEngineConfig) DeepCopyInto(out *RancherKubernetesEngi
 	in.Services.DeepCopyInto(&out.Services)
 	in.Network.DeepCopyInto(&out.Network)
 	in.Authentication.DeepCopyInto(&out.Authentication)
+	if in.AddonsInclude != nil {
+		in, out := &in.AddonsInclude, &out.AddonsInclude
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	out.SystemImages = in.SystemImages
 	in.Authorization.DeepCopyInto(&out.Authorization)
 	if in.PrivateRegistries != nil {

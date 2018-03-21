@@ -225,9 +225,8 @@ func toTaint(taintStr string) v1.Taint {
 	value := tmp[0]
 	effect := v1.TaintEffect(tmp[1])
 	return v1.Taint{
-		Key:       key,
-		Value:     value,
-		Effect:    effect,
-		TimeAdded: metav1.Time{time.Now()},
+		Key:    key,
+		Value:  value,
+		Effect: effect,
 	}
 }

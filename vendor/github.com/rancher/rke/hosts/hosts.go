@@ -32,6 +32,7 @@ type Host struct {
 	ToAddTaints         []string
 	ToDelTaints         []string
 	DockerInfo          types.Info
+	UpdateWorker        bool
 }
 
 const (
