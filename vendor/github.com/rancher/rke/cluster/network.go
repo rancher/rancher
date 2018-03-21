@@ -371,7 +371,7 @@ func (c *Cluster) runServicePortChecks(ctx context.Context) error {
 		}
 	}
 	// check all -> etcd connectivity
-	log.Infof(ctx, "[network] Running all -> etcd port checks")
+	log.Infof(ctx, "[network] Running control plane -> etcd port checks")
 	for _, host := range c.ControlPlaneHosts {
 		runHost := host
 		errgrp.Go(func() error {
@@ -381,18 +381,8 @@ func (c *Cluster) runServicePortChecks(ctx context.Context) error {
 	if err := errgrp.Wait(); err != nil {
 		return err
 	}
-	// Workers need to talk to etcd for calico
-	for _, host := range c.WorkerHosts {
-		runHost := host
-		errgrp.Go(func() error {
-			return checkPlaneTCPPortsFromHost(ctx, runHost, EtcdPortList, c.EtcdHosts, c.SystemImages.Alpine, c.PrivateRegistriesMap)
-		})
-	}
-	if err := errgrp.Wait(); err != nil {
-		return err
-	}
 	// check controle plane -> Workers
-	log.Infof(ctx, "[network] Running control plane -> etcd port checks")
+	log.Infof(ctx, "[network] Running control plane -> worker port checks")
 	for _, host := range c.ControlPlaneHosts {
 		runHost := host
 		errgrp.Go(func() error {

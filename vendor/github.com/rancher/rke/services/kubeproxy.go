@@ -8,12 +8,15 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
-func runKubeproxy(ctx context.Context, host *hosts.Host, df hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, kubeProxyProcess v3.Process) error {
+func runKubeproxy(ctx context.Context, host *hosts.Host, df hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, kubeProxyProcess v3.Process, alpineImage string) error {
 	imageCfg, hostCfg, healthCheckURL := GetProcessConfig(kubeProxyProcess)
 	if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, KubeproxyContainerName, host.Address, WorkerRole, prsMap); err != nil {
 		return err
 	}
-	return runHealthcheck(ctx, host, KubeproxyContainerName, df, healthCheckURL, nil)
+	if err := runHealthcheck(ctx, host, KubeproxyContainerName, df, healthCheckURL, nil); err != nil {
+		return err
+	}
+	return createLogLink(ctx, host, KubeproxyContainerName, WorkerRole, alpineImage, prsMap)
 }
 
 func removeKubeproxy(ctx context.Context, host *hosts.Host) error {

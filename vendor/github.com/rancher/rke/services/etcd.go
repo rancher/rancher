@@ -20,12 +20,17 @@ const (
 	EtcdHealthCheckURL = "https://127.0.0.1:2379/health"
 )
 
-func RunEtcdPlane(ctx context.Context, etcdHosts []*hosts.Host, etcdProcessHostMap map[*hosts.Host]v3.Process, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry) error {
+func RunEtcdPlane(ctx context.Context, etcdHosts []*hosts.Host, etcdProcessHostMap map[*hosts.Host]v3.Process, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, updateWorkersOnly bool, alpineImage string) error {
 	log.Infof(ctx, "[%s] Building up Etcd Plane..", ETCDRole)
 	for _, host := range etcdHosts {
+		if updateWorkersOnly {
+			continue
+		}
 		imageCfg, hostCfg, _ := GetProcessConfig(etcdProcessHostMap[host])
-		err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, EtcdContainerName, host.Address, ETCDRole, prsMap)
-		if err != nil {
+		if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, EtcdContainerName, host.Address, ETCDRole, prsMap); err != nil {
+			return err
+		}
+		if err := createLogLink(ctx, host, EtcdContainerName, ETCDRole, alpineImage, prsMap); err != nil {
 			return err
 		}
 	}
@@ -125,10 +130,13 @@ func RemoveEtcdMember(ctx context.Context, etcdHost *hosts.Host, etcdHosts []*ho
 	return nil
 }
 
-func ReloadEtcdCluster(ctx context.Context, readyEtcdHosts []*hosts.Host, localConnDialerFactory hosts.DialerFactory, cert, key []byte, prsMap map[string]v3.PrivateRegistry, etcdProcessHostMap map[*hosts.Host]v3.Process) error {
+func ReloadEtcdCluster(ctx context.Context, readyEtcdHosts []*hosts.Host, localConnDialerFactory hosts.DialerFactory, cert, key []byte, prsMap map[string]v3.PrivateRegistry, etcdProcessHostMap map[*hosts.Host]v3.Process, alpineImage string) error {
 	for host, process := range etcdProcessHostMap {
 		imageCfg, hostCfg, _ := GetProcessConfig(process)
 		if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, EtcdContainerName, host.Address, ETCDRole, prsMap); err != nil {
+			return err
+		}
+		if err := createLogLink(ctx, host, EtcdContainerName, ETCDRole, alpineImage, prsMap); err != nil {
 			return err
 		}
 	}

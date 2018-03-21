@@ -19,11 +19,12 @@ const (
 	unschedulableEtcdTaint = "node-role.kubernetes.io/etcd=true:NoExecute"
 )
 
-func ReconcileCluster(ctx context.Context, kubeCluster, currentCluster *Cluster) error {
+func ReconcileCluster(ctx context.Context, kubeCluster, currentCluster *Cluster, updateOnly bool) error {
 	log.Infof(ctx, "[reconcile] Reconciling cluster state")
+	kubeCluster.UpdateWorkersOnly = updateOnly
 	if currentCluster == nil {
 		log.Infof(ctx, "[reconcile] This is newly generated cluster")
-
+		kubeCluster.UpdateWorkersOnly = false
 		return nil
 	}
 
@@ -67,6 +68,7 @@ func reconcileWorker(ctx context.Context, currentCluster, kubeCluster *Cluster, 
 	// attempt to remove unschedulable taint
 	toAddHosts := hosts.GetToAddHosts(currentCluster.WorkerHosts, kubeCluster.WorkerHosts)
 	for _, host := range toAddHosts {
+		host.UpdateWorker = true
 		if host.IsEtcd {
 			host.ToDelTaints = append(host.ToDelTaints, unschedulableEtcdTaint)
 		}
@@ -110,6 +112,7 @@ func reconcileControl(ctx context.Context, currentCluster, kubeCluster *Cluster,
 	// attempt to remove unschedulable taint
 	toAddHosts := hosts.GetToAddHosts(currentCluster.ControlPlaneHosts, kubeCluster.ControlPlaneHosts)
 	for _, host := range toAddHosts {
+		kubeCluster.UpdateWorkersOnly = false
 		if host.IsEtcd {
 			host.ToDelTaints = append(host.ToDelTaints, unschedulableEtcdTaint)
 		}
@@ -173,6 +176,7 @@ func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, ku
 	crtMap := currentCluster.Certificates
 	var err error
 	for _, etcdHost := range etcdToAdd {
+		kubeCluster.UpdateWorkersOnly = false
 		etcdHost.ToAddEtcdMember = true
 		// Generate new certificate for the new etcd member
 		crtMap, err = pki.RegenerateEtcdCertificate(
@@ -207,7 +211,7 @@ func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, ku
 		readyHosts := getReadyEtcdHosts(kubeCluster.EtcdHosts)
 		etcdProcessHostMap := kubeCluster.getEtcdProcessHostMap(readyHosts)
 
-		if err := services.ReloadEtcdCluster(ctx, readyHosts, currentCluster.LocalConnDialerFactory, clientCert, clientkey, currentCluster.PrivateRegistriesMap, etcdProcessHostMap); err != nil {
+		if err := services.ReloadEtcdCluster(ctx, readyHosts, currentCluster.LocalConnDialerFactory, clientCert, clientkey, currentCluster.PrivateRegistriesMap, etcdProcessHostMap, kubeCluster.SystemImages.Alpine); err != nil {
 			return err
 		}
 	}
