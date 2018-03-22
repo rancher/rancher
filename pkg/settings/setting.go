@@ -10,7 +10,7 @@ var (
 	settings = map[string]Setting{}
 	provider Provider
 
-	AgentImage                      = newSetting("agent-image", "rancher/agent:v2.0.3")
+	AgentImage                      = newSetting("agent-image", "rancher/agent:master")
 	CACerts                         = newSetting("cacerts", "")
 	CLIURLDarwin                    = newSetting("cli-url-darwin", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-darwin-amd64-v1.0.0-alpha8.tar.gz")
 	CLIURLLinux                     = newSetting("cli-url-linux", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-linux-amd64-v1.0.0-alpha8.tar.gz")
