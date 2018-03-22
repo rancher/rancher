@@ -2,7 +2,6 @@ package podsecuritypolicy
 
 import (
 	"fmt"
-	"strings"
 
 	v13 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/extensions/v1beta1"
@@ -11,11 +10,15 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
-	v1beta12 "k8s.io/api/extensions/v1beta1"
 	rbac "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/tools/cache"
 )
+
+const psptpbByTargetProjectNameAnnotationIndex = "something.something.auth/psptpb-by-project-id"
+const roleBindingByServiceAccountIndex = "something.something.auth/role-binding-by-service-account"
 
 // RegisterServiceAccount ensures that:
 // 	1. Each namespace has a pod security policy assigned to a role if:
@@ -26,214 +29,248 @@ import (
 func RegisterServiceAccount(context *config.UserContext) {
 	logrus.Infof("registering podsecuritypolicy serviceaccount handler for cluster %v", context.ClusterName)
 
-	m := &serviceAccountManager{
-		clusters: context.Management.Management.Clusters(""),
-		bindings: context.RBAC.RoleBindings(""),
-		policies: context.Extensions.PodSecurityPolicies(""),
-		roles:    context.RBAC.ClusterRoles(""),
+	psptpbInformer := context.Management.Management.PodSecurityPolicyTemplateProjectBindings("").Controller().Informer()
+	psptpbIndexers := map[string]cache.IndexFunc{
+		psptpbByTargetProjectNameAnnotationIndex: psptpbByTargetProjectName,
+	}
+	psptpbInformer.AddIndexers(psptpbIndexers)
 
-		clusterLister:   context.Management.Management.Clusters("").Controller().Lister(),
-		templateLister:  context.Management.Management.PodSecurityPolicyTemplates("").Controller().Lister(),
-		policyLister:    context.Extensions.PodSecurityPolicies("").Controller().Lister(),
-		bindingLister:   context.RBAC.RoleBindings("").Controller().Lister(),
-		roleLister:      context.RBAC.ClusterRoles("").Controller().Lister(),
-		namespaceLister: context.Core.Namespaces("").Controller().Lister(),
-		projectLister:   context.Management.Management.Projects("").Controller().Lister(),
+	roleBindingInformer := context.RBAC.RoleBindings("").Controller().Informer()
+	roleBindingIndexers := map[string]cache.IndexFunc{
+		roleBindingByServiceAccountIndex: roleBindingByServiceAccount,
+	}
+	roleBindingInformer.AddIndexers(roleBindingIndexers)
+
+	m := &serviceAccountManager{
+		clusterName:        context.ClusterName,
+		clusters:           context.Management.Management.Clusters(""),
+		pspts:              context.Management.Management.PodSecurityPolicyTemplates(""),
+		roleBindings:       context.RBAC.RoleBindings(""),
+		roleBindingIndexer: roleBindingInformer.GetIndexer(),
+
+		policies:      context.Extensions.PodSecurityPolicies(""),
+		psptpbIndexer: psptpbInformer.GetIndexer(),
+
+		clusterLister:     context.Management.Management.Clusters("").Controller().Lister(),
+		psptLister:        context.Management.Management.PodSecurityPolicyTemplates("").Controller().Lister(),
+		templateLister:    context.Management.Management.PodSecurityPolicyTemplates("").Controller().Lister(),
+		policyLister:      context.Extensions.PodSecurityPolicies("").Controller().Lister(),
+		roleBindingLister: context.RBAC.RoleBindings("").Controller().Lister(),
+		roleLister:        context.RBAC.ClusterRoles("").Controller().Lister(),
+		namespaceLister:   context.Core.Namespaces("").Controller().Lister(),
+		projectLister:     context.Management.Management.Projects("").Controller().Lister(),
+		psptpbLister: context.Management.Management.PodSecurityPolicyTemplateProjectBindings("").
+			Controller().Lister(),
 	}
 
-	context.Core.ServiceAccounts("").AddHandler("ServiceAccountSyncHandler", m.sync)
+	context.Core.ServiceAccounts("").AddHandler("ServiceAccountLifecycleHandler", m.sync)
+}
+
+func psptpbByTargetProjectName(obj interface{}) ([]string, error) {
+	psptpb, ok := obj.(*v3.PodSecurityPolicyTemplateProjectBinding)
+	if !ok || psptpb.TargetProjectName == "" {
+		return []string{}, nil
+	}
+
+	return []string{psptpb.TargetProjectName}, nil
+}
+
+func roleBindingByServiceAccount(obj interface{}) ([]string, error) {
+	roleBinding, ok := obj.(*rbac.RoleBinding)
+	if !ok || len(roleBinding.Subjects) != 1 ||
+		roleBinding.Subjects[0].Name == "" ||
+		roleBinding.Subjects[0].Namespace == "" {
+		return []string{}, nil
+	}
+
+	subject := roleBinding.Subjects[0]
+	return []string{subject.Namespace + "-" + subject.Name}, nil
 }
 
 type serviceAccountManager struct {
-	clusterLister   v3.ClusterLister
-	clusters        v3.ClusterInterface
-	templateLister  v3.PodSecurityPolicyTemplateLister
-	policyLister    v1beta1.PodSecurityPolicyLister
-	bindingLister   v12.RoleBindingLister
-	bindings        v12.RoleBindingInterface
-	policies        v1beta1.PodSecurityPolicyInterface
-	roleLister      v12.ClusterRoleLister
-	roles           v12.ClusterRoleInterface
-	namespaceLister v13.NamespaceLister
-	projectLister   v3.ProjectLister
+	clusterName        string
+	clusterLister      v3.ClusterLister
+	clusters           v3.ClusterInterface
+	pspts              v3.PodSecurityPolicyTemplateInterface
+	psptLister         v3.PodSecurityPolicyTemplateLister
+	psptpbIndexer      cache.Indexer
+	templateLister     v3.PodSecurityPolicyTemplateLister
+	policyLister       v1beta1.PodSecurityPolicyLister
+	roleBindingLister  v12.RoleBindingLister
+	roleBindings       v12.RoleBindingInterface
+	roleBindingIndexer cache.Indexer
+	policies           v1beta1.PodSecurityPolicyInterface
+	roleLister         v12.ClusterRoleLister
+	namespaceLister    v13.NamespaceLister
+	projectLister      v3.ProjectLister
+	psptpbLister       v3.PodSecurityPolicyTemplateProjectBindingLister
 }
 
 func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
-	if obj == nil {
-		logrus.Debugf("no service account provided, exiting")
+	namespace, err := m.namespaceLister.Get("", obj.Namespace)
+	if err != nil {
+		return fmt.Errorf("error getting projects: %v", err)
+	}
+
+	if namespace.Annotations[projectIDAnnotation] == "" {
 		return nil
 	}
 
-	namespaceName := obj.Namespace
-
-	// get PSPT
-	// if no PSPT then get default
-	// if no default then exit
-	namespace, err := m.namespaceLister.Get("", namespaceName)
+	psptpbs, err := m.psptpbIndexer.ByIndex(psptpbByTargetProjectNameAnnotationIndex, namespace.Annotations[projectIDAnnotation])
 	if err != nil {
-		return fmt.Errorf("error getting namespaces: %v", err)
+		return fmt.Errorf("error getting psptpbs: %v", err)
 	}
 
-	annotation := namespace.Annotations[projectIDAnnotation]
+	onePSPTPBExists := false
+	desiredBindings := map[string]*v3.PodSecurityPolicyTemplateProjectBinding{}
 
-	if annotation == "" {
-		// no project is associated with namespace so don't do anything
-		logrus.Debugf("no project is associated with namespace %v", namespaceName)
-		return nil
+	for _, rawPSPTPB := range psptpbs {
+		psptpb, ok := rawPSPTPB.(*v3.PodSecurityPolicyTemplateProjectBinding)
+		if !ok {
+			return fmt.Errorf("could not convert to *v3.PodSecurityPolicyTemplateProjectBinding: %v", rawPSPTPB)
+		}
+
+		if psptpb.DeletionTimestamp != nil {
+			continue
+		}
+
+		onePSPTPBExists = true
+
+		key := getClusterRoleName(psptpb.PodSecurityPolicyTemplateName)
+		desiredBindings[key] = psptpb
 	}
 
-	split := strings.SplitN(annotation, ":", 2)
-
-	if len(split) != 2 {
-		return fmt.Errorf("could not parse handler key: %v got len %v", annotation, len(split))
-	}
-
-	clusterName, projectID := split[0], split[1]
-
-	podSecurityPolicyTemplateID, err := getPodSecurityPolicyTemplateID(m.projectLister, m.clusterLister, projectID,
-		clusterName)
+	roleBindings, err := m.roleBindingIndexer.ByIndex(roleBindingByServiceAccountIndex, obj.Namespace+"-"+obj.Name)
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting role bindings: %v", err)
 	}
 
-	if podSecurityPolicyTemplateID == "" {
-		// Do nothing
-		logrus.Debugf("no matching pod security policy template")
-		return nil
-	}
+	for _, rawRoleBinding := range roleBindings {
+		roleBinding, ok := rawRoleBinding.(*rbac.RoleBinding)
+		if !ok {
+			return fmt.Errorf("could not convert to *rbac2.RoleBinding: %v", rawRoleBinding)
+		}
 
-	policies, err := m.policyLister.List("", labels.Everything())
-	if err != nil {
-		return fmt.Errorf("error getting policies: %v", err)
-	}
+		key := roleBinding.RoleRef.Name
 
-	var policy *v1beta12.PodSecurityPolicy
-
-	for _, candidate := range policies {
-		if candidate.Annotations[podSecurityTemplateParentAnnotation] == podSecurityPolicyTemplateID {
-			policy = candidate
+		if desiredBindings[key] == nil {
+			err = m.roleBindings.DeleteNamespaced(roleBinding.Namespace, roleBinding.Name, &metav1.DeleteOptions{})
+			if err != nil {
+				return fmt.Errorf("error deleting role binding: %v", err)
+			}
+		} else {
+			delete(desiredBindings, key)
 		}
 	}
 
-	if policy == nil {
-		template, err := m.templateLister.Get("", podSecurityPolicyTemplateID)
-		if err != nil {
-			return fmt.Errorf("error getting pod security policy templates: %v", err)
-		}
-
-		policy, err = fromTemplate(m.policies, m.policyLister, key, template)
-		if err != nil {
-			return err
-		}
-	}
-
-	roles, err := m.roleLister.List("", labels.Everything())
-	if err != nil {
-		return fmt.Errorf("error getting cluster roles: %v", err)
-	}
-
-	var role *rbac.ClusterRole
-
-	for _, candidate := range roles {
-		if candidate.Annotations[podSecurityTemplateParentAnnotation] == policy.Name {
-			role = candidate
-		}
-	}
-
-	if role == nil {
-		// Create role
-		newRole := &rbac.ClusterRole{
+	for clusterRoleName, desiredBinding := range desiredBindings {
+		roleBindingName := getRoleBindingName(obj, clusterRoleName)
+		_, err = m.roleBindings.Create(&rbac.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				Annotations:  map[string]string{},
-				GenerateName: "clusterrole-",
-				Namespace:    namespaceName,
-			},
-			TypeMeta: metav1.TypeMeta{
-				Kind: "ClusterRole",
-			},
-			Rules: []rbac.PolicyRule{
-				{
-					APIGroups:     []string{"extensions"},
-					Resources:     []string{"podsecuritypolicies"},
-					Verbs:         []string{"use"},
-					ResourceNames: []string{policy.Name},
+				Name:      roleBindingName,
+				Namespace: obj.Namespace,
+				Annotations: map[string]string{
+					podSecurityPolicyTemplateParentAnnotation: desiredBinding.PodSecurityPolicyTemplateName,
+				},
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						APIVersion: "v1",
+						Name:       obj.Name,
+						Kind:       "ServiceAccount",
+						UID:        obj.UID,
+					},
 				},
 			},
-		}
-
-		newRole.Annotations[podSecurityTemplateParentAnnotation] = policy.Name
-
-		role, err = m.roles.Create(newRole)
+			TypeMeta: metav1.TypeMeta{
+				Kind: "RoleBinding",
+			},
+			RoleRef: rbac.RoleRef{
+				APIGroup: apiGroup,
+				Name:     clusterRoleName,
+				Kind:     "ClusterRole",
+			},
+			Subjects: []rbac.Subject{
+				{
+					Kind:      "ServiceAccount",
+					Name:      obj.Name,
+					Namespace: obj.Namespace,
+				},
+			},
+		})
 		if err != nil {
-			return fmt.Errorf("error creating cluster role: %v", err)
+			return fmt.Errorf("error creating binding: %v", err)
 		}
 	}
 
-	return createBindingIfNotExists(m.bindings, m.bindingLister, obj, role.Name, policy.Name)
-}
-
-func createBindingIfNotExists(bindings2 v12.RoleBindingInterface, bindingLister v12.RoleBindingLister,
-	serviceAccount *v1.ServiceAccount, roleName string, policyName string) error {
-	bindings, err := bindingLister.List("", labels.Everything())
-	if err != nil {
-		return fmt.Errorf("error getting bindings: %v", err)
-	}
-
-	bindingExists := false
-
-	for _, binding := range bindings {
-		if binding.Annotations[podSecurityTemplateParentAnnotation] == policyName &&
-			len(binding.Subjects) > 0 && // guard against panic
-			binding.Subjects[0].Name == serviceAccount.Name &&
-			binding.Subjects[0].Namespace == serviceAccount.Namespace {
-			bindingExists = true
-		}
-	}
-
-	if !bindingExists {
-		// create binding
-		err = createBinding(bindings2, serviceAccount, roleName, policyName)
+	if !onePSPTPBExists {
+		// create default pspt role binding if it is set
+		cluster, err := m.clusterLister.Get("", m.clusterName)
 		if err != nil {
-			return err
+			return fmt.Errorf("error getting cluster: %v", err)
+		}
+
+		clusterRoleName := getClusterRoleName(cluster.Spec.DefaultPodSecurityPolicyTemplateName)
+		roleBindingName := getDefaultRoleBindingName(obj, clusterRoleName)
+
+		if cluster.Spec.DefaultPodSecurityPolicyTemplateName != "" {
+			_, err := m.roleBindingLister.Get(obj.Namespace, roleBindingName)
+			if err != nil {
+				if errors.IsNotFound(err) {
+					_, err = m.roleBindings.Create(&rbac.RoleBinding{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      roleBindingName,
+							Namespace: obj.Namespace,
+							Annotations: map[string]string{
+								podSecurityPolicyTemplateParentAnnotation: cluster.Spec.DefaultPodSecurityPolicyTemplateName,
+							},
+							OwnerReferences: []metav1.OwnerReference{
+								{
+									APIVersion: "v1",
+									Name:       obj.Name,
+									Kind:       "ServiceAccount",
+									UID:        obj.UID,
+								},
+							},
+						},
+						TypeMeta: metav1.TypeMeta{
+							Kind: "RoleBinding",
+						},
+						RoleRef: rbac.RoleRef{
+							APIGroup: apiGroup,
+							Name:     clusterRoleName,
+							Kind:     "ClusterRole",
+						},
+						Subjects: []rbac.Subject{
+							{
+								Kind:      "ServiceAccount",
+								Name:      obj.Name,
+								Namespace: obj.Namespace,
+							},
+						},
+					})
+					if err != nil {
+						return fmt.Errorf("error creating role binding: %v", err)
+					}
+				} else {
+					return fmt.Errorf("error getting role binding %v: %v", roleBindingName, err)
+				}
+			}
 		}
 	}
 
 	return nil
 }
 
-func createBinding(bindings v12.RoleBindingInterface, serviceAccount *v1.ServiceAccount, roleName string,
-	policyName string) error {
-	newBinding := &rbac.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%v-%v-binding", roleName, policyName),
-			Namespace: serviceAccount.Namespace,
-			Annotations: map[string]string{
-				podSecurityTemplateParentAnnotation: policyName,
-			},
-		},
-		TypeMeta: metav1.TypeMeta{
-			Kind: "ClusterRoleBinding",
-		},
-		RoleRef: rbac.RoleRef{
-			APIGroup: apiGroup,
-			Name:     roleName,
-			Kind:     "ClusterRole",
-		},
-		Subjects: []rbac.Subject{
-			{
-				Kind:      "ServiceAccount",
-				Name:      serviceAccount.Name,
-				Namespace: serviceAccount.Namespace,
-			},
-		},
-	}
+func getRoleBindingName(obj *v1.ServiceAccount, clusterRoleName string) string {
+	return fmt.Sprintf("%v-%v-%v-binding", obj.Name, obj.Namespace, clusterRoleName)
+}
 
-	_, err := bindings.Create(newBinding)
-	if err != nil {
-		return fmt.Errorf("error creating role binding for %v error was: %v", newBinding, err)
-	}
+func getDefaultRoleBindingName(obj *v1.ServiceAccount, clusterRoleName string) string {
+	return fmt.Sprintf("default-%v-%v-%v-binding", obj.Name, obj.Namespace, clusterRoleName)
+}
 
-	return nil
+func getClusterRoleName(podSecurityPolicyTemplateName string) string {
+	return fmt.Sprintf("%v-clusterrole", podSecurityPolicyTemplateName)
 }
 
 func resyncServiceAccounts(serviceAccountLister v13.ServiceAccountLister,
