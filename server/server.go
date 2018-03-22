@@ -15,7 +15,7 @@ import (
 	rancherdialer "github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/dynamiclistener"
 	"github.com/rancher/rancher/pkg/httpproxy"
-	k8sProxy "github.com/rancher/rancher/pkg/k8sproxy"
+	k8sProxyPkg "github.com/rancher/rancher/pkg/k8sproxy"
 	"github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/rancher/server/capabilities"
 	"github.com/rancher/rancher/server/ui"
@@ -51,7 +51,9 @@ func Start(ctx context.Context, httpPort, httpsPort int, apiContext *config.Scal
 		return err
 	}
 
-	managementAPI, err := managementapi.New(ctx, apiContext, clusterManager)
+	k8sProxy := k8sProxyPkg.New(apiContext, apiContext.Dialer)
+
+	managementAPI, err := managementapi.New(ctx, apiContext, clusterManager, k8sProxy)
 	if err != nil {
 		return err
 	}
@@ -61,12 +63,10 @@ func Start(ctx context.Context, httpPort, httpsPort int, apiContext *config.Scal
 
 	app.DefaultProxyDialer = utilnet.DialFunc(apiContext.Dialer.LocalClusterDialer())
 
-	localClusterAuth, err := k8sProxy.NewLocalProxy(apiContext, apiContext.Dialer, root)
+	localClusterAuth, err := k8sProxyPkg.NewLocalProxy(apiContext, apiContext.Dialer, root)
 	if err != nil {
 		return err
 	}
-
-	k8sProxy := k8sProxy.New(apiContext, apiContext.Dialer)
 
 	rawAuthedAPIs := newAuthed(tokenAPI, managementAPI, k8sProxy)
 

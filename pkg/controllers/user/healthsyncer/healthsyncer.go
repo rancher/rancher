@@ -1,7 +1,6 @@
 package healthsyncer
 
 import (
-	"fmt"
 	"time"
 
 	"context"
@@ -14,6 +13,7 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -43,7 +43,7 @@ func Register(ctx context.Context, workload *config.UserContext) {
 func (h *HealthSyncer) syncHealth(ctx context.Context, syncHealth time.Duration) {
 	for range ticker.Context(ctx, syncHealth) {
 		err := h.updateClusterHealth()
-		if err != nil {
+		if err != nil && !apierrors.IsConflict(err) {
 			logrus.Info(err)
 		}
 	}
@@ -78,7 +78,7 @@ func (h *HealthSyncer) updateClusterHealth() error {
 
 	_, err = h.clusters.Update(newObj.(*v3.Cluster))
 	if err != nil {
-		return fmt.Errorf("Failed to update cluster [%s] %v", cluster.Name, err)
+		return errors.Wrapf(err, "Failed to update cluster [%s]", cluster.Name)
 	}
 
 	logrus.Debugf("Updated cluster health successfully [%s]", h.clusterName)
