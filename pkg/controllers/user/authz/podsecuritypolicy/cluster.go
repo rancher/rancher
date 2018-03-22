@@ -1,21 +1,30 @@
 package podsecuritypolicy
 
 import (
+	"fmt"
+
 	v12 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/extensions/v1beta1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+	v1beta13 "k8s.io/api/extensions/v1beta1"
+	rbac "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type clusterManager struct {
-	clusterLister             v3.ClusterLister
-	clusters                  v3.ClusterInterface
+	clusterName               string
 	templateLister            v3.PodSecurityPolicyTemplateLister
 	policyLister              v1beta1.PodSecurityPolicyLister
 	policies                  v1beta1.PodSecurityPolicyInterface
 	serviceAccountLister      v12.ServiceAccountLister
 	serviceAccountsController v12.ServiceAccountController
+	clusterRoleLister         v1.ClusterRoleLister
+	clusterRoles              v1.ClusterRoleInterface
+	clusters                  v3.ClusterInterface
 }
 
 // RegisterCluster updates the pod security policy if the pod security policy template default for this cluster has been
@@ -24,12 +33,14 @@ func RegisterCluster(context *config.UserContext) {
 	logrus.Infof("registering podsecuritypolicy cluster handler for cluster %v", context.ClusterName)
 
 	m := &clusterManager{
-		clusters: context.Management.Management.Clusters(""),
-		policies: context.Extensions.PodSecurityPolicies(""),
+		clusterName: context.ClusterName,
+		policies:    context.Extensions.PodSecurityPolicies(""),
 
-		clusterLister:             context.Management.Management.Clusters("").Controller().Lister(),
+		clusters:                  context.Management.Management.Clusters(""),
 		templateLister:            context.Management.Management.PodSecurityPolicyTemplates("").Controller().Lister(),
 		policyLister:              context.Extensions.PodSecurityPolicies("").Controller().Lister(),
+		clusterRoleLister:         context.RBAC.ClusterRoles("").Controller().Lister(),
+		clusterRoles:              context.RBAC.ClusterRoles(""),
 		serviceAccountLister:      context.Core.ServiceAccounts("").Controller().Lister(),
 		serviceAccountsController: context.Core.ServiceAccounts("").Controller(),
 	}
@@ -38,22 +49,88 @@ func RegisterCluster(context *config.UserContext) {
 }
 
 func (m *clusterManager) sync(key string, obj *v3.Cluster) error {
-	if obj == nil {
+	if obj == nil ||
+		m.clusterName != obj.Name ||
+		obj.Spec.DefaultPodSecurityPolicyTemplateName == obj.Status.AppliedPodSecurityPolicyTemplateName {
 		// Nothing to do
 		return nil
 	}
 
-	id := obj.Spec.DefaultPodSecurityPolicyTemplateName
+	if obj.Spec.DefaultPodSecurityPolicyTemplateName != "" {
+		podSecurityPolicyName := fmt.Sprintf("%v-psp", obj.Spec.DefaultPodSecurityPolicyTemplateName)
 
-	if id == "" {
-		logrus.Debugf("No pod security policy template found for cluster %v", obj.Name)
-		return nil
+		_, err := m.policyLister.Get("", podSecurityPolicyName)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				template, err := m.templateLister.Get("", obj.Spec.DefaultPodSecurityPolicyTemplateName)
+				if err != nil {
+					return fmt.Errorf("error getting pspt: %v", err)
+				}
+
+				objectMeta := metav1.ObjectMeta{}
+				objectMeta.Name = podSecurityPolicyName
+				objectMeta.Annotations = make(map[string]string)
+				objectMeta.Annotations[podSecurityPolicyTemplateParentAnnotation] = template.Name
+				objectMeta.Annotations[podSecurityPolicyTemplateVersionAnnotation] = template.ResourceVersion
+
+				psp := &v1beta13.PodSecurityPolicy{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       podSecurityPolicy,
+						APIVersion: apiVersion,
+					},
+					ObjectMeta: objectMeta,
+					Spec:       template.Spec,
+				}
+
+				_, err = m.policies.Create(psp)
+				if err != nil {
+					return fmt.Errorf("error creating psp: %v", err)
+				}
+			} else {
+				return fmt.Errorf("error getting policy: %v", err)
+			}
+		}
+
+		clusterRoleName := fmt.Sprintf("%v-clusterrole", obj.Spec.DefaultPodSecurityPolicyTemplateName)
+		_, err = m.clusterRoleLister.Get("", clusterRoleName)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				newRole := &rbac.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{},
+						Name:        clusterRoleName,
+					},
+					TypeMeta: metav1.TypeMeta{
+						Kind: "ClusterRole",
+					},
+					Rules: []rbac.PolicyRule{
+						{
+							APIGroups:     []string{"extensions"},
+							Resources:     []string{"podsecuritypolicies"},
+							Verbs:         []string{"use"},
+							ResourceNames: []string{podSecurityPolicyName},
+						},
+					},
+				}
+				newRole.Annotations[podSecurityPolicyTemplateParentAnnotation] = obj.Spec.DefaultPodSecurityPolicyTemplateName
+
+				_, err := m.clusterRoles.Create(newRole)
+				if err != nil {
+					return fmt.Errorf("error creating cluster role: %v", err)
+				}
+			} else {
+				return fmt.Errorf("error getting cluster role: %v", err)
+			}
+		}
+
+		obj.Status.AppliedPodSecurityPolicyTemplateName = obj.Spec.DefaultPodSecurityPolicyTemplateName
+		_, err = m.clusters.Update(obj)
+		if err != nil {
+			return fmt.Errorf("error updating cluster: %v", err)
+		}
+
+		return resyncServiceAccounts(m.serviceAccountLister, m.serviceAccountsController, "")
 	}
 
-	err := updatePolicyIfOutdated(m.templateLister, m.policies, m.policyLister, id)
-	if err != nil {
-		return err
-	}
-
-	return resyncServiceAccounts(m.serviceAccountLister, m.serviceAccountsController, "")
+	return nil
 }

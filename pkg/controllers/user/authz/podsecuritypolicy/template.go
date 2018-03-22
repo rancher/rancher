@@ -3,179 +3,134 @@ package podsecuritypolicy
 import (
 	"fmt"
 
-	"strings"
-
 	v1beta12 "github.com/rancher/types/apis/extensions/v1beta1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v12 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/extensions/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	rbac "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/tools/cache"
 )
+
+const policyByPSPTParentAnnotationIndex = "something.something.pspt/parent-annotation"
+const clusterRoleByPSPTNameIndex = "something.something.psptpb/pspt-name"
 
 // RegisterTemplate propagates updates to pod security policy templates to their associated pod security policies.
 // Ignores pod security policy templates not assigned to a cluster or project.
 func RegisterTemplate(context *config.UserContext) {
 	logrus.Infof("registering podsecuritypolicy template handler for cluster %v", context.ClusterName)
 
-	m := &templateManager{
-		policies:     context.Extensions.PodSecurityPolicies(""),
-		policyLister: context.Extensions.PodSecurityPolicies("").Controller().Lister(),
+	policyInformer := context.Extensions.PodSecurityPolicies("").Controller().Informer()
+	policyIndexers := map[string]cache.IndexFunc{
+		policyByPSPTParentAnnotationIndex: policyByPSPTParentAnnotation,
+	}
+	policyInformer.AddIndexers(policyIndexers)
+
+	clusterRoleInformer := context.RBAC.ClusterRoles("").Controller().Informer()
+	clusterRoleIndexer := map[string]cache.IndexFunc{
+		clusterRoleByPSPTNameIndex: clusterRoleByPSPTName,
+	}
+	clusterRoleInformer.AddIndexers(clusterRoleIndexer)
+
+	lfc := &Lifecycle{
+		policies:          context.Extensions.PodSecurityPolicies(""),
+		policyLister:      context.Extensions.PodSecurityPolicies("").Controller().Lister(),
+		clusterRoles:      context.RBAC.ClusterRoles(""),
+		clusterRoleLister: context.RBAC.ClusterRoles("").Controller().Lister(),
+
+		policyIndexer:      policyInformer.GetIndexer(),
+		clusterRoleIndexer: clusterRoleInformer.GetIndexer(),
 	}
 
-	context.Management.Management.PodSecurityPolicyTemplates("").AddHandler(
-		"PodSecurityPolicyTemplateSyncHandler", m.sync)
+	pspti := context.Management.Management.PodSecurityPolicyTemplates("")
+	psptSync := v3.NewPodSecurityPolicyTemplateLifecycleAdapter("cluster-pspt-sync_"+context.ClusterName, true, pspti, lfc)
+	context.Management.Management.PodSecurityPolicyTemplates("").AddHandler("pspt-sync", psptSync)
 }
 
-type templateManager struct {
-	policies     v1beta12.PodSecurityPolicyInterface
-	policyLister v1beta12.PodSecurityPolicyLister
+type Lifecycle struct {
+	policies          v1beta12.PodSecurityPolicyInterface
+	policyLister      v1beta12.PodSecurityPolicyLister
+	clusterRoles      v12.ClusterRoleInterface
+	clusterRoleLister v12.ClusterRoleLister
+
+	policyIndexer      cache.Indexer
+	clusterRoleIndexer cache.Indexer
 }
 
-func (m *templateManager) sync(key string, obj *v3.PodSecurityPolicyTemplate) error {
-	policies, err := m.policyLister.List("", labels.Everything())
+func (l *Lifecycle) Create(obj *v3.PodSecurityPolicyTemplate) (*v3.PodSecurityPolicyTemplate, error) {
+	return nil, nil
+}
+
+func (l *Lifecycle) Updated(obj *v3.PodSecurityPolicyTemplate) (*v3.PodSecurityPolicyTemplate, error) {
+	policies, err := l.policyIndexer.ByIndex(policyByPSPTParentAnnotationIndex, obj.Name)
 	if err != nil {
-		return fmt.Errorf("error getting policies: %v", err)
+		return nil, fmt.Errorf("error getting policies: %v", err)
 	}
 
-	var childPolicies []*v1beta1.PodSecurityPolicy
+	for _, rawPolicy := range policies {
+		policy := rawPolicy.(*v1beta1.PodSecurityPolicy)
 
-	for _, candidate := range policies {
-		if candidate.Annotations[podSecurityTemplateParentAnnotation] == obj.Name {
-			childPolicies = append(childPolicies, candidate)
-		}
-	}
+		if policy.Annotations[podSecurityPolicyTemplateVersionAnnotation] != obj.ResourceVersion {
+			newPolicy := policy.DeepCopy()
+			newPolicy.Spec = obj.Spec
+			newPolicy.Annotations[podSecurityPolicyTemplateVersionAnnotation] = obj.ResourceVersion
 
-	if len(policies) == 0 {
-		// this pspt is not used so return immediately
-		return nil
-	}
-
-	for _, policy := range childPolicies {
-		if policy.Annotations[podSecurityVersionAnnotation] != obj.ResourceVersion {
-			_, err := fromTemplateExplicitName(m.policies, m.policyLister, policy.Name, obj)
+			_, err = l.policies.Update(newPolicy)
 			if err != nil {
-				return err
+				return nil, fmt.Errorf("error updating psp: %v", err)
 			}
 		}
 	}
 
-	return nil
-}
-func fromTemplate(policies v1beta12.PodSecurityPolicyInterface, policyLister v1beta12.PodSecurityPolicyLister,
-	key string, originalTemplate *v3.PodSecurityPolicyTemplate) (*v1beta1.PodSecurityPolicy, error) {
-	return fromTemplateExplicitName(policies, policyLister, keyToPolicyName(key), originalTemplate)
+	return obj, nil
 }
 
-func fromTemplateExplicitName(policies v1beta12.PodSecurityPolicyInterface,
-	policyLister v1beta12.PodSecurityPolicyLister, key string,
-	originalTemplate *v3.PodSecurityPolicyTemplate) (*v1beta1.PodSecurityPolicy, error) {
-	template := originalTemplate.DeepCopy()
-
-	objectMeta := v1.ObjectMeta{}
-	objectMeta.Name = key
-	objectMeta.Annotations = make(map[string]string)
-	objectMeta.Annotations[podSecurityTemplateParentAnnotation] = template.Name
-	objectMeta.Annotations[podSecurityVersionAnnotation] = template.ResourceVersion
-
-	psp := &v1beta1.PodSecurityPolicy{
-		TypeMeta: v1.TypeMeta{
-			Kind:       podSecurityPolicy,
-			APIVersion: apiVersion,
-		},
-		ObjectMeta: objectMeta,
-		Spec:       template.Spec,
-	}
-
-	var policy *v1beta1.PodSecurityPolicy
-	var err error
-
-	if !doesPolicyExist(policyLister, key) {
-		policy, err = policies.Create(psp)
-	} else {
-		policy, err = policies.Update(psp)
-	}
-
+func (l *Lifecycle) Remove(obj *v3.PodSecurityPolicyTemplate) (*v3.PodSecurityPolicyTemplate, error) {
+	policies, err := l.policyIndexer.ByIndex(policyByPSPTParentAnnotationIndex, obj.Name)
 	if err != nil {
-		return nil, fmt.Errorf("error creating pod security policy: %v", err)
+		return nil, fmt.Errorf("error getting policies: %v", err)
 	}
 
-	logrus.Debugf("created/updated a pod security policy with name %v", objectMeta.Name)
-
-	return policy, nil
-}
-
-func doesPolicyExist(policyLister v1beta12.PodSecurityPolicyLister, name string) bool {
-	_, err := policyLister.Get("", name)
-
-	return !errors.IsNotFound(err)
-}
-
-func getPodSecurityPolicyTemplateID(projectLister v3.ProjectLister, clusterLister v3.ClusterLister, projectID string,
-	clusterName string) (string, error) {
-	projects, err := projectLister.List("", labels.Everything())
-	if err != nil {
-		return "", fmt.Errorf("error getting projects: %v", err)
-	}
-
-	var project *v3.Project
-
-	for _, candidate := range projects {
-		if candidate.Name == projectID {
-			project = candidate
-			break
-		}
-	}
-
-	if project == nil {
-		return "", nil
-	}
-
-	podSecurityPolicyTemplateID := project.Spec.PodSecurityPolicyTemplateName
-
-	if podSecurityPolicyTemplateID == "" {
-		// check cluster
-		cluster, err := clusterLister.Get("", clusterName)
+	for _, rawPolicy := range policies {
+		policy := rawPolicy.(*v1beta1.PodSecurityPolicy)
+		err = l.policies.Delete(policy.Name, &v1.DeleteOptions{})
 		if err != nil {
-			return "", fmt.Errorf("error getting clusters: %v", err)
-		}
-
-		podSecurityPolicyTemplateID = cluster.Spec.DefaultPodSecurityPolicyTemplateName
-
-		if podSecurityPolicyTemplateID == "" {
-			logrus.Debugf("No pod security policy templates found for project %v and cluster %v", projectID,
-				clusterName)
-			return "", nil
+			return nil, fmt.Errorf("error deleting policy: %v", err)
 		}
 	}
 
-	return podSecurityPolicyTemplateID, nil
-}
-
-func keyToPolicyName(key string) string {
-	return fmt.Sprintf("%v-psp", strings.Replace(key, "/", "-", -1))
-}
-
-func updatePolicyIfOutdated(templateLister v3.PodSecurityPolicyTemplateLister,
-	policies v1beta12.PodSecurityPolicyInterface, policyLister v1beta12.PodSecurityPolicyLister, id string) error {
-	template, err := templateLister.Get("", id)
+	clusterRoles, err := l.clusterRoleIndexer.ByIndex(clusterRoleByPSPTNameIndex, obj.Name)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("error getting cluster roles: %v", err)
 	}
 
-	policy, err := policyLister.Get("", id)
-	if err != nil {
-		return err
-	}
-
-	if policy.Annotations[podSecurityVersionAnnotation] != template.ResourceVersion {
-		_, err = fromTemplate(policies, policyLister, policy.Name, template)
+	for _, rawClusterRole := range clusterRoles {
+		clusterRole := rawClusterRole.(*rbac.ClusterRole)
+		err = l.clusterRoles.DeleteNamespaced(clusterRole.Namespace, clusterRole.Name, &v1.DeleteOptions{})
 		if err != nil {
-			return err
+			return nil, fmt.Errorf("error deleting cluster role: %v", err)
 		}
 	}
 
-	return nil
+	return obj, nil
+}
+
+func policyByPSPTParentAnnotation(obj interface{}) ([]string, error) {
+	policy, ok := obj.(*v1beta1.PodSecurityPolicy)
+	if !ok || policy.Annotations[podSecurityPolicyTemplateParentAnnotation] == "" {
+		return []string{}, nil
+	}
+
+	return []string{policy.Annotations[podSecurityPolicyTemplateParentAnnotation]}, nil
+}
+
+func clusterRoleByPSPTName(obj interface{}) ([]string, error) {
+	clusterRole, ok := obj.(*rbac.ClusterRole)
+	if !ok || clusterRole.Annotations[podSecurityPolicyTemplateParentAnnotation] == "" {
+		return []string{}, nil
+	}
+
+	return []string{clusterRole.Annotations[podSecurityPolicyTemplateParentAnnotation]}, nil
 }

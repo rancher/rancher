@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/node"
 	"github.com/rancher/rancher/pkg/controllers/management/nodedriver"
 	"github.com/rancher/rancher/pkg/controllers/management/nodepool"
+	"github.com/rancher/rancher/pkg/controllers/management/podsecuritypolicy"
 	"github.com/rancher/rancher/pkg/controllers/management/usercontrollers"
 	"github.com/rancher/types/config"
 )
@@ -38,5 +39,7 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	nodepool.Register(management)
 	node.Register(management)
 	usercontrollers.Register(ctx, management, manager)
+	podsecuritypolicy.Register(management)
+
 	auth.RegisterLate(ctx, management)
 }

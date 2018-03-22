@@ -31,6 +31,7 @@ func Register(management *config.ManagementContext) {
 		crtbLister:         management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
 		projectAlertLister: management.Management.ProjectAlerts("").Controller().Lister(),
 		nodeLister:         management.Management.Nodes("").Controller().Lister(),
+		psptLister:         management.Management.PodSecurityPolicyTemplates("").Controller().Lister(),
 		prtbIndexer:        informer.GetIndexer(),
 		mgmt:               management,
 	}
@@ -46,6 +47,7 @@ type gcLifecycle struct {
 	nodeLister         v3.NodeLister
 	rtLister           v3.RoleTemplateLister
 	grbLister          v3.GlobalRoleBindingLister
+	psptLister         v3.PodSecurityPolicyTemplateLister
 	mgmt               *config.ManagementContext
 }
 
@@ -144,6 +146,17 @@ func (c *gcLifecycle) Remove(cluster *v3.Cluster) (*v3.Cluster, error) {
 	oClient = c.mgmt.Management.Nodes("").ObjectClient()
 	for _, p := range nodes {
 		if err := cleanFinalizers(cluster.Name, p, oClient); err != nil {
+			return cluster, err
+		}
+	}
+
+	pspts, err := c.psptLister.List("", labels.Everything())
+	if err != nil {
+		return cluster, err
+	}
+	oClient = c.mgmt.Management.PodSecurityPolicyTemplates("").ObjectClient()
+	for _, pspt := range pspts {
+		if err := cleanFinalizers(cluster.Name, pspt, oClient); err != nil {
 			return cluster, err
 		}
 	}

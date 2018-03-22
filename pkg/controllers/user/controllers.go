@@ -39,7 +39,7 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 	nslabels.Register(cluster)
 	pipeline.Register(ctx, cluster)
 	podsecuritypolicy.RegisterCluster(cluster)
-	podsecuritypolicy.RegisterProject(cluster)
+	podsecuritypolicy.RegisterBindings(cluster)
 	podsecuritypolicy.RegisterNamespace(cluster)
 	podsecuritypolicy.RegisterServiceAccount(cluster)
 	podsecuritypolicy.RegisterTemplate(cluster)
