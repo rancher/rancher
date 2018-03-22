@@ -5,6 +5,7 @@ const (
 	DaemonSetSpecFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	DaemonSetSpecFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
 	DaemonSetSpecFieldContainers                    = "containers"
+	DaemonSetSpecFieldDNSConfig                     = "dnsConfig"
 	DaemonSetSpecFieldDNSPolicy                     = "dnsPolicy"
 	DaemonSetSpecFieldDaemonSetConfig               = "daemonSetConfig"
 	DaemonSetSpecFieldFsgid                         = "fsgid"
@@ -35,6 +36,7 @@ type DaemonSetSpec struct {
 	ActiveDeadlineSeconds         *int64                 `json:"activeDeadlineSeconds,omitempty" yaml:"activeDeadlineSeconds,omitempty"`
 	AutomountServiceAccountToken  *bool                  `json:"automountServiceAccountToken,omitempty" yaml:"automountServiceAccountToken,omitempty"`
 	Containers                    []Container            `json:"containers,omitempty" yaml:"containers,omitempty"`
+	DNSConfig                     *PodDNSConfig          `json:"dnsConfig,omitempty" yaml:"dnsConfig,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	DaemonSetConfig               *DaemonSetConfig       `json:"daemonSetConfig,omitempty" yaml:"daemonSetConfig,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`

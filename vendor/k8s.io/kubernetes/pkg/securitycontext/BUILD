@@ -14,8 +14,9 @@ go_library(
         "fake.go",
         "util.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/securitycontext",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
     ],
 )
@@ -26,9 +27,10 @@ go_test(
         "accessors_test.go",
         "util_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/securitycontext",
     library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
     ],

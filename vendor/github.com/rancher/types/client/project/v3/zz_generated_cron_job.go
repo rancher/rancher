@@ -14,6 +14,7 @@ const (
 	CronJobFieldCreatorID                     = "creatorId"
 	CronJobFieldCronJobConfig                 = "cronJobConfig"
 	CronJobFieldCronJobStatus                 = "cronJobStatus"
+	CronJobFieldDNSConfig                     = "dnsConfig"
 	CronJobFieldDNSPolicy                     = "dnsPolicy"
 	CronJobFieldFsgid                         = "fsgid"
 	CronJobFieldGids                          = "gids"
@@ -61,6 +62,7 @@ type CronJob struct {
 	CreatorID                     string                 `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	CronJobConfig                 *CronJobConfig         `json:"cronJobConfig,omitempty" yaml:"cronJobConfig,omitempty"`
 	CronJobStatus                 *CronJobStatus         `json:"cronJobStatus,omitempty" yaml:"cronJobStatus,omitempty"`
+	DNSConfig                     *PodDNSConfig          `json:"dnsConfig,omitempty" yaml:"dnsConfig,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty" yaml:"gids,omitempty"`

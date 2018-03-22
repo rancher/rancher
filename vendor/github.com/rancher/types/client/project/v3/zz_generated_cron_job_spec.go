@@ -6,6 +6,7 @@ const (
 	CronJobSpecFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
 	CronJobSpecFieldContainers                    = "containers"
 	CronJobSpecFieldCronJobConfig                 = "cronJobConfig"
+	CronJobSpecFieldDNSConfig                     = "dnsConfig"
 	CronJobSpecFieldDNSPolicy                     = "dnsPolicy"
 	CronJobSpecFieldFsgid                         = "fsgid"
 	CronJobSpecFieldGids                          = "gids"
@@ -36,6 +37,7 @@ type CronJobSpec struct {
 	AutomountServiceAccountToken  *bool                  `json:"automountServiceAccountToken,omitempty" yaml:"automountServiceAccountToken,omitempty"`
 	Containers                    []Container            `json:"containers,omitempty" yaml:"containers,omitempty"`
 	CronJobConfig                 *CronJobConfig         `json:"cronJobConfig,omitempty" yaml:"cronJobConfig,omitempty"`
+	DNSConfig                     *PodDNSConfig          `json:"dnsConfig,omitempty" yaml:"dnsConfig,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty" yaml:"gids,omitempty"`

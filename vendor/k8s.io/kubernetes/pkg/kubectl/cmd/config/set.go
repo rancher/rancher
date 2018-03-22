@@ -106,8 +106,7 @@ func (o setOptions) run() error {
 func (o *setOptions) complete(cmd *cobra.Command) error {
 	endingArgs := cmd.Flags().Args()
 	if len(endingArgs) != 2 {
-		cmd.Help()
-		return fmt.Errorf("Unexpected args: %v", endingArgs)
+		return helpErrorf(cmd, "Unexpected args: %v", endingArgs)
 	}
 
 	o.propertyValue = endingArgs[1]
@@ -153,6 +152,9 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 
 		needToSetNewMapValue := currMapValue.Kind() == reflect.Invalid
 		if needToSetNewMapValue {
+			if unset {
+				return fmt.Errorf("current map key `%v` is invalid", mapKey.Interface())
+			}
 			currMapValue = reflect.New(mapValueType.Elem()).Elem().Addr()
 			actualCurrValue.SetMapIndex(mapKey, currMapValue)
 		}

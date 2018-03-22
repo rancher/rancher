@@ -17,10 +17,12 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -33,8 +35,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
-	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -45,11 +45,11 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/golang/glog"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	cloudkms "google.golang.org/api/cloudkms/v1"
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
@@ -107,7 +107,6 @@ type GCECloud struct {
 	serviceBeta      *computebeta.Service
 	serviceAlpha     *computealpha.Service
 	containerService *container.Service
-	cloudkmsService  *cloudkms.Service
 	client           clientset.Interface
 	clientBuilder    controller.ControllerClientBuilder
 	eventBroadcaster record.EventBroadcaster
@@ -132,7 +131,7 @@ type GCECloud struct {
 	nodeInstancePrefix       string      // If non-"", an advisory prefix for all nodes in the cluster
 	useMetadataServer        bool
 	operationPollRateLimiter flowcontrol.RateLimiter
-	manager                  ServiceManager
+	manager                  diskServiceManager
 	// Lock for access to nodeZones
 	nodeZonesLock sync.Mutex
 	// nodeZones is a mapping from Zone to a sets.String of Node's names in the Zone
@@ -149,59 +148,6 @@ type GCECloud struct {
 	// the corresponding api is enabled.
 	// If not enabled, it should return error.
 	AlphaFeatureGate *AlphaFeatureGate
-}
-
-type ServiceManager interface {
-	// Creates a new persistent disk on GCE with the given disk spec.
-	CreateDisk(
-		name string,
-		sizeGb int64,
-		tagsStr string,
-		diskType string,
-		zone string) (gceObject, error)
-
-	// Creates a new regional persistent disk on GCE with the given disk spec.
-	CreateRegionalDisk(
-		name string,
-		sizeGb int64,
-		tagsStr string,
-		diskType string,
-		zones sets.String) (gceObject, error)
-
-	// Deletes the persistent disk from GCE with the given diskName.
-	DeleteDisk(zone string, disk string) (gceObject, error)
-
-	// Deletes the regional persistent disk from GCE with the given diskName.
-	DeleteRegionalDisk(diskName string) (gceObject, error)
-
-	// Attach a persistent disk on GCE with the given disk spec to the specified instance.
-	AttachDisk(
-		disk *GCEDisk,
-		readWrite string,
-		instanceZone string,
-		instanceName string) (gceObject, error)
-
-	// Detach a persistent disk on GCE with the given disk spec from the specified instance.
-	DetachDisk(
-		instanceZone string,
-		instanceName string,
-		devicePath string) (gceObject, error)
-
-	// Gets the persistent disk from GCE with the given diskName.
-	GetDisk(zone string, diskName string) (*GCEDisk, error)
-
-	// Gets the regional persistent disk from GCE with the given diskName.
-	GetRegionalDisk(diskName string) (*GCEDisk, error)
-
-	// Waits until GCE reports the given operation in the given zone as done.
-	WaitForZoneOp(op gceObject, zone string, mc *metricContext) error
-
-	// Waits until GCE reports the given operation in the given region is done.
-	WaitForRegionalOp(op gceObject, mc *metricContext) error
-}
-
-type GCEServiceManager struct {
-	gce *GCECloud
 }
 
 // TODO: replace gcfg with json
@@ -259,10 +205,6 @@ type CloudConfig struct {
 	AlphaFeatureGate   *AlphaFeatureGate
 }
 
-// kmsPluginRegisterOnce prevents the cloudprovider from registering its KMS plugin
-// more than once in the KMS plugin registry.
-var kmsPluginRegisterOnce sync.Once
-
 func init() {
 	cloudprovider.RegisterCloudProvider(
 		ProviderName,
@@ -274,11 +216,6 @@ func init() {
 // Raw access to the underlying GCE service, probably should only be used for e2e tests
 func (g *GCECloud) GetComputeService() *compute.Service {
 	return g.service
-}
-
-// Raw access to the cloudkmsService of GCE cloud. Required for encryption of etcd using Google KMS.
-func (g *GCECloud) GetKMSService() *cloudkms.Service {
-	return g.cloudkmsService
 }
 
 // newGCECloud creates a new instance of GCECloud.
@@ -317,6 +254,8 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 	cloudConfig.TokenSource = google.ComputeTokenSource("")
 	cloudConfig.UseMetadataServer = true
 
+	featureMap := make(map[string]bool)
+	cloudConfig.AlphaFeatureGate = &AlphaFeatureGate{featureMap}
 	if configFile != nil {
 		if configFile.Global.ApiEndpoint != "" {
 			cloudConfig.ApiEndpoint = configFile.Global.ApiEndpoint
@@ -417,6 +356,13 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 // If no tokenSource is specified, uses oauth2.DefaultTokenSource.
 // If managedZones is nil / empty all zones in the region will be managed.
 func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
+	// Remove any pre-release version and build metadata from the semver, leaving only the MAJOR.MINOR.PATCH portion.
+	// See http://semver.org/.
+	version := strings.TrimLeft(strings.Split(strings.Split(version.Get().GitVersion, "-")[0], "+")[0], "v")
+
+	// Create a user-agent header append string to supply to the Google API clients, to identify Kubernetes as the origin of the GCP API calls.
+	userAgent := fmt.Sprintf("Kubernetes/%s (%s %s)", version, runtime.GOOS, runtime.GOARCH)
+
 	// Use ProjectID for NetworkProjectID, if it wasn't explicitly set.
 	if config.NetworkProjectID == "" {
 		config.NetworkProjectID = config.ProjectID
@@ -430,6 +376,7 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 	if err != nil {
 		return nil, err
 	}
+	service.UserAgent = userAgent
 
 	client, err = newOauthClient(config.TokenSource)
 	if err != nil {
@@ -439,6 +386,7 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 	if err != nil {
 		return nil, err
 	}
+	serviceBeta.UserAgent = userAgent
 
 	client, err = newOauthClient(config.TokenSource)
 	if err != nil {
@@ -448,6 +396,7 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 	if err != nil {
 		return nil, err
 	}
+	serviceAlpha.UserAgent = userAgent
 
 	// Expect override api endpoint to always be v1 api and follows the same pattern as prod.
 	// Generate alpha and beta api endpoints based on override v1 api endpoint.
@@ -463,11 +412,7 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	cloudkmsService, err := cloudkms.New(client)
-	if err != nil {
-		return nil, err
-	}
+	containerService.UserAgent = userAgent
 
 	// ProjectID and.NetworkProjectID may be project number or name.
 	projID, netProjID := tryConvertToProjectNames(config.ProjectID, config.NetworkProjectID, service)
@@ -492,24 +437,26 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 	} else if config.SubnetworkName != "" {
 		subnetURL = gceSubnetworkURL(config.ApiEndpoint, netProjID, config.Region, config.SubnetworkName)
 	} else {
-		// Attempt to determine the subnetwork in case it's an automatic network.
-		// Legacy networks will not have a subnetwork, so subnetworkURL should remain empty.
+		// Determine the type of network and attempt to discover the correct subnet for AUTO mode.
+		// Gracefully fail because kubelet calls CreateGCECloud without any config, and minions
+		// lack the proper credentials for API calls.
 		if networkName := lastComponent(networkURL); networkName != "" {
-			if n, err := getNetwork(service, netProjID, networkName); err != nil {
-				// Gracefully fail because kubelet calls CreateGCECloud without any config, and API calls will fail coming from minions.
-				glog.Warningf("Could not retrieve network %q in attempt to determine if legacy network or see list of subnets, err %v", networkURL, err)
+			var n *compute.Network
+			if n, err = getNetwork(service, netProjID, networkName); err != nil {
+				glog.Warningf("Could not retrieve network %q; err: %v", networkName, err)
 			} else {
-				// Legacy networks have a non-empty IPv4Range
-				if len(n.IPv4Range) > 0 {
-					glog.Infof("Determined network %q is type legacy", networkURL)
+				switch typeOfNetwork(n) {
+				case netTypeLegacy:
+					glog.Infof("Network %q is type legacy - no subnetwork", networkName)
 					isLegacyNetwork = true
-				} else {
-					// Try to find the subnet in the list of subnets
-					subnetURL = findSubnetForRegion(n.Subnetworks, config.Region)
-					if len(subnetURL) > 0 {
-						glog.Infof("Using subnet %q within network %q & region %q because none was specified.", subnetURL, n.Name, config.Region)
+				case netTypeCustom:
+					glog.Warningf("Network %q is type custom - cannot auto select a subnetwork", networkName)
+				case netTypeAuto:
+					subnetURL, err = determineSubnetURL(service, netProjID, networkName, config.Region)
+					if err != nil {
+						glog.Warningf("Could not determine subnetwork for network %q and region %v; err: %v", networkName, config.Region, err)
 					} else {
-						glog.Warningf("Could not find any subnet in region %q within list %v.", config.Region, n.Subnetworks)
+						glog.Infof("Auto selecting subnetwork %q", subnetURL)
 					}
 				}
 			}
@@ -522,7 +469,7 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 			return nil, err
 		}
 	}
-	if len(config.ManagedZones) != 1 {
+	if len(config.ManagedZones) > 1 {
 		glog.Infof("managing multiple zones: %v", config.ManagedZones)
 	}
 
@@ -533,7 +480,6 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 		serviceAlpha:             serviceAlpha,
 		serviceBeta:              serviceBeta,
 		containerService:         containerService,
-		cloudkmsService:          cloudkmsService,
 		projectID:                projID,
 		networkProjectID:         netProjID,
 		onXPN:                    onXPN,
@@ -552,17 +498,33 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 		nodeZones:                map[string]sets.String{},
 	}
 
-	gce.manager = &GCEServiceManager{gce}
-
-	// Registering the KMS plugin only the first time.
-	kmsPluginRegisterOnce.Do(func() {
-		// Register the Google Cloud KMS based service in the KMS plugin registry.
-		encryptionconfig.KMSPluginRegistry.Register(KMSServiceName, func(config io.Reader) (envelope.Service, error) {
-			return gce.getGCPCloudKMSService(config)
-		})
-	})
+	gce.manager = &gceServiceManager{gce}
 
 	return gce, nil
+}
+
+// determineSubnetURL queries for all subnetworks in a region for a given network and returns
+// the URL of the subnetwork which exists in the auto-subnet range.
+func determineSubnetURL(service *compute.Service, networkProjectID, networkName, region string) (string, error) {
+	subnets, err := listSubnetworksOfNetwork(service, networkProjectID, networkName, region)
+	if err != nil {
+		return "", err
+	}
+
+	autoSubnets, err := subnetsInCIDR(subnets, autoSubnetIPRange)
+	if err != nil {
+		return "", err
+	}
+
+	if len(autoSubnets) == 0 {
+		return "", fmt.Errorf("no subnet exists in auto CIDR")
+	}
+
+	if len(autoSubnets) > 1 {
+		return "", fmt.Errorf("multiple subnetworks in the same region exist in auto CIDR")
+	}
+
+	return autoSubnets[0].SelfLink, nil
 }
 
 func tryConvertToProjectNames(configProject, configNetworkProject string, service *compute.Service) (projID, netProjID string) {
@@ -600,7 +562,7 @@ func (gce *GCECloud) Initialize(clientBuilder controller.ControllerClientBuilder
 
 	if gce.OnXPN() {
 		gce.eventBroadcaster = record.NewBroadcaster()
-		gce.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(gce.client.Core().RESTClient()).Events("")})
+		gce.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(gce.client.CoreV1().RESTClient()).Events("")})
 		gce.eventRecorder = gce.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "gce-cloudprovider"})
 	}
 
@@ -820,6 +782,16 @@ func getNetwork(svc *compute.Service, networkProjectID, networkID string) (*comp
 	return svc.Networks.Get(networkProjectID, networkID).Do()
 }
 
+// listSubnetworksOfNetwork returns a list of subnetworks for a particular region of a network.
+func listSubnetworksOfNetwork(svc *compute.Service, networkProjectID, networkID, region string) ([]*compute.Subnetwork, error) {
+	var subnets []*compute.Subnetwork
+	err := svc.Subnetworks.List(networkProjectID, region).Filter(fmt.Sprintf("network eq .*/%v$", networkID)).Pages(context.Background(), func(res *compute.SubnetworkList) error {
+		subnets = append(subnets, res.Items...)
+		return nil
+	})
+	return subnets, err
+}
+
 // getProjectID returns the project's string ID given a project number or string
 func getProjectID(svc *compute.Service, projectNumberOrID string) (string, error) {
 	proj, err := svc.Projects.Get(projectNumberOrID).Do()
@@ -889,335 +861,7 @@ func newOauthClient(tokenSource oauth2.TokenSource) (*http.Client, error) {
 	return oauth2.NewClient(oauth2.NoContext, tokenSource), nil
 }
 
-func (manager *GCEServiceManager) CreateDisk(
-	name string,
-	sizeGb int64,
-	tagsStr string,
-	diskType string,
-	zone string) (gceObject, error) {
-	diskTypeURI, err := manager.getDiskTypeURI(
-		manager.gce.region /* diskRegion */, singleZone{zone}, diskType)
-	if err != nil {
-		return nil, err
-	}
-
-	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
-		diskToCreateAlpha := &computealpha.Disk{
-			Name:        name,
-			SizeGb:      sizeGb,
-			Description: tagsStr,
-			Type:        diskTypeURI,
-		}
-
-		return manager.gce.serviceAlpha.Disks.Insert(
-			manager.gce.projectID, zone, diskToCreateAlpha).Do()
-	}
-
-	diskToCreateV1 := &compute.Disk{
-		Name:        name,
-		SizeGb:      sizeGb,
-		Description: tagsStr,
-		Type:        diskTypeURI,
-	}
-	return manager.gce.service.Disks.Insert(
-		manager.gce.projectID, zone, diskToCreateV1).Do()
-}
-
-func (manager *GCEServiceManager) CreateRegionalDisk(
-	name string,
-	sizeGb int64,
-	tagsStr string,
-	diskType string,
-	replicaZones sets.String) (gceObject, error) {
-	diskTypeURI, err := manager.getDiskTypeURI(
-		manager.gce.region /* diskRegion */, multiZone{replicaZones}, diskType)
-	if err != nil {
-		return nil, err
-	}
-	fullyQualifiedReplicaZones := []string{}
-	for _, replicaZone := range replicaZones.UnsortedList() {
-		fullyQualifiedReplicaZones = append(
-			fullyQualifiedReplicaZones, manager.getReplicaZoneURI(replicaZone))
-	}
-	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
-		diskToCreateAlpha := &computealpha.Disk{
-			Name:         name,
-			SizeGb:       sizeGb,
-			Description:  tagsStr,
-			Type:         diskTypeURI,
-			ReplicaZones: fullyQualifiedReplicaZones,
-		}
-		return manager.gce.serviceAlpha.RegionDisks.Insert(
-			manager.gce.projectID, manager.gce.region, diskToCreateAlpha).Do()
-	}
-
-	return nil, fmt.Errorf("The regional PD feature is only available via the GCE Alpha API. Enable \"GCEDiskAlphaAPI\" in the list of \"alpha-features\" in \"gce.conf\" to use the feature.")
-}
-
-func (manager *GCEServiceManager) AttachDisk(
-	disk *GCEDisk,
-	readWrite string,
-	instanceZone string,
-	instanceName string) (gceObject, error) {
-	source, err := manager.getDiskSourceURI(disk)
-	if err != nil {
-		return nil, err
-	}
-
-	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
-		attachedDiskAlpha := &computealpha.AttachedDisk{
-			DeviceName: disk.Name,
-			Kind:       disk.Kind,
-			Mode:       readWrite,
-			Source:     source,
-			Type:       diskTypePersistent,
-		}
-		return manager.gce.serviceAlpha.Instances.AttachDisk(
-			manager.gce.projectID, instanceZone, instanceName, attachedDiskAlpha).Do()
-	}
-
-	attachedDiskV1 := &compute.AttachedDisk{
-		DeviceName: disk.Name,
-		Kind:       disk.Kind,
-		Mode:       readWrite,
-		Source:     source,
-		Type:       disk.Type,
-	}
-	return manager.gce.service.Instances.AttachDisk(
-		manager.gce.projectID, instanceZone, instanceName, attachedDiskV1).Do()
-}
-
-func (manager *GCEServiceManager) DetachDisk(
-	instanceZone string,
-	instanceName string,
-	devicePath string) (gceObject, error) {
-	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
-		manager.gce.serviceAlpha.Instances.DetachDisk(
-			manager.gce.projectID, instanceZone, instanceName, devicePath).Do()
-	}
-
-	return manager.gce.service.Instances.DetachDisk(
-		manager.gce.projectID, instanceZone, instanceName, devicePath).Do()
-}
-
-func (manager *GCEServiceManager) GetDisk(
-	zone string,
-	diskName string) (*GCEDisk, error) {
-	if zone == "" {
-		return nil, fmt.Errorf("Can not fetch disk %q. Zone is empty.", diskName)
-	}
-
-	if diskName == "" {
-		return nil, fmt.Errorf("Can not fetch disk. Zone is specified (%q). But disk name is empty.", zone)
-	}
-
-	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
-		diskAlpha, err := manager.gce.serviceAlpha.Disks.Get(
-			manager.gce.projectID, zone, diskName).Do()
-		if err != nil {
-			return nil, err
-		}
-
-		var zoneInfo zoneType
-		if len(diskAlpha.ReplicaZones) > 1 {
-			zones := sets.NewString()
-			for _, zoneURI := range diskAlpha.ReplicaZones {
-				zones.Insert(lastComponent(zoneURI))
-			}
-			zoneInfo = multiZone{zones}
-		} else {
-			zoneInfo = singleZone{lastComponent(diskAlpha.Zone)}
-			if diskAlpha.Zone == "" {
-				zoneInfo = singleZone{lastComponent(zone)}
-			}
-		}
-
-		region := strings.TrimSpace(lastComponent(diskAlpha.Region))
-		if region == "" {
-			region, err = manager.getRegionFromZone(zoneInfo)
-			if err != nil {
-				return nil, fmt.Errorf("failed to extract region from zone for %q/%q err=%v", zone, diskName, err)
-			}
-		}
-
-		return &GCEDisk{
-			ZoneInfo: zoneInfo,
-			Region:   region,
-			Name:     diskAlpha.Name,
-			Kind:     diskAlpha.Kind,
-			Type:     diskAlpha.Type,
-		}, nil
-	}
-
-	diskStable, err := manager.gce.service.Disks.Get(
-		manager.gce.projectID, zone, diskName).Do()
-	if err != nil {
-		return nil, err
-	}
-
-	zoneInfo := singleZone{strings.TrimSpace(lastComponent(diskStable.Zone))}
-	if zoneInfo.zone == "" {
-		zoneInfo = singleZone{zone}
-	}
-
-	region, err := manager.getRegionFromZone(zoneInfo)
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract region from zone for %q/%q err=%v", zone, diskName, err)
-	}
-
-	return &GCEDisk{
-		ZoneInfo: zoneInfo,
-		Region:   region,
-		Name:     diskStable.Name,
-		Kind:     diskStable.Kind,
-		Type:     diskStable.Type,
-	}, nil
-}
-
-func (manager *GCEServiceManager) GetRegionalDisk(
-	diskName string) (*GCEDisk, error) {
-
-	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
-		diskAlpha, err := manager.gce.serviceAlpha.RegionDisks.Get(
-			manager.gce.projectID, manager.gce.region, diskName).Do()
-		if err != nil {
-			return nil, err
-		}
-
-		zones := sets.NewString()
-		for _, zoneURI := range diskAlpha.ReplicaZones {
-			zones.Insert(lastComponent(zoneURI))
-		}
-
-		return &GCEDisk{
-			ZoneInfo: multiZone{zones},
-			Region:   lastComponent(diskAlpha.Region),
-			Name:     diskAlpha.Name,
-			Kind:     diskAlpha.Kind,
-			Type:     diskAlpha.Type,
-		}, nil
-	}
-
-	return nil, fmt.Errorf("The regional PD feature is only available via the GCE Alpha API. Enable \"GCEDiskAlphaAPI\" in the list of \"alpha-features\" in \"gce.conf\" to use the feature.")
-}
-
-func (manager *GCEServiceManager) DeleteDisk(
-	zone string,
-	diskName string) (gceObject, error) {
-
-	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
-		return manager.gce.serviceAlpha.Disks.Delete(
-			manager.gce.projectID, zone, diskName).Do()
-	}
-
-	return manager.gce.service.Disks.Delete(
-		manager.gce.projectID, zone, diskName).Do()
-}
-
-func (manager *GCEServiceManager) DeleteRegionalDisk(
-	diskName string) (gceObject, error) {
-	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
-		return manager.gce.serviceAlpha.RegionDisks.Delete(
-			manager.gce.projectID, manager.gce.region, diskName).Do()
-	}
-
-	return nil, fmt.Errorf("DeleteRegionalDisk is a regional PD feature and is only available via the GCE Alpha API. Enable \"GCEDiskAlphaAPI\" in the list of \"alpha-features\" in \"gce.conf\" to use the feature.")
-}
-
-func (manager *GCEServiceManager) WaitForZoneOp(
-	op gceObject, zone string, mc *metricContext) error {
-	return manager.gce.waitForZoneOp(op, zone, mc)
-}
-
-func (manager *GCEServiceManager) WaitForRegionalOp(
-	op gceObject, mc *metricContext) error {
-	return manager.gce.waitForRegionOp(op, manager.gce.region, mc)
-}
-
-func (manager *GCEServiceManager) getDiskSourceURI(disk *GCEDisk) (string, error) {
-	getProjectsAPIEndpoint := manager.getProjectsAPIEndpoint()
-	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
-		getProjectsAPIEndpoint = manager.getProjectsAPIEndpointAlpha()
-	}
-
-	switch zoneInfo := disk.ZoneInfo.(type) {
-	case singleZone:
-		if zoneInfo.zone == "" || disk.Region == "" {
-			// Unexpected, but sanity-check
-			return "", fmt.Errorf("PD does not have zone/region information: %#v", disk)
-		}
-
-		return getProjectsAPIEndpoint + fmt.Sprintf(
-			diskSourceURITemplateSingleZone,
-			manager.gce.projectID,
-			zoneInfo.zone,
-			disk.Name), nil
-	case multiZone:
-		if zoneInfo.replicaZones == nil || zoneInfo.replicaZones.Len() <= 0 {
-			// Unexpected, but sanity-check
-			return "", fmt.Errorf("PD is regional but does not have any replicaZones specified: %v", disk)
-		}
-		return getProjectsAPIEndpoint + fmt.Sprintf(
-			diskSourceURITemplateRegional,
-			manager.gce.projectID,
-			disk.Region,
-			disk.Name), nil
-	case nil:
-		// Unexpected, but sanity-check
-		return "", fmt.Errorf("PD did not have ZoneInfo: %v", disk)
-	default:
-		// Unexpected, but sanity-check
-		return "", fmt.Errorf("disk.ZoneInfo has unexpected type %T", zoneInfo)
-	}
-}
-
-func (manager *GCEServiceManager) getDiskTypeURI(
-	diskRegion string, diskZoneInfo zoneType, diskType string) (string, error) {
-	getProjectsAPIEndpoint := manager.getProjectsAPIEndpoint()
-	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
-		getProjectsAPIEndpoint = manager.getProjectsAPIEndpointAlpha()
-	}
-
-	switch zoneInfo := diskZoneInfo.(type) {
-	case singleZone:
-		if zoneInfo.zone == "" {
-			return "", fmt.Errorf("zone is empty: %v", zoneInfo)
-		}
-
-		return getProjectsAPIEndpoint + fmt.Sprintf(
-			diskTypeURITemplateSingleZone,
-			manager.gce.projectID,
-			zoneInfo.zone,
-			diskType), nil
-	case multiZone:
-		if zoneInfo.replicaZones == nil || zoneInfo.replicaZones.Len() <= 0 {
-			return "", fmt.Errorf("zoneInfo is regional but does not have any replicaZones specified: %v", zoneInfo)
-		}
-		return getProjectsAPIEndpoint + fmt.Sprintf(
-			diskTypeURITemplateRegional,
-			manager.gce.projectID,
-			diskRegion,
-			diskType), nil
-	case nil:
-		return "", fmt.Errorf("zoneInfo nil")
-	default:
-		return "", fmt.Errorf("zoneInfo has unexpected type %T", zoneInfo)
-	}
-}
-
-func (manager *GCEServiceManager) getReplicaZoneURI(zone string) string {
-	getProjectsAPIEndpoint := manager.getProjectsAPIEndpoint()
-	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
-		getProjectsAPIEndpoint = manager.getProjectsAPIEndpointAlpha()
-	}
-
-	return getProjectsAPIEndpoint + fmt.Sprintf(
-		replicaZoneURITemplateSingleZone,
-		manager.gce.projectID,
-		zone)
-}
-
-func (manager *GCEServiceManager) getProjectsAPIEndpoint() string {
+func (manager *gceServiceManager) getProjectsAPIEndpoint() string {
 	projectsApiEndpoint := gceComputeAPIEndpoint + "projects/"
 	if manager.gce.service != nil {
 		projectsApiEndpoint = manager.gce.service.BasePath
@@ -1226,45 +870,11 @@ func (manager *GCEServiceManager) getProjectsAPIEndpoint() string {
 	return projectsApiEndpoint
 }
 
-func (manager *GCEServiceManager) getProjectsAPIEndpointAlpha() string {
+func (manager *gceServiceManager) getProjectsAPIEndpointAlpha() string {
 	projectsApiEndpoint := gceComputeAPIEndpointAlpha + "projects/"
 	if manager.gce.service != nil {
 		projectsApiEndpoint = manager.gce.serviceAlpha.BasePath
 	}
 
 	return projectsApiEndpoint
-}
-
-func (manager *GCEServiceManager) getRegionFromZone(zoneInfo zoneType) (string, error) {
-	var zone string
-	switch zoneInfo := zoneInfo.(type) {
-	case singleZone:
-		if zoneInfo.zone == "" {
-			// Unexpected, but sanity-check
-			return "", fmt.Errorf("PD is single zone, but zone is not specified: %#v", zoneInfo)
-		}
-
-		zone = zoneInfo.zone
-	case multiZone:
-		if zoneInfo.replicaZones == nil || zoneInfo.replicaZones.Len() <= 0 {
-			// Unexpected, but sanity-check
-			return "", fmt.Errorf("PD is regional but does not have any replicaZones specified: %v", zoneInfo)
-		}
-
-		zone = zoneInfo.replicaZones.UnsortedList()[0]
-	case nil:
-		// Unexpected, but sanity-check
-		return "", fmt.Errorf("zoneInfo is nil")
-	default:
-		// Unexpected, but sanity-check
-		return "", fmt.Errorf("zoneInfo has unexpected type %T", zoneInfo)
-	}
-
-	region, err := GetGCERegion(zone)
-	if err != nil {
-		glog.Warningf("failed to parse GCE region from zone %q: %v", zone, err)
-		region = manager.gce.region
-	}
-
-	return region, nil
 }

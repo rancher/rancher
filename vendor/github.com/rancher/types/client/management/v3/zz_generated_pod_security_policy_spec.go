@@ -4,6 +4,7 @@ const (
 	PodSecurityPolicySpecType                                 = "podSecurityPolicySpec"
 	PodSecurityPolicySpecFieldAllowPrivilegeEscalation        = "allowPrivilegeEscalation"
 	PodSecurityPolicySpecFieldAllowedCapabilities             = "allowedCapabilities"
+	PodSecurityPolicySpecFieldAllowedFlexVolumes              = "allowedFlexVolumes"
 	PodSecurityPolicySpecFieldAllowedHostPaths                = "allowedHostPaths"
 	PodSecurityPolicySpecFieldDefaultAddCapabilities          = "defaultAddCapabilities"
 	PodSecurityPolicySpecFieldDefaultAllowPrivilegeEscalation = "defaultAllowPrivilegeEscalation"
@@ -24,6 +25,7 @@ const (
 type PodSecurityPolicySpec struct {
 	AllowPrivilegeEscalation        *bool                              `json:"allowPrivilegeEscalation,omitempty" yaml:"allowPrivilegeEscalation,omitempty"`
 	AllowedCapabilities             []string                           `json:"allowedCapabilities,omitempty" yaml:"allowedCapabilities,omitempty"`
+	AllowedFlexVolumes              []AllowedFlexVolume                `json:"allowedFlexVolumes,omitempty" yaml:"allowedFlexVolumes,omitempty"`
 	AllowedHostPaths                []AllowedHostPath                  `json:"allowedHostPaths,omitempty" yaml:"allowedHostPaths,omitempty"`
 	DefaultAddCapabilities          []string                           `json:"defaultAddCapabilities,omitempty" yaml:"defaultAddCapabilities,omitempty"`
 	DefaultAllowPrivilegeEscalation *bool                              `json:"defaultAllowPrivilegeEscalation,omitempty" yaml:"defaultAllowPrivilegeEscalation,omitempty"`

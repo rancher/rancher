@@ -36,12 +36,13 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/helper"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
-	"k8s.io/kubernetes/pkg/api/validation"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/core/endpoint"
+	podstore "k8s.io/kubernetes/pkg/registry/core/pod/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 )
@@ -59,6 +60,7 @@ type REST struct {
 	serviceIPs       ipallocator.Interface
 	serviceNodePorts portallocator.Interface
 	proxyTransport   http.RoundTripper
+	pods             *podstore.REST
 }
 
 // ServiceNodePort includes protocol and port number of a service NodePort.
@@ -72,7 +74,7 @@ type ServiceNodePort struct {
 }
 
 // NewStorage returns a new REST.
-func NewStorage(registry Registry, endpoints endpoint.Registry, serviceIPs ipallocator.Interface,
+func NewStorage(registry Registry, endpoints endpoint.Registry, pods *podstore.REST, serviceIPs ipallocator.Interface,
 	serviceNodePorts portallocator.Interface, proxyTransport http.RoundTripper) *ServiceRest {
 	rest := &REST{
 		registry:         registry,
@@ -80,6 +82,7 @@ func NewStorage(registry Registry, endpoints endpoint.Registry, serviceIPs ipall
 		serviceIPs:       serviceIPs,
 		serviceNodePorts: serviceNodePorts,
 		proxyTransport:   proxyTransport,
+		pods:             pods,
 	}
 	return &ServiceRest{
 		Service: rest,
@@ -98,7 +101,7 @@ func (rs *REST) Categories() []string {
 }
 
 // TODO: implement includeUninitialized by refactoring this to move to store
-func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
+func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	service := obj.(*api.Service)
 
 	if err := rest.BeforeCreate(Strategy, ctx, obj); err != nil {
@@ -143,7 +146,7 @@ func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object, includ
 		}
 	}
 
-	out, err := rs.registry.CreateService(ctx, service)
+	out, err := rs.registry.CreateService(ctx, service, createValidation)
 	if err != nil {
 		err = rest.CheckGeneratedNameError(Strategy, err, service)
 	}
@@ -294,7 +297,7 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service, node
 	return true, nil
 }
 
-func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
 	oldService, err := rs.registry.GetService(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
@@ -370,7 +373,7 @@ func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.
 		}
 	}
 
-	out, err := rs.registry.UpdateService(ctx, service)
+	out, err := rs.registry.UpdateService(ctx, service, createValidation, updateValidation)
 	if err == nil {
 		el := nodePortOp.Commit()
 		if el != nil {
@@ -432,17 +435,55 @@ func (rs *REST) ResourceLocation(ctx genericapirequest.Context, id string) (*url
 		}
 		for i := range ss.Ports {
 			if ss.Ports[i].Name == portStr {
-				// Pick a random address.
-				ip := ss.Addresses[rand.Intn(len(ss.Addresses))].IP
-				port := int(ss.Ports[i].Port)
-				return &url.URL{
-					Scheme: svcScheme,
-					Host:   net.JoinHostPort(ip, strconv.Itoa(port)),
-				}, rs.proxyTransport, nil
+				addrSeed := rand.Intn(len(ss.Addresses))
+				// This is a little wonky, but it's expensive to test for the presence of a Pod
+				// So we repeatedly try at random and validate it, this means that for an invalid
+				// service with a lot of endpoints we're going to potentially make a lot of calls,
+				// but in the expected case we'll only make one.
+				for try := 0; try < len(ss.Addresses); try++ {
+					addr := ss.Addresses[(addrSeed+try)%len(ss.Addresses)]
+					if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceProxyAllowExternalIPs) {
+						if err := isValidAddress(ctx, &addr, rs.pods); err != nil {
+							glog.Errorf("Address %v isn't valid (%v)", addr, err)
+							continue
+						}
+					}
+					ip := addr.IP
+					port := int(ss.Ports[i].Port)
+					return &url.URL{
+						Scheme: svcScheme,
+						Host:   net.JoinHostPort(ip, strconv.Itoa(port)),
+					}, rs.proxyTransport, nil
+				}
+				glog.Errorf("Failed to find a valid address, skipping subset: %v", ss)
 			}
 		}
 	}
 	return nil, nil, errors.NewServiceUnavailable(fmt.Sprintf("no endpoints available for service %q", id))
+}
+
+func isValidAddress(ctx genericapirequest.Context, addr *api.EndpointAddress, pods *podstore.REST) error {
+	if addr.TargetRef == nil {
+		return fmt.Errorf("Address has no target ref, skipping: %v", addr)
+	}
+	if genericapirequest.NamespaceValue(ctx) != addr.TargetRef.Namespace {
+		return fmt.Errorf("Address namespace doesn't match context namespace")
+	}
+	obj, err := pods.Get(ctx, addr.TargetRef.Name, &metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	pod, ok := obj.(*api.Pod)
+	if !ok {
+		return fmt.Errorf("failed to cast to pod: %v", obj)
+	}
+	if pod == nil {
+		return fmt.Errorf("pod is missing, skipping (%s/%s)", addr.TargetRef.Namespace, addr.TargetRef.Name)
+	}
+	if pod.Status.PodIP != addr.IP {
+		return fmt.Errorf("pod ip doesn't match endpoint ip, skipping: %s vs %s (%s/%s)", pod.Status.PodIP, addr.IP, addr.TargetRef.Namespace, addr.TargetRef.Name)
+	}
+	return nil
 }
 
 // This is O(N), but we expect haystack to be small;

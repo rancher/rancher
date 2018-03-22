@@ -19,13 +19,12 @@ package cloudprovider
 import (
 	// Cloud providers
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
-	// _ "k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
+	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/cloudstack"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/ovirt"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/photon"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/rackspace"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/rancher"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 )

@@ -12,6 +12,7 @@ const (
 	PodFieldContainers                    = "containers"
 	PodFieldCreated                       = "created"
 	PodFieldCreatorID                     = "creatorId"
+	PodFieldDNSConfig                     = "dnsConfig"
 	PodFieldDNSPolicy                     = "dnsPolicy"
 	PodFieldDescription                   = "description"
 	PodFieldFsgid                         = "fsgid"
@@ -57,6 +58,7 @@ type Pod struct {
 	Containers                    []Container            `json:"containers,omitempty" yaml:"containers,omitempty"`
 	Created                       string                 `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                     string                 `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DNSConfig                     *PodDNSConfig          `json:"dnsConfig,omitempty" yaml:"dnsConfig,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	Description                   string                 `json:"description,omitempty" yaml:"description,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`

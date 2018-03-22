@@ -21,13 +21,12 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
-
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -44,11 +43,13 @@ type SelectorOptions struct {
 	all         bool
 	record      bool
 	changeCause string
+	output      string
 
 	resources []string
 	selector  *metav1.LabelSelector
 
 	out              io.Writer
+	PrintSuccess     func(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
 	PrintObject      func(obj runtime.Object) error
 	ClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 
@@ -107,23 +108,29 @@ func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	o.all = cmdutil.GetFlagBool(cmd, "all")
 	o.record = cmdutil.GetRecordFlag(cmd)
 	o.dryrun = cmdutil.GetDryRunFlag(cmd)
+	o.output = cmdutil.GetFlagString(cmd, "output")
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
 
+	o.PrintSuccess = f.PrintSuccess
+
 	o.changeCause = f.Command(cmd, false)
 	mapper, _ := f.Object()
 	o.mapper = mapper
 	o.encoder = f.JSONEncoder()
+
 	o.resources, o.selector, err = getResourcesAndSelector(args)
 	if err != nil {
 		return err
 	}
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
-	o.builder = f.NewBuilder(!o.local).
+	o.builder = f.NewBuilder().
+		Internal().
+		LocalParam(o.local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.fileOptions).
@@ -131,9 +138,16 @@ func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 		Flatten()
 
 	if !o.local {
-		o.builder = o.builder.
+		o.builder.
 			ResourceTypeOrNameArgs(o.all, o.resources...).
 			Latest()
+	} else {
+		// if a --local flag was provided, and a resource was specified in the form
+		// <resource>/<name>, fail immediately as --local cannot query the api server
+		// for the specified resource.
+		if len(o.resources) > 0 {
+			return resource.LocalResourceError
+		}
 	}
 
 	o.PrintObject = func(obj runtime.Object) error {
@@ -167,6 +181,8 @@ func (o *SelectorOptions) RunSelector() error {
 	return r.Visit(func(info *resource.Info, err error) error {
 		patch := &Patch{Info: info}
 		CalculatePatch(patch, o.encoder, func(info *resource.Info) ([]byte, error) {
+			versioned := info.AsVersioned()
+			patch.Info.Object = versioned
 			selectErr := updateSelectorForObject(info.Object, *o.selector)
 
 			if selectErr == nil {
@@ -179,8 +195,7 @@ func (o *SelectorOptions) RunSelector() error {
 			return patch.Err
 		}
 		if o.local || o.dryrun {
-			o.PrintObject(info.Object)
-			return nil
+			return o.PrintObject(info.Object)
 		}
 
 		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
@@ -197,7 +212,12 @@ func (o *SelectorOptions) RunSelector() error {
 		}
 
 		info.Refresh(patched, true)
-		cmdutil.PrintSuccess(o.mapper, false, o.out, info.Mapping.Resource, info.Name, o.dryrun, "selector updated")
+
+		shortOutput := o.output == "name"
+		if len(o.output) > 0 && !shortOutput {
+			return o.PrintObject(patched)
+		}
+		o.PrintSuccess(o.mapper, shortOutput, o.out, info.Mapping.Resource, info.Name, o.dryrun, "selector updated")
 		return nil
 	})
 }
@@ -215,7 +235,7 @@ func updateSelectorForObject(obj runtime.Object, selector metav1.LabelSelector) 
 	}
 	var err error
 	switch t := obj.(type) {
-	case *api.Service:
+	case *v1.Service:
 		t.Spec.Selector, err = copyOldSelector()
 	default:
 		err = fmt.Errorf("setting a selector is only supported for Services")

@@ -14,8 +14,9 @@ go_library(
         "provider.go",
         "types.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/security/podsecuritypolicy",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/security/podsecuritypolicy/apparmor:go_default_library",
         "//pkg/security/podsecuritypolicy/capabilities:go_default_library",
@@ -35,10 +36,11 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["provider_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/security/podsecuritypolicy",
     library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/v1:go_default_library",
+        "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/v1:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//pkg/security/podsecuritypolicy/seccomp:go_default_library",
