@@ -154,14 +154,29 @@ func authzTypes(schemas *types.Schemas) *types.Schemas {
 			&m.Embed{Field: "status"}).
 		AddMapperForType(&Version, v3.GlobalRole{}, m.DisplayName{}).
 		AddMapperForType(&Version, v3.RoleTemplate{}, m.DisplayName{}).
+		AddMapperForType(&Version,
+			v3.PodSecurityPolicyTemplateProjectBinding{},
+			&mapper.NamespaceIDMapper{}).
 		AddMapperForType(&Version, v3.ProjectRoleTemplateBinding{},
 			&mapper.NamespaceIDMapper{},
 		).
-		MustImport(&Version, v3.Project{}).
+		MustImport(&Version, v3.SetPodSecurityPolicyTemplateInput{}).
+		MustImportAndCustomize(&Version, v3.Project{}, func(schema *types.Schema) {
+			schema.ResourceActions = map[string]types.Action{
+				"setpodsecuritypolicytemplate": {
+					Input:  "setPodSecurityPolicyTemplateInput",
+					Output: "project",
+				},
+			}
+		}).
 		MustImport(&Version, v3.GlobalRole{}).
 		MustImport(&Version, v3.GlobalRoleBinding{}).
 		MustImport(&Version, v3.RoleTemplate{}).
 		MustImport(&Version, v3.PodSecurityPolicyTemplate{}).
+		MustImportAndCustomize(&Version, v3.PodSecurityPolicyTemplateProjectBinding{}, func(schema *types.Schema) {
+			schema.CollectionMethods = []string{http.MethodGet, http.MethodPost}
+			schema.ResourceMethods = []string{}
+		}).
 		MustImport(&Version, v3.ClusterRoleTemplateBinding{}).
 		MustImport(&Version, v3.ProjectRoleTemplateBinding{}).
 		MustImport(&Version, v3.GlobalRoleBinding{})

@@ -51,6 +51,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&RoleTemplateList{},
 		&PodSecurityPolicyTemplate{},
 		&PodSecurityPolicyTemplateList{},
+		&PodSecurityPolicyTemplateProjectBinding{},
+		&PodSecurityPolicyTemplateProjectBindingList{},
 		&ClusterRoleTemplateBinding{},
 		&ClusterRoleTemplateBindingList{},
 		&ProjectRoleTemplateBinding{},
