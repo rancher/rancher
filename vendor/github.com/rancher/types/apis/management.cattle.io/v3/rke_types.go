@@ -217,6 +217,8 @@ type BaseService struct {
 	Image string `yaml:"image" json:"image,omitempty"`
 	// Extra arguments that are added to the services
 	ExtraArgs map[string]string `yaml:"extra_args" json:"extraArgs,omitempty"`
+	// Extra binds added to the nodes
+	ExtraBinds []string `yaml:"extra_binds" json:"extraBinds,omitempty"`
 }
 
 type NetworkConfig struct {

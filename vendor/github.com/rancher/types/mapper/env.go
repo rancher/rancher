@@ -14,7 +14,7 @@ func (e EnvironmentMapper) FromInternal(data map[string]interface{}) {
 	var envFrom []v1.EnvFromSource
 
 	envMap := map[string]interface{}{}
-	var envFromMaps []map[string]interface{}
+	var envFromMaps []interface{}
 
 	if err := convert.ToObj(data["env"], &env); err == nil {
 		for _, envVar := range env {
@@ -68,6 +68,7 @@ func (e EnvironmentMapper) FromInternal(data map[string]interface{}) {
 					"sourceName": envVar.SecretRef.Name,
 					"prefix":     envVar.Prefix,
 					"optional":   envVar.SecretRef.Optional,
+					"type":       "/v3/project/schemas/environmentFrom",
 				})
 			}
 			if envVar.ConfigMapRef != nil {
@@ -76,6 +77,7 @@ func (e EnvironmentMapper) FromInternal(data map[string]interface{}) {
 					"sourceName": envVar.ConfigMapRef.Name,
 					"prefix":     envVar.Prefix,
 					"optional":   envVar.ConfigMapRef.Optional,
+					"type":       "/v3/project/schemas/environmentFrom",
 				})
 			}
 		}
