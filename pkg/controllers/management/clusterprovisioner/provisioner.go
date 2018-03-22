@@ -140,11 +140,11 @@ func (p *Provisioner) Create(cluster *v3.Cluster) (*v3.Cluster, error) {
 	v3.ClusterConditionPending.CreateUnknownIfNotExists(cluster)
 	v3.ClusterConditionProvisioned.CreateUnknownIfNotExists(cluster)
 
-	if v3.ClusterConditionReady.GetStatus(cluster) == "" {
-		v3.ClusterConditionReady.False(cluster)
+	if v3.ClusterConditionWaiting.GetStatus(cluster) == "" {
+		v3.ClusterConditionWaiting.Unknown(cluster)
 	}
-	if v3.ClusterConditionReady.GetMessage(cluster) == "" {
-		v3.ClusterConditionReady.Message(cluster, "Waiting for API to be available")
+	if v3.ClusterConditionWaiting.GetMessage(cluster) == "" {
+		v3.ClusterConditionWaiting.Message(cluster, "Waiting for API to be available")
 	}
 
 	cluster, err = p.pending(cluster)
