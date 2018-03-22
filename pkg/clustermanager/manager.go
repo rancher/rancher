@@ -234,6 +234,20 @@ func (m *Manager) APIExtClient(apiContext *types.APIContext, storageContext type
 	return record.cluster.APIExtClient, nil
 }
 
+func (m *Manager) UserContext(clusterName string) (*config.UserContext, error) {
+	cluster, err := m.clusterLister.Get("", clusterName)
+	if err != nil {
+		return nil, err
+	}
+
+	record, err := m.start(context.Background(), cluster)
+	if err != nil {
+		return nil, httperror.NewAPIError(httperror.ClusterUnavailable, err.Error())
+	}
+
+	return record.cluster, nil
+}
+
 func (m *Manager) record(apiContext *types.APIContext, storageContext types.StorageContext) (*record, error) {
 	if apiContext == nil {
 		return nil, nil
