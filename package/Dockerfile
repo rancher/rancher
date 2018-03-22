@@ -17,7 +17,7 @@ WORKDIR /var/lib/rancher
 
 RUN mkdir /opt/rke
 COPY --from=sidekick /opt/rke /opt/rke
-COPY --from=k8s /usr/bin/kubectl /usr/bin/kubelet /usr/bin/kube-proxy /usr/bin/
+COPY --from=k8s /usr/bin/kubelet /usr/bin/kube-proxy /usr/bin/
 
 ENV CATTLE_UI_PATH /usr/share/rancher/ui
 ENV CATTLE_UI_VERSION 2.0.25
