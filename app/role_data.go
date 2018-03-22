@@ -81,7 +81,12 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("projects").verbs("create")
 
 	rb.addRoleTemplate("View All Projects", "projects-view", "cluster", true, false, false).
-		addRule().apiGroups("management.cattle.io").resources("projects").verbs("get", "list", "watch")
+		addRule().apiGroups("management.cattle.io").resources("projects").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("projectroletemplatebindings").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("clusterevents").verbs("get", "list", "watch").
+		addRule().apiGroups("").resources("namespaces").verbs("get", "list", "watch").
+		addRule().apiGroups("*").resources("persistentvolumes").verbs("get", "list", "watch").
+		setRoleTemplateNames("view")
 
 	rb.addRoleTemplate("Manage Nodes", "nodes-manage", "cluster", true, false, false).
 		addRule().apiGroups("management.cattle.io").resources("nodes", "nodepools").verbs("*").
@@ -106,21 +111,18 @@ func addRoles(management *config.ManagementContext) (string, error) {
 	// Project roles
 	rb.addRoleTemplate("Project Owner", "project-owner", "project", true, false, false).
 		addRule().apiGroups("management.cattle.io").resources("projectroletemplatebindings").verbs("*").
-		addRule().apiGroups("project.cattle.io").resources("worklods").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("clusterevents").verbs("get", "list", "watch").
 		addRule().apiGroups("").resources("namespaces").verbs("create").
 		setRoleTemplateNames("admin")
 
 	rb.addRoleTemplate("Project Member", "project-member", "project", true, false, false).
 		addRule().apiGroups("management.cattle.io").resources("projectroletemplatebindings").verbs("get", "list", "watch").
-		addRule().apiGroups("project.cattle.io").resources("worklods").verbs("*").
 		addRule().apiGroups("").resources("namespaces").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("clusterevents").verbs("get", "list", "watch").
 		setRoleTemplateNames("edit")
 
 	rb.addRoleTemplate("Read-only", "read-only", "project", true, false, false).
 		addRule().apiGroups("management.cattle.io").resources("projectroletemplatebindings").verbs("get", "list", "watch").
-		addRule().apiGroups("project.cattle.io").resources("worklods").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clusterevents").verbs("get", "list", "watch").
 		setRoleTemplateNames("view")
 
