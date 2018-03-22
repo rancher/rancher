@@ -51,6 +51,7 @@ var transitioningMap = map[string]string{
 	"Saved":                       "saving",
 	"Updated":                     "updating",
 	"Updating":                    "updating",
+	"Waiting":                     "waiting",
 	"InitialRolesPopulated":       "activating",
 }
 
