@@ -1,3 +1,5 @@
+FROM rancher/k8s:v1.8.9-rancher1-1 as k8s
+
 FROM ubuntu:17.10
 RUN apt-get update && \
     apt-get install -y --no-install-recommends curl ca-certificates jq iproute2 && \
@@ -5,9 +7,10 @@ RUN apt-get update && \
     chmod +x /usr/bin/docker && \
     DEBIAN_FRONTEND=noninteractive apt-get autoremove -y && \
     DEBIAN_FRONTEND=noninteractive apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+COPY --from=k8s /usr/bin/kubelet /usr/bin/
 ARG VERSION=dev
 LABEL io.cattle.agent true
 ENV AGENT_IMAGE rancher/agent:${VERSION}
 ENV SSL_CERT_DIR /etc/kubernetes/ssl/certs
-COPY agent run.sh /usr/bin/
+COPY agent run.sh kubectl-shell.sh shell-setup.sh /usr/bin/
 ENTRYPOINT ["run.sh"]
