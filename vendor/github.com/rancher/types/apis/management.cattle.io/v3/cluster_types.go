@@ -16,6 +16,7 @@ const (
 	// ClusterConditionProvisioned Cluster is provisioned
 	ClusterConditionProvisioned condition.Cond = "Provisioned"
 	ClusterConditionUpdated     condition.Cond = "Updated"
+	ClusterConditionWaiting     condition.Cond = "Waiting"
 	ClusterConditionRemoved     condition.Cond = "Removed"
 	// ClusterConditionNoDiskPressure true when all cluster nodes have sufficient disk
 	ClusterConditionNoDiskPressure condition.Cond = "NoDiskPressure"
