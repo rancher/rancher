@@ -3,13 +3,16 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/juju/ratelimit"
+	errors2 "github.com/pkg/errors"
 	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/types"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -197,10 +200,45 @@ func (g *genericController) processNextWorkItem() bool {
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("%v %v %v", g.name, key, err))
+	if err := filterConflictsError(err); err != nil {
+		utilruntime.HandleError(fmt.Errorf("%v %v %v", g.name, key, err))
+	}
+
 	g.queue.AddRateLimited(key)
 
 	return true
+}
+
+func ignoreError(err error, checkString bool) bool {
+	err = errors2.Cause(err)
+	if errors.IsConflict(err) {
+		return true
+	}
+	if _, ok := err.(*ForgetError); ok {
+		return true
+	}
+	if checkString {
+		return strings.HasSuffix(err.Error(), "please apply your changes to the latest version and try again")
+	}
+	return false
+}
+
+func filterConflictsError(err error) error {
+	if ignoreError(err, false) {
+		return nil
+	}
+
+	if errs, ok := errors2.Cause(err).(*types.MultiErrors); ok {
+		var newErrors []error
+		for _, err := range errs.Errors {
+			if !ignoreError(err, true) {
+				newErrors = append(newErrors)
+			}
+		}
+		return types.NewErrors(newErrors...)
+	}
+
+	return err
 }
 
 func (g *genericController) syncHandler(s string) (err error) {
@@ -226,4 +264,8 @@ type handlerError struct {
 
 func (h *handlerError) Error() string {
 	return fmt.Sprintf("[%s] failed with : %v", h.name, h.err)
+}
+
+func (h *handlerError) Cause() error {
+	return h.err
 }

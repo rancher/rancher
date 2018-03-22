@@ -142,7 +142,11 @@ func versionsForPath(schemas *types.Schemas, path string) []types.APIVersion {
 	var matchedVersion []types.APIVersion
 	for _, version := range schemas.Versions() {
 		if strings.HasPrefix(path, version.Path) {
-			matchedVersion = append(matchedVersion, version)
+			afterPath := path[len(version.Path):]
+			// if version.Path is /v3/cluster allow /v3/clusters but not /v3/clusterstuff
+			if len(afterPath) < 3 || strings.Contains(afterPath[:3], "/") {
+				matchedVersion = append(matchedVersion, version)
+			}
 		}
 	}
 	sort.Slice(matchedVersion, func(i, j int) bool {

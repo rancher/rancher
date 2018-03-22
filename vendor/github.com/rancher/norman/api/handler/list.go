@@ -25,6 +25,10 @@ func ListHandler(request *types.APIContext, next types.RequestHandler) error {
 	} else if request.Link == "" {
 		data, err = store.ByID(request, request.Schema, request.ID)
 	} else {
+		_, err = store.ByID(request, request.Schema, request.ID)
+		if err != nil {
+			return err
+		}
 		return request.Schema.LinkHandler(request, nil)
 	}
 

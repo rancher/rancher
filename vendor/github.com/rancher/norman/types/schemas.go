@@ -339,8 +339,8 @@ func (s *Schemas) SubContextVersionForSchema(schema *Schema) *APIVersion {
 	return nil
 }
 
-type multiErrors struct {
-	errors []error
+type MultiErrors struct {
+	Errors []error
 }
 
 func NewErrors(errors ...error) error {
@@ -349,14 +349,14 @@ func NewErrors(errors ...error) error {
 	} else if len(errors) == 1 {
 		return errors[0]
 	}
-	return &multiErrors{
-		errors: errors,
+	return &MultiErrors{
+		Errors: errors,
 	}
 }
 
-func (m *multiErrors) Error() string {
+func (m *MultiErrors) Error() string {
 	buf := bytes.NewBuffer(nil)
-	for _, err := range m.errors {
+	for _, err := range m.Errors {
 		if buf.Len() > 0 {
 			buf.WriteString(", ")
 		}
