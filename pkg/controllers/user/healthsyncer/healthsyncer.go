@@ -44,7 +44,7 @@ func (h *HealthSyncer) syncHealth(ctx context.Context, syncHealth time.Duration)
 	for range ticker.Context(ctx, syncHealth) {
 		err := h.updateClusterHealth()
 		if err != nil && !apierrors.IsConflict(err) {
-			logrus.Info(err)
+			logrus.Error(err)
 		}
 	}
 }
@@ -75,6 +75,11 @@ func (h *HealthSyncer) updateClusterHealth() error {
 		}
 		return cluster, nil
 	})
+	if err != nil {
+		return err
+	}
+	v3.ClusterConditionWaiting.True(newObj)
+	v3.ClusterConditionWaiting.Message(newObj, "")
 
 	_, err = h.clusters.Update(newObj.(*v3.Cluster))
 	if err != nil {
