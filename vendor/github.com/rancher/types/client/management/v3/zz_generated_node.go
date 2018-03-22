@@ -32,6 +32,7 @@ const (
 	NodeFieldOwnerReferences      = "ownerReferences"
 	NodeFieldPodCidr              = "podCidr"
 	NodeFieldProviderId           = "providerId"
+	NodeFieldPublicEndpoints      = "publicEndpoints"
 	NodeFieldRemoved              = "removed"
 	NodeFieldRequested            = "requested"
 	NodeFieldRequestedHostname    = "requestedHostname"
@@ -75,6 +76,7 @@ type Node struct {
 	OwnerReferences      []OwnerReference          `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PodCidr              string                    `json:"podCidr,omitempty" yaml:"podCidr,omitempty"`
 	ProviderId           string                    `json:"providerId,omitempty" yaml:"providerId,omitempty"`
+	PublicEndpoints      []PublicEndpoint          `json:"publicEndpoints,omitempty" yaml:"publicEndpoints,omitempty"`
 	Removed              string                    `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Requested            map[string]string         `json:"requested,omitempty" yaml:"requested,omitempty"`
 	RequestedHostname    string                    `json:"requestedHostname,omitempty" yaml:"requestedHostname,omitempty"`

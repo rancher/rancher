@@ -29,6 +29,8 @@ type RancherKubernetesEngineConfig struct {
 	PrivateRegistries []PrivateRegistry `yaml:"private_registries" json:"privateRegistries,omitempty"`
 	// Ingress controller used in the cluster
 	Ingress IngressConfig `yaml:"ingress" json:"ingress,omitempty"`
+	// Cluster Name used in the kube config
+	ClusterName string `yaml:"cluster_name" json:"clusterName,omitempty"`
 }
 
 type PrivateRegistry struct {
