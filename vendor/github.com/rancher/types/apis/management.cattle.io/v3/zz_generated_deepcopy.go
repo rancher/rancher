@@ -1150,6 +1150,11 @@ func (in *BaseService) DeepCopyInto(out *BaseService) {
 			(*out)[key] = val
 		}
 	}
+	if in.ExtraBinds != nil {
+		in, out := &in.ExtraBinds, &out.ExtraBinds
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
