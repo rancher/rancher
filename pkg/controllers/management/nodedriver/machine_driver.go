@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 
+	errs "github.com/pkg/errors"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -48,11 +49,13 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 		return obj, nil
 	}
 
-	var err error
+	err := errs.New("not found")
 	// if node driver was created, we also activate the driver by default
 	driver := NewDriver(obj.Spec.Builtin, obj.Spec.DisplayName, obj.Spec.URL, obj.Spec.Checksum)
-	schemaName := obj.Name + "config"
-	_, err = m.schemaLister.Get("", schemaName)
+	if obj.Spec.DisplayName != "" {
+		schemaName := obj.Spec.DisplayName + "config"
+		_, err = m.schemaLister.Get("", schemaName)
+	}
 
 	if driver.Exists() && err == nil {
 		return obj, nil
@@ -99,7 +102,7 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 			ResourceFields: resourceFields,
 		},
 	}
-	dynamicSchema.Name = obj.Name + "config"
+	dynamicSchema.Name = obj.Spec.DisplayName + "config"
 	dynamicSchema.OwnerReferences = []metav1.OwnerReference{
 		{
 			UID:        obj.UID,
