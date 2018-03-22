@@ -20,7 +20,12 @@ const (
 )
 
 func TokenAndURL() (string, string, error) {
-	return getRancherClient()
+	url, err := readKey(urlFilename)
+	if err != nil {
+		return "", "", err
+	}
+	token, err := readKey(tokenFilename)
+	return token, url, err
 }
 
 func Params() (map[string]interface{}, error) {
@@ -66,15 +71,6 @@ func populateCAData(cfg *rest.Config) error {
 	}
 	cfg.CAData = bytes
 	return nil
-}
-
-func getRancherClient() (string, string, error) {
-	url, err := readKey(urlFilename)
-	if err != nil {
-		return "", "", err
-	}
-	token, err := readKey(tokenFilename)
-	return token, url, err
 }
 
 func readKey(key string) (string, error) {

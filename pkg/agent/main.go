@@ -4,13 +4,16 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"time"
 
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/client"
 	"github.com/rancher/norman/signal"
 	"github.com/rancher/rancher/pkg/agent/cluster"
 	"github.com/rancher/rancher/pkg/agent/node"
@@ -42,10 +45,65 @@ func getParams() (map[string]interface{}, error) {
 }
 
 func getTokenAndURL() (string, string, error) {
-	if os.Getenv("CATTLE_CLUSTER") == "true" {
+	token, url, err := node.TokenAndURL()
+	if err != nil {
+		return "", "", err
+	}
+	if token == "" {
 		return cluster.TokenAndURL()
 	}
-	return node.TokenAndURL()
+	return token, url, nil
+}
+
+func isConnect() bool {
+	if os.Getenv("CATTLE_AGENT_CONNECT") == "true" {
+		return true
+	}
+	_, err := os.Stat("connected")
+	return err == nil
+}
+
+func connected() {
+	f, err := os.Create("connected")
+	if err != nil {
+		f.Close()
+	}
+}
+
+func cleanup(ctx context.Context) error {
+	if os.Getenv("CATTLE_K8S_MANAGED") != "true" {
+		return nil
+	}
+
+	c, err := client.NewEnvClient()
+	if err != nil {
+		return err
+	}
+
+	args := filters.NewArgs()
+	args.Add("label", "io.cattle.agent=true")
+
+	containers, err := c.ContainerList(ctx, types.ContainerListOptions{
+		All:     true,
+		Filters: args,
+	})
+	if err != nil {
+		return err
+	}
+
+	for _, container := range containers {
+		if _, ok := container.Labels["io.kubernetes.pod.namespace"]; ok {
+			continue
+		}
+		err := c.ContainerRemove(ctx, container.ID, types.ContainerRemoveOptions{
+			Force: true,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func run() error {
@@ -77,21 +135,26 @@ func run() error {
 	}
 
 	onConnect := func() error {
+		connected()
 		connectConfig := fmt.Sprintf("https://%s/v3/connect/config", serverURL.Host)
 		return rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers)
 	}
 
-	wsURL := fmt.Sprintf("wss://%s/v3/connect", serverURL.Host)
-	logrus.Infof("Connecting to %s with token %s", wsURL, token)
-	remotedialer.ClientConnect(wsURL, http.Header(headers), nil, func(proto, address string) bool {
-		switch proto {
-		case "tcp":
-			return true
-		case "unix":
-			return address == "/var/run/docker.sock"
+	for {
+		wsURL := fmt.Sprintf("wss://%s/v3/connect", serverURL.Host)
+		if !isConnect() {
+			wsURL += "/register"
 		}
-		return false
-	}, onConnect)
-
-	return errors.New("client exited")
+		logrus.Infof("Connecting to %s with token %s", wsURL, token)
+		remotedialer.ClientConnect(wsURL, http.Header(headers), nil, func(proto, address string) bool {
+			switch proto {
+			case "tcp":
+				return true
+			case "unix":
+				return address == "/var/run/docker.sock"
+			}
+			return false
+		}, onConnect)
+		time.Sleep(5 * time.Second)
+	}
 }

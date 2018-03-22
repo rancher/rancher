@@ -1,7 +1,6 @@
 package remotedialer
 
 import (
-	"crypto/tls"
 	"net/http"
 	"time"
 
@@ -11,15 +10,10 @@ import (
 
 type ConnectAuthorizer func(proto, address string) bool
 
-func ClientConnect(wsURL string, headers http.Header, tlsConfig *tls.Config, auth ConnectAuthorizer, onConnect func() error) {
-	dialer := &websocket.Dialer{
-		TLSClientConfig: tlsConfig,
-	}
-	for {
-		if err := connectToProxy(wsURL, headers, auth, dialer, onConnect); err != nil {
-			logrus.WithError(err).Error("Failed to connect to proxy")
-			time.Sleep(time.Duration(5) * time.Second)
-		}
+func ClientConnect(wsURL string, headers http.Header, dialer *websocket.Dialer, auth ConnectAuthorizer, onConnect func() error) {
+	if err := connectToProxy(wsURL, headers, auth, dialer, onConnect); err != nil {
+		logrus.WithError(err).Error("Failed to connect to proxy")
+		time.Sleep(time.Duration(5) * time.Second)
 	}
 }
 

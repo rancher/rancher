@@ -8,6 +8,10 @@ import (
 	"errors"
 	"net/http"
 
+	"strings"
+
+	"fmt"
+
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/remotedialer"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -20,6 +24,7 @@ import (
 
 const (
 	crtKeyIndex    = "crtKeyIndex"
+	nodeKeyIndex   = "nodeKeyIndex"
 	importedDriver = "imported"
 
 	Token  = "X-API-Tunnel-Token"
@@ -51,6 +56,7 @@ func NewAuthorizer(context *config.ScaledContext) *Authorizer {
 	auth := &Authorizer{
 		crtIndexer:    context.Management.ClusterRegistrationTokens("").Controller().Informer().GetIndexer(),
 		clusterLister: context.Management.Clusters("").Controller().Lister(),
+		nodeIndexer:   context.Management.Nodes("").Controller().Informer().GetIndexer(),
 		machineLister: context.Management.Nodes("").Controller().Lister(),
 		machines:      context.Management.Nodes(""),
 		clusters:      context.Management.Clusters(""),
@@ -58,12 +64,16 @@ func NewAuthorizer(context *config.ScaledContext) *Authorizer {
 	context.Management.ClusterRegistrationTokens("").Controller().Informer().AddIndexers(map[string]cache.IndexFunc{
 		crtKeyIndex: auth.crtIndex,
 	})
+	context.Management.Nodes("").Controller().Informer().AddIndexers(map[string]cache.IndexFunc{
+		nodeKeyIndex: auth.nodeIndex,
+	})
 	return auth
 }
 
 type Authorizer struct {
 	crtIndexer    cache.Indexer
 	clusterLister v3.ClusterLister
+	nodeIndexer   cache.Indexer
 	machineLister v3.NodeLister
 	machines      v3.NodeInterface
 	clusters      v3.ClusterInterface
@@ -144,11 +154,27 @@ func (t *Authorizer) Authorize(req *http.Request) (*Client, bool, error) {
 	return nil, false, nil
 }
 
-func (t *Authorizer) authorizeNode(cluster *v3.Cluster, inNode *client.Node, req *http.Request) (*v3.Node, bool, error) {
+func (t *Authorizer) getMachine(cluster *v3.Cluster, inNode *client.Node) (*v3.Node, error) {
 	machineName := machineName(inNode)
 
 	machine, err := t.machineLister.Get(cluster.Name, machineName)
 	if apierrors.IsNotFound(err) {
+		if objs, err := t.nodeIndexer.ByIndex(nodeKeyIndex, fmt.Sprintf("%s/%s", cluster.Name, inNode.RequestedHostname)); err == nil {
+			for _, obj := range objs {
+				return obj.(*v3.Node), err
+			}
+		}
+	}
+
+	return machine, err
+}
+
+func (t *Authorizer) authorizeNode(cluster *v3.Cluster, inNode *client.Node, req *http.Request) (*v3.Node, bool, error) {
+	machine, err := t.getMachine(cluster, inNode)
+	if apierrors.IsNotFound(err) {
+		if !strings.HasSuffix(req.URL.Path, "/register") {
+			return nil, false, err
+		}
 		machine, err = t.createNode(inNode, cluster, req)
 		if err != nil {
 			return nil, false, err
@@ -221,13 +247,15 @@ func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, r
 	token := inCluster.Token
 	caCert := inCluster.CACert
 
-	if cluster.Status.APIEndpoint != apiEndpoint ||
-		cluster.Status.ServiceAccountToken != token ||
-		cluster.Status.CACert != caCert {
-		cluster.Status.APIEndpoint = apiEndpoint
-		cluster.Status.ServiceAccountToken = token
-		cluster.Status.CACert = caCert
-		changed = true
+	if cluster.Status.Driver == importedDriver {
+		if cluster.Status.APIEndpoint != apiEndpoint ||
+			cluster.Status.ServiceAccountToken != token ||
+			cluster.Status.CACert != caCert {
+			cluster.Status.APIEndpoint = apiEndpoint
+			cluster.Status.ServiceAccountToken = token
+			cluster.Status.CACert = caCert
+			changed = true
+		}
 	}
 
 	if changed {
@@ -295,6 +323,11 @@ func (t *Authorizer) getClusterByToken(token string) (*v3.Cluster, error) {
 func (t *Authorizer) crtIndex(obj interface{}) ([]string, error) {
 	crt := obj.(*v3.ClusterRegistrationToken)
 	return []string{crt.Status.Token}, nil
+}
+
+func (t *Authorizer) nodeIndex(obj interface{}) ([]string, error) {
+	node := obj.(*v3.Node)
+	return []string{fmt.Sprintf("%s/%s", node.Namespace, node.Status.NodeName)}, nil
 }
 
 func (t *Authorizer) toCustomConfig(machine *client.Node) *v3.CustomConfig {

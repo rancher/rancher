@@ -1,35 +1,21 @@
-package clusteregistrationtokens
+package clusterregistrationtokens
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
-	"strings"
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/systemtemplate"
 )
 
 const (
 	commandFormat         = "kubectl apply -f %s"
 	insecureCommandFormat = "curl --insecure -sfL %s | kubectl apply -f -"
-	nodeCommandFormat     = "docker run -d --restart=unless-stopped --net=host -v /var/run/docker.sock:/var/run/docker.sock %s --server %s --token %s%s"
+	nodeCommandFormat     = "docker run -d --restart=unless-stopped --net=host -v /etc/kubernetes/ssl:/etc/kubernetes/ssl -v /var/run:/var/run %s --server %s --token %s%s"
 )
 
-func CAChecksum() string {
-	ca := settings.CACerts.Get()
-	if ca != "" {
-		if !strings.HasSuffix(ca, "\n") {
-			ca += "\n"
-		}
-		digest := sha256.Sum256([]byte(ca))
-		return hex.EncodeToString(digest[:])
-	}
-	return ""
-}
-
 func Formatter(request *types.APIContext, resource *types.RawResource) {
-	ca := CAChecksum()
+	ca := systemtemplate.CAChecksum()
 	if ca != "" {
 		ca = " --ca-checksum " + ca
 	}

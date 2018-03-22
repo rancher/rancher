@@ -21,7 +21,7 @@ cp ../bin/rancher ../bin/agent .
 IMAGE=${REPO}/server:${TAG}
 AGENT_IMAGE=${REPO}/agent:${TAG}
 docker build --build-arg VERSION=${TAG} -t ${IMAGE} .
-#docker build --build-arg VERSION=${TAG} -t ${AGENT_IMAGE} -f Dockerfile.agent .
+docker build --build-arg VERSION=${TAG} -t ${AGENT_IMAGE} -f Dockerfile.agent .
 echo ${IMAGE} > ../dist/images
-#echo ${AGENT_IMAGE} > ../dist/images
+echo ${AGENT_IMAGE} >> ../dist/images
 echo Built ${IMAGE} #${AGENT_IMAGE}

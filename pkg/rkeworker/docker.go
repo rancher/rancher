@@ -9,6 +9,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 )
 
 type NodeConfig struct {
@@ -94,7 +95,6 @@ func changed(ctx context.Context, c *client.Client, p v3.Process, container type
 		Args:        inspect.Config.Cmd,
 		Env:         inspect.Config.Env,
 		Image:       inspect.Config.Image,
-		VolumesFrom: inspect.HostConfig.VolumesFrom,
 		Binds:       inspect.HostConfig.Binds,
 		NetworkMode: string(inspect.HostConfig.NetworkMode),
 		PidMode:     string(inspect.HostConfig.PidMode),
@@ -117,8 +117,23 @@ func changed(ctx context.Context, c *client.Client, p v3.Process, container type
 		p.PidMode = newProcess.PidMode
 	}
 
+	// Don't detect changes on these fields
+	newProcess.Name = p.Name
 	newProcess.HealthCheck.URL = p.HealthCheck.URL
 	newProcess.RestartPolicy = p.RestartPolicy
+	newProcess.VolumesFrom = p.VolumesFrom
 
-	return !reflect.DeepEqual(newProcess, p), nil
+	changed := false
+	t := reflect.TypeOf(newProcess)
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		left := reflect.ValueOf(newProcess).Field(i).Interface()
+		right := reflect.ValueOf(p).Field(i).Interface()
+		if !reflect.DeepEqual(left, right) {
+			logrus.Infof("For process %s, %s has changed from %v to %v", p.Name, f.Name, right, left)
+			changed = true
+		}
+	}
+
+	return changed, nil
 }

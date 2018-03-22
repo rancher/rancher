@@ -13,7 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/authn"
 	"github.com/rancher/rancher/pkg/api/customization/catalog"
 	ccluster "github.com/rancher/rancher/pkg/api/customization/cluster"
-	"github.com/rancher/rancher/pkg/api/customization/clusteregistrationtokens"
+	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
 	"github.com/rancher/rancher/pkg/api/customization/logging"
 	"github.com/rancher/rancher/pkg/api/customization/node"
 	"github.com/rancher/rancher/pkg/api/customization/nodetemplate"
@@ -182,7 +182,7 @@ func ClusterRegistrationTokens(schemas *types.Schemas) {
 	schema.Store = &cluster.RegistrationTokenStore{
 		Store: schema.Store,
 	}
-	schema.Formatter = clusteregistrationtokens.Formatter
+	schema.Formatter = clusterregistrationtokens.Formatter
 }
 
 func NodeTemplates(schemas *types.Schemas, management *config.ScaledContext) {

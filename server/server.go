@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/rancher/rancher/pkg/api/customization/clusteregistrationtokens"
+	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
 	managementapi "github.com/rancher/rancher/pkg/api/server"
 	"github.com/rancher/rancher/pkg/auth/providers/publicapi"
 	authrequests "github.com/rancher/rancher/pkg/auth/requests"
@@ -81,8 +81,9 @@ func Start(ctx context.Context, httpPort, httpsPort int, apiContext *config.Scal
 
 	root.Handle("/", ui.UI(managementAPI))
 	root.PathPrefix("/v3-public").Handler(publicAPI)
-	root.Handle("/v3/import/{token}.yaml", http.HandlerFunc(clusteregistrationtokens.ClusterImportHandler))
+	root.Handle("/v3/import/{token}.yaml", http.HandlerFunc(clusterregistrationtokens.ClusterImportHandler))
 	root.Handle("/v3/connect", connectHandler)
+	root.Handle("/v3/connect/register", connectHandler)
 	root.Handle("/v3/connect/config", connectConfigHandler)
 	root.Handle("/v3/settings/cacerts", rawAuthedAPIs).Methods(http.MethodGet)
 	root.PathPrefix("/v3").Handler(authedHandler)
