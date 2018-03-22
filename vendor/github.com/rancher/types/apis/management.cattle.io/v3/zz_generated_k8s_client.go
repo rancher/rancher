@@ -23,6 +23,7 @@ type Interface interface {
 	GlobalRoleBindingsGetter
 	RoleTemplatesGetter
 	PodSecurityPolicyTemplatesGetter
+	PodSecurityPolicyTemplateProjectBindingsGetter
 	ClusterRoleTemplateBindingsGetter
 	ProjectRoleTemplateBindingsGetter
 	ClustersGetter
@@ -62,47 +63,48 @@ type Client struct {
 	restClient rest.Interface
 	starters   []controller.Starter
 
-	nodePoolControllers                   map[string]NodePoolController
-	nodeControllers                       map[string]NodeController
-	nodeDriverControllers                 map[string]NodeDriverController
-	nodeTemplateControllers               map[string]NodeTemplateController
-	projectControllers                    map[string]ProjectController
-	globalRoleControllers                 map[string]GlobalRoleController
-	globalRoleBindingControllers          map[string]GlobalRoleBindingController
-	roleTemplateControllers               map[string]RoleTemplateController
-	podSecurityPolicyTemplateControllers  map[string]PodSecurityPolicyTemplateController
-	clusterRoleTemplateBindingControllers map[string]ClusterRoleTemplateBindingController
-	projectRoleTemplateBindingControllers map[string]ProjectRoleTemplateBindingController
-	clusterControllers                    map[string]ClusterController
-	clusterEventControllers               map[string]ClusterEventController
-	clusterRegistrationTokenControllers   map[string]ClusterRegistrationTokenController
-	catalogControllers                    map[string]CatalogController
-	templateControllers                   map[string]TemplateController
-	templateVersionControllers            map[string]TemplateVersionController
-	groupControllers                      map[string]GroupController
-	groupMemberControllers                map[string]GroupMemberController
-	principalControllers                  map[string]PrincipalController
-	userControllers                       map[string]UserController
-	authConfigControllers                 map[string]AuthConfigController
-	tokenControllers                      map[string]TokenController
-	dynamicSchemaControllers              map[string]DynamicSchemaController
-	preferenceControllers                 map[string]PreferenceController
-	projectNetworkPolicyControllers       map[string]ProjectNetworkPolicyController
-	clusterLoggingControllers             map[string]ClusterLoggingController
-	projectLoggingControllers             map[string]ProjectLoggingController
-	listenConfigControllers               map[string]ListenConfigController
-	settingControllers                    map[string]SettingController
-	notifierControllers                   map[string]NotifierController
-	clusterAlertControllers               map[string]ClusterAlertController
-	projectAlertControllers               map[string]ProjectAlertController
-	clusterPipelineControllers            map[string]ClusterPipelineController
-	sourceCodeCredentialControllers       map[string]SourceCodeCredentialController
-	pipelineControllers                   map[string]PipelineController
-	pipelineExecutionControllers          map[string]PipelineExecutionController
-	pipelineExecutionLogControllers       map[string]PipelineExecutionLogController
-	sourceCodeRepositoryControllers       map[string]SourceCodeRepositoryController
-	globalComposeConfigControllers        map[string]GlobalComposeConfigController
-	clusterComposeConfigControllers       map[string]ClusterComposeConfigController
+	nodePoolControllers                                map[string]NodePoolController
+	nodeControllers                                    map[string]NodeController
+	nodeDriverControllers                              map[string]NodeDriverController
+	nodeTemplateControllers                            map[string]NodeTemplateController
+	projectControllers                                 map[string]ProjectController
+	globalRoleControllers                              map[string]GlobalRoleController
+	globalRoleBindingControllers                       map[string]GlobalRoleBindingController
+	roleTemplateControllers                            map[string]RoleTemplateController
+	podSecurityPolicyTemplateControllers               map[string]PodSecurityPolicyTemplateController
+	podSecurityPolicyTemplateProjectBindingControllers map[string]PodSecurityPolicyTemplateProjectBindingController
+	clusterRoleTemplateBindingControllers              map[string]ClusterRoleTemplateBindingController
+	projectRoleTemplateBindingControllers              map[string]ProjectRoleTemplateBindingController
+	clusterControllers                                 map[string]ClusterController
+	clusterEventControllers                            map[string]ClusterEventController
+	clusterRegistrationTokenControllers                map[string]ClusterRegistrationTokenController
+	catalogControllers                                 map[string]CatalogController
+	templateControllers                                map[string]TemplateController
+	templateVersionControllers                         map[string]TemplateVersionController
+	groupControllers                                   map[string]GroupController
+	groupMemberControllers                             map[string]GroupMemberController
+	principalControllers                               map[string]PrincipalController
+	userControllers                                    map[string]UserController
+	authConfigControllers                              map[string]AuthConfigController
+	tokenControllers                                   map[string]TokenController
+	dynamicSchemaControllers                           map[string]DynamicSchemaController
+	preferenceControllers                              map[string]PreferenceController
+	projectNetworkPolicyControllers                    map[string]ProjectNetworkPolicyController
+	clusterLoggingControllers                          map[string]ClusterLoggingController
+	projectLoggingControllers                          map[string]ProjectLoggingController
+	listenConfigControllers                            map[string]ListenConfigController
+	settingControllers                                 map[string]SettingController
+	notifierControllers                                map[string]NotifierController
+	clusterAlertControllers                            map[string]ClusterAlertController
+	projectAlertControllers                            map[string]ProjectAlertController
+	clusterPipelineControllers                         map[string]ClusterPipelineController
+	sourceCodeCredentialControllers                    map[string]SourceCodeCredentialController
+	pipelineControllers                                map[string]PipelineController
+	pipelineExecutionControllers                       map[string]PipelineExecutionController
+	pipelineExecutionLogControllers                    map[string]PipelineExecutionLogController
+	sourceCodeRepositoryControllers                    map[string]SourceCodeRepositoryController
+	globalComposeConfigControllers                     map[string]GlobalComposeConfigController
+	clusterComposeConfigControllers                    map[string]ClusterComposeConfigController
 }
 
 func NewForConfig(config rest.Config) (Interface, error) {
@@ -119,47 +121,48 @@ func NewForConfig(config rest.Config) (Interface, error) {
 	return &Client{
 		restClient: restClient,
 
-		nodePoolControllers:                   map[string]NodePoolController{},
-		nodeControllers:                       map[string]NodeController{},
-		nodeDriverControllers:                 map[string]NodeDriverController{},
-		nodeTemplateControllers:               map[string]NodeTemplateController{},
-		projectControllers:                    map[string]ProjectController{},
-		globalRoleControllers:                 map[string]GlobalRoleController{},
-		globalRoleBindingControllers:          map[string]GlobalRoleBindingController{},
-		roleTemplateControllers:               map[string]RoleTemplateController{},
-		podSecurityPolicyTemplateControllers:  map[string]PodSecurityPolicyTemplateController{},
-		clusterRoleTemplateBindingControllers: map[string]ClusterRoleTemplateBindingController{},
-		projectRoleTemplateBindingControllers: map[string]ProjectRoleTemplateBindingController{},
-		clusterControllers:                    map[string]ClusterController{},
-		clusterEventControllers:               map[string]ClusterEventController{},
-		clusterRegistrationTokenControllers:   map[string]ClusterRegistrationTokenController{},
-		catalogControllers:                    map[string]CatalogController{},
-		templateControllers:                   map[string]TemplateController{},
-		templateVersionControllers:            map[string]TemplateVersionController{},
-		groupControllers:                      map[string]GroupController{},
-		groupMemberControllers:                map[string]GroupMemberController{},
-		principalControllers:                  map[string]PrincipalController{},
-		userControllers:                       map[string]UserController{},
-		authConfigControllers:                 map[string]AuthConfigController{},
-		tokenControllers:                      map[string]TokenController{},
-		dynamicSchemaControllers:              map[string]DynamicSchemaController{},
-		preferenceControllers:                 map[string]PreferenceController{},
-		projectNetworkPolicyControllers:       map[string]ProjectNetworkPolicyController{},
-		clusterLoggingControllers:             map[string]ClusterLoggingController{},
-		projectLoggingControllers:             map[string]ProjectLoggingController{},
-		listenConfigControllers:               map[string]ListenConfigController{},
-		settingControllers:                    map[string]SettingController{},
-		notifierControllers:                   map[string]NotifierController{},
-		clusterAlertControllers:               map[string]ClusterAlertController{},
-		projectAlertControllers:               map[string]ProjectAlertController{},
-		clusterPipelineControllers:            map[string]ClusterPipelineController{},
-		sourceCodeCredentialControllers:       map[string]SourceCodeCredentialController{},
-		pipelineControllers:                   map[string]PipelineController{},
-		pipelineExecutionControllers:          map[string]PipelineExecutionController{},
-		pipelineExecutionLogControllers:       map[string]PipelineExecutionLogController{},
-		sourceCodeRepositoryControllers:       map[string]SourceCodeRepositoryController{},
-		globalComposeConfigControllers:        map[string]GlobalComposeConfigController{},
-		clusterComposeConfigControllers:       map[string]ClusterComposeConfigController{},
+		nodePoolControllers:                                map[string]NodePoolController{},
+		nodeControllers:                                    map[string]NodeController{},
+		nodeDriverControllers:                              map[string]NodeDriverController{},
+		nodeTemplateControllers:                            map[string]NodeTemplateController{},
+		projectControllers:                                 map[string]ProjectController{},
+		globalRoleControllers:                              map[string]GlobalRoleController{},
+		globalRoleBindingControllers:                       map[string]GlobalRoleBindingController{},
+		roleTemplateControllers:                            map[string]RoleTemplateController{},
+		podSecurityPolicyTemplateControllers:               map[string]PodSecurityPolicyTemplateController{},
+		podSecurityPolicyTemplateProjectBindingControllers: map[string]PodSecurityPolicyTemplateProjectBindingController{},
+		clusterRoleTemplateBindingControllers:              map[string]ClusterRoleTemplateBindingController{},
+		projectRoleTemplateBindingControllers:              map[string]ProjectRoleTemplateBindingController{},
+		clusterControllers:                                 map[string]ClusterController{},
+		clusterEventControllers:                            map[string]ClusterEventController{},
+		clusterRegistrationTokenControllers:                map[string]ClusterRegistrationTokenController{},
+		catalogControllers:                                 map[string]CatalogController{},
+		templateControllers:                                map[string]TemplateController{},
+		templateVersionControllers:                         map[string]TemplateVersionController{},
+		groupControllers:                                   map[string]GroupController{},
+		groupMemberControllers:                             map[string]GroupMemberController{},
+		principalControllers:                               map[string]PrincipalController{},
+		userControllers:                                    map[string]UserController{},
+		authConfigControllers:                              map[string]AuthConfigController{},
+		tokenControllers:                                   map[string]TokenController{},
+		dynamicSchemaControllers:                           map[string]DynamicSchemaController{},
+		preferenceControllers:                              map[string]PreferenceController{},
+		projectNetworkPolicyControllers:                    map[string]ProjectNetworkPolicyController{},
+		clusterLoggingControllers:                          map[string]ClusterLoggingController{},
+		projectLoggingControllers:                          map[string]ProjectLoggingController{},
+		listenConfigControllers:                            map[string]ListenConfigController{},
+		settingControllers:                                 map[string]SettingController{},
+		notifierControllers:                                map[string]NotifierController{},
+		clusterAlertControllers:                            map[string]ClusterAlertController{},
+		projectAlertControllers:                            map[string]ProjectAlertController{},
+		clusterPipelineControllers:                         map[string]ClusterPipelineController{},
+		sourceCodeCredentialControllers:                    map[string]SourceCodeCredentialController{},
+		pipelineControllers:                                map[string]PipelineController{},
+		pipelineExecutionControllers:                       map[string]PipelineExecutionController{},
+		pipelineExecutionLogControllers:                    map[string]PipelineExecutionLogController{},
+		sourceCodeRepositoryControllers:                    map[string]SourceCodeRepositoryController{},
+		globalComposeConfigControllers:                     map[string]GlobalComposeConfigController{},
+		clusterComposeConfigControllers:                    map[string]ClusterComposeConfigController{},
 	}, nil
 }
 
@@ -286,6 +289,19 @@ type PodSecurityPolicyTemplatesGetter interface {
 func (c *Client) PodSecurityPolicyTemplates(namespace string) PodSecurityPolicyTemplateInterface {
 	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &PodSecurityPolicyTemplateResource, PodSecurityPolicyTemplateGroupVersionKind, podSecurityPolicyTemplateFactory{})
 	return &podSecurityPolicyTemplateClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type PodSecurityPolicyTemplateProjectBindingsGetter interface {
+	PodSecurityPolicyTemplateProjectBindings(namespace string) PodSecurityPolicyTemplateProjectBindingInterface
+}
+
+func (c *Client) PodSecurityPolicyTemplateProjectBindings(namespace string) PodSecurityPolicyTemplateProjectBindingInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &PodSecurityPolicyTemplateProjectBindingResource, PodSecurityPolicyTemplateProjectBindingGroupVersionKind, podSecurityPolicyTemplateProjectBindingFactory{})
+	return &podSecurityPolicyTemplateProjectBindingClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

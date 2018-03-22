@@ -5,43 +5,43 @@ import (
 )
 
 const (
-	ProjectType                             = "project"
-	ProjectFieldAnnotations                 = "annotations"
-	ProjectFieldClusterId                   = "clusterId"
-	ProjectFieldConditions                  = "conditions"
-	ProjectFieldCreated                     = "created"
-	ProjectFieldCreatorID                   = "creatorId"
-	ProjectFieldDescription                 = "description"
-	ProjectFieldLabels                      = "labels"
-	ProjectFieldName                        = "name"
-	ProjectFieldNamespaceId                 = "namespaceId"
-	ProjectFieldOwnerReferences             = "ownerReferences"
-	ProjectFieldPodSecurityPolicyTemplateId = "podSecurityPolicyTemplateId"
-	ProjectFieldRemoved                     = "removed"
-	ProjectFieldState                       = "state"
-	ProjectFieldTransitioning               = "transitioning"
-	ProjectFieldTransitioningMessage        = "transitioningMessage"
-	ProjectFieldUuid                        = "uuid"
+	ProjectType                               = "project"
+	ProjectFieldAnnotations                   = "annotations"
+	ProjectFieldClusterId                     = "clusterId"
+	ProjectFieldConditions                    = "conditions"
+	ProjectFieldCreated                       = "created"
+	ProjectFieldCreatorID                     = "creatorId"
+	ProjectFieldDescription                   = "description"
+	ProjectFieldLabels                        = "labels"
+	ProjectFieldName                          = "name"
+	ProjectFieldNamespaceId                   = "namespaceId"
+	ProjectFieldOwnerReferences               = "ownerReferences"
+	ProjectFieldPodSecurityPolicyTemplateName = "podSecurityPolicyTemplateId"
+	ProjectFieldRemoved                       = "removed"
+	ProjectFieldState                         = "state"
+	ProjectFieldTransitioning                 = "transitioning"
+	ProjectFieldTransitioningMessage          = "transitioningMessage"
+	ProjectFieldUuid                          = "uuid"
 )
 
 type Project struct {
 	types.Resource
-	Annotations                 map[string]string  `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	ClusterId                   string             `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
-	Conditions                  []ProjectCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
-	Created                     string             `json:"created,omitempty" yaml:"created,omitempty"`
-	CreatorID                   string             `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
-	Description                 string             `json:"description,omitempty" yaml:"description,omitempty"`
-	Labels                      map[string]string  `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Name                        string             `json:"name,omitempty" yaml:"name,omitempty"`
-	NamespaceId                 string             `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
-	OwnerReferences             []OwnerReference   `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	PodSecurityPolicyTemplateId string             `json:"podSecurityPolicyTemplateId,omitempty" yaml:"podSecurityPolicyTemplateId,omitempty"`
-	Removed                     string             `json:"removed,omitempty" yaml:"removed,omitempty"`
-	State                       string             `json:"state,omitempty" yaml:"state,omitempty"`
-	Transitioning               string             `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
-	TransitioningMessage        string             `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	Uuid                        string             `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Annotations                   map[string]string  `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	ClusterId                     string             `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	Conditions                    []ProjectCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+	Created                       string             `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID                     string             `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Description                   string             `json:"description,omitempty" yaml:"description,omitempty"`
+	Labels                        map[string]string  `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name                          string             `json:"name,omitempty" yaml:"name,omitempty"`
+	NamespaceId                   string             `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
+	OwnerReferences               []OwnerReference   `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	PodSecurityPolicyTemplateName string             `json:"podSecurityPolicyTemplateId,omitempty" yaml:"podSecurityPolicyTemplateId,omitempty"`
+	Removed                       string             `json:"removed,omitempty" yaml:"removed,omitempty"`
+	State                         string             `json:"state,omitempty" yaml:"state,omitempty"`
+	Transitioning                 string             `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage          string             `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	Uuid                          string             `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 type ProjectCollection struct {
 	types.Collection
@@ -59,6 +59,8 @@ type ProjectOperations interface {
 	Update(existing *Project, updates interface{}) (*Project, error)
 	ByID(id string) (*Project, error)
 	Delete(container *Project) error
+
+	ActionSetpodsecuritypolicytemplate(*Project, *SetPodSecurityPolicyTemplateInput) (*Project, error)
 }
 
 func newProjectClient(apiClient *Client) *ProjectClient {
@@ -104,4 +106,13 @@ func (c *ProjectClient) ByID(id string) (*Project, error) {
 
 func (c *ProjectClient) Delete(container *Project) error {
 	return c.apiClient.Ops.DoResourceDelete(ProjectType, &container.Resource)
+}
+
+func (c *ProjectClient) ActionSetpodsecuritypolicytemplate(resource *Project, input *SetPodSecurityPolicyTemplateInput) (*Project, error) {
+
+	resp := &Project{}
+
+	err := c.apiClient.Ops.DoAction(ProjectType, "setpodsecuritypolicytemplate", &resource.Resource, input, resp)
+
+	return resp, err
 }
