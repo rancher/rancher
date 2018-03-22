@@ -25,7 +25,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
@@ -184,6 +183,9 @@ func (b *downwardAPIVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		glog.Errorf("Unable to setup downwardAPI volume %v for pod %v/%v: %s", b.volName, b.pod.Namespace, b.pod.Name, err.Error())
 		return err
 	}
+	if err := volumeutil.MakeNestedMountpoints(b.volName, dir, *b.pod); err != nil {
+		return err
+	}
 
 	data, err := CollectData(b.source.Items, b.pod, b.plugin.host, b.source.DefaultMode)
 	if err != nil {
@@ -246,7 +248,7 @@ func CollectData(items []v1.DownwardAPIVolumeFile, pod *v1.Pod, host volume.Volu
 			nodeAllocatable, err := host.GetNodeAllocatable()
 			if err != nil {
 				errlist = append(errlist, err)
-			} else if values, err := resource.ExtractResourceValueByContainerNameAndNodeAllocatable(api.Scheme, fileInfo.ResourceFieldRef, pod, containerName, nodeAllocatable); err != nil {
+			} else if values, err := resource.ExtractResourceValueByContainerNameAndNodeAllocatable(fileInfo.ResourceFieldRef, pod, containerName, nodeAllocatable); err != nil {
 				glog.Errorf("Unable to extract field %s: %s", fileInfo.ResourceFieldRef.Resource, err.Error())
 				errlist = append(errlist, err)
 			} else {

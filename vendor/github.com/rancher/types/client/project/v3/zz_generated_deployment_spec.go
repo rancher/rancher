@@ -5,6 +5,7 @@ const (
 	DeploymentSpecFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	DeploymentSpecFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
 	DeploymentSpecFieldContainers                    = "containers"
+	DeploymentSpecFieldDNSConfig                     = "dnsConfig"
 	DeploymentSpecFieldDNSPolicy                     = "dnsPolicy"
 	DeploymentSpecFieldDeploymentConfig              = "deploymentConfig"
 	DeploymentSpecFieldFsgid                         = "fsgid"
@@ -36,6 +37,7 @@ type DeploymentSpec struct {
 	ActiveDeadlineSeconds         *int64                 `json:"activeDeadlineSeconds,omitempty" yaml:"activeDeadlineSeconds,omitempty"`
 	AutomountServiceAccountToken  *bool                  `json:"automountServiceAccountToken,omitempty" yaml:"automountServiceAccountToken,omitempty"`
 	Containers                    []Container            `json:"containers,omitempty" yaml:"containers,omitempty"`
+	DNSConfig                     *PodDNSConfig          `json:"dnsConfig,omitempty" yaml:"dnsConfig,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	DeploymentConfig              *DeploymentConfig      `json:"deploymentConfig,omitempty" yaml:"deploymentConfig,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`

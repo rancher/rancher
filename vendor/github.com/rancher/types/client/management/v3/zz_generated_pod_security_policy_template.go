@@ -8,6 +8,7 @@ const (
 	PodSecurityPolicyTemplateType                                 = "podSecurityPolicyTemplate"
 	PodSecurityPolicyTemplateFieldAllowPrivilegeEscalation        = "allowPrivilegeEscalation"
 	PodSecurityPolicyTemplateFieldAllowedCapabilities             = "allowedCapabilities"
+	PodSecurityPolicyTemplateFieldAllowedFlexVolumes              = "allowedFlexVolumes"
 	PodSecurityPolicyTemplateFieldAllowedHostPaths                = "allowedHostPaths"
 	PodSecurityPolicyTemplateFieldAnnotations                     = "annotations"
 	PodSecurityPolicyTemplateFieldCreated                         = "created"
@@ -38,6 +39,7 @@ type PodSecurityPolicyTemplate struct {
 	types.Resource
 	AllowPrivilegeEscalation        *bool                              `json:"allowPrivilegeEscalation,omitempty" yaml:"allowPrivilegeEscalation,omitempty"`
 	AllowedCapabilities             []string                           `json:"allowedCapabilities,omitempty" yaml:"allowedCapabilities,omitempty"`
+	AllowedFlexVolumes              []AllowedFlexVolume                `json:"allowedFlexVolumes,omitempty" yaml:"allowedFlexVolumes,omitempty"`
 	AllowedHostPaths                []AllowedHostPath                  `json:"allowedHostPaths,omitempty" yaml:"allowedHostPaths,omitempty"`
 	Annotations                     map[string]string                  `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Created                         string                             `json:"created,omitempty" yaml:"created,omitempty"`

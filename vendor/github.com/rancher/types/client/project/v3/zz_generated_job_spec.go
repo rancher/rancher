@@ -5,6 +5,7 @@ const (
 	JobSpecFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	JobSpecFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
 	JobSpecFieldContainers                    = "containers"
+	JobSpecFieldDNSConfig                     = "dnsConfig"
 	JobSpecFieldDNSPolicy                     = "dnsPolicy"
 	JobSpecFieldFsgid                         = "fsgid"
 	JobSpecFieldGids                          = "gids"
@@ -35,6 +36,7 @@ type JobSpec struct {
 	ActiveDeadlineSeconds         *int64                 `json:"activeDeadlineSeconds,omitempty" yaml:"activeDeadlineSeconds,omitempty"`
 	AutomountServiceAccountToken  *bool                  `json:"automountServiceAccountToken,omitempty" yaml:"automountServiceAccountToken,omitempty"`
 	Containers                    []Container            `json:"containers,omitempty" yaml:"containers,omitempty"`
+	DNSConfig                     *PodDNSConfig          `json:"dnsConfig,omitempty" yaml:"dnsConfig,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty" yaml:"gids,omitempty"`

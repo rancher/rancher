@@ -12,6 +12,7 @@ const (
 	DeploymentFieldContainers                    = "containers"
 	DeploymentFieldCreated                       = "created"
 	DeploymentFieldCreatorID                     = "creatorId"
+	DeploymentFieldDNSConfig                     = "dnsConfig"
 	DeploymentFieldDNSPolicy                     = "dnsPolicy"
 	DeploymentFieldDeploymentConfig              = "deploymentConfig"
 	DeploymentFieldDeploymentStatus              = "deploymentStatus"
@@ -60,6 +61,7 @@ type Deployment struct {
 	Containers                    []Container            `json:"containers,omitempty" yaml:"containers,omitempty"`
 	Created                       string                 `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                     string                 `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DNSConfig                     *PodDNSConfig          `json:"dnsConfig,omitempty" yaml:"dnsConfig,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	DeploymentConfig              *DeploymentConfig      `json:"deploymentConfig,omitempty" yaml:"deploymentConfig,omitempty"`
 	DeploymentStatus              *DeploymentStatus      `json:"deploymentStatus,omitempty" yaml:"deploymentStatus,omitempty"`

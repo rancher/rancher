@@ -28,6 +28,7 @@ const (
 	ContainerFieldTerminationMessagePath   = "terminationMessagePath"
 	ContainerFieldTerminationMessagePolicy = "terminationMessagePolicy"
 	ContainerFieldUid                      = "uid"
+	ContainerFieldVolumeDevices            = "volumeDevices"
 	ContainerFieldVolumeMounts             = "volumeMounts"
 	ContainerFieldWorkingDir               = "workingDir"
 )
@@ -59,6 +60,7 @@ type Container struct {
 	TerminationMessagePath   string            `json:"terminationMessagePath,omitempty" yaml:"terminationMessagePath,omitempty"`
 	TerminationMessagePolicy string            `json:"terminationMessagePolicy,omitempty" yaml:"terminationMessagePolicy,omitempty"`
 	Uid                      *int64            `json:"uid,omitempty" yaml:"uid,omitempty"`
+	VolumeDevices            []VolumeDevice    `json:"volumeDevices,omitempty" yaml:"volumeDevices,omitempty"`
 	VolumeMounts             []VolumeMount     `json:"volumeMounts,omitempty" yaml:"volumeMounts,omitempty"`
 	WorkingDir               string            `json:"workingDir,omitempty" yaml:"workingDir,omitempty"`
 }

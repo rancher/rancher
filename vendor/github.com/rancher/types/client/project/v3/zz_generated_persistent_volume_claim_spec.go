@@ -7,6 +7,7 @@ const (
 	PersistentVolumeClaimSpecFieldSelector       = "selector"
 	PersistentVolumeClaimSpecFieldStorageClassId = "storageClassId"
 	PersistentVolumeClaimSpecFieldVolumeId       = "volumeId"
+	PersistentVolumeClaimSpecFieldVolumeMode     = "volumeMode"
 )
 
 type PersistentVolumeClaimSpec struct {
@@ -15,4 +16,5 @@ type PersistentVolumeClaimSpec struct {
 	Selector       *LabelSelector        `json:"selector,omitempty" yaml:"selector,omitempty"`
 	StorageClassId string                `json:"storageClassId,omitempty" yaml:"storageClassId,omitempty"`
 	VolumeId       string                `json:"volumeId,omitempty" yaml:"volumeId,omitempty"`
+	VolumeMode     string                `json:"volumeMode,omitempty" yaml:"volumeMode,omitempty"`
 }

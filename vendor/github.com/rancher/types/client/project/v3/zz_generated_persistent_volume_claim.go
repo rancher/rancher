@@ -25,6 +25,7 @@ const (
 	PersistentVolumeClaimFieldTransitioningMessage = "transitioningMessage"
 	PersistentVolumeClaimFieldUuid                 = "uuid"
 	PersistentVolumeClaimFieldVolumeId             = "volumeId"
+	PersistentVolumeClaimFieldVolumeMode           = "volumeMode"
 )
 
 type PersistentVolumeClaim struct {
@@ -48,6 +49,7 @@ type PersistentVolumeClaim struct {
 	TransitioningMessage string                       `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	Uuid                 string                       `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	VolumeId             string                       `json:"volumeId,omitempty" yaml:"volumeId,omitempty"`
+	VolumeMode           string                       `json:"volumeMode,omitempty" yaml:"volumeMode,omitempty"`
 }
 type PersistentVolumeClaimCollection struct {
 	types.Collection

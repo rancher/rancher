@@ -25,17 +25,18 @@ import (
 	volumeapi "github.com/libopenstorage/openstorage/volume"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
 const (
-	osdMgmtPort      = "9001"
-	osdDriverVersion = "v1"
-	pxdDriverName    = "pxd"
-	pvcClaimLabel    = "pvc"
-	pxServiceName    = "portworx-service"
-	pxDriverName     = "pxd-sched"
+	osdMgmtPort       = "9001"
+	osdDriverVersion  = "v1"
+	pxdDriverName     = "pxd"
+	pvcClaimLabel     = "pvc"
+	pvcNamespaceLabel = "namespace"
+	pxServiceName     = "portworx-service"
+	pxDriverName      = "pxd-sched"
 )
 
 type PortworxVolumeUtil struct {
@@ -80,9 +81,20 @@ func (util *PortworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (stri
 
 	// Add claim Name as a part of Portworx Volume Labels
 	locator.VolumeLabels[pvcClaimLabel] = p.options.PVC.Name
+	locator.VolumeLabels[pvcNamespaceLabel] = p.options.PVC.Namespace
+
+	for k, v := range p.options.PVC.Annotations {
+		if _, present := spec.VolumeLabels[k]; present {
+			glog.Warningf("not saving annotation: %s=%s in spec labels due to an existing key", k, v)
+			continue
+		}
+		spec.VolumeLabels[k] = v
+	}
+
 	volumeID, err := driver.Create(locator, source, spec)
 	if err != nil {
 		glog.Errorf("Error creating Portworx Volume : %v", err)
+		return "", 0, nil, err
 	}
 
 	glog.Infof("Successfully created Portworx volume for PVC: %v", p.options.PVC.Name)

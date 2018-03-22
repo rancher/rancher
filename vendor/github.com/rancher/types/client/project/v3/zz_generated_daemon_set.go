@@ -12,6 +12,7 @@ const (
 	DaemonSetFieldContainers                    = "containers"
 	DaemonSetFieldCreated                       = "created"
 	DaemonSetFieldCreatorID                     = "creatorId"
+	DaemonSetFieldDNSConfig                     = "dnsConfig"
 	DaemonSetFieldDNSPolicy                     = "dnsPolicy"
 	DaemonSetFieldDaemonSetConfig               = "daemonSetConfig"
 	DaemonSetFieldDaemonSetStatus               = "daemonSetStatus"
@@ -59,6 +60,7 @@ type DaemonSet struct {
 	Containers                    []Container            `json:"containers,omitempty" yaml:"containers,omitempty"`
 	Created                       string                 `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                     string                 `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DNSConfig                     *PodDNSConfig          `json:"dnsConfig,omitempty" yaml:"dnsConfig,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	DaemonSetConfig               *DaemonSetConfig       `json:"daemonSetConfig,omitempty" yaml:"daemonSetConfig,omitempty"`
 	DaemonSetStatus               *DaemonSetStatus       `json:"daemonSetStatus,omitempty" yaml:"daemonSetStatus,omitempty"`

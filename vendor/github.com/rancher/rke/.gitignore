@@ -5,3 +5,7 @@
 *.swp
 /.trash-cache
 kube_config*
+/.kube_config*
+/rke
+/admin.config
+/trash.lock

@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"fmt"
-	"strings"
 
 	"context"
 
@@ -32,10 +31,6 @@ func (c *Cluster) TunnelHosts(ctx context.Context, local bool) error {
 	uniqueHosts := hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts)
 	for i := range uniqueHosts {
 		if err := uniqueHosts[i].TunnelUp(ctx, c.DockerDialerFactory); err != nil {
-			// Unsupported Docker version is NOT a connectivity problem that we can't recover! So we bail out on it
-			if strings.Contains(err.Error(), "Unsupported Docker version found") {
-				return err
-			}
 			log.Warnf(ctx, "Failed to set up SSH tunneling for host [%s]: %v", uniqueHosts[i].Address, err)
 			c.InactiveHosts = append(c.InactiveHosts, uniqueHosts[i])
 		}

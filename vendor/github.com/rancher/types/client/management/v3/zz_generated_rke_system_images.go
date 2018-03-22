@@ -12,9 +12,13 @@ const (
 	RKESystemImagesFieldCanalNode                 = "canalNode"
 	RKESystemImagesFieldCertDownloader            = "certDownloader"
 	RKESystemImagesFieldDNSmasq                   = "dnsmasq"
+	RKESystemImagesFieldDashboard                 = "dashboard"
 	RKESystemImagesFieldEtcd                      = "etcd"
 	RKESystemImagesFieldFlannel                   = "flannel"
 	RKESystemImagesFieldFlannelCNI                = "flannelCni"
+	RKESystemImagesFieldGrafana                   = "grafana"
+	RKESystemImagesFieldHeapster                  = "heapster"
+	RKESystemImagesFieldInfluxdb                  = "influxdb"
 	RKESystemImagesFieldIngress                   = "ingress"
 	RKESystemImagesFieldIngressBackend            = "ingressBackend"
 	RKESystemImagesFieldKubeDNS                   = "kubedns"
@@ -24,6 +28,7 @@ const (
 	RKESystemImagesFieldKubernetesServicesSidecar = "kubernetesServicesSidecar"
 	RKESystemImagesFieldNginxProxy                = "nginxProxy"
 	RKESystemImagesFieldPodInfraContainer         = "podInfraContainer"
+	RKESystemImagesFieldTiller                    = "tiller"
 	RKESystemImagesFieldWeaveCNI                  = "weaveCni"
 	RKESystemImagesFieldWeaveNode                 = "weaveNode"
 )
@@ -39,9 +44,13 @@ type RKESystemImages struct {
 	CanalNode                 string `json:"canalNode,omitempty" yaml:"canalNode,omitempty"`
 	CertDownloader            string `json:"certDownloader,omitempty" yaml:"certDownloader,omitempty"`
 	DNSmasq                   string `json:"dnsmasq,omitempty" yaml:"dnsmasq,omitempty"`
+	Dashboard                 string `json:"dashboard,omitempty" yaml:"dashboard,omitempty"`
 	Etcd                      string `json:"etcd,omitempty" yaml:"etcd,omitempty"`
 	Flannel                   string `json:"flannel,omitempty" yaml:"flannel,omitempty"`
 	FlannelCNI                string `json:"flannelCni,omitempty" yaml:"flannelCni,omitempty"`
+	Grafana                   string `json:"grafana,omitempty" yaml:"grafana,omitempty"`
+	Heapster                  string `json:"heapster,omitempty" yaml:"heapster,omitempty"`
+	Influxdb                  string `json:"influxdb,omitempty" yaml:"influxdb,omitempty"`
 	Ingress                   string `json:"ingress,omitempty" yaml:"ingress,omitempty"`
 	IngressBackend            string `json:"ingressBackend,omitempty" yaml:"ingressBackend,omitempty"`
 	KubeDNS                   string `json:"kubedns,omitempty" yaml:"kubedns,omitempty"`
@@ -51,6 +60,7 @@ type RKESystemImages struct {
 	KubernetesServicesSidecar string `json:"kubernetesServicesSidecar,omitempty" yaml:"kubernetesServicesSidecar,omitempty"`
 	NginxProxy                string `json:"nginxProxy,omitempty" yaml:"nginxProxy,omitempty"`
 	PodInfraContainer         string `json:"podInfraContainer,omitempty" yaml:"podInfraContainer,omitempty"`
+	Tiller                    string `json:"tiller,omitempty" yaml:"tiller,omitempty"`
 	WeaveCNI                  string `json:"weaveCni,omitempty" yaml:"weaveCni,omitempty"`
 	WeaveNode                 string `json:"weaveNode,omitempty" yaml:"weaveNode,omitempty"`
 }

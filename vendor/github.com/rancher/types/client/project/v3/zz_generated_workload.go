@@ -14,6 +14,7 @@ const (
 	WorkloadFieldCreatorID                     = "creatorId"
 	WorkloadFieldCronJobConfig                 = "cronJobConfig"
 	WorkloadFieldCronJobStatus                 = "cronJobStatus"
+	WorkloadFieldDNSConfig                     = "dnsConfig"
 	WorkloadFieldDNSPolicy                     = "dnsPolicy"
 	WorkloadFieldDaemonSetConfig               = "daemonSetConfig"
 	WorkloadFieldDaemonSetStatus               = "daemonSetStatus"
@@ -74,6 +75,7 @@ type Workload struct {
 	CreatorID                     string                       `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	CronJobConfig                 *CronJobConfig               `json:"cronJobConfig,omitempty" yaml:"cronJobConfig,omitempty"`
 	CronJobStatus                 *CronJobStatus               `json:"cronJobStatus,omitempty" yaml:"cronJobStatus,omitempty"`
+	DNSConfig                     *PodDNSConfig                `json:"dnsConfig,omitempty" yaml:"dnsConfig,omitempty"`
 	DNSPolicy                     string                       `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	DaemonSetConfig               *DaemonSetConfig             `json:"daemonSetConfig,omitempty" yaml:"daemonSetConfig,omitempty"`
 	DaemonSetStatus               *DaemonSetStatus             `json:"daemonSetStatus,omitempty" yaml:"daemonSetStatus,omitempty"`

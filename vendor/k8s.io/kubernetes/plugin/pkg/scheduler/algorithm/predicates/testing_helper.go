@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 )
 
 type FakePersistentVolumeClaimInfo []v1.PersistentVolumeClaim
@@ -60,4 +61,15 @@ func (pvs FakePersistentVolumeInfo) GetPersistentVolumeInfo(pvID string) (*v1.Pe
 		}
 	}
 	return nil, fmt.Errorf("Unable to find persistent volume: %s", pvID)
+}
+
+type FakeStorageClassInfo []storagev1.StorageClass
+
+func (classes FakeStorageClassInfo) GetStorageClassInfo(name string) (*storagev1.StorageClass, error) {
+	for _, sc := range classes {
+		if sc.Name == name {
+			return &sc, nil
+		}
+	}
+	return nil, fmt.Errorf("Unable to find storage class: %s", name)
 }
