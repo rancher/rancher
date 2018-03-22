@@ -1,3 +1,6 @@
+FROM rancher/k8s:v1.8.9-rancher1-1 as k8s
+FROM rancher/rke-service-sidekick:v0.1.0 as sidekick
+
 FROM ubuntu:17.10
 RUN apt-get update && apt-get install -y git curl ca-certificates unzip xz-utils && \
     useradd rancher && \
@@ -12,6 +15,10 @@ RUN mkdir /root/.kube && \
     ln -s /var/lib/rancher/kube_config_cluster.yml /root/.kube/config
 WORKDIR /var/lib/rancher
 
+RUN mkdir /opt/rke
+COPY --from=sidekick /opt/rke /opt/rke
+COPY --from=k8s /usr/bin/kubectl /usr/bin/kubelet /usr/bin/kube-proxy /usr/bin/
+
 ENV CATTLE_UI_PATH /usr/share/rancher/ui
 ENV CATTLE_UI_VERSION 2.0.25
 RUN mkdir -p /usr/share/rancher/ui && \
@@ -23,7 +30,7 @@ ARG VERSION=dev
 ENV CATTLE_SERVER_VERSION ${VERSION}
 COPY rancher /usr/bin/
 
-ENV CATTLE_AGENT_IMAGE rancher/agent:v2.0.3
+ENV CATTLE_AGENT_IMAGE rancher/agent:${VERSION}
 ENV CATTLE_SERVER_IMAGE rancher/server
 VOLUME /var/lib/rancher
 ENTRYPOINT ["rancher", "--http-listen-port=80", "--https-listen-port=443"]

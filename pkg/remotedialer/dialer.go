@@ -7,6 +7,11 @@ import (
 	"github.com/rancher/types/config/dialer"
 )
 
+func (s *Server) HasSession(clientKey string) bool {
+	_, err := s.sessions.getByClient(clientKey)
+	return err == nil
+}
+
 func (s *Server) Dial(clientKey string, deadline time.Duration, proto, address string) (net.Conn, error) {
 	session, err := s.sessions.getByClient(clientKey)
 	if err != nil {

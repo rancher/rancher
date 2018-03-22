@@ -49,23 +49,33 @@ type Factory struct {
 }
 
 func (f *Factory) ClusterDialer(clusterName string) (dialer.Dialer, error) {
+	return func(network, address string) (net.Conn, error) {
+		d, err := f.clusterDialer(clusterName)
+		if err != nil {
+			return nil, err
+		}
+		return d(network, address)
+	}, nil
+}
+
+func (f *Factory) clusterDialer(clusterName string) (dialer.Dialer, error) {
 	cluster, err := f.clusterLister.Get("", clusterName)
 	if err != nil {
 		return nil, err
 	}
 
-	if cluster.Status.Driver == v3.ClusterDriverImported && !cluster.Spec.Internal && (cluster.Spec.ImportedConfig == nil || cluster.Spec.ImportedConfig.KubeConfig == "") {
+	if f.TunnelServer.HasSession(cluster.Name) {
 		return f.TunnelServer.Dialer(cluster.Name, 15*time.Second), nil
-	} else if cluster.Status.Driver == v3.ClusterDriverRKE {
-		nodes, err := f.nodeLister.List(cluster.Name, labels.Everything())
-		if err != nil {
-			return nil, err
-		}
+	}
 
-		for _, node := range nodes {
-			if node.Spec.Imported && node.DeletionTimestamp == nil && v3.NodeConditionProvisioned.IsTrue(node) {
-				return f.NodeDialer(clusterName, node.Name)
-			}
+	nodes, err := f.nodeLister.List(cluster.Name, labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+
+	for _, node := range nodes {
+		if node.DeletionTimestamp == nil && v3.NodeConditionProvisioned.IsTrue(node) {
+			return f.NodeDialer(clusterName, node.Name)
 		}
 	}
 
@@ -78,7 +88,7 @@ func (f *Factory) DockerDialer(clusterName, machineName string) (dialer.Dialer, 
 		return nil, err
 	}
 
-	if machine.Spec.Imported {
+	if f.TunnelServer.HasSession(machine.Name) {
 		d := f.TunnelServer.Dialer(machine.Name, 15*time.Second)
 		return func(string, string) (net.Conn, error) {
 			return d("unix", "/var/run/docker.sock")
@@ -94,7 +104,16 @@ func (f *Factory) DockerDialer(clusterName, machineName string) (dialer.Dialer, 
 	}
 
 	return nil, fmt.Errorf("can not build dailer to %s:%s", clusterName, machineName)
+}
 
+func (f *Factory) nodeDialer(clusterName, machineName string) (dialer.Dialer, error) {
+	return func(network, address string) (net.Conn, error) {
+		d, err := f.nodeDialer(clusterName, machineName)
+		if err != nil {
+			return nil, err
+		}
+		return d(network, address)
+	}, nil
 }
 
 func (f *Factory) NodeDialer(clusterName, machineName string) (dialer.Dialer, error) {
@@ -103,7 +122,7 @@ func (f *Factory) NodeDialer(clusterName, machineName string) (dialer.Dialer, er
 		return nil, err
 	}
 
-	if machine.Spec.Imported {
+	if f.TunnelServer.HasSession(machine.Name) {
 		d := f.TunnelServer.Dialer(machine.Name, 15*time.Second)
 		return dialer.Dialer(d), nil
 	}

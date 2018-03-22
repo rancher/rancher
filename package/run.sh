@@ -6,6 +6,11 @@ error()
     echo "ERROR:" "$@" 1>&2
 }
 
+warn()
+{
+    echo "WARN :" "$@" 1>&2
+}
+
 AGENT_IMAGE=${AGENT_IMAGE:-ubuntu:14.04}
 
 export CATTLE_ADDRESS
@@ -79,11 +84,11 @@ if [ -n "$CATTLE_CA_CHECKSUM" ]; then
     cat $temp
     if [ "$(sha256sum $temp | awk '{print $1}')" != $CATTLE_CA_CHECKSUM ]; then
         rm -f $temp
-        error $CATTLE_SERVER/v3/settings/cacerts does not match $CATTLE_CA_CHECKSUM
-        exit 1
+        warn $CATTLE_SERVER/v3/settings/cacerts does not match $CATTLE_CA_CHECKSUM
+    else
+        mkdir -p /etc/kubernetes/ssl/certs
+        mv $temp /etc/kubernetes/ssl/certs/serverca
     fi
-    mkdir -p /etc/kubernetes/ssl/certs
-    mv $temp /etc/kubernetes/ssl/certs/serverca
 fi
 
 if [ -z "$CATTLE_SERVER" ]; then
@@ -91,7 +96,7 @@ if [ -z "$CATTLE_SERVER" ]; then
     exit 1
 fi
 
-if [ "$CATTLE_CLUSTER" != "true" ]; then
+if [ "$CATTLE_K8S_MANAGED" != "true" ]; then
     if [ -z "$CATTLE_TOKEN" ]; then
         error -- --token is a required option
         exit 1

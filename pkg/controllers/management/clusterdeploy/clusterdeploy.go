@@ -6,13 +6,18 @@ import (
 
 	"reflect"
 
+	"bytes"
+
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/kubectl"
+	"github.com/rancher/rancher/pkg/randomtoken"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/systemtemplate"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
+	errors2 "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -26,6 +31,7 @@ func Register(management *config.ManagementContext, clusterManager *clustermanag
 	c := &clusterDeploy{
 		userManager:    management.UserManager,
 		crtbs:          management.Management.ClusterRoleTemplateBindings(""),
+		crts:           management.Management.ClusterRegistrationTokens(""),
 		clusters:       management.Management.Clusters(""),
 		clusterManager: clusterManager,
 	}
@@ -37,6 +43,7 @@ type clusterDeploy struct {
 	userManager    user.Manager
 	crtbs          v3.ClusterRoleTemplateBindingInterface
 	clusters       v3.ClusterInterface
+	crts           v3.ClusterRegistrationTokenInterface
 	clusterManager *clustermanager.Manager
 }
 
@@ -75,8 +82,7 @@ func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
 		return err
 	}
 
-	//return cd.deployAgent(cluster)
-	return nil
+	return cd.deployAgent(cluster)
 }
 
 func (cd *clusterDeploy) createSystemAccount(cluster *v3.Cluster) error {
@@ -123,12 +129,12 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 		return err
 	}
 
-	yaml, err := cd.getYAML(cluster, desired)
-	if err != nil {
-		return err
-	}
-
 	_, err = v3.ClusterConditionAgentDeployed.Do(cluster, func() (runtime.Object, error) {
+		yaml, err := cd.getYAML(cluster, desired)
+		if err != nil {
+			return cluster, err
+		}
+
 		output, err := kubectl.Apply(yaml, kubeConfig)
 		if err != nil {
 			return cluster, types.NewErrors(err, errors.New(string(output)))
@@ -162,5 +168,52 @@ func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Confi
 }
 
 func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage string) ([]byte, error) {
-	return nil, nil
+	token, err := cd.getClusterToken(cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	url := settings.ServerURL.Get()
+	if url == "" {
+		return nil, fmt.Errorf("waiting for server-url setting to be set")
+	}
+
+	buf := &bytes.Buffer{}
+	err = systemtemplate.SystemTemplate(buf, agentImage, token, url)
+
+	return buf.Bytes(), err
+}
+
+func (cd *clusterDeploy) getClusterToken(cluster *v3.Cluster) (string, error) {
+	token := ""
+
+	crt, err := cd.crts.GetNamespaced(cluster.Name, "system", v1.GetOptions{})
+	if errors2.IsNotFound(err) {
+		token, err = randomtoken.Generate()
+		if err != nil {
+			return "", err
+		}
+		crt = &v3.ClusterRegistrationToken{
+			ObjectMeta: v1.ObjectMeta{
+				Name:      "system",
+				Namespace: cluster.Name,
+			},
+			Spec: v3.ClusterRegistrationTokenSpec{
+				ClusterName: cluster.Name,
+			},
+			Status: v3.ClusterRegistrationTokenStatus{
+				Token: token,
+			},
+		}
+
+		if _, err := cd.crts.Create(crt); err != nil {
+			return "", err
+		}
+	} else if err != nil {
+		return "", err
+	} else {
+		token = crt.Status.Token
+	}
+
+	return token, nil
 }

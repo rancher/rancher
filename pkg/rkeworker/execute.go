@@ -73,9 +73,10 @@ func startHTTPServer(address, serverURL string) error {
 
 	host, _, err := net.SplitHostPort(address)
 	if err == nil {
-		err := exec.Command("ip", "addr", "add", fmt.Sprintf("%s/32", host), "dev", "lo").Run()
-		if err != nil {
-			logrus.Warnf("Failed to assign IP %s: %v", host, err)
+		exec.Command("ip", "addr", "add", fmt.Sprintf("%s/32", host), "dev", "lo").Run()
+		output, err := exec.Command("ip", "addr", "show", "dev", "lo").CombinedOutput()
+		if err == nil {
+			fmt.Println(string(output))
 		}
 	}
 

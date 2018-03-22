@@ -5,6 +5,8 @@ import (
 
 	"context"
 
+	"fmt"
+
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/services"
@@ -41,7 +43,7 @@ func LocalConfig() (*v3.RancherKubernetesEngineConfig, error) {
 	rkeConfig.Services.KubeAPI.ExtraArgs["advertise-address"] = "10.233.0.1"
 	rkeConfig.Services.KubeAPI.ExtraArgs["bind-address"] = "127.0.0.1"
 	rkeConfig.SystemImages = v3.K8sVersionToRKESystemImages[v3.K8sV18]
-	rkeConfig.SystemImages.Kubernetes = settings.AgentImage.Get()
+	rkeConfig.SystemImages.Kubernetes = fmt.Sprintf("%s:%s", settings.ServerImage.Get(), settings.ServerVersion.Get())
 	rkeConfig.IgnoreDockerVersion = true
 	rkeConfig.Nodes = []v3.RKEConfigNode{
 		{
