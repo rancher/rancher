@@ -185,16 +185,21 @@ func nodeTypes(schemas *types.Schemas) *types.Schemas {
 			&m.Move{From: "nodeAnnotations", To: "annotations"},
 			&m.Drop{Field: "desiredNodeLabels"},
 			&m.Drop{Field: "desiredNodeAnnotations"},
+			&m.AnnotationField{Field: "publicEndpoints", List: true},
 			m.DisplayName{}).
 		AddMapperForType(&Version, v3.NodeDriver{}, m.DisplayName{}).
 		AddMapperForType(&Version, v3.NodeTemplate{}, m.DisplayName{}).
+		MustImport(&Version, v3.PublicEndpoint{}).
 		MustImport(&Version, v3.NodePool{}).
 		MustImportAndCustomize(&Version, v3.Node{}, func(schema *types.Schema) {
 			labelField := schema.ResourceFields["labels"]
 			labelField.Create = true
 			labelField.Update = true
 			schema.ResourceFields["labels"] = labelField
-		}).
+
+		}, struct {
+			PublicEndpoints string `json:"publicEndpoints" norman:"type=array[publicEndpoint],nocreate,noupdate"`
+		}{}).
 		MustImportAndCustomize(&Version, v3.NodeDriver{}, func(schema *types.Schema) {
 			schema.ResourceActions["activate"] = types.Action{
 				Output: "nodeDriver",

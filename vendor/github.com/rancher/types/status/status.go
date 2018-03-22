@@ -28,7 +28,7 @@ type condition struct {
 var transitioningMap = map[string]string{
 	"Active":                      "activating",
 	"AddonDeploy":                 "deploying",
-	"AgentInstalled":              "installing",
+	"AgentDeployed":               "installing",
 	"Available":                   "activating",
 	"BackingNamespaceCreated":     "configuring",
 	"ConfigOK":                    "configuring",
