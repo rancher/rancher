@@ -385,7 +385,10 @@ func (m *manager) grantManagementPlanePrivileges(roleTemplateName string, resour
 	roleBindings := m.mgmt.RBAC.RoleBindings(namespace)
 	for _, role := range roles {
 		for _, resource := range resources {
-			verbs := m.checkForManagementPlaneRules(role, resource)
+			verbs, err := m.checkForManagementPlaneRules(role, resource)
+			if err != nil {
+				return err
+			}
 			if len(verbs) > 0 {
 				if err := m.reconcileManagementPlaneRole(namespace, resource, role, verbs); err != nil {
 					return err
@@ -443,7 +446,10 @@ func (m *manager) grantManagementClusterScopedPrivilegesInProjectNamespace(roleT
 	roleBindings := m.mgmt.RBAC.RoleBindings(projectNamespace)
 	for _, role := range roles {
 		for _, resource := range resources {
-			verbs := m.checkForManagementPlaneRules(role, resource)
+			verbs, err := m.checkForManagementPlaneRules(role, resource)
+			if err != nil {
+				return err
+			}
 			if len(verbs) > 0 {
 				if err := m.reconcileManagementPlaneRole(projectNamespace, resource, role, verbs); err != nil {
 					return err
@@ -534,9 +540,18 @@ func (m *manager) reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs m
 }
 
 // If the roleTemplate has rules granting access to a managment plane resource, return the verbs for those rules
-func (m *manager) checkForManagementPlaneRules(role *v3.RoleTemplate, managmentPlaneResource string) map[string]bool {
+func (m *manager) checkForManagementPlaneRules(role *v3.RoleTemplate, managmentPlaneResource string) (map[string]bool, error) {
 	var rules []v1.PolicyRule
-	if !role.External {
+	if role.External {
+		externalRole, err := m.crLister.Get("", role.Name)
+		if err != nil && !clientbase.IsNotFound(err) {
+			// dont error if it doesnt exist
+			return nil, err
+		}
+		if externalRole != nil {
+			rules = externalRole.Rules
+		}
+	} else {
 		rules = role.Rules
 	}
 
@@ -549,7 +564,7 @@ func (m *manager) checkForManagementPlaneRules(role *v3.RoleTemplate, managmentP
 		}
 	}
 
-	return verbs
+	return verbs, nil
 }
 
 func (m *manager) reconcileManagementPlaneRole(namespace, resource string, rt *v3.RoleTemplate, newVerbs map[string]bool) error {
