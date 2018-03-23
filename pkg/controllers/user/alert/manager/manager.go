@@ -15,8 +15,8 @@ import (
 
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/config"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
+	"github.com/rancher/types/config/dialer"
+	"github.com/sirupsen/logrus"
 )
 
 type AlertState string
@@ -81,52 +81,44 @@ const (
 )
 
 type Manager struct {
-	nodeLister v1.NodeLister
-	svcLister  v1.ServiceLister
-	podLister  v1.PodLister
-	IsDeploy   bool
+	svcLister   v1.ServiceLister
+	dialer      dialer.Factory
+	IsDeploy    bool
+	clusterName string
+	client      *http.Client
 }
 
 func NewManager(cluster *config.UserContext) *Manager {
+
+	dial, err := cluster.Management.Dialer.ClusterDialer(cluster.ClusterName)
+	if err != nil {
+		logrus.Warnf("Failed to get cluster dialer: %v", err)
+	}
+	client := &http.Client{
+		Transport: &http.Transport{
+			Dial: dial,
+		},
+	}
+
 	return &Manager{
-		nodeLister: cluster.Core.Nodes("").Controller().Lister(),
-		svcLister:  cluster.Core.Services("").Controller().Lister(),
-		podLister:  cluster.Core.Pods("").Controller().Lister(),
-		IsDeploy:   false,
+		svcLister:   cluster.Core.Services("").Controller().Lister(),
+		client:      client,
+		IsDeploy:    false,
+		clusterName: cluster.ClusterName,
 	}
 }
 
-//TODO: optimized this
 func (m *Manager) getAlertManagerEndpoint() (string, error) {
 
-	selector := labels.NewSelector()
-	r, _ := labels.NewRequirement("app", selection.Equals, []string{"alertmanager"})
-	selector = selector.Add(*r)
-	pods, err := m.podLister.List("cattle-alerting", selector)
-	if err != nil {
-		return "", err
-	}
-
-	if len(pods) == 0 {
-		return "", fmt.Errorf("the alert manager pod does not exist yet")
-	}
-
-	node, err := m.nodeLister.Get("", pods[0].Spec.NodeName)
-	if err != nil {
-		return "", err
-	}
-
-	//TODO: check correct way to make call to alertManager
-	if len(node.Status.Addresses) == 0 {
-		return "", err
-	}
-	ip := node.Status.Addresses[0].Address
 	svc, err := m.svcLister.Get("cattle-alerting", "alertmanager-svc")
 	if err != nil {
 		return "", fmt.Errorf("Failed to get service for alertmanager")
 	}
-	port := svc.Spec.Ports[0].NodePort
+
+	ip := svc.Spec.ClusterIP
+	port := svc.Spec.Ports[0].Port
 	url := "http://" + ip + ":" + strconv.Itoa(int(port))
+
 	return url, nil
 }
 
@@ -186,11 +178,8 @@ func (m *Manager) GetAlertList() ([]*APIAlert, error) {
 	if err != nil {
 		return nil, err
 	}
-	//q := req.URL.Query()
-	//q.Add("filter", fmt.Sprintf("{%s}", filter))
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := m.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +242,12 @@ func (m *Manager) AddSilenceRule(alertID string) error {
 		return err
 	}
 
-	resp, err := http.Post(url+"/api/v1/silences", "application/json", bytes.NewBuffer(silenceData))
+	req, err := http.NewRequest(http.MethodPost, url+"/api/v1/silences", bytes.NewBuffer(silenceData))
+	if err != nil {
+		return err
+	}
+
+	resp, err := m.client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -285,8 +279,7 @@ func (m *Manager) RemoveSilenceRule(alertID string) error {
 	q := req.URL.Query()
 	q.Add("filter", fmt.Sprintf("{%s}", "alert_id="+alertID))
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := m.client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -312,7 +305,7 @@ func (m *Manager) RemoveSilenceRule(alertID string) error {
 				return err
 			}
 
-			delResp, err := client.Do(delReq)
+			delResp, err := m.client.Do(delReq)
 			if err != nil {
 				return err
 			}
@@ -327,6 +320,7 @@ func (m *Manager) RemoveSilenceRule(alertID string) error {
 
 	return nil
 }
+
 func (m *Manager) SendAlert(alertID, text, title, severity string) error {
 	url, err := m.getAlertManagerEndpoint()
 	if err != nil {
@@ -348,7 +342,12 @@ func (m *Manager) SendAlert(alertID, text, title, severity string) error {
 		return err
 	}
 
-	resp, err := http.Post(url+"/api/alerts", "application/json", bytes.NewBuffer(alertData))
+	req, err := http.NewRequest(http.MethodPost, url+"/api/alerts", bytes.NewBuffer(alertData))
+	if err != nil {
+		return err
+	}
+
+	resp, err := m.client.Do(req)
 	if err != nil {
 		return err
 	}
