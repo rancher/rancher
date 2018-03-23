@@ -106,6 +106,12 @@ func (p *Provisioner) Updated(cluster *v3.Cluster) (*v3.Cluster, error) {
 	obj, err := v3.ClusterConditionUpdated.Do(cluster, func() (runtime.Object, error) {
 		return p.update(cluster, false)
 	})
+
+	changed, err := p.nodeChanged(obj.(*v3.Cluster))
+	if err == nil && changed {
+		v3.ClusterConditionUpdated.Unknown(obj)
+	}
+
 	return obj.(*v3.Cluster), err
 }
 
@@ -121,9 +127,8 @@ func (p *Provisioner) update(cluster *v3.Cluster, create bool) (*v3.Cluster, err
 
 func (p *Provisioner) machineChanged(key string, machine *v3.Node) error {
 	parts := strings.SplitN(key, "/", 2)
-	if machine == nil || machine.Status.NodeConfig != nil {
-		p.ClusterController.Enqueue("", parts[0])
-	}
+
+	p.ClusterController.Enqueue("", parts[0])
 
 	return nil
 }
@@ -427,6 +432,40 @@ func (p *Provisioner) getSpec(cluster *v3.Cluster) (*v3.ClusterSpec, error) {
 	}
 
 	return newSpec, nil
+}
+
+func (p *Provisioner) nodeChanged(cluster *v3.Cluster) (bool, error) {
+	driverName, err := p.validateDriver(cluster)
+	if err != nil {
+		return false, err
+	}
+
+	if driverName == v3.ClusterDriverRKE {
+		machines, err := p.NodeLister.List(cluster.Name, labels.Everything())
+		if err != nil {
+			return false, err
+		}
+
+		for _, machine := range machines {
+			if machine.DeletionTimestamp != nil {
+				return true, nil
+			}
+
+			if machine.Status.NodeConfig == nil {
+				return true, nil
+			}
+
+			if len(machine.Status.NodeConfig.Role) == 0 {
+				return true, nil
+			}
+
+			if !v3.NodeConditionProvisioned.IsTrue(machine) {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
 }
 
 func (p *Provisioner) reconcileRKENodes(clusterName string) ([]v3.RKEConfigNode, error) {
