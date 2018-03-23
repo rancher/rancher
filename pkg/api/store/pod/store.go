@@ -12,7 +12,7 @@ func New(store types.Store) types.Store {
 	}
 }
 
-func transformer(context *types.APIContext, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
+func transformer(context *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
 	if data == nil {
 		return data, nil
 	}

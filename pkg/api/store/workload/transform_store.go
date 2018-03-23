@@ -14,7 +14,7 @@ import (
 func New(store types.Store) types.Store {
 	return &transform.Store{
 		Store: store,
-		Transformer: func(apiContext *types.APIContext, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
+		Transformer: func(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
 			hide := true
 			if opt != nil && opt.Options["hidden"] == "true" {
 				hide = false
