@@ -12,7 +12,7 @@ type nsSyncer struct {
 
 // Sync invokes Policy Handler to program the native network policies
 func (nss *nsSyncer) Sync(key string, ns *corev1.Namespace) error {
-	if ns == nil {
+	if ns == nil || ns.DeletionTimestamp != nil {
 		return nil
 	}
 	logrus.Debugf("nss Sync: %+v", *ns)

@@ -35,7 +35,7 @@ type projectSyncer struct {
 // this pnp object is tied to the namespace of the project, it's deleted
 // automatically.
 func (ps *projectSyncer) Sync(key string, p *v3.Project) error {
-	if p == nil {
+	if p == nil || p.DeletionTimestamp != nil {
 		return nil
 	}
 
