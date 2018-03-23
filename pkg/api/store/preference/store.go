@@ -23,7 +23,7 @@ func NewStore(nsClient v1.NamespaceInterface, store types.Store) types.Store {
 		})
 }
 
-func transformer(apiContext *types.APIContext, data map[string]interface{}, opts *types.QueryOptions) (map[string]interface{}, error) {
+func transformer(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opts *types.QueryOptions) (map[string]interface{}, error) {
 	if data == nil {
 		return nil, nil
 	}

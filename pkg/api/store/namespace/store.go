@@ -9,7 +9,7 @@ import (
 func New(store types.Store) types.Store {
 	t := &transform.Store{
 		Store: store,
-		Transformer: func(apiContext *types.APIContext, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
+		Transformer: func(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
 			anns, _ := data["annotations"].(map[string]interface{})
 			if anns["management.cattle.io/system-namespace"] == "true" {
 				return nil, nil

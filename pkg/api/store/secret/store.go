@@ -32,7 +32,7 @@ func NewNamespacedSecretStore(clientGetter proxy.ClientGetter) *Store {
 				"v1",
 				"Secret",
 				"secrets"),
-			Transformer: func(apiContext *types.APIContext, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
+			Transformer: func(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
 				if data == nil {
 					return data, nil
 				}
