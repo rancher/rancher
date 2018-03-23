@@ -24,8 +24,8 @@ func addMachineDrivers(management *config.ManagementContext) error {
 		"e98f246f625ca46f5e037dc29bdf00fe", false, false, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver("packet", "https://github.com/packethost/docker-machine-driver-packet/releases/download/v0.1.5/docker-machine-driver-packet_linux-amd64.zip",
-		"8231136e899311d54eca0b560b1feb96", false, false, management); err != nil {
+	if err := addMachineDriver("packet", "https://github.com/packethost/docker-machine-driver-packet/releases/download/v0.1.4/docker-machine-driver-packet_linux-amd64.zip",
+		"2cd0b9614ab448b61b1bf73ef4738ab5", false, false, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver("rackspace", "local://", "", false, true, management); err != nil {
