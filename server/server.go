@@ -19,25 +19,12 @@ import (
 	"github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/rancher/server/capabilities"
 	"github.com/rancher/rancher/server/ui"
+	"github.com/rancher/rancher/server/whitelist"
 	managementSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/config/dialer"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
-)
-
-var (
-	whiteList = []string{
-		"*.amazonaws.com",
-		"*.amazonaws.com.cn",
-		"forums.rancher.com",
-		"api.exoscale.ch",
-		"api.ubiquityhosting.com",
-		"api.digitalocean.com",
-		"*.otc.t-systems.com",
-		"api.profitbricks.com",
-		"api.packet.net",
-	}
 )
 
 func Start(ctx context.Context, httpPort, httpsPort int, apiContext *config.ScaledContext, clusterManager *clustermanager.Manager) error {
@@ -132,7 +119,5 @@ func connectHandlers(dialer dialer.Factory) (http.Handler, http.Handler) {
 }
 
 func newProxy() http.Handler {
-	return httpproxy.NewProxy("/proxy/", func() []string {
-		return whiteList
-	})
+	return httpproxy.NewProxy("/proxy/", whitelist.Proxy.Get)
 }

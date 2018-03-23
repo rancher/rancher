@@ -30,6 +30,7 @@ var (
 	UIIndex                         = newSetting("ui-index", "https://releases.rancher.com/ui/latest2/index.html")
 	UIPath                          = newSetting("ui-path", "")
 	UIPL                            = newSetting("ui-pl", "rancher")
+	WhitelistDomain                 = newSetting("whitelist-domain", "forums.rancher.com")
 )
 
 type Provider interface {

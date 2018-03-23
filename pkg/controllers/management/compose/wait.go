@@ -10,9 +10,7 @@ import (
 
 var (
 	// WaitCondition is a set of function that can be customized to wait for a resource
-	WaitCondition = map[string]func(baseClient *clientbase.APIBaseClient, id, schemaType string) error{
-	//"cluster": WaitCluster,
-	}
+	WaitCondition = map[string]func(baseClient *clientbase.APIBaseClient, id, schemaType string) error{}
 )
 
 func WaitCluster(baseClient *clientbase.APIBaseClient, id, schemaType string) error {
