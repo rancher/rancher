@@ -12,6 +12,8 @@ import (
 
 	"fmt"
 
+	"reflect"
+
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/remotedialer"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -222,10 +224,14 @@ func (t *Authorizer) createNode(inNode *client.Node, cluster *v3.Cluster, req *h
 }
 
 func (t *Authorizer) updateNode(machine *v3.Node, inNode *client.Node, cluster *v3.Cluster) (*v3.Node, error) {
-	machine.Spec.Etcd = inNode.Etcd
-	machine.Spec.ControlPlane = inNode.ControlPlane
-	machine.Spec.Worker = inNode.Worker
-	return t.machines.Update(machine)
+	newMachine := machine.DeepCopy()
+	newMachine.Spec.Etcd = inNode.Etcd
+	newMachine.Spec.ControlPlane = inNode.ControlPlane
+	newMachine.Spec.Worker = inNode.Worker
+	if !reflect.DeepEqual(machine, newMachine) {
+		return t.machines.Update(newMachine)
+	}
+	return machine, nil
 }
 
 func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, req *http.Request) (*v3.Cluster, bool, error) {

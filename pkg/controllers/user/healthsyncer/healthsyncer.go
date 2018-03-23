@@ -5,6 +5,8 @@ import (
 
 	"context"
 
+	"reflect"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/rancher/pkg/ticker"
@@ -50,14 +52,11 @@ func (h *HealthSyncer) syncHealth(ctx context.Context, syncHealth time.Duration)
 }
 
 func (h *HealthSyncer) updateClusterHealth() error {
-	cluster, err := h.getCluster()
+	oldCluster, err := h.getCluster()
 	if err != nil {
 		return err
 	}
-	if cluster == nil {
-		logrus.Debugf("Skip updating cluster health, cluster [%s] deleted", h.clusterName)
-		return nil
-	}
+	cluster := oldCluster.DeepCopy()
 	if !v3.ClusterConditionProvisioned.IsTrue(cluster) {
 		logrus.Debugf("Skip updating cluster health - cluster [%s] not provisioned yet", h.clusterName)
 		return nil
@@ -81,9 +80,11 @@ func (h *HealthSyncer) updateClusterHealth() error {
 	v3.ClusterConditionWaiting.True(newObj)
 	v3.ClusterConditionWaiting.Message(newObj, "")
 
-	_, err = h.clusters.Update(newObj.(*v3.Cluster))
-	if err != nil {
-		return errors.Wrapf(err, "Failed to update cluster [%s]", cluster.Name)
+	if reflect.DeepEqual(oldCluster, cluster) {
+		_, err = h.clusters.Update(newObj.(*v3.Cluster))
+		if err != nil {
+			return errors.Wrapf(err, "Failed to update cluster [%s]", cluster.Name)
+		}
 	}
 
 	logrus.Debugf("Updated cluster health successfully [%s]", h.clusterName)
