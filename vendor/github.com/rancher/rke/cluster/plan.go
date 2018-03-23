@@ -77,23 +77,27 @@ func (c *Cluster) BuildKubeAPIProcess() v3.Process {
 	Command := []string{
 		"/opt/rke/entrypoint.sh",
 		"kube-apiserver",
-		"--insecure-bind-address=127.0.0.1",
-		"--bind-address=0.0.0.0",
-		"--insecure-port=0",
-		"--secure-port=6443",
-		"--cloud-provider=",
-		"--allow_privileged=true",
-		"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
-		"--service-cluster-ip-range=" + c.Services.KubeAPI.ServiceClusterIPRange,
-		"--admission-control=ServiceAccount,NamespaceLifecycle,LimitRanger,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
-		"--storage-backend=etcd3",
-		"--client-ca-file=" + pki.GetCertPath(pki.CACertName),
-		"--tls-cert-file=" + pki.GetCertPath(pki.KubeAPICertName),
-		"--tls-private-key-file=" + pki.GetKeyPath(pki.KubeAPICertName),
-		"--kubelet-client-certificate=" + pki.GetCertPath(pki.KubeAPICertName),
-		"--kubelet-client-key=" + pki.GetKeyPath(pki.KubeAPICertName),
-		"--service-account-key-file=" + pki.GetKeyPath(pki.KubeAPICertName),
 	}
+
+	CommandArgs := map[string]string{
+		"insecure-bind-address":           "127.0.0.1",
+		"bind-address":                    "0.0.0.0",
+		"insecure-port":                   "0",
+		"secure-port":                     "6443",
+		"cloud-provider":                  c.CloudProvider.Name,
+		"allow_privileged":                "true",
+		"kubelet-preferred-address-types": "InternalIP,ExternalIP,Hostname",
+		"service-cluster-ip-range":        c.Services.KubeAPI.ServiceClusterIPRange,
+		"admission-control":               "ServiceAccount,NamespaceLifecycle,LimitRanger,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
+		"storage-backend":                 "etcd3",
+		"client-ca-file":                  pki.GetCertPath(pki.CACertName),
+		"tls-cert-file":                   pki.GetCertPath(pki.KubeAPICertName),
+		"tls-private-key-file":            pki.GetKeyPath(pki.KubeAPICertName),
+		"kubelet-client-certificate":      pki.GetCertPath(pki.KubeAPICertName),
+		"kubelet-client-key":              pki.GetKeyPath(pki.KubeAPICertName),
+		"service-account-key-file":        pki.GetKeyPath(pki.KubeAPICertName),
+	}
+
 	args := []string{
 		"--etcd-cafile=" + etcdCAClientCert,
 		"--etcd-certfile=" + etcdClientCert,
@@ -103,10 +107,11 @@ func (c *Cluster) BuildKubeAPIProcess() v3.Process {
 	}
 
 	if c.Authorization.Mode == services.RBACAuthorizationMode {
-		args = append(args, "--authorization-mode=Node,RBAC")
+		CommandArgs["authorization-mode"] = "Node,RBAC"
 	}
 	if c.Services.KubeAPI.PodSecurityPolicy {
-		args = append(args, "--runtime-config=extensions/v1beta1/podsecuritypolicy=true", "--admission-control=PodSecurityPolicy")
+		CommandArgs["runtime-config"] = "extensions/v1beta1/podsecuritypolicy=true"
+		CommandArgs["admission-control"] = CommandArgs["admission-control"] + ",PodSecurityPolicy"
 	}
 
 	VolumesFrom := []string{
@@ -116,10 +121,20 @@ func (c *Cluster) BuildKubeAPIProcess() v3.Process {
 		"/etc/kubernetes:/etc/kubernetes:z",
 	}
 
+	// Override args if they exist, add additional args
 	for arg, value := range c.Services.KubeAPI.ExtraArgs {
+		if _, ok := c.Services.KubeAPI.ExtraArgs[arg]; ok {
+			CommandArgs[arg] = value
+		}
+	}
+
+	for arg, value := range CommandArgs {
 		cmd := fmt.Sprintf("--%s=%s", arg, value)
 		Command = append(Command, cmd)
 	}
+
+	Binds = append(Binds, c.Services.KubeAPI.ExtraBinds...)
+
 	healthCheck := v3.HealthCheck{
 		URL: services.GetHealthCheckURL(true, services.KubeAPIPort),
 	}
@@ -137,22 +152,29 @@ func (c *Cluster) BuildKubeAPIProcess() v3.Process {
 }
 
 func (c *Cluster) BuildKubeControllerProcess() v3.Process {
-	Command := []string{"/opt/rke/entrypoint.sh",
+	Command := []string{
+		"/opt/rke/entrypoint.sh",
 		"kube-controller-manager",
-		"--address=0.0.0.0",
-		"--cloud-provider=",
-		"--leader-elect=true",
-		"--kubeconfig=" + pki.GetConfigPath(pki.KubeControllerCertName),
-		"--enable-hostpath-provisioner=false",
-		"--node-monitor-grace-period=40s",
-		"--pod-eviction-timeout=5m0s",
-		"--v=2",
-		"--allocate-node-cidrs=true",
-		"--cluster-cidr=" + c.ClusterCIDR,
-		"--service-cluster-ip-range=" + c.Services.KubeController.ServiceClusterIPRange,
-		"--service-account-private-key-file=" + pki.GetKeyPath(pki.KubeAPICertName),
-		"--root-ca-file=" + pki.GetCertPath(pki.CACertName),
 	}
+
+	CommandArgs := map[string]string{
+		"address":                     "0.0.0.0",
+		"cloud-provider":              c.CloudProvider.Name,
+		"allow-untagged-cloud":        "true",
+		"configure-cloud-routes":      "false",
+		"leader-elect":                "true",
+		"kubeconfig":                  pki.GetConfigPath(pki.KubeControllerCertName),
+		"enable-hostpath-provisioner": "false",
+		"node-monitor-grace-period":   "40s",
+		"pod-eviction-timeout":        "5m0s",
+		"v": "2",
+		"allocate-node-cidrs":              "true",
+		"cluster-cidr":                     c.ClusterCIDR,
+		"service-cluster-ip-range":         c.Services.KubeController.ServiceClusterIPRange,
+		"service-account-private-key-file": pki.GetKeyPath(pki.KubeAPICertName),
+		"root-ca-file":                     pki.GetCertPath(pki.CACertName),
+	}
+
 	args := []string{}
 	if c.Authorization.Mode == services.RBACAuthorizationMode {
 		args = append(args, "--use-service-account-credentials=true")
@@ -165,9 +187,18 @@ func (c *Cluster) BuildKubeControllerProcess() v3.Process {
 	}
 
 	for arg, value := range c.Services.KubeController.ExtraArgs {
+		if _, ok := c.Services.KubeController.ExtraArgs[arg]; ok {
+			CommandArgs[arg] = value
+		}
+	}
+
+	for arg, value := range CommandArgs {
 		cmd := fmt.Sprintf("--%s=%s", arg, value)
 		Command = append(Command, cmd)
 	}
+
+	Binds = append(Binds, c.Services.KubeController.ExtraBinds...)
+
 	healthCheck := v3.HealthCheck{
 		URL: services.GetHealthCheckURL(false, services.KubeControllerPort),
 	}
@@ -186,30 +217,34 @@ func (c *Cluster) BuildKubeControllerProcess() v3.Process {
 
 func (c *Cluster) BuildKubeletProcess(host *hosts.Host) v3.Process {
 
-	Command := []string{"/opt/rke/entrypoint.sh",
+	Command := []string{
+		"/opt/rke/entrypoint.sh",
 		"kubelet",
-		"--v=2",
-		"--address=0.0.0.0",
-		"--cadvisor-port=0",
-		"--read-only-port=0",
-		"--cluster-domain=" + c.ClusterDomain,
-		"--pod-infra-container-image=" + c.Services.Kubelet.InfraContainerImage,
-		"--cgroups-per-qos=True",
-		"--enforce-node-allocatable=",
-		"--hostname-override=" + host.HostnameOverride,
-		"--cluster-dns=" + c.ClusterDNSServer,
-		"--network-plugin=cni",
-		"--cni-conf-dir=/etc/cni/net.d",
-		"--cni-bin-dir=/opt/cni/bin",
-		"--resolv-conf=/etc/resolv.conf",
-		"--allow-privileged=true",
-		"--cloud-provider=",
-		"--kubeconfig=" + pki.GetConfigPath(pki.KubeNodeCertName),
-		"--client-ca-file=" + pki.GetCertPath(pki.CACertName),
-		"--anonymous-auth=false",
-		"--volume-plugin-dir=/var/lib/kubelet/volumeplugins",
-		"--require-kubeconfig=True",
-		"--fail-swap-on=" + strconv.FormatBool(c.Services.Kubelet.FailSwapOn),
+	}
+
+	CommandArgs := map[string]string{
+		"v":                         "2",
+		"address":                   "0.0.0.0",
+		"cadvisor-port":             "0",
+		"read-only-port":            "0",
+		"cluster-domain":            c.ClusterDomain,
+		"pod-infra-container-image": c.Services.Kubelet.InfraContainerImage,
+		"cgroups-per-qos":           "True",
+		"enforce-node-allocatable":  "",
+		"hostname-override":         host.HostnameOverride,
+		"cluster-dns":               c.ClusterDNSServer,
+		"network-plugin":            "cni",
+		"cni-conf-dir":              "/etc/cni/net.d",
+		"cni-bin-dir":               "/opt/cni/bin",
+		"resolv-conf":               "/etc/resolv.conf",
+		"allow-privileged":          "true",
+		"cloud-provider":            c.CloudProvider.Name,
+		"kubeconfig":                pki.GetConfigPath(pki.KubeNodeCertName),
+		"client-ca-file":            pki.GetCertPath(pki.CACertName),
+		"anonymous-auth":            "false",
+		"volume-plugin-dir":         "/var/lib/kubelet/volumeplugins",
+		"require-kubeconfig":        "True",
+		"fail-swap-on":              strconv.FormatBool(c.Services.Kubelet.FailSwapOn),
 	}
 
 	VolumesFrom := []string{
@@ -233,9 +268,18 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host) v3.Process {
 	}
 
 	for arg, value := range c.Services.Kubelet.ExtraArgs {
+		if _, ok := c.Services.Kubelet.ExtraArgs[arg]; ok {
+			CommandArgs[arg] = value
+		}
+	}
+
+	for arg, value := range CommandArgs {
 		cmd := fmt.Sprintf("--%s=%s", arg, value)
 		Command = append(Command, cmd)
 	}
+
+	Binds = append(Binds, c.Services.Kubelet.ExtraBinds...)
+
 	healthCheck := v3.HealthCheck{
 		URL: services.GetHealthCheckURL(true, services.KubeletPort),
 	}
@@ -254,12 +298,17 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host) v3.Process {
 }
 
 func (c *Cluster) BuildKubeProxyProcess() v3.Process {
-	Command := []string{"/opt/rke/entrypoint.sh",
+	Command := []string{
+		"/opt/rke/entrypoint.sh",
 		"kube-proxy",
-		"--v=2",
-		"--healthz-bind-address=0.0.0.0",
-		"--kubeconfig=" + pki.GetConfigPath(pki.KubeProxyCertName),
 	}
+
+	CommandArgs := map[string]string{
+		"v": "2",
+		"healthz-bind-address": "0.0.0.0",
+		"kubeconfig":           pki.GetConfigPath(pki.KubeProxyCertName),
+	}
+
 	VolumesFrom := []string{
 		services.SidekickContainerName,
 	}
@@ -268,9 +317,18 @@ func (c *Cluster) BuildKubeProxyProcess() v3.Process {
 	}
 
 	for arg, value := range c.Services.Kubeproxy.ExtraArgs {
+		if _, ok := c.Services.Kubeproxy.ExtraArgs[arg]; ok {
+			CommandArgs[arg] = value
+		}
+	}
+
+	for arg, value := range CommandArgs {
 		cmd := fmt.Sprintf("--%s=%s", arg, value)
 		Command = append(Command, cmd)
 	}
+
+	Binds = append(Binds, c.Services.Kubeproxy.ExtraBinds...)
+
 	healthCheck := v3.HealthCheck{
 		URL: services.GetHealthCheckURL(false, services.KubeproxyPort),
 	}
@@ -310,13 +368,18 @@ func (c *Cluster) BuildProxyProcess() v3.Process {
 }
 
 func (c *Cluster) BuildSchedulerProcess() v3.Process {
-	Command := []string{"/opt/rke/entrypoint.sh",
+	Command := []string{
+		"/opt/rke/entrypoint.sh",
 		"kube-scheduler",
-		"--leader-elect=true",
-		"--v=2",
-		"--address=0.0.0.0",
-		"--kubeconfig=" + pki.GetConfigPath(pki.KubeSchedulerCertName),
 	}
+
+	CommandArgs := map[string]string{
+		"leader-elect": "true",
+		"v":            "2",
+		"address":      "0.0.0.0",
+		"kubeconfig":   pki.GetConfigPath(pki.KubeSchedulerCertName),
+	}
+
 	VolumesFrom := []string{
 		services.SidekickContainerName,
 	}
@@ -325,9 +388,18 @@ func (c *Cluster) BuildSchedulerProcess() v3.Process {
 	}
 
 	for arg, value := range c.Services.Scheduler.ExtraArgs {
+		if _, ok := c.Services.Scheduler.ExtraArgs[arg]; ok {
+			CommandArgs[arg] = value
+		}
+	}
+
+	for arg, value := range CommandArgs {
 		cmd := fmt.Sprintf("--%s=%s", arg, value)
 		Command = append(Command, cmd)
 	}
+
+	Binds = append(Binds, c.Services.Scheduler.ExtraBinds...)
+
 	healthCheck := v3.HealthCheck{
 		URL: services.GetHealthCheckURL(false, services.SchedulerPort),
 	}
@@ -365,34 +437,48 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host) v3
 	if host.ExistingEtcdCluster {
 		clusterState = "existing"
 	}
-	args := []string{"/usr/local/bin/etcd",
-		"--name=etcd-" + host.HostnameOverride,
-		"--data-dir=/var/lib/rancher/etcd",
-		"--advertise-client-urls=https://" + host.InternalAddress + ":2379,https://" + host.InternalAddress + ":4001",
-		"--listen-client-urls=https://0.0.0.0:2379",
-		"--initial-advertise-peer-urls=https://" + host.InternalAddress + ":2380",
-		"--listen-peer-urls=https://0.0.0.0:2380",
-		"--initial-cluster-token=etcd-cluster-1",
-		"--initial-cluster=" + initCluster,
-		"--initial-cluster-state=" + clusterState,
+	args := []string{
+		"/usr/local/bin/etcd",
 		"--peer-client-cert-auth",
 		"--client-cert-auth",
-		"--trusted-ca-file=" + pki.GetCertPath(pki.CACertName),
-		"--peer-trusted-ca-file=" + pki.GetCertPath(pki.CACertName),
-		"--cert-file=" + pki.GetCertPath(nodeName),
-		"--key-file=" + pki.GetKeyPath(nodeName),
-		"--peer-cert-file=" + pki.GetCertPath(nodeName),
-		"--peer-key-file=" + pki.GetKeyPath(nodeName),
+	}
+
+	CommandArgs := map[string]string{
+		"name":                        "etcd-" + host.HostnameOverride,
+		"data-dir":                    "/var/lib/rancher/etcd",
+		"advertise-client-urls":       "https://" + host.InternalAddress + ":2379,https://" + host.InternalAddress + ":4001",
+		"listen-client-urls":          "https://0.0.0.0:2379",
+		"initial-advertise-peer-urls": "https://" + host.InternalAddress + ":2380",
+		"listen-peer-urls":            "https://0.0.0.0:2380",
+		"initial-cluster-token":       "etcd-cluster-1",
+		"initial-cluster":             initCluster,
+		"initial-cluster-state":       clusterState,
+		"trusted-ca-file":             pki.GetCertPath(pki.CACertName),
+		"peer-trusted-ca-file":        pki.GetCertPath(pki.CACertName),
+		"cert-file":                   pki.GetCertPath(nodeName),
+		"key-file":                    pki.GetKeyPath(nodeName),
+		"peer-cert-file":              pki.GetCertPath(nodeName),
+		"peer-key-file":               pki.GetKeyPath(nodeName),
 	}
 
 	Binds := []string{
 		"/var/lib/etcd:/var/lib/rancher/etcd:z",
 		"/etc/kubernetes:/etc/kubernetes:z",
 	}
+
 	for arg, value := range c.Services.Etcd.ExtraArgs {
+		if _, ok := c.Services.Etcd.ExtraArgs[arg]; ok {
+			CommandArgs[arg] = value
+		}
+	}
+
+	for arg, value := range CommandArgs {
 		cmd := fmt.Sprintf("--%s=%s", arg, value)
 		args = append(args, cmd)
 	}
+
+	Binds = append(Binds, c.Services.Etcd.ExtraBinds...)
+
 	healthCheck := v3.HealthCheck{
 		URL: services.EtcdHealthCheckURL,
 	}

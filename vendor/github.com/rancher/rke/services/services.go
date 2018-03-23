@@ -102,7 +102,7 @@ func createLogLink(ctx context.Context, host *hosts.Host, containerName, plane, 
 	}
 	containerID := containerInspect.ID
 	containerLogPath := containerInspect.LogPath
-	containerLogLink := fmt.Sprintf("%s/%s-%s.log", RKELogsPath, containerName, containerID)
+	containerLogLink := fmt.Sprintf("%s/%s_%s.log", RKELogsPath, containerName, containerID)
 	imageCfg := &container.Config{
 		Image: image,
 		Tty:   true,

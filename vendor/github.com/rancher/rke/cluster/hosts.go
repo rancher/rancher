@@ -16,9 +16,9 @@ import (
 )
 
 const (
-	etcdRoleLabel   = "node-role.kubernetes.io/etcd"
-	masterRoleLabel = "node-role.kubernetes.io/master"
-	workerRoleLabel = "node-role.kubernetes.io/worker"
+	etcdRoleLabel         = "node-role.kubernetes.io/etcd"
+	controlplaneRoleLabel = "node-role.kubernetes.io/controlplane"
+	workerRoleLabel       = "node-role.kubernetes.io/worker"
 )
 
 func (c *Cluster) TunnelHosts(ctx context.Context, local bool) error {
@@ -32,7 +32,7 @@ func (c *Cluster) TunnelHosts(ctx context.Context, local bool) error {
 	uniqueHosts := hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts)
 	for i := range uniqueHosts {
 		if err := uniqueHosts[i].TunnelUp(ctx, c.DockerDialerFactory); err != nil {
-			// Unsupported Docker version is NOT a connectivity problem that we can't recover! So we bail out on it
+			// Unsupported Docker version is NOT a connectivity problem that we can recover! So we bail out on it
 			if strings.Contains(err.Error(), "Unsupported Docker version found") {
 				return err
 			}
@@ -77,7 +77,7 @@ func (c *Cluster) InvertIndexHosts() error {
 				c.EtcdHosts = append(c.EtcdHosts, &newHost)
 			case services.ControlRole:
 				newHost.IsControl = true
-				newHost.ToAddLabels[masterRoleLabel] = "true"
+				newHost.ToAddLabels[controlplaneRoleLabel] = "true"
 				c.ControlPlaneHosts = append(c.ControlPlaneHosts, &newHost)
 			case services.WorkerRole:
 				newHost.IsWorker = true
@@ -91,7 +91,7 @@ func (c *Cluster) InvertIndexHosts() error {
 			newHost.ToDelLabels[etcdRoleLabel] = "true"
 		}
 		if !newHost.IsControl {
-			newHost.ToDelLabels[masterRoleLabel] = "true"
+			newHost.ToDelLabels[controlplaneRoleLabel] = "true"
 		}
 		if !newHost.IsWorker {
 			newHost.ToDelLabels[workerRoleLabel] = "true"

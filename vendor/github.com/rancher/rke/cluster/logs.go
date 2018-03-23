@@ -19,6 +19,9 @@ func (c *Cluster) CleanDeadLogs(ctx context.Context) error {
 	var errgrp errgroup.Group
 
 	for _, host := range hosts {
+		if !host.UpdateWorker {
+			continue
+		}
 		runHost := host
 		errgrp.Go(func() error {
 			return doRunLogCleaner(ctx, runHost, c.SystemImages.Alpine, c.PrivateRegistriesMap)

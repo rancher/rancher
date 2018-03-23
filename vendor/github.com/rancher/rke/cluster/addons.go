@@ -8,15 +8,22 @@ import (
 	"os/exec"
 	"time"
 
+	"io/ioutil"
+	"net/http"
+	"strings"
+
 	"github.com/rancher/rke/addons"
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
+	"github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v2"
 )
 
 const (
-	KubeDNSAddonResourceName = "rke-kubedns-addon"
-	UserAddonResourceName    = "rke-user-addon"
-	IngressAddonResourceName = "rke-ingress-controller"
+	KubeDNSAddonResourceName      = "rke-kubedns-addon"
+	UserAddonResourceName         = "rke-user-addon"
+	IngressAddonResourceName      = "rke-ingress-controller"
+	UserAddonsIncludeResourceName = "rke-user-includes-addons"
 )
 
 type ingressOptions struct {
@@ -36,17 +43,105 @@ func (c *Cluster) deployK8sAddOns(ctx context.Context) error {
 }
 
 func (c *Cluster) deployUserAddOns(ctx context.Context) error {
-	log.Infof(ctx, "[addons] Setting up user addons..")
-	if c.Addons == "" {
-		log.Infof(ctx, "[addons] No user addons configured..")
+	log.Infof(ctx, "[addons] Setting up user addons")
+	if c.Addons != "" {
+		if err := c.doAddonDeploy(ctx, c.Addons, UserAddonResourceName); err != nil {
+			return err
+		}
+	}
+	if len(c.AddonsInclude) > 0 {
+		if err := c.deployAddonsInclude(ctx); err != nil {
+			return err
+		}
+	}
+	if c.Addons == "" && len(c.AddonsInclude) == 0 {
+		log.Infof(ctx, "[addons] no user addons defined")
+	} else {
+		log.Infof(ctx, "[addons] User addons deployed successfully")
+	}
+	return nil
+}
+
+func (c *Cluster) deployAddonsInclude(ctx context.Context) error {
+	var manifests []byte
+	log.Infof(ctx, "[addons] Checking for included user addons")
+
+	if len(c.AddonsInclude) == 0 {
+		log.Infof(ctx, "[addons] No included addon paths or urls..")
 		return nil
 	}
+	for _, addon := range c.AddonsInclude {
+		if strings.HasPrefix(addon, "http") {
+			addonYAML, err := getAddonFromURL(addon)
+			if err != nil {
+				return err
+			}
+			log.Infof(ctx, "[addons] Adding addon from url %s", addon)
+			logrus.Debugf("URL Yaml: %s", addonYAML)
 
-	if err := c.doAddonDeploy(ctx, c.Addons, UserAddonResourceName); err != nil {
+			if err := validateUserAddonYAML(addonYAML); err != nil {
+				return err
+			}
+			manifests = append(manifests, addonYAML...)
+		} else if isFilePath(addon) {
+			addonYAML, err := ioutil.ReadFile(addon)
+			if err != nil {
+				return err
+			}
+			log.Infof(ctx, "[addons] Adding addon from %s", addon)
+			logrus.Debugf("FilePath Yaml: %s", string(addonYAML))
+
+			// make sure we properly separated manifests
+			addonYAMLStr := string(addonYAML)
+			if !strings.HasPrefix(addonYAMLStr, "---") {
+				addonYAML = []byte(fmt.Sprintf("%s\n%s", "---", addonYAMLStr))
+			}
+			if err := validateUserAddonYAML(addonYAML); err != nil {
+				return err
+			}
+			manifests = append(manifests, addonYAML...)
+		} else {
+			log.Warnf(ctx, "[addons] Unable to determine if %s is a file path or url, skipping", addon)
+		}
+	}
+	log.Infof(ctx, "[addons] Deploying %s", UserAddonsIncludeResourceName)
+	logrus.Debugf("[addons] Compiled addons yaml: %s", string(manifests))
+
+	return c.doAddonDeploy(ctx, string(manifests), UserAddonsIncludeResourceName)
+}
+
+func validateUserAddonYAML(addon []byte) error {
+	yamlContents := make(map[string]interface{})
+	if err := yaml.Unmarshal(addon, &yamlContents); err != nil {
 		return err
 	}
-	log.Infof(ctx, "[addons] User addon deployed successfully..")
+
 	return nil
+}
+
+func isFilePath(addonPath string) bool {
+	if _, err := os.Stat(addonPath); os.IsNotExist(err) {
+		return false
+	}
+	return true
+}
+
+func getAddonFromURL(yamlURL string) ([]byte, error) {
+	resp, err := http.Get(yamlURL)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	addonYaml, err := ioutil.ReadAll(resp.Body)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return addonYaml, nil
 
 }
 
@@ -91,8 +186,16 @@ func (c *Cluster) doAddonDeploy(ctx context.Context, addonYaml, resourceName str
 	}
 
 	log.Infof(ctx, "[addons] Executing deploy job..")
+	k8sClient, err := k8s.NewClient(c.LocalKubeConfigPath, c.K8sWrapTransport)
+	if err != nil {
+		return err
+	}
+	node, err := k8s.GetNode(k8sClient, c.ControlPlaneHosts[0].HostnameOverride)
+	if err != nil {
+		return fmt.Errorf("Failed to get Node [%s]: %v", node.Name, err)
+	}
+	addonJob, err := addons.GetAddonsExcuteJob(resourceName, node.Name, c.Services.KubeAPI.Image)
 
-	addonJob, err := addons.GetAddonsExcuteJob(resourceName, c.ControlPlaneHosts[0].HostnameOverride, c.Services.KubeAPI.Image)
 	if err != nil {
 		return fmt.Errorf("Failed to deploy addon execute job: %v", err)
 	}

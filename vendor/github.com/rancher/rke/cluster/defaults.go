@@ -14,6 +14,7 @@ const (
 	DefaultClusterCIDR           = "10.233.64.0/18"
 	DefaultClusterDNSService     = "10.233.0.3"
 	DefaultClusterDomain         = "cluster.local"
+	DefaultClusterName           = "local"
 	DefaultClusterSSHKeyPath     = "~/.ssh/id_rsa"
 
 	DefaultK8sVersion = v3.K8sV18
@@ -75,6 +76,9 @@ func (c *Cluster) setClusterDefaults(ctx context.Context) {
 	}
 	if len(c.Ingress.Provider) == 0 {
 		c.Ingress.Provider = DefaultIngressController
+	}
+	if len(c.ClusterName) == 0 {
+		c.ClusterName = DefaultClusterName
 	}
 
 	c.setClusterImageDefaults()

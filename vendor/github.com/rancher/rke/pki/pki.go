@@ -52,7 +52,7 @@ func GenerateRKECerts(ctx context.Context, rkeConfig v3.RancherKubernetesEngineC
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get Kubernetes Service IP: %v", err)
 	}
-	kubeAPIAltNames := GetAltNames(cpHosts, clusterDomain, kubernetesServiceIP)
+	kubeAPIAltNames := GetAltNames(cpHosts, clusterDomain, kubernetesServiceIP, rkeConfig.Authentication.SANs)
 	kubeAPICrt, kubeAPIKey, err := GenerateSignedCertAndKey(caCrt, caKey, true, KubeAPICertName, kubeAPIAltNames, nil, nil)
 	if err != nil {
 		return nil, err
@@ -105,6 +105,7 @@ func GenerateRKECerts(ctx context.Context, rkeConfig v3.RancherKubernetesEngineC
 	if len(cpHosts) > 0 {
 		kubeAdminConfig := GetKubeConfigX509WithData(
 			"https://"+cpHosts[0].Address+":6443",
+			rkeConfig.ClusterName,
 			KubeAdminCertName,
 			string(cert.EncodeCertPEM(caCrt)),
 			string(cert.EncodeCertPEM(kubeAdminCrt)),
@@ -134,7 +135,7 @@ func GenerateRKECerts(ctx context.Context, rkeConfig v3.RancherKubernetesEngineC
 		certs[EtcdClientCACertName] = ToCertObject(EtcdClientCACertName, "", "", caCert[0], nil)
 	}
 	etcdHosts := hosts.NodesToHosts(rkeConfig.Nodes, etcdRole)
-	etcdAltNames := GetAltNames(etcdHosts, clusterDomain, kubernetesServiceIP)
+	etcdAltNames := GetAltNames(etcdHosts, clusterDomain, kubernetesServiceIP, []string{})
 	for _, host := range etcdHosts {
 		log.Infof(ctx, "[certificates] Generating etcd-%s certificate and key", host.InternalAddress)
 		etcdCrt, etcdKey, err := GenerateSignedCertAndKey(caCrt, caKey, true, EtcdCertName, etcdAltNames, nil, nil)
@@ -195,7 +196,7 @@ func RegenerateEtcdCertificate(
 	log.Infof(ctx, "[certificates] Regenerating new etcd-%s certificate and key", etcdHost.InternalAddress)
 	caCrt := crtMap[CACertName].Certificate
 	caKey := crtMap[CACertName].Key
-	etcdAltNames := GetAltNames(etcdHosts, clusterDomain, KubernetesServiceIP)
+	etcdAltNames := GetAltNames(etcdHosts, clusterDomain, KubernetesServiceIP, []string{})
 
 	etcdCrt, etcdKey, err := GenerateSignedCertAndKey(caCrt, caKey, true, EtcdCertName, etcdAltNames, nil, nil)
 	if err != nil {
