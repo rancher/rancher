@@ -190,6 +190,9 @@ func (l *Lifecycle) Run(obj *v3.App, action, templateVersionID string) error {
 	}
 
 	kubeConfig := l.KubeConfigGetter.KubeConfig(l.ClusterName, token)
+	for k := range kubeConfig.Clusters {
+		kubeConfig.Clusters[k].InsecureSkipTLSVerify = true
+	}
 	if err := os.MkdirAll(filepath.Join(tempDir, obj.Namespace), 0755); err != nil {
 		return err
 	}

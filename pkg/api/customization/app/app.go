@@ -56,6 +56,9 @@ func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 	}
 	tokenAuthValue := tokens.GetTokenAuthFromRequest(apiContext.Request)
 	data := a.KubeConfigGetter.KubeConfig(cluster.ID, tokenAuthValue)
+	for k := range data.Clusters {
+		data.Clusters[k].InsecureSkipTLSVerify = true
+	}
 	rootDir, err := ioutil.TempDir("", "helm-")
 	if err != nil {
 		return err
