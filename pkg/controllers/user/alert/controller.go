@@ -173,7 +173,7 @@ func initClusterPreCanAlerts(clusterAlerts v3.ClusterAlertInterface, clusterName
 				RepeatIntervalSeconds: 3600,
 			},
 			TargetEvent: v3.TargetEvent{
-				Type:         "Warning",
+				EventType:    "Warning",
 				ResourceKind: "Deployment",
 			},
 		},
