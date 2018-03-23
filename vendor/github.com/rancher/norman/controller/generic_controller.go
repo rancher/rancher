@@ -246,6 +246,7 @@ func (g *genericController) syncHandler(s string) (err error) {
 
 	var errs []error
 	for _, handler := range g.handlers {
+		logrus.Debugf("%s calling handler %s %s", g.name, handler.name, s)
 		if err := handler.handler(s); err != nil {
 			errs = append(errs, &handlerError{
 				name: handler.name,
