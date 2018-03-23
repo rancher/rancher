@@ -224,6 +224,8 @@ type AuthnConfig struct {
 	Strategy string `yaml:"strategy" json:"strategy,omitempty"`
 	// Authentication options
 	Options map[string]string `yaml:"options" json:"options,omitempty"`
+	// List of additional hostnames and IPs to include in the api server PKI cert
+	SANs []string `yaml:"sans" json:"sans,omitempty"`
 }
 
 type AuthzConfig struct {

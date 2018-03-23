@@ -640,11 +640,20 @@ func volumeTypes(schemas *types.Schemas) *types.Schemas {
 		AddMapperForType(&Version, v1.PersistentVolumeClaimVolumeSource{},
 			&m.Move{From: "claimName", To: "persistentVolumeClaimName"},
 		).
+		AddMapperForType(&Version, v1.VolumeMount{},
+			m.Required{Fields: []string{
+				"mountPath",
+				"name",
+			}},
+		).
 		MustImport(&Version, v1.PersistentVolumeClaimVolumeSource{}, struct {
 			ClaimName string `norman:"type=reference[persistentVolumeClaim]"`
 		}{}).
 		MustImport(&Version, v1.SecretVolumeSource{}, struct {
 			SecretName string `norman:"type=reference[secret]"`
+		}{}).
+		MustImport(&Version, v1.VolumeMount{}, struct {
+			MountPath string `json:"mountPath" norman:"required"`
 		}{}).
 		MustImport(&Version, v1.Volume{}, struct {
 		}{}).
