@@ -106,7 +106,7 @@ func (f *Factory) DockerDialer(clusterName, machineName string) (dialer.Dialer, 
 	return nil, fmt.Errorf("can not build dailer to %s:%s", clusterName, machineName)
 }
 
-func (f *Factory) nodeDialer(clusterName, machineName string) (dialer.Dialer, error) {
+func (f *Factory) NodeDialer(clusterName, machineName string) (dialer.Dialer, error) {
 	return func(network, address string) (net.Conn, error) {
 		d, err := f.nodeDialer(clusterName, machineName)
 		if err != nil {
@@ -116,7 +116,7 @@ func (f *Factory) nodeDialer(clusterName, machineName string) (dialer.Dialer, er
 	}, nil
 }
 
-func (f *Factory) NodeDialer(clusterName, machineName string) (dialer.Dialer, error) {
+func (f *Factory) nodeDialer(clusterName, machineName string) (dialer.Dialer, error) {
 	machine, err := f.nodeLister.Get(clusterName, machineName)
 	if err != nil {
 		return nil, err
