@@ -29,7 +29,7 @@ func New(ctx context.Context, scaledContext *config.ScaledContext, clusterManage
 		return nil, err
 	}
 
-	if err := userstored.Setup(ctx, scaledContext); err != nil {
+	if err := userstored.Setup(ctx, scaledContext, clusterManager); err != nil {
 		return nil, err
 	}
 

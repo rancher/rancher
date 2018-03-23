@@ -267,6 +267,20 @@ func (m *Manager) record(apiContext *types.APIContext, storageContext types.Stor
 	return record, nil
 }
 
+func (m *Manager) ClusterName(apiContext *types.APIContext) string {
+	clusterID := apiContext.SubContext["/v3/schemas/cluster"]
+	if clusterID == "" {
+		projectID, ok := apiContext.SubContext["/v3/schemas/project"]
+		if ok {
+			parts := strings.SplitN(projectID, ":", 2)
+			if len(parts) == 2 {
+				clusterID = parts[0]
+			}
+		}
+	}
+	return clusterID
+}
+
 func (m *Manager) cluster(apiContext *types.APIContext, context types.StorageContext) (*v3.Cluster, error) {
 	switch context {
 	case types.DefaultStorageContext:
@@ -279,17 +293,7 @@ func (m *Manager) cluster(apiContext *types.APIContext, context types.StorageCon
 
 	}
 
-	clusterID := apiContext.SubContext["/v3/schemas/cluster"]
-	if clusterID == "" {
-		projectID, ok := apiContext.SubContext["/v3/schemas/project"]
-		if ok {
-			parts := strings.SplitN(projectID, ":", 2)
-			if len(parts) == 2 {
-				clusterID = parts[0]
-			}
-		}
-	}
-
+	clusterID := m.ClusterName(apiContext)
 	if clusterID == "" {
 		return nil, nil
 	}
