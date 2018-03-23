@@ -80,7 +80,7 @@ func (h *HealthSyncer) updateClusterHealth() error {
 	v3.ClusterConditionWaiting.True(newObj)
 	v3.ClusterConditionWaiting.Message(newObj, "")
 
-	if reflect.DeepEqual(oldCluster, cluster) {
+	if !reflect.DeepEqual(oldCluster, newObj) {
 		_, err = h.clusters.Update(newObj.(*v3.Cluster))
 		if err != nil {
 			return errors.Wrapf(err, "Failed to update cluster [%s]", cluster.Name)

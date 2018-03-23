@@ -172,9 +172,11 @@ func (t *Authorizer) getMachine(cluster *v3.Cluster, inNode *client.Node) (*v3.N
 }
 
 func (t *Authorizer) authorizeNode(cluster *v3.Cluster, inNode *client.Node, req *http.Request) (*v3.Node, bool, error) {
+	register := strings.HasSuffix(req.URL.Path, "/register")
+
 	machine, err := t.getMachine(cluster, inNode)
 	if apierrors.IsNotFound(err) {
-		if !strings.HasSuffix(req.URL.Path, "/register") {
+		if !register {
 			return nil, false, err
 		}
 		machine, err = t.createNode(inNode, cluster, req)
@@ -185,10 +187,13 @@ func (t *Authorizer) authorizeNode(cluster *v3.Cluster, inNode *client.Node, req
 		return nil, false, err
 	}
 
-	machine, err = t.updateNode(machine, inNode, cluster)
-	if err != nil {
-		return nil, false, err
+	if register {
+		machine, err = t.updateNode(machine, inNode, cluster)
+		if err != nil {
+			return nil, false, err
+		}
 	}
+
 	return machine, true, nil
 }
 
