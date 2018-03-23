@@ -31,6 +31,8 @@ type RancherKubernetesEngineConfig struct {
 	Ingress IngressConfig `yaml:"ingress" json:"ingress,omitempty"`
 	// Cluster Name used in the kube config
 	ClusterName string `yaml:"cluster_name" json:"clusterName,omitempty"`
+	// Cloud Provider options
+	CloudProvider CloudProvider `yaml:"cloud_provider" json:"cloudProvider,omitempty"`
 }
 
 type PrivateRegistry struct {
@@ -306,4 +308,11 @@ type PortCheck struct {
 	Port int `json:"port,omitempty"`
 	// Port Protocol
 	Protocol string `json:"protocol,omitempty"`
+}
+
+type CloudProvider struct {
+	// Name of the Cloud Provider
+	Name string `yaml:"name" json:"name,omitempty"`
+	// Configuration Options of Cloud Provider
+	CloudConfig map[string]string `yaml:"cloud_config" json:"cloudConfig,omitempty"`
 }

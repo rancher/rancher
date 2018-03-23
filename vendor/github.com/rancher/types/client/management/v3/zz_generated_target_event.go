@@ -2,11 +2,11 @@ package client
 
 const (
 	TargetEventType              = "targetEvent"
+	TargetEventFieldEventType    = "eventType"
 	TargetEventFieldResourceKind = "resourceKind"
-	TargetEventFieldType         = "type"
 )
 
 type TargetEvent struct {
+	EventType    string `json:"eventType,omitempty" yaml:"eventType,omitempty"`
 	ResourceKind string `json:"resourceKind,omitempty" yaml:"resourceKind,omitempty"`
-	Type         string `json:"type,omitempty" yaml:"type,omitempty"`
 }

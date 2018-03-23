@@ -6,6 +6,7 @@ const (
 	RancherKubernetesEngineConfigFieldAddonsInclude       = "addonsInclude"
 	RancherKubernetesEngineConfigFieldAuthentication      = "authentication"
 	RancherKubernetesEngineConfigFieldAuthorization       = "authorization"
+	RancherKubernetesEngineConfigFieldCloudProvider       = "cloudProvider"
 	RancherKubernetesEngineConfigFieldClusterName         = "clusterName"
 	RancherKubernetesEngineConfigFieldIgnoreDockerVersion = "ignoreDockerVersion"
 	RancherKubernetesEngineConfigFieldIngress             = "ingress"
@@ -23,6 +24,7 @@ type RancherKubernetesEngineConfig struct {
 	AddonsInclude       []string           `json:"addonsInclude,omitempty" yaml:"addonsInclude,omitempty"`
 	Authentication      *AuthnConfig       `json:"authentication,omitempty" yaml:"authentication,omitempty"`
 	Authorization       *AuthzConfig       `json:"authorization,omitempty" yaml:"authorization,omitempty"`
+	CloudProvider       *CloudProvider     `json:"cloudProvider,omitempty" yaml:"cloudProvider,omitempty"`
 	ClusterName         string             `json:"clusterName,omitempty" yaml:"clusterName,omitempty"`
 	IgnoreDockerVersion bool               `json:"ignoreDockerVersion,omitempty" yaml:"ignoreDockerVersion,omitempty"`
 	Ingress             *IngressConfig     `json:"ingress,omitempty" yaml:"ingress,omitempty"`
