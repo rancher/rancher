@@ -4,3 +4,5 @@
 *.swp
 /.trash-cache
 /.idea
+/trash.lock
+/types
