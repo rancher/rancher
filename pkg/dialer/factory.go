@@ -75,7 +75,9 @@ func (f *Factory) clusterDialer(clusterName string) (dialer.Dialer, error) {
 
 	for _, node := range nodes {
 		if node.DeletionTimestamp == nil && v3.NodeConditionProvisioned.IsTrue(node) {
-			return f.NodeDialer(clusterName, node.Name)
+			if nodeDialer, err := f.nodeDialer(clusterName, node.Name); err == nil {
+				return nodeDialer, err
+			}
 		}
 	}
 
@@ -103,7 +105,7 @@ func (f *Factory) DockerDialer(clusterName, machineName string) (dialer.Dialer, 
 		return f.tlsDialer(machine)
 	}
 
-	return nil, fmt.Errorf("can not build dailer to %s:%s", clusterName, machineName)
+	return nil, fmt.Errorf("can not build dialer to %s:%s", clusterName, machineName)
 }
 
 func (f *Factory) NodeDialer(clusterName, machineName string) (dialer.Dialer, error) {
@@ -135,5 +137,5 @@ func (f *Factory) nodeDialer(clusterName, machineName string) (dialer.Dialer, er
 		return f.sshLocalDialer(machine)
 	}
 
-	return nil, fmt.Errorf("can not build dailer to %s:%s", clusterName, machineName)
+	return nil, fmt.Errorf("can not build dialer to %s:%s", clusterName, machineName)
 }
