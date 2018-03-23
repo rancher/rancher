@@ -54,9 +54,9 @@ func (l *EventWatcher) Sync(key string, obj *corev1.Event) error {
 		alertID := alert.Namespace + "-" + alert.Name
 		target := alert.Spec.TargetEvent
 		if target.ResourceKind != "" {
-			if target.Type == obj.Type && target.ResourceKind == obj.InvolvedObject.Kind {
+			if target.EventType == obj.Type && target.ResourceKind == obj.InvolvedObject.Kind {
 
-				title := fmt.Sprintf("%s event of %s occurred", target.Type, target.ResourceKind)
+				title := fmt.Sprintf("%s event of %s occurred", target.EventType, target.ResourceKind)
 				//TODO: how to set unit for display for Quantity
 				desc := fmt.Sprintf("*Alert Name*: %s\n*Cluster Name*: %s\n*Target*: %s\n*Count*: %s\n*Event Message*: %s\n*First Seen*: %s\n*Last Seen*: %s",
 					alert.Spec.DisplayName, l.clusterName, obj.InvolvedObject.Name, strconv.Itoa(int(obj.Count)), obj.Message, obj.FirstTimestamp, obj.LastTimestamp)
