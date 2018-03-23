@@ -4,11 +4,13 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/kubeconfig"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	managementv3 "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/user"
 )
 
@@ -33,13 +35,17 @@ func (a ActionHandler) GenerateKubeconfigActionHandler(actionName string, action
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
 
-	clusterName := apiContext.ID
+	var cluster managementv3.Cluster
+	if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, &cluster); err != nil {
+		return err
+	}
+
 	userName := a.UserMgr.GetUser(apiContext)
 	token, err := a.UserMgr.EnsureToken("kubeconfig-"+userName, "Kubeconfig token", userName)
 	if err != nil {
 		return err
 	}
-	cfg, err := kubeconfig.ForTokenBased(clusterName, apiContext.Request.Host, userName, token)
+	cfg, err := kubeconfig.ForTokenBased(cluster.Name, apiContext.Request.Host, userName, token)
 	if err != nil {
 		return err
 	}
