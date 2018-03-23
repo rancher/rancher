@@ -36,7 +36,7 @@ func (npmgr *netpolMgr) program(np *networkingv1.NetworkPolicy) error {
 		if kerrors.IsNotFound(err) {
 			logrus.Debugf("about to create np=%+v", *np)
 			_, err = npmgr.k8sClient.NetworkingV1().NetworkPolicies(np.Namespace).Create(np)
-			if err != nil {
+			if err != nil && !kerrors.IsAlreadyExists(err) && !kerrors.IsForbidden(err) {
 				logrus.Errorf("netpolMgr: program: error creating network policy err=%v", err)
 				return err
 			}
@@ -45,7 +45,7 @@ func (npmgr *netpolMgr) program(np *networkingv1.NetworkPolicy) error {
 		}
 	} else {
 		logrus.Debugf("netpolMgr: program: existing=%+v", existing)
-		if !reflect.DeepEqual(existing, np) {
+		if existing.DeletionTimestamp == nil && !reflect.DeepEqual(existing, np) {
 			logrus.Debugf("about to update np=%+v", *np)
 			_, err = npmgr.k8sClient.NetworkingV1().NetworkPolicies(np.Namespace).Update(np)
 			if err != nil {
@@ -90,6 +90,10 @@ func (npmgr *netpolMgr) programNetworkPolicy(projectID string) error {
 	logrus.Debugf("namespaces=%+v", namespaces)
 
 	for _, aNS := range namespaces {
+		if aNS.DeletionTimestamp != nil {
+			logrus.Debugf("programNetworkPolicy: aNS=%+v marked for deletion, skipping", aNS)
+			continue
+		}
 		policyName := "np-default"
 		np := &networkingv1.NetworkPolicy{
 			ObjectMeta: v1.ObjectMeta{
@@ -279,6 +283,11 @@ func (npmgr *netpolMgr) handleHostNetwork() error {
 	}
 
 	for _, aNS := range namespaces {
+		if aNS.DeletionTimestamp != nil || aNS.Status.Phase == corev1.NamespaceTerminating {
+			logrus.Debugf("handleHostNetwork: aNS=%+v marked for deletion/termination, skipping", aNS)
+			continue
+		}
+		logrus.Debugf("handleHostNetwork: aNS=%+v", aNS)
 		if _, ok := aNS.Labels[nslabels.ProjectIDFieldLabel]; !ok {
 			continue
 		}
