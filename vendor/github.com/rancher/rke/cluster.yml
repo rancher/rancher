@@ -45,6 +45,8 @@ services:
   kube-api:
     service_cluster_ip_range: 10.233.0.0/18
     pod_security_policy: false
+    # add additional arguments to the kubernetes component
+    # Note that this WILL OVERRIDE existing defaults
     extra_args:
       v: 4
   kube-controller:
@@ -55,6 +57,10 @@ services:
     cluster_domain: cluster.local
     cluster_dns_server: 10.233.0.3
     infra_container_image: gcr.io/google_containers/pause-amd64:3.0
+    # Optionally define additional volume binds to a service
+    extra_binds:
+      - "/host/dev:/dev"
+      - "/usr/libexec/kubernetes/kubelet-plugins:/usr/libexec/kubernetes/kubelet-plugins"
   kubeproxy:
 
 # supported plugins are:
@@ -82,8 +88,15 @@ network:
   plugin: flannel
   options:
 
+# At the moment, the only authentication strategy supported is x509.
+# You can optionally create additional SANs (hostnames or IPs) to add to
+#  the API server PKI certificate. This is useful if you want to use a load balancer
+#  for the control plane servers, for example.
 authentication:
   strategy: x509
+  sans:
+  - "10.18.160.10"
+  - "my-loadbalancer-1234567890.us-west-2.elb.amazonaws.com"
 
 # all addon manifests MUST specify a namespace
 addons: |-
@@ -99,6 +112,11 @@ addons: |-
         image: nginx
         ports:
         - containerPort: 80
+
+addons_include:
+    - https://raw.githubusercontent.com/rook/rook/master/cluster/examples/kubernetes/rook-operator.yaml
+    - https://raw.githubusercontent.com/rook/rook/master/cluster/examples/kubernetes/rook-cluster.yaml
+    - /path/to/manifest
 
 system_images:
   etcd: rancher/etcd:v3.0.17
@@ -128,6 +146,10 @@ ignore_docker_version: false
 
 kubernetes_version: v1.8.9-rancher1-1
 
+# If set, this is the cluster name that will be used in the kube config file
+# Default value is "local"
+cluster_name: mycluster
+
 # List of registry credentials, if you are using a Docker Hub registry,
 # you can omit the `url` or set it to `docker.io`
 private_registries:
@@ -155,3 +177,6 @@ private_registries:
 
 ingress:
   provider: nginx
+
+cloud_provider:
+  name: aws

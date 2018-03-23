@@ -135,6 +135,15 @@ addons: |-
 
 Note that we are using `|-` because the addons option is a multi line string option, where you can specify multiple yaml files and separate them with `---`
 
+For `addons_include:` you may pass either http/https urls or file paths, for example:
+```yaml
+addons_include:
+    - https://raw.githubusercontent.com/rook/rook/master/cluster/examples/kubernetes/rook-operator.yaml
+    - https://raw.githubusercontent.com/rook/rook/master/cluster/examples/kubernetes/rook-cluster.yaml
+    - /opt/manifests/example.yaml
+    - ./nginx.yaml
+```
+
 ## High Availability
 
 RKE is HA ready, you can specify more than one controlplane host in the `cluster.yml` file, and rke will deploy master components on all of them, the kubelets are configured to connect to `127.0.0.1:6443` by default which is the address of `nginx-proxy` service that proxy requests to all master nodes.
@@ -221,6 +230,44 @@ ingress:
 ```
 
 RKE will deploy Nginx Ingress controller as a DaemonSet with `hostnetwork: true`, so ports `80`, and `443` will be opened on each node where the controller is deployed.
+
+## Extra Args and Binds
+
+RKE supports additional service arguments.
+
+```yaml
+services:
+  # ...
+  kube-controller:
+    extra_args:
+      cluster-name: "mycluster"
+```
+This will add/append `--cluster-name=mycluster` to the container list of arguments.
+
+As of `v0.1.3-rc2` using `extra_args` will add new arguments and **override** existing defaults. For example, if you need to modify the default admission controllers list, you need to change the default list and add apply it using `extra_args`.
+
+RKE also supports additional volume binds:
+
+```yaml
+services:
+  # ...
+  kubelet:
+    extra_binds:
+      - "/host/dev:/dev"
+      - "/usr/libexec/kubernetes/kubelet-plugins:/usr/libexec/kubernetes/kubelet-plugins:z"
+```
+
+## Authentication
+
+RKE Supports x509 authentication strategy. You can additionally define a list of SANs (Subject Alternative Names) to add to the Kubernetes API Server PKI certificates. This allows you to connect to your Kubernetes cluster API Server through a load balancer, for example, rather than a single node.
+
+```yaml
+authentication:
+  strategy: x509
+  sans:
+  - "10.18.160.10"
+  - "my-loadbalancer-1234567890.us-west-2.elb.amazonaws.com"
+```
 
 ## External etcd
 

@@ -10,7 +10,12 @@ import (
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
+)
+
+const (
+	HostnameLabel = "kubernetes.io/hostname"
 )
 
 func DeleteNode(k8sClient *kubernetes.Clientset, nodeName string) error {
@@ -22,7 +27,16 @@ func GetNodeList(k8sClient *kubernetes.Clientset) (*v1.NodeList, error) {
 }
 
 func GetNode(k8sClient *kubernetes.Clientset, nodeName string) (*v1.Node, error) {
-	return k8sClient.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+	nodes, err := GetNodeList(k8sClient)
+	if err != nil {
+		return nil, err
+	}
+	for _, node := range nodes.Items {
+		if node.Labels[HostnameLabel] == nodeName {
+			return &node, nil
+		}
+	}
+	return nil, apierrors.NewNotFound(schema.GroupResource{}, nodeName)
 }
 
 func CordonUncordon(k8sClient *kubernetes.Clientset, nodeName string, cordoned bool) error {
