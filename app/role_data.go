@@ -100,9 +100,10 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("nodes", "nodepools").verbs("get", "list", "watch").
 		addRule().apiGroups("*").resources("nodes").verbs("get", "list", "watch")
 
-	rb.addRoleTemplate("Manage Volumes", "volumes-manage", "cluster", true, false, false).
+	rb.addRoleTemplate("Manage Storage", "storage-manage", "cluster", true, false, false).
 		addRule().apiGroups("*").resources("persistentvolumes").verbs("*").
-		addRule().apiGroups("*").resources("storageclasses").verbs("*")
+		addRule().apiGroups("*").resources("storageclasses").verbs("*").
+		addRule().apiGroups("*").resources("persistentvolumeclaims").verbs("*")
 
 	rb.addRoleTemplate("Manage Cluster Members", "clusterroletemplatebindings-manage", "cluster", true, false, false).
 		addRule().apiGroups("management.cattle.io").resources("clusterroletemplatebindings").verbs("*")
