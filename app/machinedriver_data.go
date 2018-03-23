@@ -8,37 +8,37 @@ import (
 )
 
 func addMachineDrivers(management *config.ManagementContext) error {
-	if err := addMachineDriver("amazonec2", "local://", "", true, true, management); err != nil {
+	if err := addMachineDriver("amazonec2", "local://", "", []string{"*.amazonaws.com", "*.amazonaws.com.cn"}, true, true, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver("digitalocean", "local://", "", true, true, management); err != nil {
+	if err := addMachineDriver("digitalocean", "local://", "", []string{"api.digitalocean.com"}, true, true, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver("exoscale", "local://", "", false, true, management); err != nil {
+	if err := addMachineDriver("exoscale", "local://", "", []string{"api.exoscale.ch"}, false, true, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver("openstack", "local://", "", false, true, management); err != nil {
+	if err := addMachineDriver("openstack", "local://", "", nil, false, true, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver("otc", "https://obs.otc.t-systems.com/dockermachinedriver/docker-machine-driver-otc",
-		"e98f246f625ca46f5e037dc29bdf00fe", false, false, management); err != nil {
+		"e98f246f625ca46f5e037dc29bdf00fe", []string{"*.otc.t-systems.com"}, false, false, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver("packet", "https://github.com/packethost/docker-machine-driver-packet/releases/download/v0.1.4/docker-machine-driver-packet_linux-amd64.zip",
-		"2cd0b9614ab448b61b1bf73ef4738ab5", false, false, management); err != nil {
+		"2cd0b9614ab448b61b1bf73ef4738ab5", []string{"api.packet.net"}, false, false, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver("rackspace", "local://", "", false, true, management); err != nil {
+	if err := addMachineDriver("rackspace", "local://", "", nil, false, true, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver("softlayer", "local://", "", false, true, management); err != nil {
+	if err := addMachineDriver("softlayer", "local://", "", nil, false, true, management); err != nil {
 		return err
 	}
 
-	return addMachineDriver("vmwarevsphere", "local://", "", true, true, management)
+	return addMachineDriver("vmwarevsphere", "local://", "", nil, true, true, management)
 }
 
-func addMachineDriver(name, url, checksum string, active, builtin bool, management *config.ManagementContext) error {
+func addMachineDriver(name, url, checksum string, whitelist []string, active, builtin bool, management *config.ManagementContext) error {
 	lister := management.Management.NodeDrivers("").Controller().Lister()
 	cli := management.Management.NodeDrivers("")
 	m, _ := lister.Get("", name)
@@ -49,6 +49,7 @@ func addMachineDriver(name, url, checksum string, active, builtin bool, manageme
 			m.Spec.URL = url
 			m.Spec.Checksum = checksum
 			m.Spec.DisplayName = name
+			m.Spec.WhitelistDomains = whitelist
 			_, err := cli.Update(m)
 			return err
 		}
@@ -61,11 +62,12 @@ func addMachineDriver(name, url, checksum string, active, builtin bool, manageme
 			Name: name,
 		},
 		Spec: v3.NodeDriverSpec{
-			Active:      active,
-			Builtin:     builtin,
-			URL:         url,
-			DisplayName: name,
-			Checksum:    checksum,
+			Active:           active,
+			Builtin:          builtin,
+			URL:              url,
+			DisplayName:      name,
+			Checksum:         checksum,
+			WhitelistDomains: whitelist,
 		},
 	})
 
