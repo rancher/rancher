@@ -13,13 +13,14 @@ import (
 	"github.com/rancher/rancher/pkg/api/store/secret"
 	"github.com/rancher/rancher/pkg/api/store/service"
 	"github.com/rancher/rancher/pkg/api/store/workload"
+	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	clusterClient "github.com/rancher/types/client/cluster/v3"
 	"github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/config"
 )
 
-func Setup(ctx context.Context, mgmt *config.ScaledContext) error {
+func Setup(ctx context.Context, mgmt *config.ScaledContext, clusterManager *clustermanager.Manager) error {
 	// Here we setup all types that will be stored in the User cluster
 
 	schemas := mgmt.Schemas
@@ -43,12 +44,12 @@ func Setup(ctx context.Context, mgmt *config.ScaledContext) error {
 	Service(schemas)
 	Workload(schemas)
 
-	SetProjectID(schemas)
+	SetProjectID(schemas, clusterManager)
 
 	return nil
 }
 
-func SetProjectID(schemas *types.Schemas) {
+func SetProjectID(schemas *types.Schemas, clusterManager *clustermanager.Manager) {
 	for _, schema := range schemas.SchemasForVersion(schema.Version) {
 		if schema.Store == nil || schema.Store.Context() != config.UserStorageContext {
 			continue
@@ -66,7 +67,7 @@ func SetProjectID(schemas *types.Schemas) {
 			panic(schema.ID + " does not have projectId")
 		}
 
-		schema.Store = projectsetter.Wrap(schema.Store)
+		schema.Store = projectsetter.New(schema.Store, clusterManager)
 	}
 }
 

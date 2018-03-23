@@ -1,126 +1,88 @@
 package projectsetter
 
 import (
-	"strings"
-
+	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/norman/types/definition"
-	"github.com/rancher/rancher/pkg/api/customization/namespace"
+	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/client/cluster/v3"
 )
 
-func Wrap(store types.Store) types.Store {
-	return &Store{
-		store,
+func New(store types.Store, manager *clustermanager.Manager) types.Store {
+	t := &transformer{
+		ClusterManager: manager,
+	}
+	return &transform.Store{
+		Store:             store,
+		Transformer:       t.object,
+		ListTransformer:   t.list,
+		StreamTransformer: t.stream,
 	}
 }
 
-type Store struct {
-	types.Store
+type transformer struct {
+	ClusterManager *clustermanager.Manager
 }
 
-func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
-	data, err := p.Store.Create(apiContext, schema, data)
-	if err != nil {
-		return nil, err
-	}
-
-	return lookupAndSetProjectID(apiContext, schema, data)
+func (t *transformer) object(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
+	t.lookupAndSetProjectID(apiContext, schema, data)
+	return data, nil
 }
 
-func (p *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
-	data, err := p.Store.Delete(apiContext, schema, id)
-	if err != nil {
-		return nil, err
-	}
-
-	return lookupAndSetProjectID(apiContext, schema, data)
-}
-
-func (p *Store) ByID(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
-	data, err := p.Store.ByID(apiContext, schema, id)
-	if err != nil {
-		return nil, err
-	}
-
-	return lookupAndSetProjectID(apiContext, schema, data)
-}
-
-func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
-	data, err := p.Store.Update(apiContext, schema, data, id)
-	if err != nil {
-		return nil, err
-	}
-
-	return lookupAndSetProjectID(apiContext, schema, data)
-}
-
-func (p *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {
-	datas, err := p.Store.List(apiContext, schema, opt)
-	if err != nil {
-		return nil, err
-	}
-
-	if _, ok := schema.ResourceFields[client.NamespaceFieldProjectID]; !ok || schema.ID == client.NamespaceType {
-		return datas, nil
-	}
-
-	namespaceMap, err := namespace.ProjectMap(apiContext, true)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, data := range datas {
-		setProjectID(apiContext, namespaceMap, data)
-	}
-
-	return datas, nil
-}
-
-func (p *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
-	c, err := p.Store.Watch(apiContext, schema, opt)
-	if err != nil || c == nil {
-		return nil, err
-	}
-
-	namespaceMap, err := namespace.ProjectMap(apiContext, true)
-	if err != nil {
-		return nil, err
-	}
-
-	return convert.Chan(c, func(data map[string]interface{}) map[string]interface{} {
-		typeName := definition.GetType(data)
-		refresh := false
-		if strings.Contains(typeName, "namespace") || strings.Contains(typeName, "project") {
-			refresh = true
-		}
-		tempNamespaceMap, err := namespace.ProjectMap(apiContext, refresh)
-		if err == nil {
-			namespaceMap = tempNamespaceMap
-		}
-
-		setProjectID(apiContext, namespaceMap, data)
-		return data
-	}), nil
-}
-
-func lookupAndSetProjectID(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
-	if _, ok := schema.ResourceFields[client.NamespaceFieldProjectID]; !ok || schema.ID == client.NamespaceType {
+func (t *transformer) list(apiContext *types.APIContext, schema *types.Schema, data []map[string]interface{}, opt *types.QueryOptions) ([]map[string]interface{}, error) {
+	namespaceLister := t.lister(apiContext, schema)
+	if namespaceLister == nil {
 		return data, nil
 	}
 
-	namespaceMap, err := namespace.ProjectMap(apiContext, true)
-	if err != nil {
-		return nil, err
+	for _, item := range data {
+		setProjectID(namespaceLister, item)
 	}
-
-	setProjectID(apiContext, namespaceMap, data)
 
 	return data, nil
 }
 
-func setProjectID(apiContext *types.APIContext, namespaceMap map[string]string, data map[string]interface{}) {
+func (t *transformer) stream(apiContext *types.APIContext, schema *types.Schema, data chan map[string]interface{}, opt *types.QueryOptions) (chan map[string]interface{}, error) {
+	namespaceLister := t.lister(apiContext, schema)
+	if namespaceLister == nil {
+		return data, nil
+	}
+
+	return convert.Chan(data, func(data map[string]interface{}) map[string]interface{} {
+		setProjectID(namespaceLister, data)
+		return data
+	}), nil
+}
+
+func (t *transformer) lister(apiContext *types.APIContext, schema *types.Schema) v1.NamespaceLister {
+	if _, ok := schema.ResourceFields[client.NamespaceFieldProjectID]; !ok || schema.ID == client.NamespaceType {
+		return nil
+	}
+
+	clusterName := t.ClusterManager.ClusterName(apiContext)
+	if clusterName == "" {
+		return nil
+	}
+
+	clusterContext, err := t.ClusterManager.UserContext(clusterName)
+	if err != nil {
+		return nil
+	}
+
+	return clusterContext.Core.Namespaces("").Controller().Lister()
+}
+
+func (t *transformer) lookupAndSetProjectID(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) {
+	namespaceLister := t.lister(apiContext, schema)
+	if namespaceLister == nil {
+		return
+	}
+
+	setProjectID(namespaceLister, data)
+}
+
+func setProjectID(namespaceLister v1.NamespaceLister, data map[string]interface{}) {
 	if data == nil {
 		return
 	}
@@ -131,12 +93,10 @@ func setProjectID(apiContext *types.APIContext, namespaceMap map[string]string, 
 		return
 	}
 
-	if _, ok := namespaceMap[ns]; !ok {
-		tempNamespaceMap, err := namespace.ProjectMap(apiContext, true)
-		if err == nil {
-			namespaceMap = tempNamespaceMap
-		}
+	nsObj, err := namespaceLister.Get("", ns)
+	if err != nil {
+		return
 	}
-	data[client.NamespaceFieldProjectID] = namespaceMap[ns]
 
+	data[client.NamespaceFieldProjectID] = nsObj.Annotations["field.cattle.io/projectId"]
 }
