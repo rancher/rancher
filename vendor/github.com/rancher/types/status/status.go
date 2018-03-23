@@ -29,7 +29,6 @@ var transitioningMap = map[string]string{
 	"Active":                      "activating",
 	"AddonDeploy":                 "deploying",
 	"AgentDeployed":               "installing",
-	"Available":                   "activating",
 	"BackingNamespaceCreated":     "configuring",
 	"ConfigOK":                    "configuring",
 	"Created":                     "creating",
@@ -44,7 +43,6 @@ var transitioningMap = map[string]string{
 	"NodesCreated":                "provisioning",
 	"Pending":                     "pending",
 	"PodScheduled":                "scheduling",
-	"Progressing":                 "updating",
 	"Provisioned":                 "provisioning",
 	"Registered":                  "registering",
 	"Removed":                     "removing",
@@ -81,6 +79,14 @@ var errorMapping = map[string]bool{
 var doneMap = map[string]string{
 	"Completed": "activating",
 	"Ready":     "unavailable",
+	"Available": "updating",
+}
+
+// True == transitioning
+// False ==
+// Unknown ==
+var progressMap = map[string]string{
+	"Progressing": "progressing",
 }
 
 func concat(str, next string) string {
@@ -115,40 +121,6 @@ func Set(data map[string]interface{}) {
 		if len(status.Conditions) > 0 {
 			conditions = append(conditions, status.Conditions...)
 		}
-	}
-
-	val, ok := values.GetValue(data, "metadata", "removed")
-	if ok && val != "" && val != nil {
-		data["state"] = "removing"
-		data["transitioning"] = "yes"
-
-		finalizers, ok := values.GetStringSlice(data, "metadata", "finalizers")
-		if !ok {
-			finalizers, ok = values.GetStringSlice(data, "spec", "finalizers")
-		}
-
-		msg := ""
-		for _, cond := range conditions {
-			if cond.Type == "Removed" && (cond.Status == "Unknown" || cond.Status == "False") && cond.Message != "" {
-				msg = cond.Message
-			}
-		}
-
-		if ok && len(finalizers) > 0 {
-			if len(msg) > 0 {
-				msg = msg + "; waiting on " + finalizers[0]
-			} else {
-				msg = "waiting on " + finalizers[0]
-			}
-			data["transitioningMessage"] = msg
-			if i, err := convert.ToTimestamp(val); err == nil {
-				if time.Unix(i/1000, 0).Add(5 * time.Minute).Before(time.Now()) {
-					data["transitioning"] = "error"
-				}
-			}
-		}
-
-		return
 	}
 
 	state := ""
@@ -209,6 +181,21 @@ func Set(data map[string]interface{}) {
 		}
 	}
 
+	for _, c := range conditions {
+		if state != "" {
+			break
+		}
+		newState, ok := progressMap[c.Type]
+		if !ok {
+			continue
+		}
+		if c.Status == "True" {
+			transitioning = true
+			state = newState
+			message = concat(message, c.Message)
+		}
+	}
+
 	if state == "" {
 		val, ok := values.GetValue(data, "spec", "active")
 		if ok {
@@ -253,4 +240,41 @@ func Set(data map[string]interface{}) {
 
 	data["state"] = strings.ToLower(state)
 	data["transitioningMessage"] = message
+
+	val, ok := values.GetValue(data, "metadata", "removed")
+	if ok && val != "" && val != nil {
+		data["state"] = "removing"
+		data["transitioning"] = "yes"
+
+		finalizers, ok := values.GetStringSlice(data, "metadata", "finalizers")
+		if !ok {
+			finalizers, ok = values.GetStringSlice(data, "spec", "finalizers")
+		}
+
+		msg := message
+		for _, cond := range conditions {
+			if cond.Type == "Removed" && (cond.Status == "Unknown" || cond.Status == "False") && cond.Message != "" {
+				msg = cond.Message
+			}
+		}
+
+		if ok && len(finalizers) > 0 {
+			parts := strings.Split(finalizers[0], "controller.cattle.io/")
+			f := parts[len(parts)-1]
+
+			if len(msg) > 0 {
+				msg = msg + "; waiting on " + f
+			} else {
+				msg = "waiting on " + f
+			}
+			data["transitioningMessage"] = msg
+			if i, err := convert.ToTimestamp(val); err == nil {
+				if time.Unix(i/1000, 0).Add(5 * time.Minute).Before(time.Now()) {
+					data["transitioning"] = "error"
+				}
+			}
+		}
+
+		return
+	}
 }

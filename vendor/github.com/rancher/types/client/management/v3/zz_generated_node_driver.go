@@ -25,6 +25,7 @@ const (
 	NodeDriverFieldUIURL                = "uiUrl"
 	NodeDriverFieldURL                  = "url"
 	NodeDriverFieldUuid                 = "uuid"
+	NodeDriverFieldWhitelistDomains     = "whitelistDomains"
 )
 
 type NodeDriver struct {
@@ -48,6 +49,7 @@ type NodeDriver struct {
 	UIURL                string            `json:"uiUrl,omitempty" yaml:"uiUrl,omitempty"`
 	URL                  string            `json:"url,omitempty" yaml:"url,omitempty"`
 	Uuid                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	WhitelistDomains     []string          `json:"whitelistDomains,omitempty" yaml:"whitelistDomains,omitempty"`
 }
 type NodeDriverCollection struct {
 	types.Collection

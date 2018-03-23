@@ -29,7 +29,11 @@ func (n *NamespaceReference) FromInternal(data map[string]interface{}) {
 func (n *NamespaceReference) ToInternal(data map[string]interface{}) {
 	for _, path := range n.fields {
 		convert.Transform(data, path, func(input interface{}) interface{} {
-			return strings.SplitN(convert.ToString(input), ":", 2)[0]
+			parts := strings.SplitN(convert.ToString(input), ":", 2)
+			if len(parts) == 2 {
+				return parts[1]
+			}
+			return parts[0]
 		})
 	}
 }
