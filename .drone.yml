@@ -23,6 +23,8 @@ pipeline:
     context: package/
     tag: master
     secrets: [docker_username, docker_password]
+    build_args:
+    - VERSION=master
     when:
       branch: master
       event: push
@@ -65,7 +67,6 @@ pipeline:
     when:
       branch: master
       event: tag
-
 
   slack-notification-failure:
     image: plugins/slack
