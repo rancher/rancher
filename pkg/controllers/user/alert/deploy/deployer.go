@@ -177,7 +177,6 @@ func getService() *corev1.Service {
 			Name:      "alertmanager-svc",
 		},
 		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeNodePort,
 			Selector: map[string]string{
 				"app": "alertmanager",
 			},
