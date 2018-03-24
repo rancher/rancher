@@ -27,6 +27,7 @@ var (
 	Schemas = factory.Schemas(&Version).
 		// volume before pod types.  pod types uses volume things, so need to register mapper
 		Init(volumeTypes).
+		Init(configMapTypes).
 		Init(ingressTypes).
 		Init(secretTypes).
 		Init(serviceTypes).
@@ -41,12 +42,11 @@ var (
 		Init(podTemplateSpecTypes).
 		Init(workloadTypes).
 		Init(appTypes).
-		Init(configMapTypes).
 		Init(namespaceComposeType)
 )
 
 func configMapTypes(schemas *types.Schemas) *types.Schemas {
-	return schemas.MustImport(&Version, v1.ConfigMap{})
+	return schemas.MustImport(&Version, v1.ConfigMap{}, projectOverride{})
 }
 
 type DeploymentConfig struct {

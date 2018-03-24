@@ -56,6 +56,7 @@ type Config struct {
 
 	// Project Client
 	PersistentVolumeClaims         map[string]projectClient.PersistentVolumeClaim         `json:"persistentVolumeClaims,omitempty" yaml:"persistentVolumeClaims,omitempty"`
+	ConfigMaps                     map[string]projectClient.ConfigMap                     `json:"configMaps,omitempty" yaml:"configMaps,omitempty"`
 	Ingresss                       map[string]projectClient.Ingress                       `json:"ingresses,omitempty" yaml:"ingresses,omitempty"`
 	Secrets                        map[string]projectClient.Secret                        `json:"secrets,omitempty" yaml:"secrets,omitempty"`
 	ServiceAccountTokens           map[string]projectClient.ServiceAccountToken           `json:"serviceAccountTokens,omitempty" yaml:"serviceAccountTokens,omitempty"`
@@ -81,6 +82,5 @@ type Config struct {
 	CronJobs                       map[string]projectClient.CronJob                       `json:"cronJobs,omitempty" yaml:"cronJobs,omitempty"`
 	Workloads                      map[string]projectClient.Workload                      `json:"workloads,omitempty" yaml:"workloads,omitempty"`
 	Apps                           map[string]projectClient.App                           `json:"apps,omitempty" yaml:"apps,omitempty"`
-	ConfigMaps                     map[string]projectClient.ConfigMap                     `json:"configMaps,omitempty" yaml:"configMaps,omitempty"`
 	NamespaceComposeConfigs        map[string]projectClient.NamespaceComposeConfig        `json:"namespaceComposeConfigs,omitempty" yaml:"namespaceComposeConfigs,omitempty"`
 }
