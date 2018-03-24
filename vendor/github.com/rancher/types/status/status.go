@@ -70,7 +70,8 @@ var reverseErrorMap = map[string]bool{
 // False == error
 // Unknown ==
 var errorMapping = map[string]bool{
-	"Failed": true,
+	"Failed":      true,
+	"Progressing": true,
 }
 
 // True ==
@@ -85,9 +86,7 @@ var doneMap = map[string]string{
 // True == transitioning
 // False ==
 // Unknown ==
-var progressMap = map[string]string{
-	"Progressing": "progressing",
-}
+var progressMap = map[string]string{}
 
 func concat(str, next string) string {
 	if str == "" {
