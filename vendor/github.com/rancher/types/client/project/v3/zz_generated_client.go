@@ -8,6 +8,7 @@ type Client struct {
 	clientbase.APIBaseClient
 
 	PersistentVolumeClaim         PersistentVolumeClaimOperations
+	ConfigMap                     ConfigMapOperations
 	Ingress                       IngressOperations
 	Secret                        SecretOperations
 	ServiceAccountToken           ServiceAccountTokenOperations
@@ -33,7 +34,6 @@ type Client struct {
 	CronJob                       CronJobOperations
 	Workload                      WorkloadOperations
 	App                           AppOperations
-	ConfigMap                     ConfigMapOperations
 	NamespaceComposeConfig        NamespaceComposeConfigOperations
 }
 
@@ -48,6 +48,7 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	}
 
 	client.PersistentVolumeClaim = newPersistentVolumeClaimClient(client)
+	client.ConfigMap = newConfigMapClient(client)
 	client.Ingress = newIngressClient(client)
 	client.Secret = newSecretClient(client)
 	client.ServiceAccountToken = newServiceAccountTokenClient(client)
@@ -73,7 +74,6 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.CronJob = newCronJobClient(client)
 	client.Workload = newWorkloadClient(client)
 	client.App = newAppClient(client)
-	client.ConfigMap = newConfigMapClient(client)
 	client.NamespaceComposeConfig = newNamespaceComposeConfigClient(client)
 
 	return client, nil
