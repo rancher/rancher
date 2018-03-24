@@ -81,7 +81,9 @@ func (f *Factory) clusterDialer(clusterName string) (dialer.Dialer, error) {
 		}
 	}
 
-	return net.Dial, nil
+	return func(network, address string) (net.Conn, error) {
+		return net.DialTimeout(network, address, 30*time.Second)
+	}, nil
 }
 
 func (f *Factory) DockerDialer(clusterName, machineName string) (dialer.Dialer, error) {
