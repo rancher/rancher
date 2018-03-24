@@ -1,18 +1,23 @@
 package networkpolicy
 
 import (
+	"fmt"
+
+	"github.com/rancher/rancher/pkg/controllers/user/nodesyncer"
+	rmgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
 )
 
 type nodeHandler struct {
-	npmgr *netpolMgr
+	npmgr            *netpolMgr
+	machines         rmgmtv3.NodeInterface
+	clusterNamespace string
 }
 
-func (nh *nodeHandler) Sync(key string, node *corev1.Node) error {
-	if node == nil {
-		return nil
+func (nh *nodeHandler) Sync(key string, machine *rmgmtv3.Node) error {
+	if key == fmt.Sprintf("%s/%s", nh.clusterNamespace, nodesyncer.AllNodeKey) {
+		logrus.Debugf("nodeHandler Sync key=%v", key)
+		return nh.npmgr.handleHostNetwork()
 	}
-	logrus.Debugf("nodeHandler: Sync: %+v", *node)
-	return nh.npmgr.handleHostNetwork()
+	return nil
 }

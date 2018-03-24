@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	allNodeKey     = "_machine_all_"
+	AllNodeKey     = "_machine_all_"
 	annotationName = "management.cattle.io/nodesyncer"
 )
 
@@ -68,17 +68,17 @@ func Register(cluster *config.UserContext) {
 }
 
 func (n *NodeSyncer) sync(key string, node *corev1.Node) error {
-	n.machines.Controller().Enqueue(n.clusterNamespace, allNodeKey)
+	n.machines.Controller().Enqueue(n.clusterNamespace, AllNodeKey)
 	return nil
 }
 
 func (p *PodsStatsSyncer) sync(key string, pod *corev1.Pod) error {
-	p.machinesClient.Controller().Enqueue(p.clusterNamespace, allNodeKey)
+	p.machinesClient.Controller().Enqueue(p.clusterNamespace, AllNodeKey)
 	return nil
 }
 
 func (m *NodesSyncer) sync(key string, machine *v3.Node) error {
-	if key == fmt.Sprintf("%s/%s", m.clusterNamespace, allNodeKey) {
+	if key == fmt.Sprintf("%s/%s", m.clusterNamespace, AllNodeKey) {
 		return m.reconcileAll()
 	}
 	return nil
