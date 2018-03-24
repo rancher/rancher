@@ -16,6 +16,7 @@ func Register(cluster *config.UserContext) {
 	nsLister := cluster.Core.Namespaces("").Controller().Lister()
 	k8sClient := cluster.K8sClient
 	pods := cluster.Core.Pods("")
+	machines := cluster.Management.Management.Nodes(cluster.ClusterName)
 
 	npmgr := &netpolMgr{nsLister, nodeLister, pods, k8sClient}
 	ps := &projectSyncer{pnpLister, pnpClient, projClient}
@@ -23,7 +24,7 @@ func Register(cluster *config.UserContext) {
 	pnps := &projectNetworkPolicySyncer{npmgr}
 	podHandler := &podHandler{npmgr, pods}
 	serviceHandler := &serviceHandler{npmgr}
-	nodeHandler := &nodeHandler{npmgr}
+	nodeHandler := &nodeHandler{npmgr, machines, cluster.ClusterName}
 
 	cluster.Management.Management.Projects("").Controller().AddClusterScopedHandler("projectSyncer", cluster.ClusterName, ps.Sync)
 	cluster.Management.Management.ProjectNetworkPolicies("").AddClusterScopedHandler("projectNetworkPolicySyncer", cluster.ClusterName, pnps.Sync)
@@ -31,5 +32,5 @@ func Register(cluster *config.UserContext) {
 
 	cluster.Core.Pods("").AddHandler("podHandler", podHandler.Sync)
 	cluster.Core.Services("").AddHandler("serviceHandler", serviceHandler.Sync)
-	cluster.Core.Nodes("").AddHandler("nodeHandler", nodeHandler.Sync)
+	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler("nodeHandler", nodeHandler.Sync)
 }
