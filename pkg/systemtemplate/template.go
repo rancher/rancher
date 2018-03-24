@@ -130,6 +130,8 @@ spec:
           mountPath: /var/run
         - name: run
           mountPath: /run
+        securityContext:
+          privileged: true
       volumes:
       - name: k8s-ssl
         hostPath:
