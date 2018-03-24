@@ -25,6 +25,7 @@ func Setup(ctx context.Context, mgmt *config.ScaledContext, clusterManager *clus
 
 	schemas := mgmt.Schemas
 
+	addProxyStore(schemas, mgmt, client.ConfigMapType, "v1", nil)
 	addProxyStore(schemas, mgmt, client.CronJobType, "batch/v1beta1", workload.New)
 	addProxyStore(schemas, mgmt, client.DaemonSetType, "apps/v1beta2", workload.New)
 	addProxyStore(schemas, mgmt, client.DeploymentType, "apps/v1beta2", workload.New)
