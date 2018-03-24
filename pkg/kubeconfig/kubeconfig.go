@@ -71,10 +71,10 @@ func caCertString() string {
 	return buf.String()
 }
 
-func ForTokenBased(clusterName, host, username, token string) (string, error) {
+func ForTokenBased(clusterName, clusterID, host, username, token string) (string, error) {
 	data := &data{
 		ClusterName: clusterName,
-		ClusterID:   clusterName,
+		ClusterID:   clusterID,
 		Host:        host,
 		Cert:        caCertString(),
 		User:        username,

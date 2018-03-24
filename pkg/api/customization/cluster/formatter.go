@@ -45,7 +45,7 @@ func (a ActionHandler) GenerateKubeconfigActionHandler(actionName string, action
 	if err != nil {
 		return err
 	}
-	cfg, err := kubeconfig.ForTokenBased(cluster.Name, apiContext.Request.Host, userName, token)
+	cfg, err := kubeconfig.ForTokenBased(cluster.Name, apiContext.ID, apiContext.Request.Host, userName, token)
 	if err != nil {
 		return err
 	}
