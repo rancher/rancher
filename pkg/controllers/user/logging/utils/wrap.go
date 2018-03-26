@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -133,6 +134,10 @@ func getWrapConfig(es *v3.ElasticsearchConfig, sp *v3.SplunkConfig, sl *v3.Syslo
 		if err != nil {
 			return
 		}
+		err = testReachable("tcp", h)
+		if err != nil {
+			return
+		}
 		wes = WrapElasticsearch{
 			Host:       h,
 			Scheme:     s,
@@ -147,6 +152,10 @@ func getWrapConfig(es *v3.ElasticsearchConfig, sp *v3.SplunkConfig, sl *v3.Syslo
 		if err != nil {
 			return
 		}
+		err = testReachable("tcp", h)
+		if err != nil {
+			return
+		}
 		wsp = WrapSplunk{
 			Server: h,
 			Scheme: s,
@@ -155,6 +164,10 @@ func getWrapConfig(es *v3.ElasticsearchConfig, sp *v3.SplunkConfig, sl *v3.Syslo
 	}
 
 	if sl != nil {
+		err = testReachable(sl.Protocol, sl.Endpoint)
+		if err != nil {
+			return
+		}
 		var host, port string
 		host, port, err = net.SplitHostPort(sl.Endpoint)
 		if err != nil {
@@ -180,6 +193,10 @@ func getWrapConfig(es *v3.ElasticsearchConfig, sp *v3.SplunkConfig, sl *v3.Syslo
 				if err != nil {
 					return
 				}
+				err = testReachable("tcp", h)
+				if err != nil {
+					return
+				}
 				bs = append(bs, h)
 			}
 			wkf = WrapKafka{
@@ -189,6 +206,10 @@ func getWrapConfig(es *v3.ElasticsearchConfig, sp *v3.SplunkConfig, sl *v3.Syslo
 			if kf.ZookeeperEndpoint != "" {
 				var h string
 				if h, _, err = parseEndpoint(kf.ZookeeperEndpoint); err != nil {
+					return
+				}
+				err = testReachable("tcp", h)
+				if err != nil {
 					return
 				}
 				wkf = WrapKafka{
@@ -224,6 +245,16 @@ func getDateFormat(dateformat string) string {
 		return ToRealMap[dateformat]
 	}
 	return "%Y.%m.%d"
+}
+
+func testReachable(network string, url string) error {
+	timeout := time.Duration(10 * time.Second)
+	conn, err := net.DialTimeout(network, url, timeout)
+	if err != nil {
+		return fmt.Errorf("url %s unreachable, error: %v", url, err)
+	}
+	conn.Close()
+	return nil
 }
 
 func GetClusterTarget(spec v3.ClusterLoggingSpec) string {
