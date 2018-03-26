@@ -20,6 +20,31 @@ var (
 		"v1.9.5-rancher1-1": v19SystemImages,
 	}
 
+	// ToolsSystemImages default images for alert, pipeline, logging
+	ToolsSystemImages = struct {
+		AlertSystemImages    AlertSystemImages
+		PipelineSystemImages PipelineSystemImages
+		LoggingSystemImages  LoggingSystemImages
+	}{
+		AlertSystemImages: AlertSystemImages{
+			AlertManager:       "prom/alertmanager:v0.11.0",
+			AlertManagerHelper: "rancher/alertmanager-helper:v0.0.2",
+		},
+		PipelineSystemImages: PipelineSystemImages{
+			Jenkins:       "jenkins/jenkins:lts",
+			JenkinsJnlp:   "jenkins/jnlp-slave:3.10-1-alpine",
+			AlpineGit:     "alpine/git",
+			PluginsDocker: "plugins/docker",
+		},
+		LoggingSystemImages: LoggingSystemImages{
+			Fluentd:       "rancher/fluentd:v0.1.4",
+			FluentdHelper: "rancher/fluentd-helper:v0.1.1",
+			Elaticsearch:  "rancher/docker-elasticsearch-kubernetes:5.6.2",
+			Kibana:        "kibana:5.6.4",
+			Busybox:       "busybox",
+		},
+	}
+
 	// v18 system images defaults
 	v18SystemImages = RKESystemImages{
 		Etcd:                      "rancher/coreos-etcd:v3.0.17",

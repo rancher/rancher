@@ -112,6 +112,12 @@ func workloadTypes(schemas *types.Schemas) *types.Schemas {
 					schema.ResourceFields[name] = field
 				}
 			}
+			schema.ResourceActions = map[string]types.Action{
+				"rollback": {
+					Input: "revision",
+				},
+				"pause": {},
+			}
 			schema.MustCustomizeField("name", func(field types.Field) types.Field {
 				field.Type = "dnsLabel"
 				field.Nullable = false

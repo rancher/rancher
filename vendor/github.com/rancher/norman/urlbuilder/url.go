@@ -271,3 +271,7 @@ func (u *urlBuilder) CollectionAction(schema *types.Schema, versionOverride *typ
 	collectionURL := u.Collection(schema, versionOverride)
 	return collectionURL + "?action=" + url.QueryEscape(action)
 }
+
+func (u *urlBuilder) ActionLinkByID(schema *types.Schema, id string, action string) string {
+	return u.constructBasicURL(schema.Version, schema.PluralName, id) + "?action=" + url.QueryEscape(action)
+}
