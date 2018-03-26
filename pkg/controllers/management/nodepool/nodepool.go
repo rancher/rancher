@@ -211,16 +211,6 @@ func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, simulate bool) (b
 			continue
 		}
 
-		if IsNodeStatusUnknown(node) {
-			continue
-		}
-
-		if node.DeletionTimestamp != nil {
-			// We want to force the provisioning to run again with simulate = false
-			changed = true
-			continue
-		}
-
 		if v3.NodeConditionProvisioned.IsFalse(node) {
 			changed = true
 			if !simulate {

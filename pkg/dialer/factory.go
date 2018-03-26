@@ -81,6 +81,10 @@ func (f *Factory) clusterDialer(clusterName string) (dialer.Dialer, error) {
 		}
 	}
 
+	if cluster.Status.Driver == v3.ClusterDriverImported && !cluster.Spec.Internal {
+		return nil, fmt.Errorf("waiting for cluster agent to connect")
+	}
+
 	return func(network, address string) (net.Conn, error) {
 		return net.DialTimeout(network, address, 30*time.Second)
 	}, nil
