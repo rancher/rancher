@@ -2,13 +2,14 @@ package workload
 
 import (
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/api/customization/workload"
 	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
+	"github.com/rancher/types/config"
 )
 
-func ConfigureStore(schemas *types.Schemas) {
+func ConfigureStore(schemas *types.Schemas, management *config.ScaledContext) {
 	workloadSchema := schemas.Schema(&schema.Version, "workload")
-	store := NewAggregateStore(
-		schemas.Schema(&schema.Version, "deployment"),
+	store := NewAggregateStore(schemas.Schema(&schema.Version, "deployment"),
 		schemas.Schema(&schema.Version, "replicaSet"),
 		schemas.Schema(&schema.Version, "replicationController"),
 		schemas.Schema(&schema.Version, "daemonSet"),
@@ -17,16 +18,17 @@ func ConfigureStore(schemas *types.Schemas) {
 		schemas.Schema(&schema.Version, "cronJob"))
 
 	for _, s := range store.Schemas {
-		s.Formatter = workloadFormatter
+		if s.ID == "deployment" {
+			s.Formatter = workload.DeploymentFormatter
+		} else {
+			s.Formatter = workload.Formatter
+		}
 	}
 
 	workloadSchema.Store = store
-}
-
-func workloadFormatter(apiContext *types.APIContext, resource *types.RawResource) {
-	workloadID := resource.ID
-	workloadSchema := apiContext.Schemas.Schema(&schema.Version, "workload")
-	resource.Links["self"] = apiContext.URLBuilder.ResourceLinkByID(workloadSchema, workloadID)
-	resource.Links["remove"] = apiContext.URLBuilder.ResourceLinkByID(workloadSchema, workloadID)
-	resource.Links["update"] = apiContext.URLBuilder.ResourceLinkByID(workloadSchema, workloadID)
+	actionWrapper := workload.ActionWrapper{
+		Client: management.UnversionedClient,
+	}
+	workloadSchema.ActionHandler = actionWrapper.ActionHandler
+	workloadSchema.LinkHandler = workload.Handler{}.LinkHandler
 }
