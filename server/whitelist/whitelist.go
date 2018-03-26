@@ -21,7 +21,7 @@ type ProxyList struct {
 
 func (p *ProxyList) Get() []string {
 	p.RLock()
-	p.RUnlock()
+	defer p.RUnlock()
 	v := settings.WhitelistDomain.Get()
 	r := strings.Split(v, ",")
 	for k := range p.whitelistProxy {
@@ -32,12 +32,12 @@ func (p *ProxyList) Get() []string {
 
 func (p *ProxyList) Add(key string) {
 	p.Lock()
-	p.Unlock()
+	defer p.Unlock()
 	p.whitelistProxy[key] = true
 }
 
 func (p *ProxyList) Rm(key string) {
 	p.Lock()
-	p.Unlock()
+	defer p.Unlock()
 	delete(p.whitelistProxy, key)
 }
