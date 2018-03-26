@@ -90,6 +90,31 @@ func getOwner(data map[string]interface{}) (string, string) {
 	return "", ""
 }
 
+func SaveOwner(apiContext *types.APIContext, kind, name string, data map[string]interface{}) {
+	parentKind, parentName := getOwner(data)
+	namespace, _ := data["namespaceId"].(string)
+
+	subContext := apiContext.SubContext["/v3/schemas/project"]
+	if subContext == "" {
+		subContext = apiContext.SubContext["/v3/schemas/cluster"]
+	}
+	if subContext == "" {
+		return
+	}
+
+	key := key{
+		SubContext: subContext,
+		Namespace:  namespace,
+		Kind:       kind,
+		Name:       name,
+	}
+
+	ownerCache.Add(key, value{
+		Kind: parentKind,
+		Name: parentName,
+	}, time.Hour)
+}
+
 func resolveWorkloadID(apiContext *types.APIContext, data map[string]interface{}) string {
 	kind, name := getOwner(data)
 	if kind == "" {
