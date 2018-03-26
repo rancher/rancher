@@ -33,7 +33,7 @@ func New(store types.Store) types.Store {
 			if typeName != "" && id != "" {
 				data["id"] = strings.ToLower(typeName) + ":" + id
 			}
-			setPublicEnpointsFields(apiContext, data)
+			SetPublicEnpointsFields(data)
 			nodeName := convert.ToString(values.GetValueN(data, "nodeId"))
 			if nodeName != "" {
 				state := getState(data)
@@ -44,7 +44,7 @@ func New(store types.Store) types.Store {
 	}
 }
 
-func setPublicEnpointsFields(apiContext *types.APIContext, data map[string]interface{}) {
+func SetPublicEnpointsFields(data map[string]interface{}) {
 	if val, ok := data["publicEndpoints"]; ok {
 		eps := convert.ToInterfaceSlice(val)
 		for _, ep := range eps {
