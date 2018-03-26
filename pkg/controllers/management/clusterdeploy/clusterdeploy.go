@@ -75,6 +75,10 @@ func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
 		return nil
 	}
 
+	if cluster.Spec.Internal && cluster.Status.Driver == v3.ClusterDriverImported {
+		return nil
+	}
+
 	_, err := v3.ClusterConditionSystemAccountCreated.DoUntilTrue(cluster, func() (runtime.Object, error) {
 		return cluster, cd.createSystemAccount(cluster)
 	})

@@ -348,6 +348,11 @@ func (p *Provisioner) getDriver(cluster *v3.Cluster) string {
 
 func (p *Provisioner) validateDriver(cluster *v3.Cluster) (string, error) {
 	oldDriver := cluster.Status.Driver
+
+	if oldDriver == v3.ClusterDriverImported {
+		return v3.ClusterDriverImported, nil
+	}
+
 	newDriver := p.getDriver(cluster)
 
 	if oldDriver == "" && newDriver == "" {
