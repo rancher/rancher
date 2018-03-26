@@ -27,7 +27,7 @@ func (s *ShellLinkHandler) LinkHandler(apiContext *types.APIContext, next types.
 	userManager := context.Management.UserManager
 
 	userID := userManager.GetUser(apiContext)
-	token, err := userManager.EnsureToken("kubectl-shell", "Access to kubectl shell in the browser", userID)
+	token, err := userManager.EnsureToken("kubectl-shell-"+userID, "Access to kubectl shell in the browser", userID)
 	if err != nil {
 		return err
 	}
@@ -49,6 +49,7 @@ func (s *ShellLinkHandler) LinkHandler(apiContext *types.APIContext, next types.
 			vars.Add("tty", "1")
 			vars.Add("command", "kubectl-shell.sh")
 			vars.Add("command", token)
+			vars.Add("command", context.ClusterName)
 
 			path := fmt.Sprintf("/k8s/clusters/%s/api/v1/namespaces/%s/pods/%s/exec", context.ClusterName, "cattle-system", pod.Name)
 
