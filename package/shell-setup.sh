@@ -12,6 +12,7 @@ mkdir -p .kube/certs
 
 if [ -f /etc/kubernetes/ssl/certs/serverca ]; then
     cp /etc/kubernetes/ssl/certs/serverca .kube/certs/ca.crt
+    chmod 666 .kube/certs/ca.crt
     CERT="    certificate-authority: /nonexistent/.kube/certs/ca.crt"
 fi
 
