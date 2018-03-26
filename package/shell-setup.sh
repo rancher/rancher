@@ -10,7 +10,10 @@ cd /nonexistent
 
 mkdir -p .kube/certs
 
-mount --bind /etc/kubernetes/ssl/certs .kube/certs
+if [ -f /etc/kubernetes/ssl/certs/serverca ]; then
+    cp /etc/kubernetes/ssl/certs/serverca .kube/certs/ca.crt
+    CERT="    certificate-authority: /nonexistent/.kube/certs/ca.crt"
+fi
 
 for i in /run /var/run /etc/kubernetes; do
     mount -t tmpfs tmpfs $i
@@ -23,6 +26,7 @@ clusters:
 - cluster:
     api-version: v1
     server: "${CATTLE_SERVER}/k8s/clusters/${cluster}"
+${CERT}
   name: "Default"
 contexts:
 - context:
@@ -46,8 +50,6 @@ EOF
 
 chmod 777 .kube .bashrc
 chmod 666 .kube/config
-
-SSL_CERT_DIR=$(pwd)/.kube/certs
 
 for i in $(env | cut -d "=" -f 1 | grep "CATTLE\|RANCHER"); do
     unset $i
