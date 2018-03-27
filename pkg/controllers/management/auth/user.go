@@ -11,21 +11,24 @@ import (
 )
 
 type userLifecycle struct {
-	prtb        v3.ProjectRoleTemplateBindingInterface
-	crtb        v3.ClusterRoleTemplateBindingInterface
-	grb         v3.GlobalRoleBindingInterface
-	users       v3.UserInterface
-	prtbLister  v3.ProjectRoleTemplateBindingLister
-	crtbLister  v3.ClusterRoleTemplateBindingLister
-	grbLister   v3.GlobalRoleBindingLister
-	prtbIndexer cache.Indexer
-	crtbIndexer cache.Indexer
-	grbIndexer  cache.Indexer
+	prtb         v3.ProjectRoleTemplateBindingInterface
+	crtb         v3.ClusterRoleTemplateBindingInterface
+	grb          v3.GlobalRoleBindingInterface
+	users        v3.UserInterface
+	tokens       v3.TokenInterface
+	prtbLister   v3.ProjectRoleTemplateBindingLister
+	crtbLister   v3.ClusterRoleTemplateBindingLister
+	grbLister    v3.GlobalRoleBindingLister
+	prtbIndexer  cache.Indexer
+	crtbIndexer  cache.Indexer
+	grbIndexer   cache.Indexer
+	tokenIndexer cache.Indexer
 }
 
 const crtbByUserRefKey = "auth.management.cattle.io/crtb-by-user-ref"
 const prtbByUserRefKey = "auth.management.cattle.io/prtb-by-user-ref"
 const grbByUserRefKey = "auth.management.cattle.io/grb-by-user-ref"
+const tokenByUserRefKey = "auth.management.cattle.io/token-by-user-ref"
 
 func newUserLifecycle(management *config.ManagementContext) *userLifecycle {
 	lfc := &userLifecycle{
@@ -33,6 +36,7 @@ func newUserLifecycle(management *config.ManagementContext) *userLifecycle {
 		crtb:       management.Management.ClusterRoleTemplateBindings(""),
 		grb:        management.Management.GlobalRoleBindings(""),
 		users:      management.Management.Users(""),
+		tokens:     management.Management.Tokens(""),
 		prtbLister: management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
 		crtbLister: management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
 		grbLister:  management.Management.GlobalRoleBindings("").Controller().Lister(),
@@ -58,6 +62,13 @@ func newUserLifecycle(management *config.ManagementContext) *userLifecycle {
 	})
 
 	lfc.grbIndexer = grbInformer.GetIndexer()
+
+	tokenInformer := management.Management.Tokens("").Controller().Informer()
+	tokenInformer.AddIndexers(map[string]cache.IndexFunc{
+		tokenByUserRefKey: tokenByUserRefFunc,
+	})
+
+	lfc.tokenIndexer = tokenInformer.GetIndexer()
 
 	return lfc
 }
@@ -87,6 +98,15 @@ func crtbByUserRefFunc(obj interface{}) ([]string, error) {
 	}
 
 	return []string{clusterRoleBinding.UserName}, nil
+}
+
+func tokenByUserRefFunc(obj interface{}) ([]string, error) {
+	token, ok := obj.(*v3.Token)
+	if !ok {
+		return []string{}, nil
+	}
+
+	return []string{token.UserID}, nil
 }
 
 func (l *userLifecycle) Create(user *v3.User) (*v3.User, error) {
@@ -136,6 +156,16 @@ func (l *userLifecycle) Remove(user *v3.User) (*v3.User, error) {
 	}
 
 	err = l.deleteAllGRB(globalRoles)
+	if err != nil {
+		return nil, err
+	}
+
+	tokens, err := l.getTokensByUserName(user.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	err = l.deleteAllTokens(tokens)
 	if err != nil {
 		return nil, err
 	}
@@ -200,6 +230,25 @@ func (l *userLifecycle) getGRBByUserName(username string) ([]*v3.GlobalRoleBindi
 	return grbs, nil
 }
 
+func (l *userLifecycle) getTokensByUserName(username string) ([]*v3.Token, error) {
+	objs, err := l.tokenIndexer.ByIndex(tokenByUserRefKey, username)
+	if err != nil {
+		return nil, fmt.Errorf("error getting indexed tokens: %v", err)
+	}
+
+	var tokens []*v3.Token
+	for _, obj := range objs {
+		token, ok := obj.(*v3.Token)
+		if !ok {
+			return nil, fmt.Errorf("could not convert to *v3.Token: %v", obj)
+		}
+
+		tokens = append(tokens, token)
+	}
+
+	return tokens, nil
+}
+
 func (l *userLifecycle) deleteAllCRTB(crtbs []*v3.ClusterRoleTemplateBinding) error {
 	for _, crtb := range crtbs {
 		var err error
@@ -243,6 +292,17 @@ func (l *userLifecycle) deleteAllGRB(grbs []*v3.GlobalRoleBinding) error {
 		if err != nil {
 			return fmt.Errorf("error deleting global role template %v: %v", grb.Name, err)
 
+		}
+	}
+
+	return nil
+}
+
+func (l *userLifecycle) deleteAllTokens(tokens []*v3.Token) error {
+	for _, token := range tokens {
+		err := l.tokens.DeleteNamespaced(token.Namespace, token.Name, &metav1.DeleteOptions{})
+		if err != nil {
+			return fmt.Errorf("error deleting token: %v", err)
 		}
 	}
 
