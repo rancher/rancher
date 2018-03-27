@@ -28,9 +28,8 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 
 func formatData(data map[string]interface{}) {
 	var ports []interface{}
-	port := int64(42)
 	servicePort := v3.ServicePort{
-		Port:       &port,
+		Port:       42,
 		TargetPort: intstr.Parse(strconv.FormatInt(42, 10)),
 		Protocol:   "TCP",
 		Name:       "default",
