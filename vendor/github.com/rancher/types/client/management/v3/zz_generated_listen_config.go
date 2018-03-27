@@ -54,7 +54,7 @@ type ListenConfig struct {
 	IssuedAt                string            `json:"issuedAt,omitempty" yaml:"issuedAt,omitempty"`
 	Issuer                  string            `json:"issuer,omitempty" yaml:"issuer,omitempty"`
 	Key                     string            `json:"key,omitempty" yaml:"key,omitempty"`
-	KeySize                 *int64            `json:"keySize,omitempty" yaml:"keySize,omitempty"`
+	KeySize                 int64             `json:"keySize,omitempty" yaml:"keySize,omitempty"`
 	KnownIPs                []string          `json:"knownIps,omitempty" yaml:"knownIps,omitempty"`
 	Labels                  map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Mode                    string            `json:"mode,omitempty" yaml:"mode,omitempty"`
@@ -65,7 +65,7 @@ type ListenConfig struct {
 	SubjectAlternativeNames []string          `json:"subjectAlternativeNames,omitempty" yaml:"subjectAlternativeNames,omitempty"`
 	TOS                     []string          `json:"tos,omitempty" yaml:"tos,omitempty"`
 	Uuid                    string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
-	Version                 *int64            `json:"version,omitempty" yaml:"version,omitempty"`
+	Version                 int64             `json:"version,omitempty" yaml:"version,omitempty"`
 }
 type ListenConfigCollection struct {
 	types.Collection

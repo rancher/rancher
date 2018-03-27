@@ -17,7 +17,7 @@ type PipelineStatus struct {
 	LastExecutionID      string                `json:"lastExecutionId,omitempty" yaml:"lastExecutionId,omitempty"`
 	LastRunState         string                `json:"lastRunState,omitempty" yaml:"lastRunState,omitempty"`
 	LastStarted          string                `json:"lastStarted,omitempty" yaml:"lastStarted,omitempty"`
-	NextRun              *int64                `json:"nextRun,omitempty" yaml:"nextRun,omitempty"`
+	NextRun              int64                 `json:"nextRun,omitempty" yaml:"nextRun,omitempty"`
 	NextStart            string                `json:"nextStart,omitempty" yaml:"nextStart,omitempty"`
 	PipelineState        string                `json:"pipelineState,omitempty" yaml:"pipelineState,omitempty"`
 	SourceCodeCredential *SourceCodeCredential `json:"sourceCodeCredential,omitempty" yaml:"sourceCodeCredential,omitempty"`

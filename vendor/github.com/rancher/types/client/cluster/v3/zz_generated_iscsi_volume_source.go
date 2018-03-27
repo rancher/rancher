@@ -21,7 +21,7 @@ type ISCSIVolumeSource struct {
 	IQN               string                `json:"iqn,omitempty" yaml:"iqn,omitempty"`
 	ISCSIInterface    string                `json:"iscsiInterface,omitempty" yaml:"iscsiInterface,omitempty"`
 	InitiatorName     string                `json:"initiatorName,omitempty" yaml:"initiatorName,omitempty"`
-	Lun               *int64                `json:"lun,omitempty" yaml:"lun,omitempty"`
+	Lun               int64                 `json:"lun,omitempty" yaml:"lun,omitempty"`
 	Portals           []string              `json:"portals,omitempty" yaml:"portals,omitempty"`
 	ReadOnly          bool                  `json:"readOnly,omitempty" yaml:"readOnly,omitempty"`
 	SecretRef         *LocalObjectReference `json:"secretRef,omitempty" yaml:"secretRef,omitempty"`

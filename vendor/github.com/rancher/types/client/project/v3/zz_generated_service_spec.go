@@ -21,7 +21,7 @@ type ServiceSpec struct {
 	ClusterIp                string                 `json:"clusterIp,omitempty" yaml:"clusterIp,omitempty"`
 	ExternalIPs              []string               `json:"externalIPs,omitempty" yaml:"externalIPs,omitempty"`
 	ExternalTrafficPolicy    string                 `json:"externalTrafficPolicy,omitempty" yaml:"externalTrafficPolicy,omitempty"`
-	HealthCheckNodePort      *int64                 `json:"healthCheckNodePort,omitempty" yaml:"healthCheckNodePort,omitempty"`
+	HealthCheckNodePort      int64                  `json:"healthCheckNodePort,omitempty" yaml:"healthCheckNodePort,omitempty"`
 	Hostname                 string                 `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	LoadBalancerIP           string                 `json:"loadBalancerIP,omitempty" yaml:"loadBalancerIP,omitempty"`
 	LoadBalancerSourceRanges []string               `json:"loadBalancerSourceRanges,omitempty" yaml:"loadBalancerSourceRanges,omitempty"`

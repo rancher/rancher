@@ -162,7 +162,7 @@ func checkFieldCriteria(fieldName string, field types.Field, value interface{}) 
 		value = field.Default
 	}
 
-	if value != nil {
+	if value != nil && value != "" {
 		hasStrVal = true
 		strVal = fmt.Sprint(value)
 	}

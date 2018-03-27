@@ -29,11 +29,11 @@ type AzureKubernetesServiceConfig struct {
 	BaseURL              string            `json:"baseUrl,omitempty" yaml:"baseUrl,omitempty"`
 	ClientID             string            `json:"clientId,omitempty" yaml:"clientId,omitempty"`
 	ClientSecret         string            `json:"clientSecret,omitempty" yaml:"clientSecret,omitempty"`
-	Count                *int64            `json:"count,omitempty" yaml:"count,omitempty"`
+	Count                int64             `json:"count,omitempty" yaml:"count,omitempty"`
 	KubernetesVersion    string            `json:"kubernetesVersion,omitempty" yaml:"kubernetesVersion,omitempty"`
 	Location             string            `json:"location,omitempty" yaml:"location,omitempty"`
 	MasterDNSPrefix      string            `json:"masterDnsPrefix,omitempty" yaml:"masterDnsPrefix,omitempty"`
-	OsDiskSizeGB         *int64            `json:"osDiskSizeGb,omitempty" yaml:"osDiskSizeGb,omitempty"`
+	OsDiskSizeGB         int64             `json:"osDiskSizeGb,omitempty" yaml:"osDiskSizeGb,omitempty"`
 	ResourceGroup        string            `json:"resourceGroup,omitempty" yaml:"resourceGroup,omitempty"`
 	SSHPublicKeyContents string            `json:"sshPublicKeyContents,omitempty" yaml:"sshPublicKeyContents,omitempty"`
 	SubscriptionID       string            `json:"subscriptionId,omitempty" yaml:"subscriptionId,omitempty"`

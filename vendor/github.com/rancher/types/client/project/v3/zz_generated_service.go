@@ -49,7 +49,7 @@ type Service struct {
 	Description              string                 `json:"description,omitempty" yaml:"description,omitempty"`
 	ExternalIPs              []string               `json:"externalIPs,omitempty" yaml:"externalIPs,omitempty"`
 	ExternalTrafficPolicy    string                 `json:"externalTrafficPolicy,omitempty" yaml:"externalTrafficPolicy,omitempty"`
-	HealthCheckNodePort      *int64                 `json:"healthCheckNodePort,omitempty" yaml:"healthCheckNodePort,omitempty"`
+	HealthCheckNodePort      int64                  `json:"healthCheckNodePort,omitempty" yaml:"healthCheckNodePort,omitempty"`
 	Hostname                 string                 `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	IPAddresses              []string               `json:"ipAddresses,omitempty" yaml:"ipAddresses,omitempty"`
 	Kind                     string                 `json:"kind,omitempty" yaml:"kind,omitempty"`

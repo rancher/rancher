@@ -48,7 +48,7 @@ type NodePool struct {
 	NodeLabels           map[string]string `json:"nodeLabels,omitempty" yaml:"nodeLabels,omitempty"`
 	NodeTemplateId       string            `json:"nodeTemplateId,omitempty" yaml:"nodeTemplateId,omitempty"`
 	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	Quantity             *int64            `json:"quantity,omitempty" yaml:"quantity,omitempty"`
+	Quantity             int64             `json:"quantity,omitempty" yaml:"quantity,omitempty"`
 	Removed              string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	State                string            `json:"state,omitempty" yaml:"state,omitempty"`
 	Status               *NodePoolStatus   `json:"status,omitempty" yaml:"status,omitempty"`

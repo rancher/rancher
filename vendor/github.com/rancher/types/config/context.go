@@ -17,6 +17,7 @@ import (
 	extv1beta1 "github.com/rancher/types/apis/extensions/v1beta1"
 	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
+	knetworkingv1 "github.com/rancher/types/apis/networking.k8s.io/v1"
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	projectSchema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	rbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
@@ -187,6 +188,7 @@ type UserContext struct {
 	Extensions   extv1beta1.Interface
 	BatchV1      batchv1.Interface
 	BatchV1Beta1 batchv1beta1.Interface
+	Networking   knetworkingv1.Interface
 }
 
 func (w *UserContext) controllers() []controller.Starter {
@@ -198,6 +200,7 @@ func (w *UserContext) controllers() []controller.Starter {
 		w.Extensions,
 		w.BatchV1,
 		w.BatchV1Beta1,
+		w.Networking,
 	}
 }
 
@@ -377,6 +380,11 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 	}
 
 	context.RBAC, err = rbacv1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	context.Networking, err = knetworkingv1.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}

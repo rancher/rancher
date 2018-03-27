@@ -40,7 +40,7 @@ type Token struct {
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	ProviderInfo    map[string]string `json:"providerInfo,omitempty" yaml:"providerInfo,omitempty"`
 	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	TTLMillis       *int64            `json:"ttl,omitempty" yaml:"ttl,omitempty"`
+	TTLMillis       int64             `json:"ttl,omitempty" yaml:"ttl,omitempty"`
 	Token           string            `json:"token,omitempty" yaml:"token,omitempty"`
 	UserID          string            `json:"userId,omitempty" yaml:"userId,omitempty"`
 	UserPrincipal   string            `json:"userPrincipal,omitempty" yaml:"userPrincipal,omitempty"`

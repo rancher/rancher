@@ -11,10 +11,10 @@ const (
 )
 
 type JobStatus struct {
-	Active         *int64         `json:"active,omitempty" yaml:"active,omitempty"`
+	Active         int64          `json:"active,omitempty" yaml:"active,omitempty"`
 	CompletionTime string         `json:"completionTime,omitempty" yaml:"completionTime,omitempty"`
 	Conditions     []JobCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
-	Failed         *int64         `json:"failed,omitempty" yaml:"failed,omitempty"`
+	Failed         int64          `json:"failed,omitempty" yaml:"failed,omitempty"`
 	StartTime      string         `json:"startTime,omitempty" yaml:"startTime,omitempty"`
-	Succeeded      *int64         `json:"succeeded,omitempty" yaml:"succeeded,omitempty"`
+	Succeeded      int64          `json:"succeeded,omitempty" yaml:"succeeded,omitempty"`
 }

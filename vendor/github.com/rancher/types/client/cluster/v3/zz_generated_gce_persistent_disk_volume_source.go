@@ -11,6 +11,6 @@ const (
 type GCEPersistentDiskVolumeSource struct {
 	FSType    string `json:"fsType,omitempty" yaml:"fsType,omitempty"`
 	PDName    string `json:"pdName,omitempty" yaml:"pdName,omitempty"`
-	Partition *int64 `json:"partition,omitempty" yaml:"partition,omitempty"`
+	Partition int64  `json:"partition,omitempty" yaml:"partition,omitempty"`
 	ReadOnly  bool   `json:"readOnly,omitempty" yaml:"readOnly,omitempty"`
 }

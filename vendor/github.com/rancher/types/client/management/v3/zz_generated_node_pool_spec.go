@@ -23,6 +23,6 @@ type NodePoolSpec struct {
 	NodeAnnotations map[string]string `json:"nodeAnnotations,omitempty" yaml:"nodeAnnotations,omitempty"`
 	NodeLabels      map[string]string `json:"nodeLabels,omitempty" yaml:"nodeLabels,omitempty"`
 	NodeTemplateId  string            `json:"nodeTemplateId,omitempty" yaml:"nodeTemplateId,omitempty"`
-	Quantity        *int64            `json:"quantity,omitempty" yaml:"quantity,omitempty"`
+	Quantity        int64             `json:"quantity,omitempty" yaml:"quantity,omitempty"`
 	Worker          bool              `json:"worker,omitempty" yaml:"worker,omitempty"`
 }
