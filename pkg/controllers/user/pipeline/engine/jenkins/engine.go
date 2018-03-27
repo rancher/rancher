@@ -12,11 +12,13 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/config/dialer"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
@@ -26,43 +28,27 @@ import (
 type Engine struct {
 	Client *Client
 
-	NodeLister    v1.NodeLister
 	ServiceLister v1.ServiceLister
 
 	Secrets                    v1.SecretInterface
 	SecretLister               v1.SecretLister
 	ManagementSecretLister     v1.SecretLister
 	SourceCodeCredentialLister v3.SourceCodeCredentialLister
+
+	ClusterName string
+	Dialer      dialer.Factory
 }
 
 func (j *Engine) getJenkinsURL() (string, error) {
-	//FIXME proper way to connect to Jenkins in cluster
-	nodes, err := j.NodeLister.List("", labels.NewSelector())
-	if err != nil {
-		return "", err
-	}
-	if len(nodes) < 1 {
-		return "", errors.New("no available nodes")
-	}
-	if len(nodes[0].Status.Addresses) < 1 {
-		return "", errors.New("no available address")
-	}
-	host := nodes[0].Status.Addresses[0].Address
-
-	svcport := 0
 	service, err := j.ServiceLister.Get(utils.PipelineNamespace, "jenkins")
 	if err != nil {
 		return "", err
 	}
 
-	ports := service.Spec.Ports
-	for _, port := range ports {
-		if port.NodePort != 0 && port.Name == "http" {
-			svcport = int(port.NodePort)
-			break
-		}
-	}
-	return fmt.Sprintf("http://%s:%d", host, svcport), nil
+	ip := service.Spec.ClusterIP
+	port := service.Spec.Ports[0].Port
+
+	return fmt.Sprintf("http://%s:%d", ip, port), nil
 }
 
 func (j *Engine) PreCheck() error {
@@ -77,11 +63,30 @@ func (j *Engine) PreCheck() error {
 	}
 	token := string(secret.Data["jenkins-admin-password"])
 
-	client, err := New(url, user, token)
-	if err != nil {
-		return err
+	if j.Client == nil {
+		dial, err := j.Dialer.ClusterDialer(j.ClusterName)
+		if err != nil {
+			return err
+		}
+		httpClient := &http.Client{
+			Transport: &http.Transport{
+				Dial: dial,
+			},
+		}
+
+		client, err := New(url, user, token, httpClient)
+		if err != nil {
+			return err
+		}
+		j.Client = client
+	} else if j.Client.API != url || j.Client.Token != token {
+		client, err := New(url, user, token, j.Client.HTTPClient)
+		if err != nil {
+			return err
+		}
+		j.Client = client
 	}
-	j.Client = client
+
 	return nil
 }
 

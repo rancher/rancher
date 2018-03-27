@@ -31,13 +31,16 @@ type Client struct {
 	Token       string
 	CrumbHeader string
 	CrumbBody   string
+
+	HTTPClient *http.Client
 }
 
-func New(api string, user string, token string) (*Client, error) {
+func New(api string, user string, token string, httpClient *http.Client) (*Client, error) {
 	c := &Client{
-		API:   api,
-		User:  user,
-		Token: token,
+		API:        api,
+		User:       user,
+		Token:      token,
+		HTTPClient: httpClient,
 	}
 
 	if err := c.getCSRF(); err != nil {
@@ -53,9 +56,8 @@ func (c *Client) getCSRF() error {
 	}
 	req, _ := http.NewRequest(http.MethodGet, getCrumbURL.String(), nil)
 	req.SetBasicAuth(c.User, c.Token)
-	client := http.Client{}
 
-	resp, err := client.Do(req)
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -83,8 +85,8 @@ func (c *Client) deleteBuild(jobname string, buildNumber int) error {
 
 	req.Header.Add(c.CrumbHeader, c.CrumbBody)
 	req.SetBasicAuth(c.User, c.Token)
-	client := http.Client{}
-	resp, err := client.Do(req)
+
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -109,8 +111,8 @@ func (c *Client) execScript(script string) (string, error) {
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Add(c.CrumbHeader, c.CrumbBody)
 	req.SetBasicAuth(c.User, c.Token)
-	client := http.Client{}
-	resp, err := client.Do(req)
+
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -135,8 +137,8 @@ func (c *Client) createJob(jobname string, content []byte) error {
 	req.Header.Add(c.CrumbHeader, c.CrumbBody)
 	req.Header.Set("Content-Type", "application/xml")
 	req.SetBasicAuth(c.User, c.Token)
-	client := http.Client{}
-	resp, err := client.Do(req)
+
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -161,8 +163,8 @@ func (c *Client) updateJob(jobname string, content []byte) error {
 	req.Header.Add(c.CrumbHeader, c.CrumbBody)
 	req.Header.Set("Content-Type", "application/xml")
 	req.SetBasicAuth(c.User, c.Token)
-	client := http.Client{}
-	resp, err := client.Do(req)
+
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -188,8 +190,8 @@ func (c *Client) buildJob(jobname string, params map[string]string) (string, err
 
 	req.Header.Add(c.CrumbHeader, c.CrumbBody)
 	req.SetBasicAuth(c.User, c.Token)
-	client := http.Client{}
-	resp, err := client.Do(req)
+
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -214,8 +216,8 @@ func (c *Client) getBuildInfo(jobname string) (*BuildInfo, error) {
 
 	req.Header.Add(c.CrumbHeader, c.CrumbBody)
 	req.SetBasicAuth(c.User, c.Token)
-	client := http.Client{}
-	resp, err := client.Do(req)
+
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -249,8 +251,8 @@ func (c *Client) getJobInfo(jobname string) (*JobInfo, error) {
 
 	req.Header.Add(c.CrumbHeader, c.CrumbBody)
 	req.SetBasicAuth(c.User, c.Token)
-	client := http.Client{}
-	resp, err := client.Do(req)
+
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -287,8 +289,8 @@ func (c *Client) getBuildRawOutput(jobname string, buildNumber int, startLine in
 
 	req.Header.Add(c.CrumbHeader, c.CrumbBody)
 	req.SetBasicAuth(c.User, c.Token)
-	client := http.Client{}
-	resp, err := client.Do(req)
+
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -313,8 +315,8 @@ func (c *Client) stopJob(jobname string, buildNumber int) error {
 
 	req.Header.Add(c.CrumbHeader, c.CrumbBody)
 	req.SetBasicAuth(c.User, c.Token)
-	client := http.Client{}
-	resp, err := client.Do(req)
+
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -366,8 +368,8 @@ func (c *Client) getWFBuildInfo(jobname string) (*WFBuildInfo, error) {
 
 	req.Header.Add(c.CrumbHeader, c.CrumbBody)
 	req.SetBasicAuth(c.User, c.Token)
-	client := http.Client{}
-	resp, err := client.Do(req)
+
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -399,8 +401,8 @@ func (c *Client) getWFNodeInfo(jobname string, nodeID string) (*WFNodeInfo, erro
 
 	req.Header.Add(c.CrumbHeader, c.CrumbBody)
 	req.SetBasicAuth(c.User, c.Token)
-	client := http.Client{}
-	resp, err := client.Do(req)
+
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -432,8 +434,8 @@ func (c *Client) getWFNodeLog(jobname string, nodeID string) (*WFNodeLog, error)
 
 	req.Header.Add(c.CrumbHeader, c.CrumbBody)
 	req.SetBasicAuth(c.User, c.Token)
-	client := http.Client{}
-	resp, err := client.Do(req)
+
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -463,8 +465,8 @@ func (c *Client) createCredential(content []byte) error {
 	req.Header.Add(c.CrumbHeader, c.CrumbBody)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.SetBasicAuth(c.User, c.Token)
-	client := http.Client{}
-	resp, err := client.Do(req)
+
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -487,8 +489,8 @@ func (c *Client) getCredential(credentialID string) error {
 	req, _ := http.NewRequest(http.MethodGet, getCredURL.String(), nil)
 	req.Header.Add(c.CrumbHeader, c.CrumbBody)
 	req.SetBasicAuth(c.User, c.Token)
-	client := http.Client{}
-	resp, err := client.Do(req)
+
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return err
 	}
