@@ -46,7 +46,7 @@ type Pipeline struct {
 	LastStarted           string                `json:"lastStarted,omitempty" yaml:"lastStarted,omitempty"`
 	Name                  string                `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId           string                `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
-	NextRun               *int64                `json:"nextRun,omitempty" yaml:"nextRun,omitempty"`
+	NextRun               int64                 `json:"nextRun,omitempty" yaml:"nextRun,omitempty"`
 	NextStart             string                `json:"nextStart,omitempty" yaml:"nextStart,omitempty"`
 	OwnerReferences       []OwnerReference      `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PipelineState         string                `json:"pipelineState,omitempty" yaml:"pipelineState,omitempty"`

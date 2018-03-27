@@ -47,7 +47,7 @@ type PipelineExecution struct {
 	PipelineId           string            `json:"pipelineId,omitempty" yaml:"pipelineId,omitempty"`
 	ProjectId            string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	Removed              string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	Run                  *int64            `json:"run,omitempty" yaml:"run,omitempty"`
+	Run                  int64             `json:"run,omitempty" yaml:"run,omitempty"`
 	Stages               []StageStatus     `json:"stages,omitempty" yaml:"stages,omitempty"`
 	Started              string            `json:"started,omitempty" yaml:"started,omitempty"`
 	State                string            `json:"state,omitempty" yaml:"state,omitempty"`

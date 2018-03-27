@@ -38,7 +38,7 @@ type ProjectLogging struct {
 	Labels               map[string]string    `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                 string               `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId          string               `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
-	OutputFlushInterval  *int64               `json:"outputFlushInterval,omitempty" yaml:"outputFlushInterval,omitempty"`
+	OutputFlushInterval  int64                `json:"outputFlushInterval,omitempty" yaml:"outputFlushInterval,omitempty"`
 	OutputTags           map[string]string    `json:"outputTags,omitempty" yaml:"outputTags,omitempty"`
 	OwnerReferences      []OwnerReference     `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	ProjectId            string               `json:"projectId,omitempty" yaml:"projectId,omitempty"`

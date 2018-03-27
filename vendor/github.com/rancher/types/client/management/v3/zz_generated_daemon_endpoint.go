@@ -6,5 +6,5 @@ const (
 )
 
 type DaemonEndpoint struct {
-	Port *int64 `json:"Port,omitempty" yaml:"Port,omitempty"`
+	Port int64 `json:"Port,omitempty" yaml:"Port,omitempty"`
 }

@@ -14,7 +14,7 @@ const (
 
 type Status struct {
 	APIVersion string         `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
-	Code       *int64         `json:"code,omitempty" yaml:"code,omitempty"`
+	Code       int64          `json:"code,omitempty" yaml:"code,omitempty"`
 	Details    *StatusDetails `json:"details,omitempty" yaml:"details,omitempty"`
 	Kind       string         `json:"kind,omitempty" yaml:"kind,omitempty"`
 	ListMeta   *ListMeta      `json:"metadata,omitempty" yaml:"metadata,omitempty"`

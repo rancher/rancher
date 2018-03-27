@@ -30,7 +30,7 @@ type ClusterEvent struct {
 	types.Resource
 	Annotations     map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	ClusterId       string            `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
-	Count           *int64            `json:"count,omitempty" yaml:"count,omitempty"`
+	Count           int64             `json:"count,omitempty" yaml:"count,omitempty"`
 	Created         string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID       string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	EventType       string            `json:"eventType,omitempty" yaml:"eventType,omitempty"`

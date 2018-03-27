@@ -24,10 +24,10 @@ type Question struct {
 	Group        string   `json:"group,omitempty" yaml:"group,omitempty"`
 	InvalidChars string   `json:"invalidChars,omitempty" yaml:"invalidChars,omitempty"`
 	Label        string   `json:"label,omitempty" yaml:"label,omitempty"`
-	Max          *int64   `json:"max,omitempty" yaml:"max,omitempty"`
-	MaxLength    *int64   `json:"maxLength,omitempty" yaml:"maxLength,omitempty"`
-	Min          *int64   `json:"min,omitempty" yaml:"min,omitempty"`
-	MinLength    *int64   `json:"minLength,omitempty" yaml:"minLength,omitempty"`
+	Max          int64    `json:"max,omitempty" yaml:"max,omitempty"`
+	MaxLength    int64    `json:"maxLength,omitempty" yaml:"maxLength,omitempty"`
+	Min          int64    `json:"min,omitempty" yaml:"min,omitempty"`
+	MinLength    int64    `json:"minLength,omitempty" yaml:"minLength,omitempty"`
 	Options      []string `json:"options,omitempty" yaml:"options,omitempty"`
 	Required     bool     `json:"required,omitempty" yaml:"required,omitempty"`
 	Type         string   `json:"type,omitempty" yaml:"type,omitempty"`

@@ -43,7 +43,7 @@ type ActiveDirectoryConfig struct {
 	AllowedPrincipalIDs         []string          `json:"allowedPrincipalIds,omitempty" yaml:"allowedPrincipalIds,omitempty"`
 	Annotations                 map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Certificate                 string            `json:"certificate,omitempty" yaml:"certificate,omitempty"`
-	ConnectionTimeout           *int64            `json:"connectionTimeout,omitempty" yaml:"connectionTimeout,omitempty"`
+	ConnectionTimeout           int64             `json:"connectionTimeout,omitempty" yaml:"connectionTimeout,omitempty"`
 	Created                     string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                   string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	DefaultLoginDomain          string            `json:"defaultLoginDomain,omitempty" yaml:"defaultLoginDomain,omitempty"`
@@ -58,14 +58,14 @@ type ActiveDirectoryConfig struct {
 	Labels                      map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                        string            `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences             []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	Port                        *int64            `json:"port,omitempty" yaml:"port,omitempty"`
+	Port                        int64             `json:"port,omitempty" yaml:"port,omitempty"`
 	Removed                     string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Servers                     []string          `json:"servers,omitempty" yaml:"servers,omitempty"`
 	ServiceAccountPassword      string            `json:"serviceAccountPassword,omitempty" yaml:"serviceAccountPassword,omitempty"`
 	ServiceAccountUsername      string            `json:"serviceAccountUsername,omitempty" yaml:"serviceAccountUsername,omitempty"`
 	TLS                         bool              `json:"tls,omitempty" yaml:"tls,omitempty"`
 	Type                        string            `json:"type,omitempty" yaml:"type,omitempty"`
-	UserDisabledBitMask         *int64            `json:"userDisabledBitMask,omitempty" yaml:"userDisabledBitMask,omitempty"`
+	UserDisabledBitMask         int64             `json:"userDisabledBitMask,omitempty" yaml:"userDisabledBitMask,omitempty"`
 	UserEnabledAttribute        string            `json:"userEnabledAttribute,omitempty" yaml:"userEnabledAttribute,omitempty"`
 	UserLoginAttribute          string            `json:"userLoginAttribute,omitempty" yaml:"userLoginAttribute,omitempty"`
 	UserNameAttribute           string            `json:"userNameAttribute,omitempty" yaml:"userNameAttribute,omitempty"`

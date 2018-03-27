@@ -15,6 +15,6 @@ type StatusDetails struct {
 	Group             string        `json:"group,omitempty" yaml:"group,omitempty"`
 	Kind              string        `json:"kind,omitempty" yaml:"kind,omitempty"`
 	Name              string        `json:"name,omitempty" yaml:"name,omitempty"`
-	RetryAfterSeconds *int64        `json:"retryAfterSeconds,omitempty" yaml:"retryAfterSeconds,omitempty"`
+	RetryAfterSeconds int64         `json:"retryAfterSeconds,omitempty" yaml:"retryAfterSeconds,omitempty"`
 	UID               string        `json:"uid,omitempty" yaml:"uid,omitempty"`
 }
