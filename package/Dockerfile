@@ -21,10 +21,16 @@ COPY --from=k8s /usr/bin/kubelet /usr/bin/kube-proxy /usr/bin/
 
 ENV CATTLE_UI_PATH /usr/share/rancher/ui
 ENV CATTLE_UI_VERSION 2.0.25
+ENV CATTLE_CLI_VERSION v1.0.0-alpha10
+
 RUN mkdir -p /usr/share/rancher/ui && \
     cd /usr/share/rancher/ui && \
     curl -sL https://releases.rancher.com/ui/${CATTLE_UI_VERSION}.tar.gz | tar xvzf - --strip-components=1 && \
     cd /var/lib/rancher
+
+ENV CATTLE_CLI_URL_DARWIN  https://releases.rancher.com/cli/${CATTLE_CLI_VERSION}/rancher-darwin-amd64-${CATTLE_CLI_VERSION}.tar.gz
+ENV CATTLE_CLI_URL_LINUX   https://releases.rancher.com/cli/${CATTLE_CLI_VERSION}/rancher-linux-amd64-${CATTLE_CLI_VERSION}.tar.gz
+ENV CATTLE_CLI_URL_WINDOWS https://releases.rancher.com/cli/${CATTLE_CLI_VERSION}/rancher-windows-386-${CATTLE_CLI_VERSION}.zip
 
 ARG VERSION=dev
 ENV CATTLE_SERVER_VERSION ${VERSION}
