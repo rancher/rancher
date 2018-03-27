@@ -450,8 +450,15 @@ func (s *server) serveACME(config *v3.ListenConfig) error {
 		HostPolicy: s.hostPolicy,
 	}
 	conf := &tls.Config{
-		GetCertificate: manager.GetCertificate,
-		NextProtos:     []string{"h2", "http/1.1"},
+		GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+			if hello.ServerName == "localhost" || hello.ServerName == "" {
+				newHello := *hello
+				newHello.ServerName = config.Domains[0]
+				return manager.GetCertificate(&newHello)
+			}
+			return manager.GetCertificate(hello)
+		},
+		NextProtos: []string{"h2", "http/1.1"},
 	}
 
 	httpsListener, err := s.newListener(s.httpsPort, conf)
