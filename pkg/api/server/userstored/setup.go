@@ -2,9 +2,11 @@ package userstored
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/rancher/norman/store/subtype"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/api/customization/yaml"
 	"github.com/rancher/rancher/pkg/api/store/cert"
 	"github.com/rancher/rancher/pkg/api/store/ingress"
 	"github.com/rancher/rancher/pkg/api/store/namespace"
@@ -20,7 +22,7 @@ import (
 	"github.com/rancher/types/config"
 )
 
-func Setup(ctx context.Context, mgmt *config.ScaledContext, clusterManager *clustermanager.Manager) error {
+func Setup(ctx context.Context, mgmt *config.ScaledContext, clusterManager *clustermanager.Manager, k8sProxy http.Handler) error {
 	// Here we setup all types that will be stored in the User cluster
 
 	schemas := mgmt.Schemas
@@ -45,12 +47,12 @@ func Setup(ctx context.Context, mgmt *config.ScaledContext, clusterManager *clus
 	Service(schemas)
 	Workload(schemas, mgmt)
 
-	SetProjectID(schemas, clusterManager)
+	SetProjectID(schemas, clusterManager, k8sProxy)
 
 	return nil
 }
 
-func SetProjectID(schemas *types.Schemas, clusterManager *clustermanager.Manager) {
+func SetProjectID(schemas *types.Schemas, clusterManager *clustermanager.Manager, k8sProxy http.Handler) {
 	for _, schema := range schemas.SchemasForVersion(schema.Version) {
 		if schema.Store == nil || schema.Store.Context() != config.UserStorageContext {
 			continue
@@ -69,6 +71,8 @@ func SetProjectID(schemas *types.Schemas, clusterManager *clustermanager.Manager
 		}
 
 		schema.Store = projectsetter.New(schema.Store, clusterManager)
+		schema.Formatter = yaml.NewFormatter(schema.Formatter)
+		schema.LinkHandler = yaml.NewLinkHandler(k8sProxy, clusterManager, schema.LinkHandler)
 	}
 }
 
