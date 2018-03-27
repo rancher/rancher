@@ -14,11 +14,11 @@ func Register(cluster *config.UserContext) {
 	projClient := cluster.Management.Management.Projects("").ObjectClient()
 	nodeLister := cluster.Core.Nodes("").Controller().Lister()
 	nsLister := cluster.Core.Namespaces("").Controller().Lister()
-	k8sClient := cluster.K8sClient
 	pods := cluster.Core.Pods("")
 	machines := cluster.Management.Management.Nodes(cluster.ClusterName)
+	npClient := cluster.Networking
 
-	npmgr := &netpolMgr{nsLister, nodeLister, pods, k8sClient}
+	npmgr := &netpolMgr{nsLister, nodeLister, pods, npClient}
 	ps := &projectSyncer{pnpLister, pnpClient, projClient}
 	nss := &nsSyncer{npmgr}
 	pnps := &projectNetworkPolicySyncer{npmgr}
