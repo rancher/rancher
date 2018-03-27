@@ -11,6 +11,9 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver("amazonec2", "local://", "", []string{"*.amazonaws.com", "*.amazonaws.com.cn"}, true, true, management); err != nil {
 		return err
 	}
+	if err := addMachineDriver("azure", "local://", "", nil, true, true, management); err != nil {
+		return err
+	}
 	if err := addMachineDriver("digitalocean", "local://", "", []string{"api.digitalocean.com"}, true, true, management); err != nil {
 		return err
 	}
