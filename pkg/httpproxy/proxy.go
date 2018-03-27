@@ -72,6 +72,8 @@ func (p *proxy) proxy(req *http.Request) error {
 		destPath = httpsStart.ReplaceAllString(destPath, "https://$1")
 	} else if httpStart.Match([]byte(destPath)) {
 		destPath = httpStart.ReplaceAllString(destPath, "http://$1")
+	} else {
+		destPath = "https://" + destPath
 	}
 
 	destURL, err := url.Parse(destPath)
