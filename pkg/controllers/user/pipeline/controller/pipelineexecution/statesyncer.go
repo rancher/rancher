@@ -2,6 +2,7 @@ package pipelineexecution
 
 import (
 	"context"
+	"github.com/rancher/norman/controller"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/engine"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ticker"
@@ -42,10 +43,16 @@ func (s *ExecutionStateSyncer) syncState() {
 	}
 
 	set := labels.Set(map[string]string{utils.PipelineFinishLabel: "false"})
-	executions, err := s.pipelineExecutionLister.List("", set.AsSelector())
+	allExecutions, err := s.pipelineExecutionLister.List("", set.AsSelector())
 	if err != nil {
 		logrus.Errorf("Error listing PipelineExecutions - %v", err)
 		return
+	}
+	executions := []*v3.PipelineExecution{}
+	for _, e := range allExecutions {
+		if controller.ObjectInCluster(s.clusterName, e) {
+			executions = append(executions, e)
+		}
 	}
 	if len(executions) < 1 {
 		return
