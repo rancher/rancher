@@ -7,14 +7,14 @@ import (
 
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	typescorev1 "github.com/rancher/types/apis/core/v1"
+	rnetworkingv1 "github.com/rancher/types/apis/networking.k8s.io/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	networkingv1 "k8s.io/api/networking/v1"
+	knetworkingv1 "k8s.io/api/networking/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -26,16 +26,16 @@ type netpolMgr struct {
 	nsLister   typescorev1.NamespaceLister
 	nodeLister typescorev1.NodeLister
 	pods       typescorev1.PodInterface
-	k8sClient  kubernetes.Interface
+	npClient   rnetworkingv1.Interface
 }
 
-func (npmgr *netpolMgr) program(np *networkingv1.NetworkPolicy) error {
-	existing, err := npmgr.k8sClient.NetworkingV1().NetworkPolicies(np.Namespace).Get(np.Name, v1.GetOptions{})
+func (npmgr *netpolMgr) program(np *knetworkingv1.NetworkPolicy) error {
+	existing, err := npmgr.npClient.NetworkPolicies(np.Namespace).Get(np.Name, v1.GetOptions{})
 	logrus.Debugf("netpolMgr: program: existing=%+v, err=%v", existing, err)
 	if err != nil {
 		if kerrors.IsNotFound(err) {
 			logrus.Debugf("about to create np=%+v", *np)
-			_, err = npmgr.k8sClient.NetworkingV1().NetworkPolicies(np.Namespace).Create(np)
+			_, err = npmgr.npClient.NetworkPolicies(np.Namespace).Create(np)
 			if err != nil && !kerrors.IsAlreadyExists(err) && !kerrors.IsForbidden(err) {
 				logrus.Errorf("netpolMgr: program: error creating network policy err=%v", err)
 				return err
@@ -47,7 +47,7 @@ func (npmgr *netpolMgr) program(np *networkingv1.NetworkPolicy) error {
 		logrus.Debugf("netpolMgr: program: existing=%+v", existing)
 		if existing.DeletionTimestamp == nil && !reflect.DeepEqual(existing, np) {
 			logrus.Debugf("about to update np=%+v", *np)
-			_, err = npmgr.k8sClient.NetworkingV1().NetworkPolicies(np.Namespace).Update(np)
+			_, err = npmgr.npClient.NetworkPolicies(np.Namespace).Update(np)
 			if err != nil {
 				logrus.Errorf("netpolMgr: program: error updating network policy err=%v", err)
 				return err
@@ -60,7 +60,7 @@ func (npmgr *netpolMgr) program(np *networkingv1.NetworkPolicy) error {
 }
 
 func (npmgr *netpolMgr) delete(policyNamespace, policyName string) error {
-	existing, err := npmgr.k8sClient.NetworkingV1().NetworkPolicies(policyNamespace).Get(policyName, v1.GetOptions{})
+	existing, err := npmgr.npClient.NetworkPolicies(policyNamespace).Get(policyName, v1.GetOptions{})
 	logrus.Debugf("netpolMgr: delete: existing=%+v, err=%v", existing, err)
 	if err != nil {
 		if kerrors.IsNotFound(err) {
@@ -69,7 +69,7 @@ func (npmgr *netpolMgr) delete(policyNamespace, policyName string) error {
 		logrus.Errorf("netpolMgr: delete: got unexpected error while getting network policy=%v", err)
 	} else {
 		logrus.Debugf("netpolMgr: delete: existing=%+v", existing)
-		err = npmgr.k8sClient.NetworkingV1().NetworkPolicies(existing.Namespace).Delete(existing.Name, &v1.DeleteOptions{})
+		err = npmgr.npClient.NetworkPolicies(existing.Namespace).Delete(existing.Name, &v1.DeleteOptions{})
 		if err != nil {
 			logrus.Errorf("netpolMgr: delete: error deleting network policy err=%v", err)
 			return err
@@ -95,19 +95,19 @@ func (npmgr *netpolMgr) programNetworkPolicy(projectID string) error {
 			continue
 		}
 		policyName := "np-default"
-		np := &networkingv1.NetworkPolicy{
+		np := &knetworkingv1.NetworkPolicy{
 			ObjectMeta: v1.ObjectMeta{
 				Name:      policyName,
 				Namespace: aNS.Name,
 				Labels:    labels.Set(map[string]string{nslabels.ProjectIDFieldLabel: projectID}),
 			},
-			Spec: networkingv1.NetworkPolicySpec{
+			Spec: knetworkingv1.NetworkPolicySpec{
 				// An empty PodSelector selects all pods in this Namespace.
 				PodSelector: v1.LabelSelector{},
-				Ingress: []networkingv1.NetworkPolicyIngressRule{
-					networkingv1.NetworkPolicyIngressRule{
-						From: []networkingv1.NetworkPolicyPeer{
-							networkingv1.NetworkPolicyPeer{
+				Ingress: []knetworkingv1.NetworkPolicyIngressRule{
+					knetworkingv1.NetworkPolicyIngressRule{
+						From: []knetworkingv1.NetworkPolicyPeer{
+							knetworkingv1.NetworkPolicyPeer{
 								NamespaceSelector: &v1.LabelSelector{
 									MatchLabels: map[string]string{nslabels.ProjectIDFieldLabel: projectID},
 								},
@@ -125,7 +125,7 @@ func (npmgr *netpolMgr) programNetworkPolicy(projectID string) error {
 
 func (npmgr *netpolMgr) hostPortsUpdateHandler(pod *corev1.Pod) error {
 	policyName := getHostPortsPolicyName(pod)
-	np := &networkingv1.NetworkPolicy{
+	np := &knetworkingv1.NetworkPolicy{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      policyName,
 			Namespace: pod.Namespace,
@@ -138,14 +138,14 @@ func (npmgr *netpolMgr) hostPortsUpdateHandler(pod *corev1.Pod) error {
 				},
 			},
 		},
-		Spec: networkingv1.NetworkPolicySpec{
+		Spec: knetworkingv1.NetworkPolicySpec{
 			PodSelector: v1.LabelSelector{
 				MatchLabels: map[string]string{PodNameFieldLabel: pod.Name},
 			},
-			Ingress: []networkingv1.NetworkPolicyIngressRule{
-				networkingv1.NetworkPolicyIngressRule{
-					From:  []networkingv1.NetworkPolicyPeer{},
-					Ports: []networkingv1.NetworkPolicyPort{},
+			Ingress: []knetworkingv1.NetworkPolicyIngressRule{
+				knetworkingv1.NetworkPolicyIngressRule{
+					From:  []knetworkingv1.NetworkPolicyPeer{},
+					Ports: []knetworkingv1.NetworkPolicyPort{},
 				},
 			},
 		},
@@ -157,7 +157,7 @@ func (npmgr *netpolMgr) hostPortsUpdateHandler(pod *corev1.Pod) error {
 			if port.HostPort != 0 {
 				hp := intstr.FromInt(int(port.ContainerPort))
 				proto := corev1.Protocol(port.Protocol)
-				p := networkingv1.NetworkPolicyPort{
+				p := knetworkingv1.NetworkPolicyPort{
 					Protocol: &proto,
 					Port:     &hp,
 				}
@@ -188,7 +188,7 @@ func getNodePortsPolicyName(service *corev1.Service) string {
 
 func (npmgr *netpolMgr) nodePortsUpdateHandler(service *corev1.Service) error {
 	policyName := getNodePortsPolicyName(service)
-	np := &networkingv1.NetworkPolicy{
+	np := &knetworkingv1.NetworkPolicy{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      policyName,
 			Namespace: service.Namespace,
@@ -201,14 +201,14 @@ func (npmgr *netpolMgr) nodePortsUpdateHandler(service *corev1.Service) error {
 				},
 			},
 		},
-		Spec: networkingv1.NetworkPolicySpec{
+		Spec: knetworkingv1.NetworkPolicySpec{
 			PodSelector: v1.LabelSelector{
 				MatchLabels: service.Spec.Selector,
 			},
-			Ingress: []networkingv1.NetworkPolicyIngressRule{
-				networkingv1.NetworkPolicyIngressRule{
-					From:  []networkingv1.NetworkPolicyPeer{},
-					Ports: []networkingv1.NetworkPolicyPort{},
+			Ingress: []knetworkingv1.NetworkPolicyIngressRule{
+				knetworkingv1.NetworkPolicyIngressRule{
+					From:  []knetworkingv1.NetworkPolicyPeer{},
+					Ports: []knetworkingv1.NetworkPolicyPort{},
 				},
 			},
 		},
@@ -219,7 +219,7 @@ func (npmgr *netpolMgr) nodePortsUpdateHandler(service *corev1.Service) error {
 		if port.NodePort != 0 {
 			tp := port.TargetPort
 			proto := corev1.Protocol(port.Protocol)
-			p := networkingv1.NetworkPolicyPort{
+			p := knetworkingv1.NetworkPolicyPort{
 				Protocol: &proto,
 				Port:     &tp,
 			}
@@ -237,15 +237,15 @@ func (npmgr *netpolMgr) nodePortsUpdateHandler(service *corev1.Service) error {
 
 func (npmgr *netpolMgr) handleHostNetwork() error {
 	policyName := "hn-nodes"
-	np := &networkingv1.NetworkPolicy{
+	np := &knetworkingv1.NetworkPolicy{
 		ObjectMeta: v1.ObjectMeta{
 			Name: policyName,
 		},
-		Spec: networkingv1.NetworkPolicySpec{
+		Spec: knetworkingv1.NetworkPolicySpec{
 			PodSelector: v1.LabelSelector{},
-			Ingress: []networkingv1.NetworkPolicyIngressRule{
-				networkingv1.NetworkPolicyIngressRule{
-					From: []networkingv1.NetworkPolicyPeer{},
+			Ingress: []knetworkingv1.NetworkPolicyIngressRule{
+				knetworkingv1.NetworkPolicyIngressRule{
+					From: []knetworkingv1.NetworkPolicyPeer{},
 				},
 			},
 		},
@@ -270,11 +270,11 @@ func (npmgr *netpolMgr) handleHostNetwork() error {
 			logrus.Errorf("couldn't parse PodCIDR(%v) err=%v", node.Spec.PodCIDR, err)
 			continue
 		}
-		ipBlock := networkingv1.IPBlock{
+		ipBlock := knetworkingv1.IPBlock{
 			CIDR:   podCIDRFirstIP.String() + "/32",
 			Except: []string{},
 		}
-		np.Spec.Ingress[0].From = append(np.Spec.Ingress[0].From, networkingv1.NetworkPolicyPeer{IPBlock: &ipBlock})
+		np.Spec.Ingress[0].From = append(np.Spec.Ingress[0].From, knetworkingv1.NetworkPolicyPeer{IPBlock: &ipBlock})
 	}
 
 	namespaces, err := npmgr.nsLister.List("", labels.Everything())
