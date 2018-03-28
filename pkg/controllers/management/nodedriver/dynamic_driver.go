@@ -236,10 +236,18 @@ func (d *Driver) copyBinary(cacheFile, input string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		driverName = strings.Split(path.Base(u.Path), "_")[0]
-		if !strings.HasPrefix(driverName, "docker-machine-driver-") {
+		if !strings.HasPrefix(path.Base(u.Path), "docker-machine-driver-") {
 			return "", fmt.Errorf("invalid URL %s, path should be of the format docker-machine-driver-*", d.url)
 		}
+
+		s := strings.TrimPrefix(path.Base(u.Path), "docker-machine-driver-")
+		name := strings.FieldsFunc(s, func(r rune) bool {
+			return r == '-' || r == '_'
+		})[0]
+		if name == "" {
+			return "", fmt.Errorf("invalid URL %s, NAME is empty, path should be of the format docker-machine-driver-NAME", d.url)
+		}
+		driverName = "docker-machine-driver-" + name
 	} else {
 		if err := exec.Command("tar", "xvf", input, "-C", temp).Run(); err != nil {
 			if err := exec.Command("unzip", "-o", input, "-d", temp).Run(); err != nil {
@@ -277,6 +285,7 @@ func (d *Driver) copyBinary(cacheFile, input string) (string, error) {
 		return "", err
 	}
 
+	driverName = strings.ToLower(driverName)
 	dest, err := os.Create(cacheFile + "-" + driverName)
 	if err != nil {
 		return "", err
@@ -359,7 +368,7 @@ func isInstalled(file string) (string, error) {
 	if os.IsNotExist(err) {
 		return "", nil
 	}
-	return strings.TrimSpace(string(content)), err
+	return strings.ToLower(strings.TrimSpace(string(content))), err
 }
 
 func sha256Bytes(content []byte) string {
