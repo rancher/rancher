@@ -119,3 +119,11 @@ type SyslogConfig struct {
 	Program  string `json:"program,omitempty"`
 	Protocol string `json:"protocol,omitempty" norman:"default=udp,type=enum,options=udp|tcp"`
 }
+
+type LoggingSystemImages struct {
+	Fluentd       string `json:"fluentd,omitempty"`
+	FluentdHelper string `json:"fluentdHelper,omitempty"`
+	Elaticsearch  string `json:"elaticsearch,omitempty"`
+	Kibana        string `json:"kibana,omitempty"`
+	Busybox       string `json:"busybox,omitempty"`
+}

@@ -235,3 +235,10 @@ type AuthUserInput struct {
 	RedirectURL    string `json:"redirectUrl,omitempty" norman:"type=string"`
 	Code           string `json:"code,omitempty" norman:"type=string,required"`
 }
+
+type PipelineSystemImages struct {
+	Jenkins       string `json:"jenkins,omitempty"`
+	JenkinsJnlp   string `json:"jenkinsJnlp,omitempty"`
+	AlpineGit     string `json:"alpineGit,omitempty"`
+	PluginsDocker string `json:"pluginsDocker,omitempty"`
+}

@@ -184,6 +184,7 @@ type URLBuilder interface {
 	FilterLink(schema *Schema, fieldName string, value string) string
 	Action(action string, resource *RawResource) string
 	ResourceLinkByID(schema *Schema, id string) string
+	ActionLinkByID(schema *Schema, id string, action string) string
 }
 
 type StorageContext string

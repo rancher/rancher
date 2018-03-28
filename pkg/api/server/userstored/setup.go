@@ -43,7 +43,7 @@ func Setup(ctx context.Context, mgmt *config.ScaledContext, clusterManager *clus
 
 	Secret(mgmt, schemas)
 	Service(schemas)
-	Workload(schemas)
+	Workload(schemas, mgmt)
 
 	SetProjectID(schemas, clusterManager)
 
@@ -72,8 +72,8 @@ func SetProjectID(schemas *types.Schemas, clusterManager *clustermanager.Manager
 	}
 }
 
-func Workload(schemas *types.Schemas) {
-	workload.ConfigureStore(schemas)
+func Workload(schemas *types.Schemas, management *config.ScaledContext) {
+	workload.ConfigureStore(schemas, management)
 }
 
 func Service(schemas *types.Schemas) {
