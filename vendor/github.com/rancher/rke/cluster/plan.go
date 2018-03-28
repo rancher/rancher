@@ -246,7 +246,9 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host) v3.Process {
 		"require-kubeconfig":        "True",
 		"fail-swap-on":              strconv.FormatBool(c.Services.Kubelet.FailSwapOn),
 	}
-
+	if host.Address != host.InternalAddress {
+		CommandArgs["node-ip"] = host.InternalAddress
+	}
 	VolumesFrom := []string{
 		services.SidekickContainerName,
 	}

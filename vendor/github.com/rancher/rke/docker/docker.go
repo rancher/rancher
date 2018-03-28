@@ -209,7 +209,7 @@ func UseLocalOrPull(ctx context.Context, dClient *client.Client, hostname string
 		logrus.Debugf("[%s] No pull necessary, image [%s] exists on host [%s]", plane, containerImage, hostname)
 		return nil
 	}
-	logrus.Debugf("[%s] Pulling image [%s] on host [%s]", plane, containerImage, hostname)
+	logrus.Infof("[%s] Pulling image [%s] on host [%s]", plane, containerImage, hostname)
 	if err := pullImage(ctx, dClient, hostname, containerImage, prsMap); err != nil {
 		return err
 	}

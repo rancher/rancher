@@ -4,8 +4,13 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"time"
 
 	"golang.org/x/crypto/ssh"
+)
+
+const (
+	DockerDialerTimeout = 30
 )
 
 type DialerFactory func(h *Host) (func(network, address string) (net.Conn, error), error)
@@ -105,9 +110,13 @@ func (h *Host) newHTTPClient(dialerFactory DialerFactory) (*http.Client, error) 
 	if err != nil {
 		return nil, err
 	}
+	dockerDialerTimeout := time.Second * DockerDialerTimeout
 	return &http.Client{
 		Transport: &http.Transport{
-			Dial: dialer,
+			Dial:                  dialer,
+			TLSHandshakeTimeout:   dockerDialerTimeout,
+			IdleConnTimeout:       dockerDialerTimeout,
+			ResponseHeaderTimeout: dockerDialerTimeout,
 		},
 	}, nil
 }

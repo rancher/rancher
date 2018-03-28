@@ -112,11 +112,8 @@ func (c *Cluster) deployAddonsInclude(ctx context.Context) error {
 
 func validateUserAddonYAML(addon []byte) error {
 	yamlContents := make(map[string]interface{})
-	if err := yaml.Unmarshal(addon, &yamlContents); err != nil {
-		return err
-	}
 
-	return nil
+	return yaml.Unmarshal(addon, &yamlContents)
 }
 
 func isFilePath(addonPath string) bool {

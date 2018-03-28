@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	DefaultRetries      = 5
-	DefaultSleepSeconds = 5
+	DefaultRetries          = 5
+	DefaultSleepSeconds     = 5
+	K8sWrapTransportTimeout = 30
 )
 
 type k8sCall func(*kubernetes.Clientset, interface{}) error
@@ -28,6 +29,7 @@ func NewClient(kubeConfigPath string, k8sWrapTransport WrapTransport) (*kubernet
 	if k8sWrapTransport != nil {
 		config.WrapTransport = k8sWrapTransport
 	}
+	config.Timeout = time.Second * time.Duration(K8sWrapTransportTimeout)
 	K8sClientSet, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return nil, err
