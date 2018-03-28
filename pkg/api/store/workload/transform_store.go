@@ -55,6 +55,7 @@ func SetPublicEnpointsFields(data map[string]interface{}) {
 			}
 			epMap["serviceId"] = epMap["serviceName"]
 			epMap["nodeId"] = epMap["nodeName"]
+			epMap["ingressId"] = epMap["ingressName"]
 		}
 	}
 }

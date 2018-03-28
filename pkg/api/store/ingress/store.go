@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
+	"github.com/rancher/rancher/pkg/api/store/workload"
 	"github.com/sirupsen/logrus"
 )
 
@@ -56,7 +57,7 @@ func formatData(data map[string]interface{}, forFrontend bool) {
 
 	updateCerts(data, forFrontend, oldState, newState)
 	setState(data, newState)
-
+	workload.SetPublicEnpointsFields(data)
 }
 
 func updateRule(target map[string]interface{}, hostpath string, forFrontend bool, data map[string]interface{}, oldState map[string]string, newState map[string]string) {

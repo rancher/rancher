@@ -2,9 +2,7 @@ package ingress
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
-	"fmt"
 
 	"strconv"
 
@@ -46,7 +44,7 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) error {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil
 	}
-	state := getIngressState(obj)
+	state := GetIngressState(obj)
 	if state == nil {
 		return nil
 	}
@@ -57,7 +55,7 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) error {
 		for _, b := range r.HTTP.Paths {
 			path := b.Path
 			port := b.Backend.ServicePort.IntVal
-			key := getStateKey(host, path, convert.ToString(port))
+			key := GetStateKey(host, path, convert.ToString(port))
 			if _, ok := state[key]; ok {
 				serviceToKey[b.Backend.ServiceName] = key
 				serviceToPort[b.Backend.ServiceName] = convert.ToString(port)
@@ -67,7 +65,7 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) error {
 	if obj.Spec.Backend != nil {
 		serviceName := obj.Spec.Backend.ServiceName
 		portStr := convert.ToString(obj.Spec.Backend.ServicePort.IntVal)
-		key := getStateKey("", "", portStr)
+		key := GetStateKey("", "", portStr)
 		if _, ok := state[key]; ok {
 			serviceToKey[serviceName] = key
 			serviceToPort[serviceName] = portStr
@@ -147,23 +145,5 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) error {
 		}
 	}
 
-	return nil
-}
-
-func getStateKey(host string, path string, port string) string {
-	key := fmt.Sprintf("%s/%s/%s", host, path, port)
-	return base64.URLEncoding.EncodeToString([]byte(key))
-}
-
-func getIngressState(obj *v1beta1.Ingress) map[string]string {
-	annotations := obj.Annotations
-	if annotations == nil {
-		return nil
-	}
-	if v, ok := annotations["ingress.cattle.io/state"]; ok {
-		state := make(map[string]string)
-		json.Unmarshal([]byte(convert.ToString(v)), &state)
-		return state
-	}
 	return nil
 }
