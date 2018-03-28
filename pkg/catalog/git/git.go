@@ -2,6 +2,7 @@ package git
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
 	"os/exec"
 	"strings"
 )
@@ -21,6 +22,16 @@ func HeadCommit(path string) (string, error) {
 	cmd := exec.Command("git", "-C", path, "rev-parse", "HEAD")
 	output, err := cmd.Output()
 	return strings.Trim(string(output), "\n"), err
+}
+
+func RemoteBranchHeadCommit(url, branch string) (string, error) {
+	cmd := exec.Command("git", "ls-remote", url, branch)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", errors.Wrap(err, string(output))
+	}
+	parts := strings.Split(string(output), "\t")
+	return parts[0], nil
 }
 
 func IsValid(url string) bool {

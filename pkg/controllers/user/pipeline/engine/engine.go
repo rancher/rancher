@@ -8,7 +8,7 @@ import (
 
 type PipelineEngine interface {
 	PreCheck() error
-	RunPipeline(pipeline *v3.Pipeline, triggerType string) error
+	RunPipelineExecution(execution *v3.PipelineExecution, triggerType string) error
 	RerunExecution(execution *v3.PipelineExecution) error
 	StopExecution(execution *v3.PipelineExecution) error
 	GetStepLog(execution *v3.PipelineExecution, stage int, step int) (string, error)

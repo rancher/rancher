@@ -24,8 +24,9 @@ var (
 	IngressResource = metav1.APIResource{
 		Name:         "ingresses",
 		SingularName: "ingress",
-		Namespaced:   false,
-		Kind:         IngressGroupVersionKind.Kind,
+		Namespaced:   true,
+
+		Kind: IngressGroupVersionKind.Kind,
 	}
 )
 

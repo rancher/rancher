@@ -85,26 +85,26 @@ func (j *Engine) PreCheck() error {
 	return nil
 }
 
-func (j *Engine) RunPipeline(pipeline *v3.Pipeline, triggerType string) error {
+func (j *Engine) RunPipelineExecution(execution *v3.PipelineExecution, triggerType string) error {
 
-	jobName := getJobName(pipeline)
+	jobName := getJobName(execution)
 
 	if _, err := j.Client.getJobInfo(jobName); err == ErrNotFound {
-		if err = j.createPipelineJob(pipeline); err != nil {
+		if err = j.createPipelineJob(execution); err != nil {
 			return err
 		}
 	} else if err != nil {
 		return err
 	}
-	if err := j.updatePipelineJob(pipeline); err != nil {
+	if err := j.updatePipelineJob(execution); err != nil {
 		return err
 	}
 
-	if err := j.setCredential(pipeline); err != nil {
+	if err := j.setCredential(&execution.Spec.Pipeline); err != nil {
 		return err
 	}
 
-	if err := j.preparePipeline(pipeline); err != nil {
+	if err := j.preparePipeline(&execution.Spec.Pipeline); err != nil {
 		return err
 	}
 
@@ -187,32 +187,36 @@ func (j *Engine) prepareRegistryCredential(pipeline *v3.Pipeline, stage int, ste
 	return err
 }
 
-func (j *Engine) createPipelineJob(pipeline *v3.Pipeline) error {
+func (j *Engine) createPipelineJob(execution *v3.PipelineExecution) error {
 	logrus.Debug("create jenkins job for pipeline")
-	jobconf := ConvertPipelineToJenkinsPipeline(pipeline)
-
-	jobName := getJobName(pipeline)
+	jobconf, err := ConvertPipelineExecutionToJenkinsPipeline(execution)
+	if err != nil {
+		return err
+	}
+	jobName := getJobName(execution)
 	bconf, _ := xml.MarshalIndent(jobconf, "  ", "    ")
 	return j.Client.createJob(jobName, bconf)
 }
 
-func (j *Engine) updatePipelineJob(pipeline *v3.Pipeline) error {
+func (j *Engine) updatePipelineJob(execution *v3.PipelineExecution) error {
 	logrus.Debug("update jenkins job for pipeline")
-	jobconf := ConvertPipelineToJenkinsPipeline(pipeline)
-
-	jobName := getJobName(pipeline)
+	jobconf, err := ConvertPipelineExecutionToJenkinsPipeline(execution)
+	if err != nil {
+		return err
+	}
+	jobName := getJobName(execution)
 	bconf, _ := xml.MarshalIndent(jobconf, "  ", "    ")
 	return j.Client.updateJob(jobName, bconf)
 }
 
 func (j *Engine) RerunExecution(execution *v3.PipelineExecution) error {
 
-	return j.RunPipeline(&execution.Spec.Pipeline, utils.TriggerTypeUser)
+	return j.RunPipelineExecution(execution, utils.TriggerTypeUser)
 }
 
 func (j *Engine) StopExecution(execution *v3.PipelineExecution) error {
 
-	jobName := getJobName(&execution.Spec.Pipeline)
+	jobName := getJobName(execution)
 	buildNumber := execution.Spec.Run
 	info, err := j.Client.getJobInfo(jobName)
 	if err == ErrNotFound {
@@ -251,7 +255,7 @@ func (j *Engine) SyncExecution(execution *v3.PipelineExecution) (bool, error) {
 
 	updated := false
 
-	jobName := getJobName(&execution.Spec.Pipeline)
+	jobName := getJobName(execution)
 	buildinfo, err := j.Client.getBuildInfo(jobName)
 	if err == ErrNotFound {
 		//there is a chance that Jenkins job is created but build info is not available
@@ -326,6 +330,26 @@ func (j *Engine) SyncExecution(execution *v3.PipelineExecution) (bool, error) {
 	} else if info.Status == "IN_PROGRESS" && execution.Status.ExecutionState != utils.StateBuilding {
 		updated = true
 		execution.Status.ExecutionState = utils.StateBuilding
+	}
+
+	if execution.Status.ExecutionState == utils.StateBuilding {
+		if len(execution.Status.Stages) > 0 &&
+			len(execution.Status.Stages[0].Steps) > 0 &&
+			execution.Status.Stages[0].Steps[0].State == utils.StateWaiting {
+			//update ProvisionCondition
+			prepareLog, err := j.Client.getWFNodeLog(jobName, PrepareWFNodeID)
+			if err != nil {
+				return false, err
+			}
+			prevMessage := v3.PipelineExecutionConditonProvisioned.GetMessage(execution)
+			curMessage := translatePreparingMessage(prepareLog.Text)
+			if prevMessage != curMessage {
+				v3.PipelineExecutionConditonProvisioned.Message(execution, curMessage)
+				updated = true
+			}
+		} else {
+			v3.PipelineExecutionConditonProvisioned.True(execution)
+		}
 	}
 
 	return updated, nil
@@ -403,7 +427,7 @@ func buildingStep(execution *v3.PipelineExecution, stage int, step int, jenkinsS
 
 func (j Engine) GetStepLog(execution *v3.PipelineExecution, stage int, step int) (string, error) {
 
-	jobName := getJobName(&execution.Spec.Pipeline)
+	jobName := getJobName(execution)
 	info, err := j.Client.getWFBuildInfo(jobName)
 	if err != nil {
 		return "", err
@@ -435,15 +459,21 @@ func (j Engine) GetStepLog(execution *v3.PipelineExecution, stage int, step int)
 	return nodeLog.Text, nil
 }
 
-func getJobName(pipeline *v3.Pipeline) string {
-	return fmt.Sprintf("%s%s-%d", JenkinsJobPrefix, pipeline.Name, pipeline.Status.NextRun)
+func getJobName(execution *v3.PipelineExecution) string {
+	if execution == nil {
+		return ""
+	}
+	return fmt.Sprintf("%s%s", JenkinsJobPrefix, execution.Name)
 }
 
 func (j Engine) setCredential(pipeline *v3.Pipeline) error {
-	if !utils.ValidSourceCodeConfig(pipeline.Spec) {
-		return errors.New("Invalid pipeline definition")
+	if err := utils.ValidPipelineSpec(pipeline.Spec); err != nil {
+		return err
 	}
 	credentialID := pipeline.Spec.Stages[0].Steps[0].SourceCodeConfig.SourceCodeCredentialName
+	if credentialID == "" {
+		return nil
+	}
 	ns, name := ref.Parse(credentialID)
 	souceCodeCredential, err := j.SourceCodeCredentialLister.Get(ns, name)
 	if err != nil {
@@ -471,4 +501,18 @@ func (j Engine) setCredential(pipeline *v3.Pipeline) error {
 	buff := bytes.NewBufferString("json=")
 	buff.Write(b)
 	return j.Client.createCredential(buff.Bytes())
+}
+
+func translatePreparingMessage(log string) string {
+	log = strings.TrimRight(log, "\n")
+	lines := strings.Split(log, "\n")
+
+	message := lines[len(lines)-1]
+	if message == "" {
+		message = "Setting up executors"
+	}
+	if strings.Contains(message, " offline") {
+		message = "Waiting executors to be online"
+	}
+	return message
 }

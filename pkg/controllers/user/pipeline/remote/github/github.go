@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/google/go-github/github"
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/catalog/git"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/utils"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -16,6 +17,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"strings"
 )
 
 const (
@@ -94,8 +96,8 @@ func (c *client) Login(redirectURL string, code string) (*v3.SourceCodeCredentia
 }
 
 func (c *client) CreateHook(pipeline *v3.Pipeline, accessToken string) (string, error) {
-	if len(pipeline.Spec.Stages) <= 0 || len(pipeline.Spec.Stages[0].Steps) <= 0 || pipeline.Spec.Stages[0].Steps[0].SourceCodeConfig == nil {
-		return "", errors.New("invalid pipeline")
+	if err := utils.ValidPipelineSpec(pipeline.Spec); err != nil {
+		return "", err
 	}
 	sourceCodeConfig := pipeline.Spec.Stages[0].Steps[0].SourceCodeConfig
 	user, repo, err := getUserRepoFromURL(sourceCodeConfig.URL)
@@ -111,8 +113,8 @@ func (c *client) CreateHook(pipeline *v3.Pipeline, accessToken string) (string, 
 }
 
 func (c *client) DeleteHook(pipeline *v3.Pipeline, accessToken string) error {
-	if len(pipeline.Spec.Stages) <= 0 || len(pipeline.Spec.Stages[0].Steps) <= 0 || pipeline.Spec.Stages[0].Steps[0].SourceCodeConfig == nil {
-		return errors.New("invalid pipeline")
+	if err := utils.ValidPipelineSpec(pipeline.Spec); err != nil {
+		return err
 	}
 	sourceCodeConfig := pipeline.Spec.Stages[0].Steps[0].SourceCodeConfig
 	user, repo, err := getUserRepoFromURL(sourceCodeConfig.URL)
@@ -173,18 +175,12 @@ func convertAccount(gitaccount *github.User) *v3.SourceCodeCredential {
 	}
 	account := &v3.SourceCodeCredential{}
 	account.Spec.SourceCodeType = "github"
-	if gitaccount.AvatarURL != nil {
-		account.Spec.AvatarURL = *gitaccount.AvatarURL
-	}
-	if gitaccount.HTMLURL != nil {
-		account.Spec.HTMLURL = *gitaccount.HTMLURL
-	}
-	if gitaccount.Login != nil {
-		account.Spec.LoginName = *gitaccount.Login
-	}
-	if gitaccount.Name != nil {
-		account.Spec.DisplayName = *gitaccount.Name
-	}
+
+	account.Spec.AvatarURL = gitaccount.GetAvatarURL()
+	account.Spec.HTMLURL = gitaccount.GetHTMLURL()
+	account.Spec.LoginName = gitaccount.GetLogin()
+	account.Spec.DisplayName = gitaccount.GetName()
+
 	return account
 
 }
@@ -287,27 +283,31 @@ func (c *client) GetDefaultBranch(repoURL string, accessToken string) (string, e
 
 }
 
+func (c *client) GetHeadCommit(repoURL string, branch string, credential *v3.SourceCodeCredential) (string, error) {
+
+	if credential != nil {
+		userName := credential.Spec.LoginName
+		token := credential.Spec.AccessToken
+		repoURL = strings.Replace(repoURL, "://", "://"+userName+":"+token+"@", 1)
+	}
+
+	return git.RemoteBranchHeadCommit(repoURL, branch)
+}
+
 func convertRepos(repos []github.Repository) []v3.SourceCodeRepository {
 	result := []v3.SourceCodeRepository{}
 	for _, repo := range repos {
 		r := v3.SourceCodeRepository{}
-		if repo.CloneURL != nil {
-			r.Spec.URL = *repo.CloneURL
-		}
-		if repo.Language != nil {
-			r.Spec.Language = *repo.Language
-		}
-		if repo.Permissions != nil {
-			if (*repo.Permissions)["pull"] == true {
-				r.Spec.Permissions.Pull = true
-			}
-			if (*repo.Permissions)["push"] == true {
-				r.Spec.Permissions.Push = true
-			}
-			if (*repo.Permissions)["admin"] == true {
-				r.Spec.Permissions.Admin = true
-			}
-		}
+
+		r.Spec.URL = repo.GetCloneURL()
+		r.Spec.Language = repo.GetLanguage()
+		r.Spec.DefaultBranch = repo.GetDefaultBranch()
+
+		permissions := repo.GetPermissions()
+		r.Spec.Permissions.Pull = permissions["pull"]
+		r.Spec.Permissions.Push = permissions["push"]
+		r.Spec.Permissions.Admin = permissions["admin"]
+
 		result = append(result, r)
 	}
 	return result
@@ -345,7 +345,9 @@ func getFromGithub(githubAccessToken string, url string) (*http.Response, error)
 	q.Set("per_page", maxPerPage)
 	req.URL.RawQuery = q.Encode()
 
-	req.Header.Add("Authorization", "token "+githubAccessToken)
+	if githubAccessToken != "" {
+		req.Header.Add("Authorization", "token "+githubAccessToken)
+	}
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36)")
 	resp, err := client.Do(req)

@@ -18,4 +18,5 @@ const (
 	JenkinsWFNodeLogURI   = "/job/%s/lastBuild/execution/node/%s/wfapi/log"
 	JenkinsBuildLogURI    = "/job/%s/%d/timestamps/?elapsed=HH'h'mm'm'ss's'S'ms'&appendLog"
 	ScriptURI             = "/scriptText"
+	PrepareWFNodeID       = "5"
 )

@@ -7,7 +7,8 @@ const (
 	PipelineSpecFieldTemplates             = "templates"
 	PipelineSpecFieldTriggerCronExpression = "triggerCronExpression"
 	PipelineSpecFieldTriggerCronTimezone   = "triggerCronTimezone"
-	PipelineSpecFieldTriggerWebhook        = "triggerWebhook"
+	PipelineSpecFieldTriggerWebhookPr      = "triggerWebhookPr"
+	PipelineSpecFieldTriggerWebhookPush    = "triggerWebhookPush"
 )
 
 type PipelineSpec struct {
@@ -16,5 +17,6 @@ type PipelineSpec struct {
 	Templates             map[string]string `json:"templates,omitempty" yaml:"templates,omitempty"`
 	TriggerCronExpression string            `json:"triggerCronExpression,omitempty" yaml:"triggerCronExpression,omitempty"`
 	TriggerCronTimezone   string            `json:"triggerCronTimezone,omitempty" yaml:"triggerCronTimezone,omitempty"`
-	TriggerWebhook        bool              `json:"triggerWebhook,omitempty" yaml:"triggerWebhook,omitempty"`
+	TriggerWebhookPr      bool              `json:"triggerWebhookPr,omitempty" yaml:"triggerWebhookPr,omitempty"`
+	TriggerWebhookPush    bool              `json:"triggerWebhookPush,omitempty" yaml:"triggerWebhookPush,omitempty"`
 }

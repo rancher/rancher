@@ -28,4 +28,6 @@ type Remote interface {
 	GetPipelineFileInRepo(repoURL string, ref string, accessToken string) ([]byte, error)
 
 	GetDefaultBranch(repoURL string, accessToken string) (string, error)
+
+	GetHeadCommit(repoURL string, branch string, credential *v3.SourceCodeCredential) (string, error)
 }

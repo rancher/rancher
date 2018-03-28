@@ -3,26 +3,37 @@ package jenkins
 import (
 	"bytes"
 	"fmt"
+	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/utils"
+	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"regexp"
 	"strconv"
 	"strings"
 )
 
-func ConvertPipelineToJenkinsPipeline(pipeline *v3.Pipeline) PipelineJob {
-	parsedPipeline := parsePreservedEnvVar(*pipeline)
+func ConvertPipelineExecutionToJenkinsPipeline(execution *v3.PipelineExecution) (PipelineJob, error) {
+	if execution == nil {
+		return PipelineJob{}, errors.New("nil pipeline execution")
+	}
+
+	if err := utils.ValidPipelineSpec(execution.Spec.Pipeline.Spec); err != nil {
+		return PipelineJob{}, err
+	}
+
+	copyExecution := execution.DeepCopy()
+	parsePreservedEnvVar(copyExecution)
 	pipelineJob := PipelineJob{
 		Plugin: WorkflowJobPlugin,
 		Definition: Definition{
 			Class:   FlowDefinitionClass,
 			Plugin:  FlowDefinitionPlugin,
 			Sandbox: true,
-			Script:  convertPipeline(parsedPipeline),
+			Script:  convertPipelineExecution(copyExecution),
 		},
 	}
 
-	return pipelineJob
+	return pipelineJob, nil
 }
 
 func convertStep(pipeline *v3.Pipeline, stageOrdinal int, stepOrdinal int) string {
@@ -40,7 +51,13 @@ func convertStep(pipeline *v3.Pipeline, stageOrdinal int, stepOrdinal int) strin
 		} else if branchCondition == "all" {
 			branch = "**"
 		}
-		stepContent = fmt.Sprintf("git url: '%s', branch: '%s', credentialsId: '%s'", step.SourceCodeConfig.URL, branch, step.SourceCodeConfig.SourceCodeCredentialName)
+		isPr, _ := regexp.MatchString("refs/pull/([1-9]+)/head", branch)
+		if isPr {
+			stepContent = fmt.Sprintf("checkout([$class: 'GitSCM', branches: [[name: 'pr/temp']], userRemoteConfigs: [[url: '%s', refspec: '+%s:refs/remotes/pr/temp', credentialsId: '%s']]])",
+				step.SourceCodeConfig.URL, branch, step.SourceCodeConfig.SourceCodeCredentialName)
+		} else {
+			stepContent = fmt.Sprintf("git url: '%s', branch: '%s', credentialsId: '%s'", step.SourceCodeConfig.URL, branch, step.SourceCodeConfig.SourceCodeCredentialName)
+		}
 	} else if step.RunScriptConfig != nil {
 		if step.RunScriptConfig.IsShell {
 			stepContent = fmt.Sprintf(`sh ''' %s '''`, step.RunScriptConfig.ShellScript)
@@ -72,11 +89,12 @@ func convertStage(pipeline *v3.Pipeline, stageOrdinal int) string {
 	return fmt.Sprintf(stageBlock, stage.Name, buffer.String())
 }
 
-func convertPipeline(pipeline *v3.Pipeline) string {
+func convertPipelineExecution(execution *v3.PipelineExecution) string {
+	pipeline := execution.Spec.Pipeline
 	var containerbuffer bytes.Buffer
 	var pipelinebuffer bytes.Buffer
 	for j, stage := range pipeline.Spec.Stages {
-		pipelinebuffer.WriteString(convertStage(pipeline, j))
+		pipelinebuffer.WriteString(convertStage(&pipeline, j))
 		pipelinebuffer.WriteString("\n")
 		for k, step := range stage.Steps {
 			stepName := fmt.Sprintf("step-%d-%d", j, k)
@@ -87,7 +105,7 @@ func convertPipeline(pipeline *v3.Pipeline) string {
 			} else if step.RunScriptConfig != nil {
 				image = step.RunScriptConfig.Image
 
-				options = getPreservedEnvVarOptions(pipeline)
+				options = getPreservedEnvVarOptions(execution)
 			} else if step.PublishImageConfig != nil {
 				registry, repo, tag := utils.SplitImageTag(step.PublishImageConfig.Tag)
 				//TODO key-key mapping instead of registry-key mapping
@@ -122,18 +140,47 @@ func convertPipeline(pipeline *v3.Pipeline) string {
 	return fmt.Sprintf(pipelineBlock, containerbuffer.String(), pipelinebuffer.String())
 }
 
-func getPreservedEnvVarOptions(pipeline *v3.Pipeline) string {
+func getPreservedEnvVarOptions(execution *v3.PipelineExecution) string {
 	var buffer bytes.Buffer
-	buffer.WriteString(fmt.Sprintf(envVarSkel, "CICD_PIPELINE_NAME", pipeline.Spec.DisplayName))
-	buffer.WriteString(fmt.Sprintf(envVarSkel, "CICD_RUN_NUMBER", strconv.Itoa(pipeline.Status.NextRun)))
-
+	for k, v := range getEnvVarMap(execution) {
+		buffer.WriteString(fmt.Sprintf(envVarSkel, k, v))
+	}
 	return fmt.Sprintf(envVarsSkel, buffer.String())
 }
 
-func parsePreservedEnvVar(pipeline v3.Pipeline) *v3.Pipeline {
+func getEnvVarMap(execution *v3.PipelineExecution) map[string]string {
+
 	m := map[string]string{}
-	m["CICD_PIPELINE_NAME"] = pipeline.Spec.DisplayName
-	m["CICD_RUN_NUMBER"] = strconv.Itoa(pipeline.Status.NextRun)
+	sourceCodeConfig := execution.Spec.Pipeline.Spec.Stages[0].Steps[0].SourceCodeConfig
+	repoURL := sourceCodeConfig.URL
+	repoName := ""
+	if strings.Contains(repoURL, "/") {
+		trimmedURL := strings.TrimRight(repoURL, "/")
+		idx := strings.LastIndex(trimmedURL, "/")
+		repoName = strings.TrimSuffix(trimmedURL[idx+1:], ".git")
+	}
+
+	commit := execution.Status.Commit
+	if commit != "" && len(commit) > 7 {
+		//use abbreviated SHA
+		commit = commit[:7]
+	}
+
+	m["CICD_GIT_COMMIT"] = commit
+	m["CICD_GIT_REPO_NAME"] = repoName
+	m["CICD_GIT_BRANCH"] = sourceCodeConfig.Branch
+	m["CICD_GIT_URL"] = sourceCodeConfig.URL
+	m["CICD_PIPELINE_ID"] = execution.Spec.PipelineName
+	m["CICD_PIPELINE_NAME"] = execution.Spec.Pipeline.Spec.DisplayName
+	m["CICD_TRIGGER_TYPE"] = execution.Spec.TriggeredBy
+	m["CICD_EXECUTION_ID"] = ref.Ref(execution)
+	m["CICD_EXECUTION_SEQUENCE"] = strconv.Itoa(execution.Spec.Run)
+	return m
+}
+
+func parsePreservedEnvVar(execution *v3.PipelineExecution) {
+	m := getEnvVarMap(execution)
+	pipeline := execution.Spec.Pipeline
 
 	//environment variables substituion in configs
 	for _, stage := range pipeline.Spec.Stages {
@@ -149,7 +196,6 @@ func parsePreservedEnvVar(pipeline v3.Pipeline) *v3.Pipeline {
 			}
 		}
 	}
-	return &pipeline
 }
 
 const stageBlock = `stage('%s'){

@@ -39,7 +39,7 @@ func IsPipelineDeploy(clusterPipelineLister v3.ClusterPipelineLister, clusterNam
 	return clusterPipeline.Spec.Deploy
 }
 
-func InitExecution(p *v3.Pipeline, triggerType string, triggerUserName string, branch string) *v3.PipelineExecution {
+func InitExecution(p *v3.Pipeline, triggerType string, triggerUserName string, branch string, commit string) *v3.PipelineExecution {
 	execution := &v3.PipelineExecution{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      getNextExecutionName(p),
@@ -57,6 +57,9 @@ func InitExecution(p *v3.Pipeline, triggerType string, triggerUserName string, b
 	}
 	if branch != "" {
 		setExecutionBranch(execution, branch)
+	}
+	if commit != "" {
+		execution.Status.Commit = commit
 	}
 	execution.Status.ExecutionState = StateWaiting
 	execution.Status.Started = time.Now().Format(time.RFC3339)
@@ -127,10 +130,10 @@ func IsExecutionFinish(execution *v3.PipelineExecution) bool {
 	return false
 }
 
-func GenerateExecution(pipelines v3.PipelineInterface, executions v3.PipelineExecutionInterface, pipeline *v3.Pipeline, triggerType string, triggerUserName string, branch string) (*v3.PipelineExecution, error) {
+func GenerateExecution(pipelines v3.PipelineInterface, executions v3.PipelineExecutionInterface, pipeline *v3.Pipeline, triggerType string, triggerUserName string, branch string, commit string) (*v3.PipelineExecution, error) {
 
 	//Generate a new pipeline execution
-	execution := InitExecution(pipeline, triggerType, triggerUserName, branch)
+	execution := InitExecution(pipeline, triggerType, triggerUserName, branch, commit)
 	execution, err := executions.Create(execution)
 	if err != nil {
 		return nil, err
@@ -167,11 +170,11 @@ func SplitImageTag(image string) (string, string, string) {
 	return registry, repo, tag
 }
 
-func ValidSourceCodeConfig(spec v3.PipelineSpec) bool {
+func ValidPipelineSpec(spec v3.PipelineSpec) error {
 	if len(spec.Stages) < 1 ||
 		len(spec.Stages[0].Steps) < 1 ||
 		spec.Stages[0].Steps[0].SourceCodeConfig == nil {
-		return false
+		return fmt.Errorf("invalid definition for pipeline '%s': expect souce code step at the start", spec.DisplayName)
 	}
-	return true
+	return nil
 }
