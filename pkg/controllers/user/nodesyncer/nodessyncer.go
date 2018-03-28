@@ -332,6 +332,7 @@ func (m *NodesSyncer) convertNodeToNode(node *corev1.Node, existing *v3.Node, po
 		machine.Status.Limits = make(map[corev1.ResourceName]resource.Quantity)
 		machine.Spec.InternalNodeSpec = *node.Spec.DeepCopy()
 		machine.Status.InternalNodeStatus = *node.Status.DeepCopy()
+		machine.Spec.RequestedHostname = node.Name
 	} else {
 		machine = existing.DeepCopy()
 		machine.Spec.InternalNodeSpec = *node.Spec.DeepCopy()
