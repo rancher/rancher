@@ -37,7 +37,7 @@ type Host struct {
 
 const (
 	ToCleanEtcdDir       = "/var/lib/etcd"
-	ToCleanSSLDir        = "/etc/kubernetes/ssl"
+	ToCleanSSLDir        = "/etc/kubernetes"
 	ToCleanCNIConf       = "/etc/cni"
 	ToCleanCNIBin        = "/opt/cni"
 	ToCleanCNILib        = "/var/lib/cni"

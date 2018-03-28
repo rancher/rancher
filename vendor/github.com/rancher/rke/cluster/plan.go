@@ -97,7 +97,9 @@ func (c *Cluster) BuildKubeAPIProcess() v3.Process {
 		"kubelet-client-key":              pki.GetKeyPath(pki.KubeAPICertName),
 		"service-account-key-file":        pki.GetKeyPath(pki.KubeAPICertName),
 	}
-
+	if len(c.CloudProvider.Name) > 0 {
+		CommandArgs["cloud-config"] = CloudConfigPath
+	}
 	args := []string{
 		"--etcd-cafile=" + etcdCAClientCert,
 		"--etcd-certfile=" + etcdClientCert,
@@ -174,7 +176,9 @@ func (c *Cluster) BuildKubeControllerProcess() v3.Process {
 		"service-account-private-key-file": pki.GetKeyPath(pki.KubeAPICertName),
 		"root-ca-file":                     pki.GetCertPath(pki.CACertName),
 	}
-
+	if len(c.CloudProvider.Name) > 0 {
+		CommandArgs["cloud-config"] = CloudConfigPath
+	}
 	args := []string{}
 	if c.Authorization.Mode == services.RBACAuthorizationMode {
 		args = append(args, "--use-service-account-credentials=true")
@@ -248,6 +252,9 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host) v3.Process {
 	}
 	if host.Address != host.InternalAddress {
 		CommandArgs["node-ip"] = host.InternalAddress
+	}
+	if len(c.CloudProvider.Name) > 0 {
+		CommandArgs["cloud-config"] = CloudConfigPath
 	}
 	VolumesFrom := []string{
 		services.SidekickContainerName,
