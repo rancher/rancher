@@ -281,6 +281,9 @@ func (c *Cluster) SyncLabelsAndTaints(ctx context.Context) error {
 			return fmt.Errorf("Failed to initialize new kubernetes client: %v", err)
 		}
 		for _, host := range hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts) {
+			if err := k8s.SetAddressesAnnotations(k8sClient, host.HostnameOverride, host.InternalAddress, host.Address); err != nil {
+				return err
+			}
 			if err := k8s.SyncLabels(k8sClient, host.HostnameOverride, host.ToAddLabels, host.ToDelLabels); err != nil {
 				return err
 			}
