@@ -11,10 +11,13 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/remote"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
+	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
 	"github.com/sirupsen/logrus"
 	"io/ioutil"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"net/http"
@@ -28,7 +31,9 @@ type ClusterPipelineHandler struct {
 	SourceCodeRepositories     v3.SourceCodeRepositoryInterface
 	SourceCodeRepositoryLister v3.SourceCodeRepositoryLister
 
-	AuthConfigs v3.AuthConfigInterface
+	SecretLister v1.SecretLister
+	Secrets      v1.SecretInterface
+	AuthConfigs  v3.AuthConfigInterface
 }
 
 func ClusterPipelineFormatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -129,14 +134,16 @@ func (h *ClusterPipelineHandler) authapp(apiContext *types.APIContext) error {
 		return err
 	}
 
+	clientSecret := ""
 	if authAppInput.SourceCodeType == "github" {
 		clusterPipeline.Spec.GithubConfig = &v3.GithubClusterConfig{
-			TLS:          authAppInput.TLS,
-			Host:         authAppInput.Host,
-			ClientID:     authAppInput.ClientID,
-			ClientSecret: authAppInput.ClientSecret,
-			RedirectURL:  authAppInput.RedirectURL,
+			TLS:         authAppInput.TLS,
+			Host:        authAppInput.Host,
+			ClientID:    authAppInput.ClientID,
+			RedirectURL: authAppInput.RedirectURL,
 		}
+
+		clientSecret = authAppInput.ClientSecret
 		if authAppInput.InheritGlobal {
 			globalConfig, err := h.getGithubConfigCR()
 			if err != nil {
@@ -145,19 +152,25 @@ func (h *ClusterPipelineHandler) authapp(apiContext *types.APIContext) error {
 			clusterPipeline.Spec.GithubConfig.TLS = globalConfig.TLS
 			clusterPipeline.Spec.GithubConfig.Host = globalConfig.Hostname
 			clusterPipeline.Spec.GithubConfig.ClientID = globalConfig.ClientID
-			clusterPipeline.Spec.GithubConfig.ClientSecret = globalConfig.ClientSecret
+			clientSecret = globalConfig.ClientSecret
 		}
 	} else {
 		return fmt.Errorf("Error unsupported source code type %s", authAppInput.SourceCodeType)
 	}
 	//oauth and add user
+	clusterPipelineCopy := clusterPipeline.DeepCopy()
+	clusterPipelineCopy.Spec.GithubConfig.ClientSecret = clientSecret
 	userName := apiContext.Request.Header.Get("Impersonate-User")
-	sourceCodeCredential, err := h.authAddAccount(clusterPipeline, authAppInput.SourceCodeType, userName, authAppInput.RedirectURL, authAppInput.Code)
+	sourceCodeCredential, err := h.authAddAccount(clusterPipelineCopy, authAppInput.SourceCodeType, userName, authAppInput.RedirectURL, authAppInput.Code)
 	if err != nil {
 		return err
 	}
 	//update cluster pipeline config
 	if _, err := h.ClusterPipelines.Update(clusterPipeline); err != nil {
+		return err
+	}
+	//store credential in secrets
+	if err := h.saveClientSecret(ns, authAppInput.SourceCodeType, clientSecret); err != nil {
 		return err
 	}
 
@@ -193,10 +206,16 @@ func (h *ClusterPipelineHandler) authuser(apiContext *types.APIContext) error {
 		return errors.New("github oauth app is not configured")
 	}
 
+	clientSecret, err := h.getClientSecret(ns, authUserInput.SourceCodeType)
+	if err != nil {
+		return err
+	}
+	clusterPipelineCopy := clusterPipeline.DeepCopy()
+	clusterPipelineCopy.Spec.GithubConfig.ClientSecret = clientSecret
 	//oauth and add user
 	userName := apiContext.Request.Header.Get("Impersonate-User")
 	logrus.Debugf("try auth with %v,%v,%v,%v,%v", clusterPipeline, authUserInput.SourceCodeType, userName, authUserInput.RedirectURL, authUserInput.Code)
-	account, err := h.authAddAccount(clusterPipeline, authUserInput.SourceCodeType, userName, authUserInput.RedirectURL, authUserInput.Code)
+	account, err := h.authAddAccount(clusterPipelineCopy, authUserInput.SourceCodeType, userName, authUserInput.RedirectURL, authUserInput.Code)
 	if err != nil {
 		return err
 	}
@@ -284,4 +303,34 @@ func (h *ClusterPipelineHandler) getGithubConfigCR() (*v3.GithubConfig, error) {
 	storedGithubConfig.ObjectMeta = *typemeta
 
 	return storedGithubConfig, nil
+}
+
+func (h *ClusterPipelineHandler) saveClientSecret(namespace, name, token string) error {
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+		},
+		Data: map[string][]byte{
+			"clientSecret": []byte(token),
+		},
+	}
+	_, err := h.Secrets.Create(secret)
+	if apierrors.IsAlreadyExists(err) {
+		if _, err := h.Secrets.Update(secret); err != nil {
+			return err
+		}
+		return nil
+	}
+	return err
+}
+
+func (h *ClusterPipelineHandler) getClientSecret(namespace, name string) (string, error) {
+	secret, err := h.SecretLister.Get(namespace, name)
+	if err != nil {
+		return "", err
+	}
+	clientSecret := string(secret.Data["clientSecret"])
+
+	return clientSecret, nil
 }
