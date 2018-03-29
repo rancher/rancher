@@ -1,18 +1,17 @@
 package clusterpipeline
 
 import (
+	"fmt"
+
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/engine/jenkins"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/utils"
 	"github.com/rancher/rancher/pkg/randomtoken"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
-
-const (
-	JenkinsImage = "jenkins/jenkins:lts"
 )
 
 func getSecret() *corev1.Secret {
@@ -76,13 +75,15 @@ func getJenkinsAgentService() *corev1.Service {
 }
 
 func getConfigMap() *corev1.ConfigMap {
+	jenkinsConfig := fmt.Sprintf(JenkinsConfig, v3.ToolsSystemImages.PipelineSystemImages.JenkinsJnlp)
+
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: utils.PipelineNamespace,
 			Name:      "jenkins",
 		},
 		Data: map[string]string{
-			"config.xml":      JenkinsConfig,
+			"config.xml":      jenkinsConfig,
 			"apply_config.sh": JenkinsApplyConfig,
 			"plugins.txt":     JenkinsPlugins,
 			"init.groovy":     InitGroovy,
@@ -138,7 +139,7 @@ func getJenkinsDeployment() *appsv1beta2.Deployment {
 					InitContainers: []corev1.Container{
 						{
 							Name:            "jenkins-config",
-							Image:           JenkinsImage,
+							Image:           v3.ToolsSystemImages.PipelineSystemImages.Jenkins,
 							ImagePullPolicy: corev1.PullAlways,
 							Command:         []string{"sh", "/var/jenkins_config/apply_config.sh"},
 							VolumeMounts: []corev1.VolumeMount{
@@ -160,7 +161,7 @@ func getJenkinsDeployment() *appsv1beta2.Deployment {
 					Containers: []corev1.Container{
 						{
 							Name:            "jenkins",
-							Image:           JenkinsImage,
+							Image:           v3.ToolsSystemImages.PipelineSystemImages.Jenkins,
 							ImagePullPolicy: corev1.PullAlways,
 							Env: []corev1.EnvVar{
 								{
@@ -274,7 +275,7 @@ const JenkinsConfig = `<?xml version='1.0' encoding='UTF-8'?>
           <containers>
             <org.csanchez.jenkins.plugins.kubernetes.ContainerTemplate>
               <name>jnlp</name>
-              <image>jenkins/jnlp-slave:3.10-1-alpine</image>
+              <image>%s</image>
               <privileged>false</privileged>
               <alwaysPullImage>false</alwaysPullImage>
               <workingDir>/home/jenkins</workingDir>
