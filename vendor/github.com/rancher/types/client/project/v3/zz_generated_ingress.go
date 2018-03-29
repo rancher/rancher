@@ -16,6 +16,7 @@ const (
 	IngressFieldNamespaceId          = "namespaceId"
 	IngressFieldOwnerReferences      = "ownerReferences"
 	IngressFieldProjectID            = "projectId"
+	IngressFieldPublicEndpoints      = "publicEndpoints"
 	IngressFieldRemoved              = "removed"
 	IngressFieldRules                = "rules"
 	IngressFieldState                = "state"
@@ -38,6 +39,7 @@ type Ingress struct {
 	NamespaceId          string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	ProjectID            string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
+	PublicEndpoints      []PublicEndpoint  `json:"publicEndpoints,omitempty" yaml:"publicEndpoints,omitempty"`
 	Removed              string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Rules                []IngressRule     `json:"rules,omitempty" yaml:"rules,omitempty"`
 	State                string            `json:"state,omitempty" yaml:"state,omitempty"`
