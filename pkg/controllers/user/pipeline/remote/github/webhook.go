@@ -15,7 +15,7 @@ import (
 )
 
 //create webhook,return id of webhook
-func (c *client) createGithubWebhook(user string, repo string, accesstoken string, webhookURL string, secret string) (string, error) {
+func (c *client) createGithubWebhook(user string, repo string, accesstoken string, webhookURL string, secret string, events []string) (string, error) {
 	data := user + ":" + accesstoken
 	sEnc := base64.StdEncoding.EncodeToString([]byte(data))
 	name := "web"
@@ -24,7 +24,7 @@ func (c *client) createGithubWebhook(user string, repo string, accesstoken strin
 		Name:   &name,
 		Active: &active,
 		Config: make(map[string]interface{}),
-		Events: []string{"push"},
+		Events: events,
 	}
 
 	hook.Config["url"] = webhookURL

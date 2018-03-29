@@ -104,8 +104,16 @@ func (c *client) CreateHook(pipeline *v3.Pipeline, accessToken string) (string, 
 	if err != nil {
 		return "", err
 	}
+	events := []string{}
+	if pipeline.Spec.TriggerWebhookPush {
+		events = append(events, "push")
+	}
+	if pipeline.Spec.TriggerWebhookPr {
+		events = append(events, "pull_request")
+	}
+
 	hookURL := fmt.Sprintf("%s?pipelineId=%s:%s", utils.CIEndpoint, pipeline.Namespace, pipeline.Name)
-	id, err := c.createGithubWebhook(user, repo, accessToken, hookURL, pipeline.Status.Token)
+	id, err := c.createGithubWebhook(user, repo, accessToken, hookURL, pipeline.Status.Token, events)
 	if err != nil {
 		return "", err
 	}
@@ -210,7 +218,7 @@ func (c *client) getGithubRepos(githubAccessToken string) ([]v3.SourceCodeReposi
 
 func (c *client) getPipelineContent(owner string, repo string, ref string, githubAccessToken string) (*github.RepositoryContent, error) {
 
-	url := fmt.Sprintf("%s/repos/%s/%s/contents/.pipeline.yml", c.API, owner, repo)
+	url := fmt.Sprintf("%s/repos/%s/%s/contents/.pipeline.yaml", c.API, owner, repo)
 	if ref != "" {
 		url = url + "?ref=" + ref
 	}
