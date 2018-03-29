@@ -16,6 +16,7 @@ func NewObject(mappers ...types.Mapper) Object {
 			&ReadOnly{Field: "status", Optional: true, SubFields: true},
 			Drop{Field: "kind"},
 			Drop{Field: "apiVersion"},
+			Move{From: "selfLink", To: ".selfLink", DestDefined: true},
 			&Scope{
 				IfNot: types.NamespaceScope,
 				Mappers: []types.Mapper{
