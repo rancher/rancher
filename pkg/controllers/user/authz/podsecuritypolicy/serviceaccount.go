@@ -145,9 +145,16 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 		desiredBindings[key] = psptpb
 	}
 
+	originalDesiredBindingsLen := len(desiredBindings)
+
 	roleBindings, err := m.roleBindingIndexer.ByIndex(roleBindingByServiceAccountIndex, obj.Namespace+"-"+obj.Name)
 	if err != nil {
 		return fmt.Errorf("error getting role bindings: %v", err)
+	}
+
+	cluster, err := m.clusterLister.Get("", m.clusterName)
+	if err != nil {
+		return fmt.Errorf("error getting cluster: %v", err)
 	}
 
 	for _, rawRoleBinding := range roleBindings {
@@ -158,7 +165,7 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 
 		key := roleBinding.RoleRef.Name
 
-		if desiredBindings[key] == nil {
+		if desiredBindings[key] == nil && okToDelete(obj, roleBinding, cluster, originalDesiredBindingsLen) {
 			err = m.roleBindings.DeleteNamespaced(roleBinding.Namespace, roleBinding.Name, &metav1.DeleteOptions{})
 			if err != nil {
 				return fmt.Errorf("error deleting role binding: %v", err)
@@ -209,11 +216,6 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 
 	if !onePSPTPBExists {
 		// create default pspt role binding if it is set
-		cluster, err := m.clusterLister.Get("", m.clusterName)
-		if err != nil {
-			return fmt.Errorf("error getting cluster: %v", err)
-		}
-
 		clusterRoleName := getClusterRoleName(cluster.Spec.DefaultPodSecurityPolicyTemplateName)
 		roleBindingName := getDefaultRoleBindingName(obj, clusterRoleName)
 
@@ -264,6 +266,27 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 	}
 
 	return nil
+}
+
+func okToDelete(svcAct *v1.ServiceAccount, rb *rbac.RoleBinding, cluster *v3.Cluster,
+	originalDesiredBindingsLen int) bool {
+	// No default PSPT is set so its ok to delete this if its a normal rolebinding or a leftover default PSPT binding
+	if cluster.Spec.DefaultPodSecurityPolicyTemplateName == "" {
+		return true
+	}
+
+	// at least one PSPTPB exists so we need to delete all default PSPT bindings
+	if originalDesiredBindingsLen > 0 {
+		return true
+	}
+
+	// the default PSPT has changed so we need to clean it up before creating the new one
+	if getDefaultRoleBindingName(svcAct,
+		getClusterRoleName(cluster.Spec.DefaultPodSecurityPolicyTemplateName)) != rb.Name {
+		return true
+	}
+
+	return false
 }
 
 func getRoleBindingName(obj *v1.ServiceAccount, clusterRoleName string) string {
