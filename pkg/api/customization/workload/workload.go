@@ -53,7 +53,7 @@ func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 			return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error updating workload %s by %s", deployment.ID, actionName))
 		}
 
-	case "pause":
+	case "pause", "resume":
 		data, err := convert.EncodeToMap(deployment)
 		if err == nil {
 			values.PutValue(data, !deployment.DeploymentConfig.Paused, "deploymentConfig", "paused")
@@ -117,6 +117,7 @@ func DeploymentFormatter(apiContext *types.APIContext, resource *types.RawResour
 	Formatter(apiContext, resource)
 	resource.Links["revisions"] = apiContext.URLBuilder.ResourceLinkByID(workloadSchema, workloadID) + "/" + workloadRevisions
 	resource.Actions["pause"] = apiContext.URLBuilder.ActionLinkByID(workloadSchema, workloadID, "pause")
+	resource.Actions["resume"] = apiContext.URLBuilder.ActionLinkByID(workloadSchema, workloadID, "resume")
 	resource.Actions["upgrade"] = apiContext.URLBuilder.ActionLinkByID(workloadSchema, workloadID, "upgrade")
 	resource.Actions["rollback"] = apiContext.URLBuilder.ActionLinkByID(workloadSchema, workloadID, "rollback")
 }
