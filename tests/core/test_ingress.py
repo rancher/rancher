@@ -8,6 +8,7 @@ def test_ingress_fields(client):
         'rules': 'cru',
         'tls': 'cru',
         'defaultBackend': 'cru',
+        'publicEndpoints': 'r',
         'status': 'r',
     })
 
