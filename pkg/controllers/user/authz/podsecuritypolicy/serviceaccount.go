@@ -107,6 +107,11 @@ type serviceAccountManager struct {
 }
 
 func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
+	if obj == nil {
+		// do nothing
+		return nil
+	}
+
 	namespace, err := m.namespaceLister.Get("", obj.Namespace)
 	if err != nil {
 		return fmt.Errorf("error getting projects: %v", err)
