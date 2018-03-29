@@ -241,8 +241,12 @@ func (m *Manager) UserContext(clusterName string) (*config.UserContext, error) {
 	}
 
 	record, err := m.start(context.Background(), cluster)
-	if err != nil {
-		return nil, httperror.NewAPIError(httperror.ClusterUnavailable, err.Error())
+	if err != nil || record == nil {
+		msg := ""
+		if err != nil {
+			msg = err.Error()
+		}
+		return nil, httperror.NewAPIError(httperror.ClusterUnavailable, msg)
 	}
 
 	return record.cluster, nil
