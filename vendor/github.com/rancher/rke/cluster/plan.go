@@ -92,7 +92,7 @@ func (c *Cluster) BuildKubeAPIProcess() v3.Process {
 		"insecure-port":                   "0",
 		"secure-port":                     "6443",
 		"cloud-provider":                  c.CloudProvider.Name,
-		"allow_privileged":                "true",
+		"allow-privileged":                "true",
 		"kubelet-preferred-address-types": "InternalIP,ExternalIP,Hostname",
 		"service-cluster-ip-range":        c.Services.KubeAPI.ServiceClusterIPRange,
 		"admission-control":               "ServiceAccount,NamespaceLifecycle,LimitRanger,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
@@ -254,7 +254,6 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host) v3.Process {
 		"client-ca-file":            pki.GetCertPath(pki.CACertName),
 		"anonymous-auth":            "false",
 		"volume-plugin-dir":         "/var/lib/kubelet/volumeplugins",
-		"require-kubeconfig":        "True",
 		"fail-swap-on":              strconv.FormatBool(c.Services.Kubelet.FailSwapOn),
 	}
 	if host.Address != host.InternalAddress {
@@ -278,7 +277,7 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host) v3.Process {
 		"/var/run:/var/run:rw,rprivate",
 		"/run:/run:rprivate",
 		"/etc/ceph:/etc/ceph",
-		"/dev:/host/dev,rprivate",
+		"/dev:/host/dev:rprivate",
 		"/var/log/containers:/var/log/containers:z",
 		"/var/log/pods:/var/log/pods:z",
 	}

@@ -268,19 +268,19 @@ func StopRenameContainer(ctx context.Context, dClient *client.Client, hostname s
 	if err := StopContainer(ctx, dClient, hostname, oldContainerName); err != nil {
 		return err
 	}
-	if err := WaitForContainer(ctx, dClient, oldContainerName); err != nil {
+	if err := WaitForContainer(ctx, dClient, hostname, oldContainerName); err != nil {
 		return nil
 	}
 	err := RenameContainer(ctx, dClient, hostname, oldContainerName, newContainerName)
 	return err
 }
 
-func WaitForContainer(ctx context.Context, dClient *client.Client, containerName string) error {
+func WaitForContainer(ctx context.Context, dClient *client.Client, hostname string, containerName string) error {
 	statusCh, errCh := dClient.ContainerWait(ctx, containerName, container.WaitConditionNotRunning)
 	select {
 	case err := <-errCh:
 		if err != nil {
-			return fmt.Errorf("Error wating for container [%s]: %v", containerName, err)
+			return fmt.Errorf("Error waiting for container [%s] on host [%s]: %v", containerName, hostname, err)
 		}
 	case <-statusCh:
 	}

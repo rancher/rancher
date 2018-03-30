@@ -428,7 +428,7 @@ func checkPlaneTCPPortsFromHost(ctx context.Context, host *hosts.Host, portList 
 	if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, PortCheckContainer, host.Address, "network", prsMap); err != nil {
 		return err
 	}
-	if err := docker.WaitForContainer(ctx, host.DClient, PortCheckContainer); err != nil {
+	if err := docker.WaitForContainer(ctx, host.DClient, host.Address, PortCheckContainer); err != nil {
 		return err
 	}
 	logs, err := docker.ReadContainerLogs(ctx, host.DClient, PortCheckContainer)

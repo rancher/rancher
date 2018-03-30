@@ -90,7 +90,7 @@ func getHealthz(client *http.Client, serviceName, hostAddress, url string) error
 	}
 	if resp.StatusCode != http.StatusOK {
 		statusBody, _ := ioutil.ReadAll(resp.Body)
-		return fmt.Errorf("service [%s] is not healthy response code: [%d], response body: %s", serviceName, resp.StatusCode, statusBody)
+		return fmt.Errorf("Service [%s] is not healthy on host [%s]. Response code: [%d], response body: %s", serviceName, hostAddress, resp.StatusCode, statusBody)
 	}
 	return nil
 }
