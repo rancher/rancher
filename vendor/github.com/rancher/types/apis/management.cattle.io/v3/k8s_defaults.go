@@ -1,7 +1,7 @@
 package v3
 
 const (
-	K8sV18  = "v1.8.9-rancher1-1"
+	K8sV18  = "v1.8.10-rancher1-1"
 	K8sV19  = "v1.9.5-rancher1-1"
 	K8sV110 = "v1.10.0-rancher1-1"
 )
@@ -9,16 +9,16 @@ const (
 var (
 	// K8sVersionToRKESystemImages - images map for 2.0
 	K8sVersionToRKESystemImages = map[string]RKESystemImages{
-		"v1.8.9-rancher1-1":  v18SystemImages,
-		"v1.9.5-rancher1-1":  v19SystemImages,
-		"v1.10.0-rancher1-1": v110SystemImages,
+		K8sV18:  v18SystemImages,
+		K8sV19:  v19SystemImages,
+		K8sV110: v110SystemImages,
 	}
 
 	// K8SVersionToSystemImages16 - images map for 1.6. Keeping it sepate in case we have to diverge
 	K8SVersionToSystemImages16 = map[string]RKESystemImages{
-		"v1.8.9-rancher1-1":  v18SystemImages,
-		"v1.9.5-rancher1-1":  v19SystemImages,
-		"v1.10.0-rancher1-1": v110SystemImages,
+		K8sV18:  v18SystemImages,
+		K8sV19:  v19SystemImages,
+		K8sV110: v110SystemImages,
 	}
 
 	// ToolsSystemImages default images for alert, pipeline, logging
@@ -75,7 +75,7 @@ var (
 
 	// v19 system images defaults
 	v19SystemImages = RKESystemImages{
-		Etcd:                      "rancher/coreos-etcd:v3.0.17",
+		Etcd:                      "rancher/coreos-etcd:v3.1.12",
 		Kubernetes:                "rancher/k8s:" + K8sV19,
 		Alpine:                    "alpine:latest",
 		NginxProxy:                "rancher/rke-nginx-proxy:v0.1.1",

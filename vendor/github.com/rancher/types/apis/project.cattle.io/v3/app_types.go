@@ -31,6 +31,8 @@ var (
 )
 
 type AppStatus struct {
+	StdOutput  []string       `json:"stdOutput,omitempty"`
+	StdError   []string       `json:"stdError,omitempty"`
 	Releases   []ReleaseInfo  `json:"releases,omitempty"`
 	Conditions []AppCondition `json:"conditions,omitempty"`
 }
