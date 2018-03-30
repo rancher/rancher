@@ -10,6 +10,7 @@ const (
 	StorageClassFieldAnnotations          = "annotations"
 	StorageClassFieldCreated              = "created"
 	StorageClassFieldCreatorID            = "creatorId"
+	StorageClassFieldDescription          = "description"
 	StorageClassFieldLabels               = "labels"
 	StorageClassFieldMountOptions         = "mountOptions"
 	StorageClassFieldName                 = "name"
@@ -27,6 +28,7 @@ type StorageClass struct {
 	Annotations          map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Created              string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Description          string            `json:"description,omitempty" yaml:"description,omitempty"`
 	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	MountOptions         []string          `json:"mountOptions,omitempty" yaml:"mountOptions,omitempty"`
 	Name                 string            `json:"name,omitempty" yaml:"name,omitempty"`

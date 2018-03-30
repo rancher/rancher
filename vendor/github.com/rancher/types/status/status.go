@@ -40,6 +40,7 @@ var transitioningMap = map[string]string{
 	"Downloaded":                  "downloading",
 	"Inactive":                    "deactivating",
 	"Initialized":                 "initializing",
+	"Installed":                   "installing",
 	"NodesCreated":                "provisioning",
 	"Pending":                     "pending",
 	"PodScheduled":                "scheduling",

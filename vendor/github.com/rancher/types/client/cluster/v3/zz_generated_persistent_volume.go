@@ -17,6 +17,7 @@ const (
 	PersistentVolumeFieldClaimRef                      = "claimRef"
 	PersistentVolumeFieldCreated                       = "created"
 	PersistentVolumeFieldCreatorID                     = "creatorId"
+	PersistentVolumeFieldDescription                   = "description"
 	PersistentVolumeFieldFC                            = "fc"
 	PersistentVolumeFieldFlexVolume                    = "flexVolume"
 	PersistentVolumeFieldFlocker                       = "flocker"
@@ -60,6 +61,7 @@ type PersistentVolume struct {
 	ClaimRef                      *ObjectReference                  `json:"claimRef,omitempty" yaml:"claimRef,omitempty"`
 	Created                       string                            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                     string                            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Description                   string                            `json:"description,omitempty" yaml:"description,omitempty"`
 	FC                            *FCVolumeSource                   `json:"fc,omitempty" yaml:"fc,omitempty"`
 	FlexVolume                    *FlexVolumeSource                 `json:"flexVolume,omitempty" yaml:"flexVolume,omitempty"`
 	Flocker                       *FlockerVolumeSource              `json:"flocker,omitempty" yaml:"flocker,omitempty"`
