@@ -200,6 +200,7 @@ type NodeDriverStatus struct {
 
 var (
 	NodeDriverConditionDownloaded condition.Cond = "Downloaded"
+	NodeDriverConditionInstalled  condition.Cond = "Installed"
 	NodeDriverConditionActive     condition.Cond = "Active"
 	NodeDriverConditionInactive   condition.Cond = "Inactive"
 )

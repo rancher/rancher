@@ -61,7 +61,7 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 		return obj, nil
 	}
 
-	_, err = v3.NodeDriverConditionDownloaded.Do(obj, func() (runtime.Object, error) {
+	newObj, err := v3.NodeDriverConditionDownloaded.Once(obj, func() (runtime.Object, error) {
 		// update status
 		obj, err = m.nodeDriverClient.Update(obj)
 		if err != nil {
@@ -71,20 +71,29 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 		if err := driver.Stage(); err != nil {
 			return nil, err
 		}
-
-		if err := driver.Install(); err != nil {
-			logrus.Errorf("Failed to download/install driver %s: %v", driver.Name(), err)
-			return nil, err
-		}
-
-		obj.Spec.DisplayName = strings.TrimPrefix(driver.Name(), "docker-machine-driver-")
 		return obj, nil
 	})
 	if err != nil {
 		return obj, err
 	}
 
-	driverName := strings.TrimPrefix(driver.Name(), "docker-machine-driver-")
+	obj = newObj.(*v3.NodeDriver)
+	newObj, err = v3.NodeDriverConditionInstalled.Once(obj, func() (runtime.Object, error) {
+		if err := driver.Install(); err != nil {
+			return nil, err
+		}
+		if err = driver.Excutable(); err != nil {
+			return nil, err
+		}
+		obj.Spec.DisplayName = strings.TrimPrefix(driver.Name(), dockerMachineDriverPrefix)
+		return obj, nil
+	})
+	if err != nil {
+		return newObj.(*v3.NodeDriver), err
+	}
+
+	obj = newObj.(*v3.NodeDriver)
+	driverName := strings.TrimPrefix(driver.Name(), dockerMachineDriverPrefix)
 	flags, err := getCreateFlagsForDriver(driverName)
 	if err != nil {
 		return nil, err

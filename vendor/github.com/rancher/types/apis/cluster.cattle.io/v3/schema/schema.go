@@ -41,15 +41,24 @@ func namespaceTypes(schemas *types.Schemas) *types.Schemas {
 
 func persistentVolumeTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
+		AddMapperForType(&Version, v1.PersistentVolume{},
+			&m.AnnotationField{Field: "description"},
+		).
 		MustImport(&Version, v1.PersistentVolumeSpec{}, struct {
 			StorageClassName *string `json:"storageClassName,omitempty" norman:"type=reference[storageClass]"`
 		}{}).
-		MustImport(&Version, v1.PersistentVolume{})
+		MustImport(&Version, v1.PersistentVolume{}, struct {
+			Description string `json:"description"`
+		}{})
 }
 
 func storageClassTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
+		AddMapperForType(&Version, storagev1.StorageClass{},
+			&m.AnnotationField{Field: "description"},
+		).
 		MustImport(&Version, storagev1.StorageClass{}, struct {
+			Description   string `json:"description"`
 			ReclaimPolicy string `json:"reclaimPolicy,omitempty" norman:"type=enum,options=Recycle|Delete|Retain"`
 		}{})
 }
