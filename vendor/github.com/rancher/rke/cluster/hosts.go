@@ -121,7 +121,7 @@ func (c *Cluster) SetUpHosts(ctx context.Context) error {
 		}
 		log.Infof(ctx, "[certificates] Successfully deployed kubernetes certificates to Cluster nodes")
 		if c.CloudProvider.Name != "" {
-			if err := deployCloudProviderConfig(ctx, hosts, c.CloudProvider, c.SystemImages.Alpine, c.PrivateRegistriesMap); err != nil {
+			if err := deployCloudProviderConfig(ctx, hosts, c.SystemImages.Alpine, c.PrivateRegistriesMap, c.CloudConfigFile); err != nil {
 				return err
 			}
 			log.Infof(ctx, "[%s] Successfully deployed kubernetes cloud config to Cluster nodes", CloudConfigServiceName)
