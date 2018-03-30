@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"bytes"
+
 	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/randomtoken"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -108,12 +110,25 @@ func InstallCharts(rootDir, port string, obj *v3.App) error {
 
 	cmd := exec.Command(helmName, commands...)
 	cmd.Env = []string{fmt.Sprintf("%s=%s", "HELM_HOST", "127.0.0.1:"+port)}
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	sbOut := &bytes.Buffer{}
+	sbError := &bytes.Buffer{}
+	cmd.Stdout = sbOut
+	cmd.Stderr = sbError
 	if err := cmd.Start(); err != nil {
 		return err
 	}
-	return cmd.Wait()
+	if err := cmd.Wait(); err != nil {
+		return err
+	}
+	if obj.Status.StdOutput == nil {
+		obj.Status.StdOutput = []string{}
+	}
+	if obj.Status.StdError == nil {
+		obj.Status.StdError = []string{}
+	}
+	obj.Status.StdOutput = append(obj.Status.StdOutput, sbOut.String())
+	obj.Status.StdError = append(obj.Status.StdError, sbError.String())
+	return nil
 }
 
 func DeleteCharts(port string, obj *v3.App) error {

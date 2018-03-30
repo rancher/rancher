@@ -9,7 +9,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
+
+	"bytes"
 
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/parse"
@@ -18,8 +19,10 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	hutils "github.com/rancher/rancher/pkg/controllers/user/helm/utils"
+	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
+	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	projectschema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	"github.com/rancher/types/client/management/v3"
 	managementv3 "github.com/rancher/types/client/management/v3"
@@ -35,6 +38,7 @@ const (
 )
 
 type ActionWrapper struct {
+	Apps             pv3.AppsGetter
 	Clusters         v3.ClusterInterface
 	KubeConfigGetter common.KubeConfigGetter
 }
@@ -49,13 +53,13 @@ func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 	if err := access.ByID(apiContext, &projectschema.Version, projectv3.AppType, apiContext.ID, &app); err != nil {
 		return err
 	}
-	clusterName := strings.Split(app.ProjectId, ":")[0]
-	var cluster managementv3.Cluster
-	if err := access.ByID(apiContext, &managementschema.Version, managementv3.ClusterType, clusterName, &cluster); err != nil {
+	clusterID, projectID := ref.Parse(app.ProjectId)
+	appObj, err := a.Apps.Apps(projectID).Get(app.ID, metav1.GetOptions{})
+	if err != nil {
 		return err
 	}
 	tokenAuthValue := tokens.GetTokenAuthFromRequest(apiContext.Request)
-	data := a.KubeConfigGetter.KubeConfig(cluster.ID, tokenAuthValue)
+	data := a.KubeConfigGetter.KubeConfig(clusterID, tokenAuthValue)
 	for k := range data.Clusters {
 		data.Clusters[k].InsecureSkipTLSVerify = true
 	}
@@ -81,12 +85,7 @@ func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 			return err
 		}
 		externalID := actionInput["externalId"]
-		updateData := map[string]interface{}{}
-		updateData["externalId"] = externalID
-		_, err = store.Update(apiContext, apiContext.Schema, updateData, apiContext.ID)
-		if err != nil {
-			return err
-		}
+		// find the templates, upgrade first and then update app obj
 		templateVersionID, err := hutils.ParseExternalID(convert.ToString(externalID))
 		if err != nil {
 			return err
@@ -104,14 +103,11 @@ func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 			return err
 		}
 		defer os.RemoveAll(tempDir)
-		if err := upgradeCharts(tempDir, addr, app.Name); err != nil {
+		if err := upgradeCharts(tempDir, addr, app.Name, appObj); err != nil {
 			return err
 		}
-		_, err = store.Update(apiContext, apiContext.Schema, updateData, apiContext.ID)
-		if err != nil {
-			return err
-		}
-		return nil
+		_, err = a.Apps.Apps(projectID).Update(appObj)
+		return err
 	case "rollback":
 		cont, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -138,15 +134,28 @@ func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 	return nil
 }
 
-func upgradeCharts(rootDir, port, releaseName string) error {
+func upgradeCharts(rootDir, port, releaseName string, obj *pv3.App) error {
 	cmd := exec.Command(helmName, "upgrade", "--namespace", releaseName, releaseName, rootDir)
 	cmd.Env = []string{fmt.Sprintf("%s=%s", "HELM_HOST", "127.0.0.1:"+port)}
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	sbOut := &bytes.Buffer{}
+	sbErr := &bytes.Buffer{}
+	cmd.Stdout = sbOut
+	cmd.Stderr = sbErr
 	if err := cmd.Start(); err != nil {
 		return err
 	}
-	return cmd.Wait()
+	if err := cmd.Wait(); err != nil {
+		return err
+	}
+	if obj.Status.StdOutput == nil {
+		obj.Status.StdOutput = []string{}
+	}
+	if obj.Status.StdError == nil {
+		obj.Status.StdError = []string{}
+	}
+	obj.Status.StdOutput = append(obj.Status.StdOutput, sbOut.String())
+	obj.Status.StdError = append(obj.Status.StdError, sbErr.String())
+	return nil
 }
 
 func rollbackCharts(port, releaseName, revision string) error {
