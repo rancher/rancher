@@ -3,10 +3,13 @@ package authn
 import (
 	"net/http"
 
+	"strings"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
 	"golang.org/x/crypto/bcrypt"
@@ -26,13 +29,27 @@ type Handler struct {
 }
 
 func (h *Handler) Actions(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	resetFirstLogin := false
 	switch actionName {
 	case "changepassword":
-		return h.changePassword(actionName, action, apiContext)
+		err := h.changePassword(actionName, action, apiContext)
+		if err == nil {
+			resetFirstLogin = true
+		}
+		return err
 	case "setpassword":
-		return h.setPassword(actionName, action, apiContext)
+		err := h.setPassword(actionName, action, apiContext)
+		if err == nil {
+			resetFirstLogin = true
+		}
+		return err
 	}
 
+	if resetFirstLogin && strings.EqualFold(settings.FirstLogin.Get(), "true") {
+		if err := settings.FirstLogin.Set("false"); err != nil {
+			return err
+		}
+	}
 	return errors.Errorf("bad action %v", actionName)
 }
 
