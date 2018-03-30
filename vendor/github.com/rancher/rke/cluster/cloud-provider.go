@@ -2,9 +2,7 @@ package cluster
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"strconv"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/rancher/rke/docker"
@@ -21,11 +19,7 @@ const (
 	CloudConfigEnv         = "RKE_CLOUD_CONFIG"
 )
 
-func deployCloudProviderConfig(ctx context.Context, uniqueHosts []*hosts.Host, cloudProvider v3.CloudProvider, alpineImage string, prsMap map[string]v3.PrivateRegistry) error {
-	cloudConfig, err := getCloudConfigFile(ctx, cloudProvider)
-	if err != nil {
-		return err
-	}
+func deployCloudProviderConfig(ctx context.Context, uniqueHosts []*hosts.Host, alpineImage string, prsMap map[string]v3.PrivateRegistry, cloudConfig string) error {
 	for _, host := range uniqueHosts {
 		log.Infof(ctx, "[%s] Deploying cloud config file to node [%s]", CloudConfigServiceName, host.Address)
 		if err := doDeployConfigFile(ctx, host, cloudConfig, alpineImage, prsMap); err != nil {
@@ -33,36 +27,6 @@ func deployCloudProviderConfig(ctx context.Context, uniqueHosts []*hosts.Host, c
 		}
 	}
 	return nil
-}
-
-func getCloudConfigFile(ctx context.Context, cloudProvider v3.CloudProvider) (string, error) {
-	if len(cloudProvider.CloudConfig) == 0 {
-		return "", nil
-	}
-	tmpMap := make(map[string]interface{})
-	for key, value := range cloudProvider.CloudConfig {
-		tmpBool, err := strconv.ParseBool(value)
-		if err == nil {
-			tmpMap[key] = tmpBool
-			continue
-		}
-		tmpInt, err := strconv.ParseInt(value, 10, 64)
-		if err == nil {
-			tmpMap[key] = tmpInt
-			continue
-		}
-		tmpFloat, err := strconv.ParseFloat(value, 64)
-		if err == nil {
-			tmpMap[key] = tmpFloat
-			continue
-		}
-		tmpMap[key] = value
-	}
-	jsonString, err := json.MarshalIndent(tmpMap, "", "\n")
-	if err != nil {
-		return "", err
-	}
-	return string(jsonString), nil
 }
 
 func doDeployConfigFile(ctx context.Context, host *hosts.Host, cloudConfig, alpineImage string, prsMap map[string]v3.PrivateRegistry) error {

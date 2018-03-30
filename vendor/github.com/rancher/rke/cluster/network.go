@@ -94,8 +94,6 @@ const (
 	Calicoctl = "Calicoctl"
 
 	FlannelInterface = "FlannelInterface"
-	CloudProvider    = "CloudProvider"
-	AWSCloudProvider = "aws"
 	RBACConfig       = "RBACConfig"
 )
 

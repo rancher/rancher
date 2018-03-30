@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	b64 "encoding/base64"
+
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
@@ -52,10 +54,15 @@ func BuildRKEConfigNodePlan(ctx context.Context, myCluster *Cluster, host *hosts
 
 		portChecks = append(portChecks, BuildPortChecksFromPortList(host, EtcdPortList, ProtocolTCP)...)
 	}
+	cloudConfig := v3.File{
+		Name:     CloudConfigPath,
+		Contents: b64.StdEncoding.EncodeToString([]byte(myCluster.CloudConfigFile)),
+	}
 	return v3.RKEConfigNodePlan{
 		Address:    host.Address,
 		Processes:  processes,
 		PortChecks: portChecks,
+		Files:      []v3.File{cloudConfig},
 	}
 }
 
