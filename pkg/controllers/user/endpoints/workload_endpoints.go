@@ -6,10 +6,12 @@ import (
 
 	workloadutil "github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/types/apis/core/v1"
+	"github.com/rancher/types/apis/extensions/v1beta1"
 	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -18,11 +20,13 @@ import (
 // and NodePort services backing up the workload
 
 type WorkloadEndpointsController struct {
+	ingressLister      v1beta1.IngressLister
 	serviceLister      v1.ServiceLister
 	podLister          v1.PodLister
 	WorkloadController workloadutil.CommonController
 	machinesLister     managementv3.NodeLister
 	clusterName        string
+	isRKE              bool
 }
 
 func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadutil.Workload) error {
@@ -41,6 +45,7 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 
 	var workloads []*workloadutil.Workload
 	var services []*corev1.Service
+	var ingresses []*extensionsv1beta1.Ingress
 	var err error
 	if strings.HasSuffix(key, workloadutil.AllWorkloads) {
 		namespace := ""
@@ -52,8 +57,16 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 			return err
 		}
 		services, err = c.serviceLister.List(namespace, labels.NewSelector())
+		if err != nil {
+			return err
+		}
+		ingresses, err = c.ingressLister.List(namespace, labels.NewSelector())
 
 	} else {
+		ingresses, err = c.ingressLister.List(obj.Namespace, labels.NewSelector())
+		if err != nil {
+			return err
+		}
 		services, err = c.serviceLister.List(obj.Namespace, labels.NewSelector())
 		workloads = append(workloads, obj)
 	}
@@ -64,6 +77,19 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 	if err != nil {
 		return err
 	}
+	// get ingress endpoint group by service
+	serviceToIngressEndpoints := make(map[string][]v3.PublicEndpoint)
+	for _, ingress := range ingresses {
+		epsMap, err := convertIngressToServicePublicEndpointsMap(ingress, c.isRKE)
+		if err != nil {
+			return err
+		}
+		for k, v := range epsMap {
+			eps := serviceToIngressEndpoints[k]
+			serviceToIngressEndpoints[k] = append(eps, v...)
+		}
+	}
+
 	for _, w := range workloads {
 		// 1. Get endpoints from services
 		var newPublicEps []v3.PublicEndpoint
@@ -103,6 +129,9 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 					return err
 				}
 				newPublicEps = append(newPublicEps, eps...)
+				if ingressEndpoints, ok := serviceToIngressEndpoints[svc.Name]; ok {
+					newPublicEps = append(newPublicEps, ingressEndpoints...)
+				}
 			}
 		}
 
