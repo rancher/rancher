@@ -3,6 +3,7 @@ package pipelineexecution
 import (
 	"context"
 	"fmt"
+	"github.com/rancher/norman/controller"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/engine"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
@@ -42,10 +43,16 @@ func (s *ExecutionLogSyncer) syncLogs() {
 	}
 
 	set := labels.Set(map[string]string{utils.PipelineFinishLabel: "false"})
-	Logs, err := s.pipelineExecutionLogLister.List("", set.AsSelector())
+	allLogs, err := s.pipelineExecutionLogLister.List("", set.AsSelector())
 	if err != nil {
 		logrus.Errorf("Error listing PipelineExecutionLogs - %v", err)
 		return
+	}
+	Logs := []*v3.PipelineExecutionLog{}
+	for _, log := range allLogs {
+		if controller.ObjectInCluster(s.clusterName, log) {
+			Logs = append(Logs, log)
+		}
 	}
 	if len(Logs) < 1 {
 		return
@@ -62,6 +69,7 @@ func (s *ExecutionLogSyncer) syncLogs() {
 		return
 	}
 	for _, log := range Logs {
+
 		ns, name := ref.Parse(log.Spec.PipelineExecutionName)
 		execution, err := s.pipelineExecutionLister.Get(ns, name)
 		if err != nil {

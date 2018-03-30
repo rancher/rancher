@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/controller"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ticker"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -39,10 +40,16 @@ func (s *CronSyncer) syncCron() {
 	}
 
 	set := labels.Set(map[string]string{utils.PipelineCronLabel: "true"})
-	pipelines, err := s.pipelineLister.List("", set.AsSelector())
+	allPipelines, err := s.pipelineLister.List("", set.AsSelector())
 	if err != nil {
 		logrus.Errorf("Error listing pipelines")
 		return
+	}
+	pipelines := []*v3.Pipeline{}
+	for _, p := range allPipelines {
+		if controller.ObjectInCluster(s.clusterName, p) {
+			pipelines = append(pipelines, p)
+		}
 	}
 	for _, p := range pipelines {
 		s.checkCron(p)

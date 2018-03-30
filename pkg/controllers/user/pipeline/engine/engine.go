@@ -17,19 +17,23 @@ type PipelineEngine interface {
 
 func New(cluster *config.UserContext) PipelineEngine {
 
-	nodeLister := cluster.Core.Nodes("").Controller().Lister()
 	serviceLister := cluster.Core.Services("").Controller().Lister()
 	secrets := cluster.Core.Secrets("")
 	secretLister := secrets.Controller().Lister()
 	managementSecretLister := cluster.Management.Core.Secrets("").Controller().Lister()
 	sourceCodeCredentialLister := cluster.Management.Management.SourceCodeCredentials("").Controller().Lister()
+
+	dialer := cluster.Management.Dialer
+
 	engine := &jenkins.Engine{
-		NodeLister:                 nodeLister,
 		ServiceLister:              serviceLister,
 		Secrets:                    secrets,
 		SecretLister:               secretLister,
 		ManagementSecretLister:     managementSecretLister,
 		SourceCodeCredentialLister: sourceCodeCredentialLister,
+
+		Dialer:      dialer,
+		ClusterName: cluster.ClusterName,
 	}
 	return engine
 }
