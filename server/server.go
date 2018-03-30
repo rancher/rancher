@@ -73,6 +73,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, apiContext *config.Scal
 	root.Handle("/v3/connect/register", connectHandler)
 	root.Handle("/v3/connect/config", connectConfigHandler)
 	root.Handle("/v3/settings/cacerts", rawAuthedAPIs).Methods(http.MethodGet)
+	root.Handle("/v3/settings/first-login", rawAuthedAPIs).Methods(http.MethodGet)
 	root.PathPrefix("/v3").Handler(authedHandler)
 	root.PathPrefix("/hooks").Handler(webhookHandler)
 	root.PathPrefix("/k8s/clusters/").Handler(authedHandler)

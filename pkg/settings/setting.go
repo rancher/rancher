@@ -31,6 +31,7 @@ var (
 	UIPath                          = newSetting("ui-path", "")
 	UIPL                            = newSetting("ui-pl", "rancher")
 	WhitelistDomain                 = newSetting("whitelist-domain", "forums.rancher.com")
+	FirstLogin                      = newSetting("first-login", "true")
 )
 
 type Provider interface {
