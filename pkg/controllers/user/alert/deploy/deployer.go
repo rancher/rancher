@@ -211,7 +211,7 @@ func getDeployment() *appsv1beta2.Deployment {
 					Containers: []corev1.Container{
 						{
 							Name:  "alertmanager",
-							Image: "prom/alertmanager:v0.11.0",
+							Image: v3.ToolsSystemImages.AlertSystemImages.AlertManager,
 							Args:  []string{"-config.file=/etc/alertmanager/config.yml", "-storage.path=/alertmanager"},
 							Ports: []corev1.ContainerPort{
 								{
@@ -232,7 +232,7 @@ func getDeployment() *appsv1beta2.Deployment {
 						},
 						{
 							Name:    "alertmanager-helper",
-							Image:   "rancher/alertmanager-helper:v0.0.2",
+							Image:   v3.ToolsSystemImages.AlertSystemImages.AlertManagerHelper,
 							Command: []string{"alertmanager-helper"},
 							Args:    []string{"--watched-file-list", "/etc/alertmanager"},
 							VolumeMounts: []corev1.VolumeMount{

@@ -3,6 +3,7 @@ package utils
 import (
 	rv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
 	rv1 "github.com/rancher/types/apis/core/v1"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	rrbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/api/apps/v1beta2"
@@ -134,7 +135,7 @@ func newFluentdDaemonset(name, namespace, clusterName string) *v1beta2.DaemonSet
 					Containers: []v1.Container{
 						{
 							Name:            loggingconfig.FluentdHelperName,
-							Image:           loggingconfig.FluentdHelperImage,
+							Image:           v3.ToolsSystemImages.LoggingSystemImages.FluentdHelper,
 							Command:         []string{"fluentd-helper"},
 							Args:            []string{"--watched-file-list", "/fluentd/etc/config/cluster", "--watched-file-list", "/fluentd/etc/config/project"},
 							ImagePullPolicy: v1.PullAlways,
@@ -154,7 +155,7 @@ func newFluentdDaemonset(name, namespace, clusterName string) *v1beta2.DaemonSet
 						},
 						{
 							Name:            loggingconfig.FluentdName,
-							Image:           loggingconfig.FluentdImages,
+							Image:           v3.ToolsSystemImages.LoggingSystemImages.Fluentd,
 							ImagePullPolicy: v1.PullIfNotPresent,
 							Command:         []string{"fluentd"},
 							Args:            []string{"-c", "/fluentd/etc/fluent.conf"},

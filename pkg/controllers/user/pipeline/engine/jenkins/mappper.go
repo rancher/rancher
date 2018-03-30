@@ -3,13 +3,14 @@ package jenkins
 import (
 	"bytes"
 	"fmt"
+	"regexp"
+	"strconv"
+	"strings"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
-	"regexp"
-	"strconv"
-	"strings"
 )
 
 func ConvertPipelineExecutionToJenkinsPipeline(execution *v3.PipelineExecution) (PipelineJob, error) {
@@ -101,7 +102,7 @@ func convertPipelineExecution(execution *v3.PipelineExecution) string {
 			image := ""
 			options := ""
 			if step.SourceCodeConfig != nil {
-				image = "alpine/git"
+				image = v3.ToolsSystemImages.PipelineSystemImages.AlpineGit
 			} else if step.RunScriptConfig != nil {
 				image = step.RunScriptConfig.Image
 
@@ -117,7 +118,7 @@ func convertPipelineExecution(execution *v3.PipelineExecution) string {
 					//the `plugins/docker` image fails when setting DOCKER_REGISTRY to index.docker.io
 					registry = ""
 				}
-				image = "plugins/docker"
+				image = v3.ToolsSystemImages.PipelineSystemImages.PluginsDocker
 				publishoption := `, privileged: true, envVars: [
 			envVar(key: 'PLUGIN_REPO', value: '%s'),
 			envVar(key: 'PLUGIN_TAG', value: '%s'),
@@ -137,7 +138,7 @@ func convertPipelineExecution(execution *v3.PipelineExecution) string {
 		}
 	}
 
-	return fmt.Sprintf(pipelineBlock, containerbuffer.String(), pipelinebuffer.String())
+	return fmt.Sprintf(pipelineBlock, containerbuffer.String(), v3.ToolsSystemImages.PipelineSystemImages.JenkinsJnlp, pipelinebuffer.String())
 }
 
 func getPreservedEnvVarOptions(execution *v3.PipelineExecution) string {
@@ -215,7 +216,7 @@ const stepBlock = `'%s': {
 const pipelineBlock = `def label = "buildpod.${env.JOB_NAME}.${env.BUILD_NUMBER}".replace('-', '_').replace('/', '_')
 podTemplate(label: label, containers: [
 %s
-containerTemplate(name: 'jnlp', image: 'jenkins/jnlp-slave:3.10-1-alpine', envVars: [
+containerTemplate(name: 'jnlp', image: '%s', envVars: [
 envVar(key: 'JENKINS_URL', value: 'http://jenkins:8080')], args: '${computer.jnlpmac} ${computer.name}', ttyEnabled: false)]) {
 node(label) {
 timestamps {

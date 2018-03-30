@@ -8,19 +8,14 @@ const (
 
 //daemonset
 const (
-	FluentdName        = "fluentd"
-	FluentdHelperName  = "fluentd-helper"
-	FluentdHelperImage = "rancher/fluentd-helper:v0.1.1"
-	FluentdImages      = "rancher/fluentd:v0.1.4"
+	FluentdName       = "fluentd"
+	FluentdHelperName = "fluentd-helper"
 )
 
 //embedded
 const (
 	EmbeddedESName     = "elasticsearch"
 	EmbeddedKibanaName = "kibana"
-	ESImage            = "rancher/docker-elasticsearch-kubernetes:5.6.2"
-	KibanaImage        = "kibana:5.6.4"
-	BusyboxImage       = "busybox"
 )
 
 //configmap

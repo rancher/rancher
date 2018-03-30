@@ -496,7 +496,7 @@ func NewESDeployment(namespace string) *v1beta2.Deployment {
 					InitContainers: []v1.Container{
 						{
 							Name:            "init-sysctl",
-							Image:           loggingconfig.BusyboxImage,
+							Image:           v3.ToolsSystemImages.LoggingSystemImages.Busybox,
 							ImagePullPolicy: v1.PullIfNotPresent,
 							Command:         []string{"sysctl", "-w", "vm.max_map_count=262144"},
 							SecurityContext: &v1.SecurityContext{
@@ -512,7 +512,7 @@ func NewESDeployment(namespace string) *v1beta2.Deployment {
 									Add: []v1.Capability{"IPC_LOCK"},
 								},
 							},
-							Image: loggingconfig.ESImage,
+							Image: v3.ToolsSystemImages.LoggingSystemImages.Elaticsearch,
 							Env: []v1.EnvVar{
 								{
 									Name:  "KUBERNETES_CA_CERTIFICATE_FILE",
@@ -615,7 +615,7 @@ func newKibanaDeployment(namespace string) *v1beta2.Deployment {
 					Containers: []v1.Container{
 						{
 							Name:  loggingconfig.EmbeddedKibanaName,
-							Image: loggingconfig.KibanaImage,
+							Image: v3.ToolsSystemImages.LoggingSystemImages.Kibana,
 							Ports: []v1.ContainerPort{
 								{
 									Name:          "http",
