@@ -23,6 +23,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var dockerMachineDriverPrefix = "docker-machine-driver-"
+
 type Driver struct {
 	builtin bool
 	url     string
@@ -37,8 +39,8 @@ func NewDriver(builtin bool, name, url, hash string) *Driver {
 		url:     url,
 		hash:    hash,
 	}
-	if !strings.HasPrefix(d.name, "docker-machine-driver-") {
-		d.name = "docker-machine-driver-" + d.name
+	if !strings.HasPrefix(d.name, dockerMachineDriverPrefix) {
+		d.name = dockerMachineDriverPrefix + d.name
 	}
 	return d
 }
@@ -56,7 +58,7 @@ func (d *Driver) Checksum() string {
 }
 
 func (d *Driver) FriendlyName() string {
-	return strings.TrimPrefix(d.name, "docker-machine-driver-")
+	return strings.TrimPrefix(d.name, dockerMachineDriverPrefix)
 }
 
 func (d *Driver) Remove() error {
@@ -176,6 +178,27 @@ func (d *Driver) Exists() bool {
 	return err == nil
 }
 
+func (d *Driver) Excutable() error {
+	if d.name == "" {
+		return fmt.Errorf("Empty driver name")
+	}
+
+	if d.builtin {
+		return nil
+	}
+
+	binaryPath := path.Join(binDir(), d.name)
+	_, err := os.Stat(binaryPath)
+	if err != nil {
+		return fmt.Errorf("Driver %s not found", binaryPath)
+	}
+	err = exec.Command(binaryPath).Start()
+	if err != nil {
+		return errors.Wrapf(err, "Driver binary %s couldn't execute", binaryPath)
+	}
+	return nil
+}
+
 func (d *Driver) Install() error {
 	if d.builtin {
 		return nil
@@ -202,7 +225,10 @@ func (d *Driver) Install() error {
 	}
 
 	err = os.Rename(tmpPath, binaryPath)
-	return errors.Wrapf(err, "Couldn't copy driver %v to %v", d.Name(), binaryPath)
+	if err != nil {
+		return errors.Wrapf(err, "Couldn't copy driver %v to %v", d.Name(), binaryPath)
+	}
+	return nil
 }
 
 func isElf(input string) bool {
@@ -216,8 +242,8 @@ func isElf(input string) bool {
 	if _, err := f.Read(elf); err != nil {
 		return false
 	}
-
-	return bytes.Compare(elf, []byte{0x7f, 0x45, 0x4c, 0x46}) == 0
+	//support unix binary and mac-os binary mach-o
+	return bytes.Compare(elf, []byte{0x7f, 0x45, 0x4c, 0x46}) == 0 || bytes.Compare(elf, []byte{0xcf, 0xfa, 0xed, 0xfe}) == 0
 }
 
 func (d *Driver) copyBinary(cacheFile, input string) (string, error) {
@@ -236,10 +262,20 @@ func (d *Driver) copyBinary(cacheFile, input string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		driverName = strings.Split(path.Base(u.Path), "_")[0]
-		if !strings.HasPrefix(driverName, "docker-machine-driver-") {
+
+		if !strings.HasPrefix(path.Base(u.Path), dockerMachineDriverPrefix) {
 			return "", fmt.Errorf("invalid URL %s, path should be of the format docker-machine-driver-*", d.url)
 		}
+
+		s := strings.TrimPrefix(path.Base(u.Path), dockerMachineDriverPrefix)
+		name := strings.FieldsFunc(s, func(r rune) bool {
+			return r == '-' || r == '_' || r == '.'
+		})[0]
+
+		if name == "" {
+			return "", fmt.Errorf("invalid URL %s, NAME is empty, path should be of the format docker-machine-driver-NAME", d.url)
+		}
+		driverName = dockerMachineDriverPrefix + name
 	} else {
 		if err := exec.Command("tar", "xvf", input, "-C", temp).Run(); err != nil {
 			if err := exec.Command("unzip", "-o", input, "-d", temp).Run(); err != nil {
@@ -253,7 +289,7 @@ func (d *Driver) copyBinary(cacheFile, input string) (string, error) {
 			return nil
 		}
 
-		if strings.HasPrefix(path.Base(p), "docker-machine-driver-") {
+		if strings.HasPrefix(path.Base(p), dockerMachineDriverPrefix) {
 			file = p
 		}
 
@@ -277,6 +313,7 @@ func (d *Driver) copyBinary(cacheFile, input string) (string, error) {
 		return "", err
 	}
 
+	driverName = strings.ToLower(driverName)
 	dest, err := os.Create(cacheFile + "-" + driverName)
 	if err != nil {
 		return "", err
@@ -359,7 +396,7 @@ func isInstalled(file string) (string, error) {
 	if os.IsNotExist(err) {
 		return "", nil
 	}
-	return strings.TrimSpace(string(content)), err
+	return strings.ToLower(strings.TrimSpace(string(content))), err
 }
 
 func sha256Bytes(content []byte) string {
