@@ -37,8 +37,12 @@ func main() {
 	}
 }
 
+func isCluster() bool {
+	return os.Getenv("CATTLE_CLUSTER") == "true"
+}
+
 func getParams() (map[string]interface{}, error) {
-	if os.Getenv("CATTLE_CLUSTER") == "true" {
+	if isCluster() {
 		return cluster.Params()
 	}
 	return node.Params(), nil
@@ -95,6 +99,7 @@ func cleanup(ctx context.Context) error {
 		if _, ok := container.Labels["io.kubernetes.pod.namespace"]; ok {
 			continue
 		}
+		logrus.Infof("Removing unmanaged agent %s(%s)", container.Names[0], container.ID)
 		err := c.ContainerRemove(ctx, container.ID, types.ContainerRemoveOptions{
 			Force: true,
 		})
@@ -137,7 +142,14 @@ func run() error {
 	onConnect := func() error {
 		connected()
 		connectConfig := fmt.Sprintf("https://%s/v3/connect/config", serverURL.Host)
-		return rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers)
+		err := rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers)
+		if err != nil {
+			return err
+		}
+		if !isCluster() {
+			return cleanup(context.Background())
+		}
+		return nil
 	}
 
 	for {

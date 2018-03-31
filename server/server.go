@@ -22,25 +22,24 @@ import (
 	"github.com/rancher/rancher/server/whitelist"
 	managementSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/config"
-	"github.com/rancher/types/config/dialer"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 )
 
-func Start(ctx context.Context, httpPort, httpsPort int, apiContext *config.ScaledContext, clusterManager *clustermanager.Manager) error {
-	tokenAPI, err := tokens.NewAPIHandler(ctx, apiContext)
+func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) error {
+	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext)
 	if err != nil {
 		return err
 	}
 
-	publicAPI, err := publicapi.NewHandler(ctx, apiContext)
+	publicAPI, err := publicapi.NewHandler(ctx, scaledContext)
 	if err != nil {
 		return err
 	}
 
-	k8sProxy := k8sProxyPkg.New(apiContext, apiContext.Dialer)
+	k8sProxy := k8sProxyPkg.New(scaledContext, scaledContext.Dialer)
 
-	managementAPI, err := managementapi.New(ctx, apiContext, clusterManager, k8sProxy)
+	managementAPI, err := managementapi.New(ctx, scaledContext, clusterManager, k8sProxy)
 	if err != nil {
 		return err
 	}
@@ -48,23 +47,23 @@ func Start(ctx context.Context, httpPort, httpsPort int, apiContext *config.Scal
 	root := mux.NewRouter()
 	root.UseEncodedPath()
 
-	app.DefaultProxyDialer = utilnet.DialFunc(apiContext.Dialer.LocalClusterDialer())
+	app.DefaultProxyDialer = utilnet.DialFunc(scaledContext.Dialer.LocalClusterDialer())
 
-	localClusterAuth, err := k8sProxyPkg.NewLocalProxy(apiContext, apiContext.Dialer, root)
+	localClusterAuth, err := k8sProxyPkg.NewLocalProxy(scaledContext, scaledContext.Dialer, root)
 	if err != nil {
 		return err
 	}
 
 	rawAuthedAPIs := newAuthed(tokenAPI, managementAPI, k8sProxy)
 
-	authedHandler, err := authrequests.NewAuthenticationFilter(ctx, apiContext, rawAuthedAPIs)
+	authedHandler, err := authrequests.NewAuthenticationFilter(ctx, scaledContext, rawAuthedAPIs)
 	if err != nil {
 		return err
 	}
 
-	webhookHandler := hooks.New(apiContext)
+	webhookHandler := hooks.New(scaledContext)
 
-	connectHandler, connectConfigHandler := connectHandlers(apiContext.Dialer)
+	connectHandler, connectConfigHandler := connectHandlers(scaledContext)
 
 	root.Handle("/", ui.UI(managementAPI))
 	root.PathPrefix("/v3-public").Handler(publicAPI)
@@ -90,7 +89,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, apiContext *config.Scal
 
 	registerHealth(root)
 
-	dynamiclistener.Start(ctx, apiContext, httpPort, httpsPort, localClusterAuth)
+	dynamiclistener.Start(ctx, scaledContext, httpPort, httpsPort, localClusterAuth)
 	return nil
 }
 
@@ -110,9 +109,9 @@ func newAuthed(tokenAPI http.Handler, managementAPI http.Handler, k8sproxy http.
 	return authed
 }
 
-func connectHandlers(dialer dialer.Factory) (http.Handler, http.Handler) {
-	if f, ok := dialer.(*rancherdialer.Factory); ok {
-		return f.TunnelServer, rkenodeconfigserver.Handler(f.TunnelAuthorizer)
+func connectHandlers(scaledContext *config.ScaledContext) (http.Handler, http.Handler) {
+	if f, ok := scaledContext.Dialer.(*rancherdialer.Factory); ok {
+		return f.TunnelServer, rkenodeconfigserver.Handler(f.TunnelAuthorizer, scaledContext)
 	}
 
 	return http.NotFoundHandler(), http.NotFoundHandler()

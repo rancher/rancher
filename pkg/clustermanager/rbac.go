@@ -5,47 +5,42 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (m *Manager) CanCreate(apiContext *types.APIContext, schema *types.Schema) bool {
+func (m *Manager) CanCreate(apiContext *types.APIContext, schema *types.Schema) error {
 	ac, err := m.getAccessControl(apiContext, schema)
 	if err != nil {
-		logrus.Warnf("failed to find access control: %v", err)
-		return false
+		return err
 	}
 	return ac.CanCreate(apiContext, schema)
 }
 
-func (m *Manager) CanList(apiContext *types.APIContext, schema *types.Schema) bool {
+func (m *Manager) CanList(apiContext *types.APIContext, schema *types.Schema) error {
 	ac, err := m.getAccessControl(apiContext, schema)
 	if err != nil {
-		logrus.Warnf("failed to find access control: %v", err)
-		return false
+		return err
 	}
 	return ac.CanList(apiContext, schema)
 }
 
-func (m *Manager) CanGet(apiContext *types.APIContext, schema *types.Schema) bool {
+func (m *Manager) CanGet(apiContext *types.APIContext, schema *types.Schema) error {
 	ac, err := m.getAccessControl(apiContext, schema)
 	if err != nil {
-		logrus.Warnf("failed to find access control: %v", err)
-		return false
+		return err
 	}
 	return ac.CanGet(apiContext, schema)
 }
 
-func (m *Manager) CanUpdate(apiContext *types.APIContext, obj map[string]interface{}, schema *types.Schema) bool {
+func (m *Manager) CanUpdate(apiContext *types.APIContext, obj map[string]interface{}, schema *types.Schema) error {
 	ac, err := m.getAccessControl(apiContext, schema)
 	if err != nil {
-		logrus.Warnf("failed to find access control: %v", err)
-		return false
+		return err
 	}
 	return ac.CanUpdate(apiContext, obj, schema)
 }
 
-func (m *Manager) CanDelete(apiContext *types.APIContext, obj map[string]interface{}, schema *types.Schema) bool {
+func (m *Manager) CanDelete(apiContext *types.APIContext, obj map[string]interface{}, schema *types.Schema) error {
 	ac, err := m.getAccessControl(apiContext, schema)
 	if err != nil {
-		logrus.Warnf("failed to find access control: %v", err)
-		return false
+		return err
 	}
 	return ac.CanDelete(apiContext, obj, schema)
 }

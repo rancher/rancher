@@ -166,6 +166,11 @@ func (t *Authorizer) getMachine(cluster *v3.Cluster, inNode *client.Node) (*v3.N
 				return obj.(*v3.Node), err
 			}
 		}
+
+		machine, err := t.machineLister.Get(cluster.Name, inNode.RequestedHostname)
+		if err == nil {
+			return machine, nil
+		}
 	}
 
 	return machine, err

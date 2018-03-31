@@ -14,6 +14,7 @@ warn()
 AGENT_IMAGE=${AGENT_IMAGE:-ubuntu:14.04}
 
 export CATTLE_ADDRESS
+export CATTLE_AGENT_CONNECT
 export CATTLE_INTERNAL_ADDRESS
 export CATTLE_NODE_NAME
 export CATTLE_ROLE
@@ -22,17 +23,18 @@ export CATTLE_TOKEN
 
 while true; do
     case "$1" in
-        -d | --debug)              DEBUG=true                 ;;
-        -s | --server)      shift; CATTLE_SERVER=$1           ;;
-        -t | --token)       shift; CATTLE_TOKEN=$1            ;;
-        -c | --ca-checksum) shift; CATTLE_CA_CHECKSUM=$1      ;;
-        -a | --all-roles)          ALL=true                   ;;
-        -e | --etcd)               ETCD=true                  ;;
-        -w | --worker)             WORKER=true                ;;
-        -p | --controlplane)       CONTROL=true               ;;
-        -n | --node-name)          CATTLE_NODE_NAME=true      ;;
-        --address)          shift; CATTLE_ADDRESS=$1          ;;
-        --internal-address) shift; CATTLE_INTERNAL_ADDRESS=$1 ;;
+        -d | --debug)                   DEBUG=true                 ;;
+        -s | --server)           shift; CATTLE_SERVER=$1           ;;
+        -t | --token)            shift; CATTLE_TOKEN=$1            ;;
+        -c | --ca-checksum)      shift; CATTLE_CA_CHECKSUM=$1      ;;
+        -a | --all-roles)               ALL=true                   ;;
+        -e | --etcd)                    ETCD=true                  ;;
+        -w | --worker)                  WORKER=true                ;;
+        -p | --controlplane)            CONTROL=true               ;;
+        -n | --node-name)        shift; CATTLE_NODE_NAME=$1        ;;
+        -r | --no-register)             CATTLE_AGENT_CONNECT=true  ;;
+        -a | --address)          shift; CATTLE_ADDRESS=$1          ;;
+        -i | --internal-address) shift; CATTLE_INTERNAL_ADDRESS=$1 ;;
         *) break;
     esac
     shift

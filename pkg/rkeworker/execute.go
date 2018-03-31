@@ -2,30 +2,12 @@ package rkeworker
 
 import (
 	"context"
-	"log"
-	"net/http"
-	"net/url"
-	"sync"
+	"strings"
 
-	"fmt"
-	"net"
-	"os/exec"
-
-	"github.com/rancher/rancher/pkg/clusterrouter/proxy"
 	"github.com/rancher/rancher/pkg/rkecerts"
-	"github.com/sirupsen/logrus"
 )
 
-const (
-	tlsKey  = "/etc/kubernetes/ssl/kube-apiserver-key.pem"
-	tlsCert = "/etc/kubernetes/ssl/kube-apiserver.pem"
-)
-
-var (
-	apiProxy sync.Once
-)
-
-func ExecutePlan(ctx context.Context, serverURL string, nodeConfig *NodeConfig) error {
+func ExecutePlan(ctx context.Context, nodeConfig *NodeConfig) error {
 	if nodeConfig.Certs != "" {
 		bundle, err := rkecerts.Unmarshal(nodeConfig.Certs)
 		if err != nil {
@@ -38,52 +20,20 @@ func ExecutePlan(ctx context.Context, serverURL string, nodeConfig *NodeConfig) 
 	}
 
 	for name, process := range nodeConfig.Processes {
-		if err := runProcess(ctx, name, process); err != nil {
-			return err
-		}
-	}
-
-	if nodeConfig.APIProxyAddress != "" {
-		apiProxy.Do(func() {
-			if err := startHTTPServer(nodeConfig.APIProxyAddress, serverURL); err != nil {
-				logrus.Fatalf("Failed to start API proxy: %v", err)
+		if strings.Contains(name, "sidekick") {
+			if err := runProcess(ctx, name, process, false); err != nil {
+				return err
 			}
-		})
-	}
-
-	return nil
-}
-
-func startHTTPServer(address, serverURL string) error {
-	parsedURL, err := url.Parse(serverURL)
-	if err != nil {
-		return err
-	}
-
-	proxy, err := proxy.NewSimpleProxy(parsedURL.Host, nil)
-	if err != nil {
-		return err
-	}
-
-	wrapped := func(rw http.ResponseWriter, req *http.Request) {
-		req.Header.Set("X-API-K8s-Node-Client", "true")
-		req.Host = parsedURL.Host
-		proxy.ServeHTTP(rw, req)
-	}
-
-	host, _, err := net.SplitHostPort(address)
-	if err == nil {
-		exec.Command("ip", "addr", "add", fmt.Sprintf("%s/32", host), "dev", "lo").Run()
-		output, err := exec.Command("ip", "addr", "show", "dev", "lo").CombinedOutput()
-		if err == nil {
-			fmt.Println(string(output))
 		}
 	}
 
-	go func() {
-		err := http.ListenAndServeTLS(address, tlsCert, tlsKey, http.HandlerFunc(wrapped))
-		log.Fatal(err)
-	}()
+	for name, process := range nodeConfig.Processes {
+		if !strings.Contains(name, "sidekick") {
+			if err := runProcess(ctx, name, process, true); err != nil {
+				return err
+			}
+		}
+	}
 
 	return nil
 }

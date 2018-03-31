@@ -45,7 +45,7 @@ func getOwnerWithKind(apiContext *types.APIContext, namespace, ownerKind, name s
 	key := key{
 		SubContext: subContext,
 		Namespace:  namespace,
-		Kind:       ownerKind,
+		Kind:       strings.ToLower(ownerKind),
 		Name:       name,
 	}
 

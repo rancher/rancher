@@ -1,50 +1,57 @@
 package clusterdeploy
 
 import (
+	"bytes"
+	"context"
 	"errors"
 	"fmt"
-
 	"reflect"
 
-	"bytes"
+	"io/ioutil"
+	"os"
+	"path"
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/clusteryaml"
 	"github.com/rancher/rancher/pkg/kubectl"
-	"github.com/rancher/rancher/pkg/randomtoken"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/systemtemplate"
+	"github.com/rancher/rke/cluster"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
-	errors2 "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 const (
 	clusterOwnerRole = "cluster-owner"
+	tempDir          = "./management-state/tmp"
 )
 
 func Register(management *config.ManagementContext, clusterManager *clustermanager.Manager) {
 	c := &clusterDeploy{
-		userManager:    management.UserManager,
-		crtbs:          management.Management.ClusterRoleTemplateBindings(""),
-		crts:           management.Management.ClusterRegistrationTokens(""),
-		clusters:       management.Management.Clusters(""),
-		clusterManager: clusterManager,
+		systemAccountManager: systemaccount.NewManager(management),
+		userManager:          management.UserManager,
+		clusters:             management.Management.Clusters(""),
+		clusterManager:       clusterManager,
+		builder: clusteryaml.NewBuilder(management.Dialer,
+			management.Management.Nodes("").Controller().Lister(),
+			management.K8sClient.CoreV1()),
 	}
 
 	management.Management.Clusters("").AddHandler("cluster-deploy", c.sync)
 }
 
 type clusterDeploy struct {
-	userManager    user.Manager
-	crtbs          v3.ClusterRoleTemplateBindingInterface
-	clusters       v3.ClusterInterface
-	crts           v3.ClusterRegistrationTokenInterface
-	clusterManager *clustermanager.Manager
+	systemAccountManager *systemaccount.Manager
+	userManager          user.Manager
+	clusters             v3.ClusterInterface
+	clusterManager       *clustermanager.Manager
+	builder              *clusteryaml.Builder
 }
 
 func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) error {
@@ -80,42 +87,13 @@ func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
 	}
 
 	_, err := v3.ClusterConditionSystemAccountCreated.DoUntilTrue(cluster, func() (runtime.Object, error) {
-		return cluster, cd.createSystemAccount(cluster)
+		return cluster, cd.systemAccountManager.CreateSystemAccount(cluster)
 	})
 	if err != nil {
 		return err
 	}
 
 	return cd.deployAgent(cluster)
-}
-
-func (cd *clusterDeploy) createSystemAccount(cluster *v3.Cluster) error {
-	user, err := cd.getUser(cluster)
-	if err != nil {
-		return err
-	}
-
-	bindingName := user.Name + "-admin"
-	_, err = cd.crtbs.GetNamespaced(cluster.Name, bindingName, v1.GetOptions{})
-	if err == nil {
-		return nil
-	}
-
-	_, err = cd.crtbs.Create(&v3.ClusterRoleTemplateBinding{
-		ObjectMeta: v1.ObjectMeta{
-			Name:      bindingName,
-			Namespace: cluster.Name,
-		},
-		ClusterName:      cluster.Name,
-		UserName:         user.Name,
-		RoleTemplateName: clusterOwnerRole,
-	})
-
-	return err
-}
-
-func (cd *clusterDeploy) getUser(cluster *v3.Cluster) (*v3.User, error) {
-	return cd.userManager.EnsureUser(fmt.Sprintf("system://%s", cluster.Name), "System account for Cluster "+cluster.Spec.DisplayName)
 }
 
 func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
@@ -146,19 +124,24 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 		v3.ClusterConditionAgentDeployed.Message(cluster, string(output))
 		return cluster, nil
 	})
-
-	if err == nil {
-		cluster.Status.AgentImage = desired
-		if cluster.Spec.DesiredAgentImage == "fixed" {
-			cluster.Spec.DesiredAgentImage = desired
-		}
+	if err != nil {
+		return err
 	}
 
-	return err
+	if err := cd.deployRKE(kubeConfig, cluster); err != nil {
+		return err
+	}
+
+	cluster.Status.AgentImage = desired
+	if cluster.Spec.DesiredAgentImage == "fixed" {
+		cluster.Spec.DesiredAgentImage = desired
+	}
+
+	return nil
 }
 
 func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Config, error) {
-	user, err := cd.getUser(cluster)
+	user, err := cd.systemAccountManager.GetSystemUser(cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +155,7 @@ func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Confi
 }
 
 func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage string) ([]byte, error) {
-	token, err := cd.getClusterToken(cluster)
+	token, err := cd.systemAccountManager.GetOrCreateSystemClusterToken(cluster.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -188,36 +171,49 @@ func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage string) ([]byte
 	return buf.Bytes(), err
 }
 
-func (cd *clusterDeploy) getClusterToken(cluster *v3.Cluster) (string, error) {
-	token := ""
-
-	crt, err := cd.crts.GetNamespaced(cluster.Name, "system", v1.GetOptions{})
-	if errors2.IsNotFound(err) {
-		token, err = randomtoken.Generate()
-		if err != nil {
-			return "", err
-		}
-		crt = &v3.ClusterRegistrationToken{
-			ObjectMeta: v1.ObjectMeta{
-				Name:      "system",
-				Namespace: cluster.Name,
-			},
-			Spec: v3.ClusterRegistrationTokenSpec{
-				ClusterName: cluster.Name,
-			},
-			Status: v3.ClusterRegistrationTokenStatus{
-				Token: token,
-			},
-		}
-
-		if _, err := cd.crts.Create(crt); err != nil {
-			return "", err
-		}
-	} else if err != nil {
-		return "", err
-	} else {
-		token = crt.Status.Token
+func (cd *clusterDeploy) deployRKE(kubeConfig *clientcmdapi.Config, c *v3.Cluster) error {
+	if c.Status.Driver != v3.ClusterDriverRKE {
+		return nil
 	}
 
-	return token, nil
+	_, err := v3.ClusterConditionAddonDeploy.DoUntilTrue(c, func() (runtime.Object, error) {
+		return c, cd.doDeployRKE(kubeConfig, c)
+	})
+
+	return err
+}
+
+func (cd *clusterDeploy) doDeployRKE(kubeConfig *clientcmdapi.Config, c *v3.Cluster) error {
+	spec, err := cd.builder.GetSpec(c, false)
+	if err != nil {
+		return err
+	}
+
+	bundle, err := cd.builder.GetOrGenerateCerts(c)
+	if err != nil {
+		return err
+	}
+
+	tmp, err := ioutil.TempDir(tempDir, "rke-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tmp)
+
+	tmpFile := path.Join(tmp, "kube_config_cluster.yml")
+	if err := clientcmd.WriteToFile(*kubeConfig, tmpFile); err != nil {
+		return err
+	}
+
+	if err := cluster.ApplyAuthzResources(context.Background(), *spec.RancherKubernetesEngineConfig, "", tmpFile, nil); err != nil {
+		return err
+	}
+
+	return cluster.ConfigureCluster(context.Background(),
+		*spec.RancherKubernetesEngineConfig,
+		bundle.Certs(),
+		"",
+		tmpFile,
+		nil,
+		true)
 }

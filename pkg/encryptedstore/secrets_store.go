@@ -20,6 +20,14 @@ type GenericEncryptedStore struct {
 	secrets   typedv1.SecretsGetter
 }
 
+func NewNamespacedGenericEncrypedStore(prefix, namespace string, secrets typedv1.SecretsGetter) *GenericEncryptedStore {
+	return &GenericEncryptedStore{
+		prefix:    prefix,
+		namespace: namespace,
+		secrets:   secrets,
+	}
+}
+
 func NewGenericEncrypedStore(prefix, namespace string, namespaceInterface v1.NamespaceInterface, secrets typedv1.SecretsGetter) (*GenericEncryptedStore, error) {
 	if namespace == "" {
 		namespace = defaultNamespace

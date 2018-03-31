@@ -2,6 +2,7 @@ package clusterregistrationtokens
 
 import (
 	"fmt"
+	"net/url"
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/settings"
@@ -11,7 +12,7 @@ import (
 const (
 	commandFormat         = "kubectl apply -f %s"
 	insecureCommandFormat = "curl --insecure -sfL %s | kubectl apply -f -"
-	nodeCommandFormat     = "docker run -d --restart=unless-stopped --net=host -v /etc/kubernetes/ssl:/etc/kubernetes/ssl -v /var/run:/var/run %s --server %s --token %s%s"
+	nodeCommandFormat     = "sudo docker run -d --restart=unless-stopped --net=host -v /etc/kubernetes:/etc/kubernetes -v /var/run:/var/run %s --server %s --token %s%s"
 )
 
 func Formatter(request *types.APIContext, resource *types.RawResource) {
@@ -22,16 +23,67 @@ func Formatter(request *types.APIContext, resource *types.RawResource) {
 
 	token, _ := resource.Values["token"].(string)
 	if token != "" {
-		url := request.URLBuilder.RelativeToRoot("/v3/import/" + token + ".yaml")
+		url := getURL(request, token)
 		resource.Values["insecureCommand"] = fmt.Sprintf(insecureCommandFormat, url)
 		resource.Values["command"] = fmt.Sprintf(commandFormat, url)
 		resource.Values["nodeCommand"] = fmt.Sprintf(nodeCommandFormat,
 			settings.AgentImage.Get(),
-			request.URLBuilder.RelativeToRoot(""),
+			getRootURL(request),
 			token,
 			ca)
 		resource.Values["token"] = token
 		resource.Values["manifestUrl"] = url
 	}
+}
 
+func NodeCommand(token string) string {
+	ca := systemtemplate.CAChecksum()
+	if ca != "" {
+		ca = " --ca-checksum " + ca
+	}
+
+	return fmt.Sprintf(nodeCommandFormat,
+		settings.AgentImage.Get(),
+		getRootURL(nil),
+		token,
+		ca)
+}
+
+func getRootURL(request *types.APIContext) string {
+	serverURL := settings.ServerURL.Get()
+	if serverURL == "" {
+		if request != nil {
+			serverURL = request.URLBuilder.RelativeToRoot("")
+		}
+	} else {
+		u, err := url.Parse(serverURL)
+		if err != nil {
+			if request != nil {
+				serverURL = request.URLBuilder.RelativeToRoot("")
+			}
+		} else {
+			u.Path = ""
+			serverURL = u.String()
+		}
+	}
+
+	return serverURL
+}
+
+func getURL(request *types.APIContext, token string) string {
+	path := "/v3/import/" + token + ".yaml"
+	serverURL := settings.ServerURL.Get()
+	if serverURL == "" {
+		serverURL = request.URLBuilder.RelativeToRoot(path)
+	} else {
+		u, err := url.Parse(serverURL)
+		if err != nil {
+			serverURL = request.URLBuilder.RelativeToRoot(path)
+		} else {
+			u.Path = path
+			serverURL = u.String()
+		}
+	}
+
+	return serverURL
 }

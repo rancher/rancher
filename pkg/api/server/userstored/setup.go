@@ -58,7 +58,7 @@ func SetProjectID(schemas *types.Schemas, clusterManager *clustermanager.Manager
 			continue
 		}
 
-		if !schema.CanList(nil) {
+		if schema.CanList(nil) != nil {
 			continue
 		}
 
