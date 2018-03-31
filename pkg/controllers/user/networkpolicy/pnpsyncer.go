@@ -10,10 +10,10 @@ type projectNetworkPolicySyncer struct {
 }
 
 // Sync invokes the Policy Handler to take care of installing the native network policies
-func (pnplc *projectNetworkPolicySyncer) Sync(key string, pnp *v3.ProjectNetworkPolicy) error {
+func (pnps *projectNetworkPolicySyncer) Sync(key string, pnp *v3.ProjectNetworkPolicy) error {
 	if pnp == nil || pnp.DeletionTimestamp != nil {
 		return nil
 	}
-	logrus.Debugf("pnplc Sync pnp=%+v", pnp)
-	return pnplc.npmgr.programNetworkPolicy(pnp.Namespace)
+	logrus.Debugf("projectNetworkPolicySyncer: Sync: pnp=%+v", pnp)
+	return pnps.npmgr.programNetworkPolicy(pnp.Namespace)
 }

@@ -17,8 +17,9 @@ func Register(cluster *config.UserContext) {
 	pods := cluster.Core.Pods("")
 	machines := cluster.Management.Management.Nodes(cluster.ClusterName)
 	npClient := cluster.Networking
+	npLister := cluster.Networking.NetworkPolicies("").Controller().Lister()
 
-	npmgr := &netpolMgr{nsLister, nodeLister, pods, npClient}
+	npmgr := &netpolMgr{nsLister, nodeLister, pods, npLister, npClient}
 	ps := &projectSyncer{pnpLister, pnpClient, projClient}
 	nss := &nsSyncer{npmgr}
 	pnps := &projectNetworkPolicySyncer{npmgr}

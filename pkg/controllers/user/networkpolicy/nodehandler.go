@@ -16,7 +16,7 @@ type nodeHandler struct {
 
 func (nh *nodeHandler) Sync(key string, machine *rmgmtv3.Node) error {
 	if key == fmt.Sprintf("%s/%s", nh.clusterNamespace, nodesyncer.AllNodeKey) {
-		logrus.Debugf("nodeHandler Sync key=%v", key)
+		logrus.Debugf("nodeHandler: Sync: key=%v", key)
 		return nh.npmgr.handleHostNetwork()
 	}
 	return nil

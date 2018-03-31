@@ -68,7 +68,7 @@ func (ps *projectSyncer) createDefaultNetworkPolicy(p runtime.Object) (runtime.O
 		defaultPolicyName := "pnp-" + projectName
 		existingPolicies, err := ps.pnpLister.List(defaultPolicyName, labels.Everything())
 		if err != nil {
-			logrus.Errorf("error fetching existing project network policy: %v", err)
+			logrus.Errorf("projectSyncer: createDefaultNetworkPolicy: error fetching existing project network policy: %v", err)
 			return p, err
 		}
 		if len(existingPolicies) == 0 {
@@ -84,7 +84,7 @@ func (ps *projectSyncer) createDefaultNetworkPolicy(p runtime.Object) (runtime.O
 				},
 			})
 			if err == nil {
-				logrus.Infof("Successfully created default network policy for project: %v", projectName)
+				logrus.Infof("projectSyncer: createDefaultNetworkPolicy: successfully created default network policy for project: %v", projectName)
 			}
 		}
 

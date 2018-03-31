@@ -30,7 +30,7 @@ func (nsh *namespaceHandler) Sync(key string, ns *corev1.Namespace) error {
 	if ns == nil {
 		return nil
 	}
-	logrus.Debugf("namespaceHandler Sync key=%v, ns=%+v", key, *ns)
+	logrus.Debugf("namespaceHandler: Sync: key=%v, ns=%+v", key, *ns)
 
 	field, ok := ns.Annotations[ProjectIDFieldLabel]
 	if !ok {
@@ -42,10 +42,10 @@ func (nsh *namespaceHandler) Sync(key string, ns *corev1.Namespace) error {
 		return nil
 	}
 	projectID := splits[1]
-	logrus.Debugf("namespaceHandler Sync: projectID=%v", projectID)
+	logrus.Debugf("namespaceHandler: Sync: projectID=%v", projectID)
 
 	if err := nsh.addProjectIDLabelToNamespace(ns, projectID); err != nil {
-		logrus.Errorf("nsh Updated: error adding project id label to namespace err=%v", err)
+		logrus.Errorf("namespaceHandler: Sync: error adding project id label to namespace err=%v", err)
 		return nil
 	}
 
@@ -57,7 +57,7 @@ func (nsh *namespaceHandler) addProjectIDLabelToNamespace(ns *corev1.Namespace, 
 		return fmt.Errorf("cannot add label to nil namespace")
 	}
 	if ns.Labels[ProjectIDFieldLabel] != projectID {
-		logrus.Infof("adding label %v=%v to namespace=%v", ProjectIDFieldLabel, projectID, ns.Name)
+		logrus.Infof("namespaceHandler: addProjectIDLabelToNamespace: adding label %v=%v to namespace=%v", ProjectIDFieldLabel, projectID, ns.Name)
 		nscopy := ns.DeepCopy()
 		if nscopy.Labels == nil {
 			nscopy.Labels = map[string]string{}
