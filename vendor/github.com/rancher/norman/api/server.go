@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/norman/api/writer"
 	"github.com/rancher/norman/authorization"
 	"github.com/rancher/norman/httperror"
+	ehandler "github.com/rancher/norman/httperror/handler"
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/store/wrapper"
 	"github.com/rancher/norman/types"
@@ -64,7 +65,7 @@ func NewAPIServer() *Server {
 			LinkHandler: func(*types.APIContext, types.RequestHandler) error {
 				return httperror.NewAPIError(httperror.NotFound, "Link not found")
 			},
-			ErrorHandler: httperror.ErrorHandler,
+			ErrorHandler: ehandler.ErrorHandler,
 		},
 		StoreWrapper: wrapper.Wrap,
 		URLParser:    parse.DefaultURLParser,
@@ -187,31 +188,31 @@ func (s *Server) handle(rw http.ResponseWriter, req *http.Request) (*types.APICo
 			switch apiRequest.Method {
 			case http.MethodGet:
 				if apiRequest.ID == "" {
-					if !apiRequest.AccessControl.CanList(apiRequest, apiRequest.Schema) {
-						return apiRequest, httperror.NewAPIError(httperror.PermissionDenied, "Can not list "+apiRequest.Schema.ID)
+					if err := apiRequest.AccessControl.CanList(apiRequest, apiRequest.Schema); err != nil {
+						return apiRequest, err
 					}
 				} else {
-					if !apiRequest.AccessControl.CanGet(apiRequest, apiRequest.Schema) {
-						return apiRequest, httperror.NewAPIError(httperror.PermissionDenied, "Can not get "+apiRequest.Schema.ID)
+					if err := apiRequest.AccessControl.CanGet(apiRequest, apiRequest.Schema); err != nil {
+						return apiRequest, err
 					}
 				}
 				handler = apiRequest.Schema.ListHandler
 				nextHandler = s.Defaults.ListHandler
 			case http.MethodPost:
-				if !apiRequest.AccessControl.CanCreate(apiRequest, apiRequest.Schema) {
-					return apiRequest, httperror.NewAPIError(httperror.PermissionDenied, "Can not create "+apiRequest.Schema.ID)
+				if err := apiRequest.AccessControl.CanCreate(apiRequest, apiRequest.Schema); err != nil {
+					return apiRequest, err
 				}
 				handler = apiRequest.Schema.CreateHandler
 				nextHandler = s.Defaults.CreateHandler
 			case http.MethodPut:
-				if !apiRequest.AccessControl.CanUpdate(apiRequest, nil, apiRequest.Schema) {
-					return apiRequest, httperror.NewAPIError(httperror.PermissionDenied, "Can not update "+apiRequest.Schema.ID)
+				if err := apiRequest.AccessControl.CanUpdate(apiRequest, nil, apiRequest.Schema); err != nil {
+					return apiRequest, err
 				}
 				handler = apiRequest.Schema.UpdateHandler
 				nextHandler = s.Defaults.UpdateHandler
 			case http.MethodDelete:
-				if !apiRequest.AccessControl.CanDelete(apiRequest, nil, apiRequest.Schema) {
-					return apiRequest, httperror.NewAPIError(httperror.PermissionDenied, "Can not delete "+apiRequest.Schema.ID)
+				if err := apiRequest.AccessControl.CanDelete(apiRequest, nil, apiRequest.Schema); err != nil {
+					return apiRequest, err
 				}
 				handler = apiRequest.Schema.DeleteHandler
 				nextHandler = s.Defaults.DeleteHandler

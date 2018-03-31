@@ -81,6 +81,18 @@ func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions) (*types.
 		return nil, fmt.Errorf("error unmarshalling kubeconfig: %v", err)
 	}
 
+	if len(clusters.Clusters) == 0 {
+		return nil, fmt.Errorf("kubeconfig has no clusters")
+	}
+
+	if len(clusters.Contexts) == 0 {
+		return nil, fmt.Errorf("kubeconfig has no contexts")
+	}
+
+	if len(clusters.Users) == 0 {
+		return nil, fmt.Errorf("kubeconfig has no users")
+	}
+
 	info := &types.ClusterInfo{}
 	info.Endpoint = clusters.Clusters[0].Cluster.Server
 	info.Username = clusters.Contexts[0].Context.User

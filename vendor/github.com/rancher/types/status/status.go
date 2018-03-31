@@ -27,9 +27,10 @@ type condition struct {
 // Unknown == transitioning
 var transitioningMap = map[string]string{
 	"Active":                      "activating",
-	"AddonDeploy":                 "deploying",
-	"AgentDeployed":               "installing",
+	"AddonDeploy":                 "provisioning",
+	"AgentDeployed":               "provisioning",
 	"BackingNamespaceCreated":     "configuring",
+	"CertsGenerated":              "provisioning",
 	"ConfigOK":                    "configuring",
 	"Created":                     "creating",
 	"CreatorMadeOwner":            "configuring",
@@ -38,6 +39,7 @@ var transitioningMap = map[string]string{
 	"DefaultProjectCreated":       "configuring",
 	"DockerProvisioned":           "provisioning",
 	"Downloaded":                  "downloading",
+	"etcd":                        "provisioning",
 	"Inactive":                    "deactivating",
 	"Initialized":                 "initializing",
 	"Installed":                   "installing",
@@ -96,7 +98,7 @@ func concat(str, next string) string {
 	if next == "" {
 		return str
 	}
-	return str + ", " + next
+	return str + "; " + next
 }
 
 func Set(data map[string]interface{}) {

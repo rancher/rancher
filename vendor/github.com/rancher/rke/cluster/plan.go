@@ -39,7 +39,7 @@ func BuildRKEConfigNodePlan(ctx context.Context, myCluster *Cluster, host *hosts
 
 	portChecks = append(portChecks, BuildPortChecksFromPortList(host, WorkerPortList, ProtocolTCP)...)
 	// Do we need an nginxProxy for this one ?
-	if host.IsWorker && !host.IsControl {
+	if !host.IsControl {
 		processes[services.NginxProxyContainerName] = myCluster.BuildProxyProcess()
 	}
 	if host.IsControl {

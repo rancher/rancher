@@ -48,6 +48,35 @@ func UpCommand() cli.Command {
 	}
 }
 
+func EtcdUp(ctx context.Context, currentCluster, kubeCluster *cluster.Cluster, disablePortCheck bool) error {
+	log.Infof(ctx, "Checking ETCD")
+	if err := kubeCluster.TunnelHosts(ctx, false); err != nil {
+		return err
+	}
+
+	if !disablePortCheck {
+		if err := kubeCluster.CheckClusterPorts(ctx, currentCluster); err != nil {
+			return err
+		}
+	}
+
+	if currentCluster != nil {
+		if err := cluster.ReconcileEtcd(ctx, currentCluster, kubeCluster, nil, false); err != nil {
+			return err
+		}
+	}
+
+	if err := kubeCluster.DeployETCD(ctx); err != nil {
+		return err
+	}
+
+	if len(kubeCluster.InactiveHosts) > 0 {
+		return fmt.Errorf("failed to contact to %s", kubeCluster.InactiveHosts[0].Address)
+	}
+
+	return nil
+}
+
 func ClusterUp(
 	ctx context.Context,
 	rkeConfig *v3.RancherKubernetesEngineConfig,

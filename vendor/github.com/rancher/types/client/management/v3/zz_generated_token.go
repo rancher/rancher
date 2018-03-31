@@ -67,6 +67,8 @@ type TokenOperations interface {
 	Update(existing *Token, updates interface{}) (*Token, error)
 	ByID(id string) (*Token, error)
 	Delete(container *Token) error
+
+	ActionLogout(resource *Token) error
 }
 
 func newTokenClient(apiClient *Client) *TokenClient {
@@ -112,4 +114,10 @@ func (c *TokenClient) ByID(id string) (*Token, error) {
 
 func (c *TokenClient) Delete(container *Token) error {
 	return c.apiClient.Ops.DoResourceDelete(TokenType, &container.Resource)
+}
+
+func (c *TokenClient) ActionLogout(resource *Token) error {
+	err := c.apiClient.Ops.DoAction(TokenType, "logout", &resource.Resource, nil, nil)
+	return err
+
 }

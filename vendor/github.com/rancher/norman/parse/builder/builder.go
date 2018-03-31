@@ -137,6 +137,8 @@ func (b *Builder) checkDefaultAndRequired(schema *types.Schema, input map[string
 
 		if op.IsList() && fieldMatchesOp(field, List) && definition.IsReferenceType(field.Type) && !hasKey {
 			result[fieldName] = nil
+		} else if op.IsList() && fieldMatchesOp(field, List) && !hasKey && field.Default != nil {
+			result[fieldName] = field.Default
 		}
 	}
 

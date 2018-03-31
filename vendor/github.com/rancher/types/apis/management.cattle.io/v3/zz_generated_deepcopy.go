@@ -7,6 +7,7 @@ import (
 	rbac_v1 "k8s.io/api/rbac/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	version "k8s.io/apimachinery/pkg/version"
 )
 
 func init() {
@@ -2226,7 +2227,24 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 			(*out)[key] = val.DeepCopy()
 		}
 	}
-	in.AppliedSpec.DeepCopyInto(&out.AppliedSpec)
+	if in.AppliedSpec != nil {
+		in, out := &in.AppliedSpec, &out.AppliedSpec
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(ClusterSpec)
+			(*in).DeepCopyInto(*out)
+		}
+	}
+	if in.AppliedEtcdSpec != nil {
+		in, out := &in.AppliedEtcdSpec, &out.AppliedEtcdSpec
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(ClusterSpec)
+			(*in).DeepCopyInto(*out)
+		}
+	}
 	if in.FailedSpec != nil {
 		in, out := &in.FailedSpec, &out.FailedSpec
 		if *in == nil {
@@ -2248,6 +2266,15 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 		*out = make(v1.ResourceList, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val.DeepCopy()
+		}
+	}
+	if in.Version != nil {
+		in, out := &in.Version, &out.Version
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(version.Info)
+			**out = **in
 		}
 	}
 	return

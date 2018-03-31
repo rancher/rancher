@@ -21,7 +21,7 @@ const (
 )
 
 func RunEtcdPlane(ctx context.Context, etcdHosts []*hosts.Host, etcdProcessHostMap map[*hosts.Host]v3.Process, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, updateWorkersOnly bool, alpineImage string) error {
-	log.Infof(ctx, "[%s] Building up Etcd Plane..", ETCDRole)
+	log.Infof(ctx, "[%s] Building up etcd plane..", ETCDRole)
 	for _, host := range etcdHosts {
 		if updateWorkersOnly {
 			continue
@@ -34,12 +34,12 @@ func RunEtcdPlane(ctx context.Context, etcdHosts []*hosts.Host, etcdProcessHostM
 			return err
 		}
 	}
-	log.Infof(ctx, "[%s] Successfully started Etcd Plane..", ETCDRole)
+	log.Infof(ctx, "[%s] Successfully started etcd plane..", ETCDRole)
 	return nil
 }
 
 func RemoveEtcdPlane(ctx context.Context, etcdHosts []*hosts.Host, force bool) error {
-	log.Infof(ctx, "[%s] Tearing down Etcd Plane..", ETCDRole)
+	log.Infof(ctx, "[%s] Tearing down etcd plane..", ETCDRole)
 	for _, host := range etcdHosts {
 		err := docker.DoRemoveContainer(ctx, host.DClient, EtcdContainerName, host.Address)
 		if err != nil {
@@ -62,7 +62,7 @@ func RemoveEtcdPlane(ctx context.Context, etcdHosts []*hosts.Host, force bool) e
 		}
 
 	}
-	log.Infof(ctx, "[%s] Successfully tore down Etcd Plane..", ETCDRole)
+	log.Infof(ctx, "[%s] Successfully tore down etcd plane..", ETCDRole)
 	return nil
 }
 

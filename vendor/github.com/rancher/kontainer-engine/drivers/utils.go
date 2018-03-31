@@ -19,7 +19,7 @@ const (
 )
 
 // GenerateServiceAccountToken generate a serviceAccountToken for clusterAdmin given a rest clientset
-func GenerateServiceAccountToken(clientset *kubernetes.Clientset) (string, error) {
+func GenerateServiceAccountToken(clientset kubernetes.Interface) (string, error) {
 	serviceAccount := &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: netesDefault,
