@@ -26,15 +26,16 @@ type netpolMgr struct {
 	nsLister   typescorev1.NamespaceLister
 	nodeLister typescorev1.NodeLister
 	pods       typescorev1.PodInterface
+	npLister   rnetworkingv1.NetworkPolicyLister
 	npClient   rnetworkingv1.Interface
 }
 
 func (npmgr *netpolMgr) program(np *knetworkingv1.NetworkPolicy) error {
-	existing, err := npmgr.npClient.NetworkPolicies(np.Namespace).Get(np.Name, v1.GetOptions{})
+	existing, err := npmgr.npLister.Get(np.Namespace, np.Name)
 	logrus.Debugf("netpolMgr: program: existing=%+v, err=%v", existing, err)
 	if err != nil {
 		if kerrors.IsNotFound(err) {
-			logrus.Debugf("about to create np=%+v", *np)
+			logrus.Debugf("netpolMgr: program: about to create np=%+v", *np)
 			_, err = npmgr.npClient.NetworkPolicies(np.Namespace).Create(np)
 			if err != nil && !kerrors.IsAlreadyExists(err) && !kerrors.IsForbidden(err) {
 				logrus.Errorf("netpolMgr: program: error creating network policy err=%v", err)
@@ -46,21 +47,21 @@ func (npmgr *netpolMgr) program(np *knetworkingv1.NetworkPolicy) error {
 	} else {
 		logrus.Debugf("netpolMgr: program: existing=%+v", existing)
 		if existing.DeletionTimestamp == nil && !reflect.DeepEqual(existing, np) {
-			logrus.Debugf("about to update np=%+v", *np)
+			logrus.Debugf("netpolMgr: program: about to update np=%+v", *np)
 			_, err = npmgr.npClient.NetworkPolicies(np.Namespace).Update(np)
 			if err != nil {
 				logrus.Errorf("netpolMgr: program: error updating network policy err=%v", err)
 				return err
 			}
 		} else {
-			logrus.Debugf("no need to update np=%+v", *np)
+			logrus.Debugf("netpolMgr: program: no need to update np=%+v", *np)
 		}
 	}
 	return nil
 }
 
 func (npmgr *netpolMgr) delete(policyNamespace, policyName string) error {
-	existing, err := npmgr.npClient.NetworkPolicies(policyNamespace).Get(policyName, v1.GetOptions{})
+	existing, err := npmgr.npLister.Get(policyNamespace, policyName)
 	logrus.Debugf("netpolMgr: delete: existing=%+v, err=%v", existing, err)
 	if err != nil {
 		if kerrors.IsNotFound(err) {
@@ -79,19 +80,19 @@ func (npmgr *netpolMgr) delete(policyNamespace, policyName string) error {
 }
 
 func (npmgr *netpolMgr) programNetworkPolicy(projectID string) error {
-	logrus.Debugf("programNetworkPolicy: projectID=%v", projectID)
+	logrus.Debugf("netpolMgr: programNetworkPolicy: projectID=%v", projectID)
 	// Get namespaces belonging to project
 	set := labels.Set(map[string]string{nslabels.ProjectIDFieldLabel: projectID})
 	namespaces, err := npmgr.nsLister.List("", set.AsSelector())
 	if err != nil {
-		logrus.Errorf("programNetworkPolicy err=%v", err)
+		logrus.Errorf("netpolMgr: programNetworkPolicy: err=%v", err)
 		return fmt.Errorf("couldn't list namespaces with projectID %v err=%v", projectID, err)
 	}
-	logrus.Debugf("namespaces=%+v", namespaces)
+	logrus.Debugf("netpolMgr: programNetworkPolicy: namespaces=%+v", namespaces)
 
 	for _, aNS := range namespaces {
 		if aNS.DeletionTimestamp != nil {
-			logrus.Debugf("programNetworkPolicy: aNS=%+v marked for deletion, skipping", aNS)
+			logrus.Debugf("netpolMgr: programNetworkPolicy: aNS=%+v marked for deletion, skipping", aNS)
 			continue
 		}
 		policyName := "np-default"
@@ -117,8 +118,9 @@ func (npmgr *netpolMgr) programNetworkPolicy(projectID string) error {
 				},
 			},
 		}
-
-		return npmgr.program(np)
+		if err := npmgr.program(np); err != nil {
+			logrus.Errorf("netpolMgr: programNetworkPolicy: error programming default network policy for ns=%v err=%v", aNS.Name, err)
+		}
 	}
 	return nil
 }
@@ -255,19 +257,17 @@ func (npmgr *netpolMgr) handleHostNetwork() error {
 	if err != nil {
 		return fmt.Errorf("couldn't list nodes err=%v", err)
 	}
-	logrus.Debugf("handleHostNetwork: nodes=%+v", nodes)
+	logrus.Debugf("netpolMgr: handleHostNetwork: nodes=%+v", nodes)
 
 	for _, node := range nodes {
-		// TODO: Ask @ibuildthecloud if I need to skip
-		// a node marked for deletion?
-		logrus.Debugf("node=%+v", node)
+		logrus.Debugf("netpolMgr: handleHostNetwork: node=%+v", node)
 		if _, ok := node.Annotations[FlannelPresenceLabel]; !ok {
-			logrus.Debugf("node=%v doesn't have flannel label, skipping", node.Name)
+			logrus.Debugf("netpolMgr: handleHostNetwork: node=%v doesn't have flannel label, skipping", node.Name)
 			continue
 		}
 		podCIDRFirstIP, _, err := net.ParseCIDR(node.Spec.PodCIDR)
 		if err != nil {
-			logrus.Errorf("couldn't parse PodCIDR(%v) err=%v", node.Spec.PodCIDR, err)
+			logrus.Errorf("netpolMgr: handleHostNetwork: couldn't parse PodCIDR(%v) err=%v", node.Spec.PodCIDR, err)
 			continue
 		}
 		ipBlock := knetworkingv1.IPBlock{
@@ -284,10 +284,10 @@ func (npmgr *netpolMgr) handleHostNetwork() error {
 
 	for _, aNS := range namespaces {
 		if aNS.DeletionTimestamp != nil || aNS.Status.Phase == corev1.NamespaceTerminating {
-			logrus.Debugf("handleHostNetwork: aNS=%+v marked for deletion/termination, skipping", aNS)
+			logrus.Debugf("netpolMgr: handleHostNetwork: aNS=%+v marked for deletion/termination, skipping", aNS)
 			continue
 		}
-		logrus.Debugf("handleHostNetwork: aNS=%+v", aNS)
+		logrus.Debugf("netpolMgr: handleHostNetwork: aNS=%+v", aNS)
 		if _, ok := aNS.Labels[nslabels.ProjectIDFieldLabel]; !ok {
 			continue
 		}
@@ -301,7 +301,7 @@ func (npmgr *netpolMgr) handleHostNetwork() error {
 		}
 		np.Namespace = aNS.Name
 		if err := npmgr.program(np); err != nil {
-			logrus.Errorf("error programming hostNetwork network policy for ns=%v err=%v", aNS.Name, err)
+			logrus.Errorf("netpolMgr: handleHostNetwork: error programming hostNetwork network policy for ns=%v err=%v", aNS.Name, err)
 		}
 	}
 	return nil
