@@ -10,7 +10,9 @@ const (
 	ClusterFieldAgentImage                           = "agentImage"
 	ClusterFieldAllocatable                          = "allocatable"
 	ClusterFieldAnnotations                          = "annotations"
+	ClusterFieldAppliedEtcdSpec                      = "appliedEtcdSpec"
 	ClusterFieldAppliedPodSecurityPolicyTemplateName = "appliedPodSecurityPolicyTemplateId"
+	ClusterFieldAppliedSpec                          = "appliedSpec"
 	ClusterFieldAzureKubernetesServiceConfig         = "azureKubernetesServiceConfig"
 	ClusterFieldCACert                               = "caCert"
 	ClusterFieldCapacity                             = "capacity"
@@ -38,6 +40,7 @@ const (
 	ClusterFieldTransitioning                        = "transitioning"
 	ClusterFieldTransitioningMessage                 = "transitioningMessage"
 	ClusterFieldUuid                                 = "uuid"
+	ClusterFieldVersion                              = "version"
 )
 
 type Cluster struct {
@@ -46,7 +49,9 @@ type Cluster struct {
 	AgentImage                           string                         `json:"agentImage,omitempty" yaml:"agentImage,omitempty"`
 	Allocatable                          map[string]string              `json:"allocatable,omitempty" yaml:"allocatable,omitempty"`
 	Annotations                          map[string]string              `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	AppliedEtcdSpec                      *ClusterSpec                   `json:"appliedEtcdSpec,omitempty" yaml:"appliedEtcdSpec,omitempty"`
 	AppliedPodSecurityPolicyTemplateName string                         `json:"appliedPodSecurityPolicyTemplateId,omitempty" yaml:"appliedPodSecurityPolicyTemplateId,omitempty"`
+	AppliedSpec                          *ClusterSpec                   `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`
 	AzureKubernetesServiceConfig         *AzureKubernetesServiceConfig  `json:"azureKubernetesServiceConfig,omitempty" yaml:"azureKubernetesServiceConfig,omitempty"`
 	CACert                               string                         `json:"caCert,omitempty" yaml:"caCert,omitempty"`
 	Capacity                             map[string]string              `json:"capacity,omitempty" yaml:"capacity,omitempty"`
@@ -74,6 +79,7 @@ type Cluster struct {
 	Transitioning                        string                         `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage                 string                         `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	Uuid                                 string                         `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Version                              *Info                          `json:"version,omitempty" yaml:"version,omitempty"`
 }
 type ClusterCollection struct {
 	types.Collection

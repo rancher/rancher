@@ -5,19 +5,21 @@ import (
 	"github.com/rancher/norman/types"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/version"
 )
 
 type ClusterConditionType string
 
 const (
 	// ClusterConditionReady Cluster ready to serve API (healthy when true, unhealthy when false)
-	ClusterConditionReady   condition.Cond = "Ready"
-	ClusterConditionPending condition.Cond = "Pending"
-	// ClusterConditionProvisioned Cluster is provisioned
-	ClusterConditionProvisioned condition.Cond = "Provisioned"
-	ClusterConditionUpdated     condition.Cond = "Updated"
-	ClusterConditionWaiting     condition.Cond = "Waiting"
-	ClusterConditionRemoved     condition.Cond = "Removed"
+	ClusterConditionReady          condition.Cond = "Ready"
+	ClusterConditionPending        condition.Cond = "Pending"
+	ClusterConditionCertsGenerated condition.Cond = "CertsGenerated"
+	ClusterConditionEtcd           condition.Cond = "etcd"
+	ClusterConditionProvisioned    condition.Cond = "Provisioned"
+	ClusterConditionUpdated        condition.Cond = "Updated"
+	ClusterConditionWaiting        condition.Cond = "Waiting"
+	ClusterConditionRemoved        condition.Cond = "Removed"
 	// ClusterConditionNoDiskPressure true when all cluster nodes have sufficient disk
 	ClusterConditionNoDiskPressure condition.Cond = "NoDiskPressure"
 	// ClusterConditionNoMemoryPressure true when all cluster nodes have sufficient memory
@@ -80,11 +82,13 @@ type ClusterStatus struct {
 	CACert                               string                   `json:"caCert,omitempty"`
 	Capacity                             v1.ResourceList          `json:"capacity,omitempty"`
 	Allocatable                          v1.ResourceList          `json:"allocatable,omitempty"`
-	AppliedSpec                          ClusterSpec              `json:"appliedSpec,omitempty"`
+	AppliedSpec                          *ClusterSpec             `json:"appliedSpec,omitempty"`
+	AppliedEtcdSpec                      *ClusterSpec             `json:"appliedEtcdSpec,omitempty"`
 	FailedSpec                           *ClusterSpec             `json:"failedSpec,omitempty"`
 	Requested                            v1.ResourceList          `json:"requested,omitempty"`
 	Limits                               v1.ResourceList          `json:"limits,omitempty"`
 	ClusterName                          string                   `json:"clusterName,omitempty"`
+	Version                              *version.Info            `json:"version,omitempty"`
 	AppliedPodSecurityPolicyTemplateName string                   `json:"appliedPodSecurityPolicyTemplateId"`
 }
 

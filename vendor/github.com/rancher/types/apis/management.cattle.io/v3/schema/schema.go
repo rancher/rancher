@@ -117,7 +117,6 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 		).
 		AddMapperForType(&Version, v3.ClusterStatus{},
 			m.Drop{Field: "serviceAccountToken"},
-			m.Drop{Field: "appliedSpec"},
 			m.Drop{Field: "clusterName"},
 		).
 		AddMapperForType(&Version, v3.ClusterEvent{}, &m.Move{

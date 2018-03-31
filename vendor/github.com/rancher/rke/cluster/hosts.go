@@ -6,6 +6,7 @@ import (
 
 	"context"
 
+	"github.com/docker/docker/api/types"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
@@ -62,6 +63,9 @@ func (c *Cluster) InvertIndexHosts() error {
 			ToDelLabels:   map[string]string{},
 			ToAddTaints:   []string{},
 			ToDelTaints:   []string{},
+			DockerInfo: types.Info{
+				DockerRootDir: "/var/lib/docker",
+			},
 		}
 		for k, v := range host.Labels {
 			newHost.ToAddLabels[k] = v

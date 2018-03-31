@@ -63,6 +63,8 @@ type CatalogOperations interface {
 	Update(existing *Catalog, updates interface{}) (*Catalog, error)
 	ByID(id string) (*Catalog, error)
 	Delete(container *Catalog) error
+
+	ActionRefresh(resource *Catalog) error
 }
 
 func newCatalogClient(apiClient *Client) *CatalogClient {
@@ -108,4 +110,10 @@ func (c *CatalogClient) ByID(id string) (*Catalog, error) {
 
 func (c *CatalogClient) Delete(container *Catalog) error {
 	return c.apiClient.Ops.DoResourceDelete(CatalogType, &container.Resource)
+}
+
+func (c *CatalogClient) ActionRefresh(resource *Catalog) error {
+	err := c.apiClient.Ops.DoAction(CatalogType, "refresh", &resource.Resource, nil, nil)
+	return err
+
 }

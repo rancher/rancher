@@ -140,16 +140,16 @@ func (j *JSONResponseWriter) addLinks(b *builder.Builder, schema *types.Schema, 
 
 	self := context.URLBuilder.ResourceLink(rawResource)
 	rawResource.Links["self"] = self
-	if context.AccessControl.CanUpdate(context, input, schema) {
+	if context.AccessControl.CanUpdate(context, input, schema) == nil {
 		rawResource.Links["update"] = self
 	}
-	if context.AccessControl.CanDelete(context, input, schema) {
+	if context.AccessControl.CanDelete(context, input, schema) == nil {
 		rawResource.Links["remove"] = self
 	}
 
 	subContextVersion := context.Schemas.SubContextVersionForSchema(schema)
 	for _, backRef := range context.Schemas.References(schema) {
-		if !backRef.Schema.CanList(context) {
+		if backRef.Schema.CanList(context) != nil {
 			continue
 		}
 
@@ -162,7 +162,7 @@ func (j *JSONResponseWriter) addLinks(b *builder.Builder, schema *types.Schema, 
 
 	if subContextVersion != nil {
 		for _, subSchema := range context.Schemas.SchemasForVersion(*subContextVersion) {
-			if subSchema.CanList(context) {
+			if subSchema.CanList(context) == nil {
 				rawResource.Links[subSchema.PluralName] = context.URLBuilder.SubContextCollection(schema, rawResource.ID, subSchema)
 			}
 		}
@@ -184,7 +184,7 @@ func newCollection(apiContext *types.APIContext) *types.GenericCollection {
 	}
 
 	if apiContext.Method == http.MethodGet {
-		if apiContext.AccessControl.CanCreate(apiContext, apiContext.Schema) {
+		if apiContext.AccessControl.CanCreate(apiContext, apiContext.Schema) == nil {
 			result.CreateTypes[apiContext.Schema.ID] = apiContext.URLBuilder.Collection(apiContext.Schema, apiContext.Version)
 		}
 	}

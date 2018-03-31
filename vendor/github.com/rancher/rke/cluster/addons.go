@@ -189,7 +189,7 @@ func (c *Cluster) doAddonDeploy(ctx context.Context, addonYaml, resourceName str
 	}
 	node, err := k8s.GetNode(k8sClient, c.ControlPlaneHosts[0].HostnameOverride)
 	if err != nil {
-		return fmt.Errorf("Failed to get Node [%s]: %v", node.Name, err)
+		return fmt.Errorf("Failed to get Node [%s]: %v", c.ControlPlaneHosts[0].HostnameOverride, err)
 	}
 	addonJob, err := addons.GetAddonsExcuteJob(resourceName, node.Name, c.Services.KubeAPI.Image)
 

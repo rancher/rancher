@@ -65,6 +65,8 @@ type NotifierOperations interface {
 	Update(existing *Notifier, updates interface{}) (*Notifier, error)
 	ByID(id string) (*Notifier, error)
 	Delete(container *Notifier) error
+
+	ActionSend(resource *Notifier, input *Notification) error
 }
 
 func newNotifierClient(apiClient *Client) *NotifierClient {
@@ -110,4 +112,10 @@ func (c *NotifierClient) ByID(id string) (*Notifier, error) {
 
 func (c *NotifierClient) Delete(container *Notifier) error {
 	return c.apiClient.Ops.DoResourceDelete(NotifierType, &container.Resource)
+}
+
+func (c *NotifierClient) ActionSend(resource *Notifier, input *Notification) error {
+	err := c.apiClient.Ops.DoAction(NotifierType, "send", &resource.Resource, input, nil)
+	return err
+
 }

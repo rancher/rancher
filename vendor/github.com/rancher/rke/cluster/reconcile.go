@@ -35,7 +35,7 @@ func ReconcileCluster(ctx context.Context, kubeCluster, currentCluster *Cluster,
 	// sync node labels to define the toDelete labels
 	syncLabels(ctx, currentCluster, kubeCluster)
 
-	if err := reconcileEtcd(ctx, currentCluster, kubeCluster, kubeClient); err != nil {
+	if err := ReconcileEtcd(ctx, currentCluster, kubeCluster, kubeClient, true); err != nil {
 		return fmt.Errorf("Failed to reconcile etcd plane: %v", err)
 	}
 
@@ -149,7 +149,7 @@ func reconcileHost(ctx context.Context, toDeleteHost *hosts.Host, worker, etcd b
 	return nil
 }
 
-func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, kubeClient *kubernetes.Clientset) error {
+func ReconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, kubeClient *kubernetes.Clientset, handleCerts bool) error {
 	log.Infof(ctx, "[reconcile] Check etcd hosts to be deleted")
 	// get tls for the first current etcd host
 	clientCert := cert.EncodeCertPEM(currentCluster.Certificates[pki.KubeNodeCertName].Certificate)
@@ -161,9 +161,11 @@ func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, ku
 			log.Warnf(ctx, "[reconcile] %v", err)
 			continue
 		}
-		if err := hosts.DeleteNode(ctx, etcdHost, kubeClient, etcdHost.IsControl); err != nil {
-			log.Warnf(ctx, "Failed to delete etcd node %s from cluster", etcdHost.Address)
-			continue
+		if kubeClient != nil {
+			if err := hosts.DeleteNode(ctx, etcdHost, kubeClient, etcdHost.IsControl); err != nil {
+				log.Warnf(ctx, "Failed to delete etcd node %s from cluster", etcdHost.Address)
+				continue
+			}
 		}
 		// attempting to clean services/files on the host
 		if err := reconcileHost(ctx, etcdHost, false, true, currentCluster.SystemImages.Alpine, currentCluster.DockerDialerFactory, currentCluster.PrivateRegistriesMap); err != nil {
@@ -173,28 +175,32 @@ func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, ku
 	}
 	log.Infof(ctx, "[reconcile] Check etcd hosts to be added")
 	etcdToAdd := hosts.GetToAddHosts(currentCluster.EtcdHosts, kubeCluster.EtcdHosts)
-	crtMap := currentCluster.Certificates
-	var err error
-	for _, etcdHost := range etcdToAdd {
-		kubeCluster.UpdateWorkersOnly = false
-		etcdHost.ToAddEtcdMember = true
-		// Generate new certificate for the new etcd member
-		crtMap, err = pki.RegenerateEtcdCertificate(
-			ctx,
-			crtMap,
-			etcdHost,
-			kubeCluster.EtcdHosts,
-			kubeCluster.ClusterDomain,
-			kubeCluster.KubernetesServiceIP)
-		if err != nil {
-			return err
+	if handleCerts {
+		crtMap := currentCluster.Certificates
+		var err error
+		for _, etcdHost := range etcdToAdd {
+			kubeCluster.UpdateWorkersOnly = false
+			etcdHost.ToAddEtcdMember = true
+			// Generate new certificate for the new etcd member
+			crtMap, err = pki.RegenerateEtcdCertificate(
+				ctx,
+				crtMap,
+				etcdHost,
+				kubeCluster.EtcdHosts,
+				kubeCluster.ClusterDomain,
+				kubeCluster.KubernetesServiceIP)
+			if err != nil {
+				return err
+			}
 		}
+		currentCluster.Certificates = crtMap
 	}
-	currentCluster.Certificates = crtMap
 	for _, etcdHost := range etcdToAdd {
-		// deploy certificates on new etcd host
-		if err := pki.DeployCertificatesOnHost(ctx, etcdHost, currentCluster.Certificates, kubeCluster.SystemImages.CertDownloader, pki.CertPathPrefix, kubeCluster.PrivateRegistriesMap); err != nil {
-			return err
+		if handleCerts {
+			// deploy certificates on new etcd host
+			if err := pki.DeployCertificatesOnHost(ctx, etcdHost, currentCluster.Certificates, kubeCluster.SystemImages.CertDownloader, pki.CertPathPrefix, kubeCluster.PrivateRegistriesMap); err != nil {
+				return err
+			}
 		}
 
 		// Check if the host already part of the cluster -- this will cover cluster with lost quorum

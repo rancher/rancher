@@ -151,7 +151,7 @@ func (s *Schemas) importType(version *APIVersion, t reflect.Type, overrides ...r
 
 	mappers := s.mapper(&schema.Version, schema.ID)
 	if s.DefaultMappers != nil {
-		if schema.CanList(nil) {
+		if schema.CanList(nil) == nil {
 			mappers = append(s.DefaultMappers(), mappers...)
 		}
 	}
@@ -175,7 +175,7 @@ func (s *Schemas) importType(version *APIVersion, t reflect.Type, overrides ...r
 
 	mapper := &typeMapper{
 		Mappers: mappers,
-		root:    schema.CanList(nil),
+		root:    schema.CanList(nil) == nil,
 	}
 
 	if err := mapper.ModifySchema(schema, s); err != nil {
