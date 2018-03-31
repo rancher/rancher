@@ -9,9 +9,11 @@ import (
 	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/event"
 	"github.com/rancher/norman/types/values"
+	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
 	"github.com/rancher/rancher/pkg/encryptedstore"
 	"github.com/rancher/rancher/pkg/nodeconfig"
 	"github.com/rancher/rancher/pkg/ref"
+	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -37,6 +39,7 @@ func Register(management *config.ManagementContext) {
 	nodeClient := management.Management.Nodes("")
 
 	nodeLifecycle := &Lifecycle{
+		systemAccountManager:      systemaccount.NewManager(management),
 		secretStore:               secretStore,
 		nodeClient:                nodeClient,
 		nodeTemplateClient:        management.Management.NodeTemplates(""),
@@ -50,6 +53,7 @@ func Register(management *config.ManagementContext) {
 }
 
 type Lifecycle struct {
+	systemAccountManager      *systemaccount.Manager
 	secretStore               *encryptedstore.GenericEncryptedStore
 	nodeTemplateGenericClient clientbase.GenericClient
 	nodeClient                v3.NodeInterface
@@ -232,8 +236,29 @@ func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *v3.Node) (*v3.N
 		return obj, err
 	}
 
+	if err := m.deployAgent(nodeDir, obj); err != nil {
+		return obj, err
+	}
+
 	m.logger.Infof(obj, "Provisioning node %s done", obj.Spec.RequestedHostname)
 	return obj, nil
+}
+
+func (m *Lifecycle) deployAgent(nodeDir string, obj *v3.Node) error {
+	token, err := m.systemAccountManager.GetOrCreateSystemClusterToken(obj.Namespace)
+	if err != nil {
+		return err
+	}
+
+	drun := clusterregistrationtokens.NodeCommand(token)
+	args := buildAgentCommand(obj, drun)
+	cmd := buildCommand(nodeDir, args)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return errors.Wrap(err, string(output))
+	}
+
+	return nil
 }
 
 func (m *Lifecycle) ready(obj *v3.Node) (*v3.Node, error) {
@@ -372,8 +397,8 @@ func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, ob
 }
 
 func (m *Lifecycle) isNodeInAppliedSpec(node *v3.Node) (bool, error) {
-	// worker nodes can just be immediately deleted
-	if !node.Spec.Etcd && !node.Spec.ControlPlane {
+	// worker/controlplane nodes can just be immediately deleted
+	if !node.Spec.Etcd {
 		return false, nil
 	}
 
@@ -390,11 +415,14 @@ func (m *Lifecycle) isNodeInAppliedSpec(node *v3.Node) (bool, error) {
 	if cluster.DeletionTimestamp != nil {
 		return false, nil
 	}
-	if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig == nil {
+	if cluster.Status.AppliedEtcdSpec == nil {
+		return false, nil
+	}
+	if cluster.Status.AppliedEtcdSpec.RancherKubernetesEngineConfig == nil {
 		return false, nil
 	}
 
-	for _, rkeNode := range cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.Nodes {
+	for _, rkeNode := range cluster.Status.AppliedEtcdSpec.RancherKubernetesEngineConfig.Nodes {
 		nodeName := rkeNode.NodeName
 		if len(nodeName) == 0 {
 			continue

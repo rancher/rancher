@@ -33,6 +33,14 @@ const (
 	nodeCmd           = "docker-machine"
 )
 
+func buildAgentCommand(node *v3.Node, dockerRun string) []string {
+	drun := strings.Fields(dockerRun)
+	cmd := []string{"--native-ssh", "ssh", node.Spec.RequestedHostname}
+	cmd = append(cmd, drun...)
+	cmd = append(cmd, "-r", "-n", node.Name)
+	return cmd
+}
+
 func buildCreateCommand(node *v3.Node, configMap map[string]interface{}) []string {
 	sDriver := strings.ToLower(node.Status.NodeTemplateSpec.Driver)
 	cmd := []string{"create", "-d", sDriver}

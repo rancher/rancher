@@ -3,6 +3,7 @@ package clusterstats
 import (
 	"reflect"
 
+	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"k8s.io/api/core/v1"
@@ -11,8 +12,9 @@ import (
 )
 
 type StatsAggregator struct {
-	NodesLister v3.NodeLister
-	Clusters    v3.ClusterInterface
+	NodesLister    v3.NodeLister
+	Clusters       v3.ClusterInterface
+	ClusterManager *clustermanager.Manager
 }
 
 type ClusterNodeData struct {
@@ -24,13 +26,14 @@ type ClusterNodeData struct {
 	ConditionNoMemoryPressureStatus v1.ConditionStatus
 }
 
-func Register(management *config.ManagementContext) {
+func Register(management *config.ManagementContext, clusterManager *clustermanager.Manager) {
 	clustersClient := management.Management.Clusters("")
 	machinesClient := management.Management.Nodes("")
 
 	s := &StatsAggregator{
-		NodesLister: machinesClient.Controller().Lister(),
-		Clusters:    clustersClient,
+		NodesLister:    machinesClient.Controller().Lister(),
+		Clusters:       clustersClient,
+		ClusterManager: clusterManager,
 	}
 
 	clustersClient.AddHandler("cluster-stats", s.sync)
@@ -115,7 +118,14 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 	}
 
 	if !reflect.DeepEqual(origStatus, cluster.Status) {
-		_, err := s.Clusters.Update(cluster)
+		userContext, err := s.ClusterManager.UserContext(cluster.Name)
+		if err == nil {
+			version, err := userContext.K8sClient.Discovery().ServerVersion()
+			if err == nil {
+				cluster.Status.Version = version
+			}
+		}
+		_, err = s.Clusters.Update(cluster)
 		return err
 	}
 

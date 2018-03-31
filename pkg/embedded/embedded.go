@@ -10,8 +10,8 @@ import (
 	"github.com/rancher/rancher/pkg/clusteryaml"
 	"github.com/rancher/rancher/pkg/hyperkube"
 	"github.com/rancher/rancher/pkg/k8scheck"
+	"github.com/rancher/rancher/pkg/librke"
 	"github.com/rancher/rancher/pkg/rkecerts"
-	"github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -39,7 +39,7 @@ func Run(ctx context.Context) (context.Context, string, error) {
 		return ctx, "", err
 	}
 
-	plan, err := cluster.GeneratePlan(ctx, rkeConfig)
+	plan, err := librke.New().GeneratePlan(ctx, rkeConfig)
 	if err != nil {
 		return ctx, "", err
 	}

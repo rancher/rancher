@@ -26,7 +26,7 @@ func ConfigClient(ctx context.Context, url string, header http.Header) error {
 		}
 
 		if nc != nil {
-			return rkeworker.ExecutePlan(ctx, url, nc)
+			return rkeworker.ExecutePlan(ctx, nc)
 		}
 
 		logrus.Infof("waiting for node to register")
@@ -60,7 +60,7 @@ func getConfig(client *http.Client, url string, header http.Header) (*rkeworker.
 
 	if resp.StatusCode != http.StatusOK {
 		content, _ := ioutil.ReadAll(resp.Body)
-		return nil, fmt.Errorf("Invalid response %d: %s", resp.StatusCode, string(content))
+		return nil, fmt.Errorf("invalid response %d: %s", resp.StatusCode, string(content))
 	}
 
 	nc := &rkeworker.NodeConfig{}

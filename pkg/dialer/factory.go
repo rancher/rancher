@@ -5,6 +5,9 @@ import (
 	"net"
 	"time"
 
+	"net/url"
+	"strings"
+
 	"github.com/rancher/rancher/pkg/encryptedstore"
 	"github.com/rancher/rancher/pkg/nodeconfig"
 	"github.com/rancher/rancher/pkg/remotedialer"
@@ -50,7 +53,7 @@ type Factory struct {
 
 func (f *Factory) ClusterDialer(clusterName string) (dialer.Dialer, error) {
 	return func(network, address string) (net.Conn, error) {
-		d, err := f.clusterDialer(clusterName)
+		d, err := f.clusterDialer(clusterName, address)
 		if err != nil {
 			return nil, err
 		}
@@ -58,16 +61,36 @@ func (f *Factory) ClusterDialer(clusterName string) (dialer.Dialer, error) {
 	}, nil
 }
 
-func (f *Factory) clusterDialer(clusterName string) (dialer.Dialer, error) {
+func isCloudDriver(cluster *v3.Cluster) bool {
+	return !cluster.Spec.Internal && cluster.Status.Driver != v3.ClusterDriverImported && cluster.Status.Driver != v3.ClusterDriverRKE
+}
+
+func (f *Factory) clusterDialer(clusterName, address string) (dialer.Dialer, error) {
 	cluster, err := f.clusterLister.Get("", clusterName)
 	if err != nil {
 		return nil, err
+	}
+
+	if cluster.Spec.Internal {
+		// For local (embedded, or import) we just assume we can connect directly
+		return native()
+	}
+
+	hostPort := hostPort(cluster)
+	if address == hostPort && isCloudDriver(cluster) {
+		// For cloud drivers we just connect directly to the k8s API, not through the tunnel.  All other go through tunnel
+		return native()
 	}
 
 	if f.TunnelServer.HasSession(cluster.Name) {
 		return f.TunnelServer.Dialer(cluster.Name, 15*time.Second), nil
 	}
 
+	if cluster.Status.Driver != v3.ClusterDriverRKE {
+		return nil, fmt.Errorf("waiting for cluster agent to connect")
+	}
+
+	// Only for RKE will we try to connect to a node for the cluster dialer
 	nodes, err := f.nodeLister.List(cluster.Name, labels.Everything())
 	if err != nil {
 		return nil, err
@@ -76,15 +99,33 @@ func (f *Factory) clusterDialer(clusterName string) (dialer.Dialer, error) {
 	for _, node := range nodes {
 		if node.DeletionTimestamp == nil && v3.NodeConditionProvisioned.IsTrue(node) {
 			if nodeDialer, err := f.nodeDialer(clusterName, node.Name); err == nil {
-				return nodeDialer, err
+				return func(network, address string) (net.Conn, error) {
+					if address == hostPort {
+						// The node dialer may not have direct access to kube-api so we hit localhost:6443 instead
+						address = "127.0.0.1:6443"
+					}
+					return nodeDialer(network, address)
+				}, nil
 			}
 		}
 	}
 
-	if cluster.Status.Driver == v3.ClusterDriverImported && !cluster.Spec.Internal {
-		return nil, fmt.Errorf("waiting for cluster agent to connect")
+	return nil, fmt.Errorf("waiting for cluster agent to connect")
+}
+
+func hostPort(cluster *v3.Cluster) string {
+	u, err := url.Parse(cluster.Status.APIEndpoint)
+	if err != nil {
+		return ""
 	}
 
+	if strings.Contains(u.Host, ":") {
+		return u.Host
+	}
+	return u.Host + ":443"
+}
+
+func native() (dialer.Dialer, error) {
 	return func(network, address string) (net.Conn, error) {
 		return net.DialTimeout(network, address, 30*time.Second)
 	}, nil

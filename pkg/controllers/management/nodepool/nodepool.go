@@ -11,7 +11,6 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
-	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -181,15 +180,6 @@ func (c *Controller) nodes(nodePool *v3.NodePool, simulate bool) ([]*v3.Node, er
 	return nodes, nil
 }
 
-func IsNodeStatusUnknown(node *v3.Node) bool {
-	for _, cond := range node.Status.InternalNodeStatus.Conditions {
-		if cond.Status == v1.ConditionUnknown && cond.Reason == "NodeStatusUnknown" {
-			return true
-		}
-	}
-	return false
-}
-
 func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, simulate bool) (bool, error) {
 	var (
 		err     error
@@ -211,7 +201,7 @@ func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, simulate bool) (b
 			continue
 		}
 
-		if v3.NodeConditionProvisioned.IsFalse(node) {
+		if v3.NodeConditionProvisioned.IsFalse(node) || v3.NodeConditionInitialized.IsFalse(node) {
 			changed = true
 			if !simulate {
 				c.deleteNode(node, 2*time.Minute)

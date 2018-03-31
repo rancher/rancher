@@ -1,14 +1,11 @@
 package clusteryaml
 
 import (
+	"fmt"
 	"io/ioutil"
 
-	"context"
-
-	"fmt"
-
+	"github.com/rancher/rancher/pkg/librke"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"gopkg.in/yaml.v2"
@@ -55,10 +52,7 @@ func LocalConfig() (*v3.RancherKubernetesEngineConfig, error) {
 		},
 	}
 
-	c, err := cluster.ParseCluster(context.Background(),
-		rkeConfig,
-		"",
-		"",
+	c, err := librke.New().ParseCluster("local", rkeConfig,
 		nil,
 		nil,
 		nil)

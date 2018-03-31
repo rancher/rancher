@@ -84,8 +84,11 @@ func (m *Manager) start(ctx context.Context, cluster *v3.Cluster) (*record, erro
 	}
 
 	controller, err := m.toRecord(ctx, cluster)
-	if controller == nil || err != nil {
+	if err != nil {
 		return nil, err
+	}
+	if controller == nil {
+		return nil, httperror.NewAPIError(httperror.ClusterUnavailable, "cluster not found")
 	}
 
 	obj, loaded := m.controllers.LoadOrStore(cluster.UID, controller)
@@ -243,6 +246,10 @@ func (m *Manager) UserContext(clusterName string) (*config.UserContext, error) {
 	record, err := m.start(context.Background(), cluster)
 	if err != nil {
 		return nil, httperror.NewAPIError(httperror.ClusterUnavailable, err.Error())
+	}
+
+	if record == nil {
+		return nil, httperror.NewAPIError(httperror.NotFound, "failed to find cluster")
 	}
 
 	return record.cluster, nil

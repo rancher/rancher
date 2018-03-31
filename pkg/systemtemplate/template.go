@@ -125,7 +125,7 @@ spec:
           mountPath: /cattle-credentials
           readOnly: true
         - name: k8s-ssl
-          mountPath: /etc/kubernetes/ssl
+          mountPath: /etc/kubernetes
         - name: var-run
           mountPath: /var/run
         - name: run
@@ -135,7 +135,7 @@ spec:
       volumes:
       - name: k8s-ssl
         hostPath:
-          path: /etc/kubernetes/ssl
+          path: /etc/kubernetes
           type: DirectoryOrCreate
       - name: var-run
         hostPath:

@@ -2,23 +2,27 @@ package rkeworker
 
 import (
 	"context"
+	"io"
+	"os"
 	"reflect"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
+	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
 
 type NodeConfig struct {
-	APIProxyAddress string                `json:"apiProxyAddress"`
-	Certs           string                `json:"certs"`
-	Processes       map[string]v3.Process `json:"processes"`
+	ClusterName string                `json:"clusterName"`
+	Certs       string                `json:"certs"`
+	Processes   map[string]v3.Process `json:"processes"`
+	Files       []v3.File             `json:"files"`
 }
 
-func runProcess(ctx context.Context, name string, p v3.Process) error {
+func runProcess(ctx context.Context, name string, p v3.Process, start bool) error {
 	c, err := client.NewEnvClient()
 	if err != nil {
 		return err
@@ -68,10 +72,19 @@ func runProcess(ctx context.Context, name string, p v3.Process) error {
 		config.Labels = map[string]string{}
 	}
 	config.Labels["io.cattle.process.name"] = name
-	hostConfig.VolumesFrom = nil
 
 	newContainer, err := c.ContainerCreate(ctx, config, hostConfig, nil, name)
-	if err == nil {
+	if client.IsErrImageNotFound(err) {
+		var output io.ReadCloser
+		output, err = c.ImagePull(ctx, config.Image, types.ImagePullOptions{})
+		if err != nil {
+			return err
+		}
+		defer output.Close()
+		io.Copy(os.Stdout, output)
+		newContainer, err = c.ContainerCreate(ctx, config, hostConfig, nil, name)
+	}
+	if err == nil && start {
 		return c.ContainerStart(ctx, newContainer.ID, types.ContainerStartOptions{})
 	}
 	return err
@@ -99,6 +112,7 @@ func changed(ctx context.Context, c *client.Client, p v3.Process, container type
 		NetworkMode: string(inspect.HostConfig.NetworkMode),
 		PidMode:     string(inspect.HostConfig.PidMode),
 		Privileged:  inspect.HostConfig.Privileged,
+		VolumesFrom: inspect.HostConfig.VolumesFrom,
 	}
 
 	if len(p.Command) == 0 {
@@ -121,12 +135,31 @@ func changed(ctx context.Context, c *client.Client, p v3.Process, container type
 	newProcess.Name = p.Name
 	newProcess.HealthCheck.URL = p.HealthCheck.URL
 	newProcess.RestartPolicy = p.RestartPolicy
-	newProcess.VolumesFrom = p.VolumesFrom
 
 	changed := false
 	t := reflect.TypeOf(newProcess)
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
+		if f.Name == "Command" {
+			leftMap := sliceToMap(p.Command)
+			rightMap := sliceToMap(newProcess.Command)
+			if reflect.DeepEqual(leftMap, rightMap) {
+				continue
+			}
+		} else if f.Name == "Env" {
+			changed := false
+			for _, v := range p.Env {
+				if !slice.ContainsString(newProcess.Env, v) {
+					changed = true
+					break
+				}
+			}
+
+			if !changed {
+				continue
+			}
+		}
+
 		left := reflect.ValueOf(newProcess).Field(i).Interface()
 		right := reflect.ValueOf(p).Field(i).Interface()
 		if !reflect.DeepEqual(left, right) {
@@ -136,4 +169,12 @@ func changed(ctx context.Context, c *client.Client, p v3.Process, container type
 	}
 
 	return changed, nil
+}
+
+func sliceToMap(args []string) map[string]bool {
+	result := map[string]bool{}
+	for _, arg := range args {
+		result[arg] = true
+	}
+	return result
 }

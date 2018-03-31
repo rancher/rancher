@@ -14,6 +14,9 @@ func (p *Provisioner) driverCreate(cluster *v3.Cluster, spec v3.ClusterSpec) (ap
 		cluster = newCluster
 	}
 
+	if cluster.Status.Driver == v3.ClusterDriverRKE {
+		return p.rke.Provision(ctx, cluster, false)
+	}
 	return p.Driver.Create(ctx, cluster.Status.ClusterName, spec)
 }
 
@@ -25,6 +28,9 @@ func (p *Provisioner) driverUpdate(cluster *v3.Cluster, spec v3.ClusterSpec) (ap
 		cluster = newCluster
 	}
 
+	if cluster.Status.Driver == v3.ClusterDriverRKE {
+		return p.rke.Provision(ctx, cluster, true)
+	}
 	return p.Driver.Update(ctx, cluster.Status.ClusterName, spec)
 }
 
@@ -37,6 +43,9 @@ func (p *Provisioner) driverRemove(cluster *v3.Cluster) error {
 			cluster = newCluster
 		}
 
+		if cluster.Status.Driver == v3.ClusterDriverRKE {
+			return cluster, p.rke.Remove(ctx, cluster)
+		}
 		return cluster, p.Driver.Remove(ctx, cluster.Status.ClusterName, cluster.Spec)
 	})
 

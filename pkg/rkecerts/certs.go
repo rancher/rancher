@@ -1,8 +1,10 @@
 package rkecerts
 
 import (
+	"bytes"
 	"context"
 	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,12 +12,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"crypto/x509"
-
-	"bytes"
-
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/kubeconfig"
+	"github.com/rancher/rancher/pkg/librke"
+	"github.com/rancher/rancher/pkg/ref"
+	"github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"k8s.io/client-go/util/cert"
@@ -51,7 +52,7 @@ func (b *Bundle) Certs() map[string]pki.CertificatePKI {
 	return b.certs
 }
 
-func Load() (*Bundle, error) {
+func LoadLocal() (*Bundle, error) {
 	f, err := os.Open(bundleFile)
 	if err != nil {
 		return nil, err
@@ -99,8 +100,8 @@ func load(f io.Reader) (*Bundle, error) {
 	return bundle, nil
 }
 
-func Generate(ctx context.Context, config *v3.RancherKubernetesEngineConfig) (*Bundle, error) {
-	certs, err := pki.GenerateRKECerts(ctx, *config, "", "")
+func Generate(config *v3.RancherKubernetesEngineConfig) (*Bundle, error) {
+	certs, err := librke.New().GenerateCerts(config)
 	if err != nil {
 		return nil, err
 	}
@@ -141,9 +142,15 @@ func (b *Bundle) save(w io.Writer) error {
 	return json.NewEncoder(w).Encode(toSave)
 }
 
-func (b *Bundle) ForNode(config *v3.RancherKubernetesEngineConfig, node *v3.RKEConfigNode, server, token string) (*Bundle, error) {
-	certs := pki.GenerateRKENodeCerts(context.Background(), *config, node.Address, b.certs)
+func (b *Bundle) ForNode(config *v3.RancherKubernetesEngineConfig, node *v3.RKEConfigNode) *Bundle {
+	certs := librke.New().GenerateRKENodeCerts(context.Background(), *config, node.Address, b.certs)
+	return &Bundle{
+		certs: certs,
+	}
+}
 
+func (b *Bundle) ForLocalDriverNode(config *v3.RancherKubernetesEngineConfig, node *v3.RKEConfigNode, server, token string) (*Bundle, error) {
+	certs := librke.New().GenerateRKENodeCerts(context.Background(), *config, node.Address, b.certs)
 	updates := map[string]string{}
 	nameToUser := map[string]string{
 		nodeCfg:  node.HostnameOverride,
@@ -174,7 +181,7 @@ func (b *Bundle) ForNode(config *v3.RancherKubernetesEngineConfig, node *v3.RKEC
 	}, nil
 }
 
-func (b *Bundle) Save() error {
+func (b *Bundle) SaveLocal() error {
 	bundlePath := filepath.Dir(bundleFile)
 	if err := os.MkdirAll(bundlePath, 0700); err != nil {
 		return err
@@ -212,6 +219,37 @@ func (b *Bundle) Explode() error {
 	}
 
 	return f.err()
+}
+
+func (b *Bundle) Merge(bundle *Bundle) {
+	for k, v := range bundle.certs {
+		b.certs[k] = v
+	}
+}
+
+func (b *Bundle) GenerateETCD(nodeName string, cluster *cluster.Cluster) (*Bundle, error) {
+	copy := map[string]pki.CertificatePKI{}
+	for k, v := range b.certs {
+		copy[k] = v
+	}
+
+	for _, host := range cluster.EtcdHosts {
+		_, hostNodeName := ref.Parse(host.NodeName)
+		if hostNodeName == nodeName {
+			newCerts, err := librke.New().RegenerateEtcdCertificate(copy, host, cluster)
+			if err != nil {
+				return nil, err
+			}
+			for k := range b.certs {
+				delete(newCerts, k)
+			}
+			return &Bundle{
+				certs: newCerts,
+			}, err
+		}
+	}
+
+	return nil, fmt.Errorf("failed to find etcd host %s to generate cert", nodeName)
 }
 
 type fileWriter struct {

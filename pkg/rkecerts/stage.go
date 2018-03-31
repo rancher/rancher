@@ -1,20 +1,19 @@
 package rkecerts
 
 import (
-	"context"
 	"os"
 
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 func Stage(rkeConfig *v3.RancherKubernetesEngineConfig) (*Bundle, error) {
-	bundle, err := Load()
+	bundle, err := LoadLocal()
 	if os.IsNotExist(err) {
-		bundle, err = Generate(context.Background(), rkeConfig)
+		bundle, err = Generate(rkeConfig)
 		if err != nil {
 			return nil, err
 		}
-		if err := bundle.Save(); err != nil {
+		if err := bundle.SaveLocal(); err != nil {
 			return nil, err
 		}
 	} else if err != nil {

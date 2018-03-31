@@ -26,6 +26,7 @@ import (
 	nodeStore "github.com/rancher/rancher/pkg/api/store/node"
 	"github.com/rancher/rancher/pkg/api/store/preference"
 	"github.com/rancher/rancher/pkg/api/store/scoped"
+	"github.com/rancher/rancher/pkg/api/store/templateversion"
 	"github.com/rancher/rancher/pkg/api/store/userscope"
 	"github.com/rancher/rancher/pkg/auth/principals"
 	"github.com/rancher/rancher/pkg/auth/providers"
@@ -179,6 +180,7 @@ func TemplateVersion(schemas *types.Schemas) {
 	schema := schemas.Schema(&managementschema.Version, client.TemplateVersionType)
 	schema.Formatter = catalog.TemplateVersionFormatter
 	schema.LinkHandler = catalog.TemplateVersionReadmeHandler
+	schema.Store = templateversion.Wrap(schema.Store)
 }
 
 func Catalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
@@ -217,7 +219,7 @@ func SecretTypes(schemas *types.Schemas, management *config.ScaledContext) {
 
 	for _, subSchema := range schemas.SchemasForVersion(projectschema.Version) {
 		if subSchema.BaseType == projectclient.SecretType && subSchema.ID != projectclient.SecretType {
-			if subSchema.CanList(nil) {
+			if subSchema.CanList(nil) == nil {
 				subSchema.Store = subtype.NewSubTypeStore(subSchema.ID, secretSchema.Store)
 			}
 		}
