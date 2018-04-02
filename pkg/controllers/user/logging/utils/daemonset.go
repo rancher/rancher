@@ -177,6 +177,10 @@ func newFluentdDaemonset(name, namespace, clusterName string) *v1beta2.DaemonSet
 									MountPath: "/fluentd/etc/log",
 								},
 								{
+									Name:      "rkelog",
+									MountPath: "/var/lib/rancher/rke/log",
+								},
+								{
 									Name:      "clusterlogging",
 									MountPath: "/fluentd/etc/config/cluster",
 								},
@@ -214,6 +218,14 @@ func newFluentdDaemonset(name, namespace, clusterName string) *v1beta2.DaemonSet
 							VolumeSource: v1.VolumeSource{
 								HostPath: &v1.HostPathVolumeSource{
 									Path: "/var/log/pods",
+								},
+							},
+						},
+						{
+							Name: "rkelog",
+							VolumeSource: v1.VolumeSource{
+								HostPath: &v1.HostPathVolumeSource{
+									Path: "/var/lib/rancher/rke/log",
 								},
 							},
 						},
