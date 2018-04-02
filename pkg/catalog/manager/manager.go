@@ -32,6 +32,7 @@ type Manager struct {
 	catalogClient         v3.CatalogInterface
 	templateClient        v3.TemplateInterface
 	templateVersionClient v3.TemplateVersionInterface
+	templateContentClient v3.TemplateContentInterface
 	lastUpdateTime        time.Time
 }
 
@@ -47,6 +48,7 @@ func New(management *config.ManagementContext, cacheRoot string) *Manager {
 		catalogClient:         management.Management.Catalogs(""),
 		templateClient:        management.Management.Templates(""),
 		templateVersionClient: management.Management.TemplateVersions(""),
+		templateContentClient: management.Management.TemplateContents(""),
 	}
 }
 

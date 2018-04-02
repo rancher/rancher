@@ -1,22 +1,22 @@
 package helm
 
 import (
-	"context"
-	"encoding/base64"
-	"fmt"
+	"crypto/sha256"
+	"encoding/hex"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"time"
+	"reflect"
 
-	"github.com/rancher/norman/types/slice"
+	"fmt"
+
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
-	hutils "github.com/rancher/rancher/pkg/controllers/user/helm/utils"
+	"github.com/rancher/rancher/pkg/ref"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
-	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -39,6 +39,8 @@ func Register(user *config.UserContext, kubeConfigGetter common.KubeConfigGetter
 		TemplateVersionClient: user.Management.Management.TemplateVersions(""),
 		ListenConfigClient:    user.Management.Management.ListenConfigs(""),
 		ClusterName:           user.ClusterName,
+		TemplateContentClient: user.Management.Management.TemplateContents(""),
+		AppRevisionGetter:     user.Management.Project,
 	}
 	appClient.AddClusterScopedLifecycle("helm-controller", user.ClusterName, stackLifecycle)
 }
@@ -52,136 +54,146 @@ type Lifecycle struct {
 	K8sClient             kubernetes.Interface
 	ListenConfigClient    mgmtv3.ListenConfigInterface
 	ClusterName           string
+	TemplateContentClient mgmtv3.TemplateContentInterface
+	AppRevisionGetter     v3.AppRevisionsGetter
 }
 
 func (l *Lifecycle) Create(obj *v3.App) (*v3.App, error) {
-	if obj.Spec.ExternalID == "" {
-		return obj, nil
-	}
-	newObj, err := v3.AppConditionInstalled.DoUntilTrue(obj, func() (runtime.Object, error) {
-		templateVersionID, err := hutils.ParseExternalID(obj.Spec.ExternalID)
-		if err != nil {
-			return obj, err
-		}
-		if err := l.Run(obj, "install", templateVersionID); err != nil {
-			return obj, err
-		}
-		configMaps, err := l.K8sClient.CoreV1().ConfigMaps(obj.Spec.InstallNamespace).List(metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%s=%s", "NAME", obj.Name),
-		})
-		if err != nil {
-			return obj, err
-		}
-		releases := []v3.ReleaseInfo{}
-		for _, cm := range configMaps.Items {
-			releaseInfo := v3.ReleaseInfo{}
-			releaseInfo.Name = cm.Name
-			releaseInfo.Version = cm.Labels["VERSION"]
-			releaseInfo.CreateTimestamp = cm.CreationTimestamp.Format(time.RFC3339)
-			releaseInfo.ModifiedAt = cm.Labels["MODIFIED_AT"]
-			releaseInfo.TemplateVersionID = templateVersionID
-			releases = append(releases, releaseInfo)
-		}
-		obj.Status.Releases = releases
-		return obj, nil
-	})
-	return newObj.(*v3.App), err
+	return obj, nil
 }
 
 func (l *Lifecycle) Updated(obj *v3.App) (*v3.App, error) {
 	if obj.Spec.ExternalID == "" {
 		return obj, nil
 	}
-	templateVersionID, err := hutils.ParseExternalID(obj.Spec.ExternalID)
-	if err != nil {
-		return obj, err
-	}
-	templateVersion, err := l.TemplateVersionClient.Get(templateVersionID, metav1.GetOptions{})
-	if err != nil {
-		return obj, err
-	}
-	if err := l.saveTemplates(obj, templateVersion); err != nil {
-		return obj, err
-	}
-	configMaps, err := l.K8sClient.CoreV1().ConfigMaps(obj.Spec.InstallNamespace).List(metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", "NAME", obj.Name),
-	})
-	if err != nil {
-		return obj, err
-	}
-	releases := obj.Status.Releases
-	alreadyExistedReleaseNames := []string{}
-	for _, k := range releases {
-		alreadyExistedReleaseNames = append(alreadyExistedReleaseNames, k.Name)
-	}
-	for _, cm := range configMaps.Items {
-		if !slice.ContainsString(alreadyExistedReleaseNames, cm.Name) {
-			logrus.Infof("uploading release %s into namespace %s", cm.Name, obj.Name)
-			releaseInfo := v3.ReleaseInfo{}
-			releaseInfo.Name = cm.Name
-			releaseInfo.Version = cm.Labels["VERSION"]
-			releaseInfo.CreateTimestamp = cm.CreationTimestamp.Format(time.RFC3339)
-			releaseInfo.ModifiedAt = cm.Labels["MODIFIED_AT"]
-			releaseInfo.TemplateVersionID = templateVersionID
-			releases = append(releases, releaseInfo)
+	_, projectName := ref.Parse(obj.Spec.ProjectName)
+	appRevisionClient := l.AppRevisionGetter.AppRevisions(projectName)
+	if obj.Spec.AppRevisionName != "" {
+		currentRevision, err := appRevisionClient.Get(obj.Spec.AppRevisionName, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		if currentRevision.Status.ExternalID == obj.Spec.ExternalID && reflect.DeepEqual(currentRevision.Status.Answers, obj.Spec.Answers) {
+			return obj, nil
 		}
 	}
-	obj.Status.Releases = releases
-	return obj, nil
+
+	template, notes, err := generateTemplates(obj, l.TemplateVersionClient, l.TemplateContentClient)
+	if err != nil {
+		return obj, err
+	}
+	newObj, err := v3.AppConditionInstalled.Do(obj, func() (runtime.Object, error) {
+		if err := l.Run(obj, template, notes); err != nil {
+			obj.Status.LastAppliedTemplates = template
+			return obj, err
+		}
+		return obj, nil
+	})
+	return newObj.(*v3.App), err
 }
 
 func (l *Lifecycle) Remove(obj *v3.App) (*v3.App, error) {
 	if obj.Spec.ExternalID == "" {
 		return obj, nil
 	}
-	templateVersionID, err := hutils.ParseExternalID(obj.Spec.ExternalID)
+	tempDir, err := ioutil.TempDir("", "helm-")
 	if err != nil {
 		return obj, err
 	}
-	if err := l.Run(obj, "delete", templateVersionID); err != nil {
+	defer os.RemoveAll(tempDir)
+	kubeConfigPath, err := l.writeKubeConfig(obj, tempDir)
+	if err != nil {
 		return obj, err
+	}
+	_, projectName := ref.Parse(obj.Spec.ProjectName)
+	appRevisionClient := l.AppRevisionGetter.AppRevisions(projectName)
+	if obj.Spec.AppRevisionName != "" {
+		currentRevision, err := appRevisionClient.Get(obj.Spec.AppRevisionName, metav1.GetOptions{})
+		if err != nil {
+			return obj, err
+		}
+		tc, err := l.TemplateContentClient.Get(currentRevision.Status.Digest, metav1.GetOptions{})
+		if err != nil {
+			return obj, err
+		}
+		if err := kubectlDelete(tc.Data, kubeConfigPath, obj.Spec.TargetNamespace); err != nil {
+			return obj, err
+		}
+	} else if obj.Status.LastAppliedTemplates != "" {
+		if err := kubectlDelete(obj.Status.LastAppliedTemplates, kubeConfigPath, obj.Spec.TargetNamespace); err != nil {
+			return obj, err
+		}
+	}
+	revisions, err := appRevisionClient.List(metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", appLabel, obj.Name),
+	})
+	if err != nil {
+		return obj, err
+	}
+	for _, revision := range revisions.Items {
+		if err := appRevisionClient.Delete(revision.Name, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+			return obj, err
+		}
 	}
 	return obj, nil
 }
 
-func (l *Lifecycle) Run(obj *v3.App, action, templateVersionID string) error {
-	templateVersion, err := l.TemplateVersionClient.Get(templateVersionID, metav1.GetOptions{})
+func (l *Lifecycle) Run(obj *v3.App, template, notes string) error {
+	tempDir, err := ioutil.TempDir("", "kubeconfig-")
 	if err != nil {
 		return err
 	}
-	if err := l.saveTemplates(obj, templateVersion); err != nil {
-		return err
-	}
-	files := map[string]string{}
-	for _, file := range templateVersion.Spec.Files {
-		content, err := base64.StdEncoding.DecodeString(file.Contents)
-		if err != nil {
-			return err
-		}
-		files[file.Name] = string(content)
-	}
-	tempDir, err := ioutil.TempDir("", "helm-")
-	if err != nil {
-		return err
-	}
-	dir, err := hutils.WriteTempDir(tempDir, files)
-	defer os.RemoveAll(dir)
+	defer os.RemoveAll(tempDir)
+	kubeConfigPath, err := l.writeKubeConfig(obj, tempDir)
 	if err != nil {
 		return err
 	}
 
-	cont, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	addr := hutils.GenerateRandomPort()
-	probeAddr := hutils.GenerateRandomPort()
-	userID := obj.Annotations["field.cattle.io/creatorId"]
-	user, err := l.UserClient.Get(userID, metav1.GetOptions{})
+	if err := kubectlApply(template, kubeConfigPath, obj); err != nil {
+		return err
+	}
+	_, projectName := ref.Parse(obj.Spec.ProjectName)
+	appRevisionClient := l.AppRevisionGetter.AppRevisions(projectName)
+	release := &v3.AppRevision{}
+	release.GenerateName = "apprevision-"
+	release.Labels = map[string]string{
+		appLabel: obj.Name,
+	}
+	release.Status.Answers = obj.Spec.Answers
+	release.Status.ProjectName = projectName
+	release.Status.ExternalID = obj.Spec.ExternalID
+	digest := sha256.New()
+	digest.Write([]byte(template))
+	tag := hex.EncodeToString(digest.Sum(nil))
+	if _, err := l.TemplateContentClient.Get(tag, metav1.GetOptions{}); errors.IsNotFound(err) {
+		tc := &mgmtv3.TemplateContent{}
+		tc.Name = tag
+		tc.Data = template
+		if _, err := l.TemplateContentClient.Create(tc); err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
+	}
+	release.Status.Digest = tag
+	createdRevision, err := appRevisionClient.Create(release)
 	if err != nil {
 		return err
 	}
+	obj.Spec.AppRevisionName = createdRevision.Name
+	obj.Status.Notes = notes
+	return err
+}
+
+func (l *Lifecycle) writeKubeConfig(obj *v3.App, tempDir string) (string, error) {
+	userID := obj.Annotations["field.cattle.io/creatorId"]
+	user, err := l.UserClient.Get(userID, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
 	token, err := l.UserManager.EnsureToken(helmTokenPrefix+user.Name, description, user.Name)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	kubeConfig := l.KubeConfigGetter.KubeConfig(l.ClusterName, token)
@@ -189,32 +201,11 @@ func (l *Lifecycle) Run(obj *v3.App, action, templateVersionID string) error {
 		kubeConfig.Clusters[k].InsecureSkipTLSVerify = true
 	}
 	if err := os.MkdirAll(filepath.Join(tempDir, obj.Namespace), 0755); err != nil {
-		return err
+		return "", err
 	}
 	kubeConfigPath := filepath.Join(tempDir, obj.Namespace, ".kubeconfig")
 	if err := clientcmd.WriteToFile(*kubeConfig, kubeConfigPath); err != nil {
-		return err
+		return "", err
 	}
-	defer os.RemoveAll(kubeConfigPath)
-	go hutils.StartTiller(cont, addr, probeAddr, obj.Spec.InstallNamespace, kubeConfigPath)
-	switch action {
-	case "install":
-		if err := hutils.InstallCharts(dir, addr, obj); err != nil {
-			return err
-		}
-	case "delete":
-		if err := hutils.DeleteCharts(addr, obj); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (l *Lifecycle) saveTemplates(obj *v3.App, templateVersion *mgmtv3.TemplateVersion) error {
-	templates := map[string]string{}
-	for _, file := range templateVersion.Spec.Files {
-		templates[file.Name] = file.Contents
-	}
-	obj.Spec.Templates = templates
-	return nil
+	return kubeConfigPath, nil
 }

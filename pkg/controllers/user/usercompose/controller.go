@@ -2,29 +2,28 @@ package usercompose
 
 import (
 	"encoding/json"
-	"strings"
-
 	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
-	hutils "github.com/rancher/rancher/pkg/controllers/user/helm/utils"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	clusterClient "github.com/rancher/types/client/cluster/v3"
 	managementClient "github.com/rancher/types/client/management/v3"
 	projectClient "github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/compose"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/user"
 	yaml "gopkg.in/yaml.v2"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
 	composeTokenPrefix = "compose-token-"
+	description        = "token for compose"
 	url                = "https://localhost:%v/v3"
 )
 
@@ -32,6 +31,7 @@ type Lifecycle struct {
 	HTTPSPortGetter common.KubeConfigGetter
 	TokenClient     v3.TokenInterface
 	UserClient      v3.UserInterface
+	UserManager     user.Manager
 	ComposeClient   v3.ClusterComposeConfigInterface
 	ClusterName     string
 }
@@ -42,6 +42,7 @@ func Register(user *config.UserContext, portGetter common.KubeConfigGetter) {
 	userClient := user.Management.Management.Users("")
 	l := Lifecycle{
 		HTTPSPortGetter: portGetter,
+		UserManager:     user.Management.UserManager,
 		TokenClient:     tokenClient,
 		UserClient:      userClient,
 		ComposeClient:   composeClient,
@@ -73,16 +74,9 @@ func (l Lifecycle) Create(obj *v3.ClusterComposeConfig) (*v3.ClusterComposeConfi
 	if err != nil {
 		return obj, err
 	}
-	token := ""
-	if t, err := l.TokenClient.Get(composeTokenPrefix+user.Name, metav1.GetOptions{}); err != nil && !kerrors.IsNotFound(err) {
+	token, err := l.UserManager.EnsureToken(composeTokenPrefix+user.Name, description, user.Name)
+	if err != nil {
 		return obj, err
-	} else if kerrors.IsNotFound(err) {
-		token, err = hutils.GenerateToken(user, composeTokenPrefix, l.TokenClient)
-		if err != nil {
-			return obj, err
-		}
-	} else {
-		token = t.Name + ":" + t.Token
 	}
 	config := &compose.Config{}
 	if err := yaml.Unmarshal([]byte(obj.Spec.RancherCompose), config); err != nil {

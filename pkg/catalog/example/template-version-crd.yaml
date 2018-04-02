@@ -8,5 +8,5 @@ spec:
   scope: Cluster
   names:
     plural: templateversions
-    singular: templateversion
+    singular: noopwatching
     kind: TemplateVersion

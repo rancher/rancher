@@ -1,4 +1,4 @@
-package templateversion
+package noopwatching
 
 import "github.com/rancher/norman/types"
 

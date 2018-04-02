@@ -12,6 +12,8 @@ import (
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/templatecontent"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/client/management/v3"
@@ -38,19 +40,24 @@ func TemplateFormatter(apiContext *types.APIContext, resource *types.RawResource
 	delete(resource.Values, "versions")
 }
 
-func TemplateVersionFormatter(apiContext *types.APIContext, resource *types.RawResource) {
+type TemplateVerionFormatterWrapper struct {
+	TemplateContentClient v3.TemplateContentInterface
+}
+
+func (t TemplateVerionFormatterWrapper) TemplateVersionFormatter(apiContext *types.APIContext, resource *types.RawResource) {
 	// files
 	files := resource.Values["files"]
 	delete(resource.Values, "files")
 	fileMap := map[string]string{}
-	for _, file := range files.([]interface{}) {
-		m, ok := file.(map[string]interface{})
-		if ok {
-			if k, ok := m["name"].(string); ok {
-				if v, ok := m["contents"].(string); ok {
-					fileMap[k] = v
-				}
+	m, ok := files.(map[string]interface{})
+	if ok {
+		for k, v := range m {
+			tag := convert.ToString(v)
+			data, err := templatecontent.GetTemplateFromTag(tag, t.TemplateContentClient)
+			if err != nil {
+				continue
 			}
+			fileMap[k] = base64.StdEncoding.EncodeToString([]byte(data))
 		}
 	}
 	resource.Values["files"] = fileMap
@@ -58,6 +65,12 @@ func TemplateVersionFormatter(apiContext *types.APIContext, resource *types.RawR
 	// readme
 	delete(resource.Values, "readme")
 	resource.Links["readme"] = apiContext.URLBuilder.Link("readme", resource)
+
+	// app-readme
+	if _, ok := resource.Values["appReadme"]; ok {
+		delete(resource.Values, "readme")
+		resource.Links["app-readme"] = apiContext.URLBuilder.Link("app-readme", resource)
+	}
 
 	version := resource.Values["version"].(string)
 	if revision, ok := resource.Values["revision"]; ok {
@@ -143,7 +156,11 @@ func extractVersionLinks(apiContext *types.APIContext, resource *types.RawResour
 	return r
 }
 
-func TemplateIconHandler(apiContext *types.APIContext, next types.RequestHandler) error {
+type TemplateWrapper struct {
+	TemplateContentClient v3.TemplateContentInterface
+}
+
+func (t TemplateWrapper) TemplateIconHandler(apiContext *types.APIContext, next types.RequestHandler) error {
 	switch apiContext.Link {
 	case "icon":
 		template := &client.Template{}
@@ -151,15 +168,19 @@ func TemplateIconHandler(apiContext *types.APIContext, next types.RequestHandler
 			return err
 		}
 
-		icon, err := base64.StdEncoding.DecodeString(template.Icon)
+		data, err := templatecontent.GetTemplateFromTag(template.Icon, t.TemplateContentClient)
 		if err != nil {
 			return err
 		}
-		iconReader := bytes.NewReader(icon)
 		t, err := time.Parse(time.RFC3339, template.Created)
 		if err != nil {
 			return err
 		}
+		value, err := base64.StdEncoding.DecodeString(data)
+		if err != nil {
+			return err
+		}
+		iconReader := bytes.NewReader(value)
 		apiContext.Response.Header().Set("Cache-Control", "private, max-age=604800")
 		http.ServeContent(apiContext.Response, apiContext.Request, template.IconFilename, t, iconReader)
 		return nil
@@ -168,20 +189,41 @@ func TemplateIconHandler(apiContext *types.APIContext, next types.RequestHandler
 	}
 }
 
-func TemplateVersionReadmeHandler(apiContext *types.APIContext, next types.RequestHandler) error {
+func (t TemplateVerionFormatterWrapper) TemplateVersionReadmeHandler(apiContext *types.APIContext, next types.RequestHandler) error {
 	switch apiContext.Link {
 	case "readme":
 		templateVersion := &client.TemplateVersion{}
 		if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, templateVersion); err != nil {
 			return err
 		}
-		readmeReader := bytes.NewReader([]byte(templateVersion.Readme))
+		data, err := templatecontent.GetTemplateFromTag(templateVersion.Readme, t.TemplateContentClient)
+		if err != nil {
+			return err
+		}
+		readmeReader := bytes.NewReader([]byte(data))
 		t, err := time.Parse(time.RFC3339, templateVersion.Created)
 		if err != nil {
 			return err
 		}
 		apiContext.Response.Header().Set("Content-Type", "text/plain")
 		http.ServeContent(apiContext.Response, apiContext.Request, "readme", t, readmeReader)
+		return nil
+	case "app-readme":
+		templateVersion := &client.TemplateVersion{}
+		if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, templateVersion); err != nil {
+			return err
+		}
+		data, err := templatecontent.GetTemplateFromTag(templateVersion.AppReadme, t.TemplateContentClient)
+		if err != nil {
+			return err
+		}
+		readmeReader := bytes.NewReader([]byte(data))
+		t, err := time.Parse(time.RFC3339, templateVersion.Created)
+		if err != nil {
+			return err
+		}
+		apiContext.Response.Header().Set("Content-Type", "text/plain")
+		http.ServeContent(apiContext.Response, apiContext.Request, "app-readme", t, readmeReader)
 		return nil
 	default:
 		return httperror.NewAPIError(httperror.NotFound, "not found")
