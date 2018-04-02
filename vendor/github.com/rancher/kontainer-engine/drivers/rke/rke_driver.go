@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/rancher/kontainer-engine/drivers"
+	"github.com/rancher/kontainer-engine/drivers/rke/rkecerts"
 	"github.com/rancher/kontainer-engine/types"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rke/cmd"
@@ -131,8 +132,12 @@ func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions) (*types.
 	}
 	defer d.cleanup(stateDir)
 
-	APIURL, caCrt, clientCert, clientKey, err := cmd.ClusterUp(ctx, &rkeConfig, d.DockerDialer, d.LocalDialer,
+	certsStr := ""
+	APIURL, caCrt, clientCert, clientKey, certs, err := cmd.ClusterUp(ctx, &rkeConfig, d.DockerDialer, d.LocalDialer,
 		d.wrapTransport(&rkeConfig), false, stateDir, false, false)
+	if err == nil {
+		certsStr, err = rkecerts.ToString(certs)
+	}
 	if err != nil {
 		return d.save(&types.ClusterInfo{
 			Metadata: map[string]string{
@@ -148,6 +153,7 @@ func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions) (*types.
 			"ClientCert": base64.StdEncoding.EncodeToString([]byte(clientCert)),
 			"ClientKey":  base64.StdEncoding.EncodeToString([]byte(clientKey)),
 			"Config":     yaml,
+			"Certs":      certsStr,
 		},
 	}, stateDir), nil
 }
@@ -170,8 +176,12 @@ func (d *Driver) Update(ctx context.Context, clusterInfo *types.ClusterInfo, opt
 	}
 	defer d.cleanup(stateDir)
 
-	APIURL, caCrt, clientCert, clientKey, err := cmd.ClusterUp(ctx, &rkeConfig, d.DockerDialer, d.LocalDialer,
+	certStr := ""
+	APIURL, caCrt, clientCert, clientKey, certs, err := cmd.ClusterUp(ctx, &rkeConfig, d.DockerDialer, d.LocalDialer,
 		d.wrapTransport(&rkeConfig), false, stateDir, false, false)
+	if err == nil {
+		certStr, err = rkecerts.ToString(certs)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -185,6 +195,7 @@ func (d *Driver) Update(ctx context.Context, clusterInfo *types.ClusterInfo, opt
 	clusterInfo.Metadata["ClientCert"] = base64.StdEncoding.EncodeToString([]byte(clientCert))
 	clusterInfo.Metadata["ClientKey"] = base64.StdEncoding.EncodeToString([]byte(clientKey))
 	clusterInfo.Metadata["Config"] = yaml
+	clusterInfo.Metadata["Certs"] = certStr
 
 	return d.save(clusterInfo, stateDir), nil
 }
@@ -277,7 +288,7 @@ func (d *Driver) SetVersion(ctx context.Context, info *types.ClusterInfo, versio
 	}
 	defer d.cleanup(stateDir)
 
-	_, _, _, _, err = cmd.ClusterUp(ctx, &config, d.DockerDialer, d.LocalDialer,
+	_, _, _, _, _, err = cmd.ClusterUp(ctx, &config, d.DockerDialer, d.LocalDialer,
 		d.wrapTransport(&config), false, stateDir, false, false)
 
 	if err != nil {

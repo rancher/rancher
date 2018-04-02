@@ -143,10 +143,10 @@ type EngineService interface {
 }
 
 type engineService struct {
-	store cluster.PersistStore
+	store cluster.PersistentStore
 }
 
-func NewEngineService(store cluster.PersistStore) EngineService {
+func NewEngineService(store cluster.PersistentStore) EngineService {
 	return &engineService{
 		store: store,
 	}

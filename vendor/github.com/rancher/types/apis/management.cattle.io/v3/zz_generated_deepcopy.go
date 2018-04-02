@@ -2227,24 +2227,7 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 			(*out)[key] = val.DeepCopy()
 		}
 	}
-	if in.AppliedSpec != nil {
-		in, out := &in.AppliedSpec, &out.AppliedSpec
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ClusterSpec)
-			(*in).DeepCopyInto(*out)
-		}
-	}
-	if in.AppliedEtcdSpec != nil {
-		in, out := &in.AppliedEtcdSpec, &out.AppliedEtcdSpec
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ClusterSpec)
-			(*in).DeepCopyInto(*out)
-		}
-	}
+	in.AppliedSpec.DeepCopyInto(&out.AppliedSpec)
 	if in.FailedSpec != nil {
 		in, out := &in.FailedSpec, &out.FailedSpec
 		if *in == nil {

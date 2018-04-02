@@ -10,7 +10,6 @@ const (
 	ClusterFieldAgentImage                           = "agentImage"
 	ClusterFieldAllocatable                          = "allocatable"
 	ClusterFieldAnnotations                          = "annotations"
-	ClusterFieldAppliedEtcdSpec                      = "appliedEtcdSpec"
 	ClusterFieldAppliedPodSecurityPolicyTemplateName = "appliedPodSecurityPolicyTemplateId"
 	ClusterFieldAppliedSpec                          = "appliedSpec"
 	ClusterFieldAzureKubernetesServiceConfig         = "azureKubernetesServiceConfig"
@@ -49,7 +48,6 @@ type Cluster struct {
 	AgentImage                           string                         `json:"agentImage,omitempty" yaml:"agentImage,omitempty"`
 	Allocatable                          map[string]string              `json:"allocatable,omitempty" yaml:"allocatable,omitempty"`
 	Annotations                          map[string]string              `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	AppliedEtcdSpec                      *ClusterSpec                   `json:"appliedEtcdSpec,omitempty" yaml:"appliedEtcdSpec,omitempty"`
 	AppliedPodSecurityPolicyTemplateName string                         `json:"appliedPodSecurityPolicyTemplateId,omitempty" yaml:"appliedPodSecurityPolicyTemplateId,omitempty"`
 	AppliedSpec                          *ClusterSpec                   `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`
 	AzureKubernetesServiceConfig         *AzureKubernetesServiceConfig  `json:"azureKubernetesServiceConfig,omitempty" yaml:"azureKubernetesServiceConfig,omitempty"`
