@@ -107,3 +107,7 @@ type Workload struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 }
+
+type DeploymentRollbackInput struct {
+	ReplicaSetID string `json:"replicaSetId" norman:"type=reference[replicaSet]"`
+}

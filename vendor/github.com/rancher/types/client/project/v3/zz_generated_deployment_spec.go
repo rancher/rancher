@@ -17,6 +17,7 @@ const (
 	DeploymentSpecFieldImagePullSecrets              = "imagePullSecrets"
 	DeploymentSpecFieldNodeId                        = "nodeId"
 	DeploymentSpecFieldObjectMeta                    = "metadata"
+	DeploymentSpecFieldPaused                        = "paused"
 	DeploymentSpecFieldPriority                      = "priority"
 	DeploymentSpecFieldPriorityClassName             = "priorityClassName"
 	DeploymentSpecFieldRestartPolicy                 = "restartPolicy"
@@ -48,6 +49,7 @@ type DeploymentSpec struct {
 	ImagePullSecrets              []LocalObjectReference `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	NodeId                        string                 `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
 	ObjectMeta                    *ObjectMeta            `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	Paused                        bool                   `json:"paused,omitempty" yaml:"paused,omitempty"`
 	Priority                      *int64                 `json:"priority,omitempty" yaml:"priority,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty" yaml:"priorityClassName,omitempty"`
 	RestartPolicy                 string                 `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
