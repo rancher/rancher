@@ -164,7 +164,7 @@ func LoadFile(version *ChartVersion, path string) (*v3.File, error) {
 
 	return &v3.File{
 		Name:     filepath.Join(version.Name, strings.TrimPrefix(f.Name(), version.Dir+"/")),
-		Contents: base64.StdEncoding.EncodeToString(data),
+		Contents: string(data),
 	}, nil
 }
 

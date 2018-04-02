@@ -1,9 +1,7 @@
 package manager
 
 import (
-	"encoding/base64"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/rancher/rancher/pkg/catalog/helm"
@@ -13,10 +11,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []error, error) {
+func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, map[string]v3.VersionCommits, []error, error) {
 	index, err := helm.LoadIndex(repoPath)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	newHelmVersionCommits := map[string]v3.VersionCommits{}
 
@@ -77,41 +75,33 @@ func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []error
 				errors = append(errors, err)
 				continue
 			}
-			var filesToAdd []v3.File
+			filesToAdd := make(map[string]string)
 			for _, file := range files {
 				if strings.EqualFold(fmt.Sprintf("%s/%s", chart, "readme.md"), file.Name) {
-					contents, err := base64.StdEncoding.DecodeString(file.Contents)
-					if err != nil {
-						return nil, nil, err
-					}
-					v.Readme = string(contents)
-					continue
+					v.Readme = file.Contents
 				}
 				if strings.EqualFold(fmt.Sprintf("%s/%s", chart, "questions.yml"), file.Name) {
 					var value questionYml
-					contents, err := base64.StdEncoding.DecodeString(file.Contents)
-					if err != nil {
-						return nil, nil, err
-					}
-					if err := yaml.Unmarshal([]byte(contents), &value); err != nil {
-						return nil, nil, err
+					if err := yaml.Unmarshal([]byte(file.Contents), &value); err != nil {
+						return nil, nil, nil, err
 					}
 					v.Questions = value.Questions
 				}
-				filesToAdd = append(filesToAdd, file)
+				if strings.EqualFold(fmt.Sprintf("%s/%s", chart, "app-readme.md"), file.Name) {
+					v.AppReadme = file.Contents
+				}
+				filesToAdd[file.Name] = file.Contents
 			}
 			v.Files = filesToAdd
+			v.Digest = version.Digest
 			v.UpgradeVersionLinks = map[string]string{}
 			for _, versionSpec := range template.Spec.Versions {
 				if showUpgradeLinks(v.Version, versionSpec.Version, versionSpec.UpgradeFrom) {
-					revision := versionSpec.Version
-					if v.Revision != nil {
-						revision = strconv.Itoa(*versionSpec.Revision)
-					}
-					v.UpgradeVersionLinks[versionSpec.Version] = fmt.Sprintf("%s-%s", template.Name, revision)
+					version := versionSpec.Version
+					v.UpgradeVersionLinks[versionSpec.Version] = fmt.Sprintf("%s-%s", template.Name, version)
 				}
 			}
-			v.ExternalID = fmt.Sprintf("catalog://?catalog=%s&base=%s&template=%s&version=%s", catalog.Name, template.Spec.Base, template.Spec.FolderName, v.Version)
+			v.ExternalID = fmt.Sprintf("catalog://?catalog=%s&template=%s&version=%s", catalog.Name, template.Spec.FolderName, v.Version)
 			versions = append(versions, v)
 		}
 		var categories []string
@@ -121,11 +111,11 @@ func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []error
 		template.Spec.Categories = categories
 		template.Spec.Versions = versions
 		template.Spec.CatalogID = catalog.Name
+		template.Name = fmt.Sprintf("%s-%s", catalog.Name, template.Spec.FolderName)
 
 		templates = append(templates, template)
 	}
-	catalog.Status.HelmVersionCommits = newHelmVersionCommits
-	return templates, nil, nil
+	return templates, newHelmVersionCommits, nil, nil
 }
 
 type questionYml struct {
