@@ -59,6 +59,8 @@ type PrincipalOperations interface {
 	Update(existing *Principal, updates interface{}) (*Principal, error)
 	ByID(id string) (*Principal, error)
 	Delete(container *Principal) error
+
+	ActionSearch(resource *Principal, input *SearchPrincipalsInput) (*PrincipalCollection, error)
 }
 
 func newPrincipalClient(apiClient *Client) *PrincipalClient {
@@ -104,4 +106,11 @@ func (c *PrincipalClient) ByID(id string) (*Principal, error) {
 
 func (c *PrincipalClient) Delete(container *Principal) error {
 	return c.apiClient.Ops.DoResourceDelete(PrincipalType, &container.Resource)
+}
+
+func (c *PrincipalClient) ActionSearch(resource *Principal, input *SearchPrincipalsInput) (*PrincipalCollection, error) {
+	resp := &PrincipalCollection{}
+	err := c.apiClient.Ops.DoAction(PrincipalType, "search", &resource.Resource, input, resp)
+	return resp, err
+
 }

@@ -335,7 +335,7 @@ nodes:
 ```
 
 ## Deploying Rancher 2.0 using rke
-Using RKE's pluggable user addons, it's possible to deploy Rancher 2.0 server with a single command using the [rancher-minimal.yml](https://github.com/rancher/rke/blob/master/rancher-minimal.yml) cluster configuration:
+Using RKE's pluggable user addons, it's possible to deploy Rancher 2.0 server with a single command after updating the node settings in the [rancher-minimal.yml](https://github.com/rancher/rke/blob/master/rancher-minimal.yml) cluster configuration:
 
 ```bash
 rke up --config rancher-minimal.yml

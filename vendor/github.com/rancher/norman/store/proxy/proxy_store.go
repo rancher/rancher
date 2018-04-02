@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rancher/norman/restwatch"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
@@ -185,6 +186,10 @@ func (p *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt *t
 	k8sClient, err := p.k8sClient(apiContext)
 	if err != nil {
 		return nil, err
+	}
+
+	if watchClient, ok := k8sClient.(restwatch.WatchClient); ok {
+		k8sClient = watchClient.WatchClient()
 	}
 
 	timeout := int64(60 * 60)
