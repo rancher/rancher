@@ -232,9 +232,8 @@ func (c *Cluster) StoreAddonConfigMap(ctx context.Context, addonYaml string, add
 }
 
 func (c *Cluster) ApplySystemAddonExcuteJob(addonJob string) error {
-
 	if err := k8s.ApplyK8sSystemJob(addonJob, c.LocalKubeConfigPath, c.K8sWrapTransport); err != nil {
-		fmt.Println(err)
+		logrus.Error(err)
 		return err
 	}
 	return nil

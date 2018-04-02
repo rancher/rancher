@@ -62,7 +62,7 @@ const (
 	AWSCloudProvider           = "aws"
 )
 
-func (c *Cluster) DeployETCD(ctx context.Context) error {
+func (c *Cluster) DeployControlPlane(ctx context.Context) error {
 	// Deploy Etcd Plane
 	etcdProcessHostMap := c.getEtcdProcessHostMap(nil)
 	if len(c.Services.Etcd.ExternalURLs) > 0 {
@@ -71,15 +71,6 @@ func (c *Cluster) DeployETCD(ctx context.Context) error {
 		if err := services.RunEtcdPlane(ctx, c.EtcdHosts, etcdProcessHostMap, c.LocalConnDialerFactory, c.PrivateRegistriesMap, c.UpdateWorkersOnly, c.SystemImages.Alpine); err != nil {
 			return fmt.Errorf("[etcd] Failed to bring up Etcd Plane: %v", err)
 		}
-	}
-
-	return nil
-}
-
-func (c *Cluster) DeployControlPlane(ctx context.Context) error {
-	// Deploy Etcd Plane
-	if err := c.DeployETCD(ctx); err != nil {
-		return err
 	}
 
 	// Deploy Control plane

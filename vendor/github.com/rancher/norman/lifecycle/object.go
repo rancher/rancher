@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"fmt"
 	"reflect"
 
 	"github.com/rancher/norman/clientbase"
@@ -92,15 +93,10 @@ func (o *objectLifecycleAdapter) finalize(metadata metav1.Object, obj runtime.Ob
 		copyObj = newObj
 	}
 
-	if err := removeFinalizer(o.constructFinalizerKey(), copyObj); err != nil {
-		return false, err
-	}
-
-	_, err := o.objectClient.Update(metadata.GetName(), copyObj)
-	return false, err
+	return false, o.removeFinalizer(o.constructFinalizerKey(), copyObj)
 }
 
-func removeFinalizer(name string, obj runtime.Object) error {
+func (o *objectLifecycleAdapter) removeFinalizer(name string, obj runtime.Object) error {
 	metadata, err := meta.Accessor(obj)
 	if err != nil {
 		return err
@@ -115,7 +111,26 @@ func removeFinalizer(name string, obj runtime.Object) error {
 	}
 	metadata.SetFinalizers(finalizers)
 
-	return nil
+	for i := 0; i < 3; i++ {
+		_, err := o.objectClient.Update(metadata.GetName(), obj)
+		if err == nil {
+			return nil
+		}
+
+		obj, err = o.objectClient.GetNamespaced(metadata.GetNamespace(), metadata.GetName(), metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		metadata, err := meta.Accessor(obj)
+		if err != nil {
+			return err
+		}
+
+		metadata.SetFinalizers(finalizers)
+	}
+
+	return fmt.Errorf("failed to remove finalizer on %s:%s", metadata.GetNamespace(), metadata.GetName())
 }
 
 func (o *objectLifecycleAdapter) createKey() string {

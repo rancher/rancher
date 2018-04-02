@@ -9,7 +9,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"reflect"
 	"regexp"
 
 	ref "github.com/docker/distribution/reference"
@@ -19,6 +18,7 @@ import (
 	"github.com/rancher/rke/log"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 const (
@@ -209,7 +209,7 @@ func UseLocalOrPull(ctx context.Context, dClient *client.Client, hostname string
 		logrus.Debugf("[%s] No pull necessary, image [%s] exists on host [%s]", plane, containerImage, hostname)
 		return nil
 	}
-	logrus.Infof("[%s] Pulling image [%s] on host [%s]", plane, containerImage, hostname)
+	log.Infof(ctx, "[%s] Pulling image [%s] on host [%s]", plane, containerImage, hostname)
 	if err := pullImage(ctx, dClient, hostname, containerImage, prsMap); err != nil {
 		return err
 	}
@@ -296,13 +296,17 @@ func IsContainerUpgradable(ctx context.Context, dClient *client.Client, imageCfg
 		return false, err
 	}
 	if containerInspect.Config.Image != imageCfg.Image ||
-		!reflect.DeepEqual(containerInspect.Config.Entrypoint, imageCfg.Entrypoint) ||
-		!reflect.DeepEqual(containerInspect.Config.Cmd, imageCfg.Cmd) {
+		!sliceEqualsIgnoreOrder(containerInspect.Config.Entrypoint, imageCfg.Entrypoint) ||
+		!sliceEqualsIgnoreOrder(containerInspect.Config.Cmd, imageCfg.Cmd) {
 		logrus.Debugf("[%s] Container [%s] is eligible for updgrade on host [%s]", plane, containerName, hostname)
 		return true, nil
 	}
 	logrus.Debugf("[%s] Container [%s] is not eligible for updgrade on host [%s]", plane, containerName, hostname)
 	return false, nil
+}
+
+func sliceEqualsIgnoreOrder(left, right []string) bool {
+	return sets.NewString(left...).Equal(sets.NewString(right...))
 }
 
 func IsSupportedDockerVersion(info types.Info, K8sVersion string) (bool, error) {

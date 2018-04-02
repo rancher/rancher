@@ -53,15 +53,15 @@ type Cluster struct {
 	// Metadata store specific driver options per cloud provider
 	Metadata map[string]string `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
-	PersistStore PersistStore `json:"-" yaml:"-"`
+	PersistStore PersistentStore `json:"-" yaml:"-"`
 
 	ConfigGetter ConfigGetter `json:"-" yaml:"-"`
 
 	Logger logstream.Logger `json:"-" yaml:"-"`
 }
 
-// PersistStore defines the interface for persist options like check and store
-type PersistStore interface {
+// PersistentStore defines the interface for persist options like check and store
+type PersistentStore interface {
 	GetStatus(name string) (string, error)
 	Get(name string) (Cluster, error)
 	Remove(name string) error
@@ -280,7 +280,7 @@ func (c *Cluster) restore() error {
 }
 
 // NewCluster create a cluster interface to do operations
-func NewCluster(driverName, addr, name string, configGetter ConfigGetter, persistStore PersistStore) (*Cluster, error) {
+func NewCluster(driverName, addr, name string, configGetter ConfigGetter, persistStore PersistentStore) (*Cluster, error) {
 	rpcClient, err := types.NewClient(driverName, addr)
 	if err != nil {
 		return nil, err
@@ -294,7 +294,7 @@ func NewCluster(driverName, addr, name string, configGetter ConfigGetter, persis
 	}, nil
 }
 
-func FromCluster(cluster *Cluster, addr string, configGetter ConfigGetter, persistStore PersistStore) (*Cluster, error) {
+func FromCluster(cluster *Cluster, addr string, configGetter ConfigGetter, persistStore PersistentStore) (*Cluster, error) {
 	rpcClient, err := types.NewClient(cluster.DriverName, addr)
 	if err != nil {
 		return nil, err
