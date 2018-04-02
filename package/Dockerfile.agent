@@ -10,6 +10,7 @@ RUN apt-get update && \
 COPY --from=k8s /usr/bin/kubectl /usr/bin/
 ARG VERSION=dev
 LABEL io.cattle.agent true
+ENV DOCKER_API_VERSION 1.24
 ENV AGENT_IMAGE rancher/agent:${VERSION}
 ENV SSL_CERT_DIR /etc/kubernetes/ssl/certs
 COPY agent run.sh kubectl-shell.sh shell-setup.sh /usr/bin/
