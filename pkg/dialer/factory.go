@@ -144,10 +144,6 @@ func (f *Factory) DockerDialer(clusterName, machineName string) (dialer.Dialer, 
 		}, nil
 	}
 
-	if machine.Spec.CustomConfig != nil && machine.Spec.CustomConfig.Address != "" && machine.Spec.CustomConfig.SSHKey != "" {
-		return f.sshDialer(machine)
-	}
-
 	if machine.Spec.NodeTemplateName != "" {
 		return f.tlsDialer(machine)
 	}
@@ -174,14 +170,6 @@ func (f *Factory) nodeDialer(clusterName, machineName string) (dialer.Dialer, er
 	if f.TunnelServer.HasSession(machine.Name) {
 		d := f.TunnelServer.Dialer(machine.Name, 15*time.Second)
 		return dialer.Dialer(d), nil
-	}
-
-	if machine.Spec.CustomConfig != nil && machine.Spec.CustomConfig.Address != "" && machine.Spec.CustomConfig.SSHKey != "" {
-		return f.sshLocalDialer(machine)
-	}
-
-	if machine.Spec.NodeTemplateName != "" {
-		return f.sshLocalDialer(machine)
 	}
 
 	return nil, fmt.Errorf("can not build dialer to %s:%s", clusterName, machineName)

@@ -3,6 +3,8 @@ package clusterstats
 import (
 	"reflect"
 
+	"time"
+
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -120,16 +122,32 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 	if !reflect.DeepEqual(origStatus, cluster.Status) {
 		userContext, err := s.ClusterManager.UserContext(cluster.Name)
 		if err == nil {
-			version, err := userContext.K8sClient.Discovery().ServerVersion()
-			if err == nil {
-				cluster.Status.Version = version
-			}
+			callWithTimeout(func() {
+				// This has the tendency to timeout
+				version, err := userContext.K8sClient.Discovery().ServerVersion()
+				if err == nil {
+					cluster.Status.Version = version
+				}
+			})
 		}
 		_, err = s.Clusters.Update(cluster)
 		return err
 	}
 
 	return nil
+}
+
+func callWithTimeout(do func()) {
+	done := make(chan struct{})
+	go func() {
+		do()
+		done <- struct{}{}
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(15 * time.Second):
+	}
 }
 
 func (s *StatsAggregator) machineChanged(key string, machine *v3.Node) error {

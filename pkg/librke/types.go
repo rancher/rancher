@@ -15,7 +15,6 @@ type RKE interface {
 	GenerateCerts(config *v3.RancherKubernetesEngineConfig) (map[string]pki.CertificatePKI, error)
 	RegenerateEtcdCertificate(crtMap map[string]pki.CertificatePKI, etcdHost *hosts.Host, cluster *cluster.Cluster) (map[string]pki.CertificatePKI, error)
 	ParseCluster(clusterName string, config *v3.RancherKubernetesEngineConfig, dockerDialerFactory, localConnDialerFactory hosts.DialerFactory, k8sWrapTransport k8s.WrapTransport) (*cluster.Cluster, error)
-	EtcdUp(ctx context.Context, currentCluster, kubeCluster *cluster.Cluster) error
 	GeneratePlan(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig) (v3.RKEPlan, error)
 }
 

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/rancher/rke/cluster"
-	"github.com/rancher/rke/cmd"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/pki"
@@ -46,10 +45,6 @@ func (*rke) ParseCluster(clusterName string, config *v3.RancherKubernetesEngineC
 		dockerDialerFactory,
 		localConnDialerFactory,
 		k8sWrapTransport)
-}
-
-func (*rke) EtcdUp(ctx context.Context, currentCluster, kubeCluster *cluster.Cluster) error {
-	return cmd.EtcdUp(ctx, currentCluster, kubeCluster, true)
 }
 
 func (*rke) GeneratePlan(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig) (v3.RKEPlan, error) {

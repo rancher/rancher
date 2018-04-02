@@ -1,4 +1,4 @@
-package clusteryaml
+package embedded
 
 import (
 	"fmt"
@@ -15,7 +15,7 @@ const (
 	localCluster = "/etc/rancher/cluster.yml"
 )
 
-func LocalConfig() (*v3.RancherKubernetesEngineConfig, error) {
+func localConfig() (*v3.RancherKubernetesEngineConfig, error) {
 	rkeConfig := &v3.RancherKubernetesEngineConfig{}
 
 	content, err := ioutil.ReadFile(localCluster)
@@ -37,7 +37,7 @@ func LocalConfig() (*v3.RancherKubernetesEngineConfig, error) {
 		rkeConfig.Services.KubeAPI.ExtraArgs = map[string]string{}
 	}
 
-	rkeConfig.Services.KubeAPI.ExtraArgs["advertise-address"] = "10.233.0.1"
+	rkeConfig.Services.KubeAPI.ExtraArgs["advertise-address"] = "10.43.0.1"
 	rkeConfig.Services.KubeAPI.ExtraArgs["bind-address"] = "127.0.0.1"
 	rkeConfig.SystemImages = v3.K8sVersionToRKESystemImages[v3.K8sV18]
 	rkeConfig.SystemImages.Kubernetes = fmt.Sprintf("%s:%s", settings.ServerImage.Get(), settings.ServerVersion.Get())

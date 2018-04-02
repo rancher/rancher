@@ -2,34 +2,21 @@ package clusterdeploy
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"reflect"
 
-	"io/ioutil"
-	"os"
-	"path"
-
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/clustermanager"
-	"github.com/rancher/rancher/pkg/clusteryaml"
 	"github.com/rancher/rancher/pkg/kubectl"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/systemtemplate"
-	"github.com/rancher/rke/cluster"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-)
-
-const (
-	clusterOwnerRole = "cluster-owner"
-	tempDir          = "./management-state/tmp"
 )
 
 func Register(management *config.ManagementContext, clusterManager *clustermanager.Manager) {
@@ -38,9 +25,6 @@ func Register(management *config.ManagementContext, clusterManager *clustermanag
 		userManager:          management.UserManager,
 		clusters:             management.Management.Clusters(""),
 		clusterManager:       clusterManager,
-		builder: clusteryaml.NewBuilder(management.Dialer,
-			management.Management.Nodes("").Controller().Lister(),
-			management.K8sClient.CoreV1()),
 	}
 
 	management.Management.Clusters("").AddHandler("cluster-deploy", c.sync)
@@ -51,7 +35,6 @@ type clusterDeploy struct {
 	userManager          user.Manager
 	clusters             v3.ClusterInterface
 	clusterManager       *clustermanager.Manager
-	builder              *clusteryaml.Builder
 }
 
 func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) error {
@@ -128,16 +111,14 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 		return err
 	}
 
-	if err := cd.deployRKE(kubeConfig, cluster); err != nil {
-		return err
+	if err == nil {
+		cluster.Status.AgentImage = desired
+		if cluster.Spec.DesiredAgentImage == "fixed" {
+			cluster.Spec.DesiredAgentImage = desired
+		}
 	}
 
-	cluster.Status.AgentImage = desired
-	if cluster.Spec.DesiredAgentImage == "fixed" {
-		cluster.Spec.DesiredAgentImage = desired
-	}
-
-	return nil
+	return err
 }
 
 func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Config, error) {
@@ -169,51 +150,4 @@ func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage string) ([]byte
 	err = systemtemplate.SystemTemplate(buf, agentImage, token, url)
 
 	return buf.Bytes(), err
-}
-
-func (cd *clusterDeploy) deployRKE(kubeConfig *clientcmdapi.Config, c *v3.Cluster) error {
-	if c.Status.Driver != v3.ClusterDriverRKE {
-		return nil
-	}
-
-	_, err := v3.ClusterConditionAddonDeploy.DoUntilTrue(c, func() (runtime.Object, error) {
-		return c, cd.doDeployRKE(kubeConfig, c)
-	})
-
-	return err
-}
-
-func (cd *clusterDeploy) doDeployRKE(kubeConfig *clientcmdapi.Config, c *v3.Cluster) error {
-	spec, err := cd.builder.GetSpec(c, false)
-	if err != nil {
-		return err
-	}
-
-	bundle, err := cd.builder.GetOrGenerateCerts(c)
-	if err != nil {
-		return err
-	}
-
-	tmp, err := ioutil.TempDir(tempDir, "rke-")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(tmp)
-
-	tmpFile := path.Join(tmp, "kube_config_cluster.yml")
-	if err := clientcmd.WriteToFile(*kubeConfig, tmpFile); err != nil {
-		return err
-	}
-
-	if err := cluster.ApplyAuthzResources(context.Background(), *spec.RancherKubernetesEngineConfig, "", tmpFile, nil); err != nil {
-		return err
-	}
-
-	return cluster.ConfigureCluster(context.Background(),
-		*spec.RancherKubernetesEngineConfig,
-		bundle.Certs(),
-		"",
-		tmpFile,
-		nil,
-		true)
 }

@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/coreos/etcd/etcdmain"
-	"github.com/rancher/rancher/pkg/clusteryaml"
 	"github.com/rancher/rancher/pkg/hyperkube"
 	"github.com/rancher/rancher/pkg/k8scheck"
 	"github.com/rancher/rancher/pkg/librke"
@@ -29,7 +28,7 @@ var (
 )
 
 func Run(ctx context.Context) (context.Context, string, error) {
-	rkeConfig, err := clusteryaml.LocalConfig()
+	rkeConfig, err := localConfig()
 	if err != nil {
 		return ctx, "", err
 	}

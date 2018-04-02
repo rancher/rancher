@@ -415,14 +415,11 @@ func (m *Lifecycle) isNodeInAppliedSpec(node *v3.Node) (bool, error) {
 	if cluster.DeletionTimestamp != nil {
 		return false, nil
 	}
-	if cluster.Status.AppliedEtcdSpec == nil {
-		return false, nil
-	}
-	if cluster.Status.AppliedEtcdSpec.RancherKubernetesEngineConfig == nil {
+	if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig == nil {
 		return false, nil
 	}
 
-	for _, rkeNode := range cluster.Status.AppliedEtcdSpec.RancherKubernetesEngineConfig.Nodes {
+	for _, rkeNode := range cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.Nodes {
 		nodeName := rkeNode.NodeName
 		if len(nodeName) == 0 {
 			continue
