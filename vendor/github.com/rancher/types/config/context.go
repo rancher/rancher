@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/event"
+	"github.com/rancher/norman/restwatch"
 	"github.com/rancher/norman/signal"
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/types"
@@ -119,7 +120,7 @@ func NewScaledContext(config rest.Config) (*ScaledContext, error) {
 		dynamicConfig.NegotiatedSerializer = configConfig.NegotiatedSerializer
 	}
 
-	context.UnversionedClient, err = rest.UnversionedRESTClientFor(&dynamicConfig)
+	context.UnversionedClient, err = restwatch.UnversionedRESTClientFor(&dynamicConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -292,7 +293,7 @@ func NewManagementContext(config rest.Config) (*ManagementContext, error) {
 		dynamicConfig.NegotiatedSerializer = configConfig.NegotiatedSerializer
 	}
 
-	context.UnversionedClient, err = rest.UnversionedRESTClientFor(&dynamicConfig)
+	context.UnversionedClient, err = restwatch.UnversionedRESTClientFor(&dynamicConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -410,7 +411,7 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 		dynamicConfig.NegotiatedSerializer = configConfig.NegotiatedSerializer
 	}
 
-	context.UnversionedClient, err = rest.UnversionedRESTClientFor(&dynamicConfig)
+	context.UnversionedClient, err = restwatch.UnversionedRESTClientFor(&dynamicConfig)
 	if err != nil {
 		return nil, err
 	}

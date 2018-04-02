@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/restwatch"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -199,7 +200,12 @@ func (p *ObjectClient) List(opts metav1.ListOptions) (runtime.Object, error) {
 }
 
 func (p *ObjectClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	r, err := p.restClient.Get().
+	restClient := p.restClient
+	if watchClient, ok := restClient.(restwatch.WatchClient); ok {
+		restClient = watchClient.WatchClient()
+	}
+
+	r, err := restClient.Get().
 		Prefix(p.getAPIPrefix(), p.gvk.Group, p.gvk.Version).
 		Prefix("watch").
 		NamespaceIfScoped(p.ns, p.resource.Namespaced).

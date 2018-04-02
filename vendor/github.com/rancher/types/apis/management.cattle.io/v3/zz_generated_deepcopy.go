@@ -1455,6 +1455,24 @@ func (in *CloudProvider) DeepCopyInto(out *CloudProvider) {
 			(*out)[key] = val
 		}
 	}
+	if in.AWSCloudProvider != nil {
+		in, out := &in.AWSCloudProvider, &out.AWSCloudProvider
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(AWSCloudProvider)
+			**out = **in
+		}
+	}
+	if in.AzureCloudProvider != nil {
+		in, out := &in.AzureCloudProvider, &out.AzureCloudProvider
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(AzureCloudProvider)
+			**out = **in
+		}
+	}
 	return
 }
 
@@ -3477,6 +3495,33 @@ func (in *NetworkConfig) DeepCopyInto(out *NetworkConfig) {
 		*out = make(map[string]string, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
+		}
+	}
+	if in.CalicoNetworkProvider != nil {
+		in, out := &in.CalicoNetworkProvider, &out.CalicoNetworkProvider
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(CalicoNetworkProvider)
+			**out = **in
+		}
+	}
+	if in.CanalNetworkProvider != nil {
+		in, out := &in.CanalNetworkProvider, &out.CanalNetworkProvider
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(CanalNetworkProvider)
+			**out = **in
+		}
+	}
+	if in.FlannelNetworkProvider != nil {
+		in, out := &in.FlannelNetworkProvider, &out.FlannelNetworkProvider
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(FlannelNetworkProvider)
+			**out = **in
 		}
 	}
 	return
@@ -5593,11 +5638,6 @@ func (in *RancherKubernetesEngineConfig) DeepCopyInto(out *RancherKubernetesEngi
 	}
 	in.Ingress.DeepCopyInto(&out.Ingress)
 	in.CloudProvider.DeepCopyInto(&out.CloudProvider)
-	out.AWSCloudProvider = in.AWSCloudProvider
-	out.AzureCloudProvider = in.AzureCloudProvider
-	out.CalicoNetworkProvider = in.CalicoNetworkProvider
-	out.CanalNetworkProvider = in.CanalNetworkProvider
-	out.FlannelNetworkProvider = in.FlannelNetworkProvider
 	return
 }
 
