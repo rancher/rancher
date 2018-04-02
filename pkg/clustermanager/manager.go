@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 
+	"time"
+
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	clusterController "github.com/rancher/rancher/pkg/controllers/user"
@@ -161,6 +163,7 @@ func (m *Manager) toRESTConfig(cluster *v3.Cluster) (*rest.Config, error) {
 		TLSClientConfig: rest.TLSClientConfig{
 			CAData: caBytes,
 		},
+		Timeout: 30 * time.Second,
 		WrapTransport: func(rt http.RoundTripper) http.RoundTripper {
 			if ht, ok := rt.(*http.Transport); ok {
 				ht.DialContext = nil

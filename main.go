@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/docker/docker/pkg/reexec"
 	"github.com/ehazlett/simplelog"
@@ -137,5 +138,6 @@ func run(cfg app.Config) error {
 	cfg.Embedded = embedded
 
 	os.Unsetenv("KUBECONFIG")
+	kubeConfig.Timeout = 30 * time.Second
 	return app.Run(ctx, *kubeConfig, &cfg)
 }
