@@ -158,6 +158,9 @@ func (m *Lifecycle) reportStatus(stdoutReader io.Reader, stderrReader io.Reader,
 	scanner := bufio.NewScanner(stdoutReader)
 	for scanner.Scan() {
 		msg := scanner.Text()
+		if strings.Contains(msg, "To see how to connect") {
+			continue
+		}
 		logrus.Infof("stdout: %s", msg)
 		_, err := filterDockerMessage(msg, node)
 		if err != nil {
