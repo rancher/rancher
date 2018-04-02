@@ -105,7 +105,7 @@ func SaveOwner(apiContext *types.APIContext, kind, name string, data map[string]
 	key := key{
 		SubContext: subContext,
 		Namespace:  namespace,
-		Kind:       kind,
+		Kind:       strings.ToLower(kind),
 		Name:       name,
 	}
 

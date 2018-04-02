@@ -99,13 +99,13 @@ func cleanup(ctx context.Context) error {
 		if _, ok := container.Labels["io.kubernetes.pod.namespace"]; ok {
 			continue
 		}
-		logrus.Infof("Removing unmanaged agent %s(%s)", container.Names[0], container.ID)
-		err := c.ContainerRemove(ctx, container.ID, types.ContainerRemoveOptions{
-			Force: true,
-		})
-		if err != nil {
-			return err
-		}
+		go func() {
+			time.Sleep(15 * time.Second)
+			logrus.Infof("Removing unmanaged agent %s(%s)", container.Names[0], container.ID)
+			c.ContainerRemove(ctx, container.ID, types.ContainerRemoveOptions{
+				Force: true,
+			})
+		}()
 	}
 
 	return nil
