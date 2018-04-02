@@ -110,6 +110,9 @@ func getClusterCerts(ctx context.Context, kubeClient *kubernetes.Clientset, etcd
 			EnvName:       string(secret.Data["EnvName"]),
 			ConfigEnvName: string(secret.Data["ConfigEnvName"]),
 			KeyEnvName:    string(secret.Data["KeyEnvName"]),
+			Path:          string(secret.Data["Path"]),
+			KeyPath:       string(secret.Data["KeyPath"]),
+			ConfigPath:    string(secret.Data["ConfigPath"]),
 		}
 	}
 	log.Infof(ctx, "[certificates] Successfully fetched Cluster certificates from Kubernetes")
@@ -143,14 +146,17 @@ func saveCertToKubernetes(kubeClient *kubernetes.Clientset, crtName string, crt 
 	if crt.Certificate != nil {
 		secretData["Certificate"] = cert.EncodeCertPEM(crt.Certificate)
 		secretData["EnvName"] = []byte(crt.EnvName)
+		secretData["Path"] = []byte(crt.Path)
 	}
 	if crt.Key != nil {
 		secretData["Key"] = cert.EncodePrivateKeyPEM(crt.Key)
 		secretData["KeyEnvName"] = []byte(crt.KeyEnvName)
+		secretData["KeyPath"] = []byte(crt.KeyPath)
 	}
 	if len(crt.Config) > 0 {
 		secretData["ConfigEnvName"] = []byte(crt.ConfigEnvName)
 		secretData["Config"] = []byte(crt.Config)
+		secretData["ConfigPath"] = []byte(crt.ConfigPath)
 	}
 	go func() {
 		for {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/restwatch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 )
@@ -51,7 +52,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		config.NegotiatedSerializer = configConfig.NegotiatedSerializer
 	}
 
-	restClient, err := rest.UnversionedRESTClientFor(&config)
+	restClient, err := restwatch.UnversionedRESTClientFor(&config)
 	if err != nil {
 		return nil, err
 	}

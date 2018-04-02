@@ -175,11 +175,11 @@ func (c *Cluster) setClusterNetworkDefaults() {
 			CalicoCloudProvider: DefaultNetworkCloudProvider,
 		}
 	}
-	if c.CalicoNetworkProvider.CloudProvider != "" {
-		networkPluginConfigDefaultsMap[CalicoCloudProvider] = c.CalicoNetworkProvider.CloudProvider
+	if c.Network.CalicoNetworkProvider != nil {
+		networkPluginConfigDefaultsMap[CalicoCloudProvider] = c.Network.CalicoNetworkProvider.CloudProvider
 	}
-	if c.FlannelNetworkProvider.Iface != "" {
-		networkPluginConfigDefaultsMap[FlannelIface] = c.FlannelNetworkProvider.Iface
+	if c.Network.FlannelNetworkProvider != nil {
+		networkPluginConfigDefaultsMap[FlannelIface] = c.Network.FlannelNetworkProvider.Iface
 	}
 	for k, v := range networkPluginConfigDefaultsMap {
 		setDefaultIfEmptyMapValue(c.Network.Options, k, v)

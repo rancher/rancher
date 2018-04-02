@@ -33,16 +33,6 @@ type RancherKubernetesEngineConfig struct {
 	ClusterName string `yaml:"cluster_name" json:"clusterName,omitempty"`
 	// Cloud Provider options
 	CloudProvider CloudProvider `yaml:"cloud_provider" json:"cloudProvider,omitempty"`
-	// AWSCloudProvicer
-	AWSCloudProvider AWSCloudProvider `yaml:",omitempty" json:"awsCloudProvider,omitempty"`
-	// AzureCloudProvicer
-	AzureCloudProvider AzureCloudProvider `yaml:",omitempty" json:"azureCloudProvider,omitempty"`
-	// CalicoNetworkProvider
-	CalicoNetworkProvider CalicoNetworkProvider `yaml:",omitempty" json:"calicoNetworkProvider,omitempty"`
-	// CanalNetworkProvider
-	CanalNetworkProvider CanalNetworkProvider `yaml:",omitempty" json:"canalNetworkProvider,omitempty"`
-	// FlannelNetworkProvider
-	FlannelNetworkProvider FlannelNetworkProvider `yaml:",omitempty" json:"flannelNetworkProvider,omitempty"`
 }
 
 type PrivateRegistry struct {
@@ -227,6 +217,12 @@ type NetworkConfig struct {
 	Plugin string `yaml:"plugin" json:"plugin,omitempty"`
 	// Plugin options to configure network properties
 	Options map[string]string `yaml:"options" json:"options,omitempty"`
+	// CalicoNetworkProvider
+	CalicoNetworkProvider *CalicoNetworkProvider `yaml:",omitempty" json:"calicoNetworkProvider,omitempty"`
+	// CanalNetworkProvider
+	CanalNetworkProvider *CanalNetworkProvider `yaml:",omitempty" json:"canalNetworkProvider,omitempty"`
+	// FlannelNetworkProvider
+	FlannelNetworkProvider *FlannelNetworkProvider `yaml:",omitempty" json:"flannelNetworkProvider,omitempty"`
 }
 
 type AuthnConfig struct {
@@ -316,6 +312,10 @@ type CloudProvider struct {
 	Name string `yaml:"name" json:"name,omitempty"`
 	// Configuration Options of Cloud Provider
 	CloudConfig map[string]string `yaml:"cloud_config" json:"cloudConfig,omitempty"`
+	// AWSCloudProvicer
+	AWSCloudProvider *AWSCloudProvider `yaml:",omitempty" json:"awsCloudProvider,omitempty"`
+	// AzureCloudProvicer
+	AzureCloudProvider *AzureCloudProvider `yaml:",omitempty" json:"azureCloudProvider,omitempty"`
 }
 
 type AzureCloudProvider struct {

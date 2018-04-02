@@ -46,17 +46,6 @@ type EnvironmentFrom struct {
 	TargetKey  string
 }
 
-type Resources struct {
-	CPU       *ResourceRequest
-	Memory    *ResourceRequest
-	NvidiaGPU *ResourceRequest
-}
-
-type ResourceRequest struct {
-	Request string
-	Limit   string
-}
-
 type Scheduling struct {
 	Node              *NodeScheduling
 	Tolerate          []v1.Toleration

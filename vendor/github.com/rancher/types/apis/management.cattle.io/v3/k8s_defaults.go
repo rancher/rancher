@@ -53,7 +53,7 @@ var (
 		Alpine:                    "alpine:latest",
 		NginxProxy:                "rancher/rke-nginx-proxy:v0.1.1",
 		CertDownloader:            "rancher/rke-cert-deployer:v0.1.1",
-		KubernetesServicesSidecar: "rancher/rke-service-sidekick:v0.1.1",
+		KubernetesServicesSidecar: "rancher/rke-service-sidekick:v0.1.2",
 		KubeDNS:                   "rancher/k8s-dns-kube-dns-amd64:1.14.5",
 		DNSmasq:                   "rancher/k8s-dns-dnsmasq-nanny-amd64:1.14.5",
 		KubeDNSSidecar:            "rancher/k8s-dns-sidecar-amd64:1.14.5",

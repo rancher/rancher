@@ -19,9 +19,18 @@ const (
 	HostnameLabel             = "kubernetes.io/hostname"
 	InternalAddressAnnotation = "rke.io/internal-ip"
 	ExternalAddressAnnotation = "rke.io/external-ip"
+	AWSCloudProvider          = "aws"
 )
 
-func DeleteNode(k8sClient *kubernetes.Clientset, nodeName string) error {
+func DeleteNode(k8sClient *kubernetes.Clientset, nodeName, cloudProvider string) error {
+
+	if cloudProvider == AWSCloudProvider {
+		node, err := GetNode(k8sClient, nodeName)
+		if err != nil {
+			return err
+		}
+		nodeName = node.Name
+	}
 	return k8sClient.CoreV1().Nodes().Delete(nodeName, &metav1.DeleteOptions{})
 }
 
@@ -45,7 +54,7 @@ func GetNode(k8sClient *kubernetes.Clientset, nodeName string) (*v1.Node, error)
 func CordonUncordon(k8sClient *kubernetes.Clientset, nodeName string, cordoned bool) error {
 	updated := false
 	for retries := 0; retries <= 5; retries++ {
-		node, err := k8sClient.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		node, err := GetNode(k8sClient, nodeName)
 		if err != nil {
 			logrus.Debugf("Error getting node %s: %v", nodeName, err)
 			time.Sleep(time.Second * 5)
