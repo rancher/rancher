@@ -1,6 +1,7 @@
 package endpoints
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -109,7 +110,12 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 				if !ok || value == "" {
 					continue
 				}
-				workloadIDs := strings.Split(value, ",")
+				var workloadIDs []string
+				err := json.Unmarshal([]byte(value), &workloadIDs)
+				if err != nil {
+					logrus.WithError(err).Errorf("Unmarshalling %s workloadIDs of %s Error", value, svc.Name)
+					continue
+				}
 				for _, workloadID := range workloadIDs {
 					splitted := strings.Split(workloadID, ":")
 					if len(splitted) != 3 {
