@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/event"
+	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
 	"github.com/rancher/rancher/pkg/encryptedstore"
@@ -55,7 +55,7 @@ func Register(management *config.ManagementContext) {
 type Lifecycle struct {
 	systemAccountManager      *systemaccount.Manager
 	secretStore               *encryptedstore.GenericEncryptedStore
-	nodeTemplateGenericClient clientbase.GenericClient
+	nodeTemplateGenericClient objectclient.GenericClient
 	nodeClient                v3.NodeInterface
 	nodeTemplateClient        v3.NodeTemplateInterface
 	configMapGetter           typedv1.ConfigMapsGetter

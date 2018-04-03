@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/clientbase"
+	"github.com/rancher/norman/objectclient"
 	typescorev1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	typesrbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
@@ -266,7 +266,7 @@ type createFn func(objectMeta metav1.ObjectMeta, subjects []rbacv1.Subject, role
 type listFn func(ns string, selector labels.Selector) ([]interface{}, error)
 type convertFn func(i interface{}) (string, string, []rbacv1.Subject)
 
-func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, binding interface{}, client *clientbase.ObjectClient,
+func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, binding interface{}, client *objectclient.ObjectClient,
 	create createFn, list listFn, convert convertFn) error {
 	meta, err := meta.Accessor(binding)
 	if err != nil {

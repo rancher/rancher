@@ -5,6 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/clientbase"
+	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/slice"
 	v13 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -230,7 +231,7 @@ func (m *manager) createProjectMembershipRole(roleName, namespace string, projec
 	return nil
 }
 
-func (m *manager) createMembershipRole(resourceType, roleName string, makeOwner bool, ownerObject interface{}, client *clientbase.ObjectClient) error {
+func (m *manager) createMembershipRole(resourceType, roleName string, makeOwner bool, ownerObject interface{}, client *objectclient.ObjectClient) error {
 	metaObj, err := meta.Accessor(ownerObject)
 	if err != nil {
 		return err
@@ -321,7 +322,7 @@ func (m *manager) reconcileProjectMembershipBindingForDelete(namespace, roleToKe
 type listFn func(ns string, selector labels.Selector) ([]runtime.Object, error)
 type convertFn func(i interface{}) string
 
-func (m *manager) reconcileMembershipBindingForDelete(namespace, roleToKeep, rtbUID string, list listFn, convert convertFn, client *clientbase.ObjectClient) error {
+func (m *manager) reconcileMembershipBindingForDelete(namespace, roleToKeep, rtbUID string, list listFn, convert convertFn, client *objectclient.ObjectClient) error {
 	set := labels.Set(map[string]string{rtbUID: membershipBindingOwner})
 	roleBindings, err := list(namespace, set.AsSelector())
 	if err != nil {
