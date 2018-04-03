@@ -14,24 +14,24 @@ import (
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 )
 
-type WrapClusterLogging struct {
+type WrapLogging struct {
 	CurrentTarget string
-	v3.ClusterLoggingSpec
 	WrapSyslog
 	WrapSplunk
-	WrapEmbedded
 	WrapElasticsearch
 	WrapKafka
 }
 
+type WrapClusterLogging struct {
+	v3.ClusterLoggingSpec
+	WrapEmbedded
+	WrapLogging
+}
+
 type WrapProjectLogging struct {
-	CurrentTarget string
 	v3.ProjectLoggingSpec
 	GrepNamespace string
-	WrapSyslog
-	WrapSplunk
-	WrapElasticsearch
-	WrapKafka
+	WrapLogging
 }
 
 type WrapEmbedded struct {
@@ -60,26 +60,23 @@ type WrapSyslog struct {
 }
 
 func (w *WrapClusterLogging) Validate() error {
-	curtg, _, _, _, _, err := getWrapConfig(w.ElasticsearchConfig, w.SplunkConfig, w.SyslogConfig, w.KafkaConfig)
+	wrapLogging, _, err := getWrapConfig(w.ElasticsearchConfig, w.SplunkConfig, w.SyslogConfig, w.KafkaConfig, w.EmbeddedConfig)
 	if err != nil {
 		return err
 	}
-	if w.EmbeddedConfig != nil {
-		curtg = loggingconfig.Embedded
-	}
 
-	if curtg == "" {
+	if wrapLogging.CurrentTarget == "" {
 		return fmt.Errorf("one of the target must set")
 	}
 	return nil
 }
 
 func (w *WrapProjectLogging) Validate() error {
-	curtg, _, _, _, _, err := getWrapConfig(w.ElasticsearchConfig, w.SplunkConfig, w.SyslogConfig, w.KafkaConfig)
+	wrapLogging, _, err := getWrapConfig(w.ElasticsearchConfig, w.SplunkConfig, w.SyslogConfig, w.KafkaConfig, nil)
 	if err != nil {
 		return err
 	}
-	if curtg == "" {
+	if wrapLogging.CurrentTarget == "" {
 		return fmt.Errorf("one of the target must set")
 	}
 	return nil
@@ -90,20 +87,13 @@ func ToWrapClusterLogging(clusterLogging v3.ClusterLoggingSpec) (*WrapClusterLog
 		ClusterLoggingSpec: clusterLogging,
 	}
 
-	curtg, wes, wsp, wsl, wkf, err := getWrapConfig(clusterLogging.ElasticsearchConfig, clusterLogging.SplunkConfig, clusterLogging.SyslogConfig, clusterLogging.KafkaConfig)
+	wrapLogging, wem, err := getWrapConfig(clusterLogging.ElasticsearchConfig, clusterLogging.SplunkConfig, clusterLogging.SyslogConfig, clusterLogging.KafkaConfig, clusterLogging.EmbeddedConfig)
 	if err != nil {
 		return nil, err
 	}
-	wp.WrapElasticsearch = wes
-	wp.WrapSplunk = wsp
-	wp.WrapSyslog = wsl
-	wp.WrapKafka = wkf
+	wp.WrapLogging = wrapLogging
+	wp.WrapEmbedded = wem
 
-	if clusterLogging.EmbeddedConfig != nil {
-		curtg = loggingconfig.Embedded
-		wp.WrapEmbedded.DateFormat = getDateFormat(clusterLogging.EmbeddedConfig.DateFormat)
-	}
-	wp.CurrentTarget = curtg
 	return &wp, nil
 }
 
@@ -113,21 +103,16 @@ func ToWrapProjectLogging(grepNamespace string, projectLogging v3.ProjectLogging
 		GrepNamespace:      grepNamespace,
 	}
 
-	curtg, wes, wsp, wsl, wkf, err := getWrapConfig(projectLogging.ElasticsearchConfig, projectLogging.SplunkConfig, projectLogging.SyslogConfig, projectLogging.KafkaConfig)
+	wrapLogging, _, err := getWrapConfig(projectLogging.ElasticsearchConfig, projectLogging.SplunkConfig, projectLogging.SyslogConfig, projectLogging.KafkaConfig, nil)
 
 	if err != nil {
 		return nil, err
 	}
-	wp.CurrentTarget = curtg
-	wp.WrapElasticsearch = wes
-	wp.WrapSplunk = wsp
-	wp.WrapSyslog = wsl
-	wp.WrapKafka = wkf
-
+	wp.WrapLogging = wrapLogging
 	return &wp, nil
 }
 
-func getWrapConfig(es *v3.ElasticsearchConfig, sp *v3.SplunkConfig, sl *v3.SyslogConfig, kf *v3.KafkaConfig) (currentTarget string, wes WrapElasticsearch, wsp WrapSplunk, wsl WrapSyslog, wkf WrapKafka, err error) {
+func getWrapConfig(es *v3.ElasticsearchConfig, sp *v3.SplunkConfig, sl *v3.SyslogConfig, kf *v3.KafkaConfig, em *v3.EmbeddedConfig) (wrapLogging WrapLogging, wem WrapEmbedded, err error) {
 	if es != nil {
 		var h, s string
 		h, s, err = parseEndpoint(es.Endpoint)
@@ -138,12 +123,12 @@ func getWrapConfig(es *v3.ElasticsearchConfig, sp *v3.SplunkConfig, sl *v3.Syslo
 		if err != nil {
 			return
 		}
-		wes = WrapElasticsearch{
+		wrapLogging.WrapElasticsearch = WrapElasticsearch{
 			Host:       h,
 			Scheme:     s,
 			DateFormat: getDateFormat(es.DateFormat),
 		}
-		currentTarget = loggingconfig.Elasticsearch
+		wrapLogging.CurrentTarget = loggingconfig.Elasticsearch
 	}
 
 	if sp != nil {
@@ -156,11 +141,11 @@ func getWrapConfig(es *v3.ElasticsearchConfig, sp *v3.SplunkConfig, sl *v3.Syslo
 		if err != nil {
 			return
 		}
-		wsp = WrapSplunk{
+		wrapLogging.WrapSplunk = WrapSplunk{
 			Server: h,
 			Scheme: s,
 		}
-		currentTarget = loggingconfig.Splunk
+		wrapLogging.CurrentTarget = loggingconfig.Splunk
 	}
 
 	if sl != nil {
@@ -173,11 +158,11 @@ func getWrapConfig(es *v3.ElasticsearchConfig, sp *v3.SplunkConfig, sl *v3.Syslo
 		if err != nil {
 			return
 		}
-		wsl = WrapSyslog{
+		wrapLogging.WrapSyslog = WrapSyslog{
 			Host: host,
 			Port: port,
 		}
-		currentTarget = loggingconfig.Syslog
+		wrapLogging.CurrentTarget = loggingconfig.Syslog
 	}
 
 	if kf != nil {
@@ -199,7 +184,7 @@ func getWrapConfig(es *v3.ElasticsearchConfig, sp *v3.SplunkConfig, sl *v3.Syslo
 				}
 				bs = append(bs, h)
 			}
-			wkf = WrapKafka{
+			wrapLogging.WrapKafka = WrapKafka{
 				Brokers: strings.Join(bs, ","),
 			}
 		} else {
@@ -212,12 +197,27 @@ func getWrapConfig(es *v3.ElasticsearchConfig, sp *v3.SplunkConfig, sl *v3.Syslo
 				if err != nil {
 					return
 				}
-				wkf = WrapKafka{
+				wrapLogging.WrapKafka = WrapKafka{
 					Zookeeper: h,
 				}
 			}
 		}
-		currentTarget = loggingconfig.Kafka
+		wrapLogging.CurrentTarget = loggingconfig.Kafka
+	}
+
+	if em != nil {
+		if em.LimitsCPU != 0 && em.LimitsCPU < em.RequestsCPU {
+			err = fmt.Errorf("limits cpu %d is less than request cpu %d", em.LimitsCPU, em.RequestsCPU)
+			return
+		}
+		if em.LimitsMemery != 0 && em.LimitsMemery < em.RequestsMemery {
+			err = fmt.Errorf("limits memory %d is less than request memory %d", em.LimitsMemery, em.RequestsMemery)
+			return
+		}
+		wem = WrapEmbedded{
+			DateFormat: getDateFormat(em.DateFormat),
+		}
+		wrapLogging.CurrentTarget = loggingconfig.Embedded
 	}
 	return
 }

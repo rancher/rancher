@@ -91,7 +91,7 @@ func (c *ClusterLoggingSyncer) Sync(key string, obj *v3.ClusterLogging) error {
 		return err
 	}
 	if utils.GetClusterTarget(obj.Spec) == "embedded" {
-		if err := utils.CreateEmbeddedTarget(c.deployments, c.serviceAccounts, c.services, c.roles, c.rolebindings, loggingconfig.LoggingNamespace); err != nil {
+		if err := utils.CreateOrUpdateEmbeddedTarget(c.deployments, c.serviceAccounts, c.services, c.roles, c.rolebindings, loggingconfig.LoggingNamespace, obj); err != nil {
 			return err
 		}
 

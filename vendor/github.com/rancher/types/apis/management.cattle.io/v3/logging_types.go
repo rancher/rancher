@@ -105,6 +105,10 @@ type EmbeddedConfig struct {
 	DateFormat            string `json:"dateFormat,omitempty" norman:"required,type=enum,options=YYYY-MM-DD|YYYY-MM|YYYY,default=YYYY-MM-DD"`
 	ElasticsearchEndpoint string `json:"elasticsearchEndpoint,omitempty" norman:"nocreate"`
 	KibanaEndpoint        string `json:"kibanaEndpoint,omitempty" norman:"nocreate"`
+	RequestsMemery        int    `json:"requestsMemory,omitempty" norman:"default=500,min=500"`
+	RequestsCPU           int    `json:"requestsCpu,omitempty" norman:"default=1000,min=1000"`
+	LimitsMemery          int    `json:"limitsMemory,omitempty"`
+	LimitsCPU             int    `json:"limitsCpu,omitempty"`
 }
 
 type KafkaConfig struct {

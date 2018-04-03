@@ -8,6 +8,7 @@ import (
 	rv1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	rrbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	v1beta2 "k8s.io/api/apps/v1beta2"
 	v1 "k8s.io/api/core/v1"
@@ -26,135 +27,157 @@ const (
 	running = "Running"
 )
 
-func CreateEmbeddedTarget(dep rv1beta2.DeploymentInterface, sa rv1.ServiceAccountInterface, se rv1.ServiceInterface, ro rrbacv1.RoleInterface, rb rrbacv1.RoleBindingInterface, namespace string) error {
+func CreateOrUpdateEmbeddedTarget(dep rv1beta2.DeploymentInterface, sa rv1.ServiceAccountInterface, se rv1.ServiceInterface, ro rrbacv1.RoleInterface, rb rrbacv1.RoleBindingInterface, namespace string, obj *v3.ClusterLogging) error {
 	// create es deployment
-	_, err := dep.Controller().Lister().Get(loggingconfig.EmbeddedESName, loggingconfig.EmbeddedESName)
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			return errors.Wrapf(err, "get deployment %s fail", loggingconfig.EmbeddedESName)
-		}
-		// create service account, role and rolebinding
-		sc := newESServiceAccount(namespace)
-		role := newESRole(namespace)
-		roleBind := newESRoleBinding(namespace)
+	_, err := dep.Controller().Lister().Get(loggingconfig.LoggingNamespace, loggingconfig.EmbeddedESName)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return errors.Wrapf(err, "get deployment %s fail", loggingconfig.EmbeddedESName)
+	}
 
-		defer func() {
-			if err != nil && !apierrors.IsAlreadyExists(err) {
-				sa.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{})
-			}
-		}()
-		_, err = sa.Create(sc)
-		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return errors.Wrapf(err, "create service account %s fail", loggingconfig.EmbeddedESName)
-		}
+	// create service account, role and rolebinding
+	sc := newESServiceAccount(namespace)
+	role := newESRole(namespace)
+	roleBind := newESRoleBinding(namespace)
 
-		defer func() {
-			if err != nil && !apierrors.IsAlreadyExists(err) {
-				ro.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{})
-			}
-		}()
-		_, err = ro.Create(role)
+	defer func() {
 		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return errors.Wrapf(err, "create role %s fail", loggingconfig.EmbeddedESName)
+			if err = sa.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+				logrus.Errorf("recycle %s service account failed", loggingconfig.EmbeddedESName)
+			}
 		}
+	}()
+	_, err = sa.Create(sc)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return errors.Wrapf(err, "create service account %s fail", loggingconfig.EmbeddedESName)
+	}
 
-		defer func() {
-			if err != nil && !apierrors.IsAlreadyExists(err) {
-				rb.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{})
-			}
-		}()
-		_, err = rb.Create(roleBind)
+	defer func() {
 		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return errors.Wrapf(err, "create role %s fail", loggingconfig.EmbeddedESName)
+			if err = ro.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+				logrus.Errorf("recycle %s role failed", loggingconfig.EmbeddedESName)
+			}
 		}
+	}()
+	_, err = ro.Create(role)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return errors.Wrapf(err, "create role %s fail", loggingconfig.EmbeddedESName)
+	}
 
-		// create service and deployment
-		defer func() {
-			if err != nil && !apierrors.IsAlreadyExists(err) {
-				se.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{})
-			}
-		}()
-		newService := newESService(namespace)
-		_, err = se.Create(newService)
+	defer func() {
 		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return errors.Wrapf(err, "create service %s fail", loggingconfig.EmbeddedESName)
+			if err = rb.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+				logrus.Errorf("recycle %s role binding failed", loggingconfig.EmbeddedESName)
+			}
 		}
+	}()
+	_, err = rb.Create(roleBind)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return errors.Wrapf(err, "create role %s fail", loggingconfig.EmbeddedESName)
+	}
 
-		defer func() {
-			if err != nil && !apierrors.IsAlreadyExists(err) {
-				dep.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{})
-			}
-		}()
-		esDeployment := NewESDeployment(namespace)
-		_, err = dep.Create(esDeployment)
+	// create service and deployment
+	defer func() {
 		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return errors.Wrapf(err, "create deployment %s fail", loggingconfig.EmbeddedESName)
+			if err = se.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+				logrus.Errorf("recycle %s service failed", loggingconfig.EmbeddedESName)
+			}
 		}
+	}()
+	newService := newESService(namespace)
+	_, err = se.Create(newService)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return errors.Wrapf(err, "create service %s fail", loggingconfig.EmbeddedESName)
+	}
+
+	defer func() {
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			if err = dep.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+				logrus.Errorf("recycle %s deployment failed", loggingconfig.EmbeddedESName)
+			}
+		}
+	}()
+	esDeployment := newESDeployment(namespace, obj)
+	_, err = dep.Create(esDeployment)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return errors.Wrapf(err, "create deployment %s fail", loggingconfig.EmbeddedESName)
+	}
+
+	if err = updateEmbeddedQuota(dep, obj); err != nil {
+		return err
 	}
 
 	// create kibana deployment
 	_, err = dep.Controller().Lister().Get(loggingconfig.LoggingNamespace, loggingconfig.EmbeddedKibanaName)
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			return errors.Wrapf(err, "get deployment %s fail", loggingconfig.EmbeddedKibanaName)
-		}
+	if err != nil && !apierrors.IsNotFound(err) {
+		return errors.Wrapf(err, "get deployment %s fail", loggingconfig.EmbeddedKibanaName)
+	}
 
-		// create service account, role and rolebinding
-		sc := newKibanaServiceAccount(namespace)
-		role := newKibanaRole(namespace)
-		roleBind := newKibanaRoleBinding(namespace)
+	// create service account, role and rolebinding
+	sc = newKibanaServiceAccount(namespace)
+	role = newKibanaRole(namespace)
+	roleBind = newKibanaRoleBinding(namespace)
 
-		defer func() {
-			if err != nil && !apierrors.IsAlreadyExists(err) {
-				sa.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{})
-			}
-		}()
-		_, err = sa.Create(sc)
+	defer func() {
 		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return errors.Wrapf(err, "create service account  %s fail", loggingconfig.EmbeddedKibanaName)
-		}
-
-		defer func() {
-			if err != nil && !apierrors.IsAlreadyExists(err) {
-				ro.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{})
+			if err = sa.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+				logrus.Errorf("recycle %s service account failed", loggingconfig.EmbeddedKibanaName)
 			}
-		}()
-		_, err = ro.Create(role)
-		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return errors.Wrapf(err, "create role %s fail", loggingconfig.EmbeddedKibanaName)
-		}
 
-		defer func() {
-			if err != nil && !apierrors.IsAlreadyExists(err) {
-				rb.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{})
-			}
-		}()
-		_, err = rb.Create(roleBind)
-		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return errors.Wrapf(err, "create role %s fail", loggingconfig.EmbeddedKibanaName)
 		}
+	}()
+	_, err = sa.Create(sc)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return errors.Wrapf(err, "create service account  %s fail", loggingconfig.EmbeddedKibanaName)
+	}
 
-		defer func() {
-			if err != nil && !apierrors.IsAlreadyExists(err) {
-				se.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{})
-			}
-		}()
-		newService := newKibanaService(namespace)
-		_, err = se.Create(newService)
+	defer func() {
 		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return errors.Wrapf(err, "create service %s fail", loggingconfig.EmbeddedKibanaName)
+			if err = ro.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+				logrus.Errorf("recycle %s role failed", loggingconfig.EmbeddedKibanaName)
+			}
 		}
+	}()
+	_, err = ro.Create(role)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return errors.Wrapf(err, "create role %s fail", loggingconfig.EmbeddedKibanaName)
+	}
 
-		defer func() {
-			if err != nil && !apierrors.IsAlreadyExists(err) {
-				dep.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{})
-			}
-		}()
-		kibanaDeployment := newKibanaDeployment(namespace)
-		_, err = dep.Create(kibanaDeployment)
+	defer func() {
 		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return errors.Wrapf(err, "create deployment %s fail", loggingconfig.EmbeddedKibanaName)
+			if err = rb.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+				logrus.Errorf("recycle %s role binding failed", loggingconfig.EmbeddedKibanaName)
+			}
 		}
+	}()
+	_, err = rb.Create(roleBind)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return errors.Wrapf(err, "create role %s fail", loggingconfig.EmbeddedKibanaName)
+	}
+
+	defer func() {
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			if err = se.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+				logrus.Errorf("recycle %s service failed", loggingconfig.EmbeddedKibanaName)
+			}
+		}
+	}()
+	newService = newKibanaService(namespace)
+	_, err = se.Create(newService)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return errors.Wrapf(err, "create service %s fail", loggingconfig.EmbeddedKibanaName)
+	}
+
+	defer func() {
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			if err = dep.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+				logrus.Errorf("recycle %s deployment failed", loggingconfig.EmbeddedKibanaName)
+			}
+		}
+	}()
+	kibanaDeployment := newKibanaDeployment(namespace)
+	_, err = dep.Create(kibanaDeployment)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return errors.Wrapf(err, "create deployment %s fail", loggingconfig.EmbeddedKibanaName)
 	}
 	return nil
 }
@@ -251,6 +274,35 @@ func UpdateEmbeddedEndpoint(podLister rv1.PodLister, serviceLister rv1.ServiceLi
 
 	if esEndpoint == "" || kibanaEndpoint == "" {
 		return fmt.Errorf("embedded endpoint not set completely")
+	}
+	return nil
+}
+
+func updateEmbeddedQuota(dep rv1beta2.DeploymentInterface, obj *v3.ClusterLogging) error {
+	d, err := dep.Get(loggingconfig.EmbeddedESName, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "fail to get embedded deployment %s before update quota", loggingconfig.EmbeddedESName)
+	}
+	requests, limits := map[v1.ResourceName]resource.Quantity{}, map[v1.ResourceName]resource.Quantity{}
+	if obj.Spec.EmbeddedConfig.LimitsCPU > 0 {
+		limits[v1.ResourceCPU] = *resource.NewMilliQuantity(int64(obj.Spec.EmbeddedConfig.LimitsCPU), resource.DecimalSI)
+	}
+	if obj.Spec.EmbeddedConfig.LimitsMemery > 0 {
+		limits[v1.ResourceMemory] = *resource.NewQuantity(int64(obj.Spec.EmbeddedConfig.LimitsMemery*1024*1024), resource.DecimalSI)
+	}
+
+	if obj.Spec.EmbeddedConfig.RequestsCPU > 0 {
+		requests[v1.ResourceCPU] = *resource.NewMilliQuantity(int64(obj.Spec.EmbeddedConfig.RequestsCPU), resource.DecimalSI)
+	}
+	if obj.Spec.EmbeddedConfig.RequestsMemery > 0 {
+		requests[v1.ResourceMemory] = *resource.NewQuantity(int64(obj.Spec.EmbeddedConfig.RequestsMemery*1024*1024), resource.DecimalSI)
+	}
+
+	d.Spec.Template.Spec.Containers[0].Resources.Requests = requests
+	d.Spec.Template.Spec.Containers[0].Resources.Limits = limits
+	_, err = dep.Update(d)
+	if err != nil {
+		return errors.Wrapf(err, "update deployment %s fail", loggingconfig.EmbeddedESName)
 	}
 	return nil
 }
@@ -468,7 +520,17 @@ func newKibanaService(namespace string) *v1.Service {
 	}
 }
 
-func NewESDeployment(namespace string) *v1beta2.Deployment {
+func newESDeployment(namespace string, obj *v3.ClusterLogging) *v1beta2.Deployment {
+	limits := map[v1.ResourceName]resource.Quantity{}
+	if obj.Spec.EmbeddedConfig.LimitsCPU > 0 {
+		//CPU is always requested as an absolute quantity, never as a relative quantity; 0.1 is the same amount of CPU on a single-core, dual-core, or 48-core machine
+		limits[v1.ResourceCPU] = *resource.NewMilliQuantity(int64(obj.Spec.EmbeddedConfig.LimitsCPU), resource.DecimalSI)
+	}
+	if obj.Spec.EmbeddedConfig.LimitsMemery > 0 {
+		//Limits and requests for memory are measured in bytes.
+		limits[v1.ResourceMemory] = *resource.NewQuantity(int64(obj.Spec.EmbeddedConfig.LimitsMemery*1024*1024), resource.DecimalSI)
+	}
+
 	deployment := &v1beta2.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
@@ -562,10 +624,11 @@ func NewESDeployment(namespace string) *v1beta2.Deployment {
 							Resources: v1.ResourceRequirements{
 								Requests: map[v1.ResourceName]resource.Quantity{
 									//CPU is always requested as an absolute quantity, never as a relative quantity; 0.1 is the same amount of CPU on a single-core, dual-core, or 48-core machine
-									v1.ResourceCPU: *resource.NewMilliQuantity(int64(1000), resource.DecimalSI),
+									v1.ResourceCPU: *resource.NewMilliQuantity(int64(obj.Spec.EmbeddedConfig.RequestsCPU), resource.DecimalSI),
 									//Limits and requests for memory are measured in bytes.
-									v1.ResourceMemory: *resource.NewQuantity(int64(500*1024*1024), resource.DecimalSI), // unit is byte
+									v1.ResourceMemory: *resource.NewQuantity(int64(obj.Spec.EmbeddedConfig.RequestsMemery*1024*1024), resource.DecimalSI), // unit is byte
 								},
+								Limits: limits,
 							},
 							VolumeMounts: []v1.VolumeMount{
 								{
