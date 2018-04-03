@@ -127,11 +127,13 @@ func (t *Authorizer) Authorize(req *http.Request) (*Client, bool, error) {
 	}
 
 	if input.Node != nil {
-		node, ok, err := t.authorizeNode(cluster, input.Node, req)
+		register := strings.HasSuffix(req.URL.Path, "/register")
+
+		node, ok, err := t.authorizeNode(register, cluster, input.Node, req)
 		if err != nil {
 			return nil, false, err
 		}
-		if node.Status.NodeConfig != nil && input.Node.CustomConfig != nil {
+		if register && node.Status.NodeConfig != nil && input.Node.CustomConfig != nil {
 			node = node.DeepCopy()
 			node.Status.NodeConfig.Address = input.Node.CustomConfig.Address
 			node.Status.NodeConfig.InternalAddress = input.Node.CustomConfig.InternalAddress
@@ -176,9 +178,7 @@ func (t *Authorizer) getMachine(cluster *v3.Cluster, inNode *client.Node) (*v3.N
 	return machine, err
 }
 
-func (t *Authorizer) authorizeNode(cluster *v3.Cluster, inNode *client.Node, req *http.Request) (*v3.Node, bool, error) {
-	register := strings.HasSuffix(req.URL.Path, "/register")
-
+func (t *Authorizer) authorizeNode(register bool, cluster *v3.Cluster, inNode *client.Node, req *http.Request) (*v3.Node, bool, error) {
 	machine, err := t.getMachine(cluster, inNode)
 	if apierrors.IsNotFound(err) {
 		if !register {
