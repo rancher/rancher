@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/rancher/kontainer-engine/drivers"
 	"github.com/rancher/kontainer-engine/drivers/rke/rkecerts"
@@ -201,6 +202,13 @@ func (d *Driver) Update(ctx context.Context, clusterInfo *types.ClusterInfo, opt
 }
 
 func (d *Driver) getClientset(info *types.ClusterInfo) (*kubernetes.Clientset, error) {
+	yaml := info.Metadata["Config"]
+
+	rkeConfig, err := drivers.ConvertToRkeConfig(yaml)
+	if err != nil {
+		return nil, err
+	}
+
 	info.Endpoint = info.Metadata["Endpoint"]
 	info.ClientCertificate = info.Metadata["ClientCert"]
 	info.ClientKey = info.Metadata["ClientKey"]
@@ -230,6 +238,7 @@ func (d *Driver) getClientset(info *types.ClusterInfo) (*kubernetes.Clientset, e
 			CertData: certBytes,
 			KeyData:  keyBytes,
 		},
+		WrapTransport: d.WrapTransportFactory(&rkeConfig),
 	}
 
 	return kubernetes.NewForConfig(config)
@@ -242,21 +251,36 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 		return nil, err
 	}
 
-	serverVersion, err := clientset.DiscoveryClient.ServerVersion()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get Kubernetes server version: %v", err)
+	var lastErr error
+	for i := 0; i < 3; i++ {
+		serverVersion, err := clientset.DiscoveryClient.ServerVersion()
+		if err != nil {
+			lastErr = fmt.Errorf("failed to get Kubernetes server version: %v", err)
+			time.Sleep(2 * time.Second)
+			continue
+		}
+
+		token, err := drivers.GenerateServiceAccountToken(clientset)
+		if err != nil {
+			lastErr = err
+			time.Sleep(2 * time.Second)
+			continue
+		}
+
+		info.Version = serverVersion.GitVersion
+		info.ServiceAccountToken = token
+
+		info.NodeCount, err = nodeCount(info)
+		if err != nil {
+			lastErr = err
+			time.Sleep(2 * time.Second)
+			continue
+		}
+
+		return info, err
 	}
 
-	token, err := drivers.GenerateServiceAccountToken(clientset)
-	if err != nil {
-		return nil, err
-	}
-
-	info.Version = serverVersion.GitVersion
-	info.ServiceAccountToken = token
-
-	info.NodeCount, err = nodeCount(info)
-	return info, err
+	return nil, lastErr
 }
 
 func (d *Driver) GetVersion(ctx context.Context, info *types.ClusterInfo) (*types.KubernetesVersion, error) {
