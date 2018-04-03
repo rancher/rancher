@@ -34,7 +34,9 @@ func Setup(ctx context.Context, mgmt *config.ScaledContext, clusterManager *clus
 	addProxyStore(schemas, mgmt, client.IngressType, "extensions/v1beta1", ingress.Wrap)
 	addProxyStore(schemas, mgmt, client.JobType, "batch/v1", workload.New)
 	addProxyStore(schemas, mgmt, client.PersistentVolumeClaimType, "v1", nil)
-	addProxyStore(schemas, mgmt, client.PodType, "v1", pod.New)
+	addProxyStore(schemas, mgmt, client.PodType, "v1", func(store types.Store) types.Store {
+		return pod.New(store, clusterManager, mgmt)
+	})
 	addProxyStore(schemas, mgmt, client.ReplicaSetType, "apps/v1beta2", workload.New)
 	addProxyStore(schemas, mgmt, client.ReplicationControllerType, "v1", workload.New)
 	addProxyStore(schemas, mgmt, client.ServiceType, "v1", service.New)
