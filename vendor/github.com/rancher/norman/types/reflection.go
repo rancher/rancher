@@ -2,24 +2,20 @@ package types
 
 import (
 	"fmt"
+	"net/http"
 	"reflect"
 	"strconv"
 	"strings"
-
-	"net/http"
 
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/definition"
 	"github.com/rancher/norman/types/slice"
 	"github.com/sirupsen/logrus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
 	namespacedType = reflect.TypeOf(Namespaced{})
 	resourceType   = reflect.TypeOf(Resource{})
-	typeType       = reflect.TypeOf(metav1.TypeMeta{})
-	metaType       = reflect.TypeOf(metav1.ObjectMeta{})
 	blacklistNames = map[string]bool{
 		"links":   true,
 		"actions": true,
@@ -194,6 +190,16 @@ func jsonName(f reflect.StructField) string {
 	return strings.SplitN(f.Tag.Get("json"), ",", 2)[0]
 }
 
+func k8sType(field reflect.StructField) bool {
+	return field.Type.Name() == "TypeMeta" &&
+		strings.HasSuffix(field.Type.PkgPath(), "k8s.io/apimachinery/pkg/apis/meta/v1")
+}
+
+func k8sObject(field reflect.StructField) bool {
+	return field.Type.Name() == "ObjectMeta" &&
+		strings.HasSuffix(field.Type.PkgPath(), "k8s.io/apimachinery/pkg/apis/meta/v1")
+}
+
 func (s *Schemas) readFields(schema *Schema, t reflect.Type) error {
 	if t == resourceType {
 		schema.CollectionMethods = []string{"GET", "POST"}
@@ -212,16 +218,15 @@ func (s *Schemas) readFields(schema *Schema, t reflect.Type) error {
 		}
 
 		jsonName := jsonName(field)
-
 		if jsonName == "-" {
 			continue
 		}
 
-		if field.Anonymous && jsonName == "" && field.Type == typeType {
+		if field.Anonymous && jsonName == "" && k8sType(field) {
 			hasType = true
 		}
 
-		if field.Anonymous && jsonName == "metadata" && field.Type == metaType {
+		if field.Anonymous && jsonName == "metadata" && k8sObject(field) {
 			hasMeta = true
 		}
 

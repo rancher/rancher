@@ -3,8 +3,8 @@ package v3public
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -52,7 +52,7 @@ type AuthProviderController interface {
 }
 
 type AuthProviderInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*AuthProvider) (*AuthProvider, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*AuthProvider, error)
 	Get(name string, opts metav1.GetOptions) (*AuthProvider, error)
@@ -177,11 +177,11 @@ func (s *authProviderClient) Controller() AuthProviderController {
 type authProviderClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   AuthProviderController
 }
 
-func (s *authProviderClient) ObjectClient() *clientbase.ObjectClient {
+func (s *authProviderClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

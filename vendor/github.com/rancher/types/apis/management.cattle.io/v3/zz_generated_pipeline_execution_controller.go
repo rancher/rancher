@@ -3,8 +3,8 @@ package v3
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -53,7 +53,7 @@ type PipelineExecutionController interface {
 }
 
 type PipelineExecutionInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*PipelineExecution) (*PipelineExecution, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*PipelineExecution, error)
 	Get(name string, opts metav1.GetOptions) (*PipelineExecution, error)
@@ -178,11 +178,11 @@ func (s *pipelineExecutionClient) Controller() PipelineExecutionController {
 type pipelineExecutionClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   PipelineExecutionController
 }
 
-func (s *pipelineExecutionClient) ObjectClient() *clientbase.ObjectClient {
+func (s *pipelineExecutionClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/restwatch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
@@ -70,7 +70,7 @@ type DeploymentsGetter interface {
 }
 
 func (c *Client) Deployments(namespace string) DeploymentInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &DeploymentResource, DeploymentGroupVersionKind, deploymentFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &DeploymentResource, DeploymentGroupVersionKind, deploymentFactory{})
 	return &deploymentClient{
 		ns:           namespace,
 		client:       c,
@@ -83,7 +83,7 @@ type DaemonSetsGetter interface {
 }
 
 func (c *Client) DaemonSets(namespace string) DaemonSetInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &DaemonSetResource, DaemonSetGroupVersionKind, daemonSetFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &DaemonSetResource, DaemonSetGroupVersionKind, daemonSetFactory{})
 	return &daemonSetClient{
 		ns:           namespace,
 		client:       c,
@@ -96,7 +96,7 @@ type StatefulSetsGetter interface {
 }
 
 func (c *Client) StatefulSets(namespace string) StatefulSetInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &StatefulSetResource, StatefulSetGroupVersionKind, statefulSetFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &StatefulSetResource, StatefulSetGroupVersionKind, statefulSetFactory{})
 	return &statefulSetClient{
 		ns:           namespace,
 		client:       c,
@@ -109,7 +109,7 @@ type ReplicaSetsGetter interface {
 }
 
 func (c *Client) ReplicaSets(namespace string) ReplicaSetInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &ReplicaSetResource, ReplicaSetGroupVersionKind, replicaSetFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ReplicaSetResource, ReplicaSetGroupVersionKind, replicaSetFactory{})
 	return &replicaSetClient{
 		ns:           namespace,
 		client:       c,

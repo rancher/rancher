@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/restwatch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
@@ -61,7 +61,7 @@ type JobsGetter interface {
 }
 
 func (c *Client) Jobs(namespace string) JobInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &JobResource, JobGroupVersionKind, jobFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &JobResource, JobGroupVersionKind, jobFactory{})
 	return &jobClient{
 		ns:           namespace,
 		client:       c,

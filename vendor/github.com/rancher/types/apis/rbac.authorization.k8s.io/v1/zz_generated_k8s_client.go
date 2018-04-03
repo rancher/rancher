@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/restwatch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
@@ -70,7 +70,7 @@ type ClusterRoleBindingsGetter interface {
 }
 
 func (c *Client) ClusterRoleBindings(namespace string) ClusterRoleBindingInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &ClusterRoleBindingResource, ClusterRoleBindingGroupVersionKind, clusterRoleBindingFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ClusterRoleBindingResource, ClusterRoleBindingGroupVersionKind, clusterRoleBindingFactory{})
 	return &clusterRoleBindingClient{
 		ns:           namespace,
 		client:       c,
@@ -83,7 +83,7 @@ type ClusterRolesGetter interface {
 }
 
 func (c *Client) ClusterRoles(namespace string) ClusterRoleInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &ClusterRoleResource, ClusterRoleGroupVersionKind, clusterRoleFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ClusterRoleResource, ClusterRoleGroupVersionKind, clusterRoleFactory{})
 	return &clusterRoleClient{
 		ns:           namespace,
 		client:       c,
@@ -96,7 +96,7 @@ type RoleBindingsGetter interface {
 }
 
 func (c *Client) RoleBindings(namespace string) RoleBindingInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &RoleBindingResource, RoleBindingGroupVersionKind, roleBindingFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &RoleBindingResource, RoleBindingGroupVersionKind, roleBindingFactory{})
 	return &roleBindingClient{
 		ns:           namespace,
 		client:       c,
@@ -109,7 +109,7 @@ type RolesGetter interface {
 }
 
 func (c *Client) Roles(namespace string) RoleInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &RoleResource, RoleGroupVersionKind, roleFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &RoleResource, RoleGroupVersionKind, roleFactory{})
 	return &roleClient{
 		ns:           namespace,
 		client:       c,

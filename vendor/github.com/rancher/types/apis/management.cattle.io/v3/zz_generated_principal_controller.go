@@ -3,8 +3,8 @@ package v3
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -52,7 +52,7 @@ type PrincipalController interface {
 }
 
 type PrincipalInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*Principal) (*Principal, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*Principal, error)
 	Get(name string, opts metav1.GetOptions) (*Principal, error)
@@ -177,11 +177,11 @@ func (s *principalClient) Controller() PrincipalController {
 type principalClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   PrincipalController
 }
 
-func (s *principalClient) ObjectClient() *clientbase.ObjectClient {
+func (s *principalClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

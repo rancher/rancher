@@ -3,8 +3,8 @@ package v3
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -53,7 +53,7 @@ type NodePoolController interface {
 }
 
 type NodePoolInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*NodePool) (*NodePool, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*NodePool, error)
 	Get(name string, opts metav1.GetOptions) (*NodePool, error)
@@ -178,11 +178,11 @@ func (s *nodePoolClient) Controller() NodePoolController {
 type nodePoolClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   NodePoolController
 }
 
-func (s *nodePoolClient) ObjectClient() *clientbase.ObjectClient {
+func (s *nodePoolClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

@@ -264,6 +264,10 @@ type RKEConfigNodePlan struct {
 	PortChecks []PortCheck `json:"portChecks,omitempty"`
 	// List of files to deploy on the node
 	Files []File `json:"files,omitempty"`
+	// Node Annotations
+	Annotations map[string]string `json:"annotations,omitempty"`
+	// Node Labels
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 type Process struct {
@@ -277,6 +281,8 @@ type Process struct {
 	Env []string `json:"env,omitempty"`
 	// Process docker image
 	Image string `json:"image,omitempty"`
+	//AuthConfig for image private registry
+	ImageRegistryAuthConfig string `json:"imageRegistryAuthConfig,omitempty"`
 	// Process docker image VolumesFrom
 	VolumesFrom []string `json:"volumesFrom,omitempty"`
 	// Process docker container bind mounts

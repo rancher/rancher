@@ -3,8 +3,8 @@ package v1
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,7 +54,7 @@ type RoleBindingController interface {
 }
 
 type RoleBindingInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*v1.RoleBinding) (*v1.RoleBinding, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.RoleBinding, error)
 	Get(name string, opts metav1.GetOptions) (*v1.RoleBinding, error)
@@ -179,11 +179,11 @@ func (s *roleBindingClient) Controller() RoleBindingController {
 type roleBindingClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   RoleBindingController
 }
 
-func (s *roleBindingClient) ObjectClient() *clientbase.ObjectClient {
+func (s *roleBindingClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

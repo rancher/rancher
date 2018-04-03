@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/rancher/norman/clientbase"
+	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/slice"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,10 +27,10 @@ type objectLifecycleAdapter struct {
 	name          string
 	clusterScoped bool
 	lifecycle     ObjectLifecycle
-	objectClient  *clientbase.ObjectClient
+	objectClient  *objectclient.ObjectClient
 }
 
-func NewObjectLifecycleAdapter(name string, clusterScoped bool, lifecycle ObjectLifecycle, objectClient *clientbase.ObjectClient) func(key string, obj runtime.Object) error {
+func NewObjectLifecycleAdapter(name string, clusterScoped bool, lifecycle ObjectLifecycle, objectClient *objectclient.ObjectClient) func(key string, obj runtime.Object) error {
 	o := objectLifecycleAdapter{
 		name:          name,
 		clusterScoped: clusterScoped,

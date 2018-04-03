@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/restwatch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
@@ -91,7 +91,7 @@ type NodesGetter interface {
 }
 
 func (c *Client) Nodes(namespace string) NodeInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &NodeResource, NodeGroupVersionKind, nodeFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &NodeResource, NodeGroupVersionKind, nodeFactory{})
 	return &nodeClient{
 		ns:           namespace,
 		client:       c,
@@ -104,7 +104,7 @@ type ComponentStatusesGetter interface {
 }
 
 func (c *Client) ComponentStatuses(namespace string) ComponentStatusInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &ComponentStatusResource, ComponentStatusGroupVersionKind, componentStatusFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ComponentStatusResource, ComponentStatusGroupVersionKind, componentStatusFactory{})
 	return &componentStatusClient{
 		ns:           namespace,
 		client:       c,
@@ -117,7 +117,7 @@ type NamespacesGetter interface {
 }
 
 func (c *Client) Namespaces(namespace string) NamespaceInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &NamespaceResource, NamespaceGroupVersionKind, namespaceFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &NamespaceResource, NamespaceGroupVersionKind, namespaceFactory{})
 	return &namespaceClient{
 		ns:           namespace,
 		client:       c,
@@ -130,7 +130,7 @@ type EventsGetter interface {
 }
 
 func (c *Client) Events(namespace string) EventInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &EventResource, EventGroupVersionKind, eventFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &EventResource, EventGroupVersionKind, eventFactory{})
 	return &eventClient{
 		ns:           namespace,
 		client:       c,
@@ -143,7 +143,7 @@ type EndpointsGetter interface {
 }
 
 func (c *Client) Endpoints(namespace string) EndpointsInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &EndpointsResource, EndpointsGroupVersionKind, endpointsFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &EndpointsResource, EndpointsGroupVersionKind, endpointsFactory{})
 	return &endpointsClient{
 		ns:           namespace,
 		client:       c,
@@ -156,7 +156,7 @@ type PodsGetter interface {
 }
 
 func (c *Client) Pods(namespace string) PodInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &PodResource, PodGroupVersionKind, podFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &PodResource, PodGroupVersionKind, podFactory{})
 	return &podClient{
 		ns:           namespace,
 		client:       c,
@@ -169,7 +169,7 @@ type ServicesGetter interface {
 }
 
 func (c *Client) Services(namespace string) ServiceInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &ServiceResource, ServiceGroupVersionKind, serviceFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ServiceResource, ServiceGroupVersionKind, serviceFactory{})
 	return &serviceClient{
 		ns:           namespace,
 		client:       c,
@@ -182,7 +182,7 @@ type SecretsGetter interface {
 }
 
 func (c *Client) Secrets(namespace string) SecretInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &SecretResource, SecretGroupVersionKind, secretFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &SecretResource, SecretGroupVersionKind, secretFactory{})
 	return &secretClient{
 		ns:           namespace,
 		client:       c,
@@ -195,7 +195,7 @@ type ConfigMapsGetter interface {
 }
 
 func (c *Client) ConfigMaps(namespace string) ConfigMapInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &ConfigMapResource, ConfigMapGroupVersionKind, configMapFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ConfigMapResource, ConfigMapGroupVersionKind, configMapFactory{})
 	return &configMapClient{
 		ns:           namespace,
 		client:       c,
@@ -208,7 +208,7 @@ type ServiceAccountsGetter interface {
 }
 
 func (c *Client) ServiceAccounts(namespace string) ServiceAccountInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &ServiceAccountResource, ServiceAccountGroupVersionKind, serviceAccountFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ServiceAccountResource, ServiceAccountGroupVersionKind, serviceAccountFactory{})
 	return &serviceAccountClient{
 		ns:           namespace,
 		client:       c,
@@ -221,7 +221,7 @@ type ReplicationControllersGetter interface {
 }
 
 func (c *Client) ReplicationControllers(namespace string) ReplicationControllerInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &ReplicationControllerResource, ReplicationControllerGroupVersionKind, replicationControllerFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ReplicationControllerResource, ReplicationControllerGroupVersionKind, replicationControllerFactory{})
 	return &replicationControllerClient{
 		ns:           namespace,
 		client:       c,

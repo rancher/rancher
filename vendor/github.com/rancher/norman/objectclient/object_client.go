@@ -1,4 +1,4 @@
-package clientbase
+package objectclient
 
 import (
 	"encoding/json"

@@ -3,8 +3,8 @@ package v3
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -52,7 +52,7 @@ type NodeDriverController interface {
 }
 
 type NodeDriverInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*NodeDriver) (*NodeDriver, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*NodeDriver, error)
 	Get(name string, opts metav1.GetOptions) (*NodeDriver, error)
@@ -177,11 +177,11 @@ func (s *nodeDriverClient) Controller() NodeDriverController {
 type nodeDriverClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   NodeDriverController
 }
 
-func (s *nodeDriverClient) ObjectClient() *clientbase.ObjectClient {
+func (s *nodeDriverClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

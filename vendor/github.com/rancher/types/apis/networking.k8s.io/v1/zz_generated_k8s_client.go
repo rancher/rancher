@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/restwatch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
@@ -61,7 +61,7 @@ type NetworkPoliciesGetter interface {
 }
 
 func (c *Client) NetworkPolicies(namespace string) NetworkPolicyInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &NetworkPolicyResource, NetworkPolicyGroupVersionKind, networkPolicyFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &NetworkPolicyResource, NetworkPolicyGroupVersionKind, networkPolicyFactory{})
 	return &networkPolicyClient{
 		ns:           namespace,
 		client:       c,

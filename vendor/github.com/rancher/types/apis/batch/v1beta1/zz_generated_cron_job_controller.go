@@ -3,8 +3,8 @@ package v1beta1
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/api/batch/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,7 +54,7 @@ type CronJobController interface {
 }
 
 type CronJobInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*v1beta1.CronJob) (*v1beta1.CronJob, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1beta1.CronJob, error)
 	Get(name string, opts metav1.GetOptions) (*v1beta1.CronJob, error)
@@ -179,11 +179,11 @@ func (s *cronJobClient) Controller() CronJobController {
 type cronJobClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   CronJobController
 }
 
-func (s *cronJobClient) ObjectClient() *clientbase.ObjectClient {
+func (s *cronJobClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

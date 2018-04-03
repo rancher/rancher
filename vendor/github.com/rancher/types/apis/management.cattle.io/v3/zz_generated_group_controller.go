@@ -3,8 +3,8 @@ package v3
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -52,7 +52,7 @@ type GroupController interface {
 }
 
 type GroupInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*Group) (*Group, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*Group, error)
 	Get(name string, opts metav1.GetOptions) (*Group, error)
@@ -177,11 +177,11 @@ func (s *groupClient) Controller() GroupController {
 type groupClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   GroupController
 }
 
-func (s *groupClient) ObjectClient() *clientbase.ObjectClient {
+func (s *groupClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

@@ -9,7 +9,7 @@ import (
 
 	"github.com/juju/ratelimit"
 	errors2 "github.com/pkg/errors"
-	"github.com/rancher/norman/clientbase"
+	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -40,7 +40,7 @@ type GenericController interface {
 type Backend interface {
 	List(opts metav1.ListOptions) (runtime.Object, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
-	ObjectFactory() clientbase.ObjectFactory
+	ObjectFactory() objectclient.ObjectFactory
 }
 
 type handlerDef struct {

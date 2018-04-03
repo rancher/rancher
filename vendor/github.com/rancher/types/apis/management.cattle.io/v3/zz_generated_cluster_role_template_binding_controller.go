@@ -3,8 +3,8 @@ package v3
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -53,7 +53,7 @@ type ClusterRoleTemplateBindingController interface {
 }
 
 type ClusterRoleTemplateBindingInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*ClusterRoleTemplateBinding) (*ClusterRoleTemplateBinding, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*ClusterRoleTemplateBinding, error)
 	Get(name string, opts metav1.GetOptions) (*ClusterRoleTemplateBinding, error)
@@ -178,11 +178,11 @@ func (s *clusterRoleTemplateBindingClient) Controller() ClusterRoleTemplateBindi
 type clusterRoleTemplateBindingClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   ClusterRoleTemplateBindingController
 }
 
-func (s *clusterRoleTemplateBindingClient) ObjectClient() *clientbase.ObjectClient {
+func (s *clusterRoleTemplateBindingClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

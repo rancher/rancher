@@ -3,8 +3,8 @@ package v3
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -53,7 +53,7 @@ type NamespacedBasicAuthController interface {
 }
 
 type NamespacedBasicAuthInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*NamespacedBasicAuth) (*NamespacedBasicAuth, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*NamespacedBasicAuth, error)
 	Get(name string, opts metav1.GetOptions) (*NamespacedBasicAuth, error)
@@ -178,11 +178,11 @@ func (s *namespacedBasicAuthClient) Controller() NamespacedBasicAuthController {
 type namespacedBasicAuthClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   NamespacedBasicAuthController
 }
 
-func (s *namespacedBasicAuthClient) ObjectClient() *clientbase.ObjectClient {
+func (s *namespacedBasicAuthClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 
