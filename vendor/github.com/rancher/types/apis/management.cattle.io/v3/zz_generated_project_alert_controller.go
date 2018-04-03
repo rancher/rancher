@@ -3,8 +3,8 @@ package v3
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -53,7 +53,7 @@ type ProjectAlertController interface {
 }
 
 type ProjectAlertInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*ProjectAlert) (*ProjectAlert, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*ProjectAlert, error)
 	Get(name string, opts metav1.GetOptions) (*ProjectAlert, error)
@@ -178,11 +178,11 @@ func (s *projectAlertClient) Controller() ProjectAlertController {
 type projectAlertClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   ProjectAlertController
 }
 
-func (s *projectAlertClient) ObjectClient() *clientbase.ObjectClient {
+func (s *projectAlertClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

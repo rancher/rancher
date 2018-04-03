@@ -3,8 +3,8 @@ package v3
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -52,7 +52,7 @@ type RoleTemplateController interface {
 }
 
 type RoleTemplateInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*RoleTemplate) (*RoleTemplate, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*RoleTemplate, error)
 	Get(name string, opts metav1.GetOptions) (*RoleTemplate, error)
@@ -177,11 +177,11 @@ func (s *roleTemplateClient) Controller() RoleTemplateController {
 type roleTemplateClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   RoleTemplateController
 }
 
-func (s *roleTemplateClient) ObjectClient() *clientbase.ObjectClient {
+func (s *roleTemplateClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

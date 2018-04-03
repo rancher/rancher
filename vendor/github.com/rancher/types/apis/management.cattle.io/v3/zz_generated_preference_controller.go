@@ -3,8 +3,8 @@ package v3
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -53,7 +53,7 @@ type PreferenceController interface {
 }
 
 type PreferenceInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*Preference) (*Preference, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*Preference, error)
 	Get(name string, opts metav1.GetOptions) (*Preference, error)
@@ -178,11 +178,11 @@ func (s *preferenceClient) Controller() PreferenceController {
 type preferenceClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   PreferenceController
 }
 
-func (s *preferenceClient) ObjectClient() *clientbase.ObjectClient {
+func (s *preferenceClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

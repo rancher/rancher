@@ -3,8 +3,8 @@ package v1
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,7 +54,7 @@ type JobController interface {
 }
 
 type JobInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*v1.Job) (*v1.Job, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.Job, error)
 	Get(name string, opts metav1.GetOptions) (*v1.Job, error)
@@ -179,11 +179,11 @@ func (s *jobClient) Controller() JobController {
 type jobClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   JobController
 }
 
-func (s *jobClient) ObjectClient() *clientbase.ObjectClient {
+func (s *jobClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

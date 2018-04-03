@@ -3,8 +3,8 @@ package v3
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -53,7 +53,7 @@ type ClusterLoggingController interface {
 }
 
 type ClusterLoggingInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*ClusterLogging) (*ClusterLogging, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*ClusterLogging, error)
 	Get(name string, opts metav1.GetOptions) (*ClusterLogging, error)
@@ -178,11 +178,11 @@ func (s *clusterLoggingClient) Controller() ClusterLoggingController {
 type clusterLoggingClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   ClusterLoggingController
 }
 
-func (s *clusterLoggingClient) ObjectClient() *clientbase.ObjectClient {
+func (s *clusterLoggingClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

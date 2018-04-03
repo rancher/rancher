@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/restwatch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
@@ -61,7 +61,7 @@ type AuthProvidersGetter interface {
 }
 
 func (c *Client) AuthProviders(namespace string) AuthProviderInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &AuthProviderResource, AuthProviderGroupVersionKind, authProviderFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &AuthProviderResource, AuthProviderGroupVersionKind, authProviderFactory{})
 	return &authProviderClient{
 		ns:           namespace,
 		client:       c,

@@ -3,8 +3,8 @@ package v3
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -52,7 +52,7 @@ type CatalogController interface {
 }
 
 type CatalogInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*Catalog) (*Catalog, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*Catalog, error)
 	Get(name string, opts metav1.GetOptions) (*Catalog, error)
@@ -177,11 +177,11 @@ func (s *catalogClient) Controller() CatalogController {
 type catalogClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   CatalogController
 }
 
-func (s *catalogClient) ObjectClient() *clientbase.ObjectClient {
+func (s *catalogClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

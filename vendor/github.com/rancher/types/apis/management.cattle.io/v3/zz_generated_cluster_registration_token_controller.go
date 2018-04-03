@@ -3,8 +3,8 @@ package v3
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -53,7 +53,7 @@ type ClusterRegistrationTokenController interface {
 }
 
 type ClusterRegistrationTokenInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*ClusterRegistrationToken) (*ClusterRegistrationToken, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*ClusterRegistrationToken, error)
 	Get(name string, opts metav1.GetOptions) (*ClusterRegistrationToken, error)
@@ -178,11 +178,11 @@ func (s *clusterRegistrationTokenClient) Controller() ClusterRegistrationTokenCo
 type clusterRegistrationTokenClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   ClusterRegistrationTokenController
 }
 
-func (s *clusterRegistrationTokenClient) ObjectClient() *clientbase.ObjectClient {
+func (s *clusterRegistrationTokenClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

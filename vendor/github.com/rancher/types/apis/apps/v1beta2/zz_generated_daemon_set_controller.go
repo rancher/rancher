@@ -3,8 +3,8 @@ package v1beta2
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/api/apps/v1beta2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,7 +54,7 @@ type DaemonSetController interface {
 }
 
 type DaemonSetInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*v1beta2.DaemonSet) (*v1beta2.DaemonSet, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1beta2.DaemonSet, error)
 	Get(name string, opts metav1.GetOptions) (*v1beta2.DaemonSet, error)
@@ -179,11 +179,11 @@ func (s *daemonSetClient) Controller() DaemonSetController {
 type daemonSetClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   DaemonSetController
 }
 
-func (s *daemonSetClient) ObjectClient() *clientbase.ObjectClient {
+func (s *daemonSetClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

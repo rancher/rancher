@@ -3,8 +3,8 @@ package v1
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,7 +53,7 @@ type ComponentStatusController interface {
 }
 
 type ComponentStatusInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*v1.ComponentStatus) (*v1.ComponentStatus, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.ComponentStatus, error)
 	Get(name string, opts metav1.GetOptions) (*v1.ComponentStatus, error)
@@ -178,11 +178,11 @@ func (s *componentStatusClient) Controller() ComponentStatusController {
 type componentStatusClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   ComponentStatusController
 }
 
-func (s *componentStatusClient) ObjectClient() *clientbase.ObjectClient {
+func (s *componentStatusClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

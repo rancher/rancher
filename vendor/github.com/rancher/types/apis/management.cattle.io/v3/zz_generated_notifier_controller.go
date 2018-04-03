@@ -3,8 +3,8 @@ package v3
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -53,7 +53,7 @@ type NotifierController interface {
 }
 
 type NotifierInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*Notifier) (*Notifier, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*Notifier, error)
 	Get(name string, opts metav1.GetOptions) (*Notifier, error)
@@ -178,11 +178,11 @@ func (s *notifierClient) Controller() NotifierController {
 type notifierClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   NotifierController
 }
 
-func (s *notifierClient) ObjectClient() *clientbase.ObjectClient {
+func (s *notifierClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

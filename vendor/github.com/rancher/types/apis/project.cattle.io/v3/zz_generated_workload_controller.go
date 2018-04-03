@@ -3,8 +3,8 @@ package v3
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -53,7 +53,7 @@ type WorkloadController interface {
 }
 
 type WorkloadInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*Workload) (*Workload, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*Workload, error)
 	Get(name string, opts metav1.GetOptions) (*Workload, error)
@@ -178,11 +178,11 @@ func (s *workloadClient) Controller() WorkloadController {
 type workloadClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   WorkloadController
 }
 
-func (s *workloadClient) ObjectClient() *clientbase.ObjectClient {
+func (s *workloadClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

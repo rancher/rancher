@@ -103,9 +103,10 @@ func nativeNodeTypes(schemas *types.Schemas) *types.Schemas {
 			schema.CodeName = "InternalNodeStatus"
 			schema.CodeNamePlural = "InternalNodeStatuses"
 		}, struct {
-			IPAddress string
-			Hostname  string
-			Info      NodeInfo
+			IPAddress         string
+			ExternalIPAddress string `json:"externalIpAddress,omitempty"`
+			Hostname          string
+			Info              NodeInfo
 		}{})
 }
 

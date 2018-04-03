@@ -3,8 +3,8 @@ package v1beta1
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,7 +53,7 @@ type PodSecurityPolicyController interface {
 }
 
 type PodSecurityPolicyInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*v1beta1.PodSecurityPolicy) (*v1beta1.PodSecurityPolicy, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1beta1.PodSecurityPolicy, error)
 	Get(name string, opts metav1.GetOptions) (*v1beta1.PodSecurityPolicy, error)
@@ -178,11 +178,11 @@ func (s *podSecurityPolicyClient) Controller() PodSecurityPolicyController {
 type podSecurityPolicyClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   PodSecurityPolicyController
 }
 
-func (s *podSecurityPolicyClient) ObjectClient() *clientbase.ObjectClient {
+func (s *podSecurityPolicyClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

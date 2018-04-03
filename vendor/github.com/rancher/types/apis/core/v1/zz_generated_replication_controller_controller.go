@@ -3,8 +3,8 @@ package v1
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,7 +54,7 @@ type ReplicationControllerController interface {
 }
 
 type ReplicationControllerInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*v1.ReplicationController) (*v1.ReplicationController, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.ReplicationController, error)
 	Get(name string, opts metav1.GetOptions) (*v1.ReplicationController, error)
@@ -179,11 +179,11 @@ func (s *replicationControllerClient) Controller() ReplicationControllerControll
 type replicationControllerClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   ReplicationControllerController
 }
 
-func (s *replicationControllerClient) ObjectClient() *clientbase.ObjectClient {
+func (s *replicationControllerClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/restwatch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
@@ -61,7 +61,7 @@ type CronJobsGetter interface {
 }
 
 func (c *Client) CronJobs(namespace string) CronJobInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &CronJobResource, CronJobGroupVersionKind, cronJobFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &CronJobResource, CronJobGroupVersionKind, cronJobFactory{})
 	return &cronJobClient{
 		ns:           namespace,
 		client:       c,

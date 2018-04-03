@@ -3,8 +3,8 @@ package v1beta2
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/api/apps/v1beta2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,7 +54,7 @@ type DeploymentController interface {
 }
 
 type DeploymentInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*v1beta2.Deployment) (*v1beta2.Deployment, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1beta2.Deployment, error)
 	Get(name string, opts metav1.GetOptions) (*v1beta2.Deployment, error)
@@ -179,11 +179,11 @@ func (s *deploymentClient) Controller() DeploymentController {
 type deploymentClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   DeploymentController
 }
 
-func (s *deploymentClient) ObjectClient() *clientbase.ObjectClient {
+func (s *deploymentClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

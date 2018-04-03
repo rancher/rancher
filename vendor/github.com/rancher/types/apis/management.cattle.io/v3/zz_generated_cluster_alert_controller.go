@@ -3,8 +3,8 @@ package v3
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -53,7 +53,7 @@ type ClusterAlertController interface {
 }
 
 type ClusterAlertInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*ClusterAlert) (*ClusterAlert, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*ClusterAlert, error)
 	Get(name string, opts metav1.GetOptions) (*ClusterAlert, error)
@@ -178,11 +178,11 @@ func (s *clusterAlertClient) Controller() ClusterAlertController {
 type clusterAlertClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   ClusterAlertController
 }
 
-func (s *clusterAlertClient) ObjectClient() *clientbase.ObjectClient {
+func (s *clusterAlertClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

@@ -3,8 +3,8 @@ package v1
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,7 +54,7 @@ type SecretController interface {
 }
 
 type SecretInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*v1.Secret) (*v1.Secret, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.Secret, error)
 	Get(name string, opts metav1.GetOptions) (*v1.Secret, error)
@@ -179,11 +179,11 @@ func (s *secretClient) Controller() SecretController {
 type secretClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   SecretController
 }
 
-func (s *secretClient) ObjectClient() *clientbase.ObjectClient {
+func (s *secretClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

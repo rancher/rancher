@@ -3,8 +3,8 @@ package v1
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,7 +54,7 @@ type PodController interface {
 }
 
 type PodInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*v1.Pod) (*v1.Pod, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.Pod, error)
 	Get(name string, opts metav1.GetOptions) (*v1.Pod, error)
@@ -179,11 +179,11 @@ func (s *podClient) Controller() PodController {
 type podClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   PodController
 }
 
-func (s *podClient) ObjectClient() *clientbase.ObjectClient {
+func (s *podClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

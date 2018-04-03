@@ -3,8 +3,8 @@ package v1beta2
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/api/apps/v1beta2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,7 +54,7 @@ type StatefulSetController interface {
 }
 
 type StatefulSetInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*v1beta2.StatefulSet) (*v1beta2.StatefulSet, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1beta2.StatefulSet, error)
 	Get(name string, opts metav1.GetOptions) (*v1beta2.StatefulSet, error)
@@ -179,11 +179,11 @@ func (s *statefulSetClient) Controller() StatefulSetController {
 type statefulSetClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   StatefulSetController
 }
 
-func (s *statefulSetClient) ObjectClient() *clientbase.ObjectClient {
+func (s *statefulSetClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

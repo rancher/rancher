@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/restwatch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
@@ -64,7 +64,7 @@ type PodSecurityPoliciesGetter interface {
 }
 
 func (c *Client) PodSecurityPolicies(namespace string) PodSecurityPolicyInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &PodSecurityPolicyResource, PodSecurityPolicyGroupVersionKind, podSecurityPolicyFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &PodSecurityPolicyResource, PodSecurityPolicyGroupVersionKind, podSecurityPolicyFactory{})
 	return &podSecurityPolicyClient{
 		ns:           namespace,
 		client:       c,
@@ -77,7 +77,7 @@ type IngressesGetter interface {
 }
 
 func (c *Client) Ingresses(namespace string) IngressInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &IngressResource, IngressGroupVersionKind, ingressFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &IngressResource, IngressGroupVersionKind, ingressFactory{})
 	return &ingressClient{
 		ns:           namespace,
 		client:       c,

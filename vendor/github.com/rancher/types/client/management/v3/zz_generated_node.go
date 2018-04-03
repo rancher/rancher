@@ -17,6 +17,7 @@ const (
 	NodeFieldCustomConfig         = "customConfig"
 	NodeFieldDescription          = "description"
 	NodeFieldEtcd                 = "etcd"
+	NodeFieldExternalIPAddress    = "externalIpAddress"
 	NodeFieldHostname             = "hostname"
 	NodeFieldIPAddress            = "ipAddress"
 	NodeFieldImported             = "imported"
@@ -61,6 +62,7 @@ type Node struct {
 	CustomConfig         *CustomConfig             `json:"customConfig,omitempty" yaml:"customConfig,omitempty"`
 	Description          string                    `json:"description,omitempty" yaml:"description,omitempty"`
 	Etcd                 bool                      `json:"etcd,omitempty" yaml:"etcd,omitempty"`
+	ExternalIPAddress    string                    `json:"externalIpAddress,omitempty" yaml:"externalIpAddress,omitempty"`
 	Hostname             string                    `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	IPAddress            string                    `json:"ipAddress,omitempty" yaml:"ipAddress,omitempty"`
 	Imported             bool                      `json:"imported,omitempty" yaml:"imported,omitempty"`

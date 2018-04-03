@@ -58,6 +58,10 @@ func (u *urlBuilder) Link(linkName string, resource *types.RawResource) string {
 		return ""
 	}
 
+	if self, ok := resource.Links["self"]; ok {
+		return self + "/" + strings.ToLower(linkName)
+	}
+
 	return u.constructBasicURL(resource.Schema.Version, resource.Schema.PluralName, resource.ID, strings.ToLower(linkName))
 }
 

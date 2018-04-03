@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/restwatch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
@@ -97,7 +97,7 @@ type ServiceAccountTokensGetter interface {
 }
 
 func (c *Client) ServiceAccountTokens(namespace string) ServiceAccountTokenInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &ServiceAccountTokenResource, ServiceAccountTokenGroupVersionKind, serviceAccountTokenFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ServiceAccountTokenResource, ServiceAccountTokenGroupVersionKind, serviceAccountTokenFactory{})
 	return &serviceAccountTokenClient{
 		ns:           namespace,
 		client:       c,
@@ -110,7 +110,7 @@ type DockerCredentialsGetter interface {
 }
 
 func (c *Client) DockerCredentials(namespace string) DockerCredentialInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &DockerCredentialResource, DockerCredentialGroupVersionKind, dockerCredentialFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &DockerCredentialResource, DockerCredentialGroupVersionKind, dockerCredentialFactory{})
 	return &dockerCredentialClient{
 		ns:           namespace,
 		client:       c,
@@ -123,7 +123,7 @@ type CertificatesGetter interface {
 }
 
 func (c *Client) Certificates(namespace string) CertificateInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &CertificateResource, CertificateGroupVersionKind, certificateFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &CertificateResource, CertificateGroupVersionKind, certificateFactory{})
 	return &certificateClient{
 		ns:           namespace,
 		client:       c,
@@ -136,7 +136,7 @@ type BasicAuthsGetter interface {
 }
 
 func (c *Client) BasicAuths(namespace string) BasicAuthInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &BasicAuthResource, BasicAuthGroupVersionKind, basicAuthFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &BasicAuthResource, BasicAuthGroupVersionKind, basicAuthFactory{})
 	return &basicAuthClient{
 		ns:           namespace,
 		client:       c,
@@ -149,7 +149,7 @@ type SSHAuthsGetter interface {
 }
 
 func (c *Client) SSHAuths(namespace string) SSHAuthInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &SSHAuthResource, SSHAuthGroupVersionKind, sshAuthFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &SSHAuthResource, SSHAuthGroupVersionKind, sshAuthFactory{})
 	return &sshAuthClient{
 		ns:           namespace,
 		client:       c,
@@ -162,7 +162,7 @@ type NamespacedServiceAccountTokensGetter interface {
 }
 
 func (c *Client) NamespacedServiceAccountTokens(namespace string) NamespacedServiceAccountTokenInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &NamespacedServiceAccountTokenResource, NamespacedServiceAccountTokenGroupVersionKind, namespacedServiceAccountTokenFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &NamespacedServiceAccountTokenResource, NamespacedServiceAccountTokenGroupVersionKind, namespacedServiceAccountTokenFactory{})
 	return &namespacedServiceAccountTokenClient{
 		ns:           namespace,
 		client:       c,
@@ -175,7 +175,7 @@ type NamespacedDockerCredentialsGetter interface {
 }
 
 func (c *Client) NamespacedDockerCredentials(namespace string) NamespacedDockerCredentialInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &NamespacedDockerCredentialResource, NamespacedDockerCredentialGroupVersionKind, namespacedDockerCredentialFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &NamespacedDockerCredentialResource, NamespacedDockerCredentialGroupVersionKind, namespacedDockerCredentialFactory{})
 	return &namespacedDockerCredentialClient{
 		ns:           namespace,
 		client:       c,
@@ -188,7 +188,7 @@ type NamespacedCertificatesGetter interface {
 }
 
 func (c *Client) NamespacedCertificates(namespace string) NamespacedCertificateInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &NamespacedCertificateResource, NamespacedCertificateGroupVersionKind, namespacedCertificateFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &NamespacedCertificateResource, NamespacedCertificateGroupVersionKind, namespacedCertificateFactory{})
 	return &namespacedCertificateClient{
 		ns:           namespace,
 		client:       c,
@@ -201,7 +201,7 @@ type NamespacedBasicAuthsGetter interface {
 }
 
 func (c *Client) NamespacedBasicAuths(namespace string) NamespacedBasicAuthInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &NamespacedBasicAuthResource, NamespacedBasicAuthGroupVersionKind, namespacedBasicAuthFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &NamespacedBasicAuthResource, NamespacedBasicAuthGroupVersionKind, namespacedBasicAuthFactory{})
 	return &namespacedBasicAuthClient{
 		ns:           namespace,
 		client:       c,
@@ -214,7 +214,7 @@ type NamespacedSSHAuthsGetter interface {
 }
 
 func (c *Client) NamespacedSSHAuths(namespace string) NamespacedSSHAuthInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &NamespacedSSHAuthResource, NamespacedSSHAuthGroupVersionKind, namespacedSshAuthFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &NamespacedSSHAuthResource, NamespacedSSHAuthGroupVersionKind, namespacedSshAuthFactory{})
 	return &namespacedSshAuthClient{
 		ns:           namespace,
 		client:       c,
@@ -227,7 +227,7 @@ type WorkloadsGetter interface {
 }
 
 func (c *Client) Workloads(namespace string) WorkloadInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &WorkloadResource, WorkloadGroupVersionKind, workloadFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &WorkloadResource, WorkloadGroupVersionKind, workloadFactory{})
 	return &workloadClient{
 		ns:           namespace,
 		client:       c,
@@ -240,7 +240,7 @@ type AppsGetter interface {
 }
 
 func (c *Client) Apps(namespace string) AppInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &AppResource, AppGroupVersionKind, appFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &AppResource, AppGroupVersionKind, appFactory{})
 	return &appClient{
 		ns:           namespace,
 		client:       c,
@@ -253,7 +253,7 @@ type NamespaceComposeConfigsGetter interface {
 }
 
 func (c *Client) NamespaceComposeConfigs(namespace string) NamespaceComposeConfigInterface {
-	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &NamespaceComposeConfigResource, NamespaceComposeConfigGroupVersionKind, namespaceComposeConfigFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &NamespaceComposeConfigResource, NamespaceComposeConfigGroupVersionKind, namespaceComposeConfigFactory{})
 	return &namespaceComposeConfigClient{
 		ns:           namespace,
 		client:       c,

@@ -3,8 +3,8 @@ package v3
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -52,7 +52,7 @@ type GlobalRoleBindingController interface {
 }
 
 type GlobalRoleBindingInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*GlobalRoleBinding) (*GlobalRoleBinding, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*GlobalRoleBinding, error)
 	Get(name string, opts metav1.GetOptions) (*GlobalRoleBinding, error)
@@ -177,11 +177,11 @@ func (s *globalRoleBindingClient) Controller() GlobalRoleBindingController {
 type globalRoleBindingClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   GlobalRoleBindingController
 }
 
-func (s *globalRoleBindingClient) ObjectClient() *clientbase.ObjectClient {
+func (s *globalRoleBindingClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

@@ -3,8 +3,8 @@ package v3
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -53,7 +53,7 @@ type SourceCodeCredentialController interface {
 }
 
 type SourceCodeCredentialInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*SourceCodeCredential) (*SourceCodeCredential, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*SourceCodeCredential, error)
 	Get(name string, opts metav1.GetOptions) (*SourceCodeCredential, error)
@@ -178,11 +178,11 @@ func (s *sourceCodeCredentialClient) Controller() SourceCodeCredentialController
 type sourceCodeCredentialClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   SourceCodeCredentialController
 }
 
-func (s *sourceCodeCredentialClient) ObjectClient() *clientbase.ObjectClient {
+func (s *sourceCodeCredentialClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

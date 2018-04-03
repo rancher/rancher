@@ -3,8 +3,8 @@ package v3
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -52,7 +52,7 @@ type DynamicSchemaController interface {
 }
 
 type DynamicSchemaInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*DynamicSchema) (*DynamicSchema, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*DynamicSchema, error)
 	Get(name string, opts metav1.GetOptions) (*DynamicSchema, error)
@@ -177,11 +177,11 @@ func (s *dynamicSchemaClient) Controller() DynamicSchemaController {
 type dynamicSchemaClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   DynamicSchemaController
 }
 
-func (s *dynamicSchemaClient) ObjectClient() *clientbase.ObjectClient {
+func (s *dynamicSchemaClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

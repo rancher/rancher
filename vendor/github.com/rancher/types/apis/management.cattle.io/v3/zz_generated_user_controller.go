@@ -3,8 +3,8 @@ package v3
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -52,7 +52,7 @@ type UserController interface {
 }
 
 type UserInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*User) (*User, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*User, error)
 	Get(name string, opts metav1.GetOptions) (*User, error)
@@ -177,11 +177,11 @@ func (s *userClient) Controller() UserController {
 type userClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   UserController
 }
 
-func (s *userClient) ObjectClient() *clientbase.ObjectClient {
+func (s *userClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

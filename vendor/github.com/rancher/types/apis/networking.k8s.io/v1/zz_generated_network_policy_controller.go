@@ -3,8 +3,8 @@ package v1
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,7 +54,7 @@ type NetworkPolicyController interface {
 }
 
 type NetworkPolicyInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*v1.NetworkPolicy) (*v1.NetworkPolicy, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.NetworkPolicy, error)
 	Get(name string, opts metav1.GetOptions) (*v1.NetworkPolicy, error)
@@ -179,11 +179,11 @@ func (s *networkPolicyClient) Controller() NetworkPolicyController {
 type networkPolicyClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   NetworkPolicyController
 }
 
-func (s *networkPolicyClient) ObjectClient() *clientbase.ObjectClient {
+func (s *networkPolicyClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 

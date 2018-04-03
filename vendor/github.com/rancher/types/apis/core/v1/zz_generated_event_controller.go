@@ -3,8 +3,8 @@ package v1
 import (
 	"context"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/objectclient"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,7 +53,7 @@ type EventController interface {
 }
 
 type EventInterface interface {
-	ObjectClient() *clientbase.ObjectClient
+	ObjectClient() *objectclient.ObjectClient
 	Create(*v1.Event) (*v1.Event, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.Event, error)
 	Get(name string, opts metav1.GetOptions) (*v1.Event, error)
@@ -178,11 +178,11 @@ func (s *eventClient) Controller() EventController {
 type eventClient struct {
 	client       *Client
 	ns           string
-	objectClient *clientbase.ObjectClient
+	objectClient *objectclient.ObjectClient
 	controller   EventController
 }
 
-func (s *eventClient) ObjectClient() *clientbase.ObjectClient {
+func (s *eventClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 
