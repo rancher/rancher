@@ -21,6 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"net/http"
+	"strings"
 )
 
 type ClusterPipelineHandler struct {
@@ -267,7 +268,7 @@ func (h *ClusterPipelineHandler) authAddAccount(clusterPipeline *v3.ClusterPipel
 	if err != nil {
 		return nil, err
 	}
-	account.Name = fmt.Sprintf("%s-%s-%s", clusterPipeline.Spec.ClusterName, remoteType, account.Spec.LoginName)
+	account.Name = strings.ToLower(fmt.Sprintf("%s-%s-%s", clusterPipeline.Spec.ClusterName, remoteType, account.Spec.LoginName))
 	account.Namespace = userID
 	account.Spec.UserName = userID
 	account.Spec.ClusterName = clusterPipeline.Spec.ClusterName
