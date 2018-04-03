@@ -109,6 +109,7 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.Links["self"] = apiContext.URLBuilder.ResourceLinkByID(workloadSchema, workloadID)
 	resource.Links["remove"] = apiContext.URLBuilder.ResourceLinkByID(workloadSchema, workloadID)
 	resource.Links["update"] = apiContext.URLBuilder.ResourceLinkByID(workloadSchema, workloadID)
+	resource.Links["yaml"] = apiContext.URLBuilder.ResourceLinkByID(workloadSchema, workloadID) + "/yaml"
 }
 
 func DeploymentFormatter(apiContext *types.APIContext, resource *types.RawResource) {
