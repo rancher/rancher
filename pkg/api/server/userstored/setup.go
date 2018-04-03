@@ -6,6 +6,7 @@ import (
 
 	"github.com/rancher/norman/store/subtype"
 	"github.com/rancher/norman/types"
+	namespacecustom "github.com/rancher/rancher/pkg/api/customization/namespace"
 	"github.com/rancher/rancher/pkg/api/customization/yaml"
 	"github.com/rancher/rancher/pkg/api/store/cert"
 	"github.com/rancher/rancher/pkg/api/store/ingress"
@@ -16,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/store/service"
 	"github.com/rancher/rancher/pkg/api/store/workload"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	clusterschema "github.com/rancher/types/apis/cluster.cattle.io/v3/schema"
 	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	clusterClient "github.com/rancher/types/client/cluster/v3"
 	"github.com/rancher/types/client/project/v3"
@@ -48,6 +50,7 @@ func Setup(ctx context.Context, mgmt *config.ScaledContext, clusterManager *clus
 	Secret(mgmt, schemas)
 	Service(schemas)
 	Workload(schemas, clusterManager)
+	Namespace(schemas, clusterManager)
 
 	SetProjectID(schemas, clusterManager, k8sProxy)
 
@@ -76,6 +79,12 @@ func SetProjectID(schemas *types.Schemas, clusterManager *clustermanager.Manager
 		schema.Formatter = yaml.NewFormatter(schema.Formatter)
 		schema.LinkHandler = yaml.NewLinkHandler(k8sProxy, clusterManager, schema.LinkHandler)
 	}
+}
+
+func Namespace(schemas *types.Schemas, manager *clustermanager.Manager) {
+	namespaceSchema := schemas.Schema(&clusterschema.Version, "namespace")
+	namespaceSchema.LinkHandler = namespacecustom.NewLinkHandler(namespaceSchema.LinkHandler, manager)
+	namespaceSchema.Formatter = yaml.NewFormatter(namespaceSchema.Formatter)
 }
 
 func Workload(schemas *types.Schemas, clusterManager *clustermanager.Manager) {
