@@ -14,6 +14,7 @@ def test_node_fields(mc):
         'hostname': 'r',
         'info': 'r',
         'ipAddress': 'r',
+        'externalIpAddress': 'r',
         'limits': 'r',
         'publicEndpoints': 'r',
         'nodePoolId': 'r',

@@ -121,6 +121,24 @@ func getPublicEndpointsFromAnnotations(annotations map[string]string) []v3.Publi
 	return eps
 }
 
+func getEndpointNodeIP(node *managementv3.Node) string {
+	externalIP := ""
+	internalIP := ""
+	for _, ip := range node.Status.InternalNodeStatus.Addresses {
+		if ip.Type == "ExternalIP" && ip.Address != "" {
+			externalIP = ip.Address
+			break
+		} else if ip.Type == "InternalIP" && ip.Address != "" {
+			internalIP = ip.Address
+		}
+	}
+
+	if externalIP != "" {
+		return externalIP
+	}
+	return internalIP
+}
+
 func convertServiceToPublicEndpoints(svc *corev1.Service, clusterName string, node *managementv3.Node) ([]v3.PublicEndpoint, error) {
 	var eps []v3.PublicEndpoint
 	if svc.DeletionTimestamp != nil {
@@ -129,27 +147,15 @@ func convertServiceToPublicEndpoints(svc *corev1.Service, clusterName string, no
 	if !(svc.Spec.Type == "NodePort" || svc.Spec.Type == "LoadBalancer") {
 		return eps, nil
 	}
-	var address string
-	var nodeName string
-
-	nodePort := svc.Spec.Type == "NodePort"
-
+	address := ""
+	nodeName := ""
 	if node != nil {
-		if val, ok := node.Status.NodeAnnotations["alpha.kubernetes.io/provided-node-ip"]; ok {
-			nodeIP := string(val)
-			if nodeIP == "" {
-				logrus.Warnf("Node [%s] has no ip address set", node.Name)
-			} else {
-				address = nodeIP
-			}
-		}
+		address = getEndpointNodeIP(node)
 		nodeName = fmt.Sprintf("%s:%s", clusterName, node.Name)
-	} else if nodePort {
-		address = ""
 	}
 
 	svcName := fmt.Sprintf("%s:%s", svc.Namespace, svc.Name)
-	if nodePort {
+	if svc.Spec.Type == "NodePort" {
 		for _, port := range svc.Spec.Ports {
 			if port.NodePort == 0 {
 				continue
@@ -209,10 +215,7 @@ func convertHostPortToEndpoint(pod *corev1.Pod, clusterName string, node *manage
 			if p.HostPort == 0 {
 				continue
 			}
-			address := p.HostIP
-			if address == "" {
-				address = pod.Status.HostIP
-			}
+			address := getEndpointNodeIP(node)
 			p := v3.PublicEndpoint{
 				NodeName:  fmt.Sprintf("%s:%s", clusterName, node.Name),
 				Addresses: []string{address},
