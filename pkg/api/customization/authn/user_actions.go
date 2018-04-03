@@ -29,28 +29,25 @@ type Handler struct {
 }
 
 func (h *Handler) Actions(actionName string, action *types.Action, apiContext *types.APIContext) error {
-	resetFirstLogin := false
 	switch actionName {
 	case "changepassword":
-		err := h.changePassword(actionName, action, apiContext)
-		if err == nil {
-			resetFirstLogin = true
+		if err := h.changePassword(actionName, action, apiContext); err != nil {
+			return err
 		}
-		return err
 	case "setpassword":
-		err := h.setPassword(actionName, action, apiContext)
-		if err == nil {
-			resetFirstLogin = true
+		if err := h.setPassword(actionName, action, apiContext); err != nil {
+			return err
 		}
-		return err
+	default:
+		return errors.Errorf("bad action %v", actionName)
 	}
 
-	if resetFirstLogin && strings.EqualFold(settings.FirstLogin.Get(), "true") {
+	if !strings.EqualFold(settings.FirstLogin.Get(), "false") {
 		if err := settings.FirstLogin.Set("false"); err != nil {
 			return err
 		}
 	}
-	return errors.Errorf("bad action %v", actionName)
+	return nil
 }
 
 func (h *Handler) changePassword(actionName string, action *types.Action, request *types.APIContext) error {
