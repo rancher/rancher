@@ -76,6 +76,11 @@ func runProcess(ctx context.Context, name string, p v3.Process, start bool) erro
 	newContainer, err := c.ContainerCreate(ctx, config, hostConfig, nil, name)
 	if client.IsErrImageNotFound(err) {
 		var output io.ReadCloser
+		imagePullOptions := types.ImagePullOptions{}
+		if p.ImageRegistryAuthConfig != "" {
+			imagePullOptions.RegistryAuth = p.ImageRegistryAuthConfig
+			imagePullOptions.PrivilegeFunc = func() (string, error) { return p.ImageRegistryAuthConfig, nil }
+		}
 		output, err = c.ImagePull(ctx, config.Image, types.ImagePullOptions{})
 		if err != nil {
 			return err
