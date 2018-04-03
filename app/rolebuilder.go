@@ -6,7 +6,7 @@ import (
 	"reflect"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/clientbase"
+	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -171,7 +171,7 @@ type buildFnc func(thisRB *roleBuilder) (string, runtime.Object)
 type compareAndModifyFnc func(have runtime.Object, want runtime.Object) (bool, runtime.Object, error)
 type gatherExistingFnc func() (map[string]runtime.Object, error)
 
-func (rb *roleBuilder) reconcile(build buildFnc, gatherExisting gatherExistingFnc, compareAndModify compareAndModifyFnc, client *clientbase.ObjectClient) error {
+func (rb *roleBuilder) reconcile(build buildFnc, gatherExisting gatherExistingFnc, compareAndModify compareAndModifyFnc, client *objectclient.ObjectClient) error {
 	current := rb.first()
 	builtRoles := map[string]runtime.Object{}
 	for current != nil {

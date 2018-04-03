@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/condition"
+	"github.com/rancher/norman/objectclient"
 	typescorev1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -18,16 +18,16 @@ import (
 
 type mgr struct {
 	pnpLister v3.ProjectNetworkPolicyLister
-	pnpClient *clientbase.ObjectClient
+	pnpClient *objectclient.ObjectClient
 	nsLister  typescorev1.NamespaceLister
-	nsClient  *clientbase.ObjectClient
+	nsClient  *objectclient.ObjectClient
 	K8sClient kubernetes.Interface
 }
 
 type projectSyncer struct {
 	pnpLister  v3.ProjectNetworkPolicyLister
-	pnpClient  *clientbase.ObjectClient
-	projClient *clientbase.ObjectClient
+	pnpClient  *objectclient.ObjectClient
+	projClient *objectclient.ObjectClient
 }
 
 // Sync is responsible for creating a default ProjectNetworkPolicy for

@@ -3,8 +3,8 @@ package clustergc
 import (
 	"strings"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -59,7 +59,7 @@ func (c *gcLifecycle) Updated(obj *v3.Cluster) (*v3.Cluster, error) {
 	return nil, nil
 }
 
-func cleanFinalizers(clusterName string, object runtime.Object, client *clientbase.ObjectClient) error {
+func cleanFinalizers(clusterName string, object runtime.Object, client *objectclient.ObjectClient) error {
 	object = object.DeepCopyObject()
 	modified := false
 	md, err := meta.Accessor(object)

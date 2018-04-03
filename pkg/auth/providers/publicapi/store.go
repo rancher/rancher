@@ -3,8 +3,8 @@ package publicapi
 import (
 	"strings"
 
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/httperror"
+	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/store/empty"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers"
@@ -23,7 +23,7 @@ func setAuthProvidersStore(schema *types.Schema, apiContext *config.ScaledContex
 
 type authProvidersStore struct {
 	empty.Store
-	authConfigsRaw clientbase.GenericClient
+	authConfigsRaw objectclient.GenericClient
 }
 
 func (s *authProvidersStore) ByID(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
