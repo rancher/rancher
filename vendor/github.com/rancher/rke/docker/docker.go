@@ -159,31 +159,16 @@ func localImageExists(ctx context.Context, dClient *client.Client, hostname stri
 }
 
 func pullImage(ctx context.Context, dClient *client.Client, hostname string, containerImage string, prsMap map[string]v3.PrivateRegistry) error {
-
 	pullOptions := types.ImagePullOptions{}
-	containerNamed, err := ref.ParseNormalizedNamed(containerImage)
+
+	regAuth, prURL, err := GetImageRegistryConfig(containerImage, prsMap)
 	if err != nil {
 		return err
 	}
-
-	regURL := ref.Domain(containerNamed)
-	if pr, ok := prsMap[regURL]; ok {
-		// We do this if we have some docker.io login information
-		regAuth, err := getRegistryAuth(pr)
-		if err != nil {
-			return err
-		}
-		if pr.URL == DockerRegistryURL {
-			pullOptions.RegistryAuth = regAuth
-		} else {
-			// We have a registry, but it's not docker.io
-			// this could be public or private, ImagePull() can handle it
-			// if we provide a PrivilegeFunc
-
-			pullOptions.PrivilegeFunc = tryRegistryAuth(pr)
-			pullOptions.RegistryAuth = regAuth
-		}
+	if regAuth != "" && prURL == DockerRegistryURL {
+		pullOptions.PrivilegeFunc = tryRegistryAuth(prsMap[prURL])
 	}
+	pullOptions.RegistryAuth = regAuth
 
 	out, err := dClient.ImagePull(ctx, containerImage, pullOptions)
 	if err != nil {
@@ -359,4 +344,18 @@ func getRegistryAuth(pr v3.PrivateRegistry) (string, error) {
 		return "", err
 	}
 	return base64.URLEncoding.EncodeToString(encodedJSON), nil
+}
+
+func GetImageRegistryConfig(image string, prsMap map[string]v3.PrivateRegistry) (string, string, error) {
+	namedImage, err := ref.ParseNormalizedNamed(image)
+	if err != nil {
+		return "", "", err
+	}
+	regURL := ref.Domain(namedImage)
+	if pr, ok := prsMap[regURL]; ok {
+		// We do this if we have some docker.io login information
+		regAuth, err := getRegistryAuth(pr)
+		return regAuth, pr.URL, err
+	}
+	return "", "", nil
 }

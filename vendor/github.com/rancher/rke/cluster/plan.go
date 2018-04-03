@@ -8,7 +8,9 @@ import (
 
 	b64 "encoding/base64"
 
+	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
+	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -63,6 +65,11 @@ func BuildRKEConfigNodePlan(ctx context.Context, myCluster *Cluster, host *hosts
 		Processes:  processes,
 		PortChecks: portChecks,
 		Files:      []v3.File{cloudConfig},
+		Annotations: map[string]string{
+			k8s.ExternalAddressAnnotation: host.Address,
+			k8s.InternalAddressAnnotation: host.InternalAddress,
+		},
+		Labels: host.Labels,
 	}
 }
 
@@ -147,16 +154,19 @@ func (c *Cluster) BuildKubeAPIProcess() v3.Process {
 	healthCheck := v3.HealthCheck{
 		URL: services.GetHealthCheckURL(true, services.KubeAPIPort),
 	}
+	registryAuthConfig, _, _ := docker.GetImageRegistryConfig(c.Services.KubeAPI.Image, c.PrivateRegistriesMap)
+
 	return v3.Process{
-		Name:          services.KubeAPIContainerName,
-		Command:       Command,
-		Args:          args,
-		VolumesFrom:   VolumesFrom,
-		Binds:         Binds,
-		NetworkMode:   "host",
-		RestartPolicy: "always",
-		Image:         c.Services.KubeAPI.Image,
-		HealthCheck:   healthCheck,
+		Name:                    services.KubeAPIContainerName,
+		Command:                 Command,
+		Args:                    args,
+		VolumesFrom:             VolumesFrom,
+		Binds:                   Binds,
+		NetworkMode:             "host",
+		RestartPolicy:           "always",
+		Image:                   c.Services.KubeAPI.Image,
+		HealthCheck:             healthCheck,
+		ImageRegistryAuthConfig: registryAuthConfig,
 	}
 }
 
@@ -213,16 +223,19 @@ func (c *Cluster) BuildKubeControllerProcess() v3.Process {
 	healthCheck := v3.HealthCheck{
 		URL: services.GetHealthCheckURL(false, services.KubeControllerPort),
 	}
+
+	registryAuthConfig, _, _ := docker.GetImageRegistryConfig(c.Services.KubeController.Image, c.PrivateRegistriesMap)
 	return v3.Process{
-		Name:          services.KubeControllerContainerName,
-		Command:       Command,
-		Args:          args,
-		VolumesFrom:   VolumesFrom,
-		Binds:         Binds,
-		NetworkMode:   "host",
-		RestartPolicy: "always",
-		Image:         c.Services.KubeController.Image,
-		HealthCheck:   healthCheck,
+		Name:                    services.KubeControllerContainerName,
+		Command:                 Command,
+		Args:                    args,
+		VolumesFrom:             VolumesFrom,
+		Binds:                   Binds,
+		NetworkMode:             "host",
+		RestartPolicy:           "always",
+		Image:                   c.Services.KubeController.Image,
+		HealthCheck:             healthCheck,
+		ImageRegistryAuthConfig: registryAuthConfig,
 	}
 }
 
@@ -298,17 +311,20 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host) v3.Process {
 	healthCheck := v3.HealthCheck{
 		URL: services.GetHealthCheckURL(true, services.KubeletPort),
 	}
+	registryAuthConfig, _, _ := docker.GetImageRegistryConfig(c.Services.Kubelet.Image, c.PrivateRegistriesMap)
+
 	return v3.Process{
-		Name:          services.KubeletContainerName,
-		Command:       Command,
-		VolumesFrom:   VolumesFrom,
-		Binds:         Binds,
-		NetworkMode:   "host",
-		RestartPolicy: "always",
-		Image:         c.Services.Kubelet.Image,
-		PidMode:       "host",
-		Privileged:    true,
-		HealthCheck:   healthCheck,
+		Name:                    services.KubeletContainerName,
+		Command:                 Command,
+		VolumesFrom:             VolumesFrom,
+		Binds:                   Binds,
+		NetworkMode:             "host",
+		RestartPolicy:           "always",
+		Image:                   c.Services.Kubelet.Image,
+		PidMode:                 "host",
+		Privileged:              true,
+		HealthCheck:             healthCheck,
+		ImageRegistryAuthConfig: registryAuthConfig,
 	}
 }
 
@@ -347,6 +363,7 @@ func (c *Cluster) BuildKubeProxyProcess() v3.Process {
 	healthCheck := v3.HealthCheck{
 		URL: services.GetHealthCheckURL(false, services.KubeproxyPort),
 	}
+	registryAuthConfig, _, _ := docker.GetImageRegistryConfig(c.Services.Kubeproxy.Image, c.PrivateRegistriesMap)
 	return v3.Process{
 		Name:          services.KubeproxyContainerName,
 		Command:       Command,
@@ -358,6 +375,7 @@ func (c *Cluster) BuildKubeProxyProcess() v3.Process {
 		Privileged:    true,
 		HealthCheck:   healthCheck,
 		Image:         c.Services.Kubeproxy.Image,
+		ImageRegistryAuthConfig: registryAuthConfig,
 	}
 }
 
@@ -371,6 +389,7 @@ func (c *Cluster) BuildProxyProcess() v3.Process {
 	}
 	Env := []string{fmt.Sprintf("%s=%s", services.NginxProxyEnvName, nginxProxyEnv)}
 
+	registryAuthConfig, _, _ := docker.GetImageRegistryConfig(c.SystemImages.NginxProxy, c.PrivateRegistriesMap)
 	return v3.Process{
 		Name:          services.NginxProxyContainerName,
 		Env:           Env,
@@ -379,6 +398,7 @@ func (c *Cluster) BuildProxyProcess() v3.Process {
 		RestartPolicy: "always",
 		HealthCheck:   v3.HealthCheck{},
 		Image:         c.SystemImages.NginxProxy,
+		ImageRegistryAuthConfig: registryAuthConfig,
 	}
 }
 
@@ -418,24 +438,28 @@ func (c *Cluster) BuildSchedulerProcess() v3.Process {
 	healthCheck := v3.HealthCheck{
 		URL: services.GetHealthCheckURL(false, services.SchedulerPort),
 	}
+	registryAuthConfig, _, _ := docker.GetImageRegistryConfig(c.Services.Scheduler.Image, c.PrivateRegistriesMap)
 	return v3.Process{
-		Name:          services.SchedulerContainerName,
-		Command:       Command,
-		Binds:         Binds,
-		VolumesFrom:   VolumesFrom,
-		NetworkMode:   "host",
-		RestartPolicy: "always",
-		Image:         c.Services.Scheduler.Image,
-		HealthCheck:   healthCheck,
+		Name:                    services.SchedulerContainerName,
+		Command:                 Command,
+		Binds:                   Binds,
+		VolumesFrom:             VolumesFrom,
+		NetworkMode:             "host",
+		RestartPolicy:           "always",
+		Image:                   c.Services.Scheduler.Image,
+		HealthCheck:             healthCheck,
+		ImageRegistryAuthConfig: registryAuthConfig,
 	}
 }
 
 func (c *Cluster) BuildSidecarProcess() v3.Process {
+	registryAuthConfig, _, _ := docker.GetImageRegistryConfig(c.SystemImages.KubernetesServicesSidecar, c.PrivateRegistriesMap)
 	return v3.Process{
-		Name:        services.SidekickContainerName,
-		NetworkMode: "none",
-		Image:       c.SystemImages.KubernetesServicesSidecar,
-		HealthCheck: v3.HealthCheck{},
+		Name:                    services.SidekickContainerName,
+		NetworkMode:             "none",
+		Image:                   c.SystemImages.KubernetesServicesSidecar,
+		HealthCheck:             v3.HealthCheck{},
+		ImageRegistryAuthConfig: registryAuthConfig,
 	}
 }
 
@@ -497,14 +521,17 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host) v3
 	healthCheck := v3.HealthCheck{
 		URL: services.EtcdHealthCheckURL,
 	}
+	registryAuthConfig, _, _ := docker.GetImageRegistryConfig(c.Services.Etcd.Image, c.PrivateRegistriesMap)
+
 	return v3.Process{
-		Name:          services.EtcdContainerName,
-		Args:          args,
-		Binds:         Binds,
-		NetworkMode:   "host",
-		RestartPolicy: "always",
-		Image:         c.Services.Etcd.Image,
-		HealthCheck:   healthCheck,
+		Name:                    services.EtcdContainerName,
+		Args:                    args,
+		Binds:                   Binds,
+		NetworkMode:             "host",
+		RestartPolicy:           "always",
+		Image:                   c.Services.Etcd.Image,
+		HealthCheck:             healthCheck,
+		ImageRegistryAuthConfig: registryAuthConfig,
 	}
 }
 
