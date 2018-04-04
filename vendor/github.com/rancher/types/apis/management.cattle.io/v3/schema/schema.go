@@ -114,11 +114,9 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
 		AddMapperForType(&Version, v3.Cluster{},
 			&m.Embed{Field: "status"},
-			m.DisplayName{},
 		).
 		AddMapperForType(&Version, v3.ClusterStatus{},
 			m.Drop{Field: "serviceAccountToken"},
-			m.Drop{Field: "clusterName"},
 		).
 		AddMapperForType(&Version, v3.ClusterEvent{}, &m.Move{
 			From: "type",
