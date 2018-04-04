@@ -12,11 +12,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func ConfigClient(ctx context.Context, url string, header http.Header) error {
-	client := &http.Client{
+var (
+	client = &http.Client{
 		Timeout: 300 * time.Second,
 	}
+)
 
+func ConfigClient(ctx context.Context, url string, header http.Header) error {
 	for {
 		nc, err := getConfig(client, url, header)
 		if err != nil {

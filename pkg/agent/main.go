@@ -14,7 +14,6 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
-	"github.com/rancher/norman/signal"
 	"github.com/rancher/rancher/pkg/agent/cluster"
 	"github.com/rancher/rancher/pkg/agent/node"
 	"github.com/rancher/rancher/pkg/remotedialer"
@@ -112,8 +111,6 @@ func cleanup(ctx context.Context) error {
 }
 
 func run() error {
-	ctx := signal.SigTermCancelContext(context.Background())
-
 	params, err := getParams()
 	if err != nil {
 		return err
@@ -139,16 +136,36 @@ func run() error {
 		return err
 	}
 
-	onConnect := func() error {
+	onConnect := func(ctx context.Context) error {
 		connected()
 		connectConfig := fmt.Sprintf("https://%s/v3/connect/config", serverURL.Host)
-		err := rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers)
-		if err != nil {
+		if err := rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers); err != nil {
 			return err
 		}
-		if !isCluster() {
-			return cleanup(context.Background())
+
+		if isCluster() {
+			return nil
 		}
+
+		if err := cleanup(context.Background()); err != nil {
+			return err
+		}
+
+		go func() {
+			logrus.Infof("Starting plan monitor")
+			for {
+				select {
+				case <-time.After(2 * time.Minute):
+					err := rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers)
+					if err != nil {
+						logrus.Errorf("failed to check plan: %v", err)
+					}
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+
 		return nil
 	}
 
