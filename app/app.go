@@ -129,9 +129,5 @@ func addData(management *config.ManagementContext, cfg Config) error {
 		return err
 	}
 
-	if err := addCatalogs(management); err != nil {
-		return err
-	}
-
 	return addMachineDrivers(management)
 }
