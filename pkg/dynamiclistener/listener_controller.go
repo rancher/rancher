@@ -13,8 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-type HandlerGetter func() http.Handler
-
 type Controller struct {
 	listenConfig       v3.ListenConfigInterface
 	listenConfigLister v3.ListenConfigLister
@@ -23,7 +21,9 @@ type Controller struct {
 
 func Start(ctx context.Context, context *config.ScaledContext, httpPort, httpsPort int, handler http.Handler) {
 	c := &Controller{
-		server:             newServer(ctx, context.Management.ListenConfigs(""), handler, httpPort, httpsPort),
+		server: newServer(ctx, context.Management.ListenConfigs(""),
+			context.Management.ListenConfigs("").Controller().Lister(),
+			handler, httpPort, httpsPort),
 		listenConfig:       context.Management.ListenConfigs(""),
 		listenConfigLister: context.Management.ListenConfigs("").Controller().Lister(),
 	}

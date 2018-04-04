@@ -22,7 +22,6 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/acme/autocert"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/cert"
 )
 
@@ -35,6 +34,7 @@ type server struct {
 	sync.Mutex
 
 	listenConfigs       v3.ListenConfigInterface
+	listenConfigLister  v3.ListenConfigLister
 	handler             http.Handler
 	httpPort, httpsPort int
 	certs               map[string]*tls.Certificate
@@ -54,13 +54,15 @@ type server struct {
 	tosAll      bool
 }
 
-func newServer(ctx context.Context, listenConfigs v3.ListenConfigInterface, handler http.Handler, httpPort, httpsPort int) *server {
+func newServer(ctx context.Context, listenConfigs v3.ListenConfigInterface, listenConfigLister v3.ListenConfigLister,
+	handler http.Handler, httpPort, httpsPort int) *server {
 	s := &server{
-		listenConfigs: listenConfigs,
-		handler:       handler,
-		httpPort:      httpPort,
-		httpsPort:     httpsPort,
-		certs:         map[string]*tls.Certificate{},
+		listenConfigLister: listenConfigLister,
+		listenConfigs:      listenConfigs,
+		handler:            handler,
+		httpPort:           httpPort,
+		httpsPort:          httpsPort,
+		certs:              map[string]*tls.Certificate{},
 	}
 
 	s.ips, _ = lru.New(20)
@@ -74,7 +76,7 @@ func (s *server) updateIPs(savedIPs map[string]bool) map[string]bool {
 		return savedIPs
 	}
 
-	cfg, err := s.listenConfigs.Get(s.activeConfig.Name, v1.GetOptions{})
+	cfg, err := s.listenConfigLister.Get("", s.activeConfig.Name)
 	if err != nil {
 		return savedIPs
 	}
