@@ -114,6 +114,7 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 	for _, tempNode := range plan.Nodes {
 		if tempNode.Address == node.Status.NodeConfig.Address {
 			nc.Processes = tempNode.Processes
+			nc.Files = tempNode.Files
 			delete(nc.Processes, "etcd")
 			return nc, nil
 		}
