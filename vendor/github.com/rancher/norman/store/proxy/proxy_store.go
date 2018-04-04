@@ -117,7 +117,7 @@ func (p *Store) getUser(apiContext *types.APIContext) string {
 func (p *Store) doAuthed(apiContext *types.APIContext, request *rest.Request) rest.Result {
 	start := time.Now()
 	defer func() {
-		logrus.Debug("GET:", time.Now().Sub(start), p.resourcePlural)
+		logrus.Debug("GET: ", time.Now().Sub(start), p.resourcePlural)
 	}()
 
 	for _, header := range authHeaders {
@@ -166,7 +166,7 @@ func (p *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *ty
 	resultList := &unstructured.UnstructuredList{}
 	start := time.Now()
 	err = req.Do().Into(resultList)
-	logrus.Debug("LIST:", time.Now().Sub(start), p.resourcePlural)
+	logrus.Debug("LIST: ", time.Now().Sub(start), p.resourcePlural)
 	if err != nil {
 		return nil, err
 	}

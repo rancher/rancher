@@ -69,7 +69,7 @@ func BuildRKEConfigNodePlan(ctx context.Context, myCluster *Cluster, host *hosts
 			k8s.ExternalAddressAnnotation: host.Address,
 			k8s.InternalAddressAnnotation: host.InternalAddress,
 		},
-		Labels: host.Labels,
+		Labels: host.ToAddLabels,
 	}
 }
 

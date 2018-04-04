@@ -64,7 +64,7 @@ func NewGenericController(name string, genericClient Backend) GenericController 
 			ListFunc:  genericClient.List,
 			WatchFunc: genericClient.Watch,
 		},
-		genericClient.ObjectFactory().Object(), resyncPeriod, cache.Indexers{})
+		genericClient.ObjectFactory().Object(), resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
 	rl := workqueue.NewMaxOfRateLimiter(
 		workqueue.NewItemExponentialFailureRateLimiter(500*time.Millisecond, 1000*time.Second),
