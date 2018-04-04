@@ -51,24 +51,29 @@ func (m *Manager) update(catalog *v3.Catalog, templates []v3.Template, updateOnl
 	// templates is the one we should update, so for all the templates that were in existingTemplates
 	// 1. if it doesn't exist in templates, delete them
 	// 2. if it exists, update it
-	var errs []error
-	for name, existingTemplate := range existingTemplatesByName {
-		err := m.updateTemplate(name, existingTemplate, templatesByName, updateOnly)
-		if err != nil {
-			errs = append(errs, err)
-		}
-	}
+	// done: hack
+	// todo: remove hack
+	//var errs []error
+	//for name, existingTemplate := range existingTemplatesByName {
+	//	err := m.updateTemplate(name, existingTemplate, templatesByName, updateOnly)
+	//	if err != nil {
+	//		errs = append(errs, err)
+	//	}
+	//}
 
 	// for templates that exist in template but not in existingTemplates, we should create them
 	for name, template := range templatesByName {
 		err := m.createTemplate(name, template, existingTemplatesByName, catalog)
 		if err != nil {
-			errs = append(errs, err)
+			// done: hack
+			// todo: remove hack
+			logrus.Error(err)
+			//errs = append(errs, err)
 		}
 	}
-	if len(errs) > 0 {
-		return errors.Errorf("Multiple errors happens: %v", errs)
-	}
+	//if len(errs) > 0 {
+	//	return errors.Errorf("Multiple errors happens: %v", errs)
+	//}
 
 	v3.CatalogConditionRefreshed.True(catalog)
 	if _, err := m.catalogClient.Update(catalog); err != nil {
