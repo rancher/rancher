@@ -23,14 +23,14 @@ func NewLookup(namespaces v1.NamespaceInterface, secrets typedv1.SecretsGetter) 
 }
 
 func (r *BundleLookup) Lookup(cluster *v3.Cluster) (*Bundle, error) {
-	c, err := r.engineStore.Get(cluster.Status.ClusterName)
+	c, err := r.engineStore.Get(cluster.Name)
 	if err != nil {
 		return nil, err
 	}
 
 	certs, ok := c.Metadata["Certs"]
 	if !ok {
-		return nil, fmt.Errorf("waiting for certs to be generated for cluster %s", cluster.Status.ClusterName)
+		return nil, fmt.Errorf("waiting for certs to be generated for cluster %s", cluster.Name)
 	}
 
 	certMap, err := rkecerts.LoadString(certs)

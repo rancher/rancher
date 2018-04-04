@@ -19,7 +19,7 @@ func (p *Provisioner) driverCreate(cluster *v3.Cluster, spec v3.ClusterSpec) (ap
 		cluster = newCluster
 	}
 
-	return p.Driver.Create(ctx, cluster.Status.ClusterName, spec)
+	return p.Driver.Create(ctx, cluster.Name, spec)
 }
 
 func (p *Provisioner) driverUpdate(cluster *v3.Cluster, spec v3.ClusterSpec) (api string, token string, cert string, err error) {
@@ -38,7 +38,7 @@ func (p *Provisioner) driverUpdate(cluster *v3.Cluster, spec v3.ClusterSpec) (ap
 		cluster = newCluster
 	}
 
-	return p.Driver.Update(ctx, cluster.Status.ClusterName, spec)
+	return p.Driver.Update(ctx, cluster.Name, spec)
 }
 
 func (p *Provisioner) driverRemove(cluster *v3.Cluster) error {
@@ -52,7 +52,7 @@ func (p *Provisioner) driverRemove(cluster *v3.Cluster) error {
 			cluster = newCluster
 		}
 
-		return cluster, p.Driver.Remove(ctx, cluster.Status.ClusterName, spec)
+		return cluster, p.Driver.Remove(ctx, cluster.Name, spec)
 	})
 
 	return err
