@@ -55,7 +55,7 @@ func (s *Manager) CreateSystemAccount(cluster *v3.Cluster) error {
 }
 
 func (s *Manager) GetSystemUser(cluster *v3.Cluster) (*v3.User, error) {
-	return s.userManager.EnsureUser(fmt.Sprintf("system://%s", cluster.Name), "System account for Cluster "+cluster.Spec.DisplayName)
+	return s.userManager.EnsureUser(fmt.Sprintf("system://%s", cluster.Name), "System account for Cluster "+cluster.Name)
 }
 
 func (s *Manager) GetOrCreateSystemClusterToken(clusterName string) (string, error) {
