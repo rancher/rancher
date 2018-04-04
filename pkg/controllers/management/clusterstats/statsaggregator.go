@@ -119,7 +119,7 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 		v3.ClusterConditionNoMemoryPressure.False(cluster)
 	}
 
-	if !reflect.DeepEqual(origStatus, cluster.Status) {
+	if !reflect.DeepEqual(origStatus, &cluster.Status) {
 		userContext, err := s.ClusterManager.UserContext(cluster.Name)
 		if err == nil {
 			callWithTimeout(func() {
