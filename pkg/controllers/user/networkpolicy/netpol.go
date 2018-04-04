@@ -46,7 +46,7 @@ func (npmgr *netpolMgr) program(np *knetworkingv1.NetworkPolicy) error {
 		}
 	} else {
 		logrus.Debugf("netpolMgr: program: existing=%+v", existing)
-		if existing.DeletionTimestamp == nil && !reflect.DeepEqual(existing, np) {
+		if existing.DeletionTimestamp == nil && !reflect.DeepEqual(existing.Spec, np.Spec) {
 			logrus.Debugf("netpolMgr: program: about to update np=%+v", *np)
 			_, err = npmgr.npClient.NetworkPolicies(np.Namespace).Update(np)
 			if err != nil {
@@ -115,6 +115,9 @@ func (npmgr *netpolMgr) programNetworkPolicy(projectID string) error {
 							},
 						},
 					},
+				},
+				PolicyTypes: []knetworkingv1.PolicyType{
+					knetworkingv1.PolicyTypeIngress,
 				},
 			},
 		}
@@ -246,9 +249,12 @@ func (npmgr *netpolMgr) handleHostNetwork() error {
 		Spec: knetworkingv1.NetworkPolicySpec{
 			PodSelector: v1.LabelSelector{},
 			Ingress: []knetworkingv1.NetworkPolicyIngressRule{
-				knetworkingv1.NetworkPolicyIngressRule{
+				{
 					From: []knetworkingv1.NetworkPolicyPeer{},
 				},
+			},
+			PolicyTypes: []knetworkingv1.PolicyType{
+				knetworkingv1.PolicyTypeIngress,
 			},
 		},
 	}
@@ -271,8 +277,7 @@ func (npmgr *netpolMgr) handleHostNetwork() error {
 			continue
 		}
 		ipBlock := knetworkingv1.IPBlock{
-			CIDR:   podCIDRFirstIP.String() + "/32",
-			Except: []string{},
+			CIDR: podCIDRFirstIP.String() + "/32",
 		}
 		np.Spec.Ingress[0].From = append(np.Spec.Ingress[0].From, knetworkingv1.NetworkPolicyPeer{IPBlock: &ipBlock})
 	}
