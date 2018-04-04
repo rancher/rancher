@@ -122,11 +122,6 @@ func (p *Provisioner) machineChanged(key string, machine *v3.Node) error {
 func (p *Provisioner) Create(cluster *v3.Cluster) (*v3.Cluster, error) {
 	var err error
 
-	cluster.Status.ClusterName = cluster.Spec.DisplayName
-	if cluster.Status.ClusterName == "" {
-		cluster.Status.ClusterName = cluster.Name
-	}
-
 	// Initialize conditions, be careful to not continually update them
 	v3.ClusterConditionPending.CreateUnknownIfNotExists(cluster)
 	v3.ClusterConditionProvisioned.CreateUnknownIfNotExists(cluster)
