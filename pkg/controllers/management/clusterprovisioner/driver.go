@@ -63,6 +63,8 @@ func cleanRKE(spec v3.ClusterSpec) v3.ClusterSpec {
 		return spec
 	}
 
+	result := spec.DeepCopy()
+
 	var filteredNodes []v3.RKEConfigNode
 	for _, node := range spec.RancherKubernetesEngineConfig.Nodes {
 		if len(node.Role) == 1 && node.Role[0] == services.WorkerRole {
@@ -71,8 +73,6 @@ func cleanRKE(spec v3.ClusterSpec) v3.ClusterSpec {
 		filteredNodes = append(filteredNodes, node)
 	}
 
-	copy := *spec.RancherKubernetesEngineConfig
-	spec.RancherKubernetesEngineConfig = &copy
-	spec.RancherKubernetesEngineConfig.Nodes = filteredNodes
-	return spec
+	result.RancherKubernetesEngineConfig.Nodes = filteredNodes
+	return *result
 }
