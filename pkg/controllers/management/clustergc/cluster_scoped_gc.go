@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/norman/lifecycle"
 	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -32,6 +33,7 @@ func Register(management *config.ManagementContext) {
 		projectAlertLister: management.Management.ProjectAlerts("").Controller().Lister(),
 		nodeLister:         management.Management.Nodes("").Controller().Lister(),
 		psptLister:         management.Management.PodSecurityPolicyTemplates("").Controller().Lister(),
+		secretsLister:      management.Core.Secrets("").Controller().Lister(),
 		prtbIndexer:        informer.GetIndexer(),
 		mgmt:               management,
 	}
@@ -48,6 +50,7 @@ type gcLifecycle struct {
 	rtLister           v3.RoleTemplateLister
 	grbLister          v3.GlobalRoleBindingLister
 	psptLister         v3.PodSecurityPolicyTemplateLister
+	secretsLister      v1.SecretLister
 	mgmt               *config.ManagementContext
 }
 
@@ -128,12 +131,23 @@ func (c *gcLifecycle) Remove(cluster *v3.Cluster) (*v3.Cluster, error) {
 		}
 	}
 
-	alerts, err := c.projectAlertLister.List(cluster.Name, labels.Everything())
+	alerts, err := c.projectAlertLister.List("", labels.Everything())
 	if err != nil {
 		return cluster, err
 	}
 	oClient = c.mgmt.Management.ProjectAlerts("").ObjectClient()
 	for _, p := range alerts {
+		if err := cleanFinalizers(cluster.Name, p, oClient); err != nil {
+			return cluster, err
+		}
+	}
+
+	secrets, err := c.secretsLister.List("", labels.Everything())
+	if err != nil {
+		return cluster, err
+	}
+	oClient = c.mgmt.Core.Secrets("").ObjectClient()
+	for _, p := range secrets {
 		if err := cleanFinalizers(cluster.Name, p, oClient); err != nil {
 			return cluster, err
 		}
