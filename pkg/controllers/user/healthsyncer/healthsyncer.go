@@ -7,6 +7,8 @@ import (
 
 	"reflect"
 
+	"sort"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/rancher/pkg/ticker"
@@ -24,19 +26,26 @@ const (
 	syncInterval = 15 * time.Second
 )
 
+type ClusterControllerLifecycle interface {
+	Start(ctx context.Context, cluster *v3.Cluster) error
+	Stop(cluster *v3.Cluster)
+}
+
 type HealthSyncer struct {
 	clusterName       string
 	clusterLister     v3.ClusterLister
 	clusters          v3.ClusterInterface
 	componentStatuses corev1.ComponentStatusInterface
+	clusterManager    ClusterControllerLifecycle
 }
 
-func Register(ctx context.Context, workload *config.UserContext) {
+func Register(ctx context.Context, workload *config.UserContext, clusterManager ClusterControllerLifecycle) {
 	h := &HealthSyncer{
 		clusterName:       workload.ClusterName,
 		clusterLister:     workload.Management.Management.Clusters("").Controller().Lister(),
 		clusters:          workload.Management.Management.Clusters(""),
 		componentStatuses: workload.Core.ComponentStatuses(""),
+		clusterManager:    clusterManager,
 	}
 
 	go h.syncHealth(ctx, syncInterval)
@@ -72,22 +81,36 @@ func (h *HealthSyncer) updateClusterHealth() error {
 			clusterCS := convertToClusterComponentStatus(&cs)
 			cluster.Status.ComponentStatuses = append(cluster.Status.ComponentStatuses, *clusterCS)
 		}
+		sort.Slice(cluster.Status.ComponentStatuses, func(i, j int) bool {
+			return cluster.Status.ComponentStatuses[i].Name < cluster.Status.ComponentStatuses[j].Name
+		})
 		return cluster, nil
 	})
-	if err != nil {
-		return err
+	if err == nil {
+		v3.ClusterConditionWaiting.True(newObj)
+		v3.ClusterConditionWaiting.Message(newObj, "")
 	}
-	v3.ClusterConditionWaiting.True(newObj)
-	v3.ClusterConditionWaiting.Message(newObj, "")
 
 	if !reflect.DeepEqual(oldCluster, newObj) {
-		_, err = h.clusters.Update(newObj.(*v3.Cluster))
-		if err != nil {
+		if _, err := h.clusters.Update(newObj.(*v3.Cluster)); err != nil {
 			return errors.Wrapf(err, "Failed to update cluster [%s]", cluster.Name)
 		}
 	}
 
-	logrus.Debugf("Updated cluster health successfully [%s]", h.clusterName)
+	if err != nil {
+		logrus.Errorf("Cluster %s is unavaliable, stopping controllers and waiting for successful ping: %v", h.clusterName, err)
+		h.clusterManager.Stop(cluster)
+		for {
+			if err := h.clusterManager.Start(context.TODO(), cluster); err == nil || apierrors.IsNotFound(err) {
+				logrus.Infof("Cluster %s may be back online", h.clusterName)
+				break
+			} else {
+				logrus.Debugf("Cluster %s still unavailable: %v", h.clusterName, err)
+			}
+			time.Sleep(15 * time.Second)
+		}
+	}
+
 	return nil
 }
 
