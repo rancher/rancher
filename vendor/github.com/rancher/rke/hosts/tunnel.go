@@ -8,13 +8,14 @@ import (
 	"path/filepath"
 	"strings"
 
+	"net"
+
 	"github.com/docker/docker/client"
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/log"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
-	"net"
 )
 
 const (
