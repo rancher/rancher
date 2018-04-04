@@ -52,7 +52,6 @@ type Cluster struct {
 }
 
 type ClusterSpec struct {
-	DisplayName                          string                         `json:"displayName"`
 	Description                          string                         `json:"description"`
 	Internal                             bool                           `json:"internal" norman:"nocreate,noupdate"`
 	DesiredAgentImage                    string                         `json:"desiredAgentImage"`
@@ -86,7 +85,6 @@ type ClusterStatus struct {
 	FailedSpec                           *ClusterSpec             `json:"failedSpec,omitempty"`
 	Requested                            v1.ResourceList          `json:"requested,omitempty"`
 	Limits                               v1.ResourceList          `json:"limits,omitempty"`
-	ClusterName                          string                   `json:"clusterName,omitempty"`
 	Version                              *version.Info            `json:"version,omitempty"`
 	AppliedPodSecurityPolicyTemplateName string                   `json:"appliedPodSecurityPolicyTemplateId"`
 }
