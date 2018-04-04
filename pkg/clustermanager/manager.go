@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"strings"
 	"sync"
-
 	"time"
 
 	"github.com/rancher/norman/httperror"
@@ -62,7 +61,12 @@ func (m *Manager) Stop(cluster *v3.Cluster) {
 }
 
 func (m *Manager) Start(ctx context.Context, cluster *v3.Cluster) error {
-	_, err := m.start(ctx, cluster)
+	// reload cluster, always use the cached one
+	cluster, err := m.clusterLister.Get("", cluster.Name)
+	if err != nil {
+		return err
+	}
+	_, err = m.start(ctx, cluster)
 	return err
 }
 
@@ -118,7 +122,7 @@ func (m *Manager) changed(r *record, cluster *v3.Cluster) bool {
 
 func (m *Manager) doStart(rec *record) error {
 	logrus.Info("Starting cluster agent for", rec.cluster.ClusterName)
-	if err := clusterController.Register(rec.ctx, rec.cluster, m); err != nil {
+	if err := clusterController.Register(rec.ctx, rec.cluster, m, m); err != nil {
 		return err
 	}
 	return rec.cluster.Start(rec.ctx)
@@ -126,6 +130,10 @@ func (m *Manager) doStart(rec *record) error {
 
 func (m *Manager) toRESTConfig(cluster *v3.Cluster) (*rest.Config, error) {
 	if cluster == nil {
+		return nil, nil
+	}
+
+	if cluster.DeletionTimestamp != nil {
 		return nil, nil
 	}
 
