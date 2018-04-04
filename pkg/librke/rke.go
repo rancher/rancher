@@ -48,5 +48,5 @@ func (*rke) ParseCluster(clusterName string, config *v3.RancherKubernetesEngineC
 }
 
 func (*rke) GeneratePlan(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig) (v3.RKEPlan, error) {
-	return cluster.GeneratePlan(ctx, rkeConfig)
+	return cluster.GeneratePlan(ctx, rkeConfig.DeepCopy())
 }
