@@ -256,29 +256,31 @@ func getNodeNameToMachine(clusterName string, machineLister managementv3.NodeLis
 	return machineMap, nil
 }
 
-func convertIngressToServicePublicEndpointsMap(obj *extensionsv1beta1.Ingress, isRKE bool) (map[string][]v3.PublicEndpoint, error) {
+func convertIngressToServicePublicEndpointsMap(obj *extensionsv1beta1.Ingress, allNodes bool) (map[string][]v3.PublicEndpoint, error) {
 	var addresses []string
-	allNode := isRKE
-	if !isRKE {
+	if !allNodes {
 		for _, address := range obj.Status.LoadBalancer.Ingress {
 			addresses = append(addresses, address.IP)
 		}
 	}
 	epsMap := make(map[string][]v3.PublicEndpoint)
+	ports := map[int32]string{80: "HTTP", 443: "HTTPS"}
 	for _, rule := range obj.Spec.Rules {
 		for _, path := range rule.HTTP.Paths {
-			p := v3.PublicEndpoint{
-				Hostname:    rule.Host,
-				Path:        path.Path,
-				ServiceName: fmt.Sprintf("%s:%s", obj.Namespace, path.Backend.ServiceName),
-				Addresses:   addresses,
-				// set to HTTP by default because ingress controller should update to https if the path need tls
-				Protocol:    "HTTP",
-				AllNodes:    allNode,
-				IngressName: fmt.Sprintf("%s:%s", obj.Namespace, obj.Name),
+			for port, proto := range ports {
+				p := v3.PublicEndpoint{
+					Hostname:    rule.Host,
+					Path:        path.Path,
+					ServiceName: fmt.Sprintf("%s:%s", obj.Namespace, path.Backend.ServiceName),
+					Addresses:   addresses,
+					Port:        port,
+					Protocol:    proto,
+					AllNodes:    allNodes,
+					IngressName: fmt.Sprintf("%s:%s", obj.Namespace, obj.Name),
+				}
+				v := epsMap[path.Backend.ServiceName]
+				epsMap[path.Backend.ServiceName] = append(v, p)
 			}
-			v := epsMap[path.Backend.ServiceName]
-			epsMap[path.Backend.ServiceName] = append(v, p)
 		}
 	}
 	return epsMap, nil
