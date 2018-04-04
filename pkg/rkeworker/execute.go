@@ -1,9 +1,15 @@
 package rkeworker
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"strings"
 
+	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/rkecerts"
 )
 
@@ -17,6 +23,11 @@ func ExecutePlan(ctx context.Context, nodeConfig *NodeConfig) error {
 		if err := bundle.Explode(); err != nil {
 			return err
 		}
+	}
+
+	f := fileWriter{}
+	for _, file := range nodeConfig.Files {
+		f.write(file.Name, file.Contents)
 	}
 
 	for name, process := range nodeConfig.Processes {
@@ -36,4 +47,37 @@ func ExecutePlan(ctx context.Context, nodeConfig *NodeConfig) error {
 	}
 
 	return nil
+}
+
+type fileWriter struct {
+	errs []error
+}
+
+func (f *fileWriter) write(path string, base64Content string) {
+	if path == "" || len(base64Content) == 0 {
+		return
+	}
+
+	content, err := base64.StdEncoding.DecodeString(base64Content)
+	if err != nil {
+		f.errs = append(f.errs, err)
+		return
+	}
+
+	existing, err := ioutil.ReadFile(path)
+	if err == nil && bytes.Equal(existing, content) {
+		return
+	}
+
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		f.errs = append(f.errs, err)
+	}
+	if err := ioutil.WriteFile(path, content, 0600); err != nil {
+		f.errs = append(f.errs, err)
+	}
+}
+
+func (f *fileWriter) err() error {
+	return types.NewErrors(f.errs...)
 }

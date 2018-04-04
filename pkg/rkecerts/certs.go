@@ -136,6 +136,11 @@ func (f *fileWriter) write(path string, content []byte, x509cert *x509.Certifica
 		return
 	}
 
+	existing, err := ioutil.ReadFile(path)
+	if err == nil && bytes.Equal(existing, content) {
+		return
+	}
+
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		f.errs = append(f.errs, err)
