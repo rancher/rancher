@@ -232,12 +232,6 @@ func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, e
 		return nil, err
 	}
 
-	localPrincipal := "local://" + created.Name
-	if !slice.ContainsString(created.PrincipalIDs, localPrincipal) {
-		created.PrincipalIDs = append(created.PrincipalIDs, localPrincipal)
-		return m.users.Update(created)
-	}
-
 	return created, nil
 }
 
