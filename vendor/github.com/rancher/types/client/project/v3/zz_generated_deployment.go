@@ -28,6 +28,7 @@ const (
 	DeploymentFieldNamespaceId                   = "namespaceId"
 	DeploymentFieldNodeId                        = "nodeId"
 	DeploymentFieldOwnerReferences               = "ownerReferences"
+	DeploymentFieldPaused                        = "paused"
 	DeploymentFieldPriority                      = "priority"
 	DeploymentFieldPriorityClassName             = "priorityClassName"
 	DeploymentFieldProjectID                     = "projectId"
@@ -76,6 +77,7 @@ type Deployment struct {
 	NamespaceId                   string                 `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	NodeId                        string                 `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
 	OwnerReferences               []OwnerReference       `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Paused                        bool                   `json:"paused,omitempty" yaml:"paused,omitempty"`
 	Priority                      *int64                 `json:"priority,omitempty" yaml:"priority,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty" yaml:"priorityClassName,omitempty"`
 	ProjectID                     string                 `json:"projectId,omitempty" yaml:"projectId,omitempty"`

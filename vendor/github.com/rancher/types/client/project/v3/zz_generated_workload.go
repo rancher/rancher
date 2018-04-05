@@ -34,6 +34,7 @@ const (
 	WorkloadFieldNamespaceId                   = "namespaceId"
 	WorkloadFieldNodeId                        = "nodeId"
 	WorkloadFieldOwnerReferences               = "ownerReferences"
+	WorkloadFieldPaused                        = "paused"
 	WorkloadFieldPriority                      = "priority"
 	WorkloadFieldPriorityClassName             = "priorityClassName"
 	WorkloadFieldProjectID                     = "projectId"
@@ -94,6 +95,7 @@ type Workload struct {
 	NamespaceId                   string                       `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	NodeId                        string                       `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
 	OwnerReferences               []OwnerReference             `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Paused                        bool                         `json:"paused,omitempty" yaml:"paused,omitempty"`
 	Priority                      *int64                       `json:"priority,omitempty" yaml:"priority,omitempty"`
 	PriorityClassName             string                       `json:"priorityClassName,omitempty" yaml:"priorityClassName,omitempty"`
 	ProjectID                     string                       `json:"projectId,omitempty" yaml:"projectId,omitempty"`
