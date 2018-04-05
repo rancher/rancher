@@ -19,6 +19,7 @@ import (
 
 var (
 	providers       = make(map[string]common.AuthProvider)
+	localProvider   = "local"
 	providersByType = make(map[string]common.AuthProvider)
 	confMu          sync.Mutex
 )
@@ -62,9 +63,24 @@ func AuthenticateUser(input interface{}, providerName string) (v3.Principal, []v
 }
 
 func GetPrincipal(principalID string, myToken v3.Token) (v3.Principal, error) {
-	return providers[myToken.AuthProvider].GetPrincipal(principalID, myToken)
+	principal, err := providers[myToken.AuthProvider].GetPrincipal(principalID, myToken)
+	if err != nil && myToken.AuthProvider != localProvider {
+		principal, err = providers[localProvider].GetPrincipal(principalID, myToken)
+	}
+	return principal, err
 }
 
 func SearchPrincipals(name, principalType string, myToken v3.Token) ([]v3.Principal, error) {
-	return providers[myToken.AuthProvider].SearchPrincipals(name, principalType, myToken)
+	principals, err := providers[myToken.AuthProvider].SearchPrincipals(name, principalType, myToken)
+	if err != nil {
+		return principals, err
+	}
+	if myToken.AuthProvider != localProvider {
+		localPrincipals, err := providers[localProvider].SearchPrincipals(name, principalType, myToken)
+		if err != nil {
+			return principals, err
+		}
+		principals = append(principals, localPrincipals...)
+	}
+	return principals, err
 }
