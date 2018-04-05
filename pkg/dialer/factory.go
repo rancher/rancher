@@ -51,9 +51,9 @@ type Factory struct {
 	store               *encryptedstore.GenericEncryptedStore
 }
 
-func (f *Factory) ClusterDialer(clusterName string) (dialer.Dialer, error) {
+func (f *Factory) ClusterDialer(clusterName string, disableKeepAlives bool) (dialer.Dialer, error) {
 	return func(network, address string) (net.Conn, error) {
-		d, err := f.clusterDialer(clusterName, address)
+		d, err := f.clusterDialer(clusterName, address, disableKeepAlives)
 		if err != nil {
 			return nil, err
 		}
@@ -65,12 +65,11 @@ func isCloudDriver(cluster *v3.Cluster) bool {
 	return !cluster.Spec.Internal && cluster.Status.Driver != v3.ClusterDriverImported && cluster.Status.Driver != v3.ClusterDriverRKE
 }
 
-func (f *Factory) clusterDialer(clusterName, address string) (dialer.Dialer, error) {
+func (f *Factory) clusterDialer(clusterName, address string, disableKeepAlives bool) (dialer.Dialer, error) {
 	cluster, err := f.clusterLister.Get("", clusterName)
 	if err != nil {
 		return nil, err
 	}
-
 	if cluster.Spec.Internal {
 		// For local (embedded, or import) we just assume we can connect directly
 		return native()
@@ -83,7 +82,7 @@ func (f *Factory) clusterDialer(clusterName, address string) (dialer.Dialer, err
 	}
 
 	if f.TunnelServer.HasSession(cluster.Name) {
-		return f.TunnelServer.Dialer(cluster.Name, 15*time.Second), nil
+		return f.TunnelServer.Dialer(cluster.Name, 15*time.Second, disableKeepAlives), nil
 	}
 
 	if cluster.Status.Driver != v3.ClusterDriverRKE {
@@ -138,7 +137,7 @@ func (f *Factory) DockerDialer(clusterName, machineName string) (dialer.Dialer, 
 	}
 
 	if f.TunnelServer.HasSession(machine.Name) {
-		d := f.TunnelServer.Dialer(machine.Name, 15*time.Second)
+		d := f.TunnelServer.Dialer(machine.Name, 15*time.Second, false)
 		return func(string, string) (net.Conn, error) {
 			return d("unix", "/var/run/docker.sock")
 		}, nil
@@ -168,7 +167,7 @@ func (f *Factory) nodeDialer(clusterName, machineName string) (dialer.Dialer, er
 	}
 
 	if f.TunnelServer.HasSession(machine.Name) {
-		d := f.TunnelServer.Dialer(machine.Name, 15*time.Second)
+		d := f.TunnelServer.Dialer(machine.Name, 15*time.Second, false)
 		return dialer.Dialer(d), nil
 	}
 

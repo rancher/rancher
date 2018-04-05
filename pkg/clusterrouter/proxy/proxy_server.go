@@ -73,7 +73,7 @@ func NewRemote(cluster *v3.Cluster, factory dialer.Factory) (*RemoteService, err
 	transport := &http.Transport{}
 
 	if factory != nil {
-		d, err := factory.ClusterDialer(cluster.Name)
+		d, err := factory.ClusterDialer(cluster.Name, false)
 		if err != nil {
 			return nil, err
 		}

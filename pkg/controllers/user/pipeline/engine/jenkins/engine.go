@@ -64,7 +64,7 @@ func (j *Engine) PreCheck() error {
 	token := string(secret.Data["jenkins-admin-password"])
 
 	if j.Client == nil {
-		dial, err := j.Dialer.ClusterDialer(j.ClusterName)
+		dial, err := j.Dialer.ClusterDialer(j.ClusterName, true)
 		if err != nil {
 			return err
 		}
