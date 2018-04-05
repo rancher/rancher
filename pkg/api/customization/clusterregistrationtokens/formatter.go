@@ -12,7 +12,7 @@ import (
 const (
 	commandFormat         = "kubectl apply -f %s"
 	insecureCommandFormat = "curl --insecure -sfL %s | kubectl apply -f -"
-	nodeCommandFormat     = "sudo docker run -d --restart=unless-stopped --net=host -v /etc/kubernetes:/etc/kubernetes -v /var/run:/var/run %s --server %s --token %s%s"
+	nodeCommandFormat     = "sudo docker run -d --privileged --restart=unless-stopped --net=host -v /etc/kubernetes:/etc/kubernetes -v /var/run:/var/run %s --server %s --token %s%s"
 )
 
 func Formatter(request *types.APIContext, resource *types.RawResource) {
