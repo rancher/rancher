@@ -15,7 +15,8 @@ func addLocalCluster(embedded bool, adminName string, management *config.Managem
 			},
 		},
 		Spec: v3.ClusterSpec{
-			Internal: true,
+			Internal:    true,
+			DisplayName: "local",
 		},
 		Status: v3.ClusterStatus{
 			Driver: v3.ClusterDriverImported,
