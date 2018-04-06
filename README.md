@@ -1,5 +1,9 @@
 # Rancher
 
+[![Build Status](https://drone8.rancher.io/api/badges/rancher/rancher/status.svg?branch=master)](https://drone8.rancher.io/rancher/rancher)
+[![Docker Pulls](https://img.shields.io/docker/pulls/rancher/server.svg)](https://store.docker.com/community/images/rancher/server)
+[![Go Report Card](https://goreportcard.com/badge/github.com/rancher/rancher)](https://goreportcard.com/report/github.com/rancher/rancher)
+
 Rancher is an open source project that provides a complete platform for operating Docker in production. It provides infrastructure services such as multi-host networking, global and local load balancing, and volume snapshots. It integrates native Docker management capabilities such as Docker Machine and Docker Swarm. It offers a rich user experience that enables devops admins to operate Docker in production at large scale.
 
 ## Latest Release
