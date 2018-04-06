@@ -126,6 +126,7 @@ func (h *Handler) setPassword(actionName string, action *types.Action, request *
 		return err
 	}
 	userData[client.UserFieldMustChangePassword] = false
+	delete(userData, "me")
 
 	userData, err = store.Update(request, request.Schema, userData, request.ID)
 	if err != nil {
