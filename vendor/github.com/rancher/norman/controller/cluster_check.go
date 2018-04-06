@@ -30,6 +30,15 @@ func ObjectInCluster(cluster string, obj interface{}) bool {
 			}
 		}
 	}
+	if clusterName == "" {
+		if a := getValue(obj, "Annotations"); a.IsValid() {
+			if c := a.MapIndex(reflect.ValueOf("field.cattle.io/projectId")); c.IsValid() {
+				if parts := strings.SplitN(c.String(), ":", 2); len(parts) == 2 {
+					clusterName = parts[0]
+				}
+			}
+		}
+	}
 
 	return clusterName == cluster
 }
