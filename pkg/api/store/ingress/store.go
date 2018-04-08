@@ -44,7 +44,7 @@ func formatData(data map[string]interface{}, forFrontend bool) {
 	newState := map[string]string{}
 
 	// transform default backend
-	if target, ok := values.GetValue(data, "defaultBackend"); ok {
+	if target, ok := values.GetValue(data, "defaultBackend"); ok && target != nil {
 		updateRule(convert.ToMapInterface(target), "/", forFrontend, data, oldState, newState)
 	}
 
