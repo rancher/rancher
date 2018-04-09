@@ -57,7 +57,7 @@ var ClusterTemplate = `{{ if ne .clusterTarget.CurrentTarget "none" }}
     include_tag_key  true
     hosts "elasticsearch.cattle-logging:9200"
     reload_connections "true"
-    logstash_prefix {{.clusterTarget.ClusterName}}
+    logstash_prefix {{.clusterTarget.EmbeddedConfig.IndexPrefix}}
     logstash_format true
     logstash_dateformat  {{.clusterTarget.WrapEmbedded.DateFormat}}
     type_name  "container_log"
