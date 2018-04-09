@@ -69,7 +69,7 @@ var (
 		WeaveNode:                 "weaveworks/weave-kube:2.1.2",
 		WeaveCNI:                  "weaveworks/weave-npc:2.1.2",
 		PodInfraContainer:         "rancher/pause-amd64:3.0",
-		Ingress:                   "rancher/nginx-ingress-controller:0.10.2",
+		Ingress:                   "rancher/nginx-ingress-controller:0.10.2-rancher1",
 		IngressBackend:            "rancher/nginx-ingress-controller-defaultbackend:1.4",
 	}
 
@@ -96,7 +96,7 @@ var (
 		WeaveNode:                 "weaveworks/weave-kube:2.1.2",
 		WeaveCNI:                  "weaveworks/weave-npc:2.1.2",
 		PodInfraContainer:         "rancher/pause-amd64:3.0",
-		Ingress:                   "rancher/nginx-ingress-controller:0.10.2",
+		Ingress:                   "rancher/nginx-ingress-controller:0.10.2-rancher1",
 		IngressBackend:            "rancher/nginx-ingress-controller-defaultbackend:1.4",
 		Grafana:                   "rancher/heapster-grafana-amd64:v4.4.3",
 		Heapster:                  "rancher/heapster-amd64:v1.5.0",
@@ -128,7 +128,7 @@ var (
 		WeaveNode:                 "weaveworks/weave-kube:2.1.2",
 		WeaveCNI:                  "weaveworks/weave-npc:2.1.2",
 		PodInfraContainer:         "rancher/pause-amd64:3.1",
-		Ingress:                   "rancher/nginx-ingress-controller:0.10.2",
+		Ingress:                   "rancher/nginx-ingress-controller:0.10.2-rancher1",
 		IngressBackend:            "rancher/nginx-ingress-controller-defaultbackend:1.4",
 		Grafana:                   "rancher/heapster-grafana-amd64:v4.4.3",
 		Heapster:                  "rancher/heapster-amd64:v1.5.0",

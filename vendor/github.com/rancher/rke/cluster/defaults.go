@@ -25,7 +25,7 @@ const (
 	DefaultAuthStrategy      = "x509"
 	DefaultAuthorizationMode = "rbac"
 
-	DefaultNetworkPlugin        = "flannel"
+	DefaultNetworkPlugin        = "canal"
 	DefaultNetworkCloudProvider = "none"
 
 	DefaultIngressController = "nginx"
