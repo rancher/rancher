@@ -8,7 +8,7 @@ Please check the [releases](https://github.com/rancher/rke/releases/) page.
 
 ## Requirements
 
-- Docker versions 1.12.6, 1.13.1, or 17.03 should be installed for Kubernetes 1.8.
+- Docker versions `1.11.2` up to `1.13.1` and `17.03.x` are validated for Kubernetes versions 1.8, 1.9 and 1.10
 - OpenSSH 7.0+ must be installed on each node for stream local forwarding to work.
 - The SSH user used for node access must be a member of the `docker` group:
 
@@ -21,7 +21,7 @@ usermod -aG docker <user_name>
 
 ## Getting Started
 
-Starting out with RKE? Check out this [blog post](http://rancher.com/an-introduction-to-rke/).
+Starting out with RKE? Check out this [blog post](http://rancher.com/an-introduction-to-rke/) or the [Quick Start Guide](https://github.com/rancher/rke/wiki/Quick-Start-Guide)
 
 ## Using RKE
 
@@ -38,8 +38,8 @@ You can view full sample of cluster.yml [here](https://github.com/rancher/rke/bl
 ### Minimal `cluster.yml` example
 
 ```yaml
-# default k8s version: v1.8.9-rancher1-1
-# default network plugin: flannel
+# default k8s version: v1.8.10-rancher1-1
+# default network plugin: canal
 nodes:
   - address: 1.2.3.4
     user: ubuntu
@@ -361,7 +361,7 @@ rke up --config rancher-minimal.yml
 
 ## License
 
-Copyright (c) 2017 [Rancher Labs, Inc.](http://rancher.com)
+Copyright (c) 2018 [Rancher Labs, Inc.](http://rancher.com)
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
