@@ -66,7 +66,12 @@ func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.Act
 		return v3.Principal{}, nil, nil, err
 	}
 
-	allowed, err := p.userMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipal, groupPrincipals)
+	testAllowedPrincipals := config.AllowedPrincipalIDs
+	if config.AccessMode == "restricted" {
+		testAllowedPrincipals = append(testAllowedPrincipals, userPrincipal.Name)
+	}
+
+	allowed, err := p.userMGR.CheckAccess(config.AccessMode, testAllowedPrincipals, userPrincipal, groupPrincipals)
 	if err != nil {
 		return v3.Principal{}, nil, nil, err
 	}
