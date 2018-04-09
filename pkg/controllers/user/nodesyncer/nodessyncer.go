@@ -11,14 +11,16 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
 const (
-	AllNodeKey     = "_machine_all_"
-	annotationName = "management.cattle.io/nodesyncer"
+	AllNodeKey           = "_machine_all_"
+	annotationName       = "management.cattle.io/nodesyncer"
+	externalIPAnnotation = "rke.cattle.io/external-ip"
 )
 
 type NodeSyncer struct {
@@ -84,6 +86,38 @@ func (m *NodesSyncer) sync(key string, machine *v3.Node) error {
 	return nil
 }
 
+func (m *NodesSyncer) getNode(machine *v3.Node, nodes []*corev1.Node) (*corev1.Node, error) {
+	nodeName := node.GetNodeName(machine)
+	if nodeName != "" {
+		node, err := m.nodeLister.Get("", nodeName)
+		if err != nil {
+			if !apierrors.IsNotFound(err) {
+				return nil, err
+			}
+		}
+		if node != nil {
+			return node, nil
+		}
+	}
+	// search by rke annotations
+	if machine.Status.NodeConfig == nil {
+		return nil, nil
+	}
+	address := machine.Status.NodeConfig.Address
+	if address == "" {
+		return nil, nil
+	}
+
+	for _, n := range nodes {
+		nodeExternalIP := n.Annotations[externalIPAnnotation]
+		if address == nodeExternalIP {
+			return n, nil
+		}
+	}
+
+	return nil, nil
+}
+
 func (m *NodesSyncer) syncLabels(key string, obj *v3.Node) error {
 	if obj == nil {
 		return nil
@@ -94,12 +128,11 @@ func (m *NodesSyncer) syncLabels(key string, obj *v3.Node) error {
 	}
 
 	machine := obj.DeepCopy()
-	nodeName := node.GetNodeName(machine)
-	if nodeName == "" {
-		logrus.Debugf("Failed to get nodeName from machine [%s]", machine.Name)
-		return nil
+	nodes, err := m.nodeLister.List("", labels.NewSelector())
+	if err != nil {
+		return err
 	}
-	node, err := m.nodeClient.Get(nodeName, metav1.GetOptions{})
+	node, err := m.getNode(machine, nodes)
 	if err != nil {
 		return err
 	}
@@ -146,12 +179,15 @@ func (m *NodesSyncer) reconcileAll() error {
 	machines, err := m.machineLister.List(m.clusterNamespace, labels.NewSelector())
 	machineMap := make(map[string]*v3.Node)
 	for _, machine := range machines {
-		nodeName := node.GetNodeName(machine)
-		if nodeName == "" {
-			logrus.Debugf("Failed to get nodeName from machine [%s]", machine.Name)
+		node, err := m.getNode(machine, nodes)
+		if err != nil {
+			return err
+		}
+		if node == nil {
+			logrus.Debugf("Failed to get node for machine [%s]", machine.Name)
 			continue
 		}
-		machineMap[nodeName] = machine
+		machineMap[node.Name] = machine
 	}
 	nodeToPodMap, err := m.getNonTerminatedPods()
 	if err != nil {
