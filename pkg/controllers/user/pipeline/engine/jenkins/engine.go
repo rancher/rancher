@@ -269,10 +269,10 @@ func (j *Engine) SyncExecution(execution *v3.PipelineExecution) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		if time.Now().Before(startTime.Add(15 * time.Second)) {
+		if time.Now().Before(startTime.Add(60 * time.Second)) {
 			return false, nil
 		}
-		return false, ErrGetBuildInfoFail
+		return false, errors.New("timeout get build info")
 	}
 	if err != nil {
 		return false, err
