@@ -63,7 +63,7 @@ func (w *SysComponentWatcher) watchRule() error {
 		if alert.Status.AlertState == "inactive" {
 			continue
 		}
-		if alert.Spec.TargetSystemService.Condition != "" {
+		if alert.Spec.TargetSystemService != nil {
 			w.checkComponentHealthy(statuses, alert)
 		}
 	}

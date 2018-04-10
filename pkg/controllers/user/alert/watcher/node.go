@@ -67,6 +67,11 @@ func (w *NodeWatcher) watchRule() error {
 		if alert.Status.AlertState == "inactive" {
 			continue
 		}
+
+		if alert.Spec.TargetNode == nil {
+			continue
+		}
+
 		if alert.Spec.TargetNode.NodeName != "" {
 			parts := strings.Split(alert.Spec.TargetNode.NodeName, ":")
 			if len(parts) != 2 {
