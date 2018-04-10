@@ -10,6 +10,7 @@ const (
 	RancherKubernetesEngineConfigFieldClusterName         = "clusterName"
 	RancherKubernetesEngineConfigFieldIgnoreDockerVersion = "ignoreDockerVersion"
 	RancherKubernetesEngineConfigFieldIngress             = "ingress"
+	RancherKubernetesEngineConfigFieldKubernetesDirPath   = "kubernetesDirPath"
 	RancherKubernetesEngineConfigFieldNetwork             = "network"
 	RancherKubernetesEngineConfigFieldNodes               = "nodes"
 	RancherKubernetesEngineConfigFieldPrivateRegistries   = "privateRegistries"
@@ -28,6 +29,7 @@ type RancherKubernetesEngineConfig struct {
 	ClusterName         string             `json:"clusterName,omitempty" yaml:"clusterName,omitempty"`
 	IgnoreDockerVersion bool               `json:"ignoreDockerVersion,omitempty" yaml:"ignoreDockerVersion,omitempty"`
 	Ingress             *IngressConfig     `json:"ingress,omitempty" yaml:"ingress,omitempty"`
+	KubernetesDirPath   string             `json:"kubernetesDirPath,omitempty" yaml:"kubernetesDirPath,omitempty"`
 	Network             *NetworkConfig     `json:"network,omitempty" yaml:"network,omitempty"`
 	Nodes               []RKEConfigNode    `json:"nodes,omitempty" yaml:"nodes,omitempty"`
 	PrivateRegistries   []PrivateRegistry  `json:"privateRegistries,omitempty" yaml:"privateRegistries,omitempty"`
