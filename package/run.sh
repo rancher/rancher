@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+if [ "$1" = "--" ]; then
+    shift 1
+    exec "$@"
+fi
+
 error()
 {
     echo "ERROR:" "$@" 1>&2
@@ -50,6 +55,7 @@ if [ "$CATTLE_CLUSTER" != "true" ]; then
         error example:  docker run -v /var/run/docker.sock:/var/run/docker.sock ...
         exit 1
     fi
+    docker run --privileged --net host --pid host -v /:/host --rm $AGENT_IMAGE -- /usr/bin/share-mnt /var/lib/kubelet -- norun >/dev/null 2>&1 || true
 fi
 
 if [ -z "$CATTLE_NODE_NAME" ]; then
