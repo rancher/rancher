@@ -142,6 +142,10 @@ func (s *session) serveMessage(reader io.Reader) error {
 		s.closeConnection(message.connID, message.Err())
 	}
 
+	if conn.disableKeepAlives {
+		s.closeConnection(message.connID, io.EOF)
+	}
+
 	return nil
 }
 
@@ -158,7 +162,7 @@ func (s *session) closeConnection(connID int64, err error) {
 }
 
 func (s *session) clientConnect(message *message) {
-	conn := newConnection(message.connID, s, message.proto, message.address)
+	conn := newConnection(message.connID, s, message.proto, message.address, false)
 
 	s.Lock()
 	s.conns[message.connID] = conn
@@ -168,21 +172,19 @@ func (s *session) clientConnect(message *message) {
 	go clientDial(conn, message)
 }
 
-func (s *session) serverConnect(deadline time.Duration, proto, address string) (net.Conn, error) {
+func (s *session) serverConnect(deadline time.Duration, proto, address string, disableKeepAlives bool) (net.Conn, error) {
 	connID := atomic.AddInt64(&s.nextConnID, 1)
-	conn := newConnection(connID, s, proto, address)
+	conn := newConnection(connID, s, proto, address, disableKeepAlives)
 
 	s.Lock()
 	s.conns[connID] = conn
 	logrus.Debugf("CONNECTIONS %d %d", s.sessionKey, len(s.conns))
 	s.Unlock()
-
 	_, err := s.writeMessage(newConnect(connID, deadline, proto, address))
 	if err != nil {
 		s.closeConnection(connID, err)
 		return nil, err
 	}
-
 	return conn, err
 }
 

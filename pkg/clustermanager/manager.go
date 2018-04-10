@@ -159,7 +159,7 @@ func (m *Manager) toRESTConfig(cluster *v3.Cluster) (*rest.Config, error) {
 		return nil, err
 	}
 
-	dialer, err := m.dialer.ClusterDialer(cluster.Name)
+	dialer, err := m.dialer.ClusterDialer(cluster.Name, false)
 	if err != nil {
 		return nil, err
 	}

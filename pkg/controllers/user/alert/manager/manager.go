@@ -90,7 +90,7 @@ type Manager struct {
 
 func NewManager(cluster *config.UserContext) *Manager {
 
-	dial, err := cluster.Management.Dialer.ClusterDialer(cluster.ClusterName)
+	dial, err := cluster.Management.Dialer.ClusterDialer(cluster.ClusterName, false)
 	if err != nil {
 		logrus.Warnf("Failed to get cluster dialer: %v", err)
 	}

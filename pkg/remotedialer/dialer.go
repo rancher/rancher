@@ -12,17 +12,17 @@ func (s *Server) HasSession(clientKey string) bool {
 	return err == nil
 }
 
-func (s *Server) Dial(clientKey string, deadline time.Duration, proto, address string) (net.Conn, error) {
+func (s *Server) Dial(clientKey string, deadline time.Duration, proto, address string, disableKeepAlives bool) (net.Conn, error) {
 	session, err := s.sessions.getByClient(clientKey)
 	if err != nil {
 		return nil, err
 	}
 
-	return session.serverConnect(deadline, proto, address)
+	return session.serverConnect(deadline, proto, address, disableKeepAlives)
 }
 
-func (s *Server) Dialer(clientKey string, deadline time.Duration) dialer.Dialer {
+func (s *Server) Dialer(clientKey string, deadline time.Duration, disableKeepAlives bool) dialer.Dialer {
 	return func(proto, address string) (net.Conn, error) {
-		return s.Dial(clientKey, deadline, proto, address)
+		return s.Dial(clientKey, deadline, proto, address, disableKeepAlives)
 	}
 }

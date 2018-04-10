@@ -11,24 +11,26 @@ import (
 type connection struct {
 	sync.Mutex
 
-	err           error
-	writeDeadline time.Time
-	buf           chan []byte
-	readBuf       []byte
-	addr          addr
-	session       *session
-	connID        int64
+	err               error
+	writeDeadline     time.Time
+	buf               chan []byte
+	readBuf           []byte
+	addr              addr
+	session           *session
+	connID            int64
+	disableKeepAlives bool
 }
 
-func newConnection(connID int64, session *session, proto, address string) *connection {
+func newConnection(connID int64, session *session, proto, address string, disableKeepAlives bool) *connection {
 	c := &connection{
 		addr: addr{
 			proto:   proto,
 			address: address,
 		},
-		connID:  connID,
-		session: session,
-		buf:     make(chan []byte, 1024),
+		connID:            connID,
+		session:           session,
+		buf:               make(chan []byte, 1024),
+		disableKeepAlives: disableKeepAlives,
 	}
 	return c
 }

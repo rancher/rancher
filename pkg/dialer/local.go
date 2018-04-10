@@ -56,7 +56,7 @@ func (f *Factory) dialLocal(network, address string) (net.Conn, error) {
 
 	for _, obj := range objs {
 		if node, ok := obj.(*v3.Node); ok {
-			return f.TunnelServer.Dial(node.Name, 15*time.Second, network, address)
+			return f.TunnelServer.Dial(node.Name, 15*time.Second, network, address, false)
 		}
 	}
 
