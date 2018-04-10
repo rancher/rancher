@@ -76,6 +76,7 @@ func (p *adProvider) testAndApply(actionName string, action *types.Action, reque
 
 	//if this works, save adConfig CR adding enabled flag
 	config.Enabled = configApplyInput.Enabled
+	config.AllowedPrincipalIDs = []string{userPrincipal.Name}
 	err = p.saveActiveDirectoryConfig(config)
 	if err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to save activedirectory config: %v", err))
@@ -99,7 +100,7 @@ func (p *adProvider) saveActiveDirectoryConfig(config *v3.ActiveDirectoryConfig)
 	config.Type = client.ActiveDirectoryConfigType
 	config.ObjectMeta = storedConfig.ObjectMeta
 
-	logrus.Debugf("updating githubConfig")
+	logrus.Debugf("updating ADConfig")
 	_, err = p.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
 	if err != nil {
 		return err
