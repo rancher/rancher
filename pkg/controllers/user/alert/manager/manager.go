@@ -278,6 +278,7 @@ func (m *Manager) RemoveSilenceRule(alertID string) error {
 	}
 	q := req.URL.Query()
 	q.Add("filter", fmt.Sprintf("{%s}", "alert_id="+alertID))
+	req.URL.RawQuery = q.Encode()
 
 	resp, err := m.client.Do(req)
 	if err != nil {

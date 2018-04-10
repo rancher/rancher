@@ -53,7 +53,7 @@ func (l *EventWatcher) Sync(key string, obj *corev1.Event) error {
 		}
 		alertID := alert.Namespace + "-" + alert.Name
 		target := alert.Spec.TargetEvent
-		if target.ResourceKind != "" {
+		if target != nil {
 			if target.EventType == obj.Type && target.ResourceKind == obj.InvolvedObject.Kind {
 
 				title := fmt.Sprintf("%s event of %s occurred", target.EventType, target.ResourceKind)

@@ -45,18 +45,18 @@ type AlertCommonSpec struct {
 type ClusterAlertSpec struct {
 	AlertCommonSpec
 
-	ClusterName         string              `json:"clusterName" norman:"type=reference[cluster]"`
-	TargetNode          TargetNode          `json:"targetNode,omitempty"`
-	TargetSystemService TargetSystemService `json:"targetSystemService,omitempty"`
-	TargetEvent         TargetEvent         `json:"targetEvent,omitempty"`
+	ClusterName         string               `json:"clusterName" norman:"type=reference[cluster]"`
+	TargetNode          *TargetNode          `json:"targetNode,omitempty"`
+	TargetSystemService *TargetSystemService `json:"targetSystemService,omitempty"`
+	TargetEvent         *TargetEvent         `json:"targetEvent,omitempty"`
 }
 
 type ProjectAlertSpec struct {
 	AlertCommonSpec
 
-	ProjectName    string         `json:"projectName" norman:"type=reference[project]"`
-	TargetWorkload TargetWorkload `json:"targetWorkload,omitempty"`
-	TargetPod      TargetPod      `json:"targetPod,omitempty"`
+	ProjectName    string          `json:"projectName" norman:"type=reference[project]"`
+	TargetWorkload *TargetWorkload `json:"targetWorkload,omitempty"`
+	TargetPod      *TargetPod      `json:"targetPod,omitempty"`
 }
 
 type Recipient struct {

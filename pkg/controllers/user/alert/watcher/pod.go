@@ -99,7 +99,7 @@ func (w *PodWatcher) watchRule() error {
 			continue
 		}
 
-		if alert.Spec.TargetPod.PodName != "" {
+		if alert.Spec.TargetPod != nil {
 			parts := strings.Split(alert.Spec.TargetPod.PodName, ":")
 			ns := parts[0]
 			podID := parts[1]

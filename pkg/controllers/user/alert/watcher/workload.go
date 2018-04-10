@@ -70,6 +70,10 @@ func (w *WorkloadWatcher) watchRule() error {
 			continue
 		}
 
+		if alert.Spec.TargetWorkload == nil {
+			continue
+		}
+
 		if alert.Spec.TargetWorkload.WorkloadID != "" {
 
 			wl, err := w.workloadController.GetByWorkloadID(alert.Spec.TargetWorkload.WorkloadID)

@@ -64,7 +64,7 @@ func initClusterPreCanAlerts(clusterAlerts v3.ClusterAlertInterface, clusterName
 				InitialWaitSeconds:    180,
 				RepeatIntervalSeconds: 3600,
 			},
-			TargetSystemService: v3.TargetSystemService{
+			TargetSystemService: &v3.TargetSystemService{
 				Condition: "etcd",
 			},
 		},
@@ -90,7 +90,7 @@ func initClusterPreCanAlerts(clusterAlerts v3.ClusterAlertInterface, clusterName
 				InitialWaitSeconds:    180,
 				RepeatIntervalSeconds: 3600,
 			},
-			TargetSystemService: v3.TargetSystemService{
+			TargetSystemService: &v3.TargetSystemService{
 				Condition: "controller-manager",
 			},
 		},
@@ -116,7 +116,7 @@ func initClusterPreCanAlerts(clusterAlerts v3.ClusterAlertInterface, clusterName
 				InitialWaitSeconds:    180,
 				RepeatIntervalSeconds: 3600,
 			},
-			TargetSystemService: v3.TargetSystemService{
+			TargetSystemService: &v3.TargetSystemService{
 				Condition: "scheduler",
 			},
 		},
@@ -142,7 +142,7 @@ func initClusterPreCanAlerts(clusterAlerts v3.ClusterAlertInterface, clusterName
 				InitialWaitSeconds:    180,
 				RepeatIntervalSeconds: 3600,
 			},
-			TargetNode: v3.TargetNode{
+			TargetNode: &v3.TargetNode{
 				Condition:    "mem",
 				MemThreshold: 70,
 				Selector: map[string]string{
@@ -172,7 +172,7 @@ func initClusterPreCanAlerts(clusterAlerts v3.ClusterAlertInterface, clusterName
 				InitialWaitSeconds:    180,
 				RepeatIntervalSeconds: 3600,
 			},
-			TargetEvent: v3.TargetEvent{
+			TargetEvent: &v3.TargetEvent{
 				EventType:    "Warning",
 				ResourceKind: "Deployment",
 			},
@@ -209,7 +209,7 @@ func (l *ProjectLifecycle) Create(obj *v3.Project) (*v3.Project, error) {
 				InitialWaitSeconds:    180,
 				RepeatIntervalSeconds: 3600,
 			},
-			TargetWorkload: v3.TargetWorkload{
+			TargetWorkload: &v3.TargetWorkload{
 				Selector: map[string]string{
 					"app": "workload",
 				},
