@@ -114,7 +114,7 @@ func (s *session) serveMessage(reader io.Reader) error {
 	logrus.Debug("REQUEST ", message)
 
 	if message.messageType == Connect {
-		if s.auth == nil || !s.auth(message.proto, message.address) {
+		if s.auth != nil && !s.auth(message.proto, message.address) {
 			return errors.New("connect not allowed")
 		}
 		s.clientConnect(message)
