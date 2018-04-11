@@ -44,6 +44,21 @@ func persistentVolumeTypes(schemas *types.Schemas) *types.Schemas {
 		AddMapperForType(&Version, v1.PersistentVolume{},
 			&m.AnnotationField{Field: "description"},
 		).
+		AddMapperForType(&Version, v1.HostPathVolumeSource{},
+			m.Move{From: "type", To: "kind"},
+			m.Enum{
+				Options: []string{
+					"DirectoryOrCreate",
+					"Directory",
+					"FileOrCreate",
+					"File",
+					"Socket",
+					"CharDevice",
+					"BlockDevice",
+				},
+				Field: "kind",
+			},
+		).
 		MustImport(&Version, v1.PersistentVolumeSpec{}, struct {
 			StorageClassName *string `json:"storageClassName,omitempty" norman:"type=reference[storageClass]"`
 		}{}).

@@ -399,13 +399,26 @@ type AWSCloudProvider struct {
 
 type CalicoNetworkProvider struct {
 	// Cloud provider type used with calico
-	CloudProvider string
+	CloudProvider string `json:"cloudProvider"`
 }
 
 type FlannelNetworkProvider struct {
 	// Alternate cloud interface for flannel
-	Iface string
+	Iface string `json:"iface"`
 }
 
 type CanalNetworkProvider struct {
+}
+
+type KubernetesServicesOptions struct {
+	// Additional options passed to KubeAPI
+	KubeAPI map[string]string `json:"kubeapi"`
+	// Additional options passed to Kubelet
+	Kubelet map[string]string `json:"kubelet"`
+	// Additional options passed to Kubeproxy
+	Kubeproxy map[string]string `json:"kubeproxy"`
+	// Additional options passed to KubeController
+	KubeController map[string]string `json:"kubeController"`
+	// Additional options passed to Scheduler
+	Scheduler map[string]string `json:"scheduler"`
 }
