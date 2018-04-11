@@ -35,7 +35,10 @@ func newConnection(connID int64, session *session, proto, address string) *conne
 
 func (c *connection) tunnelClose(err error) {
 	c.writeErr(err)
+	c.doTunnelClose(err)
+}
 
+func (c *connection) doTunnelClose(err error) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -56,7 +59,7 @@ func (c *connection) tunnelWriter() io.Writer {
 }
 
 func (c *connection) Close() error {
-	c.session.closeConnection(c.connID, ErrConnClosed)
+	c.session.closeConnection(c.connID, io.EOF)
 	return nil
 }
 
@@ -67,13 +70,6 @@ func (c *connection) copyData(b []byte) int {
 }
 
 func (c *connection) Read(b []byte) (int, error) {
-	c.Lock()
-	if c.err != nil {
-		defer c.Unlock()
-		return 0, c.err
-	}
-	c.Unlock()
-
 	if len(b) == 0 {
 		return 0, nil
 	}
@@ -85,7 +81,13 @@ func (c *connection) Read(b []byte) (int, error) {
 
 	next, ok := <-c.buf
 	if !ok {
-		return 0, io.EOF
+		err := io.EOF
+		c.Lock()
+		if c.err != nil {
+			err = c.err
+		}
+		c.Unlock()
+		return 0, err
 	}
 
 	c.readBuf = next

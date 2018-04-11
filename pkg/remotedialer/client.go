@@ -33,8 +33,10 @@ func connectToProxy(proxyURL string, headers http.Header, auth ConnectAuthorizer
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	if err := onConnect(ctx); err != nil {
-		return err
+	if onConnect != nil {
+		if err := onConnect(ctx); err != nil {
+			return err
+		}
 	}
 
 	session := newClientSession(auth, ws)
