@@ -21,6 +21,9 @@ func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.Act
 
 	username := adCredential.Username
 	password := adCredential.Password
+	if password == "" {
+		return v3.Principal{}, nil, nil, httperror.NewAPIError(httperror.MissingRequired, "password not provided")
+	}
 	externalID := ldap.GetUserExternalID(username, config.DefaultLoginDomain)
 
 	lConn, err := ldap.NewLDAPConn(config, caPool)
@@ -31,6 +34,9 @@ func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.Act
 
 	if !config.Enabled { // TODO testing for enabled here might not be correct. Might be better to pass in an explicit testSvcAccount bool
 		logrus.Debug("Bind service account username password")
+		if config.ServiceAccountPassword == "" {
+			return v3.Principal{}, nil, nil, httperror.NewAPIError(httperror.MissingRequired, "service account password not provided")
+		}
 		sausername := ldap.GetUserExternalID(config.ServiceAccountUsername, config.DefaultLoginDomain)
 		err = lConn.Bind(sausername, config.ServiceAccountPassword)
 		if err != nil {
@@ -54,7 +60,7 @@ func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.Act
 	if strings.Contains(username, "\\") {
 		samName = strings.SplitN(username, "\\\\", 2)[1]
 	}
-	query := "(" + config.UserLoginAttribute + "=" + samName + ")"
+	query := "(" + config.UserLoginAttribute + "=" + ldapv2.EscapeFilter(samName) + ")"
 	logrus.Debugf("LDAP Search query: {%s}", query)
 	search := ldapv2.NewSearchRequest(config.UserSearchBase,
 		ldapv2.ScopeWholeSubtree, ldapv2.NeverDerefAliases, 0, 0, false,
