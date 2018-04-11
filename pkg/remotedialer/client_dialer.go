@@ -5,8 +5,6 @@ import (
 	"net"
 	"sync"
 	"time"
-
-	"github.com/sirupsen/logrus"
 )
 
 func clientDial(conn *connection, message *message) {
@@ -29,29 +27,32 @@ func clientDial(conn *connection, message *message) {
 	}
 	defer netConn.Close()
 
-	pipe(conn.connID, conn, netConn)
+	pipe(conn, netConn)
 }
 
-func pipe(connID int64, client *connection, server net.Conn) {
+func pipe(client *connection, server net.Conn) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
-	go func() error {
+	close := func(err error) error {
+		if err == nil {
+			err = io.EOF
+		}
+		client.doTunnelClose(err)
+		server.Close()
+		return err
+	}
+
+	go func() {
 		defer wg.Done()
 		_, err := io.Copy(server, client)
-		if err != nil {
-			client.tunnelClose(err)
-			server.Close()
-		}
-		return err
+		close(err)
 	}()
 
 	_, err := io.Copy(client, server)
-	if err != nil {
-		client.tunnelClose(err)
-		server.Close()
-		logrus.WithError(err).Errorf("client connection failed: client %d", connID)
-	}
-
+	err = close(err)
 	wg.Wait()
+
+	// Write tunnel error after no more I/O is happening, just incase messages get out of order
+	client.writeErr(err)
 }

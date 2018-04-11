@@ -22,8 +22,7 @@ const (
 )
 
 var (
-	ErrConnClosed = errors.New("ConnClosed")
-	idCounter     int64
+	idCounter int64
 )
 
 func init() {
@@ -141,8 +140,8 @@ func (m *message) Err() error {
 	}
 
 	str := string(bytes)
-	if str == "ConnClosed" {
-		m.err = ErrConnClosed
+	if str == "EOF" {
+		m.err = io.EOF
 	} else {
 		m.err = errors.New(str)
 	}
