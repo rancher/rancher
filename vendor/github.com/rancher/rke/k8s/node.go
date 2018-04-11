@@ -17,8 +17,8 @@ import (
 
 const (
 	HostnameLabel             = "kubernetes.io/hostname"
-	InternalAddressAnnotation = "rke.io/internal-ip"
-	ExternalAddressAnnotation = "rke.io/external-ip"
+	InternalAddressAnnotation = "rke.cattle.io/internal-ip"
+	ExternalAddressAnnotation = "rke.cattle.io/external-ip"
 	AWSCloudProvider          = "aws"
 )
 
