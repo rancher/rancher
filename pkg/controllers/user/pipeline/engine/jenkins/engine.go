@@ -72,6 +72,7 @@ func (j *Engine) PreCheck() error {
 			Transport: &http.Transport{
 				Dial: dial,
 			},
+			Timeout: 15 * time.Second,
 		}
 
 		client, err := New(url, user, token, httpClient)
