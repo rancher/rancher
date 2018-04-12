@@ -38,7 +38,9 @@ func (e *Embed) ToInternal(data map[string]interface{}) {
 
 		delete(data, fieldName)
 	}
-
+	if len(sub) == 0 {
+		return
+	}
 	data[e.Field] = sub
 }
 

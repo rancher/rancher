@@ -107,5 +107,9 @@ func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 }
 
 func (s *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
-	return s.Store.Delete(apiContext, schema, id)
+	obj, err := s.Store.Delete(apiContext, schema, id)
+	if err != nil || obj == nil {
+		return obj, err
+	}
+	return s.Transformer(apiContext, schema, obj, nil)
 }

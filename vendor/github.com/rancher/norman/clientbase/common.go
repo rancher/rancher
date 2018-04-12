@@ -28,6 +28,25 @@ var (
 	dialer = &websocket.Dialer{}
 )
 
+type APIBaseClientInterface interface {
+	Websocket(url string, headers map[string][]string) (*websocket.Conn, *http.Response, error)
+	List(schemaType string, opts *types.ListOpts, respObject interface{}) error
+	Post(url string, createObj interface{}, respObject interface{}) error
+	GetLink(resource types.Resource, link string, respObject interface{}) error
+	Create(schemaType string, createObj interface{}, respObject interface{}) error
+	Update(schemaType string, existing *types.Resource, updates interface{}, respObject interface{}) error
+	ByID(schemaType string, id string, respObject interface{}) error
+	Delete(existing *types.Resource) error
+	Reload(existing *types.Resource, output interface{}) error
+	Action(schemaType string, action string, existing *types.Resource, inputObject, respObject interface{}) error
+}
+
+type APIBaseClient struct {
+	Ops   *APIOperations
+	Opts  *ClientOpts
+	Types map[string]types.Schema
+}
+
 type ClientOpts struct {
 	URL        string
 	AccessKey  string
