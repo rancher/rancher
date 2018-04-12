@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/api/store/userscope"
 	"github.com/rancher/types/apis/core/v1"
+	rbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/client/management/v3"
 )
 
@@ -15,8 +16,12 @@ const (
 	NamespaceID = client.PreferenceFieldNamespaceId
 )
 
-func NewStore(nsClient v1.NamespaceInterface, store types.Store) types.Store {
-	return userscope.NewStore(nsClient,
+func NewStore(nsClient v1.NamespaceInterface,
+	rbClient rbacv1.RoleBindingInterface,
+	clusterRoleLister rbacv1.ClusterRoleLister,
+	crClient rbacv1.ClusterRoleInterface,
+	store types.Store) types.Store {
+	return userscope.NewStore(nsClient, rbClient, clusterRoleLister, crClient,
 		&transform.Store{
 			Store:       store,
 			Transformer: transformer,
