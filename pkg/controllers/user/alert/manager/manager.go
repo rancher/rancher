@@ -98,6 +98,7 @@ func NewManager(cluster *config.UserContext) *Manager {
 		Transport: &http.Transport{
 			Dial: dial,
 		},
+		Timeout: 15 * time.Second,
 	}
 
 	return &Manager{
