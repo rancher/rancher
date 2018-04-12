@@ -218,7 +218,7 @@ func setPorts(data map[string]interface{}) {
 
 		if ok {
 			ports := convert.ToInterfaceSlice(v)
-			for _, p := range ports {
+			for i, p := range ports {
 				port, err := convert.EncodeToMap(p)
 				if err != nil {
 					logrus.Warnf("Failed to transform port to map %v", err)
@@ -229,7 +229,7 @@ func setPorts(data map[string]interface{}) {
 					if err != nil {
 						logrus.Warnf("Failed to transform container port [%v] to number: %v", port["containerPort"], err)
 					}
-					port["name"] = fmt.Sprintf("%s%s", strings.ToLower(convert.ToString(port["protocol"])), strconv.Itoa(int(containerPort)))
+					port["name"] = fmt.Sprintf("%s%s-%s", strings.ToLower(convert.ToString(port["protocol"])), strconv.Itoa(int(containerPort)), strconv.Itoa(i))
 				}
 			}
 		}

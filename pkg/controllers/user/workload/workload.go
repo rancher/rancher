@@ -13,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
@@ -97,39 +98,41 @@ func (c *Controller) CreateServiceForWorkload(workload *Workload) error {
 		services[service.Type] = *service
 	}
 
-	for _, toCreate := range services {
-		existing, err := c.serviceExistsForWorkload(workload, &toCreate)
-		if err != nil {
-			return err
-		}
+	existingServices, err := c.getExistingServices(workload)
+	if err != nil {
+		return err
+	}
 
-		if existing == nil {
+	for _, toCreate := range services {
+		existing, ok := existingServices[toCreate.Name]
+
+		if !ok {
 			if err := c.createService(toCreate, workload); err != nil {
 				return err
 			}
 
 		} else {
-			// check if the port of the same type
-			if existing.Spec.Type != toCreate.Type {
-				logrus.Warnf("Service [%s/%s] already exists but with diff type. Expected type [%s], actual type [%v]", existing.Name, existing.Namespace, toCreate.Type, existing.Spec.Type)
-				return nil
-			}
-			isOwner := false
-			for _, ref := range existing.OwnerReferences {
-				if reflect.DeepEqual(ref.UID, workload.UUID) {
-					isOwner = true
-					break
-				}
-			}
-			if !isOwner {
-				logrus.Warnf("Service [%s/%s] already exists but with diff owner", existing.Name, existing.Namespace)
-				return nil
-			}
 
-			if arePortsEqual(toCreate.ServicePorts, existing.Spec.Ports) {
+			if arePortsEqual(toCreate.ServicePorts, existing.Spec.Ports) && existing.Spec.Type == toCreate.Type {
 				continue
 			}
+
 			if err := c.updateService(toCreate, existing); err != nil {
+				return err
+			}
+		}
+	}
+
+	for name, svc := range existingServices {
+		found := false
+		for _, toCreate := range services {
+			if toCreate.Name == name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			if err := c.deleteService(svc); err != nil {
 				return err
 			}
 		}
@@ -139,29 +142,36 @@ func (c *Controller) CreateServiceForWorkload(workload *Workload) error {
 }
 
 func (c *Controller) updateService(toUpdate Service, existing *corev1.Service) error {
-	existingPortNameToPort := map[string]corev1.ServicePort{}
-	for _, p := range existing.Spec.Ports {
-		existingPortNameToPort[p.Name] = p
-	}
 
-	var portsToUpdate []corev1.ServicePort
-	for _, p := range toUpdate.ServicePorts {
-		if val, ok := existingPortNameToPort[p.Name]; ok {
-			if val.Port == p.Port {
-				// Once switch to k8s 1.9, reset only when p.Nodeport == 0. There is a bug in 1.8
-				// on port update with diff NodePort value resulting in api server crash
-				// https://github.com/kubernetes/kubernetes/issues/58892
-				//if p.NodePort == 0 {
-				//	p.NodePort = val.NodePort
-				//}
-				p.NodePort = val.NodePort
-			}
+	if existing.Spec.Type == toUpdate.Type {
+		existingPortNameToPort := map[string]corev1.ServicePort{}
+		for _, p := range existing.Spec.Ports {
+			existingPortNameToPort[p.Name] = p
 		}
-		portsToUpdate = append(portsToUpdate, p)
+
+		var portsToUpdate []corev1.ServicePort
+		for _, p := range toUpdate.ServicePorts {
+			if val, ok := existingPortNameToPort[p.Name]; ok {
+				if val.Port == p.Port {
+					// Once switch to k8s 1.9, reset only when p.Nodeport == 0. There is a bug in 1.8
+					// on port update with diff NodePort value resulting in api server crash
+					// https://github.com/kubernetes/kubernetes/issues/58892
+					//if p.NodePort == 0 {
+					//	p.NodePort = val.NodePort
+					//}
+					p.NodePort = val.NodePort
+				}
+			}
+			portsToUpdate = append(portsToUpdate, p)
+		}
+
+		existing.Spec.Ports = portsToUpdate
+	} else {
+		existing.Spec.Ports = toUpdate.ServicePorts
+		existing.Spec.Type = toUpdate.Type
 	}
 
-	existing.Spec.Ports = portsToUpdate
-	logrus.Infof("Updating [%s/%s] service with ports [%v]", existing.Namespace, existing.Name, portsToUpdate)
+	logrus.Infof("Updating [%s/%s] service with ports [%v]", existing.Namespace, existing.Name, existing.Spec.Ports)
 	_, err := c.services.Update(existing)
 	if err != nil {
 		return err
@@ -244,4 +254,44 @@ func workloadAnnotationToString(workloadID string) (string, error) {
 		return "", err
 	}
 	return string(b), nil
+}
+
+func (c *Controller) getExistingServices(workload *Workload) (map[string]*corev1.Service, error) {
+	svcs, err := c.serviceLister.List(workload.Namespace, labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+
+	existingSvcs := map[string]*corev1.Service{}
+
+	for _, svc := range svcs {
+		if svc.DeletionTimestamp != nil {
+			continue
+		}
+
+		isOwner := false
+		for _, ref := range svc.OwnerReferences {
+			if reflect.DeepEqual(ref.UID, workload.UUID) {
+				isOwner = true
+				break
+			}
+		}
+		if !isOwner {
+			continue
+		}
+
+		existingSvcs[svc.Name] = svc
+	}
+
+	return existingSvcs, nil
+
+}
+
+func (c *Controller) deleteService(toDelete *corev1.Service) error {
+
+	err := c.services.DeleteNamespaced(toDelete.Namespace, toDelete.Name, &metav1.DeleteOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
 }
