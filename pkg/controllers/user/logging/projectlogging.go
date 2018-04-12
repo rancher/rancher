@@ -33,6 +33,7 @@ type ProjectLoggingSyncer struct {
 	configmaps           v1.ConfigMapInterface
 	daemonsets           v1beta2.DaemonSetInterface
 	clusterRoleBindings  rbacv1.ClusterRoleBindingInterface
+	clusterLister        v3.ClusterLister
 	clusterName          string
 }
 
@@ -46,6 +47,7 @@ func registerProjectLogging(cluster *config.UserContext) {
 		configmaps:           cluster.Core.ConfigMaps(loggingconfig.LoggingNamespace),
 		daemonsets:           cluster.Apps.DaemonSets(loggingconfig.LoggingNamespace),
 		clusterRoleBindings:  cluster.RBAC.ClusterRoleBindings(loggingconfig.LoggingNamespace),
+		clusterLister:        cluster.Management.Management.Clusters("").Controller().Lister(),
 		clusterName:          cluster.ClusterName,
 	}
 	projectLoggings.AddClusterScopedHandler("project-logging-controller", cluster.ClusterName, syncer.Sync)
@@ -54,20 +56,7 @@ func registerProjectLogging(cluster *config.UserContext) {
 func (c *ProjectLoggingSyncer) Sync(key string, obj *v3.ProjectLogging) error {
 	//clean up
 	if obj == nil || obj.DeletionTimestamp != nil {
-		allDisabled, err := utils.IsAllLoggingDisable(c.clusterLoggingLister, c.projectLoggings.Controller().Lister())
-		if err != nil {
-			return err
-		}
-
-		if allDisabled {
-			if err := utils.RemoveFluentd(c.daemonsets, c.serviceAccounts, c.clusterRoleBindings); err != nil {
-				return err
-			}
-			if err := utils.RemoveConfigMap(c.configmaps); err != nil {
-				return err
-			}
-		}
-		return nil
+		return utils.CleanResource(c.namespaces, c.clusterLoggingLister, c.projectLoggings.Controller().Lister())
 	}
 
 	if err := utils.IniteNamespace(c.namespaces); err != nil {
@@ -79,6 +68,11 @@ func (c *ProjectLoggingSyncer) Sync(key string, obj *v3.ProjectLogging) error {
 	if err := c.createOrUpdateProjectConfigMap(); err != nil {
 		return err
 	}
+
+	if err := utils.CreateLogAggregator(c.daemonsets, c.serviceAccounts, c.clusterRoleBindings, c.clusterLister, c.clusterName, loggingconfig.LoggingNamespace); err != nil {
+		return err
+	}
+
 	return utils.CreateFluentd(c.daemonsets, c.serviceAccounts, c.clusterRoleBindings, loggingconfig.LoggingNamespace)
 }
 

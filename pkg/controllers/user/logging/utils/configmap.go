@@ -6,7 +6,6 @@ import (
 
 	"github.com/pkg/errors"
 	rv1 "github.com/rancher/types/apis/core/v1"
-	"golang.org/x/sync/errgroup"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,20 +53,6 @@ func UpdateConfigMap(configPath, loggingName, level string, configmaps rv1.Confi
 	existConfig.Data = configMap.Data
 	if _, err = configmaps.Update(existConfig); err != nil {
 		return errors.Wrapf(err, "update configmap %s:%s failed", existConfig.Namespace, existConfig.Name)
-	}
-	return nil
-}
-
-func RemoveConfigMap(configmaps rv1.ConfigMapInterface) error {
-	var errgrp errgroup.Group
-	errgrp.Go(func() error {
-		return configmaps.Delete(loggingconfig.ClusterLoggingName, &metav1.DeleteOptions{})
-	})
-	errgrp.Go(func() error {
-		return configmaps.Delete(loggingconfig.ProjectLoggingName, &metav1.DeleteOptions{})
-	})
-	if err := errgrp.Wait(); err != nil && !apierrors.IsNotFound(err) {
-		return err
 	}
 	return nil
 }
