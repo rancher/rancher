@@ -43,11 +43,12 @@ var (
 			PluginsDocker: "plugins/docker",
 		},
 		LoggingSystemImages: LoggingSystemImages{
-			Fluentd:       "rancher/fluentd:v0.1.4",
-			FluentdHelper: "rancher/fluentd-helper:v0.1.1",
-			Elaticsearch:  "rancher/docker-elasticsearch-kubernetes:5.6.2",
-			Kibana:        "kibana:5.6.4",
-			Busybox:       "busybox",
+			Fluentd:                       "rancher/fluentd:v0.1.6",
+			FluentdHelper:                 "rancher/fluentd-helper:v0.1.2",
+			LogAggregatorFlexVolumeDriver: "rancher/log-aggregator:v0.1.2",
+			Elaticsearch:                  "rancher/docker-elasticsearch-kubernetes:5.6.2",
+			Kibana:                        "kibana:5.6.4",
+			Busybox:                       "busybox",
 		},
 	}
 

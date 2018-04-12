@@ -38,6 +38,8 @@ type ClusterLoggingSyncer struct {
 	roles                rbacv1.RoleInterface
 	rolebindings         rbacv1.RoleBindingInterface
 	clusterRoleBindings  rbacv1.ClusterRoleBindingInterface
+	clusterLister        v3.ClusterLister
+	clusterName          string
 }
 
 func registerClusterLogging(cluster *config.UserContext) {
@@ -57,6 +59,8 @@ func registerClusterLogging(cluster *config.UserContext) {
 		roles:                cluster.RBAC.Roles(loggingconfig.LoggingNamespace),
 		rolebindings:         cluster.RBAC.RoleBindings(loggingconfig.LoggingNamespace),
 		clusterRoleBindings:  cluster.RBAC.ClusterRoleBindings(loggingconfig.LoggingNamespace),
+		clusterLister:        cluster.Management.Management.Clusters("").Controller().Lister(),
+		clusterName:          cluster.ClusterName,
 	}
 	clusterloggingClient.AddClusterScopedHandler("cluster-logging-controller", cluster.ClusterName, syncer.Sync)
 }
@@ -64,24 +68,7 @@ func registerClusterLogging(cluster *config.UserContext) {
 func (c *ClusterLoggingSyncer) Sync(key string, obj *v3.ClusterLogging) error {
 	//clean up
 	if obj == nil || obj.DeletionTimestamp != nil {
-		if err := utils.RemoveEmbeddedTarget(c.deployments, c.serviceAccounts, c.services, c.roles, c.rolebindings); err != nil {
-			return err
-		}
-
-		allDisabled, err := utils.IsAllLoggingDisable(c.clusterLoggings.Controller().Lister(), c.projectLoggingLister)
-		if err != nil {
-			return err
-		}
-
-		if allDisabled {
-			if err := utils.RemoveFluentd(c.daemonsets, c.serviceAccounts, c.clusterRoleBindings); err != nil {
-				return err
-			}
-			if err := utils.RemoveConfigMap(c.configmaps); err != nil {
-				return err
-			}
-		}
-		return nil
+		return utils.CleanResource(c.namespaces, c.clusterLoggingLister, c.projectLoggingLister)
 	}
 
 	if err := utils.IniteNamespace(c.namespaces); err != nil {
@@ -90,11 +77,12 @@ func (c *ClusterLoggingSyncer) Sync(key string, obj *v3.ClusterLogging) error {
 	if err := utils.InitConfigMap(c.configmaps); err != nil {
 		return err
 	}
+
+	//embedded
 	if utils.GetClusterTarget(obj.Spec) == "embedded" {
 		if err := utils.CreateOrUpdateEmbeddedTarget(c.deployments, c.serviceAccounts, c.services, c.roles, c.rolebindings, loggingconfig.LoggingNamespace, obj); err != nil {
 			return err
 		}
-
 		c.updateEmbeddedEndpoint()
 	} else {
 		if err := utils.RemoveEmbeddedTarget(c.deployments, c.serviceAccounts, c.services, c.roles, c.rolebindings); err != nil {
@@ -105,6 +93,11 @@ func (c *ClusterLoggingSyncer) Sync(key string, obj *v3.ClusterLogging) error {
 	if err := c.createOrUpdateClusterConfigMap(); err != nil {
 		return err
 	}
+
+	if err := utils.CreateLogAggregator(c.daemonsets, c.serviceAccounts, c.clusterRoleBindings, c.clusterLister, c.clusterName, loggingconfig.LoggingNamespace); err != nil {
+		return err
+	}
+
 	return utils.CreateFluentd(c.daemonsets, c.serviceAccounts, c.clusterRoleBindings, loggingconfig.LoggingNamespace)
 }
 
@@ -132,7 +125,7 @@ func (c *ClusterLoggingSyncer) createOrUpdateClusterConfigMap() error {
 }
 
 func (c *ClusterLoggingSyncer) updateEmbeddedEndpoint() {
-	timeout := 2 * time.Minute
+	timeout := 3 * time.Minute
 	syncInterval := 10 * time.Second
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	go func(ctx context.Context, cancel context.CancelFunc) {

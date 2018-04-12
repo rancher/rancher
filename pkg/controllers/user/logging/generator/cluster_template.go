@@ -51,7 +51,7 @@ var ClusterTemplate = `{{ if ne .clusterTarget.CurrentTarget "none" }}
   </record>
 </filter>
 
-<match  cluster.** rke.**> 
+<match  cluster.** rke.** cluster-custom.**> 
     {{ if eq .clusterTarget.CurrentTarget "embedded"}}
     @type elasticsearch
     include_tag_key  true

@@ -44,7 +44,7 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
 </filter>
 
 {{ if $store.CurrentTarget }}
-<match  {{$store.ProjectName}}.**> 
+<match  {{$store.ProjectName}}.** project-custom.{{$store.ProjectName}}.**> 
     flush_interval {{$store.OutputFlushInterval}}s
     {{ if eq $store.CurrentTarget "elasticsearch"}}
     @type elasticsearch
@@ -91,7 +91,6 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
     program {{$store.SyslogConfig.Program}}
     {{end}}
     
-
     max_retry_wait 30
     disable_retry_limit
     num_threads 8

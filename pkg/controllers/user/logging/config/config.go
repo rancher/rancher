@@ -10,6 +10,7 @@ const (
 const (
 	FluentdName       = "fluentd"
 	FluentdHelperName = "fluentd-helper"
+	LogAggregatorName = "log-aggregator"
 )
 
 //embedded
@@ -38,4 +39,8 @@ const (
 //app label
 const (
 	LabelK8sApp = "k8s-app"
+)
+
+const (
+	GoogleKubernetesEngine = "googleKubernetesEngine"
 )
