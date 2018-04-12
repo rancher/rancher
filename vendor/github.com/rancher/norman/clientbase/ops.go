@@ -12,6 +12,12 @@ import (
 	"github.com/rancher/norman/types"
 )
 
+type APIOperations struct {
+	Opts   *ClientOpts
+	Types  map[string]types.Schema
+	Client *http.Client
+}
+
 func (a *APIOperations) setupRequest(req *http.Request) {
 	req.Header.Add("Authorization", a.Opts.getAuthHeader())
 }

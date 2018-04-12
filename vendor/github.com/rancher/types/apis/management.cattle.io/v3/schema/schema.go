@@ -95,6 +95,8 @@ func nativeNodeTypes(schemas *types.Schemas) *types.Schemas {
 				"taints":        "ru",
 				"unschedulable": "ru",
 			}}).
+		AddMapperForType(&Version, v1.Node{},
+			&mapper.NodeAddressAnnotationMapper{}).
 		MustImportAndCustomize(&Version, v1.NodeSpec{}, func(schema *types.Schema) {
 			schema.CodeName = "InternalNodeSpec"
 			schema.CodeNamePlural = "InternalNodeSpecs"
