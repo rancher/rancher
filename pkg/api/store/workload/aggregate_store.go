@@ -136,8 +136,17 @@ func (a *AggregateStore) Create(apiContext *types.APIContext, schema *types.Sche
 	setSecrets(apiContext, data)
 	setPorts(data)
 	setScheduling(apiContext, data)
+	setStrategy(data)
 
 	return toStore.Create(apiContext, toSchema, data)
+}
+
+func setStrategy(data map[string]interface{}) {
+	strategy, ok := values.GetValue(data, "deploymentConfig", "strategy")
+	if ok && convert.ToString(strategy) == "Recreate" {
+		values.RemoveValue(data, "deploymentConfig", "maxSurge")
+		values.RemoveValue(data, "deploymentConfig", "maxUnavailable")
+	}
 }
 
 func setSelector(schemaID string, data map[string]interface{}) {
