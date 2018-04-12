@@ -34,7 +34,7 @@ type RancherKubernetesEngineConfig struct {
 	// Cloud Provider options
 	CloudProvider CloudProvider `yaml:"cloud_provider" json:"cloudProvider,omitempty"`
 	// kubernetes directory path
-	KubernetesDirPath string `yaml:"kubernetes_dir_path" json:"kubernetesDirPath,omitempty"`
+	PrefixPath string `yaml:"prefix_path" json:"prefixPath,omitempty"`
 }
 
 type PrivateRegistry struct {

@@ -125,9 +125,10 @@ type SyslogConfig struct {
 }
 
 type LoggingSystemImages struct {
-	Fluentd       string `json:"fluentd,omitempty"`
-	FluentdHelper string `json:"fluentdHelper,omitempty"`
-	Elaticsearch  string `json:"elaticsearch,omitempty"`
-	Kibana        string `json:"kibana,omitempty"`
-	Busybox       string `json:"busybox,omitempty"`
+	Fluentd                       string `json:"fluentd,omitempty"`
+	FluentdHelper                 string `json:"fluentdHelper,omitempty"`
+	Elaticsearch                  string `json:"elaticsearch,omitempty"`
+	Kibana                        string `json:"kibana,omitempty"`
+	Busybox                       string `json:"busybox,omitempty"`
+	LogAggregatorFlexVolumeDriver string `json:"logAggregatorFlexVolumeDriver,omitempty"`
 }
