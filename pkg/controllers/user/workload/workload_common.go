@@ -25,21 +25,22 @@ import (
 )
 
 const (
-	AppVersion                = "apps/v1beta2"
-	BatchBetaVersion          = "batch/v1beta1"
-	BatchVersion              = "batch/v1"
-	WorkloadAnnotation        = "field.cattle.io/targetWorkloadIds"
-	PortsAnnotation           = "field.cattle.io/ports"
-	ClusterIPServiceType      = "ClusterIP"
-	AllWorkloads              = "_all_workloads_"
-	DeploymentType            = "deployment"
-	ReplicationControllerType = "replicationcontroller"
-	ReplicaSetType            = "replicaset"
-	DaemonSetType             = "daemonset"
-	StatefulSetType           = "statefulset"
-	JobType                   = "job"
-	CronJobType               = "cronjob"
-	WorkloadAnnotatioNoop     = "targetWorkloadIdNoop"
+	AppVersion                         = "apps/v1beta2"
+	BatchBetaVersion                   = "batch/v1beta1"
+	BatchVersion                       = "batch/v1"
+	WorkloadAnnotation                 = "field.cattle.io/targetWorkloadIds"
+	PortsAnnotation                    = "field.cattle.io/ports"
+	ClusterIPServiceType               = "ClusterIP"
+	AllWorkloads                       = "_all_workloads_"
+	DeploymentType                     = "deployment"
+	ReplicationControllerType          = "replicationcontroller"
+	ReplicaSetType                     = "replicaset"
+	DaemonSetType                      = "daemonset"
+	StatefulSetType                    = "statefulset"
+	JobType                            = "job"
+	CronJobType                        = "cronjob"
+	WorkloadAnnotatioNoop              = "workload.cattle.io/targetWorkloadIdNoop"
+	WorkloaAnnotationdPortBasedService = "workload.cattle.io/workloadPortBased"
 )
 
 var WorkloadKinds = map[string]bool{
@@ -470,7 +471,7 @@ type ContainerPort struct {
 	ContainerPort int32  `json:"containerPort,omitempty"`
 }
 
-func generateServiceFromContainers(workload *Workload) *Service {
+func generateClusterIPServiceFromContainers(workload *Workload) *Service {
 	var servicePorts []corev1.ServicePort
 	for _, c := range workload.TemplateSpec.Spec.Containers {
 		for _, p := range c.Ports {

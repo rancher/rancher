@@ -134,7 +134,9 @@ func (a *AggregateStore) Create(apiContext *types.APIContext, schema *types.Sche
 	setSelector(toSchema.ID, data)
 	setWorkloadSpecificDefaults(toSchema.ID, data)
 	setSecrets(apiContext, data)
-	setPorts(data)
+	if err := setPorts(convert.ToString(data["name"]), data); err != nil {
+		return nil, err
+	}
 	setScheduling(apiContext, data)
 	setStrategy(data)
 
@@ -202,10 +204,10 @@ func store(registries map[string]projectclient.RegistryCredential, domainToCreds
 	}
 }
 
-func setPorts(data map[string]interface{}) {
+func setPorts(workloadName string, data map[string]interface{}) error {
 	containers, ok := values.GetValue(data, "containers")
 	if !ok {
-		return
+		return nil
 	}
 
 	for _, c := range convert.ToInterfaceSlice(containers) {
@@ -218,22 +220,71 @@ func setPorts(data map[string]interface{}) {
 
 		if ok {
 			ports := convert.ToInterfaceSlice(v)
+			usedNames := map[string]bool{}
 			for _, p := range ports {
 				port, err := convert.EncodeToMap(p)
 				if err != nil {
 					logrus.Warnf("Failed to transform port to map %v", err)
 					continue
 				}
+				portName := ""
 				if convert.IsEmpty(port["name"]) {
 					containerPort, err := convert.ToNumber(port["containerPort"])
 					if err != nil {
 						logrus.Warnf("Failed to transform container port [%v] to number: %v", port["containerPort"], err)
 					}
-					port["name"] = fmt.Sprintf("%s%s", strings.ToLower(convert.ToString(port["protocol"])), strconv.Itoa(int(containerPort)))
+					// port name is of format containerPortProtoSourcePortKind
+					// len limit is 15, therefore a) no separator b) kind is numerated
+					numKind := 0
+					switch kind := convert.ToString(port["kind"]); kind {
+					case "NodePort":
+						numKind = 1
+					case "ClusterIP":
+						numKind = 2
+					case "LoadBalancer":
+						numKind = 3
+					}
+
+					portName = fmt.Sprintf("%s%s%s%s", strconv.Itoa(int(containerPort)),
+						strings.ToLower(convert.ToString(port["protocol"])),
+						strings.ToLower(convert.ToString(port["sourcePort"])),
+						strings.ToLower(convert.ToString(numKind)))
+				} else {
+					portName = convert.ToString(port["name"])
+				}
+
+				//validate port name
+				if _, ok := usedNames[portName]; ok {
+					return httperror.NewAPIError(httperror.InvalidOption, fmt.Sprintf("Duplicated port kind=%v,"+
+						" conainerPort=%v, protcol=%v", port["kind"], port["containerPort"], port["protocol"]))
+				}
+				usedNames[portName] = true
+				port["name"] = portName
+
+				if generateDNSName(workloadName, convert.ToString(port["dnsName"])) {
+					if port["kind"] == "ClusterIP" {
+						// use workload name for clusterIP service as it will be used by dns resolution
+						port["dnsName"] = strings.ToLower(convert.ToString(workloadName))
+					} else {
+						port["dnsName"] = fmt.Sprintf("%s-%s", strings.ToLower(convert.ToString(workloadName)),
+							strings.ToLower(convert.ToString(port["kind"])))
+					}
 				}
 			}
 		}
 	}
+	return nil
+}
+
+func generateDNSName(workloadName, dnsName string) bool {
+	if dnsName == "" {
+		return true
+	}
+	// regenerate the name in case port type got changed
+	if strings.HasPrefix(dnsName, fmt.Sprintf("%s-", workloadName)) {
+		return true
+	}
+	return false
 }
 
 func getCreds(apiContext *types.APIContext, namespaceID string) map[string][]corev1.LocalObjectReference {
@@ -305,7 +356,10 @@ func (a *AggregateStore) Update(apiContext *types.APIContext, schema *types.Sche
 		return nil, err
 	}
 	_, shortID := splitTypeAndID(id)
-	setPorts(data)
+	splitted := strings.Split(shortID, ":")
+	if err := setPorts(splitted[1], data); err != nil {
+		return nil, err
+	}
 	return store.Update(apiContext, a.Schemas[schemaType], data, shortID)
 }
 
