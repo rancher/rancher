@@ -95,6 +95,8 @@ func (s *Schemas) setupFilters(schema *Schema) {
 		switch field.Type {
 		case "enum":
 			mods = []ModifierType{ModifierEQ, ModifierNE, ModifierIn, ModifierNotIn}
+		case "dnsLabel":
+			fallthrough
 		case "string":
 			mods = []ModifierType{ModifierEQ, ModifierNE, ModifierIn, ModifierNotIn}
 		case "int":
