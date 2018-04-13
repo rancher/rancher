@@ -87,8 +87,8 @@ func Register(ctx context.Context, workload *config.UserContext) {
 }
 
 func areEqualEndpoints(one []v3.PublicEndpoint, two []v3.PublicEndpoint) bool {
-	oneMap := make(map[string]bool)
-	twoMap := make(map[string]bool)
+	oneMap := map[string]bool{}
+	twoMap := map[string]bool{}
 	for _, value := range one {
 		oneMap[publicEndpointToString(value)] = true
 	}
@@ -183,16 +183,18 @@ func convertServiceToPublicEndpoints(svc *corev1.Service, clusterName string, no
 			}
 			addresses = append(addresses, address)
 		}
-		for _, port := range svc.Spec.Ports {
-			p := v3.PublicEndpoint{
-				NodeName:    "",
-				Addresses:   addresses,
-				Port:        port.Port,
-				Protocol:    string(port.Protocol),
-				ServiceName: svcName,
-				AllNodes:    false,
+		if len(addresses) > 0 {
+			for _, port := range svc.Spec.Ports {
+				p := v3.PublicEndpoint{
+					NodeName:    "",
+					Addresses:   addresses,
+					Port:        port.Port,
+					Protocol:    string(port.Protocol),
+					ServiceName: svcName,
+					AllNodes:    false,
+				}
+				eps = append(eps, p)
 			}
-			eps = append(eps, p)
 		}
 	}
 
@@ -241,7 +243,7 @@ func getNodeNameToMachine(clusterName string, machineLister managementv3.NodeLis
 	if err != nil {
 		return nil, err
 	}
-	machineMap := make(map[string]*managementv3.Node)
+	machineMap := map[string]*managementv3.Node{}
 	for _, machine := range machines {
 		if machine.Status.NodeName == "" {
 			if machine.Status.NodeConfig != nil {
@@ -258,12 +260,16 @@ func getNodeNameToMachine(clusterName string, machineLister managementv3.NodeLis
 
 func convertIngressToServicePublicEndpointsMap(obj *extensionsv1beta1.Ingress, allNodes bool) (map[string][]v3.PublicEndpoint, error) {
 	var addresses []string
+	epsMap := map[string][]v3.PublicEndpoint{}
 	if !allNodes {
 		for _, address := range obj.Status.LoadBalancer.Ingress {
 			addresses = append(addresses, address.IP)
 		}
+		if len(addresses) == 0 {
+			return epsMap, nil
+		}
 	}
-	epsMap := make(map[string][]v3.PublicEndpoint)
+
 	ports := map[int32]string{80: "HTTP", 443: "HTTPS"}
 	for _, rule := range obj.Spec.Rules {
 		for _, path := range rule.HTTP.Paths {

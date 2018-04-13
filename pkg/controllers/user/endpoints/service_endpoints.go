@@ -64,7 +64,7 @@ func (s *ServicesController) reconcileEndpointsForService(svc *corev1.Service) (
 
 	logrus.Infof("Updating service [%s] with public endpoints [%v]", svc.Name, epsToUpdate)
 	if toUpdate.Annotations == nil {
-		toUpdate.Annotations = make(map[string]string)
+		toUpdate.Annotations = map[string]string{}
 	}
 	toUpdate.Annotations[endpointsAnnotation] = epsToUpdate
 	_, err = s.services.Update(toUpdate)
