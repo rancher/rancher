@@ -345,7 +345,8 @@ func (s *server) cacheIPHandler(handler http.Handler) http.Handler {
 
 func (s *server) serveHTTPS(config *v3.ListenConfig) error {
 	conf := &tls.Config{
-		GetCertificate: s.getCertificate,
+		GetCertificate:           s.getCertificate,
+		PreferServerCipherSuites: true,
 	}
 	listener, err := s.newListener(s.httpsPort, conf)
 	if err != nil {
