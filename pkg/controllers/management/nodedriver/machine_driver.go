@@ -172,14 +172,14 @@ func (m *Lifecycle) createOrUpdateNodeForEmbeddedType(embeddedType, fieldName st
 	schemaLock.Lock()
 	defer schemaLock.Unlock()
 
-	if err := m.createOrUpdateNodeForEmbeddedTypeWithParents(embeddedType, fieldName, "nodeconfig", "node", embedded); err != nil {
+	if err := m.createOrUpdateNodeForEmbeddedTypeWithParents(embeddedType, fieldName, "nodeconfig", "node", embedded, false); err != nil {
 		return err
 	}
 
-	return m.createOrUpdateNodeForEmbeddedTypeWithParents(embeddedType, fieldName, "nodetemplateconfig", "nodeTemplate", embedded)
+	return m.createOrUpdateNodeForEmbeddedTypeWithParents(embeddedType, fieldName, "nodetemplateconfig", "nodeTemplate", embedded, true)
 }
 
-func (m *Lifecycle) createOrUpdateNodeForEmbeddedTypeWithParents(embeddedType, fieldName, schemaID, parentID string, embedded bool) error {
+func (m *Lifecycle) createOrUpdateNodeForEmbeddedTypeWithParents(embeddedType, fieldName, schemaID, parentID string, embedded, update bool) error {
 	nodeSchema, err := m.schemaLister.Get("", schemaID)
 	if err != nil && !errors.IsNotFound(err) {
 		return err
@@ -189,7 +189,7 @@ func (m *Lifecycle) createOrUpdateNodeForEmbeddedTypeWithParents(embeddedType, f
 			resourceField[fieldName] = v3.Field{
 				Create:   true,
 				Nullable: true,
-				Update:   false,
+				Update:   update,
 				Type:     embeddedType,
 			}
 		}
@@ -216,7 +216,7 @@ func (m *Lifecycle) createOrUpdateNodeForEmbeddedTypeWithParents(embeddedType, f
 			nodeSchema.Spec.ResourceFields[fieldName] = v3.Field{
 				Create:   true,
 				Nullable: true,
-				Update:   false,
+				Update:   update,
 				Type:     embeddedType,
 			}
 			shouldUpdate = true

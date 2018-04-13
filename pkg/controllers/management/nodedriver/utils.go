@@ -37,6 +37,7 @@ var (
 func flagToField(flag cli.Flag) (string, v3.Field, error) {
 	field := v3.Field{
 		Create: true,
+		Update: true,
 		Type:   "string",
 	}
 
