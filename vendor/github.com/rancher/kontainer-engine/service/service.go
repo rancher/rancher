@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/rancher/kontainer-engine/cluster"
-	"github.com/rancher/kontainer-engine/plugin"
+	"github.com/rancher/kontainer-engine/drivers"
 	"github.com/rancher/kontainer-engine/types"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -20,16 +20,14 @@ var (
 )
 
 func Start() error {
-	for driver := range plugin.BuiltInDrivers {
+	for name, driver := range drivers.Drivers {
 		logrus.Infof("Activating driver %s", driver)
 		addr := make(chan string)
-		rpcDriver, err := plugin.Run(driver, addr)
-		if err != nil {
-			return err
-		}
-		Drivers[driver] = rpcDriver
+		go types.NewServer(driver, addr).Serve()
+
+		Drivers[name] = driver
 		listenAddr := <-addr
-		pluginAddress[driver] = listenAddr
+		pluginAddress[name] = listenAddr
 		logrus.Infof("Activating driver %s done", driver)
 	}
 	return nil
@@ -72,6 +70,13 @@ func (c controllerConfigGetter) GetConfig() (types.DriverOptions, error) {
 		flatten(data, &driverOptions)
 	case "import":
 		config, err := toMap(c.clusterSpec.ImportedConfig, "json")
+		if err != nil {
+			return driverOptions, err
+		}
+		data = config
+		flatten(data, &driverOptions)
+	case "eks":
+		config, err := toMap(c.clusterSpec.AmazonElasticContainerServiceConfig, "json")
 		if err != nil {
 			return driverOptions, err
 		}
@@ -161,6 +166,8 @@ func (e *engineService) convertCluster(name string, spec v3.ClusterSpec) (cluste
 		driverName = "gke"
 	} else if spec.RancherKubernetesEngineConfig != nil {
 		driverName = "rke"
+	} else if spec.AmazonElasticContainerServiceConfig != nil {
+		driverName = "eks"
 	} else if spec.ImportedConfig != nil {
 		driverName = "import"
 	}

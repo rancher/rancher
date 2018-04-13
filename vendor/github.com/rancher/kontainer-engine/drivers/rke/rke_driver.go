@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rancher/kontainer-engine/drivers"
 	"github.com/rancher/kontainer-engine/drivers/rke/rkecerts"
+	"github.com/rancher/kontainer-engine/drivers/util"
 	"github.com/rancher/kontainer-engine/types"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rke/cmd"
@@ -43,8 +43,7 @@ type Driver struct {
 	types.UnimplementedClusterSizeAccess
 }
 
-// NewDriver creates a new rke driver
-func NewDriver() *Driver {
+func NewDriver() types.Driver {
 	d := &Driver{
 		driverCapabilities: types.Capabilities{
 			Capabilities: make(map[int64]bool),
@@ -122,7 +121,7 @@ func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions) (*types.
 		return nil, err
 	}
 
-	rkeConfig, err := drivers.ConvertToRkeConfig(yaml)
+	rkeConfig, err := util.ConvertToRkeConfig(yaml)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +165,7 @@ func (d *Driver) Update(ctx context.Context, clusterInfo *types.ClusterInfo, opt
 		return nil, err
 	}
 
-	rkeConfig, err := drivers.ConvertToRkeConfig(yaml)
+	rkeConfig, err := util.ConvertToRkeConfig(yaml)
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +203,7 @@ func (d *Driver) Update(ctx context.Context, clusterInfo *types.ClusterInfo, opt
 func (d *Driver) getClientset(info *types.ClusterInfo) (*kubernetes.Clientset, error) {
 	yaml := info.Metadata["Config"]
 
-	rkeConfig, err := drivers.ConvertToRkeConfig(yaml)
+	rkeConfig, err := util.ConvertToRkeConfig(yaml)
 	if err != nil {
 		return nil, err
 	}
@@ -260,7 +259,7 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 			continue
 		}
 
-		token, err := drivers.GenerateServiceAccountToken(clientset)
+		token, err := util.GenerateServiceAccountToken(clientset)
 		if err != nil {
 			lastErr = err
 			time.Sleep(2 * time.Second)
@@ -298,7 +297,7 @@ func (d *Driver) GetVersion(ctx context.Context, info *types.ClusterInfo) (*type
 }
 
 func (d *Driver) SetVersion(ctx context.Context, info *types.ClusterInfo, version *types.KubernetesVersion) error {
-	config, err := drivers.ConvertToRkeConfig(info.Metadata["Config"])
+	config, err := util.ConvertToRkeConfig(info.Metadata["Config"])
 
 	if err != nil {
 		return err
@@ -344,7 +343,7 @@ func nodeCount(info *types.ClusterInfo) (int64, error) {
 		return 0, nil
 	}
 
-	rkeConfig, err := drivers.ConvertToRkeConfig(yaml)
+	rkeConfig, err := util.ConvertToRkeConfig(yaml)
 	if err != nil {
 		return 0, err
 	}
@@ -361,7 +360,7 @@ func nodeCount(info *types.ClusterInfo) (int64, error) {
 
 // Remove removes the cluster
 func (d *Driver) Remove(ctx context.Context, clusterInfo *types.ClusterInfo) error {
-	rkeConfig, err := drivers.ConvertToRkeConfig(clusterInfo.Metadata["Config"])
+	rkeConfig, err := util.ConvertToRkeConfig(clusterInfo.Metadata["Config"])
 	if err != nil {
 		return err
 	}
