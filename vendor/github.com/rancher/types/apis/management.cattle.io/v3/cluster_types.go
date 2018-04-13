@@ -52,16 +52,17 @@ type Cluster struct {
 }
 
 type ClusterSpec struct {
-	DisplayName                          string                         `json:"displayName"`
-	Description                          string                         `json:"description"`
-	Internal                             bool                           `json:"internal" norman:"nocreate,noupdate"`
-	DesiredAgentImage                    string                         `json:"desiredAgentImage"`
-	ImportedConfig                       *ImportedConfig                `json:"importedConfig,omitempty" norman:"nocreate,noupdate"`
-	GoogleKubernetesEngineConfig         *GoogleKubernetesEngineConfig  `json:"googleKubernetesEngineConfig,omitempty"`
-	AzureKubernetesServiceConfig         *AzureKubernetesServiceConfig  `json:"azureKubernetesServiceConfig,omitempty"`
-	RancherKubernetesEngineConfig        *RancherKubernetesEngineConfig `json:"rancherKubernetesEngineConfig,omitempty"`
-	DefaultPodSecurityPolicyTemplateName string                         `json:"defaultPodSecurityPolicyTemplateName,omitempty" norman:"type=reference[podSecurityPolicyTemplate]"`
-	DefaultClusterRoleForProjectMembers  string                         `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
+	DisplayName                          string                               `json:"displayName"`
+	Description                          string                               `json:"description"`
+	Internal                             bool                                 `json:"internal" norman:"nocreate,noupdate"`
+	DesiredAgentImage                    string                               `json:"desiredAgentImage"`
+	ImportedConfig                       *ImportedConfig                      `json:"importedConfig,omitempty" norman:"nocreate,noupdate"`
+	GoogleKubernetesEngineConfig         *GoogleKubernetesEngineConfig        `json:"googleKubernetesEngineConfig,omitempty"`
+	AzureKubernetesServiceConfig         *AzureKubernetesServiceConfig        `json:"azureKubernetesServiceConfig,omitempty"`
+	RancherKubernetesEngineConfig        *RancherKubernetesEngineConfig       `json:"rancherKubernetesEngineConfig,omitempty"`
+	AmazonElasticContainerServiceConfig  *AmazonElasticContainerServiceConfig `json:"amazonElasticContainerServiceConfig,omitempty"`
+	DefaultPodSecurityPolicyTemplateName string                               `json:"defaultPodSecurityPolicyTemplateName,omitempty" norman:"type=reference[podSecurityPolicyTemplate]"`
+	DefaultClusterRoleForProjectMembers  string                               `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
 }
 
 type ImportedConfig struct {
@@ -191,6 +192,11 @@ type AzureKubernetesServiceConfig struct {
 	TenantID string `json:"tenantId,omitempty" norman:"required"`
 	// Secret associated with the Client ID
 	ClientSecret string `json:"clientSecret,omitempty" norman:"required,type=password"`
+}
+
+type AmazonElasticContainerServiceConfig struct {
+	AccessKey string `json:"accessKey" norman:"required"`
+	SecretKey string `json:"secretKey" norman:"required,type=password"`
 }
 
 type ClusterEvent struct {
