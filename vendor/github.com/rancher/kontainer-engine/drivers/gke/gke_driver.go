@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/kontainer-engine/drivers"
+	"github.com/rancher/kontainer-engine/drivers/util"
 	"github.com/rancher/kontainer-engine/types"
 	"github.com/rancher/rke/log"
 	"github.com/sirupsen/logrus"
@@ -84,8 +84,7 @@ type state struct {
 	ClusterInfo types.ClusterInfo
 }
 
-// NewDriver creates a gke Driver
-func NewDriver() *Driver {
+func NewDriver() types.Driver {
 	driver := &Driver{
 		driverCapabilities: types.Capabilities{
 			Capabilities: make(map[int64]bool),
@@ -561,7 +560,7 @@ func generateServiceAccountTokenForGke(cluster *raw.Cluster) (string, error) {
 		return "", err
 	}
 
-	return drivers.GenerateServiceAccountToken(clientset)
+	return util.GenerateServiceAccountToken(clientset)
 }
 
 func (d *Driver) waitCluster(ctx context.Context, svc *raw.Service, state *state) error {

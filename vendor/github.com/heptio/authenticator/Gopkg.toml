@@ -1,0 +1,30 @@
+
+# Gopkg.toml
+#
+# Refer to https://github.com/golang/dep/blob/master/docs/Gopkg.toml.md
+# for detailed Gopkg.toml documentation.
+#
+
+[[constraint]]
+  name = "github.com/aws/aws-sdk-go"
+  version = "1.12.8"
+
+[[constraint]]
+  name = "github.com/sirupsen/logrus"
+  version = "1.0.3"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/spf13/cobra"
+
+[[constraint]]
+  name = "github.com/spf13/viper"
+  version = "1.0.0"
+
+[[constraint]]
+  branch = "master"
+  name = "k8s.io/api"
+
+[[constraint]]
+  name = "github.com/prometheus/client_golang"
+  version = "0.9.0-pre1"

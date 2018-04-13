@@ -9,7 +9,7 @@ import (
 
 	"fmt"
 
-	"github.com/rancher/kontainer-engine/drivers"
+	"github.com/rancher/kontainer-engine/drivers/util"
 	"github.com/rancher/kontainer-engine/store"
 	"github.com/rancher/kontainer-engine/types"
 	"github.com/sirupsen/logrus"
@@ -25,7 +25,7 @@ type Driver struct {
 	types.UnimplementedClusterSizeAccess
 }
 
-func NewDriver() *Driver {
+func NewDriver() types.Driver {
 	return &Driver{}
 }
 
@@ -159,7 +159,7 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 		return nil, fmt.Errorf("failed to get Kubernetes server version: %v", err)
 	}
 
-	info.ServiceAccountToken, err = drivers.GenerateServiceAccountToken(clientset)
+	info.ServiceAccountToken, err = util.GenerateServiceAccountToken(clientset)
 
 	if err != nil {
 		return nil, err

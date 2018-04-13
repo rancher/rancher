@@ -17,7 +17,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/pkg/errors"
-	"github.com/rancher/kontainer-engine/drivers"
+	"github.com/rancher/kontainer-engine/drivers/util"
 	"github.com/rancher/kontainer-engine/types"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -43,7 +43,7 @@ type state struct {
 	ClusterInfo types.ClusterInfo
 }
 
-func NewDriver() *Driver {
+func NewDriver() types.Driver {
 	driver := &Driver{
 		driverCapabilities: types.Capabilities{
 			Capabilities: make(map[int64]bool),
@@ -743,7 +743,7 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 	failureCount := 0
 
 	for {
-		info.ServiceAccountToken, err = drivers.GenerateServiceAccountToken(clientset)
+		info.ServiceAccountToken, err = util.GenerateServiceAccountToken(clientset)
 
 		if err == nil {
 			logrus.Info("service account token generated successfully")

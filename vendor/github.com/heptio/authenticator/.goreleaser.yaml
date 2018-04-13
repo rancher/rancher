@@ -1,0 +1,62 @@
+# Configuration for https://goreleaser.com/
+project_name: authenticator
+
+builds:
+  - binary: heptio-authenticator-aws
+    main: ./cmd/heptio-authenticator-aws/
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+    env:
+      - CGO_ENABLED=0
+
+dockers:
+  - image: gcr.io/heptio-images/authenticator
+    binary: heptio-authenticator-aws
+    dockerfile: Dockerfile.scratch
+    tag_templates:
+     - "{{ .Tag }}-scratch"
+     - "{{ .Tag }}"
+    latest: false
+  - image: gcr.io/heptio-images/authenticator
+    binary: heptio-authenticator-aws
+    dockerfile: Dockerfile.alpine-3.6
+    tag_templates:
+     - "{{ .Tag }}-alpine-3.6"
+    latest: false
+  - image: gcr.io/heptio-images/authenticator
+    binary: heptio-authenticator-aws
+    dockerfile: Dockerfile.alpine-3.7
+    tag_templates:
+     - "{{ .Tag }}-alpine-3.7"
+     - "{{ .Tag }}-alpine"
+    latest: false
+  - image: gcr.io/heptio-images/authenticator
+    binary: heptio-authenticator-aws
+    dockerfile: Dockerfile.debian-jessie
+    tag_templates:
+     - "{{ .Tag }}-debian-jessie"
+    latest: false
+  - image: gcr.io/heptio-images/authenticator
+    binary: heptio-authenticator-aws
+    dockerfile: Dockerfile.debian-stretch
+    tag_templates:
+     - "{{ .Tag }}-debian-stretch"
+     - "{{ .Tag }}-debian"
+    latest: false
+
+snapshot:
+  name_template: "git-{{.Commit}}"
+
+archive:
+  format: binary
+
+release:
+  github:
+    owner: heptio
+    name: authenticator
+  draft: true
+  prerelease: true
+  name_template: "v{{.Version}}"
