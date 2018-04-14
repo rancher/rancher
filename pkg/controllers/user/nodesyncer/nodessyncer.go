@@ -5,13 +5,12 @@ import (
 	"reflect"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/node"
+	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -87,30 +86,8 @@ func (m *NodesSyncer) sync(key string, machine *v3.Node) error {
 }
 
 func (m *NodesSyncer) getNode(machine *v3.Node, nodes []*corev1.Node) (*corev1.Node, error) {
-	nodeName := node.GetNodeName(machine)
-	if nodeName != "" {
-		node, err := m.nodeLister.Get("", nodeName)
-		if err != nil {
-			if !apierrors.IsNotFound(err) {
-				return nil, err
-			}
-		}
-		if node != nil {
-			return node, nil
-		}
-	}
-	// search by rke annotations
-	if machine.Status.NodeConfig == nil {
-		return nil, nil
-	}
-	address := machine.Status.NodeConfig.Address
-	if address == "" {
-		return nil, nil
-	}
-
 	for _, n := range nodes {
-		nodeExternalIP := n.Annotations[externalIPAnnotation]
-		if address == nodeExternalIP {
+		if isNodeForNode(n, machine) {
 			return n, nil
 		}
 	}
@@ -258,7 +235,7 @@ func (m *NodesSyncer) updateNode(existing *v3.Node, node *corev1.Node, pods map[
 
 func (m *NodesSyncer) createNode(node *corev1.Node, pods map[string][]*corev1.Pod) error {
 	// try to get machine from api, in case cache didn't get the update
-	existing, err := m.getNodeForNode(node.Name, false)
+	existing, err := m.getNodeForNode(node, false)
 	if err != nil {
 		return err
 	}
@@ -283,14 +260,14 @@ func (m *NodesSyncer) createNode(node *corev1.Node, pods map[string][]*corev1.Po
 	return nil
 }
 
-func (m *NodesSyncer) getNodeForNode(nodeName string, cache bool) (*v3.Node, error) {
+func (m *NodesSyncer) getNodeForNode(node *corev1.Node, cache bool) (*v3.Node, error) {
 	if cache {
 		machines, err := m.machineLister.List(m.clusterNamespace, labels.NewSelector())
 		if err != nil {
 			return nil, err
 		}
 		for _, machine := range machines {
-			if isNodeForNode(nodeName, machine) {
+			if isNodeForNode(node, machine) {
 				return machine, nil
 			}
 		}
@@ -301,7 +278,7 @@ func (m *NodesSyncer) getNodeForNode(nodeName string, cache bool) (*v3.Node, err
 		}
 		for _, machine := range machines.Items {
 			if machine.Namespace == m.clusterNamespace {
-				if isNodeForNode(nodeName, &machine) {
+				if isNodeForNode(node, &machine) {
 					return &machine, nil
 				}
 			}
@@ -311,16 +288,26 @@ func (m *NodesSyncer) getNodeForNode(nodeName string, cache bool) (*v3.Node, err
 	return nil, nil
 }
 
-func isNodeForNode(nodeName string, machine *v3.Node) bool {
-	if machine.Status.NodeName == nodeName {
+func isNodeForNode(node *corev1.Node, machine *v3.Node) bool {
+	nodeName := nodehelper.GetNodeName(machine)
+	if nodeName == node.Name {
 		return true
 	}
-	// to handle the case when machine was provisioned first
+	// search by rke external-ip annotations
+	address := ""
 	if machine.Status.NodeConfig != nil {
-		if machine.Status.NodeConfig.HostnameOverride == nodeName {
-			return true
-		}
+		address = machine.Status.NodeConfig.Address
 	}
+
+	if address == "" {
+		return false
+	}
+
+	nodeExternalIP := node.Annotations[externalIPAnnotation]
+	if address == nodeExternalIP {
+		return true
+	}
+
 	return false
 }
 
