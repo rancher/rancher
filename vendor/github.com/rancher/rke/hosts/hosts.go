@@ -3,6 +3,7 @@ package hosts
 import (
 	"context"
 	"fmt"
+	"path"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -33,6 +34,7 @@ type Host struct {
 	ToDelTaints         []string
 	DockerInfo          types.Info
 	UpdateWorker        bool
+	PrefixPath          string
 }
 
 const (
@@ -49,15 +51,15 @@ const (
 func (h *Host) CleanUpAll(ctx context.Context, cleanerImage string, prsMap map[string]v3.PrivateRegistry, externalEtcd bool) error {
 	log.Infof(ctx, "[hosts] Cleaning up host [%s]", h.Address)
 	toCleanPaths := []string{
-		ToCleanSSLDir,
+		path.Join(h.PrefixPath, ToCleanSSLDir),
 		ToCleanCNIConf,
 		ToCleanCNIBin,
 		ToCleanCalicoRun,
-		ToCleanTempCertPath,
-		ToCleanCNILib,
+		path.Join(h.PrefixPath, ToCleanTempCertPath),
+		path.Join(h.PrefixPath, ToCleanCNILib),
 	}
 	if !externalEtcd {
-		toCleanPaths = append(toCleanPaths, ToCleanEtcdDir)
+		toCleanPaths = append(toCleanPaths, path.Join(h.PrefixPath, ToCleanEtcdDir))
 	}
 	return h.CleanUp(ctx, toCleanPaths, cleanerImage, prsMap)
 }
@@ -68,11 +70,11 @@ func (h *Host) CleanUpWorkerHost(ctx context.Context, cleanerImage string, prsMa
 		return nil
 	}
 	toCleanPaths := []string{
-		ToCleanSSLDir,
+		path.Join(h.PrefixPath, ToCleanSSLDir),
 		ToCleanCNIConf,
 		ToCleanCNIBin,
 		ToCleanCalicoRun,
-		ToCleanCNILib,
+		path.Join(h.PrefixPath, ToCleanCNILib),
 	}
 	return h.CleanUp(ctx, toCleanPaths, cleanerImage, prsMap)
 }
@@ -83,24 +85,24 @@ func (h *Host) CleanUpControlHost(ctx context.Context, cleanerImage string, prsM
 		return nil
 	}
 	toCleanPaths := []string{
-		ToCleanSSLDir,
+		path.Join(h.PrefixPath, ToCleanSSLDir),
 		ToCleanCNIConf,
 		ToCleanCNIBin,
 		ToCleanCalicoRun,
-		ToCleanCNILib,
+		path.Join(h.PrefixPath, ToCleanCNILib),
 	}
 	return h.CleanUp(ctx, toCleanPaths, cleanerImage, prsMap)
 }
 
 func (h *Host) CleanUpEtcdHost(ctx context.Context, cleanerImage string, prsMap map[string]v3.PrivateRegistry) error {
 	toCleanPaths := []string{
-		ToCleanEtcdDir,
-		ToCleanSSLDir,
+		path.Join(h.PrefixPath, ToCleanEtcdDir),
+		path.Join(h.PrefixPath, ToCleanSSLDir),
 	}
 	if h.IsWorker || h.IsControl {
 		log.Infof(ctx, "[hosts] Host [%s] is already a worker or control host, skipping cleanup certs.", h.Address)
 		toCleanPaths = []string{
-			ToCleanEtcdDir,
+			path.Join(h.PrefixPath, ToCleanEtcdDir),
 		}
 	}
 	return h.CleanUp(ctx, toCleanPaths, cleanerImage, prsMap)

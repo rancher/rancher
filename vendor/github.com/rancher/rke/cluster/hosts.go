@@ -40,6 +40,7 @@ func (c *Cluster) TunnelHosts(ctx context.Context, local bool) error {
 			log.Warnf(ctx, "Failed to set up SSH tunneling for host [%s]: %v", uniqueHosts[i].Address, err)
 			c.InactiveHosts = append(c.InactiveHosts, uniqueHosts[i])
 		}
+		uniqueHosts[i].PrefixPath = c.getPrefixPath(uniqueHosts[i].DockerInfo.OperatingSystem)
 	}
 	for _, host := range c.InactiveHosts {
 		log.Warnf(ctx, "Removing host [%s] from node lists", host.Address)

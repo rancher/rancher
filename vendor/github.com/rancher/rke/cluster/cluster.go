@@ -32,6 +32,7 @@ type Cluster struct {
 	WorkerHosts                      []*hosts.Host
 	ControlPlaneHosts                []*hosts.Host
 	InactiveHosts                    []*hosts.Host
+	EtcdReadyHosts                   []*hosts.Host
 	KubeClient                       *kubernetes.Clientset
 	KubernetesServiceIP              net.IP
 	Certificates                     map[string]pki.CertificatePKI
@@ -64,26 +65,30 @@ const (
 
 func (c *Cluster) DeployControlPlane(ctx context.Context) error {
 	// Deploy Etcd Plane
-	etcdProcessHostMap := c.getEtcdProcessHostMap(nil)
+	etcdNodePlanMap := make(map[string]v3.RKEConfigNodePlan)
+	// Build etcd node plan map
+	for _, etcdHost := range c.EtcdHosts {
+		etcdNodePlanMap[etcdHost.Address] = BuildRKEConfigNodePlan(ctx, c, etcdHost, etcdHost.DockerInfo)
+	}
+
 	if len(c.Services.Etcd.ExternalURLs) > 0 {
 		log.Infof(ctx, "[etcd] External etcd connection string has been specified, skipping etcd plane")
 	} else {
-		if err := services.RunEtcdPlane(ctx, c.EtcdHosts, etcdProcessHostMap, c.LocalConnDialerFactory, c.PrivateRegistriesMap, c.UpdateWorkersOnly, c.SystemImages.Alpine); err != nil {
+		if err := services.RunEtcdPlane(ctx, c.EtcdHosts, etcdNodePlanMap, c.LocalConnDialerFactory, c.PrivateRegistriesMap, c.UpdateWorkersOnly, c.SystemImages.Alpine); err != nil {
 			return fmt.Errorf("[etcd] Failed to bring up Etcd Plane: %v", err)
 		}
 	}
 
 	// Deploy Control plane
-	processMap := map[string]v3.Process{
-		services.SidekickContainerName:       c.BuildSidecarProcess(),
-		services.KubeAPIContainerName:        c.BuildKubeAPIProcess(),
-		services.KubeControllerContainerName: c.BuildKubeControllerProcess(),
-		services.SchedulerContainerName:      c.BuildSchedulerProcess(),
+	cpNodePlanMap := make(map[string]v3.RKEConfigNodePlan)
+	// Build cp node plan map
+	for _, cpHost := range c.ControlPlaneHosts {
+		cpNodePlanMap[cpHost.Address] = BuildRKEConfigNodePlan(ctx, c, cpHost, cpHost.DockerInfo)
 	}
 	if err := services.RunControlPlane(ctx, c.ControlPlaneHosts,
 		c.LocalConnDialerFactory,
 		c.PrivateRegistriesMap,
-		processMap,
+		cpNodePlanMap,
 		c.UpdateWorkersOnly,
 		c.SystemImages.Alpine); err != nil {
 		return fmt.Errorf("[controlPlane] Failed to bring up Control Plane: %v", err)
@@ -93,22 +98,17 @@ func (c *Cluster) DeployControlPlane(ctx context.Context) error {
 }
 
 func (c *Cluster) DeployWorkerPlane(ctx context.Context) error {
-	// Deploy Worker Plane
-	processMap := map[string]v3.Process{
-		services.SidekickContainerName:   c.BuildSidecarProcess(),
-		services.KubeproxyContainerName:  c.BuildKubeProxyProcess(),
-		services.NginxProxyContainerName: c.BuildProxyProcess(),
-	}
-	kubeletProcessHostMap := make(map[*hosts.Host]v3.Process)
-	for _, host := range hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts) {
-		kubeletProcessHostMap[host] = c.BuildKubeletProcess(host)
-	}
+	// Deploy Worker plane
+	workerNodePlanMap := make(map[string]v3.RKEConfigNodePlan)
+	// Build cp node plan map
 	allHosts := hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts)
+	for _, workerHost := range allHosts {
+		workerNodePlanMap[workerHost.Address] = BuildRKEConfigNodePlan(ctx, c, workerHost, workerHost.DockerInfo)
+	}
 	if err := services.RunWorkerPlane(ctx, allHosts,
 		c.LocalConnDialerFactory,
 		c.PrivateRegistriesMap,
-		processMap,
-		kubeletProcessHostMap,
+		workerNodePlanMap,
 		c.Certificates,
 		c.UpdateWorkersOnly,
 		c.SystemImages.Alpine); err != nil {
@@ -348,16 +348,6 @@ func ConfigureCluster(
 		return kubeCluster.deployAddons(ctx)
 	}
 	return nil
-}
-
-func (c *Cluster) getEtcdProcessHostMap(readyEtcdHosts []*hosts.Host) map[*hosts.Host]v3.Process {
-	etcdProcessHostMap := make(map[*hosts.Host]v3.Process)
-	for _, host := range c.EtcdHosts {
-		if !host.ToAddEtcdMember {
-			etcdProcessHostMap[host] = c.BuildEtcdProcess(host, readyEtcdHosts)
-		}
-	}
-	return etcdProcessHostMap
 }
 
 func (c *Cluster) parseCloudConfig(ctx context.Context) (string, error) {

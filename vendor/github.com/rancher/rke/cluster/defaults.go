@@ -47,7 +47,10 @@ func (c *Cluster) setClusterDefaults(ctx context.Context) {
 	if len(c.SSHKeyPath) == 0 {
 		c.SSHKeyPath = DefaultClusterSSHKeyPath
 	}
-
+	// Default Path prefix
+	if len(c.PrefixPath) == 0 {
+		c.PrefixPath = "/"
+	}
 	for i, host := range c.Nodes {
 		if len(host.InternalAddress) == 0 {
 			c.Nodes[i].InternalAddress = c.Nodes[i].Address

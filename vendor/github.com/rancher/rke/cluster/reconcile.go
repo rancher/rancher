@@ -208,10 +208,14 @@ func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, ku
 			}
 		}
 		etcdHost.ToAddEtcdMember = false
-		readyHosts := getReadyEtcdHosts(kubeCluster.EtcdHosts)
-		etcdProcessHostMap := kubeCluster.getEtcdProcessHostMap(readyHosts)
+		kubeCluster.setReadyEtcdHosts()
 
-		if err := services.ReloadEtcdCluster(ctx, readyHosts, currentCluster.LocalConnDialerFactory, clientCert, clientkey, currentCluster.PrivateRegistriesMap, etcdProcessHostMap, kubeCluster.SystemImages.Alpine); err != nil {
+		etcdNodePlanMap := make(map[string]v3.RKEConfigNodePlan)
+		for _, etcdReadyHost := range kubeCluster.EtcdReadyHosts {
+			etcdNodePlanMap[etcdReadyHost.Address] = BuildRKEConfigNodePlan(ctx, kubeCluster, etcdReadyHost, etcdReadyHost.DockerInfo)
+		}
+
+		if err := services.ReloadEtcdCluster(ctx, kubeCluster.EtcdReadyHosts, currentCluster.LocalConnDialerFactory, clientCert, clientkey, currentCluster.PrivateRegistriesMap, etcdNodePlanMap, kubeCluster.SystemImages.Alpine); err != nil {
 			return err
 		}
 	}
@@ -235,13 +239,12 @@ func syncLabels(ctx context.Context, currentCluster, kubeCluster *Cluster) {
 	}
 }
 
-func getReadyEtcdHosts(etcdHosts []*hosts.Host) []*hosts.Host {
-	readyEtcdHosts := []*hosts.Host{}
-	for _, host := range etcdHosts {
+func (c *Cluster) setReadyEtcdHosts() {
+	c.EtcdReadyHosts = []*hosts.Host{}
+	for _, host := range c.EtcdHosts {
 		if !host.ToAddEtcdMember {
-			readyEtcdHosts = append(readyEtcdHosts, host)
+			c.EtcdReadyHosts = append(c.EtcdReadyHosts, host)
 			host.ExistingEtcdCluster = true
 		}
 	}
-	return readyEtcdHosts
 }

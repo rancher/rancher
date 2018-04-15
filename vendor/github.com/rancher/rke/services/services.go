@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"path"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/rancher/rke/docker"
@@ -114,7 +115,7 @@ func createLogLink(ctx context.Context, host *hosts.Host, containerName, plane, 
 	}
 	hostCfg := &container.HostConfig{
 		Binds: []string{
-			"/var/lib:/var/lib",
+			fmt.Sprintf("%s:/var/lib", path.Join(host.PrefixPath, "/var/lib")),
 		},
 		Privileged: true,
 	}

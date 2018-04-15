@@ -16,6 +16,7 @@ const (
 	NodeFieldCreatorID            = "creatorId"
 	NodeFieldCustomConfig         = "customConfig"
 	NodeFieldDescription          = "description"
+	NodeFieldDockerInfo           = "dockerInfo"
 	NodeFieldEtcd                 = "etcd"
 	NodeFieldExternalIPAddress    = "externalIpAddress"
 	NodeFieldHostname             = "hostname"
@@ -61,6 +62,7 @@ type Node struct {
 	CreatorID            string                    `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	CustomConfig         *CustomConfig             `json:"customConfig,omitempty" yaml:"customConfig,omitempty"`
 	Description          string                    `json:"description,omitempty" yaml:"description,omitempty"`
+	DockerInfo           *DockerInfo               `json:"dockerInfo,omitempty" yaml:"dockerInfo,omitempty"`
 	Etcd                 bool                      `json:"etcd,omitempty" yaml:"etcd,omitempty"`
 	ExternalIPAddress    string                    `json:"externalIpAddress,omitempty" yaml:"externalIpAddress,omitempty"`
 	Hostname             string                    `json:"hostname,omitempty" yaml:"hostname,omitempty"`
