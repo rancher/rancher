@@ -34,7 +34,8 @@ def test_node_fields(mc):
         'unschedulable': 'ru',
         'providerId': 'r',
         'sshUser': 'r',
-        'imported': "cru",
+        'imported': 'cru',
+        'dockerInfo': 'r',
     }
 
     for name, field in cclient.schema.types['node'].resourceFields.items():
