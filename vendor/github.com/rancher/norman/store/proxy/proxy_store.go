@@ -279,7 +279,7 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	if name == "" {
 		generated, _ := values.GetValueN(data, "metadata", "generateName").(string)
 		if generated == "" {
-			values.PutValue(data, strings.ToLower(schema.ID+"-"), "metadata", "generateName")
+			values.PutValue(data, types.GenerateName(schema.ID), "metadata", "name")
 		}
 	}
 

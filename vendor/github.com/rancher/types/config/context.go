@@ -333,7 +333,7 @@ func (c *ManagementContext) Start(ctx context.Context) error {
 		watcher.Stop()
 	}()
 
-	return controller.SyncThenStart(ctx, 5, c.controllers()...)
+	return controller.SyncThenStart(ctx, 50, c.controllers()...)
 }
 
 func (c *ManagementContext) StartAndWait() error {

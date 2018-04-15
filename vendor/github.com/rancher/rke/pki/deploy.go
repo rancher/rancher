@@ -50,7 +50,7 @@ func doRunDeployer(ctx context.Context, host *hosts.Host, containerEnv []string,
 	}
 	hostCfg := &container.HostConfig{
 		Binds: []string{
-			"/etc/kubernetes:/etc/kubernetes",
+			fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(host.PrefixPath, "/etc/kubernetes")),
 		},
 		Privileged: true,
 	}
@@ -178,7 +178,7 @@ func fetchFileFromHost(ctx context.Context, filePath, image string, host *hosts.
 	}
 	hostCfg := &container.HostConfig{
 		Binds: []string{
-			"/etc/kubernetes:/etc/kubernetes",
+			fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(host.PrefixPath, "/etc/kubernetes")),
 		},
 		Privileged: true,
 	}

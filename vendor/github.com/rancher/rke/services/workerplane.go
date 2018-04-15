@@ -14,7 +14,7 @@ const (
 	unschedulableEtcdTaint = "node-role.kubernetes.io/etcd=true:NoExecute"
 )
 
-func RunWorkerPlane(ctx context.Context, allHosts []*hosts.Host, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, processMap map[string]v3.Process, kubeletProcessHostMap map[*hosts.Host]v3.Process, certMap map[string]pki.CertificatePKI, updateWorkersOnly bool, alpineImage string) error {
+func RunWorkerPlane(ctx context.Context, allHosts []*hosts.Host, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, workerNodePlanMap map[string]v3.RKEConfigNodePlan, certMap map[string]pki.CertificatePKI, updateWorkersOnly bool, alpineImage string) error {
 	log.Infof(ctx, "[%s] Building up Worker Plane..", WorkerRole)
 	var errgrp errgroup.Group
 	for _, host := range allHosts {
@@ -29,9 +29,8 @@ func RunWorkerPlane(ctx context.Context, allHosts []*hosts.Host, localConnDialer
 		}
 		runHost := host
 		// maps are not thread safe
-		hostProcessMap := copyProcessMap(processMap)
+		hostProcessMap := copyProcessMap(workerNodePlanMap[runHost.Address].Processes)
 		errgrp.Go(func() error {
-			hostProcessMap[KubeletContainerName] = kubeletProcessHostMap[runHost]
 			return doDeployWorkerPlane(ctx, runHost, localConnDialerFactory, prsMap, hostProcessMap, certMap, alpineImage)
 		})
 	}

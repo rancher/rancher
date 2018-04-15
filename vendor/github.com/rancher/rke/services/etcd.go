@@ -20,13 +20,14 @@ const (
 	EtcdHealthCheckURL = "https://127.0.0.1:2379/health"
 )
 
-func RunEtcdPlane(ctx context.Context, etcdHosts []*hosts.Host, etcdProcessHostMap map[*hosts.Host]v3.Process, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, updateWorkersOnly bool, alpineImage string) error {
+func RunEtcdPlane(ctx context.Context, etcdHosts []*hosts.Host, etcdNodePlanMap map[string]v3.RKEConfigNodePlan, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, updateWorkersOnly bool, alpineImage string) error {
 	log.Infof(ctx, "[%s] Building up etcd plane..", ETCDRole)
 	for _, host := range etcdHosts {
 		if updateWorkersOnly {
 			continue
 		}
-		imageCfg, hostCfg, _ := GetProcessConfig(etcdProcessHostMap[host])
+		etcdProcess := etcdNodePlanMap[host.Address].Processes[EtcdContainerName]
+		imageCfg, hostCfg, _ := GetProcessConfig(etcdProcess)
 		if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, EtcdContainerName, host.Address, ETCDRole, prsMap); err != nil {
 			return err
 		}
@@ -130,20 +131,20 @@ func RemoveEtcdMember(ctx context.Context, etcdHost *hosts.Host, etcdHosts []*ho
 	return nil
 }
 
-func ReloadEtcdCluster(ctx context.Context, readyEtcdHosts []*hosts.Host, localConnDialerFactory hosts.DialerFactory, cert, key []byte, prsMap map[string]v3.PrivateRegistry, etcdProcessHostMap map[*hosts.Host]v3.Process, alpineImage string) error {
-	for host, process := range etcdProcessHostMap {
-		imageCfg, hostCfg, _ := GetProcessConfig(process)
-		if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, EtcdContainerName, host.Address, ETCDRole, prsMap); err != nil {
+func ReloadEtcdCluster(ctx context.Context, readyEtcdHosts []*hosts.Host, localConnDialerFactory hosts.DialerFactory, cert, key []byte, prsMap map[string]v3.PrivateRegistry, etcdNodePlanMap map[string]v3.RKEConfigNodePlan, alpineImage string) error {
+	for _, etcdHost := range readyEtcdHosts {
+		imageCfg, hostCfg, _ := GetProcessConfig(etcdNodePlanMap[etcdHost.Address].Processes[EtcdContainerName])
+		if err := docker.DoRunContainer(ctx, etcdHost.DClient, imageCfg, hostCfg, EtcdContainerName, etcdHost.Address, ETCDRole, prsMap); err != nil {
 			return err
 		}
-		if err := createLogLink(ctx, host, EtcdContainerName, ETCDRole, alpineImage, prsMap); err != nil {
+		if err := createLogLink(ctx, etcdHost, EtcdContainerName, ETCDRole, alpineImage, prsMap); err != nil {
 			return err
 		}
 	}
 	time.Sleep(10 * time.Second)
 	var healthy bool
 	for _, host := range readyEtcdHosts {
-		_, _, healthCheckURL := GetProcessConfig(etcdProcessHostMap[host])
+		_, _, healthCheckURL := GetProcessConfig(etcdNodePlanMap[host.Address].Processes[EtcdContainerName])
 		if healthy = isEtcdHealthy(ctx, localConnDialerFactory, host, cert, key, healthCheckURL); healthy {
 			break
 		}

@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"path"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/rancher/rke/docker"
@@ -46,7 +47,7 @@ func doDeployConfigFile(ctx context.Context, host *hosts.Host, cloudConfig, alpi
 	}
 	hostCfg := &container.HostConfig{
 		Binds: []string{
-			"/etc/kubernetes:/etc/kubernetes",
+			fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(host.PrefixPath, "/etc/kubernetes")),
 		},
 		Privileged: true,
 	}

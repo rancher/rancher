@@ -72,6 +72,28 @@ type NodeStatus struct {
 	NodeAnnotations    map[string]string `json:"nodeAnnotations,omitempty"`
 	NodeLabels         map[string]string `json:"nodeLabels,omitempty"`
 	NodeTaints         []v1.Taint        `json:"nodeTaints,omitempty"`
+	DockerInfo         *DockerInfo       `json:"dockerInfo,omitempty"`
+}
+
+type DockerInfo struct {
+	ID                 string
+	Driver             string
+	Debug              bool
+	LoggingDriver      string
+	CgroupDriver       string
+	KernelVersion      string
+	OperatingSystem    string
+	OSType             string
+	Architecture       string
+	IndexServerAddress string
+	DockerRootDir      string
+	HTTPProxy          string
+	HTTPSProxy         string
+	NoProxy            string
+	Name               string
+	Labels             []string
+	ExperimentalBuild  bool
+	ServerVersion      string
 }
 
 var (
