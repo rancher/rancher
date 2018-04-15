@@ -6,13 +6,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"net/http"
-
-	"strings"
-
 	"fmt"
-
+	"net/http"
 	"reflect"
+	"strings"
 
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/remotedialer"
@@ -199,7 +196,8 @@ func (t *Authorizer) authorizeNode(register bool, cluster *v3.Cluster, inNode *c
 		}
 	}
 
-	return machine, true, nil
+	machine, err = t.updateDockerInfo(machine, inNode)
+	return machine, true, err
 }
 
 func (t *Authorizer) createNode(inNode *client.Node, cluster *v3.Cluster, req *http.Request) (*v3.Node, error) {
@@ -231,6 +229,25 @@ func (t *Authorizer) createNode(inNode *client.Node, cluster *v3.Cluster, req *h
 	}
 
 	return t.machines.Create(machine)
+}
+
+func (t *Authorizer) updateDockerInfo(machine *v3.Node, inNode *client.Node) (*v3.Node, error) {
+	if inNode.DockerInfo == nil {
+		return machine, nil
+	}
+
+	dockerInfo := &v3.DockerInfo{}
+	err := convert.ToObj(inNode.DockerInfo, dockerInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	newMachine := machine.DeepCopy()
+	newMachine.Status.DockerInfo = dockerInfo
+	if !reflect.DeepEqual(machine, newMachine) {
+		return t.machines.Update(newMachine)
+	}
+	return machine, nil
 }
 
 func (t *Authorizer) updateNode(machine *v3.Node, inNode *client.Node, cluster *v3.Cluster) (*v3.Node, error) {

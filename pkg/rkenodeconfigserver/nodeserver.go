@@ -72,6 +72,11 @@ func (n *RKENodeConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Reques
 		return
 	}
 
+	if client.Cluster.Status.AppliedSpec.RancherKubernetesEngineConfig == nil {
+		rw.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+
 	nodeConfig, err := n.nodeConfig(req.Context(), client.Cluster, client.Node)
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
@@ -101,7 +106,12 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 		return nil, errors.Wrapf(err, "failed to marshall bundle")
 	}
 
-	plan, err := librke.New().GeneratePlan(ctx, spec.RancherKubernetesEngineConfig)
+	infos, err := librke.GetDockerInfo(node)
+	if err != nil {
+		return nil, err
+	}
+
+	plan, err := librke.New().GeneratePlan(ctx, spec.RancherKubernetesEngineConfig, infos)
 	if err != nil {
 		return nil, err
 	}

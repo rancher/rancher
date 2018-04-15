@@ -79,7 +79,12 @@ func copyMap(in map[string]string) map[string]string {
 }
 
 func getNodePlan(cluster *v3.Cluster, node *v3.Node) (*v3.RKEConfigNodePlan, error) {
-	plan, err := librke.New().GeneratePlan(context.Background(), cluster.Status.AppliedSpec.RancherKubernetesEngineConfig)
+	dockerInfo, err := librke.GetDockerInfo(node)
+	if err != nil {
+		return nil, err
+	}
+
+	plan, err := librke.New().GeneratePlan(context.Background(), cluster.Status.AppliedSpec.RancherKubernetesEngineConfig, dockerInfo)
 	if err != nil {
 		return nil, err
 	}

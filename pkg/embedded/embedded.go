@@ -38,7 +38,7 @@ func Run(ctx context.Context) (context.Context, string, error) {
 		return ctx, "", err
 	}
 
-	plan, err := librke.New().GeneratePlan(ctx, rkeConfig)
+	plan, err := librke.New().GeneratePlan(ctx, rkeConfig, nil)
 	if err != nil {
 		return ctx, "", err
 	}
