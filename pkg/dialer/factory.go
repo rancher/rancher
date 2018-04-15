@@ -8,13 +8,17 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/encryptedstore"
 	"github.com/rancher/rancher/pkg/nodeconfig"
 	"github.com/rancher/rancher/pkg/remotedialer"
 	"github.com/rancher/rancher/pkg/tunnelserver"
+	"github.com/rancher/rke/k8s"
+	"github.com/rancher/rke/services"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/config/dialer"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
@@ -65,6 +69,58 @@ func isCloudDriver(cluster *v3.Cluster) bool {
 	return !cluster.Spec.Internal && cluster.Status.Driver != v3.ClusterDriverImported && cluster.Status.Driver != v3.ClusterDriverRKE
 }
 
+func (f *Factory) translateClusterAddress(cluster *v3.Cluster, clusterHostPort, address string) string {
+	if clusterHostPort != address {
+		return address
+	}
+
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return address
+	}
+
+	// Make sure that control plane node we are connecting to is not bad, also use internal address
+	nodes, err := f.nodeLister.List(cluster.Name, labels.Everything())
+	if err != nil {
+		return address
+	}
+
+	clusterGood := v3.ClusterConditionReady.IsTrue(cluster)
+	lastGoodHost := ""
+	for _, node := range nodes {
+		var (
+			publicIP  = node.Status.NodeAnnotations[k8s.ExternalAddressAnnotation]
+			privateIP = node.Status.NodeAnnotations[k8s.InternalAddressAnnotation]
+		)
+
+		fakeNode := &v1.Node{
+			Status: node.Status.InternalNodeStatus,
+		}
+
+		nodeGood := v3.NodeConditionRegistered.IsTrue(node) && v3.NodeConditionProvisioned.IsTrue(node) &&
+			!v3.NodeConditionReady.IsUnknown(fakeNode) && node.DeletionTimestamp == nil
+
+		if privateIP == "" || !nodeGood {
+			continue
+		}
+
+		if publicIP == host {
+			if clusterGood {
+				host = privateIP
+				return fmt.Sprintf("%s:%s", host, port)
+			}
+		} else if node.Status.NodeConfig != nil && slice.ContainsString(node.Status.NodeConfig.Role, services.ControlRole) {
+			lastGoodHost = privateIP
+		}
+	}
+
+	if lastGoodHost != "" {
+		return fmt.Sprintf("%s:%s", lastGoodHost, port)
+	}
+
+	return address
+}
+
 func (f *Factory) clusterDialer(clusterName, address string) (dialer.Dialer, error) {
 	cluster, err := f.clusterLister.Get("", clusterName)
 	if err != nil {
@@ -83,7 +139,13 @@ func (f *Factory) clusterDialer(clusterName, address string) (dialer.Dialer, err
 	}
 
 	if f.TunnelServer.HasSession(cluster.Name) {
-		return f.TunnelServer.Dialer(cluster.Name, 15*time.Second), nil
+		cd := f.TunnelServer.Dialer(cluster.Name, 15*time.Second)
+		return func(network, address string) (net.Conn, error) {
+			if cluster.Status.Driver == v3.ClusterDriverRKE {
+				address = f.translateClusterAddress(cluster, hostPort, address)
+			}
+			return cd(network, address)
+		}, nil
 	}
 
 	if cluster.Status.Driver != v3.ClusterDriverRKE {
