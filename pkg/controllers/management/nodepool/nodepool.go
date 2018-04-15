@@ -201,7 +201,7 @@ func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, simulate bool) (b
 			continue
 		}
 
-		if v3.NodeConditionProvisioned.IsFalse(node) || v3.NodeConditionInitialized.IsFalse(node) {
+		if v3.NodeConditionProvisioned.IsFalse(node) || v3.NodeConditionInitialized.IsFalse(node) || v3.NodeConditionConfigSaved.IsFalse(node) {
 			changed = true
 			if !simulate {
 				c.deleteNode(node, 2*time.Minute)
