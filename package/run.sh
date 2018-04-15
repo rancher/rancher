@@ -64,6 +64,8 @@ fi
 
 if [ "$CATTLE_ADDRESS" = "awslocal" ]; then
     export CATTLE_ADDRESS=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
+elif [ "$CATTLE_ADDRESS" = "awspublic" ]; then
+    export CATTLE_ADDRESS=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
 elif [ "$CATTLE_ADDRESS" = "ipify" ]; then
     export CATTLE_ADDRESS=$(curl -s https://api.ipify.org)
 fi
