@@ -39,7 +39,6 @@ func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	logrus.Infof("Handling backend connection request.")
 	clientKey, authed, err := s.authorizer(req)
 	if err != nil {
 		s.errorWriter(rw, req, 400, err)
@@ -49,6 +48,8 @@ func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		s.errorWriter(rw, req, 401, errFailedAuth)
 		return
 	}
+
+	logrus.Infof("Handling backend connection request [%s]", clientKey)
 
 	upgrader := websocket.Upgrader{
 		HandshakeTimeout: 5 * time.Second,

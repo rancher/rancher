@@ -1,9 +1,11 @@
 package node
 
 import (
+	"context"
 	"os"
 	"strings"
 
+	"github.com/docker/docker/client"
 	"github.com/rancher/norman/types/slice"
 	"github.com/sirupsen/logrus"
 )
@@ -33,6 +35,14 @@ func Params() map[string]interface{} {
 			}
 		} else {
 			logrus.Infof("Option %s=%v", k, v)
+		}
+	}
+
+	dclient, err := client.NewEnvClient()
+	if err == nil {
+		info, err := dclient.Info(context.Background())
+		if err == nil {
+			params["dockerInfo"] = info
 		}
 	}
 

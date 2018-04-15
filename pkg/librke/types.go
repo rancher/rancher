@@ -3,6 +3,7 @@ package librke
 import (
 	"context"
 
+	"github.com/docker/docker/api/types"
 	"github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/k8s"
@@ -15,7 +16,7 @@ type RKE interface {
 	GenerateCerts(config *v3.RancherKubernetesEngineConfig) (map[string]pki.CertificatePKI, error)
 	RegenerateEtcdCertificate(crtMap map[string]pki.CertificatePKI, etcdHost *hosts.Host, cluster *cluster.Cluster) (map[string]pki.CertificatePKI, error)
 	ParseCluster(clusterName string, config *v3.RancherKubernetesEngineConfig, dockerDialerFactory, localConnDialerFactory hosts.DialerFactory, k8sWrapTransport k8s.WrapTransport) (*cluster.Cluster, error)
-	GeneratePlan(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig) (v3.RKEPlan, error)
+	GeneratePlan(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig, dockerInfo map[string]types.Info) (v3.RKEPlan, error)
 }
 
 func New() RKE {
