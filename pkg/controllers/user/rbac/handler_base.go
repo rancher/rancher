@@ -87,6 +87,7 @@ func Register(workload *config.UserContext) {
 		nsLister:      workload.Core.Namespaces("").Controller().Lister(),
 		nsController:  workload.Core.Namespaces("").Controller(),
 		clusterLister: workload.Management.Management.Clusters("").Controller().Lister(),
+		projectLister: workload.Management.Management.Projects("").Controller().Lister(),
 		clusterName:   workload.ClusterName,
 	}
 	workload.Management.Management.Projects("").AddClusterScopedLifecycle("project-namespace-auth", workload.ClusterName, newProjectLifecycle(r))
@@ -122,6 +123,7 @@ type manager struct {
 	nsLister      typescorev1.NamespaceLister
 	nsController  typescorev1.NamespaceController
 	clusterLister v3.ClusterLister
+	projectLister v3.ProjectLister
 	clusterName   string
 }
 

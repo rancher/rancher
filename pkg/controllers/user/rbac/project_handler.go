@@ -2,8 +2,10 @@ package rbac
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -34,7 +36,7 @@ func (p *pLifecycle) Create(project *v3.Project) (*v3.Project, error) {
 
 	}
 
-	err := p.ensureDefaultNamespaceAssigned(project)
+	err := p.ensureNamespacesAssigned(project)
 	return project, err
 }
 
@@ -80,16 +82,15 @@ func (p *pLifecycle) Remove(project *v3.Project) (*v3.Project, error) {
 	return nil, nil
 }
 
-func (p *pLifecycle) ensureDefaultNamespaceAssigned(project *v3.Project) error {
-	if _, ok := project.Labels["authz.management.cattle.io/default-project"]; !ok {
-		return nil
+func (p *pLifecycle) ensureNamespacesAssigned(project *v3.Project) error {
+	projectName := ""
+	if _, ok := project.Labels["authz.management.cattle.io/default-project"]; ok {
+		projectName = "Default"
+	} else if _, ok := project.Labels["authz.management.cattle.io/system-project"]; !ok {
+		projectName = "System"
 	}
-	ns, err := p.m.nsLister.Get("", "default")
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil
-		}
-		return err
+	if projectName == "" {
+		return nil
 	}
 
 	cluster, err := p.m.clusterLister.Get("", p.m.clusterName)
@@ -100,12 +101,50 @@ func (p *pLifecycle) ensureDefaultNamespaceAssigned(project *v3.Project) error {
 		return errors.Errorf("couldn't find cluster %v", p.m.clusterName)
 	}
 
-	updateCluster := false
-	c, err := v3.ClusterConditionDefaultNamespaceAssigned.DoUntilTrue(cluster.DeepCopy(), func() (runtime.Object, error) {
-		updateCluster = true
+	switch projectName {
+	case "Default":
+		if err = p.ensureDefaultNamespaceAssigned(cluster, project); err != nil {
+			return err
+		}
+	case "System":
+		if err = p.ensureSystemNamespaceAssigned(cluster, project); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (p *pLifecycle) ensureDefaultNamespaceAssigned(cluster *v3.Cluster, project *v3.Project) error {
+	_, err := v3.ClusterConditionDefaultNamespaceAssigned.DoUntilTrue(cluster.DeepCopy(), func() (runtime.Object, error) {
+		return nil, p.assignNamespacesToProject(project, "Default")
+	})
+	return err
+}
+
+func (p *pLifecycle) ensureSystemNamespaceAssigned(cluster *v3.Cluster, project *v3.Project) error {
+	_, err := v3.ClusterConditionSystemNamespacesAssigned.DoUntilTrue(cluster.DeepCopy(), func() (runtime.Object, error) {
+		return nil, p.assignNamespacesToProject(project, "System")
+	})
+	return err
+}
+
+func (p *pLifecycle) assignNamespacesToProject(project *v3.Project, projectName string) error {
+	initialProjectsToNamespaces, err := getDefaultAndSystemProjectsToNamespaces()
+	if err != nil {
+		return err
+	}
+	for _, nsName := range initialProjectsToNamespaces[projectName] {
+		ns, err := p.m.nsLister.Get("", nsName)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			return err
+		}
 		projectID := ns.Annotations[projectIDAnnotation]
 		if projectID != "" {
-			return nil, nil
+			return nil
 		}
 
 		ns = ns.DeepCopy()
@@ -114,15 +153,26 @@ func (p *pLifecycle) ensureDefaultNamespaceAssigned(project *v3.Project) error {
 		}
 		ns.Annotations[projectIDAnnotation] = fmt.Sprintf("%v:%v", p.m.clusterName, project.Name)
 		if _, err := p.m.workload.Core.Namespaces(p.m.clusterName).Update(ns); err != nil {
-			return nil, err
-		}
-
-		return nil, nil
-	})
-	if updateCluster {
-		if _, err := p.m.workload.Management.Management.Clusters("").ObjectClient().Update(cluster.Name, c); err != nil {
 			return err
 		}
 	}
-	return err
+	return nil
+}
+
+func getDefaultAndSystemProjectsToNamespaces() (map[string][]string, error) {
+	systemNamespacesStr := settings.SystemNamespaces.Get()
+	var systemNamespaces []string
+	if systemNamespacesStr == "" {
+		return nil, fmt.Errorf("failed to load setting %v", settings.SystemNamespaces)
+	}
+
+	splitted := strings.Split(systemNamespacesStr, ",")
+	for _, s := range splitted {
+		systemNamespaces = append(systemNamespaces, strings.TrimSpace(s))
+	}
+
+	return map[string][]string{
+		"Default": {"default"},
+		"System":  systemNamespaces,
+	}, nil
 }

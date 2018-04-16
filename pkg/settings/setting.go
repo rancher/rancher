@@ -30,14 +30,15 @@ var (
 	ServerURL                       = newSetting("server-url", "")
 	ServerVersion                   = newSetting("server-version", "dev")
 	SystemDefaultRegistry           = newSetting("system-default-registry", "")
-	SystemNamespaces                = newSetting("system-namespaces", "kube-system,kube-public,cattle-system,cattle-alerting,cattle-logging,cattle-pipeline")
-	TelemetryOpt                    = newSetting("telemetry-opt", "")
-	UIFeedBackForm                  = newSetting("ui-feedback-form", "")
-	UIIndex                         = newSetting("ui-index", "https://releases.rancher.com/ui/latest2/index.html")
-	UIPath                          = newSetting("ui-path", "")
-	UIPL                            = newSetting("ui-pl", "rancher")
-	WhitelistDomain                 = newSetting("whitelist-domain", "forums.rancher.com")
-	RDNSServerBaseURL               = newSetting("rdns-base-url", "https://api.lb.rancher.cloud/v1")
+	SystemNamespaces                = newSetting("system-namespaces",
+		"kube-system,kube-public,cattle-system,cattle-alerting,cattle-logging,cattle-pipeline,ingress-nginx")
+	TelemetryOpt      = newSetting("telemetry-opt", "")
+	UIFeedBackForm    = newSetting("ui-feedback-form", "")
+	UIIndex           = newSetting("ui-index", "https://releases.rancher.com/ui/latest2/index.html")
+	UIPath            = newSetting("ui-path", "")
+	UIPL              = newSetting("ui-pl", "rancher")
+	WhitelistDomain   = newSetting("whitelist-domain", "forums.rancher.com")
+	RDNSServerBaseURL = newSetting("rdns-base-url", "https://api.lb.rancher.cloud/v1")
 )
 
 type Provider interface {

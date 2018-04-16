@@ -10,7 +10,8 @@ import (
 )
 
 type serviceHandler struct {
-	npmgr *netpolMgr
+	npmgr            *netpolMgr
+	clusterNamespace string
 }
 
 func (sh *serviceHandler) Sync(key string, service *corev1.Service) error {

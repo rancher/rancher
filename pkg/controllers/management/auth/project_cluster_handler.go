@@ -2,6 +2,7 @@ package auth
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"time"
 
@@ -30,7 +31,15 @@ const (
 )
 
 var defaultProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/default-project": "true"})
+var systemProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/system-project": "true"})
 var crtbCeatorOwnerAnnotations = map[string]string{creatorOwnerBindingAnnotation: "true"}
+
+var defaultProjects = map[string]bool{
+	"Default": true,
+}
+var systemProjects = map[string]bool{
+	"System": true,
+}
 
 func newPandCLifecycles(management *config.ManagementContext) (*projectLifecycle, *clusterLifecycle) {
 	m := &mgr{
@@ -118,6 +127,10 @@ func (l *clusterLifecycle) sync(key string, orig *v3.Cluster) error {
 		return err
 	}
 
+	obj, err = l.mgr.createSystemProject(obj)
+	if err != nil {
+		return err
+	}
 	obj, err = l.mgr.addRTAnnotation(obj, "cluster")
 	if err != nil {
 		return err
@@ -175,43 +188,49 @@ type mgr struct {
 }
 
 func (m *mgr) createDefaultProject(obj runtime.Object) (runtime.Object, error) {
-	return v3.ClusterConditionconditionDefautlProjectCreated.DoUntilTrue(obj, func() (runtime.Object, error) {
+	return m.createProject("Default", v3.ClusterConditionconditionDefaultProjectCreated, obj, defaultProjectLabels, defaultProjects)
+}
+
+func (m *mgr) createSystemProject(obj runtime.Object) (runtime.Object, error) {
+	return m.createProject("System", v3.ClusterConditionconditionSystemProjectCreated, obj, systemProjectLabels, systemProjects)
+}
+
+func (m *mgr) createProject(name string, cond condition.Cond, obj runtime.Object, labels labels.Set, projectMap map[string]bool) (runtime.Object, error) {
+	return cond.DoUntilTrue(obj, func() (runtime.Object, error) {
 		metaAccessor, err := meta.Accessor(obj)
 		if err != nil {
 			return obj, err
 		}
-
-		projects, err := m.projectLister.List(metaAccessor.GetName(), defaultProjectLabels.AsSelector())
+		projects, err := m.projectLister.List(metaAccessor.GetName(), labels.AsSelector())
 		if err != nil {
 			return obj, err
 		}
 		if len(projects) > 0 {
 			return obj, nil
 		}
-
 		creatorID, ok := metaAccessor.GetAnnotations()[creatorIDAnn]
 		if !ok {
-			logrus.Warnf("Cluster %v has no creatorId annotation. Cannot create default project", metaAccessor.GetName())
+			logrus.Warnf("Cluster %v has no creatorId annotation. Cannot create %s project", metaAccessor.GetName(), name)
 			return obj, nil
 		}
-
-		logrus.Infof("[%v] Creating default project for cluster %v", clusterCreateController, metaAccessor.GetName())
-		_, err = m.mgmt.Management.Projects(metaAccessor.GetName()).Create(&v3.Project{
+		logrus.Infof("[%v] Creating %s project for cluster %v", clusterCreateController, name, metaAccessor.GetName())
+		if _, err = m.mgmt.Management.Projects(metaAccessor.GetName()).Create(&v3.Project{
 			ObjectMeta: v1.ObjectMeta{
-				GenerateName: "p-",
+				GenerateName: "project-",
 				Annotations: map[string]string{
 					creatorIDAnn: creatorID,
 				},
-				Labels: defaultProjectLabels,
+				Labels: labels,
 			},
 			Spec: v3.ProjectSpec{
-				DisplayName: "Default",
-				Description: "Default project created for the cluster",
+				DisplayName: name,
+				Description: fmt.Sprintf("%s project created for the cluster", name),
 				ClusterName: metaAccessor.GetName(),
 			},
-		})
-
-		return obj, err
+		}); err != nil {
+			return obj, err
+		}
+		return obj, nil
 	})
 }
 

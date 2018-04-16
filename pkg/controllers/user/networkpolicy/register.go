@@ -17,13 +17,14 @@ func Register(cluster *config.UserContext) {
 	pods := cluster.Core.Pods("")
 	npClient := cluster.Networking
 	npLister := cluster.Networking.NetworkPolicies("").Controller().Lister()
+	pLister := cluster.Management.Management.Projects("").Controller().Lister()
 
-	npmgr := &netpolMgr{nsLister, nodeLister, npLister, npClient}
+	npmgr := &netpolMgr{nsLister, nodeLister, pods, npLister, npClient, pLister, cluster.ClusterName}
 	ps := &projectSyncer{pnpLister, pnpClient, projClient}
-	nss := &nsSyncer{npmgr}
+	nss := &nsSyncer{npmgr, cluster.ClusterName}
 	pnps := &projectNetworkPolicySyncer{npmgr}
-	podHandler := &podHandler{npmgr, pods}
-	serviceHandler := &serviceHandler{npmgr}
+	podHandler := &podHandler{npmgr, pods, cluster.ClusterName}
+	serviceHandler := &serviceHandler{npmgr, cluster.ClusterName}
 	nodeHandler := &nodeHandler{npmgr, cluster.ClusterName}
 
 	cluster.Management.Management.Projects("").Controller().AddClusterScopedHandler("projectSyncer", cluster.ClusterName, ps.Sync)

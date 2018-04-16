@@ -18,8 +18,9 @@ const (
 )
 
 type podHandler struct {
-	npmgr *netpolMgr
-	pods  v1.PodInterface
+	npmgr            *netpolMgr
+	pods             v1.PodInterface
+	clusterNamespace string
 }
 
 func (ph *podHandler) Sync(key string, pod *corev1.Pod) error {
@@ -31,7 +32,7 @@ func (ph *podHandler) Sync(key string, pod *corev1.Pod) error {
 	if err := ph.addLabelIfHostPortsPresent(pod); err != nil {
 		return err
 	}
-	return ph.hostPortsUpdateHandler(pod)
+	return ph.npmgr.hostPortsUpdateHandler(pod, ph.clusterNamespace)
 }
 
 // k8s native network policy can select pods only using labels,
