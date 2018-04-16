@@ -58,8 +58,8 @@ func (l *EventWatcher) Sync(key string, obj *corev1.Event) error {
 
 				title := fmt.Sprintf("%s event of %s occurred", target.EventType, target.ResourceKind)
 				//TODO: how to set unit for display for Quantity
-				desc := fmt.Sprintf("*Alert Name*: %s\n*Cluster Name*: %s\n*Target*: %s\n*Count*: %s\n*Event Message*: %s\n*First Seen*: %s\n*Last Seen*: %s",
-					alert.Spec.DisplayName, l.clusterName, obj.InvolvedObject.Name, strconv.Itoa(int(obj.Count)), obj.Message, obj.FirstTimestamp, obj.LastTimestamp)
+				desc := fmt.Sprintf("*Alert Name*: %s\n*Severity*: %s\n*Cluster Name*: %s\n*Target*: %s\n*Count*: %s\n*Event Message*: %s\n*First Seen*: %s\n*Last Seen*: %s",
+					alert.Spec.DisplayName, alert.Spec.Severity, l.clusterName, obj.InvolvedObject.Name, strconv.Itoa(int(obj.Count)), obj.Message, obj.FirstTimestamp, obj.LastTimestamp)
 
 				if err := l.alertManager.SendAlert(alertID, desc, title, alert.Spec.Severity); err != nil {
 					logrus.Debugf("Failed to send alert: %v", err)
