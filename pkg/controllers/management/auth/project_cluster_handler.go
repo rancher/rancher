@@ -3,6 +3,8 @@ package auth
 import (
 	"reflect"
 
+	"fmt"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/condition"
 	corev1 "github.com/rancher/types/apis/core/v1"
@@ -24,6 +26,11 @@ const (
 
 var defaultProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/default-project": "true"})
 var crtbCeatorOwnerAnnotations = map[string]string{creatorOwnerBindingAnnotation: "true"}
+
+var defaultProjects = map[string]bool{
+	"Default": true,
+	"System":  true,
+}
 
 func newPandCLifecycles(management *config.ManagementContext) (*projectLifecycle, *clusterLifecycle) {
 	m := &mgr{
@@ -158,8 +165,19 @@ func (m *mgr) createDefaultProject(obj runtime.Object) (runtime.Object, error) {
 		if err != nil {
 			return obj, err
 		}
-		if len(projects) > 0 {
+		if len(projects) > 1 {
 			return obj, nil
+		}
+
+		existing := map[string]bool{}
+		var toCreate []string
+		for _, project := range projects {
+			existing[project.Spec.DisplayName] = true
+		}
+		for pName := range defaultProjects {
+			if _, ok := existing[pName]; !ok {
+				toCreate = append(toCreate, pName)
+			}
 		}
 
 		creatorID, ok := metaAccessor.GetAnnotations()[creatorIDAnn]
@@ -168,20 +186,25 @@ func (m *mgr) createDefaultProject(obj runtime.Object) (runtime.Object, error) {
 			return obj, nil
 		}
 
-		_, err = m.mgmt.Management.Projects(metaAccessor.GetName()).Create(&v3.Project{
-			ObjectMeta: v1.ObjectMeta{
-				GenerateName: "project-",
-				Annotations: map[string]string{
-					creatorIDAnn: creatorID,
+		for _, projectName := range toCreate {
+			_, err = m.mgmt.Management.Projects(metaAccessor.GetName()).Create(&v3.Project{
+				ObjectMeta: v1.ObjectMeta{
+					GenerateName: "project-",
+					Annotations: map[string]string{
+						creatorIDAnn: creatorID,
+					},
+					Labels: defaultProjectLabels,
 				},
-				Labels: defaultProjectLabels,
-			},
-			Spec: v3.ProjectSpec{
-				DisplayName: "Default",
-				Description: "Default project created for the cluster",
-				ClusterName: metaAccessor.GetName(),
-			},
-		})
+				Spec: v3.ProjectSpec{
+					DisplayName: projectName,
+					Description: fmt.Sprintf("%s project created for the cluster", projectName),
+					ClusterName: metaAccessor.GetName(),
+				},
+			})
+			if err != nil {
+				return obj, err
+			}
+		}
 
 		return obj, err
 	})

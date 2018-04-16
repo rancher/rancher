@@ -34,6 +34,8 @@ var (
 	WhitelistDomain                 = newSetting("whitelist-domain", "forums.rancher.com")
 	FirstLogin                      = newSetting("first-login", "true")
 	InstallUUID                     = newSetting("install-uuid", "")
+	SystemNamespaces                = newSetting("system-namespaces", "kube-system,kube-public,cattle-system,"+
+		"cattle-alerting,cattle-logging, cattle-pipeline")
 )
 
 type Provider interface {
