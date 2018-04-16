@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/rancher/norman/httperror"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config/dialer"
 	"k8s.io/client-go/rest"
 )
@@ -14,8 +15,8 @@ type Router struct {
 	serverFactory *factory
 }
 
-func New(localConfig *rest.Config, lookup ClusterLookup, dialer dialer.Factory) http.Handler {
-	serverFactory := newFactory(localConfig, dialer, lookup)
+func New(localConfig *rest.Config, lookup ClusterLookup, dialer dialer.Factory, clusterLister v3.ClusterLister) http.Handler {
+	serverFactory := newFactory(localConfig, dialer, lookup, clusterLister)
 	return &Router{
 		serverFactory: serverFactory,
 	}
