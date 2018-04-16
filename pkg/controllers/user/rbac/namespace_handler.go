@@ -31,6 +31,12 @@ var projectNSVerbToSuffix = map[string]string{
 	"get": "readonly",
 	"*":   "edit",
 }
+var defaultProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/default-project": "true"})
+var systemProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/system-project": "true"})
+var initialProjectToLabels = map[string]labels.Set{
+	"Default": defaultProjectLabels,
+	"System":  systemProjectLabels,
+}
 
 func newNamespaceLifecycle(m *manager) *nsLifecycle {
 	return &nsLifecycle{m: m}
@@ -52,6 +58,10 @@ func (n *nsLifecycle) Create(obj *v1.Namespace) (*v1.Namespace, error) {
 	}
 
 	SetNamespaceCondition(obj, 0, initialRoleCondition, true, "")
+
+	if err := n.assignToInitialProject(obj); err != nil {
+		return obj, err
+	}
 
 	go updateStatusAnnotation(hasPRTBs, obj, n.m)
 
@@ -91,6 +101,41 @@ func (n *nsLifecycle) syncNS(obj *v1.Namespace) (bool, error) {
 	}
 
 	return hasPRTBs, nil
+}
+
+func (n *nsLifecycle) assignToInitialProject(ns *v1.Namespace) error {
+	initialProjectsToNamespaces, err := getDefaultAndSystemProjectsToNamespaces()
+	if err != nil {
+		return err
+	}
+	for projectName, namespaces := range initialProjectsToNamespaces {
+		for _, nsToCheck := range namespaces {
+			if nsToCheck == ns.Name {
+				projectID := ns.Annotations[projectIDAnnotation]
+				if projectID != "" {
+					return nil
+				}
+				projects, err := n.m.projectLister.List(n.m.clusterName, initialProjectToLabels[projectName].AsSelector())
+				if err != nil {
+					return err
+				}
+				if len(projects) == 0 {
+					continue
+				}
+				if len(projects) > 1 {
+					return fmt.Errorf("cluster [%s] contains more than 1 [%s] project", n.m.clusterName, projectName)
+				}
+				if projects[0] == nil {
+					continue
+				}
+				if ns.Annotations == nil {
+					ns.Annotations = map[string]string{}
+				}
+				ns.Annotations[projectIDAnnotation] = fmt.Sprintf("%v:%v", n.m.clusterName, projects[0].Name)
+			}
+		}
+	}
+	return nil
 }
 
 func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
