@@ -14,17 +14,19 @@ import (
 type factory struct {
 	dialerFactory dialer.Factory
 	clusterLookup ClusterLookup
+	clusterLister v3.ClusterLister
 	clusters      sync.Map
 	serverLock    *locker.Locker
 	servers       sync.Map
 	localConfig   *rest.Config
 }
 
-func newFactory(localConfig *rest.Config, dialer dialer.Factory, lookup ClusterLookup) *factory {
+func newFactory(localConfig *rest.Config, dialer dialer.Factory, lookup ClusterLookup, clusterLister v3.ClusterLister) *factory {
 	return &factory{
 		dialerFactory: dialer,
 		serverLock:    locker.New(),
 		clusterLookup: lookup,
+		clusterLister: clusterLister,
 		localConfig:   localConfig,
 	}
 }
@@ -71,5 +73,5 @@ func (s *factory) get(req *http.Request) (*v3.Cluster, http.Handler, error) {
 }
 
 func (s *factory) newServer(c *v3.Cluster) (server, error) {
-	return proxy.New(s.localConfig, c, s.dialerFactory)
+	return proxy.New(s.localConfig, c, s.clusterLister, s.dialerFactory)
 }

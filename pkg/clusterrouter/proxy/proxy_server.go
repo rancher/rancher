@@ -19,13 +19,15 @@ import (
 type RemoteService struct {
 	cluster   *v3.Cluster
 	transport http.RoundTripper
-	url       *url.URL
+	url       urlGetter
 	auth      string
 }
 
 var (
 	er = &errorResponder{}
 )
+
+type urlGetter func() (url.URL, error)
 
 type errorResponder struct {
 }
@@ -39,11 +41,11 @@ func prefix(cluster *v3.Cluster) string {
 	return "/k8s/clusters/" + cluster.Name
 }
 
-func New(localConfig *rest.Config, cluster *v3.Cluster, factory dialer.Factory) (*RemoteService, error) {
+func New(localConfig *rest.Config, cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory) (*RemoteService, error) {
 	if cluster.Spec.Internal {
 		return NewLocal(localConfig, cluster)
 	}
-	return NewRemote(cluster, factory)
+	return NewRemote(cluster, clusterLister, factory)
 }
 
 func NewLocal(localConfig *rest.Config, cluster *v3.Cluster) (*RemoteService, error) {
@@ -59,13 +61,15 @@ func NewLocal(localConfig *rest.Config, cluster *v3.Cluster) (*RemoteService, er
 	}
 
 	return &RemoteService{
-		cluster:   cluster,
-		url:       hostURL,
+		cluster: cluster,
+		url: func() (url.URL, error) {
+			return *hostURL, nil
+		},
 		transport: transport,
 	}, nil
 }
 
-func NewRemote(cluster *v3.Cluster, factory dialer.Factory) (*RemoteService, error) {
+func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory) (*RemoteService, error) {
 	if !v3.ClusterConditionProvisioned.IsTrue(cluster) {
 		return nil, httperror.NewAPIError(httperror.ClusterUnavailable, "cluster not provisioned")
 	}
@@ -92,15 +96,23 @@ func NewRemote(cluster *v3.Cluster, factory dialer.Factory) (*RemoteService, err
 		}
 	}
 
-	u, err := url.Parse(cluster.Status.APIEndpoint)
-	if err != nil {
-		return nil, err
+	urlGetter := func() (url.URL, error) {
+		newCluster, err := clusterLister.Get("", cluster.Name)
+		if err != nil {
+			return url.URL{}, err
+		}
+
+		u, err := url.Parse(newCluster.Status.APIEndpoint)
+		if err != nil {
+			return url.URL{}, err
+		}
+		return *u, nil
 	}
 
 	return &RemoteService{
 		cluster:   cluster,
 		transport: transport,
-		url:       u,
+		url:       urlGetter,
 		auth:      "Bearer " + cluster.Status.ServiceAccountToken,
 	}, nil
 }
@@ -113,7 +125,12 @@ func (r *RemoteService) Handler() http.Handler {
 }
 
 func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	u := *r.url
+	u, err := r.url()
+	if err != nil {
+		er.Error(rw, req, err)
+		return
+	}
+
 	u.Path = strings.TrimPrefix(req.URL.Path, prefix(r.cluster))
 	u.RawQuery = req.URL.RawQuery
 

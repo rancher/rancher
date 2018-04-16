@@ -13,7 +13,8 @@ import (
 )
 
 func New(scaledContext *config.ScaledContext, dialer dialer.Factory) http.Handler {
-	return clusterrouter.New(scaledContext.LocalConfig, k8slookup.New(scaledContext, true), dialer)
+	return clusterrouter.New(scaledContext.LocalConfig, k8slookup.New(scaledContext, true), dialer,
+		scaledContext.Management.Clusters("").Controller().Lister())
 }
 
 func NewLocalProxy(scaledContext *config.ScaledContext, dialer dialer.Factory, next http.Handler) (http.Handler, error) {
@@ -21,10 +22,14 @@ func NewLocalProxy(scaledContext *config.ScaledContext, dialer dialer.Factory, n
 	if err != nil {
 		return nil, err
 	}
+
+	router := clusterrouter.New(scaledContext.LocalConfig, k8slookup.New(scaledContext, false), dialer,
+		scaledContext.Management.Clusters("").Controller().Lister())
+
 	lp := &localProxy{
 		passThrough: passThrough,
 		next:        next,
-		router:      clusterrouter.New(scaledContext.LocalConfig, k8slookup.New(scaledContext, false), dialer),
+		router:      router,
 	}
 
 	if rd, ok := dialer.(*rdialer.Factory); ok {
