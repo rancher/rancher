@@ -4,7 +4,9 @@ import (
 	"time"
 
 	"github.com/rancher/norman/api/access"
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/types/apis/cluster.cattle.io/v3/schema"
 	"github.com/rancher/types/client/cluster/v3"
 	"k8s.io/apimachinery/pkg/util/cache"
@@ -12,6 +14,11 @@ import (
 
 var (
 	namespaceOwnerMap = cache.NewLRUExpireCache(1000)
+	systemNamespaces  = map[string]bool{
+		"cattle-system": true,
+		"kube-public":   true,
+		"kube-system":   true,
+	}
 )
 
 func updateNamespaceOwnerMap(apiContext *types.APIContext) error {
@@ -43,4 +50,16 @@ func ProjectMap(apiContext *types.APIContext, refresh bool) (map[string]string, 
 	}
 
 	return data, nil
+}
+
+func Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
+	name := request.ID
+	if len(name) == 0 {
+		return nil
+	}
+	if _, ok := systemNamespaces[name]; ok && !convert.IsEmpty(data["projectId"]) {
+		return httperror.NewAPIError(httperror.InvalidOption, "Can not set projectID on a system namespace")
+	}
+
+	return nil
 }
