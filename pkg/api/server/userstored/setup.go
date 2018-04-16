@@ -85,6 +85,7 @@ func Namespace(schemas *types.Schemas, manager *clustermanager.Manager) {
 	namespaceSchema := schemas.Schema(&clusterschema.Version, "namespace")
 	namespaceSchema.LinkHandler = namespacecustom.NewLinkHandler(namespaceSchema.LinkHandler, manager)
 	namespaceSchema.Formatter = yaml.NewFormatter(namespaceSchema.Formatter)
+	namespaceSchema.Validator = namespacecustom.Validator
 }
 
 func Workload(schemas *types.Schemas, clusterManager *clustermanager.Manager) {
