@@ -36,6 +36,8 @@ type Driver struct {
 }
 
 type state struct {
+	// The displayed name of the cluster
+	DisplayName string
 	// ProjectID is the ID of your project to use when creating a cluster
 	ProjectID string
 	// The zone to launch the cluster
@@ -103,6 +105,10 @@ func NewDriver() types.Driver {
 func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags, error) {
 	driverFlag := types.DriverFlags{
 		Options: make(map[string]*types.Flag),
+	}
+	driverFlag.Options["display-name"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "the name of the cluster that should be displayed to the user",
 	}
 	driverFlag.Options["project-id"] = &types.Flag{
 		Type:  types.StringType,
@@ -185,6 +191,7 @@ func getStateFromOpts(driverOptions *types.DriverOptions) (state, error) {
 		},
 	}
 	d.Name = getValueFromDriverOptions(driverOptions, types.StringType, "name").(string)
+	d.DisplayName = getValueFromDriverOptions(driverOptions, types.StringType, "display-name", "displayName").(string)
 	d.ProjectID = getValueFromDriverOptions(driverOptions, types.StringType, "project-id", "projectId").(string)
 	d.Zone = getValueFromDriverOptions(driverOptions, types.StringType, "zone").(string)
 	d.NodePoolID = getValueFromDriverOptions(driverOptions, types.StringType, "nodePool").(string)
@@ -219,6 +226,7 @@ func getStateFromOpts(driverOptions *types.DriverOptions) (state, error) {
 			d.NodeConfig.Labels[kv[0]] = kv[1]
 		}
 	}
+
 	return d, d.validate()
 }
 
@@ -419,6 +427,7 @@ func (d *Driver) generateClusterCreateRequest(state state) *raw.CreateClusterReq
 		Username: "admin",
 	}
 	request.Cluster.NodeConfig = state.NodeConfig
+	request.Cluster.ResourceLabels = map[string]string{"display-name": strings.ToLower(state.DisplayName)}
 	return &request
 }
 
