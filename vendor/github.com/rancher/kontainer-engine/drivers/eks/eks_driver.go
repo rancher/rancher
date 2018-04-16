@@ -48,6 +48,7 @@ type Driver struct {
 
 type state struct {
 	ClusterName  string
+	DisplayName  string
 	ClientID     string
 	ClientSecret string
 
@@ -90,13 +91,17 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 	driverFlag := types.DriverFlags{
 		Options: make(map[string]*types.Flag),
 	}
+	driverFlag.Options["display-name"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "The displayed name of the cluster in the Rancher UI",
+	}
 	driverFlag.Options["client-id"] = &types.Flag{
 		Type:  types.StringType,
-		Usage: "",
+		Usage: "The AWS Client ID to use",
 	}
 	driverFlag.Options["client-secret"] = &types.Flag{
 		Type:  types.StringType,
-		Usage: "",
+		Usage: "The AWS Client Secret associated with the Client ID",
 	}
 
 	return &driverFlag, nil
@@ -111,8 +116,10 @@ func (d *Driver) GetDriverUpdateOptions(ctx context.Context) (*types.DriverFlags
 }
 
 func getStateFromOptions(driverOptions *types.DriverOptions) (state, error) {
+	logrus.Infof("%v", driverOptions)
 	state := state{}
 	state.ClusterName = getValueFromDriverOptions(driverOptions, types.StringType, "name").(string)
+	state.DisplayName = getValueFromDriverOptions(driverOptions, types.StringType, "display-name", "displayName").(string)
 	state.ClientID = getValueFromDriverOptions(driverOptions, types.StringType, "client-id", "accessKey").(string)
 	state.ClientSecret = getValueFromDriverOptions(driverOptions, types.StringType, "client-secret", "secretKey").(string)
 
@@ -180,7 +187,7 @@ func alreadyExistsInCloudFormationError(err error) bool {
 	return false
 }
 
-func (d *Driver) createStack(svc *cloudformation.CloudFormation, name string,
+func (d *Driver) createStack(svc *cloudformation.CloudFormation, name string, displayName string,
 	templateURL string, parameters []*cloudformation.Parameter) (*cloudformation.DescribeStacksOutput, error) {
 	_, err := svc.CreateStack(&cloudformation.CreateStackInput{
 		StackName:   aws.String(name),
@@ -189,6 +196,9 @@ func (d *Driver) createStack(svc *cloudformation.CloudFormation, name string,
 			cloudformation.CapabilityCapabilityIam,
 		}),
 		Parameters: parameters,
+		Tags: []*cloudformation.Tag{
+			{Key: aws.String("displayName"), Value: aws.String(displayName)},
+		},
 	})
 	if err != nil && !alreadyExistsInCloudFormationError(err) {
 		return nil, fmt.Errorf("error creating master: %v", err)
@@ -269,7 +279,12 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions) (*typ
 
 	logrus.Infof("Bringing up vpc")
 
-	stack, err := d.createStack(svc, getVPCStackName(state),
+	displayName := state.DisplayName
+	if displayName == "" {
+		displayName = state.ClusterName
+	}
+
+	stack, err := d.createStack(svc, getVPCStackName(state), displayName,
 		"https://amazon-eks.s3-us-west-2.amazonaws.com/2018-04-04/amazon-eks-vpc-sample.yaml",
 		[]*cloudformation.Parameter{
 			{ParameterKey: aws.String("ClusterName"), ParameterValue: aws.String(state.ClusterName)},
@@ -301,7 +316,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions) (*typ
 
 	logrus.Infof("Creating service role")
 
-	stack, err = d.createStack(svc, getServiceRoleName(state),
+	stack, err = d.createStack(svc, getServiceRoleName(state), displayName,
 		"https://amazon-eks.s3-us-west-2.amazonaws.com/2018-04-04/amazon-eks-service-role.yaml", nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating stack: %v", err)
@@ -352,7 +367,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions) (*typ
 
 	logrus.Infof("Creating worker nodes")
 
-	stack, err = d.createStack(svc, getWorkNodeName(state),
+	stack, err = d.createStack(svc, getWorkNodeName(state), displayName,
 		"https://amazon-eks.s3-us-west-2.amazonaws.com/2018-04-04/amazon-eks-nodegroup.yaml",
 		[]*cloudformation.Parameter{
 			{ParameterKey: aws.String("ClusterName"), ParameterValue: aws.String(state.ClusterName)},
@@ -649,7 +664,7 @@ func (d *Driver) Remove(ctx context.Context, info *types.ClusterInfo) error {
 		return fmt.Errorf("error deleting key pair: %v", err)
 	}
 
-	return fmt.Errorf("not implemented")
+	return nil
 }
 
 func noClusterFound(err error) bool {
