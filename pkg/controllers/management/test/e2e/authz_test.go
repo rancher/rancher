@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/rancher/norman/types/slice"
-	"github.com/rancher/rancher/pkg/controllers/user/authz"
+	"github.com/rancher/rancher/pkg/controllers/user/rbac"
 	authzv1 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"gopkg.in/check.v1"
@@ -388,7 +388,7 @@ func (s *AuthzSuite) SetUpSuite(c *check.C) {
 	s.ctx = workload
 	s.setupCRDs(c)
 
-	authz.Register(workload)
+	rbac.Register(workload)
 
 	ctx := context.Background()
 	err := workload.Start(ctx)
