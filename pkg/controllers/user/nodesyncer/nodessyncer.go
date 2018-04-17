@@ -17,9 +17,8 @@ import (
 )
 
 const (
-	AllNodeKey           = "_machine_all_"
-	annotationName       = "management.cattle.io/nodesyncer"
-	externalIPAnnotation = "rke.cattle.io/external-ip"
+	AllNodeKey     = "_machine_all_"
+	annotationName = "management.cattle.io/nodesyncer"
 )
 
 type NodeSyncer struct {
@@ -293,22 +292,31 @@ func isNodeForNode(node *corev1.Node, machine *v3.Node) bool {
 	if nodeName == node.Name {
 		return true
 	}
+
 	// search by rke external-ip annotations
-	address := ""
+	machineAddress := ""
 	if machine.Status.NodeConfig != nil {
-		address = machine.Status.NodeConfig.Address
+		machineAddress = machine.Status.NodeConfig.Address
 	}
 
-	if address == "" {
+	if machineAddress == "" {
 		return false
 	}
 
-	nodeExternalIP := node.Annotations[externalIPAnnotation]
-	if address == nodeExternalIP {
+	if machineAddress == getNodeExternalAddress(node) {
 		return true
 	}
 
 	return false
+}
+
+func getNodeExternalAddress(node *corev1.Node) string {
+	for _, address := range node.Status.Addresses {
+		if address.Type == corev1.NodeExternalIP {
+			return address.Address
+		}
+	}
+	return ""
 }
 
 func resetConditions(machine *v3.Node) *v3.Node {
