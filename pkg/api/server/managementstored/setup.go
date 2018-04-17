@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/node"
 	"github.com/rancher/rancher/pkg/api/customization/nodetemplate"
 	"github.com/rancher/rancher/pkg/api/customization/pipeline"
+	"github.com/rancher/rancher/pkg/api/customization/podsecuritypolicytemplate"
 	projectaction "github.com/rancher/rancher/pkg/api/customization/project"
 	"github.com/rancher/rancher/pkg/api/customization/setting"
 	"github.com/rancher/rancher/pkg/api/store/cert"
@@ -112,6 +113,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	Pipeline(schemas, apiContext)
 	Project(schemas, apiContext)
 	TemplateContent(schemas)
+	PodSecurityPolicyTemplate(schemas, apiContext)
 
 	if err := NodeTypes(schemas, apiContext); err != nil {
 		return err
@@ -395,4 +397,13 @@ func Project(schemas *types.Schemas, management *config.ScaledContext) {
 		ProjectLister: management.Management.Projects("").Controller().Lister(),
 	}
 	schema.ActionHandler = handler.Actions
+}
+
+func PodSecurityPolicyTemplate(schemas *types.Schemas, management *config.ScaledContext) {
+
+	schema := schemas.Schema(&managementschema.Version, client.PodSecurityPolicyTemplateType)
+	schema.Formatter = podsecuritypolicytemplate.NewFormatter(management)
+	schema.Store = &podsecuritypolicytemplate.Store{
+		Store: schema.Store,
+	}
 }
