@@ -73,7 +73,7 @@ func updateRule(target map[string]interface{}, hostpath string, forFrontend bool
 		}
 
 		if isService {
-			targetData["serviceId"] = fmt.Sprintf("%s/%s", data["namespaceId"].(string), serviceID)
+			targetData["serviceId"] = fmt.Sprintf("%s:%s", data["namespaceId"].(string), serviceID)
 		} else {
 			delete(targetData, "serviceId")
 		}
