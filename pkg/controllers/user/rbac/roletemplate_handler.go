@@ -1,4 +1,4 @@
-package authz
+package rbac
 
 import (
 	"github.com/pkg/errors"

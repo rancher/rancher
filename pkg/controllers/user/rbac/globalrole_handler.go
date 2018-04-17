@@ -1,4 +1,4 @@
-package authz
+package rbac
 
 import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
