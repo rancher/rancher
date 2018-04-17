@@ -271,10 +271,10 @@ type FreeIpaTestAndApplyInput struct {
 }
 
 type SamlConfig struct {
-	metav1.TypeMeta    `json:",inline"`
-	metav1.ObjectMeta  `json:"metadata,omitempty"`
-	AuthConfig         `json:",inline" mapstructure:",squash"`
-	IDPMetadataURL     string `json:"idpMetadataUrl"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	AuthConfig        `json:",inline" mapstructure:",squash"`
+
 	IDPMetadataContent string `json:"idpMetadataContent" norman:"required"`
 	SPSelfSignedCert   string `json:"spCert"             norman:"required"`
 	SPSelfSignedKey    string `json:"spKey"              norman:"required"`
@@ -282,23 +282,13 @@ type SamlConfig struct {
 	DisplayNameField   string `json:"displayNameField"   norman:"required"`
 	UserNameField      string `json:"userNameField"      norman:"required"`
 	UIDField           string `json:"uidField"           norman:"required"`
-
-	IDPMetadataFilePath      string
-	SPSelfSignedCertFilePath string
-	SPSelfSignedKeyFilePath  string
-	RancherAPIHost           string `json:"rancherApiHost"           norman:"required"`
+	RancherAPIHost     string `json:"rancherApiHost"     norman:"required"`
 }
 
 type PingConfig struct {
 	SamlConfig `json:",inline" mapstructure:",squash"`
 }
 
-type SamlConfigTestOutput struct {
-	RedirectURL string `json:"redirectUrl"`
-}
-
-type SamlConfigApplyInput struct {
-	SamlConfig SamlConfig `json:"samlConfig, omitempty"`
-	Code       string     `json:"code,omitempty"`
-	Enabled    bool       `json:"enabled,omitempty"`
+type SamlConfigTestInput struct {
+	FinalRedirectURL string `json:"finalRedirectUrl"`
 }
