@@ -296,23 +296,28 @@ func isNodeForNode(node *corev1.Node, machine *v3.Node) bool {
 	// search by rke external-ip annotations
 	machineAddress := ""
 	if machine.Status.NodeConfig != nil {
-		machineAddress = machine.Status.NodeConfig.Address
+		if machine.Status.NodeConfig.InternalAddress == "" {
+			// rke defaults internal address to address
+			machineAddress = machine.Status.NodeConfig.Address
+		} else {
+			machineAddress = machine.Status.NodeConfig.InternalAddress
+		}
 	}
 
 	if machineAddress == "" {
 		return false
 	}
 
-	if machineAddress == getNodeExternalAddress(node) {
+	if machineAddress == getNodeInternalAddress(node) {
 		return true
 	}
 
 	return false
 }
 
-func getNodeExternalAddress(node *corev1.Node) string {
+func getNodeInternalAddress(node *corev1.Node) string {
 	for _, address := range node.Status.Addresses {
-		if address.Type == corev1.NodeExternalIP {
+		if address.Type == corev1.NodeInternalIP {
 			return address.Address
 		}
 	}
