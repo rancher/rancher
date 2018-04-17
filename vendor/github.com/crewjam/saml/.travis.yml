@@ -1,0 +1,19 @@
+language: go
+
+before_install:
+  - curl -L -s https://github.com/golang/dep/releases/download/v0.3.1/dep-linux-amd64 -o $GOPATH/bin/dep
+  - chmod +x $GOPATH/bin/dep
+  # get test deps
+  - go get golang.org/x/sys/unix
+  - go get github.com/goji/param
+  - go get github.com/kr/pty
+
+install:
+  - dep ensure
+
+# starting with go 1.9, vendor is excluded and you can simply do: go test ./...
+script: go test ./...
+
+go:
+  - 1.9
+  - tip

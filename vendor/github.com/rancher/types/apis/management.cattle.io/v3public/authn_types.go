@@ -58,6 +58,14 @@ type AzureADProvider struct {
 	RedirectURL string `json:"redirectUrl"`
 }
 
+type SamlProvider struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	AuthProvider      `json:",inline"`
+
+	RedirectURL string `json:"redirectUrl"`
+}
+
 type AzureADLogin struct {
 	GenericLogin `json:",inline"`
 	Code         string `json:"code" norman:"type=string,required"`
@@ -73,4 +81,12 @@ type FreeIpaProvider struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	AuthProvider      `json:",inline"`
+}
+
+type PingProvider struct {
+	SamlProvider `json:",inline"`
+}
+
+type SamlLogin struct {
+	FinalRedirectURL string `json:"finalRedirectUrl"`
 }
