@@ -84,6 +84,16 @@ func (m *userManager) SetPrincipalOnCurrentUser(apiContext *types.APIContext, pr
 		return nil, err
 	}
 
+	if providerExists(user.PrincipalIDs, principal.Provider) {
+		var principalIDs []string
+		for _, id := range user.PrincipalIDs {
+			if !strings.Contains(id, principal.Provider) {
+				principalIDs = append(principalIDs, id)
+			}
+		}
+		user.PrincipalIDs = principalIDs
+	}
+
 	if !slice.ContainsString(user.PrincipalIDs, principal.Name) {
 		user.PrincipalIDs = append(user.PrincipalIDs, principal.Name)
 		return m.users.Update(user)
@@ -331,4 +341,14 @@ func groupPrincipalPRTB(obj interface{}) ([]string, error) {
 		gp = append(gp, b.GroupPrincipalName)
 	}
 	return gp, nil
+}
+
+func providerExists(principalIDs []string, provider string) bool {
+	for _, id := range principalIDs {
+		splitID := strings.Split(id, ":")[1]
+		if strings.Contains(splitID, provider) {
+			return true
+		}
+	}
+	return false
 }
