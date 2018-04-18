@@ -102,6 +102,22 @@ func concat(str, next string) string {
 }
 
 func Set(data map[string]interface{}) {
+	genericStatus(data)
+	loadBalancerSetatus(data)
+}
+
+func loadBalancerSetatus(data map[string]interface{}) {
+	if data["state"] == "active" && data["kind"] == "Service" && values.GetValueN(data, "spec", "serviceKind") == "LoadBalancer" {
+		addresses, ok := values.GetSlice(data, "status", "loadBalancer", "ingress")
+		if !ok || len(addresses) == 0 {
+			data["state"] = "pending"
+			data["transitioning"] = "yes"
+			data["transitioningMessage"] = "Load Balancer is being provisioned"
+		}
+	}
+}
+
+func genericStatus(data map[string]interface{}) {
 	if data == nil {
 		return
 	}
