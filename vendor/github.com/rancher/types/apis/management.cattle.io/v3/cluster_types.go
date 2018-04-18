@@ -238,3 +238,16 @@ type ClusterRegistrationTokenStatus struct {
 type GenerateKubeConfigOutput struct {
 	Config string `json:"config"`
 }
+
+type ImportClusterYamlInput struct {
+	Yaml string `json:"yaml,omitempty"`
+}
+
+type ImportProjectYamlInput struct {
+	Yaml      string `json:"yaml,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
+}
+
+type ImportYamlOutput struct {
+	OutputMessage string `json:"outputMessage,omitempty"`
+}

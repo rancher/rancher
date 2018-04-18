@@ -189,6 +189,11 @@ func parseVersionAndSubContext(schemas *types.Schemas, escapedPath string) (*typ
 		return nil, version, "", paths, nil
 	}
 
+	attrs := map[string]string{}
+	if len(paths) > 0 {
+		attrs[version.SubContextSchema] = paths[0]
+	}
+
 	if len(paths) < 2 {
 		// Handle case like /v3/clusters/foo where /v3 and /v3/clusters are API versions.
 		// In this situation you want the version to be /v3 and the path "clusters", "foo"
@@ -196,13 +201,7 @@ func parseVersionAndSubContext(schemas *types.Schemas, escapedPath string) (*typ
 		if len(paths) > 0 {
 			newVersion.Path = newVersion.Path + "/" + paths[0]
 		}
-		return &newVersion, &versions[1], "", pathParts[len(versionParts)-1:], nil
-	}
-
-	// Length is always >= 3
-
-	attrs := map[string]string{
-		version.SubContextSchema: paths[0],
+		return &newVersion, &versions[1], "", pathParts[len(versionParts)-1:], attrs
 	}
 
 	for i, version := range versions {

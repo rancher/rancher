@@ -159,13 +159,14 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 		ClusterManager: clusterManager,
 	}
 	handler := ccluster.ActionHandler{
-		ClusterClient: managementContext.Management.Clusters(""),
-		UserMgr:       managementContext.UserManager,
+		ClusterClient:  managementContext.Management.Clusters(""),
+		UserMgr:        managementContext.UserManager,
+		ClusterManager: clusterManager,
 	}
 
 	schema := schemas.Schema(&managementschema.Version, client.ClusterType)
 	schema.Formatter = ccluster.Formatter
-	schema.ActionHandler = handler.GenerateKubeconfigActionHandler
+	schema.ActionHandler = handler.ClusterActionHandler
 	schema.Store = &cluster.Store{
 		Store:        schema.Store,
 		ShellHandler: linkHandler.LinkHandler,
@@ -390,8 +391,10 @@ func Project(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.ProjectType)
 	schema.Formatter = projectaction.Formatter
 	handler := &projectaction.Handler{
-		Projects:      management.Management.Projects(""),
-		ProjectLister: management.Management.Projects("").Controller().Lister(),
+		Projects:       management.Management.Projects(""),
+		ProjectLister:  management.Management.Projects("").Controller().Lister(),
+		UserMgr:        management.UserManager,
+		ClusterManager: management.ClientGetter.(*clustermanager.Manager),
 	}
 	schema.ActionHandler = handler.Actions
 }
