@@ -1,16 +1,14 @@
 package client
 
 const (
-	AppStatusType            = "appStatus"
-	AppStatusFieldConditions = "conditions"
-	AppStatusFieldReleases   = "releases"
-	AppStatusFieldStdError   = "stdError"
-	AppStatusFieldStdOutput  = "stdOutput"
+	AppStatusType                      = "appStatus"
+	AppStatusFieldConditions           = "conditions"
+	AppStatusFieldLastAppliedTemplates = "lastAppliedTemplate"
+	AppStatusFieldNotes                = "notes"
 )
 
 type AppStatus struct {
-	Conditions []AppCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
-	Releases   []ReleaseInfo  `json:"releases,omitempty" yaml:"releases,omitempty"`
-	StdError   []string       `json:"stdError,omitempty" yaml:"stdError,omitempty"`
-	StdOutput  []string       `json:"stdOutput,omitempty" yaml:"stdOutput,omitempty"`
+	Conditions           []AppCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+	LastAppliedTemplates string         `json:"lastAppliedTemplate,omitempty" yaml:"lastAppliedTemplate,omitempty"`
+	Notes                string         `json:"notes,omitempty" yaml:"notes,omitempty"`
 }

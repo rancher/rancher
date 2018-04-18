@@ -27,6 +27,7 @@ type Interface interface {
 	NamespacedSSHAuthsGetter
 	WorkloadsGetter
 	AppsGetter
+	AppRevisionsGetter
 	NamespaceComposeConfigsGetter
 }
 
@@ -47,6 +48,7 @@ type Client struct {
 	namespacedSshAuthControllers             map[string]NamespacedSSHAuthController
 	workloadControllers                      map[string]WorkloadController
 	appControllers                           map[string]AppController
+	appRevisionControllers                   map[string]AppRevisionController
 	namespaceComposeConfigControllers        map[string]NamespaceComposeConfigController
 }
 
@@ -76,6 +78,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		namespacedSshAuthControllers:             map[string]NamespacedSSHAuthController{},
 		workloadControllers:                      map[string]WorkloadController{},
 		appControllers:                           map[string]AppController{},
+		appRevisionControllers:                   map[string]AppRevisionController{},
 		namespaceComposeConfigControllers:        map[string]NamespaceComposeConfigController{},
 	}, nil
 }
@@ -242,6 +245,19 @@ type AppsGetter interface {
 func (c *Client) Apps(namespace string) AppInterface {
 	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &AppResource, AppGroupVersionKind, appFactory{})
 	return &appClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type AppRevisionsGetter interface {
+	AppRevisions(namespace string) AppRevisionInterface
+}
+
+func (c *Client) AppRevisions(namespace string) AppRevisionInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &AppRevisionResource, AppRevisionGroupVersionKind, appRevisionFactory{})
+	return &appRevisionClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

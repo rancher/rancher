@@ -687,14 +687,13 @@ func appTypes(schema *types.Schemas) *types.Schemas {
 	return schema.
 		MustImportAndCustomize(&Version, v3.App{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
-				"upgrade": {
-					Input: "templateVersionId",
-				},
+				"upgrade": {},
 				"rollback": {
 					Input: "revision",
 				},
 			}
-		})
+		}).
+		MustImport(&Version, v3.AppRevision{})
 }
 
 func podTemplateSpecTypes(schemas *types.Schemas) *types.Schemas {

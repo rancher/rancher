@@ -28,6 +28,7 @@ type Config struct {
 	Catalogs                                 map[string]managementClient.Catalog                                 `json:"catalogs,omitempty" yaml:"catalogs,omitempty"`
 	Templates                                map[string]managementClient.Template                                `json:"templates,omitempty" yaml:"templates,omitempty"`
 	TemplateVersions                         map[string]managementClient.TemplateVersion                         `json:"templateVersions,omitempty" yaml:"templateVersions,omitempty"`
+	TemplateContents                         map[string]managementClient.TemplateContent                         `json:"templateContents,omitempty" yaml:"templateContents,omitempty"`
 	Groups                                   map[string]managementClient.Group                                   `json:"groups,omitempty" yaml:"groups,omitempty"`
 	GroupMembers                             map[string]managementClient.GroupMember                             `json:"groupMembers,omitempty" yaml:"groupMembers,omitempty"`
 	Users                                    map[string]managementClient.User                                    `json:"users,omitempty" yaml:"users,omitempty"`
@@ -83,5 +84,6 @@ type Config struct {
 	CronJobs                       map[string]projectClient.CronJob                       `json:"cronJobs,omitempty" yaml:"cronJobs,omitempty"`
 	Workloads                      map[string]projectClient.Workload                      `json:"workloads,omitempty" yaml:"workloads,omitempty"`
 	Apps                           map[string]projectClient.App                           `json:"apps,omitempty" yaml:"apps,omitempty"`
+	AppRevisions                   map[string]projectClient.AppRevision                   `json:"appRevisions,omitempty" yaml:"appRevisions,omitempty"`
 	NamespaceComposeConfigs        map[string]projectClient.NamespaceComposeConfig        `json:"namespaceComposeConfigs,omitempty" yaml:"namespaceComposeConfigs,omitempty"`
 }

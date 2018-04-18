@@ -7,8 +7,10 @@ import (
 const (
 	TemplateVersionType                       = "templateVersion"
 	TemplateVersionFieldAnnotations           = "annotations"
+	TemplateVersionFieldAppReadme             = "appReadme"
 	TemplateVersionFieldCreated               = "created"
 	TemplateVersionFieldCreatorID             = "creatorId"
+	TemplateVersionFieldDigest                = "digest"
 	TemplateVersionFieldExternalID            = "externalId"
 	TemplateVersionFieldFiles                 = "files"
 	TemplateVersionFieldLabels                = "labels"
@@ -33,10 +35,12 @@ const (
 type TemplateVersion struct {
 	types.Resource
 	Annotations           map[string]string      `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	AppReadme             string                 `json:"appReadme,omitempty" yaml:"appReadme,omitempty"`
 	Created               string                 `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID             string                 `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Digest                string                 `json:"digest,omitempty" yaml:"digest,omitempty"`
 	ExternalID            string                 `json:"externalId,omitempty" yaml:"externalId,omitempty"`
-	Files                 []File                 `json:"files,omitempty" yaml:"files,omitempty"`
+	Files                 map[string]string      `json:"files,omitempty" yaml:"files,omitempty"`
 	Labels                map[string]string      `json:"labels,omitempty" yaml:"labels,omitempty"`
 	MaximumRancherVersion string                 `json:"maximumRancherVersion,omitempty" yaml:"maximumRancherVersion,omitempty"`
 	MinimumRancherVersion string                 `json:"minimumRancherVersion,omitempty" yaml:"minimumRancherVersion,omitempty"`

@@ -17,24 +17,24 @@ type App struct {
 }
 
 type AppSpec struct {
-	ProjectName      string            `json:"projectName,omitempty" norman:"type=reference[/v3/schemas/project]"`
-	Description      string            `json:"description,omitempty"`
-	InstallNamespace string            `json:"installNamespace,omitempty"`
-	ExternalID       string            `json:"externalId,omitempty"`
-	Templates        map[string]string `json:"templates,omitempty"`
-	Answers          map[string]string `json:"answers,omitempty"`
-	AnswerValues     string            `json:"answerValues,omitempty"`
+	ProjectName     string            `json:"projectName,omitempty" norman:"type=reference[/v3/schemas/project]"`
+	Description     string            `json:"description,omitempty"`
+	TargetNamespace string            `json:"targetNamespace,omitempty"`
+	ExternalID      string            `json:"externalId,omitempty"`
+	Answers         map[string]string `json:"answers,omitempty"`
+	AppRevisionName string            `json:"appRevisionName,omitempty" norman:"type=reference[/v3/project/schemas/apprevision]"`
+	Prune           bool              `json:"prune,omitempty"`
 }
 
 var (
 	AppConditionInstalled condition.Cond = "installed"
+	AppConditionUpdated   condition.Cond = "updated"
 )
 
 type AppStatus struct {
-	StdOutput  []string       `json:"stdOutput,omitempty"`
-	StdError   []string       `json:"stdError,omitempty"`
-	Releases   []ReleaseInfo  `json:"releases,omitempty"`
-	Conditions []AppCondition `json:"conditions,omitempty"`
+	Notes                string         `json:"notes,omitempty"`
+	Conditions           []AppCondition `json:"conditions,omitempty"`
+	LastAppliedTemplates string         `json:"lastAppliedTemplate,omitempty"`
 }
 
 type AppCondition struct {
@@ -52,10 +52,20 @@ type AppCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
-type ReleaseInfo struct {
-	Name              string `json:"name"`
-	Version           string `json:"version"`
-	CreateTimestamp   string `json:"createTimestamp"`
-	ModifiedAt        string `json:"modifiedAt"`
-	TemplateVersionID string `json:"templateVersionId"`
+type AppRevision struct {
+	types.Namespaced
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   AppRevisionSpec   `json:"spec,omitempty"`
+	Status AppRevisionStatus `json:"status,omitempty"`
+}
+
+type AppRevisionSpec struct{}
+
+type AppRevisionStatus struct {
+	ProjectName string            `json:"projectName,omitempty" norman:"type=reference[/v3/schemas/project]"`
+	ExternalID  string            `json:"externalId"`
+	Answers     map[string]string `json:"answers"`
+	Digest      string            `json:"digest"`
 }

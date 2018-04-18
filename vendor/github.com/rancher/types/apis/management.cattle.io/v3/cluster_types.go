@@ -28,6 +28,9 @@ const (
 	ClusterConditionconditionDefautlProjectCreated condition.Cond = "DefaultProjectCreated"
 	// ClusterConditionDefaultNamespaceAssigned true when cluster's default namespace has been initially assigned
 	ClusterConditionDefaultNamespaceAssigned condition.Cond = "DefaultNamespaceAssigned"
+	// ClusterConditionSystemNamespacesAssigned true when cluster's system namespaces has been initially assigned to
+	// a system project
+	ClusterConditionSystemNamespacesAssigned condition.Cond = "SystemNamespacesAssigned"
 	ClusterConditionAddonDeploy              condition.Cond = "AddonDeploy"
 	ClusterConditionSystemAccountCreated     condition.Cond = "SystemAccountCreated"
 	ClusterConditionAgentDeployed            condition.Cond = "AgentDeployed"

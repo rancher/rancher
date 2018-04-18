@@ -57,6 +57,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&WorkloadList{},
 		&App{},
 		&AppList{},
+		&AppRevision{},
+		&AppRevisionList{},
 		&NamespaceComposeConfig{},
 		&NamespaceComposeConfigList{},
 	)

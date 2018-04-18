@@ -92,7 +92,6 @@ type TemplateSpec struct {
 }
 
 type TemplateStatus struct {
-	// todo:
 }
 
 type TemplateVersion struct {
@@ -114,14 +113,15 @@ type TemplateVersionSpec struct {
 	MaximumRancherVersion string            `json:"maximumRancherVersion,omitempty" yaml:"maximum_rancher_version,omitempty"`
 	UpgradeFrom           string            `json:"upgradeFrom,omitempty" yaml:"upgrade_from,omitempty"`
 	Readme                string            `json:"readme,omitempty"`
+	AppReadme             string            `json:"appReadme,omitempty"`
 	UpgradeVersionLinks   map[string]string `json:"upgradeVersionLinks,omitempty"`
+	Digest                string            `json:"digest,omitempty"`
 
-	Files     []File     `json:"files,omitempty"`
-	Questions []Question `json:"questions,omitempty"`
+	Files     map[string]string `json:"files,omitempty"`
+	Questions []Question        `json:"questions,omitempty"`
 }
 
 type TemplateVersionStatus struct {
-	// todo
 }
 
 type File struct {
@@ -130,6 +130,26 @@ type File struct {
 }
 
 type Question struct {
+	Variable          string        `json:"variable,omitempty" yaml:"variable,omitempty"`
+	Label             string        `json:"label,omitempty" yaml:"label,omitempty"`
+	Description       string        `json:"description,omitempty" yaml:"description,omitempty"`
+	Type              string        `json:"type,omitempty" yaml:"type,omitempty"`
+	Required          bool          `json:"required,omitempty" yaml:"required,omitempty"`
+	Default           string        `json:"default,omitempty" yaml:"default,omitempty"`
+	Group             string        `json:"group,omitempty" yaml:"group,omitempty"`
+	MinLength         int           `json:"minLength,omitempty" yaml:"min_length,omitempty"`
+	MaxLength         int           `json:"maxLength,omitempty" yaml:"max_length,omitempty"`
+	Min               int           `json:"min,omitempty" yaml:"min,omitempty"`
+	Max               int           `json:"max,omitempty" yaml:"max,omitempty"`
+	Options           []string      `json:"options,omitempty" yaml:"options,omitempty"`
+	ValidChars        string        `json:"validChars,omitempty" yaml:"valid_chars,omitempty"`
+	InvalidChars      string        `json:"invalidChars,omitempty" yaml:"invalid_chars,omitempty"`
+	Subquestions      []SubQuestion `json:"subquestions,omitempty" yaml:"subquestions,omitempty"`
+	ShowIf            string        `json:"showIf,omitempty" yaml:"show_if,omitempty"`
+	ShowSubquestionIf string        `json:"showSubquestionIf,omitempty" yaml:"show_subquestion_if,omitempty"`
+}
+
+type SubQuestion struct {
 	Variable     string   `json:"variable,omitempty" yaml:"variable,omitempty"`
 	Label        string   `json:"label,omitempty" yaml:"label,omitempty"`
 	Description  string   `json:"description,omitempty" yaml:"description,omitempty"`
@@ -144,4 +164,15 @@ type Question struct {
 	Options      []string `json:"options,omitempty" yaml:"options,omitempty"`
 	ValidChars   string   `json:"validChars,omitempty" yaml:"valid_chars,omitempty"`
 	InvalidChars string   `json:"invalidChars,omitempty" yaml:"invalid_chars,omitempty"`
+	ShowIf       string   `json:"showIf,omitempty" yaml:"show_if,omitempty"`
+}
+
+type TemplateContent struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object’s metadata. More info:
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	// Specification of the desired behavior of the the cluster. More info:
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+	Data string `json:"data,omitempty"`
 }
