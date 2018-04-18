@@ -3,7 +3,6 @@ package cluster
 import (
 	"context"
 
-	ref "github.com/docker/distribution/reference"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -83,26 +82,12 @@ func (c *Cluster) setClusterDefaults(ctx context.Context) {
 	if len(c.ClusterName) == 0 {
 		c.ClusterName = DefaultClusterName
 	}
-
+	if len(c.Version) == 0 {
+		c.Version = DefaultK8sVersion
+	}
 	c.setClusterImageDefaults()
-	c.setClusterKubernetesImageVersion(ctx)
 	c.setClusterServicesDefaults()
 	c.setClusterNetworkDefaults()
-}
-
-func (c *Cluster) setClusterKubernetesImageVersion(ctx context.Context) {
-	k8sImageNamed, _ := ref.ParseNormalizedNamed(c.SystemImages.Kubernetes)
-	// Kubernetes image is already set by c.setClusterImageDefaults(),
-	// I will override it here if Version is set.
-	var VersionedImageNamed ref.NamedTagged
-	if c.Version != "" {
-		VersionedImageNamed, _ = ref.WithTag(ref.TrimNamed(k8sImageNamed), c.Version)
-		c.SystemImages.Kubernetes = VersionedImageNamed.String()
-	}
-	normalizedSystemImage, _ := ref.ParseNormalizedNamed(c.SystemImages.Kubernetes)
-	if normalizedSystemImage.String() != k8sImageNamed.String() {
-		log.Infof(ctx, "Overrding Kubernetes image [%s] with tag [%s]", VersionedImageNamed.Name(), VersionedImageNamed.Tag())
-	}
 }
 
 func (c *Cluster) setClusterServicesDefaults() {

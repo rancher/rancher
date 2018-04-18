@@ -1,9 +1,15 @@
 # default k8s version: v1.8.9-rancher1-1
 # default network plugin: flannel
 nodes:
-  - address: 1.2.3.4
-    user: ubuntu
+  - address: <IP>
+    user: <USER>
     role: [controlplane,etcd,worker]
+    ssh_key_path: <PEM_FILE>
+
+ingress:
+  provider: nginx
+  extra_args:
+    enable-ssl-passthrough: ""
 
 addons: |-
   ---
@@ -50,16 +56,19 @@ addons: |-
   metadata:
     namespace: cattle-system
     name: cattle-ingress-http
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"   # Max time in seconds for ws to remain shell window open
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"   # Max time in seconds for ws to remain shell window open
+      nginx.ingress.kubernetes.io/ssl-passthrough: "true"      # Enable ssl-passthrough to backend.
   spec:
     rules:
-    - http:
+    - host: <FQDN>  # FQDN to access cattle server
+      http:
         paths:
-        -   backend:
-              serviceName: cattle-service
-              servicePort: 80
-        -   backend:
-              serviceName: cattle-service
-              servicePort: 443
+        - backend:
+            serviceName: cattle-service
+            servicePort: 443
   ---
   kind: Deployment
   apiVersion: extensions/v1beta1

@@ -44,7 +44,7 @@ func GetNode(k8sClient *kubernetes.Clientset, nodeName string) (*v1.Node, error)
 		return nil, err
 	}
 	for _, node := range nodes.Items {
-		if node.Labels[HostnameLabel] == nodeName {
+		if strings.ToLower(node.Labels[HostnameLabel]) == strings.ToLower(nodeName) {
 			return &node, nil
 		}
 	}
