@@ -2,9 +2,11 @@ package clustermanager
 
 import (
 	"context"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -161,14 +163,17 @@ func (m *Manager) toRESTConfig(cluster *v3.Cluster) (*rest.Config, error) {
 		return nil, err
 	}
 
-	dialer, err := m.dialer.ClusterDialer(cluster.Name)
+	clusterDialer, err := m.dialer.ClusterDialer(cluster.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	rkeVerify, err := VerifyIgnoreDNSName(caBytes)
-	if err != nil {
-		return nil, err
+	var tlsDialer dialer.Dialer
+	if cluster.Status.Driver == v3.ClusterDriverRKE {
+		tlsDialer, err = nameIgnoringTLSDialer(clusterDialer, caBytes)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	rc := &rest.Config{
@@ -181,25 +186,42 @@ func (m *Manager) toRESTConfig(cluster *v3.Cluster) (*rest.Config, error) {
 		Timeout: 30 * time.Second,
 		WrapTransport: func(rt http.RoundTripper) http.RoundTripper {
 			if ht, ok := rt.(*http.Transport); ok {
-				if cluster.Status.Driver == v3.ClusterDriverRKE {
-					ht.TLSClientConfig.VerifyPeerCertificate = rkeVerify
-				}
 				ht.DialContext = nil
-				ht.DialTLS = nil
-				ht.Dial = dialer
+				ht.DialTLS = tlsDialer
+				ht.Dial = clusterDialer
 			}
 			return rt
 		},
 	}
 
-	if cluster.Status.Driver == v3.ClusterDriverRKE {
-		// Use custom TLS validate that validates the cert chain, but not the server.  This should be secure because
-		// we use a private per cluster CA always for RKE
-		rc.TLSClientConfig.Insecure = true
-		rc.TLSClientConfig.CAData = nil
+	return rc, nil
+}
+
+func nameIgnoringTLSDialer(dialer dialer.Dialer, caBytes []byte) (dialer.Dialer, error) {
+	rkeVerify, err := VerifyIgnoreDNSName(caBytes)
+	if err != nil {
+		return nil, err
 	}
 
-	return rc, nil
+	tlsConfig := &tls.Config{
+		// Use custom TLS validate that validates the cert chain, but not the server.  This should be secure because
+		// we use a private per cluster CA always for RKE
+		InsecureSkipVerify:    true,
+		VerifyPeerCertificate: rkeVerify,
+	}
+
+	return func(network, address string) (net.Conn, error) {
+		rawConn, err := dialer(network, address)
+		if err != nil {
+			return nil, err
+		}
+		tlsConn := tls.Client(rawConn, tlsConfig)
+		if err := tlsConn.Handshake(); err != nil {
+			rawConn.Close()
+			return nil, err
+		}
+		return tlsConn, err
+	}, nil
 }
 
 func VerifyIgnoreDNSName(caCertsPEM []byte) (func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error, error) {
