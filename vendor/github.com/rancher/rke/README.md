@@ -201,13 +201,15 @@ RKE will ask some questions around the cluster file like number of the hosts, ip
 
 ## Ingress Controller
 
-RKE will deploy Nginx controller by default, user can disable this by specifying `none` to ingress `provider` option in the cluster configuration, user also can specify list of options for nginx config map listed in this [doc](https://github.com/kubernetes/ingress-nginx/blob/master/docs/user-guide/configmap.md), for example:
+RKE will deploy Nginx controller by default, user can disable this by specifying `none` to ingress `provider` option in the cluster configuration, user also can specify list of options for nginx config map listed in this [doc](https://github.com/kubernetes/ingress-nginx/blob/master/docs/user-guide/configmap.md), and command line extra_args listed in this [doc](https://github.com/kubernetes/ingress-nginx/blob/master/docs/user-guide/cli-arguments.md), for example:
 ```
 ingress:
   provider: nginx
   options:
     map-hash-bucket-size: "128"
     ssl-protocols: SSLv2
+  extra_args:
+    enable-ssl-passthrough: ""
 ```
 By default, RKE will deploy ingress controller on all schedulable nodes (controlplane and workers), to specify only certain nodes for ingress controller to be deployed, user has to specify `node_selector` for the ingress and the right label on the node, for example:
 ```
@@ -335,11 +337,40 @@ nodes:
 ```
 
 ## Deploying Rancher 2.0 using rke
-Using RKE's pluggable user addons, it's possible to deploy Rancher 2.0 server with a single command after updating the node settings in the [rancher-minimal.yml](https://github.com/rancher/rke/blob/master/rancher-minimal.yml) cluster configuration:
+Using RKE's pluggable user addons, it's possible to deploy Rancher 2.0 server in HA with a single command.
 
-```bash
-rke up --config rancher-minimal.yml
+Depending how you want to manage your ssl certificates, there are 2 deployment options:
+
+- Use own ssl cerficiates:
+  - Use [rancher-minimal-ssl.yml](https://github.com/rancher/rke/blob/master/rancher-minimal-ssl.yml)
+  - Update `nodes` configuration.
+  - Update <FQDN> at `cattle-ingress-http` ingress definition. FQDN should be a dns a entry pointing to all nodes IP's running ingress-controller (controlplane and workers by default).
+  - Update certificate, key and ca crt at `cattle-keys-server` secret, <BASE64_CRT>, <BASE64_KEY> and <BASE64_CA>. Content must be in base64 format, `cat <FILE> | base64`
+  - Update ssl certificate and key at `cattle-keys-ingress` secret, <BASE64_CRT> and <BASE64_KEY>. Content must be in base64 format, `cat <FILE> | base64`. If selfsigned, certificate and key must be signed by same CA.  
+  - Run RKE.
+
+  ```bash
+  rke up --config rancher-minimal-ssl.yml
+  ```
+
+- Use SSL-passthrough:
+  - Use [rancher-minimal-passthrough.yml](https://github.com/rancher/rke/blob/master/rancher-minimal-passthrough.yml)
+  - Update `nodes` configuration.
+  - Update FQDN at `cattle-ingress-http` ingress definition. FQDN should be a dns a entry, pointing to all nodes IP's running ingress-controller (controlplane and workers by default).
+  - Run RKE.
+
+  ```bash
+  rke up --config rancher-minimal-passthrough.yml
+  ```
+
+Once RKE execution finish, rancher is deployed at `cattle-system` namespace. You could access to your rancher instance by `https://<FQDN>`
+
+By default, rancher deployment has just 1 replica, scale it to desired replicas. 
+
 ```
+kubectl -n cattle-system scale deployment cattle --replicas=3
+```
+
 ## Operating Systems Notes
 
 ### Atomic OS

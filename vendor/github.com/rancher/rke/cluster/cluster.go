@@ -312,9 +312,6 @@ func (c *Cluster) PrePullK8sImages(ctx context.Context) error {
 	var errgrp errgroup.Group
 	hosts := hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts)
 	for _, host := range hosts {
-		if !host.UpdateWorker {
-			continue
-		}
 		runHost := host
 		errgrp.Go(func() error {
 			return docker.UseLocalOrPull(ctx, runHost.DClient, runHost.Address, c.SystemImages.Kubernetes, "pre-deploy", c.PrivateRegistriesMap)

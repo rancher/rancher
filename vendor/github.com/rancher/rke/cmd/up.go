@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/hosts"
@@ -137,8 +138,25 @@ func ClusterUp(
 	}
 	caCrt = string(cert.EncodeCertPEM(kubeCluster.Certificates[pki.CACertName].Certificate))
 
+	if err := checkAllIncluded(kubeCluster); err != nil {
+		return APIURL, caCrt, clientCert, clientKey, nil, err
+	}
+
 	log.Infof(ctx, "Finished building Kubernetes cluster successfully")
 	return APIURL, caCrt, clientCert, clientKey, kubeCluster.Certificates, nil
+}
+
+func checkAllIncluded(cluster *cluster.Cluster) error {
+	if len(cluster.InactiveHosts) == 0 {
+		return nil
+	}
+
+	var names []string
+	for _, host := range cluster.InactiveHosts {
+		names = append(names, host.Address)
+	}
+
+	return fmt.Errorf("Provisioning incomplete, host(s) [%s] skipped because they could not be contacted", strings.Join(names, ","))
 }
 
 func clusterUpFromCli(ctx *cli.Context) error {
