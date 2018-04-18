@@ -360,6 +360,8 @@ func (a *AggregateStore) Update(apiContext *types.APIContext, schema *types.Sche
 	if err := setPorts(splitted[1], data); err != nil {
 		return nil, err
 	}
+	setScheduling(apiContext, data)
+	setStrategy(data)
 	return store.Update(apiContext, a.Schemas[schemaType], data, shortID)
 }
 
