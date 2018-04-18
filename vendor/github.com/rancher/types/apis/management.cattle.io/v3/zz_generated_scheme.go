@@ -69,6 +69,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&TemplateList{},
 		&TemplateVersion{},
 		&TemplateVersionList{},
+		&TemplateContent{},
+		&TemplateContentList{},
 		&Group{},
 		&GroupList{},
 		&GroupMember{},

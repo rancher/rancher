@@ -7,22 +7,22 @@ import (
 const (
 	AppType                      = "app"
 	AppFieldAnnotations          = "annotations"
-	AppFieldAnswerValues         = "answerValues"
 	AppFieldAnswers              = "answers"
+	AppFieldAppRevisionId        = "appRevisionId"
 	AppFieldCreated              = "created"
 	AppFieldCreatorID            = "creatorId"
 	AppFieldDescription          = "description"
 	AppFieldExternalID           = "externalId"
-	AppFieldInstallNamespace     = "installNamespace"
 	AppFieldLabels               = "labels"
 	AppFieldName                 = "name"
 	AppFieldNamespaceId          = "namespaceId"
 	AppFieldOwnerReferences      = "ownerReferences"
 	AppFieldProjectId            = "projectId"
+	AppFieldPrune                = "prune"
 	AppFieldRemoved              = "removed"
 	AppFieldState                = "state"
 	AppFieldStatus               = "status"
-	AppFieldTemplates            = "templates"
+	AppFieldTargetNamespace      = "targetNamespace"
 	AppFieldTransitioning        = "transitioning"
 	AppFieldTransitioningMessage = "transitioningMessage"
 	AppFieldUuid                 = "uuid"
@@ -31,22 +31,22 @@ const (
 type App struct {
 	types.Resource
 	Annotations          map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	AnswerValues         string            `json:"answerValues,omitempty" yaml:"answerValues,omitempty"`
 	Answers              map[string]string `json:"answers,omitempty" yaml:"answers,omitempty"`
+	AppRevisionId        string            `json:"appRevisionId,omitempty" yaml:"appRevisionId,omitempty"`
 	Created              string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Description          string            `json:"description,omitempty" yaml:"description,omitempty"`
 	ExternalID           string            `json:"externalId,omitempty" yaml:"externalId,omitempty"`
-	InstallNamespace     string            `json:"installNamespace,omitempty" yaml:"installNamespace,omitempty"`
 	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                 string            `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId          string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	ProjectId            string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
+	Prune                bool              `json:"prune,omitempty" yaml:"prune,omitempty"`
 	Removed              string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	State                string            `json:"state,omitempty" yaml:"state,omitempty"`
 	Status               *AppStatus        `json:"status,omitempty" yaml:"status,omitempty"`
-	Templates            map[string]string `json:"templates,omitempty" yaml:"templates,omitempty"`
+	TargetNamespace      string            `json:"targetNamespace,omitempty" yaml:"targetNamespace,omitempty"`
 	Transitioning        string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	Uuid                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`

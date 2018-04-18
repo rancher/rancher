@@ -66,7 +66,8 @@ func catalogTypes(schemas *types.Schemas) *types.Schemas {
 			}
 		}).
 		MustImport(&Version, v3.Template{}).
-		MustImport(&Version, v3.TemplateVersion{})
+		MustImport(&Version, v3.TemplateVersion{}).
+		MustImport(&Version, v3.TemplateContent{})
 }
 
 func nativeNodeTypes(schemas *types.Schemas) *types.Schemas {

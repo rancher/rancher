@@ -33,6 +33,7 @@ type Interface interface {
 	CatalogsGetter
 	TemplatesGetter
 	TemplateVersionsGetter
+	TemplateContentsGetter
 	GroupsGetter
 	GroupMembersGetter
 	PrincipalsGetter
@@ -82,6 +83,7 @@ type Client struct {
 	catalogControllers                                 map[string]CatalogController
 	templateControllers                                map[string]TemplateController
 	templateVersionControllers                         map[string]TemplateVersionController
+	templateContentControllers                         map[string]TemplateContentController
 	groupControllers                                   map[string]GroupController
 	groupMemberControllers                             map[string]GroupMemberController
 	principalControllers                               map[string]PrincipalController
@@ -140,6 +142,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		catalogControllers:                                 map[string]CatalogController{},
 		templateControllers:                                map[string]TemplateController{},
 		templateVersionControllers:                         map[string]TemplateVersionController{},
+		templateContentControllers:                         map[string]TemplateContentController{},
 		groupControllers:                                   map[string]GroupController{},
 		groupMemberControllers:                             map[string]GroupMemberController{},
 		principalControllers:                               map[string]PrincipalController{},
@@ -407,6 +410,19 @@ type TemplateVersionsGetter interface {
 func (c *Client) TemplateVersions(namespace string) TemplateVersionInterface {
 	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &TemplateVersionResource, TemplateVersionGroupVersionKind, templateVersionFactory{})
 	return &templateVersionClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type TemplateContentsGetter interface {
+	TemplateContents(namespace string) TemplateContentInterface
+}
+
+func (c *Client) TemplateContents(namespace string) TemplateContentInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &TemplateContentResource, TemplateContentGroupVersionKind, templateContentFactory{})
+	return &templateContentClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,
