@@ -345,7 +345,7 @@ func groupPrincipalPRTB(obj interface{}) ([]string, error) {
 
 func providerExists(principalIDs []string, provider string) bool {
 	for _, id := range principalIDs {
-		splitID := strings.Split(id, ":")[1]
+		splitID := strings.Split(id, ":")[0]
 		if strings.Contains(splitID, provider) {
 			return true
 		}
