@@ -4,6 +4,8 @@ const (
 	K8sV18  = "v1.8.10-rancher1-1"
 	K8sV19  = "v1.9.5-rancher1-1"
 	K8sV110 = "v1.10.0-rancher1-1"
+
+	MajorK8sV110 = "v1.10"
 )
 
 var (
@@ -16,7 +18,7 @@ var (
 
 	// K8sVersionServiceOptions - service options per k8s version
 	K8sVersionServiceOptions = map[string]KubernetesServicesOptions{
-		K8sV110: v110ServiceOptions,
+		MajorK8sV110: v110ServiceOptions,
 	}
 
 	// K8SVersionToSystemImages16 - images map for 1.6. Keeping it sepate in case we have to diverge

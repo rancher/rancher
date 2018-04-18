@@ -3216,10 +3216,12 @@ func (in *IngressConfig) DeepCopyInto(out *IngressConfig) {
 			(*out)[key] = val
 		}
 	}
-	if in.ExtraArguments != nil {
-		in, out := &in.ExtraArguments, &out.ExtraArguments
-		*out = make([]string, len(*in))
-		copy(*out, *in)
+	if in.ExtraArgs != nil {
+		in, out := &in.ExtraArgs, &out.ExtraArgs
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
 	}
 	return
 }
