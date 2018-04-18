@@ -12,7 +12,7 @@ const (
 	projectResource = "projects"
 )
 
-var projectManagmentPlanResources = []string{"projectroletemplatebindings", "apps", "secrets", "pipelines", "pipelineexecutions", "pipelineexecutionlogs"}
+var projectManagmentPlanResources = []string{"projectroletemplatebindings", "apps", "secrets", "pipelines", "pipelineexecutions", "pipelineexecutionlogs", "projectloggings", "projectalerts"}
 
 type prtbLifecycle struct {
 	mgr           *manager
