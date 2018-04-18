@@ -112,6 +112,7 @@ type PipelineSpec struct {
 	DisplayName           string `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	TriggerWebhookPush    bool   `json:"triggerWebhookPush,omitempty" yaml:"triggerWebhookPush,omitempty"`
 	TriggerWebhookPr      bool   `json:"triggerWebhookPr,omitempty" yaml:"triggerWebhookPr,omitempty"`
+	TriggerWebhookTag     bool   `json:"triggerWebhookTag,omitempty" yaml:"triggerWebhookTag,omitempty"`
 	TriggerCronTimezone   string `json:"triggerCronTimezone,omitempty" yaml:"triggerCronTimezone,omitempty"`
 	TriggerCronExpression string `json:"triggerCronExpression,omitempty" yaml:"triggerCronExpression,omitempty"`
 
@@ -181,11 +182,12 @@ type PipelineExecutionSpec struct {
 type PipelineExecutionStatus struct {
 	Conditions []PipelineCondition `json:"conditions,omitempty"`
 
-	Commit         string        `json:"commit,omitempty"`
-	ExecutionState string        `json:"executionState,omitempty"`
-	Started        string        `json:"started,omitempty"`
-	Ended          string        `json:"ended,omitempty"`
-	Stages         []StageStatus `json:"stages,omitempty"`
+	Commit         string            `json:"commit,omitempty"`
+	ExecutionState string            `json:"executionState,omitempty"`
+	Started        string            `json:"started,omitempty"`
+	Ended          string            `json:"ended,omitempty"`
+	Stages         []StageStatus     `json:"stages,omitempty"`
+	EnvVars        map[string]string `json:"envVars,omitempty"`
 }
 
 type StageStatus struct {

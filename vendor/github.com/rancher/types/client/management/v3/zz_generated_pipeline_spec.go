@@ -9,6 +9,7 @@ const (
 	PipelineSpecFieldTriggerCronTimezone   = "triggerCronTimezone"
 	PipelineSpecFieldTriggerWebhookPr      = "triggerWebhookPr"
 	PipelineSpecFieldTriggerWebhookPush    = "triggerWebhookPush"
+	PipelineSpecFieldTriggerWebhookTag     = "triggerWebhookTag"
 )
 
 type PipelineSpec struct {
@@ -19,4 +20,5 @@ type PipelineSpec struct {
 	TriggerCronTimezone   string            `json:"triggerCronTimezone,omitempty" yaml:"triggerCronTimezone,omitempty"`
 	TriggerWebhookPr      bool              `json:"triggerWebhookPr,omitempty" yaml:"triggerWebhookPr,omitempty"`
 	TriggerWebhookPush    bool              `json:"triggerWebhookPush,omitempty" yaml:"triggerWebhookPush,omitempty"`
+	TriggerWebhookTag     bool              `json:"triggerWebhookTag,omitempty" yaml:"triggerWebhookTag,omitempty"`
 }

@@ -12,6 +12,7 @@ const (
 	PipelineExecutionFieldCreated              = "created"
 	PipelineExecutionFieldCreatorID            = "creatorId"
 	PipelineExecutionFieldEnded                = "ended"
+	PipelineExecutionFieldEnvVars              = "envVars"
 	PipelineExecutionFieldExecutionState       = "executionState"
 	PipelineExecutionFieldLabels               = "labels"
 	PipelineExecutionFieldName                 = "name"
@@ -40,6 +41,7 @@ type PipelineExecution struct {
 	Created              string              `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string              `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Ended                string              `json:"ended,omitempty" yaml:"ended,omitempty"`
+	EnvVars              map[string]string   `json:"envVars,omitempty" yaml:"envVars,omitempty"`
 	ExecutionState       string              `json:"executionState,omitempty" yaml:"executionState,omitempty"`
 	Labels               map[string]string   `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                 string              `json:"name,omitempty" yaml:"name,omitempty"`
