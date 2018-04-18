@@ -1,31 +1,45 @@
 package project
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/kubectl"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/client/management/v3"
+
+	"github.com/rancher/rancher/pkg/clustermanager"
+
+	managementv3 "github.com/rancher/types/client/management/v3"
+	"github.com/rancher/types/user"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(apiContext, "setpodsecuritypolicytemplate")
+	resource.AddAction(apiContext, "importYaml")
 }
 
 type Handler struct {
-	Projects      v3.ProjectInterface
-	ProjectLister v3.ProjectLister
+	Projects       v3.ProjectInterface
+	ProjectLister  v3.ProjectLister
+	ClusterManager *clustermanager.Manager
+	UserMgr        user.Manager
 }
 
 func (h *Handler) Actions(actionName string, action *types.Action, apiContext *types.APIContext) error {
 	switch actionName {
 	case "setpodsecuritypolicytemplate":
 		return h.setPodSecurityPolicyTemplate(actionName, action, apiContext)
+	case "importYaml":
+		return h.ImportYamlHandler(action, apiContext)
 	}
 
 	return errors.Errorf("unrecognized action %v", actionName)
@@ -180,4 +194,50 @@ func getID(id interface{}) (string, error) {
 
 	split := strings.Split(s, ":")
 	return split[0] + ":" + split[len(split)-1], nil
+}
+
+func (h Handler) ImportYamlHandler(action *types.Action, apiContext *types.APIContext) error {
+	data, err := ioutil.ReadAll(apiContext.Request.Body)
+	if err != nil {
+		return errors.Wrap(err, "reading request body error")
+	}
+
+	input := managementv3.ImportProjectYamlInput{}
+	if err = json.Unmarshal(data, &input); err != nil {
+		return errors.Wrap(err, "unmarshaling input error")
+	}
+
+	clustername := h.ClusterManager.ClusterName(apiContext)
+	userName := h.UserMgr.GetUser(apiContext)
+	cfg, err := h.getKubeConfig(userName, clustername)
+
+	if err != nil {
+		return err
+	}
+	var msg []byte
+	if input.Namespace == "" {
+		msg, err = kubectl.Apply([]byte(input.Yaml), cfg)
+	} else {
+		msg, err = kubectl.ApplyWithNamespace([]byte(input.Yaml), input.Namespace, cfg)
+	}
+	if err != nil {
+		return err
+	}
+
+	rtn := map[string]interface{}{
+		"outputMessage": string(msg),
+		"type":          "importYamlOutput",
+	}
+	apiContext.WriteResponse(http.StatusOK, rtn)
+
+	return nil
+}
+
+func (h Handler) getKubeConfig(userName, clusterName string) (*clientcmdapi.Config, error) {
+	token, err := h.UserMgr.EnsureToken("kubeconfig-"+userName, "token for agent deployment", userName)
+	if err != nil {
+		return nil, err
+	}
+
+	return h.ClusterManager.KubeConfig(clusterName, token), nil
 }
