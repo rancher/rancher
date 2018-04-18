@@ -9,6 +9,7 @@ import (
 
 	b64 "encoding/base64"
 
+	ref "github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
@@ -122,8 +123,8 @@ func (c *Cluster) BuildKubeAPIProcess(prefixPath string) v3.Process {
 		CommandArgs["cloud-config"] = CloudConfigPath
 	}
 	// check if our version has specific options for this component
-	serviceOptions, ok := v3.K8sVersionServiceOptions[c.Version]
-	if ok && serviceOptions.KubeAPI != nil {
+	serviceOptions := c.GetKubernetesServicesOptions()
+	if serviceOptions.KubeAPI != nil {
 		for k, v := range serviceOptions.KubeAPI {
 			CommandArgs[k] = v
 		}
@@ -213,8 +214,8 @@ func (c *Cluster) BuildKubeControllerProcess(prefixPath string) v3.Process {
 	}
 
 	// check if our version has specific options for this component
-	serviceOptions, ok := v3.K8sVersionServiceOptions[c.Version]
-	if ok && serviceOptions.KubeController != nil {
+	serviceOptions := c.GetKubernetesServicesOptions()
+	if serviceOptions.KubeController != nil {
 		for k, v := range serviceOptions.KubeController {
 			CommandArgs[k] = v
 		}
@@ -302,8 +303,8 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string) v3.Pr
 	}
 
 	// check if our version has specific options for this component
-	serviceOptions, ok := v3.K8sVersionServiceOptions[c.Version]
-	if ok && serviceOptions.Kubelet != nil {
+	serviceOptions := c.GetKubernetesServicesOptions()
+	if serviceOptions.Kubelet != nil {
 		for k, v := range serviceOptions.Kubelet {
 			CommandArgs[k] = v
 		}
@@ -321,6 +322,7 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string) v3.Pr
 		"/sys:/sys:rprivate",
 		host.DockerInfo.DockerRootDir + ":" + host.DockerInfo.DockerRootDir + ":rw,rslave,z",
 		fmt.Sprintf("%s:%s:shared,z", path.Join(prefixPath, "/var/lib/kubelet"), path.Join(prefixPath, "/var/lib/kubelet")),
+		fmt.Sprintf("%s:%s:shared,z", path.Join(prefixPath, "/var/lib/rancher"), path.Join(prefixPath, "/var/lib/rancher")),
 		"/var/run:/var/run:rw,rprivate",
 		"/run:/run:rprivate",
 		fmt.Sprintf("%s:/etc/ceph", path.Join(prefixPath, "/etc/ceph")),
@@ -375,8 +377,8 @@ func (c *Cluster) BuildKubeProxyProcess(prefixPath string) v3.Process {
 	}
 
 	// check if our version has specific options for this component
-	serviceOptions, ok := v3.K8sVersionServiceOptions[c.Version]
-	if ok && serviceOptions.Kubeproxy != nil {
+	serviceOptions := c.GetKubernetesServicesOptions()
+	if serviceOptions.Kubeproxy != nil {
 		for k, v := range serviceOptions.Kubeproxy {
 			CommandArgs[k] = v
 		}
@@ -458,8 +460,8 @@ func (c *Cluster) BuildSchedulerProcess(prefixPath string) v3.Process {
 	}
 
 	// check if our version has specific options for this component
-	serviceOptions, ok := v3.K8sVersionServiceOptions[c.Version]
-	if ok && serviceOptions.Scheduler != nil {
+	serviceOptions := c.GetKubernetesServicesOptions()
+	if serviceOptions.Scheduler != nil {
 		for k, v := range serviceOptions.Scheduler {
 			CommandArgs[k] = v
 		}
@@ -608,4 +610,26 @@ func (c *Cluster) getPrefixPath(osType string) string {
 		prefixPath = c.PrefixPath
 	}
 	return prefixPath
+}
+
+func (c *Cluster) GetKubernetesServicesOptions() v3.KubernetesServicesOptions {
+	clusterMajorVersion := getTagMajorVersion(c.Version)
+	NamedkK8sImage, _ := ref.ParseNormalizedNamed(c.SystemImages.Kubernetes)
+	k8sImageTag := NamedkK8sImage.(ref.Tagged).Tag()
+	k8sImageMajorVersion := getTagMajorVersion(k8sImageTag)
+
+	if clusterMajorVersion != k8sImageMajorVersion {
+		clusterMajorVersion = k8sImageMajorVersion
+	}
+
+	serviceOptions, ok := v3.K8sVersionServiceOptions[clusterMajorVersion]
+	if ok {
+		return serviceOptions
+	}
+	return v3.KubernetesServicesOptions{}
+}
+
+func getTagMajorVersion(tag string) string {
+	splitTag := strings.Split(tag, ".")
+	return strings.Join(splitTag[:2], ".")
 }
