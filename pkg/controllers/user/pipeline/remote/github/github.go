@@ -104,13 +104,7 @@ func (c *client) CreateHook(pipeline *v3.Pipeline, accessToken string) (string, 
 	if err != nil {
 		return "", err
 	}
-	events := []string{}
-	if pipeline.Spec.TriggerWebhookPush {
-		events = append(events, "push")
-	}
-	if pipeline.Spec.TriggerWebhookPr {
-		events = append(events, "pull_request")
-	}
+	events := []string{"push", "pull_request"}
 
 	hookURL := fmt.Sprintf("%s?pipelineId=%s:%s", utils.CIEndpoint, pipeline.Namespace, pipeline.Name)
 	id, err := c.createGithubWebhook(user, repo, accessToken, hookURL, pipeline.Status.Token, events)
