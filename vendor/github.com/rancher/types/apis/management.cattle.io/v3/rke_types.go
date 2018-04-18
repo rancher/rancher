@@ -251,7 +251,7 @@ type IngressConfig struct {
 	// NodeSelector key pair
 	NodeSelector map[string]string `yaml:"node_selector" json:"nodeSelector,omitempty"`
 	// Ingress controller extra arguments
-	ExtraArguments []string `yaml:"extra_arguments" json:"extraArguments,omitempty"`
+	ExtraArgs map[string]string `yaml:"extra_args" json:"extraArgs,omitempty"`
 }
 
 type RKEPlan struct {
