@@ -18,7 +18,9 @@ const (
 	rbByRoleAndSubjectIndex   = "auth.management.cattle.io/crb-by-role-and-subject"
 )
 
-var clusterManagmentPlaneResources = []string{"clusterroletemplatebindings", "nodes", "nodepools", "clusterevents", "projects", "clusterregistrationtokens", "clusterpipelines", "clusterloggings", "notifiers", "clusteralerts"}
+var clusterManagmentPlaneResources = []string{"clusterroletemplatebindings", "nodes", "nodepools", "clusterevents",
+	"projects", "clusterregistrationtokens", "clusterpipelines", "clusterloggings", "notifiers", "clusteralerts",
+	"podsecuritypolicytemplateprojectbindings"}
 
 type crtbLifecycle struct {
 	mgr           *manager
