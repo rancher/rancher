@@ -71,16 +71,13 @@ type TemplateSpec struct {
 	CatalogID                string `json:"catalogId,omitempty" norman:"type=reference[catalog]"`
 	DefaultTemplateVersionID string `json:"defaultTemplateVersionId,omitempty" norman:"type=reference[templateVersion]"`
 
-	IsSystem       string `json:"isSystem,omitempty"`
 	Description    string `json:"description,omitempty"`
 	DefaultVersion string `json:"defaultVersion,omitempty" yaml:"default_version,omitempty"`
 	Path           string `json:"path,omitempty"`
 	Maintainer     string `json:"maintainer,omitempty"`
-	License        string `json:"license,omitempty"`
 	ProjectURL     string `json:"projectURL,omitempty" yaml:"project_url,omitempty"`
 	UpgradeFrom    string `json:"upgradeFrom,omitempty"`
 	FolderName     string `json:"folderName,omitempty"`
-	Base           string `json:"templateBase"`
 	Icon           string `json:"icon,omitempty"`
 	IconFilename   string `json:"iconFilename,omitempty"`
 	Readme         string `json:"readme,omitempty"`

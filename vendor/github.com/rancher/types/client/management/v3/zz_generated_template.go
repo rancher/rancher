@@ -7,7 +7,6 @@ import (
 const (
 	TemplateType                          = "template"
 	TemplateFieldAnnotations              = "annotations"
-	TemplateFieldBase                     = "templateBase"
 	TemplateFieldCatalogID                = "catalogId"
 	TemplateFieldCategories               = "categories"
 	TemplateFieldCategory                 = "category"
@@ -16,13 +15,10 @@ const (
 	TemplateFieldDefaultTemplateVersionID = "defaultTemplateVersionId"
 	TemplateFieldDefaultVersion           = "defaultVersion"
 	TemplateFieldDescription              = "description"
-	TemplateFieldDisplayName              = "displayName"
 	TemplateFieldFolderName               = "folderName"
 	TemplateFieldIcon                     = "icon"
 	TemplateFieldIconFilename             = "iconFilename"
-	TemplateFieldIsSystem                 = "isSystem"
 	TemplateFieldLabels                   = "labels"
-	TemplateFieldLicense                  = "license"
 	TemplateFieldMaintainer               = "maintainer"
 	TemplateFieldName                     = "name"
 	TemplateFieldOwnerReferences          = "ownerReferences"
@@ -42,7 +38,6 @@ const (
 type Template struct {
 	types.Resource
 	Annotations              map[string]string     `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	Base                     string                `json:"templateBase,omitempty" yaml:"templateBase,omitempty"`
 	CatalogID                string                `json:"catalogId,omitempty" yaml:"catalogId,omitempty"`
 	Categories               []string              `json:"categories,omitempty" yaml:"categories,omitempty"`
 	Category                 string                `json:"category,omitempty" yaml:"category,omitempty"`
@@ -51,13 +46,10 @@ type Template struct {
 	DefaultTemplateVersionID string                `json:"defaultTemplateVersionId,omitempty" yaml:"defaultTemplateVersionId,omitempty"`
 	DefaultVersion           string                `json:"defaultVersion,omitempty" yaml:"defaultVersion,omitempty"`
 	Description              string                `json:"description,omitempty" yaml:"description,omitempty"`
-	DisplayName              string                `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	FolderName               string                `json:"folderName,omitempty" yaml:"folderName,omitempty"`
 	Icon                     string                `json:"icon,omitempty" yaml:"icon,omitempty"`
 	IconFilename             string                `json:"iconFilename,omitempty" yaml:"iconFilename,omitempty"`
-	IsSystem                 string                `json:"isSystem,omitempty" yaml:"isSystem,omitempty"`
 	Labels                   map[string]string     `json:"labels,omitempty" yaml:"labels,omitempty"`
-	License                  string                `json:"license,omitempty" yaml:"license,omitempty"`
 	Maintainer               string                `json:"maintainer,omitempty" yaml:"maintainer,omitempty"`
 	Name                     string                `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences          []OwnerReference      `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`

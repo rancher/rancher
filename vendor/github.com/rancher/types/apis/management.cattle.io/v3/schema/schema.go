@@ -65,6 +65,9 @@ func catalogTypes(schemas *types.Schemas) *types.Schemas {
 				"refresh": {},
 			}
 		}).
+		AddMapperForType(&Version, v3.Template{},
+			m.DisplayName{},
+		).
 		MustImport(&Version, v3.Template{}).
 		MustImport(&Version, v3.TemplateVersion{}).
 		MustImport(&Version, v3.TemplateContent{})
