@@ -2,9 +2,11 @@ package rbac
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -16,6 +18,8 @@ import (
 )
 
 const owner = "owner-user"
+
+var globalResourcesNeededInProjects = []string{"persistentvolumes", "storageclasses"}
 
 func newPRTBLifecycle(m *manager) *prtbLifecycle {
 	return &prtbLifecycle{m: m}
@@ -75,7 +79,7 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 		}
 	}
 
-	return p.reconcileProjectNSAccess(binding, roles)
+	return p.reconcileProjectAccessToGlobalResources(binding, roles)
 }
 
 func (p *prtbLifecycle) ensurePRTBDelete(binding *v3.ProjectRoleTemplateBinding) error {
@@ -103,12 +107,13 @@ func (p *prtbLifecycle) ensurePRTBDelete(binding *v3.ProjectRoleTemplateBinding)
 		}
 	}
 
-	return p.reconcileProjectNSAccessForDelete(binding)
+	return p.reconcileProjectAccessToGlobalResourcesForDelete(binding)
 }
 
-func (p *prtbLifecycle) reconcileProjectNSAccess(binding *v3.ProjectRoleTemplateBinding, rts map[string]*v3.RoleTemplate) error {
+func (p *prtbLifecycle) reconcileProjectAccessToGlobalResources(binding *v3.ProjectRoleTemplateBinding, rts map[string]*v3.RoleTemplate) error {
 	var role string
 	var createNSPerms bool
+	var roles []string
 	if parts := strings.SplitN(binding.ProjectName, ":", 2); len(parts) == 2 && len(parts[1]) > 0 {
 		projectName := parts[1]
 		var roleVerb, roleSuffix string
@@ -129,15 +134,31 @@ func (p *prtbLifecycle) reconcileProjectNSAccess(binding *v3.ProjectRoleTemplate
 		}
 		roleSuffix = projectNSVerbToSuffix[roleVerb]
 		role = fmt.Sprintf(projectNSGetClusterRoleNameFmt, projectName, roleSuffix)
+		roles = append(roles, role)
+
+		for _, rt := range rts {
+			for _, resource := range globalResourcesNeededInProjects {
+				verbs, err := p.m.checkForGlobalResourceRules(rt, resource)
+				if err != nil {
+					return err
+				}
+				if len(verbs) > 0 {
+					roleName, err := p.m.reconcileRoleForProjectAccessToGlobalResource(resource, rt, verbs)
+					if err != nil {
+						return err
+					}
+					roles = append(roles, roleName)
+				}
+			}
+		}
 	}
 
-	if role == "" {
+	if len(roles) == 0 {
 		return nil
 	}
 
 	bindingCli := p.m.workload.K8sClient.RbacV1().ClusterRoleBindings()
 
-	roles := []string{role}
 	if createNSPerms {
 		roles = append(roles, "create-ns")
 		if nsRole, _ := p.m.crLister.Get("", "create-ns"); nsRole == nil {
@@ -206,7 +227,7 @@ func (p *prtbLifecycle) reconcileProjectNSAccess(binding *v3.ProjectRoleTemplate
 	return nil
 }
 
-func (p *prtbLifecycle) reconcileProjectNSAccessForDelete(binding *v3.ProjectRoleTemplateBinding) error {
+func (p *prtbLifecycle) reconcileProjectAccessToGlobalResourcesForDelete(binding *v3.ProjectRoleTemplateBinding) error {
 	prtbs, err := p.m.prtbIndexer.ByIndex(prtbByProjecSubjectIndex, getPRTBProjectAndSubjectKey(binding))
 	if err != nil {
 		return err
@@ -238,7 +259,7 @@ func (p *prtbLifecycle) reconcileProjectNSAccessForDelete(binding *v3.ProjectRol
 
 		if len(crb.Labels) == 0 {
 			if err := bindingCli.Delete(crb.Name, &metav1.DeleteOptions{}); err != nil {
-				if !apierrors.IsNotFound(err) {
+				if apierrors.IsNotFound(err) {
 					continue
 				}
 				return err
@@ -251,4 +272,90 @@ func (p *prtbLifecycle) reconcileProjectNSAccessForDelete(binding *v3.ProjectRol
 	}
 
 	return nil
+}
+
+// If the roleTemplate has rules granting access to non-namespaced (global) resource, return the verbs for those rules
+func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource string) (map[string]bool, error) {
+	var rules []rbacv1.PolicyRule
+	if role.External {
+		externalRole, err := m.crLister.Get("", role.Name)
+		if err != nil && !clientbase.IsNotFound(err) {
+			// dont error if it doesnt exist
+			return nil, err
+		}
+		if externalRole != nil {
+			rules = externalRole.Rules
+		}
+	} else {
+		rules = role.Rules
+	}
+
+	verbs := map[string]bool{}
+	for _, rule := range rules {
+		if (slice.ContainsString(rule.Resources, resource) || slice.ContainsString(rule.Resources, "*")) && len(rule.ResourceNames) == 0 {
+			for _, v := range rule.Verbs {
+				verbs[v] = true
+			}
+		}
+	}
+
+	return verbs, nil
+}
+
+// Ensure the clusterRole used to grant access of global resources to users/groups in projects has appropriate rulesfor the give resource and verbs
+func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string, rt *v3.RoleTemplate, newVerbs map[string]bool) (string, error) {
+	clusterRoles := m.workload.RBAC.ClusterRoles("")
+	roleName := rt.Name + "-promoted"
+	if role, err := m.crLister.Get("", roleName); err == nil && role != nil {
+		currentVerbs := map[string]bool{}
+		for _, rule := range role.Rules {
+			if slice.ContainsString(rule.Resources, resource) {
+				for _, v := range rule.Verbs {
+					currentVerbs[v] = true
+				}
+			}
+		}
+
+		if !reflect.DeepEqual(currentVerbs, newVerbs) {
+			role = role.DeepCopy()
+			added := false
+			for i, rule := range role.Rules {
+				if slice.ContainsString(rule.Resources, resource) {
+					role.Rules[i] = buildRule(resource, newVerbs)
+					added = true
+				}
+			}
+			if !added {
+				role.Rules = append(role.Rules, buildRule(resource, newVerbs))
+			}
+			_, err := clusterRoles.Update(role)
+			return roleName, err
+		}
+		return roleName, nil
+	}
+
+	rules := []rbacv1.PolicyRule{buildRule(resource, newVerbs)}
+	_, err := clusterRoles.Create(&rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: roleName,
+		},
+		Rules: rules,
+	})
+	if err != nil {
+		return roleName, errors.Wrapf(err, "couldn't create role %v", roleName)
+	}
+
+	return roleName, nil
+}
+
+func buildRule(resource string, verbs map[string]bool) rbacv1.PolicyRule {
+	var vs []string
+	for v := range verbs {
+		vs = append(vs, v)
+	}
+	return rbacv1.PolicyRule{
+		Resources: []string{resource},
+		Verbs:     vs,
+		APIGroups: []string{"*"},
+	}
 }
