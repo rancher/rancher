@@ -9,6 +9,8 @@ const (
 )
 
 var (
+	ToolsImage = "rancher/rke-tools:v0.1.1"
+
 	// K8sVersionToRKESystemImages - images map for 2.0
 	K8sVersionToRKESystemImages = map[string]RKESystemImages{
 		K8sV18:  v18SystemImages,
@@ -57,11 +59,11 @@ var (
 	// v18 system images defaults
 	v18SystemImages = RKESystemImages{
 		Etcd:                      "rancher/coreos-etcd:v3.0.17",
-		Kubernetes:                "rancher/k8s:" + K8sV18,
-		Alpine:                    "alpine:latest",
-		NginxProxy:                "rancher/rke-nginx-proxy:v0.1.1",
-		CertDownloader:            "rancher/rke-cert-deployer:v0.1.1",
-		KubernetesServicesSidecar: "rancher/rke-service-sidekick:v0.1.2",
+		Kubernetes:                "rancher/hyperkube:v1.8.10",
+		Alpine:                    ToolsImage,
+		NginxProxy:                ToolsImage,
+		CertDownloader:            ToolsImage,
+		KubernetesServicesSidecar: ToolsImage,
 		KubeDNS:                   "rancher/k8s-dns-kube-dns-amd64:1.14.5",
 		DNSmasq:                   "rancher/k8s-dns-dnsmasq-nanny-amd64:1.14.5",
 		KubeDNSSidecar:            "rancher/k8s-dns-sidecar-amd64:1.14.5",
@@ -84,11 +86,11 @@ var (
 	// v19 system images defaults
 	v19SystemImages = RKESystemImages{
 		Etcd:                      "rancher/coreos-etcd:v3.1.12",
-		Kubernetes:                "rancher/k8s:" + K8sV19,
-		Alpine:                    "alpine:latest",
-		NginxProxy:                "rancher/rke-nginx-proxy:v0.1.1",
-		CertDownloader:            "rancher/rke-cert-deployer:v0.1.1",
-		KubernetesServicesSidecar: "rancher/rke-service-sidekick:v0.1.1",
+		Kubernetes:                "rancher/hyperkube:v1.9.5",
+		Alpine:                    ToolsImage,
+		NginxProxy:                ToolsImage,
+		CertDownloader:            ToolsImage,
+		KubernetesServicesSidecar: ToolsImage,
 		KubeDNS:                   "rancher/k8s-dns-kube-dns-amd64:1.14.7",
 		DNSmasq:                   "rancher/k8s-dns-dnsmasq-nanny-amd64:1.14.7",
 		KubeDNSSidecar:            "rancher/k8s-dns-sidecar-amd64:1.14.7",
@@ -116,11 +118,11 @@ var (
 	// v110 system images defaults
 	v110SystemImages = RKESystemImages{
 		Etcd:                      "rancher/coreos-etcd:v3.1.12",
-		Kubernetes:                "rancher/k8s:" + K8sV110,
-		Alpine:                    "alpine:latest",
-		NginxProxy:                "rancher/rke-nginx-proxy:v0.1.1",
-		CertDownloader:            "rancher/rke-cert-deployer:v0.1.1",
-		KubernetesServicesSidecar: "rancher/rke-service-sidekick:v0.1.1",
+		Kubernetes:                "rancher/hyperkube:v1.10.1",
+		Alpine:                    ToolsImage,
+		NginxProxy:                ToolsImage,
+		CertDownloader:            ToolsImage,
+		KubernetesServicesSidecar: ToolsImage,
 		KubeDNS:                   "rancher/k8s-dns-kube-dns-amd64:1.14.8",
 		DNSmasq:                   "rancher/k8s-dns-dnsmasq-nanny-amd64:1.14.8",
 		KubeDNSSidecar:            "rancher/k8s-dns-sidecar-amd64:1.14.8",
