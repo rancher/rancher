@@ -76,11 +76,14 @@ func SearchPrincipals(name, principalType string, myToken v3.Token) ([]v3.Princi
 		return principals, err
 	}
 	if myToken.AuthProvider != localProvider {
-		localPrincipals, err := providers[localProvider].SearchPrincipals(name, principalType, myToken)
-		if err != nil {
-			return principals, err
+		lp := providers[localProvider]
+		if lpDedupe, _ := lp.(*local.Provider); lpDedupe != nil {
+			localPrincipals, err := lpDedupe.SearchPrincipalsDedupe(name, principalType, myToken, principals)
+			if err != nil {
+				return principals, err
+			}
+			principals = append(principals, localPrincipals...)
 		}
-		principals = append(principals, localPrincipals...)
 	}
 	return principals, err
 }
