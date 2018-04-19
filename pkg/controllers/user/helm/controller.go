@@ -78,11 +78,11 @@ func (l *Lifecycle) Updated(obj *v3.App) (*v3.App, error) {
 		}
 	}
 
-	template, notes, err := generateTemplates(obj, l.TemplateVersionClient, l.TemplateContentClient)
-	if err != nil {
-		return obj, err
-	}
 	newObj, err := v3.AppConditionInstalled.Do(obj, func() (runtime.Object, error) {
+		template, notes, err := generateTemplates(obj, l.TemplateVersionClient, l.TemplateContentClient)
+		if err != nil {
+			return obj, err
+		}
 		if err := l.Run(obj, template, notes); err != nil {
 			obj.Status.LastAppliedTemplates = template
 			return obj, err

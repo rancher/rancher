@@ -50,6 +50,13 @@ func (m *Manager) Sync(key string, obj *v3.Catalog) error {
 	catalog := obj.DeepCopy()
 
 	repoPath, commit, err := m.prepareRepoPath(*catalog)
+	if err != nil {
+		v3.CatalogConditionRefreshed.False(catalog)
+		v3.CatalogConditionRefreshed.ReasonAndMessageFromError(catalog, err)
+		m.catalogClient.Update(catalog)
+		return err
+	}
+
 	if commit == catalog.Status.Commit {
 		logrus.Debugf("Catalog %s is already up to date", catalog.Name)
 		if v3.CatalogConditionRefreshed.IsUnknown(catalog) {

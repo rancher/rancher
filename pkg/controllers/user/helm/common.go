@@ -168,26 +168,32 @@ func generateTemplates(obj *v3.App, templateVersionClient mgmtv3.TemplateVersion
 
 	cmd := exec.Command(helmName, commands...)
 	sbOut := &bytes.Buffer{}
+	sbErr := &bytes.Buffer{}
 	cmd.Stdout = sbOut
+	cmd.Stderr = sbErr
 	if err := cmd.Start(); err != nil {
-		return "", "", err
+		return "", "", errors.Wrapf(err, "helm template failed. %s", sbErr.String())
 	}
 	if err := cmd.Wait(); err != nil {
-		return "", "", err
+		return "", "", errors.Wrapf(err, "helm template failed. %s", sbErr.String())
 	}
 
 	// notes.txt
 	commands = []string{"template", dir, "--name", obj.Name, "--namespace", obj.Spec.TargetNamespace, "--notes"}
 	cmd = exec.Command(helmName, commands...)
 	noteOut := &bytes.Buffer{}
+	sbErr = &bytes.Buffer{}
 	cmd.Stdout = noteOut
+	cmd.Stderr = sbErr
 	if err := cmd.Start(); err != nil {
-		return "", "", err
+		return "", "", errors.Wrapf(err, "helm template --notes failed. %s", sbErr.String())
 	}
 	if err := cmd.Wait(); err != nil {
-		return "", "", err
+		return "", "", errors.Wrapf(err, "helm template --notes failed. %s", sbErr.String())
 	}
-	return sbOut.String(), noteOut.String(), nil
+	template := sbOut.String()
+	notes := noteOut.String()
+	return template, notes, nil
 }
 
 func parseExternalID(externalID string) (string, error) {

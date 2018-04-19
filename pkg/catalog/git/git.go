@@ -1,10 +1,12 @@
 package git
 
 import (
+	"bytes"
 	"fmt"
-	"github.com/pkg/errors"
 	"os/exec"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 func Clone(path, url, branch string) error {
@@ -41,5 +43,10 @@ func IsValid(url string) bool {
 
 func runcmd(name string, arg ...string) error {
 	cmd := exec.Command(name, arg...)
-	return cmd.Run()
+	bufErr := &bytes.Buffer{}
+	cmd.Stderr = bufErr
+	if err := cmd.Run(); err != nil {
+		return errors.Wrap(err, bufErr.String())
+	}
+	return nil
 }
