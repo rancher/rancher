@@ -18,6 +18,8 @@ import (
 	"github.com/rancher/rke/cmd"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/k8s"
+	"github.com/rancher/rke/log"
+	"github.com/rancher/rke/pki"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -133,7 +135,7 @@ func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions) (*types.
 	defer d.cleanup(stateDir)
 
 	certsStr := ""
-	APIURL, caCrt, clientCert, clientKey, certs, err := cmd.ClusterUp(ctx, &rkeConfig, d.DockerDialer, d.LocalDialer,
+	APIURL, caCrt, clientCert, clientKey, certs, err := clusterUp(ctx, &rkeConfig, d.DockerDialer, d.LocalDialer,
 		d.wrapTransport(&rkeConfig), false, stateDir, false, false)
 	if err == nil {
 		certsStr, err = rkecerts.ToString(certs)
@@ -415,4 +417,17 @@ func kubeConfig(stateDir string) string {
 		return filepath.Join(filepath.Dir(stateDir), kubeConfigFile)
 	}
 	return filepath.Join(stateDir, kubeConfigFile)
+}
+
+func clusterUp(
+	ctx context.Context,
+	rkeConfig *v3.RancherKubernetesEngineConfig,
+	dockerDialerFactory, localConnDialerFactory hosts.DialerFactory,
+	k8sWrapTransport k8s.WrapTransport,
+	local bool, configDir string, updateOnly, disablePortCheck bool) (string, string, string, string, map[string]pki.CertificatePKI, error) {
+	APIURL, caCrt, clientCert, clientKey, certs, err := cmd.ClusterUp(ctx, rkeConfig, dockerDialerFactory, localConnDialerFactory, k8sWrapTransport, local, configDir, updateOnly, disablePortCheck)
+	if err != nil {
+		log.Infof(ctx, "%v", err)
+	}
+	return APIURL, caCrt, clientCert, clientKey, certs, err
 }

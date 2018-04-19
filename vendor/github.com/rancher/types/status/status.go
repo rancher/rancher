@@ -47,6 +47,7 @@ var transitioningMap = map[string]string{
 	"Pending":                     "pending",
 	"PodScheduled":                "scheduling",
 	"Provisioned":                 "provisioning",
+	"Refreshed":                   "refreshed",
 	"Registered":                  "registering",
 	"Removed":                     "removing",
 	"Saved":                       "saving",

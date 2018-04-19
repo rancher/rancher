@@ -27,8 +27,7 @@ type AppSpec struct {
 }
 
 var (
-	AppConditionInstalled condition.Cond = "installed"
-	AppConditionUpdated   condition.Cond = "updated"
+	AppConditionInstalled condition.Cond = "Installed"
 )
 
 type AppStatus struct {

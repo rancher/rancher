@@ -333,8 +333,7 @@ func ReadFileFromContainer(ctx context.Context, dClient *client.Client, hostname
 }
 
 func ReadContainerLogs(ctx context.Context, dClient *client.Client, containerName string) (io.ReadCloser, error) {
-	return dClient.ContainerLogs(ctx, containerName, types.ContainerLogsOptions{ShowStdout: true})
-
+	return dClient.ContainerLogs(ctx, containerName, types.ContainerLogsOptions{Follow: true, ShowStdout: true, ShowStderr: true, Timestamps: false})
 }
 
 func tryRegistryAuth(pr v3.PrivateRegistry) types.RequestPrivilegeFunc {
