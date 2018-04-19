@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/librke"
 	"github.com/rancher/rancher/pkg/rkecerts"
 	"github.com/rancher/rancher/pkg/rkeworker"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/tunnelserver"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -66,18 +68,17 @@ func (n *RKENodeConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	if slice.ContainsString(client.Node.Status.NodeConfig.Role, services.ETCDRole) ||
-		slice.ContainsString(client.Node.Status.NodeConfig.Role, services.ControlRole) {
-		rw.WriteHeader(http.StatusNotFound)
-		return
+	var nodeConfig *rkeworker.NodeConfig
+	if isNonWorkerOnly(client.Node.Status.NodeConfig.Role) {
+		nodeConfig, err = n.nonWorkerConfig(req.Context(), client.Cluster, client.Node)
+	} else {
+		if client.Cluster.Status.AppliedSpec.RancherKubernetesEngineConfig == nil {
+			rw.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		nodeConfig, err = n.nodeConfig(req.Context(), client.Cluster, client.Node)
 	}
 
-	if client.Cluster.Status.AppliedSpec.RancherKubernetesEngineConfig == nil {
-		rw.WriteHeader(http.StatusServiceUnavailable)
-		return
-	}
-
-	nodeConfig, err := n.nodeConfig(req.Context(), client.Cluster, client.Node)
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
 		rw.Write([]byte(err.Error()))
@@ -89,6 +90,50 @@ func (n *RKENodeConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Reques
 	if err := json.NewEncoder(rw).Encode(nodeConfig); err != nil {
 		logrus.Errorf("failed to write nodeConfig to agent: %v", err)
 	}
+}
+
+func isNonWorkerOnly(role []string) bool {
+	if slice.ContainsString(role, services.ETCDRole) ||
+		slice.ContainsString(role, services.ControlRole) {
+		return true
+	}
+	return false
+}
+
+func (n *RKENodeConfigServer) nonWorkerConfig(ctx context.Context, cluster *v3.Cluster, node *v3.Node) (*rkeworker.NodeConfig, error) {
+	rkeConfig := cluster.Status.AppliedSpec.RancherKubernetesEngineConfig
+	if rkeConfig == nil {
+		rkeConfig = &v3.RancherKubernetesEngineConfig{}
+	}
+
+	rkeConfig = rkeConfig.DeepCopy()
+	rkeConfig.Nodes = []v3.RKEConfigNode{
+		*node.Status.NodeConfig,
+	}
+	rkeConfig.Nodes[0].Role = []string{services.WorkerRole, services.ETCDRole, services.ControlRole}
+
+	infos, err := librke.GetDockerInfo(node)
+	if err != nil {
+		return nil, err
+	}
+
+	plan, err := librke.New().GeneratePlan(ctx, rkeConfig, infos)
+	if err != nil {
+		return nil, err
+	}
+
+	nc := &rkeworker.NodeConfig{
+		ClusterName: cluster.Name,
+	}
+
+	for _, tempNode := range plan.Nodes {
+		if tempNode.Address == node.Status.NodeConfig.Address {
+			nc.Processes = augmentProcesses(tempNode.Processes, false)
+			return nc, nil
+		}
+	}
+
+	return nil, fmt.Errorf("failed to find plan for non-worker %s", node.Status.NodeConfig.Address)
 }
 
 func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluster, node *v3.Node) (*rkeworker.NodeConfig, error) {
@@ -123,12 +168,68 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 
 	for _, tempNode := range plan.Nodes {
 		if tempNode.Address == node.Status.NodeConfig.Address {
-			nc.Processes = tempNode.Processes
+			nc.Processes = augmentProcesses(tempNode.Processes, true)
 			nc.Files = tempNode.Files
-			delete(nc.Processes, "etcd")
 			return nc, nil
 		}
 	}
 
 	return nil, fmt.Errorf("failed to find plan for %s", node.Status.NodeConfig.Address)
+}
+
+func augmentProcesses(processes map[string]v3.Process, worker bool) map[string]v3.Process {
+	var shared []string
+
+	for _, process := range processes {
+		for _, bind := range process.Binds {
+			parts := strings.Split(bind, ":")
+			if len(parts) > 2 && strings.Contains(parts[2], "shared") {
+				shared = append(shared, parts[0])
+			}
+		}
+	}
+
+	if len(shared) > 0 {
+		args := []string{"--", "share-root.sh"}
+		args = append(args, shared...)
+
+		processes["share-mnt"] = v3.Process{
+			Name:          "share-mnt",
+			Args:          args,
+			Image:         settings.AgentImage.Get(),
+			Binds:         []string{"/var/run:/var/run"},
+			NetworkMode:   "host",
+			RestartPolicy: "always",
+			PidMode:       "host",
+			Privileged:    true,
+		}
+
+		if !worker {
+
+		}
+	}
+
+	if worker {
+		// not sure if we really need this anymore
+		delete(processes, "etcd")
+	} else {
+		processes = nil
+		if p, ok := processes["share-mnt"]; ok {
+			processes = map[string]v3.Process{
+				"share-mnt": p,
+			}
+		}
+	}
+
+	for _, p := range processes {
+		for i, bind := range p.Binds {
+			parts := strings.Split(bind, ":")
+			if len(parts) > 1 && parts[1] == "/etc/kubernetes" {
+				parts[0] = parts[1]
+				p.Binds[i] = strings.Join(parts, ":")
+			}
+		}
+	}
+
+	return processes
 }

@@ -14,5 +14,5 @@ LABEL io.cattle.agent true
 ENV DOCKER_API_VERSION 1.24
 ENV AGENT_IMAGE rancher/agent:${VERSION}
 ENV SSL_CERT_DIR /etc/kubernetes/ssl/certs
-COPY agent run.sh kubectl-shell.sh shell-setup.sh /usr/bin/
+COPY agent run.sh kubectl-shell.sh shell-setup.sh share-root.sh /usr/bin/
 ENTRYPOINT ["run.sh"]
