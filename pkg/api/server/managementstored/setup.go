@@ -364,6 +364,7 @@ func Pipeline(schemas *types.Schemas, management *config.ScaledContext) {
 	schema.ActionHandler = pipelineExecutionHandler.ActionHandler
 
 	sourceCodeCredentialHandler := &pipeline.SourceCodeCredentialHandler{
+		ClusterPipelineLister:      management.Management.ClusterPipelines("").Controller().Lister(),
 		SourceCodeCredentials:      management.Management.SourceCodeCredentials(""),
 		SourceCodeCredentialLister: management.Management.SourceCodeCredentials("").Controller().Lister(),
 		SourceCodeRepositories:     management.Management.SourceCodeRepositories(""),

@@ -144,11 +144,6 @@ func (s *Syncer) deploy() error {
 		return errors.Wrapf(err, "Error create service")
 	}
 
-	agentservice := getJenkinsAgentService()
-	if _, err := s.services.Create(agentservice); err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "Error create service")
-	}
-
 	sa := getServiceAccount()
 	if _, err := s.serviceAccounts.Create(sa); err != nil && !apierrors.IsAlreadyExists(err) {
 		return errors.Wrapf(err, "Error create service account")

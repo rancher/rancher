@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -74,6 +75,9 @@ func (l *Lifecycle) Create(obj *v3.PipelineExecution) (*v3.PipelineExecution, er
 		return obj, nil
 	}
 	if err := l.initLogs(obj); err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			return obj, nil
+		}
 		return obj, err
 	}
 

@@ -15,8 +15,10 @@ import (
 //Lifecycle is responsible for watching pipelines and handling webhook management
 //in source code repository. It also helps to maintain labels on pipelines.
 type Lifecycle struct {
+	clusterName                string
 	pipelines                  v3.PipelineInterface
 	pipelineLister             v3.PipelineLister
+	clusterPipelineLister      v3.ClusterPipelineLister
 	sourceCodeCredentialLister v3.SourceCodeCredentialLister
 }
 
@@ -29,8 +31,10 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	sourceCodeCredentialLister := cluster.Management.Management.SourceCodeCredentials("").Controller().Lister()
 
 	pipelineLifecycle := &Lifecycle{
+		clusterName:                clusterName,
 		pipelines:                  pipelines,
 		pipelineLister:             pipelineLister,
+		clusterPipelineLister:      clusterPipelineLister,
 		sourceCodeCredentialLister: sourceCodeCredentialLister,
 	}
 	s := &CronSyncer{
@@ -139,12 +143,11 @@ func (l *Lifecycle) createHook(obj *v3.Pipeline) (string, error) {
 	}
 	accessToken := credential.Spec.AccessToken
 	kind := credential.Spec.SourceCodeType
-	mockConfig := v3.ClusterPipeline{
-		Spec: v3.ClusterPipelineSpec{
-			GithubConfig: &v3.GithubClusterConfig{},
-		},
+	clusterPipeline, err := l.clusterPipelineLister.Get(l.clusterName, l.clusterName)
+	if err != nil {
+		return "", err
 	}
-	remote, err := remote.New(mockConfig, kind)
+	remote, err := remote.New(*clusterPipeline, kind)
 	if err != nil {
 		return "", err
 	}
@@ -169,12 +172,11 @@ func (l *Lifecycle) deleteHook(obj *v3.Pipeline) error {
 	}
 	accessToken := credential.Spec.AccessToken
 	kind := credential.Spec.SourceCodeType
-	mockConfig := v3.ClusterPipeline{
-		Spec: v3.ClusterPipelineSpec{
-			GithubConfig: &v3.GithubClusterConfig{},
-		},
+	clusterPipeline, err := l.clusterPipelineLister.Get(l.clusterName, l.clusterName)
+	if err != nil {
+		return err
 	}
-	remote, err := remote.New(mockConfig, kind)
+	remote, err := remote.New(*clusterPipeline, kind)
 	if err != nil {
 		return err
 	}

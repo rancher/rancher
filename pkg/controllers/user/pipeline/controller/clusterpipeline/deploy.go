@@ -39,7 +39,6 @@ func getJenkinsService() *corev1.Service {
 			Name:      "jenkins",
 		},
 		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeNodePort,
 			Selector: map[string]string{
 				"app": "jenkins",
 			},
@@ -48,23 +47,6 @@ func getJenkinsService() *corev1.Service {
 					Name: "http",
 					Port: 8080,
 				},
-			},
-		},
-	}
-}
-
-func getJenkinsAgentService() *corev1.Service {
-	return &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: utils.PipelineNamespace,
-			Name:      "jenkins-agent",
-		},
-		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeNodePort,
-			Selector: map[string]string{
-				"app": "jenkins",
-			},
-			Ports: []corev1.ServicePort{
 				{
 					Name: "agent",
 					Port: 50000,
@@ -303,7 +285,7 @@ const JenkinsConfig = `<?xml version='1.0' encoding='UTF-8'?>
       <skipTlsVerify>false</skipTlsVerify>
       <namespace>cattle-pipeline</namespace>
       <jenkinsUrl>http://jenkins:8080</jenkinsUrl>
-      <jenkinsTunnel>jenkins-agent:50000</jenkinsTunnel>
+      <jenkinsTunnel>jenkins:50000</jenkinsTunnel>
       <containerCap>10</containerCap>
       <retentionTimeout>5</retentionTimeout>
       <connectTimeout>0</connectTimeout>
