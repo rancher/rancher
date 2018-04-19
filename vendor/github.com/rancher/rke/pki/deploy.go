@@ -46,6 +46,7 @@ func doRunDeployer(ctx context.Context, host *hosts.Host, containerEnv []string,
 	}
 	imageCfg := &container.Config{
 		Image: certDownloaderImage,
+		Cmd:   []string{"cert-deployer"},
 		Env:   containerEnv,
 	}
 	hostCfg := &container.HostConfig{

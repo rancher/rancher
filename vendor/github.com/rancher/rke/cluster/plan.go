@@ -29,7 +29,10 @@ const (
 
 func GeneratePlan(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig, hostsInfoMap map[string]types.Info) (v3.RKEPlan, error) {
 	clusterPlan := v3.RKEPlan{}
-	myCluster, _ := ParseCluster(ctx, rkeConfig, "", "", nil, nil, nil)
+	myCluster, err := ParseCluster(ctx, rkeConfig, "", "", nil, nil, nil)
+	if err != nil {
+		return clusterPlan, err
+	}
 	// rkeConfig.Nodes are already unique. But they don't have role flags. So I will use the parsed cluster.Hosts to make use of the role flags.
 	uniqHosts := hosts.GetUniqueHostList(myCluster.EtcdHosts, myCluster.ControlPlaneHosts, myCluster.WorkerHosts)
 	for _, host := range uniqHosts {
@@ -322,7 +325,7 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string) v3.Pr
 		"/sys:/sys:rprivate",
 		host.DockerInfo.DockerRootDir + ":" + host.DockerInfo.DockerRootDir + ":rw,rslave,z",
 		fmt.Sprintf("%s:%s:shared,z", path.Join(prefixPath, "/var/lib/kubelet"), path.Join(prefixPath, "/var/lib/kubelet")),
-		fmt.Sprintf("%s:%s:shared,z", path.Join(prefixPath, "/var/lib/rancher"), path.Join(prefixPath, "/var/lib/rancher")),
+		"/var/lib/rancher:/var/lib/rancher:shared,z",
 		"/var/run:/var/run:rw,rprivate",
 		"/run:/run:rprivate",
 		fmt.Sprintf("%s:/etc/ceph", path.Join(prefixPath, "/etc/ceph")),
@@ -437,7 +440,7 @@ func (c *Cluster) BuildProxyProcess() v3.Process {
 	return v3.Process{
 		Name:          services.NginxProxyContainerName,
 		Env:           Env,
-		Args:          Env,
+		Args:          []string{"nginx-proxy"},
 		NetworkMode:   "host",
 		RestartPolicy: "always",
 		HealthCheck:   v3.HealthCheck{},

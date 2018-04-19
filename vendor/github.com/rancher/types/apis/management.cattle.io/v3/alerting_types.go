@@ -82,7 +82,7 @@ type TargetPod struct {
 
 type TargetEvent struct {
 	EventType    string `json:"eventType,omitempty" norman:"required,options=Normal|Warning,default=Warning"`
-	ResourceKind string `json:"resourceKind,omitempty" norman:"required,options=Pod|Node|Deployment|Statefulset|Daemonset"`
+	ResourceKind string `json:"resourceKind,omitempty" norman:"required,options=Pod|Node|Deployment|StatefulSet|DaemonSet"`
 }
 
 type TargetWorkload struct {
