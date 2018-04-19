@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/types/config"
 	"k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,13 +33,13 @@ const (
 
 func Register(workload *config.UserContext) {
 	// Add cache informer to project role template bindings
-	informer := workload.Management.Management.ProjectRoleTemplateBindings("").Controller().Informer()
-	indexers := map[string]cache.IndexFunc{
+	prtbInformer := workload.Management.Management.ProjectRoleTemplateBindings("").Controller().Informer()
+	prtbIndexers := map[string]cache.IndexFunc{
 		prtbByProjectIndex:               prtbByProjectName,
 		prtbByProjecSubjectIndex:         prtbByProjectAndSubject,
 		rtbByClusterAndRoleTemplateIndex: rtbByClusterAndRoleTemplateName,
 	}
-	informer.AddIndexers(indexers)
+	prtbInformer.AddIndexers(prtbIndexers)
 
 	crtbInformer := workload.Management.Management.ClusterRoleTemplateBindings("").Controller().Informer()
 	crtbIndexers := map[string]cache.IndexFunc{
@@ -69,7 +70,7 @@ func Register(workload *config.UserContext) {
 
 	r := &manager{
 		workload:      workload,
-		prtbIndexer:   informer.GetIndexer(),
+		prtbIndexer:   prtbInformer.GetIndexer(),
 		crtbIndexer:   crtbInformer.GetIndexer(),
 		nsIndexer:     nsInformer.GetIndexer(),
 		crIndexer:     crInformer.GetIndexer(),
@@ -233,7 +234,7 @@ func (m *manager) ensureClusterBindings(roles map[string]*v3.RoleTemplate, bindi
 	return m.ensureBindings("", roles, binding, m.workload.RBAC.ClusterRoleBindings("").ObjectClient(), create, list, convert)
 }
 
-func (m *manager) ensureRoleBindings(ns string, roles map[string]*v3.RoleTemplate, binding *v3.ProjectRoleTemplateBinding) error {
+func (m *manager) ensureProjectRoleBindings(ns string, roles map[string]*v3.RoleTemplate, binding *v3.ProjectRoleTemplateBinding) error {
 	create := func(objectMeta metav1.ObjectMeta, subjects []rbacv1.Subject, roleRef rbacv1.RoleRef) runtime.Object {
 		return &rbacv1.RoleBinding{
 			ObjectMeta: objectMeta,
@@ -319,7 +320,7 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 	}
 
 	for name := range rbsToDelete {
-		if err := client.Delete(name, &metav1.DeleteOptions{}); err != nil {
+		if err := client.Delete(name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
 	}
