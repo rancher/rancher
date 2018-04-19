@@ -14,18 +14,13 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-func refreshReposByCredential(sourceCodeRepositories v3.SourceCodeRepositoryInterface, sourceCodeRepositoryLister v3.SourceCodeRepositoryLister, credential *v3.SourceCodeCredential) ([]*v3.SourceCodeRepository, error) {
+func refreshReposByCredential(sourceCodeRepositories v3.SourceCodeRepositoryInterface, sourceCodeRepositoryLister v3.SourceCodeRepositoryLister, credential *v3.SourceCodeCredential, clusterPipeline *v3.ClusterPipeline) ([]*v3.SourceCodeRepository, error) {
 
 	remoteType := credential.Spec.SourceCodeType
 	namespace := credential.Namespace
 	credentialID := ref.Ref(credential)
 
-	mockConfig := v3.ClusterPipeline{
-		Spec: v3.ClusterPipelineSpec{
-			GithubConfig: &v3.GithubClusterConfig{},
-		},
-	}
-	remote, err := remote.New(mockConfig, remoteType)
+	remote, err := remote.New(*clusterPipeline, remoteType)
 	if err != nil {
 		return nil, err
 	}
