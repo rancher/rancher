@@ -50,7 +50,6 @@ func (t *RKEDialerFactory) WrapTransport(config *v3.RancherKubernetesEngineConfi
 
 		return func(rt http.RoundTripper) http.RoundTripper {
 			if ht, ok := rt.(*http.Transport); ok {
-				ht.MaxIdleConnsPerHost = 1
 				ht.DialContext = nil
 				ht.DialTLS = nil
 				ht.Dial = dialer
