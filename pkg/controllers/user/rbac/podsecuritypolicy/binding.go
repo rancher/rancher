@@ -17,7 +17,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-const namespaceByProjectNameIndex = "something.something.namespace/by-project-name"
+const namespaceByProjectNameIndex = "podsecuritypolicy.rbac.user.cattle.io/by-project-name"
 
 // RegisterBindings updates the pod security policy for this binding if it has been changed.  Also resync service
 // accounts so they pick up the change.  If no policy exists then exits without doing anything.
