@@ -17,8 +17,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-const psptpbByTargetProjectNameAnnotationIndex = "something.something.auth/psptpb-by-project-id"
-const roleBindingByServiceAccountIndex = "something.something.auth/role-binding-by-service-account"
+const psptpbByTargetProjectNameAnnotationIndex = "podsecuritypolicy.rbac.user.cattle.io/psptpb-by-project-id"
+const roleBindingByServiceAccountIndex = "podsecuritypolicy.rbac.user.cattle.io/role-binding-by-service-account"
+const psptpbRoleBindingAnnotation = "podsecuritypolicy.rbac.user.cattle.io/psptpb-role-binding"
 
 // RegisterServiceAccount ensures that:
 // 	1. Each namespace has a pod security policy assigned to a role if:
@@ -183,6 +184,7 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 				Namespace: obj.Namespace,
 				Annotations: map[string]string{
 					podSecurityPolicyTemplateParentAnnotation: desiredBinding.PodSecurityPolicyTemplateName,
+					psptpbRoleBindingAnnotation:               "true",
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
@@ -229,6 +231,7 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 							Namespace: obj.Namespace,
 							Annotations: map[string]string{
 								podSecurityPolicyTemplateParentAnnotation: cluster.Spec.DefaultPodSecurityPolicyTemplateName,
+								psptpbRoleBindingAnnotation:               "true",
 							},
 							OwnerReferences: []metav1.OwnerReference{
 								{
@@ -270,6 +273,11 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 
 func okToDelete(svcAct *v1.ServiceAccount, rb *rbac.RoleBinding, cluster *v3.Cluster,
 	originalDesiredBindingsLen int) bool {
+	// This is not a role binding this logic should manage so exit immediately
+	if rb.Annotations[psptpbRoleBindingAnnotation] == "" {
+		return false
+	}
+
 	// No default PSPT is set so its ok to delete this if its a normal rolebinding or a leftover default PSPT binding
 	if cluster.Spec.DefaultPodSecurityPolicyTemplateName == "" {
 		return true

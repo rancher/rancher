@@ -14,8 +14,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-const policyByPSPTParentAnnotationIndex = "something.something.pspt/parent-annotation"
-const clusterRoleByPSPTNameIndex = "something.something.psptpb/pspt-name"
+const policyByPSPTParentAnnotationIndex = "podsecuritypolicy.rbac.user.cattle.io/parent-annotation"
+const clusterRoleByPSPTNameIndex = "podsecuritypolicy.rbac.user.cattle.io/pspt-name"
 
 // RegisterTemplate propagates updates to pod security policy templates to their associated pod security policies.
 // Ignores pod security policy templates not assigned to a cluster or project.
