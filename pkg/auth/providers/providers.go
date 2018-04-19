@@ -42,7 +42,7 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	defer confMu.Unlock()
 	userMGR := mgmt.UserManager
 	var p common.AuthProvider
-	p = local.Configure(ctx, mgmt)
+	p = local.Configure(ctx, mgmt, userMGR)
 	providers[local.Name] = p
 	providersByType[client.LocalConfigType] = p
 	providersByType[publicclient.LocalProviderType] = p
