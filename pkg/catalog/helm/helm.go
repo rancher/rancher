@@ -17,6 +17,7 @@ import (
 	"strings"
 
 	"github.com/blang/semver"
+	"github.com/pkg/errors"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
@@ -31,6 +32,9 @@ func DownloadIndex(indexURL string) (*RepoIndex, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("invalid catalog url")
+	}
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err

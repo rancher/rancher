@@ -12,6 +12,7 @@ import (
 )
 
 func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, map[string]v3.VersionCommits, []error, error) {
+	logrus.Info("traversing files and generating templates")
 	index, err := helm.LoadIndex(repoPath)
 	if err != nil {
 		return nil, nil, nil, err
@@ -58,7 +59,6 @@ func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, map[str
 		}
 		template.Spec.Icon = iconData
 		template.Spec.IconFilename = iconFilename
-		template.Spec.Base = HelmTemplateBaseType
 		template.Spec.FolderName = chart
 		template.Spec.DisplayName = chart
 		var versions []v3.TemplateVersionSpec
@@ -66,9 +66,6 @@ func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, map[str
 		for _, version := range metadata {
 			v := v3.TemplateVersionSpec{
 				Version: version.Version,
-			}
-			for _, k := range version.Keywords {
-				keywords[k] = struct{}{}
 			}
 			files, err := helm.FetchFiles(version, version.URLs)
 			if err != nil {
@@ -80,12 +77,18 @@ func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, map[str
 				if strings.EqualFold(fmt.Sprintf("%s/%s", chart, "readme.md"), file.Name) {
 					v.Readme = file.Contents
 				}
-				if strings.EqualFold(fmt.Sprintf("%s/%s", chart, "questions.yml"), file.Name) {
-					var value questionYml
-					if err := yaml.Unmarshal([]byte(file.Contents), &value); err != nil {
-						return nil, nil, nil, err
+				for _, f := range supportedFiles {
+					if strings.EqualFold(fmt.Sprintf("%s/%s", chart, f), file.Name) {
+						var value catalogYml
+						if err := yaml.Unmarshal([]byte(file.Contents), &value); err != nil {
+							return nil, nil, nil, err
+						}
+						v.Questions = value.Questions
+						for _, category := range value.Categories {
+							keywords[category] = struct{}{}
+						}
+						break
 					}
-					v.Questions = value.Questions
 				}
 				if strings.EqualFold(fmt.Sprintf("%s/%s", chart, "app-readme.md"), file.Name) {
 					v.AppReadme = file.Contents
@@ -118,6 +121,9 @@ func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, map[str
 	return templates, newHelmVersionCommits, nil, nil
 }
 
-type questionYml struct {
-	Questions []v3.Question `yaml:"questions,omitempty"`
+var supportedFiles = []string{"catalog.yml", "catalog.yaml", "questions.yml", "questions.yaml"}
+
+type catalogYml struct {
+	Categories []string      `yaml:"categories,omitempty"`
+	Questions  []v3.Question `yaml:"questions,omitempty"`
 }

@@ -289,6 +289,7 @@ func App(schemas *types.Schemas, management *config.ScaledContext, kubeConfigGet
 		Clusters:              management.Management.Clusters(""),
 		KubeConfigGetter:      kubeConfigGetter,
 		TemplateContentClient: management.Management.TemplateContents(""),
+		AppGetter:             management.Project,
 	}
 	schema.Formatter = app.Formatter
 	schema.ActionHandler = wrapper.ActionHandler
