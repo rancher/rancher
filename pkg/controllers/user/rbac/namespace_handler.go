@@ -114,7 +114,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 			return false, errors.Wrap(err, "couldn't ensure roles")
 		}
 
-		if err := n.m.ensureRoleBindings(ns.Name, roles, prtb); err != nil {
+		if err := n.m.ensureProjectRoleBindings(ns.Name, roles, prtb); err != nil {
 			return false, errors.Wrapf(err, "couldn't ensure binding %v in %v", prtb.Name, ns.Name)
 		}
 	}
