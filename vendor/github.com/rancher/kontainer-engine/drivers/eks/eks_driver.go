@@ -361,7 +361,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions) (*typ
 	_, err = ec2svc.CreateKeyPair(&ec2.CreateKeyPairInput{
 		KeyName: aws.String(keyPairName),
 	})
-	if err != nil {
+	if err != nil && !isDuplicateKeyError(err) {
 		return nil, fmt.Errorf("error creating key pair %v", err)
 	}
 
@@ -401,6 +401,10 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions) (*typ
 	info := &types.ClusterInfo{}
 	storeState(info, state)
 	return info, nil
+}
+
+func isDuplicateKeyError(err error) bool {
+	return strings.Contains(err.Error(), "already exists")
 }
 
 func isClusterConflict(err error) bool {
