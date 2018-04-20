@@ -68,7 +68,9 @@ func catalogTypes(schemas *types.Schemas) *types.Schemas {
 		AddMapperForType(&Version, v3.Template{},
 			m.DisplayName{},
 		).
-		MustImport(&Version, v3.Template{}).
+		MustImport(&Version, v3.Template{}, struct {
+			VersionLinks map[string]string
+		}{}).
 		MustImport(&Version, v3.TemplateVersion{}).
 		MustImport(&Version, v3.TemplateContent{})
 }
