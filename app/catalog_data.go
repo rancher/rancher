@@ -8,22 +8,24 @@ import (
 )
 
 const (
-	defaultURL = "https://github.com/ibuildthecloud/rancher-charts"
+	defaultURL    = "https://github.com/rancher/rancher-charts"
+	defaultBranch = "2.0"
 )
 
 func addCatalogs(management *config.ManagementContext) error {
 	catalogClient := management.Management.Catalogs("")
-	_, err := catalogClient.Get("helm", metav1.GetOptions{})
+	_, err := catalogClient.Get("rancher", metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	} else if errors.IsNotFound(err) {
 		obj := &v3.Catalog{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "helm",
+				Name: "rancher",
 			},
 			Spec: v3.CatalogSpec{
 				URL:         defaultURL,
 				CatalogKind: "helm",
+				Branch:      defaultBranch,
 			},
 		}
 		if _, err := catalogClient.Create(obj); err != nil {
