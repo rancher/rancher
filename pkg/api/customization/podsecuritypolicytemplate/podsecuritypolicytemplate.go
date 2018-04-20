@@ -87,7 +87,7 @@ type Format struct {
 
 func (f *Format) Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	// check if PSPT is assigned to a cluster or project
-	projectsWithPSPT, err := f.ProjectIndexer.ByIndex(projectByPSPTKey, apiContext.ID)
+	projectsWithPSPT, err := f.ProjectIndexer.ByIndex(projectByPSPTKey, resource.ID)
 	if err != nil {
 		logrus.Warn("failed to determine if PSPT was assigned to a project: %v", err)
 		return
@@ -99,7 +99,7 @@ func (f *Format) Formatter(apiContext *types.APIContext, resource *types.RawReso
 		return
 	}
 
-	clustersWithPSPT, err := f.ClusterIndexer.ByIndex(clusterByPSPTKey, apiContext.ID)
+	clustersWithPSPT, err := f.ClusterIndexer.ByIndex(clusterByPSPTKey, resource.ID)
 	if err != nil {
 		logrus.Warnf("failed to determine if a PSPT was assigned to a cluster: %v", err)
 		return
