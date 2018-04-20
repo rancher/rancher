@@ -231,17 +231,16 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 				receiverExist = true
 
 			} else if notifier.Spec.SMTPConfig != nil {
-				tls := false
 				header := map[string]string{}
 				header["Subject"] = "Alert from Rancher: {{ (index .Alerts 0).Labels.title}}"
 				email := &alertconfig.EmailConfig{
 					Smarthost:    notifier.Spec.SMTPConfig.Host + ":" + strconv.Itoa(notifier.Spec.SMTPConfig.Port),
 					AuthPassword: alertconfig.Secret(notifier.Spec.SMTPConfig.Password),
 					AuthUsername: notifier.Spec.SMTPConfig.Username,
-					RequireTLS:   &tls,
+					RequireTLS:   &notifier.Spec.SMTPConfig.TLS,
 					To:           notifier.Spec.SMTPConfig.DefaultRecipient,
 					Headers:      header,
-					From:         notifier.Spec.SMTPConfig.Username,
+					From:         notifier.Spec.SMTPConfig.Sender,
 					HTML:         `{{ template "email.text" . }}`,
 				}
 				if r.Recipient != "" {
