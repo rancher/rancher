@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/types/convert"
 	typescorev1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	typesrbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
@@ -25,6 +26,7 @@ const (
 	projectIDAnnotation              = "field.cattle.io/projectId"
 	prtbByProjectIndex               = "authz.cluster.cattle.io/prtb-by-project"
 	prtbByProjecSubjectIndex         = "authz.cluster.cattle.io/prtb-by-project-subject"
+	prtbByUIDIndex                   = "authz.cluster.cattle.io/rtb-owner"
 	rtbByClusterAndRoleTemplateIndex = "authz.cluster.cattle.io/rtb-by-cluster-rt"
 	nsByProjectIndex                 = "authz.cluster.cattle.io/ns-by-project"
 	crByNSIndex                      = "authz.cluster.cattle.io/cr-by-ns"
@@ -38,6 +40,7 @@ func Register(workload *config.UserContext) {
 		prtbByProjectIndex:               prtbByProjectName,
 		prtbByProjecSubjectIndex:         prtbByProjectAndSubject,
 		rtbByClusterAndRoleTemplateIndex: rtbByClusterAndRoleTemplateName,
+		prtbByUIDIndex:                   prtbByUID,
 	}
 	prtbInformer.AddIndexers(prtbIndexers)
 
@@ -418,6 +421,14 @@ func prtbByProjectAndSubject(obj interface{}) ([]string, error) {
 	}
 
 	return []string{getPRTBProjectAndSubjectKey(prtb)}, nil
+}
+
+func prtbByUID(obj interface{}) ([]string, error) {
+	prtb, ok := obj.(*v3.ProjectRoleTemplateBinding)
+	if !ok {
+		return []string{}, nil
+	}
+	return []string{convert.ToString(prtb.UID)}, nil
 }
 
 func nsByProjectID(obj interface{}) ([]string, error) {
