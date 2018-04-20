@@ -452,6 +452,9 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 			m.Move{From: "hostIP", To: "hostIp"},
 			m.Drop{Field: "hostPort"},
 		).
+		AddMapperForType(&Version, v1.Handler{},
+			mapper.ContainerProbeHandler{}).
+		AddMapperForType(&Version, v1.Probe{}, mapper.ContainerProbeHandler{}).
 		AddMapperForType(&Version, v1.Handler{}, handlerMapper).
 		AddMapperForType(&Version, v1.Probe{}, handlerMapper).
 		AddMapperForType(&Version, v1.PodStatus{},

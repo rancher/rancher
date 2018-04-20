@@ -139,6 +139,8 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.ClusterEvent{}).
 		MustImport(&Version, v3.ClusterRegistrationToken{}).
 		MustImport(&Version, v3.GenerateKubeConfigOutput{}).
+		MustImport(&Version, v3.ImportClusterYamlInput{}).
+		MustImport(&Version, v3.ImportYamlOutput{}).
 		MustImportAndCustomize(&Version, v3.Cluster{}, func(schema *types.Schema) {
 			schema.MustCustomizeField("name", func(field types.Field) types.Field {
 				field.Type = "dnsLabel"
@@ -148,6 +150,10 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 			})
 			schema.ResourceActions["generateKubeconfig"] = types.Action{
 				Output: "generateKubeConfigOutput",
+			}
+			schema.ResourceActions["importYaml"] = types.Action{
+				Input:  "importClusterYamlInput",
+				Output: "importYamlOutput",
 			}
 		})
 }
@@ -166,6 +172,7 @@ func authzTypes(schemas *types.Schemas) *types.Schemas {
 			&mapper.NamespaceIDMapper{},
 		).
 		MustImport(&Version, v3.SetPodSecurityPolicyTemplateInput{}).
+		MustImport(&Version, v3.ImportYamlOutput{}).
 		MustImportAndCustomize(&Version, v3.Project{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
 				"setpodsecuritypolicytemplate": {
