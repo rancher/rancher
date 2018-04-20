@@ -203,21 +203,18 @@ func augmentProcesses(processes map[string]v3.Process, worker bool) map[string]v
 			PidMode:       "host",
 			Privileged:    true,
 		}
-
-		if !worker {
-
-		}
 	}
 
 	if worker {
 		// not sure if we really need this anymore
 		delete(processes, "etcd")
 	} else {
-		processes = nil
 		if p, ok := processes["share-mnt"]; ok {
 			processes = map[string]v3.Process{
 				"share-mnt": p,
 			}
+		} else {
+			processes = nil
 		}
 	}
 
