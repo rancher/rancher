@@ -86,7 +86,7 @@ func (m *NodesSyncer) sync(key string, machine *v3.Node) error {
 
 func (m *NodesSyncer) getNode(machine *v3.Node, nodes []*corev1.Node) (*corev1.Node, error) {
 	for _, n := range nodes {
-		if isNodeForNode(n, machine) {
+		if nodehelper.IsNodeForNode(n, machine) {
 			return n, nil
 		}
 	}
@@ -266,7 +266,7 @@ func (m *NodesSyncer) getNodeForNode(node *corev1.Node, cache bool) (*v3.Node, e
 			return nil, err
 		}
 		for _, machine := range machines {
-			if isNodeForNode(node, machine) {
+			if nodehelper.IsNodeForNode(node, machine) {
 				return machine, nil
 			}
 		}
@@ -277,7 +277,7 @@ func (m *NodesSyncer) getNodeForNode(node *corev1.Node, cache bool) (*v3.Node, e
 		}
 		for _, machine := range machines.Items {
 			if machine.Namespace == m.clusterNamespace {
-				if isNodeForNode(node, &machine) {
+				if nodehelper.IsNodeForNode(node, &machine) {
 					return &machine, nil
 				}
 			}
@@ -285,43 +285,6 @@ func (m *NodesSyncer) getNodeForNode(node *corev1.Node, cache bool) (*v3.Node, e
 	}
 
 	return nil, nil
-}
-
-func isNodeForNode(node *corev1.Node, machine *v3.Node) bool {
-	nodeName := nodehelper.GetNodeName(machine)
-	if nodeName == node.Name {
-		return true
-	}
-
-	// search by rke external-ip annotations
-	machineAddress := ""
-	if machine.Status.NodeConfig != nil {
-		if machine.Status.NodeConfig.InternalAddress == "" {
-			// rke defaults internal address to address
-			machineAddress = machine.Status.NodeConfig.Address
-		} else {
-			machineAddress = machine.Status.NodeConfig.InternalAddress
-		}
-	}
-
-	if machineAddress == "" {
-		return false
-	}
-
-	if machineAddress == getNodeInternalAddress(node) {
-		return true
-	}
-
-	return false
-}
-
-func getNodeInternalAddress(node *corev1.Node) string {
-	for _, address := range node.Status.Addresses {
-		if address.Type == corev1.NodeInternalIP {
-			return address.Address
-		}
-	}
-	return ""
 }
 
 func resetConditions(machine *v3.Node) *v3.Node {
