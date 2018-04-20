@@ -39,7 +39,7 @@ func IsPipelineDeploy(clusterPipelineLister v3.ClusterPipelineLister, clusterNam
 	return clusterPipeline.Spec.Deploy
 }
 
-func InitExecution(p *v3.Pipeline, triggerType string, triggerUserName string, branch string, commit string) *v3.PipelineExecution {
+func InitExecution(p *v3.Pipeline, triggerType string, triggerUserName string, branch string, commit string, envVars map[string]string) *v3.PipelineExecution {
 	execution := &v3.PipelineExecution{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      getNextExecutionName(p),
@@ -64,6 +64,7 @@ func InitExecution(p *v3.Pipeline, triggerType string, triggerUserName string, b
 	execution.Status.ExecutionState = StateWaiting
 	execution.Status.Started = time.Now().Format(time.RFC3339)
 	execution.Status.Stages = make([]v3.StageStatus, len(p.Spec.Stages))
+	execution.Status.EnvVars = envVars
 
 	for i := 0; i < len(execution.Status.Stages); i++ {
 		stage := &execution.Status.Stages[i]
@@ -130,10 +131,10 @@ func IsExecutionFinish(execution *v3.PipelineExecution) bool {
 	return false
 }
 
-func GenerateExecution(pipelines v3.PipelineInterface, executions v3.PipelineExecutionInterface, pipeline *v3.Pipeline, triggerType string, triggerUserName string, branch string, commit string) (*v3.PipelineExecution, error) {
+func GenerateExecution(pipelines v3.PipelineInterface, executions v3.PipelineExecutionInterface, pipeline *v3.Pipeline, triggerType string, triggerUserName string, branch string, commit string, envVars map[string]string) (*v3.PipelineExecution, error) {
 
 	//Generate a new pipeline execution
-	execution := InitExecution(pipeline, triggerType, triggerUserName, branch, commit)
+	execution := InitExecution(pipeline, triggerType, triggerUserName, branch, commit, envVars)
 	execution, err := executions.Create(execution)
 	if err != nil {
 		return nil, err

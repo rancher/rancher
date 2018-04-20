@@ -177,6 +177,11 @@ func getEnvVarMap(execution *v3.PipelineExecution) map[string]string {
 	m["CICD_TRIGGER_TYPE"] = execution.Spec.TriggeredBy
 	m["CICD_EXECUTION_ID"] = ref.Ref(execution)
 	m["CICD_EXECUTION_SEQUENCE"] = strconv.Itoa(execution.Spec.Run)
+
+	for k, v := range execution.Status.EnvVars {
+		m[k] = v
+	}
+
 	return m
 }
 

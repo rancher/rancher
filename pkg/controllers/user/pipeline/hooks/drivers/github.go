@@ -17,7 +17,11 @@ import (
 	"strings"
 )
 
-const GithubWebhookHeader = "X-GitHub-Event"
+const (
+	GithubWebhookHeader = "X-GitHub-Event"
+	RefsBranchPrefix    = "refs/heads/"
+	RefsTagPrefix       = "refs/tags/"
+)
 
 type GithubDriver struct {
 	Pipelines          v3.PipelineInterface
@@ -59,7 +63,7 @@ func (g GithubDriver) Execute(req *http.Request) (int, error) {
 		return http.StatusUnavailableForLegalReasons, errors.New("Pipeline is not active")
 	}
 
-	if (event == "push" && !pipeline.Spec.TriggerWebhookPush) ||
+	if (event == "push" && !pipeline.Spec.TriggerWebhookPush && !pipeline.Spec.TriggerWebhookTag) ||
 		(event == "pull_request" && !pipeline.Spec.TriggerWebhookPr) {
 		return http.StatusUnavailableForLegalReasons, fmt.Errorf("trigger for event '%s' is disabled", event)
 	}
@@ -69,14 +73,29 @@ func (g GithubDriver) Execute(req *http.Request) (int, error) {
 	}
 
 	ref, branch, commit := "", "", ""
+	envVars := map[string]string{}
 	if event == "push" {
 		payload := &github.PushEvent{}
 		if err := json.Unmarshal(body, payload); err != nil {
 			return http.StatusUnprocessableEntity, err
 		}
 		ref = payload.GetRef()
-		branch = strings.TrimLeft(payload.GetRef(), "refs/heads/")
-		commit = payload.HeadCommit.GetID()
+		if strings.HasPrefix(ref, RefsTagPrefix) {
+			//git tag is triggered as a push event
+			if !pipeline.Spec.TriggerWebhookTag {
+				return http.StatusUnavailableForLegalReasons, errors.New("trigger for tag event is disabled")
+			}
+			tag := strings.TrimPrefix(ref, RefsTagPrefix)
+			envVars["CICD_GIT_TAG"] = tag
+			branch = strings.TrimPrefix(payload.GetBaseRef(), RefsBranchPrefix)
+			commit = payload.HeadCommit.GetID()
+		} else {
+			if !pipeline.Spec.TriggerWebhookPush {
+				return http.StatusUnavailableForLegalReasons, errors.New("trigger for push event is disabled")
+			}
+			branch = strings.TrimPrefix(payload.GetRef(), RefsBranchPrefix)
+			commit = payload.HeadCommit.GetID()
+		}
 	} else if event == "pull_request" {
 		payload := &github.PullRequestEvent{}
 		if err := json.Unmarshal(body, payload); err != nil {
@@ -92,7 +111,7 @@ func (g GithubDriver) Execute(req *http.Request) (int, error) {
 	}
 
 	logrus.Debugf("receieve github webhook, triggered '%s' on branch '%s'", pipeline.Spec.DisplayName, ref)
-	if _, err := utils.GenerateExecution(g.Pipelines, g.PipelineExecutions, pipeline, utils.TriggerTypeWebhook, "", ref, commit); err != nil {
+	if _, err := utils.GenerateExecution(g.Pipelines, g.PipelineExecutions, pipeline, utils.TriggerTypeWebhook, "", ref, commit, envVars); err != nil {
 		return http.StatusInternalServerError, err
 	}
 	return http.StatusOK, nil

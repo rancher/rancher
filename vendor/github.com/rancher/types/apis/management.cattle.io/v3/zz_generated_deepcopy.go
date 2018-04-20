@@ -4699,6 +4699,13 @@ func (in *PipelineExecutionStatus) DeepCopyInto(out *PipelineExecutionStatus) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.EnvVars != nil {
+		in, out := &in.EnvVars, &out.EnvVars
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 

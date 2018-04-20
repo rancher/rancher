@@ -185,7 +185,7 @@ func (l *Lifecycle) deleteHook(obj *v3.Pipeline) error {
 }
 
 func hasWebhookTrigger(obj *v3.Pipeline) bool {
-	if obj != nil && (obj.Spec.TriggerWebhookPr || obj.Spec.TriggerWebhookPush) {
+	if obj != nil && (obj.Spec.TriggerWebhookPr || obj.Spec.TriggerWebhookPush || obj.Spec.TriggerWebhookTag) {
 		return true
 	}
 	return false
