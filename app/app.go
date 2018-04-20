@@ -140,5 +140,9 @@ func addData(management *config.ManagementContext, cfg Config) error {
 		return err
 	}
 
+	if err := addDefaultPodSecurityPolicyTemplates(management); err != nil {
+		return err
+	}
+
 	return addMachineDrivers(management)
 }
