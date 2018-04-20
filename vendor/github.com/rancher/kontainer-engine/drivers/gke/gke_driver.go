@@ -65,13 +65,13 @@ type state struct {
 	// Enable alpha feature
 	EnableAlphaFeature bool
 	// Configuration for the HTTP (L7) load balancing controller addon
-	HTTPLoadBalancing bool
+	DisableHTTPLoadBalancing bool
 	// Configuration for the horizontal pod autoscaling feature, which increases or decreases the number of replica pods a replication controller has based on the resource usage of the existing pods
-	HorizontalPodAutoscaling bool
+	DisableHorizontalPodAutoscaling bool
 	// Configuration for the Kubernetes Dashboard
-	KubernetesDashboard bool
+	EnableKubernetesDashboard bool
 	// Configuration for NetworkPolicy
-	NetworkPolicyConfig bool
+	DisableNetworkPolicyConfig bool
 	// The list of Google Compute Engine locations in which the cluster's nodes should be located
 	Locations []string
 	// Network
@@ -204,14 +204,14 @@ func getStateFromOpts(driverOptions *types.DriverOptions) (state, error) {
 	d.CredentialPath = getValueFromDriverOptions(driverOptions, types.StringType, "gke-credential-path").(string)
 	d.CredentialContent = getValueFromDriverOptions(driverOptions, types.StringType, "credential").(string)
 	d.EnableAlphaFeature = getValueFromDriverOptions(driverOptions, types.BoolType, "enable-alpha-feature", "enableAlphaFeature").(bool)
-	d.HorizontalPodAutoscaling = getValueFromDriverOptions(driverOptions, types.BoolType, "horizontalPodAutoscaling").(bool)
-	d.HTTPLoadBalancing = getValueFromDriverOptions(driverOptions, types.BoolType, "httpLoadBalancing").(bool)
-	d.KubernetesDashboard = getValueFromDriverOptions(driverOptions, types.BoolType, "kubernetesDashboard").(bool)
-	d.NetworkPolicyConfig = getValueFromDriverOptions(driverOptions, types.BoolType, "networkPolicyConfig").(bool)
+	d.DisableHorizontalPodAutoscaling = getValueFromDriverOptions(driverOptions, types.BoolType, "disableHorizontalPodAutoscaling").(bool)
+	d.DisableHTTPLoadBalancing = getValueFromDriverOptions(driverOptions, types.BoolType, "disableHttpLoadBalancing").(bool)
+	d.EnableKubernetesDashboard = getValueFromDriverOptions(driverOptions, types.BoolType, "enableKubernetesDashboard").(bool)
+	d.DisableNetworkPolicyConfig = getValueFromDriverOptions(driverOptions, types.BoolType, "disableNetworkPolicyConfig").(bool)
 	d.NodeConfig.ImageType = getValueFromDriverOptions(driverOptions, types.StringType, "imageType").(string)
 	d.Network = getValueFromDriverOptions(driverOptions, types.StringType, "network").(string)
 	d.SubNetwork = getValueFromDriverOptions(driverOptions, types.StringType, "subNetwork").(string)
-	d.LegacyAbac = getValueFromDriverOptions(driverOptions, types.BoolType, "legacyAbac").(bool)
+	d.LegacyAbac = getValueFromDriverOptions(driverOptions, types.BoolType, "enableLegacyAbac").(bool)
 	d.Locations = []string{}
 	locations := getValueFromDriverOptions(driverOptions, types.StringSliceType, "locations").(*types.StringSlice)
 	for _, location := range locations.Value {
@@ -276,7 +276,7 @@ func (s *state) validate() error {
 }
 
 // Create implements driver interface
-func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions) (*types.ClusterInfo, error) {
+func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions, _ *types.ClusterInfo) (*types.ClusterInfo, error) {
 	state, err := getStateFromOpts(opts)
 	if err != nil {
 		return nil, err
@@ -413,10 +413,10 @@ func (d *Driver) generateClusterCreateRequest(state state) *raw.CreateClusterReq
 	request.Cluster.Description = state.Description
 	request.Cluster.EnableKubernetesAlpha = state.EnableAlphaFeature
 	request.Cluster.AddonsConfig = &raw.AddonsConfig{
-		HttpLoadBalancing:        &raw.HttpLoadBalancing{Disabled: !state.HTTPLoadBalancing},
-		HorizontalPodAutoscaling: &raw.HorizontalPodAutoscaling{Disabled: !state.HorizontalPodAutoscaling},
-		KubernetesDashboard:      &raw.KubernetesDashboard{Disabled: !state.KubernetesDashboard},
-		NetworkPolicyConfig:      &raw.NetworkPolicyConfig{Disabled: !state.NetworkPolicyConfig},
+		HttpLoadBalancing:        &raw.HttpLoadBalancing{Disabled: state.DisableHTTPLoadBalancing},
+		HorizontalPodAutoscaling: &raw.HorizontalPodAutoscaling{Disabled: state.DisableHorizontalPodAutoscaling},
+		KubernetesDashboard:      &raw.KubernetesDashboard{Disabled: !state.EnableKubernetesDashboard},
+		NetworkPolicyConfig:      &raw.NetworkPolicyConfig{Disabled: state.DisableNetworkPolicyConfig},
 	}
 	request.Cluster.Network = state.Network
 	request.Cluster.Subnetwork = state.SubNetwork

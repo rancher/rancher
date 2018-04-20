@@ -3,14 +3,15 @@ package eks
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strings"
+	"sync"
 	"time"
-
-	"encoding/base64"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -116,7 +117,6 @@ func (d *Driver) GetDriverUpdateOptions(ctx context.Context) (*types.DriverFlags
 }
 
 func getStateFromOptions(driverOptions *types.DriverOptions) (state, error) {
-	logrus.Infof("%v", driverOptions)
 	state := state{}
 	state.ClusterName = getValueFromDriverOptions(driverOptions, types.StringType, "name").(string)
 	state.DisplayName = getValueFromDriverOptions(driverOptions, types.StringType, "display-name", "displayName").(string)
@@ -255,7 +255,7 @@ func (d *Driver) awsHTTPRequest(state state, url string, method string, data []b
 	return body, nil
 }
 
-func (d *Driver) Create(ctx context.Context, options *types.DriverOptions) (*types.ClusterInfo, error) {
+func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *types.ClusterInfo) (*types.ClusterInfo, error) {
 	logrus.Infof("Starting create")
 
 	state, err := getStateFromOptions(options)
@@ -424,27 +424,7 @@ func getVPCStackName(state state) string {
 }
 
 func (d *Driver) createConfigMap(state state, endpoint string, capem []byte, nodeInstanceRole string) error {
-	generator, err := heptio.NewGenerator()
-	if err != nil {
-		return fmt.Errorf("error creating generator: %v", err)
-	}
-
-	token, err := generator.Get(state.ClusterName)
-	if err != nil {
-		return fmt.Errorf("error generating token: %v", err)
-	}
-
-	config := &rest.Config{
-		Host: endpoint,
-		TLSClientConfig: rest.TLSClientConfig{
-			CAData: capem,
-		},
-		BearerToken: token,
-	}
-
-	logrus.Infof("Applying ConfigMap")
-
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := getClientset(state, endpoint, capem)
 	if err != nil {
 		return fmt.Errorf("error creating clientset: %v", err)
 	}
@@ -465,6 +445,8 @@ func (d *Driver) createConfigMap(state state, endpoint string, capem []byte, nod
 		return fmt.Errorf("error marshalling map roles: %v", err)
 	}
 
+	logrus.Infof("Applying ConfigMap")
+
 	_, err = clientset.CoreV1().ConfigMaps("default").Create(&v1.ConfigMap{
 		TypeMeta: v12.TypeMeta{
 			Kind:       "ConfigMap",
@@ -483,6 +465,67 @@ func (d *Driver) createConfigMap(state state, endpoint string, capem []byte, nod
 	}
 
 	return nil
+}
+
+func getClientset(state state, endpoint string, capem []byte) (*kubernetes.Clientset, error) {
+	token, err := getEKSToken(state)
+	if err != nil {
+		return nil, fmt.Errorf("error generating token: %v", err)
+	}
+
+	config := &rest.Config{
+		Host: endpoint,
+		TLSClientConfig: rest.TLSClientConfig{
+			CAData: capem,
+		},
+		BearerToken: token,
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating clientset: %v", err)
+	}
+
+	return clientset, nil
+}
+
+const awsCredentialsDirectory = "./.aws"
+const awsCredentialsPath = awsCredentialsDirectory + "/credentials"
+const awsSharedCredentialsFile = "AWS_SHARED_CREDENTIALS_FILE"
+
+var awsCredentialsLocker = &sync.Mutex{}
+
+func getEKSToken(state state) (string, error) {
+	generator, err := heptio.NewGenerator()
+	if err != nil {
+		return "", fmt.Errorf("error creating generator: %v", err)
+	}
+
+	defer awsCredentialsLocker.Unlock()
+	awsCredentialsLocker.Lock()
+	os.Setenv(awsSharedCredentialsFile, awsCredentialsPath)
+
+	defer func() {
+		os.Remove(awsCredentialsPath)
+		os.Remove(awsCredentialsDirectory)
+		os.Unsetenv(awsSharedCredentialsFile)
+	}()
+	err = os.MkdirAll(awsCredentialsDirectory, 0744)
+	if err != nil {
+		return "", fmt.Errorf("error creating credentials directory: %v", err)
+	}
+
+	err = ioutil.WriteFile(awsCredentialsPath, []byte(fmt.Sprintf(
+		`[default]
+aws_access_key_id=%v
+aws_secret_access_key=%v`,
+		state.ClientID,
+		state.ClientSecret)), 0644)
+	if err != nil {
+		return "", fmt.Errorf("error writing credentials file: %v", err)
+	}
+
+	return generator.Get(state.ClusterName)
 }
 
 func (d *Driver) waitForClusterReady(state state) (*eksCluster, error) {
@@ -587,28 +630,10 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 		return nil, fmt.Errorf("error parsing CA data: %v", err)
 	}
 
-	generator, err := heptio.NewGenerator()
-	if err != nil {
-		return nil, fmt.Errorf("error creating generator: %v", err)
-	}
-
-	token, err := generator.Get(state.ClusterName)
-	if err != nil {
-		return nil, fmt.Errorf("error generating token: %v", err)
-	}
-
 	info.Endpoint = *cluster.Cluster.MasterEndpoint
 	info.RootCaCertificate = *cluster.Cluster.CertificateAuthority.Data
 
-	config := &rest.Config{
-		Host: *cluster.Cluster.MasterEndpoint,
-		TLSClientConfig: rest.TLSClientConfig{
-			CAData: capem,
-		},
-		BearerToken: token,
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := getClientset(state, *cluster.Cluster.MasterEndpoint, capem)
 	if err != nil {
 		return nil, fmt.Errorf("error creating clientset: %v", err)
 	}

@@ -56,7 +56,7 @@ func (d *Driver) GetDriverUpdateOptions(ctx context.Context) (*types.DriverFlags
 	return getDriverOptions(), nil
 }
 
-func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions) (*types.ClusterInfo, error) {
+func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions, _ *types.ClusterInfo) (*types.ClusterInfo, error) {
 	logrus.Info("importing kubeconfig file into clusters")
 
 	configPath := opts.StringOptions["kubeConfigPath"]
