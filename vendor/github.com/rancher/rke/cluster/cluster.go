@@ -61,6 +61,9 @@ const (
 	CloudProvider              = "CloudProvider"
 	AzureCloudProvider         = "azure"
 	AWSCloudProvider           = "aws"
+	ControlPlane               = "controlPlane"
+	WorkerPlane                = "workerPlan"
+	EtcdPlane                  = "etcd"
 )
 
 func (c *Cluster) DeployControlPlane(ctx context.Context) error {
