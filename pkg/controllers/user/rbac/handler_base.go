@@ -231,7 +231,7 @@ func (m *manager) ensureClusterBindings(roles map[string]*v3.RoleTemplate, bindi
 		return crb.Name, crb.RoleRef.Name, crb.Subjects
 	}
 
-	return m.ensureBindings("", roles, binding, m.workload.RBAC.ClusterRoleBindings("").ObjectClient(), create, list, convert)
+	return m.ensureBindings("", "crb-", roles, binding, m.workload.RBAC.ClusterRoleBindings("").ObjectClient(), create, list, convert)
 }
 
 func (m *manager) ensureProjectRoleBindings(ns string, roles map[string]*v3.RoleTemplate, binding *v3.ProjectRoleTemplateBinding) error {
@@ -260,14 +260,14 @@ func (m *manager) ensureProjectRoleBindings(ns string, roles map[string]*v3.Role
 		return rb.Name, rb.RoleRef.Name, rb.Subjects
 	}
 
-	return m.ensureBindings(ns, roles, binding, m.workload.RBAC.RoleBindings(ns).ObjectClient(), create, list, convert)
+	return m.ensureBindings(ns, "rb-", roles, binding, m.workload.RBAC.RoleBindings(ns).ObjectClient(), create, list, convert)
 }
 
 type createFn func(objectMeta metav1.ObjectMeta, subjects []rbacv1.Subject, roleRef rbacv1.RoleRef) runtime.Object
 type listFn func(ns string, selector labels.Selector) ([]interface{}, error)
 type convertFn func(i interface{}) (string, string, []rbacv1.Subject)
 
-func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, binding interface{}, client *objectclient.ObjectClient,
+func (m *manager) ensureBindings(ns, generateName string, roles map[string]*v3.RoleTemplate, binding interface{}, client *objectclient.ObjectClient,
 	create createFn, list listFn, convert convertFn) error {
 	meta, err := meta.Accessor(binding)
 	if err != nil {
@@ -280,7 +280,7 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 		return err
 	}
 	for roleName := range roles {
-		rbKey, objectMeta, subjects, roleRef := bindingParts(roleName, string(meta.GetUID()), subject)
+		rbKey, objectMeta, subjects, roleRef := bindingParts(roleName, string(meta.GetUID()), generateName, subject)
 		desiredRBs[rbKey] = create(objectMeta, subjects, roleRef)
 	}
 
@@ -374,11 +374,11 @@ func buildSubjectFromRTB(binding interface{}) (rbacv1.Subject, error) {
 	}, nil
 }
 
-func bindingParts(roleName, parentUID string, subject rbacv1.Subject) (string, metav1.ObjectMeta, []rbacv1.Subject, rbacv1.RoleRef) {
+func bindingParts(roleName, parentUID, generateName string, subject rbacv1.Subject) (string, metav1.ObjectMeta, []rbacv1.Subject, rbacv1.RoleRef) {
 	crbKey := rbRoleSubjectKey(roleName, subject)
 	return crbKey,
 		metav1.ObjectMeta{
-			GenerateName: "clusterrolebinding-",
+			GenerateName: generateName,
 			Labels:       map[string]string{rtbOwnerLabel: parentUID},
 		},
 		[]rbacv1.Subject{subject},
