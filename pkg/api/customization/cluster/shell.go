@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/transport"
 )
 
 type ShellLinkHandler struct {
@@ -56,6 +57,10 @@ func (s *ShellLinkHandler) LinkHandler(apiContext *types.APIContext, next types.
 			req := apiContext.Request
 			req.URL.Path = path
 			req.URL.RawQuery = vars.Encode()
+			// we want to run this as a the system user
+			req.Header.Del(transport.ImpersonateUserHeader)
+			req.Header.Del(transport.ImpersonateGroupHeader)
+			req.Header.Del(transport.ImpersonateUserExtraHeaderPrefix)
 
 			s.Proxy.ServeHTTP(apiContext.Response, req)
 			return nil
