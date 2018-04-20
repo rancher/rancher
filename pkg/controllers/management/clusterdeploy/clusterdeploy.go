@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -24,6 +25,7 @@ func Register(management *config.ManagementContext, clusterManager *clustermanag
 		systemAccountManager: systemaccount.NewManager(management),
 		userManager:          management.UserManager,
 		clusters:             management.Management.Clusters(""),
+		nodeLister:           management.Management.Nodes("").Controller().Lister(),
 		clusterManager:       clusterManager,
 	}
 
@@ -35,6 +37,7 @@ type clusterDeploy struct {
 	userManager          user.Manager
 	clusters             v3.ClusterInterface
 	clusterManager       *clustermanager.Manager
+	nodeLister           v3.NodeLister
 }
 
 func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) error {
@@ -65,11 +68,15 @@ func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
 		return nil
 	}
 
-	if cluster.Spec.Internal && cluster.Status.Driver == v3.ClusterDriverImported {
+	nodes, err := cd.nodeLister.List(cluster.Name, labels.Everything())
+	if err != nil {
+		return err
+	}
+	if len(nodes) == 0 {
 		return nil
 	}
 
-	_, err := v3.ClusterConditionSystemAccountCreated.DoUntilTrue(cluster, func() (runtime.Object, error) {
+	_, err = v3.ClusterConditionSystemAccountCreated.DoUntilTrue(cluster, func() (runtime.Object, error) {
 		return cluster, cd.systemAccountManager.CreateSystemAccount(cluster)
 	})
 	if err != nil {
