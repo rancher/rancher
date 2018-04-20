@@ -9,7 +9,7 @@ const (
 )
 
 var (
-	ToolsImage = "rancher/rke-tools:v0.1.1"
+	ToolsImage = "rancher/rke-tools:v0.1.2"
 
 	// K8sVersionToRKESystemImages - images map for 2.0
 	K8sVersionToRKESystemImages = map[string]RKESystemImages{

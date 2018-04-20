@@ -17,9 +17,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-const creatorIDAnn = "field.cattle.io/creatorId"
+const (
+	creatorIDAnn                  = "field.cattle.io/creatorId"
+	creatorOwnerBindingAnnotation = "authz.management.cattle.io/creator-owner-binding"
+)
 
 var defaultProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/default-project": "true"})
+var crtbCeatorOwnerAnnotations = map[string]string{creatorOwnerBindingAnnotation: "true"}
 
 func newPandCLifecycles(management *config.ManagementContext) (*projectLifecycle, *clusterLifecycle) {
 	m := &mgr{
@@ -224,6 +228,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 			if rtb, _ := m.crtbLister.Get(metaAccessor.GetName(), rtbName); rtb != nil {
 				return obj, nil
 			}
+			om.Annotations = crtbCeatorOwnerAnnotations
 			if _, err := m.mgmt.Management.ClusterRoleTemplateBindings(metaAccessor.GetName()).Create(&v3.ClusterRoleTemplateBinding{
 				ObjectMeta:       om,
 				ClusterName:      metaAccessor.GetName(),
