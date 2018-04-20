@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -118,6 +119,43 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 			return false, errors.Wrapf(err, "couldn't ensure binding %v in %v", prtb.Name, ns.Name)
 		}
 	}
+
+	var namespace string
+	if parts := strings.SplitN(projectID, ":", 2); len(parts) == 2 && len(parts[1]) > 0 {
+		namespace = parts[1]
+	} else {
+		return hasPRTBs, nil
+	}
+
+	rbs, err := n.m.rbLister.List(ns.Name, labels.Everything())
+	if err != nil {
+		return false, errors.Wrapf(err, "couldn't list role bindings in %s", ns.Name)
+	}
+	client := n.m.workload.RBAC.RoleBindings(ns.Name).ObjectClient()
+
+	for _, rb := range rbs {
+		if uid := convert.ToString(rb.Labels[rtbOwnerLabel]); uid != "" {
+			prtbs, err := n.m.prtbIndexer.ByIndex(prtbByUIDIndex, uid)
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					continue
+				} else {
+					return false, errors.Wrapf(err, "couldn't find prtb for %s", rb.Name)
+				}
+			}
+			for _, prtb := range prtbs {
+				if prtb, ok := prtb.(*v3.ProjectRoleTemplateBinding); ok {
+					if prtb.Namespace != namespace {
+						logrus.Infof("Deleting role binding %s in %s", rb.Name, ns.Name)
+						if err := client.Delete(rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+							return false, errors.Wrapf(err, "couldn't delete role binding %s", rb.Name)
+						}
+					}
+				}
+			}
+		}
+	}
+
 	return hasPRTBs, nil
 }
 
@@ -167,6 +205,28 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace) err
 					}
 					r.ResourceNames = resNames
 				}
+			}
+			//if ResourceNames is empty, delete the rule and delete the role if no rules exist
+			toDeleteRules := 0
+			for _, rule := range undesiredRole.Rules {
+				if len(rule.ResourceNames) == 0 {
+					toDeleteRules++
+				}
+			}
+			if toDeleteRules == len(undesiredRole.Rules) {
+				logrus.Infof("Deleting ClusterRole %s", undesiredRole.Name)
+				if err = roleCli.Delete(undesiredRole.Name, &metav1.DeleteOptions{}); err != nil {
+					return err
+				}
+				continue
+			} else if toDeleteRules != 0 {
+				var updatedRules []rbacv1.PolicyRule
+				for _, rule := range undesiredRole.Rules {
+					if len(rule.ResourceNames) != 0 {
+						updatedRules = append(updatedRules, rule)
+					}
+				}
+				undesiredRole.Rules = updatedRules
 			}
 			if modified {
 				if _, err = roleCli.Update(undesiredRole); err != nil {
