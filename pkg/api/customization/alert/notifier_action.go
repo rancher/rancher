@@ -71,7 +71,7 @@ func (h *Handler) testNotifier(actionName string, action *types.Action, apiConte
 
 		if notifier.Spec.SMTPConfig != nil {
 			s := notifier.Spec.SMTPConfig
-			return testEmail(s.Host, s.Password, s.Username, int(s.Port), s.TLS, msg, s.DefaultRecipient)
+			return testEmail(s.Host, s.Password, s.Username, int(s.Port), s.TLS, msg, s.DefaultRecipient, s.Sender)
 		}
 
 		if notifier.Spec.PagerdutyConfig != nil {
@@ -89,7 +89,7 @@ func (h *Handler) testNotifier(actionName string, action *types.Action, apiConte
 			slackConfig := convert.ToMapInterface(slackConfigInterface)
 			url, ok := slackConfig["url"].(string)
 			if ok {
-				channel := slackConfig["defaultRecipient"].(string)
+				channel := convert.ToString(slackConfig["defaultRecipient"])
 				return testSlack(url, channel, msg)
 			}
 		}
@@ -99,12 +99,13 @@ func (h *Handler) testNotifier(actionName string, action *types.Action, apiConte
 			smtpConfig := convert.ToMapInterface(smtpConfigInterface)
 			host, ok := smtpConfig["host"].(string)
 			if ok {
-				port, _ := smtpConfig["port"].(json.Number).Int64()
-				password := smtpConfig["password"].(string)
-				username := smtpConfig["username"].(string)
-				receiver := smtpConfig["defaultRecipient"].(string)
-				tls := smtpConfig["tls"].(bool)
-				return testEmail(host, password, username, int(port), tls, msg, receiver)
+				port, _ := convert.ToNumber(smtpConfig["port"])
+				password := convert.ToString(smtpConfig["password"])
+				username := convert.ToString(smtpConfig["username"])
+				sender := convert.ToString(smtpConfig["sender"])
+				receiver := convert.ToString(smtpConfig["defaultRecipient"])
+				tls := convert.ToBool(smtpConfig["tls"])
+				return testEmail(host, password, username, int(port), tls, msg, receiver, sender)
 			}
 		}
 
@@ -246,54 +247,66 @@ func testSlack(url, channel, msg string) error {
 	return nil
 }
 
-func testEmail(host, password, username string, port int, requireTLS bool, msg, receiver string) error {
+func testEmail(host, password, username string, port int, requireTLS bool, msg, receiver, sender string) error {
 	var c *smtp.Client
 	smartHost := host + ":" + strconv.Itoa(port)
 
 	timeout := 15 * time.Second
-	if requireTLS {
+	if port == 465 {
 		conn, err := tls.DialWithDialer(&net.Dialer{Timeout: timeout}, "tcp", smartHost, &tls.Config{ServerName: host})
 		if err != nil {
-			return err
+			return fmt.Errorf("Failed to connect smtp server: %v", err)
 		}
 		c, err = smtp.NewClient(conn, smartHost)
 		if err != nil {
-			return err
+			return fmt.Errorf("Failed to connect smtp server: %v", err)
 		}
 
 	} else {
 		conn, err := net.DialTimeout("tcp", smartHost, timeout)
 		if err != nil {
-			return err
+			return fmt.Errorf("Failed to connect smtp server: %v", err)
 		}
 		c, err = smtp.NewClient(conn, smartHost)
 		if err != nil {
-			return err
+			return fmt.Errorf("Failed to connect smtp server: %v", err)
 		}
 	}
 	defer c.Quit()
 
-	if ok, mech := c.Extension("AUTH"); ok {
-		auth, err := auth(mech, username, password)
-		if err != nil {
-			return err
+	if requireTLS {
+		if ok, _ := c.Extension("STARTTLS"); !ok {
+			return fmt.Errorf("Require TLS but %q does not advertise the STARTTLS extension", smartHost)
 		}
-		if auth != nil {
-			if err := c.Auth(auth); err != nil {
-				return fmt.Errorf("%T failed: %s", auth, err)
+		tlsConf := &tls.Config{ServerName: host}
+		if err := c.StartTLS(tlsConf); err != nil {
+			return fmt.Errorf("Starttls failed: %v", err)
+		}
+	}
+
+	if ok, mech := c.Extension("AUTH"); ok {
+		if password != "" && username != "" {
+			auth, err := auth(mech, username, password)
+			if err != nil {
+				return fmt.Errorf("Authentication failed: %v", err)
+			}
+			if auth != nil {
+				if err := c.Auth(auth); err != nil {
+					return fmt.Errorf("Authentication failed: %v", err)
+				}
 			}
 		}
 	}
 
+	if err := c.Mail(sender); err != nil {
+		return fmt.Errorf("Failed to set sender: %v", err)
+	}
+
+	if err := c.Rcpt(receiver); err != nil {
+		return fmt.Errorf("Failed to set recipient: %v", err)
+	}
+
 	if msg != "" {
-		if err := c.Mail(username); err != nil {
-			return fmt.Errorf("fail to set sender: %v", err)
-		}
-
-		if err := c.Rcpt(receiver); err != nil {
-			return fmt.Errorf("fail to set recipient: %v", err)
-		}
-
 		// Data
 		w, err := c.Data()
 		if err != nil {

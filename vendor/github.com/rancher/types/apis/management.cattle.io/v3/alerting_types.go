@@ -135,8 +135,9 @@ type Notification struct {
 type SMTPConfig struct {
 	Host             string `json:"host,omitempty" norman:"required,type=dnsLabel"`
 	Port             int    `json:"port,omitempty" norman:"required,min=1,max=65535,default=465"`
-	Username         string `json:"username,omitempty" norman:"required"`
-	Password         string `json:"password,omitempty" norman:"required"`
+	Username         string `json:"username,omitempty"`
+	Password         string `json:"password,omitempty"`
+	Sender           string `json:"sender,omitempty" norman:"required"`
 	DefaultRecipient string `json:"defaultRecipient,omitempty" norman:"required"`
 	TLS              bool   `json:"tls,omitempty" norman:"required,default=true"`
 }
