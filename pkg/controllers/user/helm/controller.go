@@ -109,15 +109,17 @@ func (l *Lifecycle) Remove(obj *v3.App) (*v3.App, error) {
 	appRevisionClient := l.AppRevisionGetter.AppRevisions(projectName)
 	if obj.Spec.AppRevisionName != "" {
 		currentRevision, err := appRevisionClient.Get(obj.Spec.AppRevisionName, metav1.GetOptions{})
-		if err != nil {
+		if err != nil && !errors.IsNotFound(err) {
 			return obj, err
 		}
-		tc, err := l.TemplateContentClient.Get(currentRevision.Status.Digest, metav1.GetOptions{})
-		if err != nil {
-			return obj, err
-		}
-		if err := kubectlDelete(tc.Data, kubeConfigPath, obj.Spec.TargetNamespace); err != nil {
-			return obj, err
+		if err == nil {
+			tc, err := l.TemplateContentClient.Get(currentRevision.Status.Digest, metav1.GetOptions{})
+			if err != nil {
+				return obj, err
+			}
+			if err := kubectlDelete(tc.Data, kubeConfigPath, obj.Spec.TargetNamespace); err != nil {
+				return obj, err
+			}
 		}
 	} else if obj.Status.LastAppliedTemplates != "" {
 		if err := kubectlDelete(obj.Status.LastAppliedTemplates, kubeConfigPath, obj.Spec.TargetNamespace); err != nil {
