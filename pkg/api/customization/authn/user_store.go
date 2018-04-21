@@ -86,7 +86,7 @@ func hashPassword(data map[string]interface{}) error {
 	if !ok {
 		return errors.New("password not a string")
 	}
-	hashed, err := hashPasswordString(pass)
+	hashed, err := HashPasswordString(pass)
 	if err != nil {
 		return err
 	}
@@ -95,7 +95,7 @@ func hashPassword(data map[string]interface{}) error {
 	return nil
 }
 
-func hashPasswordString(password string) (string, error) {
+func HashPasswordString(password string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return "", errors.Wrap(err, "problem encrypting password")
