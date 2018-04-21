@@ -32,7 +32,7 @@ func getEtcdClient(ctx context.Context, etcdHost *hosts.Host, localConnDialerFac
 	}
 
 	cfg := etcdclient.Config{
-		Endpoints: []string{"https://127.0.0.1:2379"},
+		Endpoints: []string{"https://" + etcdHost.InternalAddress + ":2379"},
 		Transport: DefaultEtcdTransport,
 	}
 

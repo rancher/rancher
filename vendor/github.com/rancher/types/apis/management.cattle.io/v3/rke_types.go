@@ -95,16 +95,6 @@ type RKESystemImages struct {
 	Ingress string `yaml:"ingress" json:"ingress,omitempty"`
 	// Ingress Controller Backend image
 	IngressBackend string `yaml:"ingress_backend" json:"ingressBackend,omitempty"`
-	// Dashboard image
-	Dashboard string `yaml:"dashboard" json:"dashboard,omitempty"`
-	// Heapster addon image
-	Heapster string `yaml:"heapster" json:"heapster,omitempty"`
-	// Grafana image for heapster addon
-	Grafana string `yaml:"grafana" json:"grafana,omitempty"`
-	// Influxdb image for heapster addon
-	Influxdb string `yaml:"influxdb" json:"influxdb,omitempty"`
-	// Tiller addon image
-	Tiller string `yaml:"tiller" json:"tiller,omitempty"`
 }
 
 type RKEConfigNode struct {
