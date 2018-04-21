@@ -85,3 +85,14 @@ pipeline:
       status: success
       branch: master
       event: tag
+
+  github_binary_release:
+    image: plugins/github-release
+    files:
+     - bin/*
+    checksum:
+     - sha256
+    secrets: [github_token]
+    when:
+      branch: master
+      event: tag

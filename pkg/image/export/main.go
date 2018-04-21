@@ -13,15 +13,19 @@ import (
 )
 
 func main() {
-	if err := run(); err != nil {
+	if err := run(os.Args[1:]...); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run() error {
+func run(images ...string) error {
 	targetImages, err := collectionImages(v3.K8sVersionToRKESystemImages, v3.ToolsSystemImages)
 	if err != nil {
 		return err
+	}
+
+	for _, i := range images {
+		targetImages = append(targetImages, image.Mirror(i))
 	}
 
 	err = imagesText(targetImages)
@@ -43,8 +47,8 @@ func run() error {
 }
 
 func loadScript(targetImages []string) error {
-	log.Println("Creating load-images.sh")
-	load, err := os.Create("load-images.sh")
+	log.Println("Creating rancher-load-images.sh")
+	load, err := os.Create("rancher-load-images.sh")
 	if err != nil {
 		return err
 	}
@@ -86,8 +90,8 @@ func saveImages(targetImages []string) []string {
 }
 
 func saveScript(targetImages []string) error {
-	log.Println("Creating save-images.sh")
-	save, err := os.Create("save-images.sh")
+	log.Println("Creating rancher-save-images.sh")
+	save, err := os.Create("rancher-save-images.sh")
 	if err != nil {
 		return err
 	}
@@ -96,7 +100,7 @@ func saveScript(targetImages []string) error {
 
 	fmt.Fprintf(save, "#!/bin/sh\nset -e -x\n\n")
 
-	for _, targetImage := range targetImages {
+	for _, targetImage := range saveImages(targetImages) {
 		fmt.Fprintf(save, "docker pull %s\n", targetImage)
 	}
 
@@ -124,8 +128,8 @@ func imagesText(targetImages []string) error {
 }
 
 func mirrorScript(targetImages []string) error {
-	log.Println("Creating mirror-to-rancher-org.sh")
-	mirror, err := os.Create("mirror-to-rancher-org.sh")
+	log.Println("Creating rancher-mirror-to-rancher-org.sh")
+	mirror, err := os.Create("rancher-mirror-to-rancher-org.sh")
 	if err != nil {
 		return err
 	}
