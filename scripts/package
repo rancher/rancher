@@ -25,3 +25,7 @@ docker build --build-arg VERSION=${TAG} -t ${AGENT_IMAGE} -f Dockerfile.agent .
 echo ${IMAGE} > ../dist/images
 echo ${AGENT_IMAGE} >> ../dist/images
 echo Built ${IMAGE} #${AGENT_IMAGE}
+echo
+
+cd ../bin
+go run ../pkg/image/export/main.go

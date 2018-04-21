@@ -4,12 +4,12 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/manager"
+	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/types/apis/apps/v1beta2"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
-
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v2"
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -211,7 +211,7 @@ func getDeployment() *appsv1beta2.Deployment {
 					Containers: []corev1.Container{
 						{
 							Name:  "alertmanager",
-							Image: v3.ToolsSystemImages.AlertSystemImages.AlertManager,
+							Image: image.Resolve(v3.ToolsSystemImages.AlertSystemImages.AlertManager),
 							Args:  []string{"-config.file=/etc/alertmanager/config.yml", "-storage.path=/alertmanager"},
 							Ports: []corev1.ContainerPort{
 								{
@@ -232,7 +232,7 @@ func getDeployment() *appsv1beta2.Deployment {
 						},
 						{
 							Name:    "alertmanager-helper",
-							Image:   v3.ToolsSystemImages.AlertSystemImages.AlertManagerHelper,
+							Image:   image.Resolve(v3.ToolsSystemImages.AlertSystemImages.AlertManagerHelper),
 							Command: []string{"alertmanager-helper"},
 							Args:    []string{"--watched-file-list", "/etc/alertmanager"},
 							VolumeMounts: []corev1.VolumeMount{

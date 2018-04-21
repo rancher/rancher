@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/engine/jenkins"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/utils"
+	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/randomtoken"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -57,7 +58,7 @@ func getJenkinsService() *corev1.Service {
 }
 
 func getConfigMap() *corev1.ConfigMap {
-	jenkinsConfig := fmt.Sprintf(JenkinsConfig, v3.ToolsSystemImages.PipelineSystemImages.JenkinsJnlp)
+	jenkinsConfig := fmt.Sprintf(JenkinsConfig, image.Resolve(v3.ToolsSystemImages.PipelineSystemImages.JenkinsJnlp))
 
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -121,7 +122,7 @@ func getJenkinsDeployment() *appsv1beta2.Deployment {
 					InitContainers: []corev1.Container{
 						{
 							Name:            "jenkins-config",
-							Image:           v3.ToolsSystemImages.PipelineSystemImages.Jenkins,
+							Image:           image.Resolve(v3.ToolsSystemImages.PipelineSystemImages.Jenkins),
 							ImagePullPolicy: corev1.PullAlways,
 							Command:         []string{"sh", "/var/jenkins_config/apply_config.sh"},
 							VolumeMounts: []corev1.VolumeMount{
@@ -143,7 +144,7 @@ func getJenkinsDeployment() *appsv1beta2.Deployment {
 					Containers: []corev1.Container{
 						{
 							Name:            "jenkins",
-							Image:           v3.ToolsSystemImages.PipelineSystemImages.Jenkins,
+							Image:           image.Resolve(v3.ToolsSystemImages.PipelineSystemImages.Jenkins),
 							ImagePullPolicy: corev1.PullAlways,
 							Env: []corev1.EnvVar{
 								{

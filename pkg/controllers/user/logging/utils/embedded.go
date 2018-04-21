@@ -4,14 +4,16 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
+	"github.com/rancher/rancher/pkg/image"
 	rv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
 	rv1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	rrbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
-	v1beta2 "k8s.io/api/apps/v1beta2"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/apps/v1beta2"
+	"k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -19,8 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/intstr"
-
-	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 )
 
 const (
@@ -558,7 +558,7 @@ func newESDeployment(namespace string, obj *v3.ClusterLogging) *v1beta2.Deployme
 					InitContainers: []v1.Container{
 						{
 							Name:            "init-sysctl",
-							Image:           v3.ToolsSystemImages.LoggingSystemImages.Busybox,
+							Image:           image.Resolve(v3.ToolsSystemImages.LoggingSystemImages.Busybox),
 							ImagePullPolicy: v1.PullIfNotPresent,
 							Command:         []string{"sysctl", "-w", "vm.max_map_count=262144"},
 							SecurityContext: &v1.SecurityContext{
@@ -574,7 +574,7 @@ func newESDeployment(namespace string, obj *v3.ClusterLogging) *v1beta2.Deployme
 									Add: []v1.Capability{"IPC_LOCK"},
 								},
 							},
-							Image: v3.ToolsSystemImages.LoggingSystemImages.Elaticsearch,
+							Image: image.Resolve(v3.ToolsSystemImages.LoggingSystemImages.Elaticsearch),
 							Env: []v1.EnvVar{
 								{
 									Name:  "KUBERNETES_CA_CERTIFICATE_FILE",
@@ -678,7 +678,7 @@ func newKibanaDeployment(namespace string) *v1beta2.Deployment {
 					Containers: []v1.Container{
 						{
 							Name:  loggingconfig.EmbeddedKibanaName,
-							Image: v3.ToolsSystemImages.LoggingSystemImages.Kibana,
+							Image: image.Resolve(v3.ToolsSystemImages.LoggingSystemImages.Kibana),
 							Ports: []v1.ContainerPort{
 								{
 									Name:          "http",
