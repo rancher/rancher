@@ -376,25 +376,32 @@ func getSystemImages(spec v3.ClusterSpec) (*v3.RKESystemImages, error) {
 		return nil, fmt.Errorf("Failed to find system images for version %v", version)
 	}
 
-	if len(spec.RancherKubernetesEngineConfig.PrivateRegistries) == 0 {
+	privateRegistry := getPrivateRepo(spec.RancherKubernetesEngineConfig)
+	if privateRegistry == "" {
 		return &systemImages, nil
 	}
 
 	// prepend private repo
-	privateRegistry := spec.RancherKubernetesEngineConfig.PrivateRegistries[0]
 	imagesMap, err := convert.EncodeToMap(systemImages)
 	if err != nil {
 		return nil, err
 	}
 	updatedMap := make(map[string]interface{})
 	for key, value := range imagesMap {
-		newValue := fmt.Sprintf("%s/%s", privateRegistry.URL, value)
+		newValue := fmt.Sprintf("%s/%s", privateRegistry, value)
 		updatedMap[key] = newValue
 	}
 	if err := mapstructure.Decode(updatedMap, &systemImages); err != nil {
 		return nil, err
 	}
 	return &systemImages, nil
+}
+
+func getPrivateRepo(config *v3.RancherKubernetesEngineConfig) string {
+	if len(config.PrivateRegistries) > 0 {
+		return config.PrivateRegistries[0].URL
+	}
+	return settings.SystemDefaultRegistry.Get()
 }
 
 func (p *Provisioner) getSpec(cluster *v3.Cluster) (*v3.ClusterSpec, error) {
