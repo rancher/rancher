@@ -247,7 +247,7 @@ func generateDNSName(workloadName, dnsName string) bool {
 		return true
 	}
 	// regenerate the name in case port type got changed
-	if strings.HasPrefix(dnsName, fmt.Sprintf("%s-", workloadName)) {
+	if strings.EqualFold(dnsName, workloadName) || strings.HasPrefix(dnsName, fmt.Sprintf("%s-", workloadName)) {
 		return true
 	}
 	return false
