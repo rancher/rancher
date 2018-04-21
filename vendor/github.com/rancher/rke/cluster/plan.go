@@ -537,13 +537,19 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host, pr
 		"--client-cert-auth",
 	}
 
+	// If InternalAddress is not explicitly set, it's set to the same value as Address. This is all good until we deploy on a host with a DNATed public address like AWS, in that case we can't bind to that address so we fall back to 0.0.0.0
+	listenAddress := host.InternalAddress
+	if host.Address == host.InternalAddress {
+		listenAddress = "0.0.0.0"
+	}
+
 	CommandArgs := map[string]string{
 		"name":                        "etcd-" + host.HostnameOverride,
 		"data-dir":                    "/var/lib/rancher/etcd",
 		"advertise-client-urls":       "https://" + host.InternalAddress + ":2379,https://" + host.InternalAddress + ":4001",
-		"listen-client-urls":          "https://" + host.InternalAddress + ":2379",
+		"listen-client-urls":          "https://" + listenAddress + ":2379",
 		"initial-advertise-peer-urls": "https://" + host.InternalAddress + ":2380",
-		"listen-peer-urls":            "https://" + host.InternalAddress + ":2380",
+		"listen-peer-urls":            "https://" + listenAddress + ":2380",
 		"initial-cluster-token":       "etcd-cluster-1",
 		"initial-cluster":             initCluster,
 		"initial-cluster-state":       clusterState,
@@ -572,9 +578,8 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host, pr
 	}
 
 	Binds = append(Binds, c.Services.Etcd.ExtraBinds...)
-
 	healthCheck := v3.HealthCheck{
-		URL: services.EtcdHealthCheckURL,
+		URL: fmt.Sprintf("https://%s:2379/health", host.InternalAddress),
 	}
 	registryAuthConfig, _, _ := docker.GetImageRegistryConfig(c.Services.Etcd.Image, c.PrivateRegistriesMap)
 
