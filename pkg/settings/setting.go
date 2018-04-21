@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 
 	"github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/pborman/uuid"
 )
 
 var (
@@ -34,12 +33,13 @@ var (
 	UIPL                            = newSetting("ui-pl", "rancher")
 	WhitelistDomain                 = newSetting("whitelist-domain", "forums.rancher.com")
 	FirstLogin                      = newSetting("first-login", "true")
-	InstallUUID						= newSetting("install-uuid", "")
+	InstallUUID                     = newSetting("install-uuid", "")
 )
 
 type Provider interface {
 	Get(name string) string
 	Set(name, value string) error
+	SetIfUnset(name, value string) error
 	SetAll(settings map[string]Setting) error
 }
 
@@ -47,6 +47,13 @@ type Setting struct {
 	Name     string
 	Default  string
 	ReadOnly bool
+}
+
+func (s Setting) SetIfUnset(value string) error {
+	if provider == nil {
+		return s.Set(value)
+	}
+	return provider.SetIfUnset(s.Name, value)
 }
 
 func (s Setting) Set(value string) error {
