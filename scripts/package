@@ -16,6 +16,10 @@ if echo $TAG | grep -q dirty; then
     TAG=dev
 fi
 
+if [ -n "$DRONE_TAG" ]; then
+    TAG=$DRONE_TAG
+fi
+
 cp ../bin/rancher ../bin/agent .
 
 IMAGE=${REPO}/server:${TAG}
@@ -28,4 +32,4 @@ echo Built ${IMAGE} #${AGENT_IMAGE}
 echo
 
 cd ../bin
-go run ../pkg/image/export/main.go
+go run ../pkg/image/export/main.go $IMAGE $AGENT_IMAGE
