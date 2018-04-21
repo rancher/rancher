@@ -9,6 +9,7 @@ kind: Job
 metadata:
   name: {{$addonName}}-deploy-job
 spec:
+  backoffLimit: 10
   template:
     metadata:
        name: pi

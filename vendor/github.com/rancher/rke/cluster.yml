@@ -121,10 +121,10 @@ addons_include:
 system_images:
   etcd: rancher/etcd:v3.0.17
   kubernetes: rancher/k8s:v1.8.9-rancher1-1
-  alpine: alpine:latest
-  nginx_proxy: rancher/rke-nginx-proxy:v0.1.1
-  cert_downloader: rancher/rke-cert-deployer:v0.1.1
-  kubernetes_services_sidecar: rancher/rke-service-sidekick:v0.1.0
+  alpine: rancher/rke-tools:v0.1.2
+  nginx_proxy: rancher/rke-tools:v0.1.2
+  cert_downloader: rancher/rke-tools:v0.1.2
+  kubernetes_services_sidecar: rancher/rke-tools:v0.1.2
   kubedns: rancher/k8s-dns-kube-dns-amd64:1.14.5
   dnsmasq: rancher/k8s-dns-dnsmasq-nanny-amd64:1.14.5
   kubedns_sidecar: rancher/k8s-dns-sidecar-amd64:1.14.5
