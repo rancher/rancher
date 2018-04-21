@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	defaultURL    = "https://github.com/rancher/rancher-charts"
-	defaultBranch = "2.0"
+	defaultURL    = "https://github.com/rancher/charts"
+	defaultBranch = "master"
 )
 
 func addCatalogs(management *config.ManagementContext) error {
