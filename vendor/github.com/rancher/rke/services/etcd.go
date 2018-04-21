@@ -16,10 +16,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	EtcdHealthCheckURL = "https://127.0.0.1:2379/health"
-)
-
 func RunEtcdPlane(ctx context.Context, etcdHosts []*hosts.Host, etcdNodePlanMap map[string]v3.RKEConfigNodePlan, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, updateWorkersOnly bool, alpineImage string) error {
 	log.Infof(ctx, "[%s] Building up etcd plane..", ETCDRole)
 	for _, host := range etcdHosts {

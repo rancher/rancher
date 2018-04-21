@@ -8,9 +8,13 @@ import (
 
 	"github.com/rancher/kontainer-engine/cluster"
 	"github.com/rancher/kontainer-engine/drivers"
+	"github.com/rancher/kontainer-engine/drivers/aks"
+	"github.com/rancher/kontainer-engine/drivers/eks"
+	"github.com/rancher/kontainer-engine/drivers/gke"
+	"github.com/rancher/kontainer-engine/drivers/import"
+	"github.com/rancher/kontainer-engine/drivers/rke"
 	"github.com/rancher/kontainer-engine/types"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
 
@@ -21,14 +25,7 @@ var (
 
 func Start() error {
 	for name, driver := range drivers.Drivers {
-		logrus.Infof("Activating driver %s", name)
-		addr := make(chan string)
-		go types.NewServer(driver, addr).Serve()
-
 		Drivers[name] = driver
-		listenAddr := <-addr
-		pluginAddress[name] = listenAddr
-		logrus.Infof("Activating driver %s done", name)
 	}
 	return nil
 }
@@ -185,7 +182,28 @@ func (e *engineService) convertCluster(name string, spec v3.ClusterSpec) (cluste
 		clusterSpec: spec,
 		clusterName: name,
 	}
-	clusterPlugin, err := cluster.NewCluster(driverName, pluginAddr, name, configGetter, e.store)
+	var driver types.Driver
+	if _, ok := drivers.Drivers[driverName]; !ok {
+		rpcClient, err := types.NewClient(driverName, pluginAddr)
+		if err != nil {
+			return cluster.Cluster{}, err
+		}
+		driver = rpcClient
+	} else {
+		switch driverName {
+		case "gke":
+			driver = gke.NewDriver()
+		case "aks":
+			driver = aks.NewDriver()
+		case "eks":
+			driver = eks.NewDriver()
+		case "import":
+			driver = kubeimport.NewDriver()
+		case "rke":
+			driver = rke.NewDriver()
+		}
+	}
+	clusterPlugin, err := cluster.NewCluster(driverName, name, configGetter, e.store, driver)
 	if err != nil {
 		return cluster.Cluster{}, err
 	}
