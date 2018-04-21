@@ -48,6 +48,21 @@ func (s *settingsProvider) Set(name, value string) error {
 	return err
 }
 
+func (s *settingsProvider) SetIfUnset(name, value string) error {
+	obj, err := s.settings.Get(name, v1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	if obj.Value != "" {
+		return nil
+	}
+
+	obj.Value = value
+	_, err = s.settings.Update(obj)
+	return err
+}
+
 func (s *settingsProvider) SetAll(settings map[string]settings.Setting) error {
 	fallback := map[string]string{}
 
