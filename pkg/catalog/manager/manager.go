@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/rancher/rancher/pkg/settings"
 )
 
 const (
@@ -37,8 +38,7 @@ type Manager struct {
 }
 
 func New(management *config.ManagementContext, cacheRoot string) *Manager {
-	// todo: figure out uuid
-	uuid := "9bf84dcd-8011-4f21-a24e-fc0c979026a3"
+	uuid := settings.InstallUUID.Get()
 	return &Manager{
 		cacheRoot: cacheRoot,
 		httpClient: http.Client{
