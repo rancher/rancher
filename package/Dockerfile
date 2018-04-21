@@ -12,7 +12,8 @@ RUN curl -sLf https://github.com/rancher/machine-package/releases/download/v0.14
     chmod +x /usr/bin/helm
 RUN mkdir /root/.kube && \
     ln -s /usr/bin/rancher /usr/bin/kubectl && \
-    ln -s /var/lib/rancher/kube_config_cluster.yml /root/.kube/config
+    ln -s /var/lib/rancher/kube_config_cluster.yml /root/.kube/config && \
+    ln -s /usr/bin/rancher /usr/bin/reset-password
 WORKDIR /var/lib/rancher
 
 RUN mkdir /opt/rke

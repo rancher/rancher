@@ -85,7 +85,7 @@ func (h *Handler) changePassword(actionName string, action *types.Action, reques
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid current password")
 	}
 
-	newPassHash, err := hashPasswordString(newPass)
+	newPassHash, err := HashPasswordString(newPass)
 	if err != nil {
 		return err
 	}

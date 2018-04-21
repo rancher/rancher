@@ -27,6 +27,7 @@ var (
 )
 
 func main() {
+	app.RegisterPasswordResetCommand()
 	if reexec.Init() {
 		return
 	}
