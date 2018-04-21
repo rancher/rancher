@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/pborman/uuid"
 )
 
 var (
@@ -33,6 +34,7 @@ var (
 	UIPL                            = newSetting("ui-pl", "rancher")
 	WhitelistDomain                 = newSetting("whitelist-domain", "forums.rancher.com")
 	FirstLogin                      = newSetting("first-login", "true")
+	InstallUUID						= newSetting("install-uuid", "")
 )
 
 type Provider interface {
