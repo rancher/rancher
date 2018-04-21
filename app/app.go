@@ -133,7 +133,7 @@ func addData(management *config.ManagementContext, cfg Config) error {
 		return err
 	}
 
-	if err := addSetting(management); err != nil {
+	if err := addSetting(); err != nil {
 		return err
 	}
 
