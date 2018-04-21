@@ -15,15 +15,11 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/catalog/git"
 	"github.com/rancher/rancher/pkg/catalog/helm"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"github.com/rancher/rancher/pkg/settings"
-)
-
-const (
-	HelmTemplateBaseType = "kubernetes"
 )
 
 type Manager struct {

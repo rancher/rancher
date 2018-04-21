@@ -96,10 +96,7 @@ func (m *Manager) createTemplate(template v3.Template, catalog *v3.Catalog, tagM
 	if err != nil {
 		return errors.Wrapf(err, "failed to create template %s", template.Name)
 	}
-	if err := m.createTemplateVersions(versionFiles, createdTemplate, tagMap); err != nil {
-		return err
-	}
-	return nil
+	return m.createTemplateVersions(versionFiles, createdTemplate, tagMap)
 }
 
 func (m *Manager) getTemplateMap(catalogName string) (map[string]v3.Template, error) {
