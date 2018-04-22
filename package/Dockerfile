@@ -19,7 +19,6 @@ RUN mkdir /opt/rke
 COPY --from=sidekick /opt/rke /opt/rke
 COPY --from=k8s /usr/bin/kubelet /usr/bin/kube-proxy /usr/bin/
 
-ENV DISABLE_HTTP2 true
 ENV CATTLE_UI_PATH /usr/share/rancher/ui
 ENV CATTLE_UI_VERSION 2.0.35
 ENV CATTLE_CLI_VERSION v1.0.0-alpha13
