@@ -183,7 +183,6 @@ type NodeSpec struct {
 	Description            string            `json:"description,omitempty"`
 	DisplayName            string            `json:"displayName"`
 	RequestedHostname      string            `json:"requestedHostname,omitempty" norman:"type=dnsLabel,nullable,noupdate,required"`
-	ClusterName            string            `json:"clusterName,omitempty" norman:"type=reference[cluster],noupdate,required"`
 	InternalNodeSpec       v1.NodeSpec       `json:"internalNodeSpec"`
 	DesiredNodeLabels      map[string]string `json:"desiredNodeLabels,omitempty"`
 	DesiredNodeAnnotations map[string]string `json:"desiredNodeAnnotations,omitempty"`

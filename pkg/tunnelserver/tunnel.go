@@ -221,7 +221,6 @@ func (t *Authorizer) createNode(inNode *client.Node, cluster *v3.Cluster, req *h
 			Etcd:              inNode.Etcd,
 			ControlPlane:      inNode.ControlPlane,
 			Worker:            inNode.Worker,
-			ClusterName:       cluster.Name,
 			RequestedHostname: inNode.RequestedHostname,
 			CustomConfig:      customConfig,
 			Imported:          true,

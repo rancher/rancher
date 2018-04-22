@@ -29,7 +29,7 @@ func newPT(clusterManager *clustermanager.Manager, scaledContext *config.ScaledC
 			if name == "" {
 				return nil, nil
 			}
-			return []string{ref.FromStrings(node.Spec.ClusterName, name)}, nil
+			return []string{ref.FromStrings(node.Namespace, name)}, nil
 		},
 	})
 

@@ -108,7 +108,6 @@ func (c *Controller) createNode(name string, nodePool *v3.NodePool, simulate boo
 			NodeTemplateName:  nodePool.Spec.NodeTemplateName,
 			NodePoolName:      ref.Ref(nodePool),
 			RequestedHostname: name,
-			ClusterName:       nodePool.Namespace,
 		},
 	}
 
