@@ -438,9 +438,11 @@ func (c *Cluster) BuildProxyProcess() v3.Process {
 
 	registryAuthConfig, _, _ := docker.GetImageRegistryConfig(c.SystemImages.NginxProxy, c.PrivateRegistriesMap)
 	return v3.Process{
-		Name:          services.NginxProxyContainerName,
-		Env:           Env,
-		Args:          []string{"nginx-proxy"},
+		Name: services.NginxProxyContainerName,
+		Env:  Env,
+		// we do this to force container update when CP hosts change.
+		Args:          Env,
+		Command:       []string{"nginx-proxy"},
 		NetworkMode:   "host",
 		RestartPolicy: "always",
 		HealthCheck:   v3.HealthCheck{},
