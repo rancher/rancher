@@ -2,7 +2,6 @@ package client
 
 const (
 	NodeSpecType                        = "nodeSpec"
-	NodeSpecFieldClusterId              = "clusterId"
 	NodeSpecFieldControlPlane           = "controlPlane"
 	NodeSpecFieldCustomConfig           = "customConfig"
 	NodeSpecFieldDescription            = "description"
@@ -22,7 +21,6 @@ const (
 )
 
 type NodeSpec struct {
-	ClusterId              string            `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	ControlPlane           bool              `json:"controlPlane,omitempty" yaml:"controlPlane,omitempty"`
 	CustomConfig           *CustomConfig     `json:"customConfig,omitempty" yaml:"customConfig,omitempty"`
 	Description            string            `json:"description,omitempty" yaml:"description,omitempty"`
