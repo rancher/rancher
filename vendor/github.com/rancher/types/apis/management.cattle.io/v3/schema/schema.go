@@ -215,6 +215,7 @@ func nodeTypes(schemas *types.Schemas) *types.Schemas {
 			&m.Drop{Field: "desiredNodeLabels"},
 			&m.Drop{Field: "desiredNodeAnnotations"},
 			&m.AnnotationField{Field: "publicEndpoints", List: true},
+			m.Copy{From: "namespaceId", To: "clusterName"},
 			m.DisplayName{}).
 		AddMapperForType(&Version, v3.NodeDriver{}, m.DisplayName{}).
 		AddMapperForType(&Version, v3.NodeTemplate{}, m.DisplayName{}).
@@ -225,7 +226,9 @@ func nodeTypes(schemas *types.Schemas) *types.Schemas {
 			labelField.Create = true
 			labelField.Update = true
 			schema.ResourceFields["labels"] = labelField
-
+			clusterField := schema.ResourceFields["clusterId"]
+			clusterField.Type = "reference[cluster]"
+			schema.ResourceFields["clusterId"] = clusterField
 		}, struct {
 			PublicEndpoints string `json:"publicEndpoints" norman:"type=array[publicEndpoint],nocreate,noupdate"`
 		}{}).

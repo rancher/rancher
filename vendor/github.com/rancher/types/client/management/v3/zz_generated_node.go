@@ -9,6 +9,7 @@ const (
 	NodeFieldAllocatable          = "allocatable"
 	NodeFieldAnnotations          = "annotations"
 	NodeFieldCapacity             = "capacity"
+	NodeFieldClusterId            = "clusterId"
 	NodeFieldConditions           = "conditions"
 	NodeFieldControlPlane         = "controlPlane"
 	NodeFieldCreated              = "created"
@@ -54,6 +55,7 @@ type Node struct {
 	Allocatable          map[string]string         `json:"allocatable,omitempty" yaml:"allocatable,omitempty"`
 	Annotations          map[string]string         `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Capacity             map[string]string         `json:"capacity,omitempty" yaml:"capacity,omitempty"`
+	ClusterId            string                    `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	Conditions           []NodeCondition           `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	ControlPlane         bool                      `json:"controlPlane,omitempty" yaml:"controlPlane,omitempty"`
 	Created              string                    `json:"created,omitempty" yaml:"created,omitempty"`
