@@ -63,7 +63,11 @@ func (c *Cluster) GetClusterState(ctx context.Context) (*Cluster, error) {
 			if err := currentCluster.InvertIndexHosts(); err != nil {
 				return nil, fmt.Errorf("Failed to classify hosts from fetched cluster: %v", err)
 			}
-			currentCluster.Certificates, err = getClusterCerts(ctx, c.KubeClient, currentCluster.EtcdHosts)
+			activeEtcdHosts := currentCluster.EtcdHosts
+			for _, inactiveHost := range c.InactiveHosts {
+				activeEtcdHosts = removeFromHosts(inactiveHost, activeEtcdHosts)
+			}
+			currentCluster.Certificates, err = getClusterCerts(ctx, c.KubeClient, activeEtcdHosts)
 			currentCluster.DockerDialerFactory = c.DockerDialerFactory
 			currentCluster.LocalConnDialerFactory = c.LocalConnDialerFactory
 			if err != nil {
