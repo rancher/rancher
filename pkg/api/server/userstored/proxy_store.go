@@ -1,10 +1,12 @@
 package userstored
 
 import (
+	"context"
 	"strings"
 
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/api/store/sharewatch"
 	clusterSchema "github.com/rancher/types/apis/cluster.cattle.io/v3/schema"
 	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	"github.com/rancher/types/config"
@@ -12,7 +14,7 @@ import (
 
 type storeWrapperFunc func(types.Store) types.Store
 
-func addProxyStore(schemas *types.Schemas, context *config.ScaledContext, schemaType, apiVersion string, storeWrapper storeWrapperFunc) *types.Schema {
+func addProxyStore(ctx context.Context, schemas *types.Schemas, context *config.ScaledContext, schemaType, apiVersion string, storeWrapper storeWrapperFunc) *types.Schema {
 	s := schemas.Schema(&schema.Version, schemaType)
 	if s == nil {
 		s = schemas.Schema(&clusterSchema.Version, schemaType)
@@ -44,6 +46,11 @@ func addProxyStore(schemas *types.Schemas, context *config.ScaledContext, schema
 		version,
 		kind,
 		plural)
+
+	s.Store = &sharewatch.WatchShare{
+		Store: s.Store,
+		Close: ctx,
+	}
 
 	if storeWrapper != nil {
 		s.Store = storeWrapper(s.Store)
