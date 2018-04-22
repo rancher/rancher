@@ -13,11 +13,11 @@ import (
 
 	"github.com/docker/docker/pkg/reexec"
 	"github.com/ehazlett/simplelog"
-	"github.com/leodotcloud/log/server"
 	"github.com/rancher/norman/pkg/dump"
 	"github.com/rancher/norman/signal"
 	"github.com/rancher/rancher/app"
 	"github.com/rancher/rancher/k8s"
+	"github.com/rancher/rancher/pkg/logserver"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
@@ -125,7 +125,7 @@ func initLogs(c *cli.Context, cfg app.Config) {
 		logrus.SetFormatter(&logrus.JSONFormatter{})
 	}
 	logrus.SetOutput(os.Stdout)
-	server.StartServerWithDefaults()
+	logserver.StartServerWithDefaults()
 }
 
 func run(cfg app.Config) error {
