@@ -26,6 +26,7 @@ type WorkloadEndpointsController struct {
 	podLister          v1.PodLister
 	WorkloadController workloadutil.CommonController
 	machinesLister     managementv3.NodeLister
+	nodeLister         v1.NodeLister
 	clusterName        string
 	isRKE              bool
 }
@@ -74,7 +75,7 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 	if err != nil {
 		return err
 	}
-	nodeNameToMachine, err := getNodeNameToMachine(c.clusterName, c.machinesLister)
+	nodeNameToMachine, err := getNodeNameToMachine(c.clusterName, c.machinesLister, c.nodeLister)
 	if err != nil {
 		return err
 	}

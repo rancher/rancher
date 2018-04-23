@@ -61,7 +61,7 @@ func (n *NodesController) reconcileEndpontsForNode(node *corev1.Node) (bool, err
 	if err != nil {
 		return false, err
 	}
-	nodeNameToMachine, err := getNodeNameToMachine(n.clusterName, n.machinesLister)
+	nodeNameToMachine, err := getNodeNameToMachine(n.clusterName, n.machinesLister, n.nodeLister)
 	if err != nil {
 		return false, err
 	}
