@@ -200,7 +200,12 @@ func (s *tokenAPIServer) deleteToken(tokenAuthValue string) (int, error) {
 			return 401, err
 		}
 	}
-	err = s.tokensClient.Delete(storedToken.ObjectMeta.Name, &metav1.DeleteOptions{})
+
+	return s.deleteTokenByName(storedToken.Name)
+}
+
+func (s *tokenAPIServer) deleteTokenByName(tokenName string) (int, error) {
+	err := s.tokensClient.Delete(tokenName, &metav1.DeleteOptions{})
 	if err != nil {
 		if e2, ok := err.(*errors.StatusError); ok && e2.Status().Code == 404 {
 			return 0, nil
@@ -227,7 +232,7 @@ func (s *tokenAPIServer) getTokenByID(tokenAuthValue string, tokenID string) (v3
 	}
 
 	if token.UserID != storedToken.UserID {
-		return v3.Token{}, 403, fmt.Errorf("access denied: cannot get token")
+		return v3.Token{}, 404, fmt.Errorf("%v not found", tokenID)
 	}
 
 	if IsExpired(*token) {
