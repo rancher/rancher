@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/norman/restwatch"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/norman/types/convert/merge"
 	"github.com/rancher/norman/types/values"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -326,7 +327,7 @@ func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	}
 
 	p.toInternal(schema.Mapper, data)
-	existing = convert.APIUpdateMerge(existing, data, apiContext.Query.Get("_replace") == "true")
+	existing = merge.APIUpdateMerge(schema.InternalSchema, apiContext.Schemas, existing, data, apiContext.Query.Get("_replace") == "true")
 
 	values.PutValue(existing, resourceVersion, "metadata", "resourceVersion")
 	values.PutValue(existing, namespace, "metadata", "namespace")
