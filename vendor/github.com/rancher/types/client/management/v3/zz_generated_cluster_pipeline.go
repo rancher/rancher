@@ -12,6 +12,7 @@ const (
 	ClusterPipelineFieldCreatorID            = "creatorId"
 	ClusterPipelineFieldDeploy               = "deploy"
 	ClusterPipelineFieldGithubConfig         = "githubConfig"
+	ClusterPipelineFieldGitlabConfig         = "gitlabConfig"
 	ClusterPipelineFieldLabels               = "labels"
 	ClusterPipelineFieldName                 = "name"
 	ClusterPipelineFieldNamespaceId          = "namespaceId"
@@ -31,7 +32,8 @@ type ClusterPipeline struct {
 	Created              string                 `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string                 `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Deploy               bool                   `json:"deploy,omitempty" yaml:"deploy,omitempty"`
-	GithubConfig         *GithubClusterConfig   `json:"githubConfig,omitempty" yaml:"githubConfig,omitempty"`
+	GithubConfig         *GitAppConfig          `json:"githubConfig,omitempty" yaml:"githubConfig,omitempty"`
+	GitlabConfig         *GitAppConfig          `json:"gitlabConfig,omitempty" yaml:"gitlabConfig,omitempty"`
 	Labels               map[string]string      `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                 string                 `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId          string                 `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`

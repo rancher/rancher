@@ -80,15 +80,16 @@ type SourceCodeRepository struct {
 }
 
 type ClusterPipelineSpec struct {
-	ClusterName  string               `json:"clusterName" norman:"type=reference[cluster]"`
-	Deploy       bool                 `json:"deploy"`
-	GithubConfig *GithubClusterConfig `json:"githubConfig,omitempty"`
+	ClusterName  string        `json:"clusterName" norman:"type=reference[cluster]"`
+	Deploy       bool          `json:"deploy"`
+	GithubConfig *GitAppConfig `json:"githubConfig,omitempty"`
+	GitlabConfig *GitAppConfig `json:"gitlabConfig,omitempty"`
 }
 
 type ClusterPipelineStatus struct {
 }
 
-type GithubClusterConfig struct {
+type GitAppConfig struct {
 	TLS          bool   `json:"tls,omitempty"`
 	Host         string `json:"host,omitempty"`
 	ClientID     string `json:"clientId,omitempty"`

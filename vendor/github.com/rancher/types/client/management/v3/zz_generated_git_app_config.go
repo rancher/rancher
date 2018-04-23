@@ -1,15 +1,15 @@
 package client
 
 const (
-	GithubClusterConfigType              = "githubClusterConfig"
-	GithubClusterConfigFieldClientID     = "clientId"
-	GithubClusterConfigFieldClientSecret = "clientSecret"
-	GithubClusterConfigFieldHost         = "host"
-	GithubClusterConfigFieldRedirectURL  = "redirectUrl"
-	GithubClusterConfigFieldTLS          = "tls"
+	GitAppConfigType              = "gitAppConfig"
+	GitAppConfigFieldClientID     = "clientId"
+	GitAppConfigFieldClientSecret = "clientSecret"
+	GitAppConfigFieldHost         = "host"
+	GitAppConfigFieldRedirectURL  = "redirectUrl"
+	GitAppConfigFieldTLS          = "tls"
 )
 
-type GithubClusterConfig struct {
+type GitAppConfig struct {
 	ClientID     string `json:"clientId,omitempty" yaml:"clientId,omitempty"`
 	ClientSecret string `json:"clientSecret,omitempty" yaml:"clientSecret,omitempty"`
 	Host         string `json:"host,omitempty" yaml:"host,omitempty"`
