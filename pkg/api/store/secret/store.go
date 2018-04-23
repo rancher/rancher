@@ -3,10 +3,13 @@ package secret
 import (
 	"strings"
 
+	"context"
+
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/api/store/sharewatch"
 	"github.com/rancher/types/config"
 )
 
@@ -22,16 +25,18 @@ func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	return s.Store.Create(apiContext, schema, data)
 }
 
-func NewNamespacedSecretStore(clientGetter proxy.ClientGetter) *Store {
+func NewNamespacedSecretStore(ctx context.Context, clientGetter proxy.ClientGetter) *Store {
+	secretsStore := proxy.NewProxyStore(clientGetter,
+		config.UserStorageContext,
+		[]string{"api"},
+		"",
+		"v1",
+		"Secret",
+		"secrets")
+	secretsStore = sharewatch.NewWatchShare(ctx, clientGetter, secretsStore)
 	return &Store{
 		Store: &transform.Store{
-			Store: proxy.NewProxyStore(clientGetter,
-				config.UserStorageContext,
-				[]string{"api"},
-				"",
-				"v1",
-				"Secret",
-				"secrets"),
+			Store: secretsStore,
 			Transformer: func(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
 				if data == nil {
 					return data, nil

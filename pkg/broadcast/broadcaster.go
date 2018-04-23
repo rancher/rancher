@@ -60,6 +60,7 @@ func (b *Broadcaster) stream(input chan map[string]interface{}) {
 	for item := range input {
 		b.Lock()
 		for sub := range b.subs {
+			item = cloneMap(item)
 			select {
 			case sub <- item:
 			default:
@@ -76,4 +77,38 @@ func (b *Broadcaster) stream(input chan map[string]interface{}) {
 	}
 	b.running = false
 	b.Unlock()
+}
+
+func cloneMap(data map[string]interface{}) map[string]interface{} {
+	if data == nil {
+		return nil
+	}
+
+	result := map[string]interface{}{}
+	for k, v := range data {
+		switch t := v.(type) {
+		case []interface{}:
+			result[k] = cloneSlice(t)
+		case []map[string]interface{}:
+			result[k] = cloneMapSlice(t)
+		case map[string]interface{}:
+			result[k] = cloneMap(t)
+		default:
+			result[k] = v
+		}
+	}
+
+	return result
+}
+
+func cloneMapSlice(data []map[string]interface{}) []map[string]interface{} {
+	result := make([]map[string]interface{}, len(data))
+	copy(result, data)
+	return result
+}
+
+func cloneSlice(data []interface{}) []interface{} {
+	result := make([]interface{}, len(data))
+	copy(result, data)
+	return result
 }

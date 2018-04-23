@@ -47,7 +47,7 @@ func Setup(ctx context.Context, mgmt *config.ScaledContext, clusterManager *clus
 	addProxyStore(ctx, schemas, mgmt, clusterClient.PersistentVolumeType, "v1", nil)
 	addProxyStore(ctx, schemas, mgmt, clusterClient.StorageClassType, "storage.k8s.io/v1", nil)
 
-	Secret(mgmt, schemas)
+	Secret(ctx, mgmt, schemas)
 	Service(schemas)
 	Workload(schemas, clusterManager)
 	Namespace(schemas, clusterManager)
@@ -97,9 +97,9 @@ func Service(schemas *types.Schemas) {
 	dnsSchema.Store = serviceSchema.Store
 }
 
-func Secret(management *config.ScaledContext, schemas *types.Schemas) {
+func Secret(ctx context.Context, management *config.ScaledContext, schemas *types.Schemas) {
 	schema := schemas.Schema(&schema.Version, "namespacedSecret")
-	schema.Store = secret.NewNamespacedSecretStore(management.ClientGetter)
+	schema.Store = secret.NewNamespacedSecretStore(ctx, management.ClientGetter)
 
 	for _, subSchema := range schemas.Schemas() {
 		if subSchema.BaseType == schema.ID && subSchema.ID != schema.ID {
