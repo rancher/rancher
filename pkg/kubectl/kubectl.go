@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"strings"
 
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -40,7 +41,7 @@ func Apply(yaml []byte, kubeConfig *clientcmdapi.Config) ([]byte, error) {
 		"apply",
 		"-f",
 		yamlFile.Name())
-	return cmd.CombinedOutput()
+	return runWithHTTP2(cmd)
 }
 
 func tempFile(prefix string) (*os.File, error) {
@@ -87,5 +88,17 @@ func ApplyWithNamespace(yaml []byte, namespace string, kubeConfig *clientcmdapi.
 		"apply",
 		"-f",
 		yamlFile.Name())
+	return runWithHTTP2(cmd)
+}
+
+func runWithHTTP2(cmd *exec.Cmd) ([]byte, error) {
+	var newEnv []string
+	for _, env := range os.Environ() {
+		if strings.HasPrefix(env, "DISABLE_HTTP2") {
+			continue
+		}
+		newEnv = append(newEnv, env)
+	}
+	cmd.Env = newEnv
 	return cmd.CombinedOutput()
 }
