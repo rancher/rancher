@@ -95,11 +95,9 @@ type APIContext struct {
 	ResponseWriter              ResponseWriter
 	QueryFilter                 QueryFilter
 	SubContextAttributeProvider SubContextAttributeProvider
-	//QueryOptions                *QueryOptions
-	URLBuilder    URLBuilder
-	AccessControl AccessControl
-	SubContext    map[string]string
-	//Attributes    map[string]interface{}
+	URLBuilder                  URLBuilder
+	AccessControl               AccessControl
+	SubContext                  map[string]string
 
 	Request  *http.Request
 	Response http.ResponseWriter
