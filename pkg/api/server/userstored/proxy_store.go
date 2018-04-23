@@ -47,10 +47,7 @@ func addProxyStore(ctx context.Context, schemas *types.Schemas, context *config.
 		kind,
 		plural)
 
-	s.Store = &sharewatch.WatchShare{
-		Store: s.Store,
-		Close: ctx,
-	}
+	s.Store = sharewatch.NewWatchShare(ctx, context.ClientGetter, s.Store)
 
 	if storeWrapper != nil {
 		s.Store = storeWrapper(s.Store)

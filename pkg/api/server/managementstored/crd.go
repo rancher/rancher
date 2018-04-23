@@ -31,10 +31,7 @@ func createCrd(ctx context.Context, wg *sync.WaitGroup, factory *crd.Factory, sc
 		}
 
 		for _, schema := range schemasToCreate {
-			schema.Store = &sharewatch.WatchShare{
-				Store: schema.Store,
-				Close: ctx,
-			}
+			schema.Store = sharewatch.NewWatchShare(ctx, factory.ClientGetter, schema.Store)
 		}
 	}()
 }
