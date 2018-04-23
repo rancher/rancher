@@ -21,7 +21,7 @@ COPY --from=sidekick /opt/rke /opt/rke
 COPY --from=k8s /usr/bin/kubelet /usr/bin/kube-proxy /usr/bin/
 
 ENV CATTLE_UI_PATH /usr/share/rancher/ui
-ENV CATTLE_UI_VERSION 2.0.35
+ENV CATTLE_UI_VERSION 2.0.36
 ENV CATTLE_CLI_VERSION v1.0.0-alpha14
 
 RUN mkdir -p /usr/share/rancher/ui && \
