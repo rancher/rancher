@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	defaultURL    = "https://github.com/rancher/charts"
+	defaultURL    = "https://git.rancher.io/charts"
 	defaultBranch = "master"
 )
 
