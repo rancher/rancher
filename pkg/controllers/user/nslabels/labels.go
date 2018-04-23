@@ -93,7 +93,6 @@ func (nsh *namespaceHandler) updateProjectIDLabelForSecrets(projectIDFieldValue,
 			}
 		} else if secret.Annotations[ProjectIDFieldLabel] != "" {
 			secret.Annotations[ProjectIDFieldLabel] = fmt.Sprintf("%s:%s", clusterID, projectID)
-			// secret.Annotations[ProjectIDFieldLabel] = strings.Replace(secret.Annotations[ProjectIDFieldLabel], projectIDFieldValue, projectID, 1)
 			if _, err := nsh.secrets.Update(&secret); err != nil {
 				return err
 			}
