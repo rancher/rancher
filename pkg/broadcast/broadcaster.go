@@ -60,9 +60,9 @@ func (b *Broadcaster) stream(input chan map[string]interface{}) {
 	for item := range input {
 		b.Lock()
 		for sub := range b.subs {
-			item = cloneMap(item)
+			newItem := cloneMap(item)
 			select {
-			case sub <- item:
+			case sub <- newItem:
 			default:
 				// Slow consumer, drop
 				go b.unsub(sub)
@@ -86,29 +86,37 @@ func cloneMap(data map[string]interface{}) map[string]interface{} {
 
 	result := map[string]interface{}{}
 	for k, v := range data {
-		switch t := v.(type) {
-		case []interface{}:
-			result[k] = cloneSlice(t)
-		case []map[string]interface{}:
-			result[k] = cloneMapSlice(t)
-		case map[string]interface{}:
-			result[k] = cloneMap(t)
-		default:
-			result[k] = v
-		}
+		result[k] = cloneValue(v)
 	}
 
 	return result
 }
 
-func cloneMapSlice(data []map[string]interface{}) []map[string]interface{} {
-	result := make([]map[string]interface{}, len(data))
-	copy(result, data)
+func cloneValue(v interface{}) interface{} {
+	switch t := v.(type) {
+	case []interface{}:
+		return cloneSlice(t)
+	case []map[string]interface{}:
+		return cloneMapSlice(t)
+	case map[string]interface{}:
+		return cloneMap(t)
+	default:
+		return v
+	}
+}
+
+func cloneMapSlice(data []map[string]interface{}) []interface{} {
+	result := make([]interface{}, len(data))
+	for i := range data {
+		result[i] = cloneValue(data[i])
+	}
 	return result
 }
 
 func cloneSlice(data []interface{}) []interface{} {
 	result := make([]interface{}, len(data))
-	copy(result, data)
+	for i := range data {
+		result[i] = cloneValue(data[i])
+	}
 	return result
 }
