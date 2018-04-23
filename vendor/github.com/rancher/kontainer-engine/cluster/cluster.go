@@ -280,9 +280,13 @@ func (c *Cluster) restore() error {
 }
 
 // NewCluster create a cluster interface to do operations
-func NewCluster(driverName, name string, configGetter ConfigGetter, persistStore PersistentStore, driver types.Driver) (*Cluster, error) {
+func NewCluster(driverName, addr, name string, configGetter ConfigGetter, persistStore PersistentStore) (*Cluster, error) {
+	rpcClient, err := types.NewClient(driverName, addr)
+	if err != nil {
+		return nil, err
+	}
 	return &Cluster{
-		Driver:       driver,
+		Driver:       rpcClient,
 		DriverName:   driverName,
 		Name:         name,
 		ConfigGetter: configGetter,
