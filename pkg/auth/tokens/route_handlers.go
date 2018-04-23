@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/util"
@@ -207,7 +206,7 @@ func (s *tokenAPIServer) removeToken(request *types.APIContext) error {
 	tokenID := request.ID
 
 	//getToken
-	_, status, err := s.getTokenByID(tokenAuthValue, tokenID)
+	t, status, err := s.getTokenByID(tokenAuthValue, tokenID)
 	if err != nil {
 		if status != 410 {
 			logrus.Errorf("DeleteToken Failed to fetch the token to delete with error: %v", err)
@@ -218,23 +217,19 @@ func (s *tokenAPIServer) removeToken(request *types.APIContext) error {
 		}
 	}
 
-	tokenData, err := deleteTokenUsingStore(request, tokenID)
+	currentAuthToken, _, err := s.getK8sTokenCR(tokenAuthValue)
 	if err != nil {
 		return err
 	}
-	request.WriteResponse(http.StatusOK, tokenData)
+
+	if currentAuthToken.Name == t.Name && !currentAuthToken.IsDerived {
+		return httperror.NewAPIErrorLong(http.StatusBadRequest, util.GetHTTPErrorCode(http.StatusBadRequest), "Cannot delete token for current session. Use logout instead")
+	}
+
+	if _, err := tokenServer.deleteTokenByName(t.Name); err != nil {
+		return err
+	}
+
+	request.WriteResponse(http.StatusNoContent, nil)
 	return nil
-}
-
-func deleteTokenUsingStore(request *types.APIContext, tokenID string) (map[string]interface{}, error) {
-	store := request.Schema.Store
-	if store == nil {
-		return nil, errors.New("no token store available")
-	}
-
-	tokenData, err := store.Delete(request, request.Schema, tokenID)
-	if err != nil {
-		return nil, err
-	}
-	return tokenData, nil
 }
