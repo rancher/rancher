@@ -200,10 +200,10 @@ func nodeExists(nodeDir string, name string) (bool, error) {
 		return false, err
 	}
 
-	err = command.Start()
-	if err != nil {
+	if err = command.Start(); err != nil {
 		return false, err
 	}
+	defer command.Wait()
 
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
@@ -216,8 +216,7 @@ func nodeExists(nodeDir string, name string) (bool, error) {
 		return false, err
 	}
 
-	err = command.Wait()
-	if err != nil {
+	if err := command.Wait(); err != nil {
 		return false, err
 	}
 
@@ -226,13 +225,11 @@ func nodeExists(nodeDir string, name string) (bool, error) {
 
 func deleteNode(nodeDir string, node *v3.Node) error {
 	command := buildCommand(nodeDir, []string{"rm", "-f", node.Spec.RequestedHostname})
-	err := command.Start()
-	if err != nil {
+	if err := command.Start(); err != nil {
 		return err
 	}
 
-	err = command.Wait()
-	if err != nil {
+	if err := command.Wait(); err != nil {
 		return err
 	}
 
