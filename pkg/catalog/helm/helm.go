@@ -121,7 +121,7 @@ func FetchTgz(url string) ([]v3.File, error) {
 			}
 			files = append(files, v3.File{
 				Name:     name,
-				Contents: base64.StdEncoding.EncodeToString(contents),
+				Contents: string(contents),
 			})
 		}
 	}
