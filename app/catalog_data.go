@@ -10,17 +10,18 @@ import (
 const (
 	defaultURL    = "https://git.rancher.io/charts"
 	defaultBranch = "master"
+	name          = "library"
 )
 
 func addCatalogs(management *config.ManagementContext) error {
 	catalogClient := management.Management.Catalogs("")
-	_, err := catalogClient.Get("rancher", metav1.GetOptions{})
+	_, err := catalogClient.Get(name, metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	} else if errors.IsNotFound(err) {
 		obj := &v3.Catalog{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "library",
+				Name: name,
 			},
 			Spec: v3.CatalogSpec{
 				URL:         defaultURL,
