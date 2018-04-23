@@ -201,7 +201,7 @@ type SlackConfig struct {
 	Color    string `yaml:"color,omitempty" json:"color,omitempty"`
 
 	Title     string `yaml:"title,omitempty" json:"title,omitempty"`
-	TitleLink string `yaml:"title_link,omitempty" json:"title_link,omitempty"`
+	TitleLink string `yaml:"title_link" json:"title_link"`
 	Pretext   string `yaml:"pretext,omitempty" json:"pretext,omitempty"`
 	Text      string `yaml:"text,omitempty" json:"text,omitempty"`
 	Fallback  string `yaml:"fallback,omitempty" json:"fallback,omitempty"`

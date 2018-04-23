@@ -202,10 +202,10 @@ func (w *PodWatcher) checkPodRunning(pod *corev1.Pod, alert *v3.ProjectAlert) {
 			}
 
 			title := fmt.Sprintf("The Pod %s is not running", pod.Name)
-			desc := fmt.Sprintf("*Alert Name*: %s\n*Severity*: %s\n*Cluster Name*: %s\n*Namespace*: %s\n*Container Name*: %s", alert.Spec.DisplayName, alert.Spec.Severity, w.clusterName, pod.Namespace, containerStatus.Name)
+			desc := fmt.Sprintf("Alert Name: %s\n Severity: %s\n Cluster Name: %s\n Namespace: %s\n Container Name: %s", alert.Spec.DisplayName, alert.Spec.Severity, w.clusterName, pod.Namespace, containerStatus.Name)
 
 			if details != "" {
-				desc = desc + fmt.Sprintf("\n*Logs*: %s", details)
+				desc = desc + fmt.Sprintf("\n Logs: %s", details)
 			}
 
 			if err := w.alertManager.SendAlert(alertID, desc, title, alert.Spec.Severity); err != nil {
@@ -224,10 +224,10 @@ func (w *PodWatcher) checkPodScheduled(pod *corev1.Pod, alert *v3.ProjectAlert) 
 			details := condition.Message
 
 			title := fmt.Sprintf("The Pod %s is not scheduled", pod.Name)
-			desc := fmt.Sprintf("*Alert Name*: %s\n*Severity*: %s\n*Cluster Name*: %s\n*Namespace*: %s\n*Pod Name*: %s", alert.Spec.DisplayName, alert.Spec.Severity, w.clusterName, pod.Namespace, pod.Name)
+			desc := fmt.Sprintf("Alert Name: %s\n Severity: %s\n Cluster Name: %s\n Namespace: %s\n Pod Name: %s", alert.Spec.DisplayName, alert.Spec.Severity, w.clusterName, pod.Namespace, pod.Name)
 
 			if details != "" {
-				desc = desc + fmt.Sprintf("\n*Logs*: %s", details)
+				desc = desc + fmt.Sprintf("\n Logs: %s", details)
 			}
 
 			if err := w.alertManager.SendAlert(alertID, desc, title, alert.Spec.Severity); err != nil {

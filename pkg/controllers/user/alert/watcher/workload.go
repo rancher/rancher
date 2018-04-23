@@ -117,7 +117,7 @@ func (w *WorkloadWatcher) checkWorkloadCondition(wl *workload.Workload, alert *v
 
 	if wl.Status.AvailableReplicas <= availableThreshold {
 		title := fmt.Sprintf("The workload %s has available replicas less than  %s%%", wl.Name, strconv.Itoa(percentage))
-		desc := fmt.Sprintf("*Alert Name*: %s\n*Severity*: %s\n*Cluster Name*: %s\n*Available Replicas*: %s\n*Desired Replicas*: %s", alert.Spec.DisplayName, alert.Spec.Severity, w.clusterName, strconv.Itoa(int(wl.Status.AvailableReplicas)),
+		desc := fmt.Sprintf("Alert Name: %s\n Severity: %s\n Cluster Name: %s\n Available Replicas: %s\n Desired Replicas: %s", alert.Spec.DisplayName, alert.Spec.Severity, w.clusterName, strconv.Itoa(int(wl.Status.AvailableReplicas)),
 			strconv.Itoa(int(wl.Status.Replicas)))
 
 		if err := w.alertManager.SendAlert(alertID, desc, title, alert.Spec.Severity); err != nil {
