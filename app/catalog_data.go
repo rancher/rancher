@@ -20,7 +20,7 @@ func addCatalogs(management *config.ManagementContext) error {
 	} else if errors.IsNotFound(err) {
 		obj := &v3.Catalog{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "rancher",
+				Name: "library",
 			},
 			Spec: v3.CatalogSpec{
 				URL:         defaultURL,
