@@ -78,9 +78,9 @@ func (w *SysComponentWatcher) checkComponentHealthy(statuses *v1.ComponentStatus
 				if cond.Type == corev1.ComponentHealthy {
 					if cond.Status == corev1.ConditionFalse {
 						title := fmt.Sprintf("The system component %s is not running", alert.Spec.TargetSystemService.Condition)
-						desc := fmt.Sprintf("*Alert Name*: %s\n*Severity*: %s\n*Cluster Name*: %s", alert.Spec.DisplayName, alert.Spec.Severity, w.clusterName)
+						desc := fmt.Sprintf("Alert Name: %s\n Severity: %s\n Cluster Name: %s", alert.Spec.DisplayName, alert.Spec.Severity, w.clusterName)
 						if cond.Message != "" {
-							desc = desc + fmt.Sprintf("\n*Logs*: %s", cond.Message)
+							desc = desc + fmt.Sprintf("\n Logs: %s", cond.Message)
 						}
 						if err := w.alertManager.SendAlert(alertID, desc, title, alert.Spec.Severity); err != nil {
 							logrus.Debugf("Failed to send alert: %v", err)

@@ -98,7 +98,7 @@ func (w *NodeWatcher) watchRule() error {
 				continue
 			}
 			for _, node := range nodes {
-				machine := getMachineByNodeName(machines, node.Name)
+				machine := getMachineForNode(machines, node)
 				w.checkNodeCondition(alert, machine)
 			}
 		}
@@ -115,9 +115,9 @@ func getMachineByID(machines []*v3.Node, id string) *v3.Node {
 	return nil
 }
 
-func getMachineByNodeName(machines []*v3.Node, nodeName string) *v3.Node {
+func getMachineForNode(machines []*v3.Node, n *corev1.Node) *v3.Node {
 	for _, m := range machines {
-		if node.GetNodeName(m) == nodeName {
+		if node.IsNodeForNode(n, m) {
 			return m
 		}
 	}
@@ -144,7 +144,7 @@ func (w *NodeWatcher) checkNodeMemUsage(alert *v3.ClusterAlert, machine *v3.Node
 		if used.Value()*100.0/total.Value() > int64(alert.Spec.TargetNode.MemThreshold) {
 			title := fmt.Sprintf("The memory usage on the node %s is over %s%%", node.GetNodeName(machine), strconv.Itoa(alert.Spec.TargetNode.MemThreshold))
 			//TODO: how to set unit for display for Quantity
-			desc := fmt.Sprintf("*Alert Name*: %s\n*Severity*: %s\n*Cluster Name*: %s\n*Used Memory*: %s\n*Total Memory*: %s", alert.Spec.DisplayName, alert.Spec.Severity, w.clusterName, used.String(), total.String())
+			desc := fmt.Sprintf("Alert Name: %s\n Severity: %s\n Cluster Name: %s\n Used Memory: %s\n Total Memory: %s", alert.Spec.DisplayName, alert.Spec.Severity, w.clusterName, used.String(), total.String())
 
 			if err := w.alertManager.SendAlert(alertID, desc, title, alert.Spec.Severity); err != nil {
 				logrus.Debugf("Failed to send alert: %v", err)
@@ -161,7 +161,7 @@ func (w *NodeWatcher) checkNodeCPUUsage(alert *v3.ClusterAlert, machine *v3.Node
 
 		if used.MilliValue()*100.0/total.MilliValue() > int64(alert.Spec.TargetNode.CPUThreshold) {
 			title := fmt.Sprintf("The CPU usage on the node %s is over %s%%", node.GetNodeName(machine), strconv.Itoa(alert.Spec.TargetNode.CPUThreshold))
-			desc := fmt.Sprintf("*Alert Name*: %s\n*Severity*: %s\n*Cluster Name*: %s\n*Used CPU*: %s m\n*Total CPU*: %s m", alert.Spec.DisplayName, alert.Spec.Severity, w.clusterName, strconv.FormatInt(used.MilliValue(), 10), strconv.FormatInt(total.MilliValue(), 10))
+			desc := fmt.Sprintf("Alert Name: %s\n Severity: %s\n Cluster Name: %s\n Used CPU: %s m\n Total CPU: %s m", alert.Spec.DisplayName, alert.Spec.Severity, w.clusterName, strconv.FormatInt(used.MilliValue(), 10), strconv.FormatInt(total.MilliValue(), 10))
 
 			if err := w.alertManager.SendAlert(alertID, desc, title, alert.Spec.Severity); err != nil {
 				logrus.Debugf("Failed to send alert: %v", err)
@@ -177,10 +177,10 @@ func (w *NodeWatcher) checkNodeReady(alert *v3.ClusterAlert, machine *v3.Node) {
 			if cond.Status != corev1.ConditionTrue {
 
 				title := fmt.Sprintf("The kubelet on the node %s is not healthy", node.GetNodeName(machine))
-				desc := fmt.Sprintf("*Alert Name*: %s\n*Severity*: %s\n*Cluster Name*: %s", alert.Spec.DisplayName, alert.Spec.Severity, w.clusterName)
+				desc := fmt.Sprintf("Alert Name: %s\n Severity: %s\n Cluster Name: %s", alert.Spec.DisplayName, alert.Spec.Severity, w.clusterName)
 
 				if cond.Message != "" {
-					desc = desc + fmt.Sprintf("\n*Logs*: %s", cond.Message)
+					desc = desc + fmt.Sprintf("\n Logs: %s", cond.Message)
 				}
 				if err := w.alertManager.SendAlert(alertID, desc, title, alert.Spec.Severity); err != nil {
 					logrus.Debugf("Failed to send alert: %v", err)
