@@ -59,7 +59,7 @@ func (c *PodsController) sync(key string, obj *corev1.Pod) error {
 
 	nodesToUpdate := map[string]bool{}
 	workloadsToUpdate := map[string]*workloadutil.Workload{}
-	nodeNameToMachine, err := getNodeNameToMachine(c.clusterName, c.machinesLister)
+	nodeNameToMachine, err := getNodeNameToMachine(c.clusterName, c.machinesLister, c.nodeLister)
 	if err != nil {
 		return err
 	}

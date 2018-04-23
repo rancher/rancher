@@ -9,6 +9,8 @@ import (
 	"reflect"
 
 	workloadUtil "github.com/rancher/rancher/pkg/controllers/user/workload"
+	nodehelper "github.com/rancher/rancher/pkg/node"
+	"github.com/rancher/types/apis/core/v1"
 	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -20,8 +22,9 @@ import (
 )
 
 const (
-	allEndpoints        = "_all_endpoints_"
-	endpointsAnnotation = "field.cattle.io/publicEndpoints"
+	allEndpoints              = "_all_endpoints_"
+	endpointsAnnotation       = "field.cattle.io/publicEndpoints"
+	ExternalAddressAnnotation = "rke.cattle.io/external-ip"
 )
 
 func Register(ctx context.Context, workload *config.UserContext) {
@@ -73,6 +76,7 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		serviceLister:  workload.Core.Services("").Controller().Lister(),
 		podLister:      workload.Core.Pods("").Controller().Lister(),
 		machinesLister: workload.Management.Management.Nodes(workload.ClusterName).Controller().Lister(),
+		nodeLister:     workload.Core.Nodes("").Controller().Lister(),
 		clusterName:    workload.ClusterName,
 		isRKE:          isRKE,
 	}
@@ -136,6 +140,14 @@ func getEndpointNodeIP(node *managementv3.Node) string {
 	if externalIP != "" {
 		return externalIP
 	}
+
+	if node.Annotations != nil {
+		externalIP = node.Status.NodeAnnotations[ExternalAddressAnnotation]
+		if externalIP != "" {
+			return externalIP
+		}
+	}
+
 	return internalIP
 }
 
@@ -238,21 +250,21 @@ func publicEndpointToString(p v3.PublicEndpoint) string {
 	return fmt.Sprintf("%s_%v_%v_%s_%s_%s_%s_%s_%s", p.NodeName, p.Addresses, p.Port, p.Protocol, p.ServiceName, p.PodName, p.IngressName, p.Hostname, p.Path)
 }
 
-func getNodeNameToMachine(clusterName string, machineLister managementv3.NodeLister) (map[string]*managementv3.Node, error) {
+func getNodeNameToMachine(clusterName string, machineLister managementv3.NodeLister, nodeLister v1.NodeLister) (map[string]*managementv3.Node, error) {
 	machines, err := machineLister.List(clusterName, labels.NewSelector())
 	if err != nil {
 		return nil, err
 	}
 	machineMap := map[string]*managementv3.Node{}
+	nodes, err := nodeLister.List("", labels.NewSelector())
+	if err != nil {
+		return nil, err
+	}
 	for _, machine := range machines {
-		if machine.Status.NodeName == "" {
-			if machine.Status.NodeConfig != nil {
-				if machine.Status.NodeConfig.HostnameOverride != "" {
-					machineMap[machine.Status.NodeConfig.HostnameOverride] = machine
-				}
+		for _, node := range nodes {
+			if nodehelper.IsNodeForNode(node, machine) {
+				machineMap[node.Name] = machine
 			}
-		} else {
-			machineMap[machine.Status.NodeName] = machine
 		}
 	}
 	return machineMap, nil
