@@ -34,6 +34,7 @@ func main() {
 
 	os.Unsetenv("SSH_AUTH_SOCK")
 	os.Unsetenv("SSH_AGENT_PID")
+	os.Setenv("DISABLE_HTTP2", "true")
 
 	if dir, err := os.Getwd(); err == nil {
 		dmPath := filepath.Join(dir, "management-state", "bin")
