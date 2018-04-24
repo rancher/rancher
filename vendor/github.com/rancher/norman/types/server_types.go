@@ -75,8 +75,8 @@ type AccessControl interface {
 	CanUpdate(apiContext *APIContext, obj map[string]interface{}, schema *Schema) error
 	CanDelete(apiContext *APIContext, obj map[string]interface{}, schema *Schema) error
 
-	Filter(apiContext *APIContext, schema *Schema, obj map[string]interface{}, context map[string]string) map[string]interface{}
-	FilterList(apiContext *APIContext, schema *Schema, obj []map[string]interface{}, context map[string]string) []map[string]interface{}
+	Filter(apiContext *APIContext, schema *Schema, obj map[string]interface{}) map[string]interface{}
+	FilterList(apiContext *APIContext, schema *Schema, obj []map[string]interface{}) []map[string]interface{}
 }
 
 type APIContext struct {
@@ -197,4 +197,5 @@ type Store interface {
 	Update(apiContext *APIContext, schema *Schema, data map[string]interface{}, id string) (map[string]interface{}, error)
 	Delete(apiContext *APIContext, schema *Schema, id string) (map[string]interface{}, error)
 	Watch(apiContext *APIContext, schema *Schema, opt *QueryOptions) (chan map[string]interface{}, error)
+	AuthContext(apiContext *APIContext) map[string]string
 }
