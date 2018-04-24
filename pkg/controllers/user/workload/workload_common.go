@@ -287,7 +287,7 @@ func (c CommonController) GetByWorkloadID(key string) (*Workload, error) {
 func getWorkload(namespace string, name string, kind string, apiVersion string, UUID types.UID, selectorLabels *metav1.LabelSelector,
 	annotations map[string]string, podTemplateSpec *corev1.PodTemplateSpec, ownerRefs []metav1.OwnerReference, labels map[string]string,
 	replicas, availableReplicas int32) *Workload {
-	return &Workload{
+	w := &Workload{
 		Name:            name,
 		Namespace:       namespace,
 		SelectorLabels:  getSelectorLables(selectorLabels),
@@ -298,12 +298,13 @@ func getWorkload(namespace string, name string, kind string, apiVersion string, 
 		Kind:            kind,
 		APIVersion:      apiVersion,
 		Labels:          labels,
-		Key:             fmt.Sprintf("%s/%s", namespace, name),
+		Key:             fmt.Sprintf("%s:%s:%s", kind, namespace, name),
 		Status: &Status{
 			Replicas:          replicas,
 			AvailableReplicas: availableReplicas,
 		},
 	}
+	return w
 }
 
 func (c CommonController) GetAllWorkloads(namespace string) ([]*Workload, error) {
@@ -584,10 +585,6 @@ func generateServicesFromPortsAnnotation(workload *Workload) ([]Service, error) 
 	}
 
 	return services, nil
-}
-
-func (wk Workload) getKey() string {
-	return fmt.Sprintf("%s:%s:%s", wk.Kind, wk.Namespace, wk.Name)
 }
 
 func getWorkloadID(objectType string, namespace string, name string) string {

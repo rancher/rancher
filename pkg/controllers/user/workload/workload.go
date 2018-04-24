@@ -223,7 +223,7 @@ func (c *Controller) createService(toCreate Service, workload *Workload) error {
 	}
 
 	serviceAnnotations := map[string]string{}
-	workloadAnnotationValue, err := workloadAnnotationToString(workload.getKey())
+	workloadAnnotationValue, err := workloadAnnotationToString(workload.Key)
 	if err != nil {
 		return err
 	}
@@ -247,7 +247,7 @@ func (c *Controller) createService(toCreate Service, workload *Workload) error {
 	}
 
 	logrus.Infof("Creating [%s/%s] service of type [%s] with ports [%v] for workload %s", service.Namespace, service.Name,
-		service.Spec.Type, toCreate.ServicePorts, workload.getKey())
+		service.Spec.Type, toCreate.ServicePorts, workload.Key)
 	_, err = c.services.Create(service)
 	if err != nil {
 		if apierrors.IsAlreadyExists(err) {
