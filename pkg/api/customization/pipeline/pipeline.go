@@ -223,7 +223,7 @@ func (h *Handler) run(apiContext *types.APIContext) error {
 	}
 
 	userName := apiContext.Request.Header.Get("Impersonate-User")
-	execution, err := utils.GenerateExecution(h.Pipelines, h.PipelineExecutions, pipeline, utils.TriggerTypeUser, userName, runPipelineInput.Branch, "", nil)
+	execution, err := utils.GenerateExecution(h.Pipelines, h.PipelineExecutions, pipeline, utils.TriggerTypeUser, userName, branch, "", nil)
 	if err != nil {
 		return err
 	}
