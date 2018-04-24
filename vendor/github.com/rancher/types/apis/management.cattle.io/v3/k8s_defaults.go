@@ -8,13 +8,13 @@ const (
 
 var (
 	m          = image.Mirror
-	ToolsImage = m("rancher/rke-tools:v0.1.3")
+	ToolsImage = m("rancher/rke-tools:v0.1.4")
 
 	// K8sVersionToRKESystemImages - images map for 2.0
 	K8sVersionToRKESystemImages = map[string]RKESystemImages{
 		"v1.8.10-rancher1-1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.0.17"),
-			Kubernetes:                m("gcr.io/google_containers/hyperkube:v1.8.10"),
+			Kubernetes:                m("rancher/hyperkube:v1.8.10-rancher1"),
 			Alpine:                    ToolsImage,
 			NginxProxy:                ToolsImage,
 			CertDownloader:            ToolsImage,
@@ -34,12 +34,12 @@ var (
 			WeaveNode:                 m("weaveworks/weave-kube:2.1.2"),
 			WeaveCNI:                  m("weaveworks/weave-npc:2.1.2"),
 			PodInfraContainer:         m("gcr.io/google_containers/pause-amd64:3.0"),
-			Ingress:                   m("rancher/nginx-ingress-controller:0.10.2-rancher2"),
+			Ingress:                   m("rancher/nginx-ingress-controller:0.10.2-rancher3"),
 			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
 		},
 		"v1.8.11-rancher1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.0.17"),
-			Kubernetes:                m("gcr.io/google_containers/hyperkube:v1.8.11"),
+			Kubernetes:                m("rancher/hyperkube:v1.8.11-rancher1"),
 			Alpine:                    ToolsImage,
 			NginxProxy:                ToolsImage,
 			CertDownloader:            ToolsImage,
@@ -59,12 +59,12 @@ var (
 			WeaveNode:                 m("weaveworks/weave-kube:2.1.2"),
 			WeaveCNI:                  m("weaveworks/weave-npc:2.1.2"),
 			PodInfraContainer:         m("gcr.io/google_containers/pause-amd64:3.0"),
-			Ingress:                   m("rancher/nginx-ingress-controller:0.10.2-rancher2"),
+			Ingress:                   m("rancher/nginx-ingress-controller:0.10.2-rancher3"),
 			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
 		},
 		"v1.9.7-rancher1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.1.12"),
-			Kubernetes:                m("gcr.io/google_containers/hyperkube:v1.9.7"),
+			Kubernetes:                m("rancher/hyperkube:v1.9.7-rancher1"),
 			Alpine:                    ToolsImage,
 			NginxProxy:                ToolsImage,
 			CertDownloader:            ToolsImage,
@@ -84,12 +84,12 @@ var (
 			WeaveNode:                 m("weaveworks/weave-kube:2.1.2"),
 			WeaveCNI:                  m("weaveworks/weave-npc:2.1.2"),
 			PodInfraContainer:         m("gcr.io/google_containers/pause-amd64:3.0"),
-			Ingress:                   m("rancher/nginx-ingress-controller:0.10.2-rancher2"),
+			Ingress:                   m("rancher/nginx-ingress-controller:0.10.2-rancher3"),
 			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
 		},
 		"v1.9.5-rancher1-1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.1.12"),
-			Kubernetes:                m("gcr.io/google_containers/hyperkube:v1.9.5"),
+			Kubernetes:                m("rancher/hyperkube:v1.9.5-rancher1"),
 			Alpine:                    ToolsImage,
 			NginxProxy:                ToolsImage,
 			CertDownloader:            ToolsImage,
@@ -109,12 +109,12 @@ var (
 			WeaveNode:                 m("weaveworks/weave-kube:2.1.2"),
 			WeaveCNI:                  m("weaveworks/weave-npc:2.1.2"),
 			PodInfraContainer:         m("gcr.io/google_containers/pause-amd64:3.0"),
-			Ingress:                   m("rancher/nginx-ingress-controller:0.10.2-rancher2"),
+			Ingress:                   m("rancher/nginx-ingress-controller:0.10.2-rancher3"),
 			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
 		},
 		"v1.10.0-rancher1-1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.1.12"),
-			Kubernetes:                m("gcr.io/google_containers/hyperkube:v1.10.0"),
+			Kubernetes:                m("rancher/hyperkube:v1.10.0-rancher1"),
 			Alpine:                    ToolsImage,
 			NginxProxy:                ToolsImage,
 			CertDownloader:            ToolsImage,
@@ -134,12 +134,12 @@ var (
 			WeaveNode:                 m("weaveworks/weave-kube:2.1.2"),
 			WeaveCNI:                  m("weaveworks/weave-npc:2.1.2"),
 			PodInfraContainer:         m("gcr.io/google_containers/pause-amd64:3.1"),
-			Ingress:                   m("rancher/nginx-ingress-controller:0.10.2-rancher2"),
+			Ingress:                   m("rancher/nginx-ingress-controller:0.10.2-rancher3"),
 			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
 		},
 		"v1.10.1-rancher1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.1.12"),
-			Kubernetes:                m("gcr.io/google_containers/hyperkube:v1.10.1"),
+			Kubernetes:                m("rancher/hyperkube:v1.10.1-rancher1"),
 			Alpine:                    ToolsImage,
 			NginxProxy:                ToolsImage,
 			CertDownloader:            ToolsImage,
@@ -159,7 +159,7 @@ var (
 			WeaveNode:                 m("weaveworks/weave-kube:2.1.2"),
 			WeaveCNI:                  m("weaveworks/weave-npc:2.1.2"),
 			PodInfraContainer:         m("gcr.io/google_containers/pause-amd64:3.1"),
-			Ingress:                   m("rancher/nginx-ingress-controller:0.10.2-rancher2"),
+			Ingress:                   m("rancher/nginx-ingress-controller:0.10.2-rancher3"),
 			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
 		},
 	}

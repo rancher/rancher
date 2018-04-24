@@ -142,13 +142,13 @@ type GoogleKubernetesEngineConfig struct {
 	// Enable alpha feature
 	EnableAlphaFeature bool `json:"enableAlphaFeature,omitempty"`
 	// Configuration for the HTTP (L7) load balancing controller addon
-	HTTPLoadBalancing bool `json:"httpLoadBalancing,omitempty"`
+	DisableHTTPLoadBalancing bool `json:"disableHttpLoadBalancing,omitempty"`
 	// Configuration for the horizontal pod autoscaling feature, which increases or decreases the number of replica pods a replication controller has based on the resource usage of the existing pods
-	HorizontalPodAutoscaling bool `json:"horizontalPodAutoscaling,omitempty"`
+	DisableHorizontalPodAutoscaling bool `json:"disableHorizontalPodAutoscaling,omitempty"`
 	// Configuration for the Kubernetes Dashboard
-	KubernetesDashboard bool `json:"kubernetesDashboard,omitempty"`
+	EnableKubernetesDashboard bool `json:"enableKubernetesDashboard,omitempty"`
 	// Configuration for NetworkPolicy
-	NetworkPolicyConfig bool `json:"networkPolicyConfig,omitempty"`
+	DisableNetworkPolicyConfig bool `json:"disableNetworkPolicyConfig,omitempty"`
 	// The list of Google Compute Engine locations in which the cluster's nodes should be located
 	Locations []string `json:"locations,omitempty"`
 	// Image Type
@@ -158,7 +158,7 @@ type GoogleKubernetesEngineConfig struct {
 	// Sub Network
 	SubNetwork string `json:"subNetwork,omitempty"`
 	// Configuration for LegacyAbac
-	LegacyAbac bool `json:"legacyAbac,omitempty"`
+	EnableLegacyAbac bool `json:"enableLegacyAbac,omitempty"`
 }
 
 type AzureKubernetesServiceConfig struct {

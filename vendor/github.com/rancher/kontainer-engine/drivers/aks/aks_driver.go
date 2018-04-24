@@ -334,7 +334,7 @@ const updatingStatus = "Updating"
 const pollInterval = 30
 
 // Create implements driver interface
-func (d *Driver) Create(ctx context.Context, options *types.DriverOptions) (*types.ClusterInfo, error) {
+func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *types.ClusterInfo) (*types.ClusterInfo, error) {
 	driverState, err := getStateFromOptions(options)
 	if err != nil {
 		return nil, err

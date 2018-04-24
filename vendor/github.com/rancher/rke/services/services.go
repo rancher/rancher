@@ -56,7 +56,7 @@ func runSidekick(ctx context.Context, host *hosts.Host, prsMap map[string]v3.Pri
 	if err := docker.UseLocalOrPull(ctx, host.DClient, host.Address, sidecarImage, SidekickServiceName, prsMap); err != nil {
 		return err
 	}
-	if _, err := docker.CreateContiner(ctx, host.DClient, host.Address, SidekickContainerName, imageCfg, hostCfg); err != nil {
+	if _, err := docker.CreateContainer(ctx, host.DClient, host.Address, SidekickContainerName, imageCfg, hostCfg); err != nil {
 		return err
 	}
 	return nil
