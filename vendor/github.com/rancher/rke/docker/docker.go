@@ -93,7 +93,7 @@ func DoRollingUpdateContainer(ctx context.Context, dClient *client.Client, image
 		return err
 	}
 	logrus.Debugf("[%s] Successfully stopped old container %s on host [%s]", plane, containerName, hostname)
-	_, err = CreateContiner(ctx, dClient, hostname, containerName, imageCfg, hostCfg)
+	_, err = CreateContainer(ctx, dClient, hostname, containerName, imageCfg, hostCfg)
 	if err != nil {
 		return fmt.Errorf("Failed to create [%s] container on host [%s]: %v", containerName, hostname, err)
 	}
@@ -236,7 +236,7 @@ func StartContainer(ctx context.Context, dClient *client.Client, hostname string
 	return nil
 }
 
-func CreateContiner(ctx context.Context, dClient *client.Client, hostname string, containerName string, imageCfg *container.Config, hostCfg *container.HostConfig) (container.ContainerCreateCreatedBody, error) {
+func CreateContainer(ctx context.Context, dClient *client.Client, hostname string, containerName string, imageCfg *container.Config, hostCfg *container.HostConfig) (container.ContainerCreateCreatedBody, error) {
 	created, err := dClient.ContainerCreate(ctx, imageCfg, hostCfg, nil, containerName)
 	if err != nil {
 		return container.ContainerCreateCreatedBody{}, fmt.Errorf("Failed to create [%s] container on host [%s]: %v", containerName, hostname, err)
@@ -286,10 +286,10 @@ func IsContainerUpgradable(ctx context.Context, dClient *client.Client, imageCfg
 	if containerInspect.Config.Image != imageCfg.Image ||
 		!sliceEqualsIgnoreOrder(containerInspect.Config.Entrypoint, imageCfg.Entrypoint) ||
 		!sliceEqualsIgnoreOrder(containerInspect.Config.Cmd, imageCfg.Cmd) {
-		logrus.Debugf("[%s] Container [%s] is eligible for updgrade on host [%s]", plane, containerName, hostname)
+		logrus.Debugf("[%s] Container [%s] is eligible for upgrade on host [%s]", plane, containerName, hostname)
 		return true, nil
 	}
-	logrus.Debugf("[%s] Container [%s] is not eligible for updgrade on host [%s]", plane, containerName, hostname)
+	logrus.Debugf("[%s] Container [%s] is not eligible for upgrade on host [%s]", plane, containerName, hostname)
 	return false, nil
 }
 

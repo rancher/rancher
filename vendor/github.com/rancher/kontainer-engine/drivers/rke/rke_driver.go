@@ -117,7 +117,7 @@ func getYAML(driverOptions *types.DriverOptions) (string, error) {
 }
 
 // Create creates the rke cluster
-func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions) (*types.ClusterInfo, error) {
+func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions, info *types.ClusterInfo) (*types.ClusterInfo, error) {
 	yaml, err := getYAML(opts)
 	if err != nil {
 		return nil, err
@@ -128,7 +128,7 @@ func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions) (*types.
 		return nil, err
 	}
 
-	stateDir, err := d.restore(nil)
+	stateDir, err := d.restore(info)
 	if err != nil {
 		return nil, err
 	}

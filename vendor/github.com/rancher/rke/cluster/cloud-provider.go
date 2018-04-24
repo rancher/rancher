@@ -41,7 +41,7 @@ func doDeployConfigFile(ctx context.Context, host *hosts.Host, cloudConfig, alpi
 		Cmd: []string{
 			"sh",
 			"-c",
-			fmt.Sprintf("if [ ! -f %s ]; then echo -e \"$%s\" > %s;fi", CloudConfigPath, CloudConfigEnv, CloudConfigPath),
+			fmt.Sprintf("t=$(mktemp); echo -e \"$%s\" > $t && mv $t %s", CloudConfigEnv, CloudConfigPath),
 		},
 		Env: containerEnv,
 	}
