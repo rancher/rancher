@@ -12,6 +12,7 @@ import (
 	rbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 	"github.com/rancher/rancher/pkg/controllers/user/logging/generator"
@@ -22,61 +23,79 @@ const (
 	ProjectIDAnnotation = "field.cattle.io/projectId"
 )
 
-// ProjectLoggingSyncer listens for projectLogging CRD in management API
+// ProjectLoggingLifecycle listens for projectLogging CRD in management API
 // and update the changes to configmap, deploy fluentd
 
-type ProjectLoggingSyncer struct {
-	projectLoggings      v3.ProjectLoggingInterface
+type ProjectLoggingLifecycle struct {
+	clusterName          string
+	clusterLister        v3.ClusterLister
+	clusterRoleBindings  rbacv1.ClusterRoleBindingInterface
 	clusterLoggingLister v3.ClusterLoggingLister
-	namespaces           v1.NamespaceInterface
-	serviceAccounts      v1.ServiceAccountInterface
 	configmaps           v1.ConfigMapInterface
 	daemonsets           v1beta2.DaemonSetInterface
-	clusterRoleBindings  rbacv1.ClusterRoleBindingInterface
-	clusterLister        v3.ClusterLister
-	clusterName          string
+	namespaces           v1.NamespaceInterface
+	projectLoggings      v3.ProjectLoggingInterface
+	serviceAccounts      v1.ServiceAccountInterface
 }
 
 func registerProjectLogging(cluster *config.UserContext) {
 	projectLoggings := cluster.Management.Management.ProjectLoggings("")
-	syncer := &ProjectLoggingSyncer{
-		projectLoggings:      projectLoggings,
+	lifecycle := &ProjectLoggingLifecycle{
+		clusterName:          cluster.ClusterName,
+		clusterLister:        cluster.Management.Management.Clusters("").Controller().Lister(),
+		clusterRoleBindings:  cluster.RBAC.ClusterRoleBindings(loggingconfig.LoggingNamespace),
 		clusterLoggingLister: cluster.Management.Management.ClusterLoggings("").Controller().Lister(),
-		serviceAccounts:      cluster.Core.ServiceAccounts(loggingconfig.LoggingNamespace),
-		namespaces:           cluster.Core.Namespaces(""),
 		configmaps:           cluster.Core.ConfigMaps(loggingconfig.LoggingNamespace),
 		daemonsets:           cluster.Apps.DaemonSets(loggingconfig.LoggingNamespace),
-		clusterRoleBindings:  cluster.RBAC.ClusterRoleBindings(loggingconfig.LoggingNamespace),
-		clusterLister:        cluster.Management.Management.Clusters("").Controller().Lister(),
-		clusterName:          cluster.ClusterName,
+		namespaces:           cluster.Core.Namespaces(""),
+		projectLoggings:      projectLoggings,
+		serviceAccounts:      cluster.Core.ServiceAccounts(loggingconfig.LoggingNamespace),
 	}
-	projectLoggings.AddClusterScopedHandler("project-logging-controller", cluster.ClusterName, syncer.Sync)
+	projectLoggings.AddClusterScopedLifecycle("project-logging-controller", cluster.ClusterName, lifecycle)
 }
 
-func (c *ProjectLoggingSyncer) Sync(key string, obj *v3.ProjectLogging) error {
-	//clean up
-	if obj == nil || obj.DeletionTimestamp != nil {
-		return utils.CleanResource(c.namespaces, c.clusterLoggingLister, c.projectLoggings.Controller().Lister())
+func (c *ProjectLoggingLifecycle) Create(obj *v3.ProjectLogging) (*v3.ProjectLogging, error) {
+	newObj, err := v3.LoggingConditionProvisioned.DoUntilTrue(obj, func() (runtime.Object, error) {
+		return obj, provision(c.namespaces, c.configmaps, c.serviceAccounts, c.clusterRoleBindings, c.daemonsets, c.clusterLister, c.clusterName)
+	})
+
+	return newObj.(*v3.ProjectLogging), err
+}
+func (c *ProjectLoggingLifecycle) Updated(obj *v3.ProjectLogging) (*v3.ProjectLogging, error) {
+	newObj, err := v3.LoggingConditionProvisioned.DoUntilTrue(obj, func() (runtime.Object, error) {
+		return obj, provision(c.namespaces, c.configmaps, c.serviceAccounts, c.clusterRoleBindings, c.daemonsets, c.clusterLister, c.clusterName)
+	})
+	if err != nil {
+		return newObj.(*v3.ProjectLogging), err
 	}
 
-	if err := utils.IniteNamespace(c.namespaces); err != nil {
-		return err
-	}
-	if err := utils.InitConfigMap(c.configmaps); err != nil {
-		return err
-	}
-	if err := c.createOrUpdateProjectConfigMap(); err != nil {
-		return err
+	newObj, err = v3.LoggingConditionUpdated.Do(newObj, func() (runtime.Object, error) {
+		return obj, c.createOrUpdateProjectConfigMap("")
+	})
+
+	if err != nil {
+		return newObj.(*v3.ProjectLogging), err
 	}
 
-	if err := utils.CreateLogAggregator(c.daemonsets, c.serviceAccounts, c.clusterRoleBindings, c.clusterLister, c.clusterName, loggingconfig.LoggingNamespace); err != nil {
-		return err
-	}
-
-	return utils.CreateFluentd(c.daemonsets, c.serviceAccounts, c.clusterRoleBindings, loggingconfig.LoggingNamespace)
+	pl := newObj.(*v3.ProjectLogging)
+	pl.Status.AppliedSpec = pl.Spec
+	return pl, nil
 }
 
-func (c *ProjectLoggingSyncer) createOrUpdateProjectConfigMap() error {
+func (c *ProjectLoggingLifecycle) Remove(obj *v3.ProjectLogging) (*v3.ProjectLogging, error) {
+	isAllDisable, err := utils.CleanResource(c.namespaces, c.clusterLoggingLister, c.projectLoggings.Controller().Lister())
+	if err != nil {
+		return obj, err
+	}
+
+	if !isAllDisable {
+		return obj, c.createOrUpdateProjectConfigMap(obj.Name)
+	}
+
+	return obj, nil
+}
+
+func (c *ProjectLoggingLifecycle) createOrUpdateProjectConfigMap(excludeName string) error {
 	projectLoggings, err := c.projectLoggings.Controller().Lister().List("", labels.NewSelector())
 	if err != nil {
 		return errors.Wrap(err, "list project logging failed")
@@ -90,6 +109,9 @@ func (c *ProjectLoggingSyncer) createOrUpdateProjectConfigMap() error {
 	}
 	var wl []utils.WrapProjectLogging
 	for _, v := range projectLoggings {
+		if v.Name == excludeName {
+			continue
+		}
 		if controller.ObjectInCluster(c.clusterName, v) {
 			var grepNamespace []string
 			for _, v2 := range ns {

@@ -20,7 +20,7 @@ func CreateFluentd(ds rv1beta2.DaemonSetInterface, sa rv1.ServiceAccountInterfac
 	defer func() {
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			if err = removeDeamonset(ds, sa, rb, loggingconfig.FluentdName); err != nil {
-				logrus.Error("recycle daemonset failed", err)
+				logrus.Error("recycle fluentd daemonset failed", err)
 			}
 		}
 	}()
@@ -49,7 +49,7 @@ func CreateLogAggregator(ds rv1beta2.DaemonSetInterface, sa rv1.ServiceAccountIn
 	defer func() {
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			if err = removeDeamonset(ds, sa, rb, loggingconfig.LogAggregatorName); err != nil {
-				logrus.Error("recycle daemonset failed", err)
+				logrus.Error("recycle log-aggregator daemonset failed", err)
 			}
 		}
 	}()
@@ -226,7 +226,7 @@ func newFluentdDaemonset(name, namespace, clusterName string) *v1beta2.DaemonSet
 								},
 								{
 									Name:      "customlog",
-									MountPath: "/var/log/rancher-log-volumes",
+									MountPath: "/var/lib/rancher/log-volumes",
 								},
 								{
 									Name:      "clustercustomlogconfig",
@@ -281,7 +281,7 @@ func newFluentdDaemonset(name, namespace, clusterName string) *v1beta2.DaemonSet
 							Name: "customlog",
 							VolumeSource: v1.VolumeSource{
 								HostPath: &v1.HostPathVolumeSource{
-									Path: "/var/log/rancher-log-volumes",
+									Path: "/var/lib/rancher/log-volumes",
 								},
 							},
 						},
@@ -289,7 +289,7 @@ func newFluentdDaemonset(name, namespace, clusterName string) *v1beta2.DaemonSet
 							Name: "clustercustomlogconfig",
 							VolumeSource: v1.VolumeSource{
 								HostPath: &v1.HostPathVolumeSource{
-									Path: "/var/lib/fluentd/etc/config/custom/cluster",
+									Path: "/var/lib/rancher/fluentd/etc/config/custom/cluster",
 								},
 							},
 						},
@@ -297,7 +297,7 @@ func newFluentdDaemonset(name, namespace, clusterName string) *v1beta2.DaemonSet
 							Name: "projectcustomlogconfig",
 							VolumeSource: v1.VolumeSource{
 								HostPath: &v1.HostPathVolumeSource{
-									Path: "/var/lib/fluentd/etc/config/custom/project",
+									Path: "/var/lib/rancher/fluentd/etc/config/custom/project",
 								},
 							},
 						},
@@ -305,7 +305,7 @@ func newFluentdDaemonset(name, namespace, clusterName string) *v1beta2.DaemonSet
 							Name: "fluentdlog",
 							VolumeSource: v1.VolumeSource{
 								HostPath: &v1.HostPathVolumeSource{
-									Path: "/var/log/fluentd",
+									Path: "/var/lib/rancher/fluentd/log",
 								},
 							},
 						},

@@ -34,6 +34,25 @@ func InitConfigMap(cm rv1.ConfigMapInterface) error {
 	return nil
 }
 
+func UnsetConfigMap(cm rv1.ConfigMapInterface, name, level string) error {
+	ncm, err := cm.Get(name, metav1.GetOptions{})
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+		return nil
+	}
+
+	ncm.Data = map[string]string{
+		level + ".conf": "",
+	}
+
+	if _, err := cm.Update(ncm); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
 func UpdateConfigMap(configPath, loggingName, level string, configmaps rv1.ConfigMapInterface) error {
 	configMap, err := buildConfigMap(configPath, loggingconfig.LoggingNamespace, loggingName, level)
 	if err != nil {

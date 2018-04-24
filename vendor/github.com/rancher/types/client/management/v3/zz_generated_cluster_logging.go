@@ -31,27 +31,27 @@ const (
 
 type ClusterLogging struct {
 	types.Resource
-	Annotations          map[string]string    `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	ClusterId            string               `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
-	Created              string               `json:"created,omitempty" yaml:"created,omitempty"`
-	CreatorID            string               `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
-	ElasticsearchConfig  *ElasticsearchConfig `json:"elasticsearchConfig,omitempty" yaml:"elasticsearchConfig,omitempty"`
-	EmbeddedConfig       *EmbeddedConfig      `json:"embeddedConfig,omitempty" yaml:"embeddedConfig,omitempty"`
-	KafkaConfig          *KafkaConfig         `json:"kafkaConfig,omitempty" yaml:"kafkaConfig,omitempty"`
-	Labels               map[string]string    `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Name                 string               `json:"name,omitempty" yaml:"name,omitempty"`
-	NamespaceId          string               `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
-	OutputFlushInterval  int64                `json:"outputFlushInterval,omitempty" yaml:"outputFlushInterval,omitempty"`
-	OutputTags           map[string]string    `json:"outputTags,omitempty" yaml:"outputTags,omitempty"`
-	OwnerReferences      []OwnerReference     `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	Removed              string               `json:"removed,omitempty" yaml:"removed,omitempty"`
-	SplunkConfig         *SplunkConfig        `json:"splunkConfig,omitempty" yaml:"splunkConfig,omitempty"`
-	State                string               `json:"state,omitempty" yaml:"state,omitempty"`
-	Status               *LoggingStatus       `json:"status,omitempty" yaml:"status,omitempty"`
-	SyslogConfig         *SyslogConfig        `json:"syslogConfig,omitempty" yaml:"syslogConfig,omitempty"`
-	Transitioning        string               `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
-	TransitioningMessage string               `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	Uuid                 string               `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Annotations          map[string]string     `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	ClusterId            string                `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	Created              string                `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID            string                `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	ElasticsearchConfig  *ElasticsearchConfig  `json:"elasticsearchConfig,omitempty" yaml:"elasticsearchConfig,omitempty"`
+	EmbeddedConfig       *EmbeddedConfig       `json:"embeddedConfig,omitempty" yaml:"embeddedConfig,omitempty"`
+	KafkaConfig          *KafkaConfig          `json:"kafkaConfig,omitempty" yaml:"kafkaConfig,omitempty"`
+	Labels               map[string]string     `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name                 string                `json:"name,omitempty" yaml:"name,omitempty"`
+	NamespaceId          string                `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
+	OutputFlushInterval  int64                 `json:"outputFlushInterval,omitempty" yaml:"outputFlushInterval,omitempty"`
+	OutputTags           map[string]string     `json:"outputTags,omitempty" yaml:"outputTags,omitempty"`
+	OwnerReferences      []OwnerReference      `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Removed              string                `json:"removed,omitempty" yaml:"removed,omitempty"`
+	SplunkConfig         *SplunkConfig         `json:"splunkConfig,omitempty" yaml:"splunkConfig,omitempty"`
+	State                string                `json:"state,omitempty" yaml:"state,omitempty"`
+	Status               *ClusterLoggingStatus `json:"status,omitempty" yaml:"status,omitempty"`
+	SyslogConfig         *SyslogConfig         `json:"syslogConfig,omitempty" yaml:"syslogConfig,omitempty"`
+	Transitioning        string                `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage string                `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	Uuid                 string                `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 type ClusterLoggingCollection struct {
 	types.Collection

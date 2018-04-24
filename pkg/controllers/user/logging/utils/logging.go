@@ -24,18 +24,18 @@ func IsAllLoggingDisable(clusterLoggingLister v3.ClusterLoggingLister, projectLo
 
 }
 
-func CleanResource(ns v1.NamespaceInterface, cl v3.ClusterLoggingLister, pl v3.ProjectLoggingLister) error {
+func CleanResource(ns v1.NamespaceInterface, cl v3.ClusterLoggingLister, pl v3.ProjectLoggingLister) (bool, error) {
 	allDisabled, err := IsAllLoggingDisable(cl, pl)
 	if err != nil {
-		return err
+		return allDisabled, err
 	}
 
 	var zero int64
 	foreground := metav1.DeletePropagationForeground
 	if allDisabled {
 		if err = ns.Delete(loggingconfig.LoggingNamespace, &metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &foreground}); err != nil && !apierrors.IsNotFound(err) {
-			return err
+			return allDisabled, err
 		}
 	}
-	return nil
+	return allDisabled, nil
 }
