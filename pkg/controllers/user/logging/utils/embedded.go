@@ -1,10 +1,13 @@
 package utils
 
 import (
+	"context"
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/pkg/errors"
-	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
+	"github.com/rancher/kontainer-engine/logstream"
 	"github.com/rancher/rancher/pkg/image"
 	rv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
 	rv1 "github.com/rancher/types/apis/core/v1"
@@ -19,12 +22,14 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
+	nodeHelper "github.com/rancher/rancher/pkg/node"
 )
 
 const (
-	running = "Running"
+	externalAddressAnnotation = "rke.cattle.io/external-ip"
 )
 
 func CreateOrUpdateEmbeddedTarget(dep rv1beta2.DeploymentInterface, sa rv1.ServiceAccountInterface, se rv1.ServiceInterface, ro rrbacv1.RoleInterface, rb rrbacv1.RoleBindingInterface, namespace string, obj *v3.ClusterLogging) error {
@@ -230,7 +235,7 @@ func RemoveEmbeddedTarget(dep rv1beta2.DeploymentInterface, sa rv1.ServiceAccoun
 	return nil
 }
 
-func UpdateEmbeddedEndpoint(podLister rv1.PodLister, serviceLister rv1.ServiceLister, clusterLoggings v3.ClusterLoggingInterface) error {
+func UpdateEmbeddedEndpoint(deploymentLister rv1beta2.DeploymentLister, endpointLister rv1.EndpointsLister, serviceLister rv1.ServiceLister, clusterLoggings v3.ClusterLoggingInterface, nodeLister v3.NodeLister, k8sNodeLister rv1.NodeLister, clusterName string) error {
 	cls, err := clusterLoggings.List(metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("get cluterlogging failed, %v", err)
@@ -241,20 +246,22 @@ func UpdateEmbeddedEndpoint(podLister rv1.PodLister, serviceLister rv1.ServiceLi
 	cl := cls.Items[0]
 	if cl.Spec.EmbeddedConfig == nil {
 		return fmt.Errorf("embedded configuration should not be nil when update embedded endpoint")
-	}
 
+	}
 	updated := false
-	esEndpoint, err := getEmbeddedESEndpoint(podLister, serviceLister)
+
+	esEndpoint, err := getEndpoint(deploymentLister, endpointLister, serviceLister, nodeLister, k8sNodeLister, clusterName, loggingconfig.EmbeddedESName)
 	if err != nil {
 		return fmt.Errorf("get elasticsearch endpoint failed, %v", err)
 	}
 
 	if cl.Spec.EmbeddedConfig.ElasticsearchEndpoint != esEndpoint {
 		updated = true
+
 		cl.Spec.EmbeddedConfig.ElasticsearchEndpoint = esEndpoint
 	}
 
-	kibanaEndpoint, err := getEmbeddedKibanaEndpoint(podLister, serviceLister)
+	kibanaEndpoint, err := getEndpoint(deploymentLister, endpointLister, serviceLister, nodeLister, k8sNodeLister, clusterName, loggingconfig.EmbeddedKibanaName)
 	if err != nil {
 		return fmt.Errorf("get kibana endpoint failed, %v", err)
 	}
@@ -307,70 +314,69 @@ func updateEmbeddedQuota(dep rv1beta2.DeploymentInterface, obj *v3.ClusterLoggin
 	return nil
 }
 
-func getEmbeddedESEndpoint(podLister rv1.PodLister, serviceLister rv1.ServiceLister) (esEndpoint string, err error) {
-	selector := labels.NewSelector()
-	requirement, err := labels.NewRequirement(loggingconfig.LabelK8sApp, selection.Equals, []string{loggingconfig.EmbeddedESName})
+func getEndpoint(deploymentLister rv1beta2.DeploymentLister, endpointLister rv1.EndpointsLister, serviceLister rv1.ServiceLister, nodeLister v3.NodeLister, k8sNodeLister rv1.NodeLister, clusterName, serviceName string) (esEndpoint string, err error) {
+	deploymen, err := deploymentLister.Get(loggingconfig.LoggingNamespace, loggingconfig.EmbeddedESName)
+	for _, cond := range deploymen.Status.Conditions {
+		if cond.Status == v1.ConditionFalse {
+			return "", fmt.Errorf("deployment %s status %s is %s, reason: %s, message: %s", deploymen.Name, cond.Type, cond.Status, cond.Reason, cond.Message)
+		}
+	}
+
+	endpoint, err := endpointLister.Get(loggingconfig.LoggingNamespace, serviceName)
 	if err != nil {
 		return "", err
 	}
 
-	espods, err := podLister.List(loggingconfig.LoggingNamespace, selector.Add(*requirement))
-	if err != nil {
-		return "", err
+	if len(endpoint.Subsets) == 0 || len(endpoint.Subsets[0].Addresses) == 0 {
+		return "", fmt.Errorf("get %s endpoint subsets failed", serviceName)
 	}
-	esservice, err := serviceLister.Get(loggingconfig.LoggingNamespace, loggingconfig.EmbeddedESName)
+
+	esservice, err := serviceLister.Get(loggingconfig.LoggingNamespace, serviceName)
 	if err != nil {
 		return "", err
 	}
 
 	if len(esservice.Spec.Ports) == 0 {
-		return "", fmt.Errorf("get service %s node port failed", loggingconfig.EmbeddedESName)
+		return "", fmt.Errorf("could not find the node port for %s", serviceName)
 	}
-	var esPort int32
+	var port int32
 	for _, v := range esservice.Spec.Ports {
 		if v.Name == "http" {
-			esPort = v.NodePort
+			port = v.NodePort
 			break
 		}
 	}
 
-	if len(espods) == 0 {
-		return "", fmt.Errorf("deploying %s", loggingconfig.EmbeddedESName)
+	nodeIP, err := getNodeIP(nodeLister, k8sNodeLister, *endpoint.Subsets[0].Addresses[0].NodeName, clusterName)
+	if err != nil {
+		return "", errors.Wrapf(err, "get node ip failed")
 	}
-	espod := espods[0]
-	if espod.Status.Phase == running {
-		return fmt.Sprintf("http://%s:%v", espod.Status.HostIP, esPort), nil
-	}
-	return "", fmt.Errorf("got embedded elasticsearch pod status %s", espod.Status.Phase)
+	return fmt.Sprintf("http://%s:%v", nodeIP, port), nil
 }
 
-func getEmbeddedKibanaEndpoint(podLister rv1.PodLister, serviceLister rv1.ServiceLister) (kibanaEndpoint string, err error) {
-	selector := labels.NewSelector()
-	requirement, err := labels.NewRequirement(loggingconfig.LabelK8sApp, selection.Equals, []string{loggingconfig.EmbeddedKibanaName})
+func getNodeIP(nodeLister v3.NodeLister, k8sNodeLister rv1.NodeLister, nodeName, clusterName string) (string, error) {
+	ip := ""
+	machines, err := nodeLister.List(clusterName, labels.NewSelector())
 	if err != nil {
 		return "", err
 	}
-	kibanapods, err := podLister.List(loggingconfig.LoggingNamespace, selector.Add(*requirement))
+	machine := nodeHelper.GetNodeByNodeName(machines, nodeName)
+
+	node, err := k8sNodeLister.Get("", nodeName)
 	if err != nil {
 		return "", err
-	}
-	kibanaservice, err := serviceLister.Get(loggingconfig.LoggingNamespace, loggingconfig.EmbeddedKibanaName)
-	if err != nil {
-		return "", err
-	}
-	if len(kibanaservice.Spec.Ports) == 0 {
-		return "", fmt.Errorf("get service %s node port failed", loggingconfig.EmbeddedKibanaName)
 	}
 
-	if len(kibanapods) == 0 {
-		return "", fmt.Errorf("deploying %s", loggingconfig.EmbeddedKibanaName)
+	if nodeHelper.IsNodeForNode(node, machine) {
+		ip = nodeHelper.GetEndpointNodeIP(machine)
+	} else {
+		ip = node.Annotations[externalAddressAnnotation]
 	}
-	kibanapod := kibanapods[0]
-	if kibanapod.Status.Phase == running {
-		return fmt.Sprintf("http://%s:%v", kibanapod.Status.HostIP, kibanaservice.Spec.Ports[0].NodePort), nil
-	}
-	return "", fmt.Errorf("got embedded kibana pod status %s", kibanapod.Status.Phase)
 
+	if ip == "" {
+		return "", fmt.Errorf("ip for node %s is empty", nodeName)
+	}
+	return ip, nil
 }
 
 func newESServiceAccount(namespace string) *v1.ServiceAccount {
@@ -521,16 +527,6 @@ func newKibanaService(namespace string) *v1.Service {
 }
 
 func newESDeployment(namespace string, obj *v3.ClusterLogging) *v1beta2.Deployment {
-	limits := map[v1.ResourceName]resource.Quantity{}
-	if obj.Spec.EmbeddedConfig.LimitsCPU > 0 {
-		//CPU is always requested as an absolute quantity, never as a relative quantity; 0.1 is the same amount of CPU on a single-core, dual-core, or 48-core machine
-		limits[v1.ResourceCPU] = *resource.NewMilliQuantity(int64(obj.Spec.EmbeddedConfig.LimitsCPU), resource.DecimalSI)
-	}
-	if obj.Spec.EmbeddedConfig.LimitsMemery > 0 {
-		//Limits and requests for memory are measured in bytes.
-		limits[v1.ResourceMemory] = *resource.NewQuantity(int64(obj.Spec.EmbeddedConfig.LimitsMemery*1024*1024), resource.DecimalSI)
-	}
-
 	deployment := &v1beta2.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
@@ -540,6 +536,9 @@ func newESDeployment(namespace string, obj *v3.ClusterLogging) *v1beta2.Deployme
 			},
 		},
 		Spec: v1beta2.DeploymentSpec{
+			Strategy: v1beta2.DeploymentStrategy{
+				Type: v1beta2.RecreateDeploymentStrategyType,
+			},
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					loggingconfig.LabelK8sApp: loggingconfig.EmbeddedESName,
@@ -608,6 +607,10 @@ func newESDeployment(namespace string, obj *v3.ClusterLogging) *v1beta2.Deployme
 									Name:  "HTTP_ENABLE",
 									Value: "true",
 								},
+								{
+									Name:  "ES_JAVA_OPTS",
+									Value: "-XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap -XX:InitialRAMFraction=2 -XX:MinRAMFraction=2 -XX:MaxRAMFraction=2",
+								},
 							},
 							Ports: []v1.ContainerPort{
 								{
@@ -628,7 +631,12 @@ func newESDeployment(namespace string, obj *v3.ClusterLogging) *v1beta2.Deployme
 									//Limits and requests for memory are measured in bytes.
 									v1.ResourceMemory: *resource.NewQuantity(int64(obj.Spec.EmbeddedConfig.RequestsMemery*1024*1024), resource.DecimalSI), // unit is byte
 								},
-								Limits: limits,
+								Limits: map[v1.ResourceName]resource.Quantity{
+									//CPU is always requested as an absolute quantity, never as a relative quantity; 0.1 is the same amount of CPU on a single-core, dual-core, or 48-core machine
+									v1.ResourceCPU: *resource.NewMilliQuantity(int64(obj.Spec.EmbeddedConfig.LimitsCPU), resource.DecimalSI),
+									//Limits and requests for memory are measured in bytes.
+									v1.ResourceMemory: *resource.NewQuantity(int64(obj.Spec.EmbeddedConfig.LimitsMemery*1024*1024), resource.DecimalSI), // unit is byte
+								},
 							},
 							VolumeMounts: []v1.VolumeMount{
 								{
@@ -701,6 +709,48 @@ func newKibanaDeployment(namespace string) *v1beta2.Deployment {
 	}
 
 	return deployment
+}
+
+func UpdateEmbeddedEndpointWithRetry(ctx context.Context, deploymentLister rv1beta2.DeploymentLister, endpointLister rv1.EndpointsLister, serviceLister rv1.ServiceLister, clusterLoggings v3.ClusterLoggingInterface, nodeLister v3.NodeLister, k8sNodeLister rv1.NodeLister, clusterName string, logger logstream.LoggerStream) error {
+	timeout := time.After(3 * time.Minute)
+	ticker := time.NewTicker(10 * time.Second)
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	updated := false
+	errCh := make(chan error, 18)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				err := UpdateEmbeddedEndpoint(deploymentLister, endpointLister, serviceLister, clusterLoggings, nodeLister, k8sNodeLister, clusterName)
+				if err != nil {
+					logger.Infof("Get embedded components status failed, %s", err.Error())
+					errCh <- err
+				} else {
+					updated = true
+					return
+				}
+			case <-timeout:
+				return
+			}
+		}
+	}()
+	wg.Wait()
+	close(errCh)
+
+	var errs []error
+	for e := range errCh {
+		errs = append(errs, e)
+	}
+	if updated {
+		return nil
+	}
+
+	return errs[len(errs)-1]
 }
 
 func int32Ptr(i int32) *int32 { return &i }

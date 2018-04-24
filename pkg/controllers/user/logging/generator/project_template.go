@@ -4,7 +4,7 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
 <source>
    @type  tail
    path  /var/log/containers/*.log
-   pos_file  /fluentd/etc/log/fluentd-project-{{$store.ProjectName}}-logging.pos
+   pos_file  /fluentd/log/fluentd-project-{{$store.ProjectName}}-logging.pos
    time_format  %Y-%m-%dT%H:%M:%S
    tag  {{$store.ProjectName}}.*
    format  json
@@ -45,7 +45,6 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
 
 {{ if $store.CurrentTarget }}
 <match  {{$store.ProjectName}}.** project-custom.{{$store.ProjectName}}.**> 
-    flush_interval {{$store.OutputFlushInterval}}s
     {{ if eq $store.CurrentTarget "elasticsearch"}}
     @type elasticsearch
     include_tag_key  true
@@ -89,8 +88,10 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
     port {{$store.WrapSyslog.Port}}
     severity {{$store.SyslogConfig.Severity}}
     program {{$store.SyslogConfig.Program}}
+    protocol {{$store.SyslogConfig.Protocol}}
     {{end}}
     
+    flush_interval {{$store.OutputFlushInterval}}s
     max_retry_wait 30
     disable_retry_limit
     num_threads 8

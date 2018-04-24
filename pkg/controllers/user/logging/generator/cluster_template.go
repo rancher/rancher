@@ -5,7 +5,7 @@ var ClusterTemplate = `{{ if ne .clusterTarget.CurrentTarget "none" }}
 <source>
   @type  tail
   path  /var/lib/rancher/rke/log/*.log
-  pos_file  /fluentd/etc/log/fluentd-rke-logging.pos
+  pos_file  /fluentd/log/fluentd-rke-logging.pos
   time_format  %Y-%m-%dT%H:%M:%S
   tag  rke.*
   format  json
@@ -27,7 +27,7 @@ var ClusterTemplate = `{{ if ne .clusterTarget.CurrentTarget "none" }}
 <source>
    @type  tail
    path  /var/log/containers/*.log
-   pos_file  /fluentd/etc/log/fluentd-cluster-logging.pos
+   pos_file  /fluentd/log/fluentd-cluster-logging.pos
    time_format  %Y-%m-%dT%H:%M:%S
    tag  cluster.*
    format  json
@@ -113,9 +113,10 @@ var ClusterTemplate = `{{ if ne .clusterTarget.CurrentTarget "none" }}
     port {{.clusterTarget.WrapSyslog.Port}}
     severity {{.clusterTarget.SyslogConfig.Severity}}
     program {{.clusterTarget.SyslogConfig.Program}}
+    protocol {{.clusterTarget.SyslogConfig.Protocol}}
     {{end -}}
 
-    flush_interval 2s
+    flush_interval {{.clusterTarget.OutputFlushInterval}}s
     buffer_type file
     buffer_path /fluentd/etc/buffer/cluster.buffer
     buffer_queue_limit 128
