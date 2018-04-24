@@ -1,6 +1,3 @@
-FROM rancher/k8s:v1.8.9-rancher1-1 as k8s
-FROM rancher/rke-service-sidekick:v0.1.0 as sidekick
-
 FROM ubuntu:17.10
 RUN apt-get update && apt-get install -y git curl ca-certificates unzip xz-utils && \
     useradd rancher && \
@@ -15,10 +12,6 @@ RUN mkdir /root/.kube && \
     ln -s /var/lib/rancher/kube_config_cluster.yml /root/.kube/config && \
     ln -s /usr/bin/rancher /usr/bin/reset-password
 WORKDIR /var/lib/rancher
-
-RUN mkdir /opt/rke
-COPY --from=sidekick /opt/rke /opt/rke
-COPY --from=k8s /usr/bin/kubelet /usr/bin/kube-proxy /usr/bin/
 
 ENV CATTLE_UI_PATH /usr/share/rancher/ui
 ENV CATTLE_UI_VERSION 2.0.36
