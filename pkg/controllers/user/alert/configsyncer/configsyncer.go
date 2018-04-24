@@ -102,7 +102,7 @@ func (d *ConfigSyncer) sync() error {
 
 	if string(configSecret.Data["config.yml"]) != string(data) {
 		configSecret.Data["config.yml"] = data
-		configSecret.Data["email.tmpl"] = []byte(deploy.EmailTmlp)
+		configSecret.Data["notification.tmpl"] = []byte(deploy.NotificationTmpl)
 
 		_, err = d.secrets.Update(configSecret)
 		if err != nil {
@@ -198,7 +198,7 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 			if notifier.Spec.PagerdutyConfig != nil {
 				pagerduty := &alertconfig.PagerdutyConfig{
 					ServiceKey:  alertconfig.Secret(notifier.Spec.PagerdutyConfig.ServiceKey),
-					Description: "{{ (index .Alerts 0).Labels.description}}",
+					Description: `{{ template "rancher.title" . }}`,
 				}
 				if r.Recipient != "" {
 					pagerduty.ServiceKey = alertconfig.Secret(r.Recipient)
@@ -217,12 +217,12 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 				receiverExist = true
 			} else if notifier.Spec.SlackConfig != nil {
 				slack := &alertconfig.SlackConfig{
-					APIURL:  alertconfig.Secret(notifier.Spec.SlackConfig.URL),
-					Channel: notifier.Spec.SlackConfig.DefaultRecipient,
-					Text:    "{{ (index .Alerts 0).Labels.text}}\n",
-					Title:   "{{ (index .Alerts 0).Labels.title}}\n",
-					//Pretext: "Alert From Rancher",
-					Color: `{{ if eq (index .Alerts 0).Labels.severity "critical" }}danger{{ else if eq (index .Alerts 0).Labels.severity "warning" }}warning{{ else }}good{{ end }}`,
+					APIURL:    alertconfig.Secret(notifier.Spec.SlackConfig.URL),
+					Channel:   notifier.Spec.SlackConfig.DefaultRecipient,
+					Text:      `{{ template "slack.text" . }}`,
+					Title:     `{{ template "rancher.title" . }}`,
+					TitleLink: "",
+					Color:     `{{ if eq (index .Alerts 0).Labels.severity "critical" }}danger{{ else if eq (index .Alerts 0).Labels.severity "warning" }}warning{{ else }}good{{ end }}`,
 				}
 				if r.Recipient != "" {
 					slack.Channel = r.Recipient
@@ -232,7 +232,7 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 
 			} else if notifier.Spec.SMTPConfig != nil {
 				header := map[string]string{}
-				header["Subject"] = "Alert from Rancher: {{ (index .Alerts 0).Labels.title}}"
+				header["Subject"] = `{{ template "rancher.title" . }}`
 				email := &alertconfig.EmailConfig{
 					Smarthost:    notifier.Spec.SMTPConfig.Host + ":" + strconv.Itoa(notifier.Spec.SMTPConfig.Port),
 					AuthPassword: alertconfig.Secret(notifier.Spec.SMTPConfig.Password),

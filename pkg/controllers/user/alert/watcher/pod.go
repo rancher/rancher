@@ -2,7 +2,6 @@ package watcher
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -137,13 +136,24 @@ func (w *PodWatcher) checkPodRestarts(pod *corev1.Pod, alert *v3.ProjectAlert) {
 				if containerStatus.State.Waiting != nil {
 					details = containerStatus.State.Waiting.Message
 				}
-				title := fmt.Sprintf("The Pod %s restarts %s in 5 mins", pod.Name, strconv.Itoa(alert.Spec.TargetPod.RestartTimes))
-				desc := fmt.Sprintf("*Alert Name*: %s\n*Severity*: %s\n*Cluster Name*: %s\n*Namespace*: %s\n*Container Name*: %s", alert.Spec.DisplayName, alert.Spec.Severity, w.clusterName, pod.Namespace, containerStatus.Name)
+
+				data := map[string]string{}
+				data["alert_type"] = "podRestarts"
+				data["alert_id"] = alertID
+				data["severity"] = alert.Spec.Severity
+				data["alert_name"] = alert.Spec.DisplayName
+				data["cluster_name"] = w.clusterName
+				data["namespace"] = pod.Namespace
+				data["pod_name"] = pod.Name
+				data["container_name"] = containerStatus.Name
+				data["restart_times"] = strconv.Itoa(alert.Spec.TargetPod.RestartTimes)
+				data["restart_interval"] = strconv.Itoa(alert.Spec.TargetPod.RestartIntervalSeconds)
+
 				if details != "" {
-					desc = desc + fmt.Sprintf("\n*Logs*: %s", details)
+					data["logs"] = details
 				}
 
-				if err := w.alertManager.SendAlert(alertID, desc, title, alert.Spec.Severity); err != nil {
+				if err := w.alertManager.SendAlert(data); err != nil {
 					logrus.Debugf("Error occured while getting pod %s: %v", alert.Spec.TargetPod.PodName, err)
 				}
 			}
@@ -201,14 +211,21 @@ func (w *PodWatcher) checkPodRunning(pod *corev1.Pod, alert *v3.ProjectAlert) {
 				details = containerStatus.State.Terminated.Message
 			}
 
-			title := fmt.Sprintf("The Pod %s is not running", pod.Name)
-			desc := fmt.Sprintf("*Alert Name*: %s\n*Severity*: %s\n*Cluster Name*: %s\n*Namespace*: %s\n*Container Name*: %s", alert.Spec.DisplayName, alert.Spec.Severity, w.clusterName, pod.Namespace, containerStatus.Name)
+			data := map[string]string{}
+			data["alert_type"] = "podNotRunning"
+			data["alert_id"] = alertID
+			data["severity"] = alert.Spec.Severity
+			data["alert_name"] = alert.Spec.DisplayName
+			data["cluster_name"] = w.clusterName
+			data["namespace"] = pod.Namespace
+			data["pod_name"] = pod.Name
+			data["container_name"] = containerStatus.Name
 
 			if details != "" {
-				desc = desc + fmt.Sprintf("\n*Logs*: %s", details)
+				data["logs"] = details
 			}
 
-			if err := w.alertManager.SendAlert(alertID, desc, title, alert.Spec.Severity); err != nil {
+			if err := w.alertManager.SendAlert(data); err != nil {
 				logrus.Debugf("Error occured while send alert %s: %v", alert.Spec.TargetPod.PodName, err)
 			}
 			return
@@ -223,14 +240,20 @@ func (w *PodWatcher) checkPodScheduled(pod *corev1.Pod, alert *v3.ProjectAlert) 
 		if condition.Type == corev1.PodScheduled && condition.Status == corev1.ConditionFalse {
 			details := condition.Message
 
-			title := fmt.Sprintf("The Pod %s is not scheduled", pod.Name)
-			desc := fmt.Sprintf("*Alert Name*: %s\n*Severity*: %s\n*Cluster Name*: %s\n*Namespace*: %s\n*Pod Name*: %s", alert.Spec.DisplayName, alert.Spec.Severity, w.clusterName, pod.Namespace, pod.Name)
+			data := map[string]string{}
+			data["alert_type"] = "podNotScheduled"
+			data["alert_id"] = alertID
+			data["severity"] = alert.Spec.Severity
+			data["alert_name"] = alert.Spec.DisplayName
+			data["cluster_name"] = w.clusterName
+			data["namespace"] = pod.Namespace
+			data["pod_name"] = pod.Name
 
 			if details != "" {
-				desc = desc + fmt.Sprintf("\n*Logs*: %s", details)
+				data["logs"] = details
 			}
 
-			if err := w.alertManager.SendAlert(alertID, desc, title, alert.Spec.Severity); err != nil {
+			if err := w.alertManager.SendAlert(data); err != nil {
 				logrus.Debugf("Error occured while getting pod %s: %v", alert.Spec.TargetPod.PodName, err)
 			}
 			return false
