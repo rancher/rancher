@@ -118,6 +118,9 @@ func (c *Client) execScript(script string) (string, error) {
 	}
 	defer resp.Body.Close()
 	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
 		return string(data), fmt.Errorf("jenkins run script fail,response code is :%v", resp.StatusCode)
 	}
@@ -299,7 +302,9 @@ func (c *Client) getBuildRawOutput(jobname string, buildNumber int, startLine in
 		return "", ErrGetJobInfoFail
 	}
 	respBytes, err := ioutil.ReadAll(resp.Body)
-
+	if err != nil {
+		return "", err
+	}
 	return string(respBytes), nil
 
 }

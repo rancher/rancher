@@ -190,7 +190,7 @@ func parsePreservedEnvVar(execution *v3.PipelineExecution) {
 	m := getEnvVarMap(execution)
 	pipeline := execution.Spec.Pipeline
 
-	//environment variables substituion in configs
+	//environment variables substitution in configs
 	for _, stage := range pipeline.Spec.Stages {
 		for _, step := range stage.Steps {
 			if step.RunScriptConfig != nil {
