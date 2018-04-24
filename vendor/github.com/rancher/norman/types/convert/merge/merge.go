@@ -90,13 +90,6 @@ func mergeMetadata(dest map[string]interface{}, src map[string]interface{}) map[
 }
 
 func merge(field string, schema *types.Schema, schemas *types.Schemas, dest, src interface{}) interface{} {
-	if dest == nil {
-		return src
-	}
-	if src == nil {
-		return dest
-	}
-
 	if isMap(field, schema) {
 		return src
 	}
