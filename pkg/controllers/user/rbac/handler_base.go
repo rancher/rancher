@@ -84,6 +84,7 @@ func Register(workload *config.UserContext) {
 		crLister:      workload.RBAC.ClusterRoles("").Controller().Lister(),
 		nsLister:      workload.Core.Namespaces("").Controller().Lister(),
 		clusterLister: workload.Management.Management.Clusters("").Controller().Lister(),
+		projectLister: workload.Management.Management.Projects("").Controller().Lister(),
 		clusterName:   workload.ClusterName,
 	}
 	workload.Management.Management.Projects("").AddClusterScopedLifecycle("project-namespace-auth", workload.ClusterName, newProjectLifecycle(r))
@@ -118,6 +119,7 @@ type manager struct {
 	rbLister      typesrbacv1.RoleBindingLister
 	nsLister      typescorev1.NamespaceLister
 	clusterLister v3.ClusterLister
+	projectLister v3.ProjectLister
 	clusterName   string
 }
 

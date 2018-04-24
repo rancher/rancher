@@ -45,6 +45,9 @@ func (n *nsLifecycle) Create(obj *v1.Namespace) (*v1.Namespace, error) {
 	}
 
 	setRolesPopulatedCondition(obj, 0)
+	if err := n.assignToSystemProject(obj); err != nil {
+		return obj, err
+	}
 	go updateStatusAnnotation(hasPRTBs, obj, n.m)
 
 	return obj, err
@@ -71,6 +74,44 @@ func (n *nsLifecycle) syncNS(obj *v1.Namespace) (bool, error) {
 	}
 
 	return hasPRTBs, nil
+}
+
+func (n *nsLifecycle) assignToSystemProject(ns *v1.Namespace) error {
+	defaultProjectsToNamespaces, err := GetDefaultProjectsToNamespaces()
+	if err != nil {
+		return err
+	}
+	for projectDisplayName, namespaces := range defaultProjectsToNamespaces {
+		for _, nsToCheck := range namespaces {
+			if nsToCheck == ns.Name {
+				projects, err := n.m.projectLister.List(n.m.clusterName, labels.NewSelector())
+				if err != nil {
+					return err
+				}
+				var project *v3.Project
+				for _, p := range projects {
+					if p.Spec.DisplayName == projectDisplayName {
+						project = p
+						break
+					}
+				}
+				if project == nil {
+					continue
+				}
+
+				projectID := ns.Annotations[projectIDAnnotation]
+				if projectID != "" {
+					return nil
+				}
+
+				if ns.Annotations == nil {
+					ns.Annotations = map[string]string{}
+				}
+				ns.Annotations[projectIDAnnotation] = fmt.Sprintf("%v:%v", n.m.clusterName, project.Name)
+			}
+		}
+	}
+	return nil
 }
 
 func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
