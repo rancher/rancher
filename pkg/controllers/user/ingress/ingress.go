@@ -114,12 +114,11 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) error {
 					Annotations:     annotations,
 				},
 				Spec: corev1.ServiceSpec{
-					ClusterIP: "None",
-					Type:      "ClusterIP",
-					Ports:     servicePorts,
+					Type:  "NodePort",
+					Ports: servicePorts,
 				},
 			}
-			logrus.Infof("Creating headless service %s for ingress %s, port %s", serviceName, key, portStr)
+			logrus.Infof("Creating NodePort service %s for ingress %s, port %s", serviceName, key, portStr)
 			if _, err := c.services.Create(service); err != nil {
 				return err
 			}
