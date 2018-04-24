@@ -86,6 +86,7 @@ var ClusterTemplate = `{{ if ne .clusterTarget.CurrentTarget "none" }}
     server  {{.clusterTarget.WrapSplunk.Server}}
     all_items true
     protocol {{.clusterTarget.WrapSplunk.Scheme}}
+    verify false
     sourcetype {{.clusterTarget.SplunkConfig.Source}}
     token {{.clusterTarget.SplunkConfig.Token}}
     format json
