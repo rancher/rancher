@@ -113,3 +113,7 @@ func (s *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id st
 	}
 	return s.Transformer(apiContext, schema, obj, nil)
 }
+
+func (s *Store) AuthContext(apiContext *types.APIContext) map[string]string {
+	return s.Store.AuthContext(apiContext)
+}
