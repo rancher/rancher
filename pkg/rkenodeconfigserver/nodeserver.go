@@ -183,7 +183,7 @@ func augmentProcesses(processes map[string]v3.Process, worker bool) map[string]v
 	for _, process := range processes {
 		for _, bind := range process.Binds {
 			parts := strings.Split(bind, ":")
-			if len(parts) > 2 && strings.Contains(parts[2], "shared") {
+			if len(parts) > 2 && (strings.Contains(parts[2], "shared") || strings.Contains(parts[2], "slave")) {
 				shared = append(shared, parts[0])
 			}
 		}
