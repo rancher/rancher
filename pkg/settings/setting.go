@@ -34,6 +34,7 @@ var (
 	WhitelistDomain                 = newSetting("whitelist-domain", "forums.rancher.com")
 	FirstLogin                      = newSetting("first-login", "true")
 	InstallUUID                     = newSetting("install-uuid", "")
+	BaseRDNSServerURL               = newSetting("base-rdns-url", "")
 )
 
 type Provider interface {
