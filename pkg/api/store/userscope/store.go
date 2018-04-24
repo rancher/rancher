@@ -110,6 +110,10 @@ func (s *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt *t
 	return s.Store.Watch(apiContext, schema, opt)
 }
 
+func (s *Store) AuthContext(apiContext *types.APIContext) map[string]string {
+	return s.Store.AuthContext(apiContext)
+}
+
 func getUser(apiContext *types.APIContext) (string, error) {
 	user := apiContext.Request.Header.Get("Impersonate-User")
 	if user == "" {

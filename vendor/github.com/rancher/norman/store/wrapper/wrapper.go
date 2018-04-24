@@ -94,6 +94,10 @@ func (s *StoreWrapper) Delete(apiContext *types.APIContext, schema *types.Schema
 	return s.store.Delete(apiContext, schema, id)
 }
 
+func (s *StoreWrapper) AuthContext(apiContext *types.APIContext) map[string]string {
+	return s.store.AuthContext(apiContext)
+}
+
 func validateGet(apiContext *types.APIContext, schema *types.Schema, id string) error {
 	store := schema.Store
 	if store == nil {
