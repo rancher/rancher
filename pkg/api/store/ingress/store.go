@@ -16,6 +16,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	ingressStateAnnotation = "field.cattle.io.ingress/state"
+)
+
 func Wrap(store types.Store) types.Store {
 	modify := &Store{
 		store,
@@ -140,13 +144,13 @@ func setState(data map[string]interface{}, stateMap map[string]string) {
 		return
 	}
 
-	values.PutValue(data, string(content), "annotations", "ingress.cattle.io/state")
+	values.PutValue(data, string(content), "annotations", ingressStateAnnotation)
 }
 
 func getState(data map[string]interface{}) map[string]string {
 	state := map[string]string{}
 
-	v, ok := values.GetValue(data, "annotations", "ingress.cattle.io/state")
+	v, ok := values.GetValue(data, "annotations", ingressStateAnnotation)
 	if ok {
 		json.Unmarshal([]byte(convert.ToString(v)), &state)
 	}
