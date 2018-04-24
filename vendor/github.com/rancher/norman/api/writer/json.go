@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/norman/parse/builder"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/definition"
+	schema2 "github.com/rancher/types/apis/management.cattle.io/v3public/schema"
 	"github.com/sirupsen/logrus"
 )
 
@@ -128,6 +129,10 @@ func (j *JSONResponseWriter) convert(b *builder.Builder, context *types.APIConte
 
 	if schema.Formatter != nil {
 		schema.Formatter(context, rawResource)
+	}
+
+	if *context.Version != schema2.PublicVersion && context.AccessControl.CanUpdate(context, input, schema) != nil {
+		rawResource.Actions = map[string]string{}
 	}
 
 	return rawResource

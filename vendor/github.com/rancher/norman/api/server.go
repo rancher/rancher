@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/store/wrapper"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/types/apis/management.cattle.io/v3public/schema"
 )
 
 type StoreWrapper func(types.Store) types.Store
@@ -228,6 +229,11 @@ func (s *Server) handle(rw http.ResponseWriter, req *http.Request) (*types.APICo
 
 		return apiRequest, handler(apiRequest, nextHandler)
 	} else if action != nil {
+		if *apiRequest.Version != schema.PublicVersion {
+			if err := apiRequest.AccessControl.CanUpdate(apiRequest, nil, apiRequest.Schema); err != nil {
+				return apiRequest, err
+			}
+		}
 		return apiRequest, handleAction(action, apiRequest)
 	}
 
