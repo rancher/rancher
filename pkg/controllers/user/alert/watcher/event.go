@@ -56,12 +56,21 @@ func (l *EventWatcher) Sync(key string, obj *corev1.Event) error {
 		if target != nil {
 			if target.EventType == obj.Type && target.ResourceKind == obj.InvolvedObject.Kind {
 
-				title := fmt.Sprintf("%s event of %s occurred", target.EventType, target.ResourceKind)
-				//TODO: how to set unit for display for Quantity
-				desc := fmt.Sprintf("*Alert Name*: %s\n*Severity*: %s\n*Cluster Name*: %s\n*Target*: %s\n*Count*: %s\n*Event Message*: %s\n*First Seen*: %s\n*Last Seen*: %s",
-					alert.Spec.DisplayName, alert.Spec.Severity, l.clusterName, obj.InvolvedObject.Name, strconv.Itoa(int(obj.Count)), obj.Message, obj.FirstTimestamp, obj.LastTimestamp)
+				data := map[string]string{}
+				data["alert_type"] = "event"
+				data["alert_id"] = alertID
+				data["event_type"] = target.EventType
+				data["resource_kind"] = target.ResourceKind
+				data["severity"] = alert.Spec.Severity
+				data["alert_name"] = alert.Spec.DisplayName
+				data["cluster_name"] = l.clusterName
+				data["target_name"] = obj.InvolvedObject.Name
+				data["event_count"] = strconv.Itoa(int(obj.Count))
+				data["event_message"] = obj.Message
+				data["event_firstseen"] = fmt.Sprintf("%s", obj.FirstTimestamp)
+				data["event_lastseen"] = fmt.Sprintf("%s", obj.LastTimestamp)
 
-				if err := l.alertManager.SendAlert(alertID, desc, title, alert.Spec.Severity); err != nil {
+				if err := l.alertManager.SendAlert(data); err != nil {
 					logrus.Debugf("Failed to send alert: %v", err)
 				}
 			}

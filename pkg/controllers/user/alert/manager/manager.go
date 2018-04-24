@@ -159,7 +159,7 @@ func (m *Manager) GetDefaultConfig() *alertconfig.Config {
 		RepeatInterval: &repeatInterval,
 	}
 
-	config.Templates = []string{"/etc/alertmanager/email.tmpl"}
+	config.Templates = []string{"/etc/alertmanager/notification.tmpl"}
 
 	return &config
 }
@@ -323,7 +323,7 @@ func (m *Manager) RemoveSilenceRule(alertID string) error {
 	return nil
 }
 
-func (m *Manager) SendAlert(alertID, text, title, severity string) error {
+func (m *Manager) SendAlert(labels map[string]string) error {
 	url, err := m.getAlertManagerEndpoint()
 	if err != nil {
 		return err
@@ -332,10 +332,9 @@ func (m *Manager) SendAlert(alertID, text, title, severity string) error {
 	alertList := model.Alerts{}
 	a := &model.Alert{}
 	a.Labels = map[model.LabelName]model.LabelValue{}
-	a.Labels[model.LabelName("alert_id")] = model.LabelValue(alertID)
-	a.Labels[model.LabelName("text")] = model.LabelValue(text)
-	a.Labels[model.LabelName("title")] = model.LabelValue(title)
-	a.Labels[model.LabelName("severity")] = model.LabelValue(severity)
+	for k, v := range labels {
+		a.Labels[model.LabelName(k)] = model.LabelValue(v)
+	}
 
 	alertList = append(alertList, a)
 

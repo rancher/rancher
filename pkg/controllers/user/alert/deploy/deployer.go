@@ -17,10 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-const (
-	EmailTmlp = `{{ define "email.text" }}{{ (index .Alerts 0).Labels.text}} {{ end}}"`
-)
-
 func NewDeployer(cluster *config.UserContext, manager *manager.Manager) *Deployer {
 	return &Deployer{
 		nsClient:           cluster.Core.Namespaces(""),
@@ -164,8 +160,8 @@ func (d *Deployer) getSecret() *corev1.Secret {
 			Name:      "alertmanager",
 		},
 		Data: map[string][]byte{
-			"config.yml": data,
-			"email.tmpl": []byte(EmailTmlp),
+			"config.yml":        data,
+			"notification.tmpl": []byte(NotificationTmpl),
 		},
 	}
 }

@@ -2,7 +2,6 @@ package watcher
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -116,11 +115,19 @@ func (w *WorkloadWatcher) checkWorkloadCondition(wl *workload.Workload, alert *v
 	availableThreshold := int32(percentage) * (wl.Status.Replicas) / 100
 
 	if wl.Status.AvailableReplicas <= availableThreshold {
-		title := fmt.Sprintf("The workload %s has available replicas less than  %s%%", wl.Name, strconv.Itoa(percentage))
-		desc := fmt.Sprintf("*Alert Name*: %s\n*Severity*: %s\n*Cluster Name*: %s\n*Available Replicas*: %s\n*Desired Replicas*: %s", alert.Spec.DisplayName, alert.Spec.Severity, w.clusterName, strconv.Itoa(int(wl.Status.AvailableReplicas)),
-			strconv.Itoa(int(wl.Status.Replicas)))
 
-		if err := w.alertManager.SendAlert(alertID, desc, title, alert.Spec.Severity); err != nil {
+		data := map[string]string{}
+		data["alert_type"] = "workload"
+		data["alert_id"] = alertID
+		data["severity"] = alert.Spec.Severity
+		data["alert_name"] = alert.Spec.DisplayName
+		data["cluster_name"] = w.clusterName
+		data["workload_name"] = wl.Name
+		data["available_percentage"] = strconv.Itoa(percentage)
+		data["available_replicas"] = strconv.Itoa(int(wl.Status.AvailableReplicas))
+		data["desired_replicas"] = strconv.Itoa(int(wl.Status.Replicas))
+
+		if err := w.alertManager.SendAlert(data); err != nil {
 			logrus.Debugf("Failed to send alert: %v", err)
 		}
 	}

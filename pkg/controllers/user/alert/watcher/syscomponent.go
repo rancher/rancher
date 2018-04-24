@@ -2,7 +2,6 @@ package watcher
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -77,12 +76,19 @@ func (w *SysComponentWatcher) checkComponentHealthy(statuses *v1.ComponentStatus
 			for _, cond := range cs.Conditions {
 				if cond.Type == corev1.ComponentHealthy {
 					if cond.Status == corev1.ConditionFalse {
-						title := fmt.Sprintf("The system component %s is not running", alert.Spec.TargetSystemService.Condition)
-						desc := fmt.Sprintf("*Alert Name*: %s\n*Severity*: %s\n*Cluster Name*: %s", alert.Spec.DisplayName, alert.Spec.Severity, w.clusterName)
+
+						data := map[string]string{}
+						data["alert_type"] = "systemService"
+						data["alert_id"] = alertID
+						data["severity"] = alert.Spec.Severity
+						data["alert_name"] = alert.Spec.DisplayName
+						data["cluster_name"] = w.clusterName
+						data["component_name"] = alert.Spec.TargetSystemService.Condition
+
 						if cond.Message != "" {
-							desc = desc + fmt.Sprintf("\n*Logs*: %s", cond.Message)
+							data["logs"] = cond.Message
 						}
-						if err := w.alertManager.SendAlert(alertID, desc, title, alert.Spec.Severity); err != nil {
+						if err := w.alertManager.SendAlert(data); err != nil {
 							logrus.Debugf("Failed to send alert: %v", err)
 						}
 						return
