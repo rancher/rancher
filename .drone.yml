@@ -68,6 +68,17 @@ pipeline:
       branch: master
       event: tag
 
+  github_binary_release:
+    image: plugins/github-release
+    files:
+     - bin/*
+    checksum:
+     - sha256
+    secrets: [github_token]
+    when:
+      branch: master
+      event: tag
+
   slack-notification-failure:
     image: plugins/slack
     channel: engineering
@@ -83,16 +94,5 @@ pipeline:
     secrets: [ slack_webhook ]
     when:
       status: success
-      branch: master
-      event: tag
-
-  github_binary_release:
-    image: plugins/github-release
-    files:
-     - bin/*
-    checksum:
-     - sha256
-    secrets: [github_token]
-    when:
       branch: master
       event: tag
