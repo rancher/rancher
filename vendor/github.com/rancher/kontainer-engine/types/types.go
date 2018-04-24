@@ -23,8 +23,8 @@ type Driver interface {
 	// GetDriverUpdateOptions returns cli flags that are used in update
 	GetDriverUpdateOptions(ctx context.Context) (*DriverFlags, error)
 
-	// Create creates the cluster
-	Create(ctx context.Context, opts *DriverOptions) (*ClusterInfo, error)
+	// Create creates the cluster. clusterInfo is only set when we are retrying a failed or interrupted create
+	Create(ctx context.Context, opts *DriverOptions, clusterInfo *ClusterInfo) (*ClusterInfo, error)
 
 	// Update updates the cluster
 	Update(ctx context.Context, clusterInfo *ClusterInfo, opts *DriverOptions) (*ClusterInfo, error)

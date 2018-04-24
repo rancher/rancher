@@ -77,12 +77,13 @@ type ConfigGetter interface {
 // Create creates a cluster
 func (c *Cluster) Create(ctx context.Context) error {
 	if err := c.createInner(ctx); err != nil {
+		c.PersistStore.PersistStatus(*c, Error)
 		return err
 	}
 	return c.PersistStore.PersistStatus(*c, Running)
 }
 
-func (c *Cluster) create(ctx context.Context) error {
+func (c *Cluster) create(ctx context.Context, clusterInfo *types.ClusterInfo) error {
 	if c.Status == PostCheck {
 		return nil
 	}
@@ -107,16 +108,11 @@ func (c *Cluster) create(ctx context.Context) error {
 	}
 
 	// create cluster
-	info, err := c.Driver.Create(ctx, &driverOpts)
-	if err != nil {
-		if info != nil {
-			transformClusterInfo(c, info)
-		}
-		return err
+	info, err := c.Driver.Create(ctx, &driverOpts, clusterInfo)
+	if info != nil {
+		transformClusterInfo(c, info)
 	}
-
-	transformClusterInfo(c, info)
-	return nil
+	return err
 }
 
 func (c *Cluster) postCheck(ctx context.Context) error {
@@ -140,9 +136,10 @@ func (c *Cluster) createInner(ctx context.Context) error {
 	// check if it is already created
 	c.restore()
 
+	var info *types.ClusterInfo
 	if c.Status == Error {
 		logrus.Errorf("Cluster %s previously failed to create", c.Name)
-		return fmt.Errorf("cluster %s previously failed to create", c.Name)
+		info = toInfo(c)
 	}
 
 	if c.Status == Updating || c.Status == Running || c.Status == PostCheck {
@@ -151,7 +148,7 @@ func (c *Cluster) createInner(ctx context.Context) error {
 		return fmt.Errorf("cluster already exists")
 	}
 
-	if err := c.create(ctx); err != nil {
+	if err := c.create(ctx, info); err != nil {
 		return err
 	}
 
