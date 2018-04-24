@@ -26,19 +26,19 @@ func CreateFluentd(ds rv1beta2.DaemonSetInterface, sa rv1.ServiceAccountInterfac
 	}()
 
 	serviceAccount := newServiceAccount(loggingconfig.FluentdName, namespace)
-	serviceAccount, err = sa.Create(serviceAccount)
+	_, err = sa.Create(serviceAccount)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
 
 	projectRoleBind := newRoleBinding(loggingconfig.FluentdName, namespace)
-	projectRoleBind, err = rb.Create(projectRoleBind)
+	_, err = rb.Create(projectRoleBind)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
 
 	daemonset := newFluentdDaemonset(loggingconfig.FluentdName, namespace, loggingconfig.FluentdName)
-	daemonset, err = ds.Create(daemonset)
+	_, err = ds.Create(daemonset)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
@@ -55,13 +55,13 @@ func CreateLogAggregator(ds rv1beta2.DaemonSetInterface, sa rv1.ServiceAccountIn
 	}()
 
 	serviceAccount := newServiceAccount(loggingconfig.LogAggregatorName, namespace)
-	serviceAccount, err = sa.Create(serviceAccount)
+	_, err = sa.Create(serviceAccount)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
 
 	projectRoleBind := newRoleBinding(loggingconfig.LogAggregatorName, namespace)
-	projectRoleBind, err = rb.Create(projectRoleBind)
+	_, err = rb.Create(projectRoleBind)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
@@ -72,7 +72,7 @@ func CreateLogAggregator(ds rv1beta2.DaemonSetInterface, sa rv1.ServiceAccountIn
 	}
 	driverDir := getDriverDir(cluster.Status.Driver)
 	daemonset := newLogAggregatorDaemonset(loggingconfig.LogAggregatorName, namespace, driverDir)
-	daemonset, err = ds.Create(daemonset)
+	_, err = ds.Create(daemonset)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}

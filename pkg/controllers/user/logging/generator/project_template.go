@@ -61,6 +61,7 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
     server  {{$store.WrapSplunk.Server}}
     all_items true
     protocol {{$store.WrapSplunk.Scheme}}
+    verify false
     sourcetype {{$store.SplunkConfig.Source}}
     format json
     token {{$store.SplunkConfig.Token}}
