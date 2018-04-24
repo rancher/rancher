@@ -112,7 +112,8 @@ func (e EnvironmentMapper) ToInternal(data map[string]interface{}) {
 		}
 
 		targetKey := convert.ToString(value["targetKey"])
-		if targetKey == "" {
+		sourceKey := convert.ToString(value["sourceKey"])
+		if targetKey == "" && sourceKey == "" {
 			switch source {
 			case "secret":
 				envVarFrom = append(envVarFrom, map[string]interface{}{
@@ -132,9 +133,12 @@ func (e EnvironmentMapper) ToInternal(data map[string]interface{}) {
 				})
 			}
 		} else {
+			if targetKey == "" {
+				targetKey = sourceKey
+			}
 			switch source {
 			case "field":
-				envVar = append(envVarFrom, map[string]interface{}{
+				envVar = append(envVar, map[string]interface{}{
 					"name": targetKey,
 					"valueFrom": map[string]interface{}{
 						"fieldRef": map[string]interface{}{
@@ -143,7 +147,7 @@ func (e EnvironmentMapper) ToInternal(data map[string]interface{}) {
 					},
 				})
 			case "resource":
-				envVar = append(envVarFrom, map[string]interface{}{
+				envVar = append(envVar, map[string]interface{}{
 					"name": targetKey,
 					"valueFrom": map[string]interface{}{
 						"resourceFieldRef": map[string]interface{}{
@@ -154,7 +158,7 @@ func (e EnvironmentMapper) ToInternal(data map[string]interface{}) {
 					},
 				})
 			case "configMap":
-				envVar = append(envVarFrom, map[string]interface{}{
+				envVar = append(envVar, map[string]interface{}{
 					"name": targetKey,
 					"valueFrom": map[string]interface{}{
 						"configMapKeyRef": map[string]interface{}{
@@ -165,7 +169,7 @@ func (e EnvironmentMapper) ToInternal(data map[string]interface{}) {
 					},
 				})
 			case "secret":
-				envVar = append(envVarFrom, map[string]interface{}{
+				envVar = append(envVar, map[string]interface{}{
 					"name": targetKey,
 					"valueFrom": map[string]interface{}{
 						"secretKeyRef": map[string]interface{}{
