@@ -49,11 +49,6 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 
 	app.DefaultProxyDialer = utilnet.DialFunc(scaledContext.Dialer.LocalClusterDialer())
 
-	localClusterAuth, err := k8sProxyPkg.NewLocalProxy(scaledContext, scaledContext.Dialer, root)
-	if err != nil {
-		return err
-	}
-
 	rawAuthedAPIs := newAuthed(tokenAPI, managementAPI, k8sProxy)
 
 	authedHandler, err := authrequests.NewAuthenticationFilter(ctx, scaledContext, rawAuthedAPIs)
@@ -90,7 +85,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 
 	registerHealth(root)
 
-	dynamiclistener.Start(ctx, scaledContext, httpPort, httpsPort, localClusterAuth)
+	dynamiclistener.Start(ctx, scaledContext, httpPort, httpsPort, root)
 	return nil
 }
 
