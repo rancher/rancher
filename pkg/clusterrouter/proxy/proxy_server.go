@@ -60,13 +60,18 @@ func NewLocal(localConfig *rest.Config, cluster *v3.Cluster) (*RemoteService, er
 		return nil, err
 	}
 
-	return &RemoteService{
+	rs := &RemoteService{
 		cluster: cluster,
 		url: func() (url.URL, error) {
 			return *hostURL, nil
 		},
 		transport: transport,
-	}, nil
+	}
+	if localConfig.BearerToken != "" {
+		rs.auth = "Bearer " + localConfig.BearerToken
+	}
+
+	return rs, nil
 }
 
 func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory) (*RemoteService, error) {
