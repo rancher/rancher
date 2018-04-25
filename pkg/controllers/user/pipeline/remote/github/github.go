@@ -59,7 +59,7 @@ func New(pipeline v3.ClusterPipeline) (model.Remote, error) {
 }
 
 func (c *client) Type() string {
-	return "github"
+	return model.GithubType
 }
 
 func (c *client) CanLogin() bool {
@@ -127,10 +127,6 @@ func (c *client) DeleteHook(pipeline *v3.Pipeline, accessToken string) error {
 	return c.deleteGithubWebhook(user, repo, accessToken, pipeline.Status.WebHookID)
 }
 
-func (c *client) ParseHook(r *http.Request) {
-
-}
-
 func (c *client) GetAccount(accessToken string) (*v3.SourceCodeCredential, error) {
 	account, err := c.getGithubUser(accessToken)
 	if err != nil {
@@ -176,7 +172,7 @@ func convertAccount(gitaccount *github.User) *v3.SourceCodeCredential {
 		return nil
 	}
 	account := &v3.SourceCodeCredential{}
-	account.Spec.SourceCodeType = "github"
+	account.Spec.SourceCodeType = model.GithubType
 
 	account.Spec.AvatarURL = gitaccount.GetAvatarURL()
 	account.Spec.HTMLURL = gitaccount.GetHTMLURL()
