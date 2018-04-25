@@ -191,7 +191,7 @@ func (p *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *ty
 		result = append(result, p.fromInternal(schema, obj.Object))
 	}
 
-	return apiContext.AccessControl.FilterList(apiContext, schema, result, p.authContext), nil
+	return apiContext.AccessControl.FilterList(apiContext, schema, result), nil
 }
 
 func (p *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
@@ -237,7 +237,7 @@ func (p *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt *t
 			if event.Type == watch.Deleted && data.Object != nil {
 				data.Object[".removed"] = true
 			}
-			result <- apiContext.AccessControl.Filter(apiContext, schema, data.Object, p.authContext)
+			result <- apiContext.AccessControl.Filter(apiContext, schema, data.Object)
 		}
 		logrus.Debugf("closing watcher for %s", schema.ID)
 		close(result)
@@ -422,4 +422,7 @@ func (p *Store) fromInternal(schema *types.Schema, data map[string]interface{}) 
 	}
 
 	return data
+}
+func (p *Store) AuthContext(apiContext *types.APIContext) map[string]string {
+	return p.authContext
 }

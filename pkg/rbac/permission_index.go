@@ -86,7 +86,7 @@ type permissionIndex struct {
 	clusterRoleIndexKey string
 }
 
-func (p *permissionIndex) get(subjectName, apiGroup, resource string) []ListPermission {
+func (p *permissionIndex) get(subjectName, apiGroup, resource, verb string) []ListPermission {
 	var result []ListPermission
 
 	for _, binding := range p.getRoleBindings(subjectName) {
@@ -94,20 +94,20 @@ func (p *permissionIndex) get(subjectName, apiGroup, resource string) []ListPerm
 			continue
 		}
 
-		result = p.filterPermissions(result, binding.Namespace, binding.RoleRef.Kind, binding.RoleRef.Name, apiGroup, resource)
+		result = p.filterPermissions(result, binding.Namespace, binding.RoleRef.Kind, binding.RoleRef.Name, apiGroup, resource, verb)
 	}
 
 	for _, binding := range p.getClusterRoleBindings(subjectName) {
 		if binding.RoleRef.APIGroup != rbacGroup {
 			continue
 		}
-		result = p.filterPermissions(result, "*", binding.RoleRef.Kind, binding.RoleRef.Name, apiGroup, resource)
+		result = p.filterPermissions(result, "*", binding.RoleRef.Kind, binding.RoleRef.Name, apiGroup, resource, verb)
 	}
 
 	return result
 }
 
-func (p *permissionIndex) filterPermissions(result []ListPermission, namespace, kind, name, apiGroup, resource string) []ListPermission {
+func (p *permissionIndex) filterPermissions(result []ListPermission, namespace, kind, name, apiGroup, resource, verb string) []ListPermission {
 	nsForResourceNameGets := namespace
 	if namespace == "*" {
 		nsForResourceNameGets = ""
@@ -119,7 +119,12 @@ func (p *permissionIndex) filterPermissions(result []ListPermission, namespace, 
 		}
 
 		if len(rule.ResourceNames) > 0 {
-			if slice.ContainsString(rule.Verbs, "*") || slice.ContainsString(rule.Verbs, "get") {
+			// special case: if verb is list and this rule has resourceNames, check for the verb get instead of list
+			v := verb
+			if verb == "list" {
+				v = "get"
+			}
+			if slice.ContainsString(rule.Verbs, "*") || slice.ContainsString(rule.Verbs, v) {
 				for _, resourceName := range rule.ResourceNames {
 					result = append(result, ListPermission{
 						Namespace: nsForResourceNameGets,
@@ -130,7 +135,7 @@ func (p *permissionIndex) filterPermissions(result []ListPermission, namespace, 
 			continue
 		}
 
-		if slice.ContainsString(rule.Verbs, "*") || slice.ContainsString(rule.Verbs, "list") {
+		if slice.ContainsString(rule.Verbs, "*") || slice.ContainsString(rule.Verbs, verb) {
 			result = append(result, ListPermission{
 				Namespace: namespace,
 				Name:      "*",

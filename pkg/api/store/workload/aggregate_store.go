@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/types/client/project/v3"
@@ -156,6 +157,33 @@ func (a *AggregateStore) Delete(apiContext *types.APIContext, schema *types.Sche
 	}
 	_, shortID := splitTypeAndID(id)
 	return store.Delete(apiContext, a.Schemas[schemaType], shortID)
+}
+
+func (a *AggregateStore) AuthContext(apiContext *types.APIContext) map[string]string {
+	if apiContext.ID != "" {
+		store, _, err := a.getStore(apiContext.ID)
+		if err != nil {
+			return nil
+		}
+		return store.AuthContext(apiContext)
+	}
+
+	data, err := handler.ParseAndValidateBody(apiContext, true)
+	if err != nil {
+		return nil
+	}
+
+	// deployment is default if otherwise is not specified
+	kind := client.DeploymentType
+	toStore := a.Stores[kind]
+	for field, schemaID := range a.FieldToSchemaID {
+		if val, ok := data[field]; ok && val != nil {
+			toStore = a.Stores[schemaID]
+			break
+		}
+	}
+
+	return toStore.AuthContext(apiContext)
 }
 
 func (a *AggregateStore) getStore(id string) (types.Store, string, error) {

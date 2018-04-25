@@ -138,3 +138,7 @@ func (s *Store) traverseAndAdd(apiContext *types.APIContext, schema *types.Schem
 
 	return schemas
 }
+
+func (s *Store) AuthContext(apiContext *types.APIContext) map[string]string {
+	return nil
+}
