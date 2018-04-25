@@ -39,6 +39,8 @@ type NodesSyncer struct {
 	nodeClient       v1.NodeInterface
 	podLister        v1.PodLister
 	clusterNamespace string
+	clusterName      string
+	clusterLister    v3.ClusterLister
 }
 
 func Register(cluster *config.UserContext) {
@@ -54,6 +56,8 @@ func Register(cluster *config.UserContext) {
 		nodeLister:       cluster.Core.Nodes("").Controller().Lister(),
 		nodeClient:       cluster.Core.Nodes(""),
 		podLister:        cluster.Core.Pods("").Controller().Lister(),
+		clusterName:      cluster.ClusterName,
+		clusterLister:    cluster.Management.Management.Clusters("").Controller().Lister(),
 	}
 
 	p := &PodsStatsSyncer{
@@ -233,6 +237,14 @@ func (m *NodesSyncer) updateNode(existing *v3.Node, node *corev1.Node, pods map[
 }
 
 func (m *NodesSyncer) createNode(node *corev1.Node, pods map[string][]*corev1.Pod) error {
+	// do not create machine for rke cluster
+	cluster, err := m.clusterLister.Get("", m.clusterName)
+	if err != nil {
+		return err
+	}
+	if cluster.Spec.RancherKubernetesEngineConfig != nil {
+		return nil
+	}
 	// try to get machine from api, in case cache didn't get the update
 	existing, err := m.getNodeForNode(node, false)
 	if err != nil {
