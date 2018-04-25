@@ -90,7 +90,11 @@ func (npmgr *netpolMgr) programNetworkPolicy(projectID string) error {
 	}
 	logrus.Debugf("netpolMgr: programNetworkPolicy: namespaces=%+v", namespaces)
 
+	systemNamespaces := GetSystemNamespaces()
 	for _, aNS := range namespaces {
+		if systemNamespaces[aNS.Name] {
+			continue
+		}
 		if aNS.DeletionTimestamp != nil {
 			logrus.Debugf("netpolMgr: programNetworkPolicy: aNS=%+v marked for deletion, skipping", aNS)
 			continue
@@ -106,9 +110,9 @@ func (npmgr *netpolMgr) programNetworkPolicy(projectID string) error {
 				// An empty PodSelector selects all pods in this Namespace.
 				PodSelector: v1.LabelSelector{},
 				Ingress: []knetworkingv1.NetworkPolicyIngressRule{
-					knetworkingv1.NetworkPolicyIngressRule{
+					{
 						From: []knetworkingv1.NetworkPolicyPeer{
-							knetworkingv1.NetworkPolicyPeer{
+							{
 								NamespaceSelector: &v1.LabelSelector{
 									MatchLabels: map[string]string{nslabels.ProjectIDFieldLabel: projectID},
 								},
@@ -148,7 +152,7 @@ func (npmgr *netpolMgr) hostPortsUpdateHandler(pod *corev1.Pod) error {
 				MatchLabels: map[string]string{PodNameFieldLabel: pod.Name},
 			},
 			Ingress: []knetworkingv1.NetworkPolicyIngressRule{
-				knetworkingv1.NetworkPolicyIngressRule{
+				{
 					From:  []knetworkingv1.NetworkPolicyPeer{},
 					Ports: []knetworkingv1.NetworkPolicyPort{},
 				},
@@ -211,7 +215,7 @@ func (npmgr *netpolMgr) nodePortsUpdateHandler(service *corev1.Service) error {
 				MatchLabels: service.Spec.Selector,
 			},
 			Ingress: []knetworkingv1.NetworkPolicyIngressRule{
-				knetworkingv1.NetworkPolicyIngressRule{
+				{
 					From:  []knetworkingv1.NetworkPolicyPeer{},
 					Ports: []knetworkingv1.NetworkPolicyPort{},
 				},
@@ -287,7 +291,11 @@ func (npmgr *netpolMgr) handleHostNetwork() error {
 		return fmt.Errorf("couldn't list namespaces err=%v", err)
 	}
 
+	systemNamespaces := GetSystemNamespaces()
 	for _, aNS := range namespaces {
+		if systemNamespaces[aNS.Name] {
+			continue
+		}
 		if aNS.DeletionTimestamp != nil || aNS.Status.Phase == corev1.NamespaceTerminating {
 			logrus.Debugf("netpolMgr: handleHostNetwork: aNS=%+v marked for deletion/termination, skipping", aNS)
 			continue
