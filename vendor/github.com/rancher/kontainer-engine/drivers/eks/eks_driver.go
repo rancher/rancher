@@ -246,6 +246,11 @@ func (d *Driver) awsHTTPRequest(state state, url string, method string, data []b
 	if err != nil {
 		return nil, fmt.Errorf("error creating cluster: %v", err)
 	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return nil, fmt.Errorf("http response code was: %v", resp.StatusCode)
+	}
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -546,6 +551,10 @@ func (d *Driver) waitForClusterReady(state state) (*eksCluster, error) {
 		err = json.Unmarshal(resp, cluster)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing cluster: %v", err)
+		}
+
+		if cluster.Cluster.Status == nil {
+			return nil, fmt.Errorf("no cluster status was returned")
 		}
 
 		status = *cluster.Cluster.Status
