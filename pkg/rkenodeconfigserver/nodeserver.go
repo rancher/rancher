@@ -14,10 +14,15 @@ import (
 	"github.com/rancher/rancher/pkg/rkeworker"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/tunnelserver"
+	cluster2 "github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+)
+
+var (
+	b2Mount = "/mnt/sda1"
 )
 
 type RKENodeConfigServer struct {
@@ -128,7 +133,8 @@ func (n *RKENodeConfigServer) nonWorkerConfig(ctx context.Context, cluster *v3.C
 
 	for _, tempNode := range plan.Nodes {
 		if tempNode.Address == node.Status.NodeConfig.Address {
-			nc.Processes = augmentProcesses(tempNode.Processes, false)
+			b2d := strings.Contains(infos[tempNode.Address].OperatingSystem, cluster2.B2DOS)
+			nc.Processes = augmentProcesses(tempNode.Processes, false, b2d)
 			return nc, nil
 		}
 	}
@@ -168,7 +174,8 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 
 	for _, tempNode := range plan.Nodes {
 		if tempNode.Address == node.Status.NodeConfig.Address {
-			nc.Processes = augmentProcesses(tempNode.Processes, true)
+			b2d := strings.Contains(infos[tempNode.Address].OperatingSystem, cluster2.B2DOS)
+			nc.Processes = augmentProcesses(tempNode.Processes, true, b2d)
 			nc.Files = tempNode.Files
 			return nc, nil
 		}
@@ -177,13 +184,17 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 	return nil, fmt.Errorf("failed to find plan for %s", node.Status.NodeConfig.Address)
 }
 
-func augmentProcesses(processes map[string]v3.Process, worker bool) map[string]v3.Process {
+func augmentProcesses(processes map[string]v3.Process, worker, b2d bool) map[string]v3.Process {
 	var shared []string
+
+	if b2d {
+		shared = append(shared, b2Mount)
+	}
 
 	for _, process := range processes {
 		for _, bind := range process.Binds {
 			parts := strings.Split(bind, ":")
-			if len(parts) > 2 && (strings.Contains(parts[2], "shared") || strings.Contains(parts[2], "slave")) {
+			if len(parts) > 2 && strings.Contains(parts[2], "shared") {
 				shared = append(shared, parts[0])
 			}
 		}
