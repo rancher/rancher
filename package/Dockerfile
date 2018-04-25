@@ -15,7 +15,7 @@ WORKDIR /var/lib/rancher
 
 ENV CATTLE_UI_PATH /usr/share/rancher/ui
 ENV CATTLE_UI_VERSION 2.0.38
-ENV CATTLE_CLI_VERSION v1.0.0-alpha14
+ENV CATTLE_CLI_VERSION v2.0.0-rc1
 
 RUN mkdir -p /usr/share/rancher/ui && \
     cd /usr/share/rancher/ui && \
