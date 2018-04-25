@@ -112,7 +112,7 @@ system_images:
 ```
 As of version `0.1.6`, we consolidated several of those images into a single image to simplify and speed the deployment process.
 
-The following images are no longer required, and can be replaced by `rancher/rke-tools:v0.1.2`:
+The following images are no longer required, and can be replaced by `rancher/rke-tools:v0.1.4`:
 - alpine:latest
 - rancher/rke-nginx-proxy:v0.1.1
 - rancher/rke-cert-deployer:v0.1.1
