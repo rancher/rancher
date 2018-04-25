@@ -72,7 +72,7 @@ func resetPassword() {
 		admin.Password = hashedPass
 		admin.MustChangePassword = false
 		_, err = client.Users("").Update(&admin)
-		fmt.Fprintf(os.Stdout, "New passowrd for default admin user (%v):\n%s\n", admin.Name, pass)
+		fmt.Fprintf(os.Stdout, "New password for default admin user (%v):\n%s\n", admin.Name, pass)
 		return err
 	}
 
