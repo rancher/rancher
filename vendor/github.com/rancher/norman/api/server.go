@@ -228,6 +228,36 @@ func (s *Server) handle(rw http.ResponseWriter, req *http.Request) (*types.APICo
 
 		return apiRequest, handler(apiRequest, nextHandler)
 	} else if action != nil {
+		//for actionName, action := range schema.ResourceActions {
+		//	if action.SkipVerbBasedRBAC {
+		//		continue
+		//	}
+		//
+		//	verb := action.RBACVerb
+		//	if verb == "" {
+		//		verb = "udpate" // use update by default
+		//	}
+		//
+		//	if context.AccessControl.CanUpdate(context, input, schema) != nil {
+		//		delete(schema.ResourceActions, actionName)
+		//	}
+		//}
+		//
+		//a, ok := apiRequest.Schema.ResourceActions[action]
+		//if !ok {
+		//
+		//}
+		//if !a.SkipVerbBasedRBAC {
+		//	verb := action.RBACVerb
+		//	if verb == "" {
+		//		verb = "udpate" // use update by default
+		//	}
+		//
+		//	if err := apiRequest.AccessControl.CanDo(apiRequest, nil, apiRequest.Schema); err != nil {
+		//		return apiRequest, err
+		//	}
+		//}
+
 		return apiRequest, handleAction(action, apiRequest)
 	}
 

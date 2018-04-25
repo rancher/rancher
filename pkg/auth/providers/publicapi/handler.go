@@ -19,6 +19,7 @@ func NewHandler(ctx context.Context, mgmtCtx *config.ScaledContext) (http.Handle
 	}
 
 	server := normanapi.NewAPIServer()
+	server.AccessControl = mgmtCtx.AccessControl
 	if err := server.AddSchemas(schemas); err != nil {
 		return nil, err
 	}

@@ -158,6 +158,34 @@ func (a *AggregateStore) Delete(apiContext *types.APIContext, schema *types.Sche
 	return store.Delete(apiContext, a.Schemas[schemaType], shortID)
 }
 
+func (a *AggregateStore) AuthContext(apiContext *types.APIContext) map[string]string {
+	return nil
+	//if apiContext.ID != "" {
+	//	store, _, err := a.getStore(apiContext.ID)
+	//	if err != nil {
+	//		return nil
+	//	}
+	//	return store.AuthContext(apiContext)
+	//}
+	//
+	//data, err := handler.ParseAndValidateBody(apiContext, true)
+	//if err != nil {
+	//	return nil
+	//}
+	//
+	//// deployment is default if otherwise is not specified
+	//kind := client.DeploymentType
+	//toStore := a.Stores[kind]
+	//for field, schemaID := range a.FieldToSchemaID {
+	//	if val, ok := data[field]; ok && val != nil {
+	//		toStore = a.Stores[schemaID]
+	//		break
+	//	}
+	//}
+	//
+	//return toStore.AuthContext(apiContext)
+}
+
 func (a *AggregateStore) getStore(id string) (types.Store, string, error) {
 	typeName, _ := splitTypeAndID(id)
 	store, ok := a.Stores[typeName]

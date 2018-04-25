@@ -130,7 +130,24 @@ func (j *JSONResponseWriter) convert(b *builder.Builder, context *types.APIConte
 		schema.Formatter(context, rawResource)
 	}
 
+	for actionName, action := range schema.ResourceActions {
+		if err := checkAction(action, context, data, schema); err != nil {
+			delete(rawResource.Actions, actionName)
+		}
+	}
+
 	return rawResource
+}
+
+func checkAction(action types.Action, context *types.APIContext, input map[string]interface{}, schema *types.Schema) error {
+	if action.SkipVerbBasedRBAC {
+		return nil
+	}
+	verb := action.RBACVerb
+	if verb == "" {
+		verb = "udpate" // use update by default
+	}
+	return context.AccessControl.CanDo(verb, context, input, schema)
 }
 
 func (j *JSONResponseWriter) addLinks(b *builder.Builder, schema *types.Schema, context *types.APIContext, input map[string]interface{}, rawResource *types.RawResource) {

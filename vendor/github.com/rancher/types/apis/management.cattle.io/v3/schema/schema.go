@@ -151,11 +151,13 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 				return field
 			})
 			schema.ResourceActions["generateKubeconfig"] = types.Action{
-				Output: "generateKubeConfigOutput",
+				Output:   "generateKubeConfigOutput",
+				RBACVerb: "get",
 			}
 			schema.ResourceActions["importYaml"] = types.Action{
-				Input:  "importClusterYamlInput",
-				Output: "importYamlOutput",
+				Input:    "importClusterYamlInput",
+				Output:   "importYamlOutput",
+				RBACVerb: "get",
 			}
 		})
 }
@@ -178,8 +180,9 @@ func authzTypes(schemas *types.Schemas) *types.Schemas {
 		MustImportAndCustomize(&Version, v3.Project{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
 				"setpodsecuritypolicytemplate": {
-					Input:  "setPodSecurityPolicyTemplateInput",
-					Output: "project",
+					Input:             "setPodSecurityPolicyTemplateInput",
+					Output:            "project",
+					SkipVerbBasedRBAC: true,
 				},
 			}
 		}).
@@ -266,8 +269,9 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 			schema.ResourceMethods = []string{http.MethodGet}
 			schema.CollectionActions = map[string]types.Action{
 				"search": {
-					Input:  "searchPrincipalsInput",
-					Output: "collection",
+					Input:             "searchPrincipalsInput",
+					Output:            "collection",
+					SkipVerbBasedRBAC: true,
 				},
 			}
 		}).
@@ -277,8 +281,9 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 		MustImportAndCustomize(&Version, v3.User{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
 				"setpassword": {
-					Input:  "setPasswordInput",
-					Output: "user",
+					Input:             "setPasswordInput",
+					Output:            "user",
+					SkipVerbBasedRBAC: true,
 				},
 			}
 			schema.CollectionActions = map[string]types.Action{

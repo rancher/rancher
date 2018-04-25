@@ -42,6 +42,17 @@ func ValidateAction(request *types.APIContext) (*types.Action, error) {
 		}
 	}
 
+	if !action.SkipVerbBasedRBAC {
+		verb := action.RBACVerb
+		if verb == "" {
+			verb = "udpate" // use update by default
+		}
+
+		if err := request.AccessControl.CanDo(verb, request, nil, request.Schema); err != nil {
+			return nil, err
+		}
+	}
+
 	return &action, nil
 }
 
