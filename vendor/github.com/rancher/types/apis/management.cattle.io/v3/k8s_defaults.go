@@ -14,7 +14,7 @@ var (
 	K8sVersionToRKESystemImages = map[string]RKESystemImages{
 		"v1.8.10-rancher1-1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.0.17"),
-			Kubernetes:                m("rancher/hyperkube:v1.8.10-rancher1"),
+			Kubernetes:                m("rancher/hyperkube:v1.8.10-rancher2"),
 			Alpine:                    ToolsImage,
 			NginxProxy:                ToolsImage,
 			CertDownloader:            ToolsImage,
@@ -39,7 +39,7 @@ var (
 		},
 		"v1.8.11-rancher1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.0.17"),
-			Kubernetes:                m("rancher/hyperkube:v1.8.11-rancher1"),
+			Kubernetes:                m("rancher/hyperkube:v1.8.11-rancher2"),
 			Alpine:                    ToolsImage,
 			NginxProxy:                ToolsImage,
 			CertDownloader:            ToolsImage,
@@ -64,7 +64,7 @@ var (
 		},
 		"v1.9.7-rancher1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.1.12"),
-			Kubernetes:                m("rancher/hyperkube:v1.9.7-rancher1"),
+			Kubernetes:                m("rancher/hyperkube:v1.9.7-rancher2"),
 			Alpine:                    ToolsImage,
 			NginxProxy:                ToolsImage,
 			CertDownloader:            ToolsImage,
@@ -139,7 +139,7 @@ var (
 		},
 		"v1.10.1-rancher1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.1.12"),
-			Kubernetes:                m("rancher/hyperkube:v1.10.1-rancher1"),
+			Kubernetes:                m("rancher/hyperkube:v1.10.1-rancher2"),
 			Alpine:                    ToolsImage,
 			NginxProxy:                ToolsImage,
 			CertDownloader:            ToolsImage,
@@ -169,9 +169,11 @@ var (
 		"v1.10": {
 			KubeAPI: map[string]string{
 				"tls-cipher-suites": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305",
+				"feature-gates":     "MountPropagation=false",
 			},
 			Kubelet: map[string]string{
 				"tls-cipher-suites": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305",
+				"feature-gates":     "MountPropagation=false",
 			},
 		},
 	}
@@ -187,10 +189,10 @@ var (
 			AlertManagerHelper: m("rancher/alertmanager-helper:v0.0.2"),
 		},
 		PipelineSystemImages: PipelineSystemImages{
-			Jenkins:       m("jenkins/jenkins:lts"),
+			Jenkins:       m("jenkins/jenkins:2.107-slim"),
 			JenkinsJnlp:   m("jenkins/jnlp-slave:3.10-1-alpine"),
-			AlpineGit:     m("alpine/git"),
-			PluginsDocker: m("plugins/docker"),
+			AlpineGit:     m("alpine/git:1.0.4"),
+			PluginsDocker: m("plugins/docker:17.12"),
 		},
 		LoggingSystemImages: LoggingSystemImages{
 			Fluentd:                       m("rancher/fluentd:v0.1.7"),

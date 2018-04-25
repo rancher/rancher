@@ -427,7 +427,7 @@ func clusterUp(
 	local bool, configDir string, updateOnly, disablePortCheck bool) (string, string, string, string, map[string]pki.CertificatePKI, error) {
 	APIURL, caCrt, clientCert, clientKey, certs, err := cmd.ClusterUp(ctx, rkeConfig, dockerDialerFactory, localConnDialerFactory, k8sWrapTransport, local, configDir, updateOnly, disablePortCheck)
 	if err != nil {
-		log.Infof(ctx, "%v", err)
+		log.Warnf(ctx, "%v", err)
 	}
 	return APIURL, caCrt, clientCert, clientKey, certs, err
 }
