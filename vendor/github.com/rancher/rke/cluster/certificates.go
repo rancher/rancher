@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/rancher/rke/hosts"
@@ -38,7 +39,22 @@ func SetUpAuthentication(ctx context.Context, kubeCluster, currentCluster *Clust
 				return err
 			}
 			if kubeCluster.Certificates != nil {
-				log.Infof(ctx, "[certificates] Certificate backup found on[%s] hosts", backupPlane)
+				log.Infof(ctx, "[certificates] Certificate backup found on [%s] hosts", backupPlane)
+
+				// make sure I have all the etcd certs, We need handle dialer failure for etcd nodes https://github.com/rancher/rancher/issues/12898
+				for _, host := range kubeCluster.EtcdHosts {
+					certName := pki.GetEtcdCrtName(host.InternalAddress)
+					if kubeCluster.Certificates[certName].Certificate == nil {
+						if kubeCluster.Certificates, err = pki.RegenerateEtcdCertificate(ctx,
+							kubeCluster.Certificates,
+							host,
+							kubeCluster.EtcdHosts,
+							kubeCluster.ClusterDomain,
+							kubeCluster.KubernetesServiceIP); err != nil {
+							return err
+						}
+					}
+				}
 				// this is the case of adding controlplane node on empty cluster with only etcd nodes
 				if kubeCluster.Certificates[pki.KubeAdminCertName].Config == "" && len(kubeCluster.ControlPlaneHosts) > 0 {
 					if err := rebuildLocalAdminConfig(ctx, kubeCluster); err != nil {
@@ -102,9 +118,15 @@ func getClusterCerts(ctx context.Context, kubeClient *kubernetes.Clientset, etcd
 	certMap := make(map[string]pki.CertificatePKI)
 	for _, certName := range certificatesNames {
 		secret, err := k8s.GetSecret(kubeClient, certName)
-		if err != nil {
+		if err != nil && !strings.HasPrefix(certName, "kube-etcd") {
 			return nil, err
 		}
+		// If I can't find an etcd cert, I will not fail and will create it later.
+		if secret == nil && strings.HasPrefix(certName, "kube-etcd") {
+			certMap[certName] = pki.CertificatePKI{}
+			continue
+		}
+
 		secretCert, _ := cert.ParseCertsPEM(secret.Data["Certificate"])
 		secretKey, _ := cert.ParsePrivateKeyPEM(secret.Data["Key"])
 		secretConfig := string(secret.Data["Config"])
