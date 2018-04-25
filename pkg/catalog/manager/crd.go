@@ -23,8 +23,25 @@ const (
 )
 
 // update will sync templates with catalog without costing too much
-func (m *Manager) update(catalog *v3.Catalog, templates []v3.Template, versionCommits map[string]v3.VersionCommits, commit string) error {
+func (m *Manager) update(catalog *v3.Catalog, templates []v3.Template, toDeleteTemplate []string, versionCommits map[string]v3.VersionCommits, commit string) error {
 	logrus.Debugf("Syncing catalog %s with templates", catalog.Name)
+
+	// delete non-existing templates
+	for _, toDelete := range toDeleteTemplate {
+		logrus.Infof("Deleting template %s and its associated templateVersion", toDelete)
+		toDeleteTvs, err := m.getTemplateVersion(toDelete)
+		if err != nil {
+			return err
+		}
+		for tv := range toDeleteTvs {
+			if err := m.templateVersionClient.Delete(tv, &metav1.DeleteOptions{}); err != nil && !kerrors.IsNotFound(err) {
+				return err
+			}
+		}
+		if err := m.templateClient.Delete(toDelete, &metav1.DeleteOptions{}); err != nil && !kerrors.IsNotFound(err) {
+			return err
+		}
+	}
 
 	// list all existing templates
 	templateMap, err := m.getTemplateMap(catalog.Name)
@@ -170,6 +187,20 @@ func (m *Manager) updateTemplate(template *v3.Template, toUpdate v3.Template, ta
 			toCreate.Spec = templateVersion.Spec
 			logrus.Infof("Creating templateVersion %v", toCreate.Name)
 			if _, err := m.templateVersionClient.Create(toCreate); err != nil {
+				return err
+			}
+		}
+	}
+
+	// find existing templateVersion that is not in toUpdate.Versions
+	toUpdateTvs := map[string]struct{}{}
+	for _, toUpdateVer := range toUpdate.Spec.Versions {
+		toUpdateTvs[toUpdateVer.Version] = struct{}{}
+	}
+	for v, tv := range tvByVersion {
+		if _, ok := toUpdateTvs[v]; !ok {
+			logrus.Infof("Deleting templateVersion %s", tv.Name)
+			if err := m.templateVersionClient.Delete(tv.Name, &metav1.DeleteOptions{}); err != nil && !kerrors.IsNotFound(err) {
 				return err
 			}
 		}

@@ -112,8 +112,8 @@ func (m *Manager) prepareGitRepoPath(catalog v3.Catalog) (string, string, error)
 		}
 	} else {
 		// remove lock file
-		if _, err := os.Stat(path.Join(repoBranchHash, ".git", "index.lock")); err == nil {
-			os.RemoveAll(path.Join(repoBranchHash, ".git", "index.lock"))
+		if _, err := os.Stat(path.Join(repoPath, ".git", "index.lock")); err == nil {
+			os.RemoveAll(path.Join(repoPath, ".git", "index.lock"))
 		}
 		changed, err := m.remoteShaChanged(catalog.Spec.URL, catalog.Spec.Branch, catalog.Status.Commit, m.uuid)
 		if err != nil {
