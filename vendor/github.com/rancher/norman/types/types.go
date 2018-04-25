@@ -138,8 +138,10 @@ type Field struct {
 }
 
 type Action struct {
-	Input  string `json:"input,omitempty"`
-	Output string `json:"output,omitempty"`
+	Input             string `json:"input,omitempty"`
+	Output            string `json:"output,omitempty"`
+	RBACVerb          string `json:"-"`
+	SkipVerbBasedRBAC bool   `json:"-"`
 }
 
 type Filter struct {

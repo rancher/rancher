@@ -39,6 +39,13 @@ func (*AllAccess) CanUpdate(apiContext *types.APIContext, obj map[string]interfa
 	return httperror.NewAPIError(httperror.PermissionDenied, "can not update "+schema.ID)
 }
 
+func (*AllAccess) CanDo(verb string, apiContext *types.APIContext, obj map[string]interface{}, schema *types.Schema) error {
+	if slice.ContainsString(schema.ResourceMethods, verb) {
+		return nil
+	}
+	return httperror.NewAPIError(httperror.PermissionDenied, "can not "+verb+" "+schema.ID)
+}
+
 func (*AllAccess) CanDelete(apiContext *types.APIContext, obj map[string]interface{}, schema *types.Schema) error {
 	if slice.ContainsString(schema.ResourceMethods, http.MethodDelete) {
 		return nil

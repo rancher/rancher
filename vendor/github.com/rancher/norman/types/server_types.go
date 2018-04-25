@@ -74,6 +74,7 @@ type AccessControl interface {
 	CanGet(apiContext *APIContext, schema *Schema) error
 	CanUpdate(apiContext *APIContext, obj map[string]interface{}, schema *Schema) error
 	CanDelete(apiContext *APIContext, obj map[string]interface{}, schema *Schema) error
+	CanDo(verb string, apiContext *APIContext, obj map[string]interface{}, schema *Schema) error
 
 	Filter(apiContext *APIContext, schema *Schema, obj map[string]interface{}) map[string]interface{}
 	FilterList(apiContext *APIContext, schema *Schema, obj []map[string]interface{}) []map[string]interface{}

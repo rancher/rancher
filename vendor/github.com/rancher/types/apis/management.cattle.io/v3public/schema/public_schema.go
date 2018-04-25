@@ -35,8 +35,9 @@ func authProvidersTypes(schemas *types.Schemas) *types.Schemas {
 			schema.BaseType = "authProvider"
 			schema.ResourceActions = map[string]types.Action{
 				"login": {
-					Input:  "basicLogin",
-					Output: "token",
+					Input:    "basicLogin",
+					Output:   "token",
+					RBACVerb: "get",
 				},
 			}
 			schema.CollectionMethods = []string{}
@@ -48,8 +49,9 @@ func authProvidersTypes(schemas *types.Schemas) *types.Schemas {
 			schema.BaseType = "authProvider"
 			schema.ResourceActions = map[string]types.Action{
 				"login": {
-					Input:  "githubLogin",
-					Output: "token",
+					Input:    "githubLogin",
+					Output:   "token",
+					RBACVerb: "get",
 				},
 			}
 			schema.CollectionMethods = []string{}
@@ -61,8 +63,9 @@ func authProvidersTypes(schemas *types.Schemas) *types.Schemas {
 			schema.BaseType = "authProvider"
 			schema.ResourceActions = map[string]types.Action{
 				"login": {
-					Input:  "basicLogin",
-					Output: "token",
+					Input:    "basicLogin",
+					Output:   "token",
+					RBACVerb: "get",
 				},
 			}
 			schema.CollectionMethods = []string{}

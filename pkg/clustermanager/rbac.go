@@ -45,6 +45,14 @@ func (m *Manager) CanDelete(apiContext *types.APIContext, obj map[string]interfa
 	return ac.CanDelete(apiContext, obj, schema)
 }
 
+func (m *Manager) CanDo(verb string, apiContext *types.APIContext, obj map[string]interface{}, schema *types.Schema) error {
+	ac, err := m.getAccessControl(apiContext, schema)
+	if err != nil {
+		return err
+	}
+	return ac.CanDo(verb, apiContext, obj, schema)
+}
+
 func (m *Manager) Filter(apiContext *types.APIContext, schema *types.Schema, obj map[string]interface{}) map[string]interface{} {
 	ac, err := m.getAccessControl(apiContext, schema)
 	if err != nil {
