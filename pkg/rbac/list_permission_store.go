@@ -30,17 +30,17 @@ type ListPermission struct {
 	Name      string
 }
 
-func (l *ListPermissionStore) UserPermissions(subjectName, apiGroup, resource string) ListPermissionSet {
-	return getFromIndex(subjectName, apiGroup, resource, l.users)
+func (l *ListPermissionStore) UserPermissions(subjectName, apiGroup, resource, verb string) ListPermissionSet {
+	return getFromIndex(subjectName, apiGroup, resource, verb, l.users)
 }
 
-func (l *ListPermissionStore) GroupPermissions(subjectName, apiGroup, resource string) ListPermissionSet {
-	return getFromIndex(subjectName, apiGroup, resource, l.groups)
+func (l *ListPermissionStore) GroupPermissions(subjectName, apiGroup, resource, verb string) ListPermissionSet {
+	return getFromIndex(subjectName, apiGroup, resource, verb, l.groups)
 }
 
-func getFromIndex(subjectName, apiGroup, resource string, index *permissionIndex) ListPermissionSet {
+func getFromIndex(subjectName, apiGroup, resource, verb string, index *permissionIndex) ListPermissionSet {
 	result := ListPermissionSet{}
-	for _, value := range index.get(subjectName, apiGroup, resource) {
+	for _, value := range index.get(subjectName, apiGroup, resource, verb) {
 		result[value] = true
 	}
 	return result
