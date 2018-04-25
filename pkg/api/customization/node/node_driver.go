@@ -34,6 +34,11 @@ func (h *DriverHandlers) ActionHandler(actionName string, action *types.Action, 
 		return err
 	}
 
+	// passing nil as the resource only works because just namespace is grabbed from it and nodedriver is not namespaced
+	if err := apiContext.AccessControl.CanDo(v3.NodeDriverGroupVersionKind.Group, v3.NodeDriverResource.Name, "update", apiContext, nil, apiContext.Schema); err != nil {
+		return err
+	}
+
 	switch actionName {
 	case "activate":
 		m.Spec.Active = true
@@ -59,8 +64,10 @@ func (h *DriverHandlers) ActionHandler(actionName string, action *types.Action, 
 
 // Formatter for NodeDriver
 func (h *DriverHandlers) Formatter(apiContext *types.APIContext, resource *types.RawResource) {
-	resource.AddAction(apiContext, "activate")
-	resource.AddAction(apiContext, "deactivate")
+	if err := apiContext.AccessControl.CanDo(v3.NodeDriverGroupVersionKind.Group, v3.NodeDriverResource.Name, "update", apiContext, resource.Values, apiContext.Schema); err == nil {
+		resource.AddAction(apiContext, "activate")
+		resource.AddAction(apiContext, "deactivate")
+	}
 }
 
 type DriverHandler struct {
@@ -68,11 +75,17 @@ type DriverHandler struct {
 }
 
 func (h DriverHandler) LinkHandler(apiContext *types.APIContext, next types.RequestHandler) error {
-	var node client.Node
+	var node map[string]interface{}
 	if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, &node); err != nil {
 		return err
 	}
-	nodeID := strings.Split(node.ID, ":")[1]
+
+	if err := apiContext.AccessControl.CanDo(v3.NodeDriverGroupVersionKind.Group, v3.NodeDriverResource.Name, "update", apiContext, node, apiContext.Schema); err != nil {
+		return err
+	}
+
+	nID, _ := node["id"].(string)
+	nodeID := strings.Split(nID, ":")[1]
 	secret, err := h.SecretStore.Get(nodeID)
 	if err != nil {
 		return err
@@ -128,7 +141,7 @@ func (h DriverHandler) LinkHandler(apiContext *types.APIContext, next types.Requ
 	}
 	apiContext.Response.Header().Set("Content-Length", strconv.Itoa(len(buf.Bytes())))
 	apiContext.Response.Header().Set("Content-Type", "application/octet-stream")
-	apiContext.Response.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.zip", node.RequestedHostname))
+	apiContext.Response.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.zip", node[client.NodeSpecFieldRequestedHostname]))
 	apiContext.Response.Header().Set("Cache-Control", "private")
 	apiContext.Response.Header().Set("Pragma", "private")
 	apiContext.Response.Header().Set("Expires", "Wed 24 Feb 1982 18:42:00 GMT")
