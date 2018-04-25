@@ -68,8 +68,10 @@ func (t TemplateVerionFormatterWrapper) TemplateVersionFormatter(apiContext *typ
 
 	// app-readme
 	if _, ok := resource.Values["appReadme"]; ok {
-		delete(resource.Values, "readme")
-		resource.Links["app-readme"] = apiContext.URLBuilder.Link("app-readme", resource)
+		if convert.ToString(resource.Values["appReadme"]) != "" {
+			resource.Links["app-readme"] = apiContext.URLBuilder.Link("app-readme", resource)
+		}
+		delete(resource.Values, "appReadme")
 	}
 
 	version := resource.Values["version"].(string)

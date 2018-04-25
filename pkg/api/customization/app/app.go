@@ -75,7 +75,7 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		}
 		return nil
 	case "rollback":
-		revision := actionInput["revision"]
+		revision := actionInput["revisionId"]
 		if convert.ToString(revision) == "" {
 			return fmt.Errorf("revision is empty")
 		}

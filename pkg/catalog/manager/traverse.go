@@ -11,11 +11,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, map[string]v3.VersionCommits, []error, error) {
+func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []string, map[string]v3.VersionCommits, []error, error) {
 	logrus.Info("traversing files and generating templates")
 	index, err := helm.LoadIndex(repoPath)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	newHelmVersionCommits := map[string]v3.VersionCommits{}
 
@@ -32,11 +32,20 @@ func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, map[str
 		keywords := map[string]struct{}{}
 		// comparing version commit with the previous commit to detect if a template has been changed.
 		hasChanged := false
+		versionNumber := 0
 		for _, version := range metadata {
 			newHelmVersionCommits[chart].Value[version.Version] = version.Digest
-			if digest, ok := existingHelmVersionCommits[version.Version]; !ok || digest != version.Digest {
+			digest, ok := existingHelmVersionCommits[version.Version]
+			if !ok || digest != version.Digest {
 				hasChanged = true
 			}
+			if ok {
+				versionNumber++
+			}
+		}
+		// if there is a version getting deleted then also set hasChanged to true
+		if versionNumber != len(existingHelmVersionCommits) {
+			hasChanged = true
 		}
 		if !hasChanged {
 			logrus.Debugf("chart %s has not been changed. Skipping generating templates for it", chart)
@@ -81,7 +90,7 @@ func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, map[str
 					if strings.EqualFold(fmt.Sprintf("%s/%s", chart, f), file.Name) {
 						var value catalogYml
 						if err := yaml.Unmarshal([]byte(file.Contents), &value); err != nil {
-							return nil, nil, nil, err
+							return nil, nil, nil, nil, err
 						}
 						v.Questions = value.Questions
 						for _, category := range value.Categories {
@@ -118,7 +127,14 @@ func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, map[str
 
 		templates = append(templates, template)
 	}
-	return templates, newHelmVersionCommits, nil, nil
+
+	toDeleteChart := []string{}
+	for chart := range catalog.Status.HelmVersionCommits {
+		if _, ok := index.IndexFile.Entries[chart]; !ok {
+			toDeleteChart = append(toDeleteChart, fmt.Sprintf("%s-%s", catalog.Name, chart))
+		}
+	}
+	return templates, toDeleteChart, newHelmVersionCommits, nil, nil
 }
 
 var supportedFiles = []string{"catalog.yml", "catalog.yaml", "questions.yml", "questions.yaml"}

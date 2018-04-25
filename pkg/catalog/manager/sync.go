@@ -67,7 +67,7 @@ func (m *Manager) Sync(key string, obj *v3.Catalog) error {
 	}
 
 	catalog.Status.Commit = commit
-	templates, versionCommits, errs, err := traverseFiles(repoPath, catalog)
+	templates, toDeleteTemplate, versionCommits, errs, err := traverseFiles(repoPath, catalog)
 	if err != nil {
 		return errors.Wrap(err, "Repo traversal failed")
 	}
@@ -76,5 +76,5 @@ func (m *Manager) Sync(key string, obj *v3.Catalog) error {
 	}
 
 	logrus.Infof("Updating catalog %s", catalog.Name)
-	return m.update(catalog, templates, versionCommits, commit)
+	return m.update(catalog, templates, toDeleteTemplate, versionCommits, commit)
 }
