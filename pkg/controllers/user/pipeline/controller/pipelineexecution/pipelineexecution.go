@@ -164,21 +164,19 @@ func (l *Lifecycle) getHeadCommit(execution *v3.PipelineExecution) (string, erro
 	if err != nil {
 		return "", err
 	}
-	sourceCodeType := ""
-	if clusterPipeline.Spec.GithubConfig != nil {
-		sourceCodeType = "github"
-	}
 
 	sourceCodeCredentialID := sourceCodeConfig.SourceCodeCredentialName
 	url := sourceCodeConfig.URL
 	branch := sourceCodeConfig.Branch
 	ns, name := ref.Parse(sourceCodeCredentialID)
 	var credential *v3.SourceCodeCredential
+	sourceCodeType := ""
 	if sourceCodeCredentialID != "" {
 		credential, err = l.sourceCodeCredentialLister.Get(ns, name)
 		if err != nil {
 			return "", err
 		}
+		sourceCodeType = credential.Spec.SourceCodeType
 	}
 
 	client, err := remote.New(*clusterPipeline, sourceCodeType)

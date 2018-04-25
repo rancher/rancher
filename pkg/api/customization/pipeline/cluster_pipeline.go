@@ -9,12 +9,12 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/remote"
+	"github.com/rancher/rancher/pkg/controllers/user/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -136,31 +136,13 @@ func (h *ClusterPipelineHandler) authapp(apiContext *types.APIContext) error {
 	}
 
 	clientSecret := ""
-	if authAppInput.SourceCodeType == "github" {
-		clusterPipeline.Spec.GithubConfig = &v3.GithubClusterConfig{
-			TLS:         authAppInput.TLS,
-			Host:        authAppInput.Host,
-			ClientID:    authAppInput.ClientID,
-			RedirectURL: authAppInput.RedirectURL,
-		}
-
-		clientSecret = authAppInput.ClientSecret
-		if authAppInput.InheritGlobal {
-			globalConfig, err := h.getGithubConfigCR()
-			if err != nil {
-				return err
-			}
-			clusterPipeline.Spec.GithubConfig.TLS = globalConfig.TLS
-			clusterPipeline.Spec.GithubConfig.Host = globalConfig.Hostname
-			clusterPipeline.Spec.GithubConfig.ClientID = globalConfig.ClientID
-			clientSecret = globalConfig.ClientSecret
-		}
-	} else {
-		return fmt.Errorf("Error unsupported source code type %s", authAppInput.SourceCodeType)
+	if err := h.configClusterPipeline(authAppInput, clusterPipeline, &clientSecret); err != nil {
+		return err
 	}
 	//oauth and add user
 	clusterPipelineCopy := clusterPipeline.DeepCopy()
-	clusterPipelineCopy.Spec.GithubConfig.ClientSecret = clientSecret
+	h.configClusterPipelineClientSecret(clusterPipelineCopy, authAppInput.SourceCodeType, clientSecret)
+
 	userName := apiContext.Request.Header.Get("Impersonate-User")
 	sourceCodeCredential, err := h.authAddAccount(clusterPipelineCopy, authAppInput.SourceCodeType, userName, authAppInput.RedirectURL, authAppInput.Code)
 	if err != nil {
@@ -186,6 +168,50 @@ func (h *ClusterPipelineHandler) authapp(apiContext *types.APIContext) error {
 	return nil
 }
 
+func (h *ClusterPipelineHandler) configClusterPipeline(authAppInput v3.AuthAppInput, clusterPipeline *v3.ClusterPipeline, clientSecret *string) error {
+
+	if authAppInput.SourceCodeType == model.GithubType {
+		clusterPipeline.Spec.GithubConfig = &v3.GitAppConfig{
+			TLS:         authAppInput.TLS,
+			Host:        authAppInput.Host,
+			ClientID:    authAppInput.ClientID,
+			RedirectURL: authAppInput.RedirectURL,
+		}
+
+		*clientSecret = authAppInput.ClientSecret
+		if authAppInput.InheritGlobal {
+			globalConfig, err := h.getGithubConfigCR()
+			if err != nil {
+				return err
+			}
+			clusterPipeline.Spec.GithubConfig.TLS = globalConfig.TLS
+			clusterPipeline.Spec.GithubConfig.Host = globalConfig.Hostname
+			clusterPipeline.Spec.GithubConfig.ClientID = globalConfig.ClientID
+			*clientSecret = globalConfig.ClientSecret
+		}
+	} else if authAppInput.SourceCodeType == model.GitlabType {
+		clusterPipeline.Spec.GitlabConfig = &v3.GitAppConfig{
+			TLS:         authAppInput.TLS,
+			Host:        authAppInput.Host,
+			ClientID:    authAppInput.ClientID,
+			RedirectURL: authAppInput.RedirectURL,
+		}
+
+		*clientSecret = authAppInput.ClientSecret
+	} else {
+		return fmt.Errorf("Error unsupported source code type %s", authAppInput.SourceCodeType)
+	}
+	return nil
+}
+
+func (h *ClusterPipelineHandler) configClusterPipelineClientSecret(clusterPipeline *v3.ClusterPipeline, sourceCodeType string, clientSecret string) {
+	if sourceCodeType == model.GithubType && clusterPipeline.Spec.GithubConfig != nil {
+		clusterPipeline.Spec.GithubConfig.ClientSecret = clientSecret
+	} else if sourceCodeType == model.GitlabType && clusterPipeline.Spec.GitlabConfig != nil {
+		clusterPipeline.Spec.GitlabConfig.ClientSecret = clientSecret
+	}
+}
+
 func (h *ClusterPipelineHandler) authuser(apiContext *types.APIContext) error {
 
 	ns, name := ref.Parse(apiContext.ID)
@@ -203,19 +229,15 @@ func (h *ClusterPipelineHandler) authuser(apiContext *types.APIContext) error {
 		return err
 	}
 
-	if authUserInput.SourceCodeType == "github" && clusterPipeline.Spec.GithubConfig == nil {
-		return errors.New("github oauth app is not configured")
-	}
-
 	clientSecret, err := h.getClientSecret(ns, authUserInput.SourceCodeType)
 	if err != nil {
 		return err
 	}
 	clusterPipelineCopy := clusterPipeline.DeepCopy()
-	clusterPipelineCopy.Spec.GithubConfig.ClientSecret = clientSecret
+	h.configClusterPipelineClientSecret(clusterPipelineCopy, authUserInput.SourceCodeType, clientSecret)
+
 	//oauth and add user
 	userName := apiContext.Request.Header.Get("Impersonate-User")
-	logrus.Debugf("try auth with %v,%v,%v,%v,%v", clusterPipeline, authUserInput.SourceCodeType, userName, authUserInput.RedirectURL, authUserInput.Code)
 	account, err := h.authAddAccount(clusterPipelineCopy, authUserInput.SourceCodeType, userName, authUserInput.RedirectURL, authUserInput.Code)
 	if err != nil {
 		return err
@@ -240,6 +262,7 @@ func (h *ClusterPipelineHandler) revokeapp(apiContext *types.APIContext) error {
 	}
 
 	clusterPipeline.Spec.GithubConfig = nil
+	clusterPipeline.Spec.GitlabConfig = nil
 	_, err = h.ClusterPipelines.Update(clusterPipeline)
 	if err != nil {
 		return err

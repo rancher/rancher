@@ -22,4 +22,8 @@ func RegisterDrivers(Management *config.ScaledContext) {
 		Pipelines:          pipelines,
 		PipelineExecutions: pipelineExecutions,
 	}
+	Drivers[drivers.GitlabWebhookHeader] = drivers.GitlabDriver{
+		Pipelines:          pipelines,
+		PipelineExecutions: pipelineExecutions,
+	}
 }

@@ -98,7 +98,7 @@ func (s *Syncer) Sync(key string, obj *v3.ClusterPipeline) error {
 	//ensure clusterpipeline singleton in the cluster
 	utils.InitClusterPipeline(s.clusterPipelines, obj.Spec.ClusterName)
 
-	if obj.Spec.GithubConfig == nil {
+	if !isPipelineEnabled(obj) {
 		if err := s.cleanUp(obj.Spec.ClusterName); err != nil {
 			return err
 		}
@@ -234,4 +234,14 @@ func (s *Syncer) cleanUpInNamespace(ns string) error {
 	}
 
 	return nil
+}
+
+func isPipelineEnabled(clusterPipeline *v3.ClusterPipeline) bool {
+	if clusterPipeline == nil {
+		return false
+	}
+	if clusterPipeline.Spec.GitlabConfig == nil && clusterPipeline.Spec.GithubConfig == nil {
+		return false
+	}
+	return true
 }

@@ -2,7 +2,6 @@ package model
 
 import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
-	"net/http"
 )
 
 type Remote interface {
@@ -22,8 +21,6 @@ type Remote interface {
 	CreateHook(pipeline *v3.Pipeline, accessToken string) (string, error)
 
 	DeleteHook(pipeline *v3.Pipeline, accessToken string) error
-
-	ParseHook(r *http.Request)
 
 	GetPipelineFileInRepo(repoURL string, ref string, accessToken string) ([]byte, error)
 
