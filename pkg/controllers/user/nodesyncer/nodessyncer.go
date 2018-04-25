@@ -364,6 +364,22 @@ func (m *NodesSyncer) convertNodeToNode(node *corev1.Node, existing *v3.Node, po
 	for name, quantity := range limits {
 		machine.Status.Limits[name] = quantity
 	}
+	if node.Labels != nil {
+		if _, ok := node.Labels["node-role.kubernetes.io/etcd"]; ok {
+			machine.Spec.Etcd = true
+		}
+		if _, ok := node.Labels["node-role.kubernetes.io/controlplane"]; ok {
+			machine.Spec.ControlPlane = true
+		}
+
+		if _, ok := node.Labels["node-role.kubernetes.io/master"]; ok {
+			machine.Spec.ControlPlane = true
+		}
+
+		if _, ok := node.Labels["node-role.kubernetes.io/worker"]; ok {
+			machine.Spec.Worker = true
+		}
+	}
 
 	machine.Status.NodeAnnotations = node.Annotations
 	machine.Status.NodeLabels = node.Labels
