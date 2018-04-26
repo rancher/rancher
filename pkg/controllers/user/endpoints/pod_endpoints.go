@@ -120,6 +120,10 @@ func (c *PodsController) updatePodEndpoints(obj *corev1.Pod, services []*corev1.
 	if err != nil {
 		return false, err
 	}
+	allNodesIP, err := getAllNodesPublicEndpointIP(c.machinesLister, c.clusterName)
+	if err != nil {
+		return false, err
+	}
 	// b) from services
 	for _, svc := range services {
 		if svc.Namespace != obj.Namespace {
@@ -131,7 +135,7 @@ func (c *PodsController) updatePodEndpoints(obj *corev1.Pod, services []*corev1.
 		}
 		selector := labels.SelectorFromSet(set)
 		if selector.Matches(labels.Set(obj.Labels)) {
-			eps, err := convertServiceToPublicEndpoints(svc, "", nil)
+			eps, err := convertServiceToPublicEndpoints(svc, "", nil, allNodesIP)
 			if err != nil {
 				return false, err
 			}
