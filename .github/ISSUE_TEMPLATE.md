@@ -1,6 +1,6 @@
 **Rancher versions:**
-rancher/server:
-rancher/agent:
+rancher/server or rancher/rancher:
+rancher/agent or rancher/rancher-agent:
 
 **Infrastructure Stack versions:**
 healthcheck:
