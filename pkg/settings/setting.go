@@ -20,6 +20,7 @@ var (
 	EngineSupportedRange            = newSetting("engine-supported-range", "~v1.11.2 || ~v1.12.0 || ~v1.13.0 || ~v17.03.0")
 	FirstLogin                      = newSetting("first-login", "true")
 	HelmVersion                     = newSetting("helm-version", "dev")
+	IngressIPDomain                 = newSetting("ingress-ip-domain", "xip.io")
 	InstallUUID                     = newSetting("install-uuid", "")
 	KubernetesVersion               = newSetting("k8s-version", v3.DefaultK8s)
 	KubernetesVersionToSystemImages = newSetting("k8s-version-to-images", getSystemImages())
