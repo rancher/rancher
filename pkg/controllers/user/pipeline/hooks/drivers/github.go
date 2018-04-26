@@ -19,8 +19,6 @@ import (
 
 const (
 	GithubWebhookHeader = "X-GitHub-Event"
-	RefsBranchPrefix    = "refs/heads/"
-	RefsTagPrefix       = "refs/tags/"
 )
 
 type GithubDriver struct {
@@ -132,20 +130,4 @@ func VerifyGithubWebhookSignature(secret []byte, signature string, body []byte) 
 	computed.Write(body)
 
 	return hmac.Equal([]byte(computed.Sum(nil)), actual)
-}
-
-func VerifyBranch(config *v3.SourceCodeConfig, branch string) bool {
-	if config.BranchCondition == "all" {
-		return true
-	} else if config.BranchCondition == "except" {
-		if config.Branch == branch {
-			return false
-		}
-		return true
-	} else if config.Branch == branch {
-		return true
-
-	}
-
-	return false
 }
