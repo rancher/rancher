@@ -28,6 +28,7 @@ import (
 
 const (
 	defaultEngineInstallURL = "https://releases.rancher.com/install-docker/17.03.2.sh"
+	amazonec2               = "amazonec2"
 )
 
 func Register(management *config.ManagementContext) {
@@ -136,6 +137,9 @@ func (m *Lifecycle) Create(obj *v3.Node) (*v3.Node, error) {
 		rawConfig, ok := values.GetValue(rawTemplate.(*unstructured.Unstructured).Object, template.Spec.Driver+"Config")
 		if !ok {
 			return obj, fmt.Errorf("node config not specified")
+		}
+		if template.Spec.Driver == amazonec2 {
+			setEc2ClusterIDTag(rawConfig, obj.Namespace)
 		}
 
 		bytes, err := json.Marshal(rawConfig)
