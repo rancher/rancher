@@ -56,7 +56,7 @@ func registerClusterLogging(cluster *config.UserContext) {
 		daemonsets:           cluster.Apps.DaemonSets(loggingconfig.LoggingNamespace),
 		deployments:          cluster.Apps.Deployments(loggingconfig.LoggingNamespace),
 		deploymentLister:     cluster.Apps.Deployments("").Controller().Lister(),
-		k8sNodeLister:        cluster.Management.Core.Nodes("").Controller().Lister(),
+		k8sNodeLister:        cluster.Core.Nodes("").Controller().Lister(),
 		namespaces:           cluster.Core.Namespaces(""),
 		nodeLister:           cluster.Management.Management.Nodes("").Controller().Lister(),
 		endpointLister:       cluster.Core.Endpoints("").Controller().Lister(),
