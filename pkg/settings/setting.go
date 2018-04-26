@@ -16,6 +16,7 @@ var (
 	CLIURLLinux                     = newSetting("cli-url-linux", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-linux-amd64-v1.0.0-alpha8.tar.gz")
 	CLIURLWindows                   = newSetting("cli-url-windows", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-windows-386-v1.0.0-alpha8.zip")
 	EngineInstallURL                = newSetting("engine-install-url", "https://releases.rancher.com/install-docker/17.03.sh")
+	EngineISOURL                    = newSetting("engine-iso-url", "https://github.com/boot2docker/boot2docker/releases/download/v17.03.2-ce/boot2docker.iso")
 	EngineNewestVersion             = newSetting("engine-newest-version", "v17.12.0")
 	EngineSupportedRange            = newSetting("engine-supported-range", "~v1.11.2 || ~v1.12.0 || ~v1.13.0 || ~v17.03.0")
 	FirstLogin                      = newSetting("first-login", "true")
