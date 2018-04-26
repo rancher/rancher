@@ -235,54 +235,22 @@ func RemoveEmbeddedTarget(dep rv1beta2.DeploymentInterface, sa rv1.ServiceAccoun
 	return nil
 }
 
-func UpdateEmbeddedEndpoint(deploymentLister rv1beta2.DeploymentLister, endpointLister rv1.EndpointsLister, serviceLister rv1.ServiceLister, clusterLoggings v3.ClusterLoggingInterface, nodeLister v3.NodeLister, k8sNodeLister rv1.NodeLister, clusterName string) error {
-	cls, err := clusterLoggings.List(metav1.ListOptions{})
-	if err != nil {
-		return fmt.Errorf("get cluterlogging failed, %v", err)
-	}
-	if len(cls.Items) == 0 {
-		return fmt.Errorf("not clusterlogging found")
-	}
-	cl := cls.Items[0]
-	if cl.Spec.EmbeddedConfig == nil {
-		return fmt.Errorf("embedded configuration should not be nil when update embedded endpoint")
-
-	}
-	updated := false
-
+func GetEmbeddedEndpoint(deploymentLister rv1beta2.DeploymentLister, endpointLister rv1.EndpointsLister, serviceLister rv1.ServiceLister, nodeLister v3.NodeLister, k8sNodeLister rv1.NodeLister, clusterName string) (string, string, error) {
 	esEndpoint, err := getEndpoint(deploymentLister, endpointLister, serviceLister, nodeLister, k8sNodeLister, clusterName, loggingconfig.EmbeddedESName)
 	if err != nil {
-		return fmt.Errorf("get elasticsearch endpoint failed, %v", err)
-	}
-
-	if cl.Spec.EmbeddedConfig.ElasticsearchEndpoint != esEndpoint {
-		updated = true
-
-		cl.Spec.EmbeddedConfig.ElasticsearchEndpoint = esEndpoint
+		return "", "", fmt.Errorf("get elasticsearch endpoint failed, %v", err)
 	}
 
 	kibanaEndpoint, err := getEndpoint(deploymentLister, endpointLister, serviceLister, nodeLister, k8sNodeLister, clusterName, loggingconfig.EmbeddedKibanaName)
 	if err != nil {
-		return fmt.Errorf("get kibana endpoint failed, %v", err)
-	}
-
-	if cl.Spec.EmbeddedConfig.KibanaEndpoint != kibanaEndpoint {
-		updated = true
-		cl.Spec.EmbeddedConfig.KibanaEndpoint = kibanaEndpoint
-	}
-
-	if !updated {
-		return nil
-	}
-
-	if _, err = clusterLoggings.Update(&cl); err != nil {
-		return fmt.Errorf("update embedded logging endpoint failed, %v", err)
+		return "", "", fmt.Errorf("get kibana endpoint failed, %v", err)
 	}
 
 	if esEndpoint == "" || kibanaEndpoint == "" {
-		return fmt.Errorf("embedded endpoint not set completely")
+		return esEndpoint, kibanaEndpoint, fmt.Errorf("embedded endpoint is empty")
 	}
-	return nil
+
+	return esEndpoint, kibanaEndpoint, nil
 }
 
 func updateEmbeddedQuota(dep rv1beta2.DeploymentInterface, obj *v3.ClusterLogging) error {
@@ -711,14 +679,13 @@ func newKibanaDeployment(namespace string) *v1beta2.Deployment {
 	return deployment
 }
 
-func UpdateEmbeddedEndpointWithRetry(ctx context.Context, deploymentLister rv1beta2.DeploymentLister, endpointLister rv1.EndpointsLister, serviceLister rv1.ServiceLister, clusterLoggings v3.ClusterLoggingInterface, nodeLister v3.NodeLister, k8sNodeLister rv1.NodeLister, clusterName string, logger logstream.LoggerStream) error {
-	timeout := time.After(3 * time.Minute)
+func GetEmbeddedEndpointWithRetry(ctx context.Context, deploymentLister rv1beta2.DeploymentLister, endpointLister rv1.EndpointsLister, serviceLister rv1.ServiceLister, clusterLoggings v3.ClusterLoggingInterface, nodeLister v3.NodeLister, k8sNodeLister rv1.NodeLister, clusterName string, logger logstream.LoggerStream) (string, string, error) {
+	timeout := time.After(1 * time.Minute)
 	ticker := time.NewTicker(10 * time.Second)
-
+	var esEndpoint, kibanaEndpoint string
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-	updated := false
-	errCh := make(chan error, 18)
+	errCh := make(chan error, 6)
 	go func() {
 		defer wg.Done()
 		for {
@@ -726,12 +693,12 @@ func UpdateEmbeddedEndpointWithRetry(ctx context.Context, deploymentLister rv1be
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				err := UpdateEmbeddedEndpoint(deploymentLister, endpointLister, serviceLister, clusterLoggings, nodeLister, k8sNodeLister, clusterName)
+				var err error
+				esEndpoint, kibanaEndpoint, err = GetEmbeddedEndpoint(deploymentLister, endpointLister, serviceLister, nodeLister, k8sNodeLister, clusterName)
 				if err != nil {
 					logger.Infof("Get embedded components status failed, %s", err.Error())
 					errCh <- err
 				} else {
-					updated = true
 					return
 				}
 			case <-timeout:
@@ -746,11 +713,11 @@ func UpdateEmbeddedEndpointWithRetry(ctx context.Context, deploymentLister rv1be
 	for e := range errCh {
 		errs = append(errs, e)
 	}
-	if updated {
-		return nil
-	}
 
-	return errs[len(errs)-1]
+	if len(errs) != 0 {
+		return "", "", errs[len(errs)-1]
+	}
+	return esEndpoint, kibanaEndpoint, nil
 }
 
 func int32Ptr(i int32) *int32 { return &i }

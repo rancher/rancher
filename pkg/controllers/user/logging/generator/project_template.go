@@ -1,6 +1,7 @@
 package generator
 
 var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
+{{ if $store.CurrentTarget }}
 <source>
    @type  tail
    path  /var/log/containers/*.log
@@ -43,7 +44,6 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
   remove_keys namespace
 </filter>
 
-{{ if $store.CurrentTarget }}
 <match  {{$store.ProjectName}}.** project-custom.{{$store.ProjectName}}.**> 
     {{ if eq $store.CurrentTarget "elasticsearch"}}
     @type elasticsearch

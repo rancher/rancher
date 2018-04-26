@@ -1,6 +1,6 @@
 package generator
 
-var ClusterTemplate = `{{ if ne .clusterTarget.CurrentTarget "none" }}
+var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
 
 <source>
   @type  tail

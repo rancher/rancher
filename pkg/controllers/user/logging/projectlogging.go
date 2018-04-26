@@ -2,6 +2,7 @@ package logging
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -23,10 +24,10 @@ const (
 	ProjectIDAnnotation = "field.cattle.io/projectId"
 )
 
-// ProjectLoggingLifecycle listens for projectLogging CRD in management API
+// ProjectLoggingSyncer listens for projectLogging CRD in management API
 // and update the changes to configmap, deploy fluentd
 
-type ProjectLoggingLifecycle struct {
+type ProjectLoggingSyncer struct {
 	clusterName          string
 	clusterLister        v3.ClusterLister
 	clusterRoleBindings  rbacv1.ClusterRoleBindingInterface
@@ -40,7 +41,7 @@ type ProjectLoggingLifecycle struct {
 
 func registerProjectLogging(cluster *config.UserContext) {
 	projectLoggings := cluster.Management.Management.ProjectLoggings("")
-	lifecycle := &ProjectLoggingLifecycle{
+	syncer := &ProjectLoggingSyncer{
 		clusterName:          cluster.ClusterName,
 		clusterLister:        cluster.Management.Management.Clusters("").Controller().Lister(),
 		clusterRoleBindings:  cluster.RBAC.ClusterRoleBindings(loggingconfig.LoggingNamespace),
@@ -51,51 +52,70 @@ func registerProjectLogging(cluster *config.UserContext) {
 		projectLoggings:      projectLoggings,
 		serviceAccounts:      cluster.Core.ServiceAccounts(loggingconfig.LoggingNamespace),
 	}
-	projectLoggings.AddClusterScopedLifecycle("project-logging-controller", cluster.ClusterName, lifecycle)
+	projectLoggings.AddClusterScopedHandler("project-logging-controller", cluster.ClusterName, syncer.Sync)
 }
 
-func (c *ProjectLoggingLifecycle) Create(obj *v3.ProjectLogging) (*v3.ProjectLogging, error) {
-	newObj, err := v3.LoggingConditionProvisioned.DoUntilTrue(obj, func() (runtime.Object, error) {
-		return obj, provision(c.namespaces, c.configmaps, c.serviceAccounts, c.clusterRoleBindings, c.daemonsets, c.clusterLister, c.clusterName)
-	})
+func (c *ProjectLoggingSyncer) Sync(key string, obj *v3.ProjectLogging) error {
+	if obj == nil || obj.DeletionTimestamp != nil || utils.GetProjectTarget(obj.Spec) == "none" {
+		isAllDisable, err := utils.CleanResource(c.namespaces, c.clusterLoggingLister, c.projectLoggings.Controller().Lister(), nil, obj)
+		if err != nil {
+			return err
+		}
 
-	return newObj.(*v3.ProjectLogging), err
-}
-func (c *ProjectLoggingLifecycle) Updated(obj *v3.ProjectLogging) (*v3.ProjectLogging, error) {
-	newObj, err := v3.LoggingConditionProvisioned.DoUntilTrue(obj, func() (runtime.Object, error) {
-		return obj, provision(c.namespaces, c.configmaps, c.serviceAccounts, c.clusterRoleBindings, c.daemonsets, c.clusterLister, c.clusterName)
-	})
-	if err != nil {
-		return newObj.(*v3.ProjectLogging), err
+		if obj != nil && !isAllDisable {
+			if err = c.createOrUpdateProjectConfigMap(obj.Name); err != nil {
+				return err
+			}
+		}
+
+		var updateErr error
+		if obj != nil && !reflect.DeepEqual(obj.Spec, obj.Status.AppliedSpec) {
+			updatedObj := obj.DeepCopy()
+			updatedObj.Status.AppliedSpec = obj.Spec
+			_, updateErr = c.projectLoggings.Update(updatedObj)
+		}
+		return updateErr
 	}
 
-	newObj, err = v3.LoggingConditionUpdated.Do(newObj, func() (runtime.Object, error) {
-		return obj, c.createOrUpdateProjectConfigMap("")
-	})
+	original := obj
+	obj = original.DeepCopy()
 
+	newObj, err := c.doSync(obj)
 	if err != nil {
-		return newObj.(*v3.ProjectLogging), err
+		return err
 	}
 
-	pl := newObj.(*v3.ProjectLogging)
-	pl.Status.AppliedSpec = pl.Spec
-	return pl, nil
+	if newObj != nil && !reflect.DeepEqual(newObj, original) {
+		if _, err = c.projectLoggings.Update(newObj); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-func (c *ProjectLoggingLifecycle) Remove(obj *v3.ProjectLogging) (*v3.ProjectLogging, error) {
-	isAllDisable, err := utils.CleanResource(c.namespaces, c.clusterLoggingLister, c.projectLoggings.Controller().Lister())
+func (c *ProjectLoggingSyncer) doSync(obj *v3.ProjectLogging) (*v3.ProjectLogging, error) {
+	newObj := obj.DeepCopy()
+	_, err := v3.LoggingConditionProvisioned.Do(obj, func() (runtime.Object, error) {
+		return obj, provision(c.namespaces, c.configmaps, c.serviceAccounts, c.clusterRoleBindings, c.daemonsets, c.clusterLister, c.clusterName)
+	})
 	if err != nil {
 		return obj, err
 	}
 
-	if !isAllDisable {
-		return obj, c.createOrUpdateProjectConfigMap(obj.Name)
+	_, err = v3.LoggingConditionUpdated.Do(obj, func() (runtime.Object, error) {
+		return obj, c.createOrUpdateProjectConfigMap("")
+	})
+
+	if err != nil {
+		return obj, err
 	}
 
-	return obj, nil
+	newObj.Status.AppliedSpec = obj.Spec
+	return newObj, nil
 }
 
-func (c *ProjectLoggingLifecycle) createOrUpdateProjectConfigMap(excludeName string) error {
+func (c *ProjectLoggingSyncer) createOrUpdateProjectConfigMap(excludeName string) error {
 	projectLoggings, err := c.projectLoggings.Controller().Lister().List("", labels.NewSelector())
 	if err != nil {
 		return errors.Wrap(err, "list project logging failed")
