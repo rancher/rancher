@@ -83,6 +83,12 @@ services:
 #   plugin: flannel
 #   options:
 #     flannel_iface: eth1
+# To specify flannel interface for canal plugin, you can use the 'canal_iface' option:
+# network:
+#   plugin: canal
+#   options:
+#     canal_iface: eth1
+
 
 network:
   plugin: flannel

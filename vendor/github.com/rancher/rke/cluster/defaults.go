@@ -169,6 +169,9 @@ func (c *Cluster) setClusterNetworkDefaults() {
 	if c.Network.FlannelNetworkProvider != nil {
 		networkPluginConfigDefaultsMap[FlannelIface] = c.Network.FlannelNetworkProvider.Iface
 	}
+	if c.Network.CanalNetworkProvider != nil {
+		networkPluginConfigDefaultsMap[CanalIface] = c.Network.CanalNetworkProvider.Iface
+	}
 	for k, v := range networkPluginConfigDefaultsMap {
 		setDefaultIfEmptyMapValue(c.Network.Options, k, v)
 	}

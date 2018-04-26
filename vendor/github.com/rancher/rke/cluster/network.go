@@ -56,6 +56,7 @@ const (
 	CanalNodeImage     = "canal_node_image"
 	CanalCNIImage      = "canal_cni_image"
 	CanalFlannelImage  = "canal_flannel_image"
+	CanalIface         = "canal_iface"
 
 	WeaveNetworkPlugin = "weave"
 	WeaveImage         = "weave_node_image"
@@ -94,6 +95,7 @@ const (
 	Calicoctl = "Calicoctl"
 
 	FlannelInterface = "FlannelInterface"
+	CanalInterface   = "CanalInterface"
 	RBACConfig       = "RBACConfig"
 )
 
@@ -172,6 +174,7 @@ func (c *Cluster) doCanalDeploy(ctx context.Context) error {
 		CNIImage:        c.SystemImages.CanalCNI,
 		CanalFlannelImg: c.SystemImages.CanalFlannel,
 		RBACConfig:      c.Authorization.Mode,
+		CanalInterface:  c.Network.Options[CanalIface],
 	}
 	pluginYaml, err := c.getNetworkPluginManifest(canalConfig)
 	if err != nil {
