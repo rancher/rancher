@@ -57,8 +57,8 @@ func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.Act
 	}
 
 	samName := username
-	if strings.Contains(username, "\\") {
-		samName = strings.SplitN(username, "\\\\", 2)[1]
+	if strings.Contains(username, `\`) {
+		samName = strings.SplitN(username, `\`, 2)[1]
 	}
 	query := "(" + config.UserLoginAttribute + "=" + ldapv2.EscapeFilter(samName) + ")"
 	logrus.Debugf("LDAP Search query: {%s}", query)
