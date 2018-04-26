@@ -102,7 +102,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	TemplateVersion(schemas, apiContext)
 	User(schemas, apiContext)
 	Catalog(schemas, apiContext)
-	SecretTypes(schemas, apiContext)
+	SecretTypes(ctx, schemas, apiContext)
 	App(schemas, apiContext, clusterManager)
 	Setting(schemas)
 	Preference(schemas, apiContext)
@@ -223,9 +223,9 @@ func NodeTemplates(schemas *types.Schemas, management *config.ScaledContext) {
 	schema.Validator = nodetemplate.Validator
 }
 
-func SecretTypes(schemas *types.Schemas, management *config.ScaledContext) {
+func SecretTypes(ctx context.Context, schemas *types.Schemas, management *config.ScaledContext) {
 	secretSchema := schemas.Schema(&projectschema.Version, projectclient.SecretType)
-	secretSchema.Store = proxy.NewProxyStore(management.ClientGetter,
+	secretSchema.Store = proxy.NewProxyStore(ctx, management.ClientGetter,
 		config.ManagementStorageContext,
 		[]string{"api"},
 		"",
