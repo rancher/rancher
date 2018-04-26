@@ -74,6 +74,9 @@ type AccessControl interface {
 	CanGet(apiContext *APIContext, schema *Schema) error
 	CanUpdate(apiContext *APIContext, obj map[string]interface{}, schema *Schema) error
 	CanDelete(apiContext *APIContext, obj map[string]interface{}, schema *Schema) error
+	// CanDo function should not yet be used if a corresponding specific method exists. It has been added to
+	// satisfy a specific usecase for the short term until full-blown dynamic RBAC can be implemented.
+	CanDo(apiGroup, resource, verb string, apiContext *APIContext, obj map[string]interface{}, schema *Schema) error
 
 	Filter(apiContext *APIContext, schema *Schema, obj map[string]interface{}, context map[string]string) map[string]interface{}
 	FilterList(apiContext *APIContext, schema *Schema, obj []map[string]interface{}, context map[string]string) []map[string]interface{}

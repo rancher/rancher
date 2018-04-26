@@ -400,6 +400,7 @@ type FlannelNetworkProvider struct {
 }
 
 type CanalNetworkProvider struct {
+	FlannelNetworkProvider `yaml:",inline" json:",inline"`
 }
 
 type KubernetesServicesOptions struct {
