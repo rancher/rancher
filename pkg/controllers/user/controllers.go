@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/healthsyncer"
 	"github.com/rancher/rancher/pkg/controllers/user/helm"
 	"github.com/rancher/rancher/pkg/controllers/user/ingress"
+	"github.com/rancher/rancher/pkg/controllers/user/ingresshostgen"
 	"github.com/rancher/rancher/pkg/controllers/user/logging"
 	"github.com/rancher/rancher/pkg/controllers/user/namespacecompose"
 	"github.com/rancher/rancher/pkg/controllers/user/networkpolicy"
@@ -52,6 +53,7 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 	dnsrecord.Register(ctx, userOnlyContext)
 	externalservice.Register(ctx, userOnlyContext)
 	ingress.Register(ctx, userOnlyContext)
+	ingresshostgen.Register(userOnlyContext)
 	targetworkloadservice.Register(ctx, userOnlyContext)
 	workload.Register(ctx, userOnlyContext)
 
