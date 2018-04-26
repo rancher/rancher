@@ -78,21 +78,3 @@ pipeline:
     when:
       branch: master
       event: tag
-
-  slack-notification-failure:
-    image: plugins/slack
-    channel: engineering
-    secrets: [ slack_webhook ]
-    when:
-      status: failure
-      branch: master
-      event: [push, tag]
-
-  slack-new-build:
-    image: plugins/slack
-    channel: engineering
-    secrets: [ slack_webhook ]
-    when:
-      status: success
-      branch: master
-      event: tag
