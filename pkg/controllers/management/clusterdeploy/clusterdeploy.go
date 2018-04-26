@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/clustermanager"
@@ -108,7 +109,16 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 			return cluster, err
 		}
 
-		output, err := kubectl.Apply(yaml, kubeConfig)
+		var output []byte
+		for i := 0; i < 3; i++ {
+			// This will fail almost always the first time because when we create the namespace in the file
+			// it won't have privileges.  Just stupidly try 3 times
+			output, err = kubectl.Apply(yaml, kubeConfig)
+			if err == nil {
+				break
+			}
+			time.Sleep(2 * time.Second)
+		}
 		if err != nil {
 			return cluster, types.NewErrors(err, errors.New(string(output)))
 		}
