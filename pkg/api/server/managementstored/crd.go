@@ -6,7 +6,6 @@ import (
 
 	"github.com/rancher/norman/store/crd"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/rancher/pkg/api/store/sharewatch"
 	"github.com/rancher/types/config"
 )
 
@@ -28,10 +27,6 @@ func createCrd(ctx context.Context, wg *sync.WaitGroup, factory *crd.Factory, sc
 		err := factory.AssignStores(ctx, config.ManagementStorageContext, schemasToCreate...)
 		if err != nil {
 			panic("creating CRD store " + err.Error())
-		}
-
-		for _, schema := range schemasToCreate {
-			schema.Store = sharewatch.NewWatchShare(ctx, factory.ClientGetter, schema.Store)
 		}
 	}()
 }

@@ -6,7 +6,6 @@ import (
 
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/rancher/pkg/api/store/sharewatch"
 	clusterSchema "github.com/rancher/types/apis/cluster.cattle.io/v3/schema"
 	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	"github.com/rancher/types/config"
@@ -39,15 +38,13 @@ func addProxyStore(ctx context.Context, schemas *types.Schemas, context *config.
 		prefix = []string{"apis"}
 	}
 
-	s.Store = proxy.NewProxyStore(context.ClientGetter,
+	s.Store = proxy.NewProxyStore(ctx, context.ClientGetter,
 		config.UserStorageContext,
 		prefix,
 		group,
 		version,
 		kind,
 		plural)
-
-	s.Store = sharewatch.NewWatchShare(ctx, context.ClientGetter, s.Store)
 
 	if storeWrapper != nil {
 		s.Store = storeWrapper(s.Store)
