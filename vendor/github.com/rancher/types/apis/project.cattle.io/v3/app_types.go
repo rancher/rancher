@@ -68,3 +68,12 @@ type AppRevisionStatus struct {
 	Answers     map[string]string `json:"answers"`
 	Digest      string            `json:"digest"`
 }
+
+type AppUpgradeConfig struct {
+	ExternalID string            `json:"externalId,omitempty"`
+	Answers    map[string]string `json:"answers,omitempty"`
+}
+
+type RollbackRevision struct {
+	RevisionName string `json:"revisionName,omitempty" norman:"type=reference[/v3/project/schemas/apprevision]"`
+}
