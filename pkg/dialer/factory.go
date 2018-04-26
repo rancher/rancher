@@ -23,9 +23,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func NewFactory(apiContext *config.ScaledContext) (dialer.Factory, error) {
+func NewFactory(apiContext *config.ScaledContext, ready func() bool) (dialer.Factory, error) {
 	authorizer := tunnelserver.NewAuthorizer(apiContext)
-	tunneler := tunnelserver.NewTunnelServer(apiContext, authorizer)
+	tunneler := tunnelserver.NewTunnelServer(ready, authorizer)
 
 	secretStore, err := nodeconfig.NewStore(apiContext.Core.Namespaces(""), apiContext.K8sClient.CoreV1())
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/rancher/norman/leader"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
 	managementapi "github.com/rancher/rancher/pkg/api/server"
 	"github.com/rancher/rancher/pkg/auth/providers/publicapi"
@@ -26,7 +27,11 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 )
 
-func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) error {
+func wrapMasterRedirect(leader leader.LeaderState, next http.Handler) http.Handler {
+
+}
+
+func Start(ctx context.Context, leader leader.LeaderState, httpPort, httpsPort int, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) error {
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext)
 	if err != nil {
 		return err
