@@ -4,8 +4,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/settings"
 	"k8s.io/api/extensions/v1beta1"
 )
 
@@ -14,6 +16,10 @@ const (
 )
 
 func GetStateKey(host string, path string, port string) string {
+	ipDomain := settings.IngressIPDomain.Get()
+	if ipDomain != "" && strings.HasSuffix(host, ipDomain) {
+		host = ipDomain
+	}
 	key := fmt.Sprintf("%s/%s/%s", host, path, port)
 	return base64.URLEncoding.EncodeToString([]byte(key))
 }

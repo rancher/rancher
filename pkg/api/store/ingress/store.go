@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/api/store/workload"
+	"github.com/rancher/rancher/pkg/controllers/user/ingress"
 	"github.com/sirupsen/logrus"
 )
 
@@ -49,13 +50,13 @@ func formatData(data map[string]interface{}, forFrontend bool) {
 
 	// transform default backend
 	if target, ok := values.GetValue(data, "defaultBackend"); ok && target != nil {
-		updateRule(convert.ToMapInterface(target), "/", forFrontend, data, oldState, newState)
+		updateRule(convert.ToMapInterface(target), "", "/", forFrontend, data, oldState, newState)
 	}
 
 	// transform rules
 	if paths, ok := getPaths(data); ok {
 		for hostpath, target := range paths {
-			updateRule(target, hostpath, forFrontend, data, oldState, newState)
+			updateRule(target, hostpath.host, hostpath.path, forFrontend, data, oldState, newState)
 		}
 	}
 
@@ -64,11 +65,11 @@ func formatData(data map[string]interface{}, forFrontend bool) {
 	workload.SetPublicEnpointsFields(data)
 }
 
-func updateRule(target map[string]interface{}, hostpath string, forFrontend bool, data map[string]interface{}, oldState map[string]string, newState map[string]string) {
+func updateRule(target map[string]interface{}, host, path string, forFrontend bool, data map[string]interface{}, oldState map[string]string, newState map[string]string) {
 	targetData := convert.ToMapInterface(target)
 	port, _ := targetData["targetPort"]
 	serviceID, _ := targetData["serviceId"].(string)
-	stateKey := getStateKey(hostpath, convert.ToString(port))
+	stateKey := ingress.GetStateKey(host, path, convert.ToString(port))
 	if forFrontend {
 		isService := true
 		if serviceValue, ok := oldState[stateKey]; ok && !convert.IsEmpty(serviceValue) {
@@ -108,28 +109,28 @@ func getServiceID(stateKey string) string {
 	return hex
 }
 
-func getStateKey(hostpath string, port string) string {
-	key := fmt.Sprintf("%s/%s", hostpath, port)
-	return base64.URLEncoding.EncodeToString([]byte(key))
-}
-
 func getCertKey(key string) string {
 	return base64.URLEncoding.EncodeToString([]byte(key))
 }
 
-func getPaths(data map[string]interface{}) (map[string]map[string]interface{}, bool) {
+type hostPath struct {
+	host string
+	path string
+}
+
+func getPaths(data map[string]interface{}) (map[hostPath]map[string]interface{}, bool) {
 	v, ok := values.GetValue(data, "rules")
 	if !ok {
 		return nil, false
 	}
 
-	result := make(map[string]map[string]interface{})
+	result := make(map[hostPath]map[string]interface{})
 	for _, rule := range convert.ToMapSlice(v) {
 		converted := convert.ToMapInterface(rule)
 		paths, ok := converted["paths"]
 		if ok {
 			for path, target := range convert.ToMapInterface(paths) {
-				result[fmt.Sprintf("%s/%s", convert.ToString(converted["host"]), path)] = convert.ToMapInterface(target)
+				result[hostPath{host: convert.ToString(converted["host"]), path: path}] = convert.ToMapInterface(target)
 			}
 		}
 	}
