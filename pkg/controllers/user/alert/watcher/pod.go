@@ -24,6 +24,7 @@ type PodWatcher struct {
 	projectAlertLister v3.ProjectAlertLister
 	clusterName        string
 	podRestartTrack    sync.Map
+	clusterLister      v3.ClusterLister
 }
 
 type restartTrack struct {
@@ -40,6 +41,7 @@ func StartPodWatcher(ctx context.Context, cluster *config.UserContext, manager *
 		alertManager:       manager,
 		clusterName:        cluster.ClusterName,
 		podRestartTrack:    sync.Map{},
+		clusterLister:      cluster.Management.Management.Clusters("").Controller().Lister(),
 	}
 
 	projectAlertLifecycle := &ProjectAlertLifecycle{
@@ -137,12 +139,20 @@ func (w *PodWatcher) checkPodRestarts(pod *corev1.Pod, alert *v3.ProjectAlert) {
 					details = containerStatus.State.Waiting.Message
 				}
 
+				clusterDisplayName := w.clusterName
+				cluster, err := w.clusterLister.Get("", w.clusterName)
+				if err != nil {
+					logrus.Warnf("Failed to get cluster for %s: %v", w.clusterName, err)
+				} else {
+					clusterDisplayName = cluster.Spec.DisplayName
+				}
+
 				data := map[string]string{}
 				data["alert_type"] = "podRestarts"
 				data["alert_id"] = alertID
 				data["severity"] = alert.Spec.Severity
 				data["alert_name"] = alert.Spec.DisplayName
-				data["cluster_name"] = w.clusterName
+				data["cluster_name"] = clusterDisplayName
 				data["namespace"] = pod.Namespace
 				data["pod_name"] = pod.Name
 				data["container_name"] = containerStatus.Name
@@ -211,12 +221,20 @@ func (w *PodWatcher) checkPodRunning(pod *corev1.Pod, alert *v3.ProjectAlert) {
 				details = containerStatus.State.Terminated.Message
 			}
 
+			clusterDisplayName := w.clusterName
+			cluster, err := w.clusterLister.Get("", w.clusterName)
+			if err != nil {
+				logrus.Warnf("Failed to get cluster for %s: %v", w.clusterName, err)
+			} else {
+				clusterDisplayName = cluster.Spec.DisplayName
+			}
+
 			data := map[string]string{}
 			data["alert_type"] = "podNotRunning"
 			data["alert_id"] = alertID
 			data["severity"] = alert.Spec.Severity
 			data["alert_name"] = alert.Spec.DisplayName
-			data["cluster_name"] = w.clusterName
+			data["cluster_name"] = clusterDisplayName
 			data["namespace"] = pod.Namespace
 			data["pod_name"] = pod.Name
 			data["container_name"] = containerStatus.Name
@@ -240,12 +258,20 @@ func (w *PodWatcher) checkPodScheduled(pod *corev1.Pod, alert *v3.ProjectAlert) 
 		if condition.Type == corev1.PodScheduled && condition.Status == corev1.ConditionFalse {
 			details := condition.Message
 
+			clusterDisplayName := w.clusterName
+			cluster, err := w.clusterLister.Get("", w.clusterName)
+			if err != nil {
+				logrus.Warnf("Failed to get cluster for %s: %v", w.clusterName, err)
+			} else {
+				clusterDisplayName = cluster.Spec.DisplayName
+			}
+
 			data := map[string]string{}
 			data["alert_type"] = "podNotScheduled"
 			data["alert_id"] = alertID
 			data["severity"] = alert.Spec.Severity
 			data["alert_name"] = alert.Spec.DisplayName
-			data["cluster_name"] = w.clusterName
+			data["cluster_name"] = clusterDisplayName
 			data["namespace"] = pod.Namespace
 			data["pod_name"] = pod.Name
 

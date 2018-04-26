@@ -24,6 +24,7 @@ type NodeWatcher struct {
 	clusterAlertLister v3.ClusterAlertLister
 	alertManager       *manager.Manager
 	clusterName        string
+	clusterLister      v3.ClusterLister
 }
 
 func StartNodeWatcher(ctx context.Context, cluster *config.UserContext, manager *manager.Manager) {
@@ -34,6 +35,7 @@ func StartNodeWatcher(ctx context.Context, cluster *config.UserContext, manager 
 		clusterAlertLister: cluster.Management.Management.ClusterAlerts(cluster.ClusterName).Controller().Lister(),
 		alertManager:       manager,
 		clusterName:        cluster.ClusterName,
+		clusterLister:      cluster.Management.Management.Clusters("").Controller().Lister(),
 	}
 	go n.watch(ctx, syncInterval)
 }
@@ -133,12 +135,20 @@ func (w *NodeWatcher) checkNodeMemUsage(alert *v3.ClusterAlert, machine *v3.Node
 
 		if used.Value()*100.0/total.Value() > int64(alert.Spec.TargetNode.MemThreshold) {
 
+			clusterDisplayName := w.clusterName
+			cluster, err := w.clusterLister.Get("", w.clusterName)
+			if err != nil {
+				logrus.Warnf("Failed to get cluster for %s: %v", w.clusterName, err)
+			} else {
+				clusterDisplayName = cluster.Spec.DisplayName
+			}
+
 			data := map[string]string{}
 			data["alert_type"] = "nodeMemory"
 			data["alert_id"] = alertID
 			data["severity"] = alert.Spec.Severity
 			data["alert_name"] = alert.Spec.DisplayName
-			data["cluster_name"] = w.clusterName
+			data["cluster_name"] = clusterDisplayName
 			data["mem_threshold"] = strconv.Itoa(alert.Spec.TargetNode.MemThreshold)
 			data["used_mem"] = used.String()
 			data["total_mem"] = total.String()
@@ -159,12 +169,20 @@ func (w *NodeWatcher) checkNodeCPUUsage(alert *v3.ClusterAlert, machine *v3.Node
 
 		if used.MilliValue()*100.0/total.MilliValue() > int64(alert.Spec.TargetNode.CPUThreshold) {
 
+			clusterDisplayName := w.clusterName
+			cluster, err := w.clusterLister.Get("", w.clusterName)
+			if err != nil {
+				logrus.Warnf("Failed to get cluster for %s: %v", w.clusterName, err)
+			} else {
+				clusterDisplayName = cluster.Spec.DisplayName
+			}
+
 			data := map[string]string{}
 			data["alert_type"] = "nodeCPU"
 			data["alert_id"] = alertID
 			data["severity"] = alert.Spec.Severity
 			data["alert_name"] = alert.Spec.DisplayName
-			data["cluster_name"] = w.clusterName
+			data["cluster_name"] = clusterDisplayName
 			data["cpu_threshold"] = strconv.Itoa(alert.Spec.TargetNode.CPUThreshold)
 			data["used_cpu"] = strconv.FormatInt(used.MilliValue(), 10)
 			data["total_cpu"] = strconv.FormatInt(total.MilliValue(), 10)
@@ -182,12 +200,20 @@ func (w *NodeWatcher) checkNodeReady(alert *v3.ClusterAlert, machine *v3.Node) {
 	for _, cond := range machine.Status.InternalNodeStatus.Conditions {
 		if cond.Type == corev1.NodeReady {
 			if cond.Status != corev1.ConditionTrue {
+				clusterDisplayName := w.clusterName
+				cluster, err := w.clusterLister.Get("", w.clusterName)
+				if err != nil {
+					logrus.Warnf("Failed to get cluster for %s: %v", w.clusterName, err)
+				} else {
+					clusterDisplayName = cluster.Spec.DisplayName
+				}
+
 				data := map[string]string{}
 				data["alert_type"] = "nodeHealthy"
 				data["alert_id"] = alertID
 				data["severity"] = alert.Spec.Severity
 				data["alert_name"] = alert.Spec.DisplayName
-				data["cluster_name"] = w.clusterName
+				data["cluster_name"] = clusterDisplayName
 				data["node_name"] = nodeHelper.GetNodeName(machine)
 
 				if cond.Message != "" {

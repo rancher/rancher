@@ -24,6 +24,7 @@ type WorkloadWatcher struct {
 	alertManager       *manager.Manager
 	projectAlertLister v3.ProjectAlertLister
 	clusterName        string
+	clusterLister      v3.ClusterLister
 }
 
 func StartWorkloadWatcher(ctx context.Context, cluster *config.UserContext, manager *manager.Manager) {
@@ -33,6 +34,7 @@ func StartWorkloadWatcher(ctx context.Context, cluster *config.UserContext, mana
 		workloadController: workload.NewWorkloadController(cluster.UserOnlyContext(), nil),
 		alertManager:       manager,
 		clusterName:        cluster.ClusterName,
+		clusterLister:      cluster.Management.Management.Clusters("").Controller().Lister(),
 	}
 
 	go d.watch(ctx, syncInterval)
@@ -116,12 +118,20 @@ func (w *WorkloadWatcher) checkWorkloadCondition(wl *workload.Workload, alert *v
 
 	if wl.Status.AvailableReplicas <= availableThreshold {
 
+		clusterDisplayName := w.clusterName
+		cluster, err := w.clusterLister.Get("", w.clusterName)
+		if err != nil {
+			logrus.Warnf("Failed to get cluster for %s: %v", w.clusterName, err)
+		} else {
+			clusterDisplayName = cluster.Spec.DisplayName
+		}
+
 		data := map[string]string{}
 		data["alert_type"] = "workload"
 		data["alert_id"] = alertID
 		data["severity"] = alert.Spec.Severity
 		data["alert_name"] = alert.Spec.DisplayName
-		data["cluster_name"] = w.clusterName
+		data["cluster_name"] = clusterDisplayName
 		data["workload_name"] = wl.Name
 		data["available_percentage"] = strconv.Itoa(percentage)
 		data["available_replicas"] = strconv.Itoa(int(wl.Status.AvailableReplicas))
