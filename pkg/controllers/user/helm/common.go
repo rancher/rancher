@@ -110,14 +110,24 @@ func kubectlDelete(template, kubeconfig, namespace string) error {
 		return err
 	}
 	command := []string{"delete", "--all", "-n", namespace, "-f", file.Name()}
-	cmd := exec.Command(kubectl, command...)
-	cmd.Env = []string{fmt.Sprintf("%s=%s", kcEnv, kubeconfig)}
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Start(); err != nil {
-		return err
+	// try three times and succeed
+	start := time.Second * 1
+	for i := 0; i < 3; i++ {
+		cmd := exec.Command(kubectl, command...)
+		cmd.Env = []string{fmt.Sprintf("%s=%s", kcEnv, kubeconfig)}
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Start(); err != nil {
+			return err
+		}
+		if err := cmd.Wait(); err != nil {
+			time.Sleep(start)
+			start = start * 2
+			continue
+		}
+		break
 	}
-	return cmd.Wait()
+	return nil
 }
 
 func convertTemplates(files map[string]string, templateContentClient mgmtv3.TemplateContentInterface) (map[string]string, error) {
