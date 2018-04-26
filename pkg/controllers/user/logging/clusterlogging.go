@@ -19,10 +19,10 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/logging/utils"
 )
 
-// ClusterLoggingLifecycle listens for clusterLogging CRD in management API
+// ClusterLoggingSyncer listens for clusterLogging CRD in management API
 // and update the changes to configmap, deploy fluentd, embedded elasticsearch, embedded kibana
 
-type ClusterLoggingLifecycle struct {
+type ClusterLoggingSyncer struct {
 	clusterName          string
 	clusterLoggings      v3.ClusterLoggingInterface
 	clusterLoggingLister v3.ClusterLoggingLister
@@ -46,7 +46,7 @@ type ClusterLoggingLifecycle struct {
 
 func registerClusterLogging(cluster *config.UserContext) {
 	clusterloggingClient := cluster.Management.Management.ClusterLoggings(cluster.ClusterName)
-	lifecycle := &ClusterLoggingLifecycle{
+	syncer := &ClusterLoggingSyncer{
 		clusterName:          cluster.ClusterName,
 		clusterLoggings:      clusterloggingClient,
 		clusterLoggingLister: clusterloggingClient.Controller().Lister(),
@@ -67,30 +67,58 @@ func registerClusterLogging(cluster *config.UserContext) {
 		serviceLister:        cluster.Core.Services("").Controller().Lister(),
 		serviceAccounts:      cluster.Core.ServiceAccounts(loggingconfig.LoggingNamespace),
 	}
-	clusterloggingClient.AddClusterScopedLifecycle("cluster-logging-controller", cluster.ClusterName, lifecycle)
+	clusterloggingClient.AddClusterScopedHandler("cluster-logging-controller", cluster.ClusterName, syncer.Sync)
 }
 
-func (c *ClusterLoggingLifecycle) Create(obj *v3.ClusterLogging) (*v3.ClusterLogging, error) {
-	newObj, err := v3.LoggingConditionProvisioned.DoUntilTrue(obj, func() (runtime.Object, error) {
-		return obj, provision(c.namespaces, c.configmaps, c.serviceAccounts, c.clusterRoleBindings, c.daemonsets, c.clusterLister, c.clusterName)
-	})
-	return newObj.(*v3.ClusterLogging), err
+func (c *ClusterLoggingSyncer) Sync(key string, obj *v3.ClusterLogging) error {
+	if obj == nil || obj.DeletionTimestamp != nil || utils.GetClusterTarget(obj.Spec) == "none" {
+		isAllDisable, err := utils.CleanResource(c.namespaces, c.clusterLoggingLister, c.projectLoggingLister, obj, nil)
+		if err != nil {
+			return err
+		}
+		if !isAllDisable {
+			utils.UnsetConfigMap(c.configmaps, loggingconfig.ClusterLoggingName, "cluster")
+		}
+
+		var updateErr error
+		if obj != nil && !reflect.DeepEqual(obj.Spec, obj.Status.AppliedSpec) {
+			updatedObj := obj.DeepCopy()
+			updatedObj.Status.AppliedSpec = obj.Spec
+			_, updateErr = c.clusterLoggings.Update(updatedObj)
+		}
+		return updateErr
+	}
+
+	original := obj
+	obj = original.DeepCopy()
+
+	newObj, err := c.doSync(obj)
+	if err != nil {
+		return err
+	}
+
+	if newObj != nil && !reflect.DeepEqual(newObj, original) {
+		if _, err = c.clusterLoggings.Update(newObj); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-func (c *ClusterLoggingLifecycle) Updated(obj *v3.ClusterLogging) (*v3.ClusterLogging, error) {
-	newObj, err := v3.LoggingConditionProvisioned.DoUntilTrue(obj, func() (runtime.Object, error) {
+func (c *ClusterLoggingSyncer) doSync(obj *v3.ClusterLogging) (*v3.ClusterLogging, error) {
+	_, err := v3.LoggingConditionProvisioned.Do(obj, func() (runtime.Object, error) {
 		return obj, provision(c.namespaces, c.configmaps, c.serviceAccounts, c.clusterRoleBindings, c.daemonsets, c.clusterLister, c.clusterName)
 	})
 	if err != nil {
-		return newObj.(*v3.ClusterLogging), err
+		return obj, err
 	}
 
-	cl := newObj.(*v3.ClusterLogging)
-	if reflect.DeepEqual(cl.Spec, obj.Status.AppliedSpec) {
-		return newObj.(*v3.ClusterLogging), nil
+	if reflect.DeepEqual(obj.Spec, obj.Status.AppliedSpec) {
+		return obj, nil
 	}
 
-	newObj, err = v3.LoggingConditionUpdated.Do(newObj, func() (runtime.Object, error) {
+	newObj, err := v3.LoggingConditionUpdated.Do(obj, func() (runtime.Object, error) {
 		return c.update(obj)
 	})
 
@@ -98,24 +126,12 @@ func (c *ClusterLoggingLifecycle) Updated(obj *v3.ClusterLogging) (*v3.ClusterLo
 		return newObj.(*v3.ClusterLogging), err
 	}
 
-	cl = newObj.(*v3.ClusterLogging)
-	cl.Status.AppliedSpec = cl.Spec
-	return cl, nil
-}
-
-func (c *ClusterLoggingLifecycle) Remove(obj *v3.ClusterLogging) (*v3.ClusterLogging, error) {
-	isAllDisable, err := utils.CleanResource(c.namespaces, c.clusterLoggingLister, c.projectLoggingLister)
-	if err != nil {
-		return obj, err
-	}
-
-	if !isAllDisable {
-		return obj, utils.UnsetConfigMap(c.configmaps, loggingconfig.ClusterLoggingName, "cluster")
-	}
+	obj = newObj.(*v3.ClusterLogging)
+	obj.Status.AppliedSpec = obj.Spec
 	return obj, nil
 }
 
-func (c *ClusterLoggingLifecycle) createOrUpdateClusterConfigMap() error {
+func (c *ClusterLoggingSyncer) createOrUpdateClusterConfigMap() error {
 	clusterLoggingList, err := c.clusterLoggings.Controller().Lister().List("", labels.NewSelector())
 	if err != nil {
 		return errors.Wrap(err, "list cluster logging failed")
@@ -138,7 +154,7 @@ func (c *ClusterLoggingLifecycle) createOrUpdateClusterConfigMap() error {
 	return utils.UpdateConfigMap(loggingconfig.ClusterConfigPath, loggingconfig.ClusterLoggingName, "cluster", c.configmaps)
 }
 
-func (c *ClusterLoggingLifecycle) update(obj *v3.ClusterLogging) (newobj *v3.ClusterLogging, err error) {
+func (c *ClusterLoggingSyncer) update(obj *v3.ClusterLogging) (newobj *v3.ClusterLogging, err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	logger, io := utils.NewClusterLoggingLogger(obj, c.clusterLoggings, v3.LoggingConditionUpdated)
 	defer func() {
@@ -147,28 +163,32 @@ func (c *ClusterLoggingLifecycle) update(obj *v3.ClusterLogging) (newobj *v3.Clu
 	}()
 
 	//embedded
-	if utils.GetClusterTarget(obj.Spec) == "embedded" {
-		logger.Infof("Start creating embedded %s, %s", loggingconfig.EmbeddedESName, loggingconfig.EmbeddedKibanaName)
-		if err = utils.CreateOrUpdateEmbeddedTarget(c.deployments, c.serviceAccounts, c.services, c.roles, c.rolebindings, loggingconfig.LoggingNamespace, obj); err != nil {
-			return obj, err
-		}
-
-		logger.Infof("Checking embedded components deployment progress")
-		if err = utils.UpdateEmbeddedEndpointWithRetry(ctx, c.deploymentLister, c.endpointLister, c.serviceLister, c.clusterLoggings, c.nodeLister, c.k8sNodeLister, c.clusterName, logger); err != nil {
-			return obj, err
-		}
-
-	} else {
+	if utils.GetClusterTarget(obj.Spec) != "embedded" {
 		if err = utils.RemoveEmbeddedTarget(c.deployments, c.serviceAccounts, c.services, c.roles, c.rolebindings); err != nil {
 			return obj, err
 		}
+		return obj, c.createOrUpdateClusterConfigMap()
 	}
 
-	if err = c.createOrUpdateClusterConfigMap(); err != nil {
+	logger.Infof("Start creating embedded %s, %s", loggingconfig.EmbeddedESName, loggingconfig.EmbeddedKibanaName)
+	if err = utils.CreateOrUpdateEmbeddedTarget(c.deployments, c.serviceAccounts, c.services, c.roles, c.rolebindings, loggingconfig.LoggingNamespace, obj); err != nil {
 		return obj, err
 	}
 
-	return c.clusterLoggings.Get(obj.Name, metav1.GetOptions{})
+	logger.Infof("Checking embedded components deployment progress")
+	var esEndpoint, kibanaEndpoint string
+	if esEndpoint, kibanaEndpoint, err = utils.GetEmbeddedEndpointWithRetry(ctx, c.deploymentLister, c.endpointLister, c.serviceLister, c.clusterLoggings, c.nodeLister, c.k8sNodeLister, c.clusterName, logger); err != nil {
+		return obj, err
+	}
+
+	//return new version cluster logging
+	updatedObj, err := c.clusterLoggings.Get(obj.Name, metav1.GetOptions{})
+	if err != nil {
+		return updatedObj, err
+	}
+	updatedObj.Spec.EmbeddedConfig.ElasticsearchEndpoint = esEndpoint
+	updatedObj.Spec.EmbeddedConfig.KibanaEndpoint = kibanaEndpoint
+	return updatedObj, c.createOrUpdateClusterConfigMap()
 }
 
 func provision(namespaces v1.NamespaceInterface, configmaps v1.ConfigMapInterface, serviceAccounts v1.ServiceAccountInterface, clusterRoleBindings rbacv1.ClusterRoleBindingInterface, daemonsets v1beta2.DaemonSetInterface, clusterLister v3.ClusterLister, clusterName string) error {

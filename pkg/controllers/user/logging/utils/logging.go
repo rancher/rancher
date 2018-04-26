@@ -10,22 +10,51 @@ import (
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 )
 
-func IsAllLoggingDisable(clusterLoggingLister v3.ClusterLoggingLister, projectLoggingLister v3.ProjectLoggingLister) (bool, error) {
-	clusterLoggings, err := clusterLoggingLister.List(loggingconfig.LoggingNamespace, labels.NewSelector())
+func IsAllLoggingDisable(clusterLoggingLister v3.ClusterLoggingLister, projectLoggingLister v3.ProjectLoggingLister, currentCL *v3.ClusterLogging, currentPL *v3.ProjectLogging) (bool, error) {
+	clusterLoggings, err := clusterLoggingLister.List("", labels.NewSelector())
 	if err != nil {
 		return false, err
 	}
 
-	projectLoggings, err := projectLoggingLister.List(loggingconfig.LoggingNamespace, labels.NewSelector())
+	projectLoggings, err := projectLoggingLister.List("", labels.NewSelector())
 	if err != nil {
 		return false, err
 	}
-	return len(clusterLoggings) == 0 && len(projectLoggings) == 0, nil
 
+	if len(clusterLoggings) == 0 && len(projectLoggings) == 0 {
+		return true, nil
+	}
+
+	for _, v := range clusterLoggings {
+		if currentCL != nil && v.Name == currentCL.Name {
+			v = currentCL
+		}
+		logging, _, err := GetWrapConfig(v.Spec.ElasticsearchConfig, v.Spec.SplunkConfig, v.Spec.SyslogConfig, v.Spec.KafkaConfig, v.Spec.EmbeddedConfig)
+		if err != nil {
+			return false, err
+		}
+		if logging.CurrentTarget != "" {
+			return false, nil
+		}
+	}
+
+	for _, v := range projectLoggings {
+		if currentPL != nil && v.Name == currentPL.Name {
+			v = currentPL
+		}
+		logging, _, err := GetWrapConfig(v.Spec.ElasticsearchConfig, v.Spec.SplunkConfig, v.Spec.SyslogConfig, v.Spec.KafkaConfig, nil)
+		if err != nil {
+			return false, err
+		}
+		if logging.CurrentTarget != "" {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
-func CleanResource(ns v1.NamespaceInterface, cl v3.ClusterLoggingLister, pl v3.ProjectLoggingLister) (bool, error) {
-	allDisabled, err := IsAllLoggingDisable(cl, pl)
+func CleanResource(ns v1.NamespaceInterface, cl v3.ClusterLoggingLister, pl v3.ProjectLoggingLister, currentCL *v3.ClusterLogging, currentPL *v3.ProjectLogging) (bool, error) {
+	allDisabled, err := IsAllLoggingDisable(cl, pl, currentCL, currentPL)
 	if err != nil {
 		return allDisabled, err
 	}
