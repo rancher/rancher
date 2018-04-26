@@ -10,7 +10,7 @@ var (
 	settings = map[string]Setting{}
 	provider Provider
 
-	AgentImage                      = newSetting("agent-image", "rancher/agent:master")
+	AgentImage                      = newSetting("agent-image", "rancher/rancher-agent:master")
 	CACerts                         = newSetting("cacerts", "")
 	CLIURLDarwin                    = newSetting("cli-url-darwin", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-darwin-amd64-v1.0.0-alpha8.tar.gz")
 	CLIURLLinux                     = newSetting("cli-url-linux", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-linux-amd64-v1.0.0-alpha8.tar.gz")
@@ -23,7 +23,7 @@ var (
 	KubernetesVersionToSystemImages = newSetting("k8s-version-to-images", getSystemImages())
 	MachineVersion                  = newSetting("machine-version", "dev")
 	SystemDefaultRegistry           = newSetting("system-default-registry", "")
-	ServerImage                     = newSetting("server-image", "rancher/server")
+	ServerImage                     = newSetting("server-image", "rancher/rancher")
 	ServerVersion                   = newSetting("server-version", "dev")
 	ServerURL                       = newSetting("server-url", "")
 	TelemetryOpt                    = newSetting("telemetry-opt", "")

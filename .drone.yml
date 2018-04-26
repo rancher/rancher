@@ -19,7 +19,7 @@ pipeline:
   docker-publish-master:
     image: plugins/docker
     dockerfile: package/Dockerfile
-    repo: rancher/server
+    repo: rancher/rancher
     context: package/
     tag: master
     secrets: [docker_username, docker_password]
@@ -32,7 +32,7 @@ pipeline:
   docker-publish-master-agent:
     image: plugins/docker
     dockerfile: package/Dockerfile.agent
-    repo: rancher/agent
+    repo: rancher/rancher-agent
     context: package/
     tag: master
     secrets: [docker_username, docker_password]
@@ -45,7 +45,7 @@ pipeline:
   docker-publish:
     image: plugins/docker
     dockerfile: package/Dockerfile
-    repo: rancher/server
+    repo: rancher/rancher
     context: package/
     tag: ${DRONE_TAG}
     secrets: [docker_username, docker_password]
@@ -58,7 +58,7 @@ pipeline:
   docker-publish-agent:
     image: plugins/docker
     dockerfile: package/Dockerfile.agent
-    repo: rancher/agent
+    repo: rancher/rancher-agent
     context: package/
     tag: ${DRONE_TAG}
     secrets: [docker_username, docker_password]

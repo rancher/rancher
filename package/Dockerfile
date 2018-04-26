@@ -30,7 +30,7 @@ ARG VERSION=dev
 ENV CATTLE_SERVER_VERSION ${VERSION}
 COPY rancher /usr/bin/
 
-ENV CATTLE_AGENT_IMAGE rancher/agent:${VERSION}
-ENV CATTLE_SERVER_IMAGE rancher/server
+ENV CATTLE_AGENT_IMAGE rancher/rancher-agent:${VERSION}
+ENV CATTLE_SERVER_IMAGE rancher/rancher
 VOLUME /var/lib/rancher
 ENTRYPOINT ["rancher", "--http-listen-port=80", "--https-listen-port=443"]
