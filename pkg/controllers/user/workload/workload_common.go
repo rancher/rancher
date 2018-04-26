@@ -31,7 +31,6 @@ const (
 	WorkloadAnnotation                 = "field.cattle.io/targetWorkloadIds"
 	PortsAnnotation                    = "field.cattle.io/ports"
 	ClusterIPServiceType               = "ClusterIP"
-	AllWorkloads                       = "_all_workloads_"
 	DeploymentType                     = "deployment"
 	ReplicationControllerType          = "replicationcontroller"
 	ReplicaSetType                     = "replicaset"

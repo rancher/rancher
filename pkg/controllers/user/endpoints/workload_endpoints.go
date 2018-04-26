@@ -32,7 +32,7 @@ type WorkloadEndpointsController struct {
 }
 
 func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadutil.Workload) error {
-	if obj == nil && key != workloadutil.AllWorkloads {
+	if obj == nil && key != allEndpoints {
 		return nil
 	}
 	// do not update endpoints for job, cronJob and for workload owned by controller (ReplicaSet)
@@ -49,7 +49,7 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 	var services []*corev1.Service
 	var ingresses []*extensionsv1beta1.Ingress
 	var err error
-	if strings.HasSuffix(key, workloadutil.AllWorkloads) {
+	if strings.HasSuffix(key, allEndpoints) {
 		namespace := ""
 		if !strings.EqualFold(key, allEndpoints) {
 			namespace = strings.TrimSuffix(key, fmt.Sprintf("/%s", allEndpoints))
@@ -75,14 +75,19 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 	if err != nil {
 		return err
 	}
+
 	nodeNameToMachine, err := getNodeNameToMachine(c.clusterName, c.machinesLister, c.nodeLister)
+	if err != nil {
+		return err
+	}
+	allNodesIP, err := getAllNodesPublicEndpointIP(c.machinesLister, c.clusterName)
 	if err != nil {
 		return err
 	}
 	// get ingress endpoint group by service
 	serviceToIngressEndpoints := make(map[string][]v3.PublicEndpoint)
 	for _, ingress := range ingresses {
-		epsMap, err := convertIngressToServicePublicEndpointsMap(ingress, c.isRKE)
+		epsMap, err := convertIngressToServicePublicEndpointsMap(ingress, c.isRKE, allNodesIP)
 		if err != nil {
 			return err
 		}
@@ -131,7 +136,7 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 				}
 			}
 			if found {
-				eps, err := convertServiceToPublicEndpoints(svc, "", nil)
+				eps, err := convertServiceToPublicEndpoints(svc, "", nil, allNodesIP)
 				if err != nil {
 					return err
 				}

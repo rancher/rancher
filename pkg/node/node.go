@@ -5,6 +5,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+const (
+	externalAddressAnnotation = "rke.cattle.io/external-ip"
+)
+
 func GetNodeName(node *v3.Node) string {
 	if node.Status.NodeName != "" {
 		return node.Status.NodeName
@@ -24,7 +28,6 @@ func IsNodeForNode(node *corev1.Node, machine *v3.Node) bool {
 		return true
 	}
 
-	// search by rke external-ip annotations
 	machineAddress := ""
 	if machine.Status.NodeConfig != nil {
 		if machine.Status.NodeConfig.InternalAddress == "" {
@@ -68,6 +71,12 @@ func GetEndpointNodeIP(node *v3.Node) string {
 	}
 	if externalIP != "" {
 		return externalIP
+	}
+	if node.Annotations != nil {
+		externalIP = node.Status.NodeAnnotations[externalAddressAnnotation]
+		if externalIP != "" {
+			return externalIP
+		}
 	}
 	return internalIP
 }
