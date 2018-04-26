@@ -688,11 +688,16 @@ func volumeTypes(schemas *types.Schemas) *types.Schemas {
 
 func appTypes(schema *types.Schemas) *types.Schemas {
 	return schema.
+		AddMapperForType(&Version, v3.App{}, &m.Embed{Field: "status"}).
+		MustImport(&Version, v3.AppUpgradeConfig{}).
+		MustImport(&Version, v3.RollbackRevision{}).
 		MustImportAndCustomize(&Version, v3.App{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
-				"upgrade": {},
+				"upgrade": {
+					Input: "appUpgradeConfig",
+				},
 				"rollback": {
-					Input: "revision",
+					Input: "rollbackRevision",
 				},
 			}
 		}).
