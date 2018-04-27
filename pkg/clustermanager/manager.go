@@ -22,6 +22,7 @@ import (
 	"github.com/rancher/types/config/dialer"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/cert"
@@ -31,6 +32,7 @@ type Manager struct {
 	httpsPort     int
 	ScaledContext *config.ScaledContext
 	clusterLister v3.ClusterLister
+	clusters      v3.ClusterInterface
 	controllers   sync.Map
 	accessControl types.AccessControl
 	dialer        dialer.Factory
@@ -51,6 +53,7 @@ func NewManager(httpsPort int, context *config.ScaledContext) *Manager {
 		dialer:        context.Dialer,
 		accessControl: rbac.NewAccessControl(context.RBAC),
 		clusterLister: context.Management.Clusters("").Controller().Lister(),
+		clusters:      context.Management.Clusters(""),
 	}
 }
 
@@ -84,6 +87,15 @@ func (m *Manager) RESTConfig(cluster *v3.Cluster) (rest.Config, error) {
 	return record.cluster.RESTConfig, nil
 }
 
+func (m *Manager) markUnavailable(clusterName string) {
+	if cluster, err := m.clusters.Get(clusterName, v1.GetOptions{}); err == nil {
+		if !v3.ClusterConditionReady.IsFalse(cluster) {
+			v3.ClusterConditionReady.False(cluster)
+			m.clusters.Update(cluster)
+		}
+	}
+}
+
 func (m *Manager) start(ctx context.Context, cluster *v3.Cluster) (*record, error) {
 	obj, ok := m.controllers.Load(cluster.UID)
 	if ok {
@@ -95,6 +107,7 @@ func (m *Manager) start(ctx context.Context, cluster *v3.Cluster) (*record, erro
 
 	controller, err := m.toRecord(ctx, cluster)
 	if err != nil {
+		m.markUnavailable(cluster.Name)
 		return nil, err
 	}
 	if controller == nil {
