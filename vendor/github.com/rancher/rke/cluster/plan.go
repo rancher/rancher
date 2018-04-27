@@ -123,7 +123,7 @@ func (c *Cluster) BuildKubeAPIProcess(prefixPath string) v3.Process {
 		"kubelet-client-key":              pki.GetKeyPath(pki.KubeAPICertName),
 		"service-account-key-file":        pki.GetKeyPath(pki.KubeAPICertName),
 	}
-	if len(c.CloudProvider.Name) > 0 {
+	if len(c.CloudProvider.Name) > 0 && c.CloudProvider.Name != AWSCloudProvider {
 		CommandArgs["cloud-config"] = CloudConfigPath
 	}
 	// check if our version has specific options for this component
@@ -213,7 +213,7 @@ func (c *Cluster) BuildKubeControllerProcess(prefixPath string) v3.Process {
 		"service-account-private-key-file": pki.GetKeyPath(pki.KubeAPICertName),
 		"root-ca-file":                     pki.GetCertPath(pki.CACertName),
 	}
-	if len(c.CloudProvider.Name) > 0 {
+	if len(c.CloudProvider.Name) > 0 && c.CloudProvider.Name != AWSCloudProvider {
 		CommandArgs["cloud-config"] = CloudConfigPath
 	}
 
@@ -302,7 +302,7 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string) v3.Pr
 	if host.Address != host.InternalAddress {
 		CommandArgs["node-ip"] = host.InternalAddress
 	}
-	if len(c.CloudProvider.Name) > 0 {
+	if len(c.CloudProvider.Name) > 0 && c.CloudProvider.Name != AWSCloudProvider {
 		CommandArgs["cloud-config"] = CloudConfigPath
 	}
 

@@ -443,7 +443,7 @@ func pipelineTypes(schema *types.Schemas) *types.Schemas {
 				"destroy": {},
 				"authapp": {
 					Input:  "authAppInput",
-					Output: "cluterPipeline",
+					Output: "clusterPipeline",
 				},
 				"revokeapp": {},
 				"authuser": {
