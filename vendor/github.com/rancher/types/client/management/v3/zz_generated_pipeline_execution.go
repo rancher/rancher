@@ -77,6 +77,10 @@ type PipelineExecutionOperations interface {
 	Update(existing *PipelineExecution, updates interface{}) (*PipelineExecution, error)
 	ByID(id string) (*PipelineExecution, error)
 	Delete(container *PipelineExecution) error
+
+	ActionRerun(resource *PipelineExecution) error
+
+	ActionStop(resource *PipelineExecution) error
 }
 
 func newPipelineExecutionClient(apiClient *Client) *PipelineExecutionClient {
@@ -122,4 +126,14 @@ func (c *PipelineExecutionClient) ByID(id string) (*PipelineExecution, error) {
 
 func (c *PipelineExecutionClient) Delete(container *PipelineExecution) error {
 	return c.apiClient.Ops.DoResourceDelete(PipelineExecutionType, &container.Resource)
+}
+
+func (c *PipelineExecutionClient) ActionRerun(resource *PipelineExecution) error {
+	err := c.apiClient.Ops.DoAction(PipelineExecutionType, "rerun", &resource.Resource, nil, nil)
+	return err
+}
+
+func (c *PipelineExecutionClient) ActionStop(resource *PipelineExecution) error {
+	err := c.apiClient.Ops.DoAction(PipelineExecutionType, "stop", &resource.Resource, nil, nil)
+	return err
 }

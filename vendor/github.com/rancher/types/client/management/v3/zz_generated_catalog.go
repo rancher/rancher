@@ -64,7 +64,9 @@ type CatalogOperations interface {
 	ByID(id string) (*Catalog, error)
 	Delete(container *Catalog) error
 
-	ActionRefresh(resource *CatalogCollection) error
+	ActionRefresh(resource *Catalog) error
+
+	CollectionActionRefresh(resource *CatalogCollection) error
 }
 
 func newCatalogClient(apiClient *Client) *CatalogClient {
@@ -112,8 +114,12 @@ func (c *CatalogClient) Delete(container *Catalog) error {
 	return c.apiClient.Ops.DoResourceDelete(CatalogType, &container.Resource)
 }
 
-func (c *CatalogClient) ActionRefresh(resource *CatalogCollection) error {
+func (c *CatalogClient) ActionRefresh(resource *Catalog) error {
+	err := c.apiClient.Ops.DoAction(CatalogType, "refresh", &resource.Resource, nil, nil)
+	return err
+}
+
+func (c *CatalogClient) CollectionActionRefresh(resource *CatalogCollection) error {
 	err := c.apiClient.Ops.DoCollectionAction(CatalogType, "refresh", &resource.Collection, nil, nil)
 	return err
-
 }

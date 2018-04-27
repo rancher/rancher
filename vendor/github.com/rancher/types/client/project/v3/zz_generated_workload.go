@@ -141,6 +141,12 @@ type WorkloadOperations interface {
 	Update(existing *Workload, updates interface{}) (*Workload, error)
 	ByID(id string) (*Workload, error)
 	Delete(container *Workload) error
+
+	ActionPause(resource *Workload) error
+
+	ActionResume(resource *Workload) error
+
+	ActionRollback(resource *Workload, input *RollbackRevision) error
 }
 
 func newWorkloadClient(apiClient *Client) *WorkloadClient {
@@ -186,4 +192,19 @@ func (c *WorkloadClient) ByID(id string) (*Workload, error) {
 
 func (c *WorkloadClient) Delete(container *Workload) error {
 	return c.apiClient.Ops.DoResourceDelete(WorkloadType, &container.Resource)
+}
+
+func (c *WorkloadClient) ActionPause(resource *Workload) error {
+	err := c.apiClient.Ops.DoAction(WorkloadType, "pause", &resource.Resource, nil, nil)
+	return err
+}
+
+func (c *WorkloadClient) ActionResume(resource *Workload) error {
+	err := c.apiClient.Ops.DoAction(WorkloadType, "resume", &resource.Resource, nil, nil)
+	return err
+}
+
+func (c *WorkloadClient) ActionRollback(resource *Workload, input *RollbackRevision) error {
+	err := c.apiClient.Ops.DoAction(WorkloadType, "rollback", &resource.Resource, input, nil)
+	return err
 }

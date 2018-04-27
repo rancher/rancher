@@ -71,6 +71,14 @@ type ClusterAlertOperations interface {
 	Update(existing *ClusterAlert, updates interface{}) (*ClusterAlert, error)
 	ByID(id string) (*ClusterAlert, error)
 	Delete(container *ClusterAlert) error
+
+	ActionActivate(resource *ClusterAlert) error
+
+	ActionDeactivate(resource *ClusterAlert) error
+
+	ActionMute(resource *ClusterAlert) error
+
+	ActionUnmute(resource *ClusterAlert) error
 }
 
 func newClusterAlertClient(apiClient *Client) *ClusterAlertClient {
@@ -116,4 +124,24 @@ func (c *ClusterAlertClient) ByID(id string) (*ClusterAlert, error) {
 
 func (c *ClusterAlertClient) Delete(container *ClusterAlert) error {
 	return c.apiClient.Ops.DoResourceDelete(ClusterAlertType, &container.Resource)
+}
+
+func (c *ClusterAlertClient) ActionActivate(resource *ClusterAlert) error {
+	err := c.apiClient.Ops.DoAction(ClusterAlertType, "activate", &resource.Resource, nil, nil)
+	return err
+}
+
+func (c *ClusterAlertClient) ActionDeactivate(resource *ClusterAlert) error {
+	err := c.apiClient.Ops.DoAction(ClusterAlertType, "deactivate", &resource.Resource, nil, nil)
+	return err
+}
+
+func (c *ClusterAlertClient) ActionMute(resource *ClusterAlert) error {
+	err := c.apiClient.Ops.DoAction(ClusterAlertType, "mute", &resource.Resource, nil, nil)
+	return err
+}
+
+func (c *ClusterAlertClient) ActionUnmute(resource *ClusterAlert) error {
+	err := c.apiClient.Ops.DoAction(ClusterAlertType, "unmute", &resource.Resource, nil, nil)
+	return err
 }

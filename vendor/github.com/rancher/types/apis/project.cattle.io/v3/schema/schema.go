@@ -114,7 +114,7 @@ func workloadTypes(schemas *types.Schemas) *types.Schemas {
 			}
 			schema.ResourceActions = map[string]types.Action{
 				"rollback": {
-					Input: "revision",
+					Input: "rollbackRevision",
 				},
 				"pause":  {},
 				"resume": {},
@@ -472,6 +472,7 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 			&m.AnnotationField{Field: "description"},
 			&m.AnnotationField{Field: "publicEndpoints", List: true},
 			mapper.ContainerPorts{},
+			mapper.ContainerStatus{},
 		).
 		// Must import handlers before Container
 		MustImport(&Version, v1.ContainerPort{}, struct {
@@ -489,9 +490,13 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v1.Handler{}, handlerOverride{}).
 		MustImport(&Version, v1.Probe{}, handlerOverride{}).
 		MustImport(&Version, v1.Container{}, struct {
-			Environment     map[string]string
-			EnvironmentFrom []EnvironmentFrom
-			InitContainer   bool
+			Environment          map[string]string
+			EnvironmentFrom      []EnvironmentFrom
+			InitContainer        bool
+			State                string
+			TransitioningMessage string
+			ExitCode             *int
+			RestartCount         int
 		}{}).
 		MustImport(&Version, v1.PodSpec{}, struct {
 			Scheduling *Scheduling

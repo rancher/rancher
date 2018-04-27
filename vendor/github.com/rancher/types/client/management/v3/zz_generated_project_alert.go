@@ -69,6 +69,14 @@ type ProjectAlertOperations interface {
 	Update(existing *ProjectAlert, updates interface{}) (*ProjectAlert, error)
 	ByID(id string) (*ProjectAlert, error)
 	Delete(container *ProjectAlert) error
+
+	ActionActivate(resource *ProjectAlert) error
+
+	ActionDeactivate(resource *ProjectAlert) error
+
+	ActionMute(resource *ProjectAlert) error
+
+	ActionUnmute(resource *ProjectAlert) error
 }
 
 func newProjectAlertClient(apiClient *Client) *ProjectAlertClient {
@@ -114,4 +122,24 @@ func (c *ProjectAlertClient) ByID(id string) (*ProjectAlert, error) {
 
 func (c *ProjectAlertClient) Delete(container *ProjectAlert) error {
 	return c.apiClient.Ops.DoResourceDelete(ProjectAlertType, &container.Resource)
+}
+
+func (c *ProjectAlertClient) ActionActivate(resource *ProjectAlert) error {
+	err := c.apiClient.Ops.DoAction(ProjectAlertType, "activate", &resource.Resource, nil, nil)
+	return err
+}
+
+func (c *ProjectAlertClient) ActionDeactivate(resource *ProjectAlert) error {
+	err := c.apiClient.Ops.DoAction(ProjectAlertType, "deactivate", &resource.Resource, nil, nil)
+	return err
+}
+
+func (c *ProjectAlertClient) ActionMute(resource *ProjectAlert) error {
+	err := c.apiClient.Ops.DoAction(ProjectAlertType, "mute", &resource.Resource, nil, nil)
+	return err
+}
+
+func (c *ProjectAlertClient) ActionUnmute(resource *ProjectAlert) error {
+	err := c.apiClient.Ops.DoAction(ProjectAlertType, "unmute", &resource.Resource, nil, nil)
+	return err
 }
