@@ -108,6 +108,7 @@ func (p *Provisioner) update(cluster *v3.Cluster, create bool) (*v3.Cluster, err
 	}
 
 	v3.ClusterConditionProvisioned.True(cluster)
+	v3.ClusterConditionPending.True(cluster)
 	return cluster, nil
 }
 
