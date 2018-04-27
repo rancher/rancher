@@ -62,8 +62,8 @@ func (s *ExecutionStateSyncer) syncState() {
 		logrus.Errorf("Error get Jenkins engine - %v", err)
 		for _, e := range executions {
 			e.Status.ExecutionState = utils.StateFail
-			v3.PipelineExecutionConditionCompleted.Unknown(e)
-			v3.PipelineExecutionConditionCompleted.ReasonAndMessageFromError(e, err)
+			v3.PipelineExecutionConditonProvisioned.False(e)
+			v3.PipelineExecutionConditonProvisioned.ReasonAndMessageFromError(e, err)
 			if err := s.updateExecutionAndLastRunState(e); err != nil {
 				logrus.Errorf("Error update pipeline execution - %v", err)
 				return
@@ -77,8 +77,8 @@ func (s *ExecutionStateSyncer) syncState() {
 			if err != nil {
 				logrus.Errorf("Error sync pipeline execution - %v", err)
 				e.Status.ExecutionState = utils.StateFail
-				v3.PipelineExecutionConditionCompleted.Unknown(e)
-				v3.PipelineExecutionConditionCompleted.ReasonAndMessageFromError(e, err)
+				v3.PipelineExecutionConditonProvisioned.False(e)
+				v3.PipelineExecutionConditonProvisioned.ReasonAndMessageFromError(e, err)
 				updated = true
 			}
 			if updated {
