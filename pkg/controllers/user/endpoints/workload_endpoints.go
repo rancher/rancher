@@ -87,13 +87,9 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 	// get ingress endpoint group by service
 	serviceToIngressEndpoints := make(map[string][]v3.PublicEndpoint)
 	for _, ingress := range ingresses {
-		epsMap, err := convertIngressToServicePublicEndpointsMap(ingress, c.isRKE, allNodesIP)
-		if err != nil {
-			return err
-		}
+		epsMap := convertIngressToServicePublicEndpointsMap(ingress, c.isRKE, allNodesIP)
 		for k, v := range epsMap {
-			eps := serviceToIngressEndpoints[k]
-			serviceToIngressEndpoints[k] = append(eps, v...)
+			serviceToIngressEndpoints[k] = append(serviceToIngressEndpoints[k], v...)
 		}
 	}
 
@@ -107,7 +103,7 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 			}
 			selector := labels.SelectorFromSet(set)
 			found := false
-			if selector.Matches(labels.Set(w.Labels)) {
+			if selector.Matches(labels.Set(w.SelectorLabels)) {
 				// direct selector match
 				found = true
 			} else {
