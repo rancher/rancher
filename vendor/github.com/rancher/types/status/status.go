@@ -230,6 +230,7 @@ func genericStatus(data map[string]interface{}) {
 	if phase != "" && ok {
 		if phase == "Succeeded" {
 			state = "succeeded"
+			transitioning = false
 		} else if state == "" {
 			state = phase
 		}
