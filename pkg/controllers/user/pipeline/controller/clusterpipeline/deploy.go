@@ -330,6 +330,9 @@ def strategy = new hudson.security.FullControlOnceLoggedInAuthorizationStrategy(
 strategy.setAllowAnonymousRead(false)
 instance.setAuthorizationStrategy(strategy)
 instance.save()
+
+def mb = new Integer(1024*1024).toString()
+System.setProperty("com.cloudbees.workflow.rest.external.FlowNodeLogExt.maxReturnChars",mb)
 `
 const JenkinsApplyConfig = `
 mkdir -p /var/jenkins_home/init.groovy.d
