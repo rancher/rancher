@@ -14,8 +14,8 @@ RUN mkdir /root/.kube && \
 WORKDIR /var/lib/rancher
 
 ENV CATTLE_UI_PATH /usr/share/rancher/ui
-ENV CATTLE_UI_VERSION 2.0.38
-ENV CATTLE_CLI_VERSION v2.0.0-rc1
+ENV CATTLE_UI_VERSION 2.0.39
+ENV CATTLE_CLI_VERSION v2.0.0-rc2
 
 RUN mkdir -p /usr/share/rancher/ui && \
     cd /usr/share/rancher/ui && \
