@@ -71,6 +71,10 @@ type AppOperations interface {
 	Update(existing *App, updates interface{}) (*App, error)
 	ByID(id string) (*App, error)
 	Delete(container *App) error
+
+	ActionRollback(resource *App, input *RollbackRevision) error
+
+	ActionUpgrade(resource *App, input *AppUpgradeConfig) error
 }
 
 func newAppClient(apiClient *Client) *AppClient {
@@ -116,4 +120,14 @@ func (c *AppClient) ByID(id string) (*App, error) {
 
 func (c *AppClient) Delete(container *App) error {
 	return c.apiClient.Ops.DoResourceDelete(AppType, &container.Resource)
+}
+
+func (c *AppClient) ActionRollback(resource *App, input *RollbackRevision) error {
+	err := c.apiClient.Ops.DoAction(AppType, "rollback", &resource.Resource, input, nil)
+	return err
+}
+
+func (c *AppClient) ActionUpgrade(resource *App, input *AppUpgradeConfig) error {
+	err := c.apiClient.Ops.DoAction(AppType, "upgrade", &resource.Resource, input, nil)
+	return err
 }

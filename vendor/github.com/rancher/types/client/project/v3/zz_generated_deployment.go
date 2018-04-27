@@ -117,6 +117,12 @@ type DeploymentOperations interface {
 	Update(existing *Deployment, updates interface{}) (*Deployment, error)
 	ByID(id string) (*Deployment, error)
 	Delete(container *Deployment) error
+
+	ActionPause(resource *Deployment) error
+
+	ActionResume(resource *Deployment) error
+
+	ActionRollback(resource *Deployment, input *DeploymentRollbackInput) error
 }
 
 func newDeploymentClient(apiClient *Client) *DeploymentClient {
@@ -162,4 +168,19 @@ func (c *DeploymentClient) ByID(id string) (*Deployment, error) {
 
 func (c *DeploymentClient) Delete(container *Deployment) error {
 	return c.apiClient.Ops.DoResourceDelete(DeploymentType, &container.Resource)
+}
+
+func (c *DeploymentClient) ActionPause(resource *Deployment) error {
+	err := c.apiClient.Ops.DoAction(DeploymentType, "pause", &resource.Resource, nil, nil)
+	return err
+}
+
+func (c *DeploymentClient) ActionResume(resource *Deployment) error {
+	err := c.apiClient.Ops.DoAction(DeploymentType, "resume", &resource.Resource, nil, nil)
+	return err
+}
+
+func (c *DeploymentClient) ActionRollback(resource *Deployment, input *DeploymentRollbackInput) error {
+	err := c.apiClient.Ops.DoAction(DeploymentType, "rollback", &resource.Resource, input, nil)
+	return err
 }

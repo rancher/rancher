@@ -9,6 +9,7 @@ const (
 	ContainerFieldEntrypoint               = "entrypoint"
 	ContainerFieldEnvironment              = "environment"
 	ContainerFieldEnvironmentFrom          = "environmentFrom"
+	ContainerFieldExitCode                 = "exitCode"
 	ContainerFieldImage                    = "image"
 	ContainerFieldImagePullPolicy          = "imagePullPolicy"
 	ContainerFieldInitContainer            = "initContainer"
@@ -21,12 +22,15 @@ const (
 	ContainerFieldReadOnly                 = "readOnly"
 	ContainerFieldReadinessProbe           = "readinessProbe"
 	ContainerFieldResources                = "resources"
+	ContainerFieldRestartCount             = "restartCount"
 	ContainerFieldRunAsNonRoot             = "runAsNonRoot"
+	ContainerFieldState                    = "state"
 	ContainerFieldStdin                    = "stdin"
 	ContainerFieldStdinOnce                = "stdinOnce"
 	ContainerFieldTTY                      = "tty"
 	ContainerFieldTerminationMessagePath   = "terminationMessagePath"
 	ContainerFieldTerminationMessagePolicy = "terminationMessagePolicy"
+	ContainerFieldTransitioningMessage     = "transitioningMessage"
 	ContainerFieldUid                      = "uid"
 	ContainerFieldVolumeMounts             = "volumeMounts"
 	ContainerFieldWorkingDir               = "workingDir"
@@ -40,6 +44,7 @@ type Container struct {
 	Entrypoint               []string              `json:"entrypoint,omitempty" yaml:"entrypoint,omitempty"`
 	Environment              map[string]string     `json:"environment,omitempty" yaml:"environment,omitempty"`
 	EnvironmentFrom          []EnvironmentFrom     `json:"environmentFrom,omitempty" yaml:"environmentFrom,omitempty"`
+	ExitCode                 *int64                `json:"exitCode,omitempty" yaml:"exitCode,omitempty"`
 	Image                    string                `json:"image,omitempty" yaml:"image,omitempty"`
 	ImagePullPolicy          string                `json:"imagePullPolicy,omitempty" yaml:"imagePullPolicy,omitempty"`
 	InitContainer            bool                  `json:"initContainer,omitempty" yaml:"initContainer,omitempty"`
@@ -52,12 +57,15 @@ type Container struct {
 	ReadOnly                 *bool                 `json:"readOnly,omitempty" yaml:"readOnly,omitempty"`
 	ReadinessProbe           *Probe                `json:"readinessProbe,omitempty" yaml:"readinessProbe,omitempty"`
 	Resources                *ResourceRequirements `json:"resources,omitempty" yaml:"resources,omitempty"`
+	RestartCount             int64                 `json:"restartCount,omitempty" yaml:"restartCount,omitempty"`
 	RunAsNonRoot             *bool                 `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
+	State                    string                `json:"state,omitempty" yaml:"state,omitempty"`
 	Stdin                    bool                  `json:"stdin,omitempty" yaml:"stdin,omitempty"`
 	StdinOnce                bool                  `json:"stdinOnce,omitempty" yaml:"stdinOnce,omitempty"`
 	TTY                      bool                  `json:"tty,omitempty" yaml:"tty,omitempty"`
 	TerminationMessagePath   string                `json:"terminationMessagePath,omitempty" yaml:"terminationMessagePath,omitempty"`
 	TerminationMessagePolicy string                `json:"terminationMessagePolicy,omitempty" yaml:"terminationMessagePolicy,omitempty"`
+	TransitioningMessage     string                `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	Uid                      *int64                `json:"uid,omitempty" yaml:"uid,omitempty"`
 	VolumeMounts             []VolumeMount         `json:"volumeMounts,omitempty" yaml:"volumeMounts,omitempty"`
 	WorkingDir               string                `json:"workingDir,omitempty" yaml:"workingDir,omitempty"`
