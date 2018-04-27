@@ -285,6 +285,10 @@ func (a *APIOperations) doAction(
 
 	var input io.Reader
 
+	if debug {
+		fmt.Println("POST " + actionURL)
+	}
+
 	if inputObject != nil {
 		bodyContent, err := json.Marshal(inputObject)
 		if err != nil {
@@ -325,5 +329,8 @@ func (a *APIOperations) doAction(
 		fmt.Println("Response <= " + string(byteContent))
 	}
 
-	return json.Unmarshal(byteContent, respObject)
+	if nil != respObject {
+		return json.Unmarshal(byteContent, respObject)
+	}
+	return nil
 }
