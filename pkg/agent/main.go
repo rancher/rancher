@@ -11,6 +11,8 @@ import (
 	"os"
 	"time"
 
+	"strings"
+
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
@@ -98,6 +100,11 @@ func cleanup(ctx context.Context) error {
 		if _, ok := container.Labels["io.kubernetes.pod.namespace"]; ok {
 			continue
 		}
+
+		if strings.Contains(container.Names[0], "share-mnt") {
+			continue
+		}
+
 		container := container
 		go func() {
 			time.Sleep(15 * time.Second)
