@@ -64,9 +64,14 @@ func AuthenticateUser(input interface{}, providerName string) (v3.Principal, []v
 
 func GetPrincipal(principalID string, myToken v3.Token) (v3.Principal, error) {
 	principal, err := providers[myToken.AuthProvider].GetPrincipal(principalID, myToken)
+
 	if err != nil && myToken.AuthProvider != localProvider {
-		principal, err = providers[localProvider].GetPrincipal(principalID, myToken)
+		p2, e2 := providers[localProvider].GetPrincipal(principalID, myToken)
+		if e2 == nil {
+			return p2, nil
+		}
 	}
+
 	return principal, err
 }
 

@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
@@ -216,7 +217,10 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 
 	result, err := lConn.Search(search)
 	if err != nil {
-		return nil, fmt.Errorf("Error %v in search query : %v", err, filter)
+		if ldapErr, ok := err.(*ldapv2.Error); ok && ldapErr.ResultCode == 32 {
+			return nil, httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("%v not found", distinguishedName))
+		}
+		return nil, httperror.WrapAPIError(errors.Wrapf(err, "server returned error for search %v %v: %v", search.BaseDN, filter, err), httperror.ServerError, "Internal server error")
 	}
 
 	if len(result.Entries) < 1 {
