@@ -329,10 +329,16 @@ func (j *Engine) SyncExecution(execution *v3.PipelineExecution) (bool, error) {
 		updated = true
 		execution.Labels[utils.PipelineFinishLabel] = "true"
 		execution.Status.ExecutionState = utils.StateSuccess
+		if v3.PipelineExecutionConditonProvisioned.IsUnknown(execution) {
+			v3.PipelineExecutionConditonProvisioned.True(execution)
+		}
 	} else if info.Status == "FAILED" && execution.Status.ExecutionState != utils.StateFail {
 		updated = true
 		execution.Labels[utils.PipelineFinishLabel] = "true"
 		execution.Status.ExecutionState = utils.StateFail
+		if v3.PipelineExecutionConditonProvisioned.IsUnknown(execution) {
+			v3.PipelineExecutionConditonProvisioned.True(execution)
+		}
 	} else if info.Status == "IN_PROGRESS" && execution.Status.ExecutionState != utils.StateBuilding {
 		updated = true
 		execution.Status.ExecutionState = utils.StateBuilding
@@ -516,9 +522,16 @@ func translatePreparingMessage(log string) string {
 	message := lines[len(lines)-1]
 	if message == "" {
 		message = "Setting up executors"
-	}
-	if strings.Contains(message, " offline") {
+	} else if strings.Contains(message, " offline") {
 		message = "Waiting executors to be online"
+	} else {
+		message = stripTags(message)
 	}
 	return message
+}
+
+func stripTags(content string) string {
+	re, _ := regexp.Compile("\\<[\\S\\s]+?\\>")
+	stripped := re.ReplaceAllString(content, "")
+	return stripped
 }
