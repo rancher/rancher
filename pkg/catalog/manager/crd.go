@@ -296,16 +296,9 @@ func zipAndHash(content string) (string, string, error) {
 	return tag, base64.StdEncoding.EncodeToString(compressedData), nil
 }
 
-func showUpgradeLinks(version, upgradeVersion, upgradeFrom string) bool {
+func showUpgradeLinks(version, upgradeVersion string) bool {
 	if !utils.VersionGreaterThan(upgradeVersion, version) {
 		return false
-	}
-	if upgradeFrom != "" {
-		satisfiesRange, err := utils.VersionSatisfiesRange(version, upgradeFrom)
-		if err != nil {
-			return false
-		}
-		return satisfiesRange
 	}
 	return true
 }
