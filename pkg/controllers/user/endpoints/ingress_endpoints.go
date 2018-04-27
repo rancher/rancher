@@ -38,14 +38,10 @@ func (c *IngressEndpointsController) reconcileEndpointsForIngress(obj *extension
 	if err != nil {
 		return false, err
 	}
-	fromObj, err := convertIngressToPublicEndpoints(obj, c.isRKE, allNodesIP)
-	if err != nil {
-		return false, err
-	}
+	fromObj := convertIngressToPublicEndpoints(obj, c.isRKE, allNodesIP)
+	fromAnnotation := getPublicEndpointsFromAnnotations(obj.Annotations)
 
-	fromAnnontation := getPublicEndpointsFromAnnotations(obj.Annotations)
-
-	if areEqualEndpoints(fromAnnontation, fromObj) {
+	if areEqualEndpoints(fromAnnotation, fromObj) {
 		return false, nil
 	}
 

@@ -288,7 +288,7 @@ func getAllNodesPublicEndpointIP(machineLister managementv3.NodeLister, clusterN
 	return addresses[0].String(), nil
 }
 
-func convertIngressToServicePublicEndpointsMap(obj *extensionsv1beta1.Ingress, allNodes bool, allNodesIP string) (map[string][]v3.PublicEndpoint, error) {
+func convertIngressToServicePublicEndpointsMap(obj *extensionsv1beta1.Ingress, allNodes bool, allNodesIP string) map[string][]v3.PublicEndpoint {
 	var addresses []string
 	epsMap := map[string][]v3.PublicEndpoint{}
 	if !allNodes {
@@ -303,7 +303,7 @@ func convertIngressToServicePublicEndpointsMap(obj *extensionsv1beta1.Ingress, a
 	}
 
 	if len(addresses) == 0 {
-		return epsMap, nil
+		return epsMap
 	}
 
 	ports := map[int32]string{80: "HTTP", 443: "HTTPS"}
@@ -320,22 +320,18 @@ func convertIngressToServicePublicEndpointsMap(obj *extensionsv1beta1.Ingress, a
 					AllNodes:    allNodes,
 					IngressName: fmt.Sprintf("%s:%s", obj.Namespace, obj.Name),
 				}
-				v := epsMap[path.Backend.ServiceName]
-				epsMap[path.Backend.ServiceName] = append(v, p)
+				epsMap[path.Backend.ServiceName] = append(epsMap[path.Backend.ServiceName], p)
 			}
 		}
 	}
-	return epsMap, nil
+	return epsMap
 }
 
-func convertIngressToPublicEndpoints(obj *extensionsv1beta1.Ingress, isRKE bool, allNodesIP string) ([]v3.PublicEndpoint, error) {
-	epsMap, err := convertIngressToServicePublicEndpointsMap(obj, isRKE, allNodesIP)
-	if err != nil {
-		return nil, err
-	}
+func convertIngressToPublicEndpoints(obj *extensionsv1beta1.Ingress, isRKE bool, allNodesIP string) []v3.PublicEndpoint {
+	epsMap := convertIngressToServicePublicEndpointsMap(obj, isRKE, allNodesIP)
 	var eps []v3.PublicEndpoint
 	for _, v := range epsMap {
 		eps = append(eps, v...)
 	}
-	return eps, nil
+	return eps
 }
