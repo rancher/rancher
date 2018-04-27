@@ -21,6 +21,11 @@ func Register(userOnlyContext *config.UserOnlyContext) {
 	userOnlyContext.Extensions.Ingresses("").AddHandler("ingress-host-gen", c.sync)
 }
 
+func isGeneratedDomain(obj *v1beta1.Ingress, host, domain string) bool {
+	parts := strings.Split(host, ".")
+	return strings.HasSuffix(host, "."+domain) && len(parts) == 8 && parts[1] == obj.Namespace
+}
+
 func (i *IngressHostGen) sync(key string, obj *v1beta1.Ingress) error {
 	if obj == nil {
 		return nil
@@ -45,7 +50,7 @@ func (i *IngressHostGen) sync(key string, obj *v1beta1.Ingress) error {
 
 	changed := false
 	for _, rule := range obj.Spec.Rules {
-		if strings.HasSuffix(rule.Host, ipDomain) && rule.Host != xipHost {
+		if (isGeneratedDomain(obj, rule.Host, ipDomain) || rule.Host == ipDomain) && rule.Host != xipHost {
 			changed = true
 			break
 		}
