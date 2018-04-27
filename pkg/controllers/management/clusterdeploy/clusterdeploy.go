@@ -8,6 +8,7 @@ import (
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/kubectl"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
@@ -89,7 +90,7 @@ func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
 func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	desired := cluster.Spec.DesiredAgentImage
 	if desired == "" || desired == "fixed" {
-		desired = settings.AgentImage.Get()
+		desired = image.Resolve(settings.AgentImage.Get())
 	}
 
 	if cluster.Status.AgentImage == desired {

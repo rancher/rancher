@@ -5,6 +5,7 @@ import (
 	"net/url"
 
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemtemplate"
 )
@@ -27,7 +28,7 @@ func Formatter(request *types.APIContext, resource *types.RawResource) {
 		resource.Values["insecureCommand"] = fmt.Sprintf(insecureCommandFormat, url)
 		resource.Values["command"] = fmt.Sprintf(commandFormat, url)
 		resource.Values["nodeCommand"] = fmt.Sprintf(nodeCommandFormat,
-			settings.AgentImage.Get(),
+			image.Resolve(settings.AgentImage.Get()),
 			getRootURL(request),
 			token,
 			ca)
@@ -43,7 +44,7 @@ func NodeCommand(token string) string {
 	}
 
 	return fmt.Sprintf(nodeCommandFormat,
-		settings.AgentImage.Get(),
+		image.Resolve(settings.AgentImage.Get()),
 		getRootURL(nil),
 		token,
 		ca)
