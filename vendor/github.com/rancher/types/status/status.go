@@ -226,10 +226,12 @@ func genericStatus(data map[string]interface{}) {
 		}
 	}
 
-	if state == "" {
-		val, ok := values.GetValueN(data, "status", "phase").(string)
-		if val != "" && ok {
-			state = val
+	phase, ok := values.GetValueN(data, "status", "phase").(string)
+	if phase != "" && ok {
+		if phase == "Succeeded" {
+			state = "succeeded"
+		} else if state == "" {
+			state = phase
 		}
 	}
 
@@ -260,7 +262,7 @@ func genericStatus(data map[string]interface{}) {
 	data["state"] = strings.ToLower(state)
 	data["transitioningMessage"] = message
 
-	val, ok := values.GetValue(data, "metadata", "removed")
+	val, ok = values.GetValue(data, "metadata", "removed")
 	if ok && val != "" && val != nil {
 		data["state"] = "removing"
 		data["transitioning"] = "yes"

@@ -68,9 +68,9 @@ type NodeDriverOperations interface {
 	ByID(id string) (*NodeDriver, error)
 	Delete(container *NodeDriver) error
 
-	ActionActivate(*NodeDriver) (*NodeDriver, error)
+	ActionActivate(resource *NodeDriver) (*NodeDriver, error)
 
-	ActionDeactivate(*NodeDriver) (*NodeDriver, error)
+	ActionDeactivate(resource *NodeDriver) (*NodeDriver, error)
 }
 
 func newNodeDriverClient(apiClient *Client) *NodeDriverClient {
@@ -119,19 +119,13 @@ func (c *NodeDriverClient) Delete(container *NodeDriver) error {
 }
 
 func (c *NodeDriverClient) ActionActivate(resource *NodeDriver) (*NodeDriver, error) {
-
 	resp := &NodeDriver{}
-
 	err := c.apiClient.Ops.DoAction(NodeDriverType, "activate", &resource.Resource, nil, resp)
-
 	return resp, err
 }
 
 func (c *NodeDriverClient) ActionDeactivate(resource *NodeDriver) (*NodeDriver, error) {
-
 	resp := &NodeDriver{}
-
 	err := c.apiClient.Ops.DoAction(NodeDriverType, "deactivate", &resource.Resource, nil, resp)
-
 	return resp, err
 }

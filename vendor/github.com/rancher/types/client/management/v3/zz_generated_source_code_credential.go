@@ -67,6 +67,8 @@ type SourceCodeCredentialOperations interface {
 	Update(existing *SourceCodeCredential, updates interface{}) (*SourceCodeCredential, error)
 	ByID(id string) (*SourceCodeCredential, error)
 	Delete(container *SourceCodeCredential) error
+
+	ActionRefreshrepos(resource *SourceCodeCredential) error
 }
 
 func newSourceCodeCredentialClient(apiClient *Client) *SourceCodeCredentialClient {
@@ -112,4 +114,9 @@ func (c *SourceCodeCredentialClient) ByID(id string) (*SourceCodeCredential, err
 
 func (c *SourceCodeCredentialClient) Delete(container *SourceCodeCredential) error {
 	return c.apiClient.Ops.DoResourceDelete(SourceCodeCredentialType, &container.Resource)
+}
+
+func (c *SourceCodeCredentialClient) ActionRefreshrepos(resource *SourceCodeCredential) error {
+	err := c.apiClient.Ops.DoAction(SourceCodeCredentialType, "refreshrepos", &resource.Resource, nil, nil)
+	return err
 }

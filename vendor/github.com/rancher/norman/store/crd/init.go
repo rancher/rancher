@@ -34,7 +34,7 @@ func (c *Factory) AssignStores(ctx context.Context, storageContext types.Storage
 			return fmt.Errorf("failed to create create/find CRD for %s", schema.ID)
 		}
 
-		schema.Store = proxy.NewProxyStore(c.ClientGetter,
+		schema.Store = proxy.NewProxyStore(ctx, c.ClientGetter,
 			storageContext,
 			[]string{"apis"},
 			crd.Spec.Group,
