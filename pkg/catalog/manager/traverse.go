@@ -93,6 +93,7 @@ func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []strin
 							return nil, nil, nil, nil, err
 						}
 						v.Questions = value.Questions
+						v.RancherVersion = value.RancherVersion
 						for _, category := range value.Categories {
 							keywords[category] = struct{}{}
 						}
@@ -105,14 +106,16 @@ func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []strin
 				filesToAdd[file.Name] = file.Contents
 			}
 			v.Files = filesToAdd
+			v.KubeVersion = version.KubeVersion
 			v.Digest = version.Digest
 			v.UpgradeVersionLinks = map[string]string{}
 			for _, versionSpec := range template.Spec.Versions {
-				if showUpgradeLinks(v.Version, versionSpec.Version, versionSpec.UpgradeFrom) {
+				if showUpgradeLinks(v.Version, versionSpec.Version) {
 					version := versionSpec.Version
 					v.UpgradeVersionLinks[versionSpec.Version] = fmt.Sprintf("%s-%s", template.Name, version)
 				}
 			}
+
 			v.ExternalID = fmt.Sprintf("catalog://?catalog=%s&template=%s&version=%s", catalog.Name, template.Spec.FolderName, v.Version)
 			versions = append(versions, v)
 		}
@@ -140,6 +143,7 @@ func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []strin
 var supportedFiles = []string{"catalog.yml", "catalog.yaml", "questions.yml", "questions.yaml"}
 
 type catalogYml struct {
-	Categories []string      `yaml:"categories,omitempty"`
-	Questions  []v3.Question `yaml:"questions,omitempty"`
+	RancherVersion string        `yaml:"rancher_version,omitempty"`
+	Categories     []string      `yaml:"categories,omitempty"`
+	Questions      []v3.Question `yaml:"questions,omitempty"`
 }
