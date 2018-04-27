@@ -54,7 +54,7 @@ type fileWriter struct {
 }
 
 func (f *fileWriter) write(path string, base64Content string) {
-	if path == "" || len(base64Content) == 0 {
+	if path == "" {
 		return
 	}
 
