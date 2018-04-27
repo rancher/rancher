@@ -55,7 +55,7 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) error {
 		for _, b := range r.HTTP.Paths {
 			path := b.Path
 			port := b.Backend.ServicePort.IntVal
-			key := GetStateKey(host, path, convert.ToString(port))
+			key := GetStateKey(obj.Name, obj.Namespace, host, path, convert.ToString(port))
 			if _, ok := state[key]; ok {
 				serviceToKey[b.Backend.ServiceName] = key
 				serviceToPort[b.Backend.ServiceName] = convert.ToString(port)
@@ -65,7 +65,7 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) error {
 	if obj.Spec.Backend != nil {
 		serviceName := obj.Spec.Backend.ServiceName
 		portStr := convert.ToString(obj.Spec.Backend.ServicePort.IntVal)
-		key := GetStateKey("", "", portStr)
+		key := GetStateKey(obj.Name, obj.Namespace, "", "", portStr)
 		if _, ok := state[key]; ok {
 			serviceToKey[serviceName] = key
 			serviceToPort[serviceName] = portStr

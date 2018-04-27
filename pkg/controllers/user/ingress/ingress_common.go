@@ -15,12 +15,12 @@ const (
 	ingressStateAnnotation = "field.cattle.io.ingress/state"
 )
 
-func GetStateKey(host string, path string, port string) string {
+func GetStateKey(name, namespace, host string, path string, port string) string {
 	ipDomain := settings.IngressIPDomain.Get()
 	if ipDomain != "" && strings.HasSuffix(host, ipDomain) {
 		host = ipDomain
 	}
-	key := fmt.Sprintf("%s/%s/%s", host, path, port)
+	key := fmt.Sprintf("%s/%s/%s/%s/%s", name, namespace, host, path, port)
 	return base64.URLEncoding.EncodeToString([]byte(key))
 }
 

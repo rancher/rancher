@@ -67,9 +67,11 @@ func formatData(data map[string]interface{}, forFrontend bool) {
 
 func updateRule(target map[string]interface{}, host, path string, forFrontend bool, data map[string]interface{}, oldState map[string]string, newState map[string]string) {
 	targetData := convert.ToMapInterface(target)
+	name, _ := data["name"].(string)
+	namespace, _ := data["namespaceId"].(string)
 	port, _ := targetData["targetPort"]
 	serviceID, _ := targetData["serviceId"].(string)
-	stateKey := ingress.GetStateKey(host, path, convert.ToString(port))
+	stateKey := ingress.GetStateKey(name, namespace, host, path, convert.ToString(port))
 	if forFrontend {
 		isService := true
 		if serviceValue, ok := oldState[stateKey]; ok && !convert.IsEmpty(serviceValue) {
