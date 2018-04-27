@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/slice"
+	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/librke"
 	"github.com/rancher/rancher/pkg/rkecerts"
 	"github.com/rancher/rancher/pkg/rkeworker"
@@ -207,7 +208,7 @@ func augmentProcesses(processes map[string]v3.Process, worker, b2d bool) map[str
 		processes["share-mnt"] = v3.Process{
 			Name:          "share-mnt",
 			Args:          args,
-			Image:         settings.AgentImage.Get(),
+			Image:         image.Resolve(settings.AgentImage.Get()),
 			Binds:         []string{"/var/run:/var/run"},
 			NetworkMode:   "host",
 			RestartPolicy: "always",
