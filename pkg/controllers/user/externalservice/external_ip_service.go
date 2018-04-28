@@ -45,13 +45,16 @@ func (c *Controller) sync(key string, obj *corev1.Service) error {
 	}
 
 	var newSubsets []corev1.EndpointSubset
-	if _, ok := obj.Annotations[ExternalIPsAnnotation]; !ok {
+	val, ok := obj.Annotations[ExternalIPsAnnotation]
+	if !ok {
 		return nil
 	}
 	var ipsStr []string
-	err := json.Unmarshal([]byte(obj.Annotations[ExternalIPsAnnotation]), &ipsStr)
-	if err != nil {
-		return err
+	if val != "" {
+		err := json.Unmarshal([]byte(val), &ipsStr)
+		if err != nil {
+			return err
+		}
 	}
 
 	var addresses []corev1.EndpointAddress
