@@ -366,7 +366,7 @@ func (m *manager) reconcileMembershipBindingForDelete(namespace, roleToKeep, rtb
 // Certain resources (projects, machines, prtbs, crtbs, clusterevents, etc) exist in the mangement plane but are scoped to clusters or
 // projects. They need special RBAC handling because the need to be authorized just inside of the namespace that backs the project
 // or cluster they belong to.
-func (m *manager) grantManagementPlanePrivileges(roleTemplateName string, resources []string, subject v1.Subject, binding interface{}) error {
+func (m *manager) grantManagementPlanePrivileges(roleTemplateName string, resources []string, subject v1.Subject, binding interface{}, namespace string) error {
 	bindingMeta, err := meta.Accessor(binding)
 	if err != nil {
 		return err
@@ -375,7 +375,6 @@ func (m *manager) grantManagementPlanePrivileges(roleTemplateName string, resour
 	if err != nil {
 		return err
 	}
-	namespace := bindingMeta.GetNamespace()
 
 	roles, err := m.gatherAndDedupeRoles(roleTemplateName)
 	if err != nil {
