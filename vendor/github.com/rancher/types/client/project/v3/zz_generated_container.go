@@ -30,6 +30,7 @@ const (
 	ContainerFieldTTY                      = "tty"
 	ContainerFieldTerminationMessagePath   = "terminationMessagePath"
 	ContainerFieldTerminationMessagePolicy = "terminationMessagePolicy"
+	ContainerFieldTransitioning            = "transitioning"
 	ContainerFieldTransitioningMessage     = "transitioningMessage"
 	ContainerFieldUid                      = "uid"
 	ContainerFieldVolumeMounts             = "volumeMounts"
@@ -65,6 +66,7 @@ type Container struct {
 	TTY                      bool                  `json:"tty,omitempty" yaml:"tty,omitempty"`
 	TerminationMessagePath   string                `json:"terminationMessagePath,omitempty" yaml:"terminationMessagePath,omitempty"`
 	TerminationMessagePolicy string                `json:"terminationMessagePolicy,omitempty" yaml:"terminationMessagePolicy,omitempty"`
+	Transitioning            string                `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage     string                `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	Uid                      *int64                `json:"uid,omitempty" yaml:"uid,omitempty"`
 	VolumeMounts             []VolumeMount         `json:"volumeMounts,omitempty" yaml:"volumeMounts,omitempty"`

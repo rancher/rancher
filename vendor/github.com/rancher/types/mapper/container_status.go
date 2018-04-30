@@ -12,39 +12,62 @@ type ContainerStatus struct {
 }
 
 type containerState struct {
-	state        string
-	message      string
-	exitCode     interface{}
-	restartCount int64
+	state         string
+	message       string
+	transitioning string
+	exitCode      interface{}
+	restartCount  int64
 }
 
-func (n ContainerStatus) FromInternal(data map[string]interface{}) {
-	containerStates := map[string]containerState{}
-	containerStatus := convert.ToMapSlice(values.GetValueN(data, "status", "containerStatuses"))
+func message(m map[string]interface{}) string {
+	if m["message"] == nil {
+		return convert.ToString(m["reason"])
+	}
+	return fmt.Sprintf("%s: %s", m["reason"], m["message"])
+}
+
+func checkStatus(containerStates map[string]containerState, containerStatus []map[string]interface{}) {
 	for _, status := range containerStatus {
 		name := convert.ToString(status["name"])
 		restartCount, _ := convert.ToNumber(status["restartCount"])
 		s := containerState{
-			state:        "pending",
-			restartCount: restartCount,
+			state:         "pending",
+			restartCount:  restartCount,
+			transitioning: "no",
 		}
 		for k, v := range convert.ToMapInterface(status["state"]) {
 			m := convert.ToMapInterface(v)
 			switch k {
 			case "terminated":
 				s.state = "terminated"
-				s.message = fmt.Sprintf("%s: %s", m["reason"], m["message"])
+				s.message = message(m)
 				s.exitCode = m["exitCode"]
+				if convert.ToString(s.exitCode) == "0" {
+					s.transitioning = "no"
+				} else {
+					s.transitioning = "error"
+				}
 			case "running":
 				s.state = "running"
+				s.transitioning = "no"
 			case "waiting":
 				s.state = "waiting"
-				s.message = fmt.Sprintf("%s: %s", m["reason"], m["message"])
+				s.transitioning = "yes"
+				s.message = message(m)
 			}
 		}
 
 		containerStates[name] = s
 	}
+}
+
+func (n ContainerStatus) FromInternal(data map[string]interface{}) {
+	containerStates := map[string]containerState{}
+	containerStatus := convert.ToMapSlice(values.GetValueN(data, "status", "containerStatuses"))
+	checkStatus(containerStates, containerStatus)
+
+	containerStatus = convert.ToMapSlice(values.GetValueN(data, "status", "initContainerStatuses"))
+	checkStatus(containerStates, containerStatus)
 
 	containers := convert.ToMapSlice(values.GetValueN(data, "containers"))
 	for _, container := range containers {
@@ -56,6 +79,7 @@ func (n ContainerStatus) FromInternal(data map[string]interface{}) {
 		state, ok := containerStates[name]
 		if ok {
 			container["state"] = state.state
+			container["transitioning"] = state.transitioning
 			container["transitioningMessage"] = state.message
 			container["restartCount"] = state.restartCount
 			container["exitCode"] = state.exitCode
