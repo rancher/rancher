@@ -3,7 +3,7 @@ RUN apt-get update && apt-get install -y git curl ca-certificates unzip xz-utils
     useradd rancher && \
     mkdir -p /var/lib/rancher/etcd /var/lib/cattle && \
     chown -R rancher /var/lib/rancher /var/lib/cattle /usr/local/bin
-RUN curl -sLf https://github.com/rancher/machine-package/releases/download/v0.14.0-rancher1-1/docker-machine.tar.gz | tar xvzf - -C /usr/bin && \
+RUN curl -sLf https://github.com/rancher/machine-package/releases/download/v0.14.0-rancher2-1/docker-machine.tar.gz | tar xvzf - -C /usr/bin && \
     curl -sLf https://github.com/leodotcloud/loglevel/releases/download/v0.1/loglevel-amd64-v0.1.tar.gz | tar xvzf - -C /usr/bin && \
     curl -sLf https://github.com/rancher/helm/releases/download/v2.8.0-rancher3/helm > /usr/bin/helm && \
     chmod +x /usr/bin/helm
@@ -14,7 +14,7 @@ RUN mkdir /root/.kube && \
 WORKDIR /var/lib/rancher
 
 ENV CATTLE_UI_PATH /usr/share/rancher/ui
-ENV CATTLE_UI_VERSION 2.0.39
+ENV CATTLE_UI_VERSION 2.0.40
 ENV CATTLE_CLI_VERSION v2.0.0-rc2
 
 RUN mkdir -p /usr/share/rancher/ui && \
