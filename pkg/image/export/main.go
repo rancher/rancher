@@ -63,8 +63,9 @@ if [ -z "$1" ]; then
 fi
 
 set -e -x
+REGISTRY=$1
 
-tar xvzf rancher-images.tar.gz | docker load
+docker load --input rancher-images.tar.gz
 
 `)
 
