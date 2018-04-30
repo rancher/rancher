@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	ingressStateAnnotation = "field.cattle.io.ingress/state"
+	ingressStateAnnotation = "field.cattle.io/ingressState"
 )
 
 func GetStateKey(name, namespace, host string, path string, port string) string {
