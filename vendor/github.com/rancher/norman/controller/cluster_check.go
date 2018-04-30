@@ -39,6 +39,11 @@ func ObjectInCluster(cluster string, obj interface{}) bool {
 			}
 		}
 	}
+	if clusterName == "" {
+		if c := getValue(obj, "Namespace"); c.IsValid() {
+			clusterName = c.String()
+		}
+	}
 
 	return clusterName == cluster
 }

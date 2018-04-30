@@ -669,6 +669,9 @@ func volumeTypes(schemas *types.Schemas) *types.Schemas {
 				"name",
 			}},
 		).
+		AddMapperForType(&Version, v1.PersistentVolumeClaim{},
+			mapper.PersistVolumeClaim{},
+		).
 		MustImport(&Version, v1.PersistentVolumeClaimVolumeSource{}, struct {
 			ClaimName string `norman:"type=reference[persistentVolumeClaim]"`
 		}{}).
