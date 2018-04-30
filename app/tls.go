@@ -48,14 +48,14 @@ func ReadTLSConfig(config *Config) error {
 	}
 
 	valid := false
-	if lc.CACerts != "" && lc.Key != "" && lc.Cert != "" {
+	if lc.Key != "" && lc.Cert != "" {
 		valid = true
 	} else if lc.Key == "" && lc.Cert == "" {
 		valid = true
 	}
 
 	if !valid {
-		return fmt.Errorf("invalid SSL configuration found, please set all (cacerts, cert, key), cacerts only, or none")
+		return fmt.Errorf("invalid SSL configuration found, please set cert/key, cert/key/cacerts, cacerts only, or none")
 	}
 
 	config.ListenConfig = lc
