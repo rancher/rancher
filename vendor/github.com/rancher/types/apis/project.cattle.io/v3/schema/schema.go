@@ -494,6 +494,7 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 			EnvironmentFrom      []EnvironmentFrom
 			InitContainer        bool
 			State                string
+			Transitioning        string
 			TransitioningMessage string
 			ExitCode             *int
 			RestartCount         int
