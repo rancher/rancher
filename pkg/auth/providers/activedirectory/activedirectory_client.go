@@ -132,18 +132,100 @@ func (p *adProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult, 
 	userPrincipal.Me = true
 
 	if len(memberOf) != 0 {
-		for _, attrib := range memberOf {
-			group, err := p.getPrincipal(attrib, GroupScope, config, caPool)
+		lConn, err := ldap.NewLDAPConn(config, caPool)
+		if err != nil {
+			return userPrincipal, groupPrincipals, err
+		}
+		defer lConn.Close()
+		for i := 0; i < len(memberOf); i += 50 {
+			batch := memberOf[i:min(i+50, len(memberOf))]
+			groupPrincipalListBatch, err := p.getGroupPrincipals(batch, lConn, config)
 			if err != nil {
 				return userPrincipal, groupPrincipals, err
 			}
-			if group != nil {
-				group.MemberOf = true
-			}
-			groupPrincipals = append(groupPrincipals, *group)
+			groupPrincipals = append(groupPrincipals, groupPrincipalListBatch...)
 		}
 	}
 	return userPrincipal, groupPrincipals, nil
+}
+
+func min(a int, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func (p *adProvider) getGroupPrincipals(groupDN []string, lConn *ldapv2.Conn, config *v3.ActiveDirectoryConfig) ([]v3.Principal, error) {
+	var nilPrincipal []v3.Principal
+	// Bind before query
+	// If service acc bind fails, and auth is on, return principal formed using DN
+	serviceAccountUsername := ldap.GetUserExternalID(config.ServiceAccountUsername, config.DefaultLoginDomain)
+	err := lConn.Bind(serviceAccountUsername, config.ServiceAccountPassword)
+
+	if err != nil {
+		if ldapv2.IsErrorWithCode(err, ldapv2.LDAPResultInvalidCredentials) && config.Enabled {
+			groupList := []v3.Principal{}
+			for _, dn := range groupDN {
+				grp := v3.Principal{
+					ObjectMeta:    metav1.ObjectMeta{Name: GroupScope + "://" + dn},
+					DisplayName:   dn,
+					LoginName:     dn,
+					PrincipalType: GroupScope,
+					MemberOf:      true,
+				}
+				groupList = append(groupList, grp)
+			}
+			return groupList, nil
+		}
+		return []v3.Principal{}, fmt.Errorf("Error in ldap bind: %v", err)
+	}
+
+	filter := "(" + ObjectClassAttribute + "=" + config.GroupObjectClass + ")"
+	query := "(|"
+	for _, attrib := range groupDN {
+		query += "(distinguishedName=" + attrib + ")"
+	}
+	query += ")"
+	query = "(&" + filter + query + ")"
+	// Pulling user's groups
+	logrus.Debugf("AD: Query for pulling user's groups: %v", query)
+	searchDomain := config.UserSearchBase
+	if config.GroupSearchBase != "" {
+		searchDomain = config.GroupSearchBase
+	}
+	search := ldapv2.NewSearchRequest(searchDomain,
+		ldapv2.ScopeWholeSubtree, ldapv2.NeverDerefAliases, 0, 0, false,
+		query,
+		ldap.GetGroupSearchAttributes(MemberOfAttribute, ObjectClassAttribute, config), nil)
+
+	result, err := lConn.Search(search)
+	if err != nil {
+		// check errors
+		if ldapErr, ok := err.(*ldapv2.Error); ok && ldapErr.ResultCode == 32 {
+			return nil, httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("%v not found", searchDomain))
+		}
+		return nil, httperror.WrapAPIError(errors.Wrapf(err, "server returned error for search %v %v: %v", search.BaseDN, query, err), httperror.ServerError, "Internal server error")
+	}
+
+	principals := []v3.Principal{}
+	for _, e := range result.Entries {
+		principal, err := p.attributesToPrincipal(e.Attributes, e.DN, GroupScope, config)
+		if err != nil {
+			logrus.Errorf("AD: Error in getting principal for group entry %v: %v", e, err)
+			continue
+		}
+		if principal == nil {
+			logrus.Error("AD: No LDAP principal returned")
+			continue
+		}
+		if !reflect.DeepEqual(principal, nilPrincipal) {
+			principal.MemberOf = true
+			principals = append(principals, *principal)
+		}
+	}
+
+	return principals, nil
 }
 
 func (p *adProvider) getPrincipal(distinguishedName string, scope string, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) (*v3.Principal, error) {
