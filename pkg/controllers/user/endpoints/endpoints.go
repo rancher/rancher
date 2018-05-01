@@ -22,6 +22,7 @@ import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 const (
@@ -306,10 +307,24 @@ func convertIngressToServicePublicEndpointsMap(obj *extensionsv1beta1.Ingress, a
 		return epsMap
 	}
 
+	tlsHosts := sets.NewString()
+	for _, t := range obj.Spec.TLS {
+		tlsHosts.Insert(t.Hosts...)
+	}
+
 	ports := map[int32]string{80: "HTTP", 443: "HTTPS"}
 	for _, rule := range obj.Spec.Rules {
 		for _, path := range rule.HTTP.Paths {
 			for port, proto := range ports {
+				if port == 80 {
+					if tlsHosts.Has(rule.Host) {
+						continue
+					}
+				} else {
+					if !tlsHosts.Has(rule.Host) && rule.Host != "" {
+						continue
+					}
+				}
 				p := v3.PublicEndpoint{
 					Hostname:    rule.Host,
 					Path:        path.Path,
