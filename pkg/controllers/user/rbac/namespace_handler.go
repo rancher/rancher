@@ -77,6 +77,19 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 	// Get project that contain this namespace
 	projectID := ns.Annotations[projectIDAnnotation]
 	if len(projectID) == 0 {
+		rbs, err := n.m.rbLister.List(ns.Name, labels.Everything())
+		if err != nil {
+			return false, errors.Wrapf(err, "couldn't list role bindings in %s", ns.Name)
+		}
+		client := n.m.workload.RBAC.RoleBindings(ns.Name).ObjectClient()
+		for _, rb := range rbs {
+			if uid := convert.ToString(rb.Labels[rtbOwnerLabel]); uid != "" {
+				logrus.Infof("Deleting role binding %s in %s", rb.Name, ns.Name)
+				if err := client.Delete(rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+					return false, errors.Wrapf(err, "couldn't delete role binding %s", rb.Name)
+				}
+			}
+		}
 		return false, nil
 	}
 
