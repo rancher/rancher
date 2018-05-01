@@ -230,6 +230,7 @@ func (p *adProvider) getGroupPrincipals(groupDN []string, lConn *ldapv2.Conn, co
 
 func (p *adProvider) getPrincipal(distinguishedName string, scope string, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) (*v3.Principal, error) {
 	var search *ldapv2.SearchRequest
+	var filter string
 	if !slice.ContainsString(scopes, scope) {
 		return nil, fmt.Errorf("Invalid scope")
 	}
@@ -253,7 +254,12 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 		return nil, nil
 	}
 
-	filter := "(" + ObjectClassAttribute + "=*)"
+	if strings.EqualFold(UserScope, scope) {
+		filter = "(" + ObjectClassAttribute + "=" + config.UserObjectClass + ")"
+	} else {
+		filter = "(" + ObjectClassAttribute + "=" + config.GroupObjectClass + ")"
+	}
+
 	logrus.Debugf("Query for getPrincipal(%s): %s", distinguishedName, filter)
 	lConn, err := ldap.NewLDAPConn(config, caPool)
 	if err != nil {
@@ -287,12 +293,12 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 
 	if strings.EqualFold(UserScope, scope) {
 		search = ldapv2.NewSearchRequest(distinguishedName,
-			ldapv2.ScopeWholeSubtree, ldapv2.NeverDerefAliases, 0, 0, false,
+			ldapv2.ScopeBaseObject, ldapv2.NeverDerefAliases, 0, 0, false,
 			filter,
 			ldap.GetUserSearchAttributes(MemberOfAttribute, ObjectClassAttribute, config), nil)
 	} else {
 		search = ldapv2.NewSearchRequest(distinguishedName,
-			ldapv2.ScopeWholeSubtree, ldapv2.NeverDerefAliases, 0, 0, false,
+			ldapv2.ScopeBaseObject, ldapv2.NeverDerefAliases, 0, 0, false,
 			filter,
 			ldap.GetGroupSearchAttributes(MemberOfAttribute, ObjectClassAttribute, config), nil)
 	}
