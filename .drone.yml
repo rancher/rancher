@@ -71,7 +71,7 @@ pipeline:
   github_binary_release:
     image: plugins/github-release
     files:
-     - bin/*
+     - bin/rancher-*
     checksum:
      - sha256
     secrets: [github_token]
