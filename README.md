@@ -4,45 +4,54 @@
 [![Docker Pulls](https://img.shields.io/docker/pulls/rancher/server.svg)](https://store.docker.com/community/images/rancher/server)
 [![Go Report Card](https://goreportcard.com/badge/github.com/rancher/rancher)](https://goreportcard.com/report/github.com/rancher/rancher)
 
-Rancher is an open source project that provides a complete platform for operating Docker in production. It provides infrastructure services such as multi-host networking, global and local load balancing, and volume snapshots. It integrates native Docker management capabilities such as Docker Machine and Docker Swarm. It offers a rich user experience that enables devops admins to operate Docker in production at large scale.
+Rancher is an open source project that provides a ontainer management platform built for organizations that deploy containers in production. Rancher makes it easy to run Kubernetes everywhere, meet IT requirements, and empower DevOps teams.
+
+> Looking for Rancher 1.6.x info?  [Click here](https://github.com/rancher/rancher/blob/master/README_1_6.md)
 
 ## Latest Release
 
-* Beta - v1.6.17 - `rancher/server:latest` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v1.6.17).
+* Latest - v2.0.0 - `rancher/rancher:latest` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.0.0).
 
-* Stable - v1.6.17 - `rancher/server:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v1.6.17).
+* Stable - TBD - `rancher/rancher:stable` - TBD
 
 To get automated notifications of our latest release, you can watch the announcements category in our [forums](http://forums.rancher.com/c/announcements), or subscribe to the RSS feed `https://forums.rancher.com/c/announcements.rss`.
 
+## Quick Start
+Use our [Quick Start Guide](https://rancher.com/docs/rancher/v2.x/en/quick-start-guide/) to quickly get your first Rancher server up and deploying your first Kubernetes workload.
+
 ## Installation
+Rancher can be deployed in either a single node or multi-node setup.  Please refer to the following for guides on how to get Rancher up and running.
 
-Rancher is deployed as a set of Docker containers.  Running Rancher is as simple as launching two containers.  One container as the management server and another container on a node as an agent.  You can install the containers in following approaches.
+* [Single Node Install](https://rancher.com/docs/rancher/v2.x/en/installation/server-installation/install-using-docker/)
+* [Multi Node/HA Install](https://rancher.com/docs/rancher/v2.x/en/installation/server-installation/install-using-kubernetes/)
 
-* [Manually](#launching-management-server)
-* [Terraform](https://github.com/rancher/terraform-modules)
-* [Puppet](https://github.com/nickschuch/puppet-rancher) (Thanks @nickschuch)
-* [Ansible](https://github.com/joshuacox/ansibleplaybook-rancher)
-* [SaltStack](https://github.com/komljen/rancher-salt)
+> **No internet access?**  Refer to our [Air Gap Installation](https://rancher.com/docs/rancher/v2.x/en/installation/air-gap-installation/install-from-private-registry/) for instructions on how to use your own private registry to install Rancher.
 
-### Requirements
+### Minimum Requirements
 
-* [Supported Docker version](http://rancher.com/docs/rancher/v1.6/en/hosts/#supported-docker-versions)
-* Any modern Linux distribution with a [supported Docker version](http://rancher.com/docs/rancher/v1.6/en/hosts/#supported-docker-versions). (Ubuntu, RHEL/CentOS 7 are more heavily tested.) Rancher also works with [RancherOS](https://github.com/rancher/os).
-* RAM: 1GB+
-
-### Launching Management Server
-
-    docker run -d --restart=unless-stopped -p 8080:8080 rancher/server
-
-The UI and API are available on the exposed port `8080`.
+* Operating Systems
+  * Ubuntu 16.04 (64-bit)
+  * Red Hat Enterprise Linux 7.5 (64-bit)
+  * RancherOS 1.3 (64-bit)
+* Hardware
+  * 4 GB of Memory
+* Software
+  * Docker v1.12.6, 1.13.1, 17.03.02
 
 ### Using Rancher
 
-To learn more about using Rancher, please refer to our [Rancher Documentation](http://docs.rancher.com/).
+To learn more about using Rancher, please refer to our [Rancher Documentation](https://rancher.com/docs/rancher/v2.x/en/).
 
 ## Source Code
 
-This repo is a meta-repo used for packaging.  The source code for Rancher is in other repos in the rancher organization.  The majority of the code is in https://github.com/rancher/cattle.
+This repo is a meta-repo used for packaging and contains the majority of rancher codebase.  Rancher does include other Rancher projects  including:
+* https://github.com/rancher/types
+* https://github.com/rancher/norman
+* https://github.com/rancher/kontainer-engine
+* https://github.com/rancher/rke
+* https://github.com/rancher/ui
+
+Rancher also includes other open source llbraries and projects.  Please [go here](https://github.com/rancher/rancher/blob/master/vendor.conf) to view the entire list.
 
 ## Support, Discussion, and Community
 If you need any help with Rancher or RancherOS, please join us at either our [Rancher forums](http://forums.rancher.com/), [#rancher IRC channel](http://webchat.freenode.net/?channels=rancher) or [Slack](https://slack.rancher.io/) where most of our team hangs out at.
