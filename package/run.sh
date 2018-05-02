@@ -91,9 +91,12 @@ if [ -n "$CATTLE_CA_CHECKSUM" ]; then
     temp=$(mktemp)
     curl --insecure -s -fL $CATTLE_SERVER/v3/settings/cacerts | jq -r .value > $temp
     cat $temp
-    if [ "$(sha256sum $temp | awk '{print $1}')" != $CATTLE_CA_CHECKSUM ]; then
+    CATTLE_SERVER_CHECKSUM=$(sha256sum $temp | awk '{print $1}')
+    if [ $CATTLE_SERVER_CHECKSUM != $CATTLE_CA_CHECKSUM ]; then
         rm -f $temp
-        warn $CATTLE_SERVER/v3/settings/cacerts does not match $CATTLE_CA_CHECKSUM
+        error "Configured cacerts checksum ($CATTLE_SERVER_CHECKSUM) does not match given --ca-checksum ($CATTLE_CA_CHECKSUM)"
+        error "Please check if the correct certificate is configured at $CATTLE_SERVER/v3/settings/cacerts"
+        exit 1
     else
         mkdir -p /etc/kubernetes/ssl/certs
         mv $temp /etc/kubernetes/ssl/certs/serverca
