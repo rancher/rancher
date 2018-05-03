@@ -22,8 +22,8 @@ Use our [Quick Start Guide](https://rancher.com/docs/rancher/v2.x/en/quick-start
 ## Installation
 Rancher can be deployed in either a single node or multi-node setup.  Please refer to the following for guides on how to get Rancher up and running.
 
-* [Single Node Install](https://rancher.com/docs/rancher/v2.x/en/installation/server-installation/install-using-docker/)
-* [Multi Node/HA Install](https://rancher.com/docs/rancher/v2.x/en/installation/server-installation/install-using-kubernetes/)
+* [Single Node Install](https://rancher.com/docs/rancher/v2.x/en/installation/server-installation/single-node-install/)
+* [Multi Node/HA Install](https://rancher.com/docs/rancher/v2.x/en/installation/server-installation/ha-server-install/)
 
 > **No internet access?**  Refer to our [Air Gap Installation](https://rancher.com/docs/rancher/v2.x/en/installation/air-gap-installation/install-from-private-registry/) for instructions on how to use your own private registry to install Rancher.
 
