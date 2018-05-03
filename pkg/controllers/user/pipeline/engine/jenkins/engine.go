@@ -80,7 +80,7 @@ func (j *Engine) PreCheck() error {
 			return err
 		}
 		j.Client = client
-	} else if j.Client.API != url || j.Client.Token != token {
+	} else {
 		client, err := New(url, user, token, j.Client.HTTPClient)
 		if err != nil {
 			return err
