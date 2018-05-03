@@ -11,18 +11,10 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 var (
-	ErrNotFound         = errors.New("Not Found")
-	ErrCreateJobFail    = errors.New("Create Job fail")
-	ErrUpdateJobFail    = errors.New("Update Job fail")
-	ErrStopJobFail      = errors.New("Stop Job fail")
-	ErrDeleteBuildFail  = errors.New("Delete Build fail")
-	ErrBuildJobFail     = errors.New("Build Job fail")
-	ErrGetBuildInfoFail = errors.New("Get Build Info fail")
-	ErrGetJobInfoFail   = errors.New("Get Job Info fail")
+	ErrNotFound = errors.New("Not Found")
 )
 
 type Client struct {
@@ -44,7 +36,7 @@ func New(api string, user string, token string, httpClient *http.Client) (*Clien
 	}
 
 	if err := c.getCSRF(); err != nil {
-		return nil, errors.Wrap(err, "fail to connect Jenkins")
+		return nil, err
 	}
 	return c, nil
 }
@@ -65,7 +57,7 @@ func (c *Client) getCSRF() error {
 	data, _ := ioutil.ReadAll(resp.Body)
 	Crumbs := strings.Split(string(data), ":")
 	if len(Crumbs) != 2 {
-		return errors.New("error get crumbs from jenkins")
+		return errors.New("error get crumbs, Jenkins is probably not ready yet")
 	}
 	c.CrumbHeader = Crumbs[0]
 	c.CrumbBody = Crumbs[1]
@@ -91,10 +83,8 @@ func (c *Client) deleteBuild(jobname string, buildNumber int) error {
 		return err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		return ErrDeleteBuildFail
-	}
-	return nil
+
+	return checkHTTPError(resp, "delete build")
 
 }
 
@@ -117,13 +107,15 @@ func (c *Client) execScript(script string) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
+
+	if err := checkHTTPError(resp, "exec script"); err != nil {
+		return "", err
+	}
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		return string(data), fmt.Errorf("jenkins run script fail,response code is :%v", resp.StatusCode)
-	}
+
 	return string(data), nil
 }
 
@@ -147,12 +139,7 @@ func (c *Client) createJob(jobname string, content []byte) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		data, _ := ioutil.ReadAll(resp.Body)
-		logrus.Debug(string(data))
-		return fmt.Errorf("create job get response:%v", resp.StatusCode)
-	}
-	return nil
+	return checkHTTPError(resp, "create job")
 }
 
 func (c *Client) updateJob(jobname string, content []byte) error {
@@ -172,12 +159,8 @@ func (c *Client) updateJob(jobname string, content []byte) error {
 		return err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		data, _ := ioutil.ReadAll(resp.Body)
-		logrus.Debug(string(data))
-		return fmt.Errorf("update job get response:%v", resp.StatusCode)
-	}
-	return nil
+
+	return checkHTTPError(resp, "update job")
 }
 
 func (c *Client) buildJob(jobname string, params map[string]string) (string, error) {
@@ -199,11 +182,8 @@ func (c *Client) buildJob(jobname string, params map[string]string) (string, err
 		return "", err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		return "", ErrBuildJobFail
-	}
-	logrus.Debugf("job queue is %s", resp.Header.Get("location"))
-	return "", nil
+
+	return "", checkHTTPError(resp, "build job")
 }
 
 func (c *Client) getBuildInfo(jobname string) (*BuildInfo, error) {
@@ -225,11 +205,9 @@ func (c *Client) getBuildInfo(jobname string) (*BuildInfo, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		if resp.StatusCode == 404 {
-			return nil, ErrNotFound
-		}
-		return nil, ErrGetBuildInfoFail
+
+	if err := checkHTTPError(resp, "get build info"); err != nil {
+		return nil, err
 	}
 	buildInfo := &BuildInfo{}
 	respBytes, err := ioutil.ReadAll(resp.Body)
@@ -260,11 +238,9 @@ func (c *Client) getJobInfo(jobname string) (*JobInfo, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		if resp.StatusCode == 404 {
-			return nil, ErrNotFound
-		}
-		return nil, ErrGetJobInfoFail
+
+	if err := checkHTTPError(resp, "get job info"); err != nil {
+		return nil, err
 	}
 	jobInfo := &JobInfo{}
 	respBytes, err := ioutil.ReadAll(resp.Body)
@@ -298,8 +274,9 @@ func (c *Client) getBuildRawOutput(jobname string, buildNumber int, startLine in
 		return "", err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		return "", ErrGetJobInfoFail
+
+	if err := checkHTTPError(resp, "get build output"); err != nil {
+		return "", err
 	}
 	respBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -326,10 +303,8 @@ func (c *Client) stopJob(jobname string, buildNumber int) error {
 		return err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		return ErrStopJobFail
-	}
-	return nil
+
+	return checkHTTPError(resp, "stop job")
 }
 
 func (c *Client) cancelQueueItem(id int) error {
@@ -354,10 +329,8 @@ func (c *Client) cancelQueueItem(id int) error {
 		return err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		return ErrStopJobFail
-	}
-	return nil
+
+	return checkHTTPError(resp, "cancel queue")
 }
 
 func (c *Client) getWFBuildInfo(jobname string) (*WFBuildInfo, error) {
@@ -379,8 +352,9 @@ func (c *Client) getWFBuildInfo(jobname string) (*WFBuildInfo, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		return nil, ErrGetBuildInfoFail
+
+	if err := checkHTTPError(resp, "get build info"); err != nil {
+		return nil, err
 	}
 	buildInfo := &WFBuildInfo{}
 	respBytes, err := ioutil.ReadAll(resp.Body)
@@ -412,8 +386,9 @@ func (c *Client) getWFNodeInfo(jobname string, nodeID string) (*WFNodeInfo, erro
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		return nil, errors.New("Error get jenkins node info")
+
+	if err := checkHTTPError(resp, "get WFNode info"); err != nil {
+		return nil, err
 	}
 	nodeInfo := &WFNodeInfo{}
 	respBytes, err := ioutil.ReadAll(resp.Body)
@@ -445,8 +420,9 @@ func (c *Client) getWFNodeLog(jobname string, nodeID string) (*WFNodeLog, error)
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		return nil, errors.New("Error get jenkins node log")
+
+	if err := checkHTTPError(resp, "get WFNode log"); err != nil {
+		return nil, err
 	}
 	nodeLog := &WFNodeLog{}
 	respBytes, err := ioutil.ReadAll(resp.Body)
@@ -477,10 +453,7 @@ func (c *Client) createCredential(content []byte) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		return errors.New("create credential fail")
-	}
-	return nil
+	return checkHTTPError(resp, "create credential")
 }
 
 func (c *Client) getCredential(credentialID string) error {
@@ -501,11 +474,19 @@ func (c *Client) getCredential(credentialID string) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		if resp.StatusCode == 404 {
-			return ErrNotFound
-		}
-		return fmt.Errorf("Error create credential - got status code %v", resp.StatusCode)
+	return checkHTTPError(resp, "get credential")
+}
+
+func checkHTTPError(resp *http.Response, event string) error {
+	if resp == nil {
+		return nil
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return ErrNotFound
+	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusBadRequest {
+		data, _ := ioutil.ReadAll(resp.Body)
+		return fmt.Errorf("%s error - status %d, result: %s", event, resp.StatusCode, string(data))
 	}
 	return nil
 }
