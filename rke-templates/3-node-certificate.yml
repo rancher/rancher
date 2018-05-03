@@ -11,7 +11,7 @@ nodes:
     ssh_key_path: <PEM_FILE>
   - address: <IP>
     user: <USER>
-    role: [etcd,worker]
+    role: [controlplane,etcd,worker]
     ssh_key_path: <PEM_FILE>
 
 addons: |-
@@ -118,7 +118,7 @@ addons: |-
       spec:
         serviceAccountName: cattle-admin
         containers:
-        - image: rancher/rancher:master
+        - image: rancher/rancher:stable
           imagePullPolicy: Always
           name: cattle-server
           ports:
