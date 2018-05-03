@@ -117,6 +117,7 @@ export CATTLE_NODE_NAME
 export CATTLE_ROLE
 export CATTLE_SERVER
 export CATTLE_TOKEN
+export CATTLE_VALIDATE
 export CATTLE_NODE_LABEL
 export CATTLE_WRITE_CERT_ONLY
 
@@ -136,6 +137,7 @@ while true; do
         -i | --internal-address) shift; CATTLE_INTERNAL_ADDRESS=$1  ;;
         -l | --label)            shift; CATTLE_NODE_LABEL+=",$1"    ;;
         -o | --only-write-certs)        CATTLE_WRITE_CERT_ONLY=true ;;
+        -v | --validate)         shift; CATTLE_VALIDATE=true        ;;
         *) break;
     esac
     shift

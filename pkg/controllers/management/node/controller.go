@@ -1,9 +1,13 @@
 package node
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
+
+	"bufio"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/event"
@@ -241,10 +245,6 @@ func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *v3.Node) (*v3.N
 		return obj, err
 	}
 
-	if err := m.deployAgent(nodeDir, obj); err != nil {
-		return obj, err
-	}
-
 	m.logger.Infof(obj, "Provisioning node %s done", obj.Spec.RequestedHostname)
 	return obj, nil
 }
@@ -256,6 +256,16 @@ func (m *Lifecycle) deployAgent(nodeDir string, obj *v3.Node) error {
 	}
 
 	drun := clusterregistrationtokens.NodeCommand(token)
+
+	// validate first
+	validateArgs := buildAgentCommand(obj, strings.Replace(drun, "sudo docker run -d", "sudo docker run", 1)+" --validate")
+	validateCmd := buildCommand(nodeDir, validateArgs)
+	stdoutBuf := &bytes.Buffer{}
+	validateCmd.Stdout = stdoutBuf
+	if err := validateCmd.Run(); err != nil {
+		return errors.New(filterErrorMsg(stdoutBuf))
+	}
+
 	args := buildAgentCommand(obj, drun)
 	cmd := buildCommand(nodeDir, args)
 	output, err := cmd.CombinedOutput()
@@ -264,6 +274,17 @@ func (m *Lifecycle) deployAgent(nodeDir string, obj *v3.Node) error {
 	}
 
 	return nil
+}
+
+func filterErrorMsg(buf *bytes.Buffer) string {
+	s := bufio.NewScanner(buf)
+	errorMessage := ""
+	for s.Scan() {
+		if strings.Contains(s.Text(), "ERROR") {
+			errorMessage += s.Text() + "; "
+		}
+	}
+	return errorMessage
 }
 
 func (m *Lifecycle) ready(obj *v3.Node) (*v3.Node, error) {
@@ -329,7 +350,35 @@ func (m *Lifecycle) Updated(obj *v3.Node) (*v3.Node, error) {
 		}
 		return obj, err
 	})
-	return newObj.(*v3.Node), err
+	if err != nil {
+		return newObj.(*v3.Node), err
+	}
+	updateObj, err := m.nodeClient.Update(newObj.(*v3.Node))
+	if err != nil {
+		return newObj.(*v3.Node), err
+	}
+
+	newObjTwo, err := v3.NodeConditionAgentDeployed.Once(updateObj, func() (runtime.Object, error) {
+		if updateObj.Status.NodeTemplateSpec == nil {
+			m.setWaiting(updateObj)
+			return updateObj, nil
+		}
+
+		config, err := nodeconfig.NewNodeConfig(m.secretStore, updateObj)
+		if err != nil {
+			return updateObj, err
+		}
+		defer config.Cleanup()
+
+		if err := config.Restore(); err != nil {
+			return updateObj, err
+		}
+		if err := m.deployAgent(config.Dir(), updateObj); err != nil {
+			return updateObj, err
+		}
+		return updateObj, nil
+	})
+	return newObjTwo.(*v3.Node), err
 }
 
 func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, obj *v3.Node) (*v3.Node, error) {

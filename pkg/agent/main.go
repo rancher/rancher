@@ -11,9 +11,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"time"
-
 	"strings"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
@@ -40,6 +39,9 @@ func main() {
 	logserver.StartServerWithDefaults()
 	if os.Getenv("CATTLE_DEBUG") == "true" || os.Getenv("RANCHER_DEBUG") == "true" {
 		logrus.SetLevel(logrus.DebugLevel)
+	}
+	if os.Getenv("CATTLE_VALIDATE") == "true" {
+		return
 	}
 
 	var err error
