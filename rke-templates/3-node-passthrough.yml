@@ -100,7 +100,7 @@ addons: |-
       spec:
         serviceAccountName: cattle-admin
         containers:
-        - image: rancher/rancher:stable
+        - image: rancher/rancher:latest
           imagePullPolicy: Always
           name: cattle-server
           ports:
