@@ -1,6 +1,6 @@
 FROM rancher/k8s:v1.8.9-rancher1-1 as k8s
 
-FROM ubuntu:17.10
+FROM ubuntu:18.04
 RUN apt-get update && \
     apt-get install -y --no-install-recommends curl ca-certificates jq iproute2 vim-tiny less bash-completion && \
     curl -sLf https://get.docker.com/builds/Linux/x86_64/docker-1.10.3 > /usr/bin/docker && \

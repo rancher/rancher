@@ -1,4 +1,4 @@
-FROM ubuntu:17.10
+FROM ubuntu:18.04
 RUN apt-get update && apt-get install -y git curl ca-certificates unzip xz-utils && \
     useradd rancher && \
     mkdir -p /var/lib/rancher/etcd /var/lib/cattle && \
