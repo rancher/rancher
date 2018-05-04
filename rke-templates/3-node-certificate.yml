@@ -110,7 +110,7 @@ addons: |-
     namespace: cattle-system
     name: cattle
   spec:
-    replicas: 2
+    replicas: 1
     template:
       metadata:
         labels:
