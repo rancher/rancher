@@ -27,7 +27,11 @@ type Wrapper struct {
 	AppGetter             pv3.AppsGetter
 }
 
-const appLabel = "io.cattle.field/appId"
+const (
+	appLabel       = "io.cattle.field/appId"
+	activeState    = "active"
+	deployingState = "deploying"
+)
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(apiContext, "upgrade")
@@ -36,6 +40,21 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	if _, ok := resource.Values["status"]; ok {
 		if status, ok := resource.Values["status"].(map[string]interface{}); ok {
 			delete(status, "lastAppliedTemplate")
+		}
+	}
+	var workloads []projectv3.Workload
+	if err := access.List(apiContext, &projectschema.Version, projectv3.WorkloadType, &types.QueryOptions{}, &workloads); err == nil {
+		for _, w := range workloads {
+			_, appID := ref.Parse(resource.ID)
+			if w.WorkloadLabels[appLabel] == appID && w.State != activeState {
+				resource.Values["state"] = deployingState
+				resource.Values["transitioning"] = "yes"
+				transitionMsg := convert.ToString(resource.Values["transitioningMessage"])
+				if transitionMsg != "" {
+					transitionMsg += "; "
+				}
+				resource.Values["transitioningMessage"] = transitionMsg + fmt.Sprintf("Workload %s: %s", w.Name, w.TransitioningMessage)
+			}
 		}
 	}
 }
