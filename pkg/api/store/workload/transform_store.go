@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/norman/types/definition"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/api/store/pod"
+	"github.com/rancher/rancher/pkg/ref"
 	"github.com/sirupsen/logrus"
 )
 
@@ -37,7 +38,8 @@ func NewTransformStore(store types.Store) types.Store {
 			nodeName := convert.ToString(values.GetValueN(data, "nodeId"))
 			if nodeName != "" {
 				state := getState(data)
-				data["nodeId"] = state[getKey(nodeName)]
+				_, nodeName := ref.Parse(state[getKey(nodeName)])
+				data["nodeId"] = nodeName
 			}
 			return data, nil
 		},
