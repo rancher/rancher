@@ -16,6 +16,53 @@ warn()
     echo "WARN :" "$@" 1>&2
 }
 
+get_address()
+{
+    local address=$1
+    if [ -e "/sys/class/net/${address}" ]; then
+        echo $(ip addr show dev $address | grep -w inet | awk '{print $2}' | cut -f1 -d/ | head -1)
+    else
+        case $address in
+            awslocal)
+                echo $(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
+                ;;
+            awspublic)
+                echo $(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+                ;;
+            doprivate)
+                echo $(curl -s http://169.254.169.254/metadata/v1/interfaces/private/0/ipv4/address)
+                ;;
+            dopublic)
+                echo $(curl -s http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/address)
+                ;;
+            azprivate)
+                echo $(curl -s -H Metadata:true "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/privateIpAddress?api-version=2017-08-01&format=text")
+                ;;
+            azpublic)
+                echo $(curl -s -H Metadata:true "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/publicIpAddress?api-version=2017-08-01&format=text")
+                ;;
+            gceinternal)
+                echo $(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip)
+                ;;
+            gceexternal)
+                echo $(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip)
+                ;;
+            packetlocal)
+                echo $(curl -s https://metadata.packet.net/2009-04-04/meta-data/local-ipv4)
+                ;;
+            packetpublic)
+                echo $(curl -s https://metadata.packet.net/2009-04-04/meta-data/public-ipv4)
+                ;;
+            ipify)
+                echo $(curl -s https://api.ipify.org)
+                ;;
+            *)
+                echo ""
+                ;;
+        esac
+    fi
+}
+
 AGENT_IMAGE=${AGENT_IMAGE:-ubuntu:14.04}
 
 export CATTLE_ADDRESS
@@ -61,13 +108,8 @@ if [ -z "$CATTLE_NODE_NAME" ]; then
     CATTLE_NODE_NAME=$(hostname -s)
 fi
 
-if [ "$CATTLE_ADDRESS" = "awslocal" ]; then
-    export CATTLE_ADDRESS=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
-elif [ "$CATTLE_ADDRESS" = "awspublic" ]; then
-    export CATTLE_ADDRESS=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
-elif [ "$CATTLE_ADDRESS" = "ipify" ]; then
-    export CATTLE_ADDRESS=$(curl -s https://api.ipify.org)
-fi
+export CATTLE_ADDRESS=$(get_address $CATTLE_ADDRESS)
+export CATTLE_INTERNAL_ADDRESS=$(get_address $CATTLE_INTERNAL_ADDRESS)
 
 if [ -z "$CATTLE_ADDRESS" ]; then
     CATTLE_ADDRESS=$(ip route get 8.8.8.8 | grep via | awk '{print $NF}')
