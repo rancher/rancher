@@ -61,7 +61,6 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     logstash_format true
     logstash_dateformat  {{.clusterTarget.WrapEmbedded.DateFormat}}
     type_name  "container_log"
-    reload_connections false
     {{end -}}
 
     {{ if eq .clusterTarget.CurrentTarget "elasticsearch"}}
@@ -74,11 +73,11 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     {{end -}}
  
     reload_connections "true"
-    logstash_prefix "{{.clusterTarget.ElasticsearchConfig.IndexPrefix}}"
     logstash_format true
+    logstash_prefix "{{.clusterTarget.ElasticsearchConfig.IndexPrefix}}"
     logstash_dateformat  {{.clusterTarget.WrapElasticsearch.DateFormat}}
+    ssl_verify {{.clusterTarget.ElasticsearchConfig.SSLVerify}}
     type_name  "container_log"
-    reload_connections false
     {{end -}}
 
     {{ if eq .clusterTarget.CurrentTarget "splunk"}}
@@ -86,7 +85,7 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     server  {{.clusterTarget.WrapSplunk.Server}}
     all_items true
     protocol {{.clusterTarget.WrapSplunk.Scheme}}
-    verify false
+    verify {{.clusterTarget.SplunkConfig.SSLVerify}}
     sourcetype {{.clusterTarget.SplunkConfig.Source}}
     token {{.clusterTarget.SplunkConfig.Token}}
     format json

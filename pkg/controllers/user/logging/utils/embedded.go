@@ -1,13 +1,9 @@
 package utils
 
 import (
-	"context"
 	"fmt"
-	"sync"
-	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/kontainer-engine/logstream"
 	"github.com/rancher/rancher/pkg/image"
 	rv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
 	rv1 "github.com/rancher/types/apis/core/v1"
@@ -22,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
@@ -33,10 +30,12 @@ const (
 )
 
 func CreateOrUpdateEmbeddedTarget(dep rv1beta2.DeploymentInterface, sa rv1.ServiceAccountInterface, se rv1.ServiceInterface, ro rrbacv1.RoleInterface, rb rrbacv1.RoleBindingInterface, namespace string, obj *v3.ClusterLogging) error {
+	elasticsearch := fmt.Sprintf("%s:%s", namespace, loggingconfig.EmbeddedESName)
+	kibana := fmt.Sprintf("%s:%s", namespace, loggingconfig.EmbeddedKibanaName)
 	// create es deployment
 	_, err := dep.Controller().Lister().Get(loggingconfig.LoggingNamespace, loggingconfig.EmbeddedESName)
 	if err != nil && !apierrors.IsNotFound(err) {
-		return errors.Wrapf(err, "get deployment %s fail", loggingconfig.EmbeddedESName)
+		return errors.Wrapf(err, "get deployment %s fail", elasticsearch)
 	}
 
 	// create service account, role and rolebinding
@@ -47,64 +46,64 @@ func CreateOrUpdateEmbeddedTarget(dep rv1beta2.DeploymentInterface, sa rv1.Servi
 	defer func() {
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			if err = sa.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-				logrus.Errorf("recycle %s service account failed", loggingconfig.EmbeddedESName)
+				logrus.Errorf("recycle %s service account failed", elasticsearch)
 			}
 		}
 	}()
 	_, err = sa.Create(sc)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "create service account %s fail", loggingconfig.EmbeddedESName)
+		return errors.Wrapf(err, "create service account %s fail", elasticsearch)
 	}
 
 	defer func() {
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			if err = ro.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-				logrus.Errorf("recycle %s role failed", loggingconfig.EmbeddedESName)
+				logrus.Errorf("recycle %s role failed", elasticsearch)
 			}
 		}
 	}()
 	_, err = ro.Create(role)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "create role %s fail", loggingconfig.EmbeddedESName)
+		return errors.Wrapf(err, "create role %s fail", elasticsearch)
 	}
 
 	defer func() {
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			if err = rb.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-				logrus.Errorf("recycle %s role binding failed", loggingconfig.EmbeddedESName)
+				logrus.Errorf("recycle %s role binding failed", elasticsearch)
 			}
 		}
 	}()
 	_, err = rb.Create(roleBind)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "create role %s fail", loggingconfig.EmbeddedESName)
+		return errors.Wrapf(err, "create role %s fail", elasticsearch)
 	}
 
 	// create service and deployment
 	defer func() {
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			if err = se.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-				logrus.Errorf("recycle %s service failed", loggingconfig.EmbeddedESName)
+				logrus.Errorf("recycle %s service failed", elasticsearch)
 			}
 		}
 	}()
 	newService := newESService(namespace)
 	_, err = se.Create(newService)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "create service %s fail", loggingconfig.EmbeddedESName)
+		return errors.Wrapf(err, "create service %s fail", elasticsearch)
 	}
 
 	defer func() {
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			if err = dep.Delete(loggingconfig.EmbeddedESName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-				logrus.Errorf("recycle %s deployment failed", loggingconfig.EmbeddedESName)
+				logrus.Errorf("recycle %s deployment failed", elasticsearch)
 			}
 		}
 	}()
 	esDeployment := newESDeployment(namespace, obj)
 	_, err = dep.Create(esDeployment)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "create deployment %s fail", loggingconfig.EmbeddedESName)
+		return errors.Wrapf(err, "create deployment %s fail", elasticsearch)
 	}
 
 	if err = updateEmbeddedQuota(dep, obj); err != nil {
@@ -114,7 +113,7 @@ func CreateOrUpdateEmbeddedTarget(dep rv1beta2.DeploymentInterface, sa rv1.Servi
 	// create kibana deployment
 	_, err = dep.Controller().Lister().Get(loggingconfig.LoggingNamespace, loggingconfig.EmbeddedKibanaName)
 	if err != nil && !apierrors.IsNotFound(err) {
-		return errors.Wrapf(err, "get deployment %s fail", loggingconfig.EmbeddedKibanaName)
+		return errors.Wrapf(err, "get deployment %s fail", kibana)
 	}
 
 	// create service account, role and rolebinding
@@ -125,64 +124,64 @@ func CreateOrUpdateEmbeddedTarget(dep rv1beta2.DeploymentInterface, sa rv1.Servi
 	defer func() {
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			if err = sa.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-				logrus.Errorf("recycle %s service account failed", loggingconfig.EmbeddedKibanaName)
+				logrus.Errorf("recycle %s service account failed", kibana)
 			}
 
 		}
 	}()
 	_, err = sa.Create(sc)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "create service account  %s fail", loggingconfig.EmbeddedKibanaName)
+		return errors.Wrapf(err, "create service account  %s fail", kibana)
 	}
 
 	defer func() {
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			if err = ro.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-				logrus.Errorf("recycle %s role failed", loggingconfig.EmbeddedKibanaName)
+				logrus.Errorf("recycle %s role failed", kibana)
 			}
 		}
 	}()
 	_, err = ro.Create(role)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "create role %s fail", loggingconfig.EmbeddedKibanaName)
+		return errors.Wrapf(err, "create role %s fail", kibana)
 	}
 
 	defer func() {
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			if err = rb.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-				logrus.Errorf("recycle %s role binding failed", loggingconfig.EmbeddedKibanaName)
+				logrus.Errorf("recycle %s role binding failed", kibana)
 			}
 		}
 	}()
 	_, err = rb.Create(roleBind)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "create role %s fail", loggingconfig.EmbeddedKibanaName)
+		return errors.Wrapf(err, "create role %s fail", kibana)
 	}
 
 	defer func() {
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			if err = se.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-				logrus.Errorf("recycle %s service failed", loggingconfig.EmbeddedKibanaName)
+				logrus.Errorf("recycle %s service failed", kibana)
 			}
 		}
 	}()
 	newService = newKibanaService(namespace)
 	_, err = se.Create(newService)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "create service %s fail", loggingconfig.EmbeddedKibanaName)
+		return errors.Wrapf(err, "create service %s fail", kibana)
 	}
 
 	defer func() {
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			if err = dep.Delete(loggingconfig.EmbeddedKibanaName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-				logrus.Errorf("recycle %s deployment failed", loggingconfig.EmbeddedKibanaName)
+				logrus.Errorf("recycle %s deployment failed", kibana)
 			}
 		}
 	}()
 	kibanaDeployment := newKibanaDeployment(namespace)
 	_, err = dep.Create(kibanaDeployment)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "create deployment %s fail", loggingconfig.EmbeddedKibanaName)
+		return errors.Wrapf(err, "create deployment %s fail", kibana)
 	}
 	return nil
 }
@@ -235,28 +234,37 @@ func RemoveEmbeddedTarget(dep rv1beta2.DeploymentInterface, sa rv1.ServiceAccoun
 	return nil
 }
 
-func GetEmbeddedEndpoint(deploymentLister rv1beta2.DeploymentLister, endpointLister rv1.EndpointsLister, serviceLister rv1.ServiceLister, nodeLister v3.NodeLister, k8sNodeLister rv1.NodeLister, clusterName string) (string, string, error) {
-	esEndpoint, err := getEndpoint(deploymentLister, endpointLister, serviceLister, nodeLister, k8sNodeLister, clusterName, loggingconfig.EmbeddedESName)
+func SetEmbeddedEndpoint(podLister rv1.PodLister, serviceLister rv1.ServiceLister, nodeLister v3.NodeLister, k8sNodeLister rv1.NodeLister, obj *v3.ClusterLogging, clusterName string) (string, error) {
+	obj.Spec.EmbeddedConfig.ElasticsearchEndpoint = ""
+	obj.Spec.EmbeddedConfig.KibanaEndpoint = ""
+	esEndpoint, esWaitingMsg, err := getEndpoint(podLister, serviceLister, nodeLister, k8sNodeLister, obj, clusterName, loggingconfig.EmbeddedESName, true)
 	if err != nil {
-		return "", "", fmt.Errorf("get elasticsearch endpoint failed, %v", err)
+		return "", err
 	}
 
-	kibanaEndpoint, err := getEndpoint(deploymentLister, endpointLister, serviceLister, nodeLister, k8sNodeLister, clusterName, loggingconfig.EmbeddedKibanaName)
+	kibanaEndpoint, kibanaWaitingMsg, err := getEndpoint(podLister, serviceLister, nodeLister, k8sNodeLister, obj, clusterName, loggingconfig.EmbeddedKibanaName, false)
 	if err != nil {
-		return "", "", fmt.Errorf("get kibana endpoint failed, %v", err)
+		return "", err
 	}
 
-	if esEndpoint == "" || kibanaEndpoint == "" {
-		return esEndpoint, kibanaEndpoint, fmt.Errorf("embedded endpoint is empty")
+	if esEndpoint == "" {
+		return esWaitingMsg, nil
 	}
 
-	return esEndpoint, kibanaEndpoint, nil
+	if kibanaEndpoint == "" {
+		return kibanaWaitingMsg, nil
+	}
+
+	obj.Spec.EmbeddedConfig.ElasticsearchEndpoint = esEndpoint
+	obj.Spec.EmbeddedConfig.KibanaEndpoint = kibanaEndpoint
+	return "", nil
 }
 
 func updateEmbeddedQuota(dep rv1beta2.DeploymentInterface, obj *v3.ClusterLogging) error {
+	elasticsearch := fmt.Sprintf("%s:%s", loggingconfig.LoggingNamespace, loggingconfig.EmbeddedESName)
 	d, err := dep.Get(loggingconfig.EmbeddedESName, metav1.GetOptions{})
 	if err != nil {
-		return errors.Wrapf(err, "fail to get embedded deployment %s before update quota", loggingconfig.EmbeddedESName)
+		return errors.Wrapf(err, "fail to get embedded deployment %s before update quota", elasticsearch)
 	}
 	requests, limits := map[v1.ResourceName]resource.Quantity{}, map[v1.ResourceName]resource.Quantity{}
 	if obj.Spec.EmbeddedConfig.LimitsCPU > 0 {
@@ -277,35 +285,45 @@ func updateEmbeddedQuota(dep rv1beta2.DeploymentInterface, obj *v3.ClusterLoggin
 	d.Spec.Template.Spec.Containers[0].Resources.Limits = limits
 	_, err = dep.Update(d)
 	if err != nil {
-		return errors.Wrapf(err, "update deployment %s fail", loggingconfig.EmbeddedESName)
+		return errors.Wrapf(err, "update deployment %s fail", elasticsearch)
 	}
 	return nil
 }
 
-func getEndpoint(deploymentLister rv1beta2.DeploymentLister, endpointLister rv1.EndpointsLister, serviceLister rv1.ServiceLister, nodeLister v3.NodeLister, k8sNodeLister rv1.NodeLister, clusterName, serviceName string) (esEndpoint string, err error) {
-	deploymen, err := deploymentLister.Get(loggingconfig.LoggingNamespace, loggingconfig.EmbeddedESName)
-	for _, cond := range deploymen.Status.Conditions {
+func getEndpoint(podLister rv1.PodLister, serviceLister rv1.ServiceLister, nodeLister v3.NodeLister, k8sNodeLister rv1.NodeLister, obj *v3.ClusterLogging, clusterName, serviceName string, checkResourceQuota bool) (endpoint, waitingMsg string, err error) {
+	service := fmt.Sprintf("%s:%s", loggingconfig.LoggingNamespace, serviceName)
+
+	selector := labels.NewSelector()
+	requirement, err := labels.NewRequirement(loggingconfig.LabelK8sApp, selection.Equals, []string{serviceName})
+	if err != nil {
+		return "", "", err
+	}
+
+	pods, err := podLister.List(loggingconfig.LoggingNamespace, selector.Add(*requirement))
+	if err != nil {
+		return "", "", err
+	}
+	if len(pods) == 0 {
+		return "", fmt.Sprintf("waiting for %s pod deploy", service), nil
+	}
+	pod := pods[0]
+
+	if checkResourceQuota && !isLatestResourceQuota(pod, obj) {
+		return "", fmt.Sprintf("waiting for %s reconcile", service), nil
+	}
+
+	for _, cond := range pod.Status.Conditions {
 		if cond.Status == v1.ConditionFalse {
-			return "", fmt.Errorf("deployment %s status %s is %s, reason: %s, message: %s", deploymen.Name, cond.Type, cond.Status, cond.Reason, cond.Message)
+			return "", "", fmt.Errorf("deployment %s failed, %s", service, cond.Message)
 		}
 	}
-
-	endpoint, err := endpointLister.Get(loggingconfig.LoggingNamespace, serviceName)
-	if err != nil {
-		return "", err
-	}
-
-	if len(endpoint.Subsets) == 0 || len(endpoint.Subsets[0].Addresses) == 0 {
-		return "", fmt.Errorf("get %s endpoint subsets failed", serviceName)
-	}
-
 	esservice, err := serviceLister.Get(loggingconfig.LoggingNamespace, serviceName)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	if len(esservice.Spec.Ports) == 0 {
-		return "", fmt.Errorf("could not find the node port for %s", serviceName)
+		return "", "", fmt.Errorf("could not find the node port for %s", service)
 	}
 	var port int32
 	for _, v := range esservice.Spec.Ports {
@@ -315,11 +333,27 @@ func getEndpoint(deploymentLister rv1beta2.DeploymentLister, endpointLister rv1.
 		}
 	}
 
-	nodeIP, err := getNodeIP(nodeLister, k8sNodeLister, *endpoint.Subsets[0].Addresses[0].NodeName, clusterName)
+	nodeIP, err := getNodeIP(nodeLister, k8sNodeLister, pod.Spec.NodeName, clusterName)
 	if err != nil {
-		return "", errors.Wrapf(err, "get node ip failed")
+		return "", "", errors.Wrapf(err, "get node %s ip failed", pod.Spec.NodeName)
 	}
-	return fmt.Sprintf("http://%s:%v", nodeIP, port), nil
+	return fmt.Sprintf("http://%s:%v", nodeIP, port), "", nil
+}
+
+func isLatestResourceQuota(pod *v1.Pod, obj *v3.ClusterLogging) bool {
+	requestsCPU, requestsMemory, limitsCPU, limitMemory :=
+		resource.NewMilliQuantity(int64(obj.Spec.EmbeddedConfig.RequestsCPU), resource.DecimalSI),
+		resource.NewQuantity(int64(obj.Spec.EmbeddedConfig.RequestsMemery*1024*1024), resource.DecimalSI),
+		resource.NewMilliQuantity(int64(obj.Spec.EmbeddedConfig.LimitsCPU), resource.DecimalSI),
+		resource.NewQuantity(int64(obj.Spec.EmbeddedConfig.LimitsMemery*1024*1024), resource.DecimalSI)
+
+	if pod.Spec.Containers[0].Resources.Requests.Cpu().Cmp(*requestsCPU) == 0 &&
+		pod.Spec.Containers[0].Resources.Requests.Memory().Cmp(*requestsMemory) == 0 &&
+		pod.Spec.Containers[0].Resources.Limits.Cpu().Cmp(*limitsCPU) == 0 &&
+		pod.Spec.Containers[0].Resources.Limits.Memory().Cmp(*limitMemory) == 0 {
+		return true
+	}
+	return false
 }
 
 func getNodeIP(nodeLister v3.NodeLister, k8sNodeLister rv1.NodeLister, nodeName, clusterName string) (string, error) {
@@ -677,47 +711,6 @@ func newKibanaDeployment(namespace string) *v1beta2.Deployment {
 	}
 
 	return deployment
-}
-
-func GetEmbeddedEndpointWithRetry(ctx context.Context, deploymentLister rv1beta2.DeploymentLister, endpointLister rv1.EndpointsLister, serviceLister rv1.ServiceLister, clusterLoggings v3.ClusterLoggingInterface, nodeLister v3.NodeLister, k8sNodeLister rv1.NodeLister, clusterName string, logger logstream.LoggerStream) (string, string, error) {
-	timeout := time.After(1 * time.Minute)
-	ticker := time.NewTicker(10 * time.Second)
-	var esEndpoint, kibanaEndpoint string
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	errCh := make(chan error, 6)
-	go func() {
-		defer wg.Done()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				var err error
-				esEndpoint, kibanaEndpoint, err = GetEmbeddedEndpoint(deploymentLister, endpointLister, serviceLister, nodeLister, k8sNodeLister, clusterName)
-				if err != nil {
-					logger.Infof("Get embedded components status failed, %s", err.Error())
-					errCh <- err
-				} else {
-					return
-				}
-			case <-timeout:
-				return
-			}
-		}
-	}()
-	wg.Wait()
-	close(errCh)
-
-	var errs []error
-	for e := range errCh {
-		errs = append(errs, e)
-	}
-
-	if len(errs) != 0 {
-		return "", "", errs[len(errs)-1]
-	}
-	return esEndpoint, kibanaEndpoint, nil
 }
 
 func int32Ptr(i int32) *int32 { return &i }
