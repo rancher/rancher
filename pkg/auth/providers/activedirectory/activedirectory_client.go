@@ -323,8 +323,13 @@ func (p *adProvider) searchPrincipals(name, principalType string, config *v3.Act
 }
 
 func (p *adProvider) searchUser(name string, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) ([]v3.Principal, error) {
-	query := "(&(" + config.UserSearchAttribute + "=*" + name + "*)(" + ObjectClassAttribute + "=" +
-		config.UserObjectClass + "))"
+	srchAttributes := strings.Split(config.UserSearchAttribute, "|")
+	query := "(&(" + ObjectClassAttribute + "=" + config.UserObjectClass + ")"
+	srchAttrs := "(|"
+	for _, attr := range srchAttributes {
+		srchAttrs += "(" + attr + "=" + name + "*)"
+	}
+	query += srchAttrs + "))"
 	logrus.Debugf("LDAPProvider searchUser query: %s", query)
 	return p.searchLdap(query, UserScope, config, caPool)
 }
