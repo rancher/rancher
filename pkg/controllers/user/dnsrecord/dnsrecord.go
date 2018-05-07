@@ -84,7 +84,7 @@ func (c *Controller) reconcileEndpoints(key string, obj *corev1.Service) error {
 		return nil
 	}
 	value, ok := obj.Annotations[DNSAnnotation]
-	if !ok {
+	if !ok || value == "" {
 		return nil
 	}
 
