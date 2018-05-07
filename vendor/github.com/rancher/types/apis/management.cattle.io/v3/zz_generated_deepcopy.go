@@ -2007,6 +2007,15 @@ func (in *ClusterLoggingStatus) DeepCopyInto(out *ClusterLoggingStatus) {
 		copy(*out, *in)
 	}
 	in.AppliedSpec.DeepCopyInto(&out.AppliedSpec)
+	if in.FailedSpec != nil {
+		in, out := &in.FailedSpec, &out.FailedSpec
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(ClusterLoggingSpec)
+			(*in).DeepCopyInto(*out)
+		}
+	}
 	return
 }
 

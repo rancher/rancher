@@ -63,8 +63,9 @@ type ProjectLoggingSpec struct {
 }
 
 type ClusterLoggingStatus struct {
-	Conditions  []LoggingCondition `json:"conditions,omitempty"`
-	AppliedSpec ClusterLoggingSpec `json:"appliedSpec,omitempty"`
+	Conditions  []LoggingCondition  `json:"conditions,omitempty"`
+	AppliedSpec ClusterLoggingSpec  `json:"appliedSpec,omitempty"`
+	FailedSpec  *ClusterLoggingSpec `json:"failedSpec,omitempty"`
 }
 
 type ProjectLoggingStatus struct {
@@ -98,12 +99,14 @@ type ElasticsearchConfig struct {
 	DateFormat   string `json:"dateFormat,omitempty" norman:"required,type=enum,options=YYYY-MM-DD|YYYY-MM|YYYY,default=YYYY-MM-DD"`
 	AuthUserName string `json:"authUsername,omitempty"` //secret
 	AuthPassword string `json:"authPassword,omitempty"` //secret
+	SSLVerify    bool   `json:"sslVerify,omitempty" norman:"required,default=true"`
 }
 
 type SplunkConfig struct {
-	Endpoint string `json:"endpoint,omitempty" norman:"required"`
-	Source   string `json:"source,omitempty"`
-	Token    string `json:"token,omitempty" norman:"required"` //secret
+	Endpoint  string `json:"endpoint,omitempty" norman:"required"`
+	Source    string `json:"source,omitempty"`
+	Token     string `json:"token,omitempty" norman:"required"` //secret
+	SSLVerify bool   `json:"sslVerify,omitempty" norman:"required,default=true"`
 }
 
 type EmbeddedConfig struct {
