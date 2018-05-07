@@ -2,6 +2,7 @@ package client
 
 const (
 	RancherKubernetesEngineConfigType                     = "rancherKubernetesEngineConfig"
+	RancherKubernetesEngineConfigFieldAddonJobRetries     = "addonJobRetries"
 	RancherKubernetesEngineConfigFieldAddons              = "addons"
 	RancherKubernetesEngineConfigFieldAddonsInclude       = "addonsInclude"
 	RancherKubernetesEngineConfigFieldAuthentication      = "authentication"
@@ -21,6 +22,7 @@ const (
 )
 
 type RancherKubernetesEngineConfig struct {
+	AddonJobRetries     int64              `json:"addonJobRetries,omitempty" yaml:"addonJobRetries,omitempty"`
 	Addons              string             `json:"addons,omitempty" yaml:"addons,omitempty"`
 	AddonsInclude       []string           `json:"addonsInclude,omitempty" yaml:"addonsInclude,omitempty"`
 	Authentication      *AuthnConfig       `json:"authentication,omitempty" yaml:"authentication,omitempty"`
