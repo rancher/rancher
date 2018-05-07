@@ -89,11 +89,13 @@ func (c *Controller) reconcileEndpoints(key string, obj *corev1.Service) error {
 	}
 
 	var records []string
-	err := json.Unmarshal([]byte(value), &records)
-	if err != nil {
-		// just log the error, can't really do anything here.
-		logrus.Debugf("Failed to unmarshal targetDnsRecordIds", err)
-		return nil
+	if value != "" {
+		err := json.Unmarshal([]byte(value), &records)
+		if err != nil {
+			// just log the error, can't really do anything here.
+			logrus.Debugf("Failed to unmarshal targetDnsRecordIds", err)
+			return nil
+		}
 	}
 
 	var newEndpointSubsets []corev1.EndpointSubset

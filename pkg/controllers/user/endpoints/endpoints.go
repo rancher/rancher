@@ -122,7 +122,7 @@ func getPublicEndpointsFromAnnotations(annotations map[string]string) []v3.Publi
 	if annotations == nil {
 		return eps
 	}
-	if val, ok := annotations[endpointsAnnotation]; ok {
+	if val, ok := annotations[endpointsAnnotation]; ok && val != "" {
 		err := json.Unmarshal([]byte(val), &eps)
 		if err != nil {
 			logrus.Errorf("Failed to read public endpoints from annotation %v", err)
