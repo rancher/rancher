@@ -72,6 +72,8 @@ func (c *ProjectLoggingSyncer) Sync(key string, obj *v3.ProjectLogging) error {
 		if obj != nil && !reflect.DeepEqual(obj.Spec, obj.Status.AppliedSpec) {
 			updatedObj := obj.DeepCopy()
 			updatedObj.Status.AppliedSpec = obj.Spec
+			v3.LoggingConditionProvisioned.False(updatedObj)
+			v3.LoggingConditionUpdated.False(updatedObj)
 			_, updateErr = c.projectLoggings.Update(updatedObj)
 		}
 		return updateErr

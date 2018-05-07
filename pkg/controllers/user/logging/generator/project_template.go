@@ -54,6 +54,7 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
     logstash_format true
     logstash_dateformat  {{$store.WrapElasticsearch.DateFormat}}
     type_name  "container_log"
+    ssl_verify {{$store.ElasticsearchConfig.SSLVerify}}
     {{end -}}
 
     {{ if eq $store.CurrentTarget "splunk"}}
@@ -61,7 +62,7 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
     server  {{$store.WrapSplunk.Server}}
     all_items true
     protocol {{$store.WrapSplunk.Scheme}}
-    verify false
+    verify {{$store.SplunkConfig.SSLVerify}}
     sourcetype {{$store.SplunkConfig.Source}}
     format json
     token {{$store.SplunkConfig.Token}}

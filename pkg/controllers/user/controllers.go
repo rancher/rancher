@@ -33,7 +33,7 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 	rbac.Register(cluster)
 	healthsyncer.Register(ctx, cluster, clusterManager)
 	helm.Register(cluster, kubeConfigGetter)
-	logging.Register(cluster)
+	logging.Register(ctx, cluster)
 	networkpolicy.Register(cluster)
 	noderemove.Register(cluster)
 	nodesyncer.Register(cluster)
