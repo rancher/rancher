@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	errors2 "errors"
 	"fmt"
 
 	"github.com/rancher/kontainer-engine/logstream"
@@ -17,6 +18,11 @@ const (
 	Running     = "Running"
 	Error       = "Error"
 	Updating    = "Updating"
+)
+
+var (
+	// ErrClusterExists This error is checked in rancher, don't change the string
+	ErrClusterExists = errors2.New("cluster already exists")
 )
 
 // Cluster represents a kubernetes cluster
@@ -76,7 +82,7 @@ type ConfigGetter interface {
 
 // Create creates a cluster
 func (c *Cluster) Create(ctx context.Context) error {
-	if err := c.createInner(ctx); err != nil {
+	if err := c.createInner(ctx); err != nil && err != ErrClusterExists {
 		c.PersistStore.PersistStatus(*c, Error)
 		return err
 	}
@@ -144,8 +150,7 @@ func (c *Cluster) createInner(ctx context.Context) error {
 
 	if c.Status == Updating || c.Status == Running || c.Status == PostCheck {
 		logrus.Infof("Cluster %s already exists.", c.Name)
-		// This error is checked in rancher, don't change the string
-		return fmt.Errorf("cluster already exists")
+		return ErrClusterExists
 	}
 
 	if err := c.create(ctx, info); err != nil {
@@ -163,12 +168,12 @@ func (c *Cluster) Update(ctx context.Context) error {
 
 	if c.Status == Error {
 		logrus.Errorf("Cluster %s previously failed to create", c.Name)
-		return fmt.Errorf("cluster %s previously failed to create", c.Name)
+		return c.Create(ctx)
 	}
 
 	if c.Status == PreCreating || c.Status == Creating {
-		logrus.Errorf("Cluster %s host not been created.", c.Name)
-		return fmt.Errorf("cluster %s host not been created", c.Name)
+		logrus.Errorf("Cluster %s has not been created.", c.Name)
+		return fmt.Errorf("cluster %s has not been created", c.Name)
 	}
 
 	driverOpts, err := c.ConfigGetter.GetConfig()
