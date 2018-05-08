@@ -1,7 +1,7 @@
 # Rancher
 
 [![Build Status](https://drone8.rancher.io/api/badges/rancher/rancher/status.svg?branch=master)](https://drone8.rancher.io/rancher/rancher)
-[![Docker Pulls](https://img.shields.io/docker/pulls/rancher/server.svg)](https://store.docker.com/community/images/rancher/server)
+[![Docker Pulls](https://img.shields.io/docker/pulls/rancher/rancher.svg)](https://store.docker.com/community/images/rancher/rancher)
 [![Go Report Card](https://goreportcard.com/badge/github.com/rancher/rancher)](https://goreportcard.com/report/github.com/rancher/rancher)
 
 Rancher is an open source project that provides a container management platform built for organizations that deploy containers in production. Rancher makes it easy to run Kubernetes everywhere, meet IT requirements, and empower DevOps teams.
