@@ -54,6 +54,9 @@ func (c *Controller) sync(key string, obj *corev1.Service) error {
 		logrus.Debugf("Failed to unmarshal ipAddresses", err)
 		return nil
 	}
+	if ipsStr == nil {
+		return nil
+	}
 
 	var addresses []corev1.EndpointAddress
 	for _, ipStr := range ipsStr {
