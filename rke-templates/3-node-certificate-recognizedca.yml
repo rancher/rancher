@@ -50,15 +50,6 @@ addons: |-
     tls.key: <BASE64_KEY>  # ssl key for ingress. If selfsigned, must be signed by same CA as cattle server
   ---
   apiVersion: v1
-  kind: Secret
-  metadata:
-    name: cattle-keys-server
-    namespace: cattle-system
-  type: Opaque
-  data:
-    cacerts.pem: <BASE64_CA>  # CA cert used to sign cattle server cert and key
-  ---
-  apiVersion: v1
   kind: Service
   metadata:
     namespace: cattle-system
@@ -122,12 +113,3 @@ addons: |-
             protocol: TCP
           - containerPort: 443
             protocol: TCP
-          volumeMounts:
-          - mountPath: /etc/rancher/ssl
-            name: cattle-keys-volume
-            readOnly: true
-        volumes:
-        - name: cattle-keys-volume
-          secret:
-            defaultMode: 420
-            secretName: cattle-keys-server
