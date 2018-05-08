@@ -4,42 +4,51 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	v12 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
 type userLifecycle struct {
-	prtb         v3.ProjectRoleTemplateBindingInterface
-	crtb         v3.ClusterRoleTemplateBindingInterface
-	grb          v3.GlobalRoleBindingInterface
-	users        v3.UserInterface
-	tokens       v3.TokenInterface
-	prtbLister   v3.ProjectRoleTemplateBindingLister
-	crtbLister   v3.ClusterRoleTemplateBindingLister
-	grbLister    v3.GlobalRoleBindingLister
-	prtbIndexer  cache.Indexer
-	crtbIndexer  cache.Indexer
-	grbIndexer   cache.Indexer
-	tokenIndexer cache.Indexer
+	prtb            v3.ProjectRoleTemplateBindingInterface
+	crtb            v3.ClusterRoleTemplateBindingInterface
+	grb             v3.GlobalRoleBindingInterface
+	users           v3.UserInterface
+	tokens          v3.TokenInterface
+	namespaces      v1.NamespaceInterface
+	namespaceLister v1.NamespaceLister
+	prtbLister      v3.ProjectRoleTemplateBindingLister
+	crtbLister      v3.ClusterRoleTemplateBindingLister
+	grbLister       v3.GlobalRoleBindingLister
+	prtbIndexer     cache.Indexer
+	crtbIndexer     cache.Indexer
+	grbIndexer      cache.Indexer
+	tokenIndexer    cache.Indexer
 }
 
-const crtbByUserRefKey = "auth.management.cattle.io/crtb-by-user-ref"
-const prtbByUserRefKey = "auth.management.cattle.io/prtb-by-user-ref"
-const grbByUserRefKey = "auth.management.cattle.io/grb-by-user-ref"
-const tokenByUserRefKey = "auth.management.cattle.io/token-by-user-ref"
+const (
+	crtbByUserRefKey  = "auth.management.cattle.io/crtb-by-user-ref"
+	prtbByUserRefKey  = "auth.management.cattle.io/prtb-by-user-ref"
+	grbByUserRefKey   = "auth.management.cattle.io/grb-by-user-ref"
+	tokenByUserRefKey = "auth.management.cattle.io/token-by-user-ref"
+)
 
 func newUserLifecycle(management *config.ManagementContext) *userLifecycle {
 	lfc := &userLifecycle{
-		prtb:       management.Management.ProjectRoleTemplateBindings(""),
-		crtb:       management.Management.ClusterRoleTemplateBindings(""),
-		grb:        management.Management.GlobalRoleBindings(""),
-		users:      management.Management.Users(""),
-		tokens:     management.Management.Tokens(""),
-		prtbLister: management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
-		crtbLister: management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
-		grbLister:  management.Management.GlobalRoleBindings("").Controller().Lister(),
+		prtb:            management.Management.ProjectRoleTemplateBindings(""),
+		crtb:            management.Management.ClusterRoleTemplateBindings(""),
+		grb:             management.Management.GlobalRoleBindings(""),
+		users:           management.Management.Users(""),
+		tokens:          management.Management.Tokens(""),
+		namespaces:      management.Core.Namespaces(""),
+		prtbLister:      management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
+		crtbLister:      management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
+		grbLister:       management.Management.GlobalRoleBindings("").Controller().Lister(),
+		namespaceLister: management.Core.Namespaces("").Controller().Lister(),
 	}
 
 	prtbInformer := management.Management.ProjectRoleTemplateBindings("").Controller().Informer()
@@ -166,6 +175,11 @@ func (l *userLifecycle) Remove(user *v3.User) (*v3.User, error) {
 	}
 
 	err = l.deleteAllTokens(tokens)
+	if err != nil {
+		return nil, err
+	}
+
+	err = l.deleteUserNamespace(user.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -304,6 +318,28 @@ func (l *userLifecycle) deleteAllTokens(tokens []*v3.Token) error {
 		if err != nil {
 			return fmt.Errorf("error deleting token: %v", err)
 		}
+	}
+
+	return nil
+}
+
+func (l *userLifecycle) deleteUserNamespace(username string) error {
+	namespace, err := l.namespaceLister.Get("", username)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil // nothing to delete
+		}
+
+		return fmt.Errorf("error getting user namespace: %v", err)
+	}
+
+	if namespace.Status.Phase == v12.NamespaceTerminating {
+		return nil // nothing to do namespace is already deleting
+	}
+
+	err = l.namespaces.Delete(username, &metav1.DeleteOptions{})
+	if err != nil {
+		return fmt.Errorf("error deleting user namespace: %v", err)
 	}
 
 	return nil
