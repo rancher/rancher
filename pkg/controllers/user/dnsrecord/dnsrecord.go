@@ -84,7 +84,7 @@ func (c *Controller) reconcileEndpoints(key string, obj *corev1.Service) error {
 		return nil
 	}
 	value, ok := obj.Annotations[DNSAnnotation]
-	if !ok || value == "" {
+	if !ok {
 		return nil
 	}
 
@@ -93,6 +93,9 @@ func (c *Controller) reconcileEndpoints(key string, obj *corev1.Service) error {
 	if err != nil {
 		// just log the error, can't really do anything here.
 		logrus.Debugf("Failed to unmarshal targetDnsRecordIds", err)
+		return nil
+	}
+	if records == nil {
 		return nil
 	}
 
