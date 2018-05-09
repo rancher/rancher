@@ -118,13 +118,13 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 		return fmt.Errorf("error getting projects: %v", err)
 	}
 
-	if namespace.Annotations[projectIDAnnotation] == "" {
-		return nil
-	}
+	var psptpbs []interface{}
 
-	psptpbs, err := m.psptpbIndexer.ByIndex(psptpbByTargetProjectNameAnnotationIndex, namespace.Annotations[projectIDAnnotation])
-	if err != nil {
-		return fmt.Errorf("error getting psptpbs: %v", err)
+	if namespace.Annotations[projectIDAnnotation] != "" {
+		psptpbs, err = m.psptpbIndexer.ByIndex(psptpbByTargetProjectNameAnnotationIndex, namespace.Annotations[projectIDAnnotation])
+		if err != nil {
+			return fmt.Errorf("error getting psptpbs: %v", err)
+		}
 	}
 
 	onePSPTPBExists := false
@@ -216,7 +216,7 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 		}
 	}
 
-	if !onePSPTPBExists {
+	if !onePSPTPBExists && namespace.Annotations[projectIDAnnotation] != "" {
 		// create default pspt role binding if it is set
 		clusterRoleName := getClusterRoleName(cluster.Spec.DefaultPodSecurityPolicyTemplateName)
 		roleBindingName := getDefaultRoleBindingName(obj, clusterRoleName)
@@ -276,6 +276,11 @@ func okToDelete(svcAct *v1.ServiceAccount, rb *rbac.RoleBinding, cluster *v3.Clu
 	// This is not a role binding this logic should manage so exit immediately
 	if rb.Annotations[psptpbRoleBindingAnnotation] == "" {
 		return false
+	}
+
+	// Namespace isn't in a project so it should have no role bindings
+	if rb.Annotations[projectIDAnnotation] == "" {
+		return true
 	}
 
 	// No default PSPT is set so its ok to delete this if its a normal rolebinding or a leftover default PSPT binding
