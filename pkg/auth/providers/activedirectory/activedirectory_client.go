@@ -184,7 +184,7 @@ func (p *adProvider) getGroupPrincipals(groupDN []string, lConn *ldapv2.Conn, co
 	filter := "(" + ObjectClassAttribute + "=" + config.GroupObjectClass + ")"
 	query := "(|"
 	for _, attrib := range groupDN {
-		query += "(distinguishedName=" + attrib + ")"
+		query += "(distinguishedName=" + ldapv2.EscapeFilter(attrib) + ")"
 	}
 	query += ")"
 	query = "(&" + filter + query + ")"
