@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/rancher/norman/store/transform"
@@ -89,6 +90,7 @@ func updateRule(target map[string]interface{}, id, host, path string, forFronten
 		}
 	} else {
 		workloadIDs := convert.ToStringSlice(targetData["workloadIds"])
+		sort.Strings(workloadIDs)
 		if serviceID != "" {
 			splitted := strings.Split(serviceID, ":")
 			if len(splitted) > 1 {

@@ -136,14 +136,15 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) error {
 				return err
 			}
 		} else {
-			// TODO - fix so the update is done only when workload ids are changed
-			toUpdate := existing.DeepCopy()
-			if toUpdate.Annotations == nil {
-				toUpdate.Annotations = map[string]string{}
+			if existing.Annotations == nil {
+				existing.Annotations = map[string]string{}
 			}
-			toUpdate.Annotations[util.WorkloadAnnotation] = workloadIDs
-			if _, err := c.services.Update(toUpdate); err != nil {
-				return err
+			if existing.Annotations[util.WorkloadAnnotation] != workloadIDs {
+				toUpdate := existing.DeepCopy()
+				toUpdate.Annotations[util.WorkloadAnnotation] = workloadIDs
+				if _, err := c.services.Update(toUpdate); err != nil {
+					return err
+				}
 			}
 			delete(ingressServices, serviceName)
 		}
