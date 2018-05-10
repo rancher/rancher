@@ -376,7 +376,11 @@ func deploymentTypes(schemas *types.Schemas) *types.Schemas {
 			m.Move{From: "type", To: "strategy"},
 		).
 		AddMapperForType(&Version, v1beta2.DeploymentSpec{},
-			&m.Embed{Field: "strategy"},
+			&m.Move{
+				From: "strategy",
+				To:   "upgradeStrategy",
+			},
+			&m.Embed{Field: "upgradeStrategy"},
 			&m.Move{
 				From: "replicas",
 				To:   "scale",
