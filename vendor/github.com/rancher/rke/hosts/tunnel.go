@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"net"
 
@@ -83,7 +82,7 @@ func parsePrivateKeyWithPassPhrase(keyBuff string, passphrase []byte) (ssh.Signe
 	return ssh.ParsePrivateKeyWithPassphrase([]byte(keyBuff), passphrase)
 }
 
-func getSSHConfig(username, sshPrivateKeyString string, passphrase []byte, useAgentAuth bool) (*ssh.ClientConfig, error) {
+func getSSHConfig(username, sshPrivateKeyString string, useAgentAuth bool) (*ssh.ClientConfig, error) {
 	config := &ssh.ClientConfig{
 		User:            username,
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
@@ -104,21 +103,13 @@ func getSSHConfig(username, sshPrivateKeyString string, passphrase []byte, useAg
 		}
 	}
 
-	signer, err := getPrivateKeySigner(sshPrivateKeyString, passphrase)
+	signer, err := parsePrivateKey(sshPrivateKeyString)
 	if err != nil {
 		return config, err
 	}
 	config.Auth = append(config.Auth, ssh.PublicKeys(signer))
 
 	return config, nil
-}
-
-func getPrivateKeySigner(sshPrivateKeyString string, passphrase []byte) (ssh.Signer, error) {
-	key, err := parsePrivateKey(sshPrivateKeyString)
-	if err != nil && strings.Contains(err.Error(), "decode encrypted private keys") {
-		key, err = parsePrivateKeyWithPassPhrase(sshPrivateKeyString, passphrase)
-	}
-	return key, err
 }
 
 func privateKeyPath(sshKeyPath string) string {

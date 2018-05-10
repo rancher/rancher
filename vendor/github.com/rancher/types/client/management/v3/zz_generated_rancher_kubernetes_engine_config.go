@@ -2,11 +2,12 @@ package client
 
 const (
 	RancherKubernetesEngineConfigType                     = "rancherKubernetesEngineConfig"
-	RancherKubernetesEngineConfigFieldAddonJobRetries     = "addonJobRetries"
+	RancherKubernetesEngineConfigFieldAddonJobTimeout     = "addonJobTimeout"
 	RancherKubernetesEngineConfigFieldAddons              = "addons"
 	RancherKubernetesEngineConfigFieldAddonsInclude       = "addonsInclude"
 	RancherKubernetesEngineConfigFieldAuthentication      = "authentication"
 	RancherKubernetesEngineConfigFieldAuthorization       = "authorization"
+	RancherKubernetesEngineConfigFieldBastionHost         = "bastionHost"
 	RancherKubernetesEngineConfigFieldCloudProvider       = "cloudProvider"
 	RancherKubernetesEngineConfigFieldClusterName         = "clusterName"
 	RancherKubernetesEngineConfigFieldIgnoreDockerVersion = "ignoreDockerVersion"
@@ -22,11 +23,12 @@ const (
 )
 
 type RancherKubernetesEngineConfig struct {
-	AddonJobRetries     int64              `json:"addonJobRetries,omitempty" yaml:"addonJobRetries,omitempty"`
+	AddonJobTimeout     int64              `json:"addonJobTimeout,omitempty" yaml:"addonJobTimeout,omitempty"`
 	Addons              string             `json:"addons,omitempty" yaml:"addons,omitempty"`
 	AddonsInclude       []string           `json:"addonsInclude,omitempty" yaml:"addonsInclude,omitempty"`
 	Authentication      *AuthnConfig       `json:"authentication,omitempty" yaml:"authentication,omitempty"`
 	Authorization       *AuthzConfig       `json:"authorization,omitempty" yaml:"authorization,omitempty"`
+	BastionHost         *BastionHost       `json:"bastionHost,omitempty" yaml:"bastionHost,omitempty"`
 	CloudProvider       *CloudProvider     `json:"cloudProvider,omitempty" yaml:"cloudProvider,omitempty"`
 	ClusterName         string             `json:"clusterName,omitempty" yaml:"clusterName,omitempty"`
 	IgnoreDockerVersion bool               `json:"ignoreDockerVersion,omitempty" yaml:"ignoreDockerVersion,omitempty"`

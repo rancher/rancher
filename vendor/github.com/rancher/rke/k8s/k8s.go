@@ -13,6 +13,7 @@ import (
 const (
 	DefaultRetries          = 5
 	DefaultSleepSeconds     = 5
+	DefaultTimeout          = 30
 	K8sWrapTransportTimeout = 30
 )
 
@@ -40,6 +41,20 @@ func NewClient(kubeConfigPath string, k8sWrapTransport WrapTransport) (*kubernet
 func decodeYamlResource(resource interface{}, yamlManifest string) error {
 	decoder := yamlutil.NewYAMLToJSONDecoder(bytes.NewReader([]byte(yamlManifest)))
 	return decoder.Decode(&resource)
+}
+
+func retryToWithTimeout(runFunc k8sCall, k8sClient *kubernetes.Clientset, resource interface{}, timeout int) error {
+	var err error
+	timePassed := 0
+	for timePassed < timeout {
+		if err = runFunc(k8sClient, resource); err != nil {
+			time.Sleep(time.Second * time.Duration(DefaultSleepSeconds))
+			timePassed += DefaultSleepSeconds
+			continue
+		}
+		return nil
+	}
+	return err
 }
 
 func retryTo(runFunc k8sCall, k8sClient *kubernetes.Clientset, resource interface{}, retries, sleepSeconds int) error {

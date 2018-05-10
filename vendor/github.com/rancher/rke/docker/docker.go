@@ -253,26 +253,40 @@ func InspectContainer(ctx context.Context, dClient *client.Client, hostname stri
 }
 
 func StopRenameContainer(ctx context.Context, dClient *client.Client, hostname string, oldContainerName string, newContainerName string) error {
+	// make sure we don't have an old old-container from a previous broken update
+	exists, err := IsContainerRunning(ctx, dClient, hostname, newContainerName, true)
+	if err != nil {
+		return err
+	}
+	if exists {
+		if err := RemoveContainer(ctx, dClient, hostname, newContainerName); err != nil {
+			return err
+		}
+	}
 	if err := StopContainer(ctx, dClient, hostname, oldContainerName); err != nil {
 		return err
 	}
-	if err := WaitForContainer(ctx, dClient, hostname, oldContainerName); err != nil {
+	if _, err := WaitForContainer(ctx, dClient, hostname, oldContainerName); err != nil {
 		return nil
 	}
-	err := RenameContainer(ctx, dClient, hostname, oldContainerName, newContainerName)
-	return err
+	return RenameContainer(ctx, dClient, hostname, oldContainerName, newContainerName)
+
 }
 
-func WaitForContainer(ctx context.Context, dClient *client.Client, hostname string, containerName string) error {
+func WaitForContainer(ctx context.Context, dClient *client.Client, hostname string, containerName string) (int64, error) {
+	// We capture the status exit code of the container
 	statusCh, errCh := dClient.ContainerWait(ctx, containerName, container.WaitConditionNotRunning)
 	select {
 	case err := <-errCh:
 		if err != nil {
-			return fmt.Errorf("Error waiting for container [%s] on host [%s]: %v", containerName, hostname, err)
+			// if error is present return 1 exit code
+			return 1, fmt.Errorf("Error waiting for container [%s] on host [%s]: %v", containerName, hostname, err)
 		}
-	case <-statusCh:
+	case status := <-statusCh:
+		// return the status exit code of the container
+		return status.StatusCode, nil
 	}
-	return nil
+	return 0, nil
 }
 
 func IsContainerUpgradable(ctx context.Context, dClient *client.Client, imageCfg *container.Config, containerName string, hostname string, plane string) (bool, error) {

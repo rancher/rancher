@@ -68,6 +68,7 @@ addons: |-
       nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"   # Max time in seconds for ws to remain shell window open
       nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"   # Max time in seconds for ws to remain shell window open
       nginx.ingress.kubernetes.io/ssl-passthrough: "true"      # Enable ssl-passthrough to backend.
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"   # Force redirect to ssl.
   spec:
     rules:
     - host: <FQDN>  # FQDN to access cattle server
