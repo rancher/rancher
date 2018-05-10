@@ -37,6 +37,7 @@ var (
 	UIPath                          = newSetting("ui-path", "")
 	UIPL                            = newSetting("ui-pl", "rancher")
 	WhitelistDomain                 = newSetting("whitelist-domain", "forums.rancher.com")
+	RDNSServerBaseURL               = newSetting("rdns-base-url", "http://api.lb.rancher.cloud/v1")
 )
 
 type Provider interface {
