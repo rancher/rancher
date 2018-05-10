@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"path/filepath"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -35,6 +36,7 @@ type Host struct {
 	DockerInfo          types.Info
 	UpdateWorker        bool
 	PrefixPath          string
+	BastionHost         v3.BastionHost
 }
 
 const (
@@ -58,6 +60,7 @@ func (h *Host) CleanUpAll(ctx context.Context, cleanerImage string, prsMap map[s
 		path.Join(h.PrefixPath, ToCleanTempCertPath),
 		path.Join(h.PrefixPath, ToCleanCNILib),
 	}
+
 	if !externalEtcd {
 		toCleanPaths = append(toCleanPaths, path.Join(h.PrefixPath, ToCleanEtcdDir))
 	}
@@ -116,7 +119,7 @@ func (h *Host) CleanUp(ctx context.Context, toCleanPaths []string, cleanerImage 
 		return err
 	}
 
-	if err := docker.WaitForContainer(ctx, h.DClient, h.Address, CleanerContainerName); err != nil {
+	if _, err := docker.WaitForContainer(ctx, h.DClient, h.Address, CleanerContainerName); err != nil {
 		return err
 	}
 
@@ -240,8 +243,12 @@ func buildCleanerConfig(host *Host, toCleanDirs []string, cleanerImage string) (
 		Cmd:   cmd,
 	}
 	bindMounts := []string{}
+	bindMountsMap := make(map[string]string)
 	for _, vol := range toCleanDirs {
-		bindMounts = append(bindMounts, fmt.Sprintf("%s:%s:z", vol, vol))
+		bindMountsMap[filepath.Dir(vol)] = vol
+	}
+	for dir := range bindMountsMap {
+		bindMounts = append(bindMounts, fmt.Sprintf("%s:%s:z", dir, dir))
 	}
 	hostCfg := &container.HostConfig{
 		Binds: bindMounts,

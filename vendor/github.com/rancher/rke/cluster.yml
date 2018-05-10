@@ -43,11 +43,16 @@ services:
     #   xxxxxxxxxx
     #   -----END PRIVATE KEY-----
   kube-api:
-    service_cluster_ip_range: 10.42.0.0/16
+    service_cluster_ip_range: 10.43.0.0/16
     pod_security_policy: false
     # add additional arguments to the kubernetes component
     # Note that this WILL OVERRIDE existing defaults
     extra_args:
+      # Enable audit log to stdout
+      audit-log-path: "-"
+      # Increase number of delete workers
+      delete-collection-workers: 3
+      # Set the level of log output to debug-level
       v: 4
   kube-controller:
     cluster_cidr: 10.42.0.0/16
@@ -59,7 +64,6 @@ services:
     infra_container_image: gcr.io/google_containers/pause-amd64:3.0
     # Optionally define additional volume binds to a service
     extra_binds:
-      - "/host/dev:/dev"
       - "/usr/libexec/kubernetes/kubelet-plugins:/usr/libexec/kubernetes/kubelet-plugins"
   kubeproxy:
 
@@ -152,6 +156,8 @@ ignore_docker_version: false
 
 kubernetes_version: v1.10.1
 
+# addons are deployed using kubernetes jobs. RKE will give up on trying to get the job status after this timeout in seconds.. 
+addon_job_timeout: 30
 # If set, this is the cluster name that will be used in the kube config file
 # Default value is "local"
 cluster_name: mycluster
@@ -188,3 +194,15 @@ ingress:
 
 cloud_provider:
   name: aws
+
+# Bastion/Jump host configuration
+bastion_host:
+  address: x.x.x.x
+  user: ubuntu
+  port: 22
+  ssh_key_path: /home/user/.ssh/bastion_rsa
+  # or
+  # ssh_key: |-
+  #   -----BEGIN RSA PRIVATE KEY-----
+  #
+  #   -----END RSA PRIVATE KEY-----

@@ -39,9 +39,10 @@ kind: ServiceAccount
 metadata:
   name: kube-dns-autoscaler
   namespace: kube-system
-  labels: 
+  labels:
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
+{{- if eq .RBAC "rbac"}}
 ---
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
@@ -73,6 +74,7 @@ roleRef:
   kind: ClusterRole
   name: system:kube-dns-autoscaler
   apiGroup: rbac.authorization.k8s.io
+{{- end }}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -111,6 +113,17 @@ spec:
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                  - key: k8s-app
+                    operator: In
+                    values: ["kube-dns"]
+              topologyKey: kubernetes.io/hostname
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"

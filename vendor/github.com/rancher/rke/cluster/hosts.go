@@ -72,7 +72,10 @@ func (c *Cluster) InvertIndexHosts() error {
 			newHost.ToAddLabels[k] = v
 		}
 		newHost.IgnoreDockerVersion = c.IgnoreDockerVersion
-
+		if c.BastionHost.Address != "" {
+			// Add the bastion host information to each host object
+			newHost.BastionHost = c.BastionHost
+		}
 		for _, role := range host.Role {
 			logrus.Debugf("Host: " + host.Address + " has role: " + role)
 			switch role {

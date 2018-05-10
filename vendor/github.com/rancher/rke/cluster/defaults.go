@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 
+	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -27,7 +28,9 @@ const (
 	DefaultNetworkPlugin        = "canal"
 	DefaultNetworkCloudProvider = "none"
 
-	DefaultIngressController = "nginx"
+	DefaultIngressController         = "nginx"
+	DefaultEtcdBackupCreationPeriod  = "5m0s"
+	DefaultEtcdBackupRetentionPeriod = "24h"
 )
 
 func setDefaultIfEmptyMapValue(configMap map[string]string, key string, value string) {
@@ -49,6 +52,17 @@ func (c *Cluster) setClusterDefaults(ctx context.Context) {
 	// Default Path prefix
 	if len(c.PrefixPath) == 0 {
 		c.PrefixPath = "/"
+	}
+	// Set bastion/jump host defaults
+	if len(c.BastionHost.Address) > 0 {
+		if len(c.BastionHost.Port) == 0 {
+			c.BastionHost.Port = DefaultSSHPort
+		}
+		if len(c.BastionHost.SSHKeyPath) == 0 {
+			c.BastionHost.SSHKeyPath = c.SSHKeyPath
+		}
+		c.BastionHost.SSHAgentAuth = c.SSHAgentAuth
+
 	}
 	for i, host := range c.Nodes {
 		if len(host.InternalAddress) == 0 {
@@ -85,6 +99,9 @@ func (c *Cluster) setClusterDefaults(ctx context.Context) {
 	if len(c.Version) == 0 {
 		c.Version = DefaultK8sVersion
 	}
+	if c.AddonJobTimeout == 0 {
+		c.AddonJobTimeout = k8s.DefaultTimeout
+	}
 	c.setClusterImageDefaults()
 	c.setClusterServicesDefaults()
 	c.setClusterNetworkDefaults()
@@ -105,6 +122,8 @@ func (c *Cluster) setClusterServicesDefaults() {
 		&c.Services.Kubelet.Image:                        c.SystemImages.Kubernetes,
 		&c.Services.Kubeproxy.Image:                      c.SystemImages.Kubernetes,
 		&c.Services.Etcd.Image:                           c.SystemImages.Etcd,
+		&c.Services.Etcd.Creation:                        DefaultEtcdBackupCreationPeriod,
+		&c.Services.Etcd.Retention:                       DefaultEtcdBackupRetentionPeriod,
 	}
 	for k, v := range serviceConfigDefaultsMap {
 		setDefaultIfEmpty(k, v)
@@ -156,14 +175,15 @@ func (c *Cluster) setClusterNetworkDefaults() {
 		c.Network.Options = make(map[string]string)
 	}
 	networkPluginConfigDefaultsMap := make(map[string]string)
+	// This is still needed because RKE doesn't use c.Network.*NetworkProvider, that's a rancher type
 	switch c.Network.Plugin {
-
 	case CalicoNetworkPlugin:
 		networkPluginConfigDefaultsMap = map[string]string{
 			CalicoCloudProvider: DefaultNetworkCloudProvider,
 		}
 	}
 	if c.Network.CalicoNetworkProvider != nil {
+		setDefaultIfEmpty(&c.Network.CalicoNetworkProvider.CloudProvider, DefaultNetworkCloudProvider)
 		networkPluginConfigDefaultsMap[CalicoCloudProvider] = c.Network.CalicoNetworkProvider.CloudProvider
 	}
 	if c.Network.FlannelNetworkProvider != nil {
@@ -175,5 +195,4 @@ func (c *Cluster) setClusterNetworkDefaults() {
 	for k, v := range networkPluginConfigDefaultsMap {
 		setDefaultIfEmptyMapValue(c.Network.Options, k, v)
 	}
-
 }

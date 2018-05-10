@@ -228,3 +228,21 @@ func fetchBackupCertificates(ctx context.Context, backupHosts []*hosts.Host, kub
 	// reporting the last error only.
 	return nil, err
 }
+
+func fetchCertificatesFromEtcd(ctx context.Context, kubeCluster *Cluster) ([]byte, []byte, error) {
+	// Get kubernetes certificates from the etcd hosts
+	certificates := map[string]pki.CertificatePKI{}
+	var err error
+	for _, host := range kubeCluster.EtcdHosts {
+		certificates, err = pki.FetchCertificatesFromHost(ctx, kubeCluster.EtcdHosts, host, kubeCluster.SystemImages.Alpine, kubeCluster.LocalKubeConfigPath, kubeCluster.PrivateRegistriesMap)
+		if certificates != nil {
+			break
+		}
+	}
+	if err != nil || certificates == nil {
+		return nil, nil, fmt.Errorf("Failed to fetch certificates from etcd hosts: %v", err)
+	}
+	clientCert := cert.EncodeCertPEM(certificates[pki.KubeNodeCertName].Certificate)
+	clientkey := cert.EncodePrivateKeyPEM(certificates[pki.KubeNodeCertName].Key)
+	return clientCert, clientkey, nil
+}

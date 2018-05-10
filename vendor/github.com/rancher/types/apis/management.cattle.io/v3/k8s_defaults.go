@@ -8,7 +8,7 @@ const (
 
 var (
 	m          = image.Mirror
-	ToolsImage = m("rancher/rke-tools:v0.1.5")
+	ToolsImage = m("rancher/rke-tools:v0.1.6")
 
 	// K8sVersionToRKESystemImages - images map for 2.0
 	K8sVersionToRKESystemImages = map[string]RKESystemImages{

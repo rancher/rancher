@@ -12,7 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func ApplyK8sSystemJob(jobYaml, kubeConfigPath string, k8sWrapTransport WrapTransport) error {
+func ApplyK8sSystemJob(jobYaml, kubeConfigPath string, k8sWrapTransport WrapTransport, timeout int) error {
 	job := v1.Job{}
 	if err := decodeYamlResource(&job, jobYaml); err != nil {
 		return err
@@ -32,7 +32,7 @@ func ApplyK8sSystemJob(jobYaml, kubeConfigPath string, k8sWrapTransport WrapTran
 		return err
 	}
 	logrus.Debugf("[k8s] waiting for job %s to complete..", job.Name)
-	return retryTo(ensureJobCompleted, k8sClient, job, DefaultRetries, DefaultSleepSeconds)
+	return retryToWithTimeout(ensureJobCompleted, k8sClient, job, timeout)
 }
 
 func ensureJobCompleted(k8sClient *kubernetes.Clientset, j interface{}) error {

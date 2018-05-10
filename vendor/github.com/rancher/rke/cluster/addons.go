@@ -36,17 +36,36 @@ type ingressOptions struct {
 	IngressBackend string
 }
 
+type addonError struct {
+	err        string
+	isCritical bool
+}
+
+func (e *addonError) Error() string {
+	return e.err
+}
+
 func (c *Cluster) deployK8sAddOns(ctx context.Context) error {
 	if err := c.deployKubeDNS(ctx); err != nil {
-		return err
+		if err, ok := err.(*addonError); ok && err.isCritical {
+			return err
+		}
+		log.Warnf(ctx, "Failed to deploy addon execute job [%s]: %v", KubeDNSAddonResourceName, err)
 	}
-	return c.deployIngress(ctx)
+	if err := c.deployIngress(ctx); err != nil {
+		if err, ok := err.(*addonError); ok && err.isCritical {
+			return err
+		}
+		log.Warnf(ctx, "Failed to deploy addon execute job [%s]: %v", IngressAddonResourceName, err)
+
+	}
+	return nil
 }
 
 func (c *Cluster) deployUserAddOns(ctx context.Context) error {
 	log.Infof(ctx, "[addons] Setting up user addons")
 	if c.Addons != "" {
-		if err := c.doAddonDeploy(ctx, c.Addons, UserAddonResourceName); err != nil {
+		if err := c.doAddonDeploy(ctx, c.Addons, UserAddonResourceName, false); err != nil {
 			return err
 		}
 	}
@@ -108,7 +127,7 @@ func (c *Cluster) deployAddonsInclude(ctx context.Context) error {
 	log.Infof(ctx, "[addons] Deploying %s", UserAddonsIncludeResourceName)
 	logrus.Debugf("[addons] Compiled addons yaml: %s", string(manifests))
 
-	return c.doAddonDeploy(ctx, string(manifests), UserAddonsIncludeResourceName)
+	return c.doAddonDeploy(ctx, string(manifests), UserAddonsIncludeResourceName, false)
 }
 
 func validateUserAddonYAML(addon []byte) error {
@@ -152,12 +171,13 @@ func (c *Cluster) deployKubeDNS(ctx context.Context) error {
 		addons.DNSMasqImage:           c.SystemImages.DNSmasq,
 		addons.KubeDNSSidecarImage:    c.SystemImages.KubeDNSSidecar,
 		addons.KubeDNSAutoScalerImage: c.SystemImages.KubeDNSAutoscaler,
+		addons.RBAC:                   c.Authorization.Mode,
 	}
 	kubeDNSYaml, err := addons.GetKubeDNSManifest(kubeDNSConfig)
 	if err != nil {
 		return err
 	}
-	if err := c.doAddonDeploy(ctx, kubeDNSYaml, KubeDNSAddonResourceName); err != nil {
+	if err := c.doAddonDeploy(ctx, kubeDNSYaml, KubeDNSAddonResourceName, false); err != nil {
 		return err
 	}
 	log.Infof(ctx, "[addons] KubeDNS deployed successfully..")
@@ -173,33 +193,35 @@ func (c *Cluster) deployWithKubectl(ctx context.Context, addonYaml string) error
 	return cmd.Run()
 }
 
-func (c *Cluster) doAddonDeploy(ctx context.Context, addonYaml, resourceName string) error {
+func (c *Cluster) doAddonDeploy(ctx context.Context, addonYaml, resourceName string, isCritical bool) error {
 	if c.UseKubectlDeploy {
-		return c.deployWithKubectl(ctx, addonYaml)
+		if err := c.deployWithKubectl(ctx, addonYaml); err != nil {
+			return &addonError{fmt.Sprintf("%v", err), isCritical}
+		}
 	}
 
 	err := c.StoreAddonConfigMap(ctx, addonYaml, resourceName)
 	if err != nil {
-		return fmt.Errorf("Failed to save addon ConfigMap: %v", err)
+		return &addonError{fmt.Sprintf("Failed to save addon ConfigMap: %v", err), isCritical}
 	}
 
 	log.Infof(ctx, "[addons] Executing deploy job..")
 	k8sClient, err := k8s.NewClient(c.LocalKubeConfigPath, c.K8sWrapTransport)
 	if err != nil {
-		return err
+		return &addonError{fmt.Sprintf("%v", err), isCritical}
 	}
 	node, err := k8s.GetNode(k8sClient, c.ControlPlaneHosts[0].HostnameOverride)
 	if err != nil {
-		return fmt.Errorf("Failed to get Node [%s]: %v", c.ControlPlaneHosts[0].HostnameOverride, err)
+		return &addonError{fmt.Sprintf("Failed to get Node [%s]: %v", c.ControlPlaneHosts[0].HostnameOverride, err), isCritical}
 	}
 	addonJob, err := addons.GetAddonsExcuteJob(resourceName, node.Name, c.Services.KubeAPI.Image)
 
 	if err != nil {
-		return fmt.Errorf("Failed to deploy addon execute job: %v", err)
+		return &addonError{fmt.Sprintf("Failed to generate addon execute job: %v", err), isCritical}
 	}
 	err = c.ApplySystemAddonExcuteJob(addonJob)
 	if err != nil {
-		return fmt.Errorf("Failed to deploy addon execute job: %v", err)
+		return &addonError{fmt.Sprintf("%v", err), isCritical}
 	}
 	return nil
 }
@@ -233,7 +255,7 @@ func (c *Cluster) StoreAddonConfigMap(ctx context.Context, addonYaml string, add
 }
 
 func (c *Cluster) ApplySystemAddonExcuteJob(addonJob string) error {
-	if err := k8s.ApplyK8sSystemJob(addonJob, c.LocalKubeConfigPath, c.K8sWrapTransport); err != nil {
+	if err := k8s.ApplyK8sSystemJob(addonJob, c.LocalKubeConfigPath, c.K8sWrapTransport, c.AddonJobTimeout); err != nil {
 		logrus.Error(err)
 		return err
 	}
@@ -260,7 +282,7 @@ func (c *Cluster) deployIngress(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if err := c.doAddonDeploy(ctx, ingressYaml, IngressAddonResourceName); err != nil {
+	if err := c.doAddonDeploy(ctx, ingressYaml, IngressAddonResourceName, false); err != nil {
 		return err
 	}
 	log.Infof(ctx, "[ingress] ingress controller %s is successfully deployed", c.Ingress.Provider)

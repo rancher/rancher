@@ -9,6 +9,7 @@ const (
 	KubeDNSAutoScalerImage = "KubeDNSAutoScalerImage"
 	KubeDNSServer          = "ClusterDNSServer"
 	KubeDNSClusterDomain   = "ClusterDomain"
+	RBAC                   = "RBAC"
 )
 
 func GetKubeDNSManifest(kubeDNSConfig map[string]string) (string, error) {

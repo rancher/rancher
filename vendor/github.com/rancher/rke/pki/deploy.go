@@ -134,7 +134,7 @@ func FetchCertificatesFromHost(ctx context.Context, extraHosts []*hosts.Host, ho
 
 	for certName, config := range crtList {
 		certificate := CertificatePKI{}
-		crt, err := fetchFileFromHost(ctx, GetCertTempPath(certName), image, host, prsMap)
+		crt, err := FetchFileFromHost(ctx, GetCertTempPath(certName), image, host, prsMap)
 		// I will only exit with an error if it's not a not-found-error and this is not an etcd certificate
 		if err != nil && !strings.HasPrefix(certName, "kube-etcd") {
 			if strings.Contains(err.Error(), "no such file or directory") ||
@@ -149,10 +149,10 @@ func FetchCertificatesFromHost(ctx context.Context, extraHosts []*hosts.Host, ho
 			tmpCerts[certName] = CertificatePKI{}
 			continue
 		}
-		key, err := fetchFileFromHost(ctx, GetKeyTempPath(certName), image, host, prsMap)
+		key, err := FetchFileFromHost(ctx, GetKeyTempPath(certName), image, host, prsMap)
 
 		if config {
-			config, err := fetchFileFromHost(ctx, GetConfigTempPath(certName), image, host, prsMap)
+			config, err := FetchFileFromHost(ctx, GetConfigTempPath(certName), image, host, prsMap)
 			if err != nil {
 				return nil, err
 			}
@@ -179,7 +179,7 @@ func FetchCertificatesFromHost(ctx context.Context, extraHosts []*hosts.Host, ho
 
 }
 
-func fetchFileFromHost(ctx context.Context, filePath, image string, host *hosts.Host, prsMap map[string]v3.PrivateRegistry) (string, error) {
+func FetchFileFromHost(ctx context.Context, filePath, image string, host *hosts.Host, prsMap map[string]v3.PrivateRegistry) (string, error) {
 
 	imageCfg := &container.Config{
 		Image: image,
