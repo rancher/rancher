@@ -103,7 +103,7 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 			}
 			selector := labels.SelectorFromSet(set)
 			found := false
-			if selector.Matches(labels.Set(w.SelectorLabels)) {
+			if selector.Matches(labels.Set(w.SelectorLabels)) && !selector.Empty() {
 				// direct selector match
 				found = true
 			} else {

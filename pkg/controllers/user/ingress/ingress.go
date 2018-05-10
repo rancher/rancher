@@ -3,9 +3,7 @@ package ingress
 import (
 	"context"
 	"encoding/json"
-
 	"strconv"
-
 	"strings"
 
 	"github.com/rancher/norman/types/convert"
