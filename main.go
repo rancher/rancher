@@ -93,6 +93,10 @@ func main() {
 			Name:  "acme-domain",
 			Usage: "Domain to register with LetsEncrypt",
 		},
+		cli.BoolFlag{
+			Name:  "no-cacerts",
+			Usage: "Skip CA certs population in settings when set to true",
+		},
 	}
 
 	app.Action = func(c *cli.Context) error {
@@ -102,6 +106,7 @@ func main() {
 		}()
 
 		config.ACMEDomains = c.GlobalStringSlice("acme-domain")
+		config.NoCACerts = c.Bool("no-cacerts")
 		initLogs(c, config)
 		return run(config)
 	}

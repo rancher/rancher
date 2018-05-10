@@ -26,6 +26,7 @@ type Config struct {
 	HTTPSListenPort int
 	K8sMode         string
 	Debug           bool
+	NoCACerts       bool
 	ListenConfig    *v3.ListenConfig
 }
 
