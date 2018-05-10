@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/norman/leader"
@@ -29,7 +30,7 @@ type Config struct {
 	ListenConfig    *v3.ListenConfig
 }
 
-func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config) (*config.ScaledContext, *clustermanager.Manager, error) {
+func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config, ready func() bool) (*config.ScaledContext, *clustermanager.Manager, error) {
 	scaledContext, err := config.NewScaledContext(kubeConfig)
 	if err != nil {
 		return nil, nil, err
@@ -44,7 +45,7 @@ func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config
 		return nil, nil, err
 	}
 
-	dialerFactory, err := dialer.NewFactory(scaledContext)
+	dialerFactory, err := dialer.NewFactory(scaledContext, ready)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -70,12 +71,18 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 		return err
 	}
 
-	scaledContext, clusterManager, err := buildScaledContext(ctx, kubeConfig, cfg)
+	leaderState := &leader.LeaderState{}
+
+	scaledContext, clusterManager, err := buildScaledContext(ctx, kubeConfig, cfg, func() bool {
+		_, leader := leaderState.Get()
+		return leader
+	})
+
 	if err != nil {
 		return err
 	}
 
-	if err := server.Start(ctx, cfg.HTTPListenPort, cfg.HTTPSListenPort, scaledContext, clusterManager); err != nil {
+	if err := server.Start(ctx, leaderState, cfg.HTTPListenPort, cfg.HTTPSListenPort, scaledContext, clusterManager); err != nil {
 		return err
 	}
 
@@ -84,8 +91,6 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 	}
 
 	go leader.RunOrDie(ctx, "cattle-controllers", scaledContext.K8sClient, func(ctx context.Context) {
-		scaledContext.Leader = true
-
 		management, err := scaledContext.NewManagementContext()
 		if err != nil {
 			panic(err)
@@ -103,6 +108,9 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 		tokens.StartPurgeDaemon(ctx, management)
 
 		<-ctx.Done()
+	}, func(id string, ok bool) {
+		//Normally we use hostname as the id but we should specify port here
+		leaderState.Status(id+":"+strconv.Itoa(cfg.HTTPSListenPort), ok)
 	})
 
 	<-ctx.Done()
