@@ -68,7 +68,7 @@ func addListenConfig(management *config.ManagementContext, cfg Config) error {
 		cfg.ListenConfig.CAKey = string(caKeyBuffer.Bytes())
 	}
 
-	if cfg.ListenConfig.Mode == "acme" {
+	if cfg.NoCACerts || cfg.ListenConfig.Mode == "acme" {
 		cfg.ListenConfig.CACerts = ""
 	} else if userCACerts != "" {
 		cfg.ListenConfig.CACerts = userCACerts
