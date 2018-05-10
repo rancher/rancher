@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/dynamiclistener"
 	"github.com/rancher/rancher/pkg/httpproxy"
 	k8sProxyPkg "github.com/rancher/rancher/pkg/k8sproxy"
+	"github.com/rancher/rancher/pkg/masterredirect"
 	"github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/rancher/server/capabilities"
 	"github.com/rancher/rancher/server/ui"
@@ -27,11 +28,11 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 )
 
-func wrapMasterRedirect(leader leader.LeaderState, next http.Handler) http.Handler {
-
+func wrapMasterRedirect(leader *leader.LeaderState, next http.Handler) http.Handler {
+	return masterredirect.New(leader.Get, next)
 }
 
-func Start(ctx context.Context, leader leader.LeaderState, httpPort, httpsPort int, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) error {
+func Start(ctx context.Context, leader *leader.LeaderState, httpPort, httpsPort int, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) error {
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext)
 	if err != nil {
 		return err
@@ -63,7 +64,7 @@ func Start(ctx context.Context, leader leader.LeaderState, httpPort, httpsPort i
 
 	webhookHandler := hooks.New(scaledContext)
 
-	connectHandler, connectConfigHandler := connectHandlers(scaledContext)
+	connectHandler, connectConfigHandler := connectHandlers(leader, scaledContext)
 
 	root.Handle("/", ui.UI(managementAPI))
 	root.PathPrefix("/v3-public").Handler(publicAPI)
@@ -110,9 +111,9 @@ func newAuthed(tokenAPI http.Handler, managementAPI http.Handler, k8sproxy http.
 	return authed
 }
 
-func connectHandlers(scaledContext *config.ScaledContext) (http.Handler, http.Handler) {
+func connectHandlers(leader *leader.LeaderState, scaledContext *config.ScaledContext) (http.Handler, http.Handler) {
 	if f, ok := scaledContext.Dialer.(*rancherdialer.Factory); ok {
-		return f.TunnelServer, rkenodeconfigserver.Handler(f.TunnelAuthorizer, scaledContext)
+		return wrapMasterRedirect(leader, f.TunnelServer), wrapMasterRedirect(leader, rkenodeconfigserver.Handler(f.TunnelAuthorizer, scaledContext))
 	}
 
 	return http.NotFoundHandler(), http.NotFoundHandler()

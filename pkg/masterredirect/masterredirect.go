@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/rancher/rancher/pkg/clusterrouter/proxy"
 )
 
@@ -34,6 +36,7 @@ func (s *server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	proxy, err := s.proxy(addr)
 	if err == nil {
+		logrus.Infof("I am not leader so I am proxying request to leader [%s], request path it [%s]", addr, req.RequestURI)
 		proxy.ServeHTTP(rw, req)
 	} else {
 		rw.WriteHeader(http.StatusInternalServerError)

@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/norman/leader"
@@ -81,7 +82,7 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 		return err
 	}
 
-	if err := server.Start(ctx, cfg.HTTPListenPort, cfg.HTTPSListenPort, scaledContext, clusterManager); err != nil {
+	if err := server.Start(ctx, leaderState, cfg.HTTPListenPort, cfg.HTTPSListenPort, scaledContext, clusterManager); err != nil {
 		return err
 	}
 
@@ -107,7 +108,10 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 		tokens.StartPurgeDaemon(ctx, management)
 
 		<-ctx.Done()
-	}, leaderState.Status)
+	}, func(id string, ok bool) {
+		//Normally we use hostname as the id but we should specify port here
+		leaderState.Status(id+":"+strconv.Itoa(cfg.HTTPSListenPort), ok)
+	})
 
 	<-ctx.Done()
 	return ctx.Err()
