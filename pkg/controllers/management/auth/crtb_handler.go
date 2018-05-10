@@ -122,7 +122,7 @@ func (c *crtbLifecycle) reconcilBindings(binding *v3.ClusterRoleTemplateBinding)
 		return err
 	}
 
-	err = c.mgr.grantManagementPlanePrivileges(binding.RoleTemplateName, clusterManagmentPlaneResources, subject, binding)
+	err = c.mgr.grantManagementPlanePrivileges(binding.RoleTemplateName, clusterManagmentPlaneResources, subject, binding, binding.Namespace)
 	if err != nil {
 		return err
 	}

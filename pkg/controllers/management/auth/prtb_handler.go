@@ -13,6 +13,7 @@ const (
 )
 
 var projectManagmentPlaneResources = []string{"projectroletemplatebindings", "apps", "secrets", "pipelines", "pipelineexecutions", "pipelineexecutionlogs", "projectloggings", "projectalerts"}
+var clusterManagmentPlaneResourcesForProject = []string{"notifiers"}
 
 type prtbLifecycle struct {
 	mgr           *manager
@@ -76,6 +77,7 @@ func (p *prtbLifecycle) reconcileSubject(binding *v3.ProjectRoleTemplateBinding)
 // - ensure the subject can see the project and its parent cluster in the mgmt API
 // - if the subject was granted owner permissions for the project, ensure they can create/update/delete the project
 // - if the subject was granted privileges to mgmt plane resources that are scoped to the project, enforce those rules in the project's mgmt plane namespace
+// - if the subject was granted privileges to mgmt plane resources that are scoped to the cluster, enforce those rules in the cluster's mgmt plane namespace
 func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding) error {
 	if binding.UserName == "" && binding.GroupPrincipalName == "" && binding.GroupName == "" {
 		return nil
@@ -124,5 +126,9 @@ func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding
 		return err
 	}
 
-	return p.mgr.grantManagementPlanePrivileges(binding.RoleTemplateName, projectManagmentPlaneResources, subject, binding)
+	if err := p.mgr.grantManagementPlanePrivileges(binding.RoleTemplateName, projectManagmentPlaneResources, subject, binding, binding.Namespace); err != nil {
+		return err
+	}
+
+	return p.mgr.grantManagementPlanePrivileges(binding.RoleTemplateName, clusterManagmentPlaneResourcesForProject, subject, binding, clusterName)
 }
