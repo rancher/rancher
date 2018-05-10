@@ -40,6 +40,7 @@ func NewTransformStore(store types.Store) types.Store {
 				state := getState(data)
 				_, nodeName := ref.Parse(state[getKey(nodeName)])
 				data["nodeId"] = nodeName
+				values.PutValue(data, nodeName, "scheduling", "node", "nodeId")
 			}
 			return data, nil
 		},
