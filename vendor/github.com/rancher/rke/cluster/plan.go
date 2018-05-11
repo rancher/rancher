@@ -25,6 +25,8 @@ const (
 	B2DPrefixPath      = "/mnt/sda1/rke"
 	ROS                = "RancherOS"
 	ROSPrefixPath      = "/opt/rke"
+	CoreOS             = "CoreOS"
+	CoreOSPrefixPath   = "/opt/rke"
 	ContainerNameLabel = "io.rancher.rke.container.name"
 )
 
@@ -652,11 +654,14 @@ func BuildPortChecksFromPortList(host *hosts.Host, portList []string, proto stri
 
 func (c *Cluster) getPrefixPath(osType string) string {
 	var prefixPath string
-	if strings.Contains(osType, B2DOS) {
+	switch {
+	case strings.Contains(osType, B2DOS):
 		prefixPath = B2DPrefixPath
-	} else if strings.Contains(osType, ROS) {
+	case strings.Contains(osType, ROS):
 		prefixPath = ROSPrefixPath
-	} else {
+	case strings.Contains(osType, CoreOS):
+		prefixPath = CoreOSPrefixPath
+	default:
 		prefixPath = c.PrefixPath
 	}
 	return prefixPath
