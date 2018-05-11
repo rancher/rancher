@@ -133,6 +133,10 @@ if [ -n "$CATTLE_CA_CHECKSUM" ]; then
     temp=$(mktemp)
     curl --insecure -s -fL $CATTLE_SERVER/v3/settings/cacerts | jq -r .value > $temp
     cat $temp
+    if [ ! -s $temp ]; then
+      error "Failed to pull the cacert from the rancher server settings at $CATTLE_SERVER/v3/settings/cacerts"
+      exit 1
+    fi
     CATTLE_SERVER_CHECKSUM=$(sha256sum $temp | awk '{print $1}')
     if [ $CATTLE_SERVER_CHECKSUM != $CATTLE_CA_CHECKSUM ]; then
         rm -f $temp
