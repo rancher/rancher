@@ -41,11 +41,11 @@ type Host struct {
 
 const (
 	ToCleanEtcdDir       = "/var/lib/etcd"
-	ToCleanSSLDir        = "/etc/kubernetes"
-	ToCleanCNIConf       = "/etc/cni"
-	ToCleanCNIBin        = "/opt/cni"
+	ToCleanSSLDir        = "/etc/kubernetes/"
+	ToCleanCNIConf       = "/etc/cni/"
+	ToCleanCNIBin        = "/opt/cni/"
 	ToCleanCNILib        = "/var/lib/cni"
-	ToCleanCalicoRun     = "/var/run/calico"
+	ToCleanCalicoRun     = "/var/run/calico/"
 	ToCleanTempCertPath  = "/etc/kubernetes/.tmp/"
 	CleanerContainerName = "kube-cleaner"
 )

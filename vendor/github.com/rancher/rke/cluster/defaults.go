@@ -108,6 +108,14 @@ func (c *Cluster) setClusterDefaults(ctx context.Context) {
 }
 
 func (c *Cluster) setClusterServicesDefaults() {
+	// We don't accept per service images anymore.
+	c.Services.KubeAPI.Image = c.SystemImages.Kubernetes
+	c.Services.Scheduler.Image = c.SystemImages.Kubernetes
+	c.Services.KubeController.Image = c.SystemImages.Kubernetes
+	c.Services.Kubelet.Image = c.SystemImages.Kubernetes
+	c.Services.Kubeproxy.Image = c.SystemImages.Kubernetes
+	c.Services.Etcd.Image = c.SystemImages.Etcd
+
 	serviceConfigDefaultsMap := map[*string]string{
 		&c.Services.KubeAPI.ServiceClusterIPRange:        DefaultServiceClusterIPRange,
 		&c.Services.KubeController.ServiceClusterIPRange: DefaultServiceClusterIPRange,
@@ -116,12 +124,6 @@ func (c *Cluster) setClusterServicesDefaults() {
 		&c.Services.Kubelet.ClusterDomain:                DefaultClusterDomain,
 		&c.Services.Kubelet.InfraContainerImage:          c.SystemImages.PodInfraContainer,
 		&c.Authentication.Strategy:                       DefaultAuthStrategy,
-		&c.Services.KubeAPI.Image:                        c.SystemImages.Kubernetes,
-		&c.Services.Scheduler.Image:                      c.SystemImages.Kubernetes,
-		&c.Services.KubeController.Image:                 c.SystemImages.Kubernetes,
-		&c.Services.Kubelet.Image:                        c.SystemImages.Kubernetes,
-		&c.Services.Kubeproxy.Image:                      c.SystemImages.Kubernetes,
-		&c.Services.Etcd.Image:                           c.SystemImages.Etcd,
 		&c.Services.Etcd.Creation:                        DefaultEtcdBackupCreationPeriod,
 		&c.Services.Etcd.Retention:                       DefaultEtcdBackupRetentionPeriod,
 	}
