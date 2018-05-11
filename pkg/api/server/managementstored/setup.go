@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/pipeline"
 	"github.com/rancher/rancher/pkg/api/customization/podsecuritypolicytemplate"
 	projectaction "github.com/rancher/rancher/pkg/api/customization/project"
+	"github.com/rancher/rancher/pkg/api/customization/roletemplatebinding"
 	"github.com/rancher/rancher/pkg/api/customization/setting"
 	"github.com/rancher/rancher/pkg/api/store/cert"
 	"github.com/rancher/rancher/pkg/api/store/cluster"
@@ -98,6 +99,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	wg.Wait()
 
 	Clusters(schemas, apiContext, clusterManager, k8sProxy)
+	ClusterRoleTemplateBinding(schemas, apiContext)
 	Templates(schemas, apiContext)
 	TemplateVersion(schemas, apiContext)
 	User(schemas, apiContext)
@@ -112,6 +114,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	Alert(schemas, apiContext)
 	Pipeline(schemas, apiContext)
 	Project(schemas, apiContext)
+	ProjectRoleTemplateBinding(schemas, apiContext)
 	TemplateContent(schemas)
 	PodSecurityPolicyTemplate(schemas, apiContext)
 
@@ -404,10 +407,19 @@ func Project(schemas *types.Schemas, management *config.ScaledContext) {
 }
 
 func PodSecurityPolicyTemplate(schemas *types.Schemas, management *config.ScaledContext) {
-
 	schema := schemas.Schema(&managementschema.Version, client.PodSecurityPolicyTemplateType)
 	schema.Formatter = podsecuritypolicytemplate.NewFormatter(management)
 	schema.Store = &podsecuritypolicytemplate.Store{
 		Store: schema.Store,
 	}
+}
+
+func ClusterRoleTemplateBinding(schemas *types.Schemas, management *config.ScaledContext) {
+	schema := schemas.Schema(&managementschema.Version, client.ClusterRoleTemplateBindingType)
+	schema.Validator = roletemplatebinding.NewCRTBValidator(management)
+}
+
+func ProjectRoleTemplateBinding(schemas *types.Schemas, management *config.ScaledContext) {
+	schema := schemas.Schema(&managementschema.Version, client.ProjectRoleTemplateBindingType)
+	schema.Validator = roletemplatebinding.NewPRTBValidator(management)
 }
