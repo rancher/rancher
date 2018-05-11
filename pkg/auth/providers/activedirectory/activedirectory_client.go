@@ -461,7 +461,7 @@ func (p *adProvider) searchLdap(query string, scope string, config *v3.ActiveDir
 	}
 	defer lConn.Close()
 
-	results, err := lConn.Search(search)
+	results, err := lConn.SearchWithPaging(search, 1000)
 	if err != nil {
 		ldapErr, ok := reflect.ValueOf(err).Interface().(*ldapv2.Error)
 		if ok && ldapErr.ResultCode != ldapv2.LDAPResultNoSuchObject {
