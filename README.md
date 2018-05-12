@@ -17,15 +17,18 @@ Rancher is an open source project that provides a container management platform 
 To get automated notifications of our latest release, you can watch the announcements category in our [forums](http://forums.rancher.com/c/announcements), or subscribe to the RSS feed `https://forums.rancher.com/c/announcements.rss`.
 
 ## Quick Start
-Use our [Quick Start Guide](https://rancher.com/docs/rancher/v2.x/en/quick-start-guide/) to quickly get your first Rancher server up and deploying your first Kubernetes workload.
+
+    sudo docker run -d --restart=unless-stopped -p 80:80 -p 443:443 rancher/rancher
+
+Open your browser to https://localhost
 
 ## Installation
 Rancher can be deployed in either a single node or multi-node setup.  Please refer to the following for guides on how to get Rancher up and running.
 
-* [Single Node Install](https://rancher.com/docs/rancher/v2.x/en/installation/server-installation/single-node-install/)
-* [Multi Node/HA Install](https://rancher.com/docs/rancher/v2.x/en/installation/server-installation/ha-server-install/)
+* [Single Node Install](https://rancher.com/docs/rancher/v2.x/en/installation/single-node-install/)
+* [Multi Node/HA Install](https://rancher.com/docs/rancher/v2.x/en/installation/ha-server-install/)
 
-> **No internet access?**  Refer to our [Air Gap Installation](https://rancher.com/docs/rancher/v2.x/en/installation/air-gap-installation/install-from-private-registry/) for instructions on how to use your own private registry to install Rancher.
+> **No internet access?**  Refer to our [Air Gap Installation](https://rancher.com/docs/rancher/v2.x/en/installation/air-gap-installation/) for instructions on how to use your own private registry to install Rancher.
 
 ### Minimum Requirements
 
