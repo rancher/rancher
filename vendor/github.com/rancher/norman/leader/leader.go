@@ -2,7 +2,6 @@ package leader
 
 import (
 	"context"
-	"os"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -38,19 +37,16 @@ func (l *State) Status(identity string, leader bool) {
 type Callback func(cb context.Context)
 type StatusCallback func(identity string, leader bool)
 
-func RunOrDie(ctx context.Context, name string, client kubernetes.Interface, cb Callback, status StatusCallback) {
-	err := run(ctx, name, client, cb, status)
+func RunOrDie(ctx context.Context, name string, client kubernetes.Interface, cb Callback, status StatusCallback, getID func() string) {
+	err := run(ctx, name, client, cb, status, getID)
 	if err != nil {
 		logrus.Fatalf("Failed to start leader election for %s", name)
 	}
 	panic("Failed to start leader election for " + name)
 }
 
-func run(ctx context.Context, name string, client kubernetes.Interface, cb Callback, status StatusCallback) error {
-	id, err := os.Hostname()
-	if err != nil {
-		return err
-	}
+func run(ctx context.Context, name string, client kubernetes.Interface, cb Callback, status StatusCallback, getID func() string) error {
+	id := getID()
 
 	le := leaderelectionconfig.DefaultLeaderElectionConfiguration()
 	le.LeaderElect = true

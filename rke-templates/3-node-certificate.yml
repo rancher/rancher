@@ -126,6 +126,13 @@ addons: |-
           - mountPath: /etc/rancher/ssl
             name: cattle-keys-volume
             readOnly: true
+          args:
+          - --advertise-address=$(POD_IP)
+          env:
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
         volumes:
         - name: cattle-keys-volume
           secret:

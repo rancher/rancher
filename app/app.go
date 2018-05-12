@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"fmt"
+	"os"
 
 	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/norman/leader"
@@ -18,15 +20,16 @@ import (
 )
 
 type Config struct {
-	ACMEDomains     []string
-	AddLocal        string
-	Embedded        bool
-	KubeConfig      string
-	HTTPListenPort  int
-	HTTPSListenPort int
-	K8sMode         string
-	Debug           bool
-	ListenConfig    *v3.ListenConfig
+	ACMEDomains      []string
+	AddLocal         string
+	Embedded         bool
+	KubeConfig       string
+	HTTPListenPort   int
+	HTTPSListenPort  int
+	K8sMode          string
+	Debug            bool
+	AdvertiseAddress string
+	ListenConfig     *v3.ListenConfig
 }
 
 func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config, ready func() bool) (*config.ScaledContext, *clustermanager.Manager, error) {
@@ -66,6 +69,14 @@ func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config
 }
 
 func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
+	getID := func() string {
+		identity := cfg.AdvertiseAddress
+		if identity == "" {
+			identity, _ = os.Hostname()
+		}
+		return fmt.Sprintf("%s:%d", identity, cfg.HTTPSListenPort)
+	}
+
 	if err := service.Start(); err != nil {
 		return err
 	}
@@ -107,7 +118,7 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 		tokens.StartPurgeDaemon(ctx, management)
 
 		<-ctx.Done()
-	}, leaderState.Status)
+	}, leaderState.Status, getID)
 
 	<-ctx.Done()
 	return ctx.Err()
