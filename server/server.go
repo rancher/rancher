@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -29,20 +28,14 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 )
 
-func redirectToMaster(leader *leader.State, httpsPort int) func(http.Handler) http.Handler {
+func redirectToMaster(leader *leader.State) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		return masterredirect.New(func() (string, bool) {
-			addr, leader := leader.Get()
-			if addr != "" {
-				addr = fmt.Sprintf("%s:%d", addr, httpsPort)
-			}
-			return addr, leader
-		}, next)
+		return masterredirect.New(leader.Get, next)
 	}
 }
 
 func Start(ctx context.Context, leader *leader.State, httpPort, httpsPort int, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) error {
-	toMaster := redirectToMaster(leader, httpsPort)
+	toMaster := redirectToMaster(leader)
 
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext)
 	if err != nil {
