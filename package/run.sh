@@ -19,8 +19,13 @@ warn()
 get_address()
 {
     local address=$1
-    if [ -e "/sys/class/net/${address}" ]; then
+    # If nothing is given, return empty (it will be automatically determined later if empty)
+    if [ -z $address ]; then
+        echo ""
+    # If given address is a network interface on the system, retrieve configured IP on that interface (only the first configured IP is taken)
+    elif [ -n "$(find /sys/devices -name $address)" ]; then
         echo $(ip addr show dev $address | grep -w inet | awk '{print $2}' | cut -f1 -d/ | head -1)
+    # Loop through cloud provider options to get IP from metadata
     else
         case $address in
             awslocal)
