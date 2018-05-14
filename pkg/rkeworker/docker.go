@@ -15,6 +15,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	RKEContainerNameLabel = "io.rancher.rke.container.name"
+)
+
 type NodeConfig struct {
 	ClusterName string                `json:"clusterName"`
 	Certs       string                `json:"certs"`
@@ -29,7 +33,7 @@ func runProcess(ctx context.Context, name string, p v3.Process, start bool) erro
 	}
 
 	args := filters.NewArgs()
-	args.Add("label", "io.cattle.process.name="+name)
+	args.Add("label", RKEContainerNameLabel+"="+name)
 
 	containers, err := c.ContainerList(ctx, types.ContainerListOptions{
 		All:     true,
@@ -71,7 +75,7 @@ func runProcess(ctx context.Context, name string, p v3.Process, start bool) erro
 	if config.Labels == nil {
 		config.Labels = map[string]string{}
 	}
-	config.Labels["io.cattle.process.name"] = name
+	config.Labels[RKEContainerNameLabel] = name
 
 	newContainer, err := c.ContainerCreate(ctx, config, hostConfig, nil, name)
 	if client.IsErrImageNotFound(err) {
@@ -107,7 +111,10 @@ func changed(ctx context.Context, c *client.Client, p v3.Process, container type
 	if err != nil {
 		return false, err
 	}
-
+	imageInspect, _, err := c.ImageInspectWithRaw(ctx, inspect.Image)
+	if err != nil {
+		return false, err
+	}
 	newProcess := v3.Process{
 		Command:     inspect.Config.Entrypoint,
 		Args:        inspect.Config.Cmd,
@@ -118,6 +125,7 @@ func changed(ctx context.Context, c *client.Client, p v3.Process, container type
 		PidMode:     string(inspect.HostConfig.PidMode),
 		Privileged:  inspect.HostConfig.Privileged,
 		VolumesFrom: inspect.HostConfig.VolumesFrom,
+		Labels:      inspect.Config.Labels,
 	}
 
 	if len(p.Command) == 0 {
@@ -134,6 +142,9 @@ func changed(ctx context.Context, c *client.Client, p v3.Process, container type
 	}
 	if p.PidMode == "" {
 		p.PidMode = newProcess.PidMode
+	}
+	if len(p.Labels) == 0 {
+		p.Labels = newProcess.Labels
 	}
 
 	// Don't detect changes on these fields
@@ -161,6 +172,17 @@ func changed(ctx context.Context, c *client.Client, p v3.Process, container type
 			}
 
 			if !changed {
+				continue
+			}
+		} else if f.Name == "Labels" {
+			processLabels := make(map[string]string)
+			for k, v := range imageInspect.Config.Labels {
+				processLabels[k] = v
+			}
+			for k, v := range p.Labels {
+				processLabels[k] = v
+			}
+			if reflect.DeepEqual(processLabels, newProcess.Labels) {
 				continue
 			}
 		}
