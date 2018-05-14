@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"net/smtp"
+	"net/textproto"
 	"strconv"
 	"strings"
 	"time"
@@ -150,7 +152,7 @@ func hashKey(s string) string {
 
 func testPagerduty(key, msg string) error {
 	if msg == "" {
-		msg = "test pagerduty service key"
+		msg = "Pagerduty setting validated"
 	}
 
 	pd := &pagerDutyMessage{
@@ -180,7 +182,7 @@ func testPagerduty(key, msg string) error {
 
 func testWebhook(url, msg string) error {
 	if msg == "" {
-		msg = "test webhook"
+		msg = "Webhook setting validated"
 	}
 	alertList := model.Alerts{
 		&model.Alert{
@@ -210,7 +212,7 @@ func testWebhook(url, msg string) error {
 
 func testSlack(url, channel, msg string) error {
 	if msg == "" {
-		msg = "test slack webhook"
+		msg = "Slack setting validated"
 	}
 	req := struct {
 		Text    string `json:"text"`
@@ -250,6 +252,10 @@ func testSlack(url, channel, msg string) error {
 func testEmail(host, password, username string, port int, requireTLS bool, msg, receiver, sender string) error {
 	var c *smtp.Client
 	smartHost := host + ":" + strconv.Itoa(port)
+
+	if msg == "" {
+		msg = "Alert Name: Test SMTP setting"
+	}
 
 	timeout := 15 * time.Second
 	if port == 465 {
@@ -306,18 +312,40 @@ func testEmail(host, password, username string, port int, requireTLS bool, msg, 
 		return fmt.Errorf("Failed to set recipient: %v", err)
 	}
 
-	if msg != "" {
-		// Data
-		w, err := c.Data()
-		if err != nil {
-			return err
-		}
-		defer w.Close()
+	wc, err := c.Data()
+	if err != nil {
+		return err
+	}
 
-		_, err = w.Write([]byte(msg))
-		if err != nil {
-			return err
-		}
+	defer wc.Close()
+
+	fmt.Fprintf(wc, "%s: %s\r\n", "From", sender)
+	fmt.Fprintf(wc, "%s: %s\r\n", "To", receiver)
+	fmt.Fprintf(wc, "%s: %s\r\n", "Subject", "Alert From Rancher: SMTP configuration validated")
+
+	buffer := &bytes.Buffer{}
+	multipartWriter := multipart.NewWriter(buffer)
+
+	fmt.Fprintf(wc, "Date: %s\r\n", time.Now().Format(time.RFC1123Z))
+	fmt.Fprintf(wc, "Content-Type: multipart/alternative;  boundary=%s\r\n", multipartWriter.Boundary())
+	fmt.Fprintf(wc, "MIME-Version: 1.0\r\n")
+
+	fmt.Fprintf(wc, "\r\n")
+
+	w, err := multipartWriter.CreatePart(textproto.MIMEHeader{"Content-Type": {"text/html; charset=UTF-8"}})
+	if err != nil {
+		return fmt.Errorf("Failed to send test email: %s", err)
+	}
+
+	_, err = w.Write([]byte(msg))
+	if err != nil {
+		return fmt.Errorf("Failed to send test email: %s", err)
+	}
+
+	multipartWriter.Close()
+	_, err = wc.Write(buffer.Bytes())
+	if err != nil {
+		return fmt.Errorf("Failed to send test email: %s", err)
 	}
 
 	return nil
