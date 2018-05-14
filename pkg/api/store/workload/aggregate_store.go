@@ -8,6 +8,7 @@ import (
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/types/client/project/v3"
 	projectclient "github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/config"
@@ -53,7 +54,11 @@ func (a *AggregateStore) ByID(apiContext *types.APIContext, schema *types.Schema
 		return nil, err
 	}
 	_, shortID := splitTypeAndID(id)
-	return store.ByID(apiContext, a.Schemas[schemaType], shortID)
+	data, err := store.ByID(apiContext, a.Schemas[schemaType], shortID)
+	if err != nil {
+		return nil, err
+	}
+	return capabilitiesToUpperCase(data), nil
 }
 
 func (a *AggregateStore) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
@@ -83,7 +88,7 @@ func (a *AggregateStore) List(apiContext *types.APIContext, schema *types.Schema
 			}
 			for _, item := range data {
 				select {
-				case items <- item:
+				case items <- capabilitiesToUpperCase(item):
 				case <-ctx.Done():
 					return ctx.Err()
 				}
@@ -198,4 +203,30 @@ func splitTypeAndID(id string) (string, string) {
 
 func getKey(key string) string {
 	return base64.URLEncoding.EncodeToString([]byte(key))
+}
+
+//Related issue: #12619
+//In Rancher API schema, Capabilities is defined as enum type and `ALL` is one of the options, which means Rancher API only accepts `ALL`.
+//However, Kubernetes accepts both `all` and `ALL`` for capabilities, if user uses kubectl and use `all`` in the yaml, edit will fail in Rancher UI.
+//Thus we should convert `all`` to `ALL` so that UI always get `ALL`.
+func capabilitiesToUpperCase(data map[string]interface{}) map[string]interface{} {
+	containers := convert.ToMapSlice(data["containers"])
+	elements := []string{"capDrop", "capAdd"}
+
+	if containers != nil {
+		for _, c := range containers {
+			for _, element := range elements {
+				caps := convert.ToStringSlice(c[element])
+				newCaps := []string{}
+				if caps != nil {
+					for _, cap := range caps {
+						newCaps = append(newCaps, strings.ToUpper(cap))
+					}
+					c[element] = newCaps
+				}
+			}
+		}
+	}
+
+	return data
 }
