@@ -113,10 +113,3 @@ addons: |-
             protocol: TCP
           - containerPort: 443
             protocol: TCP
-          args:
-          - --advertise-address=$(POD_IP)
-          env:
-          - name: POD_IP
-            valueFrom:
-              fieldRef:
-                fieldPath: status.podIP
