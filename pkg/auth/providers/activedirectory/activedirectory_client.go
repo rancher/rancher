@@ -134,13 +134,17 @@ func (p *adProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult, 
 	if len(memberOf) != 0 {
 		for _, attrib := range memberOf {
 			group, err := p.getPrincipal(attrib, GroupScope, config, caPool)
-			if err != nil {
-				return userPrincipal, groupPrincipals, err
+			//if err != nil {
+			//	return userPrincipal, groupPrincipals, err
+			//}
+			// Invalid group memberships are a non-fatal error
+			// They may simply not be relevant+accessible to this service
+			if err == nil {
+				if group != nil {
+					group.MemberOf = true
+				}
+				groupPrincipals = append(groupPrincipals, *group)
 			}
-			if group != nil {
-				group.MemberOf = true
-			}
-			groupPrincipals = append(groupPrincipals, *group)
 		}
 	}
 	return userPrincipal, groupPrincipals, nil
