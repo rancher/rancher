@@ -93,12 +93,6 @@ func main() {
 			Name:  "acme-domain",
 			Usage: "Domain to register with LetsEncrypt",
 		},
-		cli.StringFlag{
-			Name:        "advertise-address",
-			Usage:       "IP address for identity of this instance",
-			Value:       "",
-			Destination: &config.AdvertiseAddress,
-		},
 	}
 
 	app.Action = func(c *cli.Context) error {

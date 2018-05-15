@@ -41,7 +41,10 @@ type input struct {
 	Cluster *cluster     `json:"cluster"`
 }
 
-func NewTunnelServer(ready func() bool, authorizer *Authorizer) *remotedialer.Server {
+func NewTunnelServer(context *config.ScaledContext, authorizer *Authorizer) *remotedialer.Server {
+	ready := func() bool {
+		return context.Leader
+	}
 	return remotedialer.New(authorizer.authorizeTunnel, func(rw http.ResponseWriter, req *http.Request, code int, err error) {
 		rw.WriteHeader(code)
 		rw.Write([]byte(err.Error()))

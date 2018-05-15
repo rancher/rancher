@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/rancher/norman/leader"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
 	managementapi "github.com/rancher/rancher/pkg/api/server"
 	"github.com/rancher/rancher/pkg/auth/providers/publicapi"
@@ -17,7 +16,6 @@ import (
 	"github.com/rancher/rancher/pkg/dynamiclistener"
 	"github.com/rancher/rancher/pkg/httpproxy"
 	k8sProxyPkg "github.com/rancher/rancher/pkg/k8sproxy"
-	"github.com/rancher/rancher/pkg/masterredirect"
 	"github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/rancher/server/capabilities"
 	"github.com/rancher/rancher/server/ui"
@@ -28,15 +26,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 )
 
-func redirectToMaster(leader *leader.State) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return masterredirect.New(leader.Get, next)
-	}
-}
-
-func Start(ctx context.Context, leader *leader.State, httpPort, httpsPort int, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) error {
-	toMaster := redirectToMaster(leader)
-
+func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) error {
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext)
 	if err != nil {
 		return err
@@ -47,7 +37,7 @@ func Start(ctx context.Context, leader *leader.State, httpPort, httpsPort int, s
 		return err
 	}
 
-	k8sProxy := toMaster(k8sProxyPkg.New(scaledContext, scaledContext.Dialer))
+	k8sProxy := k8sProxyPkg.New(scaledContext, scaledContext.Dialer)
 
 	managementAPI, err := managementapi.New(ctx, scaledContext, clusterManager, k8sProxy)
 	if err != nil {
@@ -69,7 +59,6 @@ func Start(ctx context.Context, leader *leader.State, httpPort, httpsPort int, s
 	webhookHandler := hooks.New(scaledContext)
 
 	connectHandler, connectConfigHandler := connectHandlers(scaledContext)
-	connectHandler = toMaster(connectHandler)
 
 	root.Handle("/", ui.UI(managementAPI))
 	root.PathPrefix("/v3-public").Handler(publicAPI)

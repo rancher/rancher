@@ -2,7 +2,7 @@ package leader
 
 import (
 	"context"
-	"sync"
+	"os"
 
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
@@ -15,38 +15,21 @@ import (
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 )
 
-type State struct {
-	sync.Mutex
-	identity string
-	leader   bool
-}
-
-func (l *State) Get() (string, bool) {
-	l.Lock()
-	defer l.Unlock()
-	return l.identity, l.leader
-}
-
-func (l *State) Status(identity string, leader bool) {
-	l.Lock()
-	l.identity = identity
-	l.leader = leader
-	l.Unlock()
-}
-
 type Callback func(cb context.Context)
-type StatusCallback func(identity string, leader bool)
 
-func RunOrDie(ctx context.Context, name string, client kubernetes.Interface, cb Callback, status StatusCallback, getID func() string) {
-	err := run(ctx, name, client, cb, status, getID)
+func RunOrDie(ctx context.Context, name string, client kubernetes.Interface, cb Callback) {
+	err := run(ctx, name, client, cb)
 	if err != nil {
 		logrus.Fatalf("Failed to start leader election for %s", name)
 	}
 	panic("Failed to start leader election for " + name)
 }
 
-func run(ctx context.Context, name string, client kubernetes.Interface, cb Callback, status StatusCallback, getID func() string) error {
-	id := getID()
+func run(ctx context.Context, name string, client kubernetes.Interface, cb Callback) error {
+	id, err := os.Hostname()
+	if err != nil {
+		return err
+	}
 
 	le := leaderelectionconfig.DefaultLeaderElectionConfiguration()
 	le.LeaderElect = true
@@ -66,8 +49,6 @@ func run(ctx context.Context, name string, client kubernetes.Interface, cb Callb
 		logrus.Fatalf("error creating leader lock for %s: %v", name, err)
 	}
 
-	status(id, false)
-
 	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
 		Lock:          rl,
 		LeaseDuration: le.LeaseDuration.Duration,
@@ -77,15 +58,11 @@ func run(ctx context.Context, name string, client kubernetes.Interface, cb Callb
 			OnStartedLeading: func(stop <-chan struct{}) {
 				subCtx, cancel := context.WithCancel(ctx)
 				go cb(subCtx)
-				status(id, true)
 				<-stop
 				cancel()
 			},
 			OnStoppedLeading: func() {
 				logrus.Fatalf("leaderelection lost for %s", name)
-			},
-			OnNewLeader: func(identity string) {
-				status(identity, identity == id)
 			},
 		},
 	})
