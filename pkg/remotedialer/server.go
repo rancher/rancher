@@ -42,12 +42,10 @@ func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	clientKey, authed, err := s.authorizer(req)
 	if err != nil {
 		s.errorWriter(rw, req, 400, err)
-		logrus.Debugf("error authorizing node: %v", err)
 		return
 	}
 	if !authed {
 		s.errorWriter(rw, req, 401, errFailedAuth)
-		logrus.Debug("node is not authorized")
 		return
 	}
 
