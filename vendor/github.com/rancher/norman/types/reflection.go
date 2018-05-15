@@ -48,6 +48,10 @@ func (s *Schemas) AddMapperForType(version *APIVersion, obj interface{}, mapper 
 }
 
 func (s *Schemas) MustImport(version *APIVersion, obj interface{}, externalOverrides ...interface{}) *Schemas {
+	if reflect.ValueOf(obj).Kind() == reflect.Ptr {
+		panic(fmt.Errorf("obj cannot be a pointer"))
+	}
+
 	if _, err := s.Import(version, obj, externalOverrides...); err != nil {
 		panic(err)
 	}

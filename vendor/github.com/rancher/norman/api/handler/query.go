@@ -7,12 +7,12 @@ import (
 	"github.com/rancher/norman/types/convert"
 )
 
-func QueryFilter(opts *types.QueryOptions, data []map[string]interface{}) []map[string]interface{} {
-	return ApplyQueryOptions(opts, data)
+func QueryFilter(opts *types.QueryOptions, schema *types.Schema, data []map[string]interface{}) []map[string]interface{} {
+	return ApplyQueryOptions(opts, schema, data)
 }
 
-func ApplyQueryOptions(options *types.QueryOptions, data []map[string]interface{}) []map[string]interface{} {
-	data = ApplyQueryConditions(options.Conditions, data)
+func ApplyQueryOptions(options *types.QueryOptions, schema *types.Schema, data []map[string]interface{}) []map[string]interface{} {
+	data = ApplyQueryConditions(options.Conditions, schema, data)
 	data = ApplySort(options.Sort, data)
 	return ApplyPagination(options.Pagination, data)
 }
@@ -35,13 +35,13 @@ func ApplySort(sortOpts types.Sort, data []map[string]interface{}) []map[string]
 	return data
 }
 
-func ApplyQueryConditions(conditions []*types.QueryCondition, data []map[string]interface{}) []map[string]interface{} {
+func ApplyQueryConditions(conditions []*types.QueryCondition, schema *types.Schema, data []map[string]interface{}) []map[string]interface{} {
 	var result []map[string]interface{}
 
 outer:
 	for _, item := range data {
 		for _, condition := range conditions {
-			if !condition.Valid(item) {
+			if !condition.Valid(schema, item) {
 				continue outer
 			}
 		}
