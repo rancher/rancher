@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/norman/signal"
 	"github.com/rancher/rancher/app"
 	"github.com/rancher/rancher/k8s"
+	"github.com/rancher/rancher/pkg/logserver"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
@@ -26,12 +27,14 @@ var (
 )
 
 func main() {
+	app.RegisterPasswordResetCommand()
 	if reexec.Init() {
 		return
 	}
 
 	os.Unsetenv("SSH_AUTH_SOCK")
 	os.Unsetenv("SSH_AGENT_PID")
+	os.Setenv("DISABLE_HTTP2", "true")
 
 	if dir, err := os.Getwd(); err == nil {
 		dmPath := filepath.Join(dir, "management-state", "bin")
@@ -90,6 +93,12 @@ func main() {
 			Name:  "acme-domain",
 			Usage: "Domain to register with LetsEncrypt",
 		},
+		cli.StringFlag{
+			Name:        "advertise-address",
+			Usage:       "IP address for identity of this instance",
+			Value:       "",
+			Destination: &config.AdvertiseAddress,
+		},
 	}
 
 	app.Action = func(c *cli.Context) error {
@@ -124,7 +133,7 @@ func initLogs(c *cli.Context, cfg app.Config) {
 		logrus.SetFormatter(&logrus.JSONFormatter{})
 	}
 	logrus.SetOutput(os.Stdout)
-	//server.StartServerWithDefaults()
+	logserver.StartServerWithDefaults()
 }
 
 func run(cfg app.Config) error {

@@ -16,12 +16,20 @@ if echo $TAG | grep -q dirty; then
     TAG=dev
 fi
 
+if [ -n "$DRONE_TAG" ]; then
+    TAG=$DRONE_TAG
+fi
+
 cp ../bin/rancher ../bin/agent .
 
-IMAGE=${REPO}/server:${TAG}
-AGENT_IMAGE=${REPO}/agent:${TAG}
+IMAGE=${REPO}/rancher:${TAG}
+AGENT_IMAGE=${REPO}/rancher-agent:${TAG}
 docker build --build-arg VERSION=${TAG} -t ${IMAGE} .
 docker build --build-arg VERSION=${TAG} -t ${AGENT_IMAGE} -f Dockerfile.agent .
 echo ${IMAGE} > ../dist/images
 echo ${AGENT_IMAGE} >> ../dist/images
 echo Built ${IMAGE} #${AGENT_IMAGE}
+echo
+
+cd ../bin
+go run ../pkg/image/export/main.go $IMAGE $AGENT_IMAGE

@@ -15,14 +15,11 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/catalog/git"
 	"github.com/rancher/rancher/pkg/catalog/helm"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
-
-const (
-	HelmTemplateBaseType = "kubernetes"
 )
 
 type Manager struct {
@@ -32,12 +29,12 @@ type Manager struct {
 	catalogClient         v3.CatalogInterface
 	templateClient        v3.TemplateInterface
 	templateVersionClient v3.TemplateVersionInterface
+	templateContentClient v3.TemplateContentInterface
 	lastUpdateTime        time.Time
 }
 
 func New(management *config.ManagementContext, cacheRoot string) *Manager {
-	// todo: figure out uuid
-	uuid := "9bf84dcd-8011-4f21-a24e-fc0c979026a3"
+	uuid := settings.InstallUUID.Get()
 	return &Manager{
 		cacheRoot: cacheRoot,
 		httpClient: http.Client{
@@ -47,6 +44,7 @@ func New(management *config.ManagementContext, cacheRoot string) *Manager {
 		catalogClient:         management.Management.Catalogs(""),
 		templateClient:        management.Management.Templates(""),
 		templateVersionClient: management.Management.TemplateVersions(""),
+		templateContentClient: management.Management.TemplateContents(""),
 	}
 }
 
@@ -113,6 +111,10 @@ func (m *Manager) prepareGitRepoPath(catalog v3.Catalog) (string, string, error)
 			return "", "", errors.Wrap(err, "Clone failed")
 		}
 	} else {
+		// remove lock file
+		if _, err := os.Stat(path.Join(repoPath, ".git", "index.lock")); err == nil {
+			os.RemoveAll(path.Join(repoPath, ".git", "index.lock"))
+		}
 		changed, err := m.remoteShaChanged(catalog.Spec.URL, catalog.Spec.Branch, catalog.Status.Commit, m.uuid)
 		if err != nil {
 			return "", "", errors.Wrap(err, "Remote commit check failed")

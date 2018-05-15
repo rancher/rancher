@@ -3,7 +3,7 @@ syntax = "proto3";
 package types;
 
 service Driver {
-    rpc Create (DriverOptions) returns (ClusterInfo) {}
+    rpc Create (CreateRequest) returns (ClusterInfo) {}
     rpc Update(UpdateRequest) returns (ClusterInfo) {}
     rpc PostCheck(ClusterInfo) returns (ClusterInfo) {}
     rpc Remove (ClusterInfo) returns (Empty) {}
@@ -68,6 +68,8 @@ message ClusterInfo {
     map<string, string> metadata = 10;
 
     string status = 11;
+
+    string create_error = 12;
 }
 
 message KubernetesVersion {
@@ -80,6 +82,11 @@ message NodeCount {
 
 message Capabilities {
     map<int64, bool> capabilities = 1;
+}
+
+message CreateRequest {
+    DriverOptions driver_options = 1;
+    ClusterInfo cluster_info = 2;
 }
 
 message UpdateRequest {

@@ -12,7 +12,7 @@ const (
 	projectResource = "projects"
 )
 
-var projectManagmentPlanResources = []string{"projectroletemplatebindings", "apps", "secrets", "pipelines", "pipelineexecutions", "pipelineexecutionlogs"}
+var projectManagmentPlaneResources = []string{"projectroletemplatebindings", "apps", "secrets", "pipelines", "pipelineexecutions", "pipelineexecutionlogs", "projectloggings", "projectalerts"}
 
 type prtbLifecycle struct {
 	mgr           *manager
@@ -124,5 +124,5 @@ func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding
 		return err
 	}
 
-	return p.mgr.grantManagementPlanePrivileges(binding.RoleTemplateName, projectManagmentPlanResources, subject, binding)
+	return p.mgr.grantManagementPlanePrivileges(binding.RoleTemplateName, projectManagmentPlaneResources, subject, binding)
 }

@@ -39,6 +39,9 @@ type state struct {
 	// Cluster Name
 	Name string
 
+	// The name that is displayed to the user on the Rancher UI
+	DisplayName string
+
 	// Cluster info
 	ClusterInfo types.ClusterInfo
 }
@@ -62,6 +65,10 @@ func NewDriver() types.Driver {
 func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags, error) {
 	driverFlag := types.DriverFlags{
 		Options: make(map[string]*types.Flag),
+	}
+	driverFlag.Options["display-name"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "The name that is displayed to the user on the Rancher UI",
 	}
 	driverFlag.Options["subscription-id"] = &types.Flag{
 		Type:  types.StringType,
@@ -163,6 +170,7 @@ func (d *Driver) GetDriverUpdateOptions(ctx context.Context) (*types.DriverFlags
 func getStateFromOptions(driverOptions *types.DriverOptions) (state, error) {
 	state := state{}
 	state.Name = getValueFromDriverOptions(driverOptions, types.StringType, "name").(string)
+	state.DisplayName = getValueFromDriverOptions(driverOptions, types.StringType, "display-name", "displayName").(string)
 	state.AgentDNSPrefix = getValueFromDriverOptions(driverOptions, types.StringType, "node-dns-prefix", "agentDnsPrefix").(string)
 	state.AgentVMSize = getValueFromDriverOptions(driverOptions, types.StringType, "node-vm-size", "agentVmSize").(string)
 	state.Count = getValueFromDriverOptions(driverOptions, types.IntType, "node-count", "count").(int64)
@@ -326,7 +334,7 @@ const updatingStatus = "Updating"
 const pollInterval = 30
 
 // Create implements driver interface
-func (d *Driver) Create(ctx context.Context, options *types.DriverOptions) (*types.ClusterInfo, error) {
+func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *types.ClusterInfo) (*types.ClusterInfo, error) {
 	driverState, err := getStateFromOptions(options)
 	if err != nil {
 		return nil, err
@@ -366,6 +374,13 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions) (*typ
 
 	publicKeyContents := string(publicKey)
 	tags := make(map[string]*string)
+
+	displayName := driverState.DisplayName
+	if displayName == "" {
+		displayName = driverState.Name
+	}
+	tags["displayName"] = to.StringPtr(displayName)
+
 	exists, err := d.resourceGroupExists(ctx, resourcesClient, driverState.ResourceGroup)
 	if err != nil {
 		return nil, err

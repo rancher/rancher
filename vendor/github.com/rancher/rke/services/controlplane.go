@@ -5,11 +5,12 @@ import (
 
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
+	"github.com/rancher/rke/pki"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"golang.org/x/sync/errgroup"
 )
 
-func RunControlPlane(ctx context.Context, controlHosts []*hosts.Host, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, cpNodePlanMap map[string]v3.RKEConfigNodePlan, updateWorkersOnly bool, alpineImage string) error {
+func RunControlPlane(ctx context.Context, controlHosts []*hosts.Host, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, cpNodePlanMap map[string]v3.RKEConfigNodePlan, updateWorkersOnly bool, alpineImage string, certMap map[string]pki.CertificatePKI) error {
 	log.Infof(ctx, "[%s] Building up Controller Plane..", ControlRole)
 	var errgrp errgroup.Group
 	for _, host := range controlHosts {
@@ -18,7 +19,7 @@ func RunControlPlane(ctx context.Context, controlHosts []*hosts.Host, localConnD
 			continue
 		}
 		errgrp.Go(func() error {
-			return doDeployControlHost(ctx, runHost, localConnDialerFactory, prsMap, cpNodePlanMap[host.Address].Processes, alpineImage)
+			return doDeployControlHost(ctx, runHost, localConnDialerFactory, prsMap, cpNodePlanMap[host.Address].Processes, alpineImage, certMap)
 		})
 	}
 	if err := errgrp.Wait(); err != nil {
@@ -69,7 +70,7 @@ func RemoveControlPlane(ctx context.Context, controlHosts []*hosts.Host, force b
 	return nil
 }
 
-func doDeployControlHost(ctx context.Context, host *hosts.Host, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, processMap map[string]v3.Process, alpineImage string) error {
+func doDeployControlHost(ctx context.Context, host *hosts.Host, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, processMap map[string]v3.Process, alpineImage string, certMap map[string]pki.CertificatePKI) error {
 	if host.IsWorker {
 		if err := removeNginxProxy(ctx, host); err != nil {
 			return err
@@ -80,7 +81,7 @@ func doDeployControlHost(ctx context.Context, host *hosts.Host, localConnDialerF
 		return err
 	}
 	// run kubeapi
-	if err := runKubeAPI(ctx, host, localConnDialerFactory, prsMap, processMap[KubeAPIContainerName], alpineImage); err != nil {
+	if err := runKubeAPI(ctx, host, localConnDialerFactory, prsMap, processMap[KubeAPIContainerName], alpineImage, certMap); err != nil {
 		return err
 	}
 	// run kubecontroller

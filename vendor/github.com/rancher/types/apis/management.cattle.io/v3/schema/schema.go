@@ -65,8 +65,14 @@ func catalogTypes(schemas *types.Schemas) *types.Schemas {
 				"refresh": {},
 			}
 		}).
-		MustImport(&Version, v3.Template{}).
-		MustImport(&Version, v3.TemplateVersion{})
+		AddMapperForType(&Version, v3.Template{},
+			m.DisplayName{},
+		).
+		MustImport(&Version, v3.Template{}, struct {
+			VersionLinks map[string]string
+		}{}).
+		MustImport(&Version, v3.TemplateVersion{}).
+		MustImport(&Version, v3.TemplateContent{})
 }
 
 func nativeNodeTypes(schemas *types.Schemas) *types.Schemas {
@@ -135,6 +141,8 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.ClusterEvent{}).
 		MustImport(&Version, v3.ClusterRegistrationToken{}).
 		MustImport(&Version, v3.GenerateKubeConfigOutput{}).
+		MustImport(&Version, v3.ImportClusterYamlInput{}).
+		MustImport(&Version, v3.ImportYamlOutput{}).
 		MustImportAndCustomize(&Version, v3.Cluster{}, func(schema *types.Schema) {
 			schema.MustCustomizeField("name", func(field types.Field) types.Field {
 				field.Type = "dnsLabel"
@@ -144,6 +152,10 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 			})
 			schema.ResourceActions["generateKubeconfig"] = types.Action{
 				Output: "generateKubeConfigOutput",
+			}
+			schema.ResourceActions["importYaml"] = types.Action{
+				Input:  "importClusterYamlInput",
+				Output: "importYamlOutput",
 			}
 		})
 }
@@ -162,6 +174,7 @@ func authzTypes(schemas *types.Schemas) *types.Schemas {
 			&mapper.NamespaceIDMapper{},
 		).
 		MustImport(&Version, v3.SetPodSecurityPolicyTemplateInput{}).
+		MustImport(&Version, v3.ImportYamlOutput{}).
 		MustImportAndCustomize(&Version, v3.Project{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
 				"setpodsecuritypolicytemplate": {
@@ -202,6 +215,7 @@ func nodeTypes(schemas *types.Schemas) *types.Schemas {
 			&m.Drop{Field: "desiredNodeLabels"},
 			&m.Drop{Field: "desiredNodeAnnotations"},
 			&m.AnnotationField{Field: "publicEndpoints", List: true},
+			m.Copy{From: "namespaceId", To: "clusterName"},
 			m.DisplayName{}).
 		AddMapperForType(&Version, v3.NodeDriver{}, m.DisplayName{}).
 		AddMapperForType(&Version, v3.NodeTemplate{}, m.DisplayName{}).
@@ -212,7 +226,9 @@ func nodeTypes(schemas *types.Schemas) *types.Schemas {
 			labelField.Create = true
 			labelField.Update = true
 			schema.ResourceFields["labels"] = labelField
-
+			clusterField := schema.ResourceFields["clusterId"]
+			clusterField.Type = "reference[cluster]"
+			schema.ResourceFields["clusterId"] = clusterField
 		}, struct {
 			PublicEndpoints string `json:"publicEndpoints" norman:"type=array[publicEndpoint],nocreate,noupdate"`
 		}{}).
@@ -339,6 +355,7 @@ func projectNetworkPolicyTypes(schema *types.Schemas) *types.Schemas {
 func logTypes(schema *types.Schemas) *types.Schemas {
 	return schema.
 		AddMapperForType(&Version, v3.ClusterLogging{},
+			&m.Embed{Field: "status"},
 			m.DisplayName{}).
 		AddMapperForType(&Version, v3.ProjectLogging{},
 			m.DisplayName{}).
@@ -426,7 +443,7 @@ func pipelineTypes(schema *types.Schemas) *types.Schemas {
 				"destroy": {},
 				"authapp": {
 					Input:  "authAppInput",
-					Output: "cluterPipeline",
+					Output: "clusterPipeline",
 				},
 				"revokeapp": {},
 				"authuser": {

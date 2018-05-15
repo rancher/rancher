@@ -1,6 +1,7 @@
 package userstored
 
 import (
+	"context"
 	"strings"
 
 	"github.com/rancher/norman/store/proxy"
@@ -12,7 +13,7 @@ import (
 
 type storeWrapperFunc func(types.Store) types.Store
 
-func addProxyStore(schemas *types.Schemas, context *config.ScaledContext, schemaType, apiVersion string, storeWrapper storeWrapperFunc) *types.Schema {
+func addProxyStore(ctx context.Context, schemas *types.Schemas, context *config.ScaledContext, schemaType, apiVersion string, storeWrapper storeWrapperFunc) *types.Schema {
 	s := schemas.Schema(&schema.Version, schemaType)
 	if s == nil {
 		s = schemas.Schema(&clusterSchema.Version, schemaType)
@@ -37,7 +38,7 @@ func addProxyStore(schemas *types.Schemas, context *config.ScaledContext, schema
 		prefix = []string{"apis"}
 	}
 
-	s.Store = proxy.NewProxyStore(context.ClientGetter,
+	s.Store = proxy.NewProxyStore(ctx, context.ClientGetter,
 		config.UserStorageContext,
 		prefix,
 		group,

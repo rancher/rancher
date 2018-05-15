@@ -21,6 +21,7 @@ type ServicesController struct {
 	podController      v1.PodController
 	workloadController workloadutil.CommonController
 	machinesLister     v3.NodeLister
+	clusterName        string
 }
 
 func (s *ServicesController) sync(key string, obj *corev1.Service) error {
@@ -47,7 +48,11 @@ func (s *ServicesController) sync(key string, obj *corev1.Service) error {
 
 func (s *ServicesController) reconcileEndpointsForService(svc *corev1.Service) (bool, error) {
 	// 1. update service with endpoints
-	newPublicEps, err := convertServiceToPublicEndpoints(svc, "", nil)
+	allNodesIP, err := getAllNodesPublicEndpointIP(s.machinesLister, s.clusterName)
+	if err != nil {
+		return false, err
+	}
+	newPublicEps, err := convertServiceToPublicEndpoints(svc, "", nil, allNodesIP)
 	if err != nil {
 		return false, err
 	}

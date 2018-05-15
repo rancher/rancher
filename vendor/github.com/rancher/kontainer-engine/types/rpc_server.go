@@ -41,8 +41,13 @@ func (s *GrpcServer) GetDriverUpdateOptions(ctx context.Context, in *Empty) (*Dr
 }
 
 // Create implements grpc method
-func (s *GrpcServer) Create(ctx context.Context, opts *DriverOptions) (*ClusterInfo, error) {
-	return s.driver.Create(GetCtx(ctx), opts)
+func (s *GrpcServer) Create(ctx context.Context, create *CreateRequest) (*ClusterInfo, error) {
+	info, err := s.driver.Create(GetCtx(ctx), create.DriverOptions, create.ClusterInfo)
+	if err != nil && info != nil {
+		info.CreateError = err.Error()
+		return info, nil
+	}
+	return info, err
 }
 
 // Update implements grpc method

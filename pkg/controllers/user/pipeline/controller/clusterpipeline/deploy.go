@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/engine/jenkins"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/utils"
+	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/randomtoken"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -39,7 +40,6 @@ func getJenkinsService() *corev1.Service {
 			Name:      "jenkins",
 		},
 		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeNodePort,
 			Selector: map[string]string{
 				"app": "jenkins",
 			},
@@ -48,23 +48,6 @@ func getJenkinsService() *corev1.Service {
 					Name: "http",
 					Port: 8080,
 				},
-			},
-		},
-	}
-}
-
-func getJenkinsAgentService() *corev1.Service {
-	return &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: utils.PipelineNamespace,
-			Name:      "jenkins-agent",
-		},
-		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeNodePort,
-			Selector: map[string]string{
-				"app": "jenkins",
-			},
-			Ports: []corev1.ServicePort{
 				{
 					Name: "agent",
 					Port: 50000,
@@ -75,7 +58,7 @@ func getJenkinsAgentService() *corev1.Service {
 }
 
 func getConfigMap() *corev1.ConfigMap {
-	jenkinsConfig := fmt.Sprintf(JenkinsConfig, v3.ToolsSystemImages.PipelineSystemImages.JenkinsJnlp)
+	jenkinsConfig := fmt.Sprintf(JenkinsConfig, image.Resolve(v3.ToolsSystemImages.PipelineSystemImages.JenkinsJnlp))
 
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -139,7 +122,7 @@ func getJenkinsDeployment() *appsv1beta2.Deployment {
 					InitContainers: []corev1.Container{
 						{
 							Name:            "jenkins-config",
-							Image:           v3.ToolsSystemImages.PipelineSystemImages.Jenkins,
+							Image:           image.Resolve(v3.ToolsSystemImages.PipelineSystemImages.Jenkins),
 							ImagePullPolicy: corev1.PullAlways,
 							Command:         []string{"sh", "/var/jenkins_config/apply_config.sh"},
 							VolumeMounts: []corev1.VolumeMount{
@@ -161,7 +144,7 @@ func getJenkinsDeployment() *appsv1beta2.Deployment {
 					Containers: []corev1.Container{
 						{
 							Name:            "jenkins",
-							Image:           v3.ToolsSystemImages.PipelineSystemImages.Jenkins,
+							Image:           image.Resolve(v3.ToolsSystemImages.PipelineSystemImages.Jenkins),
 							ImagePullPolicy: corev1.PullAlways,
 							Env: []corev1.EnvVar{
 								{
@@ -303,7 +286,7 @@ const JenkinsConfig = `<?xml version='1.0' encoding='UTF-8'?>
       <skipTlsVerify>false</skipTlsVerify>
       <namespace>cattle-pipeline</namespace>
       <jenkinsUrl>http://jenkins:8080</jenkinsUrl>
-      <jenkinsTunnel>jenkins-agent:50000</jenkinsTunnel>
+      <jenkinsTunnel>jenkins:50000</jenkinsTunnel>
       <containerCap>10</containerCap>
       <retentionTimeout>5</retentionTimeout>
       <connectTimeout>0</connectTimeout>
@@ -347,6 +330,9 @@ def strategy = new hudson.security.FullControlOnceLoggedInAuthorizationStrategy(
 strategy.setAllowAnonymousRead(false)
 instance.setAuthorizationStrategy(strategy)
 instance.save()
+
+def mb = new Integer(1024*1024).toString()
+System.setProperty("com.cloudbees.workflow.rest.external.FlowNodeLogExt.maxReturnChars",mb)
 `
 const JenkinsApplyConfig = `
 mkdir -p /var/jenkins_home/init.groovy.d

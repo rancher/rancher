@@ -19,14 +19,16 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/node"
 	"github.com/rancher/rancher/pkg/api/customization/nodetemplate"
 	"github.com/rancher/rancher/pkg/api/customization/pipeline"
+	"github.com/rancher/rancher/pkg/api/customization/podsecuritypolicytemplate"
 	projectaction "github.com/rancher/rancher/pkg/api/customization/project"
+	"github.com/rancher/rancher/pkg/api/customization/roletemplatebinding"
 	"github.com/rancher/rancher/pkg/api/customization/setting"
 	"github.com/rancher/rancher/pkg/api/store/cert"
 	"github.com/rancher/rancher/pkg/api/store/cluster"
 	nodeStore "github.com/rancher/rancher/pkg/api/store/node"
+	"github.com/rancher/rancher/pkg/api/store/noopwatching"
 	"github.com/rancher/rancher/pkg/api/store/preference"
 	"github.com/rancher/rancher/pkg/api/store/scoped"
-	"github.com/rancher/rancher/pkg/api/store/templateversion"
 	"github.com/rancher/rancher/pkg/api/store/userscope"
 	"github.com/rancher/rancher/pkg/auth/principals"
 	"github.com/rancher/rancher/pkg/auth/providers"
@@ -82,6 +84,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.SettingType,
 		client.TemplateType,
 		client.TemplateVersionType,
+		client.TemplateContentType,
 		client.ClusterPipelineType,
 		client.PipelineType,
 		client.PipelineExecutionType,
@@ -91,16 +94,17 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.TokenType,
 		client.UserType)
 	createCrd(ctx, wg, factory, schemas, &projectschema.Version,
-		projectclient.AppType, projectclient.NamespaceComposeConfigType)
+		projectclient.AppType, projectclient.AppRevisionType, projectclient.NamespaceComposeConfigType)
 
 	wg.Wait()
 
 	Clusters(schemas, apiContext, clusterManager, k8sProxy)
-	Templates(schemas)
-	TemplateVersion(schemas)
+	ClusterRoleTemplateBinding(schemas, apiContext)
+	Templates(schemas, apiContext)
+	TemplateVersion(schemas, apiContext)
 	User(schemas, apiContext)
 	Catalog(schemas, apiContext)
-	SecretTypes(schemas, apiContext)
+	SecretTypes(ctx, schemas, apiContext)
 	App(schemas, apiContext, clusterManager)
 	Setting(schemas)
 	Preference(schemas, apiContext)
@@ -110,6 +114,9 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	Alert(schemas, apiContext)
 	Pipeline(schemas, apiContext)
 	Project(schemas, apiContext)
+	ProjectRoleTemplateBinding(schemas, apiContext)
+	TemplateContent(schemas)
+	PodSecurityPolicyTemplate(schemas, apiContext)
 
 	if err := NodeTypes(schemas, apiContext); err != nil {
 		return err
@@ -157,30 +164,42 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 		ClusterManager: clusterManager,
 	}
 	handler := ccluster.ActionHandler{
-		ClusterClient: managementContext.Management.Clusters(""),
-		UserMgr:       managementContext.UserManager,
+		ClusterClient:  managementContext.Management.Clusters(""),
+		UserMgr:        managementContext.UserManager,
+		ClusterManager: clusterManager,
 	}
 
 	schema := schemas.Schema(&managementschema.Version, client.ClusterType)
 	schema.Formatter = ccluster.Formatter
-	schema.ActionHandler = handler.GenerateKubeconfigActionHandler
+	schema.ActionHandler = handler.ClusterActionHandler
 	schema.Store = &cluster.Store{
 		Store:        schema.Store,
 		ShellHandler: linkHandler.LinkHandler,
 	}
 }
 
-func Templates(schemas *types.Schemas) {
+func Templates(schemas *types.Schemas, managementContext *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.TemplateType)
 	schema.Formatter = catalog.TemplateFormatter
-	schema.LinkHandler = catalog.TemplateIconHandler
+	wrapper := catalog.TemplateWrapper{
+		TemplateContentClient: managementContext.Management.TemplateContents(""),
+	}
+	schema.LinkHandler = wrapper.TemplateIconHandler
 }
 
-func TemplateVersion(schemas *types.Schemas) {
+func TemplateVersion(schemas *types.Schemas, managementContext *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.TemplateVersionType)
-	schema.Formatter = catalog.TemplateVersionFormatter
-	schema.LinkHandler = catalog.TemplateVersionReadmeHandler
-	schema.Store = templateversion.Wrap(schema.Store)
+	t := catalog.TemplateVerionFormatterWrapper{
+		TemplateContentClient: managementContext.Management.TemplateContents(""),
+	}
+	schema.Formatter = t.TemplateVersionFormatter
+	schema.LinkHandler = t.TemplateVersionReadmeHandler
+	schema.Store = noopwatching.Wrap(schema.Store)
+}
+
+func TemplateContent(schemas *types.Schemas) {
+	schema := schemas.Schema(&managementschema.Version, client.TemplateContentType)
+	schema.Store = noopwatching.Wrap(schema.Store)
 }
 
 func Catalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
@@ -207,9 +226,9 @@ func NodeTemplates(schemas *types.Schemas, management *config.ScaledContext) {
 	schema.Validator = nodetemplate.Validator
 }
 
-func SecretTypes(schemas *types.Schemas, management *config.ScaledContext) {
+func SecretTypes(ctx context.Context, schemas *types.Schemas, management *config.ScaledContext) {
 	secretSchema := schemas.Schema(&projectschema.Version, projectclient.SecretType)
-	secretSchema.Store = proxy.NewProxyStore(management.ClientGetter,
+	secretSchema.Store = proxy.NewProxyStore(ctx, management.ClientGetter,
 		config.ManagementStorageContext,
 		[]string{"api"},
 		"",
@@ -270,12 +289,15 @@ func NodeTypes(schemas *types.Schemas, management *config.ScaledContext) error {
 
 func App(schemas *types.Schemas, management *config.ScaledContext, kubeConfigGetter common.KubeConfigGetter) {
 	schema := schemas.Schema(&projectschema.Version, projectclient.AppType)
-	actionWrapper := app.ActionWrapper{
-		Clusters:         management.Management.Clusters(""),
-		KubeConfigGetter: kubeConfigGetter,
+	wrapper := app.Wrapper{
+		Clusters:              management.Management.Clusters(""),
+		KubeConfigGetter:      kubeConfigGetter,
+		TemplateContentClient: management.Management.TemplateContents(""),
+		AppGetter:             management.Project,
 	}
 	schema.Formatter = app.Formatter
-	schema.ActionHandler = actionWrapper.ActionHandler
+	schema.ActionHandler = wrapper.ActionHandler
+	schema.LinkHandler = wrapper.LinkHandler
 }
 
 func Setting(schemas *types.Schemas) {
@@ -310,7 +332,6 @@ func Alert(schemas *types.Schemas, management *config.ScaledContext) {
 	schema.CollectionFormatter = alert.NotifierCollectionFormatter
 	schema.Formatter = alert.NotifierFormatter
 	schema.ActionHandler = handler.NotifierActionHandler
-
 }
 
 func Pipeline(schemas *types.Schemas, management *config.ScaledContext) {
@@ -350,6 +371,7 @@ func Pipeline(schemas *types.Schemas, management *config.ScaledContext) {
 	schema.ActionHandler = pipelineExecutionHandler.ActionHandler
 
 	sourceCodeCredentialHandler := &pipeline.SourceCodeCredentialHandler{
+		ClusterPipelineLister:      management.Management.ClusterPipelines("").Controller().Lister(),
 		SourceCodeCredentials:      management.Management.SourceCodeCredentials(""),
 		SourceCodeCredentialLister: management.Management.SourceCodeCredentials("").Controller().Lister(),
 		SourceCodeRepositories:     management.Management.SourceCodeRepositories(""),
@@ -376,8 +398,28 @@ func Project(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.ProjectType)
 	schema.Formatter = projectaction.Formatter
 	handler := &projectaction.Handler{
-		Projects:      management.Management.Projects(""),
-		ProjectLister: management.Management.Projects("").Controller().Lister(),
+		Projects:       management.Management.Projects(""),
+		ProjectLister:  management.Management.Projects("").Controller().Lister(),
+		UserMgr:        management.UserManager,
+		ClusterManager: management.ClientGetter.(*clustermanager.Manager),
 	}
 	schema.ActionHandler = handler.Actions
+}
+
+func PodSecurityPolicyTemplate(schemas *types.Schemas, management *config.ScaledContext) {
+	schema := schemas.Schema(&managementschema.Version, client.PodSecurityPolicyTemplateType)
+	schema.Formatter = podsecuritypolicytemplate.NewFormatter(management)
+	schema.Store = &podsecuritypolicytemplate.Store{
+		Store: schema.Store,
+	}
+}
+
+func ClusterRoleTemplateBinding(schemas *types.Schemas, management *config.ScaledContext) {
+	schema := schemas.Schema(&managementschema.Version, client.ClusterRoleTemplateBindingType)
+	schema.Validator = roletemplatebinding.NewCRTBValidator(management)
+}
+
+func ProjectRoleTemplateBinding(schemas *types.Schemas, management *config.ScaledContext) {
+	schema := schemas.Schema(&managementschema.Version, client.ProjectRoleTemplateBindingType)
+	schema.Validator = roletemplatebinding.NewPRTBValidator(management)
 }

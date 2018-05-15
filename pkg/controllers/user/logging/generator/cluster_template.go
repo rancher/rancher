@@ -1,11 +1,11 @@
 package generator
 
-var ClusterTemplate = `{{ if ne .clusterTarget.CurrentTarget "none" }}
+var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
 
 <source>
   @type  tail
   path  /var/lib/rancher/rke/log/*.log
-  pos_file  /fluentd/etc/log/fluentd-rke-logging.pos
+  pos_file  /fluentd/log/fluentd-rke-logging.pos
   time_format  %Y-%m-%dT%H:%M:%S
   tag  rke.*
   format  json
@@ -27,7 +27,7 @@ var ClusterTemplate = `{{ if ne .clusterTarget.CurrentTarget "none" }}
 <source>
    @type  tail
    path  /var/log/containers/*.log
-   pos_file  /fluentd/etc/log/fluentd-cluster-logging.pos
+   pos_file  /fluentd/log/fluentd-cluster-logging.pos
    time_format  %Y-%m-%dT%H:%M:%S
    tag  cluster.*
    format  json
@@ -61,7 +61,6 @@ var ClusterTemplate = `{{ if ne .clusterTarget.CurrentTarget "none" }}
     logstash_format true
     logstash_dateformat  {{.clusterTarget.WrapEmbedded.DateFormat}}
     type_name  "container_log"
-    reload_connections false
     {{end -}}
 
     {{ if eq .clusterTarget.CurrentTarget "elasticsearch"}}
@@ -74,11 +73,11 @@ var ClusterTemplate = `{{ if ne .clusterTarget.CurrentTarget "none" }}
     {{end -}}
  
     reload_connections "true"
-    logstash_prefix "{{.clusterTarget.ElasticsearchConfig.IndexPrefix}}"
     logstash_format true
+    logstash_prefix "{{.clusterTarget.ElasticsearchConfig.IndexPrefix}}"
     logstash_dateformat  {{.clusterTarget.WrapElasticsearch.DateFormat}}
+    ssl_verify {{.clusterTarget.ElasticsearchConfig.SSLVerify}}
     type_name  "container_log"
-    reload_connections false
     {{end -}}
 
     {{ if eq .clusterTarget.CurrentTarget "splunk"}}
@@ -86,6 +85,7 @@ var ClusterTemplate = `{{ if ne .clusterTarget.CurrentTarget "none" }}
     server  {{.clusterTarget.WrapSplunk.Server}}
     all_items true
     protocol {{.clusterTarget.WrapSplunk.Scheme}}
+    verify {{.clusterTarget.SplunkConfig.SSLVerify}}
     sourcetype {{.clusterTarget.SplunkConfig.Source}}
     token {{.clusterTarget.SplunkConfig.Token}}
     format json
@@ -113,9 +113,10 @@ var ClusterTemplate = `{{ if ne .clusterTarget.CurrentTarget "none" }}
     port {{.clusterTarget.WrapSyslog.Port}}
     severity {{.clusterTarget.SyslogConfig.Severity}}
     program {{.clusterTarget.SyslogConfig.Program}}
+    protocol {{.clusterTarget.SyslogConfig.Protocol}}
     {{end -}}
 
-    flush_interval 2s
+    flush_interval {{.clusterTarget.OutputFlushInterval}}s
     buffer_type file
     buffer_path /fluentd/etc/buffer/cluster.buffer
     buffer_queue_limit 128

@@ -40,6 +40,14 @@ func runHealthcheck(ctx context.Context, host *hosts.Host, serviceName string, l
 			return err
 		}
 	}
+	if serviceName == KubeAPIContainerName {
+		certificate := cert.EncodeCertPEM(certMap[pki.KubeAPICertName].Certificate)
+		key := cert.EncodePrivateKeyPEM(certMap[pki.KubeAPICertName].Key)
+		x509Pair, err = tls.X509KeyPair(certificate, key)
+		if err != nil {
+			return err
+		}
+	}
 	client, err := getHealthCheckHTTPClient(host, port, localConnDialerFactory, &x509Pair)
 	if err != nil {
 		return fmt.Errorf("Failed to initiate new HTTP client for service [%s] for host [%s]", serviceName, host.Address)

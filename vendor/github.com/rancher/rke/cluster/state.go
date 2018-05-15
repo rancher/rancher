@@ -8,6 +8,7 @@ import (
 
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
+	"github.com/rancher/rke/pki"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
@@ -63,11 +64,30 @@ func (c *Cluster) GetClusterState(ctx context.Context) (*Cluster, error) {
 			if err := currentCluster.InvertIndexHosts(); err != nil {
 				return nil, fmt.Errorf("Failed to classify hosts from fetched cluster: %v", err)
 			}
-			currentCluster.Certificates, err = getClusterCerts(ctx, c.KubeClient, currentCluster.EtcdHosts)
+			activeEtcdHosts := currentCluster.EtcdHosts
+			for _, inactiveHost := range c.InactiveHosts {
+				activeEtcdHosts = removeFromHosts(inactiveHost, activeEtcdHosts)
+			}
+			currentCluster.Certificates, err = getClusterCerts(ctx, c.KubeClient, activeEtcdHosts)
 			currentCluster.DockerDialerFactory = c.DockerDialerFactory
 			currentCluster.LocalConnDialerFactory = c.LocalConnDialerFactory
 			if err != nil {
 				return nil, fmt.Errorf("Failed to Get Kubernetes certificates: %v", err)
+			}
+
+			// make sure I have all the etcd certs, We need handle dialer failure for etcd nodes https://github.com/rancher/rancher/issues/12898
+			for _, host := range activeEtcdHosts {
+				certName := pki.GetEtcdCrtName(host.InternalAddress)
+				if (currentCluster.Certificates[certName] == pki.CertificatePKI{}) {
+					if currentCluster.Certificates, err = pki.RegenerateEtcdCertificate(ctx,
+						currentCluster.Certificates,
+						host,
+						activeEtcdHosts,
+						currentCluster.ClusterDomain,
+						currentCluster.KubernetesServiceIP); err != nil {
+						return nil, err
+					}
+				}
 			}
 			// setting cluster defaults for the fetched cluster as well
 			currentCluster.setClusterDefaults(ctx)

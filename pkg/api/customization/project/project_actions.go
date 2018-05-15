@@ -11,6 +11,10 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/client/management/v3"
+
+	"github.com/rancher/rancher/pkg/clustermanager"
+
+	"github.com/rancher/types/user"
 )
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -18,8 +22,10 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 }
 
 type Handler struct {
-	Projects      v3.ProjectInterface
-	ProjectLister v3.ProjectLister
+	Projects       v3.ProjectInterface
+	ProjectLister  v3.ProjectLister
+	ClusterManager *clustermanager.Manager
+	UserMgr        user.Manager
 }
 
 func (h *Handler) Actions(actionName string, action *types.Action, apiContext *types.APIContext) error {

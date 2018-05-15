@@ -13,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
@@ -92,11 +93,14 @@ func (c *Controller) CreateServiceForWorkload(workload *Workload) error {
 		for _, service := range svcs {
 			services[service.Type] = service
 		}
-	} else {
-		service := generateServiceFromContainers(workload)
+	}
+	// always create cluster ip service, if missing in ports
+	if _, ok := services[ClusterIPServiceType]; !ok {
+		service := generateClusterIPServiceFromContainers(workload)
 		services[service.Type] = *service
 	}
 
+	// 1. Create new services
 	for _, toCreate := range services {
 		existing, err := c.serviceExistsForWorkload(workload, &toCreate)
 		if err != nil {
@@ -134,6 +138,26 @@ func (c *Controller) CreateServiceForWorkload(workload *Workload) error {
 			}
 		}
 	}
+	// 2. Cleanup services that are no longer needed
+	existingSvcs, err := c.getServicesOwnedByWorkload(workload)
+	if err != nil {
+		return err
+	}
+	var toRemove []*corev1.Service
+	for _, existingSvc := range existingSvcs {
+		toCreate, ok := services[existingSvc.Spec.Type]
+		if ok && toCreate.Name == existingSvc.Name {
+			continue
+		}
+		toRemove = append(toRemove, existingSvc)
+	}
+	for _, svc := range toRemove {
+		logrus.Infof("Deleting [%s/%s] service of type [%s] for workload [%s/%s]", svc.Namespace, svc.Name, svc.Spec.Type,
+			workload.Namespace, workload.Name)
+		if err := c.services.DeleteNamespaced(svc.Namespace, svc.Name, &metav1.DeleteOptions{}); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
@@ -169,6 +193,25 @@ func (c *Controller) updateService(toUpdate Service, existing *corev1.Service) e
 	return nil
 }
 
+func (c *Controller) getServicesOwnedByWorkload(workload *Workload) ([]*corev1.Service, error) {
+	var toReturn []*corev1.Service
+	services, err := c.serviceLister.List(workload.Namespace, labels.NewSelector())
+	if err != nil {
+		return toReturn, err
+	}
+	for _, svc := range services {
+		if _, ok := svc.Annotations[WorkloaAnnotationdPortBasedService]; ok {
+			for _, o := range svc.OwnerReferences {
+				if o.UID == workload.UUID {
+					toReturn = append(toReturn, svc)
+					break
+				}
+			}
+		}
+	}
+	return toReturn, nil
+}
+
 func (c *Controller) createService(toCreate Service, workload *Workload) error {
 	controller := true
 	ownerRef := metav1.OwnerReference{
@@ -180,18 +223,19 @@ func (c *Controller) createService(toCreate Service, workload *Workload) error {
 	}
 
 	serviceAnnotations := map[string]string{}
-	workloadAnnotationValue, err := workloadAnnotationToString(workload.getKey())
+	workloadAnnotationValue, err := workloadAnnotationToString(workload.Key)
 	if err != nil {
 		return err
 	}
 	serviceAnnotations[WorkloadAnnotation] = workloadAnnotationValue
 	serviceAnnotations[WorkloadAnnotatioNoop] = "true"
+	serviceAnnotations[WorkloaAnnotationdPortBasedService] = "true"
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			OwnerReferences: []metav1.OwnerReference{ownerRef},
 			Namespace:       workload.Namespace,
-			Name:            workload.Name,
+			Name:            toCreate.Name,
 			Annotations:     serviceAnnotations,
 		},
 		Spec: corev1.ServiceSpec{
@@ -202,7 +246,8 @@ func (c *Controller) createService(toCreate Service, workload *Workload) error {
 		},
 	}
 
-	logrus.Infof("Creating [%s] service with ports [%v] for workload %s", service.Spec.Type, toCreate.ServicePorts, workload.getKey())
+	logrus.Infof("Creating [%s/%s] service of type [%s] with ports [%v] for workload %s", service.Namespace, service.Name,
+		service.Spec.Type, toCreate.ServicePorts, workload.Key)
 	_, err = c.services.Create(service)
 	if err != nil {
 		if apierrors.IsAlreadyExists(err) {

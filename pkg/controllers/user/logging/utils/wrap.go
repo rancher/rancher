@@ -60,26 +60,13 @@ type WrapSyslog struct {
 }
 
 func (w *WrapClusterLogging) Validate() error {
-	wrapLogging, _, err := getWrapConfig(w.ElasticsearchConfig, w.SplunkConfig, w.SyslogConfig, w.KafkaConfig, w.EmbeddedConfig)
-	if err != nil {
-		return err
-	}
-
-	if wrapLogging.CurrentTarget == "" {
-		return fmt.Errorf("one of the target must set")
-	}
-	return nil
+	_, _, err := GetWrapConfig(w.ElasticsearchConfig, w.SplunkConfig, w.SyslogConfig, w.KafkaConfig, w.EmbeddedConfig)
+	return err
 }
 
 func (w *WrapProjectLogging) Validate() error {
-	wrapLogging, _, err := getWrapConfig(w.ElasticsearchConfig, w.SplunkConfig, w.SyslogConfig, w.KafkaConfig, nil)
-	if err != nil {
-		return err
-	}
-	if wrapLogging.CurrentTarget == "" {
-		return fmt.Errorf("one of the target must set")
-	}
-	return nil
+	_, _, err := GetWrapConfig(w.ElasticsearchConfig, w.SplunkConfig, w.SyslogConfig, w.KafkaConfig, nil)
+	return err
 }
 
 func ToWrapClusterLogging(clusterLogging v3.ClusterLoggingSpec) (*WrapClusterLogging, error) {
@@ -87,7 +74,7 @@ func ToWrapClusterLogging(clusterLogging v3.ClusterLoggingSpec) (*WrapClusterLog
 		ClusterLoggingSpec: clusterLogging,
 	}
 
-	wrapLogging, wem, err := getWrapConfig(clusterLogging.ElasticsearchConfig, clusterLogging.SplunkConfig, clusterLogging.SyslogConfig, clusterLogging.KafkaConfig, clusterLogging.EmbeddedConfig)
+	wrapLogging, wem, err := GetWrapConfig(clusterLogging.ElasticsearchConfig, clusterLogging.SplunkConfig, clusterLogging.SyslogConfig, clusterLogging.KafkaConfig, clusterLogging.EmbeddedConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +90,7 @@ func ToWrapProjectLogging(grepNamespace string, projectLogging v3.ProjectLogging
 		GrepNamespace:      grepNamespace,
 	}
 
-	wrapLogging, _, err := getWrapConfig(projectLogging.ElasticsearchConfig, projectLogging.SplunkConfig, projectLogging.SyslogConfig, projectLogging.KafkaConfig, nil)
+	wrapLogging, _, err := GetWrapConfig(projectLogging.ElasticsearchConfig, projectLogging.SplunkConfig, projectLogging.SyslogConfig, projectLogging.KafkaConfig, nil)
 
 	if err != nil {
 		return nil, err
@@ -112,7 +99,7 @@ func ToWrapProjectLogging(grepNamespace string, projectLogging v3.ProjectLogging
 	return &wp, nil
 }
 
-func getWrapConfig(es *v3.ElasticsearchConfig, sp *v3.SplunkConfig, sl *v3.SyslogConfig, kf *v3.KafkaConfig, em *v3.EmbeddedConfig) (wrapLogging WrapLogging, wem WrapEmbedded, err error) {
+func GetWrapConfig(es *v3.ElasticsearchConfig, sp *v3.SplunkConfig, sl *v3.SyslogConfig, kf *v3.KafkaConfig, em *v3.EmbeddedConfig) (wrapLogging WrapLogging, wem WrapEmbedded, err error) {
 	if es != nil {
 		var h, s string
 		h, s, err = parseEndpoint(es.Endpoint)
@@ -261,6 +248,19 @@ func GetClusterTarget(spec v3.ClusterLoggingSpec) string {
 	if spec.EmbeddedConfig != nil {
 		return "embedded"
 	} else if spec.ElasticsearchConfig != nil {
+		return "elasticsearch"
+	} else if spec.SplunkConfig != nil {
+		return "splunk"
+	} else if spec.KafkaConfig != nil {
+		return "kafka"
+	} else if spec.SyslogConfig != nil {
+		return "syslog"
+	}
+	return "none"
+}
+
+func GetProjectTarget(spec v3.ProjectLoggingSpec) string {
+	if spec.ElasticsearchConfig != nil {
 		return "elasticsearch"
 	} else if spec.SplunkConfig != nil {
 		return "splunk"

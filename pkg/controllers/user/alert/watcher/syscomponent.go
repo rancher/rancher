@@ -2,7 +2,6 @@ package watcher
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -23,6 +22,7 @@ type SysComponentWatcher struct {
 	clusterAlertLister v3.ClusterAlertLister
 	alertManager       *manager.Manager
 	clusterName        string
+	clusterLister      v3.ClusterLister
 }
 
 func StartSysComponentWatcher(ctx context.Context, cluster *config.UserContext, manager *manager.Manager) {
@@ -32,6 +32,7 @@ func StartSysComponentWatcher(ctx context.Context, cluster *config.UserContext, 
 		clusterAlertLister: cluster.Management.Management.ClusterAlerts(cluster.ClusterName).Controller().Lister(),
 		alertManager:       manager,
 		clusterName:        cluster.ClusterName,
+		clusterLister:      cluster.Management.Management.Clusters("").Controller().Lister(),
 	}
 	go s.watch(ctx, syncInterval)
 }
@@ -77,10 +78,27 @@ func (w *SysComponentWatcher) checkComponentHealthy(statuses *v1.ComponentStatus
 			for _, cond := range cs.Conditions {
 				if cond.Type == corev1.ComponentHealthy {
 					if cond.Status == corev1.ConditionFalse {
-						title := fmt.Sprintf("The system component %s is not running", alert.Spec.TargetSystemService.Condition)
-						desc := fmt.Sprintf("*Alert Name*: %s\n*Cluster Name*: %s\n*Logs*: %s", alert.Spec.DisplayName, w.clusterName, cond.Message)
 
-						if err := w.alertManager.SendAlert(alertID, desc, title, alert.Spec.Severity); err != nil {
+						clusterDisplayName := w.clusterName
+						cluster, err := w.clusterLister.Get("", w.clusterName)
+						if err != nil {
+							logrus.Warnf("Failed to get cluster for %s: %v", w.clusterName, err)
+						} else {
+							clusterDisplayName = cluster.Spec.DisplayName
+						}
+
+						data := map[string]string{}
+						data["alert_type"] = "systemService"
+						data["alert_id"] = alertID
+						data["severity"] = alert.Spec.Severity
+						data["alert_name"] = alert.Spec.DisplayName
+						data["cluster_name"] = clusterDisplayName
+						data["component_name"] = alert.Spec.TargetSystemService.Condition
+
+						if cond.Message != "" {
+							data["logs"] = cond.Message
+						}
+						if err := w.alertManager.SendAlert(data); err != nil {
 							logrus.Debugf("Failed to send alert: %v", err)
 						}
 						return

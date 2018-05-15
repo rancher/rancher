@@ -11,19 +11,19 @@ import (
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
-	hutils "github.com/rancher/rancher/pkg/controllers/user/helm/utils"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	managementClient "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/compose"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
 	composeTokenPrefix = "compose-token-"
+	description        = "token for compose"
 	url                = "https://localhost:%v/v3"
 )
 
@@ -31,6 +31,7 @@ const (
 type Lifecycle struct {
 	TokenClient     v3.TokenInterface
 	UserClient      v3.UserInterface
+	UserManager     user.Manager
 	HTTPSPortGetter common.KubeConfigGetter
 	ComposeClient   v3.GlobalComposeConfigInterface
 }
@@ -41,6 +42,7 @@ func Register(managementContext *config.ManagementContext, portGetter common.Kub
 	userClient := managementContext.Management.Users("")
 	l := Lifecycle{
 		HTTPSPortGetter: portGetter,
+		UserManager:     managementContext.UserManager,
 		TokenClient:     tokenClient,
 		UserClient:      userClient,
 		ComposeClient:   composeClient,
@@ -68,16 +70,9 @@ func (l Lifecycle) Create(obj *v3.GlobalComposeConfig) (*v3.GlobalComposeConfig,
 	if err != nil {
 		return obj, err
 	}
-	token := ""
-	if t, err := l.TokenClient.Get(composeTokenPrefix+user.Name, metav1.GetOptions{}); err != nil && !kerrors.IsNotFound(err) {
+	token, err := l.UserManager.EnsureToken(composeTokenPrefix+user.Name, description, user.Name)
+	if err != nil {
 		return obj, err
-	} else if kerrors.IsNotFound(err) {
-		token, err = hutils.GenerateToken(user, composeTokenPrefix, l.TokenClient)
-		if err != nil {
-			return obj, err
-		}
-	} else {
-		token = t.Name + ":" + t.Token
 	}
 	globalClient, err := constructGlobalClient(token, l.HTTPSPortGetter.GetHTTPSPort())
 	if err != nil {

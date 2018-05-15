@@ -30,9 +30,16 @@ type grpcClient struct {
 }
 
 // Create call grpc create
-func (rpc *grpcClient) Create(ctx context.Context, opts *DriverOptions) (*ClusterInfo, error) {
-	o, err := rpc.client.Create(ctx, opts)
-	return o, handlErr(err)
+func (rpc *grpcClient) Create(ctx context.Context, opts *DriverOptions, clusterInfo *ClusterInfo) (*ClusterInfo, error) {
+	o, err := rpc.client.Create(ctx, &CreateRequest{
+		DriverOptions: opts,
+		ClusterInfo:   clusterInfo,
+	})
+	err = handlErr(err)
+	if o.CreateError != "" && err == nil {
+		err = errors.New(o.CreateError)
+	}
+	return o, err
 }
 
 // Update call grpc update

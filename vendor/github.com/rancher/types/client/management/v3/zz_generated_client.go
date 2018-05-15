@@ -25,6 +25,7 @@ type Client struct {
 	Catalog                                 CatalogOperations
 	Template                                TemplateOperations
 	TemplateVersion                         TemplateVersionOperations
+	TemplateContent                         TemplateContentOperations
 	Group                                   GroupOperations
 	GroupMember                             GroupMemberOperations
 	Principal                               PrincipalOperations
@@ -79,6 +80,7 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.Catalog = newCatalogClient(client)
 	client.Template = newTemplateClient(client)
 	client.TemplateVersion = newTemplateVersionClient(client)
+	client.TemplateContent = newTemplateContentClient(client)
 	client.Group = newGroupClient(client)
 	client.GroupMember = newGroupMemberClient(client)
 	client.Principal = newPrincipalClient(client)

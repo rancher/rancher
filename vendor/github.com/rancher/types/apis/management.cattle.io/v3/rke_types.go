@@ -35,6 +35,25 @@ type RancherKubernetesEngineConfig struct {
 	CloudProvider CloudProvider `yaml:"cloud_provider" json:"cloudProvider,omitempty"`
 	// kubernetes directory path
 	PrefixPath string `yaml:"prefix_path" json:"prefixPath,omitempty"`
+	// Timeout in seconds for status check on addon deployment jobs
+	AddonJobTimeout int `yaml:"addon_job_timeout" json:"addonJobTimeout,omitempty" norman:"default=30"`
+	// Bastion/Jump Host configuration
+	BastionHost BastionHost `yaml:"bastion_host" json:"bastionHost,omitempty"`
+}
+
+type BastionHost struct {
+	// Address of Bastion Host
+	Address string `yaml:"address" json:"address,omitempty"`
+	// SSH Port of Bastion Host
+	Port string `yaml:"port" json:"port,omitempty"`
+	// ssh User to Bastion Host
+	User string `yaml:"user" json:"user,omitempty"`
+	// SSH Agent Auth enable
+	SSHAgentAuth bool `yaml:"ssh_agent_auth,omitempty" json:"sshAgentAuth,omitempty"`
+	// SSH Private Key
+	SSHKey string `yaml:"ssh_key" json:"sshKey,omitempty"`
+	// SSH Private Key Path
+	SSHKeyPath string `yaml:"ssh_key_path" json:"sshKeyPath,omitempty"`
 }
 
 type PrivateRegistry struct {
@@ -95,16 +114,6 @@ type RKESystemImages struct {
 	Ingress string `yaml:"ingress" json:"ingress,omitempty"`
 	// Ingress Controller Backend image
 	IngressBackend string `yaml:"ingress_backend" json:"ingressBackend,omitempty"`
-	// Dashboard image
-	Dashboard string `yaml:"dashboard" json:"dashboard,omitempty"`
-	// Heapster addon image
-	Heapster string `yaml:"heapster" json:"heapster,omitempty"`
-	// Grafana image for heapster addon
-	Grafana string `yaml:"grafana" json:"grafana,omitempty"`
-	// Influxdb image for heapster addon
-	Influxdb string `yaml:"influxdb" json:"influxdb,omitempty"`
-	// Tiller addon image
-	Tiller string `yaml:"tiller" json:"tiller,omitempty"`
 }
 
 type RKEConfigNode struct {
@@ -162,6 +171,12 @@ type ETCDService struct {
 	Key string `yaml:"key" json:"key,omitempty"`
 	// External etcd prefix
 	Path string `yaml:"path" json:"path,omitempty"`
+	// Etcd Backup Service
+	Backup bool `yaml:"backup" json:"backup,omitempty"`
+	// Etcd Backup Retention period
+	Retention string `yaml:"retention" json:"retention,omitempty"`
+	// Etcd Backup Creation period
+	Creation string `yaml:"creation" json:"creation,omitempty"`
 }
 
 type KubeAPIService struct {
@@ -251,7 +266,7 @@ type IngressConfig struct {
 	// NodeSelector key pair
 	NodeSelector map[string]string `yaml:"node_selector" json:"nodeSelector,omitempty"`
 	// Ingress controller extra arguments
-	ExtraArguments []string `yaml:"extra_arguments" json:"extraArguments,omitempty"`
+	ExtraArgs map[string]string `yaml:"extra_args" json:"extraArgs,omitempty"`
 }
 
 type RKEPlan struct {
@@ -301,6 +316,8 @@ type Process struct {
 	Privileged bool `json:"privileged,omitempty"`
 	// Process healthcheck
 	HealthCheck HealthCheck `json:"healthCheck,omitempty"`
+	// Process docker container Labels
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 type HealthCheck struct {
@@ -410,6 +427,7 @@ type FlannelNetworkProvider struct {
 }
 
 type CanalNetworkProvider struct {
+	FlannelNetworkProvider `yaml:",inline" json:",inline"`
 }
 
 type KubernetesServicesOptions struct {

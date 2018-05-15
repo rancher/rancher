@@ -3,14 +3,15 @@ package eks
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strings"
+	"sync"
 	"time"
-
-	"encoding/base64"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -48,6 +49,7 @@ type Driver struct {
 
 type state struct {
 	ClusterName  string
+	DisplayName  string
 	ClientID     string
 	ClientSecret string
 
@@ -90,13 +92,17 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 	driverFlag := types.DriverFlags{
 		Options: make(map[string]*types.Flag),
 	}
+	driverFlag.Options["display-name"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "The displayed name of the cluster in the Rancher UI",
+	}
 	driverFlag.Options["client-id"] = &types.Flag{
 		Type:  types.StringType,
-		Usage: "",
+		Usage: "The AWS Client ID to use",
 	}
 	driverFlag.Options["client-secret"] = &types.Flag{
 		Type:  types.StringType,
-		Usage: "",
+		Usage: "The AWS Client Secret associated with the Client ID",
 	}
 
 	return &driverFlag, nil
@@ -113,6 +119,7 @@ func (d *Driver) GetDriverUpdateOptions(ctx context.Context) (*types.DriverFlags
 func getStateFromOptions(driverOptions *types.DriverOptions) (state, error) {
 	state := state{}
 	state.ClusterName = getValueFromDriverOptions(driverOptions, types.StringType, "name").(string)
+	state.DisplayName = getValueFromDriverOptions(driverOptions, types.StringType, "display-name", "displayName").(string)
 	state.ClientID = getValueFromDriverOptions(driverOptions, types.StringType, "client-id", "accessKey").(string)
 	state.ClientSecret = getValueFromDriverOptions(driverOptions, types.StringType, "client-secret", "secretKey").(string)
 
@@ -180,7 +187,7 @@ func alreadyExistsInCloudFormationError(err error) bool {
 	return false
 }
 
-func (d *Driver) createStack(svc *cloudformation.CloudFormation, name string,
+func (d *Driver) createStack(svc *cloudformation.CloudFormation, name string, displayName string,
 	templateURL string, parameters []*cloudformation.Parameter) (*cloudformation.DescribeStacksOutput, error) {
 	_, err := svc.CreateStack(&cloudformation.CreateStackInput{
 		StackName:   aws.String(name),
@@ -189,6 +196,9 @@ func (d *Driver) createStack(svc *cloudformation.CloudFormation, name string,
 			cloudformation.CapabilityCapabilityIam,
 		}),
 		Parameters: parameters,
+		Tags: []*cloudformation.Tag{
+			{Key: aws.String("displayName"), Value: aws.String(displayName)},
+		},
 	})
 	if err != nil && !alreadyExistsInCloudFormationError(err) {
 		return nil, fmt.Errorf("error creating master: %v", err)
@@ -236,6 +246,11 @@ func (d *Driver) awsHTTPRequest(state state, url string, method string, data []b
 	if err != nil {
 		return nil, fmt.Errorf("error creating cluster: %v", err)
 	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return nil, fmt.Errorf("http response code was: %v", resp.StatusCode)
+	}
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -245,7 +260,7 @@ func (d *Driver) awsHTTPRequest(state state, url string, method string, data []b
 	return body, nil
 }
 
-func (d *Driver) Create(ctx context.Context, options *types.DriverOptions) (*types.ClusterInfo, error) {
+func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *types.ClusterInfo) (*types.ClusterInfo, error) {
 	logrus.Infof("Starting create")
 
 	state, err := getStateFromOptions(options)
@@ -269,7 +284,12 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions) (*typ
 
 	logrus.Infof("Bringing up vpc")
 
-	stack, err := d.createStack(svc, getVPCStackName(state),
+	displayName := state.DisplayName
+	if displayName == "" {
+		displayName = state.ClusterName
+	}
+
+	stack, err := d.createStack(svc, getVPCStackName(state), displayName,
 		"https://amazon-eks.s3-us-west-2.amazonaws.com/2018-04-04/amazon-eks-vpc-sample.yaml",
 		[]*cloudformation.Parameter{
 			{ParameterKey: aws.String("ClusterName"), ParameterValue: aws.String(state.ClusterName)},
@@ -301,7 +321,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions) (*typ
 
 	logrus.Infof("Creating service role")
 
-	stack, err = d.createStack(svc, getServiceRoleName(state),
+	stack, err = d.createStack(svc, getServiceRoleName(state), displayName,
 		"https://amazon-eks.s3-us-west-2.amazonaws.com/2018-04-04/amazon-eks-service-role.yaml", nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating stack: %v", err)
@@ -346,13 +366,13 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions) (*typ
 	_, err = ec2svc.CreateKeyPair(&ec2.CreateKeyPairInput{
 		KeyName: aws.String(keyPairName),
 	})
-	if err != nil {
+	if err != nil && !isDuplicateKeyError(err) {
 		return nil, fmt.Errorf("error creating key pair %v", err)
 	}
 
 	logrus.Infof("Creating worker nodes")
 
-	stack, err = d.createStack(svc, getWorkNodeName(state),
+	stack, err = d.createStack(svc, getWorkNodeName(state), displayName,
 		"https://amazon-eks.s3-us-west-2.amazonaws.com/2018-04-04/amazon-eks-nodegroup.yaml",
 		[]*cloudformation.Parameter{
 			{ParameterKey: aws.String("ClusterName"), ParameterValue: aws.String(state.ClusterName)},
@@ -388,6 +408,10 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions) (*typ
 	return info, nil
 }
 
+func isDuplicateKeyError(err error) bool {
+	return strings.Contains(err.Error(), "already exists")
+}
+
 func isClusterConflict(err error) bool {
 	return strings.Contains(err.Error(), "Cluster already exists with name")
 }
@@ -405,27 +429,7 @@ func getVPCStackName(state state) string {
 }
 
 func (d *Driver) createConfigMap(state state, endpoint string, capem []byte, nodeInstanceRole string) error {
-	generator, err := heptio.NewGenerator()
-	if err != nil {
-		return fmt.Errorf("error creating generator: %v", err)
-	}
-
-	token, err := generator.Get(state.ClusterName)
-	if err != nil {
-		return fmt.Errorf("error generating token: %v", err)
-	}
-
-	config := &rest.Config{
-		Host: endpoint,
-		TLSClientConfig: rest.TLSClientConfig{
-			CAData: capem,
-		},
-		BearerToken: token,
-	}
-
-	logrus.Infof("Applying ConfigMap")
-
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := getClientset(state, endpoint, capem)
 	if err != nil {
 		return fmt.Errorf("error creating clientset: %v", err)
 	}
@@ -445,6 +449,8 @@ func (d *Driver) createConfigMap(state state, endpoint string, capem []byte, nod
 	if err != nil {
 		return fmt.Errorf("error marshalling map roles: %v", err)
 	}
+
+	logrus.Infof("Applying ConfigMap")
 
 	_, err = clientset.CoreV1().ConfigMaps("default").Create(&v1.ConfigMap{
 		TypeMeta: v12.TypeMeta{
@@ -466,6 +472,67 @@ func (d *Driver) createConfigMap(state state, endpoint string, capem []byte, nod
 	return nil
 }
 
+func getClientset(state state, endpoint string, capem []byte) (*kubernetes.Clientset, error) {
+	token, err := getEKSToken(state)
+	if err != nil {
+		return nil, fmt.Errorf("error generating token: %v", err)
+	}
+
+	config := &rest.Config{
+		Host: endpoint,
+		TLSClientConfig: rest.TLSClientConfig{
+			CAData: capem,
+		},
+		BearerToken: token,
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating clientset: %v", err)
+	}
+
+	return clientset, nil
+}
+
+const awsCredentialsDirectory = "./management-state/aws"
+const awsCredentialsPath = awsCredentialsDirectory + "/credentials"
+const awsSharedCredentialsFile = "AWS_SHARED_CREDENTIALS_FILE"
+
+var awsCredentialsLocker = &sync.Mutex{}
+
+func getEKSToken(state state) (string, error) {
+	generator, err := heptio.NewGenerator()
+	if err != nil {
+		return "", fmt.Errorf("error creating generator: %v", err)
+	}
+
+	defer awsCredentialsLocker.Unlock()
+	awsCredentialsLocker.Lock()
+	os.Setenv(awsSharedCredentialsFile, awsCredentialsPath)
+
+	defer func() {
+		os.Remove(awsCredentialsPath)
+		os.Remove(awsCredentialsDirectory)
+		os.Unsetenv(awsSharedCredentialsFile)
+	}()
+	err = os.MkdirAll(awsCredentialsDirectory, 0744)
+	if err != nil {
+		return "", fmt.Errorf("error creating credentials directory: %v", err)
+	}
+
+	err = ioutil.WriteFile(awsCredentialsPath, []byte(fmt.Sprintf(
+		`[default]
+aws_access_key_id=%v
+aws_secret_access_key=%v`,
+		state.ClientID,
+		state.ClientSecret)), 0644)
+	if err != nil {
+		return "", fmt.Errorf("error writing credentials file: %v", err)
+	}
+
+	return generator.Get(state.ClusterName)
+}
+
 func (d *Driver) waitForClusterReady(state state) (*eksCluster, error) {
 	cluster := &eksCluster{}
 
@@ -484,6 +551,10 @@ func (d *Driver) waitForClusterReady(state state) (*eksCluster, error) {
 		err = json.Unmarshal(resp, cluster)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing cluster: %v", err)
+		}
+
+		if cluster.Cluster.Status == nil {
+			return nil, fmt.Errorf("no cluster status was returned")
 		}
 
 		status = *cluster.Cluster.Status
@@ -568,28 +639,10 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 		return nil, fmt.Errorf("error parsing CA data: %v", err)
 	}
 
-	generator, err := heptio.NewGenerator()
-	if err != nil {
-		return nil, fmt.Errorf("error creating generator: %v", err)
-	}
-
-	token, err := generator.Get(state.ClusterName)
-	if err != nil {
-		return nil, fmt.Errorf("error generating token: %v", err)
-	}
-
 	info.Endpoint = *cluster.Cluster.MasterEndpoint
 	info.RootCaCertificate = *cluster.Cluster.CertificateAuthority.Data
 
-	config := &rest.Config{
-		Host: *cluster.Cluster.MasterEndpoint,
-		TLSClientConfig: rest.TLSClientConfig{
-			CAData: capem,
-		},
-		BearerToken: token,
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := getClientset(state, *cluster.Cluster.MasterEndpoint, capem)
 	if err != nil {
 		return nil, fmt.Errorf("error creating clientset: %v", err)
 	}
@@ -649,7 +702,7 @@ func (d *Driver) Remove(ctx context.Context, info *types.ClusterInfo) error {
 		return fmt.Errorf("error deleting key pair: %v", err)
 	}
 
-	return fmt.Errorf("not implemented")
+	return nil
 }
 
 func noClusterFound(err error) bool {

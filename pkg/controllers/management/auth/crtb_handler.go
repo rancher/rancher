@@ -18,7 +18,9 @@ const (
 	rbByRoleAndSubjectIndex   = "auth.management.cattle.io/crb-by-role-and-subject"
 )
 
-var clusterManagmentPlaneResources = []string{"clusterroletemplatebindings", "nodes", "nodepools", "clusterevents", "projects", "clusterregistrationtokens", "clusterpipelines"}
+var clusterManagmentPlaneResources = []string{"clusterroletemplatebindings", "nodes", "nodepools", "clusterevents",
+	"projects", "clusterregistrationtokens", "clusterpipelines", "clusterloggings", "notifiers", "clusteralerts",
+	"podsecuritypolicytemplateprojectbindings"}
 
 type crtbLifecycle struct {
 	mgr           *manager
@@ -31,6 +33,21 @@ func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterR
 		return nil, err
 	}
 	err = c.reconcilBindings(obj)
+
+	if obj.Annotations[creatorOwnerBindingAnnotation] == "true" {
+		cluster, err := c.clusterLister.Get("", obj.ClusterName)
+		if err != nil {
+			return nil, err
+		}
+		if !v3.ClusterConditionInitialRolesPopulated.IsTrue(cluster) {
+			cluster = cluster.DeepCopy()
+			v3.ClusterConditionInitialRolesPopulated.True(cluster)
+			if _, err := c.mgr.mgmt.Management.Clusters("").Update(cluster); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	return obj, err
 }
 
@@ -115,7 +132,7 @@ func (c *crtbLifecycle) reconcilBindings(binding *v3.ClusterRoleTemplateBinding)
 		return err
 	}
 	for _, p := range projects {
-		if err := c.mgr.grantManagementClusterScopedPrivilegesInProjectNamespace(binding.RoleTemplateName, p.Name, projectManagmentPlanResources, subject, binding); err != nil {
+		if err := c.mgr.grantManagementClusterScopedPrivilegesInProjectNamespace(binding.RoleTemplateName, p.Name, projectManagmentPlaneResources, subject, binding); err != nil {
 			return err
 		}
 	}

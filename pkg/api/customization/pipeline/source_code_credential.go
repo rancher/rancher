@@ -12,6 +12,7 @@ import (
 )
 
 type SourceCodeCredentialHandler struct {
+	ClusterPipelineLister      v3.ClusterPipelineLister
 	SourceCodeCredentials      v3.SourceCodeCredentialInterface
 	SourceCodeCredentialLister v3.SourceCodeCredentialLister
 	SourceCodeRepositories     v3.SourceCodeRepositoryInterface
@@ -69,7 +70,11 @@ func (h *SourceCodeCredentialHandler) refreshrepos(apiContext *types.APIContext)
 	if err != nil {
 		return err
 	}
-	if _, err := refreshReposByCredential(h.SourceCodeRepositories, h.SourceCodeRepositoryLister, credential); err != nil {
+	clusterPipeline, err := h.ClusterPipelineLister.Get(credential.Spec.ClusterName, credential.Spec.ClusterName)
+	if err != nil {
+		return err
+	}
+	if _, err := refreshReposByCredential(h.SourceCodeRepositories, h.SourceCodeRepositoryLister, credential, clusterPipeline); err != nil {
 		return err
 	}
 	data := []map[string]interface{}{}

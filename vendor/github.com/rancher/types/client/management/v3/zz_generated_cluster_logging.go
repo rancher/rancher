@@ -7,11 +7,14 @@ import (
 const (
 	ClusterLoggingType                      = "clusterLogging"
 	ClusterLoggingFieldAnnotations          = "annotations"
+	ClusterLoggingFieldAppliedSpec          = "appliedSpec"
 	ClusterLoggingFieldClusterId            = "clusterId"
+	ClusterLoggingFieldConditions           = "conditions"
 	ClusterLoggingFieldCreated              = "created"
 	ClusterLoggingFieldCreatorID            = "creatorId"
 	ClusterLoggingFieldElasticsearchConfig  = "elasticsearchConfig"
 	ClusterLoggingFieldEmbeddedConfig       = "embeddedConfig"
+	ClusterLoggingFieldFailedSpec           = "failedSpec"
 	ClusterLoggingFieldKafkaConfig          = "kafkaConfig"
 	ClusterLoggingFieldLabels               = "labels"
 	ClusterLoggingFieldName                 = "name"
@@ -22,7 +25,6 @@ const (
 	ClusterLoggingFieldRemoved              = "removed"
 	ClusterLoggingFieldSplunkConfig         = "splunkConfig"
 	ClusterLoggingFieldState                = "state"
-	ClusterLoggingFieldStatus               = "status"
 	ClusterLoggingFieldSyslogConfig         = "syslogConfig"
 	ClusterLoggingFieldTransitioning        = "transitioning"
 	ClusterLoggingFieldTransitioningMessage = "transitioningMessage"
@@ -32,11 +34,14 @@ const (
 type ClusterLogging struct {
 	types.Resource
 	Annotations          map[string]string    `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	AppliedSpec          *ClusterLoggingSpec  `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`
 	ClusterId            string               `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	Conditions           []LoggingCondition   `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	Created              string               `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string               `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	ElasticsearchConfig  *ElasticsearchConfig `json:"elasticsearchConfig,omitempty" yaml:"elasticsearchConfig,omitempty"`
 	EmbeddedConfig       *EmbeddedConfig      `json:"embeddedConfig,omitempty" yaml:"embeddedConfig,omitempty"`
+	FailedSpec           *ClusterLoggingSpec  `json:"failedSpec,omitempty" yaml:"failedSpec,omitempty"`
 	KafkaConfig          *KafkaConfig         `json:"kafkaConfig,omitempty" yaml:"kafkaConfig,omitempty"`
 	Labels               map[string]string    `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                 string               `json:"name,omitempty" yaml:"name,omitempty"`
@@ -47,7 +52,6 @@ type ClusterLogging struct {
 	Removed              string               `json:"removed,omitempty" yaml:"removed,omitempty"`
 	SplunkConfig         *SplunkConfig        `json:"splunkConfig,omitempty" yaml:"splunkConfig,omitempty"`
 	State                string               `json:"state,omitempty" yaml:"state,omitempty"`
-	Status               *LoggingStatus       `json:"status,omitempty" yaml:"status,omitempty"`
 	SyslogConfig         *SyslogConfig        `json:"syslogConfig,omitempty" yaml:"syslogConfig,omitempty"`
 	Transitioning        string               `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string               `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`

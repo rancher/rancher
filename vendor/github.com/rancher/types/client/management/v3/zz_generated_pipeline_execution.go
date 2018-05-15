@@ -12,6 +12,7 @@ const (
 	PipelineExecutionFieldCreated              = "created"
 	PipelineExecutionFieldCreatorID            = "creatorId"
 	PipelineExecutionFieldEnded                = "ended"
+	PipelineExecutionFieldEnvVars              = "envVars"
 	PipelineExecutionFieldExecutionState       = "executionState"
 	PipelineExecutionFieldLabels               = "labels"
 	PipelineExecutionFieldName                 = "name"
@@ -40,6 +41,7 @@ type PipelineExecution struct {
 	Created              string              `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string              `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Ended                string              `json:"ended,omitempty" yaml:"ended,omitempty"`
+	EnvVars              map[string]string   `json:"envVars,omitempty" yaml:"envVars,omitempty"`
 	ExecutionState       string              `json:"executionState,omitempty" yaml:"executionState,omitempty"`
 	Labels               map[string]string   `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                 string              `json:"name,omitempty" yaml:"name,omitempty"`
@@ -75,6 +77,10 @@ type PipelineExecutionOperations interface {
 	Update(existing *PipelineExecution, updates interface{}) (*PipelineExecution, error)
 	ByID(id string) (*PipelineExecution, error)
 	Delete(container *PipelineExecution) error
+
+	ActionRerun(resource *PipelineExecution) error
+
+	ActionStop(resource *PipelineExecution) error
 }
 
 func newPipelineExecutionClient(apiClient *Client) *PipelineExecutionClient {
@@ -120,4 +126,14 @@ func (c *PipelineExecutionClient) ByID(id string) (*PipelineExecution, error) {
 
 func (c *PipelineExecutionClient) Delete(container *PipelineExecution) error {
 	return c.apiClient.Ops.DoResourceDelete(PipelineExecutionType, &container.Resource)
+}
+
+func (c *PipelineExecutionClient) ActionRerun(resource *PipelineExecution) error {
+	err := c.apiClient.Ops.DoAction(PipelineExecutionType, "rerun", &resource.Resource, nil, nil)
+	return err
+}
+
+func (c *PipelineExecutionClient) ActionStop(resource *PipelineExecution) error {
+	err := c.apiClient.Ops.DoAction(PipelineExecutionType, "stop", &resource.Resource, nil, nil)
+	return err
 }

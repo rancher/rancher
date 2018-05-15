@@ -32,6 +32,7 @@ const (
 	PipelineFieldTriggerCronTimezone   = "triggerCronTimezone"
 	PipelineFieldTriggerWebhookPr      = "triggerWebhookPr"
 	PipelineFieldTriggerWebhookPush    = "triggerWebhookPush"
+	PipelineFieldTriggerWebhookTag     = "triggerWebhookTag"
 	PipelineFieldUuid                  = "uuid"
 	PipelineFieldWebHookID             = "webhookId"
 )
@@ -64,6 +65,7 @@ type Pipeline struct {
 	TriggerCronTimezone   string                `json:"triggerCronTimezone,omitempty" yaml:"triggerCronTimezone,omitempty"`
 	TriggerWebhookPr      bool                  `json:"triggerWebhookPr,omitempty" yaml:"triggerWebhookPr,omitempty"`
 	TriggerWebhookPush    bool                  `json:"triggerWebhookPush,omitempty" yaml:"triggerWebhookPush,omitempty"`
+	TriggerWebhookTag     bool                  `json:"triggerWebhookTag,omitempty" yaml:"triggerWebhookTag,omitempty"`
 	Uuid                  string                `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	WebHookID             string                `json:"webhookId,omitempty" yaml:"webhookId,omitempty"`
 }
@@ -83,6 +85,12 @@ type PipelineOperations interface {
 	Update(existing *Pipeline, updates interface{}) (*Pipeline, error)
 	ByID(id string) (*Pipeline, error)
 	Delete(container *Pipeline) error
+
+	ActionActivate(resource *Pipeline) error
+
+	ActionDeactivate(resource *Pipeline) error
+
+	ActionRun(resource *Pipeline, input *RunPipelineInput) error
 }
 
 func newPipelineClient(apiClient *Client) *PipelineClient {
@@ -128,4 +136,19 @@ func (c *PipelineClient) ByID(id string) (*Pipeline, error) {
 
 func (c *PipelineClient) Delete(container *Pipeline) error {
 	return c.apiClient.Ops.DoResourceDelete(PipelineType, &container.Resource)
+}
+
+func (c *PipelineClient) ActionActivate(resource *Pipeline) error {
+	err := c.apiClient.Ops.DoAction(PipelineType, "activate", &resource.Resource, nil, nil)
+	return err
+}
+
+func (c *PipelineClient) ActionDeactivate(resource *Pipeline) error {
+	err := c.apiClient.Ops.DoAction(PipelineType, "deactivate", &resource.Resource, nil, nil)
+	return err
+}
+
+func (c *PipelineClient) ActionRun(resource *Pipeline, input *RunPipelineInput) error {
+	err := c.apiClient.Ops.DoAction(PipelineType, "run", &resource.Resource, input, nil)
+	return err
 }

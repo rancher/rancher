@@ -61,6 +61,9 @@ const (
 	CloudProvider              = "CloudProvider"
 	AzureCloudProvider         = "azure"
 	AWSCloudProvider           = "aws"
+	ControlPlane               = "controlPlane"
+	WorkerPlane                = "workerPlan"
+	EtcdPlane                  = "etcd"
 )
 
 func (c *Cluster) DeployControlPlane(ctx context.Context) error {
@@ -74,7 +77,12 @@ func (c *Cluster) DeployControlPlane(ctx context.Context) error {
 	if len(c.Services.Etcd.ExternalURLs) > 0 {
 		log.Infof(ctx, "[etcd] External etcd connection string has been specified, skipping etcd plane")
 	} else {
-		if err := services.RunEtcdPlane(ctx, c.EtcdHosts, etcdNodePlanMap, c.LocalConnDialerFactory, c.PrivateRegistriesMap, c.UpdateWorkersOnly, c.SystemImages.Alpine); err != nil {
+		etcdBackup := services.EtcdBackup{
+			Backup:    c.Services.Etcd.Backup,
+			Creation:  c.Services.Etcd.Creation,
+			Retention: c.Services.Etcd.Retention,
+		}
+		if err := services.RunEtcdPlane(ctx, c.EtcdHosts, etcdNodePlanMap, c.LocalConnDialerFactory, c.PrivateRegistriesMap, c.UpdateWorkersOnly, c.SystemImages.Alpine, etcdBackup); err != nil {
 			return fmt.Errorf("[etcd] Failed to bring up Etcd Plane: %v", err)
 		}
 	}
@@ -90,7 +98,8 @@ func (c *Cluster) DeployControlPlane(ctx context.Context) error {
 		c.PrivateRegistriesMap,
 		cpNodePlanMap,
 		c.UpdateWorkersOnly,
-		c.SystemImages.Alpine); err != nil {
+		c.SystemImages.Alpine,
+		c.Certificates); err != nil {
 		return fmt.Errorf("[controlPlane] Failed to bring up Control Plane: %v", err)
 	}
 
@@ -175,6 +184,10 @@ func ParseCluster(
 	c.CloudConfigFile, err = c.parseCloudConfig(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to parse cloud config file: %v", err)
+	}
+	// Create k8s wrap transport for bastion host
+	if len(c.BastionHost.Address) > 0 {
+		c.K8sWrapTransport = hosts.BastionHostWrapTransport(c.BastionHost)
 	}
 	return c, nil
 }
@@ -280,7 +293,14 @@ func (c *Cluster) deployAddons(ctx context.Context) error {
 	if err := c.deployK8sAddOns(ctx); err != nil {
 		return err
 	}
-	return c.deployUserAddOns(ctx)
+	if err := c.deployUserAddOns(ctx); err != nil {
+		if err, ok := err.(*addonError); ok && err.isCritical {
+			return err
+		}
+		log.Warnf(ctx, "Failed to deploy addon execute job [%s]: %v", UserAddonsIncludeResourceName, err)
+
+	}
+	return nil
 }
 
 func (c *Cluster) SyncLabelsAndTaints(ctx context.Context) error {
@@ -312,9 +332,6 @@ func (c *Cluster) PrePullK8sImages(ctx context.Context) error {
 	var errgrp errgroup.Group
 	hosts := hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts)
 	for _, host := range hosts {
-		if !host.UpdateWorker {
-			continue
-		}
 		runHost := host
 		errgrp.Go(func() error {
 			return docker.UseLocalOrPull(ctx, runHost.DClient, runHost.Address, c.SystemImages.Kubernetes, "pre-deploy", c.PrivateRegistriesMap)
@@ -343,9 +360,14 @@ func ConfigureCluster(
 	if len(kubeCluster.ControlPlaneHosts) > 0 {
 		kubeCluster.Certificates = crtBundle
 		if err := kubeCluster.deployNetworkPlugin(ctx); err != nil {
+			if err, ok := err.(*addonError); ok && err.isCritical {
+				return err
+			}
+			log.Warnf(ctx, "Failed to deploy addon execute job [%s]: %v", NetworkPluginResourceName, err)
+		}
+		if err := kubeCluster.deployAddons(ctx); err != nil {
 			return err
 		}
-		return kubeCluster.deployAddons(ctx)
 	}
 	return nil
 }

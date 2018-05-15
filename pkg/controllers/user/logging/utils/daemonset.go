@@ -1,6 +1,8 @@
 package utils
 
 import (
+	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
+	"github.com/rancher/rancher/pkg/image"
 	rv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
 	rv1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -8,37 +10,35 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/api/apps/v1beta2"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 )
 
 func CreateFluentd(ds rv1beta2.DaemonSetInterface, sa rv1.ServiceAccountInterface, rb rrbacv1.ClusterRoleBindingInterface, namespace string) (err error) {
 	defer func() {
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			if err = removeDeamonset(ds, sa, rb, loggingconfig.FluentdName); err != nil {
-				logrus.Error("recycle daemonset failed", err)
+				logrus.Error("recycle fluentd daemonset failed", err)
 			}
 		}
 	}()
 
 	serviceAccount := newServiceAccount(loggingconfig.FluentdName, namespace)
-	serviceAccount, err = sa.Create(serviceAccount)
+	_, err = sa.Create(serviceAccount)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
 
 	projectRoleBind := newRoleBinding(loggingconfig.FluentdName, namespace)
-	projectRoleBind, err = rb.Create(projectRoleBind)
+	_, err = rb.Create(projectRoleBind)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
 
 	daemonset := newFluentdDaemonset(loggingconfig.FluentdName, namespace, loggingconfig.FluentdName)
-	daemonset, err = ds.Create(daemonset)
+	_, err = ds.Create(daemonset)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
@@ -49,19 +49,19 @@ func CreateLogAggregator(ds rv1beta2.DaemonSetInterface, sa rv1.ServiceAccountIn
 	defer func() {
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			if err = removeDeamonset(ds, sa, rb, loggingconfig.LogAggregatorName); err != nil {
-				logrus.Error("recycle daemonset failed", err)
+				logrus.Error("recycle log-aggregator daemonset failed", err)
 			}
 		}
 	}()
 
 	serviceAccount := newServiceAccount(loggingconfig.LogAggregatorName, namespace)
-	serviceAccount, err = sa.Create(serviceAccount)
+	_, err = sa.Create(serviceAccount)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
 
 	projectRoleBind := newRoleBinding(loggingconfig.LogAggregatorName, namespace)
-	projectRoleBind, err = rb.Create(projectRoleBind)
+	_, err = rb.Create(projectRoleBind)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
@@ -72,7 +72,7 @@ func CreateLogAggregator(ds rv1beta2.DaemonSetInterface, sa rv1.ServiceAccountIn
 	}
 	driverDir := getDriverDir(cluster.Status.Driver)
 	daemonset := newLogAggregatorDaemonset(loggingconfig.LogAggregatorName, namespace, driverDir)
-	daemonset, err = ds.Create(daemonset)
+	_, err = ds.Create(daemonset)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
@@ -163,7 +163,7 @@ func newFluentdDaemonset(name, namespace, clusterName string) *v1beta2.DaemonSet
 					Containers: []v1.Container{
 						{
 							Name:            loggingconfig.FluentdHelperName,
-							Image:           v3.ToolsSystemImages.LoggingSystemImages.FluentdHelper,
+							Image:           image.Resolve(v3.ToolsSystemImages.LoggingSystemImages.FluentdHelper),
 							Command:         []string{"fluentd-helper"},
 							Args:            []string{"--watched-file-list", "/fluentd/etc/config/cluster", "--watched-file-list", "/fluentd/etc/config/project", "--watched-file-list", "/fluentd/etc/config/custom/cluster", "--watched-file-list", "/fluentd/etc/config/custom/project"},
 							ImagePullPolicy: v1.PullAlways,
@@ -191,7 +191,7 @@ func newFluentdDaemonset(name, namespace, clusterName string) *v1beta2.DaemonSet
 						},
 						{
 							Name:            loggingconfig.FluentdName,
-							Image:           v3.ToolsSystemImages.LoggingSystemImages.Fluentd,
+							Image:           image.Resolve(v3.ToolsSystemImages.LoggingSystemImages.Fluentd),
 							ImagePullPolicy: v1.PullIfNotPresent,
 							Command:         []string{"fluentd"},
 							Args:            []string{"-c", "/fluentd/etc/fluent.conf"},
@@ -226,7 +226,7 @@ func newFluentdDaemonset(name, namespace, clusterName string) *v1beta2.DaemonSet
 								},
 								{
 									Name:      "customlog",
-									MountPath: "/var/log/rancher-log-volumes",
+									MountPath: "/var/lib/rancher/log-volumes",
 								},
 								{
 									Name:      "clustercustomlogconfig",
@@ -281,7 +281,7 @@ func newFluentdDaemonset(name, namespace, clusterName string) *v1beta2.DaemonSet
 							Name: "customlog",
 							VolumeSource: v1.VolumeSource{
 								HostPath: &v1.HostPathVolumeSource{
-									Path: "/var/log/rancher-log-volumes",
+									Path: "/var/lib/rancher/log-volumes",
 								},
 							},
 						},
@@ -289,7 +289,7 @@ func newFluentdDaemonset(name, namespace, clusterName string) *v1beta2.DaemonSet
 							Name: "clustercustomlogconfig",
 							VolumeSource: v1.VolumeSource{
 								HostPath: &v1.HostPathVolumeSource{
-									Path: "/var/lib/fluentd/etc/config/custom/cluster",
+									Path: "/var/lib/rancher/fluentd/etc/config/custom/cluster",
 								},
 							},
 						},
@@ -297,7 +297,7 @@ func newFluentdDaemonset(name, namespace, clusterName string) *v1beta2.DaemonSet
 							Name: "projectcustomlogconfig",
 							VolumeSource: v1.VolumeSource{
 								HostPath: &v1.HostPathVolumeSource{
-									Path: "/var/lib/fluentd/etc/config/custom/project",
+									Path: "/var/lib/rancher/fluentd/etc/config/custom/project",
 								},
 							},
 						},
@@ -305,7 +305,7 @@ func newFluentdDaemonset(name, namespace, clusterName string) *v1beta2.DaemonSet
 							Name: "fluentdlog",
 							VolumeSource: v1.VolumeSource{
 								HostPath: &v1.HostPathVolumeSource{
-									Path: "/var/log/fluentd",
+									Path: "/var/lib/rancher/fluentd/log",
 								},
 							},
 						},
@@ -376,7 +376,7 @@ func newLogAggregatorDaemonset(name, namespace, driverDir string) *v1beta2.Daemo
 					Containers: []v1.Container{
 						{
 							Name:            loggingconfig.LogAggregatorName,
-							Image:           v3.ToolsSystemImages.LoggingSystemImages.LogAggregatorFlexVolumeDriver,
+							Image:           image.Resolve(v3.ToolsSystemImages.LoggingSystemImages.LogAggregatorFlexVolumeDriver),
 							ImagePullPolicy: v1.PullAlways,
 							SecurityContext: &v1.SecurityContext{
 								Privileged: &privileged,

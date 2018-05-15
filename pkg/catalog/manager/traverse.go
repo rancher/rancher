@@ -1,9 +1,7 @@
 package manager
 
 import (
-	"encoding/base64"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/rancher/rancher/pkg/catalog/helm"
@@ -13,10 +11,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []error, error) {
+func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []string, map[string]v3.VersionCommits, []error, error) {
+	logrus.Info("traversing files and generating templates")
 	index, err := helm.LoadIndex(repoPath)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	newHelmVersionCommits := map[string]v3.VersionCommits{}
 
@@ -33,11 +32,20 @@ func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []error
 		keywords := map[string]struct{}{}
 		// comparing version commit with the previous commit to detect if a template has been changed.
 		hasChanged := false
+		versionNumber := 0
 		for _, version := range metadata {
 			newHelmVersionCommits[chart].Value[version.Version] = version.Digest
-			if digest, ok := existingHelmVersionCommits[version.Version]; !ok || digest != version.Digest {
+			digest, ok := existingHelmVersionCommits[version.Version]
+			if !ok || digest != version.Digest {
 				hasChanged = true
 			}
+			if ok {
+				versionNumber++
+			}
+		}
+		// if there is a version getting deleted then also set hasChanged to true
+		if versionNumber != len(existingHelmVersionCommits) {
+			hasChanged = true
 		}
 		if !hasChanged {
 			logrus.Debugf("chart %s has not been changed. Skipping generating templates for it", chart)
@@ -60,7 +68,6 @@ func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []error
 		}
 		template.Spec.Icon = iconData
 		template.Spec.IconFilename = iconFilename
-		template.Spec.Base = HelmTemplateBaseType
 		template.Spec.FolderName = chart
 		template.Spec.DisplayName = chart
 		var versions []v3.TemplateVersionSpec
@@ -69,49 +76,47 @@ func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []error
 			v := v3.TemplateVersionSpec{
 				Version: version.Version,
 			}
-			for _, k := range version.Keywords {
-				keywords[k] = struct{}{}
-			}
 			files, err := helm.FetchFiles(version, version.URLs)
 			if err != nil {
 				errors = append(errors, err)
 				continue
 			}
-			var filesToAdd []v3.File
+			filesToAdd := make(map[string]string)
 			for _, file := range files {
 				if strings.EqualFold(fmt.Sprintf("%s/%s", chart, "readme.md"), file.Name) {
-					contents, err := base64.StdEncoding.DecodeString(file.Contents)
-					if err != nil {
-						return nil, nil, err
-					}
-					v.Readme = string(contents)
-					continue
+					v.Readme = file.Contents
 				}
-				if strings.EqualFold(fmt.Sprintf("%s/%s", chart, "questions.yml"), file.Name) {
-					var value questionYml
-					contents, err := base64.StdEncoding.DecodeString(file.Contents)
-					if err != nil {
-						return nil, nil, err
+				for _, f := range supportedFiles {
+					if strings.EqualFold(fmt.Sprintf("%s/%s", chart, f), file.Name) {
+						var value catalogYml
+						if err := yaml.Unmarshal([]byte(file.Contents), &value); err != nil {
+							return nil, nil, nil, nil, err
+						}
+						v.Questions = value.Questions
+						v.RancherVersion = value.RancherVersion
+						for _, category := range value.Categories {
+							keywords[category] = struct{}{}
+						}
+						break
 					}
-					if err := yaml.Unmarshal([]byte(contents), &value); err != nil {
-						return nil, nil, err
-					}
-					v.Questions = value.Questions
 				}
-				filesToAdd = append(filesToAdd, file)
+				if strings.EqualFold(fmt.Sprintf("%s/%s", chart, "app-readme.md"), file.Name) {
+					v.AppReadme = file.Contents
+				}
+				filesToAdd[file.Name] = file.Contents
 			}
 			v.Files = filesToAdd
+			v.KubeVersion = version.KubeVersion
+			v.Digest = version.Digest
 			v.UpgradeVersionLinks = map[string]string{}
 			for _, versionSpec := range template.Spec.Versions {
-				if showUpgradeLinks(v.Version, versionSpec.Version, versionSpec.UpgradeFrom) {
-					revision := versionSpec.Version
-					if v.Revision != nil {
-						revision = strconv.Itoa(*versionSpec.Revision)
-					}
-					v.UpgradeVersionLinks[versionSpec.Version] = fmt.Sprintf("%s-%s", template.Name, revision)
+				if showUpgradeLinks(v.Version, versionSpec.Version) {
+					version := versionSpec.Version
+					v.UpgradeVersionLinks[versionSpec.Version] = fmt.Sprintf("%s-%s", template.Name, version)
 				}
 			}
-			v.ExternalID = fmt.Sprintf("catalog://?catalog=%s&base=%s&template=%s&version=%s", catalog.Name, template.Spec.Base, template.Spec.FolderName, v.Version)
+
+			v.ExternalID = fmt.Sprintf("catalog://?catalog=%s&template=%s&version=%s", catalog.Name, template.Spec.FolderName, v.Version)
 			versions = append(versions, v)
 		}
 		var categories []string
@@ -121,13 +126,24 @@ func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []error
 		template.Spec.Categories = categories
 		template.Spec.Versions = versions
 		template.Spec.CatalogID = catalog.Name
+		template.Name = fmt.Sprintf("%s-%s", catalog.Name, template.Spec.FolderName)
 
 		templates = append(templates, template)
 	}
-	catalog.Status.HelmVersionCommits = newHelmVersionCommits
-	return templates, nil, nil
+
+	toDeleteChart := []string{}
+	for chart := range catalog.Status.HelmVersionCommits {
+		if _, ok := index.IndexFile.Entries[chart]; !ok {
+			toDeleteChart = append(toDeleteChart, fmt.Sprintf("%s-%s", catalog.Name, chart))
+		}
+	}
+	return templates, toDeleteChart, newHelmVersionCommits, nil, nil
 }
 
-type questionYml struct {
-	Questions []v3.Question `yaml:"questions,omitempty"`
+var supportedFiles = []string{"catalog.yml", "catalog.yaml", "questions.yml", "questions.yaml"}
+
+type catalogYml struct {
+	RancherVersion string        `yaml:"rancher_version,omitempty"`
+	Categories     []string      `yaml:"categories,omitempty"`
+	Questions      []v3.Question `yaml:"questions,omitempty"`
 }

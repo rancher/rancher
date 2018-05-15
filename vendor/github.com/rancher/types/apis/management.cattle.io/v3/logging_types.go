@@ -19,7 +19,7 @@ type ClusterLogging struct {
 	Spec ClusterLoggingSpec `json:"spec"`
 	// Most recent observed status of the cluster. More info:
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
-	Status LoggingStatus `json:"status"`
+	Status ClusterLoggingStatus `json:"status"`
 }
 
 type ProjectLogging struct {
@@ -34,7 +34,7 @@ type ProjectLogging struct {
 	Spec ProjectLoggingSpec `json:"spec"`
 	// Most recent observed status of the cluster. More info:
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
-	Status LoggingStatus `json:"status"`
+	Status ProjectLoggingStatus `json:"status"`
 }
 
 type LoggingCommonSpec struct {
@@ -62,13 +62,20 @@ type ProjectLoggingSpec struct {
 	ProjectName string `json:"projectName" norman:"type=reference[project]"`
 }
 
-type LoggingStatus struct {
-	Conditions []LoggingCondition `json:"conditions,omitempty"`
+type ClusterLoggingStatus struct {
+	Conditions  []LoggingCondition  `json:"conditions,omitempty"`
+	AppliedSpec ClusterLoggingSpec  `json:"appliedSpec,omitempty"`
+	FailedSpec  *ClusterLoggingSpec `json:"failedSpec,omitempty"`
+}
+
+type ProjectLoggingStatus struct {
+	Conditions  []LoggingCondition `json:"conditions,omitempty"`
+	AppliedSpec ProjectLoggingSpec `json:"appliedSpec,omitempty"`
 }
 
 var (
-	ClusterLoggingConditionInitialized condition.Cond = "Initialized"
-	ClusterLoggingConditionProvisioned condition.Cond = "Provisioned"
+	LoggingConditionProvisioned condition.Cond = "Provisioned"
+	LoggingConditionUpdated     condition.Cond = "Updated"
 )
 
 type LoggingCondition struct {
@@ -92,12 +99,14 @@ type ElasticsearchConfig struct {
 	DateFormat   string `json:"dateFormat,omitempty" norman:"required,type=enum,options=YYYY-MM-DD|YYYY-MM|YYYY,default=YYYY-MM-DD"`
 	AuthUserName string `json:"authUsername,omitempty"` //secret
 	AuthPassword string `json:"authPassword,omitempty"` //secret
+	SSLVerify    bool   `json:"sslVerify,omitempty" norman:"required,default=true"`
 }
 
 type SplunkConfig struct {
-	Endpoint string `json:"endpoint,omitempty" norman:"required"`
-	Source   string `json:"source,omitempty"`
-	Token    string `json:"token,omitempty" norman:"required"` //secret
+	Endpoint  string `json:"endpoint,omitempty" norman:"required"`
+	Source    string `json:"source,omitempty"`
+	Token     string `json:"token,omitempty" norman:"required"` //secret
+	SSLVerify bool   `json:"sslVerify,omitempty" norman:"required,default=true"`
 }
 
 type EmbeddedConfig struct {
@@ -105,10 +114,10 @@ type EmbeddedConfig struct {
 	DateFormat            string `json:"dateFormat,omitempty" norman:"required,type=enum,options=YYYY-MM-DD|YYYY-MM|YYYY,default=YYYY-MM-DD"`
 	ElasticsearchEndpoint string `json:"elasticsearchEndpoint,omitempty" norman:"nocreate"`
 	KibanaEndpoint        string `json:"kibanaEndpoint,omitempty" norman:"nocreate"`
-	RequestsMemery        int    `json:"requestsMemory,omitempty" norman:"default=500,min=500"`
-	RequestsCPU           int    `json:"requestsCpu,omitempty" norman:"default=1000,min=1000"`
-	LimitsMemery          int    `json:"limitsMemory,omitempty"`
-	LimitsCPU             int    `json:"limitsCpu,omitempty"`
+	RequestsMemery        int    `json:"requestsMemory,omitempty" norman:"default=4096,min=512"`
+	RequestsCPU           int    `json:"requestsCpu,omitempty" norman:"default=2000,min=1000"`
+	LimitsMemery          int    `json:"limitsMemory,omitempty" norman:"default=4096,min=512"`
+	LimitsCPU             int    `json:"limitsCpu,omitempty" norman:"default=2000,min=1000"`
 }
 
 type KafkaConfig struct {

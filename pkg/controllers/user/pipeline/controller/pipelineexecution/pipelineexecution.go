@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -74,6 +75,9 @@ func (l *Lifecycle) Create(obj *v3.PipelineExecution) (*v3.PipelineExecution, er
 		return obj, nil
 	}
 	if err := l.initLogs(obj); err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			return obj, nil
+		}
 		return obj, err
 	}
 
@@ -81,8 +85,8 @@ func (l *Lifecycle) Create(obj *v3.PipelineExecution) (*v3.PipelineExecution, er
 	if err := l.pipelineEngine.PreCheck(); err != nil {
 		logrus.Errorf("Error get Jenkins engine - %v", err)
 		obj.Status.ExecutionState = utils.StateFail
-		v3.PipelineExecutionConditionCompleted.Unknown(obj)
-		v3.PipelineExecutionConditionCompleted.ReasonAndMessageFromError(obj, err)
+		v3.PipelineExecutionConditonProvisioned.False(obj)
+		v3.PipelineExecutionConditonProvisioned.ReasonAndMessageFromError(obj, err)
 		return obj, nil
 	}
 
@@ -98,8 +102,8 @@ func (l *Lifecycle) Create(obj *v3.PipelineExecution) (*v3.PipelineExecution, er
 	if err := l.pipelineEngine.RunPipelineExecution(obj, obj.Spec.TriggeredBy); err != nil {
 		logrus.Errorf("Error run pipeline - %v", err)
 		obj.Status.ExecutionState = utils.StateFail
-		v3.PipelineExecutionConditionCompleted.Unknown(obj)
-		v3.PipelineExecutionConditionCompleted.ReasonAndMessageFromError(obj, err)
+		v3.PipelineExecutionConditonProvisioned.False(obj)
+		v3.PipelineExecutionConditonProvisioned.ReasonAndMessageFromError(obj, err)
 		return obj, nil
 	}
 

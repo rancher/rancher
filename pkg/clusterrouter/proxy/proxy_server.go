@@ -60,13 +60,18 @@ func NewLocal(localConfig *rest.Config, cluster *v3.Cluster) (*RemoteService, er
 		return nil, err
 	}
 
-	return &RemoteService{
+	rs := &RemoteService{
 		cluster: cluster,
 		url: func() (url.URL, error) {
 			return *hostURL, nil
 		},
 		transport: transport,
-	}, nil
+	}
+	if localConfig.BearerToken != "" {
+		rs.auth = "Bearer " + localConfig.BearerToken
+	}
+
+	return rs, nil
 }
 
 func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory) (*RemoteService, error) {
@@ -159,6 +164,19 @@ func (r *RemoteService) Cluster() *v3.Cluster {
 type SimpleProxy struct {
 	url       *url.URL
 	transport http.RoundTripper
+}
+
+func NewSimpleInsecureProxy(host string) (*SimpleProxy, error) {
+	p, err := NewSimpleProxy(host, nil)
+	if err != nil {
+		return nil, err
+	}
+	p.transport = &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+	}
+	return p, nil
 }
 
 func NewSimpleProxy(host string, caData []byte) (*SimpleProxy, error) {

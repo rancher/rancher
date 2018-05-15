@@ -1,6 +1,7 @@
 package endpoints
 
 import (
+	workloadutil "github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/types/apis/core/v1"
 	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
@@ -14,12 +15,13 @@ import (
 // and NodePort/LoadBalancer services
 
 type NodesController struct {
-	nodes          v1.NodeInterface
-	nodeLister     v1.NodeLister
-	serviceLister  v1.ServiceLister
-	podLister      v1.PodLister
-	machinesLister managementv3.NodeLister
-	clusterName    string
+	nodes              v1.NodeInterface
+	nodeLister         v1.NodeLister
+	serviceLister      v1.ServiceLister
+	podLister          v1.PodLister
+	machinesLister     managementv3.NodeLister
+	workloadController workloadutil.CommonController
+	clusterName        string
 }
 
 func (n *NodesController) sync(key string, obj *corev1.Node) error {
@@ -50,6 +52,15 @@ func (n *NodesController) sync(key string, obj *corev1.Node) error {
 			return err
 		}
 	}
+	workloadsToUpdate, err := n.workloadController.GetAllWorkloads("")
+	if err != nil {
+		return err
+	}
+	//reconcile workloads as node condition can change
+	// and it might affect public endpoints
+	for _, w := range workloadsToUpdate {
+		n.workloadController.EnqueueWorkload(w)
+	}
 	return nil
 }
 
@@ -61,7 +72,12 @@ func (n *NodesController) reconcileEndpontsForNode(node *corev1.Node) (bool, err
 	if err != nil {
 		return false, err
 	}
-	nodeNameToMachine, err := getNodeNameToMachine(n.clusterName, n.machinesLister)
+
+	nodeNameToMachine, err := getNodeNameToMachine(n.clusterName, n.machinesLister, n.nodeLister)
+	if err != nil {
+		return false, err
+	}
+	allNodesIP, err := getAllNodesPublicEndpointIP(n.machinesLister, n.clusterName)
 	if err != nil {
 		return false, err
 	}
@@ -69,7 +85,7 @@ func (n *NodesController) reconcileEndpontsForNode(node *corev1.Node) (bool, err
 		if svc.DeletionTimestamp != nil {
 			continue
 		}
-		pEps, err := convertServiceToPublicEndpoints(svc, n.clusterName, nodeNameToMachine[node.Name])
+		pEps, err := convertServiceToPublicEndpoints(svc, n.clusterName, nodeNameToMachine[node.Name], allNodesIP)
 		if err != nil {
 			return false, err
 		}

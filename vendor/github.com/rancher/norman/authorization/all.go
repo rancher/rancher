@@ -46,6 +46,13 @@ func (*AllAccess) CanDelete(apiContext *types.APIContext, obj map[string]interfa
 	return httperror.NewAPIError(httperror.PermissionDenied, "can not delete "+schema.ID)
 }
 
+func (*AllAccess) CanDo(apiGroup, resource, verb string, apiContext *types.APIContext, obj map[string]interface{}, schema *types.Schema) error {
+	if slice.ContainsString(schema.ResourceMethods, verb) {
+		return nil
+	}
+	return httperror.NewAPIError(httperror.PermissionDenied, "can not perform "+verb+" "+schema.ID)
+}
+
 func (*AllAccess) Filter(apiContext *types.APIContext, schema *types.Schema, obj map[string]interface{}, context map[string]string) map[string]interface{} {
 	return obj
 }

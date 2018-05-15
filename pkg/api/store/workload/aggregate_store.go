@@ -2,21 +2,13 @@ package workload
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 
-	"github.com/docker/distribution/reference"
-	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/norman/types/values"
-	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
-	projectschema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
-	managementv3 "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/client/project/v3"
 	projectclient "github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/config"
@@ -62,7 +54,11 @@ func (a *AggregateStore) ByID(apiContext *types.APIContext, schema *types.Schema
 		return nil, err
 	}
 	_, shortID := splitTypeAndID(id)
-	return store.ByID(apiContext, a.Schemas[schemaType], shortID)
+	data, err := store.ByID(apiContext, a.Schemas[schemaType], shortID)
+	if err != nil {
+		return nil, err
+	}
+	return capabilitiesToUpperCase(data), nil
 }
 
 func (a *AggregateStore) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
@@ -92,7 +88,7 @@ func (a *AggregateStore) List(apiContext *types.APIContext, schema *types.Schema
 			}
 			for _, item := range data {
 				select {
-				case items <- item:
+				case items <- capabilitiesToUpperCase(item):
 				case <-ctx.Done():
 					return ctx.Err()
 				}
@@ -131,64 +127,7 @@ func (a *AggregateStore) Create(apiContext *types.APIContext, schema *types.Sche
 		}
 	}
 
-	setSelector(toSchema.ID, data)
-	setWorkloadSpecificDefaults(toSchema.ID, data)
-	setSecrets(apiContext, data)
-	setPorts(data)
-	setScheduling(apiContext, data)
-	setStrategy(data)
-
 	return toStore.Create(apiContext, toSchema, data)
-}
-
-func setStrategy(data map[string]interface{}) {
-	strategy, ok := values.GetValue(data, "deploymentConfig", "strategy")
-	if ok && convert.ToString(strategy) == "Recreate" {
-		values.RemoveValue(data, "deploymentConfig", "maxSurge")
-		values.RemoveValue(data, "deploymentConfig", "maxUnavailable")
-	}
-}
-
-func setSelector(schemaID string, data map[string]interface{}) {
-	setSelector := false
-	isJob := strings.EqualFold(schemaID, "job") || strings.EqualFold(schemaID, "cronJob")
-	if convert.IsEmpty(data["selector"]) && !isJob {
-		setSelector = true
-	}
-	if setSelector {
-		workloadID := resolveWorkloadID(schemaID, data)
-		// set selector
-		data["selector"] = map[string]interface{}{
-			"matchLabels": map[string]interface{}{
-				SelectorLabel: workloadID,
-			},
-		}
-
-		// set workload labels
-		workloadLabels := convert.ToMapInterface(data["workloadLabels"])
-		if workloadLabels == nil {
-			workloadLabels = make(map[string]interface{})
-		}
-		workloadLabels[SelectorLabel] = workloadID
-		data["workloadLabels"] = workloadLabels
-
-		// set labels
-		labels := convert.ToMapInterface(data["labels"])
-		if labels == nil {
-			labels = make(map[string]interface{})
-		}
-		labels[SelectorLabel] = workloadID
-		data["labels"] = labels
-	}
-}
-
-func setWorkloadSpecificDefaults(schemaID string, data map[string]interface{}) {
-	if strings.EqualFold(schemaID, "job") || strings.EqualFold(schemaID, "cronJob") {
-		// job has different defaults
-		if _, ok := data["restartPolicy"]; !ok {
-			data["restartPolicy"] = "OnFailure"
-		}
-	}
 }
 
 func store(registries map[string]projectclient.RegistryCredential, domainToCreds map[string][]corev1.LocalObjectReference, name string) {
@@ -202,99 +141,6 @@ func store(registries map[string]projectclient.RegistryCredential, domainToCreds
 	}
 }
 
-func setPorts(data map[string]interface{}) {
-	containers, ok := values.GetValue(data, "containers")
-	if !ok {
-		return
-	}
-
-	for _, c := range convert.ToInterfaceSlice(containers) {
-		cMap, err := convert.EncodeToMap(c)
-		if err != nil {
-			logrus.Warnf("Failed to transform container to map: %v", err)
-			continue
-		}
-		v, ok := values.GetValue(cMap, "ports")
-
-		if ok {
-			ports := convert.ToInterfaceSlice(v)
-			for _, p := range ports {
-				port, err := convert.EncodeToMap(p)
-				if err != nil {
-					logrus.Warnf("Failed to transform port to map %v", err)
-					continue
-				}
-				if convert.IsEmpty(port["name"]) {
-					containerPort, err := convert.ToNumber(port["containerPort"])
-					if err != nil {
-						logrus.Warnf("Failed to transform container port [%v] to number: %v", port["containerPort"], err)
-					}
-					port["name"] = fmt.Sprintf("%s%s", strings.ToLower(convert.ToString(port["protocol"])), strconv.Itoa(int(containerPort)))
-				}
-			}
-		}
-	}
-}
-
-func getCreds(apiContext *types.APIContext, namespaceID string) map[string][]corev1.LocalObjectReference {
-	domainToCreds := make(map[string][]corev1.LocalObjectReference)
-	var namespacedCreds []projectclient.NamespacedDockerCredential
-	if err := access.List(apiContext, &projectschema.Version, "namespacedDockerCredential", &types.QueryOptions{}, &namespacedCreds); err == nil {
-		for _, cred := range namespacedCreds {
-			if cred.NamespaceId == namespaceID {
-				store(cred.Registries, domainToCreds, cred.Name)
-			}
-		}
-	}
-	var creds []projectclient.DockerCredential
-	if err := access.List(apiContext, &projectschema.Version, "dockerCredential", &types.QueryOptions{}, &creds); err == nil {
-		for _, cred := range creds {
-			store(cred.Registries, domainToCreds, cred.Name)
-		}
-	}
-	return domainToCreds
-}
-
-func setSecrets(apiContext *types.APIContext, data map[string]interface{}) {
-	if val, _ := values.GetValue(data, "imagePullSecrets"); val != nil {
-		return
-	}
-	if containers, _ := values.GetSlice(data, "containers"); len(containers) > 0 {
-		imagePullSecrets, _ := data["imagePullSecrets"].([]corev1.LocalObjectReference)
-		domainToCreds := getCreds(apiContext, convert.ToString(data["namespaceId"]))
-		for _, container := range containers {
-			if image := convert.ToString(container["image"]); image != "" {
-				domain := getDomain(image)
-				if secrets, ok := domainToCreds[domain]; ok {
-					imagePullSecrets = append(imagePullSecrets, secrets...)
-				}
-			}
-		}
-		if imagePullSecrets != nil {
-			values.PutValue(data, imagePullSecrets, "imagePullSecrets")
-		}
-	}
-}
-
-func setScheduling(apiContext *types.APIContext, data map[string]interface{}) {
-	if nodeID := convert.ToString(values.GetValueN(data, "scheduling", "node", "nodeId")); nodeID != "" {
-		nodeName := getNodeName(apiContext, nodeID)
-		values.PutValue(data, nodeName, "scheduling", "node", "nodeId")
-		state := getState(data)
-		state[getKey(nodeName)] = nodeID
-		setState(data, state)
-	}
-}
-
-func getNodeName(apiContext *types.APIContext, nodeID string) string {
-	var node managementv3.Node
-	var nodeName string
-	if err := access.ByID(apiContext, &managementschema.Version, managementv3.NodeType, nodeID, &node); err == nil {
-		nodeName = node.NodeName
-	}
-	return nodeName
-}
-
 func resolveWorkloadID(schemaID string, data map[string]interface{}) string {
 	return fmt.Sprintf("%s-%s-%s", schemaID, data["namespaceId"], data["name"])
 }
@@ -305,7 +151,6 @@ func (a *AggregateStore) Update(apiContext *types.APIContext, schema *types.Sche
 		return nil, err
 	}
 	_, shortID := splitTypeAndID(id)
-	setPorts(data)
 	return store.Update(apiContext, a.Schemas[schemaType], data, shortID)
 }
 
@@ -356,41 +201,32 @@ func splitTypeAndID(id string) (string, string) {
 	return parts[0], parts[1]
 }
 
-func getDomain(image string) string {
-	var repo string
-	named, err := reference.ParseNormalizedNamed(image)
-	if err != nil {
-		logrus.Debug(err)
-		return repo
-	}
-	domain := reference.Domain(named)
-	if domain == "docker.io" {
-		return "index.docker.io"
-	}
-	return domain
-}
-
-func setState(data map[string]interface{}, stateMap map[string]string) {
-	content, err := json.Marshal(stateMap)
-	if err != nil {
-		logrus.Errorf("failed to save state on workload: %v", data["id"])
-		return
-	}
-
-	values.PutValue(data, string(content), "annotations", "workload.cattle.io/state")
-}
-
-func getState(data map[string]interface{}) map[string]string {
-	state := map[string]string{}
-
-	v, ok := values.GetValue(data, "annotations", "workload.cattle.io/state")
-	if ok {
-		json.Unmarshal([]byte(convert.ToString(v)), &state)
-	}
-
-	return state
-}
-
 func getKey(key string) string {
 	return base64.URLEncoding.EncodeToString([]byte(key))
+}
+
+//Related issue: #12619
+//In Rancher API schema, Capabilities is defined as enum type and `ALL` is one of the options, which means Rancher API only accepts `ALL`.
+//However, Kubernetes accepts both `all` and `ALL`` for capabilities, if user uses kubectl and use `all`` in the yaml, edit will fail in Rancher UI.
+//Thus we should convert `all`` to `ALL` so that UI always get `ALL`.
+func capabilitiesToUpperCase(data map[string]interface{}) map[string]interface{} {
+	containers := convert.ToMapSlice(data["containers"])
+	elements := []string{"capDrop", "capAdd"}
+
+	if containers != nil {
+		for _, c := range containers {
+			for _, element := range elements {
+				caps := convert.ToStringSlice(c[element])
+				newCaps := []string{}
+				if caps != nil {
+					for _, cap := range caps {
+						newCaps = append(newCaps, strings.ToUpper(cap))
+					}
+					c[element] = newCaps
+				}
+			}
+		}
+	}
+
+	return data
 }

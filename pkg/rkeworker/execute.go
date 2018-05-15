@@ -31,7 +31,7 @@ func ExecutePlan(ctx context.Context, nodeConfig *NodeConfig) error {
 	}
 
 	for name, process := range nodeConfig.Processes {
-		if strings.Contains(name, "sidekick") {
+		if strings.Contains(name, "sidekick") || strings.Contains(name, "share-mnt") {
 			if err := runProcess(ctx, name, process, false); err != nil {
 				return err
 			}
@@ -54,7 +54,7 @@ type fileWriter struct {
 }
 
 func (f *fileWriter) write(path string, base64Content string) {
-	if path == "" || len(base64Content) == 0 {
+	if path == "" {
 		return
 	}
 

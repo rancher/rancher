@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/rancher/norman/leader"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
 	managementapi "github.com/rancher/rancher/pkg/api/server"
 	"github.com/rancher/rancher/pkg/auth/providers/publicapi"
@@ -16,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/dynamiclistener"
 	"github.com/rancher/rancher/pkg/httpproxy"
 	k8sProxyPkg "github.com/rancher/rancher/pkg/k8sproxy"
+	"github.com/rancher/rancher/pkg/masterredirect"
 	"github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/rancher/server/capabilities"
 	"github.com/rancher/rancher/server/ui"
@@ -26,7 +28,15 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 )
 
-func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) error {
+func redirectToMaster(leader *leader.State) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return masterredirect.New(leader.Get, next)
+	}
+}
+
+func Start(ctx context.Context, leader *leader.State, httpPort, httpsPort int, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) error {
+	toMaster := redirectToMaster(leader)
+
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext)
 	if err != nil {
 		return err
@@ -37,7 +47,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 		return err
 	}
 
-	k8sProxy := k8sProxyPkg.New(scaledContext, scaledContext.Dialer)
+	k8sProxy := toMaster(k8sProxyPkg.New(scaledContext, scaledContext.Dialer))
 
 	managementAPI, err := managementapi.New(ctx, scaledContext, clusterManager, k8sProxy)
 	if err != nil {
@@ -49,11 +59,6 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 
 	app.DefaultProxyDialer = utilnet.DialFunc(scaledContext.Dialer.LocalClusterDialer())
 
-	localClusterAuth, err := k8sProxyPkg.NewLocalProxy(scaledContext, scaledContext.Dialer, root)
-	if err != nil {
-		return err
-	}
-
 	rawAuthedAPIs := newAuthed(tokenAPI, managementAPI, k8sProxy)
 
 	authedHandler, err := authrequests.NewAuthenticationFilter(ctx, scaledContext, rawAuthedAPIs)
@@ -64,6 +69,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 	webhookHandler := hooks.New(scaledContext)
 
 	connectHandler, connectConfigHandler := connectHandlers(scaledContext)
+	connectHandler = toMaster(connectHandler)
 
 	root.Handle("/", ui.UI(managementAPI))
 	root.PathPrefix("/v3-public").Handler(publicAPI)
@@ -90,7 +96,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 
 	registerHealth(root)
 
-	dynamiclistener.Start(ctx, scaledContext, httpPort, httpsPort, localClusterAuth)
+	dynamiclistener.Start(ctx, scaledContext, httpPort, httpsPort, root)
 	return nil
 }
 

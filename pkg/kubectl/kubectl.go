@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"strings"
 
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -40,7 +41,7 @@ func Apply(yaml []byte, kubeConfig *clientcmdapi.Config) ([]byte, error) {
 		"apply",
 		"-f",
 		yamlFile.Name())
-	return cmd.CombinedOutput()
+	return runWithHTTP2(cmd)
 }
 
 func tempFile(prefix string) (*os.File, error) {
@@ -56,4 +57,48 @@ func tempFile(prefix string) (*os.File, error) {
 	}
 
 	return f, f.Close()
+}
+
+func ApplyWithNamespace(yaml []byte, namespace string, kubeConfig *clientcmdapi.Config) ([]byte, error) {
+	kubeConfigFile, err := tempFile("kubeconfig-")
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(kubeConfigFile.Name())
+
+	yamlFile, err := tempFile("yaml-")
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(yamlFile.Name())
+
+	if err := ioutil.WriteFile(yamlFile.Name(), yaml, 0600); err != nil {
+		return nil, err
+	}
+
+	if err := clientcmd.WriteToFile(*kubeConfig, kubeConfigFile.Name()); err != nil {
+		return nil, err
+	}
+
+	cmd := exec.Command("kubectl",
+		"--kubeconfig",
+		kubeConfigFile.Name(),
+		"-n",
+		namespace,
+		"apply",
+		"-f",
+		yamlFile.Name())
+	return runWithHTTP2(cmd)
+}
+
+func runWithHTTP2(cmd *exec.Cmd) ([]byte, error) {
+	var newEnv []string
+	for _, env := range os.Environ() {
+		if strings.HasPrefix(env, "DISABLE_HTTP2") {
+			continue
+		}
+		newEnv = append(newEnv, env)
+	}
+	cmd.Env = newEnv
+	return cmd.CombinedOutput()
 }

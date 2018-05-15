@@ -2,7 +2,9 @@ package util
 
 import (
 	"fmt"
+	"time"
 
+	errs "github.com/pkg/errors"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"gopkg.in/yaml.v2"
 	"k8s.io/api/core/v1"
@@ -77,21 +79,27 @@ func GenerateServiceAccountToken(clientset kubernetes.Interface) (string, error)
 		return "", fmt.Errorf("error creating role bindings: %v", err)
 	}
 
-	if serviceAccount, err = clientset.CoreV1().ServiceAccounts(defaultNamespace).Get(serviceAccount.Name, metav1.GetOptions{}); err != nil {
-		return "", fmt.Errorf("error getting service account: %v", err)
+	start := time.Millisecond * 250
+	for i := 0; i < 5; i++ {
+		time.Sleep(start)
+		if serviceAccount, err = clientset.CoreV1().ServiceAccounts(defaultNamespace).Get(serviceAccount.Name, metav1.GetOptions{}); err != nil {
+			return "", fmt.Errorf("error getting service account: %v", err)
+		}
+
+		if len(serviceAccount.Secrets) > 0 {
+			secret := serviceAccount.Secrets[0]
+			secretObj, err := clientset.CoreV1().Secrets(defaultNamespace).Get(secret.Name, metav1.GetOptions{})
+			if err != nil {
+				return "", fmt.Errorf("error getting secret: %v", err)
+			}
+			if token, ok := secretObj.Data["token"]; ok {
+				return string(token), nil
+			}
+		}
+		start = start * 2
 	}
 
-	if len(serviceAccount.Secrets) > 0 {
-		secret := serviceAccount.Secrets[0]
-		secretObj, err := clientset.CoreV1().Secrets(defaultNamespace).Get(secret.Name, metav1.GetOptions{})
-		if err != nil {
-			return "", fmt.Errorf("error getting secret: %v", err)
-		}
-		if token, ok := secretObj.Data["token"]; ok {
-			return string(token), nil
-		}
-	}
-	return "", fmt.Errorf("failed to configure serviceAccountToken")
+	return "", errs.New("failed to fetch serviceAccountToken")
 }
 
 func ConvertToRkeConfig(config string) (v3.RancherKubernetesEngineConfig, error) {

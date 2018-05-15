@@ -114,7 +114,7 @@ func workloadTypes(schemas *types.Schemas) *types.Schemas {
 			}
 			schema.ResourceActions = map[string]types.Action{
 				"rollback": {
-					Input: "revision",
+					Input: "rollbackRevision",
 				},
 				"pause":  {},
 				"resume": {},
@@ -376,7 +376,11 @@ func deploymentTypes(schemas *types.Schemas) *types.Schemas {
 			m.Move{From: "type", To: "strategy"},
 		).
 		AddMapperForType(&Version, v1beta2.DeploymentSpec{},
-			&m.Embed{Field: "strategy"},
+			&m.Move{
+				From: "strategy",
+				To:   "upgradeStrategy",
+			},
+			&m.Embed{Field: "upgradeStrategy"},
 			&m.Move{
 				From: "replicas",
 				To:   "scale",
@@ -452,6 +456,9 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 			m.Move{From: "hostIP", To: "hostIp"},
 			m.Drop{Field: "hostPort"},
 		).
+		AddMapperForType(&Version, v1.Handler{},
+			mapper.ContainerProbeHandler{}).
+		AddMapperForType(&Version, v1.Probe{}, mapper.ContainerProbeHandler{}).
 		AddMapperForType(&Version, v1.Handler{}, handlerMapper).
 		AddMapperForType(&Version, v1.Probe{}, handlerMapper).
 		AddMapperForType(&Version, v1.PodStatus{},
@@ -469,6 +476,7 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 			&m.AnnotationField{Field: "description"},
 			&m.AnnotationField{Field: "publicEndpoints", List: true},
 			mapper.ContainerPorts{},
+			mapper.ContainerStatus{},
 		).
 		// Must import handlers before Container
 		MustImport(&Version, v1.ContainerPort{}, struct {
@@ -486,9 +494,14 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v1.Handler{}, handlerOverride{}).
 		MustImport(&Version, v1.Probe{}, handlerOverride{}).
 		MustImport(&Version, v1.Container{}, struct {
-			Environment     map[string]string
-			EnvironmentFrom []EnvironmentFrom
-			InitContainer   bool
+			Environment          map[string]string
+			EnvironmentFrom      []EnvironmentFrom
+			InitContainer        bool
+			State                string
+			Transitioning        string
+			TransitioningMessage string
+			ExitCode             *int
+			RestartCount         int
 		}{}).
 		MustImport(&Version, v1.PodSpec{}, struct {
 			Scheduling *Scheduling
@@ -661,6 +674,9 @@ func volumeTypes(schemas *types.Schemas) *types.Schemas {
 				"name",
 			}},
 		).
+		AddMapperForType(&Version, v1.PersistentVolumeClaim{},
+			mapper.PersistVolumeClaim{},
+		).
 		MustImport(&Version, v1.PersistentVolumeClaimVolumeSource{}, struct {
 			ClaimName string `norman:"type=reference[persistentVolumeClaim]"`
 		}{}).
@@ -685,16 +701,20 @@ func volumeTypes(schemas *types.Schemas) *types.Schemas {
 
 func appTypes(schema *types.Schemas) *types.Schemas {
 	return schema.
+		AddMapperForType(&Version, v3.App{}, &m.Embed{Field: "status"}).
+		MustImport(&Version, v3.AppUpgradeConfig{}).
+		MustImport(&Version, v3.RollbackRevision{}).
 		MustImportAndCustomize(&Version, v3.App{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
 				"upgrade": {
-					Input: "templateVersionId",
+					Input: "appUpgradeConfig",
 				},
 				"rollback": {
-					Input: "revision",
+					Input: "rollbackRevision",
 				},
 			}
-		})
+		}).
+		MustImport(&Version, v3.AppRevision{})
 }
 
 func podTemplateSpecTypes(schemas *types.Schemas) *types.Schemas {

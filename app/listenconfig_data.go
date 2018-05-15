@@ -12,6 +12,8 @@ import (
 )
 
 func addListenConfig(management *config.ManagementContext, cfg Config) error {
+	userCACerts := cfg.ListenConfig.CACerts
+
 	existing, err := management.Management.ListenConfigs("").Get(cfg.ListenConfig.Name, v1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
@@ -68,6 +70,8 @@ func addListenConfig(management *config.ManagementContext, cfg Config) error {
 
 	if cfg.ListenConfig.Mode == "acme" {
 		cfg.ListenConfig.CACerts = ""
+	} else if userCACerts != "" {
+		cfg.ListenConfig.CACerts = userCACerts
 	}
 
 	if existing == nil {

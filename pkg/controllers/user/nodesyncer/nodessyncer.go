@@ -17,9 +17,8 @@ import (
 )
 
 const (
-	AllNodeKey           = "_machine_all_"
-	annotationName       = "management.cattle.io/nodesyncer"
-	externalIPAnnotation = "rke.cattle.io/external-ip"
+	AllNodeKey     = "_machine_all_"
+	annotationName = "management.cattle.io/nodesyncer"
 )
 
 type NodeSyncer struct {
@@ -40,6 +39,8 @@ type NodesSyncer struct {
 	nodeClient       v1.NodeInterface
 	podLister        v1.PodLister
 	clusterNamespace string
+	clusterName      string
+	clusterLister    v3.ClusterLister
 }
 
 func Register(cluster *config.UserContext) {
@@ -55,6 +56,8 @@ func Register(cluster *config.UserContext) {
 		nodeLister:       cluster.Core.Nodes("").Controller().Lister(),
 		nodeClient:       cluster.Core.Nodes(""),
 		podLister:        cluster.Core.Pods("").Controller().Lister(),
+		clusterName:      cluster.ClusterName,
+		clusterLister:    cluster.Management.Management.Clusters("").Controller().Lister(),
 	}
 
 	p := &PodsStatsSyncer{
@@ -87,7 +90,7 @@ func (m *NodesSyncer) sync(key string, machine *v3.Node) error {
 
 func (m *NodesSyncer) getNode(machine *v3.Node, nodes []*corev1.Node) (*corev1.Node, error) {
 	for _, n := range nodes {
-		if isNodeForNode(n, machine) {
+		if nodehelper.IsNodeForNode(n, machine) {
 			return n, nil
 		}
 	}
@@ -234,6 +237,14 @@ func (m *NodesSyncer) updateNode(existing *v3.Node, node *corev1.Node, pods map[
 }
 
 func (m *NodesSyncer) createNode(node *corev1.Node, pods map[string][]*corev1.Pod) error {
+	// do not create machine for rke cluster
+	cluster, err := m.clusterLister.Get("", m.clusterName)
+	if err != nil {
+		return err
+	}
+	if cluster.Spec.RancherKubernetesEngineConfig != nil {
+		return nil
+	}
 	// try to get machine from api, in case cache didn't get the update
 	existing, err := m.getNodeForNode(node, false)
 	if err != nil {
@@ -267,7 +278,7 @@ func (m *NodesSyncer) getNodeForNode(node *corev1.Node, cache bool) (*v3.Node, e
 			return nil, err
 		}
 		for _, machine := range machines {
-			if isNodeForNode(node, machine) {
+			if nodehelper.IsNodeForNode(node, machine) {
 				return machine, nil
 			}
 		}
@@ -278,7 +289,7 @@ func (m *NodesSyncer) getNodeForNode(node *corev1.Node, cache bool) (*v3.Node, e
 		}
 		for _, machine := range machines.Items {
 			if machine.Namespace == m.clusterNamespace {
-				if isNodeForNode(node, &machine) {
+				if nodehelper.IsNodeForNode(node, &machine) {
 					return &machine, nil
 				}
 			}
@@ -286,29 +297,6 @@ func (m *NodesSyncer) getNodeForNode(node *corev1.Node, cache bool) (*v3.Node, e
 	}
 
 	return nil, nil
-}
-
-func isNodeForNode(node *corev1.Node, machine *v3.Node) bool {
-	nodeName := nodehelper.GetNodeName(machine)
-	if nodeName == node.Name {
-		return true
-	}
-	// search by rke external-ip annotations
-	address := ""
-	if machine.Status.NodeConfig != nil {
-		address = machine.Status.NodeConfig.Address
-	}
-
-	if address == "" {
-		return false
-	}
-
-	nodeExternalIP := node.Annotations[externalIPAnnotation]
-	if address == nodeExternalIP {
-		return true
-	}
-
-	return false
 }
 
 func resetConditions(machine *v3.Node) *v3.Node {
@@ -375,6 +363,22 @@ func (m *NodesSyncer) convertNodeToNode(node *corev1.Node, existing *v3.Node, po
 	}
 	for name, quantity := range limits {
 		machine.Status.Limits[name] = quantity
+	}
+	if node.Labels != nil {
+		if _, ok := node.Labels["node-role.kubernetes.io/etcd"]; ok {
+			machine.Spec.Etcd = true
+		}
+		if _, ok := node.Labels["node-role.kubernetes.io/controlplane"]; ok {
+			machine.Spec.ControlPlane = true
+		}
+
+		if _, ok := node.Labels["node-role.kubernetes.io/master"]; ok {
+			machine.Spec.ControlPlane = true
+		}
+
+		if _, ok := node.Labels["node-role.kubernetes.io/worker"]; ok {
+			machine.Spec.Worker = true
+		}
 	}
 
 	machine.Status.NodeAnnotations = node.Annotations

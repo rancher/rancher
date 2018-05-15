@@ -11,23 +11,24 @@ import (
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
-	hutils "github.com/rancher/rancher/pkg/controllers/user/helm/utils"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/compose"
 	"github.com/rancher/types/config"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	"github.com/rancher/types/user"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
 	composeTokenPrefix = "compose-token-"
+	description        = "token for compose"
 	url                = "https://localhost:%v/v3"
 )
 
 type Lifecycle struct {
 	HTTPSPortGetter common.KubeConfigGetter
+	UserManager     user.Manager
 	TokenClient     v3.TokenInterface
 	UserClient      v3.UserInterface
 	ComposeClient   projectv3.NamespaceComposeConfigInterface
@@ -40,6 +41,7 @@ func Register(user *config.UserContext, portGetter common.KubeConfigGetter) {
 	userClient := user.Management.Management.Users("")
 	l := Lifecycle{
 		HTTPSPortGetter: portGetter,
+		UserManager:     user.Management.UserManager,
 		TokenClient:     tokenClient,
 		UserClient:      userClient,
 		ComposeClient:   composeClient,
@@ -72,16 +74,9 @@ func (l Lifecycle) Create(obj *projectv3.NamespaceComposeConfig) (*projectv3.Nam
 	if err != nil {
 		return obj, err
 	}
-	token := ""
-	if t, err := l.TokenClient.Get(composeTokenPrefix+user.Name, metav1.GetOptions{}); err != nil && !kerrors.IsNotFound(err) {
+	token, err := l.UserManager.EnsureToken(composeTokenPrefix+user.Name, description, user.Name)
+	if err != nil {
 		return obj, err
-	} else if kerrors.IsNotFound(err) {
-		token, err = hutils.GenerateToken(user, composeTokenPrefix, l.TokenClient)
-		if err != nil {
-			return obj, err
-		}
-	} else {
-		token = t.Name + ":" + t.Token
 	}
 	var dataMap interface{}
 	if err := Unmarshal([]byte(obj.Spec.RancherCompose), &dataMap); err != nil {

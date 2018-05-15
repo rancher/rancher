@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"io/ioutil"
 
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -44,6 +45,17 @@ func ReadTLSConfig(config *Config) error {
 	if len(config.ACMEDomains) > 0 {
 		lc.Mode = "acme"
 		lc.Domains = config.ACMEDomains
+	}
+
+	valid := false
+	if lc.Key != "" && lc.Cert != "" {
+		valid = true
+	} else if lc.Key == "" && lc.Cert == "" {
+		valid = true
+	}
+
+	if !valid {
+		return fmt.Errorf("invalid SSL configuration found, please set cert/key, cert/key/cacerts, cacerts only, or none")
 	}
 
 	config.ListenConfig = lc

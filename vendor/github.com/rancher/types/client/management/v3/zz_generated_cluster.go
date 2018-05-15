@@ -98,7 +98,9 @@ type ClusterOperations interface {
 	ByID(id string) (*Cluster, error)
 	Delete(container *Cluster) error
 
-	ActionGenerateKubeconfig(*Cluster) (*GenerateKubeConfigOutput, error)
+	ActionGenerateKubeconfig(resource *Cluster) (*GenerateKubeConfigOutput, error)
+
+	ActionImportYaml(resource *Cluster, input *ImportClusterYamlInput) (*ImportYamlOutput, error)
 }
 
 func newClusterClient(apiClient *Client) *ClusterClient {
@@ -147,10 +149,13 @@ func (c *ClusterClient) Delete(container *Cluster) error {
 }
 
 func (c *ClusterClient) ActionGenerateKubeconfig(resource *Cluster) (*GenerateKubeConfigOutput, error) {
-
 	resp := &GenerateKubeConfigOutput{}
-
 	err := c.apiClient.Ops.DoAction(ClusterType, "generateKubeconfig", &resource.Resource, nil, resp)
+	return resp, err
+}
 
+func (c *ClusterClient) ActionImportYaml(resource *Cluster, input *ImportClusterYamlInput) (*ImportYamlOutput, error) {
+	resp := &ImportYamlOutput{}
+	err := c.apiClient.Ops.DoAction(ClusterType, "importYaml", &resource.Resource, input, resp)
 	return resp, err
 }

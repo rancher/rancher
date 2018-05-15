@@ -2,7 +2,6 @@ package client
 
 const (
 	TemplateSpecType                          = "templateSpec"
-	TemplateSpecFieldBase                     = "templateBase"
 	TemplateSpecFieldCatalogID                = "catalogId"
 	TemplateSpecFieldCategories               = "categories"
 	TemplateSpecFieldCategory                 = "category"
@@ -13,8 +12,6 @@ const (
 	TemplateSpecFieldFolderName               = "folderName"
 	TemplateSpecFieldIcon                     = "icon"
 	TemplateSpecFieldIconFilename             = "iconFilename"
-	TemplateSpecFieldIsSystem                 = "isSystem"
-	TemplateSpecFieldLicense                  = "license"
 	TemplateSpecFieldMaintainer               = "maintainer"
 	TemplateSpecFieldPath                     = "path"
 	TemplateSpecFieldProjectURL               = "projectURL"
@@ -24,7 +21,6 @@ const (
 )
 
 type TemplateSpec struct {
-	Base                     string                `json:"templateBase,omitempty" yaml:"templateBase,omitempty"`
 	CatalogID                string                `json:"catalogId,omitempty" yaml:"catalogId,omitempty"`
 	Categories               []string              `json:"categories,omitempty" yaml:"categories,omitempty"`
 	Category                 string                `json:"category,omitempty" yaml:"category,omitempty"`
@@ -35,8 +31,6 @@ type TemplateSpec struct {
 	FolderName               string                `json:"folderName,omitempty" yaml:"folderName,omitempty"`
 	Icon                     string                `json:"icon,omitempty" yaml:"icon,omitempty"`
 	IconFilename             string                `json:"iconFilename,omitempty" yaml:"iconFilename,omitempty"`
-	IsSystem                 string                `json:"isSystem,omitempty" yaml:"isSystem,omitempty"`
-	License                  string                `json:"license,omitempty" yaml:"license,omitempty"`
 	Maintainer               string                `json:"maintainer,omitempty" yaml:"maintainer,omitempty"`
 	Path                     string                `json:"path,omitempty" yaml:"path,omitempty"`
 	ProjectURL               string                `json:"projectURL,omitempty" yaml:"projectURL,omitempty"`

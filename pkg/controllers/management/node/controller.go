@@ -28,6 +28,7 @@ import (
 
 const (
 	defaultEngineInstallURL = "https://releases.rancher.com/install-docker/17.03.2.sh"
+	amazonec2               = "amazonec2"
 )
 
 func Register(management *config.ManagementContext) {
@@ -65,7 +66,7 @@ type Lifecycle struct {
 
 func (m *Lifecycle) setupCustom(obj *v3.Node) {
 	obj.Status.NodeConfig = &v3.RKEConfigNode{
-		NodeName:         obj.Spec.ClusterName + ":" + obj.Name,
+		NodeName:         obj.Namespace + ":" + obj.Name,
 		HostnameOverride: obj.Spec.RequestedHostname,
 		Address:          obj.Spec.CustomConfig.Address,
 		InternalAddress:  obj.Spec.CustomConfig.InternalAddress,
@@ -136,6 +137,9 @@ func (m *Lifecycle) Create(obj *v3.Node) (*v3.Node, error) {
 		rawConfig, ok := values.GetValue(rawTemplate.(*unstructured.Unstructured).Object, template.Spec.Driver+"Config")
 		if !ok {
 			return obj, fmt.Errorf("node config not specified")
+		}
+		if template.Spec.Driver == amazonec2 {
+			setEc2ClusterIDTag(rawConfig, obj.Namespace)
 		}
 
 		bytes, err := json.Marshal(rawConfig)
@@ -363,7 +367,7 @@ func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, ob
 	}
 
 	obj.Status.NodeConfig = &v3.RKEConfigNode{
-		NodeName:         obj.Spec.ClusterName + ":" + obj.Name,
+		NodeName:         obj.Namespace + ":" + obj.Name,
 		Address:          ip,
 		InternalAddress:  interalAddress,
 		User:             sshUser,
@@ -392,7 +396,7 @@ func (m *Lifecycle) isNodeInAppliedSpec(node *v3.Node) (bool, error) {
 		return false, nil
 	}
 
-	cluster, err := m.clusterLister.Get("", node.Spec.ClusterName)
+	cluster, err := m.clusterLister.Get("", node.Namespace)
 	if err != nil {
 		if kerror.IsNotFound(err) {
 			return false, nil

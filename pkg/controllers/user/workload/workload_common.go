@@ -25,21 +25,21 @@ import (
 )
 
 const (
-	AppVersion                = "apps/v1beta2"
-	BatchBetaVersion          = "batch/v1beta1"
-	BatchVersion              = "batch/v1"
-	WorkloadAnnotation        = "field.cattle.io/targetWorkloadIds"
-	PortsAnnotation           = "field.cattle.io/ports"
-	ClusterIPServiceType      = "ClusterIP"
-	AllWorkloads              = "_all_workloads_"
-	DeploymentType            = "deployment"
-	ReplicationControllerType = "replicationcontroller"
-	ReplicaSetType            = "replicaset"
-	DaemonSetType             = "daemonset"
-	StatefulSetType           = "statefulset"
-	JobType                   = "job"
-	CronJobType               = "cronjob"
-	WorkloadAnnotatioNoop     = "targetWorkloadIdNoop"
+	AppVersion                         = "apps/v1beta2"
+	BatchBetaVersion                   = "batch/v1beta1"
+	BatchVersion                       = "batch/v1"
+	WorkloadAnnotation                 = "field.cattle.io/targetWorkloadIds"
+	PortsAnnotation                    = "field.cattle.io/ports"
+	ClusterIPServiceType               = "ClusterIP"
+	DeploymentType                     = "deployment"
+	ReplicationControllerType          = "replicationcontroller"
+	ReplicaSetType                     = "replicaset"
+	DaemonSetType                      = "daemonset"
+	StatefulSetType                    = "statefulset"
+	JobType                            = "job"
+	CronJobType                        = "cronjob"
+	WorkloadAnnotatioNoop              = "workload.cattle.io/targetWorkloadIdNoop"
+	WorkloaAnnotationdPortBasedService = "workload.cattle.io/workloadPortBased"
 )
 
 var WorkloadKinds = map[string]bool{
@@ -286,7 +286,7 @@ func (c CommonController) GetByWorkloadID(key string) (*Workload, error) {
 func getWorkload(namespace string, name string, kind string, apiVersion string, UUID types.UID, selectorLabels *metav1.LabelSelector,
 	annotations map[string]string, podTemplateSpec *corev1.PodTemplateSpec, ownerRefs []metav1.OwnerReference, labels map[string]string,
 	replicas, availableReplicas int32) *Workload {
-	return &Workload{
+	w := &Workload{
 		Name:            name,
 		Namespace:       namespace,
 		SelectorLabels:  getSelectorLables(selectorLabels),
@@ -297,12 +297,13 @@ func getWorkload(namespace string, name string, kind string, apiVersion string, 
 		Kind:            kind,
 		APIVersion:      apiVersion,
 		Labels:          labels,
-		Key:             fmt.Sprintf("%s/%s", namespace, name),
+		Key:             fmt.Sprintf("%s:%s:%s", kind, namespace, name),
 		Status: &Status{
 			Replicas:          replicas,
 			AvailableReplicas: availableReplicas,
 		},
 	}
+	return w
 }
 
 func (c CommonController) GetAllWorkloads(namespace string) ([]*Workload, error) {
@@ -470,7 +471,7 @@ type ContainerPort struct {
 	ContainerPort int32  `json:"containerPort,omitempty"`
 }
 
-func generateServiceFromContainers(workload *Workload) *Service {
+func generateClusterIPServiceFromContainers(workload *Workload) *Service {
 	var servicePorts []corev1.ServicePort
 	for _, c := range workload.TemplateSpec.Spec.Containers {
 		for _, p := range c.Ports {
@@ -583,10 +584,6 @@ func generateServicesFromPortsAnnotation(workload *Workload) ([]Service, error) 
 	}
 
 	return services, nil
-}
-
-func (wk Workload) getKey() string {
-	return fmt.Sprintf("%s:%s:%s", wk.Kind, wk.Namespace, wk.Name)
 }
 
 func getWorkloadID(objectType string, namespace string, name string) string {

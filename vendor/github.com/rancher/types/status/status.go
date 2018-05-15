@@ -47,6 +47,7 @@ var transitioningMap = map[string]string{
 	"Pending":                     "pending",
 	"PodScheduled":                "scheduling",
 	"Provisioned":                 "provisioning",
+	"Refreshed":                   "refreshed",
 	"Registered":                  "registering",
 	"Removed":                     "removing",
 	"Saved":                       "saving",
@@ -102,6 +103,22 @@ func concat(str, next string) string {
 }
 
 func Set(data map[string]interface{}) {
+	genericStatus(data)
+	loadBalancerSetatus(data)
+}
+
+func loadBalancerSetatus(data map[string]interface{}) {
+	if data["state"] == "active" && data["kind"] == "Service" && values.GetValueN(data, "spec", "serviceKind") == "LoadBalancer" {
+		addresses, ok := values.GetSlice(data, "status", "loadBalancer", "ingress")
+		if !ok || len(addresses) == 0 {
+			data["state"] = "pending"
+			data["transitioning"] = "yes"
+			data["transitioningMessage"] = "Load Balancer is being provisioned"
+		}
+	}
+}
+
+func genericStatus(data map[string]interface{}) {
 	if data == nil {
 		return
 	}
@@ -209,10 +226,13 @@ func Set(data map[string]interface{}) {
 		}
 	}
 
-	if state == "" {
-		val, ok := values.GetValueN(data, "status", "phase").(string)
-		if val != "" && ok {
-			state = val
+	phase, ok := values.GetValueN(data, "status", "phase").(string)
+	if phase != "" && ok {
+		if phase == "Succeeded" {
+			state = "succeeded"
+			transitioning = false
+		} else if state == "" {
+			state = phase
 		}
 	}
 
@@ -243,7 +263,7 @@ func Set(data map[string]interface{}) {
 	data["state"] = strings.ToLower(state)
 	data["transitioningMessage"] = message
 
-	val, ok := values.GetValue(data, "metadata", "removed")
+	val, ok = values.GetValue(data, "metadata", "removed")
 	if ok && val != "" && val != nil {
 		data["state"] = "removing"
 		data["transitioning"] = "yes"

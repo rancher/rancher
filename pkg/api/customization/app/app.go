@@ -1,132 +1,117 @@
 package app
 
 import (
-	"context"
-	"encoding/base64"
-	"fmt"
-	"io/ioutil"
-	"net/url"
-	"os"
-	"os/exec"
-	"path/filepath"
+	"net/http"
 
-	"bytes"
+	"fmt"
+
+	"reflect"
 
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
-	hutils "github.com/rancher/rancher/pkg/controllers/user/helm/utils"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
-	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	projectschema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
-	"github.com/rancher/types/client/management/v3"
-	managementv3 "github.com/rancher/types/client/management/v3"
 	projectv3 "github.com/rancher/types/client/project/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 )
+
+type Wrapper struct {
+	Clusters              v3.ClusterInterface
+	KubeConfigGetter      common.KubeConfigGetter
+	TemplateContentClient v3.TemplateContentInterface
+	AppGetter             pv3.AppsGetter
+}
 
 const (
-	helmName  = "helm"
-	cacheRoot = "helm-controller"
+	appLabel       = "io.cattle.field/appId"
+	activeState    = "active"
+	deployingState = "deploying"
 )
-
-type ActionWrapper struct {
-	Apps             pv3.AppsGetter
-	Clusters         v3.ClusterInterface
-	KubeConfigGetter common.KubeConfigGetter
-}
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(apiContext, "upgrade")
 	resource.AddAction(apiContext, "rollback")
+	resource.Links["revision"] = apiContext.URLBuilder.Link("revision", resource)
+	if _, ok := resource.Values["status"]; ok {
+		if status, ok := resource.Values["status"].(map[string]interface{}); ok {
+			delete(status, "lastAppliedTemplate")
+		}
+	}
+	var workloads []projectv3.Workload
+	if err := access.List(apiContext, &projectschema.Version, projectv3.WorkloadType, &types.QueryOptions{}, &workloads); err == nil {
+		for _, w := range workloads {
+			_, appID := ref.Parse(resource.ID)
+			if w.WorkloadLabels[appLabel] == appID && w.State != activeState {
+				resource.Values["state"] = deployingState
+				resource.Values["transitioning"] = "yes"
+				transitionMsg := convert.ToString(resource.Values["transitioningMessage"])
+				if transitionMsg != "" {
+					transitionMsg += "; "
+				}
+				resource.Values["transitioningMessage"] = transitionMsg + fmt.Sprintf("Workload %s: %s", w.Name, w.TransitioningMessage)
+			}
+		}
+	}
 }
 
-func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
+func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
 	var app projectv3.App
 	if err := access.ByID(apiContext, &projectschema.Version, projectv3.AppType, apiContext.ID, &app); err != nil {
 		return err
 	}
-	clusterID, projectID := ref.Parse(app.ProjectId)
-	appObj, err := a.Apps.Apps(projectID).Get(app.ID, metav1.GetOptions{})
+	actionInput, err := parse.ReadBody(apiContext.Request)
 	if err != nil {
 		return err
 	}
-	tokenAuthValue := tokens.GetTokenAuthFromRequest(apiContext.Request)
-	data := a.KubeConfigGetter.KubeConfig(clusterID, tokenAuthValue)
-	for k := range data.Clusters {
-		data.Clusters[k].InsecureSkipTLSVerify = true
-	}
-	rootDir, err := ioutil.TempDir("", "helm-")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(rootDir)
-	kubeConfigPath := filepath.Join(rootDir, ".kubeconfig")
-	if err := clientcmd.WriteToFile(*data, kubeConfigPath); err != nil {
-		return err
-	}
-	store := apiContext.Schema.Store
 	switch actionName {
 	case "upgrade":
-		cont, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		addr := hutils.GenerateRandomPort()
-		probeAddr := hutils.GenerateRandomPort()
-		go hutils.StartTiller(cont, addr, probeAddr, app.InstallNamespace, kubeConfigPath)
-		actionInput, err := parse.ReadBody(apiContext.Request)
-		if err != nil {
-			return err
-		}
 		externalID := actionInput["externalId"]
-		// find the templates, upgrade first and then update app obj
-		templateVersionID, err := hutils.ParseExternalID(convert.ToString(externalID))
+		answers := actionInput["answers"]
+		_, namespace := ref.Parse(app.ProjectId)
+		obj, err := w.AppGetter.Apps(namespace).Get(app.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
-		var templateVersion managementv3.TemplateVersion
-		if err := access.ByID(apiContext, &managementschema.Version, managementv3.TemplateVersionType, templateVersionID, &templateVersion); err != nil {
+		if answers != nil {
+			m, ok := answers.(map[string]interface{})
+			if ok {
+				if obj.Spec.Answers == nil {
+					obj.Spec.Answers = make(map[string]string)
+				}
+				for k, v := range m {
+					obj.Spec.Answers[k] = convert.ToString(v)
+				}
+			}
+		}
+		obj.Spec.ExternalID = convert.ToString(externalID)
+		if _, err := w.AppGetter.Apps(namespace).Update(obj); err != nil {
 			return err
 		}
-		files, err := hutils.ConvertTemplates(templateVersion.Files)
-		if err != nil {
-			return err
-		}
-		tempDir, err := hutils.WriteTempDir(rootDir, files)
-		if err != nil {
-			return err
-		}
-		defer os.RemoveAll(tempDir)
-		if err := upgradeCharts(tempDir, addr, app.Name, appObj); err != nil {
-			return err
-		}
-		_, err = a.Apps.Apps(projectID).Update(appObj)
-		return err
+		return nil
 	case "rollback":
-		cont, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		addr := hutils.GenerateRandomPort()
-		probeAddr := hutils.GenerateRandomPort()
-		go hutils.StartTiller(cont, addr, probeAddr, app.InstallNamespace, kubeConfigPath)
-		actionInput, err := parse.ReadBody(apiContext.Request)
+		revision := actionInput["revisionId"]
+		if convert.ToString(revision) == "" {
+			return fmt.Errorf("revision is empty")
+		}
+		var appRevision projectv3.AppRevision
+		_, projectID := ref.Parse(app.ProjectId)
+		revisionID := fmt.Sprintf("%s:%s", projectID, convert.ToString(revision))
+		if err := access.ByID(apiContext, &projectschema.Version, projectv3.AppRevisionType, revisionID, &appRevision); err != nil {
+			return err
+		}
+		_, namespace := ref.Parse(app.ProjectId)
+		obj, err := w.AppGetter.Apps(namespace).Get(app.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
-		revision := actionInput["revision"]
-		if err := rollbackCharts(addr, app.Name, convert.ToString(revision)); err != nil {
-			return err
-		}
-		data := map[string]interface{}{
-			"name": apiContext.ID,
-		}
-		_, err = store.Update(apiContext, apiContext.Schema, data, apiContext.ID)
-		if err != nil {
+		obj.Spec.Answers = appRevision.Status.Answers
+		obj.Spec.ExternalID = appRevision.Status.ExternalID
+		if _, err := w.AppGetter.Apps(namespace).Update(obj); err != nil {
 			return err
 		}
 		return nil
@@ -134,74 +119,26 @@ func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 	return nil
 }
 
-func upgradeCharts(rootDir, port, releaseName string, obj *pv3.App) error {
-	cmd := exec.Command(helmName, "upgrade", "--namespace", releaseName, releaseName, rootDir)
-	cmd.Env = []string{fmt.Sprintf("%s=%s", "HELM_HOST", "127.0.0.1:"+port)}
-	sbOut := &bytes.Buffer{}
-	sbErr := &bytes.Buffer{}
-	cmd.Stdout = sbOut
-	cmd.Stderr = sbErr
-	if err := cmd.Start(); err != nil {
-		return err
+func (w Wrapper) LinkHandler(apiContext *types.APIContext, next types.RequestHandler) error {
+	switch apiContext.Link {
+	case "revision":
+		var app projectv3.App
+		if err := access.ByID(apiContext, &projectschema.Version, projectv3.AppType, apiContext.ID, &app); err != nil {
+			return err
+		}
+		var appRevisions, filtered []map[string]interface{}
+		if err := access.List(apiContext, &projectschema.Version, projectv3.AppRevisionType, &types.QueryOptions{}, &appRevisions); err != nil {
+			return err
+		}
+		for _, re := range appRevisions {
+			labels := convert.ToMapInterface(re["labels"])
+			if reflect.DeepEqual(labels[appLabel], app.Name) {
+				filtered = append(filtered, re)
+			}
+		}
+		apiContext.Type = projectv3.AppRevisionType
+		apiContext.WriteResponse(http.StatusOK, filtered)
+		return nil
 	}
-	if err := cmd.Wait(); err != nil {
-		return err
-	}
-	if obj.Status.StdOutput == nil {
-		obj.Status.StdOutput = []string{}
-	}
-	if obj.Status.StdError == nil {
-		obj.Status.StdError = []string{}
-	}
-	obj.Status.StdOutput = append(obj.Status.StdOutput, sbOut.String())
-	obj.Status.StdError = append(obj.Status.StdError, sbErr.String())
 	return nil
-}
-
-func rollbackCharts(port, releaseName, revision string) error {
-	cmd := exec.Command(helmName, "rollback", releaseName, revision)
-	cmd.Env = []string{fmt.Sprintf("%s=%s", "HELM_HOST", "127.0.0.1:"+port)}
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-	return cmd.Wait()
-}
-
-func (a ActionWrapper) toRESTConfig(cluster *client.Cluster) (*rest.Config, error) {
-	cls, err := a.Clusters.Get(cluster.ID, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-	if cls == nil {
-		return nil, nil
-	}
-
-	//if cluster.Internal {
-	//	return a.LocalConfig, nil
-	//}
-
-	if cluster.APIEndpoint == "" || cluster.CACert == "" || cls.Status.ServiceAccountToken == "" {
-		return nil, nil
-	}
-
-	u, err := url.Parse(cluster.APIEndpoint)
-	if err != nil {
-		return nil, err
-	}
-
-	data, err := base64.StdEncoding.DecodeString(cluster.CACert)
-	if err != nil {
-		return nil, err
-	}
-
-	return &rest.Config{
-		Host:        u.Host,
-		Prefix:      u.Path,
-		BearerToken: cls.Status.ServiceAccountToken,
-		TLSClientConfig: rest.TLSClientConfig{
-			CAData: data,
-		},
-	}, nil
 }

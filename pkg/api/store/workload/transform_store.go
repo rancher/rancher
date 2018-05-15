@@ -9,10 +9,11 @@ import (
 	"github.com/rancher/norman/types/definition"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/api/store/pod"
+	"github.com/rancher/rancher/pkg/ref"
 	"github.com/sirupsen/logrus"
 )
 
-func New(store types.Store) types.Store {
+func NewTransformStore(store types.Store) types.Store {
 	return &transform.Store{
 		Store: store,
 		Transformer: func(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
@@ -37,7 +38,9 @@ func New(store types.Store) types.Store {
 			nodeName := convert.ToString(values.GetValueN(data, "nodeId"))
 			if nodeName != "" {
 				state := getState(data)
-				data["nodeId"] = state[getKey(nodeName)]
+				_, nodeName := ref.Parse(state[getKey(nodeName)])
+				data["nodeId"] = nodeName
+				values.PutValue(data, nodeName, "scheduling", "node", "nodeId")
 			}
 			return data, nil
 		},

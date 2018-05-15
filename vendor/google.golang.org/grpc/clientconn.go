@@ -1119,8 +1119,8 @@ func (ac *addrConn) createTransport(connectRetryNum, ridx int, backoffDeadline, 
 		}
 		done := make(chan struct{})
 		onPrefaceReceipt := func() {
-			close(done)
 			ac.mu.Lock()
+			close(done)
 			if !ac.backoffDeadline.IsZero() {
 				// If we haven't already started reconnecting to
 				// other backends.
@@ -1185,10 +1185,16 @@ func (ac *addrConn) createTransport(connectRetryNum, ridx int, backoffDeadline, 
 			close(ac.ready)
 			ac.ready = nil
 		}
-		ac.connectRetryNum = connectRetryNum
-		ac.backoffDeadline = backoffDeadline
-		ac.connectDeadline = connectDeadline
-		ac.reconnectIdx = i + 1 // Start reconnecting from the next backend in the list.
+		select {
+		case <-done:
+			// If the server has responded back with preface already,
+			// don't set the reconnect parameters.
+		default:
+			ac.connectRetryNum = connectRetryNum
+			ac.backoffDeadline = backoffDeadline
+			ac.connectDeadline = connectDeadline
+			ac.reconnectIdx = i + 1 // Start reconnecting from the next backend in the list.
+		}
 		ac.mu.Unlock()
 		return true, nil
 	}

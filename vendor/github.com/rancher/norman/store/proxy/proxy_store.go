@@ -1,15 +1,19 @@
 package proxy
 
 import (
+	"context"
 	ejson "encoding/json"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rancher/norman/httperror"
+	"github.com/rancher/norman/pkg/broadcast"
 	"github.com/rancher/norman/restwatch"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/norman/types/convert/merge"
 	"github.com/rancher/norman/types/values"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -82,6 +86,8 @@ func (s *simpleClientGetter) APIExtClient(apiContext *types.APIContext, context 
 }
 
 type Store struct {
+	sync.Mutex
+
 	clientGetter   ClientGetter
 	storageContext types.StorageContext
 	prefix         []string
@@ -90,9 +96,11 @@ type Store struct {
 	kind           string
 	resourcePlural string
 	authContext    map[string]string
+	close          context.Context
+	broadcasters   map[rest.Interface]*broadcast.Broadcaster
 }
 
-func NewProxyStore(clientGetter ClientGetter, storageContext types.StorageContext,
+func NewProxyStore(ctx context.Context, clientGetter ClientGetter, storageContext types.StorageContext,
 	prefix []string, group, version, kind, resourcePlural string) types.Store {
 	return &errorStore{
 		Store: &Store{
@@ -107,6 +115,8 @@ func NewProxyStore(clientGetter ClientGetter, storageContext types.StorageContex
 				"apiGroup": group,
 				"resource": resourcePlural,
 			},
+			close:        ctx,
+			broadcasters: map[rest.Interface]*broadcast.Broadcaster{},
 		},
 	}
 }
@@ -194,6 +204,17 @@ func (p *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *ty
 }
 
 func (p *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
+	c, err := p.shareWatch(apiContext, schema, opt)
+	if err != nil {
+		return nil, err
+	}
+
+	return convert.Chan(c, func(data map[string]interface{}) map[string]interface{} {
+		return apiContext.AccessControl.Filter(apiContext, schema, data, p.authContext)
+	}), nil
+}
+
+func (p *Store) realWatch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
 	namespace := getNamespace(apiContext, opt)
 
 	k8sClient, err := p.k8sClient(apiContext)
@@ -236,7 +257,7 @@ func (p *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt *t
 			if event.Type == watch.Deleted && data.Object != nil {
 				data.Object[".removed"] = true
 			}
-			result <- apiContext.AccessControl.Filter(apiContext, schema, data.Object, p.authContext)
+			result <- data.Object
 		}
 		logrus.Debugf("closing watcher for %s", schema.ID)
 		close(result)
@@ -326,7 +347,7 @@ func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	}
 
 	p.toInternal(schema.Mapper, data)
-	existing = convert.APIUpdateMerge(existing, data, apiContext.Query.Get("_replace") == "true")
+	existing = merge.APIUpdateMerge(schema.InternalSchema, apiContext.Schemas, existing, data, apiContext.Query.Get("_replace") == "true")
 
 	values.PutValue(existing, resourceVersion, "metadata", "resourceVersion")
 	values.PutValue(existing, namespace, "metadata", "namespace")

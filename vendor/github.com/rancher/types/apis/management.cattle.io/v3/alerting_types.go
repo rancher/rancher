@@ -82,7 +82,7 @@ type TargetPod struct {
 
 type TargetEvent struct {
 	EventType    string `json:"eventType,omitempty" norman:"required,options=Normal|Warning,default=Warning"`
-	ResourceKind string `json:"resourceKind,omitempty" norman:"required,options=Pod|Node|Deployment|Statefulset|Daemonset"`
+	ResourceKind string `json:"resourceKind,omitempty" norman:"required,options=Pod|Node|Deployment|StatefulSet|DaemonSet"`
 }
 
 type TargetWorkload struct {
@@ -134,9 +134,10 @@ type Notification struct {
 
 type SMTPConfig struct {
 	Host             string `json:"host,omitempty" norman:"required,type=dnsLabel"`
-	Port             int    `json:"port,omitempty" norman:"required,min=1,max=65535,default=465"`
-	Username         string `json:"username,omitempty" norman:"required"`
-	Password         string `json:"password,omitempty" norman:"required"`
+	Port             int    `json:"port,omitempty" norman:"required,min=1,max=65535,default=587"`
+	Username         string `json:"username,omitempty"`
+	Password         string `json:"password,omitempty"`
+	Sender           string `json:"sender,omitempty" norman:"required"`
 	DefaultRecipient string `json:"defaultRecipient,omitempty" norman:"required"`
 	TLS              bool   `json:"tls,omitempty" norman:"required,default=true"`
 }

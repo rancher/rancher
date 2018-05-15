@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/kubectl"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
@@ -15,6 +17,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -24,6 +27,7 @@ func Register(management *config.ManagementContext, clusterManager *clustermanag
 		systemAccountManager: systemaccount.NewManager(management),
 		userManager:          management.UserManager,
 		clusters:             management.Management.Clusters(""),
+		nodeLister:           management.Management.Nodes("").Controller().Lister(),
 		clusterManager:       clusterManager,
 	}
 
@@ -35,6 +39,7 @@ type clusterDeploy struct {
 	userManager          user.Manager
 	clusters             v3.ClusterInterface
 	clusterManager       *clustermanager.Manager
+	nodeLister           v3.NodeLister
 }
 
 func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) error {
@@ -65,11 +70,15 @@ func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
 		return nil
 	}
 
-	if cluster.Spec.Internal && cluster.Status.Driver == v3.ClusterDriverImported {
+	nodes, err := cd.nodeLister.List(cluster.Name, labels.Everything())
+	if err != nil {
+		return err
+	}
+	if len(nodes) == 0 {
 		return nil
 	}
 
-	_, err := v3.ClusterConditionSystemAccountCreated.DoUntilTrue(cluster, func() (runtime.Object, error) {
+	_, err = v3.ClusterConditionSystemAccountCreated.DoUntilTrue(cluster, func() (runtime.Object, error) {
 		return cluster, cd.systemAccountManager.CreateSystemAccount(cluster)
 	})
 	if err != nil {
@@ -82,7 +91,7 @@ func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
 func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	desired := cluster.Spec.DesiredAgentImage
 	if desired == "" || desired == "fixed" {
-		desired = settings.AgentImage.Get()
+		desired = image.Resolve(settings.AgentImage.Get())
 	}
 
 	if cluster.Status.AgentImage == desired {
@@ -100,7 +109,16 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 			return cluster, err
 		}
 
-		output, err := kubectl.Apply(yaml, kubeConfig)
+		var output []byte
+		for i := 0; i < 3; i++ {
+			// This will fail almost always the first time because when we create the namespace in the file
+			// it won't have privileges.  Just stupidly try 3 times
+			output, err = kubectl.Apply(yaml, kubeConfig)
+			if err == nil {
+				break
+			}
+			time.Sleep(2 * time.Second)
+		}
 		if err != nil {
 			return cluster, types.NewErrors(err, errors.New(string(output)))
 		}

@@ -180,7 +180,7 @@ func (h *ClusterPipelineHandler) authapp(apiContext *types.APIContext) error {
 		return err
 	}
 
-	go refreshReposByCredential(h.SourceCodeRepositories, h.SourceCodeRepositoryLister, sourceCodeCredential)
+	go refreshReposByCredential(h.SourceCodeRepositories, h.SourceCodeRepositoryLister, sourceCodeCredential, clusterPipeline)
 
 	apiContext.WriteResponse(http.StatusOK, data)
 	return nil
@@ -225,7 +225,7 @@ func (h *ClusterPipelineHandler) authuser(apiContext *types.APIContext) error {
 		return err
 	}
 
-	go refreshReposByCredential(h.SourceCodeRepositories, h.SourceCodeRepositoryLister, account)
+	go refreshReposByCredential(h.SourceCodeRepositories, h.SourceCodeRepositoryLister, account, clusterPipeline)
 
 	apiContext.WriteResponse(http.StatusOK, data)
 	return nil

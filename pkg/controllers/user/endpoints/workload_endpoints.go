@@ -26,12 +26,13 @@ type WorkloadEndpointsController struct {
 	podLister          v1.PodLister
 	WorkloadController workloadutil.CommonController
 	machinesLister     managementv3.NodeLister
+	nodeLister         v1.NodeLister
 	clusterName        string
 	isRKE              bool
 }
 
 func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadutil.Workload) error {
-	if obj == nil && key != workloadutil.AllWorkloads {
+	if obj == nil && key != allEndpoints {
 		return nil
 	}
 	// do not update endpoints for job, cronJob and for workload owned by controller (ReplicaSet)
@@ -48,7 +49,7 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 	var services []*corev1.Service
 	var ingresses []*extensionsv1beta1.Ingress
 	var err error
-	if strings.HasSuffix(key, workloadutil.AllWorkloads) {
+	if strings.HasSuffix(key, allEndpoints) {
 		namespace := ""
 		if !strings.EqualFold(key, allEndpoints) {
 			namespace = strings.TrimSuffix(key, fmt.Sprintf("/%s", allEndpoints))
@@ -74,20 +75,21 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 	if err != nil {
 		return err
 	}
-	nodeNameToMachine, err := getNodeNameToMachine(c.clusterName, c.machinesLister)
+
+	nodeNameToMachine, err := getNodeNameToMachine(c.clusterName, c.machinesLister, c.nodeLister)
+	if err != nil {
+		return err
+	}
+	allNodesIP, err := getAllNodesPublicEndpointIP(c.machinesLister, c.clusterName)
 	if err != nil {
 		return err
 	}
 	// get ingress endpoint group by service
 	serviceToIngressEndpoints := make(map[string][]v3.PublicEndpoint)
 	for _, ingress := range ingresses {
-		epsMap, err := convertIngressToServicePublicEndpointsMap(ingress, c.isRKE)
-		if err != nil {
-			return err
-		}
+		epsMap := convertIngressToServicePublicEndpointsMap(ingress, c.isRKE, allNodesIP)
 		for k, v := range epsMap {
-			eps := serviceToIngressEndpoints[k]
-			serviceToIngressEndpoints[k] = append(eps, v...)
+			serviceToIngressEndpoints[k] = append(serviceToIngressEndpoints[k], v...)
 		}
 	}
 
@@ -101,7 +103,7 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 			}
 			selector := labels.SelectorFromSet(set)
 			found := false
-			if selector.Matches(labels.Set(w.Labels)) {
+			if selector.Matches(labels.Set(w.SelectorLabels)) && !selector.Empty() {
 				// direct selector match
 				found = true
 			} else {
@@ -130,7 +132,7 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 				}
 			}
 			if found {
-				eps, err := convertServiceToPublicEndpoints(svc, "", nil)
+				eps, err := convertServiceToPublicEndpoints(svc, "", nil, allNodesIP)
 				if err != nil {
 					return err
 				}

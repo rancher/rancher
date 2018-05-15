@@ -143,7 +143,6 @@ func (m *Lifecycle) Updated(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 
 	v3.NodeDriverConditionActive.True(obj)
 	v3.NodeDriverConditionInactive.True(obj)
-	v3.NodeDriverConditionDownloaded.True(obj)
 
 	return obj, nil
 }

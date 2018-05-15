@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/utils"
+	images "github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
@@ -103,7 +104,7 @@ func convertPipelineExecution(execution *v3.PipelineExecution) string {
 			image := ""
 			options := ""
 			if step.SourceCodeConfig != nil {
-				image = v3.ToolsSystemImages.PipelineSystemImages.AlpineGit
+				image = images.Resolve(v3.ToolsSystemImages.PipelineSystemImages.AlpineGit)
 			} else if step.RunScriptConfig != nil {
 				image = step.RunScriptConfig.Image
 
@@ -119,7 +120,7 @@ func convertPipelineExecution(execution *v3.PipelineExecution) string {
 					//the `plugins/docker` image fails when setting DOCKER_REGISTRY to index.docker.io
 					registry = ""
 				}
-				image = v3.ToolsSystemImages.PipelineSystemImages.PluginsDocker
+				image = images.Resolve(v3.ToolsSystemImages.PipelineSystemImages.PluginsDocker)
 				publishoption := `, privileged: true, envVars: [
 			envVar(key: 'PLUGIN_REPO', value: '%s'),
 			envVar(key: 'PLUGIN_TAG', value: '%s'),
@@ -139,7 +140,7 @@ func convertPipelineExecution(execution *v3.PipelineExecution) string {
 		}
 	}
 
-	return fmt.Sprintf(pipelineBlock, containerbuffer.String(), v3.ToolsSystemImages.PipelineSystemImages.JenkinsJnlp, pipelinebuffer.String())
+	return fmt.Sprintf(pipelineBlock, containerbuffer.String(), images.Resolve(v3.ToolsSystemImages.PipelineSystemImages.JenkinsJnlp), pipelinebuffer.String())
 }
 
 func getPreservedEnvVarOptions(execution *v3.PipelineExecution) string {
@@ -177,6 +178,11 @@ func getEnvVarMap(execution *v3.PipelineExecution) map[string]string {
 	m["CICD_TRIGGER_TYPE"] = execution.Spec.TriggeredBy
 	m["CICD_EXECUTION_ID"] = ref.Ref(execution)
 	m["CICD_EXECUTION_SEQUENCE"] = strconv.Itoa(execution.Spec.Run)
+
+	for k, v := range execution.Status.EnvVars {
+		m[k] = v
+	}
+
 	return m
 }
 
@@ -184,7 +190,7 @@ func parsePreservedEnvVar(execution *v3.PipelineExecution) {
 	m := getEnvVarMap(execution)
 	pipeline := execution.Spec.Pipeline
 
-	//environment variables substituion in configs
+	//environment variables substitution in configs
 	for _, stage := range pipeline.Spec.Stages {
 		for _, step := range stage.Steps {
 			if step.RunScriptConfig != nil {

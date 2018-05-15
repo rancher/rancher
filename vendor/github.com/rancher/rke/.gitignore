@@ -4,4 +4,5 @@
 /dist
 *.swp
 /.trash-cache
+/trash.lock
 kube_config*

@@ -93,7 +93,7 @@ func DoRollingUpdateContainer(ctx context.Context, dClient *client.Client, image
 		return err
 	}
 	logrus.Debugf("[%s] Successfully stopped old container %s on host [%s]", plane, containerName, hostname)
-	_, err = CreateContiner(ctx, dClient, hostname, containerName, imageCfg, hostCfg)
+	_, err = CreateContainer(ctx, dClient, hostname, containerName, imageCfg, hostCfg)
 	if err != nil {
 		return fmt.Errorf("Failed to create [%s] container on host [%s]: %v", containerName, hostname, err)
 	}
@@ -236,7 +236,7 @@ func StartContainer(ctx context.Context, dClient *client.Client, hostname string
 	return nil
 }
 
-func CreateContiner(ctx context.Context, dClient *client.Client, hostname string, containerName string, imageCfg *container.Config, hostCfg *container.HostConfig) (container.ContainerCreateCreatedBody, error) {
+func CreateContainer(ctx context.Context, dClient *client.Client, hostname string, containerName string, imageCfg *container.Config, hostCfg *container.HostConfig) (container.ContainerCreateCreatedBody, error) {
 	created, err := dClient.ContainerCreate(ctx, imageCfg, hostCfg, nil, containerName)
 	if err != nil {
 		return container.ContainerCreateCreatedBody{}, fmt.Errorf("Failed to create [%s] container on host [%s]: %v", containerName, hostname, err)
@@ -253,26 +253,40 @@ func InspectContainer(ctx context.Context, dClient *client.Client, hostname stri
 }
 
 func StopRenameContainer(ctx context.Context, dClient *client.Client, hostname string, oldContainerName string, newContainerName string) error {
+	// make sure we don't have an old old-container from a previous broken update
+	exists, err := IsContainerRunning(ctx, dClient, hostname, newContainerName, true)
+	if err != nil {
+		return err
+	}
+	if exists {
+		if err := RemoveContainer(ctx, dClient, hostname, newContainerName); err != nil {
+			return err
+		}
+	}
 	if err := StopContainer(ctx, dClient, hostname, oldContainerName); err != nil {
 		return err
 	}
-	if err := WaitForContainer(ctx, dClient, hostname, oldContainerName); err != nil {
+	if _, err := WaitForContainer(ctx, dClient, hostname, oldContainerName); err != nil {
 		return nil
 	}
-	err := RenameContainer(ctx, dClient, hostname, oldContainerName, newContainerName)
-	return err
+	return RenameContainer(ctx, dClient, hostname, oldContainerName, newContainerName)
+
 }
 
-func WaitForContainer(ctx context.Context, dClient *client.Client, hostname string, containerName string) error {
+func WaitForContainer(ctx context.Context, dClient *client.Client, hostname string, containerName string) (int64, error) {
+	// We capture the status exit code of the container
 	statusCh, errCh := dClient.ContainerWait(ctx, containerName, container.WaitConditionNotRunning)
 	select {
 	case err := <-errCh:
 		if err != nil {
-			return fmt.Errorf("Error waiting for container [%s] on host [%s]: %v", containerName, hostname, err)
+			// if error is present return 1 exit code
+			return 1, fmt.Errorf("Error waiting for container [%s] on host [%s]: %v", containerName, hostname, err)
 		}
-	case <-statusCh:
+	case status := <-statusCh:
+		// return the status exit code of the container
+		return status.StatusCode, nil
 	}
-	return nil
+	return 0, nil
 }
 
 func IsContainerUpgradable(ctx context.Context, dClient *client.Client, imageCfg *container.Config, containerName string, hostname string, plane string) (bool, error) {
@@ -286,10 +300,10 @@ func IsContainerUpgradable(ctx context.Context, dClient *client.Client, imageCfg
 	if containerInspect.Config.Image != imageCfg.Image ||
 		!sliceEqualsIgnoreOrder(containerInspect.Config.Entrypoint, imageCfg.Entrypoint) ||
 		!sliceEqualsIgnoreOrder(containerInspect.Config.Cmd, imageCfg.Cmd) {
-		logrus.Debugf("[%s] Container [%s] is eligible for updgrade on host [%s]", plane, containerName, hostname)
+		logrus.Debugf("[%s] Container [%s] is eligible for upgrade on host [%s]", plane, containerName, hostname)
 		return true, nil
 	}
-	logrus.Debugf("[%s] Container [%s] is not eligible for updgrade on host [%s]", plane, containerName, hostname)
+	logrus.Debugf("[%s] Container [%s] is not eligible for upgrade on host [%s]", plane, containerName, hostname)
 	return false, nil
 }
 
@@ -333,8 +347,7 @@ func ReadFileFromContainer(ctx context.Context, dClient *client.Client, hostname
 }
 
 func ReadContainerLogs(ctx context.Context, dClient *client.Client, containerName string) (io.ReadCloser, error) {
-	return dClient.ContainerLogs(ctx, containerName, types.ContainerLogsOptions{ShowStdout: true})
-
+	return dClient.ContainerLogs(ctx, containerName, types.ContainerLogsOptions{Follow: true, ShowStdout: true, ShowStderr: true, Timestamps: false})
 }
 
 func tryRegistryAuth(pr v3.PrivateRegistry) types.RequestPrivilegeFunc {

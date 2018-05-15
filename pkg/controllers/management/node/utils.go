@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +32,7 @@ const (
 	errorCreatingNode = "Error creating machine: "
 	nodeDirEnvKey     = "MACHINE_STORAGE_PATH="
 	nodeCmd           = "docker-machine"
+	ec2TagFlag        = "tags"
 )
 
 func buildAgentCommand(node *v3.Node, dockerRun string) []string {
@@ -200,10 +202,10 @@ func nodeExists(nodeDir string, name string) (bool, error) {
 		return false, err
 	}
 
-	err = command.Start()
-	if err != nil {
+	if err = command.Start(); err != nil {
 		return false, err
 	}
+	defer command.Wait()
 
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
@@ -216,8 +218,7 @@ func nodeExists(nodeDir string, name string) (bool, error) {
 		return false, err
 	}
 
-	err = command.Wait()
-	if err != nil {
+	if err := command.Wait(); err != nil {
 		return false, err
 	}
 
@@ -226,13 +227,11 @@ func nodeExists(nodeDir string, name string) (bool, error) {
 
 func deleteNode(nodeDir string, node *v3.Node) error {
 	command := buildCommand(nodeDir, []string{"rm", "-f", node.Spec.RequestedHostname})
-	err := command.Start()
-	if err != nil {
+	if err := command.Start(); err != nil {
 		return err
 	}
 
-	err = command.Wait()
-	if err != nil {
+	if err := command.Wait(); err != nil {
 		return err
 	}
 
@@ -263,5 +262,16 @@ func waitUntilSSHKey(nodeDir string, node *v3.Node) error {
 			continue
 		}
 		return nil
+	}
+}
+
+func setEc2ClusterIDTag(data interface{}, clusterID string) {
+	if m, ok := data.(map[string]interface{}); ok {
+		tagValue := fmt.Sprintf("kubernetes.io/cluster/%s,owned", clusterID)
+		if tags, ok := m[ec2TagFlag]; !ok || convert.ToString(tags) == "" {
+			m[ec2TagFlag] = tagValue
+		} else {
+			m[ec2TagFlag] = convert.ToString(tags) + "," + tagValue
+		}
 	}
 }

@@ -3,9 +3,7 @@ package ingress
 import (
 	"context"
 	"encoding/json"
-
 	"strconv"
-
 	"strings"
 
 	"github.com/rancher/norman/types/convert"
@@ -15,8 +13,8 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -48,6 +46,22 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) error {
 	if state == nil {
 		return nil
 	}
+
+	ingressServices := map[string]*corev1.Service{}
+	services, err := c.serviceLister.List(obj.Namespace, labels.NewSelector())
+	if err != nil {
+		logrus.Error(err)
+		services = []*corev1.Service{}
+	}
+	for _, service := range services {
+		for i, owners := 0, service.GetOwnerReferences(); owners != nil && i < len(owners); i++ {
+			if owners[i].UID == obj.UID {
+				ingressServices[service.Name] = service
+				break
+			}
+		}
+	}
+
 	serviceToPort := make(map[string]string)
 	serviceToKey := make(map[string]string)
 	for _, r := range obj.Spec.Rules {
@@ -55,7 +69,7 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) error {
 		for _, b := range r.HTTP.Paths {
 			path := b.Path
 			port := b.Backend.ServicePort.IntVal
-			key := GetStateKey(host, path, convert.ToString(port))
+			key := GetStateKey(obj.Name, obj.Namespace, host, path, convert.ToString(port))
 			if _, ok := state[key]; ok {
 				serviceToKey[b.Backend.ServiceName] = key
 				serviceToPort[b.Backend.ServiceName] = convert.ToString(port)
@@ -65,7 +79,7 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) error {
 	if obj.Spec.Backend != nil {
 		serviceName := obj.Spec.Backend.ServiceName
 		portStr := convert.ToString(obj.Spec.Backend.ServicePort.IntVal)
-		key := GetStateKey("", "", portStr)
+		key := GetStateKey(obj.Name, obj.Namespace, "", "", portStr)
 		if _, ok := state[key]; ok {
 			serviceToKey[serviceName] = key
 			serviceToPort[serviceName] = portStr
@@ -79,14 +93,11 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) error {
 			return err
 		}
 		workloadIDs := string(b)
-		existing, err := c.serviceLister.Get(obj.Namespace, serviceName)
-		if err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
+		existing := ingressServices[serviceName]
 		if existing == nil {
 			controller := true
 			ownerRef := metav1.OwnerReference{
-				Name:       serviceName,
+				Name:       obj.Name,
 				APIVersion: "v1beta1/extensions",
 				UID:        obj.UID,
 				Kind:       "Ingress",
@@ -114,34 +125,31 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) error {
 					Annotations:     annotations,
 				},
 				Spec: corev1.ServiceSpec{
-					ClusterIP: "None",
-					Type:      "ClusterIP",
-					Ports:     servicePorts,
+					Type:  "NodePort",
+					Ports: servicePorts,
 				},
 			}
-			logrus.Infof("Creating headless service %s for ingress %s, port %s", serviceName, key, portStr)
+			logrus.Infof("Creating NodePort service %s for ingress %s, port %s", serviceName, key, portStr)
 			if _, err := c.services.Create(service); err != nil {
 				return err
 			}
 		} else {
-			ingressManaged := false
-			for _, o := range existing.OwnerReferences {
-				if o.UID == obj.UID {
-					ingressManaged = true
-					break
-				}
+			if existing.Annotations == nil {
+				existing.Annotations = map[string]string{}
 			}
-			if ingressManaged {
-				// TODO - fix so the update is done only when workload ids are changed
+			if existing.Annotations[util.WorkloadAnnotation] != workloadIDs {
 				toUpdate := existing.DeepCopy()
-				if toUpdate.Annotations == nil {
-					toUpdate.Annotations = map[string]string{}
-				}
 				toUpdate.Annotations[util.WorkloadAnnotation] = workloadIDs
 				if _, err := c.services.Update(toUpdate); err != nil {
 					return err
 				}
 			}
+			delete(ingressServices, serviceName)
+		}
+	}
+	for serviceName := range ingressServices {
+		if err := c.services.DeleteNamespaced(obj.Namespace, serviceName, &metav1.DeleteOptions{}); err != nil {
+			return err
 		}
 	}
 

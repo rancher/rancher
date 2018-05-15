@@ -21,10 +21,10 @@ import (
 )
 
 const (
-	userAuthHeader         = "Impersonate-User"
-	userByPrincipalIndex   = "auth.management.cattle.io/userByPrincipal"
-	groupPrincpalCRTBIndex = "auth.management.cattle.io/groupPrincipalCRTB"
-	groupPrincpalPRTBIndex = "auth.management.cattle.io/groupPrincipalPRTB"
+	userAuthHeader        = "Impersonate-User"
+	userByPrincipalIndex  = "auth.management.cattle.io/userByPrincipal"
+	crtbsByPrincipalIndex = "auth.management.cattle.io/crtbByPrincipal"
+	prtbsByPrincipalIndex = "auth.management.cattle.io/prtbByPrincipal"
 )
 
 func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
@@ -38,7 +38,7 @@ func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
 
 	crtbInformer := scaledContext.Management.ClusterRoleTemplateBindings("").Controller().Informer()
 	crtbIndexers := map[string]cache.IndexFunc{
-		groupPrincpalCRTBIndex: groupPrincipalCRTB,
+		crtbsByPrincipalIndex: crtbsByPrincipals,
 	}
 	if err := crtbInformer.AddIndexers(crtbIndexers); err != nil {
 		return nil, err
@@ -46,7 +46,7 @@ func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
 
 	prtbInformer := scaledContext.Management.ProjectRoleTemplateBindings("").Controller().Informer()
 	prtbIndexers := map[string]cache.IndexFunc{
-		groupPrincpalPRTBIndex: groupPrincipalPRTB,
+		prtbsByPrincipalIndex: prtbsByPrincipals,
 	}
 	if err := prtbInformer.AddIndexers(prtbIndexers); err != nil {
 		return nil, err
@@ -84,6 +84,16 @@ func (m *userManager) SetPrincipalOnCurrentUser(apiContext *types.APIContext, pr
 		return nil, err
 	}
 
+	if providerExists(user.PrincipalIDs, principal.Provider) {
+		var principalIDs []string
+		for _, id := range user.PrincipalIDs {
+			if !strings.Contains(id, principal.Provider) {
+				principalIDs = append(principalIDs, id)
+			}
+		}
+		user.PrincipalIDs = principalIDs
+	}
+
 	if !slice.ContainsString(user.PrincipalIDs, principal.Name) {
 		user.PrincipalIDs = append(user.PrincipalIDs, principal.Name)
 		return m.users.Update(user)
@@ -97,46 +107,46 @@ func (m *userManager) GetUser(apiContext *types.APIContext) string {
 
 // checkis if the supplied principal can login based on the accessMode and allowed principals
 func (m *userManager) CheckAccess(accessMode string, allowedPrincipalIDs []string, userPrinc v3.Principal, groups []v3.Principal) (bool, error) {
-	if accessMode == "unrestricted" {
+	if accessMode == "unrestricted" || accessMode == "" {
 		return true, nil
 	}
 
 	if accessMode == "required" || accessMode == "restricted" {
-		if slice.ContainsString(allowedPrincipalIDs, userPrinc.Name) {
-			return true, nil
+		user, err := m.checkCache(userPrinc.Name)
+		if err != nil {
+			return false, err
 		}
+
+		userPrincipals := []string{userPrinc.Name}
+		if user != nil {
+			for _, p := range user.PrincipalIDs {
+				userPrincipals = append(userPrincipals, p)
+			}
+		}
+
+		for _, p := range userPrincipals {
+			if slice.ContainsString(allowedPrincipalIDs, p) {
+				return true, nil
+			}
+		}
+
 		for _, g := range groups {
 			if slice.ContainsString(allowedPrincipalIDs, g.Name) {
 				return true, nil
 			}
 		}
+
 		if accessMode == "restricted" {
-			// check if any of the groups principals have been assigned to clusters or projects
-			allowed, err := m.hasMemberGroup(groups)
-			if err != nil {
-				return false, err
+			// check if any of the user's principals are in a project or cluster
+			var principals []string
+			for _, g := range groups {
+				principals = append(principals, g.Name)
 			}
-			if allowed {
-				return true, nil
-			}
-
-			// check if user prinicpal exists as a user
-			u, err := m.checkCache(userPrinc.Name)
-			if err != nil {
-				return false, err
-			}
-			if u != nil {
-				return true, nil
+			if user != nil {
+				principals = append(principals, userPrincipals...)
 			}
 
-			// user principal not in cache, query API by label
-			u, _, err = m.checkLabels(userPrinc.Name)
-			if err != nil {
-				return false, err
-			}
-			if u != nil {
-				return true, nil
-			}
+			return m.atLeastOnePrincipalInProjectOrCluster(principals)
 		}
 		return false, nil
 	}
@@ -250,16 +260,16 @@ func (m *userManager) checkCache(principalName string) (*v3.User, error) {
 	return nil, nil
 }
 
-func (m *userManager) hasMemberGroup(groupPrincipals []v3.Principal) (bool, error) {
-	for _, g := range groupPrincipals {
-		crtbs, err := m.crtbIndexer.ByIndex(groupPrincpalCRTBIndex, g.Name)
+func (m *userManager) atLeastOnePrincipalInProjectOrCluster(principals []string) (bool, error) {
+	for _, principal := range principals {
+		crtbs, err := m.crtbIndexer.ByIndex(crtbsByPrincipalIndex, principal)
 		if err != nil {
 			return false, err
 		}
 		if len(crtbs) > 0 {
 			return true, nil
 		}
-		prtbs, err := m.prtbIndexer.ByIndex(groupPrincpalPRTBIndex, g.Name)
+		prtbs, err := m.prtbIndexer.ByIndex(prtbsByPrincipalIndex, principal)
 		if err != nil {
 			return false, err
 		}
@@ -309,26 +319,42 @@ func userByPrincipal(obj interface{}) ([]string, error) {
 	return u.PrincipalIDs, nil
 }
 
-func groupPrincipalCRTB(obj interface{}) ([]string, error) {
-	var gp []string
+func crtbsByPrincipals(obj interface{}) ([]string, error) {
+	var principals []string
 	b, ok := obj.(*v3.ClusterRoleTemplateBinding)
 	if !ok {
 		return []string{}, nil
 	}
 	if b.GroupPrincipalName != "" {
-		gp = append(gp, b.GroupPrincipalName)
+		principals = append(principals, b.GroupPrincipalName)
 	}
-	return gp, nil
+	if b.UserPrincipalName != "" {
+		principals = append(principals, b.UserPrincipalName)
+	}
+	return principals, nil
 }
 
-func groupPrincipalPRTB(obj interface{}) ([]string, error) {
-	var gp []string
+func prtbsByPrincipals(obj interface{}) ([]string, error) {
+	var principals []string
 	b, ok := obj.(*v3.ProjectRoleTemplateBinding)
 	if !ok {
 		return []string{}, nil
 	}
 	if b.GroupPrincipalName != "" {
-		gp = append(gp, b.GroupPrincipalName)
+		principals = append(principals, b.GroupPrincipalName)
 	}
-	return gp, nil
+	if b.UserPrincipalName != "" {
+		principals = append(principals, b.UserPrincipalName)
+	}
+	return principals, nil
+}
+
+func providerExists(principalIDs []string, provider string) bool {
+	for _, id := range principalIDs {
+		splitID := strings.Split(id, ":")[0]
+		if strings.Contains(splitID, provider) {
+			return true
+		}
+	}
+	return false
 }

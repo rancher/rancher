@@ -17,6 +17,7 @@ import (
 	"strings"
 
 	"github.com/blang/semver"
+	"github.com/pkg/errors"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
@@ -31,6 +32,9 @@ func DownloadIndex(indexURL string) (*RepoIndex, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("invalid catalog url")
+	}
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
@@ -117,7 +121,7 @@ func FetchTgz(url string) ([]v3.File, error) {
 			}
 			files = append(files, v3.File{
 				Name:     name,
-				Contents: base64.StdEncoding.EncodeToString(contents),
+				Contents: string(contents),
 			})
 		}
 	}
@@ -164,7 +168,7 @@ func LoadFile(version *ChartVersion, path string) (*v3.File, error) {
 
 	return &v3.File{
 		Name:     filepath.Join(version.Name, strings.TrimPrefix(f.Name(), version.Dir+"/")),
-		Contents: base64.StdEncoding.EncodeToString(data),
+		Contents: string(data),
 	}, nil
 }
 

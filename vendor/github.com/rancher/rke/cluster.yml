@@ -43,11 +43,16 @@ services:
     #   xxxxxxxxxx
     #   -----END PRIVATE KEY-----
   kube-api:
-    service_cluster_ip_range: 10.42.0.0/16
+    service_cluster_ip_range: 10.43.0.0/16
     pod_security_policy: false
     # add additional arguments to the kubernetes component
     # Note that this WILL OVERRIDE existing defaults
     extra_args:
+      # Enable audit log to stdout
+      audit-log-path: "-"
+      # Increase number of delete workers
+      delete-collection-workers: 3
+      # Set the level of log output to debug-level
       v: 4
   kube-controller:
     cluster_cidr: 10.42.0.0/16
@@ -59,7 +64,6 @@ services:
     infra_container_image: gcr.io/google_containers/pause-amd64:3.0
     # Optionally define additional volume binds to a service
     extra_binds:
-      - "/host/dev:/dev"
       - "/usr/libexec/kubernetes/kubelet-plugins:/usr/libexec/kubernetes/kubelet-plugins"
   kubeproxy:
 
@@ -83,6 +87,12 @@ services:
 #   plugin: flannel
 #   options:
 #     flannel_iface: eth1
+# To specify flannel interface for canal plugin, you can use the 'canal_iface' option:
+# network:
+#   plugin: canal
+#   options:
+#     canal_iface: eth1
+
 
 network:
   plugin: flannel
@@ -120,11 +130,11 @@ addons_include:
 
 system_images:
   etcd: rancher/etcd:v3.0.17
-  kubernetes: rancher/k8s:v1.8.9-rancher1-1
-  alpine: alpine:latest
-  nginx_proxy: rancher/rke-nginx-proxy:v0.1.1
-  cert_downloader: rancher/rke-cert-deployer:v0.1.1
-  kubernetes_services_sidecar: rancher/rke-service-sidekick:v0.1.0
+  kubernetes: rancher/hyperkube:v1.10.1
+  alpine: rancher/rke-tools:v0.1.4
+  nginx_proxy: rancher/rke-tools:v0.1.4
+  cert_downloader: rancher/rke-tools:v0.1.4
+  kubernetes_services_sidecar: rancher/rke-tools:v0.1.4
   kubedns: rancher/k8s-dns-kube-dns-amd64:1.14.5
   dnsmasq: rancher/k8s-dns-dnsmasq-nanny-amd64:1.14.5
   kubedns_sidecar: rancher/k8s-dns-sidecar-amd64:1.14.5
@@ -143,9 +153,11 @@ authorization:
 
 # If set to true, rke won't fail when unsupported Docker version is found
 ignore_docker_version: false
+# The kubernetes version used. For now, this should match the version defined in rancher/types defaults map: https://github.com/rancher/types/blob/master/apis/management.cattle.io/v3/k8s_defaults.go#L14
+kubernetes_version: v1.10.1-rancher1
 
-kubernetes_version: v1.8.9-rancher1-1
-
+# addons are deployed using kubernetes jobs. RKE will give up on trying to get the job status after this timeout in seconds..
+addon_job_timeout: 30
 # If set, this is the cluster name that will be used in the kube config file
 # Default value is "local"
 cluster_name: mycluster
@@ -174,9 +186,23 @@ private_registries:
 #   provider: nginx
 #   node_selector:
 #     app: ingress
+#   extra_args:
+#     enable-ssl-passthrough: ""
 
 ingress:
   provider: nginx
 
 cloud_provider:
   name: aws
+
+# Bastion/Jump host configuration
+bastion_host:
+  address: x.x.x.x
+  user: ubuntu
+  port: 22
+  ssh_key_path: /home/user/.ssh/bastion_rsa
+  # or
+  # ssh_key: |-
+  #   -----BEGIN RSA PRIVATE KEY-----
+  #
+  #   -----END RSA PRIVATE KEY-----

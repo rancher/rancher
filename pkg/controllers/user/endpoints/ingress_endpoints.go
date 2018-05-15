@@ -3,6 +3,7 @@ package endpoints
 import (
 	workloadutil "github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/types/apis/extensions/v1beta1"
+	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 )
@@ -10,7 +11,9 @@ import (
 type IngressEndpointsController struct {
 	workloadController workloadutil.CommonController
 	ingressInterface   v1beta1.IngressInterface
+	machinesLister     managementv3.NodeLister
 	isRKE              bool
+	clusterName        string
 }
 
 func (c *IngressEndpointsController) sync(key string, obj *extensionsv1beta1.Ingress) error {
@@ -31,14 +34,14 @@ func (c *IngressEndpointsController) sync(key string, obj *extensionsv1beta1.Ing
 }
 
 func (c *IngressEndpointsController) reconcileEndpointsForIngress(obj *extensionsv1beta1.Ingress) (bool, error) {
-	fromObj, err := convertIngressToPublicEndpoints(obj, c.isRKE)
+	allNodesIP, err := getAllNodesPublicEndpointIP(c.machinesLister, c.clusterName)
 	if err != nil {
 		return false, err
 	}
+	fromObj := convertIngressToPublicEndpoints(obj, c.isRKE, allNodesIP)
+	fromAnnotation := getPublicEndpointsFromAnnotations(obj.Annotations)
 
-	fromAnnontation := getPublicEndpointsFromAnnotations(obj.Annotations)
-
-	if areEqualEndpoints(fromAnnontation, fromObj) {
+	if areEqualEndpoints(fromAnnotation, fromObj) {
 		return false, nil
 	}
 

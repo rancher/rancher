@@ -27,6 +27,9 @@ const (
 	KubeControllerContainerName = "kube-controller-manager"
 	SchedulerContainerName      = "kube-scheduler"
 	EtcdContainerName           = "etcd"
+	EtcdBackupContainerName     = "etcd-backup"
+	EtcdBackupOnceContainerName = "etcd-backup-once"
+	EtcdRestoreContainerName    = "etcd-restore"
 	NginxProxyContainerName     = "nginx-proxy"
 	SidekickContainerName       = "service-sidekick"
 	LogLinkContainerName        = "rke-log-linker"
@@ -56,7 +59,7 @@ func runSidekick(ctx context.Context, host *hosts.Host, prsMap map[string]v3.Pri
 	if err := docker.UseLocalOrPull(ctx, host.DClient, host.Address, sidecarImage, SidekickServiceName, prsMap); err != nil {
 		return err
 	}
-	if _, err := docker.CreateContiner(ctx, host.DClient, host.Address, SidekickContainerName, imageCfg, hostCfg); err != nil {
+	if _, err := docker.CreateContainer(ctx, host.DClient, host.Address, SidekickContainerName, imageCfg, hostCfg); err != nil {
 		return err
 	}
 	return nil
@@ -72,6 +75,7 @@ func GetProcessConfig(process v3.Process) (*container.Config, *container.HostCon
 		Cmd:        process.Args,
 		Env:        process.Env,
 		Image:      process.Image,
+		Labels:     process.Labels,
 	}
 	// var pidMode container.PidMode
 	// pidMode = process.PidMode
