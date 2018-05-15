@@ -25,7 +25,7 @@ get_address()
     # If given address is a network interface on the system, retrieve configured IP on that interface (only the first configured IP is taken)
     elif [ -n "$(find /sys/devices -name $address)" ]; then
         echo $(ip addr show dev $address | grep -w inet | awk '{print $2}' | cut -f1 -d/ | head -1)
-    # Loop through cloud provider options to get IP from metadata
+    # Loop through cloud provider options to get IP from metadata, if not found return given value
     else
         case $address in
             awslocal)
@@ -62,7 +62,7 @@ get_address()
                 echo $(curl -s https://api.ipify.org)
                 ;;
             *)
-                echo ""
+                echo $address
                 ;;
         esac
     fi
