@@ -39,33 +39,42 @@ type QueryCondition struct {
 	left, right   *QueryCondition
 }
 
-func (q *QueryCondition) Valid(data map[string]interface{}) bool {
+func (q *QueryCondition) Valid(schema *Schema, data map[string]interface{}) bool {
 	switch q.conditionType {
 	case CondAnd:
 		if q.left == nil || q.right == nil {
 			return false
 		}
-		return q.left.Valid(data) && q.right.Valid(data)
+		return q.left.Valid(schema, data) && q.right.Valid(schema, data)
 	case CondOr:
 		if q.left == nil || q.right == nil {
 			return false
 		}
-		return q.left.Valid(data) || q.right.Valid(data)
+		return q.left.Valid(schema, data) || q.right.Valid(schema, data)
 	case CondEQ:
-		return q.Value == convert.ToString(data[q.Field])
+		return q.Value == convert.ToString(valueOrDefault(schema, data, q))
 	case CondNE:
-		return q.Value != convert.ToString(data[q.Field])
+		return q.Value != convert.ToString(valueOrDefault(schema, data, q))
 	case CondIn:
-		return q.Values[convert.ToString(data[q.Field])]
+		return q.Values[convert.ToString(valueOrDefault(schema, data, q))]
 	case CondNotIn:
-		return !q.Values[convert.ToString(data[q.Field])]
+		return !q.Values[convert.ToString(valueOrDefault(schema, data, q))]
 	case CondNotNull:
-		return convert.ToString(data[q.Field]) != ""
+		return convert.ToString(valueOrDefault(schema, data, q)) != ""
 	case CondNull:
-		return convert.ToString(data[q.Field]) == ""
+		return convert.ToString(valueOrDefault(schema, data, q)) == ""
 	}
 
 	return false
+}
+
+func valueOrDefault(schema *Schema, data map[string]interface{}, q *QueryCondition) interface{} {
+	value := data[q.Field]
+	if value == nil {
+		value = schema.ResourceFields[q.Field].Default
+	}
+
+	return value
 }
 
 func (q *QueryCondition) ToCondition() Condition {

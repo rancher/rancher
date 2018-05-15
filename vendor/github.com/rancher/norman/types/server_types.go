@@ -49,7 +49,7 @@ type ActionHandler func(actionName string, action *Action, request *APIContext) 
 
 type RequestHandler func(request *APIContext, next RequestHandler) error
 
-type QueryFilter func(opts *QueryOptions, data []map[string]interface{}) []map[string]interface{}
+type QueryFilter func(opts *QueryOptions, schema *Schema, data []map[string]interface{}) []map[string]interface{}
 
 type Validator func(request *APIContext, schema *Schema, data map[string]interface{}) error
 
@@ -127,25 +127,25 @@ func (r *APIContext) WriteResponse(code int, obj interface{}) {
 	r.ResponseWriter.Write(r, code, obj)
 }
 
-func (r *APIContext) FilterList(opts *QueryOptions, obj []map[string]interface{}) []map[string]interface{} {
-	return r.QueryFilter(opts, obj)
+func (r *APIContext) FilterList(opts *QueryOptions, schema *Schema, obj []map[string]interface{}) []map[string]interface{} {
+	return r.QueryFilter(opts, schema, obj)
 }
 
-func (r *APIContext) FilterObject(opts *QueryOptions, obj map[string]interface{}) map[string]interface{} {
+func (r *APIContext) FilterObject(opts *QueryOptions, schema *Schema, obj map[string]interface{}) map[string]interface{} {
 	opts.Pagination = nil
-	result := r.QueryFilter(opts, []map[string]interface{}{obj})
+	result := r.QueryFilter(opts, schema, []map[string]interface{}{obj})
 	if len(result) == 0 {
 		return nil
 	}
 	return result[0]
 }
 
-func (r *APIContext) Filter(opts *QueryOptions, obj interface{}) interface{} {
+func (r *APIContext) Filter(opts *QueryOptions, schema *Schema, obj interface{}) interface{} {
 	switch v := obj.(type) {
 	case []map[string]interface{}:
-		return r.FilterList(opts, v)
+		return r.FilterList(opts, schema, v)
 	case map[string]interface{}:
-		return r.FilterObject(opts, v)
+		return r.FilterObject(opts, schema, v)
 	}
 
 	return nil
