@@ -25,7 +25,7 @@ func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.Act
 	if password == "" {
 		return v3.Principal{}, nil, nil, httperror.NewAPIError(httperror.MissingRequired, "password not provided")
 	}
-	externalID := ldap.GetUserExternalID(username, config.DefaultLoginDomain)
+	// externalID := ldap.GetUserExternalID(username, config.DefaultLoginDomain)
 
 	lConn, err := ldap.NewLDAPConn(config, caPool)
 	if err != nil {
@@ -33,23 +33,13 @@ func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.Act
 	}
 	defer lConn.Close()
 
-	if !config.Enabled { // TODO testing for enabled here might not be correct. Might be better to pass in an explicit testSvcAccount bool
-		logrus.Debug("Bind service account username password")
-		if config.ServiceAccountPassword == "" {
-			return v3.Principal{}, nil, nil, httperror.NewAPIError(httperror.MissingRequired, "service account password not provided")
-		}
-		sausername := ldap.GetUserExternalID(config.ServiceAccountUsername, config.DefaultLoginDomain)
-		err = lConn.Bind(sausername, config.ServiceAccountPassword)
-		if err != nil {
-			if ldapv2.IsErrorWithCode(err, ldapv2.LDAPResultInvalidCredentials) {
-				return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
-			}
-			return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.ServerError, "server error while authenticating")
-		}
+	// Bind as service account for full access
+	logrus.Debug("Bind service account username password")
+	if config.ServiceAccountPassword == "" {
+		return v3.Principal{}, nil, nil, httperror.NewAPIError(httperror.MissingRequired, "service account password not provided")
 	}
-
-	logrus.Debug("Binding username password")
-	err = lConn.Bind(externalID, password)
+	sausername := ldap.GetUserExternalID(config.ServiceAccountUsername, config.DefaultLoginDomain)
+	err = lConn.Bind(sausername, config.ServiceAccountPassword)
 	if err != nil {
 		if ldapv2.IsErrorWithCode(err, ldapv2.LDAPResultInvalidCredentials) {
 			return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
@@ -57,6 +47,7 @@ func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.Act
 		return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.ServerError, "server error while authenticating")
 	}
 
+	// Look up user entry by login attribute
 	samName := username
 	if strings.Contains(username, `\`) {
 		samName = strings.SplitN(username, `\`, 2)[1]
@@ -71,6 +62,16 @@ func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.Act
 	userPrincipal, groupPrincipals, err := p.userRecord(search, lConn, config, caPool)
 	if err != nil {
 		return v3.Principal{}, nil, nil, err
+	}
+
+	// Bind as found user to check access
+	logrus.Debug("Binding username password")
+	err = lConn.Bind(userPrincipal.ExtraInfo["DN"], password)
+	if err != nil {
+		if ldapv2.IsErrorWithCode(err, ldapv2.LDAPResultInvalidCredentials) {
+			return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
+		}
+		return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.ServerError, "server error while authenticating")
 	}
 
 	allowed, err := p.userMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipal, groupPrincipals)
@@ -132,18 +133,19 @@ func (p *adProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult, 
 	userPrincipal.Me = true
 
 	if len(memberOf) != 0 {
-		lConn, err := ldap.NewLDAPConn(config, caPool)
-		if err != nil {
-			return userPrincipal, groupPrincipals, err
-		}
-		defer lConn.Close()
-		for i := 0; i < len(memberOf); i += 50 {
-			batch := memberOf[i:min(i+50, len(memberOf))]
-			groupPrincipalListBatch, err := p.getGroupPrincipals(batch, lConn, config)
-			if err != nil {
-				return userPrincipal, groupPrincipals, err
+		for _, attrib := range memberOf {
+			group, err := p.getPrincipal(attrib, GroupScope, config, caPool)
+			//if err != nil {
+			//	return userPrincipal, groupPrincipals, err
+			//}
+			// Invalid group memberships are a non-fatal error
+			// They may simply not be relevant+accessible to this service
+			if err == nil {
+				if group != nil {
+					group.MemberOf = true
+				}
+				groupPrincipals = append(groupPrincipals, *group)
 			}
-			groupPrincipals = append(groupPrincipals, groupPrincipalListBatch...)
 		}
 	}
 	return userPrincipal, groupPrincipals, nil
@@ -381,6 +383,9 @@ func (p *adProvider) attributesToPrincipal(attribs []*ldapv2.EntryAttribute, dnS
 		LoginName:     login,
 		PrincipalType: kind,
 		Provider:      Name,
+		ExtraInfo: map[string]string{
+			"DN": dnStr,
+		},
 	}
 
 	return principal, nil
