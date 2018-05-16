@@ -53,12 +53,12 @@ The current default kubernetes version used by RKE is `v1.10.1-rancher1`.
 
 There are two ways to select a kubernetes version:
 
-- Using the kubernetes image defined in  [System Images](#rke-system-images)
+- Using the kubernetes image defined in [System Images](#rke-system-images)
 - Using the configuration option `kubernetes_version`
 
-In case both are defined, the system images configuration will take precedence over `kuberntest_version`. Since the `kubernetes_version` options was added mainly to be used by Rancher v2.0, it has a limited number of supported tags that can be found [here](https://github.com/rancher/types/blob/master/apis/management.cattle.io/v3/k8s_defaults.go#L14).
+In case both are defined, the system images configuration will take precedence over `kubernetes_version`. Since the `kubernetes_version` options was added mainly to be used by Rancher v2.0, it has a limited number of supported tags that can be found [here](https://github.com/rancher/types/blob/master/apis/management.cattle.io/v3/k8s_defaults.go#L14).
 
-If a the version defined in `kuberntest_version` is not found ins this map, the default kubernretes version is used.
+If a version is defined in `kubernetes_version` and is not found in this map, the default is used.
 
 ## Network Plugins
 
@@ -184,10 +184,10 @@ RKE uses kubernetes Jobs to deploy addons. In some cases, addons deployment take
 addon_job_timeout: 30
 ```
 
-#### Critical and uncritical addons
-As of version `0.1.7-rc1`, addons are split into two categories: critical and uncritical.
+#### Critical and noncritical addons
+As of version `0.1.7-rc1`, addons are split into two categories: critical and noncritical.
 
-Critical addons will cause RKE to error out if they fail to deploy for any reason. While uncritical addons will just log a warning and continue with the deployment. Currently only the network plugin is considered critical.
+Critical addons will cause RKE to error out if they fail to deploy for any reason. While noncritical addons will just log a warning and continue with the deployment. Currently only the network plugin is considered critical.
 ## High Availability
 
 RKE is HA ready, you can specify more than one controlplane host in the `cluster.yml` file, and rke will deploy master components on all of them, the kubelets are configured to connect to `127.0.0.1:6443` by default which is the address of `nginx-proxy` service that proxy requests to all master nodes.
@@ -391,41 +391,9 @@ nodes:
     - worker
 ```
 
-## Deploying Rancher 2.0 using rke
+## Deploying Rancher 2.x using rke
 
-Using RKE's pluggable user addons, it's possible to deploy Rancher 2.0 server in HA with a single command.
-
-Depending how you want to manage your ssl certificates, there are 2 deployment options:
-
-- Use own ssl certificates:
-  - Use [rancher-minimal-ssl.yml](https://github.com/rancher/rke/blob/master/rancher-minimal-ssl.yml)
-  - Update `nodes` configuration.
-  - Update <FQDN> at `cattle-ingress-http` ingress definition. FQDN should be a dns a entry pointing to all nodes IP's running ingress-controller (controlplane and workers by default).
-  - Update certificate, key and ca crt at `cattle-keys-server` secret, <BASE64_CRT>, <BASE64_KEY> and <BASE64_CA>. Content must be in base64 format, `cat <FILE> | base64`
-  - Update ssl certificate and key at `cattle-keys-ingress` secret, <BASE64_CRT> and <BASE64_KEY>. Content must be in base64 format, `cat <FILE> | base64`. If selfsigned, certificate and key must be signed by same CA.  
-  - Run RKE.
-
-  ```bash
-  rke up --config rancher-minimal-ssl.yml
-  ```
-
-- Use SSL-passthrough:
-  - Use [rancher-minimal-passthrough.yml](https://github.com/rancher/rke/blob/master/rancher-minimal-passthrough.yml)
-  - Update `nodes` configuration.
-  - Update FQDN at `cattle-ingress-http` ingress definition. FQDN should be a dns a entry, pointing to all nodes IP's running ingress-controller (controlplane and workers by default).
-  - Run RKE.
-
-  ```bash
-  rke up --config rancher-minimal-passthrough.yml
-  ```
-
-Once RKE execution finish, rancher is deployed at `cattle-system` namespace. You could access to your rancher instance by `https://<FQDN>`
-
-By default, rancher deployment has just 1 replica, scale it to desired replicas.
-
-```
-kubectl -n cattle-system scale deployment cattle --replicas=3
-```
+Using RKE's pluggable user addons, it's possible to deploy Rancher 2.x server in HA with a single command. Detailed instructions can be found [here](https://rancher.com/docs/rancher/v2.x/en/installation/ha-server-install/).
 
 ## Operating Systems Notes
 
@@ -491,17 +459,17 @@ Backups are saved to the following directory: `/opt/rke/etcdbackup/`. Backups ar
 
 RKE also added two commands that for etcd backup management:
 ```
-./rke etcd backup [NAME]
+./rke etcd backup --name NAME
 ```
 and
 ```
-./rke etcd restore [NAME]
+./rke etcd restore --name NAME
 ```
 
-The backup command saves a snapshot of etcd in `/opt/rke/etcdbackup`. This command also creates a container for the backup. When the backup completes, the container is removed.
+The backup command saves a snapshot of etcd from each etcd nodes in the cluster config file and will save it in `/opt/rke/etcdbackup`. This command also creates a container for the backup. When the backup completes, the container is removed.
 
 ```
-# ./rke etcd backup --name snapshot
+# ./rke etcd backup --name snapshot --config cluster.yml
 
 INFO[0000] Starting Backup on etcd hosts
 INFO[0000] [dialer] Setup tunnel for host [x.x.x.x]
@@ -522,7 +490,7 @@ INFO[0011] Finished backup on all etcd hosts
 >**Warning:** Restoring an etcd backup deletes your current etcd cluster and replaces it with a new one. Before you run the `etcd restore` command, backup any important data in your current cluster.
 
 ```
-./rke etcd restore --name snapshot --config test-aws.yml
+./rke etcd restore --name snapshot --config cluster.yml
 INFO[0000] Starting restore on etcd hosts
 INFO[0000] [dialer] Setup tunnel for host [x.x.x.x]
 INFO[0002] [dialer] Setup tunnel for host [y.y.y.y]

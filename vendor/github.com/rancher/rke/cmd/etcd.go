@@ -26,7 +26,7 @@ func EtcdCommand() cli.Command {
 		},
 	}
 
-	backupRestoreFlags = append(backupRestoreFlags, sshCliOptions...)
+	backupRestoreFlags = append(backupRestoreFlags, commonFlags...)
 
 	return cli.Command{
 		Name:  "etcd",

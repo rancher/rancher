@@ -20,6 +20,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	EtcdBackupPath  = "/opt/rke/etcdbackup/"
+	EtcdRestorePath = "/opt/rke/etcdrestore/"
+	EtcdDataDir     = "/var/lib/rancher/etcd/"
+)
+
 type EtcdBackup struct {
 	// Enable or disable backup creation
 	Backup bool
@@ -223,6 +229,7 @@ func RunEtcdBackup(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]
 			"--cert", pki.GetCertPath(pki.KubeNodeCertName),
 			"--key", pki.GetKeyPath(pki.KubeNodeCertName),
 			"--name", name,
+			"--endpoints=" + etcdHost.InternalAddress + ":2379",
 		},
 		Image: etcdBackupImage,
 	}
@@ -235,7 +242,7 @@ func RunEtcdBackup(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]
 	}
 	hostCfg := &container.HostConfig{
 		Binds: []string{
-			"/opt/rke/etcdbackup:/backup",
+			fmt.Sprintf("%s:/backup", EtcdBackupPath),
 			fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(etcdHost.PrefixPath, "/etc/kubernetes"))},
 		NetworkMode: container.NetworkMode("host"),
 	}
@@ -246,7 +253,7 @@ func RunEtcdBackup(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]
 		}
 		status, err := docker.WaitForContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdBackupOnceContainerName)
 		if status != 0 || err != nil {
-			return fmt.Errorf("Failed to take etcd backup exit code [%s]: %v", status, err)
+			return fmt.Errorf("Failed to take etcd backup exit code [%d]: %v", status, err)
 		}
 		return docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdBackupOnceContainerName)
 	}
@@ -256,28 +263,33 @@ func RunEtcdBackup(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]
 func RestoreEtcdBackup(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]v3.PrivateRegistry, etcdRestoreImage, backupName, initCluster string) error {
 	log.Infof(ctx, "[etcd] Restoring [%s] snapshot on etcd host [%s]", backupName, etcdHost.Address)
 	nodeName := pki.GetEtcdCrtName(etcdHost.InternalAddress)
-	backupPath := filepath.Join("/backup/", backupName)
+	backupPath := filepath.Join(EtcdBackupPath, backupName)
 
 	imageCfg := &container.Config{
 		Cmd: []string{
-			"/usr/local/bin/etcdctl",
-			"--cacert", pki.GetCertPath(pki.CACertName),
-			"--cert", pki.GetCertPath(nodeName),
-			"--key", pki.GetKeyPath(nodeName),
-			"snapshot", "restore", backupPath,
-			"--data-dir=/var/lib/rancher/etcd",
-			"--name=etcd-" + etcdHost.HostnameOverride,
-			"--initial-cluster=" + initCluster,
-			"--initial-cluster-token=etcd-cluster-1",
-			"--initial-advertise-peer-urls=https://" + etcdHost.InternalAddress + ":2380",
+			"sh", "-c", strings.Join([]string{
+				"/usr/local/bin/etcdctl",
+				fmt.Sprintf("--endpoints=[%s:2379]", etcdHost.InternalAddress),
+				"--cacert", pki.GetCertPath(pki.CACertName),
+				"--cert", pki.GetCertPath(nodeName),
+				"--key", pki.GetKeyPath(nodeName),
+				"snapshot", "restore", backupPath,
+				"--data-dir=" + EtcdRestorePath,
+				"--name=etcd-" + etcdHost.HostnameOverride,
+				"--initial-cluster=" + initCluster,
+				"--initial-cluster-token=etcd-cluster-1",
+				"--initial-advertise-peer-urls=https://" + etcdHost.InternalAddress + ":2380",
+				"&& mv", EtcdRestorePath + "*", EtcdDataDir,
+				"&& rm -rf", EtcdRestorePath,
+			}, " "),
 		},
 		Env:   []string{"ETCDCTL_API=3"},
 		Image: etcdRestoreImage,
 	}
 	hostCfg := &container.HostConfig{
 		Binds: []string{
-			"/opt/rke/etcdbackup:/backup:z",
-			fmt.Sprintf("%s:/var/lib/rancher/:z", path.Join(etcdHost.PrefixPath, "/var/lib/")),
+			"/opt/rke/:/opt/rke/:z",
+			fmt.Sprintf("%s:/var/lib/rancher/etcd:z", path.Join(etcdHost.PrefixPath, "/var/lib/etcd")),
 			fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(etcdHost.PrefixPath, "/etc/kubernetes"))},
 		NetworkMode: container.NetworkMode("host"),
 	}

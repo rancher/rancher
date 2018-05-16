@@ -35,7 +35,7 @@ func RemoveCommand() cli.Command {
 		},
 	}
 
-	removeFlags = append(removeFlags, sshCliOptions...)
+	removeFlags = append(removeFlags, commonFlags...)
 
 	return cli.Command{
 		Name:   "remove",

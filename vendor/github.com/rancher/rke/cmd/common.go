@@ -10,10 +10,14 @@ import (
 	"github.com/urfave/cli"
 )
 
-var sshCliOptions = []cli.Flag{
+var commonFlags = []cli.Flag{
 	cli.BoolFlag{
 		Name:  "ssh-agent-auth",
 		Usage: "Use SSH Agent Auth defined by SSH_AUTH_SOCK",
+	},
+	cli.BoolFlag{
+		Name:  "ignore-docker-version",
+		Usage: "Disable Docker version check",
 	},
 }
 
@@ -41,5 +45,10 @@ func setOptionsFromCLI(c *cli.Context, rkeConfig *v3.RancherKubernetesEngineConf
 	if c.Bool("ssh-agent-auth") {
 		rkeConfig.SSHAgentAuth = c.Bool("ssh-agent-auth")
 	}
+
+	if c.Bool("ignore-docker-version") {
+		rkeConfig.IgnoreDockerVersion = c.Bool("ignore-docker-version")
+	}
+
 	return rkeConfig, nil
 }

@@ -29,8 +29,9 @@ func SetUpAuthentication(ctx context.Context, kubeCluster, currentCluster *Clust
 				backupPlane = ControlPlane
 				backupHosts = kubeCluster.ControlPlaneHosts
 			} else {
-				backupPlane = EtcdPlane
-				backupHosts = kubeCluster.EtcdHosts
+				// Save certificates on etcd and controlplane hosts
+				backupPlane = fmt.Sprintf("%s,%s", EtcdPlane, ControlPlane)
+				backupHosts = hosts.GetUniqueHostList(kubeCluster.EtcdHosts, kubeCluster.ControlPlaneHosts, nil)
 			}
 			log.Infof(ctx, "[certificates] Attempting to recover certificates from backup on [%s] hosts", backupPlane)
 
