@@ -39,7 +39,7 @@ func UpCommand() cli.Command {
 		},
 	}
 
-	upFlags = append(upFlags, sshCliOptions...)
+	upFlags = append(upFlags, commonFlags...)
 
 	return cli.Command{
 		Name:   "up",
@@ -199,6 +199,9 @@ func clusterUpLocal(ctx *cli.Context) error {
 		}
 		rkeConfig.Nodes = []v3.RKEConfigNode{*cluster.GetLocalRKENodeConfig()}
 	}
+
+	rkeConfig.IgnoreDockerVersion = ctx.Bool("ignore-docker-version")
+
 	_, _, _, _, _, err = ClusterUp(context.Background(), rkeConfig, nil, hosts.LocalHealthcheckFactory, nil, true, "", false, false)
 	return err
 }

@@ -578,7 +578,7 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host, pr
 
 	CommandArgs := map[string]string{
 		"name":                        "etcd-" + host.HostnameOverride,
-		"data-dir":                    "/var/lib/rancher/etcd",
+		"data-dir":                    services.EtcdDataDir,
 		"advertise-client-urls":       "https://" + host.InternalAddress + ":2379,https://" + host.InternalAddress + ":4001",
 		"listen-client-urls":          "https://" + listenAddress + ":2379",
 		"initial-advertise-peer-urls": "https://" + host.InternalAddress + ":2380",
@@ -595,7 +595,7 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host, pr
 	}
 
 	Binds := []string{
-		fmt.Sprintf("%s:/var/lib/rancher/:z", path.Join(prefixPath, "/var/lib/")),
+		fmt.Sprintf("%s:%s:z", path.Join(prefixPath, "/var/lib/etcd"), services.EtcdDataDir),
 		fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(prefixPath, "/etc/kubernetes")),
 	}
 
@@ -655,6 +655,8 @@ func BuildPortChecksFromPortList(host *hosts.Host, portList []string, proto stri
 func (c *Cluster) getPrefixPath(osType string) string {
 	var prefixPath string
 	switch {
+	case c.PrefixPath != "/":
+		prefixPath = c.PrefixPath
 	case strings.Contains(osType, B2DOS):
 		prefixPath = B2DPrefixPath
 	case strings.Contains(osType, ROS):

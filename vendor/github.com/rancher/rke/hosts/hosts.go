@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"path"
-	"path/filepath"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -40,11 +39,11 @@ type Host struct {
 }
 
 const (
-	ToCleanEtcdDir       = "/var/lib/etcd"
+	ToCleanEtcdDir       = "/var/lib/etcd/"
 	ToCleanSSLDir        = "/etc/kubernetes/"
 	ToCleanCNIConf       = "/etc/cni/"
 	ToCleanCNIBin        = "/opt/cni/"
-	ToCleanCNILib        = "/var/lib/cni"
+	ToCleanCNILib        = "/var/lib/cni/"
 	ToCleanCalicoRun     = "/var/run/calico/"
 	ToCleanTempCertPath  = "/etc/kubernetes/.tmp/"
 	CleanerContainerName = "kube-cleaner"
@@ -243,12 +242,8 @@ func buildCleanerConfig(host *Host, toCleanDirs []string, cleanerImage string) (
 		Cmd:   cmd,
 	}
 	bindMounts := []string{}
-	bindMountsMap := make(map[string]string)
 	for _, vol := range toCleanDirs {
-		bindMountsMap[filepath.Dir(vol)] = vol
-	}
-	for dir := range bindMountsMap {
-		bindMounts = append(bindMounts, fmt.Sprintf("%s:%s:z", dir, dir))
+		bindMounts = append(bindMounts, fmt.Sprintf("%s:%s:z", vol, vol))
 	}
 	hostCfg := &container.HostConfig{
 		Binds: bindMounts,
