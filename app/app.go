@@ -2,8 +2,6 @@ package app
 
 import (
 	"context"
-	"fmt"
-	"os"
 
 	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/norman/leader"
@@ -20,19 +18,18 @@ import (
 )
 
 type Config struct {
-	ACMEDomains      []string
-	AddLocal         string
-	Embedded         bool
-	KubeConfig       string
-	HTTPListenPort   int
-	HTTPSListenPort  int
-	K8sMode          string
-	Debug            bool
-	AdvertiseAddress string
-	ListenConfig     *v3.ListenConfig
+	ACMEDomains     []string
+	AddLocal        string
+	Embedded        bool
+	KubeConfig      string
+	HTTPListenPort  int
+	HTTPSListenPort int
+	K8sMode         string
+	Debug           bool
+	ListenConfig    *v3.ListenConfig
 }
 
-func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config, ready func() bool) (*config.ScaledContext, *clustermanager.Manager, error) {
+func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config) (*config.ScaledContext, *clustermanager.Manager, error) {
 	scaledContext, err := config.NewScaledContext(kubeConfig)
 	if err != nil {
 		return nil, nil, err
@@ -47,7 +44,7 @@ func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config
 		return nil, nil, err
 	}
 
-	dialerFactory, err := dialer.NewFactory(scaledContext, ready)
+	dialerFactory, err := dialer.NewFactory(scaledContext)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -69,30 +66,16 @@ func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config
 }
 
 func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
-	getID := func() string {
-		identity := cfg.AdvertiseAddress
-		if identity == "" {
-			identity, _ = os.Hostname()
-		}
-		return fmt.Sprintf("%s:%d", identity, cfg.HTTPSListenPort)
-	}
-
 	if err := service.Start(); err != nil {
 		return err
 	}
 
-	leaderState := &leader.State{}
-
-	scaledContext, clusterManager, err := buildScaledContext(ctx, kubeConfig, cfg, func() bool {
-		_, leader := leaderState.Get()
-		return leader
-	})
-
+	scaledContext, clusterManager, err := buildScaledContext(ctx, kubeConfig, cfg)
 	if err != nil {
 		return err
 	}
 
-	if err := server.Start(ctx, leaderState, cfg.HTTPListenPort, cfg.HTTPSListenPort, scaledContext, clusterManager); err != nil {
+	if err := server.Start(ctx, cfg.HTTPListenPort, cfg.HTTPSListenPort, scaledContext, clusterManager); err != nil {
 		return err
 	}
 
@@ -101,6 +84,8 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 	}
 
 	go leader.RunOrDie(ctx, "cattle-controllers", scaledContext.K8sClient, func(ctx context.Context) {
+		scaledContext.Leader = true
+
 		management, err := scaledContext.NewManagementContext()
 		if err != nil {
 			panic(err)
@@ -118,7 +103,7 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 		tokens.StartPurgeDaemon(ctx, management)
 
 		<-ctx.Done()
-	}, leaderState.Status, getID)
+	})
 
 	<-ctx.Done()
 	return ctx.Err()
