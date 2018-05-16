@@ -36,7 +36,7 @@ func (rpc *grpcClient) Create(ctx context.Context, opts *DriverOptions, clusterI
 		ClusterInfo:   clusterInfo,
 	})
 	err = handlErr(err)
-	if o.CreateError != "" && err == nil {
+	if err == nil && o.CreateError != "" {
 		err = errors.New(o.CreateError)
 	}
 	return o, err
