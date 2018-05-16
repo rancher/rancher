@@ -8,10 +8,12 @@ import (
 	"reflect"
 
 	"github.com/rancher/norman/api/access"
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
+	hcommon "github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
@@ -22,6 +24,7 @@ import (
 
 type Wrapper struct {
 	Clusters              v3.ClusterInterface
+	TemplateVersionClient v3.TemplateVersionInterface
 	KubeConfigGetter      common.KubeConfigGetter
 	TemplateContentClient v3.TemplateContentInterface
 	AppGetter             pv3.AppsGetter
@@ -59,6 +62,23 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	}
 	delete(resource.Values, "appliedFiles")
 	delete(resource.Values, "files")
+}
+
+func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
+	externalID := convert.ToString(data["externalId"])
+	templateVersionID, err := hcommon.ParseExternalID(externalID)
+	if err != nil {
+		return err
+	}
+	templateVersion, err := w.TemplateVersionClient.Get(templateVersionID, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	targetNamespace := convert.ToString(data["targetNamespace"])
+	if templateVersion.Spec.RequiredNamespace != "" && templateVersion.Spec.RequiredNamespace != targetNamespace {
+		return httperror.NewAPIError(httperror.InvalidType, "template's requiredNamespace doesn't match catalog app's target namespace")
+	}
+	return nil
 }
 
 func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {

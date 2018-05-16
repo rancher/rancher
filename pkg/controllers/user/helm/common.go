@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,6 +14,7 @@ import (
 	"encoding/base64"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	"github.com/rancher/rancher/pkg/templatecontent"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
@@ -147,7 +147,7 @@ func convertTemplates(files map[string]string, templateContentClient mgmtv3.Temp
 func generateTemplates(obj *v3.App, templateVersionClient mgmtv3.TemplateVersionInterface, templateContentClient mgmtv3.TemplateContentInterface) (string, string, error) {
 	files := map[string]string{}
 	if obj.Spec.ExternalID != "" {
-		templateVersionID, err := parseExternalID(obj.Spec.ExternalID)
+		templateVersionID, err := common.ParseExternalID(obj.Spec.ExternalID)
 		if err != nil {
 			return "", "", err
 		}
@@ -168,7 +168,6 @@ func generateTemplates(obj *v3.App, templateVersionClient mgmtv3.TemplateVersion
 			files[k] = string(content)
 		}
 	}
-
 	tempDir, err := ioutil.TempDir("", "helm-")
 	if err != nil {
 		return "", "", err
@@ -218,15 +217,4 @@ func generateTemplates(obj *v3.App, templateVersionClient mgmtv3.TemplateVersion
 	template := sbOut.String()
 	notes := noteOut.String()
 	return template, notes, nil
-}
-
-func parseExternalID(externalID string) (string, error) {
-	values, err := url.Parse(externalID)
-	if err != nil {
-		return "", err
-	}
-	catalog := values.Query().Get("catalog")
-	template := values.Query().Get("template")
-	version := values.Query().Get("version")
-	return strings.Join([]string{catalog, template, version}, "-"), nil
 }
