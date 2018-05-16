@@ -294,6 +294,7 @@ func App(schemas *types.Schemas, management *config.ScaledContext, kubeConfigGet
 	schema := schemas.Schema(&projectschema.Version, projectclient.AppType)
 	wrapper := app.Wrapper{
 		Clusters:              management.Management.Clusters(""),
+		TemplateVersionClient: management.Management.TemplateVersions(""),
 		KubeConfigGetter:      kubeConfigGetter,
 		TemplateContentClient: management.Management.TemplateContents(""),
 		AppGetter:             management.Project,
@@ -301,6 +302,7 @@ func App(schemas *types.Schemas, management *config.ScaledContext, kubeConfigGet
 	schema.Formatter = app.Formatter
 	schema.ActionHandler = wrapper.ActionHandler
 	schema.LinkHandler = wrapper.LinkHandler
+	schema.Validator = wrapper.Validator
 }
 
 func Setting(schemas *types.Schemas) {

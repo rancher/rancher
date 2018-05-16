@@ -94,6 +94,7 @@ func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []strin
 						}
 						v.Questions = value.Questions
 						v.RancherVersion = value.RancherVersion
+						v.RequiredNamespace = value.Namespace
 						for _, category := range value.Categories {
 							keywords[category] = struct{}{}
 						}
@@ -146,4 +147,5 @@ type catalogYml struct {
 	RancherVersion string        `yaml:"rancher_version,omitempty"`
 	Categories     []string      `yaml:"categories,omitempty"`
 	Questions      []v3.Question `yaml:"questions,omitempty"`
+	Namespace      string        `yaml:"namespace,omitempty"`
 }
