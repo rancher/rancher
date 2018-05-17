@@ -11,16 +11,16 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
-func (c *Cluster) BackupEtcd(ctx context.Context, backupName string) error {
+func (c *Cluster) SnapshotEtcd(ctx context.Context, snapshotName string) error {
 	for _, host := range c.EtcdHosts {
-		if err := services.RunEtcdBackup(ctx, host, c.PrivateRegistriesMap, c.SystemImages.Alpine, c.Services.Etcd.Creation, c.Services.Etcd.Retention, backupName, true); err != nil {
+		if err := services.RunEtcdSnapshotSave(ctx, host, c.PrivateRegistriesMap, c.SystemImages.Alpine, c.Services.Etcd.Creation, c.Services.Etcd.Retention, snapshotName, true); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (c *Cluster) RestoreEtcdBackup(ctx context.Context, backupPath string) error {
+func (c *Cluster) RestoreEtcdSnapshot(ctx context.Context, snapshotPath string) error {
 	// Stopping all etcd containers
 	for _, host := range c.EtcdHosts {
 		if err := tearDownOldEtcd(ctx, host, c.SystemImages.Alpine, c.PrivateRegistriesMap); err != nil {
@@ -30,8 +30,8 @@ func (c *Cluster) RestoreEtcdBackup(ctx context.Context, backupPath string) erro
 	// Start restore process on all etcd hosts
 	initCluster := services.GetEtcdInitialCluster(c.EtcdHosts)
 	for _, host := range c.EtcdHosts {
-		if err := services.RestoreEtcdBackup(ctx, host, c.PrivateRegistriesMap, c.SystemImages.Etcd, backupPath, initCluster); err != nil {
-			return fmt.Errorf("[etcd] Failed to restore etcd backup: %v", err)
+		if err := services.RestoreEtcdSnapshot(ctx, host, c.PrivateRegistriesMap, c.SystemImages.Etcd, snapshotPath, initCluster); err != nil {
+			return fmt.Errorf("[etcd] Failed to restore etcd snapshot: %v", err)
 		}
 	}
 	// Deploy Etcd Plane
@@ -40,12 +40,12 @@ func (c *Cluster) RestoreEtcdBackup(ctx context.Context, backupPath string) erro
 	for _, etcdHost := range c.EtcdHosts {
 		etcdNodePlanMap[etcdHost.Address] = BuildRKEConfigNodePlan(ctx, c, etcdHost, etcdHost.DockerInfo)
 	}
-	etcdBackup := services.EtcdBackup{
-		Backup:    c.Services.Etcd.Backup,
+	etcdRollingSnapshots := services.EtcdSnapshot{
+		Snapshot:  c.Services.Etcd.Snapshot,
 		Creation:  c.Services.Etcd.Creation,
 		Retention: c.Services.Etcd.Retention,
 	}
-	if err := services.RunEtcdPlane(ctx, c.EtcdHosts, etcdNodePlanMap, c.LocalConnDialerFactory, c.PrivateRegistriesMap, c.UpdateWorkersOnly, c.SystemImages.Alpine, etcdBackup); err != nil {
+	if err := services.RunEtcdPlane(ctx, c.EtcdHosts, etcdNodePlanMap, c.LocalConnDialerFactory, c.PrivateRegistriesMap, c.UpdateWorkersOnly, c.SystemImages.Alpine, etcdRollingSnapshots); err != nil {
 		return fmt.Errorf("[etcd] Failed to bring up Etcd Plane: %v", err)
 	}
 	return nil

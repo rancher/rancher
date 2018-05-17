@@ -171,11 +171,11 @@ type ETCDService struct {
 	Key string `yaml:"key" json:"key,omitempty"`
 	// External etcd prefix
 	Path string `yaml:"path" json:"path,omitempty"`
-	// Etcd Backup Service
-	Backup bool `yaml:"backup" json:"backup,omitempty"`
-	// Etcd Backup Retention period
+	// Etcd Recurring snapshot Service
+	Snapshot bool `yaml:"snapshot" json:"snapshot,omitempty"`
+	// Etcd snapshot Retention period
 	Retention string `yaml:"retention" json:"retention,omitempty"`
-	// Etcd Backup Creation period
+	// Etcd snapshot Creation period
 	Creation string `yaml:"creation" json:"creation,omitempty"`
 }
 
