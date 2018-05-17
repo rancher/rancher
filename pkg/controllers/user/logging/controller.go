@@ -8,5 +8,5 @@ import (
 
 func Register(ctx context.Context, cluster *config.UserContext) {
 	registerClusterLogging(ctx, cluster)
-	registerProjectLogging(cluster)
+	registerProjectLogging(ctx, cluster)
 }

@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	watcherSyncInterval  = 30 * time.Second
+	watcherSyncInterval  = 1 * time.Minute
 	retryBackoffInterval = 10 * time.Second
 	retryTimeout         = 5 * time.Minute
 )
