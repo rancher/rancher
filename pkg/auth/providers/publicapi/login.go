@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
+	"github.com/rancher/rancher/pkg/auth/providers/azuread"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -104,6 +105,9 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	case client.ActiveDirectoryProviderType:
 		input = &v3public.BasicLogin{}
 		providerName = activedirectory.Name
+	case client.AzureADProviderType:
+		input = &v3public.BasicLogin{}
+		providerName = azuread.Name
 	default:
 		return v3.Token{}, "", httperror.NewAPIError(httperror.ServerError, "unknown authentication provider")
 	}

@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
+	"github.com/rancher/rancher/pkg/auth/providers/azuread"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
@@ -56,6 +57,11 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	providers[activedirectory.Name] = p
 	providersByType[client.ActiveDirectoryConfigType] = p
 	providersByType[publicclient.ActiveDirectoryProviderType] = p
+
+	p = azuread.Configure(ctx, mgmt, userMGR)
+	providers[azuread.Name] = p
+	providersByType[client.AzureADConfigType] = p
+	providersByType[publicclient.AzureADProviderType] = p
 }
 
 func AuthenticateUser(input interface{}, providerName string) (v3.Principal, []v3.Principal, map[string]string, error) {

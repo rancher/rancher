@@ -12,10 +12,11 @@ def test_auth_configs(mc):
         client.create_auth_config({})
 
     configs = client.list_auth_config()
-    assert len(configs) == 3
+    assert len(configs) == 4
     gh = None
     local = None
     ad = None
+    azuread = None
     for c in configs:
         if c.type == "githubConfig":
             gh = c
@@ -23,8 +24,10 @@ def test_auth_configs(mc):
             local = c
         elif c.type == "activeDirectoryConfig":
             ad = c
+        elif c.type == "azureADConfig":
+            azuread = c
 
-    for x in [gh, local, ad]:
+    for x in [gh, local, ad, azuread]:
         assert x is not None
         config = client.by_id_auth_config(x.id)
         with pytest.raises(ApiError) as e:
@@ -35,3 +38,5 @@ def test_auth_configs(mc):
     assert gh.actions['configureTest']
 
     assert ad.actions['testAndApply']
+
+    assert azuread.actions['testAndApply']
