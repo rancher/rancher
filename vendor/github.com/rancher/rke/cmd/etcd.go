@@ -33,14 +33,14 @@ func EtcdCommand() cli.Command {
 		Usage: "etcd backup/restore operations in k8s cluster",
 		Subcommands: []cli.Command{
 			{
-				Name:   "backup",
-				Usage:  "Take backup on all etcd hosts",
+				Name:   "snapshot-save",
+				Usage:  "Take snapshot on all etcd hosts",
 				Flags:  backupRestoreFlags,
 				Action: BackupEtcdHostsFromCli,
 			},
 			{
-				Name:   "restore",
-				Usage:  "Restore existing backup",
+				Name:   "snapshot-restore",
+				Usage:  "Restore existing snapshot",
 				Flags:  backupRestoreFlags,
 				Action: RestoreEtcdBackupFromCli,
 			},
@@ -54,7 +54,7 @@ func BackupEtcdHosts(
 	dockerDialerFactory hosts.DialerFactory,
 	configDir, backupName string) error {
 
-	log.Infof(ctx, "Starting Backup on etcd hosts")
+	log.Infof(ctx, "Starting saving snapshot on etcd hosts")
 	kubeCluster, err := cluster.ParseCluster(ctx, rkeConfig, clusterFilePath, configDir, dockerDialerFactory, nil, nil)
 	if err != nil {
 		return err
@@ -67,7 +67,7 @@ func BackupEtcdHosts(
 		return err
 	}
 
-	log.Infof(ctx, "Finished backup on all etcd hosts")
+	log.Infof(ctx, "Finished saving snapshot on all etcd hosts")
 	return nil
 }
 
@@ -77,7 +77,7 @@ func RestoreEtcdBackup(
 	dockerDialerFactory hosts.DialerFactory,
 	configDir, backupName string) error {
 
-	log.Infof(ctx, "Starting restore on etcd hosts")
+	log.Infof(ctx, "Starting restoring snapshot on etcd hosts")
 	kubeCluster, err := cluster.ParseCluster(ctx, rkeConfig, clusterFilePath, configDir, dockerDialerFactory, nil, nil)
 	if err != nil {
 		return err
@@ -90,7 +90,7 @@ func RestoreEtcdBackup(
 		return err
 	}
 
-	log.Infof(ctx, "Finished restoring on all etcd hosts")
+	log.Infof(ctx, "Finished restoring snapshot on all etcd hosts")
 	return nil
 }
 
