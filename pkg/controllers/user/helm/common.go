@@ -12,6 +12,8 @@ import (
 
 	"time"
 
+	"encoding/base64"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/templatecontent"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -143,18 +145,30 @@ func convertTemplates(files map[string]string, templateContentClient mgmtv3.Temp
 }
 
 func generateTemplates(obj *v3.App, templateVersionClient mgmtv3.TemplateVersionInterface, templateContentClient mgmtv3.TemplateContentInterface) (string, string, error) {
-	templateVersionID, err := parseExternalID(obj.Spec.ExternalID)
-	if err != nil {
-		return "", "", err
+	files := map[string]string{}
+	if obj.Spec.ExternalID != "" {
+		templateVersionID, err := parseExternalID(obj.Spec.ExternalID)
+		if err != nil {
+			return "", "", err
+		}
+		templateVersion, err := templateVersionClient.Get(templateVersionID, metav1.GetOptions{})
+		if err != nil {
+			return "", "", err
+		}
+		files, err = convertTemplates(templateVersion.Spec.Files, templateContentClient)
+		if err != nil {
+			return "", "", err
+		}
+	} else {
+		for k, v := range obj.Spec.Files {
+			content, err := base64.StdEncoding.DecodeString(v)
+			if err != nil {
+				return "", "", err
+			}
+			files[k] = string(content)
+		}
 	}
-	templateVersion, err := templateVersionClient.Get(templateVersionID, metav1.GetOptions{})
-	if err != nil {
-		return "", "", err
-	}
-	files, err := convertTemplates(templateVersion.Spec.Files, templateContentClient)
-	if err != nil {
-		return "", "", err
-	}
+
 	tempDir, err := ioutil.TempDir("", "helm-")
 	if err != nil {
 		return "", "", err

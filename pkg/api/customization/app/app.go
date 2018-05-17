@@ -57,6 +57,8 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 			}
 		}
 	}
+	delete(resource.Values, "appliedFiles")
+	delete(resource.Values, "files")
 }
 
 func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {

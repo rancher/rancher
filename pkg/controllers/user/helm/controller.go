@@ -63,9 +63,6 @@ func (l *Lifecycle) Create(obj *v3.App) (*v3.App, error) {
 }
 
 func (l *Lifecycle) Updated(obj *v3.App) (*v3.App, error) {
-	if obj.Spec.ExternalID == "" {
-		return obj, nil
-	}
 	_, projectName := ref.Parse(obj.Spec.ProjectName)
 	appRevisionClient := l.AppRevisionGetter.AppRevisions(projectName)
 	if obj.Spec.AppRevisionName != "" {
@@ -73,8 +70,15 @@ func (l *Lifecycle) Updated(obj *v3.App) (*v3.App, error) {
 		if err != nil {
 			return nil, err
 		}
-		if currentRevision.Status.ExternalID == obj.Spec.ExternalID && reflect.DeepEqual(currentRevision.Status.Answers, obj.Spec.Answers) {
-			return obj, nil
+		if obj.Spec.ExternalID != "" {
+			if currentRevision.Status.ExternalID == obj.Spec.ExternalID && reflect.DeepEqual(currentRevision.Status.Answers, obj.Spec.Answers) {
+				return obj, nil
+			}
+		}
+		if obj.Status.AppliedFiles != nil {
+			if reflect.DeepEqual(obj.Status.AppliedFiles, obj.Spec.Files) && reflect.DeepEqual(currentRevision.Status.Answers, obj.Spec.Answers) {
+				return obj, nil
+			}
 		}
 	}
 
@@ -93,9 +97,6 @@ func (l *Lifecycle) Updated(obj *v3.App) (*v3.App, error) {
 }
 
 func (l *Lifecycle) Remove(obj *v3.App) (*v3.App, error) {
-	if obj.Spec.ExternalID == "" {
-		return obj, nil
-	}
 	tempDir, err := ioutil.TempDir("", "helm-")
 	if err != nil {
 		return obj, err
@@ -184,6 +185,9 @@ func (l *Lifecycle) Run(obj *v3.App, template, notes string) error {
 	}
 	obj.Spec.AppRevisionName = createdRevision.Name
 	obj.Status.Notes = notes
+	if obj.Spec.Files != nil {
+		obj.Status.AppliedFiles = obj.Spec.Files
+	}
 	return err
 }
 
