@@ -75,11 +75,12 @@ const (
 	ClusterCIDR = "ClusterCIDR"
 	// Images key names
 
-	Image            = "Image"
-	CNIImage         = "CNIImage"
-	NodeImage        = "NodeImage"
-	ControllersImage = "ControllersImage"
-	CanalFlannelImg  = "CanalFlannelImg"
+	Image              = "Image"
+	CNIImage           = "CNIImage"
+	NodeImage          = "NodeImage"
+	ControllersImage   = "ControllersImage"
+	CanalFlannelImg    = "CanalFlannelImg"
+	WeaveLoopbackImage = "WeaveLoopbackImage"
 
 	Calicoctl = "Calicoctl"
 
@@ -174,10 +175,11 @@ func (c *Cluster) doCanalDeploy(ctx context.Context) error {
 
 func (c *Cluster) doWeaveDeploy(ctx context.Context) error {
 	weaveConfig := map[string]string{
-		ClusterCIDR: c.ClusterCIDR,
-		Image:       c.SystemImages.WeaveNode,
-		CNIImage:    c.SystemImages.WeaveCNI,
-		RBACConfig:  c.Authorization.Mode,
+		ClusterCIDR:        c.ClusterCIDR,
+		Image:              c.SystemImages.WeaveNode,
+		CNIImage:           c.SystemImages.WeaveCNI,
+		WeaveLoopbackImage: c.SystemImages.Alpine,
+		RBACConfig:         c.Authorization.Mode,
 	}
 	pluginYaml, err := c.getNetworkPluginManifest(weaveConfig)
 	if err != nil {
