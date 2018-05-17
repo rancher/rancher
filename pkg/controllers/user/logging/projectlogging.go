@@ -1,9 +1,11 @@
 package logging
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/controller"
@@ -12,12 +14,14 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 	"github.com/rancher/rancher/pkg/controllers/user/logging/generator"
 	"github.com/rancher/rancher/pkg/controllers/user/logging/utils"
+	"github.com/rancher/rancher/pkg/ticker"
 )
 
 const (
@@ -39,7 +43,11 @@ type ProjectLoggingSyncer struct {
 	serviceAccounts      v1.ServiceAccountInterface
 }
 
-func registerProjectLogging(cluster *config.UserContext) {
+type projectLoggingEndpointWatcher struct {
+	projectLoggings v3.ProjectLoggingInterface
+}
+
+func registerProjectLogging(ctx context.Context, cluster *config.UserContext) {
 	projectLoggings := cluster.Management.Management.ProjectLoggings("")
 	syncer := &ProjectLoggingSyncer{
 		clusterName:          cluster.ClusterName,
@@ -52,7 +60,22 @@ func registerProjectLogging(cluster *config.UserContext) {
 		projectLoggings:      projectLoggings,
 		serviceAccounts:      cluster.Core.ServiceAccounts(loggingconfig.LoggingNamespace),
 	}
+
+	watcher := projectLoggingEndpointWatcher{
+		projectLoggings: projectLoggings,
+	}
+
 	projectLoggings.AddClusterScopedHandler("project-logging-controller", cluster.ClusterName, syncer.Sync)
+
+	go watcher.watch(ctx, watcherSyncInterval)
+}
+
+func (p *projectLoggingEndpointWatcher) watch(ctx context.Context, interval time.Duration) {
+	for range ticker.Context(ctx, interval) {
+		if err := p.checkTarget(); err != nil {
+			logrus.Error(err)
+		}
+	}
 }
 
 func (c *ProjectLoggingSyncer) Sync(key string, obj *v3.ProjectLogging) error {
@@ -157,4 +180,27 @@ func (c *ProjectLoggingSyncer) createOrUpdateProjectConfigMap(excludeName string
 		return errors.Wrap(err, "generate project config file failed")
 	}
 	return utils.UpdateConfigMap(loggingconfig.ProjectConfigPath, loggingconfig.ProjectLoggingName, "project", c.configmaps)
+}
+
+func (p *projectLoggingEndpointWatcher) checkTarget() error {
+	pls, err := p.projectLoggings.Controller().Lister().List("", labels.NewSelector())
+	if err != nil {
+		return errors.Wrapf(err, "list projectlogging fail in endpoint watcher")
+	}
+	if len(pls) == 0 {
+		return nil
+	}
+
+	var mergedErrs error
+	for _, v := range pls {
+		_, _, err = utils.GetWrapConfig(v.Spec.ElasticsearchConfig, v.Spec.SplunkConfig, v.Spec.SyslogConfig, v.Spec.KafkaConfig, nil)
+		if err != nil {
+			updatedObj := v.DeepCopy()
+			v3.LoggingConditionUpdated.False(updatedObj)
+			v3.LoggingConditionUpdated.Message(updatedObj, err.Error())
+			_, updateErr := p.projectLoggings.Update(updatedObj)
+			mergedErrs = mergedErrors(mergedErrs, errors.Wrapf(err, "%s:%s", v.Namespace, v.Name), updateErr)
+		}
+	}
+	return errors.Wrapf(mergedErrs, "check project logging reachable fail in watch endpoint")
 }
