@@ -73,7 +73,6 @@ func (ac *Client) getAccessToken(adCredential *v3public.BasicLogin, config *v3.A
 
 	authority, graphEndpoint, bodyconstruct, err := ac.uriEndpointConstruction(config)
 	if err != nil {
-		logrus.Errorf("Wrong Azure Domain %v is provided", domain)
 		return "", "", fmt.Errorf("Wrong Azure Domain %v is provided", domain)
 	}
 	body := bytes.Buffer{}
@@ -89,14 +88,12 @@ func (ac *Client) getAccessToken(adCredential *v3public.BasicLogin, config *v3.A
 
 	url, err := ac.getURL(authority, graphEndpoint, "TOKEN", config, "")
 	if err != nil {
-		logrus.Errorf("AzureAD GET url %v received error from Azure, err: %v", url, err)
-		return "", "", err
+		return "", "", fmt.Errorf("AzureAD GET url %v received error from Azure, err: %v", url, err)
 	}
 
 	resp, err := ac.postToAzureAD(url, body.String())
 	if err != nil {
-		logrus.Errorf("AzureAD getAccessToken: GET url %v received error from Azure, err: %v", url, err)
-		return "", "", err
+		return "", "", fmt.Errorf("AzureAD getAccessToken: GET url %v received error from Azure, err: %v", url, err)
 	}
 	defer resp.Body.Close()
 
@@ -104,18 +101,15 @@ func (ac *Client) getAccessToken(adCredential *v3public.BasicLogin, config *v3.A
 	var respMap map[string]interface{}
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		logrus.Errorf("AzureAD getAccessToken: received error reading response body, err: %v", err)
-		return "", "", err
+		return "", "", fmt.Errorf("AzureAD getAccessToken: received error reading response body, err: %v", err)
 	}
 
 	if err := json.Unmarshal(b, &respMap); err != nil {
-		logrus.Errorf("AzureAD getAccessToken: received error unmarshalling response body, err: %v", err)
-		return "", "", err
+		return "", "", fmt.Errorf("AzureAD getAccessToken: received error unmarshalling response body, err: %v", err)
 	}
 
 	if respMap["error"] != nil {
 		desc := respMap["error_description"]
-		logrus.Errorf("Received Error from AzureAD %v, description from AzureAD %v", respMap["error"], desc)
 		return "", "", fmt.Errorf("Received Error from AzureAD %v, description from AzureAD %v", respMap["error"], desc)
 	}
 
@@ -141,10 +135,8 @@ func (ac *Client) postToAzureAD(url string, body string) (*http.Response, error)
 
 	resp, err := ac.httpClient.Do(req)
 	if err != nil {
-		logrus.Errorf("Received error from azure: %v", err)
-		return resp, err
+		return resp, fmt.Errorf("Received error from azure: %v", err)
 	}
-	defer resp.Body.Close()
 
 	// Check the status code
 	switch resp.StatusCode {
@@ -153,7 +145,8 @@ func (ac *Client) postToAzureAD(url string, body string) (*http.Response, error)
 	default:
 		var body bytes.Buffer
 		io.Copy(&body, resp.Body)
-		return resp, fmt.Errorf("Request failed, got status code: %d. Response: %s",
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("Request failed, got status code: %d. Response: %s",
 			resp.StatusCode, body.Bytes())
 	}
 	return resp, nil
@@ -166,35 +159,30 @@ func (ac *Client) getUser(azureAccessToken string, config *v3.AzureADConfig) (Ac
 
 	authority, graphEndpoint, _, err := ac.uriEndpointConstruction(config)
 	if err != nil {
-		logrus.Errorf("Wrong Azure Domain %v is provided", config.Domain)
 		return Account{}, nil, fmt.Errorf("Wrong Azure Domain %v is provided", config.Domain)
 	}
 	url, err := ac.getURL(authority, graphEndpoint, "USER", config, "")
 	if err != nil {
-		logrus.Errorf("AzureAD GET url %v received error from azure, err: %v", url, err)
-		return Account{}, nil, err
+		return Account{}, nil, fmt.Errorf("AzureAD GET url %v received error from azure, err: %v", url, err)
 	}
 
 	var azureADAcct Account
 
 	resp, newAccessToken, providerInfo, err := ac.getFromAzureAD(azureAccessToken, config, url)
 	if err != nil {
-		logrus.Errorf("AzureAD getAzureADUser: GET url %v received error from Azure, err: %v", url, err)
-		return Account{}, nil, err
+		return Account{}, nil, fmt.Errorf("AzureAD getAzureADUser: GET url %v received error from Azure, err: %v", url, err)
 	}
 	defer resp.Body.Close()
 
 	if newAccessToken == "" {
 		azureADAcct, err = ac.parsingResponseForAccount(resp)
 		if err != nil {
-			logrus.Errorf("parsing response received error from azure, err: %v", err)
-			return Account{}, nil, err
+			return Account{}, nil, fmt.Errorf("parsing response received error from azure, err: %v", err)
 		}
 	} else {
 		newResp, _, newProviderInfo, err := ac.getFromAzureAD(newAccessToken, config, url)
 		if err != nil {
-			logrus.Errorf("AzureAD getAccessToken: GET url %v received error from azure, err: %v", url, err)
-			return Account{}, nil, err
+			return Account{}, nil, fmt.Errorf("AzureAD getAccessToken: GET url %v received error from azure, err: %v", url, err)
 		}
 		defer newResp.Body.Close()
 
@@ -212,35 +200,30 @@ func (ac *Client) getGroups(azureAccessToken string, config *v3.AzureADConfig) (
 	}
 	authority, graphEndpoint, _, err := ac.uriEndpointConstruction(config)
 	if err != nil {
-		logrus.Errorf("Wrong Azure Domain %v is provided", config.Domain)
 		return []Account{}, nil, fmt.Errorf("Wrong Azure Domain %v is provided", config.Domain)
 	}
 	url, err := ac.getURL(authority, graphEndpoint, "GROUP", config, "")
 	if err != nil {
-		logrus.Errorf("AzureAD GET url %v received error from azure, err: %v", url, err)
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("AzureAD GET url %v received error from azure, err: %v", url, err)
 	}
 
 	var azureADAccts []Account
 
 	resp, newAccessToken, providerInfo, err := ac.getFromAzureAD(azureAccessToken, config, url)
 	if err != nil {
-		logrus.Errorf("AzureAD getAzureADGroup: GET url %v received error from Azure, err: %v", url, err)
-		return []Account{}, nil, err
+		return []Account{}, nil, fmt.Errorf("AzureAD getAzureADGroup: GET url %v received error from Azure, err: %v", url, err)
 	}
 	defer resp.Body.Close()
 
 	if newAccessToken == "" {
 		azureADAccts, err = ac.parsingResponseForAccounts(resp)
 		if err != nil {
-			logrus.Errorf("parsing response received error from azure, err: %v", err)
-			return []Account{}, nil, err
+			return []Account{}, nil, fmt.Errorf("parsing response received error from azure, err: %v", err)
 		}
 	} else {
 		newResp, _, newProviderInfo, err := ac.getFromAzureAD(newAccessToken, config, url)
 		if err != nil {
-			logrus.Errorf("AzureAD getAccessToken: GET url %v received error from azure, err: %v", url, err)
-			return []Account{}, nil, err
+			return []Account{}, nil, fmt.Errorf("AzureAD getAccessToken: GET url %v received error from azure, err: %v", url, err)
 		}
 		defer newResp.Body.Close()
 
@@ -263,14 +246,12 @@ func (ac *Client) searchUsers(searchkey string, azureAccessToken string, config 
 
 	authority, graphEndpoint, _, err := ac.uriEndpointConstruction(config)
 	if err != nil {
-		logrus.Errorf("Wrong Azure Domain %v is provided", config.Domain)
 		return []Account{}, nil, fmt.Errorf("Wrong Azure Domain %v is provided", config.Domain)
 	}
 
 	url, err := ac.getURL(authority, graphEndpoint, "USERS", config, "")
 	if err != nil {
-		logrus.Errorf("AzureAD GET url %v received error from azure, err: %v", url, err)
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("AzureAD GET url %v received error from azure, err: %v", url, err)
 	}
 
 	var azureADAccts []Account
@@ -278,22 +259,19 @@ func (ac *Client) searchUsers(searchkey string, azureAccessToken string, config 
 	url = url + "&" + filter
 	resp, newAccessToken, providerInfo, err := ac.getFromAzureAD(azureAccessToken, config, url)
 	if err != nil {
-		logrus.Errorf("AzureAD getAccessToken: GET url %v received error from azure, err: %v", url, err)
-		return []Account{}, nil, err
+		return []Account{}, nil, fmt.Errorf("AzureAD getAccessToken: GET url %v received error from azure, err: %v", url, err)
 	}
 	defer resp.Body.Close()
 
 	if newAccessToken == "" {
 		azureADAccts, err = ac.parsingResponseForAccounts(resp)
 		if err != nil {
-			logrus.Errorf("parsing response received error from azure, err: %v", err)
-			return []Account{}, nil, err
+			return []Account{}, nil, fmt.Errorf("parsing response received error from azure, err: %v", err)
 		}
 	} else {
 		newResp, _, newProviderInfo, err := ac.getFromAzureAD(newAccessToken, config, url)
 		if err != nil {
-			logrus.Errorf("AzureAD getAccessToken: GET url %v received error from azure, err: %v", url, err)
-			return []Account{}, nil, err
+			return []Account{}, nil, fmt.Errorf("AzureAD getAccessToken: GET url %v received error from azure, err: %v", url, err)
 		}
 		defer newResp.Body.Close()
 
@@ -318,14 +296,12 @@ func (ac *Client) searchGroups(searchkey string, azureAccessToken string, config
 
 	authority, graphEndpoint, _, err := ac.uriEndpointConstruction(config)
 	if err != nil {
-		logrus.Errorf("Wrong Azure Domain %v is provided", config.Domain)
 		return []Account{}, nil, fmt.Errorf("Wrong Azure Domain %v is provided", config.Domain)
 	}
 
 	url, err := ac.getURL(authority, graphEndpoint, "GROUPS", config, "")
 	if err != nil {
-		logrus.Errorf("AzureAD GET url %v received error from azure, err: %v", url, err)
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("AzureAD GET url %v received error from azure, err: %v", url, err)
 	}
 
 	var azureADAccts []Account
@@ -333,22 +309,19 @@ func (ac *Client) searchGroups(searchkey string, azureAccessToken string, config
 	url = url + "&" + filter
 	resp, newAccessToken, providerInfo, err := ac.getFromAzureAD(azureAccessToken, config, url)
 	if err != nil {
-		logrus.Errorf("AzureAD getAccessToken: GET url %v received error from azure, err: %v", url, err)
-		return []Account{}, nil, err
+		return []Account{}, nil, fmt.Errorf("AzureAD getAccessToken: GET url %v received error from azure, err: %v", url, err)
 	}
 	defer resp.Body.Close()
 
 	if newAccessToken == "" {
 		azureADAccts, err = ac.parsingResponseForAccounts(resp)
 		if err != nil {
-			logrus.Errorf("parsing response received error from azure, err: %v", err)
-			return []Account{}, nil, err
+			return []Account{}, nil, fmt.Errorf("parsing response received error from azure, err: %v", err)
 		}
 	} else {
 		newResp, _, newProviderInfo, err := ac.getFromAzureAD(newAccessToken, config, url)
 		if err != nil {
-			logrus.Errorf("AzureAD getAccessToken: GET url %v received error from azure, err: %v", url, err)
-			return []Account{}, nil, err
+			return []Account{}, nil, fmt.Errorf("AzureAD getAccessToken: GET url %v received error from azure, err: %v", url, err)
 		}
 		defer newResp.Body.Close()
 
@@ -366,36 +339,31 @@ func (ac *Client) getUserByID(id string, azureAccessToken string, config *v3.Azu
 	}
 	authority, graphEndpoint, _, err := ac.uriEndpointConstruction(config)
 	if err != nil {
-		logrus.Errorf("Wrong Azure Domain %v is provided", config.Domain)
 		return Account{}, nil, fmt.Errorf("Wrong Azure Domain %v is provided", config.Domain)
 	}
 
 	url, err := ac.getURL(authority, graphEndpoint, "USERS", config, id)
 	if err != nil {
-		logrus.Errorf("AzureAD GET url %v received error from azure, err: %v", url, err)
-		return Account{}, nil, err
+		return Account{}, nil, fmt.Errorf("AzureAD GET url %v received error from azure, err: %v", url, err)
 	}
 
 	var azureADAcct Account
 
 	resp, newAccessToken, providerInfo, err := ac.getFromAzureAD(azureAccessToken, config, url)
 	if err != nil {
-		logrus.Errorf("AzureAD getAzureADUser: GET url %v received error from Azure, err: %v", url, err)
-		return Account{}, nil, err
+		return Account{}, nil, fmt.Errorf("AzureAD getAzureADUser: GET url %v received error from Azure, err: %v", url, err)
 	}
 	defer resp.Body.Close()
 
 	if newAccessToken == "" {
 		azureADAcct, err = ac.parsingResponseForAccount(resp)
 		if err != nil {
-			logrus.Errorf("parsing response received error from azure, err: %v", err)
-			return Account{}, nil, err
+			return Account{}, nil, fmt.Errorf("parsing response received error from azure, err: %v", err)
 		}
 	} else {
 		newResp, _, newProviderInfo, err := ac.getFromAzureAD(newAccessToken, config, url)
 		if err != nil {
-			logrus.Errorf("AzureAD getAccessToken: GET url %v received error from azure, err: %v", url, err)
-			return Account{}, nil, err
+			return Account{}, nil, fmt.Errorf("AzureAD getAccessToken: GET url %v received error from azure, err: %v", url, err)
 		}
 		defer newResp.Body.Close()
 
@@ -413,36 +381,31 @@ func (ac *Client) getGroupByID(id string, azureAccessToken string, config *v3.Az
 	}
 	authority, graphEndpoint, _, err := ac.uriEndpointConstruction(config)
 	if err != nil {
-		logrus.Errorf("Wrong Azure Domain %v is provided", config.Domain)
 		return Account{}, nil, fmt.Errorf("Wrong Azure Domain %v is provided", config.Domain)
 	}
 
 	url, err := ac.getURL(authority, graphEndpoint, "GROUPS", config, id)
 	if err != nil {
-		logrus.Errorf("AzureAD GET url %v received error from azure, err: %v", url, err)
-		return Account{}, nil, err
+		return Account{}, nil, fmt.Errorf("AzureAD GET url %v received error from azure, err: %v", url, err)
 	}
 
 	var azureADAcct Account
 
 	resp, newAccessToken, providerInfo, err := ac.getFromAzureAD(azureAccessToken, config, url)
 	if err != nil {
-		logrus.Errorf("AzureAD getAzureADGroup: GET url %v received error from Azure, err: %v", url, err)
-		return Account{}, nil, err
+		return Account{}, nil, fmt.Errorf("AzureAD getAzureADGroup: GET url %v received error from Azure, err: %v", url, err)
 	}
 	defer resp.Body.Close()
 
 	if newAccessToken == "" {
 		azureADAcct, err = ac.parsingResponseForAccount(resp)
 		if err != nil {
-			logrus.Errorf("parsing response received error from azure, err: %v", err)
-			return Account{}, nil, err
+			return Account{}, nil, fmt.Errorf("parsing response received error from azure, err: %v", err)
 		}
 	} else {
 		newResp, _, newProviderInfo, err := ac.getFromAzureAD(newAccessToken, config, url)
 		if err != nil {
-			logrus.Errorf("AzureAD getAccessToken: GET url %v received error from azure, err: %v", url, err)
-			return Account{}, nil, err
+			return Account{}, nil, fmt.Errorf("AzureAD getAccessToken: GET url %v received error from azure, err: %v", url, err)
 		}
 		defer newResp.Body.Close()
 
@@ -463,10 +426,8 @@ func (ac *Client) getFromAzureAD(azureAccessToken string, config *v3.AzureADConf
 	req.Header.Add("Accept", "application/json")
 	resp, err := ac.httpClient.Do(req)
 	if err != nil {
-		logrus.Errorf("Received error from azure: %v", err)
-		return resp, "", nil, err
+		return resp, "", nil, fmt.Errorf("Received error from azure: %v", err)
 	}
-	defer resp.Body.Close()
 
 	// Check the status code
 	switch resp.StatusCode {
@@ -477,12 +438,13 @@ func (ac *Client) getFromAzureAD(azureAccessToken string, config *v3.AzureADConf
 		var respMap map[string]interface{}
 		b, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			logrus.Errorf("AzureAD getAccessToken: received error reading response body, err: %v", err)
-			return resp, "", nil, err
+			return resp, "", nil, fmt.Errorf("AzureAD getAccessToken: received error reading response body, err: %v", err)
 		}
+
+		defer resp.Body.Close()
+
 		if err := json.Unmarshal(b, &respMap); err != nil {
-			logrus.Errorf("AzureAD getAccessToken: received error unmarshalling response body, err: %v", err)
-			return resp, "", nil, err
+			return resp, "", nil, fmt.Errorf("AzureAD getAccessToken: received error unmarshalling response body, err: %v", err)
 		}
 		if respMap["odata.error"] != nil {
 			odataError := respMap["odata.error"].(map[string]interface{})
@@ -490,16 +452,15 @@ func (ac *Client) getFromAzureAD(azureAccessToken string, config *v3.AzureADConf
 			if strings.EqualFold("Authentication_ExpiredToken", azureCode) {
 				newAccessToken, providerInfo, err := ac.refreshAccessToken(respMap, config)
 				if err != nil {
-					logrus.Errorf("AzureAD refresh AccessToken received error: %v", err)
-					return resp, "", nil, err
+					return resp, "", nil, fmt.Errorf("AzureAD refresh AccessToken received error: %v", err)
 				}
-				return resp, newAccessToken, providerInfo, err
+				return resp, newAccessToken, providerInfo, nil
 			}
 		}
 
 		var body bytes.Buffer
 		io.Copy(&body, resp.Body)
-		return resp, "", nil, fmt.Errorf("Request failed, got status code: %d. Response: %s",
+		return nil, "", nil, fmt.Errorf("Request failed, got status code: %d. Response: %s",
 			resp.StatusCode, body.Bytes())
 	}
 	return resp, "", nil, nil
@@ -548,7 +509,6 @@ func (ac *Client) refreshAccessToken(respMap map[string]interface{}, config *v3.
 
 	authority, graphEndpoint, _, err := ac.uriEndpointConstruction(config)
 	if err != nil {
-		logrus.Errorf("Wrong Azure Domain %v is provided", config.Domain)
 		return "", nil, fmt.Errorf("Wrong Azure Domain %v is provided", config.Domain)
 	}
 	body := bytes.Buffer{}
@@ -556,31 +516,26 @@ func (ac *Client) refreshAccessToken(respMap map[string]interface{}, config *v3.
 
 	url, err := ac.getURL(authority, graphEndpoint, "TOKEN", config, "")
 	if err != nil {
-		logrus.Errorf("AzureAD GET url %v received error from Azure, err: %v", url, err)
-		return "", nil, err
+		return "", nil, fmt.Errorf("AzureAD GET url %v received error from Azure, err: %v", url, err)
 	}
 
 	resp, err := ac.postToAzureAD(url, body.String())
 	if err != nil {
-		logrus.Errorf("AzureAD getAccessToken: GET url %v received error from Azure, err: %v", url, err)
-		return "", nil, err
+		return "", nil, fmt.Errorf("AzureAD getAccessToken: GET url %v received error from Azure, err: %v", url, err)
 	}
 	defer resp.Body.Close()
 
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		logrus.Errorf("AzureAD getAccessToken: received error reading response body, err: %v", err)
-		return "", nil, err
+		return "", nil, fmt.Errorf("AzureAD getAccessToken: received error reading response body, err: %v", err)
 	}
 
 	if err := json.Unmarshal(b, &respMap); err != nil {
-		logrus.Errorf("AzureAD getAccessToken: received error unmarshalling response body, err: %v", err)
-		return "", nil, err
+		return "", nil, fmt.Errorf("AzureAD getAccessToken: received error unmarshalling response body, err: %v", err)
 	}
 
 	if respMap["error"] != nil {
 		desc := respMap["error_description"]
-		logrus.Errorf("Received Error from AzureAD %v, description from AzureAD %v", respMap["error"], desc)
 		return "", nil, fmt.Errorf("Received Error from AzureAD %v, description from AzureAD %v", respMap["error"], desc)
 	}
 	newAccessToken := respMap["access_token"]
@@ -596,13 +551,11 @@ func (ac *Client) parsingResponseForAccount(resp *http.Response) (Account, error
 	var azureADAcct Account
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		logrus.Errorf("AzureAD error reading response, err: %v", err)
-		return Account{}, err
+		return Account{}, fmt.Errorf("AzureAD error reading response, err: %v", err)
 	}
 
 	if err := json.Unmarshal(b, &azureADAcct); err != nil {
-		logrus.Errorf("AzureAD error unmarshalling response, err: %v", err)
-		return Account{}, err
+		return Account{}, fmt.Errorf("AzureAD error unmarshalling response, err: %v", err)
 	}
 	return azureADAcct, nil
 }
@@ -610,14 +563,12 @@ func (ac *Client) parsingResponseForAccount(resp *http.Response) (Account, error
 func (ac *Client) parsingResponseForAccounts(resp *http.Response) ([]Account, error) {
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		logrus.Errorf("AzureAD error reading response, err: %v", err)
-		return []Account{}, err
+		return []Account{}, fmt.Errorf("AzureAD error reading response, err: %v", err)
 	}
 
 	result := &searchResult{}
 	if err := json.Unmarshal(b, result); err != nil {
-		logrus.Errorf("AzureAD error unmarshalling response, err: %v", err)
-		return []Account{}, err
+		return []Account{}, fmt.Errorf("AzureAD error unmarshalling response, err: %v", err)
 	}
 	return result.Items, nil
 }
