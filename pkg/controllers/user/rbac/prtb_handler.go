@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -279,7 +278,7 @@ func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource st
 	var rules []rbacv1.PolicyRule
 	if role.External {
 		externalRole, err := m.crLister.Get("", role.Name)
-		if err != nil && !clientbase.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			// dont error if it doesnt exist
 			return nil, err
 		}

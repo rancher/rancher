@@ -21,7 +21,7 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding
 metadata:
-  name: cattle
+  name: cattle-admin-binding
   namespace: cattle-system
 subjects:
 - kind: ServiceAccount
@@ -29,7 +29,7 @@ subjects:
   namespace: cattle-system
 roleRef:
   kind: ClusterRole
-  name: cluster-admin
+  name: cattle-admin
   apiGroup: rbac.authorization.k8s.io
 
 ---
@@ -43,6 +43,24 @@ type: Opaque
 data:
   url: "{{.URL}}"
   token: "{{.Token}}"
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cattle-admin
+rules:
+- apiGroups:
+  - '*'
+  resources:
+  - '*'
+  verbs:
+  - '*'
+- nonResourceURLs:
+  - '*'
+  verbs:
+  - '*'
 
 ---
 

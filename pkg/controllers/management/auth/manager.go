@@ -4,7 +4,6 @@ import (
 	"reflect"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/slice"
 	v13 "github.com/rancher/types/apis/core/v1"
@@ -545,7 +544,7 @@ func (m *manager) checkForManagementPlaneRules(role *v3.RoleTemplate, managmentP
 	var rules []v1.PolicyRule
 	if role.External {
 		externalRole, err := m.crLister.Get("", role.Name)
-		if err != nil && !clientbase.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			// dont error if it doesnt exist
 			return nil, err
 		}
