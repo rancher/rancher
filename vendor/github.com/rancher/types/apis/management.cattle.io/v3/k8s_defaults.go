@@ -138,7 +138,7 @@ var (
 		},
 		"v1.9.7-rancher2-1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.1.12"),
-			Kubernetes:                m("rancher/hyperkube:v1.9.7-rancher2-1"),
+			Kubernetes:                m("rancher/hyperkube:v1.9.7-rancher2"),
 			Alpine:                    m("rancher/rke-tools:v0.1.8"),
 			NginxProxy:                m("rancher/rke-tools:v0.1.8"),
 			CertDownloader:            m("rancher/rke-tools:v0.1.8"),
