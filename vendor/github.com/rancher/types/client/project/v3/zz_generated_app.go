@@ -9,11 +9,13 @@ const (
 	AppFieldAnnotations          = "annotations"
 	AppFieldAnswers              = "answers"
 	AppFieldAppRevisionId        = "appRevisionId"
+	AppFieldAppliedFiles         = "appliedFiles"
 	AppFieldConditions           = "conditions"
 	AppFieldCreated              = "created"
 	AppFieldCreatorID            = "creatorId"
 	AppFieldDescription          = "description"
 	AppFieldExternalID           = "externalId"
+	AppFieldFiles                = "files"
 	AppFieldLabels               = "labels"
 	AppFieldLastAppliedTemplates = "lastAppliedTemplate"
 	AppFieldName                 = "name"
@@ -35,11 +37,13 @@ type App struct {
 	Annotations          map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Answers              map[string]string `json:"answers,omitempty" yaml:"answers,omitempty"`
 	AppRevisionId        string            `json:"appRevisionId,omitempty" yaml:"appRevisionId,omitempty"`
+	AppliedFiles         map[string]string `json:"appliedFiles,omitempty" yaml:"appliedFiles,omitempty"`
 	Conditions           []AppCondition    `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	Created              string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Description          string            `json:"description,omitempty" yaml:"description,omitempty"`
 	ExternalID           string            `json:"externalId,omitempty" yaml:"externalId,omitempty"`
+	Files                map[string]string `json:"files,omitempty" yaml:"files,omitempty"`
 	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	LastAppliedTemplates string            `json:"lastAppliedTemplate,omitempty" yaml:"lastAppliedTemplate,omitempty"`
 	Name                 string            `json:"name,omitempty" yaml:"name,omitempty"`

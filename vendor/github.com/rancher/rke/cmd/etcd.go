@@ -3,20 +3,22 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
 func EtcdCommand() cli.Command {
-	backupRestoreFlags := []cli.Flag{
+	snapshotFlags := []cli.Flag{
 		cli.StringFlag{
 			Name:  "name",
-			Usage: "Specify Backup name",
+			Usage: "Specify Snapshot name",
 		},
 		cli.StringFlag{
 			Name:   "config",
@@ -26,33 +28,33 @@ func EtcdCommand() cli.Command {
 		},
 	}
 
-	backupRestoreFlags = append(backupRestoreFlags, commonFlags...)
+	snapshotFlags = append(snapshotFlags, commonFlags...)
 
 	return cli.Command{
 		Name:  "etcd",
-		Usage: "etcd backup/restore operations in k8s cluster",
+		Usage: "etcd snapshot save/restore operations in k8s cluster",
 		Subcommands: []cli.Command{
 			{
 				Name:   "snapshot-save",
 				Usage:  "Take snapshot on all etcd hosts",
-				Flags:  backupRestoreFlags,
-				Action: BackupEtcdHostsFromCli,
+				Flags:  snapshotFlags,
+				Action: SnapshotSaveEtcdHostsFromCli,
 			},
 			{
 				Name:   "snapshot-restore",
 				Usage:  "Restore existing snapshot",
-				Flags:  backupRestoreFlags,
-				Action: RestoreEtcdBackupFromCli,
+				Flags:  snapshotFlags,
+				Action: RestoreEtcdSnapshotFromCli,
 			},
 		},
 	}
 }
 
-func BackupEtcdHosts(
+func SnapshotSaveEtcdHosts(
 	ctx context.Context,
 	rkeConfig *v3.RancherKubernetesEngineConfig,
 	dockerDialerFactory hosts.DialerFactory,
-	configDir, backupName string) error {
+	configDir, snapshotName string) error {
 
 	log.Infof(ctx, "Starting saving snapshot on etcd hosts")
 	kubeCluster, err := cluster.ParseCluster(ctx, rkeConfig, clusterFilePath, configDir, dockerDialerFactory, nil, nil)
@@ -63,19 +65,19 @@ func BackupEtcdHosts(
 	if err := kubeCluster.TunnelHosts(ctx, false); err != nil {
 		return err
 	}
-	if err := kubeCluster.BackupEtcd(ctx, backupName); err != nil {
+	if err := kubeCluster.SnapshotEtcd(ctx, snapshotName); err != nil {
 		return err
 	}
 
-	log.Infof(ctx, "Finished saving snapshot on all etcd hosts")
+	log.Infof(ctx, "Finished saving snapshot [%s] on all etcd hosts", snapshotName)
 	return nil
 }
 
-func RestoreEtcdBackup(
+func RestoreEtcdSnapshot(
 	ctx context.Context,
 	rkeConfig *v3.RancherKubernetesEngineConfig,
 	dockerDialerFactory hosts.DialerFactory,
-	configDir, backupName string) error {
+	configDir, snapshotName string) error {
 
 	log.Infof(ctx, "Starting restoring snapshot on etcd hosts")
 	kubeCluster, err := cluster.ParseCluster(ctx, rkeConfig, clusterFilePath, configDir, dockerDialerFactory, nil, nil)
@@ -86,15 +88,15 @@ func RestoreEtcdBackup(
 	if err := kubeCluster.TunnelHosts(ctx, false); err != nil {
 		return err
 	}
-	if err := kubeCluster.RestoreEtcdBackup(ctx, backupName); err != nil {
+	if err := kubeCluster.RestoreEtcdSnapshot(ctx, snapshotName); err != nil {
 		return err
 	}
 
-	log.Infof(ctx, "Finished restoring snapshot on all etcd hosts")
+	log.Infof(ctx, "Finished restoring snapshot [%s] on all etcd hosts", snapshotName)
 	return nil
 }
 
-func BackupEtcdHostsFromCli(ctx *cli.Context) error {
+func SnapshotSaveEtcdHostsFromCli(ctx *cli.Context) error {
 	clusterFile, filePath, err := resolveClusterFile(ctx)
 	if err != nil {
 		return fmt.Errorf("Failed to resolve cluster file: %v", err)
@@ -110,11 +112,16 @@ func BackupEtcdHostsFromCli(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-
-	return BackupEtcdHosts(context.Background(), rkeConfig, nil, "", ctx.String("name"))
+	// Check snapshot name
+	etcdSnapshotName := ctx.String("name")
+	if etcdSnapshotName == "" {
+		etcdSnapshotName = fmt.Sprintf("rke_etcd_snapshot_%s", time.Now().Format(time.RFC3339))
+		logrus.Warnf("Name of the snapshot is not specified using [%s]", etcdSnapshotName)
+	}
+	return SnapshotSaveEtcdHosts(context.Background(), rkeConfig, nil, "", etcdSnapshotName)
 }
 
-func RestoreEtcdBackupFromCli(ctx *cli.Context) error {
+func RestoreEtcdSnapshotFromCli(ctx *cli.Context) error {
 	clusterFile, filePath, err := resolveClusterFile(ctx)
 	if err != nil {
 		return fmt.Errorf("Failed to resolve cluster file: %v", err)
@@ -130,7 +137,10 @@ func RestoreEtcdBackupFromCli(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-
-	return RestoreEtcdBackup(context.Background(), rkeConfig, nil, "", ctx.String("name"))
+	etcdSnapshotName := ctx.String("name")
+	if etcdSnapshotName == "" {
+		return fmt.Errorf("You must specify the snapshot name to restore")
+	}
+	return RestoreEtcdSnapshot(context.Background(), rkeConfig, nil, "", etcdSnapshotName)
 
 }

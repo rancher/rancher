@@ -21,6 +21,7 @@ type AppSpec struct {
 	Description     string            `json:"description,omitempty"`
 	TargetNamespace string            `json:"targetNamespace,omitempty"`
 	ExternalID      string            `json:"externalId,omitempty"`
+	Files           map[string]string `json:"files,omitempty"`
 	Answers         map[string]string `json:"answers,omitempty"`
 	AppRevisionName string            `json:"appRevisionName,omitempty" norman:"type=reference[/v3/project/schemas/apprevision]"`
 	Prune           bool              `json:"prune,omitempty"`
@@ -31,9 +32,10 @@ var (
 )
 
 type AppStatus struct {
-	Notes                string         `json:"notes,omitempty"`
-	Conditions           []AppCondition `json:"conditions,omitempty"`
-	LastAppliedTemplates string         `json:"lastAppliedTemplate,omitempty"`
+	AppliedFiles         map[string]string `json:"appliedFiles,omitempty"`
+	Notes                string            `json:"notes,omitempty"`
+	Conditions           []AppCondition    `json:"conditions,omitempty"`
+	LastAppliedTemplates string            `json:"lastAppliedTemplate,omitempty"`
 }
 
 type AppCondition struct {
