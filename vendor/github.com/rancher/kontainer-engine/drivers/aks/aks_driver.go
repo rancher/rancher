@@ -333,8 +333,15 @@ const updatingStatus = "Updating"
 
 const pollInterval = 30
 
-// Create implements driver interface
 func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *types.ClusterInfo) (*types.ClusterInfo, error) {
+	return d.createOrUpdate(ctx, options)
+}
+
+func (d *Driver) Update(ctx context.Context, info *types.ClusterInfo, options *types.DriverOptions) (*types.ClusterInfo, error) {
+	return d.createOrUpdate(ctx, options)
+}
+
+func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOptions) (*types.ClusterInfo, error) {
 	driverState, err := getStateFromOptions(options)
 	if err != nil {
 		return nil, err
@@ -519,12 +526,6 @@ func getState(info *types.ClusterInfo) (state, error) {
 	}
 
 	return state, err
-}
-
-// Update implements driver interface
-func (d *Driver) Update(ctx context.Context, info *types.ClusterInfo, options *types.DriverOptions) (*types.ClusterInfo, error) {
-	// todo: implement
-	return nil, fmt.Errorf("not implemented")
 }
 
 func (d *Driver) GetVersion(ctx context.Context, info *types.ClusterInfo) (*types.KubernetesVersion, error) {
@@ -781,7 +782,6 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 	return info, nil
 }
 
-// Remove implements driver interface
 func (d *Driver) Remove(ctx context.Context, info *types.ClusterInfo) error {
 	state, err := getState(info)
 
