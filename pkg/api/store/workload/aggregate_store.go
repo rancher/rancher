@@ -185,7 +185,7 @@ func streamStore(eg *errgroup.Group, apiContext *types.APIContext, schema *types
 		logrus.Debugf("watching %s", schema.ID)
 
 		for e := range events {
-			result <- e
+			result <- capabilitiesToUpperCase(e)
 		}
 
 		return errors.New("disconnect")
