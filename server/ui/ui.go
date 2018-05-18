@@ -3,9 +3,7 @@ package ui
 import (
 	"io"
 	"net/http"
-	"os"
 	"path/filepath"
-	"strings"
 
 	"crypto/tls"
 
@@ -30,14 +28,16 @@ func Content() http.Handler {
 
 func UI(next http.Handler) http.Handler {
 	local := false
-	_, err := os.Stat(indexHTML())
-	if err == nil {
-		local = true
-	}
-
-	if local && !strings.HasPrefix(settings.ServerVersion.Get(), "v") {
-		local = false
-	}
+	// @NOTE this is disabled to make it possible for us to load our ui
+	// customizations from our own remote
+	// _, err := os.Stat(indexHTML())
+	// if err == nil {
+	// 	local = true
+	// }
+	//
+	// if local && !strings.HasPrefix(settings.ServerVersion.Get(), "v") {
+	// 	local = false
+	// }
 
 	return http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 		if parse.IsBrowser(req, true) {
