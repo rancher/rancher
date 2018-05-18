@@ -6058,15 +6058,6 @@ func (in *RoleTemplate) DeepCopyInto(out *RoleTemplate) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.Enabled != nil {
-		in, out := &in.Enabled, &out.Enabled
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
-	}
 	if in.RoleTemplateNames != nil {
 		in, out := &in.RoleTemplateNames, &out.RoleTemplateNames
 		*out = make([]string, len(*in))

@@ -73,18 +73,15 @@ type RoleTemplate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	DisplayName string              `json:"displayName,omitempty" norman:"required"`
-	Description string              `json:"description"`
-	Rules       []rbacv1.PolicyRule `json:"rules,omitempty"`
-	Builtin     bool                `json:"builtin" norman:"nocreate,noupdate"`
-	External    bool                `json:"external"`
-	Hidden      bool                `json:"hidden"`
-	// Enabled is a bool pointer so that it will be backwards compatible with previous versions of rancher. This field
-	// did not always exist. If it were a normal bool, old resources would default to false. With a pointer we can
-	// interpret the absence (nil) of the field to mean true.
-	Enabled           *bool    `json:"enabled,omitempty" norman:"type=boolean,default=true"`
-	Context           string   `json:"context" norman:"type=string,options=project|cluster"`
-	RoleTemplateNames []string `json:"roleTemplateNames,omitempty" norman:"type=array[reference[roleTemplate]]"`
+	DisplayName       string              `json:"displayName,omitempty" norman:"required"`
+	Description       string              `json:"description"`
+	Rules             []rbacv1.PolicyRule `json:"rules,omitempty"`
+	Builtin           bool                `json:"builtin" norman:"nocreate,noupdate"`
+	External          bool                `json:"external"`
+	Hidden            bool                `json:"hidden"`
+	Locked            bool                `json:"locked,omitempty" norman:"type=boolean"`
+	Context           string              `json:"context" norman:"type=string,options=project|cluster"`
+	RoleTemplateNames []string            `json:"roleTemplateNames,omitempty" norman:"type=array[reference[roleTemplate]]"`
 }
 
 type PodSecurityPolicyTemplate struct {

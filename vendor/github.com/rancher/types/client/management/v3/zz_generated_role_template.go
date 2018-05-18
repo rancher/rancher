@@ -12,10 +12,10 @@ const (
 	RoleTemplateFieldCreated         = "created"
 	RoleTemplateFieldCreatorID       = "creatorId"
 	RoleTemplateFieldDescription     = "description"
-	RoleTemplateFieldEnabled         = "enabled"
 	RoleTemplateFieldExternal        = "external"
 	RoleTemplateFieldHidden          = "hidden"
 	RoleTemplateFieldLabels          = "labels"
+	RoleTemplateFieldLocked          = "locked"
 	RoleTemplateFieldName            = "name"
 	RoleTemplateFieldOwnerReferences = "ownerReferences"
 	RoleTemplateFieldRemoved         = "removed"
@@ -32,10 +32,10 @@ type RoleTemplate struct {
 	Created         string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID       string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Description     string            `json:"description,omitempty" yaml:"description,omitempty"`
-	Enabled         *bool             `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	External        bool              `json:"external,omitempty" yaml:"external,omitempty"`
 	Hidden          bool              `json:"hidden,omitempty" yaml:"hidden,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Locked          bool              `json:"locked,omitempty" yaml:"locked,omitempty"`
 	Name            string            `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
