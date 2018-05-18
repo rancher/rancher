@@ -101,6 +101,8 @@ func (s *Schemas) setupFilters(schema *Schema) {
 			mods = []ModifierType{ModifierEQ, ModifierNE, ModifierIn, ModifierNotIn}
 		case "dnsLabel":
 			fallthrough
+		case "hostname":
+			fallthrough
 		case "string":
 			mods = []ModifierType{ModifierEQ, ModifierNE, ModifierIn, ModifierNotIn}
 		case "int":
