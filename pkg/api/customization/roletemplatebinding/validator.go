@@ -46,8 +46,8 @@ func (v *Validator) ValidateRoleTemplateBinding(obj interface{}) error {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error getting role template: %v", err))
 	}
 
-	if roleTemplate.Enabled != nil && !*roleTemplate.Enabled {
-		return httperror.NewAPIError(httperror.InvalidState, "Role is disabled and cannot be assigned")
+	if roleTemplate.Locked {
+		return httperror.NewAPIError(httperror.InvalidState, "Role is locked and cannot be assigned")
 	}
 
 	return nil
