@@ -14,6 +14,8 @@
 #     VERSION="${COMMIT}${DIRTY}"
 # fi
 
+VERSION="v2.0.0"
+
 if [ -z "$ARCH" ]; then
     ARCH=amd64
 fi
