@@ -326,21 +326,7 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 			schema.CollectionMethods = []string{}
 			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
 		}).
-		MustImport(&Version, v3.ActiveDirectoryTestAndApplyInput{}).
-		// AzureAD Config
-		MustImportAndCustomize(&Version, v3.AzureADConfig{}, func(schema *types.Schema) {
-			schema.BaseType = "authConfig"
-			schema.ResourceActions = map[string]types.Action{
-				"disable": {},
-				"testAndApply": {
-					Input: "azureADTestAndApplyInput",
-				},
-			}
-			schema.CollectionMethods = []string{}
-			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
-		}).
-		MustImport(&Version, v3.AzureADTestAndApplyInput{})
-
+		MustImport(&Version, v3.ActiveDirectoryTestAndApplyInput{})
 }
 
 func userTypes(schema *types.Schemas) *types.Schemas {
