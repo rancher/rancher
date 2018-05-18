@@ -158,6 +158,7 @@ func (m *NodesSyncer) reconcileAll() error {
 
 	machines, err := m.machineLister.List(m.clusterNamespace, labels.NewSelector())
 	machineMap := make(map[string]*v3.Node)
+	toDelete := make(map[string]*v3.Node)
 	for _, machine := range machines {
 		node, err := m.getNode(machine, nodes)
 		if err != nil {
@@ -165,6 +166,7 @@ func (m *NodesSyncer) reconcileAll() error {
 		}
 		if node == nil {
 			logrus.Debugf("Failed to get node for machine [%s]", machine.Name)
+			toDelete[machine.Name] = machine
 			continue
 		}
 		machineMap[node.Name] = machine
@@ -188,6 +190,12 @@ func (m *NodesSyncer) reconcileAll() error {
 			if err := m.removeNode(machine); err != nil {
 				return err
 			}
+		}
+	}
+
+	for _, machine := range toDelete {
+		if err := m.removeNode(machine); err != nil {
+			return err
 		}
 	}
 
