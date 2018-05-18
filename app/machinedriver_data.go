@@ -38,8 +38,8 @@ func addMachineDrivers(management *config.ManagementContext) error {
 		return err
 	}
 
-	if err := addMachineDriver("aliyunecs", "http://machine-driver.oss-cn-shanghai.aliyuncs.com/aliyun/1.0.1/linux/amd64/docker-machine-driver-aliyunecs.tgz",
-		"f13d3366c5f84fcb5b5840087bddedf0", []string{"ecs.aliyuncs.com"}, false, false, management); err != nil {
+	if err := addMachineDriver("aliyunecs", "http://machine-driver.oss-cn-shanghai.aliyuncs.com/aliyun/1.0.2/linux/amd64/docker-machine-driver-aliyunecs.tgz",
+		"c31b9da2c977e70c2eeee5279123a95d", []string{"ecs.aliyuncs.com"}, false, false, management); err != nil {
 		return err
 	}
 
