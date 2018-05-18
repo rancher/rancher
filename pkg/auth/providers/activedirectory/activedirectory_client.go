@@ -102,6 +102,7 @@ func (p *adProvider) userRecord(search *ldapv2.SearchRequest, lConn *ldapv2.Conn
 func (p *adProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) (v3.Principal, []v3.Principal, error) {
 	var groupPrincipals []v3.Principal
 	var userPrincipal v3.Principal
+	var nilPrincipal []v3.Principal
 
 	entry := result.Entries[0]
 	if !ldap.HasPermission(entry.Attributes, config) {
@@ -131,42 +132,33 @@ func (p *adProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult, 
 	}
 	userPrincipal.Me = true
 
-	if len(memberOf) != 0 {
-		lConn, err := ldap.NewLDAPConn(config, caPool)
-		if err != nil {
-			return userPrincipal, groupPrincipals, err
-		}
-		defer lConn.Close()
-		for i := 0; i < len(memberOf); i += 50 {
-			batch := memberOf[i:min(i+50, len(memberOf))]
-			groupPrincipalListBatch, err := p.getGroupPrincipals(batch, lConn, config)
-			if err != nil {
-				return userPrincipal, groupPrincipals, err
-			}
-			groupPrincipals = append(groupPrincipals, groupPrincipalListBatch...)
-		}
+	// As per https://msdn.microsoft.com/en-us/library/aa746475%28VS.85%29.aspx, `(member:1.2.840.113556.1.4.1941:=cn=user1,cn=users,DC=x)`
+	// query can fetch all groups that the user is a member of, including nested groups
+	userDN := result.Entries[0].DN
+	nestedGroupsQuery := "(" + config.GroupMemberMappingAttribute + ":1.2.840.113556.1.4.1941:=" + ldapv2.EscapeFilter(userDN) + ")"
+	logrus.Debugf("AD: Query for pulling user's groups: %v", nestedGroupsQuery)
+	searchBase := config.UserSearchBase
+	if config.GroupSearchBase != "" {
+		searchBase = config.GroupSearchBase
 	}
-	return userPrincipal, groupPrincipals, nil
-}
+	search := ldapv2.NewSearchRequest(searchBase,
+		ldapv2.ScopeWholeSubtree, ldapv2.NeverDerefAliases, 0, 0, false,
+		nestedGroupsQuery,
+		ldap.GetGroupSearchAttributes(MemberOfAttribute, ObjectClassAttribute, config), nil)
 
-func min(a int, b int) int {
-	if a < b {
-		return a
+	lConn, err := ldap.NewLDAPConn(config, caPool)
+	if err != nil {
+		return userPrincipal, groupPrincipals, err
 	}
-	return b
-}
 
-func (p *adProvider) getGroupPrincipals(groupDN []string, lConn *ldapv2.Conn, config *v3.ActiveDirectoryConfig) ([]v3.Principal, error) {
-	var nilPrincipal []v3.Principal
-	// Bind before query
-	// If service acc bind fails, and auth is on, return principal formed using DN
 	serviceAccountUsername := ldap.GetUserExternalID(config.ServiceAccountUsername, config.DefaultLoginDomain)
-	err := lConn.Bind(serviceAccountUsername, config.ServiceAccountPassword)
+	err = lConn.Bind(serviceAccountUsername, config.ServiceAccountPassword)
 
 	if err != nil {
 		if ldapv2.IsErrorWithCode(err, ldapv2.LDAPResultInvalidCredentials) && config.Enabled {
+			// If bind fails because service account password has changed, just return identities formed from groups in `memberOf`
 			groupList := []v3.Principal{}
-			for _, dn := range groupDN {
+			for _, dn := range memberOf {
 				grp := v3.Principal{
 					ObjectMeta:    metav1.ObjectMeta{Name: GroupScope + "://" + dn},
 					DisplayName:   dn,
@@ -176,39 +168,20 @@ func (p *adProvider) getGroupPrincipals(groupDN []string, lConn *ldapv2.Conn, co
 				}
 				groupList = append(groupList, grp)
 			}
-			return groupList, nil
+			return userPrincipal, groupList, nil
 		}
-		return []v3.Principal{}, fmt.Errorf("Error in ldap bind: %v", err)
+		return userPrincipal, groupPrincipals, err
 	}
 
-	filter := "(" + ObjectClassAttribute + "=" + config.GroupObjectClass + ")"
-	query := "(|"
-	for _, attrib := range groupDN {
-		query += "(distinguishedName=" + ldapv2.EscapeFilter(attrib) + ")"
-	}
-	query += ")"
-	query = "(&" + filter + query + ")"
-	// Pulling user's groups
-	logrus.Debugf("AD: Query for pulling user's groups: %v", query)
-	searchDomain := config.UserSearchBase
-	if config.GroupSearchBase != "" {
-		searchDomain = config.GroupSearchBase
-	}
-	search := ldapv2.NewSearchRequest(searchDomain,
-		ldapv2.ScopeWholeSubtree, ldapv2.NeverDerefAliases, 0, 0, false,
-		query,
-		ldap.GetGroupSearchAttributes(MemberOfAttribute, ObjectClassAttribute, config), nil)
-
-	result, err := lConn.Search(search)
+	result, err = lConn.SearchWithPaging(search, 1000)
 	if err != nil {
 		// check errors
 		if ldapErr, ok := err.(*ldapv2.Error); ok && ldapErr.ResultCode == 32 {
-			return nil, httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("%v not found", searchDomain))
+			return userPrincipal, groupPrincipals, err
 		}
-		return nil, httperror.WrapAPIError(errors.Wrapf(err, "server returned error for search %v %v: %v", search.BaseDN, query, err), httperror.ServerError, "Internal server error")
+		return userPrincipal, groupPrincipals, httperror.WrapAPIError(errors.Wrapf(err, "server returned error for search %v %v: %v", search.BaseDN, nestedGroupsQuery, err), httperror.ServerError, "Internal server error")
 	}
 
-	principals := []v3.Principal{}
 	for _, e := range result.Entries {
 		principal, err := p.attributesToPrincipal(e.Attributes, e.DN, GroupScope, config)
 		if err != nil {
@@ -221,11 +194,10 @@ func (p *adProvider) getGroupPrincipals(groupDN []string, lConn *ldapv2.Conn, co
 		}
 		if !reflect.DeepEqual(principal, nilPrincipal) {
 			principal.MemberOf = true
-			principals = append(principals, *principal)
+			groupPrincipals = append(groupPrincipals, *principal)
 		}
 	}
-
-	return principals, nil
+	return userPrincipal, groupPrincipals, nil
 }
 
 func (p *adProvider) getPrincipal(distinguishedName string, scope string, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) (*v3.Principal, error) {
