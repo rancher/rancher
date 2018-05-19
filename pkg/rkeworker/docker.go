@@ -16,7 +16,8 @@ import (
 )
 
 const (
-	RKEContainerNameLabel = "io.rancher.rke.container.name"
+	RKEContainerNameLabel  = "io.rancher.rke.container.name"
+	CattleProcessNameLabel = "io.cattle.process.name"
 )
 
 type NodeConfig struct {
@@ -34,6 +35,9 @@ func runProcess(ctx context.Context, name string, p v3.Process, start bool) erro
 
 	args := filters.NewArgs()
 	args.Add("label", RKEContainerNameLabel+"="+name)
+	// to handle upgrades of old container
+	oldArgs := filters.NewArgs()
+	oldArgs.Add("label", CattleProcessNameLabel+"="+name)
 
 	containers, err := c.ContainerList(ctx, types.ContainerListOptions{
 		All:     true,
@@ -42,7 +46,14 @@ func runProcess(ctx context.Context, name string, p v3.Process, start bool) erro
 	if err != nil {
 		return err
 	}
-
+	oldContainers, err := c.ContainerList(ctx, types.ContainerListOptions{
+		All:     true,
+		Filters: oldArgs,
+	})
+	if err != nil {
+		return err
+	}
+	containers = append(containers, oldContainers...)
 	var matchedContainers []types.Container
 	for _, container := range containers {
 		changed, err := changed(ctx, c, p, container)
