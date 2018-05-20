@@ -170,9 +170,9 @@ func (p *adProvider) getActiveDirectoryConfig() (*v3.ActiveDirectoryConfig, *x50
 		return nil, nil, fmt.Errorf("failed to retrieve ActiveDirectoryConfig metadata, cannot read k8s Unstructured data")
 	}
 
-	typemeta := &metav1.ObjectMeta{}
-	mapstructure.Decode(metadataMap, typemeta)
-	storedADConfig.ObjectMeta = *typemeta
+	objectMeta := &metav1.ObjectMeta{}
+	mapstructure.Decode(metadataMap, objectMeta)
+	storedADConfig.ObjectMeta = *objectMeta
 
 	if p.certs != storedADConfig.Certificate || p.caPool == nil {
 		pool, err := newCAPool(storedADConfig.Certificate)
