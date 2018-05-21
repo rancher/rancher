@@ -397,6 +397,7 @@ func Pipeline(schemas *types.Schemas, management *config.ScaledContext) {
 func Project(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.ProjectType)
 	schema.Formatter = projectaction.Formatter
+	schema.Validator = projectaction.NewValidator(management)
 	handler := &projectaction.Handler{
 		Projects:       management.Management.Projects(""),
 		ProjectLister:  management.Management.Projects("").Controller().Lister(),
