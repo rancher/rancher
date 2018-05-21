@@ -41,6 +41,7 @@ func NewTransformStore(store types.Store) types.Store {
 				delete(data, "nodeId")
 				values.PutValue(data, nodeID, "scheduling", "node", "nodeId")
 			}
+			setTransitioning(apiContext, data)
 			return data, nil
 		},
 	}
@@ -58,6 +59,33 @@ func SetPublicEnpointsFields(data map[string]interface{}) {
 			epMap["serviceId"] = epMap["serviceName"]
 			epMap["nodeId"] = epMap["nodeName"]
 			epMap["ingressId"] = epMap["ingressName"]
+		}
+	}
+}
+
+func setTransitioning(apiContext *types.APIContext, data map[string]interface{}) {
+	if data["transitioning"] == "yes" || data["transitioning"] == "error" {
+		return
+	}
+	workloadType := convert.ToString(values.GetValueN(data, "type"))
+	switch workloadType {
+	case "/v3/project/schemas/deployment":
+		update(data, "deploymentStatus", "replicas", "readyReplicas")
+	case "/v3/project/schemas/daemonSet":
+		update(data, "daemonSetStatus", "desiredNumberScheduled", "numberReady")
+	case "/v3/project/schemas/statefulSet":
+		update(data, "statefulSetStatus", "replicas", "readyReplicas")
+	}
+}
+
+func update(data map[string]interface{}, statusField string, desiredField string, currField string) {
+	if desiredNum, err := convert.ToNumber(values.GetValueN(data, statusField, desiredField)); err == nil {
+		if readyNum, err := convert.ToNumber(values.GetValueN(data, statusField, currField)); err == nil {
+			if desiredNum != readyNum {
+				data["state"] = "updating"
+				data["transitioning"] = "yes"
+				data["transitioningMessage"] = "upgrading workload"
+			}
 		}
 	}
 }
