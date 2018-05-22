@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	"github.com/rancher/rancher/pkg/controllers/user/alert"
+	"github.com/rancher/rancher/pkg/controllers/user/approuter"
 	"github.com/rancher/rancher/pkg/controllers/user/dnsrecord"
 	"github.com/rancher/rancher/pkg/controllers/user/endpoints"
 	"github.com/rancher/rancher/pkg/controllers/user/externalservice"
@@ -44,6 +45,7 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 	podsecuritypolicy.RegisterTemplate(cluster)
 	secret.Register(cluster)
 	endpoints.Register(ctx, cluster)
+	approuter.Register(ctx, cluster)
 
 	userOnlyContext := cluster.UserOnlyContext()
 	dnsrecord.Register(ctx, userOnlyContext)
