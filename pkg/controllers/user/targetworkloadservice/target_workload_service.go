@@ -136,7 +136,7 @@ func (c *Controller) updateServiceWorkloadPods(key string, workloadIDsToCleanup 
 	var workloadsToCleanup []*util.Workload
 	for workloadID := range workloadIDsToCleanup {
 		workload, err := c.workloadLister.GetByWorkloadID(workloadID)
-		if err != nil {
+		if err != nil || workload == nil {
 			logrus.Warnf("Failed to fetch workload [%s]: [%v]", workloadID, err)
 			continue
 		}
@@ -193,7 +193,7 @@ func (c *Controller) updatePods(serviceName string, obj *corev1.Service, workloa
 	targetWorkloadIDs := map[string]bool{}
 	for _, workloadID := range workloadIDs {
 		targetWorkload, err := c.workloadLister.GetByWorkloadID(workloadID)
-		if err != nil {
+		if err != nil || targetWorkload == nil {
 			logrus.Warnf("Failed to fetch workload [%s]: [%v]", workloadID, err)
 			continue
 		}
@@ -207,7 +207,6 @@ func (c *Controller) updatePods(serviceName string, obj *corev1.Service, workloa
 		targetWorkloadIDs[workloadID] = true
 
 		// Find all the pods satisfying deployments' selectors
-
 		for _, pod := range pods {
 			if pod.DeletionTimestamp != nil {
 				continue
@@ -261,20 +260,21 @@ func (c *PodController) sync(key string, obj *corev1.Pod) error {
 
 	workloadServicesLabels := map[string]string{}
 	for workloadServiceUUID := range workloadServiceUUIDsToAdd {
-		splitted := strings.Split(workloadServiceUUID, "/")
-		workloadService, err := c.serviceLister.Get(splitted[0], splitted[1])
-		if err != nil {
-			return err
+		parts := strings.Split(workloadServiceUUID, "/")
+		workloadService, err := c.serviceLister.Get(parts[0], parts[1])
+		if err != nil || workloadService == nil {
+			logrus.Warnf("Failed to fetch service [%s]: [%v]", workloadService, err)
+			continue
 		}
+
 		for key, value := range workloadService.Spec.Selector {
 			workloadServicesLabels[key] = value
 		}
 	}
 
-	toUpdate := obj.DeepCopy()
 	// remove old labels
 	labels := map[string]string{}
-	for key, value := range toUpdate.Labels {
+	for key, value := range obj.Labels {
 		if strings.HasPrefix(key, WorkloadIDLabelPrefix) {
 			if _, ok := workloadServicesLabels[key]; !ok {
 				continue
@@ -288,14 +288,11 @@ func (c *PodController) sync(key string, obj *corev1.Pod) error {
 		labels[key] = value
 	}
 
-	toUpdate.Labels = labels
 	if reflect.DeepEqual(obj.Labels, labels) {
 		return nil
 	}
+	toUpdate := obj.DeepCopy()
+	toUpdate.Labels = labels
 	_, err = c.pods.Update(toUpdate)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
