@@ -59,15 +59,45 @@ func formatData(id string, data map[string]interface{}, forFrontend bool) {
 	}
 
 	// transform rules
-	if paths, ok := getPaths(data); ok {
+	if paths, ok, flag := getPaths(data); ok {
 		for hostpath, target := range paths {
 			updateRule(target, id, hostpath.host, hostpath.path, forFrontend, data, oldState, newState)
+		}
+		if flag {
+			updateDataRules(data)
 		}
 	}
 
 	updateCerts(data, forFrontend, oldState, newState)
 	setState(data, newState)
 	workload.SetPublicEnpointsFields(data)
+}
+
+func updateDataRules(data map[string]interface{}) {
+	v, ok := values.GetValue(data, "rules")
+	if !ok {
+		return
+	}
+	var updated []interface{}
+	rules := convert.ToInterfaceSlice(v)
+	for _, rule := range rules {
+		converted := convert.ToMapInterface(rule)
+		paths, ok := converted["paths"]
+		if ok {
+			pathMap := convert.ToMapInterface(paths)
+			for path, target := range pathMap {
+				targetMap := convert.ToMapInterface(target)
+				serviceID := convert.ToString(values.GetValueN(targetMap, "serviceId"))
+				if serviceID == "" {
+					delete(pathMap, path)
+				}
+			}
+			if len(pathMap) != 0 {
+				updated = append(updated, rule)
+			}
+		}
+	}
+	values.PutValue(data, updated, "rules")
 }
 
 func updateRule(target map[string]interface{}, id, host, path string, forFrontend bool, data map[string]interface{}, oldState map[string]string, newState map[string]string) {
@@ -101,6 +131,7 @@ func updateRule(target map[string]interface{}, id, host, path string, forFronten
 		}
 		newState[stateKey] = strings.Join(workloadIDs, "/")
 		targetData["serviceId"] = serviceID
+		values.RemoveValue(targetData, "workloadIds")
 	}
 }
 
@@ -125,24 +156,33 @@ type hostPath struct {
 	path string
 }
 
-func getPaths(data map[string]interface{}) (map[hostPath]map[string]interface{}, bool) {
+func getPaths(data map[string]interface{}) (map[hostPath]map[string]interface{}, bool, bool) {
 	v, ok := values.GetValue(data, "rules")
 	if !ok {
-		return nil, false
+		return nil, false, false
 	}
-
+	flag := false
 	result := make(map[hostPath]map[string]interface{})
 	for _, rule := range convert.ToMapSlice(v) {
 		converted := convert.ToMapInterface(rule)
 		paths, ok := converted["paths"]
 		if ok {
 			for path, target := range convert.ToMapInterface(paths) {
-				result[hostPath{host: convert.ToString(converted["host"]), path: path}] = convert.ToMapInterface(target)
+				key := hostPath{host: convert.ToString(converted["host"]), path: path}
+				targetMap := convert.ToMapInterface(target)
+				if existing, ok := result[key]; ok {
+					flag = true
+					targetWorkloadIds := convert.ToStringSlice(values.GetValueN(targetMap, "workloadIds"))
+					updated := convert.ToStringSlice(values.GetValueN(convert.ToMapInterface(existing), "workloadIds"))
+					targetWorkloadIds = append(targetWorkloadIds, updated...)
+					values.PutValue(targetMap, targetWorkloadIds, "workloadIds")
+				}
+				result[key] = targetMap
 			}
 		}
 	}
 
-	return result, true
+	return result, true, flag
 }
 
 func setState(data map[string]interface{}, stateMap map[string]string) {
