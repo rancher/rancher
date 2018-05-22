@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -262,8 +263,12 @@ func (c *PodController) sync(key string, obj *corev1.Pod) error {
 	for workloadServiceUUID := range workloadServiceUUIDsToAdd {
 		parts := strings.Split(workloadServiceUUID, "/")
 		workloadService, err := c.serviceLister.Get(parts[0], parts[1])
-		if err != nil || workloadService == nil {
-			logrus.Warnf("Failed to fetch service [%s]: [%v]", workloadService, err)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+		if workloadService == nil {
+			logrus.Warnf("Failed to fetch service [%s]: [%v]", workloadServiceUUID, err)
+			workloadServiceUUIDToWorkloadIDs.Delete(workloadServiceUUID)
 			continue
 		}
 
