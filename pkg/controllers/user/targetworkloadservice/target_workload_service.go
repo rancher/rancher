@@ -262,9 +262,11 @@ func (c *PodController) sync(key string, obj *corev1.Pod) error {
 	for workloadServiceUUID := range workloadServiceUUIDsToAdd {
 		parts := strings.Split(workloadServiceUUID, "/")
 		workloadService, err := c.serviceLister.Get(parts[0], parts[1])
-		if err != nil {
-			return err
+		if err != nil || workloadService == nil {
+			logrus.Warnf("Failed to fetch service [%s]: [%v]", workloadService, err)
+			continue
 		}
+
 		for key, value := range workloadService.Spec.Selector {
 			workloadServicesLabels[key] = value
 		}
