@@ -13,7 +13,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/ingress"
 	"github.com/rancher/rancher/pkg/controllers/user/ingresshostgen"
 	"github.com/rancher/rancher/pkg/controllers/user/logging"
-	"github.com/rancher/rancher/pkg/controllers/user/namespacecompose"
 	"github.com/rancher/rancher/pkg/controllers/user/networkpolicy"
 	"github.com/rancher/rancher/pkg/controllers/user/noderemove"
 	"github.com/rancher/rancher/pkg/controllers/user/nodesyncer"
@@ -23,7 +22,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/rbac/podsecuritypolicy"
 	"github.com/rancher/rancher/pkg/controllers/user/secret"
 	"github.com/rancher/rancher/pkg/controllers/user/targetworkloadservice"
-	"github.com/rancher/rancher/pkg/controllers/user/usercompose"
 	"github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/types/config"
 )
@@ -46,8 +44,6 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 	podsecuritypolicy.RegisterTemplate(cluster)
 	secret.Register(cluster)
 	endpoints.Register(ctx, cluster)
-	usercompose.Register(cluster, kubeConfigGetter)
-	namespacecompose.Register(cluster, kubeConfigGetter)
 
 	userOnlyContext := cluster.UserOnlyContext()
 	dnsrecord.Register(ctx, userOnlyContext)

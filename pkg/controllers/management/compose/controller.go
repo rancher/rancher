@@ -2,23 +2,25 @@ package compose
 
 import (
 	"encoding/json"
-	"strings"
-
 	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	clusterClient "github.com/rancher/types/client/cluster/v3"
 	managementClient "github.com/rancher/types/client/management/v3"
+	projectClient "github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/compose"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
-	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
@@ -33,11 +35,11 @@ type Lifecycle struct {
 	UserClient      v3.UserInterface
 	UserManager     user.Manager
 	HTTPSPortGetter common.KubeConfigGetter
-	ComposeClient   v3.GlobalComposeConfigInterface
+	ComposeClient   v3.ComposeConfigInterface
 }
 
 func Register(managementContext *config.ManagementContext, portGetter common.KubeConfigGetter) {
-	composeClient := managementContext.Management.GlobalComposeConfigs("")
+	composeClient := managementContext.Management.ComposeConfigs("")
 	tokenClient := managementContext.Management.Tokens("")
 	userClient := managementContext.Management.Users("")
 	l := Lifecycle{
@@ -50,21 +52,25 @@ func Register(managementContext *config.ManagementContext, portGetter common.Kub
 	composeClient.AddHandler("compose-controller", l.sync)
 }
 
-func (l Lifecycle) sync(key string, obj *v3.GlobalComposeConfig) error {
+func (l Lifecycle) sync(key string, obj *v3.ComposeConfig) error {
 	if key == "" || obj == nil {
 		return nil
 	}
-	obj, err := l.Create(obj)
-	if err != nil {
-		return &controller.ForgetError{
-			Err: err,
+	newObj, err := v3.ComposeConditionExecuted.Once(obj, func() (runtime.Object, error) {
+		obj, err := l.Create(obj)
+		if err != nil {
+			return obj, &controller.ForgetError{
+				Err: err,
+			}
 		}
-	}
-	_, err = l.ComposeClient.Update(obj)
+		return obj, nil
+	})
+
+	_, err = l.ComposeClient.Update(newObj.(*v3.ComposeConfig))
 	return err
 }
 
-func (l Lifecycle) Create(obj *v3.GlobalComposeConfig) (*v3.GlobalComposeConfig, error) {
+func (l Lifecycle) Create(obj *v3.ComposeConfig) (*v3.ComposeConfig, error) {
 	userID := obj.Annotations["field.cattle.io/creatorId"]
 	user, err := l.UserClient.Get(userID, metav1.GetOptions{})
 	if err != nil {
@@ -74,24 +80,50 @@ func (l Lifecycle) Create(obj *v3.GlobalComposeConfig) (*v3.GlobalComposeConfig,
 	if err != nil {
 		return obj, err
 	}
-	globalClient, err := constructGlobalClient(token, l.HTTPSPortGetter.GetHTTPSPort())
-	if err != nil {
-		return obj, err
-	}
 	config := &compose.Config{}
 	if err := yaml.Unmarshal([]byte(obj.Spec.RancherCompose), config); err != nil {
 		return obj, err
 	}
-	if err := up(globalClient, config); err != nil {
+	if err := up(token, l.HTTPSPortGetter.GetHTTPSPort(), config); err != nil {
 		return obj, err
 	}
 	v3.ComposeConditionExecuted.True(obj)
 	return obj, nil
 }
 
-func CreateGlobalResources(globalCLient *managementClient.Client, config *compose.Config) error {
-	// schema map contains all the schemas
-	schemas := GetSchemaMap(globalCLient)
+func GetSchemas(token string, port int) (map[string]types.Schema, map[string]types.Schema, map[string]types.Schema, error) {
+	cc, err := clusterClient.NewClient(&clientbase.ClientOpts{
+		URL:      fmt.Sprintf(url, port) + "/clusters",
+		TokenKey: token,
+		Insecure: true,
+	})
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	mc, err := managementClient.NewClient(&clientbase.ClientOpts{
+		URL:      fmt.Sprintf(url, port),
+		TokenKey: token,
+		Insecure: true,
+	})
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	pc, err := projectClient.NewClient(&clientbase.ClientOpts{
+		URL:      fmt.Sprintf(url, port) + "/projects",
+		TokenKey: token,
+		Insecure: true,
+	})
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return cc.Types, mc.Types, pc.Types, nil
+}
+
+func up(token string, port int, config *compose.Config) error {
+	clusterSchemas, managementSchemas, projectSchemas, err := GetSchemas(token, port)
+	if err != nil {
+		return err
+	}
 
 	// referenceMap is a map of schemaType with name -> id value
 	referenceMap := map[string]map[string]string{}
@@ -105,120 +137,182 @@ func CreateGlobalResources(globalCLient *managementClient.Client, config *compos
 		return err
 	}
 	delete(rawMap, "version")
-	// find all resources that has no references
-	sortedSchemas := common.SortSchema(schemas)
+	allSchemas := getAllSchemas(clusterSchemas, managementSchemas, projectSchemas)
+	sortedSchemas := common.SortSchema(allSchemas)
+
+	baseClusterClient, err := clientbase.NewAPIClient(&clientbase.ClientOpts{
+		URL:      fmt.Sprintf(url, port) + "/cluster",
+		TokenKey: token,
+		Insecure: true,
+	})
+	if err != nil {
+		return err
+	}
+	baseManagementClient, err := clientbase.NewAPIClient(&clientbase.ClientOpts{
+		URL:      fmt.Sprintf(url, port),
+		TokenKey: token,
+		Insecure: true,
+	})
+	baseProjectClient, err := clientbase.NewAPIClient(&clientbase.ClientOpts{
+		URL:      fmt.Sprintf(url, port) + "/project",
+		TokenKey: token,
+		Insecure: true,
+	})
+	if err != nil {
+		return err
+	}
+	baseURL := fmt.Sprintf(url, port)
+	configManager := configClientManager{
+		clusterSchemas:       clusterSchemas,
+		managementSchemas:    managementSchemas,
+		projectSchemas:       projectSchemas,
+		baseClusterClient:    &baseClusterClient,
+		baseManagementClient: &baseManagementClient,
+		baseProjectClient:    &baseProjectClient,
+		baseURL:              baseURL,
+	}
+
 	for _, schemaKey := range sortedSchemas {
-		key := schemaKey + "s"
-		if v, ok := rawMap[key]; ok {
-			if !isGlobalResource(schemaKey, globalCLient) {
-				logrus.Warnf("%s is not a global resource. Skipping", schemaKey)
-				continue
-			}
-			value, ok := v.(map[string]interface{})
+		key := allSchemas[schemaKey].PluralName
+		v, ok := rawMap[key]
+		if !ok {
+			continue
+		}
+		value, ok := v.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		var baseClient *clientbase.APIBaseClient
+		for name, data := range value {
+			dataMap, ok := data.(map[string]interface{})
 			if !ok {
-				continue
+				break
 			}
-			baseClient := &globalCLient.APIBaseClient
-			for name, data := range value {
-				dataMap, ok := data.(map[string]interface{})
-				if !ok {
-					break
-				}
-				if err := common.ReplaceGlobalReference(schemas[schemaKey], dataMap, referenceMap, baseClient); err != nil {
-					return err
-				}
-				dataMap["name"] = name
-				respObj := map[string]interface{}{}
-				// in here we have to make sure the same name won't be created twice
-				// todo: right now the global resource can be created with the same name
-				created := map[string]string{}
-				if err := baseClient.List(schemaKey, &types.ListOpts{}, &respObj); err != nil {
-					return err
-				}
-				if data, ok := respObj["data"]; ok {
-					if collections, ok := data.([]interface{}); ok {
-						for _, obj := range collections {
-							if objMap, ok := obj.(map[string]interface{}); ok {
-								createdName := common.GetValue(objMap, "name")
-								if createdName != "" {
-									created[createdName] = common.GetValue(objMap, "id")
-								}
+			baseClient, err = configManager.ConfigBaseClient(schemaKey, dataMap, referenceMap, "")
+			if err != nil {
+				return err
+			}
+			if err := common.ReplaceGlobalReference(allSchemas[schemaKey], dataMap, referenceMap, &baseManagementClient); err != nil {
+				return err
+			}
+			clusterID := convert.ToString(dataMap["clusterId"])
+			baseClient, err = configManager.ConfigBaseClient(schemaKey, dataMap, referenceMap, clusterID)
+			if err != nil {
+				return err
+			}
+			dataMap["name"] = name
+			respObj := map[string]interface{}{}
+			// in here we have to make sure the same name won't be created twice
+			created := map[string]string{}
+			if err := baseClient.List(schemaKey, &types.ListOpts{}, &respObj); err != nil {
+				return err
+			}
+			if data, ok := respObj["data"]; ok {
+				if collections, ok := data.([]interface{}); ok {
+					for _, obj := range collections {
+						if objMap, ok := obj.(map[string]interface{}); ok {
+							createdName := common.GetValue(objMap, "name")
+							if createdName != "" {
+								created[createdName] = common.GetValue(objMap, "id")
 							}
 						}
 					}
 				}
+			}
 
-				id := ""
-				if v, ok := created[name]; ok {
-					id = v
-				} else {
-					if err := baseClient.Create(schemaKey, dataMap, &respObj); err != nil && !strings.Contains(err.Error(), "already exist") {
-						return err
-					} else if err != nil && strings.Contains(err.Error(), "already exist") {
-						break
-					}
-					v, ok := respObj["id"]
-					if !ok {
-						return errors.Errorf("id is missing after creating %s obj", schemaKey)
-					}
-					id = v.(string)
+			id := ""
+			if v, ok := created[name]; ok {
+				id = v
+				existing := &types.Resource{}
+				if err := baseClient.ByID(schemaKey, id, existing); err != nil {
+					return err
 				}
-				if f, ok := WaitCondition[schemaKey]; ok {
-					if err := f(baseClient, id, schemaKey); err != nil {
-						return err
-					}
+				if err := baseClient.Update(schemaKey, existing, dataMap, nil); err != nil {
+					return err
+				}
+			} else {
+				if err := baseClient.Create(schemaKey, dataMap, &respObj); err != nil && !strings.Contains(err.Error(), "already exist") {
+					return err
+				} else if err != nil && strings.Contains(err.Error(), "already exist") {
+					break
+				}
+				v, ok := respObj["id"]
+				if !ok {
+					return errors.Errorf("id is missing after creating %s obj", schemaKey)
+				}
+				id = v.(string)
+			}
+			if f, ok := WaitCondition[schemaKey]; ok {
+				if err := f(baseClient, id, schemaKey); err != nil {
+					return err
 				}
 			}
-			// fill in reference map name -> id
-			if err := common.FillInReferenceMap(baseClient, schemaKey, referenceMap, nil); err != nil {
-				return err
-			}
+		}
+		// fill in reference map name -> id
+		if err := common.FillInReferenceMap(baseClient, schemaKey, referenceMap, nil); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-func isGlobalResource(schemaType string, globalClient *managementClient.Client) bool {
-	schema, ok := globalClient.Types[schemaType]
-	if !ok {
-		return false
-	}
-	if _, ok := schema.ResourceFields["clusterId"]; ok {
-		return false
-	}
-	if _, ok := schema.ResourceFields["projectId"]; ok {
-		return false
-	}
-	return true
+type configClientManager struct {
+	clusterSchemas       map[string]types.Schema
+	managementSchemas    map[string]types.Schema
+	projectSchemas       map[string]types.Schema
+	baseClusterClient    *clientbase.APIBaseClient
+	baseManagementClient *clientbase.APIBaseClient
+	baseProjectClient    *clientbase.APIBaseClient
+	baseURL              string
 }
 
-func GetSchemaMap(globalClient *managementClient.Client) map[string]types.Schema {
-	schemas := map[string]types.Schema{}
-	for k, s := range globalClient.Types {
-		if _, ok := s.ResourceFields["creatorId"]; !ok {
+// GetBaseClient config a baseClient with a special base url based on schema type
+func (c configClientManager) ConfigBaseClient(schemaType string, data map[string]interface{}, referenceMap map[string]map[string]string, clusterID string) (*clientbase.APIBaseClient, error) {
+	if _, ok := c.clusterSchemas[schemaType]; ok {
+		c.baseClusterClient.Opts.URL = c.baseURL + fmt.Sprintf("/cluster/%s", clusterID)
+		return c.baseClusterClient, nil
+	}
+
+	if _, ok := c.managementSchemas[schemaType]; ok {
+		return c.baseManagementClient, nil
+	}
+
+	if _, ok := c.projectSchemas[schemaType]; ok {
+		projectName := common.GetValue(data, "projectId")
+		if _, ok := referenceMap["project"]; !ok {
+			filter := map[string]string{
+				"clusterId": clusterID,
+			}
+			if err := common.FillInReferenceMap(c.baseManagementClient, "project", referenceMap, filter); err != nil {
+				return nil, err
+			}
+		}
+		projectID := referenceMap["project"][projectName]
+		c.baseProjectClient.Opts.URL = c.baseURL + fmt.Sprintf("/projects/%s", projectID)
+		return c.baseProjectClient, nil
+	}
+	return nil, errors.Errorf("schema type %s not supported", schemaType)
+}
+
+func getAllSchemas(clusterSchemas, managementSchemas, projectSchemas map[string]types.Schema) map[string]types.Schema {
+	r := map[string]types.Schema{}
+	for k, schema := range clusterSchemas {
+		if _, ok := schema.ResourceFields["creatorId"]; !ok {
 			continue
 		}
-		schemas[k] = s
+		r[k] = schema
 	}
-	return schemas
-}
-
-func up(globalClient *managementClient.Client, config *compose.Config) error {
-	return CreateGlobalResources(globalClient, config)
-}
-
-type ClientSet struct {
-	mClient *managementClient.Client
-}
-
-func constructGlobalClient(token string, port int) (*managementClient.Client, error) {
-	mClient, err := managementClient.NewClient(&clientbase.ClientOpts{
-		URL:      fmt.Sprintf(url, port),
-		TokenKey: token,
-		Insecure: true,
-	})
-	if err != nil {
-		return nil, err
+	for k, schema := range managementSchemas {
+		if _, ok := schema.ResourceFields["creatorId"]; !ok {
+			continue
+		}
+		r[k] = schema
 	}
-	return mClient, nil
+	for k, schema := range projectSchemas {
+		if _, ok := schema.ResourceFields["creatorId"]; !ok {
+			continue
+		}
+		r[k] = schema
+	}
+	return r
 }

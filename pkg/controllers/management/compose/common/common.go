@@ -73,7 +73,9 @@ func ReplaceGlobalReference(schema types.Schema, data map[string]interface{}, re
 				}
 				data[key] = r
 			} else {
-				data[key] = referenceMap[reference][data[key].(string)]
+				if referenceMap[reference][data[key].(string)] != "" {
+					data[key] = referenceMap[reference][data[key].(string)]
+				}
 			}
 		}
 	}
