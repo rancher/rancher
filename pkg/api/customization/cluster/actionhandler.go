@@ -1,14 +1,12 @@
 package clusteregistrationtokens
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
-
-	"bytes"
-	"io"
-
-	"fmt"
 	"time"
 
 	yaml2 "github.com/ghodss/yaml"
@@ -22,15 +20,18 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	"github.com/rancher/rancher/pkg/kubeconfig"
 	"github.com/rancher/rancher/pkg/kubectl"
+	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/cluster.cattle.io/v3/schema"
-	v13 "github.com/rancher/types/apis/core/v1"
+	corev1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/client/cluster/v3"
 	managementv3 "github.com/rancher/types/client/management/v3"
+	mgmtclient "github.com/rancher/types/client/management/v3"
+	"github.com/rancher/types/compose"
 	"github.com/rancher/types/user"
 	errors2 "k8s.io/apimachinery/pkg/api/errors"
-	meta2 "k8s.io/apimachinery/pkg/api/meta"
-	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -38,9 +39,11 @@ import (
 )
 
 type ActionHandler struct {
-	ClusterClient  v3.ClusterInterface
-	UserMgr        user.Manager
-	ClusterManager *clustermanager.Manager
+	NodepoolGetter     v3.NodePoolsGetter
+	ClusterClient      v3.ClusterInterface
+	NodeTemplateGetter v3.NodeTemplatesGetter
+	UserMgr            user.Manager
+	ClusterManager     *clustermanager.Manager
 }
 
 func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -49,6 +52,8 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 		return a.GenerateKubeconfigActionHandler(actionName, action, apiContext)
 	case "importYaml":
 		return a.ImportYamlHandler(actionName, action, apiContext)
+	case "exportYaml":
+		return a.ExportYamlHandler(actionName, action, apiContext)
 	}
 	return httperror.NewAPIError(httperror.NotFound, "not found")
 }
@@ -136,6 +141,68 @@ func (a ActionHandler) ImportYamlHandler(actionName string, action *types.Action
 	return nil
 }
 
+func (a ActionHandler) ExportYamlHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	cluster, err := a.ClusterClient.Get(apiContext.ID, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	topkey := compose.Config{}
+	topkey.Version = "v3"
+	c := mgmtclient.Cluster{}
+	if err := convert.ToObj(cluster.Spec, &c); err != nil {
+		return err
+	}
+	topkey.Clusters = map[string]mgmtclient.Cluster{}
+	topkey.Clusters[cluster.Spec.DisplayName] = c
+
+	// if driver is rancherKubernetesEngine, add any nodePool if found
+	if cluster.Status.Driver == "rancherKubernetesEngine" {
+		nodepools, err := a.NodepoolGetter.NodePools(cluster.Name).List(metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		topkey.NodePools = map[string]mgmtclient.NodePool{}
+		for _, nodepool := range nodepools.Items {
+			n := mgmtclient.NodePool{}
+			if err := convert.ToObj(nodepool.Spec, &n); err != nil {
+				return err
+			}
+			n.ClusterId = cluster.Spec.DisplayName
+			namespace, id := ref.Parse(nodepool.Spec.NodeTemplateName)
+			nodeTemplate, err := a.NodeTemplateGetter.NodeTemplates(namespace).Get(id, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			n.NodeTemplateId = nodeTemplate.Spec.DisplayName
+			topkey.NodePools[nodepool.Name] = n
+		}
+	}
+
+	m, err := convert.EncodeToMap(topkey)
+	if err != nil {
+		return err
+	}
+	delete(m["clusters"].(map[string]interface{})[cluster.Spec.DisplayName].(map[string]interface{}), "actions")
+	delete(m["clusters"].(map[string]interface{})[cluster.Spec.DisplayName].(map[string]interface{}), "links")
+	for name := range topkey.NodePools {
+		delete(m["nodePools"].(map[string]interface{})[name].(map[string]interface{}), "actions")
+		delete(m["nodePools"].(map[string]interface{})[name].(map[string]interface{}), "links")
+	}
+	data, err := json.Marshal(m)
+	if err != nil {
+		return err
+	}
+
+	buf, err := yaml2.JSONToYAML(data)
+	if err != nil {
+		return err
+	}
+	reader := bytes.NewReader(buf)
+	apiContext.Response.Header().Set("Content-Type", "text/yaml")
+	http.ServeContent(apiContext.Response, apiContext.Request, "exportYaml", time.Now(), reader)
+	return nil
+}
+
 type noopCloser struct {
 	io.Reader
 }
@@ -167,16 +234,16 @@ func findNamespaceCreates(inputYAML string) ([]string, error) {
 
 		if obj.IsList() {
 			obj.EachListItem(func(obj runtime.Object) error {
-				meta, err := meta2.Accessor(obj)
+				metadata, err := meta.Accessor(obj)
 				if err != nil {
 					return err
 				}
 				if obj.GetObjectKind().GroupVersionKind().Kind == "Namespace" && obj.GetObjectKind().GroupVersionKind().Version == "v1" {
-					namespaces = append(namespaces, meta.GetName())
+					namespaces = append(namespaces, metadata.GetName())
 				}
 
-				if meta.GetNamespace() != "" {
-					namespaces = append(namespaces, meta.GetNamespace())
+				if metadata.GetNamespace() != "" {
+					namespaces = append(namespaces, metadata.GetNamespace())
 				}
 				return nil
 			})
@@ -204,7 +271,7 @@ func findNamespaceCreates(inputYAML string) ([]string, error) {
 	return newNamespaces, nil
 }
 
-func (a ActionHandler) findOrCreateProjectNamespaces(apiContext *types.APIContext, namespaces []string, clusterName, projectName string) (v13.NamespaceInterface, error) {
+func (a ActionHandler) findOrCreateProjectNamespaces(apiContext *types.APIContext, namespaces []string, clusterName, projectName string) (corev1.NamespaceInterface, error) {
 	userCtx, err := a.ClusterManager.UserContext(clusterName)
 	if err != nil {
 		return nil, err
@@ -213,7 +280,7 @@ func (a ActionHandler) findOrCreateProjectNamespaces(apiContext *types.APIContex
 	nsClient := userCtx.Core.Namespaces("")
 
 	for _, ns := range namespaces {
-		nsObj, err := nsClient.Get(ns, v12.GetOptions{})
+		nsObj, err := nsClient.Get(ns, metav1.GetOptions{})
 		if errors2.IsNotFound(err) {
 			apiContext.SubContext = map[string]string{
 				"/v3/schemas/cluster": clusterName,
@@ -237,11 +304,11 @@ func (a ActionHandler) findOrCreateProjectNamespaces(apiContext *types.APIContex
 	return nsClient, nil
 }
 
-func waitForNS(nsClient v13.NamespaceInterface, namespaces []string) {
+func waitForNS(nsClient corev1.NamespaceInterface, namespaces []string) {
 	for i := 0; i < 3; i++ {
 		allGood := true
 		for _, ns := range namespaces {
-			ns, err := nsClient.Get(ns, v12.GetOptions{})
+			ns, err := nsClient.Get(ns, metav1.GetOptions{})
 			if err != nil {
 				allGood = false
 				break

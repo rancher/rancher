@@ -61,8 +61,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.ClusterRegistrationTokenType,
 		client.ClusterRoleTemplateBindingType,
 		client.ClusterType,
-		client.ClusterComposeConfigType,
-		client.GlobalComposeConfigType,
+		client.ComposeConfigType,
 		client.DynamicSchemaType,
 		client.GlobalRoleBindingType,
 		client.GlobalRoleType,
@@ -94,7 +93,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.TokenType,
 		client.UserType)
 	createCrd(ctx, wg, factory, schemas, &projectschema.Version,
-		projectclient.AppType, projectclient.AppRevisionType, projectclient.NamespaceComposeConfigType)
+		projectclient.AppType, projectclient.AppRevisionType)
 
 	wg.Wait()
 
@@ -164,9 +163,11 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 		ClusterManager: clusterManager,
 	}
 	handler := ccluster.ActionHandler{
-		ClusterClient:  managementContext.Management.Clusters(""),
-		UserMgr:        managementContext.UserManager,
-		ClusterManager: clusterManager,
+		NodepoolGetter:     managementContext.Management,
+		ClusterClient:      managementContext.Management.Clusters(""),
+		UserMgr:            managementContext.UserManager,
+		ClusterManager:     clusterManager,
+		NodeTemplateGetter: managementContext.Management,
 	}
 
 	schema := schemas.Schema(&managementschema.Version, client.ClusterType)
@@ -210,6 +211,7 @@ func Catalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
 	}
 	schema.ActionHandler = handler.RefreshActionHandler
 	schema.CollectionFormatter = catalog.CollectionFormatter
+	schema.LinkHandler = handler.ExportYamlHandler
 }
 
 func ClusterRegistrationTokens(schemas *types.Schemas) {
@@ -275,6 +277,7 @@ func NodeTypes(schemas *types.Schemas, management *config.ScaledContext) error {
 	}
 	schema.Formatter = machineDriverHandlers.Formatter
 	schema.ActionHandler = machineDriverHandlers.ActionHandler
+	schema.LinkHandler = machineDriverHandlers.ExportYamlHandler
 
 	machineHandler := &node.DriverHandler{
 		SecretStore: secretStore,

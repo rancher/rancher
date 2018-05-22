@@ -17,4 +17,5 @@ func Formatter(request *types.APIContext, resource *types.RawResource) {
 	resource.Links["shell"] = shellLink
 	resource.AddAction(request, "generateKubeconfig")
 	resource.AddAction(request, "importYaml")
+	resource.AddAction(request, "exportYaml")
 }

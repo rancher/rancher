@@ -11,12 +11,18 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
+	"encoding/json"
+
+	"github.com/ghodss/yaml"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/encryptedstore"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
+	"github.com/rancher/types/compose"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -68,6 +74,7 @@ func (h *DriverHandlers) Formatter(apiContext *types.APIContext, resource *types
 		resource.AddAction(apiContext, "activate")
 		resource.AddAction(apiContext, "deactivate")
 	}
+	resource.Links["exportYaml"] = apiContext.URLBuilder.Link("exportYaml", resource)
 }
 
 type DriverHandler struct {
@@ -148,6 +155,44 @@ func (h DriverHandler) LinkHandler(apiContext *types.APIContext, next types.Requ
 	_, err = apiContext.Response.Write(buf.Bytes())
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+func (h DriverHandlers) ExportYamlHandler(apiContext *types.APIContext, next types.RequestHandler) error {
+	switch apiContext.Link {
+	case "exportyaml":
+		nodeDriver, err := h.NodeDriverClient.Get(apiContext.ID, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		topkey := compose.Config{}
+		topkey.Version = "v3"
+		nd := client.NodeDriver{}
+		if err := convert.ToObj(nodeDriver.Spec, &nd); err != nil {
+			return err
+		}
+		topkey.NodeDrivers = map[string]client.NodeDriver{}
+		topkey.NodeDrivers[nodeDriver.Spec.DisplayName] = nd
+		m, err := convert.EncodeToMap(topkey)
+		if err != nil {
+			return err
+		}
+		delete(m["nodeDrivers"].(map[string]interface{})[nodeDriver.Spec.DisplayName].(map[string]interface{}), "actions")
+		delete(m["nodeDrivers"].(map[string]interface{})[nodeDriver.Spec.DisplayName].(map[string]interface{}), "links")
+		data, err := json.Marshal(m)
+		if err != nil {
+			return err
+		}
+
+		buf, err := yaml.JSONToYAML(data)
+		if err != nil {
+			return err
+		}
+		reader := bytes.NewReader(buf)
+		apiContext.Response.Header().Set("Content-Type", "text/yaml")
+		http.ServeContent(apiContext.Response, apiContext.Request, "exportYaml", time.Now(), reader)
+		return nil
 	}
 	return nil
 }

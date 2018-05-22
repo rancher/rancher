@@ -1,24 +1,31 @@
 package project
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
+	"encoding/json"
+
+	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/client/management/v3"
-
-	"github.com/rancher/rancher/pkg/clustermanager"
-
+	"github.com/rancher/types/compose"
 	"github.com/rancher/types/user"
 )
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(apiContext, "setpodsecuritypolicytemplate")
+	resource.AddAction(apiContext, "exportYaml")
 }
 
 type Handler struct {
@@ -32,9 +39,45 @@ func (h *Handler) Actions(actionName string, action *types.Action, apiContext *t
 	switch actionName {
 	case "setpodsecuritypolicytemplate":
 		return h.setPodSecurityPolicyTemplate(actionName, action, apiContext)
+	case "exportYaml":
+		return h.ExportYamlHandler(actionName, action, apiContext)
+	}
+	return errors.Errorf("unrecognized action %v", actionName)
+}
+
+func (h *Handler) ExportYamlHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	namespace, id := ref.Parse(apiContext.ID)
+	project, err := h.ProjectLister.Get(namespace, id)
+	if err != nil {
+		return err
+	}
+	topkey := compose.Config{}
+	topkey.Version = "v3"
+	p := client.Project{}
+	if err := convert.ToObj(project.Spec, &p); err != nil {
+		return err
+	}
+	topkey.Projects = map[string]client.Project{}
+	topkey.Projects[project.Spec.DisplayName] = p
+	m, err := convert.EncodeToMap(topkey)
+	if err != nil {
+		return err
+	}
+	delete(m["projects"].(map[string]interface{})[project.Spec.DisplayName].(map[string]interface{}), "actions")
+	delete(m["projects"].(map[string]interface{})[project.Spec.DisplayName].(map[string]interface{}), "links")
+	data, err := json.Marshal(m)
+	if err != nil {
+		return err
 	}
 
-	return errors.Errorf("unrecognized action %v", actionName)
+	buf, err := yaml.JSONToYAML(data)
+	if err != nil {
+		return err
+	}
+	reader := bytes.NewReader(buf)
+	apiContext.Response.Header().Set("Content-Type", "text/yaml")
+	http.ServeContent(apiContext.Response, apiContext.Request, "exportYaml", time.Now(), reader)
+	return nil
 }
 
 func (h *Handler) setPodSecurityPolicyTemplate(actionName string, action *types.Action,

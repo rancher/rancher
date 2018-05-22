@@ -3,12 +3,15 @@ package catalog
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
+	"github.com/ghodss/yaml"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -17,6 +20,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/client/management/v3"
+	"github.com/rancher/types/compose"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -96,6 +100,7 @@ func (t TemplateVerionFormatterWrapper) TemplateVersionFormatter(apiContext *typ
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(apiContext, "refresh")
+	resource.Links["exportYaml"] = apiContext.URLBuilder.Link("exportYaml", resource)
 }
 
 func CollectionFormatter(request *types.APIContext, collection *types.GenericCollection) {
@@ -133,6 +138,44 @@ func (a ActionHandler) RefreshActionHandler(actionName string, action *types.Act
 		if _, err := a.CatalogClient.Update(&catalog); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func (a ActionHandler) ExportYamlHandler(apiContext *types.APIContext, next types.RequestHandler) error {
+	switch apiContext.Link {
+	case "exportyaml":
+		catalog, err := a.CatalogClient.Get(apiContext.ID, metav1.GetOptions{})
+		if err != nil {
+			return rpctypes.ErrGRPCStopped
+		}
+		topkey := compose.Config{}
+		topkey.Version = "v3"
+		ca := client.Catalog{}
+		if err := convert.ToObj(catalog.Spec, &ca); err != nil {
+			return err
+		}
+		topkey.Catalogs = map[string]client.Catalog{}
+		topkey.Catalogs[catalog.Name] = ca
+		m, err := convert.EncodeToMap(topkey)
+		if err != nil {
+			return err
+		}
+		delete(m["catalogs"].(map[string]interface{})[catalog.Name].(map[string]interface{}), "actions")
+		delete(m["catalogs"].(map[string]interface{})[catalog.Name].(map[string]interface{}), "links")
+		data, err := json.Marshal(m)
+		if err != nil {
+			return err
+		}
+
+		buf, err := yaml.JSONToYAML(data)
+		if err != nil {
+			return err
+		}
+		reader := bytes.NewReader(buf)
+		apiContext.Response.Header().Set("Content-Type", "text/yaml")
+		http.ServeContent(apiContext.Response, apiContext.Request, "exportYaml", time.Now(), reader)
+		return nil
 	}
 	return nil
 }
