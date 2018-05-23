@@ -245,6 +245,18 @@ func addRoles(management *config.ManagementContext) (string, error) {
 	rb.addRoleTemplate("View Project Members", "projectroletemplatebindings-view", "project", true, false, false).
 		addRule().apiGroups("management.cattle.io").resources("projectroletemplatebindings").verbs("get", "list", "watch")
 
+	rb.addRoleTemplate("Manage Project Catalogs", "projectcatalogs-manage", "project", true, false, false).
+		addRule().apiGroups("management.cattle.io").resources("projectcatalogs").verbs("*")
+
+	rb.addRoleTemplate("View Project Catalogs", "projectcatalogs-view", "project", true, false, false).
+		addRule().apiGroups("management.cattle.io").resources("projectcatalogs").verbs("*")
+
+	rb.addRoleTemplate("Manage Cluster Catalogs", "clustercatalogs-manage", "cluster", true, false, false).
+		addRule().apiGroups("management.cattle.io").resources("clustercatalogs").verbs("*")
+
+	rb.addRoleTemplate("View Cluster Catalogs", "clustercatalogs-view", "cluster", true, false, false).
+		addRule().apiGroups("management.cattle.io").resources("clustercatalogs").verbs("*")
+
 	// Not specific to project or cluster
 	// TODO When clusterevents has value, consider adding this back in
 	//rb.addRoleTemplate("View Events", "events-view", "", true, false, false).
