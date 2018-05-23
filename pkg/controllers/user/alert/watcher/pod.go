@@ -164,7 +164,7 @@ func (w *PodWatcher) checkPodRestarts(pod *corev1.Pod, alert *v3.ProjectAlert) {
 				}
 
 				if err := w.alertManager.SendAlert(data); err != nil {
-					logrus.Debugf("Error occured while getting pod %s: %v", alert.Spec.TargetPod.PodName, err)
+					logrus.Debugf("Error occurred while getting pod %s: %v", alert.Spec.TargetPod.PodName, err)
 				}
 			}
 
@@ -244,7 +244,7 @@ func (w *PodWatcher) checkPodRunning(pod *corev1.Pod, alert *v3.ProjectAlert) {
 			}
 
 			if err := w.alertManager.SendAlert(data); err != nil {
-				logrus.Debugf("Error occured while send alert %s: %v", alert.Spec.TargetPod.PodName, err)
+				logrus.Debugf("Error occurred while send alert %s: %v", alert.Spec.TargetPod.PodName, err)
 			}
 			return
 		}
@@ -280,7 +280,7 @@ func (w *PodWatcher) checkPodScheduled(pod *corev1.Pod, alert *v3.ProjectAlert) 
 			}
 
 			if err := w.alertManager.SendAlert(data); err != nil {
-				logrus.Debugf("Error occured while getting pod %s: %v", alert.Spec.TargetPod.PodName, err)
+				logrus.Debugf("Error occurred while getting pod %s: %v", alert.Spec.TargetPod.PodName, err)
 			}
 			return false
 		}

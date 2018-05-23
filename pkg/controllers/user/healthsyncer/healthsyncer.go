@@ -98,7 +98,7 @@ func (h *HealthSyncer) updateClusterHealth() error {
 	}
 
 	if err != nil {
-		logrus.Errorf("Cluster %s is unavaliable, stopping controllers and waiting for successful ping: %v", h.clusterName, err)
+		logrus.Errorf("Cluster %s is unavailable, stopping controllers and waiting for successful ping: %v", h.clusterName, err)
 		h.clusterManager.Stop(cluster)
 		for {
 			if err := h.clusterManager.Start(context.TODO(), cluster); err == nil || apierrors.IsNotFound(err) {
