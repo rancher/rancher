@@ -224,6 +224,7 @@ func (t *Authorizer) createNode(inNode *client.Node, cluster *v3.Cluster, req *h
 			RequestedHostname: inNode.RequestedHostname,
 			CustomConfig:      customConfig,
 			Imported:          true,
+			DesiredNodeLabels: inNode.Labels,
 		},
 	}
 

@@ -15,6 +15,7 @@ func TokenAndURL() (string, string, error) {
 }
 
 func Params() map[string]interface{} {
+	labels := parseLabel(os.Getenv("CATTLE_NODE_LABEL"))
 	roles := split(os.Getenv("CATTLE_ROLE"))
 	params := map[string]interface{}{
 		"customConfig": map[string]interface{}{
@@ -26,6 +27,7 @@ func Params() map[string]interface{} {
 		"controlPlane":      slice.ContainsString(roles, "controlplane"),
 		"worker":            slice.ContainsString(roles, "worker"),
 		"requestedHostname": os.Getenv("CATTLE_NODE_NAME"),
+		"labels":            labels,
 	}
 
 	for k, v := range params {
@@ -49,6 +51,22 @@ func Params() map[string]interface{} {
 	return map[string]interface{}{
 		"node": params,
 	}
+}
+
+func parseLabel(v string) map[string]string {
+	labels := map[string]string{}
+	parts := strings.Split(v, ",")
+	for _, part := range parts {
+		kvs := strings.SplitN(part, "=", 2)
+		if len(kvs) == 2 {
+			labels[kvs[0]] = kvs[1]
+		} else if len(kvs) == 1 {
+			labels[kvs[0]] = ""
+		} else {
+			logrus.Warnf("Invalid label format %v.", part)
+		}
+	}
+	return labels
 }
 
 func split(s string) []string {
