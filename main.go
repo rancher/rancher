@@ -48,6 +48,7 @@ func main() {
 
 	app := cli.NewApp()
 	app.Version = VERSION
+	app.Usage = "Complete container management platform"
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:        "kubeconfig",
