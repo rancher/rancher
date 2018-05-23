@@ -540,8 +540,8 @@ func (m *manager) reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs m
 	return nil
 }
 
-// If the roleTemplate has rules granting access to a managment plane resource, return the verbs for those rules
-func (m *manager) checkForManagementPlaneRules(role *v3.RoleTemplate, managmentPlaneResource string) (map[string]bool, error) {
+// If the roleTemplate has rules granting access to a management plane resource, return the verbs for those rules
+func (m *manager) checkForManagementPlaneRules(role *v3.RoleTemplate, managementPlaneResource string) (map[string]bool, error) {
 	var rules []v1.PolicyRule
 	if role.External {
 		externalRole, err := m.crLister.Get("", role.Name)
@@ -558,7 +558,7 @@ func (m *manager) checkForManagementPlaneRules(role *v3.RoleTemplate, managmentP
 
 	verbs := map[string]bool{}
 	for _, rule := range rules {
-		if (slice.ContainsString(rule.Resources, managmentPlaneResource) || slice.ContainsString(rule.Resources, "*")) && len(rule.ResourceNames) == 0 {
+		if (slice.ContainsString(rule.Resources, managementPlaneResource) || slice.ContainsString(rule.Resources, "*")) && len(rule.ResourceNames) == 0 {
 			for _, v := range rule.Verbs {
 				verbs[v] = true
 			}

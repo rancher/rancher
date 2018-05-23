@@ -36,7 +36,7 @@ type StateSyncer struct {
 	clusterName        string
 }
 
-//synchronize the state bewteen alert CRD and alertmanager.
+//synchronize the state between alert CRD and alertmanager.
 func (s *StateSyncer) syncState() error {
 
 	if s.alertManager.IsDeploy == false {
