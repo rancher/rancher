@@ -79,6 +79,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.PodSecurityPolicyTemplateType,
 		client.PreferenceType,
 		client.ProjectAlertType,
+		client.ProjectCatalogType,
 		client.ProjectLoggingType,
 		client.ProjectNetworkPolicyType,
 		client.ProjectRoleTemplateBindingType,
@@ -106,6 +107,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	TemplateVersion(schemas, apiContext)
 	User(schemas, apiContext)
 	Catalog(schemas, apiContext)
+	ProjectCatalog(schemas, apiContext)
 	SecretTypes(ctx, schemas, apiContext)
 	App(schemas, apiContext, clusterManager)
 	Setting(schemas)
@@ -216,6 +218,16 @@ func Catalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
 	schema.ActionHandler = handler.RefreshActionHandler
 	schema.CollectionFormatter = catalog.CollectionFormatter
 	schema.LinkHandler = handler.ExportYamlHandler
+}
+
+func ProjectCatalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
+	schema := schemas.Schema(&managementschema.Version, client.ProjectCatalogType)
+	schema.Formatter = catalog.Formatter
+	handler := catalog.ActionHandler{
+		ProjectCatalogClient: managementContext.Management.ProjectCatalogs(""),
+	}
+	schema.ActionHandler = handler.RefreshProjectCatalogActionHandler
+	schema.CollectionFormatter = catalog.CollectionFormatter
 }
 
 func ClusterRegistrationTokens(schemas *types.Schemas) {

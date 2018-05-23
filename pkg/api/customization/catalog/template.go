@@ -17,6 +17,7 @@ import (
 )
 
 func TemplateFormatter(apiContext *types.APIContext, resource *types.RawResource) {
+	var prjCatalogName string
 	// version links
 	resource.Values["versionLinks"] = extractVersionLinks(apiContext, resource)
 
@@ -24,10 +25,25 @@ func TemplateFormatter(apiContext *types.APIContext, resource *types.RawResource
 	delete(resource.Values, "icon")
 	resource.Links["icon"] = apiContext.URLBuilder.Link("icon", resource)
 
-	//catalog link
-	catalogSchema := apiContext.Schemas.Schema(&managementschema.Version, client.CatalogType)
-	catalogName := strings.Split(resource.ID, "-")[0]
-	resource.Links["catalog"] = apiContext.URLBuilder.ResourceLinkByID(catalogSchema, catalogName)
+	val := resource.Values
+	if val[client.TemplateFieldCatalogID] != nil {
+		//catalog link
+		catalogSchema := apiContext.Schemas.Schema(&managementschema.Version, client.CatalogType)
+		catalogName := strings.Split(resource.ID, "-")[0]
+		resource.Links["catalog"] = apiContext.URLBuilder.ResourceLinkByID(catalogSchema, catalogName)
+	}
+
+	if val[client.TemplateFieldProjectCatalogID] != nil {
+		prjCatID, ok := val[client.TemplateFieldProjectCatalogID].(string)
+		if ok {
+			prjCatalogName = prjCatID
+		} else {
+			prjCatalogName = strings.Split(resource.ID, "-")[0]
+		}
+		//project catalog link
+		prjCatalogSchema := apiContext.Schemas.Schema(&managementschema.Version, client.ProjectCatalogType)
+		resource.Links["projectCatalog"] = apiContext.URLBuilder.ResourceLinkByID(prjCatalogSchema, prjCatalogName)
+	}
 
 	// delete category
 	delete(resource.Values, "category")

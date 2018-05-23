@@ -18,7 +18,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	}
 }
 
-func runRefresh(ctx context.Context, interval int, controller v3.CatalogController, m *manager.Manager) {
+func runRefresh(ctx context.Context, interval int, controller v3.CatalogController, pcController v3.ProjectCatalogController, m *manager.Manager) {
 	ticker := time.NewTicker(time.Duration(interval) * time.Second)
 	defer ticker.Stop()
 
@@ -32,8 +32,16 @@ func runRefresh(ctx context.Context, interval int, controller v3.CatalogControll
 				logrus.Error(err)
 				continue
 			}
+			projectCatalogs, err := m.GetProjectCatalogs()
+			if err != nil {
+				logrus.Error(err)
+				continue
+			}
 			for _, catalog := range catalogs {
 				controller.Enqueue("", catalog.Name)
+			}
+			for _, projCatalog := range projectCatalogs {
+				pcController.Enqueue(projCatalog.Namespace, projCatalog.Name)
 			}
 		}
 	}
@@ -50,7 +58,11 @@ func Run(ctx context.Context, cacheRoot string, refreshInterval int, management 
 	controller := management.Management.Catalogs("").Controller()
 	controller.AddHandler("catalog", m.Sync)
 
-	go runRefresh(ctx, refreshInterval, controller, m)
+	logrus.Infof("Starting project-level catalog controller")
+	projectCatalogController := management.Management.ProjectCatalogs("").Controller()
+	projectCatalogController.AddHandler("projectCatalog", m.PrjCatalogSync)
+
+	go runRefresh(ctx, refreshInterval, controller, projectCatalogController, m)
 
 	return nil
 }

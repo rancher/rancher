@@ -28,7 +28,8 @@ func CollectionFormatter(request *types.APIContext, collection *types.GenericCol
 }
 
 type ActionHandler struct {
-	CatalogClient v3.CatalogInterface
+	CatalogClient        v3.CatalogInterface
+	ProjectCatalogClient v3.ProjectCatalogInterface
 }
 
 func (a ActionHandler) RefreshActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -96,6 +97,37 @@ func (a ActionHandler) ExportYamlHandler(apiContext *types.APIContext, next type
 		apiContext.Response.Header().Set("Content-Type", "text/yaml")
 		http.ServeContent(apiContext.Response, apiContext.Request, "exportYaml", time.Now(), reader)
 		return nil
+	}
+	return nil
+}
+
+func (a ActionHandler) RefreshProjectCatalogActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	if actionName != "refresh" {
+		return httperror.NewAPIError(httperror.NotFound, "not found")
+	}
+
+	prjCatalogs := []v3.ProjectCatalog{}
+	if apiContext.ID != "" {
+		catalog, err := a.ProjectCatalogClient.Get(apiContext.ID, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		prjCatalogs = append(prjCatalogs, *catalog)
+	} else {
+		catalogList, err := a.ProjectCatalogClient.List(metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		for _, catalog := range catalogList.Items {
+			prjCatalogs = append(prjCatalogs, catalog)
+		}
+	}
+	for _, catalog := range prjCatalogs {
+		catalog.Status.LastRefreshTimestamp = time.Now().Format(time.RFC3339)
+		v3.CatalogConditionRefreshed.Unknown(&catalog)
+		if _, err := a.ProjectCatalogClient.Update(&catalog); err != nil {
+			return err
+		}
 	}
 	return nil
 }
