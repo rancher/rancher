@@ -151,7 +151,7 @@ func (h *Handler) createNewBinding(request *types.APIContext, schema *types.Sche
 	binding["podSecurityPolicyTemplateId"] = podSecurityPolicyTemplateName
 	binding["namespaceId"] = strings.Split(request.ID, ":")[0]
 
-	binding, err := schema.Store.Create(request, schema, binding)
+	_, err := schema.Store.Create(request, schema, binding)
 	return err
 }
 

@@ -153,10 +153,6 @@ func (g *ghProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v
 		return v3.Principal{}, nil, nil, err
 	}
 	for _, orgAcct := range orgAccts {
-		name := orgAcct.Name
-		if name == "" {
-			name = orgAcct.Login
-		}
 		groupPrincipal := g.toPrincipal(orgType, orgAcct, nil)
 		groupPrincipal.MemberOf = true
 		groupPrincipals = append(groupPrincipals, groupPrincipal)
