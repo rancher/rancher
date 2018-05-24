@@ -641,7 +641,13 @@ func ingressTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v1beta1.IngressTLS{}, struct {
 			SecretName string `norman:"type=reference[certificate]"`
 		}{}).
-		MustImport(&Version, v1beta1.Ingress{}, projectOverride{}, struct {
+		MustImportAndCustomize(&Version, v1beta1.Ingress{}, func(schema *types.Schema) {
+			schema.MustCustomizeField("name", func(f types.Field) types.Field {
+				f.Required = true
+				f.Nullable = false
+				return f
+			})
+		}, projectOverride{}, struct {
 			Description     string `json:"description"`
 			PublicEndpoints string `json:"publicEndpoints" norman:"type=array[publicEndpoint],nocreate,noupdate"`
 		}{})
