@@ -95,6 +95,9 @@ func (nsh *namespaceHandler) updateProjectIDLabelForSecrets(projectID string, na
 			}
 		} else {
 			secretCopy := secret.DeepCopy()
+			if secretCopy.Annotations == nil {
+				secretCopy.Annotations = make(map[string]string)
+			}
 			if projectID == "" {
 				secretCopy.Annotations[ProjectIDFieldLabel] = projectID
 			} else {
