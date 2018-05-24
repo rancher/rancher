@@ -2,12 +2,11 @@ package v3
 
 import (
 	"github.com/rancher/norman/condition"
-	"github.com/rancher/norman/types"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type GlobalComposeConfig struct {
+type ComposeConfig struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object’s metadata. More info:
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
@@ -43,21 +42,4 @@ type ComposeCondition struct {
 	Reason string `json:"reason,omitempty"`
 	// Human-readable message indicating details about last transition
 	Message string `json:"message,omitempty"`
-}
-
-type ClusterComposeConfig struct {
-	types.Namespaced
-	metav1.TypeMeta `json:",inline"`
-	// Standard object’s metadata. More info:
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	// Specification of the desired behavior of the the cluster. More info:
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
-	Spec   ClusterComposeSpec `json:"spec,omitempty"`
-	Status ComposeStatus      `json:"status,omitempty"`
-}
-
-type ClusterComposeSpec struct {
-	ClusterName    string `json:"clusterName" norman:"type=reference[cluster]"`
-	RancherCompose string `json:"rancherCompose,omitempty"`
 }

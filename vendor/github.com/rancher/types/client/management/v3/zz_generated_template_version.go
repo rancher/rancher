@@ -21,6 +21,7 @@ const (
 	TemplateVersionFieldRancherVersion       = "rancherVersion"
 	TemplateVersionFieldReadme               = "readme"
 	TemplateVersionFieldRemoved              = "removed"
+	TemplateVersionFieldRequiredNamespace    = "requiredNamespace"
 	TemplateVersionFieldState                = "state"
 	TemplateVersionFieldStatus               = "status"
 	TemplateVersionFieldTransitioning        = "transitioning"
@@ -47,6 +48,7 @@ type TemplateVersion struct {
 	RancherVersion       string                 `json:"rancherVersion,omitempty" yaml:"rancherVersion,omitempty"`
 	Readme               string                 `json:"readme,omitempty" yaml:"readme,omitempty"`
 	Removed              string                 `json:"removed,omitempty" yaml:"removed,omitempty"`
+	RequiredNamespace    string                 `json:"requiredNamespace,omitempty" yaml:"requiredNamespace,omitempty"`
 	State                string                 `json:"state,omitempty" yaml:"state,omitempty"`
 	Status               *TemplateVersionStatus `json:"status,omitempty" yaml:"status,omitempty"`
 	Transitioning        string                 `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`

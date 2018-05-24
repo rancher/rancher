@@ -28,7 +28,6 @@ type Interface interface {
 	WorkloadsGetter
 	AppsGetter
 	AppRevisionsGetter
-	NamespaceComposeConfigsGetter
 }
 
 type Client struct {
@@ -49,7 +48,6 @@ type Client struct {
 	workloadControllers                      map[string]WorkloadController
 	appControllers                           map[string]AppController
 	appRevisionControllers                   map[string]AppRevisionController
-	namespaceComposeConfigControllers        map[string]NamespaceComposeConfigController
 }
 
 func NewForConfig(config rest.Config) (Interface, error) {
@@ -79,7 +77,6 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		workloadControllers:                      map[string]WorkloadController{},
 		appControllers:                           map[string]AppController{},
 		appRevisionControllers:                   map[string]AppRevisionController{},
-		namespaceComposeConfigControllers:        map[string]NamespaceComposeConfigController{},
 	}, nil
 }
 
@@ -258,19 +255,6 @@ type AppRevisionsGetter interface {
 func (c *Client) AppRevisions(namespace string) AppRevisionInterface {
 	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &AppRevisionResource, AppRevisionGroupVersionKind, appRevisionFactory{})
 	return &appRevisionClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type NamespaceComposeConfigsGetter interface {
-	NamespaceComposeConfigs(namespace string) NamespaceComposeConfigInterface
-}
-
-func (c *Client) NamespaceComposeConfigs(namespace string) NamespaceComposeConfigInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &NamespaceComposeConfigResource, NamespaceComposeConfigGroupVersionKind, namespaceComposeConfigFactory{})
-	return &namespaceComposeConfigClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

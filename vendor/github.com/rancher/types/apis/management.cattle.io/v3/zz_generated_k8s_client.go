@@ -56,8 +56,7 @@ type Interface interface {
 	PipelineExecutionsGetter
 	PipelineExecutionLogsGetter
 	SourceCodeRepositoriesGetter
-	GlobalComposeConfigsGetter
-	ClusterComposeConfigsGetter
+	ComposeConfigsGetter
 }
 
 type Client struct {
@@ -106,8 +105,7 @@ type Client struct {
 	pipelineExecutionControllers                       map[string]PipelineExecutionController
 	pipelineExecutionLogControllers                    map[string]PipelineExecutionLogController
 	sourceCodeRepositoryControllers                    map[string]SourceCodeRepositoryController
-	globalComposeConfigControllers                     map[string]GlobalComposeConfigController
-	clusterComposeConfigControllers                    map[string]ClusterComposeConfigController
+	composeConfigControllers                           map[string]ComposeConfigController
 }
 
 func NewForConfig(config rest.Config) (Interface, error) {
@@ -165,8 +163,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		pipelineExecutionControllers:                       map[string]PipelineExecutionController{},
 		pipelineExecutionLogControllers:                    map[string]PipelineExecutionLogController{},
 		sourceCodeRepositoryControllers:                    map[string]SourceCodeRepositoryController{},
-		globalComposeConfigControllers:                     map[string]GlobalComposeConfigController{},
-		clusterComposeConfigControllers:                    map[string]ClusterComposeConfigController{},
+		composeConfigControllers:                           map[string]ComposeConfigController{},
 	}, nil
 }
 
@@ -715,26 +712,13 @@ func (c *Client) SourceCodeRepositories(namespace string) SourceCodeRepositoryIn
 	}
 }
 
-type GlobalComposeConfigsGetter interface {
-	GlobalComposeConfigs(namespace string) GlobalComposeConfigInterface
+type ComposeConfigsGetter interface {
+	ComposeConfigs(namespace string) ComposeConfigInterface
 }
 
-func (c *Client) GlobalComposeConfigs(namespace string) GlobalComposeConfigInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &GlobalComposeConfigResource, GlobalComposeConfigGroupVersionKind, globalComposeConfigFactory{})
-	return &globalComposeConfigClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type ClusterComposeConfigsGetter interface {
-	ClusterComposeConfigs(namespace string) ClusterComposeConfigInterface
-}
-
-func (c *Client) ClusterComposeConfigs(namespace string) ClusterComposeConfigInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ClusterComposeConfigResource, ClusterComposeConfigGroupVersionKind, clusterComposeConfigFactory{})
-	return &clusterComposeConfigClient{
+func (c *Client) ComposeConfigs(namespace string) ComposeConfigInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ComposeConfigResource, ComposeConfigGroupVersionKind, composeConfigFactory{})
+	return &composeConfigClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

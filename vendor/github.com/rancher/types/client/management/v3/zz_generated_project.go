@@ -60,6 +60,8 @@ type ProjectOperations interface {
 	ByID(id string) (*Project, error)
 	Delete(container *Project) error
 
+	ActionExportYaml(resource *Project) error
+
 	ActionSetpodsecuritypolicytemplate(resource *Project, input *SetPodSecurityPolicyTemplateInput) (*Project, error)
 }
 
@@ -106,6 +108,11 @@ func (c *ProjectClient) ByID(id string) (*Project, error) {
 
 func (c *ProjectClient) Delete(container *Project) error {
 	return c.apiClient.Ops.DoResourceDelete(ProjectType, &container.Resource)
+}
+
+func (c *ProjectClient) ActionExportYaml(resource *Project) error {
+	err := c.apiClient.Ops.DoAction(ProjectType, "exportYaml", &resource.Resource, nil, nil)
+	return err
 }
 
 func (c *ProjectClient) ActionSetpodsecuritypolicytemplate(resource *Project, input *SetPodSecurityPolicyTemplateInput) (*Project, error) {

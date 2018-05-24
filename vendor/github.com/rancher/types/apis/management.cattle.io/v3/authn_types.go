@@ -100,10 +100,10 @@ type GithubConfig struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	AuthConfig        `json:",inline" mapstructure:",squash"`
 
-	Hostname     string `json:"hostname,omitempty" norman:"default=github.com" norman:"noupdate"`
-	TLS          bool   `json:"tls,omitempty" norman:"notnullable,default=true" norman:"noupdate"`
-	ClientID     string `json:"clientId,omitempty" norman:"noupdate"`
-	ClientSecret string `json:"clientSecret,omitempty" norman:"noupdate,type=password"`
+	Hostname     string `json:"hostname,omitempty" norman:"default=github.com" norman:"required"`
+	TLS          bool   `json:"tls,omitempty" norman:"notnullable,default=true" norman:"required"`
+	ClientID     string `json:"clientId,omitempty" norman:"required"`
+	ClientSecret string `json:"clientSecret,omitempty" norman:"required,type=password"`
 }
 
 type GithubConfigTestOutput struct {
