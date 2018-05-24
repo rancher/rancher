@@ -48,8 +48,7 @@ type Config struct {
 	PipelineExecutions                       map[string]managementClient.PipelineExecution                       `json:"pipelineExecutions,omitempty" yaml:"pipelineExecutions,omitempty"`
 	PipelineExecutionLogs                    map[string]managementClient.PipelineExecutionLog                    `json:"pipelineExecutionLogs,omitempty" yaml:"pipelineExecutionLogs,omitempty"`
 	SourceCodeRepositorys                    map[string]managementClient.SourceCodeRepository                    `json:"sourceCodeRepositories,omitempty" yaml:"sourceCodeRepositories,omitempty"`
-	GlobalComposeConfigs                     map[string]managementClient.GlobalComposeConfig                     `json:"globalComposeConfigs,omitempty" yaml:"globalComposeConfigs,omitempty"`
-	ClusterComposeConfigs                    map[string]managementClient.ClusterComposeConfig                    `json:"clusterComposeConfigs,omitempty" yaml:"clusterComposeConfigs,omitempty"`
+	ComposeConfigs                           map[string]managementClient.ComposeConfig                           `json:"composeConfigs,omitempty" yaml:"composeConfigs,omitempty"`
 
 	// Cluster Client
 	Namespaces        map[string]clusterClient.Namespace        `json:"namespaces,omitempty" yaml:"namespaces,omitempty"`
@@ -85,5 +84,4 @@ type Config struct {
 	Workloads                      map[string]projectClient.Workload                      `json:"workloads,omitempty" yaml:"workloads,omitempty"`
 	Apps                           map[string]projectClient.App                           `json:"apps,omitempty" yaml:"apps,omitempty"`
 	AppRevisions                   map[string]projectClient.AppRevision                   `json:"appRevisions,omitempty" yaml:"appRevisions,omitempty"`
-	NamespaceComposeConfigs        map[string]projectClient.NamespaceComposeConfig        `json:"namespaceComposeConfigs,omitempty" yaml:"namespaceComposeConfigs,omitempty"`
 }

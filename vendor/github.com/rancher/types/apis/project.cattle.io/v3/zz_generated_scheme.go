@@ -59,8 +59,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&AppList{},
 		&AppRevision{},
 		&AppRevisionList{},
-		&NamespaceComposeConfig{},
-		&NamespaceComposeConfigList{},
 	)
 	return nil
 }

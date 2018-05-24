@@ -10,6 +10,7 @@ const (
 	TemplateVersionSpecFieldQuestions           = "questions"
 	TemplateVersionSpecFieldRancherVersion      = "rancherVersion"
 	TemplateVersionSpecFieldReadme              = "readme"
+	TemplateVersionSpecFieldRequiredNamespace   = "requiredNamespace"
 	TemplateVersionSpecFieldUpgradeVersionLinks = "upgradeVersionLinks"
 	TemplateVersionSpecFieldVersion             = "version"
 )
@@ -23,6 +24,7 @@ type TemplateVersionSpec struct {
 	Questions           []Question        `json:"questions,omitempty" yaml:"questions,omitempty"`
 	RancherVersion      string            `json:"rancherVersion,omitempty" yaml:"rancherVersion,omitempty"`
 	Readme              string            `json:"readme,omitempty" yaml:"readme,omitempty"`
+	RequiredNamespace   string            `json:"requiredNamespace,omitempty" yaml:"requiredNamespace,omitempty"`
 	UpgradeVersionLinks map[string]string `json:"upgradeVersionLinks,omitempty" yaml:"upgradeVersionLinks,omitempty"`
 	Version             string            `json:"version,omitempty" yaml:"version,omitempty"`
 }

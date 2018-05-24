@@ -112,8 +112,9 @@ type TemplateVersionSpec struct {
 	UpgradeVersionLinks map[string]string `json:"upgradeVersionLinks,omitempty"`
 	Digest              string            `json:"digest,omitempty"`
 
-	Files     map[string]string `json:"files,omitempty"`
-	Questions []Question        `json:"questions,omitempty"`
+	Files             map[string]string `json:"files,omitempty"`
+	Questions         []Question        `json:"questions,omitempty"`
+	RequiredNamespace string            `json:"requiredNamespace,omitempty"`
 }
 
 type TemplateVersionStatus struct {

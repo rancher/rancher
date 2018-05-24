@@ -240,6 +240,10 @@ type GenerateKubeConfigOutput struct {
 	Config string `json:"config"`
 }
 
+type ExportOutput struct {
+	YAMLOutput string `json:"yamlOutput"`
+}
+
 type ImportClusterYamlInput struct {
 	YAML             string `json:"yaml,omitempty"`
 	DefaultNamespace string `json:"defaultNamespace,omitempty"`
