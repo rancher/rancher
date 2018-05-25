@@ -135,6 +135,10 @@ func (p *adProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult, 
 	// As per https://msdn.microsoft.com/en-us/library/aa746475%28VS.85%29.aspx, `(member:1.2.840.113556.1.4.1941:=cn=user1,cn=users,DC=x)`
 	// query can fetch all groups that the user is a member of, including nested groups
 	userDN := result.Entries[0].DN
+	// config.GroupMemberMappingAttribute is a required field post 2.0.1, so if an upgraded setup doesn't have its value, we set it to `member`
+	if config.GroupMemberMappingAttribute == "" {
+		config.GroupMemberMappingAttribute = "member"
+	}
 	nestedGroupsQuery := "(" + config.GroupMemberMappingAttribute + ":1.2.840.113556.1.4.1941:=" + ldapv2.EscapeFilter(userDN) + ")"
 	logrus.Debugf("AD: Query for pulling user's groups: %v", nestedGroupsQuery)
 	searchBase := config.UserSearchBase
