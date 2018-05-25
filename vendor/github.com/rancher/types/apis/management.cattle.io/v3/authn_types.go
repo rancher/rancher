@@ -141,7 +141,7 @@ type ActiveDirectoryConfig struct {
 	GroupNameAttribute          string   `json:"groupNameAttribute,omitempty"          norman:"default=name,required"`
 	GroupDNAttribute            string   `json:"groupDNAttribute,omitempty"            norman:"default=distinguishedName,required"`
 	GroupMemberUserAttribute    string   `json:"groupMemberUserAttribute,omitempty"    norman:"default=distinguishedName,required"`
-	GroupMemberMappingAttribute string   `json:"groupMemberMappingAttribute,omitempty"`
+	GroupMemberMappingAttribute string   `json:"groupMemberMappingAttribute,omitempty" norman:"default=member,required"`
 	ConnectionTimeout           int64    `json:"connectionTimeout,omitempty"           norman:"default=5000"`
 }
 
