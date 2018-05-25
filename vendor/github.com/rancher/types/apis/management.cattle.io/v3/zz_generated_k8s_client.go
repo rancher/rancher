@@ -60,6 +60,7 @@ type Interface interface {
 	SourceCodeRepositoriesGetter
 	ComposeConfigsGetter
 	ResourceQuotaTemplatesGetter
+	CattleInstancesGetter
 }
 
 type Client struct {
@@ -112,6 +113,7 @@ type Client struct {
 	sourceCodeRepositoryControllers                    map[string]SourceCodeRepositoryController
 	composeConfigControllers                           map[string]ComposeConfigController
 	resourceQuotaTemplateControllers                   map[string]ResourceQuotaTemplateController
+	cattleInstanceControllers                          map[string]CattleInstanceController
 }
 
 func NewForConfig(config rest.Config) (Interface, error) {
@@ -173,6 +175,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		sourceCodeRepositoryControllers:                    map[string]SourceCodeRepositoryController{},
 		composeConfigControllers:                           map[string]ComposeConfigController{},
 		resourceQuotaTemplateControllers:                   map[string]ResourceQuotaTemplateController{},
+		cattleInstanceControllers:                          map[string]CattleInstanceController{},
 	}, nil
 }
 
@@ -767,6 +770,19 @@ type ResourceQuotaTemplatesGetter interface {
 func (c *Client) ResourceQuotaTemplates(namespace string) ResourceQuotaTemplateInterface {
 	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ResourceQuotaTemplateResource, ResourceQuotaTemplateGroupVersionKind, resourceQuotaTemplateFactory{})
 	return &resourceQuotaTemplateClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type CattleInstancesGetter interface {
+	CattleInstances(namespace string) CattleInstanceInterface
+}
+
+func (c *Client) CattleInstances(namespace string) CattleInstanceInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &CattleInstanceResource, CattleInstanceGroupVersionKind, cattleInstanceFactory{})
+	return &cattleInstanceClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

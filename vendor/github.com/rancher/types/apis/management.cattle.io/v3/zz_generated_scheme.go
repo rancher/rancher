@@ -122,6 +122,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ComposeConfigList{},
 		&ResourceQuotaTemplate{},
 		&ResourceQuotaTemplateList{},
+		&CattleInstance{},
+		&CattleInstanceList{},
 	)
 	return nil
 }
