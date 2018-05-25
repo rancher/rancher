@@ -13,6 +13,7 @@ const (
 )
 
 var projectManagmentPlaneResources = []string{"projectroletemplatebindings", "apps", "secrets", "pipelines", "pipelineexecutions", "pipelineexecutionlogs", "projectloggings", "projectalerts"}
+var prtbClusterManagmentPlaneResources = []string{"notifiers", "clusterpipelines"}
 
 type prtbLifecycle struct {
 	mgr           *manager
@@ -123,6 +124,8 @@ func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding
 	if err := p.mgr.ensureClusterMembershipBinding(roleName, string(binding.UID), cluster, false, subject); err != nil {
 		return err
 	}
-
+	if err := p.mgr.grantManagementProjectScopedPrivilegesInClusterNamespace(binding.RoleTemplateName, proj.Namespace, prtbClusterManagmentPlaneResources, subject, binding); err != nil {
+		return err
+	}
 	return p.mgr.grantManagementPlanePrivileges(binding.RoleTemplateName, projectManagmentPlaneResources, subject, binding)
 }
