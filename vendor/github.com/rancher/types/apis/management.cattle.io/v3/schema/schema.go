@@ -35,7 +35,8 @@ var (
 		Init(rkeTypes).
 		Init(alertTypes).
 		Init(pipelineTypes).
-		Init(composeType)
+		Init(composeType).
+		Init(cattleInstanceType)
 
 	TokenSchemas = factory.Schemas(&Version).
 			Init(tokens)
@@ -490,4 +491,12 @@ func pipelineTypes(schema *types.Schemas) *types.Schemas {
 
 func composeType(schemas *types.Schemas) *types.Schemas {
 	return schemas.MustImport(&Version, v3.ComposeConfig{})
+}
+
+func cattleInstanceType(schames *types.Schemas) *types.Schemas {
+	return schames.
+		AddMapperForType(&Version, v3.CattleInstance{},
+			m.Drop{Field: "token"},
+		).
+		MustImport(&Version, v3.CattleInstance{})
 }
