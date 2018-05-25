@@ -44,7 +44,7 @@ func (e EnvironmentMapper) FromInternal(data map[string]interface{}) {
 					"source":     "configMap",
 					"sourceName": envVar.ValueFrom.ConfigMapKeyRef.Name,
 					"sourceKey":  envVar.ValueFrom.ConfigMapKeyRef.Key,
-					"optional":   envVar.ValueFrom.ConfigMapKeyRef.Optional,
+					"optional":   getValue(envVar.ValueFrom.ConfigMapKeyRef.Optional),
 					"targetKey":  envVar.Name,
 				})
 			}
@@ -53,7 +53,7 @@ func (e EnvironmentMapper) FromInternal(data map[string]interface{}) {
 					"source":     "secret",
 					"sourceName": envVar.ValueFrom.SecretKeyRef.Name,
 					"sourceKey":  envVar.ValueFrom.SecretKeyRef.Key,
-					"optional":   envVar.ValueFrom.SecretKeyRef.Optional,
+					"optional":   getValue(envVar.ValueFrom.SecretKeyRef.Optional),
 					"targetKey":  envVar.Name,
 				})
 			}
@@ -67,7 +67,7 @@ func (e EnvironmentMapper) FromInternal(data map[string]interface{}) {
 					"source":     "secret",
 					"sourceName": envVar.SecretRef.Name,
 					"prefix":     envVar.Prefix,
-					"optional":   envVar.SecretRef.Optional,
+					"optional":   getValue(envVar.SecretRef.Optional),
 					"type":       "/v3/project/schemas/environmentFrom",
 				})
 			}
@@ -76,7 +76,7 @@ func (e EnvironmentMapper) FromInternal(data map[string]interface{}) {
 					"source":     "configMap",
 					"sourceName": envVar.ConfigMapRef.Name,
 					"prefix":     envVar.Prefix,
-					"optional":   envVar.ConfigMapRef.Optional,
+					"optional":   getValue(envVar.ConfigMapRef.Optional),
 					"type":       "/v3/project/schemas/environmentFrom",
 				})
 			}
@@ -193,4 +193,11 @@ func (e EnvironmentMapper) ModifySchema(schema *types.Schema, schemas *types.Sch
 	delete(schema.ResourceFields, "env")
 	delete(schema.ResourceFields, "envFrom")
 	return nil
+}
+
+func getValue(optional *bool) bool {
+	if optional != nil {
+		return *optional
+	}
+	return false
 }
