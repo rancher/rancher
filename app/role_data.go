@@ -126,6 +126,7 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("*").resources("storageclasses").verbs("get", "list", "watch").
 		addRule().apiGroups("*").resources("persistentvolumeclaims").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("clusterevents").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("clusterpipelines").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("pipelines").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("pipelineexecutions").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("pipelineexecutionlogs").verbs("*").
@@ -142,6 +143,7 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("*").resources("storageclasses").verbs("get", "list", "watch").
 		addRule().apiGroups("*").resources("persistentvolumeclaims").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("clusterevents").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("clusterpipelines").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("pipelines").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("pipelineexecutions").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("pipelineexecutionlogs").verbs("*").
@@ -157,6 +159,7 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("*").resources("storageclasses").verbs("get", "list", "watch").
 		addRule().apiGroups("*").resources("persistentvolumeclaims").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clusterevents").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("clusterpipelines").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("pipelines").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("pipelineexecutions").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("pipelineexecutionlogs").verbs("get", "list", "watch").

@@ -489,6 +489,61 @@ func (m *manager) grantManagementClusterScopedPrivilegesInProjectNamespace(roleT
 	return m.reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs, roleBindings)
 }
 
+// grantManagementProjectScopedPrivilegesInClusterNamespace ensures that project roles grant permissions to certain cluster-scoped
+// resources(notifier, clusterpipelines). These resources exists in cluster namespace but need to be shared between projects.
+func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleTemplateName, clusterNamespace string, resources []string,
+	subject v1.Subject, binding *v3.ProjectRoleTemplateBinding) error {
+	roles, err := m.gatherAndDedupeRoles(roleTemplateName)
+	if err != nil {
+		return err
+	}
+
+	desiredRBs := map[string]*v1.RoleBinding{}
+	roleBindings := m.mgmt.RBAC.RoleBindings(clusterNamespace)
+	for _, role := range roles {
+		for _, resource := range resources {
+			verbs, err := m.checkForManagementPlaneRules(role, resource)
+			if err != nil {
+				return err
+			}
+			if len(verbs) > 0 {
+				if err := m.reconcileManagementPlaneRole(clusterNamespace, resource, role, verbs); err != nil {
+					return err
+				}
+
+				bindingName := binding.Name + "-" + role.Name
+				if _, ok := desiredRBs[bindingName]; !ok {
+					desiredRBs[bindingName] = &v1.RoleBinding{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: bindingName,
+							Labels: map[string]string{
+								string(binding.UID): prtbInClusterBindingOwner,
+							},
+						},
+						Subjects: []v1.Subject{subject},
+						RoleRef: v1.RoleRef{
+							Kind: "Role",
+							Name: role.Name,
+						},
+					}
+				}
+			}
+		}
+	}
+
+	currentRBs := map[string]*v1.RoleBinding{}
+	set := labels.Set(map[string]string{string(binding.UID): prtbInClusterBindingOwner})
+	current, err := m.rbLister.List(clusterNamespace, set.AsSelector())
+	if err != nil {
+		return err
+	}
+	for _, rb := range current {
+		currentRBs[rb.Name] = rb
+	}
+
+	return m.reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs, roleBindings)
+}
+
 func (m *manager) gatherAndDedupeRoles(roleTemplateName string) (map[string]*v3.RoleTemplate, error) {
 	rt, err := m.rtLister.Get("", roleTemplateName)
 	if err != nil {
