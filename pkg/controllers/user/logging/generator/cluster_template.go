@@ -61,6 +61,7 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     logstash_format true
     logstash_dateformat  {{.clusterTarget.WrapEmbedded.DateFormat}}
     type_name  "container_log"
+    buffer_chunk_limit 256m            
     {{end -}}
 
     {{ if eq .clusterTarget.CurrentTarget "elasticsearch"}}
@@ -71,6 +72,7 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     {{else -}}
     hosts {{.clusterTarget.ElasticsearchConfig.Endpoint}}    
     {{end -}}
+    buffer_chunk_limit 256m            
  
     reload_connections "true"
     logstash_format true
@@ -78,6 +80,7 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     logstash_dateformat  {{.clusterTarget.WrapElasticsearch.DateFormat}}
     ssl_verify {{.clusterTarget.ElasticsearchConfig.SSLVerify}}
     type_name  "container_log"
+    buffer_chunk_limit 256m        
     {{end -}}
 
     {{ if eq .clusterTarget.CurrentTarget "splunk"}}
@@ -90,6 +93,7 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     token {{.clusterTarget.SplunkConfig.Token}}
     format json
     reload_connections "true"
+    buffer_chunk_limit 8m    
     {{end -}}
 
     {{ if eq .clusterTarget.CurrentTarget "kafka"}}
@@ -105,6 +109,7 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     output_include_time true
     # get_kafka_client_log  true
     max_send_retries  3
+    buffer_chunk_limit 256m    
     {{end -}}
 
     {{ if eq .clusterTarget.CurrentTarget "syslog"}}
@@ -114,13 +119,13 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     severity {{.clusterTarget.SyslogConfig.Severity}}
     program {{.clusterTarget.SyslogConfig.Program}}
     protocol {{.clusterTarget.SyslogConfig.Protocol}}
+    buffer_chunk_limit 256m    
     {{end -}}
 
     flush_interval {{.clusterTarget.OutputFlushInterval}}s
     buffer_type file
     buffer_path /fluentd/etc/buffer/cluster.buffer
     buffer_queue_limit 128
-    buffer_chunk_limit 256m
     max_retry_wait 30
     disable_retry_limit
     num_threads 8
