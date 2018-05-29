@@ -48,13 +48,19 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
     {{ if eq $store.CurrentTarget "elasticsearch"}}
     @type elasticsearch
     include_tag_key  true
-    hosts {{$store.ElasticsearchConfig.Endpoint}}
+    {{ if and $store.ElasticsearchConfig.AuthUserName $store.ElasticsearchConfig.AuthPassword}}
+    hosts {{$store.WrapElasticsearch.Scheme}}://{{$store.ElasticsearchConfig.AuthUserName}}:{{$store.ElasticsearchConfig.AuthPassword}}@{{$store.WrapElasticsearch.Host}}
+    {{else -}}
+    hosts {{$store.ElasticsearchConfig.Endpoint}}    
+    {{end -}}
+
     reload_connections "true"
     logstash_prefix "{{$store.ElasticsearchConfig.IndexPrefix}}"
     logstash_format true
     logstash_dateformat  {{$store.WrapElasticsearch.DateFormat}}
     type_name  "container_log"
     ssl_verify {{$store.ElasticsearchConfig.SSLVerify}}
+    buffer_chunk_limit 256m            
     {{end -}}
 
     {{ if eq $store.CurrentTarget "splunk"}}
@@ -66,6 +72,7 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
     sourcetype {{$store.SplunkConfig.Source}}
     format json
     token {{$store.SplunkConfig.Token}}
+    buffer_chunk_limit 8m        
     reload_connections "true"
     {{end -}}
 
@@ -81,6 +88,7 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
     output_include_tag  true
     output_include_time  true
     # get_kafka_client_log  true
+    buffer_chunk_limit 256m        
     max_send_retries 3
     {{end -}}
 
@@ -91,6 +99,7 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
     severity {{$store.SyslogConfig.Severity}}
     program {{$store.SyslogConfig.Program}}
     protocol {{$store.SyslogConfig.Protocol}}
+    buffer_chunk_limit 256m            
     {{end}}
     
     flush_interval {{$store.OutputFlushInterval}}s
@@ -100,7 +109,6 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
     buffer_type file
     buffer_path /fluentd/etc/buffer/project.{{$store.ProjectName}}.buffer
     buffer_queue_limit 128
-    buffer_chunk_limit 256m
     slow_flush_log_threshold 40.0
 </match>
 {{end -}}
