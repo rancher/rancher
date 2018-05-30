@@ -68,6 +68,7 @@ func Register(cluster *config.UserContext) {
 	cluster.Core.Nodes("").Controller().AddHandler("nodesSyncer", n.sync)
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler("machinesSyncer", m.sync)
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler("machinesLabelSyncer", m.syncLabels)
+	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler("cordonFieldsSyncer", m.syncCordonFields)
 	cluster.Core.Pods("").Controller().AddHandler("podsStatsSyncer", p.sync)
 }
 
