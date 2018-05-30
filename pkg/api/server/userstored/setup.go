@@ -94,7 +94,11 @@ func Workload(schemas *types.Schemas, clusterManager *clustermanager.Manager) {
 func Service(schemas *types.Schemas) {
 	serviceSchema := schemas.Schema(&schema.Version, "service")
 	dnsSchema := schemas.Schema(&schema.Version, "dnsRecord")
-	dnsSchema.Store = serviceSchema.Store
+	dnsSchema.Store = struct {
+		types.Store
+	}{
+		serviceSchema.Store,
+	}
 }
 
 func Secret(ctx context.Context, management *config.ScaledContext, schemas *types.Schemas) {
