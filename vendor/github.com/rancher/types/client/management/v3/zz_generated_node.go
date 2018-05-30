@@ -111,6 +111,10 @@ type NodeOperations interface {
 	Update(existing *Node, updates interface{}) (*Node, error)
 	ByID(id string) (*Node, error)
 	Delete(container *Node) error
+
+	ActionCordon(resource *Node) error
+
+	ActionUncordon(resource *Node) error
 }
 
 func newNodeClient(apiClient *Client) *NodeClient {
@@ -156,4 +160,14 @@ func (c *NodeClient) ByID(id string) (*Node, error) {
 
 func (c *NodeClient) Delete(container *Node) error {
 	return c.apiClient.Ops.DoResourceDelete(NodeType, &container.Resource)
+}
+
+func (c *NodeClient) ActionCordon(resource *Node) error {
+	err := c.apiClient.Ops.DoAction(NodeType, "cordon", &resource.Resource, nil, nil)
+	return err
+}
+
+func (c *NodeClient) ActionUncordon(resource *Node) error {
+	err := c.apiClient.Ops.DoAction(NodeType, "uncordon", &resource.Resource, nil, nil)
+	return err
 }
