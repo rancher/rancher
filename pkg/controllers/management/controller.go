@@ -24,6 +24,7 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	// auth handlers need to run early to create namespaces that back clusters and projects
 	// also, these handlers are purely in the mgmt plane, so they are lightweight compared to those that interact with machines and clusters
 	auth.RegisterEarly(ctx, management)
+	usercontrollers.RegisterEarly(ctx, management, manager)
 
 	// a-z
 	catalog.Register(ctx, management)
@@ -36,7 +37,7 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	nodedriver.Register(management)
 	nodepool.Register(management)
 	node.Register(management)
-	usercontrollers.Register(ctx, management, manager)
+	usercontrollers.RegisterLate(ctx, management, manager)
 	podsecuritypolicy.Register(management)
 
 	// Register last
