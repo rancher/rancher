@@ -68,6 +68,9 @@ func (m *Manager) Stop(cluster *v3.Cluster) {
 }
 
 func (m *Manager) Start(ctx context.Context, cluster *v3.Cluster) error {
+	if cluster.DeletionTimestamp != nil {
+		return nil
+	}
 	// reload cluster, always use the cached one
 	cluster, err := m.clusterLister.Get("", cluster.Name)
 	if err != nil {
