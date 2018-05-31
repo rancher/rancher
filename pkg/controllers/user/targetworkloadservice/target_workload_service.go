@@ -137,7 +137,16 @@ func (c *Controller) updateServiceWorkloadPods(key string, workloadIDsToCleanup 
 	var workloadsToCleanup []*util.Workload
 	for workloadID := range workloadIDsToCleanup {
 		workload, err := c.workloadLister.GetByWorkloadID(workloadID)
-		if err != nil || workload == nil {
+		notFound := workload == nil
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				notFound = true
+			} else {
+				return err
+			}
+		}
+
+		if notFound {
 			logrus.Warnf("Failed to fetch workload [%s]: [%v]", workloadID, err)
 			continue
 		}
