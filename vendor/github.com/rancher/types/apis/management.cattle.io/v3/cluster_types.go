@@ -56,7 +56,7 @@ type Cluster struct {
 }
 
 type ClusterSpec struct {
-	DisplayName                          string                               `json:"displayName"`
+	DisplayName                          string                               `json:"displayName" norman:"required"`
 	Description                          string                               `json:"description"`
 	Internal                             bool                                 `json:"internal" norman:"nocreate,noupdate"`
 	DesiredAgentImage                    string                               `json:"desiredAgentImage"`
