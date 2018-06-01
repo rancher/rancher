@@ -129,7 +129,7 @@ func (w *NodeWatcher) checkNodeCondition(alert *v3.ClusterAlert, machine *v3.Nod
 
 func (w *NodeWatcher) checkNodeMemUsage(alert *v3.ClusterAlert, machine *v3.Node) {
 	alertID := alert.Namespace + "-" + alert.Name
-	if machine != nil {
+	if machine != nil && v3.NodeConditionReady.IsTrue(machine) {
 		total := machine.Status.InternalNodeStatus.Allocatable.Memory()
 		used := machine.Status.Requested.Memory()
 
@@ -163,7 +163,7 @@ func (w *NodeWatcher) checkNodeMemUsage(alert *v3.ClusterAlert, machine *v3.Node
 
 func (w *NodeWatcher) checkNodeCPUUsage(alert *v3.ClusterAlert, machine *v3.Node) {
 	alertID := alert.Namespace + "-" + alert.Name
-	if machine != nil {
+	if machine != nil && v3.NodeConditionReady.IsTrue(machine) {
 		total := machine.Status.InternalNodeStatus.Allocatable.Cpu()
 		used := machine.Status.Requested.Cpu()
 
@@ -196,6 +196,9 @@ func (w *NodeWatcher) checkNodeCPUUsage(alert *v3.ClusterAlert, machine *v3.Node
 }
 
 func (w *NodeWatcher) checkNodeReady(alert *v3.ClusterAlert, machine *v3.Node) {
+	if machine == nil {
+		return
+	}
 	alertID := alert.Namespace + "-" + alert.Name
 	for _, cond := range machine.Status.InternalNodeStatus.Conditions {
 		if cond.Type == corev1.NodeReady {
