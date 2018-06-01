@@ -16,7 +16,8 @@ import (
 )
 
 const (
-	unschedulableEtcdTaint = "node-role.kubernetes.io/etcd=true:NoExecute"
+	unschedulableEtcdTaint    = "node-role.kubernetes.io/etcd=true:NoExecute"
+	unschedulableControlTaint = "node-role.kubernetes.io/controlplane=true:NoExecute"
 )
 
 func ReconcileCluster(ctx context.Context, kubeCluster, currentCluster *Cluster, updateOnly bool) error {
@@ -71,6 +72,9 @@ func reconcileWorker(ctx context.Context, currentCluster, kubeCluster *Cluster, 
 		host.UpdateWorker = true
 		if host.IsEtcd {
 			host.ToDelTaints = append(host.ToDelTaints, unschedulableEtcdTaint)
+		}
+		if host.IsControl {
+			host.ToDelTaints = append(host.ToDelTaints, unschedulableControlTaint)
 		}
 	}
 	return nil

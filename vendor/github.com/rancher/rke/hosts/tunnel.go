@@ -114,8 +114,20 @@ func getSSHConfig(username, sshPrivateKeyString string, useAgentAuth bool) (*ssh
 
 func privateKeyPath(sshKeyPath string) string {
 	if sshKeyPath[:2] == "~/" {
-		sshKeyPath = filepath.Join(os.Getenv("HOME"), sshKeyPath[2:])
+		sshKeyPath = filepath.Join(userHome(), sshKeyPath[2:])
 	}
 	buff, _ := ioutil.ReadFile(sshKeyPath)
 	return string(buff)
+}
+
+func userHome() string {
+	if home := os.Getenv("HOME"); home != "" {
+		return home
+	}
+	homeDrive := os.Getenv("HOMEDRIVE")
+	homePath := os.Getenv("HOMEPATH")
+	if homeDrive != "" && homePath != "" {
+		return homeDrive + homePath
+	}
+	return os.Getenv("USERPROFILE")
 }

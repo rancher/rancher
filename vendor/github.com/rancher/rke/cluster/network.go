@@ -431,7 +431,7 @@ func checkPlaneTCPPortsFromHost(ctx context.Context, host *hosts.Host, portList 
 		return err
 	}
 
-	clogs, err := docker.ReadContainerLogs(ctx, host.DClient, PortCheckContainer)
+	clogs, err := docker.ReadContainerLogs(ctx, host.DClient, PortCheckContainer, true, "all")
 	if err != nil {
 		return err
 	}

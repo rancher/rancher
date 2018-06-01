@@ -183,8 +183,9 @@ spec:
           operator: Exists
         - effect: NoExecute
           operator: Exists
-        - key: "node-role.kubernetes.io/master"
+        - key: "node-role.kubernetes.io/controlplane"
           operator: "Exists"
+          effect: "NoExecute"
         - key: "node-role.kubernetes.io/etcd"
           operator: "Exists"
           effect: "NoExecute"

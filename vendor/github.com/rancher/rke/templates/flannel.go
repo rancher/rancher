@@ -148,9 +148,9 @@ spec:
           mountPath: /host/opt/cni/bin/
       hostNetwork: true
       tolerations:
-      - key: node-role.kubernetes.io/master
+      - key: node-role.kubernetes.io/controlplane
         operator: Exists
-        effect: NoSchedule
+        effect: NoExecute
       - key: node-role.kubernetes.io/etcd
         operator: Exists
         effect: NoExecute
