@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"fmt"
@@ -10,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
@@ -25,6 +28,9 @@ const (
 )
 
 func runHealthcheck(ctx context.Context, host *hosts.Host, serviceName string, localConnDialerFactory hosts.DialerFactory, url string, certMap map[string]pki.CertificatePKI) error {
+	var containerStderr bytes.Buffer
+	var containerStdout bytes.Buffer
+
 	log.Infof(ctx, "[healthcheck] Start Healthcheck on service [%s] on host [%s]", serviceName, host.Address)
 	var x509Pair tls.Certificate
 
@@ -61,7 +67,18 @@ func runHealthcheck(ctx context.Context, host *hosts.Host, serviceName string, l
 		log.Infof(ctx, "[healthcheck] service [%s] on host [%s] is healthy", serviceName, host.Address)
 		return nil
 	}
-	return fmt.Errorf("Failed to verify healthcheck: %v", err)
+	logrus.Debug("Checking container logs")
+	clogs, logserr := docker.ReadContainerLogs(ctx, host.DClient, serviceName, false, "1")
+	defer clogs.Close()
+	if logserr != nil {
+		logrus.Debug("logserr: %v", logserr)
+		return fmt.Errorf("Failed to verify healthcheck: %v", err)
+	}
+	stdcopy.StdCopy(&containerStdout, &containerStderr, clogs)
+	containerLog := containerStderr.String()
+	containerLog = strings.TrimSuffix(containerLog, "\n")
+
+	return fmt.Errorf("Failed to verify healthcheck: %v, log: %v", err, containerLog)
 }
 
 func getHealthCheckHTTPClient(host *hosts.Host, port int, localConnDialerFactory hosts.DialerFactory, x509KeyPair *tls.Certificate) (*http.Client, error) {
