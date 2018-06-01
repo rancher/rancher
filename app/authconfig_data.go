@@ -2,6 +2,7 @@ package app
 
 import (
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
+	"github.com/rancher/rancher/pkg/auth/providers/azure"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	localprovider "github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -17,6 +18,10 @@ func addAuthConfigs(management *config.ManagementContext) error {
 	}
 
 	if err := addAuthConfig(activedirectory.Name, client.ActiveDirectoryConfigType, false, management); err != nil {
+		return err
+	}
+
+	if err := addAuthConfig(azure.Name, client.AzureADConfigType, false, management); err != nil {
 		return err
 	}
 
