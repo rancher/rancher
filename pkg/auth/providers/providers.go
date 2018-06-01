@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
+	"github.com/rancher/rancher/pkg/auth/providers/azure"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
@@ -42,6 +43,7 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	defer confMu.Unlock()
 	userMGR := mgmt.UserManager
 	var p common.AuthProvider
+
 	p = local.Configure(ctx, mgmt, userMGR)
 	providers[local.Name] = p
 	providersByType[client.LocalConfigType] = p
@@ -51,6 +53,11 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	providers[github.Name] = p
 	providersByType[client.GithubConfigType] = p
 	providersByType[publicclient.GithubProviderType] = p
+
+	p = azure.Configure(ctx, mgmt, userMGR)
+	providers[azure.Name] = p
+	providersByType[client.AzureADConfigType] = p
+	providersByType[publicclient.AzureADProviderType] = p
 
 	p = activedirectory.Configure(ctx, mgmt, userMGR)
 	providers[activedirectory.Name] = p

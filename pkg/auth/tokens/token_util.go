@@ -127,6 +127,10 @@ func NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []
 	return tokenServer.createK8sTokenCR(token)
 }
 
+func UpateLoginToken(token *v3.Token) (*v3.Token, error) {
+	return tokenServer.updateK8sTokenCR(token)
+}
+
 func ConvertTokenResource(schema *types.Schema, token v3.Token) (map[string]interface{}, error) {
 	tokenData, err := convert.EncodeToMap(token)
 	if err != nil {

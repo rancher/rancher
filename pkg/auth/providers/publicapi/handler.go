@@ -25,7 +25,12 @@ func NewHandler(ctx context.Context, mgmtCtx *config.ScaledContext) (http.Handle
 	return server, nil
 }
 
-var authProviderTypes = []string{v3public.LocalProviderType, v3public.GithubProviderType, v3public.ActiveDirectoryProviderType}
+var authProviderTypes = []string{
+	v3public.ActiveDirectoryProviderType,
+	v3public.AzureADProviderType,
+	v3public.GithubProviderType,
+	v3public.LocalProviderType,
+}
 
 func authProviderSchemas(ctx context.Context, management *config.ScaledContext, schemas *types.Schemas) error {
 	schema := schemas.Schema(&publicSchema.PublicVersion, v3public.AuthProviderType)
