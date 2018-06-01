@@ -224,14 +224,14 @@ func parseEndpoint(endpoint string) (host string, scheme string, err error) {
 
 func getDateFormat(dateformat string) string {
 	ToRealMap := map[string]string{
-		"YYYY.MM.DD": "%Y.%m.%d",
-		"YYYY.MM":    "%Y.%m.",
-		"YYYY":       "%Y.",
+		"YYYY-MM-DD": "%Y-%m-%d",
+		"YYYY-MM":    "%Y-%m",
+		"YYYY":       "%Y",
 	}
 	if _, ok := ToRealMap[dateformat]; ok {
 		return ToRealMap[dateformat]
 	}
-	return "%Y.%m.%d"
+	return "%Y-%m-%d"
 }
 
 func testReachable(network string, url string) error {
