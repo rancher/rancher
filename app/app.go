@@ -89,10 +89,6 @@ func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config
 }
 
 func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
-	getID := func() string {
-		return getid(cfg)
-	}
-
 	if err := service.Start(); err != nil {
 		return err
 	}
@@ -118,7 +114,7 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 		return err
 	}
 
-	if err := registerInstance(getID(), scaledContext); err != nil {
+	if err := registerInstance(getid(cfg), scaledContext); err != nil {
 		return err
 	}
 

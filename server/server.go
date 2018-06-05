@@ -6,6 +6,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/api/controllers/dynamiclistener"
+	"github.com/rancher/norman/leader"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
 	managementapi "github.com/rancher/rancher/pkg/api/server"
 	"github.com/rancher/rancher/pkg/audit"
@@ -18,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/filter"
 	"github.com/rancher/rancher/pkg/httpproxy"
 	k8sProxyPkg "github.com/rancher/rancher/pkg/k8sproxy"
+	"github.com/rancher/rancher/pkg/masterredirect"
 	"github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/rancher/server/capabilities"
 	"github.com/rancher/rancher/server/ui"
@@ -28,7 +30,14 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 )
 
+func redirectToMaster(leader *leader.State) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return masterredirect.New(leader.Get, next)
+	}
+}
+
 func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager, auditLogWriter *audit.LogWriter) error {
+	toMaster := redirectToMaster(scaledContext.Leader)
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext)
 	if err != nil {
 		return err
@@ -39,7 +48,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 		return err
 	}
 
-	k8sProxy := k8sProxyPkg.New(scaledContext, scaledContext.Dialer)
+	k8sProxy := toMaster(k8sProxyPkg.New(scaledContext, scaledContext.Dialer))
 
 	managementAPI, err := managementapi.New(ctx, scaledContext, clusterManager, k8sProxy)
 	if err != nil {
@@ -60,7 +69,8 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 
 	webhookHandler := hooks.New(scaledContext)
 
-	connectHandler, connectConfigHandler := connectHandlers(scaledContext)
+	connectHandler, connectConfigHandler, clusterProxyHandler := connectHandlers(scaledContext)
+	connectHandler = toMaster(connectHandler)
 
 	samlRoot := saml.AuthHandler()
 
@@ -70,6 +80,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 	root.Handle("/v3/connect", connectHandler)
 	root.Handle("/v3/connect/register", connectHandler)
 	root.Handle("/v3/connect/config", connectConfigHandler)
+	root.Handle("/v3/connect/clusterproxy", clusterProxyHandler)
 	root.Handle("/v3/settings/cacerts", rawAuthedAPIs).Methods(http.MethodGet)
 	root.Handle("/v3/settings/first-login", rawAuthedAPIs).Methods(http.MethodGet)
 	root.Handle("/v3/settings/ui-pl", rawAuthedAPIs).Methods(http.MethodGet)
@@ -113,12 +124,12 @@ func newAuthed(tokenAPI http.Handler, managementAPI http.Handler, k8sproxy http.
 	return authed
 }
 
-func connectHandlers(scaledContext *config.ScaledContext) (http.Handler, http.Handler) {
+func connectHandlers(scaledContext *config.ScaledContext) (http.Handler, http.Handler, http.Handler) {
 	if f, ok := scaledContext.Dialer.(*rancherdialer.Factory); ok {
-		return f.TunnelServer, rkenodeconfigserver.Handler(f.TunnelAuthorizer, scaledContext)
+		return f.TunnelServer, rkenodeconfigserver.Handler(f.TunnelAuthorizer, scaledContext), f.ClusterProxyServer
 	}
 
-	return http.NotFoundHandler(), http.NotFoundHandler()
+	return http.NotFoundHandler(), http.NotFoundHandler(), http.NotFoundHandler()
 }
 
 func newProxy() http.Handler {
