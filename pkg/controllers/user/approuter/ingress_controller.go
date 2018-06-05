@@ -17,12 +17,11 @@ import (
 )
 
 const (
-	annotationHostname        = "rdns.cattle.io/hostname"
-	annotationIngressClass    = "kubernetes.io/ingress.class"
-	ingressClassNginx         = "nginx"
-	refreshIngressHostnameKey = "_refreshRDNSHostname_"
-	RdnsIPDomain              = "lb.rancher.cloud"
-	maxHost                   = 10
+	annotationHostname     = "rdns.cattle.io/hostname"
+	annotationIngressClass = "kubernetes.io/ingress.class"
+	ingressClassNginx      = "nginx"
+	RdnsIPDomain           = "lb.rancher.cloud"
+	maxHost                = 10
 )
 
 var (
@@ -44,6 +43,10 @@ func isGeneratedDomain(obj *extensionsv1beta1.Ingress, host, domain string) bool
 }
 
 func (c *Controller) sync(key string, obj *extensionsv1beta1.Ingress) error {
+	if obj == nil || obj.DeletionTimestamp != nil {
+		return nil
+	}
+
 	serverURL := settings.RDNSServerBaseURL.Get()
 	if serverURL == "" {
 		return errors.New("settings.baseRDNSServerURL is not set, dns name might not be reachable")
@@ -76,12 +79,8 @@ func (c *Controller) sync(key string, obj *extensionsv1beta1.Ingress) error {
 }
 
 func (c *Controller) refresh(rootDomain string, obj *extensionsv1beta1.Ingress) error {
-	if obj == nil {
+	if obj == nil || obj.DeletionTimestamp != nil {
 		return errors.New("Got a nil ingress object")
-	}
-
-	if obj.ObjectMeta.DeletionTimestamp != nil {
-		return nil
 	}
 
 	annotations := obj.Annotations
@@ -100,7 +99,7 @@ func (c *Controller) refresh(rootDomain string, obj *extensionsv1beta1.Ingress) 
 	default:
 		return nil
 	}
-	if hostname == targetHostname {
+	if hostname == targetHostname || targetHostname == "" {
 		return nil
 	}
 
@@ -153,7 +152,10 @@ func (c *Controller) refreshAll(rootDomain string) error {
 }
 
 func (c *Controller) getRdnsHostname(obj *extensionsv1beta1.Ingress, rootDomain string) string {
-	return fmt.Sprintf("%s.%s.%s", obj.Name, obj.Namespace, rootDomain)
+	if rootDomain != "" {
+		return fmt.Sprintf("%s.%s.%s", obj.Name, obj.Namespace, rootDomain)
+	}
+	return ""
 }
 
 func (c *Controller) renew(ctx context.Context) {
