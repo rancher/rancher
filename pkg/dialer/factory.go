@@ -1,10 +1,20 @@
 package dialer
 
 import (
+	"crypto/md5"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"time"
 
+	"github.com/gorilla/websocket"
+
+	"net/http"
 	"net/url"
 	"strings"
 
@@ -23,9 +33,16 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func NewFactory(apiContext *config.ScaledContext) (dialer.Factory, error) {
+const (
+	Token  = "X-API-Tunnel-Token"
+	Params = "X-API-Tunnel-Params"
+)
+
+func NewFactory(apiContext *config.ScaledContext, ready func() bool, getID func() string) (dialer.Factory, error) {
 	authorizer := tunnelserver.NewAuthorizer(apiContext)
-	tunneler := tunnelserver.NewTunnelServer(apiContext, authorizer)
+	tunneler := tunnelserver.NewTunnelServer(ready, authorizer)
+
+	proxyTunneler := tunnelserver.NewProxyTunnelServer(ready, authorizer, tunneler)
 
 	secretStore, err := nodeconfig.NewStore(apiContext.Core.Namespaces(""), apiContext.K8sClient.CoreV1())
 	if err != nil {
@@ -37,32 +54,91 @@ func NewFactory(apiContext *config.ScaledContext) (dialer.Factory, error) {
 	})
 
 	return &Factory{
-		clusterLister:       apiContext.Management.Clusters("").Controller().Lister(),
-		localNodeController: apiContext.Management.Nodes("local").Controller(),
-		nodeLister:          apiContext.Management.Nodes("").Controller().Lister(),
-		TunnelServer:        tunneler,
-		TunnelAuthorizer:    authorizer,
-		store:               secretStore,
+		clusterLister:        apiContext.Management.Clusters("").Controller().Lister(),
+		localNodeController:  apiContext.Management.Nodes("local").Controller(),
+		nodeLister:           apiContext.Management.Nodes("").Controller().Lister(),
+		TunnelServer:         tunneler,
+		TunnelAuthorizer:     authorizer,
+		ClusterProxyServer:   proxyTunneler,
+		cattleInstanceLister: apiContext.Management.CattleInstances("").Controller().Lister(),
+		listenConfigLister:   apiContext.Management.ListenConfigs("").Controller().Lister(),
+		store:                secretStore,
+		isLeader: func() bool {
+			_, isLeader := apiContext.Leader.Get()
+			return isLeader
+		},
+		getID: getID,
 	}, nil
 }
 
 type Factory struct {
-	localNodeController v3.NodeController
-	nodeLister          v3.NodeLister
-	clusterLister       v3.ClusterLister
-	TunnelServer        *remotedialer.Server
-	TunnelAuthorizer    *tunnelserver.Authorizer
-	store               *encryptedstore.GenericEncryptedStore
+	isLeader             func() bool
+	getID                func() string
+	localNodeController  v3.NodeController
+	nodeLister           v3.NodeLister
+	clusterLister        v3.ClusterLister
+	TunnelServer         *remotedialer.Server
+	TunnelAuthorizer     *tunnelserver.Authorizer
+	ClusterProxyServer   *remotedialer.ProxyServer
+	store                *encryptedstore.GenericEncryptedStore
+	cattleInstanceLister v3.CattleInstanceLister
+	listenConfigLister   v3.ListenConfigLister
 }
 
 func (f *Factory) ClusterDialer(clusterName string) (dialer.Dialer, error) {
 	return func(network, address string) (net.Conn, error) {
-		d, err := f.clusterDialer(clusterName, address)
+		var d dialer.Dialer
+		var err error
+		if !f.isLeader() {
+			d, err = f.clusterProxyDialer(clusterName)
+		} else {
+			d, err = f.clusterDialer(clusterName, address)
+		}
 		if err != nil {
 			return nil, err
 		}
 		return d(network, address)
 	}, nil
+}
+
+func (f *Factory) clusterProxyDialer(clusterName string) (dialer.Dialer, error) {
+
+	bytes, err := json.Marshal(map[string]string{
+		"clusterName": clusterName,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	sum := md5.Sum([]byte(f.getID()))
+	encodeID := hex.EncodeToString(sum[:])
+
+	instance, err := f.cattleInstanceLister.Get("", encodeID)
+	if err != nil {
+		return nil, err
+	}
+
+	headers := http.Header(map[string][]string{
+		Token:  {instance.Token},
+		Params: {base64.StdEncoding.EncodeToString(bytes)},
+	})
+
+	lc, err := f.listenConfigLister.Get("", "cli-config")
+	if err != nil {
+		return nil, err
+	}
+
+	roots := x509.NewCertPool()
+	if !roots.AppendCertsFromPEM([]byte(lc.CACert)) {
+		return nil, errors.New("import cacert error")
+	}
+	wsDialer := &websocket.Dialer{
+		TLSClientConfig: &tls.Config{
+			RootCAs: roots,
+		},
+	}
+
+	return f.ClusterProxyServer.ClientDialer(clusterName, 15*time.Second, headers, wsDialer), nil
 }
 
 func isCloudDriver(cluster *v3.Cluster) bool {

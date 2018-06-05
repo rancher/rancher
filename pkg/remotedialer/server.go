@@ -15,6 +15,7 @@ var (
 )
 
 type Authorizer func(req *http.Request) (clientKey string, authed bool, err error)
+type ProxyAuthorizer func(req *http.Request) (clusterName, clientKey string, authed bool, err error)
 type ErrorWriter func(rw http.ResponseWriter, req *http.Request, code int, err error)
 
 func DefaultErrorWriter(rw http.ResponseWriter, req *http.Request, code int, err error) {

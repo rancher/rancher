@@ -128,6 +128,12 @@ func main() {
 			EnvVar: "AUDIT_LEVEL",
 			Usage:  "Audit log level: 0 - disable audit log, 1 - log event metadata, 2 - log event metadata and request body, 3 - log event metadata, request body and response body",
 		},
+		cli.StringFlag{
+			Name:        "advertise-address",
+			Usage:       "IP address for identity of this instance",
+			Value:       "",
+			Destination: &config.AdvertiseAddress,
+		},
 	}
 
 	app.Action = func(c *cli.Context) error {

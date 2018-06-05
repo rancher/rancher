@@ -41,10 +41,7 @@ type input struct {
 	Cluster *cluster     `json:"cluster"`
 }
 
-func NewTunnelServer(context *config.ScaledContext, authorizer *Authorizer) *remotedialer.Server {
-	ready := func() bool {
-		return context.Leader
-	}
+func NewTunnelServer(ready func() bool, authorizer *Authorizer) *remotedialer.Server {
 	return remotedialer.New(authorizer.authorizeTunnel, func(rw http.ResponseWriter, req *http.Request, code int, err error) {
 		rw.WriteHeader(code)
 		rw.Write([]byte(err.Error()))
@@ -53,12 +50,13 @@ func NewTunnelServer(context *config.ScaledContext, authorizer *Authorizer) *rem
 
 func NewAuthorizer(context *config.ScaledContext) *Authorizer {
 	auth := &Authorizer{
-		crtIndexer:    context.Management.ClusterRegistrationTokens("").Controller().Informer().GetIndexer(),
-		clusterLister: context.Management.Clusters("").Controller().Lister(),
-		nodeIndexer:   context.Management.Nodes("").Controller().Informer().GetIndexer(),
-		machineLister: context.Management.Nodes("").Controller().Lister(),
-		machines:      context.Management.Nodes(""),
-		clusters:      context.Management.Clusters(""),
+		crtIndexer:           context.Management.ClusterRegistrationTokens("").Controller().Informer().GetIndexer(),
+		clusterLister:        context.Management.Clusters("").Controller().Lister(),
+		nodeIndexer:          context.Management.Nodes("").Controller().Informer().GetIndexer(),
+		machineLister:        context.Management.Nodes("").Controller().Lister(),
+		machines:             context.Management.Nodes(""),
+		clusters:             context.Management.Clusters(""),
+		cattleInstanceLister: context.Management.CattleInstances("").Controller().Lister(),
 	}
 	context.Management.ClusterRegistrationTokens("").Controller().Informer().AddIndexers(map[string]cache.IndexFunc{
 		crtKeyIndex: auth.crtIndex,
@@ -70,12 +68,13 @@ func NewAuthorizer(context *config.ScaledContext) *Authorizer {
 }
 
 type Authorizer struct {
-	crtIndexer    cache.Indexer
-	clusterLister v3.ClusterLister
-	nodeIndexer   cache.Indexer
-	machineLister v3.NodeLister
-	machines      v3.NodeInterface
-	clusters      v3.ClusterInterface
+	crtIndexer           cache.Indexer
+	clusterLister        v3.ClusterLister
+	nodeIndexer          cache.Indexer
+	machineLister        v3.NodeLister
+	machines             v3.NodeInterface
+	clusters             v3.ClusterInterface
+	cattleInstanceLister v3.CattleInstanceLister
 }
 
 type Client struct {
