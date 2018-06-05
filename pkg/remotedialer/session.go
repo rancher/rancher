@@ -2,7 +2,6 @@ package remotedialer
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -166,6 +166,24 @@ func (s *session) clientConnect(message *message) {
 	s.Unlock()
 
 	go clientDial(conn, message)
+}
+
+func (s *session) connect(deadline time.Duration, proto, address string) (int64, net.Conn, error) {
+	connID := atomic.AddInt64(&s.nextConnID, 1)
+	conn := newConnection(connID, s, proto, address)
+
+	s.Lock()
+	s.conns[connID] = conn
+	logrus.Debugf("CONNECTIONS %d %d", s.sessionKey, len(s.conns))
+	s.Unlock()
+
+	_, err := s.writeMessage(newConnect(connID, deadline, proto, address))
+	if err != nil {
+		s.closeConnection(connID, err)
+		return 0, nil, err
+	}
+
+	return connID, conn, err
 }
 
 func (s *session) serverConnect(deadline time.Duration, proto, address string) (net.Conn, error) {
