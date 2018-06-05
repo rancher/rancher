@@ -6,14 +6,20 @@ import (
 	"encoding/pem"
 
 	"github.com/rancher/types/config"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/cert"
 )
 
+const (
+	cattleSystemNamespace = "cattle-system"
+	selfSignedSecretName  = "tls-rancher"
+)
+
 func addListenConfig(management *config.ManagementContext, cfg Config) error {
 	userCACerts := cfg.ListenConfig.CACerts
-
+	selfSigned := false
 	existing, err := management.Management.ListenConfigs("").Get(cfg.ListenConfig.Name, v1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
@@ -38,7 +44,7 @@ func addListenConfig(management *config.ManagementContext, cfg Config) error {
 		if err != nil {
 			return err
 		}
-
+		selfSigned = true
 		caCert, err := cert.NewSelfSignedCACert(cert.Config{
 			CommonName:   "cattle-ca",
 			Organization: []string{"the-ranch"},
@@ -75,11 +81,32 @@ func addListenConfig(management *config.ManagementContext, cfg Config) error {
 	}
 
 	if existing == nil {
-		_, err := management.Management.ListenConfigs("").Create(cfg.ListenConfig)
-		return err
+		if _, err := management.Management.ListenConfigs("").Create(cfg.ListenConfig); err != nil {
+			return err
+		}
+	} else {
+		cfg.ListenConfig.ResourceVersion = existing.ResourceVersion
+		if _, err := management.Management.ListenConfigs("").Update(cfg.ListenConfig); err != nil {
+			return err
+		}
 	}
 
-	cfg.ListenConfig.ResourceVersion = existing.ResourceVersion
-	_, err = management.Management.ListenConfigs("").Update(cfg.ListenConfig)
+	if !selfSigned {
+		return nil
+	}
+	data := map[string]string{}
+	data["tls.key"] = cfg.ListenConfig.CAKey
+	data["tls.crt"] = cfg.ListenConfig.CACert
+	secret := &corev1.Secret{
+		StringData: data,
+		Type:       corev1.SecretTypeTLS,
+	}
+	secret.Name = selfSignedSecretName
+	secret.Namespace = cattleSystemNamespace
+	if _, err := management.Core.Secrets(cattleSystemNamespace).Get("tls-rancher", v1.GetOptions{}); apierrors.IsNotFound(err) {
+		_, err = management.Core.Secrets(cattleSystemNamespace).Create(secret)
+		return err
+	}
+	_, err = management.Core.Secrets(cattleSystemNamespace).Update(secret)
 	return err
 }
