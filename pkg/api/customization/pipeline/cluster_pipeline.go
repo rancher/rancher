@@ -220,12 +220,15 @@ func (h *ClusterPipelineHandler) authuser(apiContext *types.APIContext) error {
 	if err != nil {
 		return err
 	}
+
+	if _, err := refreshReposByCredential(h.SourceCodeRepositories, h.SourceCodeRepositoryLister, account, clusterPipeline); err != nil {
+		return err
+	}
+
 	data := map[string]interface{}{}
 	if err := access.ByID(apiContext, apiContext.Version, client.SourceCodeCredentialType, account.Name, &data); err != nil {
 		return err
 	}
-
-	go refreshReposByCredential(h.SourceCodeRepositories, h.SourceCodeRepositoryLister, account, clusterPipeline)
 
 	apiContext.WriteResponse(http.StatusOK, data)
 	return nil
@@ -273,7 +276,7 @@ func (h *ClusterPipelineHandler) authAddAccount(clusterPipeline *v3.ClusterPipel
 	account.Spec.UserName = userID
 	account.Spec.ClusterName = clusterPipeline.Spec.ClusterName
 	account, err = h.SourceCodeCredentials.Create(account)
-	if err != nil {
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return nil, err
 	}
 	return account, nil
