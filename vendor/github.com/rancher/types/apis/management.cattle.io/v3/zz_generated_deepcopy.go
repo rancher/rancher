@@ -93,6 +93,10 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 			return nil
 		}, InType: reflect.TypeOf(&BastionHost{})},
 		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*BlockStorageOpenstackOpts).DeepCopyInto(out.(*BlockStorageOpenstackOpts))
+			return nil
+		}, InType: reflect.TypeOf(&BlockStorageOpenstackOpts{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
 			in.(*CalicoNetworkProvider).DeepCopyInto(out.(*CalicoNetworkProvider))
 			return nil
 		}, InType: reflect.TypeOf(&CalicoNetworkProvider{})},
@@ -257,6 +261,10 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 			return nil
 		}, InType: reflect.TypeOf(&CustomConfig{})},
 		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*DiskVsphereOpts).DeepCopyInto(out.(*DiskVsphereOpts))
+			return nil
+		}, InType: reflect.TypeOf(&DiskVsphereOpts{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
 			in.(*DockerInfo).DeepCopyInto(out.(*DockerInfo))
 			return nil
 		}, InType: reflect.TypeOf(&DockerInfo{})},
@@ -329,6 +337,10 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 			return nil
 		}, InType: reflect.TypeOf(&GithubConfigTestOutput{})},
 		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*GlobalOpenstackOpts).DeepCopyInto(out.(*GlobalOpenstackOpts))
+			return nil
+		}, InType: reflect.TypeOf(&GlobalOpenstackOpts{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
 			in.(*GlobalRole).DeepCopyInto(out.(*GlobalRole))
 			return nil
 		}, InType: reflect.TypeOf(&GlobalRole{})},
@@ -344,6 +356,10 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 			in.(*GlobalRoleList).DeepCopyInto(out.(*GlobalRoleList))
 			return nil
 		}, InType: reflect.TypeOf(&GlobalRoleList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*GlobalVsphereOpts).DeepCopyInto(out.(*GlobalVsphereOpts))
+			return nil
+		}, InType: reflect.TypeOf(&GlobalVsphereOpts{})},
 		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
 			in.(*GoogleKubernetesEngineConfig).DeepCopyInto(out.(*GoogleKubernetesEngineConfig))
 			return nil
@@ -421,6 +437,10 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 			return nil
 		}, InType: reflect.TypeOf(&ListenConfigList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*LoadBalancerOpenstackOpts).DeepCopyInto(out.(*LoadBalancerOpenstackOpts))
+			return nil
+		}, InType: reflect.TypeOf(&LoadBalancerOpenstackOpts{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
 			in.(*LocalConfig).DeepCopyInto(out.(*LocalConfig))
 			return nil
 		}, InType: reflect.TypeOf(&LocalConfig{})},
@@ -437,9 +457,17 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 			return nil
 		}, InType: reflect.TypeOf(&LoggingSystemImages{})},
 		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*MetadataOpenstackOpts).DeepCopyInto(out.(*MetadataOpenstackOpts))
+			return nil
+		}, InType: reflect.TypeOf(&MetadataOpenstackOpts{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
 			in.(*NetworkConfig).DeepCopyInto(out.(*NetworkConfig))
 			return nil
 		}, InType: reflect.TypeOf(&NetworkConfig{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*NetworkVshpereOpts).DeepCopyInto(out.(*NetworkVshpereOpts))
+			return nil
+		}, InType: reflect.TypeOf(&NetworkVshpereOpts{})},
 		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
 			in.(*Node).DeepCopyInto(out.(*Node))
 			return nil
@@ -536,6 +564,10 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 			in.(*NotifierStatus).DeepCopyInto(out.(*NotifierStatus))
 			return nil
 		}, InType: reflect.TypeOf(&NotifierStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*OpenstackCloudProvider).DeepCopyInto(out.(*OpenstackCloudProvider))
+			return nil
+		}, InType: reflect.TypeOf(&OpenstackCloudProvider{})},
 		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
 			in.(*PagerdutyConfig).DeepCopyInto(out.(*PagerdutyConfig))
 			return nil
@@ -761,6 +793,10 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 			return nil
 		}, InType: reflect.TypeOf(&RoleTemplateList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*RouterOpenstackOpts).DeepCopyInto(out.(*RouterOpenstackOpts))
+			return nil
+		}, InType: reflect.TypeOf(&RouterOpenstackOpts{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
 			in.(*RunPipelineInput).DeepCopyInto(out.(*RunPipelineInput))
 			return nil
 		}, InType: reflect.TypeOf(&RunPipelineInput{})},
@@ -949,9 +985,21 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 			return nil
 		}, InType: reflect.TypeOf(&VersionCommits{})},
 		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*VirtualCenterConfig).DeepCopyInto(out.(*VirtualCenterConfig))
+			return nil
+		}, InType: reflect.TypeOf(&VirtualCenterConfig{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*VsphereCloudProvider).DeepCopyInto(out.(*VsphereCloudProvider))
+			return nil
+		}, InType: reflect.TypeOf(&VsphereCloudProvider{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
 			in.(*WebhookConfig).DeepCopyInto(out.(*WebhookConfig))
 			return nil
 		}, InType: reflect.TypeOf(&WebhookConfig{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*WorkspaceVsphereOpts).DeepCopyInto(out.(*WorkspaceVsphereOpts))
+			return nil
+		}, InType: reflect.TypeOf(&WorkspaceVsphereOpts{})},
 	)
 }
 
@@ -1339,6 +1387,22 @@ func (in *BastionHost) DeepCopy() *BastionHost {
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *BlockStorageOpenstackOpts) DeepCopyInto(out *BlockStorageOpenstackOpts) {
+	*out = *in
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BlockStorageOpenstackOpts.
+func (in *BlockStorageOpenstackOpts) DeepCopy() *BlockStorageOpenstackOpts {
+	if in == nil {
+		return nil
+	}
+	out := new(BlockStorageOpenstackOpts)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
 func (in *CalicoNetworkProvider) DeepCopyInto(out *CalicoNetworkProvider) {
 	*out = *in
 	return
@@ -1513,13 +1577,6 @@ func (in *ChangePasswordInput) DeepCopy() *ChangePasswordInput {
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
 func (in *CloudProvider) DeepCopyInto(out *CloudProvider) {
 	*out = *in
-	if in.CloudConfig != nil {
-		in, out := &in.CloudConfig, &out.CloudConfig
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
-	}
 	if in.AWSCloudProvider != nil {
 		in, out := &in.AWSCloudProvider, &out.AWSCloudProvider
 		if *in == nil {
@@ -1536,6 +1593,24 @@ func (in *CloudProvider) DeepCopyInto(out *CloudProvider) {
 		} else {
 			*out = new(AzureCloudProvider)
 			**out = **in
+		}
+	}
+	if in.OpenstackCloudProvider != nil {
+		in, out := &in.OpenstackCloudProvider, &out.OpenstackCloudProvider
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(OpenstackCloudProvider)
+			**out = **in
+		}
+	}
+	if in.VsphereCloudProvider != nil {
+		in, out := &in.VsphereCloudProvider, &out.VsphereCloudProvider
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(VsphereCloudProvider)
+			(*in).DeepCopyInto(*out)
 		}
 	}
 	return
@@ -2489,6 +2564,22 @@ func (in *CustomConfig) DeepCopy() *CustomConfig {
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *DiskVsphereOpts) DeepCopyInto(out *DiskVsphereOpts) {
+	*out = *in
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new DiskVsphereOpts.
+func (in *DiskVsphereOpts) DeepCopy() *DiskVsphereOpts {
+	if in == nil {
+		return nil
+	}
+	out := new(DiskVsphereOpts)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
 func (in *DockerInfo) DeepCopyInto(out *DockerInfo) {
 	*out = *in
 	if in.Labels != nil {
@@ -2893,6 +2984,22 @@ func (in *GithubConfigTestOutput) DeepCopy() *GithubConfigTestOutput {
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *GlobalOpenstackOpts) DeepCopyInto(out *GlobalOpenstackOpts) {
+	*out = *in
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new GlobalOpenstackOpts.
+func (in *GlobalOpenstackOpts) DeepCopy() *GlobalOpenstackOpts {
+	if in == nil {
+		return nil
+	}
+	out := new(GlobalOpenstackOpts)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
 func (in *GlobalRole) DeepCopyInto(out *GlobalRole) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
@@ -3019,6 +3126,22 @@ func (in *GlobalRoleList) DeepCopyObject() runtime.Object {
 	} else {
 		return nil
 	}
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *GlobalVsphereOpts) DeepCopyInto(out *GlobalVsphereOpts) {
+	*out = *in
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new GlobalVsphereOpts.
+func (in *GlobalVsphereOpts) DeepCopy() *GlobalVsphereOpts {
+	if in == nil {
+		return nil
+	}
+	out := new(GlobalVsphereOpts)
+	in.DeepCopyInto(out)
+	return out
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
@@ -3524,6 +3647,22 @@ func (in *ListenConfigList) DeepCopyObject() runtime.Object {
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *LoadBalancerOpenstackOpts) DeepCopyInto(out *LoadBalancerOpenstackOpts) {
+	*out = *in
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new LoadBalancerOpenstackOpts.
+func (in *LoadBalancerOpenstackOpts) DeepCopy() *LoadBalancerOpenstackOpts {
+	if in == nil {
+		return nil
+	}
+	out := new(LoadBalancerOpenstackOpts)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
 func (in *LocalConfig) DeepCopyInto(out *LocalConfig) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
@@ -3643,6 +3782,22 @@ func (in *LoggingSystemImages) DeepCopy() *LoggingSystemImages {
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *MetadataOpenstackOpts) DeepCopyInto(out *MetadataOpenstackOpts) {
+	*out = *in
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new MetadataOpenstackOpts.
+func (in *MetadataOpenstackOpts) DeepCopy() *MetadataOpenstackOpts {
+	if in == nil {
+		return nil
+	}
+	out := new(MetadataOpenstackOpts)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
 func (in *NetworkConfig) DeepCopyInto(out *NetworkConfig) {
 	*out = *in
 	if in.Options != nil {
@@ -3688,6 +3843,22 @@ func (in *NetworkConfig) DeepCopy() *NetworkConfig {
 		return nil
 	}
 	out := new(NetworkConfig)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *NetworkVshpereOpts) DeepCopyInto(out *NetworkVshpereOpts) {
+	*out = *in
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new NetworkVshpereOpts.
+func (in *NetworkVshpereOpts) DeepCopy() *NetworkVshpereOpts {
+	if in == nil {
+		return nil
+	}
+	out := new(NetworkVshpereOpts)
 	in.DeepCopyInto(out)
 	return out
 }
@@ -4461,6 +4632,27 @@ func (in *NotifierStatus) DeepCopy() *NotifierStatus {
 		return nil
 	}
 	out := new(NotifierStatus)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *OpenstackCloudProvider) DeepCopyInto(out *OpenstackCloudProvider) {
+	*out = *in
+	out.Global = in.Global
+	out.LoadBalancer = in.LoadBalancer
+	out.BlockStorage = in.BlockStorage
+	out.Router = in.Router
+	out.Metadata = in.Metadata
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new OpenstackCloudProvider.
+func (in *OpenstackCloudProvider) DeepCopy() *OpenstackCloudProvider {
+	if in == nil {
+		return nil
+	}
+	out := new(OpenstackCloudProvider)
 	in.DeepCopyInto(out)
 	return out
 }
@@ -5995,6 +6187,22 @@ func (in *RoleTemplateList) DeepCopyObject() runtime.Object {
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *RouterOpenstackOpts) DeepCopyInto(out *RouterOpenstackOpts) {
+	*out = *in
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new RouterOpenstackOpts.
+func (in *RouterOpenstackOpts) DeepCopy() *RouterOpenstackOpts {
+	if in == nil {
+		return nil
+	}
+	out := new(RouterOpenstackOpts)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
 func (in *RunPipelineInput) DeepCopyInto(out *RunPipelineInput) {
 	*out = *in
 	return
@@ -7119,6 +7327,49 @@ func (in *VersionCommits) DeepCopy() *VersionCommits {
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *VirtualCenterConfig) DeepCopyInto(out *VirtualCenterConfig) {
+	*out = *in
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new VirtualCenterConfig.
+func (in *VirtualCenterConfig) DeepCopy() *VirtualCenterConfig {
+	if in == nil {
+		return nil
+	}
+	out := new(VirtualCenterConfig)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *VsphereCloudProvider) DeepCopyInto(out *VsphereCloudProvider) {
+	*out = *in
+	out.Global = in.Global
+	if in.VirtualCenter != nil {
+		in, out := &in.VirtualCenter, &out.VirtualCenter
+		*out = make(map[string]VirtualCenterConfig, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	out.Network = in.Network
+	out.Disk = in.Disk
+	out.Workspace = in.Workspace
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new VsphereCloudProvider.
+func (in *VsphereCloudProvider) DeepCopy() *VsphereCloudProvider {
+	if in == nil {
+		return nil
+	}
+	out := new(VsphereCloudProvider)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
 func (in *WebhookConfig) DeepCopyInto(out *WebhookConfig) {
 	*out = *in
 	return
@@ -7130,6 +7381,22 @@ func (in *WebhookConfig) DeepCopy() *WebhookConfig {
 		return nil
 	}
 	out := new(WebhookConfig)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *WorkspaceVsphereOpts) DeepCopyInto(out *WorkspaceVsphereOpts) {
+	*out = *in
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new WorkspaceVsphereOpts.
+func (in *WorkspaceVsphereOpts) DeepCopy() *WorkspaceVsphereOpts {
+	if in == nil {
+		return nil
+	}
+	out := new(WorkspaceVsphereOpts)
 	in.DeepCopyInto(out)
 	return out
 }

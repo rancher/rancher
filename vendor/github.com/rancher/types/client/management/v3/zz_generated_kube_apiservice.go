@@ -7,6 +7,7 @@ const (
 	KubeAPIServiceFieldImage                 = "image"
 	KubeAPIServiceFieldPodSecurityPolicy     = "podSecurityPolicy"
 	KubeAPIServiceFieldServiceClusterIPRange = "serviceClusterIpRange"
+	KubeAPIServiceFieldServiceNodePortRange  = "serviceNodePortRange"
 )
 
 type KubeAPIService struct {
@@ -15,4 +16,5 @@ type KubeAPIService struct {
 	Image                 string            `json:"image,omitempty" yaml:"image,omitempty"`
 	PodSecurityPolicy     bool              `json:"podSecurityPolicy,omitempty" yaml:"podSecurityPolicy,omitempty"`
 	ServiceClusterIPRange string            `json:"serviceClusterIpRange,omitempty" yaml:"serviceClusterIpRange,omitempty"`
+	ServiceNodePortRange  string            `json:"serviceNodePortRange,omitempty" yaml:"serviceNodePortRange,omitempty"`
 }
