@@ -39,7 +39,7 @@ Rancher can be deployed in either a single node or multi-node setup.  Please ref
 * Hardware
   * 4 GB of Memory
 * Software
-  * Docker v1.12.6, 1.13.1, 17.03.02
+  * Docker v1.12.6, 1.13.1, 17.03.2
 
 ### Using Rancher
 
