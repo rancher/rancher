@@ -31,7 +31,7 @@ def test_node_fields(mc):
         'podCidr': 'r',
         'name': 'cru',
         'taints': 'ru',
-        'unschedulable': 'ru',
+        'unschedulable': 'r',
         'providerId': 'r',
         'sshUser': 'r',
         'imported': 'cru',

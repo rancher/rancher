@@ -4,6 +4,7 @@ import (
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/api/store/workload"
 )
 
@@ -18,6 +19,9 @@ func SetupStore(schema *types.Schema) {
 		},
 		Transformer: func(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
 			workload.SetPublicEnpointsFields(data)
+			if convert.ToBool(values.GetValueN(data, "unschedulable")) {
+				data["state"] = "cordoned"
+			}
 			return data, nil
 		},
 	}

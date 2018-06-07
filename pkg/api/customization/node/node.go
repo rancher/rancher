@@ -70,7 +70,7 @@ func cordonUncordonNode(actionName string, apiContext *types.APIContext, cordon 
 	if cordon == unschedulable {
 		return httperror.NewAPIError(httperror.InvalidAction, fmt.Sprintf("Node %s already %sed", apiContext.ID, actionName))
 	}
-	values.PutValue(node, !unschedulable, "unschedulable")
+	values.PutValue(node, convert.ToString(!unschedulable), "desiredNodeUnschedulable")
 	if _, err := schema.Store.Update(apiContext, schema, node, apiContext.ID); err != nil && apierrors.IsNotFound(err) {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error updating node %s by %s : %s", apiContext.ID, actionName, err.Error()))
 	}
