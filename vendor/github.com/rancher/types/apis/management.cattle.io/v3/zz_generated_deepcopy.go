@@ -1357,6 +1357,11 @@ func (in *BaseService) DeepCopyInto(out *BaseService) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.ExtraEnv != nil {
+		in, out := &in.ExtraEnv, &out.ExtraEnv
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

@@ -229,6 +229,8 @@ type BaseService struct {
 	ExtraArgs map[string]string `yaml:"extra_args" json:"extraArgs,omitempty"`
 	// Extra binds added to the nodes
 	ExtraBinds []string `yaml:"extra_binds" json:"extraBinds,omitempty"`
+	// this is to provide extra env variable to the docker container running kubernetes service
+	ExtraEnv []string `yaml:"extra_env" json:"extraEnv,omitempty"`
 }
 
 type NetworkConfig struct {
