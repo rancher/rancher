@@ -17,7 +17,6 @@ import (
 )
 
 const (
-	annotationHostname     = "rdns.cattle.io/hostname"
 	annotationIngressClass = "kubernetes.io/ingress.class"
 	ingressClassNginx      = "nginx"
 	RdnsIPDomain           = "lb.rancher.cloud"
@@ -44,6 +43,23 @@ func isGeneratedDomain(obj *extensionsv1beta1.Ingress, host, domain string) bool
 
 func (c *Controller) sync(key string, obj *extensionsv1beta1.Ingress) error {
 	if obj == nil || obj.DeletionTimestamp != nil {
+		return nil
+	}
+
+	ipDomain := settings.IngressIPDomain.Get()
+	if ipDomain != RdnsIPDomain {
+		return nil
+	}
+
+	isNeedSync := false
+	for _, rule := range obj.Spec.Rules {
+		if strings.HasSuffix(rule.Host, RdnsIPDomain) {
+			isNeedSync = true
+			break
+		}
+	}
+
+	if !isNeedSync {
 		return nil
 	}
 
@@ -89,7 +105,6 @@ func (c *Controller) refresh(rootDomain string, obj *extensionsv1beta1.Ingress) 
 		annotations = make(map[string]string)
 	}
 
-	hostname := annotations[annotationHostname]
 	targetHostname := ""
 	switch annotations[annotationIngressClass] {
 	case "": // nginx as default
@@ -99,18 +114,13 @@ func (c *Controller) refresh(rootDomain string, obj *extensionsv1beta1.Ingress) 
 	default:
 		return nil
 	}
-	if hostname == targetHostname || targetHostname == "" {
-		return nil
-	}
-
-	ipDomain := settings.IngressIPDomain.Get()
-	if ipDomain == "" {
+	if targetHostname == "" {
 		return nil
 	}
 
 	changed := false
 	for _, rule := range obj.Spec.Rules {
-		if (!isGeneratedDomain(obj, rule.Host, rootDomain) || rule.Host == ipDomain) && ipDomain == RdnsIPDomain {
+		if !isGeneratedDomain(obj, rule.Host, rootDomain) {
 			changed = true
 			break
 		}
@@ -121,12 +131,10 @@ func (c *Controller) refresh(rootDomain string, obj *extensionsv1beta1.Ingress) 
 	}
 
 	newObj := obj.DeepCopy()
-	newObj.Annotations[annotationHostname] = targetHostname
-
 	// Also need to update rules for hostname when using nginx
 	for i, rule := range newObj.Spec.Rules {
 		logrus.Debugf("Got ingress resource hostname: %s", rule.Host)
-		if strings.HasSuffix(rule.Host, ipDomain) {
+		if strings.HasSuffix(rule.Host, RdnsIPDomain) {
 			newObj.Spec.Rules[i].Host = targetHostname
 		}
 	}

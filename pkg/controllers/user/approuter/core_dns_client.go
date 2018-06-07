@@ -104,12 +104,13 @@ func (c *Client) ApplyDomain(hosts []string) (bool, string, error) {
 		return false, fqdn, err
 	}
 	logrus.Debugf("Fqdn %s has no changes, no need to update", d.Fqdn)
+	fqdn, _, _ := c.getSecret()
 
-	return false, "", nil
+	return false, fqdn, nil
 }
 
 func (c *Client) GetDomain() (d *model.Domain, err error) {
-	fqdn, _, err := c.getSecret()
+	fqdn, token, err := c.getSecret()
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
 			return nil, nil
@@ -122,6 +123,8 @@ func (c *Client) GetDomain() (d *model.Domain, err error) {
 	if err != nil {
 		return d, errors.Wrap(err, "GetDomain: failed to build a request")
 	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 
 	o, err := c.do(req)
 	if err != nil {
