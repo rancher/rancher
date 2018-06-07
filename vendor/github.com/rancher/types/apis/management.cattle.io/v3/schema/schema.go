@@ -219,6 +219,7 @@ func nodeTypes(schemas *types.Schemas) *types.Schemas {
 			&m.Move{From: "nodeAnnotations", To: "annotations"},
 			&m.Drop{Field: "desiredNodeLabels"},
 			&m.Drop{Field: "desiredNodeAnnotations"},
+			&m.Drop{Field: "desiredNodeUnschedulable"},
 			&m.AnnotationField{Field: "publicEndpoints", List: true},
 			m.Copy{From: "namespaceId", To: "clusterName"},
 			m.DisplayName{}).
@@ -231,6 +232,10 @@ func nodeTypes(schemas *types.Schemas) *types.Schemas {
 			labelField.Create = true
 			labelField.Update = true
 			schema.ResourceFields["labels"] = labelField
+			unschedulable := schema.ResourceFields["unschedulable"]
+			unschedulable.Create = false
+			unschedulable.Update = false
+			schema.ResourceFields["unschedulable"] = unschedulable
 			clusterField := schema.ResourceFields["clusterId"]
 			clusterField.Type = "reference[cluster]"
 			schema.ResourceFields["clusterId"] = clusterField
