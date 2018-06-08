@@ -1,4 +1,4 @@
-package activedirectory
+package openldap
 
 import (
 	"fmt"
@@ -16,12 +16,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (p *adProvider) formatter(apiContext *types.APIContext, resource *types.RawResource) {
+func (p *openldapProvider) formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	common.AddCommonActions(apiContext, resource)
 	resource.AddAction(apiContext, "testAndApply")
 }
 
-func (p *adProvider) actionHandler(actionName string, action *types.Action, request *types.APIContext) error {
+func (p *openldapProvider) actionHandler(actionName string, action *types.Action, request *types.APIContext) error {
 	handled, err := common.HandleCommonAction(actionName, action, request, Name, p.authConfigs)
 	if err != nil {
 		return err
@@ -37,20 +37,20 @@ func (p *adProvider) actionHandler(actionName string, action *types.Action, requ
 	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
-func (p *adProvider) testAndApply(actionName string, action *types.Action, request *types.APIContext) error {
+func (p *openldapProvider) testAndApply(actionName string, action *types.Action, request *types.APIContext) error {
 	input, err := handler.ParseAndValidateActionBody(request, request.Schemas.Schema(&managementschema.Version,
-		client.ActiveDirectoryTestAndApplyInputType))
+		client.OpenLDAPTestAndApplyInputType))
 	if err != nil {
 		return err
 	}
-	configApplyInput := &v3.ActiveDirectoryTestAndApplyInput{}
+	configApplyInput := &v3.OpenLDAPTestAndApplyInput{}
 	if err := mapstructure.Decode(input, configApplyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("Failed to parse body: %v", err))
 	}
 	logrus.Debugf("configApplyInput %v", configApplyInput)
 
-	config := &configApplyInput.ActiveDirectoryConfig
+	config := &configApplyInput.OpenLDAPConfig
 
 	login := &v3public.BasicLogin{
 		Username: configApplyInput.Username,
@@ -74,11 +74,11 @@ func (p *adProvider) testAndApply(actionName string, action *types.Action, reque
 		return err
 	}
 
-	//if this works, save adConfig CR adding enabled flag
+	//if this works, save openLDAPConfig CR adding enabled flag
 	config.Enabled = configApplyInput.Enabled
-	err = p.saveActiveDirectoryConfig(config)
+	err = p.saveOpenLDAPConfig(config)
 	if err != nil {
-		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to save activedirectory config: %v", err))
+		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to save openldap config: %v", err))
 	}
 
 	user, err := p.userMGR.SetPrincipalOnCurrentUser(request, userPrincipal)
@@ -86,20 +86,20 @@ func (p *adProvider) testAndApply(actionName string, action *types.Action, reque
 		return err
 	}
 
-	return tokens.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerInfo, 0, "Token via AD Configuration", request)
+	return tokens.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerInfo, 0, "Token via openLDAP Configuration", request)
 }
 
-func (p *adProvider) saveActiveDirectoryConfig(config *v3.ActiveDirectoryConfig) error {
-	storedConfig, _, err := p.getActiveDirectoryConfig()
+func (p *openldapProvider) saveOpenLDAPConfig(config *v3.OpenLDAPConfig) error {
+	storedConfig, _, err := p.getOpenLDAPConfig()
 	if err != nil {
 		return err
 	}
 	config.APIVersion = "management.cattle.io/v3"
 	config.Kind = v3.AuthConfigGroupVersionKind.Kind
-	config.Type = client.ActiveDirectoryConfigType
+	config.Type = client.OpenLDAPConfigType
 	config.ObjectMeta = storedConfig.ObjectMeta
 
-	logrus.Debugf("updating activedirectory config")
+	logrus.Debugf("updating openLDAP config")
 	_, err = p.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
 	if err != nil {
 		return err

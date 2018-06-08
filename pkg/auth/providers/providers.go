@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
+	"github.com/rancher/rancher/pkg/auth/providers/openldap"
 	"github.com/rancher/types/client/management/v3"
 	publicclient "github.com/rancher/types/client/management/v3public"
 )
@@ -56,6 +57,11 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	providers[activedirectory.Name] = p
 	providersByType[client.ActiveDirectoryConfigType] = p
 	providersByType[publicclient.ActiveDirectoryProviderType] = p
+
+	p = openldap.Configure(ctx, mgmt, userMGR)
+	providers[openldap.Name] = p
+	providersByType[client.OpenLDAPConfigType] = p
+	providersByType[publicclient.OpenLDAPProviderType] = p
 }
 
 func AuthenticateUser(input interface{}, providerName string) (v3.Principal, []v3.Principal, map[string]string, error) {

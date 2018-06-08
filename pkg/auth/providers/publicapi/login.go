@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
+	"github.com/rancher/rancher/pkg/auth/providers/openldap"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
@@ -104,6 +105,9 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	case client.ActiveDirectoryProviderType:
 		input = &v3public.BasicLogin{}
 		providerName = activedirectory.Name
+	case client.OpenLDAPProviderType:
+		input = &v3public.BasicLogin{}
+		providerName = openldap.Name
 	default:
 		return v3.Token{}, "", httperror.NewAPIError(httperror.ServerError, "unknown authentication provider")
 	}

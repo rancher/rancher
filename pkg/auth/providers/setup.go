@@ -10,7 +10,7 @@ import (
 	"github.com/rancher/types/config"
 )
 
-var authConfigTypes = []string{client.GithubConfigType, client.LocalConfigType, client.ActiveDirectoryConfigType}
+var authConfigTypes = []string{client.GithubConfigType, client.LocalConfigType, client.ActiveDirectoryConfigType, client.OpenLDAPConfigType}
 
 func SetupAuthConfig(ctx context.Context, management *config.ScaledContext, schemas *types.Schemas) {
 	Configure(ctx, management)

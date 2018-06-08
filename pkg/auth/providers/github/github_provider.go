@@ -82,9 +82,9 @@ func (g *ghProvider) getGithubConfigCR() (*v3.GithubConfig, error) {
 		return nil, fmt.Errorf("failed to retrieve GithubConfig metadata, cannot read k8s Unstructured data")
 	}
 
-	typemeta := &metav1.ObjectMeta{}
-	mapstructure.Decode(metadataMap, typemeta)
-	storedGithubConfig.ObjectMeta = *typemeta
+	objectMeta := &metav1.ObjectMeta{}
+	mapstructure.Decode(metadataMap, objectMeta)
+	storedGithubConfig.ObjectMeta = *objectMeta
 
 	return storedGithubConfig, nil
 }

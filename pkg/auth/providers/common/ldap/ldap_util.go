@@ -44,6 +44,34 @@ func NewLDAPConn(config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) (*ldap
 	return lConn, nil
 }
 
+func NewLDAPConnForOpenLDAP(config *v3.OpenLDAPConfig, caPool *x509.CertPool) (*ldapv2.Conn, error) {
+	logrus.Debug("Now creating Ldap connection")
+	var lConn *ldapv2.Conn
+	var err error
+	var tlsConfig *tls.Config
+	// TODO implment multi-server support
+	if len(config.Servers) != 1 {
+		return nil, errors.New("invalid server config. only exactly 1 server is currently supported")
+	}
+	server := config.Servers[0]
+	if config.TLS {
+		tlsConfig = &tls.Config{RootCAs: caPool, InsecureSkipVerify: false, ServerName: server}
+		lConn, err = ldapv2.DialTLS("tcp", fmt.Sprintf("%s:%d", server, config.Port), tlsConfig)
+		if err != nil {
+			return nil, fmt.Errorf("Error creating ssl connection: %v", err)
+		}
+	} else {
+		lConn, err = ldapv2.Dial("tcp", fmt.Sprintf("%s:%d", server, config.Port))
+		if err != nil {
+			return nil, fmt.Errorf("Error creating connection: %v", err)
+		}
+	}
+
+	lConn.SetTimeout(time.Duration(config.ConnectionTimeout) * time.Second)
+
+	return lConn, nil
+}
+
 func GetUserExternalID(username string, loginDomain string) string {
 	if strings.Contains(username, "\\") {
 		return username
@@ -71,6 +99,32 @@ func HasPermission(attributes []*ldapv2.EntryAttribute, config *v3.ActiveDirecto
 				return true
 			}
 		}
+	}
+	permission = permission & config.UserDisabledBitMask
+	return permission != config.UserDisabledBitMask
+}
+
+func HasPermissionForOpenLDAP(attributes []*ldapv2.EntryAttribute, config *v3.OpenLDAPConfig) bool {
+	var permission int64
+	if !IsType(attributes, config.UserObjectClass) {
+		return true
+	}
+
+	if config.UserEnabledAttribute != "" {
+		for _, attr := range attributes {
+			if attr.Name == config.UserEnabledAttribute {
+				if len(attr.Values) > 0 && attr.Values[0] != "" {
+					intAttr, err := strconv.ParseInt(attr.Values[0], 10, 64)
+					if err != nil {
+						logrus.Errorf("Failed to get USER_ENABLED_ATTRIBUTE, error: %v", err)
+						return false
+					}
+					permission = intAttr
+				}
+			}
+		}
+	} else {
+		return true
 	}
 	permission = permission & config.UserDisabledBitMask
 	return permission != config.UserDisabledBitMask
@@ -133,6 +187,25 @@ func GetUserSearchAttributes(memberOfAttribute, objectClassAttribute string, con
 func GetGroupSearchAttributes(memberOfAttribute, objectClassAttribute string, config *v3.ActiveDirectoryConfig) []string {
 	groupSeachAttributes := []string{memberOfAttribute,
 		objectClassAttribute,
+		config.GroupObjectClass,
+		config.UserLoginAttribute,
+		config.GroupNameAttribute,
+		config.GroupSearchAttribute}
+	return groupSeachAttributes
+}
+
+func GetUserSearchAttributesForOpenLDAP(config *v3.OpenLDAPConfig) []string {
+	userSearchAttributes := []string{"dn", config.UserMemberAttribute,
+		"objectClass",
+		config.UserObjectClass,
+		config.UserLoginAttribute,
+		config.UserNameAttribute,
+		config.UserEnabledAttribute}
+	return userSearchAttributes
+}
+func GetGroupSearchAttributesForOpenLDAP(config *v3.OpenLDAPConfig) []string {
+	groupSeachAttributes := []string{config.GroupMemberUserAttribute,
+		"objectClass",
 		config.GroupObjectClass,
 		config.UserLoginAttribute,
 		config.GroupNameAttribute,

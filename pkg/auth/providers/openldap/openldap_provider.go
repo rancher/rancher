@@ -1,4 +1,4 @@
-package activedirectory
+package openldap
 
 import (
 	"context"
@@ -15,23 +15,21 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
-	"github.com/rancher/types/client/management/v3public"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
-	Name                 = "activedirectory"
+	Name                 = "openldap"
 	UserScope            = Name + "_user"
 	GroupScope           = Name + "_group"
-	MemberOfAttribute    = "memberOf"
 	ObjectClassAttribute = "objectClass"
 )
 
 var scopes = []string{UserScope, GroupScope}
 
-type adProvider struct {
+type openldapProvider struct {
 	ctx         context.Context
 	authConfigs v3.AuthConfigInterface
 	userMGR     user.Manager
@@ -40,39 +38,34 @@ type adProvider struct {
 }
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager) common.AuthProvider {
-	return &adProvider{
+	return &openldapProvider{
 		ctx:         ctx,
 		authConfigs: mgmtCtx.Management.AuthConfigs(""),
 		userMGR:     userMGR,
 	}
 }
 
-func (p *adProvider) GetName() string {
+func (p *openldapProvider) GetName() string {
 	return Name
 }
 
-func (p *adProvider) CustomizeSchema(schema *types.Schema) {
+func (p *openldapProvider) CustomizeSchema(schema *types.Schema) {
 	schema.ActionHandler = p.actionHandler
 	schema.Formatter = p.formatter
 }
 
-func (p *adProvider) TransformToAuthProvider(authConfig map[string]interface{}) map[string]interface{} {
-	ap := common.TransformToAuthProvider(authConfig)
-	defaultDomain := ""
-	if dld, ok := authConfig[client.ActiveDirectoryProviderFieldDefaultLoginDomain].(string); ok {
-		defaultDomain = dld
-	}
-	ap[client.ActiveDirectoryProviderFieldDefaultLoginDomain] = defaultDomain
-	return ap
+func (p *openldapProvider) TransformToAuthProvider(authConfig map[string]interface{}) map[string]interface{} {
+	openldap := common.TransformToAuthProvider(authConfig)
+	return openldap
 }
 
-func (p *adProvider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Principal, map[string]string, error) {
+func (p *openldapProvider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Principal, map[string]string, error) {
 	login, ok := input.(*v3public.BasicLogin)
 	if !ok {
 		return v3.Principal{}, nil, nil, errors.New("unexpected input type")
 	}
 
-	config, caPool, err := p.getActiveDirectoryConfig()
+	config, caPool, err := p.getOpenLDAPConfig()
 	if err != nil {
 		return v3.Principal{}, nil, nil, errors.New("can't find authprovider")
 	}
@@ -80,13 +73,13 @@ func (p *adProvider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Pri
 	return p.loginUser(login, config, caPool)
 }
 
-func (p *adProvider) SearchPrincipals(searchKey, principalType string, myToken v3.Token) ([]v3.Principal, error) {
+func (p *openldapProvider) SearchPrincipals(searchKey, principalType string, myToken v3.Token) ([]v3.Principal, error) {
 	var principals []v3.Principal
 	var err error
 
 	// TODO use principalType in search
 
-	config, caPool, err := p.getActiveDirectoryConfig()
+	config, caPool, err := p.getOpenLDAPConfig()
 	if err != nil {
 		return principals, nil
 	}
@@ -109,8 +102,8 @@ func (p *adProvider) SearchPrincipals(searchKey, principalType string, myToken v
 	return principals, nil
 }
 
-func (p *adProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
-	config, caPool, err := p.getActiveDirectoryConfig()
+func (p *openldapProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
+	config, caPool, err := p.getOpenLDAPConfig()
 	if err != nil {
 		return v3.Principal{}, nil
 	}
@@ -132,15 +125,14 @@ func (p *adProvider) GetPrincipal(principalID string, token v3.Token) (v3.Princi
 	return *principal, err
 }
 
-func (p *adProvider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
+func (p *openldapProvider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
 	if me.ObjectMeta.Name == other.ObjectMeta.Name && me.LoginName == other.LoginName && me.PrincipalType == other.PrincipalType {
 		return true
 	}
 	return false
 }
 
-func (p *adProvider) isMemberOf(myGroups []v3.Principal, other v3.Principal) bool {
-
+func (p *openldapProvider) isMemberOf(myGroups []v3.Principal, other v3.Principal) bool {
 	for _, mygroup := range myGroups {
 		if mygroup.ObjectMeta.Name == other.ObjectMeta.Name && mygroup.PrincipalType == other.PrincipalType {
 			return true
@@ -149,25 +141,25 @@ func (p *adProvider) isMemberOf(myGroups []v3.Principal, other v3.Principal) boo
 	return false
 }
 
-func (p *adProvider) getActiveDirectoryConfig() (*v3.ActiveDirectoryConfig, *x509.CertPool, error) {
+func (p *openldapProvider) getOpenLDAPConfig() (*v3.OpenLDAPConfig, *x509.CertPool, error) {
 	// TODO See if this can be simplified. also, this makes an api call everytime. find a better way
-	authConfigObj, err := p.authConfigs.ObjectClient().UnstructuredClient().Get("activedirectory", metav1.GetOptions{})
+	authConfigObj, err := p.authConfigs.ObjectClient().UnstructuredClient().Get("openldap", metav1.GetOptions{})
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to retrieve ActiveDirectoryConfig, error: %v", err)
+		return nil, nil, fmt.Errorf("failed to retrieve OpenLDAPConfig, error: %v", err)
 	}
 
 	u, ok := authConfigObj.(runtime.Unstructured)
 	if !ok {
-		return nil, nil, fmt.Errorf("failed to retrieve ActiveDirectoryConfig, cannot read k8s Unstructured data")
+		return nil, nil, fmt.Errorf("failed to retrieve OpenLDAPConfig, cannot read k8s Unstructured data")
 	}
 	storedADConfigMap := u.UnstructuredContent()
 
-	storedADConfig := &v3.ActiveDirectoryConfig{}
+	storedADConfig := &v3.OpenLDAPConfig{}
 	mapstructure.Decode(storedADConfigMap, storedADConfig)
 
 	metadataMap, ok := storedADConfigMap["metadata"].(map[string]interface{})
 	if !ok {
-		return nil, nil, fmt.Errorf("failed to retrieve ActiveDirectoryConfig metadata, cannot read k8s Unstructured data")
+		return nil, nil, fmt.Errorf("failed to retrieve OpenLDAPConfig metadata, cannot read k8s Unstructured data")
 	}
 
 	objectMeta := &metav1.ObjectMeta{}
