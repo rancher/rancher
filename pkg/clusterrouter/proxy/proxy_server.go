@@ -166,6 +166,19 @@ type SimpleProxy struct {
 	transport http.RoundTripper
 }
 
+func NewSimpleInsecureProxy(host string) (*SimpleProxy, error) {
+	p, err := NewSimpleProxy(host, nil)
+	if err != nil {
+		return nil, err
+	}
+	p.transport = &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+	}
+	return p, nil
+}
+
 func NewSimpleProxy(host string, caData []byte) (*SimpleProxy, error) {
 	hostURL, _, err := rest.DefaultServerURL(host, "", schema.GroupVersion{}, true)
 	if err != nil {

@@ -117,6 +117,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&SourceCodeRepositoryList{},
 		&ComposeConfig{},
 		&ComposeConfigList{},
+		&CattleInstance{},
+		&CattleInstanceList{},
 	)
 	return nil
 }

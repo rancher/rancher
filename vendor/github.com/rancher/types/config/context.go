@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/event"
+	"github.com/rancher/norman/leader"
 	"github.com/rancher/norman/restwatch"
 	"github.com/rancher/norman/signal"
 	"github.com/rancher/norman/store/proxy"
@@ -51,7 +52,7 @@ type ScaledContext struct {
 	AccessControl     types.AccessControl
 	Dialer            dialer.Factory
 	UserManager       user.Manager
-	Leader            bool
+	Leader            *leader.State
 
 	Management managementv3.Interface
 	Project    projectv3.Interface
@@ -83,6 +84,7 @@ func NewScaledContext(config rest.Config) (*ScaledContext, error) {
 
 	context := &ScaledContext{
 		RESTConfig: config,
+		Leader:     &leader.State{},
 	}
 
 	context.Management, err = managementv3.NewForConfig(config)

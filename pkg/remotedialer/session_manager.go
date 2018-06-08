@@ -10,7 +10,8 @@ import (
 
 type sessionManager struct {
 	sync.Mutex
-	clients map[string][]*session
+	clients      map[string][]*session
+	onRemoveFunc func(*session)
 }
 
 func newSessionManager() *sessionManager {
@@ -62,6 +63,19 @@ func (sm *sessionManager) remove(s *session) {
 	} else {
 		sm.clients[s.clientKey] = newSessions
 	}
-
+	sm.onRemove(s)
 	s.Close()
+}
+
+func (sm *sessionManager) onRemove(s *session) {
+	if sm.onRemoveFunc != nil {
+		sm.onRemoveFunc(s)
+	}
+
+}
+
+func (sm *sessionManager) setRemoveFunc(f func(*session)) {
+	sm.Lock()
+	defer sm.Unlock()
+	sm.onRemoveFunc = f
 }
