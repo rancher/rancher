@@ -42,6 +42,7 @@ func Params() map[string]interface{} {
 
 	dclient, err := client.NewEnvClient()
 	if err == nil {
+		defer dclient.Close()
 		info, err := dclient.Info(context.Background())
 		if err == nil {
 			params["dockerInfo"] = info

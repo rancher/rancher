@@ -32,6 +32,7 @@ func runProcess(ctx context.Context, name string, p v3.Process, start bool) erro
 	if err != nil {
 		return err
 	}
+	defer c.Close()
 
 	args := filters.NewArgs()
 	args.Add("label", RKEContainerNameLabel+"="+name)

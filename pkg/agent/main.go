@@ -84,6 +84,7 @@ func cleanup(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	defer c.Close()
 
 	args := filters.NewArgs()
 	args.Add("label", "io.cattle.agent=true")
