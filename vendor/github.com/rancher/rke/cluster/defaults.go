@@ -11,6 +11,7 @@ import (
 
 const (
 	DefaultServiceClusterIPRange = "10.43.0.0/16"
+	DefaultNodePortRange         = "30000-32767"
 	DefaultClusterCIDR           = "10.42.0.0/16"
 	DefaultClusterDNSService     = "10.43.0.10"
 	DefaultClusterDomain         = "cluster.local"
@@ -118,6 +119,7 @@ func (c *Cluster) setClusterServicesDefaults() {
 
 	serviceConfigDefaultsMap := map[*string]string{
 		&c.Services.KubeAPI.ServiceClusterIPRange:        DefaultServiceClusterIPRange,
+		&c.Services.KubeAPI.ServiceNodePortRange:         DefaultNodePortRange,
 		&c.Services.KubeController.ServiceClusterIPRange: DefaultServiceClusterIPRange,
 		&c.Services.KubeController.ClusterCIDR:           DefaultClusterCIDR,
 		&c.Services.Kubelet.ClusterDNSServer:             DefaultClusterDNSService,

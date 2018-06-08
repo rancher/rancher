@@ -184,6 +184,8 @@ type KubeAPIService struct {
 	BaseService `yaml:",inline" json:",inline"`
 	// Virtual IP range that will be used by Kubernetes services
 	ServiceClusterIPRange string `yaml:"service_cluster_ip_range" json:"serviceClusterIpRange,omitempty"`
+	// Port range for services defined with NodePort type
+	ServiceNodePortRange string `yaml:"service_node_port_range" json:"serviceNodePortRange,omitempty"`
 	// Enabled/Disable PodSecurityPolicy
 	PodSecurityPolicy bool `yaml:"pod_security_policy" json:"podSecurityPolicy,omitempty"`
 }
@@ -337,14 +339,146 @@ type PortCheck struct {
 type CloudProvider struct {
 	// Name of the Cloud Provider
 	Name string `yaml:"name" json:"name,omitempty"`
-	// Configuration Options of Cloud Provider
-	CloudConfig map[string]string `yaml:"cloud_config" json:"cloudConfig,omitempty"`
-	// AWSCloudProvicer
-	AWSCloudProvider *AWSCloudProvider `yaml:",omitempty" json:"awsCloudProvider,omitempty"`
-	// AzureCloudProvicer
-	AzureCloudProvider *AzureCloudProvider `yaml:",omitempty" json:"azureCloudProvider,omitempty"`
+	// AWSCloudProvider
+	AWSCloudProvider *AWSCloudProvider `yaml:"awsCloudProvider,omitempty" json:"awsCloudProvider,omitempty"`
+	// AzureCloudProvider
+	AzureCloudProvider *AzureCloudProvider `yaml:"azureCloudProvider,omitempty" json:"azureCloudProvider,omitempty"`
+	// OpenstackCloudProvider
+	OpenstackCloudProvider *OpenstackCloudProvider `yaml:"openstackCloudProvider,omitempty" json:"openstackCloudProvider,omitempty"`
+	// VsphereCloudProvider
+	VsphereCloudProvider *VsphereCloudProvider `yaml:"vsphereCloudProvider,omitempty" json:"vsphereCloudProvider,omitempty"`
+	// CustomCloudProvider is a multiline string that represent a custom cloud config file
+	CustomCloudProvider string `yaml:"customCloudProvider,omitempty" json:"customCloudProvider,omitempty"`
 }
 
+type CalicoNetworkProvider struct {
+	// Cloud provider type used with calico
+	CloudProvider string `json:"cloudProvider"`
+}
+
+type FlannelNetworkProvider struct {
+	// Alternate cloud interface for flannel
+	Iface string `json:"iface"`
+}
+
+type CanalNetworkProvider struct {
+	FlannelNetworkProvider `yaml:",inline" json:",inline"`
+}
+
+type KubernetesServicesOptions struct {
+	// Additional options passed to KubeAPI
+	KubeAPI map[string]string `json:"kubeapi"`
+	// Additional options passed to Kubelet
+	Kubelet map[string]string `json:"kubelet"`
+	// Additional options passed to Kubeproxy
+	Kubeproxy map[string]string `json:"kubeproxy"`
+	// Additional options passed to KubeController
+	KubeController map[string]string `json:"kubeController"`
+	// Additional options passed to Scheduler
+	Scheduler map[string]string `json:"scheduler"`
+}
+
+// VsphereCloudProvider options
+type VsphereCloudProvider struct {
+	Global        GlobalVsphereOpts              `json:"global,omitempty" yaml:"global,omitempty" ini:"Global,omitempty"`
+	VirtualCenter map[string]VirtualCenterConfig `json:"virtualCenter,omitempty" yaml:"virtual_center,omitempty" ini:"VirtualCenter,omitempty"`
+	Network       NetworkVshpereOpts             `json:"network,omitempty" yaml:"network,omitempty" ini:"Network,omitempty"`
+	Disk          DiskVsphereOpts                `json:"disk,omitempty" yaml:"disk,omitempty" ini:"Disk,omitempty"`
+	Workspace     WorkspaceVsphereOpts           `json:"workspace,omitempty" yaml:"workspace,omitempty" ini:"Workspace,omitempty"`
+}
+
+type GlobalVsphereOpts struct {
+	User              string `json:"user,omitempty" yaml:"user,omitempty" ini:"user,omitempty"`
+	Password          string `json:"password,omitempty" yaml:"password,omitempty" ini:"password,omitempty"`
+	VCenterIP         string `json:"server,omitempty" yaml:"server,omitempty" ini:"server,omitempty"`
+	VCenterPort       string `json:"port,omitempty" yaml:"port,omitempty" ini:"port,omitempty"`
+	InsecureFlag      bool   `json:"insecure-flag,omitempty" yaml:"insecure-flag,omitempty" ini:"insecure-flag,omitempty"`
+	Datacenter        string `json:"datacenter,omitempty" yaml:"datacenter,omitempty" ini:"datacenter,omitempty"`
+	Datacenters       string `json:"datacenters,omitempty" yaml:"datacenters,omitempty" ini:"datacenters,omitempty"`
+	DefaultDatastore  string `json:"datastore,omitempty" yaml:"datastore,omitempty" ini:"datastore,omitempty"`
+	WorkingDir        string `json:"working-dir,omitempty" yaml:"working-dir,omitempty" ini:"working-dir,omitempty"`
+	RoundTripperCount int    `json:"soap-roundtrip-count,omitempty" yaml:"soap-roundtrip-count,omitempty" ini:"soap-roundtrip-count,omitempty"`
+	VMUUID            string `json:"vm-uuid,omitempty" yaml:"vm-uuid,omitempty" ini:"vm-uuid,omitempty"`
+	VMName            string `json:"vm-name,omitempty" yaml:"vm-name,omitempty" ini:"vm-name,omitempty"`
+}
+
+type VirtualCenterConfig struct {
+	User              string `json:"user,omitempty" yaml:"user,omitempty" ini:"user,omitempty"`
+	Password          string `json:"password,omitempty" yaml:"password,omitempty" ini:"password,omitempty"`
+	VCenterPort       string `json:"port,omitempty" yaml:"port,omitempty" ini:"port,omitempty"`
+	Datacenters       string `json:"datacenters,omitempty" yaml:"datacenters,omitempty" ini:"datacenters,omitempty"`
+	RoundTripperCount int    `json:"soap-roundtrip-count,omitempty" yaml:"soap-roundtrip-count,omitempty" ini:"soap-roundtrip-count,omitempty"`
+}
+
+type NetworkVshpereOpts struct {
+	PublicNetwork string `json:"public-network,omitempty" yaml:"public-network,omitempty" ini:"public-network,omitempty"`
+}
+
+type DiskVsphereOpts struct {
+	SCSIControllerType string `json:"scsicontrollertype,omitempty" yaml:"scsicontrollertype,omitempty" ini:"scsicontrollertype,omitempty"`
+}
+
+type WorkspaceVsphereOpts struct {
+	VCenterIP        string `json:"server,omitempty" yaml:"server,omitempty" ini:"server,omitempty"`
+	Datacenter       string `json:"datacenter,omitempty" yaml:"datacenter,omitempty" ini:"datacenter,omitempty"`
+	Folder           string `json:"folder,omitempty" yaml:"folder,omitempty" ini:"folder,omitempty"`
+	DefaultDatastore string `json:"default-datastore,omitempty" yaml:"default-datastore,omitempty" ini:"default-datastore,omitempty"`
+	ResourcePoolPath string `json:"resourcepool-path,omitempty" yaml:"resourcepool-path,omitempty" ini:"resourcepool-path,omitempty"`
+}
+
+// OpenstackCloudProvider options
+type OpenstackCloudProvider struct {
+	Global       GlobalOpenstackOpts       `json:"global" yaml:"global" ini:"Global,omitempty"`
+	LoadBalancer LoadBalancerOpenstackOpts `json:"loadBalancer" yaml:"load_balancer" ini:"LoadBalancer,omitempty"`
+	BlockStorage BlockStorageOpenstackOpts `json:"blockStorage" yaml:"block_storage" ini:"BlockStorage,omitempty"`
+	Router       RouterOpenstackOpts       `json:"router" yaml:"router" ini:"Router,omitempty"`
+	Metadata     MetadataOpenstackOpts     `json:"metadata" yaml:"metadata" ini:"Metadata,omitempty"`
+}
+
+type GlobalOpenstackOpts struct {
+	AuthURL    string `json:"auth-url" yaml:"auth-url" ini:"auth-url,omitempty"`
+	Username   string `json:"username" yaml:"username" ini:"username,omitempty"`
+	UserID     string `json:"user-id" yaml:"user-id" ini:"user-id,omitempty"`
+	Password   string `json:"password" yaml:"password" ini:"password,omitempty"`
+	TenantID   string `json:"tenant-id" yaml:"tenant-id" ini:"tenant-id,omitempty"`
+	TenantName string `json:"tenant-name" yaml:"tenant-name" ini:"tenant-name,omitempty"`
+	TrustID    string `json:"trust-id" yaml:"trust-id" ini:"trust-id,omitempty"`
+	DomainID   string `json:"domain-id" yaml:"domain-id" ini:"domain-id,omitempty"`
+	DomainName string `json:"domain-name" yaml:"domain-name" ini:"domain-name,omitempty"`
+	Region     string `json:"region" yaml:"region" ini:"region,omitempty"`
+	CAFile     string `json:"ca-file" yaml:"ca-file" ini:"ca-file,omitempty"`
+}
+
+type LoadBalancerOpenstackOpts struct {
+	LBVersion            string `json:"lb-version" yaml:"lb-version" ini:"lb-version,omitempty"`                            // overrides autodetection. Only support v2.
+	UseOctavia           bool   `json:"use-octavia" yaml:"use-octavia" ini:"use-octavia,omitempty"`                         // uses Octavia V2 service catalog endpoint
+	SubnetID             string `json:"subnet-id" yaml:"subnet-id" ini:"subnet-id,omitempty"`                               // overrides autodetection.
+	FloatingNetworkID    string `json:"floating-network-id" yaml:"floating-network-id" ini:"floating-network-id,omitempty"` // If specified, will create floating ip for loadbalancer, or do not create floating ip.
+	LBMethod             string `json:"lb-method" yaml:"lb-method" ini:"lb-method,omitempty"`                               // default to ROUND_ROBIN.
+	LBProvider           string `json:"lb-provider" yaml:"lb-provider" ini:"lb-provider,omitempty"`
+	CreateMonitor        bool   `json:"create-monitor" yaml:"create-monitor" ini:"create-monitor,omitempty"`
+	MonitorDelay         int    `json:"monitor-delay" yaml:"monitor-delay" ini:"monitor-delay,omitempty"`
+	MonitorTimeout       int    `json:"monitor-timeout" yaml:"monitor-timeout" ini:"monitor-timeout,omitempty"`
+	MonitorMaxRetries    int    `json:"monitor-max-retries" yaml:"monitor-max-retries" ini:"monitor-max-retries,omitempty"`
+	ManageSecurityGroups bool   `json:"manage-security-groups" yaml:"manage-security-groups" ini:"manage-security-groups,omitempty"`
+}
+
+type BlockStorageOpenstackOpts struct {
+	BSVersion       string `json:"bs-version" yaml:"bs-version" ini:"bs-version,omitempty"`                      // overrides autodetection. v1 or v2. Defaults to auto
+	TrustDevicePath bool   `json:"trust-device-path" yaml:"trust-device-path" ini:"trust-device-path,omitempty"` // See Issue #33128
+	IgnoreVolumeAZ  bool   `json:"ignore-volume-az" yaml:"ignore-volume-az" ini:"ignore-volume-az,omitempty"`
+}
+
+type RouterOpenstackOpts struct {
+	RouterID string `json:"router-id" yaml:"router-id" ini:"router-id,omitempty"` // required
+}
+
+type MetadataOpenstackOpts struct {
+	SearchOrder    string `json:"search-order" yaml:"search-order" ini:"search-order,omitempty"`
+	RequestTimeout int    `json:"request-timeout" yaml:"request-timeout" ini:"request-timeout,omitempty"`
+}
+
+// AzureCloudProvider options
 type AzureCloudProvider struct {
 	// The cloud environment identifier. Takes values from https://github.com/Azure/go-autorest/blob/ec5f4903f77ed9927ac95b19ab8e44ada64c1356/autorest/azure/environments.go#L13
 	Cloud string `json:"cloud" yaml:"cloud"`
@@ -408,37 +542,11 @@ type AzureCloudProvider struct {
 	// Use instance metadata service where possible
 	UseInstanceMetadata bool `json:"useInstanceMetadata" yaml:"useInstanceMetadata"`
 	// Use managed service identity for the virtual machine to access Azure ARM APIs
-	UseManagedIdentityExtension bool `json:"useManagedIdentityExtension"`
+	UseManagedIdentityExtension bool `json:"useManagedIdentityExtension" yaml:"useManagedIdentityExtension"`
 	// Maximum allowed LoadBalancer Rule Count is the limit enforced by Azure Load balancer
-	MaximumLoadBalancerRuleCount int `json:"maximumLoadBalancerRuleCount"`
+	MaximumLoadBalancerRuleCount int `json:"maximumLoadBalancerRuleCount" yaml:"maximumLoadBalancerRuleCount"`
 }
 
+// AWSCloudProvider options
 type AWSCloudProvider struct {
-}
-
-type CalicoNetworkProvider struct {
-	// Cloud provider type used with calico
-	CloudProvider string `json:"cloudProvider"`
-}
-
-type FlannelNetworkProvider struct {
-	// Alternate cloud interface for flannel
-	Iface string `json:"iface"`
-}
-
-type CanalNetworkProvider struct {
-	FlannelNetworkProvider `yaml:",inline" json:",inline"`
-}
-
-type KubernetesServicesOptions struct {
-	// Additional options passed to KubeAPI
-	KubeAPI map[string]string `json:"kubeapi"`
-	// Additional options passed to Kubelet
-	Kubelet map[string]string `json:"kubelet"`
-	// Additional options passed to Kubeproxy
-	Kubeproxy map[string]string `json:"kubeproxy"`
-	// Additional options passed to KubeController
-	KubeController map[string]string `json:"kubeController"`
-	// Additional options passed to Scheduler
-	Scheduler map[string]string `json:"scheduler"`
 }

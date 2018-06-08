@@ -69,6 +69,10 @@ func SnapshotSaveEtcdHosts(
 		return err
 	}
 
+	if err := kubeCluster.SaveBackupCertificateBundle(ctx); err != nil {
+		return err
+	}
+
 	log.Infof(ctx, "Finished saving snapshot [%s] on all etcd hosts", snapshotName)
 	return nil
 }
@@ -91,7 +95,9 @@ func RestoreEtcdSnapshot(
 	if err := kubeCluster.RestoreEtcdSnapshot(ctx, snapshotName); err != nil {
 		return err
 	}
-
+	if err := kubeCluster.ExtractBackupCertificateBundle(ctx); err != nil {
+		return err
+	}
 	log.Infof(ctx, "Finished restoring snapshot [%s] on all etcd hosts", snapshotName)
 	return nil
 }

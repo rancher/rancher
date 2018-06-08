@@ -8,6 +8,7 @@ const (
 	CertificatesSecretName  = "k8s-certs"
 	TempCertPath            = "/etc/kubernetes/.tmp/"
 	ClusterConfig           = "cluster.yml"
+	BundleCertPath          = "/backup/pki.bundle.tar.gz"
 
 	CACertName             = "kube-ca"
 	KubeAPICertName        = "kube-apiserver"

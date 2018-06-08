@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
+	"github.com/rancher/rke/services"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/client-go/kubernetes"
@@ -246,4 +247,41 @@ func fetchCertificatesFromEtcd(ctx context.Context, kubeCluster *Cluster) ([]byt
 	clientCert := cert.EncodeCertPEM(certificates[pki.KubeNodeCertName].Certificate)
 	clientkey := cert.EncodePrivateKeyPEM(certificates[pki.KubeNodeCertName].Key)
 	return clientCert, clientkey, nil
+}
+
+func (c *Cluster) SaveBackupCertificateBundle(ctx context.Context) error {
+	backupHosts := c.getBackupHosts()
+	var errgrp errgroup.Group
+
+	for _, host := range backupHosts {
+		runHost := host
+		errgrp.Go(func() error {
+			return pki.SaveBackupBundleOnHost(ctx, runHost, c.SystemImages.Alpine, services.EtcdSnapshotPath, c.PrivateRegistriesMap)
+		})
+	}
+	return errgrp.Wait()
+}
+
+func (c *Cluster) ExtractBackupCertificateBundle(ctx context.Context) error {
+	backupHosts := c.getBackupHosts()
+	var errgrp errgroup.Group
+
+	for _, host := range backupHosts {
+		runHost := host
+		errgrp.Go(func() error {
+			return pki.ExtractBackupBundleOnHost(ctx, runHost, c.SystemImages.Alpine, services.EtcdSnapshotPath, c.PrivateRegistriesMap)
+		})
+	}
+	return errgrp.Wait()
+}
+
+func (c *Cluster) getBackupHosts() []*hosts.Host {
+	var backupHosts []*hosts.Host
+	if len(c.Services.Etcd.ExternalURLs) > 0 {
+		backupHosts = c.ControlPlaneHosts
+	} else {
+		// Save certificates on etcd and controlplane hosts
+		backupHosts = hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, nil)
+	}
+	return backupHosts
 }

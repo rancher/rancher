@@ -11,6 +11,7 @@ import (
 
 	ref "github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"
+	"github.com/rancher/rke/cloudprovider/aws"
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/k8s"
@@ -119,6 +120,7 @@ func (c *Cluster) BuildKubeAPIProcess(prefixPath string) v3.Process {
 		"allow-privileged":                "true",
 		"kubelet-preferred-address-types": "InternalIP,ExternalIP,Hostname",
 		"service-cluster-ip-range":        c.Services.KubeAPI.ServiceClusterIPRange,
+		"service-node-port-range":         c.Services.KubeAPI.ServiceNodePortRange,
 		"admission-control":               "ServiceAccount,NamespaceLifecycle,LimitRanger,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
 		"storage-backend":                 "etcd3",
 		"client-ca-file":                  pki.GetCertPath(pki.CACertName),
@@ -129,7 +131,7 @@ func (c *Cluster) BuildKubeAPIProcess(prefixPath string) v3.Process {
 		"service-account-key-file":        pki.GetKeyPath(pki.KubeAPICertName),
 		"apiserver-count":                 strconv.Itoa(apiserverCount),
 	}
-	if len(c.CloudProvider.Name) > 0 && c.CloudProvider.Name != AWSCloudProvider {
+	if len(c.CloudProvider.Name) > 0 && c.CloudProvider.Name != aws.AWSCloudProviderName {
 		CommandArgs["cloud-config"] = CloudConfigPath
 	}
 	// check if our version has specific options for this component
@@ -222,7 +224,7 @@ func (c *Cluster) BuildKubeControllerProcess(prefixPath string) v3.Process {
 		"service-account-private-key-file": pki.GetKeyPath(pki.KubeAPICertName),
 		"root-ca-file":                     pki.GetCertPath(pki.CACertName),
 	}
-	if len(c.CloudProvider.Name) > 0 && c.CloudProvider.Name != AWSCloudProvider {
+	if len(c.CloudProvider.Name) > 0 && c.CloudProvider.Name != aws.AWSCloudProviderName {
 		CommandArgs["cloud-config"] = CloudConfigPath
 	}
 
@@ -314,7 +316,7 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string) v3.Pr
 	if host.Address != host.InternalAddress {
 		CommandArgs["node-ip"] = host.InternalAddress
 	}
-	if len(c.CloudProvider.Name) > 0 && c.CloudProvider.Name != AWSCloudProvider {
+	if len(c.CloudProvider.Name) > 0 && c.CloudProvider.Name != aws.AWSCloudProviderName {
 		CommandArgs["cloud-config"] = CloudConfigPath
 	}
 

@@ -1,16 +1,20 @@
 package client
 
 const (
-	CloudProviderType                    = "cloudProvider"
-	CloudProviderFieldAWSCloudProvider   = "awsCloudProvider"
-	CloudProviderFieldAzureCloudProvider = "azureCloudProvider"
-	CloudProviderFieldCloudConfig        = "cloudConfig"
-	CloudProviderFieldName               = "name"
+	CloudProviderType                        = "cloudProvider"
+	CloudProviderFieldAWSCloudProvider       = "awsCloudProvider"
+	CloudProviderFieldAzureCloudProvider     = "azureCloudProvider"
+	CloudProviderFieldCustomCloudProvider    = "customCloudProvider"
+	CloudProviderFieldName                   = "name"
+	CloudProviderFieldOpenstackCloudProvider = "openstackCloudProvider"
+	CloudProviderFieldVsphereCloudProvider   = "vsphereCloudProvider"
 )
 
 type CloudProvider struct {
-	AWSCloudProvider   *AWSCloudProvider   `json:"awsCloudProvider,omitempty" yaml:"awsCloudProvider,omitempty"`
-	AzureCloudProvider *AzureCloudProvider `json:"azureCloudProvider,omitempty" yaml:"azureCloudProvider,omitempty"`
-	CloudConfig        map[string]string   `json:"cloudConfig,omitempty" yaml:"cloudConfig,omitempty"`
-	Name               string              `json:"name,omitempty" yaml:"name,omitempty"`
+	AWSCloudProvider       *AWSCloudProvider       `json:"awsCloudProvider,omitempty" yaml:"awsCloudProvider,omitempty"`
+	AzureCloudProvider     *AzureCloudProvider     `json:"azureCloudProvider,omitempty" yaml:"azureCloudProvider,omitempty"`
+	CustomCloudProvider    string                  `json:"customCloudProvider,omitempty" yaml:"customCloudProvider,omitempty"`
+	Name                   string                  `json:"name,omitempty" yaml:"name,omitempty"`
+	OpenstackCloudProvider *OpenstackCloudProvider `json:"openstackCloudProvider,omitempty" yaml:"openstackCloudProvider,omitempty"`
+	VsphereCloudProvider   *VsphereCloudProvider   `json:"vsphereCloudProvider,omitempty" yaml:"vsphereCloudProvider,omitempty"`
 }

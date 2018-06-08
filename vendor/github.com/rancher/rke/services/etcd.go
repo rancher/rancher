@@ -58,6 +58,9 @@ func RunEtcdPlane(
 			if err := RunEtcdSnapshotSave(ctx, host, prsMap, alpineImage, etcdSnapshot.Creation, etcdSnapshot.Retention, EtcdSnapshotContainerName, false); err != nil {
 				return err
 			}
+			if err := pki.SaveBackupBundleOnHost(ctx, host, alpineImage, EtcdSnapshotPath, prsMap); err != nil {
+				return err
+			}
 		}
 		if err := createLogLink(ctx, host, EtcdContainerName, ETCDRole, alpineImage, prsMap); err != nil {
 			return err

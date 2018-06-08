@@ -6,7 +6,11 @@ import (
 	"crypto/x509"
 	"fmt"
 	"net"
+	"path"
+	"strings"
 
+	"github.com/docker/docker/api/types/container"
+	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -29,9 +33,10 @@ type CertificatePKI struct {
 }
 
 const (
-	etcdRole    = "etcd"
-	controlRole = "controlplane"
-	workerRole  = "worker"
+	etcdRole            = "etcd"
+	controlRole         = "controlplane"
+	workerRole          = "worker"
+	BundleCertContainer = "rke-bundle-cert"
 )
 
 func GenerateRKECerts(ctx context.Context, rkeConfig v3.RancherKubernetesEngineConfig, configPath, configDir string) (map[string]CertificatePKI, error) {
@@ -206,4 +211,65 @@ func RegenerateEtcdCertificate(
 	crtMap[etcdName] = ToCertObject(etcdName, "", "", etcdCrt, etcdKey)
 	log.Infof(ctx, "[certificates] Successfully generated new etcd-%s certificate and key", etcdHost.InternalAddress)
 	return crtMap, nil
+}
+
+func SaveBackupBundleOnHost(ctx context.Context, host *hosts.Host, alpineSystemImage, etcdSnapshotPath string, prsMap map[string]v3.PrivateRegistry) error {
+	imageCfg := &container.Config{
+		Cmd: []string{
+			"sh",
+			"-c",
+			fmt.Sprintf("tar czvf %s %s", BundleCertPath, path.Join(host.PrefixPath, TempCertPath)),
+		},
+		Image: alpineSystemImage,
+	}
+	hostCfg := &container.HostConfig{
+
+		Binds: []string{
+			fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(host.PrefixPath, "/etc/kubernetes")),
+			fmt.Sprintf("%s:/backup:z", etcdSnapshotPath),
+		},
+		Privileged: true,
+	}
+	if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, BundleCertContainer, host.Address, "certificates", prsMap); err != nil {
+		return err
+	}
+	status, err := docker.WaitForContainer(ctx, host.DClient, host.Address, BundleCertContainer)
+	if err != nil {
+		return err
+	}
+	if status != 0 {
+		return fmt.Errorf("Failed to run certificate bundle compress, exit status is: %d", status)
+	}
+	return docker.RemoveContainer(ctx, host.DClient, host.Address, BundleCertContainer)
+}
+
+func ExtractBackupBundleOnHost(ctx context.Context, host *hosts.Host, alpineSystemImage, etcdSnapshotPath string, prsMap map[string]v3.PrivateRegistry) error {
+	fullTempCertPath := path.Join(host.PrefixPath, TempCertPath)
+	imageCfg := &container.Config{
+		Cmd: []string{
+			"sh",
+			"-c",
+			fmt.Sprintf("if [ -f %s ];then tar xzvf %s -C %s --strip-components %d; fi", BundleCertPath, BundleCertPath, fullTempCertPath, len(strings.Split(fullTempCertPath, "/"))-1),
+		},
+		Image: alpineSystemImage,
+	}
+	hostCfg := &container.HostConfig{
+
+		Binds: []string{
+			fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(host.PrefixPath, "/etc/kubernetes")),
+			fmt.Sprintf("%s:/backup:z", etcdSnapshotPath),
+		},
+		Privileged: true,
+	}
+	if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, BundleCertContainer, host.Address, "certificates", prsMap); err != nil {
+		return err
+	}
+	status, err := docker.WaitForContainer(ctx, host.DClient, host.Address, BundleCertContainer)
+	if err != nil {
+		return err
+	}
+	if status != 0 {
+		return fmt.Errorf("Failed to run certificate bundle extract, exit status is: %d", status)
+	}
+	return docker.RemoveContainer(ctx, host.DClient, host.Address, BundleCertContainer)
 }

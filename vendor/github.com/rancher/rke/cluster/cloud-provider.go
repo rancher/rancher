@@ -16,7 +16,7 @@ import (
 const (
 	CloudConfigDeployer    = "cloud-config-deployer"
 	CloudConfigServiceName = "cloud"
-	CloudConfigPath        = "/etc/kubernetes/cloud-config.json"
+	CloudConfigPath        = "/etc/kubernetes/cloud-config"
 	CloudConfigEnv         = "RKE_CLOUD_CONFIG"
 )
 

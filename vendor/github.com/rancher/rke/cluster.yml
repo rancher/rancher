@@ -45,6 +45,8 @@ services:
   kube-api:
     service_cluster_ip_range: 10.43.0.0/16
     pod_security_policy: false
+    # Expose a different port range for NodePort services
+    service_node_port_range: 30000-32767
     # add additional arguments to the kubernetes component
     # Note that this WILL OVERRIDE existing defaults
     extra_args:
