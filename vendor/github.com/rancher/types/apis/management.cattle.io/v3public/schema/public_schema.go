@@ -67,5 +67,17 @@ func authProvidersTypes(schemas *types.Schemas) *types.Schemas {
 			}
 			schema.CollectionMethods = []string{}
 			schema.ResourceMethods = []string{http.MethodGet}
+		}).
+		// OpenLDAP provider
+		MustImportAndCustomize(&PublicVersion, v3public.OpenLDAPProvider{}, func(schema *types.Schema) {
+			schema.BaseType = "authProvider"
+			schema.ResourceActions = map[string]types.Action{
+				"login": {
+					Input:  "basicLogin",
+					Output: "token",
+				},
+			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet}
 		})
 }

@@ -49,3 +49,11 @@ type ActiveDirectoryProvider struct {
 
 	DefaultLoginDomain string `json:"defaultLoginDomain,omitempty"`
 }
+
+type OpenLDAPProvider struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	AuthProvider      `json:",inline"`
+
+	DefaultLoginDomain string `json:"defaultLoginDomain,omitempty"`
+}
