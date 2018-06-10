@@ -1,0 +1,57 @@
+FROM ubuntu:18.04
+RUN apt-get update && apt-get install -y git curl gcc ca-certificates unzip xz-utils iputils-ping net-tools && \
+    useradd rancher && \
+    mkdir -p /var/lib/rancher/etcd /var/lib/cattle && \
+    chown -R rancher /var/lib/rancher /var/lib/cattle /usr/local/bin
+
+RUN apt-get install -y wget vim less file xz-utils unzip && \
+    rm -f /bin/sh && ln -s /bin/bash /bin/sh
+
+ENV DAPPER_HOST_ARCH=
+ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
+
+ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH=GOLANG_ARCH_${ARCH} \
+    GOPATH=/go PATH=/go/bin:/usr/local/go/bin:${PATH} SHELL=/bin/bash
+
+RUN wget -O - https://storage.googleapis.com/golang/go1.10.3.linux-amd64.tar.gz | tar -xzf - -C /usr/local && \
+    go get github.com/rancher/trash && go get github.com/golang/lint/golint
+
+
+
+RUN curl -sLf https://github.com/rancher/machine-package/releases/download/v0.14.0-rancher3-1/docker-machine.tar.gz | tar xvzf - -C /usr/bin && \
+    curl -sLf https://github.com/leodotcloud/loglevel/releases/download/v0.1/loglevel-amd64-v0.1.tar.gz | tar xvzf - -C /usr/bin && \
+    curl -sLf https://github.com/rancher/helm/releases/download/v2.8.0-rancher3/helm > /usr/bin/helm && \
+    chmod +x /usr/bin/helm
+RUN mkdir /root/.kube && \
+    ln -s /usr/bin/rancher /usr/bin/kubectl && \
+    ln -s /var/lib/rancher/kube_config_cluster.yml /root/.kube/config && \
+    ln -s /usr/bin/rancher /usr/bin/reset-password && \
+    ln -s /go/src/github.com/rancher/rancher/debug /usr/bin/rancher
+
+
+WORKDIR /var/lib/rancher
+
+ENV CATTLE_UI_PATH /usr/share/rancher/ui
+ENV CATTLE_UI_VERSION 2.0.48
+ENV CATTLE_CLI_VERSION v2.0.1
+ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
+
+
+RUN mkdir -p /usr/share/rancher/ui && \
+    cd /usr/share/rancher/ui && \
+    curl -sL https://releases.rancher.com/ui/${CATTLE_UI_VERSION}.tar.gz | tar xvzf - --strip-components=1 && \
+    cd /var/lib/rancher
+
+ENV CATTLE_CLI_URL_DARWIN  https://releases.rancher.com/cli/${CATTLE_CLI_VERSION}/rancher-darwin-amd64-${CATTLE_CLI_VERSION}.tar.gz
+ENV CATTLE_CLI_URL_LINUX   https://releases.rancher.com/cli/${CATTLE_CLI_VERSION}/rancher-linux-amd64-${CATTLE_CLI_VERSION}.tar.gz
+ENV CATTLE_CLI_URL_WINDOWS https://releases.rancher.com/cli/${CATTLE_CLI_VERSION}/rancher-windows-386-${CATTLE_CLI_VERSION}.zip
+
+ARG VERSION=dev
+ENV CATTLE_SERVER_VERSION ${VERSION}
+COPY start-debugger.sh /usr/bin
+COPY kill-debugger.sh /usr/bin
+
+ENV CATTLE_AGENT_IMAGE rancher/rancher-agent:${VERSION}
+ENV CATTLE_SERVER_IMAGE rancher/rancher
+VOLUME /var/lib/rancher
+#ENTRYPOINT ["rancher", "--http-listen-port=80", "--https-listen-port=443"]
