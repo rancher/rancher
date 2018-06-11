@@ -16,9 +16,11 @@ const (
 	AzureKubernetesServiceConfigFieldOsDiskSizeGB         = "osDiskSizeGb"
 	AzureKubernetesServiceConfigFieldResourceGroup        = "resourceGroup"
 	AzureKubernetesServiceConfigFieldSSHPublicKeyContents = "sshPublicKeyContents"
+	AzureKubernetesServiceConfigFieldSubnet               = "subnet"
 	AzureKubernetesServiceConfigFieldSubscriptionID       = "subscriptionId"
 	AzureKubernetesServiceConfigFieldTag                  = "tags"
 	AzureKubernetesServiceConfigFieldTenantID             = "tenantId"
+	AzureKubernetesServiceConfigFieldVirtualNetwork       = "virtualNetwork"
 )
 
 type AzureKubernetesServiceConfig struct {
@@ -36,7 +38,9 @@ type AzureKubernetesServiceConfig struct {
 	OsDiskSizeGB         int64             `json:"osDiskSizeGb,omitempty" yaml:"osDiskSizeGb,omitempty"`
 	ResourceGroup        string            `json:"resourceGroup,omitempty" yaml:"resourceGroup,omitempty"`
 	SSHPublicKeyContents string            `json:"sshPublicKeyContents,omitempty" yaml:"sshPublicKeyContents,omitempty"`
+	Subnet               string            `json:"subnet,omitempty" yaml:"subnet,omitempty"`
 	SubscriptionID       string            `json:"subscriptionId,omitempty" yaml:"subscriptionId,omitempty"`
 	Tag                  map[string]string `json:"tags,omitempty" yaml:"tags,omitempty"`
 	TenantID             string            `json:"tenantId,omitempty" yaml:"tenantId,omitempty"`
+	VirtualNetwork       string            `json:"virtualNetwork,omitempty" yaml:"virtualNetwork,omitempty"`
 }
