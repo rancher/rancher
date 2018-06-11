@@ -291,7 +291,7 @@ func (s *AuthzSuite) createCRTBinding(bindingName string, subject rbacv1.Subject
 		ObjectMeta: metav1.ObjectMeta{
 			Name: bindingName,
 		},
-		Subject:          subject,
+		UserName:         subject.Name,
 		RoleTemplateName: rtName,
 	})
 
@@ -309,7 +309,7 @@ func (s *AuthzSuite) createPRTBinding(bindingName string, subject rbacv1.Subject
 		ObjectMeta: metav1.ObjectMeta{
 			Name: bindingName,
 		},
-		Subject:          subject,
+		UserName:         subject.Name,
 		ProjectName:      projectName,
 		RoleTemplateName: rtName,
 	})
