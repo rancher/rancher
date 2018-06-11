@@ -23,6 +23,7 @@ var (
 	allowedFormats   = map[string]bool{
 		"html": true,
 		"json": true,
+		"yaml": true,
 	}
 )
 
@@ -259,7 +260,15 @@ func parseResponseFormat(req *http.Request) string {
 	if IsBrowser(req, true) {
 		return "html"
 	}
+
+	if isYaml(req) {
+		return "yaml"
+	}
 	return "json"
+}
+
+func isYaml(req *http.Request) bool {
+	return strings.Contains(req.Header.Get("Accept"), "application/yaml")
 }
 
 func parseMethod(req *http.Request) string {

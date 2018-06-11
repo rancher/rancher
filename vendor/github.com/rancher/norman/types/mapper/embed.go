@@ -13,6 +13,7 @@ type Embed struct {
 	Ignore         []string
 	ignoreOverride bool
 	embeddedFields []string
+	EmptyValueOk   bool
 }
 
 func (e *Embed) FromInternal(data map[string]interface{}) {
@@ -39,6 +40,9 @@ func (e *Embed) ToInternal(data map[string]interface{}) {
 		delete(data, fieldName)
 	}
 	if len(sub) == 0 {
+		if e.EmptyValueOk {
+			data[e.Field] = nil
+		}
 		return
 	}
 	data[e.Field] = sub
