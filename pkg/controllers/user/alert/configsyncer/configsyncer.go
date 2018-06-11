@@ -21,6 +21,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+var (
+	defaultGroupInterval = 10
+	eventGroupInterval   = 1
+)
+
 func NewConfigSyncer(ctx context.Context, cluster *config.UserContext, manager *manager.Manager) *ConfigSyncer {
 	return &ConfigSyncer{
 		secrets:            cluster.Core.Secrets("cattle-alerting"),
@@ -139,7 +144,7 @@ func (d *ConfigSyncer) addProjectAlert2Config(config *alertconfig.Config, alerts
 		exist := d.addRecipients(notifiers, receiver, alert.Spec.Recipients)
 		if exist {
 			config.Receivers = append(config.Receivers, receiver)
-			d.addRoute(config, id, alert.Spec.InitialWaitSeconds, alert.Spec.RepeatIntervalSeconds)
+			d.addRoute(config, id, alert.Spec.InitialWaitSeconds, alert.Spec.RepeatIntervalSeconds, defaultGroupInterval)
 
 		}
 	}
@@ -157,13 +162,19 @@ func (d *ConfigSyncer) addClusterAlert2Config(config *alertconfig.Config, alerts
 		exist := d.addRecipients(notifiers, receiver, alert.Spec.Recipients)
 		if exist {
 			config.Receivers = append(config.Receivers, receiver)
-			d.addRoute(config, id, alert.Spec.InitialWaitSeconds, alert.Spec.RepeatIntervalSeconds)
+
+			updateGroupInterval := defaultGroupInterval
+			if alert.Spec.TargetEvent != nil {
+				updateGroupInterval = eventGroupInterval
+			}
+
+			d.addRoute(config, id, alert.Spec.InitialWaitSeconds, alert.Spec.RepeatIntervalSeconds, updateGroupInterval)
 		}
 
 	}
 }
 
-func (d *ConfigSyncer) addRoute(config *alertconfig.Config, id string, initalWait, repeatInterval int) {
+func (d *ConfigSyncer) addRoute(config *alertconfig.Config, id string, initalWait, repeatInterval, groupInterval int) {
 	routes := config.Route.Routes
 	if routes == nil {
 		routes = []*alertconfig.Route{}
@@ -180,6 +191,11 @@ func (d *ConfigSyncer) addRoute(config *alertconfig.Config, id string, initalWai
 	route.GroupWait = &gw
 	ri := model.Duration(time.Duration(repeatInterval) * time.Second)
 	route.RepeatInterval = &ri
+
+	if groupInterval != defaultGroupInterval {
+		gi := model.Duration(time.Duration(groupInterval) * time.Second)
+		route.GroupInterval = &gi
+	}
 
 	routes = append(routes, route)
 	config.Route.Routes = routes
