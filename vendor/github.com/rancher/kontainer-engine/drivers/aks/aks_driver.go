@@ -145,6 +145,14 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 		Type:  types.StringType,
 		Usage: "Azure tenant id to use",
 	}
+	driverFlag.Options["virtual-network"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "Azure virtual network to use",
+	}
+	driverFlag.Options["subnet"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "Azure subnet to use",
+	}
 
 	return &driverFlag, nil
 }
@@ -188,6 +196,8 @@ func getStateFromOptions(driverOptions *types.DriverOptions) (state, error) {
 	state.ClientID = getValueFromDriverOptions(driverOptions, types.StringType, "client-id", "clientId").(string)
 	state.TenantID = getValueFromDriverOptions(driverOptions, types.StringType, "tenant-id", "tenantId").(string)
 	state.ClientSecret = getValueFromDriverOptions(driverOptions, types.StringType, "client-secret", "clientSecret").(string)
+	state.VirtualNetwork = getValueFromDriverOptions(driverOptions, types.StringType, "virtualNetwork", "virtual-network").(string)
+	state.Subnet = getValueFromDriverOptions(driverOptions, types.StringType, "subnet").(string)
 	tagValues := getValueFromDriverOptions(driverOptions, types.StringSliceType).(*types.StringSlice)
 	for _, part := range tagValues.Value {
 		kv := strings.Split(part, "=")
@@ -401,6 +411,17 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 		}
 	}
 
+	var vmNetSubnetID *string
+	if driverState.VirtualNetwork != "" && driverState.Subnet != "" {
+		vmNetSubnetID = to.StringPtr(fmt.Sprintf(
+			"/subscriptions/%v/resourceGroups/%v/providers/Microsoft.Network/virtualNetworks/%v/subnets/%v",
+			driverState.SubscriptionID,
+			driverState.ResourceGroup,
+			driverState.VirtualNetwork,
+			driverState.Subnet,
+		))
+	}
+
 	_, err = clustersClient.CreateOrUpdate(ctx, driverState.ResourceGroup, driverState.Name, containerservice.ManagedCluster{
 		Location: to.StringPtr(driverState.Location),
 		Tags:     &tags,
@@ -419,10 +440,11 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 			},
 			AgentPoolProfiles: &[]containerservice.AgentPoolProfile{
 				{
-					DNSPrefix: to.StringPtr(agentDNSPrefix),
-					Name:      to.StringPtr(driverState.AgentPoolName),
-					VMSize:    containerservice.VMSizeTypes(driverState.AgentVMSize),
-					Count:     to.Int32Ptr(int32(driverState.Count)),
+					DNSPrefix:    to.StringPtr(agentDNSPrefix),
+					Name:         to.StringPtr(driverState.AgentPoolName),
+					VMSize:       containerservice.VMSizeTypes(driverState.AgentVMSize),
+					Count:        to.Int32Ptr(int32(driverState.Count)),
+					VnetSubnetID: vmNetSubnetID,
 				},
 			},
 			ServicePrincipalProfile: &containerservice.ServicePrincipalProfile{
