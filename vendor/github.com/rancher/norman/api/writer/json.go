@@ -1,7 +1,6 @@
 package writer
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,26 +12,28 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type JSONResponseWriter struct {
+type EncodingResponseWriter struct {
+	ContentType string
+	Encoder     func(io.Writer, interface{}) error
 }
 
-func (j *JSONResponseWriter) start(apiContext *types.APIContext, code int, obj interface{}) {
+func (j *EncodingResponseWriter) start(apiContext *types.APIContext, code int, obj interface{}) {
 	AddCommonResponseHeader(apiContext)
-	apiContext.Response.Header().Set("content-type", "application/json")
+	apiContext.Response.Header().Set("content-type", j.ContentType)
 	apiContext.Response.WriteHeader(code)
 }
 
-func (j *JSONResponseWriter) Write(apiContext *types.APIContext, code int, obj interface{}) {
+func (j *EncodingResponseWriter) Write(apiContext *types.APIContext, code int, obj interface{}) {
 	j.start(apiContext, code, obj)
 	j.Body(apiContext, apiContext.Response, obj)
 }
 
-func (j *JSONResponseWriter) Body(apiContext *types.APIContext, writer io.Writer, obj interface{}) error {
+func (j *EncodingResponseWriter) Body(apiContext *types.APIContext, writer io.Writer, obj interface{}) error {
 	return j.VersionBody(apiContext, apiContext.Version, writer, obj)
 
 }
 
-func (j *JSONResponseWriter) VersionBody(apiContext *types.APIContext, version *types.APIVersion, writer io.Writer, obj interface{}) error {
+func (j *EncodingResponseWriter) VersionBody(apiContext *types.APIContext, version *types.APIVersion, writer io.Writer, obj interface{}) error {
 	var output interface{}
 
 	builder := builder.NewBuilder(apiContext)
@@ -50,12 +51,12 @@ func (j *JSONResponseWriter) VersionBody(apiContext *types.APIContext, version *
 	}
 
 	if output != nil {
-		return json.NewEncoder(writer).Encode(output)
+		return j.Encoder(writer, output)
 	}
 
 	return nil
 }
-func (j *JSONResponseWriter) writeMapSlice(builder *builder.Builder, apiContext *types.APIContext, input []map[string]interface{}) *types.GenericCollection {
+func (j *EncodingResponseWriter) writeMapSlice(builder *builder.Builder, apiContext *types.APIContext, input []map[string]interface{}) *types.GenericCollection {
 	collection := newCollection(apiContext)
 	for _, value := range input {
 		converted := j.convert(builder, apiContext, value)
@@ -71,7 +72,7 @@ func (j *JSONResponseWriter) writeMapSlice(builder *builder.Builder, apiContext 
 	return collection
 }
 
-func (j *JSONResponseWriter) writeInterfaceSlice(builder *builder.Builder, apiContext *types.APIContext, input []interface{}) *types.GenericCollection {
+func (j *EncodingResponseWriter) writeInterfaceSlice(builder *builder.Builder, apiContext *types.APIContext, input []interface{}) *types.GenericCollection {
 	collection := newCollection(apiContext)
 	for _, value := range input {
 		switch v := value.(type) {
@@ -99,7 +100,7 @@ func toString(val interface{}) string {
 	return fmt.Sprint(val)
 }
 
-func (j *JSONResponseWriter) convert(b *builder.Builder, context *types.APIContext, input map[string]interface{}) *types.RawResource {
+func (j *EncodingResponseWriter) convert(b *builder.Builder, context *types.APIContext, input map[string]interface{}) *types.RawResource {
 	schema := context.Schemas.Schema(context.Version, definition.GetFullType(input))
 	if schema == nil {
 		return nil
@@ -133,7 +134,7 @@ func (j *JSONResponseWriter) convert(b *builder.Builder, context *types.APIConte
 	return rawResource
 }
 
-func (j *JSONResponseWriter) addLinks(b *builder.Builder, schema *types.Schema, context *types.APIContext, input map[string]interface{}, rawResource *types.RawResource) {
+func (j *EncodingResponseWriter) addLinks(b *builder.Builder, schema *types.Schema, context *types.APIContext, input map[string]interface{}, rawResource *types.RawResource) {
 	if rawResource.ID == "" {
 		return
 	}

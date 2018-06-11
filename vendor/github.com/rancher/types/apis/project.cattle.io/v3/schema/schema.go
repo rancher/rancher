@@ -367,7 +367,7 @@ func cronJobTypes(schemas *types.Schemas) *types.Schemas {
 func deploymentTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
 		AddMapperForType(&Version, v1beta2.DeploymentStrategy{},
-			&m.Embed{Field: "rollingUpdate"},
+			&m.Embed{Field: "rollingUpdate", EmptyValueOk: true},
 			m.Enum{Field: "type", Options: []string{
 				"Recreate",
 				"RollingUpdate",
@@ -448,6 +448,7 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 			m.Move{From: "command", To: "entrypoint"},
 			m.Move{From: "args", To: "command"},
 			mapper.EnvironmentMapper{},
+			mapper.ContainerSecurityContext{},
 			&m.Embed{Field: "securityContext"},
 			&m.Embed{Field: "lifecycle"},
 		).
