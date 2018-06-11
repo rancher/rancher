@@ -195,30 +195,34 @@ func setPorts(workloadName string, data map[string]interface{}) error {
 					logrus.Warnf("Failed to transform port to map %v", err)
 					continue
 				}
-				portName := ""
-				if convert.IsEmpty(port["name"]) {
-					containerPort, err := convert.ToNumber(port["containerPort"])
-					if err != nil {
-						logrus.Warnf("Failed to transform container port [%v] to number: %v", port["containerPort"], err)
-					}
+
+				containerPort, err := convert.ToNumber(port["containerPort"])
+				if err != nil {
+					return httperror.NewAPIError(httperror.InvalidOption, fmt.Sprintf("failed to transform container port [%v] "+
+						"to number: %v", port["containerPort"], err))
+				}
+
+				containerPortStr := strconv.Itoa(int(containerPort))
+				protocol := strings.ToLower(convert.ToString(port["protocol"]))
+				sourcePort := strings.ToLower(convert.ToString(port["sourcePort"]))
+				portName := convert.ToString(port["name"])
+				if portName == "" || isRancherGeneratedPort(portName, containerPortStr, protocol) {
 					// port name is of format containerPortProtoSourcePortKind
 					// len limit is 15, therefore a) no separator b) kind is numerated
-					numKind := 0
+					numKind := "0"
 					switch kind := convert.ToString(port["kind"]); kind {
 					case "NodePort":
-						numKind = 1
+						numKind = "1"
 					case "ClusterIP":
-						numKind = 2
+						numKind = "2"
 					case "LoadBalancer":
-						numKind = 3
+						numKind = "3"
 					}
-
-					portName = fmt.Sprintf("%s%s%s%s", strconv.Itoa(int(containerPort)),
-						strings.ToLower(convert.ToString(port["protocol"])),
-						strings.ToLower(convert.ToString(port["sourcePort"])),
-						strings.ToLower(convert.ToString(numKind)))
-				} else {
-					portName = convert.ToString(port["name"])
+					portName = fmt.Sprintf("%s%s%s%s",
+						containerPortStr,
+						protocol,
+						sourcePort,
+						numKind)
 				}
 
 				//validate port name
@@ -244,6 +248,12 @@ func setPorts(workloadName string, data map[string]interface{}) error {
 	return nil
 }
 
+func isRancherGeneratedPort(portName, containerPort, protocol string) bool {
+	if strings.HasPrefix(portName, fmt.Sprintf("%s%s", containerPort, protocol)) {
+		return true
+	}
+	return false
+}
 func generateDNSName(workloadName, dnsName string) bool {
 	if dnsName == "" {
 		return true

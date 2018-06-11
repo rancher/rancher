@@ -172,13 +172,12 @@ func (c *Controller) updateService(toUpdate Service, existing *corev1.Service) e
 	for _, p := range toUpdate.ServicePorts {
 		if val, ok := existingPortNameToPort[p.Name]; ok {
 			if val.Port == p.Port {
-				// Once switch to k8s 1.9, reset only when p.Nodeport == 0. There is a bug in 1.8
-				// on port update with diff NodePort value resulting in api server crash
-				// https://github.com/kubernetes/kubernetes/issues/58892
-				//if p.NodePort == 0 {
-				//	p.NodePort = val.NodePort
-				//}
-				p.NodePort = val.NodePort
+				if p.NodePort != val.NodePort {
+					if p.NodePort == 0 {
+						// random port handling to avoid infinite updates
+						p.NodePort = val.NodePort
+					}
+				}
 			}
 		}
 		portsToUpdate = append(portsToUpdate, p)
@@ -190,6 +189,7 @@ func (c *Controller) updateService(toUpdate Service, existing *corev1.Service) e
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -266,10 +266,8 @@ func arePortsEqual(one []corev1.ServicePort, two []corev1.ServicePort) bool {
 	for _, o := range one {
 		found := false
 		for _, t := range two {
-			// Once switch to k8s 1.9, compare nodePort value as well. There is a bug in 1.8
-			// on port update with diff NodePort value resulting in api server crash
-			// https://github.com/kubernetes/kubernetes/issues/58892
-			if o.TargetPort == t.TargetPort && o.Protocol == t.Protocol && o.Port == t.Port {
+			nodePortsEqual := (o.NodePort == 0 || t.NodePort == 0) || (o.NodePort == t.NodePort)
+			if o.TargetPort == t.TargetPort && o.Protocol == t.Protocol && o.Port == t.Port && nodePortsEqual {
 				found = true
 				break
 			}
