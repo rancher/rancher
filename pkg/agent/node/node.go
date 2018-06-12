@@ -22,12 +22,12 @@ func Params() map[string]interface{} {
 			"address":         os.Getenv("CATTLE_ADDRESS"),
 			"internalAddress": os.Getenv("CATTLE_INTERNAL_ADDRESS"),
 			"roles":           split(os.Getenv("CATTLE_ROLE")),
+			"label":           labels,
 		},
 		"etcd":              slice.ContainsString(roles, "etcd"),
 		"controlPlane":      slice.ContainsString(roles, "controlplane"),
 		"worker":            slice.ContainsString(roles, "worker"),
 		"requestedHostname": os.Getenv("CATTLE_NODE_NAME"),
-		"labels":            labels,
 	}
 
 	for k, v := range params {
@@ -58,6 +58,9 @@ func parseLabel(v string) map[string]string {
 	labels := map[string]string{}
 	parts := strings.Split(v, ",")
 	for _, part := range parts {
+		if part == "" {
+			continue
+		}
 		kvs := strings.SplitN(part, "=", 2)
 		if len(kvs) == 2 {
 			labels[kvs[0]] = kvs[1]

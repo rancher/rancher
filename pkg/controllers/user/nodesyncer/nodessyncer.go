@@ -117,6 +117,9 @@ func (m *NodesSyncer) syncLabels(key string, obj *v3.Node) error {
 	if err != nil {
 		return err
 	}
+	if node == nil {
+		return nil
+	}
 
 	shouldUpdate := false
 	// set annotations
