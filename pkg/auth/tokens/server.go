@@ -180,7 +180,6 @@ func (s *tokenAPIServer) getTokens(tokenAuthValue string) ([]v3.Token, int, erro
 	}
 
 	for _, t := range tokenList.Items {
-		SetTokenExpiresAt(&t)
 		if IsExpired(t) {
 			t.Expired = true
 		}
@@ -238,8 +237,6 @@ func (s *tokenAPIServer) getTokenByID(tokenAuthValue string, tokenID string) (v3
 	if IsExpired(*token) {
 		token.Expired = true
 	}
-
-	SetTokenExpiresAt(token)
 
 	return *token, 0, nil
 }
