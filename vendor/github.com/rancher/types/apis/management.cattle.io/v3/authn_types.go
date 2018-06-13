@@ -111,9 +111,33 @@ type GithubConfigTestOutput struct {
 }
 
 type GithubConfigApplyInput struct {
-	GithubConfig GithubConfig `json:"githubConfig, omitempty"`
+	GithubConfig GithubConfig `json:"githubConfig,omitempty"`
 	Code         string       `json:"code,omitempty"`
 	Enabled      bool         `json:"enabled,omitempty"`
+}
+
+type AzureADConfig struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	AuthConfig        `json:",inline" mapstructure:",squash"`
+
+	Endpoint          string `json:"endpoint,omitempty" norman:"default=https://login.microsoftonline.com/,required,notnullable"`
+	GraphEndpoint     string `json:"graphEndpoint,omitempty" norman:"required,notnullable"`
+	TokenEndpoint     string `json:"tokenEndpoint,omitempty" norman:"required,notnullable"`
+	AuthEndpoint      string `json:"authEndpoint,omitempty" norman:"required,notnullable"`
+	TenantID          string `json:"tenantId,omitempty" norman:"required,notnullable"`
+	ApplicationID     string `json:"applicationId,omitempty" norman:"required,notnullable"`
+	ApplicationSecret string `json:"applicationSecret,omitempty" norman:"required,notnullable,type=password"`
+	RancherURL        string `json:"rancherUrl,omitempty" norman:"required,notnullable"`
+}
+
+type AzureADConfigTestOutput struct {
+	RedirectURL string `json:"redirectUrl"`
+}
+
+type AzureADConfigApplyInput struct {
+	Config AzureADConfig `json:"config,omitempty"`
+	Code   string        `json:"code,omitempty"`
 }
 
 type ActiveDirectoryConfig struct {
@@ -146,7 +170,7 @@ type ActiveDirectoryConfig struct {
 }
 
 type ActiveDirectoryTestAndApplyInput struct {
-	ActiveDirectoryConfig ActiveDirectoryConfig `json:"activeDirectoryConfig, omitempty"`
+	ActiveDirectoryConfig ActiveDirectoryConfig `json:"activeDirectoryConfig,omitempty"`
 	Username              string                `json:"username"`
 	Password              string                `json:"password"`
 	Enabled               bool                  `json:"enabled,omitempty"`

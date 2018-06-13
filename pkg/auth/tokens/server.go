@@ -125,6 +125,10 @@ func (s *tokenAPIServer) createK8sTokenCR(k8sToken *v3.Token) (v3.Token, error) 
 	return *createdToken, nil
 }
 
+func (s *tokenAPIServer) updateK8sTokenCR(token *v3.Token) (*v3.Token, error) {
+	return s.tokensClient.Update(token)
+}
+
 func (s *tokenAPIServer) getK8sTokenCR(tokenAuthValue string) (*v3.Token, int, error) {
 	tokenName, tokenKey := SplitTokenParts(tokenAuthValue)
 
