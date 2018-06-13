@@ -44,3 +44,11 @@ const (
 const (
 	GoogleKubernetesEngine = "googleKubernetesEngine"
 )
+
+//ssl
+const (
+	SSLSecretName  = "sslconfig"
+	CaFileName     = "ca.pem"
+	ClientCertName = "client-cert.pem"
+	ClientKeyName  = "client-key.pem"
+)

@@ -56,12 +56,10 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     @type elasticsearch
     include_tag_key  true
     hosts "elasticsearch.cattle-logging:9200"
-    reload_connections "true"
     logstash_prefix {{.clusterTarget.EmbeddedConfig.IndexPrefix}}
     logstash_format true
     logstash_dateformat  {{.clusterTarget.WrapEmbedded.DateFormat}}
     type_name  "container_log"
-    buffer_chunk_limit 256m            
     {{end -}}
 
     {{ if eq .clusterTarget.CurrentTarget "elasticsearch"}}
@@ -72,28 +70,59 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     {{else -}}
     hosts {{.clusterTarget.ElasticsearchConfig.Endpoint}}    
     {{end -}}
-    buffer_chunk_limit 256m            
- 
-    reload_connections "true"
     logstash_format true
     logstash_prefix "{{.clusterTarget.ElasticsearchConfig.IndexPrefix}}"
     logstash_dateformat  {{.clusterTarget.WrapElasticsearch.DateFormat}}
-    ssl_verify {{.clusterTarget.ElasticsearchConfig.SSLVerify}}
     type_name  "container_log"
-    buffer_chunk_limit 256m        
+
+    {{ if eq .clusterTarget.WrapElasticsearch.Scheme "https"}}    
+    ssl_verify {{ .clusterTarget.ElasticsearchConfig.SSLVerify }}
+    
+    {{ if .clusterTarget.ElasticsearchConfig.Certificate }}
+    ca_file /fluentd/etc/ssl/cluster_{{.clusterName}}_ca.pem
+    {{end -}}
+
+    {{ if and .clusterTarget.ElasticsearchConfig.ClientCert .clusterTarget.ElasticsearchConfig.ClientKey}}
+    client_cert /fluentd/etc/ssl/cluster_{{.clusterName}}_client-cert.pem
+    client_key /fluentd/etc/ssl/cluster_{{.clusterName}}_client-key.pem
+    {{end -}}
+
+    {{ if .clusterTarget.ElasticsearchConfig.ClientKeyPass}}
+    client_key_pass {{.clusterTarget.ElasticsearchConfig.ClientKeyPass}}
+    {{end -}}
+    {{end -}}
     {{end -}}
 
     {{ if eq .clusterTarget.CurrentTarget "splunk"}}
-    @type splunk-http-eventcollector
-    server  {{.clusterTarget.WrapSplunk.Server}}
-    all_items true
-    protocol {{.clusterTarget.WrapSplunk.Scheme}}
-    verify {{.clusterTarget.SplunkConfig.SSLVerify}}
-    sourcetype {{.clusterTarget.SplunkConfig.Source}}
+    @type splunk_hec
+    host {{.clusterTarget.WrapSplunk.Host}}
+    port {{.clusterTarget.WrapSplunk.Port}}
     token {{.clusterTarget.SplunkConfig.Token}}
-    format json
-    reload_connections "true"
-    buffer_chunk_limit 8m    
+
+    {{ if .clusterTarget.SplunkConfig.Source}}
+    sourcetype {{.clusterTarget.SplunkConfig.Source}}
+    {{end -}}
+    {{ if .clusterTarget.SplunkConfig.Index}}
+    default_index {{ .clusterTarget.SplunkConfig.Index }}
+    {{end -}}
+
+    {{ if eq .clusterTarget.WrapSplunk.Scheme "https"}}
+    use_ssl true
+    ssl_verify {{ .clusterTarget.SplunkConfig.SSLVerify }}
+
+    {{ if .clusterTarget.SplunkConfig.Certificate }}    
+    ca_file /fluentd/etc/ssl/cluster_{{.clusterName}}_ca.pem
+    {{end -}}
+
+    {{ if and .clusterTarget.SplunkConfig.ClientCert .clusterTarget.SplunkConfig.ClientKey}}    
+    client_cert /fluentd/etc/ssl/cluster_{{.clusterName}}_client-cert.pem
+    client_key /fluentd/etc/ssl/cluster_{{.clusterName}}_client-key.pem
+    {{end -}}
+
+    {{ if .clusterTarget.SplunkConfig.ClientKeyPass}}    
+    client_key_pass {{ .clusterTarget.SplunkConfig.ClientKeyPass }}
+    {{end -}}
+    {{end -}}
     {{end -}}
 
     {{ if eq .clusterTarget.CurrentTarget "kafka"}}
@@ -107,9 +136,16 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     output_data_type  "json"
     output_include_tag true
     output_include_time true
-    # get_kafka_client_log  true
+
+    {{ if .clusterTarget.KafkaConfig.Certificate }}        
+    ssl_ca_cert /fluentd/etc/ssl/cluster_{{.clusterName}}_ca.pem
+    {{end}}
+
+    {{ if and .clusterTarget.KafkaConfig.ClientCert .clusterTarget.KafkaConfig.ClientKey}}        
+    ssl_client_cert /fluentd/etc/ssl/cluster_{{.clusterName}}_client-cert.pem
+    ssl_client_cert_key /fluentd/etc/ssl/cluster_{{.clusterName}}_client-key.pem
+    {{ end -}}
     max_send_retries  3
-    buffer_chunk_limit 256m    
     {{end -}}
 
     {{ if eq .clusterTarget.CurrentTarget "syslog"}}
@@ -119,14 +155,17 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     severity {{.clusterTarget.SyslogConfig.Severity}}
     program {{.clusterTarget.SyslogConfig.Program}}
     protocol {{.clusterTarget.SyslogConfig.Protocol}}
-    buffer_chunk_limit 256m    
     {{end -}}
 
-    flush_interval {{.clusterTarget.OutputFlushInterval}}s
-    buffer_type file
-    buffer_path /fluentd/etc/buffer/cluster.buffer
-    buffer_queue_limit 128
-    max_retry_wait 30
+    <buffer>
+      @type file
+      path /fluentd/etc/buffer/cluster.buffer
+      flush_interval {{.clusterTarget.OutputFlushInterval}}s
+      {{ if eq .clusterTarget.CurrentTarget "splunk"}}
+      chunk_limit_size 8m
+      {{end -}}
+    </buffer> 
+
     disable_retry_limit
     num_threads 8
     slow_flush_log_threshold 40.0
