@@ -16,10 +16,12 @@ const (
 	GoogleKubernetesEngineConfigFieldLabels                          = "labels"
 	GoogleKubernetesEngineConfigFieldLocations                       = "locations"
 	GoogleKubernetesEngineConfigFieldMachineType                     = "machineType"
+	GoogleKubernetesEngineConfigFieldMasterIPRange                   = "masterIpRange"
 	GoogleKubernetesEngineConfigFieldMasterVersion                   = "masterVersion"
 	GoogleKubernetesEngineConfigFieldNetwork                         = "network"
 	GoogleKubernetesEngineConfigFieldNodeCount                       = "nodeCount"
 	GoogleKubernetesEngineConfigFieldNodeVersion                     = "nodeVersion"
+	GoogleKubernetesEngineConfigFieldPrivateCluster                  = "privateCluster"
 	GoogleKubernetesEngineConfigFieldProjectID                       = "projectId"
 	GoogleKubernetesEngineConfigFieldSubNetwork                      = "subNetwork"
 	GoogleKubernetesEngineConfigFieldZone                            = "zone"
@@ -40,10 +42,12 @@ type GoogleKubernetesEngineConfig struct {
 	Labels                          map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Locations                       []string          `json:"locations,omitempty" yaml:"locations,omitempty"`
 	MachineType                     string            `json:"machineType,omitempty" yaml:"machineType,omitempty"`
+	MasterIPRange                   string            `json:"masterIpRange,omitempty" yaml:"masterIpRange,omitempty"`
 	MasterVersion                   string            `json:"masterVersion,omitempty" yaml:"masterVersion,omitempty"`
 	Network                         string            `json:"network,omitempty" yaml:"network,omitempty"`
 	NodeCount                       int64             `json:"nodeCount,omitempty" yaml:"nodeCount,omitempty"`
 	NodeVersion                     string            `json:"nodeVersion,omitempty" yaml:"nodeVersion,omitempty"`
+	PrivateCluster                  bool              `json:"privateCluster,omitempty" yaml:"privateCluster,omitempty"`
 	ProjectID                       string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	SubNetwork                      string            `json:"subNetwork,omitempty" yaml:"subNetwork,omitempty"`
 	Zone                            string            `json:"zone,omitempty" yaml:"zone,omitempty"`

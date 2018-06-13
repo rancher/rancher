@@ -159,6 +159,10 @@ type GoogleKubernetesEngineConfig struct {
 	SubNetwork string `json:"subNetwork,omitempty"`
 	// Configuration for LegacyAbac
 	EnableLegacyAbac bool `json:"enableLegacyAbac,omitempty"`
+	// Private cluster
+	PrivateCluster bool `json:"privateCluster,omitempty"`
+	// Master IP Range
+	MasterIPRange string `json:"masterIpRange,omitempty"`
 }
 
 type AzureKubernetesServiceConfig struct {

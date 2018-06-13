@@ -18,7 +18,7 @@ import (
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	raw "google.golang.org/api/container/v1"
+	raw "google.golang.org/api/container/v1beta1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -84,6 +84,10 @@ type state struct {
 	NodePoolID string
 	// cluster info
 	ClusterInfo types.ClusterInfo
+	// Is private cluster
+	PrivateCluster bool
+	// Master IP range if private cluster is set, ignored otherwise
+	MasterIPRange string
 }
 
 func NewDriver() types.Driver {
@@ -157,6 +161,18 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 		Type:  types.BoolType,
 		Usage: "To enable kubernetes alpha feature",
 	}
+	driverFlag.Options["network"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "Network to use for the GKE cluster",
+	}
+	driverFlag.Options["private-cluster"] = &types.Flag{
+		Type:  types.BoolType,
+		Usage: "To create the cluster with private IP address",
+	}
+	driverFlag.Options["master-ip-range"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "Master IP Range to use if private cluster is set, ignored otherwise",
+	}
 	return &driverFlag, nil
 }
 
@@ -227,6 +243,9 @@ func getStateFromOpts(driverOptions *types.DriverOptions) (state, error) {
 		}
 	}
 
+	d.PrivateCluster = getValueFromDriverOptions(driverOptions, types.BoolType, "privateCluster", "private-cluster").(bool)
+	d.MasterIPRange = getValueFromDriverOptions(driverOptions, types.StringType, "masterIpRange", "master-ip-range").(string)
+
 	return d, d.validate()
 }
 
@@ -271,6 +290,10 @@ func (s *state) validate() error {
 		return fmt.Errorf("zone is required")
 	} else if s.Name == "" {
 		return fmt.Errorf("cluster name is required")
+	} else if s.PrivateCluster {
+		if s.MasterIPRange == "" {
+			return fmt.Errorf("if private cluster is set, you must also specify a master ip range")
+		}
 	}
 	return nil
 }
@@ -428,6 +451,23 @@ func (d *Driver) generateClusterCreateRequest(state state) *raw.CreateClusterReq
 	}
 	request.Cluster.NodeConfig = state.NodeConfig
 	request.Cluster.ResourceLabels = map[string]string{"display-name": strings.ToLower(state.DisplayName)}
+	request.Cluster.PrivateCluster = state.PrivateCluster
+	if state.PrivateCluster {
+		if request.Cluster.IpAllocationPolicy == nil {
+			request.Cluster.IpAllocationPolicy = &raw.IPAllocationPolicy{}
+		}
+
+		request.Cluster.IpAllocationPolicy.UseIpAliases = true
+		request.Cluster.MasterIpv4CidrBlock = state.MasterIPRange
+		request.Cluster.MasterAuthorizedNetworksConfig = &raw.MasterAuthorizedNetworksConfig{
+			Enabled: false,
+		}
+	}
+
+	bytes, _ := json.Marshal(request.Cluster)
+
+	logrus.Errorf("%v", string(bytes))
+
 	return &request
 }
 
