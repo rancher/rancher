@@ -102,9 +102,7 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		if answers != nil {
 			m, ok := answers.(map[string]interface{})
 			if ok {
-				if obj.Spec.Answers == nil {
-					obj.Spec.Answers = make(map[string]string)
-				}
+				obj.Spec.Answers = make(map[string]string)
 				for k, v := range m {
 					obj.Spec.Answers[k] = convert.ToString(v)
 				}
