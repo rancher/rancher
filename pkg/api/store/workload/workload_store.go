@@ -96,6 +96,8 @@ func setScheduling(apiContext *types.APIContext, data map[string]interface{}) {
 		state := getState(data)
 		state[getKey(nodeName)] = nodeID
 		setState(data, state)
+	} else {
+		values.PutValue(data, "", "nodeId")
 	}
 }
 
