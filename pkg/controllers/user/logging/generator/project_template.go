@@ -54,26 +54,58 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
     hosts {{$store.ElasticsearchConfig.Endpoint}}    
     {{end -}}
 
-    reload_connections "true"
     logstash_prefix "{{$store.ElasticsearchConfig.IndexPrefix}}"
     logstash_format true
     logstash_dateformat  {{$store.WrapElasticsearch.DateFormat}}
     type_name  "container_log"
+
+    {{ if eq $store.WrapElasticsearch.Scheme "https"}}
     ssl_verify {{$store.ElasticsearchConfig.SSLVerify}}
-    buffer_chunk_limit 256m            
+
+    {{ if $store.ElasticsearchConfig.Certificate }}
+    ca_file /fluentd/etc/ssl/project_{{$store.WrapProjectName}}_ca.pem
+    {{end -}}
+
+    {{ if and $store.ElasticsearchConfig.ClientCert $store.ElasticsearchConfig.ClientKey}}
+    client_cert /fluentd/etc/ssl/project_{{$store.WrapProjectName}}_client-cert.pem
+    client_key /fluentd/etc/ssl/project_{{$store.WrapProjectName}}_client-key.pem
+    {{end -}}
+
+    {{ if $store.ElasticsearchConfig.ClientKeyPass}}
+    client_key_pass {{$store.ElasticsearchConfig.ClientKeyPass}}
+    {{end -}}
+    {{end -}}
     {{end -}}
 
     {{ if eq $store.CurrentTarget "splunk"}}
-    @type splunk-http-eventcollector
-    server  {{$store.WrapSplunk.Server}}
-    all_items true
-    protocol {{$store.WrapSplunk.Scheme}}
-    verify {{$store.SplunkConfig.SSLVerify}}
-    sourcetype {{$store.SplunkConfig.Source}}
-    format json
+    @type splunk_hec
+    host {{$store.WrapSplunk.Host}}
+    port {{$store.WrapSplunk.Port}}
     token {{$store.SplunkConfig.Token}}
-    buffer_chunk_limit 8m        
-    reload_connections "true"
+    {{ if $store.SplunkConfig.Source}}
+    sourcetype {{$store.SplunkConfig.Source}}
+    {{end -}}
+    {{ if $store.SplunkConfig.Index}}
+    default_index {{ $store.SplunkConfig.Index }}
+    {{end -}}
+
+    {{ if eq $store.WrapSplunk.Scheme "https"}}
+    use_ssl true    
+    ssl_verify {{$store.SplunkConfig.SSLVerify}}    
+
+    {{ if $store.SplunkConfig.Certificate }}    
+    ca_file /fluentd/etc/ssl/project_{{$store.WrapProjectName}}_ca.pem
+    {{end -}}
+
+    {{ if and $store.SplunkConfig.ClientCert $store.SplunkConfig.ClientKey}}    
+    client_cert /fluentd/etc/ssl/project_{{$store.WrapProjectName}}_client-cert.pem
+    client_key /fluentd/etc/ssl/project_{{$store.WrapProjectName}}_client-key.pem
+    {{end -}}
+
+    {{ if $store.SplunkConfig.ClientKeyPass}}    
+    client_key_pass {{ $store.SplunkConfig.ClientKeyPass }}
+    {{end -}}
+    {{end -}}
     {{end -}}
 
     {{ if eq $store.CurrentTarget "kafka"}}
@@ -88,8 +120,16 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
     output_include_tag  true
     output_include_time  true
     # get_kafka_client_log  true
-    buffer_chunk_limit 256m        
     max_send_retries 3
+    
+    {{ if $store.KafkaConfig.Certificate }}        
+    ssl_ca_cert /fluentd/etc/ssl/project_{{$store.WrapProjectName}}_ca.pem
+    {{end}}
+
+    {{ if and $store.KafkaConfig.ClientCert $store.KafkaConfig.ClientKey}}        
+    ssl_client_cert /fluentd/etc/ssl/project_{{$store.WrapProjectName}}_client-cert.pem
+    ssl_client_cert_key /fluentd/etc/ssl/project_{{$store.WrapProjectName}}_client-key.pem
+    {{ end -}}
     {{end -}}
 
     {{ if eq $store.CurrentTarget "syslog"}}
@@ -99,16 +139,19 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
     severity {{$store.SyslogConfig.Severity}}
     program {{$store.SyslogConfig.Program}}
     protocol {{$store.SyslogConfig.Protocol}}
-    buffer_chunk_limit 256m            
     {{end}}
     
-    flush_interval {{$store.OutputFlushInterval}}s
-    max_retry_wait 30
+    <buffer>
+      @type file
+      path /fluentd/etc/buffer/project.{{$store.WrapProjectName}}.buffer
+      flush_interval {{$store.OutputFlushInterval}}s
+      {{ if eq $store.CurrentTarget "splunk"}}
+      buffer_chunk_limit 8m
+      {{end -}}
+    </buffer> 
+
     disable_retry_limit
     num_threads 8
-    buffer_type file
-    buffer_path /fluentd/etc/buffer/project.{{$store.ProjectName}}.buffer
-    buffer_queue_limit 128
     slow_flush_log_threshold 40.0
 </match>
 {{end -}}

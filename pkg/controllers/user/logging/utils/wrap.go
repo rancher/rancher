@@ -32,6 +32,7 @@ type WrapProjectLogging struct {
 	v3.ProjectLoggingSpec
 	GrepNamespace string
 	WrapLogging
+	WrapProjectName string
 }
 
 type WrapEmbedded struct {
@@ -45,7 +46,8 @@ type WrapElasticsearch struct {
 }
 
 type WrapSplunk struct {
-	Server string
+	Host   string
+	Port   string
 	Scheme string
 }
 
@@ -88,6 +90,7 @@ func ToWrapProjectLogging(grepNamespace string, projectLogging v3.ProjectLogging
 	wp := WrapProjectLogging{
 		ProjectLoggingSpec: projectLogging,
 		GrepNamespace:      grepNamespace,
+		WrapProjectName:    strings.Replace(projectLogging.ProjectName, ":", "_", -1),
 	}
 
 	wrapLogging, _, err := GetWrapConfig(projectLogging.ElasticsearchConfig, projectLogging.SplunkConfig, projectLogging.SyslogConfig, projectLogging.KafkaConfig, nil)
@@ -119,7 +122,7 @@ func GetWrapConfig(es *v3.ElasticsearchConfig, sp *v3.SplunkConfig, sl *v3.Syslo
 	}
 
 	if sp != nil {
-		var h, s string
+		var h, s, host, port string
 		h, s, err = parseEndpoint(sp.Endpoint)
 		if err != nil {
 			return
@@ -128,10 +131,17 @@ func GetWrapConfig(es *v3.ElasticsearchConfig, sp *v3.SplunkConfig, sl *v3.Syslo
 		if err != nil {
 			return
 		}
+
+		host, port, err = net.SplitHostPort(h)
+		if err != nil {
+			return
+		}
 		wrapLogging.WrapSplunk = WrapSplunk{
-			Server: h,
+			Host:   host,
+			Port:   port,
 			Scheme: s,
 		}
+
 		wrapLogging.CurrentTarget = loggingconfig.Splunk
 	}
 
@@ -246,28 +256,28 @@ func testReachable(network string, url string) error {
 
 func GetClusterTarget(spec v3.ClusterLoggingSpec) string {
 	if spec.EmbeddedConfig != nil {
-		return "embedded"
+		return loggingconfig.Embedded
 	} else if spec.ElasticsearchConfig != nil {
-		return "elasticsearch"
+		return loggingconfig.Elasticsearch
 	} else if spec.SplunkConfig != nil {
-		return "splunk"
+		return loggingconfig.Splunk
 	} else if spec.KafkaConfig != nil {
-		return "kafka"
+		return loggingconfig.Kafka
 	} else if spec.SyslogConfig != nil {
-		return "syslog"
+		return loggingconfig.Syslog
 	}
 	return "none"
 }
 
 func GetProjectTarget(spec v3.ProjectLoggingSpec) string {
 	if spec.ElasticsearchConfig != nil {
-		return "elasticsearch"
+		return loggingconfig.Elasticsearch
 	} else if spec.SplunkConfig != nil {
-		return "splunk"
+		return loggingconfig.Splunk
 	} else if spec.KafkaConfig != nil {
-		return "kafka"
+		return loggingconfig.Kafka
 	} else if spec.SyslogConfig != nil {
-		return "syslog"
+		return loggingconfig.Syslog
 	}
 	return "none"
 }

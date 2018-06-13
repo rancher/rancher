@@ -40,6 +40,7 @@ type ProjectLoggingSyncer struct {
 	daemonsets           v1beta2.DaemonSetInterface
 	namespaces           v1.NamespaceInterface
 	projectLoggings      v3.ProjectLoggingInterface
+	secrets              v1.SecretInterface
 	serviceAccounts      v1.ServiceAccountInterface
 }
 
@@ -58,6 +59,7 @@ func registerProjectLogging(ctx context.Context, cluster *config.UserContext) {
 		daemonsets:           cluster.Apps.DaemonSets(loggingconfig.LoggingNamespace),
 		namespaces:           cluster.Core.Namespaces(""),
 		projectLoggings:      projectLoggings,
+		secrets:              cluster.Core.Secrets(loggingconfig.LoggingNamespace),
 		serviceAccounts:      cluster.Core.ServiceAccounts(loggingconfig.LoggingNamespace),
 	}
 
@@ -87,6 +89,9 @@ func (c *ProjectLoggingSyncer) Sync(key string, obj *v3.ProjectLogging) error {
 
 		if obj != nil && !isAllDisable {
 			if err = c.createOrUpdateProjectConfigMap(obj.Name); err != nil {
+				return err
+			}
+			if err := utils.UnsetSecret(c.secrets, loggingconfig.SSLSecretName, getProjectSecretPrefix(obj.Spec.ProjectName)); err != nil {
 				return err
 			}
 		}
@@ -122,13 +127,17 @@ func (c *ProjectLoggingSyncer) Sync(key string, obj *v3.ProjectLogging) error {
 func (c *ProjectLoggingSyncer) doSync(obj *v3.ProjectLogging) (*v3.ProjectLogging, error) {
 	newObj := obj.DeepCopy()
 	_, err := v3.LoggingConditionProvisioned.Do(obj, func() (runtime.Object, error) {
-		return obj, provision(c.namespaces, c.configmaps, c.serviceAccounts, c.clusterRoleBindings, c.daemonsets, c.clusterLister, c.clusterName)
+		return obj, provision(c.namespaces, c.configmaps, c.serviceAccounts, c.clusterRoleBindings, c.daemonsets, c.clusterLister, c.secrets, c.clusterName, obj.Spec.DockerRootDir)
 	})
 	if err != nil {
 		return obj, err
 	}
 
 	_, err = v3.LoggingConditionUpdated.Do(obj, func() (runtime.Object, error) {
+		if err := utils.UpdateSSLAuthentication(getProjectSecretPrefix(obj.Spec.ProjectName), obj.Spec.ElasticsearchConfig, obj.Spec.SplunkConfig, obj.Spec.KafkaConfig, c.secrets); err != nil {
+			return obj, err
+		}
+
 		return obj, c.createOrUpdateProjectConfigMap("")
 	})
 
@@ -203,4 +212,8 @@ func (p *projectLoggingEndpointWatcher) checkTarget() error {
 		}
 	}
 	return errors.Wrapf(mergedErrs, "check project logging reachable fail in watch endpoint")
+}
+
+func getProjectSecretPrefix(projectName string) string {
+	return "project_" + strings.Replace(projectName, ":", "_", -1)
 }

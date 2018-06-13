@@ -16,7 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func CreateFluentd(ds rv1beta2.DaemonSetInterface, sa rv1.ServiceAccountInterface, rb rrbacv1.ClusterRoleBindingInterface, namespace string) (err error) {
+func CreateFluentd(ds rv1beta2.DaemonSetInterface, sa rv1.ServiceAccountInterface, rb rrbacv1.ClusterRoleBindingInterface, namespace, dockerRootDir string) (err error) {
 	defer func() {
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			if err = removeDeamonset(ds, sa, rb, loggingconfig.FluentdName); err != nil {
@@ -37,7 +37,7 @@ func CreateFluentd(ds rv1beta2.DaemonSetInterface, sa rv1.ServiceAccountInterfac
 		return err
 	}
 
-	daemonset := newFluentdDaemonset(loggingconfig.FluentdName, namespace, loggingconfig.FluentdName)
+	daemonset := newFluentdDaemonset(loggingconfig.FluentdName, namespace, loggingconfig.FluentdName, dockerRootDir)
 	_, err = ds.Create(daemonset)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
@@ -130,9 +130,40 @@ func newRoleBinding(name, namespace string) *rbacv1.ClusterRoleBinding {
 	}
 }
 
-func newFluentdDaemonset(name, namespace, clusterName string) *v1beta2.DaemonSet {
+func newFluentdDaemonset(name, namespace, clusterName, dockerRootDir string) *v1beta2.DaemonSet {
 	privileged := true
 	terminationGracePeriodSeconds := int64(30)
+
+	if dockerRootDir == "" {
+		dockerRootDir = "/var/lib/docker/containers"
+	}
+
+	logVolMounts, logVols := buildHostPathVolumes(map[string][]string{
+		"varlibdockercontainers": []string{dockerRootDir, dockerRootDir},
+		"varlogcontainers":       []string{"/var/log/containers", "/var/log/containers"},
+		"varlogpods":             []string{"/var/log/pods", "/var/log/pods"},
+		"rkelog":                 []string{"/var/lib/rancher/rke/log", "/var/lib/rancher/rke/log"},
+		"customlog":              []string{"/var/lib/rancher/log-volumes", "/var/lib/rancher/log-volumes"},
+		"fluentdlog":             []string{"/fluentd/etc/log", "/var/lib/rancher/fluentd/log"},
+	})
+
+	configVolMounts, configVols := buildConfigMapVolumes(map[string][]string{
+		"clusterlogging": []string{"/fluentd/etc/config/cluster", loggingconfig.ClusterLoggingName, "cluster.conf", "cluster.conf"},
+		"projectlogging": []string{"/fluentd/etc/config/project", loggingconfig.ProjectLoggingName, "project.conf", "project.conf"},
+	})
+
+	customConfigVolMounts, customConfigVols := buildHostPathVolumes(map[string][]string{
+		"clustercustomlogconfig": []string{"/fluentd/etc/config/custom/cluster", "/var/lib/rancher/fluentd/etc/config/custom/cluster"},
+		"projectcustomlogconfig": []string{"/fluentd/etc/config/custom/project", "/var/lib/rancher/fluentd/etc/config/custom/project"},
+	})
+
+	sslVolMounts, sslVols := buildSecretVolumes(map[string][]string{
+		loggingconfig.SSLSecretName: []string{"/fluentd/etc/ssl", loggingconfig.SSLSecretName},
+	})
+
+	allConfigVolMounts, allConfigVols := append(configVolMounts, customConfigVolMounts...), append(configVols, customConfigVols...)
+	allVolMounts, allVols := append(append(allConfigVolMounts, logVolMounts...), sslVolMounts...), append(append(allConfigVols, logVols...), sslVols...)
+
 	return &v1beta2.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -162,81 +193,27 @@ func newFluentdDaemonset(name, namespace, clusterName string) *v1beta2.DaemonSet
 					}},
 					Containers: []v1.Container{
 						{
-							Name:            loggingconfig.FluentdHelperName,
-							Image:           image.Resolve(v3.ToolsSystemImages.LoggingSystemImages.FluentdHelper),
-							Command:         []string{"fluentd-helper"},
-							Args:            []string{"--watched-file-list", "/fluentd/etc/config/cluster", "--watched-file-list", "/fluentd/etc/config/project", "--watched-file-list", "/fluentd/etc/config/custom/cluster", "--watched-file-list", "/fluentd/etc/config/custom/project"},
+							Name:    loggingconfig.FluentdHelperName,
+							Image:   image.Resolve(v3.ToolsSystemImages.LoggingSystemImages.FluentdHelper),
+							Command: []string{"fluentd-helper"},
+							Args: []string{
+								"--watched-file-list", "/fluentd/etc/config/cluster", "--watched-file-list", "/fluentd/etc/config/project",
+								"--watched-file-list", "/fluentd/etc/config/custom/cluster", "--watched-file-list", "/fluentd/etc/config/custom/project",
+								"--watched-file-list", "/fluentd/etc/ssl",
+							},
 							ImagePullPolicy: v1.PullAlways,
 							SecurityContext: &v1.SecurityContext{
 								Privileged: &privileged,
 							},
-							VolumeMounts: []v1.VolumeMount{
-								{
-									Name:      "clusterlogging",
-									MountPath: "/fluentd/etc/config/cluster",
-								},
-								{
-									Name:      "projectlogging",
-									MountPath: "/fluentd/etc/config/project",
-								},
-								{
-									Name:      "clustercustomlogconfig",
-									MountPath: "/fluentd/etc/config/custom/cluster",
-								},
-								{
-									Name:      "projectcustomlogconfig",
-									MountPath: "/fluentd/etc/config/custom/project",
-								},
-							},
+							VolumeMounts: append(allConfigVolMounts, sslVolMounts...),
 						},
 						{
 							Name:            loggingconfig.FluentdName,
-							Image:           image.Resolve(v3.ToolsSystemImages.LoggingSystemImages.Fluentd),
+							Image:           "micheliac/fluentd:dev",
 							ImagePullPolicy: v1.PullIfNotPresent,
 							Command:         []string{"fluentd"},
 							Args:            []string{"-c", "/fluentd/etc/fluent.conf"},
-							VolumeMounts: []v1.VolumeMount{
-								{
-									Name:      "varlibdockercontainers",
-									MountPath: "/var/lib/docker/containers",
-								},
-								{
-									Name:      "varlogcontainers",
-									MountPath: "/var/log/containers",
-								},
-								{
-									Name:      "varlogpods",
-									MountPath: "/var/log/pods",
-								},
-								{
-									Name:      "fluentdlog",
-									MountPath: "/fluentd/etc/log",
-								},
-								{
-									Name:      "rkelog",
-									MountPath: "/var/lib/rancher/rke/log",
-								},
-								{
-									Name:      "clusterlogging",
-									MountPath: "/fluentd/etc/config/cluster",
-								},
-								{
-									Name:      "projectlogging",
-									MountPath: "/fluentd/etc/config/project",
-								},
-								{
-									Name:      "customlog",
-									MountPath: "/var/lib/rancher/log-volumes",
-								},
-								{
-									Name:      "clustercustomlogconfig",
-									MountPath: "/fluentd/etc/config/custom/cluster",
-								},
-								{
-									Name:      "projectcustomlogconfig",
-									MountPath: "/fluentd/etc/config/custom/project",
-								},
-							},
+							VolumeMounts:    allVolMounts,
 							SecurityContext: &v1.SecurityContext{
 								Privileged: &privileged,
 							},
@@ -244,104 +221,7 @@ func newFluentdDaemonset(name, namespace, clusterName string) *v1beta2.DaemonSet
 					},
 					ServiceAccountName:            loggingconfig.FluentdName,
 					TerminationGracePeriodSeconds: &terminationGracePeriodSeconds,
-					Volumes: []v1.Volume{
-						{
-							Name: "varlibdockercontainers",
-							VolumeSource: v1.VolumeSource{
-								HostPath: &v1.HostPathVolumeSource{
-									Path: "/var/lib/docker/containers",
-								},
-							},
-						},
-						{
-							Name: "varlogcontainers",
-							VolumeSource: v1.VolumeSource{
-								HostPath: &v1.HostPathVolumeSource{
-									Path: "/var/log/containers",
-								},
-							},
-						},
-						{
-							Name: "varlogpods",
-							VolumeSource: v1.VolumeSource{
-								HostPath: &v1.HostPathVolumeSource{
-									Path: "/var/log/pods",
-								},
-							},
-						},
-						{
-							Name: "rkelog",
-							VolumeSource: v1.VolumeSource{
-								HostPath: &v1.HostPathVolumeSource{
-									Path: "/var/lib/rancher/rke/log",
-								},
-							},
-						},
-						{
-							Name: "customlog",
-							VolumeSource: v1.VolumeSource{
-								HostPath: &v1.HostPathVolumeSource{
-									Path: "/var/lib/rancher/log-volumes",
-								},
-							},
-						},
-						{
-							Name: "clustercustomlogconfig",
-							VolumeSource: v1.VolumeSource{
-								HostPath: &v1.HostPathVolumeSource{
-									Path: "/var/lib/rancher/fluentd/etc/config/custom/cluster",
-								},
-							},
-						},
-						{
-							Name: "projectcustomlogconfig",
-							VolumeSource: v1.VolumeSource{
-								HostPath: &v1.HostPathVolumeSource{
-									Path: "/var/lib/rancher/fluentd/etc/config/custom/project",
-								},
-							},
-						},
-						{
-							Name: "fluentdlog",
-							VolumeSource: v1.VolumeSource{
-								HostPath: &v1.HostPathVolumeSource{
-									Path: "/var/lib/rancher/fluentd/log",
-								},
-							},
-						},
-						{
-							Name: "clusterlogging",
-							VolumeSource: v1.VolumeSource{
-								ConfigMap: &v1.ConfigMapVolumeSource{
-									LocalObjectReference: v1.LocalObjectReference{
-										Name: loggingconfig.ClusterLoggingName,
-									},
-									Items: []v1.KeyToPath{
-										{
-											Key:  "cluster.conf",
-											Path: "cluster.conf",
-										},
-									},
-								},
-							},
-						},
-						{
-							Name: "projectlogging",
-							VolumeSource: v1.VolumeSource{
-								ConfigMap: &v1.ConfigMapVolumeSource{
-									LocalObjectReference: v1.LocalObjectReference{
-										Name: loggingconfig.ProjectLoggingName,
-									},
-									Items: []v1.KeyToPath{
-										{
-											Key:  "project.conf",
-											Path: "project.conf",
-										},
-									},
-								},
-							},
-						},
-					},
+					Volumes: allVols,
 				},
 			},
 		},
@@ -415,4 +295,67 @@ func getDriverDir(driverName string) string {
 	default:
 		return "/usr/libexec/kubernetes/kubelet-plugins/volume/exec"
 	}
+}
+
+func buildHostPathVolumes(mounts map[string][]string) (vms []v1.VolumeMount, vs []v1.Volume) {
+	for name, value := range mounts {
+		vms = append(vms, v1.VolumeMount{
+			Name:      name,
+			MountPath: value[0],
+		})
+		vs = append(vs, v1.Volume{
+			Name: name,
+			VolumeSource: v1.VolumeSource{
+				HostPath: &v1.HostPathVolumeSource{
+					Path: value[1],
+				},
+			},
+		})
+	}
+	return
+}
+
+func buildConfigMapVolumes(mounts map[string][]string) (vms []v1.VolumeMount, vs []v1.Volume) {
+	for name, value := range mounts {
+		vms = append(vms, v1.VolumeMount{
+			Name:      name,
+			MountPath: value[0],
+		})
+		vs = append(vs, v1.Volume{
+			Name: name,
+			VolumeSource: v1.VolumeSource{
+				ConfigMap: &v1.ConfigMapVolumeSource{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: value[1],
+					},
+					Items: []v1.KeyToPath{
+						{
+							Key:  value[2],
+							Path: value[3],
+						},
+					},
+				},
+			},
+		})
+	}
+	return
+}
+
+func buildSecretVolumes(mounts map[string][]string) (vms []v1.VolumeMount, vs []v1.Volume) {
+	for name, value := range mounts {
+		vms = append(vms, v1.VolumeMount{
+			Name:      name,
+			MountPath: value[0],
+		})
+		vs = append(vs, v1.Volume{
+			Name: name,
+			VolumeSource: v1.VolumeSource{
+
+				Secret: &v1.SecretVolumeSource{
+					SecretName: value[1],
+				},
+			},
+		})
+	}
+	return
 }

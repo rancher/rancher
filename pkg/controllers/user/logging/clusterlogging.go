@@ -53,6 +53,7 @@ type ClusterLoggingSyncer struct {
 	projectLoggingLister     v3.ProjectLoggingLister
 	roles                    rbacv1.RoleInterface
 	rolebindings             rbacv1.RoleBindingInterface
+	secrets                  v1.SecretInterface
 	services                 v1.ServiceInterface
 	serviceLister            v1.ServiceLister
 	serviceAccounts          v1.ServiceAccountInterface
@@ -90,6 +91,7 @@ func registerClusterLogging(ctx context.Context, cluster *config.UserContext) {
 		projectLoggingLister:     cluster.Management.Management.ProjectLoggings("").Controller().Lister(),
 		roles:                    cluster.RBAC.Roles(loggingconfig.LoggingNamespace),
 		rolebindings:             cluster.RBAC.RoleBindings(loggingconfig.LoggingNamespace),
+		secrets:                  cluster.Core.Secrets(loggingconfig.LoggingNamespace),
 		services:                 cluster.Core.Services(loggingconfig.LoggingNamespace),
 		serviceLister:            cluster.Core.Services("").Controller().Lister(),
 		serviceAccounts:          cluster.Core.ServiceAccounts(loggingconfig.LoggingNamespace),
@@ -129,6 +131,10 @@ func (c *ClusterLoggingSyncer) Sync(key string, obj *v3.ClusterLogging) error {
 			if err := utils.UnsetConfigMap(c.configmaps, loggingconfig.ClusterLoggingName, "cluster"); err != nil {
 				return err
 			}
+
+			if err := utils.UnsetSecret(c.secrets, loggingconfig.SSLSecretName, getClusterSecretPrefix(c.clusterName)); err != nil {
+				return err
+			}
 		}
 
 		if obj != nil && !reflect.DeepEqual(obj.Spec, obj.Status.AppliedSpec) {
@@ -146,7 +152,7 @@ func (c *ClusterLoggingSyncer) Sync(key string, obj *v3.ClusterLogging) error {
 
 func (c *ClusterLoggingSyncer) doSync(obj *v3.ClusterLogging) error {
 	_, err := v3.LoggingConditionProvisioned.Do(obj, func() (runtime.Object, error) {
-		return obj, provision(c.namespaces, c.configmaps, c.serviceAccounts, c.clusterRoleBindings, c.daemonsets, c.clusterLister, c.clusterName)
+		return obj, provision(c.namespaces, c.configmaps, c.serviceAccounts, c.clusterRoleBindings, c.daemonsets, c.clusterLister, c.secrets, c.clusterName, obj.Spec.DockerRootDir)
 	})
 	if err != nil {
 		return err
@@ -172,6 +178,10 @@ func (c *ClusterLoggingSyncer) update(obj *v3.ClusterLogging) (err error) {
 
 		if mergedErr := mergedErrors(updatedErr, err); mergedErr != nil {
 			return mergedErr
+		}
+
+		if err := utils.UpdateSSLAuthentication(getClusterSecretPrefix(c.clusterName), obj.Spec.ElasticsearchConfig, obj.Spec.SplunkConfig, obj.Spec.KafkaConfig, c.secrets); err != nil {
+			return err
 		}
 
 		return c.createOrUpdateClusterConfigMap()
@@ -220,6 +230,7 @@ func (c *ClusterLoggingSyncer) createOrUpdateClusterConfigMap() error {
 	}
 
 	conf["clusterTarget"] = wpClusterlogging
+	conf["clusterName"] = c.clusterName
 	err = generator.GenerateConfigFile(loggingconfig.ClusterConfigPath, generator.ClusterTemplate, "cluster", conf)
 	if err != nil {
 		return errors.Wrap(err, "generate cluster config file failed")
@@ -270,7 +281,7 @@ func (e *endpointWatcher) checkTarget() error {
 	return errors.Wrapf(mergedErr, "set clusterlogging fail in watch endpoint")
 }
 
-func provision(namespaces v1.NamespaceInterface, configmaps v1.ConfigMapInterface, serviceAccounts v1.ServiceAccountInterface, clusterRoleBindings rbacv1.ClusterRoleBindingInterface, daemonsets v1beta2.DaemonSetInterface, clusterLister v3.ClusterLister, clusterName string) error {
+func provision(namespaces v1.NamespaceInterface, configmaps v1.ConfigMapInterface, serviceAccounts v1.ServiceAccountInterface, clusterRoleBindings rbacv1.ClusterRoleBindingInterface, daemonsets v1beta2.DaemonSetInterface, clusterLister v3.ClusterLister, secrets v1.SecretInterface, clusterName, dockerRootDir string) error {
 	if err := utils.IniteNamespace(namespaces); err != nil {
 		return err
 	}
@@ -279,11 +290,15 @@ func provision(namespaces v1.NamespaceInterface, configmaps v1.ConfigMapInterfac
 		return err
 	}
 
+	if err := utils.InitSecret(secrets); err != nil {
+		return err
+	}
+
 	if err := utils.CreateLogAggregator(daemonsets, serviceAccounts, clusterRoleBindings, clusterLister, clusterName, loggingconfig.LoggingNamespace); err != nil {
 		return err
 	}
 
-	return utils.CreateFluentd(daemonsets, serviceAccounts, clusterRoleBindings, loggingconfig.LoggingNamespace)
+	return utils.CreateFluentd(daemonsets, serviceAccounts, clusterRoleBindings, loggingconfig.LoggingNamespace, dockerRootDir)
 }
 
 func unsetClusterLogging(obj *v3.ClusterLogging, clusterLoggings v3.ClusterLoggingInterface) error {
@@ -335,4 +350,8 @@ func mergedErrors(errs ...error) error {
 		return nil
 	}
 	return errors.New(strings.Join(errMsgs, ","))
+}
+
+func getClusterSecretPrefix(clusterName string) string {
+	return "cluster_" + clusterName
 }
