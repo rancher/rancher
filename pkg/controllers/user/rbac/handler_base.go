@@ -12,7 +12,6 @@ import (
 	typesrbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
-	"k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -20,6 +19,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
+
+	nsutils "github.com/rancher/rancher/pkg/namespace"
 )
 
 const (
@@ -54,7 +55,7 @@ func Register(workload *config.UserContext) {
 	// Index for looking up namespaces by projectID annotation
 	nsInformer := workload.Core.Namespaces("").Controller().Informer()
 	nsIndexers := map[string]cache.IndexFunc{
-		nsByProjectIndex: nsByProjectID,
+		nsByProjectIndex: nsutils.NsByProjectID,
 	}
 	nsInformer.AddIndexers(nsIndexers)
 
@@ -434,19 +435,6 @@ func prtbByUID(obj interface{}) ([]string, error) {
 		return []string{}, nil
 	}
 	return []string{convert.ToString(prtb.UID)}, nil
-}
-
-func nsByProjectID(obj interface{}) ([]string, error) {
-	ns, ok := obj.(*v1.Namespace)
-	if !ok {
-		return []string{}, nil
-	}
-
-	if id, ok := ns.Annotations[projectIDAnnotation]; ok {
-		return []string{id}, nil
-	}
-
-	return []string{}, nil
 }
 
 func crbRoleSubjectKeys(roleName string, subjects []rbacv1.Subject) []string {
