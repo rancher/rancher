@@ -299,7 +299,8 @@ func IsContainerUpgradable(ctx context.Context, dClient *client.Client, imageCfg
 	}
 	if containerInspect.Config.Image != imageCfg.Image ||
 		!sliceEqualsIgnoreOrder(containerInspect.Config.Entrypoint, imageCfg.Entrypoint) ||
-		!sliceEqualsIgnoreOrder(containerInspect.Config.Cmd, imageCfg.Cmd) {
+		!sliceEqualsIgnoreOrder(containerInspect.Config.Cmd, imageCfg.Cmd) ||
+		!isContainerRKEEnvChanged(containerInspect.Config.Env, imageCfg.Env) {
 		logrus.Debugf("[%s] Container [%s] is eligible for upgrade on host [%s]", plane, containerName, hostname)
 		return true, nil
 	}
@@ -389,4 +390,22 @@ func convertToSemver(version string) (*semver.Version, error) {
 	}
 	compVersion[2] = "0"
 	return semver.NewVersion(strings.Join(compVersion, "."))
+}
+
+func isContainerRKEEnvChanged(containerEnv, imageConfigEnv []string) bool {
+	// remove PATH env from the container env
+	cleanedContainerEnv := getRKEEnvVars(containerEnv)
+	cleanedImageConfigEnv := getRKEEnvVars(imageConfigEnv)
+
+	return sliceEqualsIgnoreOrder(cleanedContainerEnv, cleanedImageConfigEnv)
+}
+
+func getRKEEnvVars(env []string) []string {
+	tmp := []string{}
+	for _, e := range env {
+		if strings.HasPrefix("RKE_", e) {
+			tmp = append(tmp, e)
+		}
+	}
+	return tmp
 }

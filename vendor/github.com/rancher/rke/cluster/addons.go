@@ -200,7 +200,7 @@ func (c *Cluster) doAddonDeploy(ctx context.Context, addonYaml, resourceName str
 		}
 	}
 
-	err := c.StoreAddonConfigMap(ctx, addonYaml, resourceName)
+	addonUpdated, err := c.StoreAddonConfigMap(ctx, addonYaml, resourceName)
 	if err != nil {
 		return &addonError{fmt.Sprintf("Failed to save addon ConfigMap: %v", err), isCritical}
 	}
@@ -219,23 +219,25 @@ func (c *Cluster) doAddonDeploy(ctx context.Context, addonYaml, resourceName str
 	if err != nil {
 		return &addonError{fmt.Sprintf("Failed to generate addon execute job: %v", err), isCritical}
 	}
-	err = c.ApplySystemAddonExcuteJob(addonJob)
-	if err != nil {
+
+	if err = c.ApplySystemAddonExcuteJob(addonJob, addonUpdated); err != nil {
 		return &addonError{fmt.Sprintf("%v", err), isCritical}
 	}
 	return nil
 }
 
-func (c *Cluster) StoreAddonConfigMap(ctx context.Context, addonYaml string, addonName string) error {
+func (c *Cluster) StoreAddonConfigMap(ctx context.Context, addonYaml string, addonName string) (bool, error) {
 	log.Infof(ctx, "[addons] Saving addon ConfigMap to Kubernetes")
+	updated := false
 	kubeClient, err := k8s.NewClient(c.LocalKubeConfigPath, c.K8sWrapTransport)
 	if err != nil {
-		return err
+		return updated, err
 	}
 	timeout := make(chan bool, 1)
 	go func() {
 		for {
-			err := k8s.UpdateConfigMap(kubeClient, []byte(addonYaml), addonName)
+
+			updated, err = k8s.UpdateConfigMap(kubeClient, []byte(addonYaml), addonName)
 			if err != nil {
 				time.Sleep(time.Second * 5)
 				fmt.Println(err)
@@ -248,14 +250,14 @@ func (c *Cluster) StoreAddonConfigMap(ctx context.Context, addonYaml string, add
 	}()
 	select {
 	case <-timeout:
-		return nil
+		return updated, nil
 	case <-time.After(time.Second * UpdateStateTimeout):
-		return fmt.Errorf("[addons] Timeout waiting for kubernetes to be ready")
+		return updated, fmt.Errorf("[addons] Timeout waiting for kubernetes to be ready")
 	}
 }
 
-func (c *Cluster) ApplySystemAddonExcuteJob(addonJob string) error {
-	if err := k8s.ApplyK8sSystemJob(addonJob, c.LocalKubeConfigPath, c.K8sWrapTransport, c.AddonJobTimeout); err != nil {
+func (c *Cluster) ApplySystemAddonExcuteJob(addonJob string, addonUpdated bool) error {
+	if err := k8s.ApplyK8sSystemJob(addonJob, c.LocalKubeConfigPath, c.K8sWrapTransport, c.AddonJobTimeout, addonUpdated); err != nil {
 		logrus.Error(err)
 		return err
 	}

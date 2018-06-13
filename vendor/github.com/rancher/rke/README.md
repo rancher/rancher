@@ -283,9 +283,11 @@ ingress:
 
 RKE will deploy Nginx Ingress controller as a DaemonSet with `hostnetwork: true`, so ports `80`, and `443` will be opened on each node where the controller is deployed.
 
-## Extra Args and Binds
+## Extra Args, Binds and Environment Variables
 
-RKE supports additional service arguments.
+RKE supports additional service arguments, additional volume binds and additional environment variables.
+
+Example additional service arguments:
 
 ```yaml
 services:
@@ -298,7 +300,7 @@ This will add/append `--cluster-name=mycluster` to the container list of argumen
 
 As of `v0.1.3-rc2` using `extra_args` will add new arguments and **override** existing defaults. For example, if you need to modify the default admission controllers list, you need to change the default list and add apply it using `extra_args`.
 
-RKE also supports additional volume binds:
+Example additional volume binds:
 
 ```yaml
 services:
@@ -307,6 +309,16 @@ services:
     extra_binds:
       - "/host/dev:/dev"
       - "/usr/libexec/kubernetes/kubelet-plugins:/usr/libexec/kubernetes/kubelet-plugins:z"
+```
+
+Example additional environment variables:
+
+```yaml
+services:
+  # ...
+  kubelet:
+    extra_env:
+      - "HTTP_PROXY=http://your_proxy"
 ```
 
 ## Authentication
