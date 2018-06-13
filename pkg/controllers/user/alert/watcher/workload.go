@@ -12,11 +12,16 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/tools/cache"
+
+	nsutils "github.com/rancher/rancher/pkg/namespace"
 )
 
 const (
-	syncInterval = 30 * time.Second
+	syncInterval     = 30 * time.Second
+	nsByProjectIndex = "projectalert.cluster.cattle.io/ns-by-project"
 )
 
 type WorkloadWatcher struct {
@@ -25,9 +30,15 @@ type WorkloadWatcher struct {
 	projectAlertLister v3.ProjectAlertLister
 	clusterName        string
 	clusterLister      v3.ClusterLister
+	namespaceIndexer   cache.Indexer
 }
 
 func StartWorkloadWatcher(ctx context.Context, cluster *config.UserContext, manager *manager.Manager) {
+	nsInformer := cluster.Core.Namespaces("").Controller().Informer()
+	nsIndexers := map[string]cache.IndexFunc{
+		nsByProjectIndex: nsutils.NsByProjectID,
+	}
+	nsInformer.AddIndexers(nsIndexers)
 
 	d := &WorkloadWatcher{
 		projectAlertLister: cluster.Management.Management.ProjectAlerts("").Controller().Lister(),
@@ -35,6 +46,7 @@ func StartWorkloadWatcher(ctx context.Context, cluster *config.UserContext, mana
 		alertManager:       manager,
 		clusterName:        cluster.ClusterName,
 		clusterLister:      cluster.Management.Management.Clusters("").Controller().Lister(),
+		namespaceIndexer:   nsInformer.GetIndexer(),
 	}
 
 	go d.watch(ctx, syncInterval)
@@ -86,13 +98,21 @@ func (w *WorkloadWatcher) watchRule() error {
 			w.checkWorkloadCondition(wl, alert)
 
 		} else if alert.Spec.TargetWorkload.Selector != nil {
-			wls, err := w.workloadController.GetWorkloadsMatchingSelector("", alert.Spec.TargetWorkload.Selector)
+			namespaces, err := w.namespaceIndexer.ByIndex(nsByProjectIndex, alert.Spec.ProjectName)
 			if err != nil {
-				logrus.Warnf("Fail to list workload: %v", err)
-				continue
+				return err
 			}
-			for _, wl := range wls {
-				w.checkWorkloadCondition(wl, alert)
+			for _, n := range namespaces {
+				namespace, _ := n.(*corev1.Namespace)
+				wls, err := w.workloadController.GetWorkloadsMatchingSelector(namespace.Name, alert.Spec.TargetWorkload.Selector)
+				if err != nil {
+					logrus.Warnf("Fail to list workload: %v", err)
+					continue
+				}
+
+				for _, wl := range wls {
+					w.checkWorkloadCondition(wl, alert)
+				}
 			}
 		}
 
