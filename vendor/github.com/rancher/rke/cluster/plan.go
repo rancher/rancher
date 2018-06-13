@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	"crypto/md5"
 	"fmt"
 	"path"
 	"strconv"
@@ -29,6 +30,7 @@ const (
 	CoreOS             = "CoreOS"
 	CoreOSPrefixPath   = "/opt/rke"
 	ContainerNameLabel = "io.rancher.rke.container.name"
+	CloudConfigSumEnv  = "RKE_CLOUD_CONFIG_CHECKSUM"
 )
 
 func GeneratePlan(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig, hostsInfoMap map[string]types.Info) (v3.RKEPlan, error) {
@@ -96,8 +98,7 @@ func (c *Cluster) BuildKubeAPIProcess(prefixPath string) v3.Process {
 	etcdClientCert := pki.GetCertPath(pki.KubeNodeCertName)
 	etcdClientKey := pki.GetKeyPath(pki.KubeNodeCertName)
 	etcdCAClientCert := pki.GetCertPath(pki.CACertName)
-	// check apiserver count
-	apiserverCount := len(c.ControlPlaneHosts)
+
 	if len(c.Services.Etcd.ExternalURLs) > 0 {
 		etcdConnectionString = strings.Join(c.Services.Etcd.ExternalURLs, ",")
 		etcdPathPrefix = c.Services.Etcd.Path
@@ -129,10 +130,14 @@ func (c *Cluster) BuildKubeAPIProcess(prefixPath string) v3.Process {
 		"kubelet-client-certificate":      pki.GetCertPath(pki.KubeAPICertName),
 		"kubelet-client-key":              pki.GetKeyPath(pki.KubeAPICertName),
 		"service-account-key-file":        pki.GetKeyPath(pki.KubeAPICertName),
-		"apiserver-count":                 strconv.Itoa(apiserverCount),
 	}
 	if len(c.CloudProvider.Name) > 0 && c.CloudProvider.Name != aws.AWSCloudProviderName {
 		CommandArgs["cloud-config"] = CloudConfigPath
+	}
+	if len(c.CloudProvider.Name) > 0 {
+		c.Services.KubeAPI.ExtraEnv = append(
+			c.Services.KubeAPI.ExtraEnv,
+			fmt.Sprintf("%s=%s", CloudConfigSumEnv, getCloudConfigChecksum(c.CloudProvider)))
 	}
 	// check if our version has specific options for this component
 	serviceOptions := c.GetKubernetesServicesOptions()
@@ -140,6 +145,10 @@ func (c *Cluster) BuildKubeAPIProcess(prefixPath string) v3.Process {
 		for k, v := range serviceOptions.KubeAPI {
 			CommandArgs[k] = v
 		}
+	}
+	// check api server count for k8s v1.8
+	if getTagMajorVersion(c.Version) == "v1.8" {
+		CommandArgs["apiserver-count"] = strconv.Itoa(len(c.ControlPlaneHosts))
 	}
 
 	args := []string{
@@ -190,6 +199,7 @@ func (c *Cluster) BuildKubeAPIProcess(prefixPath string) v3.Process {
 		Args:                    args,
 		VolumesFrom:             VolumesFrom,
 		Binds:                   Binds,
+		Env:                     getUniqStringList(c.Services.KubeAPI.ExtraEnv),
 		NetworkMode:             "host",
 		RestartPolicy:           "always",
 		Image:                   c.Services.KubeAPI.Image,
@@ -227,7 +237,11 @@ func (c *Cluster) BuildKubeControllerProcess(prefixPath string) v3.Process {
 	if len(c.CloudProvider.Name) > 0 && c.CloudProvider.Name != aws.AWSCloudProviderName {
 		CommandArgs["cloud-config"] = CloudConfigPath
 	}
-
+	if len(c.CloudProvider.Name) > 0 {
+		c.Services.KubeController.ExtraEnv = append(
+			c.Services.KubeController.ExtraEnv,
+			fmt.Sprintf("%s=%s", CloudConfigSumEnv, getCloudConfigChecksum(c.CloudProvider)))
+	}
 	// check if our version has specific options for this component
 	serviceOptions := c.GetKubernetesServicesOptions()
 	if serviceOptions.KubeController != nil {
@@ -271,6 +285,7 @@ func (c *Cluster) BuildKubeControllerProcess(prefixPath string) v3.Process {
 		Args:                    args,
 		VolumesFrom:             VolumesFrom,
 		Binds:                   Binds,
+		Env:                     getUniqStringList(c.Services.KubeController.ExtraEnv),
 		NetworkMode:             "host",
 		RestartPolicy:           "always",
 		Image:                   c.Services.KubeController.Image,
@@ -319,7 +334,11 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string) v3.Pr
 	if len(c.CloudProvider.Name) > 0 && c.CloudProvider.Name != aws.AWSCloudProviderName {
 		CommandArgs["cloud-config"] = CloudConfigPath
 	}
-
+	if len(c.CloudProvider.Name) > 0 {
+		c.Services.Kubelet.ExtraEnv = append(
+			c.Services.Kubelet.ExtraEnv,
+			fmt.Sprintf("%s=%s", CloudConfigSumEnv, getCloudConfigChecksum(c.CloudProvider)))
+	}
 	// check if our version has specific options for this component
 	serviceOptions := c.GetKubernetesServicesOptions()
 	if serviceOptions.Kubelet != nil {
@@ -375,6 +394,7 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string) v3.Pr
 		Command:                 Command,
 		VolumesFrom:             VolumesFrom,
 		Binds:                   Binds,
+		Env:                     getUniqStringList(c.Services.Kubelet.ExtraEnv),
 		NetworkMode:             "host",
 		RestartPolicy:           "always",
 		Image:                   c.Services.Kubelet.Image,
@@ -437,6 +457,7 @@ func (c *Cluster) BuildKubeProxyProcess(prefixPath string) v3.Process {
 		Command:       Command,
 		VolumesFrom:   VolumesFrom,
 		Binds:         Binds,
+		Env:           c.Services.Kubeproxy.ExtraEnv,
 		NetworkMode:   "host",
 		RestartPolicy: "always",
 		PidMode:       "host",
@@ -527,6 +548,7 @@ func (c *Cluster) BuildSchedulerProcess(prefixPath string) v3.Process {
 		Name:                    services.SchedulerContainerName,
 		Command:                 Command,
 		Binds:                   Binds,
+		Env:                     c.Services.Scheduler.ExtraEnv,
 		VolumesFrom:             VolumesFrom,
 		NetworkMode:             "host",
 		RestartPolicy:           "always",
@@ -625,6 +647,8 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host, pr
 	Env = append(Env, fmt.Sprintf("ETCDCTL_CERT=%s", pki.GetCertPath(nodeName)))
 	Env = append(Env, fmt.Sprintf("ETCDCTL_KEY=%s", pki.GetKeyPath(nodeName)))
 
+	Env = append(Env, c.Services.Etcd.ExtraEnv...)
+
 	return v3.Process{
 		Name:                    services.EtcdContainerName,
 		Args:                    args,
@@ -695,4 +719,21 @@ func getTagMajorVersion(tag string) string {
 		return ""
 	}
 	return strings.Join(splitTag[:2], ".")
+}
+
+func getCloudConfigChecksum(config v3.CloudProvider) string {
+	configByteSum := md5.Sum([]byte(fmt.Sprintf("%s", config)))
+	return fmt.Sprintf("%x", configByteSum)
+}
+
+func getUniqStringList(l []string) []string {
+	m := map[string]bool{}
+	ul := []string{}
+	for _, k := range l {
+		if _, ok := m[k]; !ok {
+			m[k] = true
+			ul = append(ul, k)
+		}
+	}
+	return ul
 }

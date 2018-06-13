@@ -110,7 +110,7 @@ func saveStateToKubernetes(ctx context.Context, kubeClient *kubernetes.Clientset
 	timeout := make(chan bool, 1)
 	go func() {
 		for {
-			err := k8s.UpdateConfigMap(kubeClient, clusterFile, StateConfigMapName)
+			_, err := k8s.UpdateConfigMap(kubeClient, clusterFile, StateConfigMapName)
 			if err != nil {
 				time.Sleep(time.Second * 5)
 				continue
