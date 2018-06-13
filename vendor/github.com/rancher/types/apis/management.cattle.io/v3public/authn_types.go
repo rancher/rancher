@@ -49,3 +49,16 @@ type ActiveDirectoryProvider struct {
 
 	DefaultLoginDomain string `json:"defaultLoginDomain,omitempty"`
 }
+
+type AzureADProvider struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	AuthProvider      `json:",inline"`
+
+	RedirectURL string `json:"redirectUrl"`
+}
+
+type AzureADLogin struct {
+	GenericLogin `json:",inline"`
+	Code         string `json:"code" norman:"type=string,required"`
+}
