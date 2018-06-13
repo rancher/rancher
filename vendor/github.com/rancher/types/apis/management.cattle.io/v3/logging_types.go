@@ -40,9 +40,9 @@ type ProjectLogging struct {
 type LoggingCommonSpec struct {
 	DisplayName string `json:"displayName,omitempty"`
 
-	OutputFlushInterval int               `json:"outputFlushInterval,omitempty" norman:"default=3"`
-	OutputTags          map[string]string `json:"outputTags,omitempty"`
-
+	OutputFlushInterval int                  `json:"outputFlushInterval,omitempty" norman:"default=3"`
+	OutputTags          map[string]string    `json:"outputTags,omitempty"`
+	DockerRootDir       string               `json:"dockerRootDir" norman:"default=/var/lib/docker/containers"`
 	ElasticsearchConfig *ElasticsearchConfig `json:"elasticsearchConfig,omitempty"`
 	SplunkConfig        *SplunkConfig        `json:"splunkConfig,omitempty"`
 	KafkaConfig         *KafkaConfig         `json:"kafkaConfig,omitempty"`
@@ -94,19 +94,28 @@ type LoggingCondition struct {
 }
 
 type ElasticsearchConfig struct {
-	Endpoint     string `json:"endpoint,omitempty" norman:"required"`
-	IndexPrefix  string `json:"indexPrefix,omitempty" norman:"required"`
-	DateFormat   string `json:"dateFormat,omitempty" norman:"required,type=enum,options=YYYY-MM-DD|YYYY-MM|YYYY,default=YYYY-MM-DD"`
-	AuthUserName string `json:"authUsername,omitempty"` //secret
-	AuthPassword string `json:"authPassword,omitempty"` //secret
-	SSLVerify    bool   `json:"sslVerify,omitempty" norman:"required,default=true"`
+	Endpoint      string `json:"endpoint,omitempty" norman:"required"`
+	IndexPrefix   string `json:"indexPrefix,omitempty" norman:"required"`
+	DateFormat    string `json:"dateFormat,omitempty" norman:"required,type=enum,options=YYYY-MM-DD|YYYY-MM|YYYY,default=YYYY-MM-DD"`
+	AuthUserName  string `json:"authUsername,omitempty"` //secret
+	AuthPassword  string `json:"authPassword,omitempty"` //secret
+	Certificate   string `json:"certificate"`
+	ClientCert    string `json:"clientCert"`
+	ClientKey     string `json:"clientKey"`
+	ClientKeyPass string `json:"clientKeyPass"`
+	SSLVerify     bool   `json:"sslVerify"`
 }
 
 type SplunkConfig struct {
-	Endpoint  string `json:"endpoint,omitempty" norman:"required"`
-	Source    string `json:"source,omitempty"`
-	Token     string `json:"token,omitempty" norman:"required"` //secret
-	SSLVerify bool   `json:"sslVerify,omitempty" norman:"required,default=true"`
+	Endpoint      string `json:"endpoint,omitempty" norman:"required"`
+	Source        string `json:"source,omitempty"`
+	Token         string `json:"token,omitempty" norman:"required"` //secret
+	Certificate   string `json:"certificate"`
+	ClientCert    string `json:"clientCert"`
+	ClientKey     string `json:"clientKey"`
+	ClientKeyPass string `json:"clientKeyPass"`
+	SSLVerify     bool   `json:"sslVerify"`
+	Index         string `json:"index"`
 }
 
 type EmbeddedConfig struct {
@@ -124,6 +133,9 @@ type KafkaConfig struct {
 	ZookeeperEndpoint string   `json:"zookeeperEndpoint,omitempty"`
 	BrokerEndpoints   []string `json:"brokerEndpoints,omitempty"`
 	Topic             string   `json:"topic,omitempty" norman:"required"`
+	Certificate       string   `json:"certificate"`
+	ClientCert        string   `json:"clientCert"`
+	ClientKey         string   `json:"clientKey"`
 }
 
 type SyslogConfig struct {
