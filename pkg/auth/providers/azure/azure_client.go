@@ -87,7 +87,7 @@ func newClientToken(token v3.Token, config *v3.AzureADConfig) (*azureClient, err
 		return nil, err
 	}
 
-	secret := &adal.ServicePrincipalTokenSecret{
+	secret := &adal.ServicePrincipalAuthorizationCodeSecret{
 		ClientSecret: config.ApplicationSecret,
 	}
 
