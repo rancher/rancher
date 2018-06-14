@@ -27,26 +27,16 @@ func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.Act
 	}
 	externalID := ldap.GetUserExternalID(username, config.DefaultLoginDomain)
 
-	lConn, err := ldap.NewLDAPConn(config, caPool)
+	lConn, err := p.ldapConnection(config, caPool)
 	if err != nil {
 		return v3.Principal{}, nil, nil, err
 	}
 	defer lConn.Close()
 
-	if !config.Enabled { // TODO testing for enabled here might not be correct. Might be better to pass in an explicit testSvcAccount bool
-		logrus.Debug("Bind service account username password")
-		if config.ServiceAccountPassword == "" {
-			return v3.Principal{}, nil, nil, httperror.NewAPIError(httperror.MissingRequired, "service account password not provided")
-		}
-		sausername := ldap.GetUserExternalID(config.ServiceAccountUsername, config.DefaultLoginDomain)
-		err = lConn.Bind(sausername, config.ServiceAccountPassword)
-		if err != nil {
-			if ldapv2.IsErrorWithCode(err, ldapv2.LDAPResultInvalidCredentials) {
-				return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
-			}
-			return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.ServerError, "server error while authenticating")
-		}
-	}
+	enabled := config.Enabled
+	serviceAccountPassword := config.ServiceAccountPassword
+	serviceAccountUserName := config.ServiceAccountUsername
+	ldap.AuthenticateServiceAccountUser(enabled, serviceAccountPassword, serviceAccountUserName, lConn)
 
 	logrus.Debug("Binding username password")
 	err = lConn.Bind(externalID, password)
@@ -105,7 +95,10 @@ func (p *adProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult, 
 	var nilPrincipal []v3.Principal
 
 	entry := result.Entries[0]
-	if !ldap.HasPermission(entry.Attributes, config) {
+	userObjectClass := config.UserObjectClass
+	userEnabledAttribute := config.UserEnabledAttribute
+	userDisabledBitMask := config.UserDisabledBitMask
+	if !ldap.HasPermission(entry.Attributes, userObjectClass, userEnabledAttribute, userDisabledBitMask) {
 		return v3.Principal{}, nil, fmt.Errorf("Permission denied")
 	}
 
@@ -150,7 +143,7 @@ func (p *adProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult, 
 		nestedGroupsQuery,
 		ldap.GetGroupSearchAttributes(MemberOfAttribute, ObjectClassAttribute, config), nil)
 
-	lConn, err := ldap.NewLDAPConn(config, caPool)
+	lConn, err := p.ldapConnection(config, caPool)
 	if err != nil {
 		return userPrincipal, groupPrincipals, err
 	}
@@ -225,7 +218,10 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 		}
 	}
 
-	if !ldap.IsType(attribs, scope) && !ldap.HasPermission(attribs, config) {
+	userObjectClass := config.UserObjectClass
+	userEnabledAttribute := config.UserEnabledAttribute
+	userDisabledBitMask := config.UserDisabledBitMask
+	if !ldap.IsType(attribs, scope) && !ldap.HasPermission(attribs, userObjectClass, userEnabledAttribute, userDisabledBitMask) {
 		logrus.Errorf("Failed to get object %s", distinguishedName)
 		return nil, nil
 	}
@@ -237,7 +233,7 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 	}
 
 	logrus.Debugf("Query for getPrincipal(%s): %s", distinguishedName, filter)
-	lConn, err := ldap.NewLDAPConn(config, caPool)
+	lConn, err := p.ldapConnection(config, caPool)
 	if err != nil {
 		return nil, err
 	}
@@ -295,7 +291,7 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 
 	entry := result.Entries[0]
 	entryAttributes := entry.Attributes
-	if !ldap.HasPermission(entry.Attributes, config) {
+	if !ldap.HasPermission(entry.Attributes, userObjectClass, userEnabledAttribute, userDisabledBitMask) {
 		return nil, fmt.Errorf("Permission denied")
 	}
 
@@ -425,7 +421,7 @@ func (p *adProvider) searchLdap(query string, scope string, config *v3.ActiveDir
 			ldap.GetGroupSearchAttributes(MemberOfAttribute, ObjectClassAttribute, config), nil)
 	}
 
-	lConn, err := ldap.NewLDAPConn(config, caPool)
+	lConn, err := p.ldapConnection(config, caPool)
 	if err != nil {
 		return []v3.Principal{}, err
 	}
@@ -455,4 +451,12 @@ func (p *adProvider) searchLdap(query string, scope string, config *v3.ActiveDir
 	}
 
 	return principals, nil
+}
+
+func (p *adProvider) ldapConnection(config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) (*ldapv2.Conn, error) {
+	servers := config.Servers
+	TLS := config.TLS
+	port := config.Port
+	connectionTimeout := config.ConnectionTimeout
+	return ldap.NewLDAPConn(servers, TLS, port, connectionTimeout, caPool)
 }
