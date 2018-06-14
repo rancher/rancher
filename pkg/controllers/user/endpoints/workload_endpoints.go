@@ -61,7 +61,7 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 			return nil
 		}
 		for _, o := range obj.OwnerReferences {
-			if *o.Controller {
+			if o.Controller != nil && *o.Controller {
 				return nil
 			}
 		}
