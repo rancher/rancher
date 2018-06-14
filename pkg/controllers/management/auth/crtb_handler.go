@@ -35,16 +35,18 @@ func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterR
 	}
 	err = c.reconcilBindings(obj)
 
-	if obj.Annotations[creatorOwnerBindingAnnotation] == "true" {
-		cluster, err := c.clusterLister.Get("", obj.ClusterName)
-		if err != nil {
-			return nil, err
-		}
-		if !v3.ClusterConditionInitialRolesPopulated.IsTrue(cluster) {
-			cluster = cluster.DeepCopy()
-			v3.ClusterConditionInitialRolesPopulated.True(cluster)
-			if _, err := c.mgr.mgmt.Management.Clusters("").Update(cluster); err != nil {
-				return nil, err
+	if err == nil {
+		if obj.Annotations[creatorOwnerBindingAnnotation] == "true" {
+			cluster, err := c.clusterLister.Get("", obj.ClusterName)
+			if err != nil {
+				return obj, err
+			}
+			if !v3.ClusterConditionInitialRolesPopulated.IsTrue(cluster) {
+				cluster = cluster.DeepCopy()
+				v3.ClusterConditionInitialRolesPopulated.True(cluster)
+				if _, err := c.mgr.mgmt.Management.Clusters("").Update(cluster); err != nil {
+					return obj, err
+				}
 			}
 		}
 	}

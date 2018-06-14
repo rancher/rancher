@@ -384,16 +384,14 @@ func (m *manager) grantManagementPlanePrivileges(roleTemplateName string, resour
 	desiredRBs := map[string]*v1.RoleBinding{}
 	roleBindings := m.mgmt.RBAC.RoleBindings(namespace)
 	for _, role := range roles {
+		resourceToVerbs := map[string]map[string]bool{}
 		for _, resource := range resources {
 			verbs, err := m.checkForManagementPlaneRules(role, resource)
 			if err != nil {
 				return err
 			}
 			if len(verbs) > 0 {
-				if err := m.reconcileManagementPlaneRole(namespace, resource, role, verbs); err != nil {
-					return err
-				}
-
+				resourceToVerbs[resource] = verbs
 				bindingName := bindingMeta.GetName() + "-" + role.Name
 				if _, ok := desiredRBs[bindingName]; !ok {
 					desiredRBs[bindingName] = &v1.RoleBinding{
@@ -415,6 +413,11 @@ func (m *manager) grantManagementPlanePrivileges(roleTemplateName string, resour
 						},
 					}
 				}
+			}
+		}
+		if len(resourceToVerbs) > 0 {
+			if err := m.reconcileManagementPlaneRole(namespace, resourceToVerbs, role); err != nil {
+				return err
 			}
 		}
 	}
@@ -445,15 +448,14 @@ func (m *manager) grantManagementClusterScopedPrivilegesInProjectNamespace(roleT
 	desiredRBs := map[string]*v1.RoleBinding{}
 	roleBindings := m.mgmt.RBAC.RoleBindings(projectNamespace)
 	for _, role := range roles {
+		resourceToVerbs := map[string]map[string]bool{}
 		for _, resource := range resources {
 			verbs, err := m.checkForManagementPlaneRules(role, resource)
 			if err != nil {
 				return err
 			}
 			if len(verbs) > 0 {
-				if err := m.reconcileManagementPlaneRole(projectNamespace, resource, role, verbs); err != nil {
-					return err
-				}
+				resourceToVerbs[resource] = verbs
 
 				bindingName := binding.Name + "-" + role.Name
 				if _, ok := desiredRBs[bindingName]; !ok {
@@ -471,6 +473,11 @@ func (m *manager) grantManagementClusterScopedPrivilegesInProjectNamespace(roleT
 						},
 					}
 				}
+			}
+		}
+		if len(resourceToVerbs) > 0 {
+			if err := m.reconcileManagementPlaneRole(projectNamespace, resourceToVerbs, role); err != nil {
+				return err
 			}
 		}
 	}
@@ -500,15 +507,14 @@ func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleT
 	desiredRBs := map[string]*v1.RoleBinding{}
 	roleBindings := m.mgmt.RBAC.RoleBindings(clusterNamespace)
 	for _, role := range roles {
+		resourceToVerbs := map[string]map[string]bool{}
 		for _, resource := range resources {
 			verbs, err := m.checkForManagementPlaneRules(role, resource)
 			if err != nil {
 				return err
 			}
 			if len(verbs) > 0 {
-				if err := m.reconcileManagementPlaneRole(clusterNamespace, resource, role, verbs); err != nil {
-					return err
-				}
+				resourceToVerbs[resource] = verbs
 
 				bindingName := binding.Name + "-" + role.Name
 				if _, ok := desiredRBs[bindingName]; !ok {
@@ -526,6 +532,11 @@ func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleT
 						},
 					}
 				}
+			}
+		}
+		if len(resourceToVerbs) > 0 {
+			if err := m.reconcileManagementPlaneRole(clusterNamespace, resourceToVerbs, role); err != nil {
+				return err
 			}
 		}
 	}
@@ -622,37 +633,48 @@ func (m *manager) checkForManagementPlaneRules(role *v3.RoleTemplate, management
 	return verbs, nil
 }
 
-func (m *manager) reconcileManagementPlaneRole(namespace, resource string, rt *v3.RoleTemplate, newVerbs map[string]bool) error {
+func (m *manager) reconcileManagementPlaneRole(namespace string, resourceToVerbs map[string]map[string]bool, rt *v3.RoleTemplate) error {
 	roleCli := m.mgmt.RBAC.Roles(namespace)
+	update := false
 	if role, err := m.rLister.Get(namespace, rt.Name); err == nil && role != nil {
-		currentVerbs := map[string]bool{}
-		for _, rule := range role.Rules {
-			if slice.ContainsString(rule.Resources, resource) {
-				for _, v := range rule.Verbs {
-					currentVerbs[v] = true
+		newRole := role.DeepCopy()
+		for resource, newVerbs := range resourceToVerbs {
+			currentVerbs := map[string]bool{}
+			for _, rule := range role.Rules {
+				if slice.ContainsString(rule.Resources, resource) {
+					for _, v := range rule.Verbs {
+						currentVerbs[v] = true
+					}
 				}
+			}
+
+			if !reflect.DeepEqual(currentVerbs, newVerbs) {
+				update = true
+				role = role.DeepCopy()
+				added := false
+				for i, rule := range newRole.Rules {
+					if slice.ContainsString(rule.Resources, resource) {
+						newRole.Rules[i] = buildRule(resource, newVerbs)
+						added = true
+					}
+				}
+				if !added {
+					newRole.Rules = append(newRole.Rules, buildRule(resource, newVerbs))
+				}
+
 			}
 		}
-
-		if !reflect.DeepEqual(currentVerbs, newVerbs) {
-			role = role.DeepCopy()
-			added := false
-			for i, rule := range role.Rules {
-				if slice.ContainsString(rule.Resources, resource) {
-					role.Rules[i] = buildRule(resource, newVerbs)
-					added = true
-				}
-			}
-			if !added {
-				role.Rules = append(role.Rules, buildRule(resource, newVerbs))
-			}
-			_, err := roleCli.Update(role)
+		if update {
+			_, err := roleCli.Update(newRole)
 			return err
 		}
 		return nil
 	}
 
-	rules := []v1.PolicyRule{buildRule(resource, newVerbs)}
+	var rules []v1.PolicyRule
+	for resource, newVerbs := range resourceToVerbs {
+		rules = append(rules, buildRule(resource, newVerbs))
+	}
 	_, err := roleCli.Create(&v1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: rt.Name,
