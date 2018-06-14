@@ -2,13 +2,11 @@ package tokens
 
 import (
 	"encoding/base64"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -86,49 +84,6 @@ func GetTokenAuthFromRequest(req *http.Request) string {
 		}
 	}
 	return tokenAuthValue
-}
-
-func CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerInfo map[string]string, ttl int, description string, request *types.APIContext) error {
-	token, err := NewLoginToken(userID, userPrincipal, groupPrincipals, providerInfo, 0, description)
-	if err != nil {
-		logrus.Errorf("Failed creating token with error: %v", err)
-		return httperror.NewAPIErrorLong(500, "", fmt.Sprintf("Failed creating token with error: %v", err))
-	}
-
-	isSecure := false
-	if request.Request.URL.Scheme == "https" {
-		isSecure = true
-	}
-
-	tokenCookie := &http.Cookie{
-		Name:     CookieName,
-		Value:    token.ObjectMeta.Name + ":" + token.Token,
-		Secure:   isSecure,
-		Path:     "/",
-		HttpOnly: true,
-	}
-	http.SetCookie(request.Response, tokenCookie)
-	request.WriteResponse(http.StatusOK, nil)
-
-	return nil
-}
-
-func NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerInfo map[string]string, ttl int64, description string) (v3.Token, error) {
-	token := &v3.Token{
-		UserPrincipal:   userPrincipal,
-		GroupPrincipals: groupPrincipals,
-		IsDerived:       false,
-		TTLMillis:       ttl,
-		UserID:          userID,
-		AuthProvider:    getAuthProviderName(userPrincipal.Name),
-		ProviderInfo:    providerInfo,
-		Description:     description,
-	}
-	return tokenServer.createK8sTokenCR(token)
-}
-
-func UpateLoginToken(token *v3.Token) (*v3.Token, error) {
-	return tokenServer.updateK8sTokenCR(token)
 }
 
 func ConvertTokenResource(schema *types.Schema, token v3.Token) (map[string]interface{}, error) {

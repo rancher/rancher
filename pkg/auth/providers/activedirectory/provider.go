@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
 	"github.com/rancher/types/client/management/v3public"
 	"github.com/rancher/types/config"
@@ -37,13 +38,15 @@ type adProvider struct {
 	userMGR     user.Manager
 	certs       string
 	caPool      *x509.CertPool
+	tokenMGR    *tokens.Manager
 }
 
-func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager) common.AuthProvider {
+func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
 	return &adProvider{
 		ctx:         ctx,
 		authConfigs: mgmtCtx.Management.AuthConfigs(""),
 		userMGR:     userMGR,
+		tokenMGR:    tokenMGR,
 	}
 }
 

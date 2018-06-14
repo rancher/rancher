@@ -35,7 +35,7 @@ var authProviderTypes = []string{
 func authProviderSchemas(ctx context.Context, management *config.ScaledContext, schemas *types.Schemas) error {
 	schema := schemas.Schema(&publicSchema.PublicVersion, v3public.AuthProviderType)
 	setAuthProvidersStore(schema, management)
-	lh := newLoginHandler(management)
+	lh := newLoginHandler(ctx, management)
 
 	for _, apSubtype := range authProviderTypes {
 		subSchema := schemas.Schema(&publicSchema.PublicVersion, apSubtype)

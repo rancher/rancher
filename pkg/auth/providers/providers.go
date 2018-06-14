@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/types/client/management/v3"
 	publicclient "github.com/rancher/types/client/management/v3public"
 )
@@ -42,6 +43,7 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	confMu.Lock()
 	defer confMu.Unlock()
 	userMGR := mgmt.UserManager
+	tokenMGR := tokens.NewManager(ctx, mgmt)
 	var p common.AuthProvider
 
 	p = local.Configure(ctx, mgmt, userMGR)
@@ -49,17 +51,17 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	providersByType[client.LocalConfigType] = p
 	providersByType[publicclient.LocalProviderType] = p
 
-	p = github.Configure(ctx, mgmt, userMGR)
+	p = github.Configure(ctx, mgmt, userMGR, tokenMGR)
 	providers[github.Name] = p
 	providersByType[client.GithubConfigType] = p
 	providersByType[publicclient.GithubProviderType] = p
 
-	p = azure.Configure(ctx, mgmt, userMGR)
+	p = azure.Configure(ctx, mgmt, userMGR, tokenMGR)
 	providers[azure.Name] = p
 	providersByType[client.AzureADConfigType] = p
 	providersByType[publicclient.AzureADProviderType] = p
 
-	p = activedirectory.Configure(ctx, mgmt, userMGR)
+	p = activedirectory.Configure(ctx, mgmt, userMGR, tokenMGR)
 	providers[activedirectory.Name] = p
 	providersByType[client.ActiveDirectoryConfigType] = p
 	providersByType[publicclient.ActiveDirectoryProviderType] = p
