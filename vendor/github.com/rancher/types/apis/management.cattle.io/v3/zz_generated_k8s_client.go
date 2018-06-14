@@ -39,6 +39,8 @@ type Interface interface {
 	PrincipalsGetter
 	UsersGetter
 	AuthConfigsGetter
+	OpenLdapTestAndApplyInputsGetter
+	FreeIpaTestAndApplyInputsGetter
 	TokensGetter
 	DynamicSchemasGetter
 	PreferencesGetter
@@ -88,6 +90,8 @@ type Client struct {
 	principalControllers                               map[string]PrincipalController
 	userControllers                                    map[string]UserController
 	authConfigControllers                              map[string]AuthConfigController
+	openLdapTestAndApplyInputControllers               map[string]OpenLdapTestAndApplyInputController
+	freeIpaTestAndApplyInputControllers                map[string]FreeIpaTestAndApplyInputController
 	tokenControllers                                   map[string]TokenController
 	dynamicSchemaControllers                           map[string]DynamicSchemaController
 	preferenceControllers                              map[string]PreferenceController
@@ -146,6 +150,8 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		principalControllers:                               map[string]PrincipalController{},
 		userControllers:                                    map[string]UserController{},
 		authConfigControllers:                              map[string]AuthConfigController{},
+		openLdapTestAndApplyInputControllers:               map[string]OpenLdapTestAndApplyInputController{},
+		freeIpaTestAndApplyInputControllers:                map[string]FreeIpaTestAndApplyInputController{},
 		tokenControllers:                                   map[string]TokenController{},
 		dynamicSchemaControllers:                           map[string]DynamicSchemaController{},
 		preferenceControllers:                              map[string]PreferenceController{},
@@ -485,6 +491,32 @@ type AuthConfigsGetter interface {
 func (c *Client) AuthConfigs(namespace string) AuthConfigInterface {
 	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &AuthConfigResource, AuthConfigGroupVersionKind, authConfigFactory{})
 	return &authConfigClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type OpenLdapTestAndApplyInputsGetter interface {
+	OpenLdapTestAndApplyInputs(namespace string) OpenLdapTestAndApplyInputInterface
+}
+
+func (c *Client) OpenLdapTestAndApplyInputs(namespace string) OpenLdapTestAndApplyInputInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &OpenLdapTestAndApplyInputResource, OpenLdapTestAndApplyInputGroupVersionKind, openLdapTestAndApplyInputFactory{})
+	return &openLdapTestAndApplyInputClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type FreeIpaTestAndApplyInputsGetter interface {
+	FreeIpaTestAndApplyInputs(namespace string) FreeIpaTestAndApplyInputInterface
+}
+
+func (c *Client) FreeIpaTestAndApplyInputs(namespace string) FreeIpaTestAndApplyInputInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &FreeIpaTestAndApplyInputResource, FreeIpaTestAndApplyInputGroupVersionKind, freeIpaTestAndApplyInputFactory{})
+	return &freeIpaTestAndApplyInputClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

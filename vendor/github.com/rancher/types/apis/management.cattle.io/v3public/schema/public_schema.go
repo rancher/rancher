@@ -80,5 +80,30 @@ func authProvidersTypes(schemas *types.Schemas) *types.Schemas {
 			schema.CollectionMethods = []string{}
 			schema.ResourceMethods = []string{http.MethodGet}
 		}).
-		MustImport(&PublicVersion, v3public.AzureADLogin{})
+		MustImport(&PublicVersion, v3public.AzureADLogin{}).
+		// OpenLdap provider
+		MustImportAndCustomize(&PublicVersion, v3public.OpenLdapProvider{}, func(schema *types.Schema) {
+			schema.BaseType = "authProvider"
+			schema.ResourceActions = map[string]types.Action{
+				"login": {
+					Input:  "basicLogin",
+					Output: "token",
+				},
+			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet}
+		}).
+		// FreeIpa provider
+		MustImportAndCustomize(&PublicVersion, v3public.FreeIpaProvider{}, func(schema *types.Schema) {
+			schema.BaseType = "authProvider"
+			schema.ResourceActions = map[string]types.Action{
+				"login": {
+					Input:  "basicLogin",
+					Output: "token",
+				},
+			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet}
+		})
+
 }
