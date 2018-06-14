@@ -31,6 +31,8 @@ type Client struct {
 	Principal                               PrincipalOperations
 	User                                    UserOperations
 	AuthConfig                              AuthConfigOperations
+	OpenLdapTestAndApplyInput               OpenLdapTestAndApplyInputOperations
+	FreeIpaTestAndApplyInput                FreeIpaTestAndApplyInputOperations
 	Token                                   TokenOperations
 	DynamicSchema                           DynamicSchemaOperations
 	Preference                              PreferenceOperations
@@ -85,6 +87,8 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.Principal = newPrincipalClient(client)
 	client.User = newUserClient(client)
 	client.AuthConfig = newAuthConfigClient(client)
+	client.OpenLdapTestAndApplyInput = newOpenLdapTestAndApplyInputClient(client)
+	client.FreeIpaTestAndApplyInput = newFreeIpaTestAndApplyInputClient(client)
 	client.Token = newTokenClient(client)
 	client.DynamicSchema = newDynamicSchemaClient(client)
 	client.Preference = newPreferenceClient(client)

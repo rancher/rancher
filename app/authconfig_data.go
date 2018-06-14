@@ -4,6 +4,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
 	"github.com/rancher/rancher/pkg/auth/providers/azure"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
+	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	localprovider "github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
@@ -22,6 +23,14 @@ func addAuthConfigs(management *config.ManagementContext) error {
 	}
 
 	if err := addAuthConfig(azure.Name, client.AzureADConfigType, false, management); err != nil {
+		return err
+	}
+
+	if err := addAuthConfig(ldap.OpenLdapName, client.OpenLdapConfigType, false, management); err != nil {
+		return err
+	}
+
+	if err := addAuthConfig(ldap.FreeIpaName, client.FreeIpaConfigType, false, management); err != nil {
 		return err
 	}
 

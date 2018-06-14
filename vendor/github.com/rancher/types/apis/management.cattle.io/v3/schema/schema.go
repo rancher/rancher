@@ -356,7 +356,33 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 			schema.CollectionMethods = []string{}
 			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
 		}).
-		MustImport(&Version, v3.ActiveDirectoryTestAndApplyInput{})
+		MustImport(&Version, v3.ActiveDirectoryTestAndApplyInput{}).
+		// OpenLdap Config
+		MustImportAndCustomize(&Version, v3.OpenLdapConfig{}, func(schema *types.Schema) {
+			schema.BaseType = "authConfig"
+			schema.ResourceActions = map[string]types.Action{
+				"disable": {},
+				"testAndApply": {
+					Input: "openLdapTestAndApplyInput",
+				},
+			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
+		}).
+		MustImport(&Version, v3.OpenLdapTestAndApplyInput{}).
+		// FreeIpa Config
+		MustImportAndCustomize(&Version, v3.FreeIpaConfig{}, func(schema *types.Schema) {
+			schema.BaseType = "authConfig"
+			schema.ResourceActions = map[string]types.Action{
+				"disable": {},
+				"testAndApply": {
+					Input: "freeIpaTestAndApplyInput",
+				},
+			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
+		}).
+		MustImport(&Version, v3.FreeIpaTestAndApplyInput{})
 }
 
 func userTypes(schema *types.Schemas) *types.Schemas {
