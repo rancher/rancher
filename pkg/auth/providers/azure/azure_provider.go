@@ -34,18 +34,21 @@ type azureProvider struct {
 	ctx         context.Context
 	authConfigs v3.AuthConfigInterface
 	userMGR     user.Manager
+	tokenMGR    *tokens.Manager
 }
 
 func Configure(
 	ctx context.Context,
 	mgmtCtx *config.ScaledContext,
 	userMGR user.Manager,
+	tokenMGR *tokens.Manager,
 ) common.AuthProvider {
 
 	return &azureProvider{
 		ctx:         ctx,
 		authConfigs: mgmtCtx.Management.AuthConfigs(""),
 		userMGR:     userMGR,
+		tokenMGR:    tokenMGR,
 	}
 }
 
@@ -100,7 +103,7 @@ func (ap *azureProvider) SearchPrincipals(
 
 	}
 
-	return princ, updateToken(client, &token)
+	return princ, ap.updateToken(client, &token)
 }
 
 func (ap *azureProvider) GetPrincipal(
@@ -131,7 +134,7 @@ func (ap *azureProvider) GetPrincipal(
 		return v3.Principal{}, err
 	}
 
-	return princ, updateToken(client, &token)
+	return princ, ap.updateToken(client, &token)
 
 }
 
@@ -394,7 +397,7 @@ func extractProviderInfo(pi map[string]string) (adal.Token, error) {
 
 // updateToken compares the current azure token to the azure token living on the
 // v3.Token and if different updates the v3.Token
-func updateToken(client *azureClient, token *v3.Token) error {
+func (ap *azureProvider) updateToken(client *azureClient, token *v3.Token) error {
 	new, err := client.marshalTokenJSON()
 	if err != nil {
 		return err
@@ -405,7 +408,7 @@ func updateToken(client *azureClient, token *v3.Token) error {
 	}
 
 	token.ProviderInfo["access_token"] = stringNew
-	_, err = tokens.UpateLoginToken(token)
+	_, err = ap.tokenMGR.UpateLoginToken(token)
 	if err != nil {
 		return err
 	}

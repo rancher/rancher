@@ -5,6 +5,8 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"context"
+
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers"
@@ -26,14 +28,16 @@ const (
 	CookieName = "R_SESS"
 )
 
-func newLoginHandler(mgmt *config.ScaledContext) *loginHandler {
+func newLoginHandler(ctx context.Context, mgmt *config.ScaledContext) *loginHandler {
 	return &loginHandler{
-		mgr: mgmt.UserManager,
+		userMGR:  mgmt.UserManager,
+		tokenMGR: tokens.NewManager(ctx, mgmt),
 	}
 }
 
 type loginHandler struct {
-	mgr user.Manager
+	userMGR  user.Manager
+	tokenMGR *tokens.Manager
 }
 
 func (h *loginHandler) login(actionName string, action *types.Action, request *types.APIContext) error {
@@ -130,11 +134,11 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	if displayName == "" {
 		displayName = userPrincipal.LoginName
 	}
-	user, err := h.mgr.EnsureUser(userPrincipal.Name, displayName)
+	user, err := h.userMGR.EnsureUser(userPrincipal.Name, displayName)
 	if err != nil {
 		return v3.Token{}, "", err
 	}
 
-	rToken, err := tokens.NewLoginToken(user.Name, userPrincipal, groupPrincipals, providerInfo, ttl, description)
+	rToken, err := h.tokenMGR.NewLoginToken(user.Name, userPrincipal, groupPrincipals, providerInfo, ttl, description)
 	return rToken, responseType, err
 }

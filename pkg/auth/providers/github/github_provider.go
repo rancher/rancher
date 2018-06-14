@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
 	"github.com/rancher/types/client/management/v3"
@@ -32,9 +33,10 @@ type ghProvider struct {
 	authConfigs  v3.AuthConfigInterface
 	githubClient *GClient
 	userMGR      user.Manager
+	tokenMGR     *tokens.Manager
 }
 
-func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager) common.AuthProvider {
+func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
 	githubClient := &GClient{
 		httpClient: &http.Client{},
 	}
@@ -44,6 +46,7 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 		authConfigs:  mgmtCtx.Management.AuthConfigs(""),
 		githubClient: githubClient,
 		userMGR:      userMGR,
+		tokenMGR:     tokenMGR,
 	}
 }
 
