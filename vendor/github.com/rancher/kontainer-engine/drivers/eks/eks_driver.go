@@ -61,17 +61,21 @@ type eksCluster struct {
 }
 
 type clusterObj struct {
-	MasterEndpoint       *string              `json:"masterEndpoint"`
-	ClusterName          *string              `json:"clusterName"`
+	MasterEndpoint       *string              `json:"endpoint"`
+	ClusterName          *string              `json:"name"`
 	Status               *string              `json:"status"`
-	CreatedAt            *int                 `json:"createdAt"`
-	DesiredMasterVerion  *string              `json:"desiredMasterVersion"`
+	CreatedAt            *float64             `json:"createdAt"`
+	DesiredMasterVersion *string              `json:"desiredMasterVersion"`
 	VPCID                *string              `json:"vpcId"`
 	CurrentMasterVersion *string              `json:"currentMasterVersion"`
 	RoleARN              *string              `json:"roleArn"`
 	CertificateAuthority certificateAuthority `json:"certificateAuthority"`
-	SecurityGroups       []string             `json:"securityGroups"`
-	Subnets              []string             `json:"subnets"`
+	ResourcesVPCConfig   vpcConfig            `json:"resourcesVpcConfig"`
+}
+
+type vpcConfig struct {
+	SecurityGroups []string `json:"securityGroupIds"`
+	Subnets        []string `json:"subnetIds"`
 }
 
 type certificateAuthority struct {
@@ -290,10 +294,8 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 	}
 
 	stack, err := d.createStack(svc, getVPCStackName(state), displayName,
-		"https://amazon-eks.s3-us-west-2.amazonaws.com/2018-04-04/amazon-eks-vpc-sample.yaml",
-		[]*cloudformation.Parameter{
-			{ParameterKey: aws.String("ClusterName"), ParameterValue: aws.String(state.ClusterName)},
-		})
+		"https://amazon-eks.s3-us-west-2.amazonaws.com/1.10.3/2018-06-05/amazon-eks-vpc-sample.yaml",
+		[]*cloudformation.Parameter{})
 	if err != nil {
 		return nil, fmt.Errorf("error creating stack: %v", err)
 	}
@@ -322,7 +324,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 	logrus.Infof("Creating service role")
 
 	stack, err = d.createStack(svc, getServiceRoleName(state), displayName,
-		"https://amazon-eks.s3-us-west-2.amazonaws.com/2018-04-04/amazon-eks-service-role.yaml", nil)
+		"https://amazon-eks.s3-us-west-2.amazonaws.com/1.10.3/2018-06-05/amazon-eks-service-role.yaml", nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating stack: %v", err)
 	}
@@ -333,10 +335,12 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 	}
 
 	data, err := json.Marshal(&clusterObj{
-		ClusterName:    aws.String(state.ClusterName),
-		RoleARN:        aws.String(roleARN),
-		SecurityGroups: strings.Split(securityGroups, " "),
-		Subnets:        strings.Split(subnetIds, " "),
+		ClusterName: aws.String(state.ClusterName),
+		RoleARN:     aws.String(roleARN),
+		ResourcesVPCConfig: vpcConfig{
+			SecurityGroups: strings.Split(securityGroups, ","),
+			Subnets:        strings.Split(subnetIds, ","),
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error marshalling eks cluster: %v", err)
@@ -373,7 +377,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 	logrus.Infof("Creating worker nodes")
 
 	stack, err = d.createStack(svc, getWorkNodeName(state), displayName,
-		"https://amazon-eks.s3-us-west-2.amazonaws.com/2018-04-04/amazon-eks-nodegroup.yaml",
+		"https://amazon-eks.s3-us-west-2.amazonaws.com/1.10.3/2018-06-05/amazon-eks-nodegroup.yaml",
 		[]*cloudformation.Parameter{
 			{ParameterKey: aws.String("ClusterName"), ParameterValue: aws.String(state.ClusterName)},
 			{ParameterKey: aws.String("ClusterControlPlaneSecurityGroup"),
@@ -413,7 +417,7 @@ func isDuplicateKeyError(err error) bool {
 }
 
 func isClusterConflict(err error) bool {
-	return strings.Contains(err.Error(), "Cluster already exists with name")
+	return strings.Contains(err.Error(), "http response code was: 409")
 }
 
 func getEC2KeyPairName(state state) string {
@@ -441,7 +445,6 @@ func (d *Driver) createConfigMap(state state, endpoint string, capem []byte, nod
 			"groups": []string{
 				"system:bootstrappers",
 				"system:nodes",
-				"system:node-proxier",
 			},
 		},
 	}
@@ -452,14 +455,14 @@ func (d *Driver) createConfigMap(state state, endpoint string, capem []byte, nod
 
 	logrus.Infof("Applying ConfigMap")
 
-	_, err = clientset.CoreV1().ConfigMaps("default").Create(&v1.ConfigMap{
+	_, err = clientset.CoreV1().ConfigMaps("kube-system").Create(&v1.ConfigMap{
 		TypeMeta: v12.TypeMeta{
 			Kind:       "ConfigMap",
 			APIVersion: "v1",
 		},
 		ObjectMeta: v12.ObjectMeta{
 			Name:      "aws-auth",
-			Namespace: "default",
+			Namespace: "kube-system",
 		},
 		Data: map[string]string{
 			"mapRoles": string(mapRoles),
@@ -545,7 +548,7 @@ func (d *Driver) waitForClusterReady(state state) (*eksCluster, error) {
 		resp, err := d.awsHTTPRequest(state, "https://eks.us-west-2.amazonaws.com/clusters/"+state.ClusterName,
 			"GET", nil)
 		if err != nil {
-			return nil, fmt.Errorf("error posting cluster: %v", err)
+			return nil, fmt.Errorf("error getting cluster: %v", err)
 		}
 
 		err = json.Unmarshal(resp, cluster)
