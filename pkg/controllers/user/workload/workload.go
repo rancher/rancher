@@ -50,7 +50,7 @@ func (c *Controller) CreateService(key string, w *Workload) error {
 		return nil
 	}
 	for _, o := range w.OwnerReferences {
-		if *o.Controller {
+		if o.Controller != nil && *o.Controller {
 			return nil
 		}
 	}
