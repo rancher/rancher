@@ -15,6 +15,7 @@ and registering k8s controllers, on cluster.update
 func RegisterLate(ctx context.Context, management *config.ManagementContext, manager *clustermanager.Manager) {
 	lifecycle := &ClusterLifecycle{
 		Manager: manager,
+		ctx:     ctx,
 	}
 
 	clusterClient := management.Management.Clusters("")
