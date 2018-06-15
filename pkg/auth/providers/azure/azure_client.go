@@ -103,6 +103,8 @@ func newClientToken(token v3.Token, config *v3.AzureADConfig) (*azureClient, err
 		return nil, err
 	}
 
+	spt.SetRefreshCallbacks(nil)
+
 	ac.servicePrincipal = spt
 
 	// Create the required bearer token
