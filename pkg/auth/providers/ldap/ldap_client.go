@@ -56,7 +56,7 @@ func (p *ldapProvider) loginUser(credential *v3public.BasicLogin, config *v3.Lda
 		return v3.Principal{}, nil, nil, fmt.Errorf("ldap user search found more than one result")
 	}
 
-	userDN := result.Entries[0].DN //userDN  is externalID
+	userDN := result.Entries[0].DN //userDN is externalID
 	err = lConn.Bind(userDN, password)
 	if err != nil {
 		if ldapv2.IsErrorWithCode(err, ldapv2.LDAPResultInvalidCredentials) {

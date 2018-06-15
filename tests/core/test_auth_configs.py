@@ -35,7 +35,7 @@ def test_auth_configs(mc):
         elif c.type == "freeIpaConfig":
             freeIpa = c
 
-    for x in [gh, local, ad, azuread, openldap, freeIpa]:
+    for x in [gh, local, ad, azure, openldap, freeIpa]:
         assert x is not None
         config = client.by_id_auth_config(x.id)
         with pytest.raises(ApiError) as e:
@@ -53,4 +53,3 @@ def test_auth_configs(mc):
     assert openldap.actions['testAndApply']
 
     assert freeIpa.actions['testAndApply']
-
