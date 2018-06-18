@@ -15,6 +15,8 @@ import (
 	"github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 )
 
 const (
@@ -51,11 +53,11 @@ func (m *Manager) update(catalog *v3.Catalog, templates []v3.Template, toDeleteT
 
 	// list all templateContent tag
 	templateContentMap := map[string]struct{}{}
-	templateContentList, err := m.templateContentClient.List(metav1.ListOptions{})
+	templateContentList, err := m.templateContentLister.List("", labels.NewSelector())
 	if err != nil {
 		return err
 	}
-	for _, t := range templateContentList.Items {
+	for _, t := range templateContentList {
 		templateContentMap[t.Name] = struct{}{}
 	}
 
@@ -64,7 +66,7 @@ func (m *Manager) update(catalog *v3.Catalog, templates []v3.Template, toDeleteT
 		var temErr error
 		// look template by name, if not found then create it, otherwise do update
 		if existing, ok := templateMap[template.Name]; ok {
-			if err := m.updateTemplate(&existing, template, templateContentMap); err != nil {
+			if err := m.updateTemplate(existing, template, templateContentMap); err != nil {
 				temErr = err
 			}
 		} else {
@@ -116,15 +118,14 @@ func (m *Manager) createTemplate(template v3.Template, catalog *v3.Catalog, tagM
 	return m.createTemplateVersions(versionFiles, createdTemplate, tagMap)
 }
 
-func (m *Manager) getTemplateMap(catalogName string) (map[string]v3.Template, error) {
-	templateList, err := m.templateClient.List(metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", CatalogNameLabel, catalogName),
-	})
+func (m *Manager) getTemplateMap(catalogName string) (map[string]*v3.Template, error) {
+	r, _ := labels.NewRequirement(catalogName, selection.Equals, []string{catalogName})
+	templateList, err := m.templateLister.List("", labels.NewSelector().Add(*r))
 	if err != nil {
 		return nil, err
 	}
-	templateMap := map[string]v3.Template{}
-	for _, t := range templateList.Items {
+	templateMap := map[string]*v3.Template{}
+	for _, t := range templateList {
 		templateMap[t.Name] = t
 	}
 	return templateMap, nil
@@ -149,14 +150,13 @@ func (m *Manager) convertTemplateIcon(template *v3.Template, tagMap map[string]s
 }
 
 func (m *Manager) updateTemplate(template *v3.Template, toUpdate v3.Template, tagMap map[string]struct{}) error {
-	templateVersions, err := m.templateVersionClient.List(metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", TemplateNameLabel, template.Name),
-	})
+	r, _ := labels.NewRequirement(TemplateNameLabel, selection.Equals, []string{template.Name})
+	templateVersions, err := m.templateVersionLister.List("", labels.NewSelector().Add(*r))
 	if err != nil {
 		return errors.Wrapf(err, "failed to list templateVersions")
 	}
-	tvByVersion := map[string]v3.TemplateVersion{}
-	for _, ver := range templateVersions.Items {
+	tvByVersion := map[string]*v3.TemplateVersion{}
+	for _, ver := range templateVersions {
 		tvByVersion[ver.Spec.Version] = ver
 	}
 	/*
@@ -172,9 +172,10 @@ func (m *Manager) updateTemplate(template *v3.Template, toUpdate v3.Template, ta
 		}
 		if tv, ok := tvByVersion[toUpdateVer.Version]; ok {
 			if tv.Spec.Digest != toUpdateVer.Digest {
-				tv.Spec = templateVersion.Spec
 				logrus.Infof("Updating templateVersion %v", tv.Name)
-				if _, err := m.templateVersionClient.Update(&tv); err != nil {
+				newObject := tv.DeepCopy()
+				newObject.Spec = templateVersion.Spec
+				if _, err := m.templateVersionClient.Update(newObject); err != nil {
 					return err
 				}
 			}
@@ -211,25 +212,26 @@ func (m *Manager) updateTemplate(template *v3.Template, toUpdate v3.Template, ta
 		toUpdate.Spec.Versions[i].Readme = ""
 		toUpdate.Spec.Versions[i].AppReadme = ""
 	}
-	template.Spec = toUpdate.Spec
-	if err := m.convertTemplateIcon(template, tagMap); err != nil {
+	newObj := template.DeepCopy()
+	newObj.Spec = toUpdate.Spec
+	if err := m.convertTemplateIcon(newObj, tagMap); err != nil {
 		return err
 	}
-	if _, err := m.templateClient.Update(template); err != nil {
+	if _, err := m.templateClient.Update(newObj); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (m *Manager) getTemplateVersion(templateName string) (map[string]struct{}, error) {
-	templateVersions, err := m.templateVersionClient.List(metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", TemplateNameLabel, templateName),
-	})
+	//because templates is a cluster resource now so we set namespace to "" when listing it.
+	r, _ := labels.NewRequirement(TemplateNameLabel, selection.Equals, []string{templateName})
+	templateVersions, err := m.templateVersionLister.List("", labels.NewSelector().Add(*r))
 	if err != nil {
 		return nil, err
 	}
 	tVersion := map[string]struct{}{}
-	for _, ver := range templateVersions.Items {
+	for _, ver := range templateVersions {
 		tVersion[ver.Name] = struct{}{}
 	}
 	return tVersion, nil
