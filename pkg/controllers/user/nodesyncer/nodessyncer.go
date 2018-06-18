@@ -108,12 +108,11 @@ func (m *NodesSyncer) syncLabels(key string, obj *v3.Node) error {
 		return nil
 	}
 
-	machine := obj.DeepCopy()
 	nodes, err := m.nodeLister.List("", labels.NewSelector())
 	if err != nil {
 		return err
 	}
-	node, err := m.getNode(machine, nodes)
+	node, err := m.getNode(obj, nodes)
 	if err != nil {
 		return err
 	}
@@ -123,27 +122,33 @@ func (m *NodesSyncer) syncLabels(key string, obj *v3.Node) error {
 
 	shouldUpdate := false
 	// set annotations
-	if !reflect.DeepEqual(node.Annotations, machine.Spec.DesiredNodeAnnotations) && machine.Spec.DesiredNodeAnnotations != nil {
-		node.Annotations = machine.Spec.DesiredNodeAnnotations
+	if obj.Spec.DesiredNodeAnnotations != nil && !reflect.DeepEqual(node.Annotations, obj.Spec.DesiredNodeAnnotations) {
+		node.Annotations = obj.Spec.DesiredNodeAnnotations
 		shouldUpdate = true
 	}
 	// set labels
-	if !reflect.DeepEqual(node.Labels, machine.Spec.DesiredNodeLabels) && machine.Spec.DesiredNodeLabels != nil {
-		node.Labels = machine.Spec.DesiredNodeLabels
+	if obj.Spec.DesiredNodeLabels != nil && !reflect.DeepEqual(node.Labels, obj.Spec.DesiredNodeLabels) {
+		node.Labels = obj.Spec.DesiredNodeLabels
 		shouldUpdate = true
 	}
 
 	if shouldUpdate {
-		if _, err := m.nodeClient.Update(node); err != nil {
+		toUpdate := node.DeepCopy()
+		logrus.Infof("Updating node %v with labels %v and annotations %v", node.Name, obj.Spec.DesiredNodeLabels,
+			obj.Spec.DesiredNodeAnnotations)
+		if _, err := m.nodeClient.Update(toUpdate); err != nil {
 			return err
 		}
 	}
 
 	// in the end we reset all desired fields
-	machine.Spec.DesiredNodeAnnotations = nil
-	machine.Spec.DesiredNodeLabels = nil
-	if _, err := m.machines.Update(machine); err != nil {
-		return err
+	if obj.Spec.DesiredNodeAnnotations != nil || obj.Spec.DesiredNodeLabels != nil {
+		machine := obj.DeepCopy()
+		machine.Spec.DesiredNodeAnnotations = nil
+		machine.Spec.DesiredNodeLabels = nil
+		if _, err := m.machines.Update(machine); err != nil {
+			return err
+		}
 	}
 
 	return nil
