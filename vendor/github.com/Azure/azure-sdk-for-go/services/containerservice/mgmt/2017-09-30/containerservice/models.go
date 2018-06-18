@@ -1289,6 +1289,106 @@ type OrchestratorProfileType struct {
 	OrchestratorVersion *string `json:"orchestratorVersion,omitempty"`
 }
 
+// OrchestratorVersionProfile the profile of an orchestrator and its available versions.
+type OrchestratorVersionProfile struct {
+	// OrchestratorType - Orchestrator type.
+	OrchestratorType *string `json:"orchestratorType,omitempty"`
+	// OrchestratorVersion - Orchestrator version (major, minor, patch).
+	OrchestratorVersion *string `json:"orchestratorVersion,omitempty"`
+	// Default - Installed by default if version is not specified.
+	Default *bool `json:"default,omitempty"`
+	// Upgrades - The list of available upgrade versions.
+	Upgrades *[]OrchestratorProfile `json:"upgrades,omitempty"`
+}
+
+// OrchestratorVersionProfileListResult the list of versions for supported orchestrators.
+type OrchestratorVersionProfileListResult struct {
+	autorest.Response `json:"-"`
+	// ID - Id of the orchestrator version profile list result.
+	ID *string `json:"id,omitempty"`
+	// Name - Name of the orchestrator version profile list result.
+	Name *string `json:"name,omitempty"`
+	// Type - Type of the orchestrator version profile list result.
+	Type *string `json:"type,omitempty"`
+	// OrchestratorVersionProfileProperties - The properties of an orchestrator version profile.
+	*OrchestratorVersionProfileProperties `json:"properties,omitempty"`
+}
+
+// MarshalJSON is the custom marshaler for OrchestratorVersionProfileListResult.
+func (ovplr OrchestratorVersionProfileListResult) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if ovplr.ID != nil {
+		objectMap["id"] = ovplr.ID
+	}
+	if ovplr.Name != nil {
+		objectMap["name"] = ovplr.Name
+	}
+	if ovplr.Type != nil {
+		objectMap["type"] = ovplr.Type
+	}
+	if ovplr.OrchestratorVersionProfileProperties != nil {
+		objectMap["properties"] = ovplr.OrchestratorVersionProfileProperties
+	}
+	return json.Marshal(objectMap)
+}
+
+// UnmarshalJSON is the custom unmarshaler for OrchestratorVersionProfileListResult struct.
+func (ovplr *OrchestratorVersionProfileListResult) UnmarshalJSON(body []byte) error {
+	var m map[string]*json.RawMessage
+	err := json.Unmarshal(body, &m)
+	if err != nil {
+		return err
+	}
+	for k, v := range m {
+		switch k {
+		case "id":
+			if v != nil {
+				var ID string
+				err = json.Unmarshal(*v, &ID)
+				if err != nil {
+					return err
+				}
+				ovplr.ID = &ID
+			}
+		case "name":
+			if v != nil {
+				var name string
+				err = json.Unmarshal(*v, &name)
+				if err != nil {
+					return err
+				}
+				ovplr.Name = &name
+			}
+		case "type":
+			if v != nil {
+				var typeVar string
+				err = json.Unmarshal(*v, &typeVar)
+				if err != nil {
+					return err
+				}
+				ovplr.Type = &typeVar
+			}
+		case "properties":
+			if v != nil {
+				var orchestratorVersionProfileProperties OrchestratorVersionProfileProperties
+				err = json.Unmarshal(*v, &orchestratorVersionProfileProperties)
+				if err != nil {
+					return err
+				}
+				ovplr.OrchestratorVersionProfileProperties = &orchestratorVersionProfileProperties
+			}
+		}
+	}
+
+	return nil
+}
+
+// OrchestratorVersionProfileProperties the properties of an orchestrator version profile.
+type OrchestratorVersionProfileProperties struct {
+	// Orchestrators - List of orchestrator version profiles.
+	Orchestrators *[]OrchestratorVersionProfile `json:"orchestrators,omitempty"`
+}
+
 // Properties properties of the container service.
 type Properties struct {
 	// ProvisioningState - The current deployment or provisioning state, which only appears in the response.

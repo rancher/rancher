@@ -41,15 +41,15 @@ func NewGroupsClientWithBaseURI(baseURI string, subscriptionID string) GroupsCli
 }
 
 // CheckExistence checks whether a resource group exists.
-//
-// resourceGroupName is the name of the resource group to check. The name is case insensitive.
+// Parameters:
+// resourceGroupName - the name of the resource group to check. The name is case insensitive.
 func (client GroupsClient) CheckExistence(ctx context.Context, resourceGroupName string) (result autorest.Response, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: resourceGroupName,
 			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "resources.GroupsClient", "CheckExistence")
+		return result, validation.NewError("resources.GroupsClient", "CheckExistence", err.Error())
 	}
 
 	req, err := client.CheckExistencePreparer(ctx, resourceGroupName)
@@ -113,9 +113,9 @@ func (client GroupsClient) CheckExistenceResponder(resp *http.Response) (result 
 }
 
 // CreateOrUpdate creates or updates a resource group.
-//
-// resourceGroupName is the name of the resource group to create or update. parameters is parameters supplied to the
-// create or update a resource group.
+// Parameters:
+// resourceGroupName - the name of the resource group to create or update.
+// parameters - parameters supplied to the create or update a resource group.
 func (client GroupsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, parameters Group) (result Group, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: resourceGroupName,
@@ -124,7 +124,7 @@ func (client GroupsClient) CreateOrUpdate(ctx context.Context, resourceGroupName
 				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}},
 		{TargetValue: parameters,
 			Constraints: []validation.Constraint{{Target: "parameters.Location", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "resources.GroupsClient", "CreateOrUpdate")
+		return result, validation.NewError("resources.GroupsClient", "CreateOrUpdate", err.Error())
 	}
 
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, parameters)
@@ -161,7 +161,7 @@ func (client GroupsClient) CreateOrUpdatePreparer(ctx context.Context, resourceG
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPut(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourcegroups/{resourceGroupName}", pathParameters),
@@ -192,15 +192,15 @@ func (client GroupsClient) CreateOrUpdateResponder(resp *http.Response) (result 
 
 // Delete when you delete a resource group, all of its resources are also deleted. Deleting a resource group deletes
 // all of its template deployments and currently stored operations.
-//
-// resourceGroupName is the name of the resource group to delete. The name is case insensitive.
+// Parameters:
+// resourceGroupName - the name of the resource group to delete. The name is case insensitive.
 func (client GroupsClient) Delete(ctx context.Context, resourceGroupName string) (result GroupsDeleteFuture, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: resourceGroupName,
 			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "resources.GroupsClient", "Delete")
+		return result, validation.NewError("resources.GroupsClient", "Delete", err.Error())
 	}
 
 	req, err := client.DeletePreparer(ctx, resourceGroupName)
@@ -241,15 +241,17 @@ func (client GroupsClient) DeletePreparer(ctx context.Context, resourceGroupName
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client GroupsClient) DeleteSender(req *http.Request) (future GroupsDeleteFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -266,16 +268,16 @@ func (client GroupsClient) DeleteResponder(resp *http.Response) (result autorest
 }
 
 // ExportTemplate captures the specified resource group as a template.
-//
-// resourceGroupName is the name of the resource group to export as a template. parameters is parameters for exporting
-// the template.
+// Parameters:
+// resourceGroupName - the name of the resource group to export as a template.
+// parameters - parameters for exporting the template.
 func (client GroupsClient) ExportTemplate(ctx context.Context, resourceGroupName string, parameters ExportTemplateRequest) (result GroupExportResult, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: resourceGroupName,
 			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "resources.GroupsClient", "ExportTemplate")
+		return result, validation.NewError("resources.GroupsClient", "ExportTemplate", err.Error())
 	}
 
 	req, err := client.ExportTemplatePreparer(ctx, resourceGroupName, parameters)
@@ -312,7 +314,7 @@ func (client GroupsClient) ExportTemplatePreparer(ctx context.Context, resourceG
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPost(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourcegroups/{resourceGroupName}/exportTemplate", pathParameters),
@@ -342,15 +344,15 @@ func (client GroupsClient) ExportTemplateResponder(resp *http.Response) (result 
 }
 
 // Get gets a resource group.
-//
-// resourceGroupName is the name of the resource group to get. The name is case insensitive.
+// Parameters:
+// resourceGroupName - the name of the resource group to get. The name is case insensitive.
 func (client GroupsClient) Get(ctx context.Context, resourceGroupName string) (result Group, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: resourceGroupName,
 			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "resources.GroupsClient", "Get")
+		return result, validation.NewError("resources.GroupsClient", "Get", err.Error())
 	}
 
 	req, err := client.GetPreparer(ctx, resourceGroupName)
@@ -415,9 +417,9 @@ func (client GroupsClient) GetResponder(resp *http.Response) (result Group, err 
 }
 
 // List gets all the resource groups for a subscription.
-//
-// filter is the filter to apply on the operation. top is the number of results to return. If null is passed, returns
-// all resource groups.
+// Parameters:
+// filter - the filter to apply on the operation.
+// top - the number of results to return. If null is passed, returns all resource groups.
 func (client GroupsClient) List(ctx context.Context, filter string, top *int32) (result GroupListResultPage, err error) {
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx, filter, top)
@@ -515,16 +517,16 @@ func (client GroupsClient) ListComplete(ctx context.Context, filter string, top 
 
 // Update resource groups can be updated through a simple PATCH operation to a group address. The format of the request
 // is the same as that for creating a resource group. If a field is unspecified, the current value is retained.
-//
-// resourceGroupName is the name of the resource group to update. The name is case insensitive. parameters is
-// parameters supplied to update a resource group.
+// Parameters:
+// resourceGroupName - the name of the resource group to update. The name is case insensitive.
+// parameters - parameters supplied to update a resource group.
 func (client GroupsClient) Update(ctx context.Context, resourceGroupName string, parameters GroupPatchable) (result Group, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: resourceGroupName,
 			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "resources.GroupsClient", "Update")
+		return result, validation.NewError("resources.GroupsClient", "Update", err.Error())
 	}
 
 	req, err := client.UpdatePreparer(ctx, resourceGroupName, parameters)
@@ -561,7 +563,7 @@ func (client GroupsClient) UpdatePreparer(ctx context.Context, resourceGroupName
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPatch(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourcegroups/{resourceGroupName}", pathParameters),
