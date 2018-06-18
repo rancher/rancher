@@ -2,6 +2,13 @@ package app
 
 import (
 	"context"
+	"io/ioutil"
+	"strings"
+	"time"
+
+	"path/filepath"
+	"strconv"
+	"syscall"
 
 	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/norman/leader"
@@ -14,6 +21,7 @@ import (
 	"github.com/rancher/rancher/server"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/rest"
 )
 
@@ -31,6 +39,7 @@ type Config struct {
 }
 
 func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config) (*config.ScaledContext, *clustermanager.Manager, error) {
+	NewDaemon()
 	scaledContext, err := config.NewScaledContext(kubeConfig)
 	if err != nil {
 		return nil, nil, err
@@ -139,4 +148,64 @@ func addData(management *config.ManagementContext, cfg Config) error {
 	}
 
 	return addMachineDrivers(management)
+}
+
+func getZombiePid(path string) int {
+	// Ignore errors
+	content, err := ioutil.ReadFile(path)
+	if err != nil {
+		return 0
+	}
+
+	fields := strings.Split(string(content), ") ")
+	fields = strings.Split(fields[len(fields)-1], " ")
+
+	if fields[0] == "Z" && fields[1] == "1" {
+		i, _ := strconv.Atoi(strings.Split(string(content), " ")[0])
+		return i
+	}
+
+	return 0
+}
+
+func reaper() {
+	reap := make([]string, 0, 5)
+
+	for {
+		time.Sleep(1 * time.Second)
+
+		for _, zombie := range reap {
+			zombiePid := getZombiePid(zombie)
+			logrus.Debugf("Reaping PID %s : %d", zombie, zombiePid)
+			if zombiePid <= 0 {
+				continue
+			}
+
+			reaped, err := syscall.Wait4(zombiePid, nil, syscall.WNOHANG, nil)
+			if err != nil || reaped <= 0 {
+				logrus.Errorf("Failed to reap %d, got %v: %v", zombiePid, reaped, err)
+			}
+		}
+
+		reap = reap[:0]
+
+		files, err := filepath.Glob("/proc/*/stat")
+		if err != nil {
+			logrus.Errorf("Failed to read processes : %v", err)
+			continue
+		}
+
+		for _, file := range files {
+			if getZombiePid(file) > 0 {
+				reap = append(reap, file)
+			}
+		}
+	}
+}
+
+// NewDaemon sets up everything for the daemon to be able to service
+// requests from the webserver.
+func NewDaemon() {
+	// Reap zombies
+	go reaper()
 }
