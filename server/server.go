@@ -97,6 +97,7 @@ func newAuthed(tokenAPI http.Handler, managementAPI http.Handler, k8sproxy http.
 	authed.PathPrefix("/v3/gkeMachineTypes").Handler(capabilities.NewGKEMachineTypesHandler())
 	authed.PathPrefix("/v3/gkeVersions").Handler(capabilities.NewGKEVersionsHandler())
 	authed.PathPrefix("/v3/gkeZones").Handler(capabilities.NewGKEZonesHandler())
+	authed.PathPrefix("/v3/aksVersions").Handler(capabilities.NewAKSVersionsHandler())
 	authed.PathPrefix("/v3/identit").Handler(tokenAPI)
 	authed.PathPrefix("/v3/token").Handler(tokenAPI)
 	authed.PathPrefix("/k8s/clusters/").Handler(k8sproxy)

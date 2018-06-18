@@ -21,7 +21,7 @@ type capabilitiesRequestBody struct {
 	ProjectID   string `json:"projectId"`
 }
 
-func validateRequestBody(writer http.ResponseWriter, body *capabilitiesRequestBody) error {
+func validateCapabilitiesRequestBody(writer http.ResponseWriter, body *capabilitiesRequestBody) error {
 	credentials := body.Credentials
 	projectID := body.ProjectID
 
@@ -33,24 +33,6 @@ func validateRequestBody(writer http.ResponseWriter, body *capabilitiesRequestBo
 	if credentials == "" {
 		writer.WriteHeader(http.StatusBadRequest)
 		return fmt.Errorf("invalid credentials")
-	}
-
-	return nil
-}
-
-func extractRequestBody(writer http.ResponseWriter, req *http.Request, body interface{}) error {
-	raw, err := ioutil.ReadAll(req.Body)
-
-	if err != nil {
-		writer.WriteHeader(http.StatusBadRequest)
-		return fmt.Errorf("cannot read request body: " + err.Error())
-	}
-
-	err = json.Unmarshal(raw, &body)
-
-	if err != nil {
-		writer.WriteHeader(http.StatusBadRequest)
-		return fmt.Errorf("cannot parse request body: " + err.Error())
 	}
 
 	return nil
