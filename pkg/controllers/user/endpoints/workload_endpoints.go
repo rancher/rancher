@@ -87,7 +87,7 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 	// get ingress endpoint group by service
 	serviceToIngressEndpoints := make(map[string][]v3.PublicEndpoint)
 	for _, ingress := range ingresses {
-		epsMap := convertIngressToServicePublicEndpointsMap(ingress, c.isRKE, allNodesIP)
+		epsMap := convertIngressToServicePublicEndpointsMap(ingress, c.isRKE)
 		for k, v := range epsMap {
 			serviceToIngressEndpoints[k] = append(serviceToIngressEndpoints[k], v...)
 		}

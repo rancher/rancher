@@ -291,19 +291,22 @@ func getAllNodesPublicEndpointIP(machineLister managementv3.NodeLister, clusterN
 	return addresses[0].String(), nil
 }
 
-func convertIngressToServicePublicEndpointsMap(obj *extensionsv1beta1.Ingress, allNodes bool, allNodesIP string) map[string][]v3.PublicEndpoint {
-	var addresses []string
+func convertIngressToServicePublicEndpointsMap(obj *extensionsv1beta1.Ingress, allNodes bool) map[string][]v3.PublicEndpoint {
 	epsMap := map[string][]v3.PublicEndpoint{}
-	ipDomain := settings.IngressIPDomain.Get()
-	if !allNodes {
-		for _, address := range obj.Status.LoadBalancer.Ingress {
-			addresses = append(addresses, address.IP)
-		}
-
-	} else {
-		if allNodesIP != "" {
-			addresses = append(addresses, allNodesIP)
-		}
+	if len(obj.Status.LoadBalancer.Ingress) == 0 {
+		return epsMap
+	}
+	var addresses []string
+	var ips []net.IP
+	for _, address := range obj.Status.LoadBalancer.Ingress {
+		addresses = append(addresses, address.IP)
+		ips = append(ips, net.ParseIP(address.IP))
+	}
+	if allNodes {
+		sort.Slice(addresses, func(i, j int) bool {
+			return bytes.Compare(ips[i], ips[j]) < 0
+		})
+		addresses = []string{ips[0].String()}
 	}
 
 	if len(addresses) == 0 {
@@ -316,6 +319,7 @@ func convertIngressToServicePublicEndpointsMap(obj *extensionsv1beta1.Ingress, a
 	}
 
 	ports := map[int32]string{80: "HTTP", 443: "HTTPS"}
+	ipDomain := settings.IngressIPDomain.Get()
 	for _, rule := range obj.Spec.Rules {
 		//If the hostname is auto-generated, the public endpoint should be shown only when the
 		//hostname is done auto-generation
@@ -350,8 +354,8 @@ func convertIngressToServicePublicEndpointsMap(obj *extensionsv1beta1.Ingress, a
 	return epsMap
 }
 
-func convertIngressToPublicEndpoints(obj *extensionsv1beta1.Ingress, isRKE bool, allNodesIP string) []v3.PublicEndpoint {
-	epsMap := convertIngressToServicePublicEndpointsMap(obj, isRKE, allNodesIP)
+func convertIngressToPublicEndpoints(obj *extensionsv1beta1.Ingress, isRKE bool) []v3.PublicEndpoint {
+	epsMap := convertIngressToServicePublicEndpointsMap(obj, isRKE)
 	var eps []v3.PublicEndpoint
 	for _, v := range epsMap {
 		eps = append(eps, v...)
