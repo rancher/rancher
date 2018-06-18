@@ -476,3 +476,73 @@ func (client ContainerServicesClient) ListByResourceGroupComplete(ctx context.Co
 	result.page, err = client.ListByResourceGroup(ctx, resourceGroupName)
 	return
 }
+
+// ListOrchestrators gets a list of supported orchestrators in the specified subscription. The operation returns
+// properties of each orchestrator including verison and available upgrades.
+// Parameters:
+// location - the name of a supported Azure region.
+// resourceType - resource type for which the list of orchestrators needs to be returned
+func (client ContainerServicesClient) ListOrchestrators(ctx context.Context, location string, resourceType string) (result OrchestratorVersionProfileListResult, err error) {
+	req, err := client.ListOrchestratorsPreparer(ctx, location, resourceType)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "containerservice.ContainerServicesClient", "ListOrchestrators", nil, "Failure preparing request")
+		return
+	}
+
+	resp, err := client.ListOrchestratorsSender(req)
+	if err != nil {
+		result.Response = autorest.Response{Response: resp}
+		err = autorest.NewErrorWithError(err, "containerservice.ContainerServicesClient", "ListOrchestrators", resp, "Failure sending request")
+		return
+	}
+
+	result, err = client.ListOrchestratorsResponder(resp)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "containerservice.ContainerServicesClient", "ListOrchestrators", resp, "Failure responding to request")
+	}
+
+	return
+}
+
+// ListOrchestratorsPreparer prepares the ListOrchestrators request.
+func (client ContainerServicesClient) ListOrchestratorsPreparer(ctx context.Context, location string, resourceType string) (*http.Request, error) {
+	pathParameters := map[string]interface{}{
+		"location":       autorest.Encode("path", location),
+		"subscriptionId": autorest.Encode("path", client.SubscriptionID),
+	}
+
+	const APIVersion = "2017-09-30"
+	queryParameters := map[string]interface{}{
+		"api-version": APIVersion,
+	}
+	if len(resourceType) > 0 {
+		queryParameters["resource-type"] = autorest.Encode("query", resourceType)
+	}
+
+	preparer := autorest.CreatePreparer(
+		autorest.AsGet(),
+		autorest.WithBaseURL(client.BaseURI),
+		autorest.WithPathParameters("/subscriptions/{subscriptionId}/providers/Microsoft.ContainerService/locations/{location}/orchestrators", pathParameters),
+		autorest.WithQueryParameters(queryParameters))
+	return preparer.Prepare((&http.Request{}).WithContext(ctx))
+}
+
+// ListOrchestratorsSender sends the ListOrchestrators request. The method will close the
+// http.Response Body if it receives an error.
+func (client ContainerServicesClient) ListOrchestratorsSender(req *http.Request) (*http.Response, error) {
+	return autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
+}
+
+// ListOrchestratorsResponder handles the response to the ListOrchestrators request. The method always
+// closes the http.Response Body.
+func (client ContainerServicesClient) ListOrchestratorsResponder(resp *http.Response) (result OrchestratorVersionProfileListResult, err error) {
+	err = autorest.Respond(
+		resp,
+		client.ByInspecting(),
+		azure.WithErrorUnlessStatusCode(http.StatusOK),
+		autorest.ByUnmarshallingJSON(&result),
+		autorest.ByClosing())
+	result.Response = autorest.Response{Response: resp}
+	return
+}

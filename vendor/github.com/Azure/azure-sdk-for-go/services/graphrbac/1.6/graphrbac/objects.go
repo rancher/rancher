@@ -104,13 +104,13 @@ func (client ObjectsClient) GetCurrentUserResponder(resp *http.Response) (result
 }
 
 // GetObjectsByObjectIds gets AD group membership for the specified AD object IDs.
-//
-// parameters is objects filtering parameters.
+// Parameters:
+// parameters - objects filtering parameters.
 func (client ObjectsClient) GetObjectsByObjectIds(ctx context.Context, parameters GetObjectsParameters) (result GetObjectsResultPage, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: parameters,
 			Constraints: []validation.Constraint{{Target: "parameters.IncludeDirectoryObjectReferences", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "graphrbac.ObjectsClient", "GetObjectsByObjectIds")
+		return result, validation.NewError("graphrbac.ObjectsClient", "GetObjectsByObjectIds", err.Error())
 	}
 
 	result.fn = func(lastResult GetObjectsResult) (GetObjectsResult, error) {
@@ -152,7 +152,7 @@ func (client ObjectsClient) GetObjectsByObjectIdsPreparer(ctx context.Context, p
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPost(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/{tenantID}/getObjectsByObjectIds", pathParameters),
@@ -188,8 +188,8 @@ func (client ObjectsClient) GetObjectsByObjectIdsComplete(ctx context.Context, p
 }
 
 // GetObjectsByObjectIdsNext gets AD group membership for the specified AD object IDs.
-//
-// nextLink is next link for the list operation.
+// Parameters:
+// nextLink - next link for the list operation.
 func (client ObjectsClient) GetObjectsByObjectIdsNext(ctx context.Context, nextLink string) (result GetObjectsResult, err error) {
 	req, err := client.GetObjectsByObjectIdsNextPreparer(ctx, nextLink)
 	if err != nil {

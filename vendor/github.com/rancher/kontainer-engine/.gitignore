@@ -7,3 +7,4 @@
 /.kontainer
 /.trash-conf
 kontainer-engine
+/trash.lock

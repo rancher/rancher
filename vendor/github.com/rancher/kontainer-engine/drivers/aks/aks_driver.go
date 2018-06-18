@@ -424,7 +424,7 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 
 	_, err = clustersClient.CreateOrUpdate(ctx, driverState.ResourceGroup, driverState.Name, containerservice.ManagedCluster{
 		Location: to.StringPtr(driverState.Location),
-		Tags:     &tags,
+		Tags:     tags,
 		ManagedClusterProperties: &containerservice.ManagedClusterProperties{
 			KubernetesVersion: to.StringPtr(driverState.KubernetesVersion),
 			DNSPrefix:         to.StringPtr(masterDNSPrefix),
