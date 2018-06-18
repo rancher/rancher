@@ -166,7 +166,8 @@ type CustomConfig struct {
 	// Optional - Docker socket on the node that will be used in tunneling
 	DockerSocket string `yaml:"docker_socket" json:"dockerSocket,omitempty"`
 	// SSH Private Key
-	SSHKey string `yaml:"ssh_key" json:"sshKey,omitempty"`
+	SSHKey string            `yaml:"ssh_key" json:"sshKey,omitempty"`
+	Label  map[string]string `yaml:"label" json:"label,omitempty"`
 }
 
 type NodeSpec struct {
