@@ -38,7 +38,7 @@ func (g *GKEZonesHandler) ServeHTTP(writer http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	err = validateRequestBody(writer, &body.capabilitiesRequestBody)
+	err = validateCapabilitiesRequestBody(writer, &body.capabilitiesRequestBody)
 
 	if err != nil {
 		handleErr(writer, err)
