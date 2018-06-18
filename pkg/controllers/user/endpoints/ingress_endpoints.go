@@ -41,11 +41,7 @@ func (c *IngressEndpointsController) sync(key string, obj *extensionsv1beta1.Ing
 }
 
 func (c *IngressEndpointsController) reconcileEndpointsForIngress(obj *extensionsv1beta1.Ingress) (bool, error) {
-	allNodesIP, err := getAllNodesPublicEndpointIP(c.machinesLister, c.clusterName)
-	if err != nil {
-		return false, err
-	}
-	fromObj := convertIngressToPublicEndpoints(obj, c.isRKE, allNodesIP)
+	fromObj := convertIngressToPublicEndpoints(obj, c.isRKE)
 	fromAnnotation := getPublicEndpointsFromAnnotations(obj.Annotations)
 
 	if areEqualEndpoints(fromAnnotation, fromObj) {
