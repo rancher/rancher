@@ -5,6 +5,8 @@ import (
 	"context"
 	"sort"
 
+	"github.com/rancher/rancher/pkg/settings"
+
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -292,6 +294,7 @@ func getAllNodesPublicEndpointIP(machineLister managementv3.NodeLister, clusterN
 func convertIngressToServicePublicEndpointsMap(obj *extensionsv1beta1.Ingress, allNodes bool, allNodesIP string) map[string][]v3.PublicEndpoint {
 	var addresses []string
 	epsMap := map[string][]v3.PublicEndpoint{}
+	ipDomain := settings.IngressIPDomain.Get()
 	if !allNodes {
 		for _, address := range obj.Status.LoadBalancer.Ingress {
 			addresses = append(addresses, address.IP)
@@ -314,6 +317,11 @@ func convertIngressToServicePublicEndpointsMap(obj *extensionsv1beta1.Ingress, a
 
 	ports := map[int32]string{80: "HTTP", 443: "HTTPS"}
 	for _, rule := range obj.Spec.Rules {
+		//If the hostname is auto-generated, the public endpoint should be shown only when the
+		//hostname is done auto-generation
+		if rule.Host == ipDomain {
+			continue
+		}
 		for _, path := range rule.HTTP.Paths {
 			for port, proto := range ports {
 				if port == 80 {
