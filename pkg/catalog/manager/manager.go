@@ -30,6 +30,9 @@ type Manager struct {
 	templateClient        v3.TemplateInterface
 	templateVersionClient v3.TemplateVersionInterface
 	templateContentClient v3.TemplateContentInterface
+	templateLister        v3.TemplateLister
+	templateVersionLister v3.TemplateVersionLister
+	templateContentLister v3.TemplateContentLister
 	lastUpdateTime        time.Time
 }
 
@@ -45,6 +48,9 @@ func New(management *config.ManagementContext, cacheRoot string) *Manager {
 		templateClient:        management.Management.Templates(""),
 		templateVersionClient: management.Management.TemplateVersions(""),
 		templateContentClient: management.Management.TemplateContents(""),
+		templateLister:        management.Management.Templates("").Controller().Lister(),
+		templateVersionLister: management.Management.TemplateVersions("").Controller().Lister(),
+		templateContentLister: management.Management.TemplateContents("").Controller().Lister(),
 	}
 }
 
