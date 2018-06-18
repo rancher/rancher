@@ -113,29 +113,30 @@ func (m *NodesSyncer) syncLabels(key string, obj *v3.Node) error {
 		return err
 	}
 	node, err := m.getNode(obj, nodes)
-	if err != nil {
+	if err != nil || node == nil {
 		return err
 	}
-	if node == nil {
-		return nil
-	}
 
-	shouldUpdate := false
+	updateLabels := false
+	updateAnnotations := false
 	// set annotations
 	if obj.Spec.DesiredNodeAnnotations != nil && !reflect.DeepEqual(node.Annotations, obj.Spec.DesiredNodeAnnotations) {
-		node.Annotations = obj.Spec.DesiredNodeAnnotations
-		shouldUpdate = true
+		updateAnnotations = true
 	}
 	// set labels
 	if obj.Spec.DesiredNodeLabels != nil && !reflect.DeepEqual(node.Labels, obj.Spec.DesiredNodeLabels) {
-		node.Labels = obj.Spec.DesiredNodeLabels
-		shouldUpdate = true
+		updateLabels = true
 	}
 
-	if shouldUpdate {
+	if updateLabels || updateAnnotations {
 		toUpdate := node.DeepCopy()
-		logrus.Infof("Updating node %v with labels %v and annotations %v", node.Name, obj.Spec.DesiredNodeLabels,
-			obj.Spec.DesiredNodeAnnotations)
+		if updateLabels {
+			toUpdate.Labels = obj.Spec.DesiredNodeLabels
+		}
+		if updateAnnotations {
+			toUpdate.Annotations = obj.Spec.DesiredNodeAnnotations
+		}
+		logrus.Infof("Updating node %v with labels %v and annotations %v", toUpdate.Name, toUpdate.Labels, toUpdate.Annotations)
 		if _, err := m.nodeClient.Update(toUpdate); err != nil {
 			return err
 		}
