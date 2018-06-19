@@ -30,6 +30,8 @@ var authProviderTypes = []string{
 	v3public.AzureADProviderType,
 	v3public.GithubProviderType,
 	v3public.LocalProviderType,
+	v3public.OpenLdapProviderType,
+	v3public.FreeIpaProviderType,
 }
 
 func authProviderSchemas(ctx context.Context, management *config.ScaledContext, schemas *types.Schemas) error {
