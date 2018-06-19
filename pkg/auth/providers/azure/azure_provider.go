@@ -238,7 +238,7 @@ func (ap *azureProvider) getGroup(client *azureClient, principalID string, token
 	}
 
 	p := ap.groupToPrincipal(group)
-	p.MemberOf = isMemberOf(token.GroupPrincipals, p)
+	p.MemberOf = ap.tokenMGR.IsMemberOf(token, p)
 
 	return p, nil
 }
@@ -269,7 +269,7 @@ func (ap *azureProvider) searchGroups(client *azureClient, name string, token v3
 	var principals []v3.Principal
 	for _, group := range groups.Values() {
 		p := ap.groupToPrincipal(group)
-		p.MemberOf = isMemberOf(token.GroupPrincipals, p)
+		p.MemberOf = ap.tokenMGR.IsMemberOf(token, p)
 		principals = append(principals, p)
 	}
 	return principals, nil
@@ -453,16 +453,6 @@ func parsePrincipalID(principalID string) (map[string]string, error) {
 func samePrincipal(me v3.Principal, other v3.Principal) bool {
 	if me.ObjectMeta.Name == other.ObjectMeta.Name && me.LoginName == other.LoginName && me.PrincipalType == other.PrincipalType {
 		return true
-	}
-	return false
-}
-
-// isMemberOf checks if other exists in myGroups
-func isMemberOf(myGroups []v3.Principal, other v3.Principal) bool {
-	for _, mygroup := range myGroups {
-		if mygroup.ObjectMeta.Name == other.ObjectMeta.Name && mygroup.PrincipalType == other.PrincipalType {
-			return true
-		}
 	}
 	return false
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"reflect"
 	"time"
 
 	"github.com/rancher/norman/httperror"
@@ -25,29 +26,38 @@ import (
 // TODO Cleanup error logging. If error is being returned, use errors.wrap to return and dont log here
 
 const (
-	userPrincipalIndex = "authn.management.cattle.io/user-principal-index"
-	UserIDLabel        = "authn.management.cattle.io/token-userId"
-	tokenKeyIndex      = "authn.management.cattle.io/token-key-index"
+	userPrincipalIndex       = "authn.management.cattle.io/user-principal-index"
+	UserIDLabel              = "authn.management.cattle.io/token-userId"
+	tokenKeyIndex            = "authn.management.cattle.io/token-key-index"
+	userAttributeByUserIndex = "authn.management.cattle.io/user-attrib-by-user"
 )
 
 func NewManager(ctx context.Context, apiContext *config.ScaledContext) *Manager {
 	informer := apiContext.Management.Users("").Controller().Informer()
 	informer.AddIndexers(map[string]cache.IndexFunc{userPrincipalIndex: userPrincipalIndexer})
+
 	tokenInformer := apiContext.Management.Tokens("").Controller().Informer()
 	tokenInformer.AddIndexers(map[string]cache.IndexFunc{tokenKeyIndex: tokenKeyIndexer})
+
 	return &Manager{
-		ctx:          ctx,
-		tokensClient: apiContext.Management.Tokens(""),
-		userIndexer:  informer.GetIndexer(),
-		tokenIndexer: tokenInformer.GetIndexer(),
+		ctx:                 ctx,
+		tokensClient:        apiContext.Management.Tokens(""),
+		userIndexer:         informer.GetIndexer(),
+		tokenIndexer:        tokenInformer.GetIndexer(),
+		userAttributes:      apiContext.Management.UserAttributes(""),
+		userAttributeLister: apiContext.Management.UserAttributes("").Controller().Lister(),
+		userLister:          apiContext.Management.Users("").Controller().Lister(),
 	}
 }
 
 type Manager struct {
-	ctx          context.Context
-	tokensClient v3.TokenInterface
-	userIndexer  cache.Indexer
-	tokenIndexer cache.Indexer
+	ctx                 context.Context
+	tokensClient        v3.TokenInterface
+	userAttributes      v3.UserAttributeInterface
+	userAttributeLister v3.UserAttributeLister
+	userIndexer         cache.Indexer
+	tokenIndexer        cache.Indexer
+	userLister          v3.UserLister
 }
 
 func userPrincipalIndexer(obj interface{}) ([]string, error) {
@@ -68,33 +78,41 @@ func tokenKeyIndexer(obj interface{}) ([]string, error) {
 	return []string{token.Token}, nil
 }
 
-//CreateDerivedToken will create a jwt token for the authenticated user
+func userAttribByUserIndexer(obj interface{}) ([]string, error) {
+	userAttrib, ok := obj.(*v3.UserAttribute)
+	if !ok {
+		return []string{}, nil
+	}
+
+	return []string{userAttrib.UserName}, nil
+}
+
+// createDerivedToken will create a jwt token for the authenticated user
 func (m *Manager) createDerivedToken(jsonInput v3.Token, tokenAuthValue string) (v3.Token, int, error) {
 
 	logrus.Debug("Create Derived Token Invoked")
 
-	token, _, err := m.getK8sTokenCR(tokenAuthValue)
+	token, _, err := m.getToken(tokenAuthValue)
 	if err != nil {
 		return v3.Token{}, 401, err
 	}
 
-	k8sToken := &v3.Token{
-		UserPrincipal:   token.UserPrincipal,
-		GroupPrincipals: token.GroupPrincipals,
-		IsDerived:       true,
-		TTLMillis:       jsonInput.TTLMillis,
-		UserID:          token.UserID,
-		AuthProvider:    token.AuthProvider,
-		ProviderInfo:    token.ProviderInfo,
-		Description:     jsonInput.Description,
+	derivedToken := v3.Token{
+		UserPrincipal: token.UserPrincipal,
+		IsDerived:     true,
+		TTLMillis:     jsonInput.TTLMillis,
+		UserID:        token.UserID,
+		AuthProvider:  token.AuthProvider,
+		ProviderInfo:  token.ProviderInfo,
+		Description:   jsonInput.Description,
 	}
-	rToken, err := m.createK8sTokenCR(k8sToken)
+	derivedToken, err = m.createToken(&derivedToken)
 
-	return rToken, 0, err
+	return derivedToken, 0, err
 
 }
 
-func (m *Manager) createK8sTokenCR(k8sToken *v3.Token) (v3.Token, error) {
+func (m *Manager) createToken(k8sToken *v3.Token) (v3.Token, error) {
 	key, err := randomtoken.Generate()
 	if err != nil {
 		logrus.Errorf("Failed to generate token key: %v", err)
@@ -120,11 +138,11 @@ func (m *Manager) createK8sTokenCR(k8sToken *v3.Token) (v3.Token, error) {
 	return *createdToken, nil
 }
 
-func (m *Manager) updateK8sTokenCR(token *v3.Token) (*v3.Token, error) {
+func (m *Manager) updateToken(token *v3.Token) (*v3.Token, error) {
 	return m.tokensClient.Update(token)
 }
 
-func (m *Manager) getK8sTokenCR(tokenAuthValue string) (*v3.Token, int, error) {
+func (m *Manager) getToken(tokenAuthValue string) (*v3.Token, int, error) {
 	tokenName, tokenKey := SplitTokenParts(tokenAuthValue)
 
 	lookupUsingClient := false
@@ -166,7 +184,7 @@ func (m *Manager) getTokens(tokenAuthValue string) ([]v3.Token, int, error) {
 	logrus.Debug("LIST Tokens Invoked")
 	tokens := make([]v3.Token, 0)
 
-	storedToken, _, err := m.getK8sTokenCR(tokenAuthValue)
+	storedToken, _, err := m.getToken(tokenAuthValue)
 	if err != nil {
 		return tokens, 401, err
 	}
@@ -190,7 +208,7 @@ func (m *Manager) getTokens(tokenAuthValue string) ([]v3.Token, int, error) {
 func (m *Manager) deleteToken(tokenAuthValue string) (int, error) {
 	logrus.Debug("DELETE Token Invoked")
 
-	storedToken, status, err := m.getK8sTokenCR(tokenAuthValue)
+	storedToken, status, err := m.getToken(tokenAuthValue)
 	if err != nil {
 		if status == 404 {
 			return 0, nil
@@ -219,7 +237,7 @@ func (m *Manager) getTokenByID(tokenAuthValue string, tokenID string) (v3.Token,
 	logrus.Debug("GET Token Invoked")
 	token := &v3.Token{}
 
-	storedToken, _, err := m.getK8sTokenCR(tokenAuthValue)
+	storedToken, _, err := m.getToken(tokenAuthValue)
 	if err != nil {
 		return *token, 401, err
 	}
@@ -356,7 +374,7 @@ func (m *Manager) logout(actionName string, action *types.Action, request *types
 	return nil
 }
 
-func (m *Manager) getToken(request *types.APIContext) error {
+func (m *Manager) getTokenFromRequest(request *types.APIContext) error {
 	// TODO switch to X-API-UserId header
 	r := request.Request
 
@@ -410,7 +428,7 @@ func (m *Manager) removeToken(request *types.APIContext) error {
 		}
 	}
 
-	currentAuthToken, _, err := m.getK8sTokenCR(tokenAuthValue)
+	currentAuthToken, _, err := m.getToken(tokenAuthValue)
 	if err != nil {
 		return err
 	}
@@ -428,22 +446,125 @@ func (m *Manager) removeToken(request *types.APIContext) error {
 }
 
 func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerInfo map[string]string, ttl int64, description string) (v3.Token, error) {
-	token := &v3.Token{
-		UserPrincipal:   userPrincipal,
-		GroupPrincipals: groupPrincipals,
-		IsDerived:       false,
-		TTLMillis:       ttl,
-		UserID:          userID,
-		AuthProvider:    getAuthProviderName(userPrincipal.Name),
-		ProviderInfo:    providerInfo,
-		Description:     description,
+	provider := getAuthProviderName(userPrincipal.Name)
+	attribs, err := m.userAttributeLister.Get("", userID)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return v3.Token{}, err
 	}
 
-	return m.createK8sTokenCR(token)
+	if attribs == nil {
+		user, err := m.userLister.Get("", userID)
+		if err != nil {
+			return v3.Token{}, err
+		}
+		attribs = &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: userID,
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						APIVersion: user.APIVersion,
+						Kind:       user.Kind,
+						UID:        user.UID,
+						Name:       user.Name,
+					},
+				},
+			},
+			GroupPrincipals: map[string]v3.Principals{
+				provider: v3.Principals{Items: groupPrincipals},
+			},
+		}
+
+		if _, err := m.userAttributes.Create(attribs); err != nil {
+			return v3.Token{}, err
+		}
+	} else {
+		attribs = attribs.DeepCopy()
+		if attribs.GroupPrincipals == nil {
+			attribs.GroupPrincipals = map[string]v3.Principals{}
+		}
+		if gps := attribs.GroupPrincipals[provider]; !reflect.DeepEqual(groupPrincipals, gps.Items) {
+			attribs.GroupPrincipals[provider] = v3.Principals{Items: groupPrincipals}
+			if _, err := m.userAttributes.Update(attribs); err != nil {
+				return v3.Token{}, err
+			}
+		}
+	}
+
+	token := &v3.Token{
+		UserPrincipal: userPrincipal,
+		IsDerived:     false,
+		TTLMillis:     ttl,
+		UserID:        userID,
+		AuthProvider:  provider,
+		ProviderInfo:  providerInfo,
+		Description:   description,
+	}
+
+	return m.createToken(token)
 }
 
 func (m *Manager) UpateLoginToken(token *v3.Token) (*v3.Token, error) {
-	return m.updateK8sTokenCR(token)
+	return m.updateToken(token)
+}
+
+func (m *Manager) GetGroupsForTokenAuthProvider(token *v3.Token) []v3.Principal {
+	var groups []v3.Principal
+
+	attribs, err := m.userAttributeLister.Get("", token.UserID)
+	if err != nil && !apierrors.IsNotFound(err) {
+		logrus.Warnf("Problem getting userAttribute while getting groups for %v: %v", token.UserID, err)
+		// if err is not nil, then attribs will be. So, below code will handle it
+	}
+
+	hitProvider := false
+	if attribs != nil {
+		for provider, y := range attribs.GroupPrincipals {
+			if provider == token.AuthProvider {
+				hitProvider = true
+				for _, principal := range y.Items {
+					groups = append(groups, principal)
+				}
+			}
+		}
+	}
+
+	// fallback to legacy token groupPrincipals
+	if !hitProvider {
+		for _, principal := range token.GroupPrincipals {
+			groups = append(groups, principal)
+		}
+	}
+
+	return groups
+}
+
+func (m *Manager) IsMemberOf(token v3.Token, group v3.Principal) bool {
+	attribs, err := m.userAttributeLister.Get("", token.UserID)
+	if err != nil && !apierrors.IsNotFound(err) {
+		logrus.Warnf("Problem getting userAttribute while determing group membership for %v in %v (%v): %v", token.UserID,
+			group.Name, group.DisplayName, err)
+		// if err not nil, then attribs will be nil. So, below code will handle it
+	}
+
+	groups := map[string]bool{}
+	hitProviders := map[string]bool{}
+	if attribs != nil {
+		for provider, gps := range attribs.GroupPrincipals {
+			for _, principal := range gps.Items {
+				hitProviders[provider] = true
+				groups[principal.Name] = true
+			}
+		}
+	}
+
+	// fallback to legacy token groupPrincipals
+	if _, ok := hitProviders[token.AuthProvider]; !ok {
+		for _, principal := range token.GroupPrincipals {
+			groups[principal.Name] = true
+		}
+	}
+
+	return groups[group.Name]
 }
 
 func (m *Manager) CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerInfo map[string]string, ttl int, description string, request *types.APIContext) error {

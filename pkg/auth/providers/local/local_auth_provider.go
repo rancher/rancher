@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
 	"github.com/rancher/types/config"
@@ -37,9 +38,10 @@ type Provider struct {
 	gmIndexer        cache.Indexer
 	groupIndexer     cache.Indexer
 	userMGR          user.Manager
+	tokenMGR         *tokens.Manager
 }
 
-func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager) common.AuthProvider {
+func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
 	informer := mgmtCtx.Management.Users("").Controller().Informer()
 	indexers := map[string]cache.IndexFunc{userNameIndex: userNameIndexer, userSearchIndex: userSearchIndexer}
 	informer.AddIndexers(indexers)
@@ -60,6 +62,7 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 		userLister:       mgmtCtx.Management.Users("").Controller().Lister(),
 		authConfigLister: mgmtCtx.Management.AuthConfigs("").Controller().Lister(),
 		userMGR:          userMGR,
+		tokenMGR:         tokenMGR,
 	}
 	return l
 }
@@ -255,7 +258,7 @@ func (l *Provider) toPrincipal(principalType, displayName, loginName, id string,
 	} else {
 		princ.PrincipalType = "group"
 		if token != nil {
-			princ.MemberOf = l.isMemberOf(token.GroupPrincipals, princ)
+			princ.MemberOf = l.tokenMGR.IsMemberOf(*token, princ)
 		}
 	}
 
@@ -354,16 +357,6 @@ func (l *Provider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
 
 	if me.ObjectMeta.Name == other.ObjectMeta.Name && me.LoginName == other.LoginName && me.PrincipalType == other.PrincipalType {
 		return true
-	}
-	return false
-}
-
-func (l *Provider) isMemberOf(myGroups []v3.Principal, other v3.Principal) bool {
-
-	for _, mygroup := range myGroups {
-		if mygroup.ObjectMeta.Name == other.ObjectMeta.Name && mygroup.PrincipalType == other.PrincipalType {
-			return true
-		}
 	}
 	return false
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/requests"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 )
@@ -22,6 +23,7 @@ type principalsHandler struct {
 	principalsClient v3.PrincipalInterface
 	tokensClient     v3.TokenInterface
 	auth             requests.Authenticator
+	tokenMGR         *tokens.Manager
 }
 
 func newPrincipalsHandler(ctx context.Context, mgmt *config.ScaledContext) *principalsHandler {
@@ -30,6 +32,7 @@ func newPrincipalsHandler(ctx context.Context, mgmt *config.ScaledContext) *prin
 		principalsClient: mgmt.Management.Principals(""),
 		tokensClient:     mgmt.Management.Tokens(""),
 		auth:             requests.NewAuthenticator(ctx, mgmt),
+		tokenMGR:         tokens.NewManager(ctx, mgmt),
 	}
 }
 
@@ -93,7 +96,8 @@ func (h *principalsHandler) list(apiContext *types.APIContext, next types.Reques
 	}
 	principals = append(principals, p)
 
-	for _, p := range token.GroupPrincipals {
+	groupPrincipals := h.tokenMGR.GetGroupsForTokenAuthProvider(token)
+	for _, p := range groupPrincipals {
 		x, err := convertPrincipal(apiContext.Schema, p)
 		if err != nil {
 			return err

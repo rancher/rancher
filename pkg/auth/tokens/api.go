@@ -68,7 +68,7 @@ func (t *tokenAPI) tokenCreateHandler(request *types.APIContext, _ types.Request
 func (t *tokenAPI) tokenListHandler(request *types.APIContext, _ types.RequestHandler) error {
 	logrus.Debugf("TokenListHandler called")
 	if request.ID != "" {
-		return t.mgr.getToken(request)
+		return t.mgr.getTokenFromRequest(request)
 	}
 	return t.mgr.listTokens(request)
 }
