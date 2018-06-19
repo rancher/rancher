@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/rancher/rancher/pkg/api/controllers/dynamiclistener"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
 	managementapi "github.com/rancher/rancher/pkg/api/server"
 	"github.com/rancher/rancher/pkg/audit"
@@ -14,7 +15,6 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/hooks"
 	rancherdialer "github.com/rancher/rancher/pkg/dialer"
-	"github.com/rancher/rancher/pkg/dynamiclistener"
 	"github.com/rancher/rancher/pkg/filter"
 	"github.com/rancher/rancher/pkg/httpproxy"
 	k8sProxyPkg "github.com/rancher/rancher/pkg/k8sproxy"

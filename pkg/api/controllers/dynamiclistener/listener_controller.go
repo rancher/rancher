@@ -1,12 +1,12 @@
 package dynamiclistener
 
 import (
-	"net/http"
-
 	"context"
+	"net/http"
 
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/cert"
+	"github.com/rancher/rancher/pkg/dynamiclistener"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -16,14 +16,25 @@ import (
 type Controller struct {
 	listenConfig       v3.ListenConfigInterface
 	listenConfigLister v3.ListenConfigLister
-	server             *server
+	server             *dynamiclistener.Server
+}
+
+type storageUpdater interface {
+	Update(*v3.ListenConfig) (*v3.ListenConfig, error)
+}
+
+type storage struct {
+	storageUpdater
+	v3.ListenConfigLister
 }
 
 func Start(ctx context.Context, context *config.ScaledContext, httpPort, httpsPort int, handler http.Handler) {
+	s := storage{
+		storageUpdater:     context.Management.ListenConfigs(""),
+		ListenConfigLister: context.Management.ListenConfigs("").Controller().Lister(),
+	}
 	c := &Controller{
-		server: newServer(ctx, context.Management.ListenConfigs(""),
-			context.Management.ListenConfigs("").Controller().Lister(),
-			handler, httpPort, httpsPort),
+		server:             dynamiclistener.NewServer(ctx, s, handler, httpPort, httpsPort),
 		listenConfig:       context.Management.ListenConfigs(""),
 		listenConfigLister: context.Management.ListenConfigs("").Controller().Lister(),
 	}

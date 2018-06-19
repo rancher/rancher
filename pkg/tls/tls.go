@@ -1,4 +1,4 @@
-package app
+package tls
 
 import (
 	"fmt"
@@ -8,12 +8,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func ReadTLSConfig(config *Config) error {
+func ReadTLSConfig(acmeDomains []string) (*v3.ListenConfig, error) {
 	var err error
-
-	if config.ListenConfig != nil {
-		return nil
-	}
 
 	lc := &v3.ListenConfig{
 		TypeMeta: metav1.TypeMeta{
@@ -28,23 +24,23 @@ func ReadTLSConfig(config *Config) error {
 
 	lc.CACerts, err = readPEM("/etc/rancher/ssl/cacerts.pem")
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	lc.Key, err = readPEM("/etc/rancher/ssl/key.pem")
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	lc.Cert, err = readPEM("/etc/rancher/ssl/cert.pem")
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	lc.Mode = "https"
-	if len(config.ACMEDomains) > 0 {
+	if len(acmeDomains) > 0 {
 		lc.Mode = "acme"
-		lc.Domains = config.ACMEDomains
+		lc.Domains = acmeDomains
 	}
 
 	valid := false
@@ -55,12 +51,10 @@ func ReadTLSConfig(config *Config) error {
 	}
 
 	if !valid {
-		return fmt.Errorf("invalid SSL configuration found, please set cert/key, cert/key/cacerts, cacerts only, or none")
+		return nil, fmt.Errorf("invalid SSL configuration found, please set cert/key, cert/key/cacerts, cacerts only, or none")
 	}
 
-	config.ListenConfig = lc
-
-	return nil
+	return lc, nil
 }
 
 func readPEM(path string) (string, error) {
