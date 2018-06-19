@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/pipeline"
 	"github.com/rancher/rancher/pkg/api/customization/podsecuritypolicytemplate"
 	projectaction "github.com/rancher/rancher/pkg/api/customization/project"
+	"github.com/rancher/rancher/pkg/api/customization/roletemplate"
 	"github.com/rancher/rancher/pkg/api/customization/roletemplatebinding"
 	"github.com/rancher/rancher/pkg/api/customization/setting"
 	"github.com/rancher/rancher/pkg/api/store/cert"
@@ -117,6 +118,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	ProjectRoleTemplateBinding(schemas, apiContext)
 	TemplateContent(schemas)
 	PodSecurityPolicyTemplate(schemas, apiContext)
+	RoleTemplate(schemas, apiContext)
 
 	if err := NodeTypes(schemas, apiContext); err != nil {
 		return err
@@ -429,4 +431,12 @@ func ClusterRoleTemplateBinding(schemas *types.Schemas, management *config.Scale
 func ProjectRoleTemplateBinding(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.ProjectRoleTemplateBindingType)
 	schema.Validator = roletemplatebinding.NewPRTBValidator(management)
+}
+
+func RoleTemplate(schemas *types.Schemas, management *config.ScaledContext) {
+	rt := roletemplate.Wrapper{
+		RoleTemplateLister: management.Management.RoleTemplates("").Controller().Lister(),
+	}
+	schema := schemas.Schema(&managementschema.Version, client.RoleTemplateType)
+	schema.Validator = rt.Validator
 }
