@@ -31,11 +31,15 @@ const (
 	acmeMode  = "acme"
 )
 
-type server struct {
+type ListenConfigStorage interface {
+	Update(*v3.ListenConfig) (*v3.ListenConfig, error)
+	Get(namespace, name string) (*v3.ListenConfig, error)
+}
+
+type Server struct {
 	sync.Mutex
 
-	listenConfigs       v3.ListenConfigInterface
-	listenConfigLister  v3.ListenConfigLister
+	listenConfigStorage ListenConfigStorage
 	handler             http.Handler
 	httpPort, httpsPort int
 	certs               map[string]*tls.Certificate
@@ -55,15 +59,14 @@ type server struct {
 	tosAll      bool
 }
 
-func newServer(ctx context.Context, listenConfigs v3.ListenConfigInterface, listenConfigLister v3.ListenConfigLister,
-	handler http.Handler, httpPort, httpsPort int) *server {
-	s := &server{
-		listenConfigLister: listenConfigLister,
-		listenConfigs:      listenConfigs,
-		handler:            handler,
-		httpPort:           httpPort,
-		httpsPort:          httpsPort,
-		certs:              map[string]*tls.Certificate{},
+func NewServer(ctx context.Context, listenConfigStorage ListenConfigStorage,
+	handler http.Handler, httpPort, httpsPort int) *Server {
+	s := &Server{
+		listenConfigStorage: listenConfigStorage,
+		handler:             handler,
+		httpPort:            httpPort,
+		httpsPort:           httpsPort,
+		certs:               map[string]*tls.Certificate{},
 	}
 
 	s.ips, _ = lru.New(20)
@@ -72,12 +75,12 @@ func newServer(ctx context.Context, listenConfigs v3.ListenConfigInterface, list
 	return s
 }
 
-func (s *server) updateIPs(savedIPs map[string]bool) map[string]bool {
+func (s *Server) updateIPs(savedIPs map[string]bool) map[string]bool {
 	if s.activeCert != nil || s.activeConfig == nil {
 		return savedIPs
 	}
 
-	cfg, err := s.listenConfigLister.Get("", s.activeConfig.Name)
+	cfg, err := s.listenConfigStorage.Get("", s.activeConfig.Name)
 	if err != nil {
 		return savedIPs
 	}
@@ -90,7 +93,7 @@ func (s *server) updateIPs(savedIPs map[string]bool) map[string]bool {
 	if !reflect.DeepEqual(certs, cfg.GeneratedCerts) {
 		cfg = cfg.DeepCopy()
 		cfg.GeneratedCerts = certs
-		cfg, err = s.listenConfigs.Update(cfg)
+		cfg, err = s.listenConfigStorage.Update(cfg)
 		if err != nil {
 			return savedIPs
 		}
@@ -115,7 +118,7 @@ func (s *server) updateIPs(savedIPs map[string]bool) map[string]bool {
 		cfg.KnownIPs = append(cfg.KnownIPs, k)
 	}
 
-	_, err = s.listenConfigs.Update(cfg)
+	_, err = s.listenConfigStorage.Update(cfg)
 	if err != nil {
 		return savedIPs
 	}
@@ -123,7 +126,7 @@ func (s *server) updateIPs(savedIPs map[string]bool) map[string]bool {
 	return allIPs
 }
 
-func (s *server) start(ctx context.Context) {
+func (s *Server) start(ctx context.Context) {
 	savedIPs := map[string]bool{}
 	for {
 		savedIPs = s.updateIPs(savedIPs)
@@ -135,7 +138,7 @@ func (s *server) start(ctx context.Context) {
 	}
 }
 
-func (s *server) Disable(config *v3.ListenConfig) {
+func (s *Server) Disable(config *v3.ListenConfig) {
 	if s.activeConfig == nil {
 		return
 	}
@@ -145,7 +148,7 @@ func (s *server) Disable(config *v3.ListenConfig) {
 	}
 }
 
-func (s *server) Enable(config *v3.ListenConfig) (bool, error) {
+func (s *Server) Enable(config *v3.ListenConfig) (bool, error) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -190,7 +193,7 @@ func (s *server) Enable(config *v3.ListenConfig) (bool, error) {
 	return true, nil
 }
 
-func (s *server) hostPolicy(ctx context.Context, host string) error {
+func (s *Server) hostPolicy(ctx context.Context, host string) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -201,7 +204,7 @@ func (s *server) hostPolicy(ctx context.Context, host string) error {
 	return errors.New("acme/autocert: host not configured")
 }
 
-func (s *server) prompt(tos string) bool {
+func (s *Server) prompt(tos string) bool {
 	s.Lock()
 	defer s.Unlock()
 
@@ -212,7 +215,7 @@ func (s *server) prompt(tos string) bool {
 	return slice.ContainsString(s.tos, tos)
 }
 
-func (s *server) Shutdown() error {
+func (s *Server) Shutdown() error {
 	for _, listener := range s.listeners {
 		if err := listener.Close(); err != nil {
 			return err
@@ -228,7 +231,7 @@ func (s *server) Shutdown() error {
 	return nil
 }
 
-func (s *server) reload(config *v3.ListenConfig) error {
+func (s *Server) reload(config *v3.ListenConfig) error {
 	if err := s.Shutdown(); err != nil {
 		return err
 	}
@@ -263,7 +266,7 @@ func (s *server) reload(config *v3.ListenConfig) error {
 	return nil
 }
 
-func (s *server) getCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+func (s *Server) getCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -328,7 +331,7 @@ func (s *server) getCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, e
 	return tlsCert, nil
 }
 
-func (s *server) cacheIPHandler(handler http.Handler) http.Handler {
+func (s *Server) cacheIPHandler(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 		h, _, err := net.SplitHostPort(req.Host)
 		if err != nil {
@@ -344,7 +347,7 @@ func (s *server) cacheIPHandler(handler http.Handler) http.Handler {
 	})
 }
 
-func (s *server) serveHTTPS(config *v3.ListenConfig) error {
+func (s *Server) serveHTTPS(config *v3.ListenConfig) error {
 	conf := &tls.Config{
 		GetCertificate:           s.getCertificate,
 		PreferServerCipherSuites: true,
@@ -419,7 +422,7 @@ func manglePort(hostport string) string {
 	return net.JoinHostPort(host, strconv.Itoa(portInt))
 }
 
-func (s *server) startServer(listener net.Listener, server *http.Server) {
+func (s *Server) startServer(listener net.Listener, server *http.Server) {
 	go func() {
 		if err := server.Serve(listener); err != nil {
 			logrus.Errorf("server on %v returned err: %v", listener.Addr(), err)
@@ -427,11 +430,11 @@ func (s *server) startServer(listener net.Listener, server *http.Server) {
 	}()
 }
 
-func (s *server) Handler() http.Handler {
+func (s *Server) Handler() http.Handler {
 	return s.handler
 }
 
-func (s *server) newListener(port int, config *tls.Config) (net.Listener, error) {
+func (s *Server) newListener(port int, config *tls.Config) (net.Listener, error) {
 	addr := fmt.Sprintf(":%d", port)
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -449,7 +452,7 @@ func (s *server) newListener(port int, config *tls.Config) (net.Listener, error)
 	return l, nil
 }
 
-func (s *server) serveACME(config *v3.ListenConfig) error {
+func (s *Server) serveACME(config *v3.ListenConfig) error {
 	manager := autocert.Manager{
 		Cache:      autocert.DirCache("certs-cache"),
 		Prompt:     s.prompt,

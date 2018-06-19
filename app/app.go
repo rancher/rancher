@@ -12,6 +12,7 @@ import (
 	managementController "github.com/rancher/rancher/pkg/controllers/management"
 	"github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/k8scheck"
+	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/server"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -44,7 +45,8 @@ func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config
 	}
 	scaledContext.LocalConfig = &kubeConfig
 
-	if err := ReadTLSConfig(cfg); err != nil {
+	cfg.ListenConfig, err = tls.ReadTLSConfig(cfg.ACMEDomains)
+	if err != nil {
 		return nil, nil, err
 	}
 
