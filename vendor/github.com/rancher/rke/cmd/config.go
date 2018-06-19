@@ -141,6 +141,13 @@ func clusterConfig(ctx *cli.Context) error {
 	}
 	cluster.Authorization = *authzConfig
 
+	// Get k8s/system images
+	systemImages, err := getSystemImagesConfig(reader)
+	if err != nil {
+		return err
+	}
+	cluster.SystemImages = *systemImages
+
 	// Get Services Config
 	serviceConfig, err := getServiceConfig(reader)
 	if err != nil {
@@ -246,6 +253,22 @@ func getHostConfig(reader *bufio.Reader, index int, clusterSSHKeyPath string) (*
 	return &host, nil
 }
 
+func getSystemImagesConfig(reader *bufio.Reader) (*v3.RKESystemImages, error) {
+	imageDefaults := v3.K8sVersionToRKESystemImages[cluster.DefaultK8sVersion]
+
+	kubeImage, err := getConfig(reader, "Kubernetes Docker image", imageDefaults.Kubernetes)
+	if err != nil {
+		return nil, err
+	}
+
+	systemImages, ok := v3.K8sVersionToRKESystemImages[kubeImage]
+	if ok {
+		return &systemImages, nil
+	}
+	imageDefaults.Kubernetes = kubeImage
+	return &imageDefaults, nil
+}
+
 func getServiceConfig(reader *bufio.Reader) (*v3.RKEConfigServices, error) {
 	servicesConfig := v3.RKEConfigServices{}
 	servicesConfig.Etcd = v3.ETCDService{}
@@ -254,24 +277,6 @@ func getServiceConfig(reader *bufio.Reader) (*v3.RKEConfigServices, error) {
 	servicesConfig.Scheduler = v3.SchedulerService{}
 	servicesConfig.Kubelet = v3.KubeletService{}
 	servicesConfig.Kubeproxy = v3.KubeproxyService{}
-
-	imageDefaults := v3.K8sVersionToRKESystemImages[cluster.DefaultK8sVersion]
-
-	etcdImage, err := getConfig(reader, "Etcd Docker Image", imageDefaults.Etcd)
-	if err != nil {
-		return nil, err
-	}
-	servicesConfig.Etcd.Image = etcdImage
-
-	kubeImage, err := getConfig(reader, "Kubernetes Docker image", imageDefaults.Kubernetes)
-	if err != nil {
-		return nil, err
-	}
-	servicesConfig.KubeAPI.Image = kubeImage
-	servicesConfig.KubeController.Image = kubeImage
-	servicesConfig.Scheduler.Image = kubeImage
-	servicesConfig.Kubelet.Image = kubeImage
-	servicesConfig.Kubeproxy.Image = kubeImage
 
 	clusterDomain, err := getConfig(reader, "Cluster domain", cluster.DefaultClusterDomain)
 	if err != nil {
@@ -308,11 +313,6 @@ func getServiceConfig(reader *bufio.Reader) (*v3.RKEConfigServices, error) {
 	}
 	servicesConfig.Kubelet.ClusterDNSServer = clusterDNSServiceIP
 
-	infraPodImage, err := getConfig(reader, "Infra Container image", imageDefaults.PodInfraContainer)
-	if err != nil {
-		return nil, err
-	}
-	servicesConfig.Kubelet.InfraContainerImage = infraPodImage
 	return &servicesConfig, nil
 }
 

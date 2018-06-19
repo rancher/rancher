@@ -433,7 +433,7 @@ type OpenstackCloudProvider struct {
 	Global       GlobalOpenstackOpts       `json:"global" yaml:"global" ini:"Global,omitempty"`
 	LoadBalancer LoadBalancerOpenstackOpts `json:"loadBalancer" yaml:"load_balancer" ini:"LoadBalancer,omitempty"`
 	BlockStorage BlockStorageOpenstackOpts `json:"blockStorage" yaml:"block_storage" ini:"BlockStorage,omitempty"`
-	Router       RouterOpenstackOpts       `json:"router" yaml:"router" ini:"Router,omitempty"`
+	Route        RouteOpenstackOpts        `json:"route" yaml:"route" ini:"Route,omitempty"`
 	Metadata     MetadataOpenstackOpts     `json:"metadata" yaml:"metadata" ini:"Metadata,omitempty"`
 }
 
@@ -471,7 +471,7 @@ type BlockStorageOpenstackOpts struct {
 	IgnoreVolumeAZ  bool   `json:"ignore-volume-az" yaml:"ignore-volume-az" ini:"ignore-volume-az,omitempty"`
 }
 
-type RouterOpenstackOpts struct {
+type RouteOpenstackOpts struct {
 	RouterID string `json:"router-id" yaml:"router-id" ini:"router-id,omitempty"` // required
 }
 
