@@ -6,7 +6,7 @@ const (
 	OpenstackCloudProviderFieldGlobal       = "global"
 	OpenstackCloudProviderFieldLoadBalancer = "loadBalancer"
 	OpenstackCloudProviderFieldMetadata     = "metadata"
-	OpenstackCloudProviderFieldRouter       = "router"
+	OpenstackCloudProviderFieldRoute        = "route"
 )
 
 type OpenstackCloudProvider struct {
@@ -14,5 +14,5 @@ type OpenstackCloudProvider struct {
 	Global       *GlobalOpenstackOpts       `json:"global,omitempty" yaml:"global,omitempty"`
 	LoadBalancer *LoadBalancerOpenstackOpts `json:"loadBalancer,omitempty" yaml:"loadBalancer,omitempty"`
 	Metadata     *MetadataOpenstackOpts     `json:"metadata,omitempty" yaml:"metadata,omitempty"`
-	Router       *RouterOpenstackOpts       `json:"router,omitempty" yaml:"router,omitempty"`
+	Route        *RouteOpenstackOpts        `json:"route,omitempty" yaml:"route,omitempty"`
 }

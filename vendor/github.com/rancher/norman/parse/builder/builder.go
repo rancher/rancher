@@ -272,6 +272,18 @@ func (b *Builder) convert(fieldType string, value interface{}, op Operation) (in
 			}
 		}
 		return str, nil
+	case "dnsLabelRestricted":
+		str := convert.ToString(value)
+		if str == "" {
+			return "", nil
+		}
+		if op == Create || op == Update {
+			if errs := validation.IsDNS1035Label(str); len(errs) != 0 {
+				return value, httperror.NewAPIError(httperror.InvalidFormat, fmt.Sprintf("invalid value %s: %s", value,
+					strings.Join(errs, ",")))
+			}
+		}
+		return str, nil
 	case "hostname":
 		str := convert.ToString(value)
 		if str == "" {

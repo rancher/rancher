@@ -39,9 +39,11 @@ type Interface interface {
 	PrincipalsGetter
 	UsersGetter
 	AuthConfigsGetter
+	LdapConfigsGetter
 	TokensGetter
 	DynamicSchemasGetter
 	PreferencesGetter
+	UserAttributesGetter
 	ProjectNetworkPoliciesGetter
 	ClusterLoggingsGetter
 	ProjectLoggingsGetter
@@ -88,9 +90,11 @@ type Client struct {
 	principalControllers                               map[string]PrincipalController
 	userControllers                                    map[string]UserController
 	authConfigControllers                              map[string]AuthConfigController
+	ldapConfigControllers                              map[string]LdapConfigController
 	tokenControllers                                   map[string]TokenController
 	dynamicSchemaControllers                           map[string]DynamicSchemaController
 	preferenceControllers                              map[string]PreferenceController
+	userAttributeControllers                           map[string]UserAttributeController
 	projectNetworkPolicyControllers                    map[string]ProjectNetworkPolicyController
 	clusterLoggingControllers                          map[string]ClusterLoggingController
 	projectLoggingControllers                          map[string]ProjectLoggingController
@@ -146,9 +150,11 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		principalControllers:                               map[string]PrincipalController{},
 		userControllers:                                    map[string]UserController{},
 		authConfigControllers:                              map[string]AuthConfigController{},
+		ldapConfigControllers:                              map[string]LdapConfigController{},
 		tokenControllers:                                   map[string]TokenController{},
 		dynamicSchemaControllers:                           map[string]DynamicSchemaController{},
 		preferenceControllers:                              map[string]PreferenceController{},
+		userAttributeControllers:                           map[string]UserAttributeController{},
 		projectNetworkPolicyControllers:                    map[string]ProjectNetworkPolicyController{},
 		clusterLoggingControllers:                          map[string]ClusterLoggingController{},
 		projectLoggingControllers:                          map[string]ProjectLoggingController{},
@@ -491,6 +497,19 @@ func (c *Client) AuthConfigs(namespace string) AuthConfigInterface {
 	}
 }
 
+type LdapConfigsGetter interface {
+	LdapConfigs(namespace string) LdapConfigInterface
+}
+
+func (c *Client) LdapConfigs(namespace string) LdapConfigInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &LdapConfigResource, LdapConfigGroupVersionKind, ldapConfigFactory{})
+	return &ldapConfigClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
 type TokensGetter interface {
 	Tokens(namespace string) TokenInterface
 }
@@ -524,6 +543,19 @@ type PreferencesGetter interface {
 func (c *Client) Preferences(namespace string) PreferenceInterface {
 	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &PreferenceResource, PreferenceGroupVersionKind, preferenceFactory{})
 	return &preferenceClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type UserAttributesGetter interface {
+	UserAttributes(namespace string) UserAttributeInterface
+}
+
+func (c *Client) UserAttributes(namespace string) UserAttributeInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &UserAttributeResource, UserAttributeGroupVersionKind, userAttributeFactory{})
+	return &userAttributeClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

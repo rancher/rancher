@@ -1,16 +1,17 @@
 rdns-server
 ========
 
-A microservice that does micro things.
+The rdns-server implements the API interface of Dynamic DNS, its goal is to use a variety of DNS servers such as CoreDNS, Route53.
+
+Currently we have implemented CoreDNS, CoreDNS will use etcd backend and rdns-server can do some CRUD operations on etcd.
 
 ## Building
 
 `make`
 
-
 ## Running
 
-`./bin/rdns-server`
+For detailed steps, you can refer to [here](deploy/README.md)
 
 ## License
 Copyright (c) 2014-2017 [Rancher Labs, Inc.](http://rancher.com)
