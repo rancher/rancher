@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
 	"github.com/rancher/rancher/pkg/auth/providers/azure"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
+	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -112,6 +113,12 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	case client.AzureADProviderType:
 		input = &v3public.AzureADLogin{}
 		providerName = azure.Name
+	case client.OpenLdapProviderType:
+		input = &v3public.BasicLogin{}
+		providerName = ldap.OpenLdapName
+	case client.FreeIpaProviderType:
+		input = &v3public.BasicLogin{}
+		providerName = ldap.FreeIpaName
 	default:
 		return v3.Token{}, "", httperror.NewAPIError(httperror.ServerError, "unknown authentication provider")
 	}

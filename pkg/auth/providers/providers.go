@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/azure"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
+	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/types/client/management/v3"
@@ -65,6 +66,16 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	providers[activedirectory.Name] = p
 	providersByType[client.ActiveDirectoryConfigType] = p
 	providersByType[publicclient.ActiveDirectoryProviderType] = p
+
+	p = ldap.Configure(ctx, mgmt, userMGR, tokenMGR, ldap.OpenLdapName, client.OpenLdapTestAndApplyInputType, "openldap_user", "openldap_group")
+	providers[ldap.OpenLdapName] = p
+	providersByType[client.OpenLdapConfigType] = p
+	providersByType[publicclient.OpenLdapProviderType] = p
+
+	p = ldap.Configure(ctx, mgmt, userMGR, tokenMGR, ldap.FreeIpaName, client.FreeIpaTestAndApplyInputType, "freeipa_user", "freeipa_group")
+	providers[ldap.FreeIpaName] = p
+	providersByType[client.FreeIpaConfigType] = p
+	providersByType[publicclient.FreeIpaProviderType] = p
 }
 
 func AuthenticateUser(input interface{}, providerName string) (v3.Principal, []v3.Principal, map[string]string, error) {
