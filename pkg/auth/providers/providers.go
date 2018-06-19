@@ -46,7 +46,7 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	tokenMGR := tokens.NewManager(ctx, mgmt)
 	var p common.AuthProvider
 
-	p = local.Configure(ctx, mgmt, userMGR)
+	p = local.Configure(ctx, mgmt, userMGR, tokenMGR)
 	providers[local.Name] = p
 	providersByType[client.LocalConfigType] = p
 	providersByType[publicclient.LocalProviderType] = p

@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 type Authenticator interface {
@@ -26,16 +27,20 @@ func NewAuthenticator(ctx context.Context, mgmtCtx *config.ScaledContext) Authen
 	tokenInformer.AddIndexers(map[string]cache.IndexFunc{tokenKeyIndex: tokenKeyIndexer})
 
 	return &tokenAuthenticator{
-		ctx:          ctx,
-		tokenIndexer: tokenInformer.GetIndexer(),
-		tokenClient:  mgmtCtx.Management.Tokens(""),
+		ctx:                 ctx,
+		tokenIndexer:        tokenInformer.GetIndexer(),
+		tokenClient:         mgmtCtx.Management.Tokens(""),
+		userAttributeLister: mgmtCtx.Management.UserAttributes("").Controller().Lister(),
+		userAttributes:      mgmtCtx.Management.UserAttributes(""),
 	}
 }
 
 type tokenAuthenticator struct {
-	ctx          context.Context
-	tokenIndexer cache.Indexer
-	tokenClient  v3.TokenInterface
+	ctx                 context.Context
+	tokenIndexer        cache.Indexer
+	tokenClient         v3.TokenInterface
+	userAttributes      v3.UserAttributeInterface
+	userAttributeLister v3.UserAttributeLister
 }
 
 const (
@@ -57,12 +62,35 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (bool, string, []st
 		return false, "", []string{}, err
 	}
 
-	var groups []string
-	for _, principal := range token.GroupPrincipals {
-		// TODO This is a short cut for now. Will actually need to lookup groups in future
-		name := strings.TrimPrefix(principal.Name, "local://")
-		groups = append(groups, name)
+	attribs, err := a.userAttributeLister.Get("", token.UserID)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return false, "", []string{}, err
 	}
+
+	var groups []string
+	hitProvider := false
+	if attribs != nil {
+		for provider, gps := range attribs.GroupPrincipals {
+			if provider == token.AuthProvider {
+				hitProvider = true
+			}
+			for _, principal := range gps.Items {
+				name := strings.TrimPrefix(principal.Name, "local://")
+				groups = append(groups, name)
+			}
+		}
+	}
+
+	// fallback to legacy token.GroupPrincipals
+	if !hitProvider {
+		for _, principal := range token.GroupPrincipals {
+			// TODO This is a short cut for now. Will actually need to lookup groups in future
+			name := strings.TrimPrefix(principal.Name, "local://")
+			groups = append(groups, name)
+		}
+	}
+
+	groups = append(groups, user.AllAuthenticated)
 
 	return true, token.UserID, groups, nil
 }

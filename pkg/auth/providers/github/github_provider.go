@@ -286,9 +286,7 @@ func (g *ghProvider) toPrincipal(principalType string, acct Account, token *v3.T
 		}
 	} else {
 		princ.PrincipalType = "group"
-		if token != nil {
-			princ.MemberOf = g.isMemberOf(token.GroupPrincipals, princ)
-		}
+		princ.MemberOf = g.tokenMGR.IsMemberOf(*token, princ)
 	}
 
 	return princ
@@ -298,16 +296,6 @@ func (g *ghProvider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
 
 	if me.ObjectMeta.Name == other.ObjectMeta.Name && me.LoginName == other.LoginName && me.PrincipalType == other.PrincipalType {
 		return true
-	}
-	return false
-}
-
-func (g *ghProvider) isMemberOf(myGroups []v3.Principal, other v3.Principal) bool {
-
-	for _, mygroup := range myGroups {
-		if mygroup.ObjectMeta.Name == other.ObjectMeta.Name && mygroup.PrincipalType == other.PrincipalType {
-			return true
-		}
 	}
 	return false
 }

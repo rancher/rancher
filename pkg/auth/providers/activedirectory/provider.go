@@ -102,9 +102,7 @@ func (p *adProvider) SearchPrincipals(searchKey, principalType string, myToken v
 					principal.Me = true
 				}
 			} else if principal.PrincipalType == "group" {
-				if p.isMemberOf(myToken.GroupPrincipals, principal) {
-					principal.MemberOf = true
-				}
+				principal.MemberOf = p.tokenMGR.IsMemberOf(myToken, principal)
 			}
 		}
 	}
@@ -138,16 +136,6 @@ func (p *adProvider) GetPrincipal(principalID string, token v3.Token) (v3.Princi
 func (p *adProvider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
 	if me.ObjectMeta.Name == other.ObjectMeta.Name && me.LoginName == other.LoginName && me.PrincipalType == other.PrincipalType {
 		return true
-	}
-	return false
-}
-
-func (p *adProvider) isMemberOf(myGroups []v3.Principal, other v3.Principal) bool {
-
-	for _, mygroup := range myGroups {
-		if mygroup.ObjectMeta.Name == other.ObjectMeta.Name && mygroup.PrincipalType == other.PrincipalType {
-			return true
-		}
 	}
 	return false
 }
