@@ -3,7 +3,6 @@ package managementstored
 import (
 	"context"
 	"net/http"
-	"sync"
 
 	"github.com/rancher/norman/store/crd"
 	"github.com/rancher/norman/store/proxy"
@@ -49,10 +48,9 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	// Here we setup all types that will be stored in the Management cluster
 	schemas := apiContext.Schemas
 
-	wg := &sync.WaitGroup{}
 	factory := &crd.Factory{ClientGetter: apiContext.ClientGetter}
 
-	createCrd(ctx, wg, factory, schemas, &managementschema.Version,
+	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, schemas, &managementschema.Version,
 		client.AuthConfigType,
 		client.ClusterAlertType,
 		client.ProjectAlertType,
@@ -96,10 +94,11 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.UserType,
 		client.UserAttributeType,
 		client.ResourceQuotaTemplateType)
-	createCrd(ctx, wg, factory, schemas, &projectschema.Version,
+
+	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, schemas, &projectschema.Version,
 		projectclient.AppType, projectclient.AppRevisionType)
 
-	wg.Wait()
+	factory.BatchWait()
 
 	Clusters(schemas, apiContext, clusterManager, k8sProxy)
 	ClusterRoleTemplateBinding(schemas, apiContext)
