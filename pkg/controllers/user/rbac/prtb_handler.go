@@ -180,6 +180,7 @@ func (p *prtbLifecycle) reconcileProjectAccessToGlobalResources(binding *v3.Proj
 		crbKey := rbRoleSubjectKey(role, subject)
 		crbs, _ := p.m.crbIndexer.ByIndex(crbByRoleAndSubjectIndex, crbKey)
 		if len(crbs) == 0 {
+			logrus.Infof("Creating clusterRoleBinding for project access to global resource for subject %v role %v.", subject.Name, role)
 			_, err := bindingCli.Create(&rbacv1.ClusterRoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: "clusterrolebinding-",
@@ -215,6 +216,7 @@ func (p *prtbLifecycle) reconcileProjectAccessToGlobalResources(binding *v3.Proj
 					crb.Labels = map[string]string{}
 				}
 				crb.Labels[rtbUID] = owner
+				logrus.Infof("Updating clusterRoleBinding %v for project access to global resource for subject %v role %v.", crb.Name, subject.Name, role)
 				_, err := bindingCli.Update(crb)
 				if err != nil {
 					return err
@@ -327,12 +329,14 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 			if !added {
 				role.Rules = append(role.Rules, buildRule(resource, newVerbs))
 			}
+			logrus.Infof("Updating clusterRole %v for project access to global resource.", role.Name)
 			_, err := clusterRoles.Update(role)
 			return roleName, err
 		}
 		return roleName, nil
 	}
 
+	logrus.Infof("Creating clusterRole %v for project access to global resource.", roleName)
 	rules := []rbacv1.PolicyRule{buildRule(resource, newVerbs)}
 	_, err := clusterRoles.Create(&rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{

@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	typesrbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
+	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -134,6 +135,7 @@ func (m *manager) ensureRoles(rts map[string]*v3.RoleTemplate) error {
 			}
 			role = role.DeepCopy()
 			role.Rules = rt.Rules
+			logrus.Infof("Updating clusterRole %v because of rules difference with roleTemplate %v (%v).", role.Name, rt.DisplayName, rt.Name)
 			_, err := roleCli.Update(role)
 			if err != nil {
 				return errors.Wrapf(err, "couldn't update role %v", rt.Name)
@@ -141,6 +143,7 @@ func (m *manager) ensureRoles(rts map[string]*v3.RoleTemplate) error {
 			continue
 		}
 
+		logrus.Infof("Creating clusterRole for roleTemplate %v (%v).", rt.DisplayName, rt.Name)
 		_, err := roleCli.Create(&rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: rt.Name,
@@ -315,7 +318,8 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 		}
 	}
 
-	for _, rb := range desiredRBs {
+	for key, rb := range desiredRBs {
+		logrus.Infof("Creating roleBinding %v", key)
 		_, err := client.Create(rb)
 		if err != nil {
 			return err
@@ -323,6 +327,7 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 	}
 
 	for name := range rbsToDelete {
+		logrus.Infof("Deleting roleBinding %v", name)
 		if err := client.Delete(name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
@@ -453,7 +458,7 @@ func crbRoleSubjectKeys(roleName string, subjects []rbacv1.Subject) []string {
 }
 
 func rbRoleSubjectKey(roleName string, subject rbacv1.Subject) string {
-	return roleName + "." + subject.Kind + "." + subject.Name
+	return subject.Kind + " " + subject.Name + " Role " + roleName
 
 }
 
