@@ -10,35 +10,34 @@ var (
 	settings = map[string]Setting{}
 	provider Provider
 
-	AgentImage                      = newSetting("agent-image", "rancher/rancher-agent:master")
-	CACerts                         = newSetting("cacerts", "")
-	CLIURLDarwin                    = newSetting("cli-url-darwin", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-darwin-amd64-v1.0.0-alpha8.tar.gz")
-	CLIURLLinux                     = newSetting("cli-url-linux", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-linux-amd64-v1.0.0-alpha8.tar.gz")
-	CLIURLWindows                   = newSetting("cli-url-windows", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-windows-386-v1.0.0-alpha8.zip")
-	EngineInstallURL                = newSetting("engine-install-url", "https://releases.rancher.com/install-docker/17.03.sh")
-	EngineISOURL                    = newSetting("engine-iso-url", "https://releases.rancher.com/os/latest/rancheros-vmware.iso")
-	EngineNewestVersion             = newSetting("engine-newest-version", "v17.12.0")
-	EngineSupportedRange            = newSetting("engine-supported-range", "~v1.11.2 || ~v1.12.0 || ~v1.13.0 || ~v17.03.0")
-	FirstLogin                      = newSetting("first-login", "true")
-	HelmVersion                     = newSetting("helm-version", "dev")
-	IngressIPDomain                 = newSetting("ingress-ip-domain", "xip.io")
-	InstallUUID                     = newSetting("install-uuid", "")
-	KubernetesVersion               = newSetting("k8s-version", v3.DefaultK8s)
-	KubernetesVersionToSystemImages = newSetting("k8s-version-to-images", getSystemImages())
-	MachineVersion                  = newSetting("machine-version", "dev")
-	ServerImage                     = newSetting("server-image", "rancher/rancher")
-	ServerURL                       = newSetting("server-url", "")
-	ServerVersion                   = newSetting("server-version", "dev")
-	SystemDefaultRegistry           = newSetting("system-default-registry", "")
-	SystemNamespaces                = newSetting("system-namespaces",
-		"kube-system,kube-public,cattle-system,cattle-alerting,cattle-logging,cattle-pipeline,ingress-nginx")
-	TelemetryOpt      = newSetting("telemetry-opt", "")
-	UIFeedBackForm    = newSetting("ui-feedback-form", "")
-	UIIndex           = newSetting("ui-index", "https://releases.rancher.com/ui/latest2/index.html")
-	UIPath            = newSetting("ui-path", "")
-	UIPL              = newSetting("ui-pl", "rancher")
-	WhitelistDomain   = newSetting("whitelist-domain", "forums.rancher.com")
-	RDNSServerBaseURL = newSetting("rdns-base-url", "https://api.lb.rancher.cloud/v1")
+	AgentImage                      = NewSetting("agent-image", "rancher/rancher-agent:master")
+	CACerts                         = NewSetting("cacerts", "")
+	CLIURLDarwin                    = NewSetting("cli-url-darwin", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-darwin-amd64-v1.0.0-alpha8.tar.gz")
+	CLIURLLinux                     = NewSetting("cli-url-linux", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-linux-amd64-v1.0.0-alpha8.tar.gz")
+	CLIURLWindows                   = NewSetting("cli-url-windows", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-windows-386-v1.0.0-alpha8.zip")
+	EngineInstallURL                = NewSetting("engine-install-url", "https://releases.rancher.com/install-docker/17.03.sh")
+	EngineISOURL                    = NewSetting("engine-iso-url", "https://releases.rancher.com/os/latest/rancheros-vmware.iso")
+	EngineNewestVersion             = NewSetting("engine-newest-version", "v17.12.0")
+	EngineSupportedRange            = NewSetting("engine-supported-range", "~v1.11.2 || ~v1.12.0 || ~v1.13.0 || ~v17.03.0")
+	FirstLogin                      = NewSetting("first-login", "true")
+	HelmVersion                     = NewSetting("helm-version", "dev")
+	IngressIPDomain                 = NewSetting("ingress-ip-domain", "xip.io")
+	InstallUUID                     = NewSetting("install-uuid", "")
+	KubernetesVersion               = NewSetting("k8s-version", v3.DefaultK8s)
+	KubernetesVersionToSystemImages = NewSetting("k8s-version-to-images", getSystemImages())
+	MachineVersion                  = NewSetting("machine-version", "dev")
+	ServerImage                     = NewSetting("server-image", "rancher/rancher")
+	ServerURL                       = NewSetting("server-url", "")
+	ServerVersion                   = NewSetting("server-version", "dev")
+	SystemDefaultRegistry           = NewSetting("system-default-registry", "")
+	SystemNamespaces                = NewSetting("system-namespaces", "kube-system,kube-public,cattle-system,cattle-alerting,cattle-logging,cattle-pipeline,ingress-nginx")
+	TelemetryOpt                    = NewSetting("telemetry-opt", "")
+	UIFeedBackForm                  = NewSetting("ui-feedback-form", "")
+	UIIndex                         = NewSetting("ui-index", "https://releases.rancher.com/ui/latest2/index.html")
+	UIPath                          = NewSetting("ui-path", "")
+	UIPL                            = NewSetting("ui-pl", "rancher")
+	WhitelistDomain                 = NewSetting("whitelist-domain", "forums.rancher.com")
+	RDNSServerBaseURL               = NewSetting("rdns-base-url", "https://api.lb.rancher.cloud/v1")
 )
 
 type Provider interface {
@@ -90,7 +89,7 @@ func SetProvider(p Provider) error {
 	return nil
 }
 
-func newSetting(name, def string) Setting {
+func NewSetting(name, def string) Setting {
 	s := Setting{
 		Name:    name,
 		Default: def,
