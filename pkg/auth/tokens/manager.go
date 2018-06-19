@@ -20,6 +20,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -445,17 +446,17 @@ func (m *Manager) removeToken(request *types.APIContext) error {
 	return nil
 }
 
-func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerInfo map[string]string, ttl int64, description string) (v3.Token, error) {
-	provider := getAuthProviderName(userPrincipal.Name)
+func (m *Manager) userAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal) error {
 	attribs, err := m.userAttributeLister.Get("", userID)
 	if err != nil && !apierrors.IsNotFound(err) {
-		return v3.Token{}, err
+		return err
 	}
 
+	// Doesn't exist, create
 	if attribs == nil {
 		user, err := m.userLister.Get("", userID)
 		if err != nil {
-			return v3.Token{}, err
+			return err
 		}
 		attribs = &v3.UserAttribute{
 			ObjectMeta: metav1.ObjectMeta{
@@ -474,20 +475,52 @@ func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, group
 			},
 		}
 
-		if _, err := m.userAttributes.Create(attribs); err != nil {
-			return v3.Token{}, err
-		}
-	} else {
-		attribs = attribs.DeepCopy()
-		if attribs.GroupPrincipals == nil {
-			attribs.GroupPrincipals = map[string]v3.Principals{}
-		}
-		if gps := attribs.GroupPrincipals[provider]; !reflect.DeepEqual(groupPrincipals, gps.Items) {
-			attribs.GroupPrincipals[provider] = v3.Principals{Items: groupPrincipals}
-			if _, err := m.userAttributes.Update(attribs); err != nil {
-				return v3.Token{}, err
+		_, createErr := m.userAttributes.Create(attribs)
+		if apierrors.IsAlreadyExists(createErr) {
+			// get from API so that we can try to update instead
+			attribs, err = m.userAttributes.Get(userID, metav1.GetOptions{})
+			if err != nil {
+				return createErr
 			}
+		} else {
+			return createErr
 		}
+	}
+
+	// Exists, just update if necessary
+	attribs = attribs.DeepCopy()
+	if attribs.GroupPrincipals == nil {
+		attribs.GroupPrincipals = map[string]v3.Principals{}
+	}
+	if gps := attribs.GroupPrincipals[provider]; !reflect.DeepEqual(groupPrincipals, gps.Items) {
+		attribs.GroupPrincipals[provider] = v3.Principals{Items: groupPrincipals}
+		_, err := m.userAttributes.Update(attribs)
+		return err
+	}
+
+	return nil
+}
+
+var uaBackoff = wait.Backoff{
+	Duration: time.Millisecond * 100,
+	Factor:   2,
+	Jitter:   .2,
+	Steps:    5,
+}
+
+func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerInfo map[string]string, ttl int64, description string) (v3.Token, error) {
+	provider := getAuthProviderName(userPrincipal.Name)
+
+	err := wait.ExponentialBackoff(uaBackoff, func() (bool, error) {
+		err := m.userAttributeCreateOrUpdate(userID, provider, groupPrincipals)
+		if err != nil {
+			logrus.Warnf("Problem creating or updating userAttribute for %v: %v", userID, err)
+		}
+		return err == nil, nil
+	})
+
+	if err != nil {
+		return v3.Token{}, fmt.Errorf("Unable to create userAttribute")
 	}
 
 	token := &v3.Token{
