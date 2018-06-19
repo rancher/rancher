@@ -70,7 +70,7 @@ func (c *Client) do(req *http.Request) (model.Response, error) {
 
 	err = json.Unmarshal(body, &data)
 	if err != nil {
-		return data, errors.Wrap(err, "Decode response error")
+		return data, errors.Wrapf(err, "Decode response error: %s", string(body))
 	}
 	logrus.Debugf("Got response entry: %+v", data)
 	if code := resp.StatusCode; code < 200 || code > 300 {
