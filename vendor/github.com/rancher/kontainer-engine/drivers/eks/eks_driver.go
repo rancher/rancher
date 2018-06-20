@@ -281,7 +281,24 @@ func (d *Driver) createStack(svc *cloudformation.CloudFormation, name string, di
 	}
 
 	if status != "CREATE_COMPLETE" {
-		return nil, fmt.Errorf("stack failed to create with status: %v", status)
+		reason := "reason unknown"
+		events, err := svc.DescribeStackEvents(&cloudformation.DescribeStackEventsInput{
+			StackName: aws.String(name),
+		})
+		if err == nil {
+			for _, event := range events.StackEvents {
+				// guard against nil pointer dereference
+				if event.ResourceStatus == nil || event.LogicalResourceId == nil || event.ResourceStatusReason == nil {
+					continue
+				}
+
+				if *event.ResourceStatus == "CREATE_FAILED" && *event.LogicalResourceId == "VPC" {
+					reason = *event.ResourceStatusReason
+					break
+				}
+			}
+		}
+		return nil, fmt.Errorf("stack failed to create: %v", reason)
 	}
 
 	return stack, nil
@@ -307,13 +324,14 @@ func (d *Driver) awsHTTPRequest(state state, url string, method string, data []b
 	if err != nil {
 		return nil, fmt.Errorf("error creating cluster: %v", err)
 	}
+
 	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body) // always read the body so the caller can get the error message from it
 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return nil, fmt.Errorf("http response code was: %v", resp.StatusCode)
+		return body, fmt.Errorf("%v", resp.StatusCode)
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading body: %v", err)
 	}
@@ -405,9 +423,9 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 
 	logrus.Infof("Creating EKS cluster")
 
-	_, err = d.awsHTTPRequest(state, fmt.Sprintf("https://eks.%v.amazonaws.com/clusters", state.Region), "POST", data)
+	body, err := d.awsHTTPRequest(state, fmt.Sprintf("https://eks.%v.amazonaws.com/clusters", state.Region), "POST", data)
 	if err != nil && !isClusterConflict(err) {
-		return nil, fmt.Errorf("error posting cluster: %v", err)
+		return nil, fmt.Errorf("error creating cluster: %v %v", err, string(body))
 	}
 
 	cluster, err := d.waitForClusterReady(state)
