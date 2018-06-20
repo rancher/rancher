@@ -193,7 +193,7 @@ func (m *manager) ensureProjectMembershipBinding(roleName, rtbUID, namespace str
 		return nil
 	}
 
-	objs, err := m.crbIndexer.ByIndex(rbByRoleAndSubjectIndex, key)
+	objs, err := m.rbIndexer.ByIndex(rbByRoleAndSubjectIndex, key)
 	if err != nil {
 		return err
 	}
