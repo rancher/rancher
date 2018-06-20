@@ -49,13 +49,22 @@ func (a *AccessControl) Filter(apiContext *types.APIContext, schema *types.Schem
 }
 
 func (a *AccessControl) canAccess(obj map[string]interface{}, permset ListPermissionSet) bool {
-	namespace, _ := obj["namespaceId"].(string)
 	var id string
+	var namespace string
+
 	if obj != nil {
 		id, _ = obj["id"].(string)
+		namespace, _ = obj["namespaceId"].(string)
+		if namespace == "" {
+			pieces := strings.Split(id, ":")
+			if len(pieces) == 2 {
+				namespace = pieces[0]
+			}
+		}
 	} else {
 		id = "*"
 	}
+
 	if permset.HasAccess(namespace, "*") || permset.HasAccess("*", "*") {
 		return true
 	}

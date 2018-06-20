@@ -280,7 +280,7 @@ func NodeTypes(schemas *types.Schemas, management *config.ScaledContext) error {
 	schema.ActionHandler = machineDriverHandlers.ActionHandler
 	schema.LinkHandler = machineDriverHandlers.ExportYamlHandler
 
-	machineHandler := &node.DriverHandler{
+	machineHandler := &node.Handler{
 		SecretStore: secretStore,
 	}
 
