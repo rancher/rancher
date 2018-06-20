@@ -12,6 +12,12 @@ nodes:
     role: [controlplane,etcd,worker]
     ssh_key_path: <PEM_FILE>
 
+services:
+  etcd:
+    backup: true
+    creation: 6h
+    retention: 24h
+
 addons: |-
   ---
   kind: Namespace

@@ -20,6 +20,12 @@ ingress:
   extra_args:
     enable-ssl-passthrough: ""
 
+services:
+  etcd:
+    backup: true
+    creation: 6h
+    retention: 24h
+
 addons: |-
   ---
   kind: Namespace
