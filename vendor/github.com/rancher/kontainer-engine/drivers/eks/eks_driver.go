@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -34,6 +35,11 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+var amiForRegion = map[string]string{
+	"us-west-2": "ami-73a6e20b",
+	"us-east-1": "ami-dea4d5a1",
+}
+
 type Driver struct {
 	types.UnimplementedClusterSizeAccess
 	types.UnimplementedVersionAccess
@@ -52,6 +58,12 @@ type state struct {
 	DisplayName  string
 	ClientID     string
 	ClientSecret string
+
+	MinimumASGSize int64
+	MaximumASGSize int64
+
+	InstanceType string
+	Region       string
 
 	ClusterInfo types.ClusterInfo
 }
@@ -108,6 +120,26 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 		Type:  types.StringType,
 		Usage: "The AWS Client Secret associated with the Client ID",
 	}
+	driverFlag.Options["region"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "The AWS Region to create the EKS cluster in",
+		Value: "us-west-2",
+	}
+	driverFlag.Options["instance-type"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "The type of machine to use for worker nodes",
+		Value: "t2.medium",
+	}
+	driverFlag.Options["minimum-nodes"] = &types.Flag{
+		Type:  types.IntType,
+		Usage: "The minimum number of worker nodes",
+		Value: "1",
+	}
+	driverFlag.Options["maximum-nodes"] = &types.Flag{
+		Type:  types.IntType,
+		Usage: "The maximum number of worker nodes",
+		Value: "3",
+	}
 
 	return &driverFlag, nil
 }
@@ -126,6 +158,11 @@ func getStateFromOptions(driverOptions *types.DriverOptions) (state, error) {
 	state.DisplayName = getValueFromDriverOptions(driverOptions, types.StringType, "display-name", "displayName").(string)
 	state.ClientID = getValueFromDriverOptions(driverOptions, types.StringType, "client-id", "accessKey").(string)
 	state.ClientSecret = getValueFromDriverOptions(driverOptions, types.StringType, "client-secret", "secretKey").(string)
+
+	state.Region = getValueFromDriverOptions(driverOptions, types.StringType, "region").(string)
+	state.InstanceType = getValueFromDriverOptions(driverOptions, types.StringType, "instance-type", "instanceType").(string)
+	state.MinimumASGSize = getValueFromDriverOptions(driverOptions, types.IntType, "minimum-nodes", "minimumNodes").(int64)
+	state.MaximumASGSize = getValueFromDriverOptions(driverOptions, types.IntType, "maximum-nodes", "maximumNodes").(int64)
 
 	return state, state.validate()
 }
@@ -175,6 +212,22 @@ func (state *state) validate() error {
 
 	if state.ClientSecret == "" {
 		return fmt.Errorf("client secret is required")
+	}
+
+	if amiForRegion[state.Region] == "" {
+		return fmt.Errorf("rancher does not support region %v, no entry for ami lookup", state.Region)
+	}
+
+	if state.MinimumASGSize < 1 {
+		return fmt.Errorf("minimum nodes must be greater than 0")
+	}
+
+	if state.MaximumASGSize < 1 {
+		return fmt.Errorf("maximum nodes must be greater than 0")
+	}
+
+	if state.MaximumASGSize < state.MinimumASGSize {
+		return fmt.Errorf("maximum nodes cannot be less than minimum nodes")
 	}
 
 	return nil
@@ -227,6 +280,10 @@ func (d *Driver) createStack(svc *cloudformation.CloudFormation, name string, di
 		return nil, fmt.Errorf("stack did not have output: %v", err)
 	}
 
+	if status != "CREATE_COMPLETE" {
+		return nil, fmt.Errorf("stack failed to create with status: %v", status)
+	}
+
 	return stack, nil
 }
 
@@ -273,7 +330,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 	}
 
 	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String("us-west-2"),
+		Region: aws.String(state.Region),
 		Credentials: credentials.NewStaticCredentials(
 			state.ClientID,
 			state.ClientSecret,
@@ -348,7 +405,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 
 	logrus.Infof("Creating EKS cluster")
 
-	_, err = d.awsHTTPRequest(state, "https://eks.us-west-2.amazonaws.com/clusters", "POST", data)
+	_, err = d.awsHTTPRequest(state, fmt.Sprintf("https://eks.%v.amazonaws.com/clusters", state.Region), "POST", data)
 	if err != nil && !isClusterConflict(err) {
 		return nil, fmt.Errorf("error posting cluster: %v", err)
 	}
@@ -383,11 +440,13 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 			{ParameterKey: aws.String("ClusterControlPlaneSecurityGroup"),
 				ParameterValue: aws.String(securityGroups)},
 			{ParameterKey: aws.String("NodeGroupName"),
-				ParameterValue: aws.String(state.ClusterName + "-node-group")}, //
-			{ParameterKey: aws.String("NodeAutoScalingGroupMinSize"), ParameterValue: aws.String("1")}, // TODO let the user specify this
-			{ParameterKey: aws.String("NodeAutoScalingGroupMaxSize"), ParameterValue: aws.String("3")}, // TODO let the user specify this
-			{ParameterKey: aws.String("NodeInstanceType"), ParameterValue: aws.String("m4.large")},     // TODO let the user specify this
-			{ParameterKey: aws.String("NodeImageId"), ParameterValue: aws.String("ami-e09b0098")},
+				ParameterValue: aws.String(state.ClusterName + "-node-group")},
+			{ParameterKey: aws.String("NodeAutoScalingGroupMinSize"), ParameterValue: aws.String(strconv.Itoa(
+				int(state.MinimumASGSize)))},
+			{ParameterKey: aws.String("NodeAutoScalingGroupMaxSize"), ParameterValue: aws.String(strconv.Itoa(
+				int(state.MaximumASGSize)))},
+			{ParameterKey: aws.String("NodeInstanceType"), ParameterValue: aws.String(state.InstanceType)},
+			{ParameterKey: aws.String("NodeImageId"), ParameterValue: aws.String(amiForRegion[state.Region])},
 			{ParameterKey: aws.String("KeyName"), ParameterValue: aws.String(keyPairName)}, // TODO let the user specify this
 			{ParameterKey: aws.String("VpcId"), ParameterValue: aws.String(vpcid)},
 			{ParameterKey: aws.String("Subnets"),
@@ -545,7 +604,8 @@ func (d *Driver) waitForClusterReady(state state) (*eksCluster, error) {
 
 		logrus.Infof("Waiting for cluster to finish provisioning")
 
-		resp, err := d.awsHTTPRequest(state, "https://eks.us-west-2.amazonaws.com/clusters/"+state.ClusterName,
+		resp, err := d.awsHTTPRequest(state, fmt.Sprintf("https://eks.%v.amazonaws.com/clusters/%v",
+			state.Region, state.ClusterName),
 			"GET", nil)
 		if err != nil {
 			return nil, fmt.Errorf("error getting cluster: %v", err)
@@ -624,8 +684,8 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 		return nil, err
 	}
 
-	resp, err := d.awsHTTPRequest(state, "https://eks.us-west-2.amazonaws.com/clusters/"+state.ClusterName,
-		"GET", nil)
+	resp, err := d.awsHTTPRequest(state, fmt.Sprintf("https://eks.%v.amazonaws.com/clusters/%v", state.Region,
+		state.ClusterName), "GET", nil)
 	if err != nil {
 		return nil, fmt.Errorf("error getting cluster: %v", err)
 	}
@@ -668,13 +728,14 @@ func (d *Driver) Remove(ctx context.Context, info *types.ClusterInfo) error {
 		return fmt.Errorf("error getting state: %v", err)
 	}
 
-	_, err = d.awsHTTPRequest(state, "https://eks.us-west-2.amazonaws.com/clusters/"+state.ClusterName, "DELETE", nil)
+	_, err = d.awsHTTPRequest(state, fmt.Sprintf("https://eks.%v.amazonaws.com/clusters/%v", state.Region,
+		state.ClusterName), "DELETE", nil)
 	if err != nil && !noClusterFound(err) {
 		return fmt.Errorf("error deleting cluster: %v", err)
 	}
 
 	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String("us-west-2"),
+		Region: aws.String(state.Region),
 		Credentials: credentials.NewStaticCredentials(
 			state.ClientID,
 			state.ClientSecret,

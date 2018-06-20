@@ -205,6 +205,11 @@ type AzureKubernetesServiceConfig struct {
 type AmazonElasticContainerServiceConfig struct {
 	AccessKey string `json:"accessKey" norman:"required"`
 	SecretKey string `json:"secretKey" norman:"required,type=password"`
+
+	Region       string `json:"region"`
+	InstanceType string `json:"instanceType"`
+	MinimumNodes int    `json:"minimumNodes"`
+	MaximumNodes int    `json:"maximumNodes"`
 }
 
 type ClusterEvent struct {
