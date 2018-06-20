@@ -95,7 +95,7 @@ func (s SchedulingMapper) nodeAffinity(data map[string]interface{}, nodeAffinity
 		values.PutValue(data, requireAny, "scheduling", "node", "requireAny")
 	}
 	if len(preferred) > 0 {
-		values.PutValue(data, requireAny, "scheduling", "node", "preferred")
+		values.PutValue(data, preferred, "scheduling", "node", "preferred")
 	}
 }
 
@@ -207,6 +207,7 @@ func (s SchedulingMapper) ToInternal(data map[string]interface{}) {
 	preferred := convert.ToStringSlice(values.GetValueN(data, "scheduling", "node", "preferred"))
 
 	if len(requireAll) == 0 && len(requireAny) == 0 && len(preferred) == 0 {
+		values.PutValue(data, nil, "affinity", "nodeAffinity")
 		return
 	}
 
@@ -242,6 +243,14 @@ func (s SchedulingMapper) ToInternal(data map[string]interface{}) {
 	affinity, _ := convert.EncodeToMap(&v1.Affinity{
 		NodeAffinity: &nodeAffinity,
 	})
+
+	if nodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution == nil {
+		values.PutValue(affinity, nil, "nodeAffinity", "preferredDuringSchedulingIgnoredDuringExecution")
+	}
+
+	if nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+		values.PutValue(affinity, nil, "nodeAffinity", "requiredDuringSchedulingIgnoredDuringExecution")
+	}
 
 	data["affinity"] = affinity
 }
