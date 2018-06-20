@@ -6,6 +6,10 @@ import (
 	"github.com/rancher/types/config"
 )
 
+const (
+	tokenController = "mgmt-auth-tokens-controller"
+)
+
 type TokenController struct {
 	tokens v3.TokenInterface
 }

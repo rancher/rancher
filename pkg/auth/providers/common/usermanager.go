@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
+	"github.com/sirupsen/logrus"
 	errors2 "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -96,6 +97,7 @@ func (m *userManager) SetPrincipalOnCurrentUser(apiContext *types.APIContext, pr
 
 	if !slice.ContainsString(user.PrincipalIDs, principal.Name) {
 		user.PrincipalIDs = append(user.PrincipalIDs, principal.Name)
+		logrus.Infof("Updating user %v. Adding principal", user.Name)
 		return m.users.Update(user)
 	}
 	return user, nil
@@ -189,6 +191,7 @@ func (m *userManager) EnsureToken(tokenName, description, userName string) (stri
 			Token:        key,
 		}
 
+		logrus.Infof("Creating token for user %v", userName)
 		createdToken, err := m.tokens.Create(token)
 		if err != nil {
 			return "", err
@@ -229,11 +232,13 @@ func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, e
 		PrincipalIDs: []string{principalName},
 	}
 
+	logrus.Info("Creating user for principal %v", principalName)
 	created, err := m.users.Create(user)
 	if err != nil {
 		return nil, err
 	}
 
+	logrus.Info("Creating globalRoleBinding for %v", created.Name)
 	_, err = m.globalRoleBindings.Create(&v3.GlobalRoleBinding{
 		ObjectMeta: v1.ObjectMeta{
 			GenerateName: "globalrolebinding-",

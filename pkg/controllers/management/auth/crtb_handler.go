@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -17,6 +18,7 @@ const (
 	prtbInClusterBindingOwner = "prtb-in-cluster-binding-owner"
 	rbByOwnerIndex            = "auth.management.cattle.io/rb-by-owner"
 	rbByRoleAndSubjectIndex   = "auth.management.cattle.io/crb-by-role-and-subject"
+	ctrbMGMTController        = "mgmt-auth-crtb-controller"
 )
 
 var clusterManagmentPlaneResources = []string{"clusterroletemplatebindings", "nodes", "nodepools", "clusterevents",
@@ -44,6 +46,7 @@ func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterR
 			if !v3.ClusterConditionInitialRolesPopulated.IsTrue(cluster) {
 				cluster = cluster.DeepCopy()
 				v3.ClusterConditionInitialRolesPopulated.True(cluster)
+				logrus.Infof("[%v] Setting InitialRolesPopulated condition on cluster %v", ctrbMGMTController, obj.ClusterName)
 				if _, err := c.mgr.mgmt.Management.Clusters("").Update(cluster); err != nil {
 					return obj, err
 				}
@@ -154,6 +157,7 @@ func (c *crtbLifecycle) removeMGMTClusterScopedPrivilegesInProjectNamespace(bind
 			return err
 		}
 		for _, rb := range rbs {
+			logrus.Infof("[%v] Deleting rolebinding %v in namespace %v for crtb %v", ctrbMGMTController, rb.Name, p.Name, binding.Name)
 			if err := c.mgr.mgmt.RBAC.RoleBindings(p.Name).Delete(rb.Name, &v1.DeleteOptions{}); err != nil {
 				return err
 			}

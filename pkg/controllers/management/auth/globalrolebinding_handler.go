@@ -16,6 +16,7 @@ var (
 	globalRoleBindingLabel = map[string]string{"authz.management.cattle.io/globalrolebinding": "true"}
 	crbNameAnnotation      = "authz.management.cattle.io/crb-name"
 	crbNamePrefix          = "cattle-globalrolebinding-"
+	grbController          = "mgmt-auth-grb-controller"
 )
 
 func newGlobalRoleBindingLifecycle(management *config.ManagementContext) *globalRoleBindingLifecycle {
@@ -80,6 +81,7 @@ func (grb *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBind
 				crb.RoleRef = roleRef
 			}
 			crb.Subjects = subjects
+			logrus.Infof("[%v] Updating clusterRoleBinding %v for globalRoleBinding %v user %v", grbController, crb.Name, globalRoleBinding.Name, globalRoleBinding.UserName)
 			if _, err := grb.crbClient.Update(crb); err != nil {
 				return errors.Wrapf(err, "couldn't update ClusterRoleBinding %v", crb.Name)
 			}
@@ -95,6 +97,7 @@ func (grb *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBind
 	} else {
 		crName = generateCRName(globalRoleBinding.GlobalRoleName)
 	}
+	logrus.Infof("[%v] Creating clusterRoleBinding for globalRoleBinding %v for user %v with role %v", grbController, globalRoleBinding.Name, globalRoleBinding.UserName, crName)
 	_, err := grb.crbClient.Create(&v1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: crbName,

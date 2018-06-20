@@ -9,7 +9,8 @@ import (
 )
 
 const (
-	projectResource = "projects"
+	projectResource    = "projects"
+	ptrbMGMTController = "mgmt-auth-prtb-controller"
 )
 
 var projectManagmentPlaneResources = []string{"projectroletemplatebindings", "apps", "secrets", "pipelines", "pipelineexecutions", "pipelineexecutionlogs", "projectloggings", "projectalerts"}
