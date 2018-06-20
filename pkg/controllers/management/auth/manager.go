@@ -3,6 +3,7 @@ package auth
 import (
 	"reflect"
 
+	"fmt"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/slice"
@@ -516,7 +517,8 @@ func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleT
 			if len(verbs) > 0 {
 				resourceToVerbs[resource] = verbs
 
-				bindingName := binding.Name + "-" + role.Name
+				bindingName := fmt.Sprintf("%s-%s-%s", binding.Namespace, binding.Name, role.Name)
+
 				if _, ok := desiredRBs[bindingName]; !ok {
 					desiredRBs[bindingName] = &v1.RoleBinding{
 						ObjectMeta: metav1.ObjectMeta{
