@@ -21,10 +21,10 @@ import (
 )
 
 const (
-	userAuthHeader        = "Impersonate-User"
-	userByPrincipalIndex  = "auth.management.cattle.io/userByPrincipal"
-	crtbsByPrincipalIndex = "auth.management.cattle.io/crtbByPrincipal"
-	prtbsByPrincipalIndex = "auth.management.cattle.io/prtbByPrincipal"
+	userAuthHeader               = "Impersonate-User"
+	userByPrincipalIndex         = "auth.management.cattle.io/userByPrincipal"
+	crtbsByPrincipalAndUserIndex = "auth.management.cattle.io/crtbByPrincipalAndUser"
+	prtbsByPrincipalAndUserIndex = "auth.management.cattle.io/prtbByPrincipalAndUser"
 )
 
 func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
@@ -38,7 +38,7 @@ func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
 
 	crtbInformer := scaledContext.Management.ClusterRoleTemplateBindings("").Controller().Informer()
 	crtbIndexers := map[string]cache.IndexFunc{
-		crtbsByPrincipalIndex: crtbsByPrincipals,
+		crtbsByPrincipalAndUserIndex: crtbsByPrincipalAndUser,
 	}
 	if err := crtbInformer.AddIndexers(crtbIndexers); err != nil {
 		return nil, err
@@ -46,7 +46,7 @@ func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
 
 	prtbInformer := scaledContext.Management.ProjectRoleTemplateBindings("").Controller().Informer()
 	prtbIndexers := map[string]cache.IndexFunc{
-		prtbsByPrincipalIndex: prtbsByPrincipals,
+		prtbsByPrincipalAndUserIndex: prtbsByPrincipalAndUser,
 	}
 	if err := prtbInformer.AddIndexers(prtbIndexers); err != nil {
 		return nil, err
@@ -120,7 +120,9 @@ func (m *userManager) CheckAccess(accessMode string, allowedPrincipalIDs []strin
 		userPrincipals := []string{userPrinc.Name}
 		if user != nil {
 			for _, p := range user.PrincipalIDs {
-				userPrincipals = append(userPrincipals, p)
+				if userPrinc.Name != p {
+					userPrincipals = append(userPrincipals, p)
+				}
 			}
 		}
 
@@ -138,15 +140,16 @@ func (m *userManager) CheckAccess(accessMode string, allowedPrincipalIDs []strin
 
 		if accessMode == "restricted" {
 			// check if any of the user's principals are in a project or cluster
-			var principals []string
+			var userNameAndPrincipals []string
 			for _, g := range groups {
-				principals = append(principals, g.Name)
+				userNameAndPrincipals = append(userNameAndPrincipals, g.Name)
 			}
 			if user != nil {
-				principals = append(principals, userPrincipals...)
+				userNameAndPrincipals = append(userNameAndPrincipals, user.Name)
+				userNameAndPrincipals = append(userNameAndPrincipals, userPrincipals...)
 			}
 
-			return m.atLeastOnePrincipalInProjectOrCluster(principals)
+			return m.userExistsInClusterOrProject(userNameAndPrincipals)
 		}
 		return false, nil
 	}
@@ -260,16 +263,16 @@ func (m *userManager) checkCache(principalName string) (*v3.User, error) {
 	return nil, nil
 }
 
-func (m *userManager) atLeastOnePrincipalInProjectOrCluster(principals []string) (bool, error) {
-	for _, principal := range principals {
-		crtbs, err := m.crtbIndexer.ByIndex(crtbsByPrincipalIndex, principal)
+func (m *userManager) userExistsInClusterOrProject(userNameAndPrincipals []string) (bool, error) {
+	for _, principal := range userNameAndPrincipals {
+		crtbs, err := m.crtbIndexer.ByIndex(crtbsByPrincipalAndUserIndex, principal)
 		if err != nil {
 			return false, err
 		}
 		if len(crtbs) > 0 {
 			return true, nil
 		}
-		prtbs, err := m.prtbIndexer.ByIndex(prtbsByPrincipalIndex, principal)
+		prtbs, err := m.prtbIndexer.ByIndex(prtbsByPrincipalAndUserIndex, principal)
 		if err != nil {
 			return false, err
 		}
@@ -319,7 +322,7 @@ func userByPrincipal(obj interface{}) ([]string, error) {
 	return u.PrincipalIDs, nil
 }
 
-func crtbsByPrincipals(obj interface{}) ([]string, error) {
+func crtbsByPrincipalAndUser(obj interface{}) ([]string, error) {
 	var principals []string
 	b, ok := obj.(*v3.ClusterRoleTemplateBinding)
 	if !ok {
@@ -331,10 +334,13 @@ func crtbsByPrincipals(obj interface{}) ([]string, error) {
 	if b.UserPrincipalName != "" {
 		principals = append(principals, b.UserPrincipalName)
 	}
+	if b.UserName != "" {
+		principals = append(principals, b.UserName)
+	}
 	return principals, nil
 }
 
-func prtbsByPrincipals(obj interface{}) ([]string, error) {
+func prtbsByPrincipalAndUser(obj interface{}) ([]string, error) {
 	var principals []string
 	b, ok := obj.(*v3.ProjectRoleTemplateBinding)
 	if !ok {
@@ -345,6 +351,9 @@ func prtbsByPrincipals(obj interface{}) ([]string, error) {
 	}
 	if b.UserPrincipalName != "" {
 		principals = append(principals, b.UserPrincipalName)
+	}
+	if b.UserName != "" {
+		principals = append(principals, b.UserName)
 	}
 	return principals, nil
 }
