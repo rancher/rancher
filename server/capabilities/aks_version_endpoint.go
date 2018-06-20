@@ -75,7 +75,7 @@ func (g *AKSVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Requ
 	client := containerservice.NewContainerServicesClient(subscriptionID)
 	client.Authorizer = authorizer
 
-	orchestrators, err := client.ListOrchestrators(context.Background(), region, "")
+	orchestrators, err := client.ListOrchestrators(context.Background(), region, "managedClusters")
 	if err != nil {
 		writer.WriteHeader(http.StatusBadRequest)
 		handleErr(writer, fmt.Errorf("failed to get orchestrators: %v", err))
