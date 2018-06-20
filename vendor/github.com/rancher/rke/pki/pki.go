@@ -249,7 +249,7 @@ func ExtractBackupBundleOnHost(ctx context.Context, host *hosts.Host, alpineSyst
 		Cmd: []string{
 			"sh",
 			"-c",
-			fmt.Sprintf("if [ -f %s ];then tar xzvf %s -C %s --strip-components %d; fi", BundleCertPath, BundleCertPath, fullTempCertPath, len(strings.Split(fullTempCertPath, "/"))-1),
+			fmt.Sprintf("mkdir -p /etc/kubernetes/.tmp/; tar xzvf %s -C %s --strip-components %d", BundleCertPath, fullTempCertPath, len(strings.Split(fullTempCertPath, "/"))-1),
 		},
 		Image: alpineSystemImage,
 	}
