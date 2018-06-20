@@ -14,18 +14,18 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext) {
 	u := newUserLifecycle(management)
 	n := newTokenController(management)
 
-	management.Management.ProjectRoleTemplateBindings("").AddLifecycle("mgmt-auth-prtb-controller", prtb)
-	management.Management.ClusterRoleTemplateBindings("").AddLifecycle("mgmt-auth-crtb-controller", crtb)
-	management.Management.GlobalRoles("").AddLifecycle("mgmt-auth-gr-controller", gr)
-	management.Management.GlobalRoleBindings("").AddLifecycle("mgmt-auth-grb-controller", grb)
-	management.Management.Projects("").AddHandler("mgmt-project-rbac-create", p.sync)
-	management.Management.Clusters("").AddHandler("mgmt-cluster-rbac-delete", c.sync)
-	management.Management.Users("").AddLifecycle("mgmt-auth-users-controller", u)
-	management.Management.Tokens("").AddHandler("mgmt-auth-tokens-controller", n.sync)
+	management.Management.ProjectRoleTemplateBindings("").AddLifecycle(ptrbMGMTController, prtb)
+	management.Management.ClusterRoleTemplateBindings("").AddLifecycle(ctrbMGMTController, crtb)
+	management.Management.GlobalRoles("").AddLifecycle(grController, gr)
+	management.Management.GlobalRoleBindings("").AddLifecycle(grbController, grb)
+	management.Management.Projects("").AddHandler(projectCreateController, p.sync)
+	management.Management.Clusters("").AddHandler(clusterCreateController, c.sync)
+	management.Management.Users("").AddLifecycle(userController, u)
+	management.Management.Tokens("").AddHandler(tokenController, n.sync)
 }
 
 func RegisterLate(ctx context.Context, management *config.ManagementContext) {
 	p, c := newPandCLifecycles(management)
-	management.Management.Projects("").AddLifecycle("mgmt-project-rbac-remove", p)
-	management.Management.Clusters("").AddLifecycle("mgmt-cluster-rbac-remove", c)
+	management.Management.Projects("").AddLifecycle(projectRemoveController, p)
+	management.Management.Clusters("").AddLifecycle(clusterRemoveController, c)
 }

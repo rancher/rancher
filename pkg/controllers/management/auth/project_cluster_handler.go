@@ -20,6 +20,10 @@ import (
 const (
 	creatorIDAnn                  = "field.cattle.io/creatorId"
 	creatorOwnerBindingAnnotation = "authz.management.cattle.io/creator-owner-binding"
+	projectCreateController       = "mgmt-project-rbac-create"
+	clusterCreateController       = "mgmt-cluster-rbac-delete" // TODO the word delete here is wrong, but changing it would break backwards compatibility
+	projectRemoveController       = "mgmt-project-rbac-remove"
+	clusterRemoveController       = "mgmt-cluster-rbac-remove"
 )
 
 var defaultProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/default-project": "true"})
@@ -53,7 +57,7 @@ func (l *projectLifecycle) sync(key string, orig *v3.Project) error {
 
 	obj := orig.DeepCopyObject()
 
-	obj, err := l.mgr.reconcileResourceToNamespace(obj)
+	obj, err := l.mgr.reconcileResourceToNamespace(obj, projectCreateController)
 	if err != nil {
 		return err
 	}
@@ -65,6 +69,7 @@ func (l *projectLifecycle) sync(key string, orig *v3.Project) error {
 
 	// update if it has changed
 	if obj != nil && !reflect.DeepEqual(orig, obj) {
+		logrus.Infof("[%] Updating project %v", projectCreateController, orig.Name)
 		_, err = l.mgr.mgmt.Management.Projects("").ObjectClient().Update(orig.Name, obj)
 		if err != nil {
 			return err
@@ -84,7 +89,7 @@ func (l *projectLifecycle) Updated(obj *v3.Project) (*v3.Project, error) {
 }
 
 func (l *projectLifecycle) Remove(obj *v3.Project) (*v3.Project, error) {
-	err := l.mgr.deleteNamespace(obj)
+	err := l.mgr.deleteNamespace(obj, projectRemoveController)
 	return obj, err
 }
 
@@ -98,7 +103,7 @@ func (l *clusterLifecycle) sync(key string, orig *v3.Cluster) error {
 	}
 
 	obj := orig.DeepCopyObject()
-	obj, err := l.mgr.reconcileResourceToNamespace(obj)
+	obj, err := l.mgr.reconcileResourceToNamespace(obj, clusterCreateController)
 	if err != nil {
 		return err
 	}
@@ -115,6 +120,7 @@ func (l *clusterLifecycle) sync(key string, orig *v3.Cluster) error {
 
 	// update if it has changed
 	if obj != nil && !reflect.DeepEqual(orig, obj) {
+		logrus.Infof("[%v] Updating cluster %v", clusterCreateController, orig.Name)
 		_, err = l.mgr.mgmt.Management.Clusters("").ObjectClient().Update(orig.Name, obj)
 		if err != nil {
 			return err
@@ -134,7 +140,7 @@ func (l *clusterLifecycle) Updated(obj *v3.Cluster) (*v3.Cluster, error) {
 }
 
 func (l *clusterLifecycle) Remove(obj *v3.Cluster) (*v3.Cluster, error) {
-	err := l.mgr.deleteNamespace(obj)
+	err := l.mgr.deleteNamespace(obj, clusterRemoveController)
 	return obj, err
 }
 
@@ -168,6 +174,7 @@ func (m *mgr) createDefaultProject(obj runtime.Object) (runtime.Object, error) {
 			return obj, nil
 		}
 
+		logrus.Info("[%v] Creating default project for cluster %v", clusterCreateController, metaAccessor.GetName())
 		_, err = m.mgmt.Management.Projects(metaAccessor.GetName()).Create(&v3.Project{
 			ObjectMeta: v1.ObjectMeta{
 				GenerateName: "project-",
@@ -216,6 +223,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 			if rtb, _ := m.prtbLister.Get(metaAccessor.GetName(), rtbName); rtb != nil {
 				return obj, nil
 			}
+			logrus.Info("[%v] Creating creator projectRoleTemplateBinding for user %v for project %v", projectCreateController, creatorID, metaAccessor.GetName())
 			if _, err := m.mgmt.Management.ProjectRoleTemplateBindings(metaAccessor.GetName()).Create(&v3.ProjectRoleTemplateBinding{
 				ObjectMeta:       om,
 				ProjectName:      metaAccessor.GetNamespace() + ":" + metaAccessor.GetName(),
@@ -229,6 +237,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 				return obj, nil
 			}
 			om.Annotations = crtbCeatorOwnerAnnotations
+			logrus.Info("[%v] Creating creator clusterRoleTemplateBinding for user %v for cluster %v", projectCreateController, creatorID, metaAccessor.GetName())
 			if _, err := m.mgmt.Management.ClusterRoleTemplateBindings(metaAccessor.GetName()).Create(&v3.ClusterRoleTemplateBinding{
 				ObjectMeta:       om,
 				ClusterName:      metaAccessor.GetName(),
@@ -243,7 +252,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 	})
 }
 
-func (m *mgr) deleteNamespace(obj runtime.Object) error {
+func (m *mgr) deleteNamespace(obj runtime.Object, controller string) error {
 	o, err := meta.Accessor(obj)
 	if err != nil {
 		return condition.Error("MissingMetadata", err)
@@ -255,6 +264,7 @@ func (m *mgr) deleteNamespace(obj runtime.Object) error {
 		return nil
 	}
 	if ns.Status.Phase != v12.NamespaceTerminating {
+		logrus.Info("[%v] Deleting namespace %v", controller, o.GetName())
 		err = nsClient.Delete(o.GetName(), nil)
 		if apierrors.IsNotFound(err) {
 			return nil
@@ -263,7 +273,7 @@ func (m *mgr) deleteNamespace(obj runtime.Object) error {
 	return err
 }
 
-func (m *mgr) reconcileResourceToNamespace(obj runtime.Object) (runtime.Object, error) {
+func (m *mgr) reconcileResourceToNamespace(obj runtime.Object, controller string) (runtime.Object, error) {
 	return v3.NamespaceBackedResource.Do(obj, func() (runtime.Object, error) {
 		o, err := meta.Accessor(obj)
 		if err != nil {
@@ -277,6 +287,7 @@ func (m *mgr) reconcileResourceToNamespace(obj runtime.Object) (runtime.Object, 
 		ns, _ := m.nsLister.Get("", o.GetName())
 		if ns == nil {
 			nsClient := m.mgmt.K8sClient.CoreV1().Namespaces()
+			logrus.Info("[%v] Creating namespace %v", controller, o.GetName())
 			_, err := nsClient.Create(&v12.Namespace{
 				ObjectMeta: v1.ObjectMeta{
 					Name: o.GetName(),

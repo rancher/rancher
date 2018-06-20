@@ -16,6 +16,7 @@ var (
 	globalRoleLabel  = map[string]string{"authz.management.cattle.io/globalrole": "true"}
 	crNameAnnotation = "authz.management.cattle.io/cr-name"
 	clusterRoleKind  = "ClusterRole"
+	grController     = "mgmt-auth-gr-controller"
 )
 
 func newGlobalRoleLifecycle(management *config.ManagementContext) *globalRoleLifecycle {
@@ -51,8 +52,8 @@ func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole) er
 	clusterRole, _ := gr.crLister.Get("", crName)
 	if clusterRole != nil {
 		if !reflect.DeepEqual(globalRole.Rules, clusterRole.Rules) {
-			logrus.Infof("Updating ClusterRole %v. GlobalRole rules have changed. Have: %+v. Want: %+v", clusterRole.Name, clusterRole.Rules, globalRole.Rules)
 			clusterRole.Rules = globalRole.Rules
+			logrus.Infof("[%v] Updating clusterRole %v. GlobalRole rules have changed. Have: %+v. Want: %+v", grController, clusterRole.Name, clusterRole.Rules, globalRole.Rules)
 			if _, err := gr.crClient.Update(clusterRole); err != nil {
 				return errors.Wrapf(err, "couldn't update ClusterRole %v", clusterRole.Name)
 			}
@@ -60,7 +61,7 @@ func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole) er
 		return nil
 	}
 
-	logrus.Infof("Creating new ClusterRole %v for corresponding GlobalRole", crName)
+	logrus.Infof("[%v] Creating clusterRole %v for corresponding GlobalRole", grController, crName)
 	_, err := gr.crClient.Create(&v1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: crName,

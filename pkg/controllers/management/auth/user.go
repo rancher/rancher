@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/sirupsen/logrus"
 	v12 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,6 +36,7 @@ const (
 	prtbByUserRefKey  = "auth.management.cattle.io/prtb-by-user-ref"
 	grbByUserRefKey   = "auth.management.cattle.io/grb-by-user-ref"
 	tokenByUserRefKey = "auth.management.cattle.io/token-by-user-ref"
+	userController    = "mgmt-auth-users-controller"
 )
 
 func newUserLifecycle(management *config.ManagementContext) *userLifecycle {
@@ -267,8 +269,10 @@ func (l *userLifecycle) deleteAllCRTB(crtbs []*v3.ClusterRoleTemplateBinding) er
 	for _, crtb := range crtbs {
 		var err error
 		if crtb.Namespace == "" {
+			logrus.Infof("[%v] Deleting clusterRoleTemplateBinding %v for user %v", userController, crtb.Name, crtb.UserName)
 			err = l.crtb.Delete(crtb.Name, &metav1.DeleteOptions{})
 		} else {
+			logrus.Infof("[%v] Deleting clusterRoleTemplateBinding %v for user %v", userController, crtb.Name, crtb.UserName)
 			err = l.crtb.DeleteNamespaced(crtb.Namespace, crtb.Name, &metav1.DeleteOptions{})
 		}
 		if err != nil {
@@ -283,8 +287,10 @@ func (l *userLifecycle) deleteAllPRTB(prtbs []*v3.ProjectRoleTemplateBinding) er
 	for _, prtb := range prtbs {
 		var err error
 		if prtb.Namespace == "" {
+			logrus.Infof("[%v] Deleting projectRoleTemplateBinding %v for user %v", userController, prtb.Name, prtb.UserName)
 			err = l.prtb.Delete(prtb.Name, &metav1.DeleteOptions{})
 		} else {
+			logrus.Infof("[%v] Deleting projectRoleTemplateBinding %v for user %v", userController, prtb.Name, prtb.UserName)
 			err = l.prtb.DeleteNamespaced(prtb.Namespace, prtb.Name, &metav1.DeleteOptions{})
 		}
 		if err != nil {
@@ -299,8 +305,10 @@ func (l *userLifecycle) deleteAllGRB(grbs []*v3.GlobalRoleBinding) error {
 	for _, grb := range grbs {
 		var err error
 		if grb.Namespace == "" {
+			logrus.Infof("[%v] Deleting globalRoleBinding %v for user %v", userController, grb.Name, grb.UserName)
 			err = l.grb.Delete(grb.Name, &metav1.DeleteOptions{})
 		} else {
+			logrus.Infof("[%v] Deleting globalRoleBinding %v for user %v", userController, grb.Name, grb.UserName)
 			err = l.grb.DeleteNamespaced(grb.Namespace, grb.Name, &metav1.DeleteOptions{})
 		}
 		if err != nil {
@@ -314,6 +322,7 @@ func (l *userLifecycle) deleteAllGRB(grbs []*v3.GlobalRoleBinding) error {
 
 func (l *userLifecycle) deleteAllTokens(tokens []*v3.Token) error {
 	for _, token := range tokens {
+		logrus.Infof("[%v] Deleting token %v for user %v", userController, token.Name, token.UserID)
 		err := l.tokens.DeleteNamespaced(token.Namespace, token.Name, &metav1.DeleteOptions{})
 		if err != nil {
 			return fmt.Errorf("error deleting token: %v", err)
@@ -337,6 +346,7 @@ func (l *userLifecycle) deleteUserNamespace(username string) error {
 		return nil // nothing to do namespace is already deleting
 	}
 
+	logrus.Infof("[%v] Deleting namespace backing user %v", userController, username)
 	err = l.namespaces.Delete(username, &metav1.DeleteOptions{})
 	if err != nil {
 		return fmt.Errorf("error deleting user namespace: %v", err)
