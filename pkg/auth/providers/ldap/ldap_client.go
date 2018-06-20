@@ -51,7 +51,7 @@ func (p *ldapProvider) loginUser(credential *v3public.BasicLogin, config *v3.Lda
 	}
 
 	if len(result.Entries) < 1 {
-		return v3.Principal{}, nil, nil, fmt.Errorf("Cannot locate user information for %s", searchRequest.Filter)
+		return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "Cannot locate user information for "+searchRequest.Filter)
 	} else if len(result.Entries) > 1 {
 		return v3.Principal{}, nil, nil, fmt.Errorf("ldap user search found more than one result")
 	}
@@ -60,7 +60,7 @@ func (p *ldapProvider) loginUser(credential *v3public.BasicLogin, config *v3.Lda
 	err = lConn.Bind(userDN, password)
 	if err != nil {
 		if ldapv2.IsErrorWithCode(err, ldapv2.LDAPResultInvalidCredentials) {
-			return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
+			return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed: invalid credentials")
 		}
 		return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.ServerError, "server error while authenticating")
 	}
@@ -83,7 +83,7 @@ func (p *ldapProvider) loginUser(credential *v3public.BasicLogin, config *v3.Lda
 		return v3.Principal{}, nil, nil, err
 	}
 	if !allowed {
-		return v3.Principal{}, nil, nil, httperror.NewAPIError(httperror.Unauthorized, "unauthorized")
+		return v3.Principal{}, nil, nil, httperror.NewAPIError(httperror.PermissionDenied, "Permission denied")
 	}
 
 	return userPrincipal, groupPrincipals, map[string]string{}, err
