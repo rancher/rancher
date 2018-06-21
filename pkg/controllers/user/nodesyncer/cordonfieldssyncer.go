@@ -26,10 +26,13 @@ func (m *NodesSyncer) syncCordonFields(key string, obj *v3.Node) error {
 			return err
 		}
 	}
-	nodeCopy := obj.DeepCopy()
-	nodeCopy.Spec.DesiredNodeUnschedulable = ""
-	if _, err := m.machines.Update(nodeCopy); err != nil {
-		return err
+	if obj.Spec.DesiredNodeUnschedulable != "" {
+		nodeCopy := obj.DeepCopy()
+		nodeCopy.Spec.DesiredNodeUnschedulable = ""
+		if _, err := m.machines.Update(nodeCopy); err != nil {
+			return err
+		}
 	}
+
 	return nil
 }
