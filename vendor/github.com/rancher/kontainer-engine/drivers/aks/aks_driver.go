@@ -720,15 +720,8 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 		return nil, err
 	}
 
-	decoded := make([]byte, base64.StdEncoding.DecodedLen(len(*result.KubeConfig)))
-	l, err := base64.StdEncoding.Decode(decoded, []byte(*result.KubeConfig))
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode kubeconfig: %v", err)
-	}
-
 	clusterConfig := KubeConfig{}
-	err = yaml.Unmarshal(decoded[:l], &clusterConfig)
+	err = yaml.Unmarshal(*result.KubeConfig, &clusterConfig)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal kubeconfig: %v", err)
