@@ -44,7 +44,8 @@ func (p *ldapProvider) loginUser(credential *v3public.BasicLogin, config *v3.Lda
 
 	searchRequest := ldapv2.NewSearchRequest(config.UserSearchBase,
 		ldapv2.ScopeWholeSubtree, ldapv2.NeverDerefAliases, 0, 0, false,
-		"(&("+ObjectClassAttribute+"="+config.UserObjectClass+")("+config.UserLoginAttribute+"="+ldap.EscapeLDAPSearchFilter(username)+"))", p.getUserSearchAttributes(config), nil)
+		fmt.Sprintf("(&(objectClass=%v)(%v=%v))", config.UserObjectClass, config.UserLoginAttribute, ldap.EscapeLDAPSearchFilter(username)),
+		p.getUserSearchAttributes(config), nil)
 	result, err := lConn.Search(searchRequest)
 	if err != nil {
 		return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed") // need to reload this error
@@ -67,7 +68,7 @@ func (p *ldapProvider) loginUser(credential *v3public.BasicLogin, config *v3.Lda
 
 	searchOpRequest := ldapv2.NewSearchRequest(userDN,
 		ldapv2.ScopeBaseObject, ldapv2.NeverDerefAliases, 0, 0, false,
-		"("+ObjectClassAttribute+"="+config.UserObjectClass+")",
+		fmt.Sprintf("(objectClass=%v)", config.UserObjectClass),
 		operationalAttrList, nil)
 	opResult, err := lConn.Search(searchOpRequest)
 	if err != nil {
@@ -111,7 +112,7 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult
 	logrus.Debugf("SearchResult memberOf attribute {%s}", userMemberAttribute)
 
 	isType := false
-	objectClass := entry.GetAttributeValues(ObjectClassAttribute)
+	objectClass := entry.GetAttributeValues("objectClass")
 	for _, obj := range objectClass {
 		if strings.EqualFold(string(obj), config.UserObjectClass) {
 			isType = true
@@ -132,8 +133,7 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult
 
 	if len(userMemberAttribute) > 0 {
 		for _, dn := range userMemberAttribute {
-			query := "(&(" + config.GroupDNAttribute + "=" + dn + ")(" + ObjectClassAttribute + "=" +
-				config.GroupObjectClass + "))"
+			query := fmt.Sprintf("(&(%v=%v)(objectClass=%v))", config.GroupDNAttribute, dn, config.GroupObjectClass)
 			userMemberGroupPrincipals, err := p.searchLdap(query, groupScope, config, lConn)
 			groupPrincipals = append(groupPrincipals, userMemberGroupPrincipals...)
 			if err != nil {
@@ -155,8 +155,7 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult
 	}
 
 	if len(groupMemberUserAttribute) > 0 {
-		query := "(&(" + config.GroupMemberMappingAttribute + "=" + groupMemberUserAttribute[0] + ")(" + ObjectClassAttribute + "=" +
-			config.GroupObjectClass + "))"
+		query := fmt.Sprintf("(&(%v=%v)(objectClass=%v))", config.GroupMemberMappingAttribute, ldapv2.EscapeFilter(groupMemberUserAttribute[0]), config.GroupObjectClass)
 		newGroupPrincipals, err := p.searchLdap(query, groupScope, config, lConn)
 		//deduplicate groupprincipals get from userMemberAttribute
 		nonDupGroupPrincipals = p.findNonDuplicateGroupPrincipals(newGroupPrincipals, groupPrincipals, nonDupGroupPrincipals)
@@ -210,18 +209,18 @@ func (p *ldapProvider) getPrincipal(distinguishedName string, scope string, conf
 	}
 
 	if !ldap.IsType(attribs, scope) && !p.permissionCheck(attribs, config) {
-		logrus.Errorf("Failed to get object %s", distinguishedName)
+		logrus.Errorf("Failed to get object %v", distinguishedName)
 		return nil, nil
 	}
 
 	userType := strings.Split(scope, "_")[1]
 	if strings.EqualFold("user", userType) {
-		filter = "(" + ObjectClassAttribute + "=" + config.UserObjectClass + ")"
+		filter = fmt.Sprintf("(objectClass=%v)", config.UserObjectClass)
 	} else {
-		filter = "(" + ObjectClassAttribute + "=" + config.GroupObjectClass + ")"
+		filter = fmt.Sprintf("(objectClass=%v)", config.GroupObjectClass)
 	}
 
-	logrus.Debugf("Query for getPrincipal(%s): %s", distinguishedName, filter)
+	logrus.Debugf("Query for getPrincipal(%v): %v", distinguishedName, filter)
 
 	lConn, err := p.ldapConnection(config, caPool)
 	if err != nil {
@@ -389,10 +388,10 @@ func (p *ldapProvider) searchPrincipals(name, principalType string, config *v3.L
 func (p *ldapProvider) searchUser(name string, config *v3.LdapConfig, lConn *ldapv2.Conn) ([]v3.Principal, error) {
 	var userScope string
 	srchAttributes := strings.Split(config.UserSearchAttribute, "|")
-	query := "(&(" + ObjectClassAttribute + "=" + config.UserObjectClass + ")"
+	query := fmt.Sprintf("(&(objectClass=%v)", config.UserObjectClass)
 	srchAttrs := "(|"
 	for _, attr := range srchAttributes {
-		srchAttrs += "(" + attr + "=" + name + "*)"
+		srchAttrs += fmt.Sprintf("(%v=%v*)", attr, name)
 	}
 	query += srchAttrs + "))"
 	logrus.Debugf("%s searchUser query: %s", p.providerName, query)
@@ -403,8 +402,7 @@ func (p *ldapProvider) searchUser(name string, config *v3.LdapConfig, lConn *lda
 
 func (p *ldapProvider) searchGroup(name string, config *v3.LdapConfig, lConn *ldapv2.Conn) ([]v3.Principal, error) {
 	var groupScope string
-	query := "(&(" + config.GroupSearchAttribute + "=*" + name + "*)(" + ObjectClassAttribute + "=" +
-		config.GroupObjectClass + "))"
+	query := fmt.Sprintf("(&(%v=*%v*)(objectClass=%v))", config.GroupSearchAttribute, name, config.GroupObjectClass)
 
 	logrus.Debugf("%s searchGroup query: %s", p.providerName, query)
 
