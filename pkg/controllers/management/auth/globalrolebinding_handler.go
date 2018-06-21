@@ -54,8 +54,9 @@ func (grb *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBind
 		crbName = crbNamePrefix + globalRoleBinding.Name
 	}
 	subject := v1.Subject{
-		Kind: "User",
-		Name: globalRoleBinding.UserName,
+		Kind:     "User",
+		Name:     globalRoleBinding.UserName,
+		APIGroup: rbacv1.GroupName,
 	}
 	crb, _ := grb.crbLister.Get("", crbName)
 	if crb != nil {
