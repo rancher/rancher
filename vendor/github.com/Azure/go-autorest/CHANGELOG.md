@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## v10.11.3
+
+### Bug Fixes
+
+- In IMDS retry logic, if we don't receive a response don't retry.
+  - Renamed the retry function so it's clear it's meant for IMDS only.
+- For error response bodies that aren't OData-v4 compliant stick the raw JSON in the ServiceError.Details field so the information isn't lost.
+  - Also add the raw HTTP response to the DetailedResponse.
+- Removed superfluous wrapping of response error in azure.DoRetryWithRegistration().
+
+## v10.11.2
+
+### Bug Fixes
+
+- Validation for integers handles int and int64 types.
+
 ## v10.11.1
 
 ### Bug Fixes

@@ -811,7 +811,7 @@ func (spt *ServicePrincipalToken) refreshInternal(ctx context.Context, resource 
 
 	var resp *http.Response
 	if isIMDS(spt.inner.OauthConfig.TokenEndpoint) {
-		resp, err = retry(spt.sender, req)
+		resp, err = retryForIMDS(spt.sender, req)
 	} else {
 		resp, err = spt.sender.Do(req)
 	}
@@ -850,7 +850,8 @@ func (spt *ServicePrincipalToken) refreshInternal(ctx context.Context, resource 
 	return spt.InvokeRefreshCallbacks(token)
 }
 
-func retry(sender Sender, req *http.Request) (resp *http.Response, err error) {
+// retry logic specific to retrieving a token from the IMDS endpoint
+func retryForIMDS(sender Sender, req *http.Request) (resp *http.Response, err error) {
 	// copied from client.go due to circular dependency
 	retries := []int{
 		http.StatusRequestTimeout,      // 408
@@ -884,7 +885,9 @@ func retry(sender Sender, req *http.Request) (resp *http.Response, err error) {
 	for attempt < maxAttempts {
 		resp, err = sender.Do(req)
 		// retry on temporary network errors, e.g. transient network failures.
-		if (err != nil && !isTemporaryNetworkError(err)) || resp.StatusCode == http.StatusOK || !containsInt(retries, resp.StatusCode) {
+		// if we don't receive a response then assume we can't connect to the
+		// endpoint so we're likely not running on an Azure VM so don't retry.
+		if (err != nil && !isTemporaryNetworkError(err)) || resp == nil || resp.StatusCode == http.StatusOK || !containsInt(retries, resp.StatusCode) {
 			return
 		}
 
