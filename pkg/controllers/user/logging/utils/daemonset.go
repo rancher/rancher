@@ -209,7 +209,7 @@ func newFluentdDaemonset(name, namespace, clusterName, dockerRootDir string) *v1
 						},
 						{
 							Name:            loggingconfig.FluentdName,
-							Image:           "micheliac/fluentd:dev",
+							Image:           image.Resolve(v3.ToolsSystemImages.LoggingSystemImages.Fluentd),
 							ImagePullPolicy: v1.PullIfNotPresent,
 							Command:         []string{"fluentd"},
 							Args:            []string{"-c", "/fluentd/etc/fluent.conf"},
