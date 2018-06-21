@@ -22,13 +22,12 @@ import (
 )
 
 const (
-	OpenLdapName         = "openldap"
-	FreeIpaName          = "freeipa"
-	OpenLdapUserScope    = OpenLdapName + "_user"
-	OpenLdapGroupScope   = OpenLdapName + "_group"
-	FreeIpaUserScope     = FreeIpaName + "_user"
-	FreeIpaGroupScope    = FreeIpaName + "_group"
-	ObjectClassAttribute = "objectClass"
+	OpenLdapName       = "openldap"
+	FreeIpaName        = "freeipa"
+	OpenLdapUserScope  = OpenLdapName + "_user"
+	OpenLdapGroupScope = OpenLdapName + "_group"
+	FreeIpaUserScope   = FreeIpaName + "_user"
+	FreeIpaGroupScope  = FreeIpaName + "_group"
 )
 
 var openLdapScopes = []string{OpenLdapUserScope, OpenLdapGroupScope}
