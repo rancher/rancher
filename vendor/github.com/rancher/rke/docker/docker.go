@@ -403,7 +403,7 @@ func isContainerRKEEnvChanged(containerEnv, imageConfigEnv []string) bool {
 func getRKEEnvVars(env []string) []string {
 	tmp := []string{}
 	for _, e := range env {
-		if strings.HasPrefix("RKE_", e) {
+		if strings.HasPrefix(e, "RKE_") {
 			tmp = append(tmp, e)
 		}
 	}
