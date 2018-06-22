@@ -16,6 +16,7 @@ import (
 
 var (
 	schemaLock = sync.Mutex{}
+	driverLock = sync.Mutex{}
 )
 
 const (
@@ -45,6 +46,8 @@ func (m *Lifecycle) Create(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 }
 
 func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
+	driverLock.Lock()
+	defer driverLock.Unlock()
 	if !obj.Spec.Active {
 		return obj, nil
 	}
