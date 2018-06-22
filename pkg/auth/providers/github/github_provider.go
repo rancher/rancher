@@ -286,7 +286,9 @@ func (g *ghProvider) toPrincipal(principalType string, acct Account, token *v3.T
 		}
 	} else {
 		princ.PrincipalType = "group"
-		princ.MemberOf = g.tokenMGR.IsMemberOf(*token, princ)
+		if token != nil {
+			princ.MemberOf = g.tokenMGR.IsMemberOf(*token, princ)
+		}
 	}
 
 	return princ
