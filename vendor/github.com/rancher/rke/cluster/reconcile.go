@@ -17,7 +17,7 @@ import (
 
 const (
 	unschedulableEtcdTaint    = "node-role.kubernetes.io/etcd=true:NoExecute"
-	unschedulableControlTaint = "node-role.kubernetes.io/controlplane=true:NoExecute"
+	unschedulableControlTaint = "node-role.kubernetes.io/controlplane=true:NoSchedule"
 )
 
 func ReconcileCluster(ctx context.Context, kubeCluster, currentCluster *Cluster, updateOnly bool) error {
