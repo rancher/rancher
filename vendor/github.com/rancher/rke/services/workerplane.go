@@ -12,7 +12,7 @@ import (
 
 const (
 	unschedulableEtcdTaint    = "node-role.kubernetes.io/etcd=true:NoExecute"
-	unschedulableControlTaint = "node-role.kubernetes.io/controlplane=true:NoExecute"
+	unschedulableControlTaint = "node-role.kubernetes.io/controlplane=true:NoSchedule"
 )
 
 func RunWorkerPlane(ctx context.Context, allHosts []*hosts.Host, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, workerNodePlanMap map[string]v3.RKEConfigNodePlan, certMap map[string]pki.CertificatePKI, updateWorkersOnly bool, alpineImage string) error {

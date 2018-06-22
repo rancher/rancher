@@ -222,7 +222,11 @@ func doSyncTaints(k8sClient *kubernetes.Clientset, nodeName string, toAddTaints,
 	// Remove Taints from node
 	for i, taintStr := range toDelTaints {
 		if isTaintExist(toTaint(taintStr), node.Spec.Taints) {
-			node.Spec.Taints = append(node.Spec.Taints[:i], node.Spec.Taints[i+1:]...)
+			if len(node.Spec.Taints) == 1 {
+				node.Spec.Taints = []v1.Taint{}
+			} else {
+				node.Spec.Taints = append(node.Spec.Taints[:i], node.Spec.Taints[i+1:]...)
+			}
 		}
 	}
 

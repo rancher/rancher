@@ -17,7 +17,7 @@ spec:
         tolerations:
         - key: node-role.kubernetes.io/controlplane
           operator: Exists
-          effect: NoExecute
+          effect: NoSchedule
         - key: node-role.kubernetes.io/etcd
           operator: Exists
           effect: NoExecute
