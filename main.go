@@ -98,6 +98,36 @@ func main() {
 			Name:  "no-cacerts",
 			Usage: "Skip CA certs population in settings when set to true",
 		},
+		cli.StringFlag{
+			Name:   "audit-log-path",
+			EnvVar: "AUDIT_LOG_PATH",
+			Value:  "/var/log/auditlog/rancher-api-audit.log",
+			Usage:  "Log path for Rancher Server API. Default path is /var/log/auditlog/rancher-api-audit.log",
+		},
+		cli.IntFlag{
+			Name:   "audit-log-maxage",
+			Value:  10,
+			EnvVar: "AUDIT_LOG_MAXAGE",
+			Usage:  "Defined the maximum number of days to retain old audit log files",
+		},
+		cli.IntFlag{
+			Name:   "audit-log-maxbackup",
+			Value:  10,
+			EnvVar: "AUDIT_LOG_MAXBACKUP",
+			Usage:  "Defines the maximum number of audit log files to retain",
+		},
+		cli.IntFlag{
+			Name:   "audit-log-maxsize",
+			Value:  100,
+			EnvVar: "AUDIT_LOG_MAXSIZE",
+			Usage:  "Defines the maximum size in megabytes of the audit log file before it gets rotated, default size is 100M",
+		},
+		cli.IntFlag{
+			Name:   "audit-level",
+			Value:  0,
+			EnvVar: "AUDIT_LEVEL",
+			Usage:  "Audit log level: 0 - disable audit log, 1 - log event metadata, 2 - log event metadata and request body, 3 - log event metadata, request body and response body",
+		},
 	}
 
 	app.Action = func(c *cli.Context) error {
@@ -108,6 +138,12 @@ func main() {
 
 		config.ACMEDomains = c.GlobalStringSlice("acme-domain")
 		config.NoCACerts = c.Bool("no-cacerts")
+
+		config.AuditLevel = c.Int("audit-level")
+		config.AuditLogPath = c.String("audit-log-path")
+		config.AuditLogMaxage = c.Int("audit-log-maxage")
+		config.AuditLogMaxbackup = c.Int("audit-log-maxbackup")
+		config.AuditLogMaxsize = c.Int("audit-log-maxsize")
 		initLogs(c, config)
 		return run(config)
 	}

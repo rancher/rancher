@@ -24,6 +24,13 @@ ENV CATTLE_UI_PATH /usr/share/rancher/ui
 ENV CATTLE_UI_VERSION 2.0.61
 ENV CATTLE_CLI_VERSION v2.0.3
 
+RUN mkdir -p /var/log/auditlog
+ENV AUDIT_LOG_PATH /var/log/auditlog/rancher-api-audit.log
+ENV AUDIT_LOG_MAXAGE 10
+ENV AUDIT_LOG_MAXBACKUP 10
+ENV AUDIT_LOG_MAXSIZE 100
+ENV AUDIT_LEVEL 0
+
 RUN mkdir -p /usr/share/rancher/ui && \
     cd /usr/share/rancher/ui && \
     curl -sL https://releases.rancher.com/ui/${CATTLE_UI_VERSION}.tar.gz | tar xvzf - --strip-components=1 && \
@@ -35,9 +42,11 @@ ENV CATTLE_CLI_URL_WINDOWS https://releases.rancher.com/cli/${CATTLE_CLI_VERSION
 
 ARG VERSION=dev
 ENV CATTLE_SERVER_VERSION ${VERSION}
-COPY rancher /usr/bin/
+COPY entrypoint.sh rancher /usr/bin/
+RUN chmod +x /usr/bin/entrypoint.sh
 
 ENV CATTLE_AGENT_IMAGE rancher/rancher-agent:${VERSION}
 ENV CATTLE_SERVER_IMAGE rancher/rancher
 VOLUME /var/lib/rancher
-ENTRYPOINT ["tini", "--", "rancher", "--http-listen-port=80", "--https-listen-port=443"]
+
+ENTRYPOINT ["entrypoint.sh"]

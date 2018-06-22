@@ -7,14 +7,15 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
 	managementapi "github.com/rancher/rancher/pkg/api/server"
+	"github.com/rancher/rancher/pkg/audit"
 	"github.com/rancher/rancher/pkg/auth/providers/publicapi"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
-	authrequests "github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/hooks"
 	rancherdialer "github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/dynamiclistener"
+	"github.com/rancher/rancher/pkg/filter"
 	"github.com/rancher/rancher/pkg/httpproxy"
 	k8sProxyPkg "github.com/rancher/rancher/pkg/k8sproxy"
 	"github.com/rancher/rancher/pkg/rkenodeconfigserver"
@@ -27,7 +28,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 )
 
-func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) error {
+func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager, auditLogWriter *audit.LogWriter) error {
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext)
 	if err != nil {
 		return err
@@ -52,7 +53,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 
 	rawAuthedAPIs := newAuthed(tokenAPI, managementAPI, k8sProxy)
 
-	authedHandler, err := authrequests.NewAuthenticationFilter(ctx, scaledContext, rawAuthedAPIs)
+	authedHandler, err := filter.NewAuthenticationFilter(ctx, scaledContext, auditLogWriter, rawAuthedAPIs)
 	if err != nil {
 		return err
 	}

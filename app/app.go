@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/norman/leader"
+	"github.com/rancher/rancher/pkg/audit"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/clustermanager"
@@ -19,16 +20,21 @@ import (
 )
 
 type Config struct {
-	ACMEDomains     []string
-	AddLocal        string
-	Embedded        bool
-	KubeConfig      string
-	HTTPListenPort  int
-	HTTPSListenPort int
-	K8sMode         string
-	Debug           bool
-	NoCACerts       bool
-	ListenConfig    *v3.ListenConfig
+	ACMEDomains       []string
+	AddLocal          string
+	Embedded          bool
+	KubeConfig        string
+	HTTPListenPort    int
+	HTTPSListenPort   int
+	K8sMode           string
+	Debug             bool
+	NoCACerts         bool
+	ListenConfig      *v3.ListenConfig
+	AuditLogPath      string
+	AuditLogMaxage    int
+	AuditLogMaxsize   int
+	AuditLogMaxbackup int
+	AuditLevel        int
 }
 
 func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config) (*config.ScaledContext, *clustermanager.Manager, error) {
@@ -77,7 +83,9 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 		return err
 	}
 
-	if err := server.Start(ctx, cfg.HTTPListenPort, cfg.HTTPSListenPort, scaledContext, clusterManager); err != nil {
+	auditLogWriter := audit.NewLogWriter(cfg.AuditLogPath, cfg.AuditLevel, cfg.AuditLogMaxage, cfg.AuditLogMaxbackup, cfg.AuditLogMaxsize)
+
+	if err := server.Start(ctx, cfg.HTTPListenPort, cfg.HTTPSListenPort, scaledContext, clusterManager, auditLogWriter); err != nil {
 		return err
 	}
 
@@ -109,6 +117,10 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 	})
 
 	<-ctx.Done()
+
+	if auditLogWriter != nil {
+		auditLogWriter.Output.Close()
+	}
 	return ctx.Err()
 }
 
