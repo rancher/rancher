@@ -328,6 +328,9 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string) v3.Pr
 		"fail-swap-on":              strconv.FormatBool(c.Services.Kubelet.FailSwapOn),
 		"root-dir":                  path.Join(prefixPath, "/var/lib/kubelet"),
 	}
+	if host.IsControl && !host.IsWorker {
+		CommandArgs["register-with-taints"] = unschedulableControlTaint
+	}
 	if host.Address != host.InternalAddress {
 		CommandArgs["node-ip"] = host.InternalAddress
 	}
