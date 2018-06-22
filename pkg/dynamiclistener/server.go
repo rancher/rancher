@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"reflect"
@@ -354,7 +355,8 @@ func (s *server) serveHTTPS(config *v3.ListenConfig) error {
 	}
 
 	server := &http.Server{
-		Handler: s.Handler(),
+		Handler:  s.Handler(),
+		ErrorLog: log.New(logrus.StandardLogger().Writer(), "", log.LstdFlags),
 	}
 
 	if s.activeConfig == nil {
@@ -370,7 +372,8 @@ func (s *server) serveHTTPS(config *v3.ListenConfig) error {
 	}
 
 	httpServer := &http.Server{
-		Handler: httpRedirect(s.Handler()),
+		Handler:  httpRedirect(s.Handler()),
+		ErrorLog: log.New(logrus.StandardLogger().Writer(), "", log.LstdFlags),
 	}
 
 	if s.activeConfig == nil {
@@ -475,7 +478,8 @@ func (s *server) serveACME(config *v3.ListenConfig) error {
 	}
 
 	httpServer := &http.Server{
-		Handler: manager.HTTPHandler(nil),
+		Handler:  manager.HTTPHandler(nil),
+		ErrorLog: log.New(logrus.StandardLogger().Writer(), "", log.LstdFlags),
 	}
 	s.servers = append(s.servers, httpServer)
 	go func() {
@@ -485,7 +489,8 @@ func (s *server) serveACME(config *v3.ListenConfig) error {
 	}()
 
 	httpsServer := &http.Server{
-		Handler: s.Handler(),
+		Handler:  s.Handler(),
+		ErrorLog: log.New(logrus.StandardLogger().Writer(), "", log.LstdFlags),
 	}
 	s.servers = append(s.servers, httpsServer)
 	go func() {
