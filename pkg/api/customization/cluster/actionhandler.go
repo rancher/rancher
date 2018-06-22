@@ -192,13 +192,25 @@ func (a ActionHandler) ExportYamlHandler(actionName string, action *types.Action
 	if err != nil {
 		return err
 	}
-
 	buf, err := yaml2.JSONToYAML(data)
 	if err != nil {
 		return err
 	}
-	reader := bytes.NewReader(buf)
-	apiContext.Response.Header().Set("Content-Type", "text/yaml")
+	if apiContext.ResponseFormat == "yaml" {
+		reader := bytes.NewReader(buf)
+		apiContext.Response.Header().Set("Content-Type", "application/yaml")
+		http.ServeContent(apiContext.Response, apiContext.Request, "exportYaml", time.Now(), reader)
+		return nil
+	}
+	r := v3.ExportOutput{
+		YAMLOutput: string(buf),
+	}
+	jsonOutput, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+	reader := bytes.NewReader(jsonOutput)
+	apiContext.Response.Header().Set("Content-Type", "application/json")
 	http.ServeContent(apiContext.Response, apiContext.Request, "exportYaml", time.Now(), reader)
 	return nil
 }
