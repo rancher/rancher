@@ -69,7 +69,7 @@ func (l *projectLifecycle) sync(key string, orig *v3.Project) error {
 
 	// update if it has changed
 	if obj != nil && !reflect.DeepEqual(orig, obj) {
-		logrus.Infof("[%] Updating project %v", projectCreateController, orig.Name)
+		logrus.Infof("[%v] Updating project %v", projectCreateController, orig.Name)
 		_, err = l.mgr.mgmt.Management.Projects("").ObjectClient().Update(orig.Name, obj)
 		if err != nil {
 			return err
@@ -174,7 +174,7 @@ func (m *mgr) createDefaultProject(obj runtime.Object) (runtime.Object, error) {
 			return obj, nil
 		}
 
-		logrus.Info("[%v] Creating default project for cluster %v", clusterCreateController, metaAccessor.GetName())
+		logrus.Infof("[%v] Creating default project for cluster %v", clusterCreateController, metaAccessor.GetName())
 		_, err = m.mgmt.Management.Projects(metaAccessor.GetName()).Create(&v3.Project{
 			ObjectMeta: v1.ObjectMeta{
 				GenerateName: "project-",
@@ -223,7 +223,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 			if rtb, _ := m.prtbLister.Get(metaAccessor.GetName(), rtbName); rtb != nil {
 				return obj, nil
 			}
-			logrus.Info("[%v] Creating creator projectRoleTemplateBinding for user %v for project %v", projectCreateController, creatorID, metaAccessor.GetName())
+			logrus.Infof("[%v] Creating creator projectRoleTemplateBinding for user %v for project %v", projectCreateController, creatorID, metaAccessor.GetName())
 			if _, err := m.mgmt.Management.ProjectRoleTemplateBindings(metaAccessor.GetName()).Create(&v3.ProjectRoleTemplateBinding{
 				ObjectMeta:       om,
 				ProjectName:      metaAccessor.GetNamespace() + ":" + metaAccessor.GetName(),
@@ -237,7 +237,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 				return obj, nil
 			}
 			om.Annotations = crtbCeatorOwnerAnnotations
-			logrus.Info("[%v] Creating creator clusterRoleTemplateBinding for user %v for cluster %v", projectCreateController, creatorID, metaAccessor.GetName())
+			logrus.Infof("[%v] Creating creator clusterRoleTemplateBinding for user %v for cluster %v", projectCreateController, creatorID, metaAccessor.GetName())
 			if _, err := m.mgmt.Management.ClusterRoleTemplateBindings(metaAccessor.GetName()).Create(&v3.ClusterRoleTemplateBinding{
 				ObjectMeta:       om,
 				ClusterName:      metaAccessor.GetName(),
@@ -264,7 +264,7 @@ func (m *mgr) deleteNamespace(obj runtime.Object, controller string) error {
 		return nil
 	}
 	if ns.Status.Phase != v12.NamespaceTerminating {
-		logrus.Info("[%v] Deleting namespace %v", controller, o.GetName())
+		logrus.Infof("[%v] Deleting namespace %v", controller, o.GetName())
 		err = nsClient.Delete(o.GetName(), nil)
 		if apierrors.IsNotFound(err) {
 			return nil
@@ -287,7 +287,7 @@ func (m *mgr) reconcileResourceToNamespace(obj runtime.Object, controller string
 		ns, _ := m.nsLister.Get("", o.GetName())
 		if ns == nil {
 			nsClient := m.mgmt.K8sClient.CoreV1().Namespaces()
-			logrus.Info("[%v] Creating namespace %v", controller, o.GetName())
+			logrus.Infof("[%v] Creating namespace %v", controller, o.GetName())
 			_, err := nsClient.Create(&v12.Namespace{
 				ObjectMeta: v1.ObjectMeta{
 					Name: o.GetName(),

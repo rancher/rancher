@@ -232,13 +232,13 @@ func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, e
 		PrincipalIDs: []string{principalName},
 	}
 
-	logrus.Info("Creating user for principal %v", principalName)
+	logrus.Infof("Creating user for principal %v", principalName)
 	created, err := m.users.Create(user)
 	if err != nil {
 		return nil, err
 	}
 
-	logrus.Info("Creating globalRoleBinding for %v", created.Name)
+	logrus.Infof("Creating globalRoleBinding for %v", created.Name)
 	_, err = m.globalRoleBindings.Create(&v3.GlobalRoleBinding{
 		ObjectMeta: v1.ObjectMeta{
 			GenerateName: "globalrolebinding-",
