@@ -201,7 +201,7 @@ func (g *genericController) processNextWorkItem() bool {
 	}
 
 	if err := filterConflictsError(err); err != nil {
-		utilruntime.HandleError(fmt.Errorf("%v %v %v", g.name, key, err))
+		logrus.Errorf("%v %v %v", g.name, key, err)
 	}
 
 	g.queue.AddRateLimited(key)
