@@ -224,6 +224,7 @@ func nodeTypes(schemas *types.Schemas) *types.Schemas {
 			&m.Drop{Field: "desiredNodeLabels"},
 			&m.Drop{Field: "desiredNodeAnnotations"},
 			&m.Drop{Field: "desiredNodeUnschedulable"},
+			&m.Drop{Field: "nodeDrainInput"},
 			&m.AnnotationField{Field: "publicEndpoints", List: true},
 			m.Copy{From: "namespaceId", To: "clusterName"},
 			m.DisplayName{}).
@@ -231,6 +232,7 @@ func nodeTypes(schemas *types.Schemas) *types.Schemas {
 		AddMapperForType(&Version, v3.NodeTemplate{}, m.DisplayName{}).
 		MustImport(&Version, v3.PublicEndpoint{}).
 		MustImport(&Version, v3.NodePool{}).
+		MustImport(&Version, v3.NodeDrainInput{}).
 		MustImportAndCustomize(&Version, v3.Node{}, func(schema *types.Schema) {
 			labelField := schema.ResourceFields["labels"]
 			labelField.Create = true
@@ -245,6 +247,9 @@ func nodeTypes(schemas *types.Schemas) *types.Schemas {
 			schema.ResourceFields["clusterId"] = clusterField
 			schema.ResourceActions["cordon"] = types.Action{}
 			schema.ResourceActions["uncordon"] = types.Action{}
+			schema.ResourceActions["drain"] = types.Action{
+				Input: "nodeDrainInput",
+			}
 		}, struct {
 			PublicEndpoints string `json:"publicEndpoints" norman:"type=array[publicEndpoint],nocreate,noupdate"`
 		}{}).

@@ -38,6 +38,7 @@ var transitioningMap = map[string]string{
 	"DefaultNetworkPolicyCreated": "configuring",
 	"DefaultProjectCreated":       "configuring",
 	"DockerProvisioned":           "provisioning",
+	"Drained":                     "draining",
 	"Downloaded":                  "downloading",
 	"etcd":                        "provisioning",
 	"Inactive":                    "deactivating",

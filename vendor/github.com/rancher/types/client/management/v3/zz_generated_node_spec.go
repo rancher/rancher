@@ -11,6 +11,7 @@ const (
 	NodeSpecFieldDisplayName              = "displayName"
 	NodeSpecFieldEtcd                     = "etcd"
 	NodeSpecFieldImported                 = "imported"
+	NodeSpecFieldNodeDrainInput           = "nodeDrainInput"
 	NodeSpecFieldNodePoolId               = "nodePoolId"
 	NodeSpecFieldNodeTemplateId           = "nodeTemplateId"
 	NodeSpecFieldPodCidr                  = "podCidr"
@@ -31,6 +32,7 @@ type NodeSpec struct {
 	DisplayName              string            `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	Etcd                     bool              `json:"etcd,omitempty" yaml:"etcd,omitempty"`
 	Imported                 bool              `json:"imported,omitempty" yaml:"imported,omitempty"`
+	NodeDrainInput           *NodeDrainInput   `json:"nodeDrainInput,omitempty" yaml:"nodeDrainInput,omitempty"`
 	NodePoolId               string            `json:"nodePoolId,omitempty" yaml:"nodePoolId,omitempty"`
 	NodeTemplateId           string            `json:"nodeTemplateId,omitempty" yaml:"nodeTemplateId,omitempty"`
 	PodCidr                  string            `json:"podCidr,omitempty" yaml:"podCidr,omitempty"`
