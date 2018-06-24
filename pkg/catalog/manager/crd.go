@@ -119,7 +119,7 @@ func (m *Manager) createTemplate(template v3.Template, catalog *v3.Catalog, tagM
 }
 
 func (m *Manager) getTemplateMap(catalogName string) (map[string]*v3.Template, error) {
-	r, _ := labels.NewRequirement(catalogName, selection.Equals, []string{catalogName})
+	r, _ := labels.NewRequirement(CatalogNameLabel, selection.Equals, []string{catalogName})
 	templateList, err := m.templateLister.List("", labels.NewSelector().Add(*r))
 	if err != nil {
 		return nil, err
