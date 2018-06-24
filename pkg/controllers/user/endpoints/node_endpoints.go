@@ -43,24 +43,31 @@ func (n *NodesController) sync(key string, obj *corev1.Node) error {
 		nodesToSync = append(nodesToSync, *obj)
 	}
 
+	syncWorkloads := false
 	for _, node := range nodesToSync {
 		if node.DeletionTimestamp != nil {
 			continue
 		}
-		_, err := n.reconcileEndpontsForNode(&node)
+		epsUpdated, err := n.reconcileEndpontsForNode(&node)
 		if err != nil {
 			return err
 		}
+		if epsUpdated {
+			syncWorkloads = true
+		}
 	}
-	workloadsToUpdate, err := n.workloadController.GetAllWorkloads("")
-	if err != nil {
-		return err
+	if syncWorkloads {
+		workloadsToUpdate, err := n.workloadController.GetAllWorkloads("")
+		if err != nil {
+			return err
+		}
+		//reconcile workloads as node condition can change
+		// and it might affect public endpoints
+		for _, w := range workloadsToUpdate {
+			n.workloadController.EnqueueWorkload(w)
+		}
 	}
-	//reconcile workloads as node condition can change
-	// and it might affect public endpoints
-	for _, w := range workloadsToUpdate {
-		n.workloadController.EnqueueWorkload(w)
-	}
+
 	return nil
 }
 
