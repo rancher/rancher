@@ -21,6 +21,8 @@ func ListHandler(request *types.APIContext, next types.RequestHandler) error {
 
 	if request.ID == "" {
 		opts := parse.QueryOptions(request, request.Schema)
+		// Save the pagination on the context so it's not reset later
+		request.Pagination = opts.Pagination
 		data, err = store.List(request, request.Schema, &opts)
 	} else if request.Link == "" {
 		data, err = store.ByID(request, request.Schema, request.ID)
