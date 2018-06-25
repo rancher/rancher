@@ -90,11 +90,13 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	w.WorkloadController = workloadUtil.NewWorkloadController(workload.UserOnlyContext(), w.UpdateEndpoints)
 
 	i := &IngressEndpointsController{
-		workloadController: workloadUtil.NewWorkloadController(workload.UserOnlyContext(), nil),
-		ingressInterface:   workload.Extensions.Ingresses(""),
-		machinesLister:     workload.Management.Management.Nodes(workload.ClusterName).Controller().Lister(),
-		isRKE:              isRKE,
-		clusterName:        workload.ClusterName,
+		ingressInterface:  workload.Extensions.Ingresses(""),
+		ingressLister:     workload.Extensions.Ingresses("").Controller().Lister(),
+		serviceLister:     workload.Core.Services("").Controller().Lister(),
+		serviceController: workload.Core.Services("").Controller(),
+		machinesLister:    workload.Management.Management.Nodes(workload.ClusterName).Controller().Lister(),
+		isRKE:             isRKE,
+		clusterName:       workload.ClusterName,
 	}
 	workload.Extensions.Ingresses("").AddHandler("ingressEndpointsController", i.sync)
 }
