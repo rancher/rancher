@@ -48,6 +48,10 @@ func parseSort(schema *types.Schema, apiContext *types.APIContext) types.Sort {
 }
 
 func parsePagination(apiContext *types.APIContext) *types.Pagination {
+	if apiContext.Pagination != nil {
+		return apiContext.Pagination
+	}
+
 	q := apiContext.Query
 	limit := q.Get("limit")
 	marker := q.Get("marker")

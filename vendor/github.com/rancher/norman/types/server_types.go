@@ -101,6 +101,7 @@ type APIContext struct {
 	URLBuilder                  URLBuilder
 	AccessControl               AccessControl
 	SubContext                  map[string]string
+	Pagination                  *Pagination
 
 	Request  *http.Request
 	Response http.ResponseWriter
