@@ -1,5 +1,5 @@
 import pytest
-from cattle import ApiError
+from rancher import ApiError
 
 
 def test_auth_configs(mc):

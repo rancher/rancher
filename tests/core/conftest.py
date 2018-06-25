@@ -1,4 +1,4 @@
-import cattle
+import rancher
 import pytest
 import requests
 import time
@@ -50,7 +50,7 @@ def mc(url, auth_url, chngpwd):
         'password': 'admin',
         'responseType': 'json',
     }, verify=False)
-    client = cattle.Client(url=url, token=r.json()['token'], verify=False)
+    client = rancher.Client(url=url, token=r.json()['token'], verify=False)
     return ManagementContext(client)
 
 
@@ -58,9 +58,9 @@ def mc(url, auth_url, chngpwd):
 def cc(mc):
     cluster = mc.client.by_id_cluster('local')
     url = cluster.links['self'] + '/schemas'
-    client = cattle.Client(url=url,
-                           verify=False,
-                           token=mc.client._token)
+    client = rancher.Client(url=url,
+                            verify=False,
+                            token=mc.client._token)
     return ClusterContext(mc, cluster, client)
 
 
@@ -74,9 +74,9 @@ def pc(request, cc):
     assert p.state == 'active'
     request.addfinalizer(lambda: cc.management.client.delete(p))
     url = p.links['self'] + '/schemas'
-    return ProjectContext(cc, p, cattle.Client(url=url,
-                                               verify=False,
-                                               token=cc.client._token))
+    return ProjectContext(cc, p, rancher.Client(url=url,
+                                                verify=False,
+                                                token=cc.client._token))
 
 
 def wait_for_condition(type, status, client, obj):
