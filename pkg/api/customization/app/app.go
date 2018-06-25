@@ -15,9 +15,11 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	hcommon "github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	"github.com/rancher/rancher/pkg/ref"
+	clusterschema "github.com/rancher/types/apis/cluster.cattle.io/v3/schema"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	projectschema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
+	clusterv3 "github.com/rancher/types/client/cluster/v3"
 	projectv3 "github.com/rancher/types/client/project/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -78,6 +80,16 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 	if templateVersion.Spec.RequiredNamespace != "" && templateVersion.Spec.RequiredNamespace != targetNamespace {
 		return httperror.NewAPIError(httperror.InvalidType, "template's requiredNamespace doesn't match catalog app's target namespace")
 	}
+
+	// in here access.ByID will only find namespace that is assigned to the current project
+	var ns clusterv3.Namespace
+	if err := access.ByID(request, &clusterschema.Version, clusterv3.NamespaceType, targetNamespace, &ns); err != nil {
+		return err
+	}
+	if ns.Name == "" {
+		return httperror.NewAPIError(httperror.InvalidReference, fmt.Sprintf("target namespace %v is not assigned to the current project %v", targetNamespace, data["projectId"]))
+	}
+
 	return nil
 }
 
