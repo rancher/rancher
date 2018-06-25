@@ -183,7 +183,7 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult
 		}
 
 		if strings.EqualFold("group", entityType) {
-			userPrincipal, groupPrincipals, err := p.findNestedGroups(searchDomain, entityDN, userDN, groupScope, config, lConn, userPrincipal, groupPrincipals)
+			err := p.findNestedGroups(searchDomain, entityDN, userDN, groupScope, config, lConn, userPrincipal)
 			if err != nil {
 				return userPrincipal, groupPrincipals, err
 			}
@@ -192,14 +192,14 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult
 	return userPrincipal, groupPrincipals, nil
 }
 
-func (p *ldapProvider) findNestedGroups(groupSearchDomain string, groupDN string, userDN string, groupScope string, config *v3.LdapConfig, lConn *ldapv2.Conn, userPrincipal v3.Principal, groupPrincipals []v3.Principal) (v3.Principal, []v3.Principal, error) {
+func (p *ldapProvider) findNestedGroups(groupSearchDomain string, groupDN string, userDN string, groupScope string, config *v3.LdapConfig, lConn *ldapv2.Conn, userPrincipal v3.Principal) error {
 	searchGroup := ldapv2.NewSearchRequest(groupSearchDomain,
 		ldapv2.ScopeWholeSubtree, ldapv2.NeverDerefAliases, 0, 0, false,
 		fmt.Sprintf("(&(%v=%v)(objectClass=%v))", config.GroupDNAttribute, groupDN, config.GroupObjectClass),
 		p.getGroupSearchAttributes(config), nil)
 	resultGroup, err := lConn.Search(searchGroup)
 	if err != nil {
-		return userPrincipal, groupPrincipals, err
+		return err
 	}
 
 	if len(resultGroup.Entries) > 0 {
@@ -213,14 +213,14 @@ func (p *ldapProvider) findNestedGroups(groupSearchDomain string, groupDN string
 							config.AllowedPrincipalIDs = append(config.AllowedPrincipalIDs, userPrincipal.ObjectMeta.Name)
 						} else {
 							// find a group'dn == currentDN
-							p.findNestedGroups(groupSearchDomain, currentDN, userDN, groupScope, config, lConn, userPrincipal, groupPrincipals)
+							p.findNestedGroups(groupSearchDomain, currentDN, userDN, groupScope, config, lConn, userPrincipal)
 						}
 					}
 				}
 			}
 		}
 	}
-	return userPrincipal, groupPrincipals, nil
+	return nil
 }
 
 func (p *ldapProvider) findNonDuplicateGroupPrincipals(newGroupPrincipals []v3.Principal, groupPrincipals []v3.Principal, nonDupGroupPrincipals []v3.Principal) []v3.Principal {
