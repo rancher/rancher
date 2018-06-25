@@ -1,6 +1,8 @@
 package endpoints
 
 import (
+	"strings"
+
 	workloadutil "github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/types/apis/extensions/v1beta1"
 	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -20,6 +22,11 @@ func (c *IngressEndpointsController) sync(key string, obj *extensionsv1beta1.Ing
 	namespace := ""
 	if obj != nil {
 		namespace = obj.Namespace
+	} else {
+		split := strings.Split(key, "/")
+		if len(split) == 2 {
+			namespace = split[0]
+		}
 	}
 	c.workloadController.EnqueueAllWorkloads(namespace)
 
