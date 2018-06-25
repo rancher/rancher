@@ -1,5 +1,4 @@
-cattle==0.5.3
-git+https://github.com/ibuildthecloud/gdapi-python.git@5d2e8addde38b24533c434c348d778439f87b122
+git+https://github.com/rancher/client-python.git@dba1fe8a9ea39f8ddc20aeedf0ad1463b932b280
 websocket-client==0.23.0
 PyJWT==1.4.0
 
