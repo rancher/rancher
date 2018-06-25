@@ -68,7 +68,7 @@ func (p *adProvider) testAndApply(actionName string, action *types.Action, reque
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "multiple servers not yet supported")
 	}
 
-	userPrincipal, groupPrincipals, providerInfo, err := p.loginUser(login, config, caPool)
+	userPrincipal, groupPrincipals, err := p.loginUser(login, config, caPool)
 	if err != nil {
 		return err
 	}
@@ -85,7 +85,7 @@ func (p *adProvider) testAndApply(actionName string, action *types.Action, reque
 		return err
 	}
 
-	return p.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerInfo, 0, "Token via AD Configuration", request)
+	return p.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, "", 0, "Token via AD Configuration", request)
 }
 
 func (p *adProvider) saveActiveDirectoryConfig(config *v3.ActiveDirectoryConfig) error {

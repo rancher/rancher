@@ -17,19 +17,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) (v3.Principal, []v3.Principal, map[string]string, error) {
+func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) (v3.Principal, []v3.Principal, error) {
 	logrus.Debug("Now generating Ldap token")
 
 	username := adCredential.Username
 	password := adCredential.Password
 	if password == "" {
-		return v3.Principal{}, nil, nil, httperror.NewAPIError(httperror.MissingRequired, "password not provided")
+		return v3.Principal{}, nil, httperror.NewAPIError(httperror.MissingRequired, "password not provided")
 	}
 	externalID := ldap.GetUserExternalID(username, config.DefaultLoginDomain)
 
 	lConn, err := p.ldapConnection(config, caPool)
 	if err != nil {
-		return v3.Principal{}, nil, nil, err
+		return v3.Principal{}, nil, err
 	}
 	defer lConn.Close()
 
@@ -42,9 +42,9 @@ func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.Act
 	err = lConn.Bind(externalID, password)
 	if err != nil {
 		if ldapv2.IsErrorWithCode(err, ldapv2.LDAPResultInvalidCredentials) {
-			return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
+			return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
 		}
-		return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.ServerError, "server error while authenticating")
+		return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.ServerError, "server error while authenticating")
 	}
 
 	samName := username
@@ -60,18 +60,18 @@ func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.Act
 
 	userPrincipal, groupPrincipals, err := p.userRecord(search, lConn, config, caPool)
 	if err != nil {
-		return v3.Principal{}, nil, nil, err
+		return v3.Principal{}, nil, err
 	}
 
 	allowed, err := p.userMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipal, groupPrincipals)
 	if err != nil {
-		return v3.Principal{}, nil, nil, err
+		return v3.Principal{}, nil, err
 	}
 	if !allowed {
-		return v3.Principal{}, nil, nil, httperror.NewAPIError(httperror.Unauthorized, "unauthorized")
+		return v3.Principal{}, nil, httperror.NewAPIError(httperror.Unauthorized, "unauthorized")
 	}
 
-	return userPrincipal, groupPrincipals, map[string]string{}, err
+	return userPrincipal, groupPrincipals, err
 }
 
 func (p *adProvider) userRecord(search *ldapv2.SearchRequest, lConn *ldapv2.Conn, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) (v3.Principal, []v3.Principal, error) {

@@ -79,10 +79,10 @@ func (l *Provider) TransformToAuthProvider(authConfig map[string]interface{}) ma
 	return common.TransformToAuthProvider(authConfig)
 }
 
-func (l *Provider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Principal, map[string]string, error) {
+func (l *Provider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Principal, string, error) {
 	localInput, ok := input.(*v3public.BasicLogin)
 	if !ok {
-		return v3.Principal{}, nil, nil, httperror.NewAPIError(httperror.ServerError, "Unexpected input type")
+		return v3.Principal{}, nil, "", httperror.NewAPIError(httperror.ServerError, "Unexpected input type")
 	}
 
 	username := localInput.Username
@@ -90,23 +90,23 @@ func (l *Provider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Princ
 
 	objs, err := l.userIndexer.ByIndex(userNameIndex, username)
 	if err != nil {
-		return v3.Principal{}, nil, nil, err
+		return v3.Principal{}, nil, "", err
 	}
 	if len(objs) == 0 {
-		return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
+		return v3.Principal{}, nil, "", httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
 	}
 	if len(objs) > 1 {
-		return v3.Principal{}, nil, nil, fmt.Errorf("found more than one users with username %v", username)
+		return v3.Principal{}, nil, "", fmt.Errorf("found more than one users with username %v", username)
 	}
 
 	user, ok := objs[0].(*v3.User)
 	if !ok {
-		return v3.Principal{}, nil, nil, fmt.Errorf("fatal error. %v is not a user", objs[0])
+		return v3.Principal{}, nil, "", fmt.Errorf("fatal error. %v is not a user", objs[0])
 
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(pwd)); err != nil {
-		return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
+		return v3.Principal{}, nil, "", httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
 	}
 
 	principalID := getLocalPrincipalID(user)
@@ -115,12 +115,12 @@ func (l *Provider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Princ
 
 	groupPrincipals, err := l.getGroupPrincipals(user)
 	if err != nil {
-		return v3.Principal{}, nil, nil, errors.Wrapf(err, "failed to get groups for %v", user.ObjectMeta.Name)
+		return v3.Principal{}, nil, "", errors.Wrapf(err, "failed to get groups for %v", user.ObjectMeta.Name)
 	}
 
 	acs, err := l.authConfigLister.List("", labels.Everything())
 	if err != nil {
-		return v3.Principal{}, nil, nil, err
+		return v3.Principal{}, nil, "", err
 	}
 
 	var checked, allowed bool
@@ -129,7 +129,7 @@ func (l *Provider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Princ
 			checked = true
 			allowed, err = l.userMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipal, groupPrincipals)
 			if err != nil {
-				return v3.Principal{}, nil, nil, err
+				return v3.Principal{}, nil, "", err
 			}
 			if allowed {
 				break
@@ -138,10 +138,10 @@ func (l *Provider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Princ
 	}
 
 	if checked && !allowed {
-		return v3.Principal{}, nil, nil, httperror.NewAPIError(httperror.Unauthorized, "unauthorized")
+		return v3.Principal{}, nil, "", httperror.NewAPIError(httperror.Unauthorized, "unauthorized")
 	}
 
-	return userPrincipal, groupPrincipals, map[string]string{}, nil
+	return userPrincipal, groupPrincipals, "", nil
 }
 
 func getLocalPrincipalID(user *v3.User) string {

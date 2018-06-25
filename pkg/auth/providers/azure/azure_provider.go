@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -58,10 +59,10 @@ func (ap *azureProvider) GetName() string {
 
 func (ap *azureProvider) AuthenticateUser(
 	input interface{},
-) (v3.Principal, []v3.Principal, map[string]string, error) {
+) (v3.Principal, []v3.Principal, string, error) {
 	login, ok := input.(*v3public.AzureADLogin)
 	if !ok {
-		return v3.Principal{}, nil, nil, errors.New("unexpected input type")
+		return v3.Principal{}, nil, "", errors.New("unexpected input type")
 	}
 	return ap.loginUser(login, nil, false)
 }
@@ -155,34 +156,29 @@ func (ap *azureProvider) loginUser(
 	azureCredential *v3public.AzureADLogin,
 	config *v3.AzureADConfig,
 	test bool,
-) (v3.Principal, []v3.Principal, map[string]string, error) {
+) (v3.Principal, []v3.Principal, string, error) {
 	var err error
 
 	if config == nil {
 		config, err = ap.getAzureConfigK8s()
 		if err != nil {
-			return v3.Principal{}, nil, nil, err
+			return v3.Principal{}, nil, "", err
 		}
 	}
 
 	azureClient, err := newClientCode(azureCredential.Code, config)
 	if err != nil {
-		return v3.Principal{}, nil, nil, err
-	}
-
-	providerInfo, err := createProviderInfo(azureClient)
-	if err != nil {
-		return v3.Principal{}, nil, nil, err
+		return v3.Principal{}, nil, "", err
 	}
 
 	oid, err := parseJWTforField(azureClient.accessToken(), "oid")
 	if err != nil {
-		return v3.Principal{}, nil, nil, err
+		return v3.Principal{}, nil, "", err
 	}
 
 	user, err := azureClient.userClient.Get(context.Background(), oid)
 	if err != nil {
-		return v3.Principal{}, nil, nil, err
+		return v3.Principal{}, nil, "", err
 	}
 
 	userPrincipal := ap.userToPrincipal(user)
@@ -195,12 +191,12 @@ func (ap *azureProvider) loginUser(
 
 	userGroups, err := azureClient.userClient.GetMemberGroups(context.Background(), *user.ObjectID, params)
 	if err != nil {
-		return v3.Principal{}, nil, nil, err
+		return v3.Principal{}, nil, "", err
 	}
 
 	groupPrincipals, err := ap.userGroupsToPrincipals(azureClient, userGroups)
 	if err != nil {
-		return v3.Principal{}, nil, nil, err
+		return v3.Principal{}, nil, "", err
 	}
 
 	testAllowedPrincipals := config.AllowedPrincipalIDs
@@ -210,13 +206,18 @@ func (ap *azureProvider) loginUser(
 
 	allowed, err := ap.userMGR.CheckAccess(config.AccessMode, testAllowedPrincipals, userPrincipal, groupPrincipals)
 	if err != nil {
-		return v3.Principal{}, nil, nil, err
+		return v3.Principal{}, nil, "", err
 	}
 	if !allowed {
-		return v3.Principal{}, nil, nil, httperror.NewAPIError(httperror.Unauthorized, "unauthorized")
+		return v3.Principal{}, nil, "", httperror.NewAPIError(httperror.Unauthorized, "unauthorized")
 	}
 
-	return userPrincipal, groupPrincipals, providerInfo, nil
+	providerToken, err := azureClient.marshalTokenJSON()
+	if err != nil {
+		return v3.Principal{}, nil, "", err
+	}
+
+	return userPrincipal, groupPrincipals, string(providerToken), nil
 }
 
 func (ap *azureProvider) getUser(client *azureClient, principalID string, token v3.Token) (v3.Principal, error) {
@@ -281,7 +282,12 @@ func (ap *azureProvider) newAzureClient(token v3.Token) (*azureClient, error) {
 		return nil, err
 	}
 
-	client, err := newClientToken(token, config)
+	azureToken, err := ap.getAzureToken(&token)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := newClientToken(token, config, azureToken)
 	if err != nil {
 		return nil, err
 	}
@@ -374,45 +380,48 @@ func (ap *azureProvider) groupToPrincipal(group graphrbac.ADGroup) v3.Principal 
 	return p
 }
 
-// createProviderInfo marshalls the token and saves it
-func createProviderInfo(azureClient *azureClient) (map[string]string, error) {
-	pi := make(map[string]string)
-	token, err := azureClient.marshalTokenJSON()
+func (ap *azureProvider) getAzureToken(token *v3.Token) (adal.Token, error) {
+	var azureToken adal.Token
+	secret, err := ap.tokenMGR.GetSecret(token)
 	if err != nil {
-		return nil, err
+		if !apierrors.IsNotFound(err) {
+			return azureToken, err
+		}
+		secret = token.ProviderInfo["access_token"]
 	}
-	pi["access_token"] = string(token)
-	return pi, nil
+	err = json.Unmarshal([]byte(secret), &azureToken)
+	if err != nil {
+		return azureToken, err
+	}
+	return azureToken, nil
 }
 
-// extractProviderInfo unmarshalls the token
-func extractProviderInfo(pi map[string]string) (adal.Token, error) {
-	var token adal.Token
-	err := json.Unmarshal([]byte(pi["access_token"]), &token)
-	if err != nil {
-		return token, err
-	}
-	return token, nil
-}
-
-// updateToken compares the current azure token to the azure token living on the
-// v3.Token and if different updates the v3.Token
+// updateToken compares the current azure token to the azure token living in the
+// secret and updates if needed
 func (ap *azureProvider) updateToken(client *azureClient, token *v3.Token) error {
 	new, err := client.marshalTokenJSON()
 	if err != nil {
 		return err
 	}
 	stringNew := string(new)
-	if stringNew == token.ProviderInfo["access_token"] {
+
+	secret, err := ap.tokenMGR.GetSecret(token)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// providerToken doesn't exists as a secret, update on token
+			if current, ok := token.ProviderInfo["access_token"]; ok && current != stringNew {
+				token.ProviderInfo["access_token"] = stringNew
+			}
+			return nil
+		}
+		return err
+	}
+
+	if stringNew == secret {
 		return nil
 	}
 
-	token.ProviderInfo["access_token"] = stringNew
-	_, err = ap.tokenMGR.UpateLoginToken(token)
-	if err != nil {
-		return err
-	}
-	return nil
+	return ap.tokenMGR.UpdateSecret(token.UserID, token.AuthProvider, stringNew)
 }
 
 func formAzureRedirectURL(config map[string]interface{}) string {

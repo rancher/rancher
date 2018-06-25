@@ -22,6 +22,8 @@ type userLifecycle struct {
 	tokens          v3.TokenInterface
 	namespaces      v1.NamespaceInterface
 	namespaceLister v1.NamespaceLister
+	secrets         v1.SecretInterface
+	secretsLister   v1.SecretLister
 	prtbLister      v3.ProjectRoleTemplateBindingLister
 	crtbLister      v3.ClusterRoleTemplateBindingLister
 	grbLister       v3.GlobalRoleBindingLister
@@ -47,6 +49,8 @@ func newUserLifecycle(management *config.ManagementContext) *userLifecycle {
 		users:           management.Management.Users(""),
 		tokens:          management.Management.Tokens(""),
 		namespaces:      management.Core.Namespaces(""),
+		secrets:         management.Core.Secrets(""),
+		secretsLister:   management.Core.Secrets("").Controller().Lister(),
 		prtbLister:      management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
 		crtbLister:      management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
 		grbLister:       management.Management.GlobalRoleBindings("").Controller().Lister(),
@@ -182,6 +186,11 @@ func (l *userLifecycle) Remove(user *v3.User) (*v3.User, error) {
 	}
 
 	err = l.deleteUserNamespace(user.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	err = l.deleteUserSecret(user.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -353,4 +362,15 @@ func (l *userLifecycle) deleteUserNamespace(username string) error {
 	}
 
 	return nil
+}
+
+func (l *userLifecycle) deleteUserSecret(username string) error {
+	_, err := l.secretsLister.Get("cattle-system", username+"-secret")
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	return l.secrets.Delete(username+"-secret", &metav1.DeleteOptions{})
 }

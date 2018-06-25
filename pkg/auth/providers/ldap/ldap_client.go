@@ -19,19 +19,19 @@ import (
 
 var operationalAttrList = []string{"1.1", "+", "*"}
 
-func (p *ldapProvider) loginUser(credential *v3public.BasicLogin, config *v3.LdapConfig, caPool *x509.CertPool) (v3.Principal, []v3.Principal, map[string]string, error) {
+func (p *ldapProvider) loginUser(credential *v3public.BasicLogin, config *v3.LdapConfig, caPool *x509.CertPool) (v3.Principal, []v3.Principal, error) {
 	logrus.Debug("Now generating Ldap token")
 
 	username := credential.Username
 	password := credential.Password
 
 	if password == "" {
-		return v3.Principal{}, nil, nil, httperror.NewAPIError(httperror.MissingRequired, "password not provided")
+		return v3.Principal{}, nil, httperror.NewAPIError(httperror.MissingRequired, "password not provided")
 	}
 
 	lConn, err := p.ldapConnection(config, caPool)
 	if err != nil {
-		return v3.Principal{}, nil, nil, err
+		return v3.Principal{}, nil, err
 	}
 	defer lConn.Close()
 
@@ -48,22 +48,22 @@ func (p *ldapProvider) loginUser(credential *v3public.BasicLogin, config *v3.Lda
 		p.getUserSearchAttributes(config), nil)
 	result, err := lConn.Search(searchRequest)
 	if err != nil {
-		return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed") // need to reload this error
+		return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed") // need to reload this error
 	}
 
 	if len(result.Entries) < 1 {
-		return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "Cannot locate user information for "+searchRequest.Filter)
+		return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "Cannot locate user information for "+searchRequest.Filter)
 	} else if len(result.Entries) > 1 {
-		return v3.Principal{}, nil, nil, fmt.Errorf("ldap user search found more than one result")
+		return v3.Principal{}, nil, fmt.Errorf("ldap user search found more than one result")
 	}
 
 	userDN := result.Entries[0].DN //userDN is externalID
 	err = lConn.Bind(userDN, password)
 	if err != nil {
 		if ldapv2.IsErrorWithCode(err, ldapv2.LDAPResultInvalidCredentials) {
-			return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed: invalid credentials")
+			return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed: invalid credentials")
 		}
-		return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.ServerError, "server error while authenticating")
+		return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.ServerError, "server error while authenticating")
 	}
 
 	searchOpRequest := ldapv2.NewSearchRequest(userDN,
@@ -72,22 +72,22 @@ func (p *ldapProvider) loginUser(credential *v3public.BasicLogin, config *v3.Lda
 		operationalAttrList, nil)
 	opResult, err := lConn.Search(searchOpRequest)
 	if err != nil {
-		return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed") // need to reload this error
+		return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed") // need to reload this error
 	}
 	userPrincipal, groupPrincipals, err := p.getPrincipalsFromSearchResult(result, opResult, config, lConn)
 	if err != nil {
-		return v3.Principal{}, nil, nil, err
+		return v3.Principal{}, nil, err
 	}
 
 	allowed, err := p.userMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipal, groupPrincipals)
 	if err != nil {
-		return v3.Principal{}, nil, nil, err
+		return v3.Principal{}, nil, err
 	}
 	if !allowed {
-		return v3.Principal{}, nil, nil, httperror.NewAPIError(httperror.PermissionDenied, "Permission denied")
+		return v3.Principal{}, nil, httperror.NewAPIError(httperror.PermissionDenied, "Permission denied")
 	}
 
-	return userPrincipal, groupPrincipals, map[string]string{}, err
+	return userPrincipal, groupPrincipals, err
 }
 
 func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult, opResult *ldapv2.SearchResult, config *v3.LdapConfig, lConn *ldapv2.Conn) (v3.Principal, []v3.Principal, error) {
