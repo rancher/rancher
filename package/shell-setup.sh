@@ -51,6 +51,7 @@ PS1="> "
 . /etc/bash_completion
 alias k="kubectl"
 alias ks="kubectl -n kube-system"
+source <(kubectl completion bash)
 EOF
 
 chmod 777 .kube .bashrc
