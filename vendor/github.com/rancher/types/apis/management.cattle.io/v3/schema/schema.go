@@ -367,7 +367,7 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 				},
 			}
 			schema.CollectionMethods = []string{}
-			schema.ResourceMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
 		}).
 		MustImport(&Version, v3.OpenLdapTestAndApplyInput{}).
 		// FreeIpa Config
@@ -380,7 +380,7 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 				},
 			}
 			schema.CollectionMethods = []string{}
-			schema.ResourceMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
 			schema.MustCustomizeField("groupObjectClass", func(f types.Field) types.Field {
 				f.Default = "groupofnames"
 				return f
