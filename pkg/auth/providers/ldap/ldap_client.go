@@ -95,6 +95,7 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult
 	var nonDupGroupPrincipals []v3.Principal
 	var userScope, groupScope string
 	entry := result.Entries[0]
+	userDN := result.Entries[0].DN
 	userAttributes := entry.Attributes
 
 	if !p.permissionCheck(userAttributes, config) {
@@ -166,6 +167,59 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult
 		}
 	}
 
+	allowedPrincipalIDs := config.AllowedPrincipalIDs
+	for _, allowedPid := range allowedPrincipalIDs {
+		parts := strings.SplitN(allowedPid, ":", 2)
+		if len(parts) != 2 {
+			return userPrincipal, groupPrincipals, errors.Errorf("invalid id %v", allowedPid)
+		}
+		scope := parts[0]
+		entityType := strings.Split(scope, "_")[1]
+		entityDN := strings.TrimPrefix(parts[1], "//")
+
+		searchDomain := config.UserSearchBase
+		if config.GroupSearchBase != "" {
+			searchDomain = config.GroupSearchBase
+		}
+
+		if strings.EqualFold("group", entityType) {
+			userPrincipal, groupPrincipals, err := p.findNestedGroups(searchDomain, entityDN, userDN, groupScope, config, lConn, userPrincipal, groupPrincipals)
+			if err != nil {
+				return userPrincipal, groupPrincipals, err
+			}
+		}
+	}
+	return userPrincipal, groupPrincipals, nil
+}
+
+func (p *ldapProvider) findNestedGroups(groupSearchDomain string, groupDN string, userDN string, groupScope string, config *v3.LdapConfig, lConn *ldapv2.Conn, userPrincipal v3.Principal, groupPrincipals []v3.Principal) (v3.Principal, []v3.Principal, error) {
+	searchGroup := ldapv2.NewSearchRequest(groupSearchDomain,
+		ldapv2.ScopeWholeSubtree, ldapv2.NeverDerefAliases, 0, 0, false,
+		fmt.Sprintf("(&(%v=%v)(objectClass=%v))", config.GroupDNAttribute, groupDN, config.GroupObjectClass),
+		p.getGroupSearchAttributes(config), nil)
+	resultGroup, err := lConn.Search(searchGroup)
+	if err != nil {
+		return userPrincipal, groupPrincipals, err
+	}
+
+	if len(resultGroup.Entries) > 0 {
+		for _, entry := range resultGroup.Entries {
+			entryAttr := entry.Attributes
+			for _, attr := range entryAttr {
+				if attr.Name == "member" {
+					for _, currentDN := range attr.Values {
+						if currentDN == userDN {
+							//add this user to allowedPrincipalID list
+							config.AllowedPrincipalIDs = append(config.AllowedPrincipalIDs, userPrincipal.ObjectMeta.Name)
+						} else {
+							// find a group'dn == currentDN
+							p.findNestedGroups(groupSearchDomain, currentDN, userDN, groupScope, config, lConn, userPrincipal, groupPrincipals)
+						}
+					}
+				}
+			}
+		}
+	}
 	return userPrincipal, groupPrincipals, nil
 }
 
@@ -214,8 +268,8 @@ func (p *ldapProvider) getPrincipal(distinguishedName string, scope string, conf
 		return nil, nil
 	}
 
-	userType := strings.Split(scope, "_")[1]
-	if strings.EqualFold("user", userType) {
+	entityType := strings.Split(scope, "_")[1]
+	if strings.EqualFold("user", entityType) {
 		filter = "(" + ObjectClassAttribute + "=" + config.UserObjectClass + ")"
 	} else {
 		filter = "(" + ObjectClassAttribute + "=" + config.GroupObjectClass + ")"
@@ -236,9 +290,9 @@ func (p *ldapProvider) getPrincipal(distinguishedName string, scope string, conf
 	if err != nil {
 		if ldapv2.IsErrorWithCode(err, ldapv2.LDAPResultInvalidCredentials) && config.Enabled {
 			var kind string
-			if strings.EqualFold("user", userType) {
+			if strings.EqualFold("user", entityType) {
 				kind = "user"
-			} else if strings.EqualFold("group", userType) {
+			} else if strings.EqualFold("group", entityType) {
 				kind = "group"
 			}
 			principal := &v3.Principal{
@@ -253,7 +307,7 @@ func (p *ldapProvider) getPrincipal(distinguishedName string, scope string, conf
 		return nil, fmt.Errorf("Error in ldap bind: %v", err)
 	}
 
-	if strings.EqualFold("user", userType) {
+	if strings.EqualFold("user", entityType) {
 		search = ldapv2.NewSearchRequest(distinguishedName,
 			ldapv2.ScopeBaseObject, ldapv2.NeverDerefAliases, 0, 0, false,
 			filter,
@@ -417,9 +471,9 @@ func (p *ldapProvider) searchLdap(query string, scope string, config *v3.LdapCon
 	principals := []v3.Principal{}
 	var search *ldapv2.SearchRequest
 
-	userType := strings.Split(scope, "_")[1]
+	entityType := strings.Split(scope, "_")[1]
 	searchDomain := config.UserSearchBase
-	if strings.EqualFold("user", userType) {
+	if strings.EqualFold("user", entityType) {
 		search = ldapv2.NewSearchRequest(searchDomain,
 			ldapv2.ScopeWholeSubtree, ldapv2.NeverDerefAliases, 0, 0, false,
 			query,
@@ -488,10 +542,11 @@ func (p *ldapProvider) getUserSearchAttributes(config *v3.LdapConfig) []string {
 
 func (p *ldapProvider) getGroupSearchAttributes(config *v3.LdapConfig) []string {
 	ldapConfig := &v3.LdapConfig{
-		GroupMemberUserAttribute: config.GroupMemberUserAttribute,
-		GroupObjectClass:         config.GroupObjectClass,
-		UserLoginAttribute:       config.UserLoginAttribute,
-		GroupNameAttribute:       config.GroupNameAttribute,
-		GroupSearchAttribute:     config.GroupSearchAttribute}
+		GroupMemberUserAttribute:    config.GroupMemberUserAttribute,
+		GroupMemberMappingAttribute: config.GroupMemberMappingAttribute,
+		GroupObjectClass:            config.GroupObjectClass,
+		UserLoginAttribute:          config.UserLoginAttribute,
+		GroupNameAttribute:          config.GroupNameAttribute,
+		GroupSearchAttribute:        config.GroupSearchAttribute}
 	return ldap.GetGroupSearchAttributesForLDAP(ldapConfig)
 }
