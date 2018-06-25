@@ -70,7 +70,7 @@ func (ap *azureProvider) testAndApply(actionName string, action *types.Action, r
 	}
 
 	//Call provider
-	userPrincipal, groupPrincipals, providerInfo, err := ap.loginUser(azureLogin, &azureADConfig, true)
+	userPrincipal, groupPrincipals, providerToken, err := ap.loginUser(azureLogin, &azureADConfig, true)
 	if err != nil {
 		if httperror.IsAPIError(err) {
 			return err
@@ -88,5 +88,5 @@ func (ap *azureProvider) testAndApply(actionName string, action *types.Action, r
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to save azure config: %v", err))
 	}
 
-	return ap.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerInfo, 0, "Token via Azure Configuration", request)
+	return ap.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerToken, 0, "Token via Azure Configuration", request)
 }

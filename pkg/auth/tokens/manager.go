@@ -13,10 +13,11 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/util"
 	"github.com/rancher/rancher/pkg/randomtoken"
+	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apicorev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -31,6 +32,8 @@ const (
 	UserIDLabel              = "authn.management.cattle.io/token-userId"
 	tokenKeyIndex            = "authn.management.cattle.io/token-key-index"
 	userAttributeByUserIndex = "authn.management.cattle.io/user-attrib-by-user"
+	secretNameEnding         = "-secret"
+	secretNamespace          = "cattle-system"
 )
 
 func NewManager(ctx context.Context, apiContext *config.ScaledContext) *Manager {
@@ -48,6 +51,8 @@ func NewManager(ctx context.Context, apiContext *config.ScaledContext) *Manager 
 		userAttributes:      apiContext.Management.UserAttributes(""),
 		userAttributeLister: apiContext.Management.UserAttributes("").Controller().Lister(),
 		userLister:          apiContext.Management.Users("").Controller().Lister(),
+		secrets:             apiContext.Core.Secrets(""),
+		secretLister:        apiContext.Core.Secrets("").Controller().Lister(),
 	}
 }
 
@@ -59,6 +64,8 @@ type Manager struct {
 	userIndexer         cache.Indexer
 	tokenIndexer        cache.Indexer
 	userLister          v3.UserLister
+	secrets             v1.SecretInterface
+	secretLister        v1.SecretLister
 }
 
 func userPrincipalIndexer(obj interface{}) ([]string, error) {
@@ -224,7 +231,7 @@ func (m *Manager) deleteToken(tokenAuthValue string) (int, error) {
 func (m *Manager) deleteTokenByName(tokenName string) (int, error) {
 	err := m.tokensClient.Delete(tokenName, &metav1.DeleteOptions{})
 	if err != nil {
-		if e2, ok := err.(*errors.StatusError); ok && e2.Status().Code == 404 {
+		if apierrors.IsNotFound(err) {
 			return 0, nil
 		}
 		return 500, fmt.Errorf("failed to delete token")
@@ -271,13 +278,13 @@ func (m *Manager) deriveToken(request *types.APIContext) error {
 
 	bytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		logrus.Errorf("GetToken failed with error: %v", err)
+		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("%s", err))
 	}
-	jsonInput := v3.Token{}
 
+	jsonInput := v3.Token{}
 	err = json.Unmarshal(bytes, &jsonInput)
 	if err != nil {
-		logrus.Errorf("unmarshal failed with error: %v", err)
+		return httperror.NewAPIError(httperror.InvalidFormat, fmt.Sprintf("%s", err))
 	}
 
 	var token v3.Token
@@ -446,6 +453,57 @@ func (m *Manager) removeToken(request *types.APIContext) error {
 	return nil
 }
 
+// CreateSecret saves the secret in k8s. Secret is saved under the userID-secret with
+// key being the provider and data being the providers secret
+func (m *Manager) CreateSecret(userID, provider, secret string) error {
+	_, err := m.secretLister.Get(secretNamespace, userID+secretNameEnding)
+	// An error either means it already exists or something bad happened
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+		// The secret doesn't exist so create it
+		data := make(map[string]string)
+		data[provider] = secret
+
+		s := apicorev1.Secret{
+			StringData: data,
+		}
+		s.ObjectMeta = metav1.ObjectMeta{
+			Name:      userID + secretNameEnding,
+			Namespace: secretNamespace,
+		}
+		_, err = m.secrets.Create(&s)
+		return err
+	}
+
+	// No error means the secret already exists and needs to be updated
+	return m.UpdateSecret(userID, provider, secret)
+}
+
+func (m *Manager) GetSecret(token *v3.Token) (string, error) {
+	cachedSecret, err := m.secretLister.Get(secretNamespace, token.UserID+secretNameEnding)
+	if err != nil {
+		return "", err
+	}
+
+	return string(cachedSecret.Data[token.AuthProvider]), nil
+}
+
+func (m *Manager) UpdateSecret(userID, provider, secret string) error {
+	cachedSecret, err := m.secretLister.Get(secretNamespace, userID+secretNameEnding)
+	if err != nil {
+		return err
+	}
+
+	cachedSecret = cachedSecret.DeepCopy()
+
+	cachedSecret.Data[provider] = []byte(secret)
+
+	_, err = m.secrets.Update(cachedSecret)
+	return err
+}
+
 func (m *Manager) userAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal) error {
 	attribs, err := m.userAttributeLister.Get("", userID)
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -508,8 +566,15 @@ var uaBackoff = wait.Backoff{
 	Steps:    5,
 }
 
-func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerInfo map[string]string, ttl int64, description string) (v3.Token, error) {
-	provider := getAuthProviderName(userPrincipal.Name)
+func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int64, description string) (v3.Token, error) {
+	provider := userPrincipal.Provider
+
+	if (provider == "github" || provider == "azuread") && providerToken != "" {
+		err := m.CreateSecret(userID, provider, providerToken)
+		if err != nil {
+			return v3.Token{}, fmt.Errorf("unable to create secret: %s", err)
+		}
+	}
 
 	err := wait.ExponentialBackoff(uaBackoff, func() (bool, error) {
 		err := m.userAttributeCreateOrUpdate(userID, provider, groupPrincipals)
@@ -529,7 +594,6 @@ func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, group
 		TTLMillis:     ttl,
 		UserID:        userID,
 		AuthProvider:  provider,
-		ProviderInfo:  providerInfo,
 		Description:   description,
 	}
 
@@ -600,8 +664,8 @@ func (m *Manager) IsMemberOf(token v3.Token, group v3.Principal) bool {
 	return groups[group.Name]
 }
 
-func (m *Manager) CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerInfo map[string]string, ttl int, description string, request *types.APIContext) error {
-	token, err := m.NewLoginToken(userID, userPrincipal, groupPrincipals, providerInfo, 0, description)
+func (m *Manager) CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error {
+	token, err := m.NewLoginToken(userID, userPrincipal, groupPrincipals, providerToken, 0, description)
 	if err != nil {
 		logrus.Errorf("Failed creating token with error: %v", err)
 		return httperror.NewAPIErrorLong(500, "", fmt.Sprintf("Failed creating token with error: %v", err))

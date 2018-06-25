@@ -78,7 +78,7 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	providersByType[publicclient.FreeIpaProviderType] = p
 }
 
-func AuthenticateUser(input interface{}, providerName string) (v3.Principal, []v3.Principal, map[string]string, error) {
+func AuthenticateUser(input interface{}, providerName string) (v3.Principal, []v3.Principal, string, error) {
 	return providers[providerName].AuthenticateUser(input)
 }
 

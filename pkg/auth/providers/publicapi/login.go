@@ -130,7 +130,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	}
 
 	// Authenticate User
-	userPrincipal, groupPrincipals, providerInfo, err := providers.AuthenticateUser(input, providerName)
+	userPrincipal, groupPrincipals, providerToken, err := providers.AuthenticateUser(input, providerName)
 	if err != nil {
 		return v3.Token{}, "", err
 	}
@@ -146,6 +146,6 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		return v3.Token{}, "", err
 	}
 
-	rToken, err := h.tokenMGR.NewLoginToken(user.Name, userPrincipal, groupPrincipals, providerInfo, ttl, description)
+	rToken, err := h.tokenMGR.NewLoginToken(user.Name, userPrincipal, groupPrincipals, providerToken, ttl, description)
 	return rToken, responseType, err
 }

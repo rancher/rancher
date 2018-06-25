@@ -69,18 +69,23 @@ func (p *adProvider) TransformToAuthProvider(authConfig map[string]interface{}) 
 	return ap
 }
 
-func (p *adProvider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Principal, map[string]string, error) {
+func (p *adProvider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Principal, string, error) {
 	login, ok := input.(*v3public.BasicLogin)
 	if !ok {
-		return v3.Principal{}, nil, nil, errors.New("unexpected input type")
+		return v3.Principal{}, nil, "", errors.New("unexpected input type")
 	}
 
 	config, caPool, err := p.getActiveDirectoryConfig()
 	if err != nil {
-		return v3.Principal{}, nil, nil, errors.New("can't find authprovider")
+		return v3.Principal{}, nil, "", errors.New("can't find authprovider")
 	}
 
-	return p.loginUser(login, config, caPool)
+	principal, groupPrincipal, err := p.loginUser(login, config, caPool)
+	if err != nil {
+		return v3.Principal{}, nil, "", err
+	}
+
+	return principal, groupPrincipal, "", err
 }
 
 func (p *adProvider) SearchPrincipals(searchKey, principalType string, myToken v3.Token) ([]v3.Principal, error) {

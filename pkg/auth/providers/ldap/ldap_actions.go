@@ -73,7 +73,7 @@ func (p *ldapProvider) testAndApply(actionName string, action *types.Action, req
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "multiple servers not yet supported")
 	}
 
-	userPrincipal, groupPrincipals, providerInfo, err := p.loginUser(login, config, caPool)
+	userPrincipal, groupPrincipals, err := p.loginUser(login, config, caPool)
 	if err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ func (p *ldapProvider) testAndApply(actionName string, action *types.Action, req
 	if err != nil {
 		return err
 	}
-	return p.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerInfo, 0, "Token via LDAP Configuration", request)
+	return p.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, "", 0, "Token via LDAP Configuration", request)
 }
 
 func (p *ldapProvider) saveLDAPConfig(config *v3.LdapConfig) error {
