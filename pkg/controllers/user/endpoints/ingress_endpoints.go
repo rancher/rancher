@@ -1,27 +1,43 @@
 package endpoints
 
 import (
-	workloadutil "github.com/rancher/rancher/pkg/controllers/user/workload"
+	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/extensions/v1beta1"
 	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 type IngressEndpointsController struct {
-	workloadController workloadutil.CommonController
-	ingressInterface   v1beta1.IngressInterface
-	machinesLister     managementv3.NodeLister
-	isRKE              bool
-	clusterName        string
+	ingressInterface  v1beta1.IngressInterface
+	ingressLister     v1beta1.IngressLister
+	serviceLister     v1.ServiceLister
+	serviceController v1.ServiceController
+	machinesLister    managementv3.NodeLister
+	isRKE             bool
+	clusterName       string
 }
 
 func (c *IngressEndpointsController) sync(key string, obj *extensionsv1beta1.Ingress) error {
-	namespace := ""
-	if obj != nil {
-		namespace = obj.Namespace
+	var ingresses []*extensionsv1beta1.Ingress
+	var err error
+
+	if obj == nil {
+		ingresses, err = c.ingressLister.List("", labels.NewSelector())
+		if err != nil {
+			return err
+		}
+	} else {
+		ingresses = []*extensionsv1beta1.Ingress{obj}
 	}
-	c.workloadController.EnqueueAllWorkloads(namespace)
+
+	for _, ingress := range ingresses {
+		for _, service := range c.getServicesFromIngress(ingress) {
+			c.serviceController.Enqueue(service.Namespace, service.Name)
+		}
+	}
 
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil
@@ -60,4 +76,26 @@ func (c *IngressEndpointsController) reconcileEndpointsForIngress(obj *extension
 	_, err = c.ingressInterface.Update(toUpdate)
 
 	return false, err
+}
+
+func (c *IngressEndpointsController) getServicesFromIngress(obj *extensionsv1beta1.Ingress) (services []*corev1.Service) {
+	if obj.Spec.Backend != nil {
+		svc, err := c.serviceLister.Get(obj.Namespace, obj.Spec.Backend.ServiceName)
+		if err != nil {
+			logrus.WithError(err).Warnf("can not get service %s:%s when refresh ingress %s endpoint", obj.Namespace, obj.Spec.Backend.ServiceName, obj.Name)
+		} else {
+			services = append(services, svc)
+		}
+	}
+	for _, rule := range obj.Spec.Rules {
+		for _, path := range rule.HTTP.Paths {
+			svc, err := c.serviceLister.Get(obj.Namespace, path.Backend.ServiceName)
+			if err != nil {
+				logrus.WithError(err).Warnf("can not get service %s:%s when refresh ingress %s endpoint", obj.Namespace, path.Backend.ServiceName, obj.Name)
+			} else {
+				services = append(services, svc)
+			}
+		}
+	}
+	return services
 }
