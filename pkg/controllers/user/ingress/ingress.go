@@ -47,21 +47,6 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) error {
 		return nil
 	}
 
-	ingressServices := map[string]*corev1.Service{}
-	services, err := c.serviceLister.List(obj.Namespace, labels.NewSelector())
-	if err != nil {
-		logrus.Error(err)
-		services = []*corev1.Service{}
-	}
-	for _, service := range services {
-		for i, owners := 0, service.GetOwnerReferences(); owners != nil && i < len(owners); i++ {
-			if owners[i].UID == obj.UID {
-				ingressServices[service.Name] = service
-				break
-			}
-		}
-	}
-
 	serviceToPort := make(map[string]string)
 	serviceToKey := make(map[string]string)
 	for _, r := range obj.Spec.Rules {
@@ -86,13 +71,37 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) error {
 		}
 	}
 
+	ingressServices := map[string]*corev1.Service{}
+	services, err := c.serviceLister.List(obj.Namespace, labels.NewSelector())
+	if err != nil {
+		logrus.Error(err)
+		services = []*corev1.Service{}
+	}
+	for _, service := range services {
+		//mark the service which related to ingress
+		if _, ok := serviceToKey[service.Name]; ok {
+			ingressServices[service.Name] = service
+			continue
+		}
+		//mark the service which own by ingress but not related to ingress
+		for i, owners := 0, service.GetOwnerReferences(); owners != nil && i < len(owners); i++ {
+			if owners[i].UID == obj.UID {
+				ingressServices[service.Name] = service
+				break
+			}
+		}
+	}
+
 	for serviceName, portStr := range serviceToPort {
 		workloadIDsStr := state[serviceToKey[serviceName]]
-		b, err := json.Marshal(strings.Split(workloadIDsStr, "/"))
-		if err != nil {
-			return err
+		workloadIDs := ""
+		if workloadIDsStr != "" {
+			b, err := json.Marshal(strings.Split(workloadIDsStr, "/"))
+			if err != nil {
+				return err
+			}
+			workloadIDs = string(b)
 		}
-		workloadIDs := string(b)
 		existing := ingressServices[serviceName]
 		if existing == nil {
 			controller := true
@@ -137,7 +146,7 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) error {
 			if existing.Annotations == nil {
 				existing.Annotations = map[string]string{}
 			}
-			if existing.Annotations[util.WorkloadAnnotation] != workloadIDs {
+			if existing.Annotations[util.WorkloadAnnotation] != workloadIDs && workloadIDs != "" {
 				toUpdate := existing.DeepCopy()
 				toUpdate.Annotations[util.WorkloadAnnotation] = workloadIDs
 				if _, err := c.services.Update(toUpdate); err != nil {
@@ -147,9 +156,19 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) error {
 			delete(ingressServices, serviceName)
 		}
 	}
-	for serviceName := range ingressServices {
-		if err := c.services.DeleteNamespaced(obj.Namespace, serviceName, &metav1.DeleteOptions{}); err != nil {
-			return err
+	for serviceName, service := range ingressServices {
+		//only delete those service owned by ingress
+		shouldDelete := false
+		for i, owners := 0, service.GetOwnerReferences(); owners != nil && i < len(owners); i++ {
+			if owners[i].UID == obj.UID {
+				shouldDelete = true
+				break
+			}
+		}
+		if shouldDelete {
+			if err := c.services.DeleteNamespaced(obj.Namespace, serviceName, &metav1.DeleteOptions{}); err != nil {
+				return err
+			}
 		}
 	}
 
