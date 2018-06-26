@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -23,6 +24,7 @@ const (
 	projectNSAnn                   = "authz.cluster.auth.io/project-namespaces"
 	statusAnn                      = "cattle.io/status"
 	initialRoleCondition           = "InitialRolesPopulated"
+	ResourceQuotaInitCondition     = "ResourceQuotaInit"
 )
 
 var projectNSVerbToSuffix = map[string]string{
@@ -39,14 +41,33 @@ type nsLifecycle struct {
 }
 
 func (n *nsLifecycle) Create(obj *v1.Namespace) (*v1.Namespace, error) {
+	obj, err := n.resourceQuotaInit(obj)
+	if err != nil {
+		return obj, err
+	}
+
 	hasPRTBs, err := n.syncNS(obj)
 	if err != nil {
 		return obj, err
 	}
 
+	SetNamespaceCondition(obj, 0, initialRoleCondition, true, "")
+
 	go updateStatusAnnotation(hasPRTBs, obj, n.m)
 
 	return obj, err
+}
+
+func (n *nsLifecycle) resourceQuotaInit(obj *v1.Namespace) (*v1.Namespace, error) {
+	resourceQuotaInit, err := IsNamespaceConditionSet(obj, ResourceQuotaInitCondition, true)
+	if err != nil {
+		return obj, err
+	}
+	if resourceQuotaInit {
+		return obj, nil
+	}
+	n.m.nsController.Enqueue("", obj.Name)
+	return obj, &controller.ForgetError{Err: fmt.Errorf("backing off, waiting for resource quota init")}
 }
 
 func (n *nsLifecycle) Updated(obj *v1.Namespace) (*v1.Namespace, error) {
@@ -386,14 +407,14 @@ func updateStatusAnnotation(hasPRTBs bool, namespace *v1.Namespace, mgr *manager
 		logrus.Errorf("error getting ns %v for status update: %v", namespace.Name, err)
 		return
 	}
-	setRolesPopulatedCondition(namespace, time.Second*1)
+	SetNamespaceCondition(namespace, time.Second*1, initialRoleCondition, true, "")
 	_, err = mgr.workload.Core.Namespaces("").Update(namespace)
 	if err != nil {
 		logrus.Errorf("error updating ns %v status: %v", namespace.Name, err)
 	}
 }
 
-func setRolesPopulatedCondition(namespace *v1.Namespace, d time.Duration) error {
+func SetNamespaceCondition(namespace *v1.Namespace, d time.Duration, conditionType string, conditionStatus bool, message string) error {
 	if namespace.ObjectMeta.Annotations == nil {
 		namespace.ObjectMeta.Annotations = map[string]string{}
 	}
@@ -413,16 +434,25 @@ func setRolesPopulatedCondition(namespace *v1.Namespace, d time.Duration) error 
 	var idx int
 	found := false
 	for i, c := range status.Conditions {
-		if c.Type == initialRoleCondition {
+		if c.Type == conditionType {
 			idx = i
 			found = true
 			break
 		}
 	}
 
+	conditionStatusStr := "False"
+	conditionMessage := ""
+	if conditionStatus {
+		conditionStatusStr = "True"
+	} else {
+		conditionMessage = message
+	}
+
 	cond := condition{
-		Type:           initialRoleCondition,
-		Status:         "True",
+		Type:           conditionType,
+		Status:         conditionStatusStr,
+		Message:        conditionMessage,
 		LastUpdateTime: time.Now().Add(d).Format(time.RFC3339),
 	}
 
@@ -439,6 +469,31 @@ func setRolesPopulatedCondition(namespace *v1.Namespace, d time.Duration) error 
 	namespace.ObjectMeta.Annotations[statusAnn] = string(bAnn)
 
 	return nil
+}
+
+func IsNamespaceConditionSet(namespace *v1.Namespace, conditionType string, conditionStatus bool) (bool, error) {
+	if namespace.ObjectMeta.Annotations == nil {
+		return false, nil
+	}
+	ann := namespace.ObjectMeta.Annotations[statusAnn]
+	if ann == "" {
+		return false, nil
+	}
+	status := &status{}
+	err := json.Unmarshal([]byte(ann), status)
+	if err != nil {
+		return false, err
+	}
+	conditionStatusStr := "False"
+	if conditionStatus {
+		conditionStatusStr = "True"
+	}
+	for _, c := range status.Conditions {
+		if c.Type == conditionType && c.Status == conditionStatusStr {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 type status struct {

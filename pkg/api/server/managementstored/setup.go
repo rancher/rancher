@@ -94,7 +94,8 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.SourceCodeRepositoryType,
 		client.TokenType,
 		client.UserType,
-		client.UserAttributeType)
+		client.UserAttributeType,
+		client.ResourceQuotaTemplateType)
 	createCrd(ctx, wg, factory, schemas, &projectschema.Version,
 		projectclient.AppType, projectclient.AppRevisionType)
 
