@@ -34,7 +34,6 @@ var (
 		Init(globalTypes).
 		Init(rkeTypes).
 		Init(alertTypes).
-		Init(pipelineTypes).
 		Init(composeType).
 		Init(resourceQuotaTemplateTypes)
 
@@ -531,65 +530,6 @@ func alertTypes(schema *types.Schemas) *types.Schemas {
 				"mute":       {},
 				"unmute":     {},
 			}
-		})
-
-}
-
-func pipelineTypes(schema *types.Schemas) *types.Schemas {
-	return schema.
-		AddMapperForType(&Version, v3.ClusterPipeline{}).
-		AddMapperForType(&Version, v3.Pipeline{},
-			&m.Embed{Field: "status"},
-			m.DisplayName{}).
-		AddMapperForType(&Version, v3.PipelineExecution{},
-			&m.Embed{Field: "status"}).
-		AddMapperForType(&Version, v3.SourceCodeCredential{}).
-		AddMapperForType(&Version, v3.SourceCodeRepository{}).
-		AddMapperForType(&Version, v3.PipelineExecutionLog{}).
-		MustImport(&Version, v3.AuthAppInput{}).
-		MustImport(&Version, v3.AuthUserInput{}).
-		MustImport(&Version, v3.RunPipelineInput{}).
-		MustImportAndCustomize(&Version, v3.ClusterPipeline{}, func(schema *types.Schema) {
-			schema.ResourceActions = map[string]types.Action{
-				"deploy":  {},
-				"destroy": {},
-				"authapp": {
-					Input:  "authAppInput",
-					Output: "clusterPipeline",
-				},
-				"revokeapp": {},
-				"authuser": {
-					Input:  "authUserInput",
-					Output: "sourceCodeCredential",
-				},
-			}
-		}).
-		MustImportAndCustomize(&Version, v3.Pipeline{}, func(schema *types.Schema) {
-			schema.ResourceActions = map[string]types.Action{
-				"activate":   {},
-				"deactivate": {},
-				"run": {
-					Input: "runPipelineInput",
-				},
-			}
-		}).
-		MustImportAndCustomize(&Version, v3.PipelineExecution{}, func(schema *types.Schema) {
-			schema.ResourceActions = map[string]types.Action{
-				"stop":  {},
-				"rerun": {},
-			}
-		}).
-		MustImport(&Version, v3.PipelineExecutionLog{}).
-		MustImportAndCustomize(&Version, v3.SourceCodeCredential{}, func(schema *types.Schema) {
-			delete(schema.ResourceFields, "namespaceId")
-			schema.ResourceMethods = []string{http.MethodGet, http.MethodDelete}
-			schema.ResourceActions = map[string]types.Action{
-				"refreshrepos": {},
-			}
-		}).
-		MustImportAndCustomize(&Version, v3.SourceCodeRepository{}, func(schema *types.Schema) {
-			schema.ResourceMethods = []string{http.MethodGet, http.MethodDelete}
-			delete(schema.ResourceFields, "namespaceId")
 		})
 
 }

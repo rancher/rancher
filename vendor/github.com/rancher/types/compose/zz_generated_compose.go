@@ -42,12 +42,6 @@ type Config struct {
 	Notifiers                                map[string]managementClient.Notifier                                `json:"notifiers,omitempty" yaml:"notifiers,omitempty"`
 	ClusterAlerts                            map[string]managementClient.ClusterAlert                            `json:"clusterAlerts,omitempty" yaml:"clusterAlerts,omitempty"`
 	ProjectAlerts                            map[string]managementClient.ProjectAlert                            `json:"projectAlerts,omitempty" yaml:"projectAlerts,omitempty"`
-	ClusterPipelines                         map[string]managementClient.ClusterPipeline                         `json:"clusterPipelines,omitempty" yaml:"clusterPipelines,omitempty"`
-	SourceCodeCredentials                    map[string]managementClient.SourceCodeCredential                    `json:"sourceCodeCredentials,omitempty" yaml:"sourceCodeCredentials,omitempty"`
-	Pipelines                                map[string]managementClient.Pipeline                                `json:"pipelines,omitempty" yaml:"pipelines,omitempty"`
-	PipelineExecutions                       map[string]managementClient.PipelineExecution                       `json:"pipelineExecutions,omitempty" yaml:"pipelineExecutions,omitempty"`
-	PipelineExecutionLogs                    map[string]managementClient.PipelineExecutionLog                    `json:"pipelineExecutionLogs,omitempty" yaml:"pipelineExecutionLogs,omitempty"`
-	SourceCodeRepositorys                    map[string]managementClient.SourceCodeRepository                    `json:"sourceCodeRepositories,omitempty" yaml:"sourceCodeRepositories,omitempty"`
 	ComposeConfigs                           map[string]managementClient.ComposeConfig                           `json:"composeConfigs,omitempty" yaml:"composeConfigs,omitempty"`
 	ResourceQuotaTemplates                   map[string]managementClient.ResourceQuotaTemplate                   `json:"resourceQuotaTemplates,omitempty" yaml:"resourceQuotaTemplates,omitempty"`
 
@@ -85,4 +79,11 @@ type Config struct {
 	Workloads                      map[string]projectClient.Workload                      `json:"workloads,omitempty" yaml:"workloads,omitempty"`
 	Apps                           map[string]projectClient.App                           `json:"apps,omitempty" yaml:"apps,omitempty"`
 	AppRevisions                   map[string]projectClient.AppRevision                   `json:"appRevisions,omitempty" yaml:"appRevisions,omitempty"`
+	SourceCodeProviders            map[string]projectClient.SourceCodeProvider            `json:"sourceCodeProviders,omitempty" yaml:"sourceCodeProviders,omitempty"`
+	SourceCodeProviderConfigs      map[string]projectClient.SourceCodeProviderConfig      `json:"sourceCodeProviderConfigs,omitempty" yaml:"sourceCodeProviderConfigs,omitempty"`
+	SourceCodeCredentials          map[string]projectClient.SourceCodeCredential          `json:"sourceCodeCredentials,omitempty" yaml:"sourceCodeCredentials,omitempty"`
+	Pipelines                      map[string]projectClient.Pipeline                      `json:"pipelines,omitempty" yaml:"pipelines,omitempty"`
+	PipelineExecutions             map[string]projectClient.PipelineExecution             `json:"pipelineExecutions,omitempty" yaml:"pipelineExecutions,omitempty"`
+	PipelineSettings               map[string]projectClient.PipelineSetting               `json:"pipelineSettings,omitempty" yaml:"pipelineSettings,omitempty"`
+	SourceCodeRepositorys          map[string]projectClient.SourceCodeRepository          `json:"sourceCodeRepositories,omitempty" yaml:"sourceCodeRepositories,omitempty"`
 }

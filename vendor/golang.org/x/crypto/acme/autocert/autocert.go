@@ -27,7 +27,6 @@ import (
 	"net"
 	"net/http"
 	"path"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -146,6 +145,15 @@ type Manager struct {
 	// If false, a default is used. Currently the default
 	// is EC-based keys using the P-256 curve.
 	ForceRSA bool
+
+	// ExtraExtensions are used when generating a new CSR (Certificate Request),
+	// thus allowing customization of the resulting certificate.
+	// For instance, TLS Feature Extension (RFC 7633) can be used
+	// to prevent an OCSP downgrade attack.
+	//
+	// The field value is passed to crypto/x509.CreateCertificateRequest
+	// in the template's ExtraExtensions field as is.
+	ExtraExtensions []pkix.Extension
 
 	clientMu sync.Mutex
 	client   *acme.Client // initialized by acmeClient method
@@ -528,7 +536,7 @@ func (m *Manager) authorizedCert(ctx context.Context, key crypto.Signer, domain 
 	if err := m.verify(ctx, client, domain); err != nil {
 		return nil, nil, err
 	}
-	csr, err := certRequest(key, domain)
+	csr, err := certRequest(key, domain, m.ExtraExtensions)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -543,6 +551,18 @@ func (m *Manager) authorizedCert(ctx context.Context, key crypto.Signer, domain 
 	return der, leaf, nil
 }
 
+// revokePendingAuthz revokes all authorizations idenfied by the elements of uri slice.
+// It ignores revocation errors.
+func (m *Manager) revokePendingAuthz(ctx context.Context, uri []string) {
+	client, err := m.acmeClient(ctx)
+	if err != nil {
+		return
+	}
+	for _, u := range uri {
+		client.RevokeAuthorization(ctx, u)
+	}
+}
+
 // verify runs the identifier (domain) authorization flow
 // using each applicable ACME challenge type.
 func (m *Manager) verify(ctx context.Context, client *acme.Client, domain string) error {
@@ -554,6 +574,22 @@ func (m *Manager) verify(ctx context.Context, client *acme.Client, domain string
 		challengeTypes = append(challengeTypes, "http-01")
 	}
 	m.tokensMu.RUnlock()
+
+	// Keep track of pending authzs and revoke the ones that did not validate.
+	pendingAuthzs := make(map[string]bool)
+	defer func() {
+		var uri []string
+		for k, pending := range pendingAuthzs {
+			if pending {
+				uri = append(uri, k)
+			}
+		}
+		if len(uri) > 0 {
+			// Use "detached" background context.
+			// The revocations need not happen in the current verification flow.
+			go m.revokePendingAuthz(context.Background(), uri)
+		}
+	}()
 
 	var nextTyp int // challengeType index of the next challenge type to try
 	for {
@@ -570,6 +606,8 @@ func (m *Manager) verify(ctx context.Context, client *acme.Client, domain string
 		case acme.StatusInvalid:
 			return fmt.Errorf("acme/autocert: invalid authorization %q", authz.URI)
 		}
+
+		pendingAuthzs[authz.URI] = true
 
 		// Pick the next preferred challenge.
 		var chal *acme.Challenge
@@ -591,6 +629,7 @@ func (m *Manager) verify(ctx context.Context, client *acme.Client, domain string
 
 		// A challenge is fulfilled and accepted: wait for the CA to validate.
 		if _, err := client.WaitAuthorization(ctx, authz.URI); err == nil {
+			delete(pendingAuthzs, authz.URI)
 			return nil
 		}
 	}
@@ -850,12 +889,12 @@ func (s *certState) tlscert() (*tls.Certificate, error) {
 	}, nil
 }
 
-// certRequest creates a certificate request for the given common name cn
-// and optional SANs.
-func certRequest(key crypto.Signer, cn string, san ...string) ([]byte, error) {
+// certRequest generates a CSR for the given common name cn and optional SANs.
+func certRequest(key crypto.Signer, cn string, ext []pkix.Extension, san ...string) ([]byte, error) {
 	req := &x509.CertificateRequest{
-		Subject:  pkix.Name{CommonName: cn},
-		DNSNames: san,
+		Subject:         pkix.Name{CommonName: cn},
+		DNSNames:        san,
+		ExtraExtensions: ext,
 	}
 	return x509.CreateCertificateRequest(rand.Reader, req, key)
 }
@@ -940,16 +979,6 @@ func validCert(domain string, der [][]byte, key crypto.Signer) (leaf *x509.Certi
 		return nil, errors.New("acme/autocert: unknown public key algorithm")
 	}
 	return leaf, nil
-}
-
-func retryAfter(v string) time.Duration {
-	if i, err := strconv.Atoi(v); err == nil {
-		return time.Duration(i) * time.Second
-	}
-	if t, err := http.ParseTime(v); err == nil {
-		return t.Sub(timeNow())
-	}
-	return time.Second
 }
 
 type lockedMathRand struct {
