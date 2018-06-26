@@ -85,6 +85,7 @@ func Register(workload *config.UserContext) {
 		crbLister:     workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
 		crLister:      workload.RBAC.ClusterRoles("").Controller().Lister(),
 		nsLister:      workload.Core.Namespaces("").Controller().Lister(),
+		nsController:  workload.Core.Namespaces("").Controller(),
 		clusterLister: workload.Management.Management.Clusters("").Controller().Lister(),
 		clusterName:   workload.ClusterName,
 	}
@@ -119,6 +120,7 @@ type manager struct {
 	crbLister     typesrbacv1.ClusterRoleBindingLister
 	rbLister      typesrbacv1.RoleBindingLister
 	nsLister      typescorev1.NamespaceLister
+	nsController  typescorev1.NamespaceController
 	clusterLister v3.ClusterLister
 	clusterName   string
 }

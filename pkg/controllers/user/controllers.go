@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline"
 	"github.com/rancher/rancher/pkg/controllers/user/rbac"
 	"github.com/rancher/rancher/pkg/controllers/user/rbac/podsecuritypolicy"
+	"github.com/rancher/rancher/pkg/controllers/user/resourcequota"
 	"github.com/rancher/rancher/pkg/controllers/user/secret"
 	"github.com/rancher/rancher/pkg/controllers/user/targetworkloadservice"
 	"github.com/rancher/rancher/pkg/controllers/user/workload"
@@ -46,6 +47,7 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 	secret.Register(cluster)
 	endpoints.Register(ctx, cluster)
 	approuter.Register(ctx, cluster)
+	resourcequota.Register(ctx, cluster)
 
 	userOnlyContext := cluster.UserOnlyContext()
 	dnsrecord.Register(ctx, userOnlyContext)
