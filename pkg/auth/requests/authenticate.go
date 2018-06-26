@@ -2,19 +2,17 @@ package requests
 
 import (
 	"context"
-	"net/http"
-
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/cache"
-
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/client-go/tools/cache"
 )
 
 type Authenticator interface {
@@ -32,6 +30,7 @@ func NewAuthenticator(ctx context.Context, mgmtCtx *config.ScaledContext) Authen
 		tokenClient:         mgmtCtx.Management.Tokens(""),
 		userAttributeLister: mgmtCtx.Management.UserAttributes("").Controller().Lister(),
 		userAttributes:      mgmtCtx.Management.UserAttributes(""),
+		userLister:          mgmtCtx.Management.Users("").Controller().Lister(),
 	}
 }
 
@@ -41,6 +40,7 @@ type tokenAuthenticator struct {
 	tokenClient         v3.TokenInterface
 	userAttributes      v3.UserAttributeInterface
 	userAttributeLister v3.UserAttributeLister
+	userLister          v3.UserLister
 }
 
 const (
@@ -65,6 +65,15 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (bool, string, []st
 	attribs, err := a.userAttributeLister.Get("", token.UserID)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return false, "", []string{}, err
+	}
+
+	u, err := a.userLister.Get("", token.UserID)
+	if err != nil {
+		return false, "", []string{}, err
+	}
+
+	if u.Enabled != nil && !*u.Enabled {
+		return false, "", []string{}, fmt.Errorf("user is not enabled")
 	}
 
 	var groups []string
