@@ -84,7 +84,7 @@ func LoadIndex(repoPath string) (*RepoIndex, error) {
 func FetchTgz(url string) ([]v3.File, error) {
 	var files []v3.File
 
-	logrus.Infof("Fetching file %s", url)
+	logrus.Debugf("Fetching file %s", url)
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err

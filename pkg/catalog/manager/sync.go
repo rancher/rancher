@@ -1,7 +1,6 @@
 package manager
 
 import (
-	"github.com/pkg/errors"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -47,7 +46,11 @@ func (m *Manager) Sync(key string, obj *v3.Catalog) error {
 		return nil
 	}
 
-	catalog := obj.DeepCopy()
+	// always get a refresh catalog from etcd
+	catalog, err := m.catalogClient.Get(key, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
 
 	repoPath, commit, err := m.prepareRepoPath(*catalog)
 	if err != nil {
@@ -61,20 +64,12 @@ func (m *Manager) Sync(key string, obj *v3.Catalog) error {
 		logrus.Debugf("Catalog %s is already up to date", catalog.Name)
 		if v3.CatalogConditionRefreshed.IsUnknown(catalog) {
 			v3.CatalogConditionRefreshed.True(catalog)
+			v3.CatalogConditionRefreshed.Reason(catalog, "")
 			m.catalogClient.Update(catalog)
 		}
 		return nil
 	}
 
-	catalog.Status.Commit = commit
-	templates, toDeleteTemplate, versionCommits, errs, err := traverseFiles(repoPath, catalog)
-	if err != nil {
-		return errors.Wrap(err, "Repo traversal failed")
-	}
-	if len(errs) != 0 {
-		logrus.Errorf("Errors while parsing repo: %v", errs)
-	}
-
 	logrus.Infof("Updating catalog %s", catalog.Name)
-	return m.update(catalog, templates, toDeleteTemplate, versionCommits, commit)
+	return m.traverseAndUpdate(repoPath, commit, catalog)
 }
