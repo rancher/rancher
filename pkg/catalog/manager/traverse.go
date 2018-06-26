@@ -4,23 +4,39 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/catalog/helm"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
-func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []string, map[string]v3.VersionCommits, []error, error) {
-	logrus.Info("traversing files and generating templates")
+func (m *Manager) traverseAndUpdate(repoPath, commit string, catalog *v3.Catalog) error {
 	index, err := helm.LoadIndex(repoPath)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return err
 	}
-	newHelmVersionCommits := map[string]v3.VersionCommits{}
 
-	var templates []v3.Template
-	var errors []error
+	// list all existing templates
+	templateMap, err := m.getTemplateMap(catalog.Name)
+	if err != nil {
+		return err
+	}
+	// list all templateContent tag
+	templateContentList, err := m.templateContentLister.List("", labels.NewSelector())
+	if err != nil {
+		return err
+	}
+	templateContentMap := map[string]struct{}{}
+	for _, t := range templateContentList {
+		templateContentMap[t.Name] = struct{}{}
+	}
+
+	newHelmVersionCommits := map[string]v3.VersionCommits{}
+	var errs []error
+	var terrors []error
 	for chart, metadata := range index.IndexFile.Entries {
 		newHelmVersionCommits[chart] = v3.VersionCommits{
 			Value: map[string]string{},
@@ -64,7 +80,7 @@ func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []strin
 		}
 		iconData, iconFilename, err := helm.Icon(metadata)
 		if err != nil {
-			errors = append(errors, err)
+			errs = append(errs, err)
 		}
 		template.Spec.Icon = iconData
 		template.Spec.IconFilename = iconFilename
@@ -78,7 +94,7 @@ func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []strin
 			}
 			files, err := helm.FetchFiles(version, version.URLs)
 			if err != nil {
-				errors = append(errors, err)
+				errs = append(errs, err)
 				continue
 			}
 			filesToAdd := make(map[string]string)
@@ -90,7 +106,7 @@ func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []strin
 					if strings.EqualFold(fmt.Sprintf("%s/%s", chart, f), file.Name) {
 						var value catalogYml
 						if err := yaml.Unmarshal([]byte(file.Contents), &value); err != nil {
-							return nil, nil, nil, nil, err
+							return err
 						}
 						v.Questions = value.Questions
 						v.RancherVersion = value.RancherVersion
@@ -129,7 +145,28 @@ func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []strin
 		template.Spec.CatalogID = catalog.Name
 		template.Name = fmt.Sprintf("%s-%s", catalog.Name, template.Spec.FolderName)
 
-		templates = append(templates, template)
+		v3.CatalogConditionRefreshed.Unknown(catalog)
+		v3.CatalogConditionRefreshed.Message(catalog, fmt.Sprintf("syncing template %v", template.Name))
+		if newCatalog, err := m.catalogClient.Update(catalog); err == nil {
+			catalog = newCatalog
+		} else {
+			catalog, _ = m.catalogClient.Get(catalog.Name, metav1.GetOptions{})
+		}
+		var temErr error
+		// look template by name, if not found then create it, otherwise do update
+		if existing, ok := templateMap[template.Name]; ok {
+			if err := m.updateTemplate(existing, template, templateContentMap); err != nil {
+				temErr = err
+			}
+		} else {
+			if err := m.createTemplate(template, catalog, templateContentMap); err != nil {
+				temErr = err
+			}
+		}
+		if temErr != nil {
+			delete(newHelmVersionCommits, template.Spec.DisplayName)
+			terrors = append(terrors, temErr)
+		}
 	}
 
 	toDeleteChart := []string{}
@@ -138,7 +175,34 @@ func traverseFiles(repoPath string, catalog *v3.Catalog) ([]v3.Template, []strin
 			toDeleteChart = append(toDeleteChart, fmt.Sprintf("%s-%s", catalog.Name, chart))
 		}
 	}
-	return templates, toDeleteChart, newHelmVersionCommits, nil, nil
+	// delete non-existing templates
+	for _, toDelete := range toDeleteChart {
+		logrus.Infof("Deleting template %s and its associated templateVersion", toDelete)
+		if err := m.deleteChart(toDelete); err != nil {
+			return err
+		}
+	}
+
+	catalog.Status.HelmVersionCommits = newHelmVersionCommits
+	if len(terrors) > 0 {
+		if _, err := m.catalogClient.Update(catalog); err != nil {
+			return err
+		}
+		return errors.Errorf("failed to update templates. Multiple error occurred: %v", terrors)
+	}
+	var finalError error
+	if len(errs) > 0 {
+		finalError = errors.Errorf("failed to sync templates. Resetting commit. Multiple error occurred: %v", errs)
+		commit = ""
+	}
+
+	v3.CatalogConditionRefreshed.True(catalog)
+	v3.CatalogConditionRefreshed.Message(catalog, "")
+	catalog.Status.Commit = commit
+	if _, err := m.catalogClient.Update(catalog); err != nil {
+		return err
+	}
+	return finalError
 }
 
 var supportedFiles = []string{"catalog.yml", "catalog.yaml", "questions.yml", "questions.yaml"}

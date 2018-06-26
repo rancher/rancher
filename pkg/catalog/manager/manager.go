@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -192,6 +193,22 @@ func (m *Manager) remoteShaChanged(repoURL, branch, sha, uuid string) (bool, err
 	}
 
 	return true, nil
+}
+
+func (m *Manager) deleteChart(toDelete string) error {
+	toDeleteTvs, err := m.getTemplateVersion(toDelete)
+	if err != nil {
+		return err
+	}
+	for tv := range toDeleteTvs {
+		if err := m.templateVersionClient.Delete(tv, &metav1.DeleteOptions{}); err != nil && !kerrors.IsNotFound(err) {
+			return err
+		}
+	}
+	if err := m.templateClient.Delete(toDelete, &metav1.DeleteOptions{}); err != nil && !kerrors.IsNotFound(err) {
+		return err
+	}
+	return nil
 }
 
 func dirEmpty(dir string) (bool, error) {
