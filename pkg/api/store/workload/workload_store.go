@@ -62,7 +62,7 @@ type CustomizeStore struct {
 func (s *CustomizeStore) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
 	setSelector(schema.ID, data)
 	setWorkloadSpecificDefaults(schema.ID, data)
-	setSecrets(apiContext, data)
+	setSecrets(apiContext, data, true)
 	if err := setPorts(convert.ToString(data["name"]), data); err != nil {
 		return nil, err
 	}
@@ -78,6 +78,9 @@ func (s *CustomizeStore) Update(apiContext *types.APIContext, schema *types.Sche
 	}
 	setScheduling(apiContext, data)
 	setStrategy(data)
+	if err := setSecrets(apiContext, data, false); err != nil {
+		return nil, err
+	}
 	return s.Store.Update(apiContext, schema, data, id)
 }
 
@@ -142,12 +145,9 @@ func setSelector(schemaID string, data map[string]interface{}) {
 	}
 }
 
-func setSecrets(apiContext *types.APIContext, data map[string]interface{}) {
-	if val, _ := values.GetValue(data, "imagePullSecrets"); val != nil {
-		return
-	}
+func getSecrets(apiContext *types.APIContext, data map[string]interface{}) *[]corev1.LocalObjectReference {
+	imagePullSecrets, _ := data["imagePullSecrets"].([]corev1.LocalObjectReference)
 	if containers, _ := values.GetSlice(data, "containers"); len(containers) > 0 {
-		imagePullSecrets, _ := data["imagePullSecrets"].([]corev1.LocalObjectReference)
 		domainToCreds := getCreds(apiContext, convert.ToString(data["namespaceId"]))
 		for _, container := range containers {
 			if image := convert.ToString(container["image"]); image != "" {
@@ -157,10 +157,24 @@ func setSecrets(apiContext *types.APIContext, data map[string]interface{}) {
 				}
 			}
 		}
-		if imagePullSecrets != nil {
+	}
+	return &imagePullSecrets
+}
+
+func setSecrets(apiContext *types.APIContext, data map[string]interface{}, create bool) error {
+	imagePullSecrets := getSecrets(apiContext, data)
+	if imagePullSecrets != nil {
+		if create {
 			values.PutValue(data, imagePullSecrets, "imagePullSecrets")
+		} else {
+			if updated, err := imageUpdated(apiContext, data); err != nil {
+				return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("error accessing workload : %v", err))
+			} else if updated {
+				values.PutValue(data, imagePullSecrets, "imagePullSecrets")
+			}
 		}
 	}
+	return nil
 }
 
 func setWorkloadSpecificDefaults(schemaID string, data map[string]interface{}) {
@@ -326,4 +340,23 @@ func getDomain(image string) string {
 		return "index.docker.io"
 	}
 	return domain
+}
+
+func imageUpdated(apiContext *types.APIContext, data map[string]interface{}) (bool, error) {
+	var workload projectclient.Workload
+	accessError := access.ByID(apiContext, &projectschema.Version, "workload", apiContext.ID, &workload)
+	if accessError != nil {
+		return false, httperror.NewAPIError(httperror.InvalidReference, "Error accessing workload")
+	}
+
+	containers, _ := values.GetSlice(data, "containers")
+	if len(containers) != len(workload.Containers) {
+		return true, nil
+	}
+	for i := range containers {
+		if workload.Containers[i].Image != convert.ToString(containers[i]["image"]) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
