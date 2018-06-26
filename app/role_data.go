@@ -83,7 +83,6 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("*").resources("persistentvolumes").verbs("get", "list", "watch").
 		addRule().apiGroups("*").resources("storageclasses").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clusterevents").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("clusterpipelines").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clusterloggings").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clusteralerts").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("notifiers").verbs("get", "list", "watch").
@@ -127,15 +126,15 @@ func addRoles(management *config.ManagementContext) (string, error) {
 	rb.addRoleTemplate("Project Owner", "project-owner", "project", true, false, false).
 		addRule().apiGroups("management.cattle.io").resources("projectroletemplatebindings").verbs("*").
 		addRule().apiGroups("project.cattle.io").resources("apps").verbs("*").
+		addRule().apiGroups("project.cattle.io").resources("pipelines").verbs("*").
+		addRule().apiGroups("project.cattle.io").resources("pipelineexecutions").verbs("*").
+		addRule().apiGroups("project.cattle.io").resources("pipelinesettings").verbs("*").
+		addRule().apiGroups("project.cattle.io").resources("sourcecodeproviderconfigs").verbs("*").
 		addRule().apiGroups("").resources("namespaces").verbs("create").
 		addRule().apiGroups("*").resources("persistentvolumes").verbs("get", "list", "watch").
 		addRule().apiGroups("*").resources("storageclasses").verbs("get", "list", "watch").
 		addRule().apiGroups("*").resources("persistentvolumeclaims").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("clusterevents").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("clusterpipelines").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("pipelines").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("pipelineexecutions").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("pipelineexecutionlogs").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("notifiers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("projectalerts").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("projectloggings").verbs("*").
@@ -145,15 +144,13 @@ func addRoles(management *config.ManagementContext) (string, error) {
 	rb.addRoleTemplate("Project Member", "project-member", "project", true, false, false).
 		addRule().apiGroups("management.cattle.io").resources("projectroletemplatebindings").verbs("get", "list", "watch").
 		addRule().apiGroups("project.cattle.io").resources("apps").verbs("*").
+		addRule().apiGroups("project.cattle.io").resources("pipelines").verbs("*").
+		addRule().apiGroups("project.cattle.io").resources("pipelineexecutions").verbs("*").
 		addRule().apiGroups("").resources("namespaces").verbs("create").
 		addRule().apiGroups("*").resources("persistentvolumes").verbs("get", "list", "watch").
 		addRule().apiGroups("*").resources("storageclasses").verbs("get", "list", "watch").
 		addRule().apiGroups("*").resources("persistentvolumeclaims").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("clusterevents").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("clusterpipelines").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("pipelines").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("pipelineexecutions").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("pipelineexecutionlogs").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("notifiers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("projectalerts").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("projectloggings").verbs("get", "list", "watch").
@@ -163,14 +160,12 @@ func addRoles(management *config.ManagementContext) (string, error) {
 	rb.addRoleTemplate("Read-only", "read-only", "project", true, false, false).
 		addRule().apiGroups("management.cattle.io").resources("projectroletemplatebindings").verbs("get", "list", "watch").
 		addRule().apiGroups("project.cattle.io").resources("apps").verbs("get", "list", "watch").
+		addRule().apiGroups("project.cattle.io").resources("pipelines").verbs("get", "list", "watch").
+		addRule().apiGroups("project.cattle.io").resources("pipelineexecutions").verbs("get", "list", "watch").
 		addRule().apiGroups("*").resources("persistentvolumes").verbs("get", "list", "watch").
 		addRule().apiGroups("*").resources("storageclasses").verbs("get", "list", "watch").
 		addRule().apiGroups("*").resources("persistentvolumeclaims").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clusterevents").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("clusterpipelines").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("pipelines").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("pipelineexecutions").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("pipelineexecutionlogs").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("notifiers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("projectalerts").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("projectloggings").verbs("get", "list", "watch").
