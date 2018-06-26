@@ -2,7 +2,6 @@ package k8s
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/batch/v1"
@@ -43,7 +42,10 @@ func ApplyK8sSystemJob(jobYaml, kubeConfigPath string, k8sWrapTransport WrapTran
 				return err
 			}
 		} else { // ignoring NotFound errors
-			time.Sleep(time.Second * 5)
+			//Jobs take longer to delete than to complete, 2 x the timeout
+			if err := retryToWithTimeout(ensureJobDeleted, k8sClient, job, timeout*2); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -70,6 +72,19 @@ func ensureJobCompleted(k8sClient *kubernetes.Clientset, j interface{}) error {
 		return nil
 	}
 	return fmt.Errorf("Failed to get job complete status: %v", err)
+}
+
+func ensureJobDeleted(k8sClient *kubernetes.Clientset, j interface{}) error {
+	job := j.(v1.Job)
+	_, err := k8sClient.BatchV1().Jobs(job.Namespace).Get(job.Name, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// this is the "true" return of the function
+			return nil
+		}
+		return err
+	}
+	return fmt.Errorf("[k8s] Job [%s] is not deleted", job.Name)
 }
 
 func deleteK8sJob(k8sClient *kubernetes.Clientset, name, namespace string) error {
