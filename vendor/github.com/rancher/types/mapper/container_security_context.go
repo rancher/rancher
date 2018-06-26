@@ -18,30 +18,18 @@ func (n ContainerSecurityContext) ToInternal(data map[string]interface{}) {
 		if err != nil {
 			return
 		}
-		if len(sc) > 2 {
-			return
-		}
-		found := false
 		if v, ok := values.GetValue(sc, "capAdd"); ok && v != nil {
 			capAdd := convert.ToStringSlice(v)
 			if len(capAdd) == 0 {
-				found = true
+				values.RemoveValue(data, "securityContext", "capAdd")
 			}
-		}
-		if found {
-			found = false
-		} else {
-			return
 		}
 
 		if v, ok := values.GetValue(sc, "capDrop"); ok && v != nil {
 			capAdd := convert.ToStringSlice(v)
 			if len(capAdd) == 0 {
-				found = true
+				values.RemoveValue(data, "securityContext", "capDrop")
 			}
-		}
-		if found {
-			values.RemoveValue(data, "securityContext")
 		}
 	}
 }
