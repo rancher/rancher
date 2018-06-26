@@ -36,6 +36,7 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	"github.com/rancher/rancher/pkg/nodeconfig"
+	sourcecodeproviders "github.com/rancher/rancher/pkg/pipeline/providers"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	projectschema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	"github.com/rancher/types/client/management/v3"
@@ -56,7 +57,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.ClusterAlertType,
 		client.ClusterEventType,
 		client.ClusterLoggingType,
-		client.ClusterPipelineType,
 		client.ClusterRegistrationTokenType,
 		client.ClusterRoleTemplateBindingType,
 		client.ClusterType,
@@ -72,9 +72,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.NodeTemplateType,
 		client.NodeType,
 		client.NotifierType,
-		client.PipelineExecutionLogType,
-		client.PipelineExecutionType,
-		client.PipelineType,
 		client.PodSecurityPolicyTemplateProjectBindingType,
 		client.PodSecurityPolicyTemplateType,
 		client.PreferenceType,
@@ -86,8 +83,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.ResourceQuotaTemplateType,
 		client.RoleTemplateType,
 		client.SettingType,
-		client.SourceCodeCredentialType,
-		client.SourceCodeRepositoryType,
 		client.TemplateContentType,
 		client.TemplateType,
 		client.TemplateVersionType,
@@ -96,7 +91,15 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.UserType)
 
 	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, schemas, &projectschema.Version,
-		projectclient.AppType, projectclient.AppRevisionType)
+		projectclient.AppType,
+		projectclient.AppRevisionType,
+		projectclient.PipelineExecutionType,
+		projectclient.PipelineSettingType,
+		projectclient.PipelineType,
+		projectclient.SourceCodeCredentialType,
+		projectclient.SourceCodeProviderConfigType,
+		projectclient.SourceCodeRepositoryType,
+	)
 
 	factory.BatchWait()
 
@@ -114,7 +117,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	NodeTemplates(schemas, apiContext)
 	LoggingTypes(schemas)
 	Alert(schemas, apiContext)
-	Pipeline(schemas, apiContext)
+	Pipeline(schemas, apiContext, clusterManager)
 	Project(schemas, apiContext)
 	ProjectRoleTemplateBinding(schemas, apiContext)
 	TemplateContent(schemas)
@@ -344,64 +347,52 @@ func Alert(schemas *types.Schemas, management *config.ScaledContext) {
 	schema.ActionHandler = handler.NotifierActionHandler
 }
 
-func Pipeline(schemas *types.Schemas, management *config.ScaledContext) {
+func Pipeline(schemas *types.Schemas, management *config.ScaledContext, clusterManager *clustermanager.Manager) {
 
-	clusterPipelineHandler := &pipeline.ClusterPipelineHandler{
-		ClusterPipelines:           management.Management.ClusterPipelines(""),
-		ClusterPipelineLister:      management.Management.ClusterPipelines("").Controller().Lister(),
-		SourceCodeCredentials:      management.Management.SourceCodeCredentials(""),
-		SourceCodeCredentialLister: management.Management.SourceCodeCredentials("").Controller().Lister(),
-		SourceCodeRepositories:     management.Management.SourceCodeRepositories(""),
-		SourceCodeRepositoryLister: management.Management.SourceCodeRepositories("").Controller().Lister(),
-		Secrets:                    management.Core.Secrets(""),
-		SecretLister:               management.Core.Secrets("").Controller().Lister(),
-		AuthConfigs:                management.Management.AuthConfigs(""),
-	}
-	schema := schemas.Schema(&managementschema.Version, client.ClusterPipelineType)
-	schema.Formatter = pipeline.ClusterPipelineFormatter
-	schema.ActionHandler = clusterPipelineHandler.ActionHandler
-	schema.LinkHandler = clusterPipelineHandler.LinkHandler
 	pipelineHandler := &pipeline.Handler{
-		Pipelines:          management.Management.Pipelines(""),
-		PipelineLister:     management.Management.Pipelines("").Controller().Lister(),
-		PipelineExecutions: management.Management.PipelineExecutions(""),
+		PipelineLister:             management.Project.Pipelines("").Controller().Lister(),
+		PipelineExecutions:         management.Project.PipelineExecutions(""),
+		SourceCodeCredentialLister: management.Project.SourceCodeCredentials("").Controller().Lister(),
 	}
-	schema = schemas.Schema(&managementschema.Version, client.PipelineType)
+	schema := schemas.Schema(&projectschema.Version, projectclient.PipelineType)
 	schema.Formatter = pipeline.Formatter
 	schema.ActionHandler = pipelineHandler.ActionHandler
-	schema.CreateHandler = pipelineHandler.CreateHandler
-	schema.UpdateHandler = pipelineHandler.UpdateHandler
 	schema.LinkHandler = pipelineHandler.LinkHandler
-	schema.Validator = pipeline.Validator
 
-	pipelineExecutionHandler := &pipeline.ExecutionHandler{}
-	schema = schemas.Schema(&managementschema.Version, client.PipelineExecutionType)
+	pipelineExecutionHandler := &pipeline.ExecutionHandler{
+		ClusterManager: clusterManager,
+
+		PipelineLister:          management.Project.Pipelines("").Controller().Lister(),
+		PipelineExecutionLister: management.Project.PipelineExecutions("").Controller().Lister(),
+		PipelineExecutions:      management.Project.PipelineExecutions(""),
+	}
+	schema = schemas.Schema(&projectschema.Version, projectclient.PipelineExecutionType)
 	schema.Formatter = pipelineExecutionHandler.ExecutionFormatter
 	schema.LinkHandler = pipelineExecutionHandler.LinkHandler
 	schema.ActionHandler = pipelineExecutionHandler.ActionHandler
 
+	schema = schemas.Schema(&projectschema.Version, projectclient.PipelineSettingType)
+	schema.Formatter = setting.Formatter
+
 	sourceCodeCredentialHandler := &pipeline.SourceCodeCredentialHandler{
-		ClusterPipelineLister:      management.Management.ClusterPipelines("").Controller().Lister(),
-		SourceCodeCredentials:      management.Management.SourceCodeCredentials(""),
-		SourceCodeCredentialLister: management.Management.SourceCodeCredentials("").Controller().Lister(),
-		SourceCodeRepositories:     management.Management.SourceCodeRepositories(""),
-		SourceCodeRepositoryLister: management.Management.SourceCodeRepositories("").Controller().Lister(),
+		SourceCodeCredentials:      management.Project.SourceCodeCredentials(""),
+		SourceCodeCredentialLister: management.Project.SourceCodeCredentials("").Controller().Lister(),
+		SourceCodeRepositories:     management.Project.SourceCodeRepositories(""),
+		SourceCodeRepositoryLister: management.Project.SourceCodeRepositories("").Controller().Lister(),
 	}
-	schema = schemas.Schema(&managementschema.Version, client.SourceCodeCredentialType)
+	schema = schemas.Schema(&projectschema.Version, projectclient.SourceCodeCredentialType)
 	schema.Formatter = pipeline.SourceCodeCredentialFormatter
+	schema.ListHandler = sourceCodeCredentialHandler.ListHandler
 	schema.ActionHandler = sourceCodeCredentialHandler.ActionHandler
 	schema.LinkHandler = sourceCodeCredentialHandler.LinkHandler
 	schema.Store = userscope.NewStore(management.Core.Namespaces(""), schema.Store)
 
-	sourceCodeRepositoryHandler := &pipeline.SourceCodeRepositoryHandler{
-		SourceCodeCredentialLister: management.Management.SourceCodeCredentials("").Controller().Lister(),
-		SourceCodeRepositoryLister: management.Management.SourceCodeRepositories("").Controller().Lister(),
-		ClusterPipelineLister:      management.Management.ClusterPipelines("").Controller().Lister(),
-	}
-	schema = schemas.Schema(&managementschema.Version, client.SourceCodeRepositoryType)
+	schema = schemas.Schema(&projectschema.Version, projectclient.SourceCodeRepositoryType)
 	schema.Store = userscope.NewStore(management.Core.Namespaces(""), schema.Store)
-	schema.Formatter = pipeline.SourceCodeRepositoryFormatter
-	schema.LinkHandler = sourceCodeRepositoryHandler.LinkHandler
+
+	//register and setup source code providers
+	sourcecodeproviders.SetupSourceCodeProviderConfig(management, schemas)
+
 }
 
 func Project(schemas *types.Schemas, management *config.ScaledContext) {
