@@ -33,6 +33,7 @@ type User struct {
 	MustChangePassword bool     `json:"mustChangePassword,omitempty"`
 	PrincipalIDs       []string `json:"principalIds,omitempty" norman:"type=array[reference[principal]]"`
 	Me                 bool     `json:"me,omitempty"`
+	Enabled            *bool    `json:"enabled,omitempty" norman:"default=true"`
 }
 
 // UserAttribute will have a CRD (and controller) generated for it, but will not be exposed in the API.

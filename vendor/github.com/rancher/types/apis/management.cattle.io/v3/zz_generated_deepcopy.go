@@ -6439,6 +6439,15 @@ func (in *User) DeepCopyInto(out *User) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.Enabled != nil {
+		in, out := &in.Enabled, &out.Enabled
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(bool)
+			**out = **in
+		}
+	}
 	return
 }
 
