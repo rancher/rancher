@@ -153,6 +153,10 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 		Type:  types.StringType,
 		Usage: "Azure subnet to use",
 	}
+	driverFlag.Options["virtual-network-resource-group"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "The resource group that the virtual network is in",
+	}
 
 	return &driverFlag, nil
 }
@@ -198,6 +202,7 @@ func getStateFromOptions(driverOptions *types.DriverOptions) (state, error) {
 	state.ClientSecret = getValueFromDriverOptions(driverOptions, types.StringType, "client-secret", "clientSecret").(string)
 	state.VirtualNetwork = getValueFromDriverOptions(driverOptions, types.StringType, "virtualNetwork", "virtual-network").(string)
 	state.Subnet = getValueFromDriverOptions(driverOptions, types.StringType, "subnet").(string)
+	state.VirtualNetworkResourceGroup = getValueFromDriverOptions(driverOptions, types.StringType, "virtualNetworkResourceGroup", "virtual-network-resource-group").(string)
 	tagValues := getValueFromDriverOptions(driverOptions, types.StringSliceType).(*types.StringSlice)
 	for _, part := range tagValues.Value {
 		kv := strings.Split(part, "=")
@@ -413,10 +418,17 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 
 	var vmNetSubnetID *string
 	if driverState.VirtualNetwork != "" && driverState.Subnet != "" {
+		virtualNetworkResourceGroup := driverState.ResourceGroup
+
+		// if virtual network resource group is set, use it, otherwise assume it is the same as the cluster
+		if driverState.VirtualNetworkResourceGroup != "" {
+			virtualNetworkResourceGroup = driverState.VirtualNetworkResourceGroup
+		}
+
 		vmNetSubnetID = to.StringPtr(fmt.Sprintf(
 			"/subscriptions/%v/resourceGroups/%v/providers/Microsoft.Network/virtualNetworks/%v/subnets/%v",
 			driverState.SubscriptionID,
-			driverState.ResourceGroup,
+			virtualNetworkResourceGroup,
 			driverState.VirtualNetwork,
 			driverState.Subnet,
 		))

@@ -200,6 +200,8 @@ type AzureKubernetesServiceConfig struct {
 	VirtualNetwork string `json:"virtualNetwork,omitempty"`
 	// Subnet to use for the AKS Cluster (must be within the virtual network)
 	Subnet string `json:"subnet,omitempty"`
+	// The resource group that the virtual network is in.  If omited it is assumed to match the resource group of the cluster
+	VirtualNetworkResourceGroup string `json:"virtualNetworkResourceGroup,omitempty"`
 }
 
 type AmazonElasticContainerServiceConfig struct {
