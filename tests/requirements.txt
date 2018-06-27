@@ -1,4 +1,4 @@
-git+https://github.com/rancher/client-python.git@dba1fe8a9ea39f8ddc20aeedf0ad1463b932b280
+git+https://github.com/rancher/client-python.git@8fc5cd7c6306a51dbe9fb55400632268b7a34374
 websocket-client==0.23.0
 PyJWT==1.4.0
 

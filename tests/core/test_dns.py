@@ -1,8 +1,8 @@
 from common import random_str, auth_check
 
 
-def test_dns_fields(client):
-    auth_check(client.schema, 'dnsRecord', 'crud', {
+def test_dns_fields(admin_pc_client):
+    auth_check(admin_pc_client.schema, 'dnsRecord', 'crud', {
         'namespaceId': 'cr',
         'projectId': 'cr',
         'hostname': 'cru',
@@ -17,11 +17,11 @@ def test_dns_fields(client):
     })
 
 
-def test_dns_hostname(pc):
-    client = pc.client
+def test_dns_hostname(admin_pc, admin_cc_client):
+    client = admin_pc.client
 
-    ns = pc.cluster.client.create_namespace(name=random_str(),
-                                            projectId=pc.project.id)
+    ns = admin_cc_client.create_namespace(name=random_str(),
+                                          projectId=admin_pc.project.id)
 
     name = random_str()
     dns_record = client.create_dns_record(name=name,
@@ -34,7 +34,7 @@ def test_dns_hostname(pc):
     assert "clusterIp" not in dns_record
     assert dns_record.namespaceId == ns.id
     assert 'namespace' not in dns_record
-    assert dns_record.projectId == pc.project.id
+    assert dns_record.projectId == admin_pc.project.id
 
     dns_record = client.update(dns_record, hostname='target2')
     dns_record = client.reload(dns_record)
@@ -46,7 +46,7 @@ def test_dns_hostname(pc):
     assert "clusterIp" not in dns_record
     assert dns_record.namespaceId == ns.id
     assert 'namespace' not in dns_record
-    assert dns_record.projectId == pc.project.id
+    assert dns_record.projectId == admin_pc.project.id
 
     found = False
     for i in client.list_dns_record():
@@ -62,11 +62,11 @@ def test_dns_hostname(pc):
     client.delete(dns_record)
 
 
-def test_dns_ips(pc):
-    client = pc.client
+def test_dns_ips(admin_pc, admin_cc_client):
+    client = admin_pc.client
 
-    ns = pc.cluster.client.create_namespace(name=random_str(),
-                                            projectId=pc.project.id)
+    ns = admin_cc_client.create_namespace(name=random_str(),
+                                          projectId=admin_pc.project.id)
 
     name = random_str()
     dns_record = client.create_dns_record(name=name,
@@ -81,7 +81,7 @@ def test_dns_ips(pc):
     assert dns_record.clusterIp is None
     assert dns_record.namespaceId == ns.id
     assert 'namespace' not in dns_record
-    assert dns_record.projectId == pc.project.id
+    assert dns_record.projectId == admin_pc.project.id
 
     dns_record = client.update(dns_record, ipAddresses=['1.1.1.2', '2.2.2.1'])
     dns_record = client.reload(dns_record)
@@ -94,7 +94,7 @@ def test_dns_ips(pc):
     assert dns_record.clusterIp is None
     assert dns_record.namespaceId == ns.id
     assert 'namespace' not in dns_record
-    assert dns_record.projectId == pc.project.id
+    assert dns_record.projectId == admin_pc.project.id
 
     found = False
     for i in client.list_dns_record():
