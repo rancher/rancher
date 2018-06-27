@@ -107,11 +107,25 @@ func (c *Controller) CreateServiceForWorkload(workload *Workload) error {
 			return err
 		}
 
-		if existing == nil {
+		recreate := false
+		// to handle clusterIP to headless service updates
+		// as clusterIP field is immutable
+		if existing != nil && toCreate.Type == ClusterIPServiceType {
+			clusterIPNew := toCreate.ClusterIP
+			custerIPOld := existing.Spec.ClusterIP
+			if clusterIPNew != custerIPOld && (clusterIPNew == "None" || custerIPOld == "None") {
+				err = c.services.DeleteNamespaced(existing.Namespace, existing.Name, &metav1.DeleteOptions{})
+				if err != nil {
+					return err
+				}
+				recreate = true
+			}
+		}
+
+		if existing == nil || recreate {
 			if err := c.createService(toCreate, workload); err != nil {
 				return err
 			}
-
 		} else {
 			// check if the port of the same type
 			if existing.Spec.Type != toCreate.Type {
@@ -133,6 +147,7 @@ func (c *Controller) CreateServiceForWorkload(workload *Workload) error {
 			if arePortsEqual(toCreate.ServicePorts, existing.Spec.Ports) {
 				continue
 			}
+
 			if err := c.updateService(toCreate, existing); err != nil {
 				return err
 			}
@@ -184,6 +199,9 @@ func (c *Controller) updateService(toUpdate Service, existing *corev1.Service) e
 	}
 
 	existing.Spec.Ports = portsToUpdate
+	if existing.Spec.Type == ClusterIPServiceType {
+		existing.Spec.ClusterIP = toUpdate.ClusterIP
+	}
 	logrus.Infof("Updating [%s/%s] service with ports [%v]", existing.Namespace, existing.Name, portsToUpdate)
 	_, err := c.services.Update(existing)
 	if err != nil {

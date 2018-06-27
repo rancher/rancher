@@ -491,7 +491,7 @@ func generateClusterIPServiceFromContainers(workload *Workload) *Service {
 			servicePorts = append(servicePorts, servicePort)
 		}
 	}
-
+	clusterIP := ""
 	// append default port as sky dns won't work w/o at least one port being set
 	if len(servicePorts) == 0 {
 		servicePort := corev1.ServicePort{
@@ -500,12 +500,13 @@ func generateClusterIPServiceFromContainers(workload *Workload) *Service {
 			Protocol:   corev1.Protocol(corev1.ProtocolTCP),
 			Name:       "default",
 		}
+		clusterIP = "None"
 		servicePorts = append(servicePorts, servicePort)
 	}
 
 	return &Service{
 		Type:         ClusterIPServiceType,
-		ClusterIP:    "None",
+		ClusterIP:    clusterIP,
 		ServicePorts: servicePorts,
 		Name:         workload.Name,
 	}
