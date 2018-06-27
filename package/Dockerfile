@@ -3,15 +3,20 @@ RUN apt-get update && apt-get install -y git curl ca-certificates unzip xz-utils
     useradd rancher && \
     mkdir -p /var/lib/rancher/etcd /var/lib/cattle && \
     chown -R rancher /var/lib/rancher /var/lib/cattle /usr/local/bin
-RUN curl -sLf https://github.com/rancher/machine-package/releases/download/v0.14.0-rancher4-1/docker-machine.tar.gz | tar xvzf - -C /usr/bin && \
-    curl -sLf https://github.com/leodotcloud/loglevel/releases/download/v0.1/loglevel-amd64-v0.1.tar.gz | tar xvzf - -C /usr/bin && \
-    curl -sLf https://github.com/rancher/helm/releases/download/v2.8.0-rancher3/helm > /usr/bin/helm && \
-    chmod +x /usr/bin/helm
 RUN mkdir /root/.kube && \
     ln -s /usr/bin/rancher /usr/bin/kubectl && \
     ln -s /var/lib/rancher/kube_config_cluster.yml /root/.kube/config && \
     ln -s /usr/bin/rancher /usr/bin/reset-password
 WORKDIR /var/lib/rancher
+
+ENV CATTLE_HELM_VERSION v2.8.0-rancher3
+ENV CATTLE_MACHINE_VERSION v0.14.0-rancher4-1
+ENV LOGLEVEL_VERSION v0.1
+
+RUN curl -sLf https://github.com/rancher/machine-package/releases/download/${CATTLE_MACHINE_VERSION}/docker-machine.tar.gz | tar xvzf - -C /usr/bin && \
+    curl -sLf https://github.com/leodotcloud/loglevel/releases/download/${LOGLEVEL_VERSION}/loglevel-amd64-${LOGLEVEL_VERSION}.tar.gz | tar xvzf - -C /usr/bin && \
+    curl -sLf https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/helm > /usr/bin/helm && \
+    chmod +x /usr/bin/helm
 
 ENV CATTLE_UI_PATH /usr/share/rancher/ui
 ENV CATTLE_UI_VERSION 2.0.53
