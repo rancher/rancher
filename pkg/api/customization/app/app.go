@@ -66,6 +66,9 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 
 func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
 	externalID := convert.ToString(data["externalId"])
+	if externalID == "" {
+		return nil
+	}
 	templateVersionID, err := hcommon.ParseExternalID(externalID)
 	if err != nil {
 		return err
