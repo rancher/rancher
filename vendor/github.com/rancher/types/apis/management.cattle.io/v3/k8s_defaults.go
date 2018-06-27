@@ -300,7 +300,7 @@ var (
 			PluginsDocker: m("plugins/docker:17.12"),
 		},
 		LoggingSystemImages: LoggingSystemImages{
-			Fluentd:                       m("rancher/fluentd:v0.1.8"),
+			Fluentd:                       m("rancher/fluentd:v0.1.9"),
 			FluentdHelper:                 m("rancher/fluentd-helper:v0.1.2"),
 			LogAggregatorFlexVolumeDriver: m("rancher/log-aggregator:v0.1.3"),
 			Elaticsearch:                  m("quay.io/pires/docker-elasticsearch-kubernetes:5.6.2"),
