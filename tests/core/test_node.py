@@ -1,8 +1,8 @@
 from common import auth_check
 
 
-def test_node_fields(mc):
-    cclient = mc.client
+def test_node_fields(admin_mc):
+    cclient = admin_mc.client
     fields = {
         'annotations': 'r',
         'labels': 'cru',

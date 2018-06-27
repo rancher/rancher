@@ -2,8 +2,8 @@ import pytest
 from rancher import ApiError
 
 
-def test_auth_configs(mc):
-    client = mc.client
+def test_auth_configs(admin_mc):
+    client = admin_mc.client
 
     with pytest.raises(AttributeError) as e:
         client.list_github_config()

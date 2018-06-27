@@ -22,11 +22,11 @@ BBUi6y1Vm9jrDi/LiiHcN4sJEoP=
 -----END CERTIFICATE-----"""
 
 
-def test_namespaced_secrets(pc):
-    client = pc.client
+def test_namespaced_secrets(admin_pc, admin_cc_client):
+    client = admin_pc.client
 
-    ns = pc.cluster.client.create_namespace(name=random_str(),
-                                            projectId=pc.project.id)
+    ns = admin_cc_client.create_namespace(name=random_str(),
+                                          projectId=admin_pc.project.id)
 
     name = random_str()
     secret = client.create_namespaced_secret(name=name, namespaceId=ns.id,
@@ -53,7 +53,7 @@ def test_namespaced_secrets(pc):
     assert secret.data['baz'] == 'YmFy'
     assert secret.namespaceId == ns.id
     assert 'namespace' not in secret
-    assert secret.projectId == pc.project.id
+    assert secret.projectId == admin_pc.project.id
 
     found = False
     for i in client.list_namespaced_secret():
@@ -66,11 +66,11 @@ def test_namespaced_secrets(pc):
     client.delete(secret)
 
 
-def test_namespaced_certificates(pc):
-    client = pc.client
+def test_namespaced_certificates(admin_pc, admin_cc_client):
+    client = admin_pc.client
 
-    ns = pc.cluster.client.create_namespace(name=random_str(),
-                                            projectId=pc.project.id)
+    ns = admin_cc_client.create_namespace(name=random_str(),
+                                          projectId=admin_pc.project.id)
 
     name = random_str()
     cert = client.create_namespaced_certificate(name=name, key=KEY,
@@ -81,12 +81,12 @@ def test_namespaced_certificates(pc):
     assert cert.name == name
     assert cert.certs == CERT
     assert cert.namespaceId == ns.id
-    assert cert.projectId == pc.project.id
+    assert cert.projectId == admin_pc.project.id
     assert 'namespace' not in cert
 
     cert = client.update(cert, certs=UPDATED_CERT)
     assert cert.namespaceId == ns.id
-    assert cert.projectId == pc.project.id
+    assert cert.projectId == admin_pc.project.id
 
     cert = client.reload(cert)
 
@@ -95,7 +95,7 @@ def test_namespaced_certificates(pc):
     assert cert.name == name
     assert cert.certs == UPDATED_CERT
     assert cert.namespaceId == ns.id
-    assert cert.projectId == pc.project.id
+    assert cert.projectId == admin_pc.project.id
 
     found = False
     for i in client.list_namespaced_certificate():
@@ -111,11 +111,11 @@ def test_namespaced_certificates(pc):
     client.delete(cert)
 
 
-def test_namespaced_docker_credential(pc):
-    client = pc.client
+def test_namespaced_docker_credential(admin_pc, admin_cc_client):
+    client = admin_pc.client
 
-    ns = pc.cluster.client.create_namespace(name=random_str(),
-                                            projectId=pc.project.id)
+    ns = admin_cc_client.create_namespace(name=random_str(),
+                                          projectId=admin_pc.project.id)
 
     name = random_str()
     registries = {'index.docker.io': {
@@ -131,7 +131,7 @@ def test_namespaced_docker_credential(pc):
     assert cert.registries['index.docker.io']['username'] == 'foo'
     assert 'password' in cert.registries['index.docker.io']
     assert cert.namespaceId == ns.id
-    assert cert.projectId == pc.project.id
+    assert cert.projectId == admin_pc.project.id
 
     registries['two'] = {
         'username': 'blah'
@@ -148,7 +148,7 @@ def test_namespaced_docker_credential(pc):
     assert 'password' not in cert.registries['index.docker.io']
     assert cert.namespaceId == ns.id
     assert 'namespace' not in cert
-    assert cert.projectId == pc.project.id
+    assert cert.projectId == admin_pc.project.id
 
     found = False
     for i in client.list_namespaced_docker_credential():
@@ -164,11 +164,11 @@ def test_namespaced_docker_credential(pc):
     client.delete(cert)
 
 
-def test_namespaced_basic_auth(pc):
-    client = pc.client
+def test_namespaced_basic_auth(admin_pc, admin_cc_client):
+    client = admin_pc.client
 
-    ns = pc.cluster.client.create_namespace(name=random_str(),
-                                            projectId=pc.project.id)
+    ns = admin_cc_client.create_namespace(name=random_str(),
+                                          projectId=admin_pc.project.id)
 
     name = random_str()
     cert = client.create_namespaced_basic_auth(name=name,
@@ -182,7 +182,7 @@ def test_namespaced_basic_auth(pc):
     assert 'password' in cert
     assert cert.namespaceId == ns.id
     assert 'namespace' not in cert
-    assert cert.projectId == pc.project.id
+    assert cert.projectId == admin_pc.project.id
 
     cert = client.update(cert, username='foo2')
     cert = client.reload(cert)
@@ -194,7 +194,7 @@ def test_namespaced_basic_auth(pc):
     assert 'password' not in cert
     assert cert.namespaceId == ns.id
     assert 'namespace' not in cert
-    assert cert.projectId == pc.project.id
+    assert cert.projectId == admin_pc.project.id
 
     found = False
     for i in client.list_namespaced_basic_auth():
@@ -210,11 +210,11 @@ def test_namespaced_basic_auth(pc):
     client.delete(cert)
 
 
-def test_namespaced_ssh_auth(pc):
-    client = pc.client
+def test_namespaced_ssh_auth(admin_pc, admin_cc_client):
+    client = admin_pc.client
 
-    ns = pc.cluster.client.create_namespace(name=random_str(),
-                                            projectId=pc.project.id)
+    ns = admin_cc_client.create_namespace(name=random_str(),
+                                          projectId=admin_pc.project.id)
 
     name = random_str()
     cert = client.create_namespaced_ssh_auth(name=name,
@@ -226,7 +226,7 @@ def test_namespaced_ssh_auth(pc):
     assert 'privateKey' in cert
     assert cert.namespaceId == ns.id
     assert 'namespace' not in cert
-    assert cert.projectId == pc.project.id
+    assert cert.projectId == admin_pc.project.id
 
     cert = client.update(cert, privateKey='foo2')
     cert = client.reload(cert)
@@ -236,7 +236,7 @@ def test_namespaced_ssh_auth(pc):
     assert 'privateKey' not in cert
     assert cert.namespaceId == ns.id
     assert 'namespace' not in cert
-    assert cert.projectId == pc.project.id
+    assert cert.projectId == admin_pc.project.id
 
     found = False
     for i in client.list_namespaced_ssh_auth():

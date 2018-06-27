@@ -1,8 +1,8 @@
 from common import random_str, auth_check
 
 
-def test_ingress_fields(client):
-    auth_check(client.schema, 'ingress', 'crud', {
+def test_ingress_fields(admin_pc_client):
+    auth_check(admin_pc_client.schema, 'ingress', 'crud', {
         'namespaceId': 'cr',
         'projectId': 'cr',
         'rules': 'cru',
@@ -12,25 +12,25 @@ def test_ingress_fields(client):
         'status': 'r',
     })
 
-    auth_check(client.schema, 'ingressBackend', '', {
+    auth_check(admin_pc_client.schema, 'ingressBackend', '', {
         'serviceId': 'cru',
         'targetPort': 'cru',
         'workloadIds': 'cru',
     })
 
-    auth_check(client.schema, 'ingressRule', '', {
+    auth_check(admin_pc_client.schema, 'ingressRule', '', {
         'host': 'cru',
         'paths': 'cru',
     })
 
-    assert 'httpIngressPath' not in client.schema.types
+    assert 'httpIngressPath' not in admin_pc_client.schema.types
 
 
-def test_ingress(pc):
-    client = pc.client
+def test_ingress(admin_pc, admin_cc_client):
+    client = admin_pc.client
 
-    ns = pc.cluster.client.create_namespace(name=random_str(),
-                                            projectId=pc.project.id)
+    ns = admin_cc_client.create_namespace(name=random_str(),
+                                          projectId=admin_pc.project.id)
 
     name = random_str()
     workload = client.create_workload(
@@ -66,11 +66,11 @@ def test_ingress(pc):
     client.delete(ns)
 
 
-def test_ingress_rules_same_hostPortPath(pc):
-    client = pc.client
+def test_ingress_rules_same_hostPortPath(admin_pc, admin_cc_client):
+    client = admin_pc.client
 
-    ns = pc.cluster.client.create_namespace(name=random_str(),
-                                            projectId=pc.project.id)
+    ns = admin_cc_client.create_namespace(name=random_str(),
+                                          projectId=admin_pc.project.id)
 
     name = random_str()
     workload1 = client.create_workload(
