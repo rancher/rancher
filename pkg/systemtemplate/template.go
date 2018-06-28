@@ -119,6 +119,13 @@ spec:
     spec:
       hostNetwork: true
       serviceAccountName: cattle
+      tolerations:
+      - effect: NoExecute
+        key: "node-role.kubernetes.io/etcd"
+        value: "true"
+      - effect: NoSchedule
+        key: "node-role.kubernetes.io/controlplane"
+        value: "true"
       containers:
       - name: agent
         image: {{.AgentImage}}
