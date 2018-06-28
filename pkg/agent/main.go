@@ -23,6 +23,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var (
+	VERSION = "dev"
+)
+
 const (
 	Token  = "X-API-Tunnel-Token"
 	Params = "X-API-Tunnel-Params"
@@ -120,6 +124,7 @@ func cleanup(ctx context.Context) error {
 }
 
 func run() error {
+	logrus.Infof("Rancher agent version %s is starting", VERSION)
 	params, err := getParams()
 	if err != nil {
 		return err
