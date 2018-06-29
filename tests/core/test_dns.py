@@ -1,4 +1,4 @@
-from common import random_str, auth_check
+from .common import random_str, auth_check
 
 
 def test_dns_fields(admin_pc_client):

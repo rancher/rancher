@@ -1,4 +1,4 @@
-from common import random_str
+from .common import random_str
 
 CERT = """-----BEGIN CERTIFICATE-----
 MIIDEDCCAfgCCQC+HwE8rpMN7jANBgkqhkiG9w0BAQUFADBKMQswCQYDVQQGEwJV
@@ -60,9 +60,9 @@ def test_secrets(admin_pc):
     assert secret.type == 'secret'
     assert secret.kind == 'Opaque'
     assert secret.name == name
-    assert secret.data['foo'] == 'YmFy'
+    assert secret.data.foo == 'YmFy'
 
-    secret.data['baz'] = 'YmFy'
+    secret.data.baz = 'YmFy'
     secret = client.update(secret, data=secret.data)
     secret = client.reload(secret)
 
@@ -70,10 +70,10 @@ def test_secrets(admin_pc):
     assert secret.type == 'secret'
     assert secret.kind == 'Opaque'
     assert secret.name == name
-    assert secret.data['foo'] == 'YmFy'
-    assert secret.data['baz'] == 'YmFy'
+    assert secret.data.foo == 'YmFy'
+    assert secret.data.baz == 'YmFy'
     assert secret.namespaceId is None
-    assert 'namespace' not in secret
+    assert 'namespace' not in secret.data
     assert secret.projectId == admin_pc.project.id
 
     found = False
@@ -138,8 +138,8 @@ def test_docker_credential(admin_pc):
     assert cert.baseType == 'secret'
     assert cert.type == 'dockerCredential'
     assert cert.name == name
-    assert cert.registries['index.docker.io']['username'] == 'foo'
-    assert 'password' in cert.registries['index.docker.io']
+    assert cert.registries.data_dict()['index.docker.io'].username == 'foo'
+    assert 'password' in cert.registries.data_dict()['index.docker.io']
     assert cert.namespaceId is None
     assert 'namespace' not in cert
     assert cert.projectId == admin_pc.project.id
@@ -154,9 +154,9 @@ def test_docker_credential(admin_pc):
     assert cert.baseType == 'secret'
     assert cert.type == 'dockerCredential'
     assert cert.name == name
-    assert cert.registries['index.docker.io']['username'] == 'foo'
-    assert cert.registries['two']['username'] == 'blah'
-    assert 'password' not in cert.registries['index.docker.io']
+    assert cert.registries.data_dict()['index.docker.io'].username == 'foo'
+    assert cert.registries.two.username == 'blah'
+    assert 'password' not in cert.registries.data_dict()['index.docker.io']
     assert cert.namespaceId is None
     assert 'namespace' not in cert
     assert cert.projectId == admin_pc.project.id
