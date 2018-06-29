@@ -129,6 +129,16 @@ func getServiceWorkloadIDs(obj *corev1.Service) []string {
 	return workloadIDs
 }
 
+func (c *Controller) fetchWorkload(workloadID string) (*util.Workload, error) {
+	workload, err := c.workloadLister.GetByWorkloadIDRetryAPIIfNotFound(workloadID)
+	if err != nil && apierrors.IsNotFound(err) {
+		logrus.Warnf("Failed to fetch workload [%s]: [%v]", workloadID, err)
+		return nil, nil
+	}
+
+	return workload, err
+}
+
 func (c *Controller) updateServiceWorkloadPods(key string, workloadIDsToCleanup map[string]bool) error {
 	if len(workloadIDsToCleanup) == 0 {
 		return nil
@@ -136,21 +146,13 @@ func (c *Controller) updateServiceWorkloadPods(key string, workloadIDsToCleanup 
 	var podsToEnqueue []*corev1.Pod
 	var workloadsToCleanup []*util.Workload
 	for workloadID := range workloadIDsToCleanup {
-		workload, err := c.workloadLister.GetByWorkloadID(workloadID)
-		notFound := workload == nil
+		workload, err := c.fetchWorkload(workloadID)
 		if err != nil {
-			if apierrors.IsNotFound(err) {
-				notFound = true
-			} else {
-				return err
-			}
+			return err
 		}
-
-		if notFound {
-			logrus.Warnf("Failed to fetch workload [%s]: [%v]", workloadID, err)
+		if workload == nil {
 			continue
 		}
-
 		pods, err := c.getPodsForWorkload(workload)
 		if err != nil {
 			return err
@@ -202,13 +204,15 @@ func (c *Controller) updatePods(serviceName string, obj *corev1.Service, workloa
 	var podsToUpdate []*corev1.Pod
 	targetWorkloadIDs := map[string]bool{}
 	for _, workloadID := range workloadIDs {
-		targetWorkload, err := c.workloadLister.GetByWorkloadID(workloadID)
-		if err != nil || targetWorkload == nil {
-			logrus.Warnf("Failed to fetch workload [%s]: [%v]", workloadID, err)
+		workload, err := c.fetchWorkload(workloadID)
+		if err != nil {
+			return nil, err
+		}
+		if workload == nil {
 			continue
 		}
 
-		pods, err := c.getPodsForWorkload(targetWorkload)
+		pods, err := c.getPodsForWorkload(workload)
 		if err != nil {
 			return nil, err
 		}
