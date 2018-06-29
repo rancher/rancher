@@ -1,4 +1,4 @@
-from common import auth_check
+from .common import auth_check
 
 
 def test_node_fields(admin_mc):
@@ -38,7 +38,7 @@ def test_node_fields(admin_mc):
         'dockerInfo': 'r',
     }
 
-    for name, field in cclient.schema.types['node'].resourceFields.items():
+    for name in cclient.schema.types['node'].resourceFields.keys():
         if name.endswith("Config"):
             fields[name] = 'cr'
 

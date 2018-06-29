@@ -13,7 +13,7 @@ def test_auth_configs(admin_mc):
 
     configs = client.list_auth_config()
 
-    assert len(configs) == 6
+    assert configs.pagination.total == 6
     gh = None
     local = None
     ad = None
@@ -42,14 +42,14 @@ def test_auth_configs(admin_mc):
             client.delete(config)
         assert e.value.error.status == 405
 
-    assert gh.actions['testAndApply']
-    assert gh.actions['configureTest']
+    assert gh.actions.testAndApply
+    assert gh.actions.configureTest
 
-    assert ad.actions['testAndApply']
+    assert ad.actions.testAndApply
 
-    assert azure.actions['testAndApply']
-    assert azure.actions['configureTest']
+    assert azure.actions.testAndApply
+    assert azure.actions.configureTest
 
-    assert openldap.actions['testAndApply']
+    assert openldap.actions.testAndApply
 
-    assert freeIpa.actions['testAndApply']
+    assert freeIpa.actions.testAndApply

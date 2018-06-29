@@ -1,4 +1,4 @@
-from common import random_str
+from .common import random_str
 import time
 
 
@@ -15,9 +15,9 @@ def test_workload_ports_change(admin_pc):
         namespaceId=ns.id,
         scale=1,
         containers=[{
-                        'name': 'one',
-                        'image': 'nginx',
-                    }])
+            'name': 'one',
+            'image': 'nginx',
+        }])
     svc = wait_for_service_create(client, name)
     assert svc.clusterIp is None
     assert svc.name == workload.name
@@ -25,18 +25,18 @@ def test_workload_ports_change(admin_pc):
 
     # update workload wiht port, and validate cluster ip is set
     ports = [{
-                 'sourcePort': '0',
-                 'containerPort': '80',
-                 'kind': 'ClusterIP',
-                 'protocol': 'TCP', }]
+        'sourcePort': '0',
+        'containerPort': '80',
+        'kind': 'ClusterIP',
+        'protocol': 'TCP', }]
     client.update(workload,
                   namespaceId=ns.id,
                   scale=1,
                   containers=[{
-                                  'name': 'one',
-                                  'image': 'nginx',
-                                  'ports': ports,
-                              }]),
+                      'name': 'one',
+                      'image': 'nginx',
+                      'ports': ports,
+                  }]),
     svc = wait_for_service_cluserip_set(client, name)
     assert svc.clusterIp is not None
 
@@ -45,10 +45,10 @@ def test_workload_ports_change(admin_pc):
                   namespaceId=ns.id,
                   scale=1,
                   containers=[{
-                                  'name': 'one',
-                                  'image': 'nginx',
-                                  'ports': [],
-                              }]),
+                      'name': 'one',
+                      'image': 'nginx',
+                      'ports': [],
+                  }]),
     svc = wait_for_service_cluserip_reset(client, name)
     assert svc.clusterIp is None
 
@@ -61,26 +61,26 @@ def wait_for_service_create(client, name, timeout=30):
         services = client.list_service(name=name, kind="ClusterIP")
         if time.time() - start > timeout:
             raise Exception('Timeout waiting for workload service')
-    return services[0]
+    return services.data[0]
 
 
 def wait_for_service_cluserip_set(client, name, timeout=30):
     start = time.time()
     services = client.list_service(name=name, kind="ClusterIP")
-    while len(services) == 0 or services[0].clusterIp is None:
+    while len(services) == 0 or services.data[0].clusterIp is None:
         time.sleep(.5)
         services = client.list_service(name=name, kind="ClusterIP")
         if time.time() - start > timeout:
             raise Exception('Timeout waiting for workload service')
-    return services[0]
+    return services.data[0]
 
 
 def wait_for_service_cluserip_reset(client, name, timeout=30):
     start = time.time()
     services = client.list_service(name=name, kind="ClusterIP")
-    while len(services) == 0 or services[0].clusterIp is not None:
+    while len(services) == 0 or services.data[0].clusterIp is not None:
         time.sleep(.5)
         services = client.list_service(name=name, kind="ClusterIP")
         if time.time() - start > timeout:
             raise Exception('Timeout waiting for workload service')
-    return services[0]
+    return services.data[0]

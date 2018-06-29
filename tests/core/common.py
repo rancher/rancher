@@ -21,35 +21,35 @@ def find_count(count, method, *args, **kw):
 
 
 def auth_check(schema, id, access, props=None):
-    type = schema.types[id]
+    schema_type = schema.types[id]
     access_actual = set()
 
     try:
-        if 'GET' in type.collectionMethods:
+        if 'GET' in schema_type.collectionMethods:
             access_actual.add('r')
     except AttributeError:
         pass
 
     try:
-        if 'GET' in type.resourceMethods:
+        if 'GET' in schema_type.resourceMethods:
             access_actual.add('r')
     except AttributeError:
         pass
 
     try:
-        if 'POST' in type.collectionMethods:
+        if 'POST' in schema_type.collectionMethods:
             access_actual.add('c')
     except AttributeError:
         pass
 
     try:
-        if 'DELETE' in type.resourceMethods:
+        if 'DELETE' in schema_type.resourceMethods:
             access_actual.add('d')
     except AttributeError:
         pass
 
     try:
-        if 'PUT' in type.resourceMethods:
+        if 'PUT' in schema_type.resourceMethods:
             access_actual.add('u')
     except AttributeError:
         pass
@@ -60,21 +60,21 @@ def auth_check(schema, id, access, props=None):
         return 1
 
     for i in ['description', 'annotations', 'labels']:
-        if i not in props and i in type.resourceFields:
+        if i not in props and i in schema_type.resourceFields.keys():
             props[i] = 'cru'
 
     for i in ['created', 'removed', 'transitioning', 'transitioningProgress',
               'removeTime', 'transitioningMessage', 'id', 'uuid', 'kind',
               'state', 'creatorId', 'finalizers', 'ownerReferences', 'type']:
-        if i not in props and i in type.resourceFields:
+        if i not in props and i in schema_type.resourceFields.keys():
             props[i] = 'r'
 
     for i in ['name']:
-        if i not in props and i in type.resourceFields:
+        if i not in props and i in schema_type.resourceFields.keys():
             props[i] = 'cr'
 
     prop = set(props.keys())
-    prop_actual = set(type.resourceFields.keys())
+    prop_actual = set(schema_type.resourceFields.keys())
 
     if prop_actual != prop:
         for k in prop:
@@ -84,7 +84,7 @@ def auth_check(schema, id, access, props=None):
 
     assert prop_actual == prop
 
-    for name, field in type.resourceFields.items():
+    for name, field in schema_type.resourceFields.items():
         assert name in props
 
         prop = set(props[name])
@@ -97,7 +97,7 @@ def auth_check(schema, id, access, props=None):
             prop_actual.add('c')
         if field.update:
             prop_actual.add('u')
-        if 'writeOnly' in field and field.writeOnly:
+        if 'writeOnly' in field.data_dict() and field.writeOnly:
             prop_actual.add('o')
 
         if prop_actual != prop:
