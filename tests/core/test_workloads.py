@@ -2,10 +2,11 @@ from common import random_str
 import time
 
 
-def test_workload_ports_change(pc):
-    client = pc.client
-    ns = pc.cluster.client.create_namespace(name=random_str(),
-                                            projectId=pc.project.id)
+def test_workload_ports_change(admin_pc):
+    client = admin_pc.client
+    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
+                                                  projectId=admin_pc.
+                                                  project.id)
     # create workload with no ports assigned
     # and verify headless service is created
     name = random_str()
