@@ -22,7 +22,7 @@ const (
 	K8sVersion       = "1.8"
 )
 
-func (h *Host) TunnelUp(ctx context.Context, dialerFactory DialerFactory) error {
+func (h *Host) TunnelUp(ctx context.Context, dialerFactory DialerFactory, clusterPrefixPath string) error {
 	if h.DClient != nil {
 		return nil
 	}
@@ -37,7 +37,11 @@ func (h *Host) TunnelUp(ctx context.Context, dialerFactory DialerFactory) error 
 	if err != nil {
 		return fmt.Errorf("Can't initiate NewClient: %v", err)
 	}
-	return checkDockerVersion(ctx, h)
+	if err := checkDockerVersion(ctx, h); err != nil {
+		return err
+	}
+	h.PrefixPath = GetPrefixPath(h.DockerInfo.OperatingSystem, clusterPrefixPath)
+	return nil
 }
 
 func (h *Host) TunnelUpLocal(ctx context.Context) error {
@@ -78,10 +82,6 @@ func parsePrivateKey(keyBuff string) (ssh.Signer, error) {
 	return ssh.ParsePrivateKey([]byte(keyBuff))
 }
 
-func parsePrivateKeyWithPassPhrase(keyBuff string, passphrase []byte) (ssh.Signer, error) {
-	return ssh.ParsePrivateKeyWithPassphrase([]byte(keyBuff), passphrase)
-}
-
 func getSSHConfig(username, sshPrivateKeyString string, useAgentAuth bool) (*ssh.ClientConfig, error) {
 	config := &ssh.ClientConfig{
 		User:            username,
@@ -112,12 +112,15 @@ func getSSHConfig(username, sshPrivateKeyString string, useAgentAuth bool) (*ssh
 	return config, nil
 }
 
-func privateKeyPath(sshKeyPath string) string {
+func privateKeyPath(sshKeyPath string) (string, error) {
 	if sshKeyPath[:2] == "~/" {
 		sshKeyPath = filepath.Join(userHome(), sshKeyPath[2:])
 	}
-	buff, _ := ioutil.ReadFile(sshKeyPath)
-	return string(buff)
+	buff, err := ioutil.ReadFile(sshKeyPath)
+	if err != nil {
+		return "", fmt.Errorf("Error while reading SSH key file: %v", err)
+	}
+	return string(buff), nil
 }
 
 func userHome() string {

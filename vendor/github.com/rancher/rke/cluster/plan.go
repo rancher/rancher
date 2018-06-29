@@ -23,12 +23,6 @@ import (
 
 const (
 	EtcdPathPrefix     = "/registry"
-	B2DOS              = "Boot2Docker"
-	B2DPrefixPath      = "/mnt/sda1/rke"
-	ROS                = "RancherOS"
-	ROSPrefixPath      = "/opt/rke"
-	CoreOS             = "CoreOS"
-	CoreOSPrefixPath   = "/opt/rke"
 	ContainerNameLabel = "io.rancher.rke.container.name"
 	CloudConfigSumEnv  = "RKE_CLOUD_CONFIG_CHECKSUM"
 )
@@ -49,13 +43,13 @@ func GeneratePlan(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConf
 }
 
 func BuildRKEConfigNodePlan(ctx context.Context, myCluster *Cluster, host *hosts.Host, hostDockerInfo types.Info) v3.RKEConfigNodePlan {
-	prefixPath := myCluster.getPrefixPath(hostDockerInfo.OperatingSystem)
+	prefixPath := hosts.GetPrefixPath(hostDockerInfo.OperatingSystem, myCluster.PrefixPath)
 	processes := map[string]v3.Process{}
 	portChecks := []v3.PortCheck{}
 	// Everybody gets a sidecar and a kubelet..
 	processes[services.SidekickContainerName] = myCluster.BuildSidecarProcess()
 	processes[services.KubeletContainerName] = myCluster.BuildKubeletProcess(host, prefixPath)
-	processes[services.KubeproxyContainerName] = myCluster.BuildKubeProxyProcess(prefixPath)
+	processes[services.KubeproxyContainerName] = myCluster.BuildKubeProxyProcess(host, prefixPath)
 
 	portChecks = append(portChecks, BuildPortChecksFromPortList(host, WorkerPortList, ProtocolTCP)...)
 	// Do we need an nginxProxy for this one ?
@@ -368,8 +362,8 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string) v3.Pr
 		"/run:/run:rprivate",
 		fmt.Sprintf("%s:/etc/ceph", path.Join(prefixPath, "/etc/ceph")),
 		"/dev:/host/dev:rprivate",
-		fmt.Sprintf("%s:/var/log/containers:z", path.Join(prefixPath, "/var/log/containers")),
-		fmt.Sprintf("%s:/var/log/pods:z", path.Join(prefixPath, "/var/log/pods")),
+		"/var/log/containers:/var/log/containers:z",
+		"/var/log/pods:/var/log/pods:z",
 		"/usr:/host/usr:ro",
 		"/etc:/host/etc:ro",
 	}
@@ -411,15 +405,17 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string) v3.Pr
 	}
 }
 
-func (c *Cluster) BuildKubeProxyProcess(prefixPath string) v3.Process {
+func (c *Cluster) BuildKubeProxyProcess(host *hosts.Host, prefixPath string) v3.Process {
 	Command := []string{
 		"/opt/rke/entrypoint.sh",
 		"kube-proxy",
 	}
 
 	CommandArgs := map[string]string{
-		"v": "2",
+		"cluster-cidr": c.ClusterCIDR,
+		"v":            "2",
 		"healthz-bind-address": "0.0.0.0",
+		"hostname-override":    host.HostnameOverride,
 		"kubeconfig":           pki.GetConfigPath(pki.KubeProxyCertName),
 	}
 
@@ -679,23 +675,6 @@ func BuildPortChecksFromPortList(host *hosts.Host, portList []string, proto stri
 		})
 	}
 	return portChecks
-}
-
-func (c *Cluster) getPrefixPath(osType string) string {
-	var prefixPath string
-	switch {
-	case c.PrefixPath != "/":
-		prefixPath = c.PrefixPath
-	case strings.Contains(osType, B2DOS):
-		prefixPath = B2DPrefixPath
-	case strings.Contains(osType, ROS):
-		prefixPath = ROSPrefixPath
-	case strings.Contains(osType, CoreOS):
-		prefixPath = CoreOSPrefixPath
-	default:
-		prefixPath = c.PrefixPath
-	}
-	return prefixPath
 }
 
 func (c *Cluster) GetKubernetesServicesOptions() v3.KubernetesServicesOptions {
