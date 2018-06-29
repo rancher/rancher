@@ -44,7 +44,7 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 			newRT.Hidden != rt.Hidden ||
 			newRT.Description != rt.Description ||
 			newRT.Context != rt.Context ||
-			newRT.Name != rt.Name {
+			newRT.Name != rt.DisplayName {
 			return e
 		}
 
