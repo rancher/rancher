@@ -74,6 +74,10 @@ func ClusterRemove(
 }
 
 func clusterRemoveFromCli(ctx *cli.Context) error {
+	clusterFile, filePath, err := resolveClusterFile(ctx)
+	if err != nil {
+		return fmt.Errorf("Failed to resolve cluster file: %v", err)
+	}
 	force := ctx.Bool("force")
 	if !force {
 		reader := bufio.NewReader(os.Stdin)
@@ -89,10 +93,6 @@ func clusterRemoveFromCli(ctx *cli.Context) error {
 	}
 	if ctx.Bool("local") {
 		return clusterRemoveLocal(ctx)
-	}
-	clusterFile, filePath, err := resolveClusterFile(ctx)
-	if err != nil {
-		return fmt.Errorf("Failed to resolve cluster file: %v", err)
 	}
 	clusterFilePath = filePath
 	rkeConfig, err := cluster.ParseConfig(clusterFile)

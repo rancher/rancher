@@ -15,7 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/rkeworker"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/tunnelserver"
-	cluster2 "github.com/rancher/rke/cluster"
+	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -134,7 +134,7 @@ func (n *RKENodeConfigServer) nonWorkerConfig(ctx context.Context, cluster *v3.C
 
 	for _, tempNode := range plan.Nodes {
 		if tempNode.Address == node.Status.NodeConfig.Address {
-			b2d := strings.Contains(infos[tempNode.Address].OperatingSystem, cluster2.B2DOS)
+			b2d := strings.Contains(infos[tempNode.Address].OperatingSystem, hosts.B2DOS)
 			nc.Processes = augmentProcesses(tempNode.Processes, false, b2d)
 			return nc, nil
 		}
@@ -175,7 +175,7 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 
 	for _, tempNode := range plan.Nodes {
 		if tempNode.Address == node.Status.NodeConfig.Address {
-			b2d := strings.Contains(infos[tempNode.Address].OperatingSystem, cluster2.B2DOS)
+			b2d := strings.Contains(infos[tempNode.Address].OperatingSystem, hosts.B2DOS)
 			nc.Processes = augmentProcesses(tempNode.Processes, true, b2d)
 			nc.Files = tempNode.Files
 			return nc, nil

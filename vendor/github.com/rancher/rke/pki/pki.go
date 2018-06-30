@@ -218,7 +218,7 @@ func SaveBackupBundleOnHost(ctx context.Context, host *hosts.Host, alpineSystemI
 		Cmd: []string{
 			"sh",
 			"-c",
-			fmt.Sprintf("tar czvf %s %s", BundleCertPath, path.Join(host.PrefixPath, TempCertPath)),
+			fmt.Sprintf("if [ -d %s ] && [ \"$(ls -A %s)\" ]; then tar czvf %s %s;fi", path.Join(host.PrefixPath, TempCertPath), path.Join(host.PrefixPath, TempCertPath), BundleCertPath, path.Join(host.PrefixPath, TempCertPath)),
 		},
 		Image: alpineSystemImage,
 	}

@@ -6,3 +6,4 @@
 /.trash-cache
 /trash.lock
 kube_config*
+/rke

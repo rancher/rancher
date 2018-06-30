@@ -148,7 +148,6 @@ func SyncLabels(k8sClient *kubernetes.Clientset, nodeName string, toAddLabels, t
 func SyncTaints(k8sClient *kubernetes.Clientset, nodeName string, toAddTaints, toDelTaints []string) error {
 	updated := false
 	var err error
-	var node *v1.Node
 	for retries := 0; retries <= 5; retries++ {
 		if err = doSyncTaints(k8sClient, nodeName, toAddTaints, toDelTaints); err != nil {
 			time.Sleep(5 * time.Second)
@@ -158,7 +157,7 @@ func SyncTaints(k8sClient *kubernetes.Clientset, nodeName string, toAddTaints, t
 		break
 	}
 	if !updated {
-		return fmt.Errorf("Timeout waiting for node [%s] to be updated with new set of taints: %v", node.Name, err)
+		return fmt.Errorf("Timeout waiting for node [%s] to be updated with new set of taints: %v", nodeName, err)
 	}
 	return nil
 }

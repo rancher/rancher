@@ -195,7 +195,11 @@ func ParseCluster(
 
 	// Create k8s wrap transport for bastion host
 	if len(c.BastionHost.Address) > 0 {
-		c.K8sWrapTransport = hosts.BastionHostWrapTransport(c.BastionHost)
+		var err error
+		c.K8sWrapTransport, err = hosts.BastionHostWrapTransport(c.BastionHost)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return c, nil
 }

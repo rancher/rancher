@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"fmt"
-	"path"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/rancher/rke/docker"
@@ -40,8 +39,6 @@ const (
 	KubeControllerPort = 10252
 	KubeletPort        = 10250
 	KubeproxyPort      = 10256
-
-	RKELogsPath = "/var/lib/rancher/rke/log"
 )
 
 func runSidekick(ctx context.Context, host *hosts.Host, prsMap map[string]v3.PrivateRegistry, sidecarProcess v3.Process) error {
@@ -107,19 +104,19 @@ func createLogLink(ctx context.Context, host *hosts.Host, containerName, plane, 
 	}
 	containerID := containerInspect.ID
 	containerLogPath := containerInspect.LogPath
-	containerLogLink := fmt.Sprintf("%s/%s_%s.log", RKELogsPath, containerName, containerID)
+	containerLogLink := fmt.Sprintf("%s/%s_%s.log", hosts.RKELogsPath, containerName, containerID)
 	imageCfg := &container.Config{
 		Image: image,
 		Tty:   true,
 		Cmd: []string{
 			"sh",
 			"-c",
-			fmt.Sprintf("mkdir -p %s ; ln -s %s %s", RKELogsPath, containerLogPath, containerLogLink),
+			fmt.Sprintf("mkdir -p %s ; ln -s %s %s", hosts.RKELogsPath, containerLogPath, containerLogLink),
 		},
 	}
 	hostCfg := &container.HostConfig{
 		Binds: []string{
-			fmt.Sprintf("%s:/var/lib", path.Join(host.PrefixPath, "/var/lib")),
+			"/var/lib:/var/lib",
 		},
 		Privileged: true,
 	}

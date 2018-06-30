@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/coreos/go-semver/semver"
 	ref "github.com/docker/distribution/reference"
@@ -24,6 +25,7 @@ import (
 
 const (
 	DockerRegistryURL = "docker.io"
+	RestartTimeout    = 30
 )
 
 var K8sDockerVersions = map[string][]string{
@@ -53,6 +55,14 @@ func DoRunContainer(ctx context.Context, dClient *client.Client, imageCfg *conta
 	}
 	// Check for upgrades
 	if container.State.Running {
+		// check if container is in a restarting loop
+		if container.State.Restarting {
+			logrus.Debugf("[%s] Container [%s] is in a restarting loop [%s]", plane, containerName, hostname)
+			restartTimeoutDuration := RestartTimeout * time.Second
+			if err := dClient.ContainerRestart(ctx, container.ID, &restartTimeoutDuration); err != nil {
+				return fmt.Errorf("Failed to start [%s] container on host [%s]: %v", containerName, hostname, err)
+			}
+		}
 		logrus.Debugf("[%s] Container [%s] is already running on host [%s]", plane, containerName, hostname)
 		isUpgradable, err := IsContainerUpgradable(ctx, dClient, imageCfg, containerName, hostname, plane)
 		if err != nil {

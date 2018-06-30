@@ -40,7 +40,11 @@ func newDialer(h *Host, kind string) (*dialer, error) {
 			useSSHAgentAuth: h.SSHAgentAuth,
 		}
 		if bastionDialer.sshKeyString == "" {
-			bastionDialer.sshKeyString = privateKeyPath(h.BastionHost.SSHKeyPath)
+			var err error
+			bastionDialer.sshKeyString, err = privateKeyPath(h.BastionHost.SSHKeyPath)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -55,7 +59,12 @@ func newDialer(h *Host, kind string) (*dialer, error) {
 	}
 
 	if dialer.sshKeyString == "" {
-		dialer.sshKeyString = privateKeyPath(h.SSHKeyPath)
+		var err error
+		dialer.sshKeyString, err = privateKeyPath(h.SSHKeyPath)
+		if err != nil {
+			return nil, err
+		}
+
 	}
 
 	switch kind {
@@ -167,7 +176,7 @@ func (d *dialer) getBastionHostTunnelConn() (*ssh.Client, error) {
 	return ssh.NewClient(newClientConn, channels, sshRequest), nil
 }
 
-func BastionHostWrapTransport(bastionHost v3.BastionHost) k8s.WrapTransport {
+func BastionHostWrapTransport(bastionHost v3.BastionHost) (k8s.WrapTransport, error) {
 
 	bastionDialer := &dialer{
 		sshAddress:      fmt.Sprintf("%s:%s", bastionHost.Address, bastionHost.Port),
@@ -178,7 +187,12 @@ func BastionHostWrapTransport(bastionHost v3.BastionHost) k8s.WrapTransport {
 	}
 
 	if bastionDialer.sshKeyString == "" {
-		bastionDialer.sshKeyString = privateKeyPath(bastionHost.SSHKeyPath)
+		var err error
+		bastionDialer.sshKeyString, err = privateKeyPath(bastionHost.SSHKeyPath)
+		if err != nil {
+			return nil, err
+		}
+
 	}
 	return func(rt http.RoundTripper) http.RoundTripper {
 		if ht, ok := rt.(*http.Transport); ok {
@@ -187,5 +201,5 @@ func BastionHostWrapTransport(bastionHost v3.BastionHost) k8s.WrapTransport {
 			ht.Dial = bastionDialer.Dial
 		}
 		return rt
-	}
+	}, nil
 }
