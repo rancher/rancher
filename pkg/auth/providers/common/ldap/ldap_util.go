@@ -182,3 +182,10 @@ func AuthenticateServiceAccountUser(enabled bool, serviceAccountPassword string,
 	}
 	return v3.Principal{}, nil, nil, nil
 }
+
+func Min(a int, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}

@@ -135,8 +135,17 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult
 	}
 
 	if len(userMemberAttribute) > 0 {
-		for _, dn := range userMemberAttribute {
-			query := fmt.Sprintf("(&(%v=%v)(objectClass=%v))", config.GroupDNAttribute, ldapv2.EscapeFilter(dn), config.GroupObjectClass)
+		for i := 0; i < len(userMemberAttribute); i += 50 {
+			batchGroupDN := userMemberAttribute[i:ldap.Min(i+50, len(userMemberAttribute))]
+			filter := fmt.Sprintf("(objectClass=%v)", config.GroupObjectClass)
+			query := "(|"
+			for _, gdn := range batchGroupDN {
+				query += fmt.Sprintf("(%v=%v)", config.GroupDNAttribute, ldapv2.EscapeFilter(gdn))
+			}
+			query += ")"
+			query = fmt.Sprintf("(&%v%v)", filter, query)
+			// Pulling user's groups
+			logrus.Debugf("Ldap: Query for pulling user's groups: %v", query)
 			userMemberGroupPrincipals, err := p.searchLdap(query, groupScope, config, lConn)
 			groupPrincipals = append(groupPrincipals, userMemberGroupPrincipals...)
 			if err != nil {
