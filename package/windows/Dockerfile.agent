@@ -1,0 +1,36 @@
+ARG PS_VERSION
+
+FROM golang:1.9.7-windowsservercore-1803 AS build-stage
+COPY [".", "C:/gopath/src/github.com/rancher/rancher/"]
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+ARG VERSION=dev
+ENV AGENT_VERSION=$VERSION
+RUN cd C:\gopath\src\github.com\rancher\rancher; \
+    \
+    $env:GOARCH='amd64'; \
+    $env:GOOS='windows'; \
+    $env:CGO_ENABLED=0; \
+    \
+    Write-Host 'Building ...'; \
+    \
+    & .\scripts\windows\validate.ps1; \
+    \
+    go build -i -tags k8s -ldflags ('-X main.VERSION={0} -s -w -extldflags -static' -f $env:AGENT_VERSION) -o .\bin\agent.exe .\pkg\agent; \
+    \
+    if ($?) { \
+        \
+        .\bin\agent.exe --version; \
+        \
+        Write-Host 'Complete.'; \
+    } else { \
+        Write-Host 'Built failed.'; \
+        exit 1; \
+    };
+
+FROM microsoft/powershell:$PS_VERSION
+ENV RUN_PATH="C:\\Program Files\\rancher"
+COPY --from=build-stage ["C:/gopath/src/github.com/rancher/rancher/bin/agent.exe", "C:/Program Files/rancher/"]
+COPY ["package/windows/*.ps1", "C:/Program Files/rancher/"]
+WORKDIR $RUN_PATH
+ENTRYPOINT ["pwsh.exe", "-f", "start.ps1"]
+

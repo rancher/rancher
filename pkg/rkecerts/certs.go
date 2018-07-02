@@ -10,11 +10,15 @@ import (
 
 	"context"
 
+	"fmt"
+
+	"github.com/ghodss/yaml"
 	"github.com/rancher/kontainer-engine/drivers/rke/rkecerts"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/librke"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	k8sclientv1 "k8s.io/client-go/tools/clientcmd/api/v1"
 	"k8s.io/client-go/util/cert"
 )
 
@@ -74,6 +78,59 @@ func (b *Bundle) Marshal() (string, error) {
 
 func (b *Bundle) ForNode(config *v3.RancherKubernetesEngineConfig, nodeAddress string) *Bundle {
 	certs := librke.New().GenerateRKENodeCerts(context.Background(), *config, nodeAddress, b.certs)
+	return &Bundle{
+		certs: certs,
+	}
+}
+
+func (b *Bundle) ForWindowsNode(config *v3.RancherKubernetesEngineConfig, nodeAddress string, windowsReleaseID string) *Bundle {
+	nb := b.ForNode(config, nodeAddress)
+
+	certs := make(map[string]pki.CertificatePKI, len(nb.certs))
+	for key, cert := range nb.certs {
+		if len(cert.Config) != 0 {
+			config := &k8sclientv1.Config{}
+
+			if err := yaml.Unmarshal([]byte(cert.Config), config); err == nil {
+				clusterAmount := len(config.Clusters)
+				for i := 0; i < clusterAmount; i++ {
+					cluster := &config.Clusters[i].Cluster
+
+					if windowsReleaseID == "1709" {
+						cluster.Server = fmt.Sprintf("https://%s:6443", nodeAddress)
+
+						cluster.InsecureSkipTLSVerify = true
+						cluster.CertificateAuthority = ""
+						cluster.CertificateAuthorityData = nil
+					}
+
+					if len(cluster.CertificateAuthority) != 0 {
+						cluster.CertificateAuthority = "c:" + cluster.CertificateAuthority
+					}
+				}
+
+				authInfoAmount := len(config.AuthInfos)
+				for i := 0; i < authInfoAmount; i++ {
+					authInfo := &config.AuthInfos[i].AuthInfo
+
+					if len(authInfo.ClientCertificate) != 0 {
+						authInfo.ClientCertificate = "c:" + authInfo.ClientCertificate
+					}
+
+					if len(authInfo.ClientKey) != 0 {
+						authInfo.ClientKey = "c:" + authInfo.ClientKey
+					}
+				}
+
+				if configYamlBytes, err := yaml.Marshal(config); err == nil {
+					cert.Config = string(configYamlBytes)
+				}
+			}
+		}
+
+		certs[key] = cert
+	}
+
 	return &Bundle{
 		certs: certs,
 	}

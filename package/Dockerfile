@@ -48,6 +48,7 @@ COPY entrypoint.sh rancher /usr/bin/
 RUN chmod +x /usr/bin/entrypoint.sh
 
 ENV CATTLE_AGENT_IMAGE rancher/rancher-agent:${VERSION}
+ENV CATTLE_WINDOWS_AGENT_IMAGE rancher/rancher-agent:${VERSION}-nanoserver-1803
 ENV CATTLE_SERVER_IMAGE rancher/rancher
 VOLUME /var/lib/rancher
 
