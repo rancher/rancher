@@ -11,11 +11,6 @@ package unix
 import "syscall"
 
 const (
-	AAFS_MAGIC                           = 0x5a3c69f0
-	ADFS_SUPER_MAGIC                     = 0xadf5
-	AFFS_SUPER_MAGIC                     = 0xadff
-	AFS_FS_MAGIC                         = 0x6b414653
-	AFS_SUPER_MAGIC                      = 0x5346414f
 	AF_ALG                               = 0x26
 	AF_APPLETALK                         = 0x5
 	AF_ASH                               = 0x12
@@ -71,7 +66,6 @@ const (
 	ALG_SET_IV                           = 0x2
 	ALG_SET_KEY                          = 0x1
 	ALG_SET_OP                           = 0x3
-	ANON_INODE_FS_MAGIC                  = 0x9041934
 	ARPHRD_6LOWPAN                       = 0x339
 	ARPHRD_ADAPT                         = 0x108
 	ARPHRD_APPLETLK                      = 0x8
@@ -139,7 +133,6 @@ const (
 	ARPHRD_VOID                          = 0xffff
 	ARPHRD_VSOCKMON                      = 0x33a
 	ARPHRD_X25                           = 0x10f
-	AUTOFS_SUPER_MAGIC                   = 0x187
 	B0                                   = 0x0
 	B1000000                             = 0x17
 	B110                                 = 0x3
@@ -171,9 +164,6 @@ const (
 	B75                                  = 0x2
 	B921600                              = 0x16
 	B9600                                = 0xd
-	BALLOON_KVM_MAGIC                    = 0x13661366
-	BDEVFS_MAGIC                         = 0x62646576
-	BINFMTFS_MAGIC                       = 0x42494e4d
 	BLKBSZGET                            = 0x40081270
 	BLKBSZSET                            = 0x80081271
 	BLKFLSBUF                            = 0x20001261
@@ -198,7 +188,6 @@ const (
 	BPF_AND                              = 0x50
 	BPF_B                                = 0x10
 	BPF_DIV                              = 0x30
-	BPF_FS_MAGIC                         = 0xcafe4a11
 	BPF_H                                = 0x8
 	BPF_IMM                              = 0x0
 	BPF_IND                              = 0x40
@@ -240,8 +229,6 @@ const (
 	BS0                                  = 0x0
 	BS1                                  = 0x8000
 	BSDLY                                = 0x8000
-	BTRFS_SUPER_MAGIC                    = 0x9123683e
-	BTRFS_TEST_MAGIC                     = 0x73727279
 	CAN_BCM                              = 0x2
 	CAN_EFF_FLAG                         = 0x80000000
 	CAN_EFF_ID_BITS                      = 0x1d
@@ -265,8 +252,6 @@ const (
 	CBAUD                                = 0xff
 	CBAUDEX                              = 0x0
 	CFLUSH                               = 0xf
-	CGROUP2_SUPER_MAGIC                  = 0x63677270
-	CGROUP_SUPER_MAGIC                   = 0x27e0eb
 	CIBAUD                               = 0xff0000
 	CLOCAL                               = 0x8000
 	CLOCK_BOOTTIME                       = 0x7
@@ -309,12 +294,10 @@ const (
 	CLONE_VFORK                          = 0x4000
 	CLONE_VM                             = 0x100
 	CMSPAR                               = 0x40000000
-	CODA_SUPER_MAGIC                     = 0x73757245
 	CR0                                  = 0x0
 	CR1                                  = 0x1000
 	CR2                                  = 0x2000
 	CR3                                  = 0x3000
-	CRAMFS_MAGIC                         = 0x28cd3d45
 	CRDLY                                = 0x3000
 	CREAD                                = 0x800
 	CRTSCTS                              = 0x80000000
@@ -329,9 +312,6 @@ const (
 	CSTOP                                = 0x13
 	CSTOPB                               = 0x400
 	CSUSP                                = 0x1a
-	DAXFS_MAGIC                          = 0x64646178
-	DEBUGFS_MAGIC                        = 0x64626720
-	DEVPTS_SUPER_MAGIC                   = 0x1cd1
 	DT_BLK                               = 0x6
 	DT_CHR                               = 0x2
 	DT_DIR                               = 0x4
@@ -348,12 +328,9 @@ const (
 	ECHOKE                               = 0x1
 	ECHONL                               = 0x10
 	ECHOPRT                              = 0x20
-	ECRYPTFS_SUPER_MAGIC                 = 0xf15f
 	EFD_CLOEXEC                          = 0x80000
 	EFD_NONBLOCK                         = 0x800
 	EFD_SEMAPHORE                        = 0x1
-	EFIVARFS_MAGIC                       = 0xde5e81e4
-	EFS_SUPER_MAGIC                      = 0x414a53
 	ENCODING_DEFAULT                     = 0x0
 	ENCODING_FM_MARK                     = 0x3
 	ENCODING_FM_SPACE                    = 0x4
@@ -470,13 +447,9 @@ const (
 	ETH_P_X25                            = 0x805
 	ETH_P_XDSA                           = 0xf8
 	EXABYTE_ENABLE_NEST                  = 0xf0
-	EXT2_SUPER_MAGIC                     = 0xef53
-	EXT3_SUPER_MAGIC                     = 0xef53
-	EXT4_SUPER_MAGIC                     = 0xef53
 	EXTA                                 = 0xe
 	EXTB                                 = 0xf
 	EXTPROC                              = 0x10000000
-	F2FS_SUPER_MAGIC                     = 0xf2f52010
 	FALLOC_FL_COLLAPSE_RANGE             = 0x8
 	FALLOC_FL_INSERT_RANGE               = 0x20
 	FALLOC_FL_KEEP_SIZE                  = 0x1
@@ -510,7 +483,6 @@ const (
 	FS_POLICY_FLAGS_PAD_8                = 0x1
 	FS_POLICY_FLAGS_PAD_MASK             = 0x3
 	FS_POLICY_FLAGS_VALID                = 0x3
-	FUTEXFS_SUPER_MAGIC                  = 0xbad1dea
 	F_ADD_SEALS                          = 0x409
 	F_DUPFD                              = 0x0
 	F_DUPFD_CLOEXEC                      = 0x406
@@ -612,9 +584,6 @@ const (
 	HDIO_SET_XFER                        = 0x306
 	HDIO_TRISTATE_HWIF                   = 0x31b
 	HDIO_UNREGISTER_HWIF                 = 0x32a
-	HOSTFS_SUPER_MAGIC                   = 0xc0ffee
-	HPFS_SUPER_MAGIC                     = 0xf995e849
-	HUGETLBFS_MAGIC                      = 0x958458f6
 	HUPCL                                = 0x4000
 	IBSHIFT                              = 0x10
 	ICANON                               = 0x100
@@ -865,14 +834,12 @@ const (
 	IP_UNICAST_IF                        = 0x32
 	IP_XFRM_POLICY                       = 0x11
 	ISIG                                 = 0x80
-	ISOFS_SUPER_MAGIC                    = 0x9660
 	ISTRIP                               = 0x20
 	IUCLC                                = 0x1000
 	IUTF8                                = 0x4000
 	IXANY                                = 0x800
 	IXOFF                                = 0x400
 	IXON                                 = 0x200
-	JFFS2_SUPER_MAGIC                    = 0x72b6
 	KEYCTL_ASSUME_AUTHORITY              = 0x10
 	KEYCTL_CHOWN                         = 0x4
 	KEYCTL_CLEAR                         = 0x7
@@ -968,15 +935,9 @@ const (
 	MCL_CURRENT                          = 0x2000
 	MCL_FUTURE                           = 0x4000
 	MCL_ONFAULT                          = 0x8000
-	MINIX2_SUPER_MAGIC                   = 0x2468
-	MINIX2_SUPER_MAGIC2                  = 0x2478
-	MINIX3_SUPER_MAGIC                   = 0x4d5a
-	MINIX_SUPER_MAGIC                    = 0x137f
-	MINIX_SUPER_MAGIC2                   = 0x138f
 	MNT_DETACH                           = 0x2
 	MNT_EXPIRE                           = 0x4
 	MNT_FORCE                            = 0x1
-	MSDOS_SUPER_MAGIC                    = 0x4d44
 	MSG_BATCH                            = 0x40000
 	MSG_CMSG_CLOEXEC                     = 0x40000000
 	MSG_CONFIRM                          = 0x800
@@ -1036,9 +997,7 @@ const (
 	MS_SYNCHRONOUS                       = 0x10
 	MS_UNBINDABLE                        = 0x20000
 	MS_VERBOSE                           = 0x8000
-	MTD_INODE_FS_MAGIC                   = 0x11307854
 	NAME_MAX                             = 0xff
-	NCP_SUPER_MAGIC                      = 0x564c
 	NETLINK_ADD_MEMBERSHIP               = 0x1
 	NETLINK_AUDIT                        = 0x9
 	NETLINK_BROADCAST_ERROR              = 0x4
@@ -1073,37 +1032,6 @@ const (
 	NETLINK_UNUSED                       = 0x1
 	NETLINK_USERSOCK                     = 0x2
 	NETLINK_XFRM                         = 0x6
-	NFNETLINK_V0                         = 0x0
-	NFNLGRP_ACCT_QUOTA                   = 0x8
-	NFNLGRP_CONNTRACK_DESTROY            = 0x3
-	NFNLGRP_CONNTRACK_EXP_DESTROY        = 0x6
-	NFNLGRP_CONNTRACK_EXP_NEW            = 0x4
-	NFNLGRP_CONNTRACK_EXP_UPDATE         = 0x5
-	NFNLGRP_CONNTRACK_NEW                = 0x1
-	NFNLGRP_CONNTRACK_UPDATE             = 0x2
-	NFNLGRP_MAX                          = 0x9
-	NFNLGRP_NFTABLES                     = 0x7
-	NFNLGRP_NFTRACE                      = 0x9
-	NFNLGRP_NONE                         = 0x0
-	NFNL_BATCH_MAX                       = 0x1
-	NFNL_MSG_BATCH_BEGIN                 = 0x10
-	NFNL_MSG_BATCH_END                   = 0x11
-	NFNL_NFA_NEST                        = 0x8000
-	NFNL_SUBSYS_ACCT                     = 0x7
-	NFNL_SUBSYS_COUNT                    = 0xc
-	NFNL_SUBSYS_CTHELPER                 = 0x9
-	NFNL_SUBSYS_CTNETLINK                = 0x1
-	NFNL_SUBSYS_CTNETLINK_EXP            = 0x2
-	NFNL_SUBSYS_CTNETLINK_TIMEOUT        = 0x8
-	NFNL_SUBSYS_IPSET                    = 0x6
-	NFNL_SUBSYS_NFTABLES                 = 0xa
-	NFNL_SUBSYS_NFT_COMPAT               = 0xb
-	NFNL_SUBSYS_NONE                     = 0x0
-	NFNL_SUBSYS_OSF                      = 0x5
-	NFNL_SUBSYS_QUEUE                    = 0x3
-	NFNL_SUBSYS_ULOG                     = 0x4
-	NFS_SUPER_MAGIC                      = 0x6969
-	NILFS_SUPER_MAGIC                    = 0x3434
 	NL0                                  = 0x0
 	NL1                                  = 0x100
 	NL2                                  = 0x200
@@ -1138,8 +1066,6 @@ const (
 	NLM_F_REQUEST                        = 0x1
 	NLM_F_ROOT                           = 0x100
 	NOFLSH                               = 0x80000000
-	NSFS_MAGIC                           = 0x6e736673
-	OCFS2_SUPER_MAGIC                    = 0x7461636f
 	OCRNL                                = 0x8
 	OFDEL                                = 0x80
 	OFILL                                = 0x40
@@ -1147,9 +1073,7 @@ const (
 	ONLCR                                = 0x2
 	ONLRET                               = 0x20
 	ONOCR                                = 0x10
-	OPENPROM_SUPER_MAGIC                 = 0x9fa1
 	OPOST                                = 0x1
-	OVERLAYFS_SUPER_MAGIC                = 0x794c7630
 	O_ACCMODE                            = 0x3
 	O_APPEND                             = 0x400
 	O_ASYNC                              = 0x2000
@@ -1242,11 +1166,9 @@ const (
 	PERF_EVENT_IOC_SET_BPF               = 0x80042408
 	PERF_EVENT_IOC_SET_FILTER            = 0x80082406
 	PERF_EVENT_IOC_SET_OUTPUT            = 0x20002405
-	PIPEFS_MAGIC                         = 0x50495045
 	PRIO_PGRP                            = 0x1
 	PRIO_PROCESS                         = 0x0
 	PRIO_USER                            = 0x2
-	PROC_SUPER_MAGIC                     = 0x9fa0
 	PROT_EXEC                            = 0x4
 	PROT_GROWSDOWN                       = 0x1000000
 	PROT_GROWSUP                         = 0x2000000
@@ -1353,7 +1275,6 @@ const (
 	PR_TSC_SIGSEGV                       = 0x2
 	PR_UNALIGN_NOPRINT                   = 0x1
 	PR_UNALIGN_SIGBUS                    = 0x2
-	PSTOREFS_MAGIC                       = 0x6165676c
 	PTRACE_ATTACH                        = 0x10
 	PTRACE_CONT                          = 0x7
 	PTRACE_DETACH                        = 0x11
@@ -1469,11 +1390,6 @@ const (
 	PT_VSR0                              = 0x96
 	PT_VSR31                             = 0xd4
 	PT_XER                               = 0x25
-	QNX4_SUPER_MAGIC                     = 0x2f
-	QNX6_SUPER_MAGIC                     = 0x68191122
-	RAMFS_MAGIC                          = 0x858458f6
-	RDTGROUP_SUPER_MAGIC                 = 0x7655821
-	REISERFS_SUPER_MAGIC                 = 0x52654973
 	RLIMIT_AS                            = 0x9
 	RLIMIT_CORE                          = 0x4
 	RLIMIT_CPU                           = 0x0
@@ -1659,8 +1575,6 @@ const (
 	SECCOMP_MODE_DISABLED                = 0x0
 	SECCOMP_MODE_FILTER                  = 0x2
 	SECCOMP_MODE_STRICT                  = 0x1
-	SECURITYFS_MAGIC                     = 0x73636673
-	SELINUX_MAGIC                        = 0xf97cff8c
 	SHUT_RD                              = 0x0
 	SHUT_RDWR                            = 0x2
 	SHUT_WR                              = 0x1
@@ -1745,7 +1659,6 @@ const (
 	SIOCSPGRP                            = 0x8902
 	SIOCSRARP                            = 0x8962
 	SIOCWANDEV                           = 0x894a
-	SMACK_MAGIC                          = 0x43415d53
 	SMART_AUTOSAVE                       = 0xd2
 	SMART_AUTO_OFFLINE                   = 0xdb
 	SMART_DISABLE                        = 0xd9
@@ -1760,8 +1673,6 @@ const (
 	SMART_STATUS                         = 0xda
 	SMART_WRITE_LOG_SECTOR               = 0xd6
 	SMART_WRITE_THRESHOLDS               = 0xd7
-	SMB_SUPER_MAGIC                      = 0x517b
-	SOCKFS_MAGIC                         = 0x534f434b
 	SOCK_CLOEXEC                         = 0x80000
 	SOCK_DCCP                            = 0x6
 	SOCK_DGRAM                           = 0x2
@@ -1872,8 +1783,6 @@ const (
 	SPLICE_F_MORE                        = 0x4
 	SPLICE_F_MOVE                        = 0x1
 	SPLICE_F_NONBLOCK                    = 0x2
-	SQUASHFS_MAGIC                       = 0x73717368
-	STACK_END_MAGIC                      = 0x57ac6e9d
 	STATX_ALL                            = 0xfff
 	STATX_ATIME                          = 0x20
 	STATX_ATTR_APPEND                    = 0x20
@@ -1895,7 +1804,6 @@ const (
 	STATX_TYPE                           = 0x1
 	STATX_UID                            = 0x8
 	STATX__RESERVED                      = 0x80000000
-	SYSFS_MAGIC                          = 0x62656572
 	S_BLKSIZE                            = 0x200
 	S_IEXEC                              = 0x40
 	S_IFBLK                              = 0x6000
@@ -2081,27 +1989,7 @@ const (
 	TIOCSTOP                             = 0x2000746f
 	TIOCSWINSZ                           = 0x80087467
 	TIOCVHANGUP                          = 0x5437
-	TMPFS_MAGIC                          = 0x1021994
 	TOSTOP                               = 0x400000
-	TPACKET_ALIGNMENT                    = 0x10
-	TPACKET_HDRLEN                       = 0x34
-	TP_STATUS_AVAILABLE                  = 0x0
-	TP_STATUS_BLK_TMO                    = 0x20
-	TP_STATUS_COPY                       = 0x2
-	TP_STATUS_CSUMNOTREADY               = 0x8
-	TP_STATUS_CSUM_VALID                 = 0x80
-	TP_STATUS_KERNEL                     = 0x0
-	TP_STATUS_LOSING                     = 0x4
-	TP_STATUS_SENDING                    = 0x2
-	TP_STATUS_SEND_REQUEST               = 0x1
-	TP_STATUS_TS_RAW_HARDWARE            = -0x80000000
-	TP_STATUS_TS_SOFTWARE                = 0x20000000
-	TP_STATUS_TS_SYS_HARDWARE            = 0x40000000
-	TP_STATUS_USER                       = 0x1
-	TP_STATUS_VLAN_TPID_VALID            = 0x40
-	TP_STATUS_VLAN_VALID                 = 0x10
-	TP_STATUS_WRONG_FORMAT               = 0x4
-	TRACEFS_MAGIC                        = 0x74726163
 	TS_COMM_LEN                          = 0x20
 	TUNATTACHFILTER                      = 0x801054d5
 	TUNDETACHFILTER                      = 0x801054d6
@@ -2129,12 +2017,9 @@ const (
 	TUNSETVNETBE                         = 0x800454de
 	TUNSETVNETHDRSZ                      = 0x800454d8
 	TUNSETVNETLE                         = 0x800454dc
-	UDF_SUPER_MAGIC                      = 0x15013346
 	UMOUNT_NOFOLLOW                      = 0x8
-	USBDEVICE_SUPER_MAGIC                = 0x9fa2
 	UTIME_NOW                            = 0x3fffffff
 	UTIME_OMIT                           = 0x3ffffffe
-	V9FS_MAGIC                           = 0x1021997
 	VDISCARD                             = 0x10
 	VEOF                                 = 0x4
 	VEOL                                 = 0x6
@@ -2265,9 +2150,7 @@ const (
 	XATTR_CREATE                         = 0x1
 	XATTR_REPLACE                        = 0x2
 	XCASE                                = 0x4000
-	XENFS_SUPER_MAGIC                    = 0xabba1974
 	XTABS                                = 0xc00
-	ZSMALLOC_MAGIC                       = 0x58295829
 )
 
 // Errors

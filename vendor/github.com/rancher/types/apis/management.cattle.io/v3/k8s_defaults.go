@@ -499,4 +499,7 @@ func init() {
 	if _, ok := K8sVersionToRKESystemImages[DefaultK8s]; !ok {
 		panic("Default K8s version " + DefaultK8s + " is not found in k8sVersionsCurrent list")
 	}
+
+	// init Windows versions
+	initWindows()
 }

@@ -24,6 +24,7 @@ const (
 	ClusterRegistrationTokenFieldTransitioning        = "transitioning"
 	ClusterRegistrationTokenFieldTransitioningMessage = "transitioningMessage"
 	ClusterRegistrationTokenFieldUUID                 = "uuid"
+	ClusterRegistrationTokenFieldWindowsNodeCommand   = "windowsNodeCommand"
 )
 
 type ClusterRegistrationToken struct {
@@ -46,6 +47,7 @@ type ClusterRegistrationToken struct {
 	Transitioning        string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	UUID                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	WindowsNodeCommand   string            `json:"windowsNodeCommand,omitempty" yaml:"windowsNodeCommand,omitempty"`
 }
 
 type ClusterRegistrationTokenCollection struct {

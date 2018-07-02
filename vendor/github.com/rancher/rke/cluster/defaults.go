@@ -190,6 +190,14 @@ func (c *Cluster) setClusterNetworkDefaults() {
 		networkPluginConfigDefaultsMap = map[string]string{
 			CalicoCloudProvider: DefaultNetworkCloudProvider,
 		}
+	case FlannelNetworkPlugin:
+		networkPluginConfigDefaultsMap = map[string]string{
+			FlannelBackendType: "vxlan",
+		}
+	case CanalNetworkPlugin:
+		networkPluginConfigDefaultsMap = map[string]string{
+			CanalFlannelBackendType: "vxlan",
+		}
 	}
 	if c.Network.CalicoNetworkProvider != nil {
 		setDefaultIfEmpty(&c.Network.CalicoNetworkProvider.CloudProvider, DefaultNetworkCloudProvider)
@@ -197,6 +205,7 @@ func (c *Cluster) setClusterNetworkDefaults() {
 	}
 	if c.Network.FlannelNetworkProvider != nil {
 		networkPluginConfigDefaultsMap[FlannelIface] = c.Network.FlannelNetworkProvider.Iface
+
 	}
 	if c.Network.CanalNetworkProvider != nil {
 		networkPluginConfigDefaultsMap[CanalIface] = c.Network.CanalNetworkProvider.Iface
