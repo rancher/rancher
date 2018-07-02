@@ -24,6 +24,15 @@ items:
           labels:
             name: weave-net
         spec:
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                    - key: beta.kubernetes.io/os
+                      operator: NotIn
+                      values:
+                        - windows
           containers:
             - name: weave
               command:

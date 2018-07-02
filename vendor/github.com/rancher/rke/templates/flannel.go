@@ -75,7 +75,7 @@ data:
     {
       "Network": "{{.ClusterCIDR}}",
       "Backend": {
-        "Type": "vxlan"
+        "Type": "{{.FlannelBackend.Type}}"
       }
     }
 ---
@@ -94,6 +94,15 @@ spec:
         tier: node
         k8s-app: flannel
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: beta.kubernetes.io/os
+                  operator: NotIn
+                  values:
+                    - windows
       serviceAccountName: flannel
       containers:
       - name: kube-flannel

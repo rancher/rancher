@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/go-connections/nat"
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
@@ -88,12 +89,14 @@ func GetProcessConfig(process v3.Process) (*container.Config, *container.HostCon
 	}
 	// var pidMode container.PidMode
 	// pidMode = process.PidMode
+	_, portBindings, _ := nat.ParsePortSpecs(process.Publish)
 	hostCfg := &container.HostConfig{
-		VolumesFrom: process.VolumesFrom,
-		Binds:       process.Binds,
-		NetworkMode: container.NetworkMode(process.NetworkMode),
-		PidMode:     container.PidMode(process.PidMode),
-		Privileged:  process.Privileged,
+		VolumesFrom:  process.VolumesFrom,
+		Binds:        process.Binds,
+		NetworkMode:  container.NetworkMode(process.NetworkMode),
+		PidMode:      container.PidMode(process.PidMode),
+		Privileged:   process.Privileged,
+		PortBindings: portBindings,
 	}
 	if len(process.RestartPolicy) > 0 {
 		hostCfg.RestartPolicy = container.RestartPolicy{Name: process.RestartPolicy}
