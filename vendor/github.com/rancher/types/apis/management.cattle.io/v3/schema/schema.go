@@ -371,6 +371,7 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 		}).
 		MustImport(&Version, v3.OpenLdapTestAndApplyInput{}).
 		// FreeIpa Config
+		AddMapperForType(&Version, v3.FreeIpaConfig{}, m.Drop{Field: "nestedGroupMembershipEnabled"}).
 		MustImportAndCustomize(&Version, v3.FreeIpaConfig{}, func(schema *types.Schema) {
 			schema.BaseType = "authConfig"
 			schema.ResourceActions = map[string]types.Action{

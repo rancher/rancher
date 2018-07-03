@@ -1098,6 +1098,15 @@ func (in *ActiveDirectoryConfig) DeepCopyInto(out *ActiveDirectoryConfig) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.NestedGroupMembershipEnabled != nil {
+		in, out := &in.NestedGroupMembershipEnabled, &out.NestedGroupMembershipEnabled
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(bool)
+			**out = **in
+		}
+	}
 	return
 }
 
