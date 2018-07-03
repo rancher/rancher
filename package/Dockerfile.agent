@@ -3,7 +3,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends curl ca-certificates jq iproute2 vim-tiny less bash-completion unzip && \
     curl -sLf https://get.docker.com/builds/Linux/x86_64/docker-1.10.3 > /usr/bin/docker && \
     chmod +x /usr/bin/docker && \
-    curl -sLf https://storage.googleapis.com/kubernetes-release/release/v1.9.8/bin/linux/amd64/kubectl > /usr/bin/kubectl && \
+    curl -sLf https://storage.googleapis.com/kubernetes-release/release/v1.10.5/bin/linux/amd64/kubectl > /usr/bin/kubectl && \
     chmod +x /usr/bin/kubectl && \
     DEBIAN_FRONTEND=noninteractive apt-get autoremove -y && \
     DEBIAN_FRONTEND=noninteractive apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
