@@ -5,41 +5,49 @@ import (
 )
 
 const (
-	UserType                    = "user"
-	UserFieldAnnotations        = "annotations"
-	UserFieldCreated            = "created"
-	UserFieldCreatorID          = "creatorId"
-	UserFieldDescription        = "description"
-	UserFieldEnabled            = "enabled"
-	UserFieldLabels             = "labels"
-	UserFieldMe                 = "me"
-	UserFieldMustChangePassword = "mustChangePassword"
-	UserFieldName               = "name"
-	UserFieldOwnerReferences    = "ownerReferences"
-	UserFieldPassword           = "password"
-	UserFieldPrincipalIDs       = "principalIds"
-	UserFieldRemoved            = "removed"
-	UserFieldUsername           = "username"
-	UserFieldUuid               = "uuid"
+	UserType                      = "user"
+	UserFieldAnnotations          = "annotations"
+	UserFieldConditions           = "conditions"
+	UserFieldCreated              = "created"
+	UserFieldCreatorID            = "creatorId"
+	UserFieldDescription          = "description"
+	UserFieldEnabled              = "enabled"
+	UserFieldLabels               = "labels"
+	UserFieldMe                   = "me"
+	UserFieldMustChangePassword   = "mustChangePassword"
+	UserFieldName                 = "name"
+	UserFieldOwnerReferences      = "ownerReferences"
+	UserFieldPassword             = "password"
+	UserFieldPrincipalIDs         = "principalIds"
+	UserFieldRemoved              = "removed"
+	UserFieldState                = "state"
+	UserFieldTransitioning        = "transitioning"
+	UserFieldTransitioningMessage = "transitioningMessage"
+	UserFieldUsername             = "username"
+	UserFieldUuid                 = "uuid"
 )
 
 type User struct {
 	types.Resource
-	Annotations        map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	Created            string            `json:"created,omitempty" yaml:"created,omitempty"`
-	CreatorID          string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
-	Description        string            `json:"description,omitempty" yaml:"description,omitempty"`
-	Enabled            *bool             `json:"enabled,omitempty" yaml:"enabled,omitempty"`
-	Labels             map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Me                 bool              `json:"me,omitempty" yaml:"me,omitempty"`
-	MustChangePassword bool              `json:"mustChangePassword,omitempty" yaml:"mustChangePassword,omitempty"`
-	Name               string            `json:"name,omitempty" yaml:"name,omitempty"`
-	OwnerReferences    []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	Password           string            `json:"password,omitempty" yaml:"password,omitempty"`
-	PrincipalIDs       []string          `json:"principalIds,omitempty" yaml:"principalIds,omitempty"`
-	Removed            string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	Username           string            `json:"username,omitempty" yaml:"username,omitempty"`
-	Uuid               string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Annotations          map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Conditions           []UserCondition   `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+	Created              string            `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID            string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Description          string            `json:"description,omitempty" yaml:"description,omitempty"`
+	Enabled              *bool             `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Me                   bool              `json:"me,omitempty" yaml:"me,omitempty"`
+	MustChangePassword   bool              `json:"mustChangePassword,omitempty" yaml:"mustChangePassword,omitempty"`
+	Name                 string            `json:"name,omitempty" yaml:"name,omitempty"`
+	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Password             string            `json:"password,omitempty" yaml:"password,omitempty"`
+	PrincipalIDs         []string          `json:"principalIds,omitempty" yaml:"principalIds,omitempty"`
+	Removed              string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	State                string            `json:"state,omitempty" yaml:"state,omitempty"`
+	Transitioning        string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	Username             string            `json:"username,omitempty" yaml:"username,omitempty"`
+	Uuid                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 type UserCollection struct {
 	types.Collection

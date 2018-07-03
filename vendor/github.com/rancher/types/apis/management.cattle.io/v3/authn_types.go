@@ -1,8 +1,12 @@
 package v3
 
 import (
+	"github.com/rancher/norman/condition"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+const UserConditionInitialRolesPopulated condition.Cond = "InitialRolesPopulated"
 
 type Token struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -26,15 +30,38 @@ type User struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	DisplayName        string   `json:"displayName,omitempty"`
-	Description        string   `json:"description"`
-	Username           string   `json:"username,omitempty"`
-	Password           string   `json:"password,omitempty" norman:"writeOnly,noupdate"`
-	MustChangePassword bool     `json:"mustChangePassword,omitempty"`
-	PrincipalIDs       []string `json:"principalIds,omitempty" norman:"type=array[reference[principal]]"`
-	Me                 bool     `json:"me,omitempty"`
-	Enabled            *bool    `json:"enabled,omitempty" norman:"default=true"`
+	DisplayName        string     `json:"displayName,omitempty"`
+	Description        string     `json:"description"`
+	Username           string     `json:"username,omitempty"`
+	Password           string     `json:"password,omitempty" norman:"writeOnly,noupdate"`
+	MustChangePassword bool       `json:"mustChangePassword,omitempty"`
+	PrincipalIDs       []string   `json:"principalIds,omitempty" norman:"type=array[reference[principal]]"`
+	Me                 bool       `json:"me,omitempty"`
+	Enabled            *bool      `json:"enabled,omitempty" norman:"default=true"`
+	Spec               UserSpec   `json:"spec,omitempty"`
+	Status             UserStatus `json:"status"`
 }
+
+type UserStatus struct {
+	Conditions []UserCondition `json:"conditions"`
+}
+
+type UserCondition struct {
+	// Type of user condition.
+	Type string `json:"type"`
+	// Status of the condition, one of True, False, Unknown.
+	Status v1.ConditionStatus `json:"status"`
+	// The last time this condition was updated.
+	LastUpdateTime string `json:"lastUpdateTime,omitempty"`
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime string `json:"lastTransitionTime,omitempty"`
+	// The reason for the condition's last transition.
+	Reason string `json:"reason,omitempty"`
+	// Human-readable message indicating details about last transition
+	Message string `json:"message,omitempty"`
+}
+
+type UserSpec struct{}
 
 // UserAttribute will have a CRD (and controller) generated for it, but will not be exposed in the API.
 type UserAttribute struct {
