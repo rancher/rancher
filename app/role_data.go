@@ -10,6 +10,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+const (
+	bootstrappedRole = "authz.management.cattle.io/bootstrapped-role"
+)
+
 var defaultAdminLabel = map[string]string{"authz.management.cattle.io/bootstrapping": "admin-user"}
 
 func addRoles(management *config.ManagementContext) (string, error) {
@@ -23,7 +27,8 @@ func addRoles(management *config.ManagementContext) (string, error) {
 	rb.addRole("Manage Node Drivers", "nodedrivers-manage").addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("*")
 	rb.addRole("Manage Catalogs", "catalogs-manage").addRule().apiGroups("management.cattle.io").resources("catalogs", "templates", "templateversions").verbs("*")
 	rb.addRole("Use Catalog Templates", "catalogs-use").addRule().apiGroups("management.cattle.io").resources("templates", "templateversions").verbs("get", "list", "watch")
-	rb.addRole("Manage Users", "users-manage").addRule().apiGroups("management.cattle.io").resources("users", "globalroles", "globalrolebindings").verbs("*")
+	rb.addRole("Manage Users", "users-manage").addRule().apiGroups("management.cattle.io").resources("users", "globalrolebindings").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("globalroles").verbs("get", "list", "watch")
 	rb.addRole("Manage Roles", "roles-manage").addRule().apiGroups("management.cattle.io").resources("roletemplates").verbs("*")
 	rb.addRole("Manage Authentication", "authn-manage").addRule().apiGroups("management.cattle.io").resources("authconfigs").verbs("get", "list", "watch", "update")
 	rb.addRole("Manage Settings", "settings-manage").addRule().apiGroups("management.cattle.io").resources("settings").verbs("*")
@@ -54,7 +59,7 @@ func addRoles(management *config.ManagementContext) (string, error) {
 	// TODO enable when groups are "in". they need to be self-service
 
 	if err := rb.reconcileGlobalRoles(management); err != nil {
-		return "", errors.Wrap(err, "problem reconciling globl roles")
+		return "", errors.Wrap(err, "problem reconciling global roles")
 	}
 
 	// RoleTemplates to be used inside of clusters
@@ -288,5 +293,72 @@ func addRoles(management *config.ManagementContext) (string, error) {
 			})
 	}
 
+	err = bootstrapDefaultRoles(management)
+	if err != nil {
+		return "", err
+	}
+
 	return admin.Name, nil
+}
+
+// bootstrapDefaultRoles will set the default roles for user login, cluster create
+// and project create. If the default roles already have the bootstrappedRole
+// annotation this will be a no-op as this was done on a previous startup and will
+// now respect the currently selected defaults.
+func bootstrapDefaultRoles(management *config.ManagementContext) error {
+	user, err := management.Management.GlobalRoles("").Get("user", v1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	if _, ok := user.Annotations[bootstrappedRole]; !ok {
+		copy := user.DeepCopy()
+		copy.NewUserDefault = true
+		if copy.Annotations == nil {
+			copy.Annotations = make(map[string]string)
+		}
+		copy.Annotations[bootstrappedRole] = "true"
+
+		_, err := management.Management.GlobalRoles("").Update(copy)
+		if err != nil {
+			return err
+		}
+	}
+
+	clusterRole, err := management.Management.RoleTemplates("").Get("cluster-owner", v1.GetOptions{})
+	if err != nil {
+		return nil
+	}
+	if _, ok := clusterRole.Annotations[bootstrappedRole]; !ok {
+		copy := clusterRole.DeepCopy()
+		copy.ClusterCreatorDefault = true
+		if copy.Annotations == nil {
+			copy.Annotations = make(map[string]string)
+		}
+		copy.Annotations[bootstrappedRole] = "true"
+
+		_, err := management.Management.RoleTemplates("").Update(copy)
+		if err != nil {
+			return err
+		}
+	}
+
+	projectRole, err := management.Management.RoleTemplates("").Get("project-owner", v1.GetOptions{})
+	if err != nil {
+		return nil
+	}
+	if _, ok := projectRole.Annotations[bootstrappedRole]; !ok {
+		copy := projectRole.DeepCopy()
+		copy.ProjectCreatorDefault = true
+		if copy.Annotations == nil {
+			copy.Annotations = make(map[string]string)
+		}
+		copy.Annotations[bootstrappedRole] = "true"
+
+		_, err := management.Management.RoleTemplates("").Update(copy)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

@@ -37,23 +37,6 @@ func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterR
 	}
 	err = c.reconcilBindings(obj)
 
-	if err == nil {
-		if obj.Annotations[creatorOwnerBindingAnnotation] == "true" {
-			cluster, err := c.clusterLister.Get("", obj.ClusterName)
-			if err != nil {
-				return obj, err
-			}
-			if !v3.ClusterConditionInitialRolesPopulated.IsTrue(cluster) {
-				cluster = cluster.DeepCopy()
-				v3.ClusterConditionInitialRolesPopulated.True(cluster)
-				logrus.Infof("[%v] Setting InitialRolesPopulated condition on cluster %v", ctrbMGMTController, obj.ClusterName)
-				if _, err := c.mgr.mgmt.Management.Clusters("").Update(cluster); err != nil {
-					return obj, err
-				}
-			}
-		}
-	}
-
 	return obj, err
 }
 

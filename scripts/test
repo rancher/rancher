@@ -37,4 +37,5 @@ while ! curl -sf http://localhost:8080/ping; do
 done
 
 cd tests
-tox -- -n $(nproc)
+tox -- -m "not nonparallel" -n $(nproc)
+tox -- -m nonparallel
