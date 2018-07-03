@@ -188,7 +188,10 @@ func authzTypes(schemas *types.Schemas) *types.Schemas {
 				"exportYaml": {},
 			}
 		}).
-		MustImport(&Version, v3.GlobalRole{}).
+		MustImportAndCustomize(&Version, v3.GlobalRole{}, func(schema *types.Schema) {
+			schema.CollectionMethods = []string{http.MethodGet}
+			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
+		}).
 		MustImport(&Version, v3.GlobalRoleBinding{}).
 		MustImport(&Version, v3.RoleTemplate{}).
 		MustImport(&Version, v3.PodSecurityPolicyTemplate{}).
@@ -268,7 +271,8 @@ func tokens(schemas *types.Schemas) *types.Schemas {
 
 func authnTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
-		AddMapperForType(&Version, v3.User{}, m.DisplayName{}).
+		AddMapperForType(&Version, v3.User{}, m.DisplayName{},
+			&m.Embed{Field: "status"}).
 		AddMapperForType(&Version, v3.Group{}, m.DisplayName{}).
 		MustImport(&Version, v3.Group{}).
 		MustImport(&Version, v3.GroupMember{}).
