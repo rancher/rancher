@@ -42,7 +42,7 @@ ENV CATTLE_HOST_API_PROXY_MODE embedded
 ENV CATTLE_RANCHER_SERVER_VERSION v1.6.19-rc2
 ENV DEFAULT_CATTLE_API_UI_INDEX //releases.rancher.com/ui/1.6.43
 ENV CATTLE_CATTLE_VERSION v0.183.54
-ENV CATTLE_RANCHER_CLI_VERSION v0.6.10
+ENV CATTLE_RANCHER_CLI_VERSION v0.6.11-rc2
 ENV CATTLE_RANCHER_COMPOSE_VERSION v0.12.5
 #ENV DEFAULT_CATTLE_CATALOG_URL='{"catalogs":{"community":{"url":"https://git.rancher.io/community-catalog.git","branch":"master"},"library":{"url":"https://git.rancher.io/rancher-catalog.git","branch":"${RELEASE}"}}}'
 ENV DEFAULT_CATTLE_CATALOG_URL='{"catalogs":{"community":{"url":"https://git.rancher.io/community-catalog.git","branch":"master"},"library":{"url":"https://git.rancher.io/rancher-catalog.git","branch":"v1.6-development"}}}'
