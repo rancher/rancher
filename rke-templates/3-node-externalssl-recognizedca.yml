@@ -95,6 +95,8 @@ addons: |-
         serviceAccountName: cattle-admin
         containers:
         - image: rancher/rancher:latest
+          args:
+          - --no-cacerts
           imagePullPolicy: Always
           name: cattle-server
           ports:
