@@ -177,7 +177,7 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult
 		}
 	}
 	// Handle nestedgroups for openldap, filter operationalAttrList already handles nestedgroups for freeipa
-	if groupScope == "openldap_group" {
+	if config.NestedGroupMembershipEnabled && groupScope == "openldap_group" {
 		searchDomain := config.UserSearchBase
 		if config.GroupSearchBase != "" {
 			searchDomain = config.GroupSearchBase
