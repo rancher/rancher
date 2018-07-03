@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"encoding/json"
 	"reflect"
 
 	"github.com/pkg/errors"
@@ -24,6 +25,7 @@ const (
 	clusterCreateController       = "mgmt-cluster-rbac-delete" // TODO the word delete here is wrong, but changing it would break backwards compatibility
 	projectRemoveController       = "mgmt-project-rbac-remove"
 	clusterRemoveController       = "mgmt-cluster-rbac-remove"
+	roleTemplatesRequired         = "authz.management.cattle.io/creator-role-bindings"
 )
 
 var defaultProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/default-project": "true"})
@@ -31,11 +33,12 @@ var crtbCeatorOwnerAnnotations = map[string]string{creatorOwnerBindingAnnotation
 
 func newPandCLifecycles(management *config.ManagementContext) (*projectLifecycle, *clusterLifecycle) {
 	m := &mgr{
-		mgmt:          management,
-		nsLister:      management.Core.Namespaces("").Controller().Lister(),
-		prtbLister:    management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
-		crtbLister:    management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
-		projectLister: management.Management.Projects("").Controller().Lister(),
+		mgmt:               management,
+		nsLister:           management.Core.Namespaces("").Controller().Lister(),
+		prtbLister:         management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
+		crtbLister:         management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
+		projectLister:      management.Management.Projects("").Controller().Lister(),
+		roleTemplateLister: management.Management.RoleTemplates("").Controller().Lister(),
 	}
 	p := &projectLifecycle{
 		mgr: m,
@@ -75,7 +78,8 @@ func (l *projectLifecycle) sync(key string, orig *v3.Project) error {
 			return err
 		}
 	}
-	return err
+
+	return nil
 }
 
 func (l *projectLifecycle) Create(obj *v3.Project) (*v3.Project, error) {
@@ -113,6 +117,20 @@ func (l *clusterLifecycle) sync(key string, orig *v3.Cluster) error {
 		return err
 	}
 
+	obj, err = l.mgr.addRTAnnotation(obj, "cluster")
+	if err != nil {
+		return err
+	}
+
+	// update if it has changed
+	if obj != nil && !reflect.DeepEqual(orig, obj) {
+		logrus.Infof("[%v] Updating cluster %v", clusterCreateController, orig.Name)
+		_, err = l.mgr.mgmt.Management.Clusters("").ObjectClient().Update(orig.Name, obj)
+		if err != nil {
+			return err
+		}
+	}
+
 	obj, err = l.mgr.reconcileCreatorRTB(obj)
 	if err != nil {
 		return err
@@ -126,7 +144,8 @@ func (l *clusterLifecycle) sync(key string, orig *v3.Cluster) error {
 			return err
 		}
 	}
-	return err
+
+	return nil
 }
 
 func (l *clusterLifecycle) Create(obj *v3.Cluster) (*v3.Cluster, error) {
@@ -149,8 +168,9 @@ type mgr struct {
 	nsLister      corev1.NamespaceLister
 	projectLister v3.ProjectLister
 
-	prtbLister v3.ProjectRoleTemplateBindingLister
-	crtbLister v3.ClusterRoleTemplateBindingLister
+	prtbLister         v3.ProjectRoleTemplateBindingLister
+	crtbLister         v3.ClusterRoleTemplateBindingLister
+	roleTemplateLister v3.RoleTemplateLister
 }
 
 func (m *mgr) createDefaultProject(obj runtime.Object) (runtime.Object, error) {
@@ -212,40 +232,143 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 			return obj, nil
 		}
 
-		rtbName := "creator"
-		om := v1.ObjectMeta{
-			Name:      rtbName,
-			Namespace: metaAccessor.GetName(),
-		}
-
 		switch typeAccessor.GetKind() {
 		case v3.ProjectGroupVersionKind.Kind:
-			if rtb, _ := m.prtbLister.Get(metaAccessor.GetName(), rtbName); rtb != nil {
-				return obj, nil
+			project := obj.(*v3.Project)
+
+			if v3.ProjectConditionInitialRolesPopulated.IsTrue(project) {
+				// The projectRoleBindings are already completed, no need to check
+				break
 			}
-			logrus.Infof("[%v] Creating creator projectRoleTemplateBinding for user %v for project %v", projectCreateController, creatorID, metaAccessor.GetName())
-			if _, err := m.mgmt.Management.ProjectRoleTemplateBindings(metaAccessor.GetName()).Create(&v3.ProjectRoleTemplateBinding{
-				ObjectMeta:       om,
-				ProjectName:      metaAccessor.GetNamespace() + ":" + metaAccessor.GetName(),
-				RoleTemplateName: "project-owner",
-				UserName:         creatorID,
-			}); err != nil {
+
+			// If the project does not have the annotation it indicates the
+			// project is from a previous rancher version so don't add the
+			// default bindings.
+			roleJSON, ok := project.Annotations[roleTemplatesRequired]
+			if !ok {
+				return project, nil
+			}
+
+			roleMap := make(map[string][]string)
+			err = json.Unmarshal([]byte(roleJSON), &roleMap)
+			if err != nil {
 				return obj, err
 			}
+
+			var createdRoles []string
+
+			for _, role := range roleMap["required"] {
+				rtbName := "creator-" + role
+
+				if rtb, _ := m.prtbLister.Get(metaAccessor.GetName(), rtbName); rtb != nil {
+					createdRoles = append(createdRoles, role)
+					// This projectRoleBinding exists, need to check all of them so keep going
+					continue
+				}
+
+				// The projectRoleBinding doesn't exist yet so create it
+				om := v1.ObjectMeta{
+					Name:      rtbName,
+					Namespace: metaAccessor.GetName(),
+				}
+
+				logrus.Infof("[%v] Creating creator projectRoleTemplateBinding for user %v for project %v", projectCreateController, creatorID, metaAccessor.GetName())
+				if _, err := m.mgmt.Management.ProjectRoleTemplateBindings(metaAccessor.GetName()).Create(&v3.ProjectRoleTemplateBinding{
+					ObjectMeta:       om,
+					ProjectName:      metaAccessor.GetNamespace() + ":" + metaAccessor.GetName(),
+					RoleTemplateName: role,
+					UserName:         creatorID,
+				}); err != nil && !apierrors.IsAlreadyExists(err) {
+					return obj, err
+				}
+				createdRoles = append(createdRoles, role)
+			}
+
+			project = project.DeepCopy()
+
+			roleMap["created"] = createdRoles
+			d, err := json.Marshal(roleMap)
+			if err != nil {
+				return obj, err
+			}
+
+			project.Annotations[roleTemplatesRequired] = string(d)
+
+			if reflect.DeepEqual(roleMap["required"], createdRoles) {
+				v3.ProjectConditionInitialRolesPopulated.True(project)
+				logrus.Infof("[%v] Setting InitialRolesPopulated condition on project %v", ctrbMGMTController, project.Name)
+			}
+			if _, err := m.mgmt.Management.Projects("").Update(project); err != nil {
+				return obj, err
+			}
+
 		case v3.ClusterGroupVersionKind.Kind:
-			if rtb, _ := m.crtbLister.Get(metaAccessor.GetName(), rtbName); rtb != nil {
-				return obj, nil
+			cluster := obj.(*v3.Cluster)
+
+			if v3.ClusterConditionInitialRolesPopulated.IsTrue(cluster) {
+				// The clusterRoleBindings are already completed, no need to check
+				break
 			}
-			om.Annotations = crtbCeatorOwnerAnnotations
-			logrus.Infof("[%v] Creating creator clusterRoleTemplateBinding for user %v for cluster %v", projectCreateController, creatorID, metaAccessor.GetName())
-			if _, err := m.mgmt.Management.ClusterRoleTemplateBindings(metaAccessor.GetName()).Create(&v3.ClusterRoleTemplateBinding{
-				ObjectMeta:       om,
-				ClusterName:      metaAccessor.GetName(),
-				RoleTemplateName: "cluster-owner",
-				UserName:         creatorID,
-			}); err != nil {
+
+			roleJSON, ok := cluster.Annotations[roleTemplatesRequired]
+			if !ok {
+				return cluster, nil
+			}
+
+			roleMap := make(map[string][]string)
+			err = json.Unmarshal([]byte(roleJSON), &roleMap)
+			if err != nil {
 				return obj, err
 			}
+
+			var createdRoles []string
+
+			for _, role := range roleMap["required"] {
+				rtbName := "creator-" + role
+
+				if rtb, _ := m.crtbLister.Get(metaAccessor.GetName(), rtbName); rtb != nil {
+					createdRoles = append(createdRoles, role)
+					// This clusterRoleBinding exists, need to check all of them so keep going
+					continue
+				}
+
+				// The clusterRoleBinding doesn't exist yet so create it
+				om := v1.ObjectMeta{
+					Name:      rtbName,
+					Namespace: metaAccessor.GetName(),
+				}
+				om.Annotations = crtbCeatorOwnerAnnotations
+
+				logrus.Infof("[%v] Creating creator clusterRoleTemplateBinding for user %v for cluster %v", projectCreateController, creatorID, metaAccessor.GetName())
+				if _, err := m.mgmt.Management.ClusterRoleTemplateBindings(metaAccessor.GetName()).Create(&v3.ClusterRoleTemplateBinding{
+					ObjectMeta:       om,
+					ClusterName:      metaAccessor.GetName(),
+					RoleTemplateName: role,
+					UserName:         creatorID,
+				}); err != nil && !apierrors.IsAlreadyExists(err) {
+					return obj, err
+				}
+				createdRoles = append(createdRoles, role)
+			}
+
+			cluster = cluster.DeepCopy()
+
+			roleMap["created"] = createdRoles
+			d, err := json.Marshal(roleMap)
+			if err != nil {
+				return obj, err
+			}
+
+			cluster.Annotations[roleTemplatesRequired] = string(d)
+
+			if reflect.DeepEqual(roleMap["required"], createdRoles) {
+				v3.ClusterConditionInitialRolesPopulated.True(cluster)
+				logrus.Infof("[%v] Setting InitialRolesPopulated condition on cluster %v", ctrbMGMTController, cluster.ClusterName)
+			}
+			if _, err := m.mgmt.Management.Clusters("").Update(cluster); err != nil {
+				return obj, err
+			}
+
 		}
 
 		return obj, nil
@@ -303,4 +426,49 @@ func (m *mgr) reconcileResourceToNamespace(obj runtime.Object, controller string
 
 		return obj, nil
 	})
+}
+
+func (m *mgr) addRTAnnotation(obj runtime.Object, context string) (runtime.Object, error) {
+	meta, err := meta.Accessor(obj)
+	if err != nil {
+		return obj, err
+	}
+
+	// If the annotation is already there move along
+	if _, ok := meta.GetAnnotations()[roleTemplatesRequired]; ok {
+		return obj, nil
+	}
+
+	rt, err := m.roleTemplateLister.List("", labels.NewSelector())
+	if err != nil {
+		return obj, err
+	}
+
+	annoMap := make(map[string][]string)
+
+	switch context {
+	case "project":
+		for _, role := range rt {
+			if role.ProjectCreatorDefault {
+				annoMap["required"] = append(annoMap["required"], role.Name)
+			}
+		}
+	case "cluster":
+		for _, role := range rt {
+			if role.ClusterCreatorDefault {
+				annoMap["required"] = append(annoMap["required"], role.Name)
+			}
+		}
+		annoMap["created"] = []string{}
+	}
+
+	d, err := json.Marshal(annoMap)
+	if err != nil {
+		return obj, err
+	}
+
+	// Save the required role templates to the annotation on the obj
+	meta.GetAnnotations()[roleTemplatesRequired] = string(d)
+
+	return obj, nil
 }

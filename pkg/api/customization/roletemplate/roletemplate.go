@@ -22,9 +22,9 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 	}
 
 	if rt.Builtin == true {
-		// Drop everything but locked. If it's builtin nothing else can change.
+		// Drop everything but locked and defaults. If it's builtin nothing else can change.
 		for k := range data {
-			if k == "locked" {
+			if k == "locked" || k == "clusterCreatorDefault" || k == "projectCreatorDefault" {
 				continue
 			}
 			delete(data, k)

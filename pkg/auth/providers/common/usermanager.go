@@ -2,6 +2,8 @@ package common
 
 import (
 	"encoding/base32"
+	"encoding/json"
+	"reflect"
 
 	"fmt"
 	"strings"
@@ -26,6 +28,8 @@ const (
 	userByPrincipalIndex         = "auth.management.cattle.io/userByPrincipal"
 	crtbsByPrincipalAndUserIndex = "auth.management.cattle.io/crtbByPrincipalAndUser"
 	prtbsByPrincipalAndUserIndex = "auth.management.cattle.io/prtbByPrincipalAndUser"
+	grbByUserIndex               = "auth.management.cattle.io/grbByUser"
+	roleTemplatesRequired        = "authz.management.cattle.io/creator-role-bindings"
 )
 
 func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
@@ -53,6 +57,14 @@ func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
 		return nil, err
 	}
 
+	grbInformer := scaledContext.Management.GlobalRoleBindings("").Controller().Informer()
+	grbIndexers := map[string]cache.IndexFunc{
+		grbByUserIndex: grbByUser,
+	}
+	if err := grbInformer.AddIndexers(grbIndexers); err != nil {
+		return nil, err
+	}
+
 	return &userManager{
 		users:              scaledContext.Management.Users(""),
 		userIndexer:        userInformer.GetIndexer(),
@@ -61,12 +73,16 @@ func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
 		tokens:             scaledContext.Management.Tokens(""),
 		tokenLister:        scaledContext.Management.Tokens("").Controller().Lister(),
 		globalRoleBindings: scaledContext.Management.GlobalRoleBindings(""),
+		globalRoleLister:   scaledContext.Management.GlobalRoles("").Controller().Lister(),
+		grbIndexer:         grbInformer.GetIndexer(),
 	}, nil
 }
 
 type userManager struct {
 	users              v3.UserInterface
 	globalRoleBindings v3.GlobalRoleBindingInterface
+	globalRoleLister   v3.GlobalRoleLister
+	grbIndexer         cache.Indexer
 	userIndexer        cache.Indexer
 	crtbIndexer        cache.Indexer
 	prtbIndexer        cache.Indexer
@@ -210,53 +226,156 @@ func (m *userManager) EnsureToken(tokenName, description, userName string) (stri
 }
 
 func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, error) {
+	var user *v3.User
+	var err error
+	var labelSet labels.Set
+
 	// First check the local cache
-	u, err := m.checkCache(principalName)
-	if err != nil {
-		return nil, err
-	}
-	if u != nil {
-		return u, nil
-	}
-
-	// Not in cache, query API by label
-	u, labelSet, err := m.checkLabels(principalName)
-	if err != nil {
-		return nil, err
-	}
-	if u != nil {
-		return u, nil
-	}
-
-	// Doesn't exist, create user
-	user := &v3.User{
-		ObjectMeta: v1.ObjectMeta{
-			GenerateName: "user-",
-			Labels:       labelSet,
-		},
-		DisplayName:  displayName,
-		PrincipalIDs: []string{principalName},
-	}
-
-	logrus.Infof("Creating user for principal %v", principalName)
-	created, err := m.users.Create(user)
+	user, err = m.checkCache(principalName)
 	if err != nil {
 		return nil, err
 	}
 
-	logrus.Infof("Creating globalRoleBinding for %v", created.Name)
-	_, err = m.globalRoleBindings.Create(&v3.GlobalRoleBinding{
-		ObjectMeta: v1.ObjectMeta{
-			GenerateName: "globalrolebinding-",
-		},
-		UserName:       created.Name,
-		GlobalRoleName: "user",
-	})
+	if user == nil {
+		// Not in cache, query API by label
+		user, labelSet, err = m.checkLabels(principalName)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if user != nil {
+		// If the user does not have the annotation it indicates the user was created
+		// through the UI or from a previous rancher version so don't add the
+		// default bindings.
+		if _, ok := user.Annotations[roleTemplatesRequired]; !ok {
+			return user, nil
+		}
+
+		if v3.UserConditionInitialRolesPopulated.IsTrue(user) {
+			// The users global role bindings were already created. They can differ
+			// from what is in the annotation if they were updated manually.
+			return user, nil
+		}
+	} else {
+		// User doesn't exist, create user
+		logrus.Infof("Creating user for principal %v", principalName)
+
+		annotations, err := m.createUsersRoleAnnotation()
+		if err != nil {
+			return nil, err
+		}
+
+		user = &v3.User{
+			ObjectMeta: v1.ObjectMeta{
+				GenerateName: "user-",
+				Labels:       labelSet,
+				Annotations:  annotations,
+			},
+			DisplayName:  displayName,
+			PrincipalIDs: []string{principalName},
+		}
+
+		user, err = m.users.Create(user)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	logrus.Infof("Creating globalRoleBindings for %v", user.Name)
+	err = m.createUsersBindings(user)
 	if err != nil {
 		return nil, err
 	}
 
-	return created, nil
+	return user, nil
+}
+
+func (m *userManager) createUsersBindings(user *v3.User) error {
+	roleMap := make(map[string][]string)
+	err := json.Unmarshal([]byte(user.Annotations[roleTemplatesRequired]), &roleMap)
+	if err != nil {
+		return err
+	}
+
+	// Collect the users existing globalRoleBindings
+	var existingGRB []string
+	grbs, err := m.grbIndexer.ByIndex(grbByUserIndex, user.Name)
+	if err != nil {
+		return err
+	}
+
+	for _, grb := range grbs {
+		binding, ok := grb.(*v3.GlobalRoleBinding)
+		if !ok {
+			continue
+		}
+		existingGRB = append(existingGRB, binding.GlobalRoleName)
+	}
+
+	var createdRoles []string
+	for _, role := range roleMap["required"] {
+		if !slice.ContainsString(existingGRB, role) {
+			_, err := m.globalRoleBindings.Create(&v3.GlobalRoleBinding{
+				ObjectMeta: v1.ObjectMeta{
+					GenerateName: "grb-",
+				},
+				UserName:       user.Name,
+				GlobalRoleName: role,
+			})
+
+			if err != nil {
+				return err
+			}
+		}
+		createdRoles = append(createdRoles, role)
+	}
+
+	u := user.DeepCopy()
+
+	roleMap["created"] = createdRoles
+	d, err := json.Marshal(roleMap)
+	if err != nil {
+		return err
+	}
+
+	u.Annotations[roleTemplatesRequired] = string(d)
+
+	if reflect.DeepEqual(roleMap["required"], createdRoles) {
+		v3.UserConditionInitialRolesPopulated.True(u)
+	}
+
+	_, err = m.users.Update(u)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *userManager) createUsersRoleAnnotation() (map[string]string, error) {
+	roleMap := make(map[string][]string)
+
+	roles, err := m.globalRoleLister.List("", labels.NewSelector())
+	if err != nil {
+		return nil, err
+	}
+
+	for _, gr := range roles {
+		if gr.NewUserDefault {
+			roleMap["required"] = append(roleMap["required"], gr.Name)
+		}
+	}
+
+	d, err := json.Marshal(roleMap)
+	if err != nil {
+		return nil, err
+	}
+
+	annotations := make(map[string]string)
+	annotations[roleTemplatesRequired] = string(d)
+
+	return annotations, nil
 }
 
 func (m *userManager) checkCache(principalName string) (*v3.User, error) {
@@ -367,6 +486,15 @@ func prtbsByPrincipalAndUser(obj interface{}) ([]string, error) {
 		principals = append(principals, b.UserName)
 	}
 	return principals, nil
+}
+
+func grbByUser(obj interface{}) ([]string, error) {
+	grb, ok := obj.(*v3.GlobalRoleBinding)
+	if !ok {
+		return []string{}, nil
+	}
+
+	return []string{grb.UserName}, nil
 }
 
 func providerExists(principalIDs []string, provider string) bool {
