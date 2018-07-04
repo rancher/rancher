@@ -2,6 +2,7 @@ package cert
 
 import (
 	"bytes"
+	"crypto"
 	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/x509"
@@ -30,12 +31,15 @@ type CertificateInfo struct {
 func Info(pemCerts, pemKey string) (*CertificateInfo, error) {
 	block, _ := pem.Decode([]byte(pemKey))
 	if block == nil {
-		return nil, errors.New("failed to parse key, not valid pem format")
+		return nil, errors.New("failed to decode key: not valid pem format")
 	}
 
-	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to read private key")
+	var key crypto.PrivateKey
+	var err error
+	if key, err = x509.ParsePKCS1PrivateKey(block.Bytes); err != nil {
+		if key, err = x509.ParsePKCS8PrivateKey(block.Bytes); err != nil {
+			return nil, errors.Wrap(err, "failed to parse key: key must be PEM encoded PKCS1 or PKCS8")
+		}
 	}
 
 	rest := []byte(pemCerts)
@@ -57,7 +61,12 @@ func Info(pemCerts, pemKey string) (*CertificateInfo, error) {
 			continue
 		}
 
-		if pubKey.N.Cmp(key.N) != 0 {
+		privKey, ok := key.(*rsa.PrivateKey)
+		if !ok {
+			continue
+		}
+
+		if pubKey.N.Cmp(privKey.N) != 0 {
 			continue
 		}
 
@@ -67,7 +76,7 @@ func Info(pemCerts, pemKey string) (*CertificateInfo, error) {
 		certInfo.ExpiresAt = cert.NotAfter
 		certInfo.IssuedAt = cert.NotBefore
 		certInfo.Issuer = cert.Issuer.CommonName
-		certInfo.KeySize = len(key.N.Bytes())
+		certInfo.KeySize = len(privKey.N.Bytes())
 		certInfo.SerialNumber = cert.SerialNumber.String()
 		certInfo.Version = cert.Version
 
