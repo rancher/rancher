@@ -236,11 +236,7 @@ func deleteNode(nodeDir string, node *v3.Node) error {
 		return err
 	}
 
-	if err := command.Wait(); err != nil {
-		return err
-	}
-
-	return nil
+	return command.Wait()
 }
 
 func getSSHPrivateKey(nodeDir string, node *v3.Node) (string, error) {

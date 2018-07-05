@@ -5,6 +5,7 @@ import (
 	"reflect"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/types/convert"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -344,7 +345,12 @@ func objectsAreEqual(existing *v3.Node, toUpdate *v3.Node) bool {
 	nodeNameEqual := toUpdateToCompare.Status.NodeName == existingToCompare.Status.NodeName
 	requestsEqual := isEqual(toUpdateToCompare.Status.Requested, existingToCompare.Status.Requested)
 	limitsEqual := isEqual(toUpdateToCompare.Status.Limits, existingToCompare.Status.Limits)
-	return statusEqual && specEqual && nodeNameEqual && labelsEqual && annotationsEqual && requestsEqual && limitsEqual
+
+	retVal := statusEqual && specEqual && nodeNameEqual && labelsEqual && annotationsEqual && requestsEqual && limitsEqual
+	if !retVal {
+		logrus.Debugf("ObjectsAreEqualResults for %s: statusEqual: %t specEqual: %t nodeNameEqual: %t labelsEqual: %t annotationsEqual: %t requestsEqual: %t limitsEqual: %t", toUpdate.Name, statusEqual, specEqual, nodeNameEqual, labelsEqual, annotationsEqual, requestsEqual, limitsEqual)
+	}
+	return retVal
 }
 
 func (m *NodesSyncer) convertNodeToNode(node *corev1.Node, existing *v3.Node, pods map[string][]*corev1.Pod) (*v3.Node, error) {
@@ -456,7 +462,7 @@ func aggregateRequestAndLimitsForNode(pods []*corev1.Pod) (map[corev1.ResourceNa
 }
 
 func isEqual(data1 map[corev1.ResourceName]resource.Quantity, data2 map[corev1.ResourceName]resource.Quantity) bool {
-	if data1 == nil && data2 == nil {
+	if convert.IsEmpty(data1) && convert.IsEmpty(data2) {
 		return true
 	}
 	if data1 == nil || data2 == nil {
