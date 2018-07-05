@@ -95,10 +95,26 @@ func (p *Provisioner) Remove(cluster *v3.Cluster) (*v3.Cluster, error) {
 
 func (p *Provisioner) Updated(cluster *v3.Cluster) (*v3.Cluster, error) {
 	obj, err := v3.ClusterConditionUpdated.Do(cluster, func() (runtime.Object, error) {
+		setVersion(cluster)
 		return p.update(cluster, false)
 	})
 
 	return obj.(*v3.Cluster), err
+}
+
+func setVersion(cluster *v3.Cluster) {
+	if cluster.Spec.RancherKubernetesEngineConfig != nil {
+		if cluster.Spec.RancherKubernetesEngineConfig.Version == "" {
+			//set version from the applied spec
+			if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
+				if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.Version != "" {
+					cluster.Spec.RancherKubernetesEngineConfig.Version = cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.Version
+				} else {
+					cluster.Spec.RancherKubernetesEngineConfig.Version = settings.KubernetesVersion.Get()
+				}
+			}
+		}
+	}
 }
 
 func (p *Provisioner) update(cluster *v3.Cluster, create bool) (*v3.Cluster, error) {
@@ -368,10 +384,6 @@ func getSystemImages(spec v3.ClusterSpec) (*v3.RKESystemImages, error) {
 	}
 
 	version := spec.RancherKubernetesEngineConfig.Version
-	if version == "" {
-		version = settings.KubernetesVersion.Get()
-	}
-
 	systemImages, ok := systemImagesMap[version]
 	if !ok {
 		return nil, fmt.Errorf("Failed to find system images for version %v", version)
