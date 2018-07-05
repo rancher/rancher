@@ -9,6 +9,8 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/norman/types/values"
+	"github.com/rancher/rancher/pkg/settings"
 	managementv3 "github.com/rancher/types/client/management/v3"
 )
 
@@ -41,6 +43,8 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, err
 	}
 
+	setKubernetesVersion(data)
+
 	return r.Store.Create(apiContext, schema, data)
 }
 
@@ -69,6 +73,9 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 			return nil, err
 		}
 	}
+
+	setKubernetesVersion(data)
+
 	return r.Store.Update(apiContext, schema, data, id)
 }
 
@@ -87,4 +94,17 @@ func canUseClusterName(apiContext *types.APIContext, requestedName string) error
 	}
 
 	return nil
+}
+
+func setKubernetesVersion(data map[string]interface{}) {
+	rkeConfig, ok := values.GetValue(data, "rancherKubernetesEngineConfig")
+
+	if ok && rkeConfig != nil {
+		k8sVersion := values.GetValueN(data, "rancherKubernetesEngineConfig", "kubernetesVersion")
+		if k8sVersion == nil || k8sVersion == "" {
+			//set k8s version to system default on the spec
+			defaultVersion := settings.KubernetesVersion.Get()
+			values.PutValue(data, defaultVersion, "rancherKubernetesEngineConfig", "kubernetesVersion")
+		}
+	}
 }
