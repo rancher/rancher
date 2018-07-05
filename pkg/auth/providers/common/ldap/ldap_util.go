@@ -22,6 +22,7 @@ func NewLDAPConn(servers []string, TLS bool, port int64, connectionTimeout int64
 	var lConn *ldapv2.Conn
 	var err error
 	var tlsConfig *tls.Config
+	ldapv2.DefaultTimeout = time.Duration(connectionTimeout) * time.Millisecond
 	// TODO implment multi-server support
 	if len(servers) != 1 {
 		return nil, errors.New("invalid server config. only exactly 1 server is currently supported")
@@ -40,7 +41,7 @@ func NewLDAPConn(servers []string, TLS bool, port int64, connectionTimeout int64
 		}
 	}
 
-	lConn.SetTimeout(time.Duration(connectionTimeout) * time.Second)
+	lConn.SetTimeout(time.Duration(connectionTimeout) * time.Millisecond)
 
 	return lConn, nil
 }
