@@ -177,7 +177,7 @@ func (m *mgr) createDefaultProject(obj runtime.Object) (runtime.Object, error) {
 		logrus.Infof("[%v] Creating default project for cluster %v", clusterCreateController, metaAccessor.GetName())
 		_, err = m.mgmt.Management.Projects(metaAccessor.GetName()).Create(&v3.Project{
 			ObjectMeta: v1.ObjectMeta{
-				GenerateName: "project-",
+				GenerateName: "p-",
 				Annotations: map[string]string{
 					creatorIDAnn: creatorID,
 				},
