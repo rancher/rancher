@@ -248,7 +248,7 @@ func augmentProcesses(prefix, os string, processes map[string]v3.Process, worker
 }
 
 func getPathPrefix(cluster *v3.Cluster) string {
-	if cluster.Spec.RancherKubernetesEngineConfig.PrefixPath != "/" {
+	if cluster.Spec.RancherKubernetesEngineConfig.PrefixPath != "" {
 		return cluster.Spec.RancherKubernetesEngineConfig.PrefixPath
 	}
 	return "/"
