@@ -267,17 +267,17 @@ func (npmgr *netpolMgr) handleHostNetwork() error {
 	if err != nil {
 		return fmt.Errorf("couldn't list nodes err=%v", err)
 	}
-	logrus.Debugf("netpolMgr: handleHostNetwork: nodes=%+v", nodes)
+	logrus.Debugf("netpolMgr: handleHostNetwork: processing %d nodes", len(nodes))
 
 	for _, node := range nodes {
-		logrus.Debugf("netpolMgr: handleHostNetwork: node=%+v", node)
 		if _, ok := node.Annotations[FlannelPresenceLabel]; !ok {
 			logrus.Debugf("netpolMgr: handleHostNetwork: node=%v doesn't have flannel label, skipping", node.Name)
 			continue
 		}
 		podCIDRFirstIP, _, err := net.ParseCIDR(node.Spec.PodCIDR)
 		if err != nil {
-			logrus.Errorf("netpolMgr: handleHostNetwork: couldn't parse PodCIDR(%v) err=%v", node.Spec.PodCIDR, err)
+			logrus.Debugf("netpolMgr: handleHostNetwork: node=%+v", node)
+			logrus.Errorf("netpolMgr: handleHostNetwork: couldn't parse PodCIDR(%v) for node %v err=%v", node.Spec.PodCIDR, node.Name, err)
 			continue
 		}
 		ipBlock := knetworkingv1.IPBlock{
