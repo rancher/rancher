@@ -18,10 +18,10 @@ func (e ServiceSpecMapper) ToInternal(data map[string]interface{}) {
 
 	if convert.IsEmpty(data["hostname"]) {
 		data["type"] = "ClusterIP"
-		data["clusterIp"] = "None"
+		data["clusterIP"] = "None"
 	} else {
 		data["type"] = "ExternalName"
-		data["clusterIp"] = ""
+		data["clusterIP"] = ""
 	}
 }
 
