@@ -145,7 +145,7 @@ def wait_for(callback, timeout=DEFAULT_TIMEOUT, fail_handler=None):
             exception_msg = 'Timeout waiting for condition.'
             if fail_handler:
                 exception_msg = exception_msg + ' Fail handler message: ' + \
-                                fail_handler()
+                    fail_handler()
             raise Exception(exception_msg)
         ret = callback()
     return ret
@@ -182,8 +182,18 @@ def wait_until_available(client, obj, timeout=DEFAULT_TIMEOUT):
             raise Exception(msg)
 
 
-def wait_for_condition(condition_type, status, client, obj):
-    timeout = 45
+@pytest.fixture
+def remove_resource(admin_mc, request):
+    """Remove a resource after a test finishes even if the test fails."""
+    client = admin_mc.client
+
+    def _cleanup(resource):
+        request.addfinalizer(lambda: client.delete(resource))
+
+    return _cleanup
+
+
+def wait_for_condition(condition_type, status, client, obj, timeout=45):
     start = time.time()
     obj = client.reload(obj)
     sleep = 0.01
@@ -198,6 +208,12 @@ def wait_for_condition(condition_type, status, client, obj):
             msg = 'Timeout waiting for [{}:{}] for condition after {}' \
                 ' seconds'.format(obj.type, obj.id, delta)
             raise Exception(msg)
+
+
+def wait_until(cb, timeout=DEFAULT_TIMEOUT):
+    start_time = time.time()
+    while time.time() < start_time + timeout and cb() is False:
+        time.sleep(1)
 
 
 def find_condition(condition_type, status, obj):
