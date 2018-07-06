@@ -10,7 +10,6 @@ import (
 
 type nodeHandler struct {
 	npmgr            *netpolMgr
-	machines         rmgmtv3.NodeInterface
 	clusterNamespace string
 }
 
