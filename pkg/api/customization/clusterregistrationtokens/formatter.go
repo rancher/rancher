@@ -8,12 +8,13 @@ import (
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemtemplate"
+	"github.com/rancher/rke/hosts"
 )
 
 const (
 	commandFormat         = "kubectl apply -f %s"
 	insecureCommandFormat = "curl --insecure -sfL %s | kubectl apply -f -"
-	nodeCommandFormat     = "sudo docker run -d --privileged --restart=unless-stopped --net=host -v /etc/kubernetes:/etc/kubernetes -v /var/run:/var/run %s --server %s --token %s%s"
+	nodeCommandFormat     = "sudo docker run -d --privileged --restart=unless-stopped --net=host -v %s/etc/kubernetes:/etc/kubernetes -v /var/run:/var/run %s --server %s --token %s%s"
 )
 
 func Formatter(request *types.APIContext, resource *types.RawResource) {
@@ -28,6 +29,7 @@ func Formatter(request *types.APIContext, resource *types.RawResource) {
 		resource.Values["insecureCommand"] = fmt.Sprintf(insecureCommandFormat, url)
 		resource.Values["command"] = fmt.Sprintf(commandFormat, url)
 		resource.Values["nodeCommand"] = fmt.Sprintf(nodeCommandFormat,
+			"",
 			image.Resolve(settings.AgentImage.Get()),
 			getRootURL(request),
 			token,
@@ -37,13 +39,15 @@ func Formatter(request *types.APIContext, resource *types.RawResource) {
 	}
 }
 
-func NodeCommand(token string) string {
+func NodeCommand(token, pathPrefix, os string) string {
 	ca := systemtemplate.CAChecksum()
 	if ca != "" {
 		ca = " --ca-checksum " + ca
 	}
+	prefix := hosts.GetPrefixPath(os, pathPrefix)
 
 	return fmt.Sprintf(nodeCommandFormat,
+		prefix,
 		image.Resolve(settings.AgentImage.Get()),
 		getRootURL(nil),
 		token,
