@@ -18,6 +18,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/rancher/rancher/pkg/agent/cluster"
 	"github.com/rancher/rancher/pkg/agent/node"
+	"github.com/rancher/rancher/pkg/logserver"
 	"github.com/rancher/rancher/pkg/remotedialer"
 	"github.com/rancher/rancher/pkg/rkenodeconfigclient"
 	"github.com/sirupsen/logrus"
@@ -33,6 +34,7 @@ const (
 )
 
 func main() {
+	logserver.StartServerWithDefaults()
 	if os.Getenv("CATTLE_DEBUG") == "true" || os.Getenv("RANCHER_DEBUG") == "true" {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
