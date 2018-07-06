@@ -50,7 +50,7 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 	userOnlyContext := cluster.UserOnlyContext()
 	dnsrecord.Register(ctx, userOnlyContext)
 	externalservice.Register(ctx, userOnlyContext)
-	ingress.Register(ctx, userOnlyContext)
+	ingress.Register(ctx, userOnlyContext, cluster)
 	ingresshostgen.Register(userOnlyContext)
 	targetworkloadservice.Register(ctx, userOnlyContext)
 	workload.Register(ctx, userOnlyContext)
