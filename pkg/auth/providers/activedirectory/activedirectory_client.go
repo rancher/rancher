@@ -217,7 +217,7 @@ func (p *adProvider) getGroupPrincipalsFromSearch(searchBase string, filter stri
 
 	result, err := lConn.SearchWithPaging(search, 1000)
 	if err != nil {
-		return groupPrincipals, httperror.WrapAPIError(errors.Wrapf(err, "server returned error for search %v %v: %v", search.BaseDN, search.Filter, err), httperror.ServerError, "Internal server error")
+		return groupPrincipals, httperror.WrapAPIError(errors.Wrapf(err, "server returned error for search %v %v: %v", search.BaseDN, search.Filter, err), httperror.ServerError, err.Error())
 	}
 
 	for _, e := range result.Entries {
