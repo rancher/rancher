@@ -25,6 +25,7 @@ const (
 type NodeSyncer struct {
 	machines         v3.NodeInterface
 	clusterNamespace string
+	nodesSyncer      *NodesSyncer
 }
 
 type PodsStatsSyncer struct {
@@ -45,11 +46,6 @@ type NodesSyncer struct {
 }
 
 func Register(cluster *config.UserContext) {
-	n := &NodeSyncer{
-		clusterNamespace: cluster.ClusterName,
-		machines:         cluster.Management.Management.Nodes(cluster.ClusterName),
-	}
-
 	m := &NodesSyncer{
 		clusterNamespace: cluster.ClusterName,
 		machines:         cluster.Management.Management.Nodes(cluster.ClusterName),
@@ -61,26 +57,55 @@ func Register(cluster *config.UserContext) {
 		clusterLister:    cluster.Management.Management.Clusters("").Controller().Lister(),
 	}
 
-	p := &PodsStatsSyncer{
+	n := &NodeSyncer{
 		clusterNamespace: cluster.ClusterName,
-		machinesClient:   cluster.Management.Management.Nodes(cluster.ClusterName),
+		machines:         cluster.Management.Management.Nodes(cluster.ClusterName),
+		nodesSyncer:      m,
 	}
 
 	cluster.Core.Nodes("").Controller().AddHandler("nodesSyncer", n.sync)
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler("machinesSyncer", m.sync)
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler("machinesLabelSyncer", m.syncLabels)
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler("cordonFieldsSyncer", m.syncCordonFields)
-	cluster.Core.Pods("").Controller().AddHandler("podsStatsSyncer", p.sync)
 }
 
 func (n *NodeSyncer) sync(key string, node *corev1.Node) error {
-	n.machines.Controller().Enqueue(n.clusterNamespace, AllNodeKey)
+	needUpdate, err := n.needUpdate(key, node)
+	if err != nil {
+		return err
+	}
+	if needUpdate {
+		n.machines.Controller().Enqueue(n.clusterNamespace, AllNodeKey)
+	}
+
 	return nil
 }
 
-func (p *PodsStatsSyncer) sync(key string, pod *corev1.Pod) error {
-	p.machinesClient.Controller().Enqueue(p.clusterNamespace, AllNodeKey)
-	return nil
+func (n *NodeSyncer) needUpdate(key string, node *corev1.Node) (bool, error) {
+	if node == nil || node.DeletionTimestamp != nil {
+		return true, nil
+	}
+	existing, err := n.nodesSyncer.getNodeForNode(node, true)
+	if err != nil {
+		return false, err
+	}
+	if existing == nil {
+		return true, nil
+	}
+	nodeToPodMap, err := n.nodesSyncer.getNonTerminatedPods()
+	if err != nil {
+		return false, err
+	}
+	toUpdate, err := n.nodesSyncer.convertNodeToNode(node, existing, nodeToPodMap)
+	if err != nil {
+		return false, err
+	}
+
+	// update only when nothing changed
+	if objectsAreEqual(existing, toUpdate) {
+		return false, nil
+	}
+	return true, nil
 }
 
 func (m *NodesSyncer) sync(key string, machine *v3.Node) error {

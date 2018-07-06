@@ -10,22 +10,21 @@ func Register(cluster *config.UserContext) {
 	logrus.Infof("Registering project network policy")
 
 	pnpLister := cluster.Management.Management.ProjectNetworkPolicies("").Controller().Lister()
-	pnpClient := cluster.Management.Management.ProjectNetworkPolicies("").ObjectClient()
-	projClient := cluster.Management.Management.Projects("").ObjectClient()
+	pnpClient := cluster.Management.Management.ProjectNetworkPolicies("")
+	projClient := cluster.Management.Management.Projects("")
 	nodeLister := cluster.Core.Nodes("").Controller().Lister()
 	nsLister := cluster.Core.Namespaces("").Controller().Lister()
 	pods := cluster.Core.Pods("")
-	machines := cluster.Management.Management.Nodes(cluster.ClusterName)
 	npClient := cluster.Networking
 	npLister := cluster.Networking.NetworkPolicies("").Controller().Lister()
 
-	npmgr := &netpolMgr{nsLister, nodeLister, pods, npLister, npClient}
+	npmgr := &netpolMgr{nsLister, nodeLister, npLister, npClient}
 	ps := &projectSyncer{pnpLister, pnpClient, projClient}
 	nss := &nsSyncer{npmgr}
 	pnps := &projectNetworkPolicySyncer{npmgr}
 	podHandler := &podHandler{npmgr, pods}
 	serviceHandler := &serviceHandler{npmgr}
-	nodeHandler := &nodeHandler{npmgr, machines, cluster.ClusterName}
+	nodeHandler := &nodeHandler{npmgr, cluster.ClusterName}
 
 	cluster.Management.Management.Projects("").Controller().AddClusterScopedHandler("projectSyncer", cluster.ClusterName, ps.Sync)
 	cluster.Management.Management.ProjectNetworkPolicies("").AddClusterScopedHandler("projectNetworkPolicySyncer", cluster.ClusterName, pnps.Sync)
