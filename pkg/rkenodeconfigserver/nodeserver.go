@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 
+	"path"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/image"
@@ -111,6 +113,7 @@ func (n *RKENodeConfigServer) nonWorkerConfig(ctx context.Context, cluster *v3.C
 	if rkeConfig == nil {
 		rkeConfig = &v3.RancherKubernetesEngineConfig{}
 	}
+	prefix := getPathPrefix(cluster)
 
 	rkeConfig = rkeConfig.DeepCopy()
 	rkeConfig.Nodes = []v3.RKEConfigNode{
@@ -135,7 +138,7 @@ func (n *RKENodeConfigServer) nonWorkerConfig(ctx context.Context, cluster *v3.C
 	for _, tempNode := range plan.Nodes {
 		if tempNode.Address == node.Status.NodeConfig.Address {
 			b2d := strings.Contains(infos[tempNode.Address].OperatingSystem, hosts.B2DOS)
-			nc.Processes = augmentProcesses(tempNode.Processes, false, b2d)
+			nc.Processes = augmentProcesses(prefix, infos[node.Status.NodeConfig.Address].OperatingSystem, tempNode.Processes, false, b2d)
 			return nc, nil
 		}
 	}
@@ -150,6 +153,7 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 	if err != nil {
 		return nil, err
 	}
+	prefix := getPathPrefix(cluster)
 
 	bundle = bundle.ForNode(spec.RancherKubernetesEngineConfig, node.Status.NodeConfig.Address)
 
@@ -176,7 +180,7 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 	for _, tempNode := range plan.Nodes {
 		if tempNode.Address == node.Status.NodeConfig.Address {
 			b2d := strings.Contains(infos[tempNode.Address].OperatingSystem, hosts.B2DOS)
-			nc.Processes = augmentProcesses(tempNode.Processes, true, b2d)
+			nc.Processes = augmentProcesses(prefix, infos[tempNode.Address].OperatingSystem, tempNode.Processes, true, b2d)
 			nc.Files = tempNode.Files
 			return nc, nil
 		}
@@ -185,7 +189,7 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 	return nil, fmt.Errorf("failed to find plan for %s", node.Status.NodeConfig.Address)
 }
 
-func augmentProcesses(processes map[string]v3.Process, worker, b2d bool) map[string]v3.Process {
+func augmentProcesses(prefix, os string, processes map[string]v3.Process, worker, b2d bool) map[string]v3.Process {
 	var shared []string
 
 	if b2d {
@@ -234,11 +238,18 @@ func augmentProcesses(processes map[string]v3.Process, worker, b2d bool) map[str
 		for i, bind := range p.Binds {
 			parts := strings.Split(bind, ":")
 			if len(parts) > 1 && parts[1] == "/etc/kubernetes" {
-				parts[0] = parts[1]
+				parts[0] = path.Join(hosts.GetPrefixPath(os, prefix), parts[1])
 				p.Binds[i] = strings.Join(parts, ":")
 			}
 		}
 	}
 
 	return processes
+}
+
+func getPathPrefix(cluster *v3.Cluster) string {
+	if cluster.Spec.RancherKubernetesEngineConfig.PrefixPath != "/" {
+		return cluster.Spec.RancherKubernetesEngineConfig.PrefixPath
+	}
+	return "/"
 }
