@@ -106,7 +106,7 @@ func setVersion(cluster *v3.Cluster) {
 	if cluster.Spec.RancherKubernetesEngineConfig != nil {
 		if cluster.Spec.RancherKubernetesEngineConfig.Version == "" {
 			//set version from the applied spec
-			if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
+			if cluster.Status.AppliedSpec != nil && cluster.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
 				if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.Version != "" {
 					cluster.Spec.RancherKubernetesEngineConfig.Version = cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.Version
 				} else {
