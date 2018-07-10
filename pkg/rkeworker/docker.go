@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
@@ -79,6 +80,15 @@ func runProcess(ctx context.Context, name string, p v3.Process, start bool) erro
 	}
 
 	if len(matchedContainers) > 0 {
+		if strings.Contains(name, "share-mnt") {
+			inspect, err := c.ContainerInspect(ctx, matchedContainers[0].ID)
+			if err != nil {
+				return err
+			}
+			if inspect.State != nil && inspect.State.Status == "exited" && inspect.State.ExitCode == 0 {
+				return nil
+			}
+		}
 		c.ContainerStart(ctx, matchedContainers[0].ID, types.ContainerStartOptions{})
 		return nil
 	}

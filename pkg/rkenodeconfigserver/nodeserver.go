@@ -9,11 +9,13 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/slice"
+	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/librke"
 	"github.com/rancher/rancher/pkg/rkecerts"
 	"github.com/rancher/rancher/pkg/rkeworker"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/tunnelserver"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/services"
@@ -27,14 +29,16 @@ var (
 )
 
 type RKENodeConfigServer struct {
-	auth   *tunnelserver.Authorizer
-	lookup *rkecerts.BundleLookup
+	auth                 *tunnelserver.Authorizer
+	lookup               *rkecerts.BundleLookup
+	systemAccountManager *systemaccount.Manager
 }
 
 func Handler(auth *tunnelserver.Authorizer, scaledContext *config.ScaledContext) http.Handler {
 	return &RKENodeConfigServer{
-		auth:   auth,
-		lookup: rkecerts.NewLookup(scaledContext.Core.Namespaces(""), scaledContext.K8sClient.CoreV1()),
+		auth:                 auth,
+		lookup:               rkecerts.NewLookup(scaledContext.Core.Namespaces(""), scaledContext.K8sClient.CoreV1()),
+		systemAccountManager: systemaccount.NewManagerFromScale(scaledContext),
 	}
 }
 
@@ -131,11 +135,14 @@ func (n *RKENodeConfigServer) nonWorkerConfig(ctx context.Context, cluster *v3.C
 	nc := &rkeworker.NodeConfig{
 		ClusterName: cluster.Name,
 	}
-
+	token, err := n.systemAccountManager.GetOrCreateSystemClusterToken(cluster.Name)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create or get cluster token for share-mnt")
+	}
 	for _, tempNode := range plan.Nodes {
 		if tempNode.Address == node.Status.NodeConfig.Address {
 			b2d := strings.Contains(infos[tempNode.Address].OperatingSystem, hosts.B2DOS)
-			nc.Processes = augmentProcesses(tempNode.Processes, false, b2d)
+			nc.Processes = augmentProcesses(token, tempNode.Processes, false, b2d)
 			return nc, nil
 		}
 	}
@@ -172,11 +179,14 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 		Certs:       certString,
 		ClusterName: cluster.Name,
 	}
-
+	token, err := n.systemAccountManager.GetOrCreateSystemClusterToken(cluster.Name)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create or get cluster token for share-mnt")
+	}
 	for _, tempNode := range plan.Nodes {
 		if tempNode.Address == node.Status.NodeConfig.Address {
 			b2d := strings.Contains(infos[tempNode.Address].OperatingSystem, hosts.B2DOS)
-			nc.Processes = augmentProcesses(tempNode.Processes, true, b2d)
+			nc.Processes = augmentProcesses(token, tempNode.Processes, true, b2d)
 			nc.Files = tempNode.Files
 			return nc, nil
 		}
@@ -185,7 +195,7 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 	return nil, fmt.Errorf("failed to find plan for %s", node.Status.NodeConfig.Address)
 }
 
-func augmentProcesses(processes map[string]v3.Process, worker, b2d bool) map[string]v3.Process {
+func augmentProcesses(token string, processes map[string]v3.Process, worker, b2d bool) map[string]v3.Process {
 	var shared []string
 
 	if b2d {
@@ -202,7 +212,8 @@ func augmentProcesses(processes map[string]v3.Process, worker, b2d bool) map[str
 	}
 
 	if len(shared) > 0 {
-		args := []string{"--", "share-root.sh"}
+		nodeCommand := clusterregistrationtokens.NodeCommand(token) + " --no-register --only-write-certs"
+		args := []string{"--", "share-root.sh", strings.TrimPrefix(nodeCommand, "sudo ")}
 		args = append(args, shared...)
 
 		processes["share-mnt"] = v3.Process{

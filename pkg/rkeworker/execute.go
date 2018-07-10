@@ -13,7 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/rkecerts"
 )
 
-func ExecutePlan(ctx context.Context, nodeConfig *NodeConfig) error {
+func ExecutePlan(ctx context.Context, nodeConfig *NodeConfig, writeCertOnly bool) error {
 	if nodeConfig.Certs != "" {
 		bundle, err := rkecerts.Unmarshal(nodeConfig.Certs)
 		if err != nil {
@@ -28,6 +28,9 @@ func ExecutePlan(ctx context.Context, nodeConfig *NodeConfig) error {
 	f := fileWriter{}
 	for _, file := range nodeConfig.Files {
 		f.write(file.Name, file.Contents)
+	}
+	if writeCertOnly {
+		return nil
 	}
 
 	for name, process := range nodeConfig.Processes {
