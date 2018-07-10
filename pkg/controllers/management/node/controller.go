@@ -260,8 +260,12 @@ func (m *Lifecycle) deployAgent(nodeDir string, obj *v3.Node) error {
 	if err != nil {
 		return err
 	}
-	if cluster.Spec.RancherKubernetesEngineConfig.PrefixPath != "" {
-		prefix = cluster.Spec.RancherKubernetesEngineConfig.PrefixPath
+	if cluster != nil {
+		if cluster.Spec.RancherKubernetesEngineConfig == nil {
+			logrus.Warn("cluster is a non-rke cluster")
+		} else if cluster.Spec.RancherKubernetesEngineConfig.PrefixPath != "" {
+			prefix = cluster.Spec.RancherKubernetesEngineConfig.PrefixPath
+		}
 	}
 	dockerInfoCmd := buildDockerInfoCommand(obj)
 	infoCmd := buildCommand(nodeDir, dockerInfoCmd)
