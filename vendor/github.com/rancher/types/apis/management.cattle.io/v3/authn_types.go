@@ -180,7 +180,7 @@ type ActiveDirectoryConfig struct {
 	GroupMemberUserAttribute     string   `json:"groupMemberUserAttribute,omitempty"    norman:"default=distinguishedName,required"`
 	GroupMemberMappingAttribute  string   `json:"groupMemberMappingAttribute,omitempty" norman:"default=member,required"`
 	ConnectionTimeout            int64    `json:"connectionTimeout,omitempty"           norman:"default=5000,notnullable,required"`
-	NestedGroupMembershipEnabled *bool    `json:"nestedGroupMembershipEnabled,omitempty" norman:"default=true"`
+	NestedGroupMembershipEnabled *bool    `json:"nestedGroupMembershipEnabled,omitempty" norman:"default=false"`
 }
 
 type ActiveDirectoryTestAndApplyInput struct {
@@ -217,7 +217,7 @@ type LdapConfig struct {
 	GroupMemberUserAttribute        string   `json:"groupMemberUserAttribute,omitempty"    norman:"default=entryDN,notnullable"`
 	GroupMemberMappingAttribute     string   `json:"groupMemberMappingAttribute,omitempty" norman:"default=member,notnullable,required"`
 	ConnectionTimeout               int64    `json:"connectionTimeout,omitempty"           norman:"default=5000,notnullable,required"`
-	NestedGroupMembershipEnabled    bool     `json:"nestedGroupMembershipEnabled"    norman:"default=true"`
+	NestedGroupMembershipEnabled    bool     `json:"nestedGroupMembershipEnabled"    norman:"default=false"`
 }
 
 type LdapTestAndApplyInput struct {
