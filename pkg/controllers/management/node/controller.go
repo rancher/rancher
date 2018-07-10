@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/docker/docker/api/types"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/event"
 	"github.com/rancher/norman/objectclient"
@@ -255,29 +254,11 @@ func (m *Lifecycle) deployAgent(nodeDir string, obj *v3.Node) error {
 	if err != nil {
 		return err
 	}
-	prefix := "/"
-	cluster, err := m.clusterLister.Get("", obj.Namespace)
-	if err != nil {
-		return err
-	}
-	if cluster.Spec.RancherKubernetesEngineConfig.PrefixPath != "" {
-		prefix = cluster.Spec.RancherKubernetesEngineConfig.PrefixPath
-	}
-	dockerInfoCmd := buildDockerInfoCommand(obj)
-	infoCmd := buildCommand(nodeDir, dockerInfoCmd)
-	output, err := infoCmd.CombinedOutput()
-	if err != nil {
-		return errors.Wrap(err, string(output))
-	}
-	info := &types.Info{}
-	if err := json.Unmarshal(output, info); err != nil {
-		return err
-	}
 
-	drun := clusterregistrationtokens.NodeCommand(token, prefix, info.OperatingSystem)
+	drun := clusterregistrationtokens.NodeCommand(token)
 	args := buildAgentCommand(obj, drun)
 	cmd := buildCommand(nodeDir, args)
-	output, err = cmd.CombinedOutput()
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return errors.Wrap(err, string(output))
 	}
