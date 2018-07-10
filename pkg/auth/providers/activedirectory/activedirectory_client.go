@@ -126,56 +126,57 @@ func (p *adProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult, 
 	}
 	userPrincipal.Me = true
 
+	// config.NestedGroupMembershipEnabled nil or false = false
 	if config.NestedGroupMembershipEnabled != nil {
-		if *config.NestedGroupMembershipEnabled == false {
-			if len(memberOf) != 0 {
-				for i := 0; i < len(memberOf); i += 50 {
-					batch := memberOf[i:ldap.Min(i+50, len(memberOf))]
-					filter := "(" + ObjectClassAttribute + "=" + config.GroupObjectClass + ")"
-					query := "(|"
-					for _, attrib := range batch {
-						query += "(distinguishedName=" + ldapv2.EscapeFilter(attrib) + ")"
-					}
-					query += ")"
-					query = "(&" + filter + query + ")"
-					// Pulling user's groups
-					logrus.Debugf("AD: Query for pulling user's groups: %v", query)
-					searchDomain := config.UserSearchBase
-					if config.GroupSearchBase != "" {
-						searchDomain = config.GroupSearchBase
-					}
-
-					// Call common method for getting group principals
-					groupPrincipalListBatch, err := p.getGroupPrincipalsFromSearch(searchDomain, query, config, caPool, batch)
-					if err != nil {
-						return userPrincipal, groupPrincipals, err
-					}
-					groupPrincipals = append(groupPrincipals, groupPrincipalListBatch...)
-				}
+		if *config.NestedGroupMembershipEnabled == true {
+			// As per https://msdn.microsoft.com/en-us/library/aa746475%28VS.85%29.aspx, `(member:1.2.840.113556.1.4.1941:=cn=user1,cn=users,DC=x)`
+			// query can fetch all groups that the user is a member of, including nested groups
+			userDN := result.Entries[0].DN
+			// config.GroupMemberMappingAttribute is a required field post 2.0.1, so if an upgraded setup doesn't have its value, we set it to `member`
+			if config.GroupMemberMappingAttribute == "" {
+				config.GroupMemberMappingAttribute = "member"
 			}
+			nestedGroupsQuery := "(" + config.GroupMemberMappingAttribute + ":1.2.840.113556.1.4.1941:=" + ldapv2.EscapeFilter(userDN) + ")"
+			logrus.Debugf("AD: Query for pulling user's groups: %v", nestedGroupsQuery)
+			searchBase := config.UserSearchBase
+			if config.GroupSearchBase != "" {
+				searchBase = config.GroupSearchBase
+			}
+
+			// Call common method for getting group principals
+			groupPrincipals, err = p.getGroupPrincipalsFromSearch(searchBase, nestedGroupsQuery, config, caPool, memberOf)
+			if err != nil {
+				return userPrincipal, groupPrincipals, err
+			}
+
 			return userPrincipal, groupPrincipals, nil
 		}
 	}
-	// As per https://msdn.microsoft.com/en-us/library/aa746475%28VS.85%29.aspx, `(member:1.2.840.113556.1.4.1941:=cn=user1,cn=users,DC=x)`
-	// query can fetch all groups that the user is a member of, including nested groups
-	userDN := result.Entries[0].DN
-	// config.GroupMemberMappingAttribute is a required field post 2.0.1, so if an upgraded setup doesn't have its value, we set it to `member`
-	if config.GroupMemberMappingAttribute == "" {
-		config.GroupMemberMappingAttribute = "member"
-	}
-	nestedGroupsQuery := "(" + config.GroupMemberMappingAttribute + ":1.2.840.113556.1.4.1941:=" + ldapv2.EscapeFilter(userDN) + ")"
-	logrus.Debugf("AD: Query for pulling user's groups: %v", nestedGroupsQuery)
-	searchBase := config.UserSearchBase
-	if config.GroupSearchBase != "" {
-		searchBase = config.GroupSearchBase
-	}
+	if len(memberOf) != 0 {
+		for i := 0; i < len(memberOf); i += 50 {
+			batch := memberOf[i:ldap.Min(i+50, len(memberOf))]
+			filter := "(" + ObjectClassAttribute + "=" + config.GroupObjectClass + ")"
+			query := "(|"
+			for _, attrib := range batch {
+				query += "(distinguishedName=" + ldapv2.EscapeFilter(attrib) + ")"
+			}
+			query += ")"
+			query = "(&" + filter + query + ")"
+			// Pulling user's groups
+			logrus.Debugf("AD: Query for pulling user's groups: %v", query)
+			searchDomain := config.UserSearchBase
+			if config.GroupSearchBase != "" {
+				searchDomain = config.GroupSearchBase
+			}
 
-	// Call common method for getting group principals
-	groupPrincipals, err = p.getGroupPrincipalsFromSearch(searchBase, nestedGroupsQuery, config, caPool, memberOf)
-	if err != nil {
-		return userPrincipal, groupPrincipals, err
+			// Call common method for getting group principals
+			groupPrincipalListBatch, err := p.getGroupPrincipalsFromSearch(searchDomain, query, config, caPool, batch)
+			if err != nil {
+				return userPrincipal, groupPrincipals, err
+			}
+			groupPrincipals = append(groupPrincipals, groupPrincipalListBatch...)
+		}
 	}
-
 	return userPrincipal, groupPrincipals, nil
 
 }
