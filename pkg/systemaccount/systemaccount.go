@@ -23,6 +23,14 @@ func NewManager(management *config.ManagementContext) *Manager {
 	}
 }
 
+func NewManagerFromScale(management *config.ScaledContext) *Manager {
+	return &Manager{
+		userManager: management.UserManager,
+		crtbs:       management.Management.ClusterRoleTemplateBindings(""),
+		crts:        management.Management.ClusterRegistrationTokens(""),
+	}
+}
+
 type Manager struct {
 	userManager user.Manager
 	crtbs       v3.ClusterRoleTemplateBindingInterface

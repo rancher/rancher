@@ -129,7 +129,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-
+	writeCertsOnly := os.Getenv("CATTLE_WRITE_CERT_ONLY") == "true"
 	bytes, err := json.Marshal(params)
 	if err != nil {
 		return err
@@ -153,7 +153,7 @@ func run() error {
 	onConnect := func(ctx context.Context) error {
 		connected()
 		connectConfig := fmt.Sprintf("https://%s/v3/connect/config", serverURL.Host)
-		if err := rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers); err != nil {
+		if err := rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers, writeCertsOnly); err != nil {
 			return err
 		}
 
@@ -170,7 +170,7 @@ func run() error {
 			for {
 				select {
 				case <-time.After(2 * time.Minute):
-					err := rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers)
+					err := rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers, writeCertsOnly)
 					if err != nil {
 						logrus.Errorf("failed to check plan: %v", err)
 					}
