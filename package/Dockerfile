@@ -19,7 +19,7 @@ RUN curl -sLf https://github.com/rancher/machine-package/releases/download/${CAT
     chmod +x /usr/bin/helm
 
 ENV CATTLE_UI_PATH /usr/share/rancher/ui
-ENV CATTLE_UI_VERSION 2.0.60
+ENV CATTLE_UI_VERSION 2.0.61
 ENV CATTLE_CLI_VERSION v2.0.3
 
 RUN mkdir -p /usr/share/rancher/ui && \
