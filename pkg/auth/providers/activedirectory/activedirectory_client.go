@@ -17,7 +17,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) (v3.Principal, []v3.Principal, error) {
+func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool, testServiceAccountBind bool) (v3.Principal, []v3.Principal, error) {
 	logrus.Debug("Now generating Ldap token")
 
 	username := adCredential.Username
@@ -33,10 +33,14 @@ func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.Act
 	}
 	defer lConn.Close()
 
-	enabled := config.Enabled
 	serviceAccountPassword := config.ServiceAccountPassword
 	serviceAccountUserName := config.ServiceAccountUsername
-	ldap.AuthenticateServiceAccountUser(enabled, serviceAccountPassword, serviceAccountUserName, lConn)
+	if testServiceAccountBind {
+		err = ldap.AuthenticateServiceAccountUser(serviceAccountPassword, serviceAccountUserName, lConn)
+		if err != nil {
+			return v3.Principal{}, nil, err
+		}
+	}
 
 	logrus.Debug("Binding username password")
 	err = lConn.Bind(externalID, password)
