@@ -166,22 +166,20 @@ func GetGroupSearchAttributesForLDAP(config *v3.LdapConfig) []string {
 	return groupSeachAttributes
 }
 
-func AuthenticateServiceAccountUser(enabled bool, serviceAccountPassword string, serviceAccountUsername string, lConn *ldapv2.Conn) (v3.Principal, []v3.Principal, map[string]string, error) {
-	if !enabled { // TODO testing for enabled here might not be correct. Might be better to pass in an explicit testSvcAccount bool
-		logrus.Debug("Bind service account username password")
-		if serviceAccountPassword == "" {
-			return v3.Principal{}, nil, nil, httperror.NewAPIError(httperror.MissingRequired, "service account password not provided")
-		}
-		sausername := GetUserExternalID(serviceAccountUsername, "")
-		err := lConn.Bind(sausername, serviceAccountPassword)
-		if err != nil {
-			if ldapv2.IsErrorWithCode(err, ldapv2.LDAPResultInvalidCredentials) {
-				return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
-			}
-			return v3.Principal{}, nil, nil, httperror.WrapAPIError(err, httperror.ServerError, "server error while authenticating")
-		}
+func AuthenticateServiceAccountUser(serviceAccountPassword string, serviceAccountUsername string, lConn *ldapv2.Conn) error {
+	logrus.Debug("Bind service account username password")
+	if serviceAccountPassword == "" {
+		return httperror.NewAPIError(httperror.MissingRequired, "service account password not provided")
 	}
-	return v3.Principal{}, nil, nil, nil
+	sausername := GetUserExternalID(serviceAccountUsername, "")
+	err := lConn.Bind(sausername, serviceAccountPassword)
+	if err != nil {
+		if ldapv2.IsErrorWithCode(err, ldapv2.LDAPResultInvalidCredentials) {
+			return httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
+		}
+		return httperror.WrapAPIError(err, httperror.ServerError, "server error while authenticating")
+	}
+	return nil
 }
 
 func Min(a int, b int) int {

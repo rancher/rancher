@@ -83,7 +83,7 @@ func (p *ldapProvider) AuthenticateUser(input interface{}) (v3.Principal, []v3.P
 		return v3.Principal{}, nil, "", errors.New("can't find authprovider")
 	}
 
-	principal, groupPrincipal, err := p.loginUser(login, config, caPool)
+	principal, groupPrincipal, err := p.loginUser(login, config, caPool, false)
 	if err != nil {
 		return v3.Principal{}, nil, "", err
 	}
