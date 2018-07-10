@@ -19,7 +19,7 @@ import (
 
 var operationalAttrList = []string{"1.1", "+", "*"}
 
-func (p *ldapProvider) loginUser(credential *v3public.BasicLogin, config *v3.LdapConfig, caPool *x509.CertPool) (v3.Principal, []v3.Principal, error) {
+func (p *ldapProvider) loginUser(credential *v3public.BasicLogin, config *v3.LdapConfig, caPool *x509.CertPool, testing bool) (v3.Principal, []v3.Principal, error) {
 	logrus.Debug("Now generating Ldap token")
 
 	username := credential.Username
@@ -35,10 +35,13 @@ func (p *ldapProvider) loginUser(credential *v3public.BasicLogin, config *v3.Lda
 	}
 	defer lConn.Close()
 
-	enabled := config.Enabled
 	serviceAccountPassword := config.ServiceAccountPassword
 	serviceAccountUserName := config.ServiceAccountDistinguishedName
-	ldap.AuthenticateServiceAccountUser(enabled, serviceAccountPassword, serviceAccountUserName, lConn)
+	if testing {
+		if err := ldap.AuthenticateServiceAccountUser(serviceAccountPassword, serviceAccountUserName, lConn); err != nil {
+			return v3.Principal{}, nil, err
+		}
+	}
 
 	logrus.Debug("Binding username password")
 

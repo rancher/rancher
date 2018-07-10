@@ -73,7 +73,7 @@ func (p *ldapProvider) testAndApply(actionName string, action *types.Action, req
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "multiple servers not yet supported")
 	}
 
-	userPrincipal, groupPrincipals, err := p.loginUser(login, config, caPool)
+	userPrincipal, groupPrincipals, err := p.loginUser(login, config, caPool, true)
 	if err != nil {
 		return err
 	}
