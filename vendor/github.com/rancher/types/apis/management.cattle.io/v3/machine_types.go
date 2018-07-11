@@ -104,6 +104,7 @@ var (
 	NodeConditionRemoved     condition.Cond = "Removed"
 	NodeConditionConfigSaved condition.Cond = "Saved"
 	NodeConditionReady       condition.Cond = "Ready"
+	NodeConditionDrained     condition.Cond = "Drained"
 )
 
 type NodeCondition struct {
@@ -188,6 +189,7 @@ type NodeSpec struct {
 	DesiredNodeLabels        map[string]string `json:"desiredNodeLabels,omitempty"`
 	DesiredNodeAnnotations   map[string]string `json:"desiredNodeAnnotations,omitempty"`
 	DesiredNodeUnschedulable string            `json:"desiredNodeUnschedulable,omitempty"`
+	NodeDrainInput           *NodeDrainInput   `json:"nodeDrainInput,omitempty"`
 }
 
 type NodeCommonParams struct {
@@ -271,4 +273,22 @@ type PublicEndpoint struct {
 	Path     string `json:"path,omitempty" norman:"nocreate,noupdate"`
 	// True when endpoint is exposed on every node
 	AllNodes bool `json:"allNodes" norman:"nocreate,noupdate"`
+}
+
+type NodeDrainInput struct {
+	// Drain node even if there are pods not managed by a ReplicationController, Job, or DaemonSet
+	// Drain will not proceed without Force set to true if there are such pods
+	Force bool `json:"force,omitempty"`
+	// If there are DaemonSet-managed pods, drain will not proceed without IgnoreDaemonSets set to true
+	// (even when set to true, kubectl won't delete pods - so setting default to true)
+	IgnoreDaemonSets bool `json:"ignoreDaemonSets,omitempty" norman:"default=true"`
+	// Continue even if there are pods using emptyDir
+	DeleteLocalData bool `json:"deleteLocalData,omitempty"`
+	//Period of time in seconds given to each pod to terminate gracefully.
+	// If negative, the default value specified in the pod will be used
+	GracePeriod int `json:"gracePeriod,omitempty" norman:"default=-1"`
+	// Time to wait (in seconds) before giving up for one try
+	Timeout int `json:"timeout" norman:"min=1,max=10800,default=60"`
+	// Number of retries
+	Retries int `json:"retries" norman:"min=1,max=20,default=3"`
 }
