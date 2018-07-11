@@ -73,7 +73,7 @@ func (d *NodeDrain) drainNode(key string, obj *v3.Node) error {
 	}
 	nodeName := obj.Spec.RequestedHostname
 	updateDrainCondition(obj, "unknown", "")
-	_, err, msg := kubectl.Drain(kubeConfig, nodeName, getFlags(obj.Spec.NodeDrainInput))
+	_, msg, err := kubectl.Drain(kubeConfig, nodeName, getFlags(obj.Spec.NodeDrainInput))
 	errMsg := ""
 	if err != nil {
 		errMsg = filterErrorMsg(msg, nodeName)

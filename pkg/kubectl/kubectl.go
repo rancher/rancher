@@ -46,15 +46,15 @@ func Apply(yaml []byte, kubeConfig *clientcmdapi.Config) ([]byte, error) {
 	return runWithHTTP2(cmd)
 }
 
-func Drain(kubeConfig *clientcmdapi.Config, nodeName string, args []string) ([]byte, error, string) {
+func Drain(kubeConfig *clientcmdapi.Config, nodeName string, args []string) ([]byte, string, error) {
 	kubeConfigFile, err := tempFile("kubeconfig-")
 	if err != nil {
-		return nil, err, ""
+		return nil, "", err
 	}
 	defer os.Remove(kubeConfigFile.Name())
 
 	if err := clientcmd.WriteToFile(*kubeConfig, kubeConfigFile.Name()); err != nil {
-		return nil, err, ""
+		return nil, "", err
 	}
 
 	cmd := exec.Command("kubectl",
@@ -73,7 +73,7 @@ func Drain(kubeConfig *clientcmdapi.Config, nodeName string, args []string) ([]b
 	}
 	cmd.Env = newEnv
 	output, err := cmd.CombinedOutput()
-	return output, err, fmt.Sprint(cmd.Stderr)
+	return output, fmt.Sprint(cmd.Stderr), err
 }
 
 func tempFile(prefix string) (*os.File, error) {

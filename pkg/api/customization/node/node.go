@@ -80,12 +80,13 @@ func cordonUncordonDrainNode(actionName string, apiContext *types.APIContext, co
 		return err
 	}
 	if actionName == "drain" {
-		if drainInput, err := validate(apiContext); err != nil {
+		drainInput, err := validate(apiContext)
+		if err != nil {
 			return err
-		} else {
-			values.PutValue(node, actionName, "desiredNodeUnschedulable")
-			values.PutValue(node, drainInput, "nodeDrainInput")
 		}
+		values.PutValue(node, actionName, "desiredNodeUnschedulable")
+		values.PutValue(node, drainInput, "nodeDrainInput")
+
 	} else {
 		unschedulable := convert.ToBool(values.GetValueN(node, "unschedulable"))
 		if cordon == unschedulable {
