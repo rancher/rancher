@@ -11,7 +11,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/api/access"
+	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
@@ -52,6 +54,7 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 		resource.AddAction(apiContext, "uncordon")
 	} else {
 		resource.AddAction(apiContext, "cordon")
+		resource.AddAction(apiContext, "drain")
 	}
 }
 
@@ -61,20 +64,19 @@ func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 	switch actionName {
 	case "cordon":
 		return cordonUncordonNode(actionName, apiContext, true)
-
 	case "uncordon":
 		return cordonUncordonNode(actionName, apiContext, false)
+	case "drain":
+		return drainNode(actionName, apiContext)
 	}
-
 	return nil
 }
 
 func cordonUncordonNode(actionName string, apiContext *types.APIContext, cordon bool) error {
-	var node map[string]interface{}
-	if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, &node); err != nil {
-		return httperror.NewAPIError(httperror.InvalidReference, "Error accessing node")
+	node, schema, err := getNodeAndSchema(apiContext)
+	if err != nil {
+		return err
 	}
-	schema := apiContext.Schemas.Schema(&managementschema.Version, client.NodeType)
 	unschedulable := convert.ToBool(values.GetValueN(node, "unschedulable"))
 	if cordon == unschedulable {
 		return httperror.NewAPIError(httperror.InvalidAction, fmt.Sprintf("Node %s already %sed", apiContext.ID, actionName))
@@ -84,6 +86,47 @@ func cordonUncordonNode(actionName string, apiContext *types.APIContext, cordon 
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error updating node %s by %s : %s", apiContext.ID, actionName, err.Error()))
 	}
 	return nil
+}
+
+func drainNode(actionName string, apiContext *types.APIContext) error {
+	node, schema, err := getNodeAndSchema(apiContext)
+	if err != nil {
+		return err
+	}
+	drainInput, err := validate(apiContext)
+	if err != nil {
+		return err
+	}
+	values.PutValue(node, actionName, "desiredNodeUnschedulable")
+	values.PutValue(node, drainInput, "nodeDrainInput")
+	if _, err := schema.Store.Update(apiContext, schema, node, apiContext.ID); err != nil && apierrors.IsNotFound(err) {
+		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error updating node %s by %s : %s", apiContext.ID, actionName, err.Error()))
+	}
+	return nil
+}
+
+func validate(apiContext *types.APIContext) (*v3.NodeDrainInput, error) {
+	input, err := handler.ParseAndValidateActionBody(apiContext, apiContext.Schemas.Schema(&managementschema.Version,
+		client.NodeDrainInputType))
+	if err != nil {
+		return nil, httperror.NewAPIError(httperror.InvalidBodyContent,
+			fmt.Sprintf("Failed to parse action body: %v", err))
+	}
+	drainInput := &v3.NodeDrainInput{}
+	if err := mapstructure.Decode(input, drainInput); err != nil {
+		return nil, httperror.NewAPIError(httperror.InvalidBodyContent,
+			fmt.Sprintf("Failed to parse body: %v", err))
+	}
+	return drainInput, nil
+}
+
+func getNodeAndSchema(apiContext *types.APIContext) (map[string]interface{}, *types.Schema, error) {
+	var node map[string]interface{}
+	if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, &node); err != nil {
+		return nil, nil, httperror.NewAPIError(httperror.InvalidReference, "Error accessing node")
+	}
+	schema := apiContext.Schemas.Schema(&managementschema.Version, client.NodeType)
+	return node, schema, nil
 }
 
 type Handler struct {
