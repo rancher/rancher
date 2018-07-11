@@ -166,7 +166,7 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 
 		key := roleBinding.RoleRef.Name
 
-		if desiredBindings[key] == nil && okToDelete(obj, roleBinding, cluster, originalDesiredBindingsLen) {
+		if desiredBindings[key] == nil && okToDelete(obj, roleBinding, namespace, cluster, originalDesiredBindingsLen) {
 			err = m.roleBindings.DeleteNamespaced(roleBinding.Namespace, roleBinding.Name, &metav1.DeleteOptions{})
 			if err != nil {
 				return fmt.Errorf("error deleting role binding: %v", err)
@@ -271,7 +271,7 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 	return nil
 }
 
-func okToDelete(svcAct *v1.ServiceAccount, rb *rbac.RoleBinding, cluster *v3.Cluster,
+func okToDelete(svcAct *v1.ServiceAccount, rb *rbac.RoleBinding, namespace *v1.Namespace, cluster *v3.Cluster,
 	originalDesiredBindingsLen int) bool {
 	// This is not a role binding this logic should manage so exit immediately
 	if rb.Annotations[psptpbRoleBindingAnnotation] == "" {
@@ -279,7 +279,7 @@ func okToDelete(svcAct *v1.ServiceAccount, rb *rbac.RoleBinding, cluster *v3.Clu
 	}
 
 	// Namespace isn't in a project so it should have no role bindings
-	if rb.Annotations[projectIDAnnotation] == "" {
+	if namespace.Annotations[projectIDAnnotation] == "" {
 		return true
 	}
 
