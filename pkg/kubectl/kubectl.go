@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"strings"
 
+	"fmt"
+
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -42,6 +44,36 @@ func Apply(yaml []byte, kubeConfig *clientcmdapi.Config) ([]byte, error) {
 		"-f",
 		yamlFile.Name())
 	return runWithHTTP2(cmd)
+}
+
+func Drain(kubeConfig *clientcmdapi.Config, nodeName string, args []string) ([]byte, error, string) {
+	kubeConfigFile, err := tempFile("kubeconfig-")
+	if err != nil {
+		return nil, err, ""
+	}
+	defer os.Remove(kubeConfigFile.Name())
+
+	if err := clientcmd.WriteToFile(*kubeConfig, kubeConfigFile.Name()); err != nil {
+		return nil, err, ""
+	}
+
+	cmd := exec.Command("kubectl",
+		"--kubeconfig",
+		kubeConfigFile.Name(),
+		"drain",
+		nodeName)
+	cmd.Args = append(cmd.Args, args...)
+
+	var newEnv []string
+	for _, env := range os.Environ() {
+		if strings.HasPrefix(env, "DISABLE_HTTP2") {
+			continue
+		}
+		newEnv = append(newEnv, env)
+	}
+	cmd.Env = newEnv
+	output, err := cmd.CombinedOutput()
+	return output, err, fmt.Sprint(cmd.Stderr)
 }
 
 func tempFile(prefix string) (*os.File, error) {
