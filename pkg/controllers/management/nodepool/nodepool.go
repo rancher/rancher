@@ -7,7 +7,10 @@ import (
 	"strconv"
 	"time"
 
+	"reflect"
+
 	"github.com/rancher/rancher/pkg/ref"
+	"github.com/rancher/rke/services"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -182,7 +185,7 @@ func (c *Controller) nodes(nodePool *v3.NodePool, simulate bool) ([]*v3.Node, er
 func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, simulate bool) (bool, error) {
 	var (
 		err     error
-		byName  = map[string]bool{}
+		byName  = map[string]*v3.Node{}
 		changed = false
 		nodes   []*v3.Node
 	)
@@ -193,7 +196,7 @@ func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, simulate bool) (b
 	}
 
 	for _, node := range allNodes {
-		byName[node.Spec.RequestedHostname] = true
+		byName[node.Spec.RequestedHostname] = node
 
 		_, nodePoolName := ref.Parse(node.Spec.NodePoolName)
 		if nodePoolName != nodePool.Name {
@@ -224,7 +227,7 @@ func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, simulate bool) (b
 			name = fmt.Sprintf("%s%0"+strconv.Itoa(minLength)+"d", prefix, i)
 		}
 
-		if byName[name] {
+		if byName[name] != nil {
 			continue
 		}
 
@@ -234,7 +237,7 @@ func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, simulate bool) (b
 			return false, err
 		}
 
-		byName[newNode.Spec.RequestedHostname] = true
+		byName[newNode.Spec.RequestedHostname] = newNode
 		nodes = append(nodes, newNode)
 	}
 
@@ -254,5 +257,64 @@ func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, simulate bool) (b
 		delete(byName, toDelete.Spec.RequestedHostname)
 	}
 
+	for _, n := range nodes {
+		if needRoleUpdate(n, nodePool) {
+			changed = true
+			_, err := c.updateNodeRoles(n, nodePool, simulate)
+			if err != nil {
+				return false, err
+			}
+		}
+	}
+
 	return changed, nil
+}
+
+func needRoleUpdate(node *v3.Node, nodePool *v3.NodePool) bool {
+	if node.Status.NodeConfig == nil {
+		return false
+	}
+	if len(node.Status.NodeConfig.Role) == 0 && !nodePool.Spec.Worker {
+		return true
+	}
+
+	nodeRolesMap := map[string]bool{}
+	for _, role := range node.Status.NodeConfig.Role {
+		switch r := role; r {
+		case services.ETCDRole:
+			nodeRolesMap[services.ETCDRole] = true
+		case services.ControlRole:
+			nodeRolesMap[services.ControlRole] = true
+		case services.WorkerRole:
+			nodeRolesMap[services.WorkerRole] = true
+		}
+	}
+
+	poolRolesMap := map[string]bool{}
+	nodeRolesMap[services.ETCDRole] = nodePool.Spec.Etcd
+	nodeRolesMap[services.ControlRole] = nodePool.Spec.ControlPlane
+	nodeRolesMap[services.WorkerRole] = nodePool.Spec.Worker
+	return !reflect.DeepEqual(nodeRolesMap, poolRolesMap)
+}
+
+func (c *Controller) updateNodeRoles(existing *v3.Node, nodePool *v3.NodePool, simulate bool) (*v3.Node, error) {
+	toUpdate := existing.DeepCopy()
+	var newRoles []string
+
+	if nodePool.Spec.ControlPlane {
+		newRoles = append(newRoles, "controlplane")
+	}
+	if nodePool.Spec.Etcd {
+		newRoles = append(newRoles, "etcd")
+	}
+	if nodePool.Spec.Worker {
+		newRoles = append(newRoles, "worker")
+	}
+
+	toUpdate.Status.NodeConfig.Role = newRoles
+	if simulate {
+		return toUpdate, nil
+	}
+
+	return c.Nodes.Update(toUpdate)
 }

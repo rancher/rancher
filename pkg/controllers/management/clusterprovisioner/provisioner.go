@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/rkedialerfactory"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rke/services"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -472,10 +473,10 @@ func (p *Provisioner) reconcileRKENodes(clusterName string) ([]v3.RKEConfigNode,
 			continue
 		}
 
-		if slice.ContainsString(machine.Status.NodeConfig.Role, "etcd") {
+		if slice.ContainsString(machine.Status.NodeConfig.Role, services.ETCDRole) {
 			etcd = true
 		}
-		if slice.ContainsString(machine.Status.NodeConfig.Role, "controlplane") {
+		if slice.ContainsString(machine.Status.NodeConfig.Role, services.ControlRole) {
 			controlplane = true
 		}
 
