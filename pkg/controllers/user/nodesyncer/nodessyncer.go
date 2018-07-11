@@ -370,10 +370,14 @@ func objectsAreEqual(existing *v3.Node, toUpdate *v3.Node) bool {
 	nodeNameEqual := toUpdateToCompare.Status.NodeName == existingToCompare.Status.NodeName
 	requestsEqual := isEqual(toUpdateToCompare.Status.Requested, existingToCompare.Status.Requested)
 	limitsEqual := isEqual(toUpdateToCompare.Status.Limits, existingToCompare.Status.Limits)
+	rolesEqual := toUpdateToCompare.Spec.Worker == existingToCompare.Spec.Worker && toUpdateToCompare.Spec.Etcd == existingToCompare.Spec.Etcd &&
+		toUpdateToCompare.Spec.ControlPlane == existingToCompare.Spec.ControlPlane
 
-	retVal := statusEqual && specEqual && nodeNameEqual && labelsEqual && annotationsEqual && requestsEqual && limitsEqual
+	retVal := statusEqual && specEqual && nodeNameEqual && labelsEqual && annotationsEqual && requestsEqual && limitsEqual && rolesEqual
 	if !retVal {
-		logrus.Debugf("ObjectsAreEqualResults for %s: statusEqual: %t specEqual: %t nodeNameEqual: %t labelsEqual: %t annotationsEqual: %t requestsEqual: %t limitsEqual: %t", toUpdate.Name, statusEqual, specEqual, nodeNameEqual, labelsEqual, annotationsEqual, requestsEqual, limitsEqual)
+		logrus.Debugf("ObjectsAreEqualResults for %s: statusEqual: %t specEqual: %t"+
+			" nodeNameEqual: %t labelsEqual: %t annotationsEqual: %t requestsEqual: %t limitsEqual: %t rolesEqual: %t",
+			toUpdate.Name, statusEqual, specEqual, nodeNameEqual, labelsEqual, annotationsEqual, requestsEqual, limitsEqual, rolesEqual)
 	}
 	return retVal
 }
@@ -413,21 +417,17 @@ func (m *NodesSyncer) convertNodeToNode(node *corev1.Node, existing *v3.Node, po
 	for name, quantity := range limits {
 		machine.Status.Limits[name] = quantity
 	}
+
 	if node.Labels != nil {
-		if _, ok := node.Labels["node-role.kubernetes.io/etcd"]; ok {
-			machine.Spec.Etcd = true
-		}
-		if _, ok := node.Labels["node-role.kubernetes.io/controlplane"]; ok {
+		_, etcd := node.Labels["node-role.kubernetes.io/etcd"]
+		machine.Spec.Etcd = etcd
+		_, control := node.Labels["node-role.kubernetes.io/controlplane"]
+		_, master := node.Labels["node-role.kubernetes.io/master"]
+		if control || master {
 			machine.Spec.ControlPlane = true
 		}
-
-		if _, ok := node.Labels["node-role.kubernetes.io/master"]; ok {
-			machine.Spec.ControlPlane = true
-		}
-
-		if _, ok := node.Labels["node-role.kubernetes.io/worker"]; ok {
-			machine.Spec.Worker = true
-		}
+		_, worker := node.Labels["node-role.kubernetes.io/worker"]
+		machine.Spec.Worker = worker
 	}
 
 	machine.Status.NodeAnnotations = node.Annotations
