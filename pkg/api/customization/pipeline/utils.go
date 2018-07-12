@@ -2,13 +2,14 @@ package pipeline
 
 import (
 	"fmt"
+
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/mapper"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/remote"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/satori/uuid"
+	"github.com/satori/go.uuid"
 	"gopkg.in/yaml.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"

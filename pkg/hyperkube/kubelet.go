@@ -40,7 +40,7 @@ func NewKubelet() (*Server, error) {
 		Docker containers.`,
 		Run: func(_ *Server, _ []string, stopCh <-chan struct{}) error {
 			if s.ExperimentalDockershim {
-				return app.RunDockershim(&s.KubeletConfiguration, &s.ContainerRuntimeOptions)
+				return app.RunDockershim(&s.KubeletFlags, &s.KubeletConfiguration)
 			}
 			return app.Run(s, nil)
 		},

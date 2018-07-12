@@ -17,24 +17,31 @@ limitations under the License.
 package hyperkube
 
 import (
-	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
-	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
+	"flag"
+
+	"k8s.io/kubernetes/cmd/kube-scheduler/app"
 )
 
 // NewScheduler creates a new hyperkube Server object that includes the
 // description and flags.
 func NewScheduler() *Server {
-	s := options.NewSchedulerServer()
+	command := app.NewSchedulerCommand()
 
 	hks := Server{
 		name:            "scheduler",
 		AlternativeName: "kube-scheduler",
 		SimpleUsage:     "scheduler",
-		Long:            "Implements a Kubernetes scheduler.  This will assign pods to kubelets based on capacity and constraints.",
-		Run: func(_ *Server, _ []string, stopCh <-chan struct{}) error {
-			return app.Run(s)
-		},
+		Long:            command.Long,
 	}
-	s.AddFlags(hks.Flags())
+	serverFlags := hks.Flags()
+	serverFlags.AddFlagSet(command.Flags())
+
+	command.Flags().AddGoFlagSet(flag.CommandLine)
+
+	hks.Run = func(_ *Server, args []string, stopCh <-chan struct{}) error {
+		command.SetArgs(args)
+		return command.Execute()
+	}
+
 	return &hks
 }
