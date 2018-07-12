@@ -193,8 +193,7 @@ func (m *Manager) toRESTConfig(cluster *v3.Cluster) (*rest.Config, error) {
 	}
 
 	rc := &rest.Config{
-		Host:        u.Host,
-		Prefix:      u.Path,
+		Host:        u.String(),
 		BearerToken: cluster.Status.ServiceAccountToken,
 		TLSClientConfig: rest.TLSClientConfig{
 			CAData: caBytes,

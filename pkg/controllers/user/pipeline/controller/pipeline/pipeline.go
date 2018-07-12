@@ -2,14 +2,15 @@ package pipeline
 
 import (
 	"context"
+	"time"
+
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/remote"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
-	"github.com/satori/uuid"
+	"github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
-	"time"
 )
 
 //Lifecycle is responsible for watching pipelines and handling webhook management
