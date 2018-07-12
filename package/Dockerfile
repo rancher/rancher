@@ -12,11 +12,13 @@ WORKDIR /var/lib/rancher
 ENV CATTLE_HELM_VERSION v2.8.0-rancher3
 ENV CATTLE_MACHINE_VERSION v0.14.0-rancher4-1
 ENV LOGLEVEL_VERSION v0.1
+ENV TINI_VERSION v0.18.0
 
 RUN curl -sLf https://github.com/rancher/machine-package/releases/download/${CATTLE_MACHINE_VERSION}/docker-machine.tar.gz | tar xvzf - -C /usr/bin && \
     curl -sLf https://github.com/rancher/loglevel/releases/download/${LOGLEVEL_VERSION}/loglevel-amd64-${LOGLEVEL_VERSION}.tar.gz | tar xvzf - -C /usr/bin && \
+    curl -sLf https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini > /usr/bin/tini && \
     curl -sLf https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/helm > /usr/bin/helm && \
-    chmod +x /usr/bin/helm
+    chmod +x /usr/bin/helm /usr/bin/tini
 
 ENV CATTLE_UI_PATH /usr/share/rancher/ui
 ENV CATTLE_UI_VERSION 2.0.61
@@ -38,4 +40,4 @@ COPY rancher /usr/bin/
 ENV CATTLE_AGENT_IMAGE rancher/rancher-agent:${VERSION}
 ENV CATTLE_SERVER_IMAGE rancher/rancher
 VOLUME /var/lib/rancher
-ENTRYPOINT ["rancher", "--http-listen-port=80", "--https-listen-port=443"]
+ENTRYPOINT ["tini", "--", "rancher", "--http-listen-port=80", "--https-listen-port=443"]
