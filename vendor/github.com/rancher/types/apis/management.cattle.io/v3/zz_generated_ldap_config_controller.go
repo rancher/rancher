@@ -95,7 +95,7 @@ func (l *ldapConfigLister) Get(namespace, name string) (*LdapConfig, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    LdapConfigGroupVersionKind.Group,
 			Resource: "ldapConfig",
-		}, name)
+		}, key)
 	}
 	return obj.(*LdapConfig), nil
 }

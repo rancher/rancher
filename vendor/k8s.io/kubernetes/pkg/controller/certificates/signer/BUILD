@@ -14,7 +14,7 @@ go_test(
         "testdata/ca.key",
         "testdata/kubelet.csr",
     ],
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//vendor/k8s.io/api/certificates/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/util/cert:go_default_library",
@@ -24,6 +24,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["cfssl_signer.go"],
+    importpath = "k8s.io/kubernetes/pkg/controller/certificates/signer",
     deps = [
         "//pkg/controller/certificates:go_default_library",
         "//vendor/github.com/cloudflare/cfssl/config:go_default_library",

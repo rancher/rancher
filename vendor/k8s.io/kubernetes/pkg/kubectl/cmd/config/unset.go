@@ -35,29 +35,40 @@ type unsetOptions struct {
 	propertyName string
 }
 
-var unset_long = templates.LongDesc(`
+var (
+	unsetLong = templates.LongDesc(`
 	Unsets an individual value in a kubeconfig file
 
 	PROPERTY_NAME is a dot delimited name where each token represents either an attribute name or a map key.  Map keys may not contain dots.`)
+
+	unsetExample = templates.Examples(`
+		# Unset the current-context.
+		kubectl config unset current-context
+
+		# Unset namespace in foo context.
+		kubectl config unset contexts.foo.namespace`)
+)
 
 func NewCmdConfigUnset(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &unsetOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use:   "unset PROPERTY_NAME",
-		Short: i18n.T("Unsets an individual value in a kubeconfig file"),
-		Long:  unset_long,
+		Use: "unset PROPERTY_NAME",
+		DisableFlagsInUseLine: true,
+		Short:   i18n.T("Unsets an individual value in a kubeconfig file"),
+		Long:    unsetLong,
+		Example: unsetExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.complete(cmd))
-			cmdutil.CheckErr(options.run())
-			fmt.Fprintf(out, "Property %q unset.\n", options.propertyName)
+			cmdutil.CheckErr(options.complete(cmd, args))
+			cmdutil.CheckErr(options.run(out))
+
 		},
 	}
 
 	return cmd
 }
 
-func (o unsetOptions) run() error {
+func (o unsetOptions) run(out io.Writer) error {
 	err := o.validate()
 	if err != nil {
 		return err
@@ -80,18 +91,18 @@ func (o unsetOptions) run() error {
 	if err := clientcmd.ModifyConfig(o.configAccess, *config, false); err != nil {
 		return err
 	}
-
+	if _, err := fmt.Fprintf(out, "Property %q unset.\n", o.propertyName); err != nil {
+		return err
+	}
 	return nil
 }
 
-func (o *unsetOptions) complete(cmd *cobra.Command) error {
-	endingArgs := cmd.Flags().Args()
-	if len(endingArgs) != 1 {
-		cmd.Help()
-		return fmt.Errorf("Unexpected args: %v", endingArgs)
+func (o *unsetOptions) complete(cmd *cobra.Command, args []string) error {
+	if len(args) != 1 {
+		return helpErrorf(cmd, "Unexpected args: %v", args)
 	}
 
-	o.propertyName = endingArgs[0]
+	o.propertyName = args[0]
 	return nil
 }
 

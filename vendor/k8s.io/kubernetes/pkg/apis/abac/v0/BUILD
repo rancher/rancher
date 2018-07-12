@@ -15,6 +15,7 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/apis/abac/v0",
     deps = [
         "//pkg/apis/abac:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

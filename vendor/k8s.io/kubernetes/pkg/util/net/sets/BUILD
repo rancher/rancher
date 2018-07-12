@@ -12,12 +12,13 @@ go_library(
         "doc.go",
         "ipnet.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/util/net/sets",
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["ipnet_test.go"],
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 filegroup(

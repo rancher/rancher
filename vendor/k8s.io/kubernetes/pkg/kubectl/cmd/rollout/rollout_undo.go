@@ -68,7 +68,8 @@ func NewCmdRolloutUndo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	argAliases := kubectl.ResourceAliases(validArgs)
 
 	cmd := &cobra.Command{
-		Use:     "undo (TYPE NAME | TYPE/NAME) [flags]",
+		Use: "undo (TYPE NAME | TYPE/NAME) [flags]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Undo a previous rollout"),
 		Long:    undo_long,
 		Example: undo_example,
@@ -103,14 +104,15 @@ func (o *UndoOptions) CompleteUndo(f cmdutil.Factory, cmd *cobra.Command, out io
 	o.ToRevision = cmdutil.GetFlagInt64(cmd, "to-revision")
 	o.Mapper, o.Typer = f.Object()
 	o.Out = out
-	o.DryRun = cmdutil.GetFlagBool(cmd, "dry-run")
+	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
 
-	r := f.NewBuilder(true).
+	r := f.NewBuilder().
+		Internal().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, args...).
@@ -146,7 +148,7 @@ func (o *UndoOptions) RunUndo() error {
 			allErrs = append(allErrs, cmdutil.AddSourceToErr("undoing", info.Source, err))
 			continue
 		}
-		cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, result)
+		cmdutil.PrintSuccess(false, o.Out, info.Object, false, result)
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

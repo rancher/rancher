@@ -95,7 +95,7 @@ func (l *authProviderLister) Get(namespace, name string) (*AuthProvider, error) 
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    AuthProviderGroupVersionKind.Group,
 			Resource: "authProvider",
-		}, name)
+		}, key)
 	}
 	return obj.(*AuthProvider), nil
 }

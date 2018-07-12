@@ -97,7 +97,7 @@ func (l *deploymentLister) Get(namespace, name string) (*v1beta2.Deployment, err
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    DeploymentGroupVersionKind.Group,
 			Resource: "deployment",
-		}, name)
+		}, key)
 	}
 	return obj.(*v1beta2.Deployment), nil
 }

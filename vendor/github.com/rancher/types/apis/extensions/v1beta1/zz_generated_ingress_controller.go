@@ -97,7 +97,7 @@ func (l *ingressLister) Get(namespace, name string) (*v1beta1.Ingress, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    IngressGroupVersionKind.Group,
 			Resource: "ingress",
-		}, name)
+		}, key)
 	}
 	return obj.(*v1beta1.Ingress), nil
 }

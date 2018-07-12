@@ -11,7 +11,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 )
 
@@ -73,5 +73,5 @@ func createRecorder(name string, kubeClient kubernetes.Interface) record.EventRe
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(logrus.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
-	return eventBroadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: name})
+	return eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: name})
 }

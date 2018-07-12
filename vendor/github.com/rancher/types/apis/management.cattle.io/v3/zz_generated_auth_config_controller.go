@@ -95,7 +95,7 @@ func (l *authConfigLister) Get(namespace, name string) (*AuthConfig, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    AuthConfigGroupVersionKind.Group,
 			Resource: "authConfig",
-		}, name)
+		}, key)
 	}
 	return obj.(*AuthConfig), nil
 }

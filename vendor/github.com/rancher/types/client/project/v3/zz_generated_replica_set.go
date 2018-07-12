@@ -12,6 +12,7 @@ const (
 	ReplicaSetFieldContainers                    = "containers"
 	ReplicaSetFieldCreated                       = "created"
 	ReplicaSetFieldCreatorID                     = "creatorId"
+	ReplicaSetFieldDNSConfig                     = "dnsConfig"
 	ReplicaSetFieldDNSPolicy                     = "dnsPolicy"
 	ReplicaSetFieldFsgid                         = "fsgid"
 	ReplicaSetFieldGids                          = "gids"
@@ -34,12 +35,14 @@ const (
 	ReplicaSetFieldReplicaSetConfig              = "replicaSetConfig"
 	ReplicaSetFieldReplicaSetStatus              = "replicaSetStatus"
 	ReplicaSetFieldRestartPolicy                 = "restartPolicy"
+	ReplicaSetFieldRunAsGroup                    = "runAsGroup"
 	ReplicaSetFieldRunAsNonRoot                  = "runAsNonRoot"
 	ReplicaSetFieldScale                         = "scale"
 	ReplicaSetFieldSchedulerName                 = "schedulerName"
 	ReplicaSetFieldScheduling                    = "scheduling"
 	ReplicaSetFieldSelector                      = "selector"
 	ReplicaSetFieldServiceAccountName            = "serviceAccountName"
+	ReplicaSetFieldShareProcessNamespace         = "shareProcessNamespace"
 	ReplicaSetFieldState                         = "state"
 	ReplicaSetFieldSubdomain                     = "subdomain"
 	ReplicaSetFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
@@ -60,6 +63,7 @@ type ReplicaSet struct {
 	Containers                    []Container            `json:"containers,omitempty" yaml:"containers,omitempty"`
 	Created                       string                 `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                     string                 `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DNSConfig                     *PodDNSConfig          `json:"dnsConfig,omitempty" yaml:"dnsConfig,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty" yaml:"gids,omitempty"`
@@ -82,12 +86,14 @@ type ReplicaSet struct {
 	ReplicaSetConfig              *ReplicaSetConfig      `json:"replicaSetConfig,omitempty" yaml:"replicaSetConfig,omitempty"`
 	ReplicaSetStatus              *ReplicaSetStatus      `json:"replicaSetStatus,omitempty" yaml:"replicaSetStatus,omitempty"`
 	RestartPolicy                 string                 `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
+	RunAsGroup                    *int64                 `json:"runAsGroup,omitempty" yaml:"runAsGroup,omitempty"`
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
 	Scale                         *int64                 `json:"scale,omitempty" yaml:"scale,omitempty"`
 	SchedulerName                 string                 `json:"schedulerName,omitempty" yaml:"schedulerName,omitempty"`
 	Scheduling                    *Scheduling            `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	Selector                      *LabelSelector         `json:"selector,omitempty" yaml:"selector,omitempty"`
 	ServiceAccountName            string                 `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`
+	ShareProcessNamespace         *bool                  `json:"shareProcessNamespace,omitempty" yaml:"shareProcessNamespace,omitempty"`
 	State                         string                 `json:"state,omitempty" yaml:"state,omitempty"`
 	Subdomain                     string                 `json:"subdomain,omitempty" yaml:"subdomain,omitempty"`
 	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`

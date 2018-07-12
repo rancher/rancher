@@ -10,12 +10,12 @@ go_library(
         "summary.go",
         "volume_stat_calculator.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/server/stats",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
-        "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/volume:go_default_library",
         "//vendor/github.com/emicklei/go-restful:go_default_library",
@@ -34,7 +34,7 @@ go_test(
         "summary_test.go",
         "volume_stat_calculator_test.go",
     ],
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/cm:go_default_library",

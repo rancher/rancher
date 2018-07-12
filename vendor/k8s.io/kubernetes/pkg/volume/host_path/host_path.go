@@ -25,8 +25,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 	"k8s.io/kubernetes/pkg/volume/validation"
 )
 
@@ -113,8 +115,9 @@ func (plugin *hostPathPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts vo
 		pathType = hostPathVolumeSource.Type
 	}
 	return &hostPathMounter{
-		hostPath: &hostPath{path: path, pathType: pathType, containerized: opts.Containerized},
+		hostPath: &hostPath{path: path, pathType: pathType},
 		readOnly: readOnly,
+		mounter:  plugin.host.GetMounter(plugin.GetPluginName()),
 	}, nil
 }
 
@@ -127,13 +130,13 @@ func (plugin *hostPathPlugin) NewUnmounter(volName string, podUID types.UID) (vo
 // Recycle recycles/scrubs clean a HostPath volume.
 // Recycle blocks until the pod has completed or any error occurs.
 // HostPath recycling only works in single node clusters and is meant for testing purposes only.
-func (plugin *hostPathPlugin) Recycle(pvName string, spec *volume.Spec, eventRecorder volume.RecycleEventRecorder) error {
+func (plugin *hostPathPlugin) Recycle(pvName string, spec *volume.Spec, eventRecorder recyclerclient.RecycleEventRecorder) error {
 	if spec.PersistentVolume == nil || spec.PersistentVolume.Spec.HostPath == nil {
 		return fmt.Errorf("spec.PersistentVolumeSource.HostPath is nil")
 	}
 
 	pod := plugin.config.RecyclerPodTemplate
-	timeout := volume.CalculateTimeoutForVolume(plugin.config.RecyclerMinimumTimeout, plugin.config.RecyclerTimeoutIncrement, spec.PersistentVolume)
+	timeout := util.CalculateTimeoutForVolume(plugin.config.RecyclerMinimumTimeout, plugin.config.RecyclerTimeoutIncrement, spec.PersistentVolume)
 	// overrides
 	pod.Spec.ActiveDeadlineSeconds = &timeout
 	pod.Spec.Volumes[0].VolumeSource = v1.VolumeSource{
@@ -141,7 +144,7 @@ func (plugin *hostPathPlugin) Recycle(pvName string, spec *volume.Spec, eventRec
 			Path: spec.PersistentVolume.Spec.HostPath.Path,
 		},
 	}
-	return volume.RecycleVolumeByWatchingPodUntilCompletion(pvName, pod, plugin.host.GetKubeClient(), eventRecorder)
+	return recyclerclient.RecycleVolumeByWatchingPodUntilCompletion(pvName, pod, plugin.host.GetKubeClient(), eventRecorder)
 }
 
 func (plugin *hostPathPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
@@ -182,9 +185,8 @@ func newProvisioner(options volume.VolumeOptions, host volume.VolumeHost, plugin
 // HostPath volumes represent a bare host file or directory mount.
 // The direct at the specified path will be directly exposed to the container.
 type hostPath struct {
-	path          string
-	pathType      *v1.HostPathType
-	containerized bool
+	path     string
+	pathType *v1.HostPathType
 	volume.MetricsNil
 }
 
@@ -195,6 +197,7 @@ func (hp *hostPath) GetPath() string {
 type hostPathMounter struct {
 	*hostPath
 	readOnly bool
+	mounter  mount.Interface
 }
 
 var _ volume.Mounter = &hostPathMounter{}
@@ -224,7 +227,7 @@ func (b *hostPathMounter) SetUp(fsGroup *int64) error {
 	if *b.pathType == v1.HostPathUnset {
 		return nil
 	}
-	return checkType(b.GetPath(), b.pathType, b.containerized)
+	return checkType(b.GetPath(), b.pathType, b.mounter)
 }
 
 // SetUpAt does not make sense for host paths - probably programmer error.
@@ -270,7 +273,7 @@ func (r *hostPathProvisioner) Provision() (*v1.PersistentVolume, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: r.options.PVName,
 			Annotations: map[string]string{
-				volumehelper.VolumeDynamicallyCreatedByKey: "hostpath-dynamic-provisioner",
+				util.VolumeDynamicallyCreatedByKey: "hostpath-dynamic-provisioner",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -340,132 +343,77 @@ type hostPathTypeChecker interface {
 	GetPath() string
 }
 
-type fileTypeChecker interface {
-	getFileType(fileInfo os.FileInfo) (v1.HostPathType, error)
-}
-
-// this is implemented in per-OS files
-type defaultFileTypeChecker struct{}
-
-type osFileTypeChecker struct {
+type fileTypeChecker struct {
 	path    string
 	exists  bool
-	info    os.FileInfo
-	checker fileTypeChecker
+	mounter mount.Interface
 }
 
-func (ftc *osFileTypeChecker) Exists() bool {
-	return ftc.exists
+func (ftc *fileTypeChecker) Exists() bool {
+	return ftc.mounter.ExistsPath(ftc.path)
 }
 
-func (ftc *osFileTypeChecker) IsFile() bool {
+func (ftc *fileTypeChecker) IsFile() bool {
 	if !ftc.Exists() {
 		return false
 	}
-	return !ftc.info.IsDir()
+	return !ftc.IsDir()
 }
 
-func (ftc *osFileTypeChecker) MakeFile() error {
-	f, err := os.OpenFile(ftc.path, os.O_CREATE, os.FileMode(0644))
-	defer f.Close()
-	if err != nil {
-		if !os.IsExist(err) {
-			return err
-		}
-	}
-	return nil
+func (ftc *fileTypeChecker) MakeFile() error {
+	return ftc.mounter.MakeFile(ftc.path)
 }
 
-func (ftc *osFileTypeChecker) IsDir() bool {
+func (ftc *fileTypeChecker) IsDir() bool {
 	if !ftc.Exists() {
 		return false
 	}
-	return ftc.info.IsDir()
-}
-
-func (ftc *osFileTypeChecker) MakeDir() error {
-	err := os.MkdirAll(ftc.path, os.FileMode(0755))
-	if err != nil {
-		if !os.IsExist(err) {
-			return err
-		}
-	}
-	return nil
-}
-
-func (ftc *osFileTypeChecker) IsBlock() bool {
-	if !ftc.Exists() {
-		return false
-	}
-
-	blkDevType, err := ftc.checker.getFileType(ftc.info)
+	pathType, err := ftc.mounter.GetFileType(ftc.path)
 	if err != nil {
 		return false
 	}
-	return blkDevType == v1.HostPathBlockDev
+	return string(pathType) == string(v1.HostPathDirectory)
 }
 
-func (ftc *osFileTypeChecker) IsChar() bool {
-	if !ftc.Exists() {
-		return false
-	}
+func (ftc *fileTypeChecker) MakeDir() error {
+	return ftc.mounter.MakeDir(ftc.path)
+}
 
-	charDevType, err := ftc.checker.getFileType(ftc.info)
+func (ftc *fileTypeChecker) IsBlock() bool {
+	blkDevType, err := ftc.mounter.GetFileType(ftc.path)
 	if err != nil {
 		return false
 	}
-	return charDevType == v1.HostPathCharDev
+	return string(blkDevType) == string(v1.HostPathBlockDev)
 }
 
-func (ftc *osFileTypeChecker) IsSocket() bool {
-	if !ftc.Exists() {
-		return false
-	}
-
-	socketType, err := ftc.checker.getFileType(ftc.info)
+func (ftc *fileTypeChecker) IsChar() bool {
+	charDevType, err := ftc.mounter.GetFileType(ftc.path)
 	if err != nil {
 		return false
 	}
-	return socketType == v1.HostPathSocket
+	return string(charDevType) == string(v1.HostPathCharDev)
 }
 
-func (ftc *osFileTypeChecker) GetPath() string {
+func (ftc *fileTypeChecker) IsSocket() bool {
+	socketType, err := ftc.mounter.GetFileType(ftc.path)
+	if err != nil {
+		return false
+	}
+	return string(socketType) == string(v1.HostPathSocket)
+}
+
+func (ftc *fileTypeChecker) GetPath() string {
 	return ftc.path
 }
 
-func newOSFileTypeChecker(path string, checker fileTypeChecker) (hostPathTypeChecker, error) {
-	ftc := osFileTypeChecker{path: path, checker: checker}
-	info, err := os.Stat(path)
-	if err != nil {
-		ftc.exists = false
-		if !os.IsNotExist(err) {
-			return nil, err
-		}
-	} else {
-		ftc.info = info
-		ftc.exists = true
-	}
-	return &ftc, nil
+func newFileTypeChecker(path string, mounter mount.Interface) hostPathTypeChecker {
+	return &fileTypeChecker{path: path, mounter: mounter}
 }
 
-func checkType(path string, pathType *v1.HostPathType, containerized bool) error {
-	var ftc hostPathTypeChecker
-	var err error
-	if containerized {
-		// For a containerized kubelet, use nsenter to run commands in
-		// the host's mount namespace.
-		// TODO(dixudx): setns into docker's mount namespace, and then run the exact same go code for checks/setup
-		ftc, err = newNsenterFileTypeChecker(path)
-		if err != nil {
-			return err
-		}
-	} else {
-		ftc, err = newOSFileTypeChecker(path, &defaultFileTypeChecker{})
-		if err != nil {
-			return err
-		}
-	}
-	return checkTypeInternal(ftc, pathType)
+// checkType checks whether the given path is the exact pathType
+func checkType(path string, pathType *v1.HostPathType, mounter mount.Interface) error {
+	return checkTypeInternal(newFileTypeChecker(path, mounter), pathType)
 }
 
 func checkTypeInternal(ftc hostPathTypeChecker, pathType *v1.HostPathType) error {

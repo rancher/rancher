@@ -96,7 +96,7 @@ func (l *namespaceLister) Get(namespace, name string) (*v1.Namespace, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    NamespaceGroupVersionKind.Group,
 			Resource: "namespace",
-		}, name)
+		}, key)
 	}
 	return obj.(*v1.Namespace), nil
 }

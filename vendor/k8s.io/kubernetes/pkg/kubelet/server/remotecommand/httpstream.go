@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/wsstream"
 	"k8s.io/client-go/tools/remotecommand"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 
 	"github.com/golang/glog"
 )
@@ -156,7 +156,7 @@ func createHttpStreamStreams(req *http.Request, w http.ResponseWriter, opts *Opt
 	case remotecommandconsts.StreamProtocolV2Name:
 		handler = &v2ProtocolHandler{}
 	case "":
-		glog.V(4).Infof("Client did not request protocol negotiaion. Falling back to %q", remotecommandconsts.StreamProtocolV1Name)
+		glog.V(4).Infof("Client did not request protocol negotiation. Falling back to %q", remotecommandconsts.StreamProtocolV1Name)
 		fallthrough
 	case remotecommandconsts.StreamProtocolV1Name:
 		handler = &v1ProtocolHandler{}

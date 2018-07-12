@@ -294,7 +294,7 @@ func (dc *DisruptionController) Run(stopCh <-chan struct{}) {
 
 	if dc.kubeClient != nil {
 		glog.Infof("Sending events to api server.")
-		dc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(dc.kubeClient.Core().RESTClient()).Events("")})
+		dc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(dc.kubeClient.CoreV1().RESTClient()).Events("")})
 	} else {
 		glog.Infof("No api server defined - no events will be sent to API server.")
 	}
@@ -617,7 +617,7 @@ func (dc *DisruptionController) getExpectedScale(pdb *policy.PodDisruptionBudget
 func countHealthyPods(pods []*v1.Pod, disruptedPods map[string]metav1.Time, currentTime time.Time) (currentHealthy int32) {
 Pod:
 	for _, pod := range pods {
-		// Pod is beeing deleted.
+		// Pod is being deleted.
 		if pod.DeletionTimestamp != nil {
 			continue
 		}
@@ -728,7 +728,7 @@ func refresh(pdbClient policyclientset.PodDisruptionBudgetInterface, pdb *policy
 }
 
 func (dc *DisruptionController) writePdbStatus(pdb *policy.PodDisruptionBudget) error {
-	pdbClient := dc.kubeClient.Policy().PodDisruptionBudgets(pdb.Namespace)
+	pdbClient := dc.kubeClient.PolicyV1beta1().PodDisruptionBudgets(pdb.Namespace)
 	st := pdb.Status
 
 	var err error

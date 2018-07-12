@@ -95,7 +95,7 @@ func (l *settingLister) Get(namespace, name string) (*Setting, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    SettingGroupVersionKind.Group,
 			Resource: "setting",
-		}, name)
+		}, key)
 	}
 	return obj.(*Setting), nil
 }

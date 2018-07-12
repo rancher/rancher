@@ -14,13 +14,13 @@ go_library(
         "flocker_util.go",
         "flocker_volume.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/volume/flocker",
     deps = [
         "//pkg/util/env:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
-        "//pkg/volume/util/volumehelper:go_default_library",
         "//vendor/github.com/clusterhq/flocker-go:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -38,7 +38,7 @@ go_test(
         "flocker_util_test.go",
         "flocker_volume_test.go",
     ],
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",

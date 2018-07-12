@@ -96,7 +96,7 @@ func (l *podSecurityPolicyTemplateProjectBindingLister) Get(namespace, name stri
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    PodSecurityPolicyTemplateProjectBindingGroupVersionKind.Group,
 			Resource: "podSecurityPolicyTemplateProjectBinding",
-		}, name)
+		}, key)
 	}
 	return obj.(*PodSecurityPolicyTemplateProjectBinding), nil
 }

@@ -12,7 +12,7 @@ go_test(
         "register_test.go",
         "roundtrip_test.go",
     ],
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/testing/roundtrip:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/fuzzer:go_default_library",
@@ -31,9 +31,10 @@ go_library(
         "zz_generated.conversion.go",
         "zz_generated.deepcopy.go",
     ],
+    importpath = "k8s.io/apimachinery/pkg/apis/meta/internalversion",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1alpha1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/fields:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",

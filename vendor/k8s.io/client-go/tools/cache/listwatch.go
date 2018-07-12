@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/pager"
@@ -51,8 +52,7 @@ type WatchFunc func(options metav1.ListOptions) (watch.Interface, error)
 type ListWatch struct {
 	ListFunc  ListFunc
 	WatchFunc WatchFunc
-	// DisableChunking requests no chunking for this list watcher. It has no effect in Kubernetes 1.8, but in
-	// 1.9 will allow a controller to opt out of chunking.
+	// DisableChunking requests no chunking for this list watcher.
 	DisableChunking bool
 }
 
@@ -63,8 +63,18 @@ type Getter interface {
 
 // NewListWatchFromClient creates a new ListWatch from the specified client, resource, namespace and field selector.
 func NewListWatchFromClient(c Getter, resource string, namespace string, fieldSelector fields.Selector) *ListWatch {
-	listFunc := func(options metav1.ListOptions) (runtime.Object, error) {
+	optionsModifier := func(options *metav1.ListOptions) {
 		options.FieldSelector = fieldSelector.String()
+	}
+	return NewFilteredListWatchFromClient(c, resource, namespace, optionsModifier)
+}
+
+// NewFilteredListWatchFromClient creates a new ListWatch from the specified client, resource, namespace, and option modifier.
+// Option modifier is a function takes a ListOptions and modifies the consumed ListOptions. Provide customized modifier function
+// to apply modification to ListOptions with a field selector, a label selector, or any other desired options.
+func NewFilteredListWatchFromClient(c Getter, resource string, namespace string, optionsModifier func(options *metav1.ListOptions)) *ListWatch {
+	listFunc := func(options metav1.ListOptions) (runtime.Object, error) {
+		optionsModifier(&options)
 		return c.Get().
 			Namespace(namespace).
 			Resource(resource).
@@ -74,7 +84,7 @@ func NewListWatchFromClient(c Getter, resource string, namespace string, fieldSe
 	}
 	watchFunc := func(options metav1.ListOptions) (watch.Interface, error) {
 		options.Watch = true
-		options.FieldSelector = fieldSelector.String()
+		optionsModifier(&options)
 		return c.Get().
 			Namespace(namespace).
 			Resource(resource).
@@ -93,9 +103,7 @@ func timeoutFromListOptions(options metav1.ListOptions) time.Duration {
 
 // List a set of apiserver resources
 func (lw *ListWatch) List(options metav1.ListOptions) (runtime.Object, error) {
-	// chunking will become the default for list watchers starting in Kubernetes 1.9, unless
-	// otherwise disabled.
-	if false && !lw.DisableChunking {
+	if !lw.DisableChunking {
 		return pager.New(pager.SimplePageFunc(lw.ListFunc)).List(context.TODO(), options)
 	}
 	return lw.ListFunc(options)
@@ -106,6 +114,8 @@ func (lw *ListWatch) Watch(options metav1.ListOptions) (watch.Interface, error) 
 	return lw.WatchFunc(options)
 }
 
+// ListWatchUntil checks the provided conditions against the items returned by the list watcher, returning wait.ErrWaitTimeout
+// if timeout is exceeded without all conditions returning true, or an error if an error occurs.
 // TODO: check for watch expired error and retry watch from latest point?  Same issue exists for Until.
 func ListWatchUntil(timeout time.Duration, lw ListerWatcher, conditions ...watch.ConditionFunc) (*watch.Event, error) {
 	if len(conditions) == 0 {
@@ -169,5 +179,10 @@ func ListWatchUntil(timeout time.Duration, lw ListerWatcher, conditions ...watch
 		return nil, err
 	}
 
-	return watch.Until(timeout, watchInterface, remainingConditions...)
+	evt, err := watch.Until(timeout, watchInterface, remainingConditions...)
+	if err == watch.ErrWatchClosed {
+		// present a consistent error interface to callers
+		err = wait.ErrWaitTimeout
+	}
+	return evt, err
 }

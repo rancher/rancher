@@ -54,9 +54,6 @@ type Config struct {
 	Host string
 	// APIPath is a sub-path that points to an API root.
 	APIPath string
-	// Prefix is the sub path of the server. If not specified, the client will set
-	// a default value.  Use "/" to indicate the server root should be used
-	Prefix string
 
 	// ContentConfig contains settings that affect how objects are transformed when
 	// sent to the server.
@@ -71,10 +68,6 @@ type Config struct {
 	// TODO: demonstrate an OAuth2 compatible client.
 	BearerToken string
 
-	// CacheDir is the directory where we'll store HTTP cached responses.
-	// If set to empty string, no caching mechanism will be used.
-	CacheDir string
-
 	// Impersonate is the configuration that RESTClient will use for impersonation.
 	Impersonate ImpersonationConfig
 
@@ -83,6 +76,9 @@ type Config struct {
 
 	// Callback to persist config for AuthProvider.
 	AuthConfigPersister AuthProviderConfigPersister
+
+	// Exec-based authentication provider.
+	ExecProvider *clientcmdapi.ExecConfig
 
 	// TLSClientConfig contains settings to enable transport layer security
 	TLSClientConfig
@@ -405,7 +401,6 @@ func AnonymousClientConfig(config *Config) *Config {
 	return &Config{
 		Host:          config.Host,
 		APIPath:       config.APIPath,
-		Prefix:        config.Prefix,
 		ContentConfig: config.ContentConfig,
 		TLSClientConfig: TLSClientConfig{
 			Insecure:   config.Insecure,
@@ -420,5 +415,44 @@ func AnonymousClientConfig(config *Config) *Config {
 		QPS:           config.QPS,
 		Burst:         config.Burst,
 		Timeout:       config.Timeout,
+		Dial:          config.Dial,
+	}
+}
+
+// CopyConfig returns a copy of the given config
+func CopyConfig(config *Config) *Config {
+	return &Config{
+		Host:          config.Host,
+		APIPath:       config.APIPath,
+		ContentConfig: config.ContentConfig,
+		Username:      config.Username,
+		Password:      config.Password,
+		BearerToken:   config.BearerToken,
+		Impersonate: ImpersonationConfig{
+			Groups:   config.Impersonate.Groups,
+			Extra:    config.Impersonate.Extra,
+			UserName: config.Impersonate.UserName,
+		},
+		AuthProvider:        config.AuthProvider,
+		AuthConfigPersister: config.AuthConfigPersister,
+		ExecProvider:        config.ExecProvider,
+		TLSClientConfig: TLSClientConfig{
+			Insecure:   config.TLSClientConfig.Insecure,
+			ServerName: config.TLSClientConfig.ServerName,
+			CertFile:   config.TLSClientConfig.CertFile,
+			KeyFile:    config.TLSClientConfig.KeyFile,
+			CAFile:     config.TLSClientConfig.CAFile,
+			CertData:   config.TLSClientConfig.CertData,
+			KeyData:    config.TLSClientConfig.KeyData,
+			CAData:     config.TLSClientConfig.CAData,
+		},
+		UserAgent:     config.UserAgent,
+		Transport:     config.Transport,
+		WrapTransport: config.WrapTransport,
+		QPS:           config.QPS,
+		Burst:         config.Burst,
+		RateLimiter:   config.RateLimiter,
+		Timeout:       config.Timeout,
+		Dial:          config.Dial,
 	}
 }

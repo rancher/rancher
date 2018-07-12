@@ -17,9 +17,11 @@ limitations under the License.
 package gce
 
 import (
-	"net/http"
-
 	compute "google.golang.org/api/compute/v1"
+
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/filter"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 )
 
 func newCertMetricContext(request string) *metricContext {
@@ -28,47 +30,42 @@ func newCertMetricContext(request string) *metricContext {
 
 // GetSslCertificate returns the SslCertificate by name.
 func (gce *GCECloud) GetSslCertificate(name string) (*compute.SslCertificate, error) {
+	ctx, cancel := cloud.ContextWithCallTimeout()
+	defer cancel()
+
 	mc := newCertMetricContext("get")
-	v, err := gce.service.SslCertificates.Get(gce.projectID, name).Do()
+	v, err := gce.c.SslCertificates().Get(ctx, meta.GlobalKey(name))
 	return v, mc.Observe(err)
 }
 
 // CreateSslCertificate creates and returns a SslCertificate.
 func (gce *GCECloud) CreateSslCertificate(sslCerts *compute.SslCertificate) (*compute.SslCertificate, error) {
-	mc := newCertMetricContext("create")
-	op, err := gce.service.SslCertificates.Insert(gce.projectID, sslCerts).Do()
+	ctx, cancel := cloud.ContextWithCallTimeout()
+	defer cancel()
 
+	mc := newCertMetricContext("create")
+	err := gce.c.SslCertificates().Insert(ctx, meta.GlobalKey(sslCerts.Name), sslCerts)
 	if err != nil {
 		return nil, mc.Observe(err)
 	}
-
-	if err = gce.waitForGlobalOp(op, mc); err != nil {
-		return nil, mc.Observe(err)
-	}
-
 	return gce.GetSslCertificate(sslCerts.Name)
 }
 
 // DeleteSslCertificate deletes the SslCertificate by name.
 func (gce *GCECloud) DeleteSslCertificate(name string) error {
+	ctx, cancel := cloud.ContextWithCallTimeout()
+	defer cancel()
+
 	mc := newCertMetricContext("delete")
-	op, err := gce.service.SslCertificates.Delete(gce.projectID, name).Do()
-
-	if err != nil {
-		if isHTTPErrorCode(err, http.StatusNotFound) {
-			return nil
-		}
-
-		return mc.Observe(err)
-	}
-
-	return gce.waitForGlobalOp(op, mc)
+	return mc.Observe(gce.c.SslCertificates().Delete(ctx, meta.GlobalKey(name)))
 }
 
 // ListSslCertificates lists all SslCertificates in the project.
-func (gce *GCECloud) ListSslCertificates() (*compute.SslCertificateList, error) {
+func (gce *GCECloud) ListSslCertificates() ([]*compute.SslCertificate, error) {
+	ctx, cancel := cloud.ContextWithCallTimeout()
+	defer cancel()
+
 	mc := newCertMetricContext("list")
-	// TODO: use PageToken to list all not just the first 500
-	v, err := gce.service.SslCertificates.List(gce.projectID).Do()
+	v, err := gce.c.SslCertificates().List(ctx, filter.None)
 	return v, mc.Observe(err)
 }

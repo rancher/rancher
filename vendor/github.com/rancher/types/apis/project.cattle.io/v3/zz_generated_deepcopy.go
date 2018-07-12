@@ -1,168 +1,8 @@
 package v3
 
 import (
-	reflect "reflect"
-
-	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
-
-func init() {
-	SchemeBuilder.Register(RegisterDeepCopies)
-}
-
-// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
-// to allow building arbitrary schemes.
-//
-// Deprecated: deepcopy registration will go away when static deepcopy is fully implemented.
-func RegisterDeepCopies(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*App).DeepCopyInto(out.(*App))
-			return nil
-		}, InType: reflect.TypeOf(&App{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*AppCondition).DeepCopyInto(out.(*AppCondition))
-			return nil
-		}, InType: reflect.TypeOf(&AppCondition{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*AppList).DeepCopyInto(out.(*AppList))
-			return nil
-		}, InType: reflect.TypeOf(&AppList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*AppRevision).DeepCopyInto(out.(*AppRevision))
-			return nil
-		}, InType: reflect.TypeOf(&AppRevision{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*AppRevisionList).DeepCopyInto(out.(*AppRevisionList))
-			return nil
-		}, InType: reflect.TypeOf(&AppRevisionList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*AppRevisionSpec).DeepCopyInto(out.(*AppRevisionSpec))
-			return nil
-		}, InType: reflect.TypeOf(&AppRevisionSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*AppRevisionStatus).DeepCopyInto(out.(*AppRevisionStatus))
-			return nil
-		}, InType: reflect.TypeOf(&AppRevisionStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*AppSpec).DeepCopyInto(out.(*AppSpec))
-			return nil
-		}, InType: reflect.TypeOf(&AppSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*AppStatus).DeepCopyInto(out.(*AppStatus))
-			return nil
-		}, InType: reflect.TypeOf(&AppStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*AppUpgradeConfig).DeepCopyInto(out.(*AppUpgradeConfig))
-			return nil
-		}, InType: reflect.TypeOf(&AppUpgradeConfig{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*BasicAuth).DeepCopyInto(out.(*BasicAuth))
-			return nil
-		}, InType: reflect.TypeOf(&BasicAuth{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*BasicAuthList).DeepCopyInto(out.(*BasicAuthList))
-			return nil
-		}, InType: reflect.TypeOf(&BasicAuthList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*Certificate).DeepCopyInto(out.(*Certificate))
-			return nil
-		}, InType: reflect.TypeOf(&Certificate{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*CertificateList).DeepCopyInto(out.(*CertificateList))
-			return nil
-		}, InType: reflect.TypeOf(&CertificateList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*DeploymentRollbackInput).DeepCopyInto(out.(*DeploymentRollbackInput))
-			return nil
-		}, InType: reflect.TypeOf(&DeploymentRollbackInput{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*DockerCredential).DeepCopyInto(out.(*DockerCredential))
-			return nil
-		}, InType: reflect.TypeOf(&DockerCredential{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*DockerCredentialList).DeepCopyInto(out.(*DockerCredentialList))
-			return nil
-		}, InType: reflect.TypeOf(&DockerCredentialList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*NamespacedBasicAuth).DeepCopyInto(out.(*NamespacedBasicAuth))
-			return nil
-		}, InType: reflect.TypeOf(&NamespacedBasicAuth{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*NamespacedBasicAuthList).DeepCopyInto(out.(*NamespacedBasicAuthList))
-			return nil
-		}, InType: reflect.TypeOf(&NamespacedBasicAuthList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*NamespacedCertificate).DeepCopyInto(out.(*NamespacedCertificate))
-			return nil
-		}, InType: reflect.TypeOf(&NamespacedCertificate{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*NamespacedCertificateList).DeepCopyInto(out.(*NamespacedCertificateList))
-			return nil
-		}, InType: reflect.TypeOf(&NamespacedCertificateList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*NamespacedDockerCredential).DeepCopyInto(out.(*NamespacedDockerCredential))
-			return nil
-		}, InType: reflect.TypeOf(&NamespacedDockerCredential{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*NamespacedDockerCredentialList).DeepCopyInto(out.(*NamespacedDockerCredentialList))
-			return nil
-		}, InType: reflect.TypeOf(&NamespacedDockerCredentialList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*NamespacedSSHAuth).DeepCopyInto(out.(*NamespacedSSHAuth))
-			return nil
-		}, InType: reflect.TypeOf(&NamespacedSSHAuth{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*NamespacedSSHAuthList).DeepCopyInto(out.(*NamespacedSSHAuthList))
-			return nil
-		}, InType: reflect.TypeOf(&NamespacedSSHAuthList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*NamespacedServiceAccountToken).DeepCopyInto(out.(*NamespacedServiceAccountToken))
-			return nil
-		}, InType: reflect.TypeOf(&NamespacedServiceAccountToken{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*NamespacedServiceAccountTokenList).DeepCopyInto(out.(*NamespacedServiceAccountTokenList))
-			return nil
-		}, InType: reflect.TypeOf(&NamespacedServiceAccountTokenList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*PublicEndpoint).DeepCopyInto(out.(*PublicEndpoint))
-			return nil
-		}, InType: reflect.TypeOf(&PublicEndpoint{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*RegistryCredential).DeepCopyInto(out.(*RegistryCredential))
-			return nil
-		}, InType: reflect.TypeOf(&RegistryCredential{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*RollbackRevision).DeepCopyInto(out.(*RollbackRevision))
-			return nil
-		}, InType: reflect.TypeOf(&RollbackRevision{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*SSHAuth).DeepCopyInto(out.(*SSHAuth))
-			return nil
-		}, InType: reflect.TypeOf(&SSHAuth{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*SSHAuthList).DeepCopyInto(out.(*SSHAuthList))
-			return nil
-		}, InType: reflect.TypeOf(&SSHAuthList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*ServiceAccountToken).DeepCopyInto(out.(*ServiceAccountToken))
-			return nil
-		}, InType: reflect.TypeOf(&ServiceAccountToken{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*ServiceAccountTokenList).DeepCopyInto(out.(*ServiceAccountTokenList))
-			return nil
-		}, InType: reflect.TypeOf(&ServiceAccountTokenList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*Workload).DeepCopyInto(out.(*Workload))
-			return nil
-		}, InType: reflect.TypeOf(&Workload{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*WorkloadList).DeepCopyInto(out.(*WorkloadList))
-			return nil
-		}, InType: reflect.TypeOf(&WorkloadList{})},
-	)
-}
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
 func (in *App) DeepCopyInto(out *App) {
@@ -189,9 +29,8 @@ func (in *App) DeepCopy() *App {
 func (in *App) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
@@ -239,9 +78,8 @@ func (in *AppList) DeepCopy() *AppList {
 func (in *AppList) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
@@ -269,9 +107,8 @@ func (in *AppRevision) DeepCopy() *AppRevision {
 func (in *AppRevision) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
@@ -303,9 +140,8 @@ func (in *AppRevisionList) DeepCopy() *AppRevisionList {
 func (in *AppRevisionList) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
@@ -451,9 +287,8 @@ func (in *BasicAuth) DeepCopy() *BasicAuth {
 func (in *BasicAuth) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
@@ -485,9 +320,8 @@ func (in *BasicAuthList) DeepCopy() *BasicAuthList {
 func (in *BasicAuthList) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
@@ -518,9 +352,8 @@ func (in *Certificate) DeepCopy() *Certificate {
 func (in *Certificate) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
@@ -552,9 +385,8 @@ func (in *CertificateList) DeepCopy() *CertificateList {
 func (in *CertificateList) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
@@ -603,9 +435,8 @@ func (in *DockerCredential) DeepCopy() *DockerCredential {
 func (in *DockerCredential) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
@@ -637,9 +468,8 @@ func (in *DockerCredentialList) DeepCopy() *DockerCredentialList {
 func (in *DockerCredentialList) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
@@ -665,9 +495,8 @@ func (in *NamespacedBasicAuth) DeepCopy() *NamespacedBasicAuth {
 func (in *NamespacedBasicAuth) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
@@ -699,9 +528,8 @@ func (in *NamespacedBasicAuthList) DeepCopy() *NamespacedBasicAuthList {
 func (in *NamespacedBasicAuthList) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
@@ -732,9 +560,8 @@ func (in *NamespacedCertificate) DeepCopy() *NamespacedCertificate {
 func (in *NamespacedCertificate) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
@@ -766,9 +593,8 @@ func (in *NamespacedCertificateList) DeepCopy() *NamespacedCertificateList {
 func (in *NamespacedCertificateList) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
@@ -801,9 +627,8 @@ func (in *NamespacedDockerCredential) DeepCopy() *NamespacedDockerCredential {
 func (in *NamespacedDockerCredential) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
@@ -835,9 +660,8 @@ func (in *NamespacedDockerCredentialList) DeepCopy() *NamespacedDockerCredential
 func (in *NamespacedDockerCredentialList) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
@@ -863,9 +687,8 @@ func (in *NamespacedSSHAuth) DeepCopy() *NamespacedSSHAuth {
 func (in *NamespacedSSHAuth) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
@@ -897,9 +720,8 @@ func (in *NamespacedSSHAuthList) DeepCopy() *NamespacedSSHAuthList {
 func (in *NamespacedSSHAuthList) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
@@ -925,9 +747,8 @@ func (in *NamespacedServiceAccountToken) DeepCopy() *NamespacedServiceAccountTok
 func (in *NamespacedServiceAccountToken) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
@@ -959,9 +780,8 @@ func (in *NamespacedServiceAccountTokenList) DeepCopy() *NamespacedServiceAccoun
 func (in *NamespacedServiceAccountTokenList) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
@@ -1040,9 +860,8 @@ func (in *SSHAuth) DeepCopy() *SSHAuth {
 func (in *SSHAuth) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
@@ -1074,9 +893,8 @@ func (in *SSHAuthList) DeepCopy() *SSHAuthList {
 func (in *SSHAuthList) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
@@ -1102,9 +920,8 @@ func (in *ServiceAccountToken) DeepCopy() *ServiceAccountToken {
 func (in *ServiceAccountToken) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
@@ -1136,9 +953,8 @@ func (in *ServiceAccountTokenList) DeepCopy() *ServiceAccountTokenList {
 func (in *ServiceAccountTokenList) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
@@ -1164,9 +980,8 @@ func (in *Workload) DeepCopy() *Workload {
 func (in *Workload) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
@@ -1198,7 +1013,6 @@ func (in *WorkloadList) DeepCopy() *WorkloadList {
 func (in *WorkloadList) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
-	} else {
-		return nil
 	}
+	return nil
 }

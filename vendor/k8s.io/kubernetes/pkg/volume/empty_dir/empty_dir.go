@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/util/mount"
 	stringsutil "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -155,19 +155,11 @@ func (plugin *emptyDirPlugin) ConstructVolumeSpec(volName, mountPath string) (*v
 type mountDetector interface {
 	// GetMountMedium determines what type of medium a given path is backed
 	// by and whether that path is a mount point.  For example, if this
-	// returns (mediumMemory, false, nil), the caller knows that the path is
+	// returns (v1.StorageMediumMemory, false, nil), the caller knows that the path is
 	// on a memory FS (tmpfs on Linux) but is not the root mountpoint of
 	// that tmpfs.
-	GetMountMedium(path string) (storageMedium, bool, error)
+	GetMountMedium(path string) (v1.StorageMedium, bool, error)
 }
-
-type storageMedium int
-
-const (
-	mediumUnknown   storageMedium = 0 // assume anything we don't explicitly handle is this
-	mediumMemory    storageMedium = 1 // memory (e.g. tmpfs on linux)
-	mediumHugepages storageMedium = 2 // hugepages
-)
 
 // EmptyDir volumes are temporary directories exposed to the pod.
 // These do not persist beyond the lifetime of a pod.
@@ -227,7 +219,7 @@ func (ed *emptyDir) SetUpAt(dir string, fsGroup *int64) error {
 		err = ed.setupDir(dir)
 	case v1.StorageMediumMemory:
 		err = ed.setupTmpfs(dir)
-	case v1.StorageMediumHugepages:
+	case v1.StorageMediumHugePages:
 		err = ed.setupHugepages(dir)
 	default:
 		err = fmt.Errorf("unknown storage medium %q", ed.medium)
@@ -257,7 +249,7 @@ func (ed *emptyDir) setupTmpfs(dir string) error {
 	}
 	// If the directory is a mountpoint with medium memory, there is no
 	// work to do since we are already in the desired state.
-	if isMnt && medium == mediumMemory {
+	if isMnt && medium == v1.StorageMediumMemory {
 		return nil
 	}
 
@@ -280,7 +272,7 @@ func (ed *emptyDir) setupHugepages(dir string) error {
 	}
 	// If the directory is a mountpoint with medium hugepages, there is no
 	// work to do since we are already in the desired state.
-	if isMnt && medium == mediumHugepages {
+	if isMnt && medium == v1.StorageMediumHugePages {
 		return nil
 	}
 
@@ -388,11 +380,11 @@ func (ed *emptyDir) TearDownAt(dir string) error {
 		return err
 	}
 	if isMnt {
-		if medium == mediumMemory {
+		if medium == v1.StorageMediumMemory {
 			ed.medium = v1.StorageMediumMemory
 			return ed.teardownTmpfsOrHugetlbfs(dir)
-		} else if medium == mediumHugepages {
-			ed.medium = v1.StorageMediumHugepages
+		} else if medium == v1.StorageMediumHugePages {
+			ed.medium = v1.StorageMediumHugePages
 			return ed.teardownTmpfsOrHugetlbfs(dir)
 		}
 	}

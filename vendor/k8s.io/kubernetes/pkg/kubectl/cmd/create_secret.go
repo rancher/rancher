@@ -49,10 +49,11 @@ var (
 		A single secret may package one or more key/value pairs.
 
 		When creating a secret based on a file, the key will default to the basename of the file, and the value will
-		default to the file content.  If the basename is an invalid key, you may specify an alternate key.
+		default to the file content. If the basename is an invalid key or you wish to chose your own, you may specify
+		an alternate key.
 
 		When creating a secret based on a directory, each file whose basename is a valid key in the directory will be
-		packaged into the secret.  Any directory entries except regular files are ignored (e.g. subdirectories,
+		packaged into the secret. Any directory entries except regular files are ignored (e.g. subdirectories,
 		symlinks, devices, pipes, etc).`))
 
 	secretExample = templates.Examples(i18n.T(`
@@ -65,6 +66,9 @@ var (
 	  # Create a new secret named my-secret with key1=supersecret and key2=topsecret
 	  kubectl create secret generic my-secret --from-literal=key1=supersecret --from-literal=key2=topsecret
 
+	  # Create a new secret named my-secret using a combination of a file and a literal
+	  kubectl create secret generic my-secret --from-file=ssh-privatekey=~/.ssh/id_rsa --from-literal=passphrase=topsecret
+
 	  # Create a new secret named my-secret from an env file
 	  kubectl create secret generic my-secret --from-env-file=path/to/bar.env`))
 )
@@ -72,7 +76,8 @@ var (
 // NewCmdCreateSecretGeneric is a command to create generic secrets from files, directories, or literal values
 func NewCmdCreateSecretGeneric(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "generic NAME [--type=string] [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run]",
+		Use: "generic NAME [--type=string] [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Create a secret from a local file, directory or literal value"),
 		Long:    secretLong,
 		Example: secretExample,
@@ -127,11 +132,10 @@ var (
 
 		Dockercfg secrets are used to authenticate against Docker registries.
 
-		When using the Docker command line to push images, you can authenticate to a given registry by running
+		When using the Docker command line to push images, you can authenticate to a given registry by running:
+			'$ docker login DOCKER_REGISTRY_SERVER --username=DOCKER_USER --password=DOCKER_PASSWORD --email=DOCKER_EMAIL'.
 
-		    $ docker login DOCKER_REGISTRY_SERVER --username=DOCKER_USER --password=DOCKER_PASSWORD --email=DOCKER_EMAIL'.
-
-    That produces a ~/.dockercfg file that is used by subsequent 'docker push' and 'docker pull' commands to
+    	That produces a ~/.dockercfg file that is used by subsequent 'docker push' and 'docker pull' commands to
 		authenticate to the registry. The email address is optional.
 
 		When creating applications, you may have a Docker registry that requires authentication.  In order for the
@@ -146,7 +150,8 @@ var (
 // NewCmdCreateSecretDockerRegistry is a macro command for creating secrets to work with Docker registries
 func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "docker-registry NAME --docker-username=user --docker-password=password --docker-email=email [--docker-server=string] [--from-literal=key1=value1] [--dry-run]",
+		Use: "docker-registry NAME --docker-username=user --docker-password=password --docker-email=email [--docker-server=string] [--from-literal=key1=value1] [--dry-run]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Create a secret for use with a Docker registry"),
 		Long:    secretForDockerRegistryLong,
 		Example: secretForDockerRegistryExample,
@@ -166,6 +171,7 @@ func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, cmdOut io.Writer) *cobr
 	cmd.Flags().String("docker-email", "", i18n.T("Email for Docker registry"))
 	cmd.Flags().String("docker-server", "https://index.docker.io/v1/", i18n.T("Server location for Docker registry"))
 	cmd.Flags().Bool("append-hash", false, "Append a hash of the secret to its name.")
+
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
 }
@@ -208,7 +214,8 @@ var (
 	secretForTLSLong = templates.LongDesc(i18n.T(`
 		Create a TLS secret from the given public/private key pair.
 
-		The public/private key pair must exist before hand. The public key certificate must be .PEM encoded and match the given private key.`))
+		The public/private key pair must exist before hand. The public key certificate must be .PEM encoded and match
+		the given private key.`))
 
 	secretForTLSExample = templates.Examples(i18n.T(`
 	  # Create a new TLS secret named tls-secret with the given key pair:
@@ -218,7 +225,8 @@ var (
 // NewCmdCreateSecretTLS is a macro command for creating secrets to work with Docker registries
 func NewCmdCreateSecretTLS(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "tls NAME --cert=path/to/cert/file --key=path/to/key/file [--dry-run]",
+		Use: "tls NAME --cert=path/to/cert/file --key=path/to/key/file [--dry-run]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Create a TLS secret"),
 		Long:    secretForTLSLong,
 		Example: secretForTLSExample,
@@ -264,7 +272,7 @@ func CreateSecretTLS(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, ar
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,
 		StructuredGenerator: generator,
-		DryRun:              cmdutil.GetFlagBool(cmd, "dry-run"),
+		DryRun:              cmdutil.GetDryRunFlag(cmd),
 		OutputFormat:        cmdutil.GetFlagString(cmd, "output"),
 	})
 }

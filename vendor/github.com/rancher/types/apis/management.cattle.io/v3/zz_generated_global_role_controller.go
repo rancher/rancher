@@ -95,7 +95,7 @@ func (l *globalRoleLister) Get(namespace, name string) (*GlobalRole, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    GlobalRoleGroupVersionKind.Group,
 			Resource: "globalRole",
-		}, name)
+		}, key)
 	}
 	return obj.(*GlobalRole), nil
 }

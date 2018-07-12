@@ -96,7 +96,7 @@ func (l *projectAlertLister) Get(namespace, name string) (*ProjectAlert, error) 
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ProjectAlertGroupVersionKind.Group,
 			Resource: "projectAlert",
-		}, name)
+		}, key)
 	}
 	return obj.(*ProjectAlert), nil
 }

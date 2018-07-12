@@ -17,6 +17,7 @@ go_library(
         "zz_generated.conversion.go",
         "zz_generated.defaults.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1",
     deps = [
         "//pkg/apis/rbac:go_default_library",
         "//vendor/k8s.io/api/rbac/v1alpha1:go_default_library",
@@ -31,7 +32,7 @@ go_test(
     name = "go_default_xtest",
     srcs = ["conversion_test.go"],
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/apis/rbac/install:go_default_library",
         "//vendor/k8s.io/api/rbac/v1alpha1:go_default_library",

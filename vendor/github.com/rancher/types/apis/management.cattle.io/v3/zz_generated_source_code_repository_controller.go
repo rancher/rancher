@@ -96,7 +96,7 @@ func (l *sourceCodeRepositoryLister) Get(namespace, name string) (*SourceCodeRep
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    SourceCodeRepositoryGroupVersionKind.Group,
 			Resource: "sourceCodeRepository",
-		}, name)
+		}, key)
 	}
 	return obj.(*SourceCodeRepository), nil
 }

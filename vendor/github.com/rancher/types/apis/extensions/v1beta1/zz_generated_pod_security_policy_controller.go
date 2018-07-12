@@ -96,7 +96,7 @@ func (l *podSecurityPolicyLister) Get(namespace, name string) (*v1beta1.PodSecur
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    PodSecurityPolicyGroupVersionKind.Group,
 			Resource: "podSecurityPolicy",
-		}, name)
+		}, key)
 	}
 	return obj.(*v1beta1.PodSecurityPolicy), nil
 }

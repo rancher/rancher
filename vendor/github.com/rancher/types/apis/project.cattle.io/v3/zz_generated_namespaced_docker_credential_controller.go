@@ -96,7 +96,7 @@ func (l *namespacedDockerCredentialLister) Get(namespace, name string) (*Namespa
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    NamespacedDockerCredentialGroupVersionKind.Group,
 			Resource: "namespacedDockerCredential",
-		}, name)
+		}, key)
 	}
 	return obj.(*NamespacedDockerCredential), nil
 }

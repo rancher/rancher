@@ -22,6 +22,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -30,7 +31,11 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	storageerr "k8s.io/apiserver/pkg/storage/errors"
-	"k8s.io/kubernetes/pkg/api"
+
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/core/namespace"
 )
 
@@ -53,7 +58,6 @@ type FinalizeREST struct {
 // NewREST returns a RESTStorage object that will work against namespaces.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *FinalizeREST) {
 	store := &genericregistry.Store{
-		Copier:                   api.Scheme,
 		NewFunc:                  func() runtime.Object { return &api.Namespace{} },
 		NewListFunc:              func() runtime.Object { return &api.NamespaceList{} },
 		PredicateFunc:            namespace.MatchNamespace,
@@ -63,6 +67,8 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Finaliz
 		UpdateStrategy:      namespace.Strategy,
 		DeleteStrategy:      namespace.Strategy,
 		ReturnDeletedObject: true,
+
+		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: namespace.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
@@ -90,12 +96,12 @@ func (r *REST) List(ctx genericapirequest.Context, options *metainternalversion.
 	return r.store.List(ctx, options)
 }
 
-func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
-	return r.store.Create(ctx, obj, includeUninitialized)
+func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+	return r.store.Create(ctx, obj, createValidation, includeUninitialized)
 }
 
-func (r *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, name, objInfo)
+func (r *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation)
 }
 
 func (r *REST) Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
@@ -202,6 +208,10 @@ func (r *REST) Delete(ctx genericapirequest.Context, name string, options *metav
 	return r.store.Delete(ctx, name, options)
 }
 
+func (e *REST) ConvertToTable(ctx genericapirequest.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
+	return e.store.ConvertToTable(ctx, object, tableOptions)
+}
+
 // Implement ShortNamesProvider
 var _ rest.ShortNamesProvider = &REST{}
 
@@ -220,8 +230,8 @@ func (r *StatusREST) Get(ctx genericapirequest.Context, name string, options *me
 }
 
 // Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, name, objInfo)
+func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation)
 }
 
 func (r *FinalizeREST) New() runtime.Object {
@@ -229,6 +239,6 @@ func (r *FinalizeREST) New() runtime.Object {
 }
 
 // Update alters the status finalizers subset of an object.
-func (r *FinalizeREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, name, objInfo)
+func (r *FinalizeREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation)
 }

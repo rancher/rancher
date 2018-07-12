@@ -27,7 +27,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -72,7 +73,8 @@ func NewCmdExec(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *c
 		Executor: &DefaultRemoteExecutor{},
 	}
 	cmd := &cobra.Command{
-		Use:     "exec POD [-c CONTAINER] -- COMMAND [args...]",
+		Use: "exec POD [-c CONTAINER] -- COMMAND [args...]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Execute a command in a container"),
 		Long:    "Execute a command in a container.",
 		Example: exec_example,
@@ -153,7 +155,7 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 		return cmdutil.UsageErrorf(cmd, execUsageStr)
 	}
 	if len(p.PodName) != 0 {
-		printDeprecationWarning("exec POD_NAME", "-p POD_NAME")
+		printDeprecationWarning(p.Err, "exec POD_NAME", "-p POD_NAME")
 		if len(argsIn) < 1 {
 			return cmdutil.UsageErrorf(cmd, execUsageStr)
 		}
@@ -166,19 +168,19 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 		}
 	}
 
-	cmdParent := cmd.Parent()
-	if cmdParent != nil {
-		p.FullCmdName = cmdParent.CommandPath()
-	}
-	if len(p.FullCmdName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "describe") {
-		p.SuggestedCmdUsage = fmt.Sprintf("Use '%s describe pod/%s' to see all of the containers in this pod.", p.FullCmdName, p.PodName)
-	}
-
 	namespace, _, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
 	p.Namespace = namespace
+
+	cmdParent := cmd.Parent()
+	if cmdParent != nil {
+		p.FullCmdName = cmdParent.CommandPath()
+	}
+	if len(p.FullCmdName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "describe") {
+		p.SuggestedCmdUsage = fmt.Sprintf("Use '%s describe pod/%s -n %s' to see all of the containers in this pod.", p.FullCmdName, p.PodName, p.Namespace)
+	}
 
 	config, err := f.ClientConfig()
 	if err != nil {
@@ -320,7 +322,7 @@ func (p *ExecOptions) Run() error {
 			Stdout:    p.Out != nil,
 			Stderr:    p.Err != nil,
 			TTY:       t.Raw,
-		}, api.ParameterCodec)
+		}, legacyscheme.ParameterCodec)
 
 		return p.Executor.Execute("POST", req.URL(), p.Config, p.In, p.Out, p.Err, t.Raw, sizeQueue)
 	}

@@ -7,6 +7,7 @@ import (
 const (
 	ConfigMapType                 = "configMap"
 	ConfigMapFieldAnnotations     = "annotations"
+	ConfigMapFieldBinaryData      = "binaryData"
 	ConfigMapFieldCreated         = "created"
 	ConfigMapFieldCreatorID       = "creatorId"
 	ConfigMapFieldData            = "data"
@@ -22,6 +23,7 @@ const (
 type ConfigMap struct {
 	types.Resource
 	Annotations     map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	BinaryData      map[string]string `json:"binaryData,omitempty" yaml:"binaryData,omitempty"`
 	Created         string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID       string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Data            map[string]string `json:"data,omitempty" yaml:"data,omitempty"`

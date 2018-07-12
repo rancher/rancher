@@ -97,7 +97,7 @@ func (l *statefulSetLister) Get(namespace, name string) (*v1beta2.StatefulSet, e
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    StatefulSetGroupVersionKind.Group,
 			Resource: "statefulSet",
-		}, name)
+		}, key)
 	}
 	return obj.(*v1beta2.StatefulSet), nil
 }

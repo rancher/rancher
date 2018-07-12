@@ -96,7 +96,7 @@ func (l *namespacedCertificateLister) Get(namespace, name string) (*NamespacedCe
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    NamespacedCertificateGroupVersionKind.Group,
 			Resource: "namespacedCertificate",
-		}, name)
+		}, key)
 	}
 	return obj.(*NamespacedCertificate), nil
 }

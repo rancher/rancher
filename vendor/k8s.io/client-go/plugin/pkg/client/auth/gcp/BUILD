@@ -9,13 +9,14 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["gcp_test.go"],
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = ["//vendor/golang.org/x/oauth2:go_default_library"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["gcp.go"],
+    importpath = "k8s.io/client-go/plugin/pkg/client/auth/gcp",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",

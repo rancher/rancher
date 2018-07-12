@@ -43,7 +43,6 @@ const (
 	the Marker for the current call.
 */
 type ListOpts struct {
-
 	// ChangesSince, if provided, instructs List to return only those things which
 	// have changed since the timestamp provided.
 	ChangesSince string `q:"changes-since"`
@@ -151,6 +150,160 @@ func Get(client *gophercloud.ServiceClient, id string) (r GetResult) {
 // Delete deletes the specified flavor ID.
 func Delete(client *gophercloud.ServiceClient, id string) (r DeleteResult) {
 	_, r.Err = client.Delete(deleteURL(client, id), nil)
+	return
+}
+
+// ListAccesses retrieves the tenants which have access to a flavor.
+func ListAccesses(client *gophercloud.ServiceClient, id string) pagination.Pager {
+	url := accessURL(client, id)
+
+	return pagination.NewPager(client, url, func(r pagination.PageResult) pagination.Page {
+		return AccessPage{pagination.SinglePageBase(r)}
+	})
+}
+
+// AddAccessOptsBuilder allows extensions to add additional parameters to the
+// AddAccess requests.
+type AddAccessOptsBuilder interface {
+	ToFlavorAddAccessMap() (map[string]interface{}, error)
+}
+
+// AddAccessOpts represents options for adding access to a flavor.
+type AddAccessOpts struct {
+	// Tenant is the project/tenant ID to grant access.
+	Tenant string `json:"tenant"`
+}
+
+// ToFlavorAddAccessMap constructs a request body from AddAccessOpts.
+func (opts AddAccessOpts) ToFlavorAddAccessMap() (map[string]interface{}, error) {
+	return gophercloud.BuildRequestBody(opts, "addTenantAccess")
+}
+
+// AddAccess grants a tenant/project access to a flavor.
+func AddAccess(client *gophercloud.ServiceClient, id string, opts AddAccessOptsBuilder) (r AddAccessResult) {
+	b, err := opts.ToFlavorAddAccessMap()
+	if err != nil {
+		r.Err = err
+		return
+	}
+	_, r.Err = client.Post(accessActionURL(client, id), b, &r.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
+	})
+	return
+}
+
+// RemoveAccessOptsBuilder allows extensions to add additional parameters to the
+// RemoveAccess requests.
+type RemoveAccessOptsBuilder interface {
+	ToFlavorRemoveAccessMap() (map[string]interface{}, error)
+}
+
+// RemoveAccessOpts represents options for removing access to a flavor.
+type RemoveAccessOpts struct {
+	// Tenant is the project/tenant ID to grant access.
+	Tenant string `json:"tenant"`
+}
+
+// ToFlavorRemoveAccessMap constructs a request body from RemoveAccessOpts.
+func (opts RemoveAccessOpts) ToFlavorRemoveAccessMap() (map[string]interface{}, error) {
+	return gophercloud.BuildRequestBody(opts, "removeTenantAccess")
+}
+
+// RemoveAccess removes/revokes a tenant/project access to a flavor.
+func RemoveAccess(client *gophercloud.ServiceClient, id string, opts RemoveAccessOptsBuilder) (r RemoveAccessResult) {
+	b, err := opts.ToFlavorRemoveAccessMap()
+	if err != nil {
+		r.Err = err
+		return
+	}
+	_, r.Err = client.Post(accessActionURL(client, id), b, &r.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
+	})
+	return
+}
+
+// ExtraSpecs requests all the extra-specs for the given flavor ID.
+func ListExtraSpecs(client *gophercloud.ServiceClient, flavorID string) (r ListExtraSpecsResult) {
+	_, r.Err = client.Get(extraSpecsListURL(client, flavorID), &r.Body, nil)
+	return
+}
+
+func GetExtraSpec(client *gophercloud.ServiceClient, flavorID string, key string) (r GetExtraSpecResult) {
+	_, r.Err = client.Get(extraSpecsGetURL(client, flavorID, key), &r.Body, nil)
+	return
+}
+
+// CreateExtraSpecsOptsBuilder allows extensions to add additional parameters to the
+// CreateExtraSpecs requests.
+type CreateExtraSpecsOptsBuilder interface {
+	ToExtraSpecsCreateMap() (map[string]interface{}, error)
+}
+
+// ExtraSpecsOpts is a map that contains key-value pairs.
+type ExtraSpecsOpts map[string]string
+
+// ToExtraSpecsCreateMap assembles a body for a Create request based on the
+// contents of a ExtraSpecsOpts
+func (opts ExtraSpecsOpts) ToExtraSpecsCreateMap() (map[string]interface{}, error) {
+	return map[string]interface{}{"extra_specs": opts}, nil
+}
+
+// CreateExtraSpecs will create or update the extra-specs key-value pairs for the specified Flavor
+func CreateExtraSpecs(client *gophercloud.ServiceClient, flavorID string, opts CreateExtraSpecsOptsBuilder) (r CreateExtraSpecsResult) {
+	b, err := opts.ToExtraSpecsCreateMap()
+	if err != nil {
+		r.Err = err
+		return
+	}
+	_, r.Err = client.Post(extraSpecsCreateURL(client, flavorID), b, &r.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
+	})
+	return
+}
+
+// UpdateExtraSpecOptsBuilder allows extensions to add additional parameters to the
+// Update request.
+type UpdateExtraSpecOptsBuilder interface {
+	ToExtraSpecUpdateMap() (map[string]string, string, error)
+}
+
+// ToExtraSpecUpdateMap assembles a body for an Update request based on the
+// contents of a ExtraSpecOpts.
+func (opts ExtraSpecsOpts) ToExtraSpecUpdateMap() (map[string]string, string, error) {
+	if len(opts) != 1 {
+		err := gophercloud.ErrInvalidInput{}
+		err.Argument = "flavors.ExtraSpecOpts"
+		err.Info = "Must have 1 and only one key-value pair"
+		return nil, "", err
+	}
+
+	var key string
+	for k := range opts {
+		key = k
+	}
+
+	return opts, key, nil
+}
+
+// UpdateExtraSpec will updates the value of the specified flavor's extra spec for the key in opts.
+func UpdateExtraSpec(client *gophercloud.ServiceClient, flavorID string, opts UpdateExtraSpecOptsBuilder) (r UpdateExtraSpecResult) {
+	b, key, err := opts.ToExtraSpecUpdateMap()
+	if err != nil {
+		r.Err = err
+		return
+	}
+	_, r.Err = client.Put(extraSpecUpdateURL(client, flavorID, key), b, &r.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
+	})
+	return
+}
+
+// DeleteExtraSpec will delete the key-value pair with the given key for the given
+// flavor ID.
+func DeleteExtraSpec(client *gophercloud.ServiceClient, flavorID, key string) (r DeleteExtraSpecResult) {
+	_, r.Err = client.Delete(extraSpecDeleteURL(client, flavorID, key), &gophercloud.RequestOpts{
+		OkCodes: []int{200},
+	})
 	return
 }
 

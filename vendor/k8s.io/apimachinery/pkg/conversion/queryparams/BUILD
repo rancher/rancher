@@ -12,6 +12,7 @@ go_library(
         "convert.go",
         "doc.go",
     ],
+    importpath = "k8s.io/apimachinery/pkg/conversion/queryparams",
 )
 
 go_test(

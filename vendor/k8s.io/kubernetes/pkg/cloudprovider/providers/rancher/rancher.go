@@ -1,6 +1,7 @@
 package rancher
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -78,14 +79,14 @@ func (r *CloudProvider) Zones() (cloudprovider.Zones, bool) {
 // GetZoneByNodeName implements Zones.GetZoneByNodeName
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
-func (r *CloudProvider) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, error) {
+func (r *CloudProvider) GetZoneByNodeName(ctx context.Context, nodeName types.NodeName) (cloudprovider.Zone, error) {
 	return cloudprovider.Zone{}, errors.New("GetZoneByNodeName not imeplemented")
 }
 
 // GetZoneByProviderID implements Zones.GetZoneByProviderID
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
-func (r *CloudProvider) GetZoneByProviderID(providerID string) (cloudprovider.Zone, error) {
+func (r *CloudProvider) GetZoneByProviderID(ctx context.Context, providerID string) (cloudprovider.Zone, error) {
 	return cloudprovider.Zone{}, errors.New("GetZoneByProviderID not implemented")
 }
 
@@ -96,7 +97,7 @@ func (r *CloudProvider) Instances() (cloudprovider.Instances, bool) {
 
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
-func (c *CloudProvider) InstanceExistsByProviderID(providerID string) (bool, error) {
+func (c *CloudProvider) InstanceExistsByProviderID(pctx context.Context, roviderID string) (bool, error) {
 	return false, errors.New("InstanceExistsByProviderID not imeplemented")
 }
 
@@ -136,7 +137,7 @@ type hostAndIPAddresses struct {
 }
 
 // GetLoadBalancer is an implementation of LoadBalancer.GetLoadBalancer
-func (r *CloudProvider) GetLoadBalancer(clusterName string, service *api.Service) (status *api.LoadBalancerStatus, exists bool, retErr error) {
+func (r *CloudProvider) GetLoadBalancer(ctx context.Context, clusterName string, service *api.Service) (status *api.LoadBalancerStatus, exists bool, retErr error) {
 	name := formatLBName(cloudprovider.GetLoadBalancerName(service))
 	glog.Infof("GetLoadBalancer [%s]", name)
 
@@ -154,7 +155,7 @@ func (r *CloudProvider) GetLoadBalancer(clusterName string, service *api.Service
 }
 
 // EnsureLoadBalancer is an implementation of LoadBalancer.EnsureLoadBalancer.
-func (r *CloudProvider) EnsureLoadBalancer(clusterName string, service *api.Service, nodes []*api.Node) (*api.LoadBalancerStatus, error) {
+func (r *CloudProvider) EnsureLoadBalancer(ctx context.Context, clusterName string, service *api.Service, nodes []*api.Node) (*api.LoadBalancerStatus, error) {
 	hosts := []string{}
 
 	for _, node := range nodes {
@@ -329,7 +330,7 @@ func convertLB(intf interface{}) *client.LoadBalancerService {
 }
 
 // UpdateLoadBalancer is an implementation of LoadBalancer.UpdateLoadBalancer.
-func (r *CloudProvider) UpdateLoadBalancer(clusterName string, service *api.Service, nodes []*api.Node) error {
+func (r *CloudProvider) UpdateLoadBalancer(ctx context.Context, clusterName string, service *api.Service, nodes []*api.Node) error {
 	hosts := []string{}
 
 	for _, node := range nodes {
@@ -361,7 +362,7 @@ func (r *CloudProvider) UpdateLoadBalancer(clusterName string, service *api.Serv
 }
 
 // EnsureLoadBalancerDeleted is an implementation of LoadBalancer.EnsureLoadBalancerDeleted.
-func (r *CloudProvider) EnsureLoadBalancerDeleted(clusterName string, service *api.Service) error {
+func (r *CloudProvider) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *api.Service) error {
 	name := formatLBName(cloudprovider.GetLoadBalancerName(service))
 	glog.Infof("EnsureLoadBalancerDeleted [%s]", name)
 	lb, err := r.getLBByName(name)
@@ -661,7 +662,7 @@ func (r *CloudProvider) deleteLBConsumedServices(lb *client.LoadBalancerService)
 // This implementation only returns the address of the calling instance. This is ok
 // because the gce implementation makes that assumption and the comment for the interface
 // states it as a todo to clarify that it is only for the current host
-func (r *CloudProvider) NodeAddresses(nodeName types.NodeName) ([]api.NodeAddress, error) {
+func (r *CloudProvider) NodeAddresses(ctx context.Context, nodeName types.NodeName) ([]api.NodeAddress, error) {
 	host, err := r.hostGetOrFetchFromCache(string(nodeName))
 	if err != nil {
 		return nil, err
@@ -678,14 +679,14 @@ func (r *CloudProvider) NodeAddresses(nodeName types.NodeName) ([]api.NodeAddres
 }
 
 // ExternalID returns the cloud provider ID of the specified instance (deprecated).
-func (r *CloudProvider) ExternalID(nodeName types.NodeName) (string, error) {
+func (r *CloudProvider) ExternalID(ctx context.Context, nodeName types.NodeName) (string, error) {
 	name := string(nodeName)
 	glog.Infof("ExternalID [%s]", name)
-	return r.InstanceID(nodeName)
+	return r.InstanceID(ctx, nodeName)
 }
 
 // InstanceID returns the cloud provider ID of the specified instance.
-func (r *CloudProvider) InstanceID(nodeName types.NodeName) (string, error) {
+func (r *CloudProvider) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
 	name := string(nodeName)
 	glog.Infof("InstanceID [%s]", name)
 	host, err := r.hostGetOrFetchFromCache(name)
@@ -698,8 +699,8 @@ func (r *CloudProvider) InstanceID(nodeName types.NodeName) (string, error) {
 
 // InstanceType returns the type of the specified instance.
 // Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
-func (r *CloudProvider) InstanceType(nodeName types.NodeName) (string, error) {
-	_, err := r.InstanceID(nodeName)
+func (r *CloudProvider) InstanceType(ctx context.Context, nodeName types.NodeName) (string, error) {
+	_, err := r.InstanceID(ctx, nodeName)
 	if err != nil {
 		return "", err
 	}
@@ -711,7 +712,7 @@ func (r *CloudProvider) InstanceType(nodeName types.NodeName) (string, error) {
 // InstanceTypeByProviderID returns the cloudprovider instance type of the node with the specified unique providerID
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
-func (r *CloudProvider) InstanceTypeByProviderID(providerID string) (string, error) {
+func (r *CloudProvider) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
 	return "", errors.New("unimplemented")
 }
 
@@ -751,19 +752,19 @@ func (r *CloudProvider) List(filter string) ([]types.NodeName, error) {
 
 // AddSSHKeyToAllInstances adds an SSH public key as a legal identity for all instances
 // expected format for the key is standard ssh-keygen format: <protocol> <blob>
-func (r *CloudProvider) AddSSHKeyToAllInstances(user string, keyData []byte) error {
+func (r *CloudProvider) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
 	return fmt.Errorf("Not implemented")
 }
 
 // NodeAddressesByProviderID returns the node addresses of an instances with the specified unique providerID
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
-func (r *CloudProvider) NodeAddressesByProviderID(providerID string) ([]api.NodeAddress, error) {
+func (r *CloudProvider) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]api.NodeAddress, error) {
 	return []api.NodeAddress{}, errors.New("unimplemented")
 }
 
 // CurrentNodeName returns the name of the node we are currently running on
-func (r *CloudProvider) CurrentNodeName(hostname string) (types.NodeName, error) {
+func (r *CloudProvider) CurrentNodeName(ctx context.Context, hostname string) (types.NodeName, error) {
 	return types.NodeName(hostname), nil
 }
 
@@ -878,7 +879,7 @@ func (r *CloudProvider) getHostByName(name string) (*Host, error) {
 // --- Zones Functions ---
 
 // GetZone is an implementation of Zones.GetZone
-func (r *CloudProvider) GetZone() (cloudprovider.Zone, error) {
+func (r *CloudProvider) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 	return cloudprovider.Zone{
 		FailureDomain: "FailureDomain1",
 		Region:        "Region1",

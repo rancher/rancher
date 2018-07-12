@@ -97,7 +97,7 @@ func (l *roleLister) Get(namespace, name string) (*v1.Role, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    RoleGroupVersionKind.Group,
 			Resource: "role",
-		}, name)
+		}, key)
 	}
 	return obj.(*v1.Role), nil
 }

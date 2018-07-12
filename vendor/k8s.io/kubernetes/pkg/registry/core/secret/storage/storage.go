@@ -20,7 +20,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/core/secret"
 )
 
@@ -31,7 +34,6 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against secrets.
 func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	store := &genericregistry.Store{
-		Copier:                   api.Scheme,
 		NewFunc:                  func() runtime.Object { return &api.Secret{} },
 		NewListFunc:              func() runtime.Object { return &api.SecretList{} },
 		PredicateFunc:            secret.Matcher,
@@ -41,6 +43,8 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		UpdateStrategy: secret.Strategy,
 		DeleteStrategy: secret.Strategy,
 		ExportStrategy: secret.Strategy,
+
+		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: secret.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {

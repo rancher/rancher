@@ -13,7 +13,7 @@ go_test(
         "sio_util_test.go",
         "sio_volume_test.go",
     ],
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
@@ -38,13 +38,13 @@ go_library(
         "sio_util.go",
         "sio_volume.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/volume/scaleio",
     deps = [
         "//pkg/util/keymutex:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
-        "//pkg/volume/util/volumehelper:go_default_library",
         "//vendor/github.com/codedellemc/goscaleio:go_default_library",
         "//vendor/github.com/codedellemc/goscaleio/types/v1:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

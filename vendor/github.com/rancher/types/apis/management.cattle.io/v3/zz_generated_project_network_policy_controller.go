@@ -96,7 +96,7 @@ func (l *projectNetworkPolicyLister) Get(namespace, name string) (*ProjectNetwor
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ProjectNetworkPolicyGroupVersionKind.Group,
 			Resource: "projectNetworkPolicy",
-		}, name)
+		}, key)
 	}
 	return obj.(*ProjectNetworkPolicy), nil
 }

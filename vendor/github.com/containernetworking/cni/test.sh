@@ -5,14 +5,14 @@
 #   ./test -v
 #
 # Run tests for one package
-#   PKG=./plugins/ipam/dhcp ./test
+#   PKG=./libcni ./test
 #
 set -e
 
 source ./build.sh
 
-TESTABLE="libcni plugins/ipam/dhcp plugins/ipam/host-local plugins/ipam/host-local/backend/allocator plugins/main/loopback pkg/invoke pkg/ns pkg/skel pkg/types pkg/types/current pkg/types/020 pkg/utils plugins/main/ipvlan plugins/main/macvlan plugins/main/bridge plugins/main/ptp plugins/test/noop pkg/utils/hwaddr pkg/ip pkg/version pkg/version/testhelpers plugins/meta/flannel pkg/ipam"
-FORMATTABLE="$TESTABLE pkg/testutils plugins/meta/flannel plugins/meta/tuning"
+TESTABLE="libcni pkg/invoke pkg/skel pkg/types pkg/types/current pkg/types/020 pkg/version pkg/version/testhelpers plugins/test/noop"
+FORMATTABLE="$TESTABLE"
 
 # user has not provided PKG override
 if [ -z "$PKG" ]; then

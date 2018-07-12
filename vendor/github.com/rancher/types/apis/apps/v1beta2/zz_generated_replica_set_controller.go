@@ -97,7 +97,7 @@ func (l *replicaSetLister) Get(namespace, name string) (*v1beta2.ReplicaSet, err
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ReplicaSetGroupVersionKind.Group,
 			Resource: "replicaSet",
-		}, name)
+		}, key)
 	}
 	return obj.(*v1beta2.ReplicaSet), nil
 }

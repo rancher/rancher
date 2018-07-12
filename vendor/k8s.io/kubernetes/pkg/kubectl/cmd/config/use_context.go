@@ -45,8 +45,10 @@ func NewCmdConfigUseContext(out io.Writer, configAccess clientcmd.ConfigAccess) 
 	options := &useContextOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use:     "use-context CONTEXT_NAME",
+		Use: "use-context CONTEXT_NAME",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Sets the current-context in a kubeconfig file"),
+		Aliases: []string{"use"},
 		Long:    `Sets the current-context in a kubeconfig file`,
 		Example: use_context_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -72,18 +74,13 @@ func (o useContextOptions) run() error {
 
 	config.CurrentContext = o.contextName
 
-	if err := clientcmd.ModifyConfig(o.configAccess, *config, true); err != nil {
-		return err
-	}
-
-	return nil
+	return clientcmd.ModifyConfig(o.configAccess, *config, true)
 }
 
 func (o *useContextOptions) complete(cmd *cobra.Command) error {
 	endingArgs := cmd.Flags().Args()
 	if len(endingArgs) != 1 {
-		cmd.Help()
-		return fmt.Errorf("Unexpected args: %v", endingArgs)
+		return helpErrorf(cmd, "Unexpected args: %v", endingArgs)
 	}
 
 	o.contextName = endingArgs[0]
@@ -92,7 +89,7 @@ func (o *useContextOptions) complete(cmd *cobra.Command) error {
 
 func (o useContextOptions) validate(config *clientcmdapi.Config) error {
 	if len(o.contextName) == 0 {
-		return errors.New("you must specify a current-context")
+		return errors.New("empty context names are not allowed")
 	}
 
 	for name := range config.Contexts {

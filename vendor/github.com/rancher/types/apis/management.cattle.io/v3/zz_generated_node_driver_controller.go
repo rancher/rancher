@@ -95,7 +95,7 @@ func (l *nodeDriverLister) Get(namespace, name string) (*NodeDriver, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    NodeDriverGroupVersionKind.Group,
 			Resource: "nodeDriver",
-		}, name)
+		}, key)
 	}
 	return obj.(*NodeDriver), nil
 }

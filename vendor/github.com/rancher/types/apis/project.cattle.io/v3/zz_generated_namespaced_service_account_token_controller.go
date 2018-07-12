@@ -96,7 +96,7 @@ func (l *namespacedServiceAccountTokenLister) Get(namespace, name string) (*Name
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    NamespacedServiceAccountTokenGroupVersionKind.Group,
 			Resource: "namespacedServiceAccountToken",
-		}, name)
+		}, key)
 	}
 	return obj.(*NamespacedServiceAccountToken), nil
 }

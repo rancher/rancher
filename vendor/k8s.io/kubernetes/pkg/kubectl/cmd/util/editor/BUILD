@@ -10,14 +10,16 @@ go_library(
         "editoptions.go",
         "editor.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util/editor",
     visibility = [
         "//build/visible_to:pkg_kubectl_cmd_util_editor_CONSUMERS",
     ],
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
+        "//pkg/kubectl/scheme:go_default_library",
         "//pkg/kubectl/util/crlf:go_default_library",
         "//pkg/kubectl/util/term:go_default_library",
         "//pkg/printers:go_default_library",
@@ -40,7 +42,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["editor_test.go"],
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 filegroup(

@@ -96,7 +96,7 @@ func (l *appLister) Get(namespace, name string) (*App, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    AppGroupVersionKind.Group,
 			Resource: "app",
-		}, name)
+		}, key)
 	}
 	return obj.(*App), nil
 }

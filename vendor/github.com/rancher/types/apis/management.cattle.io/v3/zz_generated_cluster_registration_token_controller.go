@@ -96,7 +96,7 @@ func (l *clusterRegistrationTokenLister) Get(namespace, name string) (*ClusterRe
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ClusterRegistrationTokenGroupVersionKind.Group,
 			Resource: "clusterRegistrationToken",
-		}, name)
+		}, key)
 	}
 	return obj.(*ClusterRegistrationToken), nil
 }

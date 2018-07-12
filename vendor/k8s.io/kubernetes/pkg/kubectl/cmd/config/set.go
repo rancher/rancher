@@ -56,7 +56,8 @@ func NewCmdConfigSet(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.
 	options := &setOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use:   "set PROPERTY_NAME PROPERTY_VALUE",
+		Use: "set PROPERTY_NAME PROPERTY_VALUE",
+		DisableFlagsInUseLine: true,
 		Short: i18n.T("Sets an individual value in a kubeconfig file"),
 		Long:  set_long,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -106,8 +107,7 @@ func (o setOptions) run() error {
 func (o *setOptions) complete(cmd *cobra.Command) error {
 	endingArgs := cmd.Flags().Args()
 	if len(endingArgs) != 2 {
-		cmd.Help()
-		return fmt.Errorf("Unexpected args: %v", endingArgs)
+		return helpErrorf(cmd, "Unexpected args: %v", endingArgs)
 	}
 
 	o.propertyValue = endingArgs[1]
@@ -153,6 +153,9 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 
 		needToSetNewMapValue := currMapValue.Kind() == reflect.Invalid
 		if needToSetNewMapValue {
+			if unset {
+				return fmt.Errorf("current map key `%v` is invalid", mapKey.Interface())
+			}
 			currMapValue = reflect.New(mapValueType.Elem()).Elem().Addr()
 			actualCurrValue.SetMapIndex(mapKey, currMapValue)
 		}

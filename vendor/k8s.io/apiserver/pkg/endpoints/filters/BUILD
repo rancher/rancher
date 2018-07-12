@@ -17,7 +17,7 @@ go_test(
         "legacy_audit_test.go",
         "requestinfo_test.go",
     ],
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//vendor/github.com/pborman/uuid:go_default_library",
         "//vendor/k8s.io/api/authentication/v1:go_default_library",
@@ -50,6 +50,7 @@ go_library(
         "legacy_audit.go",
         "requestinfo.go",
     ],
+    importpath = "k8s.io/apiserver/pkg/endpoints/filters",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/pborman/uuid:go_default_library",

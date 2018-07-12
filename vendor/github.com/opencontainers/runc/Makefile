@@ -1,4 +1,4 @@
-.PHONY: all shell dbuild man \
+.PHONY: all shell dbuild man release \
 	    localtest localunittest localintegration \
 	    test unittest integration
 
@@ -39,8 +39,8 @@ contrib/cmd/recvtty/recvtty: $(SOURCES)
 	$(GO) build -buildmode=pie $(EXTRA_FLAGS) -ldflags "-X main.gitCommit=${COMMIT} -X main.version=${VERSION} $(EXTRA_LDFLAGS)" -tags "$(BUILDTAGS)" -o contrib/cmd/recvtty/recvtty ./contrib/cmd/recvtty
 
 static: $(SOURCES)
-	CGO_ENABLED=1 $(GO) build $(EXTRA_FLAGS) -tags "$(BUILDTAGS) cgo static_build" -ldflags "-w -extldflags -static -X main.gitCommit=${COMMIT} -X main.version=${VERSION} $(EXTRA_LDFLAGS)" -o runc .
-	CGO_ENABLED=1 $(GO) build $(EXTRA_FLAGS) -tags "$(BUILDTAGS) cgo static_build" -ldflags "-w -extldflags -static -X main.gitCommit=${COMMIT} -X main.version=${VERSION} $(EXTRA_LDFLAGS)" -o contrib/cmd/recvtty/recvtty ./contrib/cmd/recvtty
+	CGO_ENABLED=1 $(GO) build $(EXTRA_FLAGS) -tags "$(BUILDTAGS) netgo cgo static_build" -installsuffix netgo -ldflags "-w -extldflags -static -X main.gitCommit=${COMMIT} -X main.version=${VERSION} $(EXTRA_LDFLAGS)" -o runc .
+	CGO_ENABLED=1 $(GO) build $(EXTRA_FLAGS) -tags "$(BUILDTAGS) netgo cgo static_build" -installsuffix netgo -ldflags "-w -extldflags -static -X main.gitCommit=${COMMIT} -X main.version=${VERSION} $(EXTRA_LDFLAGS)" -o contrib/cmd/recvtty/recvtty ./contrib/cmd/recvtty
 
 release:
 	script/release.sh -r release/$(VERSION) -v $(VERSION)
@@ -65,25 +65,24 @@ localtest:
 	make localunittest localintegration localrootlessintegration
 
 unittest: runcimage
-	docker run -e TESTFLAGS -t --privileged --rm -v $(CURDIR):/go/src/$(PROJECT) $(RUNC_IMAGE) make localunittest
+	docker run -e TESTFLAGS -t --privileged --rm -v /lib/modules:/lib/modules:ro -v $(CURDIR):/go/src/$(PROJECT) $(RUNC_IMAGE) make localunittest
 
 localunittest: all
 	$(GO) test -timeout 3m -tags "$(BUILDTAGS)" ${TESTFLAGS} -v $(allpackages)
 
 integration: runcimage
-	docker run -e TESTFLAGS -t --privileged --rm -v $(CURDIR):/go/src/$(PROJECT) $(RUNC_IMAGE) make localintegration
+	docker run -e TESTFLAGS -t --privileged --rm -v /lib/modules:/lib/modules:ro -v $(CURDIR):/go/src/$(PROJECT) $(RUNC_IMAGE) make localintegration
 
 localintegration: all
 	bats -t tests/integration${TESTFLAGS}
 
 rootlessintegration: runcimage
-	docker run -e TESTFLAGS -t --privileged --rm -v $(CURDIR):/go/src/$(PROJECT) --cap-drop=ALL -u rootless $(RUNC_IMAGE) make localintegration
+	docker run -e TESTFLAGS -t --privileged --rm -v $(CURDIR):/go/src/$(PROJECT) $(RUNC_IMAGE) make localrootlessintegration
 
-# FIXME: This should not be separate from rootlessintegration's method of running.
 localrootlessintegration: all
-	sudo -u rootless -H PATH="${PATH}" bats -t tests/integration${TESTFLAGS}
+	tests/rootless.sh
 
-shell: all
+shell: runcimage
 	docker run -e TESTFLAGS -ti --privileged --rm -v $(CURDIR):/go/src/$(PROJECT) $(RUNC_IMAGE) bash
 
 install:
@@ -113,6 +112,7 @@ clean:
 
 validate:
 	script/validate-gofmt
+	script/validate-c
 	$(GO) vet $(allpackages)
 
 ci: validate test release

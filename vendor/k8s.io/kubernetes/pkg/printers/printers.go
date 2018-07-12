@@ -21,7 +21,6 @@ import (
 	"io/ioutil"
 	"os"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -29,12 +28,8 @@ import (
 // a printer or an error. The printer is agnostic to schema versions, so you must
 // send arguments to PrintObj in the version you wish them to be shown using a
 // VersionedPrinter (typically when generic is true).
-func GetStandardPrinter(outputOpts *OutputOptions, noHeaders bool, mapper meta.RESTMapper, typer runtime.ObjectTyper, encoder runtime.Encoder, decoders []runtime.Decoder, options PrintOptions) (ResourcePrinter, error) {
-	if outputOpts == nil {
-		return nil, fmt.Errorf("no output options specified")
-	}
-
-	format, formatArgument, allowMissingTemplateKeys := outputOpts.FmtType, outputOpts.FmtArg, outputOpts.AllowMissingKeys
+func GetStandardPrinter(typer runtime.ObjectTyper, encoder runtime.Encoder, decoders []runtime.Decoder, options PrintOptions) (ResourcePrinter, error) {
+	format, formatArgument, allowMissingTemplateKeys := options.OutputFormatType, options.OutputFormatArgument, options.AllowMissingKeys
 
 	var printer ResourcePrinter
 	switch format {
@@ -49,7 +44,6 @@ func GetStandardPrinter(outputOpts *OutputOptions, noHeaders bool, mapper meta.R
 		printer = &NamePrinter{
 			Typer:    typer,
 			Decoders: decoders,
-			Mapper:   mapper,
 		}
 
 	case "template", "go-template":
@@ -106,7 +100,7 @@ func GetStandardPrinter(outputOpts *OutputOptions, noHeaders bool, mapper meta.R
 
 	case "custom-columns":
 		var err error
-		if printer, err = NewCustomColumnsPrinterFromSpec(formatArgument, decoders[0], noHeaders); err != nil {
+		if printer, err = NewCustomColumnsPrinterFromSpec(formatArgument, decoders[0], options.NoHeaders); err != nil {
 			return nil, err
 		}
 

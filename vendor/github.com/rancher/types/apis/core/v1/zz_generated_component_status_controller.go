@@ -96,7 +96,7 @@ func (l *componentStatusLister) Get(namespace, name string) (*v1.ComponentStatus
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ComponentStatusGroupVersionKind.Group,
 			Resource: "componentStatus",
-		}, name)
+		}, key)
 	}
 	return obj.(*v1.ComponentStatus), nil
 }

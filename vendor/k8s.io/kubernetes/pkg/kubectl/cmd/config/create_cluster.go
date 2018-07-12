@@ -63,7 +63,8 @@ func NewCmdConfigSetCluster(out io.Writer, configAccess clientcmd.ConfigAccess) 
 	options := &createClusterOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use:     fmt.Sprintf("set-cluster NAME [--%v=server] [--%v=path/to/certificate/authority] [--%v=true]", clientcmd.FlagAPIServer, clientcmd.FlagCAFile, clientcmd.FlagInsecure),
+		Use: fmt.Sprintf("set-cluster NAME [--%v=server] [--%v=path/to/certificate/authority] [--%v=true]", clientcmd.FlagAPIServer, clientcmd.FlagCAFile, clientcmd.FlagInsecure),
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Sets a cluster entry in kubeconfig"),
 		Long:    create_cluster_long,
 		Example: create_cluster_example,
@@ -150,8 +151,7 @@ func (o *createClusterOptions) modifyCluster(existingCluster clientcmdapi.Cluste
 func (o *createClusterOptions) complete(cmd *cobra.Command) error {
 	args := cmd.Flags().Args()
 	if len(args) != 1 {
-		cmd.Help()
-		return fmt.Errorf("Unexpected args: %v", args)
+		return helpErrorf(cmd, "Unexpected args: %v", args)
 	}
 
 	o.name = args[0]

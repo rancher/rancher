@@ -9,12 +9,13 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["clock_test.go"],
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["clock.go"],
+    importpath = "k8s.io/apimachinery/pkg/util/clock",
 )
 
 filegroup(

@@ -97,7 +97,7 @@ func (l *jobLister) Get(namespace, name string) (*v1.Job, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    JobGroupVersionKind.Group,
 			Resource: "job",
-		}, name)
+		}, key)
 	}
 	return obj.(*v1.Job), nil
 }

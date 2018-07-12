@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["metrics.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/metrics",
     deps = [
         "//pkg/kubelet/container:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -24,6 +25,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubelet/metrics/collectors:all-srcs",
+    ],
     tags = ["automanaged"],
 )

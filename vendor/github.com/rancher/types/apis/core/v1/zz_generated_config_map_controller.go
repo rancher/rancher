@@ -97,7 +97,7 @@ func (l *configMapLister) Get(namespace, name string) (*v1.ConfigMap, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ConfigMapGroupVersionKind.Group,
 			Resource: "configMap",
-		}, name)
+		}, key)
 	}
 	return obj.(*v1.ConfigMap), nil
 }

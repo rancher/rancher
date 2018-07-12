@@ -10,7 +10,9 @@ go_library(
     srcs = [
         "expansion_generated.go",
         "storageclass.go",
+        "volumeattachment.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/client/listers/storage/internalversion",
     deps = [
         "//pkg/apis/storage:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

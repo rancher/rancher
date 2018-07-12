@@ -3,6 +3,7 @@ package(default_visibility = ["//visibility:public"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
+    "go_test",
 )
 
 go_library(
@@ -13,11 +14,13 @@ go_library(
         "customresource_discovery_controller.go",
         "customresource_handler.go",
     ],
+    importpath = "k8s.io/apiextensions-apiserver/pkg/apiserver",
     deps = [
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/go-openapi/strfmt:go_default_library",
         "//vendor/github.com/go-openapi/validate:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/api/autoscaling/v1:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
@@ -30,7 +33,9 @@ go_library(
         "//vendor/k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/controller/finalizer:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/controller/status:go_default_library",
+        "//vendor/k8s.io/apiextensions-apiserver/pkg/features:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/registry/customresource:go_default_library",
+        "//vendor/k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/registry/customresourcedefinition:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
@@ -52,13 +57,19 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/discovery:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/handlers:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/endpoints/handlers/responsewriters:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/endpoints/metrics:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/rest:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server/storage:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/client-go/discovery:go_default_library",
+        "//vendor/k8s.io/client-go/scale:go_default_library",
+        "//vendor/k8s.io/client-go/scale/scheme/autoscalingv1:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
         "//vendor/k8s.io/client-go/util/workqueue:go_default_library",
     ],
@@ -78,4 +89,11 @@ filegroup(
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/validation:all-srcs",
     ],
     tags = ["automanaged"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["customresource_handler_test.go"],
+    embed = [":go_default_library"],
+    deps = ["//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library"],
 )

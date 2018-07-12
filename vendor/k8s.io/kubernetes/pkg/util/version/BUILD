@@ -12,12 +12,13 @@ go_library(
         "doc.go",
         "version.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/util/version",
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["version_test.go"],
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 filegroup(

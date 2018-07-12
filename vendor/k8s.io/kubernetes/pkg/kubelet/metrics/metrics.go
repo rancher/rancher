@@ -30,10 +30,6 @@ const (
 	PodWorkerLatencyKey          = "pod_worker_latency_microseconds"
 	PodStartLatencyKey           = "pod_start_latency_microseconds"
 	CgroupManagerOperationsKey   = "cgroup_manager_latency_microseconds"
-	DockerOperationsLatencyKey   = "docker_operations_latency_microseconds"
-	DockerOperationsKey          = "docker_operations"
-	DockerOperationsErrorsKey    = "docker_operations_errors"
-	DockerOperationsTimeoutKey   = "docker_operations_timeout"
 	PodWorkerStartLatencyKey     = "pod_worker_start_latency_microseconds"
 	PLEGRelistLatencyKey         = "pleg_relist_latency_microseconds"
 	PLEGRelistIntervalKey        = "pleg_relist_interval_microseconds"
@@ -48,6 +44,9 @@ const (
 	RuntimeOperationsKey        = "runtime_operations"
 	RuntimeOperationsLatencyKey = "runtime_operations_latency_microseconds"
 	RuntimeOperationsErrorsKey  = "runtime_operations_errors"
+	// Metrics keys of device plugin operations
+	DevicePluginRegistrationCountKey = "device_plugin_registration_count"
+	DevicePluginAllocationLatencyKey = "device_plugin_alloc_latency_microseconds"
 )
 
 var (
@@ -87,39 +86,6 @@ var (
 			Name:      PodWorkerStartLatencyKey,
 			Help:      "Latency in microseconds from seeing a pod to starting a worker.",
 		},
-	)
-	// TODO(random-liu): Move the following docker metrics into shim once dockertools is deprecated.
-	DockerOperationsLatency = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      DockerOperationsLatencyKey,
-			Help:      "Latency in microseconds of Docker operations. Broken down by operation type.",
-		},
-		[]string{"operation_type"},
-	)
-	DockerOperations = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      DockerOperationsKey,
-			Help:      "Cumulative number of Docker operations by operation type.",
-		},
-		[]string{"operation_type"},
-	)
-	DockerOperationsErrors = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      DockerOperationsErrorsKey,
-			Help:      "Cumulative number of Docker operation errors by operation type.",
-		},
-		[]string{"operation_type"},
-	)
-	DockerOperationsTimeout = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      DockerOperationsTimeoutKey,
-			Help:      "Cumulative number of Docker operation timeout by operation type.",
-		},
-		[]string{"operation_type"},
 	)
 	PLEGRelistLatency = prometheus.NewSummary(
 		prometheus.SummaryOpts{
@@ -168,71 +134,35 @@ var (
 		},
 		[]string{"eviction_signal"},
 	)
-	VolumeStatsCapacityBytes = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
+	DevicePluginRegistrationCount = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
 			Subsystem: KubeletSubsystem,
-			Name:      VolumeStatsCapacityBytesKey,
-			Help:      "Capacity in bytes of the volume",
+			Name:      DevicePluginRegistrationCountKey,
+			Help:      "Cumulative number of device plugin registrations. Broken down by resource name.",
 		},
-		[]string{"namespace", "persistentvolumeclaim"},
+		[]string{"resource_name"},
 	)
-	VolumeStatsAvailableBytes = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
+	DevicePluginAllocationLatency = prometheus.NewSummaryVec(
+		prometheus.SummaryOpts{
 			Subsystem: KubeletSubsystem,
-			Name:      VolumeStatsAvailableBytesKey,
-			Help:      "Number of available bytes in the volume",
+			Name:      DevicePluginAllocationLatencyKey,
+			Help:      "Latency in microseconds to serve a device plugin Allocation request. Broken down by resource name.",
 		},
-		[]string{"namespace", "persistentvolumeclaim"},
-	)
-	VolumeStatsUsedBytes = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      VolumeStatsUsedBytesKey,
-			Help:      "Number of used bytes in the volume",
-		},
-		[]string{"namespace", "persistentvolumeclaim"},
-	)
-	VolumeStatsInodes = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      VolumeStatsInodesKey,
-			Help:      "Maximum number of inodes in the volume",
-		},
-		[]string{"namespace", "persistentvolumeclaim"},
-	)
-	VolumeStatsInodesFree = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      VolumeStatsInodesFreeKey,
-			Help:      "Number of free inodes in the volume",
-		},
-		[]string{"namespace", "persistentvolumeclaim"},
-	)
-	VolumeStatsInodesUsed = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      VolumeStatsInodesUsedKey,
-			Help:      "Number of used inodes in the volume",
-		},
-		[]string{"namespace", "persistentvolumeclaim"},
+		[]string{"resource_name"},
 	)
 )
 
 var registerMetrics sync.Once
 
 // Register all metrics.
-func Register(containerCache kubecontainer.RuntimeCache) {
+func Register(containerCache kubecontainer.RuntimeCache, collectors ...prometheus.Collector) {
 	// Register the metrics.
 	registerMetrics.Do(func() {
 		prometheus.MustRegister(PodWorkerLatency)
 		prometheus.MustRegister(PodStartLatency)
-		prometheus.MustRegister(DockerOperationsLatency)
 		prometheus.MustRegister(CgroupManagerLatency)
 		prometheus.MustRegister(PodWorkerStartLatency)
 		prometheus.MustRegister(ContainersPerPodCount)
-		prometheus.MustRegister(DockerOperations)
-		prometheus.MustRegister(DockerOperationsErrors)
-		prometheus.MustRegister(DockerOperationsTimeout)
 		prometheus.MustRegister(newPodAndContainerCollector(containerCache))
 		prometheus.MustRegister(PLEGRelistLatency)
 		prometheus.MustRegister(PLEGRelistInterval)
@@ -240,12 +170,11 @@ func Register(containerCache kubecontainer.RuntimeCache) {
 		prometheus.MustRegister(RuntimeOperationsLatency)
 		prometheus.MustRegister(RuntimeOperationsErrors)
 		prometheus.MustRegister(EvictionStatsAge)
-		prometheus.MustRegister(VolumeStatsCapacityBytes)
-		prometheus.MustRegister(VolumeStatsAvailableBytes)
-		prometheus.MustRegister(VolumeStatsUsedBytes)
-		prometheus.MustRegister(VolumeStatsInodes)
-		prometheus.MustRegister(VolumeStatsInodesFree)
-		prometheus.MustRegister(VolumeStatsInodesUsed)
+		prometheus.MustRegister(DevicePluginRegistrationCount)
+		prometheus.MustRegister(DevicePluginAllocationLatency)
+		for _, collector := range collectors {
+			prometheus.MustRegister(collector)
+		}
 	})
 }
 

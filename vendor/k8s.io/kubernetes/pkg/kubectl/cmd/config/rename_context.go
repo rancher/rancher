@@ -43,7 +43,7 @@ const (
 
 var (
 	renameContextLong = templates.LongDesc(`
-		Renames a context from the kubeconfig file .
+		Renames a context from the kubeconfig file.
 
 		CONTEXT_NAME is the context name that you wish change.
 
@@ -61,7 +61,8 @@ func NewCmdConfigRenameContext(out io.Writer, configAccess clientcmd.ConfigAcces
 	options := &RenameContextOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use:     renameContextUse,
+		Use: renameContextUse,
+		DisableFlagsInUseLine: true,
 		Short:   renameContextShort,
 		Long:    renameContextLong,
 		Example: renameContextExample,
@@ -70,7 +71,7 @@ func NewCmdConfigRenameContext(out io.Writer, configAccess clientcmd.ConfigAcces
 				cmdutil.CheckErr(err)
 			}
 			if err := options.Validate(); err != nil {
-				cmdutil.UsageErrorf(cmd, err.Error())
+				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, err.Error()))
 			}
 			if err := options.RunRenameContext(out); err != nil {
 				cmdutil.CheckErr(err)
@@ -83,8 +84,7 @@ func NewCmdConfigRenameContext(out io.Writer, configAccess clientcmd.ConfigAcces
 // Complete assigns RenameContextOptions from the args.
 func (o *RenameContextOptions) Complete(cmd *cobra.Command, args []string, out io.Writer) error {
 	if len(args) != 2 {
-		cmd.Help()
-		return fmt.Errorf("Unexpected args: %v", args)
+		return helpErrorf(cmd, "Unexpected args: %v", args)
 	}
 
 	o.contextName = args[0]
@@ -131,6 +131,6 @@ func (o RenameContextOptions) RunRenameContext(out io.Writer) error {
 		return err
 	}
 
-	fmt.Fprintf(out, "Context %q was renamed to %q.\n", o.contextName, o.newName)
+	fmt.Fprintf(out, "Context %q renamed to %q.\n", o.contextName, o.newName)
 	return nil
 }

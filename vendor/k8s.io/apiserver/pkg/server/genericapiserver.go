@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
 	genericapi "k8s.io/apiserver/pkg/endpoints"
@@ -83,6 +84,10 @@ type GenericAPIServer struct {
 	// minRequestTimeout is how short the request timeout can be.  This is used to build the RESTHandler
 	minRequestTimeout time.Duration
 
+	// ShutdownTimeout is the timeout used for server shutdown. This specifies the timeout before server
+	// gracefully shutdown returns.
+	ShutdownTimeout time.Duration
+
 	// legacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
 	// to InstallLegacyAPIGroup
 	legacyAPIGroupPrefixes sets.String
@@ -94,9 +99,6 @@ type GenericAPIServer struct {
 	requestContextMapper apirequest.RequestContextMapper
 
 	SecureServingInfo *SecureServingInfo
-
-	// numerical ports, set after listening
-	effectiveSecurePort int
 
 	// ExternalAddress is the address (hostname or IP and port) that should be used in
 	// external (public internet) URLs for this GenericAPIServer.
@@ -128,6 +130,10 @@ type GenericAPIServer struct {
 	postStartHooksCalled   bool
 	disabledPostStartHooks sets.String
 
+	preShutdownHookLock    sync.Mutex
+	preShutdownHooks       map[string]preShutdownHookEntry
+	preShutdownHooksCalled bool
+
 	// healthz checks
 	healthzLock    sync.Mutex
 	healthzChecks  []healthz.HealthzChecker
@@ -142,6 +148,9 @@ type GenericAPIServer struct {
 
 	// delegationTarget is the next delegate in the chain or nil
 	delegationTarget DelegationTarget
+
+	// HandlerChainWaitGroup allows you to wait for all chain handlers finish after the server shutdown.
+	HandlerChainWaitGroup *utilwaitgroup.SafeWaitGroup
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works
@@ -156,6 +165,9 @@ type DelegationTarget interface {
 
 	// PostStartHooks returns the post-start hooks that need to be combined
 	PostStartHooks() map[string]postStartHookEntry
+
+	// PreShutdownHooks returns the pre-stop hooks that need to be combined
+	PreShutdownHooks() map[string]preShutdownHookEntry
 
 	// HealthzChecks returns the healthz checks that need to be combined
 	HealthzChecks() []healthz.HealthzChecker
@@ -173,6 +185,9 @@ func (s *GenericAPIServer) UnprotectedHandler() http.Handler {
 }
 func (s *GenericAPIServer) PostStartHooks() map[string]postStartHookEntry {
 	return s.postStartHooks
+}
+func (s *GenericAPIServer) PreShutdownHooks() map[string]preShutdownHookEntry {
+	return s.preShutdownHooks
 }
 func (s *GenericAPIServer) HealthzChecks() []healthz.HealthzChecker {
 	return s.healthzChecks
@@ -198,6 +213,9 @@ func (s emptyDelegate) UnprotectedHandler() http.Handler {
 }
 func (s emptyDelegate) PostStartHooks() map[string]postStartHookEntry {
 	return map[string]postStartHookEntry{}
+}
+func (s emptyDelegate) PreShutdownHooks() map[string]preShutdownHookEntry {
+	return map[string]preShutdownHookEntry{}
 }
 func (s emptyDelegate) HealthzChecks() []healthz.HealthzChecker {
 	return []healthz.HealthzChecker{}
@@ -247,6 +265,14 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 // Run spawns the secure http server. It only returns if stopCh is closed
 // or the secure port cannot be listened on initially.
 func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
+	// Register audit backend preShutdownHook.
+	if s.AuditBackend != nil {
+		s.AddPreShutdownHook("audit-backend", func() error {
+			s.AuditBackend.Shutdown()
+			return nil
+		})
+	}
+
 	err := s.NonBlockingRun(stopCh)
 	if err != nil {
 		return err
@@ -254,9 +280,13 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 
 	<-stopCh
 
-	if s.GenericAPIServer.AuditBackend != nil {
-		s.GenericAPIServer.AuditBackend.Shutdown()
+	err = s.RunPreShutdownHooks()
+	if err != nil {
+		return err
 	}
+
+	// Wait for all requests to finish, which are bounded by the RequestTimeout variable.
+	s.HandlerChainWaitGroup.Wait()
 
 	return nil
 }
@@ -264,11 +294,23 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 // NonBlockingRun spawns the secure http server. An error is
 // returned if the secure port cannot be listened on.
 func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
+	// Use an stop channel to allow graceful shutdown without dropping audit events
+	// after http server shutdown.
+	auditStopCh := make(chan struct{})
+
+	// Start the audit backend before any request comes in. This means we must call Backend.Run
+	// before http server start serving. Otherwise the Backend.ProcessEvents call might block.
+	if s.AuditBackend != nil {
+		if err := s.AuditBackend.Run(auditStopCh); err != nil {
+			return fmt.Errorf("failed to run the audit backend: %v", err)
+		}
+	}
+
 	// Use an internal stop channel to allow cleanup of the listeners on error.
 	internalStopCh := make(chan struct{})
 
 	if s.SecureServingInfo != nil && s.Handler != nil {
-		if err := s.serveSecurely(internalStopCh); err != nil {
+		if err := s.SecureServingInfo.Serve(s.Handler, s.ShutdownTimeout, internalStopCh); err != nil {
 			close(internalStopCh)
 			return err
 		}
@@ -280,15 +322,9 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 	go func() {
 		<-stopCh
 		close(internalStopCh)
+		s.HandlerChainWaitGroup.Wait()
+		close(auditStopCh)
 	}()
-
-	// Start the audit backend before any request comes in. This means we cannot turn it into a
-	// post start hook because without calling Backend.Run the Backend.ProcessEvents call might block.
-	if s.AuditBackend != nil {
-		if err := s.AuditBackend.Run(stopCh); err != nil {
-			return fmt.Errorf("failed to run the audit backend: %v", err)
-		}
-	}
 
 	s.RunPostStartHooks(stopCh)
 
@@ -297,11 +333,6 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 	}
 
 	return nil
-}
-
-// EffectiveSecurePort returns the secure port we bound to.
-func (s *GenericAPIServer) EffectiveSecurePort() int {
-	return s.effectiveSecurePort
 }
 
 // installAPIResources is a private method for installing the REST storage backing each api groupversionresource
@@ -410,7 +441,6 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		Creater:         apiGroupInfo.Scheme,
 		Convertor:       apiGroupInfo.Scheme,
 		UnsafeConvertor: runtime.UnsafeObjectConvertor(apiGroupInfo.Scheme),
-		Copier:          apiGroupInfo.Scheme,
 		Defaulter:       apiGroupInfo.Scheme,
 		Typer:           apiGroupInfo.Scheme,
 		Linker:          apiGroupInfo.GroupMeta.SelfLinker,

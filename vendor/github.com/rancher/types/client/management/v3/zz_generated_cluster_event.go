@@ -5,47 +5,59 @@ import (
 )
 
 const (
-	ClusterEventType                 = "clusterEvent"
-	ClusterEventFieldAnnotations     = "annotations"
-	ClusterEventFieldClusterId       = "clusterId"
-	ClusterEventFieldCount           = "count"
-	ClusterEventFieldCreated         = "created"
-	ClusterEventFieldCreatorID       = "creatorId"
-	ClusterEventFieldEventType       = "eventType"
-	ClusterEventFieldFirstTimestamp  = "firstTimestamp"
-	ClusterEventFieldInvolvedObject  = "involvedObject"
-	ClusterEventFieldLabels          = "labels"
-	ClusterEventFieldLastTimestamp   = "lastTimestamp"
-	ClusterEventFieldMessage         = "message"
-	ClusterEventFieldName            = "name"
-	ClusterEventFieldNamespaceId     = "namespaceId"
-	ClusterEventFieldOwnerReferences = "ownerReferences"
-	ClusterEventFieldReason          = "reason"
-	ClusterEventFieldRemoved         = "removed"
-	ClusterEventFieldSource          = "source"
-	ClusterEventFieldUuid            = "uuid"
+	ClusterEventType                     = "clusterEvent"
+	ClusterEventFieldAction              = "action"
+	ClusterEventFieldAnnotations         = "annotations"
+	ClusterEventFieldClusterId           = "clusterId"
+	ClusterEventFieldCount               = "count"
+	ClusterEventFieldCreated             = "created"
+	ClusterEventFieldCreatorID           = "creatorId"
+	ClusterEventFieldEventTime           = "eventTime"
+	ClusterEventFieldEventType           = "eventType"
+	ClusterEventFieldFirstTimestamp      = "firstTimestamp"
+	ClusterEventFieldInvolvedObject      = "involvedObject"
+	ClusterEventFieldLabels              = "labels"
+	ClusterEventFieldLastTimestamp       = "lastTimestamp"
+	ClusterEventFieldMessage             = "message"
+	ClusterEventFieldName                = "name"
+	ClusterEventFieldNamespaceId         = "namespaceId"
+	ClusterEventFieldOwnerReferences     = "ownerReferences"
+	ClusterEventFieldReason              = "reason"
+	ClusterEventFieldRelated             = "related"
+	ClusterEventFieldRemoved             = "removed"
+	ClusterEventFieldReportingController = "reportingComponent"
+	ClusterEventFieldReportingInstance   = "reportingInstance"
+	ClusterEventFieldSeries              = "series"
+	ClusterEventFieldSource              = "source"
+	ClusterEventFieldUuid                = "uuid"
 )
 
 type ClusterEvent struct {
 	types.Resource
-	Annotations     map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	ClusterId       string            `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
-	Count           int64             `json:"count,omitempty" yaml:"count,omitempty"`
-	Created         string            `json:"created,omitempty" yaml:"created,omitempty"`
-	CreatorID       string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
-	EventType       string            `json:"eventType,omitempty" yaml:"eventType,omitempty"`
-	FirstTimestamp  string            `json:"firstTimestamp,omitempty" yaml:"firstTimestamp,omitempty"`
-	InvolvedObject  *ObjectReference  `json:"involvedObject,omitempty" yaml:"involvedObject,omitempty"`
-	Labels          map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	LastTimestamp   string            `json:"lastTimestamp,omitempty" yaml:"lastTimestamp,omitempty"`
-	Message         string            `json:"message,omitempty" yaml:"message,omitempty"`
-	Name            string            `json:"name,omitempty" yaml:"name,omitempty"`
-	NamespaceId     string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
-	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	Reason          string            `json:"reason,omitempty" yaml:"reason,omitempty"`
-	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	Source          *EventSource      `json:"source,omitempty" yaml:"source,omitempty"`
-	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Action              string            `json:"action,omitempty" yaml:"action,omitempty"`
+	Annotations         map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	ClusterId           string            `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	Count               int64             `json:"count,omitempty" yaml:"count,omitempty"`
+	Created             string            `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID           string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	EventTime           *MicroTime        `json:"eventTime,omitempty" yaml:"eventTime,omitempty"`
+	EventType           string            `json:"eventType,omitempty" yaml:"eventType,omitempty"`
+	FirstTimestamp      string            `json:"firstTimestamp,omitempty" yaml:"firstTimestamp,omitempty"`
+	InvolvedObject      *ObjectReference  `json:"involvedObject,omitempty" yaml:"involvedObject,omitempty"`
+	Labels              map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	LastTimestamp       string            `json:"lastTimestamp,omitempty" yaml:"lastTimestamp,omitempty"`
+	Message             string            `json:"message,omitempty" yaml:"message,omitempty"`
+	Name                string            `json:"name,omitempty" yaml:"name,omitempty"`
+	NamespaceId         string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
+	OwnerReferences     []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Reason              string            `json:"reason,omitempty" yaml:"reason,omitempty"`
+	Related             *ObjectReference  `json:"related,omitempty" yaml:"related,omitempty"`
+	Removed             string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	ReportingController string            `json:"reportingComponent,omitempty" yaml:"reportingComponent,omitempty"`
+	ReportingInstance   string            `json:"reportingInstance,omitempty" yaml:"reportingInstance,omitempty"`
+	Series              *EventSeries      `json:"series,omitempty" yaml:"series,omitempty"`
+	Source              *EventSource      `json:"source,omitempty" yaml:"source,omitempty"`
+	Uuid                string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 type ClusterEventCollection struct {
 	types.Collection

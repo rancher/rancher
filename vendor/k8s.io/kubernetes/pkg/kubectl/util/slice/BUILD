@@ -9,12 +9,13 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["slice.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/util/slice",
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["slice_test.go"],
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 filegroup(

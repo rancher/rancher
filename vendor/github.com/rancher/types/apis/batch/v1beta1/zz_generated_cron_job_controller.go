@@ -97,7 +97,7 @@ func (l *cronJobLister) Get(namespace, name string) (*v1beta1.CronJob, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    CronJobGroupVersionKind.Group,
 			Resource: "cronJob",
-		}, name)
+		}, key)
 	}
 	return obj.(*v1beta1.CronJob), nil
 }

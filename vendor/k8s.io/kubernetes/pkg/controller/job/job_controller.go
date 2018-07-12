@@ -48,6 +48,8 @@ import (
 	"github.com/golang/glog"
 )
 
+const statusUpdateRetries = 3
+
 // controllerKind contains the schema.GroupVersionKind for this controller type.
 var controllerKind = batch.SchemeGroupVersion.WithKind("Job")
 
@@ -109,9 +111,13 @@ func NewJobController(podInformer coreinformers.PodInformer, jobInformer batchin
 	}
 
 	jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    jm.enqueueController,
+		AddFunc: func(obj interface{}) {
+			jm.enqueueController(obj, true)
+		},
 		UpdateFunc: jm.updateJob,
-		DeleteFunc: jm.enqueueController,
+		DeleteFunc: func(obj interface{}) {
+			jm.enqueueController(obj, true)
+		},
 	})
 	jm.jobLister = jobInformer.Lister()
 	jm.jobStoreSynced = jobInformer.Informer().HasSynced
@@ -209,7 +215,7 @@ func (jm *JobController) addPod(obj interface{}) {
 			return
 		}
 		jm.expectations.CreationObserved(jobKey)
-		jm.enqueueController(job)
+		jm.enqueueController(job, true)
 		return
 	}
 
@@ -218,7 +224,7 @@ func (jm *JobController) addPod(obj interface{}) {
 	// DO NOT observe creation because no controller should be waiting for an
 	// orphan.
 	for _, job := range jm.getPodJobs(pod) {
-		jm.enqueueController(job)
+		jm.enqueueController(job, true)
 	}
 }
 
@@ -242,7 +248,8 @@ func (jm *JobController) updatePod(old, cur interface{}) {
 		return
 	}
 
-	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
+	// the only time we want the backoff to kick-in, is when the pod failed
+	immediate := curPod.Status.Phase != v1.PodFailed
 
 	curControllerRef := metav1.GetControllerOf(curPod)
 	oldControllerRef := metav1.GetControllerOf(oldPod)
@@ -250,7 +257,7 @@ func (jm *JobController) updatePod(old, cur interface{}) {
 	if controllerRefChanged && oldControllerRef != nil {
 		// The ControllerRef was changed. Sync the old controller, if any.
 		if job := jm.resolveControllerRef(oldPod.Namespace, oldControllerRef); job != nil {
-			jm.enqueueController(job)
+			jm.enqueueController(job, immediate)
 		}
 	}
 
@@ -260,15 +267,16 @@ func (jm *JobController) updatePod(old, cur interface{}) {
 		if job == nil {
 			return
 		}
-		jm.enqueueController(job)
+		jm.enqueueController(job, immediate)
 		return
 	}
 
 	// Otherwise, it's an orphan. If anything changed, sync matching controllers
 	// to see if anyone wants to adopt it now.
+	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
 	if labelChanged || controllerRefChanged {
 		for _, job := range jm.getPodJobs(curPod) {
-			jm.enqueueController(job)
+			jm.enqueueController(job, immediate)
 		}
 	}
 }
@@ -309,7 +317,7 @@ func (jm *JobController) deletePod(obj interface{}) {
 		return
 	}
 	jm.expectations.DeletionObserved(jobKey)
-	jm.enqueueController(job)
+	jm.enqueueController(job, true)
 }
 
 func (jm *JobController) updateJob(old, cur interface{}) {
@@ -321,7 +329,7 @@ func (jm *JobController) updateJob(old, cur interface{}) {
 	if err != nil {
 		return
 	}
-	jm.enqueueController(curJob)
+	jm.enqueueController(curJob, true)
 	// check if need to add a new rsync for ActiveDeadlineSeconds
 	if curJob.Status.StartTime != nil {
 		curADS := curJob.Spec.ActiveDeadlineSeconds
@@ -341,16 +349,20 @@ func (jm *JobController) updateJob(old, cur interface{}) {
 	}
 }
 
-// obj could be an *batch.Job, or a DeletionFinalStateUnknown marker item.
-func (jm *JobController) enqueueController(job interface{}) {
-	key, err := controller.KeyFunc(job)
+// obj could be an *batch.Job, or a DeletionFinalStateUnknown marker item,
+// immediate tells the controller to update the status right away, and should
+// happen ONLY when there was a successful pod run.
+func (jm *JobController) enqueueController(obj interface{}, immediate bool) {
+	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", job, err))
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
 		return
 	}
 
-	// Retrieves the backoff duration for this Job
-	backoff := getBackoff(jm.queue, key)
+	backoff := time.Duration(0)
+	if !immediate {
+		backoff = getBackoff(jm.queue, key)
+	}
 
 	// TODO: Handle overlapping controllers better. Either disallow them at admission time or
 	// deterministically avoid syncing controllers that fight over pods. Currently, we only
@@ -486,12 +498,18 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 	var failureMessage string
 
 	jobHaveNewFailure := failed > job.Status.Failed
+	// new failures happen when status does not reflect the failures and active
+	// is different than parallelism, otherwise the previous controller loop
+	// failed updating status so even if we pick up failure it is not a new one
+	exceedsBackoffLimit := jobHaveNewFailure && (active != *job.Spec.Parallelism) &&
+		(int32(previousRetry)+1 > *job.Spec.BackoffLimit)
 
-	// check if the number of failed jobs increased since the last syncJob
-	if jobHaveNewFailure && (int32(previousRetry)+1 > *job.Spec.BackoffLimit) {
+	if exceedsBackoffLimit || pastBackoffLimitOnFailure(&job, pods) {
+		// check if the number of pod restart exceeds backoff (for restart OnFailure only)
+		// OR if the number of failed jobs increased since the last syncJob
 		jobFailed = true
 		failureReason = "BackoffLimitExceeded"
-		failureMessage = "Job has reach the specified backoff limit"
+		failureMessage = "Job has reached the specified backoff limit"
 	} else if pastActiveDeadline(&job) {
 		jobFailed = true
 		failureReason = "DeadlineExceeded"
@@ -553,6 +571,14 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 	}
 
 	forget := false
+	// Check if the number of jobs succeeded increased since the last check. If yes "forget" should be true
+	// This logic is linked to the issue: https://github.com/kubernetes/kubernetes/issues/56853 that aims to
+	// improve the Job backoff policy when parallelism > 1 and few Jobs failed but others succeed.
+	// In this case, we should clear the backoff delay.
+	if job.Status.Succeeded < succeeded {
+		forget = true
+	}
+
 	// no need to update the job if the status hasn't changed since last time
 	if job.Status.Active != active || job.Status.Succeeded != succeeded || job.Status.Failed != failed || len(job.Status.Conditions) != conditions {
 		job.Status.Active = active
@@ -560,12 +586,12 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 		job.Status.Failed = failed
 
 		if err := jm.updateHandler(&job); err != nil {
-			return false, err
+			return forget, err
 		}
 
 		if jobHaveNewFailure && !IsJobFinished(&job) {
 			// returning an error will re-enqueue Job after the backoff period
-			return false, fmt.Errorf("failed pod(s) detected for job key %q", key)
+			return forget, fmt.Errorf("failed pod(s) detected for job key %q", key)
 		}
 
 		forget = true
@@ -595,6 +621,30 @@ func (jm *JobController) deleteJobPods(job *batch.Job, pods []*v1.Pod, errCh cha
 		}(i)
 	}
 	wait.Wait()
+}
+
+// pastBackoffLimitOnFailure checks if container restartCounts sum exceeds BackoffLimit
+// this method applies only to pods with restartPolicy == OnFailure
+func pastBackoffLimitOnFailure(job *batch.Job, pods []*v1.Pod) bool {
+	if job.Spec.Template.Spec.RestartPolicy != v1.RestartPolicyOnFailure {
+		return false
+	}
+	result := int32(0)
+	for i := range pods {
+		po := pods[i]
+		if po.Status.Phase != v1.PodRunning {
+			continue
+		}
+		for j := range po.Status.InitContainerStatuses {
+			stat := po.Status.InitContainerStatuses[j]
+			result += stat.RestartCount
+		}
+		for j := range po.Status.ContainerStatuses {
+			stat := po.Status.ContainerStatuses[j]
+			result += stat.RestartCount
+		}
+	}
+	return result >= *job.Spec.BackoffLimit
 }
 
 // pastActiveDeadline checks if job has ActiveDeadlineSeconds field set and if it is exceeded.
@@ -770,7 +820,20 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *b
 }
 
 func (jm *JobController) updateJobStatus(job *batch.Job) error {
-	_, err := jm.kubeClient.Batch().Jobs(job.Namespace).UpdateStatus(job)
+	jobClient := jm.kubeClient.BatchV1().Jobs(job.Namespace)
+	var err error
+	for i := 0; i <= statusUpdateRetries; i = i + 1 {
+		var newJob *batch.Job
+		newJob, err = jobClient.Get(job.Name, metav1.GetOptions{})
+		if err != nil {
+			break
+		}
+		newJob.Status = job.Status
+		if _, err = jobClient.UpdateStatus(newJob); err == nil {
+			break
+		}
+	}
+
 	return err
 }
 

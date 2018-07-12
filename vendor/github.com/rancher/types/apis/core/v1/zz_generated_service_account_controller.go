@@ -97,7 +97,7 @@ func (l *serviceAccountLister) Get(namespace, name string) (*v1.ServiceAccount, 
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ServiceAccountGroupVersionKind.Group,
 			Resource: "serviceAccount",
-		}, name)
+		}, key)
 	}
 	return obj.(*v1.ServiceAccount), nil
 }

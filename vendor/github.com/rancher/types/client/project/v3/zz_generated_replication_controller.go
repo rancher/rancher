@@ -12,6 +12,7 @@ const (
 	ReplicationControllerFieldContainers                    = "containers"
 	ReplicationControllerFieldCreated                       = "created"
 	ReplicationControllerFieldCreatorID                     = "creatorId"
+	ReplicationControllerFieldDNSConfig                     = "dnsConfig"
 	ReplicationControllerFieldDNSPolicy                     = "dnsPolicy"
 	ReplicationControllerFieldFsgid                         = "fsgid"
 	ReplicationControllerFieldGids                          = "gids"
@@ -34,12 +35,14 @@ const (
 	ReplicationControllerFieldReplicationControllerConfig   = "replicationControllerConfig"
 	ReplicationControllerFieldReplicationControllerStatus   = "replicationControllerStatus"
 	ReplicationControllerFieldRestartPolicy                 = "restartPolicy"
+	ReplicationControllerFieldRunAsGroup                    = "runAsGroup"
 	ReplicationControllerFieldRunAsNonRoot                  = "runAsNonRoot"
 	ReplicationControllerFieldScale                         = "scale"
 	ReplicationControllerFieldSchedulerName                 = "schedulerName"
 	ReplicationControllerFieldScheduling                    = "scheduling"
 	ReplicationControllerFieldSelector                      = "selector"
 	ReplicationControllerFieldServiceAccountName            = "serviceAccountName"
+	ReplicationControllerFieldShareProcessNamespace         = "shareProcessNamespace"
 	ReplicationControllerFieldState                         = "state"
 	ReplicationControllerFieldSubdomain                     = "subdomain"
 	ReplicationControllerFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
@@ -60,6 +63,7 @@ type ReplicationController struct {
 	Containers                    []Container                  `json:"containers,omitempty" yaml:"containers,omitempty"`
 	Created                       string                       `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                     string                       `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DNSConfig                     *PodDNSConfig                `json:"dnsConfig,omitempty" yaml:"dnsConfig,omitempty"`
 	DNSPolicy                     string                       `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	Fsgid                         *int64                       `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
 	Gids                          []int64                      `json:"gids,omitempty" yaml:"gids,omitempty"`
@@ -82,12 +86,14 @@ type ReplicationController struct {
 	ReplicationControllerConfig   *ReplicationControllerConfig `json:"replicationControllerConfig,omitempty" yaml:"replicationControllerConfig,omitempty"`
 	ReplicationControllerStatus   *ReplicationControllerStatus `json:"replicationControllerStatus,omitempty" yaml:"replicationControllerStatus,omitempty"`
 	RestartPolicy                 string                       `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
+	RunAsGroup                    *int64                       `json:"runAsGroup,omitempty" yaml:"runAsGroup,omitempty"`
 	RunAsNonRoot                  *bool                        `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
 	Scale                         *int64                       `json:"scale,omitempty" yaml:"scale,omitempty"`
 	SchedulerName                 string                       `json:"schedulerName,omitempty" yaml:"schedulerName,omitempty"`
 	Scheduling                    *Scheduling                  `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	Selector                      map[string]string            `json:"selector,omitempty" yaml:"selector,omitempty"`
 	ServiceAccountName            string                       `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`
+	ShareProcessNamespace         *bool                        `json:"shareProcessNamespace,omitempty" yaml:"shareProcessNamespace,omitempty"`
 	State                         string                       `json:"state,omitempty" yaml:"state,omitempty"`
 	Subdomain                     string                       `json:"subdomain,omitempty" yaml:"subdomain,omitempty"`
 	TerminationGracePeriodSeconds *int64                       `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`

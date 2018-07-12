@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/rancher/rke/k8s"
@@ -12,7 +13,7 @@ import (
 )
 
 const (
-	DockerDialerTimeout = 30
+	DockerDialerTimeout = 50
 )
 
 type DialerFactory func(h *Host) (func(network, address string) (net.Conn, error), error)
@@ -106,6 +107,13 @@ func (d *dialer) Dial(network, addr string) (net.Conn, error) {
 		conn, err = d.getSSHTunnelConnection()
 	}
 	if err != nil {
+		if strings.Contains(err.Error(), "no key found") {
+			return nil, fmt.Errorf("Unable to access node with address [%s] using SSH. Please check if the configured key or specified key file is a valid SSH Private Key. Error: %v", d.sshAddress, err)
+		} else if strings.Contains(err.Error(), "no supported methods remain") {
+			return nil, fmt.Errorf("Unable to access node with address [%s] using SSH. Please check if you are able to SSH to the node using the specified SSH Private Key and if you have configured the correct SSH username. Error: %v", d.sshAddress, err)
+		} else if strings.Contains(err.Error(), "cannot decode encrypted private keys") {
+			return nil, fmt.Errorf("Unable to access node with address [%s] using SSH. Using encrypted private keys is only supported using ssh-agent. Please configure the option `ssh_agent_auth: true` in the configuration file or use --ssh-agent-auth as a parameter when running RKE. This will use the `SSH_AUTH_SOCK` environment variable. Error: %v", d.sshAddress, err)
+		}
 		return nil, fmt.Errorf("Failed to dial ssh using address [%s]: %v", d.sshAddress, err)
 	}
 
@@ -117,7 +125,7 @@ func (d *dialer) Dial(network, addr string) (net.Conn, error) {
 
 	remote, err := conn.Dial(network, addr)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to dial to %s: %v", addr, err)
+		return nil, fmt.Errorf("Unable to access the Docker socket (%s). Please check if the configured user can execute `docker ps` on the node, and if the SSH server version is at least version 6.7 or higher. If you are using RedHat/CentOS, you can't use the user `root`. Please refer to the documentation for more instructions. Error: %v", addr, err)
 	}
 	return remote, err
 }

@@ -9,10 +9,11 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["validation.go"],
+    importpath = "k8s.io/kubernetes/pkg/apis/apps/validation",
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/validation:go_default_library",
         "//pkg/apis/apps:go_default_library",
+        "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/validation:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/validation:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
@@ -23,10 +24,10 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["validation_test.go"],
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/apis/apps:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
