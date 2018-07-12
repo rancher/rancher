@@ -47,9 +47,10 @@ type ProjectCondition struct {
 }
 
 type ProjectSpec struct {
-	DisplayName string `json:"displayName,omitempty" norman:"required"`
-	Description string `json:"description"`
-	ClusterName string `json:"clusterName,omitempty" norman:"required,type=reference[cluster]"`
+	DisplayName   string                `json:"displayName,omitempty" norman:"required"`
+	Description   string                `json:"description"`
+	ClusterName   string                `json:"clusterName,omitempty" norman:"required,type=reference[cluster]"`
+	ResourceQuota *ProjectResourceQuota `json:"resourceQuota,omitempty"`
 }
 
 type GlobalRole struct {

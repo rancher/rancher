@@ -50,6 +50,7 @@ type Client struct {
 	PipelineExecutionLog                    PipelineExecutionLogOperations
 	SourceCodeRepository                    SourceCodeRepositoryOperations
 	ComposeConfig                           ComposeConfigOperations
+	ResourceQuotaTemplate                   ResourceQuotaTemplateOperations
 }
 
 func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
@@ -105,6 +106,7 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.PipelineExecutionLog = newPipelineExecutionLogClient(client)
 	client.SourceCodeRepository = newSourceCodeRepositoryClient(client)
 	client.ComposeConfig = newComposeConfigClient(client)
+	client.ResourceQuotaTemplate = newResourceQuotaTemplateClient(client)
 
 	return client, nil
 }
