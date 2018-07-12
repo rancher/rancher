@@ -10,11 +10,17 @@ Vagrant.configure(2) do |config|
     set -e -x -u
 
     apt-get update -y || (sleep 40 && apt-get update -y)
-    apt-get install -y golang git
-    echo "export GOPATH=/go" >> /root/.bashrc
-    export GOPATH=/go
+    apt-get install -y git
+
+    wget -qO- https://storage.googleapis.com/golang/go1.8.3.linux-amd64.tar.gz | tar -C /usr/local -xz
+
+    echo 'export GOPATH=/go; export PATH=/usr/local/go/bin:$GOPATH/bin:$PATH' >> /root/.bashrc
+    eval `tail -n1 /root/.bashrc`
+
     go get github.com/tools/godep
+
     cd /go/src/github.com/containernetworking/cni
-    /go/bin/godep restore
+    godep restore
+
   SHELL
 end

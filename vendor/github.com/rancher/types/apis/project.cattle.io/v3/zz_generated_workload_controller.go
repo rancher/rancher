@@ -96,7 +96,7 @@ func (l *workloadLister) Get(namespace, name string) (*Workload, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    WorkloadGroupVersionKind.Group,
 			Resource: "workload",
-		}, name)
+		}, key)
 	}
 	return obj.(*Workload), nil
 }

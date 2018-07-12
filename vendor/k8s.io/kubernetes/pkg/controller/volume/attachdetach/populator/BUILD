@@ -9,11 +9,12 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["desired_state_of_world_populator.go"],
+    importpath = "k8s.io/kubernetes/pkg/controller/volume/attachdetach/populator",
     deps = [
         "//pkg/controller/volume/attachdetach/cache:go_default_library",
         "//pkg/controller/volume/attachdetach/util:go_default_library",
         "//pkg/volume:go_default_library",
-        "//pkg/volume/util/volumehelper:go_default_library",
+        "//pkg/volume/util:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
@@ -40,12 +41,12 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["desired_state_of_world_populator_test.go"],
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//pkg/controller:go_default_library",
         "//pkg/controller/volume/attachdetach/cache:go_default_library",
         "//pkg/volume/testing:go_default_library",
-        "//pkg/volume/util/volumehelper:go_default_library",
+        "//pkg/volume/util:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",

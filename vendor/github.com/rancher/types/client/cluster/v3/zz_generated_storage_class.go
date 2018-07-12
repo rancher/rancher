@@ -20,6 +20,7 @@ const (
 	StorageClassFieldReclaimPolicy        = "reclaimPolicy"
 	StorageClassFieldRemoved              = "removed"
 	StorageClassFieldUuid                 = "uuid"
+	StorageClassFieldVolumeBindingMode    = "volumeBindingMode"
 )
 
 type StorageClass struct {
@@ -38,6 +39,7 @@ type StorageClass struct {
 	ReclaimPolicy        string            `json:"reclaimPolicy,omitempty" yaml:"reclaimPolicy,omitempty"`
 	Removed              string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Uuid                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	VolumeBindingMode    string            `json:"volumeBindingMode,omitempty" yaml:"volumeBindingMode,omitempty"`
 }
 type StorageClassCollection struct {
 	types.Collection

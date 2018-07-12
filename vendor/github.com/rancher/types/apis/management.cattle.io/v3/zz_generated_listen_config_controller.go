@@ -95,7 +95,7 @@ func (l *listenConfigLister) Get(namespace, name string) (*ListenConfig, error) 
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ListenConfigGroupVersionKind.Group,
 			Resource: "listenConfig",
-		}, name)
+		}, key)
 	}
 	return obj.(*ListenConfig), nil
 }

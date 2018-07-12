@@ -95,7 +95,7 @@ func (l *catalogLister) Get(namespace, name string) (*Catalog, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    CatalogGroupVersionKind.Group,
 			Resource: "catalog",
-		}, name)
+		}, key)
 	}
 	return obj.(*Catalog), nil
 }

@@ -95,7 +95,7 @@ func (l *templateVersionLister) Get(namespace, name string) (*TemplateVersion, e
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    TemplateVersionGroupVersionKind.Group,
 			Resource: "templateVersion",
-		}, name)
+		}, key)
 	}
 	return obj.(*TemplateVersion), nil
 }

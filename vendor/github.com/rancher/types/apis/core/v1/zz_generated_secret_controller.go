@@ -97,7 +97,7 @@ func (l *secretLister) Get(namespace, name string) (*v1.Secret, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    SecretGroupVersionKind.Group,
 			Resource: "secret",
-		}, name)
+		}, key)
 	}
 	return obj.(*v1.Secret), nil
 }

@@ -13,11 +13,12 @@ aliases:
     - resouer
     - timothysc
     - wojtek-t
+    - aveshagarwal
+    - ravisantoshgudimetla
   sig-cli-maintainers:
     - adohe
     - brendandburns
     - deads2k
-    - fabianofranz
     - janetkuo
     - liggitt
     - pwittrock
@@ -30,7 +31,6 @@ aliases:
     - dshulyak
     - eparis
     - ericchiang
-    - fabianofranz
     - ghodss
     - mengqiy
     - rootfs
@@ -43,13 +43,11 @@ aliases:
     - ixdy
     - rmmh
     - spiffxp
-    - spxtr
   sig-testing-approvers:
     - fejta
     - ixdy
     - rmmh
     - spiffxp
-    - spxtr
   sig-node-reviewers:
     - Random-Liu
     - dashpole
@@ -101,6 +99,12 @@ aliases:
   sig-apps-api-approvers:
     - erictune
     - smarterclayton
+  sig-autoscaling-maintainers:
+    - aleksandra-malinowska
+    - bskiba
+    - DirectXMan12
+    - MaciekPytel
+    - mwielgus
   milestone-maintainers:
     - lavalamp
     - deads2k
@@ -121,7 +125,6 @@ aliases:
     - slack
     - colemickens
     - foxish
-    - fabianofranz
     - pwittrock
     - AdoHe
     - lukemarsden
@@ -174,4 +177,54 @@ aliases:
     - steveperry-53
     - radhikpac
     - jpbetz
-
+    - cmluciano
+    - bsalamat
+    - m1093782566
+  api-approvers:
+    - erictune
+    - lavalamp
+    - smarterclayton
+    - thockin
+    - liggitt
+    # - bgrant0607 # manual escalations only
+  api-reviewers:
+    - erictune
+    - lavalamp
+    - smarterclayton
+    - thockin
+    - liggitt
+    - wojtek-t
+    - deads2k
+    - yujuhong
+    - brendandburns
+    - derekwaynecarr
+    - caesarxuchao
+    - vishh
+    - mikedanese
+    - nikhiljindal
+    - gmarek
+    - davidopp
+    - pmorie
+    - sttts
+    - dchen1107
+    - saad-ali
+    - zmerlynn
+    - luxas
+    - janetkuo
+    - justinsb
+    - pwittrock
+    - roberthbailey
+    - ncdc
+    - tallclair
+    - yifan-gu
+    - eparis
+    - mwielgus
+    - timothysc
+    - soltysh
+    - piosz
+    - jsafrane
+    - jbeda
+  dep-approvers:
+    - cblecker
+    - thockin
+    - sttts

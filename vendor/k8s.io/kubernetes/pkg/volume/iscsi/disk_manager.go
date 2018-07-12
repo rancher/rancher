@@ -22,20 +22,25 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // Abstract interface to disk operations.
 type diskManager interface {
 	MakeGlobalPDName(disk iscsiDisk) string
+	MakeGlobalVDPDName(disk iscsiDisk) string
 	// Attaches the disk to the kubelet's host machine.
 	AttachDisk(b iscsiDiskMounter) (string, error)
 	// Detaches the disk from the kubelet's host machine.
 	DetachDisk(disk iscsiDiskUnmounter, mntPath string) error
+	// Detaches the block disk from the kubelet's host machine.
+	DetachBlockISCSIDisk(disk iscsiDiskUnmapper, mntPath string) error
 }
 
 // utility to mount a disk based filesystem
+// globalPDPath: global mount path like, /var/lib/kubelet/plugins/kubernetes.io/iscsi/{ifaceName}/{portal-some_iqn-lun-lun_id}
+// volPath: pod volume dir path like, /var/lib/kubelet/pods/{podUID}/volumes/kubernetes.io~iscsi/{volumeName}
 func diskSetUp(manager diskManager, b iscsiDiskMounter, volPath string, mounter mount.Interface, fsGroup *int64) error {
-	// TODO: handle failed mounts here.
 	notMnt, err := mounter.IsLikelyNotMountPoint(volPath)
 	if err != nil && !os.IsNotExist(err) {
 		glog.Errorf("cannot validate mountpoint: %s", volPath)
@@ -59,7 +64,7 @@ func diskSetUp(manager diskManager, b iscsiDiskMounter, volPath string, mounter 
 		b.iscsiDisk.Iface = b.iscsiDisk.Portals[0] + ":" + b.iscsiDisk.VolName
 	}
 	globalPDPath := manager.MakeGlobalPDName(*b.iscsiDisk)
-	mountOptions := volume.JoinMountOptions(b.mountOptions, options)
+	mountOptions := util.JoinMountOptions(b.mountOptions, options)
 	err = mounter.Mount(globalPDPath, volPath, "", mountOptions)
 	if err != nil {
 		glog.Errorf("Failed to bind mount: source:%s, target:%s, err:%v", globalPDPath, volPath, err)
@@ -93,37 +98,4 @@ func diskSetUp(manager diskManager, b iscsiDiskMounter, volPath string, mounter 
 	}
 
 	return nil
-}
-
-// utility to tear down a disk based filesystem
-func diskTearDown(manager diskManager, c iscsiDiskUnmounter, volPath string, mounter mount.Interface) error {
-	notMnt, err := mounter.IsLikelyNotMountPoint(volPath)
-	if err != nil {
-		glog.Errorf("cannot validate mountpoint %s", volPath)
-		return err
-	}
-	if notMnt {
-		return os.Remove(volPath)
-	}
-	_, err = mount.GetMountRefs(mounter, volPath)
-	if err != nil {
-		glog.Errorf("failed to get reference count %s", volPath)
-		return err
-	}
-	if err := mounter.Unmount(volPath); err != nil {
-		glog.Errorf("failed to unmount %s", volPath)
-		return err
-	}
-	notMnt, mntErr := mounter.IsLikelyNotMountPoint(volPath)
-	if mntErr != nil {
-		glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
-		return err
-	}
-	if notMnt {
-		if err := os.Remove(volPath); err != nil {
-			return err
-		}
-	}
-	return nil
-
 }

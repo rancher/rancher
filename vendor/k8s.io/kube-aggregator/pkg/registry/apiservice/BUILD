@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["strategy.go"],
+    importpath = "k8s.io/kube-aggregator/pkg/registry/apiservice",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/fields:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
@@ -34,6 +35,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/registry/apiservice/etcd:all-srcs",
+        "//staging/src/k8s.io/kube-aggregator/pkg/registry/apiservice/rest:all-srcs",
     ],
     tags = ["automanaged"],
 )

@@ -22,10 +22,12 @@ import (
 	"os"
 	"path"
 	"strings"
+	"unicode/utf8"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubectl/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/hash"
 )
 
@@ -126,9 +128,10 @@ func (s ConfigMapGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	if err := s.validate(); err != nil {
 		return nil, err
 	}
-	configMap := &api.ConfigMap{}
+	configMap := &v1.ConfigMap{}
 	configMap.Name = s.Name
 	configMap.Data = map[string]string{}
+	configMap.BinaryData = map[string][]byte{}
 	if len(s.FileSources) > 0 {
 		if err := handleConfigMapFromFileSources(configMap, s.FileSources); err != nil {
 			return nil, err
@@ -167,9 +170,9 @@ func (s ConfigMapGeneratorV1) validate() error {
 
 // handleConfigMapFromLiteralSources adds the specified literal source
 // information into the provided configMap.
-func handleConfigMapFromLiteralSources(configMap *api.ConfigMap, literalSources []string) error {
+func handleConfigMapFromLiteralSources(configMap *v1.ConfigMap, literalSources []string) error {
 	for _, literalSource := range literalSources {
-		keyName, value, err := parseLiteralSource(literalSource)
+		keyName, value, err := util.ParseLiteralSource(literalSource)
 		if err != nil {
 			return err
 		}
@@ -183,9 +186,9 @@ func handleConfigMapFromLiteralSources(configMap *api.ConfigMap, literalSources 
 
 // handleConfigMapFromFileSources adds the specified file source information
 // into the provided configMap
-func handleConfigMapFromFileSources(configMap *api.ConfigMap, fileSources []string) error {
+func handleConfigMapFromFileSources(configMap *v1.ConfigMap, fileSources []string) error {
 	for _, fileSource := range fileSources {
-		keyName, filePath, err := parseFileSource(fileSource)
+		keyName, filePath, err := util.ParseFileSource(fileSource)
 		if err != nil {
 			return err
 		}
@@ -228,7 +231,7 @@ func handleConfigMapFromFileSources(configMap *api.ConfigMap, fileSources []stri
 
 // handleConfigMapFromEnvFileSource adds the specified env file source information
 // into the provided configMap
-func handleConfigMapFromEnvFileSource(configMap *api.ConfigMap, envFileSource string) error {
+func handleConfigMapFromEnvFileSource(configMap *v1.ConfigMap, envFileSource string) error {
 	info, err := os.Stat(envFileSource)
 	if err != nil {
 		switch err := err.(type) {
@@ -249,24 +252,46 @@ func handleConfigMapFromEnvFileSource(configMap *api.ConfigMap, envFileSource st
 
 // addKeyFromFileToConfigMap adds a key with the given name to a ConfigMap, populating
 // the value with the content of the given file path, or returns an error.
-func addKeyFromFileToConfigMap(configMap *api.ConfigMap, keyName, filePath string) error {
+func addKeyFromFileToConfigMap(configMap *v1.ConfigMap, keyName, filePath string) error {
 	data, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return err
 	}
-	return addKeyFromLiteralToConfigMap(configMap, keyName, string(data))
+
+	if utf8.Valid(data) {
+		return addKeyFromLiteralToConfigMap(configMap, keyName, string(data))
+	}
+
+	err = validateNewConfigMap(configMap, keyName)
+	if err != nil {
+		return err
+	}
+	configMap.BinaryData[keyName] = data
+	return nil
 }
 
 // addKeyFromLiteralToConfigMap adds the given key and data to the given config map,
 // returning an error if the key is not valid or if the key already exists.
-func addKeyFromLiteralToConfigMap(configMap *api.ConfigMap, keyName, data string) error {
+func addKeyFromLiteralToConfigMap(configMap *v1.ConfigMap, keyName, data string) error {
+	err := validateNewConfigMap(configMap, keyName)
+	if err != nil {
+		return err
+	}
+	configMap.Data[keyName] = data
+	return nil
+}
+
+func validateNewConfigMap(configMap *v1.ConfigMap, keyName string) error {
 	// Note, the rules for ConfigMap keys are the exact same as the ones for SecretKeys.
 	if errs := validation.IsConfigMapKey(keyName); len(errs) != 0 {
 		return fmt.Errorf("%q is not a valid key name for a ConfigMap: %s", keyName, strings.Join(errs, ";"))
 	}
-	if _, entryExists := configMap.Data[keyName]; entryExists {
-		return fmt.Errorf("cannot add key %s, another key by that name already exists: %v.", keyName, configMap.Data)
+
+	if _, exists := configMap.Data[keyName]; exists {
+		return fmt.Errorf("cannot add key %s, another key by that name already exists in data: %v", keyName, configMap.Data)
 	}
-	configMap.Data[keyName] = data
+	if _, exists := configMap.BinaryData[keyName]; exists {
+		return fmt.Errorf("cannot add key %s, another key by that name already exists in binaryData: %v", keyName, configMap.BinaryData)
+	}
 	return nil
 }

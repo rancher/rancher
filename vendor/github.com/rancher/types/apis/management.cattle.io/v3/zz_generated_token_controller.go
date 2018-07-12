@@ -95,7 +95,7 @@ func (l *tokenLister) Get(namespace, name string) (*Token, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    TokenGroupVersionKind.Group,
 			Resource: "token",
-		}, name)
+		}, key)
 	}
 	return obj.(*Token), nil
 }

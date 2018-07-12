@@ -18,7 +18,10 @@ limitations under the License.
 
 package cm
 
-import "k8s.io/api/core/v1"
+import (
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+)
 
 const (
 	MinShares     = 0
@@ -40,7 +43,7 @@ func MilliCPUToShares(milliCPU int64) int64 {
 }
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
-func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
+func ResourceConfigForPod(pod *v1.Pod, enforceCPULimit bool) *ResourceConfig {
 	return nil
 }
 
@@ -51,4 +54,9 @@ func GetCgroupSubsystems() (*CgroupSubsystems, error) {
 
 func getCgroupProcs(dir string) ([]int, error) {
 	return nil, nil
+}
+
+// GetPodCgroupNameSuffix returns the last element of the pod CgroupName identifier
+func GetPodCgroupNameSuffix(podUID types.UID) string {
+	return ""
 }

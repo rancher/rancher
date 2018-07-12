@@ -30,12 +30,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	apijson "k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -51,7 +52,6 @@ type SetLastAppliedOptions struct {
 	ShortOutput      bool
 	CreateAnnotation bool
 	Output           string
-	Codec            runtime.Encoder
 	PatchBufferList  []PatchBuffer
 	Factory          cmdutil.Factory
 	Out              io.Writer
@@ -84,7 +84,8 @@ var (
 func NewCmdApplySetLastApplied(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	options := &SetLastAppliedOptions{Out: out, ErrOut: err}
 	cmd := &cobra.Command{
-		Use:     "set-last-applied -f FILENAME",
+		Use: "set-last-applied -f FILENAME",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Set the last-applied-configuration annotation on a live object to match the contents of a file."),
 		Long:    applySetLastAppliedLong,
 		Example: applySetLastAppliedExample,
@@ -106,13 +107,12 @@ func NewCmdApplySetLastApplied(f cmdutil.Factory, out, err io.Writer) *cobra.Com
 }
 
 func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
-	o.DryRun = cmdutil.GetFlagBool(cmd, "dry-run")
+	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 	o.Output = cmdutil.GetFlagString(cmd, "output")
 	o.ShortOutput = o.Output == "name"
-	o.Codec = f.JSONEncoder()
 
 	var err error
-	o.Mapper, o.Typer, err = f.UnstructuredObject()
+	o.Mapper, o.Typer = f.Object()
 	if err != nil {
 		return err
 	}
@@ -122,28 +122,18 @@ func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) 
 }
 
 func (o *SetLastAppliedOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) error {
-	builder, err := f.NewUnstructuredBuilder(true)
-	if err != nil {
-		return err
-	}
-
-	r := builder.
+	r := f.NewBuilder().
+		Unstructured().
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
-		Latest().
 		Flatten().
 		Do()
-	err = r.Err()
-	if err != nil {
-		return err
-	}
 
-	err = r.Visit(func(info *resource.Info, err error) error {
+	err := r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
-
-		patchBuf, diffBuf, patchType, err := editor.GetApplyPatch(info.VersionedObject, o.Codec)
+		patchBuf, diffBuf, patchType, err := editor.GetApplyPatch(info.Object, scheme.DefaultJSONEncoder())
 		if err != nil {
 			return err
 		}
@@ -156,16 +146,16 @@ func (o *SetLastAppliedOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) 
 				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%v\nfrom server for:", info), info.Source, err)
 			}
 		}
-		oringalBuf, err := kubectl.GetOriginalConfiguration(info.Mapping, info.Object)
+		originalBuf, err := kubectl.GetOriginalConfiguration(info.Mapping, info.Object)
 		if err != nil {
 			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%v\nfrom server for:", info), info.Source, err)
 		}
-		if oringalBuf == nil && !o.CreateAnnotation {
+		if originalBuf == nil && !o.CreateAnnotation {
 			return cmdutil.UsageErrorf(cmd, "no last-applied-configuration annotation found on resource: %s, to create the annotation, run the command with --create-annotation", info.Name)
 		}
 
 		//only add to PatchBufferList when changed
-		if !bytes.Equal(cmdutil.StripComments(oringalBuf), cmdutil.StripComments(diffBuf)) {
+		if !bytes.Equal(cmdutil.StripComments(originalBuf), cmdutil.StripComments(diffBuf)) {
 			p := PatchBuffer{Patch: patchBuf, PatchType: patchType}
 			o.PatchBufferList = append(o.PatchBufferList, p)
 			o.InfoList = append(o.InfoList, info)
@@ -195,16 +185,16 @@ func (o *SetLastAppliedOptions) RunSetLastApplied(f cmdutil.Factory, cmd *cobra.
 
 			if len(o.Output) > 0 && !o.ShortOutput {
 				info.Refresh(patchedObj, false)
-				return cmdutil.PrintResourceInfoForCommand(cmd, info, f, o.Out)
+				return cmdutil.PrintObject(cmd, info.Object, o.Out)
 			}
-			cmdutil.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, o.DryRun, "configured")
+			cmdutil.PrintSuccess(o.ShortOutput, o.Out, info.Object, o.DryRun, "configured")
 
 		} else {
 			err := o.formatPrinter(o.Output, patch.Patch, o.Out)
 			if err != nil {
 				return err
 			}
-			cmdutil.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, o.DryRun, "configured")
+			cmdutil.PrintSuccess(o.ShortOutput, o.Out, info.Object, o.DryRun, "configured")
 		}
 	}
 	return nil
@@ -233,7 +223,7 @@ func (o *SetLastAppliedOptions) getPatch(info *resource.Info) ([]byte, []byte, e
 	objMap := map[string]map[string]map[string]string{}
 	metadataMap := map[string]map[string]string{}
 	annotationsMap := map[string]string{}
-	localFile, err := runtime.Encode(o.Codec, info.VersionedObject)
+	localFile, err := runtime.Encode(scheme.DefaultJSONEncoder(), info.Object)
 	if err != nil {
 		return nil, localFile, err
 	}

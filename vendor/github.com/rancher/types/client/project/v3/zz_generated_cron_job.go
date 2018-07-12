@@ -14,6 +14,7 @@ const (
 	CronJobFieldCreatorID                     = "creatorId"
 	CronJobFieldCronJobConfig                 = "cronJobConfig"
 	CronJobFieldCronJobStatus                 = "cronJobStatus"
+	CronJobFieldDNSConfig                     = "dnsConfig"
 	CronJobFieldDNSPolicy                     = "dnsPolicy"
 	CronJobFieldFsgid                         = "fsgid"
 	CronJobFieldGids                          = "gids"
@@ -34,11 +35,13 @@ const (
 	CronJobFieldPublicEndpoints               = "publicEndpoints"
 	CronJobFieldRemoved                       = "removed"
 	CronJobFieldRestartPolicy                 = "restartPolicy"
+	CronJobFieldRunAsGroup                    = "runAsGroup"
 	CronJobFieldRunAsNonRoot                  = "runAsNonRoot"
 	CronJobFieldSchedulerName                 = "schedulerName"
 	CronJobFieldScheduling                    = "scheduling"
 	CronJobFieldSelector                      = "selector"
 	CronJobFieldServiceAccountName            = "serviceAccountName"
+	CronJobFieldShareProcessNamespace         = "shareProcessNamespace"
 	CronJobFieldState                         = "state"
 	CronJobFieldSubdomain                     = "subdomain"
 	CronJobFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
@@ -61,6 +64,7 @@ type CronJob struct {
 	CreatorID                     string                 `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	CronJobConfig                 *CronJobConfig         `json:"cronJobConfig,omitempty" yaml:"cronJobConfig,omitempty"`
 	CronJobStatus                 *CronJobStatus         `json:"cronJobStatus,omitempty" yaml:"cronJobStatus,omitempty"`
+	DNSConfig                     *PodDNSConfig          `json:"dnsConfig,omitempty" yaml:"dnsConfig,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty" yaml:"gids,omitempty"`
@@ -81,11 +85,13 @@ type CronJob struct {
 	PublicEndpoints               []PublicEndpoint       `json:"publicEndpoints,omitempty" yaml:"publicEndpoints,omitempty"`
 	Removed                       string                 `json:"removed,omitempty" yaml:"removed,omitempty"`
 	RestartPolicy                 string                 `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
+	RunAsGroup                    *int64                 `json:"runAsGroup,omitempty" yaml:"runAsGroup,omitempty"`
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
 	SchedulerName                 string                 `json:"schedulerName,omitempty" yaml:"schedulerName,omitempty"`
 	Scheduling                    *Scheduling            `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	Selector                      *LabelSelector         `json:"selector,omitempty" yaml:"selector,omitempty"`
 	ServiceAccountName            string                 `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`
+	ShareProcessNamespace         *bool                  `json:"shareProcessNamespace,omitempty" yaml:"shareProcessNamespace,omitempty"`
 	State                         string                 `json:"state,omitempty" yaml:"state,omitempty"`
 	Subdomain                     string                 `json:"subdomain,omitempty" yaml:"subdomain,omitempty"`
 	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`

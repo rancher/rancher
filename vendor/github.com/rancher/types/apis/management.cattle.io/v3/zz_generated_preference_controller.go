@@ -96,7 +96,7 @@ func (l *preferenceLister) Get(namespace, name string) (*Preference, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    PreferenceGroupVersionKind.Group,
 			Resource: "preference",
-		}, name)
+		}, key)
 	}
 	return obj.(*Preference), nil
 }

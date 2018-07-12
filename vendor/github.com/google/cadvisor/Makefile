@@ -10,6 +10,7 @@
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
+# limitations under the License.
 
 GO := go
 pkgs  = $(shell $(GO) list ./... | grep -v vendor)
@@ -21,6 +22,9 @@ test:
 	@$(GO) test -short -race $(pkgs)
 
 test-integration:
+	GO_FLAGS="-race" ./build/build.sh
+	go test -c github.com/google/cadvisor/integration/tests/api
+	go test -c github.com/google/cadvisor/integration/tests/healthz
 	@./build/integration.sh
 
 test-runner:

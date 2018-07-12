@@ -96,7 +96,7 @@ func (l *eventLister) Get(namespace, name string) (*v1.Event, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    EventGroupVersionKind.Group,
 			Resource: "event",
-		}, name)
+		}, key)
 	}
 	return obj.(*v1.Event), nil
 }

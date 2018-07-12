@@ -96,7 +96,7 @@ func (l *certificateLister) Get(namespace, name string) (*Certificate, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    CertificateGroupVersionKind.Group,
 			Resource: "certificate",
-		}, name)
+		}, key)
 	}
 	return obj.(*Certificate), nil
 }

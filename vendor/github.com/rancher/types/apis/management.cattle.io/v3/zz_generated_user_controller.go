@@ -95,7 +95,7 @@ func (l *userLister) Get(namespace, name string) (*User, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    UserGroupVersionKind.Group,
 			Resource: "user",
-		}, name)
+		}, key)
 	}
 	return obj.(*User), nil
 }

@@ -97,7 +97,7 @@ func (l *daemonSetLister) Get(namespace, name string) (*v1beta2.DaemonSet, error
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    DaemonSetGroupVersionKind.Group,
 			Resource: "daemonSet",
-		}, name)
+		}, key)
 	}
 	return obj.(*v1beta2.DaemonSet), nil
 }

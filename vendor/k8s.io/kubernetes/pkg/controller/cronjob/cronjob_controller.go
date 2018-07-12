@@ -66,14 +66,16 @@ type CronJobController struct {
 	recorder   record.EventRecorder
 }
 
-func NewCronJobController(kubeClient clientset.Interface) *CronJobController {
+func NewCronJobController(kubeClient clientset.Interface) (*CronJobController, error) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
 
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("cronjob_controller", kubeClient.Core().RESTClient().GetRateLimiter())
+		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("cronjob_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
+			return nil, err
+		}
 	}
 
 	jm := &CronJobController{
@@ -84,12 +86,15 @@ func NewCronJobController(kubeClient clientset.Interface) *CronJobController {
 		recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cronjob-controller"}),
 	}
 
-	return jm
+	return jm, nil
 }
 
-func NewCronJobControllerFromClient(kubeClient clientset.Interface) *CronJobController {
-	jm := NewCronJobController(kubeClient)
-	return jm
+func NewCronJobControllerFromClient(kubeClient clientset.Interface) (*CronJobController, error) {
+	jm, err := NewCronJobController(kubeClient)
+	if err != nil {
+		return nil, err
+	}
+	return jm, nil
 }
 
 // Run the main goroutine responsible for watching and syncing jobs.
@@ -292,7 +297,7 @@ func syncOne(sj *batchv1beta1.CronJob, js []batchv1.Job, now time.Time, jc jobCo
 		// there is some risk that we won't see an active job when there is one.
 		// (because we haven't seen the status update to the SJ or the created pod).
 		// So it is theoretically possible to have concurrency with Forbid.
-		// As long the as the invokations are "far enough apart in time", this usually won't happen.
+		// As long the as the invocations are "far enough apart in time", this usually won't happen.
 		//
 		// TODO: for Forbid, we could use the same name for every execution, as a lock.
 		// With replace, we could use a name that is deterministic per execution time.

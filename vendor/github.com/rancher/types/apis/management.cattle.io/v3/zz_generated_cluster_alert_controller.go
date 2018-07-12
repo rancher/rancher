@@ -96,7 +96,7 @@ func (l *clusterAlertLister) Get(namespace, name string) (*ClusterAlert, error) 
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ClusterAlertGroupVersionKind.Group,
 			Resource: "clusterAlert",
-		}, name)
+		}, key)
 	}
 	return obj.(*ClusterAlert), nil
 }

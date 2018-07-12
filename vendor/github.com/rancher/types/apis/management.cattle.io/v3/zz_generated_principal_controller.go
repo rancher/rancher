@@ -95,7 +95,7 @@ func (l *principalLister) Get(namespace, name string) (*Principal, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    PrincipalGroupVersionKind.Group,
 			Resource: "principal",
-		}, name)
+		}, key)
 	}
 	return obj.(*Principal), nil
 }

@@ -12,6 +12,7 @@ const (
 	DeploymentFieldContainers                    = "containers"
 	DeploymentFieldCreated                       = "created"
 	DeploymentFieldCreatorID                     = "creatorId"
+	DeploymentFieldDNSConfig                     = "dnsConfig"
 	DeploymentFieldDNSPolicy                     = "dnsPolicy"
 	DeploymentFieldDeploymentConfig              = "deploymentConfig"
 	DeploymentFieldDeploymentStatus              = "deploymentStatus"
@@ -35,12 +36,14 @@ const (
 	DeploymentFieldPublicEndpoints               = "publicEndpoints"
 	DeploymentFieldRemoved                       = "removed"
 	DeploymentFieldRestartPolicy                 = "restartPolicy"
+	DeploymentFieldRunAsGroup                    = "runAsGroup"
 	DeploymentFieldRunAsNonRoot                  = "runAsNonRoot"
 	DeploymentFieldScale                         = "scale"
 	DeploymentFieldSchedulerName                 = "schedulerName"
 	DeploymentFieldScheduling                    = "scheduling"
 	DeploymentFieldSelector                      = "selector"
 	DeploymentFieldServiceAccountName            = "serviceAccountName"
+	DeploymentFieldShareProcessNamespace         = "shareProcessNamespace"
 	DeploymentFieldState                         = "state"
 	DeploymentFieldSubdomain                     = "subdomain"
 	DeploymentFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
@@ -61,6 +64,7 @@ type Deployment struct {
 	Containers                    []Container            `json:"containers,omitempty" yaml:"containers,omitempty"`
 	Created                       string                 `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                     string                 `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DNSConfig                     *PodDNSConfig          `json:"dnsConfig,omitempty" yaml:"dnsConfig,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	DeploymentConfig              *DeploymentConfig      `json:"deploymentConfig,omitempty" yaml:"deploymentConfig,omitempty"`
 	DeploymentStatus              *DeploymentStatus      `json:"deploymentStatus,omitempty" yaml:"deploymentStatus,omitempty"`
@@ -84,12 +88,14 @@ type Deployment struct {
 	PublicEndpoints               []PublicEndpoint       `json:"publicEndpoints,omitempty" yaml:"publicEndpoints,omitempty"`
 	Removed                       string                 `json:"removed,omitempty" yaml:"removed,omitempty"`
 	RestartPolicy                 string                 `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
+	RunAsGroup                    *int64                 `json:"runAsGroup,omitempty" yaml:"runAsGroup,omitempty"`
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
 	Scale                         *int64                 `json:"scale,omitempty" yaml:"scale,omitempty"`
 	SchedulerName                 string                 `json:"schedulerName,omitempty" yaml:"schedulerName,omitempty"`
 	Scheduling                    *Scheduling            `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	Selector                      *LabelSelector         `json:"selector,omitempty" yaml:"selector,omitempty"`
 	ServiceAccountName            string                 `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`
+	ShareProcessNamespace         *bool                  `json:"shareProcessNamespace,omitempty" yaml:"shareProcessNamespace,omitempty"`
 	State                         string                 `json:"state,omitempty" yaml:"state,omitempty"`
 	Subdomain                     string                 `json:"subdomain,omitempty" yaml:"subdomain,omitempty"`
 	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`

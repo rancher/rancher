@@ -95,7 +95,7 @@ func (l *groupMemberLister) Get(namespace, name string) (*GroupMember, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    GroupMemberGroupVersionKind.Group,
 			Resource: "groupMember",
-		}, name)
+		}, key)
 	}
 	return obj.(*GroupMember), nil
 }

@@ -12,6 +12,7 @@ const (
 	DaemonSetFieldContainers                    = "containers"
 	DaemonSetFieldCreated                       = "created"
 	DaemonSetFieldCreatorID                     = "creatorId"
+	DaemonSetFieldDNSConfig                     = "dnsConfig"
 	DaemonSetFieldDNSPolicy                     = "dnsPolicy"
 	DaemonSetFieldDaemonSetConfig               = "daemonSetConfig"
 	DaemonSetFieldDaemonSetStatus               = "daemonSetStatus"
@@ -34,11 +35,13 @@ const (
 	DaemonSetFieldPublicEndpoints               = "publicEndpoints"
 	DaemonSetFieldRemoved                       = "removed"
 	DaemonSetFieldRestartPolicy                 = "restartPolicy"
+	DaemonSetFieldRunAsGroup                    = "runAsGroup"
 	DaemonSetFieldRunAsNonRoot                  = "runAsNonRoot"
 	DaemonSetFieldSchedulerName                 = "schedulerName"
 	DaemonSetFieldScheduling                    = "scheduling"
 	DaemonSetFieldSelector                      = "selector"
 	DaemonSetFieldServiceAccountName            = "serviceAccountName"
+	DaemonSetFieldShareProcessNamespace         = "shareProcessNamespace"
 	DaemonSetFieldState                         = "state"
 	DaemonSetFieldSubdomain                     = "subdomain"
 	DaemonSetFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
@@ -59,6 +62,7 @@ type DaemonSet struct {
 	Containers                    []Container            `json:"containers,omitempty" yaml:"containers,omitempty"`
 	Created                       string                 `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                     string                 `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DNSConfig                     *PodDNSConfig          `json:"dnsConfig,omitempty" yaml:"dnsConfig,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	DaemonSetConfig               *DaemonSetConfig       `json:"daemonSetConfig,omitempty" yaml:"daemonSetConfig,omitempty"`
 	DaemonSetStatus               *DaemonSetStatus       `json:"daemonSetStatus,omitempty" yaml:"daemonSetStatus,omitempty"`
@@ -81,11 +85,13 @@ type DaemonSet struct {
 	PublicEndpoints               []PublicEndpoint       `json:"publicEndpoints,omitempty" yaml:"publicEndpoints,omitempty"`
 	Removed                       string                 `json:"removed,omitempty" yaml:"removed,omitempty"`
 	RestartPolicy                 string                 `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
+	RunAsGroup                    *int64                 `json:"runAsGroup,omitempty" yaml:"runAsGroup,omitempty"`
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
 	SchedulerName                 string                 `json:"schedulerName,omitempty" yaml:"schedulerName,omitempty"`
 	Scheduling                    *Scheduling            `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	Selector                      *LabelSelector         `json:"selector,omitempty" yaml:"selector,omitempty"`
 	ServiceAccountName            string                 `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`
+	ShareProcessNamespace         *bool                  `json:"shareProcessNamespace,omitempty" yaml:"shareProcessNamespace,omitempty"`
 	State                         string                 `json:"state,omitempty" yaml:"state,omitempty"`
 	Subdomain                     string                 `json:"subdomain,omitempty" yaml:"subdomain,omitempty"`
 	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`

@@ -96,7 +96,7 @@ func (l *namespacedBasicAuthLister) Get(namespace, name string) (*NamespacedBasi
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    NamespacedBasicAuthGroupVersionKind.Group,
 			Resource: "namespacedBasicAuth",
-		}, name)
+		}, key)
 	}
 	return obj.(*NamespacedBasicAuth), nil
 }

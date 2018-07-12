@@ -95,7 +95,7 @@ func (l *globalRoleBindingLister) Get(namespace, name string) (*GlobalRoleBindin
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    GlobalRoleBindingGroupVersionKind.Group,
 			Resource: "globalRoleBinding",
-		}, name)
+		}, key)
 	}
 	return obj.(*GlobalRoleBinding), nil
 }

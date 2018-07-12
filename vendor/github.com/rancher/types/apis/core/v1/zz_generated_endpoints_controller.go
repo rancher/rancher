@@ -97,7 +97,7 @@ func (l *endpointsLister) Get(namespace, name string) (*v1.Endpoints, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    EndpointsGroupVersionKind.Group,
 			Resource: "endpoints",
-		}, name)
+		}, key)
 	}
 	return obj.(*v1.Endpoints), nil
 }

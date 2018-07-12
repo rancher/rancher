@@ -96,7 +96,7 @@ func (l *clusterEventLister) Get(namespace, name string) (*ClusterEvent, error) 
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ClusterEventGroupVersionKind.Group,
 			Resource: "clusterEvent",
-		}, name)
+		}, key)
 	}
 	return obj.(*ClusterEvent), nil
 }

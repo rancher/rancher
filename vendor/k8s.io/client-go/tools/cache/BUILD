@@ -22,7 +22,8 @@ go_test(
         "store_test.go",
         "undelta_store_test.go",
     ],
-    library = ":go_default_library",
+    embed = [":go_default_library"],
+    race = "off",
     deps = [
         "//vendor/github.com/google/gofuzz:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -33,7 +34,6 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache/testing:go_default_library",
     ],
 )
@@ -61,6 +61,7 @@ go_library(
         "thread_safe_store.go",
         "undelta_store.go",
     ],
+    importpath = "k8s.io/client-go/tools/cache",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
@@ -78,9 +79,10 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/tools/pager:go_default_library",
+        "//vendor/k8s.io/client-go/util/buffer:go_default_library",
+        "//vendor/k8s.io/client-go/util/retry:go_default_library",
     ],
 )
 

@@ -117,7 +117,7 @@ data:
      "plugins": [
        {
          "type": "calico",
-         "log_level": "info",
+         "log_level": "WARNING",
          "datastore_type": "kubernetes",
          "nodename": "__KUBERNETES_NODE_NAME__",
          "mtu": 1500,
@@ -201,9 +201,15 @@ spec:
             # Use Kubernetes API as the backing datastore.
             - name: DATASTORE_TYPE
               value: "kubernetes"
-            # Enable felix info logging.
+            # Disable felix logging to file
+            - name: FELIX_LOGFILEPATH
+              value: "none"
+            # Disable felix logging for syslog
+            - name: FELIX_LOGSEVERITYSYS
+              value: ""
+            # Enable felix logging to stdout
             - name: FELIX_LOGSEVERITYSCREEN
-              value: "info"
+              value: "Warning"
             # Cluster type to identify the deployment type
             - name: CLUSTER_TYPE
               value: "k8s,bgp"

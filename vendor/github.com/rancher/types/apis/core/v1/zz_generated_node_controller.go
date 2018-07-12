@@ -96,7 +96,7 @@ func (l *nodeLister) Get(namespace, name string) (*v1.Node, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    NodeGroupVersionKind.Group,
 			Resource: "node",
-		}, name)
+		}, key)
 	}
 	return obj.(*v1.Node), nil
 }

@@ -97,7 +97,7 @@ func (l *podLister) Get(namespace, name string) (*v1.Pod, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    PodGroupVersionKind.Group,
 			Resource: "pod",
-		}, name)
+		}, key)
 	}
 	return obj.(*v1.Pod), nil
 }

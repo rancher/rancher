@@ -9,7 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["healthz_test.go"],
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 go_library(
@@ -18,6 +18,7 @@ go_library(
         "doc.go",
         "healthz.go",
     ],
+    importpath = "k8s.io/apiserver/pkg/server/healthz",
     deps = ["//vendor/github.com/golang/glog:go_default_library"],
 )
 

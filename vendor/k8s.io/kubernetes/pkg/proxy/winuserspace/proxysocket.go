@@ -30,7 +30,7 @@ import (
 	"github.com/miekg/dns"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/util/ipconfig"
 	"k8s.io/utils/exec"
@@ -382,7 +382,7 @@ func processUnpackedDNSResponsePacket(
 	if found {
 		index := atomic.SwapInt32(&state.searchIndex, state.searchIndex+1)
 		if rcode != 0 && index >= 0 && index < int32(len(dnsSearch)) {
-			// If the reponse has failure and iteration through the search list has not
+			// If the response has failure and iteration through the search list has not
 			// reached the end, retry on behalf of the client using the original query message
 			drop = true
 			length, err = appendDNSSuffix(state.msg, buffer, length, dnsSearch[index])
@@ -477,7 +477,7 @@ func processDNSResponsePacket(
 
 	// QDCOUNT
 	if len(msg.Question) != 1 {
-		glog.V(1).Infof("Number of entries in the reponse section of the DNS packet is: %d", len(msg.Answer))
+		glog.V(1).Infof("Number of entries in the response section of the DNS packet is: %d", len(msg.Answer))
 		return drop, length, nil
 	}
 

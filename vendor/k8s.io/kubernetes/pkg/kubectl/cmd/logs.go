@@ -28,8 +28,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/validation"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util"
@@ -86,16 +86,17 @@ type LogsOptions struct {
 }
 
 // NewCmdLogs creates a new pod logs command
-func NewCmdLogs(f cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdLogs(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	o := &LogsOptions{}
 	cmd := &cobra.Command{
-		Use:     "logs [-f] [-p] (POD | TYPE/NAME) [-c CONTAINER]",
+		Use: "logs [-f] [-p] (POD | TYPE/NAME) [-c CONTAINER]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Print the logs for a container in a pod"),
 		Long:    "Print the logs for a container in a pod or specified resource. If the pod has only one container, the container name is optional.",
 		Example: logsExample,
 		PreRun: func(cmd *cobra.Command, args []string) {
 			if len(os.Args) > 1 && os.Args[1] == "log" {
-				printDeprecationWarning("logs", "log")
+				printDeprecationWarning(errOut, "logs", "log")
 			}
 		},
 		Run: func(cmd *cobra.Command, args []string) {
@@ -192,14 +193,15 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 	}
 
 	if o.Object == nil {
-		builder := f.NewBuilder(true).
+		builder := f.NewBuilder().
+			Internal().
 			NamespaceParam(o.Namespace).DefaultNamespace().
 			SingleResourceType()
 		if o.ResourceArg != "" {
 			builder.ResourceNames("pods", o.ResourceArg)
 		}
 		if selector != "" {
-			builder.ResourceTypes("pods").SelectorParam(selector)
+			builder.ResourceTypes("pods").LabelSelectorParam(selector)
 		}
 		infos, err := builder.Do().Infos()
 		if err != nil {

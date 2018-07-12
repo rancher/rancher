@@ -26,9 +26,10 @@ import (
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 
 	"k8s.io/api/core/v1"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
-	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 )
 
 const (
@@ -102,7 +103,7 @@ func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
 }
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
-func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
+func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool) *ResourceConfig {
 	// sum requests and limits.
 	reqs, limits := resource.PodRequestsAndLimits(pod)
 
@@ -143,6 +144,11 @@ func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
 				hugePageLimits[k] = v
 			}
 		}
+	}
+
+	// quota is not capped when cfs quota is disabled
+	if !enforceCPULimits {
+		cpuQuota = int64(-1)
 	}
 
 	// determine the qos class
@@ -221,4 +227,9 @@ func getCgroupProcs(dir string) ([]int, error) {
 		}
 	}
 	return out, nil
+}
+
+// GetPodCgroupNameSuffix returns the last element of the pod CgroupName identifier
+func GetPodCgroupNameSuffix(podUID types.UID) string {
+	return podCgroupNamePrefix + string(podUID)
 }

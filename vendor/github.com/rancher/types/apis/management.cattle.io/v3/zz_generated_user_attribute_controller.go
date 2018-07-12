@@ -95,7 +95,7 @@ func (l *userAttributeLister) Get(namespace, name string) (*UserAttribute, error
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    UserAttributeGroupVersionKind.Group,
 			Resource: "userAttribute",
-		}, name)
+		}, key)
 	}
 	return obj.(*UserAttribute), nil
 }

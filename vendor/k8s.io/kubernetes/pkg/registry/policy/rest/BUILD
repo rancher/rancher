@@ -8,9 +8,11 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["storage_policy.go"],
+    importpath = "k8s.io/kubernetes/pkg/registry/policy/rest",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/policy:go_default_library",
+        "//pkg/registry/extensions/podsecuritypolicy/storage:go_default_library",
         "//pkg/registry/policy/poddisruptionbudget/storage:go_default_library",
         "//vendor/k8s.io/api/policy/v1beta1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/generic:go_default_library",

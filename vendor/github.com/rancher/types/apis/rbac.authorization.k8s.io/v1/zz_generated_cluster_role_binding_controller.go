@@ -96,7 +96,7 @@ func (l *clusterRoleBindingLister) Get(namespace, name string) (*v1.ClusterRoleB
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ClusterRoleBindingGroupVersionKind.Group,
 			Resource: "clusterRoleBinding",
-		}, name)
+		}, key)
 	}
 	return obj.(*v1.ClusterRoleBinding), nil
 }

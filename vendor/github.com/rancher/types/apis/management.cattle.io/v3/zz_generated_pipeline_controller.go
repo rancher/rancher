@@ -96,7 +96,7 @@ func (l *pipelineLister) Get(namespace, name string) (*Pipeline, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    PipelineGroupVersionKind.Group,
 			Resource: "pipeline",
-		}, name)
+		}, key)
 	}
 	return obj.(*Pipeline), nil
 }

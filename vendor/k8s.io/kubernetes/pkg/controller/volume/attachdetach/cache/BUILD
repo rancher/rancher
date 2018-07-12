@@ -12,11 +12,12 @@ go_library(
         "actual_state_of_world.go",
         "desired_state_of_world.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache",
     deps = [
         "//pkg/volume:go_default_library",
+        "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/operationexecutor:go_default_library",
         "//pkg/volume/util/types:go_default_library",
-        "//pkg/volume/util/volumehelper:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
@@ -29,7 +30,7 @@ go_test(
         "actual_state_of_world_test.go",
         "desired_state_of_world_test.go",
     ],
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//pkg/controller/volume/attachdetach/testing:go_default_library",
         "//pkg/volume/testing:go_default_library",

@@ -12,13 +12,14 @@ go_library(
         "config.go",
         "doc.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/util/config",
     deps = ["//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library"],
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["config_test.go"],
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 filegroup(

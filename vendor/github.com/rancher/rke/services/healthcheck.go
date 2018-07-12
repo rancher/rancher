@@ -56,7 +56,7 @@ func runHealthcheck(ctx context.Context, host *hosts.Host, serviceName string, l
 	}
 	client, err := getHealthCheckHTTPClient(host, port, localConnDialerFactory, &x509Pair)
 	if err != nil {
-		return fmt.Errorf("Failed to initiate new HTTP client for service [%s] for host [%s]", serviceName, host.Address)
+		return fmt.Errorf("Failed to initiate new HTTP client for service [%s] for host [%s]: %v", serviceName, host.Address, err)
 	}
 	for retries := 0; retries < 10; retries++ {
 		if err = getHealthz(client, serviceName, host.Address, url); err != nil {

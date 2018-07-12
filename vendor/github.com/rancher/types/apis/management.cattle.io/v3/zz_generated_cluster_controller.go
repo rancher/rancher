@@ -95,7 +95,7 @@ func (l *clusterLister) Get(namespace, name string) (*Cluster, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ClusterGroupVersionKind.Group,
 			Resource: "cluster",
-		}, name)
+		}, key)
 	}
 	return obj.(*Cluster), nil
 }

@@ -19,7 +19,7 @@ echo "Building reference CLI"
 go build -o ${PWD}/bin/cnitool "$@" ${REPO_PATH}/cnitool
 
 echo "Building plugins"
-PLUGINS="plugins/meta/* plugins/main/* plugins/ipam/* plugins/test/*"
+PLUGINS="plugins/test/*"
 for d in $PLUGINS; do
 	if [ -d $d ]; then
 		plugin=$(basename $d)

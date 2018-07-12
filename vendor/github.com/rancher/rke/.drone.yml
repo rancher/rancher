@@ -29,6 +29,21 @@ pipeline:
       branch: master
       event: tag
 
+  github_binary_prerelease:
+    image: plugins/github-release
+    prerelease: true
+    files:
+     - bin/*
+     - build/bin/rke_*
+    checksum:
+     - sha256
+    secrets: [github_token]
+    when:
+      branch: master
+      event: tag
+      ref:
+        include: [ refs/tags/*rc* ]
+
   github_binary_release:
     image: plugins/github-release
     files:
@@ -40,3 +55,5 @@ pipeline:
     when:
       branch: master
       event: tag
+      ref:
+        exclude: [ refs/tags/*rc* ]

@@ -96,7 +96,7 @@ func (l *projectRoleTemplateBindingLister) Get(namespace, name string) (*Project
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ProjectRoleTemplateBindingGroupVersionKind.Group,
 			Resource: "projectRoleTemplateBinding",
-		}, name)
+		}, key)
 	}
 	return obj.(*ProjectRoleTemplateBinding), nil
 }

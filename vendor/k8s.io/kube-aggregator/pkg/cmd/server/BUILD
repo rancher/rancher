@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["start.go"],
+    importpath = "k8s.io/kube-aggregator/pkg/cmd/server",
     deps = [
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
@@ -18,6 +19,7 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/server/options:go_default_library",
         "//vendor/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1:go_default_library",
         "//vendor/k8s.io/kube-aggregator/pkg/apiserver:go_default_library",
+        "//vendor/k8s.io/kube-aggregator/pkg/apiserver/scheme:go_default_library",
     ],
 )
 

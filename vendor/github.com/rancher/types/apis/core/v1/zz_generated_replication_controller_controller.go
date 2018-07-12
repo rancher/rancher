@@ -97,7 +97,7 @@ func (l *replicationControllerLister) Get(namespace, name string) (*v1.Replicati
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ReplicationControllerGroupVersionKind.Group,
 			Resource: "replicationController",
-		}, name)
+		}, key)
 	}
 	return obj.(*v1.ReplicationController), nil
 }

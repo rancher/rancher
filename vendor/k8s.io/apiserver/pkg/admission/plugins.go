@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/golang/glog"
@@ -37,6 +38,10 @@ type Factory func(config io.Reader) (Interface, error)
 type Plugins struct {
 	lock     sync.Mutex
 	registry map[string]Factory
+}
+
+func NewPlugins() *Plugins {
+	return &Plugins{}
 }
 
 // All registered admission options.
@@ -120,8 +125,8 @@ func splitStream(config io.Reader) (io.Reader, io.Reader, error) {
 
 // NewFromPlugins returns an admission.Interface that will enforce admission control decisions of all
 // the given plugins.
-func (ps *Plugins) NewFromPlugins(pluginNames []string, configProvider ConfigProvider, pluginInitializer PluginInitializer) (Interface, error) {
-	plugins := []Interface{}
+func (ps *Plugins) NewFromPlugins(pluginNames []string, configProvider ConfigProvider, pluginInitializer PluginInitializer, decorator Decorator) (Interface, error) {
+	handlers := []Interface{}
 	for _, pluginName := range pluginNames {
 		pluginConfig, err := configProvider.ConfigFor(pluginName)
 		if err != nil {
@@ -133,10 +138,17 @@ func (ps *Plugins) NewFromPlugins(pluginNames []string, configProvider ConfigPro
 			return nil, err
 		}
 		if plugin != nil {
-			plugins = append(plugins, plugin)
+			if decorator != nil {
+				handlers = append(handlers, decorator.Decorate(plugin, pluginName))
+			} else {
+				handlers = append(handlers, plugin)
+			}
 		}
 	}
-	return chainAdmissionHandler(plugins), nil
+	if len(pluginNames) != 0 {
+		glog.Infof("Loaded %d admission controller(s) successfully in the following order: %s.", len(pluginNames), strings.Join(pluginNames, ","))
+	}
+	return chainAdmissionHandler(handlers), nil
 }
 
 // InitPlugin creates an instance of the named interface.
@@ -156,18 +168,18 @@ func (ps *Plugins) InitPlugin(name string, config io.Reader, pluginInitializer P
 
 	pluginInitializer.Initialize(plugin)
 	// ensure that plugins have been properly initialized
-	if err := Validate(plugin); err != nil {
+	if err := ValidateInitialization(plugin); err != nil {
 		return nil, err
 	}
 
 	return plugin, nil
 }
 
-// Validate will call the Validate function in each plugin if they implement
-// the Validator interface.
-func Validate(plugin Interface) error {
-	if validater, ok := plugin.(Validator); ok {
-		err := validater.Validate()
+// ValidateInitialization will call the InitializationValidate function in each plugin if they implement
+// the InitializationValidator interface.
+func ValidateInitialization(plugin Interface) error {
+	if validater, ok := plugin.(InitializationValidator); ok {
+		err := validater.ValidateInitialization()
 		if err != nil {
 			return err
 		}

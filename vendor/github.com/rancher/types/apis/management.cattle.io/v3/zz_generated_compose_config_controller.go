@@ -95,7 +95,7 @@ func (l *composeConfigLister) Get(namespace, name string) (*ComposeConfig, error
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ComposeConfigGroupVersionKind.Group,
 			Resource: "composeConfig",
-		}, name)
+		}, key)
 	}
 	return obj.(*ComposeConfig), nil
 }

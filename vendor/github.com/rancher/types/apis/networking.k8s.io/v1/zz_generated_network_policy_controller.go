@@ -97,7 +97,7 @@ func (l *networkPolicyLister) Get(namespace, name string) (*v1.NetworkPolicy, er
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    NetworkPolicyGroupVersionKind.Group,
 			Resource: "networkPolicy",
-		}, name)
+		}, key)
 	}
 	return obj.(*v1.NetworkPolicy), nil
 }

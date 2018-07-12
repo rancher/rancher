@@ -4,3 +4,4 @@
 /dist
 *.swp
 /.trash-cache
+/trash.lock

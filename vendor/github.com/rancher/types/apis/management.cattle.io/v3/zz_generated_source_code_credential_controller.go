@@ -96,7 +96,7 @@ func (l *sourceCodeCredentialLister) Get(namespace, name string) (*SourceCodeCre
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    SourceCodeCredentialGroupVersionKind.Group,
 			Resource: "sourceCodeCredential",
-		}, name)
+		}, key)
 	}
 	return obj.(*SourceCodeCredential), nil
 }

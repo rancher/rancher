@@ -1,0 +1,24 @@
+package client
+
+const (
+	CSIPersistentVolumeSourceType                            = "csiPersistentVolumeSource"
+	CSIPersistentVolumeSourceFieldControllerPublishSecretRef = "controllerPublishSecretRef"
+	CSIPersistentVolumeSourceFieldDriver                     = "driver"
+	CSIPersistentVolumeSourceFieldFSType                     = "fsType"
+	CSIPersistentVolumeSourceFieldNodePublishSecretRef       = "nodePublishSecretRef"
+	CSIPersistentVolumeSourceFieldNodeStageSecretRef         = "nodeStageSecretRef"
+	CSIPersistentVolumeSourceFieldReadOnly                   = "readOnly"
+	CSIPersistentVolumeSourceFieldVolumeAttributes           = "volumeAttributes"
+	CSIPersistentVolumeSourceFieldVolumeHandle               = "volumeHandle"
+)
+
+type CSIPersistentVolumeSource struct {
+	ControllerPublishSecretRef *SecretReference  `json:"controllerPublishSecretRef,omitempty" yaml:"controllerPublishSecretRef,omitempty"`
+	Driver                     string            `json:"driver,omitempty" yaml:"driver,omitempty"`
+	FSType                     string            `json:"fsType,omitempty" yaml:"fsType,omitempty"`
+	NodePublishSecretRef       *SecretReference  `json:"nodePublishSecretRef,omitempty" yaml:"nodePublishSecretRef,omitempty"`
+	NodeStageSecretRef         *SecretReference  `json:"nodeStageSecretRef,omitempty" yaml:"nodeStageSecretRef,omitempty"`
+	ReadOnly                   bool              `json:"readOnly,omitempty" yaml:"readOnly,omitempty"`
+	VolumeAttributes           map[string]string `json:"volumeAttributes,omitempty" yaml:"volumeAttributes,omitempty"`
+	VolumeHandle               string            `json:"volumeHandle,omitempty" yaml:"volumeHandle,omitempty"`
+}

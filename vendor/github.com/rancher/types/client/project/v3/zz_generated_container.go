@@ -23,6 +23,7 @@ const (
 	ContainerFieldReadinessProbe           = "readinessProbe"
 	ContainerFieldResources                = "resources"
 	ContainerFieldRestartCount             = "restartCount"
+	ContainerFieldRunAsGroup               = "runAsGroup"
 	ContainerFieldRunAsNonRoot             = "runAsNonRoot"
 	ContainerFieldState                    = "state"
 	ContainerFieldStdin                    = "stdin"
@@ -33,6 +34,7 @@ const (
 	ContainerFieldTransitioning            = "transitioning"
 	ContainerFieldTransitioningMessage     = "transitioningMessage"
 	ContainerFieldUid                      = "uid"
+	ContainerFieldVolumeDevices            = "volumeDevices"
 	ContainerFieldVolumeMounts             = "volumeMounts"
 	ContainerFieldWorkingDir               = "workingDir"
 )
@@ -59,6 +61,7 @@ type Container struct {
 	ReadinessProbe           *Probe                `json:"readinessProbe,omitempty" yaml:"readinessProbe,omitempty"`
 	Resources                *ResourceRequirements `json:"resources,omitempty" yaml:"resources,omitempty"`
 	RestartCount             int64                 `json:"restartCount,omitempty" yaml:"restartCount,omitempty"`
+	RunAsGroup               *int64                `json:"runAsGroup,omitempty" yaml:"runAsGroup,omitempty"`
 	RunAsNonRoot             *bool                 `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
 	State                    string                `json:"state,omitempty" yaml:"state,omitempty"`
 	Stdin                    bool                  `json:"stdin,omitempty" yaml:"stdin,omitempty"`
@@ -69,6 +72,7 @@ type Container struct {
 	Transitioning            string                `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage     string                `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	Uid                      *int64                `json:"uid,omitempty" yaml:"uid,omitempty"`
+	VolumeDevices            []VolumeDevice        `json:"volumeDevices,omitempty" yaml:"volumeDevices,omitempty"`
 	VolumeMounts             []VolumeMount         `json:"volumeMounts,omitempty" yaml:"volumeMounts,omitempty"`
 	WorkingDir               string                `json:"workingDir,omitempty" yaml:"workingDir,omitempty"`
 }

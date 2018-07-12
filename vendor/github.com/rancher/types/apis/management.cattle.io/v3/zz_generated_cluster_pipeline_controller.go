@@ -96,7 +96,7 @@ func (l *clusterPipelineLister) Get(namespace, name string) (*ClusterPipeline, e
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ClusterPipelineGroupVersionKind.Group,
 			Resource: "clusterPipeline",
-		}, name)
+		}, key)
 	}
 	return obj.(*ClusterPipeline), nil
 }

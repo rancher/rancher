@@ -84,7 +84,7 @@ func ensureJobDeleted(k8sClient *kubernetes.Clientset, j interface{}) error {
 		}
 		return err
 	}
-	return fmt.Errorf("[k8s] Job [%s] deletion timedout. Consider increasing addon_job_timout value", job.Name)
+	return fmt.Errorf("[k8s] Job [%s] deletion timed out. Consider increasing addon_job_timeout value", job.Name)
 }
 
 func deleteK8sJob(k8sClient *kubernetes.Clientset, name, namespace string) error {

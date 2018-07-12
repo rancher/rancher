@@ -12,13 +12,13 @@ go_library(
         "capabilities.go",
         "doc.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/capabilities",
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["capabilities_test.go"],
-    library = ":go_default_library",
-    tags = ["automanaged"],
+    embed = [":go_default_library"],
 )
 
 filegroup(

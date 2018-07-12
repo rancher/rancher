@@ -14,6 +14,7 @@ const (
 	WorkloadFieldCreatorID                     = "creatorId"
 	WorkloadFieldCronJobConfig                 = "cronJobConfig"
 	WorkloadFieldCronJobStatus                 = "cronJobStatus"
+	WorkloadFieldDNSConfig                     = "dnsConfig"
 	WorkloadFieldDNSPolicy                     = "dnsPolicy"
 	WorkloadFieldDaemonSetConfig               = "daemonSetConfig"
 	WorkloadFieldDaemonSetStatus               = "daemonSetStatus"
@@ -45,12 +46,14 @@ const (
 	WorkloadFieldReplicationControllerConfig   = "replicationControllerConfig"
 	WorkloadFieldReplicationControllerStatus   = "replicationControllerStatus"
 	WorkloadFieldRestartPolicy                 = "restartPolicy"
+	WorkloadFieldRunAsGroup                    = "runAsGroup"
 	WorkloadFieldRunAsNonRoot                  = "runAsNonRoot"
 	WorkloadFieldScale                         = "scale"
 	WorkloadFieldSchedulerName                 = "schedulerName"
 	WorkloadFieldScheduling                    = "scheduling"
 	WorkloadFieldSelector                      = "selector"
 	WorkloadFieldServiceAccountName            = "serviceAccountName"
+	WorkloadFieldShareProcessNamespace         = "shareProcessNamespace"
 	WorkloadFieldState                         = "state"
 	WorkloadFieldStatefulSetConfig             = "statefulSetConfig"
 	WorkloadFieldStatefulSetStatus             = "statefulSetStatus"
@@ -75,6 +78,7 @@ type Workload struct {
 	CreatorID                     string                       `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	CronJobConfig                 *CronJobConfig               `json:"cronJobConfig,omitempty" yaml:"cronJobConfig,omitempty"`
 	CronJobStatus                 *CronJobStatus               `json:"cronJobStatus,omitempty" yaml:"cronJobStatus,omitempty"`
+	DNSConfig                     *PodDNSConfig                `json:"dnsConfig,omitempty" yaml:"dnsConfig,omitempty"`
 	DNSPolicy                     string                       `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	DaemonSetConfig               *DaemonSetConfig             `json:"daemonSetConfig,omitempty" yaml:"daemonSetConfig,omitempty"`
 	DaemonSetStatus               *DaemonSetStatus             `json:"daemonSetStatus,omitempty" yaml:"daemonSetStatus,omitempty"`
@@ -106,12 +110,14 @@ type Workload struct {
 	ReplicationControllerConfig   *ReplicationControllerConfig `json:"replicationControllerConfig,omitempty" yaml:"replicationControllerConfig,omitempty"`
 	ReplicationControllerStatus   *ReplicationControllerStatus `json:"replicationControllerStatus,omitempty" yaml:"replicationControllerStatus,omitempty"`
 	RestartPolicy                 string                       `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
+	RunAsGroup                    *int64                       `json:"runAsGroup,omitempty" yaml:"runAsGroup,omitempty"`
 	RunAsNonRoot                  *bool                        `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
 	Scale                         *int64                       `json:"scale,omitempty" yaml:"scale,omitempty"`
 	SchedulerName                 string                       `json:"schedulerName,omitempty" yaml:"schedulerName,omitempty"`
 	Scheduling                    *Scheduling                  `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	Selector                      *LabelSelector               `json:"selector,omitempty" yaml:"selector,omitempty"`
 	ServiceAccountName            string                       `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`
+	ShareProcessNamespace         *bool                        `json:"shareProcessNamespace,omitempty" yaml:"shareProcessNamespace,omitempty"`
 	State                         string                       `json:"state,omitempty" yaml:"state,omitempty"`
 	StatefulSetConfig             *StatefulSetConfig           `json:"statefulSetConfig,omitempty" yaml:"statefulSetConfig,omitempty"`
 	StatefulSetStatus             *StatefulSetStatus           `json:"statefulSetStatus,omitempty" yaml:"statefulSetStatus,omitempty"`

@@ -95,7 +95,7 @@ func (l *templateContentLister) Get(namespace, name string) (*TemplateContent, e
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    TemplateContentGroupVersionKind.Group,
 			Resource: "templateContent",
-		}, name)
+		}, key)
 	}
 	return obj.(*TemplateContent), nil
 }

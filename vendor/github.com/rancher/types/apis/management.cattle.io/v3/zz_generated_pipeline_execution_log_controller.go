@@ -96,7 +96,7 @@ func (l *pipelineExecutionLogLister) Get(namespace, name string) (*PipelineExecu
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    PipelineExecutionLogGroupVersionKind.Group,
 			Resource: "pipelineExecutionLog",
-		}, name)
+		}, key)
 	}
 	return obj.(*PipelineExecutionLog), nil
 }

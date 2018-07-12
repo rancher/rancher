@@ -69,7 +69,7 @@ const (
 	// The stage for events generated once the response body has been completed, and no more bytes
 	// will be sent.
 	StageResponseComplete = "ResponseComplete"
-	// The stage for events generated when a panic occured.
+	// The stage for events generated when a panic occurred.
 	StagePanic = "Panic"
 )
 
@@ -126,6 +126,20 @@ type Event struct {
 	// at Response Level.
 	// +optional
 	ResponseObject *runtime.Unknown `json:"responseObject,omitempty" protobuf:"bytes,14,opt,name=responseObject"`
+	// Time the request reached the apiserver.
+	// +optional
+	RequestReceivedTimestamp metav1.MicroTime `json:"requestReceivedTimestamp" protobuf:"bytes,15,opt,name=requestReceivedTimestamp"`
+	// Time the request reached current audit stage.
+	// +optional
+	StageTimestamp metav1.MicroTime `json:"stageTimestamp" protobuf:"bytes,16,opt,name=stageTimestamp"`
+
+	// Annotations is an unstructured key value map stored with an audit event that may be set by
+	// plugins invoked in the request serving chain, including authentication, authorization and
+	// admission plugins. Keys should uniquely identify the informing component to avoid name
+	// collisions (e.g. podsecuritypolicy.admission.k8s.io/policy). Values should be short. Annotations
+	// are included in the Metadata level.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty" protobuf:"bytes,17,rep,name=annotations"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -154,6 +168,11 @@ type Policy struct {
 	// The default audit level is None, but can be overridden by a catch-all rule at the end of the list.
 	// PolicyRules are strictly ordered.
 	Rules []PolicyRule `json:"rules" protobuf:"bytes,2,rep,name=rules"`
+
+	// OmitStages is a list of stages for which no events are created. Note that this can also
+	// be specified per rule in which case the union of both are omitted.
+	// +optional
+	OmitStages []Stage `json:"omitStages,omitempty" protobuf:"bytes,3,rep,name=omitStages"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -209,8 +228,10 @@ type PolicyRule struct {
 	// +optional
 	NonResourceURLs []string `json:"nonResourceURLs,omitempty" protobuf:"bytes,7,rep,name=nonResourceURLs"`
 
-	// OmitStages specify events generated in which stages will not be emitted to backend.
+	// OmitStages is a list of stages for which no events are created. Note that this can also
+	// be specified policy wide in which case the union of both are omitted.
 	// An empty list means no restrictions will apply.
+	// +optional
 	OmitStages []Stage `json:"omitStages,omitempty" protobuf:"bytes,8,rep,name=omitStages"`
 }
 
@@ -220,10 +241,19 @@ type GroupResources struct {
 	// The empty string represents the core API group.
 	// +optional
 	Group string `json:"group,omitempty" protobuf:"bytes,1,opt,name=group"`
-	// Resources is a list of resources within the API group. Subresources are
-	// matched using a "/" to indicate the subresource. For example, "pods/logs"
-	// would match request to the logs subresource of pods. The top level resource
-	// does not match subresources, "pods" doesn't match "pods/logs".
+	// Resources is a list of resources this rule applies to.
+	//
+	// For example:
+	// 'pods' matches pods.
+	// 'pods/log' matches the log subresource of pods.
+	// '*' matches all resources and their subresources.
+	// 'pods/*' matches all subresources of pods.
+	// '*/scale' matches all scale subresources.
+	//
+	// If wildcard is present, the validation rule will ensure resources do not
+	// overlap with each other.
+	//
+	// An empty list implies all resources and subresources in this API groups apply.
 	// +optional
 	Resources []string `json:"resources,omitempty" protobuf:"bytes,2,rep,name=resources"`
 	// ResourceNames is a list of resource instance names that the policy matches.

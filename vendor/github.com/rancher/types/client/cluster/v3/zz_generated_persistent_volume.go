@@ -11,6 +11,7 @@ const (
 	PersistentVolumeFieldAnnotations                   = "annotations"
 	PersistentVolumeFieldAzureDisk                     = "azureDisk"
 	PersistentVolumeFieldAzureFile                     = "azureFile"
+	PersistentVolumeFieldCSI                           = "csi"
 	PersistentVolumeFieldCapacity                      = "capacity"
 	PersistentVolumeFieldCephFS                        = "cephfs"
 	PersistentVolumeFieldCinder                        = "cinder"
@@ -30,6 +31,7 @@ const (
 	PersistentVolumeFieldMountOptions                  = "mountOptions"
 	PersistentVolumeFieldNFS                           = "nfs"
 	PersistentVolumeFieldName                          = "name"
+	PersistentVolumeFieldNodeAffinity                  = "nodeAffinity"
 	PersistentVolumeFieldOwnerReferences               = "ownerReferences"
 	PersistentVolumeFieldPersistentVolumeReclaimPolicy = "persistentVolumeReclaimPolicy"
 	PersistentVolumeFieldPhotonPersistentDisk          = "photonPersistentDisk"
@@ -45,6 +47,7 @@ const (
 	PersistentVolumeFieldTransitioning                 = "transitioning"
 	PersistentVolumeFieldTransitioningMessage          = "transitioningMessage"
 	PersistentVolumeFieldUuid                          = "uuid"
+	PersistentVolumeFieldVolumeMode                    = "volumeMode"
 	PersistentVolumeFieldVsphereVolume                 = "vsphereVolume"
 )
 
@@ -55,6 +58,7 @@ type PersistentVolume struct {
 	Annotations                   map[string]string                 `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	AzureDisk                     *AzureDiskVolumeSource            `json:"azureDisk,omitempty" yaml:"azureDisk,omitempty"`
 	AzureFile                     *AzureFilePersistentVolumeSource  `json:"azureFile,omitempty" yaml:"azureFile,omitempty"`
+	CSI                           *CSIPersistentVolumeSource        `json:"csi,omitempty" yaml:"csi,omitempty"`
 	Capacity                      map[string]string                 `json:"capacity,omitempty" yaml:"capacity,omitempty"`
 	CephFS                        *CephFSPersistentVolumeSource     `json:"cephfs,omitempty" yaml:"cephfs,omitempty"`
 	Cinder                        *CinderVolumeSource               `json:"cinder,omitempty" yaml:"cinder,omitempty"`
@@ -63,25 +67,26 @@ type PersistentVolume struct {
 	CreatorID                     string                            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Description                   string                            `json:"description,omitempty" yaml:"description,omitempty"`
 	FC                            *FCVolumeSource                   `json:"fc,omitempty" yaml:"fc,omitempty"`
-	FlexVolume                    *FlexVolumeSource                 `json:"flexVolume,omitempty" yaml:"flexVolume,omitempty"`
+	FlexVolume                    *FlexPersistentVolumeSource       `json:"flexVolume,omitempty" yaml:"flexVolume,omitempty"`
 	Flocker                       *FlockerVolumeSource              `json:"flocker,omitempty" yaml:"flocker,omitempty"`
 	GCEPersistentDisk             *GCEPersistentDiskVolumeSource    `json:"gcePersistentDisk,omitempty" yaml:"gcePersistentDisk,omitempty"`
 	Glusterfs                     *GlusterfsVolumeSource            `json:"glusterfs,omitempty" yaml:"glusterfs,omitempty"`
 	HostPath                      *HostPathVolumeSource             `json:"hostPath,omitempty" yaml:"hostPath,omitempty"`
-	ISCSI                         *ISCSIVolumeSource                `json:"iscsi,omitempty" yaml:"iscsi,omitempty"`
+	ISCSI                         *ISCSIPersistentVolumeSource      `json:"iscsi,omitempty" yaml:"iscsi,omitempty"`
 	Labels                        map[string]string                 `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Local                         *LocalVolumeSource                `json:"local,omitempty" yaml:"local,omitempty"`
 	MountOptions                  []string                          `json:"mountOptions,omitempty" yaml:"mountOptions,omitempty"`
 	NFS                           *NFSVolumeSource                  `json:"nfs,omitempty" yaml:"nfs,omitempty"`
 	Name                          string                            `json:"name,omitempty" yaml:"name,omitempty"`
+	NodeAffinity                  *VolumeNodeAffinity               `json:"nodeAffinity,omitempty" yaml:"nodeAffinity,omitempty"`
 	OwnerReferences               []OwnerReference                  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PersistentVolumeReclaimPolicy string                            `json:"persistentVolumeReclaimPolicy,omitempty" yaml:"persistentVolumeReclaimPolicy,omitempty"`
 	PhotonPersistentDisk          *PhotonPersistentDiskVolumeSource `json:"photonPersistentDisk,omitempty" yaml:"photonPersistentDisk,omitempty"`
 	PortworxVolume                *PortworxVolumeSource             `json:"portworxVolume,omitempty" yaml:"portworxVolume,omitempty"`
 	Quobyte                       *QuobyteVolumeSource              `json:"quobyte,omitempty" yaml:"quobyte,omitempty"`
-	RBD                           *RBDVolumeSource                  `json:"rbd,omitempty" yaml:"rbd,omitempty"`
+	RBD                           *RBDPersistentVolumeSource        `json:"rbd,omitempty" yaml:"rbd,omitempty"`
 	Removed                       string                            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	ScaleIO                       *ScaleIOVolumeSource              `json:"scaleIO,omitempty" yaml:"scaleIO,omitempty"`
+	ScaleIO                       *ScaleIOPersistentVolumeSource    `json:"scaleIO,omitempty" yaml:"scaleIO,omitempty"`
 	State                         string                            `json:"state,omitempty" yaml:"state,omitempty"`
 	Status                        *PersistentVolumeStatus           `json:"status,omitempty" yaml:"status,omitempty"`
 	StorageClassId                string                            `json:"storageClassId,omitempty" yaml:"storageClassId,omitempty"`
@@ -89,6 +94,7 @@ type PersistentVolume struct {
 	Transitioning                 string                            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage          string                            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	Uuid                          string                            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	VolumeMode                    string                            `json:"volumeMode,omitempty" yaml:"volumeMode,omitempty"`
 	VsphereVolume                 *VsphereVirtualDiskVolumeSource   `json:"vsphereVolume,omitempty" yaml:"vsphereVolume,omitempty"`
 }
 type PersistentVolumeCollection struct {

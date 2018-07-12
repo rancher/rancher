@@ -96,7 +96,7 @@ func (l *sshAuthLister) Get(namespace, name string) (*SSHAuth, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    SSHAuthGroupVersionKind.Group,
 			Resource: "sshAuth",
-		}, name)
+		}, key)
 	}
 	return obj.(*SSHAuth), nil
 }

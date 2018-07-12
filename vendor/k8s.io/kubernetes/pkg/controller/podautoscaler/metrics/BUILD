@@ -14,6 +14,7 @@ go_library(
         "rest_metrics_client.go",
         "utilization.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/autoscaling/v2beta1:go_default_library",
@@ -28,6 +29,7 @@ go_library(
         "//vendor/k8s.io/metrics/pkg/apis/metrics/v1alpha1:go_default_library",
         "//vendor/k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1beta1:go_default_library",
         "//vendor/k8s.io/metrics/pkg/client/custom_metrics:go_default_library",
+        "//vendor/k8s.io/metrics/pkg/client/external_metrics:go_default_library",
     ],
 )
 
@@ -36,10 +38,11 @@ go_test(
     srcs = [
         "legacy_metrics_client_test.go",
         "rest_metrics_client_test.go",
+        "utilization_test.go",
     ],
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/extensions/install:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/api/autoscaling/v2beta1:go_default_library",
@@ -54,10 +57,12 @@ go_test(
         "//vendor/k8s.io/client-go/testing:go_default_library",
         "//vendor/k8s.io/heapster/metrics/api/v1/types:go_default_library",
         "//vendor/k8s.io/metrics/pkg/apis/custom_metrics/v1beta1:go_default_library",
+        "//vendor/k8s.io/metrics/pkg/apis/external_metrics/v1beta1:go_default_library",
         "//vendor/k8s.io/metrics/pkg/apis/metrics/v1alpha1:go_default_library",
         "//vendor/k8s.io/metrics/pkg/apis/metrics/v1beta1:go_default_library",
         "//vendor/k8s.io/metrics/pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//vendor/k8s.io/metrics/pkg/client/custom_metrics/fake:go_default_library",
+        "//vendor/k8s.io/metrics/pkg/client/external_metrics/fake:go_default_library",
     ],
 )
 

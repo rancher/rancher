@@ -13,6 +13,7 @@ go_library(
         "job_controller.go",
         "utils.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/controller/job",
     deps = [
         "//pkg/controller:go_default_library",
         "//pkg/util/metrics:go_default_library",
@@ -44,10 +45,10 @@ go_test(
         "job_controller_test.go",
         "utils_test.go",
     ],
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/install:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
+        "//pkg/apis/core/install:go_default_library",
         "//pkg/controller:go_default_library",
         "//vendor/k8s.io/api/batch/v1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -63,6 +64,7 @@ go_test(
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/testing:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
+        "//vendor/k8s.io/client-go/util/workqueue:go_default_library",
     ],
 )
 

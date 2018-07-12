@@ -12,7 +12,9 @@ go_library(
         "initializer.go",
         "interfaces.go",
     ],
+    importpath = "k8s.io/apiserver/pkg/admission/initializer",
     deps = [
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",
@@ -24,6 +26,7 @@ go_test(
     name = "go_default_xtest",
     srcs = ["initializer_test.go"],
     deps = [
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission/initializer:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",

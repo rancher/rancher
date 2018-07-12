@@ -95,7 +95,7 @@ func (l *dynamicSchemaLister) Get(namespace, name string) (*DynamicSchema, error
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    DynamicSchemaGroupVersionKind.Group,
 			Resource: "dynamicSchema",
-		}, name)
+		}, key)
 	}
 	return obj.(*DynamicSchema), nil
 }

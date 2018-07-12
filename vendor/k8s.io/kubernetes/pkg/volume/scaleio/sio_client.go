@@ -317,7 +317,7 @@ func (c *sioClient) IID() (string, error) {
 }
 
 // getGuid returns instance GUID, if not set using resource labels
-// it attemps to fallback to using drv_cfg binary
+// it attempts to fallback to using drv_cfg binary
 func (c *sioClient) getGuid() (string, error) {
 	if c.sdcGuid == "" {
 		glog.V(4).Info(log("sdc guid label not set, falling back to using drv_cfg"))
@@ -406,7 +406,7 @@ func (c *sioClient) WaitForAttachedDevice(token string) (string, error) {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	timer := time.NewTimer(30 * time.Second)
-	defer ticker.Stop()
+	defer timer.Stop()
 
 	for {
 		select {
@@ -440,7 +440,7 @@ func (c *sioClient) WaitForDetachedDevice(token string) error {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	timer := time.NewTimer(30 * time.Second)
-	defer ticker.Stop()
+	defer timer.Stop()
 
 	for {
 		select {

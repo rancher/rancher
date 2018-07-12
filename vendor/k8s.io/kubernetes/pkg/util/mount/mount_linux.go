@@ -19,7 +19,9 @@ limitations under the License.
 package mount
 
 import (
+	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -44,13 +46,17 @@ const (
 	procMountsPath = "/proc/mounts"
 	// Location of the mountinfo file
 	procMountInfoPath = "/proc/self/mountinfo"
-)
-
-const (
 	// 'fsck' found errors and corrected them
 	fsckErrorsCorrected = 1
 	// 'fsck' found errors but exited without correcting them
 	fsckErrorsUncorrected = 4
+
+	// place for subpath mounts
+	containerSubPathDirectoryName = "volume-subpaths"
+	// syscall.Openat flags used to traverse directories not following symlinks
+	nofollowFlags = unix.O_RDONLY | unix.O_NOFOLLOW
+	// flags for getting file descriptor without following the symlink
+	openFDFlags = unix.O_NOFOLLOW | unix.O_PATH
 )
 
 // Mounter provides the default implementation of mount.Interface
@@ -72,13 +78,13 @@ func New(mounterPath string) Interface {
 }
 
 // Mount mounts source to target as fstype with given options. 'source' and 'fstype' must
-// be an emtpy string in case it's not required, e.g. for remount, or for auto filesystem
-// type, where kernel handles fs type for you. The mount 'options' is a list of options,
+// be an empty string in case it's not required, e.g. for remount, or for auto filesystem
+// type, where kernel handles fstype for you. The mount 'options' is a list of options,
 // currently come from mount(8), e.g. "ro", "remount", "bind", etc. If no more option is
 // required, call Mount with an empty string list or nil.
 func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
 	// Path to mounter binary if containerized mounter is needed. Otherwise, it is set to empty.
-	// All Linux distros are expected to be shipped with a mount utility that an support bind mounts.
+	// All Linux distros are expected to be shipped with a mount utility that a support bind mounts.
 	mounterPath := ""
 	bind, bindRemountOpts := isBind(options)
 	if bind {
@@ -268,7 +274,7 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	if err != nil {
 		return true, err
 	}
-	rootStat, err := os.Lstat(file + "/..")
+	rootStat, err := os.Lstat(filepath.Dir(strings.TrimSuffix(file, "/")))
 	if err != nil {
 		return true, err
 	}
@@ -292,19 +298,31 @@ func (mounter *Mounter) DeviceOpened(pathname string) (bool, error) {
 // PathIsDevice uses FileInfo returned from os.Stat to check if path refers
 // to a device.
 func (mounter *Mounter) PathIsDevice(pathname string) (bool, error) {
-	return pathIsDevice(pathname)
+	pathType, err := mounter.GetFileType(pathname)
+	isDevice := pathType == FileTypeCharDev || pathType == FileTypeBlockDev
+	return isDevice, err
 }
 
 func exclusiveOpenFailsOnDevice(pathname string) (bool, error) {
-	isDevice, err := pathIsDevice(pathname)
+	var isDevice bool
+	finfo, err := os.Stat(pathname)
+	if os.IsNotExist(err) {
+		isDevice = false
+	}
+	// err in call to os.Stat
 	if err != nil {
 		return false, fmt.Errorf(
 			"PathIsDevice failed for path %q: %v",
 			pathname,
 			err)
 	}
+	// path refers to a device
+	if finfo.Mode()&os.ModeDevice != 0 {
+		isDevice = true
+	}
+
 	if !isDevice {
-		glog.Errorf("Path %q is not refering to a device.", pathname)
+		glog.Errorf("Path %q is not referring to a device.", pathname)
 		return false, nil
 	}
 	fd, errno := unix.Open(pathname, unix.O_RDONLY|unix.O_EXCL, 0)
@@ -320,23 +338,6 @@ func exclusiveOpenFailsOnDevice(pathname string) (bool, error) {
 	}
 	// error during call to Open
 	return false, errno
-}
-
-func pathIsDevice(pathname string) (bool, error) {
-	finfo, err := os.Stat(pathname)
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	// err in call to os.Stat
-	if err != nil {
-		return false, err
-	}
-	// path refers to a device
-	if finfo.Mode()&os.ModeDevice != 0 {
-		return true, nil
-	}
-	// path does not refer to device
-	return false, nil
 }
 
 //GetDeviceNameFromMount: given a mount point, find the device name from its global mount point
@@ -418,30 +419,71 @@ func parseProcMounts(content []byte) ([]MountPoint, error) {
 }
 
 func (mounter *Mounter) MakeRShared(path string) error {
-	mountCmd := defaultMountCommand
-	mountArgs := []string{}
-	return doMakeRShared(path, procMountInfoPath, mountCmd, mountArgs)
+	return doMakeRShared(path, procMountInfoPath)
+}
+
+func (mounter *Mounter) GetFileType(pathname string) (FileType, error) {
+	return getFileType(pathname)
+}
+
+func (mounter *Mounter) MakeDir(pathname string) error {
+	err := os.MkdirAll(pathname, os.FileMode(0755))
+	if err != nil {
+		if !os.IsExist(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (mounter *Mounter) MakeFile(pathname string) error {
+	f, err := os.OpenFile(pathname, os.O_CREATE, os.FileMode(0644))
+	defer f.Close()
+	if err != nil {
+		if !os.IsExist(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (mounter *Mounter) ExistsPath(pathname string) bool {
+	_, err := os.Stat(pathname)
+	if err != nil {
+		return false
+	}
+	return true
 }
 
 // formatAndMount uses unix utils to format and mount the given disk
 func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, fstype string, options []string) error {
+	readOnly := false
+	for _, option := range options {
+		if option == "ro" {
+			readOnly = true
+			break
+		}
+	}
+
 	options = append(options, "defaults")
 
-	// Run fsck on the disk to fix repairable issues
-	glog.V(4).Infof("Checking for issues with fsck on disk: %s", source)
-	args := []string{"-a", source}
-	out, err := mounter.Exec.Run("fsck", args...)
-	if err != nil {
-		ee, isExitError := err.(utilexec.ExitError)
-		switch {
-		case err == utilexec.ErrExecutableNotFound:
-			glog.Warningf("'fsck' not found on system; continuing mount without running 'fsck'.")
-		case isExitError && ee.ExitStatus() == fsckErrorsCorrected:
-			glog.Infof("Device %s has errors which were corrected by fsck.", source)
-		case isExitError && ee.ExitStatus() == fsckErrorsUncorrected:
-			return fmt.Errorf("'fsck' found errors on device %s but could not correct them: %s.", source, string(out))
-		case isExitError && ee.ExitStatus() > fsckErrorsUncorrected:
-			glog.Infof("`fsck` error %s", string(out))
+	if !readOnly {
+		// Run fsck on the disk to fix repairable issues, only do this for volumes requested as rw.
+		glog.V(4).Infof("Checking for issues with fsck on disk: %s", source)
+		args := []string{"-a", source}
+		out, err := mounter.Exec.Run("fsck", args...)
+		if err != nil {
+			ee, isExitError := err.(utilexec.ExitError)
+			switch {
+			case err == utilexec.ErrExecutableNotFound:
+				glog.Warningf("'fsck' not found on system; continuing mount without running 'fsck'.")
+			case isExitError && ee.ExitStatus() == fsckErrorsCorrected:
+				glog.Infof("Device %s has errors which were corrected by fsck.", source)
+			case isExitError && ee.ExitStatus() == fsckErrorsUncorrected:
+				return fmt.Errorf("'fsck' found errors on device %s but could not correct them: %s.", source, string(out))
+			case isExitError && ee.ExitStatus() > fsckErrorsUncorrected:
+				glog.Infof("`fsck` error %s", string(out))
+			}
 		}
 	}
 
@@ -451,13 +493,18 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 	if mountErr != nil {
 		// Mount failed. This indicates either that the disk is unformatted or
 		// it contains an unexpected filesystem.
-		existingFormat, err := mounter.getDiskFormat(source)
+		existingFormat, err := mounter.GetDiskFormat(source)
 		if err != nil {
 			return err
 		}
 		if existingFormat == "" {
+			if readOnly {
+				// Don't attempt to format if mounting as readonly, return an error to reflect this.
+				return errors.New("failed to mount unformatted volume as read only")
+			}
+
 			// Disk is unformatted so format it.
-			args = []string{source}
+			args := []string{source}
 			// Use 'ext4' as the default
 			if len(fstype) == 0 {
 				fstype = "ext4"
@@ -489,57 +536,65 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 	return mountErr
 }
 
-// diskLooksUnformatted uses 'lsblk' to see if the given disk is unformated
-func (mounter *SafeFormatAndMount) getDiskFormat(disk string) (string, error) {
-	args := []string{"-n", "-o", "FSTYPE", disk}
-	glog.V(4).Infof("Attempting to determine if disk %q is formatted using lsblk with args: (%v)", disk, args)
-	dataOut, err := mounter.Exec.Run("lsblk", args...)
+// GetDiskFormat uses 'blkid' to see if the given disk is unformated
+func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
+	args := []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", disk}
+	glog.V(4).Infof("Attempting to determine if disk %q is formatted using blkid with args: (%v)", disk, args)
+	dataOut, err := mounter.Exec.Run("blkid", args...)
 	output := string(dataOut)
-	glog.V(4).Infof("Output: %q", output)
+	glog.V(4).Infof("Output: %q, err: %v", output, err)
 
 	if err != nil {
+		if exit, ok := err.(utilexec.ExitError); ok {
+			if exit.ExitStatus() == 2 {
+				// Disk device is unformatted.
+				// For `blkid`, if the specified token (TYPE/PTTYPE, etc) was
+				// not found, or no (specified) devices could be identified, an
+				// exit code of 2 is returned.
+				return "", nil
+			}
+		}
 		glog.Errorf("Could not determine if disk %q is formatted (%v)", disk, err)
 		return "", err
 	}
 
-	// Split lsblk output into lines. Unformatted devices should contain only
-	// "\n". Beware of "\n\n", that's a device with one empty partition.
-	output = strings.TrimSuffix(output, "\n") // Avoid last empty line
+	var fstype, pttype string
+
 	lines := strings.Split(output, "\n")
-	if lines[0] != "" {
-		// The device is formatted
-		return lines[0], nil
+	for _, l := range lines {
+		if len(l) <= 0 {
+			// Ignore empty line.
+			continue
+		}
+		cs := strings.Split(l, "=")
+		if len(cs) != 2 {
+			return "", fmt.Errorf("blkid returns invalid output: %s", output)
+		}
+		// TYPE is filesystem type, and PTTYPE is partition table type, according
+		// to https://www.kernel.org/pub/linux/utils/util-linux/v2.21/libblkid-docs/.
+		if cs[0] == "TYPE" {
+			fstype = cs[1]
+		} else if cs[0] == "PTTYPE" {
+			pttype = cs[1]
+		}
 	}
 
-	if len(lines) == 1 {
-		// The device is unformatted and has no dependent devices
-		return "", nil
+	if len(pttype) > 0 {
+		glog.V(4).Infof("Disk %s detected partition table type: %s", pttype)
+		// Returns a special non-empty string as filesystem type, then kubelet
+		// will not format it.
+		return "unknown data, probably partitions", nil
 	}
 
-	// The device has dependent devices, most probably partitions (LVM, LUKS
-	// and MD RAID are reported as FSTYPE and caught above).
-	return "unknown data, probably partitions", nil
+	return fstype, nil
 }
 
 // isShared returns true, if given path is on a mount point that has shared
 // mount propagation.
-func isShared(path string, filename string) (bool, error) {
-	infos, err := parseMountInfo(filename)
+func isShared(mount string, mountInfoPath string) (bool, error) {
+	info, err := findMountInfo(mount, mountInfoPath)
 	if err != nil {
 		return false, err
-	}
-
-	// process /proc/xxx/mountinfo in backward order and find the first mount
-	// point that is prefix of 'path' - that's the mount where path resides
-	var info *mountInfo
-	for i := len(infos) - 1; i >= 0; i-- {
-		if strings.HasPrefix(path, infos[i].mountPoint) {
-			info = &infos[i]
-			break
-		}
-	}
-	if info == nil {
-		return false, fmt.Errorf("cannot find mount point for %q", path)
 	}
 
 	// parse optional parameters
@@ -552,9 +607,14 @@ func isShared(path string, filename string) (bool, error) {
 }
 
 type mountInfo struct {
+	// Path of the mount point
 	mountPoint string
 	// list of "optional parameters", mount propagation is one of them
 	optional []string
+	// mount options
+	mountOptions []string
+	// super options: per-superblock options.
+	superOptions []string
 }
 
 // parseMountInfo parses /proc/xxx/mountinfo.
@@ -571,27 +631,53 @@ func parseMountInfo(filename string) ([]mountInfo, error) {
 			// the last split() item is empty string following the last \n
 			continue
 		}
+		// See `man proc` for authoritative description of format of the file.
 		fields := strings.Fields(line)
-		if len(fields) < 7 {
-			return nil, fmt.Errorf("wrong number of fields in (expected %d, got %d): %s", 8, len(fields), line)
+		if len(fields) < 10 {
+			return nil, fmt.Errorf("wrong number of fields in (expected %d, got %d): %s", 10, len(fields), line)
 		}
 		info := mountInfo{
-			mountPoint: fields[4],
-			optional:   []string{},
+			mountPoint:   fields[4],
+			mountOptions: strings.Split(fields[5], ","),
+			optional:     []string{},
 		}
+		// All fields until "-" are "optional fields".
 		for i := 6; i < len(fields) && fields[i] != "-"; i++ {
 			info.optional = append(info.optional, fields[i])
 		}
+		superOpts := fields[len(fields)-1]
+		info.superOptions = strings.Split(superOpts, ",")
 		infos = append(infos, info)
 	}
 	return infos, nil
+}
+
+func findMountInfo(path, mountInfoPath string) (mountInfo, error) {
+	infos, err := parseMountInfo(mountInfoPath)
+	if err != nil {
+		return mountInfo{}, err
+	}
+
+	// process /proc/xxx/mountinfo in backward order and find the first mount
+	// point that is prefix of 'path' - that's the mount where path resides
+	var info *mountInfo
+	for i := len(infos) - 1; i >= 0; i-- {
+		if pathWithinBase(path, infos[i].mountPoint) {
+			info = &infos[i]
+			break
+		}
+	}
+	if info == nil {
+		return mountInfo{}, fmt.Errorf("cannot find mount point for %q", path)
+	}
+	return *info, nil
 }
 
 // doMakeRShared is common implementation of MakeRShared on Linux. It checks if
 // path is shared and bind-mounts it as rshared if needed. mountCmd and
 // mountArgs are expected to contain mount-like command, doMakeRShared will add
 // '--bind <path> <path>' and '--make-rshared <path>' to mountArgs.
-func doMakeRShared(path string, mountInfoFilename string, mountCmd string, mountArgs []string) error {
+func doMakeRShared(path string, mountInfoFilename string) error {
 	shared, err := isShared(path, mountInfoFilename)
 	if err != nil {
 		return err
@@ -613,4 +699,491 @@ func doMakeRShared(path string, mountInfoFilename string, mountCmd string, mount
 	}
 
 	return nil
+}
+
+// getSELinuxSupport is common implementation of GetSELinuxSupport on Linux.
+func getSELinuxSupport(path string, mountInfoFilename string) (bool, error) {
+	info, err := findMountInfo(path, mountInfoFilename)
+	if err != nil {
+		return false, err
+	}
+
+	// "seclabel" can be both in mount options and super options.
+	for _, opt := range info.superOptions {
+		if opt == "seclabel" {
+			return true, nil
+		}
+	}
+	for _, opt := range info.mountOptions {
+		if opt == "seclabel" {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (mounter *Mounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
+	newHostPath, err = doBindSubPath(mounter, subPath, os.Getpid())
+	// There is no action when the container starts. Bind-mount will be cleaned
+	// when container stops by CleanSubPaths.
+	cleanupAction = nil
+	return newHostPath, cleanupAction, err
+}
+
+// This implementation is shared between Linux and NsEnterMounter
+// kubeletPid is PID of kubelet in the PID namespace where bind-mount is done,
+// i.e. pid on the *host* if kubelet runs in a container.
+func doBindSubPath(mounter Interface, subpath Subpath, kubeletPid int) (hostPath string, err error) {
+	// Check early for symlink. This is just a pre-check to avoid bind-mount
+	// before the final check.
+	evalSubPath, err := filepath.EvalSymlinks(subpath.Path)
+	if err != nil {
+		return "", fmt.Errorf("evalSymlinks %q failed: %v", subpath.Path, err)
+	}
+	glog.V(5).Infof("doBindSubPath %q, full subpath %q for volumepath %q", subpath.Path, evalSubPath, subpath.VolumePath)
+
+	evalSubPath = filepath.Clean(evalSubPath)
+	if !pathWithinBase(evalSubPath, subpath.VolumePath) {
+		return "", fmt.Errorf("subpath %q not within volume path %q", evalSubPath, subpath.VolumePath)
+	}
+
+	// Prepare directory for bind mounts
+	// containerName is DNS label, i.e. safe as a directory name.
+	bindDir := filepath.Join(subpath.PodDir, containerSubPathDirectoryName, subpath.VolumeName, subpath.ContainerName)
+	err = os.MkdirAll(bindDir, 0750)
+	if err != nil && !os.IsExist(err) {
+		return "", fmt.Errorf("error creating directory %s: %s", bindDir, err)
+	}
+	bindPathTarget := filepath.Join(bindDir, strconv.Itoa(subpath.VolumeMountIndex))
+
+	success := false
+	defer func() {
+		// Cleanup subpath on error
+		if !success {
+			glog.V(4).Infof("doBindSubPath() failed for %q, cleaning up subpath", bindPathTarget)
+			if cleanErr := cleanSubPath(mounter, subpath); cleanErr != nil {
+				glog.Errorf("Failed to clean subpath %q: %v", bindPathTarget, cleanErr)
+			}
+		}
+	}()
+
+	// Check it's not already bind-mounted
+	notMount, err := IsNotMountPoint(mounter, bindPathTarget)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return "", fmt.Errorf("error checking path %s for mount: %s", bindPathTarget, err)
+		}
+		// Ignore ErrorNotExist: the file/directory will be created below if it does not exist yet.
+		notMount = true
+	}
+	if !notMount {
+		// It's already mounted
+		glog.V(5).Infof("Skipping bind-mounting subpath %s: already mounted", bindPathTarget)
+		success = true
+		return bindPathTarget, nil
+	}
+
+	// Create target of the bind mount. A directory for directories, empty file
+	// for everything else.
+	t, err := os.Lstat(subpath.Path)
+	if err != nil {
+		return "", fmt.Errorf("lstat %s failed: %s", subpath.Path, err)
+	}
+	if t.Mode()&os.ModeDir > 0 {
+		if err = os.Mkdir(bindPathTarget, 0750); err != nil && !os.IsExist(err) {
+			return "", fmt.Errorf("error creating directory %s: %s", bindPathTarget, err)
+		}
+	} else {
+		// "/bin/touch <bindDir>".
+		// A file is enough for all possible targets (symlink, device, pipe,
+		// socket, ...), bind-mounting them into a file correctly changes type
+		// of the target file.
+		if err = ioutil.WriteFile(bindPathTarget, []byte{}, 0640); err != nil {
+			return "", fmt.Errorf("error creating file %s: %s", bindPathTarget, err)
+		}
+	}
+
+	// Safe open subpath and get the fd
+	fd, err := doSafeOpen(evalSubPath, subpath.VolumePath)
+	if err != nil {
+		return "", fmt.Errorf("error opening subpath %v: %v", evalSubPath, err)
+	}
+	defer syscall.Close(fd)
+
+	mountSource := fmt.Sprintf("/proc/%d/fd/%v", kubeletPid, fd)
+
+	// Do the bind mount
+	options := []string{"bind"}
+	glog.V(5).Infof("bind mounting %q at %q", mountSource, bindPathTarget)
+	if err = mounter.Mount(mountSource, bindPathTarget, "" /*fstype*/, options); err != nil {
+		return "", fmt.Errorf("error mounting %s: %s", subpath.Path, err)
+	}
+
+	success = true
+	glog.V(3).Infof("Bound SubPath %s into %s", subpath.Path, bindPathTarget)
+	return bindPathTarget, nil
+}
+
+func (mounter *Mounter) CleanSubPaths(podDir string, volumeName string) error {
+	return doCleanSubPaths(mounter, podDir, volumeName)
+}
+
+// This implementation is shared between Linux and NsEnterMounter
+func doCleanSubPaths(mounter Interface, podDir string, volumeName string) error {
+	// scan /var/lib/kubelet/pods/<uid>/volume-subpaths/<volume>/*
+	subPathDir := filepath.Join(podDir, containerSubPathDirectoryName, volumeName)
+	glog.V(4).Infof("Cleaning up subpath mounts for %s", subPathDir)
+
+	containerDirs, err := ioutil.ReadDir(subPathDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("error reading %s: %s", subPathDir, err)
+	}
+
+	for _, containerDir := range containerDirs {
+		if !containerDir.IsDir() {
+			glog.V(4).Infof("Container file is not a directory: %s", containerDir.Name())
+			continue
+		}
+		glog.V(4).Infof("Cleaning up subpath mounts for container %s", containerDir.Name())
+
+		// scan /var/lib/kubelet/pods/<uid>/volume-subpaths/<volume>/<container name>/*
+		fullContainerDirPath := filepath.Join(subPathDir, containerDir.Name())
+		subPaths, err := ioutil.ReadDir(fullContainerDirPath)
+		if err != nil {
+			return fmt.Errorf("error reading %s: %s", fullContainerDirPath, err)
+		}
+		for _, subPath := range subPaths {
+			if err = doCleanSubPath(mounter, fullContainerDirPath, subPath.Name()); err != nil {
+				return err
+			}
+		}
+		// Whole container has been processed, remove its directory.
+		if err := os.Remove(fullContainerDirPath); err != nil {
+			return fmt.Errorf("error deleting %s: %s", fullContainerDirPath, err)
+		}
+		glog.V(5).Infof("Removed %s", fullContainerDirPath)
+	}
+	// Whole pod volume subpaths have been cleaned up, remove its subpath directory.
+	if err := os.Remove(subPathDir); err != nil {
+		return fmt.Errorf("error deleting %s: %s", subPathDir, err)
+	}
+	glog.V(5).Infof("Removed %s", subPathDir)
+
+	// Remove entire subpath directory if it's the last one
+	podSubPathDir := filepath.Join(podDir, containerSubPathDirectoryName)
+	if err := os.Remove(podSubPathDir); err != nil && !os.IsExist(err) {
+		return fmt.Errorf("error deleting %s: %s", podSubPathDir, err)
+	}
+	glog.V(5).Infof("Removed %s", podSubPathDir)
+	return nil
+}
+
+// doCleanSubPath tears down the single subpath bind mount
+func doCleanSubPath(mounter Interface, fullContainerDirPath, subPathIndex string) error {
+	// process /var/lib/kubelet/pods/<uid>/volume-subpaths/<volume>/<container name>/<subPathName>
+	glog.V(4).Infof("Cleaning up subpath mounts for subpath %v", subPathIndex)
+	fullSubPath := filepath.Join(fullContainerDirPath, subPathIndex)
+	notMnt, err := IsNotMountPoint(mounter, fullSubPath)
+	if err != nil {
+		return fmt.Errorf("error checking %s for mount: %s", fullSubPath, err)
+	}
+	// Unmount it
+	if !notMnt {
+		if err = mounter.Unmount(fullSubPath); err != nil {
+			return fmt.Errorf("error unmounting %s: %s", fullSubPath, err)
+		}
+		glog.V(5).Infof("Unmounted %s", fullSubPath)
+	}
+	// Remove it *non*-recursively, just in case there were some hiccups.
+	if err = os.Remove(fullSubPath); err != nil {
+		return fmt.Errorf("error deleting %s: %s", fullSubPath, err)
+	}
+	glog.V(5).Infof("Removed %s", fullSubPath)
+	return nil
+}
+
+// cleanSubPath will teardown the subpath bind mount and any remove any directories if empty
+func cleanSubPath(mounter Interface, subpath Subpath) error {
+	containerDir := filepath.Join(subpath.PodDir, containerSubPathDirectoryName, subpath.VolumeName, subpath.ContainerName)
+
+	// Clean subdir bindmount
+	if err := doCleanSubPath(mounter, containerDir, strconv.Itoa(subpath.VolumeMountIndex)); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	// Recusively remove directories if empty
+	if err := removeEmptyDirs(subpath.PodDir, containerDir); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// removeEmptyDirs works backwards from endDir to baseDir and removes each directory
+// if it is empty.  It stops once it encounters a directory that has content
+func removeEmptyDirs(baseDir, endDir string) error {
+	if !pathWithinBase(endDir, baseDir) {
+		return fmt.Errorf("endDir %q is not within baseDir %q", endDir, baseDir)
+	}
+
+	for curDir := endDir; curDir != baseDir; curDir = filepath.Dir(curDir) {
+		s, err := os.Stat(curDir)
+		if err != nil {
+			if os.IsNotExist(err) {
+				glog.V(5).Infof("curDir %q doesn't exist, skipping", curDir)
+				continue
+			}
+			return fmt.Errorf("error stat %q: %v", curDir, err)
+		}
+		if !s.IsDir() {
+			return fmt.Errorf("path %q not a directory", curDir)
+		}
+
+		err = os.Remove(curDir)
+		if os.IsExist(err) {
+			glog.V(5).Infof("Directory %q not empty, not removing", curDir)
+			break
+		} else if err != nil {
+			return fmt.Errorf("error removing directory %q: %v", curDir, err)
+		}
+		glog.V(5).Infof("Removed directory %q", curDir)
+	}
+	return nil
+}
+
+func (mounter *Mounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
+	return doSafeMakeDir(pathname, base, perm)
+}
+
+func (mounter *Mounter) GetSELinuxSupport(pathname string) (bool, error) {
+	return getSELinuxSupport(pathname, procMountInfoPath)
+}
+
+// This implementation is shared between Linux and NsEnterMounter
+func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
+	glog.V(4).Infof("Creating directory %q within base %q", pathname, base)
+
+	if !pathWithinBase(pathname, base) {
+		return fmt.Errorf("path %s is outside of allowed base %s", pathname, base)
+	}
+
+	// Quick check if the directory already exists
+	s, err := os.Stat(pathname)
+	if err == nil {
+		// Path exists
+		if s.IsDir() {
+			// The directory already exists. It can be outside of the parent,
+			// but there is no race-proof check.
+			glog.V(4).Infof("Directory %s already exists", pathname)
+			return nil
+		}
+		return &os.PathError{Op: "mkdir", Path: pathname, Err: syscall.ENOTDIR}
+	}
+
+	// Find all existing directories
+	existingPath, toCreate, err := findExistingPrefix(base, pathname)
+	if err != nil {
+		return fmt.Errorf("error opening directory %s: %s", pathname, err)
+	}
+	// Ensure the existing directory is inside allowed base
+	fullExistingPath, err := filepath.EvalSymlinks(existingPath)
+	if err != nil {
+		return fmt.Errorf("error opening directory %s: %s", existingPath, err)
+	}
+	if !pathWithinBase(fullExistingPath, base) {
+		return fmt.Errorf("path %s is outside of allowed base %s", fullExistingPath, err)
+	}
+
+	glog.V(4).Infof("%q already exists, %q to create", fullExistingPath, filepath.Join(toCreate...))
+	parentFD, err := doSafeOpen(fullExistingPath, base)
+	if err != nil {
+		return fmt.Errorf("cannot open directory %s: %s", existingPath, err)
+	}
+	childFD := -1
+	defer func() {
+		if parentFD != -1 {
+			if err = syscall.Close(parentFD); err != nil {
+				glog.V(4).Infof("Closing FD %v failed for safemkdir(%v): %v", parentFD, pathname, err)
+			}
+		}
+		if childFD != -1 {
+			if err = syscall.Close(childFD); err != nil {
+				glog.V(4).Infof("Closing FD %v failed for safemkdir(%v): %v", childFD, pathname, err)
+			}
+		}
+	}()
+
+	currentPath := fullExistingPath
+	// create the directories one by one, making sure nobody can change
+	// created directory into symlink.
+	for _, dir := range toCreate {
+		currentPath = filepath.Join(currentPath, dir)
+		glog.V(4).Infof("Creating %s", dir)
+		err = syscall.Mkdirat(parentFD, currentPath, uint32(perm))
+		if err != nil {
+			return fmt.Errorf("cannot create directory %s: %s", currentPath, err)
+		}
+		// Dive into the created directory
+		childFD, err := syscall.Openat(parentFD, dir, nofollowFlags, 0)
+		if err != nil {
+			return fmt.Errorf("cannot open %s: %s", currentPath, err)
+		}
+		// We can be sure that childFD is safe to use. It could be changed
+		// by user after Mkdirat() and before Openat(), however:
+		// - it could not be changed to symlink - we use nofollowFlags
+		// - it could be changed to a file (or device, pipe, socket, ...)
+		//   but either subsequent Mkdirat() fails or we mount this file
+		//   to user's container. Security is no violated in both cases
+		//   and user either gets error or the file that it can already access.
+
+		if err = syscall.Close(parentFD); err != nil {
+			glog.V(4).Infof("Closing FD %v failed for safemkdir(%v): %v", parentFD, pathname, err)
+		}
+		parentFD = childFD
+		childFD = -1
+	}
+
+	// Everything was created. mkdirat(..., perm) above was affected by current
+	// umask and we must apply the right permissions to the last directory
+	// (that's the one that will be available to the container as subpath)
+	// so user can read/write it. This is the behavior of previous code.
+	// TODO: chmod all created directories, not just the last one.
+	// parentFD is the last created directory.
+
+	// Translate perm (os.FileMode) to uint32 that fchmod() expects
+	kernelPerm := uint32(perm & os.ModePerm)
+	if perm&os.ModeSetgid > 0 {
+		kernelPerm |= syscall.S_ISGID
+	}
+	if perm&os.ModeSetuid > 0 {
+		kernelPerm |= syscall.S_ISUID
+	}
+	if perm&os.ModeSticky > 0 {
+		kernelPerm |= syscall.S_ISVTX
+	}
+	if err = syscall.Fchmod(parentFD, kernelPerm); err != nil {
+		return fmt.Errorf("chmod %q failed: %s", currentPath, err)
+	}
+	return nil
+}
+
+// findExistingPrefix finds prefix of pathname that exists. In addition, it
+// returns list of remaining directories that don't exist yet.
+func findExistingPrefix(base, pathname string) (string, []string, error) {
+	rel, err := filepath.Rel(base, pathname)
+	if err != nil {
+		return base, nil, err
+	}
+	dirs := strings.Split(rel, string(filepath.Separator))
+
+	// Do OpenAt in a loop to find the first non-existing dir. Resolve symlinks.
+	// This should be faster than looping through all dirs and calling os.Stat()
+	// on each of them, as the symlinks are resolved only once with OpenAt().
+	currentPath := base
+	fd, err := syscall.Open(currentPath, syscall.O_RDONLY, 0)
+	if err != nil {
+		return pathname, nil, fmt.Errorf("error opening %s: %s", currentPath, err)
+	}
+	defer func() {
+		if err = syscall.Close(fd); err != nil {
+			glog.V(4).Infof("Closing FD %v failed for findExistingPrefix(%v): %v", fd, pathname, err)
+		}
+	}()
+	for i, dir := range dirs {
+		// Using O_PATH here will prevent hangs in case user replaces directory with
+		// fifo
+		childFD, err := syscall.Openat(fd, dir, unix.O_PATH, 0)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return currentPath, dirs[i:], nil
+			}
+			return base, nil, err
+		}
+		if err = syscall.Close(fd); err != nil {
+			glog.V(4).Infof("Closing FD %v failed for findExistingPrefix(%v): %v", fd, pathname, err)
+		}
+		fd = childFD
+		currentPath = filepath.Join(currentPath, dir)
+	}
+	return pathname, []string{}, nil
+}
+
+// This implementation is shared between Linux and NsEnterMounter
+// Open path and return its fd.
+// Symlinks are disallowed (pathname must already resolve symlinks),
+// and the path must be within the base directory.
+func doSafeOpen(pathname string, base string) (int, error) {
+	// Calculate segments to follow
+	subpath, err := filepath.Rel(base, pathname)
+	if err != nil {
+		return -1, err
+	}
+	segments := strings.Split(subpath, string(filepath.Separator))
+
+	// Assumption: base is the only directory that we have under control.
+	// Base dir is not allowed to be a symlink.
+	parentFD, err := syscall.Open(base, nofollowFlags, 0)
+	if err != nil {
+		return -1, fmt.Errorf("cannot open directory %s: %s", base, err)
+	}
+	defer func() {
+		if parentFD != -1 {
+			if err = syscall.Close(parentFD); err != nil {
+				glog.V(4).Infof("Closing FD %v failed for safeopen(%v): %v", parentFD, pathname, err)
+			}
+		}
+	}()
+
+	childFD := -1
+	defer func() {
+		if childFD != -1 {
+			if err = syscall.Close(childFD); err != nil {
+				glog.V(4).Infof("Closing FD %v failed for safeopen(%v): %v", childFD, pathname, err)
+			}
+		}
+	}()
+
+	currentPath := base
+
+	// Follow the segments one by one using openat() to make
+	// sure the user cannot change already existing directories into symlinks.
+	for _, seg := range segments {
+		currentPath = filepath.Join(currentPath, seg)
+		if !pathWithinBase(currentPath, base) {
+			return -1, fmt.Errorf("path %s is outside of allowed base %s", currentPath, base)
+		}
+
+		glog.V(5).Infof("Opening path %s", currentPath)
+		childFD, err = syscall.Openat(parentFD, seg, openFDFlags, 0)
+		if err != nil {
+			return -1, fmt.Errorf("cannot open %s: %s", currentPath, err)
+		}
+
+		var deviceStat unix.Stat_t
+		err := unix.Fstat(childFD, &deviceStat)
+		if err != nil {
+			return -1, fmt.Errorf("Error running fstat on %s with %v", currentPath, err)
+		}
+		fileFmt := deviceStat.Mode & syscall.S_IFMT
+		if fileFmt == syscall.S_IFLNK {
+			return -1, fmt.Errorf("Unexpected symlink found %s", currentPath)
+		}
+
+		// Close parentFD
+		if err = syscall.Close(parentFD); err != nil {
+			return -1, fmt.Errorf("closing fd for %q failed: %v", filepath.Dir(currentPath), err)
+		}
+		// Set child to new parent
+		parentFD = childFD
+		childFD = -1
+	}
+
+	// We made it to the end, return this fd, don't close it
+	finalFD := parentFD
+	parentFD = -1
+
+	return finalFD, nil
 }

@@ -96,7 +96,7 @@ func (l *notifierLister) Get(namespace, name string) (*Notifier, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    NotifierGroupVersionKind.Group,
 			Resource: "notifier",
-		}, name)
+		}, key)
 	}
 	return obj.(*Notifier), nil
 }

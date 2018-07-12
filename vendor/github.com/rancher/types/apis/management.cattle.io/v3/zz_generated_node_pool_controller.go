@@ -96,7 +96,7 @@ func (l *nodePoolLister) Get(namespace, name string) (*NodePool, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    NodePoolGroupVersionKind.Group,
 			Resource: "nodePool",
-		}, name)
+		}, key)
 	}
 	return obj.(*NodePool), nil
 }

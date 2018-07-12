@@ -13,6 +13,7 @@ go_library(
         "line_delimiter.go",
         "strings.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/util/strings",
 )
 
 go_test(
@@ -22,7 +23,7 @@ go_test(
         "line_delimiter_test.go",
         "strings_test.go",
     ],
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 filegroup(

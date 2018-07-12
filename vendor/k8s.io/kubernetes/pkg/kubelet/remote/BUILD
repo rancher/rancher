@@ -3,6 +3,7 @@ package(default_visibility = ["//visibility:public"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
+    "go_test",
 )
 
 go_library(
@@ -13,9 +14,10 @@ go_library(
         "remote_runtime.go",
         "utils.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/remote",
     deps = [
         "//pkg/kubelet/apis/cri:go_default_library",
-        "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
+        "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
         "//pkg/kubelet/util:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
@@ -33,6 +35,23 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubelet/remote/fake:all-srcs",
+    ],
     tags = ["automanaged"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["remote_runtime_test.go"],
+    embed = [":go_default_library"],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/kubelet/apis/cri:go_default_library",
+        "//pkg/kubelet/apis/cri/testing:go_default_library",
+        "//pkg/kubelet/remote/fake:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/github.com/stretchr/testify/require:go_default_library",
+    ],
 )

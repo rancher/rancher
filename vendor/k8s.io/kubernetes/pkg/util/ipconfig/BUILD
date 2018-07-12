@@ -12,6 +12,7 @@ go_library(
         "doc.go",
         "ipconfig.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/util/ipconfig",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
@@ -21,7 +22,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["ipconfig_test.go"],
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = ["//vendor/k8s.io/utils/exec:go_default_library"],
 )
 

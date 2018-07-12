@@ -12,12 +12,12 @@ Please review the [OS requirements](https://rancher.com/docs/rke/v0.1.x/en/insta
 
 ## Getting Started
 
-Please refer to our [RKE docs](http://staging.rancher.com/docs/rke/v0.1.x/en/) for information on how to get started!
+Please refer to our [RKE docs](http://rancher.com/docs/rke/v0.1.x/en/) for information on how to get started!
 For cluster config examples, refer to [RKE cluster.yml examples](https://rancher.com/docs/rke/v0.1.x/en/config-options/example-yamls/)
 
 ## Deploying Rancher 2.x using rke
 
-Using RKE's pluggable [user defined add-ons](https://rancher.com/docs/rke/v0.1.x/en/config-options/user-defined-addons/), it's possible to deploy Rancher 2.x server in HA with a single command. Detailed instructions can be found [here](https://rancher.com/docs/rancher/v2.x/en/installation/ha-server-install/).
+Using RKE's pluggable [user defined add-ons](https://rancher.com/docs/rke/v0.1.x/en/config-options/add-ons/user-defined-add-ons/), it's possible to deploy Rancher 2.x server in HA with a single command. Detailed instructions can be found [here](https://rancher.com/docs/rancher/v2.x/en/installation/ha-server-install/).
 
 ## License
 

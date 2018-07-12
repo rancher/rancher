@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/rancher/rke/cluster"
+	"github.com/rancher/rke/dind"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
@@ -31,7 +32,11 @@ func RemoveCommand() cli.Command {
 		},
 		cli.BoolFlag{
 			Name:  "local",
-			Usage: "Deploy Kubernetes cluster locally",
+			Usage: "Remove Kubernetes cluster locally",
+		},
+		cli.BoolFlag{
+			Name:  "dind",
+			Usage: "Remove Kubernetes cluster deployed in dind mode",
 		},
 	}
 
@@ -74,6 +79,9 @@ func ClusterRemove(
 }
 
 func clusterRemoveFromCli(ctx *cli.Context) error {
+	if ctx.Bool("local") {
+		return clusterRemoveLocal(ctx)
+	}
 	clusterFile, filePath, err := resolveClusterFile(ctx)
 	if err != nil {
 		return fmt.Errorf("Failed to resolve cluster file: %v", err)
@@ -91,8 +99,8 @@ func clusterRemoveFromCli(ctx *cli.Context) error {
 			return nil
 		}
 	}
-	if ctx.Bool("local") {
-		return clusterRemoveLocal(ctx)
+	if ctx.Bool("dind") {
+		return clusterRemoveDind(ctx)
 	}
 	clusterFilePath = filePath
 	rkeConfig, err := cluster.ParseConfig(clusterFile)
@@ -112,7 +120,7 @@ func clusterRemoveLocal(ctx *cli.Context) error {
 	var rkeConfig *v3.RancherKubernetesEngineConfig
 	clusterFile, filePath, err := resolveClusterFile(ctx)
 	if err != nil {
-		log.Infof(context.Background(), "Failed to resolve cluster file, using default cluster instead")
+		log.Warnf(context.Background(), "Failed to resolve cluster file, using default cluster instead")
 		rkeConfig = cluster.GetLocalRKEConfig()
 	} else {
 		clusterFilePath = filePath
@@ -129,4 +137,31 @@ func clusterRemoveLocal(ctx *cli.Context) error {
 	}
 
 	return ClusterRemove(context.Background(), rkeConfig, nil, nil, true, "")
+}
+
+func clusterRemoveDind(ctx *cli.Context) error {
+	clusterFile, filePath, err := resolveClusterFile(ctx)
+	if err != nil {
+		return fmt.Errorf("Failed to resolve cluster file: %v", err)
+	}
+
+	rkeConfig, err := cluster.ParseConfig(clusterFile)
+	if err != nil {
+		return fmt.Errorf("Failed to parse cluster file: %v", err)
+	}
+
+	rkeConfig, err = setOptionsFromCLI(ctx, rkeConfig)
+	if err != nil {
+		return err
+	}
+
+	for _, node := range rkeConfig.Nodes {
+		if err = dind.RmoveDindContainer(context.Background(), node.Address); err != nil {
+			return err
+		}
+	}
+	localKubeConfigPath := pki.GetLocalKubeConfig(filePath, "")
+	// remove the kube config file
+	pki.RemoveAdminConfig(context.Background(), localKubeConfigPath)
+	return err
 }

@@ -95,7 +95,7 @@ func (l *podSecurityPolicyTemplateLister) Get(namespace, name string) (*PodSecur
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    PodSecurityPolicyTemplateGroupVersionKind.Group,
 			Resource: "podSecurityPolicyTemplate",
-		}, name)
+		}, key)
 	}
 	return obj.(*PodSecurityPolicyTemplate), nil
 }

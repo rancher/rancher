@@ -96,7 +96,7 @@ func (l *projectLoggingLister) Get(namespace, name string) (*ProjectLogging, err
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ProjectLoggingGroupVersionKind.Group,
 			Resource: "projectLogging",
-		}, name)
+		}, key)
 	}
 	return obj.(*ProjectLogging), nil
 }

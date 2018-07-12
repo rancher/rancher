@@ -12,6 +12,7 @@ const (
 	StatefulSetFieldContainers                    = "containers"
 	StatefulSetFieldCreated                       = "created"
 	StatefulSetFieldCreatorID                     = "creatorId"
+	StatefulSetFieldDNSConfig                     = "dnsConfig"
 	StatefulSetFieldDNSPolicy                     = "dnsPolicy"
 	StatefulSetFieldFsgid                         = "fsgid"
 	StatefulSetFieldGids                          = "gids"
@@ -32,12 +33,14 @@ const (
 	StatefulSetFieldPublicEndpoints               = "publicEndpoints"
 	StatefulSetFieldRemoved                       = "removed"
 	StatefulSetFieldRestartPolicy                 = "restartPolicy"
+	StatefulSetFieldRunAsGroup                    = "runAsGroup"
 	StatefulSetFieldRunAsNonRoot                  = "runAsNonRoot"
 	StatefulSetFieldScale                         = "scale"
 	StatefulSetFieldSchedulerName                 = "schedulerName"
 	StatefulSetFieldScheduling                    = "scheduling"
 	StatefulSetFieldSelector                      = "selector"
 	StatefulSetFieldServiceAccountName            = "serviceAccountName"
+	StatefulSetFieldShareProcessNamespace         = "shareProcessNamespace"
 	StatefulSetFieldState                         = "state"
 	StatefulSetFieldStatefulSetConfig             = "statefulSetConfig"
 	StatefulSetFieldStatefulSetStatus             = "statefulSetStatus"
@@ -60,6 +63,7 @@ type StatefulSet struct {
 	Containers                    []Container            `json:"containers,omitempty" yaml:"containers,omitempty"`
 	Created                       string                 `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                     string                 `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DNSConfig                     *PodDNSConfig          `json:"dnsConfig,omitempty" yaml:"dnsConfig,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty" yaml:"gids,omitempty"`
@@ -80,12 +84,14 @@ type StatefulSet struct {
 	PublicEndpoints               []PublicEndpoint       `json:"publicEndpoints,omitempty" yaml:"publicEndpoints,omitempty"`
 	Removed                       string                 `json:"removed,omitempty" yaml:"removed,omitempty"`
 	RestartPolicy                 string                 `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
+	RunAsGroup                    *int64                 `json:"runAsGroup,omitempty" yaml:"runAsGroup,omitempty"`
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
 	Scale                         *int64                 `json:"scale,omitempty" yaml:"scale,omitempty"`
 	SchedulerName                 string                 `json:"schedulerName,omitempty" yaml:"schedulerName,omitempty"`
 	Scheduling                    *Scheduling            `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	Selector                      *LabelSelector         `json:"selector,omitempty" yaml:"selector,omitempty"`
 	ServiceAccountName            string                 `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`
+	ShareProcessNamespace         *bool                  `json:"shareProcessNamespace,omitempty" yaml:"shareProcessNamespace,omitempty"`
 	State                         string                 `json:"state,omitempty" yaml:"state,omitempty"`
 	StatefulSetConfig             *StatefulSetConfig     `json:"statefulSetConfig,omitempty" yaml:"statefulSetConfig,omitempty"`
 	StatefulSetStatus             *StatefulSetStatus     `json:"statefulSetStatus,omitempty" yaml:"statefulSetStatus,omitempty"`

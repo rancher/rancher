@@ -96,7 +96,7 @@ func (l *basicAuthLister) Get(namespace, name string) (*BasicAuth, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    BasicAuthGroupVersionKind.Group,
 			Resource: "basicAuth",
-		}, name)
+		}, key)
 	}
 	return obj.(*BasicAuth), nil
 }

@@ -13,6 +13,7 @@ go_library(
         "photon_pd.go",
         "photon_util.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/volume/photon_pd",
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/photon:go_default_library",
@@ -20,7 +21,6 @@ go_library(
         "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
-        "//pkg/volume/util/volumehelper:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
@@ -35,7 +35,7 @@ go_test(
         "attacher_test.go",
         "photon_pd_test.go",
     ],
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//pkg/cloudprovider/providers/photon:go_default_library",
         "//pkg/util/mount:go_default_library",

@@ -33,17 +33,9 @@ const (
 	// beta: v1.4
 	AppArmor utilfeature.Feature = "AppArmor"
 
-	// owner: @girishkalele
-	// alpha: v1.4
-	ExternalTrafficLocalOnly utilfeature.Feature = "AllowExtTrafficLocalEndpoints"
-
 	// owner: @mtaufen
 	// alpha: v1.4
 	DynamicKubeletConfig utilfeature.Feature = "DynamicKubeletConfig"
-
-	// owner: @mtaufen
-	// alpha: v1.8
-	KubeletConfigFile utilfeature.Feature = "KubeletConfigFile"
 
 	// owner: @pweil-
 	// alpha: v1.5
@@ -64,16 +56,17 @@ const (
 	// owner: @vishh
 	// alpha: v1.6
 	//
+	// This is deprecated and will be removed in v1.11. Use DevicePlugins instead.
+	//
 	// Enables support for GPUs as a schedulable resource.
 	// Only Nvidia GPUs are supported as of v1.6.
 	// Works only with Docker Container Runtime.
 	Accelerators utilfeature.Feature = "Accelerators"
 
 	// owner: @jiayingz
-	// alpha: v1.8
+	// beta: v1.10
 	//
 	// Enables support for Device Plugins
-	// Only Nvidia GPUs are tested as of v1.8.
 	DevicePlugins utilfeature.Feature = "DevicePlugins"
 
 	// owner: @gmarek
@@ -98,14 +91,14 @@ const (
 	// the API server as the certificate approaches expiration.
 	RotateKubeletClientCertificate utilfeature.Feature = "RotateKubeletClientCertificate"
 
-	// owner: @msau
+	// owner: @msau42
 	// alpha: v1.7
 	//
 	// A new volume type that supports local disks on a node.
 	PersistentLocalVolumes utilfeature.Feature = "PersistentLocalVolumes"
 
 	// owner: @jinxu
-	// alpha: v1.7
+	// beta: v1.10
 	//
 	// New local storage types to support local storage capacity isolation
 	LocalStorageCapacityIsolation utilfeature.Feature = "LocalStorageCapacityIsolation"
@@ -116,10 +109,16 @@ const (
 	ExpandPersistentVolumes utilfeature.Feature = "ExpandPersistentVolumes"
 
 	// owner: @verb
-	// alpha: v1.8
+	// alpha: v1.10
 	//
 	// Allows running a "debug container" in a pod namespaces to troubleshoot a running pod.
 	DebugContainers utilfeature.Feature = "DebugContainers"
+
+	// owner: @verb
+	// alpha: v1.10
+	//
+	// Allows all containers in a pod to share a process namespace.
+	PodShareProcessNamespace utilfeature.Feature = "PodShareProcessNamespace"
 
 	// owner: @bsalamat
 	// alpha: v1.8
@@ -140,14 +139,8 @@ const (
 	// 'MemoryPressure', 'OutOfDisk' and 'DiskPressure'.
 	TaintNodesByCondition utilfeature.Feature = "TaintNodesByCondition"
 
-	// owner: @haibinxie
-	// alpha: v1.8
-	//
-	// Implement IPVS-based in-cluster service load balancing
-	SupportIPVSProxyMode utilfeature.Feature = "SupportIPVSProxyMode"
-
 	// owner: @jsafrane
-	// alpha: v1.8
+	// beta: v1.10
 	//
 	// Enable mount propagation of volumes.
 	MountPropagation utilfeature.Feature = "MountPropagation"
@@ -159,16 +152,128 @@ const (
 	CPUManager utilfeature.Feature = "CPUManager"
 
 	// owner: @derekwaynecarr
-	// alpha: v1.8
+	// beta: v1.10
 	//
 	// Enable pods to consume pre-allocated huge pages of varying page sizes
 	HugePages utilfeature.Feature = "HugePages"
 
 	// owner @brendandburns
-	// alpha: v1.8
+	// alpha: v1.9
 	//
 	// Enable nodes to exclude themselves from service load balancers
 	ServiceNodeExclusion utilfeature.Feature = "ServiceNodeExclusion"
+
+	// owner @brendandburns
+	// deprecated: v1.10
+	//
+	// Enable the service proxy to contact external IP addresses. Note this feature is present
+	// only for backward compatibility, it will be removed in the 1.11 release.
+	ServiceProxyAllowExternalIPs utilfeature.Feature = "ServiceProxyAllowExternalIPs"
+
+	// owner: @jsafrane
+	// alpha: v1.9
+	//
+	// Enable running mount utilities in containers.
+	MountContainers utilfeature.Feature = "MountContainers"
+
+	// owner: @msau42
+	// alpha: v1.9
+	//
+	// Extend the default scheduler to be aware of PV topology and handle PV binding
+	// Before moving to beta, resolve Kubernetes issue #56180
+	VolumeScheduling utilfeature.Feature = "VolumeScheduling"
+
+	// owner: @vladimirvivien
+	// alpha: v1.9
+	//
+	// Enable mount/attachment of Container Storage Interface (CSI) backed PVs
+	CSIPersistentVolume utilfeature.Feature = "CSIPersistentVolume"
+
+	// owner @MrHohn
+	// beta: v1.10
+	//
+	// Support configurable pod DNS parameters.
+	CustomPodDNS utilfeature.Feature = "CustomPodDNS"
+
+	// owner: @screeley44
+	// alpha: v1.9
+	//
+	// Enable Block volume support in containers.
+	BlockVolume utilfeature.Feature = "BlockVolume"
+
+	// owner: @pospispa
+	// beta: v1.10
+	//
+	// Postpone deletion of a PV or a PVC when they are being used
+	StorageObjectInUseProtection utilfeature.Feature = "StorageObjectInUseProtection"
+
+	// owner: @aveshagarwal
+	// alpha: v1.9
+	//
+	// Enable resource limits priority function
+	ResourceLimitsPriorityFunction utilfeature.Feature = "ResourceLimitsPriorityFunction"
+
+	// owner: @m1093782566
+	// beta: v1.9
+	//
+	// Implement IPVS-based in-cluster service load balancing
+	SupportIPVSProxyMode utilfeature.Feature = "SupportIPVSProxyMode"
+
+	// owner: @dims
+	// alpha: v1.10
+	//
+	// Implement support for limiting pids in pods
+	SupportPodPidsLimit utilfeature.Feature = "SupportPodPidsLimit"
+
+	// owner: @feiskyer
+	// alpha: v1.10
+	//
+	// Enable Hyper-V containers on Windows
+	HyperVContainer utilfeature.Feature = "HyperVContainer"
+
+	// owner: @joelsmith
+	// deprecated: v1.10
+	//
+	// Mount secret, configMap, downwardAPI and projected volumes ReadOnly. Note: this feature
+	// gate is present only for backward compatibility, it will be removed in the 1.11 release.
+	ReadOnlyAPIDataVolumes utilfeature.Feature = "ReadOnlyAPIDataVolumes"
+
+	// owner: @k82cn
+	// alpha: v1.10
+	//
+	// Schedule DaemonSet Pods by default scheduler instead of DaemonSet controller
+	ScheduleDaemonSetPods utilfeature.Feature = "ScheduleDaemonSetPods"
+
+	// owner: @mikedanese
+	// alpha: v1.10
+	//
+	// Implement TokenRequest endpoint on service account resources.
+	TokenRequest utilfeature.Feature = "TokenRequest"
+
+	// owner: @Random-Liu
+	// alpha: v1.10
+	//
+	// Enable container log rotation for cri container runtime
+	CRIContainerLogRotation utilfeature.Feature = "CRIContainerLogRotation"
+
+	// owner: @verult
+	// beta: v1.10
+	//
+	// Enables the regional PD feature on GCE.
+	GCERegionalPersistentDisk utilfeature.Feature = "GCERegionalPersistentDisk"
+
+	// owner: @krmayankk
+	// alpha: v1.10
+	//
+	// Enables control over the primary group ID of containers' init processes.
+	RunAsGroup utilfeature.Feature = "RunAsGroup"
+
+	// owner: @saad-ali
+	// ga
+	//
+	// Allow mounting a subpath of a volume in a container
+	// Do not remove this feature gate even though it's GA
+	VolumeSubpath utilfeature.Feature = "VolumeSubpath"
 )
 
 func init() {
@@ -179,28 +284,43 @@ func init() {
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
-	ExternalTrafficLocalOnly:                    {Default: true, PreRelease: utilfeature.GA},
 	AppArmor:                                    {Default: true, PreRelease: utilfeature.Beta},
 	DynamicKubeletConfig:                        {Default: false, PreRelease: utilfeature.Alpha},
-	KubeletConfigFile:                           {Default: false, PreRelease: utilfeature.Alpha},
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: utilfeature.Beta},
 	ExperimentalCriticalPodAnnotation:           {Default: false, PreRelease: utilfeature.Alpha},
 	Accelerators:                                {Default: false, PreRelease: utilfeature.Alpha},
-	DevicePlugins:                               {Default: false, PreRelease: utilfeature.Alpha},
+	DevicePlugins:                               {Default: true, PreRelease: utilfeature.Beta},
 	TaintBasedEvictions:                         {Default: false, PreRelease: utilfeature.Alpha},
 	RotateKubeletServerCertificate:              {Default: false, PreRelease: utilfeature.Alpha},
 	RotateKubeletClientCertificate:              {Default: true, PreRelease: utilfeature.Beta},
-	PersistentLocalVolumes:                      {Default: false, PreRelease: utilfeature.Alpha},
-	LocalStorageCapacityIsolation:               {Default: false, PreRelease: utilfeature.Alpha},
-	HugePages:                                   {Default: false, PreRelease: utilfeature.Alpha},
+	PersistentLocalVolumes:                      {Default: true, PreRelease: utilfeature.Beta},
+	LocalStorageCapacityIsolation:               {Default: true, PreRelease: utilfeature.Beta},
+	HugePages:                                   {Default: true, PreRelease: utilfeature.Beta},
 	DebugContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
+	PodShareProcessNamespace:                    {Default: false, PreRelease: utilfeature.Alpha},
 	PodPriority:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	EnableEquivalenceClassCache:                 {Default: false, PreRelease: utilfeature.Alpha},
 	TaintNodesByCondition:                       {Default: false, PreRelease: utilfeature.Alpha},
-	MountPropagation:                            {Default: false, PreRelease: utilfeature.Alpha},
+	MountPropagation:                            {Default: true, PreRelease: utilfeature.Beta},
 	ExpandPersistentVolumes:                     {Default: false, PreRelease: utilfeature.Alpha},
-	CPUManager:                                  {Default: false, PreRelease: utilfeature.Alpha},
+	CPUManager:                                  {Default: true, PreRelease: utilfeature.Beta},
 	ServiceNodeExclusion:                        {Default: false, PreRelease: utilfeature.Alpha},
+	MountContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
+	VolumeScheduling:                            {Default: true, PreRelease: utilfeature.Beta},
+	CSIPersistentVolume:                         {Default: true, PreRelease: utilfeature.Beta},
+	CustomPodDNS:                                {Default: true, PreRelease: utilfeature.Beta},
+	BlockVolume:                                 {Default: false, PreRelease: utilfeature.Alpha},
+	StorageObjectInUseProtection:                {Default: true, PreRelease: utilfeature.Beta},
+	ResourceLimitsPriorityFunction:              {Default: false, PreRelease: utilfeature.Alpha},
+	SupportIPVSProxyMode:                        {Default: true, PreRelease: utilfeature.Beta},
+	SupportPodPidsLimit:                         {Default: false, PreRelease: utilfeature.Alpha},
+	HyperVContainer:                             {Default: false, PreRelease: utilfeature.Alpha},
+	ScheduleDaemonSetPods:                       {Default: false, PreRelease: utilfeature.Alpha},
+	TokenRequest:                                {Default: false, PreRelease: utilfeature.Alpha},
+	CRIContainerLogRotation:                     {Default: false, PreRelease: utilfeature.Alpha},
+	GCERegionalPersistentDisk:                   {Default: true, PreRelease: utilfeature.Beta},
+	RunAsGroup:                                  {Default: false, PreRelease: utilfeature.Alpha},
+	VolumeSubpath:                               {Default: true, PreRelease: utilfeature.GA},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
@@ -208,10 +328,14 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	genericfeatures.AdvancedAuditing:        {Default: true, PreRelease: utilfeature.Beta},
 	genericfeatures.APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha},
 	genericfeatures.Initializers:            {Default: false, PreRelease: utilfeature.Alpha},
-	genericfeatures.APIListChunking:         {Default: false, PreRelease: utilfeature.Alpha},
+	genericfeatures.APIListChunking:         {Default: true, PreRelease: utilfeature.Beta},
 
 	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
-	apiextensionsfeatures.CustomResourceValidation: {Default: false, PreRelease: utilfeature.Alpha},
-	SupportIPVSProxyMode:                           {Default: false, PreRelease: utilfeature.Alpha},
+	apiextensionsfeatures.CustomResourceValidation:   {Default: true, PreRelease: utilfeature.Beta},
+	apiextensionsfeatures.CustomResourceSubresources: {Default: false, PreRelease: utilfeature.Alpha},
+
+	// features that enable backwards compatibility but are scheduled to be removed
+	ServiceProxyAllowExternalIPs: {Default: false, PreRelease: utilfeature.Deprecated},
+	ReadOnlyAPIDataVolumes:       {Default: true, PreRelease: utilfeature.Deprecated},
 }

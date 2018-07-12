@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["kubelet_client.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/client",
     deps = [
         "//pkg/util/node:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -24,7 +25,7 @@ go_test(
     name = "go_default_test",
     srcs = ["kubelet_client_test.go"],
     data = ["//pkg/client/testdata"],
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//vendor/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",

@@ -93,8 +93,8 @@ func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner) (volSpec 
 	capacity := v.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	volSizeBytes := capacity.Value()
 	// vSphere works with kilobytes, convert to KiB with rounding up
-	volSizeKB := int(volume.RoundUpSize(volSizeBytes, 1024))
-	name := volume.GenerateVolumeName(v.options.ClusterName, v.options.PVName, 255)
+	volSizeKB := int(volumeutil.RoundUpSize(volSizeBytes, 1024))
+	name := volumeutil.GenerateVolumeName(v.options.ClusterName, v.options.PVName, 255)
 	volumeOptions := &vclib.VolumeOptions{
 		CapacityKB: volSizeKB,
 		Tags:       *v.options.CloudTags,
@@ -170,7 +170,7 @@ func (util *VsphereDiskUtil) DeleteVolume(vd *vsphereVolumeDeleter) error {
 	return nil
 }
 
-func getVolPathfromDeviceMountPath(deviceMountPath string) string {
+func getVolPathfromVolumeName(deviceMountPath string) string {
 	// Assumption: No file or folder is named starting with '[' in datastore
 	volPath := deviceMountPath[strings.LastIndex(deviceMountPath, "["):]
 	// space between datastore and vmdk name in volumePath is encoded as '\040' when returned by GetMountRefs().

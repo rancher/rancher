@@ -96,7 +96,7 @@ func (l *appRevisionLister) Get(namespace, name string) (*AppRevision, error) {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    AppRevisionGroupVersionKind.Group,
 			Resource: "appRevision",
-		}, name)
+		}, key)
 	}
 	return obj.(*AppRevision), nil
 }
