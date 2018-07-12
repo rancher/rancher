@@ -120,6 +120,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&SourceCodeRepositoryList{},
 		&ComposeConfig{},
 		&ComposeConfigList{},
+		&ResourceQuotaTemplate{},
+		&ResourceQuotaTemplateList{},
 	)
 	return nil
 }

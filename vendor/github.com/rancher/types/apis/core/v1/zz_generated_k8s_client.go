@@ -26,6 +26,7 @@ type Interface interface {
 	ConfigMapsGetter
 	ServiceAccountsGetter
 	ReplicationControllersGetter
+	ResourceQuotasGetter
 }
 
 type Client struct {
@@ -44,6 +45,7 @@ type Client struct {
 	configMapControllers             map[string]ConfigMapController
 	serviceAccountControllers        map[string]ServiceAccountController
 	replicationControllerControllers map[string]ReplicationControllerController
+	resourceQuotaControllers         map[string]ResourceQuotaController
 }
 
 func NewForConfig(config rest.Config) (Interface, error) {
@@ -71,6 +73,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		configMapControllers:             map[string]ConfigMapController{},
 		serviceAccountControllers:        map[string]ServiceAccountController{},
 		replicationControllerControllers: map[string]ReplicationControllerController{},
+		resourceQuotaControllers:         map[string]ResourceQuotaController{},
 	}, nil
 }
 
@@ -223,6 +226,19 @@ type ReplicationControllersGetter interface {
 func (c *Client) ReplicationControllers(namespace string) ReplicationControllerInterface {
 	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ReplicationControllerResource, ReplicationControllerGroupVersionKind, replicationControllerFactory{})
 	return &replicationControllerClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type ResourceQuotasGetter interface {
+	ResourceQuotas(namespace string) ResourceQuotaInterface
+}
+
+func (c *Client) ResourceQuotas(namespace string) ResourceQuotaInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ResourceQuotaResource, ResourceQuotaGroupVersionKind, resourceQuotaFactory{})
+	return &resourceQuotaClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

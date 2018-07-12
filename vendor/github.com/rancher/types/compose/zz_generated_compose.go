@@ -49,6 +49,7 @@ type Config struct {
 	PipelineExecutionLogs                    map[string]managementClient.PipelineExecutionLog                    `json:"pipelineExecutionLogs,omitempty" yaml:"pipelineExecutionLogs,omitempty"`
 	SourceCodeRepositorys                    map[string]managementClient.SourceCodeRepository                    `json:"sourceCodeRepositories,omitempty" yaml:"sourceCodeRepositories,omitempty"`
 	ComposeConfigs                           map[string]managementClient.ComposeConfig                           `json:"composeConfigs,omitempty" yaml:"composeConfigs,omitempty"`
+	ResourceQuotaTemplates                   map[string]managementClient.ResourceQuotaTemplate                   `json:"resourceQuotaTemplates,omitempty" yaml:"resourceQuotaTemplates,omitempty"`
 
 	// Cluster Client
 	Namespaces        map[string]clusterClient.Namespace        `json:"namespaces,omitempty" yaml:"namespaces,omitempty"`

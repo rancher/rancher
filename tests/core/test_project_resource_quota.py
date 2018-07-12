@@ -128,11 +128,15 @@ def wait_for_applied_template_set(admin_cc_client, ns, timeout=30):
     return ns.resourceQuotaAppliedTemplateId
 
 
-def test_namespace_resource_quota(admin_pc, template):
+def test_namespace_resource_quota(admin_cc, admin_pc, template):
+    p = admin_cc.management.client.update(admin_pc.project,
+                                          resourceQuota=default_quota())
+    p = admin_cc.management.client.wait_success(p)
+    assert p.resourceQuota is not None
     t_id = template.id
     client = admin_pc.cluster.client
     ns = client.create_namespace(name=random_str(),
-                                 projectId=admin_pc.project.id,
+                                 projectId=p.id,
                                  resourceQuotaTemplateId=t_id)
     assert ns is not None
     assert ns.resourceQuotaTemplateId is not None
