@@ -9,3 +9,4 @@ pytest-xdist
 pyyaml
 netaddr
 requests
+kubernetes==6.0.0
