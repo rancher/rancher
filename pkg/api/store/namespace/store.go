@@ -28,7 +28,7 @@ type Store struct {
 }
 
 func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
-	values.PutValue(data, "{\"conditions\": [{\"type\": \"InitialRolesPopulated\", \"status\": \"False\", \"message\": \"Populating initial roles\"}]}",
+	values.PutValue(data, "{\"conditions\": [{\"type\": \"InitialRolesPopulated\", \"status\": \"Unknown\", \"message\": \"Populating initial roles\"}]}",
 		"annotations", "cattle.io/status")
 	return p.Store.Create(apiContext, schema, data)
 }

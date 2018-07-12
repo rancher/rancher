@@ -44,7 +44,6 @@ func (n *nsLifecycle) Create(obj *v1.Namespace) (*v1.Namespace, error) {
 		return obj, err
 	}
 
-	setRolesPopulatedCondition(obj, 0)
 	go updateStatusAnnotation(hasPRTBs, obj, n.m)
 
 	return obj, err
