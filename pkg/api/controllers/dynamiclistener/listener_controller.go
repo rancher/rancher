@@ -8,14 +8,19 @@ import (
 	"github.com/rancher/rancher/pkg/cert"
 	"github.com/rancher/rancher/pkg/dynamiclistener"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
 type Controller struct {
 	listenConfig       v3.ListenConfigInterface
 	listenConfigLister v3.ListenConfigLister
+	secrets            v1.SecretInterface
 	server             *dynamiclistener.Server
 }
 
@@ -35,6 +40,7 @@ func Start(ctx context.Context, context *config.ScaledContext, httpPort, httpsPo
 	}
 	c := &Controller{
 		server:             dynamiclistener.NewServer(ctx, s, handler, httpPort, httpsPort),
+		secrets:            context.Core.Secrets(""),
 		listenConfig:       context.Management.ListenConfigs(""),
 		listenConfigLister: context.Management.ListenConfigs("").Controller().Lister(),
 	}
@@ -115,5 +121,35 @@ func (c *Controller) updateCurrent(listener *v3.ListenConfig) error {
 		}
 	}
 
-	return nil
+	return c.saveCACertToSecret(listener.CAKey, listener.CACert)
+}
+
+func (c *Controller) saveCACertToSecret(key, cert string) error {
+	if key == "" || cert == "" {
+		return nil
+	}
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "tls-rancher",
+			Namespace: "cattle-system",
+		},
+		StringData: map[string]string{
+			"tls.key": key,
+			"tls.crt": cert,
+		},
+		Type: corev1.SecretTypeTLS,
+	}
+
+	existing, err := c.secrets.GetNamespaced(secret.Namespace, secret.Name, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		_, err = c.secrets.Create(secret)
+		return err
+	} else if err != nil {
+		return err
+	}
+
+	existing.StringData = secret.StringData
+	_, err = c.secrets.Update(existing)
+	return err
 }
