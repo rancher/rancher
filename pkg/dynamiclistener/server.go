@@ -2,16 +2,19 @@ package dynamiclistener
 
 import (
 	"context"
+	"crypto/md5"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -266,6 +269,33 @@ func (s *Server) reload(config *v3.ListenConfig) error {
 	return nil
 }
 
+func (s *Server) ipMapKey() string {
+	len := s.ips.Len()
+	keys := s.ips.Keys()
+	if len == 0 {
+		return fmt.Sprintf("local/%d", len)
+	} else if len == 1 {
+		return fmt.Sprintf("local/%s", keys[0])
+	}
+
+	sort.Slice(keys, func(i, j int) bool {
+		l, _ := keys[i].(string)
+		r, _ := keys[j].(string)
+		return l < r
+	})
+	if len < 6 {
+		return fmt.Sprintf("local/%v", keys)
+	}
+
+	digest := md5.New()
+	for _, k := range keys {
+		s, _ := k.(string)
+		digest.Write([]byte(s))
+	}
+
+	return fmt.Sprintf("local/%v", hex.EncodeToString(digest.Sum(nil)))
+}
+
 func (s *Server) getCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
 	s.Lock()
 	defer s.Unlock()
@@ -281,7 +311,7 @@ func (s *Server) getCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, e
 	var ips []net.IP
 
 	if cn == "" {
-		mapKey = fmt.Sprintf("local/%d", s.ips.Len())
+		mapKey = s.ipMapKey()
 		ipBased = true
 	}
 
