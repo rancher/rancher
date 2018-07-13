@@ -115,7 +115,7 @@ func setStrategy(data map[string]interface{}) {
 func setSelector(schemaID string, data map[string]interface{}) {
 	setSelector := false
 	isJob := strings.EqualFold(schemaID, "job") || strings.EqualFold(schemaID, "cronJob")
-	if convert.IsEmpty(data["selector"]) && !isJob {
+	if convert.IsAPIObjectEmpty(data["selector"]) && !isJob {
 		setSelector = true
 	}
 	if setSelector {

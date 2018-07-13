@@ -42,16 +42,16 @@ func (n nodeStore) List(apiContext *types.APIContext, schema *types.Schema, opt 
 	}
 
 	for _, data := range datas {
-		if !convert.IsEmpty(data["name"]) {
+		if !convert.IsAPIObjectEmpty(data["name"]) {
 			continue
 		}
 
-		if !convert.IsEmpty(data["nodeName"]) {
+		if !convert.IsAPIObjectEmpty(data["nodeName"]) {
 			data["name"] = data["nodeName"]
 			continue
 		}
 
-		if !convert.IsEmpty(data["requestedHostname"]) {
+		if !convert.IsAPIObjectEmpty(data["requestedHostname"]) {
 			data["name"] = data["requestedHostname"]
 			continue
 		}
