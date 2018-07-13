@@ -36,6 +36,7 @@ func SetupListenConfig(storage Storage, noCACerts bool, lc *v3.ListenConfig) err
 			lc.CAKey = existing.CAKey
 			lc.CACert = existing.CACert
 			lc.KnownIPs = existing.KnownIPs
+			lc.GeneratedCerts = existing.GeneratedCerts
 		}
 	}
 
