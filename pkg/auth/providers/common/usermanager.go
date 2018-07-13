@@ -15,7 +15,7 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
-	errors2 "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
@@ -164,7 +164,7 @@ func (m *userManager) EnsureToken(tokenName, description, userName string) (stri
 	}
 
 	token, err := m.tokenLister.Get("", tokenName)
-	if errors2.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		token, err = nil, nil
 	} else if err != nil {
 		return "", err
@@ -194,10 +194,16 @@ func (m *userManager) EnsureToken(tokenName, description, userName string) (stri
 		logrus.Infof("Creating token for user %v", userName)
 		createdToken, err := m.tokens.Create(token)
 		if err != nil {
-			return "", err
+			if !apierrors.IsAlreadyExists(err) {
+				return "", err
+			}
+			token, err = m.tokens.Get(tokenName, v1.GetOptions{})
+			if err != nil {
+				return "", err
+			}
+		} else {
+			token = createdToken
 		}
-		token = createdToken
-
 	}
 
 	return token.Name + ":" + token.Token, nil
