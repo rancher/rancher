@@ -29,6 +29,7 @@ func connectToProxy(proxyURL string, headers http.Header, auth ConnectAuthorizer
 		logrus.WithError(err).Error("Failed to connect to proxy")
 		return err
 	}
+	defer ws.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
