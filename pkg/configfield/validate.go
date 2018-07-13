@@ -11,7 +11,7 @@ func GetDriver(obj interface{}) string {
 	driver := ""
 
 	for k, v := range data {
-		if !strings.HasSuffix(k, "Config") || convert.IsEmpty(v) {
+		if !strings.HasSuffix(k, "Config") || convert.IsAPIObjectEmpty(v) {
 			continue
 		}
 

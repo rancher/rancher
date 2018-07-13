@@ -108,7 +108,7 @@ func updateRule(target map[string]interface{}, id, host, path string, forFronten
 	stateKey := ingress.GetStateKey(name, namespace, host, path, convert.ToString(port))
 	if forFrontend {
 		isService := true
-		if serviceValue, ok := oldState[stateKey]; ok && !convert.IsEmpty(serviceValue) {
+		if serviceValue, ok := oldState[stateKey]; ok && !convert.IsAPIObjectEmpty(serviceValue) {
 			targetData["workloadIds"] = strings.Split(serviceValue, "/")
 			isService = false
 		}
