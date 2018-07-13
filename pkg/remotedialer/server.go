@@ -17,6 +17,15 @@ var (
 type Authorizer func(req *http.Request) (clientKey string, authed bool, err error)
 type ErrorWriter func(rw http.ResponseWriter, req *http.Request, code int, err error)
 
+func DefaultErrorWriter(rw http.ResponseWriter, req *http.Request, code int, err error) {
+	rw.Write([]byte(err.Error()))
+	rw.WriteHeader(code)
+}
+
+func AlwaysReady() bool {
+	return true
+}
+
 type Server struct {
 	ready       func() bool
 	authorizer  Authorizer
