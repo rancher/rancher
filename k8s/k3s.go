@@ -5,6 +5,7 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -22,6 +23,7 @@ func getEmbedded(ctx context.Context) (bool, context.Context, *rest.Config, erro
 		return false, ctx, nil, err
 	}
 
+	os.Setenv("KUBECONFIG", sc.KubeConfig)
 	restConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: sc.KubeConfig}, &clientcmd.ConfigOverrides{}).ClientConfig()
 
