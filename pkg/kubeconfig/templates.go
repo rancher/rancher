@@ -10,7 +10,9 @@ clusters:
   cluster:
     server: "https://{{.Host}}/k8s/clusters/{{.ClusterID}}"
     api-version: v1
+{{- if ne .Cert "" }}
     certificate-authority-data: "{{.Cert}}"
+{{- end }}
 
 users:
 - name: "{{.User}}"
