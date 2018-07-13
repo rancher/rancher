@@ -5,7 +5,6 @@ import (
 	"reflect"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/types/convert"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -487,7 +486,7 @@ func aggregateRequestAndLimitsForNode(pods []*corev1.Pod) (map[corev1.ResourceNa
 }
 
 func isEqual(data1 map[corev1.ResourceName]resource.Quantity, data2 map[corev1.ResourceName]resource.Quantity) bool {
-	if convert.IsEmpty(data1) && convert.IsEmpty(data2) {
+	if (data1 == nil || len(data1) == 0) && (data2 == nil || len(data2) == 0) {
 		return true
 	}
 	if data1 == nil || data2 == nil {
