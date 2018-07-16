@@ -51,9 +51,17 @@ func (s *StatsAggregator) sync(key string, cluster *v3.Cluster) error {
 }
 
 func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) error {
-	machines, err := s.NodesLister.List(cluster.Name, labels.Everything())
+	allMachines, err := s.NodesLister.List(cluster.Name, labels.Everything())
 	if err != nil {
 		return err
+	}
+
+	var machines []*v3.Node
+	// only include worker nodes
+	for _, m := range allMachines {
+		if m.Spec.Worker && !m.Spec.InternalNodeSpec.Unschedulable {
+			machines = append(machines, m)
+		}
 	}
 
 	origStatus := cluster.Status.DeepCopy()
