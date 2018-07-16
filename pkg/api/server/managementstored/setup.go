@@ -271,7 +271,7 @@ func Preference(schemas *types.Schemas, management *config.ScaledContext) {
 }
 
 func NodeTypes(schemas *types.Schemas, management *config.ScaledContext) error {
-	secretStore, err := nodeconfig.NewStore(management.Core.Namespaces(""), management.K8sClient.CoreV1())
+	secretStore, err := nodeconfig.NewStore(management.Core.Namespaces(""), management.Core)
 	if err != nil {
 		return err
 	}

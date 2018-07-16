@@ -32,7 +32,7 @@ const (
 )
 
 func Register(management *config.ManagementContext) {
-	secretStore, err := nodeconfig.NewStore(management.Core.Namespaces(""), management.K8sClient.CoreV1())
+	secretStore, err := nodeconfig.NewStore(management.Core.Namespaces(""), management.Core)
 	if err != nil {
 		logrus.Fatal(err)
 	}

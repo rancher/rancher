@@ -9,14 +9,13 @@ import (
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
-	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 type BundleLookup struct {
 	engineStore cluster.PersistentStore
 }
 
-func NewLookup(namespaces v1.NamespaceInterface, secrets typedv1.SecretsGetter) *BundleLookup {
+func NewLookup(namespaces v1.NamespaceInterface, secrets v1.SecretsGetter) *BundleLookup {
 	return &BundleLookup{
 		engineStore: clusterprovisioner.NewPersistentStore(namespaces, secrets),
 	}

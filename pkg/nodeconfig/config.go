@@ -13,7 +13,6 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
-	v12 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 const (
@@ -29,8 +28,8 @@ type NodeConfig struct {
 	cm      map[string]string
 }
 
-func NewStore(namespaceInterface v1.NamespaceInterface, v1Interface v12.CoreV1Interface) (*encryptedstore.GenericEncryptedStore, error) {
-	return encryptedstore.NewGenericEncrypedStore("mc-", "", namespaceInterface, v1Interface)
+func NewStore(namespaceInterface v1.NamespaceInterface, secretsGetter v1.SecretsGetter) (*encryptedstore.GenericEncryptedStore, error) {
+	return encryptedstore.NewGenericEncrypedStore("mc-", "", namespaceInterface, secretsGetter)
 }
 
 func NewNodeConfig(store *encryptedstore.GenericEncryptedStore, node *v3.Node) (*NodeConfig, error) {

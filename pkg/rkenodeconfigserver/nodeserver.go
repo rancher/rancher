@@ -37,7 +37,7 @@ type RKENodeConfigServer struct {
 func Handler(auth *tunnelserver.Authorizer, scaledContext *config.ScaledContext) http.Handler {
 	return &RKENodeConfigServer{
 		auth:                 auth,
-		lookup:               rkecerts.NewLookup(scaledContext.Core.Namespaces(""), scaledContext.K8sClient.CoreV1()),
+		lookup:               rkecerts.NewLookup(scaledContext.Core.Namespaces(""), scaledContext.Core),
 		systemAccountManager: systemaccount.NewManagerFromScale(scaledContext),
 	}
 }
@@ -151,7 +151,7 @@ func (n *RKENodeConfigServer) nonWorkerConfig(ctx context.Context, cluster *v3.C
 }
 
 func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluster, node *v3.Node) (*rkeworker.NodeConfig, error) {
-	spec := cluster.Status.AppliedSpec
+	spec := cluster.Status.AppliedSpec.DeepCopy()
 
 	bundle, err := n.lookup.Lookup(cluster)
 	if err != nil {
@@ -170,7 +170,10 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 		return nil, err
 	}
 
-	plan, err := librke.New().GeneratePlan(ctx, spec.RancherKubernetesEngineConfig, infos)
+	rkeConfig := spec.RancherKubernetesEngineConfig
+	filterHostForSpec(rkeConfig, node)
+	logrus.Debugf("The number of nodes sent to the plan: %v", len(rkeConfig.Nodes))
+	plan, err := librke.New().GeneratePlan(ctx, rkeConfig, infos)
 	if err != nil {
 		return nil, err
 	}
@@ -193,6 +196,16 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 	}
 
 	return nil, fmt.Errorf("failed to find plan for %s", node.Status.NodeConfig.Address)
+}
+
+func filterHostForSpec(spec *v3.RancherKubernetesEngineConfig, n *v3.Node) {
+	nodeList := make([]v3.RKEConfigNode, 0)
+	for _, node := range spec.Nodes {
+		if isNonWorkerOnly(node.Role) || node.NodeName == n.Status.NodeConfig.NodeName {
+			nodeList = append(nodeList, node)
+		}
+	}
+	spec.Nodes = nodeList
 }
 
 func augmentProcesses(token string, processes map[string]v3.Process, worker, b2d bool) map[string]v3.Process {

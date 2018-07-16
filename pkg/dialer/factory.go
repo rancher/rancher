@@ -27,7 +27,7 @@ func NewFactory(apiContext *config.ScaledContext) (dialer.Factory, error) {
 	authorizer := tunnelserver.NewAuthorizer(apiContext)
 	tunneler := tunnelserver.NewTunnelServer(apiContext, authorizer)
 
-	secretStore, err := nodeconfig.NewStore(apiContext.Core.Namespaces(""), apiContext.K8sClient.CoreV1())
+	secretStore, err := nodeconfig.NewStore(apiContext.Core.Namespaces(""), apiContext.Core)
 	if err != nil {
 		return nil, err
 	}
