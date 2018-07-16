@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 )
@@ -21,6 +22,7 @@ import (
 type NodeWatcher struct {
 	machineLister      v3.NodeLister
 	nodeLister         v1.NodeLister
+	clusterAlerts      v3.ClusterAlertInterface
 	clusterAlertLister v3.ClusterAlertLister
 	alertManager       *manager.Manager
 	clusterName        string
@@ -28,11 +30,12 @@ type NodeWatcher struct {
 }
 
 func StartNodeWatcher(ctx context.Context, cluster *config.UserContext, manager *manager.Manager) {
-
+	clusterAlerts := cluster.Management.Management.ClusterAlerts(cluster.ClusterName)
 	n := &NodeWatcher{
 		machineLister:      cluster.Management.Management.Nodes(cluster.ClusterName).Controller().Lister(),
 		nodeLister:         cluster.Core.Nodes("").Controller().Lister(),
-		clusterAlertLister: cluster.Management.Management.ClusterAlerts(cluster.ClusterName).Controller().Lister(),
+		clusterAlerts:      clusterAlerts,
+		clusterAlertLister: clusterAlerts.Controller().Lister(),
 		alertManager:       manager,
 		clusterName:        cluster.ClusterName,
 		clusterLister:      cluster.Management.Management.Clusters("").Controller().Lister(),
@@ -80,6 +83,12 @@ func (w *NodeWatcher) watchRule() error {
 			}
 			id := parts[1]
 			machine := getMachineByID(machines, id)
+			if machine == nil {
+				if err = w.clusterAlerts.Delete(alert.Name, &metav1.DeleteOptions{}); err != nil {
+					return err
+				}
+				continue
+			}
 			w.checkNodeCondition(alert, machine)
 
 		} else if alert.Spec.TargetNode.Selector != nil {
@@ -129,7 +138,7 @@ func (w *NodeWatcher) checkNodeCondition(alert *v3.ClusterAlert, machine *v3.Nod
 
 func (w *NodeWatcher) checkNodeMemUsage(alert *v3.ClusterAlert, machine *v3.Node) {
 	alertID := alert.Namespace + "-" + alert.Name
-	if machine != nil && v3.NodeConditionReady.IsTrue(machine) {
+	if v3.NodeConditionReady.IsTrue(machine) {
 		total := machine.Status.InternalNodeStatus.Allocatable.Memory()
 		used := machine.Status.Requested.Memory()
 
@@ -163,7 +172,7 @@ func (w *NodeWatcher) checkNodeMemUsage(alert *v3.ClusterAlert, machine *v3.Node
 
 func (w *NodeWatcher) checkNodeCPUUsage(alert *v3.ClusterAlert, machine *v3.Node) {
 	alertID := alert.Namespace + "-" + alert.Name
-	if machine != nil && v3.NodeConditionReady.IsTrue(machine) {
+	if v3.NodeConditionReady.IsTrue(machine) {
 		total := machine.Status.InternalNodeStatus.Allocatable.Cpu()
 		used := machine.Status.Requested.Cpu()
 
@@ -196,9 +205,6 @@ func (w *NodeWatcher) checkNodeCPUUsage(alert *v3.ClusterAlert, machine *v3.Node
 }
 
 func (w *NodeWatcher) checkNodeReady(alert *v3.ClusterAlert, machine *v3.Node) {
-	if machine == nil {
-		return
-	}
 	alertID := alert.Namespace + "-" + alert.Name
 	for _, cond := range machine.Status.InternalNodeStatus.Conditions {
 		if cond.Type == corev1.NodeReady {
