@@ -44,7 +44,7 @@ type Provisioner struct {
 
 func Register(management *config.ManagementContext) {
 	p := &Provisioner{
-		Driver:            service.NewEngineService(NewPersistentStore(management.Core.Namespaces(""), management.K8sClient.CoreV1())),
+		Driver:            service.NewEngineService(NewPersistentStore(management.Core.Namespaces(""), management.Core)),
 		Clusters:          management.Management.Clusters(""),
 		ClusterController: management.Management.Clusters("").Controller(),
 		NodeLister:        management.Management.Nodes("").Controller().Lister(),
