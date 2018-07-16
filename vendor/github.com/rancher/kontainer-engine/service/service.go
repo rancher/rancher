@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/rancher/kontainer-engine/cluster"
@@ -104,8 +105,21 @@ func flatten(data map[string]interface{}, driverOptions *types.DriverOptions) {
 			driverOptions.StringOptions[k] = v.(string)
 		case bool:
 			driverOptions.BoolOptions[k] = v.(bool)
-		case []string:
-			driverOptions.StringSliceOptions[k] = &types.StringSlice{Value: v.([]string)}
+		case []interface{}:
+			// lists of strings come across as lists of interfaces, have to convert them manually
+			var stringArray []string
+
+			for _, stringInterface := range v.([]interface{}) {
+				switch stringInterface.(type) {
+				case string:
+					stringArray = append(stringArray, stringInterface.(string))
+				}
+			}
+
+			// if the length is 0 then it must not have been an array of strings
+			if len(stringArray) != 0 {
+				driverOptions.StringSliceOptions[k] = &types.StringSlice{Value: stringArray}
+			}
 		case map[string]interface{}:
 			// hack for labels
 			if k == "labels" {
@@ -117,6 +131,8 @@ func flatten(data map[string]interface{}, driverOptions *types.DriverOptions) {
 			} else {
 				flatten(v.(map[string]interface{}), driverOptions)
 			}
+		default:
+			logrus.Warnf("could not convert %v %v=%v", reflect.TypeOf(v), k, v)
 		}
 	}
 }

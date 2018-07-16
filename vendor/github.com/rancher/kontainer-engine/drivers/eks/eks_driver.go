@@ -22,6 +22,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/iam"
 	heptio "github.com/heptio/authenticator/pkg/token"
 	"github.com/rancher/kontainer-engine/drivers/util"
 	"github.com/rancher/kontainer-engine/types"
@@ -64,6 +65,11 @@ type state struct {
 
 	InstanceType string
 	Region       string
+
+	VirtualNetwork string
+	Subnets        []string
+	SecurityGroups []string
+	ServiceRole    string
 
 	ClusterInfo types.ClusterInfo
 }
@@ -141,6 +147,23 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 		Value: "3",
 	}
 
+	driverFlag.Options["virtual-network"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "The name of hte virtual network to use",
+	}
+	driverFlag.Options["subnets"] = &types.Flag{
+		Type:  types.StringSliceType,
+		Usage: "Comma-separated list of subnets in the virtual network to use",
+	}
+	driverFlag.Options["service-role"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "The service role to use to perform the cluster operations in AWS",
+	}
+	driverFlag.Options["security-groups"] = &types.Flag{
+		Type:  types.StringSliceType,
+		Usage: "Comma-separated list of security groups to use for the cluster",
+	}
+
 	return &driverFlag, nil
 }
 
@@ -163,6 +186,10 @@ func getStateFromOptions(driverOptions *types.DriverOptions) (state, error) {
 	state.InstanceType = getValueFromDriverOptions(driverOptions, types.StringType, "instance-type", "instanceType").(string)
 	state.MinimumASGSize = getValueFromDriverOptions(driverOptions, types.IntType, "minimum-nodes", "minimumNodes").(int64)
 	state.MaximumASGSize = getValueFromDriverOptions(driverOptions, types.IntType, "maximum-nodes", "maximumNodes").(int64)
+	state.VirtualNetwork = getValueFromDriverOptions(driverOptions, types.StringType, "virtual-network", "virtualNetwork").(string)
+	state.Subnets = getValueFromDriverOptions(driverOptions, types.StringSliceType, "subnets").(*types.StringSlice).Value
+	state.ServiceRole = getValueFromDriverOptions(driverOptions, types.StringType, "service-role", "serviceRole").(string)
+	state.SecurityGroups = getValueFromDriverOptions(driverOptions, types.StringSliceType, "security-groups", "securityGroups").(*types.StringSlice).Value
 
 	return state, state.validate()
 }
@@ -228,6 +255,14 @@ func (state *state) validate() error {
 
 	if state.MaximumASGSize < state.MinimumASGSize {
 		return fmt.Errorf("maximum nodes cannot be less than minimum nodes")
+	}
+
+	networkEmpty := state.VirtualNetwork == ""
+	subnetEmpty := len(state.Subnets) == 0
+	securityGroupEmpty := len(state.SecurityGroups) == 0
+
+	if !(networkEmpty == subnetEmpty && subnetEmpty == securityGroupEmpty) {
+		return fmt.Errorf("virtual network, subnet, and security group must all be set together")
 	}
 
 	return nil
@@ -361,60 +396,87 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 
 	svc := cloudformation.New(sess)
 
-	logrus.Infof("Bringing up vpc")
-
 	displayName := state.DisplayName
 	if displayName == "" {
 		displayName = state.ClusterName
 	}
 
-	stack, err := d.createStack(svc, getVPCStackName(state), displayName,
-		"https://amazon-eks.s3-us-west-2.amazonaws.com/1.10.3/2018-06-05/amazon-eks-vpc-sample.yaml",
-		[]*cloudformation.Parameter{})
-	if err != nil {
-		return nil, fmt.Errorf("error creating stack: %v", err)
-	}
-
-	securityGroups := getParameterValueFromOutput("SecurityGroups", stack.Stacks[0].Outputs)
-	subnetIds := getParameterValueFromOutput("SubnetIds", stack.Stacks[0].Outputs)
-
-	if securityGroups == "" || subnetIds == "" {
-		return nil, fmt.Errorf("no security groups or subnet ids were returned")
-	}
-
-	resources, err := svc.DescribeStackResources(&cloudformation.DescribeStackResourcesInput{
-		StackName: aws.String(state.ClusterName + "-eks-vpc"),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("error getting stack resoures")
-	}
-
 	var vpcid string
-	for _, resource := range resources.StackResources {
-		if *resource.LogicalResourceId == "VPC" {
-			vpcid = *resource.PhysicalResourceId
+	var subnetIds []string
+	var securityGroups []string
+	if state.VirtualNetwork == "" {
+		logrus.Infof("Bringing up vpc")
+
+		stack, err := d.createStack(svc, getVPCStackName(state), displayName,
+			"https://amazon-eks.s3-us-west-2.amazonaws.com/1.10.3/2018-06-05/amazon-eks-vpc-sample.yaml",
+			[]*cloudformation.Parameter{})
+		if err != nil {
+			return nil, fmt.Errorf("error creating stack: %v", err)
 		}
+
+		securityGroupsString := getParameterValueFromOutput("SecurityGroups", stack.Stacks[0].Outputs)
+		subnetIdsString := getParameterValueFromOutput("SubnetIds", stack.Stacks[0].Outputs)
+
+		if securityGroupsString == "" || subnetIdsString == "" {
+			return nil, fmt.Errorf("no security groups or subnet ids were returned")
+		}
+
+		securityGroups = strings.Split(securityGroupsString, ",")
+		subnetIds = strings.Split(subnetIdsString, ",")
+
+		resources, err := svc.DescribeStackResources(&cloudformation.DescribeStackResourcesInput{
+			StackName: aws.String(state.ClusterName + "-eks-vpc"),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("error getting stack resoures")
+		}
+
+		for _, resource := range resources.StackResources {
+			if *resource.LogicalResourceId == "VPC" {
+				vpcid = *resource.PhysicalResourceId
+			}
+		}
+	} else {
+		logrus.Infof("VPC info provided, skipping create")
+
+		vpcid = state.VirtualNetwork
+		subnetIds = state.Subnets
+		securityGroups = state.SecurityGroups
 	}
 
-	logrus.Infof("Creating service role")
+	var roleARN string
+	if state.ServiceRole == "" {
+		logrus.Infof("Creating service role")
 
-	stack, err = d.createStack(svc, getServiceRoleName(state), displayName,
-		"https://amazon-eks.s3-us-west-2.amazonaws.com/1.10.3/2018-06-05/amazon-eks-service-role.yaml", nil)
-	if err != nil {
-		return nil, fmt.Errorf("error creating stack: %v", err)
-	}
+		stack, err := d.createStack(svc, getServiceRoleName(state), displayName,
+			"https://amazon-eks.s3-us-west-2.amazonaws.com/1.10.3/2018-06-05/amazon-eks-service-role.yaml", nil)
+		if err != nil {
+			return nil, fmt.Errorf("error creating stack: %v", err)
+		}
 
-	roleARN := getParameterValueFromOutput("RoleArn", stack.Stacks[0].Outputs)
-	if roleARN == "" {
-		return nil, fmt.Errorf("no RoleARN was returned")
+		roleARN = getParameterValueFromOutput("RoleArn", stack.Stacks[0].Outputs)
+		if roleARN == "" {
+			return nil, fmt.Errorf("no RoleARN was returned")
+		}
+	} else {
+		logrus.Infof("Retrieving existing service role")
+		iamClient := iam.New(sess, aws.NewConfig().WithRegion(state.Region))
+		role, err := iamClient.GetRole(&iam.GetRoleInput{
+			RoleName: aws.String(state.ServiceRole),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("error getting role: %v", err)
+		}
+
+		roleARN = *role.Role.Arn
 	}
 
 	data, err := json.Marshal(&clusterObj{
 		ClusterName: aws.String(state.ClusterName),
 		RoleARN:     aws.String(roleARN),
 		ResourcesVPCConfig: vpcConfig{
-			SecurityGroups: strings.Split(securityGroups, ","),
-			Subnets:        strings.Split(subnetIds, ","),
+			SecurityGroups: securityGroups,
+			Subnets:        subnetIds,
 		},
 	})
 	if err != nil {
@@ -451,12 +513,12 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 
 	logrus.Infof("Creating worker nodes")
 
-	stack, err = d.createStack(svc, getWorkNodeName(state), displayName,
+	stack, err := d.createStack(svc, getWorkNodeName(state), displayName,
 		"https://amazon-eks.s3-us-west-2.amazonaws.com/1.10.3/2018-06-05/amazon-eks-nodegroup.yaml",
 		[]*cloudformation.Parameter{
 			{ParameterKey: aws.String("ClusterName"), ParameterValue: aws.String(state.ClusterName)},
 			{ParameterKey: aws.String("ClusterControlPlaneSecurityGroup"),
-				ParameterValue: aws.String(securityGroups)},
+				ParameterValue: aws.String(strings.Join(securityGroups, ","))},
 			{ParameterKey: aws.String("NodeGroupName"),
 				ParameterValue: aws.String(state.ClusterName + "-node-group")},
 			{ParameterKey: aws.String("NodeAutoScalingGroupMinSize"), ParameterValue: aws.String(strconv.Itoa(
@@ -468,7 +530,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 			{ParameterKey: aws.String("KeyName"), ParameterValue: aws.String(keyPairName)}, // TODO let the user specify this
 			{ParameterKey: aws.String("VpcId"), ParameterValue: aws.String(vpcid)},
 			{ParameterKey: aws.String("Subnets"),
-				ParameterValue: aws.String(strings.Join(strings.Split(subnetIds, " "), ","))},
+				ParameterValue: aws.String(strings.Join(subnetIds, ","))},
 		})
 	if err != nil {
 		return nil, fmt.Errorf("error creating stack: %v", err)
