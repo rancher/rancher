@@ -15,12 +15,15 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
 type PodWatcher struct {
 	podLister          v1.PodLister
 	alertManager       *manager.Manager
+	projectAlerts      v3.ProjectAlertInterface
 	projectAlertLister v3.ProjectAlertLister
 	clusterName        string
 	podRestartTrack    sync.Map
@@ -37,6 +40,7 @@ func StartPodWatcher(ctx context.Context, cluster *config.UserContext, manager *
 
 	podWatcher := &PodWatcher{
 		podLister:          cluster.Core.Pods("").Controller().Lister(),
+		projectAlerts:      projectAlerts,
 		projectAlertLister: projectAlerts.Controller().Lister(),
 		alertManager:       manager,
 		clusterName:        cluster.ClusterName,
@@ -107,7 +111,13 @@ func (w *PodWatcher) watchRule() error {
 			newPod, err := w.podLister.Get(ns, podID)
 			if err != nil {
 				//TODO: what to do when pod not found
+				if kerrors.IsNotFound(err) || newPod == nil {
+					if err = w.projectAlerts.DeleteNamespaced(alert.Namespace, alert.Name, &metav1.DeleteOptions{}); err != nil {
+						return err
+					}
+				}
 				logrus.Debugf("Failed to get pod %s: %v", podID, err)
+
 				continue
 			}
 

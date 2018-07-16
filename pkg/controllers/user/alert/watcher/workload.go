@@ -13,10 +13,12 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 
 	nsutils "github.com/rancher/rancher/pkg/namespace"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -27,6 +29,7 @@ const (
 type WorkloadWatcher struct {
 	workloadController workload.CommonController
 	alertManager       *manager.Manager
+	projectAlerts      v3.ProjectAlertInterface
 	projectAlertLister v3.ProjectAlertLister
 	clusterName        string
 	clusterLister      v3.ClusterLister
@@ -39,9 +42,10 @@ func StartWorkloadWatcher(ctx context.Context, cluster *config.UserContext, mana
 		nsByProjectIndex: nsutils.NsByProjectID,
 	}
 	nsInformer.AddIndexers(nsIndexers)
-
+	projectAlerts := cluster.Management.Management.ProjectAlerts("")
 	d := &WorkloadWatcher{
-		projectAlertLister: cluster.Management.Management.ProjectAlerts("").Controller().Lister(),
+		projectAlerts:      projectAlerts,
+		projectAlertLister: projectAlerts.Controller().Lister(),
 		workloadController: workload.NewWorkloadController(cluster.UserOnlyContext(), nil),
 		alertManager:       manager,
 		clusterName:        cluster.ClusterName,
@@ -90,7 +94,12 @@ func (w *WorkloadWatcher) watchRule() error {
 		if alert.Spec.TargetWorkload.WorkloadID != "" {
 
 			wl, err := w.workloadController.GetByWorkloadID(alert.Spec.TargetWorkload.WorkloadID)
-			if err != nil || wl == nil {
+			if err != nil {
+				if kerrors.IsNotFound(err) || wl == nil {
+					if err = w.projectAlerts.DeleteNamespaced(alert.Namespace, alert.Name, &metav1.DeleteOptions{}); err != nil {
+						return err
+					}
+				}
 				logrus.Warnf("Fail to get workload for %s, %v", alert.Spec.TargetWorkload.WorkloadID, err)
 				continue
 			}
