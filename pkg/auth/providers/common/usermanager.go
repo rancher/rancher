@@ -3,10 +3,10 @@ package common
 import (
 	"encoding/base32"
 	"encoding/json"
-	"reflect"
-
 	"fmt"
+	"reflect"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
@@ -335,23 +335,39 @@ func (m *userManager) createUsersBindings(user *v3.User) error {
 		createdRoles = append(createdRoles, role)
 	}
 
-	u := user.DeepCopy()
-
 	roleMap["created"] = createdRoles
 	d, err := json.Marshal(roleMap)
 	if err != nil {
 		return err
 	}
 
-	u.Annotations[roleTemplatesRequired] = string(d)
+	rtr := string(d)
 
-	if reflect.DeepEqual(roleMap["required"], createdRoles) {
-		v3.UserConditionInitialRolesPopulated.True(u)
-	}
+	sleepTime := 100
+	// The user needs updated so keep trying if there is a conflict
+	for i := 0; i <= 3; i++ {
+		user, err = m.users.Get(user.Name, v1.GetOptions{})
+		if err != nil {
+			return err
+		}
 
-	_, err = m.users.Update(u)
-	if err != nil {
-		return err
+		user.Annotations[roleTemplatesRequired] = rtr
+
+		if reflect.DeepEqual(roleMap["required"], createdRoles) {
+			v3.UserConditionInitialRolesPopulated.True(user)
+		}
+
+		_, err = m.users.Update(user)
+		if err != nil {
+			if apierrors.IsConflict(err) {
+				// Conflict on the user, sleep and try again
+				time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+				sleepTime *= 2
+				continue
+			}
+			return err
+		}
+		break
 	}
 
 	return nil
