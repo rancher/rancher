@@ -377,7 +377,7 @@ func getSystemImages(spec v3.ClusterSpec) (*v3.RKESystemImages, error) {
 	// fetch system images from settings
 	systemImagesStr := settings.KubernetesVersionToSystemImages.Get()
 	if systemImagesStr == "" {
-		return nil, fmt.Errorf("Failed to load setting %s", settings.KubernetesVersionToSystemImages.Name)
+		return nil, fmt.Errorf("failed to load setting %s", settings.KubernetesVersionToSystemImages.Name)
 	}
 	systemImagesMap := make(map[string]v3.RKESystemImages)
 	if err := json.Unmarshal([]byte(systemImagesStr), &systemImagesMap); err != nil {
@@ -387,7 +387,12 @@ func getSystemImages(spec v3.ClusterSpec) (*v3.RKESystemImages, error) {
 	version := spec.RancherKubernetesEngineConfig.Version
 	systemImages, ok := systemImagesMap[version]
 	if !ok {
-		return nil, fmt.Errorf("Failed to find system images for version %v", version)
+		// add legacy map - to fetch system images for k8s version we no longer support
+		// need to have this logic unless start persisting this information on the API layer
+		systemImages, ok = v3.LegacyK8sVersionToRKESystemImages[version]
+		if !ok {
+			return nil, fmt.Errorf("failed to find system images for version %v", version)
+		}
 	}
 
 	privateRegistry := getPrivateRepo(spec.RancherKubernetesEngineConfig)
