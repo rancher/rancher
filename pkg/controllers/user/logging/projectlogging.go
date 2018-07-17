@@ -127,7 +127,7 @@ func (c *ProjectLoggingSyncer) Sync(key string, obj *v3.ProjectLogging) error {
 func (c *ProjectLoggingSyncer) doSync(obj *v3.ProjectLogging) (*v3.ProjectLogging, error) {
 	newObj := obj.DeepCopy()
 	_, err := v3.LoggingConditionProvisioned.Do(obj, func() (runtime.Object, error) {
-		return obj, provision(c.namespaces, c.configmaps, c.serviceAccounts, c.clusterRoleBindings, c.daemonsets, c.clusterLister, c.secrets, c.clusterName, obj.Spec.DockerRootDir)
+		return obj, provision(c.namespaces, c.configmaps, c.serviceAccounts, c.clusterRoleBindings, c.daemonsets, c.clusterLister, c.secrets, c.clusterName)
 	})
 	if err != nil {
 		return obj, err

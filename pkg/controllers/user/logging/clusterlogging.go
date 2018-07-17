@@ -152,7 +152,7 @@ func (c *ClusterLoggingSyncer) Sync(key string, obj *v3.ClusterLogging) error {
 
 func (c *ClusterLoggingSyncer) doSync(obj *v3.ClusterLogging) error {
 	_, err := v3.LoggingConditionProvisioned.Do(obj, func() (runtime.Object, error) {
-		return obj, provision(c.namespaces, c.configmaps, c.serviceAccounts, c.clusterRoleBindings, c.daemonsets, c.clusterLister, c.secrets, c.clusterName, obj.Spec.DockerRootDir)
+		return obj, provision(c.namespaces, c.configmaps, c.serviceAccounts, c.clusterRoleBindings, c.daemonsets, c.clusterLister, c.secrets, c.clusterName)
 	})
 	if err != nil {
 		return err
@@ -281,7 +281,7 @@ func (e *endpointWatcher) checkTarget() error {
 	return errors.Wrapf(mergedErr, "set clusterlogging fail in watch endpoint")
 }
 
-func provision(namespaces v1.NamespaceInterface, configmaps v1.ConfigMapInterface, serviceAccounts v1.ServiceAccountInterface, clusterRoleBindings rbacv1.ClusterRoleBindingInterface, daemonsets v1beta2.DaemonSetInterface, clusterLister v3.ClusterLister, secrets v1.SecretInterface, clusterName, dockerRootDir string) error {
+func provision(namespaces v1.NamespaceInterface, configmaps v1.ConfigMapInterface, serviceAccounts v1.ServiceAccountInterface, clusterRoleBindings rbacv1.ClusterRoleBindingInterface, daemonsets v1beta2.DaemonSetInterface, clusterLister v3.ClusterLister, secrets v1.SecretInterface, clusterName string) error {
 	if err := utils.IniteNamespace(namespaces); err != nil {
 		return err
 	}
@@ -298,7 +298,12 @@ func provision(namespaces v1.NamespaceInterface, configmaps v1.ConfigMapInterfac
 		return err
 	}
 
-	return utils.CreateFluentd(daemonsets, serviceAccounts, clusterRoleBindings, loggingconfig.LoggingNamespace, dockerRootDir)
+	cluster, err := clusterLister.Get("", clusterName)
+	if err != nil {
+		return errors.Wrapf(err, "get dockerRootDir from cluster %s failed", clusterName)
+	}
+
+	return utils.CreateFluentd(daemonsets, serviceAccounts, clusterRoleBindings, loggingconfig.LoggingNamespace, cluster.Spec.DockerRootDir)
 }
 
 func unsetClusterLogging(obj *v3.ClusterLogging, clusterLoggings v3.ClusterLoggingInterface) error {
