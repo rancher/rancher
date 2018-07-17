@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"reflect"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/condition"
@@ -351,24 +352,18 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 				createdRoles = append(createdRoles, role)
 			}
 
-			cluster = cluster.DeepCopy()
-
 			roleMap["created"] = createdRoles
 			d, err := json.Marshal(roleMap)
 			if err != nil {
 				return obj, err
 			}
 
-			cluster.Annotations[roleTemplatesRequired] = string(d)
+			updateCondition := reflect.DeepEqual(roleMap["required"], createdRoles)
 
-			if reflect.DeepEqual(roleMap["required"], createdRoles) {
-				v3.ClusterConditionInitialRolesPopulated.True(cluster)
-				logrus.Infof("[%v] Setting InitialRolesPopulated condition on cluster %v", ctrbMGMTController, cluster.ClusterName)
-			}
-			if _, err := m.mgmt.Management.Clusters("").Update(cluster); err != nil {
+			err = m.updateClusterAnnotationandCondition(cluster, string(d), updateCondition)
+			if err != nil {
 				return obj, err
 			}
-
 		}
 
 		return obj, nil
@@ -471,4 +466,35 @@ func (m *mgr) addRTAnnotation(obj runtime.Object, context string) (runtime.Objec
 	meta.GetAnnotations()[roleTemplatesRequired] = string(d)
 
 	return obj, nil
+}
+
+func (m *mgr) updateClusterAnnotationandCondition(cluster *v3.Cluster, anno string, updateCondition bool) error {
+	sleep := 100
+	for i := 0; i <= 3; i++ {
+		c, err := m.mgmt.Management.Clusters("").Get(cluster.Name, v1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		c.Annotations[roleTemplatesRequired] = anno
+
+		if updateCondition {
+			v3.ClusterConditionInitialRolesPopulated.True(c)
+		}
+		_, err = m.mgmt.Management.Clusters("").Update(c)
+		if err != nil {
+			if apierrors.IsConflict(err) {
+				time.Sleep(time.Duration(sleep) * time.Millisecond)
+				sleep *= 2
+				continue
+			}
+			return err
+		}
+		// Only log if we successfully updated the cluster
+		if updateCondition {
+			logrus.Infof("[%v] Setting InitialRolesPopulated condition on cluster %v", ctrbMGMTController, c.ClusterName)
+		}
+		return nil
+	}
+	return nil
 }
