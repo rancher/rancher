@@ -42,7 +42,6 @@ type LoggingCommonSpec struct {
 
 	OutputFlushInterval int                  `json:"outputFlushInterval,omitempty" norman:"default=3"`
 	OutputTags          map[string]string    `json:"outputTags,omitempty"`
-	DockerRootDir       string               `json:"dockerRootDir" norman:"default=/var/lib/docker/containers"`
 	ElasticsearchConfig *ElasticsearchConfig `json:"elasticsearchConfig,omitempty"`
 	SplunkConfig        *SplunkConfig        `json:"splunkConfig,omitempty"`
 	KafkaConfig         *KafkaConfig         `json:"kafkaConfig,omitempty"`

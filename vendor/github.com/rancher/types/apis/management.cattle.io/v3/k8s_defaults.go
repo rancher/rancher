@@ -35,6 +35,7 @@ var (
 			PodInfraContainer:         m("gcr.io/google_containers/pause-amd64:3.0"),
 			Ingress:                   m("rancher/nginx-ingress-controller:0.10.2-rancher3"),
 			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
+			MetricsServer:             m("gcr.io/google_containers/metrics-server-amd64:v0.2.1"),
 		},
 		"v1.8.11-rancher1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.0.17"),
@@ -60,6 +61,7 @@ var (
 			PodInfraContainer:         m("gcr.io/google_containers/pause-amd64:3.0"),
 			Ingress:                   m("rancher/nginx-ingress-controller:0.10.2-rancher3"),
 			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
+			MetricsServer:             m("gcr.io/google_containers/metrics-server-amd64:v0.2.1"),
 		},
 		"v1.8.11-rancher2-1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.0.17"),
@@ -85,6 +87,7 @@ var (
 			PodInfraContainer:         m("gcr.io/google_containers/pause-amd64:3.0"),
 			Ingress:                   m("rancher/nginx-ingress-controller:0.10.2-rancher3"),
 			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
+			MetricsServer:             m("gcr.io/google_containers/metrics-server-amd64:v0.2.1"),
 		},
 		"v1.9.5-rancher1-1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.1.12"),
@@ -110,6 +113,7 @@ var (
 			PodInfraContainer:         m("gcr.io/google_containers/pause-amd64:3.0"),
 			Ingress:                   m("rancher/nginx-ingress-controller:0.10.2-rancher3"),
 			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
+			MetricsServer:             m("gcr.io/google_containers/metrics-server-amd64:v0.2.1"),
 		},
 		"v1.9.7-rancher1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.1.12"),
@@ -135,6 +139,7 @@ var (
 			PodInfraContainer:         m("gcr.io/google_containers/pause-amd64:3.0"),
 			Ingress:                   m("rancher/nginx-ingress-controller:0.10.2-rancher3"),
 			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
+			MetricsServer:             m("gcr.io/google_containers/metrics-server-amd64:v0.2.1"),
 		},
 		"v1.9.7-rancher2-1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.1.12"),
@@ -160,6 +165,7 @@ var (
 			PodInfraContainer:         m("gcr.io/google_containers/pause-amd64:3.0"),
 			Ingress:                   m("rancher/nginx-ingress-controller:0.10.2-rancher3"),
 			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
+			MetricsServer:             m("gcr.io/google_containers/metrics-server-amd64:v0.2.1"),
 		},
 		"v1.10.0-rancher1-1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.1.12"),
@@ -185,6 +191,7 @@ var (
 			PodInfraContainer:         m("gcr.io/google_containers/pause-amd64:3.1"),
 			Ingress:                   m("rancher/nginx-ingress-controller:0.10.2-rancher3"),
 			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
+			MetricsServer:             m("gcr.io/google_containers/metrics-server-amd64:v0.2.1"),
 		},
 		"v1.10.1-rancher1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.1.12"),
@@ -210,6 +217,7 @@ var (
 			PodInfraContainer:         m("gcr.io/google_containers/pause-amd64:3.1"),
 			Ingress:                   m("rancher/nginx-ingress-controller:0.10.2-rancher3"),
 			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
+			MetricsServer:             m("gcr.io/google_containers/metrics-server-amd64:v0.2.1"),
 		},
 		"v1.10.1-rancher2-1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.1.12"),
@@ -235,6 +243,7 @@ var (
 			PodInfraContainer:         m("gcr.io/google_containers/pause-amd64:3.1"),
 			Ingress:                   m("rancher/nginx-ingress-controller:0.10.2-rancher3"),
 			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
+			MetricsServer:             m("gcr.io/google_containers/metrics-server-amd64:v0.2.1"),
 		},
 		"v1.10.3-rancher2-1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.1.12"),
@@ -260,6 +269,7 @@ var (
 			PodInfraContainer:         m("gcr.io/google_containers/pause-amd64:3.1"),
 			Ingress:                   m("rancher/nginx-ingress-controller:0.10.2-rancher3"),
 			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
+			MetricsServer:             m("gcr.io/google_containers/metrics-server-amd64:v0.2.1"),
 		},
 		"v1.10.5-rancher1-1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.1.12"),
@@ -285,6 +295,7 @@ var (
 			PodInfraContainer:         m("gcr.io/google_containers/pause-amd64:3.1"),
 			Ingress:                   m("rancher/nginx-ingress-controller:0.10.2-rancher3"),
 			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
+			MetricsServer:             m("gcr.io/google_containers/metrics-server-amd64:v0.2.1"),
 		},
 	}
 
