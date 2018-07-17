@@ -135,11 +135,12 @@ func newFluentdDaemonset(name, namespace, clusterName, dockerRootDir string) *v1
 	terminationGracePeriodSeconds := int64(30)
 
 	if dockerRootDir == "" {
-		dockerRootDir = "/var/lib/docker/containers"
+		dockerRootDir = "/var/lib/docker"
 	}
+	dockerRootContainers := dockerRootDir + "/containers"
 
 	logVolMounts, logVols := buildHostPathVolumes(map[string][]string{
-		"varlibdockercontainers": []string{dockerRootDir, dockerRootDir},
+		"varlibdockercontainers": []string{dockerRootContainers, dockerRootContainers},
 		"varlogcontainers":       []string{"/var/log/containers", "/var/log/containers"},
 		"varlogpods":             []string{"/var/log/pods", "/var/log/pods"},
 		"rkelog":                 []string{"/var/lib/rancher/rke/log", "/var/lib/rancher/rke/log"},
