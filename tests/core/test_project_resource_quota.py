@@ -225,7 +225,7 @@ def test_default_resource_quota_ns_create_invalid_combined(admin_cc, admin_pc,
     assert ns is not None
     assert ns.resourceQuotaTemplateId == l_id
     with pytest.raises(Exception):
-        wait_for_applied_template_set(admin_pc.cluster.client, ns, 5)
+        wait_for_applied_template_set(admin_pc.cluster.client, ns, 10)
 
     # quota within limits
     t_id = small_template.id
@@ -234,7 +234,7 @@ def test_default_resource_quota_ns_create_invalid_combined(admin_cc, admin_pc,
                                                   resourceQuotaTemplateId=t_id)
     assert ns is not None
     assert ns.resourceQuotaTemplateId == t_id
-    wait_for_applied_template_set(admin_pc.cluster.client, ns, 5)
+    wait_for_applied_template_set(admin_pc.cluster.client, ns, 10)
 
     # update namespace with exceeding quota
     ns = admin_pc.cluster.client.update(ns,
