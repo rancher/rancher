@@ -86,8 +86,8 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, catalog *v3.Catalog
 		template.Spec.IconFilename = iconFilename
 		template.Spec.FolderName = chart
 		template.Spec.DisplayName = chart
+		label := map[string]string{}
 		var versions []v3.TemplateVersionSpec
-
 		for _, version := range metadata {
 			v := v3.TemplateVersionSpec{
 				Version: version.Version,
@@ -98,6 +98,7 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, catalog *v3.Catalog
 				continue
 			}
 			filesToAdd := make(map[string]string)
+
 			for _, file := range files {
 				if strings.EqualFold(fmt.Sprintf("%s/%s", chart, "readme.md"), file.Name) {
 					v.Readme = file.Contents
@@ -111,6 +112,7 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, catalog *v3.Catalog
 						v.Questions = value.Questions
 						v.RancherVersion = value.RancherVersion
 						v.RequiredNamespace = value.Namespace
+						label = labels.Merge(label, value.Labels)
 						for _, category := range value.Categories {
 							keywords[category] = struct{}{}
 						}
@@ -140,6 +142,8 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, catalog *v3.Catalog
 		for k := range keywords {
 			categories = append(categories, k)
 		}
+		// merge all labels from templateVersion to template
+		template.Labels = label
 		template.Spec.Categories = categories
 		template.Spec.Versions = versions
 		template.Spec.CatalogID = catalog.Name
@@ -208,8 +212,9 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, catalog *v3.Catalog
 var supportedFiles = []string{"catalog.yml", "catalog.yaml", "questions.yml", "questions.yaml"}
 
 type catalogYml struct {
-	RancherVersion string        `yaml:"rancher_version,omitempty"`
-	Categories     []string      `yaml:"categories,omitempty"`
-	Questions      []v3.Question `yaml:"questions,omitempty"`
-	Namespace      string        `yaml:"namespace,omitempty"`
+	RancherVersion string            `yaml:"rancher_version,omitempty"`
+	Categories     []string          `yaml:"categories,omitempty"`
+	Questions      []v3.Question     `yaml:"questions,omitempty"`
+	Namespace      string            `yaml:"namespace,omitempty"`
+	Labels         map[string]string `yaml:"labels,omitempty"`
 }

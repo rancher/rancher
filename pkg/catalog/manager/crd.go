@@ -25,9 +25,9 @@ const (
 )
 
 func (m *Manager) createTemplate(template v3.Template, catalog *v3.Catalog, tagMap map[string]struct{}) error {
-	template.Labels = map[string]string{
+	template.Labels = labels.Merge(template.Labels, map[string]string{
 		CatalogNameLabel: catalog.Name,
-	}
+	})
 	versionFiles := make([]v3.TemplateVersionSpec, len(template.Spec.Versions))
 	copy(versionFiles, template.Spec.Versions)
 	for i := range template.Spec.Versions {
@@ -142,6 +142,7 @@ func (m *Manager) updateTemplate(template *v3.Template, toUpdate v3.Template, ta
 	}
 	newObj := template.DeepCopy()
 	newObj.Spec = toUpdate.Spec
+	newObj.Labels = mergeLabels(template.Labels, toUpdate.Labels)
 	if err := m.convertTemplateIcon(newObj, tagMap); err != nil {
 		return err
 	}
@@ -149,6 +150,29 @@ func (m *Manager) updateTemplate(template *v3.Template, toUpdate v3.Template, ta
 		return err
 	}
 	return nil
+}
+
+// merge any label from set2 into set1 and delete label
+func mergeLabels(set1, set2 map[string]string) map[string]string {
+	if set1 == nil {
+		set1 = map[string]string{}
+	}
+	for k, v := range set2 {
+		set1[k] = v
+	}
+	for k := range set1 {
+		if set2 != nil {
+			if _, ok := set2[k]; !ok && k != CatalogNameLabel {
+				delete(set1, k)
+			}
+		} else {
+			if k != CatalogNameLabel {
+				delete(set1, k)
+			}
+		}
+
+	}
+	return set1
 }
 
 func (m *Manager) getTemplateVersion(templateName string) (map[string]struct{}, error) {
