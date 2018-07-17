@@ -67,6 +67,7 @@ type ClusterSpec struct {
 	AmazonElasticContainerServiceConfig  *AmazonElasticContainerServiceConfig `json:"amazonElasticContainerServiceConfig,omitempty"`
 	DefaultPodSecurityPolicyTemplateName string                               `json:"defaultPodSecurityPolicyTemplateName,omitempty" norman:"type=reference[podSecurityPolicyTemplate]"`
 	DefaultClusterRoleForProjectMembers  string                               `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
+	DockerRootDir                        string                               `json:"dockerRootDir,omitempty" norman:"default=/var/lib/docker"`
 }
 
 type ImportedConfig struct {

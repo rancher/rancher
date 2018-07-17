@@ -3,7 +3,6 @@ package client
 const (
 	ProjectLoggingSpecType                     = "projectLoggingSpec"
 	ProjectLoggingSpecFieldDisplayName         = "displayName"
-	ProjectLoggingSpecFieldDockerRootDir       = "dockerRootDir"
 	ProjectLoggingSpecFieldElasticsearchConfig = "elasticsearchConfig"
 	ProjectLoggingSpecFieldKafkaConfig         = "kafkaConfig"
 	ProjectLoggingSpecFieldOutputFlushInterval = "outputFlushInterval"
@@ -15,7 +14,6 @@ const (
 
 type ProjectLoggingSpec struct {
 	DisplayName         string               `json:"displayName,omitempty" yaml:"displayName,omitempty"`
-	DockerRootDir       string               `json:"dockerRootDir,omitempty" yaml:"dockerRootDir,omitempty"`
 	ElasticsearchConfig *ElasticsearchConfig `json:"elasticsearchConfig,omitempty" yaml:"elasticsearchConfig,omitempty"`
 	KafkaConfig         *KafkaConfig         `json:"kafkaConfig,omitempty" yaml:"kafkaConfig,omitempty"`
 	OutputFlushInterval int64                `json:"outputFlushInterval,omitempty" yaml:"outputFlushInterval,omitempty"`

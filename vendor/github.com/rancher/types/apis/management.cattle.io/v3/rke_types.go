@@ -39,6 +39,8 @@ type RancherKubernetesEngineConfig struct {
 	AddonJobTimeout int `yaml:"addon_job_timeout" json:"addonJobTimeout,omitempty" norman:"default=30"`
 	// Bastion/Jump Host configuration
 	BastionHost BastionHost `yaml:"bastion_host" json:"bastionHost,omitempty"`
+	// Monitoring Config
+	Monitoring MonitoringConfig `yaml:"monitoring" json:"monitoring,omitempty"`
 }
 
 type BastionHost struct {
@@ -114,6 +116,8 @@ type RKESystemImages struct {
 	Ingress string `yaml:"ingress" json:"ingress,omitempty"`
 	// Ingress Controller Backend image
 	IngressBackend string `yaml:"ingress_backend" json:"ingressBackend,omitempty"`
+	// Metrics Server image
+	MetricsServer string `yaml:"metrics_server" json:"metricsServer,omitempty"`
 }
 
 type RKEConfigNode struct {
@@ -551,4 +555,11 @@ type AzureCloudProvider struct {
 
 // AWSCloudProvider options
 type AWSCloudProvider struct {
+}
+
+type MonitoringConfig struct {
+	// Monitoring server provider
+	Provider string `yaml:"provider" json:"provider,omitempty"`
+	// Metrics server options
+	Options map[string]string `yaml:"options" json:"options,omitempty"`
 }

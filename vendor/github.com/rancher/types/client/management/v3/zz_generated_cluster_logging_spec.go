@@ -4,7 +4,6 @@ const (
 	ClusterLoggingSpecType                     = "clusterLoggingSpec"
 	ClusterLoggingSpecFieldClusterId           = "clusterId"
 	ClusterLoggingSpecFieldDisplayName         = "displayName"
-	ClusterLoggingSpecFieldDockerRootDir       = "dockerRootDir"
 	ClusterLoggingSpecFieldElasticsearchConfig = "elasticsearchConfig"
 	ClusterLoggingSpecFieldEmbeddedConfig      = "embeddedConfig"
 	ClusterLoggingSpecFieldKafkaConfig         = "kafkaConfig"
@@ -17,7 +16,6 @@ const (
 type ClusterLoggingSpec struct {
 	ClusterId           string               `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	DisplayName         string               `json:"displayName,omitempty" yaml:"displayName,omitempty"`
-	DockerRootDir       string               `json:"dockerRootDir,omitempty" yaml:"dockerRootDir,omitempty"`
 	ElasticsearchConfig *ElasticsearchConfig `json:"elasticsearchConfig,omitempty" yaml:"elasticsearchConfig,omitempty"`
 	EmbeddedConfig      *EmbeddedConfig      `json:"embeddedConfig,omitempty" yaml:"embeddedConfig,omitempty"`
 	KafkaConfig         *KafkaConfig         `json:"kafkaConfig,omitempty" yaml:"kafkaConfig,omitempty"`
