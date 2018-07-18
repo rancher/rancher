@@ -40,7 +40,6 @@ type NodesSyncer struct {
 	nodeClient       v1.NodeInterface
 	podLister        v1.PodLister
 	clusterNamespace string
-	clusterName      string
 	clusterLister    v3.ClusterLister
 }
 
@@ -52,7 +51,6 @@ func Register(cluster *config.UserContext) {
 		nodeLister:       cluster.Core.Nodes("").Controller().Lister(),
 		nodeClient:       cluster.Core.Nodes(""),
 		podLister:        cluster.Core.Pods("").Controller().Lister(),
-		clusterName:      cluster.ClusterName,
 		clusterLister:    cluster.Management.Management.Clusters("").Controller().Lister(),
 	}
 
@@ -84,7 +82,7 @@ func (n *NodeSyncer) needUpdate(key string, node *corev1.Node) (bool, error) {
 	if node == nil || node.DeletionTimestamp != nil {
 		return true, nil
 	}
-	existing, err := n.nodesSyncer.getNodeForNode(node, true)
+	existing, err := n.nodesSyncer.getMachineForNode(node, true)
 	if err != nil {
 		return false, err
 	}
@@ -114,16 +112,6 @@ func (m *NodesSyncer) sync(key string, machine *v3.Node) error {
 	return nil
 }
 
-func (m *NodesSyncer) getNode(machine *v3.Node, nodes []*corev1.Node) (*corev1.Node, error) {
-	for _, n := range nodes {
-		if nodehelper.IsNodeForNode(n, machine) {
-			return n, nil
-		}
-	}
-
-	return nil, nil
-}
-
 func (m *NodesSyncer) syncLabels(key string, obj *v3.Node) error {
 	if obj == nil {
 		return nil
@@ -133,11 +121,7 @@ func (m *NodesSyncer) syncLabels(key string, obj *v3.Node) error {
 		return nil
 	}
 
-	nodes, err := m.nodeLister.List("", labels.NewSelector())
-	if err != nil {
-		return err
-	}
-	node, err := m.getNode(obj, nodes)
+	node, err := nodehelper.GetNodeForMachine(obj, m.nodeLister)
 	if err != nil || node == nil {
 		return err
 	}
@@ -195,7 +179,7 @@ func (m *NodesSyncer) reconcileAll() error {
 	machineMap := make(map[string]*v3.Node)
 	toDelete := make(map[string]*v3.Node)
 	for _, machine := range machines {
-		node, err := m.getNode(machine, nodes)
+		node, err := nodehelper.GetNodeForMachine(machine, m.nodeLister)
 		if err != nil {
 			return err
 		}
@@ -281,7 +265,7 @@ func (m *NodesSyncer) updateNode(existing *v3.Node, node *corev1.Node, pods map[
 
 func (m *NodesSyncer) createNode(node *corev1.Node, pods map[string][]*corev1.Pod) error {
 	// do not create machine for rke cluster
-	cluster, err := m.clusterLister.Get("", m.clusterName)
+	cluster, err := m.clusterLister.Get("", m.clusterNamespace)
 	if err != nil {
 		return err
 	}
@@ -289,7 +273,7 @@ func (m *NodesSyncer) createNode(node *corev1.Node, pods map[string][]*corev1.Po
 		return nil
 	}
 	// try to get machine from api, in case cache didn't get the update
-	existing, err := m.getNodeForNode(node, false)
+	existing, err := m.getMachineForNode(node, false)
 	if err != nil {
 		return err
 	}
@@ -314,27 +298,27 @@ func (m *NodesSyncer) createNode(node *corev1.Node, pods map[string][]*corev1.Po
 	return nil
 }
 
-func (m *NodesSyncer) getNodeForNode(node *corev1.Node, cache bool) (*v3.Node, error) {
+func (m *NodesSyncer) getMachineForNode(node *corev1.Node, cache bool) (*v3.Node, error) {
 	if cache {
-		machines, err := m.machineLister.List(m.clusterNamespace, labels.NewSelector())
+		return nodehelper.GetMachineForNode(node, m.clusterNamespace, m.machineLister)
+	}
+
+	labelsSearchSet := labels.Set{nodehelper.LabelNodeName: node.Name}
+	machines, err := m.machines.List(metav1.ListOptions{LabelSelector: labelsSearchSet.AsSelector().String()})
+	if err != nil {
+		return nil, err
+	}
+	if len(machines.Items) == 0 {
+		machines, err = m.machines.List(metav1.ListOptions{})
 		if err != nil {
 			return nil, err
 		}
-		for _, machine := range machines {
-			if nodehelper.IsNodeForNode(node, machine) {
-				return machine, nil
-			}
-		}
-	} else {
-		machines, err := m.machines.List(metav1.ListOptions{})
-		if err != nil {
-			return nil, err
-		}
-		for _, machine := range machines.Items {
-			if machine.Namespace == m.clusterNamespace {
-				if nodehelper.IsNodeForNode(node, &machine) {
-					return &machine, nil
-				}
+	}
+
+	for _, machine := range machines.Items {
+		if machine.Namespace == m.clusterNamespace {
+			if nodehelper.IsNodeForNode(node, &machine) {
+				return &machine, nil
 			}
 		}
 	}
@@ -363,7 +347,7 @@ func objectsAreEqual(existing *v3.Node, toUpdate *v3.Node) bool {
 	toUpdateToCompare := resetConditions(toUpdate)
 	existingToCompare := resetConditions(existing)
 	statusEqual := statusEqualTest(toUpdateToCompare.Status.InternalNodeStatus, existingToCompare.Status.InternalNodeStatus)
-	labelsEqual := reflect.DeepEqual(toUpdateToCompare.Status.NodeLabels, existing.Status.NodeLabels)
+	labelsEqual := reflect.DeepEqual(toUpdateToCompare.Status.NodeLabels, existing.Status.NodeLabels) && reflect.DeepEqual(toUpdateToCompare.Labels, existing.Labels)
 	annotationsEqual := reflect.DeepEqual(toUpdateToCompare.Status.NodeAnnotations, existing.Status.NodeAnnotations)
 	specEqual := reflect.DeepEqual(toUpdateToCompare.Spec.InternalNodeSpec, existingToCompare.Spec.InternalNodeSpec)
 	nodeNameEqual := toUpdateToCompare.Status.NodeName == existingToCompare.Status.NodeName
@@ -489,6 +473,10 @@ func (m *NodesSyncer) convertNodeToNode(node *corev1.Node, existing *v3.Node, po
 	machine.Status.NodeName = node.Name
 	machine.APIVersion = "management.cattle.io/v3"
 	machine.Kind = "Node"
+	if machine.Labels == nil {
+		machine.Labels = map[string]string{}
+	}
+	machine.Labels[nodehelper.LabelNodeName] = node.Name
 	v3.NodeConditionRegistered.True(machine)
 	v3.NodeConditionRegistered.Message(machine, "registered with kubernetes")
 	return machine, nil
