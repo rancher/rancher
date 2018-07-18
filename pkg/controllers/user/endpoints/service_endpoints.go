@@ -15,8 +15,6 @@ import (
 type ServicesController struct {
 	services           v1.ServiceInterface
 	serviceLister      v1.ServiceLister
-	nodeController     v1.NodeController
-	nodeLister         v1.NodeLister
 	podLister          v1.PodLister
 	podController      v1.PodController
 	workloadController workloadutil.CommonController
@@ -30,9 +28,8 @@ func (s *ServicesController) sync(key string, obj *corev1.Service) error {
 		if obj != nil {
 			namespace = obj.Namespace
 		}
-		// push changes to all the nodes and pods, so service
+		// push changes to all pods, so service
 		// endpoints can be removed from there
-		s.nodeController.Enqueue("", allEndpoints)
 		//since service is removed, there is no way to narrow down the pod/workload search
 		s.podController.Enqueue(namespace, allEndpoints)
 		s.workloadController.EnqueueAllWorkloads(namespace)
