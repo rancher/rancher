@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -26,6 +27,15 @@ type session struct {
 	pingCancel context.CancelFunc
 	pingWait   sync.WaitGroup
 	client     bool
+}
+
+// No tunnel logging by default
+var printTunnelData bool
+
+func init() {
+	if os.Getenv("CATTLE_TUNNEL_DATA_DEBUG") == "true" {
+		printTunnelData = true
+	}
 }
 
 func newClientSession(auth ConnectAuthorizer, conn *websocket.Conn) *session {
@@ -111,7 +121,9 @@ func (s *session) serveMessage(reader io.Reader) error {
 		return err
 	}
 
-	logrus.Debug("REQUEST ", message)
+	if printTunnelData {
+		logrus.Debug("REQUEST ", message)
+	}
 
 	if message.messageType == Connect {
 		if s.auth != nil && !s.auth(message.proto, message.address) {
@@ -149,7 +161,9 @@ func (s *session) closeConnection(connID int64, err error) {
 	s.Lock()
 	conn := s.conns[connID]
 	delete(s.conns, connID)
-	logrus.Debugf("CONNECTIONS %d %d", s.sessionKey, len(s.conns))
+	if printTunnelData {
+		logrus.Debugf("CONNECTIONS %d %d", s.sessionKey, len(s.conns))
+	}
 	s.Unlock()
 
 	if conn != nil {
@@ -162,7 +176,9 @@ func (s *session) clientConnect(message *message) {
 
 	s.Lock()
 	s.conns[message.connID] = conn
-	logrus.Debugf("CONNECTIONS %d %d", s.sessionKey, len(s.conns))
+	if printTunnelData {
+		logrus.Debugf("CONNECTIONS %d %d", s.sessionKey, len(s.conns))
+	}
 	s.Unlock()
 
 	go clientDial(conn, message)
@@ -174,7 +190,9 @@ func (s *session) serverConnect(deadline time.Duration, proto, address string) (
 
 	s.Lock()
 	s.conns[connID] = conn
-	logrus.Debugf("CONNECTIONS %d %d", s.sessionKey, len(s.conns))
+	if printTunnelData {
+		logrus.Debugf("CONNECTIONS %d %d", s.sessionKey, len(s.conns))
+	}
 	s.Unlock()
 
 	_, err := s.writeMessage(newConnect(connID, deadline, proto, address))
@@ -187,7 +205,9 @@ func (s *session) serverConnect(deadline time.Duration, proto, address string) (
 }
 
 func (s *session) writeMessage(message *message) (int, error) {
-	logrus.Debug("RESPONSE ", message)
+	if printTunnelData {
+		logrus.Debug("RESPONSE ", message)
+	}
 	return message.WriteTo(s.conn)
 }
 
