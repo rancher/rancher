@@ -42,22 +42,10 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		//assume that cluster always has a spec
 		isRKE = cluster.Spec.RancherKubernetesEngineConfig != nil
 	}
-	n := &NodesController{
-		nodes:              workload.Core.Nodes(""),
-		serviceLister:      workload.Core.Services("").Controller().Lister(),
-		nodeLister:         workload.Core.Nodes("").Controller().Lister(),
-		podLister:          workload.Core.Pods("").Controller().Lister(),
-		machinesLister:     workload.Management.Management.Nodes(workload.ClusterName).Controller().Lister(),
-		workloadController: workloadUtil.NewWorkloadController(workload.UserOnlyContext(), nil),
-		clusterName:        workload.ClusterName,
-	}
-	workload.Core.Nodes("").AddHandler("nodesEndpointsController", n.sync)
 
 	s := &ServicesController{
 		services:           workload.Core.Services(""),
 		serviceLister:      workload.Core.Services("").Controller().Lister(),
-		nodeLister:         workload.Core.Nodes("").Controller().Lister(),
-		nodeController:     workload.Core.Nodes("").Controller(),
 		podLister:          workload.Core.Pods("").Controller().Lister(),
 		podController:      workload.Core.Pods("").Controller(),
 		workloadController: workloadUtil.NewWorkloadController(workload.UserOnlyContext(), nil),
@@ -68,7 +56,6 @@ func Register(ctx context.Context, workload *config.UserContext) {
 
 	p := &PodsController{
 		nodeLister:         workload.Core.Nodes("").Controller().Lister(),
-		nodeController:     workload.Core.Nodes("").Controller(),
 		pods:               workload.Core.Pods(""),
 		serviceLister:      workload.Core.Services("").Controller().Lister(),
 		podLister:          workload.Core.Pods("").Controller().Lister(),

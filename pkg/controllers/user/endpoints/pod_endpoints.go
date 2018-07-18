@@ -19,7 +19,6 @@ import (
 
 type PodsController struct {
 	nodeLister         v1.NodeLister
-	nodeController     v1.NodeController
 	pods               v1.PodInterface
 	podLister          v1.PodLister
 	serviceLister      v1.ServiceLister
@@ -82,10 +81,6 @@ func (c *PodsController) sync(key string, obj *corev1.Pod) error {
 		}
 	}
 
-	// push changes to hosts
-	for nodeName := range nodesToUpdate {
-		c.nodeController.Enqueue("", nodeName)
-	}
 	// push changes to workload
 	for _, w := range workloadsToUpdate {
 		c.workloadController.EnqueueWorkload(w)
