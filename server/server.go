@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/httpproxy"
 	k8sProxyPkg "github.com/rancher/rancher/pkg/k8sproxy"
 	"github.com/rancher/rancher/pkg/rkenodeconfigserver"
+	"github.com/rancher/rancher/pkg/telemetry"
 	"github.com/rancher/rancher/server/capabilities"
 	"github.com/rancher/rancher/server/ui"
 	"github.com/rancher/rancher/server/whitelist"
@@ -77,6 +78,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 	root.PathPrefix("/hooks").Handler(webhookHandler)
 	root.PathPrefix("/k8s/clusters/").Handler(authedHandler)
 	root.PathPrefix("/meta").Handler(authedHandler)
+	root.PathPrefix("/v1-telemetry").Handler(authedHandler)
 	root.NotFoundHandler = ui.UI(http.NotFoundHandler())
 	root.PathPrefix("/v1-saml").Handler(samlRoot)
 
@@ -108,6 +110,7 @@ func newAuthed(tokenAPI http.Handler, managementAPI http.Handler, k8sproxy http.
 	authed.PathPrefix("/v3/identit").Handler(tokenAPI)
 	authed.PathPrefix("/v3/token").Handler(tokenAPI)
 	authed.PathPrefix("/k8s/clusters/").Handler(k8sproxy)
+	authed.PathPrefix("/v1-telemetry").Handler(telemetry.NewProxy())
 	authed.PathPrefix(managementSchema.Version.Path).Handler(managementAPI)
 
 	return authed
