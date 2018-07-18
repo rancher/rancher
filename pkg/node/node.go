@@ -1,12 +1,16 @@
 package node
 
 import (
+	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 const (
 	externalAddressAnnotation = "rke.cattle.io/external-ip"
+	LabelNodeName             = "management.cattle.io/nodename"
 )
 
 func GetNodeName(node *v3.Node) string {
@@ -88,4 +92,58 @@ func GetNodeByNodeName(nodes []*v3.Node, nodeName string) *v3.Node {
 		}
 	}
 	return nil
+}
+
+func GetNodeForMachine(machine *v3.Node, nodeLister v1.NodeLister) (*corev1.Node, error) {
+	nodeName := ""
+	if machine.Labels != nil {
+		nodeName = machine.Labels[LabelNodeName]
+	}
+	var nodes []*corev1.Node
+	var err error
+	if nodeName != "" {
+		node, err := nodeLister.Get("", nodeName)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return nil, err
+
+		}
+		if node != nil {
+			nodes = append(nodes, node)
+		}
+	}
+
+	if len(nodes) == 0 {
+		nodes, err = nodeLister.List("", labels.NewSelector())
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	for _, n := range nodes {
+		if IsNodeForNode(n, machine) {
+			return n, nil
+		}
+	}
+
+	return nil, nil
+}
+
+func GetMachineForNode(node *corev1.Node, clusterNamespace string, machineLister v3.NodeLister) (*v3.Node, error) {
+	labelsSearchSet := labels.Set{LabelNodeName: node.Name}
+	machines, err := machineLister.List(clusterNamespace, labels.SelectorFromSet(labelsSearchSet))
+	if err != nil {
+		return nil, err
+	}
+	if len(machines) == 0 {
+		machines, err = machineLister.List(clusterNamespace, labels.NewSelector())
+		if err != nil {
+			return nil, err
+		}
+	}
+	for _, machine := range machines {
+		if IsNodeForNode(node, machine) {
+			return machine, nil
+		}
+	}
+	return nil, nil
 }

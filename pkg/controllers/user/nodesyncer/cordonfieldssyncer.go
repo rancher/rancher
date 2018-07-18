@@ -2,19 +2,15 @@ package nodesyncer
 
 import (
 	"github.com/rancher/norman/types/convert"
+	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
-	"k8s.io/apimachinery/pkg/labels"
 )
 
 func (m *NodesSyncer) syncCordonFields(key string, obj *v3.Node) error {
 	if obj == nil || obj.DeletionTimestamp != nil || obj.Spec.DesiredNodeUnschedulable == "" {
 		return nil
 	}
-	nodes, err := m.nodeLister.List("", labels.NewSelector())
-	if err != nil {
-		return err
-	}
-	node, err := m.getNode(obj, nodes)
+	node, err := nodehelper.GetNodeForMachine(obj, m.nodeLister)
 	if err != nil {
 		return err
 	}

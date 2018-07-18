@@ -230,15 +230,16 @@ func getNodeNameToMachine(clusterName string, machineLister managementv3.NodeLis
 		return nil, err
 	}
 	machineMap := map[string]*managementv3.Node{}
-	nodes, err := nodeLister.List("", labels.NewSelector())
 	if err != nil {
 		return nil, err
 	}
 	for _, machine := range machines {
-		for _, node := range nodes {
-			if nodehelper.IsNodeForNode(node, machine) {
-				machineMap[node.Name] = machine
-			}
+		node, err := nodehelper.GetNodeForMachine(machine, nodeLister)
+		if err != nil {
+			return nil, err
+		}
+		if node != nil {
+			machineMap[node.Name] = machine
 		}
 	}
 	return machineMap, nil
