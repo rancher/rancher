@@ -12,6 +12,7 @@ import (
 	managementController "github.com/rancher/rancher/pkg/controllers/management"
 	"github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/k8scheck"
+	"github.com/rancher/rancher/pkg/telemetry"
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/server"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -97,6 +98,10 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 
 	go leader.RunOrDie(ctx, "cattle-controllers", scaledContext.K8sClient, func(ctx context.Context) {
 		scaledContext.Leader = true
+
+		if err := telemetry.Start(ctx, cfg.HTTPSListenPort, scaledContext); err != nil {
+			panic(err)
+		}
 
 		management, err := scaledContext.NewManagementContext()
 		if err != nil {
