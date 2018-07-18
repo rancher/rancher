@@ -32,6 +32,7 @@ const (
 	DefaultIngressController         = "nginx"
 	DefaultEtcdBackupCreationPeriod  = "5m0s"
 	DefaultEtcdBackupRetentionPeriod = "24h"
+	DefaultMonitoringProvider        = "metrics-server"
 )
 
 func setDefaultIfEmptyMapValue(configMap map[string]string, key string, value string) {
@@ -103,6 +104,9 @@ func (c *Cluster) setClusterDefaults(ctx context.Context) {
 	if c.AddonJobTimeout == 0 {
 		c.AddonJobTimeout = k8s.DefaultTimeout
 	}
+	if len(c.Monitoring.Provider) == 0 {
+		c.Monitoring.Provider = DefaultMonitoringProvider
+	}
 	c.setClusterImageDefaults()
 	c.setClusterServicesDefaults()
 	c.setClusterNetworkDefaults()
@@ -164,6 +168,7 @@ func (c *Cluster) setClusterImageDefaults() {
 		&c.SystemImages.WeaveCNI:                  imageDefaults.WeaveCNI,
 		&c.SystemImages.Ingress:                   imageDefaults.Ingress,
 		&c.SystemImages.IngressBackend:            imageDefaults.IngressBackend,
+		&c.SystemImages.MetricsServer:             imageDefaults.MetricsServer,
 	}
 
 	for k, v := range systemImagesDefaultsMap {

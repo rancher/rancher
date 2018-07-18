@@ -43,7 +43,7 @@ func GenerateRKECerts(ctx context.Context, rkeConfig v3.RancherKubernetesEngineC
 	certs := make(map[string]CertificatePKI)
 	// generate CA certificate and key
 	log.Infof(ctx, "[certificates] Generating CA kubernetes certificates")
-	caCrt, caKey, err := generateCACertAndKey()
+	caCrt, caKey, err := GenerateCACertAndKey(CACertName)
 	if err != nil {
 		return nil, err
 	}
@@ -54,6 +54,7 @@ func GenerateRKECerts(ctx context.Context, rkeConfig v3.RancherKubernetesEngineC
 	kubernetesServiceIP, err := GetKubernetesServiceIP(rkeConfig.Services.KubeAPI.ServiceClusterIPRange)
 	clusterDomain := rkeConfig.Services.Kubelet.ClusterDomain
 	cpHosts := hosts.NodesToHosts(rkeConfig.Nodes, controlRole)
+	etcdHosts := hosts.NodesToHosts(rkeConfig.Nodes, etcdRole)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get Kubernetes Service IP: %v", err)
 	}
@@ -88,7 +89,6 @@ func GenerateRKECerts(ctx context.Context, rkeConfig v3.RancherKubernetesEngineC
 	}
 	certs[KubeProxyCertName] = ToCertObject(KubeProxyCertName, "", "", kubeProxyCrt, kubeProxyKey)
 
-	// generate Kubelet certificate and key
 	log.Infof(ctx, "[certificates] Generating Node certificate")
 	nodeCrt, nodeKey, err := GenerateSignedCertAndKey(caCrt, caKey, false, KubeNodeCommonName, nil, nil, []string{KubeNodeOrganizationName})
 	if err != nil {
@@ -139,7 +139,6 @@ func GenerateRKECerts(ctx context.Context, rkeConfig v3.RancherKubernetesEngineC
 		}
 		certs[EtcdClientCACertName] = ToCertObject(EtcdClientCACertName, "", "", caCert[0], nil)
 	}
-	etcdHosts := hosts.NodesToHosts(rkeConfig.Nodes, etcdRole)
 	etcdAltNames := GetAltNames(etcdHosts, clusterDomain, kubernetesServiceIP, []string{})
 	for _, host := range etcdHosts {
 		log.Infof(ctx, "[certificates] Generating etcd-%s certificate and key", host.InternalAddress)
@@ -150,6 +149,22 @@ func GenerateRKECerts(ctx context.Context, rkeConfig v3.RancherKubernetesEngineC
 		etcdName := GetEtcdCrtName(host.InternalAddress)
 		certs[etcdName] = ToCertObject(etcdName, "", "", etcdCrt, etcdKey)
 	}
+
+	// generate request header client CA certificate and key
+	log.Infof(ctx, "[certificates] Generating Kubernetes API server aggregation layer requestheader client CA certificates")
+	requestHeaderCACrt, requestHeaderCAKey, err := GenerateCACertAndKey(RequestHeaderCACertName)
+	if err != nil {
+		return nil, err
+	}
+	certs[RequestHeaderCACertName] = ToCertObject(RequestHeaderCACertName, "", "", requestHeaderCACrt, requestHeaderCAKey)
+
+	//generate API server proxy client key and certs
+	log.Infof(ctx, "[certificates] Generating Kubernetes API server porxy client certificates")
+	apiserverProxyClientCrt, apiserverProxyClientKey, err := GenerateSignedCertAndKey(requestHeaderCACrt, requestHeaderCAKey, true, APIProxyClientCertName, nil, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	certs[APIProxyClientCertName] = ToCertObject(APIProxyClientCertName, "", "", apiserverProxyClientCrt, apiserverProxyClientKey)
 
 	return certs, nil
 }
@@ -249,7 +264,7 @@ func ExtractBackupBundleOnHost(ctx context.Context, host *hosts.Host, alpineSyst
 		Cmd: []string{
 			"sh",
 			"-c",
-			fmt.Sprintf("mkdir -p /etc/kubernetes/.tmp/; tar xzvf %s -C %s --strip-components %d", BundleCertPath, fullTempCertPath, len(strings.Split(fullTempCertPath, "/"))-1),
+			fmt.Sprintf("mkdir -p %s; tar xzvf %s -C %s --strip-components %d", fullTempCertPath, BundleCertPath, fullTempCertPath, len(strings.Split(fullTempCertPath, "/"))-1),
 		},
 		Image: alpineSystemImage,
 	}

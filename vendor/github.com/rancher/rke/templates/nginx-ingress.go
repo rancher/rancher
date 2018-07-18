@@ -71,6 +71,7 @@ rules:
       - "extensions"
     resources:
       - ingresses
+      - daemonsets
     verbs:
       - get
       - list

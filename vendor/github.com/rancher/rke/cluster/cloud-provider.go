@@ -41,7 +41,7 @@ func doDeployConfigFile(ctx context.Context, host *hosts.Host, cloudConfig, alpi
 		Cmd: []string{
 			"sh",
 			"-c",
-			fmt.Sprintf("t=$(mktemp); echo -e \"$%s\" > $t && mv $t %s", CloudConfigEnv, CloudConfigPath),
+			fmt.Sprintf("t=$(mktemp); echo -e \"$%s\" > $t && mv $t %s && chmod 644 %s", CloudConfigEnv, CloudConfigPath, CloudConfigPath),
 		},
 		Env: containerEnv,
 	}

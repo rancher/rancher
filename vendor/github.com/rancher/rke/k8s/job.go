@@ -29,7 +29,7 @@ func ApplyK8sSystemJob(jobYaml, kubeConfigPath string, k8sWrapTransport WrapTran
 	if err != nil {
 		return err
 	}
-	jobStatus, err := getK8sJobStatus(k8sClient, job.Name, job.Namespace)
+	jobStatus, err := GetK8sJobStatus(k8sClient, job.Name, job.Namespace)
 	if err != nil {
 		return err
 	}
@@ -37,18 +37,10 @@ func ApplyK8sSystemJob(jobYaml, kubeConfigPath string, k8sWrapTransport WrapTran
 	// I will remove the existing job first, if any
 	if addonUpdated || (jobStatus.Created && !jobStatus.Completed) {
 		logrus.Debugf("[k8s] replacing job %s.. ", job.Name)
-		if err := deleteK8sJob(k8sClient, job.Name, job.Namespace); err != nil {
-			if !apierrors.IsNotFound(err) {
-				return err
-			}
-		} else { // ignoring NotFound errors
-			//Jobs take longer to delete than to complete, 2 x the timeout
-			if err := retryToWithTimeout(ensureJobDeleted, k8sClient, job, timeout*2); err != nil {
-				return err
-			}
+		if err := DeleteK8sSystemJob(jobYaml, k8sClient, timeout); err != nil {
+			return err
 		}
 	}
-
 	if _, err = k8sClient.BatchV1().Jobs(job.Namespace).Create(&job); err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			logrus.Debugf("[k8s] Job %s already exists..", job.Name)
@@ -60,10 +52,28 @@ func ApplyK8sSystemJob(jobYaml, kubeConfigPath string, k8sWrapTransport WrapTran
 	return retryToWithTimeout(ensureJobCompleted, k8sClient, job, timeout)
 }
 
+func DeleteK8sSystemJob(jobYaml string, k8sClient *kubernetes.Clientset, timeout int) error {
+	job := v1.Job{}
+	if err := decodeYamlResource(&job, jobYaml); err != nil {
+		return err
+	}
+	if err := deleteK8sJob(k8sClient, job.Name, job.Namespace); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+	} else { // ignoring NotFound errors
+		//Jobs take longer to delete than to complete, 2 x the timeout
+		if err := retryToWithTimeout(ensureJobDeleted, k8sClient, job, timeout*2); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func ensureJobCompleted(k8sClient *kubernetes.Clientset, j interface{}) error {
 	job := j.(v1.Job)
 
-	jobStatus, err := getK8sJobStatus(k8sClient, job.Name, job.Namespace)
+	jobStatus, err := GetK8sJobStatus(k8sClient, job.Name, job.Namespace)
 	if err != nil {
 		return fmt.Errorf("Failed to get job complete status: %v", err)
 	}
@@ -100,7 +110,7 @@ func getK8sJob(k8sClient *kubernetes.Clientset, name, namespace string) (*v1.Job
 	return k8sClient.BatchV1().Jobs(namespace).Get(name, metav1.GetOptions{})
 }
 
-func getK8sJobStatus(k8sClient *kubernetes.Clientset, name, namespace string) (JobStatus, error) {
+func GetK8sJobStatus(k8sClient *kubernetes.Clientset, name, namespace string) (JobStatus, error) {
 	existingJob, err := getK8sJob(k8sClient, name, namespace)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
