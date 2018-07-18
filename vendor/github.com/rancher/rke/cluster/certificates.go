@@ -23,6 +23,14 @@ func SetUpAuthentication(ctx context.Context, kubeCluster, currentCluster *Clust
 		var err error
 		if currentCluster != nil {
 			kubeCluster.Certificates = currentCluster.Certificates
+			// this is the case of handling upgrades for API server aggregation layer ca cert and API server proxy client key and cert
+			if kubeCluster.Certificates[pki.RequestHeaderCACertName].Certificate == nil {
+
+				kubeCluster.Certificates, err = regenerateAPIAggregationCerts(kubeCluster, kubeCluster.Certificates)
+				if err != nil {
+					return fmt.Errorf("Failed to regenerate Aggregation layer certificates %v", err)
+				}
+			}
 		} else {
 			var backupPlane string
 			var backupHosts []*hosts.Host
@@ -65,6 +73,14 @@ func SetUpAuthentication(ctx context.Context, kubeCluster, currentCluster *Clust
 					kubeCluster.Certificates, err = regenerateAPICertificate(kubeCluster, kubeCluster.Certificates)
 					if err != nil {
 						return fmt.Errorf("Failed to regenerate KubeAPI certificate %v", err)
+					}
+				}
+				// this is the case of handling upgrades for API server aggregation layer ca cert and API server proxy client key and cert
+				if kubeCluster.Certificates[pki.RequestHeaderCACertName].Certificate == nil {
+
+					kubeCluster.Certificates, err = regenerateAPIAggregationCerts(kubeCluster, kubeCluster.Certificates)
+					if err != nil {
+						return fmt.Errorf("Failed to regenerate Aggregation layer certificates %v", err)
 					}
 				}
 				return nil
@@ -292,4 +308,22 @@ func (c *Cluster) getBackupHosts() []*hosts.Host {
 		backupHosts = hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, nil)
 	}
 	return backupHosts
+}
+
+func regenerateAPIAggregationCerts(c *Cluster, certificates map[string]pki.CertificatePKI) (map[string]pki.CertificatePKI, error) {
+	logrus.Debugf("[certificates] Regenerating Kubernetes API server aggregation layer requestheader client CA certificates")
+	requestHeaderCACrt, requestHeaderCAKey, err := pki.GenerateCACertAndKey(pki.RequestHeaderCACertName)
+	if err != nil {
+		return nil, err
+	}
+	certificates[pki.RequestHeaderCACertName] = pki.ToCertObject(pki.RequestHeaderCACertName, "", "", requestHeaderCACrt, requestHeaderCAKey)
+
+	//generate API server proxy client key and certs
+	logrus.Debugf("[certificates] Regenerating Kubernetes API server porxy client certificates")
+	apiserverProxyClientCrt, apiserverProxyClientKey, err := pki.GenerateSignedCertAndKey(requestHeaderCACrt, requestHeaderCAKey, true, pki.APIProxyClientCertName, nil, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	certificates[pki.APIProxyClientCertName] = pki.ToCertObject(pki.APIProxyClientCertName, "", "", apiserverProxyClientCrt, apiserverProxyClientKey)
+	return certificates, nil
 }

@@ -64,7 +64,7 @@ func DoRunContainer(ctx context.Context, dClient *client.Client, imageCfg *conta
 			}
 		}
 		logrus.Debugf("[%s] Container [%s] is already running on host [%s]", plane, containerName, hostname)
-		isUpgradable, err := IsContainerUpgradable(ctx, dClient, imageCfg, containerName, hostname, plane)
+		isUpgradable, err := IsContainerUpgradable(ctx, dClient, imageCfg, hostCfg, containerName, hostname, plane)
 		if err != nil {
 			return err
 		}
@@ -299,7 +299,7 @@ func WaitForContainer(ctx context.Context, dClient *client.Client, hostname stri
 	return 0, nil
 }
 
-func IsContainerUpgradable(ctx context.Context, dClient *client.Client, imageCfg *container.Config, containerName string, hostname string, plane string) (bool, error) {
+func IsContainerUpgradable(ctx context.Context, dClient *client.Client, imageCfg *container.Config, hostCfg *container.HostConfig, containerName string, hostname string, plane string) (bool, error) {
 	logrus.Debugf("[%s] Checking if container [%s] is eligible for upgrade on host [%s]", plane, containerName, hostname)
 	// this should be moved to a higher layer.
 
@@ -310,7 +310,8 @@ func IsContainerUpgradable(ctx context.Context, dClient *client.Client, imageCfg
 	if containerInspect.Config.Image != imageCfg.Image ||
 		!sliceEqualsIgnoreOrder(containerInspect.Config.Entrypoint, imageCfg.Entrypoint) ||
 		!sliceEqualsIgnoreOrder(containerInspect.Config.Cmd, imageCfg.Cmd) ||
-		!isContainerRKEEnvChanged(containerInspect.Config.Env, imageCfg.Env) {
+		!isContainerRKEEnvChanged(containerInspect.Config.Env, imageCfg.Env) ||
+		!sliceEqualsIgnoreOrder(containerInspect.HostConfig.Binds, hostCfg.Binds) {
 		logrus.Debugf("[%s] Container [%s] is eligible for upgrade on host [%s]", plane, containerName, hostname)
 		return true, nil
 	}
