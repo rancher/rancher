@@ -127,7 +127,7 @@ func clusterHasPSPTAssigned(apiContext *types.APIContext) (bool, error) {
 	clusterSchema := apiContext.Schemas.Schema(&schema.Version, client.ClusterType)
 	clusters, err := clusterSchema.Store.List(apiContext, clusterSchema, &types.QueryOptions{
 		Conditions: []*types.QueryCondition{
-			types.NewConditionFromString(client.ClusterFieldDefaultPodSecurityPolicyTemplateId, types.ModifierEQ,
+			types.NewConditionFromString(client.ClusterFieldDefaultPodSecurityPolicyTemplateID, types.ModifierEQ,
 				apiContext.ID),
 		},
 	})

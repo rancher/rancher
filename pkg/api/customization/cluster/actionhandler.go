@@ -115,8 +115,8 @@ func (a ActionHandler) ImportYamlHandler(actionName string, action *types.Action
 	}
 
 	var msg []byte
-	if input.ProjectId != "" {
-		err = a.processYAML(apiContext, cluster.ID, input.ProjectId, input.YAML)
+	if input.ProjectID != "" {
+		err = a.processYAML(apiContext, cluster.ID, input.ProjectID, input.YAML)
 		if err == nil {
 			msg, err = kubectl.Apply([]byte(input.YAML), cfg)
 		}
@@ -167,13 +167,13 @@ func (a ActionHandler) ExportYamlHandler(actionName string, action *types.Action
 			if err := convert.ToObj(nodepool.Spec, &n); err != nil {
 				return err
 			}
-			n.ClusterId = cluster.Spec.DisplayName
+			n.ClusterID = cluster.Spec.DisplayName
 			namespace, id := ref.Parse(nodepool.Spec.NodeTemplateName)
 			nodeTemplate, err := a.NodeTemplateGetter.NodeTemplates(namespace).Get(id, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
-			n.NodeTemplateId = nodeTemplate.Spec.DisplayName
+			n.NodeTemplateID = nodeTemplate.Spec.DisplayName
 			topkey.NodePools[nodepool.Name] = n
 		}
 	}
