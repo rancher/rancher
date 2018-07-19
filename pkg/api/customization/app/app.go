@@ -109,7 +109,7 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 	case "upgrade":
 		externalID := actionInput["externalId"]
 		answers := actionInput["answers"]
-		_, namespace := ref.Parse(app.ProjectId)
+		_, namespace := ref.Parse(app.ProjectID)
 		obj, err := w.AppGetter.Apps(namespace).Get(app.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -134,12 +134,12 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 			return fmt.Errorf("revision is empty")
 		}
 		var appRevision projectv3.AppRevision
-		_, projectID := ref.Parse(app.ProjectId)
+		_, projectID := ref.Parse(app.ProjectID)
 		revisionID := fmt.Sprintf("%s:%s", projectID, convert.ToString(revision))
 		if err := access.ByID(apiContext, &projectschema.Version, projectv3.AppRevisionType, revisionID, &appRevision); err != nil {
 			return err
 		}
-		_, namespace := ref.Parse(app.ProjectId)
+		_, namespace := ref.Parse(app.ProjectID)
 		obj, err := w.AppGetter.Apps(namespace).Get(app.Name, metav1.GetOptions{})
 		if err != nil {
 			return err

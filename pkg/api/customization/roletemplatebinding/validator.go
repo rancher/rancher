@@ -10,11 +10,11 @@ import (
 )
 
 func NewPRTBValidator(management *config.ScaledContext) types.Validator {
-	return newValidator(management, client.ProjectRoleTemplateBindingFieldRoleTemplateId)
+	return newValidator(management, client.ProjectRoleTemplateBindingFieldRoleTemplateID)
 }
 
 func NewCRTBValidator(management *config.ScaledContext) types.Validator {
-	return newValidator(management, client.ClusterRoleTemplateBindingFieldRoleTemplateId)
+	return newValidator(management, client.ClusterRoleTemplateBindingFieldRoleTemplateID)
 }
 
 func newValidator(management *config.ScaledContext, field string) types.Validator {

@@ -23,7 +23,7 @@ func SetRTBStore(ctx context.Context, schema *types.Schema, mgmt *config.ScaledC
 	t := &transform.Store{
 		Store: schema.Store,
 		Transformer: func(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
-			if id, ok := data[client.ClusterRoleTemplateBindingFieldUserId].(string); ok && id != "" {
+			if id, ok := data[client.ClusterRoleTemplateBindingFieldUserID].(string); ok && id != "" {
 				u, err := userLister.Get("", id)
 				if err != nil {
 					logrus.Errorf("problem retrieving user for CRTB %v from cache during CRTB transformation: %v", data, err)
@@ -57,7 +57,7 @@ type Store struct {
 }
 
 func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
-	if principalID, ok := data[client.ClusterRoleTemplateBindingFieldUserPrincipalId].(string); ok && principalID != "" && !strings.HasPrefix(principalID, "local://") {
+	if principalID, ok := data[client.ClusterRoleTemplateBindingFieldUserPrincipalID].(string); ok && principalID != "" && !strings.HasPrefix(principalID, "local://") {
 		token, err := s.auth.TokenFromRequest(apiContext.Request)
 		if err != nil {
 			return nil, err
