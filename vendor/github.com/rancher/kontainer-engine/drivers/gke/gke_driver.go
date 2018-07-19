@@ -26,6 +26,7 @@ import (
 const (
 	runningStatus        = "RUNNING"
 	defaultCredentialEnv = "GOOGLE_APPLICATION_CREDENTIALS"
+	none                 = "none"
 )
 
 var EnvMutex sync.Mutex
@@ -82,6 +83,11 @@ type state struct {
 	LegacyAbac bool
 	// NodePool id
 	NodePoolID string
+
+	NoStackdriverLogging    bool
+	NoStackdriverMonitoring bool
+	MaintenanceWindow       string
+
 	// cluster info
 	ClusterInfo types.ClusterInfo
 }
@@ -157,6 +163,35 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 		Type:  types.BoolType,
 		Usage: "To enable kubernetes alpha feature",
 	}
+	driverFlag.Options["legacy-authorization"] = &types.Flag{
+		Type:  types.BoolType,
+		Usage: "Enable legacy authorization",
+	}
+	driverFlag.Options["no-stackdriver-logging"] = &types.Flag{
+		Type:  types.BoolType,
+		Usage: "Disable stackdriver logging",
+	}
+	driverFlag.Options["no-stackdriver-monitoring"] = &types.Flag{
+		Type:  types.BoolType,
+		Usage: "Disable stackdriver monitoring",
+	}
+	driverFlag.Options["no-network-policy"] = &types.Flag{
+		Type:  types.BoolType,
+		Usage: "Disable network policy",
+	}
+	driverFlag.Options["kubernetes-dashboard"] = &types.Flag{
+		Type:  types.BoolType,
+		Usage: "Enable the kubernetes dashboard",
+	}
+	driverFlag.Options["disable-http-load-balancing"] = &types.Flag{
+		Type:  types.BoolType,
+		Usage: "Disable http load balancing",
+	}
+	driverFlag.Options["maintenance-window"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "When to performance updates on the nodes, in 24-hour time (e.g. \"19:00\")",
+	}
+
 	return &driverFlag, nil
 }
 
@@ -205,13 +240,13 @@ func getStateFromOpts(driverOptions *types.DriverOptions) (state, error) {
 	d.CredentialContent = getValueFromDriverOptions(driverOptions, types.StringType, "credential").(string)
 	d.EnableAlphaFeature = getValueFromDriverOptions(driverOptions, types.BoolType, "enable-alpha-feature", "enableAlphaFeature").(bool)
 	d.DisableHorizontalPodAutoscaling = getValueFromDriverOptions(driverOptions, types.BoolType, "disableHorizontalPodAutoscaling").(bool)
-	d.DisableHTTPLoadBalancing = getValueFromDriverOptions(driverOptions, types.BoolType, "disableHttpLoadBalancing").(bool)
-	d.EnableKubernetesDashboard = getValueFromDriverOptions(driverOptions, types.BoolType, "enableKubernetesDashboard").(bool)
 	d.DisableNetworkPolicyConfig = getValueFromDriverOptions(driverOptions, types.BoolType, "disableNetworkPolicyConfig").(bool)
+	d.DisableHTTPLoadBalancing = getValueFromDriverOptions(driverOptions, types.BoolType, "disable-http-load-balancing", "disableHttpLoadBalancing").(bool)
+	d.EnableKubernetesDashboard = getValueFromDriverOptions(driverOptions, types.BoolType, "kubernetes-dashboard", "enableKubernetesDashboard").(bool)
 	d.NodeConfig.ImageType = getValueFromDriverOptions(driverOptions, types.StringType, "imageType").(string)
 	d.Network = getValueFromDriverOptions(driverOptions, types.StringType, "network").(string)
 	d.SubNetwork = getValueFromDriverOptions(driverOptions, types.StringType, "subNetwork").(string)
-	d.LegacyAbac = getValueFromDriverOptions(driverOptions, types.BoolType, "enableLegacyAbac").(bool)
+	d.LegacyAbac = getValueFromDriverOptions(driverOptions, types.BoolType, "legacy-authorization", "enableLegacyAbac").(bool)
 	d.Locations = []string{}
 	locations := getValueFromDriverOptions(driverOptions, types.StringSliceType, "locations").(*types.StringSlice)
 	for _, location := range locations.Value {
@@ -226,6 +261,10 @@ func getStateFromOpts(driverOptions *types.DriverOptions) (state, error) {
 			d.NodeConfig.Labels[kv[0]] = kv[1]
 		}
 	}
+
+	d.NoStackdriverLogging = getValueFromDriverOptions(driverOptions, types.BoolType, "no-stackdriver-logging", "noStackdriverLogging").(bool)
+	d.NoStackdriverMonitoring = getValueFromDriverOptions(driverOptions, types.BoolType, "no-stackdriver-monitoring", "noStackdriverMonitoring").(bool)
+	d.MaintenanceWindow = getValueFromDriverOptions(driverOptions, types.StringType, "maintenance-window", "maintenanceWindow").(string)
 
 	return d, d.validate()
 }
@@ -261,6 +300,7 @@ func getValueFromDriverOptions(driverOptions *types.DriverOptions, optionType st
 		}
 		return &types.StringSlice{}
 	}
+
 	return nil
 }
 
@@ -428,6 +468,24 @@ func (d *Driver) generateClusterCreateRequest(state state) *raw.CreateClusterReq
 	}
 	request.Cluster.NodeConfig = state.NodeConfig
 	request.Cluster.ResourceLabels = map[string]string{"display-name": strings.ToLower(state.DisplayName)}
+	// Stackdriver logging and monitoring default to "on" if no parameter is
+	// passed in.  We must explicitly pass "none" if it isn't wanted
+	if state.NoStackdriverLogging {
+		request.Cluster.LoggingService = none
+	}
+	if state.NoStackdriverMonitoring {
+		request.Cluster.MonitoringService = none
+	}
+	if state.MaintenanceWindow != "" {
+		request.Cluster.MaintenancePolicy = &raw.MaintenancePolicy{
+			Window: &raw.MaintenanceWindow{
+				DailyMaintenanceWindow: &raw.DailyMaintenanceWindow{
+					StartTime: state.MaintenanceWindow,
+				},
+			},
+		}
+	}
+
 	return &request
 }
 
