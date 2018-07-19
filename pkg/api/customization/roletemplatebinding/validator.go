@@ -2,6 +2,7 @@ package roletemplatebinding
 
 import (
 	"fmt"
+
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
