@@ -362,7 +362,7 @@ func objectsAreEqual(existing *v3.Node, toUpdate *v3.Node) bool {
 	// we are updating spec and status only, so compare them
 	toUpdateToCompare := resetConditions(toUpdate)
 	existingToCompare := resetConditions(existing)
-	statusEqual := reflect.DeepEqual(toUpdateToCompare.Status.InternalNodeStatus, existingToCompare.Status.InternalNodeStatus)
+	statusEqual := statusEqualTest(toUpdateToCompare.Status.InternalNodeStatus, existingToCompare.Status.InternalNodeStatus)
 	labelsEqual := reflect.DeepEqual(toUpdateToCompare.Status.NodeLabels, existing.Status.NodeLabels)
 	annotationsEqual := reflect.DeepEqual(toUpdateToCompare.Status.NodeAnnotations, existing.Status.NodeAnnotations)
 	specEqual := reflect.DeepEqual(toUpdateToCompare.Spec.InternalNodeSpec, existingToCompare.Spec.InternalNodeSpec)
@@ -379,6 +379,61 @@ func objectsAreEqual(existing *v3.Node, toUpdate *v3.Node) bool {
 			toUpdate.Name, statusEqual, specEqual, nodeNameEqual, labelsEqual, annotationsEqual, requestsEqual, limitsEqual, rolesEqual)
 	}
 	return retVal
+}
+
+func statusEqualTest(proposed, existing corev1.NodeStatus) bool {
+	// Tests here should validate that fields of the corev1.NodeStatus type are equal for Rancher's purposes.
+	// The Images field lists would be equal if they contain the same data regardless of order. Using reflect.DeepEqual
+	// does not see lists with the same content but different order as equal, and would cause
+	// Rancher to update the resource unnecessarily. So if Images becomes a field we need to validate we need to add
+	// a custom method to validate the equality.
+	//
+	// Rancher doesn't use the following NodeStatus data, so for time savings we are skipping, but in the future these tests
+	// should be added here.
+	//
+	// SKIP:
+	//   - Images           # Do not use reflect.DeepEquals on this field for testing.
+	//   - NodeInfo
+	//   - DaemonEndpoints
+	//   - Phase
+
+	// Capacity
+	if !reflect.DeepEqual(proposed.Capacity, existing.Capacity) {
+		logrus.Debugf("Changes in Capacity, proposed %#v, existing: %#v", proposed.Capacity, existing.Capacity)
+		return false
+	}
+
+	// Allocatable
+	if !reflect.DeepEqual(proposed.Allocatable, existing.Allocatable) {
+		logrus.Debugf("Changes in Allocatable, proposed %#v, existing: %#v", proposed.Allocatable, existing.Allocatable)
+		return false
+	}
+
+	// Conditions
+	if !reflect.DeepEqual(proposed.Conditions, existing.Conditions) {
+		logrus.Debugf("Changes in Conditions, proposed %#v, existing: %#v", proposed.Conditions, existing.Conditions)
+		return false
+	}
+
+	// Addresses
+	if !reflect.DeepEqual(proposed.Addresses, existing.Addresses) {
+		logrus.Debugf("Changes in Addresses, proposed %#v, existing: %#v", proposed.Addresses, existing.Addresses)
+		return false
+	}
+
+	// Volumes in use (This test might prove to be an issue if order is not returned consistently.)
+	if !reflect.DeepEqual(proposed.VolumesInUse, existing.VolumesInUse) {
+		logrus.Debugf("Changes in VolumesInUse, proposed %#v, existing: %#v", proposed.VolumesInUse, existing.VolumesInUse)
+		return false
+	}
+
+	// VolumesAttached (This test might prove to cause excessive updates if order is not returned consistently.)
+	if !reflect.DeepEqual(proposed.VolumesAttached, existing.VolumesAttached) {
+		logrus.Debugf("Changes in VolumesAttached, proposed %#v, existing: %#v", proposed.VolumesAttached, existing.VolumesAttached)
+		return false
+	}
+
+	return true
 }
 
 func (m *NodesSyncer) convertNodeToNode(node *corev1.Node, existing *v3.Node, pods map[string][]*corev1.Pod) (*v3.Node, error) {
