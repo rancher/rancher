@@ -192,7 +192,7 @@ func StringsToNodeSelectorTerm(exprs []string) []v1.NodeSelectorTerm {
 	return result
 }
 
-func (s SchedulingMapper) ToInternal(data map[string]interface{}) {
+func (s SchedulingMapper) ToInternal(data map[string]interface{}) error {
 	defer func() {
 		delete(data, "scheduling")
 	}()
@@ -208,7 +208,7 @@ func (s SchedulingMapper) ToInternal(data map[string]interface{}) {
 
 	if len(requireAll) == 0 && len(requireAny) == 0 && len(preferred) == 0 {
 		values.PutValue(data, nil, "affinity", "nodeAffinity")
-		return
+		return nil
 	}
 
 	nodeAffinity := v1.NodeAffinity{}
@@ -253,6 +253,8 @@ func (s SchedulingMapper) ToInternal(data map[string]interface{}) {
 	}
 
 	data["affinity"] = affinity
+
+	return nil
 }
 
 func AggregateTerms(terms []v1.NodeSelectorTerm) v1.NodeSelectorTerm {

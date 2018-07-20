@@ -26,7 +26,7 @@ func (n *NamespaceReference) FromInternal(data map[string]interface{}) {
 	}
 }
 
-func (n *NamespaceReference) ToInternal(data map[string]interface{}) {
+func (n *NamespaceReference) ToInternal(data map[string]interface{}) error {
 	for _, path := range n.fields {
 		convert.Transform(data, path, func(input interface{}) interface{} {
 			parts := strings.SplitN(convert.ToString(input), ":", 2)
@@ -36,6 +36,8 @@ func (n *NamespaceReference) ToInternal(data map[string]interface{}) {
 			return parts[0]
 		})
 	}
+
+	return nil
 }
 
 func (n *NamespaceReference) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {

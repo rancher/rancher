@@ -17,7 +17,7 @@ const (
 	NamespacedDockerCredentialFieldProjectID       = "projectId"
 	NamespacedDockerCredentialFieldRegistries      = "registries"
 	NamespacedDockerCredentialFieldRemoved         = "removed"
-	NamespacedDockerCredentialFieldUuid            = "uuid"
+	NamespacedDockerCredentialFieldUUID            = "uuid"
 )
 
 type NamespacedDockerCredential struct {
@@ -33,8 +33,9 @@ type NamespacedDockerCredential struct {
 	ProjectID       string                        `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	Registries      map[string]RegistryCredential `json:"registries,omitempty" yaml:"registries,omitempty"`
 	Removed         string                        `json:"removed,omitempty" yaml:"removed,omitempty"`
-	Uuid            string                        `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID            string                        `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type NamespacedDockerCredentialCollection struct {
 	types.Collection
 	Data   []NamespacedDockerCredential `json:"data,omitempty"`
@@ -49,6 +50,7 @@ type NamespacedDockerCredentialOperations interface {
 	List(opts *types.ListOpts) (*NamespacedDockerCredentialCollection, error)
 	Create(opts *NamespacedDockerCredential) (*NamespacedDockerCredential, error)
 	Update(existing *NamespacedDockerCredential, updates interface{}) (*NamespacedDockerCredential, error)
+	Replace(existing *NamespacedDockerCredential) (*NamespacedDockerCredential, error)
 	ByID(id string) (*NamespacedDockerCredential, error)
 	Delete(container *NamespacedDockerCredential) error
 }
@@ -68,6 +70,12 @@ func (c *NamespacedDockerCredentialClient) Create(container *NamespacedDockerCre
 func (c *NamespacedDockerCredentialClient) Update(existing *NamespacedDockerCredential, updates interface{}) (*NamespacedDockerCredential, error) {
 	resp := &NamespacedDockerCredential{}
 	err := c.apiClient.Ops.DoUpdate(NamespacedDockerCredentialType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *NamespacedDockerCredentialClient) Replace(obj *NamespacedDockerCredential) (*NamespacedDockerCredential, error) {
+	resp := &NamespacedDockerCredential{}
+	err := c.apiClient.Ops.DoReplace(NamespacedDockerCredentialType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

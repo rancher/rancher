@@ -15,12 +15,12 @@ const (
 	PipelineExecutionLogFieldName                = "name"
 	PipelineExecutionLogFieldNamespaceId         = "namespaceId"
 	PipelineExecutionLogFieldOwnerReferences     = "ownerReferences"
-	PipelineExecutionLogFieldPipelineExecutionId = "pipelineExecutionId"
-	PipelineExecutionLogFieldProjectId           = "projectId"
+	PipelineExecutionLogFieldPipelineExecutionID = "pipelineExecutionId"
+	PipelineExecutionLogFieldProjectID           = "projectId"
 	PipelineExecutionLogFieldRemoved             = "removed"
 	PipelineExecutionLogFieldStage               = "stage"
 	PipelineExecutionLogFieldStep                = "step"
-	PipelineExecutionLogFieldUuid                = "uuid"
+	PipelineExecutionLogFieldUUID                = "uuid"
 )
 
 type PipelineExecutionLog struct {
@@ -34,13 +34,14 @@ type PipelineExecutionLog struct {
 	Name                string            `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId         string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	OwnerReferences     []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	PipelineExecutionId string            `json:"pipelineExecutionId,omitempty" yaml:"pipelineExecutionId,omitempty"`
-	ProjectId           string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
+	PipelineExecutionID string            `json:"pipelineExecutionId,omitempty" yaml:"pipelineExecutionId,omitempty"`
+	ProjectID           string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	Removed             string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Stage               int64             `json:"stage,omitempty" yaml:"stage,omitempty"`
 	Step                int64             `json:"step,omitempty" yaml:"step,omitempty"`
-	Uuid                string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type PipelineExecutionLogCollection struct {
 	types.Collection
 	Data   []PipelineExecutionLog `json:"data,omitempty"`
@@ -55,6 +56,7 @@ type PipelineExecutionLogOperations interface {
 	List(opts *types.ListOpts) (*PipelineExecutionLogCollection, error)
 	Create(opts *PipelineExecutionLog) (*PipelineExecutionLog, error)
 	Update(existing *PipelineExecutionLog, updates interface{}) (*PipelineExecutionLog, error)
+	Replace(existing *PipelineExecutionLog) (*PipelineExecutionLog, error)
 	ByID(id string) (*PipelineExecutionLog, error)
 	Delete(container *PipelineExecutionLog) error
 }
@@ -74,6 +76,12 @@ func (c *PipelineExecutionLogClient) Create(container *PipelineExecutionLog) (*P
 func (c *PipelineExecutionLogClient) Update(existing *PipelineExecutionLog, updates interface{}) (*PipelineExecutionLog, error) {
 	resp := &PipelineExecutionLog{}
 	err := c.apiClient.Ops.DoUpdate(PipelineExecutionLogType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *PipelineExecutionLogClient) Replace(obj *PipelineExecutionLog) (*PipelineExecutionLog, error) {
+	resp := &PipelineExecutionLog{}
+	err := c.apiClient.Ops.DoReplace(PipelineExecutionLogType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

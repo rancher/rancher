@@ -39,10 +39,10 @@ func (s SetValue) getTo() string {
 	return s.To
 }
 
-func (s SetValue) ToInternal(data map[string]interface{}) {
+func (s SetValue) ToInternal(data map[string]interface{}) error {
 	v, ok := values.GetValue(data, strings.Split(s.getTo(), "/")...)
 	if !ok {
-		return
+		return nil
 	}
 
 	if s.IfEq == nil {
@@ -50,6 +50,8 @@ func (s SetValue) ToInternal(data map[string]interface{}) {
 	} else if v == s.Value {
 		values.PutValue(data, s.IfEq, strings.Split(s.Field, "/")...)
 	}
+
+	return nil
 }
 
 func (s SetValue) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {

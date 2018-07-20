@@ -12,12 +12,13 @@ type ContainerSecurityContext struct {
 func (n ContainerSecurityContext) FromInternal(data map[string]interface{}) {
 }
 
-func (n ContainerSecurityContext) ToInternal(data map[string]interface{}) {
+func (n ContainerSecurityContext) ToInternal(data map[string]interface{}) error {
 	if v, ok := values.GetValue(data, "securityContext"); ok && v != nil {
 		sc, err := convert.EncodeToMap(v)
 		if err != nil {
-			return
+			return nil
 		}
+
 		if v, ok := values.GetValue(sc, "capAdd"); ok && v != nil {
 			capAdd := convert.ToStringSlice(v)
 			if len(capAdd) == 0 {
@@ -32,6 +33,8 @@ func (n ContainerSecurityContext) ToInternal(data map[string]interface{}) {
 			}
 		}
 	}
+
+	return nil
 }
 
 func (n ContainerSecurityContext) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {

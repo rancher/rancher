@@ -9,7 +9,7 @@ const (
 	NodeFieldAllocatable          = "allocatable"
 	NodeFieldAnnotations          = "annotations"
 	NodeFieldCapacity             = "capacity"
-	NodeFieldClusterId            = "clusterId"
+	NodeFieldClusterID            = "clusterId"
 	NodeFieldConditions           = "conditions"
 	NodeFieldControlPlane         = "controlPlane"
 	NodeFieldCreated              = "created"
@@ -28,9 +28,9 @@ const (
 	NodeFieldName                 = "name"
 	NodeFieldNamespaceId          = "namespaceId"
 	NodeFieldNodeName             = "nodeName"
-	NodeFieldNodePoolId           = "nodePoolId"
+	NodeFieldNodePoolID           = "nodePoolId"
 	NodeFieldNodeTaints           = "nodeTaints"
-	NodeFieldNodeTemplateId       = "nodeTemplateId"
+	NodeFieldNodeTemplateID       = "nodeTemplateId"
 	NodeFieldOwnerReferences      = "ownerReferences"
 	NodeFieldPodCidr              = "podCidr"
 	NodeFieldProviderId           = "providerId"
@@ -43,8 +43,8 @@ const (
 	NodeFieldTaints               = "taints"
 	NodeFieldTransitioning        = "transitioning"
 	NodeFieldTransitioningMessage = "transitioningMessage"
+	NodeFieldUUID                 = "uuid"
 	NodeFieldUnschedulable        = "unschedulable"
-	NodeFieldUuid                 = "uuid"
 	NodeFieldVolumesAttached      = "volumesAttached"
 	NodeFieldVolumesInUse         = "volumesInUse"
 	NodeFieldWorker               = "worker"
@@ -55,7 +55,7 @@ type Node struct {
 	Allocatable          map[string]string         `json:"allocatable,omitempty" yaml:"allocatable,omitempty"`
 	Annotations          map[string]string         `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Capacity             map[string]string         `json:"capacity,omitempty" yaml:"capacity,omitempty"`
-	ClusterId            string                    `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	ClusterID            string                    `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	Conditions           []NodeCondition           `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	ControlPlane         bool                      `json:"controlPlane,omitempty" yaml:"controlPlane,omitempty"`
 	Created              string                    `json:"created,omitempty" yaml:"created,omitempty"`
@@ -74,9 +74,9 @@ type Node struct {
 	Name                 string                    `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId          string                    `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	NodeName             string                    `json:"nodeName,omitempty" yaml:"nodeName,omitempty"`
-	NodePoolId           string                    `json:"nodePoolId,omitempty" yaml:"nodePoolId,omitempty"`
+	NodePoolID           string                    `json:"nodePoolId,omitempty" yaml:"nodePoolId,omitempty"`
 	NodeTaints           []Taint                   `json:"nodeTaints,omitempty" yaml:"nodeTaints,omitempty"`
-	NodeTemplateId       string                    `json:"nodeTemplateId,omitempty" yaml:"nodeTemplateId,omitempty"`
+	NodeTemplateID       string                    `json:"nodeTemplateId,omitempty" yaml:"nodeTemplateId,omitempty"`
 	OwnerReferences      []OwnerReference          `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PodCidr              string                    `json:"podCidr,omitempty" yaml:"podCidr,omitempty"`
 	ProviderId           string                    `json:"providerId,omitempty" yaml:"providerId,omitempty"`
@@ -89,12 +89,13 @@ type Node struct {
 	Taints               []Taint                   `json:"taints,omitempty" yaml:"taints,omitempty"`
 	Transitioning        string                    `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string                    `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	UUID                 string                    `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Unschedulable        bool                      `json:"unschedulable,omitempty" yaml:"unschedulable,omitempty"`
-	Uuid                 string                    `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	VolumesAttached      map[string]AttachedVolume `json:"volumesAttached,omitempty" yaml:"volumesAttached,omitempty"`
 	VolumesInUse         []string                  `json:"volumesInUse,omitempty" yaml:"volumesInUse,omitempty"`
 	Worker               bool                      `json:"worker,omitempty" yaml:"worker,omitempty"`
 }
+
 type NodeCollection struct {
 	types.Collection
 	Data   []Node `json:"data,omitempty"`
@@ -109,6 +110,7 @@ type NodeOperations interface {
 	List(opts *types.ListOpts) (*NodeCollection, error)
 	Create(opts *Node) (*Node, error)
 	Update(existing *Node, updates interface{}) (*Node, error)
+	Replace(existing *Node) (*Node, error)
 	ByID(id string) (*Node, error)
 	Delete(container *Node) error
 
@@ -134,6 +136,12 @@ func (c *NodeClient) Create(container *Node) (*Node, error) {
 func (c *NodeClient) Update(existing *Node, updates interface{}) (*Node, error) {
 	resp := &Node{}
 	err := c.apiClient.Ops.DoUpdate(NodeType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *NodeClient) Replace(obj *Node) (*Node, error) {
+	resp := &Node{}
+	err := c.apiClient.Ops.DoReplace(NodeType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

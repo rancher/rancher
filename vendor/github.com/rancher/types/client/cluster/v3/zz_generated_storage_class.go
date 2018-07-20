@@ -19,7 +19,7 @@ const (
 	StorageClassFieldProvisioner          = "provisioner"
 	StorageClassFieldReclaimPolicy        = "reclaimPolicy"
 	StorageClassFieldRemoved              = "removed"
-	StorageClassFieldUuid                 = "uuid"
+	StorageClassFieldUUID                 = "uuid"
 	StorageClassFieldVolumeBindingMode    = "volumeBindingMode"
 )
 
@@ -38,9 +38,10 @@ type StorageClass struct {
 	Provisioner          string            `json:"provisioner,omitempty" yaml:"provisioner,omitempty"`
 	ReclaimPolicy        string            `json:"reclaimPolicy,omitempty" yaml:"reclaimPolicy,omitempty"`
 	Removed              string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	Uuid                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	VolumeBindingMode    string            `json:"volumeBindingMode,omitempty" yaml:"volumeBindingMode,omitempty"`
 }
+
 type StorageClassCollection struct {
 	types.Collection
 	Data   []StorageClass `json:"data,omitempty"`
@@ -55,6 +56,7 @@ type StorageClassOperations interface {
 	List(opts *types.ListOpts) (*StorageClassCollection, error)
 	Create(opts *StorageClass) (*StorageClass, error)
 	Update(existing *StorageClass, updates interface{}) (*StorageClass, error)
+	Replace(existing *StorageClass) (*StorageClass, error)
 	ByID(id string) (*StorageClass, error)
 	Delete(container *StorageClass) error
 }
@@ -74,6 +76,12 @@ func (c *StorageClassClient) Create(container *StorageClass) (*StorageClass, err
 func (c *StorageClassClient) Update(existing *StorageClass, updates interface{}) (*StorageClass, error) {
 	resp := &StorageClass{}
 	err := c.apiClient.Ops.DoUpdate(StorageClassType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *StorageClassClient) Replace(obj *StorageClass) (*StorageClass, error) {
+	resp := &StorageClass{}
+	err := c.apiClient.Ops.DoReplace(StorageClassType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

@@ -27,7 +27,7 @@ const (
 	DaemonSetFieldLabels                        = "labels"
 	DaemonSetFieldName                          = "name"
 	DaemonSetFieldNamespaceId                   = "namespaceId"
-	DaemonSetFieldNodeId                        = "nodeId"
+	DaemonSetFieldNodeID                        = "nodeId"
 	DaemonSetFieldOwnerReferences               = "ownerReferences"
 	DaemonSetFieldPriority                      = "priority"
 	DaemonSetFieldPriorityClassName             = "priorityClassName"
@@ -47,8 +47,8 @@ const (
 	DaemonSetFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
 	DaemonSetFieldTransitioning                 = "transitioning"
 	DaemonSetFieldTransitioningMessage          = "transitioningMessage"
+	DaemonSetFieldUUID                          = "uuid"
 	DaemonSetFieldUid                           = "uid"
-	DaemonSetFieldUuid                          = "uuid"
 	DaemonSetFieldVolumes                       = "volumes"
 	DaemonSetFieldWorkloadAnnotations           = "workloadAnnotations"
 	DaemonSetFieldWorkloadLabels                = "workloadLabels"
@@ -77,7 +77,7 @@ type DaemonSet struct {
 	Labels                        map[string]string      `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                          string                 `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId                   string                 `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
-	NodeId                        string                 `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
+	NodeID                        string                 `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
 	OwnerReferences               []OwnerReference       `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Priority                      *int64                 `json:"priority,omitempty" yaml:"priority,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty" yaml:"priorityClassName,omitempty"`
@@ -97,12 +97,13 @@ type DaemonSet struct {
 	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`
 	Transitioning                 string                 `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage          string                 `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	UUID                          string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Uid                           *int64                 `json:"uid,omitempty" yaml:"uid,omitempty"`
-	Uuid                          string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Volumes                       []Volume               `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 	WorkloadAnnotations           map[string]string      `json:"workloadAnnotations,omitempty" yaml:"workloadAnnotations,omitempty"`
 	WorkloadLabels                map[string]string      `json:"workloadLabels,omitempty" yaml:"workloadLabels,omitempty"`
 }
+
 type DaemonSetCollection struct {
 	types.Collection
 	Data   []DaemonSet `json:"data,omitempty"`
@@ -117,6 +118,7 @@ type DaemonSetOperations interface {
 	List(opts *types.ListOpts) (*DaemonSetCollection, error)
 	Create(opts *DaemonSet) (*DaemonSet, error)
 	Update(existing *DaemonSet, updates interface{}) (*DaemonSet, error)
+	Replace(existing *DaemonSet) (*DaemonSet, error)
 	ByID(id string) (*DaemonSet, error)
 	Delete(container *DaemonSet) error
 }
@@ -136,6 +138,12 @@ func (c *DaemonSetClient) Create(container *DaemonSet) (*DaemonSet, error) {
 func (c *DaemonSetClient) Update(existing *DaemonSet, updates interface{}) (*DaemonSet, error) {
 	resp := &DaemonSet{}
 	err := c.apiClient.Ops.DoUpdate(DaemonSetType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *DaemonSetClient) Replace(obj *DaemonSet) (*DaemonSet, error) {
+	resp := &DaemonSet{}
+	err := c.apiClient.Ops.DoReplace(DaemonSetType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

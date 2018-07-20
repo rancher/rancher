@@ -16,7 +16,7 @@ const (
 	JobSpecFieldHostname                      = "hostname"
 	JobSpecFieldImagePullSecrets              = "imagePullSecrets"
 	JobSpecFieldJobConfig                     = "jobConfig"
-	JobSpecFieldNodeId                        = "nodeId"
+	JobSpecFieldNodeID                        = "nodeId"
 	JobSpecFieldObjectMeta                    = "metadata"
 	JobSpecFieldPriority                      = "priority"
 	JobSpecFieldPriorityClassName             = "priorityClassName"
@@ -49,7 +49,7 @@ type JobSpec struct {
 	Hostname                      string                 `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	ImagePullSecrets              []LocalObjectReference `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	JobConfig                     *JobConfig             `json:"jobConfig,omitempty" yaml:"jobConfig,omitempty"`
-	NodeId                        string                 `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
+	NodeID                        string                 `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
 	ObjectMeta                    *ObjectMeta            `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 	Priority                      *int64                 `json:"priority,omitempty" yaml:"priority,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty" yaml:"priorityClassName,omitempty"`

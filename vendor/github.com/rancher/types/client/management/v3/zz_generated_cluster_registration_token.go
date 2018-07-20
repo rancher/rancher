@@ -7,7 +7,7 @@ import (
 const (
 	ClusterRegistrationTokenType                      = "clusterRegistrationToken"
 	ClusterRegistrationTokenFieldAnnotations          = "annotations"
-	ClusterRegistrationTokenFieldClusterId            = "clusterId"
+	ClusterRegistrationTokenFieldClusterID            = "clusterId"
 	ClusterRegistrationTokenFieldCommand              = "command"
 	ClusterRegistrationTokenFieldCreated              = "created"
 	ClusterRegistrationTokenFieldCreatorID            = "creatorId"
@@ -23,13 +23,13 @@ const (
 	ClusterRegistrationTokenFieldToken                = "token"
 	ClusterRegistrationTokenFieldTransitioning        = "transitioning"
 	ClusterRegistrationTokenFieldTransitioningMessage = "transitioningMessage"
-	ClusterRegistrationTokenFieldUuid                 = "uuid"
+	ClusterRegistrationTokenFieldUUID                 = "uuid"
 )
 
 type ClusterRegistrationToken struct {
 	types.Resource
 	Annotations          map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	ClusterId            string            `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	ClusterID            string            `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	Command              string            `json:"command,omitempty" yaml:"command,omitempty"`
 	Created              string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
@@ -45,8 +45,9 @@ type ClusterRegistrationToken struct {
 	Token                string            `json:"token,omitempty" yaml:"token,omitempty"`
 	Transitioning        string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	Uuid                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type ClusterRegistrationTokenCollection struct {
 	types.Collection
 	Data   []ClusterRegistrationToken `json:"data,omitempty"`
@@ -61,6 +62,7 @@ type ClusterRegistrationTokenOperations interface {
 	List(opts *types.ListOpts) (*ClusterRegistrationTokenCollection, error)
 	Create(opts *ClusterRegistrationToken) (*ClusterRegistrationToken, error)
 	Update(existing *ClusterRegistrationToken, updates interface{}) (*ClusterRegistrationToken, error)
+	Replace(existing *ClusterRegistrationToken) (*ClusterRegistrationToken, error)
 	ByID(id string) (*ClusterRegistrationToken, error)
 	Delete(container *ClusterRegistrationToken) error
 }
@@ -80,6 +82,12 @@ func (c *ClusterRegistrationTokenClient) Create(container *ClusterRegistrationTo
 func (c *ClusterRegistrationTokenClient) Update(existing *ClusterRegistrationToken, updates interface{}) (*ClusterRegistrationToken, error) {
 	resp := &ClusterRegistrationToken{}
 	err := c.apiClient.Ops.DoUpdate(ClusterRegistrationTokenType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *ClusterRegistrationTokenClient) Replace(obj *ClusterRegistrationToken) (*ClusterRegistrationToken, error) {
+	resp := &ClusterRegistrationToken{}
+	err := c.apiClient.Ops.DoReplace(ClusterRegistrationTokenType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

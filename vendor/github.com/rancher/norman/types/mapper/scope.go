@@ -17,10 +17,11 @@ func (s *Scope) FromInternal(data map[string]interface{}) {
 	}
 }
 
-func (s *Scope) ToInternal(data map[string]interface{}) {
+func (s *Scope) ToInternal(data map[string]interface{}) error {
 	if s.run {
-		types.Mappers(s.Mappers).ToInternal(data)
+		return types.Mappers(s.Mappers).ToInternal(data)
 	}
+	return nil
 }
 
 func (s *Scope) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {

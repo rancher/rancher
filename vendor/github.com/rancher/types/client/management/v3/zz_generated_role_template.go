@@ -21,9 +21,9 @@ const (
 	RoleTemplateFieldOwnerReferences       = "ownerReferences"
 	RoleTemplateFieldProjectCreatorDefault = "projectCreatorDefault"
 	RoleTemplateFieldRemoved               = "removed"
-	RoleTemplateFieldRoleTemplateIds       = "roleTemplateIds"
+	RoleTemplateFieldRoleTemplateIDs       = "roleTemplateIds"
 	RoleTemplateFieldRules                 = "rules"
-	RoleTemplateFieldUuid                  = "uuid"
+	RoleTemplateFieldUUID                  = "uuid"
 )
 
 type RoleTemplate struct {
@@ -43,10 +43,11 @@ type RoleTemplate struct {
 	OwnerReferences       []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	ProjectCreatorDefault bool              `json:"projectCreatorDefault,omitempty" yaml:"projectCreatorDefault,omitempty"`
 	Removed               string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	RoleTemplateIds       []string          `json:"roleTemplateIds,omitempty" yaml:"roleTemplateIds,omitempty"`
+	RoleTemplateIDs       []string          `json:"roleTemplateIds,omitempty" yaml:"roleTemplateIds,omitempty"`
 	Rules                 []PolicyRule      `json:"rules,omitempty" yaml:"rules,omitempty"`
-	Uuid                  string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                  string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type RoleTemplateCollection struct {
 	types.Collection
 	Data   []RoleTemplate `json:"data,omitempty"`
@@ -61,6 +62,7 @@ type RoleTemplateOperations interface {
 	List(opts *types.ListOpts) (*RoleTemplateCollection, error)
 	Create(opts *RoleTemplate) (*RoleTemplate, error)
 	Update(existing *RoleTemplate, updates interface{}) (*RoleTemplate, error)
+	Replace(existing *RoleTemplate) (*RoleTemplate, error)
 	ByID(id string) (*RoleTemplate, error)
 	Delete(container *RoleTemplate) error
 }
@@ -80,6 +82,12 @@ func (c *RoleTemplateClient) Create(container *RoleTemplate) (*RoleTemplate, err
 func (c *RoleTemplateClient) Update(existing *RoleTemplate, updates interface{}) (*RoleTemplate, error) {
 	resp := &RoleTemplate{}
 	err := c.apiClient.Ops.DoUpdate(RoleTemplateType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *RoleTemplateClient) Replace(obj *RoleTemplate) (*RoleTemplate, error) {
+	resp := &RoleTemplate{}
+	err := c.apiClient.Ops.DoReplace(RoleTemplateType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

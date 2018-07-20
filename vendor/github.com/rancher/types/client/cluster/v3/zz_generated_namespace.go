@@ -20,7 +20,7 @@ const (
 	NamespaceFieldState                          = "state"
 	NamespaceFieldTransitioning                  = "transitioning"
 	NamespaceFieldTransitioningMessage           = "transitioningMessage"
-	NamespaceFieldUuid                           = "uuid"
+	NamespaceFieldUUID                           = "uuid"
 )
 
 type Namespace struct {
@@ -39,8 +39,9 @@ type Namespace struct {
 	State                          string            `json:"state,omitempty" yaml:"state,omitempty"`
 	Transitioning                  string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage           string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	Uuid                           string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                           string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type NamespaceCollection struct {
 	types.Collection
 	Data   []Namespace `json:"data,omitempty"`
@@ -55,6 +56,7 @@ type NamespaceOperations interface {
 	List(opts *types.ListOpts) (*NamespaceCollection, error)
 	Create(opts *Namespace) (*Namespace, error)
 	Update(existing *Namespace, updates interface{}) (*Namespace, error)
+	Replace(existing *Namespace) (*Namespace, error)
 	ByID(id string) (*Namespace, error)
 	Delete(container *Namespace) error
 }
@@ -74,6 +76,12 @@ func (c *NamespaceClient) Create(container *Namespace) (*Namespace, error) {
 func (c *NamespaceClient) Update(existing *Namespace, updates interface{}) (*Namespace, error) {
 	resp := &Namespace{}
 	err := c.apiClient.Ops.DoUpdate(NamespaceType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *NamespaceClient) Replace(obj *Namespace) (*Namespace, error) {
+	resp := &Namespace{}
+	err := c.apiClient.Ops.DoReplace(NamespaceType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

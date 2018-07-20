@@ -17,7 +17,7 @@ const (
 	DockerCredentialFieldProjectID       = "projectId"
 	DockerCredentialFieldRegistries      = "registries"
 	DockerCredentialFieldRemoved         = "removed"
-	DockerCredentialFieldUuid            = "uuid"
+	DockerCredentialFieldUUID            = "uuid"
 )
 
 type DockerCredential struct {
@@ -33,8 +33,9 @@ type DockerCredential struct {
 	ProjectID       string                        `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	Registries      map[string]RegistryCredential `json:"registries,omitempty" yaml:"registries,omitempty"`
 	Removed         string                        `json:"removed,omitempty" yaml:"removed,omitempty"`
-	Uuid            string                        `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID            string                        `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type DockerCredentialCollection struct {
 	types.Collection
 	Data   []DockerCredential `json:"data,omitempty"`
@@ -49,6 +50,7 @@ type DockerCredentialOperations interface {
 	List(opts *types.ListOpts) (*DockerCredentialCollection, error)
 	Create(opts *DockerCredential) (*DockerCredential, error)
 	Update(existing *DockerCredential, updates interface{}) (*DockerCredential, error)
+	Replace(existing *DockerCredential) (*DockerCredential, error)
 	ByID(id string) (*DockerCredential, error)
 	Delete(container *DockerCredential) error
 }
@@ -68,6 +70,12 @@ func (c *DockerCredentialClient) Create(container *DockerCredential) (*DockerCre
 func (c *DockerCredentialClient) Update(existing *DockerCredential, updates interface{}) (*DockerCredential, error) {
 	resp := &DockerCredential{}
 	err := c.apiClient.Ops.DoUpdate(DockerCredentialType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *DockerCredentialClient) Replace(obj *DockerCredential) (*DockerCredential, error) {
+	resp := &DockerCredential{}
+	err := c.apiClient.Ops.DoReplace(DockerCredentialType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

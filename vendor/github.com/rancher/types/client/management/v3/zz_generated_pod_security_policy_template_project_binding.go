@@ -16,7 +16,7 @@ const (
 	PodSecurityPolicyTemplateProjectBindingFieldPodSecurityPolicyTemplateName = "podSecurityPolicyTemplateId"
 	PodSecurityPolicyTemplateProjectBindingFieldRemoved                       = "removed"
 	PodSecurityPolicyTemplateProjectBindingFieldTargetProjectName             = "targetProjectId"
-	PodSecurityPolicyTemplateProjectBindingFieldUuid                          = "uuid"
+	PodSecurityPolicyTemplateProjectBindingFieldUUID                          = "uuid"
 )
 
 type PodSecurityPolicyTemplateProjectBinding struct {
@@ -31,8 +31,9 @@ type PodSecurityPolicyTemplateProjectBinding struct {
 	PodSecurityPolicyTemplateName string            `json:"podSecurityPolicyTemplateId,omitempty" yaml:"podSecurityPolicyTemplateId,omitempty"`
 	Removed                       string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	TargetProjectName             string            `json:"targetProjectId,omitempty" yaml:"targetProjectId,omitempty"`
-	Uuid                          string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                          string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type PodSecurityPolicyTemplateProjectBindingCollection struct {
 	types.Collection
 	Data   []PodSecurityPolicyTemplateProjectBinding `json:"data,omitempty"`
@@ -47,6 +48,7 @@ type PodSecurityPolicyTemplateProjectBindingOperations interface {
 	List(opts *types.ListOpts) (*PodSecurityPolicyTemplateProjectBindingCollection, error)
 	Create(opts *PodSecurityPolicyTemplateProjectBinding) (*PodSecurityPolicyTemplateProjectBinding, error)
 	Update(existing *PodSecurityPolicyTemplateProjectBinding, updates interface{}) (*PodSecurityPolicyTemplateProjectBinding, error)
+	Replace(existing *PodSecurityPolicyTemplateProjectBinding) (*PodSecurityPolicyTemplateProjectBinding, error)
 	ByID(id string) (*PodSecurityPolicyTemplateProjectBinding, error)
 	Delete(container *PodSecurityPolicyTemplateProjectBinding) error
 }
@@ -66,6 +68,12 @@ func (c *PodSecurityPolicyTemplateProjectBindingClient) Create(container *PodSec
 func (c *PodSecurityPolicyTemplateProjectBindingClient) Update(existing *PodSecurityPolicyTemplateProjectBinding, updates interface{}) (*PodSecurityPolicyTemplateProjectBinding, error) {
 	resp := &PodSecurityPolicyTemplateProjectBinding{}
 	err := c.apiClient.Ops.DoUpdate(PodSecurityPolicyTemplateProjectBindingType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *PodSecurityPolicyTemplateProjectBindingClient) Replace(obj *PodSecurityPolicyTemplateProjectBinding) (*PodSecurityPolicyTemplateProjectBinding, error) {
+	resp := &PodSecurityPolicyTemplateProjectBinding{}
+	err := c.apiClient.Ops.DoReplace(PodSecurityPolicyTemplateProjectBindingType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

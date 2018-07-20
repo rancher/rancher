@@ -11,7 +11,7 @@ const (
 	PingProviderFieldRedirectURL     = "redirectUrl"
 	PingProviderFieldRemoved         = "removed"
 	PingProviderFieldType            = "type"
-	PingProviderFieldUuid            = "uuid"
+	PingProviderFieldUUID            = "uuid"
 )
 
 type PingProvider struct {
@@ -24,5 +24,5 @@ type PingProvider struct {
 	RedirectURL     string            `json:"redirectUrl,omitempty" yaml:"redirectUrl,omitempty"`
 	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Type            string            `json:"type,omitempty" yaml:"type,omitempty"`
-	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }

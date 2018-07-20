@@ -12,8 +12,8 @@ const (
 	NodeSpecFieldEtcd                     = "etcd"
 	NodeSpecFieldImported                 = "imported"
 	NodeSpecFieldNodeDrainInput           = "nodeDrainInput"
-	NodeSpecFieldNodePoolId               = "nodePoolId"
-	NodeSpecFieldNodeTemplateId           = "nodeTemplateId"
+	NodeSpecFieldNodePoolID               = "nodePoolId"
+	NodeSpecFieldNodeTemplateID           = "nodeTemplateId"
 	NodeSpecFieldPodCidr                  = "podCidr"
 	NodeSpecFieldProviderId               = "providerId"
 	NodeSpecFieldRequestedHostname        = "requestedHostname"
@@ -33,8 +33,8 @@ type NodeSpec struct {
 	Etcd                     bool              `json:"etcd,omitempty" yaml:"etcd,omitempty"`
 	Imported                 bool              `json:"imported,omitempty" yaml:"imported,omitempty"`
 	NodeDrainInput           *NodeDrainInput   `json:"nodeDrainInput,omitempty" yaml:"nodeDrainInput,omitempty"`
-	NodePoolId               string            `json:"nodePoolId,omitempty" yaml:"nodePoolId,omitempty"`
-	NodeTemplateId           string            `json:"nodeTemplateId,omitempty" yaml:"nodeTemplateId,omitempty"`
+	NodePoolID               string            `json:"nodePoolId,omitempty" yaml:"nodePoolId,omitempty"`
+	NodeTemplateID           string            `json:"nodeTemplateId,omitempty" yaml:"nodeTemplateId,omitempty"`
 	PodCidr                  string            `json:"podCidr,omitempty" yaml:"podCidr,omitempty"`
 	ProviderId               string            `json:"providerId,omitempty" yaml:"providerId,omitempty"`
 	RequestedHostname        string            `json:"requestedHostname,omitempty" yaml:"requestedHostname,omitempty"`

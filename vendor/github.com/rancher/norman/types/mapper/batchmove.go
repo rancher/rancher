@@ -20,10 +20,12 @@ func (b *BatchMove) FromInternal(data map[string]interface{}) {
 	}
 }
 
-func (b *BatchMove) ToInternal(data map[string]interface{}) {
+func (b *BatchMove) ToInternal(data map[string]interface{}) error {
+	errors := types.Errors{}
 	for i := len(b.moves) - 1; i >= 0; i-- {
-		b.moves[i].ToInternal(data)
+		errors.Add(b.moves[i].ToInternal(data))
 	}
+	return errors.Err()
 }
 
 func (b *BatchMove) ModifySchema(s *types.Schema, schemas *types.Schemas) error {

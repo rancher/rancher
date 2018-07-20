@@ -18,10 +18,12 @@ func (m UntypedMove) FromInternal(data map[string]interface{}) {
 	}
 }
 
-func (m UntypedMove) ToInternal(data map[string]interface{}) {
+func (m UntypedMove) ToInternal(data map[string]interface{}) error {
 	if v, ok := values.RemoveValue(data, strings.Split(m.To, m.getSep())...); ok {
 		values.PutValue(data, v, strings.Split(m.From, m.getSep())...)
 	}
+
+	return nil
 }
 
 func (m UntypedMove) getSep() string {

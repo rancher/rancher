@@ -16,10 +16,11 @@ func (m Condition) FromInternal(data map[string]interface{}) {
 	}
 }
 
-func (m Condition) ToInternal(data map[string]interface{}) {
+func (m Condition) ToInternal(data map[string]interface{}) error {
 	if data[m.Field] == m.Value {
-		m.Mapper.ToInternal(data)
+		return m.Mapper.ToInternal(data)
 	}
+	return nil
 }
 
 func (m Condition) ModifySchema(s *types.Schema, schemas *types.Schemas) error {

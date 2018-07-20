@@ -8,7 +8,7 @@ const (
 	ClusterAlertType                       = "clusterAlert"
 	ClusterAlertFieldAlertState            = "alertState"
 	ClusterAlertFieldAnnotations           = "annotations"
-	ClusterAlertFieldClusterId             = "clusterId"
+	ClusterAlertFieldClusterID             = "clusterId"
 	ClusterAlertFieldCreated               = "created"
 	ClusterAlertFieldCreatorID             = "creatorId"
 	ClusterAlertFieldDescription           = "description"
@@ -27,14 +27,14 @@ const (
 	ClusterAlertFieldTargetSystemService   = "targetSystemService"
 	ClusterAlertFieldTransitioning         = "transitioning"
 	ClusterAlertFieldTransitioningMessage  = "transitioningMessage"
-	ClusterAlertFieldUuid                  = "uuid"
+	ClusterAlertFieldUUID                  = "uuid"
 )
 
 type ClusterAlert struct {
 	types.Resource
 	AlertState            string               `json:"alertState,omitempty" yaml:"alertState,omitempty"`
 	Annotations           map[string]string    `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	ClusterId             string               `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	ClusterID             string               `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	Created               string               `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID             string               `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Description           string               `json:"description,omitempty" yaml:"description,omitempty"`
@@ -53,8 +53,9 @@ type ClusterAlert struct {
 	TargetSystemService   *TargetSystemService `json:"targetSystemService,omitempty" yaml:"targetSystemService,omitempty"`
 	Transitioning         string               `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage  string               `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	Uuid                  string               `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                  string               `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type ClusterAlertCollection struct {
 	types.Collection
 	Data   []ClusterAlert `json:"data,omitempty"`
@@ -69,6 +70,7 @@ type ClusterAlertOperations interface {
 	List(opts *types.ListOpts) (*ClusterAlertCollection, error)
 	Create(opts *ClusterAlert) (*ClusterAlert, error)
 	Update(existing *ClusterAlert, updates interface{}) (*ClusterAlert, error)
+	Replace(existing *ClusterAlert) (*ClusterAlert, error)
 	ByID(id string) (*ClusterAlert, error)
 	Delete(container *ClusterAlert) error
 
@@ -96,6 +98,12 @@ func (c *ClusterAlertClient) Create(container *ClusterAlert) (*ClusterAlert, err
 func (c *ClusterAlertClient) Update(existing *ClusterAlert, updates interface{}) (*ClusterAlert, error) {
 	resp := &ClusterAlert{}
 	err := c.apiClient.Ops.DoUpdate(ClusterAlertType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *ClusterAlertClient) Replace(obj *ClusterAlert) (*ClusterAlert, error) {
+	resp := &ClusterAlert{}
+	err := c.apiClient.Ops.DoReplace(ClusterAlertType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

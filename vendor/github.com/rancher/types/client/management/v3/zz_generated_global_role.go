@@ -16,7 +16,7 @@ const (
 	GlobalRoleFieldOwnerReferences = "ownerReferences"
 	GlobalRoleFieldRemoved         = "removed"
 	GlobalRoleFieldRules           = "rules"
-	GlobalRoleFieldUuid            = "uuid"
+	GlobalRoleFieldUUID            = "uuid"
 )
 
 type GlobalRole struct {
@@ -31,8 +31,9 @@ type GlobalRole struct {
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Rules           []PolicyRule      `json:"rules,omitempty" yaml:"rules,omitempty"`
-	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type GlobalRoleCollection struct {
 	types.Collection
 	Data   []GlobalRole `json:"data,omitempty"`
@@ -47,6 +48,7 @@ type GlobalRoleOperations interface {
 	List(opts *types.ListOpts) (*GlobalRoleCollection, error)
 	Create(opts *GlobalRole) (*GlobalRole, error)
 	Update(existing *GlobalRole, updates interface{}) (*GlobalRole, error)
+	Replace(existing *GlobalRole) (*GlobalRole, error)
 	ByID(id string) (*GlobalRole, error)
 	Delete(container *GlobalRole) error
 }
@@ -66,6 +68,12 @@ func (c *GlobalRoleClient) Create(container *GlobalRole) (*GlobalRole, error) {
 func (c *GlobalRoleClient) Update(existing *GlobalRole, updates interface{}) (*GlobalRole, error) {
 	resp := &GlobalRole{}
 	err := c.apiClient.Ops.DoUpdate(GlobalRoleType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *GlobalRoleClient) Replace(obj *GlobalRole) (*GlobalRole, error) {
+	resp := &GlobalRole{}
+	err := c.apiClient.Ops.DoReplace(GlobalRoleType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

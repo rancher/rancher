@@ -94,9 +94,9 @@ func (e EnvironmentMapper) FromInternal(data map[string]interface{}) {
 	}
 }
 
-func (e EnvironmentMapper) ToInternal(data map[string]interface{}) {
-	envVar := []map[string]interface{}{}
-	envVarFrom := []map[string]interface{}{}
+func (e EnvironmentMapper) ToInternal(data map[string]interface{}) error {
+	var envVar []map[string]interface{}
+	var envVarFrom []map[string]interface{}
 
 	for key, value := range convert.ToMapInterface(data["environment"]) {
 		envVar = append(envVar, map[string]interface{}{
@@ -187,6 +187,8 @@ func (e EnvironmentMapper) ToInternal(data map[string]interface{}) {
 	delete(data, "environmentFrom")
 	data["env"] = envVar
 	data["envFrom"] = envVarFrom
+
+	return nil
 }
 
 func (e EnvironmentMapper) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {

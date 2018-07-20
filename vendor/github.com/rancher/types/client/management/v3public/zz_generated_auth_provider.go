@@ -14,7 +14,7 @@ const (
 	AuthProviderFieldOwnerReferences = "ownerReferences"
 	AuthProviderFieldRemoved         = "removed"
 	AuthProviderFieldType            = "type"
-	AuthProviderFieldUuid            = "uuid"
+	AuthProviderFieldUUID            = "uuid"
 )
 
 type AuthProvider struct {
@@ -27,8 +27,9 @@ type AuthProvider struct {
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Type            string            `json:"type,omitempty" yaml:"type,omitempty"`
-	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type AuthProviderCollection struct {
 	types.Collection
 	Data   []AuthProvider `json:"data,omitempty"`
@@ -43,6 +44,7 @@ type AuthProviderOperations interface {
 	List(opts *types.ListOpts) (*AuthProviderCollection, error)
 	Create(opts *AuthProvider) (*AuthProvider, error)
 	Update(existing *AuthProvider, updates interface{}) (*AuthProvider, error)
+	Replace(existing *AuthProvider) (*AuthProvider, error)
 	ByID(id string) (*AuthProvider, error)
 	Delete(container *AuthProvider) error
 }
@@ -62,6 +64,12 @@ func (c *AuthProviderClient) Create(container *AuthProvider) (*AuthProvider, err
 func (c *AuthProviderClient) Update(existing *AuthProvider, updates interface{}) (*AuthProvider, error) {
 	resp := &AuthProvider{}
 	err := c.apiClient.Ops.DoUpdate(AuthProviderType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *AuthProviderClient) Replace(obj *AuthProvider) (*AuthProvider, error) {
+	resp := &AuthProvider{}
+	err := c.apiClient.Ops.DoReplace(AuthProviderType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

@@ -14,7 +14,7 @@ const (
 	TemplateContentFieldName            = "name"
 	TemplateContentFieldOwnerReferences = "ownerReferences"
 	TemplateContentFieldRemoved         = "removed"
-	TemplateContentFieldUuid            = "uuid"
+	TemplateContentFieldUUID            = "uuid"
 )
 
 type TemplateContent struct {
@@ -27,8 +27,9 @@ type TemplateContent struct {
 	Name            string            `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type TemplateContentCollection struct {
 	types.Collection
 	Data   []TemplateContent `json:"data,omitempty"`
@@ -43,6 +44,7 @@ type TemplateContentOperations interface {
 	List(opts *types.ListOpts) (*TemplateContentCollection, error)
 	Create(opts *TemplateContent) (*TemplateContent, error)
 	Update(existing *TemplateContent, updates interface{}) (*TemplateContent, error)
+	Replace(existing *TemplateContent) (*TemplateContent, error)
 	ByID(id string) (*TemplateContent, error)
 	Delete(container *TemplateContent) error
 }
@@ -62,6 +64,12 @@ func (c *TemplateContentClient) Create(container *TemplateContent) (*TemplateCon
 func (c *TemplateContentClient) Update(existing *TemplateContent, updates interface{}) (*TemplateContent, error) {
 	resp := &TemplateContent{}
 	err := c.apiClient.Ops.DoUpdate(TemplateContentType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *TemplateContentClient) Replace(obj *TemplateContent) (*TemplateContent, error) {
+	resp := &TemplateContent{}
+	err := c.apiClient.Ops.DoReplace(TemplateContentType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

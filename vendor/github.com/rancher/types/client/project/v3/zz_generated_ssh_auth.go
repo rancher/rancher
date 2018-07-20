@@ -18,7 +18,7 @@ const (
 	SSHAuthFieldPrivateKey      = "privateKey"
 	SSHAuthFieldProjectID       = "projectId"
 	SSHAuthFieldRemoved         = "removed"
-	SSHAuthFieldUuid            = "uuid"
+	SSHAuthFieldUUID            = "uuid"
 )
 
 type SSHAuth struct {
@@ -35,8 +35,9 @@ type SSHAuth struct {
 	PrivateKey      string            `json:"privateKey,omitempty" yaml:"privateKey,omitempty"`
 	ProjectID       string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type SSHAuthCollection struct {
 	types.Collection
 	Data   []SSHAuth `json:"data,omitempty"`
@@ -51,6 +52,7 @@ type SSHAuthOperations interface {
 	List(opts *types.ListOpts) (*SSHAuthCollection, error)
 	Create(opts *SSHAuth) (*SSHAuth, error)
 	Update(existing *SSHAuth, updates interface{}) (*SSHAuth, error)
+	Replace(existing *SSHAuth) (*SSHAuth, error)
 	ByID(id string) (*SSHAuth, error)
 	Delete(container *SSHAuth) error
 }
@@ -70,6 +72,12 @@ func (c *SSHAuthClient) Create(container *SSHAuth) (*SSHAuth, error) {
 func (c *SSHAuthClient) Update(existing *SSHAuth, updates interface{}) (*SSHAuth, error) {
 	resp := &SSHAuth{}
 	err := c.apiClient.Ops.DoUpdate(SSHAuthType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *SSHAuthClient) Replace(obj *SSHAuth) (*SSHAuth, error) {
+	resp := &SSHAuth{}
+	err := c.apiClient.Ops.DoReplace(SSHAuthType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

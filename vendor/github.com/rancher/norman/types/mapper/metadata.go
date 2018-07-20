@@ -8,7 +8,7 @@ func NewMetadataMapper() types.Mapper {
 	return types.Mappers{
 		ChangeType{Field: "name", Type: "dnsLabel"},
 		Drop{Field: "generateName"},
-		Move{From: "uid", To: "uuid"},
+		Move{From: "uid", To: "uuid", CodeName: "UUID"},
 		Drop{Field: "resourceVersion"},
 		Drop{Field: "generation"},
 		Move{From: "creationTimestamp", To: "created"},

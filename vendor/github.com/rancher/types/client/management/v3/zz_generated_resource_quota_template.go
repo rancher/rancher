@@ -7,7 +7,7 @@ import (
 const (
 	ResourceQuotaTemplateType                 = "resourceQuotaTemplate"
 	ResourceQuotaTemplateFieldAnnotations     = "annotations"
-	ResourceQuotaTemplateFieldClusterId       = "clusterId"
+	ResourceQuotaTemplateFieldClusterID       = "clusterId"
 	ResourceQuotaTemplateFieldCreated         = "created"
 	ResourceQuotaTemplateFieldCreatorID       = "creatorId"
 	ResourceQuotaTemplateFieldDescription     = "description"
@@ -18,14 +18,14 @@ const (
 	ResourceQuotaTemplateFieldNamespaceId     = "namespaceId"
 	ResourceQuotaTemplateFieldOwnerReferences = "ownerReferences"
 	ResourceQuotaTemplateFieldRemoved         = "removed"
+	ResourceQuotaTemplateFieldUUID            = "uuid"
 	ResourceQuotaTemplateFieldUsedLimit       = "usedLimit"
-	ResourceQuotaTemplateFieldUuid            = "uuid"
 )
 
 type ResourceQuotaTemplate struct {
 	types.Resource
 	Annotations     map[string]string     `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	ClusterId       string                `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	ClusterID       string                `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	Created         string                `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID       string                `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Description     string                `json:"description,omitempty" yaml:"description,omitempty"`
@@ -36,9 +36,10 @@ type ResourceQuotaTemplate struct {
 	NamespaceId     string                `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	OwnerReferences []OwnerReference      `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Removed         string                `json:"removed,omitempty" yaml:"removed,omitempty"`
+	UUID            string                `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	UsedLimit       *ProjectResourceLimit `json:"usedLimit,omitempty" yaml:"usedLimit,omitempty"`
-	Uuid            string                `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type ResourceQuotaTemplateCollection struct {
 	types.Collection
 	Data   []ResourceQuotaTemplate `json:"data,omitempty"`
@@ -53,6 +54,7 @@ type ResourceQuotaTemplateOperations interface {
 	List(opts *types.ListOpts) (*ResourceQuotaTemplateCollection, error)
 	Create(opts *ResourceQuotaTemplate) (*ResourceQuotaTemplate, error)
 	Update(existing *ResourceQuotaTemplate, updates interface{}) (*ResourceQuotaTemplate, error)
+	Replace(existing *ResourceQuotaTemplate) (*ResourceQuotaTemplate, error)
 	ByID(id string) (*ResourceQuotaTemplate, error)
 	Delete(container *ResourceQuotaTemplate) error
 }
@@ -72,6 +74,12 @@ func (c *ResourceQuotaTemplateClient) Create(container *ResourceQuotaTemplate) (
 func (c *ResourceQuotaTemplateClient) Update(existing *ResourceQuotaTemplate, updates interface{}) (*ResourceQuotaTemplate, error) {
 	resp := &ResourceQuotaTemplate{}
 	err := c.apiClient.Ops.DoUpdate(ResourceQuotaTemplateType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *ResourceQuotaTemplateClient) Replace(obj *ResourceQuotaTemplate) (*ResourceQuotaTemplate, error) {
+	resp := &ResourceQuotaTemplate{}
+	err := c.apiClient.Ops.DoReplace(ResourceQuotaTemplateType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

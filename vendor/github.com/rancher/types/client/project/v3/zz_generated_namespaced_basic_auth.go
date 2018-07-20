@@ -17,8 +17,8 @@ const (
 	NamespacedBasicAuthFieldPassword        = "password"
 	NamespacedBasicAuthFieldProjectID       = "projectId"
 	NamespacedBasicAuthFieldRemoved         = "removed"
+	NamespacedBasicAuthFieldUUID            = "uuid"
 	NamespacedBasicAuthFieldUsername        = "username"
-	NamespacedBasicAuthFieldUuid            = "uuid"
 )
 
 type NamespacedBasicAuth struct {
@@ -34,9 +34,10 @@ type NamespacedBasicAuth struct {
 	Password        string            `json:"password,omitempty" yaml:"password,omitempty"`
 	ProjectID       string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Username        string            `json:"username,omitempty" yaml:"username,omitempty"`
-	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type NamespacedBasicAuthCollection struct {
 	types.Collection
 	Data   []NamespacedBasicAuth `json:"data,omitempty"`
@@ -51,6 +52,7 @@ type NamespacedBasicAuthOperations interface {
 	List(opts *types.ListOpts) (*NamespacedBasicAuthCollection, error)
 	Create(opts *NamespacedBasicAuth) (*NamespacedBasicAuth, error)
 	Update(existing *NamespacedBasicAuth, updates interface{}) (*NamespacedBasicAuth, error)
+	Replace(existing *NamespacedBasicAuth) (*NamespacedBasicAuth, error)
 	ByID(id string) (*NamespacedBasicAuth, error)
 	Delete(container *NamespacedBasicAuth) error
 }
@@ -70,6 +72,12 @@ func (c *NamespacedBasicAuthClient) Create(container *NamespacedBasicAuth) (*Nam
 func (c *NamespacedBasicAuthClient) Update(existing *NamespacedBasicAuth, updates interface{}) (*NamespacedBasicAuth, error) {
 	resp := &NamespacedBasicAuth{}
 	err := c.apiClient.Ops.DoUpdate(NamespacedBasicAuthType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *NamespacedBasicAuthClient) Replace(obj *NamespacedBasicAuth) (*NamespacedBasicAuth, error) {
+	resp := &NamespacedBasicAuth{}
+	err := c.apiClient.Ops.DoReplace(NamespacedBasicAuthType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

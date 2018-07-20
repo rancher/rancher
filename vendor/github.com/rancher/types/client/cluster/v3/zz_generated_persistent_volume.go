@@ -42,11 +42,11 @@ const (
 	PersistentVolumeFieldScaleIO                       = "scaleIO"
 	PersistentVolumeFieldState                         = "state"
 	PersistentVolumeFieldStatus                        = "status"
-	PersistentVolumeFieldStorageClassId                = "storageClassId"
+	PersistentVolumeFieldStorageClassID                = "storageClassId"
 	PersistentVolumeFieldStorageOS                     = "storageos"
 	PersistentVolumeFieldTransitioning                 = "transitioning"
 	PersistentVolumeFieldTransitioningMessage          = "transitioningMessage"
-	PersistentVolumeFieldUuid                          = "uuid"
+	PersistentVolumeFieldUUID                          = "uuid"
 	PersistentVolumeFieldVolumeMode                    = "volumeMode"
 	PersistentVolumeFieldVsphereVolume                 = "vsphereVolume"
 )
@@ -89,14 +89,15 @@ type PersistentVolume struct {
 	ScaleIO                       *ScaleIOPersistentVolumeSource    `json:"scaleIO,omitempty" yaml:"scaleIO,omitempty"`
 	State                         string                            `json:"state,omitempty" yaml:"state,omitempty"`
 	Status                        *PersistentVolumeStatus           `json:"status,omitempty" yaml:"status,omitempty"`
-	StorageClassId                string                            `json:"storageClassId,omitempty" yaml:"storageClassId,omitempty"`
+	StorageClassID                string                            `json:"storageClassId,omitempty" yaml:"storageClassId,omitempty"`
 	StorageOS                     *StorageOSPersistentVolumeSource  `json:"storageos,omitempty" yaml:"storageos,omitempty"`
 	Transitioning                 string                            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage          string                            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	Uuid                          string                            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                          string                            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	VolumeMode                    string                            `json:"volumeMode,omitempty" yaml:"volumeMode,omitempty"`
 	VsphereVolume                 *VsphereVirtualDiskVolumeSource   `json:"vsphereVolume,omitempty" yaml:"vsphereVolume,omitempty"`
 }
+
 type PersistentVolumeCollection struct {
 	types.Collection
 	Data   []PersistentVolume `json:"data,omitempty"`
@@ -111,6 +112,7 @@ type PersistentVolumeOperations interface {
 	List(opts *types.ListOpts) (*PersistentVolumeCollection, error)
 	Create(opts *PersistentVolume) (*PersistentVolume, error)
 	Update(existing *PersistentVolume, updates interface{}) (*PersistentVolume, error)
+	Replace(existing *PersistentVolume) (*PersistentVolume, error)
 	ByID(id string) (*PersistentVolume, error)
 	Delete(container *PersistentVolume) error
 }
@@ -130,6 +132,12 @@ func (c *PersistentVolumeClient) Create(container *PersistentVolume) (*Persisten
 func (c *PersistentVolumeClient) Update(existing *PersistentVolume, updates interface{}) (*PersistentVolume, error) {
 	resp := &PersistentVolume{}
 	err := c.apiClient.Ops.DoUpdate(PersistentVolumeType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *PersistentVolumeClient) Replace(obj *PersistentVolume) (*PersistentVolume, error) {
+	resp := &PersistentVolume{}
+	err := c.apiClient.Ops.DoReplace(PersistentVolumeType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

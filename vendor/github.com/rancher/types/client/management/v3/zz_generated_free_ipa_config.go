@@ -27,6 +27,7 @@ const (
 	FreeIpaConfigFieldServiceAccountPassword          = "serviceAccountPassword"
 	FreeIpaConfigFieldTLS                             = "tls"
 	FreeIpaConfigFieldType                            = "type"
+	FreeIpaConfigFieldUUID                            = "uuid"
 	FreeIpaConfigFieldUserDisabledBitMask             = "userDisabledBitMask"
 	FreeIpaConfigFieldUserEnabledAttribute            = "userEnabledAttribute"
 	FreeIpaConfigFieldUserLoginAttribute              = "userLoginAttribute"
@@ -35,7 +36,6 @@ const (
 	FreeIpaConfigFieldUserObjectClass                 = "userObjectClass"
 	FreeIpaConfigFieldUserSearchAttribute             = "userSearchAttribute"
 	FreeIpaConfigFieldUserSearchBase                  = "userSearchBase"
-	FreeIpaConfigFieldUuid                            = "uuid"
 )
 
 type FreeIpaConfig struct {
@@ -64,6 +64,7 @@ type FreeIpaConfig struct {
 	ServiceAccountPassword          string            `json:"serviceAccountPassword,omitempty" yaml:"serviceAccountPassword,omitempty"`
 	TLS                             bool              `json:"tls,omitempty" yaml:"tls,omitempty"`
 	Type                            string            `json:"type,omitempty" yaml:"type,omitempty"`
+	UUID                            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	UserDisabledBitMask             int64             `json:"userDisabledBitMask,omitempty" yaml:"userDisabledBitMask,omitempty"`
 	UserEnabledAttribute            string            `json:"userEnabledAttribute,omitempty" yaml:"userEnabledAttribute,omitempty"`
 	UserLoginAttribute              string            `json:"userLoginAttribute,omitempty" yaml:"userLoginAttribute,omitempty"`
@@ -72,5 +73,4 @@ type FreeIpaConfig struct {
 	UserObjectClass                 string            `json:"userObjectClass,omitempty" yaml:"userObjectClass,omitempty"`
 	UserSearchAttribute             string            `json:"userSearchAttribute,omitempty" yaml:"userSearchAttribute,omitempty"`
 	UserSearchBase                  string            `json:"userSearchBase,omitempty" yaml:"userSearchBase,omitempty"`
-	Uuid                            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }

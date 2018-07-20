@@ -7,7 +7,7 @@ import (
 const (
 	NodePoolType                      = "nodePool"
 	NodePoolFieldAnnotations          = "annotations"
-	NodePoolFieldClusterId            = "clusterId"
+	NodePoolFieldClusterID            = "clusterId"
 	NodePoolFieldControlPlane         = "controlPlane"
 	NodePoolFieldCreated              = "created"
 	NodePoolFieldCreatorID            = "creatorId"
@@ -19,7 +19,7 @@ const (
 	NodePoolFieldNamespaceId          = "namespaceId"
 	NodePoolFieldNodeAnnotations      = "nodeAnnotations"
 	NodePoolFieldNodeLabels           = "nodeLabels"
-	NodePoolFieldNodeTemplateId       = "nodeTemplateId"
+	NodePoolFieldNodeTemplateID       = "nodeTemplateId"
 	NodePoolFieldOwnerReferences      = "ownerReferences"
 	NodePoolFieldQuantity             = "quantity"
 	NodePoolFieldRemoved              = "removed"
@@ -27,14 +27,14 @@ const (
 	NodePoolFieldStatus               = "status"
 	NodePoolFieldTransitioning        = "transitioning"
 	NodePoolFieldTransitioningMessage = "transitioningMessage"
-	NodePoolFieldUuid                 = "uuid"
+	NodePoolFieldUUID                 = "uuid"
 	NodePoolFieldWorker               = "worker"
 )
 
 type NodePool struct {
 	types.Resource
 	Annotations          map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	ClusterId            string            `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	ClusterID            string            `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	ControlPlane         bool              `json:"controlPlane,omitempty" yaml:"controlPlane,omitempty"`
 	Created              string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
@@ -46,7 +46,7 @@ type NodePool struct {
 	NamespaceId          string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	NodeAnnotations      map[string]string `json:"nodeAnnotations,omitempty" yaml:"nodeAnnotations,omitempty"`
 	NodeLabels           map[string]string `json:"nodeLabels,omitempty" yaml:"nodeLabels,omitempty"`
-	NodeTemplateId       string            `json:"nodeTemplateId,omitempty" yaml:"nodeTemplateId,omitempty"`
+	NodeTemplateID       string            `json:"nodeTemplateId,omitempty" yaml:"nodeTemplateId,omitempty"`
 	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Quantity             int64             `json:"quantity,omitempty" yaml:"quantity,omitempty"`
 	Removed              string            `json:"removed,omitempty" yaml:"removed,omitempty"`
@@ -54,9 +54,10 @@ type NodePool struct {
 	Status               *NodePoolStatus   `json:"status,omitempty" yaml:"status,omitempty"`
 	Transitioning        string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	Uuid                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Worker               bool              `json:"worker,omitempty" yaml:"worker,omitempty"`
 }
+
 type NodePoolCollection struct {
 	types.Collection
 	Data   []NodePool `json:"data,omitempty"`
@@ -71,6 +72,7 @@ type NodePoolOperations interface {
 	List(opts *types.ListOpts) (*NodePoolCollection, error)
 	Create(opts *NodePool) (*NodePool, error)
 	Update(existing *NodePool, updates interface{}) (*NodePool, error)
+	Replace(existing *NodePool) (*NodePool, error)
 	ByID(id string) (*NodePool, error)
 	Delete(container *NodePool) error
 }
@@ -90,6 +92,12 @@ func (c *NodePoolClient) Create(container *NodePool) (*NodePool, error) {
 func (c *NodePoolClient) Update(existing *NodePool, updates interface{}) (*NodePool, error) {
 	resp := &NodePool{}
 	err := c.apiClient.Ops.DoUpdate(NodePoolType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *NodePoolClient) Replace(obj *NodePool) (*NodePool, error) {
+	resp := &NodePool{}
+	err := c.apiClient.Ops.DoReplace(NodePoolType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

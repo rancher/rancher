@@ -9,13 +9,13 @@ const (
 	GlobalRoleBindingFieldAnnotations     = "annotations"
 	GlobalRoleBindingFieldCreated         = "created"
 	GlobalRoleBindingFieldCreatorID       = "creatorId"
-	GlobalRoleBindingFieldGlobalRoleId    = "globalRoleId"
+	GlobalRoleBindingFieldGlobalRoleID    = "globalRoleId"
 	GlobalRoleBindingFieldLabels          = "labels"
 	GlobalRoleBindingFieldName            = "name"
 	GlobalRoleBindingFieldOwnerReferences = "ownerReferences"
 	GlobalRoleBindingFieldRemoved         = "removed"
-	GlobalRoleBindingFieldUserId          = "userId"
-	GlobalRoleBindingFieldUuid            = "uuid"
+	GlobalRoleBindingFieldUUID            = "uuid"
+	GlobalRoleBindingFieldUserID          = "userId"
 )
 
 type GlobalRoleBinding struct {
@@ -23,14 +23,15 @@ type GlobalRoleBinding struct {
 	Annotations     map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Created         string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID       string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
-	GlobalRoleId    string            `json:"globalRoleId,omitempty" yaml:"globalRoleId,omitempty"`
+	GlobalRoleID    string            `json:"globalRoleId,omitempty" yaml:"globalRoleId,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name            string            `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	UserId          string            `json:"userId,omitempty" yaml:"userId,omitempty"`
-	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UserID          string            `json:"userId,omitempty" yaml:"userId,omitempty"`
 }
+
 type GlobalRoleBindingCollection struct {
 	types.Collection
 	Data   []GlobalRoleBinding `json:"data,omitempty"`
@@ -45,6 +46,7 @@ type GlobalRoleBindingOperations interface {
 	List(opts *types.ListOpts) (*GlobalRoleBindingCollection, error)
 	Create(opts *GlobalRoleBinding) (*GlobalRoleBinding, error)
 	Update(existing *GlobalRoleBinding, updates interface{}) (*GlobalRoleBinding, error)
+	Replace(existing *GlobalRoleBinding) (*GlobalRoleBinding, error)
 	ByID(id string) (*GlobalRoleBinding, error)
 	Delete(container *GlobalRoleBinding) error
 }
@@ -64,6 +66,12 @@ func (c *GlobalRoleBindingClient) Create(container *GlobalRoleBinding) (*GlobalR
 func (c *GlobalRoleBindingClient) Update(existing *GlobalRoleBinding, updates interface{}) (*GlobalRoleBinding, error) {
 	resp := &GlobalRoleBinding{}
 	err := c.apiClient.Ops.DoUpdate(GlobalRoleBindingType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *GlobalRoleBindingClient) Replace(obj *GlobalRoleBinding) (*GlobalRoleBinding, error) {
+	resp := &GlobalRoleBinding{}
+	err := c.apiClient.Ops.DoReplace(GlobalRoleBindingType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

@@ -20,7 +20,7 @@ const (
 	ServiceAccountTokenFieldProjectID       = "projectId"
 	ServiceAccountTokenFieldRemoved         = "removed"
 	ServiceAccountTokenFieldToken           = "token"
-	ServiceAccountTokenFieldUuid            = "uuid"
+	ServiceAccountTokenFieldUUID            = "uuid"
 )
 
 type ServiceAccountToken struct {
@@ -39,8 +39,9 @@ type ServiceAccountToken struct {
 	ProjectID       string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Token           string            `json:"token,omitempty" yaml:"token,omitempty"`
-	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type ServiceAccountTokenCollection struct {
 	types.Collection
 	Data   []ServiceAccountToken `json:"data,omitempty"`
@@ -55,6 +56,7 @@ type ServiceAccountTokenOperations interface {
 	List(opts *types.ListOpts) (*ServiceAccountTokenCollection, error)
 	Create(opts *ServiceAccountToken) (*ServiceAccountToken, error)
 	Update(existing *ServiceAccountToken, updates interface{}) (*ServiceAccountToken, error)
+	Replace(existing *ServiceAccountToken) (*ServiceAccountToken, error)
 	ByID(id string) (*ServiceAccountToken, error)
 	Delete(container *ServiceAccountToken) error
 }
@@ -74,6 +76,12 @@ func (c *ServiceAccountTokenClient) Create(container *ServiceAccountToken) (*Ser
 func (c *ServiceAccountTokenClient) Update(existing *ServiceAccountToken, updates interface{}) (*ServiceAccountToken, error) {
 	resp := &ServiceAccountToken{}
 	err := c.apiClient.Ops.DoUpdate(ServiceAccountTokenType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *ServiceAccountTokenClient) Replace(obj *ServiceAccountToken) (*ServiceAccountToken, error) {
+	resp := &ServiceAccountToken{}
+	err := c.apiClient.Ops.DoReplace(ServiceAccountTokenType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

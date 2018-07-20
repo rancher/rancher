@@ -8,7 +8,7 @@ const (
 	ClusterLoggingType                      = "clusterLogging"
 	ClusterLoggingFieldAnnotations          = "annotations"
 	ClusterLoggingFieldAppliedSpec          = "appliedSpec"
-	ClusterLoggingFieldClusterId            = "clusterId"
+	ClusterLoggingFieldClusterID            = "clusterId"
 	ClusterLoggingFieldConditions           = "conditions"
 	ClusterLoggingFieldCreated              = "created"
 	ClusterLoggingFieldCreatorID            = "creatorId"
@@ -29,14 +29,14 @@ const (
 	ClusterLoggingFieldSyslogConfig         = "syslogConfig"
 	ClusterLoggingFieldTransitioning        = "transitioning"
 	ClusterLoggingFieldTransitioningMessage = "transitioningMessage"
-	ClusterLoggingFieldUuid                 = "uuid"
+	ClusterLoggingFieldUUID                 = "uuid"
 )
 
 type ClusterLogging struct {
 	types.Resource
 	Annotations          map[string]string    `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	AppliedSpec          *ClusterLoggingSpec  `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`
-	ClusterId            string               `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	ClusterID            string               `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	Conditions           []LoggingCondition   `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	Created              string               `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string               `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
@@ -57,8 +57,9 @@ type ClusterLogging struct {
 	SyslogConfig         *SyslogConfig        `json:"syslogConfig,omitempty" yaml:"syslogConfig,omitempty"`
 	Transitioning        string               `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string               `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	Uuid                 string               `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                 string               `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type ClusterLoggingCollection struct {
 	types.Collection
 	Data   []ClusterLogging `json:"data,omitempty"`
@@ -73,6 +74,7 @@ type ClusterLoggingOperations interface {
 	List(opts *types.ListOpts) (*ClusterLoggingCollection, error)
 	Create(opts *ClusterLogging) (*ClusterLogging, error)
 	Update(existing *ClusterLogging, updates interface{}) (*ClusterLogging, error)
+	Replace(existing *ClusterLogging) (*ClusterLogging, error)
 	ByID(id string) (*ClusterLogging, error)
 	Delete(container *ClusterLogging) error
 }
@@ -92,6 +94,12 @@ func (c *ClusterLoggingClient) Create(container *ClusterLogging) (*ClusterLoggin
 func (c *ClusterLoggingClient) Update(existing *ClusterLogging, updates interface{}) (*ClusterLogging, error) {
 	resp := &ClusterLogging{}
 	err := c.apiClient.Ops.DoUpdate(ClusterLoggingType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *ClusterLoggingClient) Replace(obj *ClusterLogging) (*ClusterLogging, error) {
+	resp := &ClusterLogging{}
+	err := c.apiClient.Ops.DoReplace(ClusterLoggingType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

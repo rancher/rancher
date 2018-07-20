@@ -14,7 +14,7 @@ const (
 	PreferenceFieldNamespaceId     = "namespaceId"
 	PreferenceFieldOwnerReferences = "ownerReferences"
 	PreferenceFieldRemoved         = "removed"
-	PreferenceFieldUuid            = "uuid"
+	PreferenceFieldUUID            = "uuid"
 	PreferenceFieldValue           = "value"
 )
 
@@ -28,9 +28,10 @@ type Preference struct {
 	NamespaceId     string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Value           string            `json:"value,omitempty" yaml:"value,omitempty"`
 }
+
 type PreferenceCollection struct {
 	types.Collection
 	Data   []Preference `json:"data,omitempty"`
@@ -45,6 +46,7 @@ type PreferenceOperations interface {
 	List(opts *types.ListOpts) (*PreferenceCollection, error)
 	Create(opts *Preference) (*Preference, error)
 	Update(existing *Preference, updates interface{}) (*Preference, error)
+	Replace(existing *Preference) (*Preference, error)
 	ByID(id string) (*Preference, error)
 	Delete(container *Preference) error
 }
@@ -64,6 +66,12 @@ func (c *PreferenceClient) Create(container *Preference) (*Preference, error) {
 func (c *PreferenceClient) Update(existing *Preference, updates interface{}) (*Preference, error) {
 	resp := &Preference{}
 	err := c.apiClient.Ops.DoUpdate(PreferenceType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *PreferenceClient) Replace(obj *Preference) (*Preference, error) {
+	resp := &Preference{}
+	err := c.apiClient.Ops.DoReplace(PreferenceType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

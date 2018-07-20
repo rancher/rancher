@@ -8,7 +8,7 @@ const (
 	AppType                      = "app"
 	AppFieldAnnotations          = "annotations"
 	AppFieldAnswers              = "answers"
-	AppFieldAppRevisionId        = "appRevisionId"
+	AppFieldAppRevisionID        = "appRevisionId"
 	AppFieldAppliedFiles         = "appliedFiles"
 	AppFieldConditions           = "conditions"
 	AppFieldCreated              = "created"
@@ -22,21 +22,21 @@ const (
 	AppFieldNamespaceId          = "namespaceId"
 	AppFieldNotes                = "notes"
 	AppFieldOwnerReferences      = "ownerReferences"
-	AppFieldProjectId            = "projectId"
+	AppFieldProjectID            = "projectId"
 	AppFieldPrune                = "prune"
 	AppFieldRemoved              = "removed"
 	AppFieldState                = "state"
 	AppFieldTargetNamespace      = "targetNamespace"
 	AppFieldTransitioning        = "transitioning"
 	AppFieldTransitioningMessage = "transitioningMessage"
-	AppFieldUuid                 = "uuid"
+	AppFieldUUID                 = "uuid"
 )
 
 type App struct {
 	types.Resource
 	Annotations          map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Answers              map[string]string `json:"answers,omitempty" yaml:"answers,omitempty"`
-	AppRevisionId        string            `json:"appRevisionId,omitempty" yaml:"appRevisionId,omitempty"`
+	AppRevisionID        string            `json:"appRevisionId,omitempty" yaml:"appRevisionId,omitempty"`
 	AppliedFiles         map[string]string `json:"appliedFiles,omitempty" yaml:"appliedFiles,omitempty"`
 	Conditions           []AppCondition    `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	Created              string            `json:"created,omitempty" yaml:"created,omitempty"`
@@ -50,15 +50,16 @@ type App struct {
 	NamespaceId          string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	Notes                string            `json:"notes,omitempty" yaml:"notes,omitempty"`
 	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	ProjectId            string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
+	ProjectID            string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	Prune                bool              `json:"prune,omitempty" yaml:"prune,omitempty"`
 	Removed              string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	State                string            `json:"state,omitempty" yaml:"state,omitempty"`
 	TargetNamespace      string            `json:"targetNamespace,omitempty" yaml:"targetNamespace,omitempty"`
 	Transitioning        string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	Uuid                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type AppCollection struct {
 	types.Collection
 	Data   []App `json:"data,omitempty"`
@@ -73,6 +74,7 @@ type AppOperations interface {
 	List(opts *types.ListOpts) (*AppCollection, error)
 	Create(opts *App) (*App, error)
 	Update(existing *App, updates interface{}) (*App, error)
+	Replace(existing *App) (*App, error)
 	ByID(id string) (*App, error)
 	Delete(container *App) error
 
@@ -96,6 +98,12 @@ func (c *AppClient) Create(container *App) (*App, error) {
 func (c *AppClient) Update(existing *App, updates interface{}) (*App, error) {
 	resp := &App{}
 	err := c.apiClient.Ops.DoUpdate(AppType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *AppClient) Replace(obj *App) (*App, error) {
+	resp := &App{}
+	err := c.apiClient.Ops.DoReplace(AppType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

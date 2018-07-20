@@ -9,7 +9,7 @@ const (
 	SourceCodeCredentialFieldAccessToken          = "accessToken"
 	SourceCodeCredentialFieldAnnotations          = "annotations"
 	SourceCodeCredentialFieldAvatarURL            = "avatarUrl"
-	SourceCodeCredentialFieldClusterId            = "clusterId"
+	SourceCodeCredentialFieldClusterID            = "clusterId"
 	SourceCodeCredentialFieldCreated              = "created"
 	SourceCodeCredentialFieldCreatorID            = "creatorId"
 	SourceCodeCredentialFieldDisplayName          = "displayName"
@@ -24,8 +24,8 @@ const (
 	SourceCodeCredentialFieldStatus               = "status"
 	SourceCodeCredentialFieldTransitioning        = "transitioning"
 	SourceCodeCredentialFieldTransitioningMessage = "transitioningMessage"
-	SourceCodeCredentialFieldUserId               = "userId"
-	SourceCodeCredentialFieldUuid                 = "uuid"
+	SourceCodeCredentialFieldUUID                 = "uuid"
+	SourceCodeCredentialFieldUserID               = "userId"
 )
 
 type SourceCodeCredential struct {
@@ -33,7 +33,7 @@ type SourceCodeCredential struct {
 	AccessToken          string                      `json:"accessToken,omitempty" yaml:"accessToken,omitempty"`
 	Annotations          map[string]string           `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	AvatarURL            string                      `json:"avatarUrl,omitempty" yaml:"avatarUrl,omitempty"`
-	ClusterId            string                      `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	ClusterID            string                      `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	Created              string                      `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string                      `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	DisplayName          string                      `json:"displayName,omitempty" yaml:"displayName,omitempty"`
@@ -48,9 +48,10 @@ type SourceCodeCredential struct {
 	Status               *SourceCodeCredentialStatus `json:"status,omitempty" yaml:"status,omitempty"`
 	Transitioning        string                      `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string                      `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	UserId               string                      `json:"userId,omitempty" yaml:"userId,omitempty"`
-	Uuid                 string                      `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                 string                      `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UserID               string                      `json:"userId,omitempty" yaml:"userId,omitempty"`
 }
+
 type SourceCodeCredentialCollection struct {
 	types.Collection
 	Data   []SourceCodeCredential `json:"data,omitempty"`
@@ -65,6 +66,7 @@ type SourceCodeCredentialOperations interface {
 	List(opts *types.ListOpts) (*SourceCodeCredentialCollection, error)
 	Create(opts *SourceCodeCredential) (*SourceCodeCredential, error)
 	Update(existing *SourceCodeCredential, updates interface{}) (*SourceCodeCredential, error)
+	Replace(existing *SourceCodeCredential) (*SourceCodeCredential, error)
 	ByID(id string) (*SourceCodeCredential, error)
 	Delete(container *SourceCodeCredential) error
 
@@ -86,6 +88,12 @@ func (c *SourceCodeCredentialClient) Create(container *SourceCodeCredential) (*S
 func (c *SourceCodeCredentialClient) Update(existing *SourceCodeCredential, updates interface{}) (*SourceCodeCredential, error) {
 	resp := &SourceCodeCredential{}
 	err := c.apiClient.Ops.DoUpdate(SourceCodeCredentialType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *SourceCodeCredentialClient) Replace(obj *SourceCodeCredential) (*SourceCodeCredential, error) {
+	resp := &SourceCodeCredential{}
+	err := c.apiClient.Ops.DoReplace(SourceCodeCredentialType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

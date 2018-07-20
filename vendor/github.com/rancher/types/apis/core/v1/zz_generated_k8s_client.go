@@ -20,6 +20,7 @@ type Interface interface {
 	NamespacesGetter
 	EventsGetter
 	EndpointsGetter
+	PersistentVolumeClaimsGetter
 	PodsGetter
 	ServicesGetter
 	SecretsGetter
@@ -39,6 +40,7 @@ type Client struct {
 	namespaceControllers             map[string]NamespaceController
 	eventControllers                 map[string]EventController
 	endpointsControllers             map[string]EndpointsController
+	persistentVolumeClaimControllers map[string]PersistentVolumeClaimController
 	podControllers                   map[string]PodController
 	serviceControllers               map[string]ServiceController
 	secretControllers                map[string]SecretController
@@ -67,6 +69,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		namespaceControllers:             map[string]NamespaceController{},
 		eventControllers:                 map[string]EventController{},
 		endpointsControllers:             map[string]EndpointsController{},
+		persistentVolumeClaimControllers: map[string]PersistentVolumeClaimController{},
 		podControllers:                   map[string]PodController{},
 		serviceControllers:               map[string]ServiceController{},
 		secretControllers:                map[string]SecretController{},
@@ -148,6 +151,19 @@ type EndpointsGetter interface {
 func (c *Client) Endpoints(namespace string) EndpointsInterface {
 	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &EndpointsResource, EndpointsGroupVersionKind, endpointsFactory{})
 	return &endpointsClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type PersistentVolumeClaimsGetter interface {
+	PersistentVolumeClaims(namespace string) PersistentVolumeClaimInterface
+}
+
+func (c *Client) PersistentVolumeClaims(namespace string) PersistentVolumeClaimInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &PersistentVolumeClaimResource, PersistentVolumeClaimGroupVersionKind, persistentVolumeClaimFactory{})
+	return &persistentVolumeClaimClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

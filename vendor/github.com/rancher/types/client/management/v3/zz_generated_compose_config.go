@@ -18,7 +18,7 @@ const (
 	ComposeConfigFieldStatus               = "status"
 	ComposeConfigFieldTransitioning        = "transitioning"
 	ComposeConfigFieldTransitioningMessage = "transitioningMessage"
-	ComposeConfigFieldUuid                 = "uuid"
+	ComposeConfigFieldUUID                 = "uuid"
 )
 
 type ComposeConfig struct {
@@ -35,8 +35,9 @@ type ComposeConfig struct {
 	Status               *ComposeStatus    `json:"status,omitempty" yaml:"status,omitempty"`
 	Transitioning        string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	Uuid                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type ComposeConfigCollection struct {
 	types.Collection
 	Data   []ComposeConfig `json:"data,omitempty"`
@@ -51,6 +52,7 @@ type ComposeConfigOperations interface {
 	List(opts *types.ListOpts) (*ComposeConfigCollection, error)
 	Create(opts *ComposeConfig) (*ComposeConfig, error)
 	Update(existing *ComposeConfig, updates interface{}) (*ComposeConfig, error)
+	Replace(existing *ComposeConfig) (*ComposeConfig, error)
 	ByID(id string) (*ComposeConfig, error)
 	Delete(container *ComposeConfig) error
 }
@@ -70,6 +72,12 @@ func (c *ComposeConfigClient) Create(container *ComposeConfig) (*ComposeConfig, 
 func (c *ComposeConfigClient) Update(existing *ComposeConfig, updates interface{}) (*ComposeConfig, error) {
 	resp := &ComposeConfig{}
 	err := c.apiClient.Ops.DoUpdate(ComposeConfigType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *ComposeConfigClient) Replace(obj *ComposeConfig) (*ComposeConfig, error) {
+	resp := &ComposeConfig{}
+	err := c.apiClient.Ops.DoReplace(ComposeConfigType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

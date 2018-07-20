@@ -4,13 +4,13 @@ import "k8s.io/apimachinery/pkg/util/intstr"
 
 const (
 	HTTPIngressPathType             = "httpIngressPath"
-	HTTPIngressPathFieldServiceId   = "serviceId"
+	HTTPIngressPathFieldServiceID   = "serviceId"
 	HTTPIngressPathFieldTargetPort  = "targetPort"
 	HTTPIngressPathFieldWorkloadIDs = "workloadIds"
 )
 
 type HTTPIngressPath struct {
-	ServiceId   string             `json:"serviceId,omitempty" yaml:"serviceId,omitempty"`
+	ServiceID   string             `json:"serviceId,omitempty" yaml:"serviceId,omitempty"`
 	TargetPort  intstr.IntOrString `json:"targetPort,omitempty" yaml:"targetPort,omitempty"`
 	WorkloadIDs []string           `json:"workloadIds,omitempty" yaml:"workloadIds,omitempty"`
 }

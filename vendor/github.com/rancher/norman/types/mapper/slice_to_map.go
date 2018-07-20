@@ -29,7 +29,7 @@ func (s SliceToMap) FromInternal(data map[string]interface{}) {
 	}
 }
 
-func (s SliceToMap) ToInternal(data map[string]interface{}) {
+func (s SliceToMap) ToInternal(data map[string]interface{}) error {
 	datas, _ := data[s.Field].(map[string]interface{})
 	var result []interface{}
 
@@ -46,6 +46,8 @@ func (s SliceToMap) ToInternal(data map[string]interface{}) {
 	} else if datas != nil {
 		data[s.Field] = result
 	}
+
+	return nil
 }
 
 func (s SliceToMap) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {

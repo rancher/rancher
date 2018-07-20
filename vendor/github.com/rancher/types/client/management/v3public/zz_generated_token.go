@@ -19,9 +19,9 @@ const (
 	TokenFieldRemoved         = "removed"
 	TokenFieldTTLMillis       = "ttl"
 	TokenFieldToken           = "token"
+	TokenFieldUUID            = "uuid"
 	TokenFieldUserID          = "userId"
 	TokenFieldUserPrincipal   = "userPrincipal"
-	TokenFieldUuid            = "uuid"
 )
 
 type Token struct {
@@ -42,7 +42,7 @@ type Token struct {
 	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	TTLMillis       int64             `json:"ttl,omitempty" yaml:"ttl,omitempty"`
 	Token           string            `json:"token,omitempty" yaml:"token,omitempty"`
+	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	UserID          string            `json:"userId,omitempty" yaml:"userId,omitempty"`
 	UserPrincipal   string            `json:"userPrincipal,omitempty" yaml:"userPrincipal,omitempty"`
-	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }

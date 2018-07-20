@@ -31,16 +31,18 @@ func (m Base64) FromInternal(data map[string]interface{}) {
 	}
 }
 
-func (m Base64) ToInternal(data map[string]interface{}) {
+func (m Base64) ToInternal(data map[string]interface{}) error {
 	if v, ok := values.RemoveValue(data, strings.Split(m.Field, m.getSep())...); ok {
 		str := convert.ToString(v)
 		if str == "" {
-			return
+			return nil
 		}
 
 		newData := base64.StdEncoding.EncodeToString([]byte(str))
 		values.PutValue(data, newData, strings.Split(m.Field, m.getSep())...)
 	}
+
+	return nil
 }
 
 func (m Base64) ModifySchema(s *types.Schema, schemas *types.Schemas) error {

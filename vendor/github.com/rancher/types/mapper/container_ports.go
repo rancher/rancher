@@ -1,11 +1,12 @@
 package mapper
 
 import (
+	"strings"
+
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/mapper"
 	"github.com/sirupsen/logrus"
-	"strings"
 )
 
 type ContainerPorts struct {
@@ -41,7 +42,7 @@ func (n ContainerPorts) FromInternal(data map[string]interface{}) {
 	}
 }
 
-func (n ContainerPorts) ToInternal(data map[string]interface{}) {
+func (n ContainerPorts) ToInternal(data map[string]interface{}) error {
 	field := mapper.AnnotationField{
 		Field: "ports",
 		List:  true,
@@ -70,8 +71,10 @@ func (n ContainerPorts) ToInternal(data map[string]interface{}) {
 
 	if len(ports) != 0 {
 		data["ports"] = ports
-		field.ToInternal(data)
+		return field.ToInternal(data)
 	}
+
+	return nil
 }
 
 func (n ContainerPorts) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {

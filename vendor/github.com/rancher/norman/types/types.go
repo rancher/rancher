@@ -111,6 +111,7 @@ type Schema struct {
 	CreateHandler       RequestHandler      `json:"-"`
 	DeleteHandler       RequestHandler      `json:"-"`
 	UpdateHandler       RequestHandler      `json:"-"`
+	InputFormatter      InputFormatter      `json:"-"`
 	Formatter           Formatter           `json:"-"`
 	CollectionFormatter CollectionFormatter `json:"-"`
 	ErrorHandler        ErrorHandler        `json:"-"`

@@ -5,11 +5,12 @@ import (
 
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/definition"
+	"github.com/rancher/norman/types/values"
 )
 
 type Mapper interface {
 	FromInternal(data map[string]interface{})
-	ToInternal(data map[string]interface{})
+	ToInternal(data map[string]interface{}) error
 	ModifySchema(schema *Schema, schemas *Schemas) error
 }
 
@@ -21,10 +22,12 @@ func (m Mappers) FromInternal(data map[string]interface{}) {
 	}
 }
 
-func (m Mappers) ToInternal(data map[string]interface{}) {
+func (m Mappers) ToInternal(data map[string]interface{}) error {
+	var errors []error
 	for i := len(m) - 1; i >= 0; i-- {
-		m[i].ToInternal(data)
+		errors = append(errors, m[i].ToInternal(data))
 	}
+	return NewErrors(errors...)
 }
 
 func (m Mappers) ModifySchema(schema *Schema, schemas *Schemas) error {
@@ -42,15 +45,30 @@ type typeMapper struct {
 	typeName        string
 	subSchemas      map[string]*Schema
 	subArraySchemas map[string]*Schema
+	subMapSchemas   map[string]*Schema
 }
 
 func (t *typeMapper) FromInternal(data map[string]interface{}) {
+	name, _ := values.GetValueN(data, "metadata", "name").(string)
+	namespace, _ := values.GetValueN(data, "metadata", "namespace").(string)
+
 	for fieldName, schema := range t.subSchemas {
 		if schema.Mapper == nil {
 			continue
 		}
 		fieldData, _ := data[fieldName].(map[string]interface{})
 		schema.Mapper.FromInternal(fieldData)
+	}
+
+	for fieldName, schema := range t.subMapSchemas {
+		if schema.Mapper == nil {
+			continue
+		}
+		datas, _ := data[fieldName].(map[string]interface{})
+		for _, fieldData := range datas {
+			mapFieldData, _ := fieldData.(map[string]interface{})
+			schema.Mapper.FromInternal(mapFieldData)
+		}
 	}
 
 	for fieldName, schema := range t.subArraySchemas {
@@ -64,16 +82,19 @@ func (t *typeMapper) FromInternal(data map[string]interface{}) {
 		}
 	}
 
+	// Attempt to set type so mappers are aware of it
+	if _, ok := data["type"]; !ok && data != nil {
+		data["type"] = t.typeName
+	}
+
 	Mappers(t.Mappers).FromInternal(data)
 
+	// Ensure if there is no type we set one
 	if _, ok := data["type"]; !ok && data != nil {
 		data["type"] = t.typeName
 	}
 
 	if data != nil && t.root {
-		name, _ := data["name"].(string)
-		namespace, _ := data["namespaceId"].(string)
-
 		if _, ok := data["id"]; ok {
 			if namespace != "" {
 				id, _ := data["id"].(string)
@@ -91,8 +112,9 @@ func (t *typeMapper) FromInternal(data map[string]interface{}) {
 	}
 }
 
-func (t *typeMapper) ToInternal(data map[string]interface{}) {
-	Mappers(t.Mappers).ToInternal(data)
+func (t *typeMapper) ToInternal(data map[string]interface{}) error {
+	errors := Errors{}
+	errors.Add(Mappers(t.Mappers).ToInternal(data))
 
 	for fieldName, schema := range t.subArraySchemas {
 		if schema.Mapper == nil {
@@ -100,7 +122,17 @@ func (t *typeMapper) ToInternal(data map[string]interface{}) {
 		}
 		datas, _ := data[fieldName].([]interface{})
 		for _, fieldData := range datas {
-			schema.Mapper.ToInternal(convert.ToMapInterface(fieldData))
+			errors.Add(schema.Mapper.ToInternal(convert.ToMapInterface(fieldData)))
+		}
+	}
+
+	for fieldName, schema := range t.subMapSchemas {
+		if schema.Mapper == nil {
+			continue
+		}
+		datas, _ := data[fieldName].(map[string]interface{})
+		for _, fieldData := range datas {
+			errors.Add(schema.Mapper.ToInternal(convert.ToMapInterface(fieldData)))
 		}
 	}
 
@@ -109,13 +141,16 @@ func (t *typeMapper) ToInternal(data map[string]interface{}) {
 			continue
 		}
 		fieldData, _ := data[fieldName].(map[string]interface{})
-		schema.Mapper.ToInternal(fieldData)
+		errors.Add(schema.Mapper.ToInternal(fieldData))
 	}
+
+	return errors.Err()
 }
 
 func (t *typeMapper) ModifySchema(schema *Schema, schemas *Schemas) error {
 	t.subSchemas = map[string]*Schema{}
 	t.subArraySchemas = map[string]*Schema{}
+	t.subMapSchemas = map[string]*Schema{}
 	t.typeName = fmt.Sprintf("%s/schemas/%s", schema.Version.Path, schema.ID)
 
 	mapperSchema := schema
@@ -128,6 +163,9 @@ func (t *typeMapper) ModifySchema(schema *Schema, schemas *Schemas) error {
 		if definition.IsArrayType(fieldType) {
 			fieldType = definition.SubType(fieldType)
 			targetMap = t.subArraySchemas
+		} else if definition.IsMapType(fieldType) {
+			fieldType = definition.SubType(fieldType)
+			targetMap = t.subMapSchemas
 		}
 
 		schema := schemas.Schema(&schema.Version, fieldType)

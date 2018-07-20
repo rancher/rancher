@@ -27,7 +27,7 @@ const (
 	CronJobFieldLabels                        = "labels"
 	CronJobFieldName                          = "name"
 	CronJobFieldNamespaceId                   = "namespaceId"
-	CronJobFieldNodeId                        = "nodeId"
+	CronJobFieldNodeID                        = "nodeId"
 	CronJobFieldOwnerReferences               = "ownerReferences"
 	CronJobFieldPriority                      = "priority"
 	CronJobFieldPriorityClassName             = "priorityClassName"
@@ -47,8 +47,8 @@ const (
 	CronJobFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
 	CronJobFieldTransitioning                 = "transitioning"
 	CronJobFieldTransitioningMessage          = "transitioningMessage"
+	CronJobFieldUUID                          = "uuid"
 	CronJobFieldUid                           = "uid"
-	CronJobFieldUuid                          = "uuid"
 	CronJobFieldVolumes                       = "volumes"
 	CronJobFieldWorkloadAnnotations           = "workloadAnnotations"
 	CronJobFieldWorkloadLabels                = "workloadLabels"
@@ -77,7 +77,7 @@ type CronJob struct {
 	Labels                        map[string]string      `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                          string                 `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId                   string                 `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
-	NodeId                        string                 `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
+	NodeID                        string                 `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
 	OwnerReferences               []OwnerReference       `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Priority                      *int64                 `json:"priority,omitempty" yaml:"priority,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty" yaml:"priorityClassName,omitempty"`
@@ -97,12 +97,13 @@ type CronJob struct {
 	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`
 	Transitioning                 string                 `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage          string                 `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	UUID                          string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Uid                           *int64                 `json:"uid,omitempty" yaml:"uid,omitempty"`
-	Uuid                          string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Volumes                       []Volume               `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 	WorkloadAnnotations           map[string]string      `json:"workloadAnnotations,omitempty" yaml:"workloadAnnotations,omitempty"`
 	WorkloadLabels                map[string]string      `json:"workloadLabels,omitempty" yaml:"workloadLabels,omitempty"`
 }
+
 type CronJobCollection struct {
 	types.Collection
 	Data   []CronJob `json:"data,omitempty"`
@@ -117,6 +118,7 @@ type CronJobOperations interface {
 	List(opts *types.ListOpts) (*CronJobCollection, error)
 	Create(opts *CronJob) (*CronJob, error)
 	Update(existing *CronJob, updates interface{}) (*CronJob, error)
+	Replace(existing *CronJob) (*CronJob, error)
 	ByID(id string) (*CronJob, error)
 	Delete(container *CronJob) error
 }
@@ -136,6 +138,12 @@ func (c *CronJobClient) Create(container *CronJob) (*CronJob, error) {
 func (c *CronJobClient) Update(existing *CronJob, updates interface{}) (*CronJob, error) {
 	resp := &CronJob{}
 	err := c.apiClient.Ops.DoUpdate(CronJobType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *CronJobClient) Replace(obj *CronJob) (*CronJob, error) {
+	resp := &CronJob{}
+	err := c.apiClient.Ops.DoReplace(CronJobType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

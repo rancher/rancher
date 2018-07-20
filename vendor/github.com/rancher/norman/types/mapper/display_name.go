@@ -20,8 +20,8 @@ func (d DisplayName) FromInternal(data map[string]interface{}) {
 	displayNameMappers.FromInternal(data)
 }
 
-func (d DisplayName) ToInternal(data map[string]interface{}) {
-	displayNameMappers.ToInternal(data)
+func (d DisplayName) ToInternal(data map[string]interface{}) error {
+	return displayNameMappers.ToInternal(data)
 }
 
 func (d DisplayName) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {

@@ -16,11 +16,12 @@ func (e LabelField) FromInternal(data map[string]interface{}) {
 	}
 }
 
-func (e LabelField) ToInternal(data map[string]interface{}) {
+func (e LabelField) ToInternal(data map[string]interface{}) error {
 	v, ok := data[e.Field]
 	if ok {
 		values.PutValue(data, v, "labels", "field.cattle.io/"+e.Field)
 	}
+	return nil
 }
 
 func (e LabelField) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {

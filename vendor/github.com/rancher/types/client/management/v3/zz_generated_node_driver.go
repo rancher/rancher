@@ -24,7 +24,7 @@ const (
 	NodeDriverFieldTransitioningMessage = "transitioningMessage"
 	NodeDriverFieldUIURL                = "uiUrl"
 	NodeDriverFieldURL                  = "url"
-	NodeDriverFieldUuid                 = "uuid"
+	NodeDriverFieldUUID                 = "uuid"
 	NodeDriverFieldWhitelistDomains     = "whitelistDomains"
 )
 
@@ -48,9 +48,10 @@ type NodeDriver struct {
 	TransitioningMessage string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	UIURL                string            `json:"uiUrl,omitempty" yaml:"uiUrl,omitempty"`
 	URL                  string            `json:"url,omitempty" yaml:"url,omitempty"`
-	Uuid                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	WhitelistDomains     []string          `json:"whitelistDomains,omitempty" yaml:"whitelistDomains,omitempty"`
 }
+
 type NodeDriverCollection struct {
 	types.Collection
 	Data   []NodeDriver `json:"data,omitempty"`
@@ -65,6 +66,7 @@ type NodeDriverOperations interface {
 	List(opts *types.ListOpts) (*NodeDriverCollection, error)
 	Create(opts *NodeDriver) (*NodeDriver, error)
 	Update(existing *NodeDriver, updates interface{}) (*NodeDriver, error)
+	Replace(existing *NodeDriver) (*NodeDriver, error)
 	ByID(id string) (*NodeDriver, error)
 	Delete(container *NodeDriver) error
 
@@ -88,6 +90,12 @@ func (c *NodeDriverClient) Create(container *NodeDriver) (*NodeDriver, error) {
 func (c *NodeDriverClient) Update(existing *NodeDriver, updates interface{}) (*NodeDriver, error) {
 	resp := &NodeDriver{}
 	err := c.apiClient.Ops.DoUpdate(NodeDriverType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *NodeDriverClient) Replace(obj *NodeDriver) (*NodeDriver, error) {
+	resp := &NodeDriver{}
+	err := c.apiClient.Ops.DoReplace(NodeDriverType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

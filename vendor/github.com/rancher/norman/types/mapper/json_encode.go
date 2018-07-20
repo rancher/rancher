@@ -27,12 +27,13 @@ func (m JSONEncode) FromInternal(data map[string]interface{}) {
 	}
 }
 
-func (m JSONEncode) ToInternal(data map[string]interface{}) {
+func (m JSONEncode) ToInternal(data map[string]interface{}) error {
 	if v, ok := values.RemoveValue(data, strings.Split(m.Field, m.getSep())...); ok && v != nil {
 		if bytes, err := json.Marshal(v); err == nil {
 			values.PutValue(data, string(bytes), strings.Split(m.Field, m.getSep())...)
 		}
 	}
+	return nil
 }
 
 func (m JSONEncode) getSep() string {

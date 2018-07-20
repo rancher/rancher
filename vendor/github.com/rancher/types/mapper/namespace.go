@@ -15,10 +15,11 @@ func (n *NamespaceIDMapper) FromInternal(data map[string]interface{}) {
 	}
 }
 
-func (n *NamespaceIDMapper) ToInternal(data map[string]interface{}) {
+func (n *NamespaceIDMapper) ToInternal(data map[string]interface{}) error {
 	if n.Move != nil {
-		n.Move.ToInternal(data)
+		return n.Move.ToInternal(data)
 	}
+	return nil
 }
 
 func (n *NamespaceIDMapper) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {

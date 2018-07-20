@@ -32,6 +32,7 @@ const (
 	LdapConfigFieldServiceAccountPassword          = "serviceAccountPassword"
 	LdapConfigFieldTLS                             = "tls"
 	LdapConfigFieldType                            = "type"
+	LdapConfigFieldUUID                            = "uuid"
 	LdapConfigFieldUserDisabledBitMask             = "userDisabledBitMask"
 	LdapConfigFieldUserEnabledAttribute            = "userEnabledAttribute"
 	LdapConfigFieldUserLoginAttribute              = "userLoginAttribute"
@@ -40,7 +41,6 @@ const (
 	LdapConfigFieldUserObjectClass                 = "userObjectClass"
 	LdapConfigFieldUserSearchAttribute             = "userSearchAttribute"
 	LdapConfigFieldUserSearchBase                  = "userSearchBase"
-	LdapConfigFieldUuid                            = "uuid"
 )
 
 type LdapConfig struct {
@@ -71,6 +71,7 @@ type LdapConfig struct {
 	ServiceAccountPassword          string            `json:"serviceAccountPassword,omitempty" yaml:"serviceAccountPassword,omitempty"`
 	TLS                             bool              `json:"tls,omitempty" yaml:"tls,omitempty"`
 	Type                            string            `json:"type,omitempty" yaml:"type,omitempty"`
+	UUID                            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	UserDisabledBitMask             int64             `json:"userDisabledBitMask,omitempty" yaml:"userDisabledBitMask,omitempty"`
 	UserEnabledAttribute            string            `json:"userEnabledAttribute,omitempty" yaml:"userEnabledAttribute,omitempty"`
 	UserLoginAttribute              string            `json:"userLoginAttribute,omitempty" yaml:"userLoginAttribute,omitempty"`
@@ -79,8 +80,8 @@ type LdapConfig struct {
 	UserObjectClass                 string            `json:"userObjectClass,omitempty" yaml:"userObjectClass,omitempty"`
 	UserSearchAttribute             string            `json:"userSearchAttribute,omitempty" yaml:"userSearchAttribute,omitempty"`
 	UserSearchBase                  string            `json:"userSearchBase,omitempty" yaml:"userSearchBase,omitempty"`
-	Uuid                            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type LdapConfigCollection struct {
 	types.Collection
 	Data   []LdapConfig `json:"data,omitempty"`
@@ -95,6 +96,7 @@ type LdapConfigOperations interface {
 	List(opts *types.ListOpts) (*LdapConfigCollection, error)
 	Create(opts *LdapConfig) (*LdapConfig, error)
 	Update(existing *LdapConfig, updates interface{}) (*LdapConfig, error)
+	Replace(existing *LdapConfig) (*LdapConfig, error)
 	ByID(id string) (*LdapConfig, error)
 	Delete(container *LdapConfig) error
 }
@@ -114,6 +116,12 @@ func (c *LdapConfigClient) Create(container *LdapConfig) (*LdapConfig, error) {
 func (c *LdapConfigClient) Update(existing *LdapConfig, updates interface{}) (*LdapConfig, error) {
 	resp := &LdapConfig{}
 	err := c.apiClient.Ops.DoUpdate(LdapConfigType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *LdapConfigClient) Replace(obj *LdapConfig) (*LdapConfig, error) {
+	resp := &LdapConfig{}
+	err := c.apiClient.Ops.DoReplace(LdapConfigType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

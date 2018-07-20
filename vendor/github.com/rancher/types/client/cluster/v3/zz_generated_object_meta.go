@@ -11,7 +11,7 @@ const (
 	ObjectMetaFieldOwnerReferences = "ownerReferences"
 	ObjectMetaFieldRemoved         = "removed"
 	ObjectMetaFieldSelfLink        = "selfLink"
-	ObjectMetaFieldUuid            = "uuid"
+	ObjectMetaFieldUUID            = "uuid"
 )
 
 type ObjectMeta struct {
@@ -24,5 +24,5 @@ type ObjectMeta struct {
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	SelfLink        string            `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
-	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }

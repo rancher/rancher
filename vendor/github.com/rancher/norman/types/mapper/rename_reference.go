@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/definition"
 )
 
@@ -17,10 +18,11 @@ func (r *RenameReference) FromInternal(data map[string]interface{}) {
 	}
 }
 
-func (r *RenameReference) ToInternal(data map[string]interface{}) {
+func (r *RenameReference) ToInternal(data map[string]interface{}) error {
 	if r.mapper != nil {
-		r.mapper.ToInternal(data)
+		return r.mapper.ToInternal(data)
 	}
+	return nil
 }
 
 func (r *RenameReference) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {
@@ -28,7 +30,8 @@ func (r *RenameReference) ModifySchema(schema *types.Schema, schemas *types.Sche
 	for name, field := range schema.ResourceFields {
 		if definition.IsReferenceType(field.Type) && strings.HasSuffix(name, "Name") {
 			newName := strings.TrimSuffix(name, "Name") + "Id"
-			move := Move{From: name, To: newName}
+			newCodeName := convert.Capitalize(strings.TrimSuffix(name, "Name") + "ID")
+			move := Move{From: name, To: newName, CodeName: newCodeName}
 			if err := move.ModifySchema(schema, schemas); err != nil {
 				return err
 			}
@@ -36,7 +39,8 @@ func (r *RenameReference) ModifySchema(schema *types.Schema, schemas *types.Sche
 			mappers = append(mappers, move)
 		} else if definition.IsArrayType(field.Type) && definition.IsReferenceType(definition.SubType(field.Type)) && strings.HasSuffix(name, "Names") {
 			newName := strings.TrimSuffix(name, "Names") + "Ids"
-			move := Move{From: name, To: newName}
+			newCodeName := convert.Capitalize(strings.TrimSuffix(name, "Names") + "IDs")
+			move := Move{From: name, To: newName, CodeName: newCodeName}
 			if err := move.ModifySchema(schema, schemas); err != nil {
 				return err
 			}

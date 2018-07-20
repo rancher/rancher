@@ -13,7 +13,8 @@ type ReadOnly struct {
 func (r ReadOnly) FromInternal(data map[string]interface{}) {
 }
 
-func (r ReadOnly) ToInternal(data map[string]interface{}) {
+func (r ReadOnly) ToInternal(data map[string]interface{}) error {
+	return nil
 }
 
 func (r ReadOnly) readOnly(field types.Field, schema *types.Schema, schemas *types.Schemas) types.Field {

@@ -10,8 +10,8 @@ const (
 	UserAttributeFieldName            = "name"
 	UserAttributeFieldOwnerReferences = "ownerReferences"
 	UserAttributeFieldRemoved         = "removed"
+	UserAttributeFieldUUID            = "uuid"
 	UserAttributeFieldUserName        = "userName"
-	UserAttributeFieldUuid            = "uuid"
 )
 
 type UserAttribute struct {
@@ -23,6 +23,6 @@ type UserAttribute struct {
 	Name            string               `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences []OwnerReference     `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Removed         string               `json:"removed,omitempty" yaml:"removed,omitempty"`
+	UUID            string               `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	UserName        string               `json:"userName,omitempty" yaml:"userName,omitempty"`
-	Uuid            string               `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }

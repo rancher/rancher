@@ -8,7 +8,7 @@ const (
 	ClusterEventType                     = "clusterEvent"
 	ClusterEventFieldAction              = "action"
 	ClusterEventFieldAnnotations         = "annotations"
-	ClusterEventFieldClusterId           = "clusterId"
+	ClusterEventFieldClusterID           = "clusterId"
 	ClusterEventFieldCount               = "count"
 	ClusterEventFieldCreated             = "created"
 	ClusterEventFieldCreatorID           = "creatorId"
@@ -29,14 +29,14 @@ const (
 	ClusterEventFieldReportingInstance   = "reportingInstance"
 	ClusterEventFieldSeries              = "series"
 	ClusterEventFieldSource              = "source"
-	ClusterEventFieldUuid                = "uuid"
+	ClusterEventFieldUUID                = "uuid"
 )
 
 type ClusterEvent struct {
 	types.Resource
 	Action              string            `json:"action,omitempty" yaml:"action,omitempty"`
 	Annotations         map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	ClusterId           string            `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	ClusterID           string            `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	Count               int64             `json:"count,omitempty" yaml:"count,omitempty"`
 	Created             string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID           string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
@@ -57,8 +57,9 @@ type ClusterEvent struct {
 	ReportingInstance   string            `json:"reportingInstance,omitempty" yaml:"reportingInstance,omitempty"`
 	Series              *EventSeries      `json:"series,omitempty" yaml:"series,omitempty"`
 	Source              *EventSource      `json:"source,omitempty" yaml:"source,omitempty"`
-	Uuid                string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type ClusterEventCollection struct {
 	types.Collection
 	Data   []ClusterEvent `json:"data,omitempty"`
@@ -73,6 +74,7 @@ type ClusterEventOperations interface {
 	List(opts *types.ListOpts) (*ClusterEventCollection, error)
 	Create(opts *ClusterEvent) (*ClusterEvent, error)
 	Update(existing *ClusterEvent, updates interface{}) (*ClusterEvent, error)
+	Replace(existing *ClusterEvent) (*ClusterEvent, error)
 	ByID(id string) (*ClusterEvent, error)
 	Delete(container *ClusterEvent) error
 }
@@ -92,6 +94,12 @@ func (c *ClusterEventClient) Create(container *ClusterEvent) (*ClusterEvent, err
 func (c *ClusterEventClient) Update(existing *ClusterEvent, updates interface{}) (*ClusterEvent, error) {
 	resp := &ClusterEvent{}
 	err := c.apiClient.Ops.DoUpdate(ClusterEventType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *ClusterEventClient) Replace(obj *ClusterEvent) (*ClusterEvent, error) {
+	resp := &ClusterEvent{}
+	err := c.apiClient.Ops.DoReplace(ClusterEventType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

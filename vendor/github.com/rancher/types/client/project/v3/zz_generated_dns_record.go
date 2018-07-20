@@ -27,7 +27,7 @@ const (
 	DNSRecordFieldTargetWorkloadIDs    = "targetWorkloadIds"
 	DNSRecordFieldTransitioning        = "transitioning"
 	DNSRecordFieldTransitioningMessage = "transitioningMessage"
-	DNSRecordFieldUuid                 = "uuid"
+	DNSRecordFieldUUID                 = "uuid"
 	DNSRecordFieldWorkloadID           = "workloadId"
 )
 
@@ -54,9 +54,10 @@ type DNSRecord struct {
 	TargetWorkloadIDs    []string          `json:"targetWorkloadIds,omitempty" yaml:"targetWorkloadIds,omitempty"`
 	Transitioning        string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	Uuid                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	WorkloadID           string            `json:"workloadId,omitempty" yaml:"workloadId,omitempty"`
 }
+
 type DNSRecordCollection struct {
 	types.Collection
 	Data   []DNSRecord `json:"data,omitempty"`
@@ -71,6 +72,7 @@ type DNSRecordOperations interface {
 	List(opts *types.ListOpts) (*DNSRecordCollection, error)
 	Create(opts *DNSRecord) (*DNSRecord, error)
 	Update(existing *DNSRecord, updates interface{}) (*DNSRecord, error)
+	Replace(existing *DNSRecord) (*DNSRecord, error)
 	ByID(id string) (*DNSRecord, error)
 	Delete(container *DNSRecord) error
 }
@@ -90,6 +92,12 @@ func (c *DNSRecordClient) Create(container *DNSRecord) (*DNSRecord, error) {
 func (c *DNSRecordClient) Update(existing *DNSRecord, updates interface{}) (*DNSRecord, error) {
 	resp := &DNSRecord{}
 	err := c.apiClient.Ops.DoUpdate(DNSRecordType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *DNSRecordClient) Replace(obj *DNSRecord) (*DNSRecord, error) {
+	resp := &DNSRecord{}
+	err := c.apiClient.Ops.DoReplace(DNSRecordType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

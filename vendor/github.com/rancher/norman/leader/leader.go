@@ -71,7 +71,7 @@ func run(ctx context.Context, name string, client kubernetes.Interface, cb Callb
 
 func createRecorder(name string, kubeClient kubernetes.Interface) record.EventRecorder {
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(logrus.Infof)
+	eventBroadcaster.StartLogging(logrus.Debugf)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
 	return eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: name})
 }

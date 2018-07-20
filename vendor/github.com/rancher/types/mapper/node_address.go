@@ -27,7 +27,8 @@ func (n NodeAddressMapper) FromInternal(data map[string]interface{}) {
 	}
 }
 
-func (n NodeAddressMapper) ToInternal(data map[string]interface{}) {
+func (n NodeAddressMapper) ToInternal(data map[string]interface{}) error {
+	return nil
 }
 
 func (n NodeAddressMapper) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {
@@ -44,7 +45,8 @@ func (n NodeAddressAnnotationMapper) FromInternal(data map[string]interface{}) {
 	}
 }
 
-func (n NodeAddressAnnotationMapper) ToInternal(data map[string]interface{}) {
+func (n NodeAddressAnnotationMapper) ToInternal(data map[string]interface{}) error {
+	return nil
 }
 
 func (n NodeAddressAnnotationMapper) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {

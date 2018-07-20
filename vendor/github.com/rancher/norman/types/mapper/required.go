@@ -11,7 +11,8 @@ type Required struct {
 func (e Required) FromInternal(data map[string]interface{}) {
 }
 
-func (e Required) ToInternal(data map[string]interface{}) {
+func (e Required) ToInternal(data map[string]interface{}) error {
+	return nil
 }
 
 func (e Required) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {

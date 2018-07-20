@@ -2,11 +2,11 @@ package client
 
 const (
 	PersistentVolumeClaimVolumeSourceType                         = "persistentVolumeClaimVolumeSource"
-	PersistentVolumeClaimVolumeSourceFieldPersistentVolumeClaimId = "persistentVolumeClaimId"
+	PersistentVolumeClaimVolumeSourceFieldPersistentVolumeClaimID = "persistentVolumeClaimId"
 	PersistentVolumeClaimVolumeSourceFieldReadOnly                = "readOnly"
 )
 
 type PersistentVolumeClaimVolumeSource struct {
-	PersistentVolumeClaimId string `json:"persistentVolumeClaimId,omitempty" yaml:"persistentVolumeClaimId,omitempty"`
+	PersistentVolumeClaimID string `json:"persistentVolumeClaimId,omitempty" yaml:"persistentVolumeClaimId,omitempty"`
 	ReadOnly                bool   `json:"readOnly,omitempty" yaml:"readOnly,omitempty"`
 }

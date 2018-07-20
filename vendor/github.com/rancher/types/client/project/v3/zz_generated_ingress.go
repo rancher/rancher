@@ -24,7 +24,7 @@ const (
 	IngressFieldTLS                  = "tls"
 	IngressFieldTransitioning        = "transitioning"
 	IngressFieldTransitioningMessage = "transitioningMessage"
-	IngressFieldUuid                 = "uuid"
+	IngressFieldUUID                 = "uuid"
 )
 
 type Ingress struct {
@@ -47,8 +47,9 @@ type Ingress struct {
 	TLS                  []IngressTLS      `json:"tls,omitempty" yaml:"tls,omitempty"`
 	Transitioning        string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	Uuid                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type IngressCollection struct {
 	types.Collection
 	Data   []Ingress `json:"data,omitempty"`
@@ -63,6 +64,7 @@ type IngressOperations interface {
 	List(opts *types.ListOpts) (*IngressCollection, error)
 	Create(opts *Ingress) (*Ingress, error)
 	Update(existing *Ingress, updates interface{}) (*Ingress, error)
+	Replace(existing *Ingress) (*Ingress, error)
 	ByID(id string) (*Ingress, error)
 	Delete(container *Ingress) error
 }
@@ -82,6 +84,12 @@ func (c *IngressClient) Create(container *Ingress) (*Ingress, error) {
 func (c *IngressClient) Update(existing *Ingress, updates interface{}) (*Ingress, error) {
 	resp := &Ingress{}
 	err := c.apiClient.Ops.DoUpdate(IngressType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *IngressClient) Replace(obj *Ingress) (*Ingress, error) {
+	resp := &Ingress{}
+	err := c.apiClient.Ops.DoReplace(IngressType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

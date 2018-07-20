@@ -11,7 +11,7 @@ const (
 	ActiveDirectoryProviderFieldOwnerReferences    = "ownerReferences"
 	ActiveDirectoryProviderFieldRemoved            = "removed"
 	ActiveDirectoryProviderFieldType               = "type"
-	ActiveDirectoryProviderFieldUuid               = "uuid"
+	ActiveDirectoryProviderFieldUUID               = "uuid"
 )
 
 type ActiveDirectoryProvider struct {
@@ -24,5 +24,5 @@ type ActiveDirectoryProvider struct {
 	OwnerReferences    []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Removed            string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Type               string            `json:"type,omitempty" yaml:"type,omitempty"`
-	Uuid               string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID               string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
