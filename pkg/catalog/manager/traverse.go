@@ -37,6 +37,7 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, catalog *v3.Catalog
 	newHelmVersionCommits := map[string]v3.VersionCommits{}
 	var errs []error
 	var terrors []error
+	createdTemplates, updatedTemplates, deletedTemplates := 0, 0, 0
 	for chart, metadata := range index.IndexFile.Entries {
 		newHelmVersionCommits[chart] = v3.VersionCommits{
 			Value: map[string]string{},
@@ -162,10 +163,12 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, catalog *v3.Catalog
 			if err := m.updateTemplate(existing, template, templateContentMap); err != nil {
 				temErr = err
 			}
+			updatedTemplates++
 		} else {
 			if err := m.createTemplate(template, catalog, templateContentMap); err != nil {
 				temErr = err
 			}
+			createdTemplates++
 		}
 		if temErr != nil {
 			delete(newHelmVersionCommits, template.Spec.DisplayName)
@@ -181,11 +184,13 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, catalog *v3.Catalog
 	}
 	// delete non-existing templates
 	for _, toDelete := range toDeleteChart {
-		logrus.Infof("Deleting template %s and its associated templateVersion", toDelete)
+		logrus.Debugf("Deleting template %s and its associated templateVersion", toDelete)
 		if err := m.deleteChart(toDelete); err != nil {
 			return err
 		}
+		deletedTemplates++
 	}
+	logrus.Infof("Catalog sync done. %v templates created, %v templates updated, %v templates deleted", createdTemplates, updatedTemplates, deletedTemplates)
 
 	catalog.Status.HelmVersionCommits = newHelmVersionCommits
 	if len(terrors) > 0 {

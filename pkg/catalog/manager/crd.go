@@ -38,7 +38,7 @@ func (m *Manager) createTemplate(template v3.Template, catalog *v3.Catalog, tagM
 	if err := m.convertTemplateIcon(&template, tagMap); err != nil {
 		return err
 	}
-	logrus.Infof("Creating template %s", template.Name)
+	logrus.Debugf("Creating template %s", template.Name)
 	createdTemplate, err := m.templateClient.Create(&template)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create template %s", template.Name)
@@ -100,7 +100,7 @@ func (m *Manager) updateTemplate(template *v3.Template, toUpdate v3.Template, ta
 		}
 		if tv, ok := tvByVersion[toUpdateVer.Version]; ok {
 			if tv.Spec.Digest != toUpdateVer.Digest {
-				logrus.Infof("Updating templateVersion %v", tv.Name)
+				logrus.Debugf("Updating templateVersion %v", tv.Name)
 				newObject := tv.DeepCopy()
 				newObject.Spec = templateVersion.Spec
 				if _, err := m.templateVersionClient.Update(newObject); err != nil {
@@ -114,7 +114,7 @@ func (m *Manager) updateTemplate(template *v3.Template, toUpdate v3.Template, ta
 				TemplateNameLabel: template.Name,
 			}
 			toCreate.Spec = templateVersion.Spec
-			logrus.Infof("Creating templateVersion %v", toCreate.Name)
+			logrus.Debugf("Creating templateVersion %v", toCreate.Name)
 			if _, err := m.templateVersionClient.Create(toCreate); err != nil {
 				return err
 			}
