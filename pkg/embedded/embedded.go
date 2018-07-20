@@ -102,6 +102,10 @@ func runK8s(ctx context.Context, kubeConfig string, args []string) {
 		}
 	}
 
+	if args[0] == "kube-controller-manager" {
+		args = append(args, "--controllers", "*", "--controllers", "-resourcequota", "--controllers", "-service")
+	}
+
 	hk := hyperkube.HyperKube{
 		Name: "hyperkube",
 		Long: "This is an all-in-one binary that can run any of the various Kubernetes servers.",
