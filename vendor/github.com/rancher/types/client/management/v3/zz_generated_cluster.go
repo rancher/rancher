@@ -24,6 +24,7 @@ const (
 	ClusterFieldDefaultPodSecurityPolicyTemplateID   = "defaultPodSecurityPolicyTemplateId"
 	ClusterFieldDescription                          = "description"
 	ClusterFieldDesiredAgentImage                    = "desiredAgentImage"
+	ClusterFieldDockerRootDir                        = "dockerRootDir"
 	ClusterFieldDriver                               = "driver"
 	ClusterFieldFailedSpec                           = "failedSpec"
 	ClusterFieldGoogleKubernetesEngineConfig         = "googleKubernetesEngineConfig"
@@ -63,6 +64,7 @@ type Cluster struct {
 	DefaultPodSecurityPolicyTemplateID   string                               `json:"defaultPodSecurityPolicyTemplateId,omitempty" yaml:"defaultPodSecurityPolicyTemplateId,omitempty"`
 	Description                          string                               `json:"description,omitempty" yaml:"description,omitempty"`
 	DesiredAgentImage                    string                               `json:"desiredAgentImage,omitempty" yaml:"desiredAgentImage,omitempty"`
+	DockerRootDir                        string                               `json:"dockerRootDir,omitempty" yaml:"dockerRootDir,omitempty"`
 	Driver                               string                               `json:"driver,omitempty" yaml:"driver,omitempty"`
 	FailedSpec                           *ClusterSpec                         `json:"failedSpec,omitempty" yaml:"failedSpec,omitempty"`
 	GoogleKubernetesEngineConfig         *GoogleKubernetesEngineConfig        `json:"googleKubernetesEngineConfig,omitempty" yaml:"googleKubernetesEngineConfig,omitempty"`
