@@ -216,7 +216,7 @@ func (m *mgr) createProject(name string, cond condition.Cond, obj runtime.Object
 		logrus.Infof("[%v] Creating %s project for cluster %v", clusterCreateController, name, metaAccessor.GetName())
 		if _, err = m.mgmt.Management.Projects(metaAccessor.GetName()).Create(&v3.Project{
 			ObjectMeta: v1.ObjectMeta{
-				GenerateName: "project-",
+				GenerateName: "p-",
 				Annotations: map[string]string{
 					creatorIDAnn: creatorID,
 				},
