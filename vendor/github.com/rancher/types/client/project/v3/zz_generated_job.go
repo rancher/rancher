@@ -27,7 +27,7 @@ const (
 	JobFieldLabels                        = "labels"
 	JobFieldName                          = "name"
 	JobFieldNamespaceId                   = "namespaceId"
-	JobFieldNodeId                        = "nodeId"
+	JobFieldNodeID                        = "nodeId"
 	JobFieldOwnerReferences               = "ownerReferences"
 	JobFieldPriority                      = "priority"
 	JobFieldPriorityClassName             = "priorityClassName"
@@ -47,8 +47,8 @@ const (
 	JobFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
 	JobFieldTransitioning                 = "transitioning"
 	JobFieldTransitioningMessage          = "transitioningMessage"
+	JobFieldUUID                          = "uuid"
 	JobFieldUid                           = "uid"
-	JobFieldUuid                          = "uuid"
 	JobFieldVolumes                       = "volumes"
 	JobFieldWorkloadAnnotations           = "workloadAnnotations"
 	JobFieldWorkloadLabels                = "workloadLabels"
@@ -77,7 +77,7 @@ type Job struct {
 	Labels                        map[string]string      `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                          string                 `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId                   string                 `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
-	NodeId                        string                 `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
+	NodeID                        string                 `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
 	OwnerReferences               []OwnerReference       `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Priority                      *int64                 `json:"priority,omitempty" yaml:"priority,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty" yaml:"priorityClassName,omitempty"`
@@ -97,12 +97,13 @@ type Job struct {
 	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`
 	Transitioning                 string                 `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage          string                 `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	UUID                          string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Uid                           *int64                 `json:"uid,omitempty" yaml:"uid,omitempty"`
-	Uuid                          string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Volumes                       []Volume               `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 	WorkloadAnnotations           map[string]string      `json:"workloadAnnotations,omitempty" yaml:"workloadAnnotations,omitempty"`
 	WorkloadLabels                map[string]string      `json:"workloadLabels,omitempty" yaml:"workloadLabels,omitempty"`
 }
+
 type JobCollection struct {
 	types.Collection
 	Data   []Job `json:"data,omitempty"`
@@ -117,6 +118,7 @@ type JobOperations interface {
 	List(opts *types.ListOpts) (*JobCollection, error)
 	Create(opts *Job) (*Job, error)
 	Update(existing *Job, updates interface{}) (*Job, error)
+	Replace(existing *Job) (*Job, error)
 	ByID(id string) (*Job, error)
 	Delete(container *Job) error
 }
@@ -136,6 +138,12 @@ func (c *JobClient) Create(container *Job) (*Job, error) {
 func (c *JobClient) Update(existing *Job, updates interface{}) (*Job, error) {
 	resp := &Job{}
 	err := c.apiClient.Ops.DoUpdate(JobType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *JobClient) Replace(obj *Job) (*Job, error) {
+	resp := &Job{}
+	err := c.apiClient.Ops.DoReplace(JobType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

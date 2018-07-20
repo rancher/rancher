@@ -23,7 +23,7 @@ const (
 	CatalogFieldTransitioning        = "transitioning"
 	CatalogFieldTransitioningMessage = "transitioningMessage"
 	CatalogFieldURL                  = "url"
-	CatalogFieldUuid                 = "uuid"
+	CatalogFieldUUID                 = "uuid"
 )
 
 type Catalog struct {
@@ -45,8 +45,9 @@ type Catalog struct {
 	Transitioning        string             `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string             `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	URL                  string             `json:"url,omitempty" yaml:"url,omitempty"`
-	Uuid                 string             `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                 string             `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type CatalogCollection struct {
 	types.Collection
 	Data   []Catalog `json:"data,omitempty"`
@@ -61,6 +62,7 @@ type CatalogOperations interface {
 	List(opts *types.ListOpts) (*CatalogCollection, error)
 	Create(opts *Catalog) (*Catalog, error)
 	Update(existing *Catalog, updates interface{}) (*Catalog, error)
+	Replace(existing *Catalog) (*Catalog, error)
 	ByID(id string) (*Catalog, error)
 	Delete(container *Catalog) error
 
@@ -84,6 +86,12 @@ func (c *CatalogClient) Create(container *Catalog) (*Catalog, error) {
 func (c *CatalogClient) Update(existing *Catalog, updates interface{}) (*Catalog, error) {
 	resp := &Catalog{}
 	err := c.apiClient.Ops.DoUpdate(CatalogType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *CatalogClient) Replace(obj *Catalog) (*Catalog, error) {
+	resp := &Catalog{}
+	err := c.apiClient.Ops.DoReplace(CatalogType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

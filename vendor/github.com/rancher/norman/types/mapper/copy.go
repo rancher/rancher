@@ -20,15 +20,17 @@ func (c Copy) FromInternal(data map[string]interface{}) {
 	}
 }
 
-func (c Copy) ToInternal(data map[string]interface{}) {
+func (c Copy) ToInternal(data map[string]interface{}) error {
 	if data == nil {
-		return
+		return nil
 	}
 	t, tok := data[c.To]
 	_, fok := data[c.From]
 	if tok && !fok {
 		data[c.From] = t
 	}
+
+	return nil
 }
 
 func (c Copy) ModifySchema(s *types.Schema, schemas *types.Schemas) error {

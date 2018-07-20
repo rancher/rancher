@@ -21,7 +21,7 @@ const (
 	ClusterFieldCreated                              = "created"
 	ClusterFieldCreatorID                            = "creatorId"
 	ClusterFieldDefaultClusterRoleForProjectMembers  = "defaultClusterRoleForProjectMembers"
-	ClusterFieldDefaultPodSecurityPolicyTemplateId   = "defaultPodSecurityPolicyTemplateId"
+	ClusterFieldDefaultPodSecurityPolicyTemplateID   = "defaultPodSecurityPolicyTemplateId"
 	ClusterFieldDescription                          = "description"
 	ClusterFieldDesiredAgentImage                    = "desiredAgentImage"
 	ClusterFieldDriver                               = "driver"
@@ -39,7 +39,7 @@ const (
 	ClusterFieldState                                = "state"
 	ClusterFieldTransitioning                        = "transitioning"
 	ClusterFieldTransitioningMessage                 = "transitioningMessage"
-	ClusterFieldUuid                                 = "uuid"
+	ClusterFieldUUID                                 = "uuid"
 	ClusterFieldVersion                              = "version"
 )
 
@@ -60,7 +60,7 @@ type Cluster struct {
 	Created                              string                               `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                            string                               `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	DefaultClusterRoleForProjectMembers  string                               `json:"defaultClusterRoleForProjectMembers,omitempty" yaml:"defaultClusterRoleForProjectMembers,omitempty"`
-	DefaultPodSecurityPolicyTemplateId   string                               `json:"defaultPodSecurityPolicyTemplateId,omitempty" yaml:"defaultPodSecurityPolicyTemplateId,omitempty"`
+	DefaultPodSecurityPolicyTemplateID   string                               `json:"defaultPodSecurityPolicyTemplateId,omitempty" yaml:"defaultPodSecurityPolicyTemplateId,omitempty"`
 	Description                          string                               `json:"description,omitempty" yaml:"description,omitempty"`
 	DesiredAgentImage                    string                               `json:"desiredAgentImage,omitempty" yaml:"desiredAgentImage,omitempty"`
 	Driver                               string                               `json:"driver,omitempty" yaml:"driver,omitempty"`
@@ -78,9 +78,10 @@ type Cluster struct {
 	State                                string                               `json:"state,omitempty" yaml:"state,omitempty"`
 	Transitioning                        string                               `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage                 string                               `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	Uuid                                 string                               `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                                 string                               `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Version                              *Info                                `json:"version,omitempty" yaml:"version,omitempty"`
 }
+
 type ClusterCollection struct {
 	types.Collection
 	Data   []Cluster `json:"data,omitempty"`
@@ -95,6 +96,7 @@ type ClusterOperations interface {
 	List(opts *types.ListOpts) (*ClusterCollection, error)
 	Create(opts *Cluster) (*Cluster, error)
 	Update(existing *Cluster, updates interface{}) (*Cluster, error)
+	Replace(existing *Cluster) (*Cluster, error)
 	ByID(id string) (*Cluster, error)
 	Delete(container *Cluster) error
 
@@ -120,6 +122,12 @@ func (c *ClusterClient) Create(container *Cluster) (*Cluster, error) {
 func (c *ClusterClient) Update(existing *Cluster, updates interface{}) (*Cluster, error) {
 	resp := &Cluster{}
 	err := c.apiClient.Ops.DoUpdate(ClusterType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *ClusterClient) Replace(obj *Cluster) (*Cluster, error) {
+	resp := &Cluster{}
+	err := c.apiClient.Ops.DoReplace(ClusterType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

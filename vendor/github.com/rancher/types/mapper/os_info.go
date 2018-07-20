@@ -41,7 +41,8 @@ func (o OSInfo) FromInternal(data map[string]interface{}) {
 	}
 }
 
-func (o OSInfo) ToInternal(data map[string]interface{}) {
+func (o OSInfo) ToInternal(data map[string]interface{}) error {
+	return nil
 }
 
 func (o OSInfo) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {

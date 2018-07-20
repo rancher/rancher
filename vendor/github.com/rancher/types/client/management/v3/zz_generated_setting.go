@@ -15,7 +15,7 @@ const (
 	SettingFieldName            = "name"
 	SettingFieldOwnerReferences = "ownerReferences"
 	SettingFieldRemoved         = "removed"
-	SettingFieldUuid            = "uuid"
+	SettingFieldUUID            = "uuid"
 	SettingFieldValue           = "value"
 )
 
@@ -30,9 +30,10 @@ type Setting struct {
 	Name            string            `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Value           string            `json:"value,omitempty" yaml:"value,omitempty"`
 }
+
 type SettingCollection struct {
 	types.Collection
 	Data   []Setting `json:"data,omitempty"`
@@ -47,6 +48,7 @@ type SettingOperations interface {
 	List(opts *types.ListOpts) (*SettingCollection, error)
 	Create(opts *Setting) (*Setting, error)
 	Update(existing *Setting, updates interface{}) (*Setting, error)
+	Replace(existing *Setting) (*Setting, error)
 	ByID(id string) (*Setting, error)
 	Delete(container *Setting) error
 }
@@ -66,6 +68,12 @@ func (c *SettingClient) Create(container *Setting) (*Setting, error) {
 func (c *SettingClient) Update(existing *Setting, updates interface{}) (*Setting, error) {
 	resp := &Setting{}
 	err := c.apiClient.Ops.DoUpdate(SettingType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *SettingClient) Replace(obj *Setting) (*Setting, error) {
+	resp := &Setting{}
+	err := c.apiClient.Ops.DoReplace(SettingType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

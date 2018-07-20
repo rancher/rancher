@@ -11,12 +11,13 @@ type ContainerProbeHandler struct {
 
 func (n ContainerProbeHandler) FromInternal(data map[string]interface{}) {
 	value := values.GetValueN(data, "tcpSocket", "port")
-	if !convert.IsEmpty(value) {
+	if !convert.IsAPIObjectEmpty(value) {
 		data["tcp"] = true
 	}
 }
 
-func (n ContainerProbeHandler) ToInternal(data map[string]interface{}) {
+func (n ContainerProbeHandler) ToInternal(data map[string]interface{}) error {
+	return nil
 }
 
 func (n ContainerProbeHandler) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {

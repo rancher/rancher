@@ -2,7 +2,7 @@ package client
 
 const (
 	NotifierSpecType                 = "notifierSpec"
-	NotifierSpecFieldClusterId       = "clusterId"
+	NotifierSpecFieldClusterID       = "clusterId"
 	NotifierSpecFieldDescription     = "description"
 	NotifierSpecFieldDisplayName     = "displayName"
 	NotifierSpecFieldPagerdutyConfig = "pagerdutyConfig"
@@ -12,7 +12,7 @@ const (
 )
 
 type NotifierSpec struct {
-	ClusterId       string           `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	ClusterID       string           `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	Description     string           `json:"description,omitempty" yaml:"description,omitempty"`
 	DisplayName     string           `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	PagerdutyConfig *PagerdutyConfig `json:"pagerdutyConfig,omitempty" yaml:"pagerdutyConfig,omitempty"`

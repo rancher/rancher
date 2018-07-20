@@ -7,7 +7,10 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
+	"regexp"
 
+	"github.com/gorilla/websocket"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 )
@@ -16,9 +19,10 @@ type APIOperations struct {
 	Opts   *ClientOpts
 	Types  map[string]types.Schema
 	Client *http.Client
+	Dialer *websocket.Dialer
 }
 
-func (a *APIOperations) setupRequest(req *http.Request) {
+func (a *APIOperations) SetupRequest(req *http.Request) {
 	req.Header.Add("Authorization", a.Opts.getAuthHeader())
 }
 
@@ -28,18 +32,19 @@ func (a *APIOperations) DoDelete(url string) error {
 		return err
 	}
 
-	a.setupRequest(req)
+	a.SetupRequest(req)
 
 	resp, err := a.Client.Do(req)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
-
-	io.Copy(ioutil.Discard, resp.Body)
+	defer func() {
+		io.Copy(ioutil.Discard, resp.Body)
+		resp.Body.Close()
+	}()
 
 	if resp.StatusCode >= 300 {
-		return newAPIError(resp, url)
+		return NewAPIError(resp, url)
 	}
 
 	return nil
@@ -54,7 +59,7 @@ func (a *APIOperations) DoGet(url string, opts *types.ListOpts, respObject inter
 		return err
 	}
 
-	if debug {
+	if Debug {
 		fmt.Println("GET " + url)
 	}
 
@@ -63,7 +68,7 @@ func (a *APIOperations) DoGet(url string, opts *types.ListOpts, respObject inter
 		return err
 	}
 
-	a.setupRequest(req)
+	a.SetupRequest(req)
 
 	resp, err := a.Client.Do(req)
 	if err != nil {
@@ -73,7 +78,7 @@ func (a *APIOperations) DoGet(url string, opts *types.ListOpts, respObject inter
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return newAPIError(resp, url)
+		return NewAPIError(resp, url)
 	}
 
 	byteContent, err := ioutil.ReadAll(resp.Body)
@@ -81,7 +86,7 @@ func (a *APIOperations) DoGet(url string, opts *types.ListOpts, respObject inter
 		return err
 	}
 
-	if debug {
+	if Debug {
 		fmt.Println("Response <= " + string(byteContent))
 	}
 
@@ -102,7 +107,12 @@ func (a *APIOperations) DoList(schemaType string, opts *types.ListOpts, respObje
 		return errors.New("Resource type [" + schemaType + "] is not listable")
 	}
 
-	return a.DoGet(a.Opts.URL+"/"+schemaType, opts, respObject)
+	collectionURL, ok := schema.Links["collection"]
+	if !ok {
+		return errors.New("Resource type [" + schemaType + "] does not have a collection URL")
+	}
+
+	return a.DoGet(collectionURL, opts, respObject)
 }
 
 func (a *APIOperations) DoNext(nextURL string, respObject interface{}) error {
@@ -115,7 +125,7 @@ func (a *APIOperations) DoModify(method string, url string, createObj interface{
 		return err
 	}
 
-	if debug {
+	if Debug {
 		fmt.Println(method + " " + url)
 		fmt.Println("Request => " + string(bodyContent))
 	}
@@ -125,7 +135,7 @@ func (a *APIOperations) DoModify(method string, url string, createObj interface{
 		return err
 	}
 
-	a.setupRequest(req)
+	a.SetupRequest(req)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := a.Client.Do(req)
@@ -136,7 +146,7 @@ func (a *APIOperations) DoModify(method string, url string, createObj interface{
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 300 {
-		return newAPIError(resp, url)
+		return NewAPIError(resp, url)
 	}
 
 	byteContent, err := ioutil.ReadAll(resp.Body)
@@ -145,7 +155,7 @@ func (a *APIOperations) DoModify(method string, url string, createObj interface{
 	}
 
 	if len(byteContent) > 0 {
-		if debug {
+		if Debug {
 			fmt.Println("Response <= " + string(byteContent))
 		}
 		return json.Unmarshal(byteContent, respObject)
@@ -170,12 +180,27 @@ func (a *APIOperations) DoCreate(schemaType string, createObj interface{}, respO
 		return errors.New("Resource type [" + schemaType + "] is not creatable")
 	}
 
-	// using collection link to post doesn't help the resources under project or cluster, because they need a projectId or clusterId in the path
-	// for example, v3/projects/foo/apps, v3/cluster/bar/namespaces
-	return a.DoModify("POST", a.Opts.URL+"/"+schemaType, createObj, respObject)
+	var collectionURL string
+	collectionURL, ok = schema.Links[COLLECTION]
+	if !ok {
+		// return errors.New("Failed to find collection URL for [" + schemaType + "]")
+		// This is a hack to address https://github.com/rancher/cattle/issues/254
+		re := regexp.MustCompile("schemas.*")
+		collectionURL = re.ReplaceAllString(schema.Links[SELF], schema.PluralName)
+	}
+
+	return a.DoModify("POST", collectionURL, createObj, respObject)
+}
+
+func (a *APIOperations) DoReplace(schemaType string, existing *types.Resource, updates interface{}, respObject interface{}) error {
+	return a.doUpdate(schemaType, true, existing, updates, respObject)
 }
 
 func (a *APIOperations) DoUpdate(schemaType string, existing *types.Resource, updates interface{}, respObject interface{}) error {
+	return a.doUpdate(schemaType, false, existing, updates, respObject)
+}
+
+func (a *APIOperations) doUpdate(schemaType string, replace bool, existing *types.Resource, updates interface{}, respObject interface{}) error {
 	if existing == nil {
 		return errors.New("Existing object is nil")
 	}
@@ -183,6 +208,17 @@ func (a *APIOperations) DoUpdate(schemaType string, existing *types.Resource, up
 	selfURL, ok := existing.Links[SELF]
 	if !ok {
 		return fmt.Errorf("failed to find self URL of [%v]", existing)
+	}
+
+	if replace {
+		u, err := url.Parse(selfURL)
+		if err != nil {
+			return fmt.Errorf("failed to parse url %s: %v", selfURL, err)
+		}
+		q := u.Query()
+		q.Set("_replace", "true")
+		u.RawQuery = q.Encode()
+		selfURL = u.String()
 	}
 
 	if updates == nil {
@@ -285,7 +321,7 @@ func (a *APIOperations) doAction(
 
 	var input io.Reader
 
-	if debug {
+	if Debug {
 		fmt.Println("POST " + actionURL)
 	}
 
@@ -294,7 +330,7 @@ func (a *APIOperations) doAction(
 		if err != nil {
 			return err
 		}
-		if debug {
+		if Debug {
 			fmt.Println("Request => " + string(bodyContent))
 		}
 		input = bytes.NewBuffer(bodyContent)
@@ -305,7 +341,7 @@ func (a *APIOperations) doAction(
 		return err
 	}
 
-	a.setupRequest(req)
+	a.SetupRequest(req)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Length", "0")
 
@@ -317,7 +353,7 @@ func (a *APIOperations) doAction(
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 300 {
-		return newAPIError(resp, actionURL)
+		return NewAPIError(resp, actionURL)
 	}
 
 	byteContent, err := ioutil.ReadAll(resp.Body)
@@ -325,7 +361,7 @@ func (a *APIOperations) doAction(
 		return err
 	}
 
-	if debug {
+	if Debug {
 		fmt.Println("Response <= " + string(byteContent))
 	}
 

@@ -36,7 +36,7 @@ const (
 	ServiceFieldTargetWorkloadIDs        = "targetWorkloadIds"
 	ServiceFieldTransitioning            = "transitioning"
 	ServiceFieldTransitioningMessage     = "transitioningMessage"
-	ServiceFieldUuid                     = "uuid"
+	ServiceFieldUUID                     = "uuid"
 	ServiceFieldWorkloadID               = "workloadId"
 )
 
@@ -72,9 +72,10 @@ type Service struct {
 	TargetWorkloadIDs        []string               `json:"targetWorkloadIds,omitempty" yaml:"targetWorkloadIds,omitempty"`
 	Transitioning            string                 `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage     string                 `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	Uuid                     string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                     string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	WorkloadID               string                 `json:"workloadId,omitempty" yaml:"workloadId,omitempty"`
 }
+
 type ServiceCollection struct {
 	types.Collection
 	Data   []Service `json:"data,omitempty"`
@@ -89,6 +90,7 @@ type ServiceOperations interface {
 	List(opts *types.ListOpts) (*ServiceCollection, error)
 	Create(opts *Service) (*Service, error)
 	Update(existing *Service, updates interface{}) (*Service, error)
+	Replace(existing *Service) (*Service, error)
 	ByID(id string) (*Service, error)
 	Delete(container *Service) error
 }
@@ -108,6 +110,12 @@ func (c *ServiceClient) Create(container *Service) (*Service, error) {
 func (c *ServiceClient) Update(existing *Service, updates interface{}) (*Service, error) {
 	resp := &Service{}
 	err := c.apiClient.Ops.DoUpdate(ServiceType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *ServiceClient) Replace(obj *Service) (*Service, error) {
+	resp := &Service{}
+	err := c.apiClient.Ops.DoReplace(ServiceType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

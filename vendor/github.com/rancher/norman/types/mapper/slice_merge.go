@@ -26,7 +26,8 @@ func (s SliceMerge) FromInternal(data map[string]interface{}) {
 	}
 }
 
-func (s SliceMerge) ToInternal(data map[string]interface{}) {
+func (s SliceMerge) ToInternal(data map[string]interface{}) error {
+	return nil
 }
 
 func (s SliceMerge) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {

@@ -25,7 +25,7 @@ const (
 	ReplicationControllerFieldLabels                        = "labels"
 	ReplicationControllerFieldName                          = "name"
 	ReplicationControllerFieldNamespaceId                   = "namespaceId"
-	ReplicationControllerFieldNodeId                        = "nodeId"
+	ReplicationControllerFieldNodeID                        = "nodeId"
 	ReplicationControllerFieldOwnerReferences               = "ownerReferences"
 	ReplicationControllerFieldPriority                      = "priority"
 	ReplicationControllerFieldPriorityClassName             = "priorityClassName"
@@ -48,8 +48,8 @@ const (
 	ReplicationControllerFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
 	ReplicationControllerFieldTransitioning                 = "transitioning"
 	ReplicationControllerFieldTransitioningMessage          = "transitioningMessage"
+	ReplicationControllerFieldUUID                          = "uuid"
 	ReplicationControllerFieldUid                           = "uid"
-	ReplicationControllerFieldUuid                          = "uuid"
 	ReplicationControllerFieldVolumes                       = "volumes"
 	ReplicationControllerFieldWorkloadAnnotations           = "workloadAnnotations"
 	ReplicationControllerFieldWorkloadLabels                = "workloadLabels"
@@ -76,7 +76,7 @@ type ReplicationController struct {
 	Labels                        map[string]string            `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                          string                       `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId                   string                       `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
-	NodeId                        string                       `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
+	NodeID                        string                       `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
 	OwnerReferences               []OwnerReference             `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Priority                      *int64                       `json:"priority,omitempty" yaml:"priority,omitempty"`
 	PriorityClassName             string                       `json:"priorityClassName,omitempty" yaml:"priorityClassName,omitempty"`
@@ -99,12 +99,13 @@ type ReplicationController struct {
 	TerminationGracePeriodSeconds *int64                       `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`
 	Transitioning                 string                       `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage          string                       `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	UUID                          string                       `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Uid                           *int64                       `json:"uid,omitempty" yaml:"uid,omitempty"`
-	Uuid                          string                       `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Volumes                       []Volume                     `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 	WorkloadAnnotations           map[string]string            `json:"workloadAnnotations,omitempty" yaml:"workloadAnnotations,omitempty"`
 	WorkloadLabels                map[string]string            `json:"workloadLabels,omitempty" yaml:"workloadLabels,omitempty"`
 }
+
 type ReplicationControllerCollection struct {
 	types.Collection
 	Data   []ReplicationController `json:"data,omitempty"`
@@ -119,6 +120,7 @@ type ReplicationControllerOperations interface {
 	List(opts *types.ListOpts) (*ReplicationControllerCollection, error)
 	Create(opts *ReplicationController) (*ReplicationController, error)
 	Update(existing *ReplicationController, updates interface{}) (*ReplicationController, error)
+	Replace(existing *ReplicationController) (*ReplicationController, error)
 	ByID(id string) (*ReplicationController, error)
 	Delete(container *ReplicationController) error
 }
@@ -138,6 +140,12 @@ func (c *ReplicationControllerClient) Create(container *ReplicationController) (
 func (c *ReplicationControllerClient) Update(existing *ReplicationController, updates interface{}) (*ReplicationController, error) {
 	resp := &ReplicationController{}
 	err := c.apiClient.Ops.DoUpdate(ReplicationControllerType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *ReplicationControllerClient) Replace(obj *ReplicationController) (*ReplicationController, error) {
+	resp := &ReplicationController{}
+	err := c.apiClient.Ops.DoReplace(ReplicationControllerType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

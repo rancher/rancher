@@ -19,7 +19,7 @@ const (
 	NamespacedSecretFieldProjectID       = "projectId"
 	NamespacedSecretFieldRemoved         = "removed"
 	NamespacedSecretFieldStringData      = "stringData"
-	NamespacedSecretFieldUuid            = "uuid"
+	NamespacedSecretFieldUUID            = "uuid"
 )
 
 type NamespacedSecret struct {
@@ -37,8 +37,9 @@ type NamespacedSecret struct {
 	ProjectID       string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	StringData      map[string]string `json:"stringData,omitempty" yaml:"stringData,omitempty"`
-	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type NamespacedSecretCollection struct {
 	types.Collection
 	Data   []NamespacedSecret `json:"data,omitempty"`
@@ -53,6 +54,7 @@ type NamespacedSecretOperations interface {
 	List(opts *types.ListOpts) (*NamespacedSecretCollection, error)
 	Create(opts *NamespacedSecret) (*NamespacedSecret, error)
 	Update(existing *NamespacedSecret, updates interface{}) (*NamespacedSecret, error)
+	Replace(existing *NamespacedSecret) (*NamespacedSecret, error)
 	ByID(id string) (*NamespacedSecret, error)
 	Delete(container *NamespacedSecret) error
 }
@@ -72,6 +74,12 @@ func (c *NamespacedSecretClient) Create(container *NamespacedSecret) (*Namespace
 func (c *NamespacedSecretClient) Update(existing *NamespacedSecret, updates interface{}) (*NamespacedSecret, error) {
 	resp := &NamespacedSecret{}
 	err := c.apiClient.Ops.DoUpdate(NamespacedSecretType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *NamespacedSecretClient) Replace(obj *NamespacedSecret) (*NamespacedSecret, error) {
+	resp := &NamespacedSecret{}
+	err := c.apiClient.Ops.DoReplace(NamespacedSecretType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

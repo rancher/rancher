@@ -20,8 +20,8 @@ const (
 	PingConfigFieldSPSelfSignedKey     = "spKey"
 	PingConfigFieldType                = "type"
 	PingConfigFieldUIDField            = "uidField"
+	PingConfigFieldUUID                = "uuid"
 	PingConfigFieldUserNameField       = "userNameField"
-	PingConfigFieldUuid                = "uuid"
 )
 
 type PingConfig struct {
@@ -43,6 +43,6 @@ type PingConfig struct {
 	SPSelfSignedKey     string            `json:"spKey,omitempty" yaml:"spKey,omitempty"`
 	Type                string            `json:"type,omitempty" yaml:"type,omitempty"`
 	UIDField            string            `json:"uidField,omitempty" yaml:"uidField,omitempty"`
+	UUID                string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	UserNameField       string            `json:"userNameField,omitempty" yaml:"userNameField,omitempty"`
-	Uuid                string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }

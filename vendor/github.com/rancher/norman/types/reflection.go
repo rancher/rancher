@@ -99,6 +99,8 @@ func (s *Schemas) setupFilters(schema *Schema) {
 		switch field.Type {
 		case "enum":
 			mods = []ModifierType{ModifierEQ, ModifierNE, ModifierIn, ModifierNotIn}
+		case "date":
+			fallthrough
 		case "dnsLabel":
 			fallthrough
 		case "hostname":

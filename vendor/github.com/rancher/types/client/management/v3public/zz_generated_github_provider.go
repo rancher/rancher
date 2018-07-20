@@ -11,7 +11,7 @@ const (
 	GithubProviderFieldRedirectURL     = "redirectUrl"
 	GithubProviderFieldRemoved         = "removed"
 	GithubProviderFieldType            = "type"
-	GithubProviderFieldUuid            = "uuid"
+	GithubProviderFieldUUID            = "uuid"
 )
 
 type GithubProvider struct {
@@ -24,5 +24,5 @@ type GithubProvider struct {
 	RedirectURL     string            `json:"redirectUrl,omitempty" yaml:"redirectUrl,omitempty"`
 	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Type            string            `json:"type,omitempty" yaml:"type,omitempty"`
-	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }

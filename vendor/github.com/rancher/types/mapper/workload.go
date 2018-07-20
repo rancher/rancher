@@ -20,7 +20,8 @@ func (n WorkloadAnnotations) FromInternal(data map[string]interface{}) {
 	}
 }
 
-func (n WorkloadAnnotations) ToInternal(data map[string]interface{}) {
+func (n WorkloadAnnotations) ToInternal(data map[string]interface{}) error {
+	return nil
 }
 
 func (n WorkloadAnnotations) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {

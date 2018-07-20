@@ -20,7 +20,7 @@ const (
 	NamespacedServiceAccountTokenFieldProjectID       = "projectId"
 	NamespacedServiceAccountTokenFieldRemoved         = "removed"
 	NamespacedServiceAccountTokenFieldToken           = "token"
-	NamespacedServiceAccountTokenFieldUuid            = "uuid"
+	NamespacedServiceAccountTokenFieldUUID            = "uuid"
 )
 
 type NamespacedServiceAccountToken struct {
@@ -39,8 +39,9 @@ type NamespacedServiceAccountToken struct {
 	ProjectID       string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Token           string            `json:"token,omitempty" yaml:"token,omitempty"`
-	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type NamespacedServiceAccountTokenCollection struct {
 	types.Collection
 	Data   []NamespacedServiceAccountToken `json:"data,omitempty"`
@@ -55,6 +56,7 @@ type NamespacedServiceAccountTokenOperations interface {
 	List(opts *types.ListOpts) (*NamespacedServiceAccountTokenCollection, error)
 	Create(opts *NamespacedServiceAccountToken) (*NamespacedServiceAccountToken, error)
 	Update(existing *NamespacedServiceAccountToken, updates interface{}) (*NamespacedServiceAccountToken, error)
+	Replace(existing *NamespacedServiceAccountToken) (*NamespacedServiceAccountToken, error)
 	ByID(id string) (*NamespacedServiceAccountToken, error)
 	Delete(container *NamespacedServiceAccountToken) error
 }
@@ -74,6 +76,12 @@ func (c *NamespacedServiceAccountTokenClient) Create(container *NamespacedServic
 func (c *NamespacedServiceAccountTokenClient) Update(existing *NamespacedServiceAccountToken, updates interface{}) (*NamespacedServiceAccountToken, error) {
 	resp := &NamespacedServiceAccountToken{}
 	err := c.apiClient.Ops.DoUpdate(NamespacedServiceAccountTokenType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *NamespacedServiceAccountTokenClient) Replace(obj *NamespacedServiceAccountToken) (*NamespacedServiceAccountToken, error) {
+	resp := &NamespacedServiceAccountToken{}
+	err := c.apiClient.Ops.DoReplace(NamespacedServiceAccountTokenType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

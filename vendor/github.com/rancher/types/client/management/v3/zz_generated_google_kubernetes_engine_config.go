@@ -16,8 +16,12 @@ const (
 	GoogleKubernetesEngineConfigFieldLabels                          = "labels"
 	GoogleKubernetesEngineConfigFieldLocations                       = "locations"
 	GoogleKubernetesEngineConfigFieldMachineType                     = "machineType"
+	GoogleKubernetesEngineConfigFieldMaintenanceWindow               = "maintenanceWindow"
 	GoogleKubernetesEngineConfigFieldMasterVersion                   = "masterVersion"
 	GoogleKubernetesEngineConfigFieldNetwork                         = "network"
+	GoogleKubernetesEngineConfigFieldNoNetworkPolicy                 = "noNetworkPolicy"
+	GoogleKubernetesEngineConfigFieldNoStackdriverLogging            = "noStackdriverLogging"
+	GoogleKubernetesEngineConfigFieldNoStackdriverMonitoring         = "noStackdriverMonitoring"
 	GoogleKubernetesEngineConfigFieldNodeCount                       = "nodeCount"
 	GoogleKubernetesEngineConfigFieldNodeVersion                     = "nodeVersion"
 	GoogleKubernetesEngineConfigFieldProjectID                       = "projectId"
@@ -40,8 +44,12 @@ type GoogleKubernetesEngineConfig struct {
 	Labels                          map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Locations                       []string          `json:"locations,omitempty" yaml:"locations,omitempty"`
 	MachineType                     string            `json:"machineType,omitempty" yaml:"machineType,omitempty"`
+	MaintenanceWindow               string            `json:"maintenanceWindow,omitempty" yaml:"maintenanceWindow,omitempty"`
 	MasterVersion                   string            `json:"masterVersion,omitempty" yaml:"masterVersion,omitempty"`
 	Network                         string            `json:"network,omitempty" yaml:"network,omitempty"`
+	NoNetworkPolicy                 bool              `json:"noNetworkPolicy,omitempty" yaml:"noNetworkPolicy,omitempty"`
+	NoStackdriverLogging            bool              `json:"noStackdriverLogging,omitempty" yaml:"noStackdriverLogging,omitempty"`
+	NoStackdriverMonitoring         bool              `json:"noStackdriverMonitoring,omitempty" yaml:"noStackdriverMonitoring,omitempty"`
 	NodeCount                       int64             `json:"nodeCount,omitempty" yaml:"nodeCount,omitempty"`
 	NodeVersion                     string            `json:"nodeVersion,omitempty" yaml:"nodeVersion,omitempty"`
 	ProjectID                       string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`

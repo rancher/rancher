@@ -23,8 +23,8 @@ const (
 	UserFieldState                = "state"
 	UserFieldTransitioning        = "transitioning"
 	UserFieldTransitioningMessage = "transitioningMessage"
+	UserFieldUUID                 = "uuid"
 	UserFieldUsername             = "username"
-	UserFieldUuid                 = "uuid"
 )
 
 type User struct {
@@ -46,9 +46,10 @@ type User struct {
 	State                string            `json:"state,omitempty" yaml:"state,omitempty"`
 	Transitioning        string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	UUID                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Username             string            `json:"username,omitempty" yaml:"username,omitempty"`
-	Uuid                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type UserCollection struct {
 	types.Collection
 	Data   []User `json:"data,omitempty"`
@@ -63,6 +64,7 @@ type UserOperations interface {
 	List(opts *types.ListOpts) (*UserCollection, error)
 	Create(opts *User) (*User, error)
 	Update(existing *User, updates interface{}) (*User, error)
+	Replace(existing *User) (*User, error)
 	ByID(id string) (*User, error)
 	Delete(container *User) error
 
@@ -86,6 +88,12 @@ func (c *UserClient) Create(container *User) (*User, error) {
 func (c *UserClient) Update(existing *User, updates interface{}) (*User, error) {
 	resp := &User{}
 	err := c.apiClient.Ops.DoUpdate(UserType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *UserClient) Replace(obj *User) (*User, error) {
+	resp := &User{}
+	err := c.apiClient.Ops.DoReplace(UserType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

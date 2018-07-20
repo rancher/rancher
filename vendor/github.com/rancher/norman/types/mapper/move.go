@@ -12,9 +12,9 @@ import (
 )
 
 type Move struct {
-	From, To          string
-	DestDefined       bool
-	NoDeleteFromField bool
+	From, To, CodeName string
+	DestDefined        bool
+	NoDeleteFromField  bool
 }
 
 func (m Move) FromInternal(data map[string]interface{}) {
@@ -23,10 +23,11 @@ func (m Move) FromInternal(data map[string]interface{}) {
 	}
 }
 
-func (m Move) ToInternal(data map[string]interface{}) {
+func (m Move) ToInternal(data map[string]interface{}) error {
 	if v, ok := values.RemoveValue(data, strings.Split(m.To, "/")...); ok {
 		values.PutValue(data, v, strings.Split(m.From, "/")...)
 	}
+	return nil
 }
 
 func (m Move) ModifySchema(s *types.Schema, schemas *types.Schemas) error {
@@ -52,7 +53,11 @@ func (m Move) ModifySchema(s *types.Schema, schemas *types.Schemas) error {
 	}
 
 	if !m.DestDefined {
-		fromField.CodeName = convert.Capitalize(toFieldName)
+		if m.CodeName == "" {
+			fromField.CodeName = convert.Capitalize(toFieldName)
+		} else {
+			fromField.CodeName = m.CodeName
+		}
 		toSchema.ResourceFields[toFieldName] = fromField
 	}
 

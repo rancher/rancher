@@ -11,18 +11,20 @@ type ServiceSpecMapper struct {
 func (e ServiceSpecMapper) FromInternal(data map[string]interface{}) {
 }
 
-func (e ServiceSpecMapper) ToInternal(data map[string]interface{}) {
+func (e ServiceSpecMapper) ToInternal(data map[string]interface{}) error {
 	if data == nil {
-		return
+		return nil
 	}
 
-	if convert.IsEmpty(data["hostname"]) {
+	if convert.IsAPIObjectEmpty(data["hostname"]) {
 		data["type"] = "ClusterIP"
 		data["clusterIP"] = "None"
 	} else {
 		data["type"] = "ExternalName"
 		data["clusterIP"] = ""
 	}
+
+	return nil
 }
 
 func (e ServiceSpecMapper) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {

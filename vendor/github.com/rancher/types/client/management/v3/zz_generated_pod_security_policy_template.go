@@ -31,7 +31,7 @@ const (
 	PodSecurityPolicyTemplateFieldRunAsUser                       = "runAsUser"
 	PodSecurityPolicyTemplateFieldSELinux                         = "seLinux"
 	PodSecurityPolicyTemplateFieldSupplementalGroups              = "supplementalGroups"
-	PodSecurityPolicyTemplateFieldUuid                            = "uuid"
+	PodSecurityPolicyTemplateFieldUUID                            = "uuid"
 	PodSecurityPolicyTemplateFieldVolumes                         = "volumes"
 )
 
@@ -62,9 +62,10 @@ type PodSecurityPolicyTemplate struct {
 	RunAsUser                       *RunAsUserStrategyOptions          `json:"runAsUser,omitempty" yaml:"runAsUser,omitempty"`
 	SELinux                         *SELinuxStrategyOptions            `json:"seLinux,omitempty" yaml:"seLinux,omitempty"`
 	SupplementalGroups              *SupplementalGroupsStrategyOptions `json:"supplementalGroups,omitempty" yaml:"supplementalGroups,omitempty"`
-	Uuid                            string                             `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                            string                             `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Volumes                         []string                           `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 }
+
 type PodSecurityPolicyTemplateCollection struct {
 	types.Collection
 	Data   []PodSecurityPolicyTemplate `json:"data,omitempty"`
@@ -79,6 +80,7 @@ type PodSecurityPolicyTemplateOperations interface {
 	List(opts *types.ListOpts) (*PodSecurityPolicyTemplateCollection, error)
 	Create(opts *PodSecurityPolicyTemplate) (*PodSecurityPolicyTemplate, error)
 	Update(existing *PodSecurityPolicyTemplate, updates interface{}) (*PodSecurityPolicyTemplate, error)
+	Replace(existing *PodSecurityPolicyTemplate) (*PodSecurityPolicyTemplate, error)
 	ByID(id string) (*PodSecurityPolicyTemplate, error)
 	Delete(container *PodSecurityPolicyTemplate) error
 }
@@ -98,6 +100,12 @@ func (c *PodSecurityPolicyTemplateClient) Create(container *PodSecurityPolicyTem
 func (c *PodSecurityPolicyTemplateClient) Update(existing *PodSecurityPolicyTemplate, updates interface{}) (*PodSecurityPolicyTemplate, error) {
 	resp := &PodSecurityPolicyTemplate{}
 	err := c.apiClient.Ops.DoUpdate(PodSecurityPolicyTemplateType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *PodSecurityPolicyTemplateClient) Replace(obj *PodSecurityPolicyTemplate) (*PodSecurityPolicyTemplate, error) {
+	resp := &PodSecurityPolicyTemplate{}
+	err := c.apiClient.Ops.DoReplace(PodSecurityPolicyTemplateType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

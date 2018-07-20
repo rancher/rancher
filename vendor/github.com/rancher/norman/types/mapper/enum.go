@@ -12,7 +12,8 @@ type Enum struct {
 func (e Enum) FromInternal(data map[string]interface{}) {
 }
 
-func (e Enum) ToInternal(data map[string]interface{}) {
+func (e Enum) ToInternal(data map[string]interface{}) error {
+	return nil
 }
 
 func (e Enum) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {

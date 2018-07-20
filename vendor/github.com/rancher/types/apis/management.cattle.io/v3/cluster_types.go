@@ -160,7 +160,11 @@ type GoogleKubernetesEngineConfig struct {
 	// Sub Network
 	SubNetwork string `json:"subNetwork,omitempty"`
 	// Configuration for LegacyAbac
-	EnableLegacyAbac bool `json:"enableLegacyAbac,omitempty"`
+	EnableLegacyAbac        bool   `json:"enableLegacyAbac,omitempty"`
+	NoStackdriverLogging    bool   `json:"noStackdriverLogging"`
+	NoStackdriverMonitoring bool   `json:"noStackdriverMonitoring"`
+	NoNetworkPolicy         bool   `json:"noNetworkPolicy"`
+	MaintenanceWindow       string `json:"maintenanceWindow"`
 }
 
 type AzureKubernetesServiceConfig struct {

@@ -19,7 +19,7 @@ const (
 	PipelineFieldNextStart             = "nextStart"
 	PipelineFieldOwnerReferences       = "ownerReferences"
 	PipelineFieldPipelineState         = "pipelineState"
-	PipelineFieldProjectId             = "projectId"
+	PipelineFieldProjectID             = "projectId"
 	PipelineFieldRemoved               = "removed"
 	PipelineFieldSourceCodeCredential  = "sourceCodeCredential"
 	PipelineFieldStages                = "stages"
@@ -33,7 +33,7 @@ const (
 	PipelineFieldTriggerWebhookPr      = "triggerWebhookPr"
 	PipelineFieldTriggerWebhookPush    = "triggerWebhookPush"
 	PipelineFieldTriggerWebhookTag     = "triggerWebhookTag"
-	PipelineFieldUuid                  = "uuid"
+	PipelineFieldUUID                  = "uuid"
 	PipelineFieldWebHookID             = "webhookId"
 )
 
@@ -52,7 +52,7 @@ type Pipeline struct {
 	NextStart             string                `json:"nextStart,omitempty" yaml:"nextStart,omitempty"`
 	OwnerReferences       []OwnerReference      `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PipelineState         string                `json:"pipelineState,omitempty" yaml:"pipelineState,omitempty"`
-	ProjectId             string                `json:"projectId,omitempty" yaml:"projectId,omitempty"`
+	ProjectID             string                `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	Removed               string                `json:"removed,omitempty" yaml:"removed,omitempty"`
 	SourceCodeCredential  *SourceCodeCredential `json:"sourceCodeCredential,omitempty" yaml:"sourceCodeCredential,omitempty"`
 	Stages                []Stage               `json:"stages,omitempty" yaml:"stages,omitempty"`
@@ -66,9 +66,10 @@ type Pipeline struct {
 	TriggerWebhookPr      bool                  `json:"triggerWebhookPr,omitempty" yaml:"triggerWebhookPr,omitempty"`
 	TriggerWebhookPush    bool                  `json:"triggerWebhookPush,omitempty" yaml:"triggerWebhookPush,omitempty"`
 	TriggerWebhookTag     bool                  `json:"triggerWebhookTag,omitempty" yaml:"triggerWebhookTag,omitempty"`
-	Uuid                  string                `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                  string                `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	WebHookID             string                `json:"webhookId,omitempty" yaml:"webhookId,omitempty"`
 }
+
 type PipelineCollection struct {
 	types.Collection
 	Data   []Pipeline `json:"data,omitempty"`
@@ -83,6 +84,7 @@ type PipelineOperations interface {
 	List(opts *types.ListOpts) (*PipelineCollection, error)
 	Create(opts *Pipeline) (*Pipeline, error)
 	Update(existing *Pipeline, updates interface{}) (*Pipeline, error)
+	Replace(existing *Pipeline) (*Pipeline, error)
 	ByID(id string) (*Pipeline, error)
 	Delete(container *Pipeline) error
 
@@ -108,6 +110,12 @@ func (c *PipelineClient) Create(container *Pipeline) (*Pipeline, error) {
 func (c *PipelineClient) Update(existing *Pipeline, updates interface{}) (*Pipeline, error) {
 	resp := &Pipeline{}
 	err := c.apiClient.Ops.DoUpdate(PipelineType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *PipelineClient) Replace(obj *Pipeline) (*Pipeline, error) {
+	resp := &Pipeline{}
+	err := c.apiClient.Ops.DoReplace(PipelineType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

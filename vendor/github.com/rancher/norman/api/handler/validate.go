@@ -27,6 +27,12 @@ func ParseAndValidateBody(apiContext *types.APIContext, create bool) (map[string
 	if !create {
 		op = builder.Update
 	}
+	if apiContext.Schema.InputFormatter != nil {
+		err = apiContext.Schema.InputFormatter(apiContext, apiContext.Schema, data, create)
+		if err != nil {
+			return nil, err
+		}
+	}
 	data, err = b.Construct(apiContext.Schema, data, op)
 	if err != nil {
 		return nil, err

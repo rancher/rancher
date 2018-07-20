@@ -19,7 +19,7 @@ const (
 	SecretFieldProjectID       = "projectId"
 	SecretFieldRemoved         = "removed"
 	SecretFieldStringData      = "stringData"
-	SecretFieldUuid            = "uuid"
+	SecretFieldUUID            = "uuid"
 )
 
 type Secret struct {
@@ -37,8 +37,9 @@ type Secret struct {
 	ProjectID       string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	StringData      map[string]string `json:"stringData,omitempty" yaml:"stringData,omitempty"`
-	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type SecretCollection struct {
 	types.Collection
 	Data   []Secret `json:"data,omitempty"`
@@ -53,6 +54,7 @@ type SecretOperations interface {
 	List(opts *types.ListOpts) (*SecretCollection, error)
 	Create(opts *Secret) (*Secret, error)
 	Update(existing *Secret, updates interface{}) (*Secret, error)
+	Replace(existing *Secret) (*Secret, error)
 	ByID(id string) (*Secret, error)
 	Delete(container *Secret) error
 }
@@ -72,6 +74,12 @@ func (c *SecretClient) Create(container *Secret) (*Secret, error) {
 func (c *SecretClient) Update(existing *Secret, updates interface{}) (*Secret, error) {
 	resp := &Secret{}
 	err := c.apiClient.Ops.DoUpdate(SecretType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *SecretClient) Replace(obj *Secret) (*Secret, error) {
+	resp := &Secret{}
+	err := c.apiClient.Ops.DoReplace(SecretType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

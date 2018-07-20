@@ -21,7 +21,7 @@ const (
 	AzureADConfigFieldTenantID            = "tenantId"
 	AzureADConfigFieldTokenEndpoint       = "tokenEndpoint"
 	AzureADConfigFieldType                = "type"
-	AzureADConfigFieldUuid                = "uuid"
+	AzureADConfigFieldUUID                = "uuid"
 )
 
 type AzureADConfig struct {
@@ -44,5 +44,5 @@ type AzureADConfig struct {
 	TenantID            string            `json:"tenantId,omitempty" yaml:"tenantId,omitempty"`
 	TokenEndpoint       string            `json:"tokenEndpoint,omitempty" yaml:"tokenEndpoint,omitempty"`
 	Type                string            `json:"type,omitempty" yaml:"type,omitempty"`
-	Uuid                string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }

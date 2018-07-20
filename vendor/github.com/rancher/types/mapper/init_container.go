@@ -24,7 +24,7 @@ func (e InitContainerMapper) FromInternal(data map[string]interface{}) {
 	}
 }
 
-func (e InitContainerMapper) ToInternal(data map[string]interface{}) {
+func (e InitContainerMapper) ToInternal(data map[string]interface{}) error {
 	var newContainers []interface{}
 	var newInitContainers []interface{}
 
@@ -41,6 +41,8 @@ func (e InitContainerMapper) ToInternal(data map[string]interface{}) {
 		data["containers"] = newContainers
 		data["initContainers"] = newInitContainers
 	}
+
+	return nil
 }
 
 func (e InitContainerMapper) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {

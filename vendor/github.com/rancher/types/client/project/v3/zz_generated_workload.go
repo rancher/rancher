@@ -33,7 +33,7 @@ const (
 	WorkloadFieldLabels                        = "labels"
 	WorkloadFieldName                          = "name"
 	WorkloadFieldNamespaceId                   = "namespaceId"
-	WorkloadFieldNodeId                        = "nodeId"
+	WorkloadFieldNodeID                        = "nodeId"
 	WorkloadFieldOwnerReferences               = "ownerReferences"
 	WorkloadFieldPaused                        = "paused"
 	WorkloadFieldPriority                      = "priority"
@@ -61,8 +61,8 @@ const (
 	WorkloadFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
 	WorkloadFieldTransitioning                 = "transitioning"
 	WorkloadFieldTransitioningMessage          = "transitioningMessage"
+	WorkloadFieldUUID                          = "uuid"
 	WorkloadFieldUid                           = "uid"
-	WorkloadFieldUuid                          = "uuid"
 	WorkloadFieldVolumes                       = "volumes"
 	WorkloadFieldWorkloadAnnotations           = "workloadAnnotations"
 	WorkloadFieldWorkloadLabels                = "workloadLabels"
@@ -97,7 +97,7 @@ type Workload struct {
 	Labels                        map[string]string            `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                          string                       `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId                   string                       `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
-	NodeId                        string                       `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
+	NodeID                        string                       `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
 	OwnerReferences               []OwnerReference             `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Paused                        bool                         `json:"paused,omitempty" yaml:"paused,omitempty"`
 	Priority                      *int64                       `json:"priority,omitempty" yaml:"priority,omitempty"`
@@ -125,12 +125,13 @@ type Workload struct {
 	TerminationGracePeriodSeconds *int64                       `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`
 	Transitioning                 string                       `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage          string                       `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	UUID                          string                       `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Uid                           *int64                       `json:"uid,omitempty" yaml:"uid,omitempty"`
-	Uuid                          string                       `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Volumes                       []Volume                     `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 	WorkloadAnnotations           map[string]string            `json:"workloadAnnotations,omitempty" yaml:"workloadAnnotations,omitempty"`
 	WorkloadLabels                map[string]string            `json:"workloadLabels,omitempty" yaml:"workloadLabels,omitempty"`
 }
+
 type WorkloadCollection struct {
 	types.Collection
 	Data   []Workload `json:"data,omitempty"`
@@ -145,6 +146,7 @@ type WorkloadOperations interface {
 	List(opts *types.ListOpts) (*WorkloadCollection, error)
 	Create(opts *Workload) (*Workload, error)
 	Update(existing *Workload, updates interface{}) (*Workload, error)
+	Replace(existing *Workload) (*Workload, error)
 	ByID(id string) (*Workload, error)
 	Delete(container *Workload) error
 
@@ -170,6 +172,12 @@ func (c *WorkloadClient) Create(container *Workload) (*Workload, error) {
 func (c *WorkloadClient) Update(existing *Workload, updates interface{}) (*Workload, error) {
 	resp := &Workload{}
 	err := c.apiClient.Ops.DoUpdate(WorkloadType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *WorkloadClient) Replace(obj *Workload) (*Workload, error) {
+	resp := &Workload{}
+	err := c.apiClient.Ops.DoReplace(WorkloadType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

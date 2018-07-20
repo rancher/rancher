@@ -24,8 +24,7 @@ const (
 )
 
 var (
-	debug  = false
-	dialer = &websocket.Dialer{}
+	Debug = false
 )
 
 type APIBaseClientInterface interface {
@@ -90,7 +89,7 @@ func IsNotFound(err error) bool {
 	return apiError.StatusCode == http.StatusNotFound
 }
 
-func newAPIError(resp *http.Response, url string) *APIError {
+func NewAPIError(resp *http.Response, url string) *APIError {
 	contents, err := ioutil.ReadAll(resp.Body)
 	var body string
 	if err != nil {
@@ -177,7 +176,7 @@ func NewAPIClient(opts *ClientOpts) (APIBaseClient, error) {
 	}
 
 	if opts.Timeout == 0 {
-		opts.Timeout = time.Second * 10
+		opts.Timeout = time.Minute
 	}
 
 	client.Timeout = opts.Timeout
@@ -209,7 +208,6 @@ func NewAPIClient(opts *ClientOpts) (APIBaseClient, error) {
 	if err != nil {
 		return result, err
 	}
-
 	req.Header.Add("Authorization", opts.getAuthHeader())
 
 	resp, err := client.Do(req)
@@ -219,7 +217,7 @@ func NewAPIClient(opts *ClientOpts) (APIBaseClient, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return result, newAPIError(resp, opts.URL)
+		return result, NewAPIError(resp, opts.URL)
 	}
 
 	schemasURLs := resp.Header.Get("X-API-Schemas")
@@ -229,20 +227,23 @@ func NewAPIClient(opts *ClientOpts) (APIBaseClient, error) {
 
 	if schemasURLs != opts.URL {
 		req, err = http.NewRequest("GET", schemasURLs, nil)
-		req.Header.Add("Authorization", opts.getAuthHeader())
 		if err != nil {
 			return result, err
+		}
+		req.Header.Add("Authorization", opts.getAuthHeader())
+
+		if Debug {
+			fmt.Println("GET " + req.URL.String())
 		}
 
 		resp, err = client.Do(req)
 		if err != nil {
 			return result, err
 		}
-
 		defer resp.Body.Close()
 
 		if resp.StatusCode != 200 {
-			return result, newAPIError(resp, opts.URL)
+			return result, NewAPIError(resp, schemasURLs)
 		}
 	}
 
@@ -250,6 +251,10 @@ func NewAPIClient(opts *ClientOpts) (APIBaseClient, error) {
 	bytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return result, err
+	}
+
+	if Debug {
+		fmt.Println("Response <= " + string(bytes))
 	}
 
 	err = json.Unmarshal(bytes, &schemas)
@@ -265,7 +270,13 @@ func NewAPIClient(opts *ClientOpts) (APIBaseClient, error) {
 	result.Ops = &APIOperations{
 		Opts:   opts,
 		Client: client,
+		Dialer: &websocket.Dialer{},
 		Types:  result.Types,
+	}
+
+	ht, ok := client.Transport.(*http.Transport)
+	if ok {
+		result.Ops.Dialer.TLSClientConfig = ht.TLSClientConfig
 	}
 
 	return result, nil
@@ -287,7 +298,7 @@ func (a *APIBaseClient) Websocket(url string, headers map[string][]string) (*web
 		httpHeaders.Add("Authorization", a.Opts.getAuthHeader())
 	}
 
-	return dialer.Dial(url, http.Header(httpHeaders))
+	return a.Ops.Dialer.Dial(url, http.Header(httpHeaders))
 }
 
 func (a *APIBaseClient) List(schemaType string, opts *types.ListOpts, respObject interface{}) error {
@@ -341,8 +352,8 @@ func (a *APIBaseClient) Action(schemaType string, action string,
 }
 
 func init() {
-	debug = os.Getenv("RANCHER_CLIENT_DEBUG") == "true"
-	if debug {
+	Debug = os.Getenv("RANCHER_CLIENT_DEBUG") == "true"
+	if Debug {
 		fmt.Println("Rancher client debug on")
 	}
 }

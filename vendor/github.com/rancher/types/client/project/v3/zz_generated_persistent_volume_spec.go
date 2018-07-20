@@ -28,7 +28,7 @@ const (
 	PersistentVolumeSpecFieldQuobyte                       = "quobyte"
 	PersistentVolumeSpecFieldRBD                           = "rbd"
 	PersistentVolumeSpecFieldScaleIO                       = "scaleIO"
-	PersistentVolumeSpecFieldStorageClassId                = "storageClassId"
+	PersistentVolumeSpecFieldStorageClassID                = "storageClassId"
 	PersistentVolumeSpecFieldStorageOS                     = "storageos"
 	PersistentVolumeSpecFieldVolumeMode                    = "volumeMode"
 	PersistentVolumeSpecFieldVsphereVolume                 = "vsphereVolume"
@@ -61,7 +61,7 @@ type PersistentVolumeSpec struct {
 	Quobyte                       *QuobyteVolumeSource              `json:"quobyte,omitempty" yaml:"quobyte,omitempty"`
 	RBD                           *RBDPersistentVolumeSource        `json:"rbd,omitempty" yaml:"rbd,omitempty"`
 	ScaleIO                       *ScaleIOPersistentVolumeSource    `json:"scaleIO,omitempty" yaml:"scaleIO,omitempty"`
-	StorageClassId                string                            `json:"storageClassId,omitempty" yaml:"storageClassId,omitempty"`
+	StorageClassID                string                            `json:"storageClassId,omitempty" yaml:"storageClassId,omitempty"`
 	StorageOS                     *StorageOSPersistentVolumeSource  `json:"storageos,omitempty" yaml:"storageos,omitempty"`
 	VolumeMode                    string                            `json:"volumeMode,omitempty" yaml:"volumeMode,omitempty"`
 	VsphereVolume                 *VsphereVirtualDiskVolumeSource   `json:"vsphereVolume,omitempty" yaml:"vsphereVolume,omitempty"`

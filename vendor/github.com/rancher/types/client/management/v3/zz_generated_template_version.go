@@ -26,8 +26,8 @@ const (
 	TemplateVersionFieldStatus               = "status"
 	TemplateVersionFieldTransitioning        = "transitioning"
 	TemplateVersionFieldTransitioningMessage = "transitioningMessage"
+	TemplateVersionFieldUUID                 = "uuid"
 	TemplateVersionFieldUpgradeVersionLinks  = "upgradeVersionLinks"
-	TemplateVersionFieldUuid                 = "uuid"
 	TemplateVersionFieldVersion              = "version"
 )
 
@@ -53,10 +53,11 @@ type TemplateVersion struct {
 	Status               *TemplateVersionStatus `json:"status,omitempty" yaml:"status,omitempty"`
 	Transitioning        string                 `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string                 `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	UUID                 string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	UpgradeVersionLinks  map[string]string      `json:"upgradeVersionLinks,omitempty" yaml:"upgradeVersionLinks,omitempty"`
-	Uuid                 string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Version              string                 `json:"version,omitempty" yaml:"version,omitempty"`
 }
+
 type TemplateVersionCollection struct {
 	types.Collection
 	Data   []TemplateVersion `json:"data,omitempty"`
@@ -71,6 +72,7 @@ type TemplateVersionOperations interface {
 	List(opts *types.ListOpts) (*TemplateVersionCollection, error)
 	Create(opts *TemplateVersion) (*TemplateVersion, error)
 	Update(existing *TemplateVersion, updates interface{}) (*TemplateVersion, error)
+	Replace(existing *TemplateVersion) (*TemplateVersion, error)
 	ByID(id string) (*TemplateVersion, error)
 	Delete(container *TemplateVersion) error
 }
@@ -90,6 +92,12 @@ func (c *TemplateVersionClient) Create(container *TemplateVersion) (*TemplateVer
 func (c *TemplateVersionClient) Update(existing *TemplateVersion, updates interface{}) (*TemplateVersion, error) {
 	resp := &TemplateVersion{}
 	err := c.apiClient.Ops.DoUpdate(TemplateVersionType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *TemplateVersionClient) Replace(obj *TemplateVersion) (*TemplateVersion, error) {
+	resp := &TemplateVersion{}
+	err := c.apiClient.Ops.DoReplace(TemplateVersionType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

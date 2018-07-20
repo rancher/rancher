@@ -17,8 +17,8 @@ const (
 	BasicAuthFieldPassword        = "password"
 	BasicAuthFieldProjectID       = "projectId"
 	BasicAuthFieldRemoved         = "removed"
+	BasicAuthFieldUUID            = "uuid"
 	BasicAuthFieldUsername        = "username"
-	BasicAuthFieldUuid            = "uuid"
 )
 
 type BasicAuth struct {
@@ -34,9 +34,10 @@ type BasicAuth struct {
 	Password        string            `json:"password,omitempty" yaml:"password,omitempty"`
 	ProjectID       string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Username        string            `json:"username,omitempty" yaml:"username,omitempty"`
-	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type BasicAuthCollection struct {
 	types.Collection
 	Data   []BasicAuth `json:"data,omitempty"`
@@ -51,6 +52,7 @@ type BasicAuthOperations interface {
 	List(opts *types.ListOpts) (*BasicAuthCollection, error)
 	Create(opts *BasicAuth) (*BasicAuth, error)
 	Update(existing *BasicAuth, updates interface{}) (*BasicAuth, error)
+	Replace(existing *BasicAuth) (*BasicAuth, error)
 	ByID(id string) (*BasicAuth, error)
 	Delete(container *BasicAuth) error
 }
@@ -70,6 +72,12 @@ func (c *BasicAuthClient) Create(container *BasicAuth) (*BasicAuth, error) {
 func (c *BasicAuthClient) Update(existing *BasicAuth, updates interface{}) (*BasicAuth, error) {
 	resp := &BasicAuth{}
 	err := c.apiClient.Ops.DoUpdate(BasicAuthType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *BasicAuthClient) Replace(obj *BasicAuth) (*BasicAuth, error) {
+	resp := &BasicAuth{}
+	err := c.apiClient.Ops.DoReplace(BasicAuthType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

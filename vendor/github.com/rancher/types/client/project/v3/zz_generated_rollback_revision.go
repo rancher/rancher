@@ -2,9 +2,9 @@ package client
 
 const (
 	RollbackRevisionType            = "rollbackRevision"
-	RollbackRevisionFieldRevisionId = "revisionId"
+	RollbackRevisionFieldRevisionID = "revisionId"
 )
 
 type RollbackRevision struct {
-	RevisionId string `json:"revisionId,omitempty" yaml:"revisionId,omitempty"`
+	RevisionID string `json:"revisionId,omitempty" yaml:"revisionId,omitempty"`
 }

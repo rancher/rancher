@@ -16,7 +16,7 @@ const (
 	ProjectAlertFieldName                  = "name"
 	ProjectAlertFieldNamespaceId           = "namespaceId"
 	ProjectAlertFieldOwnerReferences       = "ownerReferences"
-	ProjectAlertFieldProjectId             = "projectId"
+	ProjectAlertFieldProjectID             = "projectId"
 	ProjectAlertFieldRecipients            = "recipients"
 	ProjectAlertFieldRemoved               = "removed"
 	ProjectAlertFieldRepeatIntervalSeconds = "repeatIntervalSeconds"
@@ -26,7 +26,7 @@ const (
 	ProjectAlertFieldTargetWorkload        = "targetWorkload"
 	ProjectAlertFieldTransitioning         = "transitioning"
 	ProjectAlertFieldTransitioningMessage  = "transitioningMessage"
-	ProjectAlertFieldUuid                  = "uuid"
+	ProjectAlertFieldUUID                  = "uuid"
 )
 
 type ProjectAlert struct {
@@ -41,7 +41,7 @@ type ProjectAlert struct {
 	Name                  string            `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId           string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	OwnerReferences       []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	ProjectId             string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
+	ProjectID             string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	Recipients            []Recipient       `json:"recipients,omitempty" yaml:"recipients,omitempty"`
 	Removed               string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	RepeatIntervalSeconds int64             `json:"repeatIntervalSeconds,omitempty" yaml:"repeatIntervalSeconds,omitempty"`
@@ -51,8 +51,9 @@ type ProjectAlert struct {
 	TargetWorkload        *TargetWorkload   `json:"targetWorkload,omitempty" yaml:"targetWorkload,omitempty"`
 	Transitioning         string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage  string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	Uuid                  string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                  string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type ProjectAlertCollection struct {
 	types.Collection
 	Data   []ProjectAlert `json:"data,omitempty"`
@@ -67,6 +68,7 @@ type ProjectAlertOperations interface {
 	List(opts *types.ListOpts) (*ProjectAlertCollection, error)
 	Create(opts *ProjectAlert) (*ProjectAlert, error)
 	Update(existing *ProjectAlert, updates interface{}) (*ProjectAlert, error)
+	Replace(existing *ProjectAlert) (*ProjectAlert, error)
 	ByID(id string) (*ProjectAlert, error)
 	Delete(container *ProjectAlert) error
 
@@ -94,6 +96,12 @@ func (c *ProjectAlertClient) Create(container *ProjectAlert) (*ProjectAlert, err
 func (c *ProjectAlertClient) Update(existing *ProjectAlert, updates interface{}) (*ProjectAlert, error) {
 	resp := &ProjectAlert{}
 	err := c.apiClient.Ops.DoUpdate(ProjectAlertType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *ProjectAlertClient) Replace(obj *ProjectAlert) (*ProjectAlert, error) {
+	resp := &ProjectAlert{}
+	err := c.apiClient.Ops.DoReplace(ProjectAlertType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

@@ -30,8 +30,8 @@ const (
 	TemplateFieldStatus                   = "status"
 	TemplateFieldTransitioning            = "transitioning"
 	TemplateFieldTransitioningMessage     = "transitioningMessage"
+	TemplateFieldUUID                     = "uuid"
 	TemplateFieldUpgradeFrom              = "upgradeFrom"
-	TemplateFieldUuid                     = "uuid"
 	TemplateFieldVersionLinks             = "versionLinks"
 	TemplateFieldVersions                 = "versions"
 )
@@ -62,11 +62,12 @@ type Template struct {
 	Status                   *TemplateStatus       `json:"status,omitempty" yaml:"status,omitempty"`
 	Transitioning            string                `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage     string                `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	UUID                     string                `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	UpgradeFrom              string                `json:"upgradeFrom,omitempty" yaml:"upgradeFrom,omitempty"`
-	Uuid                     string                `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	VersionLinks             map[string]string     `json:"versionLinks,omitempty" yaml:"versionLinks,omitempty"`
 	Versions                 []TemplateVersionSpec `json:"versions,omitempty" yaml:"versions,omitempty"`
 }
+
 type TemplateCollection struct {
 	types.Collection
 	Data   []Template `json:"data,omitempty"`
@@ -81,6 +82,7 @@ type TemplateOperations interface {
 	List(opts *types.ListOpts) (*TemplateCollection, error)
 	Create(opts *Template) (*Template, error)
 	Update(existing *Template, updates interface{}) (*Template, error)
+	Replace(existing *Template) (*Template, error)
 	ByID(id string) (*Template, error)
 	Delete(container *Template) error
 }
@@ -100,6 +102,12 @@ func (c *TemplateClient) Create(container *Template) (*Template, error) {
 func (c *TemplateClient) Update(existing *Template, updates interface{}) (*Template, error) {
 	resp := &Template{}
 	err := c.apiClient.Ops.DoUpdate(TemplateType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *TemplateClient) Replace(obj *Template) (*Template, error) {
+	resp := &Template{}
+	err := c.apiClient.Ops.DoReplace(TemplateType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

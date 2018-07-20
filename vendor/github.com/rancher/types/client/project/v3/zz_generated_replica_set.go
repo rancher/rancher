@@ -25,7 +25,7 @@ const (
 	ReplicaSetFieldLabels                        = "labels"
 	ReplicaSetFieldName                          = "name"
 	ReplicaSetFieldNamespaceId                   = "namespaceId"
-	ReplicaSetFieldNodeId                        = "nodeId"
+	ReplicaSetFieldNodeID                        = "nodeId"
 	ReplicaSetFieldOwnerReferences               = "ownerReferences"
 	ReplicaSetFieldPriority                      = "priority"
 	ReplicaSetFieldPriorityClassName             = "priorityClassName"
@@ -48,8 +48,8 @@ const (
 	ReplicaSetFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
 	ReplicaSetFieldTransitioning                 = "transitioning"
 	ReplicaSetFieldTransitioningMessage          = "transitioningMessage"
+	ReplicaSetFieldUUID                          = "uuid"
 	ReplicaSetFieldUid                           = "uid"
-	ReplicaSetFieldUuid                          = "uuid"
 	ReplicaSetFieldVolumes                       = "volumes"
 	ReplicaSetFieldWorkloadAnnotations           = "workloadAnnotations"
 	ReplicaSetFieldWorkloadLabels                = "workloadLabels"
@@ -76,7 +76,7 @@ type ReplicaSet struct {
 	Labels                        map[string]string      `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                          string                 `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId                   string                 `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
-	NodeId                        string                 `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
+	NodeID                        string                 `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
 	OwnerReferences               []OwnerReference       `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Priority                      *int64                 `json:"priority,omitempty" yaml:"priority,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty" yaml:"priorityClassName,omitempty"`
@@ -99,12 +99,13 @@ type ReplicaSet struct {
 	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`
 	Transitioning                 string                 `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage          string                 `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	UUID                          string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Uid                           *int64                 `json:"uid,omitempty" yaml:"uid,omitempty"`
-	Uuid                          string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Volumes                       []Volume               `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 	WorkloadAnnotations           map[string]string      `json:"workloadAnnotations,omitempty" yaml:"workloadAnnotations,omitempty"`
 	WorkloadLabels                map[string]string      `json:"workloadLabels,omitempty" yaml:"workloadLabels,omitempty"`
 }
+
 type ReplicaSetCollection struct {
 	types.Collection
 	Data   []ReplicaSet `json:"data,omitempty"`
@@ -119,6 +120,7 @@ type ReplicaSetOperations interface {
 	List(opts *types.ListOpts) (*ReplicaSetCollection, error)
 	Create(opts *ReplicaSet) (*ReplicaSet, error)
 	Update(existing *ReplicaSet, updates interface{}) (*ReplicaSet, error)
+	Replace(existing *ReplicaSet) (*ReplicaSet, error)
 	ByID(id string) (*ReplicaSet, error)
 	Delete(container *ReplicaSet) error
 }
@@ -138,6 +140,12 @@ func (c *ReplicaSetClient) Create(container *ReplicaSet) (*ReplicaSet, error) {
 func (c *ReplicaSetClient) Update(existing *ReplicaSet, updates interface{}) (*ReplicaSet, error) {
 	resp := &ReplicaSet{}
 	err := c.apiClient.Ops.DoUpdate(ReplicaSetType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *ReplicaSetClient) Replace(obj *ReplicaSet) (*ReplicaSet, error) {
+	resp := &ReplicaSet{}
+	err := c.apiClient.Ops.DoReplace(ReplicaSetType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

@@ -18,7 +18,7 @@ const (
 	NamespacedSSHAuthFieldPrivateKey      = "privateKey"
 	NamespacedSSHAuthFieldProjectID       = "projectId"
 	NamespacedSSHAuthFieldRemoved         = "removed"
-	NamespacedSSHAuthFieldUuid            = "uuid"
+	NamespacedSSHAuthFieldUUID            = "uuid"
 )
 
 type NamespacedSSHAuth struct {
@@ -35,8 +35,9 @@ type NamespacedSSHAuth struct {
 	PrivateKey      string            `json:"privateKey,omitempty" yaml:"privateKey,omitempty"`
 	ProjectID       string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type NamespacedSSHAuthCollection struct {
 	types.Collection
 	Data   []NamespacedSSHAuth `json:"data,omitempty"`
@@ -51,6 +52,7 @@ type NamespacedSSHAuthOperations interface {
 	List(opts *types.ListOpts) (*NamespacedSSHAuthCollection, error)
 	Create(opts *NamespacedSSHAuth) (*NamespacedSSHAuth, error)
 	Update(existing *NamespacedSSHAuth, updates interface{}) (*NamespacedSSHAuth, error)
+	Replace(existing *NamespacedSSHAuth) (*NamespacedSSHAuth, error)
 	ByID(id string) (*NamespacedSSHAuth, error)
 	Delete(container *NamespacedSSHAuth) error
 }
@@ -70,6 +72,12 @@ func (c *NamespacedSSHAuthClient) Create(container *NamespacedSSHAuth) (*Namespa
 func (c *NamespacedSSHAuthClient) Update(existing *NamespacedSSHAuth, updates interface{}) (*NamespacedSSHAuth, error) {
 	resp := &NamespacedSSHAuth{}
 	err := c.apiClient.Ops.DoUpdate(NamespacedSSHAuthType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *NamespacedSSHAuthClient) Replace(obj *NamespacedSSHAuth) (*NamespacedSSHAuth, error) {
+	resp := &NamespacedSSHAuth{}
+	err := c.apiClient.Ops.DoReplace(NamespacedSSHAuthType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

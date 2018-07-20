@@ -28,7 +28,7 @@ const (
 	DynamicSchemaFieldStatus               = "status"
 	DynamicSchemaFieldTransitioning        = "transitioning"
 	DynamicSchemaFieldTransitioningMessage = "transitioningMessage"
-	DynamicSchemaFieldUuid                 = "uuid"
+	DynamicSchemaFieldUUID                 = "uuid"
 )
 
 type DynamicSchema struct {
@@ -55,8 +55,9 @@ type DynamicSchema struct {
 	Status               *DynamicSchemaStatus `json:"status,omitempty" yaml:"status,omitempty"`
 	Transitioning        string               `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string               `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	Uuid                 string               `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                 string               `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type DynamicSchemaCollection struct {
 	types.Collection
 	Data   []DynamicSchema `json:"data,omitempty"`
@@ -71,6 +72,7 @@ type DynamicSchemaOperations interface {
 	List(opts *types.ListOpts) (*DynamicSchemaCollection, error)
 	Create(opts *DynamicSchema) (*DynamicSchema, error)
 	Update(existing *DynamicSchema, updates interface{}) (*DynamicSchema, error)
+	Replace(existing *DynamicSchema) (*DynamicSchema, error)
 	ByID(id string) (*DynamicSchema, error)
 	Delete(container *DynamicSchema) error
 }
@@ -90,6 +92,12 @@ func (c *DynamicSchemaClient) Create(container *DynamicSchema) (*DynamicSchema, 
 func (c *DynamicSchemaClient) Update(existing *DynamicSchema, updates interface{}) (*DynamicSchema, error) {
 	resp := &DynamicSchema{}
 	err := c.apiClient.Ops.DoUpdate(DynamicSchemaType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *DynamicSchemaClient) Replace(obj *DynamicSchema) (*DynamicSchema, error) {
+	resp := &DynamicSchema{}
+	err := c.apiClient.Ops.DoReplace(DynamicSchemaType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

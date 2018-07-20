@@ -12,7 +12,8 @@ func (s Status) FromInternal(data map[string]interface{}) {
 	status.Set(data)
 }
 
-func (s Status) ToInternal(data map[string]interface{}) {
+func (s Status) ToInternal(data map[string]interface{}) error {
+	return nil
 }
 
 func (s Status) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {

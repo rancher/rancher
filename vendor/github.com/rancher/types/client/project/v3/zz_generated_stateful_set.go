@@ -25,7 +25,7 @@ const (
 	StatefulSetFieldLabels                        = "labels"
 	StatefulSetFieldName                          = "name"
 	StatefulSetFieldNamespaceId                   = "namespaceId"
-	StatefulSetFieldNodeId                        = "nodeId"
+	StatefulSetFieldNodeID                        = "nodeId"
 	StatefulSetFieldOwnerReferences               = "ownerReferences"
 	StatefulSetFieldPriority                      = "priority"
 	StatefulSetFieldPriorityClassName             = "priorityClassName"
@@ -48,8 +48,8 @@ const (
 	StatefulSetFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
 	StatefulSetFieldTransitioning                 = "transitioning"
 	StatefulSetFieldTransitioningMessage          = "transitioningMessage"
+	StatefulSetFieldUUID                          = "uuid"
 	StatefulSetFieldUid                           = "uid"
-	StatefulSetFieldUuid                          = "uuid"
 	StatefulSetFieldVolumes                       = "volumes"
 	StatefulSetFieldWorkloadAnnotations           = "workloadAnnotations"
 	StatefulSetFieldWorkloadLabels                = "workloadLabels"
@@ -76,7 +76,7 @@ type StatefulSet struct {
 	Labels                        map[string]string      `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                          string                 `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId                   string                 `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
-	NodeId                        string                 `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
+	NodeID                        string                 `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
 	OwnerReferences               []OwnerReference       `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Priority                      *int64                 `json:"priority,omitempty" yaml:"priority,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty" yaml:"priorityClassName,omitempty"`
@@ -99,12 +99,13 @@ type StatefulSet struct {
 	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`
 	Transitioning                 string                 `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage          string                 `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	UUID                          string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Uid                           *int64                 `json:"uid,omitempty" yaml:"uid,omitempty"`
-	Uuid                          string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Volumes                       []Volume               `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 	WorkloadAnnotations           map[string]string      `json:"workloadAnnotations,omitempty" yaml:"workloadAnnotations,omitempty"`
 	WorkloadLabels                map[string]string      `json:"workloadLabels,omitempty" yaml:"workloadLabels,omitempty"`
 }
+
 type StatefulSetCollection struct {
 	types.Collection
 	Data   []StatefulSet `json:"data,omitempty"`
@@ -119,6 +120,7 @@ type StatefulSetOperations interface {
 	List(opts *types.ListOpts) (*StatefulSetCollection, error)
 	Create(opts *StatefulSet) (*StatefulSet, error)
 	Update(existing *StatefulSet, updates interface{}) (*StatefulSet, error)
+	Replace(existing *StatefulSet) (*StatefulSet, error)
 	ByID(id string) (*StatefulSet, error)
 	Delete(container *StatefulSet) error
 }
@@ -138,6 +140,12 @@ func (c *StatefulSetClient) Create(container *StatefulSet) (*StatefulSet, error)
 func (c *StatefulSetClient) Update(existing *StatefulSet, updates interface{}) (*StatefulSet, error) {
 	resp := &StatefulSet{}
 	err := c.apiClient.Ops.DoUpdate(StatefulSetType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *StatefulSetClient) Replace(obj *StatefulSet) (*StatefulSet, error) {
+	resp := &StatefulSet{}
+	err := c.apiClient.Ops.DoReplace(StatefulSetType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

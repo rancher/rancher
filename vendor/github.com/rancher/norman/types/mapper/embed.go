@@ -26,9 +26,9 @@ func (e *Embed) FromInternal(data map[string]interface{}) {
 	delete(data, e.Field)
 }
 
-func (e *Embed) ToInternal(data map[string]interface{}) {
+func (e *Embed) ToInternal(data map[string]interface{}) error {
 	if data == nil {
-		return
+		return nil
 	}
 
 	sub := map[string]interface{}{}
@@ -43,9 +43,10 @@ func (e *Embed) ToInternal(data map[string]interface{}) {
 		if e.EmptyValueOk {
 			data[e.Field] = nil
 		}
-		return
+		return nil
 	}
 	data[e.Field] = sub
+	return nil
 }
 
 func (e *Embed) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {
@@ -62,6 +63,9 @@ func (e *Embed) ModifySchema(schema *types.Schema, schemas *types.Schemas) error
 	embeddedSchemaID := schema.ResourceFields[e.Field].Type
 	embeddedSchema := schemas.Schema(&schema.Version, embeddedSchemaID)
 	if embeddedSchema == nil {
+		if e.Optional {
+			return nil
+		}
 		return fmt.Errorf("failed to find schema %s for embedding", embeddedSchemaID)
 	}
 

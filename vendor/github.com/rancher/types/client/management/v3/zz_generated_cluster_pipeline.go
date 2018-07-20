@@ -7,7 +7,7 @@ import (
 const (
 	ClusterPipelineType                      = "clusterPipeline"
 	ClusterPipelineFieldAnnotations          = "annotations"
-	ClusterPipelineFieldClusterId            = "clusterId"
+	ClusterPipelineFieldClusterID            = "clusterId"
 	ClusterPipelineFieldCreated              = "created"
 	ClusterPipelineFieldCreatorID            = "creatorId"
 	ClusterPipelineFieldDeploy               = "deploy"
@@ -21,13 +21,13 @@ const (
 	ClusterPipelineFieldStatus               = "status"
 	ClusterPipelineFieldTransitioning        = "transitioning"
 	ClusterPipelineFieldTransitioningMessage = "transitioningMessage"
-	ClusterPipelineFieldUuid                 = "uuid"
+	ClusterPipelineFieldUUID                 = "uuid"
 )
 
 type ClusterPipeline struct {
 	types.Resource
 	Annotations          map[string]string      `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	ClusterId            string                 `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	ClusterID            string                 `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	Created              string                 `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string                 `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Deploy               bool                   `json:"deploy,omitempty" yaml:"deploy,omitempty"`
@@ -41,8 +41,9 @@ type ClusterPipeline struct {
 	Status               *ClusterPipelineStatus `json:"status,omitempty" yaml:"status,omitempty"`
 	Transitioning        string                 `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string                 `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	Uuid                 string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                 string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type ClusterPipelineCollection struct {
 	types.Collection
 	Data   []ClusterPipeline `json:"data,omitempty"`
@@ -57,6 +58,7 @@ type ClusterPipelineOperations interface {
 	List(opts *types.ListOpts) (*ClusterPipelineCollection, error)
 	Create(opts *ClusterPipeline) (*ClusterPipeline, error)
 	Update(existing *ClusterPipeline, updates interface{}) (*ClusterPipeline, error)
+	Replace(existing *ClusterPipeline) (*ClusterPipeline, error)
 	ByID(id string) (*ClusterPipeline, error)
 	Delete(container *ClusterPipeline) error
 
@@ -86,6 +88,12 @@ func (c *ClusterPipelineClient) Create(container *ClusterPipeline) (*ClusterPipe
 func (c *ClusterPipelineClient) Update(existing *ClusterPipeline, updates interface{}) (*ClusterPipeline, error) {
 	resp := &ClusterPipeline{}
 	err := c.apiClient.Ops.DoUpdate(ClusterPipelineType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *ClusterPipelineClient) Replace(obj *ClusterPipeline) (*ClusterPipeline, error) {
+	resp := &ClusterPipeline{}
+	err := c.apiClient.Ops.DoReplace(ClusterPipelineType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

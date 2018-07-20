@@ -20,11 +20,11 @@ const (
 	PersistentVolumeClaimFieldSelector             = "selector"
 	PersistentVolumeClaimFieldState                = "state"
 	PersistentVolumeClaimFieldStatus               = "status"
-	PersistentVolumeClaimFieldStorageClassId       = "storageClassId"
+	PersistentVolumeClaimFieldStorageClassID       = "storageClassId"
 	PersistentVolumeClaimFieldTransitioning        = "transitioning"
 	PersistentVolumeClaimFieldTransitioningMessage = "transitioningMessage"
-	PersistentVolumeClaimFieldUuid                 = "uuid"
-	PersistentVolumeClaimFieldVolumeId             = "volumeId"
+	PersistentVolumeClaimFieldUUID                 = "uuid"
+	PersistentVolumeClaimFieldVolumeID             = "volumeId"
 	PersistentVolumeClaimFieldVolumeMode           = "volumeMode"
 )
 
@@ -44,13 +44,14 @@ type PersistentVolumeClaim struct {
 	Selector             *LabelSelector               `json:"selector,omitempty" yaml:"selector,omitempty"`
 	State                string                       `json:"state,omitempty" yaml:"state,omitempty"`
 	Status               *PersistentVolumeClaimStatus `json:"status,omitempty" yaml:"status,omitempty"`
-	StorageClassId       string                       `json:"storageClassId,omitempty" yaml:"storageClassId,omitempty"`
+	StorageClassID       string                       `json:"storageClassId,omitempty" yaml:"storageClassId,omitempty"`
 	Transitioning        string                       `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string                       `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	Uuid                 string                       `json:"uuid,omitempty" yaml:"uuid,omitempty"`
-	VolumeId             string                       `json:"volumeId,omitempty" yaml:"volumeId,omitempty"`
+	UUID                 string                       `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	VolumeID             string                       `json:"volumeId,omitempty" yaml:"volumeId,omitempty"`
 	VolumeMode           string                       `json:"volumeMode,omitempty" yaml:"volumeMode,omitempty"`
 }
+
 type PersistentVolumeClaimCollection struct {
 	types.Collection
 	Data   []PersistentVolumeClaim `json:"data,omitempty"`
@@ -65,6 +66,7 @@ type PersistentVolumeClaimOperations interface {
 	List(opts *types.ListOpts) (*PersistentVolumeClaimCollection, error)
 	Create(opts *PersistentVolumeClaim) (*PersistentVolumeClaim, error)
 	Update(existing *PersistentVolumeClaim, updates interface{}) (*PersistentVolumeClaim, error)
+	Replace(existing *PersistentVolumeClaim) (*PersistentVolumeClaim, error)
 	ByID(id string) (*PersistentVolumeClaim, error)
 	Delete(container *PersistentVolumeClaim) error
 }
@@ -84,6 +86,12 @@ func (c *PersistentVolumeClaimClient) Create(container *PersistentVolumeClaim) (
 func (c *PersistentVolumeClaimClient) Update(existing *PersistentVolumeClaim, updates interface{}) (*PersistentVolumeClaim, error) {
 	resp := &PersistentVolumeClaim{}
 	err := c.apiClient.Ops.DoUpdate(PersistentVolumeClaimType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *PersistentVolumeClaimClient) Replace(obj *PersistentVolumeClaim) (*PersistentVolumeClaim, error) {
+	resp := &PersistentVolumeClaim{}
+	err := c.apiClient.Ops.DoReplace(PersistentVolumeClaimType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

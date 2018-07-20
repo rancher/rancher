@@ -15,7 +15,7 @@ const (
 	PodSpecFieldHostPID                       = "hostPID"
 	PodSpecFieldHostname                      = "hostname"
 	PodSpecFieldImagePullSecrets              = "imagePullSecrets"
-	PodSpecFieldNodeId                        = "nodeId"
+	PodSpecFieldNodeID                        = "nodeId"
 	PodSpecFieldPriority                      = "priority"
 	PodSpecFieldPriorityClassName             = "priorityClassName"
 	PodSpecFieldRestartPolicy                 = "restartPolicy"
@@ -45,7 +45,7 @@ type PodSpec struct {
 	HostPID                       bool                   `json:"hostPID,omitempty" yaml:"hostPID,omitempty"`
 	Hostname                      string                 `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	ImagePullSecrets              []LocalObjectReference `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
-	NodeId                        string                 `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
+	NodeID                        string                 `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
 	Priority                      *int64                 `json:"priority,omitempty" yaml:"priority,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty" yaml:"priorityClassName,omitempty"`
 	RestartPolicy                 string                 `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`

@@ -26,7 +26,7 @@ const (
 	PodFieldLabels                        = "labels"
 	PodFieldName                          = "name"
 	PodFieldNamespaceId                   = "namespaceId"
-	PodFieldNodeId                        = "nodeId"
+	PodFieldNodeID                        = "nodeId"
 	PodFieldOwnerReferences               = "ownerReferences"
 	PodFieldPriority                      = "priority"
 	PodFieldPriorityClassName             = "priorityClassName"
@@ -46,8 +46,8 @@ const (
 	PodFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
 	PodFieldTransitioning                 = "transitioning"
 	PodFieldTransitioningMessage          = "transitioningMessage"
+	PodFieldUUID                          = "uuid"
 	PodFieldUid                           = "uid"
-	PodFieldUuid                          = "uuid"
 	PodFieldVolumes                       = "volumes"
 	PodFieldWorkloadID                    = "workloadId"
 )
@@ -74,7 +74,7 @@ type Pod struct {
 	Labels                        map[string]string      `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                          string                 `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId                   string                 `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
-	NodeId                        string                 `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
+	NodeID                        string                 `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
 	OwnerReferences               []OwnerReference       `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Priority                      *int64                 `json:"priority,omitempty" yaml:"priority,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty" yaml:"priorityClassName,omitempty"`
@@ -94,11 +94,12 @@ type Pod struct {
 	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`
 	Transitioning                 string                 `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage          string                 `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	UUID                          string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Uid                           *int64                 `json:"uid,omitempty" yaml:"uid,omitempty"`
-	Uuid                          string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Volumes                       []Volume               `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 	WorkloadID                    string                 `json:"workloadId,omitempty" yaml:"workloadId,omitempty"`
 }
+
 type PodCollection struct {
 	types.Collection
 	Data   []Pod `json:"data,omitempty"`
@@ -113,6 +114,7 @@ type PodOperations interface {
 	List(opts *types.ListOpts) (*PodCollection, error)
 	Create(opts *Pod) (*Pod, error)
 	Update(existing *Pod, updates interface{}) (*Pod, error)
+	Replace(existing *Pod) (*Pod, error)
 	ByID(id string) (*Pod, error)
 	Delete(container *Pod) error
 }
@@ -132,6 +134,12 @@ func (c *PodClient) Create(container *Pod) (*Pod, error) {
 func (c *PodClient) Update(existing *Pod, updates interface{}) (*Pod, error) {
 	resp := &Pod{}
 	err := c.apiClient.Ops.DoUpdate(PodType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *PodClient) Replace(obj *Pod) (*Pod, error) {
+	resp := &Pod{}
+	err := c.apiClient.Ops.DoReplace(PodType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

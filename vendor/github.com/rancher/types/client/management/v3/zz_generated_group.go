@@ -13,7 +13,7 @@ const (
 	GroupFieldName            = "name"
 	GroupFieldOwnerReferences = "ownerReferences"
 	GroupFieldRemoved         = "removed"
-	GroupFieldUuid            = "uuid"
+	GroupFieldUUID            = "uuid"
 )
 
 type Group struct {
@@ -25,8 +25,9 @@ type Group struct {
 	Name            string            `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type GroupCollection struct {
 	types.Collection
 	Data   []Group `json:"data,omitempty"`
@@ -41,6 +42,7 @@ type GroupOperations interface {
 	List(opts *types.ListOpts) (*GroupCollection, error)
 	Create(opts *Group) (*Group, error)
 	Update(existing *Group, updates interface{}) (*Group, error)
+	Replace(existing *Group) (*Group, error)
 	ByID(id string) (*Group, error)
 	Delete(container *Group) error
 }
@@ -60,6 +62,12 @@ func (c *GroupClient) Create(container *Group) (*Group, error) {
 func (c *GroupClient) Update(existing *Group, updates interface{}) (*Group, error) {
 	resp := &Group{}
 	err := c.apiClient.Ops.DoUpdate(GroupType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *GroupClient) Replace(obj *Group) (*Group, error) {
+	resp := &Group{}
+	err := c.apiClient.Ops.DoReplace(GroupType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

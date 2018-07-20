@@ -9,6 +9,7 @@ var (
 	PermissionDenied = ErrorCode{"PermissionDenied", 403}
 	NotFound         = ErrorCode{"NotFound", 404}
 	MethodNotAllowed = ErrorCode{"MethodNotAllow", 405}
+	Conflict         = ErrorCode{"Conflict", 409}
 
 	InvalidDateFormat  = ErrorCode{"InvalidDateFormat", 422}
 	InvalidFormat      = ErrorCode{"InvalidFormat", 422}

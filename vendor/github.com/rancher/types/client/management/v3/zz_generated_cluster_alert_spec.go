@@ -2,7 +2,7 @@ package client
 
 const (
 	ClusterAlertSpecType                       = "clusterAlertSpec"
-	ClusterAlertSpecFieldClusterId             = "clusterId"
+	ClusterAlertSpecFieldClusterID             = "clusterId"
 	ClusterAlertSpecFieldDescription           = "description"
 	ClusterAlertSpecFieldDisplayName           = "displayName"
 	ClusterAlertSpecFieldInitialWaitSeconds    = "initialWaitSeconds"
@@ -15,7 +15,7 @@ const (
 )
 
 type ClusterAlertSpec struct {
-	ClusterId             string               `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	ClusterID             string               `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	Description           string               `json:"description,omitempty" yaml:"description,omitempty"`
 	DisplayName           string               `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	InitialWaitSeconds    int64                `json:"initialWaitSeconds,omitempty" yaml:"initialWaitSeconds,omitempty"`

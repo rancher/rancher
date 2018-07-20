@@ -17,6 +17,7 @@ type status struct {
 }
 
 type condition struct {
+	Reason  string
 	Type    string
 	Status  string
 	Message string
@@ -83,9 +84,10 @@ var errorMapping = map[string]bool{
 // False == transitioning
 // Unknown == error
 var doneMap = map[string]string{
-	"Completed": "activating",
-	"Ready":     "unavailable",
-	"Available": "updating",
+	"Completed":   "activating",
+	"Ready":       "unavailable",
+	"Available":   "updating",
+	"Progressing": "inactive",
 }
 
 // True == transitioning
@@ -105,16 +107,16 @@ func concat(str, next string) string {
 
 func Set(data map[string]interface{}) {
 	genericStatus(data)
-	loadBalancerSetatus(data)
+	loadBalancerStatus(data)
 }
 
-func loadBalancerSetatus(data map[string]interface{}) {
+func loadBalancerStatus(data map[string]interface{}) {
 	if data["state"] == "active" && data["kind"] == "Service" && values.GetValueN(data, "spec", "serviceKind") == "LoadBalancer" {
 		addresses, ok := values.GetSlice(data, "status", "loadBalancer", "ingress")
 		if !ok || len(addresses) == 0 {
 			data["state"] = "pending"
 			data["transitioning"] = "yes"
-			data["transitioningMessage"] = "Load Balancer is being provisioned"
+			data["transitioningMessage"] = "Load balancer is being provisioned"
 		}
 	}
 }
@@ -149,7 +151,7 @@ func genericStatus(data map[string]interface{}) {
 	message := ""
 
 	for _, c := range conditions {
-		if errorMapping[c.Type] && c.Status == "False" {
+		if (errorMapping[c.Type] && c.Status == "False") || c.Reason == "Error" {
 			error = true
 			message = c.Message
 			break
@@ -284,6 +286,10 @@ func genericStatus(data map[string]interface{}) {
 		if ok && len(finalizers) > 0 {
 			parts := strings.Split(finalizers[0], "controller.cattle.io/")
 			f := parts[len(parts)-1]
+
+			if f == "foregroundDeletion" {
+				f = "object cleanup"
+			}
 
 			if len(msg) > 0 {
 				msg = msg + "; waiting on " + f

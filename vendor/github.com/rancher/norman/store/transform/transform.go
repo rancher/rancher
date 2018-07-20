@@ -1,6 +1,9 @@
 package transform
 
 import (
+	"fmt"
+
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 )
@@ -30,11 +33,15 @@ func (s *Store) ByID(apiContext *types.APIContext, schema *types.Schema, id stri
 	if s.Transformer == nil {
 		return data, nil
 	}
-	return s.Transformer(apiContext, schema, data, &types.QueryOptions{
+	obj, err := s.Transformer(apiContext, schema, data, &types.QueryOptions{
 		Options: map[string]string{
 			"ByID": "true",
 		},
 	})
+	if obj == nil && err == nil {
+		return obj, httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("%s not found", id))
+	}
+	return obj, err
 }
 
 func (s *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {

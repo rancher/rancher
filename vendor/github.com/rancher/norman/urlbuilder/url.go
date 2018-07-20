@@ -12,10 +12,10 @@ import (
 )
 
 const (
-	DefaultOverrideURLHeader = "X-API-request-url"
-	ForwardedHostHeader      = "X-Forwarded-Host"
-	ForwardedProtoHeader     = "X-Forwarded-Proto"
-	ForwardedPortHeader      = "X-Forwarded-Port"
+	PrefixHeader         = "X-API-URL-Prefix"
+	ForwardedHostHeader  = "X-Forwarded-Host"
+	ForwardedProtoHeader = "X-Forwarded-Proto"
+	ForwardedPortHeader  = "X-Forwarded-Port"
 )
 
 func New(r *http.Request, version types.APIVersion, schemas *types.Schemas) (types.URLBuilder, error) {
@@ -173,24 +173,16 @@ func (u *urlBuilder) getPluralName(schema *types.Schema) string {
 
 // Constructs the request URL based off of standard headers in the request, falling back to the HttpServletRequest.getRequestURL()
 // if the headers aren't available. Here is the ordered list of how we'll attempt to construct the URL:
-//  - x-api-request-url
 //  - x-forwarded-proto://x-forwarded-host:x-forwarded-port/HttpServletRequest.getRequestURI()
 //  - x-forwarded-proto://x-forwarded-host/HttpServletRequest.getRequestURI()
 //  - x-forwarded-proto://host:x-forwarded-port/HttpServletRequest.getRequestURI()
 //  - x-forwarded-proto://host/HttpServletRequest.getRequestURI() request.getRequestURL()
 //
 // Additional notes:
-//  - With x-api-request-url, the query string is passed, it will be dropped to match the other formats.
 //  - If the x-forwarded-host/host header has a port and x-forwarded-port has been passed, x-forwarded-port will be used.
 func parseRequestURL(r *http.Request) string {
-	// Get url from custom x-api-request-url header
-	requestURL := getOverrideHeader(r, DefaultOverrideURLHeader, "")
-	if requestURL != "" {
-		return strings.SplitN(requestURL, "?", 2)[0]
-	}
-
 	// Get url from standard headers
-	requestURL = getURLFromStandardHeaders(r)
+	requestURL := getURLFromStandardHeaders(r)
 	if requestURL != "" {
 		return requestURL
 	}
@@ -200,7 +192,7 @@ func parseRequestURL(r *http.Request) string {
 	if r.TLS != nil {
 		scheme = "https"
 	}
-	return fmt.Sprintf("%s://%s%s", scheme, r.Host, r.URL.Path)
+	return fmt.Sprintf("%s://%s%s%s", scheme, r.Host, r.Header.Get(PrefixHeader), r.URL.Path)
 }
 
 func getURLFromStandardHeaders(r *http.Request) string {
@@ -234,7 +226,7 @@ func getURLFromStandardHeaders(r *http.Request) string {
 		port = ":" + port
 	}
 
-	return fmt.Sprintf("%s://%s%s%s", xForwardedProto, host, port, r.URL.Path)
+	return fmt.Sprintf("%s://%s%s%s%s", xForwardedProto, host, port, r.Header.Get(PrefixHeader), r.URL.Path)
 }
 
 func getOverrideHeader(r *http.Request, header string, defaultValue string) string {

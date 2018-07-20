@@ -13,9 +13,9 @@ type RegistryCredentialMapper struct {
 func (e RegistryCredentialMapper) FromInternal(data map[string]interface{}) {
 }
 
-func (e RegistryCredentialMapper) ToInternal(data map[string]interface{}) {
+func (e RegistryCredentialMapper) ToInternal(data map[string]interface{}) error {
 	if data == nil {
-		return
+		return nil
 	}
 
 	auth := convert.ToString(data["auth"])
@@ -25,6 +25,8 @@ func (e RegistryCredentialMapper) ToInternal(data map[string]interface{}) {
 	if auth == "" && username != "" && password != "" {
 		data["auth"] = base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
 	}
+
+	return nil
 }
 
 func (e RegistryCredentialMapper) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {

@@ -29,8 +29,8 @@ const (
 	NodeTemplateFieldStatus                   = "status"
 	NodeTemplateFieldTransitioning            = "transitioning"
 	NodeTemplateFieldTransitioningMessage     = "transitioningMessage"
+	NodeTemplateFieldUUID                     = "uuid"
 	NodeTemplateFieldUseInternalIPAddress     = "useInternalIpAddress"
-	NodeTemplateFieldUuid                     = "uuid"
 )
 
 type NodeTemplate struct {
@@ -58,9 +58,10 @@ type NodeTemplate struct {
 	Status                   *NodeTemplateStatus `json:"status,omitempty" yaml:"status,omitempty"`
 	Transitioning            string              `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage     string              `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	UUID                     string              `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	UseInternalIPAddress     bool                `json:"useInternalIpAddress,omitempty" yaml:"useInternalIpAddress,omitempty"`
-	Uuid                     string              `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type NodeTemplateCollection struct {
 	types.Collection
 	Data   []NodeTemplate `json:"data,omitempty"`
@@ -75,6 +76,7 @@ type NodeTemplateOperations interface {
 	List(opts *types.ListOpts) (*NodeTemplateCollection, error)
 	Create(opts *NodeTemplate) (*NodeTemplate, error)
 	Update(existing *NodeTemplate, updates interface{}) (*NodeTemplate, error)
+	Replace(existing *NodeTemplate) (*NodeTemplate, error)
 	ByID(id string) (*NodeTemplate, error)
 	Delete(container *NodeTemplate) error
 }
@@ -94,6 +96,12 @@ func (c *NodeTemplateClient) Create(container *NodeTemplate) (*NodeTemplate, err
 func (c *NodeTemplateClient) Update(existing *NodeTemplate, updates interface{}) (*NodeTemplate, error) {
 	resp := &NodeTemplate{}
 	err := c.apiClient.Ops.DoUpdate(NodeTemplateType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *NodeTemplateClient) Replace(obj *NodeTemplate) (*NodeTemplate, error) {
+	resp := &NodeTemplate{}
+	err := c.apiClient.Ops.DoReplace(NodeTemplateType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

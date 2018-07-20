@@ -15,7 +15,8 @@ func (d Drop) FromInternal(data map[string]interface{}) {
 	delete(data, d.Field)
 }
 
-func (d Drop) ToInternal(data map[string]interface{}) {
+func (d Drop) ToInternal(data map[string]interface{}) error {
+	return nil
 }
 
 func (d Drop) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {

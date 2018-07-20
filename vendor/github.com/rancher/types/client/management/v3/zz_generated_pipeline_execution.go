@@ -19,8 +19,8 @@ const (
 	PipelineExecutionFieldNamespaceId          = "namespaceId"
 	PipelineExecutionFieldOwnerReferences      = "ownerReferences"
 	PipelineExecutionFieldPipeline             = "pipeline"
-	PipelineExecutionFieldPipelineId           = "pipelineId"
-	PipelineExecutionFieldProjectId            = "projectId"
+	PipelineExecutionFieldPipelineID           = "pipelineId"
+	PipelineExecutionFieldProjectID            = "projectId"
 	PipelineExecutionFieldRemoved              = "removed"
 	PipelineExecutionFieldRun                  = "run"
 	PipelineExecutionFieldStages               = "stages"
@@ -28,9 +28,9 @@ const (
 	PipelineExecutionFieldState                = "state"
 	PipelineExecutionFieldTransitioning        = "transitioning"
 	PipelineExecutionFieldTransitioningMessage = "transitioningMessage"
-	PipelineExecutionFieldTriggerUserId        = "triggerUserId"
+	PipelineExecutionFieldTriggerUserID        = "triggerUserId"
 	PipelineExecutionFieldTriggeredBy          = "triggeredBy"
-	PipelineExecutionFieldUuid                 = "uuid"
+	PipelineExecutionFieldUUID                 = "uuid"
 )
 
 type PipelineExecution struct {
@@ -48,8 +48,8 @@ type PipelineExecution struct {
 	NamespaceId          string              `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	OwnerReferences      []OwnerReference    `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Pipeline             *Pipeline           `json:"pipeline,omitempty" yaml:"pipeline,omitempty"`
-	PipelineId           string              `json:"pipelineId,omitempty" yaml:"pipelineId,omitempty"`
-	ProjectId            string              `json:"projectId,omitempty" yaml:"projectId,omitempty"`
+	PipelineID           string              `json:"pipelineId,omitempty" yaml:"pipelineId,omitempty"`
+	ProjectID            string              `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	Removed              string              `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Run                  int64               `json:"run,omitempty" yaml:"run,omitempty"`
 	Stages               []StageStatus       `json:"stages,omitempty" yaml:"stages,omitempty"`
@@ -57,10 +57,11 @@ type PipelineExecution struct {
 	State                string              `json:"state,omitempty" yaml:"state,omitempty"`
 	Transitioning        string              `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string              `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	TriggerUserId        string              `json:"triggerUserId,omitempty" yaml:"triggerUserId,omitempty"`
+	TriggerUserID        string              `json:"triggerUserId,omitempty" yaml:"triggerUserId,omitempty"`
 	TriggeredBy          string              `json:"triggeredBy,omitempty" yaml:"triggeredBy,omitempty"`
-	Uuid                 string              `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                 string              `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type PipelineExecutionCollection struct {
 	types.Collection
 	Data   []PipelineExecution `json:"data,omitempty"`
@@ -75,6 +76,7 @@ type PipelineExecutionOperations interface {
 	List(opts *types.ListOpts) (*PipelineExecutionCollection, error)
 	Create(opts *PipelineExecution) (*PipelineExecution, error)
 	Update(existing *PipelineExecution, updates interface{}) (*PipelineExecution, error)
+	Replace(existing *PipelineExecution) (*PipelineExecution, error)
 	ByID(id string) (*PipelineExecution, error)
 	Delete(container *PipelineExecution) error
 
@@ -98,6 +100,12 @@ func (c *PipelineExecutionClient) Create(container *PipelineExecution) (*Pipelin
 func (c *PipelineExecutionClient) Update(existing *PipelineExecution, updates interface{}) (*PipelineExecution, error) {
 	resp := &PipelineExecution{}
 	err := c.apiClient.Ops.DoUpdate(PipelineExecutionType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *PipelineExecutionClient) Replace(obj *PipelineExecution) (*PipelineExecution, error) {
+	resp := &PipelineExecution{}
+	err := c.apiClient.Ops.DoReplace(PipelineExecutionType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

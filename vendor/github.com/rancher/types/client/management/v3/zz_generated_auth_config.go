@@ -17,7 +17,7 @@ const (
 	AuthConfigFieldOwnerReferences     = "ownerReferences"
 	AuthConfigFieldRemoved             = "removed"
 	AuthConfigFieldType                = "type"
-	AuthConfigFieldUuid                = "uuid"
+	AuthConfigFieldUUID                = "uuid"
 )
 
 type AuthConfig struct {
@@ -33,8 +33,9 @@ type AuthConfig struct {
 	OwnerReferences     []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Removed             string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Type                string            `json:"type,omitempty" yaml:"type,omitempty"`
-	Uuid                string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type AuthConfigCollection struct {
 	types.Collection
 	Data   []AuthConfig `json:"data,omitempty"`
@@ -49,6 +50,7 @@ type AuthConfigOperations interface {
 	List(opts *types.ListOpts) (*AuthConfigCollection, error)
 	Create(opts *AuthConfig) (*AuthConfig, error)
 	Update(existing *AuthConfig, updates interface{}) (*AuthConfig, error)
+	Replace(existing *AuthConfig) (*AuthConfig, error)
 	ByID(id string) (*AuthConfig, error)
 	Delete(container *AuthConfig) error
 }
@@ -68,6 +70,12 @@ func (c *AuthConfigClient) Create(container *AuthConfig) (*AuthConfig, error) {
 func (c *AuthConfigClient) Update(existing *AuthConfig, updates interface{}) (*AuthConfig, error) {
 	resp := &AuthConfig{}
 	err := c.apiClient.Ops.DoUpdate(AuthConfigType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *AuthConfigClient) Replace(obj *AuthConfig) (*AuthConfig, error) {
+	resp := &AuthConfig{}
+	err := c.apiClient.Ops.DoReplace(AuthConfigType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

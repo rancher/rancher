@@ -16,7 +16,7 @@ const (
 	DeploymentSpecFieldHostPID                       = "hostPID"
 	DeploymentSpecFieldHostname                      = "hostname"
 	DeploymentSpecFieldImagePullSecrets              = "imagePullSecrets"
-	DeploymentSpecFieldNodeId                        = "nodeId"
+	DeploymentSpecFieldNodeID                        = "nodeId"
 	DeploymentSpecFieldObjectMeta                    = "metadata"
 	DeploymentSpecFieldPaused                        = "paused"
 	DeploymentSpecFieldPriority                      = "priority"
@@ -51,7 +51,7 @@ type DeploymentSpec struct {
 	HostPID                       bool                   `json:"hostPID,omitempty" yaml:"hostPID,omitempty"`
 	Hostname                      string                 `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	ImagePullSecrets              []LocalObjectReference `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
-	NodeId                        string                 `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
+	NodeID                        string                 `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
 	ObjectMeta                    *ObjectMeta            `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 	Paused                        bool                   `json:"paused,omitempty" yaml:"paused,omitempty"`
 	Priority                      *int64                 `json:"priority,omitempty" yaml:"priority,omitempty"`

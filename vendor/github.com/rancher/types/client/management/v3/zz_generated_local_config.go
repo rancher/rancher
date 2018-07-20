@@ -13,7 +13,7 @@ const (
 	LocalConfigFieldOwnerReferences     = "ownerReferences"
 	LocalConfigFieldRemoved             = "removed"
 	LocalConfigFieldType                = "type"
-	LocalConfigFieldUuid                = "uuid"
+	LocalConfigFieldUUID                = "uuid"
 )
 
 type LocalConfig struct {
@@ -28,5 +28,5 @@ type LocalConfig struct {
 	OwnerReferences     []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Removed             string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Type                string            `json:"type,omitempty" yaml:"type,omitempty"`
-	Uuid                string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }

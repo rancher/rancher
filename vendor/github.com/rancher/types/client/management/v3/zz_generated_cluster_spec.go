@@ -5,7 +5,7 @@ const (
 	ClusterSpecFieldAmazonElasticContainerServiceConfig = "amazonElasticContainerServiceConfig"
 	ClusterSpecFieldAzureKubernetesServiceConfig        = "azureKubernetesServiceConfig"
 	ClusterSpecFieldDefaultClusterRoleForProjectMembers = "defaultClusterRoleForProjectMembers"
-	ClusterSpecFieldDefaultPodSecurityPolicyTemplateId  = "defaultPodSecurityPolicyTemplateId"
+	ClusterSpecFieldDefaultPodSecurityPolicyTemplateID  = "defaultPodSecurityPolicyTemplateId"
 	ClusterSpecFieldDescription                         = "description"
 	ClusterSpecFieldDesiredAgentImage                   = "desiredAgentImage"
 	ClusterSpecFieldDisplayName                         = "displayName"
@@ -19,7 +19,7 @@ type ClusterSpec struct {
 	AmazonElasticContainerServiceConfig *AmazonElasticContainerServiceConfig `json:"amazonElasticContainerServiceConfig,omitempty" yaml:"amazonElasticContainerServiceConfig,omitempty"`
 	AzureKubernetesServiceConfig        *AzureKubernetesServiceConfig        `json:"azureKubernetesServiceConfig,omitempty" yaml:"azureKubernetesServiceConfig,omitempty"`
 	DefaultClusterRoleForProjectMembers string                               `json:"defaultClusterRoleForProjectMembers,omitempty" yaml:"defaultClusterRoleForProjectMembers,omitempty"`
-	DefaultPodSecurityPolicyTemplateId  string                               `json:"defaultPodSecurityPolicyTemplateId,omitempty" yaml:"defaultPodSecurityPolicyTemplateId,omitempty"`
+	DefaultPodSecurityPolicyTemplateID  string                               `json:"defaultPodSecurityPolicyTemplateId,omitempty" yaml:"defaultPodSecurityPolicyTemplateId,omitempty"`
 	Description                         string                               `json:"description,omitempty" yaml:"description,omitempty"`
 	DesiredAgentImage                   string                               `json:"desiredAgentImage,omitempty" yaml:"desiredAgentImage,omitempty"`
 	DisplayName                         string                               `json:"displayName,omitempty" yaml:"displayName,omitempty"`

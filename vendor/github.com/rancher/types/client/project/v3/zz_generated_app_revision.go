@@ -18,7 +18,7 @@ const (
 	AppRevisionFieldStatus               = "status"
 	AppRevisionFieldTransitioning        = "transitioning"
 	AppRevisionFieldTransitioningMessage = "transitioningMessage"
-	AppRevisionFieldUuid                 = "uuid"
+	AppRevisionFieldUUID                 = "uuid"
 )
 
 type AppRevision struct {
@@ -35,8 +35,9 @@ type AppRevision struct {
 	Status               *AppRevisionStatus `json:"status,omitempty" yaml:"status,omitempty"`
 	Transitioning        string             `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string             `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	Uuid                 string             `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                 string             `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type AppRevisionCollection struct {
 	types.Collection
 	Data   []AppRevision `json:"data,omitempty"`
@@ -51,6 +52,7 @@ type AppRevisionOperations interface {
 	List(opts *types.ListOpts) (*AppRevisionCollection, error)
 	Create(opts *AppRevision) (*AppRevision, error)
 	Update(existing *AppRevision, updates interface{}) (*AppRevision, error)
+	Replace(existing *AppRevision) (*AppRevision, error)
 	ByID(id string) (*AppRevision, error)
 	Delete(container *AppRevision) error
 }
@@ -70,6 +72,12 @@ func (c *AppRevisionClient) Create(container *AppRevision) (*AppRevision, error)
 func (c *AppRevisionClient) Update(existing *AppRevision, updates interface{}) (*AppRevision, error) {
 	resp := &AppRevision{}
 	err := c.apiClient.Ops.DoUpdate(AppRevisionType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *AppRevisionClient) Replace(obj *AppRevision) (*AppRevision, error) {
+	resp := &AppRevision{}
+	err := c.apiClient.Ops.DoReplace(AppRevisionType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

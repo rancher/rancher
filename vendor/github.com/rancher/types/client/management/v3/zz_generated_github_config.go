@@ -17,7 +17,7 @@ const (
 	GithubConfigFieldRemoved             = "removed"
 	GithubConfigFieldTLS                 = "tls"
 	GithubConfigFieldType                = "type"
-	GithubConfigFieldUuid                = "uuid"
+	GithubConfigFieldUUID                = "uuid"
 )
 
 type GithubConfig struct {
@@ -36,5 +36,5 @@ type GithubConfig struct {
 	Removed             string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	TLS                 bool              `json:"tls,omitempty" yaml:"tls,omitempty"`
 	Type                string            `json:"type,omitempty" yaml:"type,omitempty"`
-	Uuid                string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }

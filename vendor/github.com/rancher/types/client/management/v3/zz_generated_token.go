@@ -23,9 +23,9 @@ const (
 	TokenFieldRemoved         = "removed"
 	TokenFieldTTLMillis       = "ttl"
 	TokenFieldToken           = "token"
+	TokenFieldUUID            = "uuid"
 	TokenFieldUserID          = "userId"
 	TokenFieldUserPrincipal   = "userPrincipal"
-	TokenFieldUuid            = "uuid"
 )
 
 type Token struct {
@@ -47,10 +47,11 @@ type Token struct {
 	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	TTLMillis       int64             `json:"ttl,omitempty" yaml:"ttl,omitempty"`
 	Token           string            `json:"token,omitempty" yaml:"token,omitempty"`
+	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	UserID          string            `json:"userId,omitempty" yaml:"userId,omitempty"`
 	UserPrincipal   string            `json:"userPrincipal,omitempty" yaml:"userPrincipal,omitempty"`
-	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type TokenCollection struct {
 	types.Collection
 	Data   []Token `json:"data,omitempty"`
@@ -65,6 +66,7 @@ type TokenOperations interface {
 	List(opts *types.ListOpts) (*TokenCollection, error)
 	Create(opts *Token) (*Token, error)
 	Update(existing *Token, updates interface{}) (*Token, error)
+	Replace(existing *Token) (*Token, error)
 	ByID(id string) (*Token, error)
 	Delete(container *Token) error
 
@@ -86,6 +88,12 @@ func (c *TokenClient) Create(container *Token) (*Token, error) {
 func (c *TokenClient) Update(existing *Token, updates interface{}) (*Token, error) {
 	resp := &Token{}
 	err := c.apiClient.Ops.DoUpdate(TokenType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *TokenClient) Replace(obj *Token) (*Token, error) {
+	resp := &Token{}
+	err := c.apiClient.Ops.DoReplace(TokenType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

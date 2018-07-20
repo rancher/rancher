@@ -12,7 +12,8 @@ type ChangeType struct {
 func (c ChangeType) FromInternal(data map[string]interface{}) {
 }
 
-func (c ChangeType) ToInternal(data map[string]interface{}) {
+func (c ChangeType) ToInternal(data map[string]interface{}) error {
+	return nil
 }
 
 func (c ChangeType) ModifySchema(schema *types.Schema, schemas *types.Schemas) error {

@@ -7,7 +7,7 @@ import (
 const (
 	ProjectType                               = "project"
 	ProjectFieldAnnotations                   = "annotations"
-	ProjectFieldClusterId                     = "clusterId"
+	ProjectFieldClusterID                     = "clusterId"
 	ProjectFieldConditions                    = "conditions"
 	ProjectFieldCreated                       = "created"
 	ProjectFieldCreatorID                     = "creatorId"
@@ -22,13 +22,13 @@ const (
 	ProjectFieldState                         = "state"
 	ProjectFieldTransitioning                 = "transitioning"
 	ProjectFieldTransitioningMessage          = "transitioningMessage"
-	ProjectFieldUuid                          = "uuid"
+	ProjectFieldUUID                          = "uuid"
 )
 
 type Project struct {
 	types.Resource
 	Annotations                   map[string]string     `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	ClusterId                     string                `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	ClusterID                     string                `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	Conditions                    []ProjectCondition    `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	Created                       string                `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                     string                `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
@@ -43,8 +43,9 @@ type Project struct {
 	State                         string                `json:"state,omitempty" yaml:"state,omitempty"`
 	Transitioning                 string                `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage          string                `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	Uuid                          string                `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                          string                `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type ProjectCollection struct {
 	types.Collection
 	Data   []Project `json:"data,omitempty"`
@@ -59,6 +60,7 @@ type ProjectOperations interface {
 	List(opts *types.ListOpts) (*ProjectCollection, error)
 	Create(opts *Project) (*Project, error)
 	Update(existing *Project, updates interface{}) (*Project, error)
+	Replace(existing *Project) (*Project, error)
 	ByID(id string) (*Project, error)
 	Delete(container *Project) error
 
@@ -82,6 +84,12 @@ func (c *ProjectClient) Create(container *Project) (*Project, error) {
 func (c *ProjectClient) Update(existing *Project, updates interface{}) (*Project, error) {
 	resp := &Project{}
 	err := c.apiClient.Ops.DoUpdate(ProjectType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *ProjectClient) Replace(obj *Project) (*Project, error) {
+	resp := &Project{}
+	err := c.apiClient.Ops.DoReplace(ProjectType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

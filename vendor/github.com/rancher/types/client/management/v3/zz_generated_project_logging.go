@@ -18,7 +18,7 @@ const (
 	ProjectLoggingFieldOutputFlushInterval  = "outputFlushInterval"
 	ProjectLoggingFieldOutputTags           = "outputTags"
 	ProjectLoggingFieldOwnerReferences      = "ownerReferences"
-	ProjectLoggingFieldProjectId            = "projectId"
+	ProjectLoggingFieldProjectID            = "projectId"
 	ProjectLoggingFieldRemoved              = "removed"
 	ProjectLoggingFieldSplunkConfig         = "splunkConfig"
 	ProjectLoggingFieldState                = "state"
@@ -26,7 +26,7 @@ const (
 	ProjectLoggingFieldSyslogConfig         = "syslogConfig"
 	ProjectLoggingFieldTransitioning        = "transitioning"
 	ProjectLoggingFieldTransitioningMessage = "transitioningMessage"
-	ProjectLoggingFieldUuid                 = "uuid"
+	ProjectLoggingFieldUUID                 = "uuid"
 )
 
 type ProjectLogging struct {
@@ -43,7 +43,7 @@ type ProjectLogging struct {
 	OutputFlushInterval  int64                 `json:"outputFlushInterval,omitempty" yaml:"outputFlushInterval,omitempty"`
 	OutputTags           map[string]string     `json:"outputTags,omitempty" yaml:"outputTags,omitempty"`
 	OwnerReferences      []OwnerReference      `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	ProjectId            string                `json:"projectId,omitempty" yaml:"projectId,omitempty"`
+	ProjectID            string                `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	Removed              string                `json:"removed,omitempty" yaml:"removed,omitempty"`
 	SplunkConfig         *SplunkConfig         `json:"splunkConfig,omitempty" yaml:"splunkConfig,omitempty"`
 	State                string                `json:"state,omitempty" yaml:"state,omitempty"`
@@ -51,8 +51,9 @@ type ProjectLogging struct {
 	SyslogConfig         *SyslogConfig         `json:"syslogConfig,omitempty" yaml:"syslogConfig,omitempty"`
 	Transitioning        string                `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string                `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	Uuid                 string                `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                 string                `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type ProjectLoggingCollection struct {
 	types.Collection
 	Data   []ProjectLogging `json:"data,omitempty"`
@@ -67,6 +68,7 @@ type ProjectLoggingOperations interface {
 	List(opts *types.ListOpts) (*ProjectLoggingCollection, error)
 	Create(opts *ProjectLogging) (*ProjectLogging, error)
 	Update(existing *ProjectLogging, updates interface{}) (*ProjectLogging, error)
+	Replace(existing *ProjectLogging) (*ProjectLogging, error)
 	ByID(id string) (*ProjectLogging, error)
 	Delete(container *ProjectLogging) error
 }
@@ -86,6 +88,12 @@ func (c *ProjectLoggingClient) Create(container *ProjectLogging) (*ProjectLoggin
 func (c *ProjectLoggingClient) Update(existing *ProjectLogging, updates interface{}) (*ProjectLogging, error) {
 	resp := &ProjectLogging{}
 	err := c.apiClient.Ops.DoUpdate(ProjectLoggingType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *ProjectLoggingClient) Replace(obj *ProjectLogging) (*ProjectLogging, error) {
+	resp := &ProjectLogging{}
+	err := c.apiClient.Ops.DoReplace(ProjectLoggingType, &obj.Resource, obj, resp)
 	return resp, err
 }
 
