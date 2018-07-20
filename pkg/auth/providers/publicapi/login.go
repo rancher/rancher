@@ -125,7 +125,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		input = &v3public.BasicLogin{}
 		providerName = ldap.FreeIpaName
 	case client.PingProviderType:
-		input = &v3public.SamlLogin{}
+		input = &v3public.SamlLoginInput{}
 		providerName = saml.PingName
 	default:
 		return v3.Token{}, "", httperror.NewAPIError(httperror.ServerError, "unknown authentication provider")

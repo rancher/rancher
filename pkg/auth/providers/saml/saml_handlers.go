@@ -4,6 +4,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/xml"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -63,28 +64,23 @@ func (s *Provider) getPossibleRequestIDs(r *http.Request) []string {
 		claims := token.Claims.(jwt.MapClaims)
 		rv = append(rv, claims["id"].(string))
 	}
-
 	return rv
 }
 
 // HandleSamlLogin is the endpoint for /saml/login endpoint
-func (s *Provider) HandleSamlLogin(w http.ResponseWriter, r *http.Request) {
+func (s *Provider) HandleSamlLogin(w http.ResponseWriter, r *http.Request) (string, error) {
 	serviceProvider := s.serviceProvider
 	if r.URL.Path == serviceProvider.AcsURL.Path {
-		panic("don't wrap Middleware with RequireAccount")
+		return "", fmt.Errorf("don't wrap Middleware with RequireAccount")
 	}
 
 	binding := saml.HTTPRedirectBinding
 	bindingLocation := serviceProvider.GetSSOBindingLocation(binding)
-	if bindingLocation == "" {
-		binding = saml.HTTPPostBinding
-		bindingLocation = serviceProvider.GetSSOBindingLocation(binding)
-	}
 
 	req, err := serviceProvider.MakeAuthenticationRequest(bindingLocation)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return "", err
 	}
 	// relayState is limited to 80 bytes but also must be integrety protected.
 	// this means that we cannot use a JWT because it is way to long. Instead
@@ -99,28 +95,16 @@ func (s *Provider) HandleSamlLogin(w http.ResponseWriter, r *http.Request) {
 	signedState, err := state.SignedString(secretBlock)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return "", err
 	}
 
 	s.clientState.SetState(w, r, relayState, signedState)
 
 	if binding == saml.HTTPRedirectBinding {
 		redirectURL := req.Redirect(relayState)
-		w.Header().Add("Location", redirectURL.String())
-		w.WriteHeader(http.StatusFound)
-		return
+		return redirectURL.String(), nil
 	}
-	if binding == saml.HTTPPostBinding {
-		w.Header().Add("Content-Security-Policy", ""+
-			"default-src; "+
-			"script-src 'sha256-AjPdJSbZmeWHnEc5ykvJFay8FTWeTeRbs9dutfZ0HqE='; "+
-			"reflected-xss block; referrer no-referrer;")
-		w.Header().Add("Content-type", "text/html")
-		w.Write([]byte(`<!DOCTYPE html><html><body>`))
-		w.Write(req.Post(relayState))
-		w.Write([]byte(`</body></html>`))
-		return
-	}
+	return "", nil
 }
 
 func randomBytes(n int) []byte {

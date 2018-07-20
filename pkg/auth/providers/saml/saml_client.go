@@ -150,7 +150,6 @@ func InitializeSamlServiceProvider(configToSet *v3.SamlConfig, name string) erro
 	SamlProviders[name] = provider
 
 	if name == PingName {
-		root.Get("PingLogin").HandlerFunc(provider.HandleSamlLogin)
 		root.Get("PingACS").HandlerFunc(provider.ServeHTTP)
 		root.Get("PingMetadata").HandlerFunc(provider.ServeHTTP)
 	}
@@ -162,7 +161,6 @@ func InitializeSamlServiceProvider(configToSet *v3.SamlConfig, name string) erro
 
 func AuthHandler() http.Handler {
 	root = mux.NewRouter()
-	root.Methods("GET").Path("/v1-saml/ping/login").Name("PingLogin")
 	root.Methods("POST").Path("/v1-saml/ping/saml/acs").Name("PingACS")
 	root.Methods("GET").Path("/v1-saml/ping/saml/metadata").Name("PingMetadata")
 
