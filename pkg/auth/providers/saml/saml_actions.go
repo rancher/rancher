@@ -3,6 +3,7 @@ package saml
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -56,15 +57,15 @@ func (s *Provider) testAndEnable(actionName string, action *types.Action, reques
 	provider.clientState.SetState(request.Response, request.Request, "Rancher_UserID", provider.userMGR.GetUser(request))
 	provider.clientState.SetState(request.Response, request.Request, "Rancher_FinalRedirectURL", finalRedirectURL)
 	provider.clientState.SetState(request.Response, request.Request, "Rancher_Action", "testAndEnable")
-	provider.HandleSamlLogin(request.Response, request.Request)
-	return nil
-}
-
-func (s *Provider) formSamlRedirectURL(samlConfig *v3.SamlConfig) string {
-	var path string
-	if s.name == PingName {
-		path = samlConfig.RancherAPIHost + "/v1-saml/" + PingName + "/login"
+	idpRedirectURL, err := provider.HandleSamlLogin(request.Response, request.Request)
+	if err != nil {
+		return err
+	}
+	data := map[string]interface{}{
+		"idpRedirectUrl": idpRedirectURL,
+		"type":           "samlConfigTestOutput",
 	}
 
-	return path
+	request.WriteResponse(http.StatusOK, data)
+	return nil
 }

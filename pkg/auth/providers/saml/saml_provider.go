@@ -3,6 +3,7 @@ package saml
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/crewjam/saml"
@@ -77,7 +78,7 @@ func (s *Provider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Princ
 
 func PerformSamlLogin(name string, apiContext *types.APIContext, input interface{}) error {
 	//input will contain the FINAL redirect URL
-	login, ok := input.(*v3public.SamlLogin)
+	login, ok := input.(*v3public.SamlLoginInput)
 	if !ok {
 		return errors.New("unexpected input type")
 	}
@@ -86,7 +87,17 @@ func PerformSamlLogin(name string, apiContext *types.APIContext, input interface
 	if provider, ok := SamlProviders[name]; ok {
 		provider.clientState.SetState(apiContext.Response, apiContext.Request, "Rancher_FinalRedirectURL", finalRedirectURL)
 		provider.clientState.SetState(apiContext.Response, apiContext.Request, "Rancher_Action", "login")
-		provider.HandleSamlLogin(apiContext.Response, apiContext.Request)
+		idpRedirectURL, err := provider.HandleSamlLogin(apiContext.Response, apiContext.Request)
+		if err != nil {
+			return err
+		}
+		data := map[string]interface{}{
+			"idpRedirectUrl": idpRedirectURL,
+			"type":           "samlLoginOutput",
+		}
+
+		apiContext.WriteResponse(http.StatusOK, data)
+		return nil
 	}
 
 	return nil
