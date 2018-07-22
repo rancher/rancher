@@ -1,20 +1,29 @@
 #!/bin/bash
 set -e
 
-if [ "$1" = "--" ]; then
-    shift 1
-    exec "$@"
-fi
-
+# Logging helper functions
+info()
+{
+    echo "INFO:" "$@" 1>&2
+}
 error()
 {
     echo "ERROR:" "$@" 1>&2
 }
-
 warn()
 {
-    echo "WARN :" "$@" 1>&2
+    echo "WARN:" "$@" 1>&2
 }
+
+# Print all given arguments
+if [ $# -ne 0 ]; then
+    info "Arguments: $(echo $@ | sed -e 's/\(token\s\)\w*/\1REDACTED/')"
+fi
+
+if [ "$1" = "--" ]; then
+    shift 1
+    exec "$@"
+fi
 
 get_address()
 {
@@ -65,6 +74,32 @@ get_address()
                 echo $address
                 ;;
         esac
+    fi
+}
+
+check_url()
+{
+    local url=$1
+    local err
+    err=$(curl --insecure -sS -fL -o /dev/null --stderr - $url | head -n1 ; exit ${PIPESTATUS[0]})
+    if [ $? -eq 0 ]
+    then
+        echo ""
+    else
+        echo ${err} | sed -e 's/^curl: ([0-9]\+) //'
+    fi
+}
+
+check_x509_cert()
+{
+    local cert=$1
+    local err
+    err=$(openssl x509 -in $cert -noout 2>&1)
+    if [ $? -eq 0 ]
+    then
+        echo ""
+    else
+        echo ${err}
     fi
 }
 
@@ -125,6 +160,18 @@ if [ -z "$CATTLE_ADDRESS" ]; then
     CATTLE_ADDRESS=$(ip -o route get 8.8.8.8 | sed -n 's/.*src \([0-9.]\+\).*/\1/p')
 fi
 
+if [ "$CATTLE_K8S_MANAGED" != "true" ]; then
+    if [ -z "$CATTLE_TOKEN" ]; then
+        error -- --token is a required option
+        exit 1
+    fi
+
+    if [ -z "$CATTLE_ADDRESS" ]; then
+        error -- --address is a required option
+        exit 1
+    fi
+fi
+
 if [ "$ALL" = true ]; then
     CATTLE_ROLE="etcd,worker,controlplane"
 else
@@ -139,13 +186,41 @@ else
     fi
 fi
 
+if [ -z "$CATTLE_SERVER" ]; then
+    error -- --server is a required option
+    exit 1
+fi
+
+info "Environment: $(echo $(printenv | grep CATTLE | sort | sed -e 's/\(CATTLE_TOKEN=\).*/\1REDACTED/'))"
+info "Using resolv.conf: $(echo $(cat /etc/resolv.conf | grep -v ^#))"
+if grep -E -q '^nameserver 127.*.*.*|^nameserver localhost|^nameserver ::1' /etc/resolv.conf; then
+    warn "Loopback address found in /etc/resolv.conf, please refer to the documentation how to configure your cluster to resolve DNS properly"
+fi
+
+CATTLE_SERVER_PING="${CATTLE_SERVER}/ping"
+err=$(check_url $CATTLE_SERVER_PING)
+if [[ $err ]]; then
+    error "${CATTLE_SERVER_PING} is not accessible (${err})"
+    exit 1
+else
+    info "${CATTLE_SERVER_PING} is accessible"
+fi
+
 if [ -n "$CATTLE_CA_CHECKSUM" ]; then
     temp=$(mktemp)
     curl --insecure -s -fL $CATTLE_SERVER/v3/settings/cacerts | jq -r .value > $temp
-    cat $temp
     if [ ! -s $temp ]; then
       error "Failed to pull the cacert from the rancher server settings at $CATTLE_SERVER/v3/settings/cacerts"
       exit 1
+    fi
+    err=$(check_x509_cert $temp)
+    if [[ $err ]]; then
+        error "Value from $CATTLE_SERVER/v3/settings/cacerts does not look like an x509 certificate (${err})"
+        error "Retrieved cacerts:"
+        cat $temp
+        exit 1
+    else
+        info "Value from $CATTLE_SERVER/v3/settings/cacerts is an x509 certificate"
     fi
     CATTLE_SERVER_CHECKSUM=$(sha256sum $temp | awk '{print $1}')
     if [ $CATTLE_SERVER_CHECKSUM != $CATTLE_CA_CHECKSUM ]; then
@@ -156,23 +231,6 @@ if [ -n "$CATTLE_CA_CHECKSUM" ]; then
     else
         mkdir -p /etc/kubernetes/ssl/certs
         mv $temp /etc/kubernetes/ssl/certs/serverca
-    fi
-fi
-
-if [ -z "$CATTLE_SERVER" ]; then
-    error -- --server is a required option
-    exit 1
-fi
-
-if [ "$CATTLE_K8S_MANAGED" != "true" ]; then
-    if [ -z "$CATTLE_TOKEN" ]; then
-        error -- --token is a required option
-        exit 1
-    fi
-
-    if [ -z "$CATTLE_ADDRESS" ]; then
-        error -- --address is a required option
-        exit 1
     fi
 fi
 
