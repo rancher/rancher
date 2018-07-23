@@ -81,9 +81,9 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) error {
 	for _, ingressService := range expectedServices {
 		var toCreate *corev1.Service
 		if needNodePort {
-			toCreate = ingressService.generateNewService(obj, "NodePort")
+			toCreate = ingressService.generateNewService(obj, corev1.ServiceTypeNodePort)
 		} else {
-			toCreate = ingressService.generateNewService(obj, "ClusterIP")
+			toCreate = ingressService.generateNewService(obj, corev1.ServiceTypeClusterIP)
 		}
 		logrus.Infof("Creating %s service %s for ingress %s, port %d", ingressService.serviceName, toCreate.Spec.Type, key, ingressService.servicePort)
 		if _, err := c.services.Create(toCreate); err != nil {
@@ -151,7 +151,7 @@ func updateOrDelete(obj *v1beta1.Ingress, service *corev1.Service, expectedServi
 		}
 		// handling issue https://github.com/rancher/rancher/issues/13717.
 		// if node port is using by non-GKE for ingress service, we should replace them.
-		if service.Spec.Type == "NodePort" && !isNeedNodePort && IsServiceOwnedByIngress(obj, service) {
+		if service.Spec.Type == corev1.ServiceTypeNodePort && !isNeedNodePort && IsServiceOwnedByIngress(obj, service) {
 			shouldDelete = true
 		} else {
 			if service.Annotations[util.WorkloadAnnotation] != s.workloadIDs && s.workloadIDs != "" {
