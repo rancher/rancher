@@ -64,13 +64,13 @@ func generateIngressService(name string, port int32, workloadIDs string) (ingres
 	return rtn, nil
 }
 
-func (i *ingressService) generateNewService(obj *v1beta1.Ingress, serviceType string) *corev1.Service {
+func (i *ingressService) generateNewService(obj *v1beta1.Ingress, serviceType corev1.ServiceType) *corev1.Service {
 	controller := true
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: i.serviceName,
 			OwnerReferences: []metav1.OwnerReference{
-				metav1.OwnerReference{
+				{
 					Name:       obj.Name,
 					APIVersion: "v1beta1/extensions",
 					UID:        obj.UID,
@@ -84,7 +84,7 @@ func (i *ingressService) generateNewService(obj *v1beta1.Ingress, serviceType st
 			},
 		},
 		Spec: corev1.ServiceSpec{
-			Type: "ClusterIP",
+			Type: serviceType,
 			Ports: []corev1.ServicePort{
 				{
 					Port:       i.servicePort,
