@@ -421,13 +421,15 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 			schema.ResourceActions = map[string]types.Action{
 				"disable": {},
 				"testAndEnable": {
-					Input: "samlConfigTestInput",
+					Input:  "samlConfigTestInput",
+					Output: "samlConfigTestOutput",
 				},
 			}
 			schema.CollectionMethods = []string{}
 			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
 		}).
-		MustImport(&Version, v3.SamlConfigTestInput{})
+		MustImport(&Version, v3.SamlConfigTestInput{}).
+		MustImport(&Version, v3.SamlConfigTestOutput{})
 }
 
 func userTypes(schema *types.Schemas) *types.Schemas {
