@@ -87,6 +87,10 @@ type PingProvider struct {
 	SamlProvider `json:",inline"`
 }
 
-type SamlLogin struct {
+type SamlLoginInput struct {
 	FinalRedirectURL string `json:"finalRedirectUrl"`
+}
+
+type SamlLoginOutput struct {
+	IdpRedirectURL string `json:"idpRedirectUrl"`
 }
