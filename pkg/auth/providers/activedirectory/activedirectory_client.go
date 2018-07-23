@@ -72,7 +72,7 @@ func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.Act
 		return v3.Principal{}, nil, err
 	}
 	if !allowed {
-		return v3.Principal{}, nil, httperror.NewAPIError(httperror.Unauthorized, "unauthorized")
+		return v3.Principal{}, nil, httperror.NewAPIError(httperror.PermissionDenied, "Permission denied")
 	}
 
 	return userPrincipal, groupPrincipals, err
