@@ -3,6 +3,7 @@ package workload
 import (
 	"encoding/json"
 	"fmt"
+	"path"
 	"strconv"
 	"strings"
 
@@ -68,6 +69,11 @@ func (s *CustomizeStore) Create(apiContext *types.APIContext, schema *types.Sche
 	}
 	setScheduling(apiContext, data)
 	setStrategy(data)
+
+	err := s.validateStatefulSetVolume(schema, data)
+	if err != nil {
+		return nil, err
+	}
 	return s.Store.Create(apiContext, schema, data)
 }
 
@@ -81,7 +87,48 @@ func (s *CustomizeStore) Update(apiContext *types.APIContext, schema *types.Sche
 	if err := setSecrets(apiContext, data, false); err != nil {
 		return nil, err
 	}
+
+	err := s.validateStatefulSetVolume(schema, data)
+	if err != nil {
+		return nil, err
+	}
 	return s.Store.Update(apiContext, schema, data, id)
+}
+
+func (s *CustomizeStore) validateStatefulSetVolume(schema *types.Schema, data map[string]interface{}) error {
+	if schema.ID == "statefulSet" {
+		// retrieve volumeMounts.subPath
+		containers, _ := values.GetSlice(data, "containers")
+		for i := range containers {
+			container := containers[i]
+			volumeMounts, _ := values.GetSlice(container, "volumeMounts")
+			for j := range volumeMounts {
+				vmnt := volumeMounts[j]
+				subPath := convert.ToString(vmnt["subPath"])
+				err := s.validateSubPath(subPath)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// This validate will make sure subPath:
+// 1. is not abs path
+// 2. does not have any element which is ".."
+func (s *CustomizeStore) validateSubPath(subPath string) error {
+	if path.IsAbs(subPath) {
+		return httperror.NewAPIError(httperror.MissingRequired, fmt.Sprintf("Invalid value: Sub Path in Volume %v must be a relative path", subPath))
+	}
+	parts := strings.Split(subPath, "/")
+	for _, item := range parts {
+		if item == ".." {
+			return httperror.NewAPIError(httperror.MissingRequired, fmt.Sprintf("Invalid value: Sub Path in Volume %v must not contain '..'", subPath))
+		}
+	}
+	return nil
 }
 
 func (s *CustomizeStore) ByID(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
@@ -268,6 +315,7 @@ func isRancherGeneratedPort(portName, containerPort, protocol string) bool {
 	}
 	return false
 }
+
 func generateDNSName(workloadName, dnsName string) bool {
 	if dnsName == "" {
 		return true
