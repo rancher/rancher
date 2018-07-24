@@ -428,6 +428,18 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 			schema.CollectionMethods = []string{}
 			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
 		}).
+		MustImportAndCustomize(&Version, v3.ADFSConfig{}, func(schema *types.Schema) {
+			schema.BaseType = "authConfig"
+			schema.ResourceActions = map[string]types.Action{
+				"disable": {},
+				"testAndEnable": {
+					Input:  "samlConfigTestInput",
+					Output: "samlConfigTestOutput",
+				},
+			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
+		}).
 		MustImport(&Version, v3.SamlConfigTestInput{}).
 		MustImport(&Version, v3.SamlConfigTestOutput{})
 }
@@ -594,5 +606,7 @@ func composeType(schemas *types.Schemas) *types.Schemas {
 
 func resourceQuotaTemplateTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
-		MustImport(&Version, v3.ResourceQuotaTemplate{})
+		MustImportAndCustomize(&Version, v3.ResourceQuotaTemplate{}, func(schema *types.Schema) {
+			schema.ResourceMethods = []string{http.MethodGet, http.MethodDelete}
+		})
 }

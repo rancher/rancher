@@ -285,14 +285,18 @@ type SamlConfig struct {
 	RancherAPIHost     string `json:"rancherApiHost"     norman:"required"`
 }
 
-type PingConfig struct {
-	SamlConfig `json:",inline" mapstructure:",squash"`
-}
-
 type SamlConfigTestInput struct {
 	FinalRedirectURL string `json:"finalRedirectUrl"`
 }
 
 type SamlConfigTestOutput struct {
 	IdpRedirectURL string `json:"idpRedirectUrl"`
+}
+
+type PingConfig struct {
+	SamlConfig `json:",inline" mapstructure:",squash"`
+}
+
+type ADFSConfig struct {
+	SamlConfig `json:",inline" mapstructure:",squash"`
 }
