@@ -62,7 +62,10 @@ func (c *calculateLimitController) calculateProjectResourceQuota(projectID strin
 		if templateID == "" {
 			continue
 		}
-		nsLimit := getNamespaceLimit(ns, templatesMap, false)
+		nsLimit, err := getNamespaceLimit(ns, templatesMap, false)
+		if err != nil {
+			return err
+		}
 		nsResourceList, err := convertLimitToResourceList(nsLimit)
 		if err != nil {
 			return err

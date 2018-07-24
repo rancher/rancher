@@ -82,13 +82,13 @@ func (c *validationController) validateTemplate(key string, ns *corev1.Namespace
 	return err
 }
 
-func getProjectLock(projectID string) sync.Mutex {
+func getProjectLock(projectID string) *sync.Mutex {
 	val, ok := projectLockCache.Get(projectID)
 	if !ok {
-		projectLockCache.Add(projectID, sync.Mutex{}, time.Hour)
+		projectLockCache.Add(projectID, &sync.Mutex{}, time.Hour)
 		val, _ = projectLockCache.Get(projectID)
 	}
-	mu := val.(sync.Mutex)
+	mu := val.(*sync.Mutex)
 	return mu
 }
 
@@ -168,7 +168,10 @@ func (c *validationController) isQuotaFit(ns *corev1.Namespace, projectID string
 		templatesMap[formatTemplateID(template)] = template
 	}
 	nssResourceList := api.ResourceList{}
-	nsLimit := getNamespaceLimit(ns, templatesMap, false)
+	nsLimit, err := getNamespaceLimit(ns, templatesMap, false)
+	if err != nil {
+		return false, "", err
+	}
 	// add itself on create
 	nsResourceList, err := convertLimitToResourceList(nsLimit)
 	if err != nil {
@@ -187,7 +190,10 @@ func (c *validationController) isQuotaFit(ns *corev1.Namespace, projectID string
 		if other.Name == ns.Name {
 			continue
 		}
-		nsLimit := getNamespaceLimit(other, templatesMap, true)
+		nsLimit, err := getNamespaceLimit(other, templatesMap, true)
+		if err != nil {
+			return false, "", err
+		}
 		nsResourceList, err := convertLimitToResourceList(nsLimit)
 		if err != nil {
 			return false, "", err
@@ -227,7 +233,7 @@ func formatTemplateID(template *v3.ResourceQuotaTemplate) string {
 	return fmt.Sprintf("%s:%s", template.Namespace, template.Name)
 }
 
-func getNamespaceLimit(ns *corev1.Namespace, templates map[string]*v3.ResourceQuotaTemplate, applied bool) *v3.ProjectResourceLimit {
+func getNamespaceLimit(ns *corev1.Namespace, templates map[string]*v3.ResourceQuotaTemplate, applied bool) (*v3.ProjectResourceLimit, error) {
 	templateID := ""
 	if applied {
 		templateID = getAppliedTemplateID(ns)
@@ -235,13 +241,13 @@ func getNamespaceLimit(ns *corev1.Namespace, templates map[string]*v3.ResourceQu
 		templateID = getTemplateID(ns)
 	}
 	if templateID == "" {
-		return nil
+		return nil, nil
 	}
 	template := templates[templateID]
 	if template == nil {
-		return nil
+		return nil, fmt.Errorf("failed to find the template by id [%s]", templateID)
 	}
-	return &template.Limit
+	return &template.Limit, nil
 }
 
 func convertLimitToResourceList(limit *v3.ProjectResourceLimit) (api.ResourceList, error) {
