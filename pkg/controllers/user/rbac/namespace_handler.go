@@ -245,7 +245,7 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace) err
 			return err
 		}
 
-		roleCli := n.m.workload.K8sClient.RbacV1().ClusterRoles()
+		roleCli := n.m.workload.RBAC.ClusterRoles("")
 		nsInDesiredRole := false
 		for _, c := range clusterRoles {
 			cr, ok := c.(*rbacv1.ClusterRole)
@@ -353,7 +353,7 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace) err
 }
 
 func (m *manager) createProjectNSRole(roleName, verb, ns string) error {
-	roleCli := m.workload.K8sClient.RbacV1().ClusterRoles()
+	roleCli := m.workload.RBAC.ClusterRoles("")
 
 	cr := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{

@@ -86,7 +86,7 @@ func (c *rtLifecycle) syncRT(template *v3.RoleTemplate, usedInProjects bool) err
 }
 
 func (c *rtLifecycle) ensureRTDelete(template *v3.RoleTemplate) error {
-	roleCli := c.m.workload.K8sClient.RbacV1().ClusterRoles()
+	roleCli := c.m.workload.RBAC.ClusterRoles("")
 	if err := roleCli.Delete(template.Name, &metav1.DeleteOptions{}); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return errors.Wrapf(err, "error deleting clusterrole %v", template.Name)

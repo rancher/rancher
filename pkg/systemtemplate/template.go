@@ -23,6 +23,8 @@ kind: ClusterRoleBinding
 metadata:
   name: cattle-admin-binding
   namespace: cattle-system
+  labels:
+    cattle.io/creator: "norman"
 subjects:
 - kind: ServiceAccount
   name: cattle
@@ -50,6 +52,8 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: cattle-admin
+  labels:
+    cattle.io/creator: "norman"
 rules:
 - apiGroups:
   - '*'

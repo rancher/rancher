@@ -91,7 +91,7 @@ func (p *prtbLifecycle) ensurePRTBDelete(binding *v3.ProjectRoleTemplateBinding)
 	set := labels.Set(map[string]string{rtbOwnerLabel: string(binding.UID)})
 	for _, n := range namespaces {
 		ns := n.(*v1.Namespace)
-		bindingCli := p.m.workload.K8sClient.RbacV1().RoleBindings(ns.Name)
+		bindingCli := p.m.workload.RBAC.RoleBindings(ns.Name)
 		rbs, err := p.m.rbLister.List(ns.Name, set.AsSelector())
 		if err != nil {
 			return errors.Wrapf(err, "couldn't list rolebindings with selector %s", set.AsSelector())
@@ -156,7 +156,7 @@ func (p *prtbLifecycle) reconcileProjectAccessToGlobalResources(binding *v3.Proj
 		return nil
 	}
 
-	bindingCli := p.m.workload.K8sClient.RbacV1().ClusterRoleBindings()
+	bindingCli := p.m.workload.RBAC.ClusterRoleBindings("")
 
 	if createNSPerms {
 		roles = append(roles, "create-ns")
@@ -242,7 +242,7 @@ func (p *prtbLifecycle) reconcileProjectAccessToGlobalResourcesForDelete(binding
 		}
 	}
 
-	bindingCli := p.m.workload.K8sClient.RbacV1().ClusterRoleBindings()
+	bindingCli := p.m.workload.RBAC.ClusterRoleBindings("")
 	rtbUID := string(binding.UID)
 	set := labels.Set(map[string]string{rtbUID: owner})
 	crbs, err := p.m.crbLister.List("", set.AsSelector())
