@@ -1,5 +1,8 @@
 from .common import random_str
+from rancher import ApiError
+
 import time
+import pytest
 
 
 def test_workload_image_change_private_registry(admin_pc):
@@ -80,7 +83,7 @@ def test_workload_ports_change(admin_pc):
     assert svc.name == workload.name
     assert svc.kind == "ClusterIP"
 
-    # update workload wiht port, and validate cluster ip is set
+    # update workload with port, and validate cluster ip is set
     ports = [{
         'sourcePort': '0',
         'containerPort': '80',
@@ -97,7 +100,7 @@ def test_workload_ports_change(admin_pc):
     svc = wait_for_service_cluserip_set(client, name)
     assert svc.clusterIp is not None
 
-    # update workload wiht no ports, and validate cluster ip is reset
+    # update workload with no ports, and validate cluster ip is reset
     client.update(workload,
                   namespaceId=ns.id,
                   scale=1,
@@ -110,6 +113,119 @@ def test_workload_ports_change(admin_pc):
     assert svc.clusterIp is None
 
     client.delete(ns)
+
+
+def test_statefulset_workload_volumemount_subpath(admin_pc):
+    client = admin_pc.client
+    # setup
+    name = random_str()
+
+    # valid volumeMounts
+    volumeMounts = [{
+         'name': 'vol1',
+         'mountPath': 'var/lib/mysql',
+         'subPath': 'mysql',
+    }]
+
+    containers = [{
+         'name': 'mystatefulset',
+         'image': 'ubuntu:xenial',
+         'volumeMounts': volumeMounts,
+    }]
+
+    # invalid volumeMounts
+    volumeMounts_one = [{
+          'name': 'vol1',
+          'mountPath': 'var/lib/mysql',
+          'subPath': '/mysql',
+    }]
+
+    containers_one = [{
+         'name': 'mystatefulset',
+         'image': 'ubuntu:xenial',
+         'volumeMounts': volumeMounts_one,
+    }]
+
+    volumeMounts_two = [{
+         'name': 'vol1',
+         'mountPath': 'var/lib/mysql',
+         'subPath': '../mysql',
+    }]
+
+    containers_two = [{
+         'name': 'mystatefulset',
+         'image': 'ubuntu:xenial',
+         'volumeMounts': volumeMounts_two,
+    }]
+
+    statefulSetConfig = {
+           'podManagementPolicy': 'OrderedReady',
+           'revisionHistoryLimit': 10,
+           'strategy': 'RollingUpdate',
+           'type': 'statefulSetConfig',
+    }
+
+    volumes = [{
+            'name': 'vol1',
+            'persistentVolumeClaim': {
+                'persistentVolumeClaimId': "default: myvolume",
+                'readOnly': False,
+                'type': 'persistentVolumeClaimVolumeSource',
+            },
+            'type': 'volume',
+    }]
+
+    # 1. validate volumeMounts.subPath when workload creating
+    # invalid volumeMounts.subPath: absolute path
+    with pytest.raises(ApiError) as e:
+            client.create_workload(name=name,
+                                   namespaceId='default',
+                                   scale=1,
+                                   containers=containers_one,
+                                   statefulSetConfig=statefulSetConfig,
+                                   volumes=volumes)
+
+            assert e.value.error.status == 422
+
+    # invalid volumeMounts.subPath: contains '..'
+    with pytest.raises(ApiError) as e:
+        client.create_workload(name=name,
+                               namespaceId='default',
+                               scale=1,
+                               containers=containers_two,
+                               statefulSetConfig=statefulSetConfig,
+                               volumes=volumes)
+
+        assert e.value.error.status == 422
+
+    # 2. validate volumeMounts.subPath when workload update
+    # create a validate workload then update
+    workload = client.create_workload(name=name,
+                                      namespaceId='default',
+                                      scale=1,
+                                      containers=containers,
+                                      statefulSetConfig=statefulSetConfig,
+                                      volumes=volumes)
+
+    with pytest.raises(ApiError) as e:
+        client.update(workload,
+                      namespaceId='default',
+                      scale=1,
+                      containers=containers_one,
+                      statefulSetConfig=statefulSetConfig,
+                      volumes=volumes)
+
+        assert e.value.error.status == 422
+
+    with pytest.raises(ApiError) as e:
+        client.update(workload,
+                      namespaceId='default',
+                      scale=1,
+                      containers=containers_two,
+                      statefulSetConfig=statefulSetConfig,
+                      volumes=volumes)
+
+        assert e.value.error.status == 422
 
 
 def wait_for_service_create(client, name, timeout=30):
