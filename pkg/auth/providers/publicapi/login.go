@@ -162,7 +162,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	}
 
 	if user.Enabled != nil && !*user.Enabled {
-		return v3.Token{}, "", httperror.NewAPIError(httperror.PermissionDenied, "")
+		return v3.Token{}, "", httperror.NewAPIError(httperror.PermissionDenied, "Permission Denied")
 	}
 
 	rToken, err := h.tokenMGR.NewLoginToken(user.Name, userPrincipal, groupPrincipals, providerToken, ttl, description)
