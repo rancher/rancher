@@ -36,7 +36,7 @@ func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.Act
 	serviceAccountPassword := config.ServiceAccountPassword
 	serviceAccountUserName := config.ServiceAccountUsername
 	if testServiceAccountBind {
-		err = ldap.AuthenticateServiceAccountUser(serviceAccountPassword, serviceAccountUserName, lConn)
+		err = ldap.AuthenticateServiceAccountUser(serviceAccountPassword, serviceAccountUserName, config.DefaultLoginDomain, lConn)
 		if err != nil {
 			return v3.Principal{}, nil, err
 		}

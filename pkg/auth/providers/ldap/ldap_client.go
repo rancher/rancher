@@ -37,7 +37,7 @@ func (p *ldapProvider) loginUser(credential *v3public.BasicLogin, config *v3.Lda
 
 	serviceAccountPassword := config.ServiceAccountPassword
 	serviceAccountUserName := config.ServiceAccountDistinguishedName
-	err = ldap.AuthenticateServiceAccountUser(serviceAccountPassword, serviceAccountUserName, lConn)
+	err = ldap.AuthenticateServiceAccountUser(serviceAccountPassword, serviceAccountUserName, "", lConn)
 	if err != nil {
 		return v3.Principal{}, nil, err
 	}

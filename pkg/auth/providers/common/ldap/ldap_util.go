@@ -166,12 +166,12 @@ func GetGroupSearchAttributesForLDAP(config *v3.LdapConfig) []string {
 	return groupSeachAttributes
 }
 
-func AuthenticateServiceAccountUser(serviceAccountPassword string, serviceAccountUsername string, lConn *ldapv2.Conn) error {
+func AuthenticateServiceAccountUser(serviceAccountPassword string, serviceAccountUsername string, defaultLoginDomain string, lConn *ldapv2.Conn) error {
 	logrus.Debug("Binding service account username password")
 	if serviceAccountPassword == "" {
 		return httperror.NewAPIError(httperror.MissingRequired, "service account password not provided")
 	}
-	sausername := GetUserExternalID(serviceAccountUsername, "")
+	sausername := GetUserExternalID(serviceAccountUsername, defaultLoginDomain)
 	err := lConn.Bind(sausername, serviceAccountPassword)
 	if err != nil {
 		if ldapv2.IsErrorWithCode(err, ldapv2.LDAPResultInvalidCredentials) {
