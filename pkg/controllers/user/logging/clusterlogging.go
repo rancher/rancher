@@ -180,7 +180,7 @@ func (c *ClusterLoggingSyncer) update(obj *v3.ClusterLogging) (err error) {
 			return mergedErr
 		}
 
-		if err := utils.UpdateSSLAuthentication(getClusterSecretPrefix(c.clusterName), obj.Spec.ElasticsearchConfig, obj.Spec.SplunkConfig, obj.Spec.KafkaConfig, c.secrets); err != nil {
+		if err := utils.UpdateSSLAuthentication(getClusterSecretPrefix(c.clusterName), obj.Spec.ElasticsearchConfig, obj.Spec.SplunkConfig, obj.Spec.KafkaConfig, obj.Spec.SyslogConfig, c.secrets); err != nil {
 			return err
 		}
 

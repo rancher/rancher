@@ -51,6 +51,17 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
   </record>
 </filter>
 
+{{ if eq .clusterTarget.CurrentTarget "syslog"}}
+{{ if .clusterTarget.SyslogConfig.Token}}
+<filter  cluster.**>
+  @type record_transformer
+  <record>
+    token {{.clusterTarget.SyslogConfig.Token}}
+  </record>
+</filter>
+{{end -}}
+{{end -}}
+
 <match  cluster.** rke.** cluster-custom.**> 
     {{ if eq .clusterTarget.CurrentTarget "embedded"}}
     @type elasticsearch
@@ -155,6 +166,22 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     severity {{.clusterTarget.SyslogConfig.Severity}}
     program {{.clusterTarget.SyslogConfig.Program}}
     protocol {{.clusterTarget.SyslogConfig.Protocol}}
+
+    {{ if eq .clusterTarget.SyslogConfig.SSLVerify true}}
+    verify_mode 1
+    {{else -}}
+    verify_mode 0
+    {{end -}}
+
+    {{ if .clusterTarget.SyslogConfig.Certificate }}
+    tls true        
+    ca_file /fluentd/etc/ssl/cluster_{{.clusterName}}_ca.pem
+    {{end}}
+
+    {{ if and .clusterTarget.SyslogConfig.ClientCert .clusterTarget.SyslogConfig.ClientKey}}        
+    client_cert /fluentd/etc/ssl/cluster_{{.clusterName}}_client-cert.pem
+    client_cert_key /fluentd/etc/ssl/cluster_{{.clusterName}}_client-key.pem
+    {{ end -}}
     {{end -}}
 
     <buffer>

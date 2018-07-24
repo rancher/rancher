@@ -134,7 +134,7 @@ func (c *ProjectLoggingSyncer) doSync(obj *v3.ProjectLogging) (*v3.ProjectLoggin
 	}
 
 	_, err = v3.LoggingConditionUpdated.Do(obj, func() (runtime.Object, error) {
-		if err := utils.UpdateSSLAuthentication(getProjectSecretPrefix(obj.Spec.ProjectName), obj.Spec.ElasticsearchConfig, obj.Spec.SplunkConfig, obj.Spec.KafkaConfig, c.secrets); err != nil {
+		if err := utils.UpdateSSLAuthentication(getProjectSecretPrefix(obj.Spec.ProjectName), obj.Spec.ElasticsearchConfig, obj.Spec.SplunkConfig, obj.Spec.KafkaConfig, obj.Spec.SyslogConfig, c.secrets); err != nil {
 			return obj, err
 		}
 
