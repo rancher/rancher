@@ -44,6 +44,17 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
   remove_keys namespace
 </filter>
 
+{{ if eq $store.CurrentTarget "syslog"}}
+{{ if $store.SyslogConfig.Token}}
+<filter {{$store.ProjectName}}.**>
+  @type record_transformer
+  <record>
+    token {{$store.SyslogConfig.Token}}
+  </record>
+</filter>
+{{end -}}
+{{end -}}
+
 <match  {{$store.ProjectName}}.** project-custom.{{$store.ProjectName}}.**> 
     {{ if eq $store.CurrentTarget "elasticsearch"}}
     @type elasticsearch
@@ -139,6 +150,22 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
     severity {{$store.SyslogConfig.Severity}}
     program {{$store.SyslogConfig.Program}}
     protocol {{$store.SyslogConfig.Protocol}}
+
+    {{ if eq $store.SyslogConfig.SSLVerify true}}
+    verify_mode 1
+    {{else -}}
+    verify_mode 0
+    {{end -}}
+
+    {{ if $store.SyslogConfig.Certificate }}
+    tls true        
+    ca_file /fluentd/etc/ssl/project_{{$store.WrapProjectName}}_ca.pem
+    {{end}}
+
+    {{ if and $store.SyslogConfig.ClientCert $store.SyslogConfig.ClientKey}}        
+    client_cert /fluentd/etc/ssl/project_{{$store.WrapProjectName}}_client-cert.pem
+    client_cert_key /fluentd/etc/ssl/project_{{$store.WrapProjectName}}_client-key.pem
+    {{ end -}}
     {{end}}
     
     <buffer>

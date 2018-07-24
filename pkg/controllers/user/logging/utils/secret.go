@@ -14,7 +14,7 @@ import (
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 )
 
-func UpdateSSLAuthentication(prefix string, esConfig *v3.ElasticsearchConfig, spConfig *v3.SplunkConfig, kfConfig *v3.KafkaConfig, secrets rv1.SecretInterface) error {
+func UpdateSSLAuthentication(prefix string, esConfig *v3.ElasticsearchConfig, spConfig *v3.SplunkConfig, kfConfig *v3.KafkaConfig, syslogConfig *v3.SyslogConfig, secrets rv1.SecretInterface) error {
 	var certificate, clientCert, clientKey string
 	if esConfig != nil {
 		certificate = esConfig.Certificate
@@ -28,6 +28,10 @@ func UpdateSSLAuthentication(prefix string, esConfig *v3.ElasticsearchConfig, sp
 		certificate = kfConfig.Certificate
 		clientCert = kfConfig.ClientCert
 		clientKey = kfConfig.ClientKey
+	} else if syslogConfig != nil {
+		certificate = syslogConfig.Certificate
+		clientCert = syslogConfig.ClientCert
+		clientKey = syslogConfig.ClientKey
 	}
 	return updateSecret(loggingconfig.SSLSecretName, prefix, certificate, clientCert, clientKey, secrets)
 }
