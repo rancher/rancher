@@ -138,6 +138,10 @@ func InitializeSamlServiceProvider(configToSet *v3.SamlConfig, name string) erro
 	sp.IDPMetadata.EntityID = idm.EntityID
 	sp.IDPMetadata.SPSSODescriptors = idm.SPSSODescriptors
 	sp.IDPMetadata.IDPSSODescriptors = idm.IDPSSODescriptors
+	if name == ADFSName {
+		sp.AuthnNameIDFormat = saml.UnspecifiedNameIDFormat
+	}
+
 	provider.serviceProvider = &sp
 
 	cookieStore := samlsp.ClientCookies{
@@ -149,9 +153,13 @@ func InitializeSamlServiceProvider(configToSet *v3.SamlConfig, name string) erro
 
 	SamlProviders[name] = provider
 
-	if name == PingName {
+	switch name {
+	case PingName:
 		root.Get("PingACS").HandlerFunc(provider.ServeHTTP)
 		root.Get("PingMetadata").HandlerFunc(provider.ServeHTTP)
+	case ADFSName:
+		root.Get("AdfsACS").HandlerFunc(provider.ServeHTTP)
+		root.Get("AdfsMetadata").HandlerFunc(provider.ServeHTTP)
 	}
 
 	appliedVersion = configToSet.ResourceVersion
@@ -163,6 +171,9 @@ func AuthHandler() http.Handler {
 	root = mux.NewRouter()
 	root.Methods("POST").Path("/v1-saml/ping/saml/acs").Name("PingACS")
 	root.Methods("GET").Path("/v1-saml/ping/saml/metadata").Name("PingMetadata")
+
+	root.Methods("POST").Path("/v1-saml/adfs/saml/acs").Name("AdfsACS")
+	root.Methods("GET").Path("/v1-saml/adfs/saml/metadata").Name("AdfsMetadata")
 
 	return root
 }

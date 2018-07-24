@@ -39,6 +39,10 @@ func addAuthConfigs(management *config.ManagementContext) error {
 		return err
 	}
 
+	if err := addAuthConfig(saml.ADFSName, client.ADFSConfigType, false, management); err != nil {
+		return err
+	}
+
 	return addAuthConfig(localprovider.Name, client.LocalConfigType, true, management)
 }
 
