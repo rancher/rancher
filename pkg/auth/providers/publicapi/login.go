@@ -127,6 +127,9 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	case client.PingProviderType:
 		input = &v3public.SamlLoginInput{}
 		providerName = saml.PingName
+	case client.ADFSProviderType:
+		input = &v3public.SamlLoginInput{}
+		providerName = saml.ADFSName
 	default:
 		return v3.Token{}, "", httperror.NewAPIError(httperror.ServerError, "unknown authentication provider")
 	}
@@ -140,7 +143,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	// Authenticate User
 	// SAML's login flow is different from the other providers. Unlike the other providers, it gets the logged in user's data via a POST from
 	// the identity provider on a separate endpoint specifically for that.
-	if providerName == saml.PingName {
+	if providerName == saml.PingName || providerName == saml.ADFSName {
 		err = saml.PerformSamlLogin(providerName, request, input)
 		return v3.Token{}, "saml", err
 	}

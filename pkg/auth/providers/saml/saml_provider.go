@@ -26,6 +26,7 @@ import (
 )
 
 const PingName = "ping"
+const ADFSName = "adfs"
 
 type Provider struct {
 	ctx             context.Context
@@ -51,7 +52,7 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 		userType:    name + "_user",
 		groupType:   name + "_group",
 	}
-	SamlProviders[PingName] = samlp
+	SamlProviders[name] = samlp
 	return samlp
 }
 
@@ -66,8 +67,11 @@ func (s *Provider) CustomizeSchema(schema *types.Schema) {
 
 func (s *Provider) TransformToAuthProvider(authConfig map[string]interface{}) map[string]interface{} {
 	p := common.TransformToAuthProvider(authConfig)
-	if s.name == PingName {
+	switch s.name {
+	case PingName:
 		p[publicclient.PingProviderFieldRedirectURL] = formSamlRedirectURLFromMap(authConfig, s.name)
+	case ADFSName:
+		p[publicclient.ADFSProviderFieldRedirectURL] = formSamlRedirectURLFromMap(authConfig, s.name)
 	}
 	return p
 }
@@ -142,8 +146,11 @@ func (s *Provider) saveSamlConfig(config *v3.SamlConfig) error {
 		return err
 	}
 
-	if s.name == "ping" {
+	switch s.name {
+	case PingName:
 		configType = client.PingConfigType
+	case ADFSName:
+		configType = client.ADFSConfigType
 	}
 
 	config.APIVersion = "management.cattle.io/v3"
@@ -228,7 +235,14 @@ func (s *Provider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
 }
 
 func formSamlRedirectURLFromMap(config map[string]interface{}, name string) string {
-	hostname, _ := config[client.PingConfigFieldRancherAPIHost].(string)
+	var hostname string
+	switch name {
+	case PingName:
+		hostname, _ = config[client.PingConfigFieldRancherAPIHost].(string)
+	case ADFSName:
+		hostname, _ = config[client.ADFSConfigFieldRancherAPIHost].(string)
+	}
+
 	path := hostname + "/v1-saml/" + name + "/login"
 	return path
 }

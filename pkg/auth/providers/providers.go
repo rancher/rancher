@@ -80,6 +80,11 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	providers[saml.PingName] = p
 	providersByType[client.PingConfigType] = p
 	providersByType[publicclient.PingProviderType] = p
+
+	p = saml.Configure(ctx, mgmt, userMGR, tokenMGR, saml.ADFSName)
+	providers[saml.ADFSName] = p
+	providersByType[client.ADFSConfigType] = p
+	providersByType[publicclient.ADFSProviderType] = p
 }
 
 func AuthenticateUser(input interface{}, providerName string) (v3.Principal, []v3.Principal, string, error) {
