@@ -65,7 +65,7 @@ func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding) error {
 
 func (c *crtbLifecycle) ensureCRTBDelete(binding *v3.ClusterRoleTemplateBinding) error {
 	set := labels.Set(map[string]string{rtbOwnerLabel: string(binding.UID)})
-	bindingCli := c.m.workload.K8sClient.RbacV1().ClusterRoleBindings()
+	bindingCli := c.m.workload.RBAC.ClusterRoleBindings("")
 	rbs, err := c.m.crbLister.List("", set.AsSelector())
 	if err != nil {
 		return errors.Wrapf(err, "couldn't list clusterrolebindings with selector %s", set.AsSelector())

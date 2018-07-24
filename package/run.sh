@@ -6,6 +6,7 @@ info()
 {
     echo "INFO:" "$@" 1>&2
 }
+
 error()
 {
     echo "ERROR:" "$@" 1>&2
@@ -23,6 +24,10 @@ fi
 if [ "$1" = "--" ]; then
     shift 1
     exec "$@"
+fi
+
+if [ "$CLUSTER_CLEANUP" = true ]; then
+    exec agent
 fi
 
 get_address()

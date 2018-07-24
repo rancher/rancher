@@ -18,6 +18,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
+	"github.com/rancher/rancher/pkg/agent/clean"
 	"github.com/rancher/rancher/pkg/agent/cluster"
 	"github.com/rancher/rancher/pkg/agent/node"
 	"github.com/rancher/rancher/pkg/logserver"
@@ -41,7 +42,15 @@ func main() {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 
-	if err := run(); err != nil {
+	var err error
+
+	if os.Getenv("CLUSTER_CLEANUP") == "true" {
+		err = clean.Cluster()
+	} else {
+		err = run()
+	}
+
+	if err != nil {
 		log.Fatal(err)
 	}
 }

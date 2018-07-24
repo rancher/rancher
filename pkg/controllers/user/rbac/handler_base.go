@@ -138,7 +138,7 @@ type manager struct {
 }
 
 func (m *manager) ensureRoles(rts map[string]*v3.RoleTemplate) error {
-	roleCli := m.workload.K8sClient.RbacV1().ClusterRoles()
+	roleCli := m.workload.RBAC.ClusterRoles("")
 	for _, rt := range rts {
 		if rt.External {
 			continue
@@ -335,9 +335,17 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 
 	for key, rb := range desiredRBs {
 		logrus.Infof("Creating roleBinding %v", key)
-		_, err := client.Create(rb)
-		if err != nil {
-			return err
+		switch roleBinding := rb.(type) {
+		case *rbacv1.RoleBinding:
+			_, err := m.workload.RBAC.RoleBindings(ns).Create(roleBinding)
+			if err != nil {
+				return err
+			}
+		case *rbacv1.ClusterRoleBinding:
+			_, err := m.workload.RBAC.ClusterRoleBindings("").Create(roleBinding)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
