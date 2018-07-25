@@ -1,15 +1,15 @@
 package rbac
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
+	namespaceutil "github.com/rancher/rancher/pkg/controllers/user/namespace"
+	"github.com/rancher/rancher/pkg/controllers/user/resourcequota"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
@@ -22,9 +22,7 @@ import (
 const (
 	projectNSGetClusterRoleNameFmt = "%v-namespaces-%v"
 	projectNSAnn                   = "authz.cluster.auth.io/project-namespaces"
-	statusAnn                      = "cattle.io/status"
 	initialRoleCondition           = "InitialRolesPopulated"
-	ResourceQuotaInitCondition     = "ResourceQuotaInit"
 )
 
 var projectNSVerbToSuffix = map[string]string{
@@ -38,12 +36,13 @@ var initialProjectToLabels = map[string]labels.Set{
 	"System":  systemProjectLabels,
 }
 
-func newNamespaceLifecycle(m *manager) *nsLifecycle {
-	return &nsLifecycle{m: m}
+func newNamespaceLifecycle(m *manager, sync *resourcequota.SyncController) *nsLifecycle {
+	return &nsLifecycle{m: m, rq: sync}
 }
 
 type nsLifecycle struct {
-	m *manager
+	m  *manager
+	rq *resourcequota.SyncController
 }
 
 func (n *nsLifecycle) Create(obj *v1.Namespace) (*v1.Namespace, error) {
@@ -57,7 +56,7 @@ func (n *nsLifecycle) Create(obj *v1.Namespace) (*v1.Namespace, error) {
 		return obj, err
 	}
 
-	SetNamespaceCondition(obj, 0, initialRoleCondition, true, "")
+	namespaceutil.SetNamespaceCondition(obj, 0, initialRoleCondition, true, "")
 
 	if err := n.assignToInitialProject(obj); err != nil {
 		return obj, err
@@ -69,15 +68,7 @@ func (n *nsLifecycle) Create(obj *v1.Namespace) (*v1.Namespace, error) {
 }
 
 func (n *nsLifecycle) resourceQuotaInit(obj *v1.Namespace) (*v1.Namespace, error) {
-	resourceQuotaInit, err := IsNamespaceConditionSet(obj, ResourceQuotaInitCondition, true)
-	if err != nil {
-		return obj, err
-	}
-	if resourceQuotaInit {
-		return obj, nil
-	}
-	n.m.nsController.Enqueue("", obj.Name)
-	return obj, &controller.ForgetError{Err: fmt.Errorf("backing off, waiting for resource quota init")}
+	return n.rq.CreateResourceQuota(obj)
 }
 
 func (n *nsLifecycle) Updated(obj *v1.Namespace) (*v1.Namespace, error) {
@@ -452,102 +443,9 @@ func updateStatusAnnotation(hasPRTBs bool, namespace *v1.Namespace, mgr *manager
 		logrus.Errorf("error getting ns %v for status update: %v", namespace.Name, err)
 		return
 	}
-	SetNamespaceCondition(namespace, time.Second*1, initialRoleCondition, true, "")
+	namespaceutil.SetNamespaceCondition(namespace, time.Second*1, initialRoleCondition, true, "")
 	_, err = mgr.workload.Core.Namespaces("").Update(namespace)
 	if err != nil {
 		logrus.Errorf("error updating ns %v status: %v", namespace.Name, err)
 	}
-}
-
-func SetNamespaceCondition(namespace *v1.Namespace, d time.Duration, conditionType string, conditionStatus bool, message string) error {
-	if namespace.ObjectMeta.Annotations == nil {
-		namespace.ObjectMeta.Annotations = map[string]string{}
-	}
-
-	ann := namespace.ObjectMeta.Annotations[statusAnn]
-	status := &status{}
-	if ann != "" {
-		err := json.Unmarshal([]byte(ann), status)
-		if err != nil {
-			return err
-		}
-	}
-	if status.Conditions == nil {
-		status.Conditions = []condition{}
-	}
-
-	var idx int
-	found := false
-	for i, c := range status.Conditions {
-		if c.Type == conditionType {
-			idx = i
-			found = true
-			break
-		}
-	}
-
-	conditionStatusStr := "False"
-	conditionMessage := ""
-	if conditionStatus {
-		conditionStatusStr = "True"
-	} else {
-		conditionMessage = message
-	}
-
-	cond := condition{
-		Type:           conditionType,
-		Status:         conditionStatusStr,
-		Message:        conditionMessage,
-		LastUpdateTime: time.Now().Add(d).Format(time.RFC3339),
-	}
-
-	if found {
-		status.Conditions[idx] = cond
-	} else {
-		status.Conditions = append(status.Conditions, cond)
-	}
-
-	bAnn, err := json.Marshal(status)
-	if err != nil {
-		return err
-	}
-	namespace.ObjectMeta.Annotations[statusAnn] = string(bAnn)
-
-	return nil
-}
-
-func IsNamespaceConditionSet(namespace *v1.Namespace, conditionType string, conditionStatus bool) (bool, error) {
-	if namespace.ObjectMeta.Annotations == nil {
-		return false, nil
-	}
-	ann := namespace.ObjectMeta.Annotations[statusAnn]
-	if ann == "" {
-		return false, nil
-	}
-	status := &status{}
-	err := json.Unmarshal([]byte(ann), status)
-	if err != nil {
-		return false, err
-	}
-	conditionStatusStr := "False"
-	if conditionStatus {
-		conditionStatusStr = "True"
-	}
-	for _, c := range status.Conditions {
-		if c.Type == conditionType && c.Status == conditionStatusStr {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-type status struct {
-	Conditions []condition
-}
-
-type condition struct {
-	Type           string
-	Status         string
-	Message        string
-	LastUpdateTime string
 }

@@ -13,7 +13,7 @@ import (
 )
 
 /*
-collectController is responsible for calculate the combined limit set on the project's namespaces,
+collectController is responsible for calculate the combined limit set on the project's Namespaces,
 and setting this information in the project
 */
 type calculateLimitController struct {

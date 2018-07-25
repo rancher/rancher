@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 
+	"github.com/rancher/rancher/pkg/controllers/user/resourcequota"
 	nsutils "github.com/rancher/rancher/pkg/namespace"
 )
 
@@ -94,7 +95,16 @@ func Register(workload *config.UserContext) {
 	workload.Management.Management.ProjectRoleTemplateBindings("").AddClusterScopedLifecycle("cluster-prtb-sync", workload.ClusterName, newPRTBLifecycle(r))
 	workload.Management.Management.ClusterRoleTemplateBindings("").AddClusterScopedLifecycle("cluster-crtb-sync", workload.ClusterName, newCRTBLifecycle(r))
 	workload.Management.Management.Clusters("").AddHandler("global-admin-cluster-sync", newClusterHandler(workload))
-	workload.Core.Namespaces("").AddLifecycle("namespace-auth", newNamespaceLifecycle(r))
+
+	sync := &resourcequota.SyncController{
+		Namespaces:                  workload.Core.Namespaces(""),
+		NamespaceLister:             workload.Core.Namespaces("").Controller().Lister(),
+		ResourceQuotas:              workload.Core.ResourceQuotas(""),
+		ResourceQuotaLister:         workload.Core.ResourceQuotas("").Controller().Lister(),
+		ResourceQuotaTemplateLister: workload.Management.Management.ResourceQuotaTemplates(workload.ClusterName).Controller().Lister(),
+		ProjectLister:               workload.Management.Management.Projects(workload.ClusterName).Controller().Lister(),
+	}
+	workload.Core.Namespaces("").AddLifecycle("namespace-auth", newNamespaceLifecycle(r, sync))
 
 	// This method for creating a lifecycle creates a cluster scoped handler for a non-cluster scoped resource.
 	// This means that when the cluster is deleted, cleanup logic in the mgmt cluster will remove the finalizer added by this
