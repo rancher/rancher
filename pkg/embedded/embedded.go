@@ -21,7 +21,6 @@ import (
 var (
 	copyProcesses = []string{
 		services.KubeAPIContainerName,
-		services.SchedulerContainerName,
 		services.KubeControllerContainerName,
 		services.EtcdContainerName,
 	}
