@@ -10,7 +10,6 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
-	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -185,15 +184,11 @@ func changed(ctx context.Context, c *client.Client, p v3.Process, container type
 				continue
 			}
 		} else if f.Name == "Env" {
-			changed := false
-			for _, v := range p.Env {
-				if !slice.ContainsString(newProcess.Env, v) {
-					changed = true
-					break
-				}
-			}
-
-			if !changed {
+			// all env
+			allEnv := append(p.Env, imageInspect.Config.Env...)
+			leftMap := sliceToMap(allEnv)
+			rightMap := sliceToMap(newProcess.Env)
+			if reflect.DeepEqual(leftMap, rightMap) {
 				continue
 			}
 		} else if f.Name == "Labels" {
