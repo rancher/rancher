@@ -90,7 +90,8 @@ func runK8s(ctx context.Context, kubeConfig string, args []string) {
 	args = append(args, "--logtostderr=false")
 	args = append(args, "--alsologtostderr=false")
 
-	if args[0] != "kube-apiserver" {
+	basename := args[0]
+	if basename != "kube-apiserver" {
 		restConfig, err := clientcmd.BuildConfigFromFlags("", kubeConfig)
 		if err != nil {
 			logrus.Errorf("Failed to build client: %v", err)
@@ -102,18 +103,12 @@ func runK8s(ctx context.Context, kubeConfig string, args []string) {
 		}
 	}
 
-	hk := hyperkube.HyperKube{
-		Name: "hyperkube",
-		Long: "This is an all-in-one binary that can run any of the various Kubernetes servers.",
-	}
-
-	hk.AddServer(hyperkube.NewKubeAPIServer())
-	hk.AddServer(hyperkube.NewKubeControllerManager())
-	hk.AddServer(hyperkube.NewScheduler())
-
 	logrus.Info("Running ", strings.Join(args, " "))
-	if err := hk.Run(args, ctx.Done()); err != nil {
-		logrus.Errorf("%s exited with error: %v", args[0], err)
+	hyperkubeCommand, allCommandFns := hyperkube.NewHyperKubeCommand()
+	cmd := hyperkube.CommandFor(basename, hyperkubeCommand, allCommandFns)
+	cmd.Flags().Parse(args)
+	if err := cmd.Execute(); err != nil {
+		logrus.Errorf("%s exited with error: %v", basename, err)
 	}
 }
 
