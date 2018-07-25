@@ -175,7 +175,7 @@ def test_resource_quota_ns_create(admin_cc, admin_pc, template):
     assert applied == t_id
 
 
-def test_default_resource_quota_ns_set(admin_cc, admin_pc):
+def test_default_resource_quota_ns_set(admin_cc, admin_pc, default_template):
     p = admin_cc.management.client.update(admin_pc.project,
                                           resourceQuota=default_quota())
     assert p.resourceQuota is not None
@@ -204,7 +204,8 @@ def test_quota_ns_create_exceed(admin_cc, admin_pc, large_template):
 def test_default_resource_quota_ns_create_invalid_combined(admin_cc, admin_pc,
                                                            template,
                                                            large_template,
-                                                           small_template):
+                                                           small_template,
+                                                           default_template):
     p = admin_cc.management.client.update(admin_pc.project,
                                           resourceQuota=default_quota())
     p = admin_cc.management.client.wait_success(p)
