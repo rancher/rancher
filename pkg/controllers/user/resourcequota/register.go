@@ -40,6 +40,13 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 
 	cluster.Core.Namespaces("").AddHandler("resourceQuotaValidationController", validate.validateTemplate)
 
+	reconcile := &reconcileController{
+		namespaces: cluster.Core.Namespaces(""),
+		nsIndexer:  nsInformer.GetIndexer(),
+	}
+
+	cluster.Management.Management.Projects(cluster.ClusterName).AddHandler("resourceQuotaNamespacesReconcileController", reconcile.reconcileNamespaces)
+
 	cleanup := &cleanupController{
 		projectLister:       cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister(),
 		namespaceLister:     cluster.Core.Namespaces("").Controller().Lister(),
