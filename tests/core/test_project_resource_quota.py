@@ -286,3 +286,18 @@ def wait_for_template_reset(admin_cc_client, ns, timeout=30):
             raise Exception('Timeout waiting for'
                             ' resourceQuotaTemplateId to be reset')
     return ns
+
+
+def test_default_resource_quota_project_update(admin_cc, admin_pc,
+                                               default_template):
+    p = admin_pc.project
+    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
+                                                  projectId=p.id)
+    with pytest.raises(Exception):
+        wait_for_applied_template_set(admin_pc.cluster.client, ns, 5)
+
+    p = admin_cc.management.client.update(admin_pc.project,
+                                          resourceQuota=default_quota())
+    assert p.resourceQuota is not None
+    wait_for_applied_template_set(admin_pc.cluster.client,
+                                  ns)
