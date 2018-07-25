@@ -24,6 +24,7 @@ var (
 		"transfer-encoding": true,
 		"content-length":    true,
 		"x-api-auth-header": true,
+		"cf-ray":            true,
 	}
 )
 
