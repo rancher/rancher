@@ -319,7 +319,7 @@ func regenerateAPIAggregationCerts(c *Cluster, certificates map[string]pki.Certi
 	certificates[pki.RequestHeaderCACertName] = pki.ToCertObject(pki.RequestHeaderCACertName, "", "", requestHeaderCACrt, requestHeaderCAKey)
 
 	//generate API server proxy client key and certs
-	logrus.Debugf("[certificates] Regenerating Kubernetes API server porxy client certificates")
+	logrus.Debugf("[certificates] Regenerating Kubernetes API server proxy client certificates")
 	apiserverProxyClientCrt, apiserverProxyClientKey, err := pki.GenerateSignedCertAndKey(requestHeaderCACrt, requestHeaderCAKey, true, pki.APIProxyClientCertName, nil, nil, nil)
 	if err != nil {
 		return nil, err

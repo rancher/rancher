@@ -268,10 +268,12 @@ func RestoreEtcdSnapshot(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 	nodeName := pki.GetEtcdCrtName(etcdHost.InternalAddress)
 	snapshotPath := filepath.Join(EtcdSnapshotPath, snapshotName)
 
+	// make sure that restore path is empty otherwise etcd restore will fail
 	imageCfg := &container.Config{
 		Cmd: []string{
 			"sh", "-c", strings.Join([]string{
-				"/usr/local/bin/etcdctl",
+				"rm -rf", EtcdRestorePath,
+				"&& /usr/local/bin/etcdctl",
 				fmt.Sprintf("--endpoints=[%s:2379]", etcdHost.InternalAddress),
 				"--cacert", pki.GetCertPath(pki.CACertName),
 				"--cert", pki.GetCertPath(nodeName),
@@ -304,7 +306,15 @@ func RestoreEtcdSnapshot(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 		return err
 	}
 	if status != 0 {
-		return fmt.Errorf("Failed to run etcd restore container, exit status is: %d", status)
+		containerLog, err := docker.GetContainerLogsStdoutStderr(ctx, etcdHost.DClient, EtcdRestoreContainerName, "5", false)
+		if err != nil {
+			return err
+		}
+		if err := docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdRestoreContainerName); err != nil {
+			return err
+		}
+		// printing the restore container's logs
+		return fmt.Errorf("Failed to run etcd restore container, exit status is: %d, container logs: %s", status, containerLog)
 	}
 	return docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdRestoreContainerName)
 }

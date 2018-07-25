@@ -209,7 +209,7 @@ func getHostConfig(reader *bufio.Reader, index int, clusterSSHKeyPath string) (*
 	}
 	host.User = sshUser
 
-	isControlHost, err := getConfig(reader, fmt.Sprintf("Is host (%s) a control host (y/n)?", address), "y")
+	isControlHost, err := getConfig(reader, fmt.Sprintf("Is host (%s) a Control Plane host (y/n)?", address), "y")
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +217,7 @@ func getHostConfig(reader *bufio.Reader, index int, clusterSSHKeyPath string) (*
 		host.Role = append(host.Role, services.ControlRole)
 	}
 
-	isWorkerHost, err := getConfig(reader, fmt.Sprintf("Is host (%s) a worker host (y/n)?", address), "n")
+	isWorkerHost, err := getConfig(reader, fmt.Sprintf("Is host (%s) a Worker host (y/n)?", address), "n")
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +225,7 @@ func getHostConfig(reader *bufio.Reader, index int, clusterSSHKeyPath string) (*
 		host.Role = append(host.Role, services.WorkerRole)
 	}
 
-	isEtcdHost, err := getConfig(reader, fmt.Sprintf("Is host (%s) an Etcd host (y/n)?", address), "n")
+	isEtcdHost, err := getConfig(reader, fmt.Sprintf("Is host (%s) an etcd host (y/n)?", address), "n")
 	if err != nil {
 		return nil, err
 	}
@@ -352,7 +352,7 @@ func getAddonManifests(reader *bufio.Reader) ([]string, error) {
 	var addonSlice []string
 	var resume = true
 
-	includeAddons, err := getConfig(reader, "Add addon manifest urls or yaml files", "no")
+	includeAddons, err := getConfig(reader, "Add addon manifest URLs or YAML files", "no")
 
 	if err != nil {
 		return nil, err

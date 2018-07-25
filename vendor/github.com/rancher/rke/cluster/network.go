@@ -1,14 +1,12 @@
 package cluster
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"net"
 	"strings"
 
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
@@ -404,8 +402,6 @@ func (c *Cluster) runServicePortChecks(ctx context.Context) error {
 
 func checkPlaneTCPPortsFromHost(ctx context.Context, host *hosts.Host, portList []string, planeHosts []*hosts.Host, image string, prsMap map[string]v3.PrivateRegistry) error {
 	var hosts []string
-	var containerStdout bytes.Buffer
-	var containerStderr bytes.Buffer
 
 	for _, host := range planeHosts {
 		hosts = append(hosts, host.InternalAddress)
@@ -435,14 +431,10 @@ func checkPlaneTCPPortsFromHost(ctx context.Context, host *hosts.Host, portList 
 		return err
 	}
 
-	clogs, err := docker.ReadContainerLogs(ctx, host.DClient, PortCheckContainer, true, "all")
-	if err != nil {
-		return err
+	containerLog, logsErr := docker.GetContainerLogsStdoutStderr(ctx, host.DClient, PortCheckContainer, "all", true)
+	if logsErr != nil {
+		log.Warnf(ctx, "[network] Failed to get network port check logs: %v", logsErr)
 	}
-	defer clogs.Close()
-
-	stdcopy.StdCopy(&containerStdout, &containerStderr, clogs)
-	containerLog := containerStderr.String()
 	logrus.Debugf("[network] containerLog [%s] on host: %s", containerLog, host.Address)
 
 	if err := docker.RemoveContainer(ctx, host.DClient, host.Address, PortCheckContainer); err != nil {
