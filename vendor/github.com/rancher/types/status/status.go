@@ -102,6 +102,9 @@ func concat(str, next string) string {
 	if next == "" {
 		return str
 	}
+	if strings.EqualFold(str, next) {
+		return str
+	}
 	return str + "; " + next
 }
 
