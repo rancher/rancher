@@ -7,4 +7,4 @@ cd $(dirname $0)/..
 
 mkdir -p bin
 [ "$(uname)" != "Darwin" ] && LINKFLAGS="-linkmode external -extldflags -static -s"
-CGO_ENABLED=0 go build -i -tags k8s -ldflags "-X main.VERSION=$VERSION $LINKFLAGS" -o bin/rancher
+go build -i -tags k8s -ldflags "-X main.VERSION=$VERSION $LINKFLAGS" -o bin/rancher
