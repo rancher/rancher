@@ -159,7 +159,7 @@ func GenerateRKECerts(ctx context.Context, rkeConfig v3.RancherKubernetesEngineC
 	certs[RequestHeaderCACertName] = ToCertObject(RequestHeaderCACertName, "", "", requestHeaderCACrt, requestHeaderCAKey)
 
 	//generate API server proxy client key and certs
-	log.Infof(ctx, "[certificates] Generating Kubernetes API server porxy client certificates")
+	log.Infof(ctx, "[certificates] Generating Kubernetes API server proxy client certificates")
 	apiserverProxyClientCrt, apiserverProxyClientKey, err := GenerateSignedCertAndKey(requestHeaderCACrt, requestHeaderCAKey, true, APIProxyClientCertName, nil, nil, nil)
 	if err != nil {
 		return nil, err
@@ -255,6 +255,7 @@ func SaveBackupBundleOnHost(ctx context.Context, host *hosts.Host, alpineSystemI
 	if status != 0 {
 		return fmt.Errorf("Failed to run certificate bundle compress, exit status is: %d", status)
 	}
+	log.Infof(ctx, "[certificates] successfully saved certificate bundle [%s/pki.bundle.tar.gz] on host [%s]", etcdSnapshotPath, host.Address)
 	return docker.RemoveContainer(ctx, host.DClient, host.Address, BundleCertContainer)
 }
 
@@ -264,7 +265,12 @@ func ExtractBackupBundleOnHost(ctx context.Context, host *hosts.Host, alpineSyst
 		Cmd: []string{
 			"sh",
 			"-c",
-			fmt.Sprintf("mkdir -p %s; tar xzvf %s -C %s --strip-components %d", fullTempCertPath, BundleCertPath, fullTempCertPath, len(strings.Split(fullTempCertPath, "/"))-1),
+			fmt.Sprintf(
+				"mkdir -p %s; tar xzvf %s -C %s --strip-components %d",
+				fullTempCertPath,
+				BundleCertPath,
+				fullTempCertPath,
+				len(strings.Split(fullTempCertPath, "/"))-1),
 		},
 		Image: alpineSystemImage,
 	}
@@ -284,7 +290,16 @@ func ExtractBackupBundleOnHost(ctx context.Context, host *hosts.Host, alpineSyst
 		return err
 	}
 	if status != 0 {
-		return fmt.Errorf("Failed to run certificate bundle extract, exit status is: %d", status)
+		containerLog, err := docker.GetContainerLogsStdoutStderr(ctx, host.DClient, BundleCertContainer, "5", false)
+		if err != nil {
+			return err
+		}
+		// removing the container in case of an error too
+		if err := docker.RemoveContainer(ctx, host.DClient, host.Address, BundleCertContainer); err != nil {
+			return err
+		}
+		return fmt.Errorf("Failed to run certificate bundle extract, exit status is: %d, container logs: %s", status, containerLog)
 	}
+	log.Infof(ctx, "[certificates] successfully extracted certificate bundle on host [%s] to backup path [%s]", host.Address, fullTempCertPath)
 	return docker.RemoveContainer(ctx, host.DClient, host.Address, BundleCertContainer)
 }

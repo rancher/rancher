@@ -2,6 +2,7 @@ package docker
 
 import (
 	"archive/tar"
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -17,6 +18,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -307,10 +309,15 @@ func IsContainerUpgradable(ctx context.Context, dClient *client.Client, imageCfg
 	if err != nil {
 		return false, err
 	}
+	// image inspect to compare the env correctly
+	imageInspect, _, err := dClient.ImageInspectWithRaw(ctx, imageCfg.Image)
+	if err != nil {
+		return false, err
+	}
 	if containerInspect.Config.Image != imageCfg.Image ||
 		!sliceEqualsIgnoreOrder(containerInspect.Config.Entrypoint, imageCfg.Entrypoint) ||
 		!sliceEqualsIgnoreOrder(containerInspect.Config.Cmd, imageCfg.Cmd) ||
-		!isContainerRKEEnvChanged(containerInspect.Config.Env, imageCfg.Env) ||
+		!isContainerEnvChanged(containerInspect.Config.Env, imageCfg.Env, imageInspect.Config.Env) ||
 		!sliceEqualsIgnoreOrder(containerInspect.HostConfig.Binds, hostCfg.Binds) {
 		logrus.Debugf("[%s] Container [%s] is eligible for upgrade on host [%s]", plane, containerName, hostname)
 		return true, nil
@@ -362,6 +369,21 @@ func ReadContainerLogs(ctx context.Context, dClient *client.Client, containerNam
 	return dClient.ContainerLogs(ctx, containerName, types.ContainerLogsOptions{Follow: follow, ShowStdout: true, ShowStderr: true, Timestamps: false, Tail: tail})
 }
 
+func GetContainerLogsStdoutStderr(ctx context.Context, dClient *client.Client, containerName, tail string, follow bool) (string, error) {
+	var containerStderr bytes.Buffer
+	var containerStdout bytes.Buffer
+	var containerLog string
+	clogs, logserr := ReadContainerLogs(ctx, dClient, containerName, follow, tail)
+	if logserr != nil {
+		logrus.Debug("logserr: %v", logserr)
+		return containerLog, fmt.Errorf("Failed to get gather logs from container [%s]: %v", containerName, logserr)
+	}
+	defer clogs.Close()
+	stdcopy.StdCopy(&containerStdout, &containerStderr, clogs)
+	containerLog = containerStderr.String()
+	return containerLog, nil
+}
+
 func tryRegistryAuth(pr v3.PrivateRegistry) types.RequestPrivilegeFunc {
 	return func() (string, error) {
 		return getRegistryAuth(pr)
@@ -403,20 +425,8 @@ func convertToSemver(version string) (*semver.Version, error) {
 	return semver.NewVersion(strings.Join(compVersion, "."))
 }
 
-func isContainerRKEEnvChanged(containerEnv, imageConfigEnv []string) bool {
+func isContainerEnvChanged(containerEnv, imageConfigEnv, dockerfileEnv []string) bool {
 	// remove PATH env from the container env
-	cleanedContainerEnv := getRKEEnvVars(containerEnv)
-	cleanedImageConfigEnv := getRKEEnvVars(imageConfigEnv)
-
-	return sliceEqualsIgnoreOrder(cleanedContainerEnv, cleanedImageConfigEnv)
-}
-
-func getRKEEnvVars(env []string) []string {
-	tmp := []string{}
-	for _, e := range env {
-		if strings.HasPrefix(e, "RKE_") {
-			tmp = append(tmp, e)
-		}
-	}
-	return tmp
+	allImageEnv := append(imageConfigEnv, dockerfileEnv...)
+	return sliceEqualsIgnoreOrder(allImageEnv, containerEnv)
 }

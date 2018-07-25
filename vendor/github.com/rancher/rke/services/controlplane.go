@@ -19,7 +19,7 @@ func RunControlPlane(ctx context.Context, controlHosts []*hosts.Host, localConnD
 			continue
 		}
 		errgrp.Go(func() error {
-			return doDeployControlHost(ctx, runHost, localConnDialerFactory, prsMap, cpNodePlanMap[host.Address].Processes, alpineImage, certMap)
+			return doDeployControlHost(ctx, runHost, localConnDialerFactory, prsMap, cpNodePlanMap[runHost.Address].Processes, alpineImage, certMap)
 		})
 	}
 	if err := errgrp.Wait(); err != nil {

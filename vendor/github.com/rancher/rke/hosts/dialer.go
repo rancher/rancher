@@ -125,7 +125,12 @@ func (d *dialer) Dial(network, addr string) (net.Conn, error) {
 
 	remote, err := conn.Dial(network, addr)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to access the Docker socket (%s). Please check if the configured user can execute `docker ps` on the node, and if the SSH server version is at least version 6.7 or higher. If you are using RedHat/CentOS, you can't use the user `root`. Please refer to the documentation for more instructions. Error: %v", addr, err)
+		if strings.Contains(err.Error(), "connect failed") {
+			return nil, fmt.Errorf("Unable to access the service on %s. The service might be still starting up. Error: %v", addr, err)
+		} else if strings.Contains(err.Error(), "administratively prohibited") {
+			return nil, fmt.Errorf("Unable to access the Docker socket (%s). Please check if the configured user can execute `docker ps` on the node, and if the SSH server version is at least version 6.7 or higher. If you are using RedHat/CentOS, you can't use the user `root`. Please refer to the documentation for more instructions. Error: %v", addr, err)
+		}
+		return nil, fmt.Errorf("Failed to dial to %s: %v", addr, err)
 	}
 	return remote, err
 }
