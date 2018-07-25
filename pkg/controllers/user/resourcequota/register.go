@@ -13,17 +13,17 @@ const (
 )
 
 func Register(ctx context.Context, cluster *config.UserContext) {
-	sync := &syncController{
-		namespaces:                  cluster.Core.Namespaces(""),
-		namespaceLister:             cluster.Core.Namespaces("").Controller().Lister(),
-		resourceQuotas:              cluster.Core.ResourceQuotas(""),
-		resourceQuotaLister:         cluster.Core.ResourceQuotas("").Controller().Lister(),
-		resourceQuotaTemplateLister: cluster.Management.Management.ResourceQuotaTemplates(cluster.ClusterName).Controller().Lister(),
-		projectLister:               cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister(),
+	sync := &SyncController{
+		Namespaces:                  cluster.Core.Namespaces(""),
+		NamespaceLister:             cluster.Core.Namespaces("").Controller().Lister(),
+		ResourceQuotas:              cluster.Core.ResourceQuotas(""),
+		ResourceQuotaLister:         cluster.Core.ResourceQuotas("").Controller().Lister(),
+		ResourceQuotaTemplateLister: cluster.Management.Management.ResourceQuotaTemplates(cluster.ClusterName).Controller().Lister(),
+		ProjectLister:               cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister(),
 	}
 	cluster.Core.Namespaces("").AddHandler("resourceQuotaSyncController", sync.syncResourceQuota)
 
-	// Index for looking up namespaces by projectID annotation
+	// Index for looking up Namespaces by projectID annotation
 	nsInformer := cluster.Core.Namespaces("").Controller().Informer()
 	nsIndexers := map[string]cache.IndexFunc{
 		nsByProjectIndex: nsByProjectID,

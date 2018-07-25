@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/rancher/pkg/controllers/user/rbac"
+	namespaceutil "github.com/rancher/rancher/pkg/controllers/user/namespace"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	corev1 "k8s.io/api/core/v1"
@@ -63,17 +63,16 @@ func (c *validationController) validateTemplate(key string, ns *corev1.Namespace
 	if err != nil {
 		return err
 	}
-
 	if isFit {
 		return nil
 	}
-	set, err := rbac.IsNamespaceConditionSet(ns, resourceQuotaValidatedCondition, false)
+	set, err := namespaceutil.IsNamespaceConditionSet(ns, resourceQuotaValidatedCondition, false)
 	if set || err != nil {
 		return err
 	}
 
 	toUpdate := ns.DeepCopy()
-	err = rbac.SetNamespaceCondition(toUpdate, time.Second*1, resourceQuotaValidatedCondition, false, msg)
+	err = namespaceutil.SetNamespaceCondition(toUpdate, time.Second*1, resourceQuotaValidatedCondition, false, msg)
 	if err != nil {
 		return err
 	}
@@ -179,7 +178,7 @@ func (c *validationController) isQuotaFit(ns *corev1.Namespace, projectID string
 	}
 	nssResourceList = quota.Add(nssResourceList, nsResourceList)
 
-	// get other namespaces
+	// get other Namespaces
 	namespaces, err := c.nsIndexer.ByIndex(nsByProjectIndex, projectID)
 	if err != nil {
 		return false, "", err

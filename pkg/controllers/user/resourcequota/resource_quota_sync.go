@@ -7,7 +7,7 @@ import (
 
 	"reflect"
 
-	"github.com/rancher/rancher/pkg/controllers/user/rbac"
+	namespaceutil "github.com/rancher/rancher/pkg/controllers/user/namespace"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -18,49 +18,51 @@ import (
 )
 
 const (
-	projectIDAnnotation = "field.cattle.io/projectId"
-	resourceQuotaLabel  = "resourcequota.management.cattle.io/default-resource-quota"
+	projectIDAnnotation        = "field.cattle.io/projectId"
+	resourceQuotaLabel         = "resourcequota.management.cattle.io/default-resource-quota"
+	resourceQuotaInitCondition = "ResourceQuotaInit"
 )
 
 /*
-syncController takes care of creating Kubernetes resource quota based on the resource limits
+SyncController takes care of creating Kubernetes resource quota based on the resource limits
 defined in namespace.resourceQuotaTemplateId
 */
-type syncController struct {
-	projectLister               v3.ProjectLister
-	namespaces                  v1.NamespaceInterface
-	namespaceLister             v1.NamespaceLister
-	resourceQuotas              v1.ResourceQuotaInterface
-	resourceQuotaLister         v1.ResourceQuotaLister
-	resourceQuotaTemplateLister v3.ResourceQuotaTemplateLister
+type SyncController struct {
+	ProjectLister               v3.ProjectLister
+	Namespaces                  v1.NamespaceInterface
+	NamespaceLister             v1.NamespaceLister
+	ResourceQuotas              v1.ResourceQuotaInterface
+	ResourceQuotaLister         v1.ResourceQuotaLister
+	ResourceQuotaTemplateLister v3.ResourceQuotaTemplateLister
 }
 
-func (c *syncController) syncResourceQuota(key string, ns *corev1.Namespace) error {
+func (c *SyncController) syncResourceQuota(key string, ns *corev1.Namespace) error {
 	if ns == nil || ns.DeletionTimestamp != nil {
 		return nil
 	}
 
-	return c.createResourceQuota(key, ns)
+	_, err := c.CreateResourceQuota(ns)
+	return err
 }
 
-func (c *syncController) createResourceQuota(key string, ns *corev1.Namespace) error {
+func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (*corev1.Namespace, error) {
 	existing, err := c.getExistingResourceQuota(ns)
 	if err != nil {
-		return err
+		return ns, err
 	}
 
 	setDefault := false
 	if existing == nil {
-		projectLimit, _, err := getProjectLimit(ns, c.projectLister)
+		projectLimit, _, err := getProjectLimit(ns, c.ProjectLister)
 		if err != nil {
-			return err
+			return ns, err
 		}
 		setDefault = projectLimit != nil
 	}
 
 	quotaSpec, err := c.getNamespaceResourceQuota(ns, setDefault)
 	if err != nil {
-		return err
+		return ns, err
 	}
 
 	operation := "none"
@@ -85,34 +87,34 @@ func (c *syncController) createResourceQuota(key string, ns *corev1.Namespace) e
 		err = c.deleteResourceQuota(existing)
 	}
 	if err == nil {
-		set, err := rbac.IsNamespaceConditionSet(ns, rbac.ResourceQuotaInitCondition, true)
+		set, err := namespaceutil.IsNamespaceConditionSet(ns, resourceQuotaInitCondition, true)
 		if err != nil || set {
-			return err
+			return ns, err
 		}
 		toUpdate := ns.DeepCopy()
-		rbac.SetNamespaceCondition(toUpdate, time.Second*1, rbac.ResourceQuotaInitCondition, true, "")
-		_, err = c.namespaces.Update(toUpdate)
+		namespaceutil.SetNamespaceCondition(toUpdate, time.Second*1, resourceQuotaInitCondition, true, "")
+		return c.Namespaces.Update(toUpdate)
 	}
 
-	return err
+	return ns, err
 }
 
-func (c *syncController) updateResourceQuota(quota *corev1.ResourceQuota, spec *corev1.ResourceQuotaSpec) error {
+func (c *SyncController) updateResourceQuota(quota *corev1.ResourceQuota, spec *corev1.ResourceQuotaSpec) error {
 	toUpdate := quota.DeepCopy()
 	toUpdate.Spec = *spec
 	logrus.Infof("Updating default resource quota for namespace %v", toUpdate.Namespace)
-	_, err := c.resourceQuotas.Update(toUpdate)
+	_, err := c.ResourceQuotas.Update(toUpdate)
 	return err
 }
 
-func (c *syncController) deleteResourceQuota(quota *corev1.ResourceQuota) error {
+func (c *SyncController) deleteResourceQuota(quota *corev1.ResourceQuota) error {
 	logrus.Infof("Deleting default resource quota for namespace %v", quota.Namespace)
-	return c.resourceQuotas.DeleteNamespaced(quota.Namespace, quota.Name, &metav1.DeleteOptions{})
+	return c.ResourceQuotas.DeleteNamespaced(quota.Namespace, quota.Name, &metav1.DeleteOptions{})
 }
 
-func (c *syncController) getExistingResourceQuota(ns *corev1.Namespace) (*corev1.ResourceQuota, error) {
+func (c *SyncController) getExistingResourceQuota(ns *corev1.Namespace) (*corev1.ResourceQuota, error) {
 	set := labels.Set(map[string]string{resourceQuotaLabel: "true"})
-	quota, err := c.resourceQuotaLister.List(ns.Name, set.AsSelector())
+	quota, err := c.ResourceQuotaLister.List(ns.Name, set.AsSelector())
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +124,7 @@ func (c *syncController) getExistingResourceQuota(ns *corev1.Namespace) (*corev1
 	return quota[0], nil
 }
 
-func (c *syncController) getNamespaceResourceQuota(ns *corev1.Namespace, setDefault bool) (*corev1.ResourceQuotaSpec, error) {
+func (c *SyncController) getNamespaceResourceQuota(ns *corev1.Namespace, setDefault bool) (*corev1.ResourceQuotaSpec, error) {
 	templateID := getAppliedTemplateID(ns)
 	var limit *v3.ProjectResourceLimit
 	if templateID == "" {
@@ -133,7 +135,7 @@ func (c *syncController) getNamespaceResourceQuota(ns *corev1.Namespace, setDefa
 		}
 	} else {
 		splitted := strings.Split(templateID, ":")
-		template, err := c.resourceQuotaTemplateLister.Get(splitted[0], splitted[1])
+		template, err := c.ResourceQuotaTemplateLister.Get(splitted[0], splitted[1])
 		if err != nil {
 			return nil, err
 		}
@@ -247,7 +249,7 @@ func getProjectNamespaceName(projectID string) (string, string) {
 	return "", ""
 }
 
-func (c *syncController) createDefaultResourceQuota(ns *corev1.Namespace, spec *corev1.ResourceQuotaSpec) error {
+func (c *SyncController) createDefaultResourceQuota(ns *corev1.Namespace, spec *corev1.ResourceQuotaSpec) error {
 	resourceQuota := &corev1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "default-",
@@ -257,6 +259,6 @@ func (c *syncController) createDefaultResourceQuota(ns *corev1.Namespace, spec *
 		Spec: *spec,
 	}
 	logrus.Infof("Creating default resource quota for namespace %v", ns.Name)
-	_, err := c.resourceQuotas.Create(resourceQuota)
+	_, err := c.ResourceQuotas.Create(resourceQuota)
 	return err
 }
