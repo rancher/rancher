@@ -90,7 +90,7 @@ func (npmgr *netpolMgr) programNetworkPolicy(projectID string, clusterNamespace 
 	}
 	logrus.Debugf("netpolMgr: programNetworkPolicy: namespaces=%+v", namespaces)
 
-	systemNamespaces, err := npmgr.getSystemNamespaces(clusterNamespace)
+	systemNamespaces, systemProjectID, err := npmgr.getSystemNamespaces(clusterNamespace)
 	if err != nil {
 		return fmt.Errorf("netpolMgr: programNetworkPolicy getSystemNamespaces: err=%v", err)
 	}
@@ -104,7 +104,7 @@ func (npmgr *netpolMgr) programNetworkPolicy(projectID string, clusterNamespace 
 			logrus.Debugf("netpolMgr: programNetworkPolicy: aNS=%+v marked for deletion, skipping", aNS)
 			continue
 		}
-		np := generateDefaultNamespaceNetworkPolicy(aNS, projectID)
+		np := generateDefaultNamespaceNetworkPolicy(aNS, projectID, systemProjectID)
 		if err := npmgr.program(np); err != nil {
 			return fmt.Errorf("netpolMgr: programNetworkPolicy: error programming default network policy for ns=%v err=%v", aNS.Name, err)
 		}
@@ -113,7 +113,7 @@ func (npmgr *netpolMgr) programNetworkPolicy(projectID string, clusterNamespace 
 }
 
 func (npmgr *netpolMgr) hostPortsUpdateHandler(pod *corev1.Pod, clusterNamespace string) error {
-	systemNamespaces, err := npmgr.getSystemNamespaces(clusterNamespace)
+	systemNamespaces, _, err := npmgr.getSystemNamespaces(clusterNamespace)
 	if err != nil {
 		return fmt.Errorf("netpolMgr: hostPortsUpdateHandler: getSystemNamespaces: err=%v", err)
 	}
@@ -184,7 +184,7 @@ func getNodePortsPolicyName(service *corev1.Service) string {
 }
 
 func (npmgr *netpolMgr) nodePortsUpdateHandler(service *corev1.Service, clusterNamespace string) error {
-	systemNamespaces, err := npmgr.getSystemNamespaces(clusterNamespace)
+	systemNamespaces, _, err := npmgr.getSystemNamespaces(clusterNamespace)
 	if err != nil {
 		return fmt.Errorf("netpolMgr: hostPortsUpdateHandler: getSystemNamespaces: err=%v", err)
 	}
@@ -275,7 +275,7 @@ func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
 		return fmt.Errorf("couldn't list namespaces err=%v", err)
 	}
 
-	systemNamespaces, err := npmgr.getSystemNamespaces(clusterNamespace)
+	systemNamespaces, _, err := npmgr.getSystemNamespaces(clusterNamespace)
 	if err != nil {
 		return fmt.Errorf("netpolMgr: handleHostNetwork getSystemNamespaces: err=%v", err)
 	}
@@ -313,36 +313,41 @@ func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
 	return nil
 }
 
-func (npmgr *netpolMgr) getSystemNamespaces(clusterNamespace string) (map[string]bool, error) {
+func (npmgr *netpolMgr) getSystemNamespaces(clusterNamespace string) (map[string]bool, string, error) {
 	systemNamespaces := map[string]bool{}
 	set := labels.Set(map[string]string{systemProjectLabel: "true"})
 	projects, err := npmgr.projLister.List(clusterNamespace, set.AsSelector())
+	systemProjectID := ""
 	if err != nil {
-		return nil, err
+		return nil, systemProjectID, err
 	}
 	if len(projects) == 0 {
-		return systemNamespaces, fmt.Errorf("systemNamespaces: no system project for cluster %s", clusterNamespace)
+		return systemNamespaces, systemProjectID,
+			fmt.Errorf("systemNamespaces: no system project for cluster %s", clusterNamespace)
 	}
 	if len(projects) > 1 {
-		return systemNamespaces, fmt.Errorf("systemNamespaces: more than one system project in cluster %s", clusterNamespace)
+		return systemNamespaces, systemProjectID,
+			fmt.Errorf("systemNamespaces: more than one system project in cluster %s", clusterNamespace)
 	}
-	systemProjectID := projects[0].Name
-	if systemProjectID != "" {
-		set := labels.Set(map[string]string{nslabels.ProjectIDFieldLabel: systemProjectID})
-		namespaces, err := npmgr.nsLister.List("", set.AsSelector())
-		if err != nil {
-			return nil, fmt.Errorf("sytemNamespaces: couldn't list namespaces err=%v", err)
-		}
-		for _, ns := range namespaces {
-			if _, ok := systemNamespaces[ns.Name]; !ok {
-				systemNamespaces[ns.Name] = true
-			}
+	systemProjectID = projects[0].Name
+	if systemProjectID == "" {
+		return nil, systemProjectID, fmt.Errorf("sytemNamespaces: system project id cannot be empty")
+	}
+	set = labels.Set(map[string]string{nslabels.ProjectIDFieldLabel: systemProjectID})
+	namespaces, err := npmgr.nsLister.List("", set.AsSelector())
+	if err != nil {
+		return nil, systemProjectID,
+			fmt.Errorf("sytemNamespaces: couldn't list namespaces err=%v", err)
+	}
+	for _, ns := range namespaces {
+		if _, ok := systemNamespaces[ns.Name]; !ok {
+			systemNamespaces[ns.Name] = true
 		}
 	}
-	return systemNamespaces, nil
+	return systemNamespaces, systemProjectID, nil
 }
 
-func generateDefaultNamespaceNetworkPolicy(aNS *corev1.Namespace, projectID string) *knetworkingv1.NetworkPolicy {
+func generateDefaultNamespaceNetworkPolicy(aNS *corev1.Namespace, projectID string, systemProjectID string) *knetworkingv1.NetworkPolicy {
 	policyName := "np-default"
 	np := &knetworkingv1.NetworkPolicy{
 		ObjectMeta: v1.ObjectMeta{
@@ -359,6 +364,11 @@ func generateDefaultNamespaceNetworkPolicy(aNS *corev1.Namespace, projectID stri
 						{
 							NamespaceSelector: &v1.LabelSelector{
 								MatchLabels: map[string]string{nslabels.ProjectIDFieldLabel: projectID},
+							},
+						},
+						{
+							NamespaceSelector: &v1.LabelSelector{
+								MatchLabels: map[string]string{nslabels.ProjectIDFieldLabel: systemProjectID},
 							},
 						},
 					},
