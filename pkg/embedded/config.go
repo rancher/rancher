@@ -38,6 +38,13 @@ func localConfig() (*v3.RancherKubernetesEngineConfig, error) {
 
 	rkeConfig.Services.KubeAPI.ExtraArgs["advertise-address"] = "10.43.0.1"
 	rkeConfig.Services.KubeAPI.ExtraArgs["bind-address"] = "127.0.0.1"
+	rkeConfig.Services.KubeAPI.ExtraArgs["requestheader-client-ca-file"] = ""
+	rkeConfig.Services.KubeAPI.ExtraArgs["requestheader-allowed-names"] = ""
+	rkeConfig.Services.KubeAPI.ExtraArgs["proxy-client-key-file"] = ""
+	rkeConfig.Services.KubeAPI.ExtraArgs["proxy-client-cert-file"] = ""
+	rkeConfig.Services.KubeAPI.ExtraArgs["requestheader-extra-headers-prefix"] = ""
+	rkeConfig.Services.KubeAPI.ExtraArgs["requestheader-group-headers"] = ""
+	rkeConfig.Services.KubeAPI.ExtraArgs["requestheader-username-headers"] = ""
 	rkeConfig.SystemImages = v3.K8sVersionToRKESystemImages["v1.10.5-rancher1-1"]
 	rkeConfig.Version = settings.KubernetesVersion.Get()
 	rkeConfig.IgnoreDockerVersion = true
