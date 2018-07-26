@@ -31,6 +31,7 @@ func (npmgr *netpolMgr) nodePortsUpdateHandler(service *corev1.Service, clusterN
 	}
 	policyName := getNodePortsPolicyName(service)
 	if _, ok := systemNamespaces[service.Namespace]; ok {
+		npmgr.delete(service.Namespace, policyName)
 		return nil
 	}
 	np := generateServiceNetworkPolicy(service, policyName)

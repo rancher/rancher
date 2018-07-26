@@ -79,6 +79,7 @@ func (npmgr *netpolMgr) hostPortsUpdateHandler(pod *corev1.Pod, clusterNamespace
 	policyName := getHostPortsPolicyName(pod)
 
 	if _, ok := systemNamespaces[pod.Namespace]; ok {
+		npmgr.delete(pod.Namespace, policyName)
 		return nil
 	}
 
