@@ -11,6 +11,7 @@ WORKDIR /var/lib/rancher
 
 ENV CATTLE_HELM_VERSION v2.9.1-rancher1
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher1-1
+ENV ETCD_VERSION v3.2.0
 ENV LOGLEVEL_VERSION v0.1
 ENV TINI_VERSION v0.18.0
 ENV TELEMETRY_VERSION v0.4.0
@@ -20,7 +21,8 @@ RUN curl -sLf https://github.com/rancher/machine-package/releases/download/${CAT
     curl -sLf https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini > /usr/bin/tini && \
     curl -sLf https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/helm > /usr/bin/helm && \
     curl -sLf https://github.com/rancher/telemetry/releases/download/${TELEMETRY_VERSION}/telemetry.tar.xz | tar -xJf - -C /usr/bin && \
-    chmod +x /usr/bin/helm /usr/bin/tini
+    curl -sLf https://github.com/coreos/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-amd64.tar.gz | tar zxvf - -C /usr/bin  etcd-${ETCD_VERSION}-linux-amd64/etcdctl  --strip-components=1 && \
+    chmod +x /usr/bin/helm /usr/bin/tini /usr/bin/etcdctl
 
 ENV CATTLE_UI_PATH /usr/share/rancher/ui
 ENV CATTLE_UI_VERSION 2.0.61
@@ -33,6 +35,8 @@ ENV AUDIT_LOG_MAXBACKUP 10
 ENV AUDIT_LOG_MAXSIZE 100
 ENV AUDIT_LEVEL 0
 
+ENV ETCDCTL_API 3
+
 RUN mkdir -p /usr/share/rancher/ui && \
     cd /usr/share/rancher/ui && \
     curl -sL https://releases.rancher.com/ui/${CATTLE_UI_VERSION}.tar.gz | tar xvzf - --strip-components=1 && \
@@ -44,8 +48,8 @@ ENV CATTLE_CLI_URL_WINDOWS https://releases.rancher.com/cli/${CATTLE_CLI_VERSION
 
 ARG VERSION=dev
 ENV CATTLE_SERVER_VERSION ${VERSION}
-COPY entrypoint.sh rancher /usr/bin/
-RUN chmod +x /usr/bin/entrypoint.sh
+COPY entrypoint.sh rancher etcd-backup.sh /usr/bin/
+RUN chmod +x /usr/bin/entrypoint.sh /usr/bin/etcd-backup.sh
 
 ENV CATTLE_AGENT_IMAGE rancher/rancher-agent:${VERSION}
 ENV CATTLE_SERVER_IMAGE rancher/rancher
