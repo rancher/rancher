@@ -16,8 +16,8 @@ const (
 	ADFSConfigFieldOwnerReferences     = "ownerReferences"
 	ADFSConfigFieldRancherAPIHost      = "rancherApiHost"
 	ADFSConfigFieldRemoved             = "removed"
-	ADFSConfigFieldSPSelfSignedCert    = "spCert"
-	ADFSConfigFieldSPSelfSignedKey     = "spKey"
+	ADFSConfigFieldSpCert              = "spCert"
+	ADFSConfigFieldSpKey               = "spKey"
 	ADFSConfigFieldType                = "type"
 	ADFSConfigFieldUIDField            = "uidField"
 	ADFSConfigFieldUUID                = "uuid"
@@ -39,8 +39,8 @@ type ADFSConfig struct {
 	OwnerReferences     []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	RancherAPIHost      string            `json:"rancherApiHost,omitempty" yaml:"rancherApiHost,omitempty"`
 	Removed             string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	SPSelfSignedCert    string            `json:"spCert,omitempty" yaml:"spCert,omitempty"`
-	SPSelfSignedKey     string            `json:"spKey,omitempty" yaml:"spKey,omitempty"`
+	SpCert              string            `json:"spCert,omitempty" yaml:"spCert,omitempty"`
+	SpKey               string            `json:"spKey,omitempty" yaml:"spKey,omitempty"`
 	Type                string            `json:"type,omitempty" yaml:"type,omitempty"`
 	UIDField            string            `json:"uidField,omitempty" yaml:"uidField,omitempty"`
 	UUID                string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
