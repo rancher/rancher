@@ -9,6 +9,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const RancherCreatedLabel = "creator.cattle.io/rancher-created"
+
 var (
 	NamespaceBackedResource               condition.Cond = "BackingNamespaceCreated"
 	CreatorMadeOwner                      condition.Cond = "CreatorMadeOwner"

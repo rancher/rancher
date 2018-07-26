@@ -52,7 +52,7 @@ func (a *authProvider) sync(key string, config *v3.AuthConfig) error {
 		return fmt.Errorf("failed to retrieve SamlConfig, cannot read k8s Unstructured data")
 	}
 	storedSamlConfigMap := u.UnstructuredContent()
-	decode(storedSamlConfigMap, samlConfig)
+	mapstructure.Decode(storedSamlConfigMap, samlConfig)
 
 	metadataMap, ok := storedSamlConfigMap["metadata"].(map[string]interface{})
 	if !ok {
@@ -64,19 +64,4 @@ func (a *authProvider) sync(key string, config *v3.AuthConfig) error {
 	samlConfig.ObjectMeta = *typemeta
 
 	return saml.InitializeSamlServiceProvider(samlConfig, config.Name)
-}
-
-func decode(m interface{}, rawVal interface{}) error {
-	config := &mapstructure.DecoderConfig{
-		Metadata: nil,
-		Result:   rawVal,
-		TagName:  "json",
-	}
-
-	decoder, err := mapstructure.NewDecoder(config)
-	if err != nil {
-		return err
-	}
-
-	return decoder.Decode(m)
 }

@@ -188,6 +188,11 @@ func (s *roleClient) ObjectClient() *objectclient.ObjectClient {
 }
 
 func (s *roleClient) Create(o *v1.Role) (*v1.Role, error) {
+	if o.Labels == nil {
+		labels := make(map[string]string)
+		o.Labels = labels
+	}
+	o.Labels["creator.cattle.io/rancher-created"] = "true"
 	obj, err := s.objectClient.Create(o)
 	return obj.(*v1.Role), err
 }
@@ -203,6 +208,11 @@ func (s *roleClient) GetNamespaced(namespace, name string, opts metav1.GetOption
 }
 
 func (s *roleClient) Update(o *v1.Role) (*v1.Role, error) {
+	if o.Labels == nil {
+		labels := make(map[string]string)
+		o.Labels = labels
+	}
+	o.Labels["creator.cattle.io/rancher-created"] = "true"
 	obj, err := s.objectClient.Update(o.Name, o)
 	return obj.(*v1.Role), err
 }
