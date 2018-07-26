@@ -51,18 +51,18 @@ func InitializeSamlServiceProvider(configToSet *v3.SamlConfig, name string) erro
 		return fmt.Errorf("SAML: Cannot initialize saml SP properly, missing IDP URL/metadata in the config %v", configToSet)
 	}
 
-	if configToSet.SPSelfSignedCert == "" {
-		return fmt.Errorf("SAML: Cannot initialize saml SP properly, missing SPSelfSignedCert in the config %v", configToSet)
+	if configToSet.SpCert == "" {
+		return fmt.Errorf("SAML: Cannot initialize saml SP properly, missing SpCert in the config %v", configToSet)
 	}
 
-	if configToSet.SPSelfSignedKey == "" {
-		return fmt.Errorf("SAML: Cannot initialize saml SP properly, missing SPSelfSignedKey in the config %v", configToSet)
+	if configToSet.SpKey == "" {
+		return fmt.Errorf("SAML: Cannot initialize saml SP properly, missing SpKey in the config %v", configToSet)
 	}
 
-	if configToSet.SPSelfSignedKey != "" {
+	if configToSet.SpKey != "" {
 		// used from ssh.ParseRawPrivateKey
 
-		block, _ := pem.Decode([]byte(configToSet.SPSelfSignedKey))
+		block, _ := pem.Decode([]byte(configToSet.SpKey))
 		if block == nil {
 			return fmt.Errorf("SAML: no key found")
 		}
@@ -91,8 +91,8 @@ func InitializeSamlServiceProvider(configToSet *v3.SamlConfig, name string) erro
 		}
 	}
 
-	if configToSet.SPSelfSignedCert != "" {
-		block, _ := pem.Decode([]byte(configToSet.SPSelfSignedCert))
+	if configToSet.SpCert != "" {
+		block, _ := pem.Decode([]byte(configToSet.SpCert))
 		if block == nil {
 			return fmt.Errorf("SAML: failed to parse PEM block containing the private key")
 		}

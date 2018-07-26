@@ -120,7 +120,7 @@ func (s *Provider) getSamlConfig() (*v3.SamlConfig, error) {
 	storedSamlConfigMap := u.UnstructuredContent()
 
 	storedSamlConfig := &v3.SamlConfig{}
-	decode(storedSamlConfigMap, storedSamlConfig)
+	mapstructure.Decode(storedSamlConfigMap, storedSamlConfig)
 
 	if enabled, ok := storedSamlConfigMap["enabled"].(bool); ok {
 		storedSamlConfig.Enabled = enabled
@@ -245,19 +245,4 @@ func formSamlRedirectURLFromMap(config map[string]interface{}, name string) stri
 
 	path := hostname + "/v1-saml/" + name + "/login"
 	return path
-}
-
-func decode(m interface{}, rawVal interface{}) error {
-	config := &mapstructure.DecoderConfig{
-		Metadata: nil,
-		Result:   rawVal,
-		TagName:  "json",
-	}
-
-	decoder, err := mapstructure.NewDecoder(config)
-	if err != nil {
-		return err
-	}
-
-	return decoder.Decode(m)
 }
