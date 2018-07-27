@@ -170,6 +170,7 @@ func (s *Provider) saveSamlConfig(config *v3.SamlConfig) error {
 
 func (s *Provider) toPrincipal(principalType string, princ v3.Principal, token *v3.Token) v3.Principal {
 	if principalType == s.userType {
+		princ.PrincipalType = "user"
 		if token != nil {
 			princ.Me = s.isThisUserMe(token.UserPrincipal, princ)
 			if princ.Me {
@@ -178,6 +179,7 @@ func (s *Provider) toPrincipal(principalType string, princ v3.Principal, token *
 			}
 		}
 	} else {
+		princ.PrincipalType = "group"
 		if token != nil {
 			princ.MemberOf = s.tokenMGR.IsMemberOf(*token, princ)
 		}
@@ -190,7 +192,7 @@ func (s *Provider) SearchPrincipals(searchKey, principalType string, token v3.To
 	var principals []v3.Principal
 
 	if principalType == "" {
-		principalType = s.userType
+		principalType = "user"
 	}
 
 	p := v3.Principal{
@@ -215,11 +217,10 @@ func (s *Provider) GetPrincipal(principalID string, token v3.Token) (v3.Principa
 	externalID := strings.TrimPrefix(parts[1], "//")
 
 	p := v3.Principal{
-		ObjectMeta:    metav1.ObjectMeta{Name: principalType + "://" + externalID},
-		DisplayName:   externalID,
-		LoginName:     externalID,
-		PrincipalType: principalType,
-		Provider:      s.name,
+		ObjectMeta:  metav1.ObjectMeta{Name: principalType + "://" + externalID},
+		DisplayName: externalID,
+		LoginName:   externalID,
+		Provider:    s.name,
 	}
 
 	p = s.toPrincipal(principalType, p, &token)
