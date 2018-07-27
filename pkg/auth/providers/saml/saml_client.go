@@ -186,7 +186,7 @@ func (s *Provider) getSamlPrincipals(config *v3.SamlConfig, samlData map[string]
 		userPrincipal = v3.Principal{
 			ObjectMeta:    metav1.ObjectMeta{Name: s.userType + "://" + uid[0]},
 			Provider:      s.name,
-			PrincipalType: s.userType,
+			PrincipalType: "user",
 			Me:            true,
 		}
 
@@ -207,7 +207,7 @@ func (s *Provider) getSamlPrincipals(config *v3.SamlConfig, samlData map[string]
 					ObjectMeta:    metav1.ObjectMeta{Name: s.groupType + "://" + group},
 					DisplayName:   group,
 					Provider:      s.name,
-					PrincipalType: s.groupType,
+					PrincipalType: "group",
 					MemberOf:      true,
 				}
 				groupPrincipals = append(groupPrincipals, group)
