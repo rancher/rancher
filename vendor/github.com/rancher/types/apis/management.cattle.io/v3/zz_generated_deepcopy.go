@@ -1421,6 +1421,15 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 			(*in).DeepCopyInto(*out)
 		}
 	}
+	if in.EnableNetworkPolicy != nil {
+		in, out := &in.EnableNetworkPolicy, &out.EnableNetworkPolicy
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(bool)
+			**out = **in
+		}
+	}
 	return
 }
 
