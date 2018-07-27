@@ -16,7 +16,6 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -90,7 +89,7 @@ func (npmgr *netpolMgr) programNetworkPolicy(projectID string, clusterNamespace 
 	}
 	logrus.Debugf("netpolMgr: programNetworkPolicy: namespaces=%+v", namespaces)
 
-	systemNamespaces, err := npmgr.getSystemNamespaces(clusterNamespace)
+	systemNamespaces, systemProjectID, err := npmgr.getSystemNSInfo(clusterNamespace)
 	if err != nil {
 		return fmt.Errorf("netpolMgr: programNetworkPolicy getSystemNamespaces: err=%v", err)
 	}
@@ -104,138 +103,11 @@ func (npmgr *netpolMgr) programNetworkPolicy(projectID string, clusterNamespace 
 			logrus.Debugf("netpolMgr: programNetworkPolicy: aNS=%+v marked for deletion, skipping", aNS)
 			continue
 		}
-		np := generateDefaultNamespaceNetworkPolicy(aNS, projectID)
+		np := generateDefaultNamespaceNetworkPolicy(aNS, projectID, systemProjectID)
 		if err := npmgr.program(np); err != nil {
 			return fmt.Errorf("netpolMgr: programNetworkPolicy: error programming default network policy for ns=%v err=%v", aNS.Name, err)
 		}
 	}
-	return nil
-}
-
-func (npmgr *netpolMgr) hostPortsUpdateHandler(pod *corev1.Pod, clusterNamespace string) error {
-	systemNamespaces, err := npmgr.getSystemNamespaces(clusterNamespace)
-	if err != nil {
-		return fmt.Errorf("netpolMgr: hostPortsUpdateHandler: getSystemNamespaces: err=%v", err)
-	}
-	if _, ok := systemNamespaces[pod.Namespace]; ok {
-		return nil
-	}
-
-	policyName := getHostPortsPolicyName(pod)
-	np := &knetworkingv1.NetworkPolicy{
-		ObjectMeta: v1.ObjectMeta{
-			Name:      policyName,
-			Namespace: pod.Namespace,
-			OwnerReferences: []v1.OwnerReference{
-				{
-					APIVersion: "v1",
-					Kind:       "Pod",
-					UID:        pod.UID,
-					Name:       pod.Name,
-				},
-			},
-		},
-		Spec: knetworkingv1.NetworkPolicySpec{
-			PodSelector: v1.LabelSelector{
-				MatchLabels: map[string]string{PodNameFieldLabel: pod.Name},
-			},
-			Ingress: []knetworkingv1.NetworkPolicyIngressRule{
-				{
-					From:  []knetworkingv1.NetworkPolicyPeer{},
-					Ports: []knetworkingv1.NetworkPolicyPort{},
-				},
-			},
-		},
-	}
-
-	hasHostPorts := false
-	for _, c := range pod.Spec.Containers {
-		for _, port := range c.Ports {
-			if port.HostPort != 0 {
-				hp := intstr.FromInt(int(port.ContainerPort))
-				proto := corev1.Protocol(port.Protocol)
-				p := knetworkingv1.NetworkPolicyPort{
-					Protocol: &proto,
-					Port:     &hp,
-				}
-				np.Spec.Ingress[0].Ports = append(np.Spec.Ingress[0].Ports, p)
-				hasHostPorts = true
-			}
-		}
-	}
-	if hasHostPorts {
-		logrus.Debugf("netpolMgr: hostPortsUpdateHandler: pod=%+v has host ports, hence programming np=%+v", *pod, *np)
-		return npmgr.program(np)
-	}
-
-	return nil
-}
-
-func (npmgr *netpolMgr) hostPortsRemoveHandler(pod *corev1.Pod) (*corev1.Pod, error) {
-	return pod, npmgr.delete(pod.Namespace, getHostPortsPolicyName(pod))
-}
-
-func getHostPortsPolicyName(pod *corev1.Pod) string {
-	return "hp-" + pod.Name
-}
-
-func getNodePortsPolicyName(service *corev1.Service) string {
-	return "np-" + service.Name
-}
-
-func (npmgr *netpolMgr) nodePortsUpdateHandler(service *corev1.Service, clusterNamespace string) error {
-	systemNamespaces, err := npmgr.getSystemNamespaces(clusterNamespace)
-	if err != nil {
-		return fmt.Errorf("netpolMgr: hostPortsUpdateHandler: getSystemNamespaces: err=%v", err)
-	}
-	if _, ok := systemNamespaces[service.Namespace]; ok {
-		return nil
-	}
-	policyName := getNodePortsPolicyName(service)
-	np := &knetworkingv1.NetworkPolicy{
-		ObjectMeta: v1.ObjectMeta{
-			Name:      policyName,
-			Namespace: service.Namespace,
-			OwnerReferences: []v1.OwnerReference{
-				{
-					APIVersion: "v1",
-					Kind:       "Service",
-					UID:        service.UID,
-					Name:       service.Name,
-				},
-			},
-		},
-		Spec: knetworkingv1.NetworkPolicySpec{
-			PodSelector: v1.LabelSelector{
-				MatchLabels: service.Spec.Selector,
-			},
-			Ingress: []knetworkingv1.NetworkPolicyIngressRule{
-				{
-					From:  []knetworkingv1.NetworkPolicyPeer{},
-					Ports: []knetworkingv1.NetworkPolicyPort{},
-				},
-			},
-		},
-	}
-
-	hasNodePorts := false
-	for _, port := range service.Spec.Ports {
-		if port.NodePort != 0 {
-			tp := port.TargetPort
-			proto := corev1.Protocol(port.Protocol)
-			p := knetworkingv1.NetworkPolicyPort{
-				Protocol: &proto,
-				Port:     &tp,
-			}
-			np.Spec.Ingress[0].Ports = append(np.Spec.Ingress[0].Ports, p)
-			hasNodePorts = true
-		}
-	}
-	if hasNodePorts {
-		logrus.Debugf("netpolMgr: nodePortsUpdateHandler: service=%+v has node ports, hence programming np=%+v", *service, *np)
-		return npmgr.program(np)
-	}
-
 	return nil
 }
 
@@ -275,7 +147,7 @@ func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
 		return fmt.Errorf("couldn't list namespaces err=%v", err)
 	}
 
-	systemNamespaces, err := npmgr.getSystemNamespaces(clusterNamespace)
+	systemNamespaces, _, err := npmgr.getSystemNSInfo(clusterNamespace)
 	if err != nil {
 		return fmt.Errorf("netpolMgr: handleHostNetwork getSystemNamespaces: err=%v", err)
 	}
@@ -289,9 +161,6 @@ func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
 			continue
 		}
 		if _, ok := aNS.Labels[nslabels.ProjectIDFieldLabel]; !ok {
-			continue
-		}
-		if systemNamespaces[aNS.Name] {
 			continue
 		}
 
@@ -313,36 +182,43 @@ func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
 	return nil
 }
 
-func (npmgr *netpolMgr) getSystemNamespaces(clusterNamespace string) (map[string]bool, error) {
+func (npmgr *netpolMgr) getSystemNSInfo(clusterNamespace string) (map[string]bool, string, error) {
 	systemNamespaces := map[string]bool{}
 	set := labels.Set(map[string]string{systemProjectLabel: "true"})
 	projects, err := npmgr.projLister.List(clusterNamespace, set.AsSelector())
+	systemProjectID := ""
 	if err != nil {
-		return nil, err
+		return nil, systemProjectID, err
 	}
 	if len(projects) == 0 {
-		return systemNamespaces, fmt.Errorf("systemNamespaces: no system project for cluster %s", clusterNamespace)
+		return systemNamespaces, systemProjectID,
+			fmt.Errorf("systemNamespaces: no system project for cluster %s", clusterNamespace)
 	}
 	if len(projects) > 1 {
-		return systemNamespaces, fmt.Errorf("systemNamespaces: more than one system project in cluster %s", clusterNamespace)
+		return systemNamespaces, systemProjectID,
+			fmt.Errorf("systemNamespaces: more than one system project in cluster %s", clusterNamespace)
 	}
-	systemProjectID := projects[0].Name
-	if systemProjectID != "" {
-		set := labels.Set(map[string]string{nslabels.ProjectIDFieldLabel: systemProjectID})
-		namespaces, err := npmgr.nsLister.List("", set.AsSelector())
-		if err != nil {
-			return nil, fmt.Errorf("sytemNamespaces: couldn't list namespaces err=%v", err)
-		}
-		for _, ns := range namespaces {
-			if _, ok := systemNamespaces[ns.Name]; !ok {
-				systemNamespaces[ns.Name] = true
-			}
+	// ns.Annotations[projectIDAnnotation] = fmt.Sprintf("%v:%v", n.m.clusterName, projects[0].Name)
+	// ns.Labels[ProjectIDFieldLabel] = projectID / projects[0].Name
+	systemProjectID = projects[0].Name
+	if systemProjectID == "" {
+		return nil, systemProjectID, fmt.Errorf("sytemNamespaces: system project id cannot be empty")
+	}
+	set = labels.Set(map[string]string{nslabels.ProjectIDFieldLabel: systemProjectID})
+	namespaces, err := npmgr.nsLister.List("", set.AsSelector())
+	if err != nil {
+		return nil, systemProjectID,
+			fmt.Errorf("sytemNamespaces: couldn't list namespaces err=%v", err)
+	}
+	for _, ns := range namespaces {
+		if _, ok := systemNamespaces[ns.Name]; !ok {
+			systemNamespaces[ns.Name] = true
 		}
 	}
-	return systemNamespaces, nil
+	return systemNamespaces, systemProjectID, nil
 }
 
-func generateDefaultNamespaceNetworkPolicy(aNS *corev1.Namespace, projectID string) *knetworkingv1.NetworkPolicy {
+func generateDefaultNamespaceNetworkPolicy(aNS *corev1.Namespace, projectID string, systemProjectID string) *knetworkingv1.NetworkPolicy {
 	policyName := "np-default"
 	np := &knetworkingv1.NetworkPolicy{
 		ObjectMeta: v1.ObjectMeta{
@@ -359,6 +235,11 @@ func generateDefaultNamespaceNetworkPolicy(aNS *corev1.Namespace, projectID stri
 						{
 							NamespaceSelector: &v1.LabelSelector{
 								MatchLabels: map[string]string{nslabels.ProjectIDFieldLabel: projectID},
+							},
+						},
+						{
+							NamespaceSelector: &v1.LabelSelector{
+								MatchLabels: map[string]string{nslabels.ProjectIDFieldLabel: systemProjectID},
 							},
 						},
 					},

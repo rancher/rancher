@@ -1,6 +1,8 @@
 package networkpolicy
 
 import (
+	"fmt"
+
 	"sort"
 
 	"github.com/rancher/types/apis/core/v1"
@@ -69,8 +71,19 @@ Loop:
 	return nil
 }
 
-func (ph *podHandler) hostPortsUpdateHandler(pod *corev1.Pod) error {
-	np := generatePodNetworkPolicy(pod)
+func (npmgr *netpolMgr) hostPortsUpdateHandler(pod *corev1.Pod, clusterNamespace string) error {
+	systemNamespaces, _, err := npmgr.getSystemNSInfo(clusterNamespace)
+	if err != nil {
+		return fmt.Errorf("netpolMgr: hostPortsUpdateHandler: getSystemNamespaces: err=%v", err)
+	}
+	policyName := getHostPortsPolicyName(pod)
+
+	if _, ok := systemNamespaces[pod.Namespace]; ok {
+		npmgr.delete(pod.Namespace, policyName)
+		return nil
+	}
+
+	np := generatePodNetworkPolicy(pod, policyName)
 	hasHostPorts := false
 	for _, c := range pod.Spec.Containers {
 		for _, port := range c.Ports {
@@ -96,13 +109,17 @@ func (ph *podHandler) hostPortsUpdateHandler(pod *corev1.Pod) error {
 	})
 
 	logrus.Debugf("netpolMgr: hostPortsUpdateHandler: pod=%+v has host ports, hence programming np=%+v", *pod, *np)
-	return ph.npmgr.program(np)
+	return npmgr.program(np)
 }
 
-func generatePodNetworkPolicy(pod *corev1.Pod) *knetworkingv1.NetworkPolicy {
-	np := &knetworkingv1.NetworkPolicy{
+func getHostPortsPolicyName(pod *corev1.Pod) string {
+	return "hp-" + pod.Name
+}
+
+func generatePodNetworkPolicy(pod *corev1.Pod, policyName string) *knetworkingv1.NetworkPolicy {
+	return &knetworkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "hp-" + pod.Name,
+			Name:      policyName,
 			Namespace: pod.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
 				{
@@ -125,5 +142,4 @@ func generatePodNetworkPolicy(pod *corev1.Pod) *knetworkingv1.NetworkPolicy {
 			},
 		},
 	}
-	return np
 }

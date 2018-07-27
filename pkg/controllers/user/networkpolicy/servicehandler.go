@@ -1,6 +1,8 @@
 package networkpolicy
 
 import (
+	"fmt"
+
 	"sort"
 
 	"github.com/sirupsen/logrus"
@@ -19,11 +21,20 @@ func (sh *serviceHandler) Sync(key string, service *corev1.Service) error {
 		return nil
 	}
 	logrus.Debugf("serviceHandler: Sync: %+v", *service)
-	return sh.nodePortsUpdateHandler(service)
+	return sh.npmgr.nodePortsUpdateHandler(service, sh.clusterNamespace)
 }
 
-func (sh *serviceHandler) nodePortsUpdateHandler(service *corev1.Service) error {
-	np := getServiceNetworkPolicy(service)
+func (npmgr *netpolMgr) nodePortsUpdateHandler(service *corev1.Service, clusterNamespace string) error {
+	systemNamespaces, _, err := npmgr.getSystemNSInfo(clusterNamespace)
+	if err != nil {
+		return fmt.Errorf("netpolMgr: hostPortsUpdateHandler: getSystemNamespaces: err=%v", err)
+	}
+	policyName := getNodePortsPolicyName(service)
+	if _, ok := systemNamespaces[service.Namespace]; ok {
+		npmgr.delete(service.Namespace, policyName)
+		return nil
+	}
+	np := generateServiceNetworkPolicy(service, policyName)
 	hasNodePorts := false
 	for _, port := range service.Spec.Ports {
 		if port.NodePort != 0 {
@@ -44,16 +55,20 @@ func (sh *serviceHandler) nodePortsUpdateHandler(service *corev1.Service) error 
 	})
 	if hasNodePorts {
 		logrus.Debugf("netpolMgr: nodePortsUpdateHandler: service=%+v has node ports, hence programming np=%+v", *service, *np)
-		return sh.npmgr.program(np)
+		return npmgr.program(np)
 	}
 
 	return nil
 }
 
-func getServiceNetworkPolicy(service *corev1.Service) *knetworkingv1.NetworkPolicy {
+func getNodePortsPolicyName(service *corev1.Service) string {
+	return "np-" + service.Name
+}
+
+func generateServiceNetworkPolicy(service *corev1.Service, policyName string) *knetworkingv1.NetworkPolicy {
 	np := &knetworkingv1.NetworkPolicy{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      "np-" + service.Name,
+			Name:      policyName,
 			Namespace: service.Namespace,
 			OwnerReferences: []v1.OwnerReference{
 				{
