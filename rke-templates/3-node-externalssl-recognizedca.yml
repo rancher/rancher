@@ -99,6 +99,25 @@ addons: |-
           - --no-cacerts
           imagePullPolicy: Always
           name: cattle-server
+  #       env:
+  #       - name: HTTP_PROXY
+  #         value: "http://your_proxy_address:port"
+  #       - name: HTTPS_PROXY
+  #         value: "http://your_proxy_address:port"
+  #       - name: NO_PROXY
+  #         value: "localhost,127.0.0.1,0.0.0.0,10.43.0.0/16,your_network_ranges_that_dont_need_proxy_to_access"
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: 80
+            initialDelaySeconds: 60
+            periodSeconds: 60
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: 80
+            initialDelaySeconds: 20
+            periodSeconds: 10
           ports:
           - containerPort: 80
             protocol: TCP
