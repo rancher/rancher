@@ -211,10 +211,14 @@ func (s *Provider) SearchPrincipals(searchKey, principalType string, token v3.To
 func (s *Provider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
 	parts := strings.SplitN(principalID, ":", 2)
 	if len(parts) != 2 {
-		return v3.Principal{}, errors.Errorf("SAML: invalid id %v", principalID)
+		return v3.Principal{}, fmt.Errorf("SAML: invalid id %v", principalID)
 	}
 	principalType := parts[0]
 	externalID := strings.TrimPrefix(parts[1], "//")
+
+	if principalType != s.userType && principalType != s.groupType {
+		return v3.Principal{}, fmt.Errorf("SAML: Invalid principal type")
+	}
 
 	p := v3.Principal{
 		ObjectMeta:  metav1.ObjectMeta{Name: principalType + "://" + externalID},
