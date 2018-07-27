@@ -123,15 +123,12 @@ func EscapeLDAPSearchFilter(filter string) string {
 }
 
 func GetUserSearchAttributes(memberOfAttribute, objectClassAttribute string, config *v3.ActiveDirectoryConfig) []string {
-	srchAttributes := strings.Split(config.UserSearchAttribute, "|")
 	userSearchAttributes := []string{memberOfAttribute,
 		objectClassAttribute,
 		config.UserObjectClass,
 		config.UserLoginAttribute,
 		config.UserNameAttribute,
 		config.UserEnabledAttribute}
-	userSearchAttributes = append(userSearchAttributes, srchAttributes...)
-
 	return userSearchAttributes
 }
 
