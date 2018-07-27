@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -22,9 +23,18 @@ import (
 	"k8s.io/client-go/util/workqueue"
 )
 
+const MetricsEnv = "NORMAN_QUEUE_METRICS"
+
 var (
 	resyncPeriod = 2 * time.Hour
 )
+
+// Override the metrics providers
+func init() {
+	if os.Getenv(MetricsEnv) != "true" {
+		DisableAllControllerMetrics()
+	}
+}
 
 type HandlerFunc func(key string) error
 
