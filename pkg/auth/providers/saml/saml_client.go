@@ -227,6 +227,8 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		s.clientState.DeleteState(w, r, relayState)
 	}
 
+	redirectURL := s.clientState.GetState(r, "Rancher_FinalRedirectURL")
+
 	samlData := make(map[string][]string)
 
 	for _, attributeStatement := range assertion.AttributeStatements {
@@ -243,7 +245,8 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 
 	config, err := s.getSamlConfig()
 	if err != nil {
-		writeError(w, 500, "SAML: Error getting saml config %v", err, "Server error while authenticating")
+		log.Errorf("SAML: Error getting saml config %v", err)
+		http.Redirect(w, r, redirectURL+"/login?errorCode=500", http.StatusFound)
 		return
 	}
 
@@ -252,11 +255,13 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 
 	allowed, err := s.userMGR.CheckAccess(config.AccessMode, allowedPrincipals, userPrincipal, groupPrincipals)
 	if err != nil {
-		writeError(w, 500, "SAML: Error during login while checking access %v", err, "Server error while authenticating")
+		log.Errorf("SAML: Error during login while checking access %v", err)
+		http.Redirect(w, r, redirectURL+"/login?errorCode=500", http.StatusFound)
 		return
 	}
 	if !allowed {
-		writeError(w, 403, "SAML: User does not have access %v", err, "User does not have access")
+		log.Errorf("SAML: User does not have access %v", err)
+		http.Redirect(w, r, redirectURL+"/login?errorCode=403", http.StatusFound)
 		return
 	}
 
@@ -265,14 +270,16 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	if userID != "" && rancherAction == "testAndEnable" {
 		user, err := s.userMGR.SetPrincipalOnCurrentUserByUserID(userID, userPrincipal)
 		if err != nil {
-			writeError(w, 500, "SAML: Error setting principal on current user %v", err, "Server error while authenticating")
+			log.Errorf("SAML: Error setting principal on current user %v", err)
+			http.Redirect(w, r, redirectURL+"/login?errorCode=500", http.StatusFound)
 			return
 		}
 
 		config.Enabled = true
 		err = s.saveSamlConfig(config)
 		if err != nil {
-			writeError(w, 500, "SAML: Error saving SAML config %v", err, "Server error while authenticating")
+			log.Errorf("SAML: Error saving saml config %v", err)
+			http.Redirect(w, r, redirectURL+"/login?errorCode=500", http.StatusFound)
 			return
 		}
 
@@ -282,7 +289,8 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		}
 		err = setRancherToken(w, r, s.tokenMGR, user.Name, userPrincipal, groupPrincipals, isSecure)
 		if err != nil {
-			writeError(w, 500, "SAML: Failed creating token with error: %v", err, "Server error while authenticating")
+			log.Errorf("SAML: Failed creating token with error: %v", err)
+			http.Redirect(w, r, redirectURL+"/login?errorCode=500", http.StatusFound)
 		}
 		// delete the cookies
 		s.clientState.DeleteState(w, r, "Rancher_UserID")
@@ -303,15 +311,17 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	}
 	user, err := s.userMGR.EnsureUser(userPrincipal.Name, displayName)
 	if err != nil {
-		writeError(w, 403, "SAML: User does not have access %v", err, "User does not have access")
+		log.Errorf("SAML: User does not have access %v", err)
+		http.Redirect(w, r, redirectURL+"/login?errorCode=403", http.StatusFound)
 		return
 	}
 
 	err = setRancherToken(w, r, s.tokenMGR, user.Name, userPrincipal, groupPrincipals, true)
 	if err != nil {
-		writeError(w, 500, "SAML: Failed creating token with error: %v", err, "Server error while authenticating")
+		log.Errorf("SAML: Failed creating token with error: %v", err)
+		http.Redirect(w, r, redirectURL+"/login?errorCode=500", http.StatusFound)
 	}
-	redirectURL := s.clientState.GetState(r, "Rancher_FinalRedirectURL")
+	redirectURL = s.clientState.GetState(r, "Rancher_FinalRedirectURL")
 	if redirectURL != "" {
 		// delete the cookie
 		s.clientState.DeleteState(w, r, "Rancher_FinalRedirectURL")
@@ -335,11 +345,4 @@ func setRancherToken(w http.ResponseWriter, r *http.Request, tokenMGR *tokens.Ma
 	}
 	http.SetCookie(w, tokenCookie)
 	return nil
-}
-
-func writeError(w http.ResponseWriter, code int, logMsg string, err error, errMsg string) {
-	log.Errorf(logMsg, err)
-	w.WriteHeader(code)
-	w.Write([]byte(errMsg))
-	return
 }
