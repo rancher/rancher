@@ -203,7 +203,12 @@ func convertHostPortToEndpoint(pod *corev1.Pod, clusterName string, node *manage
 			if p.HostPort == 0 {
 				continue
 			}
-			address := nodehelper.GetEndpointNodeIP(node)
+			var address string
+			if p.HostIP != "" {
+				address = p.HostIP
+			} else {
+				address = nodehelper.GetEndpointNodeIP(node)
+			}
 			p := v3.PublicEndpoint{
 				NodeName:  fmt.Sprintf("%s:%s", clusterName, node.Name),
 				Addresses: []string{address},
