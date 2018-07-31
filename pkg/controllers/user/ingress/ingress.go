@@ -110,7 +110,7 @@ func generateExpectedServices(state map[string]string, obj *v1beta1.Ingress) (ma
 		}
 	}
 	if obj.Spec.Backend != nil {
-		key := GetStateKey(obj.Name, obj.Namespace, "", "", convert.ToString(obj.Spec.Backend.ServicePort.IntVal))
+		key := GetStateKey(obj.Name, obj.Namespace, "", "/", convert.ToString(obj.Spec.Backend.ServicePort.IntVal))
 		if workloadIDs, ok := state[key]; ok {
 			rtn[obj.Spec.Backend.ServiceName], err = generateIngressService(obj.Spec.Backend.ServiceName, obj.Spec.Backend.ServicePort.IntVal, workloadIDs)
 			if err != nil {
