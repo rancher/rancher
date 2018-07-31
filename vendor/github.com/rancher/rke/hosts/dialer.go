@@ -113,6 +113,8 @@ func (d *dialer) Dial(network, addr string) (net.Conn, error) {
 			return nil, fmt.Errorf("Unable to access node with address [%s] using SSH. Please check if you are able to SSH to the node using the specified SSH Private Key and if you have configured the correct SSH username. Error: %v", d.sshAddress, err)
 		} else if strings.Contains(err.Error(), "cannot decode encrypted private keys") {
 			return nil, fmt.Errorf("Unable to access node with address [%s] using SSH. Using encrypted private keys is only supported using ssh-agent. Please configure the option `ssh_agent_auth: true` in the configuration file or use --ssh-agent-auth as a parameter when running RKE. This will use the `SSH_AUTH_SOCK` environment variable. Error: %v", d.sshAddress, err)
+		} else if strings.Contains(err.Error(), "operation timed out") {
+			return nil, fmt.Errorf("Unable to access node with address [%s] using SSH. Please check if the node is up and is accepting SSH connections or check network policies and firewall rules. Error: %v", d.sshAddress, err)
 		}
 		return nil, fmt.Errorf("Failed to dial ssh using address [%s]: %v", d.sshAddress, err)
 	}

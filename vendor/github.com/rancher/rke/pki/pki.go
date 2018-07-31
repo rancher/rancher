@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/docker/docker/api/types/container"
@@ -233,7 +234,7 @@ func SaveBackupBundleOnHost(ctx context.Context, host *hosts.Host, alpineSystemI
 		Cmd: []string{
 			"sh",
 			"-c",
-			fmt.Sprintf("if [ -d %s ] && [ \"$(ls -A %s)\" ]; then tar czvf %s %s;fi", path.Join(host.PrefixPath, TempCertPath), path.Join(host.PrefixPath, TempCertPath), BundleCertPath, path.Join(host.PrefixPath, TempCertPath)),
+			fmt.Sprintf("if [ -d %s ] && [ \"$(ls -A %s)\" ]; then tar czvf %s %s;fi", TempCertPath, TempCertPath, BundleCertPath, TempCertPath),
 		},
 		Image: alpineSystemImage,
 	}
@@ -260,17 +261,16 @@ func SaveBackupBundleOnHost(ctx context.Context, host *hosts.Host, alpineSystemI
 }
 
 func ExtractBackupBundleOnHost(ctx context.Context, host *hosts.Host, alpineSystemImage, etcdSnapshotPath string, prsMap map[string]v3.PrivateRegistry) error {
-	fullTempCertPath := path.Join(host.PrefixPath, TempCertPath)
 	imageCfg := &container.Config{
 		Cmd: []string{
 			"sh",
 			"-c",
 			fmt.Sprintf(
 				"mkdir -p %s; tar xzvf %s -C %s --strip-components %d",
-				fullTempCertPath,
+				TempCertPath,
 				BundleCertPath,
-				fullTempCertPath,
-				len(strings.Split(fullTempCertPath, "/"))-1),
+				TempCertPath,
+				len(strings.Split(filepath.Clean(TempCertPath), "/"))-1),
 		},
 		Image: alpineSystemImage,
 	}
@@ -300,6 +300,6 @@ func ExtractBackupBundleOnHost(ctx context.Context, host *hosts.Host, alpineSyst
 		}
 		return fmt.Errorf("Failed to run certificate bundle extract, exit status is: %d, container logs: %s", status, containerLog)
 	}
-	log.Infof(ctx, "[certificates] successfully extracted certificate bundle on host [%s] to backup path [%s]", host.Address, fullTempCertPath)
+	log.Infof(ctx, "[certificates] successfully extracted certificate bundle on host [%s] to backup path [%s]", host.Address, TempCertPath)
 	return docker.RemoveContainer(ctx, host.DClient, host.Address, BundleCertContainer)
 }
