@@ -28,6 +28,7 @@ type netpolMgr struct {
 	nsLister         typescorev1.NamespaceLister
 	nodeLister       typescorev1.NodeLister
 	pods             typescorev1.PodInterface
+	projects         v3.ProjectInterface
 	npLister         rnetworkingv1.NetworkPolicyLister
 	npClient         rnetworkingv1.Interface
 	projLister       v3.ProjectLister

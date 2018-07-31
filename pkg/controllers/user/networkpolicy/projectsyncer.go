@@ -14,9 +14,11 @@ import (
 )
 
 type projectSyncer struct {
-	pnpLister  v3.ProjectNetworkPolicyLister
-	pnpClient  v3.ProjectNetworkPolicyInterface
-	projClient v3.ProjectInterface
+	pnpLister        v3.ProjectNetworkPolicyLister
+	pnpClient        v3.ProjectNetworkPolicyInterface
+	projClient       v3.ProjectInterface
+	clusterLister    v3.ClusterLister
+	clusterNamespace string
 }
 
 // Sync is responsible for creating a default ProjectNetworkPolicy for
@@ -27,7 +29,13 @@ func (ps *projectSyncer) Sync(key string, p *v3.Project) error {
 	if p == nil || p.DeletionTimestamp != nil {
 		return nil
 	}
-
+	disabled, err := isNetworkPolicyDisabled(ps.clusterNamespace, ps.clusterLister)
+	if err != nil {
+		return err
+	}
+	if disabled {
+		return nil
+	}
 	updated, err := ps.createDefaultNetworkPolicy(p)
 	if err != nil {
 		return err

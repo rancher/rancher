@@ -85,7 +85,13 @@ func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
 		return err
 	}
 
-	return cd.deployAgent(cluster)
+	err = cd.deployAgent(cluster)
+	if err != nil {
+		return err
+	}
+
+	cd.setNetworkPolicy(cluster)
+	return nil
 }
 
 func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
@@ -137,6 +143,24 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	}
 
 	return err
+}
+
+func getValue(index int) *bool {
+	return &[]bool{false, true}[index]
+}
+
+func (cd *clusterDeploy) setNetworkPolicy(cluster *v3.Cluster) {
+	if cluster.Spec.EnableNetworkPolicy != nil {
+		return
+	}
+	// set current state for upgraded clusters
+	cluster.Status.AppliedEnableNetworkPolicy = true
+	if cluster.Spec.RancherKubernetesEngineConfig == nil ||
+		cluster.Spec.RancherKubernetesEngineConfig.Network.FlannelNetworkProvider != nil {
+		cluster.Spec.EnableNetworkPolicy = getValue(0)
+		return
+	}
+	cluster.Spec.EnableNetworkPolicy = getValue(1)
 }
 
 func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Config, error) {
