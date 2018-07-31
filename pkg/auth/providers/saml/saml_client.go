@@ -105,7 +105,8 @@ func InitializeSamlServiceProvider(configToSet *v3.SamlConfig, name string) erro
 
 	provider := SamlProviders[name]
 
-	samlURL := configToSet.RancherAPIHost + "/v1-saml/"
+	rancherAPIHost := strings.TrimRight(configToSet.RancherAPIHost, "/")
+	samlURL := rancherAPIHost + "/v1-saml/"
 	samlURL += name
 	actURL, err := url.Parse(samlURL)
 	if err != nil {
