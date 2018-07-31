@@ -312,7 +312,11 @@ func IsContainerUpgradable(ctx context.Context, dClient *client.Client, imageCfg
 	// image inspect to compare the env correctly
 	imageInspect, _, err := dClient.ImageInspectWithRaw(ctx, imageCfg.Image)
 	if err != nil {
-		return false, err
+		if !client.IsErrNotFound(err) {
+			return false, err
+		}
+		logrus.Debugf("[%s] Container [%s] is eligible for upgrade on host [%s]", plane, containerName, hostname)
+		return true, nil
 	}
 	if containerInspect.Config.Image != imageCfg.Image ||
 		!sliceEqualsIgnoreOrder(containerInspect.Config.Entrypoint, imageCfg.Entrypoint) ||
