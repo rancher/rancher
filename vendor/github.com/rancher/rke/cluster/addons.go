@@ -275,7 +275,7 @@ func (c *Cluster) doAddonDelete(ctx context.Context, resourceName string, isCrit
 	if err != nil {
 		return &addonError{fmt.Sprintf("Failed to generate addon delete job: %v", err), isCritical}
 	}
-	if err := k8s.ApplyK8sSystemJob(deleteJob, c.LocalKubeConfigPath, c.K8sWrapTransport, c.AddonJobTimeout, false); err != nil {
+	if err := k8s.ApplyK8sSystemJob(deleteJob, c.LocalKubeConfigPath, c.K8sWrapTransport, c.AddonJobTimeout*2, false); err != nil {
 		return &addonError{fmt.Sprintf("%v", err), isCritical}
 	}
 	// At this point, the addon should be deleted. We need to clean up by deleting the deploy and delete jobs.
