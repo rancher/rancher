@@ -12,6 +12,7 @@ const (
 	ClusterLoggingFieldConditions           = "conditions"
 	ClusterLoggingFieldCreated              = "created"
 	ClusterLoggingFieldCreatorID            = "creatorId"
+	ClusterLoggingFieldDockerRootDir        = "dockerRootDir"
 	ClusterLoggingFieldElasticsearchConfig  = "elasticsearchConfig"
 	ClusterLoggingFieldEmbeddedConfig       = "embeddedConfig"
 	ClusterLoggingFieldFailedSpec           = "failedSpec"
@@ -39,6 +40,7 @@ type ClusterLogging struct {
 	Conditions           []LoggingCondition   `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	Created              string               `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string               `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DockerRootDir        string               `json:"dockerRootDir,omitempty" yaml:"dockerRootDir,omitempty"`
 	ElasticsearchConfig  *ElasticsearchConfig `json:"elasticsearchConfig,omitempty" yaml:"elasticsearchConfig,omitempty"`
 	EmbeddedConfig       *EmbeddedConfig      `json:"embeddedConfig,omitempty" yaml:"embeddedConfig,omitempty"`
 	FailedSpec           *ClusterLoggingSpec  `json:"failedSpec,omitempty" yaml:"failedSpec,omitempty"`

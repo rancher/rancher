@@ -9,6 +9,7 @@ const (
 	ProjectLoggingFieldAnnotations          = "annotations"
 	ProjectLoggingFieldCreated              = "created"
 	ProjectLoggingFieldCreatorID            = "creatorId"
+	ProjectLoggingFieldDockerRootDir        = "dockerRootDir"
 	ProjectLoggingFieldElasticsearchConfig  = "elasticsearchConfig"
 	ProjectLoggingFieldKafkaConfig          = "kafkaConfig"
 	ProjectLoggingFieldLabels               = "labels"
@@ -33,6 +34,7 @@ type ProjectLogging struct {
 	Annotations          map[string]string     `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Created              string                `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string                `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DockerRootDir        string                `json:"dockerRootDir,omitempty" yaml:"dockerRootDir,omitempty"`
 	ElasticsearchConfig  *ElasticsearchConfig  `json:"elasticsearchConfig,omitempty" yaml:"elasticsearchConfig,omitempty"`
 	KafkaConfig          *KafkaConfig          `json:"kafkaConfig,omitempty" yaml:"kafkaConfig,omitempty"`
 	Labels               map[string]string     `json:"labels,omitempty" yaml:"labels,omitempty"`
