@@ -34,7 +34,7 @@ func (a *authProvider) sync(key string, config *v3.AuthConfig) error {
 		return nil
 	}
 
-	if config.Name != saml.PingName {
+	if config.Name != saml.PingName && config.Name != saml.ADFSName {
 		return nil
 	}
 
