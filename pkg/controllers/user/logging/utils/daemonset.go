@@ -1,6 +1,9 @@
 package utils
 
 import (
+	"fmt"
+	"strings"
+
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 	"github.com/rancher/rancher/pkg/image"
 	rv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
@@ -16,7 +19,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func CreateFluentd(ds rv1beta2.DaemonSetInterface, sa rv1.ServiceAccountInterface, rb rrbacv1.ClusterRoleBindingInterface, namespace, dockerRootDir string) (err error) {
+func CreateFluentd(ds rv1beta2.DaemonSetInterface, sa rv1.ServiceAccountInterface, rb rrbacv1.ClusterRoleBindingInterface, machineLister v3.NodeLister, nodes rv1.NodeInterface, namespace, clusterName string) (err error) {
 	defer func() {
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			if err = removeDeamonset(ds, sa, rb, loggingconfig.FluentdName); err != nil {
@@ -37,11 +40,36 @@ func CreateFluentd(ds rv1beta2.DaemonSetInterface, sa rv1.ServiceAccountInterfac
 		return err
 	}
 
-	daemonset := newFluentdDaemonset(loggingconfig.FluentdName, namespace, loggingconfig.FluentdName, dockerRootDir)
-	_, err = ds.Create(daemonset)
-	if err != nil && !apierrors.IsAlreadyExists(err) {
+	dockerRootMap, kinds, firstDockerRoot, err := getDockerRoot(machineLister, clusterName)
+	if err != nil {
 		return err
 	}
+	if kinds == 1 {
+		daemonset := newFluentdDaemonset(loggingconfig.FluentdName, namespace, loggingconfig.FluentdName, firstDockerRoot, nil)
+		_, err = ds.Create(daemonset)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+		return
+	}
+
+	i := 1
+	for k, v := range dockerRootMap {
+		labelValue := strings.Replace(k, "/", "", -1)
+		if err = addLabelToNodes(v, nodes, nodeDockerRootDir, labelValue); err != nil {
+			return err
+		}
+
+		affinity := newAffinity(nodeDockerRootDir, labelValue)
+		name := fmt.Sprintf("%s-%d", loggingconfig.FluentdName, i)
+		daemonset := newFluentdDaemonset(name, namespace, clusterName, k, affinity)
+		_, err = ds.Create(daemonset)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+		i++
+	}
+
 	return nil
 }
 
@@ -79,6 +107,25 @@ func CreateLogAggregator(ds rv1beta2.DaemonSetInterface, sa rv1.ServiceAccountIn
 	return nil
 }
 
+func newAffinity(key, value string) *v1.Affinity {
+	return &v1.Affinity{
+		NodeAffinity: &v1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{
+					{
+						MatchExpressions: []v1.NodeSelectorRequirement{
+							{
+								Key:      key,
+								Operator: v1.NodeSelectorOpIn,
+								Values:   []string{value},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
 func removeDeamonset(ds rv1beta2.DaemonSetInterface, sa rv1.ServiceAccountInterface, rb rrbacv1.ClusterRoleBindingInterface, name string) error {
 	deleteOp := metav1.DeletePropagationBackground
 	var errgrp errgroup.Group
@@ -130,7 +177,7 @@ func newRoleBinding(name, namespace string) *rbacv1.ClusterRoleBinding {
 	}
 }
 
-func newFluentdDaemonset(name, namespace, clusterName, dockerRootDir string) *v1beta2.DaemonSet {
+func newFluentdDaemonset(name, namespace, clusterName, dockerRootDir string, anffinity *v1.Affinity) *v1beta2.DaemonSet {
 	privileged := true
 	terminationGracePeriodSeconds := int64(30)
 
@@ -192,6 +239,7 @@ func newFluentdDaemonset(name, namespace, clusterName, dockerRootDir string) *v1
 						Key:    "node-role.kubernetes.io/master",
 						Effect: v1.TaintEffectNoSchedule,
 					}},
+					Affinity: anffinity,
 					Containers: []v1.Container{
 						{
 							Name:    loggingconfig.FluentdHelperName,

@@ -36,27 +36,27 @@ const (
 // and update the changes to configmap, deploy fluentd, embedded elasticsearch, embedded kibana
 
 type ClusterLoggingSyncer struct {
-	backoff                  *flowcontrol.Backoff
-	clusterName              string
-	clusterLoggingController v3.ClusterLoggingController
-	clusterLoggings          v3.ClusterLoggingInterface
-	clusterLoggingLister     v3.ClusterLoggingLister
-	clusterRoleBindings      rbacv1.ClusterRoleBindingInterface
-	clusterLister            v3.ClusterLister
-	configmaps               v1.ConfigMapInterface
-	daemonsets               v1beta2.DaemonSetInterface
-	deployments              v1beta2.DeploymentInterface
-	podLister                v1.PodLister
-	k8sNodeLister            v1.NodeLister
-	namespaces               v1.NamespaceInterface
-	nodeLister               v3.NodeLister
-	projectLoggingLister     v3.ProjectLoggingLister
-	roles                    rbacv1.RoleInterface
-	rolebindings             rbacv1.RoleBindingInterface
-	secrets                  v1.SecretInterface
-	services                 v1.ServiceInterface
-	serviceLister            v1.ServiceLister
-	serviceAccounts          v1.ServiceAccountInterface
+	backoff              *flowcontrol.Backoff
+	clusterName          string
+	clusterLoggings      v3.ClusterLoggingInterface
+	clusterLoggingLister v3.ClusterLoggingLister
+	clusterRoleBindings  rbacv1.ClusterRoleBindingInterface
+	clusterLister        v3.ClusterLister
+	configmaps           v1.ConfigMapInterface
+	daemonsets           v1beta2.DaemonSetInterface
+	deployments          v1beta2.DeploymentInterface
+	podLister            v1.PodLister
+	k8sNodeLister        v1.NodeLister
+	k8sNodes             v1.NodeInterface
+	namespaces           v1.NamespaceInterface
+	nodeLister           v3.NodeLister
+	projectLoggingLister v3.ProjectLoggingLister
+	roles                rbacv1.RoleInterface
+	rolebindings         rbacv1.RoleBindingInterface
+	secrets              v1.SecretInterface
+	services             v1.ServiceInterface
+	serviceLister        v1.ServiceLister
+	serviceAccounts      v1.ServiceAccountInterface
 }
 
 type endpointWatcher struct {
@@ -74,27 +74,27 @@ type endpointWatcher struct {
 func registerClusterLogging(ctx context.Context, cluster *config.UserContext) {
 	clusterloggingClient := cluster.Management.Management.ClusterLoggings(cluster.ClusterName)
 	syncer := &ClusterLoggingSyncer{
-		backoff:                  flowcontrol.NewBackOff(retryBackoffInterval, retryTimeout),
-		clusterLoggingController: cluster.Management.Management.ClusterLoggings(cluster.ClusterName).Controller(),
-		clusterName:              cluster.ClusterName,
-		clusterLoggings:          clusterloggingClient,
-		clusterLoggingLister:     clusterloggingClient.Controller().Lister(),
-		clusterRoleBindings:      cluster.RBAC.ClusterRoleBindings(loggingconfig.LoggingNamespace),
-		clusterLister:            cluster.Management.Management.Clusters("").Controller().Lister(),
-		configmaps:               cluster.Core.ConfigMaps(loggingconfig.LoggingNamespace),
-		daemonsets:               cluster.Apps.DaemonSets(loggingconfig.LoggingNamespace),
-		deployments:              cluster.Apps.Deployments(loggingconfig.LoggingNamespace),
-		k8sNodeLister:            cluster.Core.Nodes("").Controller().Lister(),
-		namespaces:               cluster.Core.Namespaces(""),
-		nodeLister:               cluster.Management.Management.Nodes("").Controller().Lister(),
-		podLister:                cluster.Core.Pods("").Controller().Lister(),
-		projectLoggingLister:     cluster.Management.Management.ProjectLoggings("").Controller().Lister(),
-		roles:                    cluster.RBAC.Roles(loggingconfig.LoggingNamespace),
-		rolebindings:             cluster.RBAC.RoleBindings(loggingconfig.LoggingNamespace),
-		secrets:                  cluster.Core.Secrets(loggingconfig.LoggingNamespace),
-		services:                 cluster.Core.Services(loggingconfig.LoggingNamespace),
-		serviceLister:            cluster.Core.Services("").Controller().Lister(),
-		serviceAccounts:          cluster.Core.ServiceAccounts(loggingconfig.LoggingNamespace),
+		backoff:              flowcontrol.NewBackOff(retryBackoffInterval, retryTimeout),
+		clusterName:          cluster.ClusterName,
+		clusterLoggings:      clusterloggingClient,
+		clusterLoggingLister: clusterloggingClient.Controller().Lister(),
+		clusterRoleBindings:  cluster.RBAC.ClusterRoleBindings(loggingconfig.LoggingNamespace),
+		clusterLister:        cluster.Management.Management.Clusters("").Controller().Lister(),
+		configmaps:           cluster.Core.ConfigMaps(loggingconfig.LoggingNamespace),
+		daemonsets:           cluster.Apps.DaemonSets(loggingconfig.LoggingNamespace),
+		deployments:          cluster.Apps.Deployments(loggingconfig.LoggingNamespace),
+		k8sNodeLister:        cluster.Core.Nodes("").Controller().Lister(),
+		k8sNodes:             cluster.Core.Nodes(""),
+		namespaces:           cluster.Core.Namespaces(""),
+		nodeLister:           cluster.Management.Management.Nodes("").Controller().Lister(),
+		podLister:            cluster.Core.Pods("").Controller().Lister(),
+		projectLoggingLister: cluster.Management.Management.ProjectLoggings("").Controller().Lister(),
+		roles:                cluster.RBAC.Roles(loggingconfig.LoggingNamespace),
+		rolebindings:         cluster.RBAC.RoleBindings(loggingconfig.LoggingNamespace),
+		secrets:              cluster.Core.Secrets(loggingconfig.LoggingNamespace),
+		services:             cluster.Core.Services(loggingconfig.LoggingNamespace),
+		serviceLister:        cluster.Core.Services("").Controller().Lister(),
+		serviceAccounts:      cluster.Core.ServiceAccounts(loggingconfig.LoggingNamespace),
 	}
 
 	endpointWatcher := &endpointWatcher{
@@ -152,7 +152,7 @@ func (c *ClusterLoggingSyncer) Sync(key string, obj *v3.ClusterLogging) error {
 
 func (c *ClusterLoggingSyncer) doSync(obj *v3.ClusterLogging) error {
 	_, err := v3.LoggingConditionProvisioned.Do(obj, func() (runtime.Object, error) {
-		return obj, provision(c.namespaces, c.configmaps, c.serviceAccounts, c.clusterRoleBindings, c.daemonsets, c.clusterLister, c.secrets, c.clusterName)
+		return obj, provision(c.namespaces, c.configmaps, c.serviceAccounts, c.clusterRoleBindings, c.daemonsets, c.clusterLister, c.secrets, c.nodeLister, c.k8sNodes, c.clusterName)
 	})
 	if err != nil {
 		return err
@@ -281,7 +281,7 @@ func (e *endpointWatcher) checkTarget() error {
 	return errors.Wrapf(mergedErr, "set clusterlogging fail in watch endpoint")
 }
 
-func provision(namespaces v1.NamespaceInterface, configmaps v1.ConfigMapInterface, serviceAccounts v1.ServiceAccountInterface, clusterRoleBindings rbacv1.ClusterRoleBindingInterface, daemonsets v1beta2.DaemonSetInterface, clusterLister v3.ClusterLister, secrets v1.SecretInterface, clusterName string) error {
+func provision(namespaces v1.NamespaceInterface, configmaps v1.ConfigMapInterface, serviceAccounts v1.ServiceAccountInterface, clusterRoleBindings rbacv1.ClusterRoleBindingInterface, daemonsets v1beta2.DaemonSetInterface, clusterLister v3.ClusterLister, secrets v1.SecretInterface, nodeLister v3.NodeLister, k8snodes v1.NodeInterface, clusterName string) error {
 	if err := utils.IniteNamespace(namespaces); err != nil {
 		return err
 	}
@@ -298,12 +298,7 @@ func provision(namespaces v1.NamespaceInterface, configmaps v1.ConfigMapInterfac
 		return err
 	}
 
-	cluster, err := clusterLister.Get("", clusterName)
-	if err != nil {
-		return errors.Wrapf(err, "get dockerRootDir from cluster %s failed", clusterName)
-	}
-
-	return utils.CreateFluentd(daemonsets, serviceAccounts, clusterRoleBindings, loggingconfig.LoggingNamespace, cluster.Spec.DockerRootDir)
+	return utils.CreateFluentd(daemonsets, serviceAccounts, clusterRoleBindings, nodeLister, k8snodes, loggingconfig.LoggingNamespace, clusterName)
 }
 
 func unsetClusterLogging(obj *v3.ClusterLogging, clusterLoggings v3.ClusterLoggingInterface) error {

@@ -38,7 +38,9 @@ type ProjectLoggingSyncer struct {
 	clusterLoggingLister v3.ClusterLoggingLister
 	configmaps           v1.ConfigMapInterface
 	daemonsets           v1beta2.DaemonSetInterface
+	k8sNodes             v1.NodeInterface
 	namespaces           v1.NamespaceInterface
+	nodeLister           v3.NodeLister
 	projectLoggings      v3.ProjectLoggingInterface
 	secrets              v1.SecretInterface
 	serviceAccounts      v1.ServiceAccountInterface
@@ -57,7 +59,9 @@ func registerProjectLogging(ctx context.Context, cluster *config.UserContext) {
 		clusterLoggingLister: cluster.Management.Management.ClusterLoggings("").Controller().Lister(),
 		configmaps:           cluster.Core.ConfigMaps(loggingconfig.LoggingNamespace),
 		daemonsets:           cluster.Apps.DaemonSets(loggingconfig.LoggingNamespace),
+		k8sNodes:             cluster.Core.Nodes(""),
 		namespaces:           cluster.Core.Namespaces(""),
+		nodeLister:           cluster.Management.Management.Nodes("").Controller().Lister(),
 		projectLoggings:      projectLoggings,
 		secrets:              cluster.Core.Secrets(loggingconfig.LoggingNamespace),
 		serviceAccounts:      cluster.Core.ServiceAccounts(loggingconfig.LoggingNamespace),
@@ -127,7 +131,7 @@ func (c *ProjectLoggingSyncer) Sync(key string, obj *v3.ProjectLogging) error {
 func (c *ProjectLoggingSyncer) doSync(obj *v3.ProjectLogging) (*v3.ProjectLogging, error) {
 	newObj := obj.DeepCopy()
 	_, err := v3.LoggingConditionProvisioned.Do(obj, func() (runtime.Object, error) {
-		return obj, provision(c.namespaces, c.configmaps, c.serviceAccounts, c.clusterRoleBindings, c.daemonsets, c.clusterLister, c.secrets, c.clusterName)
+		return obj, provision(c.namespaces, c.configmaps, c.serviceAccounts, c.clusterRoleBindings, c.daemonsets, c.clusterLister, c.secrets, c.nodeLister, c.k8sNodes, c.clusterName)
 	})
 	if err != nil {
 		return obj, err

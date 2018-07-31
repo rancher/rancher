@@ -62,7 +62,7 @@ func UpdateConfigMap(configPath, loggingName, level string, configmaps rv1.Confi
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			if existConfig, err = configmaps.Create(configMap); err != nil && !apierrors.IsAlreadyExists(err) {
-				return errors.Wrapf(err, "create configmap %s:%s failed", existConfig.Namespace, existConfig.Name)
+				return errors.Wrapf(err, "create configmap %s:%s failed", configMap.Namespace, configMap.Name)
 			}
 		} else {
 			return errors.Wrapf(err, "get configmap %s:%s failed", loggingconfig.LoggingNamespace, loggingName)
