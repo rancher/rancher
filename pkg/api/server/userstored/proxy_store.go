@@ -25,7 +25,7 @@ func addProxyStore(ctx context.Context, schemas *types.Schemas, context *config.
 
 	prefix := []string{"api"}
 	group := ""
-	version := "v1"
+	version := ""
 	kind := s.CodeName
 	plural := s.PluralName
 

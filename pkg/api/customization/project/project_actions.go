@@ -210,7 +210,7 @@ func (h *Handler) updateBinding(binding map[string]interface{}, request *types.A
 
 	if _, ok := binding["id"].(string); ok && id != "" {
 		var err error
-		binding, err = schema.Store.Update(request, schema, binding, id)
+		_, err = schema.Store.Update(request, schema, binding, id)
 		if err != nil {
 			return fmt.Errorf("error updating binding: %v", err)
 		}

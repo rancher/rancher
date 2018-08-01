@@ -185,7 +185,7 @@ func (m *userManager) EnsureToken(tokenName, description, userName string) (stri
 
 	token, err := m.tokenLister.Get("", tokenName)
 	if apierrors.IsNotFound(err) {
-		token, err = nil, nil
+		token = nil
 	} else if err != nil {
 		return "", err
 	}

@@ -176,6 +176,9 @@ func (m *NodesSyncer) reconcileAll() error {
 	}
 
 	machines, err := m.machineLister.List(m.clusterNamespace, labels.NewSelector())
+	if err != nil {
+		return err
+	}
 	machineMap := make(map[string]*v3.Node)
 	toDelete := make(map[string]*v3.Node)
 	for _, machine := range machines {

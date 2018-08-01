@@ -66,6 +66,10 @@ func (l Lifecycle) sync(key string, obj *v3.ComposeConfig) error {
 		return obj, nil
 	})
 
+	if err != nil {
+		return err
+	}
+
 	_, err = l.ComposeClient.Update(newObj.(*v3.ComposeConfig))
 	return err
 }
@@ -153,6 +157,9 @@ func up(token string, port int, config *compose.Config) error {
 		TokenKey: token,
 		Insecure: true,
 	})
+	if err != nil {
+		return err
+	}
 	baseProjectClient, err := clientbase.NewAPIClient(&clientbase.ClientOpts{
 		URL:      fmt.Sprintf(url, port) + "/project",
 		TokenKey: token,

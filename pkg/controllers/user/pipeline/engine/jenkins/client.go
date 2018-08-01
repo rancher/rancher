@@ -211,8 +211,10 @@ func (c *Client) getBuildInfo(jobname string) (*BuildInfo, error) {
 	}
 	buildInfo := &BuildInfo{}
 	respBytes, err := ioutil.ReadAll(resp.Body)
-	err = json.Unmarshal(respBytes, buildInfo)
 	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(respBytes, buildInfo); err != nil {
 		return nil, err
 	}
 
@@ -244,8 +246,10 @@ func (c *Client) getJobInfo(jobname string) (*JobInfo, error) {
 	}
 	jobInfo := &JobInfo{}
 	respBytes, err := ioutil.ReadAll(resp.Body)
-	err = json.Unmarshal(respBytes, jobInfo)
 	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(respBytes, jobInfo); err != nil {
 		return nil, err
 	}
 
@@ -358,8 +362,10 @@ func (c *Client) getWFBuildInfo(jobname string) (*WFBuildInfo, error) {
 	}
 	buildInfo := &WFBuildInfo{}
 	respBytes, err := ioutil.ReadAll(resp.Body)
-	err = json.Unmarshal(respBytes, buildInfo)
 	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(respBytes, buildInfo); err != nil {
 		return nil, err
 	}
 
@@ -392,8 +398,10 @@ func (c *Client) getWFNodeInfo(jobname string, nodeID string) (*WFNodeInfo, erro
 	}
 	nodeInfo := &WFNodeInfo{}
 	respBytes, err := ioutil.ReadAll(resp.Body)
-	err = json.Unmarshal(respBytes, nodeInfo)
 	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(respBytes, nodeInfo); err != nil {
 		return nil, err
 	}
 
@@ -426,8 +434,10 @@ func (c *Client) getWFNodeLog(jobname string, nodeID string) (*WFNodeLog, error)
 	}
 	nodeLog := &WFNodeLog{}
 	respBytes, err := ioutil.ReadAll(resp.Body)
-	err = json.Unmarshal(respBytes, nodeLog)
 	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(respBytes, nodeLog); err != nil {
 		return nil, err
 	}
 

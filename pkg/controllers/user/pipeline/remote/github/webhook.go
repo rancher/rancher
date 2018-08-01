@@ -38,6 +38,9 @@ func (c *client) createGithubWebhook(user string, repo string, accesstoken strin
 	client := http.Client{}
 	APIURL := fmt.Sprintf("%s/repos/%s/%s/hooks", c.API, user, repo)
 	req, err := http.NewRequest("POST", APIURL, b)
+	if err != nil {
+		return "", err
+	}
 
 	req.Header.Add("Authorization", "Basic "+sEnc)
 
@@ -47,6 +50,9 @@ func (c *client) createGithubWebhook(user string, repo string, accesstoken strin
 	}
 	defer resp.Body.Close()
 	respData, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
 	logrus.Infof("respData:%v", string(respData))
 	if resp.StatusCode > 399 {
 		return "", errors.New(string(respData))
