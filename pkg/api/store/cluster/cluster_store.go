@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"fmt"
 	"sync"
 
 	"strings"
@@ -45,6 +46,10 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 
 	setKubernetesVersion(data)
 
+	if err := validateNetworkFlag(data); err != nil {
+		return nil, httperror.NewFieldAPIError(httperror.InvalidOption, "enableNetworkPolicy", err.Error())
+	}
+
 	return r.Store.Create(apiContext, schema, data)
 }
 
@@ -75,6 +80,10 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	}
 
 	setKubernetesVersion(data)
+
+	if err := validateNetworkFlag(data); err != nil {
+		return nil, httperror.NewFieldAPIError(httperror.InvalidOption, "enableNetworkPolicy", err.Error())
+	}
 
 	return r.Store.Update(apiContext, schema, data, id)
 }
@@ -107,4 +116,24 @@ func setKubernetesVersion(data map[string]interface{}) {
 			values.PutValue(data, defaultVersion, "rancherKubernetesEngineConfig", "kubernetesVersion")
 		}
 	}
+}
+
+func validateNetworkFlag(data map[string]interface{}) error {
+	enableNetworkPolicy := values.GetValueN(data, "enableNetworkPolicy")
+	rkeConfig := values.GetValueN(data, "rancherKubernetesEngineConfig")
+	plugin := convert.ToString(values.GetValueN(data, "network", "plugin"))
+
+	if enableNetworkPolicy == nil {
+		// setting default values for new clusters if value not passed
+		values.PutValue(data, false, "enableNetworkPolicy")
+	} else if value := convert.ToBool(enableNetworkPolicy); value {
+		if rkeConfig == nil {
+			return fmt.Errorf("enableNetworkPolicy should be false for non-RKE clusters")
+		}
+		if plugin != "canal" {
+			return fmt.Errorf("plugin %s should have enableNetworkPolicy %v", plugin, !value)
+		}
+	}
+
+	return nil
 }

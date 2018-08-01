@@ -5,6 +5,7 @@ import (
 
 	"sort"
 
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	knetworkingv1 "k8s.io/api/networking/v1"
@@ -13,11 +14,19 @@ import (
 
 type serviceHandler struct {
 	npmgr            *netpolMgr
+	clusterLister    v3.ClusterLister
 	clusterNamespace string
 }
 
 func (sh *serviceHandler) Sync(key string, service *corev1.Service) error {
 	if service == nil || service.DeletionTimestamp != nil {
+		return nil
+	}
+	disabled, err := isNetworkPolicyDisabled(sh.clusterNamespace, sh.clusterLister)
+	if err != nil {
+		return err
+	}
+	if disabled {
 		return nil
 	}
 	logrus.Debugf("serviceHandler: Sync: %+v", *service)

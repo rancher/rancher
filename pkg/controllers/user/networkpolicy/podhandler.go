@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/rancher/types/apis/core/v1"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	knetworkingv1 "k8s.io/api/networking/v1"
@@ -22,6 +23,7 @@ const (
 type podHandler struct {
 	npmgr            *netpolMgr
 	pods             v1.PodInterface
+	clusterLister    v3.ClusterLister
 	clusterNamespace string
 }
 
@@ -29,8 +31,14 @@ func (ph *podHandler) Sync(key string, pod *corev1.Pod) error {
 	if pod == nil || pod.DeletionTimestamp != nil {
 		return nil
 	}
+	disabled, err := isNetworkPolicyDisabled(ph.clusterNamespace, ph.clusterLister)
+	if err != nil {
+		return err
+	}
+	if disabled {
+		return nil
+	}
 	logrus.Debugf("podHandler: Sync: %+v", *pod)
-
 	if err := ph.addLabelIfHostPortsPresent(pod); err != nil {
 		return err
 	}
@@ -102,7 +110,6 @@ func (npmgr *netpolMgr) hostPortsUpdateHandler(pod *corev1.Pod, clusterNamespace
 	if !hasHostPorts {
 		return nil
 	}
-
 	// sort ports so it always appears in a certain order
 	sort.Slice(np.Spec.Ingress[0].Ports, func(i, j int) bool {
 		return portToString(np.Spec.Ingress[0].Ports[i]) < portToString(np.Spec.Ingress[0].Ports[j])
