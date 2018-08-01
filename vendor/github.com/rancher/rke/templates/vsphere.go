@@ -41,9 +41,7 @@ vm-name = "{{ .VsphereConfig.Global.VMName }}"
         {{- if ne $v.Datacenters "" }}
         datacenters = "{{ $v.Datacenters }}"
         {{- end }}
-        {{- if ne $v.Datacenters "" }}
-        soap-roundtrip-count = "{{ $v.Datacenters }}"
-        {{- end }}
+        soap-roundtrip-count = "{{ $v.RoundTripperCount }}"
 {{- end }}
 
 [Workspace]
