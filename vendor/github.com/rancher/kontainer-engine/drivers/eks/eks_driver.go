@@ -24,6 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/iam"
 	heptio "github.com/heptio/authenticator/pkg/token"
+	"github.com/rancher/kontainer-engine/drivers/options"
 	"github.com/rancher/kontainer-engine/drivers/util"
 	"github.com/rancher/kontainer-engine/types"
 	"github.com/sirupsen/logrus"
@@ -177,55 +178,21 @@ func (d *Driver) GetDriverUpdateOptions(ctx context.Context) (*types.DriverFlags
 
 func getStateFromOptions(driverOptions *types.DriverOptions) (state, error) {
 	state := state{}
-	state.ClusterName = getValueFromDriverOptions(driverOptions, types.StringType, "name").(string)
-	state.DisplayName = getValueFromDriverOptions(driverOptions, types.StringType, "display-name", "displayName").(string)
-	state.ClientID = getValueFromDriverOptions(driverOptions, types.StringType, "client-id", "accessKey").(string)
-	state.ClientSecret = getValueFromDriverOptions(driverOptions, types.StringType, "client-secret", "secretKey").(string)
+	state.ClusterName = options.GetValueFromDriverOptions(driverOptions, types.StringType, "name").(string)
+	state.DisplayName = options.GetValueFromDriverOptions(driverOptions, types.StringType, "display-name", "displayName").(string)
+	state.ClientID = options.GetValueFromDriverOptions(driverOptions, types.StringType, "client-id", "accessKey").(string)
+	state.ClientSecret = options.GetValueFromDriverOptions(driverOptions, types.StringType, "client-secret", "secretKey").(string)
 
-	state.Region = getValueFromDriverOptions(driverOptions, types.StringType, "region").(string)
-	state.InstanceType = getValueFromDriverOptions(driverOptions, types.StringType, "instance-type", "instanceType").(string)
-	state.MinimumASGSize = getValueFromDriverOptions(driverOptions, types.IntType, "minimum-nodes", "minimumNodes").(int64)
-	state.MaximumASGSize = getValueFromDriverOptions(driverOptions, types.IntType, "maximum-nodes", "maximumNodes").(int64)
-	state.VirtualNetwork = getValueFromDriverOptions(driverOptions, types.StringType, "virtual-network", "virtualNetwork").(string)
-	state.Subnets = getValueFromDriverOptions(driverOptions, types.StringSliceType, "subnets").(*types.StringSlice).Value
-	state.ServiceRole = getValueFromDriverOptions(driverOptions, types.StringType, "service-role", "serviceRole").(string)
-	state.SecurityGroups = getValueFromDriverOptions(driverOptions, types.StringSliceType, "security-groups", "securityGroups").(*types.StringSlice).Value
+	state.Region = options.GetValueFromDriverOptions(driverOptions, types.StringType, "region").(string)
+	state.InstanceType = options.GetValueFromDriverOptions(driverOptions, types.StringType, "instance-type", "instanceType").(string)
+	state.MinimumASGSize = options.GetValueFromDriverOptions(driverOptions, types.IntType, "minimum-nodes", "minimumNodes").(int64)
+	state.MaximumASGSize = options.GetValueFromDriverOptions(driverOptions, types.IntType, "maximum-nodes", "maximumNodes").(int64)
+	state.VirtualNetwork = options.GetValueFromDriverOptions(driverOptions, types.StringType, "virtual-network", "virtualNetwork").(string)
+	state.Subnets = options.GetValueFromDriverOptions(driverOptions, types.StringSliceType, "subnets").(*types.StringSlice).Value
+	state.ServiceRole = options.GetValueFromDriverOptions(driverOptions, types.StringType, "service-role", "serviceRole").(string)
+	state.SecurityGroups = options.GetValueFromDriverOptions(driverOptions, types.StringSliceType, "security-groups", "securityGroups").(*types.StringSlice).Value
 
 	return state, state.validate()
-}
-
-func getValueFromDriverOptions(driverOptions *types.DriverOptions, optionType string, keys ...string) interface{} {
-	switch optionType {
-	case types.IntType:
-		for _, key := range keys {
-			if value, ok := driverOptions.IntOptions[key]; ok {
-				return value
-			}
-		}
-		return int64(0)
-	case types.StringType:
-		for _, key := range keys {
-			if value, ok := driverOptions.StringOptions[key]; ok {
-				return value
-			}
-		}
-		return ""
-	case types.BoolType:
-		for _, key := range keys {
-			if value, ok := driverOptions.BoolOptions[key]; ok {
-				return value
-			}
-		}
-		return false
-	case types.StringSliceType:
-		for _, key := range keys {
-			if value, ok := driverOptions.StringSliceOptions[key]; ok {
-				return value
-			}
-		}
-		return &types.StringSlice{}
-	}
-	return nil
 }
 
 func (state *state) validate() error {

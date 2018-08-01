@@ -2305,10 +2305,55 @@ func (in *GoogleKubernetesEngineConfig) DeepCopyInto(out *GoogleKubernetesEngine
 			(*out)[key] = val
 		}
 	}
+	if in.EnableHTTPLoadBalancing != nil {
+		in, out := &in.EnableHTTPLoadBalancing, &out.EnableHTTPLoadBalancing
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(bool)
+			**out = **in
+		}
+	}
+	if in.EnableHorizontalPodAutoscaling != nil {
+		in, out := &in.EnableHorizontalPodAutoscaling, &out.EnableHorizontalPodAutoscaling
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(bool)
+			**out = **in
+		}
+	}
+	if in.EnableNetworkPolicyConfig != nil {
+		in, out := &in.EnableNetworkPolicyConfig, &out.EnableNetworkPolicyConfig
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(bool)
+			**out = **in
+		}
+	}
 	if in.Locations != nil {
 		in, out := &in.Locations, &out.Locations
 		*out = make([]string, len(*in))
 		copy(*out, *in)
+	}
+	if in.EnableStackdriverLogging != nil {
+		in, out := &in.EnableStackdriverLogging, &out.EnableStackdriverLogging
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(bool)
+			**out = **in
+		}
+	}
+	if in.EnableStackdriverMonitoring != nil {
+		in, out := &in.EnableStackdriverMonitoring, &out.EnableStackdriverMonitoring
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(bool)
+			**out = **in
+		}
 	}
 	return
 }

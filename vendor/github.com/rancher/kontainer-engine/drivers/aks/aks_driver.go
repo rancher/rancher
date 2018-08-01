@@ -17,6 +17,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/pkg/errors"
+	"github.com/rancher/kontainer-engine/drivers/options"
 	"github.com/rancher/kontainer-engine/drivers/util"
 	"github.com/rancher/kontainer-engine/types"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -181,29 +182,29 @@ func (d *Driver) GetDriverUpdateOptions(ctx context.Context) (*types.DriverFlags
 // SetDriverOptions implements driver interface
 func getStateFromOptions(driverOptions *types.DriverOptions) (state, error) {
 	state := state{}
-	state.Name = getValueFromDriverOptions(driverOptions, types.StringType, "name").(string)
-	state.DisplayName = getValueFromDriverOptions(driverOptions, types.StringType, "display-name", "displayName").(string)
-	state.AgentDNSPrefix = getValueFromDriverOptions(driverOptions, types.StringType, "node-dns-prefix", "agentDnsPrefix").(string)
-	state.AgentVMSize = getValueFromDriverOptions(driverOptions, types.StringType, "node-vm-size", "agentVmSize").(string)
-	state.Count = getValueFromDriverOptions(driverOptions, types.IntType, "node-count", "count").(int64)
-	state.KubernetesVersion = getValueFromDriverOptions(driverOptions, types.StringType, "kubernetes-version", "kubernetesVersion").(string)
-	state.Location = getValueFromDriverOptions(driverOptions, types.StringType, "location").(string)
-	state.OsDiskSizeGB = getValueFromDriverOptions(driverOptions, types.IntType, "os-disk-size", "osDiskSizeGb").(int64)
-	state.SubscriptionID = getValueFromDriverOptions(driverOptions, types.StringType, "subscription-id", "subscriptionId").(string)
-	state.ResourceGroup = getValueFromDriverOptions(driverOptions, types.StringType, "resource-group", "resourceGroup").(string)
-	state.AgentPoolName = getValueFromDriverOptions(driverOptions, types.StringType, "node-pool-name", "agentPoolName").(string)
-	state.MasterDNSPrefix = getValueFromDriverOptions(driverOptions, types.StringType, "master-dns-prefix", "masterDnsPrefix").(string)
-	state.SSHPublicKeyPath = getValueFromDriverOptions(driverOptions, types.StringType, "public-key").(string)
-	state.SSHPublicKeyContents = getValueFromDriverOptions(driverOptions, types.StringType, "sshPublicKeyContents").(string)
-	state.AdminUsername = getValueFromDriverOptions(driverOptions, types.StringType, "admin-username", "adminUsername").(string)
-	state.BaseURL = getValueFromDriverOptions(driverOptions, types.StringType, "base-url").(string)
-	state.ClientID = getValueFromDriverOptions(driverOptions, types.StringType, "client-id", "clientId").(string)
-	state.TenantID = getValueFromDriverOptions(driverOptions, types.StringType, "tenant-id", "tenantId").(string)
-	state.ClientSecret = getValueFromDriverOptions(driverOptions, types.StringType, "client-secret", "clientSecret").(string)
-	state.VirtualNetwork = getValueFromDriverOptions(driverOptions, types.StringType, "virtualNetwork", "virtual-network").(string)
-	state.Subnet = getValueFromDriverOptions(driverOptions, types.StringType, "subnet").(string)
-	state.VirtualNetworkResourceGroup = getValueFromDriverOptions(driverOptions, types.StringType, "virtualNetworkResourceGroup", "virtual-network-resource-group").(string)
-	tagValues := getValueFromDriverOptions(driverOptions, types.StringSliceType).(*types.StringSlice)
+	state.Name = options.GetValueFromDriverOptions(driverOptions, types.StringType, "name").(string)
+	state.DisplayName = options.GetValueFromDriverOptions(driverOptions, types.StringType, "display-name", "displayName").(string)
+	state.AgentDNSPrefix = options.GetValueFromDriverOptions(driverOptions, types.StringType, "node-dns-prefix", "agentDnsPrefix").(string)
+	state.AgentVMSize = options.GetValueFromDriverOptions(driverOptions, types.StringType, "node-vm-size", "agentVmSize").(string)
+	state.Count = options.GetValueFromDriverOptions(driverOptions, types.IntType, "node-count", "count").(int64)
+	state.KubernetesVersion = options.GetValueFromDriverOptions(driverOptions, types.StringType, "kubernetes-version", "kubernetesVersion").(string)
+	state.Location = options.GetValueFromDriverOptions(driverOptions, types.StringType, "location").(string)
+	state.OsDiskSizeGB = options.GetValueFromDriverOptions(driverOptions, types.IntType, "os-disk-size", "osDiskSizeGb").(int64)
+	state.SubscriptionID = options.GetValueFromDriverOptions(driverOptions, types.StringType, "subscription-id", "subscriptionId").(string)
+	state.ResourceGroup = options.GetValueFromDriverOptions(driverOptions, types.StringType, "resource-group", "resourceGroup").(string)
+	state.AgentPoolName = options.GetValueFromDriverOptions(driverOptions, types.StringType, "node-pool-name", "agentPoolName").(string)
+	state.MasterDNSPrefix = options.GetValueFromDriverOptions(driverOptions, types.StringType, "master-dns-prefix", "masterDnsPrefix").(string)
+	state.SSHPublicKeyPath = options.GetValueFromDriverOptions(driverOptions, types.StringType, "public-key").(string)
+	state.SSHPublicKeyContents = options.GetValueFromDriverOptions(driverOptions, types.StringType, "sshPublicKeyContents").(string)
+	state.AdminUsername = options.GetValueFromDriverOptions(driverOptions, types.StringType, "admin-username", "adminUsername").(string)
+	state.BaseURL = options.GetValueFromDriverOptions(driverOptions, types.StringType, "base-url").(string)
+	state.ClientID = options.GetValueFromDriverOptions(driverOptions, types.StringType, "client-id", "clientId").(string)
+	state.TenantID = options.GetValueFromDriverOptions(driverOptions, types.StringType, "tenant-id", "tenantId").(string)
+	state.ClientSecret = options.GetValueFromDriverOptions(driverOptions, types.StringType, "client-secret", "clientSecret").(string)
+	state.VirtualNetwork = options.GetValueFromDriverOptions(driverOptions, types.StringType, "virtualNetwork", "virtual-network").(string)
+	state.Subnet = options.GetValueFromDriverOptions(driverOptions, types.StringType, "subnet").(string)
+	state.VirtualNetworkResourceGroup = options.GetValueFromDriverOptions(driverOptions, types.StringType, "virtualNetworkResourceGroup", "virtual-network-resource-group").(string)
+	tagValues := options.GetValueFromDriverOptions(driverOptions, types.StringSliceType).(*types.StringSlice)
 	for _, part := range tagValues.Value {
 		kv := strings.Split(part, "=")
 		if len(kv) == 2 {
@@ -211,40 +212,6 @@ func getStateFromOptions(driverOptions *types.DriverOptions) (state, error) {
 		}
 	}
 	return state, state.validate()
-}
-
-func getValueFromDriverOptions(driverOptions *types.DriverOptions, optionType string, keys ...string) interface{} {
-	switch optionType {
-	case types.IntType:
-		for _, key := range keys {
-			if value, ok := driverOptions.IntOptions[key]; ok {
-				return value
-			}
-		}
-		return int64(0)
-	case types.StringType:
-		for _, key := range keys {
-			if value, ok := driverOptions.StringOptions[key]; ok {
-				return value
-			}
-		}
-		return ""
-	case types.BoolType:
-		for _, key := range keys {
-			if value, ok := driverOptions.BoolOptions[key]; ok {
-				return value
-			}
-		}
-		return false
-	case types.StringSliceType:
-		for _, key := range keys {
-			if value, ok := driverOptions.StringSliceOptions[key]; ok {
-				return value
-			}
-		}
-		return &types.StringSlice{}
-	}
-	return nil
 }
 
 func (state *state) validate() error {
