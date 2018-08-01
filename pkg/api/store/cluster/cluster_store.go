@@ -125,17 +125,12 @@ func validateNetworkFlag(data map[string]interface{}) error {
 
 	if enableNetworkPolicy == nil {
 		// setting default values for new clusters if value not passed
-		if rkeConfig == nil || plugin == "flannel" {
-			values.PutValue(data, false, "enableNetworkPolicy")
-			return nil
-		}
-		values.PutValue(data, true, "enableNetworkPolicy")
-
+		values.PutValue(data, false, "enableNetworkPolicy")
 	} else if value := convert.ToBool(enableNetworkPolicy); value {
 		if rkeConfig == nil {
 			return fmt.Errorf("enableNetworkPolicy should be false for non-RKE clusters")
 		}
-		if plugin == "flannel" {
+		if plugin != "canal" {
 			return fmt.Errorf("plugin %s should have enableNetworkPolicy %v", plugin, !value)
 		}
 	}

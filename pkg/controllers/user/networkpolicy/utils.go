@@ -3,6 +3,7 @@ package networkpolicy
 import (
 	"fmt"
 
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -12,7 +13,7 @@ func isNetworkPolicyDisabled(clusterNamespace string, clusterLister v3.ClusterLi
 	if err != nil {
 		return false, fmt.Errorf("error getting cluster %v", err)
 	}
-	return !cluster.Status.AppliedEnableNetworkPolicy, nil
+	return !convert.ToBool(cluster.Annotations[netPolAnnotation]), nil
 }
 
 func nodePortService(service *corev1.Service) bool {

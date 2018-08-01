@@ -36,8 +36,10 @@ func Register(cluster *config.UserContext) {
 	podHandler := &podHandler{npmgr, pods, clusterLister, cluster.ClusterName}
 	serviceHandler := &serviceHandler{npmgr, clusterLister, cluster.ClusterName}
 	nodeHandler := &nodeHandler{npmgr, clusterLister, cluster.ClusterName}
-	clusterNetPolHandler := &clusterHandler{cluster, pnpLister, podLister,
+	clusterHandler := &clusterHandler{cluster, pnpLister, podLister,
 		serviceLister, projectLister, clusters, pnps, npmgr, cluster.ClusterName}
+
+	clusterNetAnnHandler := &clusterNetAnnHandler{clusters, cluster.ClusterName}
 
 	projects.Controller().AddClusterScopedHandler("projectSyncer", cluster.ClusterName, ps.Sync)
 	pnps.AddClusterScopedHandler("projectNetworkPolicySyncer", cluster.ClusterName, pnpsyncer.Sync)
@@ -46,5 +48,7 @@ func Register(cluster *config.UserContext) {
 	services.AddHandler("serviceHandler", serviceHandler.Sync)
 
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler("nodeHandler", nodeHandler.Sync)
-	clusters.AddHandler("clusterNetPolHandler", clusterNetPolHandler.Sync)
+	clusters.AddHandler("clusterHandler", clusterHandler.Sync)
+
+	clusters.AddHandler("clusterNetAnnHandler", clusterNetAnnHandler.Sync)
 }

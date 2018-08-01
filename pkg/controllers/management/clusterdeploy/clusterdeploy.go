@@ -84,14 +84,12 @@ func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
 	if err != nil {
 		return err
 	}
-
 	err = cd.deployAgent(cluster)
 	if err != nil {
 		return err
 	}
 
-	cd.setNetworkPolicy(cluster)
-	return nil
+	return cd.setNetworkPolicyAnn(cluster)
 }
 
 func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
@@ -145,22 +143,16 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	return err
 }
 
-func getValue(index int) *bool {
-	return &[]bool{false, true}[index]
-}
-
-func (cd *clusterDeploy) setNetworkPolicy(cluster *v3.Cluster) {
+func (cd *clusterDeploy) setNetworkPolicyAnn(cluster *v3.Cluster) error {
 	if cluster.Spec.EnableNetworkPolicy != nil {
-		return
+		return nil
 	}
-	// set current state for upgraded clusters
-	cluster.Status.AppliedEnableNetworkPolicy = true
-	if cluster.Spec.RancherKubernetesEngineConfig == nil ||
-		cluster.Spec.RancherKubernetesEngineConfig.Network.FlannelNetworkProvider != nil {
-		cluster.Spec.EnableNetworkPolicy = getValue(0)
-		return
+	// set current state for upgraded canal clusters
+	if cluster.Spec.RancherKubernetesEngineConfig != nil &&
+		cluster.Spec.RancherKubernetesEngineConfig.Network.CanalNetworkProvider != nil {
+		cluster.Annotations["networking.management.cattle.io/enable-network-policy"] = "true"
 	}
-	cluster.Spec.EnableNetworkPolicy = getValue(1)
+	return nil
 }
 
 func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Config, error) {
