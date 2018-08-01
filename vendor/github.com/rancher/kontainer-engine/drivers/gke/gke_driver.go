@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rancher/kontainer-engine/drivers/options"
 	"github.com/rancher/kontainer-engine/drivers/util"
 	"github.com/rancher/kontainer-engine/types"
 	"github.com/rancher/rke/log"
@@ -66,13 +67,13 @@ type state struct {
 	// Enable alpha feature
 	EnableAlphaFeature bool
 	// Configuration for the HTTP (L7) load balancing controller addon
-	DisableHTTPLoadBalancing bool
+	EnableHTTPLoadBalancing *bool
 	// Configuration for the horizontal pod autoscaling feature, which increases or decreases the number of replica pods a replication controller has based on the resource usage of the existing pods
-	DisableHorizontalPodAutoscaling bool
+	EnableHorizontalPodAutoscaling *bool
 	// Configuration for the Kubernetes Dashboard
 	EnableKubernetesDashboard bool
 	// Configuration for NetworkPolicy
-	DisableNetworkPolicyConfig bool
+	EnableNetworkPolicyConfig *bool
 	// The list of Google Compute Engine locations in which the cluster's nodes should be located
 	Locations []string
 	// Network
@@ -84,9 +85,9 @@ type state struct {
 	// NodePool id
 	NodePoolID string
 
-	NoStackdriverLogging    bool
-	NoStackdriverMonitoring bool
-	MaintenanceWindow       string
+	EnableStackdriverLogging    *bool
+	EnableStackdriverMonitoring *bool
+	MaintenanceWindow           string
 
 	// cluster info
 	ClusterInfo types.ClusterInfo
@@ -167,25 +168,25 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 		Type:  types.BoolType,
 		Usage: "Enable legacy authorization",
 	}
-	driverFlag.Options["no-stackdriver-logging"] = &types.Flag{
-		Type:  types.BoolType,
+	driverFlag.Options["enable-stackdriver-logging"] = &types.Flag{
+		Type:  types.BoolPointerType,
 		Usage: "Disable stackdriver logging",
 	}
-	driverFlag.Options["no-stackdriver-monitoring"] = &types.Flag{
-		Type:  types.BoolType,
+	driverFlag.Options["enable-stackdriver-monitoring"] = &types.Flag{
+		Type:  types.BoolPointerType,
 		Usage: "Disable stackdriver monitoring",
 	}
-	driverFlag.Options["no-network-policy"] = &types.Flag{
-		Type:  types.BoolType,
+	driverFlag.Options["enable-network-policy"] = &types.Flag{
+		Type:  types.BoolPointerType,
 		Usage: "Disable network policy",
 	}
 	driverFlag.Options["kubernetes-dashboard"] = &types.Flag{
 		Type:  types.BoolType,
 		Usage: "Enable the kubernetes dashboard",
 	}
-	driverFlag.Options["disable-http-load-balancing"] = &types.Flag{
-		Type:  types.BoolType,
-		Usage: "Disable http load balancing",
+	driverFlag.Options["enable-http-load-balancing"] = &types.Flag{
+		Type:  types.BoolPointerType,
+		Usage: "Enable http load balancing (defaults to true)",
 	}
 	driverFlag.Options["maintenance-window"] = &types.Flag{
 		Type:  types.StringType,
@@ -225,36 +226,36 @@ func getStateFromOpts(driverOptions *types.DriverOptions) (state, error) {
 			Metadata: map[string]string{},
 		},
 	}
-	d.Name = getValueFromDriverOptions(driverOptions, types.StringType, "name").(string)
-	d.DisplayName = getValueFromDriverOptions(driverOptions, types.StringType, "display-name", "displayName").(string)
-	d.ProjectID = getValueFromDriverOptions(driverOptions, types.StringType, "project-id", "projectId").(string)
-	d.Zone = getValueFromDriverOptions(driverOptions, types.StringType, "zone").(string)
-	d.NodePoolID = getValueFromDriverOptions(driverOptions, types.StringType, "nodePool").(string)
-	d.ClusterIpv4Cidr = getValueFromDriverOptions(driverOptions, types.StringType, "cluster-ipv4-cidr", "clusterIpv4Cidr").(string)
-	d.Description = getValueFromDriverOptions(driverOptions, types.StringType, "description").(string)
-	d.MasterVersion = getValueFromDriverOptions(driverOptions, types.StringType, "master-version", "masterVersion").(string)
-	d.NodeVersion = getValueFromDriverOptions(driverOptions, types.StringType, "node-version", "nodeVersion").(string)
-	d.NodeConfig.DiskSizeGb = getValueFromDriverOptions(driverOptions, types.IntType, "disk-size-gb", "diskSizeGb").(int64)
-	d.NodeConfig.MachineType = getValueFromDriverOptions(driverOptions, types.StringType, "machine-type", "machineType").(string)
-	d.CredentialPath = getValueFromDriverOptions(driverOptions, types.StringType, "gke-credential-path").(string)
-	d.CredentialContent = getValueFromDriverOptions(driverOptions, types.StringType, "credential").(string)
-	d.EnableAlphaFeature = getValueFromDriverOptions(driverOptions, types.BoolType, "enable-alpha-feature", "enableAlphaFeature").(bool)
-	d.DisableHorizontalPodAutoscaling = getValueFromDriverOptions(driverOptions, types.BoolType, "disableHorizontalPodAutoscaling").(bool)
-	d.DisableNetworkPolicyConfig = getValueFromDriverOptions(driverOptions, types.BoolType, "disableNetworkPolicyConfig").(bool)
-	d.DisableHTTPLoadBalancing = getValueFromDriverOptions(driverOptions, types.BoolType, "disable-http-load-balancing", "disableHttpLoadBalancing").(bool)
-	d.EnableKubernetesDashboard = getValueFromDriverOptions(driverOptions, types.BoolType, "kubernetes-dashboard", "enableKubernetesDashboard").(bool)
-	d.NodeConfig.ImageType = getValueFromDriverOptions(driverOptions, types.StringType, "imageType").(string)
-	d.Network = getValueFromDriverOptions(driverOptions, types.StringType, "network").(string)
-	d.SubNetwork = getValueFromDriverOptions(driverOptions, types.StringType, "subNetwork").(string)
-	d.LegacyAbac = getValueFromDriverOptions(driverOptions, types.BoolType, "legacy-authorization", "enableLegacyAbac").(bool)
+	d.Name = options.GetValueFromDriverOptions(driverOptions, types.StringType, "name").(string)
+	d.DisplayName = options.GetValueFromDriverOptions(driverOptions, types.StringType, "display-name", "displayName").(string)
+	d.ProjectID = options.GetValueFromDriverOptions(driverOptions, types.StringType, "project-id", "projectId").(string)
+	d.Zone = options.GetValueFromDriverOptions(driverOptions, types.StringType, "zone").(string)
+	d.NodePoolID = options.GetValueFromDriverOptions(driverOptions, types.StringType, "nodePool").(string)
+	d.ClusterIpv4Cidr = options.GetValueFromDriverOptions(driverOptions, types.StringType, "cluster-ipv4-cidr", "clusterIpv4Cidr").(string)
+	d.Description = options.GetValueFromDriverOptions(driverOptions, types.StringType, "description").(string)
+	d.MasterVersion = options.GetValueFromDriverOptions(driverOptions, types.StringType, "master-version", "masterVersion").(string)
+	d.NodeVersion = options.GetValueFromDriverOptions(driverOptions, types.StringType, "node-version", "nodeVersion").(string)
+	d.NodeConfig.DiskSizeGb = options.GetValueFromDriverOptions(driverOptions, types.IntType, "disk-size-gb", "diskSizeGb").(int64)
+	d.NodeConfig.MachineType = options.GetValueFromDriverOptions(driverOptions, types.StringType, "machine-type", "machineType").(string)
+	d.CredentialPath = options.GetValueFromDriverOptions(driverOptions, types.StringType, "gke-credential-path").(string)
+	d.CredentialContent = options.GetValueFromDriverOptions(driverOptions, types.StringType, "credential").(string)
+	d.EnableAlphaFeature = options.GetValueFromDriverOptions(driverOptions, types.BoolType, "enable-alpha-feature", "enableAlphaFeature").(bool)
+	d.EnableHorizontalPodAutoscaling, _ = options.GetValueFromDriverOptions(driverOptions, types.BoolPointerType, "enableHorizontalPodAutoscaling").(*bool)
+	d.EnableNetworkPolicyConfig, _ = options.GetValueFromDriverOptions(driverOptions, types.BoolPointerType, "enableNetworkPolicyConfig").(*bool)
+	d.EnableHTTPLoadBalancing, _ = options.GetValueFromDriverOptions(driverOptions, types.BoolPointerType, "enable-http-load-balancing", "enableHttpLoadBalancing").(*bool)
+	d.EnableKubernetesDashboard = options.GetValueFromDriverOptions(driverOptions, types.BoolType, "kubernetes-dashboard", "enableKubernetesDashboard").(bool)
+	d.NodeConfig.ImageType = options.GetValueFromDriverOptions(driverOptions, types.StringType, "imageType").(string)
+	d.Network = options.GetValueFromDriverOptions(driverOptions, types.StringType, "network").(string)
+	d.SubNetwork = options.GetValueFromDriverOptions(driverOptions, types.StringType, "subNetwork").(string)
+	d.LegacyAbac = options.GetValueFromDriverOptions(driverOptions, types.BoolType, "legacy-authorization", "enableLegacyAbac").(bool)
 	d.Locations = []string{}
-	locations := getValueFromDriverOptions(driverOptions, types.StringSliceType, "locations").(*types.StringSlice)
+	locations := options.GetValueFromDriverOptions(driverOptions, types.StringSliceType, "locations").(*types.StringSlice)
 	for _, location := range locations.Value {
 		d.Locations = append(d.Locations, location)
 	}
 
-	d.NodeCount = getValueFromDriverOptions(driverOptions, types.IntType, "node-count", "nodeCount").(int64)
-	labelValues := getValueFromDriverOptions(driverOptions, types.StringSliceType, "labels").(*types.StringSlice)
+	d.NodeCount = options.GetValueFromDriverOptions(driverOptions, types.IntType, "node-count", "nodeCount").(int64)
+	labelValues := options.GetValueFromDriverOptions(driverOptions, types.StringSliceType, "labels").(*types.StringSlice)
 	for _, part := range labelValues.Value {
 		kv := strings.Split(part, "=")
 		if len(kv) == 2 {
@@ -262,46 +263,11 @@ func getStateFromOpts(driverOptions *types.DriverOptions) (state, error) {
 		}
 	}
 
-	d.NoStackdriverLogging = getValueFromDriverOptions(driverOptions, types.BoolType, "no-stackdriver-logging", "noStackdriverLogging").(bool)
-	d.NoStackdriverMonitoring = getValueFromDriverOptions(driverOptions, types.BoolType, "no-stackdriver-monitoring", "noStackdriverMonitoring").(bool)
-	d.MaintenanceWindow = getValueFromDriverOptions(driverOptions, types.StringType, "maintenance-window", "maintenanceWindow").(string)
+	d.EnableStackdriverLogging, _ = options.GetValueFromDriverOptions(driverOptions, types.BoolPointerType, "enable-stackdriver-logging", "enableStackdriverLogging").(*bool)
+	d.EnableStackdriverMonitoring, _ = options.GetValueFromDriverOptions(driverOptions, types.BoolPointerType, "enable-stackdriver-monitoring", "enableStackdriverMonitoring").(*bool)
+	d.MaintenanceWindow = options.GetValueFromDriverOptions(driverOptions, types.StringType, "maintenance-window", "maintenanceWindow").(string)
 
 	return d, d.validate()
-}
-
-func getValueFromDriverOptions(driverOptions *types.DriverOptions, optionType string, keys ...string) interface{} {
-	switch optionType {
-	case types.IntType:
-		for _, key := range keys {
-			if value, ok := driverOptions.IntOptions[key]; ok {
-				return value
-			}
-		}
-		return int64(0)
-	case types.StringType:
-		for _, key := range keys {
-			if value, ok := driverOptions.StringOptions[key]; ok {
-				return value
-			}
-		}
-		return ""
-	case types.BoolType:
-		for _, key := range keys {
-			if value, ok := driverOptions.BoolOptions[key]; ok {
-				return value
-			}
-		}
-		return false
-	case types.StringSliceType:
-		for _, key := range keys {
-			if value, ok := driverOptions.StringSliceOptions[key]; ok {
-				return value
-			}
-		}
-		return &types.StringSlice{}
-	}
-
-	return nil
 }
 
 func (s *state) validate() error {
@@ -452,11 +418,16 @@ func (d *Driver) generateClusterCreateRequest(state state) *raw.CreateClusterReq
 	request.Cluster.ClusterIpv4Cidr = state.ClusterIpv4Cidr
 	request.Cluster.Description = state.Description
 	request.Cluster.EnableKubernetesAlpha = state.EnableAlphaFeature
+
+	disableHTTPLoadBalancing := state.EnableHTTPLoadBalancing != nil && !*state.EnableHTTPLoadBalancing
+	disableHorizontalPodAutoscaling := state.EnableHorizontalPodAutoscaling != nil && !*state.EnableHorizontalPodAutoscaling
+	disableNetworkPolicyConfig := state.EnableNetworkPolicyConfig != nil && !*state.EnableNetworkPolicyConfig
+
 	request.Cluster.AddonsConfig = &raw.AddonsConfig{
-		HttpLoadBalancing:        &raw.HttpLoadBalancing{Disabled: state.DisableHTTPLoadBalancing},
-		HorizontalPodAutoscaling: &raw.HorizontalPodAutoscaling{Disabled: state.DisableHorizontalPodAutoscaling},
+		HttpLoadBalancing:        &raw.HttpLoadBalancing{Disabled: disableHTTPLoadBalancing},
+		HorizontalPodAutoscaling: &raw.HorizontalPodAutoscaling{Disabled: disableHorizontalPodAutoscaling},
 		KubernetesDashboard:      &raw.KubernetesDashboard{Disabled: !state.EnableKubernetesDashboard},
-		NetworkPolicyConfig:      &raw.NetworkPolicyConfig{Disabled: state.DisableNetworkPolicyConfig},
+		NetworkPolicyConfig:      &raw.NetworkPolicyConfig{Disabled: disableNetworkPolicyConfig},
 	}
 	request.Cluster.Network = state.Network
 	request.Cluster.Subnetwork = state.SubNetwork
@@ -470,10 +441,10 @@ func (d *Driver) generateClusterCreateRequest(state state) *raw.CreateClusterReq
 	request.Cluster.ResourceLabels = map[string]string{"display-name": strings.ToLower(state.DisplayName)}
 	// Stackdriver logging and monitoring default to "on" if no parameter is
 	// passed in.  We must explicitly pass "none" if it isn't wanted
-	if state.NoStackdriverLogging {
+	if state.EnableStackdriverLogging != nil && !*state.EnableStackdriverLogging {
 		request.Cluster.LoggingService = none
 	}
-	if state.NoStackdriverMonitoring {
+	if state.EnableStackdriverMonitoring != nil && !*state.EnableStackdriverMonitoring {
 		request.Cluster.MonitoringService = none
 	}
 	if state.MaintenanceWindow != "" {

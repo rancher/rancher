@@ -7,8 +7,10 @@ import (
 const (
 	// StringType is the type for string flag
 	StringType = "string"
-	// BoolType is the type for bool flag
+	// BoolType is the type for bool flag. It should be used if the bool value should be false if missing
 	BoolType = "bool"
+	// BoolPointerType flag should be used if the bool value can be nil
+	BoolPointerType = "boolPtr"
 	// IntType is the type for int flag
 	IntType = "int"
 	// StringSliceType is the type for stringSlice flag
