@@ -72,8 +72,10 @@ func (g *GenericEncryptedStore) set(name string, data map[string]string, try int
 		sec = &corev1.Secret{}
 		sec.Name = g.getKey(name)
 		sec.StringData = data
-		_, err := g.secrets.Create(sec)
-		return err
+		if _, err := g.secrets.Create(sec); err != nil && !errors.IsAlreadyExists(err) {
+			return err
+		}
+		return nil
 	} else if err != nil {
 		return err
 	}
