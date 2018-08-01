@@ -299,7 +299,7 @@ func (s *Schemas) readFields(schema *Schema, t reflect.Type) error {
 		if schemaField.Type == "" {
 			inferedType, err := s.determineSchemaType(&schema.Version, fieldType)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed inspecting type %s, field %s: %v", t, fieldName, err)
 			}
 			schemaField.Type = inferedType
 		}
@@ -421,6 +421,13 @@ func getKeyValue(input string) (string, string) {
 	return key, value
 }
 
+func deRef(p reflect.Type) reflect.Type {
+	if p.Kind() == reflect.Ptr {
+		return p.Elem()
+	}
+	return p
+}
+
 func (s *Schemas) determineSchemaType(version *APIVersion, t reflect.Type) (string, error) {
 	switch t.Kind() {
 	case reflect.Uint8:
@@ -431,18 +438,20 @@ func (s *Schemas) determineSchemaType(version *APIVersion, t reflect.Type) (stri
 		fallthrough
 	case reflect.Int32:
 		fallthrough
+	case reflect.Uint32:
+		fallthrough
 	case reflect.Int64:
 		return "int", nil
 	case reflect.Interface:
 		return "json", nil
 	case reflect.Map:
-		subType, err := s.determineSchemaType(version, t.Elem())
+		subType, err := s.determineSchemaType(version, deRef(t.Elem()))
 		if err != nil {
 			return "", err
 		}
 		return fmt.Sprintf("map[%s]", subType), nil
 	case reflect.Slice:
-		subType, err := s.determineSchemaType(version, t.Elem())
+		subType, err := s.determineSchemaType(version, deRef(t.Elem()))
 		if err != nil {
 			return "", err
 		}

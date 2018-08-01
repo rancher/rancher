@@ -9,7 +9,7 @@ import (
 )
 
 func APIUpdateMerge(schema *types.Schema, schemas *types.Schemas, dest, src map[string]interface{}, replace bool) map[string]interface{} {
-	result := mergeMaps(schema, schemas, replace, dest, src)
+	result := mergeMaps("", nil, schema, schemas, replace, dest, src)
 	if s, ok := dest["status"]; ok {
 		result["status"] = s
 	}
@@ -73,42 +73,58 @@ func mergeMetadata(dest map[string]interface{}, src map[string]interface{}) map[
 	return result
 }
 
-func merge(field string, schema *types.Schema, schemas *types.Schemas, replace bool, dest, src interface{}) interface{} {
-	if isMap(field, schema) {
+func merge(field, fieldType string, parentSchema, schema *types.Schema, schemas *types.Schemas, replace bool, dest, src interface{}) interface{} {
+	if isMap(field, schema, schemas) {
 		return src
 	}
 
 	sm, smOk := src.(map[string]interface{})
 	dm, dmOk := dest.(map[string]interface{})
 	if smOk && dmOk {
-		return mergeMaps(getSchema(field, schema, schemas), schemas, replace, dm, sm)
+		fieldType, fieldSchema := getSchema(field, fieldType, parentSchema, schema, schemas)
+		return mergeMaps(fieldType, schema, fieldSchema, schemas, replace, dm, sm)
 	}
 	return src
 }
 
-func getSchema(field string, schema *types.Schema, schemas *types.Schemas) *types.Schema {
+func getSchema(field, parentFieldType string, parentSchema, schema *types.Schema, schemas *types.Schemas) (string, *types.Schema) {
 	if schema == nil {
-		return nil
+		if definition.IsMapType(parentFieldType) && parentSchema != nil {
+			subType := definition.SubType(parentFieldType)
+			s := schemas.Schema(&parentSchema.Version, subType)
+			if s != nil && s.InternalSchema != nil {
+				s = s.InternalSchema
+			}
+			return subType, s
+		}
+		return "", nil
 	}
-	s := schemas.Schema(&schema.Version, schema.ResourceFields[field].Type)
+	fieldType := schema.ResourceFields[field].Type
+	s := schemas.Schema(&schema.Version, fieldType)
 	if s != nil && s.InternalSchema != nil {
-		return s.InternalSchema
+		return fieldType, s.InternalSchema
 	}
-	return s
+	return fieldType, s
 }
 
-func isMap(field string, schema *types.Schema) bool {
+func isMap(field string, schema *types.Schema, schemas *types.Schemas) bool {
 	if schema == nil {
 		return false
 	}
 	f := schema.ResourceFields[field]
-	return definition.IsMapType(f.Type)
+	mapType := definition.IsMapType(f.Type)
+	if !mapType {
+		return false
+	}
+
+	subType := definition.SubType(f.Type)
+	return schemas.Schema(&schema.Version, subType) == nil
 }
 
-func mergeMaps(schema *types.Schema, schemas *types.Schemas, replace bool, dest map[string]interface{}, src map[string]interface{}) map[string]interface{} {
+func mergeMaps(fieldType string, parentSchema, schema *types.Schema, schemas *types.Schemas, replace bool, dest map[string]interface{}, src map[string]interface{}) map[string]interface{} {
 	result := copyMapReplace(schema, dest, replace)
 	for k, v := range src {
-		result[k] = merge(k, schema, schemas, replace, dest[k], v)
+		result[k] = merge(k, fieldType, parentSchema, schema, schemas, replace, dest[k], v)
 	}
 	return result
 }
@@ -124,7 +140,7 @@ func copyMap(src map[string]interface{}) map[string]interface{} {
 func copyMapReplace(schema *types.Schema, src map[string]interface{}, replace bool) map[string]interface{} {
 	result := map[string]interface{}{}
 	for k, v := range src {
-		if replace {
+		if replace && schema != nil {
 			f := schema.ResourceFields[k]
 			if f.Update {
 				continue
