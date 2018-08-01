@@ -34,6 +34,7 @@ type APIBaseClientInterface interface {
 	GetLink(resource types.Resource, link string, respObject interface{}) error
 	Create(schemaType string, createObj interface{}, respObject interface{}) error
 	Update(schemaType string, existing *types.Resource, updates interface{}, respObject interface{}) error
+	Replace(schemaType string, existing *types.Resource, updates interface{}, respObject interface{}) error
 	ByID(schemaType string, id string, respObject interface{}) error
 	Delete(existing *types.Resource) error
 	Reload(existing *types.Resource, output interface{}) error
@@ -53,6 +54,7 @@ type ClientOpts struct {
 	TokenKey   string
 	Timeout    time.Duration
 	HTTPClient *http.Client
+	WSDialer   *websocket.Dialer
 	CACerts    string
 	Insecure   bool
 }
@@ -274,6 +276,10 @@ func NewAPIClient(opts *ClientOpts) (APIBaseClient, error) {
 		Types:  result.Types,
 	}
 
+	if result.Opts.WSDialer != nil {
+		result.Ops.Dialer = result.Opts.WSDialer
+	}
+
 	ht, ok := client.Transport.(*http.Transport)
 	if ok {
 		result.Ops.Dialer.TLSClientConfig = ht.TLSClientConfig
@@ -296,6 +302,10 @@ func (a *APIBaseClient) Websocket(url string, headers map[string][]string) (*web
 
 	if a.Opts != nil {
 		httpHeaders.Add("Authorization", a.Opts.getAuthHeader())
+	}
+
+	if Debug {
+		fmt.Println("WS " + url)
 	}
 
 	return a.Ops.Dialer.Dial(url, http.Header(httpHeaders))
@@ -324,6 +334,10 @@ func (a *APIBaseClient) Create(schemaType string, createObj interface{}, respObj
 
 func (a *APIBaseClient) Update(schemaType string, existing *types.Resource, updates interface{}, respObject interface{}) error {
 	return a.Ops.DoUpdate(schemaType, existing, updates, respObject)
+}
+
+func (a *APIBaseClient) Replace(schemaType string, existing *types.Resource, updates interface{}, respObject interface{}) error {
+	return a.Ops.DoReplace(schemaType, existing, updates, respObject)
 }
 
 func (a *APIBaseClient) ByID(schemaType string, id string, respObject interface{}) error {
