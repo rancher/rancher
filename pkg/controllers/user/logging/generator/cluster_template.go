@@ -53,10 +53,10 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
 
 {{ if eq .clusterTarget.CurrentTarget "syslog"}}
 {{ if .clusterTarget.SyslogConfig.Token}}
-<filter  cluster.**>
+<filter  cluster.** rke.** cluster-custom.**>
   @type record_transformer
   <record>
-    token {{.clusterTarget.SyslogConfig.Token}}
+    tag ${tag} {{.clusterTarget.SyslogConfig.Token}}
   </record>
 </filter>
 {{end -}}

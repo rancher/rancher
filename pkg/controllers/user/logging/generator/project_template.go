@@ -46,10 +46,10 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
 
 {{ if eq $store.CurrentTarget "syslog"}}
 {{ if $store.SyslogConfig.Token}}
-<filter {{$store.ProjectName}}.**>
+<filter {{$store.ProjectName}}.** project-custom.{{$store.ProjectName}}.**>
   @type record_transformer
   <record>
-    token {{$store.SyslogConfig.Token}}
+    tag ${tag} {{$store.SyslogConfig.Token}}
   </record>
 </filter>
 {{end -}}
