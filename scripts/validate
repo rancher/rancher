@@ -18,3 +18,5 @@ done
 test -z "$failed"
 echo Running: go fmt
 test -z "$(go fmt ${PACKAGES} | tee /dev/stderr)"
+echo Running: K8s Image check
+./scripts/compare-images.sh

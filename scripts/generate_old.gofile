@@ -1,0 +1,23 @@
+package main
+
+import (
+	"encoding/json"
+	"os"
+
+	"github.com/rancher/rancher/.build/v3"
+)
+
+func main() {
+	images := v3.K8sVersionToRKESystemImages
+	data, err := json.Marshal(images)
+	if err != nil {
+		panic(err)
+	}
+	file, err := os.Create(".build/images.json")
+	if err != nil {
+		panic(err)
+	}
+	if _, err := file.Write(data); err != nil {
+		panic(err)
+	}
+}

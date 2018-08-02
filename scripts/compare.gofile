@@ -1,0 +1,59 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"os"
+)
+
+func main() {
+	old, err := ioutil.ReadFile(".build/old-images.json")
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	new, err := ioutil.ReadFile(".build/new-images.json")
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	oldImages := map[string]map[string]string{}
+	newImages := map[string]map[string]string{}
+	if err := json.Unmarshal(old, &oldImages); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	if err := json.Unmarshal(new, &newImages); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	match := true
+	for k, oldImage := range oldImages {
+		if newImage, ok := newImages[k]; !ok {
+			fmt.Printf("Version %s is missing\n", k)
+			match = false
+		} else {
+			for imageName, imageVersion := range oldImage {
+				if newImageVersion, ok := newImage[imageName]; !ok {
+					fmt.Printf("%s image is missing in version %s\n", imageName, k)
+					match = false
+				} else if newImageVersion != imageVersion {
+					fmt.Printf("%s image doesn't match in version %s. Expect: %s, Got: %s\n", imageName, k, imageVersion, newImageVersion)
+					match = false
+				}
+			}
+			for imageName := range newImage {
+				if _, ok := oldImage[imageName]; !ok {
+					fmt.Printf("New image %s found in version %s\n", imageName, k)
+					match = false
+				}
+			}
+		}
+	}
+	if !match {
+		os.Exit(1)
+	}
+	fmt.Println("Kubernete version checks have been passed.")
+	os.Exit(0)
+}
