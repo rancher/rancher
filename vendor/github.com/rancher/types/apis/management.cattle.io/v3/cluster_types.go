@@ -70,7 +70,7 @@ type ClusterSpec struct {
 	DefaultPodSecurityPolicyTemplateName string                               `json:"defaultPodSecurityPolicyTemplateName,omitempty" norman:"type=reference[podSecurityPolicyTemplate]"`
 	DefaultClusterRoleForProjectMembers  string                               `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
 	DockerRootDir                        string                               `json:"dockerRootDir,omitempty" norman:"default=/var/lib/docker"`
-	EnableNetworkPolicy                  *bool                                `json:"enableNetworkPolicy" norman:"nocreate,noupdate,default=false"`
+	EnableNetworkPolicy                  *bool                                `json:"enableNetworkPolicy" norman:"default=false"`
 }
 
 type ImportedConfig struct {
