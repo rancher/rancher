@@ -1,6 +1,7 @@
 package common
 
 import (
+	"crypto/sha256"
 	"encoding/base32"
 	"encoding/json"
 	"fmt"
@@ -265,6 +266,13 @@ func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, e
 		// User doesn't exist, create user
 		logrus.Infof("Creating user for principal %v", principalName)
 
+		// Create a hash of the principalName to use as the name for the user,
+		// this lets k8s tell us if there are duplicate users with the same name
+		// thus avoiding a race.
+		hasher := sha256.New()
+		hasher.Write([]byte(principalName))
+		sha := base32.StdEncoding.WithPadding(-1).EncodeToString(hasher.Sum(nil))[:10]
+
 		annotations, err := m.createUsersRoleAnnotation()
 		if err != nil {
 			return nil, err
@@ -272,9 +280,9 @@ func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, e
 
 		user = &v3.User{
 			ObjectMeta: v1.ObjectMeta{
-				GenerateName: "user-",
-				Labels:       labelSet,
-				Annotations:  annotations,
+				Name:        "u-" + strings.ToLower(sha),
+				Labels:      labelSet,
+				Annotations: annotations,
 			},
 			DisplayName:  displayName,
 			PrincipalIDs: []string{principalName},
