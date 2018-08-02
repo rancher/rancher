@@ -121,7 +121,7 @@ func setKubernetesVersion(data map[string]interface{}) {
 func validateNetworkFlag(data map[string]interface{}) error {
 	enableNetworkPolicy := values.GetValueN(data, "enableNetworkPolicy")
 	rkeConfig := values.GetValueN(data, "rancherKubernetesEngineConfig")
-	plugin := convert.ToString(values.GetValueN(data, "network", "plugin"))
+	plugin := convert.ToString(values.GetValueN(convert.ToMapInterface(rkeConfig), "network", "plugin"))
 
 	if enableNetworkPolicy == nil {
 		// setting default values for new clusters if value not passed
