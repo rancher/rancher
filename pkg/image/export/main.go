@@ -65,8 +65,9 @@ fi
 set -e -x
 REGISTRY=$1
 
-docker load --input rancher-images.tar.gz`)
-	fmt.Fprint(load, "\n\n")
+docker load --input rancher-images.tar.gz
+
+`)
 
 	for _, saveImage := range saveImages(targetImages) {
 		fmt.Fprintf(load, "docker tag %s ${REGISTRY}/%s\n", saveImage, saveImage)
