@@ -49,6 +49,8 @@ RUN chmod +x /usr/bin/entrypoint.sh
 
 ENV CATTLE_AGENT_IMAGE rancher/rancher-agent:${VERSION}
 ENV CATTLE_SERVER_IMAGE rancher/rancher
+
+ENV SSL_CERT_DIR /etc/rancher/ssl
 VOLUME /var/lib/rancher
 
 ENTRYPOINT ["entrypoint.sh"]
