@@ -114,7 +114,7 @@ if [ "$CATTLE_CLUSTER" != "true" ]; then
 fi
 
 if [ -z "$CATTLE_NODE_NAME" ]; then
-    CATTLE_NODE_NAME=$(hostname -s)
+    CATTLE_NODE_NAME=$(hostname -f)
 fi
 
 export CATTLE_ADDRESS=$(get_address $CATTLE_ADDRESS)
