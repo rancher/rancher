@@ -4,6 +4,8 @@ from .common import random_str
 from .conftest import wait_for_condition, wait_until
 
 CREATOR_ANNOTATION = 'authz.management.cattle.io/creator-role-bindings'
+systemProjectLabel = "authz.management.cattle.io/system-project"
+defaultProjectLabel = "authz.management.cattle.io/default-project"
 
 
 @pytest.fixture
@@ -178,6 +180,40 @@ def test_user_create_default_role(admin_mc, cleanup_roles, remove_resource):
     assert len(user.globalRoleBindings()) == 3
     for binding in user.globalRoleBindings():
         assert binding.globalRoleId in test_roles
+
+
+@pytest.mark.nonparallel
+def test_default_system_project_role(admin_mc):
+    test_roles = ['project-owner']
+    client = admin_mc.client
+    projects = client.list_project(
+               clusterId="local")
+    required_projects = {}
+    required_projects["Default"] = defaultProjectLabel
+    required_projects["System"] = systemProjectLabel
+    created_projects = []
+
+    for project in projects:
+        wait_for_condition('InitialRolesPopulated', 'True', client, project)
+        project = client.reload(project)
+
+        name = project.data_dict()['name']
+        if name in required_projects:
+            projectLabel = required_projects[name]
+            assert project.data_dict()['labels'].\
+                data_dict()[projectLabel] == 'true'
+            created_projects.append(project)
+
+    assert len(required_projects) == len(created_projects)
+
+    for project in created_projects:
+        data_dict = json.loads(project.annotations.data_dict()[
+            CREATOR_ANNOTATION])
+
+        assert set(data_dict['created']) == set(data_dict['required'])
+
+        for binding in project.projectRoleTemplateBindings():
+            assert binding.roleTemplateId in test_roles
 
 
 def set_role_state(client, roles, context):
