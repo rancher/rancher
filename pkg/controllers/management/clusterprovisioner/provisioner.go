@@ -1,7 +1,6 @@
 package clusterprovisioner
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
@@ -375,24 +374,10 @@ func (p *Provisioner) validateDriver(cluster *v3.Cluster) (string, error) {
 
 func getSystemImages(spec v3.ClusterSpec) (*v3.RKESystemImages, error) {
 	// fetch system images from settings
-	systemImagesStr := settings.KubernetesVersionToSystemImages.Get()
-	if systemImagesStr == "" {
-		return nil, fmt.Errorf("failed to load setting %s", settings.KubernetesVersionToSystemImages.Name)
-	}
-	systemImagesMap := make(map[string]v3.RKESystemImages)
-	if err := json.Unmarshal([]byte(systemImagesStr), &systemImagesMap); err != nil {
-		return nil, err
-	}
-
 	version := spec.RancherKubernetesEngineConfig.Version
-	systemImages, ok := systemImagesMap[version]
+	systemImages, ok := v3.AllK8sVersions[version]
 	if !ok {
-		// add legacy map - to fetch system images for k8s version we no longer support
-		// need to have this logic unless start persisting this information on the API layer
-		systemImages, ok = v3.LegacyK8sVersionToRKESystemImages[version]
-		if !ok {
-			return nil, fmt.Errorf("failed to find system images for version %v", version)
-		}
+		return nil, fmt.Errorf("failed to find system images for version %v", version)
 	}
 
 	privateRegistry := getPrivateRepo(spec.RancherKubernetesEngineConfig)
