@@ -99,9 +99,12 @@ func NewSetting(name, def string) Setting {
 }
 
 func getSystemImages() string {
-	versionToSystemImages := v3.K8sVersionToRKESystemImages
+	newMap := map[string]interface{}{}
+	for k := range v3.K8sVersionToRKESystemImages {
+		newMap[k] = nil
+	}
 
-	data, err := json.Marshal(versionToSystemImages)
+	data, err := json.Marshal(newMap)
 	if err != nil {
 		return ""
 	}

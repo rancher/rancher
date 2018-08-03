@@ -45,7 +45,7 @@ func localConfig() (*v3.RancherKubernetesEngineConfig, error) {
 	rkeConfig.Services.KubeAPI.ExtraArgs["requestheader-extra-headers-prefix"] = ""
 	rkeConfig.Services.KubeAPI.ExtraArgs["requestheader-group-headers"] = ""
 	rkeConfig.Services.KubeAPI.ExtraArgs["requestheader-username-headers"] = ""
-	rkeConfig.SystemImages = v3.K8sVersionToRKESystemImages["v1.10.5-rancher1-1"]
+	rkeConfig.SystemImages = v3.AllK8sVersions["v1.10.5-rancher1-1"]
 	rkeConfig.Version = settings.KubernetesVersion.Get()
 	rkeConfig.IgnoreDockerVersion = true
 	rkeConfig.Nodes = []v3.RKEConfigNode{
