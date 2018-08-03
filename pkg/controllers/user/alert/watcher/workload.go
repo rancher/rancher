@@ -145,7 +145,7 @@ func (w *WorkloadWatcher) checkWorkloadCondition(wl *workload.Workload, alert *v
 
 	availableThreshold := int32(percentage) * (wl.Status.Replicas) / 100
 
-	if wl.Status.AvailableReplicas <= availableThreshold {
+	if wl.Status.AvailableReplicas < availableThreshold {
 
 		clusterDisplayName := w.clusterName
 		cluster, err := w.clusterLister.Get("", w.clusterName)
