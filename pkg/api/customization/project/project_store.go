@@ -45,7 +45,7 @@ func (s *projectStore) createProjectAnnotation() (string, error) {
 	annoMap := make(map[string][]string)
 
 	for _, role := range rt {
-		if role.ProjectCreatorDefault {
+		if role.ProjectCreatorDefault && !role.Locked {
 			annoMap["required"] = append(annoMap["required"], role.Name)
 		}
 	}

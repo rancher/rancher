@@ -463,13 +463,13 @@ func (m *mgr) addRTAnnotation(obj runtime.Object, context string) (runtime.Objec
 	switch context {
 	case "project":
 		for _, role := range rt {
-			if role.ProjectCreatorDefault {
+			if role.ProjectCreatorDefault && !role.Locked {
 				annoMap["required"] = append(annoMap["required"], role.Name)
 			}
 		}
 	case "cluster":
 		for _, role := range rt {
-			if role.ClusterCreatorDefault {
+			if role.ClusterCreatorDefault && !role.Locked {
 				annoMap["required"] = append(annoMap["required"], role.Name)
 			}
 		}
