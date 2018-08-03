@@ -102,7 +102,7 @@ func (c *Cluster) BuildKubeAPIProcess(prefixPath string) v3.Process {
 	}
 
 	Command := []string{
-		"/opt/rke/entrypoint.sh",
+		"/opt/rke-tools/entrypoint.sh",
 		"kube-apiserver",
 	}
 
@@ -210,7 +210,7 @@ func (c *Cluster) BuildKubeAPIProcess(prefixPath string) v3.Process {
 
 func (c *Cluster) BuildKubeControllerProcess(prefixPath string) v3.Process {
 	Command := []string{
-		"/opt/rke/entrypoint.sh",
+		"/opt/rke-tools/entrypoint.sh",
 		"kube-controller-manager",
 	}
 
@@ -297,7 +297,7 @@ func (c *Cluster) BuildKubeControllerProcess(prefixPath string) v3.Process {
 func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string) v3.Process {
 
 	Command := []string{
-		"/opt/rke/entrypoint.sh",
+		"/opt/rke-tools/entrypoint.sh",
 		"kubelet",
 	}
 
@@ -415,7 +415,7 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string) v3.Pr
 
 func (c *Cluster) BuildKubeProxyProcess(host *hosts.Host, prefixPath string) v3.Process {
 	Command := []string{
-		"/opt/rke/entrypoint.sh",
+		"/opt/rke-tools/entrypoint.sh",
 		"kube-proxy",
 	}
 
@@ -508,7 +508,7 @@ func (c *Cluster) BuildProxyProcess() v3.Process {
 
 func (c *Cluster) BuildSchedulerProcess(prefixPath string) v3.Process {
 	Command := []string{
-		"/opt/rke/entrypoint.sh",
+		"/opt/rke-tools/entrypoint.sh",
 		"kube-scheduler",
 	}
 

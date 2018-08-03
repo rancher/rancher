@@ -226,7 +226,7 @@ func RunEtcdSnapshotSave(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 	log.Infof(ctx, "[etcd] Saving snapshot [%s] on host [%s]", name, etcdHost.Address)
 	imageCfg := &container.Config{
 		Cmd: []string{
-			"/opt/rke/rke-etcd-backup",
+			"/opt/rke-tools/rke-etcd-backup",
 			"rolling-backup",
 			"--cacert", pki.GetCertPath(pki.CACertName),
 			"--cert", pki.GetCertPath(pki.KubeNodeCertName),

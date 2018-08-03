@@ -219,14 +219,8 @@ func doSyncTaints(k8sClient *kubernetes.Clientset, nodeName string, toAddTaints,
 		node.Spec.Taints = append(node.Spec.Taints, toTaint(taintStr))
 	}
 	// Remove Taints from node
-	for i, taintStr := range toDelTaints {
-		if isTaintExist(toTaint(taintStr), node.Spec.Taints) {
-			if len(node.Spec.Taints) == 1 {
-				node.Spec.Taints = []v1.Taint{}
-			} else {
-				node.Spec.Taints = append(node.Spec.Taints[:i], node.Spec.Taints[i+1:]...)
-			}
-		}
+	for _, taintStr := range toDelTaints {
+		node.Spec.Taints = delTaintFromList(node.Spec.Taints, toTaint(taintStr))
 	}
 
 	//node.Spec.Taints
@@ -285,4 +279,15 @@ func SetAddressesAnnotations(k8sClient *kubernetes.Clientset, nodeName, internal
 		return nil
 	}
 	return listErr
+}
+
+func delTaintFromList(l []v1.Taint, t v1.Taint) []v1.Taint {
+	r := []v1.Taint{}
+	for _, i := range l {
+		if i == t {
+			continue
+		}
+		r = append(r, i)
+	}
+	return r
 }

@@ -82,7 +82,7 @@ items:
                   mountPath: /run/xtables.lock
             - name: weave-loopback
               command:
-                - /opt/rke/weave-loopback-cni.sh
+                - /opt/rke-tools/weave-loopback-cni.sh
               image: {{.WeaveLoopbackImage}}
               securityContext:
                 privileged: true
