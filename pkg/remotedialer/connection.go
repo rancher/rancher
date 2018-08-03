@@ -175,6 +175,11 @@ func (c chanWriter) Write(buf []byte) (int, error) {
 	case c.C <- buf:
 		return len(buf), nil
 	default:
-		return 0, errors.New("backed up reader")
+		select {
+		case c.C <- buf:
+			return len(buf), nil
+		case <-time.After(15 * time.Second):
+			return 0, errors.New("backed up reader")
+		}
 	}
 }
