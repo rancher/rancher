@@ -19,13 +19,14 @@ def cleanup_roles(request, admin_mc):
         for role in client.list_role_template():
             if role.id == 'cluster-owner':
                 client.update(role, clusterCreatorDefault=True,
-                              projectCreatorDefault=False)
+                              projectCreatorDefault=False, locked=False)
             elif role.id == 'project-owner':
                 client.update(role, clusterCreatorDefault=False,
-                              projectCreatorDefault=True)
-            elif role.clusterCreatorDefault or role.projectCreatorDefault:
+                              projectCreatorDefault=True, locked=False)
+            elif (role.clusterCreatorDefault or role.projectCreatorDefault or
+                  role.locked):
                 client.update(role, clusterCreatorDefault=False,
-                              projectCreatorDefault=False)
+                              projectCreatorDefault=False, locked=False)
 
         for role in client.list_global_role():
             if role.id == 'user':
@@ -61,6 +62,36 @@ def test_cluster_create_default_role(admin_mc, cleanup_roles, remove_resource):
 
 
 @pytest.mark.nonparallel
+def test_cluster_create_role_locked(admin_mc, cleanup_roles, remove_resource):
+    test_roles = ['projects-create', 'storage-manage', 'nodes-view']
+    client = admin_mc.client
+
+    set_role_state(client, test_roles, 'cluster')
+
+    # Grab a role to lock
+    locked_role = test_roles.pop()
+
+    # Lock the role
+    client.update(client.by_id_role_template(locked_role), locked=True)
+
+    cluster = client.create_cluster(name=random_str())
+    remove_resource(cluster)
+
+    wait_for_condition('InitialRolesPopulated', 'True', client, cluster)
+
+    cluster = client.reload(cluster)
+
+    data_dict = json.loads(cluster.annotations.data_dict()[CREATOR_ANNOTATION])
+
+    assert len(cluster.clusterRoleTemplateBindings()) == 2
+    assert set(data_dict['created']) == set(data_dict['required'])
+    assert set(data_dict['created']) == set(test_roles)
+
+    for binding in cluster.clusterRoleTemplateBindings():
+        assert binding.roleTemplateId in test_roles
+
+
+@pytest.mark.nonparallel
 def test_project_create_default_role(admin_mc, cleanup_roles, remove_resource):
     test_roles = ['project-member', 'workloads-view', 'secrets-view']
     client = admin_mc.client
@@ -78,6 +109,38 @@ def test_project_create_default_role(admin_mc, cleanup_roles, remove_resource):
         CREATOR_ANNOTATION])
 
     assert len(project.projectRoleTemplateBindings()) == 3
+    assert set(data_dict['required']) == set(test_roles)
+
+    for binding in project.projectRoleTemplateBindings():
+        assert binding.roleTemplateId in test_roles
+
+
+@pytest.mark.nonparallel
+def test_project_create_role_locked(admin_mc, cleanup_roles, remove_resource):
+    """Test a locked role that is set to default is not applied
+    """
+    test_roles = ['project-member', 'workloads-view', 'secrets-view']
+    client = admin_mc.client
+
+    set_role_state(client, test_roles, 'project')
+
+    # Grab a role to lock
+    locked_role = test_roles.pop()
+
+    # Lock the role
+    client.update(client.by_id_role_template(locked_role), locked=True)
+
+    project = client.create_project(name=random_str(), clusterId='local')
+    remove_resource(project)
+
+    wait_for_condition('InitialRolesPopulated', 'True', client, project)
+
+    project = client.reload(project)
+
+    data_dict = json.loads(project.annotations.data_dict()[
+        CREATOR_ANNOTATION])
+
+    assert len(project.projectRoleTemplateBindings()) == 2
     assert set(data_dict['required']) == set(test_roles)
 
     for binding in project.projectRoleTemplateBindings():
