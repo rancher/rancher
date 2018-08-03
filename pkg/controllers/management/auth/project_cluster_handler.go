@@ -213,8 +213,7 @@ func (m *mgr) createProject(name string, cond condition.Cond, obj runtime.Object
 			logrus.Warnf("Cluster %v has no creatorId annotation. Cannot create %s project", metaAccessor.GetName(), name)
 			return obj, nil
 		}
-		logrus.Infof("[%v] Creating %s project for cluster %v", clusterCreateController, name, metaAccessor.GetName())
-		if _, err = m.mgmt.Management.Projects(metaAccessor.GetName()).Create(&v3.Project{
+		project := &v3.Project{
 			ObjectMeta: v1.ObjectMeta{
 				GenerateName: "p-",
 				Annotations: map[string]string{
@@ -227,7 +226,14 @@ func (m *mgr) createProject(name string, cond condition.Cond, obj runtime.Object
 				Description: fmt.Sprintf("%s project created for the cluster", name),
 				ClusterName: metaAccessor.GetName(),
 			},
-		}); err != nil {
+		}
+		updated, err := m.addRTAnnotation(project, "project")
+		if err != nil {
+			return obj, err
+		}
+		project = updated.(*v3.Project)
+		logrus.Infof("[%v] Creating %s project for cluster %v", clusterCreateController, name, metaAccessor.GetName())
+		if _, err = m.mgmt.Management.Projects(metaAccessor.GetName()).Create(project); err != nil {
 			return obj, err
 		}
 		return obj, nil
