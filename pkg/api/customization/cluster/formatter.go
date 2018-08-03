@@ -5,6 +5,8 @@ import (
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/types/client/management/v3"
+	"github.com/sirupsen/logrus"
 )
 
 func Formatter(request *types.APIContext, resource *types.RawResource) {
@@ -18,4 +20,24 @@ func Formatter(request *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(request, "generateKubeconfig")
 	resource.AddAction(request, "importYaml")
 	resource.AddAction(request, "exportYaml")
+
+	if gkeConfig, ok := resource.Values[client.ClusterSpecFieldGoogleKubernetesEngineConfig]; ok {
+		configMap, ok := gkeConfig.(map[string]interface{})
+		if !ok {
+			logrus.Errorf("could not convert gke config to map")
+			return
+		}
+
+		setTrueIfNil(configMap, client.GoogleKubernetesEngineConfigFieldEnableStackdriverLogging)
+		setTrueIfNil(configMap, client.GoogleKubernetesEngineConfigFieldEnableStackdriverMonitoring)
+		setTrueIfNil(configMap, client.GoogleKubernetesEngineConfigFieldEnableHorizontalPodAutoscaling)
+		setTrueIfNil(configMap, client.GoogleKubernetesEngineConfigFieldEnableHTTPLoadBalancing)
+		setTrueIfNil(configMap, client.GoogleKubernetesEngineConfigFieldEnableNetworkPolicyConfig)
+	}
+}
+
+func setTrueIfNil(configMap map[string]interface{}, fieldName string) {
+	if configMap[fieldName] == nil {
+		configMap[fieldName] = true
+	}
 }
