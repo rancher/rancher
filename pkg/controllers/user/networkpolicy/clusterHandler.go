@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -68,7 +69,7 @@ func (ch *clusterHandler) Sync(key string, cluster *v3.Cluster) error {
 	cluster.Status.AppliedEnableNetworkPolicy = toEnable
 
 	_, err = ch.clusters.Update(cluster)
-	if err != nil {
+	if err != nil && !errors.IsConflict(err) {
 		return err
 	}
 
