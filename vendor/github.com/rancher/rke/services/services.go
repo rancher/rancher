@@ -46,15 +46,27 @@ func runSidekick(ctx context.Context, host *hosts.Host, prsMap map[string]v3.Pri
 	if err != nil {
 		return err
 	}
+	imageCfg, hostCfg, _ := GetProcessConfig(sidecarProcess)
+	isUpgradable := false
 	if isRunning {
-		log.Infof(ctx, "[%s] Sidekick container already created on host [%s]", SidekickServiceName, host.Address)
-		return nil
+		isUpgradable, err = docker.IsContainerUpgradable(ctx, host.DClient, imageCfg, hostCfg, SidekickContainerName, host.Address, SidekickServiceName)
+		if err != nil {
+			return err
+		}
+
+		if !isUpgradable {
+			log.Infof(ctx, "[%s] Sidekick container already created on host [%s]", SidekickServiceName, host.Address)
+			return nil
+		}
 	}
 
-	imageCfg, hostCfg, _ := GetProcessConfig(sidecarProcess)
-	sidecarImage := sidecarProcess.Image
-	if err := docker.UseLocalOrPull(ctx, host.DClient, host.Address, sidecarImage, SidekickServiceName, prsMap); err != nil {
+	if err := docker.UseLocalOrPull(ctx, host.DClient, host.Address, sidecarProcess.Image, SidekickServiceName, prsMap); err != nil {
 		return err
+	}
+	if isUpgradable {
+		if err := docker.DoRemoveContainer(ctx, host.DClient, SidekickContainerName, host.Address); err != nil {
+			return err
+		}
 	}
 	if _, err := docker.CreateContainer(ctx, host.DClient, host.Address, SidekickContainerName, imageCfg, hostCfg); err != nil {
 		return err

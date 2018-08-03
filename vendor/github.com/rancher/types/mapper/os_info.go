@@ -12,6 +12,9 @@ type OSInfo struct {
 }
 
 func (o OSInfo) FromInternal(data map[string]interface{}) {
+	if data == nil {
+		return
+	}
 	cpuInfo := map[string]interface{}{
 		"count": values.GetValueN(data, "capacity", "cpu"),
 	}

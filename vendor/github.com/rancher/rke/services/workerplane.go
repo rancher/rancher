@@ -33,7 +33,6 @@ func RunWorkerPlane(ctx context.Context, allHosts []*hosts.Host, localConnDialer
 				// Add unschedulable taint
 				host.ToAddTaints = append(host.ToAddTaints, unschedulableControlTaint)
 			}
-
 		}
 		runHost := host
 		// maps are not thread safe

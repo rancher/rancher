@@ -113,14 +113,6 @@ func reconcileControl(ctx context.Context, currentCluster, kubeCluster *Cluster,
 	if err := rebuildLocalAdminConfig(ctx, kubeCluster); err != nil {
 		return err
 	}
-	// attempt to remove unschedulable taint
-	toAddHosts := hosts.GetToAddHosts(currentCluster.ControlPlaneHosts, kubeCluster.ControlPlaneHosts)
-	for _, host := range toAddHosts {
-		kubeCluster.UpdateWorkersOnly = false
-		if host.IsEtcd {
-			host.ToDelTaints = append(host.ToDelTaints, unschedulableEtcdTaint)
-		}
-	}
 	return nil
 }
 
