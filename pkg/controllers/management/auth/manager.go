@@ -361,13 +361,18 @@ func (m *manager) reconcileMembershipBindingForDelete(namespace, roleToKeep, rtb
 			continue
 		}
 
+		var otherOwners bool
+
 		for k, v := range objMeta.GetLabels() {
 			if k == rtbUID && v == membershipBindingOwner {
 				delete(objMeta.GetLabels(), k)
+			} else if v == membershipBindingOwner {
+				// Another crtb is also linked to this roleBinding so don't delete
+				otherOwners = true
 			}
 		}
 
-		if len(objMeta.GetLabels()) == 0 {
+		if !otherOwners {
 			logrus.Infof("[%v] Deleting roleBinding %v", m.controller, objMeta.GetName())
 			if err := client.Delete(objMeta.GetName(), &metav1.DeleteOptions{}); err != nil {
 				if apierrors.IsNotFound(err) {
