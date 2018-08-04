@@ -382,6 +382,7 @@ func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		if errors.IsConflict(err) {
 			continue
 		}
+		return result, err
 	}
 
 	return result, err
