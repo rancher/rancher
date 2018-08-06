@@ -188,10 +188,22 @@ func newFluentdDaemonset(name, namespace, clusterName, dockerRootDir string) *v1
 					},
 				},
 				Spec: v1.PodSpec{
-					Tolerations: []v1.Toleration{{
-						Key:    "node-role.kubernetes.io/master",
-						Effect: v1.TaintEffectNoSchedule,
-					}},
+					Tolerations: []v1.Toleration{
+						{
+							Key:    "node-role.kubernetes.io/master",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+						{
+							Key:    "node-role.kubernetes.io/etcd",
+							Value:  "true",
+							Effect: v1.TaintEffectNoExecute,
+						},
+						{
+							Key:    "node-role.kubernetes.io/controlplane",
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
 					Containers: []v1.Container{
 						{
 							Name:    loggingconfig.FluentdHelperName,
@@ -254,6 +266,22 @@ func newLogAggregatorDaemonset(name, namespace, driverDir string) *v1beta2.Daemo
 					},
 				},
 				Spec: v1.PodSpec{
+					Tolerations: []v1.Toleration{
+						{
+							Key:    "node-role.kubernetes.io/master",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+						{
+							Key:    "node-role.kubernetes.io/etcd",
+							Value:  "true",
+							Effect: v1.TaintEffectNoExecute,
+						},
+						{
+							Key:    "node-role.kubernetes.io/controlplane",
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
 					Containers: []v1.Container{
 						{
 							Name:            loggingconfig.LogAggregatorName,
