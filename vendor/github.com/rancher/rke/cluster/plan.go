@@ -10,6 +10,7 @@ import (
 
 	b64 "encoding/base64"
 
+	"github.com/coreos/go-semver/semver"
 	ref "github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"
 	"github.com/rancher/rke/cloudprovider/aws"
@@ -25,6 +26,10 @@ const (
 	EtcdPathPrefix     = "/registry"
 	ContainerNameLabel = "io.rancher.rke.container.name"
 	CloudConfigSumEnv  = "RKE_CLOUD_CONFIG_CHECKSUM"
+
+	DefaultToolsEntrypoint        = "/opt/rke-tools/entrypoint.sh"
+	DefaultToolsEntrypointVersion = "0.1.13"
+	LegacyToolsEntrypoint         = "/opt/rke/entrypoint.sh"
 )
 
 func GeneratePlan(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig, hostsInfoMap map[string]types.Info) (v3.RKEPlan, error) {
@@ -102,7 +107,7 @@ func (c *Cluster) BuildKubeAPIProcess(prefixPath string) v3.Process {
 	}
 
 	Command := []string{
-		"/opt/rke-tools/entrypoint.sh",
+		c.getRKEToolsEntryPoint(),
 		"kube-apiserver",
 	}
 
@@ -210,7 +215,7 @@ func (c *Cluster) BuildKubeAPIProcess(prefixPath string) v3.Process {
 
 func (c *Cluster) BuildKubeControllerProcess(prefixPath string) v3.Process {
 	Command := []string{
-		"/opt/rke-tools/entrypoint.sh",
+		c.getRKEToolsEntryPoint(),
 		"kube-controller-manager",
 	}
 
@@ -297,7 +302,7 @@ func (c *Cluster) BuildKubeControllerProcess(prefixPath string) v3.Process {
 func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string) v3.Process {
 
 	Command := []string{
-		"/opt/rke-tools/entrypoint.sh",
+		c.getRKEToolsEntryPoint(),
 		"kubelet",
 	}
 
@@ -415,7 +420,7 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string) v3.Pr
 
 func (c *Cluster) BuildKubeProxyProcess(host *hosts.Host, prefixPath string) v3.Process {
 	Command := []string{
-		"/opt/rke-tools/entrypoint.sh",
+		c.getRKEToolsEntryPoint(),
 		"kube-proxy",
 	}
 
@@ -508,7 +513,7 @@ func (c *Cluster) BuildProxyProcess() v3.Process {
 
 func (c *Cluster) BuildSchedulerProcess(prefixPath string) v3.Process {
 	Command := []string{
-		"/opt/rke-tools/entrypoint.sh",
+		c.getRKEToolsEntryPoint(),
 		"kube-scheduler",
 	}
 
@@ -726,4 +731,20 @@ func getUniqStringList(l []string) []string {
 		}
 	}
 	return ul
+}
+
+func (c *Cluster) getRKEToolsEntryPoint() string {
+	v := strings.Split(c.SystemImages.KubernetesServicesSidecar, ":")
+	if len(v) < 2 {
+		return DefaultToolsEntrypoint
+	}
+	if strToSemVer(v[1]).LessThan(*strToSemVer(DefaultToolsEntrypointVersion)) {
+		return LegacyToolsEntrypoint
+	}
+	return DefaultToolsEntrypoint
+}
+
+func strToSemVer(version string) *semver.Version {
+	v, _ := semver.NewVersion(strings.TrimPrefix(version, "v"))
+	return v
 }
