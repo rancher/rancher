@@ -84,12 +84,7 @@ func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
 	if err != nil {
 		return err
 	}
-	err = cd.deployAgent(cluster)
-	if err != nil {
-		return err
-	}
-
-	return cd.setNetworkPolicyAnn(cluster)
+	return cd.deployAgent(cluster)
 }
 
 func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
@@ -141,18 +136,6 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	}
 
 	return err
-}
-
-func (cd *clusterDeploy) setNetworkPolicyAnn(cluster *v3.Cluster) error {
-	if cluster.Spec.EnableNetworkPolicy != nil {
-		return nil
-	}
-	// set current state for upgraded canal clusters
-	if cluster.Spec.RancherKubernetesEngineConfig != nil &&
-		cluster.Spec.RancherKubernetesEngineConfig.Network.CanalNetworkProvider != nil {
-		cluster.Annotations["networking.management.cattle.io/enable-network-policy"] = "true"
-	}
-	return nil
 }
 
 func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Config, error) {
