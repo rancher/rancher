@@ -1,6 +1,8 @@
 package mapper
 
 import (
+	"sort"
+
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"k8s.io/api/core/v1"
@@ -98,10 +100,16 @@ func (e EnvironmentMapper) ToInternal(data map[string]interface{}) error {
 	var envVar []map[string]interface{}
 	var envVarFrom []map[string]interface{}
 
-	for key, value := range convert.ToMapInterface(data["environment"]) {
+	var orderedKeys []string
+	environment := convert.ToMapInterface(data["environment"])
+	for k := range environment {
+		orderedKeys = append(orderedKeys, k)
+	}
+	sort.Strings(orderedKeys)
+	for _, key := range orderedKeys {
 		envVar = append(envVar, map[string]interface{}{
 			"name":  key,
-			"value": value,
+			"value": environment[key],
 		})
 	}
 
