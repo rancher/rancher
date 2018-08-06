@@ -150,6 +150,8 @@ func (cd *clusterDeploy) setNetworkPolicyAnn(cluster *v3.Cluster) error {
 	// set current state for upgraded canal clusters
 	if cluster.Spec.RancherKubernetesEngineConfig != nil &&
 		cluster.Spec.RancherKubernetesEngineConfig.Network.CanalNetworkProvider != nil {
+		enableNetworkPolicy := true
+		cluster.Spec.EnableNetworkPolicy = &enableNetworkPolicy
 		cluster.Annotations["networking.management.cattle.io/enable-network-policy"] = "true"
 	}
 	return nil
