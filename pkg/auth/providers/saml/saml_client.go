@@ -312,7 +312,13 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	}
 	user, err := s.userMGR.EnsureUser(userPrincipal.Name, displayName)
 	if err != nil {
-		log.Errorf("SAML: User does not have access %v", err)
+		log.Errorf("SAML: Failed getting user with error: %v", err)
+		http.Redirect(w, r, redirectURL+"/login?errorCode=500", http.StatusFound)
+		return
+	}
+
+	if user.Enabled != nil && !*user.Enabled {
+		log.Errorf("SAML: User %v permission denied", user.Name)
 		http.Redirect(w, r, redirectURL+"/login?errorCode=403", http.StatusFound)
 		return
 	}
