@@ -13,7 +13,14 @@ func isNetworkPolicyDisabled(clusterNamespace string, clusterLister v3.ClusterLi
 	if err != nil {
 		return false, fmt.Errorf("error getting cluster %v", err)
 	}
-	return !convert.ToBool(cluster.Annotations[netPolAnnotation]), nil
+	if cluster.Spec.EnableNetworkPolicy != nil {
+		return !convert.ToBool(cluster.Annotations[netPolAnnotation]), nil
+	}
+	if cluster.Spec.RancherKubernetesEngineConfig != nil &&
+		cluster.Spec.RancherKubernetesEngineConfig.Network.CanalNetworkProvider != nil {
+		return false, nil
+	}
+	return true, nil
 }
 
 func nodePortService(service *corev1.Service) bool {
