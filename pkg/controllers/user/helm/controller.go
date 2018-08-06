@@ -58,7 +58,7 @@ type Lifecycle struct {
 }
 
 func (l *Lifecycle) Create(obj *v3.App) (*v3.App, error) {
-	return obj, nil
+	return l.DeployApp(obj, true)
 }
 
 func (l *Lifecycle) Updated(obj *v3.App) (*v3.App, error) {
@@ -80,13 +80,17 @@ func (l *Lifecycle) Updated(obj *v3.App) (*v3.App, error) {
 			}
 		}
 	}
+	return l.DeployApp(obj, false)
+}
 
+func (l *Lifecycle) DeployApp(obj *v3.App, install bool) (*v3.App, error) {
 	newObj, err := v3.AppConditionInstalled.Do(obj, func() (runtime.Object, error) {
-		template, notes, err := generateTemplates(obj, l.TemplateVersionClient, l.TemplateContentClient)
+		template, notes, tempDir, err := generateTemplates(obj, l.TemplateVersionClient, l.TemplateContentClient)
+		defer os.RemoveAll(tempDir)
 		if err != nil {
 			return obj, err
 		}
-		if err := l.Run(obj, template, notes); err != nil {
+		if err := l.Run(obj, template, tempDir, notes, install); err != nil {
 			return obj, err
 		}
 		return obj, nil
@@ -104,23 +108,11 @@ func (l *Lifecycle) Remove(obj *v3.App) (*v3.App, error) {
 	if err != nil {
 		return obj, err
 	}
+	if err := helmDelete(kubeConfigPath, obj); err != nil {
+		return obj, err
+	}
 	_, projectName := ref.Parse(obj.Spec.ProjectName)
 	appRevisionClient := l.AppRevisionGetter.AppRevisions(projectName)
-	if obj.Spec.AppRevisionName != "" {
-		currentRevision, err := appRevisionClient.Get(obj.Spec.AppRevisionName, metav1.GetOptions{})
-		if err != nil && !errors.IsNotFound(err) {
-			return obj, err
-		}
-		if err == nil {
-			tc, err := l.TemplateContentClient.Get(currentRevision.Status.Digest, metav1.GetOptions{})
-			if err != nil {
-				return obj, err
-			}
-			if err := kubectlDelete(tc.Data, kubeConfigPath, obj.Spec.TargetNamespace); err != nil {
-				return obj, err
-			}
-		}
-	}
 	revisions, err := appRevisionClient.List(metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", appLabel, obj.Name),
 	})
@@ -135,7 +127,7 @@ func (l *Lifecycle) Remove(obj *v3.App) (*v3.App, error) {
 	return obj, nil
 }
 
-func (l *Lifecycle) Run(obj *v3.App, template, notes string) error {
+func (l *Lifecycle) Run(obj *v3.App, template, templateDir, notes string, install bool) error {
 	tempDir, err := ioutil.TempDir("", "kubeconfig-")
 	if err != nil {
 		return err
@@ -145,10 +137,7 @@ func (l *Lifecycle) Run(obj *v3.App, template, notes string) error {
 	if err != nil {
 		return err
 	}
-	if err := kubectlApply(template, kubeConfigPath, obj); err != nil {
-		if err := l.createAppRevision(obj, template, notes, true); err != nil {
-			return err
-		}
+	if err := helmInstall(templateDir, kubeConfigPath, obj, install); err != nil {
 		return err
 	}
 	return l.createAppRevision(obj, template, notes, false)
