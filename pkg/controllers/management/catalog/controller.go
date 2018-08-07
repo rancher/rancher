@@ -18,7 +18,8 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	}
 }
 
-func runRefresh(ctx context.Context, interval int, controller v3.CatalogController, pcController v3.ProjectCatalogController, m *manager.Manager) {
+func runRefresh(ctx context.Context, interval int, controller v3.CatalogController, pcController v3.ProjectCatalogController,
+	clController v3.ClusterCatalogController, m *manager.Manager) {
 	ticker := time.NewTicker(time.Duration(interval) * time.Second)
 	defer ticker.Stop()
 
@@ -37,11 +38,19 @@ func runRefresh(ctx context.Context, interval int, controller v3.CatalogControll
 				logrus.Error(err)
 				continue
 			}
+			clusterCatalogs, err := m.GetClusterCatalogs()
+			if err != nil {
+				logrus.Error(err)
+				continue
+			}
 			for _, catalog := range catalogs {
 				controller.Enqueue("", catalog.Name)
 			}
 			for _, projCatalog := range projectCatalogs {
 				pcController.Enqueue(projCatalog.Namespace, projCatalog.Name)
+			}
+			for _, clCatalog := range clusterCatalogs {
+				clController.Enqueue(clCatalog.Namespace, clCatalog.Name)
 			}
 		}
 	}
@@ -62,7 +71,11 @@ func Run(ctx context.Context, cacheRoot string, refreshInterval int, management 
 	projectCatalogController := management.Management.ProjectCatalogs("").Controller()
 	projectCatalogController.AddHandler("projectCatalog", m.PrjCatalogSync)
 
-	go runRefresh(ctx, refreshInterval, controller, projectCatalogController, m)
+	logrus.Infof("Starting cluster-level catalog controller")
+	clusterCatalogController := management.Management.ClusterCatalogs("").Controller()
+	clusterCatalogController.AddHandler("clusterCatalog", m.ClusterCatalogSync)
+
+	go runRefresh(ctx, refreshInterval, controller, projectCatalogController, clusterCatalogController, m)
 
 	return nil
 }

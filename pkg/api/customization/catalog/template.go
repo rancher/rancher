@@ -17,7 +17,7 @@ import (
 )
 
 func TemplateFormatter(apiContext *types.APIContext, resource *types.RawResource) {
-	var prjCatalogName string
+	var prjCatalogName, clusterCatalogName string
 	// version links
 	resource.Values["versionLinks"] = extractVersionLinks(apiContext, resource)
 
@@ -43,6 +43,18 @@ func TemplateFormatter(apiContext *types.APIContext, resource *types.RawResource
 		//project catalog link
 		prjCatalogSchema := apiContext.Schemas.Schema(&managementschema.Version, client.ProjectCatalogType)
 		resource.Links["projectCatalog"] = apiContext.URLBuilder.ResourceLinkByID(prjCatalogSchema, prjCatalogName)
+	}
+
+	if val[client.TemplateFieldClusterCatalogID] != nil {
+		clusterCatID, ok := val[client.TemplateFieldClusterCatalogID].(string)
+		if ok {
+			clusterCatalogName = clusterCatID
+		} else {
+			clusterCatalogName = strings.Split(resource.ID, "-")[0]
+		}
+		//cluster catalog link
+		clCatalogSchema := apiContext.Schemas.Schema(&managementschema.Version, client.ClusterCatalogType)
+		resource.Links["clusterCatalog"] = apiContext.URLBuilder.ResourceLinkByID(clCatalogSchema, clusterCatalogName)
 	}
 
 	// delete category

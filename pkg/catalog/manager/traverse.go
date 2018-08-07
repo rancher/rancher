@@ -18,6 +18,7 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, cmt *CatalogManager
 
 	catalog := cmt.catalog
 	projectCatalog := cmt.projectCatalog
+	clusterCatalog := cmt.clusterCatalog
 	catalogType := cmt.catalogType
 	index, err := helm.LoadIndex(repoPath)
 	if err != nil {
@@ -146,6 +147,8 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, cmt *CatalogManager
 				v.ExternalID = fmt.Sprintf("catalog://?catalog=%s&template=%s&version=%s", catalog.Name, template.Spec.FolderName, v.Version)
 			} else if catalogType == client.ProjectCatalogType {
 				v.ExternalID = fmt.Sprintf("projectcatalog://?projectcatalog=%s&template=%s&version=%s", projectCatalog.Name, template.Spec.FolderName, v.Version)
+			} else if catalogType == client.ClusterCatalogType {
+				v.ExternalID = fmt.Sprintf("clustercatalog://?clustercatalog=%s&template=%s&version=%s", clusterCatalog.Name, template.Spec.FolderName, v.Version)
 			}
 			versions = append(versions, v)
 		}
@@ -165,6 +168,11 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, cmt *CatalogManager
 			template.Spec.ProjectCatalogID = pname
 			template.Spec.ProjectID = projectCatalog.ProjectName
 			template.Name = fmt.Sprintf("%s-%s", projectCatalog.Name, template.Spec.FolderName)
+		} else if catalogType == client.ClusterCatalogType {
+			cname := clusterCatalog.Namespace + ":" + clusterCatalog.Name
+			template.Spec.ClusterCatalogID = cname
+			template.Spec.ClusterID = clusterCatalog.ClusterName
+			template.Name = fmt.Sprintf("%s-%s", clusterCatalog.Name, template.Spec.FolderName)
 		}
 
 		v3.CatalogConditionRefreshed.Unknown(catalog)
@@ -180,6 +188,12 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, cmt *CatalogManager
 				projectCatalog = newCatalog
 			} else {
 				projectCatalog, _ = m.projectCatalogClient.Get(projectCatalog.Name, metav1.GetOptions{})
+			}
+		} else if catalogType == client.ClusterCatalogType {
+			if newCatalog, err := m.clusterCatalogClient.Update(clusterCatalog); err == nil {
+				clusterCatalog = newCatalog
+			} else {
+				clusterCatalog, _ = m.clusterCatalogClient.Get(clusterCatalog.Name, metav1.GetOptions{})
 			}
 		}
 
@@ -228,6 +242,10 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, cmt *CatalogManager
 			if _, err := m.projectCatalogClient.Update(projectCatalog); err != nil {
 				return err
 			}
+		} else if catalogType == client.ClusterCatalogType {
+			if _, err := m.clusterCatalogClient.Update(clusterCatalog); err != nil {
+				return err
+			}
 		}
 
 		return errors.Errorf("failed to update templates. Multiple error occurred: %v", terrors)
@@ -247,6 +265,10 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, cmt *CatalogManager
 		}
 	} else if catalogType == client.ProjectCatalogType {
 		if _, err := m.projectCatalogClient.Update(projectCatalog); err != nil {
+			return err
+		}
+	} else if catalogType == client.ClusterCatalogType {
+		if _, err := m.clusterCatalogClient.Update(clusterCatalog); err != nil {
 			return err
 		}
 	}

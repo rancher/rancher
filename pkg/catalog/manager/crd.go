@@ -26,6 +26,7 @@ const (
 type CatalogManagerType struct {
 	catalog        *v3.Catalog
 	projectCatalog *v3.ProjectCatalog
+	clusterCatalog *v3.ClusterCatalog
 	catalogType    string
 }
 

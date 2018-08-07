@@ -54,6 +54,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.AuthConfigType,
 		client.CatalogType,
 		client.ClusterAlertType,
+		client.ClusterCatalogType,
 		client.ClusterEventType,
 		client.ClusterLoggingType,
 		client.ClusterPipelineType,
@@ -108,6 +109,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	User(schemas, apiContext)
 	Catalog(schemas, apiContext)
 	ProjectCatalog(schemas, apiContext)
+	ClusterCatalog(schemas, apiContext)
 	SecretTypes(ctx, schemas, apiContext)
 	App(schemas, apiContext, clusterManager)
 	Setting(schemas)
@@ -227,6 +229,16 @@ func ProjectCatalog(schemas *types.Schemas, managementContext *config.ScaledCont
 		ProjectCatalogClient: managementContext.Management.ProjectCatalogs(""),
 	}
 	schema.ActionHandler = handler.RefreshProjectCatalogActionHandler
+	schema.CollectionFormatter = catalog.CollectionFormatter
+}
+
+func ClusterCatalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
+	schema := schemas.Schema(&managementschema.Version, client.ClusterCatalogType)
+	schema.Formatter = catalog.Formatter
+	handler := catalog.ActionHandler{
+		ClusterCatalogClient: managementContext.Management.ClusterCatalogs(""),
+	}
+	schema.ActionHandler = handler.RefreshClusterCatalogActionHandler
 	schema.CollectionFormatter = catalog.CollectionFormatter
 }
 

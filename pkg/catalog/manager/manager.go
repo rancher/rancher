@@ -35,6 +35,7 @@ type Manager struct {
 	templateVersionLister v3.TemplateVersionLister
 	templateContentLister v3.TemplateContentLister
 	projectCatalogClient  v3.ProjectCatalogInterface
+	clusterCatalogClient  v3.ClusterCatalogInterface
 	lastUpdateTime        time.Time
 }
 
@@ -54,6 +55,7 @@ func New(management *config.ManagementContext, cacheRoot string) *Manager {
 		templateVersionLister: management.Management.TemplateVersions("").Controller().Lister(),
 		templateContentLister: management.Management.TemplateContents("").Controller().Lister(),
 		projectCatalogClient:  management.Management.ProjectCatalogs(""),
+		clusterCatalogClient:  management.Management.ClusterCatalogs(""),
 	}
 }
 
@@ -67,6 +69,14 @@ func (m *Manager) GetCatalogs() ([]v3.Catalog, error) {
 
 func (m *Manager) GetProjectCatalogs() ([]v3.ProjectCatalog, error) {
 	list, err := m.projectCatalogClient.List(metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return list.Items, nil
+}
+
+func (m *Manager) GetClusterCatalogs() ([]v3.ClusterCatalog, error) {
+	list, err := m.clusterCatalogClient.List(metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
