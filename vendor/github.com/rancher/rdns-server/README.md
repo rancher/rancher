@@ -5,6 +5,8 @@ The rdns-server implements the API interface of Dynamic DNS, its goal is to use 
 
 Currently we have implemented CoreDNS, CoreDNS will use etcd backend and rdns-server can do some CRUD operations on etcd.
 
+The API doc can be found [here](https://github.com/rancher/rancher/wiki/Rancher-2.0-Dynamic-DNS-Controller#rancher-dynamic-dns-service)
+
 ## Building
 
 `make`

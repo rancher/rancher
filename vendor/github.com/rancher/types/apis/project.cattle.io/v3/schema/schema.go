@@ -729,7 +729,6 @@ func volumeTypes(schemas *types.Schemas) *types.Schemas {
 			ClaimName string `norman:"type=reference[persistentVolumeClaim]"`
 		}{}).
 		MustImport(&Version, v1.SecretVolumeSource{}, struct {
-			SecretName string `norman:"type=reference[secret]"`
 		}{}).
 		MustImport(&Version, v1.VolumeMount{}, struct {
 			MountPath string `json:"mountPath" norman:"required"`
