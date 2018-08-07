@@ -291,9 +291,9 @@ func needRoleUpdate(node *v3.Node, nodePool *v3.NodePool) bool {
 	}
 
 	poolRolesMap := map[string]bool{}
-	nodeRolesMap[services.ETCDRole] = nodePool.Spec.Etcd
-	nodeRolesMap[services.ControlRole] = nodePool.Spec.ControlPlane
-	nodeRolesMap[services.WorkerRole] = nodePool.Spec.Worker
+	poolRolesMap[services.ETCDRole] = nodePool.Spec.Etcd
+	poolRolesMap[services.ControlRole] = nodePool.Spec.ControlPlane
+	poolRolesMap[services.WorkerRole] = nodePool.Spec.Worker
 	return !reflect.DeepEqual(nodeRolesMap, poolRolesMap)
 }
 
