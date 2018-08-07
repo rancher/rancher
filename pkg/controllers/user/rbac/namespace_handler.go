@@ -56,8 +56,6 @@ func (n *nsLifecycle) Create(obj *v1.Namespace) (*v1.Namespace, error) {
 		return obj, err
 	}
 
-	namespaceutil.SetNamespaceCondition(obj, 0, initialRoleCondition, true, "")
-
 	if err := n.assignToInitialProject(obj); err != nil {
 		return obj, err
 	}
