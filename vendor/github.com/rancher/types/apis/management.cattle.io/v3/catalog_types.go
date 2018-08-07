@@ -2,6 +2,8 @@ package v3
 
 import (
 	"github.com/rancher/norman/condition"
+	"github.com/rancher/norman/types"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -69,7 +71,11 @@ type Template struct {
 type TemplateSpec struct {
 	DisplayName              string `json:"displayName"`
 	CatalogID                string `json:"catalogId,omitempty" norman:"type=reference[catalog]"`
+	ProjectCatalogID         string `json:"projectCatalogID,omitempty" norman:"type=reference[projectCatalog]"`
+	ClusterCatalogID         string `json:"clusterCatalogID,omitempty" norman:"type=reference[clusterCatalog]"`
 	DefaultTemplateVersionID string `json:"defaultTemplateVersionId,omitempty" norman:"type=reference[templateVersion]"`
+	ProjectID                string `json:"projectID,omitempty" norman:"required,type=reference[project]"`
+	ClusterID                string `json:"clusterID,omitempty" norman:"required,type=reference[cluster]"`
 
 	Description    string `json:"description,omitempty"`
 	DefaultVersion string `json:"defaultVersion,omitempty" yaml:"default_version,omitempty"`
@@ -171,4 +177,18 @@ type TemplateContent struct {
 	// Specification of the desired behavior of the the cluster. More info:
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
 	Data string `json:"data,omitempty"`
+}
+
+type ProjectCatalog struct {
+	types.Namespaced
+
+	Catalog     `json:",inline" mapstructure:",squash"`
+	ProjectName string `json:"projectName,omitempty" norman:"type=reference[project]"`
+}
+
+type ClusterCatalog struct {
+	types.Namespaced
+
+	Catalog     `json:",inline" mapstructure:",squash"`
+	ClusterName string `json:"clusterName,omitempty" norman:"required,type=reference[cluster]"`
 }

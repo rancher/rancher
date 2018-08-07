@@ -50,6 +50,8 @@ type Config struct {
 	SourceCodeRepositorys                    map[string]managementClient.SourceCodeRepository                    `json:"sourceCodeRepositories,omitempty" yaml:"sourceCodeRepositories,omitempty"`
 	ComposeConfigs                           map[string]managementClient.ComposeConfig                           `json:"composeConfigs,omitempty" yaml:"composeConfigs,omitempty"`
 	ResourceQuotaTemplates                   map[string]managementClient.ResourceQuotaTemplate                   `json:"resourceQuotaTemplates,omitempty" yaml:"resourceQuotaTemplates,omitempty"`
+	ProjectCatalogs                          map[string]managementClient.ProjectCatalog                          `json:"projectCatalogs,omitempty" yaml:"projectCatalogs,omitempty"`
+	ClusterCatalogs                          map[string]managementClient.ClusterCatalog                          `json:"clusterCatalogs,omitempty" yaml:"clusterCatalogs,omitempty"`
 
 	// Cluster Client
 	Namespaces        map[string]clusterClient.Namespace        `json:"namespaces,omitempty" yaml:"namespaces,omitempty"`
