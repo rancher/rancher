@@ -86,7 +86,7 @@ func (p *pLifecycle) ensureNamespacesAssigned(project *v3.Project) error {
 	projectName := ""
 	if _, ok := project.Labels["authz.management.cattle.io/default-project"]; ok {
 		projectName = "Default"
-	} else if _, ok := project.Labels["authz.management.cattle.io/system-project"]; !ok {
+	} else if _, ok := project.Labels["authz.management.cattle.io/system-project"]; ok {
 		projectName = "System"
 	}
 	if projectName == "" {
