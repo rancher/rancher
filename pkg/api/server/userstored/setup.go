@@ -48,7 +48,7 @@ func Setup(ctx context.Context, mgmt *config.ScaledContext, clusterManager *clus
 	addProxyStore(ctx, schemas, mgmt, clusterClient.StorageClassType, "storage.k8s.io/v1", nil)
 
 	Secret(ctx, mgmt, schemas)
-	Service(schemas)
+	Service(ctx, schemas, mgmt)
 	Workload(schemas, clusterManager)
 	Namespace(schemas, clusterManager)
 
@@ -91,14 +91,13 @@ func Workload(schemas *types.Schemas, clusterManager *clustermanager.Manager) {
 	workload.NewWorkloadAggregateStore(schemas, clusterManager)
 }
 
-func Service(schemas *types.Schemas) {
+func Service(ctx context.Context, schemas *types.Schemas, mgmt *config.ScaledContext) {
 	serviceSchema := schemas.Schema(&schema.Version, "service")
 	dnsSchema := schemas.Schema(&schema.Version, "dnsRecord")
-	dnsSchema.Store = struct {
-		types.Store
-	}{
-		serviceSchema.Store,
-	}
+	// Move service store to DNSRecord and create new store on service, so they are then
+	// same store but two different instances
+	dnsSchema.Store = serviceSchema.Store
+	addProxyStore(ctx, schemas, mgmt, client.ServiceType, "v1", service.New)
 }
 
 func Secret(ctx context.Context, management *config.ScaledContext, schemas *types.Schemas) {
