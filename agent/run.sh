@@ -383,6 +383,20 @@ setup_env()
         fi
     fi
 
+    if [[ -z ${CATTLE_AGENT_IP} ]]; then
+        info DETECTED CATTLE AGENT IP ${DETECTED_CATTLE_AGENT_IP}
+
+        local default_docker_addr="172.17.0.1"
+        if [[ ${default_docker_addr} == *${DETECTED_CATTLE_AGENT_IP}* ]]; then
+            error Attention Please: ${DETECTED_CATTLE_AGENT_IP} should not use docker bridge IP address
+        fi
+
+        local local_addrs=$(ip addr list | grep inet | grep -v 127.0.0.1 | grep -v inet6 | awk '{print $2}')
+        if [[ ${local_addrs} != *${DETECTED_CATTLE_AGENT_IP}* ]]; then
+            error Attention Please: ${DETECTED_CATTLE_AGENT_IP} is not a local address
+        fi
+    fi
+
     info Inspecting host capabilities
     local content=$(inspect_host)
 
