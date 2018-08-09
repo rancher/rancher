@@ -20,6 +20,7 @@ import (
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -735,16 +736,29 @@ func getUniqStringList(l []string) []string {
 
 func (c *Cluster) getRKEToolsEntryPoint() string {
 	v := strings.Split(c.SystemImages.KubernetesServicesSidecar, ":")
-	if len(v) < 2 {
+	last := v[len(v)-1]
+
+	logrus.Debugf("Extracted version [%s] from image [%s]", last, c.SystemImages.KubernetesServicesSidecar)
+
+	sv, err := strToSemVer(last)
+	if err != nil {
 		return DefaultToolsEntrypoint
 	}
-	if strToSemVer(v[1]).LessThan(*strToSemVer(DefaultToolsEntrypointVersion)) {
+	svdefault, err := strToSemVer(DefaultToolsEntrypointVersion)
+	if err != nil {
+		return DefaultToolsEntrypoint
+	}
+
+	if sv.LessThan(*svdefault) {
 		return LegacyToolsEntrypoint
 	}
 	return DefaultToolsEntrypoint
 }
 
-func strToSemVer(version string) *semver.Version {
-	v, _ := semver.NewVersion(strings.TrimPrefix(version, "v"))
-	return v
+func strToSemVer(version string) (*semver.Version, error) {
+	v, err := semver.NewVersion(strings.TrimPrefix(version, "v"))
+	if err != nil {
+		return nil, err
+	}
+	return v, nil
 }
