@@ -13,7 +13,7 @@ ENV CATTLE_HELM_VERSION v2.9.1-rancher1
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher1-1
 ENV LOGLEVEL_VERSION v0.1
 ENV TINI_VERSION v0.18.0
-ENV TELEMETRY_VERSION v0.5.0
+ENV TELEMETRY_VERSION v0.5.1
 
 RUN curl -sLf https://github.com/rancher/machine-package/releases/download/${CATTLE_MACHINE_VERSION}/docker-machine.tar.gz | tar xvzf - -C /usr/bin && \
     curl -sLf https://github.com/rancher/loglevel/releases/download/${LOGLEVEL_VERSION}/loglevel-amd64-${LOGLEVEL_VERSION}.tar.gz | tar xvzf - -C /usr/bin && \
