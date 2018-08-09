@@ -2,7 +2,6 @@ package clusterstats
 
 import (
 	"reflect"
-
 	"time"
 
 	"github.com/rancher/rancher/pkg/clustermanager"
@@ -65,6 +64,7 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 	}
 
 	origStatus := cluster.Status.DeepCopy()
+	cluster = cluster.DeepCopy()
 
 	// capacity keys
 	pods, mem, cpu := resource.Quantity{}, resource.Quantity{}, resource.Quantity{}
@@ -127,7 +127,7 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 		v3.ClusterConditionNoMemoryPressure.False(cluster)
 	}
 
-	if !reflect.DeepEqual(origStatus, &cluster.Status) {
+	if statsChanged(origStatus, &cluster.Status) {
 		userContext, err := s.ClusterManager.UserContext(cluster.Name)
 		if err == nil {
 			callWithTimeout(func() {
@@ -143,6 +143,44 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 	}
 
 	return nil
+}
+
+func statsChanged(existingCluster, newCluster *v3.ClusterStatus) bool {
+	if !reflect.DeepEqual(existingCluster.Conditions, newCluster.Conditions) {
+		return true
+	}
+
+	if resourceListChanged(existingCluster.Capacity, newCluster.Capacity) {
+		return true
+	}
+
+	if resourceListChanged(existingCluster.Allocatable, newCluster.Allocatable) {
+		return true
+	}
+
+	if resourceListChanged(existingCluster.Requested, newCluster.Requested) {
+		return true
+	}
+
+	if resourceListChanged(existingCluster.Limits, newCluster.Limits) {
+		return true
+	}
+
+	return false
+}
+
+func resourceListChanged(oldList, newList v1.ResourceList) bool {
+	if len(oldList) != len(newList) {
+		return true
+	}
+
+	for k, v := range oldList {
+		if v.Cmp(newList[k]) != 0 {
+			return true
+		}
+	}
+
+	return false
 }
 
 func callWithTimeout(do func()) {
