@@ -498,6 +498,9 @@ func (m *NodesSyncer) convertNodeToNode(node *corev1.Node, existing *v3.Node, po
 		}
 		_, worker := node.Labels["node-role.kubernetes.io/worker"]
 		machine.Spec.Worker = worker
+		if !machine.Spec.Worker && !machine.Spec.ControlPlane && !machine.Spec.Etcd {
+			machine.Spec.Worker = true
+		}
 	}
 
 	machine.Status.NodeAnnotations = node.Annotations
