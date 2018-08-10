@@ -96,7 +96,8 @@ func (npmgr *netpolMgr) programNetworkPolicy(projectID string, clusterNamespace 
 	}
 	policyName := "np-default"
 	for _, aNS := range namespaces {
-		if systemNamespaces[aNS.Name] {
+		id, _ := aNS.Labels[nslabels.ProjectIDFieldLabel]
+		if systemNamespaces[aNS.Name] || id == "" {
 			npmgr.delete(aNS.Name, policyName)
 			continue
 		}
@@ -153,7 +154,8 @@ func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
 		return fmt.Errorf("netpolMgr: handleHostNetwork getSystemNamespaces: err=%v", err)
 	}
 	for _, aNS := range namespaces {
-		if systemNamespaces[aNS.Name] {
+		projectID, _ := aNS.Labels[nslabels.ProjectIDFieldLabel]
+		if systemNamespaces[aNS.Name] || projectID == "" {
 			npmgr.delete(aNS.Name, policyName)
 			continue
 		}
