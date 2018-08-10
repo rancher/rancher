@@ -192,12 +192,13 @@ func (m *Manager) toRESTConfig(cluster *v3.Cluster) (*rest.Config, error) {
 		}
 	}
 
+	// adding suffix to make tlsConfig hashkey unique
+	suffix := []byte("\n" + cluster.Name)
 	rc := &rest.Config{
 		Host:        u.String(),
 		BearerToken: cluster.Status.ServiceAccountToken,
 		TLSClientConfig: rest.TLSClientConfig{
-			ServerName: u.Hostname(),
-			CAData:     caBytes,
+			CAData: append(caBytes, suffix...),
 		},
 		Timeout: 30 * time.Second,
 		WrapTransport: func(rt http.RoundTripper) http.RoundTripper {
