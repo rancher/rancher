@@ -23,7 +23,7 @@ RUN curl -sLf https://github.com/rancher/machine-package/releases/download/${CAT
     chmod +x /usr/bin/helm /usr/bin/tini /usr/bin/telemetry
 
 ENV CATTLE_UI_PATH /usr/share/rancher/ui
-ENV CATTLE_UI_VERSION 2.0.65
+ENV CATTLE_UI_VERSION 2.0.66
 ENV CATTLE_CLI_VERSION v2.0.4
 
 RUN mkdir -p /var/log/auditlog
