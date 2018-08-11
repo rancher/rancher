@@ -185,7 +185,7 @@ func generateTemplates(obj *v3.App, templateVersionClient mgmtv3.TemplateVersion
 		for k, v := range answers {
 			result = append(result, fmt.Sprintf("%s=%s", k, v))
 		}
-		setValues = append([]string{"--set-string"}, strings.Join(result, ","))
+		setValues = append([]string{"--set"}, strings.Join(result, ","))
 	}
 	commands := append([]string{"template", dir, "--name", obj.Name, "--namespace", obj.Spec.TargetNamespace}, setValues...)
 
