@@ -1,4 +1,5 @@
 import kubernetes
+from rancher import ApiError
 from .common import random_str
 from .conftest import wait_until_available,\
     cluster_and_client, kubernetes_api_client, wait_for
@@ -112,3 +113,54 @@ def test_project_owner(admin_cc, admin_mc, user_mc, request):
     })
     response = auth.create_self_subject_access_review(access_review)
     assert response.status.allowed is True
+
+
+def test_removing_user_from_cluster(admin_pc, admin_mc, user_mc, admin_cc,
+                                    remove_resource):
+    """Test that a user added to a project in a cluster is able to see that
+    cluster and after being removed from the project they are no longer able
+    to see the cluster.
+    """
+
+    # Yes, this is misspelled, it's how the actual label is spelled.
+    mbo = 'memberhsip-binding-owner'
+
+    admin_client = admin_mc.client
+    prtb = admin_client.create_project_role_template_binding(
+        userId=user_mc.user.id,
+        roleTemplateId="project-member",
+        projectId=admin_pc.project.id,
+    )
+    remove_resource(prtb)
+
+    # Verify the user can see the cluster
+    wait_until_available(user_mc.client, admin_cc.cluster)
+
+    api_instance = kubernetes.client.RbacAuthorizationV1Api(
+        admin_mc.k8s_client)
+
+    # Find the expected k8s clusterRoleBinding
+    crbs = api_instance.list_cluster_role_binding(
+        label_selector=prtb.uuid+"="+mbo)
+
+    assert len(crbs.items) == 1
+
+    # Delete the projectRoleTemplateBinding, this should cause the user to no
+    # longer be able to see the cluster
+    admin_mc.client.delete(prtb)
+
+    def crb_callback():
+        crbs = api_instance.list_cluster_role_binding(
+            label_selector=prtb.uuid+"="+mbo)
+        return len(crbs.items) == 0
+
+    def fail_handler():
+        return "failed waiting for cluster role binding to be deleted"
+
+    wait_for(crb_callback, fail_handler=fail_handler)
+
+    try:
+        cluster = user_mc.client.by_id_cluster(admin_cc.cluster.id)
+        assert cluster is None
+    except ApiError as e:
+        assert e.error.status == 403
