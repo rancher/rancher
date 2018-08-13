@@ -18,3 +18,4 @@
 __pycache__
 /management-state
 /rancher
+*.pytest_cache

@@ -88,7 +88,7 @@ def cluster_and_client(cluster_id, mgmt_client):
 
 @pytest.fixture
 def admin_pc(request, admin_cc):
-    """Returns a ProjectContect for a newly created project in the local
+    """Returns a ProjectContext for a newly created project in the local
     cluster for the default global admin user. The project will be deleted
     when this fixture is cleaned up."""
     admin = admin_cc.management.client
@@ -106,13 +106,15 @@ def admin_pc(request, admin_cc):
 
 
 @pytest.fixture
-def user_mc(admin_mc):
+def user_mc(admin_mc, remove_resource):
     """Returns a ManagementContext for a newly created standard user"""
     admin = admin_mc.client
     username = random_str()
     password = random_str()
     user = admin.create_user(username=username, password=password)
-    admin.create_global_role_binding(userId=user.id, globalRoleId='user')
+    remove_resource(user)
+    grb = admin.create_global_role_binding(userId=user.id, globalRoleId='user')
+    remove_resource(grb)
     response = requests.post(AUTH_URL, json={
         'username': username,
         'password': password,
@@ -188,7 +190,13 @@ def remove_resource(admin_mc, request):
     client = admin_mc.client
 
     def _cleanup(resource):
-        request.addfinalizer(lambda: client.delete(resource))
+        def clean():
+            try:
+                client.delete(resource)
+            except ApiError as e:
+                if e.error.status != 404:
+                    raise e
+        request.addfinalizer(clean)
 
     return _cleanup
 
