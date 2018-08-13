@@ -283,7 +283,8 @@ func (d *Driver) createStack(svc *cloudformation.CloudFormation, name string, di
 	}
 
 	if status != "CREATE_COMPLETE" {
-		reason := "reason unknown"
+		const defaultReason = "reason unknown"
+		var reasons []string
 		events, err := svc.DescribeStackEvents(&cloudformation.DescribeStackEventsInput{
 			StackName: aws.String(name),
 		})
@@ -294,12 +295,20 @@ func (d *Driver) createStack(svc *cloudformation.CloudFormation, name string, di
 					continue
 				}
 
-				if *event.ResourceStatus == "CREATE_FAILED" && *event.LogicalResourceId == "VPC" {
-					reason = *event.ResourceStatusReason
+				if *event.ResourceStatus == "CREATE_FAILED" {
+					reasons = append(reasons, *event.ResourceStatusReason)
 					break
 				}
 			}
 		}
+		var reason interface{}
+
+		if len(reasons) == 0 {
+			reason = defaultReason
+		} else {
+			reason = reasons
+		}
+
 		return nil, fmt.Errorf("stack failed to create: %v", reason)
 	}
 
