@@ -48,8 +48,14 @@ func checkStatus(containerStates map[string]containerState, containerStatus []ma
 					s.transitioning = "error"
 				}
 			case "running":
-				s.state = "running"
-				s.transitioning = "no"
+				ready := convert.ToBool(status["ready"])
+				if ready {
+					s.state = "running"
+					s.transitioning = "no"
+				} else {
+					s.state = "notready"
+					s.transitioning = "yes"
+				}
 			case "waiting":
 				s.state = "waiting"
 				s.transitioning = "yes"

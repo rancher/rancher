@@ -36,7 +36,9 @@ var (
 		Init(alertTypes).
 		Init(pipelineTypes).
 		Init(composeType).
-		Init(resourceQuotaTemplateTypes)
+		Init(resourceQuotaTemplateTypes).
+		Init(projectCatalogTypes).
+		Init(clusterCatalogTypes)
 
 	TokenSchemas = factory.Schemas(&Version).
 			Init(tokens)
@@ -608,5 +610,37 @@ func resourceQuotaTemplateTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
 		MustImportAndCustomize(&Version, v3.ResourceQuotaTemplate{}, func(schema *types.Schema) {
 			schema.ResourceMethods = []string{http.MethodGet, http.MethodDelete}
+		})
+}
+
+func projectCatalogTypes(schemas *types.Schemas) *types.Schemas {
+	return schemas.
+		AddMapperForType(&Version, v3.ProjectCatalog{},
+			&m.Embed{Field: "status"},
+			&m.Drop{Field: "helmVersionCommits"},
+			&mapper.NamespaceIDMapper{}).
+		MustImportAndCustomize(&Version, v3.ProjectCatalog{}, func(schema *types.Schema) {
+			schema.ResourceActions = map[string]types.Action{
+				"refresh": {},
+			}
+			schema.CollectionActions = map[string]types.Action{
+				"refresh": {},
+			}
+		})
+}
+
+func clusterCatalogTypes(schemas *types.Schemas) *types.Schemas {
+	return schemas.
+		AddMapperForType(&Version, v3.ClusterCatalog{},
+			&m.Embed{Field: "status"},
+			&m.Drop{Field: "helmVersionCommits"},
+			&mapper.NamespaceIDMapper{}).
+		MustImportAndCustomize(&Version, v3.ClusterCatalog{}, func(schema *types.Schema) {
+			schema.ResourceActions = map[string]types.Action{
+				"refresh": {},
+			}
+			schema.CollectionActions = map[string]types.Action{
+				"refresh": {},
+			}
 		})
 }

@@ -51,6 +51,8 @@ type Client struct {
 	SourceCodeRepository                    SourceCodeRepositoryOperations
 	ComposeConfig                           ComposeConfigOperations
 	ResourceQuotaTemplate                   ResourceQuotaTemplateOperations
+	ProjectCatalog                          ProjectCatalogOperations
+	ClusterCatalog                          ClusterCatalogOperations
 }
 
 func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
@@ -107,6 +109,8 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.SourceCodeRepository = newSourceCodeRepositoryClient(client)
 	client.ComposeConfig = newComposeConfigClient(client)
 	client.ResourceQuotaTemplate = newResourceQuotaTemplateClient(client)
+	client.ProjectCatalog = newProjectCatalogClient(client)
+	client.ClusterCatalog = newClusterCatalogClient(client)
 
 	return client, nil
 }
