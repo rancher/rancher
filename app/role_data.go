@@ -39,7 +39,6 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups().nonResourceURLs("*").verbs("*")
 
 	rb.addRole("User", "user").addRule().apiGroups("management.cattle.io").resources("principals", "roletemplates").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("users").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("create").
@@ -51,9 +50,7 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("sourcecoderepositories").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("resourcequotatemplates").verbs("get", "list", "watch")
 
-	rb.addRole("User Base", "user-base").addRule().apiGroups("management.cattle.io").resources("principals", "roletemplates").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("users").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
+	rb.addRole("User Base", "user-base").addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch")
 
 	// TODO user should be dynamically authorized to only see herself

@@ -15,12 +15,15 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/randomtoken"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	rbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
+	k8srbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -67,28 +70,34 @@ func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
 	}
 
 	return &userManager{
-		users:              scaledContext.Management.Users(""),
-		userIndexer:        userInformer.GetIndexer(),
-		crtbIndexer:        crtbInformer.GetIndexer(),
-		prtbIndexer:        prtbInformer.GetIndexer(),
-		tokens:             scaledContext.Management.Tokens(""),
-		tokenLister:        scaledContext.Management.Tokens("").Controller().Lister(),
-		globalRoleBindings: scaledContext.Management.GlobalRoleBindings(""),
-		globalRoleLister:   scaledContext.Management.GlobalRoles("").Controller().Lister(),
-		grbIndexer:         grbInformer.GetIndexer(),
+		users:                    scaledContext.Management.Users(""),
+		userIndexer:              userInformer.GetIndexer(),
+		crtbIndexer:              crtbInformer.GetIndexer(),
+		prtbIndexer:              prtbInformer.GetIndexer(),
+		tokens:                   scaledContext.Management.Tokens(""),
+		tokenLister:              scaledContext.Management.Tokens("").Controller().Lister(),
+		globalRoleBindings:       scaledContext.Management.GlobalRoleBindings(""),
+		globalRoleLister:         scaledContext.Management.GlobalRoles("").Controller().Lister(),
+		grbIndexer:               grbInformer.GetIndexer(),
+		clusterRoleLister:        scaledContext.RBAC.ClusterRoles("").Controller().Lister(),
+		clusterRoleBindingLister: scaledContext.RBAC.ClusterRoleBindings("").Controller().Lister(),
+		rbacClient:               scaledContext.RBAC,
 	}, nil
 }
 
 type userManager struct {
-	users              v3.UserInterface
-	globalRoleBindings v3.GlobalRoleBindingInterface
-	globalRoleLister   v3.GlobalRoleLister
-	grbIndexer         cache.Indexer
-	userIndexer        cache.Indexer
-	crtbIndexer        cache.Indexer
-	prtbIndexer        cache.Indexer
-	tokenLister        v3.TokenLister
-	tokens             v3.TokenInterface
+	users                    v3.UserInterface
+	globalRoleBindings       v3.GlobalRoleBindingInterface
+	globalRoleLister         v3.GlobalRoleLister
+	grbIndexer               cache.Indexer
+	userIndexer              cache.Indexer
+	crtbIndexer              cache.Indexer
+	prtbIndexer              cache.Indexer
+	tokenLister              v3.TokenLister
+	tokens                   v3.TokenInterface
+	clusterRoleLister        rbacv1.ClusterRoleLister
+	clusterRoleBindingLister rbacv1.ClusterRoleBindingLister
+	rbacClient               rbacv1.Interface
 }
 
 func (m *userManager) SetPrincipalOnCurrentUser(apiContext *types.APIContext, principal v3.Principal) (*v3.User, error) {
@@ -292,6 +301,11 @@ func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, e
 		if err != nil {
 			return nil, err
 		}
+
+		err = m.CreateNewUserClusterRoleBinding(user.Name, user.UID)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	logrus.Infof("Creating globalRoleBindings for %v", user.Name)
@@ -301,6 +315,74 @@ func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, e
 	}
 
 	return user, nil
+}
+
+func (m *userManager) CreateNewUserClusterRoleBinding(userName string, userUID apitypes.UID) error {
+	roleName := userName + "-view"
+	bindingName := "grb-" + roleName
+
+	ownerReference := v1.OwnerReference{
+		APIVersion: "management.cattle.io/v3",
+		Kind:       "User",
+		Name:       userName,
+		UID:        userUID,
+	}
+
+	cr, err := m.clusterRoleLister.Get("", roleName)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+		// ClusterRole doesn't exist yet, create it.
+		rule := k8srbacv1.PolicyRule{
+			Verbs:         []string{"get"},
+			APIGroups:     []string{"management.cattle.io"},
+			Resources:     []string{"users"},
+			ResourceNames: []string{userName},
+		}
+		role := &k8srbacv1.ClusterRole{
+			ObjectMeta: v1.ObjectMeta{
+				Name:            roleName,
+				OwnerReferences: []v1.OwnerReference{ownerReference},
+			},
+			Rules: []k8srbacv1.PolicyRule{rule},
+		}
+
+		cr, err = m.rbacClient.ClusterRoles("").Create(role)
+		if err != nil {
+			return err
+		}
+	}
+
+	_, err = m.clusterRoleBindingLister.Get("", bindingName)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+		// ClusterRoleBinding doesn't exit yet, create it.
+		crb := &k8srbacv1.ClusterRoleBinding{
+			ObjectMeta: v1.ObjectMeta{
+				Name:            bindingName,
+				OwnerReferences: []v1.OwnerReference{ownerReference},
+			},
+			Subjects: []k8srbacv1.Subject{
+				k8srbacv1.Subject{
+					Kind: "User",
+					Name: userName,
+				},
+			},
+			RoleRef: k8srbacv1.RoleRef{
+				Kind: "ClusterRole",
+				Name: cr.Name,
+			},
+		}
+		_, err = m.rbacClient.ClusterRoleBindings("").Create(crb)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (m *userManager) createUsersBindings(user *v3.User) error {

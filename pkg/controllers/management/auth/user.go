@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
 	v12 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -31,6 +32,7 @@ type userLifecycle struct {
 	crtbIndexer     cache.Indexer
 	grbIndexer      cache.Indexer
 	tokenIndexer    cache.Indexer
+	userManager     user.Manager
 }
 
 const (
@@ -55,6 +57,7 @@ func newUserLifecycle(management *config.ManagementContext) *userLifecycle {
 		crtbLister:      management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
 		grbLister:       management.Management.GlobalRoleBindings("").Controller().Lister(),
 		namespaceLister: management.Core.Namespaces("").Controller().Lister(),
+		userManager:     management.UserManager,
 	}
 
 	prtbInformer := management.Management.ProjectRoleTemplateBindings("").Controller().Informer()
@@ -141,6 +144,10 @@ func (l *userLifecycle) Create(user *v3.User) (*v3.User, error) {
 }
 
 func (l *userLifecycle) Updated(user *v3.User) (*v3.User, error) {
+	err := l.userManager.CreateNewUserClusterRoleBinding(user.Name, user.UID)
+	if err != nil {
+		return nil, err
+	}
 	return user, nil
 }
 
@@ -370,7 +377,9 @@ func (l *userLifecycle) deleteUserSecret(username string) error {
 		if errors.IsNotFound(err) {
 			return nil
 		}
-		return err
+		return fmt.Errorf("error getting user secret: %v", err)
 	}
-	return l.secrets.Delete(username+"-secret", &metav1.DeleteOptions{})
+
+	logrus.Infof("[%v] Deleting secret backing user %v", userController, username)
+	return l.secrets.DeleteNamespaced("cattle-system", username+"-secret", &metav1.DeleteOptions{})
 }
