@@ -91,6 +91,10 @@ type ADFSProvider struct {
 	SamlProvider `json:",inline"`
 }
 
+type KeyCloakProvider struct {
+	SamlProvider `json:",inline"`
+}
+
 type SamlLoginInput struct {
 	FinalRedirectURL string `json:"finalRedirectUrl"`
 }
