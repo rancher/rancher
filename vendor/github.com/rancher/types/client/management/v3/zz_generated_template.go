@@ -10,6 +10,8 @@ const (
 	TemplateFieldCatalogID                = "catalogId"
 	TemplateFieldCategories               = "categories"
 	TemplateFieldCategory                 = "category"
+	TemplateFieldClusterCatalogID         = "clusterCatalogID"
+	TemplateFieldClusterID                = "clusterID"
 	TemplateFieldCreated                  = "created"
 	TemplateFieldCreatorID                = "creatorId"
 	TemplateFieldDefaultTemplateVersionID = "defaultTemplateVersionId"
@@ -23,6 +25,8 @@ const (
 	TemplateFieldName                     = "name"
 	TemplateFieldOwnerReferences          = "ownerReferences"
 	TemplateFieldPath                     = "path"
+	TemplateFieldProjectCatalogID         = "projectCatalogID"
+	TemplateFieldProjectID                = "projectID"
 	TemplateFieldProjectURL               = "projectURL"
 	TemplateFieldReadme                   = "readme"
 	TemplateFieldRemoved                  = "removed"
@@ -42,6 +46,8 @@ type Template struct {
 	CatalogID                string                `json:"catalogId,omitempty" yaml:"catalogId,omitempty"`
 	Categories               []string              `json:"categories,omitempty" yaml:"categories,omitempty"`
 	Category                 string                `json:"category,omitempty" yaml:"category,omitempty"`
+	ClusterCatalogID         string                `json:"clusterCatalogID,omitempty" yaml:"clusterCatalogID,omitempty"`
+	ClusterID                string                `json:"clusterID,omitempty" yaml:"clusterID,omitempty"`
 	Created                  string                `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                string                `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	DefaultTemplateVersionID string                `json:"defaultTemplateVersionId,omitempty" yaml:"defaultTemplateVersionId,omitempty"`
@@ -55,6 +61,8 @@ type Template struct {
 	Name                     string                `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences          []OwnerReference      `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Path                     string                `json:"path,omitempty" yaml:"path,omitempty"`
+	ProjectCatalogID         string                `json:"projectCatalogID,omitempty" yaml:"projectCatalogID,omitempty"`
+	ProjectID                string                `json:"projectID,omitempty" yaml:"projectID,omitempty"`
 	ProjectURL               string                `json:"projectURL,omitempty" yaml:"projectURL,omitempty"`
 	Readme                   string                `json:"readme,omitempty" yaml:"readme,omitempty"`
 	Removed                  string                `json:"removed,omitempty" yaml:"removed,omitempty"`

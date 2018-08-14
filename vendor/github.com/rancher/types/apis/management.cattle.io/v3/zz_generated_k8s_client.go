@@ -60,6 +60,8 @@ type Interface interface {
 	SourceCodeRepositoriesGetter
 	ComposeConfigsGetter
 	ResourceQuotaTemplatesGetter
+	ProjectCatalogsGetter
+	ClusterCatalogsGetter
 }
 
 type Client struct {
@@ -112,6 +114,8 @@ type Client struct {
 	sourceCodeRepositoryControllers                    map[string]SourceCodeRepositoryController
 	composeConfigControllers                           map[string]ComposeConfigController
 	resourceQuotaTemplateControllers                   map[string]ResourceQuotaTemplateController
+	projectCatalogControllers                          map[string]ProjectCatalogController
+	clusterCatalogControllers                          map[string]ClusterCatalogController
 }
 
 func NewForConfig(config rest.Config) (Interface, error) {
@@ -173,6 +177,8 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		sourceCodeRepositoryControllers:                    map[string]SourceCodeRepositoryController{},
 		composeConfigControllers:                           map[string]ComposeConfigController{},
 		resourceQuotaTemplateControllers:                   map[string]ResourceQuotaTemplateController{},
+		projectCatalogControllers:                          map[string]ProjectCatalogController{},
+		clusterCatalogControllers:                          map[string]ClusterCatalogController{},
 	}, nil
 }
 
@@ -767,6 +773,32 @@ type ResourceQuotaTemplatesGetter interface {
 func (c *Client) ResourceQuotaTemplates(namespace string) ResourceQuotaTemplateInterface {
 	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ResourceQuotaTemplateResource, ResourceQuotaTemplateGroupVersionKind, resourceQuotaTemplateFactory{})
 	return &resourceQuotaTemplateClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type ProjectCatalogsGetter interface {
+	ProjectCatalogs(namespace string) ProjectCatalogInterface
+}
+
+func (c *Client) ProjectCatalogs(namespace string) ProjectCatalogInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ProjectCatalogResource, ProjectCatalogGroupVersionKind, projectCatalogFactory{})
+	return &projectCatalogClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type ClusterCatalogsGetter interface {
+	ClusterCatalogs(namespace string) ClusterCatalogInterface
+}
+
+func (c *Client) ClusterCatalogs(namespace string) ClusterCatalogInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ClusterCatalogResource, ClusterCatalogGroupVersionKind, clusterCatalogFactory{})
+	return &clusterCatalogClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

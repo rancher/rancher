@@ -5,6 +5,8 @@ const (
 	TemplateSpecFieldCatalogID                = "catalogId"
 	TemplateSpecFieldCategories               = "categories"
 	TemplateSpecFieldCategory                 = "category"
+	TemplateSpecFieldClusterCatalogID         = "clusterCatalogID"
+	TemplateSpecFieldClusterID                = "clusterID"
 	TemplateSpecFieldDefaultTemplateVersionID = "defaultTemplateVersionId"
 	TemplateSpecFieldDefaultVersion           = "defaultVersion"
 	TemplateSpecFieldDescription              = "description"
@@ -14,6 +16,8 @@ const (
 	TemplateSpecFieldIconFilename             = "iconFilename"
 	TemplateSpecFieldMaintainer               = "maintainer"
 	TemplateSpecFieldPath                     = "path"
+	TemplateSpecFieldProjectCatalogID         = "projectCatalogID"
+	TemplateSpecFieldProjectID                = "projectID"
 	TemplateSpecFieldProjectURL               = "projectURL"
 	TemplateSpecFieldReadme                   = "readme"
 	TemplateSpecFieldUpgradeFrom              = "upgradeFrom"
@@ -24,6 +28,8 @@ type TemplateSpec struct {
 	CatalogID                string                `json:"catalogId,omitempty" yaml:"catalogId,omitempty"`
 	Categories               []string              `json:"categories,omitempty" yaml:"categories,omitempty"`
 	Category                 string                `json:"category,omitempty" yaml:"category,omitempty"`
+	ClusterCatalogID         string                `json:"clusterCatalogID,omitempty" yaml:"clusterCatalogID,omitempty"`
+	ClusterID                string                `json:"clusterID,omitempty" yaml:"clusterID,omitempty"`
 	DefaultTemplateVersionID string                `json:"defaultTemplateVersionId,omitempty" yaml:"defaultTemplateVersionId,omitempty"`
 	DefaultVersion           string                `json:"defaultVersion,omitempty" yaml:"defaultVersion,omitempty"`
 	Description              string                `json:"description,omitempty" yaml:"description,omitempty"`
@@ -33,6 +39,8 @@ type TemplateSpec struct {
 	IconFilename             string                `json:"iconFilename,omitempty" yaml:"iconFilename,omitempty"`
 	Maintainer               string                `json:"maintainer,omitempty" yaml:"maintainer,omitempty"`
 	Path                     string                `json:"path,omitempty" yaml:"path,omitempty"`
+	ProjectCatalogID         string                `json:"projectCatalogID,omitempty" yaml:"projectCatalogID,omitempty"`
+	ProjectID                string                `json:"projectID,omitempty" yaml:"projectID,omitempty"`
 	ProjectURL               string                `json:"projectURL,omitempty" yaml:"projectURL,omitempty"`
 	Readme                   string                `json:"readme,omitempty" yaml:"readme,omitempty"`
 	UpgradeFrom              string                `json:"upgradeFrom,omitempty" yaml:"upgradeFrom,omitempty"`
