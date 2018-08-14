@@ -138,12 +138,11 @@ func (w *NodeWatcher) checkNodeCondition(alert *v3.ClusterAlert, machine *v3.Nod
 
 func (w *NodeWatcher) checkNodeMemUsage(alert *v3.ClusterAlert, machine *v3.Node) {
 	alertID := alert.Namespace + "-" + alert.Name
-	if v3.NodeConditionReady.IsTrue(machine) {
+	if v3.NodeConditionProvisioned.IsTrue(machine) {
 		total := machine.Status.InternalNodeStatus.Allocatable.Memory()
 		used := machine.Status.Requested.Memory()
 
 		if used.Value()*100.0/total.Value() > int64(alert.Spec.TargetNode.MemThreshold) {
-
 			clusterDisplayName := w.clusterName
 			cluster, err := w.clusterLister.Get("", w.clusterName)
 			if err != nil {
@@ -172,12 +171,10 @@ func (w *NodeWatcher) checkNodeMemUsage(alert *v3.ClusterAlert, machine *v3.Node
 
 func (w *NodeWatcher) checkNodeCPUUsage(alert *v3.ClusterAlert, machine *v3.Node) {
 	alertID := alert.Namespace + "-" + alert.Name
-	if v3.NodeConditionReady.IsTrue(machine) {
+	if v3.NodeConditionProvisioned.IsTrue(machine) {
 		total := machine.Status.InternalNodeStatus.Allocatable.Cpu()
 		used := machine.Status.Requested.Cpu()
-
 		if used.MilliValue()*100.0/total.MilliValue() > int64(alert.Spec.TargetNode.CPUThreshold) {
-
 			clusterDisplayName := w.clusterName
 			cluster, err := w.clusterLister.Get("", w.clusterName)
 			if err != nil {
