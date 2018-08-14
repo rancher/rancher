@@ -106,23 +106,38 @@ def admin_pc(request, admin_cc):
 
 
 @pytest.fixture
-def user_mc(admin_mc, remove_resource):
+def user_mc(user_factory):
     """Returns a ManagementContext for a newly created standard user"""
-    admin = admin_mc.client
-    username = random_str()
-    password = random_str()
-    user = admin.create_user(username=username, password=password)
-    remove_resource(user)
-    grb = admin.create_global_role_binding(userId=user.id, globalRoleId='user')
-    remove_resource(grb)
-    response = requests.post(AUTH_URL, json={
-        'username': username,
-        'password': password,
-        'responseType': 'json',
-    }, verify=False)
-    client = rancher.Client(url=BASE_URL, token=response.json()['token'],
-                            verify=False)
-    return ManagementContext(client, user=user)
+    return user_factory()
+
+
+@pytest.fixture
+def user_factory(admin_mc, remove_resource):
+    """Returns a factory for creating new users which a ManagementContext for
+    a newly created standard user is returned.
+
+    This user and globalRoleBinding will be cleaned up automatically by the
+    fixture remove_resource.
+    """
+    def _create_user(globalRoleId='user'):
+        admin = admin_mc.client
+        username = random_str()
+        password = random_str()
+        user = admin.create_user(username=username, password=password)
+        remove_resource(user)
+        grb = admin.create_global_role_binding(
+            userId=user.id, globalRoleId=globalRoleId)
+        remove_resource(grb)
+        response = requests.post(AUTH_URL, json={
+            'username': username,
+            'password': password,
+            'responseType': 'json',
+        }, verify=False)
+        client = rancher.Client(url=BASE_URL, token=response.json()['token'],
+                                verify=False)
+        return ManagementContext(client, user=user)
+
+    return _create_user
 
 
 @pytest.fixture
