@@ -9,7 +9,6 @@ RUN mkdir /root/.kube && \
     ln -s /usr/bin/rancher /usr/bin/reset-password
 WORKDIR /var/lib/rancher
 
-ENV CATTLE_HELM_VERSION v2.9.1-rancher1
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher1-1
 ENV LOGLEVEL_VERSION v0.1
 ENV TINI_VERSION v0.18.0

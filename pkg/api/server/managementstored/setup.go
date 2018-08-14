@@ -72,22 +72,22 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.NodeTemplateType,
 		client.NodeType,
 		client.NotifierType,
-		client.PipelineExecutionLogType,
-		client.PipelineExecutionType,
-		client.PipelineType,
+		//client.PipelineExecutionLogType,
+		//client.PipelineExecutionType,
+		//client.PipelineType,
 		client.PodSecurityPolicyTemplateProjectBindingType,
 		client.PodSecurityPolicyTemplateType,
 		client.PreferenceType,
-		client.ProjectAlertType,
-		client.ProjectLoggingType,
-		client.ProjectNetworkPolicyType,
+		//client.ProjectAlertType,
+		//client.ProjectLoggingType,
+		//client.ProjectNetworkPolicyType,
 		client.ProjectRoleTemplateBindingType,
 		client.ProjectType,
 		client.ResourceQuotaTemplateType,
 		client.RoleTemplateType,
 		client.SettingType,
-		client.SourceCodeCredentialType,
-		client.SourceCodeRepositoryType,
+		//client.SourceCodeCredentialType,
+		//client.SourceCodeRepositoryType,
 		client.TemplateContentType,
 		client.TemplateType,
 		client.TemplateVersionType,
@@ -95,8 +95,8 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.UserAttributeType,
 		client.UserType)
 
-	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, schemas, &projectschema.Version,
-		projectclient.AppType, projectclient.AppRevisionType)
+	//factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, schemas, &projectschema.Version,
+	//	projectclient.AppType, projectclient.AppRevisionType)
 
 	factory.BatchWait()
 
@@ -107,14 +107,14 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	User(schemas, apiContext)
 	Catalog(schemas, apiContext)
 	SecretTypes(ctx, schemas, apiContext)
-	App(schemas, apiContext, clusterManager)
+	//App(schemas, apiContext, clusterManager)
 	Setting(schemas)
 	Preference(schemas, apiContext)
 	ClusterRegistrationTokens(schemas)
 	NodeTemplates(schemas, apiContext)
-	LoggingTypes(schemas)
-	Alert(schemas, apiContext)
-	Pipeline(schemas, apiContext)
+	//LoggingTypes(schemas)
+	//Alert(schemas, apiContext)
+	//Pipeline(schemas, apiContext)
 	Project(schemas, apiContext)
 	ProjectRoleTemplateBinding(schemas, apiContext)
 	TemplateContent(schemas)

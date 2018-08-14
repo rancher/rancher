@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/norman/pkg/dump"
 	"github.com/rancher/norman/signal"
 	"github.com/rancher/rancher/app"
+	apptypes "github.com/rancher/rancher/app/types"
 	"github.com/rancher/rancher/k8s"
 	"github.com/rancher/rancher/pkg/logserver"
 	"github.com/sirupsen/logrus"
@@ -44,7 +45,7 @@ func main() {
 		os.Setenv("PATH", newPath)
 	}
 
-	var config app.Config
+	var config apptypes.Config
 
 	app := cli.NewApp()
 	app.Version = VERSION
@@ -155,7 +156,7 @@ func main() {
 	app.Run(os.Args)
 }
 
-func initLogs(c *cli.Context, cfg app.Config) {
+func initLogs(c *cli.Context, cfg apptypes.Config) {
 	if cfg.Debug {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
@@ -172,7 +173,7 @@ func initLogs(c *cli.Context, cfg app.Config) {
 	logserver.StartServerWithDefaults()
 }
 
-func run(cfg app.Config) error {
+func run(cfg apptypes.Config) error {
 	logrus.Infof("Rancher version %s is starting", VERSION)
 	logrus.Infof("Rancher arguments %+v", cfg)
 	dump.GoroutineDumpOn(syscall.SIGUSR1, syscall.SIGILL)

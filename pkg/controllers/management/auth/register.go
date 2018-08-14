@@ -14,6 +14,7 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext) {
 	u := newUserLifecycle(management)
 	n := newTokenController(management)
 
+	// todo: move into user controller
 	management.Management.ProjectRoleTemplateBindings("").AddLifecycle(ptrbMGMTController, prtb)
 	management.Management.ClusterRoleTemplateBindings("").AddLifecycle(ctrbMGMTController, crtb)
 	management.Management.GlobalRoles("").AddLifecycle(grController, gr)

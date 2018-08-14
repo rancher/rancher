@@ -28,34 +28,38 @@ import (
 	"github.com/rancher/types/config"
 )
 
-func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter common.KubeConfigGetter, clusterManager healthsyncer.ClusterControllerLifecycle) error {
-	alert.Register(ctx, cluster)
-	rbac.Register(cluster)
-	healthsyncer.Register(ctx, cluster, clusterManager)
-	helm.Register(cluster, kubeConfigGetter)
-	logging.Register(ctx, cluster)
-	networkpolicy.Register(cluster)
-	noderemove.Register(cluster)
-	nodesyncer.Register(cluster)
-	nslabels.Register(cluster)
-	pipeline.Register(ctx, cluster)
-	podsecuritypolicy.RegisterCluster(cluster)
-	podsecuritypolicy.RegisterBindings(cluster)
-	podsecuritypolicy.RegisterNamespace(cluster)
-	podsecuritypolicy.RegisterServiceAccount(cluster)
-	podsecuritypolicy.RegisterTemplate(cluster)
-	secret.Register(cluster)
-	endpoints.Register(ctx, cluster)
-	approuter.Register(ctx, cluster)
-	resourcequota.Register(ctx, cluster)
+func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter common.KubeConfigGetter, clusterManager healthsyncer.ClusterControllerLifecycle, runAgent bool) error {
+	if runAgent {
+		alert.Register(ctx, cluster)
+		helm.Register(cluster, kubeConfigGetter)
+		logging.Register(ctx, cluster)
+		networkpolicy.Register(cluster)
+		noderemove.Register(cluster)
+		nodesyncer.Register(cluster)
+		nslabels.Register(cluster)
+		pipeline.Register(ctx, cluster)
+		podsecuritypolicy.RegisterCluster(cluster)
+		podsecuritypolicy.RegisterBindings(cluster)
+		podsecuritypolicy.RegisterNamespace(cluster)
+		podsecuritypolicy.RegisterServiceAccount(cluster)
+		podsecuritypolicy.RegisterTemplate(cluster)
+		secret.Register(cluster)
+		endpoints.Register(ctx, cluster)
+		approuter.Register(ctx, cluster)
+		resourcequota.Register(ctx, cluster)
 
-	userOnlyContext := cluster.UserOnlyContext()
-	dnsrecord.Register(ctx, userOnlyContext)
-	externalservice.Register(ctx, userOnlyContext)
-	ingress.Register(ctx, userOnlyContext, cluster)
-	ingresshostgen.Register(userOnlyContext)
-	targetworkloadservice.Register(ctx, userOnlyContext)
-	workload.Register(ctx, userOnlyContext)
+		userOnlyContext := cluster.UserOnlyContext()
+		dnsrecord.Register(ctx, userOnlyContext)
+		externalservice.Register(ctx, userOnlyContext)
+		ingress.Register(ctx, userOnlyContext, cluster)
+		ingresshostgen.Register(userOnlyContext)
+		targetworkloadservice.Register(ctx, userOnlyContext)
+		workload.Register(ctx, userOnlyContext)
+	} else {
+		// todo: revisit: we still need rbac and healthsyncer controllers running in management plane
+		rbac.Register(cluster)
+		healthsyncer.Register(ctx, cluster, clusterManager)
+	}
 
 	return nil
 }
