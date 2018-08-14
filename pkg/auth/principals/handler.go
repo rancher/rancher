@@ -24,6 +24,7 @@ type principalsHandler struct {
 	tokensClient     v3.TokenInterface
 	auth             requests.Authenticator
 	tokenMGR         *tokens.Manager
+	ac               types.AccessControl
 }
 
 func newPrincipalsHandler(ctx context.Context, mgmt *config.ScaledContext) *principalsHandler {
@@ -33,6 +34,7 @@ func newPrincipalsHandler(ctx context.Context, mgmt *config.ScaledContext) *prin
 		tokensClient:     mgmt.Management.Tokens(""),
 		auth:             requests.NewAuthenticator(ctx, mgmt),
 		tokenMGR:         tokens.NewManager(ctx, mgmt),
+		ac:               mgmt.AccessControl,
 	}
 }
 
@@ -65,6 +67,9 @@ func (h *principalsHandler) actions(actionName string, action *types.Action, api
 		principals = append(principals, x)
 	}
 
+	context := map[string]string{"resource": "principals", "apiGroup": "management.cattle.io"}
+	principals = h.ac.FilterList(apiContext, apiContext.Schema, principals, context)
+
 	apiContext.WriteResponse(200, principals)
 	return nil
 }
@@ -86,6 +91,10 @@ func (h *principalsHandler) list(apiContext *types.APIContext, next types.Reques
 		if err != nil {
 			return err
 		}
+
+		context := map[string]string{"resource": "principals", "apiGroup": "management.cattle.io"}
+		p = h.ac.Filter(apiContext, apiContext.Schema, p, context)
+
 		apiContext.WriteResponse(200, p)
 		return nil
 	}

@@ -12,8 +12,10 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
+	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -23,6 +25,7 @@ type userStore struct {
 	types.Store
 	mu          sync.Mutex
 	userIndexer cache.Indexer
+	userManager user.Manager
 }
 
 func SetUserStore(schema *types.Schema, mgmt *config.ScaledContext) {
@@ -36,6 +39,7 @@ func SetUserStore(schema *types.Schema, mgmt *config.ScaledContext) {
 		Store:       schema.Store,
 		mu:          sync.Mutex{},
 		userIndexer: userInformer.GetIndexer(),
+		userManager: mgmt.UserManager,
 	}
 
 	t := &transform.Store{
@@ -109,6 +113,15 @@ func (s *userStore) Create(apiContext *types.APIContext, schema *types.Schema, d
 	}
 
 	created, err := s.create(apiContext, schema, data)
+	if err != nil {
+		return nil, err
+	}
+
+	userName := created["id"].(string)
+	userUUID := created["uuid"].(string)
+	uid := apitypes.UID(userUUID)
+
+	err = s.userManager.CreateNewUserClusterRoleBinding(userName, uid)
 	if err != nil {
 		return nil, err
 	}
