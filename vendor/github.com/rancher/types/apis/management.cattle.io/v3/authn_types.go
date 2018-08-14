@@ -300,3 +300,7 @@ type PingConfig struct {
 type ADFSConfig struct {
 	SamlConfig `json:",inline" mapstructure:",squash"`
 }
+
+type KeyCloakConfig struct {
+	SamlConfig `json:",inline" mapstructure:",squash"`
+}
