@@ -19,6 +19,7 @@ var authConfigTypes = []string{
 	client.FreeIpaConfigType,
 	client.PingConfigType,
 	client.ADFSConfigType,
+	client.KeyCloakConfigType,
 }
 
 func SetupAuthConfig(ctx context.Context, management *config.ScaledContext, schemas *types.Schemas) {

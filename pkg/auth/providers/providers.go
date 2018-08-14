@@ -85,6 +85,11 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	providers[saml.ADFSName] = p
 	providersByType[client.ADFSConfigType] = p
 	providersByType[publicclient.ADFSProviderType] = p
+
+	p = saml.Configure(ctx, mgmt, userMGR, tokenMGR, saml.KeyCloakName)
+	providers[saml.KeyCloakName] = p
+	providersByType[client.KeyCloakConfigType] = p
+	providersByType[publicclient.KeyCloakProviderType] = p
 }
 
 func AuthenticateUser(input interface{}, providerName string) (v3.Principal, []v3.Principal, string, error) {

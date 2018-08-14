@@ -13,7 +13,7 @@ def test_auth_configs(admin_mc):
 
     configs = client.list_auth_config()
 
-    assert configs.pagination.total == 8
+    assert configs.pagination.total == 9
 
     gh = None
     local = None
@@ -23,6 +23,7 @@ def test_auth_configs(admin_mc):
     freeIpa = None
     ping = None
     adfs = None
+    keycloak = None
 
     for c in configs:
         if c.type == "githubConfig":
@@ -41,8 +42,10 @@ def test_auth_configs(admin_mc):
             ping = c
         elif c.type == "adfsConfig":
             adfs = c
+        elif c.type == "keyCloakConfig":
+            keycloak = c
 
-    for x in [gh, local, ad, azure, openldap, freeIpa, ping, adfs]:
+    for x in [gh, local, ad, azure, openldap, freeIpa, ping, adfs, keycloak]:
         assert x is not None
         config = client.by_id_auth_config(x.id)
         with pytest.raises(ApiError) as e:
@@ -64,3 +67,5 @@ def test_auth_configs(admin_mc):
     assert ping.actions.testAndEnable
 
     assert adfs.actions.testAndEnable
+
+    assert keycloak.actions.testAndEnable

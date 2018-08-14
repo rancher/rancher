@@ -82,8 +82,8 @@ func (s *Provider) HandleSamlLogin(w http.ResponseWriter, r *http.Request) (stri
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return "", err
 	}
-	// relayState is limited to 80 bytes but also must be integrety protected.
-	// this means that we cannot use a JWT because it is way to long. Instead
+	// relayState is limited to 80 bytes but also must be integrity protected.
+	// this means that we cannot use a JWT because it is way too long. Instead
 	// we set a cookie that corresponds to the state
 	relayState := base64.URLEncoding.EncodeToString(randomBytes(42))
 

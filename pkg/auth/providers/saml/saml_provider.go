@@ -27,6 +27,7 @@ import (
 
 const PingName = "ping"
 const ADFSName = "adfs"
+const KeyCloakName = "keycloak"
 
 type Provider struct {
 	ctx             context.Context
@@ -72,6 +73,8 @@ func (s *Provider) TransformToAuthProvider(authConfig map[string]interface{}) ma
 		p[publicclient.PingProviderFieldRedirectURL] = formSamlRedirectURLFromMap(authConfig, s.name)
 	case ADFSName:
 		p[publicclient.ADFSProviderFieldRedirectURL] = formSamlRedirectURLFromMap(authConfig, s.name)
+	case KeyCloakName:
+		p[publicclient.KeyCloakProviderFieldRedirectURL] = formSamlRedirectURLFromMap(authConfig, s.name)
 	}
 	return p
 }
@@ -131,9 +134,9 @@ func (s *Provider) getSamlConfig() (*v3.SamlConfig, error) {
 		return nil, fmt.Errorf("SAML: failed to retrieve SamlConfig metadata, cannot read k8s Unstructured data")
 	}
 
-	typemeta := &metav1.ObjectMeta{}
-	mapstructure.Decode(metadataMap, typemeta)
-	storedSamlConfig.ObjectMeta = *typemeta
+	objectMeta := &metav1.ObjectMeta{}
+	mapstructure.Decode(metadataMap, objectMeta)
+	storedSamlConfig.ObjectMeta = *objectMeta
 
 	return storedSamlConfig, nil
 }
@@ -151,6 +154,8 @@ func (s *Provider) saveSamlConfig(config *v3.SamlConfig) error {
 		configType = client.PingConfigType
 	case ADFSName:
 		configType = client.ADFSConfigType
+	case KeyCloakName:
+		configType = client.KeyCloakConfigType
 	}
 
 	config.APIVersion = "management.cattle.io/v3"
@@ -246,6 +251,8 @@ func formSamlRedirectURLFromMap(config map[string]interface{}, name string) stri
 		hostname, _ = config[client.PingConfigFieldRancherAPIHost].(string)
 	case ADFSName:
 		hostname, _ = config[client.ADFSConfigFieldRancherAPIHost].(string)
+	case KeyCloakName:
+		hostname, _ = config[client.KeyCloakConfigFieldRancherAPIHost].(string)
 	}
 
 	path := hostname + "/v1-saml/" + name + "/login"
