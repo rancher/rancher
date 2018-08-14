@@ -43,6 +43,10 @@ func addAuthConfigs(management *config.ManagementContext) error {
 		return err
 	}
 
+	if err := addAuthConfig(saml.KeyCloakName, client.KeyCloakConfigType, false, management); err != nil {
+		return err
+	}
+
 	return addAuthConfig(localprovider.Name, client.LocalConfigType, true, management)
 }
 

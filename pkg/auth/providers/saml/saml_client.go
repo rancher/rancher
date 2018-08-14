@@ -161,6 +161,9 @@ func InitializeSamlServiceProvider(configToSet *v3.SamlConfig, name string) erro
 	case ADFSName:
 		root.Get("AdfsACS").HandlerFunc(provider.ServeHTTP)
 		root.Get("AdfsMetadata").HandlerFunc(provider.ServeHTTP)
+	case KeyCloakName:
+		root.Get("KeyCloakACS").HandlerFunc(provider.ServeHTTP)
+		root.Get("KeyCloakMetadata").HandlerFunc(provider.ServeHTTP)
 	}
 
 	appliedVersion = configToSet.ResourceVersion
@@ -175,6 +178,9 @@ func AuthHandler() http.Handler {
 
 	root.Methods("POST").Path("/v1-saml/adfs/saml/acs").Name("AdfsACS")
 	root.Methods("GET").Path("/v1-saml/adfs/saml/metadata").Name("AdfsMetadata")
+
+	root.Methods("POST").Path("/v1-saml/keycloak/saml/acs").Name("KeyCloakACS")
+	root.Methods("GET").Path("/v1-saml/keycloak/saml/metadata").Name("KeyCloakMetadata")
 
 	return root
 }
