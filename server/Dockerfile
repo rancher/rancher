@@ -10,8 +10,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
                     unzip \
                     openssh-client \
                     iptables \
-                    git \
+                    software-properties-common \
+		    python-software-properties \
     && rm -rf /var/lib/apt/lists/*
+
+# install latest git
+RUN add-apt-repository ppa:git-core/ppa && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends git
 
 # In Zulu these two JAR files are built directly from OpenJDK source,
 # and result in a local_policy JAR limited to 128-bit max cipher lengths, and a
