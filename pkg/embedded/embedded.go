@@ -2,11 +2,18 @@ package embedded
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/coreos/etcd/etcdmain"
+	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/hyperkube"
 	"github.com/rancher/rancher/pkg/k8scheck"
 	"github.com/rancher/rancher/pkg/librke"
@@ -44,18 +51,69 @@ func Run(ctx context.Context) (context.Context, string, error) {
 
 	processes := getProcesses(plan)
 	eg, resultCtx := errgroup.WithContext(ctx)
+	eg.Go(runProcessFunc(ctx, "etcd", processes["etcd"], runEtcd))
+
+	if err := checkEtcd(bundle); err != nil {
+		return ctx, "", errors.Wrap(err, "waiting on etcd")
+	}
 
 	for name, process := range processes {
 		runFn := func(ctx context.Context, args []string) {
 			runK8s(ctx, bundle.KubeConfig(), args)
 		}
 		if name == "etcd" {
-			runFn = runEtcd
+			continue
 		}
 		eg.Go(runProcessFunc(ctx, name, process, runFn))
 	}
 
 	return resultCtx, bundle.KubeConfig(), nil
+}
+
+func checkEtcd(bundle *rkecerts.Bundle) error {
+	certPool := x509.NewCertPool()
+	certPool.AddCert(bundle.Certs()["kube-ca"].Certificate)
+
+	ht := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			RootCAs: certPool,
+			Certificates: []tls.Certificate{
+				{
+					Certificate: [][]byte{
+						bundle.Certs()["kube-etcd-127-0-0-1"].Certificate.Raw,
+					},
+					PrivateKey: bundle.Certs()["kube-etcd-127-0-0-1"].Key,
+				}},
+		},
+	}
+	client := http.Client{
+		Transport: ht,
+	}
+	defer ht.CloseIdleConnections()
+
+	for i := 0; ; i++ {
+		resp, err := client.Get("https://localhost:2379/health")
+		if err != nil {
+			if i > 1 {
+				logrus.Infof("Waiting on etcd startup: %v", err)
+			}
+			time.Sleep(time.Second)
+			continue
+		}
+		io.Copy(ioutil.Discard, resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			if i > 1 {
+				logrus.Infof("Waiting on etcd startup: status %d", resp.StatusCode)
+			}
+			time.Sleep(time.Second)
+			continue
+		}
+
+		break
+	}
+
+	return nil
 }
 
 func runProcessFunc(ctx context.Context, name string, process v3.Process, f func(context.Context, []string)) func() error {
