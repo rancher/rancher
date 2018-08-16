@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"context"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	nodehelper "github.com/rancher/rancher/pkg/node"
@@ -55,9 +57,11 @@ type NodeDrain struct {
 	systemAccountManager *systemaccount.Manager
 	clusterLister        v3.ClusterLister
 	machines             v3.NodeInterface
+	ctx                  context.Context
+	nodesToContext       map[string]context.CancelFunc
 }
 
-func Register(cluster *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
+func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
 	m := &NodesSyncer{
 		clusterNamespace: cluster.ClusterName,
 		machines:         cluster.Management.Management.Nodes(cluster.ClusterName),
@@ -83,6 +87,8 @@ func Register(cluster *config.UserContext, kubeConfigGetter common.KubeConfigGet
 		systemAccountManager: systemaccount.NewManager(cluster.Management),
 		clusterLister:        cluster.Management.Management.Clusters("").Controller().Lister(),
 		machines:             cluster.Management.Management.Nodes(cluster.ClusterName),
+		ctx:                  ctx,
+		nodesToContext:       map[string]context.CancelFunc{},
 	}
 
 	cluster.Core.Nodes("").Controller().AddHandler("nodesSyncer", n.sync)

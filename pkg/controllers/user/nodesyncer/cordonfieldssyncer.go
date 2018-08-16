@@ -5,10 +5,15 @@ import (
 
 	"strings"
 
+	"context"
+
+	"sync"
+
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/kubectl"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -18,10 +23,17 @@ const (
 	description      = "token for drain"
 )
 
+var nodeMapLock = sync.Mutex{}
+
 func (m *NodesSyncer) syncCordonFields(key string, obj *v3.Node) error {
-	if obj == nil || obj.DeletionTimestamp != nil || obj.Spec.DesiredNodeUnschedulable == "" || obj.Spec.DesiredNodeUnschedulable == "drain" {
+	if obj == nil || obj.DeletionTimestamp != nil || obj.Spec.DesiredNodeUnschedulable == "" {
 		return nil
 	}
+
+	if obj.Spec.DesiredNodeUnschedulable != "true" && obj.Spec.DesiredNodeUnschedulable != "false" {
+		return nil
+	}
+
 	node, err := nodehelper.GetNodeForMachine(obj, m.nodeLister)
 	if err != nil {
 		return err
@@ -47,31 +59,86 @@ func (m *NodesSyncer) syncCordonFields(key string, obj *v3.Node) error {
 }
 
 func (d *NodeDrain) drainNode(key string, obj *v3.Node) error {
-	if obj == nil || obj.DeletionTimestamp != nil || obj.Spec.DesiredNodeUnschedulable != "drain" {
+	if obj == nil || obj.DeletionTimestamp != nil || obj.Spec.DesiredNodeUnschedulable == "" {
 		return nil
 	}
-	kubeConfig, err := d.getKubeConfig()
-	if err != nil {
-		return err
+
+	if obj.Spec.DesiredNodeUnschedulable != "drain" && obj.Spec.DesiredNodeUnschedulable != "stopDrain" {
+		return nil
 	}
-	nodeName := obj.Spec.RequestedHostname
-	updatedObj, err := v3.NodeConditionDrained.DoUntilTrue(obj, func() (runtime.Object, error) {
-		_, msg, err := kubectl.Drain(kubeConfig, nodeName, getFlags(obj.Spec.NodeDrainInput))
-		if err != nil {
-			errMsg := filterErrorMsg(msg, nodeName)
-			return obj, fmt.Errorf("%s", errMsg)
+
+	defer nodeMapLock.Unlock()
+	if obj.Spec.DesiredNodeUnschedulable == "drain" {
+		nodeMapLock.Lock()
+		if _, ok := d.nodesToContext[obj.Name]; ok {
+			return nil
 		}
-		return obj, nil
-	})
-	nodeCopy := updatedObj.(*v3.Node).DeepCopy()
-	if err == nil {
-		nodeCopy.Spec.DesiredNodeUnschedulable = ""
+		ctx, cancel := context.WithCancel(d.ctx)
+		d.nodesToContext[obj.Name] = cancel
+		go d.drain(ctx, obj, cancel)
+
+	} else if obj.Spec.DesiredNodeUnschedulable == "stopDrain" {
+		nodeMapLock.Lock()
+		cancelFunc, ok := d.nodesToContext[obj.Name]
+		nodeMapLock.Unlock()
+		if ok {
+			cancelFunc()
+		}
+		return d.resetDesiredNodeUnschedulable(obj)
 	}
+	return nil
+}
+
+func (d *NodeDrain) drain(ctx context.Context, obj *v3.Node, cancel context.CancelFunc) {
+	defer deleteFromContextMap(d.nodesToContext, obj.Name)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		stopped := false
+		nodeName := obj.Spec.RequestedHostname
+		updatedObj, err := v3.NodeConditionDrained.DoUntilTrue(obj, func() (runtime.Object, error) {
+			kubeConfig, err := d.getKubeConfig()
+			if err != nil {
+				if err == context.Canceled {
+					stopped = true
+					logrus.Infof(fmt.Sprintf("Stopped draining %s in %s", obj.Name, obj.ClusterName))
+				}
+				logrus.Errorf("nodeDrain: error getting kubeConfig for node %s", obj.Name)
+				return obj, fmt.Errorf("error getting kubeConfig for node %s", obj.Name)
+			}
+			_, msg, err := kubectl.Drain(ctx, kubeConfig, nodeName, getFlags(obj.Spec.NodeDrainInput))
+			if err != nil {
+				errMsg := filterErrorMsg(msg, nodeName)
+				return obj, fmt.Errorf("%s", errMsg)
+			}
+			return obj, nil
+		})
+		if !stopped {
+			nodeCopy := updatedObj.(*v3.Node).DeepCopy()
+			if err == nil {
+				nodeCopy.Spec.DesiredNodeUnschedulable = ""
+			}
+			_, updateErr := d.machines.Update(nodeCopy)
+			if err != nil || updateErr != nil {
+				logrus.Errorf("nodeDrain: [%s] in cluster [%s] : %v %v", nodeName, d.clusterName, err, updateErr)
+				d.machines.Controller().Enqueue("", fmt.Sprintf("%s/%s", d.clusterName, obj.Name))
+			}
+		}
+		cancel()
+	}
+}
+
+func (d *NodeDrain) resetDesiredNodeUnschedulable(obj *v3.Node) error {
+	nodeCopy := obj.DeepCopy()
+	removeDrainCondition(nodeCopy)
+	nodeCopy.Spec.DesiredNodeUnschedulable = ""
 	if _, err := d.machines.Update(nodeCopy); err != nil {
 		return err
-	}
-	if err != nil {
-		return fmt.Errorf("Error draining node [%s] in cluster [%s] : %s", nodeName, d.clusterName, err)
 	}
 	return nil
 }
@@ -154,4 +221,10 @@ func removeDrainCondition(obj *v3.Node) {
 		}
 		obj.Status.Conditions = conditions
 	}
+}
+
+func deleteFromContextMap(data map[string]context.CancelFunc, id string) {
+	nodeMapLock.Lock()
+	delete(data, id)
+	nodeMapLock.Unlock()
 }

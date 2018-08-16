@@ -1,6 +1,7 @@
 package kubectl
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -46,7 +47,7 @@ func Apply(yaml []byte, kubeConfig *clientcmdapi.Config) ([]byte, error) {
 	return runWithHTTP2(cmd)
 }
 
-func Drain(kubeConfig *clientcmdapi.Config, nodeName string, args []string) ([]byte, string, error) {
+func Drain(ctx context.Context, kubeConfig *clientcmdapi.Config, nodeName string, args []string) ([]byte, string, error) {
 	kubeConfigFile, err := tempFile("kubeconfig-")
 	if err != nil {
 		return nil, "", err
@@ -57,7 +58,7 @@ func Drain(kubeConfig *clientcmdapi.Config, nodeName string, args []string) ([]b
 		return nil, "", err
 	}
 
-	cmd := exec.Command("kubectl",
+	cmd := exec.CommandContext(ctx, "kubectl",
 		"--kubeconfig",
 		kubeConfigFile.Name(),
 		"drain",
