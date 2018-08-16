@@ -1,4 +1,6 @@
 from .common import random_str, auth_check
+from rancher import ApiError
+import pytest
 
 
 def test_dns_fields(admin_pc_client):
@@ -95,6 +97,13 @@ def test_dns_ips(admin_pc, admin_cc_client):
     assert dns_record.namespaceId == ns.id
     assert 'namespace' not in dns_record
     assert dns_record.projectId == admin_pc.project.id
+
+    dnsname = random_str()
+    with pytest.raises(ApiError) as e:
+        client.create_dns_record(name=dnsname,
+                                 ipAddresses=['127.0.0.2'],
+                                 namespaceId='default')
+        assert e.value.error.status == 422
 
     found = False
     for i in client.list_dns_record():
