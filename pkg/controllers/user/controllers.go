@@ -36,7 +36,7 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 	logging.Register(ctx, cluster)
 	networkpolicy.Register(cluster)
 	noderemove.Register(cluster)
-	nodesyncer.Register(cluster, kubeConfigGetter)
+	nodesyncer.Register(ctx, cluster, kubeConfigGetter)
 	nslabels.Register(cluster)
 	pipeline.Register(ctx, cluster)
 	podsecuritypolicy.RegisterCluster(cluster)

@@ -22,7 +22,6 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/client/management/v3"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 // Formatter for Node
@@ -49,7 +48,10 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	if nodeTemplateID == nil && customConfig == nil {
 		delete(resource.Links, "remove")
 	}
-
+	if resource.Values["desiredNodeUnschedulabe"] == "drain" {
+		resource.AddAction(apiContext, "stopDrain")
+		return
+	}
 	if convert.ToBool(resource.Values["unschedulable"]) {
 		resource.AddAction(apiContext, "uncordon")
 	} else {
@@ -67,7 +69,9 @@ func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 	case "uncordon":
 		return cordonUncordonNode(actionName, apiContext, false)
 	case "drain":
-		return drainNode(actionName, apiContext)
+		return drainNode(actionName, apiContext, false)
+	case "stopDrain":
+		return drainNode(actionName, apiContext, true)
 	}
 	return nil
 }
@@ -82,27 +86,23 @@ func cordonUncordonNode(actionName string, apiContext *types.APIContext, cordon 
 		return httperror.NewAPIError(httperror.InvalidAction, fmt.Sprintf("Node %s already %sed", apiContext.ID, actionName))
 	}
 	values.PutValue(node, convert.ToString(!unschedulable), "desiredNodeUnschedulable")
-	if _, err := schema.Store.Update(apiContext, schema, node, apiContext.ID); err != nil && apierrors.IsNotFound(err) {
-		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error updating node %s by %s : %s", apiContext.ID, actionName, err.Error()))
-	}
-	return nil
+	return updateNode(apiContext, node, schema, actionName)
 }
 
-func drainNode(actionName string, apiContext *types.APIContext) error {
+func drainNode(actionName string, apiContext *types.APIContext, stop bool) error {
 	node, schema, err := getNodeAndSchema(apiContext)
 	if err != nil {
 		return err
 	}
-	drainInput, err := validate(apiContext)
-	if err != nil {
-		return err
+	if !stop {
+		drainInput, err := validate(apiContext)
+		if err != nil {
+			return err
+		}
+		values.PutValue(node, drainInput, "nodeDrainInput")
 	}
 	values.PutValue(node, actionName, "desiredNodeUnschedulable")
-	values.PutValue(node, drainInput, "nodeDrainInput")
-	if _, err := schema.Store.Update(apiContext, schema, node, apiContext.ID); err != nil && apierrors.IsNotFound(err) {
-		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error updating node %s by %s : %s", apiContext.ID, actionName, err.Error()))
-	}
-	return nil
+	return updateNode(apiContext, node, schema, actionName)
 }
 
 func validate(apiContext *types.APIContext) (*v3.NodeDrainInput, error) {
@@ -207,6 +207,13 @@ func (h Handler) LinkHandler(apiContext *types.APIContext, next types.RequestHan
 	_, err = apiContext.Response.Write(buf.Bytes())
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+func updateNode(apiContext *types.APIContext, node map[string]interface{}, schema *types.Schema, actionName string) error {
+	if _, err := schema.Store.Update(apiContext, schema, node, apiContext.ID); err != nil {
+		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error updating node %s by %s : %s", apiContext.ID, actionName, err.Error()))
 	}
 	return nil
 }
