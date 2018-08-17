@@ -247,6 +247,7 @@ func nodeTypes(schemas *types.Schemas) *types.Schemas {
 			schema.ResourceFields["clusterId"] = clusterField
 			schema.ResourceActions["cordon"] = types.Action{}
 			schema.ResourceActions["uncordon"] = types.Action{}
+			schema.ResourceActions["stopDrain"] = types.Action{}
 			schema.ResourceActions["drain"] = types.Action{
 				Input: "nodeDrainInput",
 			}
@@ -416,14 +417,14 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.FreeIpaTestAndApplyInput{}).
 		// Saml Config
 		// Ping-Saml Config
-		MustImportAndCustomize(&Version, v3.PingConfig{}, configSchema).
-		MustImportAndCustomize(&Version, v3.ADFSConfig{}, configSchema).
-		MustImportAndCustomize(&Version, v3.KeyCloakConfig{}, configSchema).
+		MustImportAndCustomize(&Version, v3.PingConfig{}, configSchemaEnable).
+		MustImportAndCustomize(&Version, v3.ADFSConfig{}, configSchemaEnable).
+		MustImportAndCustomize(&Version, v3.KeyCloakConfig{}, configSchemaDisable).
 		MustImport(&Version, v3.SamlConfigTestInput{}).
 		MustImport(&Version, v3.SamlConfigTestOutput{})
 }
 
-func configSchema(schema *types.Schema) {
+func configSchemaEnable(schema *types.Schema) {
 	schema.BaseType = "authConfig"
 	schema.ResourceActions = map[string]types.Action{
 		"disable": {},
@@ -434,6 +435,19 @@ func configSchema(schema *types.Schema) {
 	}
 	schema.CollectionMethods = []string{}
 	schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
+}
+
+func configSchemaDisable(schema *types.Schema) {
+	schema.BaseType = "authConfig"
+	schema.ResourceActions = map[string]types.Action{
+		"disable": {},
+		"testAndEnable": {
+			Input:  "samlConfigTestInput",
+			Output: "samlConfigTestOutput",
+		},
+	}
+	schema.CollectionMethods = []string{}
+	schema.ResourceMethods = []string{}
 }
 
 func userTypes(schema *types.Schemas) *types.Schemas {

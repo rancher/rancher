@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	DefaultK8s = "v1.11.1-rancher1-1"
+	DefaultK8s = "v1.11.2-rancher1-1"
 )
 
 var (
@@ -18,7 +18,7 @@ var (
 	k8sVersionsCurrent = []string{
 		"v1.9.7-rancher2-2",
 		"v1.10.5-rancher1-2",
-		"v1.11.1-rancher1-1",
+		"v1.11.2-rancher1-1",
 	}
 
 	// K8sVersionToRKESystemImages is dynamically populated on init() with the latest versions
@@ -26,6 +26,14 @@ var (
 
 	// K8sVersionServiceOptions - service options per k8s version
 	K8sVersionServiceOptions = map[string]KubernetesServicesOptions{
+		"v1.11": {
+			KubeAPI: map[string]string{
+				"tls-cipher-suites": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305",
+			},
+			Kubelet: map[string]string{
+				"tls-cipher-suites": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305",
+			},
+		},
 		"v1.10": {
 			KubeAPI: map[string]string{
 				"tls-cipher-suites":        "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305",
@@ -399,6 +407,32 @@ var (
 		"v1.11.1-rancher1-1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.2.18"),
 			Kubernetes:                m("rancher/hyperkube:v1.11.1-rancher1"),
+			Alpine:                    m("rancher/rke-tools:v0.1.13"),
+			NginxProxy:                m("rancher/rke-tools:v0.1.13"),
+			CertDownloader:            m("rancher/rke-tools:v0.1.13"),
+			KubernetesServicesSidecar: m("rancher/rke-tools:v0.1.13"),
+			KubeDNS:                   m("gcr.io/google_containers/k8s-dns-kube-dns-amd64:1.14.10"),
+			DNSmasq:                   m("gcr.io/google_containers/k8s-dns-dnsmasq-nanny-amd64:1.14.10"),
+			KubeDNSSidecar:            m("gcr.io/google_containers/k8s-dns-sidecar-amd64:1.14.10"),
+			KubeDNSAutoscaler:         m("gcr.io/google_containers/cluster-proportional-autoscaler-amd64:1.0.0"),
+			Flannel:                   m("quay.io/coreos/flannel:v0.9.1"),
+			FlannelCNI:                m("quay.io/coreos/flannel-cni:v0.2.0"),
+			CalicoNode:                m("quay.io/calico/node:v3.1.1"),
+			CalicoCNI:                 m("quay.io/calico/cni:v3.1.1"),
+			CalicoCtl:                 m("quay.io/calico/ctl:v2.0.0"),
+			CanalNode:                 m("quay.io/calico/node:v3.1.1"),
+			CanalCNI:                  m("quay.io/calico/cni:v3.1.1"),
+			CanalFlannel:              m("quay.io/coreos/flannel:v0.9.1"),
+			WeaveNode:                 m("weaveworks/weave-kube:2.1.2"),
+			WeaveCNI:                  m("weaveworks/weave-npc:2.1.2"),
+			PodInfraContainer:         m("gcr.io/google_containers/pause-amd64:3.1"),
+			Ingress:                   m("rancher/nginx-ingress-controller:0.16.2-rancher1"),
+			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
+			MetricsServer:             m("gcr.io/google_containers/metrics-server-amd64:v0.2.1"),
+		},
+		"v1.11.2-rancher1-1": {
+			Etcd:                      m("quay.io/coreos/etcd:v3.2.18"),
+			Kubernetes:                m("rancher/hyperkube:v1.11.2-rancher1"),
 			Alpine:                    m("rancher/rke-tools:v0.1.13"),
 			NginxProxy:                m("rancher/rke-tools:v0.1.13"),
 			CertDownloader:            m("rancher/rke-tools:v0.1.13"),

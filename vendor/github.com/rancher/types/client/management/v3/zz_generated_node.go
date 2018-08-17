@@ -118,6 +118,8 @@ type NodeOperations interface {
 
 	ActionDrain(resource *Node, input *NodeDrainInput) error
 
+	ActionStopDrain(resource *Node) error
+
 	ActionUncordon(resource *Node) error
 }
 
@@ -179,6 +181,11 @@ func (c *NodeClient) ActionCordon(resource *Node) error {
 
 func (c *NodeClient) ActionDrain(resource *Node, input *NodeDrainInput) error {
 	err := c.apiClient.Ops.DoAction(NodeType, "drain", &resource.Resource, input, nil)
+	return err
+}
+
+func (c *NodeClient) ActionStopDrain(resource *Node) error {
+	err := c.apiClient.Ops.DoAction(NodeType, "stopDrain", &resource.Resource, nil, nil)
 	return err
 }
 
