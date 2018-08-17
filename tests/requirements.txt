@@ -10,3 +10,4 @@ pyyaml==3.13
 netaddr==0.7.19
 requests==2.19.1
 kubernetes==6.0.0
+Jinja2==2.10

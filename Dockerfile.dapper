@@ -21,6 +21,12 @@ ENV DOCKER_URL_amd64=https://get.docker.com/builds/Linux/x86_64/docker-1.10.3 \
 
 RUN wget -O - ${!DOCKER_URL} > /usr/bin/docker && chmod +x /usr/bin/docker
 
+ENV RKE_URL_amd64=https://github.com/rancher/rke/releases/download/v0.1.10-rc1/rke_linux-amd64
+RUN wget -O - ${RKE_URL_amd64} > /usr/bin/rke && chmod +x /usr/bin/rke
+
+ENV KUBECTL_URL_amd64=https://storage.googleapis.com/kubernetes-release/release/v1.11.0/bin/linux/amd64/kubectl
+RUN wget -O - ${KUBECTL_URL_amd64} > /usr/bin/kubectl && chmod +x /usr/bin/kubectl
+
 RUN apt-get update && \
     apt-get install -y tox
 
