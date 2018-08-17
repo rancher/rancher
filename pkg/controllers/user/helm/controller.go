@@ -3,12 +3,11 @@ package helm
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
-
-	"fmt"
 
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	"github.com/rancher/rancher/pkg/ref"
@@ -88,7 +87,6 @@ func (l *Lifecycle) Updated(obj *v3.App) (*v3.App, error) {
 			return obj, err
 		}
 		if err := l.Run(obj, template, notes); err != nil {
-			obj.Status.LastAppliedTemplates = template
 			return obj, err
 		}
 		return obj, nil
@@ -122,10 +120,6 @@ func (l *Lifecycle) Remove(obj *v3.App) (*v3.App, error) {
 				return obj, err
 			}
 		}
-	} else if obj.Status.LastAppliedTemplates != "" {
-		if err := kubectlDelete(obj.Status.LastAppliedTemplates, kubeConfigPath, obj.Spec.TargetNamespace); err != nil {
-			return obj, err
-		}
 	}
 	revisions, err := appRevisionClient.List(metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", appLabel, obj.Name),
@@ -151,16 +145,25 @@ func (l *Lifecycle) Run(obj *v3.App, template, notes string) error {
 	if err != nil {
 		return err
 	}
-
 	if err := kubectlApply(template, kubeConfigPath, obj); err != nil {
+		if err := l.createAppRevision(obj, template, notes, true); err != nil {
+			return err
+		}
 		return err
 	}
+	return l.createAppRevision(obj, template, notes, false)
+}
+
+func (l *Lifecycle) createAppRevision(obj *v3.App, template, notes string, failed bool) error {
 	_, projectName := ref.Parse(obj.Spec.ProjectName)
 	appRevisionClient := l.AppRevisionGetter.AppRevisions(projectName)
 	release := &v3.AppRevision{}
 	release.GenerateName = "apprevision-"
 	release.Labels = map[string]string{
 		appLabel: obj.Name,
+	}
+	if failed {
+		release.Labels[failedLabel] = "true"
 	}
 	release.Status.Answers = obj.Spec.Answers
 	release.Status.ProjectName = projectName
