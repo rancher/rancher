@@ -15,3 +15,8 @@ func Diff(desired, actual map[string]bool) (toCreate []string, toDelete []string
 	}
 	return
 }
+
+func Changed(desired, actual map[string]bool) bool {
+	toCreate, toDelete, _ := Diff(desired, actual)
+	return len(toCreate) != 0 || len(toDelete) != 0
+}

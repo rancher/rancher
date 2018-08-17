@@ -86,9 +86,6 @@ func (s *Schemas) doRemoveSchema(schema Schema) *Schemas {
 }
 
 func (s *Schemas) removeReferences(schema *Schema) {
-	fullType := convert.ToFullReference(schema.Version.Path, schema.ID)
-	delete(s.references, fullType)
-
 	for name, values := range s.references {
 		changed := false
 		var modified []BackReference
