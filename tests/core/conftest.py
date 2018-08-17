@@ -55,14 +55,16 @@ class ProjectContext:
 @pytest.fixture(scope="session")
 def admin_mc():
     """Returns a ManagementContext for the default global admin user."""
-    requests.post(CHNG_PWD_URL, json={
+    r = requests.post(CHNG_PWD_URL, json={
         'newPassword': 'admin',
     }, verify=False)
+    protect_response(r)
     r = requests.post(AUTH_URL, json={
         'username': 'admin',
         'password': 'admin',
         'responseType': 'json',
     }, verify=False)
+    protect_response(r)
     client = rancher.Client(url=BASE_URL, token=r.json()['token'],
                             verify=False)
     k8s_client = kubernetes_api_client(client, 'local')
@@ -133,6 +135,7 @@ def user_factory(admin_mc, remove_resource):
             'password': password,
             'responseType': 'json',
         }, verify=False)
+        protect_response(response)
         client = rancher.Client(url=BASE_URL, token=response.json()['token'],
                                 verify=False)
         return ManagementContext(client, user=user)
@@ -260,3 +263,7 @@ def kubernetes_api_client(rancher_client, cluster_name):
     loader.load_and_set(client_configuration)
     k8s_client = ApiClient(configuration=client_configuration)
     return k8s_client
+
+def protect_response(r): 
+    if r.status_code >= 300:
+        raise ValueError(f'Server responded with {r.status_code}\nbody:\n{r.text}')
