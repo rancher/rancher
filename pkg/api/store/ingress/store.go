@@ -212,7 +212,12 @@ func updateCerts(data map[string]interface{}, forFrontend bool, oldState map[str
 			for _, cert := range certs {
 				certName := convert.ToString(cert["certificateId"])
 				certKey := getCertKey(certName)
-				cert["certificateId"] = oldState[certKey]
+				id := oldState[certKey]
+				if id == "" {
+					cert["certificateId"] = fmt.Sprintf("%s:%s", convert.ToString(data["namespaceId"]), certName)
+				} else {
+					cert["certificateId"] = id
+				}
 			}
 		}
 	} else {
