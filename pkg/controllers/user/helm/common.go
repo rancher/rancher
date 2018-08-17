@@ -23,10 +23,11 @@ import (
 )
 
 const (
-	helmName = "helm"
-	kubectl  = "kubectl"
-	appLabel = "io.cattle.field/appId"
-	kcEnv    = "KUBECONFIG"
+	helmName    = "helm"
+	kubectl     = "kubectl"
+	appLabel    = "io.cattle.field/appId"
+	failedLabel = "io.cattle.field/failed-revision"
+	kcEnv       = "KUBECONFIG"
 )
 
 func WriteTempDir(rootDir string, files map[string]string) (string, error) {
@@ -71,7 +72,7 @@ func kubectlApply(template, kubeconfig string, app *v3.App) error {
 		return err
 	}
 	if err := cmd.Wait(); err != nil {
-		return errors.Wrapf(err, fmt.Sprintf("Kubectl apply failed. Error: %s", sbErr.String()))
+		return errors.Wrapf(err, fmt.Sprintf("Kubectl apply failed. Error: %s", filterErrorMessage(sbErr.String(), file.Name(), "app-template")))
 	}
 
 	// wait for resources to be created and try 5 times
@@ -195,10 +196,10 @@ func generateTemplates(obj *v3.App, templateVersionClient mgmtv3.TemplateVersion
 	cmd.Stdout = sbOut
 	cmd.Stderr = sbErr
 	if err := cmd.Start(); err != nil {
-		return "", "", errors.Wrapf(err, "helm template failed. %s", sbErr.String())
+		return "", "", errors.Wrapf(err, "helm template failed. %s", filterErrorMessage(sbErr.String(), dir, "template-dir"))
 	}
 	if err := cmd.Wait(); err != nil {
-		return "", "", errors.Wrapf(err, "helm template failed. %s", sbErr.String())
+		return "", "", errors.Wrapf(err, "helm template failed. %s", filterErrorMessage(sbErr.String(), dir, "template-dir"))
 	}
 
 	// notes.txt
@@ -209,7 +210,7 @@ func generateTemplates(obj *v3.App, templateVersionClient mgmtv3.TemplateVersion
 	cmd.Stdout = noteOut
 	cmd.Stderr = sbErr
 	if err := cmd.Start(); err != nil {
-		return "", "", errors.Wrapf(err, "helm template --notes failed. %s", sbErr.String())
+		return "", "", errors.Wrapf(err, "helm template --notes failed. %s", filterErrorMessage(sbErr.String(), dir, "template-dir"))
 	}
 	if err := cmd.Wait(); err != nil {
 		return "", "", errors.Wrapf(err, "helm template --notes failed. %s", sbErr.String())
@@ -217,4 +218,9 @@ func generateTemplates(obj *v3.App, templateVersionClient mgmtv3.TemplateVersion
 	template := sbOut.String()
 	notes := noteOut.String()
 	return template, notes, nil
+}
+
+// filter error message, replace old with new
+func filterErrorMessage(msg, old, new string) string {
+	return strings.Replace(msg, old, new, -1)
 }
