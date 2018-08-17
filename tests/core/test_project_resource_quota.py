@@ -256,10 +256,8 @@ def test_project_used_quota(admin_cc, admin_pc, default_template):
 
     ns = admin_pc.cluster.client.create_namespace(name=random_str(),
                                                   projectId=p.id)
-    applied = wait_for_applied_template_set(admin_pc.cluster.client,
-                                            ns)
-    assert applied == default_template.id
-
+    wait_for_applied_template_set(admin_pc.cluster.client,
+                                  ns)
     used = wait_for_used_limit_set(admin_cc.management.client, p)
     assert used.pods == "4"
 
