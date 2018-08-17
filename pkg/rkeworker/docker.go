@@ -2,14 +2,18 @@ package rkeworker
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"reflect"
 	"strings"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
+
 	"github.com/docker/go-connections/nat"
+	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -89,6 +93,9 @@ func runProcess(ctx context.Context, name string, p v3.Process, start bool) erro
 			}
 		}
 		c.ContainerStart(ctx, matchedContainers[0].ID, types.ContainerStartOptions{})
+		if !strings.Contains(name, "share-mnt") {
+			runLogLinker(ctx, c, name, p)
+		}
 		return nil
 	}
 
@@ -115,7 +122,13 @@ func runProcess(ctx context.Context, name string, p v3.Process, start bool) erro
 		newContainer, err = c.ContainerCreate(ctx, config, hostConfig, nil, name)
 	}
 	if err == nil && start {
-		return c.ContainerStart(ctx, newContainer.ID, types.ContainerStartOptions{})
+		if err := c.ContainerStart(ctx, newContainer.ID, types.ContainerStartOptions{}); err != nil {
+			return err
+		}
+		if !strings.Contains(name, "share-mnt") {
+			return runLogLinker(ctx, c, name, p)
+		}
+		return nil
 	}
 	return err
 }
@@ -264,4 +277,42 @@ func natPortSetToSlice(args map[nat.Port]struct{}) []nat.Port {
 		result = append(result, arg)
 	}
 	return result
+}
+
+func runLogLinker(ctx context.Context, c *client.Client, containerName string, p v3.Process) error {
+	inspect, err := c.ContainerInspect(ctx, containerName)
+	if err != nil {
+		return err
+	}
+	containerID := inspect.ID
+	containerLogPath := inspect.LogPath
+	containerLogLink := fmt.Sprintf("%s/%s_%s.log", hosts.RKELogsPath, containerName, containerID)
+	logLinkerName := fmt.Sprintf("%s-%s", services.LogLinkContainerName, containerName)
+	config := &container.Config{
+		Image: p.Image,
+		Tty:   true,
+		Entrypoint: []string{
+			"sh",
+			"-c",
+			fmt.Sprintf("mkdir -p %s ; ln -s %s %s", hosts.RKELogsPath, containerLogPath, containerLogLink),
+		},
+	}
+	hostConfig := &container.HostConfig{
+		Binds: []string{
+			"/var/lib:/var/lib",
+		},
+		Privileged: true,
+	}
+	// remove log linker if its already exists
+	remove(ctx, c, logLinkerName)
+
+	newContainer, err := c.ContainerCreate(ctx, config, hostConfig, nil, logLinkerName)
+	if err != nil {
+		return err
+	}
+	if err := c.ContainerStart(ctx, newContainer.ID, types.ContainerStartOptions{}); err != nil {
+		return err
+	}
+	// remove log linker after start
+	return remove(ctx, c, logLinkerName)
 }
