@@ -111,7 +111,7 @@ addons: |-
       spec:
         serviceAccountName: cattle-admin
         containers:
-        - image: rancher/rancher:latest
+        - image: rancher/rancher:<RANCHER_VERSION>
           args:
           - --no-cacerts
           imagePullPolicy: Always
