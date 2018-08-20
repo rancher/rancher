@@ -264,6 +264,8 @@ def kubernetes_api_client(rancher_client, cluster_name):
     k8s_client = ApiClient(configuration=client_configuration)
     return k8s_client
 
-def protect_response(r): 
+
+def protect_response(r):
     if r.status_code >= 300:
-        raise ValueError(f'Server responded with {r.status_code}\nbody:\n{r.text}')
+        message = f'Server responded with {r.status_code}\nbody:\n{r.text}'
+        raise ValueError(message)
