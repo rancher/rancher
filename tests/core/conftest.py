@@ -14,7 +14,6 @@ urllib3.disable_warnings()
 
 BASE_URL = 'https://localhost:8443/v3'
 AUTH_URL = BASE_URL + '-public/localproviders/local?action=login'
-CHNG_PWD_URL = BASE_URL + '/users/admin?action=changepassword'
 DEFAULT_TIMEOUT = 45
 
 
@@ -55,10 +54,6 @@ class ProjectContext:
 @pytest.fixture(scope="session")
 def admin_mc():
     """Returns a ManagementContext for the default global admin user."""
-    r = requests.post(CHNG_PWD_URL, json={
-        'newPassword': 'admin',
-    }, verify=False)
-    protect_response(r)
     r = requests.post(AUTH_URL, json={
         'username': 'admin',
         'password': 'admin',
