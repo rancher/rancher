@@ -43,6 +43,7 @@ func authProvidersTypes(schemas *types.Schemas) *types.Schemas {
 			schema.ResourceMethods = []string{http.MethodGet}
 		}).
 		MustImport(&PublicVersion, v3public.BasicLogin{}).
+		MustImport(&PublicVersion, v3public.LdapLogin{}).
 		// Github provider
 		MustImportAndCustomize(&PublicVersion, v3public.GithubProvider{}, func(schema *types.Schema) {
 			schema.BaseType = "authProvider"
