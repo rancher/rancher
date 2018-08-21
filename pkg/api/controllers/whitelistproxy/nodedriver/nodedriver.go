@@ -1,4 +1,4 @@
-package whitelistproxy
+package nodedriver
 
 import (
 	"context"

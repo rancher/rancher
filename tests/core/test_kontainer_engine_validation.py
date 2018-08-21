@@ -20,7 +20,7 @@ def get_error_message_for_eks_config(admin_mc, remove_resource, config):
             hasattr(new_cluster, "conditions") and \
             get_provisioned_type(new_cluster) is not None
 
-    wait_until(has_provision_status, 10)
+    wait_until(has_provision_status, 60)
     cluster = admin_mc.client.reload(cluster)
 
     return get_provisioned_type(cluster)
