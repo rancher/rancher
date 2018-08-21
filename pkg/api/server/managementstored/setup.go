@@ -316,6 +316,8 @@ func App(schemas *types.Schemas, management *config.ScaledContext, kubeConfigGet
 func Setting(schemas *types.Schemas) {
 	schema := schemas.Schema(&managementschema.Version, client.SettingType)
 	schema.Formatter = setting.Formatter
+	handler := setting.Handler{}
+	schema.UpdateHandler = handler.UpdateHandler
 }
 
 func LoggingTypes(schemas *types.Schemas) {
