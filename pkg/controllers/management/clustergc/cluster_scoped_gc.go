@@ -26,16 +26,16 @@ func Register(management *config.ManagementContext) {
 	informer.AddIndexers(indexers)
 
 	gc := &gcLifecycle{
-		rtLister:           management.Management.RoleTemplates("").Controller().Lister(),
-		grbLister:          management.Management.GlobalRoleBindings("").Controller().Lister(),
-		projectLister:      management.Management.Projects("").Controller().Lister(),
-		crtbLister:         management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
-		projectAlertLister: management.Management.ProjectAlerts("").Controller().Lister(),
-		nodeLister:         management.Management.Nodes("").Controller().Lister(),
-		psptLister:         management.Management.PodSecurityPolicyTemplates("").Controller().Lister(),
-		secretsLister:      management.Core.Secrets("").Controller().Lister(),
-		prtbIndexer:        informer.GetIndexer(),
-		mgmt:               management,
+		rtLister:      management.Management.RoleTemplates("").Controller().Lister(),
+		grbLister:     management.Management.GlobalRoleBindings("").Controller().Lister(),
+		projectLister: management.Management.Projects("").Controller().Lister(),
+		crtbLister:    management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
+		//projectAlertLister: management.Management.ProjectAlerts("").Controller().Lister(),
+		nodeLister:    management.Management.Nodes("").Controller().Lister(),
+		psptLister:    management.Management.PodSecurityPolicyTemplates("").Controller().Lister(),
+		secretsLister: management.Core.Secrets("").Controller().Lister(),
+		prtbIndexer:   informer.GetIndexer(),
+		mgmt:          management,
 	}
 
 	management.Management.Clusters("").AddLifecycle("cluster-scoped-gc", gc)
@@ -131,16 +131,16 @@ func (c *gcLifecycle) Remove(cluster *v3.Cluster) (*v3.Cluster, error) {
 		}
 	}
 
-	alerts, err := c.projectAlertLister.List("", labels.Everything())
-	if err != nil {
-		return cluster, err
-	}
-	oClient = c.mgmt.Management.ProjectAlerts("").ObjectClient()
-	for _, p := range alerts {
-		if err := cleanFinalizers(cluster.Name, p, oClient); err != nil {
-			return cluster, err
-		}
-	}
+	//alerts, err := c.projectAlertLister.List("", labels.Everything())
+	//if err != nil {
+	//	return cluster, err
+	//}
+	//oClient = c.mgmt.Management.ProjectAlerts("").ObjectClient()
+	//for _, p := range alerts {
+	//	if err := cleanFinalizers(cluster.Name, p, oClient); err != nil {
+	//		return cluster, err
+	//	}
+	//}
 
 	secrets, err := c.secretsLister.List("", labels.Everything())
 	if err != nil {

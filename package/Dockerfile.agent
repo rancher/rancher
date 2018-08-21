@@ -8,9 +8,13 @@ RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get autoremove -y && \
     DEBIAN_FRONTEND=noninteractive apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 ENV LOGLEVEL_VERSION v0.1
-RUN curl -sLf https://github.com/rancher/loglevel/releases/download/${LOGLEVEL_VERSION}/loglevel-amd64-${LOGLEVEL_VERSION}.tar.gz | tar xvzf - -C /usr/bin
-RUN curl -sL https://github.com/rancher/share-mnt/releases/download/v1.0.3/share-mnt.tar.gz | tar xvzf - -C /usr/bin
-RUN curl -sL https://github.com/c-bata/kube-prompt/releases/download/v1.0.3/kube-prompt_v1.0.3_linux_amd64.zip > /usr/bin/kube-prompt.zip && unzip /usr/bin/kube-prompt.zip -d /usr/bin
+ENV CATTLE_HELM_VERSION v2.9.1-rancher1
+RUN curl -sLf https://github.com/rancher/loglevel/releases/download/${LOGLEVEL_VERSION}/loglevel-amd64-${LOGLEVEL_VERSION}.tar.gz | tar xvzf - -C /usr/bin && \
+    curl -sL https://github.com/rancher/share-mnt/releases/download/v1.0.3/share-mnt.tar.gz | tar xvzf - -C /usr/bin && \
+    curl -sL https://github.com/c-bata/kube-prompt/releases/download/v1.0.3/kube-prompt_v1.0.3_linux_amd64.zip > /usr/bin/kube-prompt.zip && unzip /usr/bin/kube-prompt.zip -d /usr/bin && \
+    curl -sLf https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/helm > /usr/bin/helm && \
+    chmod +x /usr/bin/helm
+
 ARG VERSION=dev
 LABEL io.cattle.agent true
 ENV DOCKER_API_VERSION 1.24

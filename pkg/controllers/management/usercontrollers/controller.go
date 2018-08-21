@@ -55,7 +55,7 @@ func (c *ClusterLifecycle) Remove(obj *v3.Cluster) (*v3.Cluster, error) {
 }
 
 func (c *ClusterLifecycle) Updated(obj *v3.Cluster) (*v3.Cluster, error) {
-	return nil, c.Manager.Start(c.ctx, obj)
+	return nil, c.Manager.Start(c.ctx, obj, false)
 }
 
 func (c *ClusterLifecycleCleanup) Create(obj *v3.Cluster) (*v3.Cluster, error) {

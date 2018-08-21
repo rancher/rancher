@@ -9,19 +9,27 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"time"
-
 	"strings"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
+	"github.com/rancher/norman/store/crd"
+	"github.com/rancher/norman/store/proxy"
+	normantypes "github.com/rancher/norman/types"
+	"github.com/rancher/rancher/app"
 	"github.com/rancher/rancher/pkg/agent/cluster"
 	"github.com/rancher/rancher/pkg/agent/node"
 	"github.com/rancher/rancher/pkg/logserver"
 	"github.com/rancher/rancher/pkg/remotedialer"
 	"github.com/rancher/rancher/pkg/rkenodeconfigclient"
+	projectschema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
+	mngtclient "github.com/rancher/types/client/management/v3"
+	projectclient "github.com/rancher/types/client/project/v3"
+	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+	"k8s.io/client-go/rest"
 )
 
 var (
@@ -160,6 +168,30 @@ func run() error {
 		}
 
 		if isCluster() {
+			// if it is cluster agent
+			managementConfigUrl := fmt.Sprintf("https://%s/v3/connect/managementConfig", serverURL.Host)
+			managementConfig, err := cluster.GetManagementConfig(managementConfigUrl, token)
+			if err != nil {
+				return err
+			}
+			kubeConfig := rest.Config{}
+			kubeConfig.Host = fmt.Sprintf("https://%s/k8s/clusters/local", serverURL.Host)
+			kubeConfig.BearerToken = managementConfig.BearerToken
+			kubeConfig.TLSClientConfig.CAFile = "/etc/kubernetes/ssl/certs/serverca"
+			scaleContext, clusterManager, err := app.BuildScaledContext(ctx, kubeConfig, managementConfig.CfgConfig)
+			if err != nil {
+				return err
+			}
+			if err := setupCRDs(ctx, scaleContext.Schemas); err != nil {
+				return err
+			}
+			// todo: figure out the minimum controllers that need to be running in agent. The reason we need to run resources is because we need interact with management resources in some of user controllers
+			if err := scaleContext.Start(context.Background()); err != nil {
+				logrus.Errorf("failed to start management controllers %s", err)
+			}
+			if err := cluster.StartUserController(context.Background(), clusterManager, managementConfig.Cluster); err != nil {
+				panic(err)
+			}
 			return nil
 		}
 
@@ -202,4 +234,31 @@ func run() error {
 		}, onConnect)
 		time.Sleep(5 * time.Second)
 	}
+}
+
+func setupCRDs(ctx context.Context, schemas *normantypes.Schemas) error {
+	restConfig, err := rest.InClusterConfig()
+	if err != nil {
+		return err
+	}
+	clientGetter, err := proxy.NewClientGetterFromConfig(*restConfig)
+	if err != nil {
+		return err
+	}
+	factory := &crd.Factory{ClientGetter: clientGetter}
+	factory.BatchCreateCRDs(ctx, config.UserStorageContext, schemas, &projectschema.Version,
+		projectclient.AppType,
+		projectclient.AppRevisionType,
+		mngtclient.PipelineExecutionLogType,
+		mngtclient.PipelineExecutionType,
+		mngtclient.PipelineType,
+		mngtclient.ProjectAlertType,
+		mngtclient.ProjectLoggingType,
+		mngtclient.ProjectNetworkPolicyType,
+		mngtclient.ProjectRoleTemplateBindingType,
+		mngtclient.SourceCodeCredentialType,
+		mngtclient.SourceCodeRepositoryType,
+	)
+	factory.BatchWait()
+	return nil
 }
