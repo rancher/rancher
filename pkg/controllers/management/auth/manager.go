@@ -47,6 +47,7 @@ func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *cr
 			rbLister:      management.RBAC.RoleBindings("").Controller().Lister(),
 			rtLister:      management.Management.RoleTemplates("").Controller().Lister(),
 			nsLister:      management.Core.Namespaces("").Controller().Lister(),
+			userLister:    management.Management.Users("").Controller().Lister(),
 			rbIndexer:     rbInformer.GetIndexer(),
 			crbIndexer:    crbInformer.GetIndexer(),
 			userMGR:       management.UserManager,
@@ -65,6 +66,7 @@ func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *cr
 			rbLister:      management.RBAC.RoleBindings("").Controller().Lister(),
 			rtLister:      management.Management.RoleTemplates("").Controller().Lister(),
 			nsLister:      management.Core.Namespaces("").Controller().Lister(),
+			userLister:    management.Management.Users("").Controller().Lister(),
 			rbIndexer:     rbInformer.GetIndexer(),
 			crbIndexer:    crbInformer.GetIndexer(),
 			userMGR:       management.UserManager,
@@ -83,6 +85,7 @@ type manager struct {
 	crbLister     typesrbacv1.ClusterRoleBindingLister
 	rtLister      v3.RoleTemplateLister
 	nsLister      v13.NamespaceLister
+	userLister    v3.UserLister
 	rbIndexer     cache.Indexer
 	crbIndexer    cache.Indexer
 	mgmt          *config.ManagementContext
