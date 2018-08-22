@@ -63,7 +63,8 @@ def admin_mc():
     client = rancher.Client(url=BASE_URL, token=r.json()['token'],
                             verify=False)
     k8s_client = kubernetes_api_client(client, 'local')
-    return ManagementContext(client, k8s_client)
+    admin = client.list_user(username='admin').data[0]
+    return ManagementContext(client, k8s_client, user=admin)
 
 
 @pytest.fixture
