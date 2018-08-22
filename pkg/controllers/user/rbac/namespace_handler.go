@@ -60,7 +60,7 @@ func (n *nsLifecycle) Create(obj *v1.Namespace) (*v1.Namespace, error) {
 		return obj, err
 	}
 
-	go updateStatusAnnotation(hasPRTBs, obj, n.m)
+	go updateStatusAnnotation(hasPRTBs, *obj, n.m)
 
 	return obj, err
 }
@@ -393,7 +393,7 @@ func crByNS(obj interface{}) ([]string, error) {
 	return result, nil
 }
 
-func updateStatusAnnotation(hasPRTBs bool, namespace *v1.Namespace, mgr *manager) {
+func updateStatusAnnotation(hasPRTBs bool, namespace v1.Namespace, mgr *manager) {
 	if _, ok := namespace.Annotations[projectIDAnnotation]; ok {
 		for i := 0; i < 10; i++ {
 			time.Sleep(time.Millisecond * 500)
@@ -436,14 +436,14 @@ func updateStatusAnnotation(hasPRTBs bool, namespace *v1.Namespace, mgr *manager
 		}
 	}
 
-	namespace, err := mgr.workload.Core.Namespaces("").Get(namespace.Name, metav1.GetOptions{})
+	ns, err := mgr.workload.Core.Namespaces("").Get(namespace.Name, metav1.GetOptions{})
 	if err != nil {
 		logrus.Errorf("error getting ns %v for status update: %v", namespace.Name, err)
 		return
 	}
-	namespaceutil.SetNamespaceCondition(namespace, time.Second*1, initialRoleCondition, true, "")
-	_, err = mgr.workload.Core.Namespaces("").Update(namespace)
+	namespaceutil.SetNamespaceCondition(ns, time.Second*1, initialRoleCondition, true, "")
+	_, err = mgr.workload.Core.Namespaces("").Update(ns)
 	if err != nil {
-		logrus.Errorf("error updating ns %v status: %v", namespace.Name, err)
+		logrus.Errorf("error updating ns %v status: %v", ns.Name, err)
 	}
 }
