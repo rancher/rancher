@@ -61,6 +61,9 @@ def test_cluster_create_default_role(admin_mc, cleanup_roles, remove_resource):
 
     for binding in cluster.clusterRoleTemplateBindings():
         assert binding.roleTemplateId in test_roles
+        assert binding.userId is not None
+        user = client.by_id_user(binding.userId)
+        assert binding.userPrincipalId in user.principalIds
 
 
 @pytest.mark.nonparallel
@@ -115,6 +118,9 @@ def test_project_create_default_role(admin_mc, cleanup_roles, remove_resource):
 
     for binding in project.projectRoleTemplateBindings():
         assert binding.roleTemplateId in test_roles
+        assert binding.userId is not None
+        user = client.by_id_user(binding.userId)
+        assert binding.userPrincipalId in user.principalIds
 
 
 @pytest.mark.nonparallel

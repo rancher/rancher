@@ -55,7 +55,7 @@ func (p *prtbLifecycle) Remove(obj *v3.ProjectRoleTemplateBinding) (*v3.ProjectR
 }
 
 func (p *prtbLifecycle) reconcileSubject(binding *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
-	if binding.UserName != "" || binding.GroupName != "" || binding.GroupPrincipalName != "" {
+	if binding.GroupName != "" || binding.GroupPrincipalName != "" || (binding.UserPrincipalName != "" && binding.UserName != "") {
 		return binding, nil
 	}
 
@@ -67,6 +67,19 @@ func (p *prtbLifecycle) reconcileSubject(binding *v3.ProjectRoleTemplateBinding)
 		}
 
 		binding.UserName = user.Name
+		return binding, nil
+	}
+
+	if binding.UserPrincipalName == "" && binding.UserName != "" {
+		u, err := p.mgr.userLister.Get("", binding.UserName)
+		if err != nil {
+			return binding, err
+		}
+		for _, p := range u.PrincipalIDs {
+			if strings.HasSuffix(p, binding.UserName) {
+				binding.UserPrincipalName = p
+			}
+		}
 		return binding, nil
 	}
 
