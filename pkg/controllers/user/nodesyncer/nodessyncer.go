@@ -4,11 +4,16 @@ import (
 	"fmt"
 	"reflect"
 
+	"context"
+
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	nodehelper "github.com/rancher/rancher/pkg/node"
+	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -43,7 +48,20 @@ type NodesSyncer struct {
 	clusterLister    v3.ClusterLister
 }
 
-func Register(cluster *config.UserContext) {
+type NodeDrain struct {
+	userManager          user.Manager
+	tokenClient          v3.TokenInterface
+	userClient           v3.UserInterface
+	kubeConfigGetter     common.KubeConfigGetter
+	clusterName          string
+	systemAccountManager *systemaccount.Manager
+	clusterLister        v3.ClusterLister
+	machines             v3.NodeInterface
+	ctx                  context.Context
+	nodesToContext       map[string]context.CancelFunc
+}
+
+func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
 	m := &NodesSyncer{
 		clusterNamespace: cluster.ClusterName,
 		machines:         cluster.Management.Management.Nodes(cluster.ClusterName),
@@ -60,10 +78,24 @@ func Register(cluster *config.UserContext) {
 		nodesSyncer:      m,
 	}
 
+	d := &NodeDrain{
+		userManager:          cluster.Management.UserManager,
+		tokenClient:          cluster.Management.Management.Tokens(""),
+		userClient:           cluster.Management.Management.Users(""),
+		kubeConfigGetter:     kubeConfigGetter,
+		clusterName:          cluster.ClusterName,
+		systemAccountManager: systemaccount.NewManager(cluster.Management),
+		clusterLister:        cluster.Management.Management.Clusters("").Controller().Lister(),
+		machines:             cluster.Management.Management.Nodes(cluster.ClusterName),
+		ctx:                  ctx,
+		nodesToContext:       map[string]context.CancelFunc{},
+	}
+
 	cluster.Core.Nodes("").Controller().AddHandler("nodesSyncer", n.sync)
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler("machinesSyncer", m.sync)
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler("machinesLabelSyncer", m.syncLabels)
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler("cordonFieldsSyncer", m.syncCordonFields)
+	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler("drainNodeSyncer", d.drainNode)
 }
 
 func (n *NodeSyncer) sync(key string, node *corev1.Node) error {
