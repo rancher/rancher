@@ -96,10 +96,7 @@ func (p *ldapProvider) SearchPrincipals(searchKey, principalType string, myToken
 	var principals []v3.Principal
 	var err error
 
-	// TODO use principalType in search
-
 	config, caPool, err := p.getLDAPConfig()
-
 	if err != nil {
 		return principals, nil
 	}
