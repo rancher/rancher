@@ -1,7 +1,6 @@
 package ldap
 
 import (
-	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	ldapv2 "gopkg.in/ldap.v2"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
@@ -95,36 +95,9 @@ func IsType(search []*ldapv2.EntryAttribute, varType string) bool {
 	return false
 }
 
-func EscapeLDAPSearchFilter(filter string) string {
-	buf := new(bytes.Buffer)
-	for i := 0; i < len(filter); i++ {
-		currChar := filter[i]
-		switch currChar {
-		case '\\':
-			buf.WriteString("\\5c")
-			break
-		case '*':
-			buf.WriteString("\\2a")
-			break
-		case '(':
-			buf.WriteString("\\28")
-			break
-		case ')':
-			buf.WriteString("\\29")
-			break
-		case '\u0000':
-			buf.WriteString("\\00")
-			break
-		default:
-			buf.WriteString(string(currChar))
-		}
-	}
-	return buf.String()
-}
-
-func GetUserSearchAttributes(memberOfAttribute, objectClassAttribute string, config *v3.ActiveDirectoryConfig) []string {
-	userSearchAttributes := []string{memberOfAttribute,
-		objectClassAttribute,
+func GetUserSearchAttributes(config *v3.ActiveDirectoryConfig) []string {
+	userSearchAttributes := []string{"memberOf",
+		"objectClass",
 		config.UserObjectClass,
 		config.UserLoginAttribute,
 		config.UserNameAttribute,
@@ -132,9 +105,9 @@ func GetUserSearchAttributes(memberOfAttribute, objectClassAttribute string, con
 	return userSearchAttributes
 }
 
-func GetGroupSearchAttributes(memberOfAttribute, objectClassAttribute string, config *v3.ActiveDirectoryConfig) []string {
-	groupSeachAttributes := []string{memberOfAttribute,
-		objectClassAttribute,
+func GetGroupSearchAttributes(config *v3.ActiveDirectoryConfig) []string {
+	groupSeachAttributes := []string{"memberOf",
+		"objectClass",
 		config.GroupObjectClass,
 		config.UserLoginAttribute,
 		config.GroupNameAttribute,
@@ -178,6 +151,65 @@ func AuthenticateServiceAccountUser(serviceAccountPassword string, serviceAccoun
 	}
 
 	return nil
+}
+
+func AttributesToPrincipal(attribs []*ldapv2.EntryAttribute, dnStr, scope, providerName, userObjectClass, userNameAttribute, userLoginAttribute, groupObjectClass, groupNameAttribute string) (*v3.Principal, error) {
+	var externalIDType, accountName, externalID, login, kind string
+	externalID = dnStr
+	externalIDType = scope
+
+	if IsType(attribs, userObjectClass) {
+		for _, attr := range attribs {
+			if attr.Name == userNameAttribute {
+				if len(attr.Values) != 0 {
+					accountName = attr.Values[0]
+				} else {
+					accountName = externalID
+				}
+			}
+			if attr.Name == userLoginAttribute {
+				if len(attr.Values) > 0 && attr.Values[0] != "" {
+					login = attr.Values[0]
+				}
+			}
+		}
+		if login == "" {
+			login = accountName
+		}
+		kind = "user"
+	} else if IsType(attribs, groupObjectClass) {
+		for _, attr := range attribs {
+			if attr.Name == groupNameAttribute {
+				if len(attr.Values) != 0 {
+					accountName = attr.Values[0]
+				} else {
+					accountName = externalID
+				}
+			}
+			if attr.Name == userLoginAttribute {
+				if len(attr.Values) > 0 && attr.Values[0] != "" {
+					login = attr.Values[0]
+				}
+			}
+		}
+		if login == "" {
+			login = accountName
+		}
+		kind = "group"
+	} else {
+		logrus.Errorf("Failed to get attributes for %s", dnStr)
+		return nil, nil
+	}
+
+	principal := &v3.Principal{
+		ObjectMeta:    metav1.ObjectMeta{Name: externalIDType + "://" + externalID},
+		DisplayName:   accountName,
+		LoginName:     login,
+		PrincipalType: kind,
+		Me:            true,
+		Provider:      providerName,
+	}
+	return principal, nil
 }
 
 func Min(a int, b int) int {

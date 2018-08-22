@@ -23,11 +23,9 @@ import (
 )
 
 const (
-	Name                 = "activedirectory"
-	UserScope            = Name + "_user"
-	GroupScope           = Name + "_group"
-	MemberOfAttribute    = "memberOf"
-	ObjectClassAttribute = "objectClass"
+	Name       = "activedirectory"
+	UserScope  = Name + "_user"
+	GroupScope = Name + "_group"
 )
 
 var scopes = []string{UserScope, GroupScope}
@@ -92,14 +90,18 @@ func (p *adProvider) SearchPrincipals(searchKey, principalType string, myToken v
 	var principals []v3.Principal
 	var err error
 
-	// TODO use principalType in search
-
 	config, caPool, err := p.getActiveDirectoryConfig()
 	if err != nil {
 		return principals, nil
 	}
 
-	principals, err = p.searchPrincipals(searchKey, principalType, config, caPool)
+	lConn, err := p.ldapConnection(config, caPool)
+	if err != nil {
+		return principals, nil
+	}
+	defer lConn.Close()
+
+	principals, err = p.searchPrincipals(searchKey, principalType, config, lConn)
 	if err == nil {
 		for _, principal := range principals {
 			if principal.PrincipalType == "user" {
