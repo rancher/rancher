@@ -203,7 +203,7 @@ func generateTemplates(obj *v3.App, templateVersionClient mgmtv3.TemplateVersion
 	}
 
 	// notes.txt
-	commands = []string{"template", dir, "--name", obj.Name, "--namespace", obj.Spec.TargetNamespace, "--notes"}
+	commands = append([]string{"template", dir, "--name", obj.Name, "--namespace", obj.Spec.TargetNamespace, "--notes"}, setValues...)
 	cmd = exec.Command(helmName, commands...)
 	noteOut := &bytes.Buffer{}
 	sbErr = &bytes.Buffer{}
@@ -213,7 +213,7 @@ func generateTemplates(obj *v3.App, templateVersionClient mgmtv3.TemplateVersion
 		return "", "", errors.Wrapf(err, "helm template --notes failed. %s", filterErrorMessage(sbErr.String(), dir, "template-dir"))
 	}
 	if err := cmd.Wait(); err != nil {
-		return "", "", errors.Wrapf(err, "helm template --notes failed. %s", sbErr.String())
+		return "", "", errors.Wrapf(err, "helm template --notes failed. %s", filterErrorMessage(sbErr.String(), dir, "template-dir"))
 	}
 	template := sbOut.String()
 	notes := noteOut.String()
