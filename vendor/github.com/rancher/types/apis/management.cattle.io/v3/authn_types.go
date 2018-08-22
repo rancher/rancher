@@ -197,6 +197,7 @@ type ActiveDirectoryConfig struct {
 	UserSearchBase               string   `json:"userSearchBase,omitempty"              norman:"required"`
 	UserSearchAttribute          string   `json:"userSearchAttribute,omitempty"         norman:"default=sAMAccountName|sn|givenName,required"`
 	UserLoginAttribute           string   `json:"userLoginAttribute,omitempty"          norman:"default=sAMAccountName,required"`
+	UserUniqueIDAttribute        string   `json:"userUniqueIdAttribute,omitempty"       norman:"required"`
 	UserObjectClass              string   `json:"userObjectClass,omitempty"             norman:"default=person,required"`
 	UserNameAttribute            string   `json:"userNameAttribute,omitempty"           norman:"default=name,required"`
 	UserEnabledAttribute         string   `json:"userEnabledAttribute,omitempty"        norman:"default=userAccountControl,required"`
@@ -233,6 +234,7 @@ type LdapConfig struct {
 	UserSearchBase                  string   `json:"userSearchBase,omitempty"              norman:"notnullable,required"`
 	UserSearchAttribute             string   `json:"userSearchAttribute,omitempty"         norman:"default=uid|sn|givenName,notnullable,required"`
 	UserLoginAttribute              string   `json:"userLoginAttribute,omitempty"          norman:"default=uid,notnullable,required"`
+	UserUniqueIDAttribute           string   `json:"userUniqueIdAttribute,omitempty"       norman:"required"`
 	UserObjectClass                 string   `json:"userObjectClass,omitempty"             norman:"default=inetOrgPerson,notnullable,required"`
 	UserNameAttribute               string   `json:"userNameAttribute,omitempty"           norman:"default=cn,notnullable,required"`
 	UserMemberAttribute             string   `json:"userMemberAttribute,omitempty"           norman:"default=memberOf,notnullable,required"`

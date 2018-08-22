@@ -17,11 +17,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool, testServiceAccountBind bool) (v3.Principal, []v3.Principal, error) {
+func (p *adProvider) loginUser(adCredential *v3public.LdapLogin, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool, testServiceAccountBind bool) (v3.Principal, []v3.Principal, error) {
 	logrus.Debug("Now generating Ldap token")
 
 	username := adCredential.Username
 	password := adCredential.Password
+	userUniqueID := adCredential.UserUniqueID
 	if password == "" {
 		return v3.Principal{}, nil, httperror.NewAPIError(httperror.MissingRequired, "password not provided")
 	}
@@ -55,7 +56,7 @@ func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.Act
 	if strings.Contains(username, `\`) {
 		samName = strings.SplitN(username, `\`, 2)[1]
 	}
-	query := "(" + config.UserLoginAttribute + "=" + ldapv2.EscapeFilter(samName) + ")"
+	query := "(&(" + config.UserLoginAttribute + "=" + ldapv2.EscapeFilter(samName) + ")(" + config.UserUniqueIDAttribute + "=" + ldapv2.EscapeFilter(userUniqueID) + "))"
 	logrus.Debugf("LDAP Search query: {%s}", query)
 	search := ldapv2.NewSearchRequest(config.UserSearchBase,
 		ldapv2.ScopeWholeSubtree, ldapv2.NeverDerefAliases, 0, 0, false,

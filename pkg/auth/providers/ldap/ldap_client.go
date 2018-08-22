@@ -19,11 +19,12 @@ import (
 
 var operationalAttrList = []string{"1.1", "+", "*"}
 
-func (p *ldapProvider) loginUser(credential *v3public.BasicLogin, config *v3.LdapConfig, caPool *x509.CertPool) (v3.Principal, []v3.Principal, error) {
+func (p *ldapProvider) loginUser(credential *v3public.LdapLogin, config *v3.LdapConfig, caPool *x509.CertPool) (v3.Principal, []v3.Principal, error) {
 	logrus.Debug("Now generating Ldap token")
 
 	username := credential.Username
 	password := credential.Password
+	userUniqueID := credential.UserUniqueID
 
 	if password == "" {
 		return v3.Principal{}, nil, httperror.NewAPIError(httperror.MissingRequired, "password not provided")
@@ -46,7 +47,7 @@ func (p *ldapProvider) loginUser(credential *v3public.BasicLogin, config *v3.Lda
 
 	searchRequest := ldapv2.NewSearchRequest(config.UserSearchBase,
 		ldapv2.ScopeWholeSubtree, ldapv2.NeverDerefAliases, 0, 0, false,
-		fmt.Sprintf("(&(objectClass=%v)(%v=%v))", config.UserObjectClass, config.UserLoginAttribute, ldap.EscapeLDAPSearchFilter(username)),
+		fmt.Sprintf("(&(objectClass=%v)(%v=%v)(%v=%v))", config.UserObjectClass, config.UserLoginAttribute, ldap.EscapeLDAPSearchFilter(username), config.UserUniqueIDAttribute, ldap.EscapeLDAPSearchFilter(userUniqueID)),
 		p.getUserSearchAttributes(config), nil)
 	result, err := lConn.Search(searchRequest)
 	if err != nil {

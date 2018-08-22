@@ -41,6 +41,7 @@ const (
 	LdapConfigFieldUserObjectClass                 = "userObjectClass"
 	LdapConfigFieldUserSearchAttribute             = "userSearchAttribute"
 	LdapConfigFieldUserSearchBase                  = "userSearchBase"
+	LdapConfigFieldUserUniqueIDAttribute           = "userUniqueIdAttribute"
 )
 
 type LdapConfig struct {
@@ -80,6 +81,7 @@ type LdapConfig struct {
 	UserObjectClass                 string            `json:"userObjectClass,omitempty" yaml:"userObjectClass,omitempty"`
 	UserSearchAttribute             string            `json:"userSearchAttribute,omitempty" yaml:"userSearchAttribute,omitempty"`
 	UserSearchBase                  string            `json:"userSearchBase,omitempty" yaml:"userSearchBase,omitempty"`
+	UserUniqueIDAttribute           string            `json:"userUniqueIdAttribute,omitempty" yaml:"userUniqueIdAttribute,omitempty"`
 }
 
 type LdapConfigCollection struct {

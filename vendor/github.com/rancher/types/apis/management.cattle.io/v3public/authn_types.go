@@ -23,6 +23,13 @@ type BasicLogin struct {
 	Password     string `json:"password" norman:"type=string,required"`
 }
 
+type LdapLogin struct {
+	GenericLogin `json:",inline"`
+	Username     string `json:"username" norman:"type=string,required"`
+	Password     string `json:"password" norman:"type=string,required"`
+	UserUniqueID string `json:"userUniqueId" norman:"type=string,required"`
+}
+
 type LocalProvider struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
