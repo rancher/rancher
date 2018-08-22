@@ -58,7 +58,7 @@ func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterR
 }
 
 func (c *crtbLifecycle) reconcileSubject(binding *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-	if binding.UserName != "" || binding.GroupName != "" || binding.GroupPrincipalName != "" {
+	if binding.GroupName != "" || binding.GroupPrincipalName != "" || (binding.UserPrincipalName != "" && binding.UserName != "") {
 		return binding, nil
 	}
 
@@ -70,6 +70,20 @@ func (c *crtbLifecycle) reconcileSubject(binding *v3.ClusterRoleTemplateBinding)
 		}
 
 		binding.UserName = user.Name
+		return binding, nil
+	}
+
+	if binding.UserPrincipalName == "" && binding.UserName != "" {
+		u, err := c.mgr.userLister.Get("", binding.UserName)
+		if err != nil {
+			return binding, err
+		}
+		for _, p := range u.PrincipalIDs {
+			if strings.HasSuffix(p, binding.UserName) {
+				binding.UserPrincipalName = p
+				break
+			}
+		}
 		return binding, nil
 	}
 
