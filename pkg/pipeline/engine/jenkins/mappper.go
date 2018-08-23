@@ -81,7 +81,7 @@ func convertPipelineExecution(execution *v3.PipelineExecution) string {
 	if execution.Spec.PipelineConfig.Timeout > 0 {
 		timeout = execution.Spec.PipelineConfig.Timeout
 	}
-	return fmt.Sprintf(pipelineBlock, ns, containerbuffer.String(), images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.JenkinsJnlp), jenkinsURL, execution.Name, timeout, pipelinebuffer.String())
+	return fmt.Sprintf(pipelineBlock, ns, ns, containerbuffer.String(), images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.JenkinsJnlp), jenkinsURL, execution.Name, timeout, pipelinebuffer.String())
 }
 
 func getStepContainerOptions(execution *v3.PipelineExecution, privileged bool, optional map[string]string, envFrom []v3.EnvFrom) string {
@@ -155,7 +155,7 @@ const stepBlock = `'%s': {
 
 const pipelineBlock = `import org.jenkinsci.plugins.pipeline.modeldefinition.Utils
 def label = "buildpod.${env.JOB_NAME}.${env.BUILD_NUMBER}".replace('-', '_').replace('/', '_')
-podTemplate(label: label, namespace: '%s', instanceCap: 1, serviceAccount: 'jenkins',volumes: [emptyDirVolume(mountPath: '/var/lib/docker', memory: false)], containers: [
+podTemplate(label: label, namespace: '%s', instanceCap: 1, serviceAccount: 'jenkins',volumes: [emptyDirVolume(mountPath: '/var/lib/docker', memory: false), secretVolume(mountPath: '/etc/docker/certs.d/docker-registry.%s', secretName: 'registry-crt')], containers: [
 %s
 containerTemplate(name: 'jnlp', image: '%s', envVars: [
 envVar(key: 'JENKINS_URL', value: '%s')], args: '${computer.jnlpmac} ${computer.name}', ttyEnabled: false)], yaml: """

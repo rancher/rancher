@@ -1,13 +1,16 @@
 package utils
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/yaml.v2"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strconv"
 	"strings"
@@ -177,6 +180,11 @@ func GetEnvVarMap(execution *v3.PipelineExecution) map[string]string {
 	_, pipelineID := ref.Parse(execution.Spec.PipelineName)
 	clusterID, projectID := ref.Parse(execution.Spec.ProjectName)
 
+	localRegistry := ""
+	if execution.Annotations != nil && execution.Annotations[LocalRegistryPortLabel] != "" {
+		localRegistry = "127.0.0.1:" + execution.Annotations[LocalRegistryPortLabel]
+	}
+
 	m[EnvGitCommit] = commit
 	m[EnvGitRepoName] = repoName
 	m[EnvGitRef] = execution.Spec.Ref
@@ -189,6 +197,7 @@ func GetEnvVarMap(execution *v3.PipelineExecution) map[string]string {
 	m[EnvExecutionSequence] = strconv.Itoa(execution.Spec.Run)
 	m[EnvProjectID] = projectID
 	m[EnvClusterID] = clusterID
+	m[EnvLocalRegistry] = localRegistry
 
 	if execution.Spec.Event == WebhookEventTag {
 		m[EnvGitTag] = strings.TrimPrefix(execution.Spec.Ref, "refs/tags/")
@@ -216,4 +225,40 @@ func PipelineConfigFromYaml(content []byte) (*v3.PipelineConfig, error) {
 	}
 
 	return out, nil
+}
+
+func BCryptHash(password string) (string, error) {
+	passwordBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(passwordBytes), nil
+}
+
+func GetRegistryPortMapping(cm *corev1.ConfigMap) (map[string]string, error) {
+	portMap := map[string]string{}
+	yamlMap := map[string]string{}
+	curYaml := cm.Data[RegistryPortMappingFile]
+	if err := yaml.Unmarshal([]byte(curYaml), &yamlMap); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal([]byte(yamlMap[RegistryPortMappingKey]), &portMap); err != nil {
+		return nil, err
+	}
+	return portMap, nil
+}
+
+func SetRegistryPortMapping(configmap *corev1.ConfigMap, portMap map[string]string) error {
+	yamlMap := map[string]string{}
+	b, err := json.Marshal(portMap)
+	if err != nil {
+		return err
+	}
+	yamlMap[RegistryPortMappingKey] = string(b)
+	b, err = yaml.Marshal(yamlMap)
+	if err != nil {
+		return err
+	}
+	configmap.Data[RegistryPortMappingFile] = string(b)
+	return nil
 }

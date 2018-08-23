@@ -152,7 +152,8 @@ func (j *Engine) preparePipeline(execution *v3.PipelineExecution) error {
 				if step.PublishImageConfig.PushRemote && step.PublishImageConfig.Registry != "" {
 					registry = step.PublishImageConfig.Registry
 				} else {
-					registry = utils.LocalRegistry
+					_, projectID := ref.Parse(execution.Spec.ProjectName)
+					registry = fmt.Sprintf("%s.%s-pipeline", utils.LocalRegistry, projectID)
 				}
 				if err := j.prepareRegistryCredential(execution, registry); err != nil {
 					return err
@@ -205,8 +206,8 @@ func (j *Engine) prepareRegistryCredential(execution *v3.PipelineExecution, regi
 			Name:      secretName,
 		},
 		Data: map[string][]byte{
-			"username": []byte(username),
-			"password": []byte(password),
+			utils.PublishSecretUserKey: []byte(username),
+			utils.PublishSecretPwKey:   []byte(password),
 		},
 	}
 	_, err = j.Secrets.Create(secret)

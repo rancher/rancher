@@ -1,30 +1,50 @@
 package utils
 
 const (
-	PipelineNamespaceSuffix    = "-pipeline"
-	JenkinsName                = "jenkins"
-	PipelineName               = "pipeline"
-	PipelineSecretName         = "pipeline-secret"
-	PipelineSecretUserKey      = "admin-user"
-	PipelineSecretTokenKey     = "admin-token"
-	PipelineSecretDefaultUser  = "admin"
-	PipelineSecretDefaultToken = "admin123"
-	RegistryName               = "docker-registry"
-	MinioName                  = "minio"
-	MinioBucketLocation        = "local"
-	MinioLogBucket             = "pipeline-logs"
-	NetWorkPolicyName          = "pipeline-np"
-	LabelKeyApp                = "app"
-	LabelKeyJenkins            = "jenkins"
-	JenkinsMaster              = "master"
-	LabelKeyExecution          = "execution"
-	DefaultRegistry            = "index.docker.io"
-	LocalRegistry              = "docker-registry:5000"
-	DefaultTag                 = "latest"
-	JenkinsPort                = 8080
-	JenkinsJNLPPort            = 50000
-	RegistryPort               = 5000
-	MinioPort                  = 9000
+	PipelineNamespace              = "cattle-pipeline"
+	PipelineNamespaceSuffix        = "-pipeline"
+	JenkinsName                    = "jenkins"
+	PipelineName                   = "pipeline"
+	PipelineSecretName             = "pipeline-secret"
+	PipelineSecretUserKey          = "admin-user"
+	PipelineSecretTokenKey         = "admin-token"
+	PipelineSecretRegistryTokenKey = "registry-token"
+	PipelineSecretDefaultUser      = "admin"
+	PipelineSecretDefaultToken     = "admin123"
+	RegistryName                   = "docker-registry"
+	RegistryProxyName              = "registry-proxy"
+	RegistryCrt                    = "client.cert"
+	RegistryKey                    = "client.key"
+	RegistryCACrt                  = "ca.crt"
+	RegistryCAKey                  = "ca.key"
+	RegistryCACrtSecretName        = "registry-ca-crt"
+	RegistryCrtSecretName          = "registry-crt"
+	RegistryCrtVolumeName          = "crt"
+	RegistryAuthVolumeName         = "auth"
+	RegistryAuthPath               = "/opt/auth/"
+	RegistryCrtPath                = "/opt/crt/"
+	RegistryMappingPath            = "/opt/mapping/"
+	RegistryPortMappingKey         = "mappings"
+	RegistryPortMappingFile        = "mappings.yaml"
+	PublishSecretUserKey           = "username"
+	PublishSecretPwKey             = "password"
+	DockerCredentialName           = "pipeline-docker-registry"
+	ProxyConfigMapName             = "proxy-mappings"
+	MinioName                      = "minio"
+	MinioBucketLocation            = "local"
+	MinioLogBucket                 = "pipeline-logs"
+	NetWorkPolicyName              = "pipeline-np"
+	LabelKeyApp                    = "app"
+	LabelKeyJenkins                = "jenkins"
+	JenkinsMaster                  = "master"
+	LabelKeyExecution              = "execution"
+	DefaultRegistry                = "index.docker.io"
+	LocalRegistry                  = "docker-registry"
+	DefaultTag                     = "latest"
+	JenkinsPort                    = 8080
+	JenkinsJNLPPort                = 50000
+	RegistryPort                   = 443
+	MinioPort                      = 9000
 
 	WebhookEventPush        = "push"
 	WebhookEventPullRequest = "pull_request"
@@ -43,7 +63,9 @@ const (
 	StatePending  = "Pending"
 	StateDenied   = "Denied"
 
-	PipelineFinishLabel = "pipeline.management.cattle.io/finish"
+	PipelineFinishLabel    = "pipeline.project.cattle.io/finish"
+	LocalRegistryPortLabel = "pipeline.project.cattle.io/local-registry-port"
+	PipelineNamespaceLabel = "pipeline.project.cattle.io/pipeline-namespace"
 
 	PipelineFileYml  = ".rancher-pipeline.yml"
 	PipelineFileYaml = ".rancher-pipeline.yaml"
@@ -65,8 +87,10 @@ const (
 	EnvImageRepo         = "CICD_IMAGE_REPO"
 	EnvLocalRegistry     = "CICD_LOCAL_REGISTRY"
 
-	SettingExecutorQuota        = "executor-quota"
-	SettingExecutorQuotaDefault = "2"
+	SettingExecutorQuota          = "executor-quota"
+	SettingExecutorQuotaDefault   = "2"
+	SettingSigningDuration        = "registry-signing-duration"
+	SettingSigningDurationDefault = "2160h"
 
 	DefaultTimeout = 60
 )

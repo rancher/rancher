@@ -2,13 +2,14 @@ package jenkins
 
 import (
 	"fmt"
+	"regexp"
+	"strings"
+
 	images "github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
+	"github.com/rancher/rancher/pkg/ref"
 	mv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
-	"regexp"
-	"strconv"
-	"strings"
 )
 
 func toJenkinsStep(execution *v3.PipelineExecution, stageOrdinal int, stepOrdinal int) PipelineStep {
@@ -66,27 +67,35 @@ func convertPublishImageconfig(execution *v3.PipelineExecution, step *v3.Step) P
 	if config.PushRemote {
 		registry = config.Registry
 	} else {
-		registry = utils.LocalRegistry
+		_, projectID := ref.Parse(execution.Spec.ProjectName)
+		registry = fmt.Sprintf("%s.%s-pipeline", utils.LocalRegistry, projectID)
 	}
 
 	reg, _ := regexp.Compile("[^a-zA-Z0-9]+")
 	processedRegistry := strings.ToLower(reg.ReplaceAllString(registry, ""))
 	secretName := fmt.Sprintf("%s-%s", execution.Namespace, processedRegistry)
+	secretUserKey := utils.PublishSecretUserKey
+	secretPwKey := utils.PublishSecretPwKey
+	if !config.PushRemote {
+		//use local registry credential
+		secretName = utils.PipelineSecretName
+		secretUserKey = utils.PipelineSecretUserKey
+		secretPwKey = utils.PipelineSecretTokenKey
+	}
+	pluginRepo := fmt.Sprintf("%s/%s", registry, repo)
 	if registry == utils.DefaultRegistry {
 		//the `plugins/docker` image fails when setting DOCKER_REGISTRY to index.docker.io
 		registry = ""
 	}
 
 	pStep.image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.PluginsDocker)
-	pStep.command = `sh '''docker-publish'''`
+	pStep.command = `sh '''/usr/local/bin/dockerd-entrypoint.sh /bin/drone-docker'''`
 	publishEnv := map[string]string{
-		"REGISTRY":    registry,
-		"REPO":        repo,
-		"TAG":         tag,
-		"PUSH_LOCAL":  "true",
-		"PUSH_REMOTE": strconv.FormatBool(config.PushRemote),
-		"DOCKERFILE":  config.DockerfilePath,
-		"CONTEXT":     config.BuildContext,
+		"DOCKER_REGISTRY":   registry,
+		"PLUGIN_REPO":       pluginRepo,
+		"PLUGIN_TAG":        tag,
+		"PLUGIN_DOCKERFILE": config.DockerfilePath,
+		"PLUGIN_CONTEXT":    config.BuildContext,
 	}
 
 	for k, v := range step.Env {
@@ -94,11 +103,11 @@ func convertPublishImageconfig(execution *v3.PipelineExecution, step *v3.Step) P
 	}
 	envFrom := append(step.EnvFrom, v3.EnvFrom{
 		SourceName: secretName,
-		SourceKey:  "username",
+		SourceKey:  secretUserKey,
 		TargetKey:  "DOCKER_USERNAME",
 	}, v3.EnvFrom{
 		SourceName: secretName,
-		SourceKey:  "password",
+		SourceKey:  secretPwKey,
 		TargetKey:  "DOCKER_PASSWORD",
 	})
 
@@ -113,7 +122,7 @@ func convertApplyYamlconfig(execution *v3.PipelineExecution, step *v3.Step, stag
 
 	pStep.image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.KubeApply)
 
-	pStep.command = `sh ''' /kapply.sh '''`
+	pStep.command = `sh ''' kube-apply '''`
 
 	applyEnv := map[string]string{
 		"YAML_PATH":    config.Path,
