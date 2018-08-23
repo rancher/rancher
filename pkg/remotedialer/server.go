@@ -2,6 +2,7 @@ package remotedialer
 
 import (
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -22,20 +23,19 @@ func DefaultErrorWriter(rw http.ResponseWriter, req *http.Request, code int, err
 	rw.WriteHeader(code)
 }
 
-func AlwaysReady() bool {
-	return true
-}
-
 type Server struct {
-	ready       func() bool
+	PeerID      string
+	PeerToken   string
 	authorizer  Authorizer
 	errorWriter ErrorWriter
 	sessions    *sessionManager
+	peers       map[string]peer
+	peerLock    sync.Mutex
 }
 
-func New(auth Authorizer, errorWriter ErrorWriter, ready func() bool) *Server {
+func New(auth Authorizer, errorWriter ErrorWriter) *Server {
 	return &Server{
-		ready:       ready,
+		peers:       map[string]peer{},
 		authorizer:  auth,
 		errorWriter: errorWriter,
 		sessions:    newSessionManager(),
@@ -43,12 +43,7 @@ func New(auth Authorizer, errorWriter ErrorWriter, ready func() bool) *Server {
 }
 
 func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	if !s.ready() {
-		s.errorWriter(rw, req, 503, errors.New("tunnel server not active"))
-		return
-	}
-
-	clientKey, authed, err := s.authorizer(req)
+	clientKey, authed, peer, err := s.auth(req)
 	if err != nil {
 		s.errorWriter(rw, req, 400, err)
 		return
@@ -72,7 +67,7 @@ func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	session := s.sessions.add(clientKey, wsConn)
+	session := s.sessions.add(clientKey, wsConn, peer)
 	defer s.sessions.remove(session)
 
 	// Don't need to associate req.Context() to the session, it will cancel otherwise
@@ -81,4 +76,22 @@ func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		// Hijacked so we can't write to the client
 		logrus.Debugf("error in remotedialer server [%d]: %v", code, err)
 	}
+}
+
+func (s *Server) auth(req *http.Request) (clientKey string, authed, peer bool, err error) {
+	id := req.Header.Get(ID)
+	token := req.Header.Get(Token)
+	if id != "" && token != "" {
+		// peer authentication
+		s.peerLock.Lock()
+		p, ok := s.peers[id]
+		s.peerLock.Unlock()
+
+		if ok && p.token == token {
+			return id, true, true, nil
+		}
+	}
+
+	id, authed, err = s.authorizer(req)
+	return id, authed, false, err
 }
