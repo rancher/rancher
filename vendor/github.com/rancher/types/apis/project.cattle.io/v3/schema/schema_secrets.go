@@ -125,7 +125,7 @@ func secretTypes(schemas *types.Schemas) *types.Schemas {
 					m.AnnotationField{Field: "algorithm", IgnoreDefinition: true},
 					m.AnnotationField{Field: "serialNumber", IgnoreDefinition: true},
 					m.AnnotationField{Field: "keySize", IgnoreDefinition: true},
-					m.AnnotationField{Field: "subjectAlternativeNames", IgnoreDefinition: true},
+					m.AnnotationField{Field: "subjectAlternativeNames", IgnoreDefinition: true, List: true},
 					m.SetValue{
 						Field:            "type",
 						Value:            "certificate",
