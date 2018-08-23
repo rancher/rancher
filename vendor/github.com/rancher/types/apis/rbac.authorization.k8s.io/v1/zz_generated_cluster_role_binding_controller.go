@@ -187,11 +187,6 @@ func (s *clusterRoleBindingClient) ObjectClient() *objectclient.ObjectClient {
 }
 
 func (s *clusterRoleBindingClient) Create(o *v1.ClusterRoleBinding) (*v1.ClusterRoleBinding, error) {
-	if o.Labels == nil {
-		labels := make(map[string]string)
-		o.Labels = labels
-	}
-	o.Labels["creator.cattle.io/rancher-created"] = "true"
 	obj, err := s.objectClient.Create(o)
 	return obj.(*v1.ClusterRoleBinding), err
 }
@@ -207,11 +202,6 @@ func (s *clusterRoleBindingClient) GetNamespaced(namespace, name string, opts me
 }
 
 func (s *clusterRoleBindingClient) Update(o *v1.ClusterRoleBinding) (*v1.ClusterRoleBinding, error) {
-	if o.Labels == nil {
-		labels := make(map[string]string)
-		o.Labels = labels
-	}
-	o.Labels["creator.cattle.io/rancher-created"] = "true"
 	obj, err := s.objectClient.Update(o.Name, o)
 	return obj.(*v1.ClusterRoleBinding), err
 }
