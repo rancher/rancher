@@ -7,34 +7,39 @@ import (
 	"io"
 	"net"
 	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/rancher/types/config/dialer"
 	"github.com/sirupsen/logrus"
 )
 
 type session struct {
 	sync.Mutex
 
-	nextConnID int64
-	clientKey  string
-	sessionKey int64
-	conn       *wsConn
-	conns      map[int64]*connection
-	auth       ConnectAuthorizer
-	pingCancel context.CancelFunc
-	pingWait   sync.WaitGroup
-	client     bool
+	nextConnID       int64
+	clientKey        string
+	sessionKey       int64
+	conn             *wsConn
+	conns            map[int64]*connection
+	remoteClientKeys map[string]map[int]bool
+	auth             ConnectAuthorizer
+	pingCancel       context.CancelFunc
+	pingWait         sync.WaitGroup
+	dialer           dialer.Dialer
+	client           bool
 }
 
-// No tunnel logging by default
-var printTunnelData bool
+// PrintTunnelData No tunnel logging by default
+var PrintTunnelData bool
 
 func init() {
 	if os.Getenv("CATTLE_TUNNEL_DATA_DEBUG") == "true" {
-		printTunnelData = true
+		PrintTunnelData = true
 	}
 }
 
@@ -50,11 +55,12 @@ func newClientSession(auth ConnectAuthorizer, conn *websocket.Conn) *session {
 
 func newSession(sessionKey int64, clientKey string, conn *websocket.Conn) *session {
 	return &session{
-		nextConnID: 1,
-		clientKey:  clientKey,
-		sessionKey: sessionKey,
-		conn:       newWSConn(conn),
-		conns:      map[int64]*connection{},
+		nextConnID:       1,
+		clientKey:        clientKey,
+		sessionKey:       sessionKey,
+		conn:             newWSConn(conn),
+		conns:            map[int64]*connection{},
+		remoteClientKeys: map[string]map[int]bool{},
 	}
 }
 
@@ -121,12 +127,12 @@ func (s *session) serveMessage(reader io.Reader) error {
 		return err
 	}
 
-	if printTunnelData {
+	if PrintTunnelData {
 		logrus.Debug("REQUEST ", message)
 	}
 
 	if message.messageType == Connect {
-		if s.auth != nil && !s.auth(message.proto, message.address) {
+		if s.auth == nil || !s.auth(message.proto, message.address) {
 			return errors.New("connect not allowed")
 		}
 		s.clientConnect(message)
@@ -134,6 +140,15 @@ func (s *session) serveMessage(reader io.Reader) error {
 	}
 
 	s.Lock()
+	if message.messageType == AddClient && s.remoteClientKeys != nil {
+		err := s.addRemoteClient(message.address)
+		s.Unlock()
+		return err
+	} else if message.messageType == RemoveClient {
+		err := s.removeRemoteClient(message.address)
+		s.Unlock()
+		return err
+	}
 	conn := s.conns[message.connID]
 	s.Unlock()
 
@@ -157,11 +172,59 @@ func (s *session) serveMessage(reader io.Reader) error {
 	return nil
 }
 
+func parseAddress(address string) (string, int, error) {
+	parts := strings.SplitN(address, "/", 2)
+	if len(parts) != 2 {
+		return "", 0, errors.New("not / separated")
+	}
+	v, err := strconv.Atoi(parts[1])
+	return parts[0], v, err
+}
+
+func (s *session) addRemoteClient(address string) error {
+	clientKey, sessionKey, err := parseAddress(address)
+	if err != nil {
+		return fmt.Errorf("invalid remote session %s: %v", address, err)
+	}
+
+	keys := s.remoteClientKeys[clientKey]
+	if keys == nil {
+		keys = map[int]bool{}
+		s.remoteClientKeys[clientKey] = keys
+	}
+	keys[int(sessionKey)] = true
+
+	if PrintTunnelData {
+		logrus.Debugf("ADD REMOTE CLIENT %s, SESSION %d", address, s.sessionKey)
+	}
+
+	return nil
+}
+
+func (s *session) removeRemoteClient(address string) error {
+	clientKey, sessionKey, err := parseAddress(address)
+	if err != nil {
+		return fmt.Errorf("invalid remote session %s: %v", address, err)
+	}
+
+	keys := s.remoteClientKeys[clientKey]
+	delete(keys, int(sessionKey))
+	if len(keys) == 0 {
+		delete(s.remoteClientKeys, clientKey)
+	}
+
+	if PrintTunnelData {
+		logrus.Debugf("REMOVE REMOTE CLIENT %s, SESSION %d", address, s.sessionKey)
+	}
+
+	return nil
+}
+
 func (s *session) closeConnection(connID int64, err error) {
 	s.Lock()
 	conn := s.conns[connID]
 	delete(s.conns, connID)
-	if printTunnelData {
+	if PrintTunnelData {
 		logrus.Debugf("CONNECTIONS %d %d", s.sessionKey, len(s.conns))
 	}
 	s.Unlock()
@@ -176,12 +239,12 @@ func (s *session) clientConnect(message *message) {
 
 	s.Lock()
 	s.conns[message.connID] = conn
-	if printTunnelData {
+	if PrintTunnelData {
 		logrus.Debugf("CONNECTIONS %d %d", s.sessionKey, len(s.conns))
 	}
 	s.Unlock()
 
-	go clientDial(conn, message)
+	go clientDial(s.dialer, conn, message)
 }
 
 func (s *session) serverConnect(deadline time.Duration, proto, address string) (net.Conn, error) {
@@ -190,7 +253,7 @@ func (s *session) serverConnect(deadline time.Duration, proto, address string) (
 
 	s.Lock()
 	s.conns[connID] = conn
-	if printTunnelData {
+	if PrintTunnelData {
 		logrus.Debugf("CONNECTIONS %d %d", s.sessionKey, len(s.conns))
 	}
 	s.Unlock()
@@ -205,8 +268,8 @@ func (s *session) serverConnect(deadline time.Duration, proto, address string) (
 }
 
 func (s *session) writeMessage(message *message) (int, error) {
-	if printTunnelData {
-		logrus.Debug("RESPONSE ", message)
+	if PrintTunnelData {
+		logrus.Debug("WRITE ", message)
 	}
 	return message.WriteTo(s.conn)
 }
@@ -222,4 +285,20 @@ func (s *session) Close() {
 	}
 
 	s.conns = map[int64]*connection{}
+}
+
+func (s *session) sessionAdded(clientKey string, sessionKey int64) {
+	client := fmt.Sprintf("%s/%d", clientKey, sessionKey)
+	_, err := s.writeMessage(newAddClient(client))
+	if err != nil {
+		s.conn.conn.Close()
+	}
+}
+
+func (s *session) sessionRemoved(clientKey string, sessionKey int64) {
+	client := fmt.Sprintf("%s/%d", clientKey, sessionKey)
+	_, err := s.writeMessage(newRemoveClient(client))
+	if err != nil {
+		s.conn.conn.Close()
+	}
 }
