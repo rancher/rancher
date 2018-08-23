@@ -33,18 +33,23 @@ const (
 )
 
 type Lifecycle struct {
-	namespaceLister v1.NamespaceLister
-	namespaces      v1.NamespaceInterface
-	secrets         v1.SecretInterface
-	services        v1.ServiceInterface
-	serviceAccounts v1.ServiceAccountInterface
-	podLister       v1.PodLister
-	pods            v1.PodInterface
-	networkPolicies networkv1.NetworkPolicyInterface
+	namespaceLister   v1.NamespaceLister
+	namespaces        v1.NamespaceInterface
+	secrets           v1.SecretInterface
+	serviceLister     v1.ServiceLister
+	managementSecrets v1.SecretInterface
+	services          v1.ServiceInterface
+	serviceAccounts   v1.ServiceAccountInterface
+	configMapLister   v1.ConfigMapLister
+	configMaps        v1.ConfigMapInterface
+	podLister         v1.PodLister
+	pods              v1.PodInterface
+	networkPolicies   networkv1.NetworkPolicyInterface
 
 	clusterRoleBindings rbacv1.ClusterRoleBindingInterface
 	roleBindings        rbacv1.RoleBindingInterface
 	deployments         v1beta2.DeploymentInterface
+	daemonsets          v1beta2.DaemonSetInterface
 
 	pipelineLister             v3.PipelineLister
 	pipelines                  v3.PipelineInterface
@@ -61,14 +66,21 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	namespaces := cluster.Core.Namespaces("")
 	namespaceLister := cluster.Core.Namespaces("").Controller().Lister()
 	secrets := cluster.Core.Secrets("")
+	secretLister := secrets.Controller().Lister()
+	managementSecrets := cluster.Management.Core.Secrets("")
+	managementSecretLister := managementSecrets.Controller().Lister()
 	services := cluster.Core.Services("")
+	serviceLister := services.Controller().Lister()
 	serviceAccounts := cluster.Core.ServiceAccounts("")
 	networkPolicies := cluster.Networking.NetworkPolicies("")
 	clusterRoleBindings := cluster.RBAC.ClusterRoleBindings("")
 	roleBindings := cluster.RBAC.RoleBindings("")
 	deployments := cluster.Apps.Deployments("")
+	daemonsets := cluster.Apps.DaemonSets("")
 	pods := cluster.Core.Pods("")
 	podLister := pods.Controller().Lister()
+	configMaps := cluster.Core.ConfigMaps("")
+	configMapLister := configMaps.Controller().Lister()
 
 	pipelines := cluster.Management.Project.Pipelines("")
 	pipelineLister := pipelines.Controller().Lister()
@@ -82,14 +94,19 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 		namespaces:          namespaces,
 		namespaceLister:     namespaceLister,
 		secrets:             secrets,
+		managementSecrets:   managementSecrets,
 		services:            services,
+		serviceLister:       serviceLister,
 		serviceAccounts:     serviceAccounts,
 		networkPolicies:     networkPolicies,
 		clusterRoleBindings: clusterRoleBindings,
 		roleBindings:        roleBindings,
 		deployments:         deployments,
+		daemonsets:          daemonsets,
 		pods:                pods,
 		podLister:           podLister,
+		configMaps:          configMaps,
+		configMapLister:     configMapLister,
 
 		pipelineLister:             pipelineLister,
 		pipelines:                  pipelines,
@@ -108,10 +125,23 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 		pipelineExecutions:      pipelineExecutions,
 		pipelineEngine:          pipelineEngine,
 	}
+	registryCertSyncer := &RegistryCertSyncer{
+		clusterName: clusterName,
+
+		pods:                    pods,
+		podLister:               podLister,
+		secrets:                 secrets,
+		secretLister:            secretLister,
+		managementSecretLister:  managementSecretLister,
+		namespaceLister:         namespaceLister,
+		pipelineExecutionLister: pipelineExecutionLister,
+		pipelineSettingLister:   pipelineSettingLister,
+	}
 
 	pipelineExecutions.AddClusterScopedLifecycle(pipelineExecutionLifecycle.GetName(), cluster.ClusterName, pipelineExecutionLifecycle)
 
 	go stateSyncer.sync(ctx, syncStateInterval)
+	go registryCertSyncer.sync(ctx, checkCertRotateInterval)
 
 }
 
@@ -182,7 +212,39 @@ func (l *Lifecycle) Sync(obj *v3.PipelineExecution) (*v3.PipelineExecution, erro
 		v3.PipelineExecutionConditionInitialized.ReasonAndMessageFromError(obj, err)
 	}
 
+	if err := l.markLocalRegistryPort(obj); err != nil {
+		return obj, err
+	}
+
 	return obj, nil
+}
+
+func (l *Lifecycle) markLocalRegistryPort(obj *v3.PipelineExecution) error {
+	cm, err := l.configMaps.GetNamespaced(utils.PipelineNamespace, utils.ProxyConfigMapName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	portMap, err := utils.GetRegistryPortMapping(cm)
+	if err != nil {
+		return err
+	}
+	curPort := ""
+	if obj.Annotations != nil && obj.Annotations[utils.LocalRegistryPortLabel] != "" {
+		curPort = obj.Annotations[utils.LocalRegistryPortLabel]
+	}
+	_, projectID := ref.Parse(obj.Spec.ProjectName)
+	port := portMap[projectID]
+	if port != curPort {
+		toUpdate := obj.DeepCopy()
+		if toUpdate.Annotations == nil {
+			toUpdate.Annotations = map[string]string{}
+		}
+		toUpdate.Annotations[utils.LocalRegistryPortLabel] = port
+		if _, err := l.pipelineExecutions.Update(toUpdate); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (l *Lifecycle) newExecutionUpdateLastRunState(obj *v3.PipelineExecution) error {
