@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -16,7 +17,6 @@ import (
 )
 
 var (
-	addr    string
 	clients = map[string]*http.Client{}
 	l       sync.Mutex
 	counter int64
@@ -25,15 +25,6 @@ var (
 func authorizer(req *http.Request) (string, bool, error) {
 	id := req.Header.Get("x-tunnel-id")
 	return id, id != "", nil
-}
-
-func onError(rw http.ResponseWriter, _ *http.Request, code int, err error) {
-	rw.WriteHeader(code)
-	rw.Write([]byte(err.Error()))
-}
-
-func ready() bool {
-	return true
 }
 
 func Client(server *remotedialer.Server, rw http.ResponseWriter, req *http.Request) {
@@ -53,7 +44,7 @@ func Client(server *remotedialer.Server, rw http.ResponseWriter, req *http.Reque
 	resp, err := client.Get(url)
 	if err != nil {
 		logrus.Errorf("[%03d] REQ ERR t=%s %s: %v", id, timeout, url, err)
-		onError(rw, req, 500, err)
+		remotedialer.DefaultErrorWriter(rw, req, 500, err)
 		return
 	}
 	defer resp.Body.Close()
@@ -92,10 +83,36 @@ func getClient(server *remotedialer.Server, clientKey, timeout string) *http.Cli
 }
 
 func main() {
+	var (
+		addr      string
+		peerID    string
+		peerToken string
+		peers     string
+		debug     bool
+	)
 	flag.StringVar(&addr, "listen", ":8123", "Listen address")
+	flag.StringVar(&peerID, "id", "", "Peer ID")
+	flag.StringVar(&peerToken, "token", "", "Peer Token")
+	flag.StringVar(&peers, "peers", "", "Peers format id:token:url,id:token:url")
+	flag.BoolVar(&debug, "debug", false, "Enable debug logging")
 	flag.Parse()
 
-	handler := remotedialer.New(authorizer, onError, ready)
+	if debug {
+		logrus.SetLevel(logrus.DebugLevel)
+		remotedialer.PrintTunnelData = true
+	}
+
+	handler := remotedialer.New(authorizer, remotedialer.DefaultErrorWriter)
+	handler.PeerToken = peerToken
+	handler.PeerID = peerID
+
+	for _, peer := range strings.Split(peers, ",") {
+		parts := strings.SplitN(strings.TrimSpace(peer), ":", 3)
+		if len(parts) != 3 {
+			continue
+		}
+		handler.AddPeer(parts[2], parts[0], parts[1])
+	}
 
 	router := mux.NewRouter()
 	router.Handle("/connect", handler)

@@ -28,5 +28,5 @@ func main() {
 		"X-Tunnel-ID": []string{id},
 	}
 
-	remotedialer.ClientConnect(addr, headers, nil, nil, nil)
+	remotedialer.ClientConnect(addr, headers, nil, func(string, string) bool { return true }, nil)
 }

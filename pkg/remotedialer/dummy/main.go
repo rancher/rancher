@@ -15,7 +15,7 @@ var (
 )
 
 func main() {
-	flag.StringVar(&listen, "listen", ":8124", "Listen address")
+	flag.StringVar(&listen, "listen", ":8125", "Listen address")
 	flag.Parse()
 
 	fmt.Println("listening ", listen)
