@@ -26,6 +26,8 @@ var (
 	KubernetesVersion               = NewSetting("k8s-version", v3.DefaultK8s)
 	KubernetesVersionToSystemImages = NewSetting("k8s-version-to-images", getSystemImages())
 	MachineVersion                  = NewSetting("machine-version", "dev")
+	Namespace                       = NewSetting("namespace", "cattle-system")
+	PeerServices                    = NewSetting("peer-service", "rancher")
 	RDNSServerBaseURL               = NewSetting("rdns-base-url", "https://api.lb.rancher.cloud/v1")
 	ServerImage                     = NewSetting("server-image", "rancher/rancher")
 	ServerURL                       = NewSetting("server-url", "")
