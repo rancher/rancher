@@ -10,15 +10,15 @@ import (
 )
 
 /*
-templateResetController is responsible for resetting resource quota template from the namespace
+quotaResetController is responsible for resetting resource quota on the namespace
 when project resource quota gets reset
 */
-type templateResetController struct {
+type quotaResetController struct {
 	namespaces v1.NamespaceInterface
 	nsIndexer  clientcache.Indexer
 }
 
-func (c *templateResetController) resetTemplate(key string, project *v3.Project) error {
+func (c *quotaResetController) resetNamespaceQuota(key string, project *v3.Project) error {
 	if project == nil || project.DeletionTimestamp != nil {
 		return nil
 	}
@@ -32,13 +32,12 @@ func (c *templateResetController) resetTemplate(key string, project *v3.Project)
 	}
 	for _, n := range namespaces {
 		ns := n.(*corev1.Namespace)
-		templateID := getTemplateID(ns)
-		if templateID == "" {
+		quota := getNamespaceResourceQuota(ns)
+		if quota == "" {
 			continue
 		}
 		toUpdate := ns.DeepCopy()
-		delete(toUpdate.Annotations, resourceQuotaTemplateIDAnnotation)
-		delete(toUpdate.Annotations, resourceQuotaAppliedTemplateIDAnnotation)
+		delete(toUpdate.Annotations, resourceQuotaAnnotation)
 		if _, err := c.namespaces.Update(toUpdate); err != nil {
 			return err
 		}

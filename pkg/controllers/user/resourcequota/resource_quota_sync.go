@@ -2,38 +2,49 @@ package resourcequota
 
 import (
 	"encoding/json"
+	"fmt"
+	"reflect"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 
-	"reflect"
-
-	namespaceutil "github.com/rancher/rancher/pkg/controllers/user/namespace"
+	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/cache"
+	clientcache "k8s.io/client-go/tools/cache"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/quota"
 )
 
 const (
-	projectIDAnnotation        = "field.cattle.io/projectId"
-	resourceQuotaLabel         = "resourcequota.management.cattle.io/default-resource-quota"
-	resourceQuotaInitCondition = "ResourceQuotaInit"
+	projectIDAnnotation             = "field.cattle.io/projectId"
+	resourceQuotaLabel              = "resourcequota.management.cattle.io/default-resource-quota"
+	resourceQuotaInitCondition      = "ResourceQuotaInit"
+	resourceQuotaAnnotation         = "field.cattle.io/resourceQuota"
+	resourceQuotaValidatedCondition = "ResourceQuotaValidated"
+)
+
+var (
+	projectLockCache = cache.NewLRUExpireCache(1000)
 )
 
 /*
 SyncController takes care of creating Kubernetes resource quota based on the resource limits
-defined in namespace.resourceQuotaTemplateId
+defined in namespace.resourceQuota
 */
 type SyncController struct {
-	ProjectLister               v3.ProjectLister
-	Namespaces                  v1.NamespaceInterface
-	NamespaceLister             v1.NamespaceLister
-	ResourceQuotas              v1.ResourceQuotaInterface
-	ResourceQuotaLister         v1.ResourceQuotaLister
-	ResourceQuotaTemplateLister v3.ResourceQuotaTemplateLister
+	ProjectLister       v3.ProjectLister
+	Namespaces          v1.NamespaceInterface
+	NamespaceLister     v1.NamespaceLister
+	ResourceQuotas      v1.ResourceQuotaInterface
+	ResourceQuotaLister v1.ResourceQuotaLister
+	NsIndexer           clientcache.Indexer
 }
 
 func (c *SyncController) syncResourceQuota(key string, ns *corev1.Namespace) error {
@@ -51,16 +62,12 @@ func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (*corev1.Name
 		return ns, err
 	}
 
-	setDefault := false
-	if existing == nil {
-		projectLimit, _, err := getProjectLimit(ns, c.ProjectLister)
-		if err != nil {
-			return ns, err
-		}
-		setDefault = projectLimit != nil
+	projectLimit, _, err := getProjectResourceQuotaLimit(ns, c.ProjectLister)
+	if err != nil {
+		return ns, err
 	}
 
-	quotaSpec, err := c.getNamespaceResourceQuota(ns, setDefault)
+	quotaSpec, err := c.getNamespaceResourceQuota(ns, projectLimit != nil)
 	if err != nil {
 		return ns, err
 	}
@@ -80,8 +87,16 @@ func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (*corev1.Name
 
 	switch operation {
 	case "create":
+		isFit, err := c.validateNamespaceQuota(ns)
+		if err != nil || !isFit {
+			return ns, err
+		}
 		err = c.createDefaultResourceQuota(ns, quotaSpec)
 	case "update":
+		isFit, err := c.validateNamespaceQuota(ns)
+		if err != nil || !isFit {
+			return ns, err
+		}
 		err = c.updateResourceQuota(existing, quotaSpec)
 	case "delete":
 		err = c.deleteResourceQuota(existing)
@@ -91,7 +106,10 @@ func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (*corev1.Name
 		if err != nil || set {
 			return ns, err
 		}
-		toUpdate := ns.DeepCopy()
+		toUpdate, err := c.Namespaces.Get(ns.Name, metav1.GetOptions{})
+		if err != nil {
+			return toUpdate, err
+		}
 		namespaceutil.SetNamespaceCondition(toUpdate, time.Second*1, resourceQuotaInitCondition, true, "")
 		return c.Namespaces.Update(toUpdate)
 	}
@@ -125,81 +143,34 @@ func (c *SyncController) getExistingResourceQuota(ns *corev1.Namespace) (*corev1
 }
 
 func (c *SyncController) getNamespaceResourceQuota(ns *corev1.Namespace, setDefault bool) (*corev1.ResourceQuotaSpec, error) {
-	templateID := getAppliedTemplateID(ns)
-	var limit *v3.ProjectResourceLimit
-	if templateID == "" {
+	validated := true
+	set := getNamespaceResourceQuota(ns) != ""
+	var err error
+	if set {
+		validated, err = isQuotaValidated(ns)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var limit *v3.ResourceQuotaLimit
+	if validated {
+		limit, err = getNamespaceLimit(ns)
+		if err != nil {
+			return nil, err
+		}
+	} else {
 		if setDefault {
 			limit = defaultResourceLimit
 		} else {
 			return nil, nil
 		}
-	} else {
-		splitted := strings.Split(templateID, ":")
-		template, err := c.ResourceQuotaTemplateLister.Get(splitted[0], splitted[1])
-		if err != nil {
-			return nil, err
-		}
-		limit = &template.Limit
 	}
 
 	return convertResourceLimitResourceQuotaSpec(limit)
 }
 
-func convertResourceLimitResourceQuotaSpec(limit *v3.ProjectResourceLimit) (*corev1.ResourceQuotaSpec, error) {
-	converted, err := convertProjectResourceLimitToResourceList(limit)
-	if err != nil {
-		return nil, err
-	}
-	quotaSpec := &corev1.ResourceQuotaSpec{
-		Hard: converted,
-	}
-	return quotaSpec, err
-}
-
-func convertProjectResourceLimitToResourceList(limit *v3.ProjectResourceLimit) (corev1.ResourceList, error) {
-	in, err := json.Marshal(limit)
-	if err != nil {
-		return nil, err
-	}
-	limitsMap := map[string]string{}
-	err = json.Unmarshal(in, &limitsMap)
-	if err != nil {
-		return nil, err
-	}
-
-	limits := corev1.ResourceList{}
-	for key, value := range limitsMap {
-		var resourceName corev1.ResourceName
-		if val, ok := conversion[key]; ok {
-			resourceName = corev1.ResourceName(val)
-		} else {
-			resourceName = corev1.ResourceName(key)
-		}
-
-		resourceQuantity, err := resource.ParseQuantity(value)
-		if err != nil {
-			return nil, err
-		}
-
-		limits[resourceName] = resourceQuantity
-	}
-	return limits, nil
-}
-
-var conversion = map[string]string{
-	"replicationControllers": "replicationcontrollers",
-	"configMaps":             "configmaps",
-	"persistentVolumeClaims": "persistentvolumeclaims",
-	"servicesNodePorts":      "services.nodeports",
-	"servicesLoadBalancers":  "services.loadbalancers",
-	"requestsCpu":            "requests.cpu",
-	"requestsMemory":         "requests.memory",
-	"requestsStorage":        "requests.storage",
-	"limitsCpu":              "limits.cpu",
-	"limitsMemory":           "limits.memory",
-}
-
-var defaultResourceLimit = &v3.ProjectResourceLimit{
+var defaultResourceLimit = &v3.ResourceQuotaLimit{
 	Pods:                   "0",
 	Services:               "0",
 	ReplicationControllers: "0",
@@ -213,22 +184,6 @@ var defaultResourceLimit = &v3.ProjectResourceLimit{
 	RequestsStorage:        "0",
 	LimitsCPU:              "0",
 	LimitsMemory:           "0",
-}
-
-func getProjectLimit(ns *corev1.Namespace, projectLister v3.ProjectLister) (*v3.ProjectResourceLimit, string, error) {
-	projectID := getProjectID(ns)
-	if projectID == "" {
-		return nil, "", nil
-	}
-	projectNamespace, projectName := getProjectNamespaceName(projectID)
-	if projectName == "" {
-		return nil, "", nil
-	}
-	project, err := projectLister.Get(projectNamespace, projectName)
-	if err != nil || project.Spec.ResourceQuota == nil {
-		return nil, "", err
-	}
-	return &project.Spec.ResourceQuota.Limit, projectID, nil
 }
 
 func getProjectID(ns *corev1.Namespace) string {
@@ -261,4 +216,163 @@ func (c *SyncController) createDefaultResourceQuota(ns *corev1.Namespace, spec *
 	logrus.Infof("Creating default resource quota for namespace %v", ns.Name)
 	_, err := c.ResourceQuotas.Create(resourceQuota)
 	return err
+}
+
+func (c *SyncController) validateNamespaceQuota(ns *corev1.Namespace) (bool, error) {
+	if ns == nil || ns.DeletionTimestamp != nil {
+		return true, nil
+	}
+
+	// get project limit
+	projectLimit, projectID, err := getProjectResourceQuotaLimit(ns, c.ProjectLister)
+	if err != nil {
+		return false, err
+	}
+
+	if projectLimit == nil {
+		return true, err
+	}
+
+	// set default quota if not set
+	quotaToUpdate, err := c.getResourceQuotaToUpdate(ns)
+	if err != nil {
+		return false, err
+	}
+	finalNs := *ns
+	if quotaToUpdate != "" {
+		toUpdate := ns.DeepCopy()
+		if toUpdate.Annotations == nil {
+			toUpdate.Annotations = map[string]string{}
+		}
+		toUpdate.Annotations[resourceQuotaAnnotation] = quotaToUpdate
+		toUpdate, err = c.Namespaces.Update(toUpdate)
+		if err != nil {
+			return false, err
+		}
+		finalNs = *toUpdate
+	}
+
+	// validate resource quota
+	mu := getProjectLock(projectID)
+	mu.Lock()
+	defer mu.Unlock()
+	isFit, msg, err := c.isQuotaFit(&finalNs, projectID, projectLimit)
+	if err != nil {
+		return false, err
+	}
+	return isFit, c.setValidated(ns, isFit, msg)
+}
+
+func (c *SyncController) setValidated(ns *corev1.Namespace, value bool, msg string) error {
+	set, err := namespaceutil.IsNamespaceConditionSet(ns, resourceQuotaValidatedCondition, value)
+	if set || err != nil {
+		return err
+	}
+
+	toUpdate := ns.DeepCopy()
+	err = namespaceutil.SetNamespaceCondition(toUpdate, time.Second*1, resourceQuotaValidatedCondition, value, msg)
+	if err != nil {
+		return err
+	}
+	_, err = c.Namespaces.Update(toUpdate)
+
+	return err
+}
+
+func getProjectLock(projectID string) *sync.Mutex {
+	val, ok := projectLockCache.Get(projectID)
+	if !ok {
+		projectLockCache.Add(projectID, &sync.Mutex{}, time.Hour)
+		val, _ = projectLockCache.Get(projectID)
+	}
+	mu := val.(*sync.Mutex)
+	return mu
+}
+
+func (c *SyncController) isQuotaFit(ns *corev1.Namespace, projectID string, projectLimit *v3.ResourceQuotaLimit) (bool, string, error) {
+	nssResourceList := api.ResourceList{}
+	nsLimit, err := getNamespaceLimit(ns)
+	if err != nil {
+		return false, "", err
+	}
+	// add itself on create
+	nsResourceList, err := convertLimitToResourceList(nsLimit)
+	if err != nil {
+		return false, "", err
+	}
+	nssResourceList = quota.Add(nssResourceList, nsResourceList)
+
+	// get other Namespaces
+	namespaces, err := c.NsIndexer.ByIndex(nsByProjectIndex, projectID)
+	if err != nil {
+		return false, "", err
+	}
+
+	for _, n := range namespaces {
+		// only consider namespaces who's resource quota is set
+		set, err := namespaceutil.IsNamespaceConditionSet(ns, resourceQuotaValidatedCondition, true)
+		if err != nil {
+			return false, "", err
+		}
+		if !set {
+			continue
+		}
+		other := n.(*corev1.Namespace)
+		if other.Name == ns.Name {
+			continue
+		}
+		nsLimit, err := getNamespaceLimit(other)
+		if err != nil {
+			return false, "", err
+		}
+		nsResourceList, err := convertLimitToResourceList(nsLimit)
+		if err != nil {
+			return false, "", err
+		}
+		nssResourceList = quota.Add(nssResourceList, nsResourceList)
+	}
+
+	projectResourceList, err := convertLimitToResourceList(projectLimit)
+	if err != nil {
+		return false, "", err
+	}
+
+	allowed, exceeded := quota.LessThanOrEqual(nssResourceList, projectResourceList)
+	if allowed {
+		return true, "", nil
+	}
+	failedHard := quota.Mask(nssResourceList, exceeded)
+	return false, fmt.Sprintf("Resource quota [%v] exceeds project limit ", prettyPrint(failedHard)), nil
+}
+
+func prettyPrint(item api.ResourceList) string {
+	parts := []string{}
+	keys := []string{}
+	for key := range item {
+		keys = append(keys, string(key))
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		value := item[api.ResourceName(key)]
+		constraint := key + "=" + value.String()
+		parts = append(parts, constraint)
+	}
+	return strings.Join(parts, ",")
+}
+
+func (c *SyncController) getResourceQuotaToUpdate(ns *corev1.Namespace) (string, error) {
+	if getNamespaceResourceQuota(ns) != "" {
+		return "", nil
+	}
+
+	quota, err := getProjectNamespaceDefaultQuota(ns, c.ProjectLister)
+	if err != nil {
+		return "", err
+	}
+	b, err := json.Marshal(quota)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+
 }
