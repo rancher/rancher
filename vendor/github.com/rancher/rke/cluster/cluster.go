@@ -239,7 +239,7 @@ func rebuildLocalAdminConfig(ctx context.Context, kubeCluster *Cluster) error {
 
 func isLocalConfigWorking(ctx context.Context, localKubeConfigPath string, k8sWrapTransport k8s.WrapTransport) bool {
 	if _, err := GetK8sVersion(localKubeConfigPath, k8sWrapTransport); err != nil {
-		log.Infof(ctx, "[reconcile] Local config is not vaild, rebuilding admin config")
+		log.Infof(ctx, "[reconcile] Local config is not valid, rebuilding admin config")
 		return false
 	}
 	return true
