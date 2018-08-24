@@ -209,11 +209,11 @@ func (c *Cluster) deployMetricServer(ctx context.Context) error {
 		RBACConfig:         c.Authorization.Mode,
 		Options:            c.Monitoring.Options,
 	}
-	kubeDNSYaml, err := addons.GetMetricsServerManifest(MetricsServerConfig)
+	metricsYaml, err := addons.GetMetricsServerManifest(MetricsServerConfig)
 	if err != nil {
 		return err
 	}
-	if err := c.doAddonDeploy(ctx, kubeDNSYaml, MetricsServerAddonResourceName, false); err != nil {
+	if err := c.doAddonDeploy(ctx, metricsYaml, MetricsServerAddonResourceName, false); err != nil {
 		return err
 	}
 	log.Infof(ctx, "[addons] KubeDNS deployed successfully..")

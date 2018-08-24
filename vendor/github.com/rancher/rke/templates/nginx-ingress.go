@@ -15,7 +15,7 @@ metadata:
     app: ingress-nginx
 data:
 {{ range $k,$v := .Options }}
-  {{ $k }}: {{ $v }}
+  {{ $k }}: "{{ $v }}"
 {{ end }}
 ---
 kind: ConfigMap
