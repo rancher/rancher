@@ -35,7 +35,7 @@ func (m *NodesSyncer) syncCordonFields(key string, obj *v3.Node) error {
 	}
 
 	node, err := nodehelper.GetNodeForMachine(obj, m.nodeLister)
-	if err != nil {
+	if err != nil || node == nil || node.DeletionTimestamp != nil {
 		return err
 	}
 	desiredValue := convert.ToBool(obj.Spec.DesiredNodeUnschedulable)
