@@ -31,16 +31,14 @@ func namespaceTypes(schemas *types.Schemas) *types.Schemas {
 		AddMapperForType(&Version, v1.Namespace{},
 			&m.AnnotationField{Field: "description"},
 			&m.AnnotationField{Field: "projectId"},
-			&m.AnnotationField{Field: "resourceQuotaTemplateId"},
-			&m.AnnotationField{Field: "resourceQuotaAppliedTemplateId"},
-
+			&m.AnnotationField{Field: "resourceQuota", Object: true},
 			&m.Drop{Field: "status"},
 		).
+		MustImport(&Version, NamespaceResourceQuota{}).
 		MustImport(&Version, v1.Namespace{}, struct {
-			Description                    string `json:"description"`
-			ProjectID                      string `norman:"type=reference[/v3/schemas/project]"`
-			ResourceQuotaTemplateID        string `json:"resourceQuotaTemplateId,omitempty" norman:"type=reference[/v3/schemas/resourceQuotaTemplate]"`
-			ResourceQuotaAppliedTemplateID string `json:"resourceQuotaAppliedTemplateId,omitempty" norman:"type=reference[/v3/schemas/resourceQuotaTemplate],nocreate,noupdate"`
+			Description   string `json:"description"`
+			ProjectID     string `norman:"type=reference[/v3/schemas/project]"`
+			ResourceQuota string `json:"resourceQuota,omitempty" norman:"type=namespaceResourceQuota"`
 		}{})
 }
 

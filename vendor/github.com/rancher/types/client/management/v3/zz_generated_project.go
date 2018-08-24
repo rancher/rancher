@@ -14,6 +14,7 @@ const (
 	ProjectFieldDescription                   = "description"
 	ProjectFieldLabels                        = "labels"
 	ProjectFieldName                          = "name"
+	ProjectFieldNamespaceDefaultResourceQuota = "namespaceDefaultResourceQuota"
 	ProjectFieldNamespaceId                   = "namespaceId"
 	ProjectFieldOwnerReferences               = "ownerReferences"
 	ProjectFieldPodSecurityPolicyTemplateName = "podSecurityPolicyTemplateId"
@@ -27,23 +28,24 @@ const (
 
 type Project struct {
 	types.Resource
-	Annotations                   map[string]string     `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	ClusterID                     string                `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
-	Conditions                    []ProjectCondition    `json:"conditions,omitempty" yaml:"conditions,omitempty"`
-	Created                       string                `json:"created,omitempty" yaml:"created,omitempty"`
-	CreatorID                     string                `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
-	Description                   string                `json:"description,omitempty" yaml:"description,omitempty"`
-	Labels                        map[string]string     `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Name                          string                `json:"name,omitempty" yaml:"name,omitempty"`
-	NamespaceId                   string                `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
-	OwnerReferences               []OwnerReference      `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	PodSecurityPolicyTemplateName string                `json:"podSecurityPolicyTemplateId,omitempty" yaml:"podSecurityPolicyTemplateId,omitempty"`
-	Removed                       string                `json:"removed,omitempty" yaml:"removed,omitempty"`
-	ResourceQuota                 *ProjectResourceQuota `json:"resourceQuota,omitempty" yaml:"resourceQuota,omitempty"`
-	State                         string                `json:"state,omitempty" yaml:"state,omitempty"`
-	Transitioning                 string                `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
-	TransitioningMessage          string                `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	UUID                          string                `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Annotations                   map[string]string       `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	ClusterID                     string                  `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	Conditions                    []ProjectCondition      `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+	Created                       string                  `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID                     string                  `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Description                   string                  `json:"description,omitempty" yaml:"description,omitempty"`
+	Labels                        map[string]string       `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name                          string                  `json:"name,omitempty" yaml:"name,omitempty"`
+	NamespaceDefaultResourceQuota *NamespaceResourceQuota `json:"namespaceDefaultResourceQuota,omitempty" yaml:"namespaceDefaultResourceQuota,omitempty"`
+	NamespaceId                   string                  `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
+	OwnerReferences               []OwnerReference        `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	PodSecurityPolicyTemplateName string                  `json:"podSecurityPolicyTemplateId,omitempty" yaml:"podSecurityPolicyTemplateId,omitempty"`
+	Removed                       string                  `json:"removed,omitempty" yaml:"removed,omitempty"`
+	ResourceQuota                 *ProjectResourceQuota   `json:"resourceQuota,omitempty" yaml:"resourceQuota,omitempty"`
+	State                         string                  `json:"state,omitempty" yaml:"state,omitempty"`
+	Transitioning                 string                  `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage          string                  `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	UUID                          string                  `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 
 type ProjectCollection struct {

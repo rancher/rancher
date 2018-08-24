@@ -53,7 +53,6 @@ type Interface interface {
 	ClusterAlertsGetter
 	ProjectAlertsGetter
 	ComposeConfigsGetter
-	ResourceQuotaTemplatesGetter
 }
 
 type Client struct {
@@ -99,7 +98,6 @@ type Client struct {
 	clusterAlertControllers                            map[string]ClusterAlertController
 	projectAlertControllers                            map[string]ProjectAlertController
 	composeConfigControllers                           map[string]ComposeConfigController
-	resourceQuotaTemplateControllers                   map[string]ResourceQuotaTemplateController
 }
 
 func NewForConfig(config rest.Config) (Interface, error) {
@@ -154,7 +152,6 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		clusterAlertControllers:                            map[string]ClusterAlertController{},
 		projectAlertControllers:                            map[string]ProjectAlertController{},
 		composeConfigControllers:                           map[string]ComposeConfigController{},
-		resourceQuotaTemplateControllers:                   map[string]ResourceQuotaTemplateController{},
 	}, nil
 }
 
@@ -658,19 +655,6 @@ type ComposeConfigsGetter interface {
 func (c *Client) ComposeConfigs(namespace string) ComposeConfigInterface {
 	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ComposeConfigResource, ComposeConfigGroupVersionKind, composeConfigFactory{})
 	return &composeConfigClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type ResourceQuotaTemplatesGetter interface {
-	ResourceQuotaTemplates(namespace string) ResourceQuotaTemplateInterface
-}
-
-func (c *Client) ResourceQuotaTemplates(namespace string) ResourceQuotaTemplateInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ResourceQuotaTemplateResource, ResourceQuotaTemplateGroupVersionKind, resourceQuotaTemplateFactory{})
-	return &resourceQuotaTemplateClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,
