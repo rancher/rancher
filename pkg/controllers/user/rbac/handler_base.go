@@ -97,12 +97,12 @@ func Register(workload *config.UserContext) {
 	workload.Management.Management.Clusters("").AddHandler("global-admin-cluster-sync", newClusterHandler(workload))
 
 	sync := &resourcequota.SyncController{
-		Namespaces:                  workload.Core.Namespaces(""),
-		NamespaceLister:             workload.Core.Namespaces("").Controller().Lister(),
-		ResourceQuotas:              workload.Core.ResourceQuotas(""),
-		ResourceQuotaLister:         workload.Core.ResourceQuotas("").Controller().Lister(),
-		ResourceQuotaTemplateLister: workload.Management.Management.ResourceQuotaTemplates(workload.ClusterName).Controller().Lister(),
-		ProjectLister:               workload.Management.Management.Projects(workload.ClusterName).Controller().Lister(),
+		Namespaces:          workload.Core.Namespaces(""),
+		NamespaceLister:     workload.Core.Namespaces("").Controller().Lister(),
+		NsIndexer:           nsInformer.GetIndexer(),
+		ResourceQuotas:      workload.Core.ResourceQuotas(""),
+		ResourceQuotaLister: workload.Core.ResourceQuotas("").Controller().Lister(),
+		ProjectLister:       workload.Management.Management.Projects(workload.ClusterName).Controller().Lister(),
 	}
 	workload.Core.Namespaces("").AddLifecycle("namespace-auth", newNamespaceLifecycle(r, sync))
 

@@ -12,16 +12,32 @@ const (
 )
 
 func SetNamespaceCondition(namespace *v1.Namespace, d time.Duration, conditionType string, conditionStatus bool, message string) error {
-	if namespace.ObjectMeta.Annotations == nil {
-		namespace.ObjectMeta.Annotations = map[string]string{}
+	annotations := namespace.ObjectMeta.Annotations
+	if annotations == nil {
+		annotations = map[string]string{}
 	}
+	ann := annotations[statusAnn]
+	conditionStatusStr := "False"
+	if conditionStatus {
+		conditionStatusStr = "True"
+	}
+	bAnn, err := GenerateConditionAnnotation(ann, d, conditionType, conditionStatusStr, message)
+	if err != nil {
+		return err
+	}
+	annotations[statusAnn] = bAnn
 
-	ann := namespace.ObjectMeta.Annotations[statusAnn]
+	namespace.ObjectMeta.Annotations = annotations
+
+	return nil
+}
+
+func GenerateConditionAnnotation(ann string, d time.Duration, conditionType string, conditionStatus string, message string) (string, error) {
 	status := &status{}
 	if ann != "" {
 		err := json.Unmarshal([]byte(ann), status)
 		if err != nil {
-			return err
+			return "", err
 		}
 	}
 	if status.Conditions == nil {
@@ -38,17 +54,14 @@ func SetNamespaceCondition(namespace *v1.Namespace, d time.Duration, conditionTy
 		}
 	}
 
-	conditionStatusStr := "False"
 	conditionMessage := ""
-	if conditionStatus {
-		conditionStatusStr = "True"
-	} else {
+	if conditionStatus != "True" {
 		conditionMessage = message
 	}
 
 	cond := condition{
 		Type:           conditionType,
-		Status:         conditionStatusStr,
+		Status:         conditionStatus,
 		Message:        conditionMessage,
 		LastUpdateTime: time.Now().Add(d).Format(time.RFC3339),
 	}
@@ -61,11 +74,9 @@ func SetNamespaceCondition(namespace *v1.Namespace, d time.Duration, conditionTy
 
 	bAnn, err := json.Marshal(status)
 	if err != nil {
-		return err
+		return "", err
 	}
-	namespace.ObjectMeta.Annotations[statusAnn] = string(bAnn)
-
-	return nil
+	return string(bAnn), nil
 }
 
 func IsNamespaceConditionSet(namespace *v1.Namespace, conditionType string, conditionStatus bool) (bool, error) {
