@@ -34,8 +34,7 @@ var (
 		Init(globalTypes).
 		Init(rkeTypes).
 		Init(alertTypes).
-		Init(composeType).
-		Init(resourceQuotaTemplateTypes)
+		Init(composeType)
 
 	TokenSchemas = factory.Schemas(&Version).
 			Init(tokens)
@@ -536,11 +535,4 @@ func alertTypes(schema *types.Schemas) *types.Schemas {
 
 func composeType(schemas *types.Schemas) *types.Schemas {
 	return schemas.MustImport(&Version, v3.ComposeConfig{})
-}
-
-func resourceQuotaTemplateTypes(schemas *types.Schemas) *types.Schemas {
-	return schemas.
-		MustImportAndCustomize(&Version, v3.ResourceQuotaTemplate{}, func(schema *types.Schema) {
-			schema.ResourceMethods = []string{http.MethodGet, http.MethodDelete}
-		})
 }

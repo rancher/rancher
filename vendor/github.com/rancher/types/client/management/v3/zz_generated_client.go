@@ -44,7 +44,6 @@ type Client struct {
 	ClusterAlert                            ClusterAlertOperations
 	ProjectAlert                            ProjectAlertOperations
 	ComposeConfig                           ComposeConfigOperations
-	ResourceQuotaTemplate                   ResourceQuotaTemplateOperations
 }
 
 func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
@@ -94,7 +93,6 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.ClusterAlert = newClusterAlertClient(client)
 	client.ProjectAlert = newProjectAlertClient(client)
 	client.ComposeConfig = newComposeConfigClient(client)
-	client.ResourceQuotaTemplate = newResourceQuotaTemplateClient(client)
 
 	return client, nil
 }

@@ -1,23 +1,23 @@
 package client
 
 const (
-	ProjectResourceLimitType                        = "projectResourceLimit"
-	ProjectResourceLimitFieldConfigMaps             = "configMaps"
-	ProjectResourceLimitFieldLimitsCPU              = "limitsCpu"
-	ProjectResourceLimitFieldLimitsMemory           = "limitsMemory"
-	ProjectResourceLimitFieldPersistentVolumeClaims = "persistentVolumeClaims"
-	ProjectResourceLimitFieldPods                   = "pods"
-	ProjectResourceLimitFieldReplicationControllers = "replicationControllers"
-	ProjectResourceLimitFieldRequestsCPU            = "requestsCpu"
-	ProjectResourceLimitFieldRequestsMemory         = "requestsMemory"
-	ProjectResourceLimitFieldRequestsStorage        = "requestsStorage"
-	ProjectResourceLimitFieldSecrets                = "secrets"
-	ProjectResourceLimitFieldServices               = "services"
-	ProjectResourceLimitFieldServicesLoadBalancers  = "servicesLoadBalancers"
-	ProjectResourceLimitFieldServicesNodePorts      = "servicesNodePorts"
+	ResourceQuotaLimitType                        = "resourceQuotaLimit"
+	ResourceQuotaLimitFieldConfigMaps             = "configMaps"
+	ResourceQuotaLimitFieldLimitsCPU              = "limitsCpu"
+	ResourceQuotaLimitFieldLimitsMemory           = "limitsMemory"
+	ResourceQuotaLimitFieldPersistentVolumeClaims = "persistentVolumeClaims"
+	ResourceQuotaLimitFieldPods                   = "pods"
+	ResourceQuotaLimitFieldReplicationControllers = "replicationControllers"
+	ResourceQuotaLimitFieldRequestsCPU            = "requestsCpu"
+	ResourceQuotaLimitFieldRequestsMemory         = "requestsMemory"
+	ResourceQuotaLimitFieldRequestsStorage        = "requestsStorage"
+	ResourceQuotaLimitFieldSecrets                = "secrets"
+	ResourceQuotaLimitFieldServices               = "services"
+	ResourceQuotaLimitFieldServicesLoadBalancers  = "servicesLoadBalancers"
+	ResourceQuotaLimitFieldServicesNodePorts      = "servicesNodePorts"
 )
 
-type ProjectResourceLimit struct {
+type ResourceQuotaLimit struct {
 	ConfigMaps             string `json:"configMaps,omitempty" yaml:"configMaps,omitempty"`
 	LimitsCPU              string `json:"limitsCpu,omitempty" yaml:"limitsCpu,omitempty"`
 	LimitsMemory           string `json:"limitsMemory,omitempty" yaml:"limitsMemory,omitempty"`
