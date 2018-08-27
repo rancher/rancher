@@ -7,8 +7,9 @@ import (
 )
 
 var (
-	settings = map[string]Setting{}
-	provider Provider
+	settings   = map[string]Setting{}
+	provider   Provider
+	RKEVersion string
 
 	AgentImage                      = NewSetting("agent-image", "rancher/rancher-agent:master")
 	WindowsAgentImage               = NewSetting("windows-agent-image", "rancher/rancher-agent:master-nanoserver-1803")
@@ -31,6 +32,7 @@ var (
 	Namespace                       = NewSetting("namespace", "cattle-system")
 	PeerServices                    = NewSetting("peer-service", "rancher")
 	RDNSServerBaseURL               = NewSetting("rdns-base-url", "https://api.lb.rancher.cloud/v1")
+	RkeVersion                      = NewSetting("rke-version", RKEVersion)
 	ServerImage                     = NewSetting("server-image", "rancher/rancher")
 	ServerURL                       = NewSetting("server-url", "")
 	ServerVersion                   = NewSetting("server-version", "dev")
