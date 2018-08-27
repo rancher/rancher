@@ -7,4 +7,7 @@ cd $(dirname $0)/..
 
 mkdir -p bin
 [ "$(uname)" != "Darwin" ] && LINKFLAGS="-linkmode external -extldflags -static -s"
-CGO_ENABLED=0 go build -i -tags k8s -ldflags "-X main.VERSION=$VERSION $LINKFLAGS" -o bin/rancher
+
+RKE_VERSION=$(grep '^github.com/rancher/rke' vendor.conf | awk '{print $2}')
+
+CGO_ENABLED=0 go build -i -tags k8s -ldflags "-X main.VERSION=$VERSION -X github.com/rancher/rancher/pkg/settings.RKEVersion=$RKE_VERSION $LINKFLAGS" -o bin/rancher
