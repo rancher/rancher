@@ -67,15 +67,16 @@ func (d *NodeDrain) drainNode(key string, obj *v3.Node) error {
 		return nil
 	}
 
-	defer nodeMapLock.Unlock()
 	if obj.Spec.DesiredNodeUnschedulable == "drain" {
 		nodeMapLock.Lock()
 		if _, ok := d.nodesToContext[obj.Name]; ok {
+			nodeMapLock.Unlock()
 			return nil
 		}
 		ctx, cancel := context.WithCancel(d.ctx)
 		d.nodesToContext[obj.Name] = cancel
 		go d.drain(ctx, obj, cancel)
+		nodeMapLock.Unlock()
 
 	} else if obj.Spec.DesiredNodeUnschedulable == "stopDrain" {
 		nodeMapLock.Lock()

@@ -48,15 +48,15 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	if nodeTemplateID == nil && customConfig == nil {
 		delete(resource.Links, "remove")
 	}
-	if resource.Values["desiredNodeUnschedulabe"] == "drain" {
+	if resource.Values["state"] == "draining" {
 		resource.AddAction(apiContext, "stopDrain")
 		return
 	}
+	resource.AddAction(apiContext, "drain")
 	if convert.ToBool(resource.Values["unschedulable"]) {
 		resource.AddAction(apiContext, "uncordon")
 	} else {
 		resource.AddAction(apiContext, "cordon")
-		resource.AddAction(apiContext, "drain")
 	}
 }
 
