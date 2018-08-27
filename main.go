@@ -28,6 +28,7 @@ var (
 
 func main() {
 	app.RegisterPasswordResetCommand()
+	app.RegisterEnsureDefaultAdminCommand()
 	if reexec.Init() {
 		return
 	}
