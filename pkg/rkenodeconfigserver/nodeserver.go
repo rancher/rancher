@@ -99,7 +99,7 @@ func (n *RKENodeConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
-		rw.Write([]byte(err.Error()))
+		rw.Write([]byte("Failed to construct node config. Error: " + err.Error()))
 		return
 	}
 
