@@ -55,7 +55,7 @@ func (l *Lifecycle) deploy(obj *v3.PipelineExecution) error {
 	if _, err := l.services.Create(jenkinsService); err != nil && !apierrors.IsAlreadyExists(err) {
 		return errors.Wrapf(err, "Error create jenkins service")
 	}
-	jenkinsDeployment := getJenkinsDeployment(nsName)
+	jenkinsDeployment := GetJenkinsDeployment(nsName)
 	if _, err := l.deployments.Create(jenkinsDeployment); err != nil && !apierrors.IsAlreadyExists(err) {
 		return errors.Wrapf(err, "Error create jenkins deployment")
 	}
@@ -64,7 +64,7 @@ func (l *Lifecycle) deploy(obj *v3.PipelineExecution) error {
 	if _, err := l.services.Create(registryService); err != nil && !apierrors.IsAlreadyExists(err) {
 		return errors.Wrapf(err, "Error create registry service")
 	}
-	registryDeployment := getRegistryDeployment(nsName)
+	registryDeployment := GetRegistryDeployment(nsName)
 	if _, err := l.deployments.Create(registryDeployment); err != nil && !apierrors.IsAlreadyExists(err) {
 		return errors.Wrapf(err, "Error create registry deployment")
 	}
@@ -73,7 +73,7 @@ func (l *Lifecycle) deploy(obj *v3.PipelineExecution) error {
 	if _, err := l.services.Create(minioService); err != nil && !apierrors.IsAlreadyExists(err) {
 		return errors.Wrapf(err, "Error create minio service")
 	}
-	minioDeployment := getMinioDeployment(nsName)
+	minioDeployment := GetMinioDeployment(nsName)
 	if _, err := l.deployments.Create(minioDeployment); err != nil && !apierrors.IsAlreadyExists(err) {
 		return errors.Wrapf(err, "Error create minio deployment")
 	}
@@ -170,7 +170,7 @@ func getJenkinsService(ns string) *corev1.Service {
 	}
 }
 
-func getJenkinsDeployment(ns string) *appsv1beta2.Deployment {
+func GetJenkinsDeployment(ns string) *appsv1beta2.Deployment {
 	replicas := int32(1)
 	return &appsv1beta2.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -298,7 +298,7 @@ func getRegistryService(ns string) *corev1.Service {
 	}
 }
 
-func getRegistryDeployment(ns string) *appsv1beta2.Deployment {
+func GetRegistryDeployment(ns string) *appsv1beta2.Deployment {
 	replicas := int32(1)
 	return &appsv1beta2.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -355,7 +355,7 @@ func getMinioService(ns string) *corev1.Service {
 	}
 }
 
-func getMinioDeployment(ns string) *appsv1beta2.Deployment {
+func GetMinioDeployment(ns string) *appsv1beta2.Deployment {
 	replicas := int32(1)
 	return &appsv1beta2.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
