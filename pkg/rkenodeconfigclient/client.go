@@ -56,7 +56,7 @@ func ConfigClient(ctx context.Context, url string, header http.Header, writeCert
 			return rkeworker.ExecutePlan(ctx, nc, writeCertOnly)
 		}
 
-		logrus.Infof("waiting for node to register")
+		logrus.Infof("waiting for node to register. Either cluster is not ready for registering or etcd and controlplane node have to be registered first")
 		time.Sleep(2 * time.Second)
 	}
 }
