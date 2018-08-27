@@ -188,3 +188,43 @@ func (s *userStore) create(apiContext *types.APIContext, schema *types.Schema, d
 
 	return s.Store.Create(apiContext, schema, data)
 }
+
+func (s *userStore) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
+	currentUser, err := getUser(apiContext)
+	if err != nil {
+		return nil, err
+	}
+
+	willBeInactive := false
+	if val, ok := data[client.UserFieldEnabled].(bool); ok {
+		willBeInactive = !val
+	}
+
+	if currentUser == id && willBeInactive {
+		return nil, httperror.NewAPIError(httperror.InvalidAction, "You cannot deactivate yourself")
+	}
+
+	return s.Store.Update(apiContext, schema, data, id)
+}
+
+func (s *userStore) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
+	currentUser, err := getUser(apiContext)
+	if err != nil {
+		return nil, err
+	}
+
+	if currentUser == id {
+		return nil, httperror.NewAPIError(httperror.InvalidAction, "You cannot delete yourself")
+	}
+
+	return s.Store.Delete(apiContext, schema, id)
+}
+
+func getUser(apiContext *types.APIContext) (string, error) {
+	user := apiContext.Request.Header.Get("Impersonate-User")
+	if user == "" {
+		return "", httperror.NewAPIError(httperror.ServerError, "There was an error authorizing the user")
+	}
+
+	return user, nil
+}
