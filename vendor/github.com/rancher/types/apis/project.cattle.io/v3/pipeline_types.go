@@ -336,6 +336,7 @@ type PipelineSystemImages struct {
 	PluginsDocker string `json:"pluginsDocker,omitempty"`
 	Minio         string `json:"minio,omitempty"`
 	Registry      string `json:"registry,omitempty"`
+	RegistryProxy string `json:"registryProxy,omitempty"`
 	KubeApply     string `json:"kubeApply,omitempty"`
 }
 
