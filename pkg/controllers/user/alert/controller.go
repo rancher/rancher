@@ -161,7 +161,7 @@ func initClusterPreCanAlerts(clusterAlerts v3.ClusterAlertInterface, clusterName
 
 	eventRule := &v3.ClusterAlert{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "clusteralert-deploment-event",
+			Name: "clusteralert-deployment-event",
 		},
 		Spec: v3.ClusterAlertSpec{
 			ClusterName: clusterName,
