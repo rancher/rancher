@@ -294,13 +294,13 @@ func provision(namespaces v1.NamespaceInterface, configmaps v1.ConfigMapInterfac
 		return err
 	}
 
-	if err := utils.CreateLogAggregator(daemonsets, serviceAccounts, clusterRoleBindings, clusterLister, clusterName, loggingconfig.LoggingNamespace); err != nil {
-		return err
-	}
-
 	cluster, err := clusterLister.Get("", clusterName)
 	if err != nil {
 		return errors.Wrapf(err, "get dockerRootDir from cluster %s failed", clusterName)
+	}
+
+	if err := utils.CreateLogAggregator(daemonsets, serviceAccounts, clusterRoleBindings, cluster.Status.Driver, loggingconfig.LoggingNamespace); err != nil {
+		return err
 	}
 
 	return utils.CreateFluentd(daemonsets, serviceAccounts, clusterRoleBindings, loggingconfig.LoggingNamespace, cluster.Spec.DockerRootDir)

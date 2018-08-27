@@ -37,7 +37,7 @@ func CreateFluentd(ds rv1beta2.DaemonSetInterface, sa rv1.ServiceAccountInterfac
 		return err
 	}
 
-	daemonset := newFluentdDaemonset(loggingconfig.FluentdName, namespace, loggingconfig.FluentdName, dockerRootDir)
+	daemonset := NewFluentdDaemonset(loggingconfig.FluentdName, namespace, dockerRootDir)
 	_, err = ds.Create(daemonset)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
@@ -45,7 +45,7 @@ func CreateFluentd(ds rv1beta2.DaemonSetInterface, sa rv1.ServiceAccountInterfac
 	return nil
 }
 
-func CreateLogAggregator(ds rv1beta2.DaemonSetInterface, sa rv1.ServiceAccountInterface, rb rrbacv1.ClusterRoleBindingInterface, cl v3.ClusterLister, clusterName, namespace string) (err error) {
+func CreateLogAggregator(ds rv1beta2.DaemonSetInterface, sa rv1.ServiceAccountInterface, rb rrbacv1.ClusterRoleBindingInterface, driverDir, namespace string) (err error) {
 	defer func() {
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			if err = removeDeamonset(ds, sa, rb, loggingconfig.LogAggregatorName); err != nil {
@@ -66,12 +66,7 @@ func CreateLogAggregator(ds rv1beta2.DaemonSetInterface, sa rv1.ServiceAccountIn
 		return err
 	}
 
-	cluster, err := cl.Get("", clusterName)
-	if err != nil {
-		return err
-	}
-	driverDir := getDriverDir(cluster.Status.Driver)
-	daemonset := newLogAggregatorDaemonset(loggingconfig.LogAggregatorName, namespace, driverDir)
+	daemonset := NewLogAggregatorDaemonset(loggingconfig.LogAggregatorName, namespace, driverDir)
 	_, err = ds.Create(daemonset)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
@@ -130,7 +125,7 @@ func newRoleBinding(name, namespace string) *rbacv1.ClusterRoleBinding {
 	}
 }
 
-func newFluentdDaemonset(name, namespace, clusterName, dockerRootDir string) *v1beta2.DaemonSet {
+func NewFluentdDaemonset(name, namespace, dockerRootDir string) *v1beta2.DaemonSet {
 	privileged := true
 	terminationGracePeriodSeconds := int64(30)
 
@@ -241,7 +236,7 @@ func newFluentdDaemonset(name, namespace, clusterName, dockerRootDir string) *v1
 	}
 }
 
-func newLogAggregatorDaemonset(name, namespace, driverDir string) *v1beta2.DaemonSet {
+func NewLogAggregatorDaemonset(name, namespace, driverDir string) *v1beta2.DaemonSet {
 	privileged := true
 	return &v1beta2.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{

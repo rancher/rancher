@@ -8,6 +8,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/condition"
+	systemimage "github.com/rancher/rancher/pkg/controllers/user/systemimage"
+	"github.com/rancher/rancher/pkg/project"
 	corev1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -35,10 +37,10 @@ var systemProjectLabels = labels.Set(map[string]string{"authz.management.cattle.
 var crtbCeatorOwnerAnnotations = map[string]string{creatorOwnerBindingAnnotation: "true"}
 
 var defaultProjects = map[string]bool{
-	"Default": true,
+	project.Default: true,
 }
 var systemProjects = map[string]bool{
-	"System": true,
+	project.System: true,
 }
 
 func newPandCLifecycles(management *config.ManagementContext) (*projectLifecycle, *clusterLifecycle) {
@@ -188,11 +190,11 @@ type mgr struct {
 }
 
 func (m *mgr) createDefaultProject(obj runtime.Object) (runtime.Object, error) {
-	return m.createProject("Default", v3.ClusterConditionconditionDefaultProjectCreated, obj, defaultProjectLabels, defaultProjects)
+	return m.createProject(project.Default, v3.ClusterConditionconditionDefaultProjectCreated, obj, defaultProjectLabels, defaultProjects)
 }
 
 func (m *mgr) createSystemProject(obj runtime.Object) (runtime.Object, error) {
-	return m.createProject("System", v3.ClusterConditionconditionSystemProjectCreated, obj, systemProjectLabels, systemProjects)
+	return m.createProject(project.System, v3.ClusterConditionconditionSystemProjectCreated, obj, systemProjectLabels, systemProjects)
 }
 
 func (m *mgr) createProject(name string, cond condition.Cond, obj runtime.Object, labels labels.Set, projectMap map[string]bool) (runtime.Object, error) {
@@ -213,13 +215,24 @@ func (m *mgr) createProject(name string, cond condition.Cond, obj runtime.Object
 			logrus.Warnf("Cluster %v has no creatorId annotation. Cannot create %s project", metaAccessor.GetName(), name)
 			return obj, nil
 		}
+
+		annotation := map[string]string{
+			creatorIDAnn: creatorID,
+		}
+
+		if name == project.System {
+			latestSystemVersion, err := systemimage.GetSystemImageVersion()
+			if err != nil {
+				return obj, err
+			}
+			annotation[project.SystemImageVersionAnn] = latestSystemVersion
+		}
+
 		project := &v3.Project{
 			ObjectMeta: v1.ObjectMeta{
 				GenerateName: "p-",
-				Annotations: map[string]string{
-					creatorIDAnn: creatorID,
-				},
-				Labels: labels,
+				Annotations:  annotation,
+				Labels:       labels,
 			},
 			Spec: v3.ProjectSpec{
 				DisplayName: name,

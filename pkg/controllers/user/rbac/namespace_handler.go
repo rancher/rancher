@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/controllers/user/resourcequota"
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
@@ -32,8 +33,8 @@ var projectNSVerbToSuffix = map[string]string{
 var defaultProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/default-project": "true"})
 var systemProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/system-project": "true"})
 var initialProjectToLabels = map[string]labels.Set{
-	"Default": defaultProjectLabels,
-	"System":  systemProjectLabels,
+	project.Default: defaultProjectLabels,
+	project.System:  systemProjectLabels,
 }
 
 func newNamespaceLifecycle(m *manager, sync *resourcequota.SyncController) *nsLifecycle {

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	projectpkg "github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	corev1 "k8s.io/api/core/v1"
@@ -85,9 +86,9 @@ func (p *pLifecycle) Remove(project *v3.Project) (*v3.Project, error) {
 func (p *pLifecycle) ensureNamespacesAssigned(project *v3.Project) error {
 	projectName := ""
 	if _, ok := project.Labels["authz.management.cattle.io/default-project"]; ok {
-		projectName = "Default"
+		projectName = projectpkg.Default
 	} else if _, ok := project.Labels["authz.management.cattle.io/system-project"]; ok {
-		projectName = "System"
+		projectName = projectpkg.System
 	}
 	if projectName == "" {
 		return nil
@@ -102,11 +103,11 @@ func (p *pLifecycle) ensureNamespacesAssigned(project *v3.Project) error {
 	}
 
 	switch projectName {
-	case "Default":
+	case projectpkg.Default:
 		if err = p.ensureDefaultNamespaceAssigned(cluster, project); err != nil {
 			return err
 		}
-	case "System":
+	case projectpkg.System:
 		if err = p.ensureSystemNamespaceAssigned(cluster, project); err != nil {
 			return err
 		}
@@ -117,14 +118,14 @@ func (p *pLifecycle) ensureNamespacesAssigned(project *v3.Project) error {
 
 func (p *pLifecycle) ensureDefaultNamespaceAssigned(cluster *v3.Cluster, project *v3.Project) error {
 	_, err := v3.ClusterConditionDefaultNamespaceAssigned.DoUntilTrue(cluster.DeepCopy(), func() (runtime.Object, error) {
-		return nil, p.assignNamespacesToProject(project, "Default")
+		return nil, p.assignNamespacesToProject(project, projectpkg.Default)
 	})
 	return err
 }
 
 func (p *pLifecycle) ensureSystemNamespaceAssigned(cluster *v3.Cluster, project *v3.Project) error {
 	_, err := v3.ClusterConditionSystemNamespacesAssigned.DoUntilTrue(cluster.DeepCopy(), func() (runtime.Object, error) {
-		return nil, p.assignNamespacesToProject(project, "System")
+		return nil, p.assignNamespacesToProject(project, projectpkg.System)
 	})
 	return err
 }
@@ -172,7 +173,7 @@ func getDefaultAndSystemProjectsToNamespaces() (map[string][]string, error) {
 	}
 
 	return map[string][]string{
-		"Default": {"default"},
-		"System":  systemNamespaces,
+		projectpkg.Default: {"default"},
+		projectpkg.System:  systemNamespaces,
 	}, nil
 }

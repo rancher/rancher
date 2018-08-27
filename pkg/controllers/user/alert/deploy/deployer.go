@@ -132,7 +132,7 @@ func (d *Deployer) deploy() error {
 		return errors.Wrapf(err, "Creating secret")
 	}
 
-	deployment := getDeployment()
+	deployment := GetDeployment()
 	if _, err := d.appsClient.Create(deployment); err != nil && !apierrors.IsAlreadyExists(err) {
 		return errors.Wrapf(err, "Creating deployment")
 	}
@@ -186,7 +186,7 @@ func getService() *corev1.Service {
 	}
 }
 
-func getDeployment() *appsv1beta2.Deployment {
+func GetDeployment() *appsv1beta2.Deployment {
 	replicas := int32(1)
 	return &appsv1beta2.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
