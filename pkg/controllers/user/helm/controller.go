@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"time"
 
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	"github.com/rancher/rancher/pkg/ref"
@@ -15,6 +16,7 @@ import (
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -58,10 +60,13 @@ type Lifecycle struct {
 }
 
 func (l *Lifecycle) Create(obj *v3.App) (*v3.App, error) {
-	return l.DeployApp(obj, true)
+	return obj, nil
 }
 
 func (l *Lifecycle) Updated(obj *v3.App) (*v3.App, error) {
+	if obj.Spec.ExternalID == "" && len(obj.Spec.Files) == 0 {
+		return obj, nil
+	}
 	_, projectName := ref.Parse(obj.Spec.ProjectName)
 	appRevisionClient := l.AppRevisionGetter.AppRevisions(projectName)
 	if obj.Spec.AppRevisionName != "" {
@@ -80,17 +85,17 @@ func (l *Lifecycle) Updated(obj *v3.App) (*v3.App, error) {
 			}
 		}
 	}
-	return l.DeployApp(obj, false)
+	return l.DeployApp(obj)
 }
 
-func (l *Lifecycle) DeployApp(obj *v3.App, install bool) (*v3.App, error) {
+func (l *Lifecycle) DeployApp(obj *v3.App) (*v3.App, error) {
 	newObj, err := v3.AppConditionInstalled.Do(obj, func() (runtime.Object, error) {
 		template, notes, tempDir, err := generateTemplates(obj, l.TemplateVersionClient, l.TemplateContentClient)
 		defer os.RemoveAll(tempDir)
 		if err != nil {
 			return obj, err
 		}
-		if err := l.Run(obj, template, tempDir, notes, install); err != nil {
+		if err := l.Run(obj, template, tempDir, notes); err != nil {
 			return obj, err
 		}
 		return obj, nil
@@ -99,18 +104,6 @@ func (l *Lifecycle) DeployApp(obj *v3.App, install bool) (*v3.App, error) {
 }
 
 func (l *Lifecycle) Remove(obj *v3.App) (*v3.App, error) {
-	tempDir, err := ioutil.TempDir("", "helm-")
-	if err != nil {
-		return obj, err
-	}
-	defer os.RemoveAll(tempDir)
-	kubeConfigPath, err := l.writeKubeConfig(obj, tempDir)
-	if err != nil {
-		return obj, err
-	}
-	if err := helmDelete(kubeConfigPath, obj); err != nil {
-		return obj, err
-	}
 	_, projectName := ref.Parse(obj.Spec.ProjectName)
 	appRevisionClient := l.AppRevisionGetter.AppRevisions(projectName)
 	revisions, err := appRevisionClient.List(metav1.ListOptions{
@@ -124,10 +117,29 @@ func (l *Lifecycle) Remove(obj *v3.App) (*v3.App, error) {
 			return obj, err
 		}
 	}
+	tempDir, err := ioutil.TempDir("", "helm-")
+	if err != nil {
+		return obj, err
+	}
+	defer os.RemoveAll(tempDir)
+	kubeConfigPath, err := l.writeKubeConfig(obj, tempDir)
+	if err != nil {
+		return obj, err
+	}
+	// try three times and succeed
+	start := time.Second * 1
+	for i := 0; i < 3; i++ {
+		if err := helmDelete(kubeConfigPath, obj); err == nil {
+			break
+		}
+		logrus.Error(err)
+		time.Sleep(start)
+		start *= 2
+	}
 	return obj, nil
 }
 
-func (l *Lifecycle) Run(obj *v3.App, template, templateDir, notes string, install bool) error {
+func (l *Lifecycle) Run(obj *v3.App, template, templateDir, notes string) error {
 	tempDir, err := ioutil.TempDir("", "kubeconfig-")
 	if err != nil {
 		return err
@@ -137,7 +149,7 @@ func (l *Lifecycle) Run(obj *v3.App, template, templateDir, notes string, instal
 	if err != nil {
 		return err
 	}
-	if err := helmInstall(templateDir, kubeConfigPath, obj, install); err != nil {
+	if err := helmInstall(templateDir, kubeConfigPath, obj); err != nil {
 		return err
 	}
 	return l.createAppRevision(obj, template, notes, false)

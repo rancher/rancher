@@ -3,14 +3,13 @@ package helm
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-
-	"encoding/base64"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
@@ -22,10 +21,8 @@ import (
 
 const (
 	helmName    = "helm"
-	kubectl     = "kubectl"
 	appLabel    = "io.cattle.field/appId"
 	failedLabel = "io.cattle.field/failed-revision"
-	kcEnv       = "KUBECONFIG"
 )
 
 func WriteTempDir(rootDir string, files map[string]string) (string, error) {
@@ -47,13 +44,13 @@ func WriteTempDir(rootDir string, files map[string]string) (string, error) {
 	return "", nil
 }
 
-func helmInstall(templateDir, kubeconfigPath string, app *v3.App, install bool) error {
+func helmInstall(templateDir, kubeconfigPath string, app *v3.App) error {
 	cont, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	addr := common.GenerateRandomPort()
 	probeAddr := common.GenerateRandomPort()
 	go common.StartTiller(cont, addr, probeAddr, app.Spec.TargetNamespace, kubeconfigPath)
-	return common.InstallCharts(templateDir, addr, app, install)
+	return common.InstallCharts(templateDir, addr, app)
 }
 
 func helmDelete(kubeconfigPath string, app *v3.App) error {
