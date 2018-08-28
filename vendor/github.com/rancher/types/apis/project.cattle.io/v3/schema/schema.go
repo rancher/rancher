@@ -545,6 +545,7 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 			TransitioningMessage string
 			ExitCode             *int
 			RestartCount         int
+			ProjectID            string `norman:"type=reference[project]"`
 		}{}).
 		MustImport(&Version, v1.PodSpec{}, struct {
 			Scheduling *Scheduling

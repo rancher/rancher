@@ -221,7 +221,6 @@ func (s *Schemas) readFields(schema *Schema, t reflect.Type) error {
 
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
-
 		if field.PkgPath != "" {
 			// unexported field
 			continue

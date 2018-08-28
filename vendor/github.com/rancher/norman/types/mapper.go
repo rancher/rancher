@@ -152,6 +152,12 @@ func (t *typeMapper) ModifySchema(schema *Schema, schemas *Schemas) error {
 	t.subArraySchemas = map[string]*Schema{}
 	t.subMapSchemas = map[string]*Schema{}
 	t.typeName = fmt.Sprintf("%s/schemas/%s", schema.Version.Path, schema.ID)
+	if schema.ID == "container" {
+		//pID := schema.ResourceFields["projectId"].CodeName
+		schema.Version.Path += "/"
+		schema.Version.Path += "local"
+		t.typeName = fmt.Sprintf("%s/schemas/%s", schema.Version.Path, schema.ID)
+	}
 
 	mapperSchema := schema
 	if schema.InternalSchema != nil {
