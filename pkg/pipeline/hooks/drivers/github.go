@@ -24,6 +24,11 @@ const (
 	githubPingEvent       = "ping"
 	githubPushEvent       = "push"
 	githubPREvent         = "pull_request"
+
+	githubActionOpen = "opened"
+	githubActionSync = "synchronize"
+
+	githubStateOpen = "open"
 )
 
 type GithubDriver struct {
@@ -151,6 +156,14 @@ func parsePullRequestPayload(raw []byte) (*model.BuildInfo, error) {
 	payload := &github.PullRequestEvent{}
 	if err := json.Unmarshal(raw, payload); err != nil {
 		return nil, err
+	}
+
+	action := payload.GetAction()
+	if action != githubActionOpen && action != githubActionSync {
+		return nil, fmt.Errorf("no trigger for %s action", action)
+	}
+	if payload.PullRequest.GetState() != githubStateOpen {
+		return nil, fmt.Errorf("no trigger for closed pull requests")
 	}
 
 	info.TriggerType = utils.TriggerTypeWebhook
