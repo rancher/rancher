@@ -21,6 +21,11 @@ const (
 	gitlabPushEvent     = "Push Hook"
 	gitlabMREvent       = "Merge Request Hook"
 	gitlabTagEvent      = "Tag Push Hook"
+
+	gitlabActionOpen   = "open"
+	gitlabActionUpdate = "update"
+
+	gitlabStateOpen = "opened"
 )
 
 type GitlabDriver struct {
@@ -129,14 +134,22 @@ func gitlabParsePushPayload(raw []byte) (*model.BuildInfo, error) {
 }
 
 func gitlabParseMergeRequestPayload(raw []byte) (*model.BuildInfo, error) {
+	info := &model.BuildInfo{}
 	payload := &gitlab.MergeEvent{}
 	if err := json.Unmarshal(raw, payload); err != nil {
 		return nil, err
 	}
 
-	info := &model.BuildInfo{}
-	if err := json.Unmarshal(raw, payload); err != nil {
-		return nil, err
+	action := payload.ObjectAttributes.Action
+	oldRev := payload.ObjectAttributes.OldRev
+	if action != gitlabActionOpen && action != gitlabActionUpdate {
+		return nil, fmt.Errorf("no trigger for %s action", action)
+	}
+	if action == gitlabActionUpdate && oldRev == "" {
+		return nil, fmt.Errorf("no trigger for metadata update action")
+	}
+	if payload.ObjectAttributes.State != gitlabStateOpen {
+		return nil, fmt.Errorf("no trigger for closed merge requests")
 	}
 
 	info.TriggerType = utils.TriggerTypeWebhook
@@ -144,7 +157,7 @@ func gitlabParseMergeRequestPayload(raw []byte) (*model.BuildInfo, error) {
 	info.Branch = payload.ObjectAttributes.TargetBranch
 	info.Ref = fmt.Sprintf("refs/merge-requests/%d/head", payload.ObjectAttributes.IID)
 	info.HTMLLink = payload.ObjectAttributes.URL
-	info.Title = payload.ObjectAttributes.LastCommit.Message
+	info.Title = payload.ObjectAttributes.Title
 	info.Message = payload.ObjectAttributes.LastCommit.Message
 	info.Commit = payload.ObjectAttributes.LastCommit.ID
 	info.Author = payload.User.Name
