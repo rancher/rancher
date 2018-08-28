@@ -23,8 +23,8 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver("openstack", "local://", "", nil, false, true, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver("otc", "https://obs.otc.t-systems.com/dockermachinedriver/docker-machine-driver-otc",
-		"e98f246f625ca46f5e037dc29bdf00fe", []string{"*.otc.t-systems.com"}, false, false, management); err != nil {
+	if err := addMachineDriver("otc", "https://dockermachinedriver.obs.eu-de.otc.t-systems.com/docker-machine-driver-otc",
+		"b4c05f6598dcfac7a8f10899aaac3d42", []string{"*.otc.t-systems.com"}, false, false, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver("packet", "https://github.com/packethost/docker-machine-driver-packet/releases/download/v0.1.4/docker-machine-driver-packet_linux-amd64.zip",
