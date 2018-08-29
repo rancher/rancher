@@ -188,11 +188,6 @@ func (s *roleBindingClient) ObjectClient() *objectclient.ObjectClient {
 }
 
 func (s *roleBindingClient) Create(o *v1.RoleBinding) (*v1.RoleBinding, error) {
-	if o.Labels == nil {
-		labels := make(map[string]string)
-		o.Labels = labels
-	}
-	o.Labels["creator.cattle.io/rancher-created"] = "true"
 	obj, err := s.objectClient.Create(o)
 	return obj.(*v1.RoleBinding), err
 }
@@ -208,11 +203,6 @@ func (s *roleBindingClient) GetNamespaced(namespace, name string, opts metav1.Ge
 }
 
 func (s *roleBindingClient) Update(o *v1.RoleBinding) (*v1.RoleBinding, error) {
-	if o.Labels == nil {
-		labels := make(map[string]string)
-		o.Labels = labels
-	}
-	o.Labels["creator.cattle.io/rancher-created"] = "true"
 	obj, err := s.objectClient.Update(o.Name, o)
 	return obj.(*v1.RoleBinding), err
 }

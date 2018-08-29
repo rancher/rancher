@@ -38,6 +38,13 @@ func (ph *podHandler) Sync(key string, pod *corev1.Pod) error {
 	if disabled {
 		return nil
 	}
+	moved, err := isNamespaceMoved(pod.Namespace, ph.npmgr.nsLister)
+	if err != nil {
+		return err
+	}
+	if moved {
+		return nil
+	}
 	logrus.Debugf("podHandler: Sync: %+v", *pod)
 	if err := ph.addLabelIfHostPortsPresent(pod); err != nil {
 		return err

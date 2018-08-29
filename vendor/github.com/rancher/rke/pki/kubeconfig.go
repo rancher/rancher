@@ -14,11 +14,11 @@ clusters:
 contexts:
 - context:
     cluster: "` + clusterName + `"
-    user: "` + componentName + `"
-  name: "Default"
-current-context: "Default"
+    user: "` + componentName + `-` + clusterName + `"
+  name: "` + clusterName + `"
+current-context: "` + clusterName + `"
 users:
-- name: "` + componentName + `"
+- name: "` + componentName + `-` + clusterName + `"
   user:
     client-certificate: ` + crtPath + `
     client-key: ` + keyPath + ``
@@ -36,11 +36,11 @@ clusters:
 contexts:
 - context:
     cluster: "` + clusterName + `"
-    user: "` + componentName + `"
-  name: "Default"
-current-context: "Default"
+    user: "` + componentName + `-` + clusterName + `"
+  name: "` + clusterName + `"
+current-context: "` + clusterName + `"
 users:
-- name: "` + componentName + `"
+- name: "` + componentName + `-` + clusterName + `"
   user:
     client-certificate-data: ` + base64.StdEncoding.EncodeToString([]byte(crt)) + `
     client-key-data: ` + base64.StdEncoding.EncodeToString([]byte(key)) + ``

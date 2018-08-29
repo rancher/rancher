@@ -164,9 +164,11 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     host {{.clusterTarget.WrapSyslog.Host}}
     port {{.clusterTarget.WrapSyslog.Port}}
     severity {{.clusterTarget.SyslogConfig.Severity}}
-    program {{.clusterTarget.SyslogConfig.Program}}
     protocol {{.clusterTarget.SyslogConfig.Protocol}}
-
+    {{ if .clusterTarget.SyslogConfig.Program }}
+    program {{.clusterTarget.SyslogConfig.Program}}
+    {{end -}}
+    
     {{ if eq .clusterTarget.SyslogConfig.SSLVerify true}}
     verify_mode 1
     {{else -}}

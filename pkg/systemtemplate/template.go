@@ -78,6 +78,15 @@ spec:
       labels:
         app: cattle-cluster-agent
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: beta.kubernetes.io/os
+                  operator: NotIn
+                  values:
+                    - windows
       serviceAccountName: cattle
       containers:
         - name: cluster-register
@@ -117,6 +126,15 @@ spec:
       labels:
         app: cattle-agent
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: beta.kubernetes.io/os
+                  operator: NotIn
+                  values:
+                    - windows
       hostNetwork: true
       serviceAccountName: cattle
       tolerations:

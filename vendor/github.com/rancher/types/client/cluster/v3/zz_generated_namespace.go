@@ -5,41 +5,39 @@ import (
 )
 
 const (
-	NamespaceType                                = "namespace"
-	NamespaceFieldAnnotations                    = "annotations"
-	NamespaceFieldCreated                        = "created"
-	NamespaceFieldCreatorID                      = "creatorId"
-	NamespaceFieldDescription                    = "description"
-	NamespaceFieldLabels                         = "labels"
-	NamespaceFieldName                           = "name"
-	NamespaceFieldOwnerReferences                = "ownerReferences"
-	NamespaceFieldProjectID                      = "projectId"
-	NamespaceFieldRemoved                        = "removed"
-	NamespaceFieldResourceQuotaAppliedTemplateID = "resourceQuotaAppliedTemplateId"
-	NamespaceFieldResourceQuotaTemplateID        = "resourceQuotaTemplateId"
-	NamespaceFieldState                          = "state"
-	NamespaceFieldTransitioning                  = "transitioning"
-	NamespaceFieldTransitioningMessage           = "transitioningMessage"
-	NamespaceFieldUUID                           = "uuid"
+	NamespaceType                      = "namespace"
+	NamespaceFieldAnnotations          = "annotations"
+	NamespaceFieldCreated              = "created"
+	NamespaceFieldCreatorID            = "creatorId"
+	NamespaceFieldDescription          = "description"
+	NamespaceFieldLabels               = "labels"
+	NamespaceFieldName                 = "name"
+	NamespaceFieldOwnerReferences      = "ownerReferences"
+	NamespaceFieldProjectID            = "projectId"
+	NamespaceFieldRemoved              = "removed"
+	NamespaceFieldResourceQuota        = "resourceQuota"
+	NamespaceFieldState                = "state"
+	NamespaceFieldTransitioning        = "transitioning"
+	NamespaceFieldTransitioningMessage = "transitioningMessage"
+	NamespaceFieldUUID                 = "uuid"
 )
 
 type Namespace struct {
 	types.Resource
-	Annotations                    map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	Created                        string            `json:"created,omitempty" yaml:"created,omitempty"`
-	CreatorID                      string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
-	Description                    string            `json:"description,omitempty" yaml:"description,omitempty"`
-	Labels                         map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Name                           string            `json:"name,omitempty" yaml:"name,omitempty"`
-	OwnerReferences                []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	ProjectID                      string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
-	Removed                        string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	ResourceQuotaAppliedTemplateID string            `json:"resourceQuotaAppliedTemplateId,omitempty" yaml:"resourceQuotaAppliedTemplateId,omitempty"`
-	ResourceQuotaTemplateID        string            `json:"resourceQuotaTemplateId,omitempty" yaml:"resourceQuotaTemplateId,omitempty"`
-	State                          string            `json:"state,omitempty" yaml:"state,omitempty"`
-	Transitioning                  string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
-	TransitioningMessage           string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	UUID                           string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Annotations          map[string]string       `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Created              string                  `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID            string                  `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Description          string                  `json:"description,omitempty" yaml:"description,omitempty"`
+	Labels               map[string]string       `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name                 string                  `json:"name,omitempty" yaml:"name,omitempty"`
+	OwnerReferences      []OwnerReference        `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	ProjectID            string                  `json:"projectId,omitempty" yaml:"projectId,omitempty"`
+	Removed              string                  `json:"removed,omitempty" yaml:"removed,omitempty"`
+	ResourceQuota        *NamespaceResourceQuota `json:"resourceQuota,omitempty" yaml:"resourceQuota,omitempty"`
+	State                string                  `json:"state,omitempty" yaml:"state,omitempty"`
+	Transitioning        string                  `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage string                  `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	UUID                 string                  `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 
 type NamespaceCollection struct {

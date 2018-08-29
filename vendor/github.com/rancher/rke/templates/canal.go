@@ -198,7 +198,7 @@ data:
     {
       "Network": "{{.ClusterCIDR}}",
       "Backend": {
-        "Type": "vxlan"
+        "Type": "{{.FlannelBackend.Type}}"
       }
     }
 
@@ -229,6 +229,15 @@ spec:
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: beta.kubernetes.io/os
+                  operator: NotIn
+                  values:
+                    - windows
       hostNetwork: true
       serviceAccountName: canal
       tolerations:

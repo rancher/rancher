@@ -28,7 +28,13 @@ type Store struct {
 }
 
 func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
-	values.PutValue(data, "{\"conditions\": [{\"type\": \"InitialRolesPopulated\", \"status\": \"Unknown\", \"message\": \"Populating initial roles\"}]}",
-		"annotations", "cattle.io/status")
+	if _, ok := data["resourceQuota"]; ok {
+		values.PutValue(data, "{\"conditions\": [{\"type\": \"InitialRolesPopulated\", \"status\": \"Unknown\", \"message\": \"Populating initial roles\"},{\"type\": \"ResourceQuotaValidated\", \"status\": \"Unknown\", \"message\": \"Validating resource quota\"}]}",
+			"annotations", "cattle.io/status")
+	} else {
+		values.PutValue(data, "{\"conditions\": [{\"type\": \"InitialRolesPopulated\", \"status\": \"Unknown\", \"message\": \"Populating initial roles\"}]}",
+			"annotations", "cattle.io/status")
+	}
+
 	return p.Store.Create(apiContext, schema, data)
 }

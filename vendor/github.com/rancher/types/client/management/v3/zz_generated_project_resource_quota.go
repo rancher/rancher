@@ -7,6 +7,6 @@ const (
 )
 
 type ProjectResourceQuota struct {
-	Limit     *ProjectResourceLimit `json:"limit,omitempty" yaml:"limit,omitempty"`
-	UsedLimit *ProjectResourceLimit `json:"usedLimit,omitempty" yaml:"usedLimit,omitempty"`
+	Limit     *ResourceQuotaLimit `json:"limit,omitempty" yaml:"limit,omitempty"`
+	UsedLimit *ResourceQuotaLimit `json:"usedLimit,omitempty" yaml:"usedLimit,omitempty"`
 }

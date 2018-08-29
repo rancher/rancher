@@ -3,10 +3,9 @@ package resourcequota
 import (
 	"reflect"
 
-	"github.com/rancher/norman/types/convert"
+	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	clientcache "k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/quota"
@@ -17,11 +16,10 @@ collectController is responsible for calculate the combined limit set on the pro
 and setting this information in the project
 */
 type calculateLimitController struct {
-	projectLister               v3.ProjectLister
-	projects                    v3.ProjectInterface
-	nsIndexer                   clientcache.Indexer
-	resourceQuotaTemplateLister v3.ResourceQuotaTemplateLister
-	clusterName                 string
+	projectLister v3.ProjectLister
+	projects      v3.ProjectInterface
+	nsIndexer     clientcache.Indexer
+	clusterName   string
 }
 
 func (c *calculateLimitController) calculateResourceQuotaUsed(key string, ns *corev1.Namespace) error {
@@ -46,23 +44,17 @@ func (c *calculateLimitController) calculateProjectResourceQuota(projectID strin
 	if err != nil {
 		return err
 	}
-
-	templates, err := c.resourceQuotaTemplateLister.List(c.clusterName, labels.NewSelector())
-	if err != nil {
-		return err
-	}
-	templatesMap := map[string]*v3.ResourceQuotaTemplate{}
-	for _, template := range templates {
-		templatesMap[formatTemplateID(template)] = template
-	}
 	nssResourceList := api.ResourceList{}
 	for _, n := range namespaces {
 		ns := n.(*corev1.Namespace)
-		templateID := getTemplateID(ns)
-		if templateID == "" {
+		set, err := namespaceutil.IsNamespaceConditionSet(ns, resourceQuotaValidatedCondition, true)
+		if err != nil {
+			return err
+		}
+		if !set {
 			continue
 		}
-		nsLimit, err := getNamespaceLimit(ns, templatesMap, false)
+		nsLimit, err := getNamespaceLimit(ns)
 		if err != nil {
 			return err
 		}
@@ -84,21 +76,4 @@ func (c *calculateLimitController) calculateProjectResourceQuota(projectID strin
 	toUpdate.Spec.ResourceQuota.UsedLimit = *limit
 	_, err = c.projects.Update(toUpdate)
 	return err
-}
-
-func convertResourceListToLimit(rList api.ResourceList) (*v3.ProjectResourceLimit, error) {
-	converted, err := convert.EncodeToMap(rList)
-	if err != nil {
-		return nil, err
-	}
-
-	convertedMap := map[string]string{}
-	for key, value := range converted {
-		convertedMap[key] = convert.ToString(value)
-	}
-
-	toReturn := &v3.ProjectResourceLimit{}
-	err = convert.ToObj(convertedMap, toReturn)
-
-	return toReturn, err
 }

@@ -19,9 +19,7 @@ func SetupStore(schema *types.Schema) {
 		},
 		Transformer: func(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
 			workload.SetPublicEnpointsFields(data)
-			if convert.ToBool(values.GetValueN(data, "unschedulable")) {
-				data["state"] = "cordoned"
-			}
+			setState(data)
 			return data, nil
 		},
 	}
@@ -68,4 +66,22 @@ func (n nodeStore) Update(apiContext *types.APIContext, schema *types.Schema, da
 func format(data map[string]interface{}) {
 	data["desiredNodeLabels"] = data["labels"]
 	data["desiredNodeAnnotations"] = data["annotations"]
+}
+
+func setState(data map[string]interface{}) {
+	if data["state"] == "draining" {
+		return
+	}
+	if convert.ToBool(values.GetValueN(data, "unschedulable")) {
+		conditions, _ := values.GetSlice(data, "conditions")
+		for _, condition := range conditions {
+			condType := values.GetValueN(condition, "type")
+			if convert.ToString(condType) == "Drained" &&
+				convert.ToString(values.GetValueN(condition, "status")) == "True" {
+				data["state"] = "drained"
+				return
+			}
+		}
+		data["state"] = "cordoned"
+	}
 }

@@ -59,6 +59,20 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&AppList{},
 		&AppRevision{},
 		&AppRevisionList{},
+		&SourceCodeProvider{},
+		&SourceCodeProviderList{},
+		&SourceCodeProviderConfig{},
+		&SourceCodeProviderConfigList{},
+		&SourceCodeCredential{},
+		&SourceCodeCredentialList{},
+		&Pipeline{},
+		&PipelineList{},
+		&PipelineExecution{},
+		&PipelineExecutionList{},
+		&PipelineSetting{},
+		&PipelineSettingList{},
+		&SourceCodeRepository{},
+		&SourceCodeRepositoryList{},
 	)
 	return nil
 }

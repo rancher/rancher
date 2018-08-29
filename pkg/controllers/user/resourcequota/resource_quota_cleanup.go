@@ -41,7 +41,7 @@ func (c *cleanupController) needToCleanup(quota *corev1.ResourceQuota) (bool, er
 	if err != nil {
 		return false, err
 	}
-	projectLimit, _, err := getProjectLimit(ns, c.projectLister)
+	projectLimit, _, err := getProjectResourceQuotaLimit(ns, c.projectLister)
 	if err != nil {
 		return false, err
 	}

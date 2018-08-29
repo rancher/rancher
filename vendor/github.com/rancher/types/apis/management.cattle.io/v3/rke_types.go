@@ -326,6 +326,8 @@ type Process struct {
 	HealthCheck HealthCheck `json:"healthCheck,omitempty"`
 	// Process docker container Labels
 	Labels map[string]string `json:"labels,omitempty"`
+	// Process docker publish container's port to host
+	Publish []string `json:"publish,omitempty"`
 }
 
 type HealthCheck struct {

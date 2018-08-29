@@ -106,22 +106,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ClusterAlertList{},
 		&ProjectAlert{},
 		&ProjectAlertList{},
-		&ClusterPipeline{},
-		&ClusterPipelineList{},
-		&SourceCodeCredential{},
-		&SourceCodeCredentialList{},
-		&Pipeline{},
-		&PipelineList{},
-		&PipelineExecution{},
-		&PipelineExecutionList{},
-		&PipelineExecutionLog{},
-		&PipelineExecutionLogList{},
-		&SourceCodeRepository{},
-		&SourceCodeRepositoryList{},
 		&ComposeConfig{},
 		&ComposeConfigList{},
-		&ResourceQuotaTemplate{},
-		&ResourceQuotaTemplateList{},
 	)
 	return nil
 }
