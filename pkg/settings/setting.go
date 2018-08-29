@@ -11,10 +11,12 @@ var (
 	provider Provider
 
 	AgentImage                      = NewSetting("agent-image", "rancher/rancher-agent:master")
+	WindowsAgentImage               = NewSetting("windows-agent-image", "rancher/rancher-agent:master-nanoserver-1803")
 	CACerts                         = NewSetting("cacerts", "")
 	CLIURLDarwin                    = NewSetting("cli-url-darwin", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-darwin-amd64-v1.0.0-alpha8.tar.gz")
 	CLIURLLinux                     = NewSetting("cli-url-linux", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-linux-amd64-v1.0.0-alpha8.tar.gz")
 	CLIURLWindows                   = NewSetting("cli-url-windows", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-windows-386-v1.0.0-alpha8.zip")
+	ClusterDefaults                 = NewSetting("cluster-defaults", "")
 	EngineInstallURL                = NewSetting("engine-install-url", "https://releases.rancher.com/install-docker/17.03.sh")
 	EngineISOURL                    = NewSetting("engine-iso-url", "https://releases.rancher.com/os/latest/rancheros-vmware.iso")
 	EngineNewestVersion             = NewSetting("engine-newest-version", "v17.12.0")
@@ -26,6 +28,8 @@ var (
 	KubernetesVersion               = NewSetting("k8s-version", v3.DefaultK8s)
 	KubernetesVersionToSystemImages = NewSetting("k8s-version-to-images", getSystemImages())
 	MachineVersion                  = NewSetting("machine-version", "dev")
+	Namespace                       = NewSetting("namespace", "cattle-system")
+	PeerServices                    = NewSetting("peer-service", "rancher")
 	RDNSServerBaseURL               = NewSetting("rdns-base-url", "https://api.lb.rancher.cloud/v1")
 	ServerImage                     = NewSetting("server-image", "rancher/rancher")
 	ServerURL                       = NewSetting("server-url", "")

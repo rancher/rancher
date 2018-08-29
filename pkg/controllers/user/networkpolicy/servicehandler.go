@@ -29,6 +29,13 @@ func (sh *serviceHandler) Sync(key string, service *corev1.Service) error {
 	if disabled {
 		return nil
 	}
+	moved, err := isNamespaceMoved(service.Namespace, sh.npmgr.nsLister)
+	if err != nil {
+		return err
+	}
+	if moved {
+		return nil
+	}
 	logrus.Debugf("serviceHandler: Sync: %+v", *service)
 	return sh.npmgr.nodePortsUpdateHandler(service, sh.clusterNamespace)
 }

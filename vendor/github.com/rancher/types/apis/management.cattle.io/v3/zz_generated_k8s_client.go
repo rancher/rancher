@@ -52,14 +52,7 @@ type Interface interface {
 	NotifiersGetter
 	ClusterAlertsGetter
 	ProjectAlertsGetter
-	ClusterPipelinesGetter
-	SourceCodeCredentialsGetter
-	PipelinesGetter
-	PipelineExecutionsGetter
-	PipelineExecutionLogsGetter
-	SourceCodeRepositoriesGetter
 	ComposeConfigsGetter
-	ResourceQuotaTemplatesGetter
 }
 
 type Client struct {
@@ -104,14 +97,7 @@ type Client struct {
 	notifierControllers                                map[string]NotifierController
 	clusterAlertControllers                            map[string]ClusterAlertController
 	projectAlertControllers                            map[string]ProjectAlertController
-	clusterPipelineControllers                         map[string]ClusterPipelineController
-	sourceCodeCredentialControllers                    map[string]SourceCodeCredentialController
-	pipelineControllers                                map[string]PipelineController
-	pipelineExecutionControllers                       map[string]PipelineExecutionController
-	pipelineExecutionLogControllers                    map[string]PipelineExecutionLogController
-	sourceCodeRepositoryControllers                    map[string]SourceCodeRepositoryController
 	composeConfigControllers                           map[string]ComposeConfigController
-	resourceQuotaTemplateControllers                   map[string]ResourceQuotaTemplateController
 }
 
 func NewForConfig(config rest.Config) (Interface, error) {
@@ -165,14 +151,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		notifierControllers:                                map[string]NotifierController{},
 		clusterAlertControllers:                            map[string]ClusterAlertController{},
 		projectAlertControllers:                            map[string]ProjectAlertController{},
-		clusterPipelineControllers:                         map[string]ClusterPipelineController{},
-		sourceCodeCredentialControllers:                    map[string]SourceCodeCredentialController{},
-		pipelineControllers:                                map[string]PipelineController{},
-		pipelineExecutionControllers:                       map[string]PipelineExecutionController{},
-		pipelineExecutionLogControllers:                    map[string]PipelineExecutionLogController{},
-		sourceCodeRepositoryControllers:                    map[string]SourceCodeRepositoryController{},
 		composeConfigControllers:                           map[string]ComposeConfigController{},
-		resourceQuotaTemplateControllers:                   map[string]ResourceQuotaTemplateController{},
 	}, nil
 }
 
@@ -669,84 +648,6 @@ func (c *Client) ProjectAlerts(namespace string) ProjectAlertInterface {
 	}
 }
 
-type ClusterPipelinesGetter interface {
-	ClusterPipelines(namespace string) ClusterPipelineInterface
-}
-
-func (c *Client) ClusterPipelines(namespace string) ClusterPipelineInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ClusterPipelineResource, ClusterPipelineGroupVersionKind, clusterPipelineFactory{})
-	return &clusterPipelineClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type SourceCodeCredentialsGetter interface {
-	SourceCodeCredentials(namespace string) SourceCodeCredentialInterface
-}
-
-func (c *Client) SourceCodeCredentials(namespace string) SourceCodeCredentialInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &SourceCodeCredentialResource, SourceCodeCredentialGroupVersionKind, sourceCodeCredentialFactory{})
-	return &sourceCodeCredentialClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type PipelinesGetter interface {
-	Pipelines(namespace string) PipelineInterface
-}
-
-func (c *Client) Pipelines(namespace string) PipelineInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &PipelineResource, PipelineGroupVersionKind, pipelineFactory{})
-	return &pipelineClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type PipelineExecutionsGetter interface {
-	PipelineExecutions(namespace string) PipelineExecutionInterface
-}
-
-func (c *Client) PipelineExecutions(namespace string) PipelineExecutionInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &PipelineExecutionResource, PipelineExecutionGroupVersionKind, pipelineExecutionFactory{})
-	return &pipelineExecutionClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type PipelineExecutionLogsGetter interface {
-	PipelineExecutionLogs(namespace string) PipelineExecutionLogInterface
-}
-
-func (c *Client) PipelineExecutionLogs(namespace string) PipelineExecutionLogInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &PipelineExecutionLogResource, PipelineExecutionLogGroupVersionKind, pipelineExecutionLogFactory{})
-	return &pipelineExecutionLogClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type SourceCodeRepositoriesGetter interface {
-	SourceCodeRepositories(namespace string) SourceCodeRepositoryInterface
-}
-
-func (c *Client) SourceCodeRepositories(namespace string) SourceCodeRepositoryInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &SourceCodeRepositoryResource, SourceCodeRepositoryGroupVersionKind, sourceCodeRepositoryFactory{})
-	return &sourceCodeRepositoryClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
 type ComposeConfigsGetter interface {
 	ComposeConfigs(namespace string) ComposeConfigInterface
 }
@@ -754,19 +655,6 @@ type ComposeConfigsGetter interface {
 func (c *Client) ComposeConfigs(namespace string) ComposeConfigInterface {
 	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ComposeConfigResource, ComposeConfigGroupVersionKind, composeConfigFactory{})
 	return &composeConfigClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type ResourceQuotaTemplatesGetter interface {
-	ResourceQuotaTemplates(namespace string) ResourceQuotaTemplateInterface
-}
-
-func (c *Client) ResourceQuotaTemplates(namespace string) ResourceQuotaTemplateInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ResourceQuotaTemplateResource, ResourceQuotaTemplateGroupVersionKind, resourceQuotaTemplateFactory{})
-	return &resourceQuotaTemplateClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

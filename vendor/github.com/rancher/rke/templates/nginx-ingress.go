@@ -15,7 +15,7 @@ metadata:
     app: ingress-nginx
 data:
 {{ range $k,$v := .Options }}
-  {{ $k }}: {{ $v }}
+  {{ $k }}: "{{ $v }}"
 {{ end }}
 ---
 kind: ConfigMap
@@ -176,6 +176,15 @@ spec:
         prometheus.io/port: '10254'
         prometheus.io/scrape: 'true'
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: beta.kubernetes.io/os
+                  operator: NotIn
+                  values:
+                    - windows
       hostNetwork: true
       nodeSelector:
       {{ range $k, $v := .NodeSelector }}

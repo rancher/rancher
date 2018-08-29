@@ -40,12 +40,14 @@ const (
 
 	FlannelNetworkPlugin = "flannel"
 	FlannelIface         = "flannel_iface"
+	FlannelBackendType   = "flannel_backend_type"
 
 	CalicoNetworkPlugin = "calico"
 	CalicoCloudProvider = "calico_cloud_provider"
 
-	CanalNetworkPlugin = "canal"
-	CanalIface         = "canal_iface"
+	CanalNetworkPlugin      = "canal"
+	CanalIface              = "canal_iface"
+	CanalFlannelBackendType = "canal_flannel_backend_type"
 
 	WeaveNetworkPlugin = "weave"
 
@@ -83,6 +85,7 @@ const (
 	Calicoctl = "Calicoctl"
 
 	FlannelInterface = "FlannelInterface"
+	FlannelBackend   = "FlannelBackend"
 	CanalInterface   = "CanalInterface"
 	RBACConfig       = "RBACConfig"
 )
@@ -121,12 +124,15 @@ func (c *Cluster) deployNetworkPlugin(ctx context.Context) error {
 }
 
 func (c *Cluster) doFlannelDeploy(ctx context.Context) error {
-	flannelConfig := map[string]string{
+	flannelConfig := map[string]interface{}{
 		ClusterCIDR:      c.ClusterCIDR,
 		Image:            c.SystemImages.Flannel,
 		CNIImage:         c.SystemImages.FlannelCNI,
 		FlannelInterface: c.Network.Options[FlannelIface],
-		RBACConfig:       c.Authorization.Mode,
+		FlannelBackend: map[string]interface{}{
+			"Type": c.Network.Options[FlannelBackendType],
+		},
+		RBACConfig: c.Authorization.Mode,
 	}
 	pluginYaml, err := c.getNetworkPluginManifest(flannelConfig)
 	if err != nil {
@@ -137,7 +143,7 @@ func (c *Cluster) doFlannelDeploy(ctx context.Context) error {
 
 func (c *Cluster) doCalicoDeploy(ctx context.Context) error {
 	clientConfig := pki.GetConfigPath(pki.KubeNodeCertName)
-	calicoConfig := map[string]string{
+	calicoConfig := map[string]interface{}{
 		KubeCfg:       clientConfig,
 		ClusterCIDR:   c.ClusterCIDR,
 		CNIImage:      c.SystemImages.CalicoCNI,
@@ -155,7 +161,7 @@ func (c *Cluster) doCalicoDeploy(ctx context.Context) error {
 
 func (c *Cluster) doCanalDeploy(ctx context.Context) error {
 	clientConfig := pki.GetConfigPath(pki.KubeNodeCertName)
-	canalConfig := map[string]string{
+	canalConfig := map[string]interface{}{
 		ClientCertPath:  pki.GetCertPath(pki.KubeNodeCertName),
 		APIRoot:         "https://127.0.0.1:6443",
 		ClientKeyPath:   pki.GetKeyPath(pki.KubeNodeCertName),
@@ -167,6 +173,9 @@ func (c *Cluster) doCanalDeploy(ctx context.Context) error {
 		CanalFlannelImg: c.SystemImages.CanalFlannel,
 		RBACConfig:      c.Authorization.Mode,
 		CanalInterface:  c.Network.Options[CanalIface],
+		FlannelBackend: map[string]interface{}{
+			"Type": c.Network.Options[CanalFlannelBackendType],
+		},
 	}
 	pluginYaml, err := c.getNetworkPluginManifest(canalConfig)
 	if err != nil {
@@ -176,7 +185,7 @@ func (c *Cluster) doCanalDeploy(ctx context.Context) error {
 }
 
 func (c *Cluster) doWeaveDeploy(ctx context.Context) error {
-	weaveConfig := map[string]string{
+	weaveConfig := map[string]interface{}{
 		ClusterCIDR:        c.ClusterCIDR,
 		Image:              c.SystemImages.WeaveNode,
 		CNIImage:           c.SystemImages.WeaveCNI,
@@ -190,7 +199,7 @@ func (c *Cluster) doWeaveDeploy(ctx context.Context) error {
 	return c.doAddonDeploy(ctx, pluginYaml, NetworkPluginResourceName, true)
 }
 
-func (c *Cluster) getNetworkPluginManifest(pluginConfig map[string]string) (string, error) {
+func (c *Cluster) getNetworkPluginManifest(pluginConfig map[string]interface{}) (string, error) {
 	switch c.Network.Plugin {
 	case FlannelNetworkPlugin:
 		return templates.CompileTemplateFromMap(templates.FlannelTemplate, pluginConfig)

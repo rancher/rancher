@@ -24,6 +24,7 @@ type Token struct {
 	Description     string            `json:"description"`
 	Expired         bool              `json:"expired"`
 	ExpiresAt       string            `json:"expiresAt"`
+	Current         bool              `json:"current"`
 }
 
 type User struct {

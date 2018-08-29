@@ -3,9 +3,11 @@ package rkenodeconfigclient
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/rancher/rancher/pkg/rkeworker"
@@ -16,7 +18,30 @@ var (
 	client = &http.Client{
 		Timeout: 300 * time.Second,
 	}
+
+	nodeNotFoundRegexp    = regexp.MustCompile(`^node\.management\.cattle\.io.*not found$`)
+	clusterNotFoundRegexp = regexp.MustCompile(`^cluster.*not found$`)
 )
+
+type ErrNodeOrClusterNotFound struct {
+	msg        string
+	occursType string
+}
+
+func (e *ErrNodeOrClusterNotFound) Error() string {
+	return e.msg
+}
+
+func (e *ErrNodeOrClusterNotFound) ErrorOccursType() string {
+	return e.occursType
+}
+
+func newErrNodeOrClusterNotFound(msg, occursType string) *ErrNodeOrClusterNotFound {
+	return &ErrNodeOrClusterNotFound{
+		msg,
+		occursType,
+	}
+}
 
 func ConfigClient(ctx context.Context, url string, header http.Header, writeCertOnly bool) error {
 	for {
@@ -61,8 +86,16 @@ func getConfig(client *http.Client, url string, header http.Header) (*rkeworker.
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		content, _ := ioutil.ReadAll(resp.Body)
-		return nil, fmt.Errorf("invalid response %d: %s", resp.StatusCode, string(content))
+		respBytes, _ := ioutil.ReadAll(resp.Body)
+		errMsg := fmt.Sprintf("invalid response %d: %s", resp.StatusCode, string(respBytes))
+
+		if nodeNotFoundRegexp.Match(respBytes) {
+			return nil, newErrNodeOrClusterNotFound(errMsg, "node")
+		} else if clusterNotFoundRegexp.Match(respBytes) {
+			return nil, newErrNodeOrClusterNotFound(errMsg, "cluster")
+		}
+
+		return nil, errors.New(errMsg)
 	}
 
 	nc := &rkeworker.NodeConfig{}

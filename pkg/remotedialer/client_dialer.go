@@ -5,9 +5,11 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"github.com/rancher/types/config/dialer"
 )
 
-func clientDial(conn *connection, message *message) {
+func clientDial(dialer dialer.Dialer, conn *connection, message *message) {
 	defer conn.Close()
 
 	var (
@@ -15,10 +17,10 @@ func clientDial(conn *connection, message *message) {
 		err     error
 	)
 
-	if message.deadline == 0 {
-		netConn, err = net.Dial(message.proto, message.address)
-	} else {
+	if dialer == nil {
 		netConn, err = net.DialTimeout(message.proto, message.address, time.Duration(message.deadline)*time.Millisecond)
+	} else {
+		netConn, err = dialer(message.proto, message.address)
 	}
 
 	if err != nil {

@@ -330,8 +330,14 @@ func (m *Manager) listTokens(request *types.APIContext) error {
 		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
 	}
 
+	currentAuthToken, _, err := m.getToken(tokenAuthValue)
+	if err != nil {
+		return err
+	}
+
 	tokensFromStore := make([]map[string]interface{}, len(tokens))
 	for _, token := range tokens {
+		token.Current = currentAuthToken.Name == token.Name && !currentAuthToken.IsDerived
 		tokenData, err := ConvertTokenResource(request.Schema, token)
 		if err != nil {
 			return err
@@ -394,6 +400,11 @@ func (m *Manager) getTokenFromRequest(request *types.APIContext) error {
 
 	tokenID := request.ID
 
+	currentAuthToken, _, err := m.getToken(tokenAuthValue)
+	if err != nil {
+		return err
+	}
+
 	//getToken
 	token, status, err := m.getTokenByID(tokenAuthValue, tokenID)
 	if err != nil {
@@ -405,6 +416,7 @@ func (m *Manager) getTokenFromRequest(request *types.APIContext) error {
 		}
 		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
 	}
+	token.Current = currentAuthToken.Name == token.Name && !currentAuthToken.IsDerived
 	tokenData, err := ConvertTokenResource(request.Schema, token)
 	if err != nil {
 		return err

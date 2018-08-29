@@ -41,7 +41,8 @@ var (
 		Init(cronJobTypes).
 		Init(podTemplateSpecTypes).
 		Init(workloadTypes).
-		Init(appTypes)
+		Init(appTypes).
+		Init(pipelineTypes)
 )
 
 func configMapTypes(schemas *types.Schemas) *types.Schemas {
@@ -780,4 +781,113 @@ func NewWorkloadTypeMapper() types.Mapper {
 		mapper.WorkloadAnnotations{},
 		&m.AnnotationField{Field: "publicEndpoints", List: true},
 	}
+}
+
+func pipelineTypes(schema *types.Schemas) *types.Schemas {
+	return schema.
+		AddMapperForType(&Version, v3.SourceCodeProviderConfig{}).
+		AddMapperForType(&Version, v3.Pipeline{},
+			&m.Embed{Field: "status"},
+			m.DisplayName{}).
+		AddMapperForType(&Version, v3.PipelineExecution{},
+			&m.Embed{Field: "status"}).
+		AddMapperForType(&Version, v3.SourceCodeCredential{},
+			&m.Embed{Field: "status"}).
+		AddMapperForType(&Version, v3.SourceCodeRepository{}).
+		MustImport(&Version, v3.AuthAppInput{}).
+		MustImport(&Version, v3.AuthUserInput{}).
+		MustImport(&Version, v3.RunPipelineInput{}).
+		MustImport(&Version, v3.PushPipelineConfigInput{}).
+		MustImport(&Version, v3.GithubPipelineConfigApplyInput{}).
+		MustImport(&Version, v3.GithubLoginInput{}).
+		MustImport(&Version, v3.GitlabPipelineConfigApplyInput{}).
+		MustImport(&Version, v3.GitlabLoginInput{}).
+		MustImportAndCustomize(&Version, v3.SourceCodeProvider{}, func(schema *types.Schema) {
+			schema.CollectionMethods = []string{http.MethodGet}
+		}).
+		MustImportAndCustomize(&Version, v3.GithubProvider{}, func(schema *types.Schema) {
+			schema.BaseType = "sourceCodeProvider"
+			schema.ResourceActions = map[string]types.Action{
+				"login": {
+					Input:  "githubLoginInput",
+					Output: "sourceCodeCredential",
+				},
+			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet}
+		}).
+		MustImportAndCustomize(&Version, v3.GitlabProvider{}, func(schema *types.Schema) {
+			schema.BaseType = "sourceCodeProvider"
+			schema.ResourceActions = map[string]types.Action{
+				"login": {
+					Input:  "gitlabLoginInput",
+					Output: "sourceCodeCredential",
+				},
+			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet}
+		}).
+		//Github Integration Config
+		MustImportAndCustomize(&Version, v3.SourceCodeProviderConfig{}, func(schema *types.Schema) {
+			schema.CollectionMethods = []string{http.MethodGet}
+		}).
+		MustImportAndCustomize(&Version, v3.GithubPipelineConfig{}, func(schema *types.Schema) {
+			schema.BaseType = "sourceCodeProviderConfig"
+			schema.ResourceActions = map[string]types.Action{
+				"disable": {},
+				"testAndApply": {
+					Input: "githubPipelineConfigApplyInput",
+				},
+			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
+		}).
+		MustImportAndCustomize(&Version, v3.GitlabPipelineConfig{}, func(schema *types.Schema) {
+			schema.BaseType = "sourceCodeProviderConfig"
+			schema.ResourceActions = map[string]types.Action{
+				"disable": {},
+				"testAndApply": {
+					Input: "gitlabPipelineConfigApplyInput",
+				},
+			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
+		}).
+		MustImportAndCustomize(&Version, v3.Pipeline{}, func(schema *types.Schema) {
+			schema.ResourceActions = map[string]types.Action{
+				"activate":   {},
+				"deactivate": {},
+				"run": {
+					Input: "runPipelineInput",
+				},
+				"pushconfig": {
+					Input: "pushPipelineConfigInput",
+				},
+			}
+		}).
+		MustImportAndCustomize(&Version, v3.PipelineExecution{}, func(schema *types.Schema) {
+			schema.ResourceActions = map[string]types.Action{
+				"stop":  {},
+				"rerun": {},
+			}
+		}).
+		MustImportAndCustomize(&Version, v3.PipelineSetting{}, func(schema *types.Schema) {
+			schema.MustCustomizeField("name", func(f types.Field) types.Field {
+				f.Required = true
+				return f
+			})
+		}).
+		MustImportAndCustomize(&Version, v3.SourceCodeCredential{}, func(schema *types.Schema) {
+			delete(schema.ResourceFields, "namespaceId")
+			schema.ResourceMethods = []string{http.MethodGet, http.MethodDelete}
+			schema.ResourceActions = map[string]types.Action{
+				"refreshrepos": {},
+				"logout":       {},
+			}
+		}).
+		MustImportAndCustomize(&Version, v3.SourceCodeRepository{}, func(schema *types.Schema) {
+			delete(schema.ResourceFields, "namespaceId")
+			schema.ResourceMethods = []string{http.MethodGet, http.MethodDelete}
+		})
+
 }

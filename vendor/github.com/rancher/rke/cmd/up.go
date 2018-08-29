@@ -13,7 +13,6 @@ import (
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"k8s.io/client-go/util/cert"
 )
@@ -37,10 +36,6 @@ func UpCommand() cli.Command {
 		cli.BoolFlag{
 			Name:  "dind",
 			Usage: "Deploy Kubernetes cluster in docker containers (experimental)",
-		},
-		cli.StringFlag{
-			Name:  "dind-subnet",
-			Usage: "User defined network to deploy k8s within (experimental)",
 		},
 		cli.BoolFlag{
 			Name:  "update-only",
@@ -224,12 +219,12 @@ func clusterUpLocal(ctx *cli.Context) error {
 
 func clusterUpDind(ctx *cli.Context) error {
 	// get dind config
-	rkeConfig, disablePortCheck, dindSubnet, err := getDindConfig(ctx)
+	rkeConfig, disablePortCheck, err := getDindConfig(ctx)
 	if err != nil {
 		return err
 	}
 	// setup dind environment
-	if err = createDINDEnv(context.Background(), dindSubnet, rkeConfig); err != nil {
+	if err = createDINDEnv(context.Background(), rkeConfig); err != nil {
 		return err
 	}
 	// start cluster
@@ -237,23 +232,22 @@ func clusterUpDind(ctx *cli.Context) error {
 	return err
 }
 
-func getDindConfig(ctx *cli.Context) (*v3.RancherKubernetesEngineConfig, bool, string, error) {
+func getDindConfig(ctx *cli.Context) (*v3.RancherKubernetesEngineConfig, bool, error) {
 	disablePortCheck := ctx.Bool("disable-port-check")
-	dindSubnet := ctx.String("dind-subnet")
 	clusterFile, filePath, err := resolveClusterFile(ctx)
 	if err != nil {
-		return nil, disablePortCheck, dindSubnet, fmt.Errorf("Failed to resolve cluster file: %v", err)
+		return nil, disablePortCheck, fmt.Errorf("Failed to resolve cluster file: %v", err)
 	}
 	clusterFilePath = filePath
 
 	rkeConfig, err := cluster.ParseConfig(clusterFile)
 	if err != nil {
-		return nil, disablePortCheck, dindSubnet, fmt.Errorf("Failed to parse cluster file: %v", err)
+		return nil, disablePortCheck, fmt.Errorf("Failed to parse cluster file: %v", err)
 	}
 
 	rkeConfig, err = setOptionsFromCLI(ctx, rkeConfig)
 	if err != nil {
-		return nil, disablePortCheck, dindSubnet, err
+		return nil, disablePortCheck, err
 	}
 	// Setting conntrack max for kubeproxy to 0
 	if rkeConfig.Services.Kubeproxy.ExtraArgs == nil {
@@ -261,22 +255,19 @@ func getDindConfig(ctx *cli.Context) (*v3.RancherKubernetesEngineConfig, bool, s
 	}
 	rkeConfig.Services.Kubeproxy.ExtraArgs["conntrack-max-per-core"] = "0"
 
-	return rkeConfig, disablePortCheck, dindSubnet, nil
+	return rkeConfig, disablePortCheck, nil
 }
 
-func createDINDEnv(ctx context.Context, dindSubnet string, rkeConfig *v3.RancherKubernetesEngineConfig) error {
-	if dindSubnet == "" {
-		logrus.Infof("[%s] dind subnet didn't get specified, using default subnet [%s]", dind.DINDPlane, dind.DINDSubnet)
-		dindSubnet = dind.DINDSubnet
-	}
-	if err := dind.CreateDindNetwork(ctx, dindSubnet); err != nil {
-		return fmt.Errorf("Failed to create dind network: %v", err)
-	}
-
-	for _, node := range rkeConfig.Nodes {
-		if err := dind.StartUpDindContainer(ctx, node.Address, dind.DINDNetwork); err != nil {
+func createDINDEnv(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig) error {
+	for i := range rkeConfig.Nodes {
+		address, err := dind.StartUpDindContainer(ctx, rkeConfig.Nodes[i].Address, dind.DINDNetwork)
+		if err != nil {
 			return err
 		}
+		if rkeConfig.Nodes[i].HostnameOverride == "" {
+			rkeConfig.Nodes[i].HostnameOverride = rkeConfig.Nodes[i].Address
+		}
+		rkeConfig.Nodes[i].Address = address
 	}
 	time.Sleep(DINDWaitTime * time.Second)
 	return nil

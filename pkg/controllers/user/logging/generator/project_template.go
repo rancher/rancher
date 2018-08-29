@@ -148,8 +148,10 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
     host {{$store.WrapSyslog.Host}}
     port {{$store.WrapSyslog.Port}}
     severity {{$store.SyslogConfig.Severity}}
-    program {{$store.SyslogConfig.Program}}
     protocol {{$store.SyslogConfig.Protocol}}
+    {{ if $store.SyslogConfig.Program }}
+    program {{$store.SyslogConfig.Program}}
+    {{end -}}
 
     {{ if eq $store.SyslogConfig.SSLVerify true}}
     verify_mode 1

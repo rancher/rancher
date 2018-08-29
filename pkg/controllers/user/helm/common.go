@@ -2,14 +2,13 @@ package helm
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-
-	"time"
 
 	"encoding/base64"
 
@@ -18,7 +17,6 @@ import (
 	"github.com/rancher/rancher/pkg/templatecontent"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
-	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -49,88 +47,22 @@ func WriteTempDir(rootDir string, files map[string]string) (string, error) {
 	return "", nil
 }
 
-func kubectlApply(template, kubeconfig string, app *v3.App) error {
-	file, err := ioutil.TempFile("", "app-template")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(file.Name())
-	if err := ioutil.WriteFile(file.Name(), []byte(template), 0755); err != nil {
-		return err
-	}
-
-	command := []string{"apply", "--all", "--overwrite", "-n", app.Spec.TargetNamespace, "-f", file.Name()}
-	if app.Spec.Prune {
-		command = append(command, "--prune")
-	}
-	cmd := exec.Command(kubectl, command...)
-	cmd.Env = []string{fmt.Sprintf("%s=%s", kcEnv, kubeconfig)}
-	sbErr := &bytes.Buffer{}
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = sbErr
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-	if err := cmd.Wait(); err != nil {
-		return errors.Wrapf(err, fmt.Sprintf("Kubectl apply failed. Error: %s", filterErrorMessage(sbErr.String(), file.Name(), "app-template")))
-	}
-
-	// wait for resources to be created and try 5 times
-	// todo: there is a bug around rolebindings that are being deleted if created outside rancher
-	start := 250 * time.Millisecond
-	for i := 0; i < 5; i++ {
-		time.Sleep(start)
-		command = []string{"label", "-n", app.Spec.TargetNamespace, "--overwrite", "-f", file.Name(), fmt.Sprintf("%s=%s", appLabel, app.Name)}
-		cmd = exec.Command(kubectl, command...)
-		cmd.Env = []string{fmt.Sprintf("%s=%s", kcEnv, kubeconfig)}
-		buf := &bytes.Buffer{}
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = buf
-		if err := cmd.Start(); err != nil {
-			return err
-		}
-		if err := cmd.Wait(); err != nil {
-			if i == 4 {
-				logrus.Warnf("tried 4 times and kubectl label failed. Error: %s", buf.String())
-				break
-			}
-			start = start * 2
-			continue
-		}
-		break
-	}
-
-	return nil
+func helmInstall(templateDir, kubeconfigPath string, app *v3.App, install bool) error {
+	cont, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	addr := common.GenerateRandomPort()
+	probeAddr := common.GenerateRandomPort()
+	go common.StartTiller(cont, addr, probeAddr, app.Spec.TargetNamespace, kubeconfigPath)
+	return common.InstallCharts(templateDir, addr, app, install)
 }
 
-func kubectlDelete(template, kubeconfig, namespace string) error {
-	file, err := ioutil.TempFile("", "app-template")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(file.Name())
-	if err := ioutil.WriteFile(file.Name(), []byte(template), 0755); err != nil {
-		return err
-	}
-	command := []string{"delete", "--all", "-n", namespace, "-f", file.Name()}
-	// try three times and succeed
-	start := time.Second * 1
-	for i := 0; i < 3; i++ {
-		cmd := exec.Command(kubectl, command...)
-		cmd.Env = []string{fmt.Sprintf("%s=%s", kcEnv, kubeconfig)}
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Start(); err != nil {
-			return err
-		}
-		if err := cmd.Wait(); err != nil {
-			time.Sleep(start)
-			start = start * 2
-			continue
-		}
-		break
-	}
-	return nil
+func helmDelete(kubeconfigPath string, app *v3.App) error {
+	cont, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	addr := common.GenerateRandomPort()
+	probeAddr := common.GenerateRandomPort()
+	go common.StartTiller(cont, addr, probeAddr, app.Spec.TargetNamespace, kubeconfigPath)
+	return common.DeleteCharts(addr, app)
 }
 
 func convertTemplates(files map[string]string, templateContentClient mgmtv3.TemplateContentInterface) (map[string]string, error) {
@@ -145,38 +77,37 @@ func convertTemplates(files map[string]string, templateContentClient mgmtv3.Temp
 	return templates, nil
 }
 
-func generateTemplates(obj *v3.App, templateVersionClient mgmtv3.TemplateVersionInterface, templateContentClient mgmtv3.TemplateContentInterface) (string, string, error) {
+func generateTemplates(obj *v3.App, templateVersionClient mgmtv3.TemplateVersionInterface, templateContentClient mgmtv3.TemplateContentInterface) (string, string, string, error) {
 	files := map[string]string{}
 	if obj.Spec.ExternalID != "" {
 		templateVersionID, err := common.ParseExternalID(obj.Spec.ExternalID)
 		if err != nil {
-			return "", "", err
+			return "", "", "", err
 		}
 		templateVersion, err := templateVersionClient.Get(templateVersionID, metav1.GetOptions{})
 		if err != nil {
-			return "", "", err
+			return "", "", "", err
 		}
 		files, err = convertTemplates(templateVersion.Spec.Files, templateContentClient)
 		if err != nil {
-			return "", "", err
+			return "", "", "", err
 		}
 	} else {
 		for k, v := range obj.Spec.Files {
 			content, err := base64.StdEncoding.DecodeString(v)
 			if err != nil {
-				return "", "", err
+				return "", "", "", err
 			}
 			files[k] = string(content)
 		}
 	}
 	tempDir, err := ioutil.TempDir("", "helm-")
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	dir, err := WriteTempDir(tempDir, files)
-	defer os.RemoveAll(dir)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
 	setValues := []string{}
@@ -196,10 +127,10 @@ func generateTemplates(obj *v3.App, templateVersionClient mgmtv3.TemplateVersion
 	cmd.Stdout = sbOut
 	cmd.Stderr = sbErr
 	if err := cmd.Start(); err != nil {
-		return "", "", errors.Wrapf(err, "helm template failed. %s", filterErrorMessage(sbErr.String(), dir, "template-dir"))
+		return "", "", "", errors.Wrapf(err, "helm template failed. %s", filterErrorMessage(sbErr.String(), dir, "template-dir"))
 	}
 	if err := cmd.Wait(); err != nil {
-		return "", "", errors.Wrapf(err, "helm template failed. %s", filterErrorMessage(sbErr.String(), dir, "template-dir"))
+		return "", "", "", errors.Wrapf(err, "helm template failed. %s", filterErrorMessage(sbErr.String(), dir, "template-dir"))
 	}
 
 	// notes.txt
@@ -210,14 +141,14 @@ func generateTemplates(obj *v3.App, templateVersionClient mgmtv3.TemplateVersion
 	cmd.Stdout = noteOut
 	cmd.Stderr = sbErr
 	if err := cmd.Start(); err != nil {
-		return "", "", errors.Wrapf(err, "helm template --notes failed. %s", filterErrorMessage(sbErr.String(), dir, "template-dir"))
+		return "", "", "", errors.Wrapf(err, "helm template --notes failed. %s", filterErrorMessage(sbErr.String(), dir, "template-dir"))
 	}
 	if err := cmd.Wait(); err != nil {
-		return "", "", errors.Wrapf(err, "helm template --notes failed. %s", filterErrorMessage(sbErr.String(), dir, "template-dir"))
+		return "", "", "", errors.Wrapf(err, "helm template --notes failed. %s", filterErrorMessage(sbErr.String(), dir, "template-dir"))
 	}
 	template := sbOut.String()
 	notes := noteOut.String()
-	return template, notes, nil
+	return template, notes, dir, nil
 }
 
 // filter error message, replace old with new

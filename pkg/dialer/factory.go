@@ -25,7 +25,10 @@ import (
 
 func NewFactory(apiContext *config.ScaledContext) (dialer.Factory, error) {
 	authorizer := tunnelserver.NewAuthorizer(apiContext)
-	tunneler := tunnelserver.NewTunnelServer(apiContext, authorizer)
+	tunneler, err := tunnelserver.NewTunnelServer(apiContext, authorizer)
+	if err != nil {
+		return nil, err
+	}
 
 	secretStore, err := nodeconfig.NewStore(apiContext.Core.Namespaces(""), apiContext.Core)
 	if err != nil {

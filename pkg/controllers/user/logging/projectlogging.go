@@ -101,7 +101,9 @@ func (c *ProjectLoggingSyncer) Sync(key string, obj *v3.ProjectLogging) error {
 			updatedObj := obj.DeepCopy()
 			updatedObj.Status.AppliedSpec = obj.Spec
 			v3.LoggingConditionProvisioned.False(updatedObj)
+			v3.LoggingConditionProvisioned.Message(updatedObj, "")
 			v3.LoggingConditionUpdated.False(updatedObj)
+			v3.LoggingConditionUpdated.Message(updatedObj, "")
 			_, updateErr = c.projectLoggings.Update(updatedObj)
 		}
 		return updateErr

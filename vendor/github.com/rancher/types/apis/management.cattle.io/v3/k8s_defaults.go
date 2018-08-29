@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/image"
 )
 
@@ -53,18 +54,21 @@ var (
 	// ToolsSystemImages default images for alert, pipeline, logging
 	ToolsSystemImages = struct {
 		AlertSystemImages    AlertSystemImages
-		PipelineSystemImages PipelineSystemImages
+		PipelineSystemImages projectv3.PipelineSystemImages
 		LoggingSystemImages  LoggingSystemImages
 	}{
 		AlertSystemImages: AlertSystemImages{
 			AlertManager:       m("prom/alertmanager:v0.11.0"),
 			AlertManagerHelper: m("rancher/alertmanager-helper:v0.0.2"),
 		},
-		PipelineSystemImages: PipelineSystemImages{
-			Jenkins:       m("jenkins/jenkins:2.107-slim"),
+		PipelineSystemImages: projectv3.PipelineSystemImages{
+			Jenkins:       m("rancher/pipeline-jenkins-server:v0.1.0"),
 			JenkinsJnlp:   m("jenkins/jnlp-slave:3.10-1-alpine"),
 			AlpineGit:     m("alpine/git:1.0.4"),
-			PluginsDocker: m("plugins/docker:17.12"),
+			PluginsDocker: m("rancher/pipeline-docker-publish:v0.2.0"),
+			Minio:         m("minio/minio:RELEASE.2018-05-25T19-49-13Z"),
+			Registry:      m("registry:2"),
+			KubeApply:     m("rancher/pipeline-kube-apply:v0.2.0"),
 		},
 		LoggingSystemImages: LoggingSystemImages{
 			Fluentd:                       m("rancher/fluentd:v0.1.10"),
@@ -495,4 +499,7 @@ func init() {
 	if _, ok := K8sVersionToRKESystemImages[DefaultK8s]; !ok {
 		panic("Default K8s version " + DefaultK8s + " is not found in k8sVersionsCurrent list")
 	}
+
+	// init Windows versions
+	initWindows()
 }
