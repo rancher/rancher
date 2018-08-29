@@ -134,7 +134,7 @@ func generateTemplates(obj *v3.App, templateVersionClient mgmtv3.TemplateVersion
 	}
 
 	// notes.txt
-	commands = []string{"template", dir, "--name", obj.Name, "--namespace", obj.Spec.TargetNamespace, "--notes"}
+	commands = append([]string{"template", dir, "--name", obj.Name, "--namespace", obj.Spec.TargetNamespace, "--notes"}, setValues...)
 	cmd = exec.Command(helmName, commands...)
 	noteOut := &bytes.Buffer{}
 	sbErr = &bytes.Buffer{}
