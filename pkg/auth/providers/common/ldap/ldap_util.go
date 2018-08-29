@@ -95,9 +95,9 @@ func IsType(search []*ldapv2.EntryAttribute, varType string) bool {
 	return false
 }
 
-func GetUserSearchAttributes(config *v3.ActiveDirectoryConfig) []string {
-	userSearchAttributes := []string{"memberOf",
-		"objectClass",
+func GetUserSearchAttributes(memberOfAttribute, ObjectClass string, config *v3.ActiveDirectoryConfig) []string {
+	userSearchAttributes := []string{memberOfAttribute,
+		ObjectClass,
 		config.UserObjectClass,
 		config.UserLoginAttribute,
 		config.UserNameAttribute,
@@ -105,9 +105,9 @@ func GetUserSearchAttributes(config *v3.ActiveDirectoryConfig) []string {
 	return userSearchAttributes
 }
 
-func GetGroupSearchAttributes(config *v3.ActiveDirectoryConfig) []string {
-	groupSeachAttributes := []string{"memberOf",
-		"objectClass",
+func GetGroupSearchAttributes(memberOfAttribute, ObjectClass string, config *v3.ActiveDirectoryConfig) []string {
+	groupSeachAttributes := []string{memberOfAttribute,
+		ObjectClass,
 		config.GroupObjectClass,
 		config.UserLoginAttribute,
 		config.GroupNameAttribute,
@@ -115,9 +115,9 @@ func GetGroupSearchAttributes(config *v3.ActiveDirectoryConfig) []string {
 	return groupSeachAttributes
 }
 
-func GetUserSearchAttributesForLDAP(config *v3.LdapConfig) []string {
+func GetUserSearchAttributesForLDAP(ObjectClass string, config *v3.LdapConfig) []string {
 	userSearchAttributes := []string{"dn", config.UserMemberAttribute,
-		"objectClass",
+		ObjectClass,
 		config.UserObjectClass,
 		config.UserLoginAttribute,
 		config.UserNameAttribute,
@@ -125,10 +125,10 @@ func GetUserSearchAttributesForLDAP(config *v3.LdapConfig) []string {
 	return userSearchAttributes
 }
 
-func GetGroupSearchAttributesForLDAP(config *v3.LdapConfig) []string {
+func GetGroupSearchAttributesForLDAP(ObjectClass string, config *v3.LdapConfig) []string {
 	groupSeachAttributes := []string{config.GroupMemberUserAttribute,
 		config.GroupMemberMappingAttribute,
-		"objectClass",
+		ObjectClass,
 		config.GroupObjectClass,
 		config.UserLoginAttribute,
 		config.GroupNameAttribute,

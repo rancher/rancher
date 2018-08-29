@@ -23,9 +23,11 @@ import (
 )
 
 const (
-	Name       = "activedirectory"
-	UserScope  = Name + "_user"
-	GroupScope = Name + "_group"
+	Name              = "activedirectory"
+	UserScope         = Name + "_user"
+	GroupScope        = Name + "_group"
+	ObjectClass       = "objectClass"
+	MemberOfAttribute = "memberOf"
 )
 
 var scopes = []string{UserScope, GroupScope}
