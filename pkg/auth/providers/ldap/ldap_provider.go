@@ -28,6 +28,7 @@ const (
 	OpenLdapGroupScope = OpenLdapName + "_group"
 	FreeIpaUserScope   = FreeIpaName + "_user"
 	FreeIpaGroupScope  = FreeIpaName + "_group"
+	ObjectClass        = "objectClass"
 )
 
 var openLdapScopes = []string{OpenLdapUserScope, OpenLdapGroupScope}
