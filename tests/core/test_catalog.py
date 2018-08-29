@@ -1,6 +1,5 @@
-from .common import random_str
-
-import time
+from .common import wait_for_template_to_be_created, \
+    wait_for_template_to_be_deleted, random_str
 
 
 def test_catalog(admin_mc):
@@ -14,33 +13,3 @@ def test_catalog(admin_mc):
     wait_for_template_to_be_created(client, name)
     client.delete(catalog)
     wait_for_template_to_be_deleted(client, name)
-
-
-def wait_for_template_to_be_created(client, name, timeout=45):
-    found = False
-    start = time.time()
-    interval = 0.5
-    while not found:
-        if time.time() - start > timeout:
-            raise AssertionError(
-                "Timed out waiting for templates")
-        templates = client.list_template(catalogId=name)
-        if len(templates) > 0:
-            found = True
-        time.sleep(interval)
-        interval *= 2
-
-
-def wait_for_template_to_be_deleted(client, name, timeout=45):
-    found = False
-    start = time.time()
-    interval = 0.5
-    while not found:
-        if time.time() - start > timeout:
-            raise AssertionError(
-                "Timed out waiting for templates")
-        templates = client.list_template(catalogId=name)
-        if len(templates) == 0:
-            found = True
-        time.sleep(interval)
-        interval *= 2
