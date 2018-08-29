@@ -9,10 +9,7 @@ import (
 
 func (m *Manager) Sync(key string, obj *v3.Catalog) error {
 	if obj == nil {
-		return nil
-	}
-	if obj.DeletionTimestamp != nil {
-		templates, err := m.getTemplateMap(obj.Name)
+		templates, err := m.getTemplateMap(key)
 		if err != nil {
 			return err
 		}
