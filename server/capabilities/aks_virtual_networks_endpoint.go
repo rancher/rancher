@@ -34,7 +34,12 @@ type virtualNetworksRequestBody struct {
 type virtualNetworksResponseBody struct {
 	Name          string   `json:"name"`
 	ResourceGroup string   `json:"resourceGroup"`
-	Subnets       []string `json:"subnets"`
+	Subnets       []subnet `json:"subnets"`
+}
+
+type subnet struct {
+	Name         string `json:"name"`
+	AddressRange string `json:"addressRange"`
 }
 
 func (g *AKSVirtualNetworksHandler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
@@ -94,12 +99,15 @@ func (g *AKSVirtualNetworksHandler) ServeHTTP(writer http.ResponseWriter, req *h
 		var batch []virtualNetworksResponseBody
 
 		for _, azureNetwork := range pointer.Values() {
-			var subnets []string
+			var subnets []subnet
 
 			if azureNetwork.Subnets != nil {
-				for _, subnet := range *azureNetwork.Subnets {
-					if subnet.Name != nil {
-						subnets = append(subnets, *subnet.Name)
+				for _, azureSubnet := range *azureNetwork.Subnets {
+					if azureSubnet.Name != nil {
+						subnets = append(subnets, subnet{
+							Name:         *azureSubnet.Name,
+							AddressRange: *azureSubnet.AddressPrefix,
+						})
 					}
 				}
 			}
