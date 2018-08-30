@@ -143,28 +143,12 @@ func (c *SyncController) getExistingResourceQuota(ns *corev1.Namespace) (*corev1
 }
 
 func (c *SyncController) getNamespaceResourceQuota(ns *corev1.Namespace, setDefault bool) (*corev1.ResourceQuotaSpec, error) {
-	validated := true
-	set := getNamespaceResourceQuota(ns) != ""
-	var err error
-	if set {
-		validated, err = isQuotaValidated(ns)
-		if err != nil {
-			return nil, err
-		}
+	limit, err := getNamespaceLimit(ns)
+	if err != nil {
+		return nil, err
 	}
-
-	var limit *v3.ResourceQuotaLimit
-	if validated {
-		limit, err = getNamespaceLimit(ns)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		if setDefault {
-			limit = defaultResourceLimit
-		} else {
-			return nil, nil
-		}
+	if limit == nil && setDefault {
+		limit = defaultResourceLimit
 	}
 
 	return convertResourceLimitResourceQuotaSpec(limit)
