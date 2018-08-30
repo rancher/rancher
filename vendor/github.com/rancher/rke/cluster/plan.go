@@ -31,7 +31,13 @@ const (
 	DefaultToolsEntrypoint        = "/opt/rke-tools/entrypoint.sh"
 	DefaultToolsEntrypointVersion = "0.1.13"
 	LegacyToolsEntrypoint         = "/opt/rke/entrypoint.sh"
+
+	KubeletDockerConfigEnv     = "RKE_KUBELET_DOCKER_CONFIG"
+	KubeletDockerConfigFileEnv = "RKE_KUBELET_DOCKER_FILE"
+	KubeletDockerConfigPath    = "/var/lib/kubelet/config.json"
 )
+
+var admissionControlOptionNames = []string{"enable-admission-plugins", "admission-control"}
 
 func GeneratePlan(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig, hostsInfoMap map[string]types.Info) (v3.RKEPlan, error) {
 	clusterPlan := v3.RKEPlan{}
@@ -122,7 +128,6 @@ func (c *Cluster) BuildKubeAPIProcess(prefixPath string) v3.Process {
 		"kubelet-preferred-address-types":    "InternalIP,ExternalIP,Hostname",
 		"service-cluster-ip-range":           c.Services.KubeAPI.ServiceClusterIPRange,
 		"service-node-port-range":            c.Services.KubeAPI.ServiceNodePortRange,
-		"admission-control":                  "ServiceAccount,NamespaceLifecycle,LimitRanger,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
 		"storage-backend":                    "etcd3",
 		"client-ca-file":                     pki.GetCertPath(pki.CACertName),
 		"tls-cert-file":                      pki.GetCertPath(pki.KubeAPICertName),
@@ -168,7 +173,12 @@ func (c *Cluster) BuildKubeAPIProcess(prefixPath string) v3.Process {
 	}
 	if c.Services.KubeAPI.PodSecurityPolicy {
 		CommandArgs["runtime-config"] = "extensions/v1beta1/podsecuritypolicy=true"
-		CommandArgs["admission-control"] = CommandArgs["admission-control"] + ",PodSecurityPolicy"
+		for _, optionName := range admissionControlOptionNames {
+			if _, ok := CommandArgs[optionName]; ok {
+				CommandArgs[optionName] = CommandArgs[optionName] + ",PodSecurityPolicy"
+				break
+			}
+		}
 	}
 
 	VolumesFrom := []string{
@@ -345,6 +355,17 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string) v3.Pr
 		c.Services.Kubelet.ExtraEnv = append(
 			c.Services.Kubelet.ExtraEnv,
 			fmt.Sprintf("%s=%s", CloudConfigSumEnv, getCloudConfigChecksum(c.CloudProvider)))
+	}
+	if len(c.PrivateRegistriesMap) > 0 {
+		kubeletDcokerConfig, _ := docker.GetKubeletDockerConfig(c.PrivateRegistriesMap)
+		c.Services.Kubelet.ExtraEnv = append(
+			c.Services.Kubelet.ExtraEnv,
+			fmt.Sprintf("%s=%s", KubeletDockerConfigEnv,
+				b64.StdEncoding.EncodeToString([]byte(kubeletDcokerConfig))))
+
+		c.Services.Kubelet.ExtraEnv = append(
+			c.Services.Kubelet.ExtraEnv,
+			fmt.Sprintf("%s=%s", KubeletDockerConfigFileEnv, path.Join(prefixPath, KubeletDockerConfigPath)))
 	}
 	// check if our version has specific options for this component
 	serviceOptions := c.GetKubernetesServicesOptions()

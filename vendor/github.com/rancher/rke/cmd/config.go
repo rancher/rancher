@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -40,6 +41,18 @@ func ConfigCommand() cli.Command {
 			cli.BoolFlag{
 				Name:  "print,p",
 				Usage: "Print configuration",
+			},
+			cli.BoolFlag{
+				Name:  "system-images",
+				Usage: "Generate the default system images",
+			},
+			cli.BoolFlag{
+				Name:  "all",
+				Usage: "Generate the default system images for all versions",
+			},
+			cli.StringFlag{
+				Name:  "version",
+				Usage: "Generate the default system images for specific k8s versions",
 			},
 		},
 	}
@@ -81,6 +94,9 @@ func writeConfig(cluster *v3.RancherKubernetesEngineConfig, configFile string, p
 }
 
 func clusterConfig(ctx *cli.Context) error {
+	if ctx.Bool("system-images") {
+		return generateSystemImagesList(ctx.String("version"), ctx.Bool("all"))
+	}
 	configFile := ctx.String("name")
 	print := ctx.Bool("print")
 	cluster := v3.RancherKubernetesEngineConfig{}
@@ -382,4 +398,64 @@ func getAddonManifests(reader *bufio.Reader) ([]string, error) {
 	}
 
 	return addonSlice, nil
+}
+
+func generateSystemImagesList(version string, all bool) error {
+	allVersions := []string{}
+	for version := range v3.AllK8sVersions {
+		allVersions = append(allVersions, version)
+	}
+	if all {
+		for version, rkeSystemImages := range v3.AllK8sVersions {
+			logrus.Infof("Generating images list for version [%s]:", version)
+			uniqueImages := getUniqueSystemImageList(rkeSystemImages)
+			for _, image := range uniqueImages {
+				if image == "" {
+					continue
+				}
+				fmt.Printf("%s\n", image)
+			}
+		}
+		return nil
+	}
+	if len(version) == 0 {
+		version = v3.DefaultK8s
+	}
+	rkeSystemImages := v3.AllK8sVersions[version]
+	if rkeSystemImages == (v3.RKESystemImages{}) {
+		return fmt.Errorf("k8s version is not supported, supported versions are: %v", allVersions)
+	}
+	logrus.Infof("Generating images list for version [%s]:", version)
+	uniqueImages := getUniqueSystemImageList(rkeSystemImages)
+	for _, image := range uniqueImages {
+		if image == "" {
+			continue
+		}
+		fmt.Printf("%s\n", image)
+	}
+	return nil
+}
+
+func getUniqueSystemImageList(rkeSystemImages v3.RKESystemImages) []string {
+	imagesReflect := reflect.ValueOf(rkeSystemImages)
+	images := make([]string, imagesReflect.NumField())
+	for i := 0; i < imagesReflect.NumField(); i++ {
+		images[i] = imagesReflect.Field(i).Interface().(string)
+	}
+	return getUniqueSlice(images)
+}
+
+func getUniqueSlice(slice []string) []string {
+	encountered := map[string]bool{}
+	unqiue := []string{}
+
+	for i := range slice {
+		if encountered[slice[i]] {
+			continue
+		} else {
+			encountered[slice[i]] = true
+			unqiue = append(unqiue, slice[i])
+		}
+	}
+	return unqiue
 }
