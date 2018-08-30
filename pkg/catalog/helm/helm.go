@@ -9,12 +9,14 @@ import (
 	"encoding/hex"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/blang/semver"
 	"github.com/pkg/errors"
@@ -23,21 +25,30 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+var httpTimeout = time.Second * 30
+
+var httpClient = &http.Client{
+	Timeout: httpTimeout,
+}
+
 func DownloadIndex(indexURL string) (*RepoIndex, error) {
 	indexURL = strings.TrimSuffix(indexURL, "/")
 	indexURL = indexURL + "/index.yaml"
-	resp, err := http.Get(indexURL)
+	resp, err := httpClient.Get(indexURL)
 	if err != nil {
-		return nil, err
+		if e, ok := err.(net.Error); ok && e.Timeout() {
+			return nil, errors.Errorf("Timeout in HTTP GET to [%s], did not respond in %s", indexURL, httpTimeout)
+		}
+		return nil, errors.Errorf("Error in HTTP GET to [%s], error: %s", indexURL, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("invalid catalog url")
+		return nil, errors.Errorf("Unexpected HTTP status code %d from [%s], expected 200", resp.StatusCode, indexURL)
 	}
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("Error while reading response from [%s], error: %s", indexURL, err)
 	}
 
 	sum := md5.Sum(body)
@@ -47,7 +58,12 @@ func DownloadIndex(indexURL string) (*RepoIndex, error) {
 		IndexFile: &IndexFile{},
 		Hash:      hash,
 	}
-	return helmRepoIndex, yaml.Unmarshal(body, helmRepoIndex.IndexFile)
+	err = yaml.Unmarshal(body, helmRepoIndex.IndexFile)
+	if err != nil {
+		logrus.Debugf("Error while parsing response from [%s], error: %s. Response: %s", indexURL, err, body)
+		return nil, errors.Errorf("Error while parsing response from [%s], error: %s", indexURL, err)
+	}
+	return helmRepoIndex, nil
 }
 
 func SaveIndex(index *RepoIndex, repoPath string) error {
@@ -85,9 +101,9 @@ func FetchTgz(url string) ([]v3.File, error) {
 	var files []v3.File
 
 	logrus.Debugf("Fetching file %s", url)
-	resp, err := http.Get(url)
+	resp, err := httpClient.Get(url)
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("Error in HTTP GET of [%s], error: %s", url, err)
 	}
 	defer resp.Body.Close()
 
@@ -279,9 +295,9 @@ func Icon(versions ChartVersions) (string, string, error) {
 
 	url := versions[0].Icon
 
-	resp, err := http.Get(url)
+	resp, err := httpClient.Get(url)
 	if err != nil {
-		return "", "", err
+		return "", "", errors.Errorf("Error in HTTP GET of [%s], error: %s", url, err)
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)
