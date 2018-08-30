@@ -68,9 +68,12 @@ func (c Commit) String() string {
 // GitLab API docs: https://docs.gitlab.com/ce/api/commits.html#list-repository-commits
 type ListCommitsOptions struct {
 	ListOptions
-	RefName *string   `url:"ref_name,omitempty" json:"ref_name,omitempty"`
-	Since   time.Time `url:"since,omitempty" json:"since,omitempty"`
-	Until   time.Time `url:"until,omitempty" json:"until,omitempty"`
+	RefName   *string    `url:"ref_name,omitempty" json:"ref_name,omitempty"`
+	Since     *time.Time `url:"since,omitempty" json:"since,omitempty"`
+	Until     *time.Time `url:"until,omitempty" json:"until,omitempty"`
+	Path      *string    `url:"path,omitempty" json:"path,omitempty"`
+	All       *bool      `url:"all,omitempty" json:"all,omitempty"`
+	WithStats *bool      `url:"with_stats,omitempty" json:"with_stats,omitempty"`
 }
 
 // ListCommits gets a list of repository commits in a project.
@@ -117,6 +120,49 @@ type CommitAction struct {
 	PreviousPath string     `url:"previous_path,omitempty" json:"previous_path,omitempty"`
 	Content      string     `url:"content,omitempty" json:"content,omitempty"`
 	Encoding     string     `url:"encoding,omitempty" json:"encoding,omitempty"`
+}
+
+// CommitRef represents the reference of branches/tags in a commit.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ce/api/commits.html#get-references-a-commit-is-pushed-to
+type CommitRef struct {
+	Type string `json:"type"`
+	Name string `json:"name"`
+}
+
+// GetCommitRefsOptions represents the available GetCommitRefs() options.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ce/api/commits.html#get-references-a-commit-is-pushed-to
+type GetCommitRefsOptions struct {
+	ListOptions
+	Type *string `url:"type,omitempty" json:"type,omitempty"`
+}
+
+// GetCommitRefs gets all references (from branches or tags) a commit is pushed to
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ce/api/commits.html#get-references-a-commit-is-pushed-to
+func (s *CommitsService) GetCommitRefs(pid interface{}, sha string, opt *GetCommitRefsOptions, options ...OptionFunc) ([]CommitRef, *Response, error) {
+	project, err := parseID(pid)
+	if err != nil {
+		return nil, nil, err
+	}
+	u := fmt.Sprintf("projects/%s/repository/commits/%s/refs", url.QueryEscape(project), sha)
+
+	req, err := s.client.NewRequest("GET", u, opt, options)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var cs []CommitRef
+	resp, err := s.client.Do(req, &cs)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return cs, resp, err
 }
 
 // GetCommit gets a specific commit identified by the commit hash or name of a
@@ -411,6 +457,32 @@ func (s *CommitsService) SetCommitStatus(pid interface{}, sha string, opt *SetCo
 	}
 
 	return cs, resp, err
+}
+
+// GetMergeRequestsByCommit gets merge request associated with a commit.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ce/api/commits.html#list-merge-requests-associated-with-a-commit
+func (s *CommitsService) GetMergeRequestsByCommit(pid interface{}, sha string, options ...OptionFunc) ([]*MergeRequest, *Response, error) {
+	project, err := parseID(pid)
+	if err != nil {
+		return nil, nil, err
+	}
+	u := fmt.Sprintf("projects/%s/repository/commits/%s/merge_requests",
+		url.QueryEscape(project), url.QueryEscape(sha))
+
+	req, err := s.client.NewRequest("GET", u, nil, options)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var mrs []*MergeRequest
+	resp, err := s.client.Do(req, &mrs)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return mrs, resp, err
 }
 
 // CherryPickCommitOptions represents the available options for cherry-picking a commit.

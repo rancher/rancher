@@ -41,6 +41,7 @@ type Runner struct {
 	Name        string `json:"name"`
 	Online      bool   `json:"online"`
 	Status      string `json:"status"`
+	Token       string `json:"token"`
 }
 
 // RunnerDetails represents the GitLab CI runner details.
@@ -52,11 +53,11 @@ type RunnerDetails struct {
 	Description  string     `json:"description"`
 	ID           int        `json:"id"`
 	IsShared     bool       `json:"is_shared"`
-	ContactedAt  *time.Time `json:"contacted_at,omitempty"`
+	ContactedAt  *time.Time `json:"contacted_at"`
 	Name         string     `json:"name"`
 	Online       bool       `json:"online"`
 	Status       string     `json:"status"`
-	Platform     string     `json:"platform,omitempty"`
+	Platform     string     `json:"platform"`
 	Projects     []struct {
 		ID                int    `json:"id"`
 		Name              string `json:"name"`
@@ -64,11 +65,12 @@ type RunnerDetails struct {
 		Path              string `json:"path"`
 		PathWithNamespace string `json:"path_with_namespace"`
 	} `json:"projects"`
-	Token       string   `json:"Token"`
-	Revision    string   `json:"revision,omitempty"`
-	TagList     []string `json:"tag_list"`
-	Version     string   `json:"version,omitempty"`
-	AccessLevel string   `json:"access_level"`
+	Token          string   `json:"token"`
+	Revision       string   `json:"revision"`
+	TagList        []string `json:"tag_list"`
+	Version        string   `json:"version"`
+	AccessLevel    string   `json:"access_level"`
+	MaximumTimeout int      `json:"maximum_timeout"`
 }
 
 // ListRunnersOptions represents the available ListRunners() options.
@@ -149,12 +151,13 @@ func (s *RunnersService) GetRunnerDetails(rid interface{}, options ...OptionFunc
 // GitLab API docs:
 // https://docs.gitlab.com/ce/api/runners.html#update-runner-39-s-details
 type UpdateRunnerDetailsOptions struct {
-	Description *string  `url:"description,omitempty" json:"description,omitempty"`
-	Active      *bool    `url:"active,omitempty" json:"active,omitempty"`
-	TagList     []string `url:"tag_list[],omitempty" json:"tag_list,omitempty"`
-	RunUntagged *bool    `url:"run_untagged,omitempty" json:"run_untagged,omitempty"`
-	Locked      *bool    `url:"locked,omitempty" json:"locked,omitempty"`
-	AccessLevel *string  `url:"access_level,omitempty" json:"access_level,omitempty"`
+	Description    *string  `url:"description,omitempty" json:"description,omitempty"`
+	Active         *bool    `url:"active,omitempty" json:"active,omitempty"`
+	TagList        []string `url:"tag_list[],omitempty" json:"tag_list,omitempty"`
+	RunUntagged    *bool    `url:"run_untagged,omitempty" json:"run_untagged,omitempty"`
+	Locked         *bool    `url:"locked,omitempty" json:"locked,omitempty"`
+	AccessLevel    *string  `url:"access_level,omitempty" json:"access_level,omitempty"`
+	MaximumTimeout *int     `url:"maximum_timeout,omitempty" json:"maximum_timeout,omitempty"`
 }
 
 // UpdateRunnerDetails updates details for a given runner.
@@ -318,6 +321,85 @@ func (s *RunnersService) DisableProjectRunner(pid interface{}, rid interface{}, 
 	u := fmt.Sprintf("projects/%s/runners/%s", url.QueryEscape(project), url.QueryEscape(runner))
 
 	req, err := s.client.NewRequest("DELETE", u, nil, options)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.client.Do(req, nil)
+}
+
+// RegisterNewRunnerOptions represents the available RegisterNewRunner()
+// options.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ce/api/runners.html#register-a-new-runner
+type RegisterNewRunnerOptions struct {
+	Token          *string  `url:"token" json:"token"`
+	Description    *string  `url:"description,omitempty" json:"description,omitempty"`
+	Info           *string  `url:"info,omitempty" json:"info,omitempty"`
+	Active         *bool    `url:"active,omitempty" json:"active,omitempty"`
+	Locked         *bool    `url:"locked,omitempty" json:"locked,omitempty"`
+	RunUntagged    *bool    `url:"run_untagged,omitempty" json:"run_untagged,omitempty"`
+	TagList        []string `url:"tag_list[],omitempty" json:"tag_list,omitempty"`
+	MaximumTimeout *int     `url:"maximum_timeout,omitempty" json:"maximum_timeout,omitempty"`
+}
+
+// RegisterNewRunner registers a new Runner for the instance.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ce/api/runners.html#register-a-new-runner
+func (s *RunnersService) RegisterNewRunner(opt *RegisterNewRunnerOptions, options ...OptionFunc) (*Runner, *Response, error) {
+	req, err := s.client.NewRequest("POST", "runners", opt, options)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var r *Runner
+	resp, err := s.client.Do(req, &r)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return r, resp, err
+}
+
+// DeleteRegisteredRunnerOptions represents the available
+// DeleteRegisteredRunner() options.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ce/api/runners.html#delete-a-registered-runner
+type DeleteRegisteredRunnerOptions struct {
+	Token *string `url:"token" json:"token"`
+}
+
+// DeleteRegisteredRunner registers a new Runner for the instance.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ce/api/runners.html#delete-a-registered-runner
+func (s *RunnersService) DeleteRegisteredRunner(opt *DeleteRegisteredRunnerOptions, options ...OptionFunc) (*Response, error) {
+	req, err := s.client.NewRequest("DELETE", "runners", opt, options)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.client.Do(req, nil)
+}
+
+// VerifyRegisteredRunnerOptions represents the available
+// VerifyRegisteredRunner() options.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ce/api/runners.html#verify-authentication-for-a-registered-runner
+type VerifyRegisteredRunnerOptions struct {
+	Token *string `url:"token" json:"token"`
+}
+
+// VerifyRegisteredRunner registers a new Runner for the instance.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ce/api/runners.html#verify-authentication-for-a-registered-runner
+func (s *RunnersService) VerifyRegisteredRunner(opt *VerifyRegisteredRunnerOptions, options ...OptionFunc) (*Response, error) {
+	req, err := s.client.NewRequest("POST", "runners/verify", opt, options)
 	if err != nil {
 		return nil, err
 	}

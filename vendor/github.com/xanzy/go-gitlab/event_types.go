@@ -477,6 +477,7 @@ type MergeEvent struct {
 		WorkInProgress bool   `json:"work_in_progress"`
 		URL            string `json:"url"`
 		Action         string `json:"action"`
+		OldRev         string `json:"oldrev"`
 		Assignee       struct {
 			Name      string `json:"name"`
 			Username  string `json:"username"`
