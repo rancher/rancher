@@ -159,7 +159,7 @@ def test_quota_ns_create_exceed(admin_cc, admin_pc, ns_large_quota):
     ns = admin_pc.cluster.client.create_namespace(name=random_str(),
                                                   projectId=p.id,
                                                   resourceQuota=ns_large_quota)
-    wait_for_applied_quota_failure(admin_pc.cluster.client, ns, 5)
+    wait_for_applied_quota_failure(admin_pc.cluster.client, ns, 10)
 
 
 def test_default_resource_quota_ns_create_invalid_combined(admin_cc, admin_pc,
@@ -205,7 +205,7 @@ def test_default_resource_quota_ns_create_invalid_combined(admin_cc, admin_pc,
     assert ns is not None
     assert ns.resourceQuota is not None
     ns = admin_cc.client.reload(ns)
-    wait_for_applied_quota_failure(admin_pc.cluster.client, ns, 5)
+    wait_for_applied_quota_failure(admin_pc.cluster.client, ns, 10)
 
 
 def test_project_used_quota(admin_cc, admin_pc):
@@ -243,7 +243,7 @@ def test_default_resource_quota_project_update(admin_cc, admin_pc):
     p = admin_pc.project
     ns = admin_pc.cluster.client.create_namespace(name=random_str(),
                                                   projectId=p.id)
-    wait_for_applied_quota_set(admin_pc.cluster.client, ns, 5)
+    wait_for_applied_quota_set(admin_pc.cluster.client, ns, 10)
 
     pq = default_project_quota()
     q = ns_default_quota()
