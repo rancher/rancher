@@ -10,7 +10,7 @@ import (
 	"io/ioutil"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2017-08-31/containerservice"
+	"github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2018-03-31/containerservice"
 	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2017-05-10/resources"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
@@ -158,6 +158,21 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 		Type:  types.StringType,
 		Usage: "The resource group that the virtual network is in",
 	}
+	driverFlag.Options["service-cidr"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "The IP range to assign service cluster IPs.",
+		Value: "10.0.0.0/16",
+	}
+	driverFlag.Options["dns-service-ip"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "The IP address to asign to the Kubernetes DNS service.  It must be within the Service CIDR range.",
+		Value: "10.0.0.10",
+	}
+	driverFlag.Options["docker-bridge-cidr"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "A IP range for the Docker bridge network.  It must not overlap the subnet address range of the service CIDR.",
+		Value: "172.17.0.1/16",
+	}
 
 	return &driverFlag, nil
 }
@@ -204,6 +219,9 @@ func getStateFromOptions(driverOptions *types.DriverOptions) (state, error) {
 	state.VirtualNetwork = options.GetValueFromDriverOptions(driverOptions, types.StringType, "virtualNetwork", "virtual-network").(string)
 	state.Subnet = options.GetValueFromDriverOptions(driverOptions, types.StringType, "subnet").(string)
 	state.VirtualNetworkResourceGroup = options.GetValueFromDriverOptions(driverOptions, types.StringType, "virtualNetworkResourceGroup", "virtual-network-resource-group").(string)
+	state.ServiceCIDR = options.GetValueFromDriverOptions(driverOptions, types.StringType, "serviceCidr", "service-cidr").(string)
+	state.DNSServiceIP = options.GetValueFromDriverOptions(driverOptions, types.StringType, "dnsServiceIp", "dns-service-ip").(string)
+	state.DockerBridgeCIDR = options.GetValueFromDriverOptions(driverOptions, types.StringType, "dockerBridgeCidr", "docker-bridge-cidr").(string)
 	tagValues := options.GetValueFromDriverOptions(driverOptions, types.StringSliceType).(*types.StringSlice)
 	for _, part := range tagValues.Value {
 		kv := strings.Split(part, "=")
@@ -384,7 +402,7 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 	}
 
 	var vmNetSubnetID *string
-	if driverState.VirtualNetwork != "" && driverState.Subnet != "" {
+	if d.hasCustomVirtualNetwork(driverState) {
 		virtualNetworkResourceGroup := driverState.ResourceGroup
 
 		// if virtual network resource group is set, use it, otherwise assume it is the same as the cluster
@@ -401,7 +419,7 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 		))
 	}
 
-	_, err = clustersClient.CreateOrUpdate(ctx, driverState.ResourceGroup, driverState.Name, containerservice.ManagedCluster{
+	managedCluster := containerservice.ManagedCluster{
 		Location: to.StringPtr(driverState.Location),
 		Tags:     tags,
 		ManagedClusterProperties: &containerservice.ManagedClusterProperties{
@@ -417,7 +435,7 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 					},
 				},
 			},
-			AgentPoolProfiles: &[]containerservice.AgentPoolProfile{
+			AgentPoolProfiles: &[]containerservice.ManagedClusterAgentPoolProfile{
 				{
 					DNSPrefix:    to.StringPtr(agentDNSPrefix),
 					Name:         to.StringPtr(driverState.AgentPoolName),
@@ -431,7 +449,18 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 				Secret:   to.StringPtr(driverState.ClientSecret),
 			},
 		},
-	})
+	}
+
+	if d.hasCustomVirtualNetwork(driverState) {
+		managedCluster.NetworkProfile = &containerservice.NetworkProfile{
+			DNSServiceIP:     to.StringPtr(driverState.DNSServiceIP),
+			DockerBridgeCidr: to.StringPtr(driverState.DockerBridgeCIDR),
+			ServiceCidr:      to.StringPtr(driverState.ServiceCIDR),
+			NetworkPlugin:    containerservice.Azure,
+		}
+	}
+
+	_, err = clustersClient.CreateOrUpdate(ctx, driverState.ResourceGroup, driverState.Name, managedCluster)
 	if err != nil {
 		return nil, err
 	}
@@ -476,6 +505,10 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 
 		time.Sleep(pollInterval * time.Second)
 	}
+}
+
+func (d *Driver) hasCustomVirtualNetwork(driverState state) bool {
+	return driverState.VirtualNetwork != "" && driverState.Subnet != ""
 }
 
 func (d *Driver) resourceGroupExists(ctx context.Context, client *resources.GroupsClient, groupName string) (bool, error) {
@@ -693,7 +726,7 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 		return nil, err
 	}
 
-	result, err := client.GetAccessProfiles(context.Background(), state.ResourceGroup, state.Name, "clusterUser")
+	result, err := client.GetAccessProfile(context.Background(), state.ResourceGroup, state.Name, "clusterUser")
 
 	if err != nil {
 		return nil, err
