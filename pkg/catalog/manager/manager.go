@@ -42,7 +42,7 @@ func New(management *config.ManagementContext, cacheRoot string) *Manager {
 	return &Manager{
 		cacheRoot: cacheRoot,
 		httpClient: http.Client{
-			Timeout: time.Second * 10,
+			Timeout: time.Second * 30,
 		},
 		uuid:                  uuid,
 		catalogClient:         management.Management.Catalogs(""),
