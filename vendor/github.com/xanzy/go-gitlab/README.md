@@ -23,8 +23,8 @@ to add new and/or missing endpoints. Currently the following services are suppor
 - [x] Award Emojis
 - [x] Branches
 - [x] Broadcast Messages
-- [ ] Project-level Variables
-- [ ] Group-level Variables
+- [x] Project-level Variables
+- [x] Group-level Variables
 - [x] Commits
 - [ ] Custom Attributes
 - [x] Deployments
@@ -39,15 +39,16 @@ to add new and/or missing endpoints. Currently the following services are suppor
 - [ ] GitLab CI Config templates
 - [x] Groups
 - [ ] Group Access Requests
-- [ ] Group Members
+- [x] Group Members
 - [x] Issues
 - [x] Issue Boards
+- [x] Group Issue Boards 
 - [x] Jobs
-- [ ] Keys
+- [x] Keys
 - [x] Labels
 - [ ] License
 - [x] Merge Requests
-- [ ] Merge Request Approvals
+- [x] Merge Request Approvals
 - [x] Project Milestones
 - [ ] Group Milestones
 - [x] Namespaces
@@ -130,7 +131,7 @@ func main() {
 		Description:          gitlab.String("Just a test project to play with"),
 		MergeRequestsEnabled: gitlab.Bool(true),
 		SnippetsEnabled:      gitlab.Bool(true),
-		Visibility:           gitlab.VisibilityLevel(gitlab.PublicVisibility),
+		Visibility:           gitlab.Visibility(gitlab.PublicVisibility),
 	}
 	project, _, err := git.Projects.CreateProject(p)
 	if err != nil {
@@ -138,11 +139,11 @@ func main() {
 	}
 
 	// Add a new snippet
-	s := &gitlab.CreateSnippetOptions{
+	s := &gitlab.CreateProjectSnippetOptions{
 		Title:           gitlab.String("Dummy Snippet"),
 		FileName:        gitlab.String("snippet.go"),
 		Code:            gitlab.String("package main...."),
-		Visibility:      gitlab.VisibilityLevel(gitlab.PublicVisibility),
+		Visibility:      gitlab.Visibility(gitlab.PublicVisibility),
 	}
 	_, _, err = git.ProjectSnippets.CreateSnippet(project.ID, s)
 	if err != nil {

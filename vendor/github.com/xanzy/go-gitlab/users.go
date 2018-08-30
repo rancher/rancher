@@ -82,7 +82,11 @@ type ListUsersOptions struct {
 	Search        *string    `url:"search,omitempty" json:"search,omitempty"`
 	Username      *string    `url:"username,omitempty" json:"username,omitempty"`
 	ExternalUID   *string    `url:"extern_uid,omitempty" json:"extern_uid,omitempty"`
-	CreatedBefore *time.Time `url:"created_before,omitempty" json:"created_before,omitempty" `
+	Provider      *string    `url:"provider,omitempty" json:"provider,omitempty"`
+	CreatedBefore *time.Time `url:"created_before,omitempty" json:"created_before,omitempty"`
+	CreatedAfter  *time.Time `url:"created_after,omitempty" json:"created_after,omitempty"`
+	OrderBy       *string    `url:"order_by,omitempty" json:"order_by,omitempty"`
+	Sort          *string    `url:"sort,omitempty" json:"sort,omitempty"`
 }
 
 // ListUsers gets a list of users.
@@ -129,6 +133,7 @@ func (s *UsersService) GetUser(user int, options ...OptionFunc) (*User, *Respons
 type CreateUserOptions struct {
 	Email            *string `url:"email,omitempty" json:"email,omitempty"`
 	Password         *string `url:"password,omitempty" json:"password,omitempty"`
+	ResetPassword    *bool   `url:"reset_password,omitempty" json:"reset_password,omitempty"`
 	Username         *string `url:"username,omitempty" json:"username,omitempty"`
 	Name             *string `url:"name,omitempty" json:"name,omitempty"`
 	Skype            *string `url:"skype,omitempty" json:"skype,omitempty"`
@@ -169,23 +174,24 @@ func (s *UsersService) CreateUser(opt *CreateUserOptions, options ...OptionFunc)
 //
 // GitLab API docs: https://docs.gitlab.com/ce/api/users.html#user-modification
 type ModifyUserOptions struct {
-	Email          *string `url:"email,omitempty" json:"email,omitempty"`
-	Password       *string `url:"password,omitempty" json:"password,omitempty"`
-	Username       *string `url:"username,omitempty" json:"username,omitempty"`
-	Name           *string `url:"name,omitempty" json:"name,omitempty"`
-	Skype          *string `url:"skype,omitempty" json:"skype,omitempty"`
-	Linkedin       *string `url:"linkedin,omitempty" json:"linkedin,omitempty"`
-	Twitter        *string `url:"twitter,omitempty" json:"twitter,omitempty"`
-	WebsiteURL     *string `url:"website_url,omitempty" json:"website_url,omitempty"`
-	Organization   *string `url:"organization,omitempty" json:"organization,omitempty"`
-	ProjectsLimit  *int    `url:"projects_limit,omitempty" json:"projects_limit,omitempty"`
-	ExternUID      *string `url:"extern_uid,omitempty" json:"extern_uid,omitempty"`
-	Provider       *string `url:"provider,omitempty" json:"provider,omitempty"`
-	Bio            *string `url:"bio,omitempty" json:"bio,omitempty"`
-	Location       *string `url:"location,omitempty" json:"location,omitempty"`
-	Admin          *bool   `url:"admin,omitempty" json:"admin,omitempty"`
-	CanCreateGroup *bool   `url:"can_create_group,omitempty" json:"can_create_group,omitempty"`
-	External       *bool   `url:"external,omitempty" json:"external,omitempty"`
+	Email              *string `url:"email,omitempty" json:"email,omitempty"`
+	Password           *string `url:"password,omitempty" json:"password,omitempty"`
+	Username           *string `url:"username,omitempty" json:"username,omitempty"`
+	Name               *string `url:"name,omitempty" json:"name,omitempty"`
+	Skype              *string `url:"skype,omitempty" json:"skype,omitempty"`
+	Linkedin           *string `url:"linkedin,omitempty" json:"linkedin,omitempty"`
+	Twitter            *string `url:"twitter,omitempty" json:"twitter,omitempty"`
+	WebsiteURL         *string `url:"website_url,omitempty" json:"website_url,omitempty"`
+	Organization       *string `url:"organization,omitempty" json:"organization,omitempty"`
+	ProjectsLimit      *int    `url:"projects_limit,omitempty" json:"projects_limit,omitempty"`
+	ExternUID          *string `url:"extern_uid,omitempty" json:"extern_uid,omitempty"`
+	Provider           *string `url:"provider,omitempty" json:"provider,omitempty"`
+	Bio                *string `url:"bio,omitempty" json:"bio,omitempty"`
+	Location           *string `url:"location,omitempty" json:"location,omitempty"`
+	Admin              *bool   `url:"admin,omitempty" json:"admin,omitempty"`
+	CanCreateGroup     *bool   `url:"can_create_group,omitempty" json:"can_create_group,omitempty"`
+	SkipReconfirmation *bool   `url:"skip_reconfirmation,omitempty" json:"skip_reconfirmation,omitempty"`
+	External           *bool   `url:"external,omitempty" json:"external,omitempty"`
 }
 
 // ModifyUser modifies an existing user. Only administrators can change attributes

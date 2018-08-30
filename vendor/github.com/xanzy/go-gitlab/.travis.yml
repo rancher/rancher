@@ -15,8 +15,8 @@ jobs:
     - stage: lint
       script:
         - go get github.com/golang/lint/golint
-        - golint
-        - go vet
+        - golint -set_exit_status
+        - go vet -v
     - stage: test
       script:
         - go test -v

@@ -55,7 +55,11 @@ func (t Tag) String() string {
 //
 // GitLab API docs:
 // https://docs.gitlab.com/ce/api/tags.html#list-project-repository-tags
-type ListTagsOptions ListOptions
+type ListTagsOptions struct {
+	ListOptions
+	OrderBy *string `url:"order_by,omitempty" json:"order_by,omitempty"`
+	Sort    *string `url:"sort,omitempty" json:"sort,omitempty"`
+}
 
 // ListTags gets a list of tags from a project, sorted by name in reverse
 // alphabetical order.
@@ -93,7 +97,7 @@ func (s *TagsService) GetTag(pid interface{}, tag string, options ...OptionFunc)
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/repository/tags/%s", url.QueryEscape(project), tag)
+	u := fmt.Sprintf("projects/%s/repository/tags/%s", url.QueryEscape(project), url.QueryEscape(tag))
 
 	req, err := s.client.NewRequest("GET", u, nil, options)
 	if err != nil {
@@ -154,7 +158,7 @@ func (s *TagsService) DeleteTag(pid interface{}, tag string, options ...OptionFu
 	if err != nil {
 		return nil, err
 	}
-	u := fmt.Sprintf("projects/%s/repository/tags/%s", url.QueryEscape(project), tag)
+	u := fmt.Sprintf("projects/%s/repository/tags/%s", url.QueryEscape(project), url.QueryEscape(tag))
 
 	req, err := s.client.NewRequest("DELETE", u, nil, options)
 	if err != nil {
@@ -182,7 +186,7 @@ func (s *TagsService) CreateRelease(pid interface{}, tag string, opt *CreateRele
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/repository/tags/%s/release", url.QueryEscape(project), tag)
+	u := fmt.Sprintf("projects/%s/repository/tags/%s/release", url.QueryEscape(project), url.QueryEscape(tag))
 
 	req, err := s.client.NewRequest("POST", u, opt, options)
 	if err != nil {
@@ -215,7 +219,7 @@ func (s *TagsService) UpdateRelease(pid interface{}, tag string, opt *UpdateRele
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/repository/tags/%s/release", url.QueryEscape(project), tag)
+	u := fmt.Sprintf("projects/%s/repository/tags/%s/release", url.QueryEscape(project), url.QueryEscape(tag))
 
 	req, err := s.client.NewRequest("PUT", u, opt, options)
 	if err != nil {

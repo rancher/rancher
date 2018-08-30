@@ -108,17 +108,21 @@ func (l *Labels) MarshalJSON() ([]byte, error) {
 // GitLab API docs: https://docs.gitlab.com/ce/api/issues.html#list-issues
 type ListIssuesOptions struct {
 	ListOptions
-	State           *string `url:"state,omitempty" json:"state,omitempty"`
-	Labels          Labels  `url:"labels,comma,omitempty" json:"labels,omitempty"`
-	Milestone       *string `url:"milestone,omitempty" json:"milestone,omitempty"`
-	Scope           *string `url:"scope,omitempty" json:"scope,omitempty"`
-	AuthorID        *int    `url:"author_id,omitempty" json:"author_id,omitempty"`
-	AssigneeID      *int    `url:"assignee_id,omitempty" json:"assignee_id,omitempty"`
-	MyReactionEmoji *string `url:"my_reaction_emoji,omitempty" json:"my_reaction_emoji,omitempty"`
-	IIDs            []int   `url:"iids[],omitempty" json:"iids,omitempty"`
-	OrderBy         *string `url:"order_by,omitempty" json:"order_by,omitempty"`
-	Sort            *string `url:"sort,omitempty" json:"sort,omitempty"`
-	Search          *string `url:"search,omitempty" json:"search,omitempty"`
+	State           *string    `url:"state,omitempty" json:"state,omitempty"`
+	Labels          Labels     `url:"labels,comma,omitempty" json:"labels,omitempty"`
+	Milestone       *string    `url:"milestone,omitempty" json:"milestone,omitempty"`
+	Scope           *string    `url:"scope,omitempty" json:"scope,omitempty"`
+	AuthorID        *int       `url:"author_id,omitempty" json:"author_id,omitempty"`
+	AssigneeID      *int       `url:"assignee_id,omitempty" json:"assignee_id,omitempty"`
+	MyReactionEmoji *string    `url:"my_reaction_emoji,omitempty" json:"my_reaction_emoji,omitempty"`
+	IIDs            []int      `url:"iids[],omitempty" json:"iids,omitempty"`
+	OrderBy         *string    `url:"order_by,omitempty" json:"order_by,omitempty"`
+	Sort            *string    `url:"sort,omitempty" json:"sort,omitempty"`
+	Search          *string    `url:"search,omitempty" json:"search,omitempty"`
+	CreatedAfter    *time.Time `url:"created_after,omitempty" json:"created_after,omitempty"`
+	CreatedBefore   *time.Time `url:"created_before,omitempty" json:"created_before,omitempty"`
+	UpdatedAfter    *time.Time `url:"updated_after,omitempty" json:"updated_after,omitempty"`
+	UpdatedBefore   *time.Time `url:"updated_before,omitempty" json:"updated_before,omitempty"`
 }
 
 // ListIssues gets all issues created by authenticated user. This function
@@ -145,17 +149,21 @@ func (s *IssuesService) ListIssues(opt *ListIssuesOptions, options ...OptionFunc
 // GitLab API docs: https://docs.gitlab.com/ce/api/issues.html#list-group-issues
 type ListGroupIssuesOptions struct {
 	ListOptions
-	State           *string `url:"state,omitempty" json:"state,omitempty"`
-	Labels          Labels  `url:"labels,comma,omitempty" json:"labels,omitempty"`
-	IIDs            []int   `url:"iids[],omitempty" json:"iids,omitempty"`
-	Milestone       *string `url:"milestone,omitempty" json:"milestone,omitempty"`
-	Scope           *string `url:"scope,omitempty" json:"scope,omitempty"`
-	AuthorID        *int    `url:"author_id,omitempty" json:"author_id,omitempty"`
-	AssigneeID      *int    `url:"assignee_id,omitempty" json:"assignee_id,omitempty"`
-	MyReactionEmoji *string `url:"my_reaction_emoji,omitempty" json:"my_reaction_emoji,omitempty"`
-	OrderBy         *string `url:"order_by,omitempty" json:"order_by,omitempty"`
-	Sort            *string `url:"sort,omitempty" json:"sort,omitempty"`
-	Search          *string `url:"search,omitempty" json:"search,omitempty"`
+	State           *string    `url:"state,omitempty" json:"state,omitempty"`
+	Labels          Labels     `url:"labels,comma,omitempty" json:"labels,omitempty"`
+	IIDs            []int      `url:"iids[],omitempty" json:"iids,omitempty"`
+	Milestone       *string    `url:"milestone,omitempty" json:"milestone,omitempty"`
+	Scope           *string    `url:"scope,omitempty" json:"scope,omitempty"`
+	AuthorID        *int       `url:"author_id,omitempty" json:"author_id,omitempty"`
+	AssigneeID      *int       `url:"assignee_id,omitempty" json:"assignee_id,omitempty"`
+	MyReactionEmoji *string    `url:"my_reaction_emoji,omitempty" json:"my_reaction_emoji,omitempty"`
+	OrderBy         *string    `url:"order_by,omitempty" json:"order_by,omitempty"`
+	Sort            *string    `url:"sort,omitempty" json:"sort,omitempty"`
+	Search          *string    `url:"search,omitempty" json:"search,omitempty"`
+	CreatedAfter    *time.Time `url:"created_after,omitempty" json:"created_after,omitempty"`
+	CreatedBefore   *time.Time `url:"created_before,omitempty" json:"created_before,omitempty"`
+	UpdatedAfter    *time.Time `url:"updated_after,omitempty" json:"updated_after,omitempty"`
+	UpdatedBefore   *time.Time `url:"updated_before,omitempty" json:"updated_before,omitempty"`
 }
 
 // ListGroupIssues gets a list of group issues. This function accepts
@@ -201,6 +209,8 @@ type ListProjectIssuesOptions struct {
 	Search          *string    `url:"search,omitempty" json:"search,omitempty"`
 	CreatedAfter    *time.Time `url:"created_after,omitempty" json:"created_after,omitempty"`
 	CreatedBefore   *time.Time `url:"created_before,omitempty" json:"created_before,omitempty"`
+	UpdatedAfter    *time.Time `url:"updated_after,omitempty" json:"updated_after,omitempty"`
+	UpdatedBefore   *time.Time `url:"updated_before,omitempty" json:"updated_before,omitempty"`
 }
 
 // ListProjectIssues gets a list of project issues. This function accepts
@@ -295,17 +305,18 @@ func (s *IssuesService) CreateIssue(pid interface{}, opt *CreateIssueOptions, op
 
 // UpdateIssueOptions represents the available UpdateIssue() options.
 //
-// GitLab API docs: https://docs.gitlab.com/ce/api/issues.html#edit-issues
+// GitLab API docs: https://docs.gitlab.com/ee/api/issues.html#edit-issue
 type UpdateIssueOptions struct {
 	Title            *string    `url:"title,omitempty" json:"title,omitempty"`
 	Description      *string    `url:"description,omitempty" json:"description,omitempty"`
 	Confidential     *bool      `url:"confidential,omitempty" json:"confidential,omitempty"`
-	AssigneeID       *int       `url:"assignee_id,omitempty" json:"assignee_id,omitempty"`
+	AssigneeIDs      []int      `url:"assignee_ids,omitempty" json:"assignee_ids,omitempty"`
 	MilestoneID      *int       `url:"milestone_id,omitempty" json:"milestone_id,omitempty"`
 	Labels           Labels     `url:"labels,comma,omitempty" json:"labels,omitempty"`
 	StateEvent       *string    `url:"state_event,omitempty" json:"state_event,omitempty"`
 	UpdatedAt        *time.Time `url:"updated_at,omitempty" json:"updated_at,omitempty"`
 	DueDate          *ISOTime   `url:"due_date,omitempty" json:"due_date,omitempty"`
+	Weight           *int       `url:"weight,omitempty" json:"weight,omitempty"`
 	DiscussionLocked *bool      `url:"discussion_locked,omitempty" json:"discussion_locked,omitempty"`
 }
 
@@ -350,6 +361,39 @@ func (s *IssuesService) DeleteIssue(pid interface{}, issue int, options ...Optio
 	}
 
 	return s.client.Do(req, nil)
+}
+
+// ListMergeRequestsClosingIssueOptions represents the available
+// ListMergeRequestsClosingIssue() options.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ce/api/issues.html#list-merge-requests-that-will-close-issue-on-merge
+type ListMergeRequestsClosingIssueOptions ListOptions
+
+// ListMergeRequestsClosingIssue gets all the merge requests that will close
+// issue when merged.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ce/api/issues.html#list-merge-requests-that-will-close-issue-on-merge
+func (s *IssuesService) ListMergeRequestsClosingIssue(pid interface{}, issue int, opt *ListMergeRequestsClosingIssueOptions, options ...OptionFunc) ([]*MergeRequest, *Response, error) {
+	project, err := parseID(pid)
+	if err != nil {
+		return nil, nil, err
+	}
+	u := fmt.Sprintf("/projects/%s/issues/%d/closed_by", url.QueryEscape(project), issue)
+
+	req, err := s.client.NewRequest("GET", u, opt, options)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var m []*MergeRequest
+	resp, err := s.client.Do(req, &m)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return m, resp, err
 }
 
 // SetTimeEstimate sets the time estimate for a single project issue.

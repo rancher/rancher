@@ -87,7 +87,7 @@ type ListProjectPipelinesOptions struct {
 	YamlErrors *bool            `url:"yaml_errors,omitempty" json:"yaml_errors,omitempty"`
 	Name       *string          `url:"name,omitempty" json:"name,omitempty"`
 	Username   *string          `url:"username,omitempty" json:"username,omitempty"`
-	OrderBy    *OrderByValue    `url:"order_by,omitempty" json:"order_by,omitempty"`
+	OrderBy    *string          `url:"order_by,omitempty" json:"order_by,omitempty"`
 	Sort       *string          `url:"sort,omitempty" json:"sort,omitempty"`
 }
 
