@@ -40,7 +40,7 @@ func newDialer(h *Host, kind string) (*dialer, error) {
 			netConn:         "tcp",
 			useSSHAgentAuth: h.SSHAgentAuth,
 		}
-		if bastionDialer.sshKeyString == "" {
+		if bastionDialer.sshKeyString == "" && !bastionDialer.useSSHAgentAuth {
 			var err error
 			bastionDialer.sshKeyString, err = privateKeyPath(h.BastionHost.SSHKeyPath)
 			if err != nil {
@@ -59,7 +59,7 @@ func newDialer(h *Host, kind string) (*dialer, error) {
 		bastionDialer:   bastionDialer,
 	}
 
-	if dialer.sshKeyString == "" {
+	if dialer.sshKeyString == "" && !dialer.useSSHAgentAuth {
 		var err error
 		dialer.sshKeyString, err = privateKeyPath(h.SSHKeyPath)
 		if err != nil {
