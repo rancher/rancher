@@ -42,6 +42,7 @@ func Register(user *config.UserContext, kubeConfigGetter common.KubeConfigGetter
 		ClusterName:           user.ClusterName,
 		TemplateContentClient: user.Management.Management.TemplateContents(""),
 		AppRevisionGetter:     user.Management.Project,
+		AppGetter:             user.Management.Project,
 	}
 	appClient.AddClusterScopedLifecycle("helm-controller", user.ClusterName, stackLifecycle)
 }
@@ -57,9 +58,11 @@ type Lifecycle struct {
 	ClusterName           string
 	TemplateContentClient mgmtv3.TemplateContentInterface
 	AppRevisionGetter     v3.AppRevisionsGetter
+	AppGetter             v3.AppsGetter
 }
 
 func (l *Lifecycle) Create(obj *v3.App) (*v3.App, error) {
+	v3.AppConditionMigrated.True(obj)
 	return obj, nil
 }
 
@@ -67,7 +70,21 @@ func (l *Lifecycle) Updated(obj *v3.App) (*v3.App, error) {
 	if obj.Spec.ExternalID == "" && len(obj.Spec.Files) == 0 {
 		return obj, nil
 	}
+	// always refresh app to avoid updating app twice
 	_, projectName := ref.Parse(obj.Spec.ProjectName)
+	var err error
+	obj, err = l.AppGetter.Apps(projectName).Get(obj.Name, metav1.GetOptions{})
+	if err != nil {
+		return obj, err
+	}
+	// if app was created before 2.1, run migrate to install a no-op helm release
+	newObj, err := v3.AppConditionMigrated.Once(obj, func() (runtime.Object, error) {
+		return l.DeployApp(obj)
+	})
+	if err != nil {
+		return obj, err
+	}
+	obj = newObj.(*v3.App)
 	appRevisionClient := l.AppRevisionGetter.AppRevisions(projectName)
 	if obj.Spec.AppRevisionName != "" {
 		currentRevision, err := appRevisionClient.Get(obj.Spec.AppRevisionName, metav1.GetOptions{})
