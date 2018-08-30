@@ -350,7 +350,9 @@ func (m *userManager) CreateNewUserClusterRoleBinding(userName string, userUID a
 
 		cr, err = m.rbacClient.ClusterRoles("").Create(role)
 		if err != nil {
-			return err
+			if !apierrors.IsAlreadyExists(err) {
+				return err
+			}
 		}
 	}
 
@@ -378,7 +380,9 @@ func (m *userManager) CreateNewUserClusterRoleBinding(userName string, userUID a
 		}
 		_, err = m.rbacClient.ClusterRoleBindings("").Create(crb)
 		if err != nil {
-			return err
+			if !apierrors.IsAlreadyExists(err) {
+				return err
+			}
 		}
 	}
 
