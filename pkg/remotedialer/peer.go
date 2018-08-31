@@ -81,10 +81,11 @@ func (p *peer) start(ctx context.Context, s *Server) {
 		},
 	}
 
+outer:
 	for {
 		select {
 		case <-ctx.Done():
-			break
+			break outer
 		default:
 		}
 
