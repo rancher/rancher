@@ -1,6 +1,7 @@
 import pytest
 from .common import random_str
 import time
+from rancher import ApiError
 
 
 @pytest.fixture
@@ -89,7 +90,8 @@ def wait_for_applied_quota_failure(admin_cc_client, ns, timeout=30):
 def test_namespace_resource_quota(admin_cc, admin_pc):
     q = default_project_quota()
     p = admin_cc.management.client.update(admin_pc.project,
-                                          resourceQuota=q)
+                                          resourceQuota=q,
+                                          namespaceDefaultResourceQuota=q)
     p = admin_cc.management.client.wait_success(p)
     assert p.resourceQuota is not None
     client = admin_pc.cluster.client
@@ -120,7 +122,8 @@ def test_project_resource_quota_fields(admin_cc):
 def test_resource_quota_ns_create(admin_cc, admin_pc):
     q = default_project_quota()
     p = admin_cc.management.client.update(admin_pc.project,
-                                          resourceQuota=q)
+                                          resourceQuota=q,
+                                          namespaceDefaultResourceQuota=q)
     p = admin_cc.management.client.wait_success(p)
     assert p.resourceQuota is not None
     assert p.resourceQuota.limit.pods == '100'
@@ -149,9 +152,11 @@ def test_default_resource_quota_ns_set(admin_cc, admin_pc):
 
 
 def test_quota_ns_create_exceed(admin_cc, admin_pc, ns_large_quota):
+    q = ns_default_quota()
     q = default_project_quota()
     p = admin_cc.management.client.update(admin_pc.project,
-                                          resourceQuota=q)
+                                          resourceQuota=q,
+                                          namespaceDefaultResourceQuota=q)
     p = admin_cc.management.client.wait_success(p)
     assert p.resourceQuota is not None
 
@@ -254,3 +259,22 @@ def test_default_resource_quota_project_update(admin_cc, admin_pc):
     assert p.namespaceDefaultResourceQuota is not None
     wait_for_applied_quota_set(admin_pc.cluster.client,
                                ns)
+
+
+def test_api_validation_project(admin_cc):
+    client = admin_cc.management.client
+    q = default_project_quota()
+    with pytest.raises(ApiError) as e:
+        client.create_project(name='test-' + random_str(),
+                              clusterId=admin_cc.cluster.id,
+                              resourceQuota=q)
+
+    assert e.value.error.status == 422
+
+    q = default_project_quota()
+    with pytest.raises(ApiError) as e:
+        client.create_project(name='test-' + random_str(),
+                              clusterId=admin_cc.cluster.id,
+                              namespaceDefaultResourceQuota=q)
+
+    assert e.value.error.status == 422

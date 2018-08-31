@@ -36,5 +36,21 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 			"annotations", "cattle.io/status")
 	}
 
+	if err := p.validateResourceQuota(apiContext, schema, data, ""); err != nil {
+		return nil, err
+	}
+
 	return p.Store.Create(apiContext, schema, data)
+}
+
+func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
+	if err := p.validateResourceQuota(apiContext, schema, data, id); err != nil {
+		return nil, err
+	}
+
+	return p.Store.Update(apiContext, schema, data, id)
+}
+
+func (p *Store) validateResourceQuota(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) error {
+	return nil
 }
