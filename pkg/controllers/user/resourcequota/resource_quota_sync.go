@@ -147,8 +147,12 @@ func (c *SyncController) getNamespaceResourceQuota(ns *corev1.Namespace, setDefa
 	if err != nil {
 		return nil, err
 	}
-	if limit == nil && setDefault {
-		limit = defaultResourceLimit
+	if limit == nil {
+		if setDefault {
+			limit = defaultResourceLimit
+		} else {
+			return nil, nil
+		}
 	}
 
 	return convertResourceLimitResourceQuotaSpec(limit)
