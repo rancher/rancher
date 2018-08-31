@@ -73,7 +73,7 @@ func InstallCharts(rootDir, port string, obj *v3.App) error {
 		for k, v := range answers {
 			result = append(result, fmt.Sprintf("%s=%s", k, v))
 		}
-		setValues = append([]string{"--set-string"}, strings.Join(result, ","))
+		setValues = append([]string{"--set"}, strings.Join(result, ","))
 	}
 	commands := make([]string, 0)
 	commands = append([]string{"upgrade", "--install", "--namespace", obj.Spec.TargetNamespace, obj.Name}, setValues...)
