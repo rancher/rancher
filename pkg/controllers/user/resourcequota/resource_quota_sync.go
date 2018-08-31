@@ -2,7 +2,6 @@ package resourcequota
 
 import (
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"sort"
 	"strings"
@@ -19,7 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/cache"
 	clientcache "k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/quota"
 )
 
 const (
@@ -240,11 +238,33 @@ func (c *SyncController) validateNamespaceQuota(ns *corev1.Namespace) (bool, err
 	mu := getProjectLock(projectID)
 	mu.Lock()
 	defer mu.Unlock()
-	isFit, msg, err := c.isQuotaFit(&finalNs, projectID, projectLimit)
+	// get other Namespaces
+	objects, err := c.NsIndexer.ByIndex(nsByProjectIndex, projectID)
 	if err != nil {
 		return false, err
 	}
-	return isFit, c.setValidated(ns, isFit, msg)
+	var nsLimits []*v3.ResourceQuotaLimit
+	for _, o := range objects {
+		n := o.(*corev1.Namespace)
+		// skip itself
+		if n.Name == ns.Name {
+			continue
+		}
+		nsLimit, err := getNamespaceLimit(ns)
+		if err != nil {
+			return false, err
+		}
+		nsLimits = append(nsLimits, nsLimit)
+	}
+	nsLimit, err := getNamespaceLimit(&finalNs)
+	if err != nil {
+		return false, err
+	}
+	isFit, msg, err := isQuotaFit(nsLimit, nsLimits, projectLimit)
+	if err != nil {
+		return false, err
+	}
+	return isFit, c.setValidated(&finalNs, isFit, msg)
 }
 
 func (c *SyncController) setValidated(ns *corev1.Namespace, value bool, msg string) error {
@@ -271,62 +291,6 @@ func getProjectLock(projectID string) *sync.Mutex {
 	}
 	mu := val.(*sync.Mutex)
 	return mu
-}
-
-func (c *SyncController) isQuotaFit(ns *corev1.Namespace, projectID string, projectLimit *v3.ResourceQuotaLimit) (bool, string, error) {
-	nssResourceList := api.ResourceList{}
-	nsLimit, err := getNamespaceLimit(ns)
-	if err != nil {
-		return false, "", err
-	}
-	// add itself on create
-	nsResourceList, err := convertLimitToResourceList(nsLimit)
-	if err != nil {
-		return false, "", err
-	}
-	nssResourceList = quota.Add(nssResourceList, nsResourceList)
-
-	// get other Namespaces
-	namespaces, err := c.NsIndexer.ByIndex(nsByProjectIndex, projectID)
-	if err != nil {
-		return false, "", err
-	}
-
-	for _, n := range namespaces {
-		// only consider namespaces who's resource quota is set
-		set, err := namespaceutil.IsNamespaceConditionSet(ns, resourceQuotaValidatedCondition, true)
-		if err != nil {
-			return false, "", err
-		}
-		if !set {
-			continue
-		}
-		other := n.(*corev1.Namespace)
-		if other.Name == ns.Name {
-			continue
-		}
-		nsLimit, err := getNamespaceLimit(other)
-		if err != nil {
-			return false, "", err
-		}
-		nsResourceList, err := convertLimitToResourceList(nsLimit)
-		if err != nil {
-			return false, "", err
-		}
-		nssResourceList = quota.Add(nssResourceList, nsResourceList)
-	}
-
-	projectResourceList, err := convertLimitToResourceList(projectLimit)
-	if err != nil {
-		return false, "", err
-	}
-
-	allowed, exceeded := quota.LessThanOrEqual(nssResourceList, projectResourceList)
-	if allowed {
-		return true, "", nil
-	}
-	failedHard := quota.Mask(nssResourceList, exceeded)
-	return false, fmt.Sprintf("Resource quota [%v] exceeds project limit ", prettyPrint(failedHard)), nil
 }
 
 func prettyPrint(item api.ResourceList) string {
