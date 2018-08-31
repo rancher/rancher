@@ -4,6 +4,7 @@ import (
 	"reflect"
 
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
+	validate "github.com/rancher/rancher/pkg/resourcequota"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	corev1 "k8s.io/api/core/v1"
 	clientcache "k8s.io/client-go/tools/cache"
@@ -58,7 +59,7 @@ func (c *calculateLimitController) calculateProjectResourceQuota(projectID strin
 		if err != nil {
 			return err
 		}
-		nsResourceList, err := convertLimitToResourceList(nsLimit)
+		nsResourceList, err := validate.ConvertLimitToResourceList(nsLimit)
 		if err != nil {
 			return err
 		}

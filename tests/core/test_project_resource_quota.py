@@ -62,29 +62,6 @@ def wait_for_applied_quota_set(admin_cc_client, ns, timeout=30):
         if time.time() - start > timeout:
             raise Exception('Timeout waiting for'
                             ' resource quota to be validated')
-    print('returning' + a)
-
-
-def wait_for_applied_quota_failure(admin_cc_client, ns, timeout=30):
-    start = time.time()
-    ns = admin_cc_client.reload(ns)
-    a = ns.annotations.data_dict()["cattle.io/status"]
-    while a is None:
-        time.sleep(.5)
-        ns = admin_cc_client.reload(ns)
-        a = ns.annotations["cattle.io/status"]
-        if time.time() - start > timeout:
-            raise Exception('Timeout waiting for'
-                            ' resource quota to be validated')
-
-    while "exceeds project limit" not in a:
-        time.sleep(.5)
-        ns = admin_cc_client.reload(ns)
-        a = ns.annotations.data_dict()["cattle.io/status"]
-        if time.time() - start > timeout:
-            raise Exception('Timeout waiting for'
-                            ' resource quota validation failure')
-    print('returning' + a)
 
 
 def test_namespace_resource_quota(admin_cc, admin_pc):
@@ -161,10 +138,12 @@ def test_quota_ns_create_exceed(admin_cc, admin_pc, ns_large_quota):
     assert p.resourceQuota is not None
 
     # namespace quota exceeding project resource quota
-    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
-                                                  projectId=p.id,
-                                                  resourceQuota=ns_large_quota)
-    wait_for_applied_quota_failure(admin_pc.cluster.client, ns, 10)
+    with pytest.raises(ApiError) as e:
+        admin_pc.cluster.client.create_namespace(name=random_str(),
+                                                 projectId=p.id,
+                                                 resourceQuota=ns_large_quota)
+
+    assert e.value.error.status == 422
 
 
 def test_default_resource_quota_ns_create_invalid_combined(admin_cc, admin_pc,
@@ -187,12 +166,12 @@ def test_default_resource_quota_ns_create_invalid_combined(admin_cc, admin_pc,
     assert ns.resourceQuota is not None
 
     # namespace quota exceeding project resource quota
-    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
-                                                  projectId=p.id,
-                                                  resourceQuota=ns_large_quota)
-    assert ns is not None
-    assert ns.resourceQuota is not None
-    wait_for_applied_quota_failure(admin_pc.cluster.client, ns, 10)
+    with pytest.raises(ApiError) as e:
+        admin_pc.cluster.client.create_namespace(name=random_str(),
+                                                 projectId=p.id,
+                                                 resourceQuota=ns_large_quota)
+
+    assert e.value.error.status == 422
 
     # quota within limits
     ns = admin_pc.cluster.client.create_namespace(name=random_str(),
@@ -204,13 +183,12 @@ def test_default_resource_quota_ns_create_invalid_combined(admin_cc, admin_pc,
     ns = admin_cc.client.reload(ns)
 
     # update namespace with exceeding quota
-    ns = admin_pc.cluster.client.update(ns,
-                                        projectId=p.id,
-                                        resourceQuota=ns_large_quota)
-    assert ns is not None
-    assert ns.resourceQuota is not None
-    ns = admin_cc.client.reload(ns)
-    wait_for_applied_quota_failure(admin_pc.cluster.client, ns, 10)
+    with pytest.raises(ApiError) as e:
+        admin_pc.cluster.client.update(ns,
+                                       projectId=p.id,
+                                       resourceQuota=ns_large_quota)
+
+    assert e.value.error.status == 422
 
 
 def test_project_used_quota(admin_cc, admin_pc):
