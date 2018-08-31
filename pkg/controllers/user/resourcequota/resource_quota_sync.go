@@ -63,9 +63,12 @@ func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (*corev1.Name
 		return ns, err
 	}
 
-	quotaSpec, err := c.getNamespaceResourceQuota(ns, projectLimit != nil)
-	if err != nil {
-		return ns, err
+	var quotaSpec *corev1.ResourceQuotaSpec
+	if projectLimit != nil {
+		quotaSpec, err = c.getNamespaceResourceQuota(ns, true)
+		if err != nil {
+			return ns, err
+		}
 	}
 
 	operation := "none"
