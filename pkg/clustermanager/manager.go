@@ -39,9 +39,11 @@ type Manager struct {
 }
 
 type record struct {
+	sync.Mutex
 	clusterRec    *v3.Cluster
 	cluster       *config.UserContext
 	accessControl types.AccessControl
+	started       bool
 	ctx           context.Context
 	cancel        context.CancelFunc
 }
@@ -76,7 +78,7 @@ func (m *Manager) Start(ctx context.Context, cluster *v3.Cluster) error {
 	if err != nil {
 		return err
 	}
-	_, err = m.start(ctx, cluster)
+	_, err = m.start(ctx, cluster, true)
 	return err
 }
 
@@ -99,11 +101,11 @@ func (m *Manager) markUnavailable(clusterName string) {
 	}
 }
 
-func (m *Manager) start(ctx context.Context, cluster *v3.Cluster) (*record, error) {
+func (m *Manager) start(ctx context.Context, cluster *v3.Cluster, controllers bool) (*record, error) {
 	obj, ok := m.controllers.Load(cluster.UID)
 	if ok {
 		if !m.changed(obj.(*record), cluster) {
-			return obj.(*record), nil
+			return obj.(*record), m.startController(obj.(*record), controllers)
 		}
 		m.Stop(obj.(*record).clusterRec)
 	}
@@ -117,16 +119,25 @@ func (m *Manager) start(ctx context.Context, cluster *v3.Cluster) (*record, erro
 		return nil, httperror.NewAPIError(httperror.ClusterUnavailable, "cluster not found")
 	}
 
-	obj, loaded := m.controllers.LoadOrStore(cluster.UID, controller)
-	if !loaded {
-		go func() {
-			if err := m.doStart(obj.(*record)); err != nil {
-				m.Stop(cluster)
-			}
-		}()
+	obj, _ = m.controllers.LoadOrStore(cluster.UID, controller)
+	return obj.(*record), m.startController(obj.(*record), controllers)
+}
+
+func (m *Manager) startController(r *record, controllers bool) error {
+	if !controllers {
+		return nil
 	}
 
-	return obj.(*record), nil
+	r.Lock()
+	defer r.Unlock()
+	if !r.started {
+		if err := m.doStart(r); err != nil {
+			m.Stop(r.clusterRec)
+			return err
+		}
+		r.started = true
+	}
+	return nil
 }
 
 func (m *Manager) changed(r *record, cluster *v3.Cluster) bool {
@@ -313,17 +324,6 @@ func (m *Manager) AccessControl(apiContext *types.APIContext, storageContext typ
 	return record.accessControl, nil
 }
 
-func (m *Manager) Config(apiContext *types.APIContext, storageContext types.StorageContext) (rest.Config, error) {
-	record, err := m.record(apiContext, storageContext)
-	if err != nil {
-		return rest.Config{}, err
-	}
-	if record == nil {
-		return m.ScaledContext.RESTConfig, nil
-	}
-	return record.cluster.RESTConfig, nil
-}
-
 func (m *Manager) UnversionedClient(apiContext *types.APIContext, storageContext types.StorageContext) (rest.Interface, error) {
 	record, err := m.record(apiContext, storageContext)
 	if err != nil {
@@ -334,16 +334,8 @@ func (m *Manager) UnversionedClient(apiContext *types.APIContext, storageContext
 	}
 	return record.cluster.UnversionedClient, nil
 }
-
 func (m *Manager) APIExtClient(apiContext *types.APIContext, storageContext types.StorageContext) (clientset.Interface, error) {
-	record, err := m.record(apiContext, storageContext)
-	if err != nil {
-		return nil, err
-	}
-	if record == nil {
-		return m.ScaledContext.APIExtClient, nil
-	}
-	return record.cluster.APIExtClient, nil
+	return m.ScaledContext.APIExtClient, nil
 }
 
 func (m *Manager) UserContext(clusterName string) (*config.UserContext, error) {
@@ -352,7 +344,7 @@ func (m *Manager) UserContext(clusterName string) (*config.UserContext, error) {
 		return nil, err
 	}
 
-	record, err := m.start(context.Background(), cluster)
+	record, err := m.start(context.Background(), cluster, false)
 	if err != nil || record == nil {
 		msg := ""
 		if err != nil {
@@ -379,7 +371,7 @@ func (m *Manager) record(apiContext *types.APIContext, storageContext types.Stor
 	if cluster == nil {
 		return nil, nil
 	}
-	record, err := m.start(context.Background(), cluster)
+	record, err := m.start(context.Background(), cluster, false)
 	if err != nil {
 		return nil, httperror.NewAPIError(httperror.ClusterUnavailable, err.Error())
 	}
