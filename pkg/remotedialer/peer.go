@@ -90,7 +90,7 @@ func (p *peer) start(ctx context.Context, s *Server) {
 
 		ws, _, err := dialer.Dial(p.url, headers)
 		if err != nil {
-			logrus.Errorf("Failed to connect to peer %s %#v: %v", p.url, headers, err)
+			logrus.Errorf("Failed to connect to peer %s [local ID=%s]: %v", p.url, s.PeerID, err)
 			time.Sleep(5 * time.Second)
 			continue
 		}
