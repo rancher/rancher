@@ -27,6 +27,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/store/cert"
 	"github.com/rancher/rancher/pkg/api/store/cluster"
 	nodeStore "github.com/rancher/rancher/pkg/api/store/node"
+	nodeTemplateStore "github.com/rancher/rancher/pkg/api/store/nodetemplate"
 	"github.com/rancher/rancher/pkg/api/store/noopwatching"
 	"github.com/rancher/rancher/pkg/api/store/preference"
 	"github.com/rancher/rancher/pkg/api/store/scoped"
@@ -230,7 +231,16 @@ func ClusterRegistrationTokens(schemas *types.Schemas) {
 
 func NodeTemplates(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.NodeTemplateType)
-	schema.Store = userscope.NewStore(management.Core.Namespaces(""), schema.Store)
+	npl := management.Management.NodePools("").Controller().Lister()
+	f := nodetemplate.Formatter{
+		NodePoolLister: npl,
+	}
+	schema.Formatter = f.Formatter
+	s := &nodeTemplateStore.Store{
+		Store:          userscope.NewStore(management.Core.Namespaces(""), schema.Store),
+		NodePoolLister: npl,
+	}
+	schema.Store = s
 	schema.Validator = nodetemplate.Validator
 }
 
