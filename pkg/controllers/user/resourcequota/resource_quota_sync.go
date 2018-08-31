@@ -3,12 +3,11 @@ package resourcequota
 import (
 	"encoding/json"
 	"reflect"
-	"sort"
-	"strings"
 	"sync"
 	"time"
 
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
+	validate "github.com/rancher/rancher/pkg/resourcequota"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -17,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/cache"
 	clientcache "k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 const (
@@ -168,24 +166,6 @@ var defaultResourceLimit = &v3.ResourceQuotaLimit{
 	LimitsMemory:           "0",
 }
 
-func getProjectID(ns *corev1.Namespace) string {
-	if ns.Annotations != nil {
-		return ns.Annotations[projectIDAnnotation]
-	}
-	return ""
-}
-
-func getProjectNamespaceName(projectID string) (string, string) {
-	if projectID == "" {
-		return "", ""
-	}
-	parts := strings.Split(projectID, ":")
-	if len(parts) == 2 {
-		return parts[0], parts[1]
-	}
-	return "", ""
-}
-
 func (c *SyncController) createDefaultResourceQuota(ns *corev1.Namespace, spec *corev1.ResourceQuotaSpec) error {
 	resourceQuota := &corev1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{
@@ -260,7 +240,7 @@ func (c *SyncController) validateNamespaceQuota(ns *corev1.Namespace) (bool, err
 	if err != nil {
 		return false, err
 	}
-	isFit, msg, err := isQuotaFit(nsLimit, nsLimits, projectLimit)
+	isFit, msg, err := validate.IsQuotaFit(nsLimit, nsLimits, projectLimit)
 	if err != nil {
 		return false, err
 	}
@@ -291,21 +271,6 @@ func getProjectLock(projectID string) *sync.Mutex {
 	}
 	mu := val.(*sync.Mutex)
 	return mu
-}
-
-func prettyPrint(item api.ResourceList) string {
-	parts := []string{}
-	keys := []string{}
-	for key := range item {
-		keys = append(keys, string(key))
-	}
-	sort.Strings(keys)
-	for _, key := range keys {
-		value := item[api.ResourceName(key)]
-		constraint := key + "=" + value.String()
-		parts = append(parts, constraint)
-	}
-	return strings.Join(parts, ",")
 }
 
 func (c *SyncController) getResourceQuotaToUpdate(ns *corev1.Namespace) (string, error) {

@@ -10,7 +10,6 @@ import (
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
-	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -83,8 +82,11 @@ func (s *projectStore) validateResourceQuota(apiContext *types.APIContext, schem
 	_, quotaOk := data[quotaField]
 	_, namespaceQuotaOk := data[namespaceQuotaField]
 	if quotaOk != namespaceQuotaOk {
-		return httperror.NewFieldAPIError(httperror.MissingRequired, fmt.Sprintf("Both %s and %s are required", quotaField, namespaceQuotaField), "")
+		if quotaOk {
+			return httperror.NewFieldAPIError(httperror.MissingRequired, namespaceQuotaField, fmt.Sprintf("Both %s and %s are required", quotaField, namespaceQuotaField))
+		}
+		return httperror.NewFieldAPIError(httperror.MissingRequired, quotaField, fmt.Sprintf("Both %s and %s are required", quotaField, namespaceQuotaField))
+
 	}
-	logrus.Errorf("quota is %v", data[quotaField])
 	return nil
 }

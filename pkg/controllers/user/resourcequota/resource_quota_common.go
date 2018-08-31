@@ -2,14 +2,13 @@ package resourcequota
 
 import (
 	"encoding/json"
-	"fmt"
+	"strings"
 
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/quota"
 )
 
 func convertResourceListToLimit(rList api.ResourceList) (*v3.ResourceQuotaLimit, error) {
@@ -27,22 +26,6 @@ func convertResourceListToLimit(rList api.ResourceList) (*v3.ResourceQuotaLimit,
 	err = convert.ToObj(convertedMap, toReturn)
 
 	return toReturn, err
-}
-
-func convertLimitToResourceList(limit *v3.ResourceQuotaLimit) (api.ResourceList, error) {
-	toReturn := api.ResourceList{}
-	converted, err := convert.EncodeToMap(limit)
-	if err != nil {
-		return nil, err
-	}
-	for key, value := range converted {
-		q, err := resource.ParseQuantity(convert.ToString(value))
-		if err != nil {
-			return nil, err
-		}
-		toReturn[api.ResourceName(key)] = q
-	}
-	return toReturn, nil
 }
 
 func convertResourceLimitResourceQuotaSpec(limit *v3.ResourceQuotaLimit) (*corev1.ResourceQuotaSpec, error) {
@@ -151,31 +134,20 @@ func getNamespaceLimit(ns *corev1.Namespace) (*v3.ResourceQuotaLimit, error) {
 	return &nsQuota.Limit, err
 }
 
-func isQuotaFit(nsLimit *v3.ResourceQuotaLimit, nsLimits []*v3.ResourceQuotaLimit, projectLimit *v3.ResourceQuotaLimit) (bool, string, error) {
-	nssResourceList := api.ResourceList{}
-	nsResourceList, err := convertLimitToResourceList(nsLimit)
-	if err != nil {
-		return false, "", err
+func getProjectID(ns *corev1.Namespace) string {
+	if ns.Annotations != nil {
+		return ns.Annotations[projectIDAnnotation]
 	}
-	nssResourceList = quota.Add(nssResourceList, nsResourceList)
+	return ""
+}
 
-	for _, nsLimit := range nsLimits {
-		nsResourceList, err := convertLimitToResourceList(nsLimit)
-		if err != nil {
-			return false, "", err
-		}
-		nssResourceList = quota.Add(nssResourceList, nsResourceList)
+func getProjectNamespaceName(projectID string) (string, string) {
+	if projectID == "" {
+		return "", ""
 	}
-
-	projectResourceList, err := convertLimitToResourceList(projectLimit)
-	if err != nil {
-		return false, "", err
+	parts := strings.Split(projectID, ":")
+	if len(parts) == 2 {
+		return parts[0], parts[1]
 	}
-
-	allowed, exceeded := quota.LessThanOrEqual(nssResourceList, projectResourceList)
-	if allowed {
-		return true, "", nil
-	}
-	failedHard := quota.Mask(nssResourceList, exceeded)
-	return false, fmt.Sprintf("Resource quota [%v] exceeds project limit ", prettyPrint(failedHard)), nil
+	return "", ""
 }
