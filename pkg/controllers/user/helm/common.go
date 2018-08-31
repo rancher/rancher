@@ -48,8 +48,7 @@ func helmInstall(templateDir, kubeconfigPath string, app *v3.App) error {
 	cont, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	addr := common.GenerateRandomPort()
-	probeAddr := common.GenerateRandomPort()
-	go common.StartTiller(cont, addr, probeAddr, app.Spec.TargetNamespace, kubeconfigPath)
+	go common.StartTiller(cont, addr, app.Spec.TargetNamespace, kubeconfigPath)
 	return common.InstallCharts(templateDir, addr, app)
 }
 
@@ -57,8 +56,7 @@ func helmDelete(kubeconfigPath string, app *v3.App) error {
 	cont, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	addr := common.GenerateRandomPort()
-	probeAddr := common.GenerateRandomPort()
-	go common.StartTiller(cont, addr, probeAddr, app.Spec.TargetNamespace, kubeconfigPath)
+	go common.StartTiller(cont, addr, app.Spec.TargetNamespace, kubeconfigPath)
 	return common.DeleteCharts(addr, app)
 }
 
