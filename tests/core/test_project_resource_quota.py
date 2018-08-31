@@ -239,7 +239,7 @@ def test_default_resource_quota_project_update(admin_cc, admin_pc):
                                ns)
 
 
-def test_api_validation_project(admin_cc):
+def test_api_validation_project(admin_cc, ns_large_quota):
     client = admin_cc.management.client
     q = default_project_quota()
     with pytest.raises(ApiError) as e:
@@ -249,10 +249,18 @@ def test_api_validation_project(admin_cc):
 
     assert e.value.error.status == 422
 
-    q = default_project_quota()
     with pytest.raises(ApiError) as e:
         client.create_project(name='test-' + random_str(),
                               clusterId=admin_cc.cluster.id,
                               namespaceDefaultResourceQuota=q)
+
+    assert e.value.error.status == 422
+
+    lq = ns_large_quota
+    with pytest.raises(ApiError) as e:
+        client.create_project(name='test-' + random_str(),
+                              clusterId=admin_cc.cluster.id,
+                              resourceQuota=q,
+                              namespaceDefaultResourceQuota=lq)
 
     assert e.value.error.status == 422

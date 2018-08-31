@@ -2,13 +2,15 @@ package project
 
 import (
 	"encoding/json"
-
 	"fmt"
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
+	"github.com/rancher/rancher/pkg/resourcequota"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	mgmtclient "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -49,9 +51,6 @@ func (s *projectStore) Update(apiContext *types.APIContext, schema *types.Schema
 	if err := s.validateResourceQuota(apiContext, schema, data, id); err != nil {
 		return nil, err
 	}
-	if err := s.validateResourceQuota(apiContext, schema, data, ""); err != nil {
-		return nil, err
-	}
 
 	return s.Store.Update(apiContext, schema, data, id)
 }
@@ -79,14 +78,41 @@ func (s *projectStore) createProjectAnnotation() (string, error) {
 }
 
 func (s *projectStore) validateResourceQuota(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) error {
-	_, quotaOk := data[quotaField]
-	_, namespaceQuotaOk := data[namespaceQuotaField]
+	quotaO, quotaOk := data[quotaField]
+	nsQuotaO, namespaceQuotaOk := data[namespaceQuotaField]
 	if quotaOk != namespaceQuotaOk {
 		if quotaOk {
-			return httperror.NewFieldAPIError(httperror.MissingRequired, namespaceQuotaField, fmt.Sprintf("Both %s and %s are required", quotaField, namespaceQuotaField))
+			return httperror.NewFieldAPIError(httperror.MissingRequired, namespaceQuotaField, "")
 		}
-		return httperror.NewFieldAPIError(httperror.MissingRequired, quotaField, fmt.Sprintf("Both %s and %s are required", quotaField, namespaceQuotaField))
-
+		return httperror.NewFieldAPIError(httperror.MissingRequired, quotaField, "")
 	}
-	return nil
+	var nsQuota mgmtclient.NamespaceResourceQuota
+	if err := convert.ToObj(nsQuotaO, &nsQuota); err != nil {
+		return err
+	}
+	var quota mgmtclient.ProjectResourceQuota
+	if err := convert.ToObj(quotaO, &quota); err != nil {
+		return err
+	}
+
+	quotaLimit, err := limitToLimit(quota.Limit)
+	if err != nil {
+		return err
+	}
+	nsQuotaLimit, err := limitToLimit(nsQuota.Limit)
+	if err != nil {
+		return err
+	}
+
+	isFit, msg, err := resourcequota.IsQuotaFit(nsQuotaLimit, []*v3.ResourceQuotaLimit{}, quotaLimit)
+	if err != nil || isFit {
+		return err
+	}
+	return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, quotaField, fmt.Sprintf("Resource quota exceeds the project: %s", msg))
+}
+
+func limitToLimit(from *mgmtclient.ResourceQuotaLimit) (*v3.ResourceQuotaLimit, error) {
+	var to v3.ResourceQuotaLimit
+	err := convert.ToObj(from, &to)
+	return &to, err
 }
