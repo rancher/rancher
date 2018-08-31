@@ -64,7 +64,7 @@ func (m *Manager) Stop(cluster *v3.Cluster) {
 	if !ok {
 		return
 	}
-	logrus.Info("Stopping cluster agent for", obj.(*record).cluster.ClusterName)
+	logrus.Infof("Stopping cluster agent for %s", obj.(*record).cluster.ClusterName)
 	obj.(*record).cancel()
 	m.controllers.Delete(cluster.UID)
 }
@@ -152,7 +152,7 @@ func (m *Manager) changed(r *record, cluster *v3.Cluster) bool {
 }
 
 func (m *Manager) doStart(rec *record) error {
-	logrus.Info("Starting cluster agent for", rec.cluster.ClusterName)
+	logrus.Infof("Starting cluster agent for %s", rec.cluster.ClusterName)
 	if err := clusterController.Register(rec.ctx, rec.cluster, m, m); err != nil {
 		return err
 	}
