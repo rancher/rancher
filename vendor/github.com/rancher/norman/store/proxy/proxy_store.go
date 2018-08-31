@@ -39,7 +39,6 @@ var (
 )
 
 type ClientGetter interface {
-	Config(apiContext *types.APIContext, context types.StorageContext) (rest.Config, error)
 	UnversionedClient(apiContext *types.APIContext, context types.StorageContext) (rest.Interface, error)
 	APIExtClient(apiContext *types.APIContext, context types.StorageContext) (clientset.Interface, error)
 }
@@ -302,6 +301,7 @@ func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	namespace, _ := values.GetValueN(data, "metadata", "namespace").(string)
 
 	values.PutValue(data, s.getUser(apiContext), "metadata", "annotations", "field.cattle.io/creatorId")
+	values.PutValue(data, "norman", "metadata", "labels", "cattle.io/creator")
 
 	name, _ := values.GetValueN(data, "metadata", "name").(string)
 	if name == "" {
