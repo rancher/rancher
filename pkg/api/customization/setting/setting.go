@@ -1,10 +1,10 @@
 package setting
 
 import (
-	"net/http"
-
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"strings"
 
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
@@ -45,7 +45,10 @@ func (h *Handler) UpdateHandler(apiContext *types.APIContext, next types.Request
 	}
 
 	value := convert.ToString(data["value"])
-	if value != "" {
+	clusterSchema := apiContext.Schemas.Schema(&managementschema.Version, client.ClusterType)
+	if value == "" {
+		SetClusterDefaults(clusterSchema, apiContext.Schemas)
+	} else {
 		spec := v3.ClusterSpec{}
 		err = json.Unmarshal([]byte(value), &spec)
 		if err != nil {
@@ -57,9 +60,7 @@ func (h *Handler) UpdateHandler(apiContext *types.APIContext, next types.Request
 		if err != nil {
 			return fmt.Errorf("unmarshal error %v", err)
 		}
-
-		clusterSchema := apiContext.Schemas.Schema(&managementschema.Version, client.ClusterType)
-		modify(clusterSchema, dataMap, apiContext.Schemas)
+		modify(clusterSchema, dataMap, apiContext.Schemas, getIgnoredFields(apiContext.Schemas))
 	}
 
 	data, err = store.Update(apiContext, apiContext.Schema, data, apiContext.ID)
@@ -71,12 +72,15 @@ func (h *Handler) UpdateHandler(apiContext *types.APIContext, next types.Request
 	return nil
 }
 
-func modify(schema *types.Schema, data map[string]interface{}, schemas *types.Schemas) {
+func modify(schema *types.Schema, data map[string]interface{}, schemas *types.Schemas, toIgnore map[string]bool) {
 	for name, value := range data {
+		if _, ok := toIgnore[name]; ok {
+			continue
+		}
 		if field, ok := schema.ResourceFields[name]; ok {
 			checkSchema := schemas.Schema(&managementschema.Version, field.Type)
 			if checkSchema != nil {
-				modify(checkSchema, convert.ToMapInterface(value), schemas)
+				modify(checkSchema, convert.ToMapInterface(value), schemas, toIgnore)
 			} else {
 				field.Default = value
 				schema.ResourceFields[name] = field
@@ -93,32 +97,53 @@ func ModifySchema(schema *types.Schema, schemas *types.Schemas) {
 		if err != nil {
 			return
 		}
-		modify(schema, dataMap, schemas)
+		modify(schema, dataMap, schemas, getIgnoredFields(schemas))
 	}
 }
 
 func SetClusterDefaults(schema *types.Schema, schemas *types.Schemas) {
-	ans, err := json.Marshal(getClusterSpec(schema, schemas))
+	ans, err := json.Marshal(getClusterSpec(schema, schemas, getIgnoredFields(schemas)))
 	if err != nil {
 		logrus.Warnf("error setting cluster defaults %v", err)
 	}
 	settings.ClusterDefaults.Set(string(ans))
 }
 
-func getClusterSpec(schema *types.Schema, schemas *types.Schemas) map[string]interface{} {
+func getClusterSpec(schema *types.Schema, schemas *types.Schemas, toIgnore map[string]bool) map[string]interface{} {
 	data := map[string]interface{}{}
 	for name, field := range schema.ResourceFields {
+		if _, ok := toIgnore[name]; ok {
+			continue
+		}
 		checkSchema := schemas.Schema(&managementschema.Version, field.Type)
 		if checkSchema != nil {
-			value := getClusterSpec(checkSchema, schemas)
+			value := getClusterSpec(checkSchema, schemas, toIgnore)
 			if len(value) > 0 {
 				data[name] = value
 			}
 		} else {
-			if field.Default != nil {
-				data[name] = field.Default
-			}
+			data[name] = field.Default
 		}
 	}
 	return data
+}
+
+func getIgnoredFields(schemas *types.Schemas) map[string]bool {
+	ignored := map[string]bool{}
+	clusterSchema := schemas.Schema(&managementschema.Version, client.ClusterType)
+	specSchema := schemas.Schema(&managementschema.Version, client.ClusterSpecType)
+	statusSchema := schemas.Schema(&managementschema.Version, client.ClusterStatusType)
+	for name := range statusSchema.ResourceFields {
+		ignored[name] = true
+	}
+	for name := range clusterSchema.ResourceFields {
+		if strings.HasSuffix(name, "Config") && !strings.HasPrefix(name, "rancher") {
+			ignored[name] = true
+		}
+		if _, ok := specSchema.ResourceFields[name]; !ok {
+			ignored[name] = true
+		}
+	}
+	ignored["clusterName"] = true
+	return ignored
 }
