@@ -143,6 +143,20 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.ImportClusterYamlInput{}).
 		MustImport(&Version, v3.ImportYamlOutput{}).
 		MustImport(&Version, v3.ExportOutput{}).
+		MustImportAndCustomize(&Version, v3.ETCDService{}, func(schema *types.Schema) {
+			schema.MustCustomizeField("extraArgs", func(field types.Field) types.Field {
+				field.Default = map[string]interface{}{
+					"election-timeout":   "5000",
+					"heartbeat-interval": "500"}
+				return field
+			})
+		}).
+		MustImportAndCustomize(&Version, v3.RancherKubernetesEngineConfig{}, func(schema *types.Schema) {
+			schema.MustCustomizeField("kubernetesVersion", func(field types.Field) types.Field {
+				field.Default = v3.DefaultK8s
+				return field
+			})
+		}).
 		MustImportAndCustomize(&Version, v3.Cluster{}, func(schema *types.Schema) {
 			schema.MustCustomizeField("name", func(field types.Field) types.Field {
 				field.Type = "dnsLabel"

@@ -22,7 +22,7 @@ type RancherKubernetesEngineConfig struct {
 	// Authorization mode configuration used in the cluster
 	Authorization AuthzConfig `yaml:"authorization" json:"authorization,omitempty"`
 	// Enable/disable strict docker version checking
-	IgnoreDockerVersion bool `yaml:"ignore_docker_version" json:"ignoreDockerVersion"`
+	IgnoreDockerVersion bool `yaml:"ignore_docker_version" json:"ignoreDockerVersion" norman:"default=true"`
 	// Kubernetes version to use (if kubernetes image is specifed, image version takes precedence)
 	Version string `yaml:"kubernetes_version" json:"kubernetesVersion,omitempty"`
 	// List of private registries and their credentials
@@ -65,6 +65,8 @@ type PrivateRegistry struct {
 	User string `yaml:"user" json:"user,omitempty"`
 	// Password for registry access
 	Password string `yaml:"password" json:"password,omitempty"`
+	// Default registry
+	IsDefault bool `yaml:"is_default" json:"isDefault,omitempty"`
 }
 
 type RKESystemImages struct {
@@ -189,7 +191,7 @@ type KubeAPIService struct {
 	// Virtual IP range that will be used by Kubernetes services
 	ServiceClusterIPRange string `yaml:"service_cluster_ip_range" json:"serviceClusterIpRange,omitempty"`
 	// Port range for services defined with NodePort type
-	ServiceNodePortRange string `yaml:"service_node_port_range" json:"serviceNodePortRange,omitempty"`
+	ServiceNodePortRange string `yaml:"service_node_port_range" json:"serviceNodePortRange,omitempty" norman:"default=30000-32767"`
 	// Enabled/Disable PodSecurityPolicy
 	PodSecurityPolicy bool `yaml:"pod_security_policy" json:"podSecurityPolicy,omitempty"`
 }
@@ -239,7 +241,7 @@ type BaseService struct {
 
 type NetworkConfig struct {
 	// Network Plugin That will be used in kubernetes cluster
-	Plugin string `yaml:"plugin" json:"plugin,omitempty"`
+	Plugin string `yaml:"plugin" json:"plugin,omitempty" norman:"default=canal"`
 	// Plugin options to configure network properties
 	Options map[string]string `yaml:"options" json:"options,omitempty"`
 	// CalicoNetworkProvider
@@ -252,7 +254,7 @@ type NetworkConfig struct {
 
 type AuthnConfig struct {
 	// Authentication strategy that will be used in kubernetes cluster
-	Strategy string `yaml:"strategy" json:"strategy,omitempty"`
+	Strategy string `yaml:"strategy" json:"strategy,omitempty" norman:"default=x509"`
 	// Authentication options
 	Options map[string]string `yaml:"options" json:"options,omitempty"`
 	// List of additional hostnames and IPs to include in the api server PKI cert
@@ -268,7 +270,7 @@ type AuthzConfig struct {
 
 type IngressConfig struct {
 	// Ingress controller type used by kubernetes
-	Provider string `yaml:"provider" json:"provider,omitempty"`
+	Provider string `yaml:"provider" json:"provider,omitempty" norman:"default=nginx"`
 	// Ingress controller options
 	Options map[string]string `yaml:"options" json:"options,omitempty"`
 	// NodeSelector key pair
@@ -561,7 +563,7 @@ type AWSCloudProvider struct {
 
 type MonitoringConfig struct {
 	// Monitoring server provider
-	Provider string `yaml:"provider" json:"provider,omitempty"`
+	Provider string `yaml:"provider" json:"provider,omitempty" norman:"default=metrics-server"`
 	// Metrics server options
 	Options map[string]string `yaml:"options" json:"options,omitempty"`
 }
