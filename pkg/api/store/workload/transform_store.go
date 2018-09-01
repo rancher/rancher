@@ -67,6 +67,21 @@ func setTransitioning(apiContext *types.APIContext, data map[string]interface{})
 	if data["transitioning"] == "yes" || data["transitioning"] == "error" {
 		return
 	}
+	projectID := apiContext.SubContext["/v3/schemas/project"]
+	containers := convert.ToMapSlice(data["containers"])
+	for _, c := range containers {
+		containerSchemaType := convert.ToString(c["type"])
+		if containerSchemaType == "" {
+			continue
+		}
+		newSchemaType := strings.SplitN(containerSchemaType, "schemas", 2)
+		if len(newSchemaType) != 2 {
+			continue
+		}
+		updatedType := newSchemaType[0] + projectID + "/schemas" + newSchemaType[1]
+		c["type"] = updatedType
+	}
+
 	workloadType := convert.ToString(values.GetValueN(data, "type"))
 	switch workloadType {
 	case "/v3/project/schemas/deployment":
