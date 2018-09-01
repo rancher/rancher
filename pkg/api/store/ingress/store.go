@@ -242,7 +242,15 @@ func New(store types.Store) types.Store {
 		Transformer: func(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
 			id, _ := data["id"].(string)
 			formatData(id, data, true)
+			setIngressState(data)
 			return data, nil
 		},
+	}
+}
+
+func setIngressState(data map[string]interface{}) {
+	lbStatus, ok := values.GetSlice(data, "status", "loadBalancer", "ingress")
+	if !ok || len(lbStatus) == 0 {
+		data["state"] = "initializing"
 	}
 }
