@@ -97,6 +97,9 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 	root.Handle("/robots.txt", uiContent)
 	root.Handle("/VERSION.txt", uiContent)
 
+	//API UI
+	root.PathPrefix("/api-ui").Handler(uiContent)
+
 	registerHealth(root)
 
 	dynamiclistener.Start(ctx, scaledContext, httpPort, httpsPort, root)
