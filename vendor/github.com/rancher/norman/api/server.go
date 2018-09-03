@@ -261,3 +261,17 @@ func (s *Server) handleError(apiRequest *types.APIContext, err error) {
 		apiRequest.Schema.ErrorHandler(apiRequest, err)
 	}
 }
+
+func (s *Server) CustomAPIUIResponseWriter(cssURL, jsURL, version writer.StringGetter) {
+	wi, ok := s.ResponseWriters["html"]
+	if !ok {
+		return
+	}
+	w, ok := wi.(*writer.HTMLResponseWriter)
+	if !ok {
+		return
+	}
+	w.CSSURL = cssURL
+	w.JSURL = jsURL
+	w.APIUIVersion = version
+}
