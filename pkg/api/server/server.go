@@ -4,9 +4,9 @@ import (
 	"context"
 	"net/http"
 
-	normanapi "github.com/rancher/norman/api"
 	"github.com/rancher/norman/api/builtin"
 	"github.com/rancher/norman/pkg/subscribe"
+	rancherapi "github.com/rancher/rancher/pkg/api"
 	"github.com/rancher/rancher/pkg/api/controllers/dynamicschema"
 	"github.com/rancher/rancher/pkg/api/controllers/samlconfig"
 	"github.com/rancher/rancher/pkg/api/controllers/settings"
@@ -37,19 +37,18 @@ func New(ctx context.Context, scaledContext *config.ScaledContext, clusterManage
 		return nil, err
 	}
 
-	server := normanapi.NewAPIServer()
-	server.AccessControl = scaledContext.AccessControl
-
-	if err := server.AddSchemas(scaledContext.Schemas); err != nil {
+	server, err := rancherapi.NewServer(scaledContext.Schemas)
+	if err != nil {
 		return nil, err
 	}
+	server.AccessControl = scaledContext.AccessControl
 
 	dynamicschema.Register(ctx, scaledContext, server.Schemas)
 	whitelistproxyNodeDriver.Register(ctx, scaledContext)
 	whitelistproxyKontainerDriver.Register(ctx, scaledContext)
 	samlconfig.Register(ctx, scaledContext)
 	usercontrollers.Register(ctx, scaledContext, clusterManager)
-	err := settings.Register(scaledContext)
+	err = settings.Register(scaledContext)
 
 	return server, err
 }
