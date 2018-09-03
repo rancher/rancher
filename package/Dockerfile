@@ -29,6 +29,8 @@ ENV CATTLE_UI_PATH /usr/share/rancher/ui
 ENV CATTLE_UI_VERSION 2.1.5
 ENV CATTLE_CLI_VERSION v2.0.5
 
+ENV CATTLE_API_UI_VERSION 1.1.6
+
 RUN mkdir -p /var/log/auditlog
 ENV AUDIT_LOG_PATH /var/log/auditlog/rancher-api-audit.log
 ENV AUDIT_LOG_MAXAGE 10
@@ -40,6 +42,9 @@ VOLUME /var/log/auditlog
 RUN mkdir -p /usr/share/rancher/ui && \
     cd /usr/share/rancher/ui && \
     curl -sL https://releases.rancher.com/ui/${CATTLE_UI_VERSION}.tar.gz | tar xvzf - --strip-components=1 && \
+    mkdir -p /usr/share/rancher/ui/api-ui && \
+    cd /usr/share/rancher/ui/api-ui && \
+    curl -sL https://releases.rancher.com/api-ui/${CATTLE_API_UI_VERSION}.tar.gz | tar xvzf - --strip-components=1 && \
     cd /var/lib/rancher
 
 ENV CATTLE_CLI_URL_DARWIN  https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-darwin-amd64-${CATTLE_CLI_VERSION}.tar.gz
