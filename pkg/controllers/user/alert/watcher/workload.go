@@ -60,7 +60,7 @@ func (w *WorkloadWatcher) watch(ctx context.Context, interval time.Duration) {
 	for range ticker.Context(ctx, interval) {
 		err := w.watchRule()
 		if err != nil {
-			logrus.Infof("Failed to watch deployment", err)
+			logrus.Infof("Failed to watch deployment, error: %v", err)
 		}
 	}
 }

@@ -229,7 +229,7 @@ func NewFluentdDaemonset(name, namespace, dockerRootDir string) *v1beta2.DaemonS
 					},
 					ServiceAccountName:            loggingconfig.FluentdName,
 					TerminationGracePeriodSeconds: &terminationGracePeriodSeconds,
-					Volumes: allVols,
+					Volumes:                       allVols,
 				},
 			},
 		},

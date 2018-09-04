@@ -89,7 +89,7 @@ func (f *Format) Formatter(apiContext *types.APIContext, resource *types.RawReso
 	// check if PSPT is assigned to a cluster or project
 	projectsWithPSPT, err := f.ProjectIndexer.ByIndex(projectByPSPTKey, resource.ID)
 	if err != nil {
-		logrus.Warn("failed to determine if PSPT was assigned to a project: %v", err)
+		logrus.Warnf("failed to determine if PSPT was assigned to a project: %v", err)
 		return
 	}
 

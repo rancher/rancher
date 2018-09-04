@@ -124,7 +124,7 @@ func getServiceWorkloadIDs(obj *corev1.Service) []string {
 	err := json.Unmarshal([]byte(value), &workloadIDs)
 	if err != nil {
 		// just log the error, can't really do anything here.
-		logrus.Debugf("Failed to unmarshal targetWorkloadIds", err)
+		logrus.Debugf("Failed to unmarshal targetWorkloadIds, error: %v", err)
 	}
 	return workloadIDs
 }

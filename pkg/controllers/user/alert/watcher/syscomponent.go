@@ -41,7 +41,7 @@ func (w *SysComponentWatcher) watch(ctx context.Context, interval time.Duration)
 	for range ticker.Context(ctx, interval) {
 		err := w.watchRule()
 		if err != nil {
-			logrus.Infof("Failed to watch system component", err)
+			logrus.Infof("Failed to watch system component, error: %v", err)
 		}
 	}
 }

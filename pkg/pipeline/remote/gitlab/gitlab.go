@@ -125,12 +125,12 @@ func (c *client) CreateHook(pipeline *v3.Pipeline, accessToken string) (string, 
 	project := url.QueryEscape(user + "/" + repo)
 	hookURL := fmt.Sprintf("%s/hooks?pipelineId=%s", settings.ServerURL.Get(), ref.Ref(pipeline))
 	opt := &gitlab.AddProjectHookOptions{
-		PushEvents:          gitlab.Bool(true),
-		MergeRequestsEvents: gitlab.Bool(true),
-		TagPushEvents:       gitlab.Bool(true),
-		URL:                 gitlab.String(hookURL),
+		PushEvents:            gitlab.Bool(true),
+		MergeRequestsEvents:   gitlab.Bool(true),
+		TagPushEvents:         gitlab.Bool(true),
+		URL:                   gitlab.String(hookURL),
 		EnableSSLVerification: gitlab.Bool(false),
-		Token: gitlab.String(pipeline.Status.Token),
+		Token:                 gitlab.String(pipeline.Status.Token),
 	}
 
 	url := fmt.Sprintf("%s/projects/%s/hooks", c.API, project)
