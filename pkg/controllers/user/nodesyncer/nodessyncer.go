@@ -525,7 +525,7 @@ func (m *NodesSyncer) getNonTerminatedPods() (map[string][]*corev1.Pod, error) {
 	}
 
 	for _, pod := range fromCache {
-		if pod.Spec.NodeName == "" || pod.DeletionTimestamp != nil {
+		if pod.Spec.NodeName == "" {
 			continue
 		}
 		// kubectl uses this cache to filter out the pods

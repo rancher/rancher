@@ -105,19 +105,24 @@ func (d *NodeDrain) drain(ctx context.Context, obj *v3.Node, cancel context.Canc
 		updatedObj, err := v3.NodeConditionDrained.DoUntilTrue(obj, func() (runtime.Object, error) {
 			kubeConfig, err := d.getKubeConfig()
 			if err != nil {
-				if err == context.Canceled {
-					stopped = true
-					logrus.Infof(fmt.Sprintf("Stopped draining %s in %s", obj.Name, obj.ClusterName))
-				}
 				logrus.Errorf("nodeDrain: error getting kubeConfig for node %s", obj.Name)
 				return obj, fmt.Errorf("error getting kubeConfig for node %s", obj.Name)
 			}
-			_, msg, err := kubectl.Drain(ctx, kubeConfig, nodeName, getFlags(obj.Spec.NodeDrainInput))
+			nodeObj, err := d.machines.Update(obj.DeepCopy())
 			if err != nil {
-				errMsg := filterErrorMsg(msg, nodeName)
-				return obj, fmt.Errorf("%s", errMsg)
+				return obj, err
 			}
-			return obj, nil
+			_, msg, err := kubectl.Drain(ctx, kubeConfig, nodeName, getFlags(nodeObj.Spec.NodeDrainInput))
+			if err != nil {
+				if ctx.Err() == context.Canceled {
+					stopped = true
+					logrus.Infof(fmt.Sprintf("Stopped draining %s in %s", obj.Name, obj.Namespace))
+					return nodeObj, nil
+				}
+				errMsg := filterErrorMsg(msg, nodeName)
+				return nodeObj, fmt.Errorf("%s", errMsg)
+			}
+			return nodeObj, nil
 		})
 		if !stopped {
 			nodeCopy := updatedObj.(*v3.Node).DeepCopy()
@@ -129,8 +134,8 @@ func (d *NodeDrain) drain(ctx context.Context, obj *v3.Node, cancel context.Canc
 				logrus.Errorf("nodeDrain: [%s] in cluster [%s] : %v %v", nodeName, d.clusterName, err, updateErr)
 				d.machines.Controller().Enqueue("", fmt.Sprintf("%s/%s", d.clusterName, obj.Name))
 			}
+			cancel()
 		}
-		cancel()
 	}
 }
 
