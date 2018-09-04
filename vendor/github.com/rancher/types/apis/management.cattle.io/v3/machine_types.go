@@ -144,7 +144,7 @@ type NodePoolSpec struct {
 	Worker           bool   `json:"worker"`
 	NodeTemplateName string `json:"nodeTemplateName,omitempty" norman:"type=reference[nodeTemplate],required,notnullable"`
 
-	HostnamePrefix  string            `json:"hostnamePrefix" norman:"required,notnullable"`
+	HostnamePrefix  string            `json:"hostnamePrefix" norman:"type=dnsLabel,required,notnullable"`
 	Quantity        int               `json:"quantity" norman:"required,default=1"`
 	NodeLabels      map[string]string `json:"nodeLabels"`
 	NodeAnnotations map[string]string `json:"nodeAnnotations"`
@@ -184,7 +184,7 @@ type NodeSpec struct {
 	Imported                 bool              `json:"imported"`
 	Description              string            `json:"description,omitempty"`
 	DisplayName              string            `json:"displayName"`
-	RequestedHostname        string            `json:"requestedHostname,omitempty" norman:"type=dnsLabel,nullable,noupdate,required"`
+	RequestedHostname        string            `json:"requestedHostname,omitempty" norman:"type=hostname,nullable,noupdate,required"`
 	InternalNodeSpec         v1.NodeSpec       `json:"internalNodeSpec"`
 	DesiredNodeLabels        map[string]string `json:"desiredNodeLabels,omitempty"`
 	DesiredNodeAnnotations   map[string]string `json:"desiredNodeAnnotations,omitempty"`
