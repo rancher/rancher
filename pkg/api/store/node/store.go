@@ -1,11 +1,16 @@
 package node
 
 import (
+	"fmt"
+	"strings"
+
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/api/store/workload"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 type nodeStore struct {
@@ -58,8 +63,25 @@ func (n nodeStore) List(apiContext *types.APIContext, schema *types.Schema, opt 
 	return datas, err
 }
 
+func (n nodeStore) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
+	format(data)
+	nodePoolID := n.getNodePoolID(apiContext, schema, data, "")
+	if nodePoolID != "" {
+		if err := n.validateHostname(schema, data); err != nil {
+			return nil, err
+		}
+	}
+	return n.Store.Create(apiContext, schema, data)
+}
+
 func (n nodeStore) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
 	format(data)
+	nodePoolID := n.getNodePoolID(apiContext, schema, data, id)
+	if nodePoolID != "" {
+		if err := n.validateHostname(schema, data); err != nil {
+			return nil, err
+		}
+	}
 	return n.Store.Update(apiContext, schema, data, id)
 }
 
@@ -84,4 +106,35 @@ func setState(data map[string]interface{}) {
 		}
 		data["state"] = "cordoned"
 	}
+}
+
+func (n nodeStore) getNodePoolID(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) string {
+	_, ok := data["nodePoolId"]
+	if ok {
+		return data["nodePoolId"].(string)
+	}
+	if id != "" {
+		existingNode, err := n.ByID(apiContext, schema, id)
+		if err != nil {
+			return ""
+		}
+		_, ok := existingNode["nodePoolId"].(string)
+		if ok {
+			return existingNode["nodePoolId"].(string)
+		}
+	}
+	return ""
+}
+
+func (n nodeStore) validateHostname(schema *types.Schema, data map[string]interface{}) error {
+	hostName := data["name"]
+	if hostName != nil {
+		errs := validation.IsDNS1123Label(hostName.(string))
+		if len(errs) != 0 {
+			return httperror.NewAPIError(httperror.InvalidFormat, fmt.Sprintf("invalid value %s: %s", hostName.(string),
+				strings.Join(errs, ",")))
+		}
+	}
+
+	return nil
 }
