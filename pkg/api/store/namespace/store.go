@@ -1,8 +1,6 @@
 package namespace
 
 import (
-	"fmt"
-
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/store/transform"
@@ -102,6 +100,9 @@ func (p *Store) validateResourceQuota(apiContext *types.APIContext, schema *type
 		if n.ProjectID != data["projectId"] {
 			continue
 		}
+		if n.ID == id {
+			continue
+		}
 		if n.ResourceQuota == nil {
 			continue
 		}
@@ -117,7 +118,7 @@ func (p *Store) validateResourceQuota(apiContext *types.APIContext, schema *type
 		return err
 	}
 
-	return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, quotaField, fmt.Sprintf("Resource quota exceeds the project: %s", msg))
+	return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, quotaField, msg)
 }
 
 func limitToLimit(from *mgmtclient.ResourceQuotaLimit) (*v3.ResourceQuotaLimit, error) {
