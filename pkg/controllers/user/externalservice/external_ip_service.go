@@ -51,7 +51,7 @@ func (c *Controller) sync(key string, obj *corev1.Service) error {
 	var ipsStr []string
 	err := json.Unmarshal([]byte(obj.Annotations[ExternalIPsAnnotation]), &ipsStr)
 	if err != nil {
-		logrus.Debugf("Failed to unmarshal ipAddresses", err)
+		logrus.Debugf("Failed to unmarshal ipAddresses, error: %v", err)
 		return nil
 	}
 	if ipsStr == nil {

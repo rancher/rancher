@@ -106,13 +106,13 @@ func createToken(management *config.ScaledContext) (string, error) {
 		},
 	))
 	if err != nil {
-		return "", errors.Wrapf(err, "Can't list admin-user for telemetry. Err: %v. Retry after 5 seconds")
+		return "", errors.Wrapf(err, "Can't list admin-user for telemetry. Err: %v. Retry after 5 seconds", err)
 	}
 	for _, user := range users {
 		if user.DisplayName == adminRole {
 			token, err := management.UserManager.EnsureToken("telemetry", "telemetry token", user.Name)
 			if err != nil {
-				return "", errors.Wrapf(err, "Can't create token for telemetry. Err: %v. Retry after 5 seconds")
+				return "", errors.Wrapf(err, "Can't create token for telemetry. Err: %v. Retry after 5 seconds", err)
 			}
 			return token, nil
 		}

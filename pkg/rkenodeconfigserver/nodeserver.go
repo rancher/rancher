@@ -448,7 +448,7 @@ func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configN
 	serviceOptions := v3.K8sVersionWindowsServiceOptions[clusterMajorVersion]
 
 	extendingKubeletOptions := extendMap(map[string]string{
-		"v": "2",
+		"v":                            "2",
 		"pod-infra-container-image":    kubeletPauseImage,
 		"allow-privileged":             "true",
 		"anonymous-auth":               "false",
