@@ -3,6 +3,7 @@ package project
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -21,12 +22,14 @@ const namespaceQuotaField = "namespaceDefaultResourceQuota"
 
 type projectStore struct {
 	types.Store
+	projectLister      v3.ProjectLister
 	roleTemplateLister v3.RoleTemplateLister
 }
 
 func SetProjectStore(schema *types.Schema, mgmt *config.ScaledContext) {
 	store := &projectStore{
 		Store:              schema.Store,
+		projectLister:      mgmt.Management.Projects("").Controller().Lister(),
 		roleTemplateLister: mgmt.Management.RoleTemplates("").Controller().Lister(),
 	}
 	schema.Store = store
@@ -53,6 +56,19 @@ func (s *projectStore) Update(apiContext *types.APIContext, schema *types.Schema
 	}
 
 	return s.Store.Update(apiContext, schema, data, id)
+}
+
+func (s *projectStore) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
+	parts := strings.Split(id, ":")
+
+	proj, err := s.projectLister.Get(parts[0], parts[len(parts)-1])
+	if err != nil {
+		return nil, err
+	}
+	if proj.Labels["authz.management.cattle.io/system-project"] == "true" {
+		return nil, httperror.NewAPIError(httperror.MethodNotAllowed, "System Project cannot be deleted")
+	}
+	return s.Store.Delete(apiContext, schema, id)
 }
 
 func (s *projectStore) createProjectAnnotation() (string, error) {
