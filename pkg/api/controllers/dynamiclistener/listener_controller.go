@@ -3,6 +3,7 @@ package dynamiclistener
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/cert"
@@ -21,7 +22,7 @@ type Controller struct {
 	listenConfig       v3.ListenConfigInterface
 	listenConfigLister v3.ListenConfigLister
 	secrets            v1.SecretInterface
-	server             *dynamiclistener.Server
+	server             dynamiclistener.ServerInterface
 }
 
 type storageUpdater interface {
@@ -95,9 +96,10 @@ func (c *Controller) enable(listener *v3.ListenConfig) error {
 }
 
 func (c *Controller) updateCurrent(listener *v3.ListenConfig) error {
-	settings.CACerts.Set(listener.CACerts)
-	if listener.Key != "" && listener.CACerts != "" && listener.Cert != "" {
-		certInfo, err := cert.Info(listener.Cert+"\n"+listener.CACerts, listener.Key)
+	caCerts := strings.TrimSpace(listener.CACerts)
+	settings.CACerts.Set(caCerts)
+	if listener.Key != "" && caCerts != "" && listener.Cert != "" {
+		certInfo, err := cert.Info(listener.Cert+"\n"+caCerts, listener.Key)
 		if err != nil {
 			return err
 		}
