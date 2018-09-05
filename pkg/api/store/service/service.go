@@ -24,6 +24,15 @@ type Store struct {
 }
 
 func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
+	if schema.ID == "dnsRecord" {
+		if convert.IsAPIObjectEmpty(data["hostname"]) {
+			data["kind"] = "ClusterIP"
+			data["clusterIp"] = nil
+		} else {
+			data["kind"] = "ExternalName"
+			data["clusterIp"] = ""
+		}
+	}
 	formatData(data)
 	err := p.validateNonSpecialIP(schema, data)
 	if err != nil {
