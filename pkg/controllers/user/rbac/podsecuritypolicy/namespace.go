@@ -28,7 +28,8 @@ func RegisterNamespace(context *config.UserContext) {
 }
 
 func (m *namespaceManager) sync(key string, obj *v1.Namespace) error {
-	if obj == nil {
+	if obj == nil || obj.DeletionTimestamp != nil ||
+		obj.Status.Phase == v1.NamespaceTerminating {
 		return nil
 	}
 
