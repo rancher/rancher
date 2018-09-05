@@ -69,6 +69,10 @@ func ensureDefaultAdmin() {
 			if err != nil {
 				return errors.Errorf("Couldn't make existing \"admin\" an actual admin. %v", err)
 			}
+			err = ensureAdminIsLabeled(client, admin)
+			if err != nil {
+				return errors.Errorf("Couldn't label existing \"admin\" as admin. %v", err)
+			}
 		} else {
 			err = createNewAdmin(client, length)
 			if err != nil {
@@ -108,6 +112,8 @@ func createNewAdmin(client v3.Interface, length int) error {
 		return err
 	}
 
+	addAdminRoleToUser(client, *admin)
+
 	fmt.Fprintf(os.Stdout, "New default admin user (%v):\n", admin.Name)
 	fmt.Fprintf(os.Stdout, "New password for default admin user (%v):\n%s\n", admin.Name, pass)
 	return err
@@ -141,6 +147,25 @@ func ensureAdminIsAdmin(client v3.Interface, admin v3.User) error {
 
 	fmt.Fprintf(os.Stdout, "Gave existing default admin user (%v) admin permissions\n", admin.Name)
 	return addAdminRoleToUser(client, admin)
+}
+
+func ensureAdminIsLabeled(client v3.Interface, admin v3.User) error {
+	var err error
+	changed := true
+	if current, exists := admin.ObjectMeta.Labels[defaultAdminLabelKey]; exists {
+		changed = current != defaultAdminLabelValue
+	}
+
+	if changed {
+		fmt.Fprintf(os.Stdout, "Labeled existing default admin user (%v) as admin\n", admin.Name)
+
+		admin.ObjectMeta.Labels[defaultAdminLabelKey] = defaultAdminLabelValue
+		_, err = client.Users("").Update(&admin)
+	} else {
+		fmt.Fprintf(os.Stdout, "Existing default admin user (%v) already labeled as admin\n", admin.Name)
+	}
+
+	return err
 }
 
 func addAdminRoleToUser(client v3.Interface, admin v3.User) error {
