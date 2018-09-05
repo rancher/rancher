@@ -60,6 +60,7 @@ func ensureDefaultAdmin() {
 				count, adminNames)
 		} else if count == 1 {
 			admin := admins[0]
+			fmt.Fprintf(os.Stdout, "Found existing default admin user (%v)\n", admin.Name)
 			err = ensureAdminIsEnabled(client, admin)
 			if err != nil {
 				return errors.Errorf("Couldn't enable existing admin. %v", err)
@@ -107,18 +108,21 @@ func createNewAdmin(client v3.Interface, length int) error {
 		return err
 	}
 
+	fmt.Fprintf(os.Stdout, "New default admin user (%v):\n", admin.Name)
 	fmt.Fprintf(os.Stdout, "New password for default admin user (%v):\n%s\n", admin.Name, pass)
 	return err
 }
 
 func ensureAdminIsEnabled(client v3.Interface, admin v3.User) error {
 	if *admin.Enabled {
+		fmt.Fprintf(os.Stdout, "Existing default admin user (%v) is already enabled\n", admin.Name)
 		return nil
 	}
 
 	_true := true
 	admin.Enabled = &_true
 	_, err := client.Users("").Update(&admin)
+	fmt.Fprintf(os.Stdout, "Enabled existing default admin user (%v)\n", admin.Name)
 	return err
 }
 
@@ -130,10 +134,12 @@ func ensureAdminIsAdmin(client v3.Interface, admin v3.User) error {
 
 	for _, b := range bindings.Items {
 		if b.UserName == admin.Name && b.GlobalRoleName == "admin" {
+			fmt.Fprintf(os.Stdout, "Existing default admin user (%v) is already an admin\n", admin.Name)
 			return nil
 		}
 	}
 
+	fmt.Fprintf(os.Stdout, "Gave existing default admin user (%v) admin permissions\n", admin.Name)
 	return addAdminRoleToUser(client, admin)
 }
 
