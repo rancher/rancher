@@ -144,7 +144,7 @@ type NodePoolSpec struct {
 	Worker           bool   `json:"worker"`
 	NodeTemplateName string `json:"nodeTemplateName,omitempty" norman:"type=reference[nodeTemplate],required,notnullable"`
 
-	HostnamePrefix  string            `json:"hostnamePrefix" norman:"type=dnsLabel,required,notnullable"`
+	HostnamePrefix  string            `json:"hostnamePrefix" norman:"required,notnullable"`
 	Quantity        int               `json:"quantity" norman:"required,default=1"`
 	NodeLabels      map[string]string `json:"nodeLabels"`
 	NodeAnnotations map[string]string `json:"nodeAnnotations"`
