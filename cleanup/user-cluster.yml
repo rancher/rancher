@@ -1,0 +1,95 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cattle-cleanup-sa
+  namespace: default
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cattle-cleanup-binding
+  namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cattle-cleanup-role
+subjects:
+- kind: ServiceAccount
+  name: cattle-cleanup-sa
+  namespace: default
+
+---
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cattle-cleanup-job
+  namespace: default
+  labels:
+    rancher-cleanup: "true"
+spec:
+  backoffLimit: 6
+  completions: 1
+  parallelism: 1
+  selector:
+  template:
+    metadata:
+      creationTimestamp: null
+    spec:
+      containers:
+      - env:
+        - name: CLUSTER_CLEANUP
+          value: "true"
+        # - name: DRY_RUN
+          # value: "true"
+        image: agent_image
+        imagePullPolicy: Always
+        name: cleanup-agent
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: OnFailure
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccountName: cattle-cleanup-sa
+      terminationGracePeriodSeconds: 30
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cattle-cleanup-role
+  namespace: default
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - list
+  - get
+  - update
+  - delete
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - roles
+  - rolebindings
+  - clusterroles
+  - clusterrolebindings
+  verbs:
+  - list
+  - get
+  - delete
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - list
+  - get
+  - delete
