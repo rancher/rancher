@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
@@ -139,36 +140,43 @@ func (c *Cluster) setClusterServicesDefaults() {
 }
 
 func (c *Cluster) setClusterImageDefaults() {
+	var privRegURL string
 	imageDefaults, ok := v3.K8sVersionToRKESystemImages[c.Version]
 	if !ok {
 		imageDefaults = v3.K8sVersionToRKESystemImages[DefaultK8sVersion]
 	}
 
+	for _, privReg := range c.PrivateRegistries {
+		if privReg.IsDefault {
+			privRegURL = privReg.URL
+			break
+		}
+	}
 	systemImagesDefaultsMap := map[*string]string{
-		&c.SystemImages.Alpine:                    imageDefaults.Alpine,
-		&c.SystemImages.NginxProxy:                imageDefaults.NginxProxy,
-		&c.SystemImages.CertDownloader:            imageDefaults.CertDownloader,
-		&c.SystemImages.KubeDNS:                   imageDefaults.KubeDNS,
-		&c.SystemImages.KubeDNSSidecar:            imageDefaults.KubeDNSSidecar,
-		&c.SystemImages.DNSmasq:                   imageDefaults.DNSmasq,
-		&c.SystemImages.KubeDNSAutoscaler:         imageDefaults.KubeDNSAutoscaler,
-		&c.SystemImages.KubernetesServicesSidecar: imageDefaults.KubernetesServicesSidecar,
-		&c.SystemImages.Etcd:                      imageDefaults.Etcd,
-		&c.SystemImages.Kubernetes:                imageDefaults.Kubernetes,
-		&c.SystemImages.PodInfraContainer:         imageDefaults.PodInfraContainer,
-		&c.SystemImages.Flannel:                   imageDefaults.Flannel,
-		&c.SystemImages.FlannelCNI:                imageDefaults.FlannelCNI,
-		&c.SystemImages.CalicoNode:                imageDefaults.CalicoNode,
-		&c.SystemImages.CalicoCNI:                 imageDefaults.CalicoCNI,
-		&c.SystemImages.CalicoCtl:                 imageDefaults.CalicoCtl,
-		&c.SystemImages.CanalNode:                 imageDefaults.CanalNode,
-		&c.SystemImages.CanalCNI:                  imageDefaults.CanalCNI,
-		&c.SystemImages.CanalFlannel:              imageDefaults.CanalFlannel,
-		&c.SystemImages.WeaveNode:                 imageDefaults.WeaveNode,
-		&c.SystemImages.WeaveCNI:                  imageDefaults.WeaveCNI,
-		&c.SystemImages.Ingress:                   imageDefaults.Ingress,
-		&c.SystemImages.IngressBackend:            imageDefaults.IngressBackend,
-		&c.SystemImages.MetricsServer:             imageDefaults.MetricsServer,
+		&c.SystemImages.Alpine:                    d(imageDefaults.Alpine, privRegURL),
+		&c.SystemImages.NginxProxy:                d(imageDefaults.NginxProxy, privRegURL),
+		&c.SystemImages.CertDownloader:            d(imageDefaults.CertDownloader, privRegURL),
+		&c.SystemImages.KubeDNS:                   d(imageDefaults.KubeDNS, privRegURL),
+		&c.SystemImages.KubeDNSSidecar:            d(imageDefaults.KubeDNSSidecar, privRegURL),
+		&c.SystemImages.DNSmasq:                   d(imageDefaults.DNSmasq, privRegURL),
+		&c.SystemImages.KubeDNSAutoscaler:         d(imageDefaults.KubeDNSAutoscaler, privRegURL),
+		&c.SystemImages.KubernetesServicesSidecar: d(imageDefaults.KubernetesServicesSidecar, privRegURL),
+		&c.SystemImages.Etcd:                      d(imageDefaults.Etcd, privRegURL),
+		&c.SystemImages.Kubernetes:                d(imageDefaults.Kubernetes, privRegURL),
+		&c.SystemImages.PodInfraContainer:         d(imageDefaults.PodInfraContainer, privRegURL),
+		&c.SystemImages.Flannel:                   d(imageDefaults.Flannel, privRegURL),
+		&c.SystemImages.FlannelCNI:                d(imageDefaults.FlannelCNI, privRegURL),
+		&c.SystemImages.CalicoNode:                d(imageDefaults.CalicoNode, privRegURL),
+		&c.SystemImages.CalicoCNI:                 d(imageDefaults.CalicoCNI, privRegURL),
+		&c.SystemImages.CalicoCtl:                 d(imageDefaults.CalicoCtl, privRegURL),
+		&c.SystemImages.CanalNode:                 d(imageDefaults.CanalNode, privRegURL),
+		&c.SystemImages.CanalCNI:                  d(imageDefaults.CanalCNI, privRegURL),
+		&c.SystemImages.CanalFlannel:              d(imageDefaults.CanalFlannel, privRegURL),
+		&c.SystemImages.WeaveNode:                 d(imageDefaults.WeaveNode, privRegURL),
+		&c.SystemImages.WeaveCNI:                  d(imageDefaults.WeaveCNI, privRegURL),
+		&c.SystemImages.Ingress:                   d(imageDefaults.Ingress, privRegURL),
+		&c.SystemImages.IngressBackend:            d(imageDefaults.IngressBackend, privRegURL),
+		&c.SystemImages.MetricsServer:             d(imageDefaults.MetricsServer, privRegURL),
 	}
 
 	for k, v := range systemImagesDefaultsMap {
@@ -213,4 +221,11 @@ func (c *Cluster) setClusterNetworkDefaults() {
 	for k, v := range networkPluginConfigDefaultsMap {
 		setDefaultIfEmptyMapValue(c.Network.Options, k, v)
 	}
+}
+
+func d(image, defaultRegistryURL string) string {
+	if len(defaultRegistryURL) == 0 {
+		return image
+	}
+	return fmt.Sprintf("%s/%s", defaultRegistryURL, image)
 }
