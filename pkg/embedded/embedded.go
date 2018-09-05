@@ -171,7 +171,6 @@ func runK8s(ctx context.Context, kubeConfig string, args []string) {
 
 	hk.AddServer(hyperkube.NewKubeAPIServer())
 	hk.AddServer(hyperkube.NewKubeControllerManager())
-	hk.AddServer(hyperkube.NewScheduler())
 
 	logrus.Info("Running ", strings.Join(args, " "))
 	if err := hk.Run(args, ctx.Done()); err != nil {
