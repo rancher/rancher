@@ -11,10 +11,12 @@ import (
 )
 
 const (
-	bootstrappedRole = "authz.management.cattle.io/bootstrapped-role"
+	bootstrappedRole       = "authz.management.cattle.io/bootstrapped-role"
+	defaultAdminLabelKey   = "authz.management.cattle.io/bootstrapping"
+	defaultAdminLabelValue = "admin-user"
 )
 
-var defaultAdminLabel = map[string]string{"authz.management.cattle.io/bootstrapping": "admin-user"}
+var defaultAdminLabel = map[string]string{defaultAdminLabelKey: defaultAdminLabelValue}
 
 func addRoles(management *config.ManagementContext) (string, error) {
 	rb := newRoleBuilder()
