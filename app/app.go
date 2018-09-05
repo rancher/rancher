@@ -46,7 +46,7 @@ func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config
 	}
 	scaledContext.LocalConfig = &kubeConfig
 
-	cfg.ListenConfig, err = tls.ReadTLSConfig(cfg.ACMEDomains)
+	cfg.ListenConfig, err = tls.ReadTLSConfig(cfg.ACMEDomains, cfg.NoCACerts)
 	if err != nil {
 		return nil, nil, err
 	}
