@@ -21,6 +21,7 @@ const (
 	LdapConfigFieldGroupObjectClass                = "groupObjectClass"
 	LdapConfigFieldGroupSearchAttribute            = "groupSearchAttribute"
 	LdapConfigFieldGroupSearchBase                 = "groupSearchBase"
+	LdapConfigFieldGroupUniqueIDAttribute          = "groupUniqueIdAttribute"
 	LdapConfigFieldLabels                          = "labels"
 	LdapConfigFieldName                            = "name"
 	LdapConfigFieldNestedGroupMembershipEnabled    = "nestedGroupMembershipEnabled"
@@ -41,6 +42,7 @@ const (
 	LdapConfigFieldUserObjectClass                 = "userObjectClass"
 	LdapConfigFieldUserSearchAttribute             = "userSearchAttribute"
 	LdapConfigFieldUserSearchBase                  = "userSearchBase"
+	LdapConfigFieldUserUniqueIDAttribute           = "userUniqueIdAttribute"
 )
 
 type LdapConfig struct {
@@ -60,6 +62,7 @@ type LdapConfig struct {
 	GroupObjectClass                string            `json:"groupObjectClass,omitempty" yaml:"groupObjectClass,omitempty"`
 	GroupSearchAttribute            string            `json:"groupSearchAttribute,omitempty" yaml:"groupSearchAttribute,omitempty"`
 	GroupSearchBase                 string            `json:"groupSearchBase,omitempty" yaml:"groupSearchBase,omitempty"`
+	GroupUniqueIDAttribute          string            `json:"groupUniqueIdAttribute,omitempty" yaml:"groupUniqueIdAttribute,omitempty"`
 	Labels                          map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                            string            `json:"name,omitempty" yaml:"name,omitempty"`
 	NestedGroupMembershipEnabled    bool              `json:"nestedGroupMembershipEnabled,omitempty" yaml:"nestedGroupMembershipEnabled,omitempty"`
@@ -80,6 +83,7 @@ type LdapConfig struct {
 	UserObjectClass                 string            `json:"userObjectClass,omitempty" yaml:"userObjectClass,omitempty"`
 	UserSearchAttribute             string            `json:"userSearchAttribute,omitempty" yaml:"userSearchAttribute,omitempty"`
 	UserSearchBase                  string            `json:"userSearchBase,omitempty" yaml:"userSearchBase,omitempty"`
+	UserUniqueIDAttribute           string            `json:"userUniqueIdAttribute,omitempty" yaml:"userUniqueIdAttribute,omitempty"`
 }
 
 type LdapConfigCollection struct {

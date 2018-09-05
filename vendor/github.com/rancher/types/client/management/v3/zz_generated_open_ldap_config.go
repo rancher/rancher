@@ -17,6 +17,7 @@ const (
 	OpenLdapConfigFieldGroupObjectClass                = "groupObjectClass"
 	OpenLdapConfigFieldGroupSearchAttribute            = "groupSearchAttribute"
 	OpenLdapConfigFieldGroupSearchBase                 = "groupSearchBase"
+	OpenLdapConfigFieldGroupUniqueIDAttribute          = "groupUniqueIdAttribute"
 	OpenLdapConfigFieldLabels                          = "labels"
 	OpenLdapConfigFieldName                            = "name"
 	OpenLdapConfigFieldNestedGroupMembershipEnabled    = "nestedGroupMembershipEnabled"
@@ -37,6 +38,7 @@ const (
 	OpenLdapConfigFieldUserObjectClass                 = "userObjectClass"
 	OpenLdapConfigFieldUserSearchAttribute             = "userSearchAttribute"
 	OpenLdapConfigFieldUserSearchBase                  = "userSearchBase"
+	OpenLdapConfigFieldUserUniqueIDAttribute           = "userUniqueIdAttribute"
 )
 
 type OpenLdapConfig struct {
@@ -55,6 +57,7 @@ type OpenLdapConfig struct {
 	GroupObjectClass                string            `json:"groupObjectClass,omitempty" yaml:"groupObjectClass,omitempty"`
 	GroupSearchAttribute            string            `json:"groupSearchAttribute,omitempty" yaml:"groupSearchAttribute,omitempty"`
 	GroupSearchBase                 string            `json:"groupSearchBase,omitempty" yaml:"groupSearchBase,omitempty"`
+	GroupUniqueIDAttribute          string            `json:"groupUniqueIdAttribute,omitempty" yaml:"groupUniqueIdAttribute,omitempty"`
 	Labels                          map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                            string            `json:"name,omitempty" yaml:"name,omitempty"`
 	NestedGroupMembershipEnabled    bool              `json:"nestedGroupMembershipEnabled,omitempty" yaml:"nestedGroupMembershipEnabled,omitempty"`
@@ -75,4 +78,5 @@ type OpenLdapConfig struct {
 	UserObjectClass                 string            `json:"userObjectClass,omitempty" yaml:"userObjectClass,omitempty"`
 	UserSearchAttribute             string            `json:"userSearchAttribute,omitempty" yaml:"userSearchAttribute,omitempty"`
 	UserSearchBase                  string            `json:"userSearchBase,omitempty" yaml:"userSearchBase,omitempty"`
+	UserUniqueIDAttribute           string            `json:"userUniqueIdAttribute,omitempty" yaml:"userUniqueIdAttribute,omitempty"`
 }

@@ -198,11 +198,13 @@ type ActiveDirectoryConfig struct {
 	UserSearchBase               string   `json:"userSearchBase,omitempty"              norman:"required"`
 	UserSearchAttribute          string   `json:"userSearchAttribute,omitempty"         norman:"default=sAMAccountName|sn|givenName,required"`
 	UserLoginAttribute           string   `json:"userLoginAttribute,omitempty"          norman:"default=sAMAccountName,required"`
+	UserUniqueIDAttribute        string   `json:"userUniqueIdAttribute,omitempty"       norman:"default=objectGUID"`
 	UserObjectClass              string   `json:"userObjectClass,omitempty"             norman:"default=person,required"`
 	UserNameAttribute            string   `json:"userNameAttribute,omitempty"           norman:"default=name,required"`
 	UserEnabledAttribute         string   `json:"userEnabledAttribute,omitempty"        norman:"default=userAccountControl,required"`
 	GroupSearchBase              string   `json:"groupSearchBase,omitempty"`
 	GroupSearchAttribute         string   `json:"groupSearchAttribute,omitempty"        norman:"default=sAMAccountName,required"`
+	GroupUniqueIDAttribute       string   `json:"groupUniqueIdAttribute,omitempty"       norman:"default=objectGUID"`
 	GroupObjectClass             string   `json:"groupObjectClass,omitempty"            norman:"default=group,required"`
 	GroupNameAttribute           string   `json:"groupNameAttribute,omitempty"          norman:"default=name,required"`
 	GroupDNAttribute             string   `json:"groupDNAttribute,omitempty"            norman:"default=distinguishedName,required"`
@@ -234,12 +236,14 @@ type LdapConfig struct {
 	UserSearchBase                  string   `json:"userSearchBase,omitempty"              norman:"notnullable,required"`
 	UserSearchAttribute             string   `json:"userSearchAttribute,omitempty"         norman:"default=uid|sn|givenName,notnullable,required"`
 	UserLoginAttribute              string   `json:"userLoginAttribute,omitempty"          norman:"default=uid,notnullable,required"`
+	UserUniqueIDAttribute           string   `json:"userUniqueIdAttribute,omitempty"       norman:"default=entryUUID"`
 	UserObjectClass                 string   `json:"userObjectClass,omitempty"             norman:"default=inetOrgPerson,notnullable,required"`
 	UserNameAttribute               string   `json:"userNameAttribute,omitempty"           norman:"default=cn,notnullable,required"`
 	UserMemberAttribute             string   `json:"userMemberAttribute,omitempty"           norman:"default=memberOf,notnullable,required"`
 	UserEnabledAttribute            string   `json:"userEnabledAttribute,omitempty"`
 	GroupSearchBase                 string   `json:"groupSearchBase,omitempty"`
 	GroupSearchAttribute            string   `json:"groupSearchAttribute,omitempty"        norman:"default=cn,notnullable,required"`
+	GroupUniqueIDAttribute          string   `json:"groupUniqueIdAttribute,omitempty"       norman:"default=entryUUID"`
 	GroupObjectClass                string   `json:"groupObjectClass,omitempty"            norman:"default=groupOfNames,notnullable,required"`
 	GroupNameAttribute              string   `json:"groupNameAttribute,omitempty"          norman:"default=cn,notnullable,required"`
 	GroupDNAttribute                string   `json:"groupDNAttribute,omitempty"            norman:"default=entryDN,notnullable"`
