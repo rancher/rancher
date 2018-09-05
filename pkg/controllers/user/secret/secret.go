@@ -3,6 +3,9 @@ package secret
 import (
 	"strings"
 
+	"fmt"
+
+	"github.com/rancher/norman/controller"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -51,7 +54,26 @@ func Register(cluster *config.UserContext) {
 		managementSecrets:    cluster.Management.Core.Secrets("").Controller().Lister(),
 	}
 	cluster.Core.Namespaces("").AddHandler("secretsController", n.sync)
-	cluster.Management.Core.Secrets("").AddClusterScopedLifecycle("secretsController", cluster.ClusterName, s)
+
+	sync := v1.NewSecretLifecycleAdapter(fmt.Sprintf("secretsController_%s", cluster.ClusterName), true,
+		cluster.Management.Core.Secrets(""), s)
+
+	cluster.Management.Core.Secrets("").AddHandler("secretsController", func(key string, obj *corev1.Secret) error {
+		if obj == nil {
+			return sync(key, nil)
+		}
+		if !controller.ObjectInCluster(cluster.ClusterName, obj) {
+			return nil
+		}
+
+		if obj.Labels != nil {
+			if obj.Labels["cattle.io/creator"] == "norman" {
+				return sync(key, obj)
+			}
+		}
+
+		return nil
+	})
 }
 
 type NamespaceController struct {
