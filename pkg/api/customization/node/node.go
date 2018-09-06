@@ -48,7 +48,9 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	if nodeTemplateID == nil && customConfig == nil {
 		delete(resource.Links, "remove")
 	}
-	if resource.Values[client.NodeFieldWorker] != true {
+	if resource.Values[client.NodeFieldWorker] != true ||
+		resource.Values["state"] == "registering" ||
+		resource.Values["state"] == "unavailable" {
 		return
 	}
 	if resource.Values["state"] == "draining" {
