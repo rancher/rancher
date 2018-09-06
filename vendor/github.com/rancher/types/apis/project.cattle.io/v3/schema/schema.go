@@ -584,7 +584,6 @@ func addServiceOrDNSRecord(dns bool) types.SchemasInitFunc {
 		schemas = schemas.
 			AddMapperForType(&Version, v1.ServiceSpec{},
 				&m.Move{From: "externalName", To: "hostname"},
-				&ServiceSpecMapper{},
 				&m.Move{From: "type", To: "serviceKind"},
 				&m.SetValue{
 					Field: "clusterIP",
