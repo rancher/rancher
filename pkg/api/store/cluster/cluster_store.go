@@ -46,7 +46,7 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 
 	setKubernetesVersion(data)
 
-	if err := validateNetworkFlag(data); err != nil {
+	if err := validateNetworkFlag(data, true); err != nil {
 		return nil, httperror.NewFieldAPIError(httperror.InvalidOption, "enableNetworkPolicy", err.Error())
 	}
 
@@ -81,7 +81,7 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 
 	setKubernetesVersion(data)
 
-	if err := validateNetworkFlag(data); err != nil {
+	if err := validateNetworkFlag(data, false); err != nil {
 		return nil, httperror.NewFieldAPIError(httperror.InvalidOption, "enableNetworkPolicy", err.Error())
 	}
 
@@ -118,7 +118,7 @@ func setKubernetesVersion(data map[string]interface{}) {
 	}
 }
 
-func validateNetworkFlag(data map[string]interface{}) error {
+func validateNetworkFlag(data map[string]interface{}, create bool) error {
 	enableNetworkPolicy := values.GetValueN(data, "enableNetworkPolicy")
 	rkeConfig := values.GetValueN(data, "rancherKubernetesEngineConfig")
 	plugin := convert.ToString(values.GetValueN(convert.ToMapInterface(rkeConfig), "network", "plugin"))
@@ -128,6 +128,10 @@ func validateNetworkFlag(data map[string]interface{}) error {
 		values.PutValue(data, false, "enableNetworkPolicy")
 	} else if value := convert.ToBool(enableNetworkPolicy); value {
 		if rkeConfig == nil {
+			if create {
+				values.PutValue(data, false, "enableNetworkPolicy")
+				return nil
+			}
 			return fmt.Errorf("enableNetworkPolicy should be false for non-RKE clusters")
 		}
 		if plugin != "canal" {
