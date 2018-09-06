@@ -25,7 +25,7 @@ func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.Act
 	if password == "" {
 		return v3.Principal{}, nil, httperror.NewAPIError(httperror.MissingRequired, "password not provided")
 	}
-	externalID := ldap.GetUserExternalID(username, config.DefaultLoginDomain)
+	userExternalID := ldap.GetUserExternalID(username, config.DefaultLoginDomain)
 
 	lConn, err := p.ldapConnection(config, caPool)
 	if err != nil {
@@ -43,7 +43,7 @@ func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.Act
 	}
 
 	logrus.Debug("Binding username password")
-	err = lConn.Bind(externalID, password)
+	err = lConn.Bind(userExternalID, password)
 	if err != nil {
 		if ldapv2.IsErrorWithCode(err, ldapv2.LDAPResultInvalidCredentials) {
 			return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
@@ -115,7 +115,19 @@ func (p *adProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult, 
 		return v3.Principal{}, nil, nil
 	}
 
-	user, err := ldap.AttributesToPrincipal(entry.Attributes, result.Entries[0].DN, UserScope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
+	//in old config, config.UserUniqueIDAttribute=="",config.GroupUniqueIDAttribute==""
+	var userUniqueID, groupUniqueID string
+	userUniqueIDs := entry.GetAttributeValues(config.UserUniqueIDAttribute)
+	if userUniqueIDs != nil {
+		userUniqueID = userUniqueIDs[0]
+	}
+
+	groupUniqueIDs := entry.GetAttributeValues(config.GroupUniqueIDAttribute)
+	if groupUniqueIDs != nil {
+		groupUniqueID = groupUniqueIDs[0]
+	}
+
+	user, err := ldap.AttributesToPrincipal(entry.Attributes, result.Entries[0].DN, UserScope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute, userUniqueID, groupUniqueID)
 	userPrincipal = *user
 	if err != nil {
 		return userPrincipal, groupPrincipals, err
@@ -195,8 +207,35 @@ func (p *adProvider) getGroupPrincipalsFromSearch(searchBase string, filter stri
 			// If bind fails because service account password has changed, just return identities formed from groups in `memberOf`
 			groupList := []v3.Principal{}
 			for _, dn := range groupDN {
+
+				search2 := ldapv2.NewSearchRequest(searchBase,
+					ldapv2.ScopeWholeSubtree, ldapv2.NeverDerefAliases, 0, 0, false,
+					fmt.Sprintf("(&(%v=%v)(distinguishedName=%v))", ObjectClass, config.GroupObjectClass, ldapv2.EscapeFilter(dn)),
+					ldap.GetGroupSearchAttributes(MemberOfAttribute, ObjectClass, config), nil)
+
+				result, err := lConn.Search(search2)
+				if err != nil {
+					return []v3.Principal{}, err
+				}
+				if len(result.Entries) < 1 {
+					return []v3.Principal{}, fmt.Errorf("Cannot locate user information for %s", search.Filter)
+				} else if len(result.Entries) > 1 {
+					return []v3.Principal{}, fmt.Errorf("ldap user search found more than one result")
+				}
+
+				var groupUniqueID string
+				entry := result.Entries[0]
+				groupUniqueIDs := entry.GetAttributeValues(config.GroupUniqueIDAttribute)
+				if groupUniqueIDs != nil {
+					groupUniqueID = groupUniqueIDs[0]
+				}
+
+				externalID := dn
+				if groupUniqueID != "" {
+					externalID = groupUniqueID
+				}
 				grp := v3.Principal{
-					ObjectMeta:    metav1.ObjectMeta{Name: GroupScope + "://" + dn},
+					ObjectMeta:    metav1.ObjectMeta{Name: GroupScope + "://" + externalID},
 					DisplayName:   dn,
 					LoginName:     dn,
 					PrincipalType: GroupScope,
@@ -214,10 +253,22 @@ func (p *adProvider) getGroupPrincipalsFromSearch(searchBase string, filter stri
 		return groupPrincipals, httperror.WrapAPIError(errors.Wrapf(err, "server returned error for search %v %v: %v", search.BaseDN, search.Filter, err), httperror.ServerError, err.Error())
 	}
 
-	for _, e := range result.Entries {
-		principal, err := ldap.AttributesToPrincipal(e.Attributes, e.DN, GroupScope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
+	for _, entry := range result.Entries {
+		//in old config, config.UserUniqueIDAttribute=="",config.GroupUniqueIDAttribute==""
+		var userUniqueID, groupUniqueID string
+		userUniqueIDs := entry.GetAttributeValues(config.UserUniqueIDAttribute)
+		if userUniqueIDs != nil {
+			userUniqueID = userUniqueIDs[0]
+		}
+
+		groupUniqueIDs := entry.GetAttributeValues(config.GroupUniqueIDAttribute)
+		if groupUniqueIDs != nil {
+			groupUniqueID = groupUniqueIDs[0]
+		}
+
+		principal, err := ldap.AttributesToPrincipal(entry.Attributes, entry.DN, GroupScope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute, userUniqueID, groupUniqueID)
 		if err != nil {
-			logrus.Errorf("AD: Error in getting principal for group entry %v: %v", e, err)
+			logrus.Errorf("AD: Error in getting principal for group entry %v: %v", entry, err)
 			continue
 		}
 		if principal == nil {
@@ -233,7 +284,7 @@ func (p *adProvider) getGroupPrincipalsFromSearch(searchBase string, filter stri
 	return groupPrincipals, nil
 }
 
-func (p *adProvider) getPrincipal(distinguishedName string, scope string, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) (*v3.Principal, error) {
+func (p *adProvider) getPrincipal(distinguishedName string, scope string, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool, uniqueID string) (*v3.Principal, error) {
 	var search *ldapv2.SearchRequest
 	var filter string
 	if !slice.ContainsString(scopes, scope) {
@@ -278,14 +329,29 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 
 	if err != nil {
 		if ldapv2.IsErrorWithCode(err, ldapv2.LDAPResultInvalidCredentials) && config.Enabled {
-			var kind string
+			var kind, externalID, name string
 			if strings.EqualFold(UserScope, scope) {
 				kind = "user"
+				if config.UserUniqueIDAttribute == "" {
+					externalID = distinguishedName
+				} else {
+					externalID = uniqueID
+				}
 			} else if strings.EqualFold(GroupScope, scope) {
 				kind = "group"
+				if config.GroupUniqueIDAttribute == "" {
+					externalID = distinguishedName
+				} else {
+					externalID = uniqueID
+				}
+			}
+			if externalID != "" {
+				name = scope + "://" + externalID
+			} else {
+				name = scope + "://" + distinguishedName
 			}
 			principal := &v3.Principal{
-				ObjectMeta:    metav1.ObjectMeta{Name: scope + "://" + distinguishedName},
+				ObjectMeta:    metav1.ObjectMeta{Name: name},
 				DisplayName:   distinguishedName,
 				LoginName:     distinguishedName,
 				PrincipalType: kind,
@@ -328,7 +394,19 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 		return nil, fmt.Errorf("Permission denied")
 	}
 
-	principal, err := ldap.AttributesToPrincipal(entryAttributes, distinguishedName, scope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
+	//in old config, config.UserUniqueIDAttribute=="",config.GroupUniqueIDAttribute==""
+	var userUniqueID, groupUniqueID string
+	userUniqueIDs := entry.GetAttributeValues(config.UserUniqueIDAttribute)
+	if userUniqueIDs != nil {
+		userUniqueID = userUniqueIDs[0]
+	}
+
+	groupUniqueIDs := entry.GetAttributeValues(config.GroupUniqueIDAttribute)
+	if groupUniqueIDs != nil {
+		groupUniqueID = groupUniqueIDs[0]
+	}
+
+	principal, err := ldap.AttributesToPrincipal(entryAttributes, distinguishedName, scope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute, userUniqueID, groupUniqueID)
 	if err != nil {
 		return nil, err
 	}
@@ -417,7 +495,7 @@ func (p *adProvider) searchLdap(query string, scope string, config *v3.ActiveDir
 
 	for i := 0; i < len(results.Entries); i++ {
 		entry := results.Entries[i]
-		principal, err := ldap.AttributesToPrincipal(entry.Attributes, results.Entries[i].DN, scope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
+		principal, err := ldap.AttributesToPrincipal(entry.Attributes, results.Entries[i].DN, scope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute, config.UserUniqueIDAttribute, config.GroupUniqueIDAttribute)
 		if err != nil {
 			return []v3.Principal{}, err
 		}
@@ -434,9 +512,43 @@ func (p *adProvider) ldapConnection(config *v3.ActiveDirectoryConfig, caPool *x5
 	connectionTimeout := config.ConnectionTimeout
 	return ldap.NewLDAPConn(servers, TLS, port, connectionTimeout, caPool)
 }
+
 func (p *adProvider) permissionCheck(attributes []*ldapv2.EntryAttribute, config *v3.ActiveDirectoryConfig) bool {
 	userObjectClass := config.UserObjectClass
 	userEnabledAttribute := config.UserEnabledAttribute
 	userDisabledBitMask := config.UserDisabledBitMask
 	return ldap.HasPermission(attributes, userObjectClass, userEnabledAttribute, userDisabledBitMask)
+}
+
+func (p *adProvider) getDN(config *v3.ActiveDirectoryConfig, lConn *ldapv2.Conn, scope string, uniqueID string) (string, error) {
+	var search *ldapv2.SearchRequest
+	searchDomain := config.UserSearchBase
+	if strings.EqualFold("user", scope) {
+		search = ldapv2.NewSearchRequest(searchDomain,
+			ldapv2.ScopeWholeSubtree, ldapv2.NeverDerefAliases, 0, 0, false,
+			fmt.Sprintf("(&(objectClass=%v)(%v=%v))", config.UserObjectClass, config.UserUniqueIDAttribute, uniqueID),
+			ldap.GetUserSearchAttributes(MemberOfAttribute, ObjectClass, config), nil)
+	} else {
+		if config.GroupSearchBase != "" {
+			searchDomain = config.GroupSearchBase
+		}
+		search = ldapv2.NewSearchRequest(searchDomain,
+			ldapv2.ScopeWholeSubtree, ldapv2.NeverDerefAliases, 0, 0, false,
+			fmt.Sprintf("(&(objectClass=%v)(%v=%v))", config.GroupObjectClass, config.GroupUniqueIDAttribute, uniqueID),
+			ldap.GetGroupSearchAttributes(MemberOfAttribute, ObjectClass, config), nil)
+	}
+	result, err := lConn.Search(search)
+	if err != nil {
+		return "", httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed") // need to reload this error
+	}
+
+	if len(result.Entries) < 1 {
+		return "", httperror.WrapAPIError(err, httperror.Unauthorized, "Cannot locate user information for "+search.Filter)
+	} else if len(result.Entries) > 1 {
+		return "", fmt.Errorf("ldap user search found more than one result")
+	}
+	entry := result.Entries[0]
+
+	DN := entry.DN
+	return DN, nil
 }

@@ -153,9 +153,8 @@ func AuthenticateServiceAccountUser(serviceAccountPassword string, serviceAccoun
 	return nil
 }
 
-func AttributesToPrincipal(attribs []*ldapv2.EntryAttribute, dnStr, scope, providerName, userObjectClass, userNameAttribute, userLoginAttribute, groupObjectClass, groupNameAttribute string) (*v3.Principal, error) {
+func AttributesToPrincipal(attribs []*ldapv2.EntryAttribute, dnStr, scope, providerName, userObjectClass, userNameAttribute, userLoginAttribute, groupObjectClass, groupNameAttribute, userUniqueID, groupUniqueID string) (*v3.Principal, error) {
 	var externalIDType, accountName, externalID, login, kind string
-	externalID = dnStr
 	externalIDType = scope
 
 	if IsType(attribs, userObjectClass) {
@@ -164,6 +163,11 @@ func AttributesToPrincipal(attribs []*ldapv2.EntryAttribute, dnStr, scope, provi
 				if len(attr.Values) != 0 {
 					accountName = attr.Values[0]
 				} else {
+					if userUniqueID != "" {
+						externalID = userUniqueID
+					} else {
+						externalID = dnStr
+					}
 					accountName = externalID
 				}
 			}
@@ -183,6 +187,11 @@ func AttributesToPrincipal(attribs []*ldapv2.EntryAttribute, dnStr, scope, provi
 				if len(attr.Values) != 0 {
 					accountName = attr.Values[0]
 				} else {
+					if groupUniqueID != "" {
+						externalID = groupUniqueID
+					} else {
+						externalID = dnStr
+					}
 					accountName = externalID
 				}
 			}

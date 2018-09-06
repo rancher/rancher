@@ -125,14 +125,43 @@ func (p *adProvider) GetPrincipal(principalID string, token v3.Token) (v3.Princi
 		return v3.Principal{}, nil
 	}
 
+	lConn, err := p.ldapConnection(config, caPool)
+	if err != nil {
+		return v3.Principal{}, nil
+	}
+	defer lConn.Close()
+
 	parts := strings.SplitN(principalID, ":", 2)
 	if len(parts) != 2 {
 		return v3.Principal{}, errors.Errorf("invalid id %v", principalID)
 	}
+	var uniqueID string
 	scope := parts[0]
 	externalID := strings.TrimPrefix(parts[1], "//")
+	var distinguishedName string
+	if strings.EqualFold(UserScope, scope) {
+		if config.UserUniqueIDAttribute == "" {
+			distinguishedName = externalID
+		} else {
+			uniqueID = externalID
+			distinguishedName, err = p.getDN(config, lConn, scope, externalID)
+			if err != nil {
+				return v3.Principal{}, nil
+			}
+		}
+	} else {
+		if config.GroupUniqueIDAttribute == "" {
+			distinguishedName = externalID
+		} else {
 
-	principal, err := p.getPrincipal(externalID, scope, config, caPool)
+			distinguishedName, err = p.getDN(config, lConn, scope, externalID)
+			if err != nil {
+				return v3.Principal{}, nil
+			}
+		}
+	}
+
+	principal, err := p.getPrincipal(distinguishedName, scope, config, caPool, uniqueID)
 	if err != nil {
 		return v3.Principal{}, err
 	}
