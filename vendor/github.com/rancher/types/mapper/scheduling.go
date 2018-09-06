@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	exprRegexp = regexp.MustCompile("^(.*?)\\s*(=|!=|<|>|in|notin)\\s*(.*)$")
+	exprRegexp = regexp.MustCompile("^(.*?)\\s*(=|!=|<|>| in | notin )\\s*(.*)$")
 )
 
 type SchedulingMapper struct {

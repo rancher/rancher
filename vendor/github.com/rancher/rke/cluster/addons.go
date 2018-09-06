@@ -309,7 +309,6 @@ func (c *Cluster) StoreAddonConfigMap(ctx context.Context, addonYaml string, add
 			updated, err = k8s.UpdateConfigMap(kubeClient, []byte(addonYaml), addonName)
 			if err != nil {
 				time.Sleep(time.Second * 5)
-				fmt.Println(err)
 				continue
 			}
 			log.Infof(ctx, "[addons] Successfully Saved addon to Kubernetes ConfigMap: %s", addonName)
@@ -356,7 +355,6 @@ func (c *Cluster) deployIngress(ctx context.Context) error {
 		Options:        c.Ingress.Options,
 		NodeSelector:   c.Ingress.NodeSelector,
 		ExtraArgs:      c.Ingress.ExtraArgs,
-		AlpineImage:    c.SystemImages.Alpine,
 		IngressImage:   c.SystemImages.Ingress,
 		IngressBackend: c.SystemImages.IngressBackend,
 	}
