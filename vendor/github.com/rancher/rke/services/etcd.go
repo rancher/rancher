@@ -3,7 +3,6 @@ package services
 import (
 	"fmt"
 	"path"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -21,7 +20,7 @@ import (
 )
 
 const (
-	EtcdSnapshotPath = "/opt/rke/etcd-snapshots"
+	EtcdSnapshotPath = "/opt/rke/etcd-snapshots/"
 	EtcdRestorePath  = "/opt/rke/etcd-snapshots-restore/"
 	EtcdDataDir      = "/var/lib/rancher/etcd/"
 )
@@ -266,7 +265,7 @@ func RunEtcdSnapshotSave(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 func RestoreEtcdSnapshot(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]v3.PrivateRegistry, etcdRestoreImage, snapshotName, initCluster string) error {
 	log.Infof(ctx, "[etcd] Restoring [%s] snapshot on etcd host [%s]", snapshotName, etcdHost.Address)
 	nodeName := pki.GetEtcdCrtName(etcdHost.InternalAddress)
-	snapshotPath := filepath.Join(EtcdSnapshotPath, snapshotName)
+	snapshotPath := fmt.Sprintf("%s%s", EtcdSnapshotPath, snapshotName)
 
 	// make sure that restore path is empty otherwise etcd restore will fail
 	imageCfg := &container.Config{
