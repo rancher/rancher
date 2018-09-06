@@ -116,7 +116,7 @@ func (s *ExecutionStateSyncer) checkAndRun(execution *v3.PipelineExecution) {
 	}
 	if v3.PipelineExecutionConditionInitialized.GetMessage(execution) == "" {
 		e := execution.DeepCopy()
-		v3.PipelineExecutionConditionInitialized.Message(e, "setting up jenkins")
+		v3.PipelineExecutionConditionInitialized.Message(e, "Setting up jenkins. If it is not deployed, this can take a few minutes.")
 		if err := s.updateExecutionAndLastRunState(e); err != nil {
 			logrus.Error(err)
 		}
