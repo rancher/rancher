@@ -16,6 +16,7 @@ import (
 func RegisterEnsureDefaultAdminCommand() {
 	reexec.Register("/usr/bin/ensure-default-admin", ensureDefaultAdmin)
 	reexec.Register("ensure-default-admin", ensureDefaultAdmin)
+	RegisterAlternateCommand("ensure-default-admin", ensureDefaultAdmin)
 }
 
 func ensureDefaultAdmin() {

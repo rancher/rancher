@@ -19,6 +19,7 @@ import (
 func RegisterPasswordResetCommand() {
 	reexec.Register("/usr/bin/reset-password", resetPassword)
 	reexec.Register("reset-password", resetPassword)
+	RegisterAlternateCommand("reset-password", resetPassword)
 }
 
 const (

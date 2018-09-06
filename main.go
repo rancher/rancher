@@ -29,7 +29,7 @@ var (
 func main() {
 	app.RegisterPasswordResetCommand()
 	app.RegisterEnsureDefaultAdminCommand()
-	if reexec.Init() {
+	if reexec.Init() || app.InitAlternateCommand() {
 		return
 	}
 

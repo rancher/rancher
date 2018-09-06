@@ -2,6 +2,9 @@ package app
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"strings"
 
 	"github.com/rancher/norman/leader"
 	"github.com/rancher/norman/pkg/k8scheck"
@@ -183,4 +186,33 @@ func addData(management *config.ManagementContext, cfg Config) error {
 	}
 
 	return addMachineDrivers(management)
+}
+
+var registeredInitializers = make(map[string]func())
+
+// RegisterAlternateCommand adds an initialization func under the specified name
+func RegisterAlternateCommand(name string, initializer func()) {
+	if _, exists := registeredInitializers[name]; exists {
+		panic(fmt.Sprintf("alt-cmd func already registered under name %q", name))
+	}
+
+	registeredInitializers[name] = initializer
+}
+
+// InitAlternateCommand is called as the first part of the exec process and returns true if an
+// initialization function was called.
+func InitAlternateCommand() bool {
+	for _, arg := range os.Args {
+		if !strings.HasPrefix(arg, "--alt-cmd=") {
+			continue
+		}
+		s := strings.Split(os.Args[1], "=")
+		val := s[1]
+		initializer, exists := registeredInitializers[val]
+		if exists {
+			initializer()
+			return true
+		}
+	}
+	return false
 }
