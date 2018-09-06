@@ -64,7 +64,7 @@ type PrivateRegistry struct {
 	// User name for registry acces
 	User string `yaml:"user" json:"user,omitempty"`
 	// Password for registry access
-	Password string `yaml:"password" json:"password,omitempty"`
+	Password string `yaml:"password" json:"password,omitempty" norman:"type=password"`
 	// Default registry
 	IsDefault bool `yaml:"is_default" json:"isDefault,omitempty"`
 }
