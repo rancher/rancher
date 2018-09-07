@@ -369,13 +369,15 @@ func (p *adProvider) searchUser(name string, config *v3.ActiveDirectoryConfig, l
 	for _, attr := range srchAttributes {
 		srchAttrs += fmt.Sprintf("(%v=%v*)", attr, name)
 	}
-	query += srchAttrs + "))"
+	// UserSearchFilter should be follow AD search filter syntax, enclosed by parentheses
+	query += srchAttrs + ")" + config.UserSearchFilter + ")"
 	logrus.Debugf("LDAPProvider searchUser query: %s", query)
 	return p.searchLdap(query, UserScope, config, lConn)
 }
 
 func (p *adProvider) searchGroup(name string, config *v3.ActiveDirectoryConfig, lConn *ldapv2.Conn) ([]v3.Principal, error) {
-	query := fmt.Sprintf("(&(%v=*%v*)(%v=%v))", config.GroupSearchAttribute, name, ObjectClass, config.GroupObjectClass)
+	// GroupSearchFilter should be follow AD search filter syntax, enclosed by parentheses
+	query := "(&(" + ObjectClass + "=" + config.GroupObjectClass + ")(" + config.GroupSearchAttribute + "=*" + name + "*)" + config.GroupSearchFilter + ")"
 	logrus.Debugf("LDAPProvider searchGroup query: %s", query)
 	return p.searchLdap(query, GroupScope, config, lConn)
 }
