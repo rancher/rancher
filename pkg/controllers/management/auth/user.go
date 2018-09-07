@@ -12,6 +12,7 @@ import (
 	v12 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -138,6 +139,22 @@ func (l *userLifecycle) Create(user *v3.User) (*v3.User, error) {
 
 	if !match {
 		user.PrincipalIDs = append(user.PrincipalIDs, "local://"+user.Name)
+	}
+
+	// creatorIDAnn indicates it was created through the API, create the new
+	// user bindings and add the annotation UserConditionInitialRolesPopulated
+	if user.ObjectMeta.Annotations[creatorIDAnn] != "" {
+		u, err := v3.UserConditionInitialRolesPopulated.DoUntilTrue(user, func() (runtime.Object, error) {
+			err := l.userManager.CreateNewUserClusterRoleBinding(user.Name, user.UID)
+			if err != nil {
+				return nil, err
+			}
+			return user, nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		user = u.(*v3.User)
 	}
 
 	return user, nil
