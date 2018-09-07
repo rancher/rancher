@@ -1,6 +1,6 @@
 ARG PS_VERSION
 
-FROM golang:1.9.7-windowsservercore-1803 AS build-stage
+FROM golang:1.11.0-windowsservercore-1803 AS build-stage
 COPY [".", "C:/gopath/src/github.com/rancher/rancher/"]
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 ARG VERSION=dev
@@ -30,7 +30,7 @@ RUN cd C:\gopath\src\github.com\rancher\rancher; \
 FROM microsoft/powershell:$PS_VERSION
 ENV RUN_PATH="C:\\Program Files\\rancher"
 COPY --from=build-stage ["C:/gopath/src/github.com/rancher/rancher/bin/agent.exe", "C:/Program Files/rancher/"]
-COPY ["package/windows/*.ps1", "C:/Program Files/rancher/"]
+COPY ["package/windows/*.ps1", "package/windows/*.psm1", "C:/Program Files/rancher/"]
 WORKDIR $RUN_PATH
 ENTRYPOINT ["pwsh.exe", "-f", "start.ps1"]
 

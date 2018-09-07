@@ -12,9 +12,24 @@ $InformationPreference = 'SilentlyContinue'
 #########################################################################
 ## START main definition
 
-$rancherDir = "C:\etc\rancher"
-$kubeDir = "C:\etc\kubernetes"
-$cniDir = "C:\etc\cni"
+$RancherDir = "C:\etc\rancher"
+$KubeDir = "C:\etc\kubernetes"
+$CNIDir = "C:\etc\cni"
+
+Import-Module "$RancherDir\hns.psm1" -Force
+
+function get-env-var {
+    param(
+        [parameter(Mandatory = $true)] [string]$Key
+    )
+
+    $val = [Environment]::GetEnvironmentVariable($Key, [EnvironmentVariableTarget]::Process)
+    if ($val) {
+        return $val
+    }
+
+    return [Environment]::GetEnvironmentVariable($Key, [EnvironmentVariableTarget]::Machine)
+}
 
 ## END main definition
 #########################################################################
@@ -49,20 +64,33 @@ if (-not $currentPrincipal.IsInRole([System.Security.Principal.WindowsBuiltInRol
     throw "You need elevated Administrator privileges in order to run this script, start Windows PowerShell by using the Run as Administrator option, crash"
 }
 
-# cniDir #
 try {
-    Remove-Item -Path $cniDir -Recurse -Force
-    Remove-Item -Path "C:\etc\kube-flannel" -Recurse -Force -ErrorAction Ignore
-} catch {
-    throw ("Can't remove cniDir: {0}, crash" -f $cniDir)
-}
+    $networkName = get-env-var "KUBE_NETWORK"
+    if ($networkName) {
+        $null = Clean-HNSNetworks -Names @{
+            $networkName = $True
+        }
+    }
 
-# kubeDir #
-try {
-    Remove-Item -Path $kubeDir -Recurse -Force
-} catch {
-    throw ("Can't remove kubeDir: {0}, crash" -f $kubeDir)
-}
+    # rancher #
+    Remove-Item -Path "$CNIDir\*" -Recurse -Force -ErrorAction Ignore
+    Remove-Item -Path "$KubeDir\*" -Recurse -Force -ErrorAction Ignore
+    Remove-Item -Path "$RancherDir\*" -Recurse -Force -ErrorAction Ignore
+
+    # component produces #
+    # cni
+    Remove-Item -Path "C:\etc\kube-flannel\*" -Recurse -Force -ErrorAction Ignore
+    Remove-Item -Path "C:\run\flannel\*" -Recurse -Force -ErrorAction Ignore
+
+    # logs
+    Remove-Item -Path "C:\var\log\*" -Recurse -Force -ErrorAction Ignore
+
+    # kuberentes
+    Remove-Item -Path "C:\var\lib\rancher\*" -Recurse -Force -ErrorAction Ignore
+    Remove-Item -Path "C:\var\lib\kubelet\*" -Recurse -Force -ErrorAction Ignore
+    Remove-Item -Path "C:\var\lib\cni\*" -Recurse -Force -ErrorAction Ignore
+    Remove-Item -Path "C:\var\lib\etcd\*" -Recurse -Force -ErrorAction Ignore
+} catch { }
 
 ## END main execution
 #########################################################################
