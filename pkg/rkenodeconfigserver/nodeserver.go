@@ -463,7 +463,7 @@ func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configN
 	}, serviceOptions.Kubelet)
 	extendingKubeproxyOptions := extendMap(map[string]string{
 		"v":                 "2",
-		"proxy-mode":        "userspace",
+		"proxy-mode":        "kernelspace",
 		"kubeconfig":        "c:" + rkepki.GetConfigPath(rkepki.KubeProxyCertName),
 		"hostname-override": configNode.HostnameOverride,
 	}, serviceOptions.Kubeproxy)

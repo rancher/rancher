@@ -11,28 +11,28 @@ $VerbosePreference = 'SilentlyContinue'
 $DebugPreference = 'SilentlyContinue'
 $InformationPreference = 'SilentlyContinue'
 
-$svcRancherAgtName = "rancher-agent"
-$lastIdx = 0
+$SVCRancherAgtName = "rancher-agent"
+$LastIdx = 0
 try {
     if ($Latest10Mins) {
         $datetime = (Get-Date).AddMinutes(-10)
-        $lastIdx = (Get-EventLog -LogName Application -Source $svcRancherAgtName -After $datetime | Sort-Object Index | Select-Object -First 1).Index
+        $LastIdx = (Get-EventLog -LogName Application -Source $SVCRancherAgtName -After $datetime | Sort-Object Index | Select-Object -First 1).Index
     } elseif ($LatestMins -ne 0) {
         $datetime = (Get-Date).AddMinutes(-$LatestMins)
-        $lastIdx = (Get-EventLog -LogName Application -Source $svcRancherAgtName -After $datetime | Sort-Object Index | Select-Object -First 1).Index
+        $LastIdx = (Get-EventLog -LogName Application -Source $SVCRancherAgtName -After $datetime | Sort-Object Index | Select-Object -First 1).Index
     } else {
-        $lastIdx = (Get-EventLog -LogName Application -Source $svcRancherAgtName -Newest 1).Index
+        $LastIdx = (Get-EventLog -LogName Application -Source $SVCRancherAgtName -Newest 1).Index
     }
 } catch {}
 
 while($true) {
     try {
-        $newestIdx = (Get-EventLog -LogName Application -Source $svcRancherAgtName -Newest 1).Index
+        $newestIdx = (Get-EventLog -LogName Application -Source $SVCRancherAgtName -Newest 1).Index
 
-        Get-EventLog -LogName Application -Source $svcRancherAgtName -Newest ($newestIdx - $lastIdx) | Sort-Object Index | % {
+        Get-EventLog -LogName Application -Source $SVCRancherAgtName -Newest ($newestIdx - $LastIdx) | Sort-Object Index | % {
             $item = $_
 
-            if ($item.Index -le $lastIdx) {
+            if ($item.Index -le $LastIdx) {
                 return
             }
 
@@ -57,7 +57,7 @@ while($true) {
             }
         }
 
-        $lastIdx = $newestIdx
+        $LastIdx = $newestIdx
     } catch {}
 
     Start-Sleep -s 5

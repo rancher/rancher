@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"runtime"
 	"strings"
 
 	"github.com/docker/docker/api/types"
@@ -201,20 +202,39 @@ func changed(ctx context.Context, c *client.Client, expectedProcess v3.Process, 
 			expectedEnvs := make(map[string]string, 8)
 			for _, env := range defaultDockerInspect.Config.Env {
 				es := strings.SplitN(env, "=", 2)
-				expectedEnvs[es[0]] = es[1]
+				if len(es) == 2 {
+					expectedEnvs[es[0]] = es[1]
+				}
 			}
 			for _, env := range expectedProcess.Env {
 				es := strings.SplitN(env, "=", 2)
-				expectedEnvs[es[0]] = es[1]
+				if len(es) == 2 {
+					expectedEnvs[es[0]] = es[1]
+				} else {
+					expectedEnvs[es[0]] = "_host_related_env_"
+				}
 			}
 
 			actualEnvs := make(map[string]string, 8)
 			for _, env := range actualProcess.Env {
 				es := strings.SplitN(env, "=", 2)
-				actualEnvs[es[0]] = es[1]
+				if len(es) == 2 {
+					actualEnvs[es[0]] = es[1]
+				}
 			}
 
-			if reflect.DeepEqual(expectedEnvs, actualEnvs) {
+			isNothingChange := true
+			for expectedEnvName, expectedEnvVal := range expectedEnvs {
+				if expectedEnvVal == "_host_related_env_" {
+					continue
+				}
+
+				if expectedEnvVal != actualEnvs[expectedEnvName] {
+					isNothingChange = false
+					break
+				}
+			}
+			if isNothingChange {
 				continue
 			}
 		} else if f.Name == "Labels" {
@@ -280,6 +300,10 @@ func natPortSetToSlice(args map[nat.Port]struct{}) []nat.Port {
 }
 
 func runLogLinker(ctx context.Context, c *client.Client, containerName string, p v3.Process) error {
+	if ignoreWindows() {
+		return nil
+	}
+
 	inspect, err := c.ContainerInspect(ctx, containerName)
 	if err != nil {
 		return err
@@ -315,4 +339,8 @@ func runLogLinker(ctx context.Context, c *client.Client, containerName string, p
 	}
 	// remove log linker after start
 	return remove(ctx, c, logLinkerName)
+}
+
+func ignoreWindows() bool {
+	return runtime.GOOS == "windows"
 }

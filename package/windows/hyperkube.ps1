@@ -23,515 +23,73 @@ $DebugPreference = 'SilentlyContinue'
 $InformationPreference = 'SilentlyContinue'
 
 #########################################################################
-## START hNS management
-
-function Get-VmComputeNativeMethods()
-{
-    $signature = @'
-                 [DllImport("vmcompute.dll")]
-                 public static extern void HNSCall([MarshalAs(UnmanagedType.LPWStr)] string method, [MarshalAs(UnmanagedType.LPWStr)] string path, [MarshalAs(UnmanagedType.LPWStr)] string request, [MarshalAs(UnmanagedType.LPWStr)] out string response);
-'@
-
-    # Compile into runtime type
-    try {
-        Add-Type -MemberDefinition $signature -Namespace VmCompute.PrivatePInvoke -Name NativeMethods -PassThru -ErrorAction Ignore
-    } catch {}
-}
-
-function Get-HnsSwitchExtensions
-{
-    param
-    (
-        [parameter(Mandatory=$true)] [string] $NetworkId
-    )
-
-    return (Get-HNSNetwork $NetworkId).Extensions
-}
-
-function Set-HnsSwitchExtension
-{
-    param
-    (
-        [parameter(Mandatory=$true)] [string] $NetworkId,
-        [parameter(Mandatory=$true)] [string] $ExtensionId,
-        [parameter(Mandatory=$true)] [bool]   $state
-    )
-
-    # { "Extensions": [ { "Id": "...", "IsEnabled": true|false } ] }
-    $req = @{
-        "Extensions"=@(
-            @{
-                "Id"=$ExtensionId
-                "IsEnabled"=$state
-            }
-        )
-    }
-    Invoke-HNSRequest -Method POST -Type networks -Id $NetworkId -Data (ConvertTo-Json $req)
-}
-
-function Get-HNSActivities
-{
-    [cmdletbinding()]Param()
-    return Invoke-HNSRequest -Type activities -Method GET
-}
-
-function Get-HNSPolicyList {
-    [cmdletbinding()]Param()
-    return Invoke-HNSRequest -Type policylists -Method GET
-}
-
-function Remove-HnsPolicyList
-{
-    [CmdletBinding()]
-    param
-    (
-        [parameter(Mandatory=$true,ValueFromPipeline=$True,ValueFromPipelinebyPropertyName=$True)]
-        [Object[]] $InputObjects
-    )
-    begin {$Objects = @()}
-    process {$Objects += $InputObjects; }
-    end {
-        $Objects | foreach {  Invoke-HNSRequest -Method DELETE -Type  policylists -Id $_.Id }
-    }
-}
-
-function New-HnsRoute {
-    param
-    (
-        [parameter(Mandatory = $false)] [Guid[]] $Endpoints = $null,
-        [parameter(Mandatory = $true)] [string] $DestinationPrefix,
-        [parameter(Mandatory = $false)] [switch] $EncapEnabled
-    )
-
-    $policyLists = @{
-        References = @(
-                get-endpointReferences $Endpoints
-        )
-        Policies   = @(
-            @{
-                Type = "ROUTE";
-                DestinationPrefix = $DestinationPrefix
-                NeedEncap = $EncapEnabled.IsPresent
-            }
-        )
-    }
-
-    Invoke-HNSRequest -Method POST -Type policylists -Data (ConvertTo-Json  $policyLists -Depth 10)
-}
-
-function New-HnsLoadBalancer {
-    param
-    (
-        [parameter(Mandatory = $false)] [Guid[]] $Endpoints = $null,
-        [parameter(Mandatory = $true)] [int] $InternalPort,
-        [parameter(Mandatory = $true)] [int] $ExternalPort,
-        [parameter(Mandatory = $false)] [string] $Vip
-    )
-
-    $policyLists = @{
-        References = @(
-            get-endpointReferences $Endpoints
-        )
-        Policies   = @(
-            @{
-                Type = "ELB"
-                InternalPort = $InternalPort
-                ExternalPort = $ExternalPort
-                VIPs = @($Vip)
-            }
-        );
-    }
-
-    Invoke-HNSRequest -Method POST -Type policylists -Data ( ConvertTo-Json  $policyLists -Depth 10)
-}
-
-function get-endpointReferences {
-    param
-    (
-        [parameter(Mandatory = $true)] [Guid[]] $Endpoints = $null
-    )
-    if ($Endpoints ) {
-        $endpointReference = @()
-        foreach ($endpoint in $Endpoints)
-        {
-            $endpointReference += "/endpoints/$endpoint"
-        }
-        return $endpointReference
-    }
-    return @()
-}
-
-function Get-HNSNetwork
-{
-    param
-    (
-        [parameter(Mandatory=$false)] [string] $Id = [Guid]::Empty
-    )
-
-    if ($Id -ne [Guid]::Empty)
-    {
-        return Invoke-HNSRequest -Method GET -Type networks -Id $id
-    }
-    else
-    {
-        return Invoke-HNSRequest -Method GET -Type networks
-    }
-}
-
-function Remove-HNSNetwork
-{
-    [CmdletBinding()]
-    param
-    (
-        [parameter(Mandatory=$true,ValueFromPipeline=$True,ValueFromPipelinebyPropertyName=$True)]
-        [Object[]] $InputObjects
-    )
-    begin {$Objects = @()}
-    process {$Objects += $InputObjects; }
-    end {
-        $Objects | foreach {  Invoke-HNSRequest -Method DELETE -Type  networks -Id $_.Id }
-    }
-}
-
-function New-HnsNetwork
-{
-    param
-    (
-        [parameter(Mandatory=$false, Position=0)]
-        [string] $JsonString,
-        [ValidateSet('ICS', 'Internal', 'Transparent', 'NAT', 'Overlay', 'L2Bridge', 'L2Tunnel', 'Layered', 'Private')]
-        [parameter(Mandatory = $false, Position = 0)]
-        [string] $Type,
-        [parameter(Mandatory = $false)] [string] $Name,
-        [parameter(Mandatory = $false)] [string] $AddressPrefix,
-        [parameter(Mandatory = $false)] [string] $Gateway,
-        [parameter(Mandatory = $false)] [string] $DNSServer,
-        [parameter(Mandatory = $false)] [string] $AdapterName
-    )
-
-    Begin {
-        if (!$JsonString) {
-            $netobj = @{
-                Type          = $Type;
-            };
-
-            if ($Name) {
-                $netobj += @{
-                    Name = $Name;
-                }
-            }
-
-            if ($AddressPrefix -and  $Gateway) {
-                $netobj += @{
-                    Subnets = @(
-                    @{
-                        AddressPrefix  = $AddressPrefix;
-                        GatewayAddress = $Gateway;
-                    }
-                    );
-                }
-            }
-
-            if ($DNSServerName) {
-                $netobj += @{
-                    DNSServerList = $DNSServer
-                }
-            }
-
-            if ($AdapterName) {
-                $netobj += @{
-                    NetworkAdapterName = $AdapterName;
-                }
-            }
-
-            $JsonString = ConvertTo-Json $netobj -Depth 10
-        }
-
-    }
-    Process{
-        return Invoke-HNSRequest -Method POST -Type networks -Data $JsonString
-    }
-}
-
-function Get-HnsEndpoint
-{
-    param
-    (
-        [parameter(Mandatory=$false)] [string] $Id = [Guid]::Empty
-    )
-
-    if ($Id -ne [Guid]::Empty)
-    {
-        return Invoke-HNSRequest -Method GET -Type endpoints -Id $id
-    }
-    else
-    {
-        return Invoke-HNSRequest -Method GET -Type endpoints
-    }
-}
-
-function Remove-HNSEndpoint
-{
-    param
-    (
-        [parameter(Mandatory = $true, ValueFromPipeline = $True, ValueFromPipelinebyPropertyName = $True)]
-        [Object[]] $InputObjects
-    )
-
-    begin {$objects = @()}
-    process {$Objects += $InputObjects; }
-    end {
-        $Objects | foreach {  Invoke-HNSRequest -Method DELETE -Type endpoints -Id $_.Id  }
-    }
-}
-
-function New-HnsEndpoint
-{
-    param
-    (
-        [parameter(Mandatory=$false, Position = 0)] [string] $JsonString = $null,
-        [parameter(Mandatory = $false, Position = 0)] [Guid] $NetworkId,
-        [parameter(Mandatory = $false)] [string] $Name,
-        [parameter(Mandatory = $false)] [string] $IPAddress,
-        [parameter(Mandatory = $false)] [string] $Gateway,
-        [parameter(Mandatory = $false)] [string] $MacAddress,
-        [parameter(Mandatory = $false)] [switch] $EnableOutboundNat
-    )
-
-    begin
-    {
-        if ($JsonString)
-        {
-            $EndpointData = $JsonString | ConvertTo-Json | ConvertFrom-Json
-        }
-        else
-        {
-            $endpoint = @{
-                VirtualNetwork = $NetworkId;
-                Policies       = @();
-            }
-
-            if ($Name) {
-                $endpoint += @{
-                    Name = $Name;
-                }
-            }
-
-            if ($MacAddress) {
-                $endpoint += @{
-                    MacAddress     = $MacAddress;
-                }
-            }
-
-            if ($IPAddress) {
-                $endpoint += @{
-                    IPAddress      = $IPAddress;
-                }
-            }
-
-            if ($Gateway) {
-                $endpoint += @{
-                    GatewayAddress = $Gateway;
-                }
-            }
-
-            if ($EnableOutboundNat) {
-                $endpoint.Policies += @{
-                    Type = "OutBoundNAT";
-                }
-
-            }
-            # Try to Generate the data
-            $EndpointData = convertto-json $endpoint
-        }
-    }
-
-    Process
-    {
-        return Invoke-HNSRequest -Method POST -Type endpoints -Data $EndpointData
-    }
-}
-
-
-function New-HnsRemoteEndpoint
-{
-    param
-    (
-        [parameter(Mandatory = $true)] [Guid] $NetworkId,
-        [parameter(Mandatory = $false)] [string] $IPAddress,
-        [parameter(Mandatory = $false)] [string] $MacAddress
-    )
-
-    $remoteEndpoint = @{
-        ID = [Guid]::NewGuid();
-        VirtualNetwork = $NetworkId;
-        IPAddress = $IPAddress;
-        MacAddress = $MacAddress;
-        IsRemoteEndpoint = $true;
-    }
-
-    return Invoke-HNSRequest -Method POST -Type endpoints -Data (ConvertTo-Json $remoteEndpoint  -Depth 10)
-
-}
-
-
-function Attach-HnsHostEndpoint
-{
-    param
-    (
-        [parameter(Mandatory=$true)] [Guid] $EndpointID,
-        [parameter(Mandatory=$true)] [int] $CompartmentID
-    )
-    $request = @{
-        SystemType    = "Host";
-        CompartmentId = $CompartmentID;
-    };
-
-    return Invoke-HNSRequest -Method POST -Type endpoints -Data (ConvertTo-Json $request) -Action "attach" -Id $EndpointID
-}
-
-function Attach-HNSVMEndpoint
-{
-    param
-    (
-        [parameter(Mandatory=$true)] [Guid] $EndpointID,
-        [parameter(Mandatory=$true)] [string] $VMNetworkAdapterName
-    )
-
-    $request = @{
-        VirtualNicName   = $VMNetworkAdapterName;
-        SystemType    = "VirtualMachine";
-    };
-    return Invoke-HNSRequest -Method POST -Type endpoints -Data (ConvertTo-Json $request ) -Action "attach" -Id $EndpointID
-
-}
-
-function Attach-HNSEndpoint
-{
-    param
-    (
-        [parameter(Mandatory=$true)] [Guid] $EndpointID,
-        [parameter(Mandatory=$true)] [int] $CompartmentID,
-        [parameter(Mandatory=$true)] [string] $ContainerID
-    )
-    $request = @{
-        ContainerId = $ContainerID;
-        SystemType="Container";
-        CompartmentId = $CompartmentID;
-    };
-
-    return Invoke-HNSRequest -Method POST -Type endpoints -Data (ConvertTo-Json $request) -Action "attach" -Id $EndpointID
-}
-
-function Detach-HNSVMEndpoint
-{
-    param
-    (
-        [parameter(Mandatory=$true)] [Guid] $EndpointID
-    )
-    $request = @{
-        SystemType  = "VirtualMachine";
-    };
-
-    return Invoke-HNSRequest -Method POST -Type endpoints -Data (ConvertTo-Json $request ) -Action "detach" -Id $EndpointID
-}
-
-function Detach-HNSHostEndpoint
-{
-    param
-    (
-        [parameter(Mandatory=$true)] [Guid] $EndpointID
-    )
-    $request = @{
-        SystemType  = "Host";
-    };
-
-    return Invoke-HNSRequest -Method POST -Type endpoints -Data (ConvertTo-Json $request ) -Action "detach" -Id $EndpointID
-}
-
-function Detach-HNSEndpoint
-{
-    param
-    (
-        [parameter(Mandatory=$true)] [Guid] $EndpointID,
-        [parameter(Mandatory=$true)] [string] $ContainerID
-    )
-
-    $request = @{
-        ContainerId = $ContainerID;
-        SystemType="Container";
-    };
-
-    return Invoke-HNSRequest -Method POST -Type endpoints -Data (ConvertTo-Json $request ) -Action "detach" -Id $EndpointID
-}
-
-function Invoke-HNSRequest
-{
-    param
-    (
-        [ValidateSet('GET', 'POST', 'DELETE')]
-        [parameter(Mandatory=$true)] [string] $Method,
-        [ValidateSet('networks', 'endpoints', 'activities', 'policylists', 'endpointstats', 'plugins')]
-        [parameter(Mandatory=$true)] [string] $Type,
-        [parameter(Mandatory=$false)] [string] $Action = $null,
-        [parameter(Mandatory=$false)] [string] $Data = $null,
-        [parameter(Mandatory=$false)] [Guid] $Id = [Guid]::Empty
-    )
-
-    $hnsPath = "/$Type"
-
-    if ($id -ne [Guid]::Empty)
-    {
-        $hnsPath += "/$id";
-    }
-
-    if ($Action)
-    {
-        $hnsPath += "/$Action";
-    }
-
-    $request = "";
-    if ($Data)
-    {
-        $request = $Data
-    }
-
-    $output = "";
-    $response = "";
-
-    $hnsApi = Get-VmComputeNativeMethods
-    $hnsApi::HNSCall($Method, $hnsPath, "$request", [ref] $response);
-
-    if ($response)
-    {
-        try {
-            $output = ($response | ConvertFrom-Json);
-        } catch {
-            Write-Error $_.Exception.Message
-            return ""
-        }
-        if ($output.Error)
-        {
-            Write-Error $output;
-        }
-        $output = $output.Output;
-    }
-
-    return $output;
-}
-
-## END hNS management
-#########################################################################
 ## START main definition
 
-$rancherDir = "C:\etc\rancher"
-$kubeDir = "C:\etc\kubernetes"
-$cniDir = "C:\etc\cni"
-$env:NODE_NAME = $NodeName.ToLower()
+$RancherDir = "C:\etc\rancher"
+$KubeDir = "C:\etc\kubernetes"
+$CNIDir = "C:\etc\cni"
+$RancherLogDir = ("C:\var\log\rancher\{0}" -f $(Get-Date -UFormat "%Y%m%d"))
+
+$null = New-Item -Force -Type Directory -Path $RancherDir -ErrorAction Ignore
+$null = New-Item -Force -Type Directory -Path $KubeDir -ErrorAction Ignore
+$null = New-Item -Force -Type Directory -Path $CNIDir -ErrorAction Ignore
+
+$NodeName = $NodeName.ToLower()
 $KubeCNIMode = $KubeCNIMode.ToLower()
+
+Import-Module "$RancherDir\hns.psm1" -Force
 
 function print {
     [System.Console]::Out.Write($args[0])
+    Start-Sleep -Milliseconds 100
+}
+
+function set-env-var {
+    param(
+        [parameter(Mandatory = $true)] [string]$Key,
+        [parameter(Mandatory = $false)] [string]$Value = ""
+    )
+
+    [Environment]::SetEnvironmentVariable($Key, $Value, [EnvironmentVariableTarget]::Process)
+    [Environment]::SetEnvironmentVariable($Key, $Value, [EnvironmentVariableTarget]::Machine)
+}
+
+function get-env-var {
+    param(
+        [parameter(Mandatory = $true)] [string]$Key
+    )
+
+    $val = [Environment]::GetEnvironmentVariable($Key, [EnvironmentVariableTarget]::Process)
+    if ($val) {
+        return $val
+    }
+
+    return [Environment]::GetEnvironmentVariable($Key, [EnvironmentVariableTarget]::Machine)
+}
+
+function merge-argument-list($listArr, $split) {
+    if (-not $split) {
+        $split = "="
+    }
+
+    $mergeRet = @()
+    $checkList = @{}
+    foreach ($list in $listArr) {
+        foreach ($item in $list) {
+            $sItem = $item -replace "`"",""
+            $sItem = $sItem -split $split
+            $sItemKey = $sItem[0]
+
+            if ($checkList[$sItemKey]) {
+                continue
+            }
+
+            $checkList[$sItemKey] = $True
+            $mergeRet += $item
+        }
+    }
+
+    return $mergeRet -join " "
 }
 
 function convert-to-decimal-ip {
@@ -587,7 +145,7 @@ function get-hyperv-vswitch {
     foreach ($nai in Get-NetAdapter) {
         try {
             $na = $nai
-            $ip = ($na | Get-NetIPAddress -AddressFamily IPv4).IPAddress
+            $ip = ($na | Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Ignore).IPAddress
             if ($ip -eq $NodeIP) {
                 break
             }
@@ -601,7 +159,7 @@ function get-hyperv-vswitch {
         $ip = (Get-NetIPAddress -InterfaceIndex $na.ifIndex -AddressFamily IPv4).IPAddress
     }
 
-    $subnetMask = (Get-WmiObject Win32_NetworkAdapterConfiguration | ? InterfaceIndex -eq $($na.ifIndex)).IPSubnet[0]
+    $subnetMask = (Get-WmiObject Win32_NetworkAdapterConfiguration | ? InterfaceIndex -eq $($na.InterfaceIndex)).IPSubnet[0]
     $subnet = (convert-to-decimal-ip $ip) -band (convert-to-decimal-ip $subnetMask)
     $subnet = convert-to-dotted-ip $subnet
     $subnetCIDR = "$subnet/$(convert-to-mask-length $subnetMask)"
@@ -621,41 +179,43 @@ function get-hyperv-vswitch {
     }
 }
 
-function clean-hnsnetwork {
-    param(
-        [parameter(Mandatory = $true)] $Network
-    )
-
-    docker ps -q | % { docker stop $_ *>$null } *>$null
-
-    print "Cleaning up the early HNS network"
-    Remove-HNSNetwork $Network
-    Start-Sleep -s 10
-
-    try {
-        docker restart nginx-proxy *>$null
-        Start-Sleep -s 5
-    } catch {}
-}
-
 function wait-ready {
     param(
         [parameter(Mandatory = $true)] $Path
     )
 
-    while (-not (Test-Path $Path)) {
+    $count = 15
+    while ((-not (Test-Path $Path)) -and ($count -le 0)) {
         Start-Sleep -s 2
+        $count -= 1
+    }
+
+    if ($count -le 0) {
+        throw ("Timeout and can't access {0}, crash" -f $Path)
     }
 }
 
-function get-pod-cidr() {
-    $kubeletOptions = @($KubeletOptions -split ";")
-
-    wait-ready -Path "$kubeDir\bin\kubectl.exe"
-
-    pushd $kubeDir\bin
+function reset-proxy {
     try {
-        $podCIDR = (.\kubectl.exe --kubeconfig="$kubeDir\ssl\kubecfg-kube-node.yaml" get nodes/$($env:NODE_NAME) -o custom-columns=podCIDR:.spec.podCIDR --no-headers 2>$null)
+        docker restart nginx-proxy *>$null
+    } catch {}
+
+    Start-Sleep -s 5
+}
+
+function get-pod-cidr() {
+    $kubeletArgs = merge-argument-list @(
+        @("`"--register-schedulable=false`"")
+        @($env:CATTLE_CUSTOMIZE_KUBELET_OPTIONS -split ";")
+        @($KubeletOptions -split ";")
+    )
+
+    wait-ready -Path "$KubeDir\bin\kubectl.exe"
+
+    pushd $KubeDir\bin
+    $podCIDR = ""
+    try {
+        $podCIDR = (.\kubectl.exe --kubeconfig="$KubeDir\ssl\kubecfg-kube-node.yaml" get node $NodeName -o=jsonpath='{.spec.podCIDR}' 2>$null)
     } catch {}
     if (-not $podCIDR) {
         $retryCount = 7
@@ -665,18 +225,24 @@ function get-pod-cidr() {
             $process = Get-Process -Id $process.Id -ErrorAction Ignore
             if ($process) {
                 $process | Stop-Process | Out-Null
+                Remove-Item -Force "$env:TEMP\kubelet_temp.xml" -ErrorAction Ignore
             }
-            Remove-Item -Force "$env:TEMP\kubelet_temp.xml" -ErrorAction Ignore
         }
 
-        wait-ready -Path "$kubeDir\bin\kubelet.exe"
+        wait-ready -Path "$KubeDir\bin\kubelet.exe"
 
-        $process = Start-Process -PassThru -FilePath "$kubeDir\bin\kubelet.exe" -ArgumentList $kubeletOptions
+        $process = Start-Process -PassThru -FilePath "$KubeDir\bin\kubelet.exe" -ArgumentList $kubeletArgs
         $process | Export-Clixml -Path "$env:TEMP\kubelet_temp.xml" -Force | Out-Null
         while (-not $podCIDR) {
             $process = Get-Process -Id $process.Id -ErrorAction Ignore
             if (-not $process) {
-                $process = Start-Process -PassThru -FilePath "$kubeDir\bin\kubelet.exe" -ArgumentList $kubeletOptions
+                if ($retryCount -eq 6) {
+                    # create an error debug log #
+                    $null = New-Item -Force -Type Directory -Path $RancherLogDir -ErrorAction Ignore
+                    $process = Start-Process -PassThru -FilePath "$KubeDir\bin\kubelet.exe" -ArgumentList $kubeletArgs -RedirectStandardError "$RancherLogDir\detected-kubelet-err.log"
+                } else {
+                    $process = Start-Process -PassThru -FilePath "$KubeDir\bin\kubelet.exe" -ArgumentList $kubeletArgs
+                }
                 $process | Export-Clixml -Path "$env:TEMP\kubelet_temp.xml" -Force | Out-Null
             }
 
@@ -684,17 +250,24 @@ function get-pod-cidr() {
             Start-Sleep -s 10
 
             try {
-                $podCIDR = (.\kubectl.exe --kubeconfig="$kubeDir\ssl\kubecfg-kube-node.yaml" get nodes/$($env:NODE_NAME) -o custom-columns=podCIDR:.spec.podCIDR --no-headers 2>$null)
+                $podCIDR = (.\kubectl.exe --kubeconfig="$KubeDir\ssl\kubecfg-kube-node.yaml" get node $NodeName -o=jsonpath='{.spec.podCIDR}' 2>$null)
             } catch {}
 
             $retryCount -= 1
             if ($retryCount -le 0) {
                 break
             }
+            if (($retryCount -eq 4) -and (-not $podCIDR)) {
+                reset-proxy
+            }
         }
 
         $process | Stop-Process | Out-Null
-        Remove-Item -Force "$env:TEMP\kubelet_temp.xml" -ErrorAction Ignore
+
+        # uncordon #
+        try {
+            .\kubectl.exe --kubeconfig="$KubeDir\ssl\kubecfg-kube-node.yaml" uncordon $NodeName 2>$null | Out-Null
+        } catch {}
     }
     popd
 
@@ -709,17 +282,13 @@ function get-pod-cidr() {
 }
 
 function config-cni-flannel {
-    if (($KubeCNIMode -ne "overlay") -and ($KubeCNIMode -ne "l2bridge")) {
-        throw "Unknown flannel mode: `"win-$KubeCNIMode`", crash"
-    }
-
-    Get-HnsNetwork | % {
-        $item = $_
-        if ($item.Type -eq "l2bridge") {
-            clean-hnsnetwork -Network $item
-        } elseif ($item.Type -eq "overlay") {
-            clean-hnsnetwork -Network $item
+    ## stop stale ##
+    try {
+        $process = Get-Process -Name "flanneld*" -ErrorAction Ignore
+        if ($process) {
+            $process | Stop-Process | Out-Null
         }
+    } catch {
     }
 
     ## get pod CIDR ##
@@ -727,185 +296,208 @@ function config-cni-flannel {
     $podCIDR = get-pod-cidr
     print "................. OK, $podCIDR"
 
-    # open firewall #
-    print "Checking Firewall ..."
-    $overlayRule = Get-NetFirewallRule -DisplayName 'Overlay Network Traffic (UDP)' -ErrorAction Ignore
-    if ($overlayRule) {
-        Set-NetFirewallRule -DisplayName 'Overlay Network Traffic (UDP)' -LocalPort 4789 -Protocol UDP -Profile Any -Action Allow -Enabled True -ErrorAction Ignore | Out-Null
+    $flannelBackendName = ""
+    $flannelBackendType = ""
+    $flannelNetwork = $KubeClusterCIDR
+
+    if ($KubeCNIMode -eq "overlay") {
+        $flannelBackendType = "vxlan"
+        $flannelBackendName = "vxlan0"
+    } elseif ($KubeCNIMode -eq "l2bridge") {
+        $flannelBackendType = "host-gw"
+        $flannelBackendName = "cbr0"
     } else {
-        $null = New-NetFirewallRule  -Group 'Rancher' -Description 'Overlay network traffic for Flannel. [UDP 4789]' -Name 'OVERLAY-NETWORK-TRAFFIC-UDP-ANY' -DisplayName 'Overlay Network Traffic (UDP)' -LocalPort 4789 -Protocol UDP -Profile Any -Action Allow -Enabled True
+        throw "Unknown flannel mode: `"win-$KubeCNIMode`", crash"
+    }
+
+    # clean other kind network #
+    print "Cleaning stale HNSNetwork ..."
+    $isCleanPreviousNetwork = Clean-HNSNetworks -Types @{ "l2bridge" = $True; "overlay" = $True } -Keeps @{ $flannelBackendName = $KubeCNIMode }
+    if ($isCleanPreviousNetwork) {
+        Start-Sleep -s 5
+        reset-proxy
     }
     print ".................. OK"
 
-    print "Generating flannel cni.conf ..."
-    $cniConfPath = "$cniDir\conf"
+    print "Generating flanneld net-config.json ..."
+    $kubeFlannelPath = "C:\etc\kube-flannel"
+    $null = New-Item -Force -Type Directory -Path $kubeFlannelPath -ErrorAction Ignore
+    $netConfJson = @{
+        Network = $flannelNetwork
+        Backend = @{
+            name = $flannelBackendName
+            type = $flannelBackendType
+        }
+    }
+    $netConfJson | ConvertTo-Json -Compress -Depth 32 | Out-File -Encoding ascii -Force -FilePath "$kubeFlannelPath\net-conf.json"
+    print ".................................... OK"
+
+    print "Generating cni.conf ..."
+    $cniConfPath = "$CNIDir\conf"
     $null = New-Item -Force -Type Directory -Path $cniConfPath -ErrorAction Ignore
-    $cniConf = $null
+    $delegate = $null
     if ($KubeCNIMode -eq "overlay") {
-        $cniConf = @{
-            cniVersion = "0.2.0"
-            name = "vxlan0"
-            type = "flannel"
-            delegate = @{
-                type = "win-overlay"
-                dns = @{
-                    Nameservers = @($KubeDnsServiceIP)
-                    Search = @("svc." + $KubeClusterDomain)
-                }
-                AdditionalArgs = @(
+        $delegate = @{
+            type = "win-overlay"
+            dns = @{
+                nameservers = @($KubeDnsServiceIP)
+                search = @(
+                    "svc." + $KubeClusterDomain
+                )
+            }
+            additionalArgs = @(
                 @{
-                    Name = "EndpointPolicy"
-                    Value = @{
+                    name = "EndpointPolicy"
+                    value = @{
                         Type = "OutBoundNAT"
                         ExceptionList = @(
-                        $KubeClusterCIDR
-                        $KubeServiceCIDR
+                            $KubeClusterCIDR
+                            $KubeServiceCIDR
                         )
                     }
                 }
                 @{
-                    Name = "EndpointPolicy"
-                    Value = @{
+                    name = "EndpointPolicy"
+                    value = @{
                         Type = "ROUTE"
                         NeedEncap = $true
                         DestinationPrefix = $KubeServiceCIDR
                     }
                 }
-                )
-            }
+            )
         }
     } elseif ($KubeCNIMode -eq "l2bridge") {
         $vswitch = get-hyperv-vswitch
-        $cniConf = @{
-            cniVersion = "0.2.0"
-            name = "cbr0"
-            type = "flannel"
-            delegate = @{
-                type = "win-l2bridge"
-                dns = @{
-                    Nameservers = @($KubeDnsServiceIP)
-                    Search = @("svc." + $KubeClusterDomain)
-                }
-                AdditionalArgs = @(
+
+        $delegate = @{
+            type = "win-l2bridge"
+            dns = @{
+                nameservers = @($KubeDnsServiceIP)
+                search = @(
+                    "svc." + $KubeClusterDomain
+                )
+            }
+            additionalArgs = @(
                 @{
-                    Name = "EndpointPolicy"
-                    Value = @{
+                    name = "EndpointPolicy"
+                    value = @{
                         Type = "OutBoundNAT"
                         ExceptionList = @(
-                        $KubeClusterCIDR
-                        $KubeServiceCIDR
-                        $vswitch.Subnet.CIDR
+                            $KubeClusterCIDR
+                            $KubeServiceCIDR
+                            $vswitch.Subnet.CIDR
                         )
                     }
                 }
                 @{
-                    Name = "EndpointPolicy"
-                    Value = @{
+                    name = "EndpointPolicy"
+                    value = @{
                         Type = "ROUTE"
                         NeedEncap = $true
                         DestinationPrefix = $KubeServiceCIDR
                     }
                 }
                 @{
-                    Name = "EndpointPolicy"
-                    Value = @{
+                    name = "EndpointPolicy"
+                    value = @{
                         Type = "ROUTE"
                         NeedEncap = $true
                         DestinationPrefix = $vswitch.CIDR
                     }
                 }
-                )
-            }
+            )
         }
+    }
+
+    $cniConf = @{
+        cniVersion = "0.2.0"
+        name = $flannelBackendName
+        type = "flannel"
+        capabilities = @{
+            dns = $True
+        }
+        delegate = $delegate
     }
     $cniConf | ConvertTo-Json -Compress -Depth 32 | Out-File -Encoding ascii -Force -FilePath "$cniConfPath\cni.conf"
     print "............................ OK"
 
-    print "Generating flanneld net-config.json ..."
-    $kubeFlannelPath = "C:\etc\kube-flannel"
-    $null = New-Item -Force -Type Directory -Path $kubeFlannelPath -ErrorAction Ignore
-    $netConfJson = $null
-    if ($KubeCNIMode -eq "overlay") {
-        $env:KUBE_NETWORK = "vxlan0"
-        $netConfJson = @{
-            Network = $podCIDR
-            Backend = @{
-                name = "vxlan0"
-                type = "vxlan"
-            }
-        }
-    } elseif ($KubeCNIMode -eq "l2bridge") {
-        $env:KUBE_NETWORK = "cbr0"
-        $netConfJson = @{
-            Network = $podCIDR
-            Backend = @{
-                name = "cbr0"
-                type = "host-gw"
-            }
-        }
-    }
-    $netConfJson | ConvertTo-Json -Compress -Depth 32 | Out-File -Encoding ascii -Force -FilePath "$kubeFlannelPath\net-conf.json"
-    $hnsPolicyList = Get-HnsPolicyList
-    if (-not $hnsPolicyList) {
-        $hnsPolicyList | Remove-HnsPolicyList
-    }
-    print ".................................... OK"
-
-    wait-ready -Path "$cniDir\bin\flanneld.exe"
-
     # start flanneld #
     print "Starting flanneld ..."
+    wait-ready -Path "$CNIDir\bin\flanneld.exe"
+
+    set-env-var "KUBE_NETWORK" $flannelBackendName
+    set-env-var "NODE_NAME" $NodeName
     $flanneldArgs = @(
-    "--kubeconfig-file=`"$kubeDir\ssl\kubecfg-kube-node.yaml`""
-    "--iface=$NodeIP"
-    "--ip-masq"
-    "--kube-subnet-mgr"
+        "`"--kubeconfig-file=$KubeDir\ssl\kubecfg-kube-node.yaml`""
+        "`"--iface=$NodeIP`""
+        "`"--ip-masq`""
+        "`"--kube-subnet-mgr`""
+        "`"--iptables-forward-rules=false`""
     )
-    $process = Start-Process -PassThru -FilePath "$cniDir\bin\flanneld.exe" -ArgumentList $flanneldArgs
+    $process = Start-Process -PassThru -FilePath "$CNIDir\bin\flanneld.exe" -ArgumentList $flanneldArgs
     $process | Export-Clixml -Path "$env:TEMP\flanneld.xml" -Force | Out-Null
 
-    $network = Get-HnsNetwork | ? Type -eq $KubeCNIMode
-    if (-not $network) {
-        $retryCount = 7
+    Start-Sleep -s 10
 
-        while(-not $network) {
-            $process = Get-Process -Id $process.Id -ErrorAction Ignore
-            if (-not $process) {
-                $process = Start-Process -PassThru -FilePath "$cniDir\bin\flanneld.exe" -ArgumentList $flanneldArgs
-                $process | Export-Clixml -Path "$env:TEMP\flanneld.xml" -Force | Out-Null
-            }
+    $retryCount = 7
+    $process = Get-Process -Id $process.Id -ErrorAction Ignore
+    while (-not $process) {
+        if ($retryCount -eq 6) {
+            # create an error debug log #
+            $null = New-Item -Force -Type Directory -Path $RancherLogDir -ErrorAction Ignore
+            $process = Start-Process -PassThru -FilePath "$CNIDir\bin\flanneld.exe" -ArgumentList $flanneldArgs -RedirectStandardError "$RancherLogDir\flanneld-err.log"
+        } else {
+            $process = Start-Process -PassThru -FilePath "$CNIDir\bin\flanneld.exe" -ArgumentList $flanneldArgs
+        }
+        $process | Export-Clixml -Path "$env:TEMP\kubelet.xml" -Force | Out-Null
 
-            print "....................."
-            Start-Sleep -s 10
+        print "....................."
+        Start-Sleep -s 10
 
-            $network = (Get-HnsNetwork | ? Type -eq $KubeCNIMode)
+        $process = Get-Process -Id $process.Id -ErrorAction Ignore
 
-            $retryCount -= 1
-            if ($retryCount -le 0) {
-                break
-            }
+        $retryCount -= 1
+        if ($retryCount -le 0) {
+            break
+        }
+        if ($retryCount -eq 4) {
+            reset-proxy
         }
     }
 
-    if (-not $network) {
+    if (-not $process) {
+        throw ".............. FAILED, agent retry"
+    }
+
+    $retryCount = 7
+    $network = Get-HnsNetwork | ? Name -eq $flannelBackendName
+    while(-not $network) {
+        print "....................."
+        Start-Sleep -s 10
+
+        $network = (Get-HnsNetwork | ? Name -eq $flannelBackendName)
+
+        $retryCount -= 1
+        if ($retryCount -le 0) {
+            break
+        }
+    }
+
+    if ((-not $network) -or ($network.Type -ne $KubeCNIMode)) {
         try {
             docker rm -f nginx-proxy *>$null
         } catch {}
 
         throw ".............. FAILED, agent retry"
-    } else {
-        try {
-            Start-Sleep -s 10
-            docker restart nginx-proxy *>$null
-        } catch {}
-
-        print ".................. OK"
     }
+
+    reset-proxy
+
+    print ".................. OK"
 }
 
 function start-kubelet {
-    print "Starting kubelet ..."
-
+    ## stop stale ##
     try {
         $process = Get-Process -Name "kubelet*" -ErrorAction Ignore
         if ($process) {
@@ -914,35 +506,153 @@ function start-kubelet {
     } catch {
     }
 
-    $kubeletCustomOptions = @()
-    if ($env:CATTLE_CUSTOMIZE_KUBELET_OPTIONS) {
-        $kubeletCustomOptions = @($env:CATTLE_CUSTOMIZE_KUBELET_OPTIONS -split ";")
-    }
-    $kubeletOptions = $kubeletCustomOptions += @($KubeletOptions -split ";")
+    print "Starting kubelet ..."
+    wait-ready -Path "$KubeDir\bin\kubelet.exe"
 
-    $kubeletArgs = $kubeletOptions += @(
-    "--network-plugin=cni"
-    "--cni-bin-dir=`"$cniDir\bin`""
-    "--cni-conf-dir=`"$cniDir\conf`""
+    $kubeletArgs = merge-argument-list @(
+        @(
+            "`"--register-schedulable=true`""
+            "`"--network-plugin=cni`""
+            "`"--cni-bin-dir=$CNIDir\bin`""
+            "`"--cni-conf-dir=$CNIDir\conf`""
+        )
+        @($env:CATTLE_CUSTOMIZE_KUBELET_OPTIONS -split ";")
+        @($KubeletOptions -split ";")
     )
-    Start-Process -PassThru -FilePath "$kubeDir\bin\kubelet.exe" -ArgumentList $kubeletArgs | Export-Clixml -Path "$env:TEMP\kubelet.xml" -Force | Out-Null
+    $process = Start-Process -PassThru -FilePath "$KubeDir\bin\kubelet.exe" -ArgumentList $kubeletArgs
+    $process | Export-Clixml -Path "$env:TEMP\kubelet.xml" -Force | Out-Null
+
+    Start-Sleep -s 10
+
+    $retryCount = 7
+    $process = Get-Process -Id $process.Id -ErrorAction Ignore
+    while (-not $process) {
+        if ($retryCount -eq 6) {
+            # create an error debug log #
+            $null = New-Item -Force -Type Directory -Path $RancherLogDir -ErrorAction Ignore
+            $process = Start-Process -PassThru -FilePath "$KubeDir\bin\kubelet.exe" -ArgumentList $kubeletArgs -RedirectStandardError "$RancherLogDir\kubelet-err.log"
+        } else {
+            $process = Start-Process -PassThru -FilePath "$KubeDir\bin\kubelet.exe" -ArgumentList $kubeletArgs
+        }
+        $process | Export-Clixml -Path "$env:TEMP\kubelet.xml" -Force | Out-Null
+
+        print "....................."
+        Start-Sleep -s 10
+
+        $process = Get-Process -Id $process.Id -ErrorAction Ignore
+
+        $retryCount -= 1
+        if ($retryCount -le 0) {
+            break
+        }
+    }
+
+    if (-not $process) {
+        throw ".............. FAILED, agent retry"
+    }
+
+    reset-proxy
 
     print "................. OK"
+
+    # uncordon #
+    if (Test-Path "$env:TEMP\kubelet_temp.xml") {
+        pushd $KubeDir\bin
+        try {
+            $uncorbonConut = 3
+            while ($uncorbonConut -gt 0) {
+                .\kubectl.exe --kubeconfig="$KubeDir\ssl\kubecfg-kube-node.yaml" uncordon $NodeName 2>$null | Out-Null
+                Start-Sleep -s 2
+                $uncorbonConut -= 1
+            }
+        } catch {}
+        popd
+
+        Remove-Item -Force "$env:TEMP\kubelet_temp.xml" -ErrorAction Ignore
+    }
 }
 
 function start-kube-proxy {
-    print "Starting kube-proxy ..."
-
-    $kubeproxyCustomOptions = @()
-    if ($env:CATTLE_CUSTOMIZE_KUBEPROXY_OPTIONS) {
-        $kubeproxyCustomOptions = @($env:CATTLE_CUSTOMIZE_KUBEPROXY_OPTIONS -split ";")
+    ## stop stale ##
+    try {
+        $process = Get-Process -Name "kube-proxy*" -ErrorAction Ignore
+        if ($process) {
+            $process | Stop-Process | Out-Null
+        }
+    } catch {
     }
-    $kubeproxyOptions = @($KubeproxyOptions -split ";")
 
-    $kubeproxyArgs = $kubeproxyCustomOptions += $kubeproxyOptions
-    Start-Process -PassThru -FilePath "$kubeDir\bin\kube-proxy.exe" -ArgumentList $kubeproxyArgs | Export-Clixml -Path "$env:TEMP\kube-proxy.xml" -Force | Out-Null
+    ## broke for Overlay ##
+    if ($KubeCNIMode -eq "overlay") {
+        Start-Sleep -s 60
+    }
+
+    print "Starting kube-proxy ..."
+    wait-ready -Path "$KubeDir\bin\kube-proxy.exe"
+
+    $hnsPolicyList = Get-HnsPolicyList
+    if ($hnsPolicyList) {
+        $hnsPolicyList | Remove-HnsPolicyList
+    }
+
+    $env:KUBE_NETWORK = get-env-var "KUBE_NETWORK"
+
+    $kubeproxyArgs = merge-argument-list @(
+        @("`"--cluster-cidr=$KubeClusterCIDR`"")
+        @($env:CATTLE_CUSTOMIZE_KUBEPROXY_OPTIONS -split ";")
+        @($KubeproxyOptions -split ";")
+    )
+    $process = Start-Process -PassThru -FilePath "$KubeDir\bin\kube-proxy.exe" -ArgumentList $kubeproxyArgs
+    $process | Export-Clixml -Path "$env:TEMP\kube-proxy.xml" -Force | Out-Null
+
+    Start-Sleep -s 10
+
+    $retryCount = 7
+    $process = Get-Process -Id $process.Id -ErrorAction Ignore
+    while (-not $process) {
+        if ($retryCount -eq 6) {
+            # create an error debug log #
+            $null = New-Item -Force -Type Directory -Path $RancherLogDir -ErrorAction Ignore
+            $process = Start-Process -PassThru -FilePath "$KubeDir\bin\kube-proxy.exe" -ArgumentList $kubeproxyArgs -RedirectStandardError "$RancherLogDir\kube-proxy-err.log"
+        } else {
+            $process = Start-Process -PassThru -FilePath "$KubeDir\bin\kube-proxy.exe" -ArgumentList $kubeproxyArgs
+        }
+        $process | Export-Clixml -Path "$env:TEMP\kube-proxy.xml" -Force | Out-Null
+
+        print "....................."
+        Start-Sleep -s 10
+
+        $process = Get-Process -Id $process.Id -ErrorAction Ignore
+
+        $retryCount -= 1
+        if ($retryCount -le 0) {
+            break
+        }
+    }
+
+    if (-not $process) {
+        throw ".............. FAILED, agent retry"
+    }
+
+    reset-proxy
 
     print ".................... OK"
+
+    # uncordon #
+    if (Test-Path "$env:TEMP\kubelet_temp.xml") {
+        pushd $KubeDir\bin
+        try {
+            $uncorbonConut = 3
+            while ($uncorbonConut -gt 0) {
+                .\kubectl.exe --kubeconfig="$KubeDir\ssl\kubecfg-kube-node.yaml" uncordon $NodeName 2>$null | Out-Null
+                Start-Sleep -s 2
+                $uncorbonConut -= 1
+            }
+        } catch {}
+        popd
+
+        Remove-Item -Force "$env:TEMP\kubelet_temp.xml" -ErrorAction Ignore
+    }
 }
 
 ## END main definitaion
@@ -1015,12 +725,12 @@ while ($true) {
 
         # checking the execution binaries need to be removed or not #
         $isCleaned = $false
-        if (Test-Path "$kubeDir\bin\need_clean.tip") {
-            Remove-Item -Force -Path "$kubeDir\bin\*" -ErrorAction Ignore
+        if (Test-Path "$KubeDir\bin\need_clean.tip") {
+            Remove-Item -Force -Path "$KubeDir\bin\*" -ErrorAction Ignore
             $isCleaned = $true
         }
-        if (Test-Path "$cniDir\bin\need_clean.tip") {
-            Remove-Item -Force -Path "$cniDir\bin\*" -ErrorAction Ignore
+        if (Test-Path "$CNIDir\bin\need_clean.tip") {
+            Remove-Item -Force -Path "$CNIDir\bin\*" -ErrorAction Ignore
             $isCleaned = $true
         }
         if ($isCleaned) {
@@ -1030,13 +740,13 @@ while ($true) {
         break
     } else {
         # checking the execution binaries need to be removed or not #
-        if ((Test-Path "$kubeDir\bin\need_clean.tip") -or (Test-Path "$cniDir\bin\need_clean.tip")) {
+        if ((Test-Path "$KubeDir\bin\need_clean.tip") -or (Test-Path "$CNIDir\bin\need_clean.tip")) {
             $Force = $true
             continue
         }
 
         # recover processes #
-        $shouldUseCompsCnt = 2
+        $shouldUseCompsCnt = 3
         $wantRecoverComps = @()
 
         # cni #
@@ -1055,14 +765,9 @@ while ($true) {
         }
 
         # kube-proxy #
-        # kube-proxy currently is meant fot the l2bridge only #
-        if (-not (($KubeCNIComponent -eq "flannel") -and ($KubeCNIMode -eq "overlay"))) {
-            $shouldUseCompsCnt += 1
-
-            $process = Get-Process -Name "kube-proxy*" -ErrorAction Ignore
-            if (-not $process) {
-                $wantRecoverComps += @("start-kube-proxy")
-            }
+        $process = Get-Process -Name "kube-proxy*" -ErrorAction Ignore
+        if (-not $process) {
+            $wantRecoverComps += @("start-kube-proxy")
         }
 
         if ($wantRecoverComps.Count -ne $shouldUseCompsCnt) {
@@ -1095,11 +800,6 @@ if ($KubeCNIComponent -eq "flannel") {
 start-kubelet
 
 # start kube-proxy #
-# kube-proxy currently is meant fot the l2bridge only #
-if (($KubeCNIComponent -eq "flannel") -and ($KubeCNIMode -eq "overlay")) {
-    exit 0
-}
-Start-Sleep -s 15
 start-kube-proxy
 
 ## END main execution

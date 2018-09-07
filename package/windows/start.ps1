@@ -30,15 +30,18 @@ if (-not (Test-Path "C:\host")) {
     throw "Please mount host `"C:\`" path to container `"C:\host`" path"
 }
 
-$rancherDir = "C:\host\etc\rancher"
-$null = New-Item -Type Directory -Path $rancherDir -ErrorAction Ignore
-$null = New-Item -Type Directory -Path "C:\host\etc\kubernetes" -ErrorAction Ignore
-$null = New-Item -Type Directory -Path "C:\host\etc\cni" -ErrorAction Ignore
+$RancherDir = "C:\host\etc\rancher"
+$KubeDir = "C:\host\etc\kubernetes"
+$CNIDir = "C:\host\etc\cni"
+
+$null = New-Item -Type Directory -Path $RancherDir -ErrorAction Ignore
+$null = New-Item -Type Directory -Path $KubeDir -ErrorAction Ignore
+$null = New-Item -Type Directory -Path $CNIDir -ErrorAction Ignore
 
 try {
-    Copy-Item -Force -Path "$env:ProgramFiles\rancher\*.*" -Destination $rancherDir
+    Copy-Item -Force -Path "$env:ProgramFiles\rancher\*.*" -Destination $RancherDir
     try {
-        Remove-Item -Force -Path "$rancherDir\start.ps1" -ErrorAction Ignore
+        Remove-Item -Force -Path "$RancherDir\start.ps1" -ErrorAction Ignore
     } catch {}
 
     # build run.ps1 #
@@ -87,12 +90,12 @@ try {
         $runPSContent = $runPSContent -replace "<CATTLE_AGENT_FG_RUN>","false"
     }
 
-    $runPSContent | Out-File -Encoding ascii -Force -FilePath "$rancherDir\run.ps1"
+    $runPSContent | Out-File -Encoding ascii -Force -FilePath "$RancherDir\run.ps1"
 } catch {
     throw ("Please empty host `"C:\etc\rancher`" path manually, because {0}" -f $_.Exception.Message)
 }
 
-if (Test-Path "$rancherDir\connected") {
+if (Test-Path "$RancherDir\connected") {
     [System.Console]::Out.WriteLine("WARN[0000] This host was or is connecting to a rancher server, please kept informed")
 
     Start-Sleep -s 5

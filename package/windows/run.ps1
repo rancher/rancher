@@ -23,7 +23,13 @@ $InformationPreference = 'SilentlyContinue'
 #########################################################################
 ## START main definitaion
 
-$rancherDir = "C:\etc\rancher"
+$RancherDir = "C:\etc\rancher"
+$KubeDir = "C:\etc\kubernetes"
+$CNIDir = "C:\etc\cni"
+
+$null = New-Item -Force -Type Directory -Path $RancherDir -ErrorAction Ignore
+$null = New-Item -Force -Type Directory -Path $KubeDir -ErrorAction Ignore
+$null = New-Item -Force -Type Directory -Path $CNIDir -ErrorAction Ignore
 
 function scrape-text {
     param(
@@ -207,6 +213,8 @@ $temp.MoveTo("$SSL_CERT_DIR\serverca")
 $labels = @()
 $windowsCurrentVersion = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\' -ErrorAction Ignore)
 if ($windowsCurrentVersion) {
+    $versionTag = "$($windowsCurrentVersion.CurrentMajorVersionNumber).$($windowsCurrentVersion.CurrentMinorVersionNumber).$($windowsCurrentVersion.CurrentBuildNumber).$($windowsCurrentVersion.UBR)"
+    $labels += @("rke.cattle.io/windows-version=$versionTag")
     $labels += @("rke.cattle.io/windows-release-id=$($windowsCurrentVersion.ReleaseId)")
     $labels += @("rke.cattle.io/windows-major-version=$($windowsCurrentVersion.CurrentMajorVersionNumber)")
     $labels += @("rke.cattle.io/windows-minor-version=$($windowsCurrentVersion.CurrentMinorVersionNumber)")
@@ -252,7 +260,7 @@ set-env-var -Key "CATTLE_CUSTOMIZE_KUBELET_OPTIONS" -Value $CATTLE_CUSTOMIZE_KUB
 set-env-var -Key "CATTLE_CUSTOMIZE_KUBEPROXY_OPTIONS" -Value $CATTLE_CUSTOMIZE_KUBEPROXY_OPTIONS
 
 # run rancher-agent #
-pushd $rancherDir
+pushd $RancherDir
 .\agent.exe --unregister-service *>$null
 if ($CATTLE_AGENT_FG_RUN -eq "true") {
     .\agent.exe
