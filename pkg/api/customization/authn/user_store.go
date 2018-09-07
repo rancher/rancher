@@ -15,7 +15,6 @@ import (
 	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
-	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -113,15 +112,6 @@ func (s *userStore) Create(apiContext *types.APIContext, schema *types.Schema, d
 	}
 
 	created, err := s.create(apiContext, schema, data)
-	if err != nil {
-		return nil, err
-	}
-
-	userName := created["id"].(string)
-	userUUID := created["uuid"].(string)
-	uid := apitypes.UID(userUUID)
-
-	err = s.userManager.CreateNewUserClusterRoleBinding(userName, uid)
 	if err != nil {
 		return nil, err
 	}
