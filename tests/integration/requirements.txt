@@ -3,6 +3,7 @@ websocket-client==0.56.0
 PyJWT==1.7.1
 
 flake8==3.7.7
+flask==1.0.2
 pytest==4.4.1
 pytest-repeat==0.8.0
 pytest-xdist==1.28.0
