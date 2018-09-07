@@ -56,7 +56,7 @@ def test_project_owner(admin_cc, admin_mc, user_mc, request):
     p = user_client.wait_success(p)
     assert p.state == 'active'
 
-    k8s_client = kubernetes_api_client(user_client, 'local')
+    k8s_client = kubernetes_api_client(user_client, admin_cc.cluster.id)
     auth = kubernetes.client.AuthorizationV1Api(k8s_client)
 
     # Rancher API doesn't have a surefire way of knowing exactly when the user
@@ -75,7 +75,7 @@ def test_project_owner(admin_cc, admin_mc, user_mc, request):
 
     wait_for(can_create_ns)
 
-    cluster, c_client = cluster_and_client('local', user_mc.client)
+    cluster, c_client = cluster_and_client(admin_cc.cluster.id, user_mc.client)
     ns = c_client.create_namespace(name='test-' + random_str(),
                                    projectId=p.id)
     ns = wait_until_available(c_client, ns)

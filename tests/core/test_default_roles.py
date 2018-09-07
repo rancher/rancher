@@ -103,7 +103,8 @@ def test_project_create_default_role(admin_mc, cleanup_roles, remove_resource):
 
     set_role_state(client, test_roles, 'project')
 
-    project = client.create_project(name=random_str(), clusterId='local')
+    project = client.create_project(name=random_str(),
+                                    clusterId=admin_mc.cluster_id)
     remove_resource(project)
 
     wait_for_condition('InitialRolesPopulated', 'True', client, project)
@@ -138,7 +139,8 @@ def test_project_create_role_locked(admin_mc, cleanup_roles, remove_resource):
     # Lock the role
     client.update(client.by_id_role_template(locked_role), locked=True)
 
-    project = client.create_project(name=random_str(), clusterId='local')
+    project = client.create_project(name=random_str(),
+                                    clusterId=admin_mc.cluster_id)
     remove_resource(project)
 
     wait_for_condition('InitialRolesPopulated', 'True', client, project)

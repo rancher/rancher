@@ -1,5 +1,5 @@
-from .common import random_str
-from .test_catalog import wait_for_template_to_be_created
+from .common import wait_for_template_to_be_created, \
+    wait_for_template_to_be_deleted, random_str
 import time
 
 
@@ -83,19 +83,49 @@ def test_app_wordpress(admin_pc):
     wait_for_workload(client, ns.name, count=2)
 
 
-def test_prehook_chart(admin_pc, admin_mc):
+def test_custom_chart(admin_pc, admin_mc):
+    catalog = create_test_catalog(admin_mc.client)
+
+    _test_prehook_chart(admin_pc, catalog)
+    _test_set_value_rendering(admin_pc, catalog)
+
+    admin_mc.client.delete(catalog)
+    wait_for_template_to_be_deleted(admin_mc.client, catalog.name)
+
+
+def _test_set_value_rendering(admin_pc, catalog):
     client = admin_pc.client
     name = random_str()
-
     ns = admin_pc.cluster.client.create_namespace(name=random_str(),
                                                   projectId=admin_pc.
                                                   project.id)
-    url = "https://github.com/StrongMonkey/charts-1.git"
-    catalog = admin_mc.client.create_catalog(name=random_str(),
-                                             branch="test",
-                                             url=url,
-                                             )
-    wait_for_template_to_be_created(admin_mc.client, catalog.name)
+    answers = {
+        "stringflag": "string:on",
+        "boolflag": "boolean:true",
+        "intflag": "int:100"
+    }
+    external_id = "catalog://?catalog=" + \
+                  catalog.name + "&template=busybox&version=0.0.3"
+    client.create_app(
+        name=name,
+        externalId=external_id,
+        targetNamespace=ns.name,
+        projectId=admin_pc.project.id,
+        answers=answers,
+    )
+    # it will be only one workload(job), because the deployment has to
+    # wait for job to be finished, and it will never finish because we
+    # can't create real container
+    wait_for_workload(client, ns.name, count=3)
+
+
+def _test_prehook_chart(admin_pc, catalog):
+    client = admin_pc.client
+    name = random_str()
+    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
+                                                  projectId=admin_pc.
+                                                  project.id)
+
     external_id = "catalog://?catalog=" + \
                   catalog.name + "&template=busybox&version=0.0.2"
     client.create_app(
@@ -147,6 +177,16 @@ def test_app_namespace_annotation(admin_pc):
     wait_for_app_to_be_deleted(client, app2)
     ns = admin_pc.cluster.client.reload(ns)
     assert 'cattle.io/appIds' not in ns.annotations.data_dict()
+
+
+def create_test_catalog(client):
+    url = "https://github.com/StrongMonkey/charts-1.git"
+    catalog = client.create_catalog(name=random_str(),
+                                    branch="test",
+                                    url=url,
+                                    )
+    wait_for_template_to_be_created(client, catalog.name)
+    return catalog
 
 
 def wait_for_workload(client, ns, timeout=60, count=0):

@@ -3,6 +3,7 @@ import pytest
 import requests
 import time
 import urllib3
+import os
 from .common import random_str
 from kubernetes.client import ApiClient, Configuration
 from kubernetes.config.kube_config import KubeConfigLoader
@@ -15,16 +16,18 @@ urllib3.disable_warnings()
 BASE_URL = 'https://localhost:8443/v3'
 AUTH_URL = BASE_URL + '-public/localproviders/local?action=login'
 DEFAULT_TIMEOUT = 45
+CLUSTER_ID = os.getenv("TEST_CLUSTER_ID", 'local')
 
 
 class ManagementContext:
     """Contains a client that is scoped to the managment plane APIs. That is,
     APIs that are not specific to a cluster or project."""
 
-    def __init__(self, client, k8s_client=None, user=None):
+    def __init__(self, client, cluster_id, k8s_client=None, user=None):
         self.client = client
         self.k8s_client = k8s_client
         self.user = user
+        self.cluster_id = cluster_id
 
 
 class ClusterContext:
@@ -62,16 +65,16 @@ def admin_mc():
     protect_response(r)
     client = rancher.Client(url=BASE_URL, token=r.json()['token'],
                             verify=False)
-    k8s_client = kubernetes_api_client(client, 'local')
+    k8s_client = kubernetes_api_client(client, CLUSTER_ID)
     admin = client.list_user(username='admin').data[0]
-    return ManagementContext(client, k8s_client, user=admin)
+    return ManagementContext(client, CLUSTER_ID, k8s_client, user=admin)
 
 
 @pytest.fixture
 def admin_cc(admin_mc):
     """Returns a ClusterContext for the local cluster for the default global
     admin user."""
-    cluster, client = cluster_and_client('local', admin_mc.client)
+    cluster, client = cluster_and_client(CLUSTER_ID, admin_mc.client)
     return ClusterContext(admin_mc, cluster, client)
 
 
@@ -134,7 +137,7 @@ def user_factory(admin_mc, remove_resource):
         protect_response(response)
         client = rancher.Client(url=BASE_URL, token=response.json()['token'],
                                 verify=False)
-        return ManagementContext(client, user=user)
+        return ManagementContext(client, CLUSTER_ID, user=user)
 
     return _create_user
 

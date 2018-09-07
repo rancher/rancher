@@ -43,7 +43,7 @@ def test_service_accounts_have_role_binding(admin_mc, request):
     api_client = admin_mc.client
     pspt = setup_cluster_with_pspt(api_client, request)
 
-    k8s_client = kubernetes_api_client(admin_mc.client, 'local')
+    k8s_client = kubernetes_api_client(admin_mc.client, admin_mc.cluster_id)
     core = kubernetes.client.CoreV1Api(api_client=k8s_client)
     rbac = kubernetes.client.RbacAuthorizationV1Api(api_client=k8s_client)
 
