@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -107,14 +106,9 @@ func generateTemplates(obj *v3.App, templateVersionClient mgmtv3.TemplateVersion
 		return "", "", "", err
 	}
 
-	setValues := []string{}
-	if obj.Spec.Answers != nil {
-		answers := obj.Spec.Answers
-		result := []string{}
-		for k, v := range answers {
-			result = append(result, fmt.Sprintf("%s=%s", k, v))
-		}
-		setValues = append([]string{"--set"}, strings.Join(result, ","))
+	setValues, err := common.GenerateAnswerSetValues(obj, tempDir)
+	if err != nil {
+		return "", "", "", err
 	}
 	commands := append([]string{"template", dir, "--name", obj.Name, "--namespace", obj.Spec.TargetNamespace}, setValues...)
 

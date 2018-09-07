@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net"
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -66,14 +68,9 @@ func GenerateRandomPort() string {
 }
 
 func InstallCharts(rootDir, port string, obj *v3.App) error {
-	setValues := []string{}
-	if obj.Spec.Answers != nil {
-		answers := obj.Spec.Answers
-		result := []string{}
-		for k, v := range answers {
-			result = append(result, fmt.Sprintf("%s=%s", k, v))
-		}
-		setValues = append([]string{"--set"}, strings.Join(result, ","))
+	setValues, err := GenerateAnswerSetValues(obj, rootDir)
+	if err != nil {
+		return err
 	}
 	commands := make([]string, 0)
 	commands = append([]string{"upgrade", "--install", "--namespace", obj.Spec.TargetNamespace, obj.Name}, setValues...)
@@ -106,4 +103,24 @@ func DeleteCharts(port string, obj *v3.App) error {
 		return nil
 	}
 	return errors.New(string(combinedOutput))
+}
+
+func GenerateAnswerSetValues(app *v3.App, tempDir string) ([]string, error) {
+	setValues := []string{}
+	if app.Spec.ValuesYaml != "" {
+		answersYaml := filepath.Join(tempDir, "answers.yaml")
+		if err := ioutil.WriteFile(answersYaml, []byte(app.Spec.ValuesYaml), 0755); err != nil {
+			return setValues, err
+		}
+		setValues = append([]string{"--values"}, answersYaml)
+	}
+	if app.Spec.Answers != nil {
+		answers := app.Spec.Answers
+		result := []string{}
+		for k, v := range answers {
+			result = append(result, fmt.Sprintf("%s=%s", k, v))
+		}
+		setValues = append([]string{"--set"}, strings.Join(result, ","))
+	}
+	return setValues, nil
 }
