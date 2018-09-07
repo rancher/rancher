@@ -202,8 +202,9 @@ func (f *Factory) DockerDialer(clusterName, machineName string) (dialer.Dialer, 
 		return nil, err
 	}
 
-	if f.TunnelServer.HasSession(machine.Name) {
-		d := f.TunnelServer.Dialer(machine.Name, 15*time.Second)
+	sessionKey := machineSessionKey(machine)
+	if f.TunnelServer.HasSession(sessionKey) {
+		d := f.TunnelServer.Dialer(sessionKey, 15*time.Second)
 		return func(string, string) (net.Conn, error) {
 			return d("unix", "/var/run/docker.sock")
 		}, nil
@@ -232,10 +233,15 @@ func (f *Factory) nodeDialer(clusterName, machineName string) (dialer.Dialer, er
 		return nil, err
 	}
 
-	if f.TunnelServer.HasSession(machine.Name) {
-		d := f.TunnelServer.Dialer(machine.Name, 15*time.Second)
+	sessionKey := machineSessionKey(machine)
+	if f.TunnelServer.HasSession(sessionKey) {
+		d := f.TunnelServer.Dialer(sessionKey, 15*time.Second)
 		return dialer.Dialer(d), nil
 	}
 
 	return nil, fmt.Errorf("can not build dialer to %s:%s", clusterName, machineName)
+}
+
+func machineSessionKey(machine *v3.Node) string {
+	return fmt.Sprintf("%s/%s", machine.Namespace, machine.Name)
 }

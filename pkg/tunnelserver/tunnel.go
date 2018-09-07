@@ -83,7 +83,7 @@ type Client struct {
 func (t *Authorizer) authorizeTunnel(req *http.Request) (string, bool, error) {
 	client, ok, err := t.Authorize(req)
 	if client != nil && client.Node != nil {
-		return client.Node.Name, ok, err
+		return client.Cluster.Name + "/" + client.Node.Name, ok, err
 	} else if client != nil && client.Cluster != nil {
 		return client.Cluster.Name, ok, err
 	}
