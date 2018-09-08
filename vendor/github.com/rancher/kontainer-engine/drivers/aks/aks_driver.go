@@ -1,6 +1,7 @@
 package aks
 
 import (
+	"regexp"
 	"strings"
 
 	"context"
@@ -26,6 +27,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
+
+var truePointer = true
+var redactionRegex = regexp.MustCompile("\"(clientId|secret)\": \"(.*)\"")
 
 type Driver struct {
 	driverCapabilities types.Capabilities
@@ -334,14 +338,14 @@ const updatingStatus = "Updating"
 const pollInterval = 30
 
 func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *types.ClusterInfo) (*types.ClusterInfo, error) {
-	return d.createOrUpdate(ctx, options)
+	return d.createOrUpdate(ctx, options, true)
 }
 
 func (d *Driver) Update(ctx context.Context, info *types.ClusterInfo, options *types.DriverOptions) (*types.ClusterInfo, error) {
-	return d.createOrUpdate(ctx, options)
+	return d.createOrUpdate(ctx, options, false)
 }
 
-func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOptions) (*types.ClusterInfo, error) {
+func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOptions, sendRBAC bool) (*types.ClusterInfo, error) {
 	driverState, err := getStateFromOptions(options)
 	if err != nil {
 		return nil, err
@@ -451,6 +455,10 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 		},
 	}
 
+	if sendRBAC {
+		managedCluster.ManagedClusterProperties.EnableRBAC = &truePointer
+	}
+
 	if d.hasCustomVirtualNetwork(driverState) {
 		managedCluster.NetworkProfile = &containerservice.NetworkProfile{
 			DNSServiceIP:     to.StringPtr(driverState.DNSServiceIP),
@@ -460,6 +468,7 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 		}
 	}
 
+	logClusterConfig(managedCluster)
 	_, err = clustersClient.CreateOrUpdate(ctx, driverState.ResourceGroup, driverState.Name, managedCluster)
 	if err != nil {
 		return nil, err
@@ -835,4 +844,17 @@ func (d *Driver) Remove(ctx context.Context, info *types.ClusterInfo) error {
 
 func (d *Driver) GetCapabilities(ctx context.Context) (*types.Capabilities, error) {
 	return &d.driverCapabilities, nil
+}
+
+func logClusterConfig(config containerservice.ManagedCluster) {
+	if logrus.GetLevel() == logrus.DebugLevel {
+		out, err := json.Marshal(config)
+		if err != nil {
+			logrus.Error("Error marshalling config for logging")
+			return
+		}
+		output := string(out)
+		output = redactionRegex.ReplaceAllString(output, "$1: [REDACTED]")
+		logrus.Debugf("Sending cluster config to AKS: %v", output)
+	}
 }
