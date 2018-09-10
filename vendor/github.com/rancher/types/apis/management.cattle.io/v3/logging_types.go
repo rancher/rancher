@@ -40,24 +40,22 @@ type ProjectLogging struct {
 type LoggingCommonSpec struct {
 	DisplayName string `json:"displayName,omitempty"`
 
-	OutputFlushInterval int                  `json:"outputFlushInterval,omitempty" norman:"default=3"`
-	OutputTags          map[string]string    `json:"outputTags,omitempty"`
-	ElasticsearchConfig *ElasticsearchConfig `json:"elasticsearchConfig,omitempty"`
-	SplunkConfig        *SplunkConfig        `json:"splunkConfig,omitempty"`
-	KafkaConfig         *KafkaConfig         `json:"kafkaConfig,omitempty"`
-	SyslogConfig        *SyslogConfig        `json:"syslogConfig,omitempty"`
+	OutputFlushInterval   int                    `json:"outputFlushInterval,omitempty" norman:"default=3"`
+	OutputTags            map[string]string      `json:"outputTags,omitempty"`
+	ElasticsearchConfig   *ElasticsearchConfig   `json:"elasticsearchConfig,omitempty"`
+	SplunkConfig          *SplunkConfig          `json:"splunkConfig,omitempty"`
+	KafkaConfig           *KafkaConfig           `json:"kafkaConfig,omitempty"`
+	SyslogConfig          *SyslogConfig          `json:"syslogConfig,omitempty"`
+	FluentForwarderConfig *FluentForwarderConfig `json:"fluentForwarderConfig,omitempty"`
 }
 
 type ClusterLoggingSpec struct {
 	LoggingCommonSpec
 	ClusterName string `json:"clusterName" norman:"type=reference[cluster]"`
-
-	EmbeddedConfig *EmbeddedConfig `json:"embeddedConfig,omitempty"`
 }
 
 type ProjectLoggingSpec struct {
 	LoggingCommonSpec
-
 	ProjectName string `json:"projectName" norman:"type=reference[project]"`
 }
 
@@ -117,17 +115,6 @@ type SplunkConfig struct {
 	Index         string `json:"index,omitempty"`
 }
 
-type EmbeddedConfig struct {
-	IndexPrefix           string `json:"indexPrefix,omitempty" norman:"required"`
-	DateFormat            string `json:"dateFormat,omitempty" norman:"required,type=enum,options=YYYY-MM-DD|YYYY-MM|YYYY,default=YYYY-MM-DD"`
-	ElasticsearchEndpoint string `json:"elasticsearchEndpoint,omitempty" norman:"nocreate"`
-	KibanaEndpoint        string `json:"kibanaEndpoint,omitempty" norman:"nocreate"`
-	RequestsMemery        int    `json:"requestsMemory,omitempty" norman:"default=4096,min=512"`
-	RequestsCPU           int    `json:"requestsCpu,omitempty" norman:"default=2000,min=1000"`
-	LimitsMemery          int    `json:"limitsMemory,omitempty" norman:"default=4096,min=512"`
-	LimitsCPU             int    `json:"limitsCpu,omitempty" norman:"default=2000,min=1000"`
-}
-
 type KafkaConfig struct {
 	ZookeeperEndpoint string   `json:"zookeeperEndpoint,omitempty"`
 	BrokerEndpoints   []string `json:"brokerEndpoints,omitempty"`
@@ -147,6 +134,23 @@ type SyslogConfig struct {
 	ClientCert  string `json:"clientCert,omitempty"`
 	ClientKey   string `json:"clientKey,omitempty"`
 	SSLVerify   bool   `json:"sslVerify,omitempty"`
+}
+
+type FluentForwarderConfig struct {
+	EnableTLS     bool           `json:"enableTls,omitempty" norman:"default=false"`
+	Certificate   string         `json:"certificate,omitempty"`
+	Compress      bool           `json:"compress,omitempty" norman:"default=true"`
+	FluentServers []FluentServer `json:"fluentServers,omitempty" norman:"required"`
+}
+
+type FluentServer struct {
+	Endpoint  string `json:"endpoint,omitempty" norman:"required"`
+	Hostname  string `json:"hostname,omitempty"`
+	Weight    int    `json:"weight,omitempty" norman:"default=100"`
+	Standby   bool   `json:"standby,omitempty" norman:"default=false"`
+	Username  string `json:"username,omitempty"`
+	Password  string `json:"password,omitempty"`
+	SharedKey string `json:"sharedKey,omitempty"`
 }
 
 type LoggingSystemImages struct {
