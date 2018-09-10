@@ -186,6 +186,53 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     {{ end -}}
     {{end -}}
 
+    {{ if eq .clusterTarget.CurrentTarget "fluentforwarder"}}
+    @type forward
+    {{ if .clusterTarget.FluentForwarderConfig.EnableTLS }}
+    transport tls  
+    tls_verify_hostname true
+    tls_allow_self_signed_cert true
+    {{end -}}    
+    {{ if .clusterTarget.FluentForwarderConfig.Certificate }}
+    tls_cert_path /fluentd/etc/ssl/cluster_{{.clusterName}}_ca.pem
+    {{end -}}  
+    
+    {{ if .clusterTarget.FluentForwarderConfig.Compress }}
+    compress gzip
+    {{end -}}
+
+    {{ if .clusterTarget.WrapFluentForwarder.EnableShareKey }}
+    <security>
+      self_hostname "#{Socket.gethostname}"
+      shared_key true
+    </security>
+    {{end -}}
+
+    {{range $k, $val := .clusterTarget.WrapFluentForwarder.FluentServers -}}
+    <server>
+      {{if $val.Hostname}}
+      name {{$val.Hostname}}
+      {{end -}}
+      host {{$val.Host}}
+      port {{$val.Port}}
+      {{ if $val.SharedKey}}
+      shared_key {{$val.SharedKey}}
+      {{end -}}
+      {{ if $val.Username}}
+      username  {{$val.Username}}
+      {{end -}}
+      {{ if $val.Password}}
+      password  {{$val.Password}}
+      {{end -}}
+      weight  {{$val.Weight}}
+      {{if $val.Standby}}
+      standby
+      {{end -}}
+      
+    </server>
+    {{end -}}
+    {{end -}}    
+
     <buffer>
       @type file
       path /fluentd/etc/buffer/cluster.buffer

@@ -13,13 +13,7 @@ const (
 	LogAggregatorName = "log-aggregator"
 )
 
-//embedded
-const (
-	EmbeddedESName     = "elasticsearch"
-	EmbeddedKibanaName = "kibana"
-)
-
-//configmap
+//config
 const (
 	ClusterFileName   = "cluster.conf"
 	ProjectFileName   = "project.conf"
@@ -29,11 +23,11 @@ const (
 
 //target
 const (
-	Elasticsearch = "elasticsearch"
-	Splunk        = "splunk"
-	Kafka         = "kafka"
-	Embedded      = "embedded"
-	Syslog        = "syslog"
+	Elasticsearch   = "elasticsearch"
+	Splunk          = "splunk"
+	Kafka           = "kafka"
+	Syslog          = "syslog"
+	FluentForwarder = "fluentforwarder"
 )
 
 //app label

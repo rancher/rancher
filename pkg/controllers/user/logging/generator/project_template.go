@@ -169,6 +169,52 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
     client_cert_key /fluentd/etc/ssl/project_{{$store.WrapProjectName}}_client-key.pem
     {{ end -}}
     {{end}}
+
+    {{ if eq $store.CurrentTarget "fluentforwarder"}}
+    @type forward
+    {{ if $store.FluentForwarderConfig.EnableTLS }}
+    transport tls    
+    tls_allow_self_signed_cert true
+    tls_verify_hostname true
+    {{end -}}
+    {{ if $store.FluentForwarderConfig.Certificate }}
+    tls_cert_path /fluentd/etc/ssl/project_{{$store.WrapProjectName}}_ca.pem
+    {{end -}}  
+    
+    {{ if $store.FluentForwarderConfig.Compress }}
+    compress gzip
+    {{end -}}
+
+    {{ if $store.WrapFluentForwarder.EnableShareKey }}
+    <security>
+      self_hostname "#{Socket.gethostname}"
+      shared_key true
+    </security>
+    {{end -}}
+
+    {{range $k, $val := $store.WrapFluentForwarder.FluentServers -}}
+    <server>
+      {{if $val.Hostname}}
+      name {{$val.Hostname}}
+      {{end -}}
+      host {{$val.Host}}
+      port {{$val.Port}}
+      {{ if $val.SharedKey}}
+      shared_key {{$val.SharedKey}}
+      {{end -}}
+      {{ if $val.Username}}
+      username  {{$val.Username}}
+      {{end -}}
+      {{ if $val.Password}}
+      password  {{$val.Password}}
+      {{end -}}
+      weight  {{$val.Weight}}
+      {{if $val.Standby}}
+      standby
+      {{end -}}
+    </server>
+    {{end -}}
+    {{end -}}   
     
     <buffer>
       @type file

@@ -20,11 +20,11 @@ type WrapLogging struct {
 	WrapSplunk
 	WrapElasticsearch
 	WrapKafka
+	WrapFluentForwarder
 }
 
 type WrapClusterLogging struct {
 	v3.ClusterLoggingSpec
-	WrapEmbedded
 	WrapLogging
 }
 
@@ -33,10 +33,6 @@ type WrapProjectLogging struct {
 	GrepNamespace string
 	WrapLogging
 	WrapProjectName string
-}
-
-type WrapEmbedded struct {
-	DateFormat string
 }
 
 type WrapElasticsearch struct {
@@ -61,13 +57,24 @@ type WrapSyslog struct {
 	Port string
 }
 
+type WrapFluentForwarder struct {
+	EnableShareKey bool
+	FluentServers  []FluentServer
+}
+
+type FluentServer struct {
+	Host string
+	Port string
+	v3.FluentServer
+}
+
 func (w *WrapClusterLogging) Validate() error {
-	_, _, err := GetWrapConfig(w.ElasticsearchConfig, w.SplunkConfig, w.SyslogConfig, w.KafkaConfig, w.EmbeddedConfig)
+	_, err := GetWrapConfig(w.ElasticsearchConfig, w.SplunkConfig, w.SyslogConfig, w.KafkaConfig, w.FluentForwarderConfig)
 	return err
 }
 
 func (w *WrapProjectLogging) Validate() error {
-	_, _, err := GetWrapConfig(w.ElasticsearchConfig, w.SplunkConfig, w.SyslogConfig, w.KafkaConfig, nil)
+	_, err := GetWrapConfig(w.ElasticsearchConfig, w.SplunkConfig, w.SyslogConfig, w.KafkaConfig, w.FluentForwarderConfig)
 	return err
 }
 
@@ -76,12 +83,11 @@ func ToWrapClusterLogging(clusterLogging v3.ClusterLoggingSpec) (*WrapClusterLog
 		ClusterLoggingSpec: clusterLogging,
 	}
 
-	wrapLogging, wem, err := GetWrapConfig(clusterLogging.ElasticsearchConfig, clusterLogging.SplunkConfig, clusterLogging.SyslogConfig, clusterLogging.KafkaConfig, clusterLogging.EmbeddedConfig)
+	wrapLogging, err := GetWrapConfig(clusterLogging.ElasticsearchConfig, clusterLogging.SplunkConfig, clusterLogging.SyslogConfig, clusterLogging.KafkaConfig, clusterLogging.FluentForwarderConfig)
 	if err != nil {
 		return nil, err
 	}
 	wp.WrapLogging = wrapLogging
-	wp.WrapEmbedded = wem
 
 	return &wp, nil
 }
@@ -93,7 +99,7 @@ func ToWrapProjectLogging(grepNamespace string, projectLogging v3.ProjectLogging
 		WrapProjectName:    strings.Replace(projectLogging.ProjectName, ":", "_", -1),
 	}
 
-	wrapLogging, _, err := GetWrapConfig(projectLogging.ElasticsearchConfig, projectLogging.SplunkConfig, projectLogging.SyslogConfig, projectLogging.KafkaConfig, nil)
+	wrapLogging, err := GetWrapConfig(projectLogging.ElasticsearchConfig, projectLogging.SplunkConfig, projectLogging.SyslogConfig, projectLogging.KafkaConfig, projectLogging.FluentForwarderConfig)
 
 	if err != nil {
 		return nil, err
@@ -102,7 +108,7 @@ func ToWrapProjectLogging(grepNamespace string, projectLogging v3.ProjectLogging
 	return &wp, nil
 }
 
-func GetWrapConfig(es *v3.ElasticsearchConfig, sp *v3.SplunkConfig, sl *v3.SyslogConfig, kf *v3.KafkaConfig, em *v3.EmbeddedConfig) (wrapLogging WrapLogging, wem WrapEmbedded, err error) {
+func GetWrapConfig(es *v3.ElasticsearchConfig, sp *v3.SplunkConfig, sl *v3.SyslogConfig, kf *v3.KafkaConfig, ff *v3.FluentForwarderConfig) (wrapLogging WrapLogging, err error) {
 	if es != nil {
 		var h, s string
 		h, s, err = parseEndpoint(es.Endpoint)
@@ -202,19 +208,30 @@ func GetWrapConfig(es *v3.ElasticsearchConfig, sp *v3.SplunkConfig, sl *v3.Syslo
 		wrapLogging.CurrentTarget = loggingconfig.Kafka
 	}
 
-	if em != nil {
-		if em.LimitsCPU != 0 && em.LimitsCPU < em.RequestsCPU {
-			err = fmt.Errorf("limits cpu %d is less than request cpu %d", em.LimitsCPU, em.RequestsCPU)
-			return
+	if ff != nil {
+		var enableShareKey bool
+		var fss []FluentServer
+		for _, v := range ff.FluentServers {
+			var host, port string
+			host, port, err = net.SplitHostPort(v.Endpoint)
+			if err != nil {
+				return
+			}
+			if v.SharedKey != "" {
+				enableShareKey = true
+			}
+			fs := FluentServer{
+				Host:         host,
+				Port:         port,
+				FluentServer: v,
+			}
+			fss = append(fss, fs)
 		}
-		if em.LimitsMemery != 0 && em.LimitsMemery < em.RequestsMemery {
-			err = fmt.Errorf("limits memory %d is less than request memory %d", em.LimitsMemery, em.RequestsMemery)
-			return
+		wrapLogging.WrapFluentForwarder = WrapFluentForwarder{
+			EnableShareKey: enableShareKey,
+			FluentServers:  fss,
 		}
-		wem = WrapEmbedded{
-			DateFormat: getDateFormat(em.DateFormat),
-		}
-		wrapLogging.CurrentTarget = loggingconfig.Embedded
+		wrapLogging.CurrentTarget = loggingconfig.FluentForwarder
 	}
 	return
 }
@@ -255,9 +272,7 @@ func testReachable(network string, url string) error {
 }
 
 func GetClusterTarget(spec v3.ClusterLoggingSpec) string {
-	if spec.EmbeddedConfig != nil {
-		return loggingconfig.Embedded
-	} else if spec.ElasticsearchConfig != nil {
+	if spec.ElasticsearchConfig != nil {
 		return loggingconfig.Elasticsearch
 	} else if spec.SplunkConfig != nil {
 		return loggingconfig.Splunk
@@ -265,6 +280,8 @@ func GetClusterTarget(spec v3.ClusterLoggingSpec) string {
 		return loggingconfig.Kafka
 	} else if spec.SyslogConfig != nil {
 		return loggingconfig.Syslog
+	} else if spec.FluentForwarderConfig != nil {
+		return loggingconfig.FluentForwarder
 	}
 	return "none"
 }
@@ -278,6 +295,8 @@ func GetProjectTarget(spec v3.ProjectLoggingSpec) string {
 		return loggingconfig.Kafka
 	} else if spec.SyslogConfig != nil {
 		return loggingconfig.Syslog
+	} else if spec.FluentForwarderConfig != nil {
+		return loggingconfig.FluentForwarder
 	}
 	return "none"
 }

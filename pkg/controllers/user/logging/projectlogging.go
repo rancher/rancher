@@ -29,14 +29,13 @@ const (
 )
 
 // ProjectLoggingSyncer listens for projectLogging CRD in management API
-// and update the changes to configmap, deploy fluentd
+// and update the changes to config, deploy fluentd
 
 type ProjectLoggingSyncer struct {
 	clusterName          string
 	clusterLister        v3.ClusterLister
 	clusterRoleBindings  rbacv1.ClusterRoleBindingInterface
 	clusterLoggingLister v3.ClusterLoggingLister
-	configmaps           v1.ConfigMapInterface
 	daemonsets           v1beta2.DaemonSetInterface
 	namespaces           v1.NamespaceInterface
 	projectLoggings      v3.ProjectLoggingInterface
@@ -55,7 +54,6 @@ func registerProjectLogging(ctx context.Context, cluster *config.UserContext) {
 		clusterLister:        cluster.Management.Management.Clusters("").Controller().Lister(),
 		clusterRoleBindings:  cluster.RBAC.ClusterRoleBindings(loggingconfig.LoggingNamespace),
 		clusterLoggingLister: cluster.Management.Management.ClusterLoggings("").Controller().Lister(),
-		configmaps:           cluster.Core.ConfigMaps(loggingconfig.LoggingNamespace),
 		daemonsets:           cluster.Apps.DaemonSets(loggingconfig.LoggingNamespace),
 		namespaces:           cluster.Core.Namespaces(""),
 		projectLoggings:      projectLoggings,
@@ -88,7 +86,7 @@ func (c *ProjectLoggingSyncer) Sync(key string, obj *v3.ProjectLogging) error {
 		}
 
 		if obj != nil && !isAllDisable {
-			if err = c.createOrUpdateProjectConfigMap(obj.Name); err != nil {
+			if err = c.createOrUpdateProjectConfig(obj.Name); err != nil {
 				return err
 			}
 			if err := utils.UnsetSecret(c.secrets, loggingconfig.SSLSecretName, getProjectSecretPrefix(obj.Spec.ProjectName)); err != nil {
@@ -129,18 +127,18 @@ func (c *ProjectLoggingSyncer) Sync(key string, obj *v3.ProjectLogging) error {
 func (c *ProjectLoggingSyncer) doSync(obj *v3.ProjectLogging) (*v3.ProjectLogging, error) {
 	newObj := obj.DeepCopy()
 	_, err := v3.LoggingConditionProvisioned.Do(obj, func() (runtime.Object, error) {
-		return obj, provision(c.namespaces, c.configmaps, c.serviceAccounts, c.clusterRoleBindings, c.daemonsets, c.clusterLister, c.secrets, c.clusterName)
+		return obj, provision(c.namespaces, c.secrets, c.serviceAccounts, c.clusterRoleBindings, c.daemonsets, c.clusterLister, c.clusterName)
 	})
 	if err != nil {
 		return obj, err
 	}
 
 	_, err = v3.LoggingConditionUpdated.Do(obj, func() (runtime.Object, error) {
-		if err := utils.UpdateSSLAuthentication(getProjectSecretPrefix(obj.Spec.ProjectName), obj.Spec.ElasticsearchConfig, obj.Spec.SplunkConfig, obj.Spec.KafkaConfig, obj.Spec.SyslogConfig, c.secrets); err != nil {
+		if err := utils.UpdateSSLAuthentication(getProjectSecretPrefix(obj.Spec.ProjectName), obj.Spec.ElasticsearchConfig, obj.Spec.SplunkConfig, obj.Spec.KafkaConfig, obj.Spec.SyslogConfig, obj.Spec.FluentForwarderConfig, c.secrets); err != nil {
 			return obj, err
 		}
 
-		return obj, c.createOrUpdateProjectConfigMap("")
+		return obj, c.createOrUpdateProjectConfig("")
 	})
 
 	if err != nil {
@@ -151,7 +149,7 @@ func (c *ProjectLoggingSyncer) doSync(obj *v3.ProjectLogging) (*v3.ProjectLoggin
 	return newObj, nil
 }
 
-func (c *ProjectLoggingSyncer) createOrUpdateProjectConfigMap(excludeName string) error {
+func (c *ProjectLoggingSyncer) createOrUpdateProjectConfig(excludeName string) error {
 	projectLoggings, err := c.projectLoggings.Controller().Lister().List("", labels.NewSelector())
 	if err != nil {
 		return errors.Wrap(err, "list project logging failed")
@@ -190,7 +188,7 @@ func (c *ProjectLoggingSyncer) createOrUpdateProjectConfigMap(excludeName string
 	if err != nil {
 		return errors.Wrap(err, "generate project config file failed")
 	}
-	return utils.UpdateConfigMap(loggingconfig.ProjectConfigPath, loggingconfig.ProjectLoggingName, "project", c.configmaps)
+	return utils.UpdateConfig(loggingconfig.ProjectConfigPath, loggingconfig.ProjectLoggingName, "project", c.secrets)
 }
 
 func (p *projectLoggingEndpointWatcher) checkTarget() error {
@@ -204,7 +202,7 @@ func (p *projectLoggingEndpointWatcher) checkTarget() error {
 
 	var mergedErrs error
 	for _, v := range pls {
-		_, _, err = utils.GetWrapConfig(v.Spec.ElasticsearchConfig, v.Spec.SplunkConfig, v.Spec.SyslogConfig, v.Spec.KafkaConfig, nil)
+		_, err = utils.GetWrapConfig(v.Spec.ElasticsearchConfig, v.Spec.SplunkConfig, v.Spec.SyslogConfig, v.Spec.KafkaConfig, v.Spec.FluentForwarderConfig)
 		if err != nil {
 			updatedObj := v.DeepCopy()
 			v3.LoggingConditionUpdated.False(updatedObj)
@@ -218,4 +216,17 @@ func (p *projectLoggingEndpointWatcher) checkTarget() error {
 
 func getProjectSecretPrefix(projectName string) string {
 	return "project_" + strings.Replace(projectName, ":", "_", -1)
+}
+
+func mergedErrors(errs ...error) error {
+	var errMsgs []string
+	for _, v := range errs {
+		if v != nil {
+			errMsgs = append(errMsgs, v.Error())
+		}
+	}
+	if len(errMsgs) == 0 {
+		return nil
+	}
+	return errors.New(strings.Join(errMsgs, ","))
 }

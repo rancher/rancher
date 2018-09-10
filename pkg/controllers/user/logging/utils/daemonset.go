@@ -143,9 +143,9 @@ func NewFluentdDaemonset(name, namespace, dockerRootDir string) *v1beta2.DaemonS
 		"fluentdlog":             []string{"/fluentd/etc/log", "/var/lib/rancher/fluentd/log"},
 	})
 
-	configVolMounts, configVols := buildConfigMapVolumes(map[string][]string{
-		"clusterlogging": []string{"/fluentd/etc/config/cluster", loggingconfig.ClusterLoggingName, "cluster.conf", "cluster.conf"},
-		"projectlogging": []string{"/fluentd/etc/config/project", loggingconfig.ProjectLoggingName, "project.conf", "project.conf"},
+	configVolMounts, configVols := buildSecretVolumes(map[string][]string{
+		loggingconfig.ClusterLoggingName: []string{"/fluentd/etc/config/cluster", loggingconfig.ClusterLoggingName},
+		loggingconfig.ProjectLoggingName: []string{"/fluentd/etc/config/project", loggingconfig.ProjectLoggingName},
 	})
 
 	customConfigVolMounts, customConfigVols := buildHostPathVolumes(map[string][]string{
@@ -310,7 +310,7 @@ func NewLogAggregatorDaemonset(name, namespace, driverDir string) *v1beta2.Daemo
 	}
 }
 
-func getDriverDir(driverName string) string {
+func GetDriverDir(driverName string) string {
 	switch driverName {
 	case v3.ClusterDriverRKE:
 		return "/var/lib/kubelet/volumeplugins"
@@ -339,32 +339,6 @@ func buildHostPathVolumes(mounts map[string][]string) (vms []v1.VolumeMount, vs 
 	return
 }
 
-func buildConfigMapVolumes(mounts map[string][]string) (vms []v1.VolumeMount, vs []v1.Volume) {
-	for name, value := range mounts {
-		vms = append(vms, v1.VolumeMount{
-			Name:      name,
-			MountPath: value[0],
-		})
-		vs = append(vs, v1.Volume{
-			Name: name,
-			VolumeSource: v1.VolumeSource{
-				ConfigMap: &v1.ConfigMapVolumeSource{
-					LocalObjectReference: v1.LocalObjectReference{
-						Name: value[1],
-					},
-					Items: []v1.KeyToPath{
-						{
-							Key:  value[2],
-							Path: value[3],
-						},
-					},
-				},
-			},
-		})
-	}
-	return
-}
-
 func buildSecretVolumes(mounts map[string][]string) (vms []v1.VolumeMount, vs []v1.Volume) {
 	for name, value := range mounts {
 		vms = append(vms, v1.VolumeMount{
@@ -374,7 +348,6 @@ func buildSecretVolumes(mounts map[string][]string) (vms []v1.VolumeMount, vs []
 		vs = append(vs, v1.Volume{
 			Name: name,
 			VolumeSource: v1.VolumeSource{
-
 				Secret: &v1.SecretVolumeSource{
 					SecretName: value[1],
 				},
