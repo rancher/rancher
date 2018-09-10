@@ -6,7 +6,8 @@ RUN apt-get update && apt-get install -y git curl ca-certificates unzip xz-utils
 RUN mkdir /root/.kube && \
     ln -s /usr/bin/rancher /usr/bin/kubectl && \
     ln -s /var/lib/rancher/kube_config_cluster.yml /root/.kube/config && \
-    ln -s /usr/bin/rancher /usr/bin/reset-password
+    ln -s /usr/bin/rancher /usr/bin/reset-password && \
+    ln -s /usr/bin/rancher /usr/bin/ensure-default-admin
 WORKDIR /var/lib/rancher
 
 ENV CATTLE_HELM_VERSION v2.10.0-rancher1
