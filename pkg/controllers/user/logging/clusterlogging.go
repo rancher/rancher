@@ -2,15 +2,12 @@ package logging
 
 import (
 	"context"
-	"fmt"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/controller"
 	"github.com/rancher/types/apis/apps/v1beta2"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -33,7 +30,7 @@ const (
 )
 
 // ClusterLoggingSyncer listens for clusterLogging CRD in management API
-// and update the changes to configmap, deploy fluentd, embedded elasticsearch, embedded kibana
+// and update the changes to config
 
 type ClusterLoggingSyncer struct {
 	backoff                  *flowcontrol.Backoff
@@ -43,7 +40,6 @@ type ClusterLoggingSyncer struct {
 	clusterLoggingLister     v3.ClusterLoggingLister
 	clusterRoleBindings      rbacv1.ClusterRoleBindingInterface
 	clusterLister            v3.ClusterLister
-	configmaps               v1.ConfigMapInterface
 	daemonsets               v1beta2.DaemonSetInterface
 	deployments              v1beta2.DeploymentInterface
 	podLister                v1.PodLister
@@ -81,7 +77,6 @@ func registerClusterLogging(ctx context.Context, cluster *config.UserContext) {
 		clusterLoggingLister:     clusterloggingClient.Controller().Lister(),
 		clusterRoleBindings:      cluster.RBAC.ClusterRoleBindings(loggingconfig.LoggingNamespace),
 		clusterLister:            cluster.Management.Management.Clusters("").Controller().Lister(),
-		configmaps:               cluster.Core.ConfigMaps(loggingconfig.LoggingNamespace),
 		daemonsets:               cluster.Apps.DaemonSets(loggingconfig.LoggingNamespace),
 		deployments:              cluster.Apps.Deployments(loggingconfig.LoggingNamespace),
 		k8sNodeLister:            cluster.Core.Nodes("").Controller().Lister(),
@@ -128,7 +123,7 @@ func (c *ClusterLoggingSyncer) Sync(key string, obj *v3.ClusterLogging) error {
 		}
 
 		if !isAllDisable {
-			if err := utils.UnsetConfigMap(c.configmaps, loggingconfig.ClusterLoggingName, "cluster"); err != nil {
+			if err := utils.UnsetSecret(c.secrets, loggingconfig.ClusterLoggingName, "cluster"); err != nil {
 				return err
 			}
 
@@ -143,16 +138,12 @@ func (c *ClusterLoggingSyncer) Sync(key string, obj *v3.ClusterLogging) error {
 		return nil
 	}
 
-	if ok, delay := c.backoffFailure(obj); ok {
-		return &controller.ForgetError{Err: fmt.Errorf("backing off failure, delay: %v", delay)}
-	}
-
 	return c.doSync(obj)
 }
 
 func (c *ClusterLoggingSyncer) doSync(obj *v3.ClusterLogging) error {
 	_, err := v3.LoggingConditionProvisioned.Do(obj, func() (runtime.Object, error) {
-		return obj, provision(c.namespaces, c.configmaps, c.serviceAccounts, c.clusterRoleBindings, c.daemonsets, c.clusterLister, c.secrets, c.clusterName)
+		return obj, provision(c.namespaces, c.secrets, c.serviceAccounts, c.clusterRoleBindings, c.daemonsets, c.clusterLister, c.clusterName)
 	})
 	if err != nil {
 		return err
@@ -168,52 +159,14 @@ func (c *ClusterLoggingSyncer) doSync(obj *v3.ClusterLogging) error {
 func (c *ClusterLoggingSyncer) update(obj *v3.ClusterLogging) (err error) {
 	v3.LoggingConditionUpdated.Unknown(obj)
 
-	if utils.GetClusterTarget(obj.Spec) != "embedded" {
-		err = utils.RemoveEmbeddedTarget(c.deployments, c.serviceAccounts, c.services, c.roles, c.rolebindings)
-
-		c.updateBackoff(obj.Name, "", err)
-
-		updatedObj, err := setClusterLoggingErrMsg(obj, "", err)
-		_, updatedErr := c.clusterLoggings.Update(updatedObj)
-
-		if mergedErr := mergedErrors(updatedErr, err); mergedErr != nil {
-			return mergedErr
-		}
-
-		if err := utils.UpdateSSLAuthentication(getClusterSecretPrefix(c.clusterName), obj.Spec.ElasticsearchConfig, obj.Spec.SplunkConfig, obj.Spec.KafkaConfig, obj.Spec.SyslogConfig, c.secrets); err != nil {
-			return err
-		}
-
-		return c.createOrUpdateClusterConfigMap()
-	}
-
-	if err = utils.CreateOrUpdateEmbeddedTarget(c.deployments, c.serviceAccounts, c.services, c.roles, c.rolebindings, loggingconfig.LoggingNamespace, obj); err != nil {
+	if err := utils.UpdateSSLAuthentication(getClusterSecretPrefix(c.clusterName), obj.Spec.ElasticsearchConfig, obj.Spec.SplunkConfig, obj.Spec.KafkaConfig, obj.Spec.SyslogConfig, obj.Spec.FluentForwarderConfig, c.secrets); err != nil {
 		return err
 	}
 
-	waitingMsg, err := utils.SetEmbeddedEndpoint(c.podLister, c.serviceLister, c.nodeLister, c.k8sNodeLister, obj, c.clusterName)
-
-	c.updateBackoff(obj.Name, waitingMsg, err)
-
-	updatedObj, err := setClusterLoggingErrMsg(obj, waitingMsg, err)
-	_, updatedErr := c.clusterLoggings.Update(updatedObj)
-
-	if mergedErr := mergedErrors(updatedErr, err); mergedErr != nil {
-		return mergedErr
-	}
-
-	return c.createOrUpdateClusterConfigMap()
+	return c.createOrUpdateClusterConfig()
 }
 
-func (c *ClusterLoggingSyncer) updateBackoff(name, waitingMsg string, err error) {
-	if err != nil || waitingMsg != "" {
-		c.backoff.Next(name, time.Now())
-		return
-	}
-	c.backoff.DeleteEntry(name)
-}
-
-func (c *ClusterLoggingSyncer) createOrUpdateClusterConfigMap() error {
+func (c *ClusterLoggingSyncer) createOrUpdateClusterConfig() error {
 	clusterLoggingList, err := c.clusterLoggings.Controller().Lister().List("", labels.NewSelector())
 	if err != nil {
 		return errors.Wrap(err, "list cluster logging failed")
@@ -236,27 +189,7 @@ func (c *ClusterLoggingSyncer) createOrUpdateClusterConfigMap() error {
 		return errors.Wrap(err, "generate cluster config file failed")
 	}
 
-	return utils.UpdateConfigMap(loggingconfig.ClusterConfigPath, loggingconfig.ClusterLoggingName, "cluster", c.configmaps)
-}
-
-func (c *ClusterLoggingSyncer) backoffFailure(cl *v3.ClusterLogging) (bool, time.Duration) {
-	if cl.Status.FailedSpec == nil {
-		return false, 0
-	}
-
-	if !reflect.DeepEqual(*cl.Status.FailedSpec, cl.Spec) {
-		return false, 0
-	}
-
-	if c.backoff.IsInBackOffSinceUpdate(cl.Name, time.Now()) {
-		go func() {
-			time.Sleep(c.backoff.Get(cl.Name))
-			c.clusterLoggings.Controller().Enqueue(c.clusterName, cl.Name)
-		}()
-		return true, c.backoff.Get(cl.Name)
-	}
-
-	return false, 0
+	return utils.UpdateConfig(loggingconfig.ClusterConfigPath, loggingconfig.ClusterLoggingName, "cluster", c.secrets)
 }
 
 func (e *endpointWatcher) checkTarget() error {
@@ -268,25 +201,19 @@ func (e *endpointWatcher) checkTarget() error {
 		return nil
 	}
 	obj := cls[0]
-	var waitingMsg string
-	if obj.Spec.EmbeddedConfig != nil {
-		waitingMsg, err = utils.SetEmbeddedEndpoint(e.podLister, e.serviceLister, e.nodeLister, e.k8sNodeLister, obj, e.clusterName)
-	} else {
-		_, _, err = utils.GetWrapConfig(obj.Spec.ElasticsearchConfig, obj.Spec.SplunkConfig, obj.Spec.SyslogConfig, obj.Spec.KafkaConfig, nil)
-	}
-	updatedObj, err := setClusterLoggingErrMsg(obj, waitingMsg, err)
-	_, updateErr := e.clusterLoggings.Update(updatedObj)
-
-	mergedErr := mergedErrors(updateErr, err)
-	return errors.Wrapf(mergedErr, "set clusterlogging fail in watch endpoint")
-}
-
-func provision(namespaces v1.NamespaceInterface, configmaps v1.ConfigMapInterface, serviceAccounts v1.ServiceAccountInterface, clusterRoleBindings rbacv1.ClusterRoleBindingInterface, daemonsets v1beta2.DaemonSetInterface, clusterLister v3.ClusterLister, secrets v1.SecretInterface, clusterName string) error {
-	if err := utils.IniteNamespace(namespaces); err != nil {
+	_, err = utils.GetWrapConfig(obj.Spec.ElasticsearchConfig, obj.Spec.SplunkConfig, obj.Spec.SyslogConfig, obj.Spec.KafkaConfig, obj.Spec.FluentForwarderConfig)
+	if err != nil {
 		return err
 	}
+	updatedObj := setClusterLoggingErrMsg(obj, err)
 
-	if err := utils.InitConfigMap(configmaps); err != nil {
+	_, updateErr := e.clusterLoggings.Update(updatedObj)
+
+	return errors.Wrapf(updateErr, "set clusterlogging fail in watch endpoint")
+}
+
+func provision(namespaces v1.NamespaceInterface, secrets v1.SecretInterface, serviceAccounts v1.ServiceAccountInterface, clusterRoleBindings rbacv1.ClusterRoleBindingInterface, daemonsets v1beta2.DaemonSetInterface, clusterLister v3.ClusterLister, clusterName string) error {
+	if err := utils.IniteNamespace(namespaces); err != nil {
 		return err
 	}
 
@@ -299,7 +226,7 @@ func provision(namespaces v1.NamespaceInterface, configmaps v1.ConfigMapInterfac
 		return errors.Wrapf(err, "get dockerRootDir from cluster %s failed", clusterName)
 	}
 
-	if err := utils.CreateLogAggregator(daemonsets, serviceAccounts, clusterRoleBindings, cluster.Status.Driver, loggingconfig.LoggingNamespace); err != nil {
+	if err := utils.CreateLogAggregator(daemonsets, serviceAccounts, clusterRoleBindings, utils.GetDriverDir(cluster.Status.Driver), loggingconfig.LoggingNamespace); err != nil {
 		return err
 	}
 
@@ -321,19 +248,13 @@ func unsetClusterLogging(obj *v3.ClusterLogging, clusterLoggings v3.ClusterLoggi
 	return err
 }
 
-func setClusterLoggingErrMsg(obj *v3.ClusterLogging, waitingMsg string, err error) (*v3.ClusterLogging, error) {
+func setClusterLoggingErrMsg(obj *v3.ClusterLogging, err error) *v3.ClusterLogging {
 	updatedObj := obj.DeepCopy()
 	if err != nil {
 		updatedObj.Status.FailedSpec = &obj.Spec
 		v3.LoggingConditionUpdated.False(updatedObj)
 		v3.LoggingConditionUpdated.Message(updatedObj, err.Error())
-		return updatedObj, err
-	}
-
-	if waitingMsg != "" {
-		updatedObj.Status.FailedSpec = &obj.Spec
-		v3.LoggingConditionUpdated.Message(updatedObj, waitingMsg)
-		return updatedObj, fmt.Errorf(waitingMsg)
+		return updatedObj
 	}
 
 	updatedObj.Status.FailedSpec = nil
@@ -341,20 +262,7 @@ func setClusterLoggingErrMsg(obj *v3.ClusterLogging, waitingMsg string, err erro
 
 	v3.LoggingConditionUpdated.True(updatedObj)
 	v3.LoggingConditionUpdated.Message(updatedObj, "")
-	return updatedObj, err
-}
-
-func mergedErrors(errs ...error) error {
-	var errMsgs []string
-	for _, v := range errs {
-		if v != nil {
-			errMsgs = append(errMsgs, v.Error())
-		}
-	}
-	if len(errMsgs) == 0 {
-		return nil
-	}
-	return errors.New(strings.Join(errMsgs, ","))
+	return updatedObj
 }
 
 func getClusterSecretPrefix(clusterName string) string {

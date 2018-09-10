@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"io/ioutil"
+	"os"
 	"reflect"
 	"strings"
 
@@ -14,7 +16,7 @@ import (
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 )
 
-func UpdateSSLAuthentication(prefix string, esConfig *v3.ElasticsearchConfig, spConfig *v3.SplunkConfig, kfConfig *v3.KafkaConfig, syslogConfig *v3.SyslogConfig, secrets rv1.SecretInterface) error {
+func UpdateSSLAuthentication(prefix string, esConfig *v3.ElasticsearchConfig, spConfig *v3.SplunkConfig, kfConfig *v3.KafkaConfig, syslogConfig *v3.SyslogConfig, fluentForwarder *v3.FluentForwarderConfig, secrets rv1.SecretInterface) error {
 	var certificate, clientCert, clientKey string
 	if esConfig != nil {
 		certificate = esConfig.Certificate
@@ -32,17 +34,45 @@ func UpdateSSLAuthentication(prefix string, esConfig *v3.ElasticsearchConfig, sp
 		certificate = syslogConfig.Certificate
 		clientCert = syslogConfig.ClientCert
 		clientKey = syslogConfig.ClientKey
+	} else if fluentForwarder != nil {
+		certificate = fluentForwarder.Certificate
 	}
-	return updateSecret(loggingconfig.SSLSecretName, prefix, certificate, clientCert, clientKey, secrets)
+
+	data := buildCertSecret(prefix, certificate, clientCert, clientKey)
+	return updateSecret(loggingconfig.SSLSecretName, data, secrets)
 }
 
-func InitSecret(secrets rv1.SecretInterface) error {
-	_, err := secrets.Controller().Lister().Get(loggingconfig.LoggingNamespace, loggingconfig.SSLSecretName)
-	if err != nil && !apierrors.IsNotFound(err) {
+func UpdateConfig(configPath, name, level string, secrets rv1.SecretInterface) error {
+	data, err := buildConfigSecret(configPath, loggingconfig.LoggingNamespace, name, level)
+	if err != nil {
+		return err
+	}
+	return updateSecret(name, data, secrets)
+}
+
+func InitSecret(secrets rv1.SecretInterface) (err error) {
+	if _, err = secrets.Controller().Lister().Get(loggingconfig.LoggingNamespace, loggingconfig.SSLSecretName); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	if _, err := secrets.Create(newSecret(loggingconfig.LoggingNamespace, loggingconfig.SSLSecretName, make(map[string][]byte))); err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
 
-	if _, err := secrets.Create(newSecret(loggingconfig.LoggingNamespace, loggingconfig.SSLSecretName, make(map[string][]byte))); err != nil && !apierrors.IsAlreadyExists(err) {
+	if _, err := secrets.Controller().Lister().Get(loggingconfig.LoggingNamespace, loggingconfig.ClusterLoggingName); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	if _, err = secrets.Create(newSecret(loggingconfig.LoggingNamespace, loggingconfig.ClusterLoggingName, map[string][]byte{
+		"cluster.conf": []byte{},
+	})); err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+
+	if _, err = secrets.Controller().Lister().Get(loggingconfig.LoggingNamespace, loggingconfig.ProjectLoggingName); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	if _, err = secrets.Create(newSecret(loggingconfig.LoggingNamespace, loggingconfig.ProjectLoggingName, map[string][]byte{
+		"project.conf": []byte{},
+	})); err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
 
@@ -63,7 +93,9 @@ func UnsetSecret(secrets rv1.SecretInterface, name, prefix string) error {
 	for k, v := range us.Data {
 		if !strings.HasPrefix(k, prefix) {
 			newData[k] = v
+			break
 		}
+		newData[k] = []byte{}
 	}
 	us.Data = newData
 	if _, err := secrets.Update(us); err != nil && !apierrors.IsNotFound(err) {
@@ -72,20 +104,25 @@ func UnsetSecret(secrets rv1.SecretInterface, name, prefix string) error {
 	return nil
 }
 
-func updateSecret(name, prefix, certificate, clientCert, clientKey string, secrets rv1.SecretInterface) error {
+func updateSecret(name string, data map[string][]byte, secrets rv1.SecretInterface) error {
 	existSecret, err := secrets.Get(name, metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return errors.Wrapf(err, "get secret %s:%s failed", loggingconfig.LoggingNamespace, name)
 		}
-		data := setSecretData(prefix, nil, certificate, clientCert, clientKey)
 		if existSecret, err = secrets.Create(newSecret(loggingconfig.LoggingNamespace, name, data)); err != nil && !apierrors.IsAlreadyExists(err) {
 			return errors.Wrapf(err, "create secret %s:%s failed", loggingconfig.LoggingNamespace, name)
 		}
 	}
 
+	for k, v := range existSecret.Data {
+		if _, ok := data[k]; !ok {
+			data[k] = v
+		}
+	}
+
 	newSecret := existSecret.DeepCopy()
-	newSecret.Data = setSecretData(prefix, newSecret.Data, certificate, clientCert, clientKey)
+	newSecret.Data = data
 	if reflect.DeepEqual(existSecret.Data, newSecret.Data) {
 		return nil
 	}
@@ -106,12 +143,26 @@ func newSecret(namespace, name string, data map[string][]byte) *v1.Secret {
 	}
 }
 
-func setSecretData(prefix string, data map[string][]byte, certificate, clientCert, clientKey string) map[string][]byte {
-	if data == nil {
-		data = make(map[string][]byte)
+func buildCertSecret(prefix string, certificate, clientCert, clientKey string) map[string][]byte {
+	return map[string][]byte{
+		prefix + "_" + loggingconfig.CaFileName:     []byte(certificate),
+		prefix + "_" + loggingconfig.ClientCertName: []byte(clientCert),
+		prefix + "_" + loggingconfig.ClientKeyName:  []byte(clientKey),
 	}
-	data[prefix+"_"+loggingconfig.CaFileName] = []byte(certificate)
-	data[prefix+"_"+loggingconfig.ClientCertName] = []byte(clientCert)
-	data[prefix+"_"+loggingconfig.ClientKeyName] = []byte(clientKey)
-	return data
+}
+
+func buildConfigSecret(configPath, namespace, name, level string) (map[string][]byte, error) {
+	file, err := os.Open(configPath)
+	if err != nil {
+		return nil, errors.Wrapf(err, "find %s logging configuration file %s failed", level, configPath)
+	}
+	defer file.Close()
+	buf, err := ioutil.ReadAll(file)
+	if err != nil {
+		return nil, errors.Wrapf(err, "read %s logging configuration file %s failed", level, configPath)
+	}
+
+	return map[string][]byte{
+		level + ".conf": buf,
+	}, nil
 }

@@ -29,7 +29,7 @@ func IsAllLoggingDisable(clusterLoggingLister v3.ClusterLoggingLister, projectLo
 		if currentCL != nil && v.Name == currentCL.Name {
 			v = currentCL
 		}
-		logging, _, err := GetWrapConfig(v.Spec.ElasticsearchConfig, v.Spec.SplunkConfig, v.Spec.SyslogConfig, v.Spec.KafkaConfig, v.Spec.EmbeddedConfig)
+		logging, err := GetWrapConfig(v.Spec.ElasticsearchConfig, v.Spec.SplunkConfig, v.Spec.SyslogConfig, v.Spec.KafkaConfig, v.Spec.FluentForwarderConfig)
 		if err != nil {
 			return false, err
 		}
@@ -42,7 +42,7 @@ func IsAllLoggingDisable(clusterLoggingLister v3.ClusterLoggingLister, projectLo
 		if currentPL != nil && v.Name == currentPL.Name {
 			v = currentPL
 		}
-		logging, _, err := GetWrapConfig(v.Spec.ElasticsearchConfig, v.Spec.SplunkConfig, v.Spec.SyslogConfig, v.Spec.KafkaConfig, nil)
+		logging, err := GetWrapConfig(v.Spec.ElasticsearchConfig, v.Spec.SplunkConfig, v.Spec.SyslogConfig, v.Spec.KafkaConfig, v.Spec.FluentForwarderConfig)
 		if err != nil {
 			return false, err
 		}
