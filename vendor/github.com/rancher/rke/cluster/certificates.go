@@ -126,6 +126,8 @@ func getClusterCerts(ctx context.Context, kubeClient *kubernetes.Clientset, etcd
 		pki.KubeControllerCertName,
 		pki.KubeSchedulerCertName,
 		pki.KubeAdminCertName,
+		pki.APIProxyClientCertName,
+		pki.RequestHeaderCACertName,
 	}
 
 	for _, etcdHost := range etcdHosts {
@@ -136,11 +138,16 @@ func getClusterCerts(ctx context.Context, kubeClient *kubernetes.Clientset, etcd
 	certMap := make(map[string]pki.CertificatePKI)
 	for _, certName := range certificatesNames {
 		secret, err := k8s.GetSecret(kubeClient, certName)
-		if err != nil && !strings.HasPrefix(certName, "kube-etcd") {
+		if err != nil && !strings.HasPrefix(certName, "kube-etcd") &&
+			!strings.Contains(certName, pki.RequestHeaderCACertName) &&
+			!strings.Contains(certName, pki.APIProxyClientCertName) {
 			return nil, err
 		}
-		// If I can't find an etcd cert, I will not fail and will create it later.
-		if (secret == nil || secret.Data == nil) && strings.HasPrefix(certName, "kube-etcd") {
+		// If I can't find an etcd, requestheader, or proxy client cert, I will not fail and will create it later.
+		if (secret == nil || secret.Data == nil) &&
+			(strings.HasPrefix(certName, "kube-etcd") ||
+				strings.Contains(certName, pki.RequestHeaderCACertName) ||
+				strings.Contains(certName, pki.APIProxyClientCertName)) {
 			certMap[certName] = pki.CertificatePKI{}
 			continue
 		}
