@@ -5,6 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/access"
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
@@ -13,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/cluster.cattle.io/v3/schema"
 	"github.com/rancher/types/client/cluster/v3"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/cache"
 )
@@ -67,12 +69,18 @@ func (w ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 		clusterID, _ := ref.Parse(convert.ToString(actionInput["projectId"]))
 		userContext, err := w.ClusterManager.UserContext(clusterID)
 		if err != nil {
-			return err
+			if !kerrors.IsNotFound(err) {
+				return err
+			}
+			return httperror.NewAPIError(httperror.NotFound, err.Error())
 		}
 		nsClient := userContext.Core.Namespaces("")
 		ns, err := nsClient.Get(apiContext.ID, metav1.GetOptions{})
 		if err != nil {
-			return err
+			if !kerrors.IsNotFound(err) {
+				return err
+			}
+			return httperror.NewAPIError(httperror.NotFound, err.Error())
 		}
 		if ns.Annotations[helm.AppIDsLabel] != "" {
 			return errors.New("namespace is currently being used")
