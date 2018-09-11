@@ -57,6 +57,8 @@ type NamespaceOperations interface {
 	Replace(existing *Namespace) (*Namespace, error)
 	ByID(id string) (*Namespace, error)
 	Delete(container *Namespace) error
+
+	ActionMove(resource *Namespace, input *NamespaceMove) error
 }
 
 func newNamespaceClient(apiClient *Client) *NamespaceClient {
@@ -108,4 +110,9 @@ func (c *NamespaceClient) ByID(id string) (*Namespace, error) {
 
 func (c *NamespaceClient) Delete(container *Namespace) error {
 	return c.apiClient.Ops.DoResourceDelete(NamespaceType, &container.Resource)
+}
+
+func (c *NamespaceClient) ActionMove(resource *Namespace, input *NamespaceMove) error {
+	err := c.apiClient.Ops.DoAction(NamespaceType, "move", &resource.Resource, input, nil)
+	return err
 }

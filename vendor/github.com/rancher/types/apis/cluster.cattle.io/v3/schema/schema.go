@@ -37,9 +37,15 @@ func namespaceTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, NamespaceResourceQuota{}).
 		MustImport(&Version, v1.Namespace{}, struct {
 			Description   string `json:"description"`
-			ProjectID     string `norman:"type=reference[/v3/schemas/project]"`
+			ProjectID     string `norman:"type=reference[/v3/schemas/project],noupdate"`
 			ResourceQuota string `json:"resourceQuota,omitempty" norman:"type=namespaceResourceQuota"`
-		}{})
+		}{}).
+		MustImport(&Version, NamespaceMove{}).
+		MustImportAndCustomize(&Version, v1.Namespace{}, func(schema *types.Schema) {
+			schema.ResourceActions["move"] = types.Action{
+				Input: "namespaceMove",
+			}
+		})
 }
 
 func persistentVolumeTypes(schemas *types.Schemas) *types.Schemas {
