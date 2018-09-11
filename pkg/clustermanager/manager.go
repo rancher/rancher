@@ -69,16 +69,26 @@ func (m *Manager) Stop(cluster *v3.Cluster) {
 	m.controllers.Delete(cluster.UID)
 }
 
-func (m *Manager) Start(ctx context.Context, cluster *v3.Cluster) error {
+func (m *Manager) Start(ctx context.Context, cluster *v3.Cluster, runAgent bool) error {
 	if cluster.DeletionTimestamp != nil {
 		return nil
 	}
 	// reload cluster, always use the cached one
-	cluster, err := m.clusterLister.Get("", cluster.Name)
-	if err != nil {
-		return err
+	if runAgent {
+		c, err := m.clusters.Get(cluster.Name, v1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		cluster = c
+	} else {
+		c, err := m.clusterLister.Get("", cluster.Name)
+		if err != nil {
+			return err
+		}
+		cluster = c
 	}
-	_, err = m.start(ctx, cluster, true)
+
+	_, err := m.start(ctx, cluster, true, runAgent)
 	return err
 }
 
@@ -101,16 +111,16 @@ func (m *Manager) markUnavailable(clusterName string) {
 	}
 }
 
-func (m *Manager) start(ctx context.Context, cluster *v3.Cluster, controllers bool) (*record, error) {
+func (m *Manager) start(ctx context.Context, cluster *v3.Cluster, controllers, runAgent bool) (*record, error) {
 	obj, ok := m.controllers.Load(cluster.UID)
 	if ok {
 		if !m.changed(obj.(*record), cluster) {
-			return obj.(*record), m.startController(obj.(*record), controllers)
+			return obj.(*record), m.startController(obj.(*record), controllers, runAgent)
 		}
 		m.Stop(obj.(*record).clusterRec)
 	}
 
-	controller, err := m.toRecord(ctx, cluster)
+	controller, err := m.toRecord(ctx, cluster, runAgent)
 	if err != nil {
 		m.markUnavailable(cluster.Name)
 		return nil, err
@@ -120,10 +130,10 @@ func (m *Manager) start(ctx context.Context, cluster *v3.Cluster, controllers bo
 	}
 
 	obj, _ = m.controllers.LoadOrStore(cluster.UID, controller)
-	return obj.(*record), m.startController(obj.(*record), controllers)
+	return obj.(*record), m.startController(obj.(*record), controllers, runAgent)
 }
 
-func (m *Manager) startController(r *record, controllers bool) error {
+func (m *Manager) startController(r *record, controllers bool, runAgent bool) error {
 	if !controllers {
 		return nil
 	}
@@ -131,7 +141,7 @@ func (m *Manager) startController(r *record, controllers bool) error {
 	r.Lock()
 	defer r.Unlock()
 	if !r.started {
-		if err := m.doStart(r); err != nil {
+		if err := m.doStart(r, runAgent); err != nil {
 			m.Stop(r.clusterRec)
 			return err
 		}
@@ -151,15 +161,15 @@ func (m *Manager) changed(r *record, cluster *v3.Cluster) bool {
 	return false
 }
 
-func (m *Manager) doStart(rec *record) error {
-	logrus.Infof("Starting cluster agent for %s", rec.cluster.ClusterName)
-	if err := clusterController.Register(rec.ctx, rec.cluster, m, m); err != nil {
+func (m *Manager) doStart(rec *record, runAgent bool) error {
+	logrus.Info("Starting cluster agent for ", rec.cluster.ClusterName)
+	if err := clusterController.Register(rec.ctx, rec.cluster, m, m, runAgent); err != nil {
 		return err
 	}
 	return rec.cluster.Start(rec.ctx)
 }
 
-func (m *Manager) toRESTConfig(cluster *v3.Cluster) (*rest.Config, error) {
+func (m *Manager) toRESTConfig(cluster *v3.Cluster, runAgent bool) (*rest.Config, error) {
 	if cluster == nil {
 		return nil, nil
 	}
@@ -178,6 +188,10 @@ func (m *Manager) toRESTConfig(cluster *v3.Cluster) (*rest.Config, error) {
 
 	if !v3.ClusterConditionProvisioned.IsTrue(cluster) {
 		return nil, nil
+	}
+
+	if runAgent {
+		return rest.InClusterConfig()
 	}
 
 	u, err := url.Parse(cluster.Status.APIEndpoint)
@@ -292,8 +306,8 @@ func VerifyIgnoreDNSName(caCertsPEM []byte) (func(rawCerts [][]byte, verifiedCha
 	}, nil
 }
 
-func (m *Manager) toRecord(ctx context.Context, cluster *v3.Cluster) (*record, error) {
-	kubeConfig, err := m.toRESTConfig(cluster)
+func (m *Manager) toRecord(ctx context.Context, cluster *v3.Cluster, runAgent bool) (*record, error) {
+	kubeConfig, err := m.toRESTConfig(cluster, runAgent)
 	if kubeConfig == nil || err != nil {
 		return nil, err
 	}
@@ -344,7 +358,7 @@ func (m *Manager) UserContext(clusterName string) (*config.UserContext, error) {
 		return nil, err
 	}
 
-	record, err := m.start(context.Background(), cluster, false)
+	record, err := m.start(context.Background(), cluster, false, false)
 	if err != nil || record == nil {
 		msg := ""
 		if err != nil {
@@ -371,7 +385,7 @@ func (m *Manager) record(apiContext *types.APIContext, storageContext types.Stor
 	if cluster == nil {
 		return nil, nil
 	}
-	record, err := m.start(context.Background(), cluster, false)
+	record, err := m.start(context.Background(), cluster, false, false)
 	if err != nil {
 		return nil, httperror.NewAPIError(httperror.ClusterUnavailable, err.Error())
 	}

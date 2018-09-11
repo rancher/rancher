@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/norman/leader"
+	apptypes "github.com/rancher/rancher/app/types"
 	"github.com/rancher/rancher/pkg/audit"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -15,31 +16,12 @@ import (
 	"github.com/rancher/rancher/pkg/telemetry"
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/server"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/rest"
 )
 
-type Config struct {
-	ACMEDomains       []string
-	AddLocal          string
-	Embedded          bool
-	KubeConfig        string
-	HTTPListenPort    int
-	HTTPSListenPort   int
-	K8sMode           string
-	Debug             bool
-	NoCACerts         bool
-	ListenConfig      *v3.ListenConfig
-	AuditLogPath      string
-	AuditLogMaxage    int
-	AuditLogMaxsize   int
-	AuditLogMaxbackup int
-	AuditLevel        int
-}
-
-func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config) (*config.ScaledContext, *clustermanager.Manager, error) {
+func BuildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *apptypes.Config) (*config.ScaledContext, *clustermanager.Manager, error) {
 	scaledContext, err := config.NewScaledContext(kubeConfig)
 	if err != nil {
 		return nil, nil, err
@@ -76,19 +58,19 @@ func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config
 	return scaledContext, manager, nil
 }
 
-func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
+func Run(ctx context.Context, kubeConfig rest.Config, cfg *apptypes.Config) error {
 	if err := service.Start(); err != nil {
 		return err
 	}
 
-	scaledContext, clusterManager, err := buildScaledContext(ctx, kubeConfig, cfg)
+	scaledContext, clusterManager, err := BuildScaledContext(ctx, kubeConfig, cfg)
 	if err != nil {
 		return err
 	}
 
 	auditLogWriter := audit.NewLogWriter(cfg.AuditLogPath, cfg.AuditLevel, cfg.AuditLogMaxage, cfg.AuditLogMaxbackup, cfg.AuditLogMaxsize)
 
-	if err := server.Start(ctx, cfg.HTTPListenPort, cfg.HTTPSListenPort, scaledContext, clusterManager, auditLogWriter); err != nil {
+	if err := server.Start(ctx, cfg.HTTPListenPort, cfg.HTTPSListenPort, scaledContext, clusterManager, auditLogWriter, cfg); err != nil {
 		return err
 	}
 
@@ -131,7 +113,7 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 	return ctx.Err()
 }
 
-func addData(management *config.ManagementContext, cfg Config) error {
+func addData(management *config.ManagementContext, cfg apptypes.Config) error {
 	if err := addListenConfig(management, cfg); err != nil {
 		return err
 	}

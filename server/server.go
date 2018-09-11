@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	apptypes "github.com/rancher/rancher/app/types"
 	"github.com/rancher/rancher/pkg/api/controllers/dynamiclistener"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
 	managementapi "github.com/rancher/rancher/pkg/api/server"
@@ -17,6 +18,7 @@ import (
 	"github.com/rancher/rancher/pkg/filter"
 	"github.com/rancher/rancher/pkg/httpproxy"
 	k8sProxyPkg "github.com/rancher/rancher/pkg/k8sproxy"
+	"github.com/rancher/rancher/pkg/managementconfigserver"
 	"github.com/rancher/rancher/pkg/pipeline/hooks"
 	"github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/rancher/pkg/telemetry"
@@ -29,7 +31,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 )
 
-func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager, auditLogWriter *audit.LogWriter) error {
+func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager, auditLogWriter *audit.LogWriter, cfg *apptypes.Config) error {
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext)
 	if err != nil {
 		return err
@@ -63,6 +65,8 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 
 	connectHandler, connectConfigHandler := connectHandlers(scaledContext)
 
+	managementConfigHandler := managementconfigserver.Handler(scaledContext, cfg)
+
 	samlRoot := saml.AuthHandler()
 
 	root.Handle("/", ui.UI(managementAPI))
@@ -71,6 +75,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 	root.Handle("/v3/connect", connectHandler)
 	root.Handle("/v3/connect/register", connectHandler)
 	root.Handle("/v3/connect/config", connectConfigHandler)
+	root.Handle("/v3/connect/managementConfig", managementConfigHandler)
 	root.Handle("/v3/settings/cacerts", rawAuthedAPIs).Methods(http.MethodGet)
 	root.Handle("/v3/settings/first-login", rawAuthedAPIs).Methods(http.MethodGet)
 	root.Handle("/v3/settings/ui-pl", rawAuthedAPIs).Methods(http.MethodGet)

@@ -27,7 +27,7 @@ const (
 )
 
 type ClusterControllerLifecycle interface {
-	Start(ctx context.Context, cluster *v3.Cluster) error
+	Start(ctx context.Context, cluster *v3.Cluster, runAgent bool) error
 	Stop(cluster *v3.Cluster)
 }
 
@@ -101,7 +101,7 @@ func (h *HealthSyncer) updateClusterHealth() error {
 		logrus.Errorf("Cluster %s is unavailable, stopping controllers and waiting for successful ping: %v", h.clusterName, err)
 		h.clusterManager.Stop(cluster)
 		for {
-			if err := h.clusterManager.Start(context.TODO(), cluster); err == nil || apierrors.IsNotFound(err) {
+			if err := h.clusterManager.Start(context.TODO(), cluster, false); err == nil || apierrors.IsNotFound(err) {
 				logrus.Infof("Cluster %s may be back online", h.clusterName)
 				break
 			} else {

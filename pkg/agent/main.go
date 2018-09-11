@@ -11,13 +11,13 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"time"
-
 	"strings"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
+	"github.com/rancher/rancher/app"
 	"github.com/rancher/rancher/pkg/agent/clean"
 	"github.com/rancher/rancher/pkg/agent/cluster"
 	"github.com/rancher/rancher/pkg/agent/node"
@@ -25,6 +25,7 @@ import (
 	"github.com/rancher/rancher/pkg/remotedialer"
 	"github.com/rancher/rancher/pkg/rkenodeconfigclient"
 	"github.com/sirupsen/logrus"
+	"k8s.io/client-go/rest"
 )
 
 var (
@@ -171,6 +172,23 @@ func run() error {
 		}
 
 		if isCluster() {
+			// if it is cluster agent
+			managementConfigURL := fmt.Sprintf("https://%s/v3/connect/managementConfig", serverURL.Host)
+			managementConfig, err := cluster.GetManagementConfig(managementConfigURL, token)
+			if err != nil {
+				return err
+			}
+			kubeConfig := rest.Config{}
+			kubeConfig.Host = fmt.Sprintf("https://%s/k8s/clusters/local", serverURL.Host)
+			kubeConfig.BearerToken = managementConfig.BearerToken
+			kubeConfig.TLSClientConfig.CAFile = "/etc/kubernetes/ssl/certs/serverca"
+			_, clusterManager, err := app.BuildScaledContext(ctx, kubeConfig, managementConfig.CfgConfig)
+			if err != nil {
+				return err
+			}
+			if err := cluster.StartUserController(context.Background(), clusterManager, managementConfig.Cluster); err != nil {
+				panic(err)
+			}
 			return nil
 		}
 

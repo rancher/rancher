@@ -23,45 +23,48 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/rbac/podsecuritypolicy"
 	"github.com/rancher/rancher/pkg/controllers/user/resourcequota"
 	"github.com/rancher/rancher/pkg/controllers/user/secret"
-	"github.com/rancher/rancher/pkg/controllers/user/systemimage"
 	"github.com/rancher/rancher/pkg/controllers/user/targetworkloadservice"
 	"github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/types/config"
+
 	// init upgrade implement
 	_ "github.com/rancher/rancher/pkg/controllers/user/alert/upgrade"
 	_ "github.com/rancher/rancher/pkg/controllers/user/logging/upgrade"
 	_ "github.com/rancher/rancher/pkg/controllers/user/pipeline/upgrade"
 )
 
-func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter common.KubeConfigGetter, clusterManager healthsyncer.ClusterControllerLifecycle) error {
-	alert.Register(ctx, cluster)
-	rbac.Register(cluster)
-	healthsyncer.Register(ctx, cluster, clusterManager)
-	helm.Register(cluster, kubeConfigGetter)
-	logging.Register(ctx, cluster)
-	networkpolicy.Register(cluster)
-	noderemove.Register(cluster)
-	nodesyncer.Register(ctx, cluster, kubeConfigGetter)
-	nslabels.Register(cluster)
-	pipeline.Register(ctx, cluster)
-	podsecuritypolicy.RegisterCluster(cluster)
-	podsecuritypolicy.RegisterBindings(cluster)
-	podsecuritypolicy.RegisterNamespace(cluster)
-	podsecuritypolicy.RegisterServiceAccount(cluster)
-	podsecuritypolicy.RegisterTemplate(cluster)
-	secret.Register(cluster)
-	systemimage.Register(ctx, cluster)
-	endpoints.Register(ctx, cluster)
-	approuter.Register(ctx, cluster)
-	resourcequota.Register(ctx, cluster)
+func Register(ctx context.Context, cluster *config.UserContext, clusterManager healthsyncer.ClusterControllerLifecycle, kubeConfigGetter common.KubeConfigGetter, runAgent bool) error {
+	if runAgent {
+		noderemove.Register(cluster)
+		nslabels.Register(cluster)
 
-	userOnlyContext := cluster.UserOnlyContext()
-	dnsrecord.Register(ctx, userOnlyContext)
-	externalservice.Register(ctx, userOnlyContext)
-	ingress.Register(ctx, userOnlyContext, cluster)
-	ingresshostgen.Register(userOnlyContext)
-	targetworkloadservice.Register(ctx, userOnlyContext)
-	workload.Register(ctx, userOnlyContext)
+		podsecuritypolicy.RegisterCluster(cluster)
+		podsecuritypolicy.RegisterBindings(cluster)
+		podsecuritypolicy.RegisterNamespace(cluster)
+		podsecuritypolicy.RegisterServiceAccount(cluster)
+		podsecuritypolicy.RegisterTemplate(cluster)
+		secret.Register(cluster)
+		endpoints.Register(ctx, cluster)
+		approuter.Register(ctx, cluster)
+		resourcequota.Register(ctx, cluster)
+
+		userOnlyContext := cluster.UserOnlyContext()
+		dnsrecord.Register(ctx, userOnlyContext)
+		externalservice.Register(ctx, userOnlyContext)
+		ingress.Register(ctx, userOnlyContext, cluster)
+		ingresshostgen.Register(userOnlyContext)
+		targetworkloadservice.Register(ctx, userOnlyContext)
+		workload.Register(ctx, userOnlyContext)
+	} else {
+		alert.Register(ctx, cluster)
+		rbac.Register(cluster)
+		healthsyncer.Register(ctx, cluster, clusterManager)
+		helm.Register(cluster, kubeConfigGetter)
+		logging.Register(ctx, cluster)
+		networkpolicy.Register(cluster)
+		nodesyncer.Register(ctx, cluster, kubeConfigGetter)
+		pipeline.Register(ctx, cluster)
+	}
 
 	return nil
 }
