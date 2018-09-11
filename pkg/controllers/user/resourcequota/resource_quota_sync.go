@@ -84,36 +84,40 @@ func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (*corev1.Name
 		}
 	}
 
+	var updated *corev1.Namespace
+	var isFit bool
 	switch operation {
 	case "create":
-		isFit, err := c.validateNamespaceQuota(ns)
+		isFit, updated, err = c.validateAndSetNamespaceQuota(ns)
 		if err != nil || !isFit {
-			return ns, err
+			return updated, err
 		}
 		err = c.createDefaultResourceQuota(ns, quotaSpec)
 	case "update":
-		isFit, err := c.validateNamespaceQuota(ns)
+		isFit, updated, err = c.validateAndSetNamespaceQuota(ns)
 		if err != nil || !isFit {
-			return ns, err
+			return updated, err
 		}
 		err = c.updateResourceQuota(existing, quotaSpec)
 	case "delete":
 		err = c.deleteResourceQuota(existing)
 	}
+
+	toReturn := updated
+	if toReturn == nil {
+		toReturn = ns
+	}
+
 	if err == nil {
 		set, err := namespaceutil.IsNamespaceConditionSet(ns, resourceQuotaInitCondition, true)
 		if err != nil || set {
-			return ns, err
+			return toReturn, err
 		}
-		toUpdate, err := c.Namespaces.Get(ns.Name, metav1.GetOptions{})
-		if err != nil {
-			return toUpdate, err
-		}
-		namespaceutil.SetNamespaceCondition(toUpdate, time.Second*1, resourceQuotaInitCondition, true, "")
-		return c.Namespaces.Update(toUpdate)
+		namespaceutil.SetNamespaceCondition(toReturn, time.Second*1, resourceQuotaInitCondition, true, "")
+		return c.Namespaces.Update(toReturn)
 	}
 
-	return ns, err
+	return toReturn, err
 }
 
 func (c *SyncController) updateResourceQuota(quota *corev1.ResourceQuota, spec *corev1.ResourceQuotaSpec) error {
@@ -187,38 +191,36 @@ func (c *SyncController) createDefaultResourceQuota(ns *corev1.Namespace, spec *
 	return err
 }
 
-func (c *SyncController) validateNamespaceQuota(ns *corev1.Namespace) (bool, error) {
+func (c *SyncController) validateAndSetNamespaceQuota(ns *corev1.Namespace) (bool, *corev1.Namespace, error) {
 	if ns == nil || ns.DeletionTimestamp != nil {
-		return true, nil
+		return true, ns, nil
 	}
 
 	// get project limit
 	projectLimit, projectID, err := getProjectResourceQuotaLimit(ns, c.ProjectLister)
 	if err != nil {
-		return false, err
+		return false, ns, err
 	}
 
 	if projectLimit == nil {
-		return true, err
+		return true, ns, err
 	}
 
 	// set default quota if not set
 	quotaToUpdate, err := c.getResourceQuotaToUpdate(ns)
 	if err != nil {
-		return false, err
+		return false, ns, err
 	}
-	finalNs := *ns
+	updatedNs := ns.DeepCopy()
 	if quotaToUpdate != "" {
-		toUpdate := ns.DeepCopy()
-		if toUpdate.Annotations == nil {
-			toUpdate.Annotations = map[string]string{}
+		if updatedNs.Annotations == nil {
+			updatedNs.Annotations = map[string]string{}
 		}
-		toUpdate.Annotations[resourceQuotaAnnotation] = quotaToUpdate
-		toUpdate, err = c.Namespaces.Update(toUpdate)
+		updatedNs.Annotations[resourceQuotaAnnotation] = quotaToUpdate
+		updatedNs, err = c.Namespaces.Update(updatedNs)
 		if err != nil {
-			return false, err
+			return false, updatedNs, err
 		}
-		finalNs = *toUpdate
 	}
 
 	// validate resource quota
@@ -228,7 +230,7 @@ func (c *SyncController) validateNamespaceQuota(ns *corev1.Namespace) (bool, err
 	// get other Namespaces
 	objects, err := c.NsIndexer.ByIndex(nsByProjectIndex, projectID)
 	if err != nil {
-		return false, err
+		return false, updatedNs, err
 	}
 	var nsLimits []*v3.ResourceQuotaLimit
 	for _, o := range objects {
@@ -239,35 +241,36 @@ func (c *SyncController) validateNamespaceQuota(ns *corev1.Namespace) (bool, err
 		}
 		nsLimit, err := getNamespaceLimit(ns)
 		if err != nil {
-			return false, err
+			return false, updatedNs, err
 		}
 		nsLimits = append(nsLimits, nsLimit)
 	}
-	nsLimit, err := getNamespaceLimit(&finalNs)
+	nsLimit, err := getNamespaceLimit(updatedNs)
 	if err != nil {
-		return false, err
+		return false, updatedNs, err
 	}
 	isFit, msg, err := validate.IsQuotaFit(nsLimit, nsLimits, projectLimit)
 	if err != nil {
-		return false, err
+		return false, updatedNs, err
 	}
-	return isFit, c.setValidated(&finalNs, isFit, msg)
+
+	validated, err := c.setValidated(updatedNs, isFit, msg)
+
+	return isFit, validated, err
+
 }
 
-func (c *SyncController) setValidated(ns *corev1.Namespace, value bool, msg string) error {
+func (c *SyncController) setValidated(ns *corev1.Namespace, value bool, msg string) (*corev1.Namespace, error) {
 	set, err := namespaceutil.IsNamespaceConditionSet(ns, resourceQuotaValidatedCondition, value)
 	if set || err != nil {
-		return err
+		return ns, err
 	}
-
 	toUpdate := ns.DeepCopy()
 	err = namespaceutil.SetNamespaceCondition(toUpdate, time.Second*1, resourceQuotaValidatedCondition, value, msg)
 	if err != nil {
-		return err
+		return ns, err
 	}
-	_, err = c.Namespaces.Update(toUpdate)
-
-	return err
+	return c.Namespaces.Update(toUpdate)
 }
 
 func getProjectLock(projectID string) *sync.Mutex {
