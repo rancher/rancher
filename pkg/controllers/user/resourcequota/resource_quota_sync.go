@@ -89,8 +89,15 @@ func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (*corev1.Name
 	switch operation {
 	case "create":
 		isFit, updated, err = c.validateAndSetNamespaceQuota(ns)
-		if err != nil || !isFit {
+		if err != nil {
 			return updated, err
+		}
+		if !isFit {
+			// create default "all 0" resource quota
+			quotaSpec, err = getDefaultQuotaSpec()
+			if err != nil {
+				return updated, err
+			}
 		}
 		err = c.createDefaultResourceQuota(ns, quotaSpec)
 	case "update":
@@ -159,6 +166,10 @@ func (c *SyncController) getNamespaceResourceQuota(ns *corev1.Namespace, setDefa
 	}
 
 	return convertResourceLimitResourceQuotaSpec(limit)
+}
+
+func getDefaultQuotaSpec() (*corev1.ResourceQuotaSpec, error) {
+	return convertResourceLimitResourceQuotaSpec(defaultResourceLimit)
 }
 
 var defaultResourceLimit = &v3.ResourceQuotaLimit{
