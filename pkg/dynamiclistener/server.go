@@ -39,6 +39,12 @@ type ListenConfigStorage interface {
 	Get(namespace, name string) (*v3.ListenConfig, error)
 }
 
+type ServerInterface interface {
+	Disable(config *v3.ListenConfig)
+	Enable(config *v3.ListenConfig) (bool, error)
+	Shutdown() error
+}
+
 type Server struct {
 	sync.Mutex
 
@@ -63,7 +69,7 @@ type Server struct {
 }
 
 func NewServer(ctx context.Context, listenConfigStorage ListenConfigStorage,
-	handler http.Handler, httpPort, httpsPort int) *Server {
+	handler http.Handler, httpPort, httpsPort int) ServerInterface {
 	s := &Server{
 		listenConfigStorage: listenConfigStorage,
 		handler:             handler,
