@@ -200,11 +200,12 @@ def test_default_system_project_role(admin_mc):
     created_projects = []
 
     for project in projects:
-        wait_for_condition('InitialRolesPopulated', 'True', client, project)
-        project = client.reload(project)
-
         name = project.data_dict()['name']
-        if name in required_projects:
+        if name == "Default" or name == "System":
+            wait_for_condition('InitialRolesPopulated', 'True',
+                               client, project)
+            project = client.reload(project)
+
             projectLabel = required_projects[name]
             assert project.data_dict()['labels'].\
                 data_dict()[projectLabel] == 'true'
