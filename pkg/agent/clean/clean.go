@@ -39,6 +39,7 @@ var (
 	nsAnnotations = []string{
 		"cattle.io/status",
 		"field.cattle.io/creatorId",
+		"field.cattle.io/resourceQuotaTemplateId",
 		"lifecycle.cattle.io/create.namespace-auth",
 		nslabels.ProjectIDFieldLabel,
 		helm.AppIDsLabel,
