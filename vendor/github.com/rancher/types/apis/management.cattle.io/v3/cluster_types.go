@@ -228,6 +228,7 @@ type AmazonElasticContainerServiceConfig struct {
 	Subnets        []string `json:"subnets,omitempty"`
 	SecurityGroups []string `json:"securityGroups,omitempty"`
 	ServiceRole    string   `json:"serviceRole,omitempty"`
+	AMI            string   `json:"ami,omitempty"`
 }
 
 type ClusterEvent struct {

@@ -72,6 +72,7 @@ type state struct {
 	Subnets        []string
 	SecurityGroups []string
 	ServiceRole    string
+	AMI            string
 
 	ClusterInfo types.ClusterInfo
 }
@@ -165,6 +166,10 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 		Type:  types.StringSliceType,
 		Usage: "Comma-separated list of security groups to use for the cluster",
 	}
+	driverFlag.Options["ami"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "A custom AMI ID to use for the worker nodes instead of the default",
+	}
 
 	return &driverFlag, nil
 }
@@ -192,6 +197,7 @@ func getStateFromOptions(driverOptions *types.DriverOptions) (state, error) {
 	state.Subnets = options.GetValueFromDriverOptions(driverOptions, types.StringSliceType, "subnets").(*types.StringSlice).Value
 	state.ServiceRole = options.GetValueFromDriverOptions(driverOptions, types.StringType, "service-role", "serviceRole").(string)
 	state.SecurityGroups = options.GetValueFromDriverOptions(driverOptions, types.StringSliceType, "security-groups", "securityGroups").(*types.StringSlice).Value
+	state.AMI = options.GetValueFromDriverOptions(driverOptions, types.StringType, "ami").(string)
 
 	return state, state.validate()
 }
@@ -209,7 +215,9 @@ func (state *state) validate() error {
 		return fmt.Errorf("client secret is required")
 	}
 
-	if amiForRegion[state.Region] == "" {
+	// If the custom AMI ID is set, then assume they are trying to spin up in a region we don't have knowledge of
+	// and try to create anyway
+	if amiForRegion[state.Region] == "" && state.AMI == "" {
 		return fmt.Errorf("rancher does not support region %v, no entry for ami lookup", state.Region)
 	}
 
@@ -481,6 +489,13 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 
 	logrus.Infof("Creating worker nodes")
 
+	var amiID string
+	if state.AMI != "" {
+		amiID = state.AMI
+	} else {
+		amiID = amiForRegion[state.Region]
+	}
+
 	stack, err := d.createStack(svc, getWorkNodeName(state), displayName,
 		"https://amazon-eks.s3-us-west-2.amazonaws.com/1.10.3/2018-06-05/amazon-eks-nodegroup.yaml",
 		[]*cloudformation.Parameter{
@@ -494,7 +509,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 			{ParameterKey: aws.String("NodeAutoScalingGroupMaxSize"), ParameterValue: aws.String(strconv.Itoa(
 				int(state.MaximumASGSize)))},
 			{ParameterKey: aws.String("NodeInstanceType"), ParameterValue: aws.String(state.InstanceType)},
-			{ParameterKey: aws.String("NodeImageId"), ParameterValue: aws.String(amiForRegion[state.Region])},
+			{ParameterKey: aws.String("NodeImageId"), ParameterValue: aws.String(amiID)},
 			{ParameterKey: aws.String("KeyName"), ParameterValue: aws.String(keyPairName)}, // TODO let the user specify this
 			{ParameterKey: aws.String("VpcId"), ParameterValue: aws.String(vpcid)},
 			{ParameterKey: aws.String("Subnets"),

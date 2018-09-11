@@ -2,6 +2,7 @@ package client
 
 const (
 	AmazonElasticContainerServiceConfigType                = "amazonElasticContainerServiceConfig"
+	AmazonElasticContainerServiceConfigFieldAMI            = "ami"
 	AmazonElasticContainerServiceConfigFieldAccessKey      = "accessKey"
 	AmazonElasticContainerServiceConfigFieldInstanceType   = "instanceType"
 	AmazonElasticContainerServiceConfigFieldMaximumNodes   = "maximumNodes"
@@ -15,6 +16,7 @@ const (
 )
 
 type AmazonElasticContainerServiceConfig struct {
+	AMI            string   `json:"ami,omitempty" yaml:"ami,omitempty"`
 	AccessKey      string   `json:"accessKey,omitempty" yaml:"accessKey,omitempty"`
 	InstanceType   string   `json:"instanceType,omitempty" yaml:"instanceType,omitempty"`
 	MaximumNodes   int64    `json:"maximumNodes,omitempty" yaml:"maximumNodes,omitempty"`
