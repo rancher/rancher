@@ -185,7 +185,6 @@ def test_default_resource_quota_ns_create_invalid_combined(admin_cc, admin_pc,
     # update namespace with exceeding quota
     with pytest.raises(ApiError) as e:
         admin_pc.cluster.client.update(ns,
-                                       projectId=p.id,
                                        resourceQuota=ns_large_quota)
 
     assert e.value.error.status == 422

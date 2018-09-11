@@ -84,7 +84,11 @@ func SetProjectID(schemas *types.Schemas, clusterManager *clustermanager.Manager
 func Namespace(schemas *types.Schemas, manager *clustermanager.Manager) {
 	namespaceSchema := schemas.Schema(&clusterschema.Version, "namespace")
 	namespaceSchema.LinkHandler = namespacecustom.NewLinkHandler(namespaceSchema.LinkHandler, manager)
-	namespaceSchema.Formatter = yaml.NewFormatter(namespaceSchema.Formatter)
+	namespaceSchema.Formatter = namespacecustom.NewFormatter(yaml.NewFormatter(namespaceSchema.Formatter))
+	actionWrapper := namespacecustom.ActionWrapper{
+		ClusterManager: manager,
+	}
+	namespaceSchema.ActionHandler = actionWrapper.ActionHandler
 }
 
 func Workload(schemas *types.Schemas, clusterManager *clustermanager.Manager) {

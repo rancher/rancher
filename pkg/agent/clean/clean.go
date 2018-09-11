@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rancher/rancher/pkg/controllers/user/helm"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	"github.com/sirupsen/logrus"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
@@ -40,6 +41,7 @@ var (
 		"field.cattle.io/creatorId",
 		"lifecycle.cattle.io/create.namespace-auth",
 		nslabels.ProjectIDFieldLabel,
+		helm.AppIDsLabel,
 	}
 
 	dryRun bool

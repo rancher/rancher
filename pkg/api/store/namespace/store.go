@@ -46,7 +46,7 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 			"annotations", "cattle.io/status")
 	}
 
-	if err := p.validateResourceQuota(apiContext, schema, data, ""); err != nil {
+	if err := p.validateResourceQuota(apiContext, schema, data, "", false); err != nil {
 		return nil, err
 	}
 
@@ -54,17 +54,25 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 }
 
 func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
-	if err := p.validateResourceQuota(apiContext, schema, data, id); err != nil {
+	if err := p.validateResourceQuota(apiContext, schema, data, id, true); err != nil {
 		return nil, err
 	}
 
 	return p.Store.Update(apiContext, schema, data, id)
 }
 
-func (p *Store) validateResourceQuota(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) error {
+func (p *Store) validateResourceQuota(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string, update bool) error {
 	quota := data[quotaField]
+	projectID := convert.ToString(data["projectId"])
+	if update {
+		var ns clusterclient.Namespace
+		if err := access.ByID(apiContext, &schema.Version, clusterclient.NamespaceType, id, &ns); err != nil {
+			return err
+		}
+		projectID = ns.ProjectID
+	}
 	var project mgmtclient.Project
-	if err := access.ByID(apiContext, &mgmtschema.Version, mgmtclient.ProjectType, convert.ToString(data["projectId"]), &project); err != nil {
+	if err := access.ByID(apiContext, &mgmtschema.Version, mgmtclient.ProjectType, projectID, &project); err != nil {
 		return err
 	}
 	if project.ResourceQuota == nil {

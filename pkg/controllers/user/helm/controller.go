@@ -8,10 +8,13 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	"github.com/rancher/rancher/pkg/ref"
+	corev1 "github.com/rancher/types/apis/core/v1"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -27,6 +30,7 @@ import (
 const (
 	helmTokenPrefix = "helm-token-"
 	description     = "token for helm chart deployment"
+	AppIDsLabel     = "cattle.io/appIds"
 )
 
 func Register(user *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
@@ -43,6 +47,7 @@ func Register(user *config.UserContext, kubeConfigGetter common.KubeConfigGetter
 		TemplateContentClient: user.Management.Management.TemplateContents(""),
 		AppRevisionGetter:     user.Management.Project,
 		AppGetter:             user.Management.Project,
+		NsClient:              user.Core.Namespaces(""),
 	}
 	appClient.AddClusterScopedLifecycle("helm-controller", user.ClusterName, stackLifecycle)
 }
@@ -59,6 +64,7 @@ type Lifecycle struct {
 	TemplateContentClient mgmtv3.TemplateContentInterface
 	AppRevisionGetter     v3.AppRevisionsGetter
 	AppGetter             v3.AppsGetter
+	NsClient              corev1.NamespaceInterface
 }
 
 func (l *Lifecycle) Create(obj *v3.App) (*v3.App, error) {
@@ -102,7 +108,36 @@ func (l *Lifecycle) Updated(obj *v3.App) (*v3.App, error) {
 			}
 		}
 	}
-	return l.DeployApp(obj)
+	result, err := l.DeployApp(obj)
+	if err != nil {
+		return result, err
+	}
+	ns, err := l.NsClient.Get(obj.Spec.TargetNamespace, metav1.GetOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return result, err
+	} else if errors.IsNotFound(err) {
+		return result, nil
+	}
+	if ns.Annotations[AppIDsLabel] == "" {
+		ns.Annotations[AppIDsLabel] = obj.Name
+	} else {
+		parts := strings.Split(ns.Annotations[AppIDsLabel], ",")
+		appIDs := map[string]struct{}{}
+		for _, part := range parts {
+			appIDs[part] = struct{}{}
+		}
+		appIDs[obj.Name] = struct{}{}
+		appIDList := []string{}
+		for k := range appIDs {
+			appIDList = append(appIDList, k)
+		}
+		sort.Strings(appIDList)
+		ns.Annotations[AppIDsLabel] = strings.Join(appIDList, ",")
+	}
+	if _, err := l.NsClient.Update(ns); err != nil {
+		return result, err
+	}
+	return result, nil
 }
 
 func (l *Lifecycle) DeployApp(obj *v3.App) (*v3.App, error) {
@@ -152,6 +187,29 @@ func (l *Lifecycle) Remove(obj *v3.App) (*v3.App, error) {
 		logrus.Error(err)
 		time.Sleep(start)
 		start *= 2
+	}
+	ns, err := l.NsClient.Get(obj.Spec.TargetNamespace, metav1.GetOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return obj, err
+	} else if errors.IsNotFound(err) {
+		return obj, nil
+	}
+	appIds := strings.Split(ns.Annotations[AppIDsLabel], ",")
+	appAnno := ""
+	for _, appID := range appIds {
+		if appID == obj.Name {
+			continue
+		}
+		appAnno += appID + ","
+	}
+	if appAnno == "" {
+		delete(ns.Annotations, AppIDsLabel)
+	} else {
+		appAnno = strings.TrimSuffix(appAnno, ",")
+		ns.Annotations[AppIDsLabel] = appAnno
+	}
+	if _, err := l.NsClient.Update(ns); err != nil {
+		return obj, err
 	}
 	return obj, nil
 }
