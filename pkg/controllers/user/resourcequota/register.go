@@ -51,6 +51,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 		clusterName:   cluster.ClusterName,
 	}
 	cluster.Core.Namespaces("").AddHandler("resourceQuotaUsedLimitController", calculate.calculateResourceQuotaUsed)
+	cluster.Management.Management.Projects(cluster.ClusterName).AddHandler("resourceQuotaProjectUsedLimitController", calculate.calculateResourceQuotaUsedProject)
 
 	reset := &quotaResetController{
 		nsIndexer:  nsInformer.GetIndexer(),

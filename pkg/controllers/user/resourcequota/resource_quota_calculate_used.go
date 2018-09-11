@@ -3,6 +3,8 @@ package resourcequota
 import (
 	"reflect"
 
+	"fmt"
+
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	validate "github.com/rancher/rancher/pkg/resourcequota"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -34,6 +36,14 @@ func (c *calculateLimitController) calculateResourceQuotaUsed(key string, ns *co
 	return c.calculateProjectResourceQuota(projectID)
 }
 
+func (c *calculateLimitController) calculateResourceQuotaUsedProject(key string, p *v3.Project) error {
+	if p == nil || p.DeletionTimestamp != nil {
+		return nil
+	}
+
+	return c.calculateProjectResourceQuota(fmt.Sprintf("%s:%s", c.clusterName, p.Name))
+}
+
 func (c *calculateLimitController) calculateProjectResourceQuota(projectID string) error {
 	projectNamespace, projectName := getProjectNamespaceName(projectID)
 	project, err := c.projectLister.Get(projectNamespace, projectName)
@@ -48,6 +58,9 @@ func (c *calculateLimitController) calculateProjectResourceQuota(projectID strin
 	nssResourceList := api.ResourceList{}
 	for _, n := range namespaces {
 		ns := n.(*corev1.Namespace)
+		if ns.DeletionTimestamp != nil {
+			continue
+		}
 		set, err := namespaceutil.IsNamespaceConditionSet(ns, resourceQuotaValidatedCondition, true)
 		if err != nil {
 			return err
@@ -73,6 +86,7 @@ func (c *calculateLimitController) calculateProjectResourceQuota(projectID strin
 	if reflect.DeepEqual(project.Spec.ResourceQuota.UsedLimit, limit) {
 		return nil
 	}
+
 	toUpdate := project.DeepCopy()
 	toUpdate.Spec.ResourceQuota.UsedLimit = *limit
 	_, err = c.projects.Update(toUpdate)
