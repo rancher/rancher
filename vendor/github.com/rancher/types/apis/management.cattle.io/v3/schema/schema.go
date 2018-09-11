@@ -151,12 +151,6 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 				return field
 			})
 		}).
-		MustImportAndCustomize(&Version, v3.RancherKubernetesEngineConfig{}, func(schema *types.Schema) {
-			schema.MustCustomizeField("kubernetesVersion", func(field types.Field) types.Field {
-				field.Default = v3.DefaultK8s
-				return field
-			})
-		}).
 		MustImportAndCustomize(&Version, v3.Cluster{}, func(schema *types.Schema) {
 			schema.MustCustomizeField("name", func(field types.Field) types.Field {
 				field.Type = "dnsLabel"
