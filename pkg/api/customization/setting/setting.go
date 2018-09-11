@@ -132,10 +132,6 @@ func getIgnoredFields(schemas *types.Schemas) map[string]bool {
 	ignored := map[string]bool{}
 	clusterSchema := schemas.Schema(&managementschema.Version, client.ClusterType)
 	specSchema := schemas.Schema(&managementschema.Version, client.ClusterSpecType)
-	statusSchema := schemas.Schema(&managementschema.Version, client.ClusterStatusType)
-	for name := range statusSchema.ResourceFields {
-		ignored[name] = true
-	}
 	for name := range clusterSchema.ResourceFields {
 		if strings.HasSuffix(name, "Config") && !strings.HasPrefix(name, "rancher") {
 			ignored[name] = true
@@ -144,6 +140,20 @@ func getIgnoredFields(schemas *types.Schemas) map[string]bool {
 			ignored[name] = true
 		}
 	}
-	ignored["clusterName"] = true
+	for _, field := range excludedFields() {
+		ignored[field] = true
+	}
 	return ignored
+}
+
+func excludedFields() []string {
+	return []string{
+		"clusterName",
+		"nodes",
+		"prefixPath",
+		"privateRegistries",
+		"sshKeyPath",
+		"bastionHost",
+		"sshAgentAuth",
+		"kubernetesVersion"}
 }
