@@ -45,3 +45,7 @@ type ResourceQuotaLimit struct {
 	LimitsCPU              string `json:"limitsCpu,omitempty"`
 	LimitsMemory           string `json:"limitsMemory,omitempty"`
 }
+
+type NamespaceMove struct {
+	ProjectID string `json:"projectId,omitempty"`
+}
