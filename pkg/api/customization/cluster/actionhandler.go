@@ -46,6 +46,8 @@ type ActionHandler struct {
 	ClusterManager     *clustermanager.Manager
 }
 
+const lengthOfReadYaml = 43
+
 func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
 	switch actionName {
 	case "generateKubeconfig":
@@ -227,47 +229,43 @@ func findNamespaceCreates(inputYAML string) ([]string, error) {
 	var namespaces []string
 
 	reader := yaml.NewDocumentDecoder(noopCloser{Reader: bytes.NewBufferString(inputYAML)})
-	for {
-		next, readErr := ioutil.ReadAll(reader)
-		if readErr != nil && readErr != io.ErrShortBuffer {
-			return nil, readErr
-		}
 
-		obj := &unstructured.Unstructured{}
-		next, err := yaml2.YAMLToJSON(next)
-		if err != nil {
-			return nil, err
-		}
+	dbuf := make([]byte, len(inputYAML))
+	n, readErr := reader.Read(dbuf)
+	if readErr != nil && readErr != io.ErrShortBuffer {
+		return nil, readErr
+	}
 
-		err = json.Unmarshal(next, &obj.Object)
-		if err != nil {
-			return nil, err
-		}
+	obj := &unstructured.Unstructured{}
+	b, err := yaml2.YAMLToJSON(dbuf[:n])
+	if err != nil {
+		return nil, err
+	}
 
-		if obj.IsList() {
-			obj.EachListItem(func(obj runtime.Object) error {
-				metadata, err := meta.Accessor(obj)
-				if err != nil {
-					return err
-				}
-				if obj.GetObjectKind().GroupVersionKind().Kind == "Namespace" && obj.GetObjectKind().GroupVersionKind().Version == "v1" {
-					namespaces = append(namespaces, metadata.GetName())
-				}
+	err = json.Unmarshal(b, &obj.Object)
+	if err != nil {
+		return nil, err
+	}
 
-				if metadata.GetNamespace() != "" {
-					namespaces = append(namespaces, metadata.GetNamespace())
-				}
-				return nil
-			})
-		} else if obj.GetKind() == "Namespace" && obj.GetAPIVersion() == "v1" {
-			namespaces = append(namespaces, obj.GetName())
-			if obj.GetNamespace() != "" {
-				namespaces = append(namespaces, obj.GetNamespace())
+	if obj.IsList() {
+		obj.EachListItem(func(obj runtime.Object) error {
+			metadata, err := meta.Accessor(obj)
+			if err != nil {
+				return err
 			}
-		}
+			if obj.GetObjectKind().GroupVersionKind().Kind == "Namespace" && obj.GetObjectKind().GroupVersionKind().Version == "v1" {
+				namespaces = append(namespaces, metadata.GetName())
+			}
 
-		if readErr == nil {
-			break
+			if metadata.GetNamespace() != "" {
+				namespaces = append(namespaces, metadata.GetNamespace())
+			}
+			return nil
+		})
+	} else if obj.GetKind() == "Namespace" && obj.GetAPIVersion() == "v1" {
+		namespaces = append(namespaces, obj.GetName())
+		if obj.GetNamespace() != "" {
+			namespaces = append(namespaces, obj.GetNamespace())
 		}
 	}
 
