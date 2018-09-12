@@ -1,7 +1,6 @@
 package resourcequota
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 
@@ -38,7 +37,7 @@ func IsQuotaFit(nsLimit *v3.ResourceQuotaLimit, nsLimits []*v3.ResourceQuotaLimi
 		return true, "", nil
 	}
 	failedHard := quota.Mask(nssResourceList, exceeded)
-	return false, fmt.Sprintf("Resource quota [%v] exceeds project limit ", prettyPrint(failedHard)), nil
+	return false, prettyPrint(failedHard), nil
 }
 
 func ConvertLimitToResourceList(limit *v3.ResourceQuotaLimit) (api.ResourceList, error) {

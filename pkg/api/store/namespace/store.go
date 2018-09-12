@@ -1,6 +1,8 @@
 package namespace
 
 import (
+	"fmt"
+
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/store/transform"
@@ -129,7 +131,7 @@ func (p *Store) validateResourceQuota(apiContext *types.APIContext, schema *type
 		return err
 	}
 
-	return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, quotaField, msg)
+	return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, quotaField, fmt.Sprintf("exceeds projectLimit on fields: %s", msg))
 }
 
 func limitToLimit(from *mgmtclient.ResourceQuotaLimit) (*v3.ResourceQuotaLimit, error) {
