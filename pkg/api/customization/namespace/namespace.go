@@ -64,10 +64,17 @@ func (w ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 	}
 	switch actionName {
 	case "move":
-		clusterID, _ := ref.Parse(convert.ToString(actionInput["projectId"]))
+		clusterID, projectID := ref.Parse(convert.ToString(actionInput["projectId"]))
 		userContext, err := w.ClusterManager.UserContext(clusterID)
 		if err != nil {
 			return err
+		}
+		project, err := userContext.Management.Management.Projects(clusterID).Get(projectID, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if project.Spec.ResourceQuota != nil {
+			return errors.Errorf("can't move namespace. Project %s has resource quota set", project.Spec.DisplayName)
 		}
 		nsClient := userContext.Core.Namespaces("")
 		ns, err := nsClient.Get(apiContext.ID, metav1.GetOptions{})
