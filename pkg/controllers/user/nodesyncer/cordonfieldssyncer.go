@@ -24,6 +24,7 @@ const (
 )
 
 var nodeMapLock = sync.Mutex{}
+var toIgnoreErrs = []string{"--ignore-daemonsets", "--delete-local-data", "--force", "did not complete within"}
 
 func (m *NodesSyncer) syncCordonFields(key string, obj *v3.Node) error {
 	if obj == nil || obj.DeletionTimestamp != nil || obj.Spec.DesiredNodeUnschedulable == "" {
@@ -124,6 +125,9 @@ func (d *NodeDrain) drain(ctx context.Context, obj *v3.Node, cancel context.Canc
 			}
 			return nodeObj, nil
 		})
+		if ignoreErr(err.Error()) {
+			err = nil
+		}
 		if !stopped {
 			nodeCopy := updatedObj.(*v3.Node).DeepCopy()
 			if err == nil {
@@ -233,4 +237,13 @@ func deleteFromContextMap(data map[string]context.CancelFunc, id string) {
 	nodeMapLock.Lock()
 	delete(data, id)
 	nodeMapLock.Unlock()
+}
+
+func ignoreErr(msg string) bool {
+	for _, val := range toIgnoreErrs {
+		if strings.Contains(msg, val) {
+			return true
+		}
+	}
+	return false
 }
