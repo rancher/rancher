@@ -2,6 +2,7 @@ package resourcequota
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"sync"
 	"time"
@@ -263,6 +264,10 @@ func (c *SyncController) validateAndSetNamespaceQuota(ns *corev1.Namespace) (boo
 	isFit, msg, err := validate.IsQuotaFit(nsLimit, nsLimits, projectLimit)
 	if err != nil {
 		return false, updatedNs, err
+	}
+
+	if !isFit && msg != "" {
+		msg = fmt.Sprintf("Resource quota [%v] exceeds project limit ", msg)
 	}
 
 	validated, err := c.setValidated(updatedNs, isFit, msg)

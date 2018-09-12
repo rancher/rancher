@@ -106,12 +106,12 @@ func (s *projectStore) validateResourceQuota(apiContext *types.APIContext, schem
 	if err := convert.ToObj(nsQuotaO, &nsQuota); err != nil {
 		return err
 	}
-	var quota mgmtclient.ProjectResourceQuota
-	if err := convert.ToObj(quotaO, &quota); err != nil {
+	var projectQuota mgmtclient.ProjectResourceQuota
+	if err := convert.ToObj(quotaO, &projectQuota); err != nil {
 		return err
 	}
 
-	quotaLimit, err := limitToLimit(quota.Limit)
+	projectQuotaLimit, err := limitToLimit(projectQuota.Limit)
 	if err != nil {
 		return err
 	}
@@ -120,11 +120,12 @@ func (s *projectStore) validateResourceQuota(apiContext *types.APIContext, schem
 		return err
 	}
 
-	isFit, msg, err := resourcequota.IsQuotaFit(nsQuotaLimit, []*v3.ResourceQuotaLimit{}, quotaLimit)
+	isFit, msg, err := resourcequota.IsQuotaFit(nsQuotaLimit, []*v3.ResourceQuotaLimit{}, projectQuotaLimit)
 	if err != nil || isFit {
 		return err
 	}
-	return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, quotaField, fmt.Sprintf("Resource quota exceeds the project: %s", msg))
+	return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, namespaceQuotaField, fmt.Sprintf("exceeds %s on fields: %s",
+		quotaField, msg))
 }
 
 func limitToLimit(from *mgmtclient.ResourceQuotaLimit) (*v3.ResourceQuotaLimit, error) {
