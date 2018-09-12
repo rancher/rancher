@@ -121,6 +121,13 @@ func (n *NodeSyncer) needUpdate(key string, node *corev1.Node) (bool, error) {
 	if existing == nil {
 		return true, nil
 	}
+	if existing.Annotations[annotationName] == "" {
+		existing.Annotations[annotationName] = "true"
+		if _, err := n.nodesSyncer.machines.Update(existing); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
 	nodeToPodMap, err := n.nodesSyncer.getNonTerminatedPods()
 	if err != nil {
 		return false, err
