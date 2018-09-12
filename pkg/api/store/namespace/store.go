@@ -71,6 +71,9 @@ func (p *Store) validateResourceQuota(apiContext *types.APIContext, schema *type
 		}
 		projectID = ns.ProjectID
 	}
+	if projectID == "" {
+		return nil
+	}
 	var project mgmtclient.Project
 	if err := access.ByID(apiContext, &mgmtschema.Version, mgmtclient.ProjectType, projectID, &project); err != nil {
 		return err
