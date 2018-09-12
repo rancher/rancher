@@ -76,12 +76,6 @@ func (n nodeStore) Create(apiContext *types.APIContext, schema *types.Schema, da
 
 func (n nodeStore) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
 	format(data)
-	nodePoolID := n.getNodePoolID(apiContext, schema, data, id)
-	if nodePoolID != "" {
-		if err := n.validateHostname(schema, data); err != nil {
-			return nil, err
-		}
-	}
 	return n.Store.Update(apiContext, schema, data, id)
 }
 
