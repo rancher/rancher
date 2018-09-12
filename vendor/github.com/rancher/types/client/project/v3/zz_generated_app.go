@@ -23,13 +23,13 @@ const (
 	AppFieldNotes                = "notes"
 	AppFieldOwnerReferences      = "ownerReferences"
 	AppFieldProjectID            = "projectId"
-	AppFieldPrune                = "prune"
 	AppFieldRemoved              = "removed"
 	AppFieldState                = "state"
 	AppFieldTargetNamespace      = "targetNamespace"
 	AppFieldTransitioning        = "transitioning"
 	AppFieldTransitioningMessage = "transitioningMessage"
 	AppFieldUUID                 = "uuid"
+	AppFieldValuesYaml           = "valuesYaml"
 )
 
 type App struct {
@@ -51,13 +51,13 @@ type App struct {
 	Notes                string            `json:"notes,omitempty" yaml:"notes,omitempty"`
 	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	ProjectID            string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
-	Prune                bool              `json:"prune,omitempty" yaml:"prune,omitempty"`
 	Removed              string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	State                string            `json:"state,omitempty" yaml:"state,omitempty"`
 	TargetNamespace      string            `json:"targetNamespace,omitempty" yaml:"targetNamespace,omitempty"`
 	Transitioning        string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	UUID                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	ValuesYaml           string            `json:"valuesYaml,omitempty" yaml:"valuesYaml,omitempty"`
 }
 
 type AppCollection struct {
