@@ -3,13 +3,30 @@ package resourcequota
 import (
 	"sort"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/cache"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/quota"
 )
+
+var (
+	projectLockCache = cache.NewLRUExpireCache(1000)
+)
+
+func GetProjectLock(projectID string) *sync.Mutex {
+	val, ok := projectLockCache.Get(projectID)
+	if !ok {
+		projectLockCache.Add(projectID, &sync.Mutex{}, time.Hour)
+		val, _ = projectLockCache.Get(projectID)
+	}
+	mu := val.(*sync.Mutex)
+	return mu
+}
 
 func IsQuotaFit(nsLimit *v3.ResourceQuotaLimit, nsLimits []*v3.ResourceQuotaLimit, projectLimit *v3.ResourceQuotaLimit) (bool, string, error) {
 	nssResourceList := api.ResourceList{}

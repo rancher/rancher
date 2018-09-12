@@ -95,13 +95,20 @@ func (s *projectStore) createProjectAnnotation() (string, error) {
 
 func (s *projectStore) validateResourceQuota(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) error {
 	quotaO, quotaOk := data[quotaField]
+	if quotaO == nil {
+		quotaOk = false
+	}
 	nsQuotaO, namespaceQuotaOk := data[namespaceQuotaField]
+	if nsQuotaO == nil {
+		namespaceQuotaOk = false
+	}
 	if quotaOk != namespaceQuotaOk {
 		if quotaOk {
 			return httperror.NewFieldAPIError(httperror.MissingRequired, namespaceQuotaField, "")
 		}
 		return httperror.NewFieldAPIError(httperror.MissingRequired, quotaField, "")
 	}
+
 	var nsQuota mgmtclient.NamespaceResourceQuota
 	if err := convert.ToObj(nsQuotaO, &nsQuota); err != nil {
 		return err

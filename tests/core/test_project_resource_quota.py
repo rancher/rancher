@@ -26,21 +26,7 @@ def ns_large_quota():
 
 @pytest.fixture
 def default_project_quota():
-    return {"limit": {"pods": "100",
-                      "services": "100",
-                      "replicationControllers": "100",
-                      "secrets": "100",
-                      "configMaps": "100",
-                      "persistentVolumeClaims": "100",
-                      "servicesNodePorts": "100",
-                      "servicesLoadBalancers": "100",
-                      "requestsCpu": "100",
-                      "requestsMemory": "100",
-                      "requestsStorage": "100",
-                      "requestsEphemeralStorage": "100",
-                      "limitsCpu": "100",
-                      "limitsMemory": "100",
-                      "limitsEphemeralStorage": "100"}}
+    return {"limit": {"pods": "100"}}
 
 
 def wait_for_applied_quota_set(admin_cc_client, ns, timeout=30):
@@ -241,10 +227,20 @@ def test_default_resource_quota_project_update(admin_cc, admin_pc):
 def test_api_validation_project(admin_cc, ns_large_quota):
     client = admin_cc.management.client
     q = default_project_quota()
+    # default namespace quota missing
     with pytest.raises(ApiError) as e:
         client.create_project(name='test-' + random_str(),
                               clusterId=admin_cc.cluster.id,
                               resourceQuota=q)
+
+    assert e.value.error.status == 422
+
+    # default namespace quota as None
+    with pytest.raises(ApiError) as e:
+        client.create_project(name='test-' + random_str(),
+                              clusterId=admin_cc.cluster.id,
+                              resourceQuota=q,
+                              namespaceDefaultResourceQuota=None)
 
     assert e.value.error.status == 422
 
@@ -262,4 +258,24 @@ def test_api_validation_project(admin_cc, ns_large_quota):
                               resourceQuota=q,
                               namespaceDefaultResourceQuota=lq)
 
+    assert e.value.error.status == 422
+
+
+def test_api_validation_namespace(admin_cc, admin_pc):
+    pq = {"limit": {"pods": "100",
+                    "services": "100"}}
+    dq = {"limit": {"pods": "10",
+                    "services": "10"}}
+    p = admin_cc.management.client.update(admin_pc.project,
+                                          resourceQuota=pq,
+                                          namespaceDefaultResourceQuota=dq)
+    p = admin_cc.management.client.wait_success(p)
+    assert p.resourceQuota is not None
+    assert p.namespaceDefaultResourceQuota is not None
+
+    nsq = {"limit": {"pods": "10"}}
+    with pytest.raises(ApiError) as e:
+        admin_pc.cluster.client.create_namespace(name=random_str(),
+                                                 projectId=p.id,
+                                                 resourceQuota=nsq)
     assert e.value.error.status == 422

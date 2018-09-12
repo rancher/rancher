@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"sync"
 	"time"
 
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
@@ -15,7 +14,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/cache"
 	clientcache "k8s.io/client-go/tools/cache"
 )
 
@@ -25,10 +23,6 @@ const (
 	resourceQuotaInitCondition      = "ResourceQuotaInit"
 	resourceQuotaAnnotation         = "field.cattle.io/resourceQuota"
 	resourceQuotaValidatedCondition = "ResourceQuotaValidated"
-)
-
-var (
-	projectLockCache = cache.NewLRUExpireCache(1000)
 )
 
 /*
@@ -111,21 +105,22 @@ func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (*corev1.Name
 		err = c.deleteResourceQuota(existing)
 	}
 
-	toReturn := updated
-	if toReturn == nil {
-		toReturn = ns
+	if updated == nil {
+		updated = ns
 	}
 
-	if err == nil {
-		set, err := namespaceutil.IsNamespaceConditionSet(ns, resourceQuotaInitCondition, true)
-		if err != nil || set {
-			return toReturn, err
-		}
-		namespaceutil.SetNamespaceCondition(toReturn, time.Second*1, resourceQuotaInitCondition, true, "")
-		return c.Namespaces.Update(toReturn)
+	if err != nil {
+		return updated, err
 	}
 
-	return toReturn, err
+	set, err := namespaceutil.IsNamespaceConditionSet(ns, resourceQuotaInitCondition, true)
+	if err != nil || set {
+		return updated, err
+	}
+	toUpdate := updated.DeepCopy()
+	namespaceutil.SetNamespaceCondition(toUpdate, time.Second*1, resourceQuotaInitCondition, true, "")
+	return c.Namespaces.Update(toUpdate)
+
 }
 
 func (c *SyncController) updateResourceQuota(quota *corev1.ResourceQuota, spec *corev1.ResourceQuotaSpec) error {
@@ -236,7 +231,7 @@ func (c *SyncController) validateAndSetNamespaceQuota(ns *corev1.Namespace) (boo
 	}
 
 	// validate resource quota
-	mu := getProjectLock(projectID)
+	mu := validate.GetProjectLock(projectID)
 	mu.Lock()
 	defer mu.Unlock()
 	// get other Namespaces
@@ -289,18 +284,12 @@ func (c *SyncController) setValidated(ns *corev1.Namespace, value bool, msg stri
 	return c.Namespaces.Update(toUpdate)
 }
 
-func getProjectLock(projectID string) *sync.Mutex {
-	val, ok := projectLockCache.Get(projectID)
-	if !ok {
-		projectLockCache.Add(projectID, &sync.Mutex{}, time.Hour)
-		val, _ = projectLockCache.Get(projectID)
-	}
-	mu := val.(*sync.Mutex)
-	return mu
-}
-
 func (c *SyncController) getResourceQuotaToUpdate(ns *corev1.Namespace) (string, error) {
-	if getNamespaceResourceQuota(ns) != "" {
+	toCheck := getNamespaceResourceQuota(ns)
+	// rework after api framework change is done
+	// when annotation field is passed as null, the annotation should be removed
+	// instead of being updated with the null value
+	if toCheck != "" && toCheck != "null" {
 		return "", nil
 	}
 

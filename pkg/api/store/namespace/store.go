@@ -104,6 +104,31 @@ func (p *Store) validateResourceQuota(apiContext *types.APIContext, schema *type
 		return err
 	}
 
+	// limits in namespace should include all limits defined on a project
+	projectQuotaLimitMap, err := convert.EncodeToMap(projectQuotaLimit)
+	if err != nil {
+		return err
+	}
+
+	nsQuotaLimitMap, err := convert.EncodeToMap(nsQuotaLimit)
+	if err != nil {
+		return err
+	}
+	if len(nsQuotaLimitMap) != len(projectQuotaLimitMap) {
+		return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, quotaField, "doesn not have all fields defined on a project quota")
+	}
+
+	for k := range projectQuotaLimitMap {
+		if _, ok := nsQuotaLimitMap[k]; !ok {
+			return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, quotaField, fmt.Sprintf("misses %s defined on a project quota", k))
+		}
+	}
+
+	// validate resource quota
+	mu := resourcequota.GetProjectLock(projectID)
+	mu.Lock()
+	defer mu.Unlock()
+
 	var nsLimits []*v3.ResourceQuotaLimit
 	var namespaces []clusterclient.Namespace
 	if err := access.List(apiContext, &schema.Version, clusterclient.NamespaceType, &types.QueryOptions{}, &namespaces); err != nil {
