@@ -24,6 +24,9 @@ import (
 	"github.com/rancher/types/client/management/v3"
 )
 
+var toIgnoreErrs = []string{"--ignore-daemonsets", "--delete-local-data", "--force", "did not complete within"}
+var allowedStates = map[string]bool{"active": true, "cordoned": true, "draining": true, "drained": true}
+
 // Formatter for Node
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	etcd := convert.ToBool(resource.Values[client.NodeFieldEtcd])
@@ -48,16 +51,29 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	if nodeTemplateID == nil && customConfig == nil {
 		delete(resource.Links, "remove")
 	}
-	if resource.Values[client.NodeFieldWorker] != true ||
-		resource.Values["state"] == "registering" ||
-		resource.Values["state"] == "unavailable" {
+	if resource.Values[client.NodeFieldWorker] != true {
 		return
 	}
-	if resource.Values["state"] == "draining" {
+	state := convert.ToString(resource.Values["state"])
+	if _, ok := allowedStates[state]; !ok {
+		return
+	}
+	if state == "draining" {
+		for _, cond := range convert.ToMapSlice(resource.Values["conditions"]) {
+			if cond["type"] == "Drained" && cond["status"] == "False" {
+				if ignoreErr(convert.ToString(cond["message"])) {
+					resource.Values["state"] = "cordoned"
+					resource.AddAction(apiContext, "uncordon")
+					return
+				}
+			}
+		}
 		resource.AddAction(apiContext, "stopDrain")
 		return
 	}
-	resource.AddAction(apiContext, "drain")
+	if state != "drained" {
+		resource.AddAction(apiContext, "drain")
+	}
 	if convert.ToBool(resource.Values["unschedulable"]) {
 		resource.AddAction(apiContext, "uncordon")
 	} else {
@@ -221,4 +237,13 @@ func updateNode(apiContext *types.APIContext, node map[string]interface{}, schem
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error updating node %s by %s : %s", apiContext.ID, actionName, err.Error()))
 	}
 	return nil
+}
+
+func ignoreErr(msg string) bool {
+	for _, val := range toIgnoreErrs {
+		if strings.Contains(msg, val) {
+			return true
+		}
+	}
+	return false
 }
