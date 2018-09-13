@@ -125,7 +125,8 @@ func (d *NodeDrain) drain(ctx context.Context, obj *v3.Node, cancel context.Canc
 			}
 			return nodeObj, nil
 		})
-		if ignoreErr(err.Error()) {
+
+		if err != nil && ignoreErr(err.Error()) {
 			err = nil
 		}
 		if !stopped {
