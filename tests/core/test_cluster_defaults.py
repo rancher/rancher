@@ -1,6 +1,8 @@
+import pytest
 import json
 
 
+@pytest.mark.skip(reason="cluster-defaults disabled")
 def test_initial_defaults(admin_mc):
     cclient = admin_mc.client
     schema_defaults = {}
