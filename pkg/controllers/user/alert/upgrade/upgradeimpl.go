@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/alert/deploy"
 	"github.com/rancher/rancher/pkg/controllers/user/systemimage"
 	rv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/rancher/types/config"
 	"k8s.io/api/apps/v1beta2"
@@ -53,6 +54,13 @@ func (l *alertService) Upgrade(currentVersion string) (string, error) {
 }
 
 func (l *alertService) upgradeDeployment(deployment *v1beta2.Deployment) error {
+	if _, err := l.deployments.Get(deployment.Name, metav1.GetOptions{}); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
 	if _, err := l.deployments.Update(deployment); err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil
