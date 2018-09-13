@@ -4,20 +4,14 @@ import (
 	"os"
 	"strings"
 
-	"github.com/rancher/rancher/pkg/api/customization/setting"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
-	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
-	"github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func Register(context *config.ScaledContext) error {
-	clusterSchema := context.Schemas.Schema(&managementschema.Version, client.ClusterType)
-	setting.SetClusterDefaults(clusterSchema, context.Schemas)
-
 	sp := &settingsProvider{
 		settings:       context.Management.Settings(""),
 		settingsLister: context.Management.Settings("").Controller().Lister(),
@@ -27,7 +21,6 @@ func Register(context *config.ScaledContext) error {
 		return err
 	}
 
-	setting.ModifySchema(clusterSchema, context.Schemas)
 	return nil
 }
 
