@@ -11,10 +11,10 @@ import (
 	"github.com/rancher/rancher/pkg/audit"
 	"github.com/rancher/rancher/pkg/auth/providers/publicapi"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
+	authrequests "github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	rancherdialer "github.com/rancher/rancher/pkg/dialer"
-	"github.com/rancher/rancher/pkg/filter"
 	"github.com/rancher/rancher/pkg/httpproxy"
 	k8sProxyPkg "github.com/rancher/rancher/pkg/k8sproxy"
 	"github.com/rancher/rancher/pkg/pipeline/hooks"
@@ -55,10 +55,12 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 
 	rawAuthedAPIs := newAuthed(tokenAPI, managementAPI, k8sProxy)
 
-	authedHandler, err := filter.NewAuthenticationFilter(ctx, scaledContext, auditLogWriter, rawAuthedAPIs)
+	authedHandler, err := authrequests.NewAuthenticationFilter(ctx, scaledContext, rawAuthedAPIs)
 	if err != nil {
 		return err
 	}
+
+	auditHandler := audit.NewAuditLogFilter(ctx, auditLogWriter, authedHandler)
 
 	webhookHandler := hooks.New(scaledContext)
 
@@ -75,12 +77,12 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 	root.Handle("/v3/settings/cacerts", rawAuthedAPIs).Methods(http.MethodGet)
 	root.Handle("/v3/settings/first-login", rawAuthedAPIs).Methods(http.MethodGet)
 	root.Handle("/v3/settings/ui-pl", rawAuthedAPIs).Methods(http.MethodGet)
-	root.PathPrefix("/v3").Handler(authedHandler)
+	root.PathPrefix("/v3").Handler(auditHandler)
 	root.PathPrefix("/hooks").Handler(webhookHandler)
-	root.PathPrefix("/k8s/clusters/").Handler(authedHandler)
-	root.PathPrefix("/meta").Handler(authedHandler)
-	root.PathPrefix("/v1-telemetry").Handler(authedHandler)
-	root.NotFoundHandler = chain.Handler(http.NotFoundHandler())
+	root.PathPrefix("/k8s/clusters/").Handler(auditHandler)
+	root.PathPrefix("/meta").Handler(auditHandler)
+	root.PathPrefix("/v1-telemetry").Handler(auditHandler)
+	root.NotFoundHandler = ui.UI(http.NotFoundHandler())
 	root.PathPrefix("/v1-saml").Handler(samlRoot)
 
 	// UI
