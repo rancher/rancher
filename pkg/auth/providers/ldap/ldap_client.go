@@ -76,6 +76,11 @@ func (p *ldapProvider) loginUser(credential *v3public.BasicLogin, config *v3.Lda
 	if err != nil {
 		return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed") // need to reload this error
 	}
+
+	if len(opResult.Entries) < 1 {
+		return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "Cannot locate user information for "+searchOpRequest.Filter)
+	}
+
 	userPrincipal, groupPrincipals, err := p.getPrincipalsFromSearchResult(result, opResult, config, lConn)
 	if err != nil {
 		return v3.Principal{}, nil, err
