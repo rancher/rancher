@@ -241,12 +241,12 @@ func (c *SyncController) validateAndSetNamespaceQuota(ns *corev1.Namespace) (boo
 	}
 	var nsLimits []*v3.ResourceQuotaLimit
 	for _, o := range objects {
-		n := o.(*corev1.Namespace)
+		other := o.(*corev1.Namespace)
 		// skip itself
-		if n.Name == ns.Name {
+		if other.Name == ns.Name {
 			continue
 		}
-		nsLimit, err := getNamespaceLimit(ns)
+		nsLimit, err := getNamespaceLimit(other)
 		if err != nil {
 			return false, updatedNs, err
 		}

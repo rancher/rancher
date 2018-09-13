@@ -194,7 +194,7 @@ def test_project_used_quota(admin_cc, admin_pc):
     assert used.pods == "4"
 
 
-def wait_for_used_limit_set(admin_cc_client, project, timeout=30):
+def wait_for_used_limit_set(admin_cc_client, project, timeout=30, value="0"):
     start = time.time()
     project = admin_cc_client.reload(project)
     while "usedLimit" not in project.resourceQuota \
@@ -204,7 +204,14 @@ def wait_for_used_limit_set(admin_cc_client, project, timeout=30):
         if time.time() - start > timeout:
             raise Exception('Timeout waiting for'
                             ' project.usedLimit to be set')
-    return project.resourceQuota.usedLimit
+    if value == "0":
+        return project.resourceQuota.usedLimit
+    while project.resourceQuota.usedLimit.pods != value:
+        time.sleep(.5)
+        project = admin_cc_client.reload(project)
+        if time.time() - start > timeout:
+            raise Exception('Timeout waiting for'
+                            ' project.usedLimit to be set to value ' + value)
 
 
 def test_default_resource_quota_project_update(admin_cc, admin_pc):
@@ -279,3 +286,25 @@ def test_api_validation_namespace(admin_cc, admin_pc):
                                                  projectId=p.id,
                                                  resourceQuota=nsq)
     assert e.value.error.status == 422
+
+
+def test_used_quota_exact_match(admin_cc, admin_pc):
+    pq = {"limit": {"pods": "10"}}
+    dq = {"limit": {"pods": "2"}}
+    p = admin_cc.management.client.update(admin_pc.project,
+                                          resourceQuota=pq,
+                                          namespaceDefaultResourceQuota=dq)
+    p = admin_cc.management.client.wait_success(p)
+    assert p.resourceQuota is not None
+    assert p.namespaceDefaultResourceQuota is not None
+
+    nsq = {"limit": {"pods": "2"}}
+    admin_pc.cluster.client.create_namespace(name=random_str(),
+                                             projectId=p.id,
+                                             resourceQuota=nsq)
+
+    nsq = {"limit": {"pods": "8"}}
+    admin_pc.cluster.client.create_namespace(name=random_str(),
+                                             projectId=p.id,
+                                             resourceQuota=nsq)
+    wait_for_used_limit_set(admin_cc.management.client, p, 10, "10")
