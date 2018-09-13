@@ -231,7 +231,7 @@ def test_default_resource_quota_project_update(admin_cc, admin_pc):
                                ns)
 
 
-def test_api_validation_project(admin_cc, ns_large_quota):
+def test_api_validation_project(admin_pc, admin_cc, ns_large_quota):
     client = admin_cc.management.client
     q = default_project_quota()
     # default namespace quota missing
@@ -266,6 +266,14 @@ def test_api_validation_project(admin_cc, ns_large_quota):
                               namespaceDefaultResourceQuota=lq)
 
     assert e.value.error.status == 422
+
+    pq = {"limit": {"pods": "100",
+                    "services": "100"}}
+    iq = {"limit": {"pods": "100"}}
+    with pytest.raises(ApiError) as e:
+        admin_cc.management.client.update(admin_pc.project,
+                                          resourceQuota=pq,
+                                          namespaceDefaultResourceQuota=iq)
 
 
 def test_api_validation_namespace(admin_cc, admin_pc):
@@ -308,3 +316,12 @@ def test_used_quota_exact_match(admin_cc, admin_pc):
                                              projectId=p.id,
                                              resourceQuota=nsq)
     wait_for_used_limit_set(admin_cc.management.client, p, 10, "10")
+
+    # try reducing the project quota
+    pq = {"limit": {"pods": "8"}}
+    dq = {"limit": {"pods": "1"}}
+    with pytest.raises(ApiError) as e:
+        admin_cc.management.client.update(admin_pc.project,
+                                          resourceQuota=pq,
+                                          namespaceDefaultResourceQuota=dq)
+    assert e.value.error.status == 422
