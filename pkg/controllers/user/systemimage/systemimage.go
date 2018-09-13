@@ -23,6 +23,10 @@ type Syncer struct {
 }
 
 func (s *Syncer) Sync(key string, obj *v3.Project) error {
+	if obj == nil || obj.DeletionTimestamp != nil {
+		return nil
+	}
+
 	projects, err := s.projectLister.List(s.clusterName, systemProjectLabels.AsSelector())
 	if err != nil {
 		return fmt.Errorf("get projects failed when try to upgrade system tools, %v", err)
