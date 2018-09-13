@@ -115,12 +115,12 @@ func (p *Store) validateResourceQuota(apiContext *types.APIContext, schema *type
 		return err
 	}
 	if len(nsQuotaLimitMap) != len(projectQuotaLimitMap) {
-		return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, quotaField, "doesn not have all fields defined on a project quota")
+		return httperror.NewFieldAPIError(httperror.MissingRequired, quotaField, "does not have all fields defined on a project quota")
 	}
 
 	for k := range projectQuotaLimitMap {
 		if _, ok := nsQuotaLimitMap[k]; !ok {
-			return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, quotaField, fmt.Sprintf("misses %s defined on a project quota", k))
+			return httperror.NewFieldAPIError(httperror.MissingRequired, quotaField, fmt.Sprintf("misses %s defined on a project quota", k))
 		}
 	}
 

@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/resourcequota"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	mgmtschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	mgmtclient "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
 	"k8s.io/apimachinery/pkg/labels"
@@ -41,7 +43,7 @@ func (s *projectStore) Create(apiContext *types.APIContext, schema *types.Schema
 		return nil, err
 	}
 
-	if err := s.validateResourceQuota(apiContext, schema, data, ""); err != nil {
+	if err := s.validateResourceQuota(apiContext, data, ""); err != nil {
 		return nil, err
 	}
 
@@ -51,7 +53,7 @@ func (s *projectStore) Create(apiContext *types.APIContext, schema *types.Schema
 }
 
 func (s *projectStore) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
-	if err := s.validateResourceQuota(apiContext, schema, data, id); err != nil {
+	if err := s.validateResourceQuota(apiContext, data, id); err != nil {
 		return nil, err
 	}
 
@@ -93,7 +95,7 @@ func (s *projectStore) createProjectAnnotation() (string, error) {
 	return string(d), nil
 }
 
-func (s *projectStore) validateResourceQuota(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) error {
+func (s *projectStore) validateResourceQuota(apiContext *types.APIContext, data map[string]interface{}, id string) error {
 	quotaO, quotaOk := data[quotaField]
 	if quotaO == nil {
 		quotaOk = false
@@ -127,12 +129,67 @@ func (s *projectStore) validateResourceQuota(apiContext *types.APIContext, schem
 		return err
 	}
 
-	isFit, msg, err := resourcequota.IsQuotaFit(nsQuotaLimit, []*v3.ResourceQuotaLimit{}, projectQuotaLimit)
-	if err != nil || isFit {
+	// limits in namespace default quota should include all limits defined in the project quota
+	projectQuotaLimitMap, err := convert.EncodeToMap(projectQuotaLimit)
+	if err != nil {
 		return err
 	}
-	return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, namespaceQuotaField, fmt.Sprintf("exceeds %s on fields: %s",
-		quotaField, msg))
+
+	nsQuotaLimitMap, err := convert.EncodeToMap(nsQuotaLimit)
+	if err != nil {
+		return err
+	}
+	if len(nsQuotaLimitMap) != len(projectQuotaLimitMap) {
+		return httperror.NewFieldAPIError(httperror.MissingRequired, namespaceQuotaField, fmt.Sprintf("does not have all fields defined on a %s", quotaField))
+	}
+
+	for k := range projectQuotaLimitMap {
+		if _, ok := nsQuotaLimitMap[k]; !ok {
+			return httperror.NewFieldAPIError(httperror.MissingRequired, namespaceQuotaField, fmt.Sprintf("misses %s defined on a %s", k, quotaField))
+		}
+	}
+	return isQuotaFit(apiContext, nsQuotaLimit, projectQuotaLimit, id)
+}
+
+func isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3.ResourceQuotaLimit, projectQuotaLimit *v3.ResourceQuotaLimit, id string) error {
+	// check that namespace default quota is within project quota
+	isFit, msg, err := resourcequota.IsQuotaFit(nsQuotaLimit, []*v3.ResourceQuotaLimit{}, projectQuotaLimit)
+	if err != nil {
+		return err
+	}
+	if !isFit {
+		return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, namespaceQuotaField, fmt.Sprintf("exceeds %s on fields: %s",
+			quotaField, msg))
+	}
+
+	if id == "" {
+		return nil
+	}
+
+	var project mgmtclient.Project
+	if err := access.ByID(apiContext, &mgmtschema.Version, mgmtclient.ProjectType, id, &project); err != nil {
+		return err
+	}
+
+	if project.ResourceQuota == nil || project.ResourceQuota.UsedLimit == nil {
+		return nil
+	}
+
+	// check that used quota is not bigger than the project quota
+	usedQuotaLimit, err := limitToLimit(project.ResourceQuota.UsedLimit)
+	if err != nil {
+		return err
+	}
+	isFit, msg, err = resourcequota.IsQuotaFit(usedQuotaLimit, []*v3.ResourceQuotaLimit{}, projectQuotaLimit)
+	if err != nil {
+		return err
+	}
+	if !isFit {
+		return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, quotaField, fmt.Sprintf("exceeds used limit on fields: %s",
+			msg))
+	}
+
+	return nil
 }
 
 func limitToLimit(from *mgmtclient.ResourceQuotaLimit) (*v3.ResourceQuotaLimit, error) {
