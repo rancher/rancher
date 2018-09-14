@@ -1,7 +1,7 @@
 import pytest
 import json
 from .common import random_str
-from .conftest import wait_for_condition, wait_until
+from .conftest import wait_for_condition, wait_until, wait_for
 
 CREATOR_ANNOTATION = 'authz.management.cattle.io/creator-role-bindings'
 systemProjectLabel = "authz.management.cattle.io/system-project"
@@ -60,6 +60,13 @@ def test_cluster_create_default_role(admin_mc, cleanup_roles, remove_resource):
     assert set(data_dict['created']) == set(test_roles)
 
     for binding in cluster.clusterRoleTemplateBindings():
+        def binding_principal_validate():
+            bind = client.by_id_cluster_role_template_binding(binding.id)
+            if bind.userPrincipalId is None:
+                return False
+            return bind
+
+        binding = wait_for(binding_principal_validate)
         assert binding.roleTemplateId in test_roles
         assert binding.userId is not None
         user = client.by_id_user(binding.userId)
@@ -117,6 +124,14 @@ def test_project_create_default_role(admin_mc, cleanup_roles, remove_resource):
     assert set(data_dict['required']) == set(test_roles)
 
     for binding in project.projectRoleTemplateBindings():
+        def binding_principal_validate():
+            bind = client.by_id_project_role_template_binding(binding.id)
+            if bind.userPrincipalId is None:
+                return False
+            return bind
+
+        binding = wait_for(binding_principal_validate)
+
         assert binding.roleTemplateId in test_roles
         assert binding.userId is not None
         user = client.by_id_user(binding.userId)
@@ -192,8 +207,7 @@ def test_user_create_default_role(admin_mc, cleanup_roles, remove_resource):
 def test_default_system_project_role(admin_mc):
     test_roles = ['project-owner']
     client = admin_mc.client
-    projects = client.list_project(
-               clusterId="local")
+    projects = client.list_project(clusterId="local")
     required_projects = {}
     required_projects["Default"] = defaultProjectLabel
     required_projects["System"] = systemProjectLabel

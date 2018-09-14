@@ -18,7 +18,7 @@ def test_multi_user(admin_mc, user_mc):
     assert len(ac) == 0
 
 
-def test_project_owner(admin_cc, admin_mc, user_mc, request):
+def test_project_owner(admin_cc, admin_mc, user_mc, remove_resource):
     """Tests that a non-admin member can create a project, create and
     add a namespace to it, and can do workload related things in the namespace.
 
@@ -43,18 +43,27 @@ def test_project_owner(admin_cc, admin_mc, user_mc, request):
     # access it
     wait_until_available(user_client, admin_cc.cluster)
 
-    p = user_client.create_project(name='test-' + random_str(),
-                                   clusterId=admin_cc.cluster.id)
+    proj_name = 'test-' + random_str()
 
-    # In case something goes badly as the user, add a finalizer to
-    # delete the project as the admin
-    request.addfinalizer(lambda: admin_client.delete(p))
+    def can_create_project():
+        try:
+            p = user_client.create_project(name=proj_name,
+                                           clusterId=admin_cc.cluster.id)
+            # In case something goes badly as the user, add a finalizer to
+            # delete the project as the admin
+            remove_resource(p)
+            return p
+        except ApiError as e:
+            assert e.error.status == 403
+            return False
+
+    proj = wait_for(can_create_project)
 
     # When this returns, the user can successfully access the project and thus
     # can create a namespace in it
-    p = wait_until_available(user_client, p)
-    p = user_client.wait_success(p)
-    assert p.state == 'active'
+    proj = wait_until_available(user_client, proj)
+    proj = user_client.wait_success(proj)
+    assert proj.state == 'active'
 
     k8s_client = kubernetes_api_client(user_client, 'local')
     auth = kubernetes.client.AuthorizationV1Api(k8s_client)
@@ -75,9 +84,9 @@ def test_project_owner(admin_cc, admin_mc, user_mc, request):
 
     wait_for(can_create_ns)
 
-    cluster, c_client = cluster_and_client('local', user_mc.client)
+    c_client = cluster_and_client('local', user_mc.client)[1]
     ns = c_client.create_namespace(name='test-' + random_str(),
-                                   projectId=p.id)
+                                   projectId=proj.id)
     ns = wait_until_available(c_client, ns)
     ns = c_client.wait_success(ns)
     assert ns.state == 'active'
