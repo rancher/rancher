@@ -140,7 +140,7 @@ func NewFluentdDaemonset(name, namespace, dockerRootDir string) *v1beta2.DaemonS
 		"varlogpods":             []string{"/var/log/pods", "/var/log/pods"},
 		"rkelog":                 []string{"/var/lib/rancher/rke/log", "/var/lib/rancher/rke/log"},
 		"customlog":              []string{"/var/lib/rancher/log-volumes", "/var/lib/rancher/log-volumes"},
-		"fluentdlog":             []string{"/fluentd/etc/log", "/var/lib/rancher/fluentd/log"},
+		"fluentdlog":             []string{"/fluentd/log", "/var/lib/rancher/fluentd/log"},
 	})
 
 	configVolMounts, configVols := buildSecretVolumes(map[string][]string{
