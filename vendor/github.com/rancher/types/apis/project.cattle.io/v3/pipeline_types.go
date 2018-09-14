@@ -149,7 +149,7 @@ type PipelineSpec struct {
 	TriggerWebhookTag  bool   `json:"triggerWebhookTag,omitempty" yaml:"triggerWebhookTag,omitempty"`
 
 	RepositoryURL            string `json:"repositoryUrl,omitempty" yaml:"repositoryUrl,omitempty"`
-	SourceCodeCredentialName string `json:"sourceCodeCredentialName,omitempty" yaml:"sourceCodeCredentialName,omitempty" norman:"type=reference[sourceCodeCredential]"`
+	SourceCodeCredentialName string `json:"sourceCodeCredentialName,omitempty" yaml:"sourceCodeCredentialName,omitempty" norman:"type=reference[sourceCodeCredential],noupdate"`
 }
 
 type PipelineConfig struct {
