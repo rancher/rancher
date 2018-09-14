@@ -123,7 +123,7 @@ func createNewAdmin(client v3.Interface, length int) error {
 }
 
 func ensureAdminIsEnabled(admin v3.User) bool {
-	if *admin.Enabled {
+	if admin.Enabled == nil || *admin.Enabled {
 		fmt.Fprintf(os.Stdout, "Existing default admin user (%v) is already enabled\n", admin.Name)
 		return false
 	}
