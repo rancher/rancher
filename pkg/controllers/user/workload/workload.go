@@ -199,7 +199,7 @@ func (c *Controller) updateService(toUpdate Service, existing *corev1.Service) e
 	}
 
 	existing.Spec.Ports = portsToUpdate
-	if existing.Spec.Type == ClusterIPServiceType {
+	if existing.Spec.Type == ClusterIPServiceType && existing.Spec.ClusterIP == "None" {
 		existing.Spec.ClusterIP = toUpdate.ClusterIP
 	}
 	logrus.Infof("Updating [%s/%s] service with ports [%v]", existing.Namespace, existing.Name, portsToUpdate)
