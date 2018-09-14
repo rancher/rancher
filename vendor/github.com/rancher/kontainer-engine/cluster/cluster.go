@@ -82,8 +82,13 @@ type ConfigGetter interface {
 
 // Create creates a cluster
 func (c *Cluster) Create(ctx context.Context) error {
-	if err := c.createInner(ctx); err != nil && err != ErrClusterExists {
-		c.PersistStore.PersistStatus(*c, Error)
+	err := c.createInner(ctx)
+	if err != nil {
+		if err == ErrClusterExists {
+			c.PersistStore.PersistStatus(*c, Running)
+		} else {
+			c.PersistStore.PersistStatus(*c, Error)
+		}
 		return err
 	}
 	return c.PersistStore.PersistStatus(*c, Running)
