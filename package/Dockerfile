@@ -26,7 +26,7 @@ RUN curl -sLf https://github.com/rancher/machine-package/releases/download/${CAT
 
 ENV CATTLE_UI_PATH /usr/share/rancher/ui
 ENV CATTLE_UI_VERSION 2.0.67
-ENV CATTLE_CLI_VERSION v2.0.4
+ENV CATTLE_CLI_VERSION V2.0.5-rc3
 
 RUN mkdir -p /var/log/auditlog
 ENV AUDIT_LOG_PATH /var/log/auditlog/rancher-api-audit.log
