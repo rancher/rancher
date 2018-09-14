@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/docker/pkg/locker"
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/catalog/git"
 	"github.com/rancher/rancher/pkg/catalog/helm"
@@ -35,6 +36,7 @@ type Manager struct {
 	templateVersionLister v3.TemplateVersionLister
 	templateContentLister v3.TemplateContentLister
 	lastUpdateTime        time.Time
+	lock                  *locker.Locker
 }
 
 func New(management *config.ManagementContext, cacheRoot string) *Manager {
@@ -52,6 +54,7 @@ func New(management *config.ManagementContext, cacheRoot string) *Manager {
 		templateLister:        management.Management.Templates("").Controller().Lister(),
 		templateVersionLister: management.Management.TemplateVersions("").Controller().Lister(),
 		templateContentLister: management.Management.TemplateContents("").Controller().Lister(),
+		lock:                  locker.New(),
 	}
 }
 
@@ -78,7 +81,7 @@ func (m *Manager) prepareHelmRepoPath(catalog v3.Catalog) (string, string, error
 		return "", "", err
 	}
 
-	repoPath := path.Join(m.cacheRoot, catalog.Namespace, index.Hash)
+	repoPath := path.Join(m.cacheRoot, catalog.Name, index.Hash)
 	if err := os.MkdirAll(repoPath, 0755); err != nil {
 		return "", "", err
 	}
@@ -103,6 +106,10 @@ func (m *Manager) prepareGitRepoPath(catalog v3.Catalog) (string, string, error)
 
 	repoBranchHash := hash(catalog.Spec.URL + branch)
 	repoPath := path.Join(m.cacheRoot, repoBranchHash)
+
+	// add a lock to prevent two sync running on the same hash repo
+	m.lock.Lock(repoBranchHash)
+	defer m.lock.Unlock(repoBranchHash)
 
 	if err := os.MkdirAll(repoPath, 0755); err != nil {
 		return "", "", err
