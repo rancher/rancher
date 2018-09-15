@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"time"
 
+	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
@@ -30,7 +32,13 @@ func (c *Cluster) SaveClusterState(ctx context.Context, rkeConfig *v3.RancherKub
 		}
 		err = saveStateToKubernetes(ctx, c.KubeClient, c.LocalKubeConfigPath, rkeConfig)
 		if err != nil {
-			return fmt.Errorf("[state] Failed to save configuration state: %v", err)
+			return fmt.Errorf("[state] Failed to save configuration state to k8s: %v", err)
+		}
+		// save state to the cluster nodes as a backup
+		uniqueHosts := hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts)
+		err = saveStateToNodes(ctx, uniqueHosts, rkeConfig, c.SystemImages.Alpine, c.PrivateRegistriesMap)
+		if err != nil {
+			return fmt.Errorf("[state] Failed to save configuration state to nodes: %v", err)
 		}
 	}
 	return nil
@@ -58,7 +66,12 @@ func (c *Cluster) GetClusterState(ctx context.Context) (*Cluster, error) {
 			return nil, nil
 		}
 		// Get previous kubernetes state
-		currentCluster = getStateFromKubernetes(ctx, c.KubeClient, c.LocalKubeConfigPath)
+		currentCluster, err = getStateFromKubernetes(ctx, c.KubeClient, c.LocalKubeConfigPath)
+		if err != nil {
+			// attempting to fetch state from nodes
+			uniqueHosts := hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts)
+			currentCluster = getStateFromNodes(ctx, uniqueHosts, c.SystemImages.Alpine, c.PrivateRegistriesMap)
+		}
 		// Get previous kubernetes certificates
 		if currentCluster != nil {
 			if err := currentCluster.InvertIndexHosts(); err != nil {
@@ -69,11 +82,19 @@ func (c *Cluster) GetClusterState(ctx context.Context) (*Cluster, error) {
 				activeEtcdHosts = removeFromHosts(inactiveHost, activeEtcdHosts)
 			}
 			currentCluster.Certificates, err = getClusterCerts(ctx, c.KubeClient, activeEtcdHosts)
+			// if getting certificates from k8s failed then we attempt to fetch the backup certs
+			if err != nil {
+				backupHosts := hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, nil)
+				currentCluster.Certificates, err = fetchBackupCertificates(ctx, backupHosts, c)
+				if err != nil {
+					return nil, fmt.Errorf("Failed to Get Kubernetes certificates: %v", err)
+				}
+				if currentCluster.Certificates != nil {
+					log.Infof(ctx, "[certificates] Certificate backup found on backup hosts")
+				}
+			}
 			currentCluster.DockerDialerFactory = c.DockerDialerFactory
 			currentCluster.LocalConnDialerFactory = c.LocalConnDialerFactory
-			if err != nil {
-				return nil, fmt.Errorf("Failed to Get Kubernetes certificates: %v", err)
-			}
 
 			// make sure I have all the etcd certs, We need handle dialer failure for etcd nodes https://github.com/rancher/rancher/issues/12898
 			for _, host := range activeEtcdHosts {
@@ -128,7 +149,21 @@ func saveStateToKubernetes(ctx context.Context, kubeClient *kubernetes.Clientset
 	}
 }
 
-func getStateFromKubernetes(ctx context.Context, kubeClient *kubernetes.Clientset, kubeConfigPath string) *Cluster {
+func saveStateToNodes(ctx context.Context, uniqueHosts []*hosts.Host, clusterState *v3.RancherKubernetesEngineConfig, alpineImage string, prsMap map[string]v3.PrivateRegistry) error {
+	log.Infof(ctx, "[state] Saving cluster state to cluster nodes")
+	clusterFile, err := yaml.Marshal(*clusterState)
+	if err != nil {
+		return err
+	}
+	for _, host := range uniqueHosts {
+		if err := pki.DeployStateOnPlaneHost(ctx, host, alpineImage, prsMap, string(clusterFile)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func getStateFromKubernetes(ctx context.Context, kubeClient *kubernetes.Clientset, kubeConfigPath string) (*Cluster, error) {
 	log.Infof(ctx, "[state] Fetching cluster state from Kubernetes")
 	var cfgMap *v1.ConfigMap
 	var currentCluster Cluster
@@ -151,13 +186,38 @@ func getStateFromKubernetes(ctx context.Context, kubeClient *kubernetes.Clientse
 		clusterData := cfgMap.Data[StateConfigMapName]
 		err := yaml.Unmarshal([]byte(clusterData), &currentCluster)
 		if err != nil {
-			return nil
+			return nil, fmt.Errorf("Failed to unmarshal cluster data")
 		}
-		return &currentCluster
+		return &currentCluster, nil
 	case <-time.After(time.Second * GetStateTimeout):
 		log.Infof(ctx, "Timed out waiting for kubernetes cluster to get state")
+		return nil, fmt.Errorf("Timeout waiting for kubernetes cluster to get state")
+	}
+}
+
+func getStateFromNodes(ctx context.Context, uniqueHosts []*hosts.Host, alpineImage string, prsMap map[string]v3.PrivateRegistry) *Cluster {
+	log.Infof(ctx, "[state] Fetching cluster state from Nodes")
+	var currentCluster Cluster
+	var clusterFile string
+	var err error
+
+	for _, host := range uniqueHosts {
+		filePath := path.Join(host.PrefixPath, pki.TempCertPath, pki.ClusterStateFile)
+		clusterFile, err = pki.FetchFileFromHost(ctx, filePath, alpineImage, host, prsMap, pki.StateDeployerContainerName, "state")
+		if err == nil {
+			break
+		}
+	}
+	if len(clusterFile) == 0 {
 		return nil
 	}
+	err = yaml.Unmarshal([]byte(clusterFile), &currentCluster)
+	if err != nil {
+		logrus.Debugf("[state] Failed to unmarshal the cluster file fetched from nodes: %v", err)
+		return nil
+	}
+	return &currentCluster
+
 }
 
 func GetK8sVersion(localConfigPath string, k8sWrapTransport k8s.WrapTransport) (string, error) {

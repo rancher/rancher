@@ -20,6 +20,10 @@ import (
 	"k8s.io/client-go/util/cert"
 )
 
+const (
+	StateDeployerContainerName = "cluster-state-deployer"
+)
+
 func DeployCertificatesOnPlaneHost(ctx context.Context, host *hosts.Host, rkeConfig v3.RancherKubernetesEngineConfig, crtMap map[string]CertificatePKI, certDownloaderImage string, prsMap map[string]v3.PrivateRegistry) error {
 	crtBundle := GenerateRKENodeCerts(ctx, rkeConfig, host.Address, crtMap)
 	env := []string{}
@@ -27,6 +31,38 @@ func DeployCertificatesOnPlaneHost(ctx context.Context, host *hosts.Host, rkeCon
 		env = append(env, crt.ToEnv()...)
 	}
 	return doRunDeployer(ctx, host, env, certDownloaderImage, prsMap)
+}
+
+func DeployStateOnPlaneHost(ctx context.Context, host *hosts.Host, stateDownloaderImage string, prsMap map[string]v3.PrivateRegistry, clusterState string) error {
+	// remove existing container. Only way it's still here is if previous deployment failed
+	if err := docker.DoRemoveContainer(ctx, host.DClient, StateDeployerContainerName, host.Address); err != nil {
+		return err
+	}
+	containerEnv := []string{ClusterStateEnv + "=" + clusterState}
+	ClusterStateFilePath := path.Join(host.PrefixPath, TempCertPath, ClusterStateFile)
+	imageCfg := &container.Config{
+		Image: stateDownloaderImage,
+		Cmd: []string{
+			"sh",
+			"-c",
+			fmt.Sprintf("t=$(mktemp); echo -e \"$%s\" > $t && mv $t %s && chmod 644 %s", ClusterStateEnv, ClusterStateFilePath, ClusterStateFilePath),
+		},
+		Env: containerEnv,
+	}
+	hostCfg := &container.HostConfig{
+		Binds: []string{
+			fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(host.PrefixPath, "/etc/kubernetes")),
+		},
+		Privileged: true,
+	}
+	if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, StateDeployerContainerName, host.Address, "state", prsMap); err != nil {
+		return err
+	}
+	if err := docker.DoRemoveContainer(ctx, host.DClient, StateDeployerContainerName, host.Address); err != nil {
+		return err
+	}
+	logrus.Debugf("[state] Successfully started state deployer container on node [%s]", host.Address)
+	return nil
 }
 
 func doRunDeployer(ctx context.Context, host *hosts.Host, containerEnv []string, certDownloaderImage string, prsMap map[string]v3.PrivateRegistry) error {
@@ -135,7 +171,7 @@ func FetchCertificatesFromHost(ctx context.Context, extraHosts []*hosts.Host, ho
 
 	for certName, config := range crtList {
 		certificate := CertificatePKI{}
-		crt, err := FetchFileFromHost(ctx, GetCertTempPath(certName), image, host, prsMap)
+		crt, err := FetchFileFromHost(ctx, GetCertTempPath(certName), image, host, prsMap, CertFetcherContainer, "certificates")
 		// I will only exit with an error if it's not a not-found-error and this is not an etcd certificate
 		if err != nil && (!strings.HasPrefix(certName, "kube-etcd") &&
 			!strings.Contains(certName, APIProxyClientCertName) &&
@@ -154,10 +190,10 @@ func FetchCertificatesFromHost(ctx context.Context, extraHosts []*hosts.Host, ho
 			tmpCerts[certName] = CertificatePKI{}
 			continue
 		}
-		key, err := FetchFileFromHost(ctx, GetKeyTempPath(certName), image, host, prsMap)
+		key, err := FetchFileFromHost(ctx, GetKeyTempPath(certName), image, host, prsMap, CertFetcherContainer, "certificate")
 
 		if config {
-			config, err := FetchFileFromHost(ctx, GetConfigTempPath(certName), image, host, prsMap)
+			config, err := FetchFileFromHost(ctx, GetConfigTempPath(certName), image, host, prsMap, CertFetcherContainer, "certificate")
 			if err != nil {
 				return nil, err
 			}
@@ -184,7 +220,7 @@ func FetchCertificatesFromHost(ctx context.Context, extraHosts []*hosts.Host, ho
 
 }
 
-func FetchFileFromHost(ctx context.Context, filePath, image string, host *hosts.Host, prsMap map[string]v3.PrivateRegistry) (string, error) {
+func FetchFileFromHost(ctx context.Context, filePath, image string, host *hosts.Host, prsMap map[string]v3.PrivateRegistry, containerName, state string) (string, error) {
 
 	imageCfg := &container.Config{
 		Image: image,
@@ -195,16 +231,16 @@ func FetchFileFromHost(ctx context.Context, filePath, image string, host *hosts.
 		},
 		Privileged: true,
 	}
-	isRunning, err := docker.IsContainerRunning(ctx, host.DClient, host.Address, CertFetcherContainer, true)
+	isRunning, err := docker.IsContainerRunning(ctx, host.DClient, host.Address, containerName, true)
 	if err != nil {
 		return "", err
 	}
 	if !isRunning {
-		if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, CertFetcherContainer, host.Address, "certificates", prsMap); err != nil {
+		if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, containerName, host.Address, state, prsMap); err != nil {
 			return "", err
 		}
 	}
-	file, err := docker.ReadFileFromContainer(ctx, host.DClient, host.Address, CertFetcherContainer, filePath)
+	file, err := docker.ReadFileFromContainer(ctx, host.DClient, host.Address, containerName, filePath)
 	if err != nil {
 		return "", err
 	}
