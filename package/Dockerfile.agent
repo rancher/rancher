@@ -10,7 +10,8 @@ RUN apt-get update && \
 ENV LOGLEVEL_VERSION v0.1
 RUN curl -sLf https://github.com/rancher/loglevel/releases/download/${LOGLEVEL_VERSION}/loglevel-amd64-${LOGLEVEL_VERSION}.tar.gz | tar xvzf - -C /usr/bin
 RUN curl -sL https://github.com/rancher/share-mnt/releases/download/v1.0.3/share-mnt.tar.gz | tar xvzf - -C /usr/bin
-RUN curl -sL https://github.com/c-bata/kube-prompt/releases/download/v1.0.3/kube-prompt_v1.0.3_linux_amd64.zip > /usr/bin/kube-prompt.zip && unzip /usr/bin/kube-prompt.zip -d /usr/bin
+ENV KUBEPROMPT_VERSION v1.0.4
+RUN curl -sL https://github.com/c-bata/kube-prompt/releases/download/${KUBEPROMPT_VERSION}/kube-prompt_${KUBEPROMPT_VERSION}_linux_amd64.zip > /usr/bin/kube-prompt.zip && unzip /usr/bin/kube-prompt.zip -d /usr/bin
 ARG VERSION=dev
 LABEL io.cattle.agent true
 ENV DOCKER_API_VERSION 1.24
