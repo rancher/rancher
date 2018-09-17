@@ -33,18 +33,33 @@ if (-not (Test-Path "C:\host")) {
 $RancherDir = "C:\host\etc\rancher"
 $KubeDir = "C:\host\etc\kubernetes"
 $CNIDir = "C:\host\etc\cni"
+$KubeletRootDir = "C:\host\var\lib\kubelet"
 
 $null = New-Item -Type Directory -Path $RancherDir -ErrorAction Ignore
 $null = New-Item -Type Directory -Path $KubeDir -ErrorAction Ignore
 $null = New-Item -Type Directory -Path $CNIDir -ErrorAction Ignore
+$null = New-Item -Type Directory -Path $KubeletRootDir -ErrorAction Ignore
 
+# copy kubelet volume plugins #
 try {
-    Copy-Item -Force -Path "$env:ProgramFiles\rancher\*.*" -Destination $RancherDir
+    $null = New-Item -Type Directory -Path "$KubeletRootDir\volumeplugins" -ErrorAction Ignore
+    Copy-Item -Force -Recurse -Path "$env:ProgramFiles\kubelet\volumeplugins\*" -Destination "$KubeletRootDir\volumeplugins"
+} catch {
+    throw ("Please empty host `"C:\var\lib\kubelet\volumeplugins`" path manually, because {0}" -f $_.Exception.Message)
+}
+
+# copy rancher agent artifacts #
+try {
+    Copy-Item -Force -Recurse -Path "$env:ProgramFiles\rancher\*.*" -Destination $RancherDir
     try {
         Remove-Item -Force -Path "$RancherDir\start.ps1" -ErrorAction Ignore
     } catch {}
+} catch {
+    throw ("Please empty host `"C:\etc\rancher`" path manually, because {0}" -f $_.Exception.Message)
+}
 
-    # build run.ps1 #
+# build rancher agent run.ps1 #
+try {
     $runPSContent = Get-Content "$env:ProgramFiles\rancher\run.ps1"
     $runPSContent = $runPSContent -replace "<CATTLE_SERVER>",$server
     $runPSContent = $runPSContent -replace "<CATTLE_TOKEN>",$token
@@ -92,11 +107,11 @@ try {
 
     $runPSContent | Out-File -Encoding ascii -Force -FilePath "$RancherDir\run.ps1"
 } catch {
-    throw ("Please empty host `"C:\etc\rancher`" path manually, because {0}" -f $_.Exception.Message)
+    throw ("Failed to build `"C:\etc\rancher\run.ps1`", because {0}" -f $_.Exception.Message)
 }
 
 if (Test-Path "$RancherDir\connected") {
-    [System.Console]::Out.WriteLine("WARN[0000] This host was or is connecting to a rancher server, please kept informed")
+    [System.Console]::Out.WriteLine("WARN[0000] This host had connected to a rancher server, please kept informed")
 
     Start-Sleep -s 5
 }
