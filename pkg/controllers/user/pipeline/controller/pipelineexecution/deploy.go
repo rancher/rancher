@@ -7,6 +7,10 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"strconv"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	images "github.com/rancher/rancher/pkg/image"
@@ -27,9 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/credentialprovider"
-	"math/rand"
-	"strconv"
-	"time"
 )
 
 const projectIDFieldLabel = "field.cattle.io/projectId"

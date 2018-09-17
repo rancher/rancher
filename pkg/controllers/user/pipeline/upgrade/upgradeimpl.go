@@ -14,7 +14,6 @@ import (
 	"github.com/rancher/types/config"
 	"k8s.io/api/apps/v1beta2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -96,7 +95,7 @@ func (l *pipelineService) Upgrade(currentVersion string) (newVersion string, err
 		}
 
 		deployment = pipelineexecution.GetRegistryDeployment(ns)
-		if registryVersion != newJekinsVersion {
+		if registryVersion != newRegistryVersion {
 			if err = l.upgradeDeployment(deployment); err != nil {
 				return "", err
 			}
@@ -114,13 +113,6 @@ func (l *pipelineService) Upgrade(currentVersion string) (newVersion string, err
 }
 
 func (l *pipelineService) upgradeDeployment(deployment *v1beta2.Deployment) error {
-	if _, err := l.deployments.Get(deployment.Name, metav1.GetOptions{}); err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil
-		}
-		return err
-	}
-
 	if _, err := l.deployments.Update(deployment); err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil
