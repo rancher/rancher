@@ -10,7 +10,7 @@ RUN mkdir /root/.kube && \
     ln -s /usr/bin/rancher /usr/bin/ensure-default-admin
 WORKDIR /var/lib/rancher
 
-ENV CATTLE_HELM_VERSION v2.10.0-rancher3
+ENV CATTLE_HELM_VERSION v2.10.0-rancher4
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher1-1
 ENV LOGLEVEL_VERSION v0.1
 ENV TINI_VERSION v0.18.0
