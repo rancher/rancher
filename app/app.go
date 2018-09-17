@@ -141,7 +141,7 @@ func addData(management *config.ManagementContext, cfg Config) error {
 		return err
 	}
 
-	if cfg.AddLocal == "true" || (cfg.AddLocal == "auto" && !cfg.Embedded) {
+	if cfg.AddLocal == "true" {
 		if err := addLocalCluster(cfg.Embedded, adminName, management); err != nil {
 			return err
 		}

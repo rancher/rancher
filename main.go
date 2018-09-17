@@ -64,8 +64,8 @@ func main() {
 		},
 		cli.StringFlag{
 			Name:        "add-local",
-			Usage:       "Add local cluster (true, false, auto)",
-			Value:       "auto",
+			Usage:       "Add local cluster (true, false)",
+			Value:       "false",
 			Destination: &config.AddLocal,
 		},
 		cli.IntFlag{
