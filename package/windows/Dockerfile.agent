@@ -1,10 +1,22 @@
 ARG PS_VERSION
 
 FROM golang:1.11.0-windowsservercore-1803 AS build-stage
-COPY [".", "C:/gopath/src/github.com/rancher/rancher/"]
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+RUN New-Item -Type Directory -Path '"C:\Program Files\volumeplugins"' -ErrorAction Ignore; \
+    \
+    Write-Host 'Downloading Volume plugins ...'; \
+    \
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+    Invoke-WebRequest -UseBasicParsing -OutFile '"C:\Program Files\flexvolume.zip"' -Uri "https://github.com/Microsoft/K8s-Storage-Plugins/releases/download/v0.0.2/flexvolume-windows.zip"; \
+    \
+    Write-Host 'Expanding volumeplugins/flexvolume binaries ...'; \
+    \
+    Expand-Archive -Force -Path '"C:\Program Files\flexvolume.zip"' -DestinationPath '"C:\Program Files\volumeplugins"'; \
+    \
+    Write-Host 'Complete.';
 ARG VERSION=dev
 ENV AGENT_VERSION=$VERSION
+COPY [".", "C:/gopath/src/github.com/rancher/rancher/"]
 RUN cd C:\gopath\src\github.com\rancher\rancher; \
     \
     $env:GOARCH='amd64'; \
@@ -29,6 +41,7 @@ RUN cd C:\gopath\src\github.com\rancher\rancher; \
 
 FROM microsoft/powershell:$PS_VERSION
 ENV RUN_PATH="C:\\Program Files\\rancher"
+COPY --from=build-stage ["C:/Program Files/volumeplugins", "C:/Program Files/kubelet/volumeplugins"]
 COPY --from=build-stage ["C:/gopath/src/github.com/rancher/rancher/bin/agent.exe", "C:/Program Files/rancher/"]
 COPY ["package/windows/*.ps1", "package/windows/*.psm1", "C:/Program Files/rancher/"]
 WORKDIR $RUN_PATH
