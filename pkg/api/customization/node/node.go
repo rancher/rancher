@@ -59,17 +59,20 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 		return
 	}
 	if state == "draining" {
+		override := false
 		for _, cond := range convert.ToMapSlice(resource.Values["conditions"]) {
 			if cond["type"] == "Drained" && cond["status"] == "False" {
 				if ignoreErr(convert.ToString(cond["message"])) {
+					override = true
 					resource.Values["state"] = "cordoned"
-					resource.AddAction(apiContext, "uncordon")
-					return
+					break
 				}
 			}
 		}
-		resource.AddAction(apiContext, "stopDrain")
-		return
+		if !override {
+			resource.AddAction(apiContext, "stopDrain")
+			return
+		}
 	}
 	if state != "drained" {
 		resource.AddAction(apiContext, "drain")
