@@ -408,7 +408,6 @@ func (a *agentService) start(selfChangeRequest chan<- svc.ChangeRequest) error {
 			connected := isConnected()
 
 			ctx, cancel := context.WithCancel(context.Background())
-			ctx = context.WithValue(ctx, "isConnected", connected)
 
 			wsURL := fmt.Sprintf("wss://%s/v3/connect", serverURL.Host)
 			if !connected {

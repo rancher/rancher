@@ -74,13 +74,7 @@ func ExecutePlan(ctx context.Context, nodeConfig *NodeConfig, writeCertOnly bool
 			return fmt.Errorf(`can't find %s'`, scriptPath)
 		}
 
-		args := make([]string, 0, len(hyperkubeProcess.Args)+1)
-		args = append(args, hyperkubeProcess.Args...)
-		if connected := ctx.Value("isConnected").(bool); !connected {
-			args = append(args, "-Force")
-		}
-
-		return executePowerShell(ctx, scriptPath, args...)
+		return executePowerShell(ctx, scriptPath, hyperkubeProcess.Args...)
 	}
 }
 
