@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	clusterController "github.com/rancher/rancher/pkg/controllers/user"
@@ -44,6 +45,7 @@ type record struct {
 	cluster       *config.UserContext
 	accessControl types.AccessControl
 	started       bool
+	owner         bool
 	ctx           context.Context
 	cancel        context.CancelFunc
 }
@@ -69,7 +71,7 @@ func (m *Manager) Stop(cluster *v3.Cluster) {
 	m.controllers.Delete(cluster.UID)
 }
 
-func (m *Manager) Start(ctx context.Context, cluster *v3.Cluster) error {
+func (m *Manager) Start(ctx context.Context, cluster *v3.Cluster, clusterOwner bool) error {
 	if cluster.DeletionTimestamp != nil {
 		return nil
 	}
@@ -78,7 +80,7 @@ func (m *Manager) Start(ctx context.Context, cluster *v3.Cluster) error {
 	if err != nil {
 		return err
 	}
-	_, err = m.start(ctx, cluster, true)
+	_, err = m.start(ctx, cluster, true, clusterOwner)
 	return err
 }
 
@@ -98,14 +100,15 @@ func (m *Manager) markUnavailable(clusterName string) {
 			v3.ClusterConditionReady.False(cluster)
 			m.clusters.Update(cluster)
 		}
+		m.Stop(cluster)
 	}
 }
 
-func (m *Manager) start(ctx context.Context, cluster *v3.Cluster, controllers bool) (*record, error) {
+func (m *Manager) start(ctx context.Context, cluster *v3.Cluster, controllers, clusterOwner bool) (*record, error) {
 	obj, ok := m.controllers.Load(cluster.UID)
 	if ok {
-		if !m.changed(obj.(*record), cluster) {
-			return obj.(*record), m.startController(obj.(*record), controllers)
+		if !m.changed(obj.(*record), cluster, controllers, clusterOwner) {
+			return obj.(*record), m.startController(obj.(*record), controllers, clusterOwner)
 		}
 		m.Stop(obj.(*record).clusterRec)
 	}
@@ -120,27 +123,36 @@ func (m *Manager) start(ctx context.Context, cluster *v3.Cluster, controllers bo
 	}
 
 	obj, _ = m.controllers.LoadOrStore(cluster.UID, controller)
-	return obj.(*record), m.startController(obj.(*record), controllers)
+	if err := m.startController(obj.(*record), controllers, clusterOwner); err != nil {
+		m.markUnavailable(cluster.Name)
+		return nil, err
+	}
+	return obj.(*record), nil
 }
 
-func (m *Manager) startController(r *record, controllers bool) error {
+func (m *Manager) startController(r *record, controllers, clusterOwner bool) error {
 	if !controllers {
 		return nil
+	}
+
+	if _, err := r.cluster.K8sClient.Discovery().ServerVersion(); err != nil {
+		return errors.Wrapf(err, "failed to contact server")
 	}
 
 	r.Lock()
 	defer r.Unlock()
 	if !r.started {
-		if err := m.doStart(r); err != nil {
+		if err := m.doStart(r, clusterOwner); err != nil {
 			m.Stop(r.clusterRec)
 			return err
 		}
 		r.started = true
+		r.owner = clusterOwner
 	}
 	return nil
 }
 
-func (m *Manager) changed(r *record, cluster *v3.Cluster) bool {
+func (m *Manager) changed(r *record, cluster *v3.Cluster, controllers, clusterOwner bool) bool {
 	existing := r.clusterRec
 	if existing.Status.APIEndpoint != cluster.Status.APIEndpoint ||
 		existing.Status.ServiceAccountToken != cluster.Status.ServiceAccountToken ||
@@ -148,15 +160,42 @@ func (m *Manager) changed(r *record, cluster *v3.Cluster) bool {
 		return true
 	}
 
+	if controllers && r.started && clusterOwner != r.owner {
+		return true
+	}
+
 	return false
 }
 
-func (m *Manager) doStart(rec *record) error {
-	logrus.Infof("Starting cluster agent for %s", rec.cluster.ClusterName)
-	if err := clusterController.Register(rec.ctx, rec.cluster, m, m); err != nil {
+func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
+	defer func() {
+		if exit == nil {
+			logrus.Infof("Starting cluster agent for %s [owner=%v]", rec.cluster.ClusterName, clusterOwner)
+		}
+	}()
+
+	if clusterOwner {
+		if err := clusterController.Register(rec.ctx, rec.cluster, m, m); err != nil {
+			return err
+		}
+	} else {
+		if err := clusterController.RegisterFollower(rec.ctx, rec.cluster, m, m); err != nil {
+			return err
+		}
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		done <- rec.cluster.Start(rec.ctx)
+	}()
+
+	select {
+	case <-time.After(30 * time.Second):
+		rec.cancel()
+		return fmt.Errorf("timeout syncing controllers")
+	case err := <-done:
 		return err
 	}
-	return rec.cluster.Start(rec.ctx)
 }
 
 func (m *Manager) toRESTConfig(cluster *v3.Cluster) (*rest.Config, error) {
@@ -334,6 +373,7 @@ func (m *Manager) UnversionedClient(apiContext *types.APIContext, storageContext
 	}
 	return record.cluster.UnversionedClient, nil
 }
+
 func (m *Manager) APIExtClient(apiContext *types.APIContext, storageContext types.StorageContext) (clientset.Interface, error) {
 	return m.ScaledContext.APIExtClient, nil
 }
@@ -344,7 +384,7 @@ func (m *Manager) UserContext(clusterName string) (*config.UserContext, error) {
 		return nil, err
 	}
 
-	record, err := m.start(context.Background(), cluster, false)
+	record, err := m.start(context.Background(), cluster, false, false)
 	if err != nil || record == nil {
 		msg := ""
 		if err != nil {
@@ -371,7 +411,7 @@ func (m *Manager) record(apiContext *types.APIContext, storageContext types.Stor
 	if cluster == nil {
 		return nil, nil
 	}
-	record, err := m.start(context.Background(), cluster, false)
+	record, err := m.start(context.Background(), cluster, false, false)
 	if err != nil {
 		return nil, httperror.NewAPIError(httperror.ClusterUnavailable, err.Error())
 	}

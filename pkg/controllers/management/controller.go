@@ -37,7 +37,6 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	nodedriver.Register(management)
 	nodepool.Register(management)
 	node.Register(management)
-	usercontrollers.RegisterLate(ctx, management, manager)
 	podsecuritypolicy.Register(management)
 
 	// Register last

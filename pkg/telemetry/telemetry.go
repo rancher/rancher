@@ -44,6 +44,13 @@ func (p *process) setRunningState(state bool) {
 	p.running = state
 }
 
+func isLeader(management *config.ScaledContext) bool {
+	if management.PeerManager == nil {
+		return true
+	}
+	return management.PeerManager.IsLeader()
+}
+
 func Start(ctx context.Context, httpsPort int, management *config.ScaledContext) error {
 	p := process{
 		lock: sync.RWMutex{},
@@ -52,7 +59,7 @@ func Start(ctx context.Context, httpsPort int, management *config.ScaledContext)
 	// have two go routines running. One is to run telemetry if setting is true, one is to kill telemetry if setting is false
 	go func() {
 		for range ticker.Context(ctx, time.Second*5) {
-			if settings.TelemetryOpt.Get() == "in" && management.Leader {
+			if settings.TelemetryOpt.Get() == "in" && isLeader(management) {
 				if !p.running {
 					token, err := createToken(management)
 					if err != nil {
@@ -78,7 +85,7 @@ func Start(ctx context.Context, httpsPort int, management *config.ScaledContext)
 
 	go func() {
 		for range ticker.Context(ctx, time.Second*5) {
-			if settings.TelemetryOpt.Get() != "in" || !management.Leader {
+			if settings.TelemetryOpt.Get() != "in" || !isLeader(management) {
 				if p.getRunningState() {
 					p.kill()
 					p.setRunningState(false)

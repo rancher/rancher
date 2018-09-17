@@ -1,6 +1,7 @@
 package remotedialer
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net"
@@ -11,6 +12,8 @@ import (
 type connection struct {
 	sync.Mutex
 
+	ctx           context.Context
+	cancel        func()
 	err           error
 	writeDeadline time.Time
 	buf           chan []byte
