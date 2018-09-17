@@ -9,8 +9,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/logging/utils"
 	"github.com/rancher/rancher/pkg/controllers/user/systemimage"
 	rv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"k8s.io/api/apps/v1beta2"
@@ -88,13 +86,6 @@ func (l *loggingService) Upgrade(currentVersion string) (string, error) {
 }
 
 func (l *loggingService) upgradeDaemonset(daemonset *v1beta2.DaemonSet) error {
-	if _, err := l.daemonsets.Get(daemonset.Name, metav1.GetOptions{}); err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil
-		}
-		return err
-	}
-
 	if _, err := l.daemonsets.Update(daemonset); err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil
