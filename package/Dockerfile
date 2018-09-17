@@ -34,6 +34,7 @@ ENV AUDIT_LOG_MAXAGE 10
 ENV AUDIT_LOG_MAXBACKUP 10
 ENV AUDIT_LOG_MAXSIZE 100
 ENV AUDIT_LEVEL 0
+VOLUME /var/log/auditlog
 
 RUN mkdir -p /usr/share/rancher/ui && \
     cd /usr/share/rancher/ui && \
