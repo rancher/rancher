@@ -40,13 +40,13 @@ then
     yaml=$(sed -e 's/# // ' <<< "$yaml")
 fi
 
-echo "$yaml" | kubectl --kubeconfig ~/development/kube_config_cluster.yml apply -f -
+echo "$yaml" | kubectl apply -f -
 
 # Get the pod ID to tail the logs
-pod_id=$(kubectl --kubeconfig ~/development/kube_config_cluster.yml get pod -l job-name=cattle-cleanup-job -o jsonpath="{.items[0].metadata.name}")
+pod_id=$(kubectl get pod -l job-name=cattle-cleanup-job -o jsonpath="{.items[0].metadata.name}")
 
 declare -i count=0
-until kubectl --kubeconfig ~/development/kube_config_cluster.yml logs $pod_id -f
+until kubectl logs $pod_id -f
 do
     if [ $count -gt $timeout ]
     then
@@ -58,4 +58,4 @@ do
 done
 
 # Cleanup after it completes successfully
-echo "$yaml" | kubectl --kubeconfig ~/development/kube_config_cluster.yml delete -f -
+echo "$yaml" | kubectl delete -f -
