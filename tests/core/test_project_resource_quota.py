@@ -190,11 +190,12 @@ def test_project_used_quota(admin_cc, admin_pc):
                                                   projectId=p.id)
     wait_for_applied_quota_set(admin_pc.cluster.client,
                                ns)
-    used = wait_for_used_limit_set(admin_cc.management.client, p)
+    used = wait_for_used_pods_limit_set(admin_cc.management.client, p)
     assert used.pods == "4"
 
 
-def wait_for_used_limit_set(admin_cc_client, project, timeout=30, value="0"):
+def wait_for_used_pods_limit_set(admin_cc_client, project, timeout=30,
+                                 value="0"):
     start = time.time()
     project = admin_cc_client.reload(project)
     while "usedLimit" not in project.resourceQuota \
@@ -203,7 +204,7 @@ def wait_for_used_limit_set(admin_cc_client, project, timeout=30, value="0"):
         project = admin_cc_client.reload(project)
         if time.time() - start > timeout:
             raise Exception('Timeout waiting for'
-                            ' project.usedLimit to be set')
+                            ' project.usedLimit.pods to be set')
     if value == "0":
         return project.resourceQuota.usedLimit
     while project.resourceQuota.usedLimit.pods != value:
@@ -211,7 +212,7 @@ def wait_for_used_limit_set(admin_cc_client, project, timeout=30, value="0"):
         project = admin_cc_client.reload(project)
         if time.time() - start > timeout:
             raise Exception('Timeout waiting for'
-                            ' project.usedLimit to be set to value ' + value)
+                            ' project.usedLimit.pods to be set to ' + value)
 
 
 def test_default_resource_quota_project_update(admin_cc, admin_pc):
@@ -315,7 +316,7 @@ def test_used_quota_exact_match(admin_cc, admin_pc):
     admin_pc.cluster.client.create_namespace(name=random_str(),
                                              projectId=p.id,
                                              resourceQuota=nsq)
-    wait_for_used_limit_set(admin_cc.management.client, p, 10, "10")
+    wait_for_used_pods_limit_set(admin_cc.management.client, p, 10, "10")
 
     # try reducing the project quota
     pq = {"limit": {"pods": "8"}}
@@ -325,3 +326,78 @@ def test_used_quota_exact_match(admin_cc, admin_pc):
                                           resourceQuota=pq,
                                           namespaceDefaultResourceQuota=dq)
     assert e.value.error.status == 422
+
+
+def test_add_remove_fields(admin_cc, admin_pc):
+    pq = {"limit": {"pods": "10"}}
+    dq = {"limit": {"pods": "2"}}
+    client = admin_cc.management.client
+    p = client.create_project(name='test-' + random_str(),
+                              clusterId=admin_cc.cluster.id,
+                              resourceQuota=pq,
+                              namespaceDefaultResourceQuota=dq)
+    p = admin_cc.management.client.wait_success(p)
+    assert p.resourceQuota is not None
+    assert p.namespaceDefaultResourceQuota is not None
+
+    nsq = {"limit": {"pods": "2"}}
+    admin_pc.cluster.client.create_namespace(name=random_str(),
+                                             projectId=p.id,
+                                             resourceQuota=nsq)
+
+    wait_for_used_pods_limit_set(admin_cc.management.client, p,
+                                 10, "2")
+
+    admin_pc.cluster.client.create_namespace(name=random_str(),
+                                             projectId=p.id,
+                                             resourceQuota=nsq)
+
+    wait_for_used_pods_limit_set(admin_cc.management.client, p,
+                                 10, "4")
+
+    # update project with services quota
+    with pytest.raises(ApiError) as e:
+        pq = {"limit": {"pods": "10", "services": "10"}}
+        dq = {"limit": {"pods": "2", "services": "7"}}
+        admin_cc.management.client.update(p,
+                                          resourceQuota=pq,
+                                          namespaceDefaultResourceQuota=dq)
+    assert e.value.error.status == 422
+
+    pq = {"limit": {"pods": "10", "services": "10"}}
+    dq = {"limit": {"pods": "2", "services": "2"}}
+    p = admin_cc.management.client.update(p,
+                                          resourceQuota=pq,
+                                          namespaceDefaultResourceQuota=dq)
+    wait_for_used_svcs_limit_set(admin_cc.management.client, p,
+                                 10, "4")
+
+    # remove services quota
+    pq = {"limit": {"pods": "10"}}
+    dq = {"limit": {"pods": "2"}}
+    p = admin_cc.management.client.update(p,
+                                          resourceQuota=pq,
+                                          namespaceDefaultResourceQuota=dq)
+    wait_for_used_svcs_limit_set(admin_cc.management.client, p,
+                                 10, "0")
+
+
+def wait_for_used_svcs_limit_set(admin_cc_client, project, timeout=30,
+                                 value="0"):
+    start = time.time()
+    project = admin_cc_client.reload(project)
+    while "usedLimit" not in project.resourceQuota \
+            or "services" not in project.resourceQuota.usedLimit:
+        time.sleep(.5)
+        project = admin_cc_client.reload(project)
+        if time.time() - start > timeout:
+            raise Exception('Timeout waiting for'
+                            ' project.usedLimit.services to be set')
+    if value == "0":
+        return project.resourceQuota.usedLimit
+    while project.resourceQuota.usedLimit.services != value:
+        time.sleep(.5)
+        project = admin_cc_client.reload(project)
+        if time.time() - start > timeout:
+            raise Exception('Timeout waiting for'
+                            ' usedLimit.services to be set to ' + value)

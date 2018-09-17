@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/mitchellh/mapstructure"
+	"github.com/rancher/norman/types/convert"
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	validate "github.com/rancher/rancher/pkg/resourcequota"
 	"github.com/rancher/types/apis/core/v1"
@@ -66,6 +68,11 @@ func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (*corev1.Name
 		}
 	}
 
+	quotaToUpdate, err := c.getResourceQuotaToUpdate(ns)
+	if err != nil {
+		return ns, err
+	}
+
 	operation := "none"
 	if existing == nil {
 		if quotaSpec != nil {
@@ -74,7 +81,7 @@ func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (*corev1.Name
 	} else {
 		if quotaSpec == nil {
 			operation = "delete"
-		} else if !reflect.DeepEqual(existing.Spec.Hard, quotaSpec.Hard) {
+		} else if quotaToUpdate != "" || !reflect.DeepEqual(existing.Spec.Hard, quotaSpec.Hard) {
 			operation = "update"
 		}
 	}
@@ -83,7 +90,7 @@ func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (*corev1.Name
 	var isFit bool
 	switch operation {
 	case "create":
-		isFit, updated, err = c.validateAndSetNamespaceQuota(ns)
+		isFit, updated, err = c.validateAndSetNamespaceQuota(ns, quotaToUpdate)
 		if err != nil {
 			return updated, err
 		}
@@ -96,7 +103,7 @@ func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (*corev1.Name
 		}
 		err = c.createDefaultResourceQuota(ns, quotaSpec)
 	case "update":
-		isFit, updated, err = c.validateAndSetNamespaceQuota(ns)
+		isFit, updated, err = c.validateAndSetNamespaceQuota(ns, quotaToUpdate)
 		if err != nil || !isFit {
 			return updated, err
 		}
@@ -198,7 +205,7 @@ func (c *SyncController) createDefaultResourceQuota(ns *corev1.Namespace, spec *
 	return err
 }
 
-func (c *SyncController) validateAndSetNamespaceQuota(ns *corev1.Namespace) (bool, *corev1.Namespace, error) {
+func (c *SyncController) validateAndSetNamespaceQuota(ns *corev1.Namespace, quotaToUpdate string) (bool, *corev1.Namespace, error) {
 	if ns == nil || ns.DeletionTimestamp != nil {
 		return true, ns, nil
 	}
@@ -213,11 +220,6 @@ func (c *SyncController) validateAndSetNamespaceQuota(ns *corev1.Namespace) (boo
 		return true, ns, err
 	}
 
-	// set default quota if not set
-	quotaToUpdate, err := c.getResourceQuotaToUpdate(ns)
-	if err != nil {
-		return false, ns, err
-	}
 	updatedNs := ns.DeepCopy()
 	if quotaToUpdate != "" {
 		if updatedNs.Annotations == nil {
@@ -285,22 +287,71 @@ func (c *SyncController) setValidated(ns *corev1.Namespace, value bool, msg stri
 }
 
 func (c *SyncController) getResourceQuotaToUpdate(ns *corev1.Namespace) (string, error) {
-	toCheck := getNamespaceResourceQuota(ns)
-	// rework after api framework change is done
-	// when annotation field is passed as null, the annotation should be removed
-	// instead of being updated with the null value
-	if toCheck != "" && toCheck != "null" {
-		return "", nil
-	}
-
-	quota, err := getProjectNamespaceDefaultQuota(ns, c.ProjectLister)
+	quota := getNamespaceResourceQuota(ns)
+	defaultQuota, err := getProjectNamespaceDefaultQuota(ns, c.ProjectLister)
 	if err != nil {
 		return "", err
 	}
-	b, err := json.Marshal(quota)
+
+	// rework after api framework change is done
+	// when annotation field is passed as null, the annotation should be removed
+	// instead of being updated with the null value
+	var updatedQuota *v3.NamespaceResourceQuota
+	if quota != "" && quota != "null" {
+		// check if fields need to be removed or set
+		// based on the default quota
+		var existingQuota v3.NamespaceResourceQuota
+		err := json.Unmarshal([]byte(convert.ToString(quota)), &existingQuota)
+		if err != nil {
+			return "", err
+		}
+		updatedQuota, err = completeQuota(&existingQuota, defaultQuota)
+		if updatedQuota == nil || err != nil {
+			return "", err
+		}
+	}
+
+	var b []byte
+	if updatedQuota == nil {
+		b, err = json.Marshal(defaultQuota)
+	} else {
+		b, err = json.Marshal(updatedQuota)
+	}
+
 	if err != nil {
 		return "", err
 	}
 	return string(b), nil
 
+}
+
+func completeQuota(existingQuota *v3.NamespaceResourceQuota, defaultQuota *v3.NamespaceResourceQuota) (*v3.NamespaceResourceQuota, error) {
+	if defaultQuota == nil {
+		return nil, nil
+	}
+	existingLimitMap, err := convert.EncodeToMap(existingQuota.Limit)
+	if err != nil {
+		return nil, err
+	}
+	newLimitMap, err := convert.EncodeToMap(defaultQuota.Limit)
+	if err != nil {
+		return nil, err
+	}
+	for key, value := range existingLimitMap {
+		if _, ok := newLimitMap[key]; ok {
+			newLimitMap[key] = value
+		}
+	}
+
+	if reflect.DeepEqual(existingLimitMap, newLimitMap) {
+		return nil, nil
+	}
+
+	toReturn := existingQuota.DeepCopy()
+	newLimit := v3.ResourceQuotaLimit{}
+	if err := mapstructure.Decode(newLimitMap, &newLimit); err != nil {
+		return nil, err
+	}
+	toReturn.Limit = newLimit
+	return toReturn, nil
 }

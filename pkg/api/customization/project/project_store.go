@@ -5,14 +5,17 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/resourcequota"
+	clusterchema "github.com/rancher/types/apis/cluster.cattle.io/v3/schema"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	mgmtschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
+	clusterclient "github.com/rancher/types/client/cluster/v3"
 	mgmtclient "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
 	"k8s.io/apimachinery/pkg/labels"
@@ -151,7 +154,8 @@ func (s *projectStore) validateResourceQuota(apiContext *types.APIContext, data 
 	return isQuotaFit(apiContext, nsQuotaLimit, projectQuotaLimit, id)
 }
 
-func isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3.ResourceQuotaLimit, projectQuotaLimit *v3.ResourceQuotaLimit, id string) error {
+func isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3.ResourceQuotaLimit,
+	projectQuotaLimit *v3.ResourceQuotaLimit, id string) error {
 	// check that namespace default quota is within project quota
 	isFit, msg, err := resourcequota.IsQuotaFit(nsQuotaLimit, []*v3.ResourceQuotaLimit{}, projectQuotaLimit)
 	if err != nil {
@@ -171,12 +175,51 @@ func isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3.ResourceQuotaLimi
 		return err
 	}
 
-	if project.ResourceQuota == nil || project.ResourceQuota.UsedLimit == nil {
+	if project.ResourceQuota == nil {
 		return nil
 	}
 
+	// check if fields were added or removed
+	// and update project's namespaces accordingly
+	defaultQuotaLimitMap, err := convert.EncodeToMap(nsQuotaLimit)
+	if err != nil {
+		return err
+	}
+
+	usedQuotaLimitMap := map[string]interface{}{}
+	if project.ResourceQuota.UsedLimit != nil {
+		usedQuotaLimitMap, err = convert.EncodeToMap(project.ResourceQuota.UsedLimit)
+		if err != nil {
+			return err
+		}
+	}
+
+	limitToAdd := map[string]interface{}{}
+	limitToRemove := map[string]interface{}{}
+	for key, value := range defaultQuotaLimitMap {
+		if _, ok := usedQuotaLimitMap[key]; !ok {
+			limitToAdd[key] = value
+		}
+	}
+
+	for key, value := range usedQuotaLimitMap {
+		if _, ok := defaultQuotaLimitMap[key]; !ok {
+			limitToRemove[key] = value
+		}
+	}
+
 	// check that used quota is not bigger than the project quota
-	usedQuotaLimit, err := limitToLimit(project.ResourceQuota.UsedLimit)
+	for key := range limitToRemove {
+		delete(usedQuotaLimitMap, key)
+	}
+
+	var usedLimitToCheck mgmtclient.ResourceQuotaLimit
+	err = convert.ToObj(usedQuotaLimitMap, &usedLimitToCheck)
+	if err != nil {
+		return err
+	}
+
+	usedQuotaLimit, err := limitToLimit(&usedLimitToCheck)
 	if err != nil {
 		return err
 	}
@@ -187,6 +230,47 @@ func isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3.ResourceQuotaLimi
 	if !isFit {
 		return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, quotaField, fmt.Sprintf("exceeds used limit on fields: %s",
 			msg))
+	}
+
+	if len(limitToAdd) == 0 && len(limitToRemove) == 0 {
+		return nil
+	}
+
+	// check if default quota is enough to set on namespaces
+	mu := resourcequota.GetProjectLock(id)
+	mu.Lock()
+	defer mu.Unlock()
+	var namespaces []clusterclient.Namespace
+	options := &types.QueryOptions{
+		Conditions: []*types.QueryCondition{
+			types.NewConditionFromString("projectId", types.ModifierEQ, id),
+		},
+	}
+	if err := access.List(apiContext, &clusterchema.Version, clusterclient.NamespaceType, options, &namespaces); err != nil {
+		return err
+	}
+
+	var nsLimits []*v3.ResourceQuotaLimit
+	toAppend := &mgmtclient.ResourceQuotaLimit{}
+	if err := mapstructure.Decode(limitToAdd, toAppend); err != nil {
+		return err
+	}
+	converted, err := limitToLimit(toAppend)
+	if err != nil {
+		return err
+	}
+	for i := 0; i < len(namespaces); i++ {
+		nsLimits = append(nsLimits, converted)
+	}
+
+	isFit, msg, err = resourcequota.IsQuotaFit(&v3.ResourceQuotaLimit{}, nsLimits, projectQuotaLimit)
+	if err != nil {
+		return err
+	}
+	if !isFit {
+		return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, namespaceQuotaField,
+			fmt.Sprintf("exceeds project limit on fields %s when applied to all namespaces in a project",
+				msg))
 	}
 
 	return nil
