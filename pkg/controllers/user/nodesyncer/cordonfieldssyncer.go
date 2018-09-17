@@ -9,11 +9,15 @@ import (
 
 	"sync"
 
+	"time"
+
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/kubectl"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -91,6 +95,29 @@ func (d *NodeDrain) drainNode(key string, obj *v3.Node) error {
 	return nil
 }
 
+func (d *NodeDrain) updateNode(node *v3.Node, updateFunc func(node *v3.Node, originalErr error, kubeErr error), originalErr error, kubeErr error) (*v3.Node, error) {
+	updatedObj, err := d.machines.Update(node)
+	if err != nil && errors.IsConflict(err) {
+		// retrying twelve times, if conflict error still exists, give up
+		for i := 0; i < 12; i++ {
+			latestObj, err := d.machines.Get(node.Name, metav1.GetOptions{})
+			if err != nil {
+				logrus.Warnf("nodeDrain: error fetching node %s", node.Spec.RequestedHostname)
+				return nil, err
+			}
+			updateFunc(latestObj, originalErr, kubeErr)
+			updatedObj, err = d.machines.Update(latestObj)
+			if err != nil && errors.IsConflict(err) {
+				logrus.Debugf("nodeDrain: conflict error, will retry again %s", node.Spec.RequestedHostname)
+				time.Sleep(5 * time.Millisecond)
+				continue
+			}
+			return updatedObj, err
+		}
+	}
+	return updatedObj, err
+}
+
 func (d *NodeDrain) drain(ctx context.Context, obj *v3.Node, cancel context.CancelFunc) {
 	defer deleteFromContextMap(d.nodesToContext, obj.Name)
 
@@ -109,15 +136,18 @@ func (d *NodeDrain) drain(ctx context.Context, obj *v3.Node, cancel context.Canc
 				logrus.Errorf("nodeDrain: error getting kubeConfig for node %s", obj.Name)
 				return obj, fmt.Errorf("error getting kubeConfig for node %s", obj.Name)
 			}
-			nodeObj, err := d.machines.Update(obj.DeepCopy())
+			nodeCopy := obj.DeepCopy()
+			setConditionDraining(nodeCopy, nil, nil)
+			nodeObj, err := d.updateNode(nodeCopy, setConditionDraining, nil, nil)
 			if err != nil {
 				return obj, err
 			}
+			logrus.Infof("Draining node %s in %s", nodeName, obj.Namespace)
 			_, msg, err := kubectl.Drain(ctx, kubeConfig, nodeName, getFlags(nodeObj.Spec.NodeDrainInput))
 			if err != nil {
 				if ctx.Err() == context.Canceled {
 					stopped = true
-					logrus.Infof(fmt.Sprintf("Stopped draining %s in %s", obj.Name, obj.Namespace))
+					logrus.Infof(fmt.Sprintf("Stopped draining %s in %s", nodeName, obj.Namespace))
 					return nodeObj, nil
 				}
 				errMsg := filterErrorMsg(msg, nodeName)
@@ -125,17 +155,22 @@ func (d *NodeDrain) drain(ctx context.Context, obj *v3.Node, cancel context.Canc
 			}
 			return nodeObj, nil
 		})
-
-		if err != nil && ignoreErr(err.Error()) {
-			err = nil
+		kubeErr := err
+		if err != nil {
+			ignore, timeoutErr := ignoreErr(err.Error())
+			if ignore {
+				kubeErr = nil
+				if timeoutErr {
+					err = fmt.Errorf(fmt.Sprintf("Drain failed: drain did not complete within %vs",
+						obj.Spec.NodeDrainInput.Timeout))
+				}
+			}
 		}
 		if !stopped {
 			nodeCopy := updatedObj.(*v3.Node).DeepCopy()
-			if err == nil {
-				nodeCopy.Spec.DesiredNodeUnschedulable = ""
-			}
-			_, updateErr := d.machines.Update(nodeCopy)
-			if err != nil || updateErr != nil {
+			setConditionComplete(nodeCopy, err, kubeErr)
+			_, updateErr := d.updateNode(nodeCopy, setConditionComplete, err, kubeErr)
+			if kubeErr != nil || updateErr != nil {
 				logrus.Errorf("nodeDrain: [%s] in cluster [%s] : %v %v", nodeName, d.clusterName, err, updateErr)
 				d.machines.Controller().Enqueue("", fmt.Sprintf("%s/%s", d.clusterName, obj.Name))
 			}
@@ -240,11 +275,33 @@ func deleteFromContextMap(data map[string]context.CancelFunc, id string) {
 	nodeMapLock.Unlock()
 }
 
-func ignoreErr(msg string) bool {
+func ignoreErr(msg string) (bool, bool) {
 	for _, val := range toIgnoreErrs {
 		if strings.Contains(msg, val) {
-			return true
+			// check if timeout error
+			if !strings.HasPrefix(val, "--") {
+				return true, true
+			}
+			return true, false
 		}
 	}
-	return false
+	return false, false
+}
+
+func setConditionDraining(node *v3.Node, err error, kubeErr error) {
+	v3.NodeConditionDrained.Unknown(node)
+	v3.NodeConditionDrained.Reason(node, "")
+	v3.NodeConditionDrained.Message(node, "")
+}
+
+func setConditionComplete(node *v3.Node, err error, kubeErr error) {
+	if err == nil {
+		v3.NodeConditionDrained.True(node)
+	} else {
+		v3.NodeConditionDrained.False(node)
+		v3.NodeConditionDrained.ReasonAndMessageFromError(node, err)
+	}
+	if kubeErr == nil {
+		node.Spec.DesiredNodeUnschedulable = ""
+	}
 }
