@@ -27,11 +27,11 @@ const (
 )
 
 type ClusterControllerLifecycle interface {
-	Start(ctx context.Context, cluster *v3.Cluster) error
 	Stop(cluster *v3.Cluster)
 }
 
 type HealthSyncer struct {
+	ctx               context.Context
 	clusterName       string
 	clusterLister     v3.ClusterLister
 	clusters          v3.ClusterInterface
@@ -41,6 +41,7 @@ type HealthSyncer struct {
 
 func Register(ctx context.Context, workload *config.UserContext, clusterManager ClusterControllerLifecycle) {
 	h := &HealthSyncer{
+		ctx:               ctx,
 		clusterName:       workload.ClusterName,
 		clusterLister:     workload.Management.Management.Clusters("").Controller().Lister(),
 		clusters:          workload.Management.Management.Clusters(""),
@@ -60,6 +61,22 @@ func (h *HealthSyncer) syncHealth(ctx context.Context, syncHealth time.Duration)
 	}
 }
 
+func (h *HealthSyncer) getComponentStatus(cluster *v3.Cluster) error {
+	cses, err := h.componentStatuses.List(metav1.ListOptions{})
+	if err != nil {
+		return condition.Error("ComponentStatsFetchingFailure", errors.Wrap(err, "Failed to communicate with API server"))
+	}
+	cluster.Status.ComponentStatuses = []v3.ClusterComponentStatus{}
+	for _, cs := range cses.Items {
+		clusterCS := convertToClusterComponentStatus(&cs)
+		cluster.Status.ComponentStatuses = append(cluster.Status.ComponentStatuses, *clusterCS)
+	}
+	sort.Slice(cluster.Status.ComponentStatuses, func(i, j int) bool {
+		return cluster.Status.ComponentStatuses[i].Name < cluster.Status.ComponentStatuses[j].Name
+	})
+	return nil
+}
+
 func (h *HealthSyncer) updateClusterHealth() error {
 	oldCluster, err := h.getCluster()
 	if err != nil {
@@ -72,20 +89,19 @@ func (h *HealthSyncer) updateClusterHealth() error {
 	}
 
 	newObj, err := v3.ClusterConditionReady.Do(cluster, func() (runtime.Object, error) {
-		cses, err := h.componentStatuses.List(metav1.ListOptions{})
-		if err != nil {
-			return cluster, condition.Error("ComponentStatsFetchingFailure", errors.Wrap(err, "Failed to communicate with API server"))
+		for i := 0; ; i++ {
+			err := h.getComponentStatus(cluster)
+			if err == nil || i > 2 {
+				return cluster, err
+			}
+			select {
+			case <-h.ctx.Done():
+				return cluster, err
+			case <-time.After(5 * time.Second):
+			}
 		}
-		cluster.Status.ComponentStatuses = []v3.ClusterComponentStatus{}
-		for _, cs := range cses.Items {
-			clusterCS := convertToClusterComponentStatus(&cs)
-			cluster.Status.ComponentStatuses = append(cluster.Status.ComponentStatuses, *clusterCS)
-		}
-		sort.Slice(cluster.Status.ComponentStatuses, func(i, j int) bool {
-			return cluster.Status.ComponentStatuses[i].Name < cluster.Status.ComponentStatuses[j].Name
-		})
-		return cluster, nil
 	})
+
 	if err == nil {
 		v3.ClusterConditionWaiting.True(newObj)
 		v3.ClusterConditionWaiting.Message(newObj, "")
@@ -97,20 +113,8 @@ func (h *HealthSyncer) updateClusterHealth() error {
 		}
 	}
 
-	if err != nil {
-		logrus.Errorf("Cluster %s is unavailable, stopping controllers and waiting for successful ping: %v", h.clusterName, err)
-		h.clusterManager.Stop(cluster)
-		for {
-			if err := h.clusterManager.Start(context.TODO(), cluster); err == nil || apierrors.IsNotFound(err) {
-				logrus.Infof("Cluster %s may be back online", h.clusterName)
-				break
-			} else {
-				logrus.Debugf("Cluster %s still unavailable: %v", h.clusterName, err)
-			}
-			time.Sleep(15 * time.Second)
-		}
-	}
-
+	// Purposefully not return error.  This is so when the cluster goes unavailable we don't just keep failing
+	// which will essentially keep the controller alive forever, instead of shutting down.
 	return nil
 }
 

@@ -23,12 +23,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func NewFactory(apiContext *config.ScaledContext) (dialer.Factory, error) {
+func NewFactory(apiContext *config.ScaledContext) (*Factory, error) {
 	authorizer := tunnelserver.NewAuthorizer(apiContext)
-	tunneler, err := tunnelserver.NewTunnelServer(apiContext, authorizer)
-	if err != nil {
-		return nil, err
-	}
+	tunneler := tunnelserver.NewTunnelServer(authorizer)
 
 	secretStore, err := nodeconfig.NewStore(apiContext.Core.Namespaces(""), apiContext.Core)
 	if err != nil {
@@ -243,5 +240,5 @@ func (f *Factory) nodeDialer(clusterName, machineName string) (dialer.Dialer, er
 }
 
 func machineSessionKey(machine *v3.Node) string {
-	return fmt.Sprintf("%s/%s", machine.Namespace, machine.Name)
+	return fmt.Sprintf("%s:%s", machine.Namespace, machine.Name)
 }

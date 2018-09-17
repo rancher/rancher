@@ -27,6 +27,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/targetworkloadservice"
 	"github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/types/config"
+
 	// init upgrade implement
 	_ "github.com/rancher/rancher/pkg/controllers/user/alert/upgrade"
 	_ "github.com/rancher/rancher/pkg/controllers/user/logging/upgrade"
@@ -63,5 +64,12 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 	targetworkloadservice.Register(ctx, userOnlyContext)
 	workload.Register(ctx, userOnlyContext)
 
+	return nil
+}
+
+func RegisterFollower(ctx context.Context, cluster *config.UserContext, kubeConfigGetter common.KubeConfigGetter, clusterManager healthsyncer.ClusterControllerLifecycle) error {
+	cluster.Core.Namespaces("").Controller()
+	cluster.RBAC.ClusterRoleBindings("").Controller()
+	cluster.RBAC.RoleBindings("").Controller()
 	return nil
 }
