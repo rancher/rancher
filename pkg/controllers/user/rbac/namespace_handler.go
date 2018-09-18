@@ -437,14 +437,21 @@ func updateStatusAnnotation(hasPRTBs bool, namespace v1.Namespace, mgr *manager)
 		}
 	}
 
-	ns, err := mgr.workload.Core.Namespaces("").Get(namespace.Name, metav1.GetOptions{})
-	if err != nil {
-		logrus.Errorf("error getting ns %v for status update: %v", namespace.Name, err)
-		return
+	for i := 0; i < 10; i++ {
+		ns, err := mgr.workload.Core.Namespaces("").Get(namespace.Name, metav1.GetOptions{})
+		if err != nil {
+			logrus.Errorf("error getting ns %v for status update: %v", namespace.Name, err)
+			return
+		}
+		if err := namespaceutil.SetNamespaceCondition(ns, time.Second*1, initialRoleCondition, true, ""); err != nil {
+			logrus.Warnf("fail to set %v condition on ns %v: %v", initialRoleCondition, namespace.Name, err)
+			continue
+		}
+		_, err = mgr.workload.Core.Namespaces("").Update(ns)
+		if err == nil {
+			break
+		}
+		logrus.Warnf("error updating ns %v status: %v", ns.Name, err)
 	}
-	namespaceutil.SetNamespaceCondition(ns, time.Second*1, initialRoleCondition, true, "")
-	_, err = mgr.workload.Core.Namespaces("").Update(ns)
-	if err != nil {
-		logrus.Errorf("error updating ns %v status: %v", ns.Name, err)
-	}
+
 }
