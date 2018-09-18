@@ -468,7 +468,7 @@ func (c *client) GetHeadInfo(repoURL string, branch string, accessToken string) 
 	info.Ref = branch
 	info.Branch = branch
 	info.Message = commit.Commit.GetMessage()
-	info.HTMLLink = commit.GetURL()
+	info.HTMLLink = commit.GetHTMLURL()
 	info.Email = commit.Commit.Author.GetEmail()
 	info.AvatarURL = commit.Author.GetAvatarURL()
 	info.Author = commit.Author.GetLogin()
