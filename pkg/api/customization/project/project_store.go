@@ -228,7 +228,7 @@ func isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3.ResourceQuotaLimi
 		return err
 	}
 	if !isFit {
-		return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, quotaField, fmt.Sprintf("exceeds used limit on fields: %s",
+		return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, quotaField, fmt.Sprintf("is below the used limit on fields: %s",
 			msg))
 	}
 
