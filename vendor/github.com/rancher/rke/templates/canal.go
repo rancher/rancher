@@ -388,6 +388,9 @@ spec:
             mountPath: /run
           - name: flannel-cfg
             mountPath: /etc/kube-flannel/
+          - name: xtables-lock
+            mountPath: /run/xtables.lock
+            readOnly: false
       volumes:
         # Used by calico/node.
         - name: lib-modules
@@ -413,6 +416,10 @@ spec:
         - name: flannel-cfg
           configMap:
             name: canal-config
+        - name: xtables-lock
+          hostPath:
+            path: /run/xtables.lock
+            type: FileOrCreate
 
 # Create all the CustomResourceDefinitions needed for
 # Calico policy-only mode.
