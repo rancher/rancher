@@ -46,6 +46,8 @@ type Client struct {
 	ProjectCatalog                          ProjectCatalogOperations
 	ClusterCatalog                          ClusterCatalogOperations
 	MultiClusterApp                         MultiClusterAppOperations
+	GlobalDNS                               GlobalDNSOperations
+	GlobalDNSProvider                       GlobalDNSProviderOperations
 }
 
 func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
@@ -97,6 +99,8 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.ProjectCatalog = newProjectCatalogClient(client)
 	client.ClusterCatalog = newClusterCatalogClient(client)
 	client.MultiClusterApp = newMultiClusterAppClient(client)
+	client.GlobalDNS = newGlobalDNSClient(client)
+	client.GlobalDNSProvider = newGlobalDNSProviderClient(client)
 
 	return client, nil
 }

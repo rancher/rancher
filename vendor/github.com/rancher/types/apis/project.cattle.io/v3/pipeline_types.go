@@ -15,6 +15,7 @@ const (
 	PipelineExecutionConditionProvisioned condition.Cond = "Provisioned"
 	PipelineExecutionConditionInitialized condition.Cond = "Initialized"
 	PipelineExecutionConditionBuilt       condition.Cond = "Built"
+	PipelineExecutionConditionNotified    condition.Cond = "Notified"
 )
 
 type SourceCodeProvider struct {
@@ -186,8 +187,20 @@ type PipelineSpec struct {
 type PipelineConfig struct {
 	Stages []Stage `json:"stages,omitempty" yaml:"stages,omitempty"`
 
-	Timeout int         `json:"timeout,omitempty" yaml:"timeout,omitempty"`
-	Branch  *Constraint `json:"branch,omitempty" yaml:"branch,omitempty"`
+	Timeout      int                   `json:"timeout,omitempty" yaml:"timeout,omitempty"`
+	Branch       *Constraint           `json:"branch,omitempty" yaml:"branch,omitempty"`
+	Notification *PipelineNotification `json:"notification,omitempty" yaml:"notification,omitempty"`
+}
+
+type PipelineNotification struct {
+	Recipients []Recipient   `json:"recipients,omitempty" yaml:"recipients,omitempty"`
+	Message    string        `json:"message,omitempty" yaml:"message,omitempty"`
+	Condition  stringorslice `json:"condition,omitempty" yaml:"condition,omitempty"`
+}
+
+type Recipient struct {
+	Recipient string `json:"recipient,omitempty"`
+	Notifier  string `json:"notifier,omitempty"`
 }
 
 type PipelineCondition struct {
