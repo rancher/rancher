@@ -63,6 +63,8 @@ const (
 	StatePending  = "Pending"
 	StateDenied   = "Denied"
 
+	ConditionChanged = "Changed"
+
 	PipelineFinishLabel    = "pipeline.project.cattle.io/finish"
 	LocalRegistryPortLabel = "pipeline.project.cattle.io/local-registry-port"
 	PipelineNamespaceLabel = "pipeline.project.cattle.io/pipeline-namespace"
