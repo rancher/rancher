@@ -64,6 +64,11 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 		return obj, nil
 	}
 
+	if !driver.Exists() {
+		v3.NodeDriverConditionDownloaded.Unknown(obj)
+		v3.NodeDriverConditionInstalled.Unknown(obj)
+	}
+
 	newObj, err := v3.NodeDriverConditionDownloaded.Once(obj, func() (runtime.Object, error) {
 		// update status
 		obj, err = m.nodeDriverClient.Update(obj)
