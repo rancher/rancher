@@ -1,6 +1,7 @@
 package systemaccount
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/rancher/rancher/pkg/randomtoken"
@@ -44,22 +45,30 @@ func (s *Manager) CreateSystemAccount(cluster *v3.Cluster) error {
 	}
 
 	bindingName := user.Name + "-admin"
-	_, err = s.crtbs.GetNamespaced(cluster.Name, bindingName, v1.GetOptions{})
-	if err == nil {
-		return nil
+	crbd, err := s.crtbs.GetNamespaced(cluster.Name, bindingName, v1.GetOptions{})
+	if err != nil {
+		if errors2.IsNotFound(err) {
+			crbd, err = s.crtbs.Create(&v3.ClusterRoleTemplateBinding{
+				ObjectMeta: v1.ObjectMeta{
+					Name:      bindingName,
+					Namespace: cluster.Name,
+				},
+				ClusterName:      cluster.Name,
+				UserName:         user.Name,
+				RoleTemplateName: clusterOwnerRole,
+			})
+			if err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+	if crbd.Annotations[fmt.Sprintf("lifecycle.cattle.io/create.cluster-crtb-sync_%s", cluster.Name)] != "true" {
+		return errors.New("waiting for RBAC controller")
 	}
 
-	_, err = s.crtbs.Create(&v3.ClusterRoleTemplateBinding{
-		ObjectMeta: v1.ObjectMeta{
-			Name:      bindingName,
-			Namespace: cluster.Name,
-		},
-		ClusterName:      cluster.Name,
-		UserName:         user.Name,
-		RoleTemplateName: clusterOwnerRole,
-	})
-
-	return err
+	return nil
 }
 
 func (s *Manager) GetSystemUser(cluster *v3.Cluster) (*v3.User, error) {

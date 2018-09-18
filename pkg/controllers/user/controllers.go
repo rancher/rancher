@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 
+	"github.com/rancher/rancher/pkg/controllers/management/clusterdeploy"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	"github.com/rancher/rancher/pkg/controllers/user/alert"
 	"github.com/rancher/rancher/pkg/controllers/user/approuter"
@@ -27,6 +28,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/targetworkloadservice"
 	"github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/types/config"
+
 	// init upgrade implement
 	_ "github.com/rancher/rancher/pkg/controllers/user/alert/upgrade"
 	_ "github.com/rancher/rancher/pkg/controllers/user/logging/upgrade"
@@ -54,6 +56,7 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 	endpoints.Register(ctx, cluster)
 	approuter.Register(ctx, cluster)
 	resourcequota.Register(ctx, cluster)
+	clusterdeploy.Register(cluster, kubeConfigGetter)
 
 	userOnlyContext := cluster.UserOnlyContext()
 	dnsrecord.Register(ctx, userOnlyContext)

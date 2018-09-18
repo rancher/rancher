@@ -5,10 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"time"
 
 	"github.com/rancher/norman/types"
-	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/kubectl"
 	"github.com/rancher/rancher/pkg/settings"
@@ -22,23 +21,23 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-func Register(management *config.ManagementContext, clusterManager *clustermanager.Manager) {
+func Register(cluster *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
 	c := &clusterDeploy{
-		systemAccountManager: systemaccount.NewManager(management),
-		userManager:          management.UserManager,
-		clusters:             management.Management.Clusters(""),
-		nodeLister:           management.Management.Nodes("").Controller().Lister(),
-		clusterManager:       clusterManager,
+		systemAccountManager: systemaccount.NewManager(cluster.Management),
+		userManager:          cluster.Management.UserManager,
+		clusters:             cluster.Management.Management.Clusters(""),
+		nodeLister:           cluster.Management.Management.Nodes("").Controller().Lister(),
+		kubeConfigGetter:     kubeConfigGetter,
 	}
 
-	management.Management.Clusters("").AddHandler("cluster-deploy", c.sync)
+	cluster.Management.Management.Clusters("").AddHandler("cluster-deploy", c.sync)
 }
 
 type clusterDeploy struct {
 	systemAccountManager *systemaccount.Manager
 	userManager          user.Manager
 	clusters             v3.ClusterInterface
-	clusterManager       *clustermanager.Manager
+	kubeConfigGetter     common.KubeConfigGetter
 	nodeLister           v3.NodeLister
 }
 
@@ -82,6 +81,10 @@ func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
 		return cluster, cd.systemAccountManager.CreateSystemAccount(cluster)
 	})
 	if err != nil {
+		if err.Error() == "waiting for RBAC controller" {
+			cd.clusters.Controller().Enqueue("", cluster.Name)
+			return nil
+		}
 		return err
 	}
 	err = cd.deployAgent(cluster)
@@ -114,15 +117,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 		}
 
 		var output []byte
-		for i := 0; i < 3; i++ {
-			// This will fail almost always the first time because when we create the namespace in the file
-			// it won't have privileges.  Just stupidly try 3 times
-			output, err = kubectl.Apply(yaml, kubeConfig)
-			if err == nil {
-				break
-			}
-			time.Sleep(2 * time.Second)
-		}
+		output, err = kubectl.Apply(yaml, kubeConfig)
 		if err != nil {
 			return cluster, types.NewErrors(err, errors.New(string(output)))
 		}
@@ -168,7 +163,7 @@ func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Confi
 		return nil, err
 	}
 
-	return cd.clusterManager.KubeConfig(cluster.Name, token), nil
+	return cd.kubeConfigGetter.KubeConfig(cluster.Name, token), nil
 }
 
 func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage string) ([]byte, error) {
