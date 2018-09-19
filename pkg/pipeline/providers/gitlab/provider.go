@@ -2,34 +2,22 @@ package gitlab
 
 import (
 	"fmt"
+
 	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/store/subtype"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/pipeline/providers/common"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
-	mv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	"github.com/rancher/types/client/project/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/cache"
 )
 
 type GlProvider struct {
-	SourceCodeProviderConfigs  v3.SourceCodeProviderConfigInterface
-	SourceCodeCredentials      v3.SourceCodeCredentialInterface
-	SourceCodeCredentialLister v3.SourceCodeCredentialLister
-	SourceCodeRepositories     v3.SourceCodeRepositoryInterface
-	Pipelines                  v3.PipelineInterface
-	PipelineExecutions         v3.PipelineExecutionInterface
-
-	PipelineIndexer             cache.Indexer
-	PipelineExecutionIndexer    cache.Indexer
-	SourceCodeCredentialIndexer cache.Indexer
-	SourceCodeRepositoryIndexer cache.Indexer
-
-	AuthConfigs mv3.AuthConfigInterface
+	common.BaseProvider
 }
 
 func (g *GlProvider) CustomizeSchemas(schemas *types.Schemas) {
@@ -51,25 +39,9 @@ func (g *GlProvider) GetName() string {
 }
 
 func (g *GlProvider) TransformToSourceCodeProvider(config map[string]interface{}) map[string]interface{} {
-	p := transformToSourceCodeProvider(config)
-	return p
-}
-
-func transformToSourceCodeProvider(config map[string]interface{}) map[string]interface{} {
-	result := map[string]interface{}{}
-
-	if m, ok := config["metadata"].(map[string]interface{}); ok {
-		result["id"] = fmt.Sprintf("%v:%v", m[client.ObjectMetaFieldNamespace], m[client.ObjectMetaFieldName])
-	}
-	if t := convert.ToString(config[client.SourceCodeProviderFieldType]); t != "" {
-		result[client.SourceCodeProviderFieldType] = client.GitlabProviderType
-	}
-	if t := convert.ToString(config[projectNameField]); t != "" {
-		result["projectId"] = t
-	}
-	result[client.GitlabProviderFieldRedirectURL] = formGitlabRedirectURLFromMap(config)
-
-	return result
+	m := g.BaseProvider.TransformToSourceCodeProvider(config, client.GithubProviderType)
+	m[client.GitlabProviderFieldRedirectURL] = formGitlabRedirectURLFromMap(config)
+	return m
 }
 
 func (g *GlProvider) GetProviderConfig(projectID string) (interface{}, error) {
@@ -103,4 +75,25 @@ func (g *GlProvider) GetProviderConfig(projectID string) (interface{}, error) {
 	storedGitlabPipelineConfig.APIVersion = "project.cattle.io/v3"
 	storedGitlabPipelineConfig.Kind = v3.SourceCodeProviderConfigGroupVersionKind.Kind
 	return storedGitlabPipelineConfig, nil
+}
+
+func formGitlabRedirectURLFromMap(config map[string]interface{}) string {
+	hostname := convert.ToString(config[client.GitlabPipelineConfigFieldHostname])
+	clientID := convert.ToString(config[client.GitlabPipelineConfigFieldClientID])
+	tls := convert.ToBool(config[client.GitlabPipelineConfigFieldTLS])
+	return gitlabRedirectURL(hostname, clientID, tls)
+}
+
+func gitlabRedirectURL(hostname, clientID string, tls bool) string {
+	redirect := ""
+	if hostname != "" {
+		scheme := "http://"
+		if tls {
+			scheme = "https://"
+		}
+		redirect = scheme + hostname
+	} else {
+		redirect = gitlabDefaultHostName
+	}
+	return fmt.Sprintf("%s/oauth/authorize?client_id=%s&response_type=code", redirect, clientID)
 }

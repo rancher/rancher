@@ -1,6 +1,9 @@
 package pipeline
 
 import (
+	"net/http"
+	"time"
+
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -10,8 +13,6 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/client/project/v3"
-	"net/http"
-	"time"
 )
 
 const (

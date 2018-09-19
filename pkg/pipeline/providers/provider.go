@@ -2,6 +2,7 @@ package providers
 
 import (
 	"fmt"
+
 	"github.com/rancher/norman/types"
 )
 

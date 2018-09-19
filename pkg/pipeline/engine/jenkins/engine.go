@@ -1,14 +1,21 @@
 package jenkins
 
 import (
-	"encoding/xml"
-	"fmt"
-
 	"bytes"
 	"encoding/json"
+	"encoding/xml"
+	"fmt"
+	"net/http"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/pipeline/providers"
+	"github.com/rancher/rancher/pkg/pipeline/remote"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/apps/v1beta2"
@@ -20,11 +27,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"net/http"
-	"regexp"
-	"strconv"
-	"strings"
-	"time"
 )
 
 type Engine struct {
@@ -37,6 +39,7 @@ type Engine struct {
 	Secrets                    v1.SecretInterface
 	SecretLister               v1.SecretLister
 	ManagementSecretLister     v1.SecretLister
+	SourceCodeCredentials      v3.SourceCodeCredentialInterface
 	SourceCodeCredentialLister v3.SourceCodeCredentialLister
 	PipelineLister             v3.PipelineLister
 
@@ -611,7 +614,7 @@ func (j Engine) setCredential(client *Client, execution *v3.PipelineExecution, c
 		return nil
 	}
 	ns, name := ref.Parse(credentialID)
-	souceCodeCredential, err := j.SourceCodeCredentialLister.Get(ns, name)
+	credential, err := j.SourceCodeCredentialLister.Get(ns, name)
 	if err != nil {
 		return err
 	}
@@ -625,8 +628,26 @@ func (j Engine) setCredential(client *Client, execution *v3.PipelineExecution, c
 	jenkinsCred.Scope = "GLOBAL"
 	jenkinsCred.ID = execution.Name
 
-	jenkinsCred.Username = souceCodeCredential.Spec.GitLoginName
-	jenkinsCred.Password = souceCodeCredential.Spec.AccessToken
+	_, projID := ref.Parse(execution.Spec.ProjectName)
+	scpConfig, err := providers.GetSourceCodeProviderConfig(credential.Spec.SourceCodeType, projID)
+	if err != nil {
+		return err
+	}
+	remote, err := remote.New(scpConfig)
+	if err != nil {
+		return err
+	}
+
+	jenkinsCred.Username = credential.Spec.GitLoginName
+	jenkinsCred.Password = credential.Spec.AccessToken
+	if credential.Spec.GitCloneToken != "" {
+		jenkinsCred.Password = credential.Spec.GitCloneToken
+	}
+	if accessToken, err := utils.EnsureAccessToken(j.SourceCodeCredentials, remote, credential); err != nil {
+		return err
+	} else if accessToken != credential.Spec.AccessToken {
+		jenkinsCred.Password = accessToken
+	}
 
 	bodyContent := map[string]interface{}{}
 	bodyContent["credentials"] = jenkinsCred

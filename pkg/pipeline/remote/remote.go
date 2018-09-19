@@ -2,6 +2,9 @@ package remote
 
 import (
 	"errors"
+
+	"github.com/rancher/rancher/pkg/pipeline/remote/bitbucketcloud"
+	"github.com/rancher/rancher/pkg/pipeline/remote/bitbucketserver"
 	"github.com/rancher/rancher/pkg/pipeline/remote/github"
 	"github.com/rancher/rancher/pkg/pipeline/remote/gitlab"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
@@ -17,6 +20,10 @@ func New(config interface{}) (model.Remote, error) {
 		return github.New(config)
 	case *v3.GitlabPipelineConfig:
 		return gitlab.New(config)
+	case *v3.BitbucketCloudPipelineConfig:
+		return bitbucketcloud.New(config)
+	case *v3.BitbucketServerPipelineConfig:
+		return bitbucketserver.New(config)
 	}
 
 	return nil, errors.New("unsupported remote type")

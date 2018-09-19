@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/controller/pipeline"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/controller/pipelineexecution"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/controller/project"

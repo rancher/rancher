@@ -6,15 +6,16 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"errors"
+	"math"
+	"math/big"
+	"time"
+
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/util/cert"
-	"math"
-	"math/big"
-	"time"
 )
 
 func getProjectID(ns *corev1.Namespace) string {

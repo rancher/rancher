@@ -1,9 +1,17 @@
-package bitbucket
+package bitbucketcloud
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"regexp"
+	"strings"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
@@ -13,13 +21,6 @@ import (
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
-	"io"
-	"io/ioutil"
-	"net/http"
-	"net/url"
-	"regexp"
-	"strings"
-	"time"
 )
 
 const (
@@ -50,18 +51,6 @@ func New(config *v3.BitbucketCloudPipelineConfig) (model.Remote, error) {
 
 func (c *client) Type() string {
 	return model.BitbucketCloudType
-}
-
-func (c *client) CanLogin() bool {
-	return true
-}
-
-func (c *client) CanRepos() bool {
-	return true
-}
-
-func (c *client) CanHook() bool {
-	return true
 }
 
 func (c *client) Login(code string) (*v3.SourceCodeCredential, error) {
@@ -217,7 +206,6 @@ func (c *client) GetPipelineFileInRepo(repoURL string, branch string, accessToke
 		logrus.Debugf("error GetPipelineFileInRepo - %v", err)
 		return nil, nil
 	}
-	logrus.Infof("I got pipeline content:%s", string(content))
 	return content, nil
 }
 
@@ -308,7 +296,7 @@ func (c *client) GetHeadInfo(repoURL string, branch string, accessToken string) 
 	info.Ref = branch
 	info.Branch = branch
 	info.Message = branchObj.Target.Message
-	info.HTMLLink = branchObj.Links.Html.Href
+	info.HTMLLink = branchObj.Links.HTML.Href
 	info.AvatarURL = branchObj.Target.Author.User.Links.Avatar.Href
 	info.Author = branchObj.Target.Author.User.UserName
 
@@ -324,7 +312,7 @@ func convertUser(bitbucketUser *User) *v3.SourceCodeCredential {
 	cred.Spec.SourceCodeType = model.BitbucketCloudType
 
 	cred.Spec.AvatarURL = bitbucketUser.Links.Avatar.Href
-	cred.Spec.HTMLURL = bitbucketUser.Links.Html.Href
+	cred.Spec.HTMLURL = bitbucketUser.Links.HTML.Href
 	cred.Spec.LoginName = bitbucketUser.UserName
 	cred.Spec.GitLoginName = cloneUserName
 	cred.Spec.DisplayName = bitbucketUser.DisplayName
@@ -356,7 +344,11 @@ func convertRepos(repos []Repository) []v3.SourceCodeRepository {
 		r := v3.SourceCodeRepository{}
 		for _, link := range repo.Links.Clone {
 			if link.Name == "https" {
-				r.Spec.URL = link.Href
+				u, _ := url.Parse(link.Href)
+				if u != nil {
+					u.User = nil
+					r.Spec.URL = u.String()
+				}
 				break
 			}
 		}
@@ -403,7 +395,6 @@ func getFromBitbucket(url string, accessToken string) ([]byte, error) {
 }
 
 func doRequestToBitbucket(method string, url string, accessToken string, header map[string]string, body io.Reader) ([]byte, error) {
-	logrus.Infof("requesting to url:%s", url)
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, err
@@ -420,8 +411,7 @@ func doRequestToBitbucket(method string, url string, accessToken string, header 
 		q.Set("access_token", accessToken)
 	}
 	req.URL.RawQuery = q.Encode()
-	//req.Header.Add("Accept", "application/json")
-	//req.Header.Add("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36)")
+	req.Header.Add("Cache-control", "no-cache")
 	for k, v := range header {
 		req.Header.Set(k, v)
 	}
@@ -437,7 +427,6 @@ func doRequestToBitbucket(method string, url string, accessToken string, header 
 		return nil, httperror.NewAPIErrorLong(resp.StatusCode, "", body.String())
 	}
 	r, err := ioutil.ReadAll(resp.Body)
-	logrus.Infof("response is:%s", string(r))
 	return r, err
 }
 

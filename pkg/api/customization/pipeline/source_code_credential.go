@@ -1,6 +1,8 @@
 package pipeline
 
 import (
+	"net/http"
+
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
@@ -10,7 +12,6 @@ import (
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/client/project/v3"
 	"k8s.io/apimachinery/pkg/labels"
-	"net/http"
 )
 
 const (
@@ -89,7 +90,7 @@ func (h *SourceCodeCredentialHandler) refreshrepos(apiContext *types.APIContext)
 		return err
 	}
 
-	if _, err := providers.RefreshReposByCredential(h.SourceCodeRepositories, h.SourceCodeRepositoryLister, credential, scpConfig); err != nil {
+	if _, err := providers.RefreshReposByCredential(h.SourceCodeRepositories, h.SourceCodeRepositoryLister, h.SourceCodeCredentials, credential, scpConfig); err != nil {
 		return err
 	}
 	data := []map[string]interface{}{}

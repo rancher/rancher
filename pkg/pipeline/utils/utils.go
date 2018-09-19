@@ -3,6 +3,10 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/ref"
@@ -12,9 +16,6 @@ import (
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"strconv"
-	"strings"
-	"time"
 )
 
 func initExecution(p *v3.Pipeline, config *v3.PipelineConfig) *v3.PipelineExecution {
@@ -114,6 +115,10 @@ func GenerateExecution(executions v3.PipelineExecutionInterface, pipeline *v3.Pi
 	execution.Spec.Ref = info.Ref
 	execution.Spec.Commit = info.Commit
 	execution.Spec.Event = info.Event
+
+	if info.RepositoryURL != "" {
+		execution.Spec.RepositoryURL = info.RepositoryURL
+	}
 
 	if !Match(execution.Spec.PipelineConfig.Branch, info.Branch) {
 		logrus.Debug("conditions do not match")
@@ -261,4 +266,34 @@ func SetRegistryPortMapping(configmap *corev1.ConfigMap, portMap map[string]stri
 	}
 	configmap.Data[RegistryPortMappingFile] = string(b)
 	return nil
+}
+
+// EnsureAccessToken Checks expiry and do token refresh when needed
+func EnsureAccessToken(credentialInterface v3.SourceCodeCredentialInterface, remote model.Remote, credential *v3.SourceCodeCredential) (string, error) {
+	if credential == nil {
+		return "", nil
+	}
+	refresher, ok := remote.(model.Refresher)
+	if !ok {
+		return credential.Spec.AccessToken, nil
+	}
+
+	t, err := time.Parse(time.RFC3339, credential.Spec.Expiry)
+	if err != nil {
+		return "", err
+	}
+	if t.Before(time.Now().Add(time.Minute)) {
+		torefresh := credential.DeepCopy()
+		ok, err := refresher.Refresh(torefresh)
+		if err != nil {
+			return "", err
+		}
+		if ok {
+			if _, err := credentialInterface.Update(torefresh); err != nil {
+				return "", err
+			}
+		}
+		return torefresh.Spec.AccessToken, nil
+	}
+	return credential.Spec.AccessToken, nil
 }

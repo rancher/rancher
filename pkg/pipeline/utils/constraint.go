@@ -1,8 +1,9 @@
 package utils
 
 import (
-	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"path/filepath"
+
+	"github.com/rancher/types/apis/project.cattle.io/v3"
 )
 
 func MatchAll(cs *v3.Constraints, execution *v3.PipelineExecution) bool {

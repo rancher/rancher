@@ -6,16 +6,16 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"strings"
+
 	"github.com/google/go-github/github"
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/pipeline/providers"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
-	"io/ioutil"
-	"net/http"
-	"strings"
 )
 
 const (
@@ -34,6 +34,7 @@ const (
 type GithubDriver struct {
 	PipelineLister             v3.PipelineLister
 	PipelineExecutions         v3.PipelineExecutionInterface
+	SourceCodeCredentials      v3.SourceCodeCredentialInterface
 	SourceCodeCredentialLister v3.SourceCodeCredentialLister
 }
 
@@ -80,30 +81,7 @@ func (g GithubDriver) Execute(req *http.Request) (int, error) {
 		}
 	}
 
-	if (info.Event == utils.WebhookEventPush && !pipeline.Spec.TriggerWebhookPush) ||
-		(info.Event == utils.WebhookEventTag && !pipeline.Spec.TriggerWebhookTag) ||
-		(info.Event == utils.WebhookEventPullRequest && !pipeline.Spec.TriggerWebhookPr) {
-		return http.StatusUnavailableForLegalReasons, fmt.Errorf("trigger for event '%s' is disabled", info.Event)
-	}
-
-	pipelineConfig, err := providers.GetPipelineConfigByBranch(g.SourceCodeCredentialLister, pipeline, info.Branch)
-	if err != nil {
-		return http.StatusInternalServerError, err
-	}
-
-	if pipelineConfig == nil {
-		//no pipeline config to run
-		return http.StatusOK, nil
-	}
-
-	if !utils.Match(pipelineConfig.Branch, info.Branch) {
-		return http.StatusUnavailableForLegalReasons, fmt.Errorf("skipped branch '%s'", info.Branch)
-	}
-
-	if _, err := utils.GenerateExecution(g.PipelineExecutions, pipeline, pipelineConfig, info); err != nil {
-		return http.StatusInternalServerError, err
-	}
-	return http.StatusOK, nil
+	return validateAndGeneratePipelineExecution(g.PipelineExecutions, g.SourceCodeCredentials, g.SourceCodeCredentialLister, info, pipeline)
 }
 
 func verifyGithubWebhookSignature(secret []byte, signature string, body []byte) bool {

@@ -9,7 +9,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/systemimage"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	rv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
-
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"k8s.io/api/apps/v1beta2"

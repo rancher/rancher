@@ -1,8 +1,6 @@
 package pipelineexecution
 
 import (
-	"github.com/rancher/rancher/pkg/pipeline/utils"
-
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/json"
@@ -14,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	images "github.com/rancher/rancher/pkg/image"
+	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/randomtoken"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rke/pki"
