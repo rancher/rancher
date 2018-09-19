@@ -2,26 +2,27 @@ package providers
 
 import (
 	"github.com/rancher/rancher/pkg/pipeline/remote"
+	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/satori/go.uuid"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-func GetPipelineConfigByBranch(sourceCodeCredentialLister v3.SourceCodeCredentialLister, pipeline *v3.Pipeline, branch string) (*v3.PipelineConfig, error) {
+func GetPipelineConfigByBranch(sourceCodeCredentials v3.SourceCodeCredentialInterface, sourceCodeCredentialLister v3.SourceCodeCredentialLister, pipeline *v3.Pipeline, branch string) (*v3.PipelineConfig, error) {
 	credentialName := pipeline.Spec.SourceCodeCredentialName
 	repoURL := pipeline.Spec.RepositoryURL
 	accessToken := ""
 	_, projID := ref.Parse(pipeline.Spec.ProjectName)
 	sourceCodeType := model.GithubType
 	var scpConfig interface{}
+	var credential *v3.SourceCodeCredential
+	var err error
 	if credentialName != "" {
 		ns, name := ref.Parse(credentialName)
-		credential, err := sourceCodeCredentialLister.Get(ns, name)
+		credential, err = sourceCodeCredentialLister.Get(ns, name)
 		if err != nil {
 			return nil, err
 		}
@@ -34,6 +35,10 @@ func GetPipelineConfigByBranch(sourceCodeCredentialLister v3.SourceCodeCredentia
 		}
 	}
 	remote, err := remote.New(scpConfig)
+	if err != nil {
+		return nil, err
+	}
+	accessToken, err = utils.EnsureAccessToken(sourceCodeCredentials, remote, credential)
 	if err != nil {
 		return nil, err
 	}
@@ -52,13 +57,19 @@ func GetPipelineConfigByBranch(sourceCodeCredentialLister v3.SourceCodeCredentia
 
 }
 
-func RefreshReposByCredential(sourceCodeRepositories v3.SourceCodeRepositoryInterface, sourceCodeRepositoryLister v3.SourceCodeRepositoryLister, credential *v3.SourceCodeCredential, sourceCodeProviderConfig interface{}) ([]*v3.SourceCodeRepository, error) {
+func RefreshReposByCredential(sourceCodeRepositories v3.SourceCodeRepositoryInterface, sourceCodeRepositoryLister v3.SourceCodeRepositoryLister, sourceCodeCredentials v3.SourceCodeCredentialInterface, credential *v3.SourceCodeCredential, sourceCodeProviderConfig interface{}) ([]*v3.SourceCodeRepository, error) {
 	namespace := credential.Namespace
 	credentialID := ref.Ref(credential)
 
 	remote, err := remote.New(sourceCodeProviderConfig)
 	if err != nil {
 		return nil, err
+	}
+	accessToken, err := utils.EnsureAccessToken(sourceCodeCredentials, remote, credential)
+	if err != nil {
+		return nil, err
+	} else if accessToken != credential.Spec.AccessToken {
+		credential.Spec.AccessToken = accessToken
 	}
 	repos, err := remote.Repos(credential)
 	if err != nil {

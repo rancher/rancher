@@ -21,7 +21,8 @@ func New(cluster *config.UserContext) PipelineEngine {
 	secrets := cluster.Core.Secrets("")
 	secretLister := secrets.Controller().Lister()
 	managementSecretLister := cluster.Management.Core.Secrets("").Controller().Lister()
-	sourceCodeCredentialLister := cluster.Management.Project.SourceCodeCredentials("").Controller().Lister()
+	sourceCodeCredentials := cluster.Management.Project.SourceCodeCredentials("")
+	sourceCodeCredentialLister := sourceCodeCredentials.Controller().Lister()
 	pipelineLister := cluster.Management.Project.Pipelines("").Controller().Lister()
 	dialer := cluster.Management.Dialer
 
@@ -31,6 +32,7 @@ func New(cluster *config.UserContext) PipelineEngine {
 		Secrets:                    secrets,
 		SecretLister:               secretLister,
 		ManagementSecretLister:     managementSecretLister,
+		SourceCodeCredentials:      sourceCodeCredentials,
 		SourceCodeCredentialLister: sourceCodeCredentialLister,
 		PipelineLister:             pipelineLister,
 

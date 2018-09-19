@@ -1,10 +1,11 @@
 package hooks
 
 import (
+	"net/http"
+
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/json"
-	"net/http"
 )
 
 type WebhookHandler struct {

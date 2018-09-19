@@ -2,16 +2,17 @@ package pipeline
 
 import (
 	"context"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/gorilla/websocket"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/pipeline/engine"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/ticker"
 	"github.com/sirupsen/logrus"
-	"net/http"
-	"strconv"
-	"strings"
-	"time"
 )
 
 const (

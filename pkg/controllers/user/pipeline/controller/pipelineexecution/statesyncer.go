@@ -2,6 +2,8 @@ package pipelineexecution
 
 import (
 	"context"
+	"time"
+
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/rancher/pkg/pipeline/engine"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
@@ -11,7 +13,6 @@ import (
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"time"
 )
 
 // This controller is responsible for updating pipeline execution states

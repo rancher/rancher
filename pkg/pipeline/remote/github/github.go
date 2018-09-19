@@ -5,6 +5,14 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/google/go-github/github"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
@@ -15,13 +23,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/tomnomnom/linkheader"
 	"golang.org/x/oauth2"
-	"io"
-	"io/ioutil"
-	"net/http"
-	"regexp"
-	"strconv"
-	"strings"
-	"time"
 )
 
 const (
@@ -75,17 +76,6 @@ func New(config *v3.GithubPipelineConfig) (model.Remote, error) {
 
 func (c *client) Type() string {
 	return model.GithubType
-}
-
-func (c *client) CanLogin() bool {
-	return true
-}
-
-func (c *client) CanRepos() bool {
-	return true
-}
-func (c *client) CanHook() bool {
-	return true
 }
 
 func (c *client) Login(code string) (*v3.SourceCodeCredential, error) {

@@ -2,6 +2,9 @@ package providers
 
 import (
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/pipeline/providers/bitbucketcloud"
+	"github.com/rancher/rancher/pkg/pipeline/providers/bitbucketserver"
+	"github.com/rancher/rancher/pkg/pipeline/providers/common"
 	"github.com/rancher/rancher/pkg/pipeline/providers/github"
 	"github.com/rancher/rancher/pkg/pipeline/providers/gitlab"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
@@ -17,19 +20,14 @@ var (
 	providersByType = make(map[string]SourceCodeProvider)
 )
 
-var sourceCodeProviderConfigTypes = []string{
-	client.GithubPipelineConfigType,
-	client.GitlabPipelineConfigType,
-}
-
 func SetupSourceCodeProviderConfig(management *config.ScaledContext, schemas *types.Schemas) {
 	configure(management)
 
 	providerBaseSchema := schemas.Schema(&schema.Version, client.SourceCodeProviderType)
 	setSourceCodeProviderStore(providerBaseSchema, management)
 
-	for _, scpSubtype := range sourceCodeProviderConfigTypes {
-		providersByType[scpSubtype].CustomizeSchemas(schemas)
+	for _, provider := range providers {
+		provider.CustomizeSchemas(schemas)
 	}
 }
 
@@ -58,40 +56,42 @@ func configure(management *config.ScaledContext) {
 	}
 	sourceCodeRepositoryInformer.AddIndexers(sourceCodeRepositoryIndexers)
 
+	baseProvider := common.BaseProvider{
+		SourceCodeProviderConfigs:  management.Project.SourceCodeProviderConfigs(""),
+		SourceCodeCredentialLister: management.Project.SourceCodeCredentials("").Controller().Lister(),
+		SourceCodeCredentials:      management.Project.SourceCodeCredentials(""),
+		SourceCodeRepositories:     management.Project.SourceCodeRepositories(""),
+		Pipelines:                  management.Project.Pipelines(""),
+		PipelineExecutions:         management.Project.PipelineExecutions(""),
+
+		PipelineIndexer:             pipelineInformer.GetIndexer(),
+		PipelineExecutionIndexer:    executionInformer.GetIndexer(),
+		SourceCodeCredentialIndexer: sourceCodeCredentialInformer.GetIndexer(),
+		SourceCodeRepositoryIndexer: sourceCodeRepositoryInformer.GetIndexer(),
+	}
+
 	ghProvider := &github.GhProvider{
-		SourceCodeProviderConfigs:  management.Project.SourceCodeProviderConfigs(""),
-		SourceCodeCredentialLister: management.Project.SourceCodeCredentials("").Controller().Lister(),
-		SourceCodeCredentials:      management.Project.SourceCodeCredentials(""),
-		SourceCodeRepositories:     management.Project.SourceCodeRepositories(""),
-		Pipelines:                  management.Project.Pipelines(""),
-		PipelineExecutions:         management.Project.PipelineExecutions(""),
-
-		PipelineIndexer:             pipelineInformer.GetIndexer(),
-		PipelineExecutionIndexer:    executionInformer.GetIndexer(),
-		SourceCodeCredentialIndexer: sourceCodeCredentialInformer.GetIndexer(),
-		SourceCodeRepositoryIndexer: sourceCodeRepositoryInformer.GetIndexer(),
-
-		AuthConfigs: management.Management.AuthConfigs(""),
+		BaseProvider: baseProvider,
+		AuthConfigs:  management.Management.AuthConfigs(""),
 	}
-	providers[model.GithubType] = ghProvider
-	providersByType[client.GithubPipelineConfigType] = ghProvider
-
 	glProvider := &gitlab.GlProvider{
-		SourceCodeProviderConfigs:  management.Project.SourceCodeProviderConfigs(""),
-		SourceCodeCredentialLister: management.Project.SourceCodeCredentials("").Controller().Lister(),
-		SourceCodeCredentials:      management.Project.SourceCodeCredentials(""),
-		SourceCodeRepositories:     management.Project.SourceCodeRepositories(""),
-		Pipelines:                  management.Project.Pipelines(""),
-		PipelineExecutions:         management.Project.PipelineExecutions(""),
-
-		PipelineIndexer:             pipelineInformer.GetIndexer(),
-		PipelineExecutionIndexer:    executionInformer.GetIndexer(),
-		SourceCodeCredentialIndexer: sourceCodeCredentialInformer.GetIndexer(),
-		SourceCodeRepositoryIndexer: sourceCodeRepositoryInformer.GetIndexer(),
-
-		AuthConfigs: management.Management.AuthConfigs(""),
+		BaseProvider: baseProvider,
 	}
+	bcProvider := &bitbucketcloud.BcProvider{
+		BaseProvider: baseProvider,
+	}
+	bsProvider := &bitbucketserver.BsProvider{
+		BaseProvider: baseProvider,
+	}
+
+	providers[model.GithubType] = ghProvider
 	providers[model.GitlabType] = glProvider
+	providers[model.BitbucketCloudType] = bcProvider
+	providers[model.BitbucketServerType] = bsProvider
+
+	providersByType[client.GithubPipelineConfigType] = ghProvider
 	providersByType[client.GitlabPipelineConfigType] = glProvider
+	providersByType[client.BitbucketCloudPipelineConfigType] = bcProvider
+	providersByType[client.BitbucketServerPipelineConfigType] = bsProvider
 
 }

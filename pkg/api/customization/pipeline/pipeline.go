@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/client/project/v3"
+	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -35,6 +36,7 @@ type Handler struct {
 	PipelineLister             v3.PipelineLister
 	PipelineExecutions         v3.PipelineExecutionInterface
 	SourceCodeCredentialLister v3.SourceCodeCredentialLister
+	SourceCodeCredentials      v3.SourceCodeCredentialInterface
 }
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -93,7 +95,7 @@ func (h *Handler) run(apiContext *types.APIContext) error {
 	}
 
 	userName := apiContext.Request.Header.Get("Impersonate-User")
-	pipelineConfig, err := providers.GetPipelineConfigByBranch(h.SourceCodeCredentialLister, pipeline, branch)
+	pipelineConfig, err := providers.GetPipelineConfigByBranch(h.SourceCodeCredentials, h.SourceCodeCredentialLister, pipeline, branch)
 	if err != nil {
 		return err
 	}
@@ -152,10 +154,13 @@ func (h *Handler) pushConfig(apiContext *types.APIContext) error {
 	}
 	accessToken := ""
 	sourceCodeType := model.GithubType
+	var credential *v3.SourceCodeCredential
 	for _, cred := range creds {
 		if cred.Spec.ProjectName == pipeline.Spec.ProjectName && !cred.Status.Logout {
 			accessToken = cred.Spec.AccessToken
 			sourceCodeType = cred.Spec.SourceCodeType
+			credential = cred
+			break
 		}
 	}
 
@@ -165,6 +170,10 @@ func (h *Handler) pushConfig(apiContext *types.APIContext) error {
 		return err
 	}
 	remote, err := remote.New(scpConfig)
+	if err != nil {
+		return err
+	}
+	accessToken, err = utils.EnsureAccessToken(h.SourceCodeCredentials, remote, credential)
 	if err != nil {
 		return err
 	}
@@ -198,9 +207,11 @@ func (h *Handler) getBuildInfoByBranch(pipeline *v3.Pipeline, branch string) (*m
 	accessToken := ""
 	sourceCodeType := model.GithubType
 	var scpConfig interface{}
+	var credential *v3.SourceCodeCredential
+	var err error
 	if credentialName != "" {
 		ns, name := ref.Parse(credentialName)
-		credential, err := h.SourceCodeCredentialLister.Get(ns, name)
+		credential, err = h.SourceCodeCredentialLister.Get(ns, name)
 		if err != nil {
 			return nil, err
 		}
@@ -213,6 +224,10 @@ func (h *Handler) getBuildInfoByBranch(pipeline *v3.Pipeline, branch string) (*m
 		}
 	}
 	remote, err := remote.New(scpConfig)
+	if err != nil {
+		return nil, err
+	}
+	accessToken, err = utils.EnsureAccessToken(h.SourceCodeCredentials, remote, credential)
 	if err != nil {
 		return nil, err
 	}
@@ -234,9 +249,10 @@ func (h *Handler) getValidBranches(apiContext *types.APIContext) error {
 	accessKey := ""
 	sourceCodeType := model.GithubType
 	var scpConfig interface{}
+	var cred *v3.SourceCodeCredential
 	if pipeline.Spec.SourceCodeCredentialName != "" {
 		ns, name = ref.Parse(pipeline.Spec.SourceCodeCredentialName)
-		cred, err := h.SourceCodeCredentialLister.Get(ns, name)
+		cred, err = h.SourceCodeCredentialLister.Get(ns, name)
 		if err != nil {
 			return err
 		}
@@ -248,8 +264,11 @@ func (h *Handler) getValidBranches(apiContext *types.APIContext) error {
 			return err
 		}
 	}
-
 	remote, err := remote.New(scpConfig)
+	if err != nil {
+		return err
+	}
+	accessKey, err = utils.EnsureAccessToken(h.SourceCodeCredentials, remote, cred)
 	if err != nil {
 		return err
 	}
@@ -265,6 +284,7 @@ func (h *Handler) getValidBranches(apiContext *types.APIContext) error {
 		if err != nil {
 			return err
 		}
+		logrus.Debugf("get content in branch %s:%v", b, string(content))
 		if content != nil {
 			validBranches[b] = true
 		}
@@ -399,10 +419,12 @@ func (h *Handler) updatePipelineConfigYaml(apiContext *types.APIContext) error {
 	}
 	accessToken := ""
 	sourceCodeType := model.GithubType
+	var credential *v3.SourceCodeCredential
 	for _, cred := range creds {
 		if cred.Spec.ProjectName == pipeline.Spec.ProjectName && !cred.Status.Logout {
 			accessToken = cred.Spec.AccessToken
 			sourceCodeType = cred.Spec.SourceCodeType
+			credential = cred
 		}
 	}
 
@@ -412,6 +434,10 @@ func (h *Handler) updatePipelineConfigYaml(apiContext *types.APIContext) error {
 		return err
 	}
 	remote, err := remote.New(scpConfig)
+	if err != nil {
+		return err
+	}
+	accessToken, err = utils.EnsureAccessToken(h.SourceCodeCredentials, remote, credential)
 	if err != nil {
 		return err
 	}
@@ -431,9 +457,11 @@ func (h *Handler) getPipelineConfigs(pipeline *v3.Pipeline, branch string) (map[
 	accessToken := ""
 	sourceCodeType := model.GithubType
 	var scpConfig interface{}
+	var cred *v3.SourceCodeCredential
+	var err error
 	if pipeline.Spec.SourceCodeCredentialName != "" {
 		ns, name := ref.Parse(pipeline.Spec.SourceCodeCredentialName)
-		cred, err := h.SourceCodeCredentialLister.Get(ns, name)
+		cred, err = h.SourceCodeCredentialLister.Get(ns, name)
 		if err != nil {
 			return nil, err
 		}
@@ -447,6 +475,10 @@ func (h *Handler) getPipelineConfigs(pipeline *v3.Pipeline, branch string) (map[
 	}
 
 	remote, err := remote.New(scpConfig)
+	if err != nil {
+		return nil, err
+	}
+	accessToken, err = utils.EnsureAccessToken(h.SourceCodeCredentials, remote, cred)
 	if err != nil {
 		return nil, err
 	}

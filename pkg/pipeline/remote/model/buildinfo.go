@@ -5,6 +5,7 @@ type BuildInfo struct {
 	TriggerUserName string `json:"triggerUserName,omitempty"`
 	Commit          string `json:"commit,omitempty"`
 	Event           string `json:"event,omitempty"`
+	RepositoryURL   string `json:"repositoryUrl,omitempty"`
 	Branch          string `json:"branch,omitempty"`
 	Ref             string `json:"ref,omitempty"`
 	RefSpec         string `json:"refSpec,omitempty"`

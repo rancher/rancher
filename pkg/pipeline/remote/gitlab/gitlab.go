@@ -5,6 +5,15 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/google/go-querystring/query"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
@@ -17,14 +26,6 @@ import (
 	"github.com/tomnomnom/linkheader"
 	"github.com/xanzy/go-gitlab"
 	"golang.org/x/oauth2"
-	"io"
-	"io/ioutil"
-	"net/http"
-	"net/url"
-	"regexp"
-	"strconv"
-	"strings"
-	"time"
 )
 
 const (
@@ -74,18 +75,6 @@ func New(config *v3.GitlabPipelineConfig) (model.Remote, error) {
 
 func (c *client) Type() string {
 	return model.GitlabType
-}
-
-func (c *client) CanLogin() bool {
-	return true
-}
-
-func (c *client) CanRepos() bool {
-	return true
-}
-
-func (c *client) CanHook() bool {
-	return true
 }
 
 func (c *client) Login(code string) (*v3.SourceCodeCredential, error) {

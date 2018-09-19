@@ -3,16 +3,16 @@ package drivers
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"strings"
+
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/pipeline/providers"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/xanzy/go-gitlab"
-	"io/ioutil"
-	"net/http"
-	"strings"
 )
 
 const (
@@ -31,6 +31,7 @@ const (
 type GitlabDriver struct {
 	PipelineLister             v3.PipelineLister
 	PipelineExecutions         v3.PipelineExecutionInterface
+	SourceCodeCredentials      v3.SourceCodeCredentialInterface
 	SourceCodeCredentialLister v3.SourceCodeCredentialLister
 }
 
@@ -63,12 +64,6 @@ func (g GitlabDriver) Execute(req *http.Request) (int, error) {
 		return http.StatusUnavailableForLegalReasons, errors.New("pipeline is not active")
 	}
 
-	if (event == gitlabPushEvent && !pipeline.Spec.TriggerWebhookPush) ||
-		(event == gitlabMREvent && !pipeline.Spec.TriggerWebhookPr) ||
-		(event == gitlabTagEvent && !pipeline.Spec.TriggerWebhookTag) {
-		return http.StatusUnavailableForLegalReasons, fmt.Errorf("trigger for event '%s' is disabled", event)
-	}
-
 	info := &model.BuildInfo{}
 	if event == gitlabPushEvent {
 		info, err = gitlabParsePushPayload(body)
@@ -87,24 +82,7 @@ func (g GitlabDriver) Execute(req *http.Request) (int, error) {
 		}
 	}
 
-	pipelineConfig, err := providers.GetPipelineConfigByBranch(g.SourceCodeCredentialLister, pipeline, info.Branch)
-	if err != nil {
-		return http.StatusInternalServerError, err
-	}
-	if pipelineConfig == nil {
-		//no pipeline config to run
-		return http.StatusOK, nil
-	}
-
-	if !utils.Match(pipelineConfig.Branch, info.Branch) {
-		return http.StatusUnavailableForLegalReasons, fmt.Errorf("skipped branch '%s'", info.Branch)
-	}
-
-	if _, err := utils.GenerateExecution(g.PipelineExecutions, pipeline, pipelineConfig, info); err != nil {
-		return http.StatusInternalServerError, err
-	}
-
-	return http.StatusOK, nil
+	return validateAndGeneratePipelineExecution(g.PipelineExecutions, g.SourceCodeCredentials, g.SourceCodeCredentialLister, info, pipeline)
 }
 
 func gitlabParsePushPayload(raw []byte) (*model.BuildInfo, error) {

@@ -1,15 +1,8 @@
-package bitbucket
-
-type User struct {
-	UserName    string `json:"username"`
-	Website     string `json:"website"`
-	DisplayName string `json:"display_name"`
-	AccountID   string `json:"account_id"`
-	Links       *Links `json:"links"`
-}
+package bitbucketserver
 
 type Links struct {
-	Html   Link   `json:"html"`
+	Self   []Link `json:"self"`
+	HTML   Link   `json:"html"`
 	Avatar Link   `json:"avatar"`
 	Clone  []Link `json:"clone"`
 }
@@ -20,117 +13,159 @@ type Link struct {
 }
 
 type Repository struct {
-	Scm         string `json:"scm"`
-	Website     string `json:"website"`
-	HasWiki     bool   `json:"has_wiki"`
-	Name        string `json:"name"`
-	Links       *Links `json:"links"`
-	ForkPolicy  string `json:"fork_policy"`
-	Language    string `json:"language"`
-	MainBranch  Object `json:"mainbranch"`
-	FullName    string `json:"full_name"`
-	HasIssues   bool   `json:"has_issues"`
-	Owner       *User  `json:"owner"`
-	IsPrivate   bool   `json:"is_private"`
-	Description string `json:"description"`
+	Slug          string  `json:"slug"`
+	ID            int     `json:"id"`
+	Name          string  `json:"name"`
+	ScmID         string  `json:"scmId"`
+	State         string  `json:"state"`
+	StatusMessage string  `json:"statusMessage"`
+	Forkable      bool    `json:"forkable"`
+	Project       Project `json:"project"`
+	Public        bool    `json:"public"`
+	Links         Links   `json:"links"`
+}
+
+type Project struct {
+	Key    string `json:"key"`
+	ID     int    `json:"id"`
+	Name   string `json:"name"`
+	Public bool   `json:"public"`
+	Type   string `json:"type"`
+	Links  Links  `json:"links"`
+}
+
+type paging struct {
+	Size          int  `json:"size"`
+	Limit         int  `json:"limit"`
+	Start         int  `json:"start"`
+	IsLastPage    bool `json:"isLastPage"`
+	NextPageStart int  `json:"nextPageStart"`
 }
 
 type PaginatedRepositories struct {
-	Paging
+	paging
 	Values []Repository `json:"values"`
 }
 
-type Paging struct {
-	Size       int    `json:"size"`
-	Page       int    `json:"page"`
-	PageLength int    `json:"pagelen"`
-	Next       string `json:"next"`
-	Previous   string `json:"previous"`
+type User struct {
+	Name         string `json:"name"`
+	EmailAddress string `json:"emailAddress"`
+	ID           int    `json:"id"`
+	DisplayName  string `json:"displayName"`
+	Active       bool   `json:"active"`
+	Slug         string `json:"slug"`
+	Type         string `json:"type"`
+	Links        Links  `json:"links"`
+}
+
+type AccessToken struct {
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Permissions []string `json:"permissions"`
+	User        User     `json:"user"`
+	Token       string   `json:"token"`
+}
+
+type PaginatedAccessToken struct {
+	paging
+	Values []AccessToken `json:"values"`
 }
 
 type Hook struct {
-	UUID                 string   `json:"uuid"`
-	Description          string   `json:"description"`
-	Links                *Links   `json:"links"`
-	URL                  string   `json:"url"`
-	SkipCertVerification bool     `json:"skipCertVerification"`
-	Active               bool     `json:"active"`
-	Events               []string `json:"events"`
+	ID            int               `json:"id"`
+	Name          string            `json:"name"`
+	Events        []string          `json:"events"`
+	Configuration HookConfiguration `json:"configuration"`
+	URL           string            `json:"url"`
+	Active        bool              `json:"active"`
+}
+
+type HookConfiguration struct {
+	Secret string `json:"secret"`
 }
 
 type PaginatedHooks struct {
-	Paging
+	paging
 	Values []Hook `json:"values"`
 }
 
-type Ref struct {
-	Type   string  `json:"type"`
-	Name   string  `json:"name"`
-	Links  *Links  `json:"links"`
-	Target *Target `json:"target"`
+type Branch struct {
+	ID              string `json:"id"`
+	DisplayID       string `json:"displayId"`
+	Type            string `json:"type"`
+	LatestCommit    string `json:"latestCommit"`
+	LatestChangeset string `json:"latestChangeset"`
+	IsDefault       bool   `json:"isDefault"`
 }
 
 type PaginatedBranches struct {
-	Paging
-	Values []Ref `json:"values"`
+	paging
+	Values []Branch `json:"values"`
 }
 
-type Target struct {
-	Hash       string      `json:"hash"`
-	Repository *Repository `json:"repository"`
-	Links      *Links      `json:"links"`
-	Author     *Author     `json:"author"`
-	Date       string      `json:"date"`
-	Message    string      `json:"message"`
-}
-
-type Author struct {
-	Raw  string `json:"raw"`
-	User *User  `json:"user"`
-}
-
-type Object struct {
-	Type string `json:"type"`
-	Name string `json:"name"`
+type Commit struct {
+	ID        string `json:"id"`
+	DisplayID string `json:"displayId"`
+	Author    User   `json:"author"`
+	Committer User   `json:"committer"`
+	Message   string `json:"message"`
 }
 
 type PushEventPayload struct {
+	EventKey   string     `json:"eventKey"`
+	Date       string     `json:"date"`
 	Actor      User       `json:"actor"`
 	Repository Repository `json:"repository"`
-	Push       struct {
-		Changes []Change `json:"changes"`
-	} `json:"push"`
+	Changes    []Change   `json:"changes"`
 }
 
 type Change struct {
-	New Ref `json:"new"`
+	Ref struct {
+		ID        string `json:"id"`
+		DisplayID string `json:"displayId"`
+		Type      string `json:"type"`
+	} `json:"ref"`
+	RefID    string `json:"refId"`
+	FromHash string `json:"fromHash"`
+	ToHash   string `json:"toHash"`
+	Type     string `json:"type"`
 }
 
 type PullRequestEventPayload struct {
+	EventKey    string      `json:"eventKey"`
+	Date        string      `json:"date"`
 	Actor       User        `json:"actor"`
-	PullRequest PullRequest `json:"pullrequest"`
-	Repository  Repository  `json:"repository"`
+	PullRequest PullRequest `json:"pullRequest"`
 }
 
 type PullRequest struct {
-	ID          int                 `json:"id"`
-	Title       string              `json:"title"`
-	Description string              `json:"description"`
-	State       string              `json:"state"`
-	Author      User                `json:"author"`
-	Source      PullRequestEndpoint `json:"source"`
-	Destination PullRequestEndpoint `json:"destination"`
-	Links       Links               `json:"links"`
-	Created     string              `json:"created_on"`
-	Updated     string              `json:"updated_on"`
+	ID          int    `json:"id"`
+	Version     int    `json:"version"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	State       string `json:"state"`
+	Open        bool   `json:"open"`
+	Closed      bool   `json:"closed"`
+	FromRef     Ref    `json:"fromRef"`
+	ToRef       Ref    `json:"toRef"`
+	Locked      bool   `json:"locked"`
+	Author      struct {
+		User     User   `json:"user"`
+		Role     string `json:"role"`
+		Approved bool   `json:"approved"`
+		Status   string `json:"status"`
+	} `json:"author"`
+	Links Links `json:"links"`
 }
 
-type PullRequestEndpoint struct {
-	Branch struct {
-		Name string `json:"name"`
-	} `json:"branch"`
-	Commit struct {
-		Hash string `json:"hash"`
-	} `json:"commit"`
-	Repository Repository `json:"repository"`
+type Ref struct {
+	ID           string     `json:"id"`
+	DisplayID    string     `json:"displayId"`
+	LatestCommit string     `json:"latestCommit"`
+	Repository   Repository `json:"repository"`
+}
+
+type LastModified struct {
+	Files        map[string]Commit `json:"files"`
+	LatestCommit Commit            `json:"latestCommit"`
 }
