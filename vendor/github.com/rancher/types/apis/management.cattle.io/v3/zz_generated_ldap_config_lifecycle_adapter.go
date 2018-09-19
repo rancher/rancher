@@ -15,6 +15,16 @@ type ldapConfigLifecycleAdapter struct {
 	lifecycle LdapConfigLifecycle
 }
 
+func (w *ldapConfigLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *ldapConfigLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *ldapConfigLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*LdapConfig))
 	if o == nil {

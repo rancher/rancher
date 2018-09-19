@@ -15,6 +15,16 @@ type sourceCodeRepositoryLifecycleAdapter struct {
 	lifecycle SourceCodeRepositoryLifecycle
 }
 
+func (w *sourceCodeRepositoryLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *sourceCodeRepositoryLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *sourceCodeRepositoryLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*SourceCodeRepository))
 	if o == nil {

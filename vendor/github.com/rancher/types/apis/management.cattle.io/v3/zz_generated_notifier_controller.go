@@ -37,6 +37,8 @@ type NotifierList struct {
 
 type NotifierHandlerFunc func(key string, obj *Notifier) (runtime.Object, error)
 
+type NotifierChangeHandlerFunc func(obj *Notifier) (runtime.Object, error)
+
 type NotifierLister interface {
 	List(namespace string, selector labels.Selector) (ret []*Notifier, err error)
 	Get(namespace, name string) (*Notifier, error)
@@ -247,4 +249,179 @@ func (s *notifierClient) AddClusterScopedHandler(ctx context.Context, name, clus
 func (s *notifierClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle NotifierLifecycle) {
 	sync := NewNotifierLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+type NotifierIndexer func(obj *Notifier) ([]string, error)
+
+type NotifierClientCache interface {
+	Get(namespace, name string) (*Notifier, error)
+	List(namespace string, selector labels.Selector) ([]*Notifier, error)
+
+	Index(name string, indexer NotifierIndexer)
+	GetIndexed(name, key string) ([]*Notifier, error)
+}
+
+type NotifierClient interface {
+	Create(*Notifier) (*Notifier, error)
+	Get(namespace, name string, opts metav1.GetOptions) (*Notifier, error)
+	Update(*Notifier) (*Notifier, error)
+	Delete(namespace, name string, options *metav1.DeleteOptions) error
+	List(namespace string, opts metav1.ListOptions) (*NotifierList, error)
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	Cache() NotifierClientCache
+
+	OnCreate(ctx context.Context, name string, sync NotifierChangeHandlerFunc)
+	OnChange(ctx context.Context, name string, sync NotifierChangeHandlerFunc)
+	OnRemove(ctx context.Context, name string, sync NotifierChangeHandlerFunc)
+	Enqueue(namespace, name string)
+
+	Generic() controller.GenericController
+	Interface() NotifierInterface
+}
+
+type notifierClientCache struct {
+	client *notifierClient2
+}
+
+type notifierClient2 struct {
+	iface      NotifierInterface
+	controller NotifierController
+}
+
+func (n *notifierClient2) Interface() NotifierInterface {
+	return n.iface
+}
+
+func (n *notifierClient2) Generic() controller.GenericController {
+	return n.iface.Controller().Generic()
+}
+
+func (n *notifierClient2) Enqueue(namespace, name string) {
+	n.iface.Controller().Enqueue(namespace, name)
+}
+
+func (n *notifierClient2) Create(obj *Notifier) (*Notifier, error) {
+	return n.iface.Create(obj)
+}
+
+func (n *notifierClient2) Get(namespace, name string, opts metav1.GetOptions) (*Notifier, error) {
+	return n.iface.GetNamespaced(namespace, name, opts)
+}
+
+func (n *notifierClient2) Update(obj *Notifier) (*Notifier, error) {
+	return n.iface.Update(obj)
+}
+
+func (n *notifierClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
+	return n.iface.DeleteNamespaced(namespace, name, options)
+}
+
+func (n *notifierClient2) List(namespace string, opts metav1.ListOptions) (*NotifierList, error) {
+	return n.iface.List(opts)
+}
+
+func (n *notifierClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+	return n.iface.Watch(opts)
+}
+
+func (n *notifierClientCache) Get(namespace, name string) (*Notifier, error) {
+	return n.client.controller.Lister().Get(namespace, name)
+}
+
+func (n *notifierClientCache) List(namespace string, selector labels.Selector) ([]*Notifier, error) {
+	return n.client.controller.Lister().List(namespace, selector)
+}
+
+func (n *notifierClient2) Cache() NotifierClientCache {
+	n.loadController()
+	return &notifierClientCache{
+		client: n,
+	}
+}
+
+func (n *notifierClient2) OnCreate(ctx context.Context, name string, sync NotifierChangeHandlerFunc) {
+	n.loadController()
+	n.iface.AddLifecycle(ctx, name+"-create", &notifierLifecycleDelegate{create: sync})
+}
+
+func (n *notifierClient2) OnChange(ctx context.Context, name string, sync NotifierChangeHandlerFunc) {
+	n.loadController()
+	n.iface.AddLifecycle(ctx, name+"-change", &notifierLifecycleDelegate{update: sync})
+}
+
+func (n *notifierClient2) OnRemove(ctx context.Context, name string, sync NotifierChangeHandlerFunc) {
+	n.loadController()
+	n.iface.AddLifecycle(ctx, name, &notifierLifecycleDelegate{remove: sync})
+}
+
+func (n *notifierClientCache) Index(name string, indexer NotifierIndexer) {
+	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
+		name: func(obj interface{}) ([]string, error) {
+			if v, ok := obj.(*Notifier); ok {
+				return indexer(v)
+			}
+			return nil, nil
+		},
+	})
+
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (n *notifierClientCache) GetIndexed(name, key string) ([]*Notifier, error) {
+	var result []*Notifier
+	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
+	if err != nil {
+		return nil, err
+	}
+	for _, obj := range objs {
+		if v, ok := obj.(*Notifier); ok {
+			result = append(result, v)
+		}
+	}
+
+	return result, nil
+}
+
+func (n *notifierClient2) loadController() {
+	if n.controller == nil {
+		n.controller = n.iface.Controller()
+	}
+}
+
+type notifierLifecycleDelegate struct {
+	create NotifierChangeHandlerFunc
+	update NotifierChangeHandlerFunc
+	remove NotifierChangeHandlerFunc
+}
+
+func (n *notifierLifecycleDelegate) HasCreate() bool {
+	return n.create != nil
+}
+
+func (n *notifierLifecycleDelegate) Create(obj *Notifier) (runtime.Object, error) {
+	if n.create == nil {
+		return obj, nil
+	}
+	return n.create(obj)
+}
+
+func (n *notifierLifecycleDelegate) HasFinalize() bool {
+	return n.remove != nil
+}
+
+func (n *notifierLifecycleDelegate) Remove(obj *Notifier) (runtime.Object, error) {
+	if n.remove == nil {
+		return obj, nil
+	}
+	return n.remove(obj)
+}
+
+func (n *notifierLifecycleDelegate) Updated(obj *Notifier) (runtime.Object, error) {
+	if n.update == nil {
+		return obj, nil
+	}
+	return n.update(obj)
 }

@@ -37,6 +37,8 @@ type PipelineList struct {
 
 type PipelineHandlerFunc func(key string, obj *Pipeline) (runtime.Object, error)
 
+type PipelineChangeHandlerFunc func(obj *Pipeline) (runtime.Object, error)
+
 type PipelineLister interface {
 	List(namespace string, selector labels.Selector) (ret []*Pipeline, err error)
 	Get(namespace, name string) (*Pipeline, error)
@@ -247,4 +249,179 @@ func (s *pipelineClient) AddClusterScopedHandler(ctx context.Context, name, clus
 func (s *pipelineClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle PipelineLifecycle) {
 	sync := NewPipelineLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+type PipelineIndexer func(obj *Pipeline) ([]string, error)
+
+type PipelineClientCache interface {
+	Get(namespace, name string) (*Pipeline, error)
+	List(namespace string, selector labels.Selector) ([]*Pipeline, error)
+
+	Index(name string, indexer PipelineIndexer)
+	GetIndexed(name, key string) ([]*Pipeline, error)
+}
+
+type PipelineClient interface {
+	Create(*Pipeline) (*Pipeline, error)
+	Get(namespace, name string, opts metav1.GetOptions) (*Pipeline, error)
+	Update(*Pipeline) (*Pipeline, error)
+	Delete(namespace, name string, options *metav1.DeleteOptions) error
+	List(namespace string, opts metav1.ListOptions) (*PipelineList, error)
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	Cache() PipelineClientCache
+
+	OnCreate(ctx context.Context, name string, sync PipelineChangeHandlerFunc)
+	OnChange(ctx context.Context, name string, sync PipelineChangeHandlerFunc)
+	OnRemove(ctx context.Context, name string, sync PipelineChangeHandlerFunc)
+	Enqueue(namespace, name string)
+
+	Generic() controller.GenericController
+	Interface() PipelineInterface
+}
+
+type pipelineClientCache struct {
+	client *pipelineClient2
+}
+
+type pipelineClient2 struct {
+	iface      PipelineInterface
+	controller PipelineController
+}
+
+func (n *pipelineClient2) Interface() PipelineInterface {
+	return n.iface
+}
+
+func (n *pipelineClient2) Generic() controller.GenericController {
+	return n.iface.Controller().Generic()
+}
+
+func (n *pipelineClient2) Enqueue(namespace, name string) {
+	n.iface.Controller().Enqueue(namespace, name)
+}
+
+func (n *pipelineClient2) Create(obj *Pipeline) (*Pipeline, error) {
+	return n.iface.Create(obj)
+}
+
+func (n *pipelineClient2) Get(namespace, name string, opts metav1.GetOptions) (*Pipeline, error) {
+	return n.iface.GetNamespaced(namespace, name, opts)
+}
+
+func (n *pipelineClient2) Update(obj *Pipeline) (*Pipeline, error) {
+	return n.iface.Update(obj)
+}
+
+func (n *pipelineClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
+	return n.iface.DeleteNamespaced(namespace, name, options)
+}
+
+func (n *pipelineClient2) List(namespace string, opts metav1.ListOptions) (*PipelineList, error) {
+	return n.iface.List(opts)
+}
+
+func (n *pipelineClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+	return n.iface.Watch(opts)
+}
+
+func (n *pipelineClientCache) Get(namespace, name string) (*Pipeline, error) {
+	return n.client.controller.Lister().Get(namespace, name)
+}
+
+func (n *pipelineClientCache) List(namespace string, selector labels.Selector) ([]*Pipeline, error) {
+	return n.client.controller.Lister().List(namespace, selector)
+}
+
+func (n *pipelineClient2) Cache() PipelineClientCache {
+	n.loadController()
+	return &pipelineClientCache{
+		client: n,
+	}
+}
+
+func (n *pipelineClient2) OnCreate(ctx context.Context, name string, sync PipelineChangeHandlerFunc) {
+	n.loadController()
+	n.iface.AddLifecycle(ctx, name+"-create", &pipelineLifecycleDelegate{create: sync})
+}
+
+func (n *pipelineClient2) OnChange(ctx context.Context, name string, sync PipelineChangeHandlerFunc) {
+	n.loadController()
+	n.iface.AddLifecycle(ctx, name+"-change", &pipelineLifecycleDelegate{update: sync})
+}
+
+func (n *pipelineClient2) OnRemove(ctx context.Context, name string, sync PipelineChangeHandlerFunc) {
+	n.loadController()
+	n.iface.AddLifecycle(ctx, name, &pipelineLifecycleDelegate{remove: sync})
+}
+
+func (n *pipelineClientCache) Index(name string, indexer PipelineIndexer) {
+	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
+		name: func(obj interface{}) ([]string, error) {
+			if v, ok := obj.(*Pipeline); ok {
+				return indexer(v)
+			}
+			return nil, nil
+		},
+	})
+
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (n *pipelineClientCache) GetIndexed(name, key string) ([]*Pipeline, error) {
+	var result []*Pipeline
+	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
+	if err != nil {
+		return nil, err
+	}
+	for _, obj := range objs {
+		if v, ok := obj.(*Pipeline); ok {
+			result = append(result, v)
+		}
+	}
+
+	return result, nil
+}
+
+func (n *pipelineClient2) loadController() {
+	if n.controller == nil {
+		n.controller = n.iface.Controller()
+	}
+}
+
+type pipelineLifecycleDelegate struct {
+	create PipelineChangeHandlerFunc
+	update PipelineChangeHandlerFunc
+	remove PipelineChangeHandlerFunc
+}
+
+func (n *pipelineLifecycleDelegate) HasCreate() bool {
+	return n.create != nil
+}
+
+func (n *pipelineLifecycleDelegate) Create(obj *Pipeline) (runtime.Object, error) {
+	if n.create == nil {
+		return obj, nil
+	}
+	return n.create(obj)
+}
+
+func (n *pipelineLifecycleDelegate) HasFinalize() bool {
+	return n.remove != nil
+}
+
+func (n *pipelineLifecycleDelegate) Remove(obj *Pipeline) (runtime.Object, error) {
+	if n.remove == nil {
+		return obj, nil
+	}
+	return n.remove(obj)
+}
+
+func (n *pipelineLifecycleDelegate) Updated(obj *Pipeline) (runtime.Object, error) {
+	if n.update == nil {
+		return obj, nil
+	}
+	return n.update(obj)
 }

@@ -16,6 +16,16 @@ type replicaSetLifecycleAdapter struct {
 	lifecycle ReplicaSetLifecycle
 }
 
+func (w *replicaSetLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *replicaSetLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *replicaSetLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*v1beta2.ReplicaSet))
 	if o == nil {

@@ -37,6 +37,8 @@ type ClusterRoleTemplateBindingList struct {
 
 type ClusterRoleTemplateBindingHandlerFunc func(key string, obj *ClusterRoleTemplateBinding) (runtime.Object, error)
 
+type ClusterRoleTemplateBindingChangeHandlerFunc func(obj *ClusterRoleTemplateBinding) (runtime.Object, error)
+
 type ClusterRoleTemplateBindingLister interface {
 	List(namespace string, selector labels.Selector) (ret []*ClusterRoleTemplateBinding, err error)
 	Get(namespace, name string) (*ClusterRoleTemplateBinding, error)
@@ -247,4 +249,179 @@ func (s *clusterRoleTemplateBindingClient) AddClusterScopedHandler(ctx context.C
 func (s *clusterRoleTemplateBindingClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ClusterRoleTemplateBindingLifecycle) {
 	sync := NewClusterRoleTemplateBindingLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+type ClusterRoleTemplateBindingIndexer func(obj *ClusterRoleTemplateBinding) ([]string, error)
+
+type ClusterRoleTemplateBindingClientCache interface {
+	Get(namespace, name string) (*ClusterRoleTemplateBinding, error)
+	List(namespace string, selector labels.Selector) ([]*ClusterRoleTemplateBinding, error)
+
+	Index(name string, indexer ClusterRoleTemplateBindingIndexer)
+	GetIndexed(name, key string) ([]*ClusterRoleTemplateBinding, error)
+}
+
+type ClusterRoleTemplateBindingClient interface {
+	Create(*ClusterRoleTemplateBinding) (*ClusterRoleTemplateBinding, error)
+	Get(namespace, name string, opts metav1.GetOptions) (*ClusterRoleTemplateBinding, error)
+	Update(*ClusterRoleTemplateBinding) (*ClusterRoleTemplateBinding, error)
+	Delete(namespace, name string, options *metav1.DeleteOptions) error
+	List(namespace string, opts metav1.ListOptions) (*ClusterRoleTemplateBindingList, error)
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	Cache() ClusterRoleTemplateBindingClientCache
+
+	OnCreate(ctx context.Context, name string, sync ClusterRoleTemplateBindingChangeHandlerFunc)
+	OnChange(ctx context.Context, name string, sync ClusterRoleTemplateBindingChangeHandlerFunc)
+	OnRemove(ctx context.Context, name string, sync ClusterRoleTemplateBindingChangeHandlerFunc)
+	Enqueue(namespace, name string)
+
+	Generic() controller.GenericController
+	Interface() ClusterRoleTemplateBindingInterface
+}
+
+type clusterRoleTemplateBindingClientCache struct {
+	client *clusterRoleTemplateBindingClient2
+}
+
+type clusterRoleTemplateBindingClient2 struct {
+	iface      ClusterRoleTemplateBindingInterface
+	controller ClusterRoleTemplateBindingController
+}
+
+func (n *clusterRoleTemplateBindingClient2) Interface() ClusterRoleTemplateBindingInterface {
+	return n.iface
+}
+
+func (n *clusterRoleTemplateBindingClient2) Generic() controller.GenericController {
+	return n.iface.Controller().Generic()
+}
+
+func (n *clusterRoleTemplateBindingClient2) Enqueue(namespace, name string) {
+	n.iface.Controller().Enqueue(namespace, name)
+}
+
+func (n *clusterRoleTemplateBindingClient2) Create(obj *ClusterRoleTemplateBinding) (*ClusterRoleTemplateBinding, error) {
+	return n.iface.Create(obj)
+}
+
+func (n *clusterRoleTemplateBindingClient2) Get(namespace, name string, opts metav1.GetOptions) (*ClusterRoleTemplateBinding, error) {
+	return n.iface.GetNamespaced(namespace, name, opts)
+}
+
+func (n *clusterRoleTemplateBindingClient2) Update(obj *ClusterRoleTemplateBinding) (*ClusterRoleTemplateBinding, error) {
+	return n.iface.Update(obj)
+}
+
+func (n *clusterRoleTemplateBindingClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
+	return n.iface.DeleteNamespaced(namespace, name, options)
+}
+
+func (n *clusterRoleTemplateBindingClient2) List(namespace string, opts metav1.ListOptions) (*ClusterRoleTemplateBindingList, error) {
+	return n.iface.List(opts)
+}
+
+func (n *clusterRoleTemplateBindingClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+	return n.iface.Watch(opts)
+}
+
+func (n *clusterRoleTemplateBindingClientCache) Get(namespace, name string) (*ClusterRoleTemplateBinding, error) {
+	return n.client.controller.Lister().Get(namespace, name)
+}
+
+func (n *clusterRoleTemplateBindingClientCache) List(namespace string, selector labels.Selector) ([]*ClusterRoleTemplateBinding, error) {
+	return n.client.controller.Lister().List(namespace, selector)
+}
+
+func (n *clusterRoleTemplateBindingClient2) Cache() ClusterRoleTemplateBindingClientCache {
+	n.loadController()
+	return &clusterRoleTemplateBindingClientCache{
+		client: n,
+	}
+}
+
+func (n *clusterRoleTemplateBindingClient2) OnCreate(ctx context.Context, name string, sync ClusterRoleTemplateBindingChangeHandlerFunc) {
+	n.loadController()
+	n.iface.AddLifecycle(ctx, name+"-create", &clusterRoleTemplateBindingLifecycleDelegate{create: sync})
+}
+
+func (n *clusterRoleTemplateBindingClient2) OnChange(ctx context.Context, name string, sync ClusterRoleTemplateBindingChangeHandlerFunc) {
+	n.loadController()
+	n.iface.AddLifecycle(ctx, name+"-change", &clusterRoleTemplateBindingLifecycleDelegate{update: sync})
+}
+
+func (n *clusterRoleTemplateBindingClient2) OnRemove(ctx context.Context, name string, sync ClusterRoleTemplateBindingChangeHandlerFunc) {
+	n.loadController()
+	n.iface.AddLifecycle(ctx, name, &clusterRoleTemplateBindingLifecycleDelegate{remove: sync})
+}
+
+func (n *clusterRoleTemplateBindingClientCache) Index(name string, indexer ClusterRoleTemplateBindingIndexer) {
+	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
+		name: func(obj interface{}) ([]string, error) {
+			if v, ok := obj.(*ClusterRoleTemplateBinding); ok {
+				return indexer(v)
+			}
+			return nil, nil
+		},
+	})
+
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (n *clusterRoleTemplateBindingClientCache) GetIndexed(name, key string) ([]*ClusterRoleTemplateBinding, error) {
+	var result []*ClusterRoleTemplateBinding
+	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
+	if err != nil {
+		return nil, err
+	}
+	for _, obj := range objs {
+		if v, ok := obj.(*ClusterRoleTemplateBinding); ok {
+			result = append(result, v)
+		}
+	}
+
+	return result, nil
+}
+
+func (n *clusterRoleTemplateBindingClient2) loadController() {
+	if n.controller == nil {
+		n.controller = n.iface.Controller()
+	}
+}
+
+type clusterRoleTemplateBindingLifecycleDelegate struct {
+	create ClusterRoleTemplateBindingChangeHandlerFunc
+	update ClusterRoleTemplateBindingChangeHandlerFunc
+	remove ClusterRoleTemplateBindingChangeHandlerFunc
+}
+
+func (n *clusterRoleTemplateBindingLifecycleDelegate) HasCreate() bool {
+	return n.create != nil
+}
+
+func (n *clusterRoleTemplateBindingLifecycleDelegate) Create(obj *ClusterRoleTemplateBinding) (runtime.Object, error) {
+	if n.create == nil {
+		return obj, nil
+	}
+	return n.create(obj)
+}
+
+func (n *clusterRoleTemplateBindingLifecycleDelegate) HasFinalize() bool {
+	return n.remove != nil
+}
+
+func (n *clusterRoleTemplateBindingLifecycleDelegate) Remove(obj *ClusterRoleTemplateBinding) (runtime.Object, error) {
+	if n.remove == nil {
+		return obj, nil
+	}
+	return n.remove(obj)
+}
+
+func (n *clusterRoleTemplateBindingLifecycleDelegate) Updated(obj *ClusterRoleTemplateBinding) (runtime.Object, error) {
+	if n.update == nil {
+		return obj, nil
+	}
+	return n.update(obj)
 }

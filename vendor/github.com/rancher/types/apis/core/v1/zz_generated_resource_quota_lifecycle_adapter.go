@@ -16,6 +16,16 @@ type resourceQuotaLifecycleAdapter struct {
 	lifecycle ResourceQuotaLifecycle
 }
 
+func (w *resourceQuotaLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *resourceQuotaLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *resourceQuotaLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*v1.ResourceQuota))
 	if o == nil {

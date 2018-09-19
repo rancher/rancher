@@ -15,6 +15,16 @@ type namespacedBasicAuthLifecycleAdapter struct {
 	lifecycle NamespacedBasicAuthLifecycle
 }
 
+func (w *namespacedBasicAuthLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *namespacedBasicAuthLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *namespacedBasicAuthLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*NamespacedBasicAuth))
 	if o == nil {

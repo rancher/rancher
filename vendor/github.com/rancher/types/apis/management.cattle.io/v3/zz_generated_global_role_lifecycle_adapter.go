@@ -15,6 +15,16 @@ type globalRoleLifecycleAdapter struct {
 	lifecycle GlobalRoleLifecycle
 }
 
+func (w *globalRoleLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *globalRoleLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *globalRoleLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*GlobalRole))
 	if o == nil {

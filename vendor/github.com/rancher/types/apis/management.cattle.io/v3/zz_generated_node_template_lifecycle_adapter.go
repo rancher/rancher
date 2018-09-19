@@ -15,6 +15,16 @@ type nodeTemplateLifecycleAdapter struct {
 	lifecycle NodeTemplateLifecycle
 }
 
+func (w *nodeTemplateLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *nodeTemplateLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *nodeTemplateLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*NodeTemplate))
 	if o == nil {

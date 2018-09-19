@@ -200,7 +200,7 @@ func (g *genericController) Start(ctx context.Context, threadiness int) error {
 
 	if g.running {
 		for _, h := range g.handlers {
-			if h.generation < g.generation {
+			if h.generation != g.generation {
 				continue
 			}
 			for _, key := range g.informer.GetStore().ListKeys() {
@@ -219,6 +219,11 @@ func (g *genericController) Start(ctx context.Context, threadiness int) error {
 }
 
 func (g *genericController) queueObject(obj interface{}) {
+	if _, ok := obj.(generationKey); ok {
+		g.queue.Add(obj)
+		return
+	}
+
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err == nil {
 		g.queue.Add(key)
@@ -267,7 +272,11 @@ func (g *genericController) processNextWorkItem() bool {
 		logrus.Errorf("%v %v %v", g.name, key, err)
 	}
 
-	g.queue.AddRateLimited(key)
+	if gk, ok := key.(generationKey); ok {
+		g.queue.AddRateLimited(gk.key)
+	} else {
+		g.queue.AddRateLimited(key)
+	}
 
 	return true
 }

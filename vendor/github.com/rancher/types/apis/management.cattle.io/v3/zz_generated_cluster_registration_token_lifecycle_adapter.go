@@ -15,6 +15,16 @@ type clusterRegistrationTokenLifecycleAdapter struct {
 	lifecycle ClusterRegistrationTokenLifecycle
 }
 
+func (w *clusterRegistrationTokenLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *clusterRegistrationTokenLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *clusterRegistrationTokenLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*ClusterRegistrationToken))
 	if o == nil {

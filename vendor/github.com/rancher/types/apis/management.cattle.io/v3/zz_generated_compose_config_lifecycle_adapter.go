@@ -15,6 +15,16 @@ type composeConfigLifecycleAdapter struct {
 	lifecycle ComposeConfigLifecycle
 }
 
+func (w *composeConfigLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *composeConfigLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *composeConfigLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*ComposeConfig))
 	if o == nil {

@@ -37,6 +37,8 @@ type PodSecurityPolicyTemplateProjectBindingList struct {
 
 type PodSecurityPolicyTemplateProjectBindingHandlerFunc func(key string, obj *PodSecurityPolicyTemplateProjectBinding) (runtime.Object, error)
 
+type PodSecurityPolicyTemplateProjectBindingChangeHandlerFunc func(obj *PodSecurityPolicyTemplateProjectBinding) (runtime.Object, error)
+
 type PodSecurityPolicyTemplateProjectBindingLister interface {
 	List(namespace string, selector labels.Selector) (ret []*PodSecurityPolicyTemplateProjectBinding, err error)
 	Get(namespace, name string) (*PodSecurityPolicyTemplateProjectBinding, error)
@@ -247,4 +249,179 @@ func (s *podSecurityPolicyTemplateProjectBindingClient) AddClusterScopedHandler(
 func (s *podSecurityPolicyTemplateProjectBindingClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle PodSecurityPolicyTemplateProjectBindingLifecycle) {
 	sync := NewPodSecurityPolicyTemplateProjectBindingLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+type PodSecurityPolicyTemplateProjectBindingIndexer func(obj *PodSecurityPolicyTemplateProjectBinding) ([]string, error)
+
+type PodSecurityPolicyTemplateProjectBindingClientCache interface {
+	Get(namespace, name string) (*PodSecurityPolicyTemplateProjectBinding, error)
+	List(namespace string, selector labels.Selector) ([]*PodSecurityPolicyTemplateProjectBinding, error)
+
+	Index(name string, indexer PodSecurityPolicyTemplateProjectBindingIndexer)
+	GetIndexed(name, key string) ([]*PodSecurityPolicyTemplateProjectBinding, error)
+}
+
+type PodSecurityPolicyTemplateProjectBindingClient interface {
+	Create(*PodSecurityPolicyTemplateProjectBinding) (*PodSecurityPolicyTemplateProjectBinding, error)
+	Get(namespace, name string, opts metav1.GetOptions) (*PodSecurityPolicyTemplateProjectBinding, error)
+	Update(*PodSecurityPolicyTemplateProjectBinding) (*PodSecurityPolicyTemplateProjectBinding, error)
+	Delete(namespace, name string, options *metav1.DeleteOptions) error
+	List(namespace string, opts metav1.ListOptions) (*PodSecurityPolicyTemplateProjectBindingList, error)
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	Cache() PodSecurityPolicyTemplateProjectBindingClientCache
+
+	OnCreate(ctx context.Context, name string, sync PodSecurityPolicyTemplateProjectBindingChangeHandlerFunc)
+	OnChange(ctx context.Context, name string, sync PodSecurityPolicyTemplateProjectBindingChangeHandlerFunc)
+	OnRemove(ctx context.Context, name string, sync PodSecurityPolicyTemplateProjectBindingChangeHandlerFunc)
+	Enqueue(namespace, name string)
+
+	Generic() controller.GenericController
+	Interface() PodSecurityPolicyTemplateProjectBindingInterface
+}
+
+type podSecurityPolicyTemplateProjectBindingClientCache struct {
+	client *podSecurityPolicyTemplateProjectBindingClient2
+}
+
+type podSecurityPolicyTemplateProjectBindingClient2 struct {
+	iface      PodSecurityPolicyTemplateProjectBindingInterface
+	controller PodSecurityPolicyTemplateProjectBindingController
+}
+
+func (n *podSecurityPolicyTemplateProjectBindingClient2) Interface() PodSecurityPolicyTemplateProjectBindingInterface {
+	return n.iface
+}
+
+func (n *podSecurityPolicyTemplateProjectBindingClient2) Generic() controller.GenericController {
+	return n.iface.Controller().Generic()
+}
+
+func (n *podSecurityPolicyTemplateProjectBindingClient2) Enqueue(namespace, name string) {
+	n.iface.Controller().Enqueue(namespace, name)
+}
+
+func (n *podSecurityPolicyTemplateProjectBindingClient2) Create(obj *PodSecurityPolicyTemplateProjectBinding) (*PodSecurityPolicyTemplateProjectBinding, error) {
+	return n.iface.Create(obj)
+}
+
+func (n *podSecurityPolicyTemplateProjectBindingClient2) Get(namespace, name string, opts metav1.GetOptions) (*PodSecurityPolicyTemplateProjectBinding, error) {
+	return n.iface.GetNamespaced(namespace, name, opts)
+}
+
+func (n *podSecurityPolicyTemplateProjectBindingClient2) Update(obj *PodSecurityPolicyTemplateProjectBinding) (*PodSecurityPolicyTemplateProjectBinding, error) {
+	return n.iface.Update(obj)
+}
+
+func (n *podSecurityPolicyTemplateProjectBindingClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
+	return n.iface.DeleteNamespaced(namespace, name, options)
+}
+
+func (n *podSecurityPolicyTemplateProjectBindingClient2) List(namespace string, opts metav1.ListOptions) (*PodSecurityPolicyTemplateProjectBindingList, error) {
+	return n.iface.List(opts)
+}
+
+func (n *podSecurityPolicyTemplateProjectBindingClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+	return n.iface.Watch(opts)
+}
+
+func (n *podSecurityPolicyTemplateProjectBindingClientCache) Get(namespace, name string) (*PodSecurityPolicyTemplateProjectBinding, error) {
+	return n.client.controller.Lister().Get(namespace, name)
+}
+
+func (n *podSecurityPolicyTemplateProjectBindingClientCache) List(namespace string, selector labels.Selector) ([]*PodSecurityPolicyTemplateProjectBinding, error) {
+	return n.client.controller.Lister().List(namespace, selector)
+}
+
+func (n *podSecurityPolicyTemplateProjectBindingClient2) Cache() PodSecurityPolicyTemplateProjectBindingClientCache {
+	n.loadController()
+	return &podSecurityPolicyTemplateProjectBindingClientCache{
+		client: n,
+	}
+}
+
+func (n *podSecurityPolicyTemplateProjectBindingClient2) OnCreate(ctx context.Context, name string, sync PodSecurityPolicyTemplateProjectBindingChangeHandlerFunc) {
+	n.loadController()
+	n.iface.AddLifecycle(ctx, name+"-create", &podSecurityPolicyTemplateProjectBindingLifecycleDelegate{create: sync})
+}
+
+func (n *podSecurityPolicyTemplateProjectBindingClient2) OnChange(ctx context.Context, name string, sync PodSecurityPolicyTemplateProjectBindingChangeHandlerFunc) {
+	n.loadController()
+	n.iface.AddLifecycle(ctx, name+"-change", &podSecurityPolicyTemplateProjectBindingLifecycleDelegate{update: sync})
+}
+
+func (n *podSecurityPolicyTemplateProjectBindingClient2) OnRemove(ctx context.Context, name string, sync PodSecurityPolicyTemplateProjectBindingChangeHandlerFunc) {
+	n.loadController()
+	n.iface.AddLifecycle(ctx, name, &podSecurityPolicyTemplateProjectBindingLifecycleDelegate{remove: sync})
+}
+
+func (n *podSecurityPolicyTemplateProjectBindingClientCache) Index(name string, indexer PodSecurityPolicyTemplateProjectBindingIndexer) {
+	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
+		name: func(obj interface{}) ([]string, error) {
+			if v, ok := obj.(*PodSecurityPolicyTemplateProjectBinding); ok {
+				return indexer(v)
+			}
+			return nil, nil
+		},
+	})
+
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (n *podSecurityPolicyTemplateProjectBindingClientCache) GetIndexed(name, key string) ([]*PodSecurityPolicyTemplateProjectBinding, error) {
+	var result []*PodSecurityPolicyTemplateProjectBinding
+	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
+	if err != nil {
+		return nil, err
+	}
+	for _, obj := range objs {
+		if v, ok := obj.(*PodSecurityPolicyTemplateProjectBinding); ok {
+			result = append(result, v)
+		}
+	}
+
+	return result, nil
+}
+
+func (n *podSecurityPolicyTemplateProjectBindingClient2) loadController() {
+	if n.controller == nil {
+		n.controller = n.iface.Controller()
+	}
+}
+
+type podSecurityPolicyTemplateProjectBindingLifecycleDelegate struct {
+	create PodSecurityPolicyTemplateProjectBindingChangeHandlerFunc
+	update PodSecurityPolicyTemplateProjectBindingChangeHandlerFunc
+	remove PodSecurityPolicyTemplateProjectBindingChangeHandlerFunc
+}
+
+func (n *podSecurityPolicyTemplateProjectBindingLifecycleDelegate) HasCreate() bool {
+	return n.create != nil
+}
+
+func (n *podSecurityPolicyTemplateProjectBindingLifecycleDelegate) Create(obj *PodSecurityPolicyTemplateProjectBinding) (runtime.Object, error) {
+	if n.create == nil {
+		return obj, nil
+	}
+	return n.create(obj)
+}
+
+func (n *podSecurityPolicyTemplateProjectBindingLifecycleDelegate) HasFinalize() bool {
+	return n.remove != nil
+}
+
+func (n *podSecurityPolicyTemplateProjectBindingLifecycleDelegate) Remove(obj *PodSecurityPolicyTemplateProjectBinding) (runtime.Object, error) {
+	if n.remove == nil {
+		return obj, nil
+	}
+	return n.remove(obj)
+}
+
+func (n *podSecurityPolicyTemplateProjectBindingLifecycleDelegate) Updated(obj *PodSecurityPolicyTemplateProjectBinding) (runtime.Object, error) {
+	if n.update == nil {
+		return obj, nil
+	}
+	return n.update(obj)
 }

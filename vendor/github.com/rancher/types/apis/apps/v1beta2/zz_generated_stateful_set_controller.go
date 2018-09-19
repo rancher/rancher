@@ -38,6 +38,8 @@ type StatefulSetList struct {
 
 type StatefulSetHandlerFunc func(key string, obj *v1beta2.StatefulSet) (runtime.Object, error)
 
+type StatefulSetChangeHandlerFunc func(obj *v1beta2.StatefulSet) (runtime.Object, error)
+
 type StatefulSetLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1beta2.StatefulSet, err error)
 	Get(namespace, name string) (*v1beta2.StatefulSet, error)
@@ -248,4 +250,179 @@ func (s *statefulSetClient) AddClusterScopedHandler(ctx context.Context, name, c
 func (s *statefulSetClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle StatefulSetLifecycle) {
 	sync := NewStatefulSetLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+type StatefulSetIndexer func(obj *v1beta2.StatefulSet) ([]string, error)
+
+type StatefulSetClientCache interface {
+	Get(namespace, name string) (*v1beta2.StatefulSet, error)
+	List(namespace string, selector labels.Selector) ([]*v1beta2.StatefulSet, error)
+
+	Index(name string, indexer StatefulSetIndexer)
+	GetIndexed(name, key string) ([]*v1beta2.StatefulSet, error)
+}
+
+type StatefulSetClient interface {
+	Create(*v1beta2.StatefulSet) (*v1beta2.StatefulSet, error)
+	Get(namespace, name string, opts metav1.GetOptions) (*v1beta2.StatefulSet, error)
+	Update(*v1beta2.StatefulSet) (*v1beta2.StatefulSet, error)
+	Delete(namespace, name string, options *metav1.DeleteOptions) error
+	List(namespace string, opts metav1.ListOptions) (*StatefulSetList, error)
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	Cache() StatefulSetClientCache
+
+	OnCreate(ctx context.Context, name string, sync StatefulSetChangeHandlerFunc)
+	OnChange(ctx context.Context, name string, sync StatefulSetChangeHandlerFunc)
+	OnRemove(ctx context.Context, name string, sync StatefulSetChangeHandlerFunc)
+	Enqueue(namespace, name string)
+
+	Generic() controller.GenericController
+	Interface() StatefulSetInterface
+}
+
+type statefulSetClientCache struct {
+	client *statefulSetClient2
+}
+
+type statefulSetClient2 struct {
+	iface      StatefulSetInterface
+	controller StatefulSetController
+}
+
+func (n *statefulSetClient2) Interface() StatefulSetInterface {
+	return n.iface
+}
+
+func (n *statefulSetClient2) Generic() controller.GenericController {
+	return n.iface.Controller().Generic()
+}
+
+func (n *statefulSetClient2) Enqueue(namespace, name string) {
+	n.iface.Controller().Enqueue(namespace, name)
+}
+
+func (n *statefulSetClient2) Create(obj *v1beta2.StatefulSet) (*v1beta2.StatefulSet, error) {
+	return n.iface.Create(obj)
+}
+
+func (n *statefulSetClient2) Get(namespace, name string, opts metav1.GetOptions) (*v1beta2.StatefulSet, error) {
+	return n.iface.GetNamespaced(namespace, name, opts)
+}
+
+func (n *statefulSetClient2) Update(obj *v1beta2.StatefulSet) (*v1beta2.StatefulSet, error) {
+	return n.iface.Update(obj)
+}
+
+func (n *statefulSetClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
+	return n.iface.DeleteNamespaced(namespace, name, options)
+}
+
+func (n *statefulSetClient2) List(namespace string, opts metav1.ListOptions) (*StatefulSetList, error) {
+	return n.iface.List(opts)
+}
+
+func (n *statefulSetClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+	return n.iface.Watch(opts)
+}
+
+func (n *statefulSetClientCache) Get(namespace, name string) (*v1beta2.StatefulSet, error) {
+	return n.client.controller.Lister().Get(namespace, name)
+}
+
+func (n *statefulSetClientCache) List(namespace string, selector labels.Selector) ([]*v1beta2.StatefulSet, error) {
+	return n.client.controller.Lister().List(namespace, selector)
+}
+
+func (n *statefulSetClient2) Cache() StatefulSetClientCache {
+	n.loadController()
+	return &statefulSetClientCache{
+		client: n,
+	}
+}
+
+func (n *statefulSetClient2) OnCreate(ctx context.Context, name string, sync StatefulSetChangeHandlerFunc) {
+	n.loadController()
+	n.iface.AddLifecycle(ctx, name+"-create", &statefulSetLifecycleDelegate{create: sync})
+}
+
+func (n *statefulSetClient2) OnChange(ctx context.Context, name string, sync StatefulSetChangeHandlerFunc) {
+	n.loadController()
+	n.iface.AddLifecycle(ctx, name+"-change", &statefulSetLifecycleDelegate{update: sync})
+}
+
+func (n *statefulSetClient2) OnRemove(ctx context.Context, name string, sync StatefulSetChangeHandlerFunc) {
+	n.loadController()
+	n.iface.AddLifecycle(ctx, name, &statefulSetLifecycleDelegate{remove: sync})
+}
+
+func (n *statefulSetClientCache) Index(name string, indexer StatefulSetIndexer) {
+	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
+		name: func(obj interface{}) ([]string, error) {
+			if v, ok := obj.(*v1beta2.StatefulSet); ok {
+				return indexer(v)
+			}
+			return nil, nil
+		},
+	})
+
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (n *statefulSetClientCache) GetIndexed(name, key string) ([]*v1beta2.StatefulSet, error) {
+	var result []*v1beta2.StatefulSet
+	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
+	if err != nil {
+		return nil, err
+	}
+	for _, obj := range objs {
+		if v, ok := obj.(*v1beta2.StatefulSet); ok {
+			result = append(result, v)
+		}
+	}
+
+	return result, nil
+}
+
+func (n *statefulSetClient2) loadController() {
+	if n.controller == nil {
+		n.controller = n.iface.Controller()
+	}
+}
+
+type statefulSetLifecycleDelegate struct {
+	create StatefulSetChangeHandlerFunc
+	update StatefulSetChangeHandlerFunc
+	remove StatefulSetChangeHandlerFunc
+}
+
+func (n *statefulSetLifecycleDelegate) HasCreate() bool {
+	return n.create != nil
+}
+
+func (n *statefulSetLifecycleDelegate) Create(obj *v1beta2.StatefulSet) (runtime.Object, error) {
+	if n.create == nil {
+		return obj, nil
+	}
+	return n.create(obj)
+}
+
+func (n *statefulSetLifecycleDelegate) HasFinalize() bool {
+	return n.remove != nil
+}
+
+func (n *statefulSetLifecycleDelegate) Remove(obj *v1beta2.StatefulSet) (runtime.Object, error) {
+	if n.remove == nil {
+		return obj, nil
+	}
+	return n.remove(obj)
+}
+
+func (n *statefulSetLifecycleDelegate) Updated(obj *v1beta2.StatefulSet) (runtime.Object, error) {
+	if n.update == nil {
+		return obj, nil
+	}
+	return n.update(obj)
 }

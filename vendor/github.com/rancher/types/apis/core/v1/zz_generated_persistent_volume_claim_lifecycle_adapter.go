@@ -16,6 +16,16 @@ type persistentVolumeClaimLifecycleAdapter struct {
 	lifecycle PersistentVolumeClaimLifecycle
 }
 
+func (w *persistentVolumeClaimLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *persistentVolumeClaimLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *persistentVolumeClaimLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*v1.PersistentVolumeClaim))
 	if o == nil {

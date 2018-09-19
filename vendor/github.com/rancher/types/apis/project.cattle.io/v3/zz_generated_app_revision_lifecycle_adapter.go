@@ -15,6 +15,16 @@ type appRevisionLifecycleAdapter struct {
 	lifecycle AppRevisionLifecycle
 }
 
+func (w *appRevisionLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *appRevisionLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *appRevisionLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*AppRevision))
 	if o == nil {

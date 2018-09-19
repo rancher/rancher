@@ -15,6 +15,16 @@ type podSecurityPolicyTemplateProjectBindingLifecycleAdapter struct {
 	lifecycle PodSecurityPolicyTemplateProjectBindingLifecycle
 }
 
+func (w *podSecurityPolicyTemplateProjectBindingLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *podSecurityPolicyTemplateProjectBindingLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *podSecurityPolicyTemplateProjectBindingLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*PodSecurityPolicyTemplateProjectBinding))
 	if o == nil {
