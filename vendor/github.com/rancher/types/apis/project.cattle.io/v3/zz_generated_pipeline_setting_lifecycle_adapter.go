@@ -15,6 +15,16 @@ type pipelineSettingLifecycleAdapter struct {
 	lifecycle PipelineSettingLifecycle
 }
 
+func (w *pipelineSettingLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *pipelineSettingLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *pipelineSettingLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*PipelineSetting))
 	if o == nil {

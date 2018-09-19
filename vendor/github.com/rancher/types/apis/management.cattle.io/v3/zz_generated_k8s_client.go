@@ -11,7 +11,10 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-type contextKeyType struct{}
+type (
+	contextKeyType        struct{}
+	contextClientsKeyType struct{}
+)
 
 type Interface interface {
 	RESTClient() rest.Interface
@@ -56,6 +59,48 @@ type Interface interface {
 	ComposeConfigsGetter
 	ProjectCatalogsGetter
 	ClusterCatalogsGetter
+}
+
+type Clients struct {
+	NodePool                                NodePoolClient
+	Node                                    NodeClient
+	NodeDriver                              NodeDriverClient
+	NodeTemplate                            NodeTemplateClient
+	Project                                 ProjectClient
+	GlobalRole                              GlobalRoleClient
+	GlobalRoleBinding                       GlobalRoleBindingClient
+	RoleTemplate                            RoleTemplateClient
+	PodSecurityPolicyTemplate               PodSecurityPolicyTemplateClient
+	PodSecurityPolicyTemplateProjectBinding PodSecurityPolicyTemplateProjectBindingClient
+	ClusterRoleTemplateBinding              ClusterRoleTemplateBindingClient
+	ProjectRoleTemplateBinding              ProjectRoleTemplateBindingClient
+	Cluster                                 ClusterClient
+	ClusterRegistrationToken                ClusterRegistrationTokenClient
+	Catalog                                 CatalogClient
+	Template                                TemplateClient
+	TemplateVersion                         TemplateVersionClient
+	TemplateContent                         TemplateContentClient
+	Group                                   GroupClient
+	GroupMember                             GroupMemberClient
+	Principal                               PrincipalClient
+	User                                    UserClient
+	AuthConfig                              AuthConfigClient
+	LdapConfig                              LdapConfigClient
+	Token                                   TokenClient
+	DynamicSchema                           DynamicSchemaClient
+	Preference                              PreferenceClient
+	UserAttribute                           UserAttributeClient
+	ProjectNetworkPolicy                    ProjectNetworkPolicyClient
+	ClusterLogging                          ClusterLoggingClient
+	ProjectLogging                          ProjectLoggingClient
+	ListenConfig                            ListenConfigClient
+	Setting                                 SettingClient
+	Notifier                                NotifierClient
+	ClusterAlert                            ClusterAlertClient
+	ProjectAlert                            ProjectAlertClient
+	ComposeConfig                           ComposeConfigClient
+	ProjectCatalog                          ProjectCatalogClient
+	ClusterCatalog                          ClusterCatalogClient
 }
 
 type Client struct {
@@ -110,11 +155,150 @@ func Factory(ctx context.Context, config rest.Config) (context.Context, controll
 		return ctx, nil, err
 	}
 
-	return context.WithValue(ctx, contextKeyType{}, c), c, nil
+	cs := NewClientsFromInterface(c)
+
+	ctx = context.WithValue(ctx, contextKeyType{}, c)
+	ctx = context.WithValue(ctx, contextClientsKeyType{}, cs)
+	return ctx, c, nil
+}
+
+func ClientsFrom(ctx context.Context) *Clients {
+	return ctx.Value(contextClientsKeyType{}).(*Clients)
 }
 
 func From(ctx context.Context) Interface {
 	return ctx.Value(contextKeyType{}).(Interface)
+}
+
+func NewClients(config rest.Config) (*Clients, error) {
+	iface, err := NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+	return NewClientsFromInterface(iface), nil
+}
+
+func NewClientsFromInterface(iface Interface) *Clients {
+	return &Clients{
+
+		NodePool: &nodePoolClient2{
+			iface: iface.NodePools(""),
+		},
+		Node: &nodeClient2{
+			iface: iface.Nodes(""),
+		},
+		NodeDriver: &nodeDriverClient2{
+			iface: iface.NodeDrivers(""),
+		},
+		NodeTemplate: &nodeTemplateClient2{
+			iface: iface.NodeTemplates(""),
+		},
+		Project: &projectClient2{
+			iface: iface.Projects(""),
+		},
+		GlobalRole: &globalRoleClient2{
+			iface: iface.GlobalRoles(""),
+		},
+		GlobalRoleBinding: &globalRoleBindingClient2{
+			iface: iface.GlobalRoleBindings(""),
+		},
+		RoleTemplate: &roleTemplateClient2{
+			iface: iface.RoleTemplates(""),
+		},
+		PodSecurityPolicyTemplate: &podSecurityPolicyTemplateClient2{
+			iface: iface.PodSecurityPolicyTemplates(""),
+		},
+		PodSecurityPolicyTemplateProjectBinding: &podSecurityPolicyTemplateProjectBindingClient2{
+			iface: iface.PodSecurityPolicyTemplateProjectBindings(""),
+		},
+		ClusterRoleTemplateBinding: &clusterRoleTemplateBindingClient2{
+			iface: iface.ClusterRoleTemplateBindings(""),
+		},
+		ProjectRoleTemplateBinding: &projectRoleTemplateBindingClient2{
+			iface: iface.ProjectRoleTemplateBindings(""),
+		},
+		Cluster: &clusterClient2{
+			iface: iface.Clusters(""),
+		},
+		ClusterRegistrationToken: &clusterRegistrationTokenClient2{
+			iface: iface.ClusterRegistrationTokens(""),
+		},
+		Catalog: &catalogClient2{
+			iface: iface.Catalogs(""),
+		},
+		Template: &templateClient2{
+			iface: iface.Templates(""),
+		},
+		TemplateVersion: &templateVersionClient2{
+			iface: iface.TemplateVersions(""),
+		},
+		TemplateContent: &templateContentClient2{
+			iface: iface.TemplateContents(""),
+		},
+		Group: &groupClient2{
+			iface: iface.Groups(""),
+		},
+		GroupMember: &groupMemberClient2{
+			iface: iface.GroupMembers(""),
+		},
+		Principal: &principalClient2{
+			iface: iface.Principals(""),
+		},
+		User: &userClient2{
+			iface: iface.Users(""),
+		},
+		AuthConfig: &authConfigClient2{
+			iface: iface.AuthConfigs(""),
+		},
+		LdapConfig: &ldapConfigClient2{
+			iface: iface.LdapConfigs(""),
+		},
+		Token: &tokenClient2{
+			iface: iface.Tokens(""),
+		},
+		DynamicSchema: &dynamicSchemaClient2{
+			iface: iface.DynamicSchemas(""),
+		},
+		Preference: &preferenceClient2{
+			iface: iface.Preferences(""),
+		},
+		UserAttribute: &userAttributeClient2{
+			iface: iface.UserAttributes(""),
+		},
+		ProjectNetworkPolicy: &projectNetworkPolicyClient2{
+			iface: iface.ProjectNetworkPolicies(""),
+		},
+		ClusterLogging: &clusterLoggingClient2{
+			iface: iface.ClusterLoggings(""),
+		},
+		ProjectLogging: &projectLoggingClient2{
+			iface: iface.ProjectLoggings(""),
+		},
+		ListenConfig: &listenConfigClient2{
+			iface: iface.ListenConfigs(""),
+		},
+		Setting: &settingClient2{
+			iface: iface.Settings(""),
+		},
+		Notifier: &notifierClient2{
+			iface: iface.Notifiers(""),
+		},
+		ClusterAlert: &clusterAlertClient2{
+			iface: iface.ClusterAlerts(""),
+		},
+		ProjectAlert: &projectAlertClient2{
+			iface: iface.ProjectAlerts(""),
+		},
+		ComposeConfig: &composeConfigClient2{
+			iface: iface.ComposeConfigs(""),
+		},
+		ProjectCatalog: &projectCatalogClient2{
+			iface: iface.ProjectCatalogs(""),
+		},
+		ClusterCatalog: &clusterCatalogClient2{
+			iface: iface.ClusterCatalogs(""),
+		},
+	}
 }
 
 func NewForConfig(config rest.Config) (Interface, error) {

@@ -15,6 +15,16 @@ type catalogLifecycleAdapter struct {
 	lifecycle CatalogLifecycle
 }
 
+func (w *catalogLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *catalogLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *catalogLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*Catalog))
 	if o == nil {

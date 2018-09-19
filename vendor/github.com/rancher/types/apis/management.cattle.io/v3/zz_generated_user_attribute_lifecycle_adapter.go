@@ -15,6 +15,16 @@ type userAttributeLifecycleAdapter struct {
 	lifecycle UserAttributeLifecycle
 }
 
+func (w *userAttributeLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *userAttributeLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *userAttributeLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*UserAttribute))
 	if o == nil {

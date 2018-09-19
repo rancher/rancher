@@ -16,6 +16,16 @@ type cronJobLifecycleAdapter struct {
 	lifecycle CronJobLifecycle
 }
 
+func (w *cronJobLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *cronJobLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *cronJobLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*v1beta1.CronJob))
 	if o == nil {

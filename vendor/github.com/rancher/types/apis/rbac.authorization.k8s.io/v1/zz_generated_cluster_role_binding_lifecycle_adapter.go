@@ -16,6 +16,16 @@ type clusterRoleBindingLifecycleAdapter struct {
 	lifecycle ClusterRoleBindingLifecycle
 }
 
+func (w *clusterRoleBindingLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *clusterRoleBindingLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *clusterRoleBindingLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*v1.ClusterRoleBinding))
 	if o == nil {

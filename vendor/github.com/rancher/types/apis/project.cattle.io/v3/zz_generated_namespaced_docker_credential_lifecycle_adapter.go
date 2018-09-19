@@ -15,6 +15,16 @@ type namespacedDockerCredentialLifecycleAdapter struct {
 	lifecycle NamespacedDockerCredentialLifecycle
 }
 
+func (w *namespacedDockerCredentialLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *namespacedDockerCredentialLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *namespacedDockerCredentialLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*NamespacedDockerCredential))
 	if o == nil {

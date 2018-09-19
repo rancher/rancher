@@ -15,6 +15,16 @@ type dynamicSchemaLifecycleAdapter struct {
 	lifecycle DynamicSchemaLifecycle
 }
 
+func (w *dynamicSchemaLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *dynamicSchemaLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *dynamicSchemaLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*DynamicSchema))
 	if o == nil {

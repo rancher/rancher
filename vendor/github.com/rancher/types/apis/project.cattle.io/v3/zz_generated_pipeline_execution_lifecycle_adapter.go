@@ -15,6 +15,16 @@ type pipelineExecutionLifecycleAdapter struct {
 	lifecycle PipelineExecutionLifecycle
 }
 
+func (w *pipelineExecutionLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *pipelineExecutionLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *pipelineExecutionLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*PipelineExecution))
 	if o == nil {

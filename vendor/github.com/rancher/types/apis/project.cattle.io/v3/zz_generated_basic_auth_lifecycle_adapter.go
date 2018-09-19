@@ -15,6 +15,16 @@ type basicAuthLifecycleAdapter struct {
 	lifecycle BasicAuthLifecycle
 }
 
+func (w *basicAuthLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *basicAuthLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *basicAuthLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*BasicAuth))
 	if o == nil {

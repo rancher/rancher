@@ -16,6 +16,16 @@ type componentStatusLifecycleAdapter struct {
 	lifecycle ComponentStatusLifecycle
 }
 
+func (w *componentStatusLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *componentStatusLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *componentStatusLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*v1.ComponentStatus))
 	if o == nil {

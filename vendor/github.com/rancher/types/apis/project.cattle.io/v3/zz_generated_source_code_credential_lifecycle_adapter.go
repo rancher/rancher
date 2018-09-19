@@ -15,6 +15,16 @@ type sourceCodeCredentialLifecycleAdapter struct {
 	lifecycle SourceCodeCredentialLifecycle
 }
 
+func (w *sourceCodeCredentialLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *sourceCodeCredentialLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *sourceCodeCredentialLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*SourceCodeCredential))
 	if o == nil {

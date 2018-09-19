@@ -15,6 +15,16 @@ type roleTemplateLifecycleAdapter struct {
 	lifecycle RoleTemplateLifecycle
 }
 
+func (w *roleTemplateLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *roleTemplateLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *roleTemplateLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*RoleTemplate))
 	if o == nil {

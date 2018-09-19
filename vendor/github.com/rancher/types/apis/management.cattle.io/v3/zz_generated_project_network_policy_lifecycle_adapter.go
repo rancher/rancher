@@ -15,6 +15,16 @@ type projectNetworkPolicyLifecycleAdapter struct {
 	lifecycle ProjectNetworkPolicyLifecycle
 }
 
+func (w *projectNetworkPolicyLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *projectNetworkPolicyLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *projectNetworkPolicyLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*ProjectNetworkPolicy))
 	if o == nil {

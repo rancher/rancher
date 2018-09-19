@@ -15,6 +15,16 @@ type groupMemberLifecycleAdapter struct {
 	lifecycle GroupMemberLifecycle
 }
 
+func (w *groupMemberLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *groupMemberLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *groupMemberLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*GroupMember))
 	if o == nil {

@@ -37,6 +37,8 @@ type EventList struct {
 
 type EventHandlerFunc func(key string, obj *v1.Event) (runtime.Object, error)
 
+type EventChangeHandlerFunc func(obj *v1.Event) (runtime.Object, error)
+
 type EventLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.Event, err error)
 	Get(namespace, name string) (*v1.Event, error)
@@ -247,4 +249,179 @@ func (s *eventClient) AddClusterScopedHandler(ctx context.Context, name, cluster
 func (s *eventClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle EventLifecycle) {
 	sync := NewEventLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+type EventIndexer func(obj *v1.Event) ([]string, error)
+
+type EventClientCache interface {
+	Get(namespace, name string) (*v1.Event, error)
+	List(namespace string, selector labels.Selector) ([]*v1.Event, error)
+
+	Index(name string, indexer EventIndexer)
+	GetIndexed(name, key string) ([]*v1.Event, error)
+}
+
+type EventClient interface {
+	Create(*v1.Event) (*v1.Event, error)
+	Get(namespace, name string, opts metav1.GetOptions) (*v1.Event, error)
+	Update(*v1.Event) (*v1.Event, error)
+	Delete(namespace, name string, options *metav1.DeleteOptions) error
+	List(namespace string, opts metav1.ListOptions) (*EventList, error)
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	Cache() EventClientCache
+
+	OnCreate(ctx context.Context, name string, sync EventChangeHandlerFunc)
+	OnChange(ctx context.Context, name string, sync EventChangeHandlerFunc)
+	OnRemove(ctx context.Context, name string, sync EventChangeHandlerFunc)
+	Enqueue(namespace, name string)
+
+	Generic() controller.GenericController
+	Interface() EventInterface
+}
+
+type eventClientCache struct {
+	client *eventClient2
+}
+
+type eventClient2 struct {
+	iface      EventInterface
+	controller EventController
+}
+
+func (n *eventClient2) Interface() EventInterface {
+	return n.iface
+}
+
+func (n *eventClient2) Generic() controller.GenericController {
+	return n.iface.Controller().Generic()
+}
+
+func (n *eventClient2) Enqueue(namespace, name string) {
+	n.iface.Controller().Enqueue(namespace, name)
+}
+
+func (n *eventClient2) Create(obj *v1.Event) (*v1.Event, error) {
+	return n.iface.Create(obj)
+}
+
+func (n *eventClient2) Get(namespace, name string, opts metav1.GetOptions) (*v1.Event, error) {
+	return n.iface.GetNamespaced(namespace, name, opts)
+}
+
+func (n *eventClient2) Update(obj *v1.Event) (*v1.Event, error) {
+	return n.iface.Update(obj)
+}
+
+func (n *eventClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
+	return n.iface.DeleteNamespaced(namespace, name, options)
+}
+
+func (n *eventClient2) List(namespace string, opts metav1.ListOptions) (*EventList, error) {
+	return n.iface.List(opts)
+}
+
+func (n *eventClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+	return n.iface.Watch(opts)
+}
+
+func (n *eventClientCache) Get(namespace, name string) (*v1.Event, error) {
+	return n.client.controller.Lister().Get(namespace, name)
+}
+
+func (n *eventClientCache) List(namespace string, selector labels.Selector) ([]*v1.Event, error) {
+	return n.client.controller.Lister().List(namespace, selector)
+}
+
+func (n *eventClient2) Cache() EventClientCache {
+	n.loadController()
+	return &eventClientCache{
+		client: n,
+	}
+}
+
+func (n *eventClient2) OnCreate(ctx context.Context, name string, sync EventChangeHandlerFunc) {
+	n.loadController()
+	n.iface.AddLifecycle(ctx, name+"-create", &eventLifecycleDelegate{create: sync})
+}
+
+func (n *eventClient2) OnChange(ctx context.Context, name string, sync EventChangeHandlerFunc) {
+	n.loadController()
+	n.iface.AddLifecycle(ctx, name+"-change", &eventLifecycleDelegate{update: sync})
+}
+
+func (n *eventClient2) OnRemove(ctx context.Context, name string, sync EventChangeHandlerFunc) {
+	n.loadController()
+	n.iface.AddLifecycle(ctx, name, &eventLifecycleDelegate{remove: sync})
+}
+
+func (n *eventClientCache) Index(name string, indexer EventIndexer) {
+	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
+		name: func(obj interface{}) ([]string, error) {
+			if v, ok := obj.(*v1.Event); ok {
+				return indexer(v)
+			}
+			return nil, nil
+		},
+	})
+
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (n *eventClientCache) GetIndexed(name, key string) ([]*v1.Event, error) {
+	var result []*v1.Event
+	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
+	if err != nil {
+		return nil, err
+	}
+	for _, obj := range objs {
+		if v, ok := obj.(*v1.Event); ok {
+			result = append(result, v)
+		}
+	}
+
+	return result, nil
+}
+
+func (n *eventClient2) loadController() {
+	if n.controller == nil {
+		n.controller = n.iface.Controller()
+	}
+}
+
+type eventLifecycleDelegate struct {
+	create EventChangeHandlerFunc
+	update EventChangeHandlerFunc
+	remove EventChangeHandlerFunc
+}
+
+func (n *eventLifecycleDelegate) HasCreate() bool {
+	return n.create != nil
+}
+
+func (n *eventLifecycleDelegate) Create(obj *v1.Event) (runtime.Object, error) {
+	if n.create == nil {
+		return obj, nil
+	}
+	return n.create(obj)
+}
+
+func (n *eventLifecycleDelegate) HasFinalize() bool {
+	return n.remove != nil
+}
+
+func (n *eventLifecycleDelegate) Remove(obj *v1.Event) (runtime.Object, error) {
+	if n.remove == nil {
+		return obj, nil
+	}
+	return n.remove(obj)
+}
+
+func (n *eventLifecycleDelegate) Updated(obj *v1.Event) (runtime.Object, error) {
+	if n.update == nil {
+		return obj, nil
+	}
+	return n.update(obj)
 }

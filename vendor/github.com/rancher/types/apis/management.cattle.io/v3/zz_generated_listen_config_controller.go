@@ -36,6 +36,8 @@ type ListenConfigList struct {
 
 type ListenConfigHandlerFunc func(key string, obj *ListenConfig) (runtime.Object, error)
 
+type ListenConfigChangeHandlerFunc func(obj *ListenConfig) (runtime.Object, error)
+
 type ListenConfigLister interface {
 	List(namespace string, selector labels.Selector) (ret []*ListenConfig, err error)
 	Get(namespace, name string) (*ListenConfig, error)
@@ -246,4 +248,179 @@ func (s *listenConfigClient) AddClusterScopedHandler(ctx context.Context, name, 
 func (s *listenConfigClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ListenConfigLifecycle) {
 	sync := NewListenConfigLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+type ListenConfigIndexer func(obj *ListenConfig) ([]string, error)
+
+type ListenConfigClientCache interface {
+	Get(namespace, name string) (*ListenConfig, error)
+	List(namespace string, selector labels.Selector) ([]*ListenConfig, error)
+
+	Index(name string, indexer ListenConfigIndexer)
+	GetIndexed(name, key string) ([]*ListenConfig, error)
+}
+
+type ListenConfigClient interface {
+	Create(*ListenConfig) (*ListenConfig, error)
+	Get(namespace, name string, opts metav1.GetOptions) (*ListenConfig, error)
+	Update(*ListenConfig) (*ListenConfig, error)
+	Delete(namespace, name string, options *metav1.DeleteOptions) error
+	List(namespace string, opts metav1.ListOptions) (*ListenConfigList, error)
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	Cache() ListenConfigClientCache
+
+	OnCreate(ctx context.Context, name string, sync ListenConfigChangeHandlerFunc)
+	OnChange(ctx context.Context, name string, sync ListenConfigChangeHandlerFunc)
+	OnRemove(ctx context.Context, name string, sync ListenConfigChangeHandlerFunc)
+	Enqueue(namespace, name string)
+
+	Generic() controller.GenericController
+	Interface() ListenConfigInterface
+}
+
+type listenConfigClientCache struct {
+	client *listenConfigClient2
+}
+
+type listenConfigClient2 struct {
+	iface      ListenConfigInterface
+	controller ListenConfigController
+}
+
+func (n *listenConfigClient2) Interface() ListenConfigInterface {
+	return n.iface
+}
+
+func (n *listenConfigClient2) Generic() controller.GenericController {
+	return n.iface.Controller().Generic()
+}
+
+func (n *listenConfigClient2) Enqueue(namespace, name string) {
+	n.iface.Controller().Enqueue(namespace, name)
+}
+
+func (n *listenConfigClient2) Create(obj *ListenConfig) (*ListenConfig, error) {
+	return n.iface.Create(obj)
+}
+
+func (n *listenConfigClient2) Get(namespace, name string, opts metav1.GetOptions) (*ListenConfig, error) {
+	return n.iface.GetNamespaced(namespace, name, opts)
+}
+
+func (n *listenConfigClient2) Update(obj *ListenConfig) (*ListenConfig, error) {
+	return n.iface.Update(obj)
+}
+
+func (n *listenConfigClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
+	return n.iface.DeleteNamespaced(namespace, name, options)
+}
+
+func (n *listenConfigClient2) List(namespace string, opts metav1.ListOptions) (*ListenConfigList, error) {
+	return n.iface.List(opts)
+}
+
+func (n *listenConfigClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+	return n.iface.Watch(opts)
+}
+
+func (n *listenConfigClientCache) Get(namespace, name string) (*ListenConfig, error) {
+	return n.client.controller.Lister().Get(namespace, name)
+}
+
+func (n *listenConfigClientCache) List(namespace string, selector labels.Selector) ([]*ListenConfig, error) {
+	return n.client.controller.Lister().List(namespace, selector)
+}
+
+func (n *listenConfigClient2) Cache() ListenConfigClientCache {
+	n.loadController()
+	return &listenConfigClientCache{
+		client: n,
+	}
+}
+
+func (n *listenConfigClient2) OnCreate(ctx context.Context, name string, sync ListenConfigChangeHandlerFunc) {
+	n.loadController()
+	n.iface.AddLifecycle(ctx, name+"-create", &listenConfigLifecycleDelegate{create: sync})
+}
+
+func (n *listenConfigClient2) OnChange(ctx context.Context, name string, sync ListenConfigChangeHandlerFunc) {
+	n.loadController()
+	n.iface.AddLifecycle(ctx, name+"-change", &listenConfigLifecycleDelegate{update: sync})
+}
+
+func (n *listenConfigClient2) OnRemove(ctx context.Context, name string, sync ListenConfigChangeHandlerFunc) {
+	n.loadController()
+	n.iface.AddLifecycle(ctx, name, &listenConfigLifecycleDelegate{remove: sync})
+}
+
+func (n *listenConfigClientCache) Index(name string, indexer ListenConfigIndexer) {
+	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
+		name: func(obj interface{}) ([]string, error) {
+			if v, ok := obj.(*ListenConfig); ok {
+				return indexer(v)
+			}
+			return nil, nil
+		},
+	})
+
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (n *listenConfigClientCache) GetIndexed(name, key string) ([]*ListenConfig, error) {
+	var result []*ListenConfig
+	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
+	if err != nil {
+		return nil, err
+	}
+	for _, obj := range objs {
+		if v, ok := obj.(*ListenConfig); ok {
+			result = append(result, v)
+		}
+	}
+
+	return result, nil
+}
+
+func (n *listenConfigClient2) loadController() {
+	if n.controller == nil {
+		n.controller = n.iface.Controller()
+	}
+}
+
+type listenConfigLifecycleDelegate struct {
+	create ListenConfigChangeHandlerFunc
+	update ListenConfigChangeHandlerFunc
+	remove ListenConfigChangeHandlerFunc
+}
+
+func (n *listenConfigLifecycleDelegate) HasCreate() bool {
+	return n.create != nil
+}
+
+func (n *listenConfigLifecycleDelegate) Create(obj *ListenConfig) (runtime.Object, error) {
+	if n.create == nil {
+		return obj, nil
+	}
+	return n.create(obj)
+}
+
+func (n *listenConfigLifecycleDelegate) HasFinalize() bool {
+	return n.remove != nil
+}
+
+func (n *listenConfigLifecycleDelegate) Remove(obj *ListenConfig) (runtime.Object, error) {
+	if n.remove == nil {
+		return obj, nil
+	}
+	return n.remove(obj)
+}
+
+func (n *listenConfigLifecycleDelegate) Updated(obj *ListenConfig) (runtime.Object, error) {
+	if n.update == nil {
+		return obj, nil
+	}
+	return n.update(obj)
 }

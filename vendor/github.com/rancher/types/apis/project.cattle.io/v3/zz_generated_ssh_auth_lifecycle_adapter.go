@@ -15,6 +15,16 @@ type sshAuthLifecycleAdapter struct {
 	lifecycle SSHAuthLifecycle
 }
 
+func (w *sshAuthLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *sshAuthLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *sshAuthLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*SSHAuth))
 	if o == nil {

@@ -15,6 +15,16 @@ type templateVersionLifecycleAdapter struct {
 	lifecycle TemplateVersionLifecycle
 }
 
+func (w *templateVersionLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *templateVersionLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *templateVersionLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*TemplateVersion))
 	if o == nil {

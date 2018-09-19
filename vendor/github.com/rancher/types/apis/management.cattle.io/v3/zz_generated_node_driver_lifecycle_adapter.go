@@ -15,6 +15,16 @@ type nodeDriverLifecycleAdapter struct {
 	lifecycle NodeDriverLifecycle
 }
 
+func (w *nodeDriverLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *nodeDriverLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *nodeDriverLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*NodeDriver))
 	if o == nil {

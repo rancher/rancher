@@ -16,6 +16,16 @@ type daemonSetLifecycleAdapter struct {
 	lifecycle DaemonSetLifecycle
 }
 
+func (w *daemonSetLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *daemonSetLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *daemonSetLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*v1beta2.DaemonSet))
 	if o == nil {

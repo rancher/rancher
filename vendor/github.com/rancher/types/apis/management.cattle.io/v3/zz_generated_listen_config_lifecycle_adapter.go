@@ -15,6 +15,16 @@ type listenConfigLifecycleAdapter struct {
 	lifecycle ListenConfigLifecycle
 }
 
+func (w *listenConfigLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *listenConfigLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *listenConfigLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*ListenConfig))
 	if o == nil {

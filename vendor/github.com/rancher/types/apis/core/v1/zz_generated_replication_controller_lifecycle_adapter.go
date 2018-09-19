@@ -16,6 +16,16 @@ type replicationControllerLifecycleAdapter struct {
 	lifecycle ReplicationControllerLifecycle
 }
 
+func (w *replicationControllerLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *replicationControllerLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *replicationControllerLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*v1.ReplicationController))
 	if o == nil {

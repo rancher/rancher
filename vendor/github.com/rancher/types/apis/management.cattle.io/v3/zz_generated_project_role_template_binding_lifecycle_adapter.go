@@ -15,6 +15,16 @@ type projectRoleTemplateBindingLifecycleAdapter struct {
 	lifecycle ProjectRoleTemplateBindingLifecycle
 }
 
+func (w *projectRoleTemplateBindingLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *projectRoleTemplateBindingLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *projectRoleTemplateBindingLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*ProjectRoleTemplateBinding))
 	if o == nil {

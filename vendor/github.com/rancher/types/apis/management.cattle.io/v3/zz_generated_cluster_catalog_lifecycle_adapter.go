@@ -15,6 +15,16 @@ type clusterCatalogLifecycleAdapter struct {
 	lifecycle ClusterCatalogLifecycle
 }
 
+func (w *clusterCatalogLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *clusterCatalogLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *clusterCatalogLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*ClusterCatalog))
 	if o == nil {

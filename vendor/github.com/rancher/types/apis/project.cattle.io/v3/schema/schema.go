@@ -782,6 +782,17 @@ func NewWorkloadTypeMapper() types.Mapper {
 }
 
 func pipelineTypes(schema *types.Schemas) *types.Schemas {
+	baseProviderCustomizeFunc := func(schema *types.Schema) {
+		schema.BaseType = "sourceCodeProvider"
+		schema.ResourceActions = map[string]types.Action{
+			"login": {
+				Input:  "authUserInput",
+				Output: "sourceCodeCredential",
+			},
+		}
+		schema.CollectionMethods = []string{}
+		schema.ResourceMethods = []string{http.MethodGet}
+	}
 	return schema.
 		AddMapperForType(&Version, v3.SourceCodeProviderConfig{}).
 		AddMapperForType(&Version, v3.Pipeline{},
@@ -796,29 +807,26 @@ func pipelineTypes(schema *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.AuthUserInput{}).
 		MustImport(&Version, v3.RunPipelineInput{}).
 		MustImport(&Version, v3.PushPipelineConfigInput{}).
-		MustImport(&Version, v3.GithubPipelineConfigApplyInput{}).
-		MustImport(&Version, v3.GithubLoginInput{}).
-		MustImport(&Version, v3.GitlabPipelineConfigApplyInput{}).
-		MustImport(&Version, v3.GitlabLoginInput{}).
+		MustImport(&Version, v3.GithubApplyInput{}).
+		MustImport(&Version, v3.GitlabApplyInput{}).
+		MustImport(&Version, v3.BitbucketCloudApplyInput{}).
+		MustImport(&Version, v3.BitbucketServerApplyInput{}).
+		MustImport(&Version, v3.BitbucketServerRequestLoginInput{}).
+		MustImport(&Version, v3.BitbucketServerRequestLoginOutput{}).
 		MustImportAndCustomize(&Version, v3.SourceCodeProvider{}, func(schema *types.Schema) {
 			schema.CollectionMethods = []string{http.MethodGet}
 		}).
-		MustImportAndCustomize(&Version, v3.GithubProvider{}, func(schema *types.Schema) {
+		MustImportAndCustomize(&Version, v3.GithubProvider{}, baseProviderCustomizeFunc).
+		MustImportAndCustomize(&Version, v3.GitlabProvider{}, baseProviderCustomizeFunc).
+		MustImportAndCustomize(&Version, v3.BitbucketCloudProvider{}, baseProviderCustomizeFunc).
+		MustImportAndCustomize(&Version, v3.BitbucketServerProvider{}, func(schema *types.Schema) {
 			schema.BaseType = "sourceCodeProvider"
 			schema.ResourceActions = map[string]types.Action{
-				"login": {
-					Input:  "githubLoginInput",
-					Output: "sourceCodeCredential",
+				"requestLogin": {
+					Output: "bitbucketServerRequestLoginOutput",
 				},
-			}
-			schema.CollectionMethods = []string{}
-			schema.ResourceMethods = []string{http.MethodGet}
-		}).
-		MustImportAndCustomize(&Version, v3.GitlabProvider{}, func(schema *types.Schema) {
-			schema.BaseType = "sourceCodeProvider"
-			schema.ResourceActions = map[string]types.Action{
 				"login": {
-					Input:  "gitlabLoginInput",
+					Input:  "authUserInput",
 					Output: "sourceCodeCredential",
 				},
 			}
@@ -834,7 +842,7 @@ func pipelineTypes(schema *types.Schemas) *types.Schemas {
 			schema.ResourceActions = map[string]types.Action{
 				"disable": {},
 				"testAndApply": {
-					Input: "githubPipelineConfigApplyInput",
+					Input: "githubApplyInput",
 				},
 			}
 			schema.CollectionMethods = []string{}
@@ -845,12 +853,38 @@ func pipelineTypes(schema *types.Schemas) *types.Schemas {
 			schema.ResourceActions = map[string]types.Action{
 				"disable": {},
 				"testAndApply": {
-					Input: "gitlabPipelineConfigApplyInput",
+					Input: "gitlabApplyInput",
 				},
 			}
 			schema.CollectionMethods = []string{}
 			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
 		}).
+		MustImportAndCustomize(&Version, v3.BitbucketCloudPipelineConfig{}, func(schema *types.Schema) {
+			schema.BaseType = "sourceCodeProviderConfig"
+			schema.ResourceActions = map[string]types.Action{
+				"disable": {},
+				"testAndApply": {
+					Input: "bitbucketCloudApplyInput",
+				},
+			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
+		}).MustImportAndCustomize(&Version, v3.BitbucketServerPipelineConfig{}, func(schema *types.Schema) {
+		schema.BaseType = "sourceCodeProviderConfig"
+		schema.ResourceActions = map[string]types.Action{
+			"disable":      {},
+			"generateKeys": {},
+			"requestLogin": {
+				Input:  "bitbucketServerRequestLoginInput",
+				Output: "bitbucketServerRequestLoginOutput",
+			},
+			"testAndApply": {
+				Input: "bitbucketServerApplyInput",
+			},
+		}
+		schema.CollectionMethods = []string{}
+		schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
+	}).
 		MustImportAndCustomize(&Version, v3.Pipeline{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
 				"activate":   {},

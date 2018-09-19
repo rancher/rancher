@@ -36,6 +36,8 @@ type CatalogList struct {
 
 type CatalogHandlerFunc func(key string, obj *Catalog) (runtime.Object, error)
 
+type CatalogChangeHandlerFunc func(obj *Catalog) (runtime.Object, error)
+
 type CatalogLister interface {
 	List(namespace string, selector labels.Selector) (ret []*Catalog, err error)
 	Get(namespace, name string) (*Catalog, error)
@@ -246,4 +248,179 @@ func (s *catalogClient) AddClusterScopedHandler(ctx context.Context, name, clust
 func (s *catalogClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle CatalogLifecycle) {
 	sync := NewCatalogLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+type CatalogIndexer func(obj *Catalog) ([]string, error)
+
+type CatalogClientCache interface {
+	Get(namespace, name string) (*Catalog, error)
+	List(namespace string, selector labels.Selector) ([]*Catalog, error)
+
+	Index(name string, indexer CatalogIndexer)
+	GetIndexed(name, key string) ([]*Catalog, error)
+}
+
+type CatalogClient interface {
+	Create(*Catalog) (*Catalog, error)
+	Get(namespace, name string, opts metav1.GetOptions) (*Catalog, error)
+	Update(*Catalog) (*Catalog, error)
+	Delete(namespace, name string, options *metav1.DeleteOptions) error
+	List(namespace string, opts metav1.ListOptions) (*CatalogList, error)
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	Cache() CatalogClientCache
+
+	OnCreate(ctx context.Context, name string, sync CatalogChangeHandlerFunc)
+	OnChange(ctx context.Context, name string, sync CatalogChangeHandlerFunc)
+	OnRemove(ctx context.Context, name string, sync CatalogChangeHandlerFunc)
+	Enqueue(namespace, name string)
+
+	Generic() controller.GenericController
+	Interface() CatalogInterface
+}
+
+type catalogClientCache struct {
+	client *catalogClient2
+}
+
+type catalogClient2 struct {
+	iface      CatalogInterface
+	controller CatalogController
+}
+
+func (n *catalogClient2) Interface() CatalogInterface {
+	return n.iface
+}
+
+func (n *catalogClient2) Generic() controller.GenericController {
+	return n.iface.Controller().Generic()
+}
+
+func (n *catalogClient2) Enqueue(namespace, name string) {
+	n.iface.Controller().Enqueue(namespace, name)
+}
+
+func (n *catalogClient2) Create(obj *Catalog) (*Catalog, error) {
+	return n.iface.Create(obj)
+}
+
+func (n *catalogClient2) Get(namespace, name string, opts metav1.GetOptions) (*Catalog, error) {
+	return n.iface.GetNamespaced(namespace, name, opts)
+}
+
+func (n *catalogClient2) Update(obj *Catalog) (*Catalog, error) {
+	return n.iface.Update(obj)
+}
+
+func (n *catalogClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
+	return n.iface.DeleteNamespaced(namespace, name, options)
+}
+
+func (n *catalogClient2) List(namespace string, opts metav1.ListOptions) (*CatalogList, error) {
+	return n.iface.List(opts)
+}
+
+func (n *catalogClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+	return n.iface.Watch(opts)
+}
+
+func (n *catalogClientCache) Get(namespace, name string) (*Catalog, error) {
+	return n.client.controller.Lister().Get(namespace, name)
+}
+
+func (n *catalogClientCache) List(namespace string, selector labels.Selector) ([]*Catalog, error) {
+	return n.client.controller.Lister().List(namespace, selector)
+}
+
+func (n *catalogClient2) Cache() CatalogClientCache {
+	n.loadController()
+	return &catalogClientCache{
+		client: n,
+	}
+}
+
+func (n *catalogClient2) OnCreate(ctx context.Context, name string, sync CatalogChangeHandlerFunc) {
+	n.loadController()
+	n.iface.AddLifecycle(ctx, name+"-create", &catalogLifecycleDelegate{create: sync})
+}
+
+func (n *catalogClient2) OnChange(ctx context.Context, name string, sync CatalogChangeHandlerFunc) {
+	n.loadController()
+	n.iface.AddLifecycle(ctx, name+"-change", &catalogLifecycleDelegate{update: sync})
+}
+
+func (n *catalogClient2) OnRemove(ctx context.Context, name string, sync CatalogChangeHandlerFunc) {
+	n.loadController()
+	n.iface.AddLifecycle(ctx, name, &catalogLifecycleDelegate{remove: sync})
+}
+
+func (n *catalogClientCache) Index(name string, indexer CatalogIndexer) {
+	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
+		name: func(obj interface{}) ([]string, error) {
+			if v, ok := obj.(*Catalog); ok {
+				return indexer(v)
+			}
+			return nil, nil
+		},
+	})
+
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (n *catalogClientCache) GetIndexed(name, key string) ([]*Catalog, error) {
+	var result []*Catalog
+	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
+	if err != nil {
+		return nil, err
+	}
+	for _, obj := range objs {
+		if v, ok := obj.(*Catalog); ok {
+			result = append(result, v)
+		}
+	}
+
+	return result, nil
+}
+
+func (n *catalogClient2) loadController() {
+	if n.controller == nil {
+		n.controller = n.iface.Controller()
+	}
+}
+
+type catalogLifecycleDelegate struct {
+	create CatalogChangeHandlerFunc
+	update CatalogChangeHandlerFunc
+	remove CatalogChangeHandlerFunc
+}
+
+func (n *catalogLifecycleDelegate) HasCreate() bool {
+	return n.create != nil
+}
+
+func (n *catalogLifecycleDelegate) Create(obj *Catalog) (runtime.Object, error) {
+	if n.create == nil {
+		return obj, nil
+	}
+	return n.create(obj)
+}
+
+func (n *catalogLifecycleDelegate) HasFinalize() bool {
+	return n.remove != nil
+}
+
+func (n *catalogLifecycleDelegate) Remove(obj *Catalog) (runtime.Object, error) {
+	if n.remove == nil {
+		return obj, nil
+	}
+	return n.remove(obj)
+}
+
+func (n *catalogLifecycleDelegate) Updated(obj *Catalog) (runtime.Object, error) {
+	if n.update == nil {
+		return obj, nil
+	}
+	return n.update(obj)
 }

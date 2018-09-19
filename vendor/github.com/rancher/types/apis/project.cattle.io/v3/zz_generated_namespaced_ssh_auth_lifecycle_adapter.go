@@ -15,6 +15,16 @@ type namespacedSshAuthLifecycleAdapter struct {
 	lifecycle NamespacedSSHAuthLifecycle
 }
 
+func (w *namespacedSshAuthLifecycleAdapter) HasCreate() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasCreate()
+}
+
+func (w *namespacedSshAuthLifecycleAdapter) HasFinalize() bool {
+	o, ok := w.lifecycle.(lifecycle.ObjectLifecycleCondition)
+	return !ok || o.HasFinalize()
+}
+
 func (w *namespacedSshAuthLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
 	o, err := w.lifecycle.Create(obj.(*NamespacedSSHAuth))
 	if o == nil {
