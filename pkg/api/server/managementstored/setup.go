@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/catalog"
 	ccluster "github.com/rancher/rancher/pkg/api/customization/cluster"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
+	"github.com/rancher/rancher/pkg/api/customization/globalrolebinding"
 	"github.com/rancher/rancher/pkg/api/customization/logging"
 	"github.com/rancher/rancher/pkg/api/customization/node"
 	"github.com/rancher/rancher/pkg/api/customization/nodetemplate"
@@ -123,6 +124,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	TemplateContent(schemas)
 	PodSecurityPolicyTemplate(schemas, apiContext)
 	RoleTemplate(schemas, apiContext)
+	GlobalRoleBinding(schemas, apiContext)
 
 	if err := NodeTypes(schemas, apiContext); err != nil {
 		return err
@@ -440,4 +442,9 @@ func RoleTemplate(schemas *types.Schemas, management *config.ScaledContext) {
 	}
 	schema := schemas.Schema(&managementschema.Version, client.RoleTemplateType)
 	schema.Validator = rt.Validator
+}
+
+func GlobalRoleBinding(schemas *types.Schemas, management *config.ScaledContext) {
+	schema := schemas.Schema(&managementschema.Version, client.GlobalRoleBindingType)
+	schema.Validator = globalrolebinding.NewGRBValidator(management)
 }
