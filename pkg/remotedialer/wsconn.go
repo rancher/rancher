@@ -24,6 +24,7 @@ func newWSConn(conn *websocket.Conn) *wsConn {
 func (w *wsConn) WriteMessage(messageType int, data []byte) error {
 	w.Lock()
 	defer w.Unlock()
+	w.conn.SetWriteDeadline(time.Now().Add(PingWaitDuration))
 	return w.conn.WriteMessage(messageType, data)
 }
 
