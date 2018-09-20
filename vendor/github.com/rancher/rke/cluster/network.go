@@ -262,30 +262,18 @@ func (c *Cluster) checkKubeAPIPort(ctx context.Context) error {
 func (c *Cluster) deployTCPPortListeners(ctx context.Context, currentCluster *Cluster) error {
 	log.Infof(ctx, "[network] Deploying port listener containers")
 
-	etcdHosts := []*hosts.Host{}
-	cpHosts := []*hosts.Host{}
-	workerHosts := []*hosts.Host{}
-	if currentCluster != nil {
-		etcdHosts = hosts.GetToAddHosts(currentCluster.EtcdHosts, c.EtcdHosts)
-		cpHosts = hosts.GetToAddHosts(currentCluster.ControlPlaneHosts, c.ControlPlaneHosts)
-		workerHosts = hosts.GetToAddHosts(currentCluster.WorkerHosts, c.WorkerHosts)
-	} else {
-		etcdHosts = c.EtcdHosts
-		cpHosts = c.ControlPlaneHosts
-		workerHosts = c.WorkerHosts
-	}
 	// deploy ectd listeners
-	if err := c.deployListenerOnPlane(ctx, EtcdPortList, etcdHosts, EtcdPortListenContainer); err != nil {
+	if err := c.deployListenerOnPlane(ctx, EtcdPortList, c.EtcdHosts, EtcdPortListenContainer); err != nil {
 		return err
 	}
 
 	// deploy controlplane listeners
-	if err := c.deployListenerOnPlane(ctx, ControlPlanePortList, cpHosts, CPPortListenContainer); err != nil {
+	if err := c.deployListenerOnPlane(ctx, ControlPlanePortList, c.ControlPlaneHosts, CPPortListenContainer); err != nil {
 		return err
 	}
 
 	// deploy worker listeners
-	if err := c.deployListenerOnPlane(ctx, WorkerPortList, workerHosts, WorkerPortListenContainer); err != nil {
+	if err := c.deployListenerOnPlane(ctx, WorkerPortList, c.WorkerHosts, WorkerPortListenContainer); err != nil {
 		return err
 	}
 	log.Infof(ctx, "[network] Port listener containers deployed successfully")
