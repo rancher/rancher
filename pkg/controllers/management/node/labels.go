@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"strings"
 
 	"github.com/rancher/rancher/pkg/librke"
 	"github.com/rancher/rke/services"
@@ -39,7 +40,8 @@ func (m *Lifecycle) checkLabels(node *v3.Node) (*v3.Node, error) {
 	update := false
 
 	for k, v := range nodePlan.Labels {
-		if node.Status.NodeLabels[k] != v {
+		value, ok := node.Status.NodeLabels[k]
+		if !ok || (value != v && strings.Contains(k, "kubernetes.io")) {
 			update = true
 			break
 		}
@@ -60,7 +62,10 @@ func (m *Lifecycle) checkLabels(node *v3.Node) (*v3.Node, error) {
 	node.Spec.DesiredNodeAnnotations = copyMap(node.Status.NodeAnnotations)
 
 	for k, v := range nodePlan.Labels {
-		node.Spec.DesiredNodeLabels[k] = v
+		value, ok := node.Status.NodeLabels[k]
+		if !ok || (value != v && strings.Contains(k, "kubernetes.io")) {
+			node.Spec.DesiredNodeLabels[k] = v
+		}
 	}
 
 	for k, v := range nodePlan.Annotations {
