@@ -243,8 +243,9 @@ func (s *Store) realWatch(apiContext *types.APIContext, schema *types.Schema, op
 	decoder := streaming.NewDecoder(framer, &unstructuredDecoder{})
 	watcher := watch.NewStreamWatcher(restclientwatch.NewDecoder(decoder, &unstructuredDecoder{}))
 
+	watchingContext, cancelWatchingContext := context.WithCancel(apiContext.Request.Context())
 	go func() {
-		<-apiContext.Request.Context().Done()
+		<-watchingContext.Done()
 		logrus.Debugf("stopping watcher for %s", schema.ID)
 		watcher.Stop()
 	}()
@@ -261,6 +262,7 @@ func (s *Store) realWatch(apiContext *types.APIContext, schema *types.Schema, op
 		}
 		logrus.Debugf("closing watcher for %s", schema.ID)
 		close(result)
+		cancelWatchingContext()
 	}()
 
 	return result, nil
