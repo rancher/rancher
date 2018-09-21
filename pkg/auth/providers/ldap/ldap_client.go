@@ -136,10 +136,11 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult
 	groupScope = p.groupScope
 
 	user, err := ldap.AttributesToPrincipal(entry.Attributes, result.Entries[0].DN, userScope, p.providerName, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
-	userPrincipal = *user
 	if err != nil {
-		return userPrincipal, groupPrincipals, err
+		return v3.Principal{}, groupPrincipals, err
 	}
+
+	userPrincipal = *user
 
 	if len(userMemberAttribute) > 0 {
 		for i := 0; i < len(userMemberAttribute); i += 50 {
@@ -227,12 +228,10 @@ func (p *ldapProvider) gatherParentGroups(groupPrincipal v3.Principal, searchDom
 		entry := resultGroups.Entries[i]
 		principal, err := ldap.AttributesToPrincipal(entry.Attributes, entry.DN, groupScope, p.providerName, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
 		if err != nil {
-			return err
+			logrus.Errorf("Error translating group result: %v", err)
+			continue
 		}
 		principals = append(principals, *principal)
-		if err != nil {
-			return err
-		}
 	}
 
 	for _, gp := range principals {
@@ -369,9 +368,6 @@ func (p *ldapProvider) getPrincipal(distinguishedName string, scope string, conf
 	principal, err := ldap.AttributesToPrincipal(entryAttributes, distinguishedName, scope, p.providerName, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
 	if err != nil {
 		return nil, err
-	}
-	if principal == nil {
-		return nil, fmt.Errorf("Principal not returned for LDAP")
 	}
 	return principal, nil
 }

@@ -116,10 +116,11 @@ func (p *adProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult, 
 	}
 
 	user, err := ldap.AttributesToPrincipal(entry.Attributes, result.Entries[0].DN, UserScope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
-	userPrincipal = *user
 	if err != nil {
 		return userPrincipal, groupPrincipals, err
 	}
+
+	userPrincipal = *user
 	userPrincipal.Me = true
 
 	// config.NestedGroupMembershipEnabled nil or false = false
@@ -218,10 +219,6 @@ func (p *adProvider) getGroupPrincipalsFromSearch(searchBase string, filter stri
 		principal, err := ldap.AttributesToPrincipal(e.Attributes, e.DN, GroupScope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
 		if err != nil {
 			logrus.Errorf("AD: Error in getting principal for group entry %v: %v", e, err)
-			continue
-		}
-		if principal == nil {
-			logrus.Error("AD: No LDAP principal returned")
 			continue
 		}
 		if !reflect.DeepEqual(principal, nilPrincipal) {
@@ -332,9 +329,6 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 	if err != nil {
 		return nil, err
 	}
-	if principal == nil {
-		return nil, fmt.Errorf("Principal not returned for LDAP")
-	}
 	return principal, nil
 }
 
@@ -421,7 +415,8 @@ func (p *adProvider) searchLdap(query string, scope string, config *v3.ActiveDir
 		entry := results.Entries[i]
 		principal, err := ldap.AttributesToPrincipal(entry.Attributes, results.Entries[i].DN, scope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
 		if err != nil {
-			return []v3.Principal{}, err
+			logrus.Errorf("Error translating search result: %v", err)
+			continue
 		}
 		principals = append(principals, *principal)
 	}
