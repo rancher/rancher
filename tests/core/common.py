@@ -97,7 +97,7 @@ def auth_check(schema, id, access, props=None):
             prop_actual.add('c')
         if field.update:
             prop_actual.add('u')
-        if 'writeOnly' in field.data_dict() and field.writeOnly:
+        if 'writeOnly' in field and field.writeOnly:
             prop_actual.add('o')
 
         if prop_actual != prop:

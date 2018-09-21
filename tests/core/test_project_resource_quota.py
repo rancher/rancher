@@ -32,7 +32,7 @@ def default_project_quota():
 def wait_for_applied_quota_set(admin_cc_client, ns, timeout=30):
     start = time.time()
     ns = admin_cc_client.reload(ns)
-    a = ns.annotations.data_dict()["cattle.io/status"]
+    a = ns.annotations["cattle.io/status"]
     while a is None:
         time.sleep(.5)
         ns = admin_cc_client.reload(ns)
@@ -44,7 +44,7 @@ def wait_for_applied_quota_set(admin_cc_client, ns, timeout=30):
     while "Validating resource quota" in a or "exceeds project limit" in a:
         time.sleep(.5)
         ns = admin_cc_client.reload(ns)
-        a = ns.annotations.data_dict()["cattle.io/status"]
+        a = ns.annotations["cattle.io/status"]
         if time.time() - start > timeout:
             raise Exception('Timeout waiting for'
                             ' resource quota to be validated')
