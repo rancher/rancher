@@ -27,7 +27,7 @@ RUN curl -sLf https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VE
 RUN wget -O - ${!DOCKER_URL} > /usr/bin/docker && chmod +x /usr/bin/docker
 
 RUN apt-get update && \
-    apt-get install -y tox
+    apt-get install -y tox python3.7
 
 ENV DAPPER_ENV REPO TAG DRONE_TAG
 ENV DAPPER_SOURCE /go/src/github.com/rancher/rancher/
