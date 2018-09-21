@@ -8,8 +8,8 @@ def test_initial_defaults(admin_mc):
     schema_defaults = {}
     setting_defaults = {}
 
-    data = cclient.schema.types['cluster'].resourceFields.data_dict()
-    default = data["enableNetworkPolicy"].data_dict()["default"]
+    data = cclient.schema.types['cluster'].resourceFields
+    default = data["enableNetworkPolicy"]["default"]
 
     for name in cclient.schema.types['cluster'].resourceFields.keys():
         if name == "enableNetworkPolicy":
@@ -20,11 +20,11 @@ def test_initial_defaults(admin_mc):
         if name == "ignoreDockerVersion":
             schema_defaults["ignoreDockerVersion"] = cclient.schema.\
                 types["rancherKubernetesEngineConfig"].\
-                resourceFields.data_dict()["ignoreDockerVersion"].\
+                resourceFields["ignoreDockerVersion"].\
                 data_dict()["default"]
 
     setting = cclient.list_setting(name="cluster-defaults")
-    data = json.loads(setting.data_dict()['data'][0].data_dict()['default'])
+    data = json.loads(setting['data'][0]['default'])
 
     setting_defaults["enableNetworkPolicy"] = data["enableNetworkPolicy"]
     setting_defaults["ignoreDockerVersion"] = \

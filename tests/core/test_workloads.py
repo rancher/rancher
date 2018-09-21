@@ -41,7 +41,7 @@ def test_workload_image_change_private_registry(admin_pc):
     assert workload.name == name
     assert len(workload.imagePullSecrets) == 1
     for secret in workload.imagePullSecrets:
-        assert secret.data_dict()['name'] == registry1_name
+        assert secret['name'] == registry1_name
 
     containers = [{
                     'name': 'one',
@@ -51,11 +51,11 @@ def test_workload_image_change_private_registry(admin_pc):
     workload = client.update(workload, containers=containers)
 
     for container in workload.containers:
-        assert container.data_dict()['image'] == 'quay.io/testuser/testimage'
+        assert container['image'] == 'quay.io/testuser/testimage'
 
     assert len(workload.imagePullSecrets) == 1
 
-    assert workload.imagePullSecrets[0].data_dict()['name'] == registry2_name
+    assert workload.imagePullSecrets[0]['name'] == registry2_name
 
     client.delete(registry1)
     client.delete(registry2)
