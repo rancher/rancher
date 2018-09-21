@@ -228,6 +228,7 @@ func (s *Provider) getSamlPrincipals(config *v3.SamlConfig, samlData map[string]
 func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, assertion *saml.Assertion) {
 	var groupPrincipals []v3.Principal
 	var userPrincipal v3.Principal
+	var principalExists bool
 
 	if relayState := r.Form.Get("RelayState"); relayState != "" {
 		// delete the cookie
@@ -259,8 +260,16 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 
 	userPrincipal, groupPrincipals = s.getSamlPrincipals(config, samlData)
 	allowedPrincipals := config.AllowedPrincipalIDs
-	if s.clientState.GetState(r, "Rancher_Action") == "testAndEnable" && config.AccessMode == "restricted" {
-		allowedPrincipals = append(allowedPrincipals, userPrincipal.Name)
+	if s.clientState.GetState(r, "Rancher_Action") == "testAndEnable" && config.AccessMode != "unrestricted" {
+		for _, p := range allowedPrincipals {
+			if userPrincipal.Name == p {
+				principalExists = true
+				break
+			}
+		}
+		if !principalExists {
+			allowedPrincipals = append(allowedPrincipals, userPrincipal.Name)
+		}
 	}
 
 	allowed, err := s.userMGR.CheckAccess(config.AccessMode, allowedPrincipals, userPrincipal, groupPrincipals)
@@ -286,6 +295,10 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		}
 
 		config.Enabled = true
+		if !principalExists {
+			config.AllowedPrincipalIDs = allowedPrincipals
+		}
+
 		err = s.saveSamlConfig(config)
 		if err != nil {
 			log.Errorf("SAML: Error saving saml config %v", err)
