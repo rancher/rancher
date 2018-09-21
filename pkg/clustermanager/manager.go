@@ -54,7 +54,6 @@ func NewManager(httpsPort int, context *config.ScaledContext) *Manager {
 	return &Manager{
 		httpsPort:     httpsPort,
 		ScaledContext: context,
-		dialer:        context.Dialer,
 		accessControl: rbac.NewAccessControl(context.RBAC),
 		clusterLister: context.Management.Clusters("").Controller().Lister(),
 		clusters:      context.Management.Clusters(""),
@@ -198,7 +197,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 	}
 }
 
-func (m *Manager) toRESTConfig(cluster *v3.Cluster) (*rest.Config, error) {
+func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext) (*rest.Config, error) {
 	if cluster == nil {
 		return nil, nil
 	}
@@ -208,7 +207,7 @@ func (m *Manager) toRESTConfig(cluster *v3.Cluster) (*rest.Config, error) {
 	}
 
 	if cluster.Spec.Internal {
-		return m.ScaledContext.LocalConfig, nil
+		return context.LocalConfig, nil
 	}
 
 	if cluster.Status.APIEndpoint == "" || cluster.Status.CACert == "" || cluster.Status.ServiceAccountToken == "" {
@@ -229,7 +228,7 @@ func (m *Manager) toRESTConfig(cluster *v3.Cluster) (*rest.Config, error) {
 		return nil, err
 	}
 
-	clusterDialer, err := m.dialer.ClusterDialer(cluster.Name)
+	clusterDialer, err := context.Dialer.ClusterDialer(cluster.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -332,7 +331,7 @@ func VerifyIgnoreDNSName(caCertsPEM []byte) (func(rawCerts [][]byte, verifiedCha
 }
 
 func (m *Manager) toRecord(ctx context.Context, cluster *v3.Cluster) (*record, error) {
-	kubeConfig, err := m.toRESTConfig(cluster)
+	kubeConfig, err := ToRESTConfig(cluster, m.ScaledContext)
 	if kubeConfig == nil || err != nil {
 		return nil, err
 	}
