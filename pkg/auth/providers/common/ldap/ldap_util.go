@@ -197,8 +197,7 @@ func AttributesToPrincipal(attribs []*ldapv2.EntryAttribute, dnStr, scope, provi
 		}
 		kind = "group"
 	} else {
-		logrus.Errorf("Failed to get attributes for %s", dnStr)
-		return nil, nil
+		return nil, fmt.Errorf("Failed to get attributes for %s", dnStr)
 	}
 
 	principal := &v3.Principal{
