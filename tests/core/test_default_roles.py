@@ -53,7 +53,7 @@ def test_cluster_create_default_role(admin_mc, cleanup_roles, remove_resource):
 
     cluster = client.reload(cluster)
 
-    data_dict = json.loads(cluster.annotations.data_dict()[CREATOR_ANNOTATION])
+    data_dict = json.loads(cluster.annotations[CREATOR_ANNOTATION])
 
     assert len(cluster.clusterRoleTemplateBindings()) == 3
     assert set(data_dict['created']) == set(data_dict['required'])
@@ -86,7 +86,7 @@ def test_cluster_create_role_locked(admin_mc, cleanup_roles, remove_resource):
 
     cluster = client.reload(cluster)
 
-    data_dict = json.loads(cluster.annotations.data_dict()[CREATOR_ANNOTATION])
+    data_dict = json.loads(cluster.annotations[CREATOR_ANNOTATION])
 
     assert len(cluster.clusterRoleTemplateBindings()) == 2
     assert set(data_dict['created']) == set(data_dict['required'])
@@ -110,7 +110,7 @@ def test_project_create_default_role(admin_mc, cleanup_roles, remove_resource):
 
     project = client.reload(project)
 
-    data_dict = json.loads(project.annotations.data_dict()[
+    data_dict = json.loads(project.annotations[
         CREATOR_ANNOTATION])
 
     assert len(project.projectRoleTemplateBindings()) == 3
@@ -145,7 +145,7 @@ def test_project_create_role_locked(admin_mc, cleanup_roles, remove_resource):
 
     project = client.reload(project)
 
-    data_dict = json.loads(project.annotations.data_dict()[
+    data_dict = json.loads(project.annotations[
         CREATOR_ANNOTATION])
 
     assert len(project.projectRoleTemplateBindings()) == 2
@@ -200,21 +200,21 @@ def test_default_system_project_role(admin_mc):
     created_projects = []
 
     for project in projects:
-        name = project.data_dict()['name']
+        name = project['name']
         if name == "Default" or name == "System":
             wait_for_condition('InitialRolesPopulated', 'True',
                                client, project)
             project = client.reload(project)
 
             projectLabel = required_projects[name]
-            assert project.data_dict()['labels'].\
+            assert project['labels'].\
                 data_dict()[projectLabel] == 'true'
             created_projects.append(project)
 
     assert len(required_projects) == len(created_projects)
 
     for project in created_projects:
-        data_dict = json.loads(project.annotations.data_dict()[
+        data_dict = json.loads(project.annotations[
             CREATOR_ANNOTATION])
 
         assert set(data_dict['created']) == set(data_dict['required'])

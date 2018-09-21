@@ -76,7 +76,7 @@ def test_node_template_delete(admin_mc, remove_resource):
 
     # remove link should not be available
     node_template = client.reload(node_template)
-    assert 'remove' not in node_template.links.data_dict()
+    assert 'remove' not in node_template.links
 
     client.delete(node_pool)
 
@@ -87,7 +87,7 @@ def test_node_template_delete(admin_mc, remove_resource):
     wait_for(_node_pool_reload)
 
     node_template = client.reload(node_template)
-    assert 'remove' in node_template.links.data_dict()
+    assert 'remove' in node_template.links
     # NodePool is gone, template should delete
     client.delete(node_template)
 
