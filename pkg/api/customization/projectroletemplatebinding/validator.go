@@ -1,4 +1,4 @@
-package globalrolebinding
+package projectroletemplatebinding
 
 import (
 	"encoding/json"
@@ -20,19 +20,19 @@ import (
 )
 
 const (
-	grbByUserIndex = "auth.management.cattle.io/grbByUser"
+	prtbsByPrincipalAndUserIndex = "auth.management.cattle.io/prtbByPrincipalAndUser"
 )
 
-func NewAuthzGRBValidator(management *config.ScaledContext) types.Validator {
-	grbInformer := management.Management.GlobalRoleBindings("").Controller().Informer()
-	grbIndexers := map[string]cache.IndexFunc{
-		grbByUserIndex: grbByUser,
+func NewAuthzPRTBValidator(management *config.ScaledContext) types.Validator {
+	prtbInformer := management.Management.ProjectRoleTemplateBindings("").Controller().Informer()
+	prtbIndexers := map[string]cache.IndexFunc{
+		prtbsByPrincipalAndUserIndex: prtbsByPrincipalAndUser,
 	}
-	grbInformer.AddIndexers(grbIndexers)
+	prtbInformer.AddIndexers(prtbIndexers)
 
 	validator := &Validator{
-		grLister:    management.Management.GlobalRoles("").Controller().Lister(),
-		grbIndexer:  grbInformer.GetIndexer(),
+		rtLister:    management.Management.RoleTemplates("").Controller().Lister(),
+		prtbIndexer: prtbInformer.GetIndexer(),
 		userManager: management.UserManager,
 	}
 
@@ -40,19 +40,19 @@ func NewAuthzGRBValidator(management *config.ScaledContext) types.Validator {
 }
 
 type Validator struct {
-	grLister    v3.GlobalRoleLister
-	grbIndexer  cache.Indexer
+	rtLister    v3.RoleTemplateLister
+	prtbIndexer cache.Indexer
 	userManager user.Manager
 }
 
 func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
 	currentUserID := v.userManager.GetUser(request)
-	globalRoleID := data[client.GlobalRoleBindingFieldGlobalRoleID].(string)
+	globalRoleID := data[client.ProjectRoleTemplateBindingFieldRoleTemplateID].(string)
 
-	tgrRole, _ := v.grLister.Get("", globalRoleID)
+	tgrRole, _ := v.rtLister.Get("", globalRoleID)
 	targetRules := convertRules(tgrRole.Rules)
 
-	grbRoles, err := v.grbIndexer.ByIndex(grbByUserIndex, currentUserID)
+	grbRoles, err := v.prtbIndexer.ByIndex(prtbsByPrincipalAndUserIndex, currentUserID)
 	if err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error getting roles: %v", err))
 	}
@@ -60,8 +60,8 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 	ownerRules := []rbac.PolicyRule{}
 
 	for _, grbRole := range grbRoles {
-		roleName := grbRole.(*v3.GlobalRoleBinding).GlobalRoleName
-		grRole, _ := v.grLister.Get("", roleName)
+		roleName := grbRole.(*v3.ProjectRoleTemplateBinding).RoleTemplateName
+		grRole, _ := v.rtLister.Get("", roleName)
 		rules := convertRules(grRole.Rules)
 		ownerRules = append(ownerRules, rules...)
 	}
@@ -71,7 +71,7 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 		return nil
 	}
 
-	logrus.Infof("Permission denied applying Global Role Binding...")
+	logrus.Infof("Permission denied applying Project Role Binding...")
 
 	targetRulesJSON, _ := json.MarshalIndent(targetRules, ": ", "  ")
 	logrus.Infof("target rules: %s", string(targetRulesJSON))
@@ -82,17 +82,26 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 	failedRulesJSON, _ := json.MarshalIndent(failedRules, ": ", "  ")
 	logrus.Infof("failed rules: %s", string(failedRulesJSON))
 
-	targetUserID := data[client.GlobalRoleBindingFieldUserID].(string)
+	targetUserID := data[client.ProjectRoleTemplateBindingFieldUserPrincipalID].(string)
 	return httperror.NewAPIError(httperror.InvalidState, fmt.Sprintf("Permission denied for role '%s' on user '%s'", globalRoleID, targetUserID))
 }
 
-func grbByUser(obj interface{}) ([]string, error) {
-	grb, ok := obj.(*v3.GlobalRoleBinding)
+func prtbsByPrincipalAndUser(obj interface{}) ([]string, error) {
+	var principals []string
+	b, ok := obj.(*v3.ProjectRoleTemplateBinding)
 	if !ok {
 		return []string{}, nil
 	}
-
-	return []string{grb.UserName}, nil
+	if b.GroupPrincipalName != "" {
+		principals = append(principals, b.GroupPrincipalName)
+	}
+	if b.UserPrincipalName != "" {
+		principals = append(principals, b.UserPrincipalName)
+	}
+	if b.UserName != "" {
+		principals = append(principals, b.UserName)
+	}
+	return principals, nil
 }
 
 func convertRules(rbacv1Rules []rbacv1.PolicyRule) []rbac.PolicyRule {

@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/catalog"
 	ccluster "github.com/rancher/rancher/pkg/api/customization/cluster"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
+	"github.com/rancher/rancher/pkg/api/customization/clusterroletemplatebinding"
 	"github.com/rancher/rancher/pkg/api/customization/globalrolebinding"
 	"github.com/rancher/rancher/pkg/api/customization/logging"
 	"github.com/rancher/rancher/pkg/api/customization/node"
@@ -22,8 +23,8 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/podsecuritypolicytemplate"
 	projectStore "github.com/rancher/rancher/pkg/api/customization/project"
 	projectaction "github.com/rancher/rancher/pkg/api/customization/project"
+	"github.com/rancher/rancher/pkg/api/customization/projectroletemplatebinding"
 	"github.com/rancher/rancher/pkg/api/customization/roletemplate"
-	"github.com/rancher/rancher/pkg/api/customization/roletemplatebinding"
 	"github.com/rancher/rancher/pkg/api/customization/setting"
 	"github.com/rancher/rancher/pkg/api/store/cert"
 	"github.com/rancher/rancher/pkg/api/store/cluster"
@@ -105,7 +106,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	factory.BatchWait()
 
 	Clusters(schemas, apiContext, clusterManager, k8sProxy)
-	ClusterRoleTemplateBinding(schemas, apiContext)
 	Templates(schemas, apiContext)
 	TemplateVersion(schemas, apiContext)
 	User(schemas, apiContext)
@@ -120,11 +120,12 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	Alert(schemas, apiContext)
 	Pipeline(schemas, apiContext, clusterManager)
 	Project(schemas, apiContext)
-	ProjectRoleTemplateBinding(schemas, apiContext)
 	TemplateContent(schemas)
 	PodSecurityPolicyTemplate(schemas, apiContext)
 	RoleTemplate(schemas, apiContext)
-	GlobalRoleBinding(schemas, apiContext)
+	AuthzGlobalRoleBinding(schemas, apiContext)
+	AuthzClusterRoleTemplateBinding(schemas, apiContext)
+	AuthzProjectRoleTemplateBinding(schemas, apiContext)
 
 	if err := NodeTypes(schemas, apiContext); err != nil {
 		return err
@@ -426,15 +427,15 @@ func PodSecurityPolicyTemplate(schemas *types.Schemas, management *config.Scaled
 	}
 }
 
-func ClusterRoleTemplateBinding(schemas *types.Schemas, management *config.ScaledContext) {
-	schema := schemas.Schema(&managementschema.Version, client.ClusterRoleTemplateBindingType)
-	schema.Validator = roletemplatebinding.NewCRTBValidator(management)
-}
+// func ClusterRoleTemplateBinding(schemas *types.Schemas, management *config.ScaledContext) {
+// 	schema := schemas.Schema(&managementschema.Version, client.ClusterRoleTemplateBindingType)
+// 	schema.Validator = roletemplatebinding.NewCRTBValidator(management)
+// }
 
-func ProjectRoleTemplateBinding(schemas *types.Schemas, management *config.ScaledContext) {
-	schema := schemas.Schema(&managementschema.Version, client.ProjectRoleTemplateBindingType)
-	schema.Validator = roletemplatebinding.NewPRTBValidator(management)
-}
+// func ProjectRoleTemplateBinding(schemas *types.Schemas, management *config.ScaledContext) {
+// 	schema := schemas.Schema(&managementschema.Version, client.ProjectRoleTemplateBindingType)
+// 	schema.Validator = roletemplatebinding.NewPRTBValidator(management)
+// }
 
 func RoleTemplate(schemas *types.Schemas, management *config.ScaledContext) {
 	rt := roletemplate.Wrapper{
@@ -444,7 +445,17 @@ func RoleTemplate(schemas *types.Schemas, management *config.ScaledContext) {
 	schema.Validator = rt.Validator
 }
 
-func GlobalRoleBinding(schemas *types.Schemas, management *config.ScaledContext) {
+func AuthzGlobalRoleBinding(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.GlobalRoleBindingType)
-	schema.Validator = globalrolebinding.NewGRBValidator(management)
+	schema.Validator = globalrolebinding.NewAuthzGRBValidator(management)
+}
+
+func AuthzClusterRoleTemplateBinding(schemas *types.Schemas, management *config.ScaledContext) {
+	schema := schemas.Schema(&managementschema.Version, client.ClusterRoleTemplateBindingType)
+	schema.Validator = clusterroletemplatebinding.NewAuthzCRTBValidator(management)
+}
+
+func AuthzProjectRoleTemplateBinding(schemas *types.Schemas, management *config.ScaledContext) {
+	schema := schemas.Schema(&managementschema.Version, client.ProjectRoleTemplateBindingType)
+	schema.Validator = projectroletemplatebinding.NewAuthzPRTBValidator(management)
 }
