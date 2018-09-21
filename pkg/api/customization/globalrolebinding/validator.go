@@ -14,6 +14,9 @@ import (
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/kubernetes/pkg/apis/rbac"
+	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
+	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
 
 const (
@@ -48,22 +51,24 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 	globalRoleID := data[client.GlobalRoleBindingFieldGlobalRoleID].(string)
 
 	tgrRole, _ := v.grLister.Get("", globalRoleID)
-	targetRules := tgrRole.Rules
+	targetRules := convertRules(tgrRole.Rules)
 
 	grbRoles, err := v.grbIndexer.ByIndex(grbByUserIndex, currentUserID)
 	if err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error getting roles: %v", err))
 	}
 
-	ownerRules := []rbacv1.PolicyRule{}
+	ownerRules := []rbac.PolicyRule{}
 
 	for _, grbRole := range grbRoles {
 		roleName := grbRole.(*v3.GlobalRoleBinding).GlobalRoleName
 		grRole, _ := v.grLister.Get("", roleName)
-		ownerRules = append(ownerRules, grRole.Rules...)
+		rules := convertRules(grRole.Rules)
+		ownerRules = append(ownerRules, rules...)
 	}
 
-	if isRuleListSubset(targetRules, ownerRules) {
+	rulesCover, failedRules := rbacregistryvalidation.Covers(ownerRules, targetRules)
+	if rulesCover {
 		return nil
 	}
 
@@ -74,6 +79,9 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 
 	ownerRulesJSON, _ := json.MarshalIndent(ownerRules, ": ", "  ")
 	logrus.Infof("owner rules: %s", string(ownerRulesJSON))
+
+	failedRulesJSON, _ := json.MarshalIndent(failedRules, ": ", "  ")
+	logrus.Infof("failed rules: %s", string(failedRulesJSON))
 
 	targetUserID := data[client.GlobalRoleBindingFieldUserID].(string)
 	return httperror.NewAPIError(httperror.InvalidState, fmt.Sprintf("Permission denied for role '%s' on user '%s'", globalRoleID, targetUserID))
@@ -88,60 +96,13 @@ func grbByUser(obj interface{}) ([]string, error) {
 	return []string{grb.UserName}, nil
 }
 
-func isRuleListSubset(targetRules []rbacv1.PolicyRule, ownerRules []rbacv1.PolicyRule) bool {
-	for _, tRule := range targetRules {
-		if !isRuleSubset(tRule, ownerRules) {
-			return false
+func convertRules(rbacv1Rules []rbacv1.PolicyRule) []rbac.PolicyRule {
+	convertedRules := make([]rbac.PolicyRule, len(rbacv1Rules))
+	for i := range rbacv1Rules {
+		err := rbacv1helpers.Convert_v1_PolicyRule_To_rbac_PolicyRule(&rbacv1Rules[i], &convertedRules[i], nil)
+		if err != nil {
+			return nil
 		}
 	}
-	return true
-}
-
-func isRuleSubset(targetRule rbacv1.PolicyRule, ownerRules []rbacv1.PolicyRule) bool {
-	for _, oRule := range ownerRules {
-		if !containsRule(oRule.NonResourceURLs, targetRule.NonResourceURLs) {
-			logrus.Infof("GRB Failed NonResourceURLs check")
-			continue
-		}
-		if !containsRule(oRule.Resources, targetRule.Resources) {
-			logrus.Infof("GRB Failed Resources check")
-			continue
-		}
-		if !containsRule(oRule.ResourceNames, targetRule.ResourceNames) {
-			logrus.Infof("GRB Failed ResourceNames check")
-			continue
-		}
-		if !containsRule(oRule.APIGroups, targetRule.APIGroups) {
-			logrus.Infof("GRB Failed APIGroups check")
-			continue
-		}
-		if !containsRule(oRule.Verbs, targetRule.Verbs) {
-			logrus.Infof("GRB Failed Verbs check")
-			continue
-		}
-		return true
-	}
-	return false
-}
-
-func contains(a []string, x string) bool {
-	for _, n := range a {
-		if x == n {
-			return true
-		}
-	}
-	return false
-}
-
-func containsAll(a []string, b []string) bool {
-	for _, n := range b {
-		if !contains(a, n) {
-			return false
-		}
-	}
-	return true
-}
-
-func containsRule(owner []string, target []string) bool {
-	return contains(owner, "*") || containsAll(owner, target)
+	return convertedRules
 }
