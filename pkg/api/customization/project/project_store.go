@@ -11,13 +11,13 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
+	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/resourcequota"
-	clusterchema "github.com/rancher/types/apis/cluster.cattle.io/v3/schema"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	mgmtschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
-	clusterclient "github.com/rancher/types/client/cluster/v3"
 	mgmtclient "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -29,6 +29,8 @@ type projectStore struct {
 	types.Store
 	projectLister      v3.ProjectLister
 	roleTemplateLister v3.RoleTemplateLister
+	scaledContext      *config.ScaledContext
+	clusterLister      v3.ClusterLister
 }
 
 func SetProjectStore(schema *types.Schema, mgmt *config.ScaledContext) {
@@ -36,6 +38,8 @@ func SetProjectStore(schema *types.Schema, mgmt *config.ScaledContext) {
 		Store:              schema.Store,
 		projectLister:      mgmt.Management.Projects("").Controller().Lister(),
 		roleTemplateLister: mgmt.Management.RoleTemplates("").Controller().Lister(),
+		scaledContext:      mgmt,
+		clusterLister:      mgmt.Management.Clusters("").Controller().Lister(),
 	}
 	schema.Store = store
 }
@@ -112,6 +116,8 @@ func (s *projectStore) validateResourceQuota(apiContext *types.APIContext, data 
 			return httperror.NewFieldAPIError(httperror.MissingRequired, namespaceQuotaField, "")
 		}
 		return httperror.NewFieldAPIError(httperror.MissingRequired, quotaField, "")
+	} else if !quotaOk {
+		return nil
 	}
 
 	var nsQuota mgmtclient.NamespaceResourceQuota
@@ -151,10 +157,10 @@ func (s *projectStore) validateResourceQuota(apiContext *types.APIContext, data 
 			return httperror.NewFieldAPIError(httperror.MissingRequired, namespaceQuotaField, fmt.Sprintf("misses %s defined on a %s", k, quotaField))
 		}
 	}
-	return isQuotaFit(apiContext, nsQuotaLimit, projectQuotaLimit, id)
+	return s.isQuotaFit(apiContext, nsQuotaLimit, projectQuotaLimit, id)
 }
 
-func isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3.ResourceQuotaLimit,
+func (s *projectStore) isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3.ResourceQuotaLimit,
 	projectQuotaLimit *v3.ResourceQuotaLimit, id string) error {
 	// check that namespace default quota is within project quota
 	isFit, msg, err := resourcequota.IsQuotaFit(nsQuotaLimit, []*v3.ResourceQuotaLimit{}, projectQuotaLimit)
@@ -175,10 +181,6 @@ func isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3.ResourceQuotaLimi
 		return err
 	}
 
-	if project.ResourceQuota == nil {
-		return nil
-	}
-
 	// check if fields were added or removed
 	// and update project's namespaces accordingly
 	defaultQuotaLimitMap, err := convert.EncodeToMap(nsQuotaLimit)
@@ -187,7 +189,7 @@ func isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3.ResourceQuotaLimi
 	}
 
 	usedQuotaLimitMap := map[string]interface{}{}
-	if project.ResourceQuota.UsedLimit != nil {
+	if project.ResourceQuota != nil && project.ResourceQuota.UsedLimit != nil {
 		usedQuotaLimitMap, err = convert.EncodeToMap(project.ResourceQuota.UsedLimit)
 		if err != nil {
 			return err
@@ -237,20 +239,6 @@ func isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3.ResourceQuotaLimi
 	}
 
 	// check if default quota is enough to set on namespaces
-	mu := resourcequota.GetProjectLock(id)
-	mu.Lock()
-	defer mu.Unlock()
-	var namespaces []clusterclient.Namespace
-	options := &types.QueryOptions{
-		Conditions: []*types.QueryCondition{
-			types.NewConditionFromString("projectId", types.ModifierEQ, id),
-		},
-	}
-	if err := access.List(apiContext, &clusterchema.Version, clusterclient.NamespaceType, options, &namespaces); err != nil {
-		return err
-	}
-
-	var nsLimits []*v3.ResourceQuotaLimit
 	toAppend := &mgmtclient.ResourceQuotaLimit{}
 	if err := mapstructure.Decode(limitToAdd, toAppend); err != nil {
 		return err
@@ -259,7 +247,16 @@ func isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3.ResourceQuotaLimi
 	if err != nil {
 		return err
 	}
-	for i := 0; i < len(namespaces); i++ {
+	mu := resourcequota.GetProjectLock(id)
+	mu.Lock()
+	defer mu.Unlock()
+
+	namespacesCount, err := s.getNamespacesCount(apiContext, project)
+	if err != nil {
+		return err
+	}
+	var nsLimits []*v3.ResourceQuotaLimit
+	for i := 0; i < namespacesCount; i++ {
 		nsLimits = append(nsLimits, converted)
 	}
 
@@ -274,6 +271,38 @@ func isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3.ResourceQuotaLimi
 	}
 
 	return nil
+}
+
+func (s *projectStore) getNamespacesCount(apiContext *types.APIContext, project mgmtclient.Project) (int, error) {
+	cluster, err := s.clusterLister.Get("", project.ClusterID)
+	if err != nil {
+		return 0, err
+	}
+
+	kubeConfig, err := clustermanager.ToRESTConfig(cluster, s.scaledContext)
+	if kubeConfig == nil || err != nil {
+		return 0, err
+	}
+
+	clusterContext, err := config.NewUserContext(s.scaledContext, *kubeConfig, cluster.Name)
+	if err != nil {
+		return 0, err
+	}
+	namespaces, err := clusterContext.Core.Namespaces("").List(metav1.ListOptions{})
+	if err != nil {
+		return 0, err
+	}
+	count := 0
+	for _, n := range namespaces.Items {
+		if n.Annotations == nil {
+			continue
+		}
+		if n.Annotations["field.cattle.io/projectId"] == project.ID {
+			count++
+		}
+	}
+
+	return count, nil
 }
 
 func limitToLimit(from *mgmtclient.ResourceQuotaLimit) (*v3.ResourceQuotaLimit, error) {
