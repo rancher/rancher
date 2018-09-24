@@ -38,9 +38,9 @@ import (
 )
 
 var amiForRegion = map[string]string{
-	"us-west-2": "ami-73a6e20b",
-	"us-east-1": "ami-dea4d5a1",
-	"eu-west-1": "ami-066110c1a7466949e",
+	"us-west-2": "ami-0a54c984b9f908c81",
+	"us-east-1": "ami-0440e4f6b9713faf6",
+	"eu-west-1": "ami-0c7a4976cb6fafd3a",
 }
 
 type Driver struct {
@@ -384,7 +384,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 		logrus.Infof("Bringing up vpc")
 
 		stack, err := d.createStack(svc, getVPCStackName(state), displayName,
-			"https://amazon-eks.s3-us-west-2.amazonaws.com/1.10.3/2018-06-05/amazon-eks-vpc-sample.yaml",
+			"https://amazon-eks.s3-us-west-2.amazonaws.com/cloudformation/2018-08-30/amazon-eks-vpc-sample.yaml",
 			[]*cloudformation.Parameter{})
 		if err != nil {
 			return nil, fmt.Errorf("error creating stack: %v", err)
@@ -497,7 +497,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 	}
 
 	stack, err := d.createStack(svc, getWorkNodeName(state), displayName,
-		"https://amazon-eks.s3-us-west-2.amazonaws.com/1.10.3/2018-06-05/amazon-eks-nodegroup.yaml",
+		"https://amazon-eks.s3-us-west-2.amazonaws.com/cloudformation/2018-08-30/amazon-eks-nodegroup.yaml",
 		[]*cloudformation.Parameter{
 			{ParameterKey: aws.String("ClusterName"), ParameterValue: aws.String(state.ClusterName)},
 			{ParameterKey: aws.String("ClusterControlPlaneSecurityGroup"),
