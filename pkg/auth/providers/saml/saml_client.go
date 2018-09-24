@@ -259,9 +259,6 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 
 	userPrincipal, groupPrincipals = s.getSamlPrincipals(config, samlData)
 	allowedPrincipals := config.AllowedPrincipalIDs
-	if s.clientState.GetState(r, "Rancher_Action") == "testAndEnable" && config.AccessMode == "restricted" {
-		allowedPrincipals = append(allowedPrincipals, userPrincipal.Name)
-	}
 
 	allowed, err := s.userMGR.CheckAccess(config.AccessMode, allowedPrincipals, userPrincipal, groupPrincipals)
 	if err != nil {
