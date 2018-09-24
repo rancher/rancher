@@ -224,6 +224,7 @@ func (s *Schemas) setupDefaults(schema *Schema) {
 
 func (s *Schemas) References(schema *Schema) []BackReference {
 	refType := convert.ToFullReference(schema.Version.Path, schema.ID)
+
 	s.Lock()
 	defer s.Unlock()
 	return s.references[refType]
