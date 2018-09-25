@@ -23,28 +23,11 @@ def test_global_privilege_escalation(admin_mc, user_mc):
     admin_client = admin_mc.client
     user_client = user_mc.client
 
-    admin_client.create_global_role_binding(
+    rb = admin_client.create_global_role_binding(
         userId=user_mc.user.id,
         globalRoleId="users-manage",
     )
-
-    def roles_bound():
-        roles = user_client.list_global_role_binding()
-        if not roles.data:
-            return False
-
-        roleIds = []
-        for role in roles.data:
-            if role.userId == user_mc.user.id:
-                roleIds.append(role.globalRoleId)
-
-        if set(roleIds) != set(["user", "users-manage"]):
-            pprint(roleIds)
-            assert False, "Roles ids should contain 'user' and 'users-manage'"
-
-        return True
-
-    wait_for(roles_bound)
+    rb = wait_until_available(user_client, rb)
 
     try:
         user_client.create_global_role_binding(
@@ -64,13 +47,14 @@ def test_cluster_privilege_escalation(admin_cc, admin_mc, user_mc):
     admin_client = admin_mc.client
     user_client = user_mc.client
 
-    admin_client.create_cluster_role_template_binding(
+    rb = admin_client.create_cluster_role_template_binding(
         userId=user_mc.user.id,
         roleTemplateId="clusterroletemplatebindings-manage",
         clusterId=admin_cc.cluster.id,
     )
-
+    rb = wait_until_available(user_client, rb)
     wait_until_available(user_client, admin_cc.cluster)
+
     try:
         user_client.create_cluster_role_template_binding(
             userId=user_mc.user.id,
@@ -99,12 +83,13 @@ def test_project_privilege_escalation(admin_cc, admin_pc, admin_mc, user_mc, req
     p = admin_client.wait_success(p)
     assert p.state == 'active'
 
-    admin_client.create_project_role_template_binding(
+    rb = admin_client.create_project_role_template_binding(
         userId=user_mc.user.id,
         roleTemplateId="projectroletemplatebindings-manage",
         projectId=admin_pc.project.id,
     )
-    wait_until_available(admin_client, admin_pc.project)
+    rb = wait_until_available(admin_client, rb)
+    wait_until_available(user_client, admin_pc.project)
 
     try:
         user_client.create_project_role_template_binding(
