@@ -82,13 +82,13 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 	failedRulesJSON, _ := json.MarshalIndent(failedRules, ": ", "  ")
 	logrus.Infof("failed rules: %s", string(failedRulesJSON))
 
-	userPrincipalId := data[client.ClusterRoleTemplateBindingFieldUserPrincipalID]
-	userId := data[client.ClusterRoleTemplateBindingFieldUserID]
+	userPrincipalID := data[client.ClusterRoleTemplateBindingFieldUserPrincipalID]
+	userID := data[client.ClusterRoleTemplateBindingFieldUserID]
 	targetUserID := ""
-	if userPrincipalId != nil {
-		targetUserID = userPrincipalId.(string)
-	} else if userId != nil {
-		targetUserID = userId.(string)
+	if userPrincipalID != nil {
+		targetUserID = userPrincipalID.(string)
+	} else if userID != nil {
+		targetUserID = userID.(string)
 	}
 	return httperror.NewAPIError(httperror.InvalidState, fmt.Sprintf("Permission denied for role '%s' on user '%s'", globalRoleID, targetUserID))
 }
