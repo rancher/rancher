@@ -1,10 +1,8 @@
-import kubernetes
 from rancher import ApiError
 from .common import random_str
-from .conftest import wait_until_available,\
-    cluster_and_client, kubernetes_api_client, wait_for
-
+from .conftest import wait_until_available
 from pprint import pprint
+
 
 def test_multi_user(admin_mc, user_mc):
     """Tests a bug in the python client where multiple clients would not
@@ -34,11 +32,11 @@ def test_global_privilege_escalation(admin_mc, user_mc):
             userId=user_mc.user.id,
             globalRoleId="admin",
         )
-        assert False, "create_global_role_binding should cause an exception"
+        assert False, "globalRoleBinding should cause an exception"
     except ApiError as e:
         pprint(vars(e))
-        assert e.error.code == 'InvalidState', "self escalation to project owner should be invalid state"
-        assert e.error.status == 422, "self escalation to cluster owner should return status code 422"
+        assert e.error.code == 'InvalidState'
+        assert e.error.status == 422
 
     return
 
@@ -61,16 +59,18 @@ def test_cluster_privilege_escalation(admin_cc, admin_mc, user_mc):
             roleTemplateId="cluster-owner",
             clusterId=admin_cc.cluster.id,
         )
-        assert False, "create_cluster_role_template_binding should cause an exception"
+        assert False, "clusterRoleTemplateBinding should cause an exception"
     except ApiError as e:
         pprint(vars(e))
-        assert e.error.code == 'InvalidState', "self escalation to project owner should be invalid state"
-        assert e.error.status == 422, "self escalation to cluster owner should return status code 422"
+        assert e.error.code == 'InvalidState'
+        assert e.error.status == 422
 
     return
 
 
-def test_project_privilege_escalation(admin_cc, admin_pc, admin_mc, user_mc, request):
+def test_project_privilege_escalation(
+    admin_cc, admin_pc, admin_mc, user_mc, request
+):
     admin_client = admin_mc.client
     user_client = user_mc.client
 
@@ -97,10 +97,10 @@ def test_project_privilege_escalation(admin_cc, admin_pc, admin_mc, user_mc, req
             roleTemplateId="project-owner",
             projectId=admin_pc.project.id,
         )
-        assert False, "create_project_role_template_binding should cause an exception"
+        assert False, "projectRoleTemplateBinding should cause an exception"
     except ApiError as e:
         pprint(vars(e))
-        assert e.error.code == 'InvalidState', "self escalation to project owner should be invalid state"
-        assert e.error.status == 422, "self escalation to project owner should return status code 422"
+        assert e.error.code == 'InvalidState'
+        assert e.error.status == 422
 
     return
