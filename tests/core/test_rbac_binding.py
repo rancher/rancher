@@ -104,3 +104,32 @@ def test_project_privilege_escalation(
         assert e.error.status == 422
 
     return
+
+
+def test_project_privilege_secrets(
+    admin_cc, admin_pc, admin_mc, user_mc, request
+):
+    admin_client = admin_mc.client
+    user_client = user_mc.client
+
+    p = admin_client.create_project(name='test-' + random_str(),
+                                    clusterId=admin_cc.cluster.id)
+
+    request.addfinalizer(lambda: admin_client.delete(p))
+
+    p = wait_until_available(admin_client, p)
+    p = admin_client.wait_success(p)
+    assert p.state == 'active'
+
+    rb = admin_client.create_project_role_template_binding(
+        userId=user_mc.user.id,
+        roleTemplateId="secrets-manage",
+        projectId=admin_pc.project.id,
+    )
+    rb = wait_until_available(admin_client, rb)
+    wait_until_available(user_client, admin_pc.project)
+    pprint(rb)
+    assert rb.baseType == 'projectRoleTemplateBinding'
+    assert rb.created != None
+
+    return
