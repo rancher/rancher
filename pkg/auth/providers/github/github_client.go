@@ -36,20 +36,14 @@ func (g *GClient) getAccessToken(code string, config *v3.GithubConfig) (string, 
 
 	url := g.getURL("TOKEN", config)
 
-	resp, err := g.postToGithub(url, form)
+	b, err := g.postToGithub(url, form)
 	if err != nil {
 		logrus.Errorf("Github getAccessToken: GET url %v received error from github, err: %v", url, err)
 		return "", err
 	}
-	defer resp.Body.Close()
 
 	// Decode the response
 	var respMap map[string]interface{}
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		logrus.Errorf("Github getAccessToken: received error reading response body, err: %v", err)
-		return "", err
-	}
 
 	if err := json.Unmarshal(b, &respMap); err != nil {
 		logrus.Errorf("Github getAccessToken: received error unmarshalling response body, err: %v", err)
@@ -72,19 +66,12 @@ func (g *GClient) getAccessToken(code string, config *v3.GithubConfig) (string, 
 func (g *GClient) getUser(githubAccessToken string, config *v3.GithubConfig) (Account, error) {
 
 	url := g.getURL("USER_INFO", config)
-	resp, err := g.getFromGithub(githubAccessToken, url)
+	b, _, err := g.getFromGithub(githubAccessToken, url)
 	if err != nil {
 		logrus.Errorf("Github getGithubUser: GET url %v received error from github, err: %v", url, err)
 		return Account{}, err
 	}
-	defer resp.Body.Close()
 	var githubAcct Account
-
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		logrus.Errorf("Github getGithubUser: error reading response, err: %v", err)
-		return Account{}, err
-	}
 
 	if err := json.Unmarshal(b, &githubAcct); err != nil {
 		logrus.Errorf("Github getGithubUser: error unmarshalling response, err: %v", err)
@@ -104,21 +91,13 @@ func (g *GClient) getOrgs(githubAccessToken string, config *v3.GithubConfig) ([]
 		return orgs, err
 	}
 
-	for _, response := range responses {
-		defer response.Body.Close()
+	for _, b := range responses {
 		var orgObjs []Account
-		b, err := ioutil.ReadAll(response.Body)
-		if err != nil {
-			logrus.Errorf("Github getGithubOrgs: error reading the response from github, err: %v", err)
-			return orgs, err
-		}
 		if err := json.Unmarshal(b, &orgObjs); err != nil {
 			logrus.Errorf("Github getGithubOrgs: received error unmarshalling org array, err: %v", err)
-			return orgs, err
+			return nil, err
 		}
-		for _, orgObj := range orgObjs {
-			orgs = append(orgs, orgObj)
-		}
+		orgs = append(orgs, orgObjs...)
 	}
 
 	return orgs, nil
@@ -134,7 +113,6 @@ func (g *GClient) getTeams(githubAccessToken string, config *v3.GithubConfig) ([
 		return teams, err
 	}
 	for _, response := range responses {
-		defer response.Body.Close()
 		teamObjs, err := g.getTeamInfo(response, config)
 
 		if err != nil {
@@ -149,13 +127,8 @@ func (g *GClient) getTeams(githubAccessToken string, config *v3.GithubConfig) ([
 	return teams, nil
 }
 
-func (g *GClient) getTeamInfo(response *http.Response, config *v3.GithubConfig) ([]Account, error) {
+func (g *GClient) getTeamInfo(b []byte, config *v3.GithubConfig) ([]Account, error) {
 	var teams []Account
-	b, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		logrus.Errorf("Github getTeamInfo: error reading the response from github, err: %v", err)
-		return teams, err
-	}
 	var teamObjs []Team
 	if err := json.Unmarshal(b, &teamObjs); err != nil {
 		logrus.Errorf("Github getTeamInfo: received error unmarshalling team array, err: %v", err)
@@ -176,14 +149,9 @@ func (g *GClient) getTeamByID(id string, githubAccessToken string, config *v3.Gi
 	var teamAcct Account
 
 	url := g.getURL("TEAM", config) + id
-	response, err := g.getFromGithub(githubAccessToken, url)
+	b, _, err := g.getFromGithub(githubAccessToken, url)
 	if err != nil {
 		logrus.Errorf("Github getTeamByID: GET url %v received error from github, err: %v", url, err)
-		return teamAcct, err
-	}
-	b, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		logrus.Errorf("Github getTeamByID: error reading the response from github, err: %v", err)
 		return teamAcct, err
 	}
 	var teamObj Team
@@ -197,22 +165,17 @@ func (g *GClient) getTeamByID(id string, githubAccessToken string, config *v3.Gi
 	return teamAcct, nil
 }
 
-func (g *GClient) paginateGithub(githubAccessToken string, url string) ([]*http.Response, error) {
-	var responses []*http.Response
-
-	response, err := g.getFromGithub(githubAccessToken, url)
-	if err != nil {
-		return responses, err
-	}
-	responses = append(responses, response)
-	nextURL := g.nextGithubPage(response)
+func (g *GClient) paginateGithub(githubAccessToken string, url string) ([][]byte, error) {
+	var responses [][]byte
+	var err error
+	var response []byte
+	nextURL := url
 	for nextURL != "" {
-		response, err = g.getFromGithub(githubAccessToken, nextURL)
+		response, nextURL, err = g.getFromGithub(githubAccessToken, nextURL)
 		if err != nil {
-			return responses, err
+			return nil, err
 		}
 		responses = append(responses, response)
-		nextURL = g.nextGithubPage(response)
 	}
 
 	return responses, nil
@@ -245,16 +208,10 @@ func (g *GClient) searchUsers(searchTerm, searchType string, githubAccessToken s
 	search = URLEncoded(search)
 	url := g.getURL("USER_SEARCH", config) + search
 
-	resp, err := g.getFromGithub(githubAccessToken, url)
+	b, _, err := g.getFromGithub(githubAccessToken, url)
 	if err != nil {
 		// no match on search returns an error. do not log
 		return nil, nil
-	}
-	defer resp.Body.Close()
-
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
 	}
 
 	result := &searchResult{}
@@ -269,20 +226,12 @@ func (g *GClient) getOrgByName(org string, githubAccessToken string, config *v3.
 	org = URLEncoded(org)
 	url := g.getURL("ORGS", config) + org
 
-	resp, err := g.getFromGithub(githubAccessToken, url)
+	b, _, err := g.getFromGithub(githubAccessToken, url)
 	if err != nil {
 		logrus.Debugf("Github getGithubOrgByName: GET url %v received error from github, err: %v", url, err)
 		return Account{}, err
 	}
-	defer resp.Body.Close()
 	var githubAcct Account
-
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		logrus.Errorf("Github getGithubOrgByName: error reading response, err: %v", err)
-		return Account{}, err
-	}
-
 	if err := json.Unmarshal(b, &githubAcct); err != nil {
 		logrus.Errorf("Github getGithubOrgByName: error unmarshalling response, err: %v", err)
 		return Account{}, err
@@ -294,19 +243,12 @@ func (g *GClient) getOrgByName(org string, githubAccessToken string, config *v3.
 func (g *GClient) getUserOrgByID(id string, githubAccessToken string, config *v3.GithubConfig) (Account, error) {
 	url := g.getURL("USER_INFO", config) + "/" + id
 
-	resp, err := g.getFromGithub(githubAccessToken, url)
+	b, _, err := g.getFromGithub(githubAccessToken, url)
 	if err != nil {
 		logrus.Errorf("Github getUserOrgById: GET url %v received error from github, err: %v", url, err)
 		return Account{}, err
 	}
-	defer resp.Body.Close()
 	var githubAcct Account
-
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		logrus.Errorf("Github getUserOrgById: error reading response, err: %v", err)
-		return Account{}, err
-	}
 
 	if err := json.Unmarshal(b, &githubAcct); err != nil {
 		logrus.Errorf("Github getUserOrgById: error unmarshalling response, err: %v", err)
@@ -326,7 +268,7 @@ func URLEncoded(str string) string {
 	return u.String()
 }
 
-func (g *GClient) postToGithub(url string, form url.Values) (*http.Response, error) {
+func (g *GClient) postToGithub(url string, form url.Values) ([]byte, error) {
 	req, err := http.NewRequest("POST", url, strings.NewReader(form.Encode()))
 	if err != nil {
 		logrus.Error(err)
@@ -337,8 +279,10 @@ func (g *GClient) postToGithub(url string, form url.Values) (*http.Response, err
 	resp, err := g.httpClient.Do(req)
 	if err != nil {
 		logrus.Errorf("Received error from github: %v", err)
-		return resp, err
+		return nil, err
 	}
+
+	defer resp.Body.Close()
 	// Check the status code
 	switch resp.StatusCode {
 	case 200:
@@ -346,16 +290,16 @@ func (g *GClient) postToGithub(url string, form url.Values) (*http.Response, err
 	default:
 		var body bytes.Buffer
 		io.Copy(&body, resp.Body)
-		return resp, fmt.Errorf("Request failed, got status code: %d. Response: %s",
+		return nil, fmt.Errorf("Request failed, got status code: %d. Response: %s",
 			resp.StatusCode, body.Bytes())
 	}
-	return resp, nil
+	return ioutil.ReadAll(resp.Body)
 }
 
-func (g *GClient) getFromGithub(githubAccessToken string, url string) (*http.Response, error) {
+func (g *GClient) getFromGithub(githubAccessToken string, url string) ([]byte, string, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		logrus.Error(err)
+		return nil, "", err
 	}
 	req.Header.Add("Authorization", "token "+githubAccessToken)
 	req.Header.Add("Accept", "application/json")
@@ -363,8 +307,9 @@ func (g *GClient) getFromGithub(githubAccessToken string, url string) (*http.Res
 	resp, err := g.httpClient.Do(req)
 	if err != nil {
 		logrus.Errorf("Received error from github: %v", err)
-		return resp, err
+		return nil, "", err
 	}
+	defer resp.Body.Close()
 	// Check the status code
 	switch resp.StatusCode {
 	case 200:
@@ -372,10 +317,13 @@ func (g *GClient) getFromGithub(githubAccessToken string, url string) (*http.Res
 	default:
 		var body bytes.Buffer
 		io.Copy(&body, resp.Body)
-		return resp, fmt.Errorf("Request failed, got status code: %d. Response: %s",
+		return nil, "", fmt.Errorf("request failed, got status code: %d. Response: %s",
 			resp.StatusCode, body.Bytes())
 	}
-	return resp, nil
+
+	nextURL := g.nextGithubPage(resp)
+	b, err := ioutil.ReadAll(resp.Body)
+	return b, nextURL, err
 }
 
 func (g *GClient) getURL(endpoint string, config *v3.GithubConfig) string {
