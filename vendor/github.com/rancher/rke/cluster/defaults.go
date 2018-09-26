@@ -34,6 +34,11 @@ const (
 	DefaultEtcdBackupCreationPeriod  = "5m0s"
 	DefaultEtcdBackupRetentionPeriod = "24h"
 	DefaultMonitoringProvider        = "metrics-server"
+
+	DefaultEtcdHeartbeatIntervalName  = "heartbeat-interval"
+	DefaultEtcdHeartbeatIntervalValue = "500"
+	DefaultEtcdElectionTimeoutName    = "election-timeout"
+	DefaultEtcdElectionTimeoutValue   = "5000"
 )
 
 func setDefaultIfEmptyMapValue(configMap map[string]string, key string, value string) {
@@ -136,6 +141,16 @@ func (c *Cluster) setClusterServicesDefaults() {
 	}
 	for k, v := range serviceConfigDefaultsMap {
 		setDefaultIfEmpty(k, v)
+	}
+	// Add etcd timeouts
+	if c.Services.Etcd.ExtraArgs == nil {
+		c.Services.Etcd.ExtraArgs = make(map[string]string)
+	}
+	if _, ok := c.Services.Etcd.ExtraArgs[DefaultEtcdElectionTimeoutName]; !ok {
+		c.Services.Etcd.ExtraArgs[DefaultEtcdElectionTimeoutName] = DefaultEtcdElectionTimeoutValue
+	}
+	if _, ok := c.Services.Etcd.ExtraArgs[DefaultEtcdHeartbeatIntervalName]; !ok {
+		c.Services.Etcd.ExtraArgs[DefaultEtcdHeartbeatIntervalName] = DefaultEtcdHeartbeatIntervalValue
 	}
 }
 
