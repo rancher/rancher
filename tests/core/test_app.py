@@ -134,19 +134,19 @@ def test_app_namespace_annotation(admin_pc):
     )
     wait_for_workload(client, ns.name, count=3)
     ns = admin_pc.cluster.client.reload(ns)
-    assert app1.name in ns.annotations.data_dict()['cattle.io/appIds']
-    assert app2.name in ns.annotations.data_dict()['cattle.io/appIds']
+    assert app1.name in ns.annotations['cattle.io/appIds']
+    assert app2.name in ns.annotations['cattle.io/appIds']
     client.delete(app1)
     wait_for_app_to_be_deleted(client, app1)
 
     ns = admin_pc.cluster.client.reload(ns)
-    assert app1.name not in ns.annotations.data_dict()['cattle.io/appIds']
-    assert app2.name in ns.annotations.data_dict()['cattle.io/appIds']
+    assert app1.name not in ns.annotations['cattle.io/appIds']
+    assert app2.name in ns.annotations['cattle.io/appIds']
 
     client.delete(app2)
     wait_for_app_to_be_deleted(client, app2)
     ns = admin_pc.cluster.client.reload(ns)
-    assert 'cattle.io/appIds' not in ns.annotations.data_dict()
+    assert 'cattle.io/appIds' not in ns.annotations
 
 
 def wait_for_workload(client, ns, timeout=60, count=0):

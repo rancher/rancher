@@ -2,6 +2,7 @@ package rkenodeconfigserver
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -20,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/tunnelserver"
+	rkecloudprovider "github.com/rancher/rke/cloudprovider"
 	rkecluster "github.com/rancher/rke/cluster"
 	rkedocker "github.com/rancher/rke/docker"
 	rkehosts "github.com/rancher/rke/hosts"
@@ -330,13 +332,13 @@ func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configN
 	default:
 		return nil, fmt.Errorf("windows node can't support %s network plugin", rkeConfig.Network.Plugin)
 	}
-	cniMode := "overlay"
+	cniMode := "win-overlay"
 	if len(rkeConfig.Network.Options) > 0 {
 		for _, backendTypeName := range []string{rkecluster.FlannelBackendType, rkecluster.CanalFlannelBackendType} {
 			if flannelBackendType, ok := rkeConfig.Network.Options[backendTypeName]; ok {
 				flannelBackendType = strings.ToLower(flannelBackendType)
 				if flannelBackendType == "host-gw" {
-					cniMode = "l2bridge"
+					cniMode = "win-bridge"
 				}
 				break
 			}
@@ -446,6 +448,37 @@ func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configN
 	}
 	clusterMajorVersion := getTagMajorVersion(rkeConfig.Version)
 	serviceOptions := v3.K8sVersionWindowsServiceOptions[clusterMajorVersion]
+	dockerConfig := ""
+	if len(privateRegistriesMap) > 0 {
+		configFile, err := rkedocker.GetKubeletDockerConfig(privateRegistriesMap)
+		if err != nil {
+			return nil, fmt.Errorf("windows node can't parse docker config file: %v", err)
+		}
+
+		dockerConfig = base64.StdEncoding.EncodeToString([]byte(configFile))
+	}
+	cloudProviderConfig := ""
+	cloudProviderConfigPath := ""
+	cloudProviderName := ""
+	cloudProvider, err := rkecloudprovider.InitCloudProvider(rkeConfig.CloudProvider)
+	if err != nil {
+		return nil, fmt.Errorf("windows node can't initialize cloud provider: %v", err)
+	}
+	if cloudProvider != nil {
+		configFile, err := cloudProvider.GenerateCloudConfigFile()
+		if err != nil {
+			return nil, fmt.Errorf("windows node can't parse cloud config file: %v", err)
+		}
+
+		cloudProviderName = cloudProvider.GetName()
+		if cloudProviderName == "" {
+			return nil, fmt.Errorf("name of the cloud provider is not defined for custom provider")
+		} else if cloudProviderName != "aws" {
+			cloudProviderConfigPath = "c:/etc/kubernetes/cloud-config"
+		}
+
+		cloudProviderConfig = base64.StdEncoding.EncodeToString([]byte(configFile))
+	}
 
 	extendingKubeletOptions := extendMap(map[string]string{
 		"v":                            "2",
@@ -460,6 +493,14 @@ func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configN
 		"cluster-domain":               clusterDomain,
 		"cluster-dns":                  dnsServiceIP,
 		"node-ip":                      configNode.InternalAddress,
+		"address":                      "0.0.0.0",
+		"cadvisor-port":                "0",
+		"read-only-port":               "0",
+		"cloud-provider":               cloudProviderName,
+		"cloud-config":                 cloudProviderConfigPath,
+		"volume-plugin-dir":            "c:/var/lib/kubelet/volumeplugins",
+		"root-dir":                     "c:/var/lib/kubelet",
+		"authentication-token-webhook": "true",
 	}, serviceOptions.Kubelet)
 	extendingKubeproxyOptions := extendMap(map[string]string{
 		"v":                 "2",
@@ -480,8 +521,11 @@ func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configN
 			"-KubeDnsServiceIP", dnsServiceIP,
 			"-KubeCNIComponent", cniComponent,
 			"-KubeCNIMode", cniMode,
-			"-KubeletOptions", translateMapToTuples(extendingKubeletOptions),
-			"-KubeProxyOptions", translateMapToTuples(extendingKubeproxyOptions),
+			"-KubeletCloudProviderName", cloudProviderName,
+			"-KubeletCloudProviderConfig", cloudProviderConfig,
+			"-KubeletDockerConfig", dockerConfig,
+			"-KubeletOptions", translateMapToTuples(extendingKubeletOptions, `"--%s=%v"`),
+			"-KubeProxyOptions", translateMapToTuples(extendingKubeproxyOptions, `"--%s=%v"`),
 			"-NodeIP", configNode.InternalAddress,
 			"-NodeName", configNode.HostnameOverride,
 		},
@@ -507,12 +551,12 @@ func extendMap(sourceMap, targetMap map[string]string) map[string]string {
 	return sourceMap
 }
 
-func translateMapToTuples(options map[string]string) string {
+func translateMapToTuples(options map[string]string, formatter string) string {
 	result := ""
 	if len(options) != 0 {
 		kvPairs := make([]string, 0, len(options))
 		for key, val := range options {
-			kvPairs = append(kvPairs, fmt.Sprintf(`"--%s=%v"`, key, val))
+			kvPairs = append(kvPairs, fmt.Sprintf(formatter, key, val))
 		}
 		result = strings.Join(kvPairs, ";")
 	}

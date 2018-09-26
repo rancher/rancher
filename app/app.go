@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/k8scheck"
 	"github.com/rancher/rancher/pkg/telemetry"
 	"github.com/rancher/rancher/pkg/tls"
+	"github.com/rancher/rancher/pkg/tunnelserver"
 	"github.com/rancher/rancher/server"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -61,6 +62,10 @@ func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config
 	}
 
 	scaledContext.Dialer = dialerFactory
+	scaledContext.PeerManager, err = tunnelserver.NewPeerManager(scaledContext, dialerFactory.TunnelServer)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	manager := clustermanager.NewManager(cfg.HTTPSListenPort, scaledContext)
 	scaledContext.AccessControl = manager
@@ -97,7 +102,9 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 	}
 
 	go leader.RunOrDie(ctx, "cattle-controllers", scaledContext.K8sClient, func(ctx context.Context) {
-		scaledContext.Leader = true
+		if scaledContext.PeerManager != nil {
+			scaledContext.PeerManager.Leader()
+		}
 
 		if err := telemetry.Start(ctx, cfg.HTTPSListenPort, scaledContext); err != nil {
 			panic(err)

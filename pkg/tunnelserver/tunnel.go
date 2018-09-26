@@ -41,9 +41,8 @@ type input struct {
 	Cluster *cluster     `json:"cluster"`
 }
 
-func NewTunnelServer(context *config.ScaledContext, authorizer *Authorizer) (*remotedialer.Server, error) {
-	rd := remotedialer.New(authorizer.authorizeTunnel, remotedialer.DefaultErrorWriter)
-	return rd, startPeerManager(context, rd)
+func NewTunnelServer(authorizer *Authorizer) *remotedialer.Server {
+	return remotedialer.New(authorizer.authorizeTunnel, remotedialer.DefaultErrorWriter)
 }
 
 func NewAuthorizer(context *config.ScaledContext) *Authorizer {
@@ -83,7 +82,7 @@ type Client struct {
 func (t *Authorizer) authorizeTunnel(req *http.Request) (string, bool, error) {
 	client, ok, err := t.Authorize(req)
 	if client != nil && client.Node != nil {
-		return client.Cluster.Name + "/" + client.Node.Name, ok, err
+		return client.Cluster.Name + ":" + client.Node.Name, ok, err
 	} else if client != nil && client.Cluster != nil {
 		return client.Cluster.Name, ok, err
 	}

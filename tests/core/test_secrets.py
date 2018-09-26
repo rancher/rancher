@@ -138,8 +138,8 @@ def test_docker_credential(admin_pc):
     assert cert.baseType == 'secret'
     assert cert.type == 'dockerCredential'
     assert cert.name == name
-    assert cert.registries.data_dict()['index.docker.io'].username == 'foo'
-    assert 'password' in cert.registries.data_dict()['index.docker.io']
+    assert cert.registries['index.docker.io'].username == 'foo'
+    assert 'password' in cert.registries['index.docker.io']
     assert cert.namespaceId is None
     assert 'namespace' not in cert
     assert cert.projectId == admin_pc.project.id
@@ -154,9 +154,9 @@ def test_docker_credential(admin_pc):
     assert cert.baseType == 'secret'
     assert cert.type == 'dockerCredential'
     assert cert.name == name
-    assert cert.registries.data_dict()['index.docker.io'].username == 'foo'
+    assert cert.registries['index.docker.io'].username == 'foo'
     assert cert.registries.two.username == 'blah'
-    assert 'password' not in cert.registries.data_dict()['index.docker.io']
+    assert 'password' not in cert.registries['index.docker.io']
     assert cert.namespaceId is None
     assert 'namespace' not in cert
     assert cert.projectId == admin_pc.project.id

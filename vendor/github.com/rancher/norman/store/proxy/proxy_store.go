@@ -243,8 +243,9 @@ func (s *Store) realWatch(apiContext *types.APIContext, schema *types.Schema, op
 	decoder := streaming.NewDecoder(framer, &unstructuredDecoder{})
 	watcher := watch.NewStreamWatcher(restclientwatch.NewDecoder(decoder, &unstructuredDecoder{}))
 
+	watchingContext, cancelWatchingContext := context.WithCancel(apiContext.Request.Context())
 	go func() {
-		<-apiContext.Request.Context().Done()
+		<-watchingContext.Done()
 		logrus.Debugf("stopping watcher for %s", schema.ID)
 		watcher.Stop()
 	}()
@@ -261,6 +262,7 @@ func (s *Store) realWatch(apiContext *types.APIContext, schema *types.Schema, op
 		}
 		logrus.Debugf("closing watcher for %s", schema.ID)
 		close(result)
+		cancelWatchingContext()
 	}()
 
 	return result, nil
@@ -282,10 +284,11 @@ func getNamespace(apiContext *types.APIContext, opt *types.QueryOptions) string 
 	}
 
 	for _, condition := range opt.Conditions {
-		if condition.Field == "namespaceId" && condition.Value != "" {
+		mod := condition.ToCondition().Modifier
+		if condition.Field == "namespaceId" && condition.Value != "" && mod == types.ModifierEQ {
 			return condition.Value
 		}
-		if condition.Field == "namespace" && condition.Value != "" {
+		if condition.Field == "namespace" && condition.Value != "" && mod == types.ModifierEQ {
 			return condition.Value
 		}
 	}

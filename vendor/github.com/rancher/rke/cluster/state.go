@@ -216,6 +216,7 @@ func getStateFromNodes(ctx context.Context, uniqueHosts []*hosts.Host, alpineIma
 		logrus.Debugf("[state] Failed to unmarshal the cluster file fetched from nodes: %v", err)
 		return nil
 	}
+	log.Infof(ctx, "[state] Successfully fetched cluster state from Nodes")
 	return &currentCluster
 
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/rancher/rancher/pkg/rkenodeconfigclient"
@@ -28,11 +29,7 @@ func ClientConnectWhileWindows(ctx context.Context, wsURL string, headers http.H
 				return 503
 			}
 
-			if strings.HasSuffix(errMsg, "An existing connection was forcibly closed by the remote host.") {
-				logrus.Warn("Proxy actively close this connection: ", errMsg)
-			} else {
-				logrus.Error("Failed to connect to proxy: ", errMsg)
-			}
+			logrus.Error("Failed to connect to proxy: ", errMsg)
 		}
 
 		return 500
@@ -46,12 +43,6 @@ func connectToProxyWhileWindows(rootContext context.Context, proxyURL string, he
 		dialer = &websocket.Dialer{}
 	}
 
-	ws, _, err := dialer.Dial(proxyURL, headers)
-	if err != nil {
-		return err
-	}
-	defer ws.Close()
-
 	eg, ctx := errgroup.WithContext(rootContext)
 
 	if blockingOnConnect != nil {
@@ -61,15 +52,37 @@ func connectToProxyWhileWindows(rootContext context.Context, proxyURL string, he
 	}
 
 	eg.Go(func() error {
-		session := newClientSession(auth, ws)
-		defer session.Close()
+		reconnectCount := 0
 
-		_, err := session.serveWhileWindows(ctx)
-		if err != nil {
+		for {
+			err := func() error {
+				ws, _, err := dialer.Dial(proxyURL, headers)
+				if err != nil {
+					return err
+				}
+				defer ws.Close()
+
+				session := newClientSession(auth, ws)
+				_, err = session.serveWhileWindows(ctx)
+				session.Close()
+				return err
+			}()
+			if err != nil {
+				if reconnectCount < 10 {
+					errMsg := err.Error()
+					if strings.HasSuffix(errMsg, "An existing connection was forcibly closed by the remote host.") ||
+						strings.HasSuffix(errMsg, "An established connection was aborted by the software in your host machine.") ||
+						strings.HasSuffix(errMsg, "A socket operation was attempted to an unreachable network.") {
+						time.Sleep(5 * time.Second)
+
+						reconnectCount += 1
+						continue
+					}
+				}
+			}
+
 			return err
 		}
-
-		return nil
 	})
 
 	return eg.Wait()

@@ -17,10 +17,10 @@ def test_system_project_created(admin_cc):
     required_projects = []
 
     for project in projects:
-        name = project.data_dict()['name']
+        name = project['name']
         if name in initial_projects:
             projectLabel = initial_projects[name]
-            assert project.data_dict()['labels'].\
+            assert project['labels'].\
                 data_dict()[projectLabel] == 'true'
             required_projects.append(name)
 
@@ -32,7 +32,7 @@ def test_system_namespaces_assigned(admin_cc):
         clusterId=admin_cc.cluster.id)
     systemProject = None
     for project in projects:
-        if project.data_dict()['name'] == "System":
+        if project['name'] == "System":
             systemProject = project
             break
     assert systemProject is not None
@@ -40,7 +40,7 @@ def test_system_namespaces_assigned(admin_cc):
     system_namespaces = admin_cc.client.list_namespace(
         projectId=systemProject.id)
     system_namespaces_names = set(
-        [ns.data_dict()['name'] for ns in system_namespaces])
+        [ns['name'] for ns in system_namespaces])
     assert system_namespaces_names == initial_system_namespaces
 
 
@@ -52,7 +52,7 @@ def test_system_project_cant_be_deleted(admin_mc, admin_cc):
         clusterId=admin_cc.cluster.id)
     system_project = None
     for project in projects:
-        if project.data_dict()['name'] == "System":
+        if project['name'] == "System":
             system_project = project
             break
     assert system_project is not None

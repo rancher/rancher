@@ -37,13 +37,8 @@ function scrape-text {
         [parameter(Mandatory = $true)] [string]$Uri
     )
 
-    try {
-        $scraped = Invoke-WebRequest -Headers $Headers -UseBasicParsing -Uri $Uri
-        return $scraped.Content
-    } catch {
-        log-error $_.Exception.Message
-        return $null
-    }
+    $scraped = Invoke-WebRequest -Headers $Headers -UseBasicParsing -Uri $Uri
+    return $scraped.Content
 }
 
 function scrape-json {
@@ -51,14 +46,8 @@ function scrape-json {
         [parameter(Mandatory = $true)] [string]$Uri
     )
 
-    try {
-        $scraped = Invoke-WebRequest -Headers @{"Accept"="application/json";"Cache-Control"="no-cache"} -UseBasicParsing -Uri $Uri
-        return ($scraped.Content | ConvertFrom-Json)
-    } catch {
-        log-error $_.Exception.Message
-        return $null
-    }
-
+    $scraped = Invoke-WebRequest -Headers @{"Accept"="application/json";"Cache-Control"="no-cache"} -UseBasicParsing -Uri $Uri
+    return ($scraped.Content | ConvertFrom-Json)
 }
 
 function get-address {

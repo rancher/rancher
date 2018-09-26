@@ -3,7 +3,7 @@ FROM ubuntu:18.04
 
 ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
-ENV CATTLE_HELM_VERSION v2.10.0-rancher1
+ENV CATTLE_HELM_VERSION v2.10.0-rancher4
 
 RUN apt-get update && \
     apt-get install -y gcc ca-certificates git wget curl vim less file xz-utils unzip && \

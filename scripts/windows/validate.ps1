@@ -8,21 +8,22 @@ pushd $rootPath
 Write-Host "Running validation"
 $packages = Get-ChildItem -Recurse -Force -Include "*.go" | % Fullname | Resolve-Path -Relative | Select-String -NotMatch -Pattern "(^\.$|.git|.trash-cache|vendor|bin)" | % { $r = $_ -Split "\\"; if ($r.Count -gt 2) {$r[1]} } | Sort-Object -Unique | % { ('./{0}/...' -f $_)}
 
-Write-Host "go vet"
+Write-Host "Running: go vet"
 go vet $packages
 
-Write-Host "golint"
-try {
-    go get -u golang.org/x/lint/golint | Out-Null
-    foreach ($pkg in $packages) {
-        $lintResult = golint $pkg | Select-String -NotMatch -Pattern "hyperkube|should have comment.*or be unexported"
+Write-Host "Running: golint"
+go get -u golang.org/x/lint/golint | Out-Null
+foreach ($pkg in $packages) {
+    try {
+        $lintResult = (golint $pkg | Select-String -NotMatch -Pattern "hyperkube|should have comment.*or be unexported")
         if (-not $lintResult) {
-            throw $lintResult
+            Write-Host -ForegroundColor Red $lintResult
         }
-    }
-} catch {}
+    } catch {}
+}
 
-Write-Host "go fmt"
+
+Write-Host "Running: go fmt"
 $fmtResult = go fmt $packages
 if (-not $fmtResult) {
     throw $fmtResult
