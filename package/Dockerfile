@@ -1,5 +1,5 @@
 FROM ubuntu:18.04
-RUN apt-get update && apt-get install -y git curl ca-certificates unzip xz-utils && \
+RUN apt-get update && apt-get install -y git curl ca-certificates unzip xz-utils vim && \
     useradd rancher && \
     mkdir -p /var/lib/rancher/etcd /var/lib/cattle && \
     chown -R rancher /var/lib/rancher /var/lib/cattle /usr/local/bin
