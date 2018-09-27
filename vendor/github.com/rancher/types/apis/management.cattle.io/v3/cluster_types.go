@@ -98,6 +98,7 @@ type ClusterStatus struct {
 	Version                              *version.Info            `json:"version,omitempty"`
 	AppliedPodSecurityPolicyTemplateName string                   `json:"appliedPodSecurityPolicyTemplateId"`
 	AppliedEnableNetworkPolicy           bool                     `json:"appliedEnableNetworkPolicy" norman:"nocreate,noupdate,default=false"`
+	Capabilities                         Capabilities             `json:"capabilities,omitempty"`
 }
 
 type ClusterComponentStatus struct {
@@ -284,4 +285,24 @@ type ImportClusterYamlInput struct {
 
 type ImportYamlOutput struct {
 	Message string `json:"message,omitempty"`
+}
+
+type Capabilities struct {
+	L4LoadBalancer           L4LoadBalancer      `json:"l4loadBalancer,omitempty"`
+	IngressControllers       []IngressController `json:"ingressControllers,omitempty"`
+	NodePoolScalingSupported bool                `json:"nodePoolScalingSupported,omitempty"`
+	NodePortRange            string              `json:"nodePortRange,omitempty"`
+}
+
+type L4LoadBalancer struct {
+	Enabled              bool     `json:"enabled,omitempty"`
+	Provider             string   `json:"provider,omitempty"`
+	ProtocolsSupported   []string `json:"protocolsSupported,omitempty"`
+	HealthCheckSupported bool     `json:"healthCheckSupported,omitempty"`
+}
+
+type IngressController struct {
+	HTTPLoadBalancingEnabled bool   `json:"httpLoadBalancingEnabled,omitempty"`
+	IngressProvider          string `json:"ingressProvider,omitempty"`
+	CustomDefaultBackend     bool   `json:"customDefaultBackend,omitempty"`
 }
