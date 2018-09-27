@@ -1,0 +1,140 @@
+package cluster
+
+import (
+	"reflect"
+
+	"github.com/rancher/rke/cloudprovider/aws"
+	"github.com/rancher/rke/cloudprovider/azure"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/config"
+
+	"k8s.io/apimachinery/pkg/labels"
+)
+
+const (
+	GoogleCloudLoadBalancer = "GCLB"
+	ElasticLoadBalancer     = "ELB"
+	AzureL4LB               = "Azure L4 LB"
+	NginxIngressProvider    = "Nginx"
+	DefaultNodePortRange    = "30000-32767"
+)
+
+type controller struct {
+	clusterClient v3.ClusterInterface
+	clusterLister v3.ClusterLister
+	nodeLister    v3.NodeLister
+}
+
+func Register(management *config.ManagementContext) {
+	c := controller{
+		clusterClient: management.Management.Clusters(""),
+		clusterLister: management.Management.Clusters("").Controller().Lister(),
+		nodeLister:    management.Management.Nodes("").Controller().Lister(),
+	}
+
+	c.clusterClient.AddHandler("clusterCreateUpdate", c.capsSync)
+}
+
+func (c *controller) capsSync(key string, cluster *v3.Cluster) error {
+	var err error
+	if cluster == nil || cluster.DeletionTimestamp != nil {
+		return nil
+	}
+
+	if cluster.Spec.ImportedConfig != nil {
+		return nil
+	}
+	capabilities := v3.Capabilities{}
+	capabilities.NodePortRange = DefaultNodePortRange
+
+	if cluster.Spec.GoogleKubernetesEngineConfig != nil {
+		capabilities = c.GKECapabilities(capabilities, *cluster.Spec.GoogleKubernetesEngineConfig)
+	} else if cluster.Spec.AmazonElasticContainerServiceConfig != nil {
+		capabilities = c.EKSCapabilities(capabilities, *cluster.Spec.AmazonElasticContainerServiceConfig)
+	} else if cluster.Spec.AzureKubernetesServiceConfig != nil {
+		capabilities = c.AKSCapabilities(capabilities, *cluster.Spec.AzureKubernetesServiceConfig)
+	} else if cluster.Spec.RancherKubernetesEngineConfig != nil {
+		if capabilities, err = c.RKECapabilities(capabilities, *cluster.Spec.RancherKubernetesEngineConfig, cluster.Name); err != nil {
+			return err
+		}
+	} else {
+		return nil
+	}
+
+	if !reflect.DeepEqual(capabilities, cluster.Status.Capabilities) {
+		toUpdateCluster := cluster.DeepCopy()
+		toUpdateCluster.Status.Capabilities = capabilities
+		if _, err := c.clusterClient.Update(toUpdateCluster); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *controller) GKECapabilities(capabilities v3.Capabilities, gkeConfig v3.GoogleKubernetesEngineConfig) v3.Capabilities {
+	capabilities.L4LoadBalancer = c.L4Capability(true, GoogleCloudLoadBalancer, []string{"TCP", "UDP"}, true)
+	if *gkeConfig.EnableHTTPLoadBalancing {
+		ingressController := c.IngressCapability(true, GoogleCloudLoadBalancer, true)
+		capabilities.IngressControllers = []v3.IngressController{ingressController}
+	}
+	return capabilities
+}
+
+func (c *controller) EKSCapabilities(capabilities v3.Capabilities, eksConfig v3.AmazonElasticContainerServiceConfig) v3.Capabilities {
+	capabilities.L4LoadBalancer = c.L4Capability(true, ElasticLoadBalancer, []string{"TCP"}, true)
+	return capabilities
+}
+
+func (c *controller) AKSCapabilities(capabilities v3.Capabilities, aksConfig v3.AzureKubernetesServiceConfig) v3.Capabilities {
+	capabilities.L4LoadBalancer = c.L4Capability(true, AzureL4LB, []string{"TCP", "UDP"}, true)
+	// on AKS portal you can enable Azure HTTP Application routing but Rancher doesn't have that option yet
+	return capabilities
+}
+
+func (c *controller) RKECapabilities(capabilities v3.Capabilities, rkeConfig v3.RancherKubernetesEngineConfig, clusterName string) (v3.Capabilities, error) {
+	switch rkeConfig.CloudProvider.Name {
+	case aws.AWSCloudProviderName:
+		capabilities.L4LoadBalancer = c.L4Capability(true, ElasticLoadBalancer, []string{"TCP"}, true)
+	case azure.AzureCloudProviderName:
+		capabilities.L4LoadBalancer = c.L4Capability(true, AzureL4LB, []string{"TCP", "UDP"}, true)
+	}
+	// only if not custom, non custom clusters have nodepools set
+	nodes, err := c.nodeLister.List(clusterName, labels.Everything())
+	if err != nil {
+		return capabilities, err
+	}
+
+	if len(nodes) > 0 {
+		if nodes[0].Spec.NodePoolName != "" {
+			capabilities.NodePoolScalingSupported = true
+		}
+	}
+
+	ingressController := c.IngressCapability(true, NginxIngressProvider, false)
+	capabilities.IngressControllers = []v3.IngressController{ingressController}
+	if rkeConfig.Services.KubeAPI.ExtraArgs["service-node-port-range"] != "" {
+		capabilities.NodePortRange = rkeConfig.Services.KubeAPI.ExtraArgs["service-node-port-range"]
+	}
+
+	return capabilities, nil
+}
+
+func (c *controller) L4Capability(enabled bool, providerName string, protocols []string, healthCheck bool) v3.L4LoadBalancer {
+	l4lb := v3.L4LoadBalancer{
+		Enabled:              enabled,
+		Provider:             providerName,
+		ProtocolsSupported:   protocols,
+		HealthCheckSupported: healthCheck,
+	}
+	return l4lb
+}
+
+func (c *controller) IngressCapability(httpLBEnabled bool, providerName string, customDefaultBackend bool) v3.IngressController {
+	ing := v3.IngressController{
+		HTTPLoadBalancingEnabled: httpLBEnabled,
+		IngressProvider:          providerName,
+		CustomDefaultBackend:     customDefaultBackend,
+	}
+	return ing
+}

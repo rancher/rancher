@@ -42,6 +42,9 @@ const (
 	ClusterDriverImported = "imported"
 	ClusterDriverLocal    = "local"
 	ClusterDriverRKE      = "rancherKubernetesEngine"
+	ClusterDriverGKE      = "googleKubernetesEngine"
+	ClusterDriverEKS      = "amazonElasticContainerService"
+	ClusterDriverAKS      = "azureKubernetesService"
 )
 
 type Cluster struct {
