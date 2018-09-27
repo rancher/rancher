@@ -130,7 +130,7 @@ func ClusterUp(
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
 
-	err = kubeCluster.SyncLabelsAndTaints(ctx)
+	err = kubeCluster.SyncLabelsAndTaints(ctx, currentCluster)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}

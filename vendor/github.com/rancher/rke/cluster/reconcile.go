@@ -94,19 +94,13 @@ func reconcileControl(ctx context.Context, currentCluster, kubeCluster *Cluster,
 			cpToDelete = append(cpToDelete, toDeleteHost)
 		}
 	}
-
+	if len(cpToDelete) == len(currentCluster.ControlPlaneHosts) {
+		log.Infof(ctx, "[reconcile] Deleting all current controlplane nodes, skipping deleting from k8s cluster")
+		return nil
+	}
 	for _, toDeleteHost := range cpToDelete {
-		kubeClient, err := k8s.NewClient(kubeCluster.LocalKubeConfigPath, kubeCluster.K8sWrapTransport)
-		if err != nil {
-			return fmt.Errorf("Failed to initialize new kubernetes client: %v", err)
-		}
-		if err := hosts.DeleteNode(ctx, toDeleteHost, kubeClient, toDeleteHost.IsWorker, kubeCluster.CloudProvider.Name); err != nil {
-			return fmt.Errorf("Failed to delete controlplane node [%s] from cluster: %v", toDeleteHost.Address, err)
-		}
-		// attempting to clean services/files on the host
-		if err := reconcileHost(ctx, toDeleteHost, false, false, currentCluster.SystemImages.Alpine, currentCluster.DockerDialerFactory, currentCluster.PrivateRegistriesMap, currentCluster.PrefixPath); err != nil {
-			log.Warnf(ctx, "[reconcile] Couldn't clean up controlplane node [%s]: %v", toDeleteHost.Address, err)
-			continue
+		if err := cleanControlNode(ctx, kubeCluster, currentCluster, toDeleteHost); err != nil {
+			return err
 		}
 	}
 	// rebuilding local admin config to enable saving cluster state
@@ -243,4 +237,19 @@ func (c *Cluster) setReadyEtcdHosts() {
 			host.ExistingEtcdCluster = true
 		}
 	}
+}
+
+func cleanControlNode(ctx context.Context, kubeCluster, currentCluster *Cluster, toDeleteHost *hosts.Host) error {
+	kubeClient, err := k8s.NewClient(kubeCluster.LocalKubeConfigPath, kubeCluster.K8sWrapTransport)
+	if err != nil {
+		return fmt.Errorf("Failed to initialize new kubernetes client: %v", err)
+	}
+	if err := hosts.DeleteNode(ctx, toDeleteHost, kubeClient, toDeleteHost.IsWorker, kubeCluster.CloudProvider.Name); err != nil {
+		return fmt.Errorf("Failed to delete controlplane node [%s] from cluster: %v", toDeleteHost.Address, err)
+	}
+	// attempting to clean services/files on the host
+	if err := reconcileHost(ctx, toDeleteHost, false, false, currentCluster.SystemImages.Alpine, currentCluster.DockerDialerFactory, currentCluster.PrivateRegistriesMap, currentCluster.PrefixPath); err != nil {
+		log.Warnf(ctx, "[reconcile] Couldn't clean up controlplane node [%s]: %v", toDeleteHost.Address, err)
+	}
+	return nil
 }
