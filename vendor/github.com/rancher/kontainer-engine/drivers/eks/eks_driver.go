@@ -303,7 +303,7 @@ func (d *Driver) createStack(svc *cloudformation.CloudFormation, name string, di
 					continue
 				}
 
-				if *event.ResourceStatus == "CREATE_FAILED" && *event.LogicalResourceId == "VPC" {
+				if *event.ResourceStatus == "CREATE_FAILED" {
 					reason = *event.ResourceStatusReason
 					break
 				}
@@ -539,7 +539,7 @@ func isDuplicateKeyError(err error) bool {
 }
 
 func isClusterConflict(err error) bool {
-	return strings.Contains(err.Error(), "http response code was: 409")
+	return err.Error() == "409"
 }
 
 func getEC2KeyPairName(state state) string {
