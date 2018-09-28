@@ -449,6 +449,17 @@ func statusEqualTest(proposed, existing corev1.NodeStatus) bool {
 		return false
 	}
 
+	// Compare Node's Kubernetes versions
+	if proposed.NodeInfo.KubeletVersion != existing.NodeInfo.KubeletVersion ||
+		proposed.NodeInfo.KubeProxyVersion != existing.NodeInfo.KubeProxyVersion {
+		logrus.Debugf("Changes in KubernetesInfo, "+
+			"KubeletVersion proposed %#v, existing: %#v"+
+			"KubeProxyVersion proposed %#v, existing: %#v",
+			proposed.NodeInfo.KubeletVersion, existing.NodeInfo.KubeletVersion,
+			proposed.NodeInfo.KubeProxyVersion, existing.NodeInfo.KubeProxyVersion)
+		return false
+	}
+
 	return true
 }
 
