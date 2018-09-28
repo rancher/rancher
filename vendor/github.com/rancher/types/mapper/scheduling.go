@@ -202,9 +202,17 @@ func (s SchedulingMapper) ToInternal(data map[string]interface{}) error {
 		data["nodeName"] = nodeName
 	}
 
-	requireAll := convert.ToStringSlice(values.GetValueN(data, "scheduling", "node", "requireAll"))
-	requireAny := convert.ToStringSlice(values.GetValueN(data, "scheduling", "node", "requireAny"))
-	preferred := convert.ToStringSlice(values.GetValueN(data, "scheduling", "node", "preferred"))
+	requireAllV := values.GetValueN(data, "scheduling", "node", "requireAll")
+	requireAnyV := values.GetValueN(data, "scheduling", "node", "requireAny")
+	preferredV := values.GetValueN(data, "scheduling", "node", "preferred")
+
+	if requireAllV == nil && requireAnyV == nil && preferredV == nil {
+		return nil
+	}
+
+	requireAll := convert.ToStringSlice(requireAllV)
+	requireAny := convert.ToStringSlice(requireAnyV)
+	preferred := convert.ToStringSlice(preferredV)
 
 	if len(requireAll) == 0 && len(requireAny) == 0 && len(preferred) == 0 {
 		values.PutValue(data, nil, "affinity", "nodeAffinity")
