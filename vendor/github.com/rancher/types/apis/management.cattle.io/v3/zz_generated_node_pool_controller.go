@@ -43,6 +43,7 @@ type NodePoolLister interface {
 }
 
 type NodePoolController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() NodePoolLister
 	AddHandler(name string, handler NodePoolHandlerFunc)
@@ -103,6 +104,10 @@ func (l *nodePoolLister) Get(namespace, name string) (*NodePool, error) {
 
 type nodePoolController struct {
 	controller.GenericController
+}
+
+func (c *nodePoolController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *nodePoolController) Lister() NodePoolLister {

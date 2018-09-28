@@ -44,6 +44,7 @@ type ServiceLister interface {
 }
 
 type ServiceController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ServiceLister
 	AddHandler(name string, handler ServiceHandlerFunc)
@@ -104,6 +105,10 @@ func (l *serviceLister) Get(namespace, name string) (*v1.Service, error) {
 
 type serviceController struct {
 	controller.GenericController
+}
+
+func (c *serviceController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *serviceController) Lister() ServiceLister {

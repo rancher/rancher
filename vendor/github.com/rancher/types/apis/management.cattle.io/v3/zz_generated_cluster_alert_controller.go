@@ -43,6 +43,7 @@ type ClusterAlertLister interface {
 }
 
 type ClusterAlertController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ClusterAlertLister
 	AddHandler(name string, handler ClusterAlertHandlerFunc)
@@ -103,6 +104,10 @@ func (l *clusterAlertLister) Get(namespace, name string) (*ClusterAlert, error) 
 
 type clusterAlertController struct {
 	controller.GenericController
+}
+
+func (c *clusterAlertController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *clusterAlertController) Lister() ClusterAlertLister {

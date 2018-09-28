@@ -43,6 +43,7 @@ type NotifierLister interface {
 }
 
 type NotifierController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() NotifierLister
 	AddHandler(name string, handler NotifierHandlerFunc)
@@ -103,6 +104,10 @@ func (l *notifierLister) Get(namespace, name string) (*Notifier, error) {
 
 type notifierController struct {
 	controller.GenericController
+}
+
+func (c *notifierController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *notifierController) Lister() NotifierLister {

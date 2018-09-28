@@ -44,6 +44,7 @@ type ResourceQuotaLister interface {
 }
 
 type ResourceQuotaController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ResourceQuotaLister
 	AddHandler(name string, handler ResourceQuotaHandlerFunc)
@@ -104,6 +105,10 @@ func (l *resourceQuotaLister) Get(namespace, name string) (*v1.ResourceQuota, er
 
 type resourceQuotaController struct {
 	controller.GenericController
+}
+
+func (c *resourceQuotaController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *resourceQuotaController) Lister() ResourceQuotaLister {

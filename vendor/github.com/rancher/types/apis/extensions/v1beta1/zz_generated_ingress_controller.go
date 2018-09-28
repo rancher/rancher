@@ -44,6 +44,7 @@ type IngressLister interface {
 }
 
 type IngressController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() IngressLister
 	AddHandler(name string, handler IngressHandlerFunc)
@@ -104,6 +105,10 @@ func (l *ingressLister) Get(namespace, name string) (*v1beta1.Ingress, error) {
 
 type ingressController struct {
 	controller.GenericController
+}
+
+func (c *ingressController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *ingressController) Lister() IngressLister {

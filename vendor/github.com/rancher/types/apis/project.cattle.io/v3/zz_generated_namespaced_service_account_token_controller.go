@@ -43,6 +43,7 @@ type NamespacedServiceAccountTokenLister interface {
 }
 
 type NamespacedServiceAccountTokenController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() NamespacedServiceAccountTokenLister
 	AddHandler(name string, handler NamespacedServiceAccountTokenHandlerFunc)
@@ -103,6 +104,10 @@ func (l *namespacedServiceAccountTokenLister) Get(namespace, name string) (*Name
 
 type namespacedServiceAccountTokenController struct {
 	controller.GenericController
+}
+
+func (c *namespacedServiceAccountTokenController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *namespacedServiceAccountTokenController) Lister() NamespacedServiceAccountTokenLister {

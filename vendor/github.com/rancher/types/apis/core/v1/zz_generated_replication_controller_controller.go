@@ -44,6 +44,7 @@ type ReplicationControllerLister interface {
 }
 
 type ReplicationControllerController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ReplicationControllerLister
 	AddHandler(name string, handler ReplicationControllerHandlerFunc)
@@ -104,6 +105,10 @@ func (l *replicationControllerLister) Get(namespace, name string) (*v1.Replicati
 
 type replicationControllerController struct {
 	controller.GenericController
+}
+
+func (c *replicationControllerController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *replicationControllerController) Lister() ReplicationControllerLister {

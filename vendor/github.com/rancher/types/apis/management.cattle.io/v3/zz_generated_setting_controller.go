@@ -42,6 +42,7 @@ type SettingLister interface {
 }
 
 type SettingController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() SettingLister
 	AddHandler(name string, handler SettingHandlerFunc)
@@ -102,6 +103,10 @@ func (l *settingLister) Get(namespace, name string) (*Setting, error) {
 
 type settingController struct {
 	controller.GenericController
+}
+
+func (c *settingController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *settingController) Lister() SettingLister {

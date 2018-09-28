@@ -43,6 +43,7 @@ type AppRevisionLister interface {
 }
 
 type AppRevisionController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() AppRevisionLister
 	AddHandler(name string, handler AppRevisionHandlerFunc)
@@ -103,6 +104,10 @@ func (l *appRevisionLister) Get(namespace, name string) (*AppRevision, error) {
 
 type appRevisionController struct {
 	controller.GenericController
+}
+
+func (c *appRevisionController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *appRevisionController) Lister() AppRevisionLister {

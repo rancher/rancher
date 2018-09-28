@@ -44,6 +44,7 @@ type RoleLister interface {
 }
 
 type RoleController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() RoleLister
 	AddHandler(name string, handler RoleHandlerFunc)
@@ -104,6 +105,10 @@ func (l *roleLister) Get(namespace, name string) (*v1.Role, error) {
 
 type roleController struct {
 	controller.GenericController
+}
+
+func (c *roleController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *roleController) Lister() RoleLister {

@@ -42,6 +42,7 @@ type TemplateVersionLister interface {
 }
 
 type TemplateVersionController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() TemplateVersionLister
 	AddHandler(name string, handler TemplateVersionHandlerFunc)
@@ -102,6 +103,10 @@ func (l *templateVersionLister) Get(namespace, name string) (*TemplateVersion, e
 
 type templateVersionController struct {
 	controller.GenericController
+}
+
+func (c *templateVersionController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *templateVersionController) Lister() TemplateVersionLister {

@@ -43,6 +43,7 @@ type ProjectNetworkPolicyLister interface {
 }
 
 type ProjectNetworkPolicyController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ProjectNetworkPolicyLister
 	AddHandler(name string, handler ProjectNetworkPolicyHandlerFunc)
@@ -103,6 +104,10 @@ func (l *projectNetworkPolicyLister) Get(namespace, name string) (*ProjectNetwor
 
 type projectNetworkPolicyController struct {
 	controller.GenericController
+}
+
+func (c *projectNetworkPolicyController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *projectNetworkPolicyController) Lister() ProjectNetworkPolicyLister {

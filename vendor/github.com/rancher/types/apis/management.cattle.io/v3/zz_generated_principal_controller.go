@@ -42,6 +42,7 @@ type PrincipalLister interface {
 }
 
 type PrincipalController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() PrincipalLister
 	AddHandler(name string, handler PrincipalHandlerFunc)
@@ -102,6 +103,10 @@ func (l *principalLister) Get(namespace, name string) (*Principal, error) {
 
 type principalController struct {
 	controller.GenericController
+}
+
+func (c *principalController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *principalController) Lister() PrincipalLister {

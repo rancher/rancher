@@ -44,6 +44,7 @@ type PersistentVolumeClaimLister interface {
 }
 
 type PersistentVolumeClaimController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() PersistentVolumeClaimLister
 	AddHandler(name string, handler PersistentVolumeClaimHandlerFunc)
@@ -104,6 +105,10 @@ func (l *persistentVolumeClaimLister) Get(namespace, name string) (*v1.Persisten
 
 type persistentVolumeClaimController struct {
 	controller.GenericController
+}
+
+func (c *persistentVolumeClaimController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *persistentVolumeClaimController) Lister() PersistentVolumeClaimLister {

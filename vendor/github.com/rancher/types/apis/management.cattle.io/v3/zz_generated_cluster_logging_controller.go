@@ -43,6 +43,7 @@ type ClusterLoggingLister interface {
 }
 
 type ClusterLoggingController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ClusterLoggingLister
 	AddHandler(name string, handler ClusterLoggingHandlerFunc)
@@ -103,6 +104,10 @@ func (l *clusterLoggingLister) Get(namespace, name string) (*ClusterLogging, err
 
 type clusterLoggingController struct {
 	controller.GenericController
+}
+
+func (c *clusterLoggingController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *clusterLoggingController) Lister() ClusterLoggingLister {

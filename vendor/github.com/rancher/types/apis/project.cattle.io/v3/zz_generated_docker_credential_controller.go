@@ -43,6 +43,7 @@ type DockerCredentialLister interface {
 }
 
 type DockerCredentialController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() DockerCredentialLister
 	AddHandler(name string, handler DockerCredentialHandlerFunc)
@@ -103,6 +104,10 @@ func (l *dockerCredentialLister) Get(namespace, name string) (*DockerCredential,
 
 type dockerCredentialController struct {
 	controller.GenericController
+}
+
+func (c *dockerCredentialController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *dockerCredentialController) Lister() DockerCredentialLister {

@@ -43,6 +43,7 @@ type AppLister interface {
 }
 
 type AppController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() AppLister
 	AddHandler(name string, handler AppHandlerFunc)
@@ -103,6 +104,10 @@ func (l *appLister) Get(namespace, name string) (*App, error) {
 
 type appController struct {
 	controller.GenericController
+}
+
+func (c *appController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *appController) Lister() AppLister {

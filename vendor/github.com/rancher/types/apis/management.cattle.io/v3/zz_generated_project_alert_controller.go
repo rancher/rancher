@@ -43,6 +43,7 @@ type ProjectAlertLister interface {
 }
 
 type ProjectAlertController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ProjectAlertLister
 	AddHandler(name string, handler ProjectAlertHandlerFunc)
@@ -103,6 +104,10 @@ func (l *projectAlertLister) Get(namespace, name string) (*ProjectAlert, error) 
 
 type projectAlertController struct {
 	controller.GenericController
+}
+
+func (c *projectAlertController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *projectAlertController) Lister() ProjectAlertLister {

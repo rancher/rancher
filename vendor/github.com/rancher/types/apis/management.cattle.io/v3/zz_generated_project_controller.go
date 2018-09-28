@@ -43,6 +43,7 @@ type ProjectLister interface {
 }
 
 type ProjectController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ProjectLister
 	AddHandler(name string, handler ProjectHandlerFunc)
@@ -103,6 +104,10 @@ func (l *projectLister) Get(namespace, name string) (*Project, error) {
 
 type projectController struct {
 	controller.GenericController
+}
+
+func (c *projectController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *projectController) Lister() ProjectLister {

@@ -125,7 +125,7 @@ type NotifierSpec struct {
 }
 
 type Notification struct {
-	Message         string           `json:"message, omitempty"`
+	Message         string           `json:"message,omitempty"`
 	SMTPConfig      *SMTPConfig      `json:"smtpConfig,omitempty"`
 	SlackConfig     *SlackConfig     `json:"slackConfig,omitempty"`
 	PagerdutyConfig *PagerdutyConfig `json:"pagerdutyConfig,omitempty"`

@@ -43,6 +43,7 @@ type NamespacedDockerCredentialLister interface {
 }
 
 type NamespacedDockerCredentialController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() NamespacedDockerCredentialLister
 	AddHandler(name string, handler NamespacedDockerCredentialHandlerFunc)
@@ -103,6 +104,10 @@ func (l *namespacedDockerCredentialLister) Get(namespace, name string) (*Namespa
 
 type namespacedDockerCredentialController struct {
 	controller.GenericController
+}
+
+func (c *namespacedDockerCredentialController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *namespacedDockerCredentialController) Lister() NamespacedDockerCredentialLister {

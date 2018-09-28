@@ -43,6 +43,7 @@ type NamespacedCertificateLister interface {
 }
 
 type NamespacedCertificateController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() NamespacedCertificateLister
 	AddHandler(name string, handler NamespacedCertificateHandlerFunc)
@@ -103,6 +104,10 @@ func (l *namespacedCertificateLister) Get(namespace, name string) (*NamespacedCe
 
 type namespacedCertificateController struct {
 	controller.GenericController
+}
+
+func (c *namespacedCertificateController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *namespacedCertificateController) Lister() NamespacedCertificateLister {

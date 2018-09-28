@@ -43,6 +43,7 @@ type BasicAuthLister interface {
 }
 
 type BasicAuthController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() BasicAuthLister
 	AddHandler(name string, handler BasicAuthHandlerFunc)
@@ -103,6 +104,10 @@ func (l *basicAuthLister) Get(namespace, name string) (*BasicAuth, error) {
 
 type basicAuthController struct {
 	controller.GenericController
+}
+
+func (c *basicAuthController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *basicAuthController) Lister() BasicAuthLister {

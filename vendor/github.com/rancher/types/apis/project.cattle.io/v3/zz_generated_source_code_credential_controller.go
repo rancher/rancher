@@ -43,6 +43,7 @@ type SourceCodeCredentialLister interface {
 }
 
 type SourceCodeCredentialController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() SourceCodeCredentialLister
 	AddHandler(name string, handler SourceCodeCredentialHandlerFunc)
@@ -103,6 +104,10 @@ func (l *sourceCodeCredentialLister) Get(namespace, name string) (*SourceCodeCre
 
 type sourceCodeCredentialController struct {
 	controller.GenericController
+}
+
+func (c *sourceCodeCredentialController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *sourceCodeCredentialController) Lister() SourceCodeCredentialLister {

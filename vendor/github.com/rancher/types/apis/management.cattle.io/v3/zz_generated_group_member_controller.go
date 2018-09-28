@@ -42,6 +42,7 @@ type GroupMemberLister interface {
 }
 
 type GroupMemberController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() GroupMemberLister
 	AddHandler(name string, handler GroupMemberHandlerFunc)
@@ -102,6 +103,10 @@ func (l *groupMemberLister) Get(namespace, name string) (*GroupMember, error) {
 
 type groupMemberController struct {
 	controller.GenericController
+}
+
+func (c *groupMemberController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *groupMemberController) Lister() GroupMemberLister {

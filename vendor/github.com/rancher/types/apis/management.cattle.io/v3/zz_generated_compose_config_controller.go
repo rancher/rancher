@@ -42,6 +42,7 @@ type ComposeConfigLister interface {
 }
 
 type ComposeConfigController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ComposeConfigLister
 	AddHandler(name string, handler ComposeConfigHandlerFunc)
@@ -102,6 +103,10 @@ func (l *composeConfigLister) Get(namespace, name string) (*ComposeConfig, error
 
 type composeConfigController struct {
 	controller.GenericController
+}
+
+func (c *composeConfigController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *composeConfigController) Lister() ComposeConfigLister {
