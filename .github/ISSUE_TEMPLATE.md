@@ -1,24 +1,39 @@
-**Rancher versions:**
-rancher/server or rancher/rancher:
-rancher/agent or rancher/rancher-agent:
+<!--
+Please search for existing issues first, then read https://rancher.com/docs/rancher/v2.x/en/contributing/#bugs-issues-or-questions to see what we expect in an issue
+For security issues, please email security@rancher.com instead of posting a public issue in GitHub. You may (but are not required to) use the GPG key located on Keybase.
+-->
 
-**Infrastructure Stack versions:**
-healthcheck:
-ipsec:
-network-services:
-scheduler:
-kubernetes (if applicable):
+**What kind of request is this (question/bug/enhancement/feature request):**
 
-**Docker version: (`docker version`,`docker info` preferred)**
 
-**Operating system and kernel: (`cat /etc/os-release`, `uname -r` preferred)**
+**Steps to reproduce (least amount of steps as possible):**
 
-**Type/provider of hosts: (VirtualBox/Bare-metal/AWS/GCE/DO)**
 
-**Setup details: (single node rancher vs. HA rancher, internal DB vs. external DB)**
+**Result:**
 
-**Environment Template: (Cattle/Kubernetes/Swarm/Mesos)**
 
-**Steps to Reproduce:**
+**Other details that may be helpful:**
 
-**Results:**
+
+**Environment information**
+- Rancher version (`rancher/rancher`/`rancher/server` image tag or shown bottom left in the UI):
+- Installation option (single install/HA):
+
+<!--
+If the reported issue is regarding a created cluster, please provide requested info below
+-->
+
+**Cluster information**
+- Cluster type (Hosted/Infrastructure Provider/Custom/Imported):
+- Machine type (cloud/VM/metal) and specifications (CPU/memory):
+- Kubernetes version (use `kubectl version`):
+
+```
+(paste the output here)
+```
+
+- Docker (use `docker info`):
+
+```
+(paste the output here)
+```
