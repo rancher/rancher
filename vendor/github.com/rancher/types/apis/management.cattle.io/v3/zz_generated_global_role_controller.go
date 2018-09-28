@@ -42,6 +42,7 @@ type GlobalRoleLister interface {
 }
 
 type GlobalRoleController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() GlobalRoleLister
 	AddHandler(name string, handler GlobalRoleHandlerFunc)
@@ -102,6 +103,10 @@ func (l *globalRoleLister) Get(namespace, name string) (*GlobalRole, error) {
 
 type globalRoleController struct {
 	controller.GenericController
+}
+
+func (c *globalRoleController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *globalRoleController) Lister() GlobalRoleLister {

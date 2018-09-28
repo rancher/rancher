@@ -42,6 +42,7 @@ type TemplateContentLister interface {
 }
 
 type TemplateContentController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() TemplateContentLister
 	AddHandler(name string, handler TemplateContentHandlerFunc)
@@ -102,6 +103,10 @@ func (l *templateContentLister) Get(namespace, name string) (*TemplateContent, e
 
 type templateContentController struct {
 	controller.GenericController
+}
+
+func (c *templateContentController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *templateContentController) Lister() TemplateContentLister {

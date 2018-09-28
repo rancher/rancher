@@ -43,6 +43,7 @@ type SSHAuthLister interface {
 }
 
 type SSHAuthController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() SSHAuthLister
 	AddHandler(name string, handler SSHAuthHandlerFunc)
@@ -103,6 +104,10 @@ func (l *sshAuthLister) Get(namespace, name string) (*SSHAuth, error) {
 
 type sshAuthController struct {
 	controller.GenericController
+}
+
+func (c *sshAuthController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *sshAuthController) Lister() SSHAuthLister {

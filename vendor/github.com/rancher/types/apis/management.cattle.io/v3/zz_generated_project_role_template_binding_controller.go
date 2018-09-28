@@ -43,6 +43,7 @@ type ProjectRoleTemplateBindingLister interface {
 }
 
 type ProjectRoleTemplateBindingController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ProjectRoleTemplateBindingLister
 	AddHandler(name string, handler ProjectRoleTemplateBindingHandlerFunc)
@@ -103,6 +104,10 @@ func (l *projectRoleTemplateBindingLister) Get(namespace, name string) (*Project
 
 type projectRoleTemplateBindingController struct {
 	controller.GenericController
+}
+
+func (c *projectRoleTemplateBindingController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *projectRoleTemplateBindingController) Lister() ProjectRoleTemplateBindingLister {

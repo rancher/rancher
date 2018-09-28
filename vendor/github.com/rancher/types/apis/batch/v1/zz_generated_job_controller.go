@@ -44,6 +44,7 @@ type JobLister interface {
 }
 
 type JobController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() JobLister
 	AddHandler(name string, handler JobHandlerFunc)
@@ -104,6 +105,10 @@ func (l *jobLister) Get(namespace, name string) (*v1.Job, error) {
 
 type jobController struct {
 	controller.GenericController
+}
+
+func (c *jobController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *jobController) Lister() JobLister {

@@ -43,6 +43,7 @@ type WorkloadLister interface {
 }
 
 type WorkloadController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() WorkloadLister
 	AddHandler(name string, handler WorkloadHandlerFunc)
@@ -103,6 +104,10 @@ func (l *workloadLister) Get(namespace, name string) (*Workload, error) {
 
 type workloadController struct {
 	controller.GenericController
+}
+
+func (c *workloadController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *workloadController) Lister() WorkloadLister {

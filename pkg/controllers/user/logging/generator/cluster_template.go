@@ -168,6 +168,7 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     {{ if .clusterTarget.SyslogConfig.Program }}
     program {{.clusterTarget.SyslogConfig.Program}}
     {{end -}}
+    packet_size 65535
     
     {{ if eq .clusterTarget.SyslogConfig.SSLVerify true}}
     verify_mode 1

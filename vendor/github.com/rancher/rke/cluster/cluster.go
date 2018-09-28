@@ -315,7 +315,20 @@ func (c *Cluster) deployAddons(ctx context.Context) error {
 	return nil
 }
 
-func (c *Cluster) SyncLabelsAndTaints(ctx context.Context) error {
+func (c *Cluster) SyncLabelsAndTaints(ctx context.Context, currentCluster *Cluster) error {
+	// Handle issue when deleting all controlplane nodes https://github.com/rancher/rancher/issues/15810
+	if currentCluster != nil {
+		cpToDelete := hosts.GetToDeleteHosts(currentCluster.ControlPlaneHosts, c.ControlPlaneHosts, c.InactiveHosts)
+		if len(cpToDelete) == len(currentCluster.ControlPlaneHosts) {
+			log.Infof(ctx, "[sync] Cleaning left control plane nodes from reconcilation")
+			for _, toDeleteHost := range cpToDelete {
+				if err := cleanControlNode(ctx, c, currentCluster, toDeleteHost); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
 	if len(c.ControlPlaneHosts) > 0 {
 		log.Infof(ctx, "[sync] Syncing nodes Labels and Taints")
 		k8sClient, err := k8s.NewClient(c.LocalKubeConfigPath, c.K8sWrapTransport)

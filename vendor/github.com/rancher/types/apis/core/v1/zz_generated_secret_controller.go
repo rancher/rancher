@@ -44,6 +44,7 @@ type SecretLister interface {
 }
 
 type SecretController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() SecretLister
 	AddHandler(name string, handler SecretHandlerFunc)
@@ -104,6 +105,10 @@ func (l *secretLister) Get(namespace, name string) (*v1.Secret, error) {
 
 type secretController struct {
 	controller.GenericController
+}
+
+func (c *secretController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *secretController) Lister() SecretLister {

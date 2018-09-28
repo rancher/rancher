@@ -43,6 +43,7 @@ type SourceCodeProviderConfigLister interface {
 }
 
 type SourceCodeProviderConfigController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() SourceCodeProviderConfigLister
 	AddHandler(name string, handler SourceCodeProviderConfigHandlerFunc)
@@ -103,6 +104,10 @@ func (l *sourceCodeProviderConfigLister) Get(namespace, name string) (*SourceCod
 
 type sourceCodeProviderConfigController struct {
 	controller.GenericController
+}
+
+func (c *sourceCodeProviderConfigController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *sourceCodeProviderConfigController) Lister() SourceCodeProviderConfigLister {

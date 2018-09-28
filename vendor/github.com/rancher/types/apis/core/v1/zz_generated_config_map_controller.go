@@ -44,6 +44,7 @@ type ConfigMapLister interface {
 }
 
 type ConfigMapController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ConfigMapLister
 	AddHandler(name string, handler ConfigMapHandlerFunc)
@@ -104,6 +105,10 @@ func (l *configMapLister) Get(namespace, name string) (*v1.ConfigMap, error) {
 
 type configMapController struct {
 	controller.GenericController
+}
+
+func (c *configMapController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *configMapController) Lister() ConfigMapLister {

@@ -42,6 +42,7 @@ type CatalogLister interface {
 }
 
 type CatalogController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() CatalogLister
 	AddHandler(name string, handler CatalogHandlerFunc)
@@ -102,6 +103,10 @@ func (l *catalogLister) Get(namespace, name string) (*Catalog, error) {
 
 type catalogController struct {
 	controller.GenericController
+}
+
+func (c *catalogController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *catalogController) Lister() CatalogLister {

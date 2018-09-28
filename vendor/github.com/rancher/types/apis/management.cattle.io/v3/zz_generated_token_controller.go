@@ -42,6 +42,7 @@ type TokenLister interface {
 }
 
 type TokenController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() TokenLister
 	AddHandler(name string, handler TokenHandlerFunc)
@@ -102,6 +103,10 @@ func (l *tokenLister) Get(namespace, name string) (*Token, error) {
 
 type tokenController struct {
 	controller.GenericController
+}
+
+func (c *tokenController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *tokenController) Lister() TokenLister {

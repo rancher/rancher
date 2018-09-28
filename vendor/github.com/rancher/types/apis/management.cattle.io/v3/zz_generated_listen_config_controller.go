@@ -42,6 +42,7 @@ type ListenConfigLister interface {
 }
 
 type ListenConfigController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ListenConfigLister
 	AddHandler(name string, handler ListenConfigHandlerFunc)
@@ -102,6 +103,10 @@ func (l *listenConfigLister) Get(namespace, name string) (*ListenConfig, error) 
 
 type listenConfigController struct {
 	controller.GenericController
+}
+
+func (c *listenConfigController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *listenConfigController) Lister() ListenConfigLister {

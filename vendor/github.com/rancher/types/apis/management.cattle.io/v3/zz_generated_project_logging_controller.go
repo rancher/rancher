@@ -43,6 +43,7 @@ type ProjectLoggingLister interface {
 }
 
 type ProjectLoggingController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ProjectLoggingLister
 	AddHandler(name string, handler ProjectLoggingHandlerFunc)
@@ -103,6 +104,10 @@ func (l *projectLoggingLister) Get(namespace, name string) (*ProjectLogging, err
 
 type projectLoggingController struct {
 	controller.GenericController
+}
+
+func (c *projectLoggingController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *projectLoggingController) Lister() ProjectLoggingLister {

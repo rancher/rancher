@@ -43,6 +43,7 @@ type ComponentStatusLister interface {
 }
 
 type ComponentStatusController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ComponentStatusLister
 	AddHandler(name string, handler ComponentStatusHandlerFunc)
@@ -103,6 +104,10 @@ func (l *componentStatusLister) Get(namespace, name string) (*v1.ComponentStatus
 
 type componentStatusController struct {
 	controller.GenericController
+}
+
+func (c *componentStatusController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *componentStatusController) Lister() ComponentStatusLister {

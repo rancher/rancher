@@ -343,7 +343,7 @@ func (m *Manager) SendAlert(labels map[string]string) error {
 		return err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, url+"/api/alerts", bytes.NewBuffer(alertData))
+	req, err := http.NewRequest(http.MethodPost, url+"/api/v1/alerts", bytes.NewBuffer(alertData))
 	if err != nil {
 		return err
 	}
@@ -354,9 +354,13 @@ func (m *Manager) SendAlert(labels map[string]string) error {
 	}
 	defer resp.Body.Close()
 
-	_, err = ioutil.ReadAll(resp.Body)
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("alertmanager response is %d, body: %s", resp.StatusCode, string(body))
 	}
 
 	return nil

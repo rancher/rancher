@@ -43,6 +43,7 @@ type SourceCodeRepositoryLister interface {
 }
 
 type SourceCodeRepositoryController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() SourceCodeRepositoryLister
 	AddHandler(name string, handler SourceCodeRepositoryHandlerFunc)
@@ -103,6 +104,10 @@ func (l *sourceCodeRepositoryLister) Get(namespace, name string) (*SourceCodeRep
 
 type sourceCodeRepositoryController struct {
 	controller.GenericController
+}
+
+func (c *sourceCodeRepositoryController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *sourceCodeRepositoryController) Lister() SourceCodeRepositoryLister {

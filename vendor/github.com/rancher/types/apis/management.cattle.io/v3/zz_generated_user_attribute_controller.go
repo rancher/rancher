@@ -42,6 +42,7 @@ type UserAttributeLister interface {
 }
 
 type UserAttributeController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() UserAttributeLister
 	AddHandler(name string, handler UserAttributeHandlerFunc)
@@ -102,6 +103,10 @@ func (l *userAttributeLister) Get(namespace, name string) (*UserAttribute, error
 
 type userAttributeController struct {
 	controller.GenericController
+}
+
+func (c *userAttributeController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *userAttributeController) Lister() UserAttributeLister {

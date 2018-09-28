@@ -44,6 +44,7 @@ type NetworkPolicyLister interface {
 }
 
 type NetworkPolicyController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() NetworkPolicyLister
 	AddHandler(name string, handler NetworkPolicyHandlerFunc)
@@ -104,6 +105,10 @@ func (l *networkPolicyLister) Get(namespace, name string) (*v1.NetworkPolicy, er
 
 type networkPolicyController struct {
 	controller.GenericController
+}
+
+func (c *networkPolicyController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *networkPolicyController) Lister() NetworkPolicyLister {

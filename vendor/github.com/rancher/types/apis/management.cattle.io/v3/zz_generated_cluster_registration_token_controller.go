@@ -43,6 +43,7 @@ type ClusterRegistrationTokenLister interface {
 }
 
 type ClusterRegistrationTokenController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ClusterRegistrationTokenLister
 	AddHandler(name string, handler ClusterRegistrationTokenHandlerFunc)
@@ -103,6 +104,10 @@ func (l *clusterRegistrationTokenLister) Get(namespace, name string) (*ClusterRe
 
 type clusterRegistrationTokenController struct {
 	controller.GenericController
+}
+
+func (c *clusterRegistrationTokenController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *clusterRegistrationTokenController) Lister() ClusterRegistrationTokenLister {

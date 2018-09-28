@@ -43,6 +43,7 @@ type PodSecurityPolicyTemplateProjectBindingLister interface {
 }
 
 type PodSecurityPolicyTemplateProjectBindingController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() PodSecurityPolicyTemplateProjectBindingLister
 	AddHandler(name string, handler PodSecurityPolicyTemplateProjectBindingHandlerFunc)
@@ -103,6 +104,10 @@ func (l *podSecurityPolicyTemplateProjectBindingLister) Get(namespace, name stri
 
 type podSecurityPolicyTemplateProjectBindingController struct {
 	controller.GenericController
+}
+
+func (c *podSecurityPolicyTemplateProjectBindingController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *podSecurityPolicyTemplateProjectBindingController) Lister() PodSecurityPolicyTemplateProjectBindingLister {

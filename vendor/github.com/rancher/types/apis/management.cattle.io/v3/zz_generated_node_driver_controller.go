@@ -42,6 +42,7 @@ type NodeDriverLister interface {
 }
 
 type NodeDriverController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() NodeDriverLister
 	AddHandler(name string, handler NodeDriverHandlerFunc)
@@ -102,6 +103,10 @@ func (l *nodeDriverLister) Get(namespace, name string) (*NodeDriver, error) {
 
 type nodeDriverController struct {
 	controller.GenericController
+}
+
+func (c *nodeDriverController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *nodeDriverController) Lister() NodeDriverLister {

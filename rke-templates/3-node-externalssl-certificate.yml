@@ -14,7 +14,7 @@ nodes:
 
 services:
   etcd:
-    backup: true
+    snapshot: true
     creation: 6h
     retention: 24h
 

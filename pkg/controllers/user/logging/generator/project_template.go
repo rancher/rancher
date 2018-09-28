@@ -152,6 +152,7 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
     {{ if $store.SyslogConfig.Program }}
     program {{$store.SyslogConfig.Program}}
     {{end -}}
+    packet_size 65535
 
     {{ if eq $store.SyslogConfig.SSLVerify true}}
     verify_mode 1

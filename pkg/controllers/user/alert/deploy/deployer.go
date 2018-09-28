@@ -208,7 +208,7 @@ func GetDeployment() *appsv1beta2.Deployment {
 						{
 							Name:  "alertmanager",
 							Image: image.Resolve(v3.ToolsSystemImages.AlertSystemImages.AlertManager),
-							Args:  []string{"-config.file=/etc/alertmanager/config.yml", "-storage.path=/alertmanager"},
+							Args:  []string{"--config.file=/etc/alertmanager/config.yml", "--storage.path=/alertmanager"},
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "alertmanager",

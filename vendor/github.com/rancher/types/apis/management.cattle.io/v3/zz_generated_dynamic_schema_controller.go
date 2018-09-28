@@ -42,6 +42,7 @@ type DynamicSchemaLister interface {
 }
 
 type DynamicSchemaController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() DynamicSchemaLister
 	AddHandler(name string, handler DynamicSchemaHandlerFunc)
@@ -102,6 +103,10 @@ func (l *dynamicSchemaLister) Get(namespace, name string) (*DynamicSchema, error
 
 type dynamicSchemaController struct {
 	controller.GenericController
+}
+
+func (c *dynamicSchemaController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *dynamicSchemaController) Lister() DynamicSchemaLister {

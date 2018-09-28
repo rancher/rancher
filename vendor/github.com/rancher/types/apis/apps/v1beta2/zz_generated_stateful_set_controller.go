@@ -44,6 +44,7 @@ type StatefulSetLister interface {
 }
 
 type StatefulSetController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() StatefulSetLister
 	AddHandler(name string, handler StatefulSetHandlerFunc)
@@ -104,6 +105,10 @@ func (l *statefulSetLister) Get(namespace, name string) (*v1beta2.StatefulSet, e
 
 type statefulSetController struct {
 	controller.GenericController
+}
+
+func (c *statefulSetController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *statefulSetController) Lister() StatefulSetLister {

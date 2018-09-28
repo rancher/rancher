@@ -43,6 +43,7 @@ type NamespacedBasicAuthLister interface {
 }
 
 type NamespacedBasicAuthController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() NamespacedBasicAuthLister
 	AddHandler(name string, handler NamespacedBasicAuthHandlerFunc)
@@ -103,6 +104,10 @@ func (l *namespacedBasicAuthLister) Get(namespace, name string) (*NamespacedBasi
 
 type namespacedBasicAuthController struct {
 	controller.GenericController
+}
+
+func (c *namespacedBasicAuthController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *namespacedBasicAuthController) Lister() NamespacedBasicAuthLister {
