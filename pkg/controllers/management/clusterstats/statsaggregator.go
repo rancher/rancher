@@ -127,22 +127,32 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 		v3.ClusterConditionNoMemoryPressure.False(cluster)
 	}
 
-	if statsChanged(origStatus, &cluster.Status) {
-		userContext, err := s.ClusterManager.UserContext(cluster.Name)
-		if err == nil {
-			callWithTimeout(func() {
-				// This has the tendency to timeout
-				version, err := userContext.K8sClient.Discovery().ServerVersion()
-				if err == nil {
-					cluster.Status.Version = version
-				}
-			})
-		}
+	versionChanged := s.updateVersion(cluster)
+
+	if statsChanged(origStatus, &cluster.Status) || versionChanged {
 		_, err = s.Clusters.Update(cluster)
 		return err
 	}
 
 	return nil
+}
+
+func (s *StatsAggregator) updateVersion(cluster *v3.Cluster) bool {
+	updated := false
+	userContext, err := s.ClusterManager.UserContext(cluster.Name)
+	if err == nil {
+		callWithTimeout(func() {
+			// This has the tendency to timeout
+			version, err := userContext.K8sClient.Discovery().ServerVersion()
+			if err == nil {
+				if cluster.Status.Version != version {
+					cluster.Status.Version = version
+					updated = true
+				}
+			}
+		})
+	}
+	return updated
 }
 
 func statsChanged(existingCluster, newCluster *v3.ClusterStatus) bool {
