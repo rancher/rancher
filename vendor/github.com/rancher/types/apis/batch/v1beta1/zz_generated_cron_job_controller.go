@@ -44,6 +44,7 @@ type CronJobLister interface {
 }
 
 type CronJobController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() CronJobLister
 	AddHandler(name string, handler CronJobHandlerFunc)
@@ -104,6 +105,10 @@ func (l *cronJobLister) Get(namespace, name string) (*v1beta1.CronJob, error) {
 
 type cronJobController struct {
 	controller.GenericController
+}
+
+func (c *cronJobController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *cronJobController) Lister() CronJobLister {

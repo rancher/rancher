@@ -44,6 +44,7 @@ type PodLister interface {
 }
 
 type PodController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() PodLister
 	AddHandler(name string, handler PodHandlerFunc)
@@ -104,6 +105,10 @@ func (l *podLister) Get(namespace, name string) (*v1.Pod, error) {
 
 type podController struct {
 	controller.GenericController
+}
+
+func (c *podController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *podController) Lister() PodLister {

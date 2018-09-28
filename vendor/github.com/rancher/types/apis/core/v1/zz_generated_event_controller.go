@@ -43,6 +43,7 @@ type EventLister interface {
 }
 
 type EventController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() EventLister
 	AddHandler(name string, handler EventHandlerFunc)
@@ -103,6 +104,10 @@ func (l *eventLister) Get(namespace, name string) (*v1.Event, error) {
 
 type eventController struct {
 	controller.GenericController
+}
+
+func (c *eventController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *eventController) Lister() EventLister {

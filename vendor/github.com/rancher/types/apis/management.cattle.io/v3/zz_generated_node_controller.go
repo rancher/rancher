@@ -43,6 +43,7 @@ type NodeLister interface {
 }
 
 type NodeController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() NodeLister
 	AddHandler(name string, handler NodeHandlerFunc)
@@ -103,6 +104,10 @@ func (l *nodeLister) Get(namespace, name string) (*Node, error) {
 
 type nodeController struct {
 	controller.GenericController
+}
+
+func (c *nodeController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *nodeController) Lister() NodeLister {

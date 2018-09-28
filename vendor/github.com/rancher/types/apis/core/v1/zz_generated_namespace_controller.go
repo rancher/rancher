@@ -43,6 +43,7 @@ type NamespaceLister interface {
 }
 
 type NamespaceController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() NamespaceLister
 	AddHandler(name string, handler NamespaceHandlerFunc)
@@ -103,6 +104,10 @@ func (l *namespaceLister) Get(namespace, name string) (*v1.Namespace, error) {
 
 type namespaceController struct {
 	controller.GenericController
+}
+
+func (c *namespaceController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *namespaceController) Lister() NamespaceLister {

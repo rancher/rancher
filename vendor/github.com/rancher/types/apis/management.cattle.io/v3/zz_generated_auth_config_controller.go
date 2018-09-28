@@ -42,6 +42,7 @@ type AuthConfigLister interface {
 }
 
 type AuthConfigController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() AuthConfigLister
 	AddHandler(name string, handler AuthConfigHandlerFunc)
@@ -102,6 +103,10 @@ func (l *authConfigLister) Get(namespace, name string) (*AuthConfig, error) {
 
 type authConfigController struct {
 	controller.GenericController
+}
+
+func (c *authConfigController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *authConfigController) Lister() AuthConfigLister {

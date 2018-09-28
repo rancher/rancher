@@ -1,32 +1,19 @@
-FROM ubuntu:16.04
-# FROM arm=armhf/ubuntu:16.04
+FROM golang:1.11-alpine
 
-ARG DAPPER_HOST_ARCH
-ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
+RUN apk -U add bash git gcc musl-dev docker vim less file curl wget ca-certificates
+RUN go get -d golang.org/x/lint/golint && \
+    git -C /go/src/golang.org/x/lint/golint checkout -b current 06c8688daad7faa9da5a0c2f163a3d14aac986ca && \
+    go install golang.org/x/lint/golint && \
+    rm -rf /go/src /go/pkg
+RUN go get -d golang.org/x/tools/cmd/goimports && \
+    git -C /go/src/golang.org/x/tools/cmd/goimports checkout -b current 0b24b358f4c7eaa92895f67a3f6cea2a0cf525d5 && \
+    go install golang.org/x/tools/cmd/goimports && \
+    rm -rf /go/src /go/pkg
 
-RUN apt-get update && \
-    apt-get install -y gcc ca-certificates git wget curl vim less file && \
-    rm -f /bin/sh && ln -s /bin/bash /bin/sh
-
-ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH=GOLANG_ARCH_${ARCH} \
-    GOPATH=/go PATH=/go/bin:/usr/local/go/bin:${PATH} SHELL=/bin/bash
-
-RUN wget -O - https://storage.googleapis.com/golang/go1.8.3.linux-${!GOLANG_ARCH}.tar.gz | tar -xzf - -C /usr/local && \
-    go get github.com/rancher/trash && \
-    go get github.com/golang/lint/golint && \
-    go get golang.org/x/tools/cmd/goimports
-
-ENV DOCKER_URL_amd64=https://get.docker.com/builds/Linux/x86_64/docker-1.10.3 \
-    DOCKER_URL_arm=https://github.com/rancher/docker/releases/download/v1.10.3-ros1/docker-1.10.3_arm \
-    DOCKER_URL=DOCKER_URL_${ARCH}
-
-RUN wget -O - ${!DOCKER_URL} > /usr/bin/docker && chmod +x /usr/bin/docker
-
-ENV DAPPER_ENV REPO TAG
+ENV DAPPER_ENV REPO TAG DRONE_TAG
 ENV DAPPER_SOURCE /go/src/github.com/rancher/types/
 ENV DAPPER_OUTPUT ./bin ./dist
 ENV DAPPER_DOCKER_SOCKET true
-ENV TRASH_CACHE ${DAPPER_SOURCE}/.trash-cache
 ENV HOME ${DAPPER_SOURCE}
 WORKDIR ${DAPPER_SOURCE}
 

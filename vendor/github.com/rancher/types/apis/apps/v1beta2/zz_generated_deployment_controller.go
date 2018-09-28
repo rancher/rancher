@@ -44,6 +44,7 @@ type DeploymentLister interface {
 }
 
 type DeploymentController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() DeploymentLister
 	AddHandler(name string, handler DeploymentHandlerFunc)
@@ -104,6 +105,10 @@ func (l *deploymentLister) Get(namespace, name string) (*v1beta2.Deployment, err
 
 type deploymentController struct {
 	controller.GenericController
+}
+
+func (c *deploymentController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *deploymentController) Lister() DeploymentLister {

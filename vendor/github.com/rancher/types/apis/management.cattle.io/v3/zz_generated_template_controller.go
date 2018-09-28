@@ -42,6 +42,7 @@ type TemplateLister interface {
 }
 
 type TemplateController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() TemplateLister
 	AddHandler(name string, handler TemplateHandlerFunc)
@@ -102,6 +103,10 @@ func (l *templateLister) Get(namespace, name string) (*Template, error) {
 
 type templateController struct {
 	controller.GenericController
+}
+
+func (c *templateController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *templateController) Lister() TemplateLister {

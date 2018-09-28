@@ -43,6 +43,7 @@ type CertificateLister interface {
 }
 
 type CertificateController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() CertificateLister
 	AddHandler(name string, handler CertificateHandlerFunc)
@@ -103,6 +104,10 @@ func (l *certificateLister) Get(namespace, name string) (*Certificate, error) {
 
 type certificateController struct {
 	controller.GenericController
+}
+
+func (c *certificateController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *certificateController) Lister() CertificateLister {

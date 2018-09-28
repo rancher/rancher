@@ -43,6 +43,7 @@ type PreferenceLister interface {
 }
 
 type PreferenceController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() PreferenceLister
 	AddHandler(name string, handler PreferenceHandlerFunc)
@@ -103,6 +104,10 @@ func (l *preferenceLister) Get(namespace, name string) (*Preference, error) {
 
 type preferenceController struct {
 	controller.GenericController
+}
+
+func (c *preferenceController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *preferenceController) Lister() PreferenceLister {

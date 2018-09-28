@@ -44,6 +44,7 @@ type EndpointsLister interface {
 }
 
 type EndpointsController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() EndpointsLister
 	AddHandler(name string, handler EndpointsHandlerFunc)
@@ -104,6 +105,10 @@ func (l *endpointsLister) Get(namespace, name string) (*v1.Endpoints, error) {
 
 type endpointsController struct {
 	controller.GenericController
+}
+
+func (c *endpointsController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *endpointsController) Lister() EndpointsLister {

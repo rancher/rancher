@@ -43,6 +43,7 @@ type PipelineLister interface {
 }
 
 type PipelineController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() PipelineLister
 	AddHandler(name string, handler PipelineHandlerFunc)
@@ -103,6 +104,10 @@ func (l *pipelineLister) Get(namespace, name string) (*Pipeline, error) {
 
 type pipelineController struct {
 	controller.GenericController
+}
+
+func (c *pipelineController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *pipelineController) Lister() PipelineLister {

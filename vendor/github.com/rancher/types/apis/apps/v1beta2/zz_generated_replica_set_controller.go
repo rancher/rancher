@@ -44,6 +44,7 @@ type ReplicaSetLister interface {
 }
 
 type ReplicaSetController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ReplicaSetLister
 	AddHandler(name string, handler ReplicaSetHandlerFunc)
@@ -104,6 +105,10 @@ func (l *replicaSetLister) Get(namespace, name string) (*v1beta2.ReplicaSet, err
 
 type replicaSetController struct {
 	controller.GenericController
+}
+
+func (c *replicaSetController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *replicaSetController) Lister() ReplicaSetLister {

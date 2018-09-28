@@ -43,6 +43,7 @@ type NamespacedSSHAuthLister interface {
 }
 
 type NamespacedSSHAuthController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() NamespacedSSHAuthLister
 	AddHandler(name string, handler NamespacedSSHAuthHandlerFunc)
@@ -103,6 +104,10 @@ func (l *namespacedSshAuthLister) Get(namespace, name string) (*NamespacedSSHAut
 
 type namespacedSshAuthController struct {
 	controller.GenericController
+}
+
+func (c *namespacedSshAuthController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *namespacedSshAuthController) Lister() NamespacedSSHAuthLister {

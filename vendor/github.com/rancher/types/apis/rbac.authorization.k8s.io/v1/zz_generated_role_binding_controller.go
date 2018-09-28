@@ -44,6 +44,7 @@ type RoleBindingLister interface {
 }
 
 type RoleBindingController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() RoleBindingLister
 	AddHandler(name string, handler RoleBindingHandlerFunc)
@@ -104,6 +105,10 @@ func (l *roleBindingLister) Get(namespace, name string) (*v1.RoleBinding, error)
 
 type roleBindingController struct {
 	controller.GenericController
+}
+
+func (c *roleBindingController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *roleBindingController) Lister() RoleBindingLister {

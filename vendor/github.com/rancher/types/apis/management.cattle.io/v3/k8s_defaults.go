@@ -61,7 +61,7 @@ var (
 		LoggingSystemImages  LoggingSystemImages
 	}{
 		AlertSystemImages: AlertSystemImages{
-			AlertManager:       m("prom/alertmanager:v0.11.0"),
+			AlertManager:       m("prom/alertmanager:v0.15.2"),
 			AlertManagerHelper: m("rancher/alertmanager-helper:v0.0.2"),
 		},
 		PipelineSystemImages: projectv3.PipelineSystemImages{

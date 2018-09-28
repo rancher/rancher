@@ -44,6 +44,7 @@ type DaemonSetLister interface {
 }
 
 type DaemonSetController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() DaemonSetLister
 	AddHandler(name string, handler DaemonSetHandlerFunc)
@@ -104,6 +105,10 @@ func (l *daemonSetLister) Get(namespace, name string) (*v1beta2.DaemonSet, error
 
 type daemonSetController struct {
 	controller.GenericController
+}
+
+func (c *daemonSetController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *daemonSetController) Lister() DaemonSetLister {

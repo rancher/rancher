@@ -42,6 +42,7 @@ type LdapConfigLister interface {
 }
 
 type LdapConfigController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() LdapConfigLister
 	AddHandler(name string, handler LdapConfigHandlerFunc)
@@ -102,6 +103,10 @@ func (l *ldapConfigLister) Get(namespace, name string) (*LdapConfig, error) {
 
 type ldapConfigController struct {
 	controller.GenericController
+}
+
+func (c *ldapConfigController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *ldapConfigController) Lister() LdapConfigLister {

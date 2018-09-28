@@ -342,7 +342,7 @@ type PipelineSystemImages struct {
 
 type GithubPipelineConfigApplyInput struct {
 	InheritAuth  bool                 `json:"inheritAuth,omitempty"`
-	GithubConfig GithubPipelineConfig `json:"githubConfig, omitempty"`
+	GithubConfig GithubPipelineConfig `json:"githubConfig,omitempty"`
 	Code         string               `json:"code,omitempty"`
 }
 
@@ -351,7 +351,7 @@ type GithubLoginInput struct {
 }
 
 type GitlabPipelineConfigApplyInput struct {
-	GitlabConfig GitlabPipelineConfig `json:"gitlabConfig, omitempty"`
+	GitlabConfig GitlabPipelineConfig `json:"gitlabConfig,omitempty"`
 	Code         string               `json:"code,omitempty"`
 }
 

@@ -44,6 +44,7 @@ type ServiceAccountLister interface {
 }
 
 type ServiceAccountController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ServiceAccountLister
 	AddHandler(name string, handler ServiceAccountHandlerFunc)
@@ -104,6 +105,10 @@ func (l *serviceAccountLister) Get(namespace, name string) (*v1.ServiceAccount, 
 
 type serviceAccountController struct {
 	controller.GenericController
+}
+
+func (c *serviceAccountController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *serviceAccountController) Lister() ServiceAccountLister {

@@ -43,6 +43,7 @@ type ClusterEventLister interface {
 }
 
 type ClusterEventController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ClusterEventLister
 	AddHandler(name string, handler ClusterEventHandlerFunc)
@@ -103,6 +104,10 @@ func (l *clusterEventLister) Get(namespace, name string) (*ClusterEvent, error) 
 
 type clusterEventController struct {
 	controller.GenericController
+}
+
+func (c *clusterEventController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *clusterEventController) Lister() ClusterEventLister {

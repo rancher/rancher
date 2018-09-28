@@ -43,6 +43,7 @@ type ClusterRoleBindingLister interface {
 }
 
 type ClusterRoleBindingController interface {
+	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ClusterRoleBindingLister
 	AddHandler(name string, handler ClusterRoleBindingHandlerFunc)
@@ -103,6 +104,10 @@ func (l *clusterRoleBindingLister) Get(namespace, name string) (*v1.ClusterRoleB
 
 type clusterRoleBindingController struct {
 	controller.GenericController
+}
+
+func (c *clusterRoleBindingController) Generic() controller.GenericController {
+	return c.GenericController
 }
 
 func (c *clusterRoleBindingController) Lister() ClusterRoleBindingLister {
