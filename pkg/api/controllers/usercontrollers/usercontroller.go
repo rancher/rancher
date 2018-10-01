@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/types/config"
 	tpeermanager "github.com/rancher/types/peermanager"
 	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -22,6 +23,7 @@ func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterM
 	u := &userControllersController{
 		manager:       clusterManager,
 		clusterLister: scaledContext.Management.Clusters("").Controller().Lister(),
+		clusters:      scaledContext.Management.Clusters(""),
 		clustered:     scaledContext.PeerManager != nil,
 		ctx:           ctx,
 		start:         time.Now(),
@@ -67,12 +69,19 @@ type userControllersController struct {
 	clustered     bool
 	manager       *clustermanager.Manager
 	clusterLister v3.ClusterLister
+	clusters      v3.ClusterInterface
 	ctx           context.Context
 	peers         tpeermanager.Peers
 	start         time.Time
 }
 
 func (u *userControllersController) sync(key string, cluster *v3.Cluster) error {
+	if cluster != nil && cluster.DeletionTimestamp != nil {
+		err := u.cleanFinalizers(key, cluster)
+		if err != nil {
+			return err
+		}
+	}
 	return u.setPeers(nil)
 }
 
@@ -134,4 +143,30 @@ func (u *userControllersController) amOwner(peers tpeermanager.Peers, cluster *v
 	logrus.Debugf("%s(%v): (%v * %v) / %v = %v[%v] = %v, self = %v\n", cluster.Name, cluster.UID, ck,
 		uint32(len(peers.IDs)), math.MaxUint32, peers.IDs, scaled, peers.IDs[scaled], peers.SelfID)
 	return peers.IDs[scaled] == peers.SelfID
+}
+
+func (u *userControllersController) cleanFinalizers(key string, cluster *v3.Cluster) error {
+	c, err := u.clusters.Get(key, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	var updated bool
+	var newFinalizers []string
+
+	for _, finalizer := range c.ObjectMeta.Finalizers {
+		if finalizer == "controller.cattle.io/cluster-agent-controller" {
+			updated = true
+			continue
+		}
+		newFinalizers = append(newFinalizers, finalizer)
+	}
+
+	if updated {
+		c.ObjectMeta.Finalizers = newFinalizers
+		_, err = u.clusters.Update(c)
+		return err
+	}
+
+	return nil
 }
