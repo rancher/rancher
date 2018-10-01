@@ -145,7 +145,10 @@ func (s *StatsAggregator) updateVersion(cluster *v3.Cluster) bool {
 			// This has the tendency to timeout
 			version, err := userContext.K8sClient.Discovery().ServerVersion()
 			if err == nil {
-				if cluster.Status.Version != version {
+				isClusterVersionOk := cluster.Status.Version != nil
+				isNewVersionOk := version != nil
+				if isClusterVersionOk != isNewVersionOk ||
+					(isClusterVersionOk && *cluster.Status.Version != *version) {
 					cluster.Status.Version = version
 					updated = true
 				}
