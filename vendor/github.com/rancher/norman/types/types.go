@@ -68,6 +68,17 @@ type Resource struct {
 	Actions map[string]string `json:"actions"`
 }
 
+type NamedResource struct {
+	Resource
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+type NamedResourceCollection struct {
+	Collection
+	Data []NamedResource `json:"data,omitempty"`
+}
+
 type APIVersion struct {
 	Group            string `json:"group,omitempty"`
 	Version          string `json:"version,omitempty"`
@@ -136,6 +147,7 @@ type Field struct {
 	InvalidChars string      `json:"invalidChars,omitempty"`
 	Description  string      `json:"description,omitempty"`
 	CodeName     string      `json:"-"`
+	DynamicField bool        `json:"dynamicField,omitempty"`
 }
 
 type Action struct {

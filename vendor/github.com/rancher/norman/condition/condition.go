@@ -89,9 +89,16 @@ func (c Cond) ReasonAndMessageFromError(obj runtime.Object, err error) {
 	}
 	cond := findOrCreateCond(obj, string(c))
 	setValue(cond, "Message", err.Error())
-	if ce, ok := err.(*conditionError); ok {
+	switch ce := err.(type) {
+	case *conditionError:
 		setValue(cond, "Reason", ce.reason)
-	} else {
+	case *controller.ForgetError:
+		if ce.Reason != "" {
+			setValue(cond, "Reason", ce.Reason)
+		} else {
+			setValue(cond, "Reason", "Error")
+		}
+	default:
 		setValue(cond, "Reason", "Error")
 	}
 }

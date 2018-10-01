@@ -188,6 +188,15 @@ func (in *AmazonElasticContainerServiceConfig) DeepCopyInto(out *AmazonElasticCo
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.AssociateWorkerNodePublicIP != nil {
+		in, out := &in.AssociateWorkerNodePublicIP, &out.AssociateWorkerNodePublicIP
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(bool)
+			**out = **in
+		}
+	}
 	return
 }
 
