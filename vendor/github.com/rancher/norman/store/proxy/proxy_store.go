@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/rancher/norman/httperror"
+	"github.com/rancher/norman/objectclient/dynamic"
 	"github.com/rancher/norman/pkg/broadcast"
 	"github.com/rancher/norman/restwatch"
 	"github.com/rancher/norman/types"
@@ -25,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	restclientwatch "k8s.io/client-go/rest/watch"
 )
@@ -52,8 +52,7 @@ type simpleClientGetter struct {
 func NewClientGetterFromConfig(config rest.Config) (ClientGetter, error) {
 	dynamicConfig := config
 	if dynamicConfig.NegotiatedSerializer == nil {
-		configConfig := dynamic.ContentConfig()
-		dynamicConfig.NegotiatedSerializer = configConfig.NegotiatedSerializer
+		dynamicConfig.NegotiatedSerializer = dynamic.NegotiatedSerializer
 	}
 
 	unversionedClient, err := rest.UnversionedRESTClientFor(&dynamicConfig)
@@ -232,7 +231,7 @@ func (s *Store) realWatch(apiContext *types.APIContext, schema *types.Schema, op
 		Watch:           true,
 		TimeoutSeconds:  &timeout,
 		ResourceVersion: "0",
-	}, dynamic.VersionedParameterEncoderWithV1Fallback)
+	}, metav1.ParameterCodec)
 
 	body, err := req.Stream()
 	if err != nil {

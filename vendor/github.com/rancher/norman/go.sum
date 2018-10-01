@@ -22,7 +22,9 @@ github.com/gorilla/websocket v0.0.0-20150714140627-6eb6ad425a89 h1:f3M+RTnIGEhCF
 github.com/gorilla/websocket v0.0.0-20150714140627-6eb6ad425a89/go.mod h1:E7qHFY5m1UJ88s3WnNqhKjPHQ0heANvMoAMk2YaljkQ=
 github.com/hashicorp/golang-lru v0.0.0-20160207214719-a0d98a5f2880 h1:OaRuzt9oCKNui8cCskZijoKUwe+aCuuCwvx1ox8FNyw=
 github.com/hashicorp/golang-lru v0.0.0-20160207214719-a0d98a5f2880/go.mod h1:/m3WP610KZHVQ1SGc6re/UDhFvYD7pJ4Ao+sR/qLZy8=
+github.com/howeyc/gopass v0.0.0-20170109162249-bf9dde6d0d2c h1:kQWxfPIHVLbgLzphqk3QUflDy9QdksZR4ygR807bpy0=
 github.com/howeyc/gopass v0.0.0-20170109162249-bf9dde6d0d2c/go.mod h1:lADxMC39cJJqL93Duh1xhAs4I2Zs8mKS89XWXFGp9cs=
+github.com/imdario/mergo v0.0.0-20141206190957-6633656539c1 h1:FeeCi0I2Fu8kA8IXrdVPtGzym+mW9bzfj9f26EaES9k=
 github.com/imdario/mergo v0.0.0-20141206190957-6633656539c1/go.mod h1:2EnlNZ0deacrJVfApfmtdGgDfMuh/nq6Ok1EcJh5FfA=
 github.com/json-iterator/go v0.0.0-20180612202835-f2b4162afba3 h1:/UewZcckqhvnnS0C6r3Sher2hSEbVmM6Ogpcjen08+Y=
 github.com/json-iterator/go v0.0.0-20180612202835-f2b4162afba3/go.mod h1:+SdeFBvtyEkXs7REEP0seUULqWtbJapLOCVDaaPEHmU=
@@ -30,6 +32,7 @@ github.com/kr/pretty v0.0.0-20140812000539-f31442d60e51 h1:kGEU5h0EzkNa+B8Q3e0Gl
 github.com/kr/pretty v0.0.0-20140812000539-f31442d60e51/go.mod h1:Bvhd+E3laJ0AVkG0c9rmtZcnhV0HQ3+c3YxxqTvc/gA=
 github.com/kr/text v0.0.0-20130911015532-6807e777504f h1:JaNmHIV9Eby6srQVWuiQ6n8ko2o/lG6udSRCbFZe1fs=
 github.com/kr/text v0.0.0-20130911015532-6807e777504f/go.mod h1:sjUstKUATFIcff4qlB53Kml0wQPtJVc/3fWrmuUmcfA=
+github.com/maruel/panicparse v1.1.1 h1:k62YPcEoLncEEpjMt92GtG5ugb8WL/510Ys3/h5IkRc=
 github.com/maruel/panicparse v1.1.1/go.mod h1:nty42YY5QByNC5MM7q/nj938VbgPU7avs45z6NClpxI=
 github.com/matttproud/golang_protobuf_extensions v1.0.1 h1:4hp9jkHxhMHkqkrB3Ix0jegS5sx/RkqARlsWZ6pIwiU=
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
@@ -53,10 +56,6 @@ github.com/prometheus/common v0.0.0-20180801064454-c7de2306084e h1:n/3MEhJQjQxrO
 github.com/prometheus/common v0.0.0-20180801064454-c7de2306084e/go.mod h1:daVV7qP5qjZbuso7PdcryaAu0sAZbrN9i7WWcTMWvro=
 github.com/prometheus/procfs v0.0.0-20180920065004-418d78d0b9a7 h1:NgR6WN8nQ4SmFC1sSUHY8SriLuWCZ6cCIQtH4vDZN3c=
 github.com/prometheus/procfs v0.0.0-20180920065004-418d78d0b9a7/go.mod h1:c3At6R/oaqEKCNdg8wHV1ftS6bRYblBhIjjI8uT2IGk=
-github.com/rancher/norman v0.0.0-20180925184916-d675dc79491f h1:HFqoOtSaJM2IV0W0MeqvmA0GUyWlO1AKQZm14K4GN8M=
-github.com/rancher/norman v0.0.0-20180925184916-d675dc79491f/go.mod h1:RG+lnsTkAH0hpXtWUsBSmrgPrPccC2z6d7M1m/grjO0=
-github.com/rancher/norman v0.0.0-20181010023203-ad4865987ce7 h1:sLQZP5VDqDjctHvTsxMsfrtACC+eooWOySuWgLd6q/8=
-github.com/rancher/norman v0.0.0-20181010023203-ad4865987ce7/go.mod h1:hIlaLlQ+ZVmTY/Hv+JBmxKLhJzOpHbG2IhaWOkHaSBs=
 github.com/sirupsen/logrus v1.0.4-0.20170822132746-89742aefa4b2 h1:a07zp0wovcAE2jH+wlD22JLqUH6Rdl8Aon+NiyPxE+0=
 github.com/sirupsen/logrus v1.0.4-0.20170822132746-89742aefa4b2/go.mod h1:pMByvHTf9Beacp5x1UXfOR9xyW/9antXMhjMPG0dEzc=
 github.com/spf13/pflag v1.0.1 h1:aCvUg6QPl3ibpQUxyLkrEkCHtPqYJL4x9AuhqVqFis4=
@@ -85,6 +84,7 @@ gopkg.in/gemnasium/logrus-airbrake-hook.v2 v2.1.2 h1:OAj3g0cR6Dx/R07QgQe8wkA9RNj
 gopkg.in/gemnasium/logrus-airbrake-hook.v2 v2.1.2/go.mod h1:Xk6kEKp8OKb+X14hQBKWaSkCsqBpgog8nAV2xsGOxlo=
 gopkg.in/inf.v0 v0.9.0 h1:3zYtXIO92bvsdS3ggAdA8Gb4Azj0YU+TVY1uGYNFA8o=
 gopkg.in/inf.v0 v0.9.0/go.mod h1:cWUDdTG/fYaXco+Dcufb5Vnc6Gp2YChqWtbxRZE0mXw=
+gopkg.in/yaml.v1 v1.0.0-20140924161607-9f9df34309c0 h1:POO/ycCATvegFmVuPpQzZFJ+pGZeX22Ufu6fibxDVjU=
 gopkg.in/yaml.v1 v1.0.0-20140924161607-9f9df34309c0/go.mod h1:WDnlLJ4WF5VGsH/HVa3CI79GS0ol3YnhVnKP89i0kNg=
 gopkg.in/yaml.v2 v2.0.0-20170721113624-670d4cfef054 h1:ROF+R/wHHruzF40n5DfPv2jwm7rCJwvs8fz+RTZWjLE=
 gopkg.in/yaml.v2 v2.0.0-20170721113624-670d4cfef054/go.mod h1:JAlM8MvJe8wmxCU4Bli9HhUf9+ttbYbLASfIpnQbh74=
@@ -100,4 +100,5 @@ k8s.io/gengo v0.0.0-20180223161844-01a732e01d00 h1:vt4Sh/+HFnLoTScgFLNoMjNqOg0sQ
 k8s.io/gengo v0.0.0-20180223161844-01a732e01d00/go.mod h1:ezvh/TsK7cY6rbqRK0oQQ8IAqLxYwwyPxAX1Pzy0ii0=
 k8s.io/kube-openapi v0.0.0-20180509051136-39cb288412c4 h1:gW+EUB2I96nbxVenV/8ctfbACsHP+yxlT2dhMCsiy+s=
 k8s.io/kube-openapi v0.0.0-20180509051136-39cb288412c4/go.mod h1:BXM9ceUBTj2QnfH2MK1odQs778ajze1RxcmP6S8RVVc=
+k8s.io/kubernetes v1.10.5 h1:buoMLO5r3BpYzUebBdwxa67P2evcpmaydiiKMLq9K1U=
 k8s.io/kubernetes v1.10.5/go.mod h1:ocZa8+6APFNC2tX1DZASIbocyYT5jHzqFVsY5aoB7Jk=
