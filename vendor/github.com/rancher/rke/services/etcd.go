@@ -23,6 +23,7 @@ const (
 	EtcdSnapshotPath = "/opt/rke/etcd-snapshots/"
 	EtcdRestorePath  = "/opt/rke/etcd-snapshots-restore/"
 	EtcdDataDir      = "/var/lib/rancher/etcd/"
+	EtcdInitWaitTime = 5
 )
 
 type EtcdSnapshot struct {
@@ -174,6 +175,7 @@ func ReloadEtcdCluster(ctx context.Context, readyEtcdHosts []*hosts.Host, newHos
 		if err := createLogLink(ctx, etcdHost, EtcdContainerName, ETCDRole, alpineImage, prsMap); err != nil {
 			return err
 		}
+		time.Sleep(EtcdInitWaitTime * time.Second)
 	}
 	// run the new etcd at last
 	imageCfg, hostCfg, _ := GetProcessConfig(etcdNodePlanMap[newHost.Address].Processes[EtcdContainerName])

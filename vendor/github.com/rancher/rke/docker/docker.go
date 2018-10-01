@@ -30,7 +30,7 @@ const (
 	// RestartTimeout in seconds
 	RestartTimeout = 30
 	// StopTimeout in seconds
-	StopTimeout = 30
+	StopTimeout = 5
 )
 
 var K8sDockerVersions = map[string][]string{
