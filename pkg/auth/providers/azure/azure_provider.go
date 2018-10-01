@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -354,20 +355,27 @@ func (ap *azureProvider) userGroupsToPrincipals(
 	azureClient *azureClient,
 	groups graphrbac.UserGetMemberGroupsResult,
 ) ([]v3.Principal, error) {
-	var groupPrincipals []v3.Principal
-	for _, group := range *groups.Value {
-		groupObj, err := azureClient.groupClient.Get(context.Background(), group)
-		if err != nil {
-			return groupPrincipals, err
-		}
+	var g errgroup.Group
+	groupPrincipals := make([]v3.Principal, len(*groups.Value))
+	for i, group := range *groups.Value {
+		j := i
+		g.Go(func() error {
+			groupObj, err := azureClient.groupClient.Get(context.Background(), group)
+			if err != nil {
+				return err
+			}
 
-		p := ap.groupToPrincipal(groupObj)
-		p.MemberOf = true
+			p := ap.groupToPrincipal(groupObj)
+			p.MemberOf = true
 
-		groupPrincipals = append(groupPrincipals, p)
+			groupPrincipals[j] = p
+			return nil
+		})
+	}
+	if err := g.Wait(); err != nil {
+		return nil, err
 	}
 	return groupPrincipals, nil
-
 }
 
 func (ap *azureProvider) groupToPrincipal(group graphrbac.ADGroup) v3.Principal {
