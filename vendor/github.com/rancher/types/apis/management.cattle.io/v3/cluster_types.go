@@ -220,15 +220,16 @@ type AmazonElasticContainerServiceConfig struct {
 	AccessKey string `json:"accessKey" norman:"required"`
 	SecretKey string `json:"secretKey" norman:"required,type=password"`
 
-	Region         string   `json:"region"`
-	InstanceType   string   `json:"instanceType"`
-	MinimumNodes   int      `json:"minimumNodes"`
-	MaximumNodes   int      `json:"maximumNodes"`
-	VirtualNetwork string   `json:"virtualNetwork,omitempty"`
-	Subnets        []string `json:"subnets,omitempty"`
-	SecurityGroups []string `json:"securityGroups,omitempty"`
-	ServiceRole    string   `json:"serviceRole,omitempty"`
-	AMI            string   `json:"ami,omitempty"`
+	Region                      string   `json:"region"`
+	InstanceType                string   `json:"instanceType"`
+	MinimumNodes                int      `json:"minimumNodes"`
+	MaximumNodes                int      `json:"maximumNodes"`
+	VirtualNetwork              string   `json:"virtualNetwork,omitempty"`
+	Subnets                     []string `json:"subnets,omitempty"`
+	SecurityGroups              []string `json:"securityGroups,omitempty"`
+	ServiceRole                 string   `json:"serviceRole,omitempty"`
+	AMI                         string   `json:"ami,omitempty"`
+	AssociateWorkerNodePublicIP *bool    `json:"associateWorkerNodePublicIp,omitempty" norman:"default=true"`
 }
 
 type ClusterEvent struct {
