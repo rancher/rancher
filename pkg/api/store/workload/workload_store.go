@@ -140,14 +140,16 @@ func (s *CustomizeStore) ByID(apiContext *types.APIContext, schema *types.Schema
 }
 
 func setScheduling(apiContext *types.APIContext, data map[string]interface{}) {
-	if nodeID := convert.ToString(values.GetValueN(data, "scheduling", "node", "nodeId")); nodeID != "" {
-		nodeName := getNodeName(apiContext, nodeID)
-		values.PutValue(data, nodeName, "scheduling", "node", "nodeId")
-		state := getState(data)
-		state[getKey(nodeName)] = nodeID
-		setState(data, state)
-	} else {
-		values.PutValue(data, "", "nodeId")
+	if _, ok := values.GetValue(data, "scheduling", "node"); ok {
+		if nodeID := convert.ToString(values.GetValueN(data, "scheduling", "node", "nodeId")); nodeID != "" {
+			nodeName := getNodeName(apiContext, nodeID)
+			values.PutValue(data, nodeName, "scheduling", "node", "nodeId")
+			state := getState(data)
+			state[getKey(nodeName)] = nodeID
+			setState(data, state)
+		} else {
+			values.PutValue(data, "", "nodeId")
+		}
 	}
 }
 
@@ -213,7 +215,7 @@ func setSecrets(apiContext *types.APIContext, data map[string]interface{}, creat
 	if imagePullSecrets != nil {
 		if create {
 			values.PutValue(data, imagePullSecrets, "imagePullSecrets")
-		} else {
+		} else if _, ok := data["containers"]; ok {
 			if updated, err := imageUpdated(apiContext, data); err != nil {
 				return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("error accessing workload : %v", err))
 			} else if updated {
