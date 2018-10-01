@@ -1,7 +1,8 @@
 package controller
 
 type ForgetError struct {
-	Err error
+	Err    error
+	Reason string
 }
 
 func (f *ForgetError) Error() string {

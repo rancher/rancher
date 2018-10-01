@@ -68,11 +68,12 @@ type state struct {
 	InstanceType string
 	Region       string
 
-	VirtualNetwork string
-	Subnets        []string
-	SecurityGroups []string
-	ServiceRole    string
-	AMI            string
+	VirtualNetwork              string
+	Subnets                     []string
+	SecurityGroups              []string
+	ServiceRole                 string
+	AMI                         string
+	AssociateWorkerNodePublicIP *bool
 
 	ClusterInfo types.ClusterInfo
 }
@@ -170,6 +171,10 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 		Type:  types.StringType,
 		Usage: "A custom AMI ID to use for the worker nodes instead of the default",
 	}
+	driverFlag.Options["associate-worker-node-public-ip"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "A custom AMI ID to use for the worker nodes instead of the default",
+	}
 
 	return &driverFlag, nil
 }
@@ -198,6 +203,7 @@ func getStateFromOptions(driverOptions *types.DriverOptions) (state, error) {
 	state.ServiceRole = options.GetValueFromDriverOptions(driverOptions, types.StringType, "service-role", "serviceRole").(string)
 	state.SecurityGroups = options.GetValueFromDriverOptions(driverOptions, types.StringSliceType, "security-groups", "securityGroups").(*types.StringSlice).Value
 	state.AMI = options.GetValueFromDriverOptions(driverOptions, types.StringType, "ami").(string)
+	state.AssociateWorkerNodePublicIP, _ = options.GetValueFromDriverOptions(driverOptions, types.BoolPointerType, "associate-worker-node-public-ip", "associateWorkerNodePublicIp").(*bool)
 
 	return state, state.validate()
 }
@@ -241,6 +247,12 @@ func (state *state) validate() error {
 		return fmt.Errorf("virtual network, subnet, and security group must all be set together")
 	}
 
+	if state.AssociateWorkerNodePublicIP != nil &&
+		!*state.AssociateWorkerNodePublicIP &&
+		(state.VirtualNetwork == "" || len(state.Subnets) == 0) {
+		return fmt.Errorf("if AssociateWorkerNodePublicIP is set to false a VPC and subnets must also be provided")
+	}
+
 	return nil
 }
 
@@ -256,10 +268,10 @@ func alreadyExistsInCloudFormationError(err error) bool {
 }
 
 func (d *Driver) createStack(svc *cloudformation.CloudFormation, name string, displayName string,
-	templateURL string, parameters []*cloudformation.Parameter) (*cloudformation.DescribeStacksOutput, error) {
+	templateBody string, parameters []*cloudformation.Parameter) (*cloudformation.DescribeStacksOutput, error) {
 	_, err := svc.CreateStack(&cloudformation.CreateStackInput{
-		StackName:   aws.String(name),
-		TemplateURL: aws.String(templateURL),
+		StackName:    aws.String(name),
+		TemplateBody: aws.String(templateBody),
 		Capabilities: aws.StringSlice([]string{
 			cloudformation.CapabilityCapabilityIam,
 		}),
@@ -383,8 +395,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 	if state.VirtualNetwork == "" {
 		logrus.Infof("Bringing up vpc")
 
-		stack, err := d.createStack(svc, getVPCStackName(state), displayName,
-			"https://amazon-eks.s3-us-west-2.amazonaws.com/cloudformation/2018-08-30/amazon-eks-vpc-sample.yaml",
+		stack, err := d.createStack(svc, getVPCStackName(state), displayName, vpcTemplate,
 			[]*cloudformation.Parameter{})
 		if err != nil {
 			return nil, fmt.Errorf("error creating stack: %v", err)
@@ -424,8 +435,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 	if state.ServiceRole == "" {
 		logrus.Infof("Creating service role")
 
-		stack, err := d.createStack(svc, getServiceRoleName(state), displayName,
-			"https://amazon-eks.s3-us-west-2.amazonaws.com/1.10.3/2018-06-05/amazon-eks-service-role.yaml", nil)
+		stack, err := d.createStack(svc, getServiceRoleName(state), displayName, serviceRoleTemplate, nil)
 		if err != nil {
 			return nil, fmt.Errorf("error creating stack: %v", err)
 		}
@@ -496,8 +506,14 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 		amiID = amiForRegion[state.Region]
 	}
 
-	stack, err := d.createStack(svc, getWorkNodeName(state), displayName,
-		"https://amazon-eks.s3-us-west-2.amazonaws.com/cloudformation/2018-08-30/amazon-eks-nodegroup.yaml",
+	var publicIP bool
+	if state.AssociateWorkerNodePublicIP == nil {
+		publicIP = true
+	} else {
+		publicIP = *state.AssociateWorkerNodePublicIP
+	}
+
+	stack, err := d.createStack(svc, getWorkNodeName(state), displayName, workerNodesTemplate,
 		[]*cloudformation.Parameter{
 			{ParameterKey: aws.String("ClusterName"), ParameterValue: aws.String(state.ClusterName)},
 			{ParameterKey: aws.String("ClusterControlPlaneSecurityGroup"),
@@ -514,6 +530,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 			{ParameterKey: aws.String("VpcId"), ParameterValue: aws.String(vpcid)},
 			{ParameterKey: aws.String("Subnets"),
 				ParameterValue: aws.String(strings.Join(subnetIds, ","))},
+			{ParameterKey: aws.String("PublicIp"), ParameterValue: aws.String(strconv.FormatBool(publicIP))},
 		})
 	if err != nil {
 		return nil, fmt.Errorf("error creating stack: %v", err)

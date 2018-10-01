@@ -16,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	restclientwatch "k8s.io/client-go/rest/watch"
 )
@@ -138,7 +137,7 @@ func (p *ObjectClient) GetNamespaced(namespace, name string, opts metav1.GetOpti
 	}
 	err := req.
 		Resource(p.resource.Name).
-		VersionedParams(&opts, dynamic.VersionedParameterEncoderWithV1Fallback).
+		VersionedParams(&opts, metav1.ParameterCodec).
 		Name(name).
 		Do().
 		Into(result)
@@ -153,7 +152,7 @@ func (p *ObjectClient) Get(name string, opts metav1.GetOptions) (runtime.Object,
 		Prefix(p.getAPIPrefix(), p.gvk.Group, p.gvk.Version).
 		NamespaceIfScoped(p.ns, p.resource.Namespaced).
 		Resource(p.resource.Name).
-		VersionedParams(&opts, dynamic.VersionedParameterEncoderWithV1Fallback).
+		VersionedParams(&opts, metav1.ParameterCodec).
 		Name(name).
 		Do().
 		Into(result)
@@ -215,7 +214,7 @@ func (p *ObjectClient) List(opts metav1.ListOptions) (runtime.Object, error) {
 		Prefix(p.getAPIPrefix(), p.gvk.Group, p.gvk.Version).
 		NamespaceIfScoped(p.ns, p.resource.Namespaced).
 		Resource(p.resource.Name).
-		VersionedParams(&opts, dynamic.VersionedParameterEncoderWithV1Fallback).
+		VersionedParams(&opts, metav1.ParameterCodec).
 		Do().
 		Into(result)
 }
@@ -231,7 +230,7 @@ func (p *ObjectClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		NamespaceIfScoped(p.ns, p.resource.Namespaced).
 		Resource(p.resource.Name).
-		VersionedParams(&opts, dynamic.VersionedParameterEncoderWithV1Fallback).
+		VersionedParams(&opts, metav1.ParameterCodec).
 		Stream()
 	if err != nil {
 		return nil, err
@@ -279,7 +278,7 @@ func (p *ObjectClient) DeleteCollection(deleteOptions *metav1.DeleteOptions, lis
 		Prefix(p.getAPIPrefix(), p.gvk.Group, p.gvk.Version).
 		NamespaceIfScoped(p.ns, p.resource.Namespaced).
 		Resource(p.resource.Name).
-		VersionedParams(&listOptions, dynamic.VersionedParameterEncoderWithV1Fallback).
+		VersionedParams(&listOptions, metav1.ParameterCodec).
 		Body(deleteOptions).
 		Do().
 		Error()
