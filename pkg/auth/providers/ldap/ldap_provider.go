@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	corev1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -37,6 +38,7 @@ var freeIpaScopes = []string{FreeIpaUserScope, FreeIpaGroupScope}
 type ldapProvider struct {
 	ctx                   context.Context
 	authConfigs           v3.AuthConfigInterface
+	secrets               corev1.SecretInterface
 	userMGR               user.Manager
 	tokenMGR              *tokens.Manager
 	certs                 string
@@ -51,6 +53,7 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 	return &ldapProvider{
 		ctx:                   ctx,
 		authConfigs:           mgmtCtx.Management.AuthConfigs(""),
+		secrets:               mgmtCtx.Core.Secrets(""),
 		userMGR:               userMGR,
 		tokenMGR:              tokenMGR,
 		providerName:          providerName,

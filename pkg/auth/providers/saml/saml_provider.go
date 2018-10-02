@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/rancher/norman/types/convert"
+
 	"github.com/crewjam/saml"
 	"github.com/crewjam/saml/samlsp"
 	"github.com/mitchellh/mapstructure"
@@ -20,6 +22,7 @@ import (
 	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
 
+	corev1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,6 +35,7 @@ const KeyCloakName = "keycloak"
 type Provider struct {
 	ctx             context.Context
 	authConfigs     v3.AuthConfigInterface
+	secrets         corev1.SecretInterface
 	userMGR         user.Manager
 	tokenMGR        *tokens.Manager
 	serviceProvider *saml.ServiceProvider
@@ -47,6 +51,7 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 	samlp := &Provider{
 		ctx:         ctx,
 		authConfigs: mgmtCtx.Management.AuthConfigs(""),
+		secrets:     mgmtCtx.Core.Secrets(""),
 		userMGR:     userMGR,
 		tokenMGR:    tokenMGR,
 		name:        name,
@@ -163,6 +168,13 @@ func (s *Provider) saveSamlConfig(config *v3.SamlConfig) error {
 	config.Type = configType
 	storedSamlConfig.Annotations = config.Annotations
 	config.ObjectMeta = storedSamlConfig.ObjectMeta
+
+	name := fmt.Sprintf("%s:%s-%s", "mgmt-secrets", strings.ToLower(convert.ToString(config.Type)), "spkey")
+	if err := common.CreateOrUpdateSecrets(s.secrets, config.SpKey, "spkey", strings.ToLower(convert.ToString(config.Type))); err != nil {
+		return err
+	}
+
+	config.SpKey = name
 
 	logrus.Debugf("updating samlConfig")
 	_, err = s.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)

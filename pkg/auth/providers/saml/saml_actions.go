@@ -46,6 +46,15 @@ func (s *Provider) testAndEnable(actionName string, action *types.Action, reques
 		return err
 	}
 
+	if samlConfig.SpKey != "" {
+		value, err := common.ReadFromSecret(s.secrets, samlConfig.SpKey, "spkey")
+
+		if err != nil {
+			return err
+		}
+		samlConfig.SpKey = value
+	}
+
 	err = InitializeSamlServiceProvider(samlConfig, s.name)
 	if err != nil {
 		return err

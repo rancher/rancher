@@ -29,6 +29,7 @@ import (
 	nodeStore "github.com/rancher/rancher/pkg/api/store/node"
 	nodeTemplateStore "github.com/rancher/rancher/pkg/api/store/nodetemplate"
 	"github.com/rancher/rancher/pkg/api/store/noopwatching"
+	passwordStore "github.com/rancher/rancher/pkg/api/store/password"
 	"github.com/rancher/rancher/pkg/api/store/preference"
 	"github.com/rancher/rancher/pkg/api/store/scoped"
 	"github.com/rancher/rancher/pkg/api/store/userscope"
@@ -140,8 +141,15 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	nodeStore.SetupStore(schemas.Schema(&managementschema.Version, client.NodeType))
 	projectStore.SetProjectStore(schemas.Schema(&managementschema.Version, client.ProjectType), apiContext)
 	setupScopedTypes(schemas)
+	setupPasswordTypes(ctx, schemas, apiContext)
 
 	return nil
+}
+
+func setupPasswordTypes(ctx context.Context, schemas *types.Schemas, management *config.ScaledContext) {
+	secretStore := management.Core.Secrets("")
+	nsStore := management.Core.Namespaces("")
+	passwordStore.SetPasswordStore(schemas, secretStore, nsStore)
 }
 
 func setupScopedTypes(schemas *types.Schemas) {

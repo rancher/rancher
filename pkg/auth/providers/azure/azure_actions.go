@@ -69,6 +69,13 @@ func (ap *azureProvider) testAndApply(actionName string, action *types.Action, r
 		Code: azureADConfigApplyInput.Code,
 	}
 
+	if azureADConfig.ApplicationSecret != "" {
+		value, err := common.ReadFromSecret(ap.secrets, azureADConfig.ApplicationSecret, "")
+		if err != nil {
+			return err
+		}
+		azureADConfig.ApplicationSecret = value
+	}
 	//Call provider
 	userPrincipal, groupPrincipals, providerToken, err := ap.loginUser(azureLogin, &azureADConfig, true)
 	if err != nil {

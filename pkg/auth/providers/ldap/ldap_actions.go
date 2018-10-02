@@ -2,6 +2,9 @@ package ldap
 
 import (
 	"fmt"
+	"strings"
+
+	"github.com/rancher/norman/types/convert"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/api/handler"
@@ -61,6 +64,14 @@ func (p *ldapProvider) testAndApply(actionName string, action *types.Action, req
 		Password: configApplyInput.Password,
 	}
 
+	if config.ServiceAccountPassword != "" {
+		value, err := common.ReadFromSecret(p.secrets, config.ServiceAccountPassword, "serviceaccountpassword")
+		if err != nil {
+			return err
+		}
+		config.ServiceAccountPassword = value
+	}
+
 	caPool, err := newCAPool(config.Certificate)
 	if err != nil {
 		return err
@@ -72,7 +83,6 @@ func (p *ldapProvider) testAndApply(actionName string, action *types.Action, req
 	if len(config.Servers) > 1 {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "multiple servers not yet supported")
 	}
-
 	userPrincipal, groupPrincipals, err := p.loginUser(login, config, caPool)
 	if err != nil {
 		return err
@@ -106,6 +116,13 @@ func (p *ldapProvider) saveLDAPConfig(config *v3.LdapConfig) error {
 	}
 
 	config.ObjectMeta = storedConfig.ObjectMeta
+
+	name := fmt.Sprintf("%s:%s-%s", "mgmt-secrets", strings.ToLower(convert.ToString(config.Type)), "serviceaccountpassword")
+	if err := common.CreateOrUpdateSecrets(p.secrets, config.ServiceAccountPassword, "serviceaccountpassword", strings.ToLower(convert.ToString(config.Type))); err != nil {
+		return err
+	}
+
+	config.ServiceAccountPassword = name
 
 	logrus.Debugf("updating %s config", p.providerName)
 	_, err = p.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)

@@ -2,6 +2,9 @@ package activedirectory
 
 import (
 	"fmt"
+	"strings"
+
+	"github.com/rancher/norman/types/convert"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/api/handler"
@@ -56,6 +59,14 @@ func (p *adProvider) testAndApply(actionName string, action *types.Action, reque
 		Password: configApplyInput.Password,
 	}
 
+	if config.ServiceAccountPassword != "" {
+		value, err := common.ReadFromSecret(p.secrets, config.ServiceAccountPassword, "serviceaccountpassword")
+		if err != nil {
+			return err
+		}
+		config.ServiceAccountPassword = value
+	}
+
 	caPool, err := newCAPool(config.Certificate)
 	if err != nil {
 		return err
@@ -98,7 +109,14 @@ func (p *adProvider) saveActiveDirectoryConfig(config *v3.ActiveDirectoryConfig)
 	config.Type = client.ActiveDirectoryConfigType
 	config.ObjectMeta = storedConfig.ObjectMeta
 
-	logrus.Debugf("updating githubConfig")
+	name := fmt.Sprintf("%s:%s-%s", common.SecretsNamespace, strings.ToLower(convert.ToString(config.Type)), "serviceaccountpassword")
+	if err := common.CreateOrUpdateSecrets(p.secrets, config.ServiceAccountPassword, "serviceaccountpassword", strings.ToLower(convert.ToString(config.Type))); err != nil {
+		return err
+	}
+
+	config.ServiceAccountPassword = name
+
+	logrus.Debugf("updating activeDirectoryConfig")
 	_, err = p.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
 	if err != nil {
 		return err
