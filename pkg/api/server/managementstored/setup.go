@@ -447,15 +447,15 @@ func RoleTemplate(schemas *types.Schemas, management *config.ScaledContext) {
 
 func AuthzGlobalRoleBinding(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.GlobalRoleBindingType)
-	schema.Validator = globalrolebinding.NewAuthzGRBValidator(management)
+	schema.Validator = globalrolebinding.NewAuthzGlobalRoleBindingValidator(management)
 }
 
 func AuthzClusterRoleTemplateBinding(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.ClusterRoleTemplateBindingType)
-	schema.Validator = clusterroletemplatebinding.NewAuthzCRTBValidator(management)
+	schema.Validator = clusterroletemplatebinding.NewAuthzClusterRoleTemplateBindingValidator(management)
 }
 
 func AuthzProjectRoleTemplateBinding(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.ProjectRoleTemplateBindingType)
-	schema.Validator = projectroletemplatebinding.NewAuthzPRTBValidator(management)
+	schema.Validator = projectroletemplatebinding.NewAuthzProjectRoleTemplateBindingValidator(management)
 }

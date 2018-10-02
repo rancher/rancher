@@ -20,50 +20,55 @@ import (
 )
 
 const (
-	crtbsByPrincipalAndUserIndex = "auth.management.cattle.io/crtbByPrincipalAndUser"
+	clusterRoleTemplateBindingsByPrincipalAndUserIndex = "auth.management.cattle.io/clusterRoleTemplateBindingByPrincipalAndUser"
 )
 
-func NewAuthzCRTBValidator(management *config.ScaledContext) types.Validator {
-	crtbInformer := management.Management.ClusterRoleTemplateBindings("").Controller().Informer()
-	crtbIndexers := map[string]cache.IndexFunc{
-		crtbsByPrincipalAndUserIndex: crtbsByPrincipalAndUser,
+func NewAuthzClusterRoleTemplateBindingValidator(management *config.ScaledContext) types.Validator {
+	clusterRoleTemplateBindingInformer := management.Management.ClusterRoleTemplateBindings("").Controller().Informer()
+	clusterRoleTemplateBindingIndexers := map[string]cache.IndexFunc{
+		clusterRoleTemplateBindingsByPrincipalAndUserIndex: clusterRoleTemplateBindingsByPrincipalAndUser,
 	}
-	crtbInformer.AddIndexers(crtbIndexers)
+	clusterRoleTemplateBindingInformer.AddIndexers(clusterRoleTemplateBindingIndexers)
 
 	validator := &Validator{
-		rtLister:    management.Management.RoleTemplates("").Controller().Lister(),
-		crtbIndexer: crtbInformer.GetIndexer(),
-		userManager: management.UserManager,
+		roleTemplateLister:                management.Management.RoleTemplates("").Controller().Lister(),
+		clusterRoleTemplateBindingIndexer: clusterRoleTemplateBindingInformer.GetIndexer(),
+		userManager:                       management.UserManager,
 	}
 
-	return validator.Validator
+	return validator.ClusterRoleTemplateBindingValidator
 }
 
 type Validator struct {
-	rtLister    v3.RoleTemplateLister
-	crtbIndexer cache.Indexer
-	userManager user.Manager
+	roleTemplateLister                v3.RoleTemplateLister
+	clusterRoleTemplateBindingIndexer cache.Indexer
+	userManager                       user.Manager
 }
 
-func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
+func (v *Validator) getClusterRoleTemplateBindingRules(userID string) ([]rbac.PolicyRule, error) {
+	clusterRoleTemplateBindings, err := v.clusterRoleTemplateBindingIndexer.ByIndex(clusterRoleTemplateBindingsByPrincipalAndUserIndex, userID)
+	if err != nil {
+		return nil, err
+	}
+	rules := []rbac.PolicyRule{}
+	for _, clusterRoleBinding := range clusterRoleTemplateBindings {
+		roleName := clusterRoleBinding.(*v3.ClusterRoleTemplateBinding).RoleTemplateName
+		roleTemplate, _ := v.roleTemplateLister.Get("", roleName)
+		rules = append(rules, convertRules(roleTemplate.Rules)...)
+	}
+	return rules, nil
+}
+
+func (v *Validator) ClusterRoleTemplateBindingValidator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
 	currentUserID := v.userManager.GetUser(request)
 	globalRoleID := data[client.ClusterRoleTemplateBindingFieldRoleTemplateID].(string)
 
-	tgrRole, _ := v.rtLister.Get("", globalRoleID)
+	tgrRole, _ := v.roleTemplateLister.Get("", globalRoleID)
 	targetRules := convertRules(tgrRole.Rules)
 
-	grbRoles, err := v.crtbIndexer.ByIndex(crtbsByPrincipalAndUserIndex, currentUserID)
+	ownerRules, err := v.getClusterRoleTemplateBindingRules(currentUserID)
 	if err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error getting roles: %v", err))
-	}
-
-	ownerRules := []rbac.PolicyRule{}
-
-	for _, grbRole := range grbRoles {
-		roleName := grbRole.(*v3.ClusterRoleTemplateBinding).RoleTemplateName
-		grRole, _ := v.rtLister.Get("", roleName)
-		rules := convertRules(grRole.Rules)
-		ownerRules = append(ownerRules, rules...)
 	}
 
 	rulesCover, failedRules := rbacregistryvalidation.Covers(ownerRules, targetRules)
@@ -93,7 +98,7 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 	return httperror.NewAPIError(httperror.InvalidState, fmt.Sprintf("Permission denied for role '%s' on user '%s'", globalRoleID, targetUserID))
 }
 
-func crtbsByPrincipalAndUser(obj interface{}) ([]string, error) {
+func clusterRoleTemplateBindingsByPrincipalAndUser(obj interface{}) ([]string, error) {
 	var principals []string
 	b, ok := obj.(*v3.ClusterRoleTemplateBinding)
 	if !ok {

@@ -20,50 +20,55 @@ import (
 )
 
 const (
-	grbByUserIndex = "auth.management.cattle.io/grbByUser"
+	globalRoleBindingByUserIndex = "auth.management.cattle.io/globalRoleBindingByUser"
 )
 
-func NewAuthzGRBValidator(management *config.ScaledContext) types.Validator {
-	grbInformer := management.Management.GlobalRoleBindings("").Controller().Informer()
-	grbIndexers := map[string]cache.IndexFunc{
-		grbByUserIndex: grbByUser,
+func NewAuthzGlobalRoleBindingValidator(management *config.ScaledContext) types.Validator {
+	globalRoleBindingInformer := management.Management.GlobalRoleBindings("").Controller().Informer()
+	globalRoleBindingIndexers := map[string]cache.IndexFunc{
+		globalRoleBindingByUserIndex: globalRoleBindingByUser,
 	}
-	grbInformer.AddIndexers(grbIndexers)
+	globalRoleBindingInformer.AddIndexers(globalRoleBindingIndexers)
 
 	validator := &Validator{
-		grLister:    management.Management.GlobalRoles("").Controller().Lister(),
-		grbIndexer:  grbInformer.GetIndexer(),
-		userManager: management.UserManager,
+		globalRoleLister:         management.Management.GlobalRoles("").Controller().Lister(),
+		globalRoleBindingIndexer: globalRoleBindingInformer.GetIndexer(),
+		userManager:              management.UserManager,
 	}
 
-	return validator.Validator
+	return validator.GlobalRoleBindingValidator
 }
 
 type Validator struct {
-	grLister    v3.GlobalRoleLister
-	grbIndexer  cache.Indexer
-	userManager user.Manager
+	globalRoleLister         v3.GlobalRoleLister
+	globalRoleBindingIndexer cache.Indexer
+	userManager              user.Manager
 }
 
-func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
+func (v *Validator) getGlobalRoleBindingRules(userID string) ([]rbac.PolicyRule, error) {
+	globalRoleBindings, err := v.globalRoleBindingIndexer.ByIndex(globalRoleBindingByUserIndex, userID)
+	if err != nil {
+		return nil, err
+	}
+	rules := []rbac.PolicyRule{}
+	for _, projectRoleBinding := range globalRoleBindings {
+		roleName := projectRoleBinding.(*v3.GlobalRoleBinding).GlobalRoleName
+		globalRole, _ := v.globalRoleLister.Get("", roleName)
+		rules = append(rules, convertRules(globalRole.Rules)...)
+	}
+	return rules, nil
+}
+
+func (v *Validator) GlobalRoleBindingValidator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
 	currentUserID := v.userManager.GetUser(request)
 	globalRoleID := data[client.GlobalRoleBindingFieldGlobalRoleID].(string)
 
-	tgrRole, _ := v.grLister.Get("", globalRoleID)
+	tgrRole, _ := v.globalRoleLister.Get("", globalRoleID)
 	targetRules := convertRules(tgrRole.Rules)
 
-	grbRoles, err := v.grbIndexer.ByIndex(grbByUserIndex, currentUserID)
+	ownerRules, err := v.getGlobalRoleBindingRules(currentUserID)
 	if err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error getting roles: %v", err))
-	}
-
-	ownerRules := []rbac.PolicyRule{}
-
-	for _, grbRole := range grbRoles {
-		roleName := grbRole.(*v3.GlobalRoleBinding).GlobalRoleName
-		grRole, _ := v.grLister.Get("", roleName)
-		rules := convertRules(grRole.Rules)
-		ownerRules = append(ownerRules, rules...)
 	}
 
 	rulesCover, failedRules := rbacregistryvalidation.Covers(ownerRules, targetRules)
@@ -86,13 +91,13 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 	return httperror.NewAPIError(httperror.InvalidState, fmt.Sprintf("Permission denied for role '%s' on user '%s'", globalRoleID, targetUserID))
 }
 
-func grbByUser(obj interface{}) ([]string, error) {
-	grb, ok := obj.(*v3.GlobalRoleBinding)
+func globalRoleBindingByUser(obj interface{}) ([]string, error) {
+	globalRoleBinding, ok := obj.(*v3.GlobalRoleBinding)
 	if !ok {
 		return []string{}, nil
 	}
 
-	return []string{grb.UserName}, nil
+	return []string{globalRoleBinding.UserName}, nil
 }
 
 func convertRules(rbacv1Rules []rbacv1.PolicyRule) []rbac.PolicyRule {

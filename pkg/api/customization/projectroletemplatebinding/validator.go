@@ -20,50 +20,63 @@ import (
 )
 
 const (
-	prtbsByPrincipalAndUserIndex = "auth.management.cattle.io/prtbByPrincipalAndUser"
+	projectRoleTemplateBindingsByPrincipalAndUserIndex = "auth.management.cattle.io/projectRoleTemplateBindingByPrincipalAndUser"
 )
 
-func NewAuthzPRTBValidator(management *config.ScaledContext) types.Validator {
-	prtbInformer := management.Management.ProjectRoleTemplateBindings("").Controller().Informer()
-	prtbIndexers := map[string]cache.IndexFunc{
-		prtbsByPrincipalAndUserIndex: prtbsByPrincipalAndUser,
+func NewAuthzProjectRoleTemplateBindingValidator(management *config.ScaledContext) types.Validator {
+	projectRoleTemplateBindingInformer := management.Management.ProjectRoleTemplateBindings("").Controller().Informer()
+	projectRoleTemplateBindingIndexers := map[string]cache.IndexFunc{
+		projectRoleTemplateBindingsByPrincipalAndUserIndex: projectRoleTemplateBindingsByPrincipalAndUser,
 	}
-	prtbInformer.AddIndexers(prtbIndexers)
+	projectRoleTemplateBindingInformer.AddIndexers(projectRoleTemplateBindingIndexers)
 
 	validator := &Validator{
-		rtLister:    management.Management.RoleTemplates("").Controller().Lister(),
-		prtbIndexer: prtbInformer.GetIndexer(),
-		userManager: management.UserManager,
+		roleTemplateLister:                management.Management.RoleTemplates("").Controller().Lister(),
+		projectRoleTemplateBindingIndexer: projectRoleTemplateBindingInformer.GetIndexer(),
+		userManager:                       management.UserManager,
 	}
 
-	return validator.Validator
+	return validator.ProjectRoleTemplateBindingValidator
 }
 
 type Validator struct {
-	rtLister    v3.RoleTemplateLister
-	prtbIndexer cache.Indexer
-	userManager user.Manager
+	roleTemplateLister                v3.RoleTemplateLister
+	projectRoleTemplateBindingIndexer cache.Indexer
+	userManager                       user.Manager
 }
 
-func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
-	currentUserID := v.userManager.GetUser(request)
-	globalRoleID := data[client.ProjectRoleTemplateBindingFieldRoleTemplateID].(string)
-
-	tgrRole, _ := v.rtLister.Get("", globalRoleID)
-	targetRules := convertRules(tgrRole.Rules)
-
-	grbRoles, err := v.prtbIndexer.ByIndex(prtbsByPrincipalAndUserIndex, currentUserID)
+func (v *Validator) getProjectRoleTemplateBindingRules(userID string) ([]rbac.PolicyRule, error) {
+	projectRoleTemplateBindings, err := v.projectRoleTemplateBindingIndexer.ByIndex(projectRoleTemplateBindingsByPrincipalAndUserIndex, userID)
 	if err != nil {
-		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error getting roles: %v", err))
+		return nil, err
+	}
+	rules := []rbac.PolicyRule{}
+	for _, projectRoleBinding := range projectRoleTemplateBindings {
+		roleName := projectRoleBinding.(*v3.ProjectRoleTemplateBinding).RoleTemplateName
+		roleTemplate, _ := v.roleTemplateLister.Get("", roleName)
+		rules = append(rules, convertRules(roleTemplate.Rules)...)
+	}
+	return rules, nil
+}
+
+func (v *Validator) ProjectRoleTemplateBindingValidator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
+	currentUserID := v.userManager.GetUser(request)
+	globalRoleID, ok := data[client.ProjectRoleTemplateBindingFieldRoleTemplateID].(string)
+
+	if !ok {
+		return httperror.NewAPIError(httperror.MissingRequired, "Request does not have a valid roleTemplateId")
 	}
 
-	ownerRules := []rbac.PolicyRule{}
+	targetRoleTemplate, err := v.roleTemplateLister.Get("", globalRoleID)
+	if err != nil {
+		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error getting role template: %v", err))
+	}
 
-	for _, grbRole := range grbRoles {
-		roleName := grbRole.(*v3.ProjectRoleTemplateBinding).RoleTemplateName
-		grRole, _ := v.rtLister.Get("", roleName)
-		rules := convertRules(grRole.Rules)
-		ownerRules = append(ownerRules, rules...)
+	targetRules := convertRules(targetRoleTemplate.Rules)
+
+	ownerRules, err := v.getProjectRoleTemplateBindingRules(currentUserID)
+	if err != nil {
+		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error getting roles: %v", err))
 	}
 
 	rulesCover, failedRules := rbacregistryvalidation.Covers(ownerRules, targetRules)
@@ -90,10 +103,11 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 	} else if userID != nil {
 		targetUserID = userID.(string)
 	}
+	return nil
 	return httperror.NewAPIError(httperror.InvalidState, fmt.Sprintf("Permission denied for role '%s' on user '%s'", globalRoleID, targetUserID))
 }
 
-func prtbsByPrincipalAndUser(obj interface{}) ([]string, error) {
+func projectRoleTemplateBindingsByPrincipalAndUser(obj interface{}) ([]string, error) {
 	var principals []string
 	b, ok := obj.(*v3.ProjectRoleTemplateBinding)
 	if !ok {
