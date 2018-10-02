@@ -447,7 +447,8 @@ func (p *Provisioner) reconcileRKENodes(clusterName string) ([]v3.RKEConfigNode,
 
 		if v3.NodeConditionProvisioned.IsUnknown(machine) && (machine.Spec.Etcd || machine.Spec.ControlPlane) {
 			return nil, &controller.ForgetError{
-				Err: fmt.Errorf("waiting for %s to finish provisioning", machine.Spec.RequestedHostname),
+				Err:    fmt.Errorf("waiting for %s to finish provisioning", machine.Spec.RequestedHostname),
+				Reason: "Provisioning",
 			}
 		}
 
@@ -485,7 +486,8 @@ func (p *Provisioner) reconcileRKENodes(clusterName string) ([]v3.RKEConfigNode,
 
 	if !etcd || !controlplane {
 		return nil, &controller.ForgetError{
-			Err: fmt.Errorf("waiting for etcd and controlplane nodes to be registered"),
+			Err:    fmt.Errorf("waiting for etcd and controlplane nodes to be registered"),
+			Reason: "Provisioning",
 		}
 	}
 
