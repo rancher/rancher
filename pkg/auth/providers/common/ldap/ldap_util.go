@@ -85,7 +85,7 @@ func IsType(search []*ldapv2.EntryAttribute, varType string) bool {
 	for _, attrib := range search {
 		if attrib.Name == "objectClass" {
 			for _, val := range attrib.Values {
-				if val == varType {
+				if strings.EqualFold(val, varType) {
 					return true
 				}
 			}
