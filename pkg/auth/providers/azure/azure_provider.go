@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rancher/norman/types/convert"
+
 	"github.com/Azure/azure-sdk-for-go/services/graphrbac/1.6/graphrbac"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/mitchellh/mapstructure"
@@ -15,6 +17,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	corev1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
 	"github.com/rancher/types/client/management/v3"
@@ -36,6 +39,7 @@ const (
 type azureProvider struct {
 	ctx         context.Context
 	authConfigs v3.AuthConfigInterface
+	secrets     corev1.SecretInterface
 	userMGR     user.Manager
 	tokenMGR    *tokens.Manager
 }
@@ -50,6 +54,7 @@ func Configure(
 	return &azureProvider{
 		ctx:         ctx,
 		authConfigs: mgmtCtx.Management.AuthConfigs(""),
+		secrets:     mgmtCtx.Core.Secrets(""),
 		userMGR:     userMGR,
 		tokenMGR:    tokenMGR,
 	}
@@ -313,6 +318,13 @@ func (ap *azureProvider) saveAzureConfigK8s(config *v3.AzureADConfig) error {
 	config.Kind = v3.AuthConfigGroupVersionKind.Kind
 	config.Type = client.AzureADConfigType
 	config.ObjectMeta = storedAzureConfig.ObjectMeta
+
+	name := fmt.Sprintf("%s:%s-%s", "mgmt-secrets", strings.ToLower(convert.ToString(config.Type)), "applicationsecret")
+	if err := common.CreateOrUpdateSecrets(ap.secrets, config.ApplicationSecret, "applicationsecret", strings.ToLower(convert.ToString(config.Type))); err != nil {
+		return err
+	}
+
+	config.ApplicationSecret = name
 
 	logrus.Debugf("updating AzureADConfig")
 	_, err = ap.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)

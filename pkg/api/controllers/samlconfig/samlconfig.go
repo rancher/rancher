@@ -4,16 +4,19 @@ import (
 	"fmt"
 
 	"github.com/mitchellh/mapstructure"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 
+	corev1 "github.com/rancher/types/apis/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type authProvider struct {
 	authConfigs v3.AuthConfigInterface
+	secrets     corev1.SecretInterface
 }
 
 func Register(apiContext *config.ScaledContext) {
@@ -24,6 +27,7 @@ func Register(apiContext *config.ScaledContext) {
 func newAuthProvider(apiContext *config.ScaledContext) *authProvider {
 	a := &authProvider{
 		authConfigs: apiContext.Management.AuthConfigs(""),
+		secrets:     apiContext.Core.Secrets(""),
 	}
 	return a
 }
@@ -62,6 +66,15 @@ func (a *authProvider) sync(key string, config *v3.AuthConfig) error {
 	typemeta := &metav1.ObjectMeta{}
 	mapstructure.Decode(metadataMap, typemeta)
 	samlConfig.ObjectMeta = *typemeta
+
+	if samlConfig.SpKey != "" {
+		value, err := common.ReadFromSecret(a.secrets, samlConfig.SpKey, "spkey")
+
+		if err != nil {
+			return err
+		}
+		samlConfig.SpKey = value
+	}
 
 	return saml.InitializeSamlServiceProvider(samlConfig, config.Name)
 }

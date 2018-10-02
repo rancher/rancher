@@ -7,12 +7,18 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/rancher/norman/types/convert"
+
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/mitchellh/mapstructure"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	corev1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
 	"github.com/rancher/types/client/management/v3"
@@ -22,7 +28,6 @@ import (
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
@@ -32,6 +37,7 @@ const (
 type ghProvider struct {
 	ctx          context.Context
 	authConfigs  v3.AuthConfigInterface
+	secrets      corev1.SecretInterface
 	githubClient *GClient
 	userMGR      user.Manager
 	tokenMGR     *tokens.Manager
@@ -45,6 +51,7 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 	return &ghProvider{
 		ctx:          ctx,
 		authConfigs:  mgmtCtx.Management.AuthConfigs(""),
+		secrets:      mgmtCtx.Core.Secrets(""),
 		githubClient: githubClient,
 		userMGR:      userMGR,
 		tokenMGR:     tokenMGR,
@@ -71,7 +78,6 @@ func (g *ghProvider) getGithubConfigCR() (*v3.GithubConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve GithubConfig, error: %v", err)
 	}
-
 	u, ok := authConfigObj.(runtime.Unstructured)
 	if !ok {
 		return nil, fmt.Errorf("failed to retrieve GithubConfig, cannot read k8s Unstructured data")
@@ -103,7 +109,14 @@ func (g *ghProvider) saveGithubConfig(config *v3.GithubConfig) error {
 	config.Type = client.GithubConfigType
 	config.ObjectMeta = storedGithubConfig.ObjectMeta
 
-	logrus.Debugf("updating githubConfig")
+	secretInfo := convert.ToString(config.ClientSecret)
+
+	if err := common.CreateOrUpdateSecrets(g.secrets, secretInfo, "clientsecret", "githubconfig"); err != nil {
+		return err
+	}
+
+	config.ClientSecret = "mgmt-secrets:githubconfig-clientsecret"
+
 	_, err = g.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
 	if err != nil {
 		return err
@@ -133,8 +146,8 @@ func (g *ghProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v
 	}
 
 	securityCode := githubCredential.Code
-
 	logrus.Debugf("GitHubIdentityProvider AuthenticateUser called for securityCode %v", securityCode)
+
 	accessToken, err := g.githubClient.getAccessToken(securityCode, config)
 	if err != nil {
 		logrus.Infof("Error generating accessToken from github %v", err)
