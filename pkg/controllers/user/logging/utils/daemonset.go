@@ -134,28 +134,32 @@ func NewFluentdDaemonset(name, namespace, dockerRootDir string) *v1beta2.DaemonS
 	}
 	dockerRootContainers := dockerRootDir + "/containers"
 
-	logVolMounts, logVols := buildHostPathVolumes(map[string][]string{
-		"varlibdockercontainers": []string{dockerRootContainers, dockerRootContainers},
-		"varlogcontainers":       []string{"/var/log/containers", "/var/log/containers"},
-		"varlogpods":             []string{"/var/log/pods", "/var/log/pods"},
-		"rkelog":                 []string{"/var/lib/rancher/rke/log", "/var/lib/rancher/rke/log"},
-		"customlog":              []string{"/var/lib/rancher/log-volumes", "/var/lib/rancher/log-volumes"},
-		"fluentdlog":             []string{"/fluentd/log", "/var/lib/rancher/fluentd/log"},
-	})
+	logVolMounts, logVols := buildHostPathVolumes([]string{"varlibdockercontainers", "varlogcontainers", "varlogpods", "rkelog", "customlog", "fluentdlog"},
+		map[string][]string{
+			"varlibdockercontainers": []string{dockerRootContainers, dockerRootContainers},
+			"varlogcontainers":       []string{"/var/log/containers", "/var/log/containers"},
+			"varlogpods":             []string{"/var/log/pods", "/var/log/pods"},
+			"rkelog":                 []string{"/var/lib/rancher/rke/log", "/var/lib/rancher/rke/log"},
+			"customlog":              []string{"/var/lib/rancher/log-volumes", "/var/lib/rancher/log-volumes"},
+			"fluentdlog":             []string{"/fluentd/log", "/var/lib/rancher/fluentd/log"},
+		})
 
-	configVolMounts, configVols := buildSecretVolumes(map[string][]string{
-		loggingconfig.ClusterLoggingName: []string{"/fluentd/etc/config/cluster", loggingconfig.ClusterLoggingName},
-		loggingconfig.ProjectLoggingName: []string{"/fluentd/etc/config/project", loggingconfig.ProjectLoggingName},
-	})
+	configVolMounts, configVols := buildSecretVolumes([]string{loggingconfig.ClusterLoggingName, loggingconfig.ProjectLoggingName},
+		map[string][]string{
+			loggingconfig.ClusterLoggingName: []string{"/fluentd/etc/config/cluster", loggingconfig.ClusterLoggingName},
+			loggingconfig.ProjectLoggingName: []string{"/fluentd/etc/config/project", loggingconfig.ProjectLoggingName},
+		})
 
-	customConfigVolMounts, customConfigVols := buildHostPathVolumes(map[string][]string{
-		"clustercustomlogconfig": []string{"/fluentd/etc/config/custom/cluster", "/var/lib/rancher/fluentd/etc/config/custom/cluster"},
-		"projectcustomlogconfig": []string{"/fluentd/etc/config/custom/project", "/var/lib/rancher/fluentd/etc/config/custom/project"},
-	})
+	customConfigVolMounts, customConfigVols := buildHostPathVolumes([]string{"clustercustomlogconfig", "projectcustomlogconfig"},
+		map[string][]string{
+			"clustercustomlogconfig": []string{"/fluentd/etc/config/custom/cluster", "/var/lib/rancher/fluentd/etc/config/custom/cluster"},
+			"projectcustomlogconfig": []string{"/fluentd/etc/config/custom/project", "/var/lib/rancher/fluentd/etc/config/custom/project"},
+		})
 
-	sslVolMounts, sslVols := buildSecretVolumes(map[string][]string{
-		loggingconfig.SSLSecretName: []string{"/fluentd/etc/ssl", loggingconfig.SSLSecretName},
-	})
+	sslVolMounts, sslVols := buildSecretVolumes([]string{loggingconfig.SSLSecretName},
+		map[string][]string{
+			loggingconfig.SSLSecretName: []string{"/fluentd/etc/ssl", loggingconfig.SSLSecretName},
+		})
 
 	allConfigVolMounts, allConfigVols := append(configVolMounts, customConfigVolMounts...), append(configVols, customConfigVols...)
 	allVolMounts, allVols := append(append(allConfigVolMounts, logVolMounts...), sslVolMounts...), append(append(allConfigVols, logVols...), sslVols...)
@@ -321,8 +325,12 @@ func GetDriverDir(driverName string) string {
 	}
 }
 
-func buildHostPathVolumes(mounts map[string][]string) (vms []v1.VolumeMount, vs []v1.Volume) {
-	for name, value := range mounts {
+func buildHostPathVolumes(keys []string, mounts map[string][]string) (vms []v1.VolumeMount, vs []v1.Volume) {
+	for _, name := range keys {
+		value, ok := mounts[name]
+		if !ok {
+			continue
+		}
 		vms = append(vms, v1.VolumeMount{
 			Name:      name,
 			MountPath: value[0],
@@ -339,8 +347,12 @@ func buildHostPathVolumes(mounts map[string][]string) (vms []v1.VolumeMount, vs 
 	return
 }
 
-func buildSecretVolumes(mounts map[string][]string) (vms []v1.VolumeMount, vs []v1.Volume) {
-	for name, value := range mounts {
+func buildSecretVolumes(keys []string, mounts map[string][]string) (vms []v1.VolumeMount, vs []v1.Volume) {
+	for _, name := range keys {
+		value, ok := mounts[name]
+		if !ok {
+			continue
+		}
 		vms = append(vms, v1.VolumeMount{
 			Name:      name,
 			MountPath: value[0],
