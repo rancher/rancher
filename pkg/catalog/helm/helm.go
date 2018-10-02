@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -31,10 +32,40 @@ var httpClient = &http.Client{
 	Timeout: httpTimeout,
 }
 
+func request(baseURL string, method string, username string, password string) (*http.Response, error) {
+	baseEndpoint, err := url.Parse(baseURL)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(username) > 0 && len(password) > 0 {
+		baseEndpoint.User = url.UserPassword(username, password)
+	}
+
+	if !strings.HasSuffix(baseEndpoint.Path, "/") {
+		baseEndpoint.Path += "/"
+	}
+
+	req, err := http.NewRequest(method, baseEndpoint.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := httpClient.Do(req)
+
+	return resp, err
+}
+
+// DownloadIndex Fetchs helm catalog index
 func DownloadIndex(indexURL string) (*RepoIndex, error) {
 	indexURL = strings.TrimSuffix(indexURL, "/")
 	indexURL = indexURL + "/index.yaml"
-	resp, err := httpClient.Get(indexURL)
+
+	// @TODO: Move this somewhere else
+	username := os.Getenv("REPO_USERNAME")
+	password := os.Getenv("REPO_PASSWORD")
+
+	resp, err := request(indexURL, "GET", username, password)
 	if err != nil {
 		if e, ok := err.(net.Error); ok && e.Timeout() {
 			return nil, errors.Errorf("Timeout in HTTP GET to [%s], did not respond in %s", indexURL, httpTimeout)
@@ -97,11 +128,17 @@ func LoadIndex(repoPath string) (*RepoIndex, error) {
 	return helmRepoIndex, yaml.Unmarshal(body, helmRepoIndex.IndexFile)
 }
 
+// FetchTgz fetchs artefacts from helm catalog
 func FetchTgz(url string) ([]v3.File, error) {
 	var files []v3.File
 
 	logrus.Debugf("Fetching file %s", url)
-	resp, err := httpClient.Get(url)
+
+	// @TODO: Move this somewhere else
+	username := os.Getenv("REPO_USERNAME")
+	password := os.Getenv("REPO_PASSWORD")
+
+	resp, err := request(url, "GET", username, password)
 	if err != nil {
 		return nil, errors.Errorf("Error in HTTP GET of [%s], error: %s", url, err)
 	}
