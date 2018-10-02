@@ -160,6 +160,11 @@ func (c *Cluster) BuildKubeAPIProcess(prefixPath string) v3.Process {
 	serviceOptions := c.GetKubernetesServicesOptions()
 	if serviceOptions.KubeAPI != nil {
 		for k, v := range serviceOptions.KubeAPI {
+			// if the value is empty, we remove that option
+			if len(v) == 0 {
+				delete(CommandArgs, k)
+				continue
+			}
 			CommandArgs[k] = v
 		}
 	}
@@ -259,6 +264,11 @@ func (c *Cluster) BuildKubeControllerProcess(prefixPath string) v3.Process {
 	serviceOptions := c.GetKubernetesServicesOptions()
 	if serviceOptions.KubeController != nil {
 		for k, v := range serviceOptions.KubeController {
+			// if the value is empty, we remove that option
+			if len(v) == 0 {
+				delete(CommandArgs, k)
+				continue
+			}
 			CommandArgs[k] = v
 		}
 	}
@@ -320,7 +330,7 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string) v3.Pr
 	CommandArgs := map[string]string{
 		"v":                            "2",
 		"address":                      "0.0.0.0",
-		"cadvisor-port":                "0",
+		"cadvisor-port":                "0", //depricated in 1.12
 		"read-only-port":               "0",
 		"cluster-domain":               c.ClusterDomain,
 		"pod-infra-container-image":    c.Services.Kubelet.InfraContainerImage,
@@ -371,6 +381,11 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string) v3.Pr
 	serviceOptions := c.GetKubernetesServicesOptions()
 	if serviceOptions.Kubelet != nil {
 		for k, v := range serviceOptions.Kubelet {
+			// if the value is empty, we remove that option
+			if len(v) == 0 {
+				delete(CommandArgs, k)
+				continue
+			}
 			CommandArgs[k] = v
 		}
 	}
@@ -458,6 +473,11 @@ func (c *Cluster) BuildKubeProxyProcess(host *hosts.Host, prefixPath string) v3.
 	serviceOptions := c.GetKubernetesServicesOptions()
 	if serviceOptions.Kubeproxy != nil {
 		for k, v := range serviceOptions.Kubeproxy {
+			// if the value is empty, we remove that option
+			if len(v) == 0 {
+				delete(CommandArgs, k)
+				continue
+			}
 			CommandArgs[k] = v
 		}
 	}
@@ -550,6 +570,11 @@ func (c *Cluster) BuildSchedulerProcess(prefixPath string) v3.Process {
 	serviceOptions := c.GetKubernetesServicesOptions()
 	if serviceOptions.Scheduler != nil {
 		for k, v := range serviceOptions.Scheduler {
+			// if the value is empty, we remove that option
+			if len(v) == 0 {
+				delete(CommandArgs, k)
+				continue
+			}
 			CommandArgs[k] = v
 		}
 	}
