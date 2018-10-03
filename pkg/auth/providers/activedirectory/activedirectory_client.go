@@ -371,7 +371,7 @@ func (p *adProvider) searchUser(name string, config *v3.ActiveDirectoryConfig, l
 
 func (p *adProvider) searchGroup(name string, config *v3.ActiveDirectoryConfig, lConn *ldapv2.Conn) ([]v3.Principal, error) {
 	// GroupSearchFilter should be follow AD search filter syntax, enclosed by parentheses
-	query := "(&(" + ObjectClass + "=" + config.GroupObjectClass + ")(" + config.GroupSearchAttribute + "=*" + name + "*)" + config.GroupSearchFilter + ")"
+	query := "(&(" + ObjectClass + "=" + config.GroupObjectClass + ")(" + config.GroupSearchAttribute + "=" + name + "*)" + config.GroupSearchFilter + ")"
 	logrus.Debugf("LDAPProvider searchGroup query: %s", query)
 	return p.searchLdap(query, GroupScope, config, lConn)
 }
