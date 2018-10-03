@@ -427,6 +427,7 @@ func PodSecurityPolicyTemplate(schemas *types.Schemas, management *config.Scaled
 	}
 }
 
+// TODO: Ensure NewCRTBValidator/NewPRTBValidator is covered by Authz*Binding
 // func ClusterRoleTemplateBinding(schemas *types.Schemas, management *config.ScaledContext) {
 // 	schema := schemas.Schema(&managementschema.Version, client.ClusterRoleTemplateBindingType)
 // 	schema.Validator = roletemplatebinding.NewCRTBValidator(management)

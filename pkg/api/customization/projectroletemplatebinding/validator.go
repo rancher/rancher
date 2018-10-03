@@ -76,6 +76,7 @@ func (v *Validator) getProjectRoleTemplateBindingRules(userID string) ([]rbac.Po
 	return rules, nil
 }
 
+// TODO: Use cluster client to retrieve role template information & build ruleset
 func (v *Validator) ProjectRoleTemplateBindingValidator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
 	currentUserID := v.userManager.GetUser(request)
 	roleTemplateID, ok := data[client.ProjectRoleTemplateBindingFieldRoleTemplateID].(string)
