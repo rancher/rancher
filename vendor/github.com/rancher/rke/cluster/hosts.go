@@ -24,7 +24,7 @@ const (
 
 func (c *Cluster) TunnelHosts(ctx context.Context, local bool) error {
 	if local {
-		if err := c.ControlPlaneHosts[0].TunnelUpLocal(ctx); err != nil {
+		if err := c.ControlPlaneHosts[0].TunnelUpLocal(ctx, c.Version); err != nil {
 			return fmt.Errorf("Failed to connect to docker for local host [%s]: %v", c.EtcdHosts[0].Address, err)
 		}
 		return nil
@@ -32,7 +32,7 @@ func (c *Cluster) TunnelHosts(ctx context.Context, local bool) error {
 	c.InactiveHosts = make([]*hosts.Host, 0)
 	uniqueHosts := hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts)
 	for i := range uniqueHosts {
-		if err := uniqueHosts[i].TunnelUp(ctx, c.DockerDialerFactory, c.PrefixPath); err != nil {
+		if err := uniqueHosts[i].TunnelUp(ctx, c.DockerDialerFactory, c.PrefixPath, c.Version); err != nil {
 			// Unsupported Docker version is NOT a connectivity problem that we can recover! So we bail out on it
 			if strings.Contains(err.Error(), "Unsupported Docker version found") {
 				return err

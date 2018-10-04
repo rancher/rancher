@@ -10,7 +10,6 @@ import (
 
 	b64 "encoding/base64"
 
-	"github.com/coreos/go-semver/semver"
 	ref "github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"
 	"github.com/rancher/rke/cloudprovider/aws"
@@ -19,6 +18,7 @@ import (
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
+	"github.com/rancher/rke/util"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
@@ -786,11 +786,11 @@ func (c *Cluster) getRKEToolsEntryPoint() string {
 
 	logrus.Debugf("Extracted version [%s] from image [%s]", last, c.SystemImages.KubernetesServicesSidecar)
 
-	sv, err := strToSemVer(last)
+	sv, err := util.StrToSemVer(last)
 	if err != nil {
 		return DefaultToolsEntrypoint
 	}
-	svdefault, err := strToSemVer(DefaultToolsEntrypointVersion)
+	svdefault, err := util.StrToSemVer(DefaultToolsEntrypointVersion)
 	if err != nil {
 		return DefaultToolsEntrypoint
 	}
@@ -799,12 +799,4 @@ func (c *Cluster) getRKEToolsEntryPoint() string {
 		return LegacyToolsEntrypoint
 	}
 	return DefaultToolsEntrypoint
-}
-
-func strToSemVer(version string) (*semver.Version, error) {
-	v, err := semver.NewVersion(strings.TrimPrefix(version, "v"))
-	if err != nil {
-		return nil, err
-	}
-	return v, nil
 }

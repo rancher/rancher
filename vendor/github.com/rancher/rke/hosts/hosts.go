@@ -345,3 +345,12 @@ func DoRunLogCleaner(ctx context.Context, host *Host, alpineImage string, prsMap
 	logrus.Debugf("[cleanup] Successfully cleaned up log links on host [%s]", host.Address)
 	return nil
 }
+
+func IsNodeInList(host *Host, hostList []*Host) bool {
+	for _, h := range hostList {
+		if h.HostnameOverride == host.HostnameOverride {
+			return true
+		}
+	}
+	return false
+}
