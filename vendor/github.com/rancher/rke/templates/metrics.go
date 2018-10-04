@@ -113,7 +113,13 @@ spec:
         imagePullPolicy: Always
         command:
         - /metrics-server
+        {{- if eq .Version "v0.3" }}
+        - --kubelet-insecure-tls
+        - --kubelet-preferred-address-types=InternalIP
+        - --logtostderr
+        {{- else }}
         - --source=kubernetes.summary_api:https://kubernetes.default.svc?kubeletHttps=true&kubeletPort=10250&useServiceAccount=true&insecure=true
+        {{- end }}
         {{ range $k,$v := .Options }}
         -  --{{ $k }}={{ $v }}
         {{ end }}
