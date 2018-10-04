@@ -12,6 +12,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/log"
+	"github.com/rancher/rke/util"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
@@ -19,10 +20,9 @@ import (
 
 const (
 	DockerAPIVersion = "1.24"
-	K8sVersion       = "1.8"
 )
 
-func (h *Host) TunnelUp(ctx context.Context, dialerFactory DialerFactory, clusterPrefixPath string) error {
+func (h *Host) TunnelUp(ctx context.Context, dialerFactory DialerFactory, clusterPrefixPath string, clusterVersion string) error {
 	if h.DClient != nil {
 		return nil
 	}
@@ -37,14 +37,14 @@ func (h *Host) TunnelUp(ctx context.Context, dialerFactory DialerFactory, cluste
 	if err != nil {
 		return fmt.Errorf("Can't initiate NewClient: %v", err)
 	}
-	if err := checkDockerVersion(ctx, h); err != nil {
+	if err := checkDockerVersion(ctx, h, clusterVersion); err != nil {
 		return err
 	}
 	h.PrefixPath = GetPrefixPath(h.DockerInfo.OperatingSystem, clusterPrefixPath)
 	return nil
 }
 
-func (h *Host) TunnelUpLocal(ctx context.Context) error {
+func (h *Host) TunnelUpLocal(ctx context.Context, clusterVersion string) error {
 	var err error
 	if h.DClient != nil {
 		return nil
@@ -55,16 +55,21 @@ func (h *Host) TunnelUpLocal(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("Can't initiate NewClient: %v", err)
 	}
-	return checkDockerVersion(ctx, h)
+	return checkDockerVersion(ctx, h, clusterVersion)
 }
 
-func checkDockerVersion(ctx context.Context, h *Host) error {
+func checkDockerVersion(ctx context.Context, h *Host, clusterVersion string) error {
 	info, err := h.DClient.Info(ctx)
 	if err != nil {
 		return fmt.Errorf("Can't retrieve Docker Info: %v", err)
 	}
 	logrus.Debugf("Docker Info found: %#v", info)
 	h.DockerInfo = info
+	K8sSemVer, err := util.StrToSemVer(clusterVersion)
+	if err != nil {
+		return fmt.Errorf("Error while parsing cluster version [%s]: %v", clusterVersion, err)
+	}
+	K8sVersion := fmt.Sprintf("%d.%d", K8sSemVer.Major, K8sSemVer.Minor)
 	isvalid, err := docker.IsSupportedDockerVersion(info, K8sVersion)
 	if err != nil {
 		return fmt.Errorf("Error while determining supported Docker version [%s]: %v", info.ServerVersion, err)
