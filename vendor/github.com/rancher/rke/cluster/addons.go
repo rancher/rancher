@@ -44,6 +44,7 @@ type MetricsServerOptions struct {
 	RBACConfig         string
 	Options            map[string]string
 	MetricsServerImage string
+	Version            string
 }
 
 type addonError struct {
@@ -204,10 +205,14 @@ func (c *Cluster) deployKubeDNS(ctx context.Context) error {
 
 func (c *Cluster) deployMetricServer(ctx context.Context) error {
 	log.Infof(ctx, "[addons] Setting up Metrics Server")
+	s := strings.Split(c.SystemImages.MetricsServer, ":")
+	versionTag := s[len(s)-1]
+
 	MetricsServerConfig := MetricsServerOptions{
 		MetricsServerImage: c.SystemImages.MetricsServer,
 		RBACConfig:         c.Authorization.Mode,
 		Options:            c.Monitoring.Options,
+		Version:            getTagMajorVersion(versionTag),
 	}
 	metricsYaml, err := addons.GetMetricsServerManifest(MetricsServerConfig)
 	if err != nil {
