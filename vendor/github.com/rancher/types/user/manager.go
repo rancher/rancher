@@ -14,4 +14,5 @@ type Manager interface {
 	CheckAccess(accessMode string, allowedPrincipalIDs []string, user v3.Principal, groups []v3.Principal) (bool, error)
 	SetPrincipalOnCurrentUserByUserID(userID string, principal v3.Principal) (*v3.User, error)
 	CreateNewUserClusterRoleBinding(userName string, userUID apitypes.UID) error
+	GetGroupsFromClustersAndProjects() ([]string, error)
 }
