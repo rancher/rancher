@@ -83,10 +83,130 @@ func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.Act
 		return v3.Principal{}, nil, err
 	}
 	if !allowed {
+		if config.NestedGroupMembershipEnabled != nil && *config.NestedGroupMembershipEnabled == true {
+			// check access via nestedMembership
+			allowedWithNested, groups, err := p.checkAccessViaNestedMembership(config.AccessMode, config.AllowedPrincipalIDs, userPrincipal, lConn, config, caPool)
+			if err != nil {
+				return userPrincipal, groupPrincipals, err
+			}
+
+			if allowedWithNested {
+				groupPrincipals = append(groupPrincipals, groups...)
+				return userPrincipal, groupPrincipals, nil
+			}
+		}
 		return v3.Principal{}, nil, httperror.NewAPIError(httperror.PermissionDenied, "Permission denied")
 	}
 
 	return userPrincipal, groupPrincipals, err
+}
+
+func (p *adProvider) checkAccessViaNestedMembership(accessMode string, allowedPrincipalIDs []string, userPrincipal v3.Principal, lConn *ldapv2.Conn,
+	config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) (bool, []v3.Principal, error) {
+	var groups []v3.Principal
+	var groupIDMap map[string]bool
+	if accessMode == "unrestricted" || accessMode == "" {
+		return true, []v3.Principal{}, nil
+	}
+
+	groupIDMap = make(map[string]bool)
+	parts := strings.SplitN(userPrincipal.Name, ":", 2)
+	if len(parts) != 2 {
+		return false, []v3.Principal{}, fmt.Errorf("invalid id %v", p)
+	}
+	userDN := strings.TrimPrefix(parts[1], "//")
+
+	if accessMode == "required" || accessMode == "restricted" {
+		for _, princ := range allowedPrincipalIDs {
+			parts := strings.SplitN(princ, ":", 2)
+			if len(parts) != 2 {
+				return false, []v3.Principal{}, fmt.Errorf("invalid id %v", p)
+			}
+			scope := parts[0]
+			if strings.EqualFold(scope, UserScope) {
+				continue
+			}
+			groupDN := strings.TrimPrefix(parts[1], "//")
+
+			allowed, group, err := p.runNestedGroupMembershipQuery(groupDN, userDN, lConn, config, caPool)
+			if err != nil {
+				return false, []v3.Principal{}, err
+			}
+
+			if !allowed {
+				continue
+			}
+			if !groupIDMap[group.Name] {
+				groupIDMap[group.Name] = true
+				groups = append(groups, group)
+			}
+		}
+
+		if accessMode == "restricted" {
+			groupPrincipals, err := p.userMGR.GetGroupsFromClustersAndProjects()
+			if err != nil {
+				return false, []v3.Principal{}, err
+			}
+			for _, g := range groupPrincipals {
+				parts := strings.SplitN(g, ":", 2)
+				if len(parts) != 2 {
+					return false, []v3.Principal{}, fmt.Errorf("invalid id %v", p)
+				}
+				groupDN := strings.TrimPrefix(parts[1], "//")
+				allowed, group, err := p.runNestedGroupMembershipQuery(groupDN, userDN, lConn, config, caPool)
+				if err != nil {
+					return false, []v3.Principal{}, err
+				}
+
+				if !allowed {
+					continue
+				}
+				if !groupIDMap[group.Name] {
+					groupIDMap[group.Name] = true
+					groups = append(groups, group)
+				}
+			}
+		}
+
+		if len(groups) == 0 {
+			return false, []v3.Principal{}, nil
+		}
+
+		return true, groups, nil
+	}
+	return false, []v3.Principal{}, fmt.Errorf("Unsupported accessMode: %v", accessMode)
+}
+
+func (p *adProvider) runNestedGroupMembershipQuery(groupDN string, userDN string, lConn *ldapv2.Conn, config *v3.ActiveDirectoryConfig,
+	caPool *x509.CertPool) (bool, v3.Principal, error) {
+	nestedGroupsQuery := fmt.Sprintf("(%v%v%v)", strings.ToLower(MemberOfAttribute), ":1.2.840.113556.1.4.1941:=", ldapv2.EscapeFilter(groupDN))
+	logrus.Debugf("AD: Query to check nestedGroupMembership of %v in %v: %v", userDN, groupDN, nestedGroupsQuery)
+
+	search := ldapv2.NewSearchRequest(userDN,
+		ldapv2.ScopeBaseObject, ldapv2.NeverDerefAliases, 0, 0, false,
+		nestedGroupsQuery,
+		[]string{}, nil)
+
+	serviceAccountUsername := ldap.GetUserExternalID(config.ServiceAccountUsername, config.DefaultLoginDomain)
+	if err := lConn.Bind(serviceAccountUsername, config.ServiceAccountPassword); err != nil {
+		return false, v3.Principal{}, err
+	}
+
+	result, err := lConn.SearchWithPaging(search, 1000)
+	if err != nil {
+		return false, v3.Principal{}, httperror.WrapAPIError(errors.Wrapf(err, "server returned error for search %v %v: %v", search.BaseDN, search.Filter, err), httperror.ServerError, err.Error())
+	}
+
+	if len(result.Entries) > 0 {
+		// The query returned 1 result and that is the user itself
+		// add this group to groupPrincipals
+		group, err := p.getPrincipal(groupDN, GroupScope, config, caPool)
+		if err != nil {
+			return false, v3.Principal{}, nil
+		}
+		return true, *group, nil
+	}
+	return false, v3.Principal{}, nil
 }
 
 func (p *adProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult, config *v3.ActiveDirectoryConfig, lConn *ldapv2.Conn) (v3.Principal, []v3.Principal, error) {
@@ -123,32 +243,6 @@ func (p *adProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult, 
 	userPrincipal = *user
 	userPrincipal.Me = true
 
-	// config.NestedGroupMembershipEnabled nil or false = false
-	if config.NestedGroupMembershipEnabled != nil {
-		if *config.NestedGroupMembershipEnabled == true {
-			// As per https://msdn.microsoft.com/en-us/library/aa746475%28VS.85%29.aspx, `(member:1.2.840.113556.1.4.1941:=cn=user1,cn=users,DC=x)`
-			// query can fetch all groups that the user is a member of, including nested groups
-			userDN := result.Entries[0].DN
-			// config.GroupMemberMappingAttribute is a required field post 2.0.1, so if an upgraded setup doesn't have its value, we set it to `member`
-			if config.GroupMemberMappingAttribute == "" {
-				config.GroupMemberMappingAttribute = "member"
-			}
-			nestedGroupsQuery := fmt.Sprintf("(%v%v%v)", config.GroupMemberMappingAttribute, ":1.2.840.113556.1.4.1941:=", ldapv2.EscapeFilter(userDN))
-			logrus.Debugf("AD: Query for pulling user's groups: %v", nestedGroupsQuery)
-			searchBase := config.UserSearchBase
-			if config.GroupSearchBase != "" {
-				searchBase = config.GroupSearchBase
-			}
-
-			// Call common method for getting group principals
-			groupPrincipals, err = p.getGroupPrincipalsFromSearch(searchBase, nestedGroupsQuery, config, lConn, memberOf)
-			if err != nil {
-				return userPrincipal, groupPrincipals, err
-			}
-
-			return userPrincipal, groupPrincipals, nil
-		}
-	}
 	if len(memberOf) != 0 {
 		for i := 0; i < len(memberOf); i += 50 {
 			batch := memberOf[i:ldap.Min(i+50, len(memberOf))]
