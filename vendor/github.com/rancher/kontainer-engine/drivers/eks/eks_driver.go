@@ -20,6 +20,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/iam"
@@ -733,7 +734,68 @@ func getParameterValueFromOutput(key string, outputs []*cloudformation.Output) s
 func (d *Driver) Update(ctx context.Context, info *types.ClusterInfo, options *types.DriverOptions) (*types.ClusterInfo, error) {
 	logrus.Infof("Starting update")
 
-	// nothing can be updated so just return
+	state, err := getStateFromOptions(options)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing state: %v", err)
+	}
+
+	sess, err := session.NewSession(&aws.Config{
+		Region: aws.String(state.Region),
+		Credentials: credentials.NewStaticCredentials(
+			state.ClientID,
+			state.ClientSecret,
+			"",
+		),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error getting new aws session: %v", err)
+	}
+
+	svc := autoscaling.New(sess)
+
+	FilterName := "key"
+	FilterValue := "kubernetes.io/cluster/" + state.ClusterName
+
+	describeTags, err := svc.DescribeTags(&autoscaling.DescribeTagsInput{
+		Filters: []*autoscaling.Filter{
+			&autoscaling.Filter{
+				Name:   &FilterName,
+				Values: []*string{&FilterValue},
+			},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error getting tags: %v", err)
+	}
+	if len(describeTags.Tags) != 1 {
+		return nil, fmt.Errorf("found %d tags", len(describeTags.Tags))
+	}
+
+	resourceID := describeTags.Tags[0].ResourceId
+	describeAutoScalingGroup, err := svc.DescribeAutoScalingGroups(&autoscaling.DescribeAutoScalingGroupsInput{
+		AutoScalingGroupNames: []*string{resourceID},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error getting auto scaling group: %v", err)
+	}
+	if len(describeAutoScalingGroup.AutoScalingGroups) != 1 {
+		return nil, fmt.Errorf("found %d tags", len(describeAutoScalingGroup.AutoScalingGroups))
+	}
+
+	autoScalingGroup := describeAutoScalingGroup.AutoScalingGroups[0]
+	if (*autoScalingGroup.MinSize == state.MinimumASGSize) && (*autoScalingGroup.MaxSize == state.MaximumASGSize) {
+		logrus.Infof("Not updating, auto scaling group sizes already match")
+		return nil, nil
+	}
+
+	_, updateErr := svc.UpdateAutoScalingGroup(&autoscaling.UpdateAutoScalingGroupInput{
+		AutoScalingGroupName: resourceID,
+		MinSize:              &state.MinimumASGSize,
+		MaxSize:              &state.MaximumASGSize,
+	})
+	if updateErr != nil {
+		return nil, fmt.Errorf("error updating auto scaling group: %v", err)
+	}
 
 	logrus.Infof("Update complete")
 	return info, nil
