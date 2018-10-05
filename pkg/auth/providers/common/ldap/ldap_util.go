@@ -17,6 +17,18 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
+type ConfigAttributes struct {
+	GroupMemberMappingAttribute string
+	GroupNameAttribute          string
+	GroupObjectClass            string
+	GroupSearchAttribute        string
+	ObjectClass                 string
+	ProviderName                string
+	UserLoginAttribute          string
+	UserNameAttribute           string
+	UserObjectClass             string
+}
+
 func NewLDAPConn(servers []string, TLS bool, port int64, connectionTimeout int64, caPool *x509.CertPool) (*ldapv2.Conn, error) {
 	logrus.Debug("Now creating Ldap connection")
 	var lConn *ldapv2.Conn
@@ -209,6 +221,68 @@ func AttributesToPrincipal(attribs []*ldapv2.EntryAttribute, dnStr, scope, provi
 		Provider:      providerName,
 	}
 	return principal, nil
+}
+
+func GatherParentGroups(groupPrincipal v3.Principal, searchDomain string, groupScope string, config *ConfigAttributes, lConn *ldapv2.Conn,
+	groupMap map[string]bool, nestedGroupPrincipals *[]v3.Principal, searchAttributes []string) error {
+	groupMap[groupPrincipal.ObjectMeta.Name] = true
+	principals := []v3.Principal{}
+	//var searchAttributes []string
+	parts := strings.SplitN(groupPrincipal.ObjectMeta.Name, ":", 2)
+	if len(parts) != 2 {
+		return errors.Errorf("invalid id %v", groupPrincipal.ObjectMeta.Name)
+	}
+	groupDN := strings.TrimPrefix(parts[1], "//")
+
+	searchGroup := ldapv2.NewSearchRequest(searchDomain,
+		ldapv2.ScopeWholeSubtree, ldapv2.NeverDerefAliases, 0, 0, false,
+		fmt.Sprintf("(&(%v=%v)(%v=%v))", config.GroupMemberMappingAttribute, ldapv2.EscapeFilter(groupDN), config.ObjectClass, config.GroupObjectClass),
+		searchAttributes, nil)
+	resultGroups, err := lConn.SearchWithPaging(searchGroup, 1000)
+	if err != nil {
+		return err
+	}
+
+	for i := 0; i < len(resultGroups.Entries); i++ {
+		entry := resultGroups.Entries[i]
+		principal, err := AttributesToPrincipal(entry.Attributes, entry.DN, groupScope, config.ProviderName, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
+		if err != nil {
+			logrus.Errorf("Error translating group result: %v", err)
+			continue
+		}
+		principals = append(principals, *principal)
+	}
+
+	for _, gp := range principals {
+		if _, ok := groupMap[gp.ObjectMeta.Name]; ok {
+			continue
+		} else {
+			*nestedGroupPrincipals = append(*nestedGroupPrincipals, gp)
+			err = GatherParentGroups(gp, searchDomain, groupScope, config, lConn, groupMap, nestedGroupPrincipals, searchAttributes)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func FindNonDuplicateBetweenGroupPrincipals(newGroupPrincipals []v3.Principal, groupPrincipals []v3.Principal, nonDupGroupPrincipals []v3.Principal) []v3.Principal {
+	for _, gp := range newGroupPrincipals {
+		counter := 0
+		for _, usermembergp := range groupPrincipals {
+			// check the groups ObjectMeta.Name and name fields value are the same, then they are the same group
+			if gp.ObjectMeta.Name == usermembergp.ObjectMeta.Name && gp.DisplayName == usermembergp.DisplayName {
+				break
+			} else {
+				counter++
+			}
+		}
+		if counter == len(groupPrincipals) {
+			nonDupGroupPrincipals = append(nonDupGroupPrincipals, gp)
+		}
+	}
+	return nonDupGroupPrincipals
 }
 
 func Min(a int, b int) int {

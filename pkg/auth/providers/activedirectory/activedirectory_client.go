@@ -93,6 +93,11 @@ func (p *adProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult, 
 	var groupPrincipals []v3.Principal
 	var userPrincipal v3.Principal
 
+	var nonDupGroupPrincipals []v3.Principal
+	var nestedGroupPrincipals []v3.Principal
+
+	groupMap := make(map[string]bool)
+
 	entry := result.Entries[0]
 
 	if !p.permissionCheck(entry.Attributes, config) {
@@ -123,32 +128,6 @@ func (p *adProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult, 
 	userPrincipal = *user
 	userPrincipal.Me = true
 
-	// config.NestedGroupMembershipEnabled nil or false = false
-	if config.NestedGroupMembershipEnabled != nil {
-		if *config.NestedGroupMembershipEnabled == true {
-			// As per https://msdn.microsoft.com/en-us/library/aa746475%28VS.85%29.aspx, `(member:1.2.840.113556.1.4.1941:=cn=user1,cn=users,DC=x)`
-			// query can fetch all groups that the user is a member of, including nested groups
-			userDN := result.Entries[0].DN
-			// config.GroupMemberMappingAttribute is a required field post 2.0.1, so if an upgraded setup doesn't have its value, we set it to `member`
-			if config.GroupMemberMappingAttribute == "" {
-				config.GroupMemberMappingAttribute = "member"
-			}
-			nestedGroupsQuery := fmt.Sprintf("(%v%v%v)", config.GroupMemberMappingAttribute, ":1.2.840.113556.1.4.1941:=", ldapv2.EscapeFilter(userDN))
-			logrus.Debugf("AD: Query for pulling user's groups: %v", nestedGroupsQuery)
-			searchBase := config.UserSearchBase
-			if config.GroupSearchBase != "" {
-				searchBase = config.GroupSearchBase
-			}
-
-			// Call common method for getting group principals
-			groupPrincipals, err = p.getGroupPrincipalsFromSearch(searchBase, nestedGroupsQuery, config, lConn, memberOf)
-			if err != nil {
-				return userPrincipal, groupPrincipals, err
-			}
-
-			return userPrincipal, groupPrincipals, nil
-		}
-	}
 	if len(memberOf) != 0 {
 		for i := 0; i < len(memberOf); i += 50 {
 			batch := memberOf[i:ldap.Min(i+50, len(memberOf))]
@@ -174,8 +153,46 @@ func (p *adProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult, 
 			groupPrincipals = append(groupPrincipals, groupPrincipalListBatch...)
 		}
 	}
-	return userPrincipal, groupPrincipals, nil
+	// config.NestedGroupMembershipEnabled nil or false = false
+	if config.NestedGroupMembershipEnabled != nil {
+		if *config.NestedGroupMembershipEnabled == true {
+			searchDomain := config.UserSearchBase
+			if config.GroupSearchBase != "" {
+				searchDomain = config.GroupSearchBase
+			}
+			// config.GroupMemberMappingAttribute is a required field post 2.0.1, so if an upgraded setup doesn't have its value, we set it to `member`
+			if config.GroupMemberMappingAttribute == "" {
+				config.GroupMemberMappingAttribute = "member"
+			}
 
+			// Handling nestedgroups: tracing from down to top in order to find the parent groups, parent parent groups, and so on...
+			// When traversing up, we note down all the parent groups and add them to groupPrincipals
+			commonConfig := ldap.ConfigAttributes{
+				GroupMemberMappingAttribute: config.GroupMemberMappingAttribute,
+				GroupNameAttribute:          config.GroupNameAttribute,
+				GroupObjectClass:            config.GroupObjectClass,
+				GroupSearchAttribute:        config.GroupSearchAttribute,
+				ObjectClass:                 ObjectClass,
+				ProviderName:                Name,
+				UserLoginAttribute:          config.UserLoginAttribute,
+				UserNameAttribute:           config.UserNameAttribute,
+				UserObjectClass:             config.UserObjectClass,
+			}
+			searchAttributes := []string{MemberOfAttribute, ObjectClass, config.GroupObjectClass, config.UserLoginAttribute, config.GroupNameAttribute,
+				config.GroupSearchAttribute}
+			for _, groupPrincipal := range groupPrincipals {
+				err = ldap.GatherParentGroups(groupPrincipal, searchDomain, GroupScope, &commonConfig, lConn, groupMap, &nestedGroupPrincipals, searchAttributes)
+				if err != nil {
+					return userPrincipal, groupPrincipals, nil
+				}
+			}
+			nonDupGroupPrincipals = ldap.FindNonDuplicateBetweenGroupPrincipals(nestedGroupPrincipals, groupPrincipals, []v3.Principal{})
+			groupPrincipals = append(groupPrincipals, nonDupGroupPrincipals...)
+		}
+		return userPrincipal, groupPrincipals, nil
+	}
+
+	return userPrincipal, groupPrincipals, nil
 }
 
 func (p *adProvider) getGroupPrincipalsFromSearch(searchBase string, filter string, config *v3.ActiveDirectoryConfig, lConn *ldapv2.Conn,

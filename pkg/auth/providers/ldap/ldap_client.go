@@ -178,7 +178,7 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult
 		query := fmt.Sprintf("(&(%v=%v)(%v=%v))", config.GroupMemberMappingAttribute, ldapv2.EscapeFilter(groupMemberUserAttribute[0]), ObjectClass, config.GroupObjectClass)
 		newGroupPrincipals, err := p.searchLdap(query, groupScope, config, lConn)
 		//deduplicate groupprincipals get from userMemberAttribute
-		nonDupGroupPrincipals = p.findNonDuplicateBetweenGroupPrincipals(newGroupPrincipals, groupPrincipals, nonDupGroupPrincipals)
+		nonDupGroupPrincipals = ldap.FindNonDuplicateBetweenGroupPrincipals(newGroupPrincipals, groupPrincipals, nonDupGroupPrincipals)
 		groupPrincipals = append(groupPrincipals, nonDupGroupPrincipals...)
 		if err != nil {
 			return userPrincipal, groupPrincipals, err
@@ -193,77 +193,30 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult
 
 		// Handling nestedgroups: tracing from down to top in order to find the parent groups, parent parent groups, and so on...
 		// When traversing up, we note down all the parent groups and add them to groupPrincipals
+		commonConfig := ldap.ConfigAttributes{
+			GroupMemberMappingAttribute: config.GroupMemberMappingAttribute,
+			GroupNameAttribute:          config.GroupNameAttribute,
+			GroupObjectClass:            config.GroupObjectClass,
+			GroupSearchAttribute:        config.GroupSearchAttribute,
+			ObjectClass:                 ObjectClass,
+			ProviderName:                OpenLdapName,
+			UserLoginAttribute:          config.UserLoginAttribute,
+			UserNameAttribute:           config.UserNameAttribute,
+			UserObjectClass:             config.UserObjectClass,
+		}
+		searchAttributes := []string{config.GroupMemberUserAttribute, config.GroupMemberMappingAttribute, ObjectClass, config.GroupObjectClass, config.UserLoginAttribute,
+			config.GroupNameAttribute, config.GroupSearchAttribute}
 		for _, groupPrincipal := range groupPrincipals {
-			err = p.gatherParentGroups(groupPrincipal, searchDomain, groupScope, config, lConn, groupMap, &nestedGroupPrincipals)
+			err = ldap.GatherParentGroups(groupPrincipal, searchDomain, groupScope, &commonConfig, lConn, groupMap, &nestedGroupPrincipals, searchAttributes)
 			if err != nil {
 				return userPrincipal, groupPrincipals, nil
 			}
 		}
-		nonDupGroupPrincipals = p.findNonDuplicateBetweenGroupPrincipals(nestedGroupPrincipals, groupPrincipals, []v3.Principal{})
+		nonDupGroupPrincipals = ldap.FindNonDuplicateBetweenGroupPrincipals(nestedGroupPrincipals, groupPrincipals, []v3.Principal{})
 		groupPrincipals = append(groupPrincipals, nonDupGroupPrincipals...)
 	}
 
 	return userPrincipal, groupPrincipals, nil
-}
-
-func (p *ldapProvider) gatherParentGroups(groupPrincipal v3.Principal, searchDomain string, groupScope string, config *v3.LdapConfig, lConn *ldapv2.Conn, groupMap map[string]bool, nestedGroupPrincipals *[]v3.Principal) error {
-	groupMap[groupPrincipal.ObjectMeta.Name] = true
-	principals := []v3.Principal{}
-	parts := strings.SplitN(groupPrincipal.ObjectMeta.Name, ":", 2)
-	if len(parts) != 2 {
-		return errors.Errorf("invalid id %v", groupPrincipal.ObjectMeta.Name)
-	}
-	groupDN := strings.TrimPrefix(parts[1], "//")
-
-	searchGroup := ldapv2.NewSearchRequest(searchDomain,
-		ldapv2.ScopeWholeSubtree, ldapv2.NeverDerefAliases, 0, 0, false,
-		fmt.Sprintf("(&(%v=%v)(%v=%v))", config.GroupMemberMappingAttribute, ldapv2.EscapeFilter(groupDN), ObjectClass, config.GroupObjectClass),
-		ldap.GetGroupSearchAttributesForLDAP(ObjectClass, config), nil)
-	resultGroups, err := lConn.Search(searchGroup)
-	if err != nil {
-		return err
-	}
-
-	for i := 0; i < len(resultGroups.Entries); i++ {
-		entry := resultGroups.Entries[i]
-		principal, err := ldap.AttributesToPrincipal(entry.Attributes, entry.DN, groupScope, p.providerName, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
-		if err != nil {
-			logrus.Errorf("Error translating group result: %v", err)
-			continue
-		}
-		principals = append(principals, *principal)
-	}
-
-	for _, gp := range principals {
-		if _, ok := groupMap[gp.ObjectMeta.Name]; ok {
-			continue
-		} else {
-			*nestedGroupPrincipals = append(*nestedGroupPrincipals, gp)
-			err = p.gatherParentGroups(gp, searchDomain, groupScope, config, lConn, groupMap, nestedGroupPrincipals)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func (p *ldapProvider) findNonDuplicateBetweenGroupPrincipals(newGroupPrincipals []v3.Principal, groupPrincipals []v3.Principal, nonDupGroupPrincipals []v3.Principal) []v3.Principal {
-	for _, gp := range newGroupPrincipals {
-		counter := 0
-		for _, usermembergp := range groupPrincipals {
-			// check the groups ObjectMeta.Name and name fields value are the same, then they are the same group
-			if gp.ObjectMeta.Name == usermembergp.ObjectMeta.Name && gp.DisplayName == usermembergp.DisplayName {
-				break
-			} else {
-				counter++
-			}
-		}
-		if counter == len(groupPrincipals) {
-			nonDupGroupPrincipals = append(nonDupGroupPrincipals, gp)
-		}
-	}
-	return nonDupGroupPrincipals
 }
 
 func (p *ldapProvider) getPrincipal(distinguishedName string, scope string, config *v3.LdapConfig, caPool *x509.CertPool) (*v3.Principal, error) {
