@@ -34,6 +34,8 @@ const (
 	prtbsByPrincipalAndUserIndex = "auth.management.cattle.io/prtbByPrincipalAndUser"
 	grbByUserIndex               = "auth.management.cattle.io/grbByUser"
 	roleTemplatesRequired        = "authz.management.cattle.io/creator-role-bindings"
+	crtbsByGroupPrincipalIDIndex = "authz.management.cattle.io/crtbByGroupPrincipalId"
+	prtbsByGroupPrincipalIDIndex = "authz.management.cattle.io/prtbByGroupPrincipalId"
 )
 
 func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
@@ -48,6 +50,7 @@ func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
 	crtbInformer := scaledContext.Management.ClusterRoleTemplateBindings("").Controller().Informer()
 	crtbIndexers := map[string]cache.IndexFunc{
 		crtbsByPrincipalAndUserIndex: crtbsByPrincipalAndUser,
+		crtbsByGroupPrincipalIDIndex: crtbsByGroupPrincipalID,
 	}
 	if err := crtbInformer.AddIndexers(crtbIndexers); err != nil {
 		return nil, err
@@ -56,6 +59,7 @@ func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
 	prtbInformer := scaledContext.Management.ProjectRoleTemplateBindings("").Controller().Informer()
 	prtbIndexers := map[string]cache.IndexFunc{
 		prtbsByPrincipalAndUserIndex: prtbsByPrincipalAndUser,
+		prtbsByGroupPrincipalIDIndex: prtbsByGroupPrincipalID,
 	}
 	if err := prtbInformer.AddIndexers(prtbIndexers); err != nil {
 		return nil, err
@@ -619,4 +623,54 @@ func providerExists(principalIDs []string, provider string) bool {
 		}
 	}
 	return false
+}
+
+func (m *userManager) GetGroupsFromClustersAndProjects() ([]string, error) {
+	var groupNames []string
+	crtbs, err := m.crtbIndexer.ByIndex(crtbsByGroupPrincipalIDIndex, "1")
+	if err != nil {
+		return groupNames, err
+	}
+	if len(crtbs) > 0 {
+		for _, crtb := range crtbs {
+			if c, ok := crtb.(*v3.ClusterRoleTemplateBinding); ok {
+				groupNames = append(groupNames, c.GroupPrincipalName)
+			}
+		}
+	}
+	prtbs, err := m.prtbIndexer.ByIndex(prtbsByGroupPrincipalIDIndex, "1")
+	if err != nil {
+		return groupNames, err
+	}
+	if len(prtbs) > 0 {
+		for _, prtb := range prtbs {
+			if p, ok := prtb.(*v3.ProjectRoleTemplateBinding); ok {
+				groupNames = append(groupNames, p.GroupPrincipalName)
+			}
+		}
+	}
+
+	return groupNames, nil
+}
+
+func crtbsByGroupPrincipalID(obj interface{}) ([]string, error) {
+	b, ok := obj.(*v3.ClusterRoleTemplateBinding)
+	if !ok {
+		return []string{}, nil
+	}
+	if b.GroupPrincipalName != "" {
+		return []string{"1"}, nil
+	}
+	return []string{}, nil
+}
+
+func prtbsByGroupPrincipalID(obj interface{}) ([]string, error) {
+	b, ok := obj.(*v3.ProjectRoleTemplateBinding)
+	if !ok {
+		return []string{}, nil
+	}
+	if b.GroupPrincipalName != "" {
+		return []string{"1"}, nil
+	}
+	return []string{}, nil
 }
