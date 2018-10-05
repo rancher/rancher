@@ -14,7 +14,7 @@ const opAssumeRole = "AssumeRole"
 
 // AssumeRoleRequest generates a "aws/request.Request" representing the
 // client's request for the AssumeRole operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -208,7 +208,7 @@ const opAssumeRoleWithSAML = "AssumeRoleWithSAML"
 
 // AssumeRoleWithSAMLRequest generates a "aws/request.Request" representing the
 // client's request for the AssumeRoleWithSAML operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -390,7 +390,7 @@ const opAssumeRoleWithWebIdentity = "AssumeRoleWithWebIdentity"
 
 // AssumeRoleWithWebIdentityRequest generates a "aws/request.Request" representing the
 // client's request for the AssumeRoleWithWebIdentity operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -601,7 +601,7 @@ const opDecodeAuthorizationMessage = "DecodeAuthorizationMessage"
 
 // DecodeAuthorizationMessageRequest generates a "aws/request.Request" representing the
 // client's request for the DecodeAuthorizationMessage operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -713,7 +713,7 @@ const opGetCallerIdentity = "GetCallerIdentity"
 
 // GetCallerIdentityRequest generates a "aws/request.Request" representing the
 // client's request for the GetCallerIdentity operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -788,7 +788,7 @@ const opGetFederationToken = "GetFederationToken"
 
 // GetFederationTokenRequest generates a "aws/request.Request" representing the
 // client's request for the GetFederationToken operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -957,7 +957,7 @@ const opGetSessionToken = "GetSessionToken"
 
 // GetSessionTokenRequest generates a "aws/request.Request" representing the
 // client's request for the GetSessionToken operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -1908,7 +1908,7 @@ type Credentials struct {
 	// The date on which the current credentials expire.
 	//
 	// Expiration is a required field
-	Expiration *time.Time `type:"timestamp" timestampFormat:"iso8601" required:"true"`
+	Expiration *time.Time `type:"timestamp" required:"true"`
 
 	// The secret access key that can be used to sign requests.
 	//

@@ -17,7 +17,7 @@ const opCancelUpdateStack = "CancelUpdateStack"
 
 // CancelUpdateStackRequest generates a "aws/request.Request" representing the
 // client's request for the CancelUpdateStack operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -101,7 +101,7 @@ const opContinueUpdateRollback = "ContinueUpdateRollback"
 
 // ContinueUpdateRollbackRequest generates a "aws/request.Request" representing the
 // client's request for the ContinueUpdateRollback operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -192,7 +192,7 @@ const opCreateChangeSet = "CreateChangeSet"
 
 // CreateChangeSetRequest generates a "aws/request.Request" representing the
 // client's request for the CreateChangeSet operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -300,7 +300,7 @@ const opCreateStack = "CreateStack"
 
 // CreateStackRequest generates a "aws/request.Request" representing the
 // client's request for the CreateStack operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -393,7 +393,7 @@ const opCreateStackInstances = "CreateStackInstances"
 
 // CreateStackInstancesRequest generates a "aws/request.Request" representing the
 // client's request for the CreateStackInstances operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -494,7 +494,7 @@ const opCreateStackSet = "CreateStackSet"
 
 // CreateStackSetRequest generates a "aws/request.Request" representing the
 // client's request for the CreateStackSet operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -581,7 +581,7 @@ const opDeleteChangeSet = "DeleteChangeSet"
 
 // DeleteChangeSetRequest generates a "aws/request.Request" representing the
 // client's request for the DeleteChangeSet operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -666,7 +666,7 @@ const opDeleteStack = "DeleteStack"
 
 // DeleteStackRequest generates a "aws/request.Request" representing the
 // client's request for the DeleteStack operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -749,7 +749,7 @@ const opDeleteStackInstances = "DeleteStackInstances"
 
 // DeleteStackInstancesRequest generates a "aws/request.Request" representing the
 // client's request for the DeleteStackInstances operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -842,7 +842,7 @@ const opDeleteStackSet = "DeleteStackSet"
 
 // DeleteStackSetRequest generates a "aws/request.Request" representing the
 // client's request for the DeleteStackSet operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -929,7 +929,7 @@ const opDescribeAccountLimits = "DescribeAccountLimits"
 
 // DescribeAccountLimitsRequest generates a "aws/request.Request" representing the
 // client's request for the DescribeAccountLimits operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -1004,7 +1004,7 @@ const opDescribeChangeSet = "DescribeChangeSet"
 
 // DescribeChangeSetRequest generates a "aws/request.Request" representing the
 // client's request for the DescribeChangeSet operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -1087,7 +1087,7 @@ const opDescribeStackEvents = "DescribeStackEvents"
 
 // DescribeStackEventsRequest generates a "aws/request.Request" representing the
 // client's request for the DescribeStackEvents operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -1222,7 +1222,7 @@ const opDescribeStackInstance = "DescribeStackInstance"
 
 // DescribeStackInstanceRequest generates a "aws/request.Request" representing the
 // client's request for the DescribeStackInstance operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -1308,7 +1308,7 @@ const opDescribeStackResource = "DescribeStackResource"
 
 // DescribeStackResourceRequest generates a "aws/request.Request" representing the
 // client's request for the DescribeStackResource operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -1385,7 +1385,7 @@ const opDescribeStackResources = "DescribeStackResources"
 
 // DescribeStackResourcesRequest generates a "aws/request.Request" representing the
 // client's request for the DescribeStackResources operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -1476,7 +1476,7 @@ const opDescribeStackSet = "DescribeStackSet"
 
 // DescribeStackSetRequest generates a "aws/request.Request" representing the
 // client's request for the DescribeStackSet operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -1555,7 +1555,7 @@ const opDescribeStackSetOperation = "DescribeStackSetOperation"
 
 // DescribeStackSetOperationRequest generates a "aws/request.Request" representing the
 // client's request for the DescribeStackSetOperation operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -1637,7 +1637,7 @@ const opDescribeStacks = "DescribeStacks"
 
 // DescribeStacksRequest generates a "aws/request.Request" representing the
 // client's request for the DescribeStacks operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -1770,7 +1770,7 @@ const opEstimateTemplateCost = "EstimateTemplateCost"
 
 // EstimateTemplateCostRequest generates a "aws/request.Request" representing the
 // client's request for the EstimateTemplateCost operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -1846,7 +1846,7 @@ const opExecuteChangeSet = "ExecuteChangeSet"
 
 // ExecuteChangeSetRequest generates a "aws/request.Request" representing the
 // client's request for the ExecuteChangeSet operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -1949,7 +1949,7 @@ const opGetStackPolicy = "GetStackPolicy"
 
 // GetStackPolicyRequest generates a "aws/request.Request" representing the
 // client's request for the GetStackPolicy operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -2024,7 +2024,7 @@ const opGetTemplate = "GetTemplate"
 
 // GetTemplateRequest generates a "aws/request.Request" representing the
 // client's request for the GetTemplate operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -2110,7 +2110,7 @@ const opGetTemplateSummary = "GetTemplateSummary"
 
 // GetTemplateSummaryRequest generates a "aws/request.Request" representing the
 // client's request for the GetTemplateSummary operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -2200,7 +2200,7 @@ const opListChangeSets = "ListChangeSets"
 
 // ListChangeSetsRequest generates a "aws/request.Request" representing the
 // client's request for the ListChangeSets operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -2276,7 +2276,7 @@ const opListExports = "ListExports"
 
 // ListExportsRequest generates a "aws/request.Request" representing the
 // client's request for the ListExports operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -2412,7 +2412,7 @@ const opListImports = "ListImports"
 
 // ListImportsRequest generates a "aws/request.Request" representing the
 // client's request for the ListImports operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -2548,7 +2548,7 @@ const opListStackInstances = "ListStackInstances"
 
 // ListStackInstancesRequest generates a "aws/request.Request" representing the
 // client's request for the ListStackInstances operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -2629,7 +2629,7 @@ const opListStackResources = "ListStackResources"
 
 // ListStackResourcesRequest generates a "aws/request.Request" representing the
 // client's request for the ListStackResources operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -2762,7 +2762,7 @@ const opListStackSetOperationResults = "ListStackSetOperationResults"
 
 // ListStackSetOperationResultsRequest generates a "aws/request.Request" representing the
 // client's request for the ListStackSetOperationResults operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -2844,7 +2844,7 @@ const opListStackSetOperations = "ListStackSetOperations"
 
 // ListStackSetOperationsRequest generates a "aws/request.Request" representing the
 // client's request for the ListStackSetOperations operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -2923,7 +2923,7 @@ const opListStackSets = "ListStackSets"
 
 // ListStackSetsRequest generates a "aws/request.Request" representing the
 // client's request for the ListStackSets operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -2998,7 +2998,7 @@ const opListStacks = "ListStacks"
 
 // ListStacksRequest generates a "aws/request.Request" representing the
 // client's request for the ListStacks operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -3132,7 +3132,7 @@ const opSetStackPolicy = "SetStackPolicy"
 
 // SetStackPolicyRequest generates a "aws/request.Request" representing the
 // client's request for the SetStackPolicy operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -3208,7 +3208,7 @@ const opSignalResource = "SignalResource"
 
 // SignalResourceRequest generates a "aws/request.Request" representing the
 // client's request for the SignalResource operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -3289,7 +3289,7 @@ const opStopStackSetOperation = "StopStackSetOperation"
 
 // StopStackSetOperationRequest generates a "aws/request.Request" representing the
 // client's request for the StopStackSetOperation operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -3374,7 +3374,7 @@ const opUpdateStack = "UpdateStack"
 
 // UpdateStackRequest generates a "aws/request.Request" representing the
 // client's request for the UpdateStack operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -3465,7 +3465,7 @@ const opUpdateStackInstances = "UpdateStackInstances"
 
 // UpdateStackInstancesRequest generates a "aws/request.Request" representing the
 // client's request for the UpdateStackInstances operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -3578,7 +3578,7 @@ const opUpdateStackSet = "UpdateStackSet"
 
 // UpdateStackSetRequest generates a "aws/request.Request" representing the
 // client's request for the UpdateStackSet operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -3618,7 +3618,8 @@ func (c *CloudFormation) UpdateStackSetRequest(input *UpdateStackSetInput) (req 
 
 // UpdateStackSet API operation for AWS CloudFormation.
 //
-// Updates the stack set and all associated stack instances.
+// Updates the stack set, and associated stack instances in the specified accounts
+// and regions.
 //
 // Even if the stack set operation created by updating the stack set fails (completely
 // or partially, below or above a specified failure tolerance), the stack set
@@ -3650,6 +3651,9 @@ func (c *CloudFormation) UpdateStackSetRequest(input *UpdateStackSetInput) (req 
 //   * ErrCodeInvalidOperationException "InvalidOperationException"
 //   The specified operation isn't valid.
 //
+//   * ErrCodeStackInstanceNotFoundException "StackInstanceNotFoundException"
+//   The specified stack instance doesn't exist.
+//
 // See also, https://docs.aws.amazon.com/goto/WebAPI/cloudformation-2010-05-15/UpdateStackSet
 func (c *CloudFormation) UpdateStackSet(input *UpdateStackSetInput) (*UpdateStackSetOutput, error) {
 	req, out := c.UpdateStackSetRequest(input)
@@ -3676,7 +3680,7 @@ const opUpdateTerminationProtection = "UpdateTerminationProtection"
 
 // UpdateTerminationProtectionRequest generates a "aws/request.Request" representing the
 // client's request for the UpdateTerminationProtection operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -3758,7 +3762,7 @@ const opValidateTemplate = "ValidateTemplate"
 
 // ValidateTemplateRequest generates a "aws/request.Request" representing the
 // client's request for the ValidateTemplate operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -4052,7 +4056,7 @@ type ChangeSetSummary struct {
 	ChangeSetName *string `min:"1" type:"string"`
 
 	// The start time when the change set was created, in UTC.
-	CreationTime *time.Time `type:"timestamp" timestampFormat:"iso8601"`
+	CreationTime *time.Time `type:"timestamp"`
 
 	// Descriptive information about the change set.
 	Description *string `min:"1" type:"string"`
@@ -5130,8 +5134,8 @@ type CreateStackSetInput struct {
 	//
 	// Specify an IAM role only if you are using customized administrator roles
 	// to control which users or groups can manage specific stack sets within the
-	// same administrator account. For more information, see Define Permissions
-	// for Multiple Administrators (http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacksets-prereqs.html)
+	// same administrator account. For more information, see Prerequisites: Granting
+	// Permissions for Stack Set Operations (http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacksets-prereqs.html)
 	// in the AWS CloudFormation User Guide.
 	AdministrationRoleARN *string `min:"20" type:"string"`
 
@@ -5183,6 +5187,14 @@ type CreateStackSetInput struct {
 	// A description of the stack set. You can use the description to identify the
 	// stack set's purpose or other important information.
 	Description *string `min:"1" type:"string"`
+
+	// The name of the IAM execution role to use to create the stack set. If you
+	// do not specify an execution role, AWS CloudFormation uses the AWSCloudFormationStackSetExecutionRole
+	// role for the stack set operation.
+	//
+	// Specify an IAM role only if you are using customized execution roles to control
+	// which stack resources users and groups can include in their stack sets.
+	ExecutionRoleName *string `min:"1" type:"string"`
 
 	// The input parameters for the stack set template.
 	Parameters []*Parameter `type:"list"`
@@ -5248,6 +5260,9 @@ func (s *CreateStackSetInput) Validate() error {
 	if s.Description != nil && len(*s.Description) < 1 {
 		invalidParams.Add(request.NewErrParamMinLen("Description", 1))
 	}
+	if s.ExecutionRoleName != nil && len(*s.ExecutionRoleName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("ExecutionRoleName", 1))
+	}
 	if s.StackSetName == nil {
 		invalidParams.Add(request.NewErrParamRequired("StackSetName"))
 	}
@@ -5295,6 +5310,12 @@ func (s *CreateStackSetInput) SetClientRequestToken(v string) *CreateStackSetInp
 // SetDescription sets the Description field's value.
 func (s *CreateStackSetInput) SetDescription(v string) *CreateStackSetInput {
 	s.Description = &v
+	return s
+}
+
+// SetExecutionRoleName sets the ExecutionRoleName field's value.
+func (s *CreateStackSetInput) SetExecutionRoleName(v string) *CreateStackSetInput {
+	s.ExecutionRoleName = &v
 	return s
 }
 
@@ -5890,7 +5911,7 @@ type DescribeChangeSetOutput struct {
 	Changes []*Change `type:"list"`
 
 	// The start time when the change set was created, in UTC.
-	CreationTime *time.Time `type:"timestamp" timestampFormat:"iso8601"`
+	CreationTime *time.Time `type:"timestamp"`
 
 	// Information about the change set.
 	Description *string `min:"1" type:"string"`
@@ -8901,10 +8922,10 @@ type Stack struct {
 	// The time at which the stack was created.
 	//
 	// CreationTime is a required field
-	CreationTime *time.Time `type:"timestamp" timestampFormat:"iso8601" required:"true"`
+	CreationTime *time.Time `type:"timestamp" required:"true"`
 
 	// The time the stack was deleted.
-	DeletionTime *time.Time `type:"timestamp" timestampFormat:"iso8601"`
+	DeletionTime *time.Time `type:"timestamp"`
 
 	// A user-defined description associated with the stack.
 	Description *string `min:"1" type:"string"`
@@ -8927,7 +8948,7 @@ type Stack struct {
 
 	// The time the stack was last updated. This field will only be returned if
 	// the stack has been updated at least once.
-	LastUpdatedTime *time.Time `type:"timestamp" timestampFormat:"iso8601"`
+	LastUpdatedTime *time.Time `type:"timestamp"`
 
 	// SNS topic ARNs to which stack related events are published.
 	NotificationARNs []*string `type:"list"`
@@ -9178,7 +9199,7 @@ type StackEvent struct {
 	// Time the status was updated.
 	//
 	// Timestamp is a required field
-	Timestamp *time.Time `type:"timestamp" timestampFormat:"iso8601" required:"true"`
+	Timestamp *time.Time `type:"timestamp" required:"true"`
 }
 
 // String returns the string representation
@@ -9488,7 +9509,7 @@ type StackResource struct {
 	// Time the status was updated.
 	//
 	// Timestamp is a required field
-	Timestamp *time.Time `type:"timestamp" timestampFormat:"iso8601" required:"true"`
+	Timestamp *time.Time `type:"timestamp" required:"true"`
 }
 
 // String returns the string representation
@@ -9565,7 +9586,7 @@ type StackResourceDetail struct {
 	// Time the status was updated.
 	//
 	// LastUpdatedTimestamp is a required field
-	LastUpdatedTimestamp *time.Time `type:"timestamp" timestampFormat:"iso8601" required:"true"`
+	LastUpdatedTimestamp *time.Time `type:"timestamp" required:"true"`
 
 	// The logical name of the resource specified in the template.
 	//
@@ -9680,7 +9701,7 @@ type StackResourceSummary struct {
 	// Time the status was updated.
 	//
 	// LastUpdatedTimestamp is a required field
-	LastUpdatedTimestamp *time.Time `type:"timestamp" timestampFormat:"iso8601" required:"true"`
+	LastUpdatedTimestamp *time.Time `type:"timestamp" required:"true"`
 
 	// The logical name of the resource specified in the template.
 	//
@@ -9765,7 +9786,7 @@ type StackSet struct {
 	//
 	// Use customized administrator roles to control which users or groups can manage
 	// specific stack sets within the same administrator account. For more information,
-	// see Define Permissions for Multiple Administrators (http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacksets-prereqs.html)
+	// see Prerequisites: Granting Permissions for Stack Set Operations (http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacksets-prereqs.html)
 	// in the AWS CloudFormation User Guide.
 	AdministrationRoleARN *string `min:"20" type:"string"`
 
@@ -9779,6 +9800,12 @@ type StackSet struct {
 	// A description of the stack set that you specify when the stack set is created
 	// or updated.
 	Description *string `min:"1" type:"string"`
+
+	// The name of the IAM execution role used to create or update the stack set.
+	//
+	// Use customized execution roles to control which stack resources users and
+	// groups can include in their stack sets.
+	ExecutionRoleName *string `min:"1" type:"string"`
 
 	// A list of input parameters for a stack set.
 	Parameters []*Parameter `type:"list"`
@@ -9829,6 +9856,12 @@ func (s *StackSet) SetCapabilities(v []*string) *StackSet {
 // SetDescription sets the Description field's value.
 func (s *StackSet) SetDescription(v string) *StackSet {
 	s.Description = &v
+	return s
+}
+
+// SetExecutionRoleName sets the ExecutionRoleName field's value.
+func (s *StackSet) SetExecutionRoleName(v string) *StackSet {
+	s.ExecutionRoleName = &v
 	return s
 }
 
@@ -9898,12 +9931,18 @@ type StackSetOperation struct {
 	// stacks themselves. This is because AWS CloudFormation needs to perform preparatory
 	// work for the operation, such as dispatching the work to the requested regions,
 	// before actually creating the first stacks.
-	CreationTimestamp *time.Time `type:"timestamp" timestampFormat:"iso8601"`
+	CreationTimestamp *time.Time `type:"timestamp"`
 
 	// The time at which the stack set operation ended, across all accounts and
 	// regions specified. Note that this doesn't necessarily mean that the stack
 	// set operation was successful, or even attempted, in each account or region.
-	EndTimestamp *time.Time `type:"timestamp" timestampFormat:"iso8601"`
+	EndTimestamp *time.Time `type:"timestamp"`
+
+	// The name of the IAM execution role used to create or update the stack set.
+	//
+	// Use customized execution roles to control which stack resources users and
+	// groups can include in their stack sets.
+	ExecutionRoleName *string `min:"1" type:"string"`
 
 	// The unique ID of a stack set operation.
 	OperationId *string `min:"1" type:"string"`
@@ -9973,6 +10012,12 @@ func (s *StackSetOperation) SetCreationTimestamp(v time.Time) *StackSetOperation
 // SetEndTimestamp sets the EndTimestamp field's value.
 func (s *StackSetOperation) SetEndTimestamp(v time.Time) *StackSetOperation {
 	s.EndTimestamp = &v
+	return s
+}
+
+// SetExecutionRoleName sets the ExecutionRoleName field's value.
+func (s *StackSetOperation) SetExecutionRoleName(v string) *StackSetOperation {
+	s.ExecutionRoleName = &v
 	return s
 }
 
@@ -10220,12 +10265,12 @@ type StackSetOperationSummary struct {
 	// stacks themselves. This is because AWS CloudFormation needs to perform preparatory
 	// work for the operation, such as dispatching the work to the requested regions,
 	// before actually creating the first stacks.
-	CreationTimestamp *time.Time `type:"timestamp" timestampFormat:"iso8601"`
+	CreationTimestamp *time.Time `type:"timestamp"`
 
 	// The time at which the stack set operation ended, across all accounts and
 	// regions specified. Note that this doesn't necessarily mean that the stack
 	// set operation was successful, or even attempted, in each account or region.
-	EndTimestamp *time.Time `type:"timestamp" timestampFormat:"iso8601"`
+	EndTimestamp *time.Time `type:"timestamp"`
 
 	// The unique ID of the stack set operation.
 	OperationId *string `min:"1" type:"string"`
@@ -10352,14 +10397,14 @@ type StackSummary struct {
 	// The time the stack was created.
 	//
 	// CreationTime is a required field
-	CreationTime *time.Time `type:"timestamp" timestampFormat:"iso8601" required:"true"`
+	CreationTime *time.Time `type:"timestamp" required:"true"`
 
 	// The time the stack was deleted.
-	DeletionTime *time.Time `type:"timestamp" timestampFormat:"iso8601"`
+	DeletionTime *time.Time `type:"timestamp"`
 
 	// The time the stack was last updated. This field will only be returned if
 	// the stack has been updated at least once.
-	LastUpdatedTime *time.Time `type:"timestamp" timestampFormat:"iso8601"`
+	LastUpdatedTime *time.Time `type:"timestamp"`
 
 	// For nested stacks--stacks created as resources for another stack--the stack
 	// ID of the direct parent of this stack. For the first level of nested stacks,
@@ -11168,6 +11213,23 @@ func (s *UpdateStackOutput) SetStackId(v string) *UpdateStackOutput {
 type UpdateStackSetInput struct {
 	_ struct{} `type:"structure"`
 
+	// The accounts in which to update associated stack instances. If you specify
+	// accounts, you must also specify the regions in which to update stack set
+	// instances.
+	//
+	// To update all the stack instances associated with this stack set, do not
+	// specify the Accounts or Regions properties.
+	//
+	// If the stack set update includes changes to the template (that is, if the
+	// TemplateBody or TemplateURL properties are specified), or the Parameters
+	// property, AWS CloudFormation marks all stack instances with a status of OUTDATED
+	// prior to updating the stack instances in the specified accounts and regions.
+	// If the stack set update does not include changes to the template or parameters,
+	// AWS CloudFormation updates the stack instances in the specified accounts
+	// and regions, while leaving all other stack instances with their existing
+	// stack instance status.
+	Accounts []*string `type:"list"`
+
 	// The Amazon Resource Number (ARN) of the IAM role to use to update this stack
 	// set.
 	//
@@ -11223,6 +11285,20 @@ type UpdateStackSetInput struct {
 	// A brief description of updates that you are making.
 	Description *string `min:"1" type:"string"`
 
+	// The name of the IAM execution role to use to update the stack set. If you
+	// do not specify an execution role, AWS CloudFormation uses the AWSCloudFormationStackSetExecutionRole
+	// role for the stack set operation.
+	//
+	// Specify an IAM role only if you are using customized execution roles to control
+	// which stack resources users and groups can include in their stack sets.
+	//
+	// If you specify a customized execution role, AWS CloudFormation uses that
+	// role to update the stack. If you do not specify a customized execution role,
+	// AWS CloudFormation performs the update using the role previously associated
+	// with the stack set, so long as you have permissions to perform operations
+	// on the stack set.
+	ExecutionRoleName *string `min:"1" type:"string"`
+
 	// The unique ID for this stack set operation.
 	//
 	// The operation ID also functions as an idempotency token, to ensure that AWS
@@ -11241,6 +11317,22 @@ type UpdateStackSetInput struct {
 
 	// A list of input parameters for the stack set template.
 	Parameters []*Parameter `type:"list"`
+
+	// The regions in which to update associated stack instances. If you specify
+	// regions, you must also specify accounts in which to update stack set instances.
+	//
+	// To update all the stack instances associated with this stack set, do not
+	// specify the Accounts or Regions properties.
+	//
+	// If the stack set update includes changes to the template (that is, if the
+	// TemplateBody or TemplateURL properties are specified), or the Parameters
+	// property, AWS CloudFormation marks all stack instances with a status of OUTDATED
+	// prior to updating the stack instances in the specified accounts and regions.
+	// If the stack set update does not include changes to the template or parameters,
+	// AWS CloudFormation updates the stack instances in the specified accounts
+	// and regions, while leaving all other stack instances with their existing
+	// stack instance status.
+	Regions []*string `type:"list"`
 
 	// The name or unique ID of the stack set that you want to update.
 	//
@@ -11321,6 +11413,9 @@ func (s *UpdateStackSetInput) Validate() error {
 	if s.Description != nil && len(*s.Description) < 1 {
 		invalidParams.Add(request.NewErrParamMinLen("Description", 1))
 	}
+	if s.ExecutionRoleName != nil && len(*s.ExecutionRoleName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("ExecutionRoleName", 1))
+	}
 	if s.OperationId != nil && len(*s.OperationId) < 1 {
 		invalidParams.Add(request.NewErrParamMinLen("OperationId", 1))
 	}
@@ -11355,6 +11450,12 @@ func (s *UpdateStackSetInput) Validate() error {
 	return nil
 }
 
+// SetAccounts sets the Accounts field's value.
+func (s *UpdateStackSetInput) SetAccounts(v []*string) *UpdateStackSetInput {
+	s.Accounts = v
+	return s
+}
+
 // SetAdministrationRoleARN sets the AdministrationRoleARN field's value.
 func (s *UpdateStackSetInput) SetAdministrationRoleARN(v string) *UpdateStackSetInput {
 	s.AdministrationRoleARN = &v
@@ -11373,6 +11474,12 @@ func (s *UpdateStackSetInput) SetDescription(v string) *UpdateStackSetInput {
 	return s
 }
 
+// SetExecutionRoleName sets the ExecutionRoleName field's value.
+func (s *UpdateStackSetInput) SetExecutionRoleName(v string) *UpdateStackSetInput {
+	s.ExecutionRoleName = &v
+	return s
+}
+
 // SetOperationId sets the OperationId field's value.
 func (s *UpdateStackSetInput) SetOperationId(v string) *UpdateStackSetInput {
 	s.OperationId = &v
@@ -11388,6 +11495,12 @@ func (s *UpdateStackSetInput) SetOperationPreferences(v *StackSetOperationPrefer
 // SetParameters sets the Parameters field's value.
 func (s *UpdateStackSetInput) SetParameters(v []*Parameter) *UpdateStackSetInput {
 	s.Parameters = v
+	return s
+}
+
+// SetRegions sets the Regions field's value.
+func (s *UpdateStackSetInput) SetRegions(v []*string) *UpdateStackSetInput {
+	s.Regions = v
 	return s
 }
 

@@ -6,7 +6,7 @@ aws-sdk-go is the official AWS SDK for the Go programming language.
 
 Checkout our [release notes](https://github.com/aws/aws-sdk-go/releases) for information about the latest bug fixes, updates, and features added to the SDK.
 
-We [announced](https://aws.amazon.com/blogs/developer/aws-sdk-for-go-2-0-developer-preview/) the Developer Preview for the [v2 AWS SDK for Go](). The v2 SDK is available at https://github.com/aws/aws-sdk-go-v2, and `go get github.com/aws/aws-sdk-go-v2` via `go get`. Check out the v2 SDK's [changes and updates](https://github.com/aws/aws-sdk-go-v2/blob/master/CHANGELOG.md), and let us know what you think. We want your feedback. 
+We [announced](https://aws.amazon.com/blogs/developer/aws-sdk-for-go-2-0-developer-preview/) the Developer Preview for the [v2 AWS SDK for Go](https://github.com/aws/aws-sdk-go-v2). The v2 SDK is available at https://github.com/aws/aws-sdk-go-v2, and `go get github.com/aws/aws-sdk-go-v2` via `go get`. Check out the v2 SDK's [changes and updates](https://github.com/aws/aws-sdk-go-v2/blob/master/CHANGELOG.md), and let us know what you think. We want your feedback. 
 
 ## Installing
 
@@ -334,7 +334,7 @@ take a callback function that will be called for each page of the API's response
 ```
 
 Waiter helper methods provide the functionality to wait for an AWS resource
-state. These methods abstract the logic needed to to check the state of an
+state. These methods abstract the logic needed to check the state of an
 AWS resource, and wait until that resource is in a desired state. The waiter
 will block until the resource is in the state that is desired, an error occurs,
 or the waiter times out. If a resource times out the error code returned will
