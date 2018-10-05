@@ -12,6 +12,7 @@ const (
 	AmazonElasticContainerServiceConfigFieldSecretKey                   = "secretKey"
 	AmazonElasticContainerServiceConfigFieldSecurityGroups              = "securityGroups"
 	AmazonElasticContainerServiceConfigFieldServiceRole                 = "serviceRole"
+	AmazonElasticContainerServiceConfigFieldSessionToken                = "sessionToken"
 	AmazonElasticContainerServiceConfigFieldSubnets                     = "subnets"
 	AmazonElasticContainerServiceConfigFieldVirtualNetwork              = "virtualNetwork"
 )
@@ -27,6 +28,7 @@ type AmazonElasticContainerServiceConfig struct {
 	SecretKey                   string   `json:"secretKey,omitempty" yaml:"secretKey,omitempty"`
 	SecurityGroups              []string `json:"securityGroups,omitempty" yaml:"securityGroups,omitempty"`
 	ServiceRole                 string   `json:"serviceRole,omitempty" yaml:"serviceRole,omitempty"`
+	SessionToken                string   `json:"sessionToken,omitempty" yaml:"sessionToken,omitempty"`
 	Subnets                     []string `json:"subnets,omitempty" yaml:"subnets,omitempty"`
 	VirtualNetwork              string   `json:"virtualNetwork,omitempty" yaml:"virtualNetwork,omitempty"`
 }

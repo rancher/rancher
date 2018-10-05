@@ -1,13 +1,11 @@
 package eks
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -22,13 +20,13 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/eks"
 	"github.com/aws/aws-sdk-go/service/iam"
 	heptio "github.com/heptio/authenticator/pkg/token"
 	"github.com/rancher/kontainer-engine/drivers/options"
 	"github.com/rancher/kontainer-engine/drivers/util"
 	"github.com/rancher/kontainer-engine/types"
 	"github.com/sirupsen/logrus"
-	"github.com/smartystreets/go-aws-auth"
 	"gopkg.in/yaml.v2"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -61,6 +59,7 @@ type state struct {
 	DisplayName  string
 	ClientID     string
 	ClientSecret string
+	SessionToken string
 
 	MinimumASGSize int64
 	MaximumASGSize int64
@@ -76,32 +75,6 @@ type state struct {
 	AssociateWorkerNodePublicIP *bool
 
 	ClusterInfo types.ClusterInfo
-}
-
-type eksCluster struct {
-	Cluster clusterObj `json:"cluster"`
-}
-
-type clusterObj struct {
-	MasterEndpoint       *string              `json:"endpoint"`
-	ClusterName          *string              `json:"name"`
-	Status               *string              `json:"status"`
-	CreatedAt            *float64             `json:"createdAt"`
-	DesiredMasterVersion *string              `json:"desiredMasterVersion"`
-	VPCID                *string              `json:"vpcId"`
-	CurrentMasterVersion *string              `json:"currentMasterVersion"`
-	RoleARN              *string              `json:"roleArn"`
-	CertificateAuthority certificateAuthority `json:"certificateAuthority"`
-	ResourcesVPCConfig   vpcConfig            `json:"resourcesVpcConfig"`
-}
-
-type vpcConfig struct {
-	SecurityGroups []string `json:"securityGroupIds"`
-	Subnets        []string `json:"subnetIds"`
-}
-
-type certificateAuthority struct {
-	Data *string `json:"data"`
 }
 
 func NewDriver() types.Driver {
@@ -129,6 +102,10 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 	driverFlag.Options["client-secret"] = &types.Flag{
 		Type:  types.StringType,
 		Usage: "The AWS Client Secret associated with the Client ID",
+	}
+	driverFlag.Options["session-token"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "A session token to use with the client key and secret if applicable.",
 	}
 	driverFlag.Options["region"] = &types.Flag{
 		Type:  types.StringType,
@@ -193,6 +170,7 @@ func getStateFromOptions(driverOptions *types.DriverOptions) (state, error) {
 	state.DisplayName = options.GetValueFromDriverOptions(driverOptions, types.StringType, "display-name", "displayName").(string)
 	state.ClientID = options.GetValueFromDriverOptions(driverOptions, types.StringType, "client-id", "accessKey").(string)
 	state.ClientSecret = options.GetValueFromDriverOptions(driverOptions, types.StringType, "client-secret", "secretKey").(string)
+	state.SessionToken = options.GetValueFromDriverOptions(driverOptions, types.StringType, "session-token", "sessionToken").(string)
 
 	state.Region = options.GetValueFromDriverOptions(driverOptions, types.StringType, "region").(string)
 	state.InstanceType = options.GetValueFromDriverOptions(driverOptions, types.StringType, "instance-type", "instanceType").(string)
@@ -268,14 +246,12 @@ func alreadyExistsInCloudFormationError(err error) bool {
 }
 
 func (d *Driver) createStack(svc *cloudformation.CloudFormation, name string, displayName string,
-	templateBody string, parameters []*cloudformation.Parameter) (*cloudformation.DescribeStacksOutput, error) {
+	templateBody string, capabilities []string, parameters []*cloudformation.Parameter) (*cloudformation.DescribeStacksOutput, error) {
 	_, err := svc.CreateStack(&cloudformation.CreateStackInput{
 		StackName:    aws.String(name),
 		TemplateBody: aws.String(templateBody),
-		Capabilities: aws.StringSlice([]string{
-			cloudformation.CapabilityCapabilityIam,
-		}),
-		Parameters: parameters,
+		Capabilities: aws.StringSlice(capabilities),
+		Parameters:   parameters,
 		Tags: []*cloudformation.Tag{
 			{Key: aws.String("displayName"), Value: aws.String(displayName)},
 		},
@@ -327,39 +303,24 @@ func (d *Driver) createStack(svc *cloudformation.CloudFormation, name string, di
 	return stack, nil
 }
 
-func (d *Driver) awsHTTPRequest(state state, url string, method string, data []byte) ([]byte, error) {
-	req, err := http.NewRequest(method, url,
-		bytes.NewReader(data))
-	if err != nil {
-		return nil, fmt.Errorf("error creating http request: %v", err)
+func toStringPointerSlice(strings []string) []*string {
+	var stringPointers []*string
+
+	for _, stringLiteral := range strings {
+		stringPointers = append(stringPointers, aws.String(stringLiteral))
 	}
 
-	client := http.DefaultClient
+	return stringPointers
+}
 
-	req.Header.Set("Content-Type", "application/json")
+func toStringLiteralSlice(strings []*string) []string {
+	var stringLiterals []string
 
-	awsauth.Sign4(req, awsauth.Credentials{
-		AccessKeyID:     state.ClientID,
-		SecretAccessKey: state.ClientSecret,
-	})
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error creating cluster: %v", err)
+	for _, stringPointer := range strings {
+		stringLiterals = append(stringLiterals, *stringPointer)
 	}
 
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body) // always read the body so the caller can get the error message from it
-
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return body, fmt.Errorf("%v", resp.StatusCode)
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("error reading body: %v", err)
-	}
-
-	return body, nil
+	return stringLiterals
 }
 
 func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *types.ClusterInfo) (*types.ClusterInfo, error) {
@@ -375,7 +336,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 		Credentials: credentials.NewStaticCredentials(
 			state.ClientID,
 			state.ClientSecret,
-			"",
+			state.SessionToken,
 		),
 	})
 	if err != nil {
@@ -390,13 +351,13 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 	}
 
 	var vpcid string
-	var subnetIds []string
-	var securityGroups []string
+	var subnetIds []*string
+	var securityGroups []*string
 	if state.VirtualNetwork == "" {
 		logrus.Infof("Bringing up vpc")
 
 		stack, err := d.createStack(svc, getVPCStackName(state), displayName, vpcTemplate,
-			[]*cloudformation.Parameter{})
+			[]string{}, []*cloudformation.Parameter{})
 		if err != nil {
 			return nil, fmt.Errorf("error creating stack: %v", err)
 		}
@@ -408,8 +369,8 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 			return nil, fmt.Errorf("no security groups or subnet ids were returned")
 		}
 
-		securityGroups = strings.Split(securityGroupsString, ",")
-		subnetIds = strings.Split(subnetIdsString, ",")
+		securityGroups = toStringPointerSlice(strings.Split(securityGroupsString, ","))
+		subnetIds = toStringPointerSlice(strings.Split(subnetIdsString, ","))
 
 		resources, err := svc.DescribeStackResources(&cloudformation.DescribeStackResourcesInput{
 			StackName: aws.String(state.ClusterName + "-eks-vpc"),
@@ -427,15 +388,16 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 		logrus.Infof("VPC info provided, skipping create")
 
 		vpcid = state.VirtualNetwork
-		subnetIds = state.Subnets
-		securityGroups = state.SecurityGroups
+		subnetIds = toStringPointerSlice(state.Subnets)
+		securityGroups = toStringPointerSlice(state.SecurityGroups)
 	}
 
 	var roleARN string
 	if state.ServiceRole == "" {
 		logrus.Infof("Creating service role")
 
-		stack, err := d.createStack(svc, getServiceRoleName(state), displayName, serviceRoleTemplate, nil)
+		stack, err := d.createStack(svc, getServiceRoleName(state), displayName, serviceRoleTemplate,
+			[]string{cloudformation.CapabilityCapabilityIam}, nil)
 		if err != nil {
 			return nil, fmt.Errorf("error creating stack: %v", err)
 		}
@@ -457,26 +419,22 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 		roleARN = *role.Role.Arn
 	}
 
-	data, err := json.Marshal(&clusterObj{
-		ClusterName: aws.String(state.ClusterName),
-		RoleARN:     aws.String(roleARN),
-		ResourcesVPCConfig: vpcConfig{
-			SecurityGroups: securityGroups,
-			Subnets:        subnetIds,
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("error marshalling eks cluster: %v", err)
-	}
-
 	logrus.Infof("Creating EKS cluster")
 
-	body, err := d.awsHTTPRequest(state, fmt.Sprintf("https://eks.%v.amazonaws.com/clusters", state.Region), "POST", data)
+	eksService := eks.New(sess)
+	_, err = eksService.CreateCluster(&eks.CreateClusterInput{
+		Name:    aws.String(state.ClusterName),
+		RoleArn: aws.String(roleARN),
+		ResourcesVpcConfig: &eks.VpcConfigRequest{
+			SecurityGroupIds: securityGroups,
+			SubnetIds:        subnetIds,
+		},
+	})
 	if err != nil && !isClusterConflict(err) {
-		return nil, fmt.Errorf("error creating cluster: %v %v", err, string(body))
+		return nil, fmt.Errorf("error creating cluster: %v", err)
 	}
 
-	cluster, err := d.waitForClusterReady(state)
+	cluster, err := d.waitForClusterReady(eksService, state)
 	if err != nil {
 		return nil, err
 	}
@@ -514,10 +472,11 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 	}
 
 	stack, err := d.createStack(svc, getWorkNodeName(state), displayName, workerNodesTemplate,
+		[]string{cloudformation.CapabilityCapabilityIam},
 		[]*cloudformation.Parameter{
 			{ParameterKey: aws.String("ClusterName"), ParameterValue: aws.String(state.ClusterName)},
 			{ParameterKey: aws.String("ClusterControlPlaneSecurityGroup"),
-				ParameterValue: aws.String(strings.Join(securityGroups, ","))},
+				ParameterValue: aws.String(strings.Join(toStringLiteralSlice(securityGroups), ","))},
 			{ParameterKey: aws.String("NodeGroupName"),
 				ParameterValue: aws.String(state.ClusterName + "-node-group")},
 			{ParameterKey: aws.String("NodeAutoScalingGroupMinSize"), ParameterValue: aws.String(strconv.Itoa(
@@ -529,7 +488,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 			{ParameterKey: aws.String("KeyName"), ParameterValue: aws.String(keyPairName)}, // TODO let the user specify this
 			{ParameterKey: aws.String("VpcId"), ParameterValue: aws.String(vpcid)},
 			{ParameterKey: aws.String("Subnets"),
-				ParameterValue: aws.String(strings.Join(subnetIds, ","))},
+				ParameterValue: aws.String(strings.Join(toStringLiteralSlice(subnetIds), ","))},
 			{ParameterKey: aws.String("PublicIp"), ParameterValue: aws.String(strconv.FormatBool(publicIP))},
 		})
 	if err != nil {
@@ -541,7 +500,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 		return nil, fmt.Errorf("no node instance role returned in output: %v", err)
 	}
 
-	err = d.createConfigMap(state, *cluster.Cluster.MasterEndpoint, capem, nodeInstanceRole)
+	err = d.createConfigMap(state, *cluster.Cluster.Endpoint, capem, nodeInstanceRole)
 	if err != nil {
 		return nil, err
 	}
@@ -556,7 +515,11 @@ func isDuplicateKeyError(err error) bool {
 }
 
 func isClusterConflict(err error) bool {
-	return err.Error() == "409"
+	if awsErr, ok := err.(awserr.Error); ok {
+		return awsErr.Code() == eks.ErrCodeResourceInUseException
+	}
+
+	return false
 }
 
 func getEC2KeyPairName(state state) string {
@@ -662,12 +625,26 @@ func getEKSToken(state state) (string, error) {
 		return "", fmt.Errorf("error creating credentials directory: %v", err)
 	}
 
-	err = ioutil.WriteFile(awsCredentialsPath, []byte(fmt.Sprintf(
-		`[default]
+	var credentialsContent string
+	if state.SessionToken == "" {
+		credentialsContent = fmt.Sprintf(
+			`[default]
 aws_access_key_id=%v
 aws_secret_access_key=%v`,
-		state.ClientID,
-		state.ClientSecret)), 0644)
+			state.ClientID,
+			state.ClientSecret)
+	} else {
+		credentialsContent = fmt.Sprintf(
+			`[default]
+aws_access_key_id=%v
+aws_secret_access_key=%v
+aws_session_token=%v`,
+			state.ClientID,
+			state.ClientSecret,
+			state.SessionToken)
+	}
+
+	err = ioutil.WriteFile(awsCredentialsPath, []byte(credentialsContent), 0644)
 	if err != nil {
 		return "", fmt.Errorf("error writing credentials file: %v", err)
 	}
@@ -675,8 +652,9 @@ aws_secret_access_key=%v`,
 	return generator.Get(state.ClusterName)
 }
 
-func (d *Driver) waitForClusterReady(state state) (*eksCluster, error) {
-	cluster := &eksCluster{}
+func (d *Driver) waitForClusterReady(svc *eks.EKS, state state) (*eks.DescribeClusterOutput, error) {
+	var cluster *eks.DescribeClusterOutput
+	var err error
 
 	status := ""
 	for status != "ACTIVE" {
@@ -684,16 +662,11 @@ func (d *Driver) waitForClusterReady(state state) (*eksCluster, error) {
 
 		logrus.Infof("Waiting for cluster to finish provisioning")
 
-		resp, err := d.awsHTTPRequest(state, fmt.Sprintf("https://eks.%v.amazonaws.com/clusters/%v",
-			state.Region, state.ClusterName),
-			"GET", nil)
+		cluster, err = svc.DescribeCluster(&eks.DescribeClusterInput{
+			Name: aws.String(state.ClusterName),
+		})
 		if err != nil {
-			return nil, fmt.Errorf("error getting cluster: %v", err)
-		}
-
-		err = json.Unmarshal(resp, cluster)
-		if err != nil {
-			return nil, fmt.Errorf("error parsing cluster: %v", err)
+			return nil, fmt.Errorf("error polling cluster state: %v", err)
 		}
 
 		if cluster.Cluster.Status == nil {
@@ -764,17 +737,24 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 		return nil, err
 	}
 
-	resp, err := d.awsHTTPRequest(state, fmt.Sprintf("https://eks.%v.amazonaws.com/clusters/%v", state.Region,
-		state.ClusterName), "GET", nil)
+	sess, err := session.NewSession(&aws.Config{
+		Region: aws.String(state.Region),
+		Credentials: credentials.NewStaticCredentials(
+			state.ClientID,
+			state.ClientSecret,
+			state.SessionToken,
+		),
+	})
 	if err != nil {
-		return nil, fmt.Errorf("error getting cluster: %v", err)
+		return nil, fmt.Errorf("error creating new session: %v", err)
 	}
 
-	cluster := &eksCluster{}
-
-	err = json.Unmarshal(resp, &cluster)
+	svc := eks.New(sess)
+	cluster, err := svc.DescribeCluster(&eks.DescribeClusterInput{
+		Name: aws.String(state.ClusterName),
+	})
 	if err != nil {
-		return nil, fmt.Errorf("error parsing cluster: %v", err)
+		return nil, fmt.Errorf("error getting cluster: %v", err)
 	}
 
 	capem, err := base64.StdEncoding.DecodeString(*cluster.Cluster.CertificateAuthority.Data)
@@ -782,10 +762,10 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 		return nil, fmt.Errorf("error parsing CA data: %v", err)
 	}
 
-	info.Endpoint = *cluster.Cluster.MasterEndpoint
+	info.Endpoint = *cluster.Cluster.Endpoint
 	info.RootCaCertificate = *cluster.Cluster.CertificateAuthority.Data
 
-	clientset, err := getClientset(state, *cluster.Cluster.MasterEndpoint, capem)
+	clientset, err := getClientset(state, *cluster.Cluster.Endpoint, capem)
 	if err != nil {
 		return nil, fmt.Errorf("error creating clientset: %v", err)
 	}
@@ -808,12 +788,6 @@ func (d *Driver) Remove(ctx context.Context, info *types.ClusterInfo) error {
 		return fmt.Errorf("error getting state: %v", err)
 	}
 
-	_, err = d.awsHTTPRequest(state, fmt.Sprintf("https://eks.%v.amazonaws.com/clusters/%v", state.Region,
-		state.ClusterName), "DELETE", nil)
-	if err != nil && !noClusterFound(err) {
-		return fmt.Errorf("error deleting cluster: %v", err)
-	}
-
 	sess, err := session.NewSession(&aws.Config{
 		Region: aws.String(state.Region),
 		Credentials: credentials.NewStaticCredentials(
@@ -826,13 +800,21 @@ func (d *Driver) Remove(ctx context.Context, info *types.ClusterInfo) error {
 		return fmt.Errorf("error getting new aws session: %v", err)
 	}
 
+	eksSvc := eks.New(sess)
+	_, err = eksSvc.DeleteCluster(&eks.DeleteClusterInput{
+		Name: aws.String(state.ClusterName),
+	})
+	if err != nil {
+		return fmt.Errorf("error deleting cluster: %v", err)
+	}
+
 	svc := cloudformation.New(sess)
 
 	for _, stackName := range []string{getServiceRoleName(state), getVPCStackName(state), getWorkNodeName(state)} {
 		_, err = svc.DeleteStack(&cloudformation.DeleteStackInput{
 			StackName: aws.String(stackName),
 		})
-		if err != nil {
+		if err != nil && !noClusterFound(err) {
 			return fmt.Errorf("error deleting stack: %v", err)
 		}
 	}
@@ -850,7 +832,11 @@ func (d *Driver) Remove(ctx context.Context, info *types.ClusterInfo) error {
 }
 
 func noClusterFound(err error) bool {
-	return strings.Contains(err.Error(), "No cluster found for name")
+	if awsErr, ok := err.(awserr.Error); ok {
+		return awsErr.Code() == eks.ErrCodeResourceNotFoundException
+	}
+
+	return false
 }
 
 func (d *Driver) GetCapabilities(ctx context.Context) (*types.Capabilities, error) {
