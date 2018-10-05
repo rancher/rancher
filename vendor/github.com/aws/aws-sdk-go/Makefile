@@ -4,6 +4,7 @@ LINTIGNORECONST='service/[^/]+/(api|service|waiters)\.go:.+(type|struct field|co
 LINTIGNORESTUTTER='service/[^/]+/(api|service)\.go:.+(and that stutters)'
 LINTIGNOREINFLECT='service/[^/]+/(api|errors|service)\.go:.+(method|const) .+ should be '
 LINTIGNOREINFLECTS3UPLOAD='service/s3/s3manager/upload\.go:.+struct field SSEKMSKeyId should be '
+LINTIGNOREENDPOINTS='aws/endpoints/defaults.go:.+(method|const) .+ should be '
 LINTIGNOREDEPS='vendor/.+\.go'
 LINTIGNOREPKGCOMMENT='service/[^/]+/doc_custom.go:.+package comment should be of the form'
 UNIT_TEST_TAGS="example codegen awsinclude"
@@ -13,6 +14,7 @@ SDK_ONLY_PKGS=$(shell go list ./... | grep -v "/vendor/")
 SDK_UNIT_TEST_ONLY_PKGS=$(shell go list -tags ${UNIT_TEST_TAGS} ./... | grep -v "/vendor/")
 SDK_GO_1_4=$(shell go version | grep "go1.4")
 SDK_GO_1_5=$(shell go version | grep "go1.5")
+SDK_GO_1_6=$(shell go version | grep "go1.6")
 SDK_GO_VERSION=$(shell go version | awk '''{print $$3}''' | tr -d '''\n''')
 
 all: get-deps generate unit
@@ -35,9 +37,12 @@ help:
 	@echo "  get-deps-tests          to get the SDK's test dependencies"
 	@echo "  get-deps-verify         to get the SDK's verification dependencies"
 
-generate: gen-test gen-endpoints gen-services
+generate: cleanup-models gen-test gen-endpoints gen-services
 
-gen-test: gen-protocol-test
+gen-test: gen-protocol-test gen-codegen-test
+
+gen-codegen-test:
+	go generate ./private/model/api/codegentest/service
 
 gen-services:
 	go generate ./service
@@ -47,6 +52,10 @@ gen-protocol-test:
 
 gen-endpoints:
 	go generate ./models/endpoints/
+
+cleanup-models:
+	@echo "Cleaning up stale model versions"
+	@./cleanup_models.sh
 
 build:
 	@echo "go build SDK and vendor packages"
@@ -59,6 +68,19 @@ unit: get-deps-tests build verify
 unit-with-race-cover: get-deps-tests build verify
 	@echo "go test SDK and vendor packages"
 	@go test -tags ${UNIT_TEST_TAGS} -race -cpu=1,2,4 $(SDK_UNIT_TEST_ONLY_PKGS)
+
+ci-test: ci-test-generate unit-with-race-cover ci-test-generate-validate
+
+ci-test-generate: get-deps
+	@echo "CI test generated code"
+	@if [ \( -z "${SDK_GO_1_6}" \) -a \( -z "${SDK_GO_1_5}" \) ]; then  make generate; else echo "skipping generate"; fi
+
+ci-test-generate-validate:
+	@echo "CI test validate no generated code changes"
+	@git add . -A
+	@gitstatus=`if [ \( -z "${SDK_GO_1_6}" \) -a \( -z "${SDK_GO_1_5}" \) ]; then  git diff --cached --ignore-space-change; else echo "skipping validation"; fi`; \
+	echo "$$gitstatus"; \
+	if [ "$$gitstatus" != "" ] && [ "$$gitstatus" != "skipping validation" ]; then echo "$$gitstatus"; exit 1; fi
 
 integration: get-deps-tests integ-custom smoke-tests performance
 
@@ -118,6 +140,13 @@ sandbox-go19: sandbox-build-go19
 sandbox-test-go19: sandbox-build-go19
 	docker run -t aws-sdk-go-1.9
 
+sandbox-build-go110:
+	docker build -f ./awstesting/sandbox/Dockerfile.test.go1.8 -t "aws-sdk-go-1.10" .
+sandbox-go110: sandbox-build-go110
+	docker run -i -t aws-sdk-go-1.10 bash
+sandbox-test-go110: sandbox-build-go110
+	docker run -t aws-sdk-go-1.10
+
 sandbox-build-gotip:
 	@echo "Run make update-aws-golang-tip, if this test fails because missing aws-golang:tip container"
 	docker build -f ./awstesting/sandbox/Dockerfile.test.gotip -t "aws-sdk-go-tip" .
@@ -134,7 +163,7 @@ verify: get-deps-verify lint vet
 lint:
 	@echo "go lint SDK and vendor packages"
 	@lint=`if [ \( -z "${SDK_GO_1_4}" \) -a \( -z "${SDK_GO_1_5}" \) ]; then  golint ./...; else echo "skipping golint"; fi`; \
-	lint=`echo "$$lint" | grep -E -v -e ${LINTIGNOREDOT} -e ${LINTIGNOREDOC} -e ${LINTIGNORECONST} -e ${LINTIGNORESTUTTER} -e ${LINTIGNOREINFLECT} -e ${LINTIGNOREDEPS} -e ${LINTIGNOREINFLECTS3UPLOAD} -e ${LINTIGNOREPKGCOMMENT}`; \
+	lint=`echo "$$lint" | grep -E -v -e ${LINTIGNOREDOT} -e ${LINTIGNOREDOC} -e ${LINTIGNORECONST} -e ${LINTIGNORESTUTTER} -e ${LINTIGNOREINFLECT} -e ${LINTIGNOREDEPS} -e ${LINTIGNOREINFLECTS3UPLOAD} -e ${LINTIGNOREPKGCOMMENT} -e ${LINTIGNOREENDPOINTS}`; \
 	echo "$$lint"; \
 	if [ "$$lint" != "" ] && [ "$$lint" != "skipping golint" ]; then exit 1; fi
 

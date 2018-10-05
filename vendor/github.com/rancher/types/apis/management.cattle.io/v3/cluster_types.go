@@ -217,8 +217,9 @@ type AzureKubernetesServiceConfig struct {
 }
 
 type AmazonElasticContainerServiceConfig struct {
-	AccessKey string `json:"accessKey" norman:"required"`
-	SecretKey string `json:"secretKey" norman:"required,type=password"`
+	AccessKey    string `json:"accessKey" norman:"required"`
+	SecretKey    string `json:"secretKey" norman:"required,type=password"`
+	SessionToken string `json:"sessionToken,omitempty" norman:"type=password"`
 
 	Region                      string   `json:"region"`
 	InstanceType                string   `json:"instanceType"`

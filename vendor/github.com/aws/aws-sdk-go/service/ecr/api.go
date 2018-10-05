@@ -14,7 +14,7 @@ const opBatchCheckLayerAvailability = "BatchCheckLayerAvailability"
 
 // BatchCheckLayerAvailabilityRequest generates a "aws/request.Request" representing the
 // client's request for the BatchCheckLayerAvailability operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -106,7 +106,7 @@ const opBatchDeleteImage = "BatchDeleteImage"
 
 // BatchDeleteImageRequest generates a "aws/request.Request" representing the
 // client's request for the BatchDeleteImage operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -201,7 +201,7 @@ const opBatchGetImage = "BatchGetImage"
 
 // BatchGetImageRequest generates a "aws/request.Request" representing the
 // client's request for the BatchGetImage operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -289,7 +289,7 @@ const opCompleteLayerUpload = "CompleteLayerUpload"
 
 // CompleteLayerUploadRequest generates a "aws/request.Request" representing the
 // client's request for the CompleteLayerUpload operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -399,7 +399,7 @@ const opCreateRepository = "CreateRepository"
 
 // CreateRepositoryRequest generates a "aws/request.Request" representing the
 // client's request for the CreateRepository operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -491,7 +491,7 @@ const opDeleteLifecyclePolicy = "DeleteLifecyclePolicy"
 
 // DeleteLifecyclePolicyRequest generates a "aws/request.Request" representing the
 // client's request for the DeleteLifecyclePolicy operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -581,7 +581,7 @@ const opDeleteRepository = "DeleteRepository"
 
 // DeleteRepositoryRequest generates a "aws/request.Request" representing the
 // client's request for the DeleteRepository operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -673,7 +673,7 @@ const opDeleteRepositoryPolicy = "DeleteRepositoryPolicy"
 
 // DeleteRepositoryPolicyRequest generates a "aws/request.Request" representing the
 // client's request for the DeleteRepositoryPolicy operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -764,7 +764,7 @@ const opDescribeImages = "DescribeImages"
 
 // DescribeImagesRequest generates a "aws/request.Request" representing the
 // client's request for the DescribeImages operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -916,7 +916,7 @@ const opDescribeRepositories = "DescribeRepositories"
 
 // DescribeRepositoriesRequest generates a "aws/request.Request" representing the
 // client's request for the DescribeRepositories operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -1059,7 +1059,7 @@ const opGetAuthorizationToken = "GetAuthorizationToken"
 
 // GetAuthorizationTokenRequest generates a "aws/request.Request" representing the
 // client's request for the GetAuthorizationToken operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -1149,7 +1149,7 @@ const opGetDownloadUrlForLayer = "GetDownloadUrlForLayer"
 
 // GetDownloadUrlForLayerRequest generates a "aws/request.Request" representing the
 // client's request for the GetDownloadUrlForLayer operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -1249,7 +1249,7 @@ const opGetLifecyclePolicy = "GetLifecyclePolicy"
 
 // GetLifecyclePolicyRequest generates a "aws/request.Request" representing the
 // client's request for the GetLifecyclePolicy operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -1339,7 +1339,7 @@ const opGetLifecyclePolicyPreview = "GetLifecyclePolicyPreview"
 
 // GetLifecyclePolicyPreviewRequest generates a "aws/request.Request" representing the
 // client's request for the GetLifecyclePolicyPreview operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -1429,7 +1429,7 @@ const opGetRepositoryPolicy = "GetRepositoryPolicy"
 
 // GetRepositoryPolicyRequest generates a "aws/request.Request" representing the
 // client's request for the GetRepositoryPolicy operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -1520,7 +1520,7 @@ const opInitiateLayerUpload = "InitiateLayerUpload"
 
 // InitiateLayerUploadRequest generates a "aws/request.Request" representing the
 // client's request for the InitiateLayerUpload operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -1611,7 +1611,7 @@ const opListImages = "ListImages"
 
 // ListImagesRequest generates a "aws/request.Request" representing the
 // client's request for the ListImages operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -1760,7 +1760,7 @@ const opPutImage = "PutImage"
 
 // PutImageRequest generates a "aws/request.Request" representing the
 // client's request for the PutImage operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -1865,7 +1865,7 @@ const opPutLifecyclePolicy = "PutLifecyclePolicy"
 
 // PutLifecyclePolicyRequest generates a "aws/request.Request" representing the
 // client's request for the PutLifecyclePolicy operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -1953,7 +1953,7 @@ const opSetRepositoryPolicy = "SetRepositoryPolicy"
 
 // SetRepositoryPolicyRequest generates a "aws/request.Request" representing the
 // client's request for the SetRepositoryPolicy operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -2040,7 +2040,7 @@ const opStartLifecyclePolicyPreview = "StartLifecyclePolicyPreview"
 
 // StartLifecyclePolicyPreviewRequest generates a "aws/request.Request" representing the
 // client's request for the StartLifecyclePolicyPreview operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -2135,7 +2135,7 @@ const opUploadLayerPart = "UploadLayerPart"
 
 // UploadLayerPartRequest generates a "aws/request.Request" representing the
 // client's request for the UploadLayerPart operation. The "output" return
-// value will be populated with the request's response once the request complets
+// value will be populated with the request's response once the request completes
 // successfuly.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
@@ -2247,7 +2247,7 @@ type AuthorizationData struct {
 
 	// The Unix time in seconds and milliseconds when the authorization token expires.
 	// Authorization tokens are valid for 12 hours.
-	ExpiresAt *time.Time `locationName:"expiresAt" type:"timestamp" timestampFormat:"unix"`
+	ExpiresAt *time.Time `locationName:"expiresAt" type:"timestamp"`
 
 	// The registry URL to use for this authorization token in a docker login command.
 	// The Amazon ECR registry URL format is https://aws_account_id.dkr.ecr.region.amazonaws.com.
@@ -2857,7 +2857,7 @@ type DeleteLifecyclePolicyOutput struct {
 	_ struct{} `type:"structure"`
 
 	// The time stamp of the last time that the lifecycle policy was run.
-	LastEvaluatedAt *time.Time `locationName:"lastEvaluatedAt" type:"timestamp" timestampFormat:"unix"`
+	LastEvaluatedAt *time.Time `locationName:"lastEvaluatedAt" type:"timestamp"`
 
 	// The JSON lifecycle policy text.
 	LifecyclePolicyText *string `locationName:"lifecyclePolicyText" min:"100" type:"string"`
@@ -3579,7 +3579,7 @@ type GetLifecyclePolicyOutput struct {
 	_ struct{} `type:"structure"`
 
 	// The time stamp of the last time that the lifecycle policy was run.
-	LastEvaluatedAt *time.Time `locationName:"lastEvaluatedAt" type:"timestamp" timestampFormat:"unix"`
+	LastEvaluatedAt *time.Time `locationName:"lastEvaluatedAt" type:"timestamp"`
 
 	// The JSON lifecycle policy text.
 	LifecyclePolicyText *string `locationName:"lifecyclePolicyText" min:"100" type:"string"`
@@ -3964,7 +3964,7 @@ type ImageDetail struct {
 
 	// The date and time, expressed in standard JavaScript date format, at which
 	// the current image was pushed to the repository.
-	ImagePushedAt *time.Time `locationName:"imagePushedAt" type:"timestamp" timestampFormat:"unix"`
+	ImagePushedAt *time.Time `locationName:"imagePushedAt" type:"timestamp"`
 
 	// The size, in bytes, of the image in the repository.
 	//
@@ -4323,7 +4323,7 @@ type LifecyclePolicyPreviewResult struct {
 
 	// The date and time, expressed in standard JavaScript date format, at which
 	// the current image was pushed to the repository.
-	ImagePushedAt *time.Time `locationName:"imagePushedAt" type:"timestamp" timestampFormat:"unix"`
+	ImagePushedAt *time.Time `locationName:"imagePushedAt" type:"timestamp"`
 
 	// The list of tags associated with this image.
 	ImageTags []*string `locationName:"imageTags" type:"list"`
@@ -4784,7 +4784,7 @@ type Repository struct {
 	_ struct{} `type:"structure"`
 
 	// The date and time, in JavaScript date format, when the repository was created.
-	CreatedAt *time.Time `locationName:"createdAt" type:"timestamp" timestampFormat:"unix"`
+	CreatedAt *time.Time `locationName:"createdAt" type:"timestamp"`
 
 	// The AWS account ID associated with the registry that contains the repository.
 	RegistryId *string `locationName:"registryId" type:"string"`
