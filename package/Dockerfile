@@ -27,7 +27,7 @@ RUN curl -sLf https://github.com/krallin/tini/releases/download/${TINI_VERSION}/
 
 ENV CATTLE_UI_PATH /usr/share/rancher/ui
 ENV CATTLE_UI_VERSION 2.0.77
-ENV CATTLE_CLI_VERSION V2.0.5
+ENV CATTLE_CLI_VERSION v2.0.5
 
 RUN mkdir -p /var/log/auditlog
 ENV AUDIT_LOG_PATH /var/log/auditlog/rancher-api-audit.log
@@ -42,9 +42,9 @@ RUN mkdir -p /usr/share/rancher/ui && \
     curl -sL https://releases.rancher.com/ui/${CATTLE_UI_VERSION}.tar.gz | tar xvzf - --strip-components=1 && \
     cd /var/lib/rancher
 
-ENV CATTLE_CLI_URL_DARWIN  https://releases.rancher.com/cli/${CATTLE_CLI_VERSION}/rancher-darwin-amd64-${CATTLE_CLI_VERSION}.tar.gz
-ENV CATTLE_CLI_URL_LINUX   https://releases.rancher.com/cli/${CATTLE_CLI_VERSION}/rancher-linux-amd64-${CATTLE_CLI_VERSION}.tar.gz
-ENV CATTLE_CLI_URL_WINDOWS https://releases.rancher.com/cli/${CATTLE_CLI_VERSION}/rancher-windows-386-${CATTLE_CLI_VERSION}.zip
+ENV CATTLE_CLI_URL_DARWIN  https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-darwin-amd64-${CATTLE_CLI_VERSION}.tar.gz
+ENV CATTLE_CLI_URL_LINUX   https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-linux-amd64-${CATTLE_CLI_VERSION}.tar.gz
+ENV CATTLE_CLI_URL_WINDOWS https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-windows-386-${CATTLE_CLI_VERSION}.zip
 
 ARG VERSION=dev
 ENV CATTLE_SERVER_VERSION ${VERSION}
