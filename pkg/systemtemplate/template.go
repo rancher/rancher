@@ -91,6 +91,21 @@ spec:
                   operator: NotIn
                   values:
                     - windows
+      {{- if .TolerationsOfClusterAgent}}
+      tolerations:
+      {{- range $i, $v := .TolerationsOfClusterAgent }}
+      - {{ if $v.Effect }}effect: {{ $v.Effect }}
+        {{ end -}}
+        {{ if $v.Key }}key: "{{ $v.Key }}"
+        {{ end -}}
+        {{ if $v.Value }}value: "{{ $v.Value }}"
+        {{ end -}}
+        {{ if $v.Operator }}operator: "{{ $v.Operator }}"
+        {{ end -}}
+        {{ if $v.TolerationSeconds }}tolerationSeconds: "{{ $v.TolerationSeconds }}"
+        {{ end -}}
+      {{- end }}
+      {{- end }}
       serviceAccountName: cattle
       containers:
         - name: cluster-register
@@ -148,6 +163,18 @@ spec:
       - effect: NoSchedule
         key: "node-role.kubernetes.io/controlplane"
         value: "true"
+      {{- range $i, $v := .TolerationsOfNodeAgent }}
+      - {{ if $v.Effect }}effect: {{ $v.Effect }}
+        {{ end -}}
+        {{ if $v.Key }}key: "{{ $v.Key }}"
+        {{ end -}}
+        {{ if $v.Value }}value: "{{ $v.Value }}"
+        {{ end -}}
+        {{ if $v.Operator }}operator: "{{ $v.Operator }}"
+        {{ end -}}
+        {{ if $v.TolerationSeconds }}tolerationSeconds: "{{ $v.TolerationSeconds }}"
+        {{ end -}}
+      {{- end }}
       containers:
       - name: agent
         image: {{.AgentImage}}

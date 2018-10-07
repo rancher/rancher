@@ -38,6 +38,8 @@ var (
 	SystemDefaultRegistry           = NewSetting("system-default-registry", "")
 	SystemNamespaces                = NewSetting("system-namespaces", "kube-system,kube-public,cattle-system,cattle-alerting,cattle-logging,cattle-pipeline,ingress-nginx")
 	TelemetryOpt                    = NewSetting("telemetry-opt", "prompt")
+	TolerationsOfClusterAgent       = NewSetting("tolerations-of-clusteragent", "")
+	TolerationsOfNodeAgent          = NewSetting("tolerations-of-nodeagent", "")
 	UIFeedBackForm                  = NewSetting("ui-feedback-form", "")
 	UIIndex                         = NewSetting("ui-index", "https://releases.rancher.com/ui/latest2/index.html")
 	UIPath                          = NewSetting("ui-path", "")
