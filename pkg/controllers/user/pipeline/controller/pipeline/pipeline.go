@@ -35,7 +35,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 }
 
 func (l *Lifecycle) Create(obj *v3.Pipeline) (runtime.Object, error) {
-	return l.sync(obj)
+	return obj, nil
 }
 
 func (l *Lifecycle) Updated(obj *v3.Pipeline) (runtime.Object, error) {
