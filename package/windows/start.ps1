@@ -3,7 +3,7 @@
 param (
     [parameter(Mandatory = $true)] [string]$server,
     [parameter(Mandatory = $true)] [string]$token,
-    [parameter(Mandatory = $true)] [string]$caChecksum,
+    [parameter(Mandatory = $false)] [string]$caChecksum,
     [parameter(Mandatory = $false)] [string]$nodeName,
     [parameter(Mandatory = $false)] [string]$address,
     [parameter(Mandatory = $false)] [string]$internalAddress,
