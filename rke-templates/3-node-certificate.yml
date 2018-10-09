@@ -120,7 +120,8 @@ addons: |-
       spec:
         serviceAccountName: cattle-admin
         containers:
-        - image: rancher/rancher:<RANCHER_VERSION>
+          # Rancher install via RKE addons is only supported up to v2.0.8
+        - image: rancher/rancher:v2.0.8
           imagePullPolicy: Always
           name: cattle-server
   #       env:
