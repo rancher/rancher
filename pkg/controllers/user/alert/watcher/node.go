@@ -16,7 +16,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
 )
 
 type NodeWatcher struct {
@@ -92,23 +91,22 @@ func (w *NodeWatcher) watchRule() error {
 			w.checkNodeCondition(alert, machine)
 
 		} else if alert.Spec.TargetNode.Selector != nil {
-
-			selector := labels.NewSelector()
-			for key, value := range alert.Spec.TargetNode.Selector {
-				r, err := labels.NewRequirement(key, selection.Equals, []string{value})
-				if err != nil {
-					logrus.Warnf("Fail to create new requirement foo %s: %v", key, err)
-					continue
-				}
-				selector = selector.Add(*r)
-			}
-			nodes, err := w.nodeLister.List("", selector)
+			selector := labels.Set(alert.Spec.TargetNode.Selector)
+			nodes, err := w.nodeLister.List("", selector.AsSelector())
 			if err != nil {
 				logrus.Warnf("Fail to list node: %v", err)
 				continue
 			}
 			for _, node := range nodes {
-				machine := nodeHelper.GetNodeByNodeName(machines, node.Name)
+				machine, err := nodeHelper.GetMachineForNode(node, w.clusterName, w.machineLister)
+				if err != nil {
+					return err
+				}
+
+				if machine == nil {
+					continue
+				}
+
 				w.checkNodeCondition(alert, machine)
 			}
 		}
