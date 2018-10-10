@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/rancher/pkg/telemetry"
 	"github.com/rancher/rancher/server/capabilities"
+	"github.com/rancher/rancher/server/responsewriter"
 	"github.com/rancher/rancher/server/ui"
 	"github.com/rancher/rancher/server/whitelist"
 	managementSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
@@ -64,8 +65,8 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 	connectHandler, connectConfigHandler := connectHandlers(scaledContext)
 
 	samlRoot := saml.AuthHandler()
-
-	root.Handle("/", ui.UI(managementAPI))
+	chain := responsewriter.NewMiddlewareChain(responsewriter.Gzip, responsewriter.NoCache, responsewriter.ContentType, ui.UI)
+	root.Handle("/", chain.Handler(managementAPI))
 	root.PathPrefix("/v3-public").Handler(publicAPI)
 	root.Handle("/v3/import/{token}.yaml", http.HandlerFunc(clusterregistrationtokens.ClusterImportHandler))
 	root.Handle("/v3/connect", connectHandler)
@@ -79,11 +80,11 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 	root.PathPrefix("/k8s/clusters/").Handler(authedHandler)
 	root.PathPrefix("/meta").Handler(authedHandler)
 	root.PathPrefix("/v1-telemetry").Handler(authedHandler)
-	root.NotFoundHandler = ui.UI(http.NotFoundHandler())
+	root.NotFoundHandler = chain.Handler(http.NotFoundHandler())
 	root.PathPrefix("/v1-saml").Handler(samlRoot)
 
 	// UI
-	uiContent := ui.Content()
+	uiContent := responsewriter.NewMiddlewareChain(responsewriter.Gzip, responsewriter.CacheMiddleware("json", "js", "css")).Handler(ui.Content())
 	root.PathPrefix("/assets").Handler(uiContent)
 	root.PathPrefix("/translations").Handler(uiContent)
 	root.Handle("/humans.txt", uiContent)
