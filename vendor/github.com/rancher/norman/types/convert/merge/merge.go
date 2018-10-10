@@ -9,7 +9,7 @@ import (
 )
 
 func APIUpdateMerge(schema *types.Schema, schemas *types.Schemas, dest, src map[string]interface{}, replace bool) map[string]interface{} {
-	result := mergeMaps("", nil, schema, schemas, replace, dest, src)
+	result := UpdateMerge(schema, schemas, dest, src, replace)
 	if s, ok := dest["status"]; ok {
 		result["status"] = s
 	}
@@ -17,6 +17,10 @@ func APIUpdateMerge(schema *types.Schema, schemas *types.Schemas, dest, src map[
 		result["metadata"] = mergeMetadata(convert.ToMapInterface(m), convert.ToMapInterface(src["metadata"]))
 	}
 	return result
+}
+
+func UpdateMerge(schema *types.Schema, schemas *types.Schemas, dest, src map[string]interface{}, replace bool) map[string]interface{} {
+	return mergeMaps("", nil, schema, schemas, replace, dest, src)
 }
 
 func isProtected(k string) bool {
