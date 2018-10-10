@@ -63,7 +63,7 @@ type CustomizeStore struct {
 func (s *CustomizeStore) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
 	setSelector(schema.ID, data)
 	setWorkloadSpecificDefaults(schema.ID, data)
-	setSecrets(apiContext, data, true)
+	setSecrets(apiContext, data, convert.ToString(data["namespaceId"]), true)
 	if err := setPorts(convert.ToString(data["name"]), data); err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func (s *CustomizeStore) Update(apiContext *types.APIContext, schema *types.Sche
 	}
 	setScheduling(apiContext, data)
 	setStrategy(data)
-	if err := setSecrets(apiContext, data, false); err != nil {
+	if err := setSecrets(apiContext, data, splitted[0], false); err != nil {
 		return nil, err
 	}
 
@@ -194,10 +194,10 @@ func setSelector(schemaID string, data map[string]interface{}) {
 	}
 }
 
-func getSecrets(apiContext *types.APIContext, data map[string]interface{}) *[]corev1.LocalObjectReference {
+func getSecrets(apiContext *types.APIContext, data map[string]interface{}, namespaceID string) *[]corev1.LocalObjectReference {
 	imagePullSecrets, _ := data["imagePullSecrets"].([]corev1.LocalObjectReference)
 	if containers, _ := values.GetSlice(data, "containers"); len(containers) > 0 {
-		domainToCreds := getCreds(apiContext, convert.ToString(data["namespaceId"]))
+		domainToCreds := getCreds(apiContext, namespaceID)
 		for _, container := range containers {
 			if image := convert.ToString(container["image"]); image != "" {
 				domain := getDomain(image)
@@ -210,8 +210,8 @@ func getSecrets(apiContext *types.APIContext, data map[string]interface{}) *[]co
 	return &imagePullSecrets
 }
 
-func setSecrets(apiContext *types.APIContext, data map[string]interface{}, create bool) error {
-	imagePullSecrets := getSecrets(apiContext, data)
+func setSecrets(apiContext *types.APIContext, data map[string]interface{}, namespaceID string, create bool) error {
+	imagePullSecrets := getSecrets(apiContext, data, namespaceID)
 	if imagePullSecrets != nil {
 		if create {
 			values.PutValue(data, imagePullSecrets, "imagePullSecrets")
