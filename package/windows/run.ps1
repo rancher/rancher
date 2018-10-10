@@ -151,12 +151,18 @@ if ($svcAgent -and ($svcAgent.Status -eq "Running")) {
 
 # check cattle server address #
 if (-not $CATTLE_SERVER) {
-    throw "-Server is a required option, exit"
+    throw "-server is a required option, exit"
+} else {
+    try {
+        $null = scrape-text  -Uri "$CATTLE_SERVER/ping"
+    } catch {
+        throw ("{0} is not accessible ({1})" -f $CATTLE_SERVER, $_.Exception.Message)
+    }
 }
 
 # check cattle server token #
 if (-not $CATTLE_TOKEN) {
-    throw "-Token is a required option, exit"
+    throw "-token is a required option, exit"
 }
 
 # check node name #
@@ -164,7 +170,7 @@ if (-not $CATTLE_NODE_NAME) {
     $CATTLE_NODE_NAME = hostname
 }
 if (-not $CATTLE_NODE_NAME) {
-    throw "-NodeName is a required option, exit"
+    throw "-nodeName is a required option, exit"
 }
 $CATTLE_NODE_NAME = $CATTLE_NODE_NAME.ToLower()
 
@@ -174,29 +180,38 @@ if (-not $CATTLE_ADDRESS) {
     $CATTLE_ADDRESS = $CATTLE_INTERNAL_ADDRESS
 }
 if (-not $CATTLE_ADDRESS) {
-    throw "-Address is a required option, exit"
+    throw "-address is a required option, exit"
 }
 
 # download cattle server CA #
 $SSL_CERT_DIR = "C:\etc\kubernetes\ssl\certs"
-$temp = New-TemporaryFile
-$cacerts = $null
-try {
-    $cacerts = (scrape-json -Uri "$CATTLE_SERVER/v3/settings/cacerts").value
-} catch {}
+if ($CATTLE_CA_CHECKSUM) {
+    $temp = New-TemporaryFile
+    $cacerts = $null
+    try {
+        $cacerts = (scrape-json -Uri "$CATTLE_SERVER/v3/settings/cacerts").value
+    } catch {}
 
-if (-not $cacerts) {
-    throw "Can't get cattle server CA from $CATTLE_SERVER, exit"
+    if (-not $cacerts) {
+        throw "Can't get cattle server CA from $CATTLE_SERVER, exit"
+    }
+    $cacerts + "`n" | Out-File -NoNewline -Encoding ascii -FilePath $temp.FullName
+    $tempHasher = Get-FileHash -LiteralPath $temp.FullName -Algorithm SHA256
+    if ($tempHasher.Hash.ToLower() -ne $CATTLE_CA_CHECKSUM.ToLower()) {
+        $temp.Delete()
+        throw "Actual cattle server CA checksum is $($tempHasher.Hash.ToLower()), $CATTLE_SERVER/v3/settings/cacerts does not match $($CATTLE_CA_CHECKSUM.ToLower()), exit"
+    }
+    rm -Force -Recurse "$SSL_CERT_DIR\serverca" -ErrorAction Ignore
+    $null = New-Item -Force -Type Directory -Path $SSL_CERT_DIR -ErrorAction Ignore
+    $temp.MoveTo("$SSL_CERT_DIR\serverca")
+
+    #import the self-signed certificate#
+    $cacertsBytes = [Convert]::FromBase64String((Get-Content "$SSL_CERT_DIR\serverca" | select -Skip 1 | select -SkipLast 1))
+    $cacertsFile = "$env:TEMP\serverca.cer"
+    Set-Content -Value $cacertsBytes -Path $cacertsFile -Encoding Byte
+    Import-Certificate -CertStoreLocation 'Cert:\LocalMachine\Root' -FilePath $cacertsFile | Out-Null
+    rm -Force $cacertsFile -ErrorAction Ignore
 }
-$cacerts + "`n" | Out-File -NoNewline -Encoding ascii -FilePath $temp.FullName
-$tempHasher = Get-FileHash -LiteralPath $temp.FullName -Algorithm SHA256
-if ($tempHasher.Hash.ToLower() -ne $CATTLE_CA_CHECKSUM.ToLower()) {
-    $temp.Delete()
-    throw "Actual cattle server CA checksum is $($tempHasher.Hash.ToLower()), $CATTLE_SERVER/v3/settings/cacerts does not match $($CATTLE_CA_CHECKSUM.ToLower()), exit"
-}
-rm -Force -Recurse "$SSL_CERT_DIR\serverca" -ErrorAction Ignore | Out-Null
-$null = New-Item -Force -Type Directory -Path $SSL_CERT_DIR -ErrorAction Ignore
-$temp.MoveTo("$SSL_CERT_DIR\serverca")
 
 # add labels #
 $labels = @()

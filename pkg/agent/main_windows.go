@@ -3,8 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -19,7 +17,6 @@ import (
 
 	"path/filepath"
 
-	"github.com/gorilla/websocket"
 	"github.com/mattn/go-colorable"
 	"github.com/rancher/rancher/pkg/agent/node"
 	"github.com/rancher/rancher/pkg/remotedialer"
@@ -243,59 +240,6 @@ func connected() {
 	defer f.Close()
 }
 
-func loadServerCAs() (*x509.CertPool, error) {
-	sslCertPath := os.Getenv("SSL_CERT_DIR")
-	if len(sslCertPath) == 0 {
-		return nil, errors.New("failed to load CA for server, can't get SSL_CERT_PATH environment variable")
-	}
-
-	servercaBytes, err := ioutil.ReadFile(strings.Join([]string{sslCertPath, "serverca"}, string(os.PathSeparator)))
-	if err != nil {
-		return nil, fmt.Errorf("failed to load CA for server, %v", err)
-	}
-
-	caPool := x509.NewCertPool()
-	if !caPool.AppendCertsFromPEM(servercaBytes) {
-		return nil, errors.New("failed to load CA for server, can't append cert from PEM block")
-	}
-
-	return caPool, nil
-}
-
-type clientFactory struct {
-	serverCAs *x509.CertPool
-}
-
-func (cf *clientFactory) http() *http.Client {
-	return &http.Client{
-		Timeout: 300 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				RootCAs: cf.serverCAs,
-			},
-		},
-	}
-}
-
-func (cf *clientFactory) ws() *websocket.Dialer {
-	return &websocket.Dialer{
-		TLSClientConfig: &tls.Config{
-			RootCAs: cf.serverCAs,
-		},
-	}
-}
-
-func newClientFactory() (*clientFactory, error) {
-	serverCAs, err := loadServerCAs()
-	if err != nil {
-		return nil, err
-	}
-
-	return &clientFactory{
-		serverCAs: serverCAs,
-	}, nil
-}
-
 func (a *agentService) stop() {
 	if a.isStop {
 		return
@@ -328,11 +272,6 @@ func (a *agentService) shutdown(callback callbackFn) {
 func (a *agentService) start(selfChangeRequest chan<- svc.ChangeRequest) error {
 	logrus.Infof("Rancher agent version %s is starting", VERSION)
 
-	clientPool, err := newClientFactory()
-	if err != nil {
-		return err
-	}
-
 	params, err := getParams()
 	if err != nil {
 		return err
@@ -363,7 +302,7 @@ func (a *agentService) start(selfChangeRequest chan<- svc.ChangeRequest) error {
 		connectConfig := fmt.Sprintf("https://%s/v3/connect/config", serverURL.Host)
 		if err := rkenodeconfigclient.ConfigClientWhileWindows(
 			ctx,
-			clientPool.http(),
+			nil,
 			connectConfig,
 			headers,
 			false,
@@ -379,7 +318,7 @@ func (a *agentService) start(selfChangeRequest chan<- svc.ChangeRequest) error {
 			case <-time.After(2 * time.Minute):
 				if err := rkenodeconfigclient.ConfigClientWhileWindows(
 					ctx,
-					clientPool.http(),
+					nil,
 					connectConfig,
 					headers,
 					false,
@@ -420,7 +359,7 @@ func (a *agentService) start(selfChangeRequest chan<- svc.ChangeRequest) error {
 					ctx,
 					wsURL,
 					http.Header(headers),
-					clientPool.ws(),
+					nil,
 					func(proto, address string) bool {
 						switch proto {
 						case "tcp":
