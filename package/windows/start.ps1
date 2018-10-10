@@ -3,7 +3,7 @@
 param (
     [parameter(Mandatory = $true)] [string]$server,
     [parameter(Mandatory = $true)] [string]$token,
-    [parameter(Mandatory = $true)] [string]$caChecksum,
+    [parameter(Mandatory = $false)] [string]$caChecksum,
     [parameter(Mandatory = $false)] [string]$nodeName,
     [parameter(Mandatory = $false)] [string]$address,
     [parameter(Mandatory = $false)] [string]$internalAddress,
@@ -63,7 +63,11 @@ try {
     $runPSContent = Get-Content "$env:ProgramFiles\rancher\run.ps1"
     $runPSContent = $runPSContent -replace "<CATTLE_SERVER>",$server
     $runPSContent = $runPSContent -replace "<CATTLE_TOKEN>",$token
-    $runPSContent = $runPSContent -replace "<CATTLE_CA_CHECKSUM>",$caChecksum
+    if ($caChecksum) {
+        $runPSContent = $runPSContent -replace "<CATTLE_CA_CHECKSUM>",$caChecksum
+    } else {
+        $runPSContent = $runPSContent -replace "<CATTLE_CA_CHECKSUM>",""
+    }
     if ($PSBoundParameters['debug'] -or $PSBoundParameters['Debug']) {
         $runPSContent = $runPSContent -replace "<CATTLE_DEBUG>","true"
     } else {

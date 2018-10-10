@@ -579,6 +579,8 @@ function start-flanneld {
         $networkType = "l2bridge"
     }
     if ($network.Type -ne $networkType) {
+        ## restart flanneld
+        stop-flanneld
         throw ".............. FAILED, agent retry"
     }
 
@@ -850,12 +852,6 @@ function main {
         $wantRecoverComps += @("kubelet")
     }
 
-    # kube-proxy #
-    $process = Get-Process -Name "kube-proxy*" -ErrorAction Ignore
-    if (-not $process) {
-        $wantRecoverComps += @("kube-proxy")
-    }
-
     # networking ctrl #
     if ($KubeCNIComponent -eq "flannel") {
         # flanneld #
@@ -863,6 +859,12 @@ function main {
         if (-not $process) {
             $wantRecoverComps += @("flanneld")
         }
+    }
+
+    # kube-proxy #
+    $process = Get-Process -Name "kube-proxy*" -ErrorAction Ignore
+    if (-not $process) {
+        $wantRecoverComps += @("kube-proxy")
     }
 
     if ($wantRecoverComps.Count -ne $shouldUseCompsCnt) {
@@ -874,14 +876,14 @@ function main {
                     start-kubelet -Restart
                     break
                 }
-                "kube-proxy" {
-                    start-kube-proxy -Restart
-                    break
-                }
                 "flanneld" {
                     if (-not $recoverKubelet) {
                         start-flanneld -Restart
                     }
+                }
+                "kube-proxy" {
+                    start-kube-proxy -Restart
+                    break
                 }
             }
         }
