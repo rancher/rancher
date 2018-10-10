@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"strings"
 
 	"github.com/rancher/norman/leader"
 	"github.com/rancher/norman/pkg/k8scheck"
@@ -162,8 +163,11 @@ func addData(management *config.ManagementContext, cfg Config) error {
 		return err
 	}
 
-	if err := addCatalogs(management); err != nil {
-		return err
+	if strings.EqualFold(settings.DefaultCatalog.Get(), "true") {
+		err := addCatalogs(management)
+		if err != nil {
+			return err
+		}
 	}
 
 	if err := addSetting(); err != nil {
