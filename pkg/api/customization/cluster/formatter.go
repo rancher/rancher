@@ -34,6 +34,16 @@ func Formatter(request *types.APIContext, resource *types.RawResource) {
 		setTrueIfNil(configMap, client.GoogleKubernetesEngineConfigFieldEnableHTTPLoadBalancing)
 		setTrueIfNil(configMap, client.GoogleKubernetesEngineConfigFieldEnableNetworkPolicyConfig)
 	}
+
+	if eksConfig, ok := resource.Values[client.ClusterSpecFieldAmazonElasticContainerServiceConfig]; ok {
+		configMap, ok := eksConfig.(map[string]interface{})
+		if !ok {
+			logrus.Errorf("could not convert aks config to map")
+			return
+		}
+
+		setTrueIfNil(configMap, client.AmazonElasticContainerServiceConfigFieldAssociateWorkerNodePublicIP)
+	}
 }
 
 func setTrueIfNil(configMap map[string]interface{}, fieldName string) {
