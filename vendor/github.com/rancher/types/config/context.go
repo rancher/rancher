@@ -430,6 +430,70 @@ func (w *UserContext) StartAndWait(ctx context.Context) error {
 	return ctx.Err()
 }
 
+func NewUserOnlyContext(config rest.Config) (*UserOnlyContext, error) {
+	var err error
+	context := &UserOnlyContext{
+		RESTConfig: config,
+	}
+
+	context.K8sClient, err = kubernetes.NewForConfig(&config)
+	if err != nil {
+		return nil, err
+	}
+
+	context.Apps, err = appsv1beta2.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	context.Core, err = corev1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	context.Project, err = projectv3.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	context.RBAC, err = rbacv1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	context.Extensions, err = extv1beta1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	context.BatchV1, err = batchv1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	context.BatchV1Beta1, err = batchv1beta1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	dynamicConfig := config
+	if dynamicConfig.NegotiatedSerializer == nil {
+		dynamicConfig.NegotiatedSerializer = dynamic.NegotiatedSerializer
+	}
+
+	context.UnversionedClient, err = restwatch.UnversionedRESTClientFor(&dynamicConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	context.Schemas = types.NewSchemas().
+		AddSchemas(managementSchema.Schemas).
+		AddSchemas(clusterSchema.Schemas).
+		AddSchemas(projectSchema.Schemas)
+
+	return context, err
+}
+
 func (w *UserOnlyContext) Start(ctx context.Context) error {
 	logrus.Info("Starting workload controllers")
 	return controller.SyncThenStart(ctx, 5, w.controllers()...)

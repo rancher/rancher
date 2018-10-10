@@ -171,6 +171,10 @@ func run() error {
 		}
 
 		if isCluster() {
+			err = cluster.RunControllers()
+			if err != nil {
+				logrus.Fatal(err)
+			}
 			return nil
 		}
 

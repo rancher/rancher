@@ -27,6 +27,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/targetworkloadservice"
 	"github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/types/config"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	// init upgrade implement
 	_ "github.com/rancher/rancher/pkg/controllers/user/alert/upgrade"
@@ -57,12 +58,19 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 	resourcequota.Register(ctx, cluster)
 
 	userOnlyContext := cluster.UserOnlyContext()
-	dnsrecord.Register(ctx, userOnlyContext)
-	externalservice.Register(ctx, userOnlyContext)
 	ingress.Register(ctx, userOnlyContext, cluster)
-	ingresshostgen.Register(userOnlyContext)
-	targetworkloadservice.Register(ctx, userOnlyContext)
-	workload.Register(ctx, userOnlyContext)
+
+	c, err := cluster.Management.Management.Clusters("").Get(cluster.ClusterName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	if c.Spec.Internal {
+		err = RegisterUserOnly(ctx, userOnlyContext)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
@@ -71,5 +79,14 @@ func RegisterFollower(ctx context.Context, cluster *config.UserContext, kubeConf
 	cluster.Core.Namespaces("").Controller()
 	cluster.RBAC.ClusterRoleBindings("").Controller()
 	cluster.RBAC.RoleBindings("").Controller()
+	return nil
+}
+
+func RegisterUserOnly(ctx context.Context, cluster *config.UserOnlyContext) error {
+	dnsrecord.Register(ctx, cluster)
+	externalservice.Register(ctx, cluster)
+	ingresshostgen.Register(cluster)
+	targetworkloadservice.Register(ctx, cluster)
+	workload.Register(ctx, cluster)
 	return nil
 }
