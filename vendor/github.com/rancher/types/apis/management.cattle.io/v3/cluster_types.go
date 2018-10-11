@@ -231,3 +231,7 @@ type IngressCapabilities struct {
 type MonitoringInput struct {
 	Answers map[string]string `json:"answers,omitempty"`
 }
+type RotateCertificateInput struct {
+	CACertificates bool     `json:"caCertificates,omitempty"`
+	Services       []string `json:"services,omitempty" norman:"type=enum,options=etcd|kubelet|kube-apiserver|kube-proxy|kube-scheduler|kube-controller-manager"`
+}
