@@ -213,17 +213,15 @@ func capabilitiesToUpperCase(data map[string]interface{}) map[string]interface{}
 	containers := convert.ToMapSlice(data["containers"])
 	elements := []string{"capDrop", "capAdd"}
 
-	if containers != nil {
-		for _, c := range containers {
-			for _, element := range elements {
-				caps := convert.ToStringSlice(c[element])
-				newCaps := []string{}
-				if caps != nil {
-					for _, cap := range caps {
-						newCaps = append(newCaps, strings.ToUpper(cap))
-					}
-					c[element] = newCaps
+	for _, c := range containers {
+		for _, element := range elements {
+			caps := convert.ToStringSlice(c[element])
+			newCaps := []string{}
+			if caps != nil {
+				for _, cap := range caps {
+					newCaps = append(newCaps, strings.ToUpper(cap))
 				}
+				c[element] = newCaps
 			}
 		}
 	}
