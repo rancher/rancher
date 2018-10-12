@@ -359,15 +359,15 @@ func (ap *azureProvider) userGroupsToPrincipals(
 	groupPrincipals := make([]v3.Principal, len(*groups.Value))
 	for i, group := range *groups.Value {
 		j := i
+		gp := group
 		g.Go(func() error {
-			groupObj, err := azureClient.groupClient.Get(context.Background(), group)
+			groupObj, err := azureClient.groupClient.Get(context.Background(), gp)
 			if err != nil {
 				return err
 			}
 
 			p := ap.groupToPrincipal(groupObj)
 			p.MemberOf = true
-
 			groupPrincipals[j] = p
 			return nil
 		})
