@@ -26,7 +26,7 @@ RUN curl -sLf https://github.com/krallin/tini/releases/download/${TINI_VERSION}/
     chmod +x /usr/bin/helm /usr/bin/tini /usr/bin/telemetry /usr/bin/tiller
 
 ENV CATTLE_UI_PATH /usr/share/rancher/ui
-ENV CATTLE_UI_VERSION 2.1.1
+ENV CATTLE_UI_VERSION 2.1.2
 ENV CATTLE_CLI_VERSION v2.0.5
 
 RUN mkdir -p /var/log/auditlog
