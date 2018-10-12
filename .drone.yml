@@ -24,7 +24,7 @@ pipeline:
     tag: master
     secrets: [docker_username, docker_password]
     environment:
-    -  PLUGIN_CUSTOM_DNS=8.8.8.8
+    -  PLUGIN_CUSTOM_DNS=1.1.1.1
     build_args:
     - VERSION=master
     when:
@@ -39,7 +39,7 @@ pipeline:
     tag: master
     secrets: [docker_username, docker_password]
     environment:
-    -  PLUGIN_CUSTOM_DNS=8.8.8.8
+    -  PLUGIN_CUSTOM_DNS=1.1.1.1
     build_args:
     - VERSION=master
     when:
@@ -54,7 +54,7 @@ pipeline:
     tag: ${DRONE_TAG}
     secrets: [docker_username, docker_password]
     environment:
-    -  PLUGIN_CUSTOM_DNS=8.8.8.8
+    -  PLUGIN_CUSTOM_DNS=1.1.1.1
     build_args:
     - VERSION=${DRONE_TAG}
     when:
@@ -69,7 +69,7 @@ pipeline:
     tag: ${DRONE_TAG}
     secrets: [docker_username, docker_password]
     environment:
-    -  PLUGIN_CUSTOM_DNS=8.8.8.8
+    -  PLUGIN_CUSTOM_DNS=1.1.1.1
     build_args:
     - VERSION=${DRONE_TAG}
     when:
