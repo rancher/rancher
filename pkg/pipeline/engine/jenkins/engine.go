@@ -54,7 +54,7 @@ type Engine struct {
 }
 
 func (j *Engine) getJenkinsURL(execution *v3.PipelineExecution) (string, error) {
-	ns := utils.GetPipelineCommonName(execution)
+	ns := utils.GetPipelineCommonName(execution.Spec.ProjectName)
 	service, err := j.ServiceLister.Get(ns, utils.JenkinsName)
 	if err != nil {
 		return "", err
@@ -68,7 +68,7 @@ func (j *Engine) PreCheck(execution *v3.PipelineExecution) (bool, error) {
 	var pod *corev1.Pod
 	var err error
 	set := labels.Set(map[string]string{utils.LabelKeyApp: utils.JenkinsName})
-	ns := utils.GetPipelineCommonName(execution)
+	ns := utils.GetPipelineCommonName(execution.Spec.ProjectName)
 	pods, err := j.PodLister.List(ns, set.AsSelector())
 	if err != nil {
 		return false, err
@@ -93,7 +93,7 @@ func (j *Engine) getJenkinsClient(execution *v3.PipelineExecution) (*Client, err
 		return nil, err
 	}
 	user := utils.PipelineSecretDefaultUser
-	ns := utils.GetPipelineCommonName(execution)
+	ns := utils.GetPipelineCommonName(execution.Spec.ProjectName)
 	var secret *corev1.Secret
 	if j.UseCache {
 		secret, err = j.SecretLister.Get(ns, utils.PipelineSecretName)
@@ -213,7 +213,7 @@ func (j *Engine) prepareRegistryCredential(execution *v3.PipelineExecution, regi
 
 	secretName := fmt.Sprintf("%s-%s", execution.Namespace, proceccedRegistry)
 	logrus.Debugf("preparing registry credential %s for %s", secretName, registry)
-	ns := utils.GetPipelineCommonName(execution)
+	ns := utils.GetPipelineCommonName(execution.Spec.ProjectName)
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,

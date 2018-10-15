@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/rancher/rancher/pkg/randomtoken"
+	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
@@ -12,7 +13,8 @@ import (
 )
 
 const (
-	clusterOwnerRole = "cluster-owner"
+	clusterOwnerRole  = "cluster-owner"
+	projectMemberRole = "project-member"
 )
 
 func NewManager(management *config.ManagementContext) *Manager {
@@ -20,6 +22,8 @@ func NewManager(management *config.ManagementContext) *Manager {
 		userManager: management.UserManager,
 		crtbs:       management.Management.ClusterRoleTemplateBindings(""),
 		crts:        management.Management.ClusterRegistrationTokens(""),
+		prtbs:       management.Management.ProjectRoleTemplateBindings(""),
+		tokens:      management.Management.Tokens(""),
 	}
 }
 
@@ -28,6 +32,8 @@ func NewManagerFromScale(management *config.ScaledContext) *Manager {
 		userManager: management.UserManager,
 		crtbs:       management.Management.ClusterRoleTemplateBindings(""),
 		crts:        management.Management.ClusterRegistrationTokens(""),
+		prtbs:       management.Management.ProjectRoleTemplateBindings(""),
+		tokens:      management.Management.Tokens(""),
 	}
 }
 
@@ -35,6 +41,8 @@ type Manager struct {
 	userManager user.Manager
 	crtbs       v3.ClusterRoleTemplateBindingInterface
 	crts        v3.ClusterRegistrationTokenInterface
+	prtbs       v3.ProjectRoleTemplateBindingInterface
+	tokens      v3.TokenInterface
 }
 
 func (s *Manager) CreateSystemAccount(cluster *v3.Cluster) error {
@@ -98,4 +106,43 @@ func (s *Manager) GetOrCreateSystemClusterToken(clusterName string) (string, err
 	}
 
 	return token, nil
+}
+
+func (s *Manager) GetOrCreateProjectSystemAccount(projectID string) error {
+	_, projectName := ref.Parse(projectID)
+
+	user, err := s.GetProjectSystemUser(projectName)
+	if err != nil {
+		return err
+	}
+
+	bindingName := user.Name + "-member"
+	_, err = s.prtbs.GetNamespaced(projectName, bindingName, v1.GetOptions{})
+	if err == nil {
+		return nil
+	} else if errors2.IsNotFound(err) {
+		_, err = s.prtbs.Create(&v3.ProjectRoleTemplateBinding{
+			ObjectMeta: v1.ObjectMeta{
+				Name:      bindingName,
+				Namespace: projectName,
+			},
+			ProjectName:      projectID,
+			UserName:         user.Name,
+			RoleTemplateName: projectMemberRole,
+		})
+	}
+
+	return err
+}
+
+func (s *Manager) GetProjectSystemUser(projectName string) (*v3.User, error) {
+	return s.userManager.EnsureUser(fmt.Sprintf("system://%s", projectName), "System account for Project "+projectName)
+}
+
+func (s *Manager) GetOrCreateProjectSystemToken(projectName string) (string, error) {
+	user, err := s.GetProjectSystemUser(projectName)
+	if err != nil {
+		return "", err
+	}
+	return s.userManager.EnsureToken(projectName+"-pipeline", "Pipeline token for project "+projectName, user.Name)
 }
