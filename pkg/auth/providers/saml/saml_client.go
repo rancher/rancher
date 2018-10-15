@@ -185,43 +185,46 @@ func AuthHandler() http.Handler {
 	return root
 }
 
-func (s *Provider) getSamlPrincipals(config *v3.SamlConfig, samlData map[string][]string) (v3.Principal, []v3.Principal) {
+func (s *Provider) getSamlPrincipals(config *v3.SamlConfig, samlData map[string][]string) (v3.Principal, []v3.Principal, error) {
 	var userPrincipal v3.Principal
 	var groupPrincipals []v3.Principal
 	uid, ok := samlData[config.UIDField]
+	if !ok {
+		// UID field provided by user is actually not there in SAMLResponse, without this we cannot differentiate between users and create separate principals
+		return userPrincipal, groupPrincipals, fmt.Errorf("SAML: Unique ID field is not provided in SAML Response")
+	}
+	userPrincipal = v3.Principal{
+		ObjectMeta:    metav1.ObjectMeta{Name: s.userType + "://" + uid[0]},
+		Provider:      s.name,
+		PrincipalType: "user",
+		Me:            true,
+	}
+
+	displayName, ok := samlData[config.DisplayNameField]
 	if ok {
-		userPrincipal = v3.Principal{
-			ObjectMeta:    metav1.ObjectMeta{Name: s.userType + "://" + uid[0]},
-			Provider:      s.name,
-			PrincipalType: "user",
-			Me:            true,
-		}
+		userPrincipal.DisplayName = displayName[0]
+	}
 
-		displayName, ok := samlData[config.DisplayNameField]
-		if ok {
-			userPrincipal.DisplayName = displayName[0]
-		}
+	userName, ok := samlData[config.UserNameField]
+	if ok {
+		userPrincipal.LoginName = userName[0]
+	}
 
-		userName, ok := samlData[config.UserNameField]
-		if ok {
-			userPrincipal.LoginName = userName[0]
-		}
-
-		groups, ok := samlData[config.GroupsField]
-		if ok {
-			for _, group := range groups {
-				group := v3.Principal{
-					ObjectMeta:    metav1.ObjectMeta{Name: s.groupType + "://" + group},
-					DisplayName:   group,
-					Provider:      s.name,
-					PrincipalType: "group",
-					MemberOf:      true,
-				}
-				groupPrincipals = append(groupPrincipals, group)
+	groups, ok := samlData[config.GroupsField]
+	if ok {
+		for _, group := range groups {
+			group := v3.Principal{
+				ObjectMeta:    metav1.ObjectMeta{Name: s.groupType + "://" + group},
+				DisplayName:   group,
+				Provider:      s.name,
+				PrincipalType: "group",
+				MemberOf:      true,
 			}
+			groupPrincipals = append(groupPrincipals, group)
 		}
 	}
-	return userPrincipal, groupPrincipals
+
+	return userPrincipal, groupPrincipals, nil
 }
 
 // HandleSamlAssertion processes/handles the assertion obtained by the POST to /saml/acs from IdP
@@ -257,7 +260,12 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		return
 	}
 
-	userPrincipal, groupPrincipals = s.getSamlPrincipals(config, samlData)
+	userPrincipal, groupPrincipals, err = s.getSamlPrincipals(config, samlData)
+	if err != nil {
+		log.Error(err)
+		http.Redirect(w, r, redirectURL+"/login?errorCode=500", http.StatusFound)
+		return
+	}
 	allowedPrincipals := config.AllowedPrincipalIDs
 
 	allowed, err := s.userMGR.CheckAccess(config.AccessMode, allowedPrincipals, userPrincipal, groupPrincipals)
