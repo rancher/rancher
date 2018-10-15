@@ -17,7 +17,6 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rke/pki"
 	mv3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	corev1 "k8s.io/api/core/v1"
@@ -35,27 +34,40 @@ import (
 const projectIDFieldLabel = "field.cattle.io/projectId"
 const defaultPortRange = "34000-35000"
 
-func (l *Lifecycle) deploy(obj *v3.PipelineExecution) error {
-	logrus.Debug("deploy pipeline workloads and services")
+func (l *Lifecycle) deploy(projectName string) error {
 
+	clusterID, projectID := ref.Parse(projectName)
+	ns := getPipelineNamespace(clusterID, projectID)
+	if _, err := l.namespaceLister.Get("", ns.Name); err == nil {
+		return l.reconcileRb(projectName)
+	} else if !apierrors.IsNotFound(err) {
+		return err
+	}
+	logrus.Debug("deploy pipeline workloads and services")
+	if _, err := l.namespaces.Create(ns); err != nil && !apierrors.IsAlreadyExists(err) {
+		return errors.Wrapf(err, "Error create ns")
+	}
 	token, err := randomtoken.Generate()
 	if err != nil {
 		logrus.Warningf("warning generate random token got - %v, use default instead", err)
 		token = utils.PipelineSecretDefaultToken
 	}
 
-	nsName := utils.GetPipelineCommonName(obj)
-	clusterID, projectID := ref.Parse(obj.Spec.ProjectName)
-
-	ns := getCommonPipelineNamespace()
-	if _, err := l.namespaces.Create(ns); err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "Error create ns")
-	}
-	ns = getPipelineNamespace(clusterID, projectID)
+	nsName := utils.GetPipelineCommonName(projectName)
+	ns = getCommonPipelineNamespace()
 	if _, err := l.namespaces.Create(ns); err != nil && !apierrors.IsAlreadyExists(err) {
 		return errors.Wrapf(err, "Error create ns")
 	}
 	secret := getPipelineSecret(nsName, token)
+	if _, err := l.secrets.Create(secret); err != nil && !apierrors.IsAlreadyExists(err) {
+		return errors.Wrapf(err, "Error create secret")
+	}
+
+	apikey, err := l.systemAccountManager.GetOrCreateProjectSystemToken(projectID)
+	if err != nil {
+		return err
+	}
+	secret = GetAPIKeySecret(nsName, apikey)
 	if _, err := l.secrets.Create(secret); err != nil && !apierrors.IsAlreadyExists(err) {
 		return errors.Wrapf(err, "Error create secret")
 	}
@@ -104,7 +116,7 @@ func (l *Lifecycle) deploy(obj *v3.PipelineExecution) error {
 		return err
 	}
 	//docker credential for local registry
-	if err := l.reconcileRegistryCredential(obj, token); err != nil {
+	if err := l.reconcileRegistryCredential(projectName, token); err != nil {
 		return err
 	}
 	nginxDaemonset := getProxyDaemonset()
@@ -112,7 +124,7 @@ func (l *Lifecycle) deploy(obj *v3.PipelineExecution) error {
 		return errors.Wrapf(err, "Error create nginx proxy")
 	}
 
-	return l.reconcileRb(obj)
+	return l.reconcileRb(projectName)
 }
 
 func getCommonPipelineNamespace() *corev1.Namespace {
@@ -153,6 +165,18 @@ func getPipelineSecret(ns string, token string) *corev1.Secret {
 			utils.PipelineSecretTokenKey:         []byte(token),
 			utils.PipelineSecretUserKey:          []byte(utils.PipelineSecretDefaultUser),
 			utils.PipelineSecretRegistryTokenKey: []byte(registryToken),
+		},
+	}
+}
+
+func GetAPIKeySecret(ns string, key string) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: ns,
+			Name:      utils.PipelineAPIKeySecretName,
+		},
+		Data: map[string][]byte{
+			utils.PipelineSecretAPITokenKey: []byte(key),
 		},
 	}
 }
@@ -814,7 +838,7 @@ func GetMinioDeployment(ns string) *appsv1beta2.Deployment {
 	}
 }
 
-func (l *Lifecycle) reconcileRegistryCredential(obj *v3.PipelineExecution, token string) error {
+func (l *Lifecycle) reconcileRegistryCredential(projectName, token string) error {
 	cm, err := l.configMaps.GetNamespaced(utils.PipelineNamespace, utils.ProxyConfigMapName, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -823,13 +847,13 @@ func (l *Lifecycle) reconcileRegistryCredential(obj *v3.PipelineExecution, token
 	if err != nil {
 		return err
 	}
-	_, projectID := ref.Parse(obj.Spec.ProjectName)
+	_, projectID := ref.Parse(projectName)
 	port, ok := portMap[projectID]
 	if !ok || port == "" {
 		return errors.New("Found no port for local registry")
 	}
 	regHostname := "127.0.0.1:" + port
-	dockerCredential, err := getRegistryCredential(obj.Spec.ProjectName, token, regHostname)
+	dockerCredential, err := getRegistryCredential(projectName, token, regHostname)
 	if err != nil {
 		return err
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
+	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
@@ -29,6 +30,7 @@ var settings = map[string]string{
 func Register(ctx context.Context, cluster *config.UserContext) {
 	projects := cluster.Management.Management.Projects("")
 	projectSyncer := &Syncer{
+		systemAccountManager:      systemaccount.NewManager(cluster.Management),
 		configMaps:                cluster.Core.ConfigMaps(""),
 		configMapLister:           cluster.Core.ConfigMaps("").Controller().Lister(),
 		sourceCodeProviderConfigs: cluster.Management.Project.SourceCodeProviderConfigs(""),
@@ -39,6 +41,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 }
 
 type Syncer struct {
+	systemAccountManager      *systemaccount.Manager
 	configMaps                v1.ConfigMapInterface
 	configMapLister           v1.ConfigMapLister
 	sourceCodeProviderConfigs pv3.SourceCodeProviderConfigInterface
@@ -59,8 +62,10 @@ func (l *Syncer) Sync(key string, obj *v3.Project) (runtime.Object, error) {
 	if err := l.addSourceCodeProviderConfigs(obj); err != nil {
 		return nil, err
 	}
-
-	return nil, l.addPipelineSettings(obj)
+	if err := l.addPipelineSettings(obj); err != nil {
+		return nil, err
+	}
+	return nil, l.addSystemToken(obj)
 }
 
 func (l *Syncer) addSourceCodeProviderConfigs(obj *v3.Project) error {
@@ -116,6 +121,16 @@ func (l *Syncer) addPipelineSetting(settingName string, value string, obj *v3.Pr
 	}
 
 	if _, err := l.pipelineSettings.Create(setting); err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+	return nil
+}
+
+func (l *Syncer) addSystemToken(obj *v3.Project) error {
+	if err := l.systemAccountManager.GetOrCreateProjectSystemAccount(ref.Ref(obj)); err != nil {
+		return err
+	}
+	if _, err := l.systemAccountManager.GetOrCreateProjectSystemToken(obj.Name); err != nil {
 		return err
 	}
 	return nil

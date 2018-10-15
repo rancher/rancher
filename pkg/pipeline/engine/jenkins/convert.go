@@ -8,8 +8,10 @@ import (
 	images "github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
+	"github.com/rancher/rancher/pkg/settings"
 	mv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
+	"gopkg.in/yaml.v2"
 )
 
 func toJenkinsStep(execution *v3.PipelineExecution, stageOrdinal int, stepOrdinal int) PipelineStep {
@@ -25,6 +27,10 @@ func toJenkinsStep(execution *v3.PipelineExecution, stageOrdinal int, stepOrdina
 		pStep = convertPublishImageconfig(execution, step)
 	} else if step.ApplyYamlConfig != nil {
 		pStep = convertApplyYamlconfig(execution, step, stageOrdinal)
+	} else if step.PublishCatalogConfig != nil {
+		pStep = convertPublishCatalogConfig(execution, step)
+	} else if step.ApplyAppConfig != nil {
+		pStep = convertApplyAppConfig(execution, step)
 	}
 
 	if !utils.MatchAll(stage.When, execution) || !utils.MatchAll(step.When, execution) {
@@ -155,6 +161,63 @@ StageLoop:
 		applyEnv[k] = v
 	}
 	pStep.containerOptions = getStepContainerOptions(execution, step.Privileged, applyEnv, step.EnvFrom)
+
+	return pStep
+}
+
+func convertPublishCatalogConfig(execution *v3.PipelineExecution, step *v3.Step) PipelineStep {
+	config := step.PublishCatalogConfig
+	pStep := PipelineStep{}
+
+	pStep.image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.KubeApply)
+
+	pStep.command = `sh ''' publish-catalog '''`
+
+	applyEnv := map[string]string{
+		"CATALOG_PATH": config.Path,
+		"CATALOG_NAME": config.Catalog,
+		"VERSION":      config.Version,
+		"GIT_AUTHOR":   config.GitAuthor,
+		"GIT_EMAIL":    config.GitEmail,
+		"GIT_URL":      config.GitURL,
+		"GIT_BRANCH":   config.GitBranch,
+	}
+
+	for k, v := range step.Env {
+		applyEnv[k] = v
+	}
+	pStep.containerOptions = getStepContainerOptions(execution, step.Privileged, applyEnv, step.EnvFrom)
+
+	return pStep
+}
+
+func convertApplyAppConfig(execution *v3.PipelineExecution, step *v3.Step) PipelineStep {
+	config := step.ApplyAppConfig
+	pStep := PipelineStep{}
+
+	pStep.image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.KubeApply)
+
+	pStep.command = `sh ''' apply-app '''`
+
+	answerBytes, _ := yaml.Marshal(config.Answers)
+	applyEnv := map[string]string{
+		"APP_NAME":         config.Name,
+		"ANSWERS":          string(answerBytes),
+		"CATALOG_NAME":     config.Catalog,
+		"VERSION":          config.Version,
+		"TARGET_NAMESPACE": config.TargetNamespace,
+		"RANCHER_URL":      settings.ServerURL.Get(),
+	}
+
+	for k, v := range step.Env {
+		applyEnv[k] = v
+	}
+	envFrom := append(step.EnvFrom, v3.EnvFrom{
+		SourceName: utils.PipelineAPIKeySecretName,
+		SourceKey:  utils.PipelineSecretAPITokenKey,
+	})
+
+	pStep.containerOptions = getStepContainerOptions(execution, step.Privileged, applyEnv, envFrom)
 
 	return pStep
 }
