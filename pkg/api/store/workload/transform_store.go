@@ -12,6 +12,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var (
+	hideOwnerReferenceKinds = []string{"CronJob", "Deployment"}
+)
+
 func NewTransformStore(store types.Store) types.Store {
 	return &transform.Store{
 		Store: store,
@@ -24,6 +28,7 @@ func NewTransformStore(store types.Store) types.Store {
 				hide = false
 			}
 			typeName := definition.GetType(data)
+			hide = hideByOwner(data)
 			name, _ := data["name"].(string)
 			if hide && data["ownerReferences"] != nil {
 				pod.SaveOwner(apiContext, typeName, name, data)
@@ -88,4 +93,19 @@ func update(data map[string]interface{}, statusField string, desiredField string
 			}
 		}
 	}
+}
+
+func hideByOwner(data map[string]interface{}) bool {
+	if data["ownerReferences"] != nil {
+		owners := convert.ToMapSlice(data["ownerReferences"])
+		for _, owner := range owners {
+			ownerKind := convert.ToString(owner["kind"])
+			for _, kind := range hideOwnerReferenceKinds {
+				if strings.EqualFold(ownerKind, kind) {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
