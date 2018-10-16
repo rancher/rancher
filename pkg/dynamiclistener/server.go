@@ -393,9 +393,10 @@ func (s *Server) serveHTTPS(config *v3.ListenConfig) error {
 		return err
 	}
 
+	logger := logrus.StandardLogger()
 	server := &http.Server{
 		Handler:  s.Handler(),
-		ErrorLog: log.New(logrus.StandardLogger().Writer(), "", log.LstdFlags),
+		ErrorLog: log.New(logger.WriterLevel(logrus.DebugLevel), "", log.LstdFlags),
 	}
 
 	if s.activeConfig == nil {
@@ -412,7 +413,7 @@ func (s *Server) serveHTTPS(config *v3.ListenConfig) error {
 
 	httpServer := &http.Server{
 		Handler:  httpRedirect(s.Handler()),
-		ErrorLog: log.New(logrus.StandardLogger().Writer(), "", log.LstdFlags),
+		ErrorLog: log.New(logger.WriterLevel(logrus.DebugLevel), "", log.LstdFlags),
 	}
 
 	if s.activeConfig == nil {
