@@ -135,7 +135,7 @@ func (c *client) CreateHook(pipeline *v3.Pipeline, accessToken string) (string, 
 
 	url := fmt.Sprintf("%s/projects/%s/hooks", c.API, project)
 
-	resp, err := doRequsetToGitlab(http.MethodPost, url, accessToken, opt)
+	resp, err := doRequestToGitlab(http.MethodPost, url, accessToken, opt)
 	if err != nil {
 		return "", err
 	}
@@ -166,7 +166,7 @@ func (c *client) DeleteHook(pipeline *v3.Pipeline, accessToken string) error {
 	}
 	if hook != nil {
 		url := fmt.Sprintf("%s/projects/%s/hooks/%v", c.API, project, hook.ID)
-		resp, err := doRequsetToGitlab(http.MethodDelete, url, accessToken, nil)
+		resp, err := doRequestToGitlab(http.MethodDelete, url, accessToken, nil)
 		if err != nil {
 			return err
 		}
@@ -300,7 +300,7 @@ func (c *client) SetPipelineFileInRepo(repoURL string, branch string, accessToke
 		option.CommitMessage = &message
 	}
 
-	resp, err := doRequsetToGitlab(method, url, accessToken, option)
+	resp, err := doRequestToGitlab(method, url, accessToken, option)
 	defer resp.Body.Close()
 
 	return nil
@@ -445,10 +445,10 @@ func (c *client) getGitlabUser(gitlabAccessToken string) (*gitlab.User, error) {
 }
 
 func getFromGitlab(gitlabAccessToken string, url string) (*http.Response, error) {
-	return doRequsetToGitlab(http.MethodGet, url, gitlabAccessToken, nil)
+	return doRequestToGitlab(http.MethodGet, url, gitlabAccessToken, nil)
 }
 
-func doRequsetToGitlab(method string, url string, gitlabAccessToken string, opt interface{}) (*http.Response, error) {
+func doRequestToGitlab(method string, url string, gitlabAccessToken string, opt interface{}) (*http.Response, error) {
 	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		return nil, err
