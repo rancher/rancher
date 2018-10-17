@@ -7,13 +7,21 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/catalog/helm"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/client/management/v3"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-func (m *Manager) traverseAndUpdate(repoPath, commit string, catalog *v3.Catalog) error {
+func (m *Manager) traverseAndUpdate(repoPath, commit string, cmt *CatalogInfo) error {
+	var templateName string
+	catalog := cmt.catalog
+	projectCatalog := cmt.projectCatalog
+	clusterCatalog := cmt.clusterCatalog
+	catalogType := getCatalogType(cmt)
+
 	index, err := helm.LoadIndex(repoPath)
 	if err != nil {
 		return err
@@ -74,6 +82,7 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, catalog *v3.Catalog
 				Name: chart,
 			},
 		}
+
 		template.Spec.Description = metadata[0].Description
 		template.Spec.DefaultVersion = metadata[0].Version
 		if len(metadata[0].Sources) > 0 {
@@ -147,16 +156,47 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, catalog *v3.Catalog
 		template.Labels = label
 		template.Spec.Categories = categories
 		template.Spec.Versions = versions
-		template.Spec.CatalogID = catalog.Name
-		template.Name = fmt.Sprintf("%s-%s", catalog.Name, template.Spec.FolderName)
-
-		v3.CatalogConditionRefreshed.Unknown(catalog)
-		v3.CatalogConditionRefreshed.Message(catalog, fmt.Sprintf("syncing template %v", template.Name))
-		if newCatalog, err := m.catalogClient.Update(catalog); err == nil {
-			catalog = newCatalog
-		} else {
-			catalog, _ = m.catalogClient.Get(catalog.Name, metav1.GetOptions{})
+		if catalogType == client.CatalogType {
+			labelMap := make(map[string]string)
+			labelMap[CatalogTypeLabel] = "globalCatalog"
+			newLabels := labels.Merge(template.Labels, labelMap)
+			template.Labels = newLabels
+			template.Spec.CatalogID = catalog.Name
+			template.Name = fmt.Sprintf("%s-%s", catalog.Name, template.Spec.FolderName)
+			templateName = template.Name
+		} else if catalogType == client.ProjectCatalogType {
+			labelMap := make(map[string]string)
+			pname := projectCatalog.Namespace + ":" + projectCatalog.Name
+			template.Spec.ProjectCatalogID = pname
+			template.Spec.ProjectID = projectCatalog.ProjectName
+			split := strings.SplitN(template.Spec.ProjectID, ":", 2)
+			if len(split) != 2 {
+				return fmt.Errorf("Project ID invalid while creating template")
+			}
+			template.Name = fmt.Sprintf("%s-%s-%s-%s", split[0], split[1], projectCatalog.Name, template.Spec.FolderName)
+			templateName = template.Name
+			labelMap[split[0]+"-"+projectCatalog.Namespace+"-"+projectCatalog.Name] = projectCatalog.Name
+			newLabels := labels.Merge(template.Labels, labelMap)
+			template.Labels = newLabels
+		} else if catalogType == client.ClusterCatalogType {
+			labelMap := make(map[string]string)
+			cname := clusterCatalog.Namespace + ":" + clusterCatalog.Name
+			template.Spec.ClusterCatalogID = cname
+			template.Spec.ClusterID = clusterCatalog.ClusterName
+			labelMap[template.Spec.ClusterID+"-"+clusterCatalog.Name] = clusterCatalog.Name
+			newLabels := labels.Merge(template.Labels, labelMap)
+			template.Labels = newLabels
+			template.Name = fmt.Sprintf("%s-%s-%s", clusterCatalog.ClusterName, clusterCatalog.Name, template.Spec.FolderName)
+			templateName = template.Name
 		}
+		cmt, err = m.updateCatalogInfo(cmt, catalogType, templateName, true, false)
+		if err != nil {
+			return err
+		}
+		catalog = cmt.catalog
+		projectCatalog = cmt.projectCatalog
+		clusterCatalog = cmt.clusterCatalog
+
 		var temErr error
 		// look template by name, if not found then create it, otherwise do update
 		if existing, ok := templateMap[template.Name]; ok {
@@ -193,10 +233,16 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, catalog *v3.Catalog
 	logrus.Infof("Catalog sync done. %v templates created, %v templates updated, %v templates deleted", createdTemplates, updatedTemplates, deletedTemplates)
 
 	catalog.Status.HelmVersionCommits = newHelmVersionCommits
+	if projectCatalog != nil {
+		projectCatalog.Catalog = *catalog
+	} else if clusterCatalog != nil {
+		clusterCatalog.Catalog = *catalog
+	}
+	cmt.catalog = catalog
+	cmt.projectCatalog = projectCatalog
+	cmt.clusterCatalog = clusterCatalog
 	if len(terrors) > 0 {
-		if _, err := m.catalogClient.Update(catalog); err != nil {
-			return err
-		}
+		m.updateCatalogInfo(cmt, catalogType, "", false, true)
 		return errors.Errorf("failed to update templates. Multiple error occurred: %v", terrors)
 	}
 	var finalError error
@@ -205,12 +251,17 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, catalog *v3.Catalog
 		commit = ""
 	}
 
-	v3.CatalogConditionRefreshed.True(catalog)
-	v3.CatalogConditionRefreshed.Message(catalog, "")
 	catalog.Status.Commit = commit
-	if _, err := m.catalogClient.Update(catalog); err != nil {
-		return err
+	if projectCatalog != nil {
+		projectCatalog.Catalog = *catalog
+	} else if clusterCatalog != nil {
+		clusterCatalog.Catalog = *catalog
 	}
+	cmt.catalog = catalog
+	cmt.projectCatalog = projectCatalog
+	cmt.clusterCatalog = clusterCatalog
+	m.updateCatalogInfo(cmt, catalogType, "", true, true)
+
 	return finalError
 }
 

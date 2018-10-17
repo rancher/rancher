@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/systemtemplate"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	rrbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,6 +30,7 @@ func Register(management *config.ManagementContext, clusterManager *clustermanag
 		clusters:             management.Management.Clusters(""),
 		nodeLister:           management.Management.Nodes("").Controller().Lister(),
 		clusterManager:       clusterManager,
+		clusterroles:         management.RBAC.ClusterRoles(""),
 	}
 
 	management.Management.Clusters("").AddHandler("cluster-deploy", c.sync)
@@ -40,6 +42,7 @@ type clusterDeploy struct {
 	clusters             v3.ClusterInterface
 	clusterManager       *clustermanager.Manager
 	nodeLister           v3.NodeLister
+	clusterroles         rrbacv1.ClusterRoleInterface
 }
 
 func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) error {

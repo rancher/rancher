@@ -28,15 +28,20 @@ type Manager struct {
 	cacheRoot             string
 	httpClient            http.Client
 	uuid                  string
+	lock                  *locker.Locker
 	catalogClient         v3.CatalogInterface
+	CatalogLister         v3.CatalogLister
 	templateClient        v3.TemplateInterface
 	templateVersionClient v3.TemplateVersionInterface
 	templateContentClient v3.TemplateContentInterface
 	templateLister        v3.TemplateLister
 	templateVersionLister v3.TemplateVersionLister
 	templateContentLister v3.TemplateContentLister
+	projectCatalogClient  v3.ProjectCatalogInterface
+	ProjectCatalogLister  v3.ProjectCatalogLister
+	clusterCatalogClient  v3.ClusterCatalogInterface
+	ClusterCatalogLister  v3.ClusterCatalogLister
 	lastUpdateTime        time.Time
-	lock                  *locker.Locker
 }
 
 func New(management *config.ManagementContext, cacheRoot string) *Manager {
@@ -47,23 +52,20 @@ func New(management *config.ManagementContext, cacheRoot string) *Manager {
 			Timeout: time.Second * 30,
 		},
 		uuid:                  uuid,
+		lock:                  locker.New(),
 		catalogClient:         management.Management.Catalogs(""),
+		CatalogLister:         management.Management.Catalogs("").Controller().Lister(),
 		templateClient:        management.Management.Templates(""),
 		templateVersionClient: management.Management.TemplateVersions(""),
 		templateContentClient: management.Management.TemplateContents(""),
 		templateLister:        management.Management.Templates("").Controller().Lister(),
 		templateVersionLister: management.Management.TemplateVersions("").Controller().Lister(),
 		templateContentLister: management.Management.TemplateContents("").Controller().Lister(),
-		lock:                  locker.New(),
+		projectCatalogClient:  management.Management.ProjectCatalogs(""),
+		ProjectCatalogLister:  management.Management.ProjectCatalogs("").Controller().Lister(),
+		clusterCatalogClient:  management.Management.ClusterCatalogs(""),
+		ClusterCatalogLister:  management.Management.ClusterCatalogs("").Controller().Lister(),
 	}
-}
-
-func (m *Manager) GetCatalogs() ([]v3.Catalog, error) {
-	list, err := m.catalogClient.List(metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	return list.Items, nil
 }
 
 func (m *Manager) prepareRepoPath(catalog v3.Catalog) (path string, commit string, err error) {

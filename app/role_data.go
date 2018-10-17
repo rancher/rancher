@@ -43,13 +43,13 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("create").
-		addRule().apiGroups("management.cattle.io").resources("templates", "templateversions").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("nodetemplates").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("sourcecodecredentials").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("sourcecoderepositories").verbs("*").
-		rb.addRole("User Base", "user-base").addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("sourcecoderepositories").verbs("*")
+
+	rb.addRole("User Base", "user-base").addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch")
 
 	// TODO user should be dynamically authorized to only see herself
@@ -85,7 +85,9 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("clusterloggings").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clusteralerts").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("notifiers").verbs("get", "list", "watch").
-		rb.addRoleTemplate("Create Projects", "projects-create", "cluster", true, false, false).
+		addRule().apiGroups("management.cattle.io").resources("clustercatalogs").verbs("get", "list", "watch")
+
+	rb.addRoleTemplate("Create Projects", "projects-create", "cluster", true, false, false).
 		addRule().apiGroups("management.cattle.io").resources("projects").verbs("create")
 
 	rb.addRoleTemplate("View All Projects", "projects-view", "cluster", true, false, false).
@@ -118,6 +120,12 @@ func addRoles(management *config.ManagementContext) (string, error) {
 	rb.addRoleTemplate("View Cluster Members", "clusterroletemplatebindings-view", "cluster", true, false, false).
 		addRule().apiGroups("management.cattle.io").resources("clusterroletemplatebindings").verbs("get", "list", "watch")
 
+	rb.addRoleTemplate("Manage Cluster Catalogs", "clustercatalogs-manage", "cluster", true, false, false).
+		addRule().apiGroups("management.cattle.io").resources("clustercatalogs").verbs("*")
+
+	rb.addRoleTemplate("View Cluster Catalogs", "clustercatalogs-view", "cluster", true, false, false).
+		addRule().apiGroups("management.cattle.io").resources("clustercatalogs").verbs("get", "list", "watch")
+
 	// Project roles
 	rb.addRoleTemplate("Project Owner", "project-owner", "project", true, false, false).
 		addRule().apiGroups("management.cattle.io").resources("projectroletemplatebindings").verbs("*").
@@ -134,6 +142,8 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("notifiers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("projectalerts").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("projectloggings").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("clustercatalogs").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("projectcatalogs").verbs("*").
 		setRoleTemplateNames("admin")
 
 	rb.addRoleTemplate("Project Member", "project-member", "project", true, false, false).
@@ -149,6 +159,8 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("notifiers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("projectalerts").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("projectloggings").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("clustercatalogs").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("projectcatalogs").verbs("get", "list", "watch").
 		setRoleTemplateNames("edit")
 
 	rb.addRoleTemplate("Read-only", "read-only", "project", true, false, false).
@@ -163,6 +175,8 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("notifiers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("projectalerts").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("projectloggings").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("clustercatalogs").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("projectcatalogs").verbs("get", "list", "watch").
 		setRoleTemplateNames("view")
 
 	rb.addRoleTemplate("Create Namespaces", "create-ns", "project", true, false, false).
@@ -229,6 +243,12 @@ func addRoles(management *config.ManagementContext) (string, error) {
 
 	rb.addRoleTemplate("View Project Members", "projectroletemplatebindings-view", "project", true, false, false).
 		addRule().apiGroups("management.cattle.io").resources("projectroletemplatebindings").verbs("get", "list", "watch")
+
+	rb.addRoleTemplate("Manage Project Catalogs", "projectcatalogs-manage", "project", true, false, false).
+		addRule().apiGroups("management.cattle.io").resources("projectcatalogs").verbs("*")
+
+	rb.addRoleTemplate("View Project Catalogs", "projectcatalogs-view", "project", true, false, false).
+		addRule().apiGroups("management.cattle.io").resources("projectcatalogs").verbs("get", "list", "watch")
 
 	// Not specific to project or cluster
 	// TODO When clusterevents has value, consider adding this back in

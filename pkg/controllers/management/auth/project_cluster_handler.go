@@ -12,10 +12,12 @@ import (
 	"github.com/rancher/rancher/pkg/project"
 	corev1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	rrbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	v12 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -51,6 +53,7 @@ func newPandCLifecycles(management *config.ManagementContext) (*projectLifecycle
 		crtbLister:         management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
 		projectLister:      management.Management.Projects("").Controller().Lister(),
 		roleTemplateLister: management.Management.RoleTemplates("").Controller().Lister(),
+		clusterRoleClient:  management.RBAC.ClusterRoles(""),
 	}
 	p := &projectLifecycle{
 		mgr: m,
@@ -89,6 +92,9 @@ func (l *projectLifecycle) sync(key string, orig *v3.Project) error {
 		if err != nil {
 			return err
 		}
+	}
+	if err != nil && !kerrors.IsAlreadyExists(err) {
+		return err
 	}
 
 	return nil
@@ -187,6 +193,7 @@ type mgr struct {
 	prtbLister         v3.ProjectRoleTemplateBindingLister
 	crtbLister         v3.ClusterRoleTemplateBindingLister
 	roleTemplateLister v3.RoleTemplateLister
+	clusterRoleClient  rrbacv1.ClusterRoleInterface
 }
 
 func (m *mgr) createDefaultProject(obj runtime.Object) (runtime.Object, error) {

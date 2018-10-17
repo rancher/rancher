@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -23,7 +24,7 @@ const (
 
 var clusterManagmentPlaneResources = []string{"clusterroletemplatebindings", "nodes", "nodepools", "clusterevents",
 	"projects", "clusterregistrationtokens", "clusterloggings", "notifiers", "clusteralerts",
-	"podsecuritypolicytemplateprojectbindings"}
+	"podsecuritypolicytemplateprojectbindings", "clustercatalogs"}
 
 type crtbLifecycle struct {
 	mgr           *manager
