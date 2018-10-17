@@ -53,6 +53,8 @@ type Interface interface {
 	ClusterAlertsGetter
 	ProjectAlertsGetter
 	ComposeConfigsGetter
+	ProjectCatalogsGetter
+	ClusterCatalogsGetter
 }
 
 type Client struct {
@@ -98,6 +100,8 @@ type Client struct {
 	clusterAlertControllers                            map[string]ClusterAlertController
 	projectAlertControllers                            map[string]ProjectAlertController
 	composeConfigControllers                           map[string]ComposeConfigController
+	projectCatalogControllers                          map[string]ProjectCatalogController
+	clusterCatalogControllers                          map[string]ClusterCatalogController
 }
 
 func NewForConfig(config rest.Config) (Interface, error) {
@@ -151,6 +155,8 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		clusterAlertControllers:                            map[string]ClusterAlertController{},
 		projectAlertControllers:                            map[string]ProjectAlertController{},
 		composeConfigControllers:                           map[string]ComposeConfigController{},
+		projectCatalogControllers:                          map[string]ProjectCatalogController{},
+		clusterCatalogControllers:                          map[string]ClusterCatalogController{},
 	}, nil
 }
 
@@ -654,6 +660,32 @@ type ComposeConfigsGetter interface {
 func (c *Client) ComposeConfigs(namespace string) ComposeConfigInterface {
 	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ComposeConfigResource, ComposeConfigGroupVersionKind, composeConfigFactory{})
 	return &composeConfigClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type ProjectCatalogsGetter interface {
+	ProjectCatalogs(namespace string) ProjectCatalogInterface
+}
+
+func (c *Client) ProjectCatalogs(namespace string) ProjectCatalogInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ProjectCatalogResource, ProjectCatalogGroupVersionKind, projectCatalogFactory{})
+	return &projectCatalogClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type ClusterCatalogsGetter interface {
+	ClusterCatalogs(namespace string) ClusterCatalogInterface
+}
+
+func (c *Client) ClusterCatalogs(namespace string) ClusterCatalogInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ClusterCatalogResource, ClusterCatalogGroupVersionKind, clusterCatalogFactory{})
+	return &clusterCatalogClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,
