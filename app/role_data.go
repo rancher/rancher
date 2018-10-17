@@ -46,8 +46,8 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("nodetemplates").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("sourcecodecredentials").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("sourcecoderepositories").verbs("*")
+		addRule().apiGroups("project.cattle.io").resources("sourcecodecredentials").verbs("*").
+		addRule().apiGroups("project.cattle.io").resources("sourcecoderepositories").verbs("*")
 
 	rb.addRole("User Base", "user-base").addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch")
