@@ -234,8 +234,10 @@ def wait_for_condition(condition_type, status, client, obj, timeout=45):
 
 def wait_until(cb, timeout=DEFAULT_TIMEOUT):
     start_time = time.time()
+    interval = 1
     while time.time() < start_time + timeout and cb() is False:
-        time.sleep(1)
+        interval *= 2
+        time.sleep(interval)
 
 
 def find_condition(condition_type, status, obj):
@@ -263,5 +265,5 @@ def kubernetes_api_client(rancher_client, cluster_name):
 
 def protect_response(r):
     if r.status_code >= 300:
-        message = f'Server responded with {r.status_code}\nbody:\n{r.text}'
+        message = 'Server responded with {r.status_code}\nbody:\n{r.text}'
         raise ValueError(message)

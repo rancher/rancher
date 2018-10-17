@@ -13,7 +13,7 @@ const (
 	ptrbMGMTController = "mgmt-auth-prtb-controller"
 )
 
-var projectManagmentPlaneResources = []string{"projectroletemplatebindings", "apps", "secrets", "pipelines", "pipelineexecutions", "pipelinesettings", "sourcecodeproviderconfigs", "projectloggings", "projectalerts"}
+var projectManagmentPlaneResources = []string{"projectroletemplatebindings", "apps", "secrets", "pipelines", "pipelineexecutions", "pipelinesettings", "sourcecodeproviderconfigs", "projectloggings", "projectalerts", "projectcatalogs"}
 var prtbClusterManagmentPlaneResources = []string{"notifiers"}
 
 type prtbLifecycle struct {

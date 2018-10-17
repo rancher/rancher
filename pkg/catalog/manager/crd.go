@@ -3,11 +3,10 @@ package manager
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-
-	"crypto/sha256"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/catalog/utils"
@@ -22,6 +21,7 @@ import (
 const (
 	CatalogNameLabel  = "catalog.cattle.io/name"
 	TemplateNameLabel = "catalog.cattle.io/template_name"
+	CatalogTypeLabel  = "catalog.cattle.io/catalog_type"
 )
 
 func (m *Manager) createTemplate(template v3.Template, catalog *v3.Catalog, tagMap map[string]struct{}) error {

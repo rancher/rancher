@@ -3,44 +3,13 @@ package manager
 import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func (m *Manager) Sync(key string, obj *v3.Catalog) error {
 	if obj == nil {
-		templates, err := m.getTemplateMap(key)
-		if err != nil {
-			return err
-		}
-		tvToDelete := map[string]struct{}{}
-		for _, t := range templates {
-			tvs, err := m.getTemplateVersion(t.Name)
-			if err != nil {
-				return err
-			}
-			for k := range tvs {
-				tvToDelete[k] = struct{}{}
-			}
-		}
-		go func() {
-			for {
-				for k := range templates {
-					if err := m.templateClient.Delete(k, &metav1.DeleteOptions{}); err != nil && !kerrors.IsNotFound(err) {
-						logrus.Warnf("Deleting template %v doesn't succeed. Continue loop", k)
-						continue
-					}
-				}
-				for k := range tvToDelete {
-					if err := m.templateVersionClient.Delete(k, &metav1.DeleteOptions{}); err != nil && !kerrors.IsNotFound(err) {
-						logrus.Warnf("Deleting templateVersion %v doesn't succeed. Continue loop", k)
-						continue
-					}
-				}
-				break
-			}
-		}()
-		return nil
+		return m.deleteTemplates(key)
 	}
 
 	// always get a refresh catalog from etcd
@@ -67,6 +36,10 @@ func (m *Manager) Sync(key string, obj *v3.Catalog) error {
 		return nil
 	}
 
+	cmt := &CatalogInfo{
+		catalog: catalog,
+	}
+
 	logrus.Infof("Updating catalog %s", catalog.Name)
-	return m.traverseAndUpdate(repoPath, commit, catalog)
+	return m.traverseAndUpdate(repoPath, commit, cmt)
 }
