@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clustergc"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstats"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
 	"github.com/rancher/rancher/pkg/controllers/management/compose"
 	"github.com/rancher/rancher/pkg/controllers/management/node"
 	"github.com/rancher/rancher/pkg/controllers/management/nodedriver"
@@ -34,6 +35,7 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	clustergc.Register(management)
 	clusterprovisioner.Register(management)
 	clusterstats.Register(management, manager)
+	clusterstatus.Register(management)
 	compose.Register(management, manager)
 	nodedriver.Register(management)
 	nodepool.Register(management)
