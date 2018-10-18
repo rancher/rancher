@@ -7,17 +7,22 @@ def get_error_message_for_eks_config(admin_mc, remove_resource, config):
         name=random_str(), amazonElasticContainerServiceConfig=config)
     remove_resource(cluster)
 
+    def get_provisioned_type(cluster):
+        for condition in cluster.conditions:
+            if condition.type == "Provisioned":
+                return condition.message
+
     def has_provision_status():
         new_cluster = admin_mc.client.reload(cluster)
 
-        return hasattr(new_cluster, "conditions")
+        return \
+            hasattr(new_cluster, "conditions") and \
+            get_provisioned_type(new_cluster) is not None
 
     wait_until(has_provision_status, 10)
     cluster = admin_mc.client.reload(cluster)
 
-    for condition in cluster.conditions:
-        if condition.type == "Provisioned":
-            return condition.message
+    return get_provisioned_type(cluster)
 
 
 def test_min_nodes_cannot_be_greater_than_max(admin_mc, remove_resource):
