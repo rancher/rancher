@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v2"
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
@@ -154,10 +155,15 @@ func saveStateToNodes(ctx context.Context, uniqueHosts []*hosts.Host, clusterSta
 	if err != nil {
 		return err
 	}
+	var errgrp errgroup.Group
 	for _, host := range uniqueHosts {
-		if err := pki.DeployStateOnPlaneHost(ctx, host, alpineImage, prsMap, string(clusterFile)); err != nil {
-			return err
-		}
+		runHost := host
+		errgrp.Go(func() error {
+			return pki.DeployStateOnPlaneHost(ctx, runHost, alpineImage, prsMap, string(clusterFile))
+		})
+	}
+	if err := errgrp.Wait(); err != nil {
+		return err
 	}
 	return nil
 }

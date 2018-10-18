@@ -6,20 +6,30 @@ import (
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
+	"github.com/rancher/rke/util"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"golang.org/x/sync/errgroup"
 )
 
 func RunControlPlane(ctx context.Context, controlHosts []*hosts.Host, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, cpNodePlanMap map[string]v3.RKEConfigNodePlan, updateWorkersOnly bool, alpineImage string, certMap map[string]pki.CertificatePKI) error {
+	if updateWorkersOnly {
+		return nil
+	}
 	log.Infof(ctx, "[%s] Building up Controller Plane..", ControlRole)
 	var errgrp errgroup.Group
-	for _, host := range controlHosts {
-		runHost := host
-		if updateWorkersOnly {
-			continue
-		}
+
+	hostsQueue := util.GetObjectQueue(controlHosts)
+	for w := 0; w < WorkerThreads; w++ {
 		errgrp.Go(func() error {
-			return doDeployControlHost(ctx, runHost, localConnDialerFactory, prsMap, cpNodePlanMap[runHost.Address].Processes, alpineImage, certMap)
+			var errList []error
+			for host := range hostsQueue {
+				runHost := host.(*hosts.Host)
+				err := doDeployControlHost(ctx, runHost, localConnDialerFactory, prsMap, cpNodePlanMap[runHost.Address].Processes, alpineImage, certMap)
+				if err != nil {
+					errList = append(errList, err)
+				}
+			}
+			return util.ErrList(errList)
 		})
 	}
 	if err := errgrp.Wait(); err != nil {

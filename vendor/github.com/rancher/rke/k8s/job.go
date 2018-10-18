@@ -75,13 +75,13 @@ func ensureJobCompleted(k8sClient *kubernetes.Clientset, j interface{}) error {
 
 	jobStatus, err := GetK8sJobStatus(k8sClient, job.Name, job.Namespace)
 	if err != nil {
-		return fmt.Errorf("Failed to get job complete status: %v", err)
+		return fmt.Errorf("Failed to get job complete status for job %s in namespace %s: %v", job.Name, job.Namespace, err)
 	}
 	if jobStatus.Completed {
-		logrus.Debugf("[k8s] Job %s completed successfully..", job.Name)
+		logrus.Debugf("[k8s] Job %s in namespace %s completed successfully", job.Name, job.Namespace)
 		return nil
 	}
-	return fmt.Errorf("Failed to get job complete status: %v", err)
+	return fmt.Errorf("Failed to get job complete status for job %s in namespace %s", job.Name, job.Namespace)
 }
 
 func ensureJobDeleted(k8sClient *kubernetes.Clientset, j interface{}) error {

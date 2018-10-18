@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
+	"github.com/rancher/rke/util"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/client-go/kubernetes"
@@ -240,11 +241,17 @@ func saveCertToKubernetes(kubeClient *kubernetes.Clientset, crtName string, crt 
 
 func deployBackupCertificates(ctx context.Context, backupHosts []*hosts.Host, kubeCluster *Cluster) error {
 	var errgrp errgroup.Group
-
-	for _, host := range backupHosts {
-		runHost := host
+	hostsQueue := util.GetObjectQueue(backupHosts)
+	for w := 0; w < WorkerThreads; w++ {
 		errgrp.Go(func() error {
-			return pki.DeployCertificatesOnHost(ctx, runHost, kubeCluster.Certificates, kubeCluster.SystemImages.CertDownloader, pki.TempCertPath, kubeCluster.PrivateRegistriesMap)
+			var errList []error
+			for host := range hostsQueue {
+				err := pki.DeployCertificatesOnHost(ctx, host.(*hosts.Host), kubeCluster.Certificates, kubeCluster.SystemImages.CertDownloader, pki.TempCertPath, kubeCluster.PrivateRegistriesMap)
+				if err != nil {
+					errList = append(errList, err)
+				}
+			}
+			return util.ErrList(errList)
 		})
 	}
 	return errgrp.Wait()
@@ -282,15 +289,22 @@ func fetchCertificatesFromEtcd(ctx context.Context, kubeCluster *Cluster) ([]byt
 }
 
 func (c *Cluster) SaveBackupCertificateBundle(ctx context.Context) error {
-	backupHosts := c.getBackupHosts()
 	var errgrp errgroup.Group
 
-	for _, host := range backupHosts {
-		runHost := host
+	hostsQueue := util.GetObjectQueue(c.getBackupHosts())
+	for w := 0; w < WorkerThreads; w++ {
 		errgrp.Go(func() error {
-			return pki.SaveBackupBundleOnHost(ctx, runHost, c.SystemImages.Alpine, services.EtcdSnapshotPath, c.PrivateRegistriesMap)
+			var errList []error
+			for host := range hostsQueue {
+				err := pki.SaveBackupBundleOnHost(ctx, host.(*hosts.Host), c.SystemImages.Alpine, services.EtcdSnapshotPath, c.PrivateRegistriesMap)
+				if err != nil {
+					errList = append(errList, err)
+				}
+			}
+			return util.ErrList(errList)
 		})
 	}
+
 	return errgrp.Wait()
 }
 
@@ -298,16 +312,20 @@ func (c *Cluster) ExtractBackupCertificateBundle(ctx context.Context) error {
 	backupHosts := c.getBackupHosts()
 	var errgrp errgroup.Group
 	errList := []string{}
-	for _, host := range backupHosts {
-		runHost := host
+
+	hostsQueue := util.GetObjectQueue(backupHosts)
+	for w := 0; w < WorkerThreads; w++ {
 		errgrp.Go(func() error {
-			if err := pki.ExtractBackupBundleOnHost(ctx, runHost, c.SystemImages.Alpine, services.EtcdSnapshotPath, c.PrivateRegistriesMap); err != nil {
-				errList = append(errList, fmt.Errorf(
-					"Failed to extract certificate bundle on host [%s], please make sure etcd bundle exist in /opt/rke/etcd-snapshots/pki.bundle.tar.gz: %v", runHost.Address, err).Error())
+			for host := range hostsQueue {
+				if err := pki.ExtractBackupBundleOnHost(ctx, host.(*hosts.Host), c.SystemImages.Alpine, services.EtcdSnapshotPath, c.PrivateRegistriesMap); err != nil {
+					errList = append(errList, fmt.Errorf(
+						"Failed to extract certificate bundle on host [%s], please make sure etcd bundle exist in /opt/rke/etcd-snapshots/pki.bundle.tar.gz: %v", host.(*hosts.Host).Address, err).Error())
+				}
 			}
 			return nil
 		})
 	}
+
 	errgrp.Wait()
 	if len(errList) == len(backupHosts) {
 		return fmt.Errorf(strings.Join(errList, ","))

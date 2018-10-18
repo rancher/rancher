@@ -137,10 +137,10 @@ func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions, info *ty
 	certsStr := ""
 	APIURL, caCrt, clientCert, clientKey, certs, err := clusterUp(ctx, &rkeConfig, d.DockerDialer, d.LocalDialer,
 		d.wrapTransport(&rkeConfig), false, stateDir, false, false)
-	if err == nil {
+	if len(certs) > 0 {
 		certsStr, err = rkecerts.ToString(certs)
 	}
-	if err != nil {
+	if err != nil && certsStr == "" {
 		return d.save(&types.ClusterInfo{
 			Metadata: map[string]string{
 				"Config": yaml,
@@ -157,7 +157,7 @@ func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions, info *ty
 			"Config":     yaml,
 			"Certs":      certsStr,
 		},
-	}, stateDir), nil
+	}, stateDir), err
 }
 
 // Update updates the rke cluster

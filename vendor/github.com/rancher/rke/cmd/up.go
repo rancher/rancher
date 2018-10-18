@@ -37,6 +37,10 @@ func UpCommand() cli.Command {
 			Name:  "dind",
 			Usage: "Deploy Kubernetes cluster in docker containers (experimental)",
 		},
+		cli.StringFlag{
+			Name:  "dind-storage-driver",
+			Usage: "Storage driver for the docker in docker containers (experimental)",
+		},
 		cli.BoolFlag{
 			Name:  "update-only",
 			Usage: "Skip idempotent deployment of control and etcd plane",
@@ -90,12 +94,21 @@ func ClusterUp(
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
+	if len(kubeCluster.ControlPlaneHosts) > 0 {
+		APIURL = fmt.Sprintf("https://" + kubeCluster.ControlPlaneHosts[0].Address + ":6443")
+	}
+	clientCert = string(cert.EncodeCertPEM(kubeCluster.Certificates[pki.KubeAdminCertName].Certificate))
+	clientKey = string(cert.EncodePrivateKeyPEM(kubeCluster.Certificates[pki.KubeAdminCertName].Key))
+	caCrt = string(cert.EncodeCertPEM(kubeCluster.Certificates[pki.CACertName].Certificate))
 
 	err = cluster.ReconcileCluster(ctx, kubeCluster, currentCluster, updateOnly)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
-
+	// update APIURL after reconcile
+	if len(kubeCluster.ControlPlaneHosts) > 0 {
+		APIURL = fmt.Sprintf("https://" + kubeCluster.ControlPlaneHosts[0].Address + ":6443")
+	}
 	err = kubeCluster.SetUpHosts(ctx)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
@@ -139,12 +152,6 @@ func ClusterUp(
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
-	if len(kubeCluster.ControlPlaneHosts) > 0 {
-		APIURL = fmt.Sprintf("https://" + kubeCluster.ControlPlaneHosts[0].Address + ":6443")
-		clientCert = string(cert.EncodeCertPEM(kubeCluster.Certificates[pki.KubeAdminCertName].Certificate))
-		clientKey = string(cert.EncodePrivateKeyPEM(kubeCluster.Certificates[pki.KubeAdminCertName].Key))
-	}
-	caCrt = string(cert.EncodeCertPEM(kubeCluster.Certificates[pki.CACertName].Certificate))
 
 	if err := checkAllIncluded(kubeCluster); err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
@@ -219,12 +226,12 @@ func clusterUpLocal(ctx *cli.Context) error {
 
 func clusterUpDind(ctx *cli.Context) error {
 	// get dind config
-	rkeConfig, disablePortCheck, err := getDindConfig(ctx)
+	rkeConfig, disablePortCheck, dindStorageDriver, err := getDindConfig(ctx)
 	if err != nil {
 		return err
 	}
 	// setup dind environment
-	if err = createDINDEnv(context.Background(), rkeConfig); err != nil {
+	if err = createDINDEnv(context.Background(), rkeConfig, dindStorageDriver); err != nil {
 		return err
 	}
 	// start cluster
@@ -232,22 +239,24 @@ func clusterUpDind(ctx *cli.Context) error {
 	return err
 }
 
-func getDindConfig(ctx *cli.Context) (*v3.RancherKubernetesEngineConfig, bool, error) {
+func getDindConfig(ctx *cli.Context) (*v3.RancherKubernetesEngineConfig, bool, string, error) {
 	disablePortCheck := ctx.Bool("disable-port-check")
+	dindStorageDriver := ctx.String("dind-storage-driver")
+
 	clusterFile, filePath, err := resolveClusterFile(ctx)
 	if err != nil {
-		return nil, disablePortCheck, fmt.Errorf("Failed to resolve cluster file: %v", err)
+		return nil, disablePortCheck, "", fmt.Errorf("Failed to resolve cluster file: %v", err)
 	}
 	clusterFilePath = filePath
 
 	rkeConfig, err := cluster.ParseConfig(clusterFile)
 	if err != nil {
-		return nil, disablePortCheck, fmt.Errorf("Failed to parse cluster file: %v", err)
+		return nil, disablePortCheck, "", fmt.Errorf("Failed to parse cluster file: %v", err)
 	}
 
 	rkeConfig, err = setOptionsFromCLI(ctx, rkeConfig)
 	if err != nil {
-		return nil, disablePortCheck, err
+		return nil, disablePortCheck, "", err
 	}
 	// Setting conntrack max for kubeproxy to 0
 	if rkeConfig.Services.Kubeproxy.ExtraArgs == nil {
@@ -255,12 +264,12 @@ func getDindConfig(ctx *cli.Context) (*v3.RancherKubernetesEngineConfig, bool, e
 	}
 	rkeConfig.Services.Kubeproxy.ExtraArgs["conntrack-max-per-core"] = "0"
 
-	return rkeConfig, disablePortCheck, nil
+	return rkeConfig, disablePortCheck, dindStorageDriver, nil
 }
 
-func createDINDEnv(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig) error {
+func createDINDEnv(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig, dindStorageDriver string) error {
 	for i := range rkeConfig.Nodes {
-		address, err := dind.StartUpDindContainer(ctx, rkeConfig.Nodes[i].Address, dind.DINDNetwork)
+		address, err := dind.StartUpDindContainer(ctx, rkeConfig.Nodes[i].Address, dind.DINDNetwork, dindStorageDriver)
 		if err != nil {
 			return err
 		}

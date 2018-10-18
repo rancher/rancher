@@ -33,8 +33,8 @@ pipeline:
     image: plugins/github-release
     prerelease: true
     files:
-     - bin/*
      - build/bin/rke_*
+     - dist/artifacts/${DRONE_TAG}/*
     checksum:
      - sha256
     secrets: [github_token]
@@ -47,8 +47,8 @@ pipeline:
   github_binary_release:
     image: plugins/github-release
     files:
-     - bin/*
      - build/bin/rke_*
+     - dist/artifacts/${DRONE_TAG}/*
     checksum:
      - sha256
     secrets: [github_token]
