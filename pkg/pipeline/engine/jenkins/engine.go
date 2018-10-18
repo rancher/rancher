@@ -184,8 +184,8 @@ func (j *Engine) prepareRegistryCredential(execution *v3.PipelineExecution, regi
 					continue
 				}
 				cred := convert.ToMapInterface(v)
-				username = cred["username"].(string)
-				password = cred["password"].(string)
+				username, _ = cred["username"].(string)
+				password, _ = cred["password"].(string)
 			}
 
 		}
