@@ -168,10 +168,14 @@ func (c *Controller) getRdnsHostname(obj *extensionsv1beta1.Ingress, rootDomain 
 
 func (c *Controller) renew(ctx context.Context) {
 	for range ticker.Context(ctx, renewInterval) {
+		ipDomain := settings.IngressIPDomain.Get()
+		if ipDomain != RdnsIPDomain {
+			continue
+		}
 		serverURL := settings.RDNSServerBaseURL.Get()
 		if serverURL == "" {
-			logrus.Warn("IngressIPDomain and RDNSServerBaseURL need to be set when enable approuter controller")
-			return
+			logrus.Warn("RDNSServerBaseURL need to be set when enable approuter controller")
+			continue
 		}
 
 		c.dnsClient.SetBaseURL(serverURL)
