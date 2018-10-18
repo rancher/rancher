@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"reflect"
 	"strings"
+	"time"
 
 	"github.com/rancher/rke/authz"
 	"github.com/rancher/rke/cloudprovider"
@@ -14,10 +16,12 @@ import (
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
+	"github.com/rancher/rke/util"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v2"
+	"k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/cert"
@@ -53,6 +57,7 @@ const (
 	UpdateStateTimeout         = 30
 	GetStateTimeout            = 30
 	KubernetesClientTimeOut    = 30
+	SyncWorkers                = 10
 	NoneAuthorizationMode      = "none"
 	LocalNodeAddress           = "127.0.0.1"
 	LocalNodeHostname          = "localhost"
@@ -61,6 +66,8 @@ const (
 	ControlPlane               = "controlPlane"
 	WorkerPlane                = "workerPlan"
 	EtcdPlane                  = "etcd"
+
+	WorkerThreads = util.WorkerThreads
 )
 
 func (c *Cluster) DeployControlPlane(ctx context.Context) error {
@@ -335,33 +342,88 @@ func (c *Cluster) SyncLabelsAndTaints(ctx context.Context, currentCluster *Clust
 		if err != nil {
 			return fmt.Errorf("Failed to initialize new kubernetes client: %v", err)
 		}
-		for _, host := range hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts) {
-			if err := k8s.SetAddressesAnnotations(k8sClient, host.HostnameOverride, host.InternalAddress, host.Address); err != nil {
-				return err
-			}
-			if err := k8s.SyncLabels(k8sClient, host.HostnameOverride, host.ToAddLabels, host.ToDelLabels); err != nil {
-				return err
-			}
-			// Taints are not being added by user
-			if err := k8s.SyncTaints(k8sClient, host.HostnameOverride, host.ToAddTaints, host.ToDelTaints); err != nil {
-				return err
-			}
+		hostList := hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts)
+		var errgrp errgroup.Group
+		hostQueue := make(chan *hosts.Host, len(hostList))
+		for _, host := range hostList {
+			hostQueue <- host
+		}
+		close(hostQueue)
+
+		for i := 0; i < SyncWorkers; i++ {
+			w := i
+			errgrp.Go(func() error {
+				var errs []error
+				for host := range hostQueue {
+					logrus.Debugf("worker [%d] starting sync for node [%s]", w, host.HostnameOverride)
+					if err := setNodeAnnotationsLabelsTaints(k8sClient, host); err != nil {
+						errs = append(errs, err)
+					}
+				}
+				if len(errs) > 0 {
+					return fmt.Errorf("%v", errs)
+				}
+				return nil
+			})
+		}
+		if err := errgrp.Wait(); err != nil {
+			return err
 		}
 		log.Infof(ctx, "[sync] Successfully synced nodes Labels and Taints")
 	}
 	return nil
 }
 
+func setNodeAnnotationsLabelsTaints(k8sClient *kubernetes.Clientset, host *hosts.Host) error {
+	node := &v1.Node{}
+	var err error
+	for retries := 0; retries <= 5; retries++ {
+		node, err = k8s.GetNode(k8sClient, host.HostnameOverride)
+		if err != nil {
+			logrus.Debugf("[hosts] Can't find node by name [%s], retrying..", host.HostnameOverride)
+			time.Sleep(2 * time.Second)
+			continue
+		}
+
+		oldNode := node.DeepCopy()
+		k8s.SetNodeAddressesAnnotations(node, host.InternalAddress, host.Address)
+		k8s.SyncNodeLabels(node, host.ToAddLabels, host.ToDelLabels)
+		k8s.SyncNodeTaints(node, host.ToAddTaints, host.ToDelTaints)
+
+		if reflect.DeepEqual(oldNode, node) {
+			logrus.Debugf("skipping syncing labels for node [%s]", node.Name)
+			return nil
+		}
+		_, err = k8sClient.CoreV1().Nodes().Update(node)
+		if err != nil {
+			logrus.Debugf("Error syncing labels for node [%s]: %v", node.Name, err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+		return nil
+	}
+	return err
+}
+
 func (c *Cluster) PrePullK8sImages(ctx context.Context) error {
 	log.Infof(ctx, "Pre-pulling kubernetes images")
 	var errgrp errgroup.Group
-	hosts := hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts)
-	for _, host := range hosts {
-		runHost := host
+	hostList := hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts)
+	hostsQueue := util.GetObjectQueue(hostList)
+	for w := 0; w < WorkerThreads; w++ {
 		errgrp.Go(func() error {
-			return docker.UseLocalOrPull(ctx, runHost.DClient, runHost.Address, c.SystemImages.Kubernetes, "pre-deploy", c.PrivateRegistriesMap)
+			var errList []error
+			for host := range hostsQueue {
+				runHost := host.(*hosts.Host)
+				err := docker.UseLocalOrPull(ctx, runHost.DClient, runHost.Address, c.SystemImages.Kubernetes, "pre-deploy", c.PrivateRegistriesMap)
+				if err != nil {
+					errList = append(errList, err)
+				}
+			}
+			return util.ErrList(errList)
 		})
 	}
+
 	if err := errgrp.Wait(); err != nil {
 		return err
 	}

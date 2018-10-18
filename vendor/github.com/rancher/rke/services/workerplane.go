@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
+	"github.com/rancher/rke/util"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"golang.org/x/sync/errgroup"
 )
@@ -18,34 +19,46 @@ const (
 func RunWorkerPlane(ctx context.Context, allHosts []*hosts.Host, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, workerNodePlanMap map[string]v3.RKEConfigNodePlan, certMap map[string]pki.CertificatePKI, updateWorkersOnly bool, alpineImage string) error {
 	log.Infof(ctx, "[%s] Building up Worker Plane..", WorkerRole)
 	var errgrp errgroup.Group
-	for _, host := range allHosts {
-		if updateWorkersOnly {
-			if !host.UpdateWorker {
-				continue
-			}
-		}
-		if !host.IsWorker {
-			if host.IsEtcd {
-				// Add unschedulable taint
-				host.ToAddTaints = append(host.ToAddTaints, unschedulableEtcdTaint)
-			}
-			if host.IsControl {
-				// Add unschedulable taint
-				host.ToAddTaints = append(host.ToAddTaints, unschedulableControlTaint)
-			}
-		}
-		runHost := host
-		// maps are not thread safe
-		hostProcessMap := copyProcessMap(workerNodePlanMap[runHost.Address].Processes)
+
+	hostsQueue := util.GetObjectQueue(allHosts)
+	for w := 0; w < WorkerThreads; w++ {
 		errgrp.Go(func() error {
-			return doDeployWorkerPlane(ctx, runHost, localConnDialerFactory, prsMap, hostProcessMap, certMap, alpineImage)
+			var errList []error
+			for host := range hostsQueue {
+				runHost := host.(*hosts.Host)
+				err := doDeployWorkerPlaneHost(ctx, runHost, localConnDialerFactory, prsMap, workerNodePlanMap[runHost.Address].Processes, certMap, updateWorkersOnly, alpineImage)
+				if err != nil {
+					errList = append(errList, err)
+				}
+			}
+			return util.ErrList(errList)
 		})
 	}
+
 	if err := errgrp.Wait(); err != nil {
 		return err
 	}
 	log.Infof(ctx, "[%s] Successfully started Worker Plane..", WorkerRole)
 	return nil
+}
+
+func doDeployWorkerPlaneHost(ctx context.Context, host *hosts.Host, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, processMap map[string]v3.Process, certMap map[string]pki.CertificatePKI, updateWorkersOnly bool, alpineImage string) error {
+	if updateWorkersOnly {
+		if !host.UpdateWorker {
+			return nil
+		}
+	}
+	if !host.IsWorker {
+		if host.IsEtcd {
+			// Add unschedulable taint
+			host.ToAddTaints = append(host.ToAddTaints, unschedulableEtcdTaint)
+		}
+		if host.IsControl {
+			// Add unschedulable taint
+			host.ToAddTaints = append(host.ToAddTaints, unschedulableControlTaint)
+		}
+	}
+	return doDeployWorkerPlane(ctx, host, localConnDialerFactory, prsMap, processMap, certMap, alpineImage)
 }
 
 func RemoveWorkerPlane(ctx context.Context, workerHosts []*hosts.Host, force bool) error {

@@ -386,7 +386,7 @@ func GetContainerLogsStdoutStderr(ctx context.Context, dClient *client.Client, c
 	var containerLog string
 	clogs, logserr := ReadContainerLogs(ctx, dClient, containerName, follow, tail)
 	if logserr != nil {
-		logrus.Debug("logserr: %v", logserr)
+		logrus.Debugf("logserr: %v", logserr)
 		return containerLog, fmt.Errorf("Failed to get gather logs from container [%s]: %v", containerName, logserr)
 	}
 	defer clogs.Close()

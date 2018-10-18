@@ -19,7 +19,7 @@ const (
 	DINDSubnet          = "172.18.0.0/16"
 )
 
-func StartUpDindContainer(ctx context.Context, dindAddress, dindNetwork string) (string, error) {
+func StartUpDindContainer(ctx context.Context, dindAddress, dindNetwork, dindStorageDriver string) (string, error) {
 	cli, err := client.NewEnvClient()
 	if err != nil {
 		return "", err
@@ -29,7 +29,11 @@ func StartUpDindContainer(ctx context.Context, dindAddress, dindNetwork string) 
 	if err != nil {
 		return "", err
 	}
-	storageDriver := dockerInfo.Driver
+	storageDriver := dindStorageDriver
+	if len(storageDriver) == 0 {
+		storageDriver = dockerInfo.Driver
+	}
+
 	// Get dind container name
 	containerName := fmt.Sprintf("%s-%s", DINDContainerPrefix, dindAddress)
 	_, err = cli.ContainerInspect(ctx, containerName)

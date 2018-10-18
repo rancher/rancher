@@ -106,7 +106,7 @@ func (c *Cluster) deployAddonsInclude(ctx context.Context) error {
 	log.Infof(ctx, "[addons] Checking for included user addons")
 
 	if len(c.AddonsInclude) == 0 {
-		log.Infof(ctx, "[addons] No included addon paths or urls..")
+		log.Infof(ctx, "[addons] No included addon paths or urls")
 		return nil
 	}
 	for _, addon := range c.AddonsInclude {
@@ -199,7 +199,7 @@ func (c *Cluster) deployKubeDNS(ctx context.Context) error {
 	if err := c.doAddonDeploy(ctx, kubeDNSYaml, KubeDNSAddonResourceName, false); err != nil {
 		return err
 	}
-	log.Infof(ctx, "[addons] KubeDNS deployed successfully..")
+	log.Infof(ctx, "[addons] KubeDNS deployed successfully")
 	return nil
 }
 
@@ -221,7 +221,7 @@ func (c *Cluster) deployMetricServer(ctx context.Context) error {
 	if err := c.doAddonDeploy(ctx, metricsYaml, MetricsServerAddonResourceName, false); err != nil {
 		return err
 	}
-	log.Infof(ctx, "[addons] KubeDNS deployed successfully..")
+	log.Infof(ctx, "[addons] Metrics Server deployed successfully")
 	return nil
 }
 
@@ -246,7 +246,7 @@ func (c *Cluster) doAddonDeploy(ctx context.Context, addonYaml, resourceName str
 		return &addonError{fmt.Sprintf("Failed to save addon ConfigMap: %v", err), isCritical}
 	}
 
-	log.Infof(ctx, "[addons] Executing deploy job..")
+	log.Infof(ctx, "[addons] Executing deploy job %s", resourceName)
 	k8sClient, err := k8s.NewClient(c.LocalKubeConfigPath, c.K8sWrapTransport)
 	if err != nil {
 		return &addonError{fmt.Sprintf("%v", err), isCritical}
@@ -301,7 +301,7 @@ func (c *Cluster) doAddonDelete(ctx context.Context, resourceName string, isCrit
 }
 
 func (c *Cluster) StoreAddonConfigMap(ctx context.Context, addonYaml string, addonName string) (bool, error) {
-	log.Infof(ctx, "[addons] Saving addon ConfigMap to Kubernetes")
+	log.Infof(ctx, "[addons] Saving ConfigMap for addon %s to Kubernetes", addonName)
 	updated := false
 	kubeClient, err := k8s.NewClient(c.LocalKubeConfigPath, c.K8sWrapTransport)
 	if err != nil {
@@ -316,7 +316,7 @@ func (c *Cluster) StoreAddonConfigMap(ctx context.Context, addonYaml string, add
 				time.Sleep(time.Second * 5)
 				continue
 			}
-			log.Infof(ctx, "[addons] Successfully Saved addon to Kubernetes ConfigMap: %s", addonName)
+			log.Infof(ctx, "[addons] Successfully saved ConfigMap for addon %s to Kubernetes", addonName)
 			timeout <- true
 			break
 		}
@@ -371,6 +371,6 @@ func (c *Cluster) deployIngress(ctx context.Context) error {
 	if err := c.doAddonDeploy(ctx, ingressYaml, IngressAddonResourceName, false); err != nil {
 		return err
 	}
-	log.Infof(ctx, "[ingress] ingress controller %s is successfully deployed", c.Ingress.Provider)
+	log.Infof(ctx, "[ingress] ingress controller %s deployed successfully", c.Ingress.Provider)
 	return nil
 }

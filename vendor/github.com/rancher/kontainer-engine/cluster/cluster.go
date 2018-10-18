@@ -18,6 +18,7 @@ const (
 	Running     = "Running"
 	Error       = "Error"
 	Updating    = "Updating"
+	Init        = "Init"
 )
 
 var (
@@ -82,6 +83,9 @@ type ConfigGetter interface {
 
 // Create creates a cluster
 func (c *Cluster) Create(ctx context.Context) error {
+	if c.RootCACert != "" && c.Status == "" {
+		c.PersistStore.PersistStatus(*c, Init)
+	}
 	err := c.createInner(ctx)
 	if err != nil {
 		if err == ErrClusterExists {
@@ -153,7 +157,7 @@ func (c *Cluster) createInner(ctx context.Context) error {
 		info = toInfo(c)
 	}
 
-	if c.Status == Updating || c.Status == Running || c.Status == PostCheck {
+	if c.Status == Updating || c.Status == Running || c.Status == PostCheck || c.Status == Init {
 		logrus.Infof("Cluster %s already exists.", c.Name)
 		return ErrClusterExists
 	}

@@ -266,11 +266,12 @@ func ExtractBackupBundleOnHost(ctx context.Context, host *hosts.Host, alpineSyst
 			"sh",
 			"-c",
 			fmt.Sprintf(
-				"mkdir -p %s; tar xzvf %s -C %s --strip-components %d",
+				"mkdir -p %s; tar xzvf %s -C %s --strip-components %d --exclude %s",
 				TempCertPath,
 				BundleCertPath,
 				TempCertPath,
-				len(strings.Split(filepath.Clean(TempCertPath), "/"))-1),
+				len(strings.Split(filepath.Clean(TempCertPath), "/"))-1,
+				ClusterStateFile),
 		},
 		Image: alpineSystemImage,
 	}

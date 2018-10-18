@@ -157,12 +157,19 @@ spec:
           mountPath: /host/opt/cni/bin/
       hostNetwork: true
       tolerations:
+      {{- if eq .ClusterVersion "v1.12" }}
+      - operator: Exists
+        effect: NoSchedule
+      - operator: Exists
+        effect: NoExecute
+      {{- else }}
       - key: node-role.kubernetes.io/controlplane
         operator: Exists
         effect: NoSchedule
       - key: node-role.kubernetes.io/etcd
         operator: Exists
         effect: NoExecute
+      {{- end }}
       volumes:
         - name: run
           hostPath:
