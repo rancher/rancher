@@ -35,7 +35,7 @@ type peerManager struct {
 
 func startPeerManager(context *config.ScaledContext, server *remotedialer.Server) (peermanager.PeerManager, error) {
 	tokenBytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
-	if os.IsNotExist(err) {
+	if os.IsNotExist(err) || settings.Namespace.Get() == "" || settings.PeerServices.Get() == "" {
 		logrus.Infof("Running in single server mode, will not peer connections")
 		return nil, nil
 	} else if err != nil {
