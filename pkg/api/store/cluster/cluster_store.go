@@ -2,15 +2,16 @@ package cluster
 
 import (
 	"fmt"
-	"sync"
-
+	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
 	"github.com/rancher/rancher/pkg/settings"
 	managementv3 "github.com/rancher/types/client/management/v3"
 )
@@ -31,7 +32,6 @@ func (r *Store) ByID(apiContext *types.APIContext, schema *types.Schema, id stri
 }
 
 func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
-
 	name := convert.ToString(data["name"])
 	if name == "" {
 		return nil, httperror.NewFieldAPIError(httperror.MissingRequired, "Cluster name", "")
@@ -50,7 +50,23 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, httperror.NewFieldAPIError(httperror.InvalidOption, "enableNetworkPolicy", err.Error())
 	}
 
+	if eksConfig := data[managementv3.ClusterFieldAmazonElasticContainerServiceConfig]; eksConfig != nil {
+		sessionToken, _ := values.GetValue(data, managementv3.ClusterFieldAmazonElasticContainerServiceConfig, managementv3.AmazonElasticContainerServiceConfigFieldSessionToken)
+		annotation, _ := values.GetValue(data, managementv3.ClusterFieldAnnotations)
+		m := toMap(annotation)
+		m[clusterstatus.TemporaryCredentialsAnnotationKey] = strconv.FormatBool(sessionToken != nil)
+		values.PutValue(data, m, managementv3.ClusterFieldAnnotations)
+	}
+
 	return r.Store.Create(apiContext, schema, data)
+}
+
+func toMap(rawMap interface{}) map[string]interface{} {
+	if theMap, ok := rawMap.(map[string]interface{}); ok {
+		return theMap
+	}
+
+	return make(map[string]interface{})
 }
 
 func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
