@@ -88,7 +88,7 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
 
     {{ if eq .clusterTarget.WrapElasticsearch.Scheme "https"}}    
     ssl_verify {{ .clusterTarget.ElasticsearchConfig.SSLVerify }}
-    
+    ssl_version {{ .clusterTarget.ElasticsearchConfig.SSLVersion }}
     {{ if .clusterTarget.ElasticsearchConfig.Certificate }}
     ca_file /fluentd/etc/ssl/cluster_{{.clusterName}}_ca.pem
     {{end -}}

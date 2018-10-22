@@ -72,6 +72,7 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
 
     {{ if eq $store.WrapElasticsearch.Scheme "https"}}
     ssl_verify {{$store.ElasticsearchConfig.SSLVerify}}
+    ssl_version {{ $store.ElasticsearchConfig.SSLVersion }}
 
     {{ if $store.ElasticsearchConfig.Certificate }}
     ca_file /fluentd/etc/ssl/project_{{$store.WrapProjectName}}_ca.pem
