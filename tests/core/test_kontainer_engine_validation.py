@@ -10,7 +10,8 @@ def get_error_message_for_eks_config(admin_mc, remove_resource, config):
     def get_provisioned_type(cluster):
         for condition in cluster.conditions:
             if condition.type == "Provisioned":
-                return condition.message
+                if hasattr(condition, 'message'):
+                    return condition.message
 
     def has_provision_status():
         new_cluster = admin_mc.client.reload(cluster)
