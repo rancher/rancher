@@ -12,6 +12,7 @@ const (
 	ElasticsearchConfigFieldEndpoint      = "endpoint"
 	ElasticsearchConfigFieldIndexPrefix   = "indexPrefix"
 	ElasticsearchConfigFieldSSLVerify     = "sslVerify"
+	ElasticsearchConfigFieldSSLVersion    = "sslVersion"
 )
 
 type ElasticsearchConfig struct {
@@ -25,4 +26,5 @@ type ElasticsearchConfig struct {
 	Endpoint      string `json:"endpoint,omitempty" yaml:"endpoint,omitempty"`
 	IndexPrefix   string `json:"indexPrefix,omitempty" yaml:"indexPrefix,omitempty"`
 	SSLVerify     bool   `json:"sslVerify,omitempty" yaml:"sslVerify,omitempty"`
+	SSLVersion    string `json:"sslVersion,omitempty" yaml:"sslVersion,omitempty"`
 }

@@ -101,6 +101,7 @@ type ElasticsearchConfig struct {
 	ClientKey     string `json:"clientKey,omitempty"`
 	ClientKeyPass string `json:"clientKeyPass,omitempty"`
 	SSLVerify     bool   `json:"sslVerify,omitempty"`
+	SSLVersion    string `json:"sslVersion,omitempty" norman:"type=enum,options=SSLv23|TLSv1|TLSv1_1|TLSv1_2,default=TLSv1_2"`
 }
 
 type SplunkConfig struct {
