@@ -15,19 +15,19 @@ The CPU usage on the node {{ (index .Alerts 0).Labels.node_name}} is over {{ (in
 The memory usage on the node {{ (index .Alerts 0).Labels.node_name}} is over {{ (index .Alerts 0).Labels.mem_threshold}}%
 
 {{ else if eq (index .Alerts 0).Labels.alert_type "podNotScheduled"}}
-The Pod {{ (index .Alerts 0).Labels.pod_name}} is not scheduled
+The Pod {{ if (index .Alerts 0).Labels.namespace}}{{(index .Alerts 0).Labels.namespace}}:{{end}}{{(index .Alerts 0).Labels.pod_name}} is not scheduled
 
 {{ else if eq (index .Alerts 0).Labels.alert_type "podNotRunning"}}
-The Pod {{ (index .Alerts 0).Labels.pod_name}} is not running
+The Pod {{ if (index .Alerts 0).Labels.namespace}}{{(index .Alerts 0).Labels.namespace}}:{{end}}{{(index .Alerts 0).Labels.pod_name}} is not running
 
 {{ else if eq (index .Alerts 0).Labels.alert_type "podRestarts"}}
-The Pod {{ (index .Alerts 0).Labels.pod_name}} restarts {{ (index .Alerts 0).Labels.restart_times}} times in {{ (index .Alerts 0).Labels.restart_interval}} sec
+The Pod {{ if (index .Alerts 0).Labels.namespace}}{{(index .Alerts 0).Labels.namespace}}:{{end}}{{(index .Alerts 0).Labels.pod_name}} restarts {{ (index .Alerts 0).Labels.restart_times}} times in {{ (index .Alerts 0).Labels.restart_interval}} sec
 
 {{ else if eq (index .Alerts 0).Labels.alert_type "systemService"}}
 The system component {{ (index .Alerts 0).Labels.component_name}} is not running
 
 {{ else if eq (index .Alerts 0).Labels.alert_type "workload"}}
-The workload {{ (index .Alerts 0).Labels.workload_name}} has available replicas less than {{ (index .Alerts 0).Labels.available_percentage}}%
+The workload {{ if (index .Alerts 0).Labels.workload_namespace}}{{(index .Alerts 0).Labels.workload_namespace}}:{{end}}{{(index .Alerts 0).Labels.workload_name}} has available replicas less than {{ (index .Alerts 0).Labels.available_percentage}}%
 {{ end}}
 {{ end}}
 	
@@ -38,7 +38,7 @@ The workload {{ (index .Alerts 0).Labels.workload_name}} has available replicas 
 Alert Name: {{ (index .Alerts 0).Labels.alert_name}}
 Severity: {{ (index .Alerts 0).Labels.severity}}
 Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}
-Target: {{ (index .Alerts 0).Labels.target_name}}
+Target: {{ if (index .Alerts 0).Labels.target_namespace}}{{(index .Alerts 0).Labels.target_namespace}}:{{end}}{{(index .Alerts 0).Labels.target_name}}
 Count: {{ (index .Alerts 0).Labels.event_count}}
 Event Message: {{ (index .Alerts 0).Labels.event_message}}
 First Seen: {{ (index .Alerts 0).Labels.event_firstseen}}
@@ -100,7 +100,7 @@ Logs: {{ (index .Alerts 0).Labels.logs}}
 Alert Name: {{ (index .Alerts 0).Labels.alert_name}}<br>
 Severity: {{ (index .Alerts 0).Labels.severity}}<br>
 Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}<br>
-Target: {{ (index .Alerts 0).Labels.target_name}}<br>
+Target: {{ if (index .Alerts 0).Labels.target_namespace}}{{(index .Alerts 0).Labels.target_namespace}}:{{end}}{{ (index .Alerts 0).Labels.target_name}}<br>
 Count: {{ (index .Alerts 0).Labels.event_count}}<br>
 Event Message: {{ (index .Alerts 0).Labels.event_message}}<br>
 First Seen: {{ (index .Alerts 0).Labels.event_firstseen}}<br>

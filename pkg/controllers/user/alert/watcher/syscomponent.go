@@ -93,7 +93,7 @@ func (w *SysComponentWatcher) checkComponentHealthy(statuses *v1.ComponentStatus
 						data["severity"] = alert.Spec.Severity
 						data["alert_name"] = alert.Spec.DisplayName
 						data["cluster_name"] = clusterDisplayName
-						data["component_name"] = alert.Spec.TargetSystemService.Condition
+						data["component_name"] = alert.Spec.TargetSystemService.Condition + ":" + cs.Name
 
 						if cond.Message != "" {
 							data["logs"] = cond.Message

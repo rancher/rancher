@@ -162,6 +162,7 @@ func (w *WorkloadWatcher) checkWorkloadCondition(wl *workload.Workload, alert *v
 		data["alert_name"] = alert.Spec.DisplayName
 		data["cluster_name"] = clusterDisplayName
 		data["workload_name"] = wl.Name
+		data["workload_namespace"] = wl.Namespace
 		data["available_percentage"] = strconv.Itoa(percentage)
 		data["available_replicas"] = strconv.Itoa(int(wl.Status.AvailableReplicas))
 		data["desired_replicas"] = strconv.Itoa(int(wl.Status.Replicas))

@@ -75,6 +75,7 @@ func (l *EventWatcher) Sync(key string, obj *corev1.Event) error {
 				data["alert_name"] = alert.Spec.DisplayName
 				data["cluster_name"] = clusterDisplayName
 				data["target_name"] = obj.InvolvedObject.Name
+				data["target_namespace"] = obj.InvolvedObject.Namespace
 				data["event_count"] = strconv.Itoa(int(obj.Count))
 				data["event_message"] = obj.Message
 				data["event_firstseen"] = fmt.Sprintf("%s", obj.FirstTimestamp)
