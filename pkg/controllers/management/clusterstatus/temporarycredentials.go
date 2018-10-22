@@ -8,7 +8,7 @@ import (
 	"github.com/rancher/types/config"
 )
 
-const temporaryCredentialsAnnotationKey = "clusterstatus.management.cattle.io/temporary-security-credentials"
+const TemporaryCredentialsAnnotationKey = "clusterstatus.management.cattle.io/temporary-security-credentials"
 
 func Register(management *config.ManagementContext) {
 	c := &clusterAnnotations{
@@ -30,7 +30,7 @@ func (cd *clusterAnnotations) sync(key string, cluster *v3.Cluster) error {
 	if eksConfig := cluster.Spec.AmazonElasticContainerServiceConfig; eksConfig != nil {
 		newValue := strconv.FormatBool(eksConfig.SessionToken != "")
 
-		if newValue != cluster.Annotations[temporaryCredentialsAnnotationKey] {
+		if newValue != cluster.Annotations[TemporaryCredentialsAnnotationKey] {
 			original := cluster
 			cluster = original.DeepCopy()
 
@@ -38,7 +38,7 @@ func (cd *clusterAnnotations) sync(key string, cluster *v3.Cluster) error {
 				cluster.Annotations = make(map[string]string)
 			}
 
-			cluster.Annotations[temporaryCredentialsAnnotationKey] = newValue
+			cluster.Annotations[TemporaryCredentialsAnnotationKey] = newValue
 			_, err := cd.clusters.Update(cluster)
 			if err != nil {
 				return fmt.Errorf("error updating temporary credentials annotation: %v", err)
