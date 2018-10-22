@@ -1,10 +1,12 @@
 package cluster
 
 import (
+	"encoding/json"
 	"fmt"
-	"sync"
-
+	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
+	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
@@ -31,7 +33,6 @@ func (r *Store) ByID(apiContext *types.APIContext, schema *types.Schema, id stri
 }
 
 func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
-
 	name := convert.ToString(data["name"])
 	if name == "" {
 		return nil, httperror.NewFieldAPIError(httperror.MissingRequired, "Cluster name", "")
@@ -48,6 +49,29 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 
 	if err := validateNetworkFlag(data, true); err != nil {
 		return nil, httperror.NewFieldAPIError(httperror.InvalidOption, "enableNetworkPolicy", err.Error())
+	}
+
+	if rawEKSConfig := data[managementv3.ClusterFieldAmazonElasticContainerServiceConfig]; rawEKSConfig != nil {
+		raw, err := json.Marshal(rawEKSConfig)
+		if err != nil {
+			return nil, fmt.Errorf("error marshalling eks config: %v", err)
+		}
+
+		eksConfig := &managementv3.AmazonElasticContainerServiceConfig{}
+		err = json.Unmarshal(raw, eksConfig)
+		if err != nil {
+			return nil, fmt.Errorf("error unmarshalling eks config: %v", err)
+		}
+
+		if data[managementv3.ClusterFieldAnnotations] == nil {
+			// This seems like it should be a map[string]string{} but supplying that causes annotations to blow up
+			// spectacularly
+			data[managementv3.ClusterFieldAnnotations] = make(map[string]interface{})
+		}
+
+		if annotations, ok := data[managementv3.ClusterFieldAnnotations].(map[string]interface{}); ok {
+			annotations[clusterstatus.TemporaryCredentialsAnnotationKey] = strconv.FormatBool(eksConfig.SessionToken != "")
+		}
 	}
 
 	return r.Store.Create(apiContext, schema, data)
