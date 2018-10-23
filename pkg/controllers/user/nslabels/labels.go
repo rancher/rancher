@@ -22,7 +22,7 @@ type namespaceHandler struct {
 	nsClient typescorev1.NamespaceInterface
 }
 
-func Register(cluster *config.UserContext) {
+func Register(cluster *config.UserOnlyContext) {
 	logrus.Infof("Registering namespaceHandler for adding labels ")
 	nsh := &namespaceHandler{
 		secrets:  cluster.Core.Secrets(""),
