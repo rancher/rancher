@@ -3,8 +3,6 @@ package ingress
 import (
 	"context"
 
-	"github.com/rancher/types/apis/management.cattle.io/v3"
-
 	"github.com/rancher/norman/types/convert"
 	util "github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/types/apis/core/v1"
@@ -24,16 +22,14 @@ import (
 type Controller struct {
 	serviceLister v1.ServiceLister
 	services      v1.ServiceInterface
-	clusterName   string
-	clusterLister v3.ClusterLister
+	nodeLister    v1.NodeLister
 }
 
-func Register(ctx context.Context, workload *config.UserOnlyContext, cluster *config.UserContext) {
+func Register(ctx context.Context, workload *config.UserOnlyContext) {
 	c := &Controller{
 		services:      workload.Core.Services(""),
 		serviceLister: workload.Core.Services("").Controller().Lister(),
-		clusterName:   workload.ClusterName,
-		clusterLister: cluster.Management.Management.Clusters("").Controller().Lister(),
+		nodeLister:    workload.Core.Nodes("").Controller().Lister(),
 	}
 	workload.Extensions.Ingresses("").AddHandler("ingressWorkloadController", c.sync)
 }
@@ -169,12 +165,15 @@ func updateOrDelete(obj *v1beta1.Ingress, service *corev1.Service, expectedServi
 }
 
 func (c *Controller) needNodePort() bool {
-	cluster, err := c.clusterLister.Get("", c.clusterName)
-	if err != nil || cluster.DeletionTimestamp != nil {
+	nodes, err := c.nodeLister.List("", labels.NewSelector())
+	if err != nil {
 		return false
 	}
-	if cluster.Spec.GoogleKubernetesEngineConfig != nil {
-		return true
+
+	for _, node := range nodes {
+		if label, ok := node.Labels["cloud.google.com/gke-nodepool"]; ok && label != "" {
+			return true
+		}
 	}
 	return false
 }

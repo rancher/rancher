@@ -44,7 +44,6 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 	networkpolicy.Register(cluster)
 	noderemove.Register(cluster)
 	nodesyncer.Register(ctx, cluster, kubeConfigGetter)
-	nslabels.Register(cluster)
 	pipeline.Register(ctx, cluster)
 	podsecuritypolicy.RegisterCluster(cluster)
 	podsecuritypolicy.RegisterBindings(cluster)
@@ -57,16 +56,13 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 	approuter.Register(ctx, cluster)
 	resourcequota.Register(ctx, cluster)
 
-	userOnlyContext := cluster.UserOnlyContext()
-	ingress.Register(ctx, userOnlyContext, cluster)
-
 	c, err := cluster.Management.Management.Clusters("").Get(cluster.ClusterName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 
 	if c.Spec.Internal {
-		err = RegisterUserOnly(ctx, userOnlyContext)
+		err = RegisterUserOnly(ctx, cluster.UserOnlyContext())
 		if err != nil {
 			return err
 		}
@@ -85,7 +81,9 @@ func RegisterFollower(ctx context.Context, cluster *config.UserContext, kubeConf
 func RegisterUserOnly(ctx context.Context, cluster *config.UserOnlyContext) error {
 	dnsrecord.Register(ctx, cluster)
 	externalservice.Register(ctx, cluster)
+	ingress.Register(ctx, cluster)
 	ingresshostgen.Register(cluster)
+	nslabels.Register(cluster)
 	targetworkloadservice.Register(ctx, cluster)
 	workload.Register(ctx, cluster)
 	return nil
