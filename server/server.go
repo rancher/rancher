@@ -26,8 +26,6 @@ import (
 	"github.com/rancher/rancher/server/whitelist"
 	managementSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/config"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 )
 
 func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager, auditLogWriter *audit.LogWriter) error {
@@ -50,8 +48,6 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 
 	root := mux.NewRouter()
 	root.UseEncodedPath()
-
-	app.DefaultProxyDialer = utilnet.DialFunc(scaledContext.Dialer.LocalClusterDialer())
 
 	rawAuthedAPIs := newAuthed(tokenAPI, managementAPI, k8sProxy)
 
