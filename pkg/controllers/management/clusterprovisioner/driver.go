@@ -10,7 +10,7 @@ import (
 )
 
 func (p *Provisioner) driverCreate(cluster *v3.Cluster, spec v3.ClusterSpec) (api string, token string, cert string, err error) {
-	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.EventLogger, cluster, v3.ClusterConditionProvisioned)
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, cluster, v3.ClusterConditionProvisioned)
 	defer logger.Close()
 
 	spec = cleanRKE(spec)
@@ -23,7 +23,7 @@ func (p *Provisioner) driverCreate(cluster *v3.Cluster, spec v3.ClusterSpec) (ap
 }
 
 func (p *Provisioner) driverUpdate(cluster *v3.Cluster, spec v3.ClusterSpec) (api string, token string, cert string, err error) {
-	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.EventLogger, cluster, v3.ClusterConditionUpdated)
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, cluster, v3.ClusterConditionUpdated)
 	defer logger.Close()
 
 	spec = cleanRKE(spec)
@@ -42,7 +42,7 @@ func (p *Provisioner) driverUpdate(cluster *v3.Cluster, spec v3.ClusterSpec) (ap
 }
 
 func (p *Provisioner) driverRemove(cluster *v3.Cluster) error {
-	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.EventLogger, cluster, v3.ClusterConditionProvisioned)
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, cluster, v3.ClusterConditionProvisioned)
 	defer logger.Close()
 
 	spec := cleanRKE(cluster.Spec)
