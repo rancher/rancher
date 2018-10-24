@@ -1,13 +1,15 @@
 package namespace
 
 import (
+	"strings"
+
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	printers2 "k8s.io/cli-runtime/pkg/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/printers"
-	"strings"
 )
 
 var ExportResourcePrefixMappings = map[string]string{
@@ -24,8 +26,8 @@ var ExportResourcePrefixMappings = map[string]string{
 }
 
 var ExportPrinters = map[string]printers.ResourcePrinter{
-	"json": &printers.JSONPrinter{},
-	"yaml": &printers.YAMLPrinter{},
+	"json": &printers2.JSONPrinter{},
+	"yaml": &printers2.YAMLPrinter{},
 }
 
 func NewLinkHandler(next types.RequestHandler, manager *clustermanager.Manager) types.RequestHandler {
