@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -69,6 +70,8 @@ func NewLocal(localConfig *rest.Config, cluster *v3.Cluster) (*RemoteService, er
 	}
 	if localConfig.BearerToken != "" {
 		rs.auth = "Bearer " + localConfig.BearerToken
+	} else if localConfig.Password != "" {
+		rs.auth = "Basic " + base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", localConfig.Username, localConfig.Password)))
 	}
 
 	return rs, nil
