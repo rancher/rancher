@@ -88,6 +88,7 @@ const (
 	FlannelBackend   = "FlannelBackend"
 	CanalInterface   = "CanalInterface"
 	RBACConfig       = "RBACConfig"
+	ClusterVersion   = "ClusterVersion"
 )
 
 var EtcdPortList = []string{
@@ -132,7 +133,8 @@ func (c *Cluster) doFlannelDeploy(ctx context.Context) error {
 		FlannelBackend: map[string]interface{}{
 			"Type": c.Network.Options[FlannelBackendType],
 		},
-		RBACConfig: c.Authorization.Mode,
+		RBACConfig:     c.Authorization.Mode,
+		ClusterVersion: getTagMajorVersion(c.Version),
 	}
 	pluginYaml, err := c.getNetworkPluginManifest(flannelConfig)
 	if err != nil {
