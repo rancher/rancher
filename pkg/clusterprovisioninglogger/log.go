@@ -7,8 +7,6 @@ import (
 
 	"github.com/rancher/kontainer-engine/logstream"
 	"github.com/rancher/norman/condition"
-	"github.com/rancher/norman/event"
-	"github.com/rancher/rke/log"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/metadata"
@@ -16,37 +14,22 @@ import (
 )
 
 type logger struct {
-	EventLogger event.Logger
-	Clusters    v3.ClusterInterface
+	Clusters v3.ClusterInterface
 }
 
-func NewLogger(clusters v3.ClusterInterface, eventLogger event.Logger, cluster *v3.Cluster, cond condition.Cond) (context.Context, io.Closer) {
+func NewLogger(clusters v3.ClusterInterface, cluster *v3.Cluster, cond condition.Cond) (context.Context, io.Closer) {
 	l := &logger{
-		EventLogger: eventLogger,
-		Clusters:    clusters,
+		Clusters: clusters,
 	}
 
 	_, ctx, logger := l.getCtx(cluster, cond)
 	return ctx, logger
 }
 
-func NewNonRPCLogger(clusters v3.ClusterInterface, eventLogger event.Logger, cluster *v3.Cluster, cond condition.Cond) (context.Context, io.Closer) {
-	l := &logger{
-		EventLogger: eventLogger,
-		Clusters:    clusters,
-	}
-
-	logID, ctx, logger := l.getCtx(cluster, cond)
-	targetLogger := logstream.GetLogStream(logID)
-	return log.SetLogger(ctx, targetLogger), logger
-}
-
 func (p *logger) logEvent(cluster *v3.Cluster, event logstream.LogEvent, cond condition.Cond) *v3.Cluster {
 	if event.Error {
-		p.EventLogger.Error(cluster, event.Message)
 		logrus.Errorf("cluster [%s] provisioning: %s", cluster.Name, event.Message)
 	} else {
-		p.EventLogger.Info(cluster, event.Message)
 		logrus.Infof("cluster [%s] provisioning: %s", cluster.Name, event.Message)
 	}
 	if cond.GetMessage(cluster) != event.Message {

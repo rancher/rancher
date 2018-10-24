@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/event"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
@@ -46,7 +45,6 @@ func Register(management *config.ManagementContext) {
 		nodeTemplateClient:        management.Management.NodeTemplates(""),
 		nodeTemplateGenericClient: management.Management.NodeTemplates("").ObjectClient().UnstructuredClient(),
 		configMapGetter:           management.K8sClient.CoreV1(),
-		logger:                    management.EventLogger,
 		clusterLister:             management.Management.Clusters("").Controller().Lister(),
 	}
 
@@ -60,7 +58,6 @@ type Lifecycle struct {
 	nodeClient                v3.NodeInterface
 	nodeTemplateClient        v3.NodeTemplateInterface
 	configMapGetter           typedv1.ConfigMapsGetter
-	logger                    event.Logger
 	clusterLister             v3.ClusterLister
 }
 
@@ -195,11 +192,11 @@ func (m *Lifecycle) Remove(obj *v3.Node) (*v3.Node, error) {
 		}
 
 		if mExists {
-			m.logger.Infof(obj, "Removing node %s", obj.Spec.RequestedHostname)
+			logrus.Infof("Removing node %s", obj.Spec.RequestedHostname)
 			if err := deleteNode(config.Dir(), obj); err != nil {
 				return obj, err
 			}
-			m.logger.Infof(obj, "Removing node %s done", obj.Spec.RequestedHostname)
+			logrus.Infof("Removing node %s done", obj.Spec.RequestedHostname)
 		}
 
 		return obj, nil
@@ -222,7 +219,7 @@ func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *v3.Node) (*v3.N
 
 	createCommandsArgs := buildCreateCommand(obj, configRawMap)
 	cmd := buildCommand(nodeDir, createCommandsArgs)
-	m.logger.Infof(obj, "Provisioning node %s", obj.Spec.RequestedHostname)
+	logrus.Infof("Provisioning node %s", obj.Spec.RequestedHostname)
 
 	stdoutReader, stderrReader, err := startReturnOutput(cmd)
 	if err != nil {
@@ -245,7 +242,7 @@ func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *v3.Node) (*v3.N
 		return obj, err
 	}
 
-	m.logger.Infof(obj, "Provisioning node %s done", obj.Spec.RequestedHostname)
+	logrus.Infof("Provisioning node %s done", obj.Spec.RequestedHostname)
 	return obj, nil
 }
 

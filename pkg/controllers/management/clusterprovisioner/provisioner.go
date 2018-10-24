@@ -11,7 +11,6 @@ import (
 	"github.com/rancher/kontainer-engine/drivers/rke"
 	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/event"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/configfield"
@@ -37,7 +36,6 @@ type Provisioner struct {
 	Clusters          v3.ClusterInterface
 	NodeLister        v3.NodeLister
 	Driver            service.EngineService
-	EventLogger       event.Logger
 	backoff           *flowcontrol.Backoff
 }
 
@@ -47,7 +45,6 @@ func Register(management *config.ManagementContext) {
 		Clusters:          management.Management.Clusters(""),
 		ClusterController: management.Management.Clusters("").Controller(),
 		NodeLister:        management.Management.Nodes("").Controller().Lister(),
-		EventLogger:       management.EventLogger,
 		backoff:           flowcontrol.NewBackOff(30*time.Second, 10*time.Minute),
 	}
 

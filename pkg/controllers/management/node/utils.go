@@ -168,7 +168,7 @@ func (m *Lifecycle) reportStatus(stdoutReader io.Reader, stderrReader io.Reader,
 		if err != nil {
 			return node, err
 		}
-		m.logger.Info(node, msg)
+		logrus.Info(msg)
 		v3.NodeConditionProvisioned.Message(node, msg)
 		// ignore update errors
 		if newObj, err := m.nodeClient.Update(node); err == nil {
