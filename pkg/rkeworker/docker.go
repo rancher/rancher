@@ -107,7 +107,7 @@ func runProcess(ctx context.Context, name string, p v3.Process, start bool) erro
 	config.Labels[RKEContainerNameLabel] = name
 
 	newContainer, err := c.ContainerCreate(ctx, config, hostConfig, nil, name)
-	if client.IsErrImageNotFound(err) {
+	if client.IsErrNotFound(err) {
 		var output io.ReadCloser
 		imagePullOptions := types.ImagePullOptions{}
 		if p.ImageRegistryAuthConfig != "" {
