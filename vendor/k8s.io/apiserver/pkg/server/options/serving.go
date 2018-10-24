@@ -20,16 +20,14 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
-	"path"
 	"strconv"
+	"strings"
 
-	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/server"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
-	certutil "k8s.io/client-go/util/cert"
 )
 
 type SecureServingOptions struct {
@@ -39,6 +37,11 @@ type SecureServingOptions struct {
 	// BindNetwork is the type of network to bind to - defaults to "tcp", accepts "tcp",
 	// "tcp4", and "tcp6".
 	BindNetwork string
+	// Required set to true means that BindPort cannot be zero.
+	Required bool
+	// ExternalAddress is the address advertised, even if BindAddress is a loopback. By default this
+	// is set to BindAddress if the later no loopback, or to the first host interface address.
+	ExternalAddress net.IP
 
 	// Listener is the secure server network listener.
 	// either Listener or BindAddress/BindPort/BindNetwork is set,
@@ -59,6 +62,8 @@ type SecureServingOptions struct {
 	// HTTP2MaxStreamsPerConnection is the limit that the api server imposes on each client.
 	// A value of zero means to use the default provided by golang's HTTP/2 support.
 	HTTP2MaxStreamsPerConnection int
+
+	AdvertisePort int
 }
 
 type CertKey struct {
@@ -74,6 +79,11 @@ type GeneratableKeyCert struct {
 	// CertDirectory is a directory that will contain the certificates.  If the cert and key aren't specifically set
 	// this will be used to derive a match with the "pair-name"
 	CertDirectory string
+	// FixtureDirectory is a directory that contains test fixture used to avoid regeneration of certs during tests.
+	// The format is:
+	// <host>_<ip>-<ip>_<alternateDNS>-<alternateDNS>.crt
+	// <host>_<ip>-<ip>_<alternateDNS>-<alternateDNS>.key
+	FixtureDirectory string
 	// PairName is the name which will be used with CertDirectory to make a cert and key names
 	// It becomes CertDirector/PairName.crt and CertDirector/PairName.key
 	PairName string
@@ -91,6 +101,9 @@ func NewSecureServingOptions() *SecureServingOptions {
 }
 
 func (s *SecureServingOptions) DefaultExternalAddress() (net.IP, error) {
+	if !s.ExternalAddress.IsUnspecified() {
+		return s.ExternalAddress, nil
+	}
 	return utilnet.ChooseBindAddress(s.BindAddress)
 }
 
@@ -101,7 +114,9 @@ func (s *SecureServingOptions) Validate() []error {
 
 	errors := []error{}
 
-	if s.BindPort < 0 || s.BindPort > 65535 {
+	if s.Required && s.BindPort < 1 || s.BindPort > 65535 {
+		errors = append(errors, fmt.Errorf("--secure-port %v must be between 1 and 65535, inclusive. It cannot be turned off with 0", s.BindPort))
+	} else if s.BindPort < 0 || s.BindPort > 65535 {
 		errors = append(errors, fmt.Errorf("--secure-port %v must be between 0 and 65535, inclusive. 0 for turning off secure port", s.BindPort))
 	}
 
@@ -117,9 +132,14 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"The IP address on which to listen for the --secure-port port. The "+
 		"associated interface(s) must be reachable by the rest of the cluster, and by CLI/web "+
 		"clients. If blank, all interfaces will be used (0.0.0.0 for all IPv4 interfaces and :: for all IPv6 interfaces).")
-	fs.IntVar(&s.BindPort, "secure-port", s.BindPort, ""+
-		"The port on which to serve HTTPS with authentication and authorization. If 0, "+
-		"don't serve HTTPS at all.")
+
+	desc := "The port on which to serve HTTPS with authentication and authorization."
+	if s.Required {
+		desc += "It cannot be switched off with 0."
+	} else {
+		desc += "If 0, don't serve HTTPS at all."
+	}
+	fs.IntVar(&s.BindPort, "secure-port", s.BindPort, desc)
 
 	fs.StringVar(&s.ServerCert.CertDirectory, "cert-dir", s.ServerCert.CertDirectory, ""+
 		"The directory where the TLS certs are located. "+
@@ -134,14 +154,16 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ServerCert.CertKey.KeyFile, "tls-private-key-file", s.ServerCert.CertKey.KeyFile,
 		"File containing the default x509 private key matching --tls-cert-file.")
 
+	tlsCipherPossibleValues := utilflag.TLSCipherPossibleValues()
 	fs.StringSliceVar(&s.CipherSuites, "tls-cipher-suites", s.CipherSuites,
 		"Comma-separated list of cipher suites for the server. "+
-			"Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants). "+
-			"If omitted, the default Go cipher suites will be used")
+			"If omitted, the default Go cipher suites will be use.  "+
+			"Possible values: "+strings.Join(tlsCipherPossibleValues, ","))
 
+	tlsPossibleVersions := utilflag.TLSPossibleVersions()
 	fs.StringVar(&s.MinTLSVersion, "tls-min-version", s.MinTLSVersion,
 		"Minimum TLS version supported. "+
-			"Value must match version names from https://golang.org/pkg/crypto/tls/#pkg-constants.")
+			"Possible values: "+strings.Join(tlsPossibleVersions, ", "))
 
 	fs.Var(utilflag.NewNamedCertKeyArray(&s.SNICertKeys), "tls-sni-cert-key", ""+
 		"A pair of x509 certificate and private key file paths, optionally suffixed with a list of "+
@@ -156,11 +178,6 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"The limit that the server gives to clients for "+
 		"the maximum number of streams in an HTTP/2 connection. "+
 		"Zero means to use golang's default.")
-
-	// TODO remove this flag in 1.11.  The flag had no effect before this will prevent scripts from immediately failing on upgrade.
-	fs.String("tls-ca-file", "", "This flag has no effect.")
-	fs.MarkDeprecated("tls-ca-file", "This flag has no effect.")
-
 }
 
 // ApplyTo fills up serving information in the server configuration.
@@ -234,47 +251,7 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 		return err
 	}
 
-	return nil
-}
-
-func (s *SecureServingOptions) MaybeDefaultWithSelfSignedCerts(publicAddress string, alternateDNS []string, alternateIPs []net.IP) error {
-	if s == nil {
-		return nil
-	}
-	keyCert := &s.ServerCert.CertKey
-	if len(keyCert.CertFile) != 0 || len(keyCert.KeyFile) != 0 {
-		return nil
-	}
-
-	keyCert.CertFile = path.Join(s.ServerCert.CertDirectory, s.ServerCert.PairName+".crt")
-	keyCert.KeyFile = path.Join(s.ServerCert.CertDirectory, s.ServerCert.PairName+".key")
-
-	canReadCertAndKey, err := certutil.CanReadCertAndKey(keyCert.CertFile, keyCert.KeyFile)
-	if err != nil {
-		return err
-	}
-	if !canReadCertAndKey {
-		// add either the bind address or localhost to the valid alternates
-		bindIP := s.BindAddress.String()
-		if bindIP == "0.0.0.0" {
-			alternateDNS = append(alternateDNS, "localhost")
-		} else {
-			alternateIPs = append(alternateIPs, s.BindAddress)
-		}
-
-		if cert, key, err := certutil.GenerateSelfSignedCertKey(publicAddress, alternateIPs, alternateDNS); err != nil {
-			return fmt.Errorf("unable to generate self signed cert: %v", err)
-		} else {
-			if err := certutil.WriteCert(keyCert.CertFile, cert); err != nil {
-				return err
-			}
-
-			if err := certutil.WriteKey(keyCert.KeyFile, key); err != nil {
-				return err
-			}
-			glog.Infof("Generated self-signed cert (%s, %s)", keyCert.CertFile, keyCert.KeyFile)
-		}
-	}
+	c.AdvertisePort = s.AdvertisePort
 
 	return nil
 }

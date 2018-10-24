@@ -31,10 +31,12 @@ const (
 	StatefulSetFieldPriorityClassName             = "priorityClassName"
 	StatefulSetFieldProjectID                     = "projectId"
 	StatefulSetFieldPublicEndpoints               = "publicEndpoints"
+	StatefulSetFieldReadinessGates                = "readinessGates"
 	StatefulSetFieldRemoved                       = "removed"
 	StatefulSetFieldRestartPolicy                 = "restartPolicy"
 	StatefulSetFieldRunAsGroup                    = "runAsGroup"
 	StatefulSetFieldRunAsNonRoot                  = "runAsNonRoot"
+	StatefulSetFieldRuntimeClassName              = "runtimeClassName"
 	StatefulSetFieldScale                         = "scale"
 	StatefulSetFieldSchedulerName                 = "schedulerName"
 	StatefulSetFieldScheduling                    = "scheduling"
@@ -45,6 +47,7 @@ const (
 	StatefulSetFieldStatefulSetConfig             = "statefulSetConfig"
 	StatefulSetFieldStatefulSetStatus             = "statefulSetStatus"
 	StatefulSetFieldSubdomain                     = "subdomain"
+	StatefulSetFieldSysctls                       = "sysctls"
 	StatefulSetFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
 	StatefulSetFieldTransitioning                 = "transitioning"
 	StatefulSetFieldTransitioningMessage          = "transitioningMessage"
@@ -82,10 +85,12 @@ type StatefulSet struct {
 	PriorityClassName             string                 `json:"priorityClassName,omitempty" yaml:"priorityClassName,omitempty"`
 	ProjectID                     string                 `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	PublicEndpoints               []PublicEndpoint       `json:"publicEndpoints,omitempty" yaml:"publicEndpoints,omitempty"`
+	ReadinessGates                []PodReadinessGate     `json:"readinessGates,omitempty" yaml:"readinessGates,omitempty"`
 	Removed                       string                 `json:"removed,omitempty" yaml:"removed,omitempty"`
 	RestartPolicy                 string                 `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
 	RunAsGroup                    *int64                 `json:"runAsGroup,omitempty" yaml:"runAsGroup,omitempty"`
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
+	RuntimeClassName              string                 `json:"runtimeClassName,omitempty" yaml:"runtimeClassName,omitempty"`
 	Scale                         *int64                 `json:"scale,omitempty" yaml:"scale,omitempty"`
 	SchedulerName                 string                 `json:"schedulerName,omitempty" yaml:"schedulerName,omitempty"`
 	Scheduling                    *Scheduling            `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
@@ -96,6 +101,7 @@ type StatefulSet struct {
 	StatefulSetConfig             *StatefulSetConfig     `json:"statefulSetConfig,omitempty" yaml:"statefulSetConfig,omitempty"`
 	StatefulSetStatus             *StatefulSetStatus     `json:"statefulSetStatus,omitempty" yaml:"statefulSetStatus,omitempty"`
 	Subdomain                     string                 `json:"subdomain,omitempty" yaml:"subdomain,omitempty"`
+	Sysctls                       []Sysctl               `json:"sysctls,omitempty" yaml:"sysctls,omitempty"`
 	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`
 	Transitioning                 string                 `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage          string                 `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`

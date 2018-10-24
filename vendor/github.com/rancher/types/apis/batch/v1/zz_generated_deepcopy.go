@@ -1,7 +1,7 @@
 package v1
 
 import (
-	batch_v1 "k8s.io/api/batch/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -12,7 +12,7 @@ func (in *JobList) DeepCopyInto(out *JobList) {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]batch_v1.Job, len(*in))
+		*out = make([]batchv1.Job, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

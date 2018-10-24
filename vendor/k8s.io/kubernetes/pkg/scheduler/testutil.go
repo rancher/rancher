@@ -34,16 +34,6 @@ type FakeConfigurator struct {
 	Config *Config
 }
 
-// GetPriorityFunctionConfigs is not implemented yet.
-func (fc *FakeConfigurator) GetPriorityFunctionConfigs(priorityKeys sets.String) ([]algorithm.PriorityConfig, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
-// GetPriorityMetadataProducer is not implemented yet.
-func (fc *FakeConfigurator) GetPriorityMetadataProducer() (algorithm.PriorityMetadataProducer, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
 // GetPredicateMetadataProducer is not implemented yet.
 func (fc *FakeConfigurator) GetPredicateMetadataProducer() (algorithm.PredicateMetadataProducer, error) {
 	return nil, fmt.Errorf("not implemented")
@@ -56,11 +46,6 @@ func (fc *FakeConfigurator) GetPredicates(predicateKeys sets.String) (map[string
 
 // GetHardPodAffinitySymmetricWeight is not implemented yet.
 func (fc *FakeConfigurator) GetHardPodAffinitySymmetricWeight() int32 {
-	panic("not implemented")
-}
-
-// GetSchedulerName is not implemented yet.
-func (fc *FakeConfigurator) GetSchedulerName() string {
 	panic("not implemented")
 }
 

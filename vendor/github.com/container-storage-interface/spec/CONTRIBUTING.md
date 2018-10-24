@@ -24,7 +24,11 @@ This also applies to the code snippets in the markdown files.
 
 ## Git commit
 
-Prior to committing code please run `make` in order to update the protobuf file and any language bindings.
+The "system of record" for the specification is the `spec.md` file and all hand-edits of the specification should happen there.
+**DO NOT** manually edit the generated protobufs or generated language bindings.
+Once changes to `spec.md` are complete, please run `make` to update generated files.
+
+**IMPORTANT:** Prior to committing code please run `make` to ensure that your specification changes have landed in all generated files.
 
 ### Commit Style
 

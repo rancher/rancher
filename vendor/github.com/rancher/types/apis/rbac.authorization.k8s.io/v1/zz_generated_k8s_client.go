@@ -11,6 +11,8 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+type contextKeyType struct{}
+
 type Interface interface {
 	RESTClient() rest.Interface
 	controller.Starter
@@ -30,6 +32,19 @@ type Client struct {
 	clusterRoleControllers        map[string]ClusterRoleController
 	roleBindingControllers        map[string]RoleBindingController
 	roleControllers               map[string]RoleController
+}
+
+func Factory(ctx context.Context, config rest.Config) (context.Context, controller.Starter, error) {
+	c, err := NewForConfig(config)
+	if err != nil {
+		return ctx, nil, err
+	}
+
+	return context.WithValue(ctx, contextKeyType{}, c), c, nil
+}
+
+func From(ctx context.Context) Interface {
+	return ctx.Value(contextKeyType{}).(Interface)
 }
 
 func NewForConfig(config rest.Config) (Interface, error) {

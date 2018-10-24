@@ -23,13 +23,13 @@ import (
 	"k8s.io/api/core/v1"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 )
 
 // ResourceAllocationPriority contains information to calculate resource allocation priority.
 type ResourceAllocationPriority struct {
 	Name   string
-	scorer func(requested, allocable *schedulercache.Resource) int64
+	scorer func(requested, allocable *schedulercache.Resource, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64
 }
 
 // PriorityMap priorities nodes according to the resource allocations on the node.
@@ -54,15 +54,16 @@ func (r *ResourceAllocationPriority) PriorityMap(
 
 	requested.MilliCPU += nodeInfo.NonZeroRequest().MilliCPU
 	requested.Memory += nodeInfo.NonZeroRequest().Memory
-
-	score := r.scorer(&requested, &allocatable)
+	var score int64
+	// Check if the pod has volumes and this could be added to scorer function for balanced resource allocation.
+	score = r.scorer(&requested, &allocatable, false, 0, 0)
 
 	if glog.V(10) {
 		glog.Infof(
 			"%v -> %v: %v, capacity %d millicores %d memory bytes, total request %d millicores %d memory bytes, score %d",
 			pod.Name, node.Name, r.Name,
 			allocatable.MilliCPU, allocatable.Memory,
-			requested.MilliCPU+allocatable.MilliCPU, requested.Memory+allocatable.Memory,
+			requested.MilliCPU, requested.Memory,
 			score,
 		)
 	}

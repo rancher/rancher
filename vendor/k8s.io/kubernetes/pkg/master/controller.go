@@ -79,6 +79,13 @@ type Controller struct {
 
 // NewBootstrapController returns a controller for watching the core capabilities of the master
 func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTStorage, serviceClient coreclient.ServicesGetter, nsClient coreclient.NamespacesGetter, eventClient coreclient.EventsGetter) *Controller {
+	_, publicServicePort, err := c.GenericConfig.SecureServing.HostPort()
+	if err != nil {
+		glog.Fatalf("failed to get listener address: %v", err)
+	}
+
+	systemNamespaces := []string{metav1.NamespaceSystem, metav1.NamespacePublic}
+
 	return &Controller{
 		ServiceClient:   serviceClient,
 		NamespaceClient: nsClient,
@@ -87,7 +94,7 @@ func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.Lega
 		EndpointReconciler: c.ExtraConfig.EndpointReconcilerConfig.Reconciler,
 		EndpointInterval:   c.ExtraConfig.EndpointReconcilerConfig.Interval,
 
-		SystemNamespaces:         []string{metav1.NamespaceSystem, metav1.NamespacePublic},
+		SystemNamespaces:         systemNamespaces,
 		SystemNamespacesInterval: 1 * time.Minute,
 
 		ServiceClusterIPRegistry: legacyRESTStorage.ServiceClusterIPAllocator,
@@ -104,7 +111,7 @@ func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.Lega
 		ServicePort:               c.ExtraConfig.APIServerServicePort,
 		ExtraServicePorts:         c.ExtraConfig.ExtraServicePorts,
 		ExtraEndpointPorts:        c.ExtraConfig.ExtraEndpointPorts,
-		PublicServicePort:         c.GenericConfig.ReadWritePort,
+		PublicServicePort:         publicServicePort,
 		KubernetesServiceNodePort: c.ExtraConfig.KubernetesServiceNodePort,
 	}
 }
@@ -152,7 +159,22 @@ func (c *Controller) Stop() {
 		c.runner.Stop()
 	}
 	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
-	c.EndpointReconciler.StopReconciling("kubernetes", c.PublicIP, endpointPorts)
+	finishedReconciling := make(chan struct{})
+	go func() {
+		defer close(finishedReconciling)
+		glog.Infof("Shutting down kubernetes service endpoint reconciler")
+		if err := c.EndpointReconciler.StopReconciling("kubernetes", c.PublicIP, endpointPorts); err != nil {
+			glog.Error(err)
+		}
+	}()
+
+	select {
+	case <-finishedReconciling:
+		// done
+	case <-time.After(2 * c.EndpointInterval):
+		// don't block server shutdown forever if we can't reach etcd to remove ourselves
+		glog.Warning("StopReconciling() timed out")
+	}
 }
 
 // RunKubernetesNamespaces periodically makes sure that all internal namespaces exist
@@ -257,7 +279,7 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 			// maintained by this code, not by the pod selector
 			Selector:        nil,
 			ClusterIP:       serviceIP.String(),
-			SessionAffinity: api.ServiceAffinityClientIP,
+			SessionAffinity: api.ServiceAffinityNone,
 			Type:            serviceType,
 		},
 	}

@@ -1,10 +1,12 @@
 package client
 
 const (
-	LocalVolumeSourceType      = "localVolumeSource"
-	LocalVolumeSourceFieldPath = "path"
+	LocalVolumeSourceType        = "localVolumeSource"
+	LocalVolumeSourceFieldFSType = "fsType"
+	LocalVolumeSourceFieldPath   = "path"
 )
 
 type LocalVolumeSource struct {
-	Path string `json:"path,omitempty" yaml:"path,omitempty"`
+	FSType string `json:"fsType,omitempty" yaml:"fsType,omitempty"`
+	Path   string `json:"path,omitempty" yaml:"path,omitempty"`
 }

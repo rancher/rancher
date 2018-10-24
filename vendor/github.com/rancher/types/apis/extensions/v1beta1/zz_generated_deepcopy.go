@@ -1,7 +1,7 @@
 package v1beta1
 
 import (
-	extensions_v1beta1 "k8s.io/api/extensions/v1beta1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -12,7 +12,7 @@ func (in *IngressList) DeepCopyInto(out *IngressList) {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]extensions_v1beta1.Ingress, len(*in))
+		*out = make([]extensionsv1beta1.Ingress, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -45,7 +45,7 @@ func (in *PodSecurityPolicyList) DeepCopyInto(out *PodSecurityPolicyList) {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]extensions_v1beta1.PodSecurityPolicy, len(*in))
+		*out = make([]extensionsv1beta1.PodSecurityPolicy, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

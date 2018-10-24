@@ -23,11 +23,11 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
-	"k8s.io/apiserver/pkg/admission/plugin/initialization"
 	"k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle"
 	mutatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/mutating"
 	validatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/validating"
@@ -42,8 +42,8 @@ import (
 var configScheme = runtime.NewScheme()
 
 func init() {
-	apiserverapi.AddToScheme(configScheme)
-	apiserverapiv1alpha1.AddToScheme(configScheme)
+	utilruntime.Must(apiserverapi.AddToScheme(configScheme))
+	utilruntime.Must(apiserverapiv1alpha1.AddToScheme(configScheme))
 }
 
 // AdmissionOptions holds the admission options
@@ -78,8 +78,7 @@ func NewAdmissionOptions() *AdmissionOptions {
 		// admission plugins. The apiserver always runs the validating ones
 		// after all the mutating ones, so their relative order in this list
 		// doesn't matter.
-		RecommendedPluginOrder: []string{lifecycle.PluginName, initialization.PluginName, mutatingwebhook.PluginName, validatingwebhook.PluginName},
-		DefaultOffPlugins:      sets.NewString(initialization.PluginName),
+		RecommendedPluginOrder: []string{lifecycle.PluginName, mutatingwebhook.PluginName, validatingwebhook.PluginName},
 	}
 	server.RegisterAllAdmissionPlugins(options.Plugins)
 	return options
@@ -92,11 +91,13 @@ func (a *AdmissionOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 
 	fs.StringSliceVar(&a.EnablePlugins, "enable-admission-plugins", a.EnablePlugins, ""+
-		"admission plugins that should be enabled in addition to default enabled ones. "+
+		"admission plugins that should be enabled in addition to default enabled ones ("+
+		strings.Join(a.defaultEnabledPluginNames(), ", ")+"). "+
 		"Comma-delimited list of admission plugins: "+strings.Join(a.Plugins.Registered(), ", ")+". "+
 		"The order of plugins in this flag does not matter.")
 	fs.StringSliceVar(&a.DisablePlugins, "disable-admission-plugins", a.DisablePlugins, ""+
-		"admission plugins that should be disabled although they are in the default enabled plugins list. "+
+		"admission plugins that should be disabled although they are in the default enabled plugins list ("+
+		strings.Join(a.defaultEnabledPluginNames(), ", ")+"). "+
 		"Comma-delimited list of admission plugins: "+strings.Join(a.Plugins.Registered(), ", ")+". "+
 		"The order of plugins in this flag does not matter.")
 	fs.StringVar(&a.ConfigFile, "admission-control-config-file", a.ConfigFile,
@@ -216,4 +217,16 @@ func (a *AdmissionOptions) enabledPluginNames() []string {
 	}
 
 	return orderedPlugins
+}
+
+//Return names of plugins which are enabled by default
+func (a *AdmissionOptions) defaultEnabledPluginNames() []string {
+	defaultOnPluginNames := []string{}
+	for _, pluginName := range a.RecommendedPluginOrder {
+		if !a.DefaultOffPlugins.Has(pluginName) {
+			defaultOnPluginNames = append(defaultOnPluginNames, pluginName)
+		}
+	}
+
+	return defaultOnPluginNames
 }

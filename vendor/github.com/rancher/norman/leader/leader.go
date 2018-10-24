@@ -3,6 +3,7 @@ package leader
 import (
 	"context"
 	"os"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
@@ -12,7 +13,6 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 )
 
 type Callback func(cb context.Context)
@@ -31,13 +31,9 @@ func run(ctx context.Context, name string, client kubernetes.Interface, cb Callb
 		return err
 	}
 
-	le := leaderelectionconfig.DefaultLeaderElectionConfiguration()
-	le.LeaderElect = true
-	le.ResourceLock = resourcelock.ConfigMapsResourceLock
-
 	recorder := createRecorder(name, client)
 
-	rl, err := resourcelock.New(le.ResourceLock,
+	rl, err := resourcelock.New(resourcelock.ConfigMapsResourceLock,
 		"kube-system",
 		name,
 		client.CoreV1(),
@@ -49,17 +45,14 @@ func run(ctx context.Context, name string, client kubernetes.Interface, cb Callb
 		logrus.Fatalf("error creating leader lock for %s: %v", name, err)
 	}
 
-	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
+	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
 		Lock:          rl,
-		LeaseDuration: le.LeaseDuration.Duration,
-		RenewDeadline: le.RenewDeadline.Duration,
-		RetryPeriod:   le.RetryPeriod.Duration,
+		LeaseDuration: 15 * time.Second,
+		RenewDeadline: 10 * time.Second,
+		RetryPeriod:   2 * time.Second,
 		Callbacks: leaderelection.LeaderCallbacks{
-			OnStartedLeading: func(stop <-chan struct{}) {
-				subCtx, cancel := context.WithCancel(ctx)
-				go cb(subCtx)
-				<-stop
-				cancel()
+			OnStartedLeading: func(ctx context.Context) {
+				go cb(ctx)
 			},
 			OnStoppedLeading: func() {
 				logrus.Fatalf("leaderelection lost for %s", name)

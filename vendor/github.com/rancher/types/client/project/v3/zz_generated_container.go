@@ -19,6 +19,7 @@ const (
 	ContainerFieldPostStart                = "postStart"
 	ContainerFieldPreStop                  = "preStop"
 	ContainerFieldPrivileged               = "privileged"
+	ContainerFieldProcMount                = "procMount"
 	ContainerFieldReadOnly                 = "readOnly"
 	ContainerFieldReadinessProbe           = "readinessProbe"
 	ContainerFieldResources                = "resources"
@@ -57,6 +58,7 @@ type Container struct {
 	PostStart                *Handler              `json:"postStart,omitempty" yaml:"postStart,omitempty"`
 	PreStop                  *Handler              `json:"preStop,omitempty" yaml:"preStop,omitempty"`
 	Privileged               *bool                 `json:"privileged,omitempty" yaml:"privileged,omitempty"`
+	ProcMount                string                `json:"procMount,omitempty" yaml:"procMount,omitempty"`
 	ReadOnly                 *bool                 `json:"readOnly,omitempty" yaml:"readOnly,omitempty"`
 	ReadinessProbe           *Probe                `json:"readinessProbe,omitempty" yaml:"readinessProbe,omitempty"`
 	Resources                *ResourceRequirements `json:"resources,omitempty" yaml:"resources,omitempty"`

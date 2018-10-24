@@ -27,7 +27,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/imdario/mergo"
 
-	"k8s.io/api/core/v1"
 	restclient "k8s.io/client-go/rest"
 	clientauth "k8s.io/client-go/tools/auth"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -100,6 +99,26 @@ func NewInteractiveClientConfig(config clientcmdapi.Config, contextName string, 
 	return &DirectClientConfig{config, contextName, overrides, fallbackReader, configAccess, promptedCredentials{}}
 }
 
+// NewClientConfigFromBytes takes your kubeconfig and gives you back a ClientConfig
+func NewClientConfigFromBytes(configBytes []byte) (ClientConfig, error) {
+	config, err := Load(configBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return &DirectClientConfig{*config, "", &ConfigOverrides{}, nil, nil, promptedCredentials{}}, nil
+}
+
+// RESTConfigFromKubeConfig is a convenience method to give back a restconfig from your kubeconfig bytes.
+// For programmatic access, this is what you want 80% of the time
+func RESTConfigFromKubeConfig(configBytes []byte) (*restclient.Config, error) {
+	clientConfig, err := NewClientConfigFromBytes(configBytes)
+	if err != nil {
+		return nil, err
+	}
+	return clientConfig.ClientConfig()
+}
+
 func (config *DirectClientConfig) RawConfig() (clientcmdapi.Config, error) {
 	return config.config, nil
 }
@@ -156,10 +175,6 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 	// only try to read the auth information if we are secure
 	if restclient.IsConfigTransportTLS(*clientConfig) {
 		var err error
-
-		// mergo is a first write wins for map value and a last writing wins for interface values
-		// NOTE: This behavior changed with https://github.com/imdario/mergo/commit/d304790b2ed594794496464fadd89d2bb266600a.
-		//       Our mergo.Merge version is older than this change.
 		var persister restclient.AuthProviderConfigPersister
 		if config.configAccess != nil {
 			authInfoName, _ := config.getAuthInfoName()
@@ -169,13 +184,13 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 		if err != nil {
 			return nil, err
 		}
-		mergo.Merge(clientConfig, userAuthPartialConfig)
+		mergo.MergeWithOverwrite(clientConfig, userAuthPartialConfig)
 
 		serverAuthPartialConfig, err := getServerIdentificationPartialConfig(configAuthInfo, configClusterInfo)
 		if err != nil {
 			return nil, err
 		}
-		mergo.Merge(clientConfig, serverAuthPartialConfig)
+		mergo.MergeWithOverwrite(clientConfig, serverAuthPartialConfig)
 	}
 
 	return clientConfig, nil
@@ -195,7 +210,7 @@ func getServerIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, 
 	configClientConfig.CAFile = configClusterInfo.CertificateAuthority
 	configClientConfig.CAData = configClusterInfo.CertificateAuthorityData
 	configClientConfig.Insecure = configClusterInfo.InsecureSkipTLSVerify
-	mergo.Merge(mergedConfig, configClientConfig)
+	mergo.MergeWithOverwrite(mergedConfig, configClientConfig)
 
 	return mergedConfig, nil
 }
@@ -260,8 +275,8 @@ func (config *DirectClientConfig) getUserIdentificationPartialConfig(configAuthI
 		promptedConfig := makeUserIdentificationConfig(*promptedAuthInfo)
 		previouslyMergedConfig := mergedConfig
 		mergedConfig = &restclient.Config{}
-		mergo.Merge(mergedConfig, promptedConfig)
-		mergo.Merge(mergedConfig, previouslyMergedConfig)
+		mergo.MergeWithOverwrite(mergedConfig, promptedConfig)
+		mergo.MergeWithOverwrite(mergedConfig, previouslyMergedConfig)
 		config.promptedCredentials.username = mergedConfig.Username
 		config.promptedCredentials.password = mergedConfig.Password
 	}
@@ -318,7 +333,7 @@ func (config *DirectClientConfig) Namespace() (string, bool, error) {
 	}
 
 	if len(configContext.Namespace) == 0 {
-		return v1.NamespaceDefault, false, nil
+		return "default", false, nil
 	}
 
 	return configContext.Namespace, false, nil
@@ -404,11 +419,11 @@ func (config *DirectClientConfig) getContext() (clientcmdapi.Context, error) {
 
 	mergedContext := clientcmdapi.NewContext()
 	if configContext, exists := contexts[contextName]; exists {
-		mergo.Merge(mergedContext, configContext)
+		mergo.MergeWithOverwrite(mergedContext, configContext)
 	} else if required {
 		return clientcmdapi.Context{}, fmt.Errorf("context %q does not exist", contextName)
 	}
-	mergo.Merge(mergedContext, config.overrides.Context)
+	mergo.MergeWithOverwrite(mergedContext, config.overrides.Context)
 
 	return *mergedContext, nil
 }
@@ -420,11 +435,11 @@ func (config *DirectClientConfig) getAuthInfo() (clientcmdapi.AuthInfo, error) {
 
 	mergedAuthInfo := clientcmdapi.NewAuthInfo()
 	if configAuthInfo, exists := authInfos[authInfoName]; exists {
-		mergo.Merge(mergedAuthInfo, configAuthInfo)
+		mergo.MergeWithOverwrite(mergedAuthInfo, configAuthInfo)
 	} else if required {
 		return clientcmdapi.AuthInfo{}, fmt.Errorf("auth info %q does not exist", authInfoName)
 	}
-	mergo.Merge(mergedAuthInfo, config.overrides.AuthInfo)
+	mergo.MergeWithOverwrite(mergedAuthInfo, config.overrides.AuthInfo)
 
 	return *mergedAuthInfo, nil
 }
@@ -435,13 +450,13 @@ func (config *DirectClientConfig) getCluster() (clientcmdapi.Cluster, error) {
 	clusterInfoName, required := config.getClusterName()
 
 	mergedClusterInfo := clientcmdapi.NewCluster()
-	mergo.Merge(mergedClusterInfo, config.overrides.ClusterDefaults)
+	mergo.MergeWithOverwrite(mergedClusterInfo, config.overrides.ClusterDefaults)
 	if configClusterInfo, exists := clusterInfos[clusterInfoName]; exists {
-		mergo.Merge(mergedClusterInfo, configClusterInfo)
+		mergo.MergeWithOverwrite(mergedClusterInfo, configClusterInfo)
 	} else if required {
 		return clientcmdapi.Cluster{}, fmt.Errorf("cluster %q does not exist", clusterInfoName)
 	}
-	mergo.Merge(mergedClusterInfo, config.overrides.ClusterInfo)
+	mergo.MergeWithOverwrite(mergedClusterInfo, config.overrides.ClusterInfo)
 	// An override of --insecure-skip-tls-verify=true and no accompanying CA/CA data should clear already-set CA/CA data
 	// otherwise, a kubeconfig containing a CA reference would return an error that "CA and insecure-skip-tls-verify couldn't both be set"
 	caLen := len(config.overrides.ClusterInfo.CertificateAuthority)

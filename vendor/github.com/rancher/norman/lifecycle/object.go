@@ -97,22 +97,22 @@ func (o *objectLifecycleAdapter) finalize(metadata metav1.Object, obj runtime.Ob
 }
 
 func (o *objectLifecycleAdapter) removeFinalizer(name string, obj runtime.Object) error {
-	metadata, err := meta.Accessor(obj)
-	if err != nil {
-		return err
-	}
-
-	var finalizers []string
-	for _, finalizer := range metadata.GetFinalizers() {
-		if finalizer == name {
-			continue
-		}
-		finalizers = append(finalizers, finalizer)
-	}
-	metadata.SetFinalizers(finalizers)
-
 	for i := 0; i < 3; i++ {
-		_, err := o.objectClient.Update(metadata.GetName(), obj)
+		metadata, err := meta.Accessor(obj)
+		if err != nil {
+			return err
+		}
+
+		var finalizers []string
+		for _, finalizer := range metadata.GetFinalizers() {
+			if finalizer == name {
+				continue
+			}
+			finalizers = append(finalizers, finalizer)
+		}
+		metadata.SetFinalizers(finalizers)
+
+		_, err = o.objectClient.Update(metadata.GetName(), obj)
 		if err == nil {
 			return nil
 		}
@@ -121,16 +121,9 @@ func (o *objectLifecycleAdapter) removeFinalizer(name string, obj runtime.Object
 		if err != nil {
 			return err
 		}
-
-		metadata, err := meta.Accessor(obj)
-		if err != nil {
-			return err
-		}
-
-		metadata.SetFinalizers(finalizers)
 	}
 
-	return fmt.Errorf("failed to remove finalizer on %s:%s", metadata.GetNamespace(), metadata.GetName())
+	return fmt.Errorf("failed to remove finalizer on %s", name)
 }
 
 func (o *objectLifecycleAdapter) createKey() string {

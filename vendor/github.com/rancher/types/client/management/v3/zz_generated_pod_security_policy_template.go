@@ -10,6 +10,8 @@ const (
 	PodSecurityPolicyTemplateFieldAllowedCapabilities             = "allowedCapabilities"
 	PodSecurityPolicyTemplateFieldAllowedFlexVolumes              = "allowedFlexVolumes"
 	PodSecurityPolicyTemplateFieldAllowedHostPaths                = "allowedHostPaths"
+	PodSecurityPolicyTemplateFieldAllowedProcMountTypes           = "allowedProcMountTypes"
+	PodSecurityPolicyTemplateFieldAllowedUnsafeSysctls            = "allowedUnsafeSysctls"
 	PodSecurityPolicyTemplateFieldAnnotations                     = "annotations"
 	PodSecurityPolicyTemplateFieldCreated                         = "created"
 	PodSecurityPolicyTemplateFieldCreatorID                       = "creatorId"
@@ -17,6 +19,7 @@ const (
 	PodSecurityPolicyTemplateFieldDefaultAllowPrivilegeEscalation = "defaultAllowPrivilegeEscalation"
 	PodSecurityPolicyTemplateFieldDescription                     = "description"
 	PodSecurityPolicyTemplateFieldFSGroup                         = "fsGroup"
+	PodSecurityPolicyTemplateFieldForbiddenSysctls                = "forbiddenSysctls"
 	PodSecurityPolicyTemplateFieldHostIPC                         = "hostIPC"
 	PodSecurityPolicyTemplateFieldHostNetwork                     = "hostNetwork"
 	PodSecurityPolicyTemplateFieldHostPID                         = "hostPID"
@@ -41,6 +44,8 @@ type PodSecurityPolicyTemplate struct {
 	AllowedCapabilities             []string                           `json:"allowedCapabilities,omitempty" yaml:"allowedCapabilities,omitempty"`
 	AllowedFlexVolumes              []AllowedFlexVolume                `json:"allowedFlexVolumes,omitempty" yaml:"allowedFlexVolumes,omitempty"`
 	AllowedHostPaths                []AllowedHostPath                  `json:"allowedHostPaths,omitempty" yaml:"allowedHostPaths,omitempty"`
+	AllowedProcMountTypes           []string                           `json:"allowedProcMountTypes,omitempty" yaml:"allowedProcMountTypes,omitempty"`
+	AllowedUnsafeSysctls            []string                           `json:"allowedUnsafeSysctls,omitempty" yaml:"allowedUnsafeSysctls,omitempty"`
 	Annotations                     map[string]string                  `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Created                         string                             `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                       string                             `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
@@ -48,6 +53,7 @@ type PodSecurityPolicyTemplate struct {
 	DefaultAllowPrivilegeEscalation *bool                              `json:"defaultAllowPrivilegeEscalation,omitempty" yaml:"defaultAllowPrivilegeEscalation,omitempty"`
 	Description                     string                             `json:"description,omitempty" yaml:"description,omitempty"`
 	FSGroup                         *FSGroupStrategyOptions            `json:"fsGroup,omitempty" yaml:"fsGroup,omitempty"`
+	ForbiddenSysctls                []string                           `json:"forbiddenSysctls,omitempty" yaml:"forbiddenSysctls,omitempty"`
 	HostIPC                         bool                               `json:"hostIPC,omitempty" yaml:"hostIPC,omitempty"`
 	HostNetwork                     bool                               `json:"hostNetwork,omitempty" yaml:"hostNetwork,omitempty"`
 	HostPID                         bool                               `json:"hostPID,omitempty" yaml:"hostPID,omitempty"`

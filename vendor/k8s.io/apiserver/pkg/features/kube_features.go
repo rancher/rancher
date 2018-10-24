@@ -37,24 +37,12 @@ const (
 	// owner: @tallclair
 	// alpha: v1.7
 	// beta: v1.8
+	// GA: v1.12
 	//
 	// AdvancedAuditing enables a much more general API auditing pipeline, which includes support for
 	// pluggable output backends and an audit policy specifying how different requests should be
 	// audited.
 	AdvancedAuditing utilfeature.Feature = "AdvancedAuditing"
-
-	// owner: @ilackams
-	// alpha: v1.7
-	//
-	// Enables compression of REST responses (GET and LIST only)
-	APIResponseCompression utilfeature.Feature = "APIResponseCompression"
-
-	// owner: @smarterclayton
-	// alpha: v1.7
-	//
-	// Allow asynchronous coordination of object creation.
-	// Auto-enabled by the Initializers admission plugin.
-	Initializers utilfeature.Feature = "Initializers"
 
 	// owner: @smarterclayton
 	// alpha: v1.8
@@ -74,8 +62,6 @@ func init() {
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
 	StreamingProxyRedirects: {Default: true, PreRelease: utilfeature.Beta},
-	AdvancedAuditing:        {Default: true, PreRelease: utilfeature.Beta},
-	APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha},
-	Initializers:            {Default: false, PreRelease: utilfeature.Alpha},
+	AdvancedAuditing:        {Default: true, PreRelease: utilfeature.GA},
 	APIListChunking:         {Default: true, PreRelease: utilfeature.Beta},
 }

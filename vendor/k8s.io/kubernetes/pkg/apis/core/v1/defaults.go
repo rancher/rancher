@@ -17,13 +17,13 @@ limitations under the License.
 package v1
 
 import (
+	"time"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/parsers"
-	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -91,6 +91,7 @@ func SetDefaults_Container(obj *v1.Container) {
 		obj.TerminationMessagePolicy = v1.TerminationMessageReadFile
 	}
 }
+
 func SetDefaults_Service(obj *v1.Service) {
 	if obj.Spec.SessionAffinity == "" {
 		obj.Spec.SessionAffinity = v1.ServiceAffinityNone
@@ -223,6 +224,12 @@ func SetDefaults_ProjectedVolumeSource(obj *v1.ProjectedVolumeSource) {
 		obj.DefaultMode = &perm
 	}
 }
+func SetDefaults_ServiceAccountTokenProjection(obj *v1.ServiceAccountTokenProjection) {
+	hour := int64(time.Hour.Seconds())
+	if obj.ExpirationSeconds == nil {
+		obj.ExpirationSeconds = &hour
+	}
+}
 func SetDefaults_PersistentVolume(obj *v1.PersistentVolume) {
 	if obj.Status.Phase == "" {
 		obj.Status.Phase = v1.VolumePending
@@ -230,18 +237,10 @@ func SetDefaults_PersistentVolume(obj *v1.PersistentVolume) {
 	if obj.Spec.PersistentVolumeReclaimPolicy == "" {
 		obj.Spec.PersistentVolumeReclaimPolicy = v1.PersistentVolumeReclaimRetain
 	}
-	if obj.Spec.VolumeMode == nil && utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		obj.Spec.VolumeMode = new(v1.PersistentVolumeMode)
-		*obj.Spec.VolumeMode = v1.PersistentVolumeFilesystem
-	}
 }
 func SetDefaults_PersistentVolumeClaim(obj *v1.PersistentVolumeClaim) {
 	if obj.Status.Phase == "" {
 		obj.Status.Phase = v1.ClaimPending
-	}
-	if obj.Spec.VolumeMode == nil && utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		obj.Spec.VolumeMode = new(v1.PersistentVolumeMode)
-		*obj.Spec.VolumeMode = v1.PersistentVolumeFilesystem
 	}
 }
 func SetDefaults_ISCSIVolumeSource(obj *v1.ISCSIVolumeSource) {
@@ -294,11 +293,6 @@ func SetDefaults_HTTPGetAction(obj *v1.HTTPGetAction) {
 func SetDefaults_NamespaceStatus(obj *v1.NamespaceStatus) {
 	if obj.Phase == "" {
 		obj.Phase = v1.NamespaceActive
-	}
-}
-func SetDefaults_Node(obj *v1.Node) {
-	if obj.Spec.ExternalID == "" {
-		obj.Spec.ExternalID = obj.Name
 	}
 }
 func SetDefaults_NodeStatus(obj *v1.NodeStatus) {
