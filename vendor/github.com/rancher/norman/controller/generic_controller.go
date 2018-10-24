@@ -44,6 +44,7 @@ func init() {
 type HandlerFunc func(key string) error
 
 type GenericController interface {
+	SetThreadinessOverride(count int)
 	Informer() cache.SharedIndexInformer
 	AddHandler(name string, handler HandlerFunc)
 	HandlerCount() int
@@ -65,12 +66,13 @@ type handlerDef struct {
 
 type genericController struct {
 	sync.Mutex
-	informer cache.SharedIndexInformer
-	handlers []handlerDef
-	queue    workqueue.RateLimitingInterface
-	name     string
-	running  bool
-	synced   bool
+	threadinessOverride int
+	informer            cache.SharedIndexInformer
+	handlers            []handlerDef
+	queue               workqueue.RateLimitingInterface
+	name                string
+	running             bool
+	synced              bool
 }
 
 func NewGenericController(name string, genericClient Backend) GenericController {
@@ -92,6 +94,10 @@ func NewGenericController(name string, genericClient Backend) GenericController 
 		queue:    workqueue.NewNamedRateLimitingQueue(rl, name),
 		name:     name,
 	}
+}
+
+func (g *genericController) SetThreadinessOverride(count int) {
+	g.threadinessOverride = count
 }
 
 func (g *genericController) HandlerCount() int {
@@ -163,6 +169,9 @@ func (g *genericController) Start(ctx context.Context, threadiness int) error {
 	}
 
 	if !g.running {
+		if g.threadinessOverride > 0 {
+			threadiness = g.threadinessOverride
+		}
 		go g.run(ctx, threadiness)
 	}
 

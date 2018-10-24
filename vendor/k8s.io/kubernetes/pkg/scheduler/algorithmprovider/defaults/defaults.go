@@ -17,6 +17,8 @@ limitations under the License.
 package defaults
 
 import (
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
@@ -26,8 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
-
-	"github.com/golang/glog"
 )
 
 const (
@@ -56,7 +56,7 @@ func init() {
 	// For example:
 	// https://github.com/kubernetes/kubernetes/blob/36a218e/plugin/pkg/scheduler/factory/factory.go#L422
 
-	// Registers predicates and priorities that are not enabled by default, but user can pick when creating his
+	// Registers predicates and priorities that are not enabled by default, but user can pick when creating their
 	// own set of priorities/predicates.
 
 	// PodFitsPorts has been replaced by PodFitsHostPorts for better user understanding.
@@ -77,13 +77,6 @@ func init() {
 	// Fit is determined by node selector query.
 	factory.RegisterFitPredicate(predicates.MatchNodeSelectorPred, predicates.PodMatchNodeSelector)
 
-	// Use equivalence class to speed up heavy predicates phase.
-	factory.RegisterGetEquivalencePodFunction(
-		func(args factory.PluginFactoryArgs) algorithm.GetEquivalencePodFunc {
-			return predicates.NewEquivalencePodGenerator(args.PVCInfo)
-		},
-	)
-
 	// ServiceSpreadingPriority is a priority config factory that spreads pods by minimizing
 	// the number of pods (belonging to the same service) on the same node.
 	// Register the factory so that it's available, but do not include it as part of the default priorities
@@ -101,12 +94,13 @@ func init() {
 	// Register the priority function so that its available
 	// but do not include it as part of the default priorities
 	factory.RegisterPriorityFunction2("EqualPriority", core.EqualPriorityMap, nil, 1)
-	// ImageLocalityPriority prioritizes nodes based on locality of images requested by a pod. Nodes with larger size
-	// of already-installed packages required by the pod will be preferred over nodes with no already-installed
-	// packages required by the pod or a small total size of already-installed packages required by the pod.
-	factory.RegisterPriorityFunction2("ImageLocalityPriority", priorities.ImageLocalityPriorityMap, nil, 1)
 	// Optional, cluster-autoscaler friendly priority function - give used nodes higher priority.
 	factory.RegisterPriorityFunction2("MostRequestedPriority", priorities.MostRequestedPriorityMap, nil, 1)
+	factory.RegisterPriorityFunction2(
+		"RequestedToCapacityRatioPriority",
+		priorities.RequestedToCapacityRatioResourceAllocationPriorityDefault().PriorityMap,
+		nil,
+		1)
 }
 
 func defaultPredicates() sets.String {
@@ -139,6 +133,12 @@ func defaultPredicates() sets.String {
 				return predicates.NewMaxPDVolumeCountPredicate(predicates.AzureDiskVolumeFilterType, args.PVInfo, args.PVCInfo)
 			},
 		),
+		factory.RegisterFitPredicateFactory(
+			predicates.MaxCSIVolumeCountPred,
+			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
+				return predicates.NewCSIMaxVolumeLimitPredicate(args.PVInfo, args.PVCInfo)
+			},
+		),
 		// Fit is determined by inter-pod affinity.
 		factory.RegisterFitPredicateFactory(
 			predicates.MatchInterPodAffinityPred,
@@ -160,6 +160,9 @@ func defaultPredicates() sets.String {
 		// Fit is determined by node disk pressure condition.
 		factory.RegisterFitPredicate(predicates.CheckNodeDiskPressurePred, predicates.CheckNodeDiskPressurePredicate),
 
+		// Fit is determined by node pid pressure condition.
+		factory.RegisterFitPredicate(predicates.CheckNodePIDPressurePred, predicates.CheckNodePIDPressurePredicate),
+
 		// Fit is determined by node conditions: not ready, network unavailable or out of disk.
 		factory.RegisterMandatoryFitPredicate(predicates.CheckNodeConditionPred, predicates.CheckNodeConditionPredicate),
 
@@ -179,28 +182,33 @@ func defaultPredicates() sets.String {
 // ApplyFeatureGates applies algorithm by feature gates.
 func ApplyFeatureGates() {
 	if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) {
-		// Remove "CheckNodeCondition" predicate
+		// Remove "CheckNodeCondition", "CheckNodeMemoryPressure", "CheckNodePIDPressurePred"
+		// and "CheckNodeDiskPressure" predicates
 		factory.RemoveFitPredicate(predicates.CheckNodeConditionPred)
-		// Remove Key "CheckNodeCondition" From All Algorithm Provider
+		factory.RemoveFitPredicate(predicates.CheckNodeMemoryPressurePred)
+		factory.RemoveFitPredicate(predicates.CheckNodeDiskPressurePred)
+		factory.RemoveFitPredicate(predicates.CheckNodePIDPressurePred)
+		// Remove key "CheckNodeCondition", "CheckNodeMemoryPressure" and "CheckNodeDiskPressure"
+		// from ALL algorithm provider
 		// The key will be removed from all providers which in algorithmProviderMap[]
 		// if you just want remove specific provider, call func RemovePredicateKeyFromAlgoProvider()
 		factory.RemovePredicateKeyFromAlgorithmProviderMap(predicates.CheckNodeConditionPred)
+		factory.RemovePredicateKeyFromAlgorithmProviderMap(predicates.CheckNodeMemoryPressurePred)
+		factory.RemovePredicateKeyFromAlgorithmProviderMap(predicates.CheckNodeDiskPressurePred)
+		factory.RemovePredicateKeyFromAlgorithmProviderMap(predicates.CheckNodePIDPressurePred)
 
 		// Fit is determined based on whether a pod can tolerate all of the node's taints
 		factory.RegisterMandatoryFitPredicate(predicates.PodToleratesNodeTaintsPred, predicates.PodToleratesNodeTaints)
+		// Fit is determined based on whether a pod can tolerate unschedulable of node
+		factory.RegisterMandatoryFitPredicate(predicates.CheckNodeUnschedulablePred, predicates.CheckNodeUnschedulablePredicate)
 		// Insert Key "PodToleratesNodeTaints" and "CheckNodeUnschedulable" To All Algorithm Provider
 		// The key will insert to all providers which in algorithmProviderMap[]
 		// if you just want insert to specific provider, call func InsertPredicateKeyToAlgoProvider()
 		factory.InsertPredicateKeyToAlgorithmProviderMap(predicates.PodToleratesNodeTaintsPred)
+		factory.InsertPredicateKeyToAlgorithmProviderMap(predicates.CheckNodeUnschedulablePred)
 
 		glog.Warningf("TaintNodesByCondition is enabled, PodToleratesNodeTaints predicate is mandatory")
 	}
-
-	// Prioritizes nodes that satisfy pod's resource limits
-	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceLimitsPriorityFunction) {
-		factory.RegisterPriorityFunction2("ResourceLimitsPriority", priorities.ResourceLimitsPriorityMap, nil, 1)
-	}
-
 }
 
 func registerAlgorithmProvider(predSet, priSet sets.String) {
@@ -251,6 +259,9 @@ func defaultPriorities() sets.String {
 
 		// Prioritizes nodes that marked with taint which pod can tolerate.
 		factory.RegisterPriorityFunction2("TaintTolerationPriority", priorities.ComputeTaintTolerationPriorityMap, priorities.ComputeTaintTolerationPriorityReduce, 1),
+
+		// ImageLocalityPriority prioritizes nodes that have images requested by the pod present.
+		factory.RegisterPriorityFunction2("ImageLocalityPriority", priorities.ImageLocalityPriorityMap, nil, 1),
 	)
 }
 

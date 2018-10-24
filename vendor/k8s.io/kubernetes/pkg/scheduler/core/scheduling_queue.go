@@ -29,7 +29,10 @@ package core
 import (
 	"container/heap"
 	"fmt"
+	"reflect"
 	"sync"
+
+	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,9 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/pkg/scheduler/util"
-
-	"github.com/golang/glog"
-	"reflect"
 )
 
 // SchedulingQueue is an interface for a queue to store pods waiting to be scheduled.
@@ -57,6 +57,7 @@ type SchedulingQueue interface {
 	AssignedPodAdded(pod *v1.Pod)
 	AssignedPodUpdated(pod *v1.Pod)
 	WaitingPodsForNode(nodeName string) []*v1.Pod
+	WaitingPods() []*v1.Pod
 }
 
 // NewSchedulingQueue initializes a new scheduling queue. If pod priority is
@@ -114,6 +115,15 @@ func (f *FIFO) Pop() (*v1.Pod, error) {
 		return nil
 	})
 	return result.(*v1.Pod), nil
+}
+
+// WaitingPods returns all the waiting pods in the queue.
+func (f *FIFO) WaitingPods() []*v1.Pod {
+	result := []*v1.Pod{}
+	for _, pod := range f.FIFO.List() {
+		result = append(result, pod.(*v1.Pod))
+	}
+	return result
 }
 
 // FIFO does not need to react to events, as all pods are always in the active
@@ -231,10 +241,10 @@ func (p *PriorityQueue) Add(pod *v1.Pod) error {
 	defer p.lock.Unlock()
 	err := p.activeQ.Add(pod)
 	if err != nil {
-		glog.Errorf("Error adding pod %v to the scheduling queue: %v", pod.Name, err)
+		glog.Errorf("Error adding pod %v/%v to the scheduling queue: %v", pod.Namespace, pod.Name, err)
 	} else {
 		if p.unschedulableQ.get(pod) != nil {
-			glog.Errorf("Error: pod %v is already in the unschedulable queue.", pod.Name)
+			glog.Errorf("Error: pod %v/%v is already in the unschedulable queue.", pod.Namespace, pod.Name)
 			p.deleteNominatedPodIfExists(pod)
 			p.unschedulableQ.delete(pod)
 		}
@@ -257,7 +267,7 @@ func (p *PriorityQueue) AddIfNotPresent(pod *v1.Pod) error {
 	}
 	err := p.activeQ.Add(pod)
 	if err != nil {
-		glog.Errorf("Error adding pod %v to the scheduling queue: %v", pod.Name, err)
+		glog.Errorf("Error adding pod %v/%v to the scheduling queue: %v", pod.Namespace, pod.Name, err)
 	} else {
 		p.addNominatedPodIfNeeded(pod)
 		p.cond.Broadcast()
@@ -400,7 +410,7 @@ func (p *PriorityQueue) MoveAllToActiveQueue() {
 	defer p.lock.Unlock()
 	for _, pod := range p.unschedulableQ.pods {
 		if err := p.activeQ.Add(pod); err != nil {
-			glog.Errorf("Error adding pod %v to the scheduling queue: %v", pod.Name, err)
+			glog.Errorf("Error adding pod %v/%v to the scheduling queue: %v", pod.Namespace, pod.Name, err)
 		}
 	}
 	p.unschedulableQ.clear()
@@ -415,7 +425,7 @@ func (p *PriorityQueue) movePodsToActiveQueue(pods []*v1.Pod) {
 		if err := p.activeQ.Add(pod); err == nil {
 			p.unschedulableQ.delete(pod)
 		} else {
-			glog.Errorf("Error adding pod %v to the scheduling queue: %v", pod.Name, err)
+			glog.Errorf("Error adding pod %v/%v to the scheduling queue: %v", pod.Namespace, pod.Name, err)
 		}
 	}
 	p.receivedMoveRequest = true
@@ -458,6 +468,21 @@ func (p *PriorityQueue) WaitingPodsForNode(nodeName string) []*v1.Pod {
 		return list
 	}
 	return nil
+}
+
+// WaitingPods returns all the waiting pods in the queue.
+func (p *PriorityQueue) WaitingPods() []*v1.Pod {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	result := []*v1.Pod{}
+	for _, pod := range p.activeQ.List() {
+		result = append(result, pod.(*v1.Pod))
+	}
+	for _, pod := range p.unschedulableQ.pods {
+		result = append(result, pod)
+	}
+	return result
 }
 
 // UnschedulablePodsMap holds pods that cannot be scheduled. This data structure

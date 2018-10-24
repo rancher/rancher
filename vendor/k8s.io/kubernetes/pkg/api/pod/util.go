@@ -58,6 +58,10 @@ func VisitPodSecretNames(pod *api.Pod, visitor Visitor) bool {
 			if source.CephFS.SecretRef != nil && !visitor(source.CephFS.SecretRef.Name) {
 				return false
 			}
+		case source.Cinder != nil:
+			if source.Cinder.SecretRef != nil && !visitor(source.Cinder.SecretRef.Name) {
+				return false
+			}
 		case source.FlexVolume != nil:
 			if source.FlexVolume.SecretRef != nil && !visitor(source.FlexVolume.SecretRef.Name) {
 				return false
@@ -231,10 +235,8 @@ func UpdatePodCondition(status *api.PodStatus, condition *api.PodCondition) bool
 // DropDisabledAlphaFields removes disabled fields from the pod spec.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a pod spec.
 func DropDisabledAlphaFields(podSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
-		podSpec.Priority = nil
-		podSpec.PriorityClassName = ""
-	}
+	podSpec.Priority = nil
+	podSpec.PriorityClassName = ""
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
 		for i := range podSpec.Volumes {
@@ -242,10 +244,6 @@ func DropDisabledAlphaFields(podSpec *api.PodSpec) {
 				podSpec.Volumes[i].EmptyDir.SizeLimit = nil
 			}
 		}
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodShareProcessNamespace) && podSpec.SecurityContext != nil {
-		podSpec.SecurityContext.ShareProcessNamespace = nil
 	}
 
 	for i := range podSpec.Containers {
@@ -258,6 +256,12 @@ func DropDisabledAlphaFields(podSpec *api.PodSpec) {
 	DropDisabledVolumeDevicesAlphaFields(podSpec)
 
 	DropDisabledRunAsGroupField(podSpec)
+
+	if podSpec.RuntimeClassName != nil {
+		podSpec.RuntimeClassName = nil
+	}
+
+	DropDisabledProcMountField(podSpec)
 }
 
 // DropDisabledRunAsGroupField removes disabled fields from PodSpec related
@@ -280,6 +284,22 @@ func DropDisabledRunAsGroupField(podSpec *api.PodSpec) {
 	}
 }
 
+// DropDisabledProcMountField removes disabled fields from PodSpec related
+// to ProcMount
+func DropDisabledProcMountField(podSpec *api.PodSpec) {
+	defProcMount := api.DefaultProcMount
+	for i := range podSpec.Containers {
+		if podSpec.Containers[i].SecurityContext != nil {
+			podSpec.Containers[i].SecurityContext.ProcMount = &defProcMount
+		}
+	}
+	for i := range podSpec.InitContainers {
+		if podSpec.InitContainers[i].SecurityContext != nil {
+			podSpec.InitContainers[i].SecurityContext.ProcMount = &defProcMount
+		}
+	}
+}
+
 // DropDisabledVolumeMountsAlphaFields removes disabled fields from []VolumeMount.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a VolumeMount
 func DropDisabledVolumeMountsAlphaFields(volumeMounts []api.VolumeMount) {
@@ -293,12 +313,10 @@ func DropDisabledVolumeMountsAlphaFields(volumeMounts []api.VolumeMount) {
 // DropDisabledVolumeDevicesAlphaFields removes disabled fields from []VolumeDevice.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a VolumeDevice
 func DropDisabledVolumeDevicesAlphaFields(podSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		for i := range podSpec.Containers {
-			podSpec.Containers[i].VolumeDevices = nil
-		}
-		for i := range podSpec.InitContainers {
-			podSpec.InitContainers[i].VolumeDevices = nil
-		}
+	for i := range podSpec.Containers {
+		podSpec.Containers[i].VolumeDevices = nil
+	}
+	for i := range podSpec.InitContainers {
+		podSpec.InitContainers[i].VolumeDevices = nil
 	}
 }

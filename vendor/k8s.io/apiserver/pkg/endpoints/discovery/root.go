@@ -17,9 +17,11 @@ limitations under the License.
 package discovery
 
 import (
-	"errors"
 	"net/http"
+	"strings"
 	"sync"
+
+	"k8s.io/apiserver/pkg/server/routes"
 
 	restful "github.com/emicklei/go-restful"
 
@@ -29,12 +31,13 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
-	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 // GroupManager is an interface that allows dynamic mutation of the existing webservice to handle
 // API groups being added or removed.
 type GroupManager interface {
+	routes.ListedPathProvider
+
 	AddGroup(apiGroup metav1.APIGroup)
 	RemoveGroup(groupName string)
 
@@ -48,8 +51,7 @@ type rootAPIsHandler struct {
 	// addresses is used to build cluster IPs for discovery.
 	addresses Addresses
 
-	serializer    runtime.NegotiatedSerializer
-	contextMapper request.RequestContextMapper
+	serializer runtime.NegotiatedSerializer
 
 	// Map storing information about all groups to be exposed in discovery response.
 	// The map is from name to the group.
@@ -59,18 +61,33 @@ type rootAPIsHandler struct {
 	apiGroupNames []string
 }
 
-func NewRootAPIsHandler(addresses Addresses, serializer runtime.NegotiatedSerializer, contextMapper request.RequestContextMapper) *rootAPIsHandler {
+func NewRootAPIsHandler(addresses Addresses, serializer runtime.NegotiatedSerializer) *rootAPIsHandler {
 	// Because in release 1.1, /apis returns response with empty APIVersion, we
 	// use stripVersionNegotiatedSerializer to keep the response backwards
 	// compatible.
 	serializer = stripVersionNegotiatedSerializer{serializer}
 
 	return &rootAPIsHandler{
-		addresses:     addresses,
-		serializer:    serializer,
-		apiGroups:     map[string]metav1.APIGroup{},
-		contextMapper: contextMapper,
+		addresses:  addresses,
+		serializer: serializer,
+		apiGroups:  map[string]metav1.APIGroup{},
 	}
+}
+
+func (s *rootAPIsHandler) ListedPaths() []string {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	var result []string
+	for name, group := range s.apiGroups {
+		if strings.Contains(name, ".") {
+			for _, ver := range group.Versions {
+				result = append(result, "/apis/"+ver.GroupVersion)
+			}
+		}
+	}
+
+	return result
 }
 
 func (s *rootAPIsHandler) AddGroup(apiGroup metav1.APIGroup) {
@@ -99,12 +116,6 @@ func (s *rootAPIsHandler) RemoveGroup(groupName string) {
 }
 
 func (s *rootAPIsHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
-	ctx, ok := s.contextMapper.Get(req)
-	if !ok {
-		responsewriters.InternalError(resp, req, errors.New("no context found for request"))
-		return
-	}
-
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
@@ -121,7 +132,7 @@ func (s *rootAPIsHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request)
 		groups[i].ServerAddressByClientCIDRs = serverCIDR
 	}
 
-	responsewriters.WriteObjectNegotiated(ctx, s.serializer, schema.GroupVersion{}, resp, req, http.StatusOK, &metav1.APIGroupList{Groups: groups})
+	responsewriters.WriteObjectNegotiated(s.serializer, schema.GroupVersion{}, resp, req, http.StatusOK, &metav1.APIGroupList{Groups: groups})
 }
 
 func (s *rootAPIsHandler) restfulHandle(req *restful.Request, resp *restful.Response) {

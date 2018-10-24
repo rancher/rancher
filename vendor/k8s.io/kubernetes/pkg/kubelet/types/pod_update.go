@@ -21,8 +21,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeapi "k8s.io/kubernetes/pkg/apis/core"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 )
 
 const (
@@ -30,7 +29,6 @@ const (
 	ConfigMirrorAnnotationKey    = v1.MirrorPodAnnotationKey
 	ConfigFirstSeenAnnotationKey = "kubernetes.io/config.seen"
 	ConfigHashAnnotationKey      = "kubernetes.io/config.hash"
-	CriticalPodAnnotationKey     = "scheduler.alpha.kubernetes.io/critical-pod"
 )
 
 // PodOperation defines what changes will be made on a pod configuration.
@@ -141,34 +139,25 @@ func (sp SyncPodType) String() string {
 }
 
 // IsCriticalPod returns true if the pod bears the critical pod annotation key or if pod's priority is greater than
-// or equal to SystemCriticalPriority. Both the rescheduler(deprecated in 1.10) and the kubelet use this function
+// or equal to SystemCriticalPriority. Both the default scheduler and the kubelet use this function
 // to make admission and scheduling decisions.
 func IsCriticalPod(pod *v1.Pod) bool {
-	return IsCritical(pod.Namespace, pod.Annotations) || (pod.Spec.Priority != nil && IsCriticalPodBasedOnPriority(pod.Namespace, *pod.Spec.Priority))
+	return false
 }
 
-// IsCritical returns true if parameters bear the critical pod annotation
-// key. The DaemonSetController use this key directly to make scheduling decisions.
-// TODO: @ravig - Deprecated. Remove this when we move to resolving critical pods based on priorityClassName.
-func IsCritical(ns string, annotations map[string]string) bool {
-	// Critical pods are restricted to "kube-system" namespace as of now.
-	if ns != kubeapi.NamespaceSystem {
-		return false
-	}
-	val, ok := annotations[CriticalPodAnnotationKey]
-	if ok && val == "" {
+// Preemptable returns true if preemptor pod can preempt preemptee pod
+// if preemptee is not critical or if preemptor's priority is greater than preemptee's priority
+func Preemptable(preemptor, preemptee *v1.Pod) bool {
+	if IsCriticalPod(preemptor) && !IsCriticalPod(preemptee) {
 		return true
 	}
+
 	return false
 }
 
 // IsCriticalPodBasedOnPriority checks if the given pod is a critical pod based on priority resolved from pod Spec.
-func IsCriticalPodBasedOnPriority(ns string, priority int32) bool {
-	// Critical pods are restricted to "kube-system" namespace as of now.
-	if ns != kubeapi.NamespaceSystem {
-		return false
-	}
-	if priority >= schedulerapi.SystemCriticalPriority {
+func IsCriticalPodBasedOnPriority(priority int32) bool {
+	if priority >= scheduling.SystemCriticalPriority {
 		return true
 	}
 	return false

@@ -29,7 +29,7 @@ jobs:
     # Lang stage: Go
     - stage:               lang
       language:            go
-      go:                  1.8.3
+      go:                  1.9.5
       go_import_path:      github.com/container-storage-interface/spec
       install:
         - make -C lib/go protoc

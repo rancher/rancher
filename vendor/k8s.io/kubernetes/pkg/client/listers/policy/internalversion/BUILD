@@ -12,16 +12,17 @@ go_library(
         "expansion_generated.go",
         "poddisruptionbudget.go",
         "poddisruptionbudget_expansion.go",
+        "podsecuritypolicy.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/client/listers/policy/internalversion",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/policy:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
-        "//vendor/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )
 

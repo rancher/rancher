@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/event"
 	"github.com/rancher/norman/objectclient/dynamic"
 	"github.com/rancher/norman/restwatch"
 	"github.com/rancher/norman/signal"
@@ -26,13 +25,10 @@ import (
 	"github.com/rancher/types/peermanager"
 	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
-	"k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
-	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
 )
 
 var (
@@ -143,16 +139,12 @@ func (c *ScaledContext) Start(ctx context.Context) error {
 }
 
 type ManagementContext struct {
-	eventBroadcaster record.EventBroadcaster
-
 	ClientGetter      proxy.ClientGetter
 	LocalConfig       *rest.Config
 	RESTConfig        rest.Config
 	UnversionedClient rest.Interface
 	K8sClient         kubernetes.Interface
 	APIExtClient      clientset.Interface
-	Events            record.EventRecorder
-	EventLogger       event.Logger
 	Schemas           *types.Schemas
 	Scheme            *runtime.Scheme
 	Dialer            dialer.Factory
@@ -310,26 +302,11 @@ func NewManagementContext(config rest.Config) (*ManagementContext, error) {
 	managementv3.AddToScheme(context.Scheme)
 	projectv3.AddToScheme(context.Scheme)
 
-	context.eventBroadcaster = record.NewBroadcaster()
-	context.Events = context.eventBroadcaster.NewRecorder(context.Scheme, v1.EventSource{
-		Component: "CattleManagementServer",
-	})
-	context.EventLogger = event.NewLogger(context.Events)
-
 	return context, err
 }
 
 func (c *ManagementContext) Start(ctx context.Context) error {
 	logrus.Info("Starting management controllers")
-
-	watcher := c.eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{
-		Interface: c.K8sClient.CoreV1().Events(""),
-	})
-
-	go func() {
-		<-ctx.Done()
-		watcher.Stop()
-	}()
 
 	return controller.SyncThenStart(ctx, 50, c.controllers()...)
 }

@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/initialization"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
@@ -123,6 +122,17 @@ func (p *pvcEvaluator) Matches(resourceQuota *api.ResourceQuota, item runtime.Ob
 	return generic.Matches(resourceQuota, item, p.MatchingResources, generic.MatchesNoScopeFunc)
 }
 
+// MatchingScopes takes the input specified list of scopes and input object. Returns the set of scopes resource matches.
+func (p *pvcEvaluator) MatchingScopes(item runtime.Object, scopes []api.ScopedResourceSelectorRequirement) ([]api.ScopedResourceSelectorRequirement, error) {
+	return []api.ScopedResourceSelectorRequirement{}, nil
+}
+
+// UncoveredQuotaScopes takes the input matched scopes which are limited by configuration and the matched quota scopes.
+// It returns the scopes which are in limited scopes but dont have a corresponding covering quota scope
+func (p *pvcEvaluator) UncoveredQuotaScopes(limitedScopes []api.ScopedResourceSelectorRequirement, matchedQuotaScopes []api.ScopedResourceSelectorRequirement) ([]api.ScopedResourceSelectorRequirement, error) {
+	return []api.ScopedResourceSelectorRequirement{}, nil
+}
+
 // MatchingResources takes the input specified list of resources and returns the set of resources it matches.
 func (p *pvcEvaluator) MatchingResources(items []api.ResourceName) []api.ResourceName {
 	result := []api.ResourceName{}
@@ -160,12 +170,6 @@ func (p *pvcEvaluator) Usage(item runtime.Object) (api.ResourceList, error) {
 	// charge for claim
 	result[api.ResourcePersistentVolumeClaims] = *(resource.NewQuantity(1, resource.DecimalSI))
 	result[pvcObjectCountName] = *(resource.NewQuantity(1, resource.DecimalSI))
-	if utilfeature.DefaultFeatureGate.Enabled(features.Initializers) {
-		if !initialization.IsInitialized(pvc.Initializers) {
-			// Only charge pvc count for uninitialized pvc.
-			return result, nil
-		}
-	}
 	storageClassRef := helper.GetPersistentVolumeClaimClass(pvc)
 	if len(storageClassRef) > 0 {
 		storageClassClaim := api.ResourceName(storageClassRef + storageClassSuffix + string(api.ResourcePersistentVolumeClaims))

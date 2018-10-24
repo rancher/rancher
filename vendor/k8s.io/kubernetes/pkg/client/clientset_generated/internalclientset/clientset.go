@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ limitations under the License.
 package internalclientset
 
 import (
-	glog "github.com/golang/glog"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
@@ -29,15 +28,12 @@ import (
 	authorizationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authorization/internalversion"
 	autoscalinginternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/autoscaling/internalversion"
 	batchinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
-	certificatesinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/internalversion"
 	coreinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
-	eventsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/events/internalversion"
 	extensionsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 	networkinginternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/networking/internalversion"
 	policyinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
 	rbacinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
 	schedulinginternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/scheduling/internalversion"
-	settingsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/settings/internalversion"
 	storageinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/storage/internalversion"
 )
 
@@ -50,14 +46,11 @@ type Interface interface {
 	Authorization() authorizationinternalversion.AuthorizationInterface
 	Autoscaling() autoscalinginternalversion.AutoscalingInterface
 	Batch() batchinternalversion.BatchInterface
-	Certificates() certificatesinternalversion.CertificatesInterface
-	Events() eventsinternalversion.EventsInterface
 	Extensions() extensionsinternalversion.ExtensionsInterface
 	Networking() networkinginternalversion.NetworkingInterface
 	Policy() policyinternalversion.PolicyInterface
 	Rbac() rbacinternalversion.RbacInterface
 	Scheduling() schedulinginternalversion.SchedulingInterface
-	Settings() settingsinternalversion.SettingsInterface
 	Storage() storageinternalversion.StorageInterface
 }
 
@@ -72,14 +65,11 @@ type Clientset struct {
 	authorization         *authorizationinternalversion.AuthorizationClient
 	autoscaling           *autoscalinginternalversion.AutoscalingClient
 	batch                 *batchinternalversion.BatchClient
-	certificates          *certificatesinternalversion.CertificatesClient
-	events                *eventsinternalversion.EventsClient
 	extensions            *extensionsinternalversion.ExtensionsClient
 	networking            *networkinginternalversion.NetworkingClient
 	policy                *policyinternalversion.PolicyClient
 	rbac                  *rbacinternalversion.RbacClient
 	scheduling            *schedulinginternalversion.SchedulingClient
-	settings              *settingsinternalversion.SettingsClient
 	storage               *storageinternalversion.StorageClient
 }
 
@@ -118,16 +108,6 @@ func (c *Clientset) Batch() batchinternalversion.BatchInterface {
 	return c.batch
 }
 
-// Certificates retrieves the CertificatesClient
-func (c *Clientset) Certificates() certificatesinternalversion.CertificatesInterface {
-	return c.certificates
-}
-
-// Events retrieves the EventsClient
-func (c *Clientset) Events() eventsinternalversion.EventsInterface {
-	return c.events
-}
-
 // Extensions retrieves the ExtensionsClient
 func (c *Clientset) Extensions() extensionsinternalversion.ExtensionsInterface {
 	return c.extensions
@@ -151,11 +131,6 @@ func (c *Clientset) Rbac() rbacinternalversion.RbacInterface {
 // Scheduling retrieves the SchedulingClient
 func (c *Clientset) Scheduling() schedulinginternalversion.SchedulingInterface {
 	return c.scheduling
-}
-
-// Settings retrieves the SettingsClient
-func (c *Clientset) Settings() settingsinternalversion.SettingsInterface {
-	return c.settings
 }
 
 // Storage retrieves the StorageClient
@@ -207,14 +182,6 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
-	cs.certificates, err = certificatesinternalversion.NewForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
-	cs.events, err = eventsinternalversion.NewForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
 	cs.extensions, err = extensionsinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -235,10 +202,6 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
-	cs.settings, err = settingsinternalversion.NewForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
 	cs.storage, err = storageinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -246,7 +209,6 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 
 	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
-		glog.Errorf("failed to create the DiscoveryClient: %v", err)
 		return nil, err
 	}
 	return &cs, nil
@@ -263,14 +225,11 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.authorization = authorizationinternalversion.NewForConfigOrDie(c)
 	cs.autoscaling = autoscalinginternalversion.NewForConfigOrDie(c)
 	cs.batch = batchinternalversion.NewForConfigOrDie(c)
-	cs.certificates = certificatesinternalversion.NewForConfigOrDie(c)
-	cs.events = eventsinternalversion.NewForConfigOrDie(c)
 	cs.extensions = extensionsinternalversion.NewForConfigOrDie(c)
 	cs.networking = networkinginternalversion.NewForConfigOrDie(c)
 	cs.policy = policyinternalversion.NewForConfigOrDie(c)
 	cs.rbac = rbacinternalversion.NewForConfigOrDie(c)
 	cs.scheduling = schedulinginternalversion.NewForConfigOrDie(c)
-	cs.settings = settingsinternalversion.NewForConfigOrDie(c)
 	cs.storage = storageinternalversion.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
@@ -287,14 +246,11 @@ func New(c rest.Interface) *Clientset {
 	cs.authorization = authorizationinternalversion.New(c)
 	cs.autoscaling = autoscalinginternalversion.New(c)
 	cs.batch = batchinternalversion.New(c)
-	cs.certificates = certificatesinternalversion.New(c)
-	cs.events = eventsinternalversion.New(c)
 	cs.extensions = extensionsinternalversion.New(c)
 	cs.networking = networkinginternalversion.New(c)
 	cs.policy = policyinternalversion.New(c)
 	cs.rbac = rbacinternalversion.New(c)
 	cs.scheduling = schedulinginternalversion.New(c)
-	cs.settings = settingsinternalversion.New(c)
 	cs.storage = storageinternalversion.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)

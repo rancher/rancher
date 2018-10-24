@@ -26,5 +26,6 @@ import (
 func DropDisabledAlphaFields(class *storage.StorageClass) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
 		class.VolumeBindingMode = nil
+		class.AllowedTopologies = nil
 	}
 }

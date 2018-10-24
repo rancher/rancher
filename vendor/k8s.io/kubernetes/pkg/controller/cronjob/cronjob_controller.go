@@ -20,7 +20,7 @@ package cronjob
 I did not use watch or expectations.  Those add a lot of corner cases, and we aren't
 expecting a large volume of jobs or scheduledJobs.  (We are favoring correctness
 over scalability.  If we find a single controller thread is too slow because
-there are a lot of Jobs or CronJobs, we we can parallelize by Namespace.
+there are a lot of Jobs or CronJobs, we can parallelize by Namespace.
 If we find the load on the API server is too high, we can use a watch and
 UndeltaStore.)
 
@@ -69,8 +69,7 @@ type CronJobController struct {
 func NewCronJobController(kubeClient clientset.Interface) (*CronJobController, error) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	// TODO: remove the wrapper when every clients have moved to use the clientset.
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("cronjob_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
@@ -86,14 +85,6 @@ func NewCronJobController(kubeClient clientset.Interface) (*CronJobController, e
 		recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cronjob-controller"}),
 	}
 
-	return jm, nil
-}
-
-func NewCronJobControllerFromClient(kubeClient clientset.Interface) (*CronJobController, error) {
-	jm, err := NewCronJobController(kubeClient)
-	if err != nil {
-		return nil, err
-	}
 	return jm, nil
 }
 
@@ -281,9 +272,8 @@ func syncOne(sj *batchv1beta1.CronJob, js []batchv1.Job, now time.Time, jc jobCo
 	}
 	if tooLate {
 		glog.V(4).Infof("Missed starting window for %s", nameForLog)
-		// TODO: generate an event for a miss.  Use a warning level event because it indicates a
-		// problem with the controller (restart or long queue), and is not expected by user either.
-		// Since we don't set LastScheduleTime when not scheduling, we are going to keep noticing
+		recorder.Eventf(sj, v1.EventTypeWarning, "MissSchedule", "Missed scheduled time to start a job: %s", scheduledTime.Format(time.RFC1123Z))
+		// TODO: Since we don't set LastScheduleTime when not scheduling, we are going to keep noticing
 		// the miss every cycle.  In order to avoid sending multiple events, and to avoid processing
 		// the sj again and again, we could set a Status.LastMissedTime when we notice a miss.
 		// Then, when we call getRecentUnmetScheduleTimes, we can take max(creationTimestamp,
@@ -339,7 +329,7 @@ func syncOne(sj *batchv1beta1.CronJob, js []batchv1.Job, now time.Time, jc jobCo
 
 	// If this process restarts at this point (after posting a job, but
 	// before updating the status), then we might try to start the job on
-	// the next time.  Actually, if we relist the SJs and Jobs on the next
+	// the next time.  Actually, if we re-list the SJs and Jobs on the next
 	// iteration of syncAll, we might not see our own status update, and
 	// then post one again.  So, we need to use the job name as a lock to
 	// prevent us from making the job twice (name the job with hash of its
@@ -360,11 +350,11 @@ func syncOne(sj *batchv1beta1.CronJob, js []batchv1.Job, now time.Time, jc jobCo
 	return
 }
 
-// deleteJob reaps a job, deleting the job, the pobs and the reference in the active list
+// deleteJob reaps a job, deleting the job, the pods and the reference in the active list
 func deleteJob(sj *batchv1beta1.CronJob, job *batchv1.Job, jc jobControlInterface,
 	pc podControlInterface, recorder record.EventRecorder, reason string) bool {
 	// TODO: this should be replaced with server side job deletion
-	// currencontinuetly this mimics JobReaper from pkg/kubectl/stop.go
+	// currently this mimics JobReaper from pkg/kubectl/stop.go
 	nameForLog := fmt.Sprintf("%s/%s", sj.Namespace, sj.Name)
 
 	// scale job down to 0

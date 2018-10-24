@@ -117,6 +117,9 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
 	if spec.BackoffLimit != nil {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.BackoffLimit), fldPath.Child("backoffLimit"))...)
 	}
+	if spec.TTLSecondsAfterFinished != nil {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("ttlSecondsAfterFinished"), "disabled by feature-gate"))
+	}
 
 	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, fldPath.Child("template"))...)
 	if spec.Template.Spec.RestartPolicy != api.RestartPolicyOnFailure &&
