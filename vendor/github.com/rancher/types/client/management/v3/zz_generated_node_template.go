@@ -11,6 +11,7 @@ const (
 	NodeTemplateFieldAuthKey                  = "authKey"
 	NodeTemplateFieldCreated                  = "created"
 	NodeTemplateFieldCreatorID                = "creatorId"
+	NodeTemplateFieldCredentialID             = "credentialId"
 	NodeTemplateFieldDescription              = "description"
 	NodeTemplateFieldDockerVersion            = "dockerVersion"
 	NodeTemplateFieldDriver                   = "driver"
@@ -40,6 +41,7 @@ type NodeTemplate struct {
 	AuthKey                  string              `json:"authKey,omitempty" yaml:"authKey,omitempty"`
 	Created                  string              `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                string              `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	CredentialID             string              `json:"credentialId,omitempty" yaml:"credentialId,omitempty"`
 	Description              string              `json:"description,omitempty" yaml:"description,omitempty"`
 	DockerVersion            string              `json:"dockerVersion,omitempty" yaml:"dockerVersion,omitempty"`
 	Driver                   string              `json:"driver,omitempty" yaml:"driver,omitempty"`

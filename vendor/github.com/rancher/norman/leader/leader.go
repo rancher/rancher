@@ -47,8 +47,8 @@ func run(ctx context.Context, name string, client kubernetes.Interface, cb Callb
 
 	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
 		Lock:          rl,
-		LeaseDuration: 15 * time.Second,
-		RenewDeadline: 10 * time.Second,
+		LeaseDuration: 120 * time.Second,
+		RenewDeadline: 60 * time.Second,
 		RetryPeriod:   2 * time.Second,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {

@@ -97,6 +97,9 @@ func (p *ObjectClient) Create(o runtime.Object) (runtime.Object, error) {
 	if ok && obj.GetNamespace() != "" {
 		ns = obj.GetNamespace()
 	}
+	//else if obj.GetNamespace() == "" {
+	//	logrus.Info("empty namespace")
+	//}
 
 	if ok {
 		labels := obj.GetLabels()

@@ -43,6 +43,7 @@ type NodeTemplateSpec struct {
 	DisplayName      string `json:"displayName"`
 	Description      string `json:"description"`
 	Driver           string `json:"driver" norman:"nocreate,noupdate"`
+	CredentialName   string `json:"credentialName" norman:"type=reference[cloudCredential]"`
 	NodeCommonParams `json:",inline"`
 }
 
@@ -289,4 +290,16 @@ type NodeDrainInput struct {
 	GracePeriod int `json:"gracePeriod,omitempty" norman:"default=-1"`
 	// Time to wait (in seconds) before giving up for one try
 	Timeout int `json:"timeout" norman:"min=1,max=10800,default=60"`
+}
+
+type CloudCredential struct {
+	types.Namespaced
+
+	metav1.TypeMeta `json:",inline"`
+	// Standard object’s metadata. More info:
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Name   string `json:"displayName"`
+	Driver string `json:"driver" norman:"nocreate,noupdate"`
 }

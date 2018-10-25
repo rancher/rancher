@@ -4,6 +4,7 @@ const (
 	NodeTemplateSpecType                          = "nodeTemplateSpec"
 	NodeTemplateSpecFieldAuthCertificateAuthority = "authCertificateAuthority"
 	NodeTemplateSpecFieldAuthKey                  = "authKey"
+	NodeTemplateSpecFieldCredentialID             = "credentialId"
 	NodeTemplateSpecFieldDescription              = "description"
 	NodeTemplateSpecFieldDisplayName              = "displayName"
 	NodeTemplateSpecFieldDockerVersion            = "dockerVersion"
@@ -21,6 +22,7 @@ const (
 type NodeTemplateSpec struct {
 	AuthCertificateAuthority string            `json:"authCertificateAuthority,omitempty" yaml:"authCertificateAuthority,omitempty"`
 	AuthKey                  string            `json:"authKey,omitempty" yaml:"authKey,omitempty"`
+	CredentialID             string            `json:"credentialId,omitempty" yaml:"credentialId,omitempty"`
 	Description              string            `json:"description,omitempty" yaml:"description,omitempty"`
 	DisplayName              string            `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	DockerVersion            string            `json:"dockerVersion,omitempty" yaml:"dockerVersion,omitempty"`

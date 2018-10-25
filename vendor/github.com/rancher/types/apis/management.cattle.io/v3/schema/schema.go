@@ -36,7 +36,8 @@ var (
 		Init(alertTypes).
 		Init(composeType).
 		Init(projectCatalogTypes).
-		Init(clusterCatalogTypes)
+		Init(clusterCatalogTypes).
+		Init(test)
 
 	TokenSchemas = factory.Schemas(&Version).
 			Init(tokens)
@@ -465,6 +466,16 @@ func projectNetworkPolicyTypes(schema *types.Schemas) *types.Schemas {
 		MustImportAndCustomize(&Version, v3.ProjectNetworkPolicy{}, func(schema *types.Schema) {
 			schema.CollectionMethods = []string{http.MethodGet}
 			schema.ResourceMethods = []string{http.MethodGet}
+		})
+}
+
+func test(schemas *types.Schemas) *types.Schemas {
+	return schemas.
+		MustImportAndCustomize(&Version, v3.CloudCredential{}, func(schema *types.Schema) {
+			// schema.MustCustomizeField("namespaceId", func(f types.Field) types.Field {
+			// 	f.Required = false
+			// 	return f
+			// })
 		})
 }
 

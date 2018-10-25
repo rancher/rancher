@@ -56,6 +56,7 @@ type Interface interface {
 	ComposeConfigsGetter
 	ProjectCatalogsGetter
 	ClusterCatalogsGetter
+	CloudCredentialsGetter
 }
 
 type Client struct {
@@ -102,6 +103,7 @@ type Client struct {
 	composeConfigControllers                           map[string]ComposeConfigController
 	projectCatalogControllers                          map[string]ProjectCatalogController
 	clusterCatalogControllers                          map[string]ClusterCatalogController
+	cloudCredentialControllers                         map[string]CloudCredentialController
 }
 
 func Factory(ctx context.Context, config rest.Config) (context.Context, controller.Starter, error) {
@@ -169,6 +171,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		composeConfigControllers:                           map[string]ComposeConfigController{},
 		projectCatalogControllers:                          map[string]ProjectCatalogController{},
 		clusterCatalogControllers:                          map[string]ClusterCatalogController{},
+		cloudCredentialControllers:                         map[string]CloudCredentialController{},
 	}, nil
 }
 
@@ -685,6 +688,19 @@ type ClusterCatalogsGetter interface {
 func (c *Client) ClusterCatalogs(namespace string) ClusterCatalogInterface {
 	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ClusterCatalogResource, ClusterCatalogGroupVersionKind, clusterCatalogFactory{})
 	return &clusterCatalogClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type CloudCredentialsGetter interface {
+	CloudCredentials(namespace string) CloudCredentialInterface
+}
+
+func (c *Client) CloudCredentials(namespace string) CloudCredentialInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &CloudCredentialResource, CloudCredentialGroupVersionKind, cloudCredentialFactory{})
+	return &cloudCredentialClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,
