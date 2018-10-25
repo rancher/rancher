@@ -24,6 +24,8 @@ var (
 		"transfer-encoding": true,
 		"content-length":    true,
 		"x-api-auth-header": true,
+		"impersonate-user":  true,
+		"impersonate-group": true,
 	}
 )
 
