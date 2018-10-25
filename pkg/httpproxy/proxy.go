@@ -25,6 +25,8 @@ var (
 		"content-length":    true,
 		"x-api-auth-header": true,
 		"cf-ray":            true,
+		"impersonate-user":  true,
+		"impersonate-group": true,
 	}
 )
 
