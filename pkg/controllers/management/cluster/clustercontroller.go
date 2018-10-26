@@ -73,21 +73,21 @@ func (c *controller) capsSync(key string, cluster *v3.Cluster) error {
 }
 
 func (c *controller) GKECapabilities(capabilities v3.Capabilities, gkeConfig v3.GoogleKubernetesEngineConfig) v3.Capabilities {
-	capabilities.L4LoadBalancer = c.L4Capability(true, GoogleCloudLoadBalancer, []string{"TCP", "UDP"}, true)
+	capabilities.LoadBalancerCapabilities = c.L4Capability(true, GoogleCloudLoadBalancer, []string{"TCP", "UDP"}, true)
 	if *gkeConfig.EnableHTTPLoadBalancing {
 		ingressController := c.IngressCapability(true, GoogleCloudLoadBalancer, true)
-		capabilities.IngressControllers = []v3.IngressController{ingressController}
+		capabilities.IngressCapabilities = []v3.IngressCapabilities{ingressController}
 	}
 	return capabilities
 }
 
 func (c *controller) EKSCapabilities(capabilities v3.Capabilities, eksConfig v3.AmazonElasticContainerServiceConfig) v3.Capabilities {
-	capabilities.L4LoadBalancer = c.L4Capability(true, ElasticLoadBalancer, []string{"TCP"}, true)
+	capabilities.LoadBalancerCapabilities = c.L4Capability(true, ElasticLoadBalancer, []string{"TCP"}, true)
 	return capabilities
 }
 
 func (c *controller) AKSCapabilities(capabilities v3.Capabilities, aksConfig v3.AzureKubernetesServiceConfig) v3.Capabilities {
-	capabilities.L4LoadBalancer = c.L4Capability(true, AzureL4LB, []string{"TCP", "UDP"}, true)
+	capabilities.LoadBalancerCapabilities = c.L4Capability(true, AzureL4LB, []string{"TCP", "UDP"}, true)
 	// on AKS portal you can enable Azure HTTP Application routing but Rancher doesn't have that option yet
 	return capabilities
 }
@@ -95,9 +95,9 @@ func (c *controller) AKSCapabilities(capabilities v3.Capabilities, aksConfig v3.
 func (c *controller) RKECapabilities(capabilities v3.Capabilities, rkeConfig v3.RancherKubernetesEngineConfig, clusterName string) (v3.Capabilities, error) {
 	switch rkeConfig.CloudProvider.Name {
 	case aws.AWSCloudProviderName:
-		capabilities.L4LoadBalancer = c.L4Capability(true, ElasticLoadBalancer, []string{"TCP"}, true)
+		capabilities.LoadBalancerCapabilities = c.L4Capability(true, ElasticLoadBalancer, []string{"TCP"}, true)
 	case azure.AzureCloudProviderName:
-		capabilities.L4LoadBalancer = c.L4Capability(true, AzureL4LB, []string{"TCP", "UDP"}, true)
+		capabilities.LoadBalancerCapabilities = c.L4Capability(true, AzureL4LB, []string{"TCP", "UDP"}, true)
 	}
 	// only if not custom, non custom clusters have nodepools set
 	nodes, err := c.nodeLister.List(clusterName, labels.Everything())
@@ -112,7 +112,7 @@ func (c *controller) RKECapabilities(capabilities v3.Capabilities, rkeConfig v3.
 	}
 
 	ingressController := c.IngressCapability(true, NginxIngressProvider, false)
-	capabilities.IngressControllers = []v3.IngressController{ingressController}
+	capabilities.IngressCapabilities = []v3.IngressCapabilities{ingressController}
 	if rkeConfig.Services.KubeAPI.ExtraArgs["service-node-port-range"] != "" {
 		capabilities.NodePortRange = rkeConfig.Services.KubeAPI.ExtraArgs["service-node-port-range"]
 	}
@@ -120,8 +120,8 @@ func (c *controller) RKECapabilities(capabilities v3.Capabilities, rkeConfig v3.
 	return capabilities, nil
 }
 
-func (c *controller) L4Capability(enabled bool, providerName string, protocols []string, healthCheck bool) v3.L4LoadBalancer {
-	l4lb := v3.L4LoadBalancer{
+func (c *controller) L4Capability(enabled bool, providerName string, protocols []string, healthCheck bool) v3.LoadBalancerCapabilities {
+	l4lb := v3.LoadBalancerCapabilities{
 		Enabled:              enabled,
 		Provider:             providerName,
 		ProtocolsSupported:   protocols,
@@ -130,11 +130,10 @@ func (c *controller) L4Capability(enabled bool, providerName string, protocols [
 	return l4lb
 }
 
-func (c *controller) IngressCapability(httpLBEnabled bool, providerName string, customDefaultBackend bool) v3.IngressController {
-	ing := v3.IngressController{
-		HTTPLoadBalancingEnabled: httpLBEnabled,
-		IngressProvider:          providerName,
-		CustomDefaultBackend:     customDefaultBackend,
+func (c *controller) IngressCapability(httpLBEnabled bool, providerName string, customDefaultBackend bool) v3.IngressCapabilities {
+	ing := v3.IngressCapabilities{
+		IngressProvider:      providerName,
+		CustomDefaultBackend: customDefaultBackend,
 	}
 	return ing
 }
