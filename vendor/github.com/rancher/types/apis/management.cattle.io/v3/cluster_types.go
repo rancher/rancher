@@ -291,21 +291,20 @@ type ImportYamlOutput struct {
 }
 
 type Capabilities struct {
-	L4LoadBalancer           L4LoadBalancer      `json:"l4loadBalancer,omitempty"`
-	IngressControllers       []IngressController `json:"ingressControllers,omitempty"`
-	NodePoolScalingSupported bool                `json:"nodePoolScalingSupported,omitempty"`
-	NodePortRange            string              `json:"nodePortRange,omitempty"`
+	LoadBalancerCapabilities LoadBalancerCapabilities `json:"loadBalancerCapabilities,omitempty"`
+	IngressCapabilities      []IngressCapabilities    `json:"ingressCapabilities,omitempty"`
+	NodePoolScalingSupported bool                     `json:"nodePoolScalingSupported,omitempty"`
+	NodePortRange            string                   `json:"nodePortRange,omitempty"`
 }
 
-type L4LoadBalancer struct {
+type LoadBalancerCapabilities struct {
 	Enabled              bool     `json:"enabled,omitempty"`
 	Provider             string   `json:"provider,omitempty"`
 	ProtocolsSupported   []string `json:"protocolsSupported,omitempty"`
 	HealthCheckSupported bool     `json:"healthCheckSupported,omitempty"`
 }
 
-type IngressController struct {
-	HTTPLoadBalancingEnabled bool   `json:"httpLoadBalancingEnabled,omitempty"`
-	IngressProvider          string `json:"ingressProvider,omitempty"`
-	CustomDefaultBackend     bool   `json:"customDefaultBackend,omitempty"`
+type IngressCapabilities struct {
+	IngressProvider      string `json:"ingressProvider,omitempty"`
+	CustomDefaultBackend bool   `json:"customDefaultBackend,omitempty"`
 }
