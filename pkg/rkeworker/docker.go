@@ -186,6 +186,7 @@ func changed(ctx context.Context, c *client.Client, expectedProcess v3.Process, 
 	actualProcess.Name = expectedProcess.Name
 	actualProcess.HealthCheck.URL = expectedProcess.HealthCheck.URL
 	actualProcess.RestartPolicy = expectedProcess.RestartPolicy
+	actualProcess.ImageRegistryAuthConfig = expectedProcess.ImageRegistryAuthConfig
 
 	changed := false
 	t := reflect.TypeOf(actualProcess)
