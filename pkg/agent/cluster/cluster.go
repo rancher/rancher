@@ -6,8 +6,9 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"strings"
 
-	"k8s.io/client-go/rest"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -17,6 +18,9 @@ const (
 
 	kubernetesServiceHostKey = "KUBERNETES_SERVICE_HOST"
 	kubernetesServicePortKey = "KUBERNETES_SERVICE_PORT"
+
+	tokenFile  = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+	rootCAFile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 )
 
 func TokenAndURL() (string, string, error) {
@@ -29,13 +33,14 @@ func TokenAndURL() (string, string, error) {
 }
 
 func Params() (map[string]interface{}, error) {
-	cfg, err := rest.InClusterConfig()
+	caData, err := ioutil.ReadFile(rootCAFile)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "reading %s", rootCAFile)
 	}
 
-	if err := populateCAData(cfg); err != nil {
-		return nil, err
+	token, err := ioutil.ReadFile(tokenFile)
+	if err != nil {
+		return nil, errors.Wrapf(err, "reading %s", tokenFile)
 	}
 
 	kubernetesServiceHost, err := getenv(kubernetesServiceHostKey)
@@ -50,8 +55,8 @@ func Params() (map[string]interface{}, error) {
 	return map[string]interface{}{
 		"cluster": map[string]interface{}{
 			"address": fmt.Sprintf("%s:%s", kubernetesServiceHost, kubernetesServicePort),
-			"token":   cfg.BearerToken,
-			"caCert":  base64.StdEncoding.EncodeToString(cfg.CAData),
+			"token":   strings.TrimSpace(string(token)),
+			"caCert":  base64.StdEncoding.EncodeToString(caData),
 		},
 	}, nil
 }
@@ -62,15 +67,6 @@ func getenv(env string) (string, error) {
 		return "", fmt.Errorf("%s is empty", env)
 	}
 	return value, nil
-}
-
-func populateCAData(cfg *rest.Config) error {
-	bytes, err := ioutil.ReadFile(cfg.CAFile)
-	if err != nil {
-		return err
-	}
-	cfg.CAData = bytes
-	return nil
 }
 
 func readKey(key string) (string, error) {
