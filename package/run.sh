@@ -211,6 +211,16 @@ else
     info "${CATTLE_SERVER_PING} is accessible"
 fi
 
+# Extract hostname from URL
+CATTLE_SERVER_HOSTNAME=$(echo $CATTLE_SERVER | sed -e 's/[^/]*\/\/\([^@]*@\)\?\([^:/]*\).*/\2/')
+# Resolve IPv4 address(es) from hostname
+RESOLVED_ADDR=$(getent ahostsv4 $CATTLE_SERVER_HOSTNAME | sed -n 's/ *STREAM.*//p')
+
+# If CATTLE_SERVER_HOSTNAME equals RESOLVED_ADDR, its an IP address and there is nothing to resolve
+if [ "${CATTLE_SERVER_HOSTNAME}" != "${RESOLVED_ADDR}" ]; then
+  info "${CATTLE_SERVER_HOSTNAME} resolves to $(echo $RESOLVED_ADDR)"
+fi
+
 if [ -n "$CATTLE_CA_CHECKSUM" ]; then
     temp=$(mktemp)
     curl --insecure -s -fL $CATTLE_SERVER/v3/settings/cacerts | jq -r .value > $temp
