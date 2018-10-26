@@ -1,6 +1,7 @@
 package store
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -45,7 +46,7 @@ func SetPasswordStore(schemas *types.Schemas, secretStore v1.SecretInterface, ns
 		nsStore:     nsStore,
 	}
 
-	pwdTypes := []string{}
+	pwdTypes := []string{"cloudcredential"}
 
 	for _, storeType := range pwdTypes {
 		var schema *types.Schema
@@ -54,12 +55,15 @@ func SetPasswordStore(schemas *types.Schemas, secretStore v1.SecretInterface, ns
 		} else {
 			schema = schemas.Schema(&managementschema.Version, storeType)
 		}
+		ans, _ := json.Marshal(schema.ResourceFields)
+		logrus.Infof("schema fields %s", string(ans))
 		data := getFields(schema, schemas)
 		id := schema.ID
 		pwdStore.Stores[id] = schema.Store
 		pwdStore.Fields[id] = data
+		//ans, _ := json.Marshal(data)
+		//logrus.Infof("schema data %s", string(ans))
 		schema.Store = pwdStore
-
 	}
 }
 
@@ -113,6 +117,7 @@ type fieldInfo struct {
 }
 
 func (p *PasswordStore) replacePasswords(data map[string]interface{}, id string) error {
+	logrus.Info("entered replace ")
 	var fieldData []fieldInfo
 	var path []string
 	buildFieldData(convert.ToMapInterface(p.Fields[id]), data, &fieldData, path)

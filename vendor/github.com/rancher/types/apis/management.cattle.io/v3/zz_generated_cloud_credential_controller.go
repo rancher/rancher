@@ -35,7 +35,7 @@ type CloudCredentialList struct {
 	Items           []CloudCredential
 }
 
-type CloudCredentialHandlerFunc func(key string, obj *CloudCredential) error
+type CloudCredentialHandlerFunc func(key string, obj *CloudCredential) (*CloudCredential, error)
 
 type CloudCredentialLister interface {
 	List(namespace string, selector labels.Selector) (ret []*CloudCredential, err error)
@@ -46,8 +46,8 @@ type CloudCredentialController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() CloudCredentialLister
-	AddHandler(name string, handler CloudCredentialHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler CloudCredentialHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler CloudCredentialHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler CloudCredentialHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -65,10 +65,10 @@ type CloudCredentialInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() CloudCredentialController
-	AddHandler(name string, sync CloudCredentialHandlerFunc)
-	AddLifecycle(name string, lifecycle CloudCredentialLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync CloudCredentialHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle CloudCredentialLifecycle)
+	AddHandler(ctx context.Context, name string, sync CloudCredentialHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle CloudCredentialLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync CloudCredentialHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle CloudCredentialLifecycle)
 }
 
 type cloudCredentialLister struct {
@@ -116,34 +116,27 @@ func (c *cloudCredentialController) Lister() CloudCredentialLister {
 	}
 }
 
-func (c *cloudCredentialController) AddHandler(name string, handler CloudCredentialHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *cloudCredentialController) AddHandler(ctx context.Context, name string, handler CloudCredentialHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*CloudCredential); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*CloudCredential))
 	})
 }
 
-func (c *cloudCredentialController) AddClusterScopedHandler(name, cluster string, handler CloudCredentialHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *cloudCredentialController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler CloudCredentialHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*CloudCredential); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*CloudCredential))
 	})
 }
 
@@ -238,20 +231,20 @@ func (s *cloudCredentialClient) DeleteCollection(deleteOpts *metav1.DeleteOption
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *cloudCredentialClient) AddHandler(name string, sync CloudCredentialHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *cloudCredentialClient) AddHandler(ctx context.Context, name string, sync CloudCredentialHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *cloudCredentialClient) AddLifecycle(name string, lifecycle CloudCredentialLifecycle) {
+func (s *cloudCredentialClient) AddLifecycle(ctx context.Context, name string, lifecycle CloudCredentialLifecycle) {
 	sync := NewCloudCredentialLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *cloudCredentialClient) AddClusterScopedHandler(name, clusterName string, sync CloudCredentialHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *cloudCredentialClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync CloudCredentialHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *cloudCredentialClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle CloudCredentialLifecycle) {
+func (s *cloudCredentialClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle CloudCredentialLifecycle) {
 	sync := NewCloudCredentialLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

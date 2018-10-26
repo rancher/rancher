@@ -56,6 +56,14 @@ func (s *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *ty
 }
 
 func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
+	//logrus.Info("enter namespace override")
+	//
+	//ans, _ := json.Marshal(data)
+	//logrus.Infof("data  %s", string(ans))
+	//
+	//ans,_ = json.Marshal(apiContext)
+	//logrus.Infof("api %s", string(ans))
+
 	user, err := getUser(apiContext)
 	if err != nil || data == nil {
 		return nil, err

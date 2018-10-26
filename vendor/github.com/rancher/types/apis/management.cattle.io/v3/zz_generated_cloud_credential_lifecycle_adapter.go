@@ -42,10 +42,11 @@ func (w *cloudCredentialLifecycleAdapter) Updated(obj runtime.Object) (runtime.O
 func NewCloudCredentialLifecycleAdapter(name string, clusterScoped bool, client CloudCredentialInterface, l CloudCredentialLifecycle) CloudCredentialHandlerFunc {
 	adapter := &cloudCredentialLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *CloudCredential) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *CloudCredential) (*CloudCredential, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*CloudCredential); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

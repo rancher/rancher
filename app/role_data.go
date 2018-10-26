@@ -25,7 +25,8 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("templates", "templateversions").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("nodetemplates").verbs("*")
+		addRule().apiGroups("management.cattle.io").resources("nodetemplates").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("cloudcredentials").verbs("*")
 	rb.addRole("Manage Node Drivers", "nodedrivers-manage").addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("*")
 	rb.addRole("Manage Catalogs", "catalogs-manage").addRule().apiGroups("management.cattle.io").resources("catalogs", "templates", "templateversions").verbs("*")
 	rb.addRole("Use Catalog Templates", "catalogs-use").addRule().apiGroups("management.cattle.io").resources("templates", "templateversions").verbs("get", "list", "watch")
@@ -46,6 +47,7 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("nodetemplates").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("cloudcredentials").verbs("*").
 		addRule().apiGroups("project.cattle.io").resources("sourcecodecredentials").verbs("*").
 		addRule().apiGroups("project.cattle.io").resources("sourcecoderepositories").verbs("*")
 

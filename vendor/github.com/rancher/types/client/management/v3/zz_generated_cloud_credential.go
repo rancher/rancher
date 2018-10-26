@@ -11,7 +11,7 @@ const (
 	CloudCredentialFieldCreatorID       = "creatorId"
 	CloudCredentialFieldDriver          = "driver"
 	CloudCredentialFieldLabels          = "labels"
-	CloudCredentialFieldName            = "name"
+	CloudCredentialFieldName            = "displayName"
 	CloudCredentialFieldNamespaceId     = "namespaceId"
 	CloudCredentialFieldOwnerReferences = "ownerReferences"
 	CloudCredentialFieldRemoved         = "removed"
@@ -25,7 +25,7 @@ type CloudCredential struct {
 	CreatorID       string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Driver          string            `json:"driver,omitempty" yaml:"driver,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Name            string            `json:"name,omitempty" yaml:"name,omitempty"`
+	Name            string            `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	NamespaceId     string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`

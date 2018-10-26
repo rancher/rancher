@@ -25,11 +25,11 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/roletemplatebinding"
 	"github.com/rancher/rancher/pkg/api/customization/setting"
 	"github.com/rancher/rancher/pkg/api/store/cert"
+	cloudStore "github.com/rancher/rancher/pkg/api/store/cloudcredential"
 	"github.com/rancher/rancher/pkg/api/store/cluster"
 	nodeStore "github.com/rancher/rancher/pkg/api/store/node"
 	nodeTemplateStore "github.com/rancher/rancher/pkg/api/store/nodetemplate"
 	"github.com/rancher/rancher/pkg/api/store/noopwatching"
-	passwordStore "github.com/rancher/rancher/pkg/api/store/password"
 	"github.com/rancher/rancher/pkg/api/store/preference"
 	"github.com/rancher/rancher/pkg/api/store/scoped"
 	"github.com/rancher/rancher/pkg/api/store/userscope"
@@ -56,6 +56,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, schemas, &managementschema.Version,
 		client.AuthConfigType,
 		client.CatalogType,
+		client.CloudCredentialType,
 		client.ClusterAlertType,
 		client.ClusterCatalogType,
 		client.ClusterLoggingType,
@@ -146,9 +147,9 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 }
 
 func setupPasswordTypes(ctx context.Context, schemas *types.Schemas, management *config.ScaledContext) {
-	secretStore := management.Core.Secrets("")
-	nsStore := management.Core.Namespaces("")
-	passwordStore.SetPasswordStore(schemas, secretStore, nsStore)
+	//secretStore := management.Core.Secrets("")
+	//nsStore := management.Core.Namespaces("")
+	//passwordStore.SetPasswordStore(schemas, secretStore, nsStore)
 }
 
 func setupScopedTypes(schemas *types.Schemas) {
@@ -264,6 +265,7 @@ func ClusterRegistrationTokens(schemas *types.Schemas) {
 func NodeTemplates(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.NodeTemplateType)
 	npl := management.Management.NodePools("").Controller().Lister()
+	creds := management.Management.CloudCredentials("")
 	f := nodetemplate.Formatter{
 		NodePoolLister: npl,
 	}
@@ -271,9 +273,19 @@ func NodeTemplates(schemas *types.Schemas, management *config.ScaledContext) {
 	s := &nodeTemplateStore.Store{
 		Store:          userscope.NewStore(management.Core.Namespaces(""), schema.Store),
 		NodePoolLister: npl,
+		Creds: creds,
 	}
 	schema.Store = s
 	schema.Validator = nodetemplate.Validator
+
+	credentialSchema := schemas.Schema(&managementschema.Version, client.CloudCredentialType)
+	store := &cloudStore.Store{
+		Store: userscope.NewStore(management.Core.Namespaces(""), credentialSchema.Store),
+	}
+	credentialSchema.Store = store
+
+	s.Test = credentialSchema.Store
+	s.TestSchema = credentialSchema
 }
 
 func SecretTypes(ctx context.Context, schemas *types.Schemas, management *config.ScaledContext) {
