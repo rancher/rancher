@@ -51,12 +51,21 @@ func (s *Syncer) Sync(key string, obj *v3.Project) error {
 		}
 	}
 
+	changed := false
 	for k, v := range systemServices {
-		newVersion, err := v.Upgrade(versionMap[k])
+		oldVersion := versionMap[k]
+		newVersion, err := v.Upgrade(oldVersion)
 		if err != nil {
 			return err
 		}
-		versionMap[k] = newVersion
+		if oldVersion != newVersion {
+			changed = true
+			versionMap[k] = newVersion
+		}
+	}
+
+	if !changed {
+		return nil
 	}
 
 	newVersion, err := json.Marshal(versionMap)
