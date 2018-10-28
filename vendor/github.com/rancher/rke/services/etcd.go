@@ -15,8 +15,10 @@ import (
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
+	"github.com/rancher/rke/util"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -72,27 +74,38 @@ func RunEtcdPlane(
 
 func RemoveEtcdPlane(ctx context.Context, etcdHosts []*hosts.Host, force bool) error {
 	log.Infof(ctx, "[%s] Tearing down etcd plane..", ETCDRole)
-	for _, host := range etcdHosts {
-		err := docker.DoRemoveContainer(ctx, host.DClient, EtcdContainerName, host.Address)
-		if err != nil {
-			return err
-		}
-		if !host.IsWorker || !host.IsControl || force {
-			// remove unschedulable kubelet on etcd host
-			if err := removeKubelet(ctx, host); err != nil {
-				return err
-			}
-			if err := removeKubeproxy(ctx, host); err != nil {
-				return err
-			}
-			if err := removeNginxProxy(ctx, host); err != nil {
-				return err
-			}
-			if err := removeSidekick(ctx, host); err != nil {
-				return err
-			}
-		}
 
+	var errgrp errgroup.Group
+	hostsQueue := util.GetObjectQueue(etcdHosts)
+	for w := 0; w < WorkerThreads; w++ {
+		errgrp.Go(func() error {
+			var errList []error
+			for host := range hostsQueue {
+				runHost := host.(*hosts.Host)
+				if err := docker.DoRemoveContainer(ctx, runHost.DClient, EtcdContainerName, runHost.Address); err != nil {
+					errList = append(errList, err)
+				}
+				if !runHost.IsWorker || !runHost.IsControl || force {
+					// remove unschedulable kubelet on etcd host
+					if err := removeKubelet(ctx, runHost); err != nil {
+						errList = append(errList, err)
+					}
+					if err := removeKubeproxy(ctx, runHost); err != nil {
+						errList = append(errList, err)
+					}
+					if err := removeNginxProxy(ctx, runHost); err != nil {
+						errList = append(errList, err)
+					}
+					if err := removeSidekick(ctx, runHost); err != nil {
+						errList = append(errList, err)
+					}
+				}
+			}
+			return util.ErrList(errList)
+		})
+	}
+	if err := errgrp.Wait(); err != nil {
+		return err
 	}
 	log.Infof(ctx, "[%s] Successfully tore down etcd plane..", ETCDRole)
 	return nil

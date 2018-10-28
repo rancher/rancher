@@ -176,8 +176,8 @@ func FetchCertificatesFromHost(ctx context.Context, extraHosts []*hosts.Host, ho
 		if err != nil && (!strings.HasPrefix(certName, "kube-etcd") &&
 			!strings.Contains(certName, APIProxyClientCertName) &&
 			!strings.Contains(certName, RequestHeaderCACertName)) {
-			if strings.Contains(err.Error(), "no such file or directory") ||
-				strings.Contains(err.Error(), "Could not find the file") {
+			// IsErrNotFound doesn't catch this because it's a custom error
+			if isFileNotFoundErr(err) {
 				return nil, nil
 			}
 			return nil, err
@@ -279,4 +279,13 @@ func populateCertMap(tmpCerts map[string]CertificatePKI, localConfigPath string,
 	}
 
 	return certs
+}
+
+func isFileNotFoundErr(e error) bool {
+	if strings.Contains(e.Error(), "no such file or directory") ||
+		strings.Contains(e.Error(), "Could not find the file") ||
+		strings.Contains(e.Error(), "No such container:path:") {
+		return true
+	}
+	return false
 }

@@ -172,6 +172,13 @@ rules:
       - get
       - list
       - watch
+  - apiGroups:
+      - ''
+    resources:
+      - nodes/status
+    verbs:
+      - patch
+      - update
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding
