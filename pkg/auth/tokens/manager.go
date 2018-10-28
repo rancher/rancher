@@ -650,7 +650,7 @@ func (m *Manager) GetGroupsForTokenAuthProvider(token *v3.Token) []v3.Principal 
 func (m *Manager) IsMemberOf(token v3.Token, group v3.Principal) bool {
 	attribs, err := m.userAttributeLister.Get("", token.UserID)
 	if err != nil && !apierrors.IsNotFound(err) {
-		logrus.Warnf("Problem getting userAttribute while determing group membership for %v in %v (%v): %v", token.UserID,
+		logrus.Warnf("Problem getting userAttribute while determining group membership for %v in %v (%v): %v", token.UserID,
 			group.Name, group.DisplayName, err)
 		// if err not nil, then attribs will be nil. So, below code will handle it
 	}
