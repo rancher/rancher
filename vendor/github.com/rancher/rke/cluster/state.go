@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
+	"github.com/rancher/rke/util"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -156,10 +157,18 @@ func saveStateToNodes(ctx context.Context, uniqueHosts []*hosts.Host, clusterSta
 		return err
 	}
 	var errgrp errgroup.Group
-	for _, host := range uniqueHosts {
-		runHost := host
+
+	hostsQueue := util.GetObjectQueue(uniqueHosts)
+	for w := 0; w < WorkerThreads; w++ {
 		errgrp.Go(func() error {
-			return pki.DeployStateOnPlaneHost(ctx, runHost, alpineImage, prsMap, string(clusterFile))
+			var errList []error
+			for host := range hostsQueue {
+				err := pki.DeployStateOnPlaneHost(ctx, host.(*hosts.Host), alpineImage, prsMap, string(clusterFile))
+				if err != nil {
+					errList = append(errList, err)
+				}
+			}
+			return util.ErrList(errList)
 		})
 	}
 	if err := errgrp.Wait(); err != nil {

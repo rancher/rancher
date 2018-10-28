@@ -41,41 +41,43 @@ func RunControlPlane(ctx context.Context, controlHosts []*hosts.Host, localConnD
 
 func RemoveControlPlane(ctx context.Context, controlHosts []*hosts.Host, force bool) error {
 	log.Infof(ctx, "[%s] Tearing down the Controller Plane..", ControlRole)
-	for _, host := range controlHosts {
-		// remove KubeAPI
-		if err := removeKubeAPI(ctx, host); err != nil {
-			return err
-		}
-
-		// remove KubeController
-		if err := removeKubeController(ctx, host); err != nil {
-			return nil
-		}
-
-		// remove scheduler
-		err := removeScheduler(ctx, host)
-		if err != nil {
-			return err
-		}
-
-		// check if the host already is a worker
-		if host.IsWorker {
-			log.Infof(ctx, "[%s] Host [%s] is already a worker host, skipping delete kubelet and kubeproxy.", ControlRole, host.Address)
-		} else {
-			// remove KubeAPI
-			if err := removeKubelet(ctx, host); err != nil {
-				return err
+	var errgrp errgroup.Group
+	hostsQueue := util.GetObjectQueue(controlHosts)
+	for w := 0; w < WorkerThreads; w++ {
+		errgrp.Go(func() error {
+			var errList []error
+			for host := range hostsQueue {
+				runHost := host.(*hosts.Host)
+				if err := removeKubeAPI(ctx, runHost); err != nil {
+					errList = append(errList, err)
+				}
+				if err := removeKubeController(ctx, runHost); err != nil {
+					errList = append(errList, err)
+				}
+				if err := removeScheduler(ctx, runHost); err != nil {
+					errList = append(errList, err)
+				}
+				// force is true in remove, false in reconcile
+				if force {
+					if err := removeKubelet(ctx, runHost); err != nil {
+						errList = append(errList, err)
+					}
+					if err := removeKubeproxy(ctx, runHost); err != nil {
+						errList = append(errList, err)
+					}
+					if err := removeSidekick(ctx, runHost); err != nil {
+						errList = append(errList, err)
+					}
+				}
 			}
-			// remove KubeController
-			if err := removeKubeproxy(ctx, host); err != nil {
-				return nil
-			}
-			// remove Sidekick
-			if err := removeSidekick(ctx, host); err != nil {
-				return err
-			}
-		}
+			return util.ErrList(errList)
+		})
 	}
+
+	if err := errgrp.Wait(); err != nil {
+		return err
+	}
+
 	log.Infof(ctx, "[%s] Successfully tore down Controller Plane..", ControlRole)
 	return nil
 }

@@ -63,27 +63,38 @@ func doDeployWorkerPlaneHost(ctx context.Context, host *hosts.Host, localConnDia
 
 func RemoveWorkerPlane(ctx context.Context, workerHosts []*hosts.Host, force bool) error {
 	log.Infof(ctx, "[%s] Tearing down Worker Plane..", WorkerRole)
-	for _, host := range workerHosts {
-		// check if the host already is a controlplane
-		if host.IsControl && !force {
-			log.Infof(ctx, "[%s] Host [%s] is already a controlplane host, nothing to do.", WorkerRole, host.Address)
-			return nil
-		}
-
-		if err := removeKubelet(ctx, host); err != nil {
-			return err
-		}
-		if err := removeKubeproxy(ctx, host); err != nil {
-			return err
-		}
-		if err := removeNginxProxy(ctx, host); err != nil {
-			return err
-		}
-		if err := removeSidekick(ctx, host); err != nil {
-			return err
-		}
-		log.Infof(ctx, "[%s] Successfully tore down Worker Plane..", WorkerRole)
+	var errgrp errgroup.Group
+	hostsQueue := util.GetObjectQueue(workerHosts)
+	for w := 0; w < WorkerThreads; w++ {
+		errgrp.Go(func() error {
+			var errList []error
+			for host := range hostsQueue {
+				runHost := host.(*hosts.Host)
+				if runHost.IsControl && !force {
+					log.Infof(ctx, "[%s] Host [%s] is already a controlplane host, nothing to do.", WorkerRole, runHost.Address)
+					return nil
+				}
+				if err := removeKubelet(ctx, runHost); err != nil {
+					errList = append(errList, err)
+				}
+				if err := removeKubeproxy(ctx, runHost); err != nil {
+					errList = append(errList, err)
+				}
+				if err := removeNginxProxy(ctx, runHost); err != nil {
+					errList = append(errList, err)
+				}
+				if err := removeSidekick(ctx, runHost); err != nil {
+					errList = append(errList, err)
+				}
+			}
+			return util.ErrList(errList)
+		})
 	}
+
+	if err := errgrp.Wait(); err != nil {
+		return err
+	}
+	log.Infof(ctx, "[%s] Successfully tore down Worker Plane..", WorkerRole)
 
 	return nil
 }
