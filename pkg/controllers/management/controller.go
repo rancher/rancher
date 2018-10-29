@@ -8,7 +8,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/catalog"
 	"github.com/rancher/rancher/pkg/controllers/management/cluster"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterdeploy"
-	"github.com/rancher/rancher/pkg/controllers/management/clusterevents"
 	"github.com/rancher/rancher/pkg/controllers/management/clustergc"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstats"
@@ -33,7 +32,6 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	catalog.Register(ctx, management)
 	cluster.Register(management)
 	clusterdeploy.Register(management, manager)
-	clusterevents.Register(ctx, management)
 	clustergc.Register(management)
 	clusterprovisioner.Register(management)
 	clusterstats.Register(management, manager)

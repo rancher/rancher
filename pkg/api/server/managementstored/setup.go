@@ -58,7 +58,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.CatalogType,
 		client.ClusterAlertType,
 		client.ClusterCatalogType,
-		client.ClusterEventType,
 		client.ClusterLoggingType,
 		client.ClusterRegistrationTokenType,
 		client.ClusterRoleTemplateBindingType,
