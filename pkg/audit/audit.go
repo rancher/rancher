@@ -2,6 +2,7 @@ package audit
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -41,7 +42,7 @@ type auditLog struct {
 type log struct {
 	AuditID           k8stypes.UID `json:"auditID,omitempty"`
 	RequestURI        string       `json:"requestURI,omitempty"`
-	User              *userInfo    `json:"user,omitempty"`
+	User              *UserInfo    `json:"user,omitempty"`
 	Method            string       `json:"method,omitempty"`
 	RemoteAddr        string       `json:"remoteAddr,omitempty"`
 	RequestTimestamp  string       `json:"requestTimestamp,omitempty"`
@@ -53,9 +54,27 @@ type log struct {
 	ResponseBody      []byte       `json:"responseBody,omitempty"`
 }
 
-type userInfo struct {
-	Name  string `json:"name,omitempty"`
-	Group string `json:"group,omitempty"`
+var userKey struct{}
+
+type UserInfo struct {
+	Name  string   `json:"name,omitempty"`
+	Group []string `json:"group,omitempty"`
+	// RequestUser is the --as user
+	RequestUser string `json:"requestUser,omitempty"`
+	// RequestGroups is the --as-group list
+	RequestGroups []string `json:"requestGroups,omitempty"`
+}
+
+func GetUserInfo(req *http.Request) *UserInfo {
+	return &UserInfo{
+		Name:  req.Header.Get("Impersonate-User"),
+		Group: req.Header["Impersonate-Group"],
+	}
+}
+
+func FromContext(ctx context.Context) (*UserInfo, bool) {
+	u, ok := ctx.Value(userKey).(*UserInfo)
+	return u, ok
 }
 
 func new(writer *LogWriter, req *http.Request) (*auditLog, error) {
@@ -81,11 +100,7 @@ func new(writer *LogWriter, req *http.Request) (*auditLog, error) {
 	return auditLog, nil
 }
 
-func (a *auditLog) write(reqHeaders, resHeaders http.Header, resCode int, resBody []byte) error {
-	userInfo := &userInfo{
-		Name:  reqHeaders.Get("Impersonate-User"),
-		Group: reqHeaders.Get("Impersonate-Group"),
-	}
+func (a *auditLog) write(userInfo *UserInfo, reqHeaders, resHeaders http.Header, resCode int, resBody []byte) error {
 	a.log.User = userInfo
 	a.log.ResponseTimestamp = time.Now().Format(time.RFC3339)
 	a.log.RequestHeader = filterOutHeaders(reqHeaders, sensitiveRequestHeader)
