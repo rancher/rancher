@@ -145,7 +145,17 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, cmt *CatalogInfo) e
 				}
 			}
 
-			v.ExternalID = fmt.Sprintf("catalog://?catalog=%s&template=%s&version=%s", catalog.Name, template.Spec.FolderName, v.Version)
+			if catalogType == client.ClusterCatalogType {
+				v.ExternalID = fmt.Sprintf("catalog://?catalog=%s-%s&template=%s&version=%s", clusterCatalog.ClusterName, catalog.Name, template.Spec.FolderName, v.Version)
+			} else if catalogType == client.ProjectCatalogType {
+				split := strings.SplitN(projectCatalog.ProjectName, ":", 2)
+				if len(split) != 2 {
+					return fmt.Errorf("Project ID invalid while creating template")
+				}
+				v.ExternalID = fmt.Sprintf("catalog://?catalog=%s-%s-%s&template=%s&version=%s", split[0], split[1], catalog.Name, template.Spec.FolderName, v.Version)
+			} else {
+				v.ExternalID = fmt.Sprintf("catalog://?catalog=%s&template=%s&version=%s", catalog.Name, template.Spec.FolderName, v.Version)
+			}
 			versions = append(versions, v)
 		}
 		var categories []string
