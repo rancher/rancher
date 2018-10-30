@@ -25,23 +25,23 @@ type calculateLimitController struct {
 	clusterName   string
 }
 
-func (c *calculateLimitController) calculateResourceQuotaUsed(key string, ns *corev1.Namespace) error {
+func (c *calculateLimitController) calculateResourceQuotaUsed(key string, ns *corev1.Namespace) (*corev1.Namespace, error) {
 	if ns == nil {
-		return nil
+		return nil, nil
 	}
 	projectID := getProjectID(ns)
 	if projectID == "" {
-		return nil
+		return nil, nil
 	}
-	return c.calculateProjectResourceQuota(projectID)
+	return nil, c.calculateProjectResourceQuota(projectID)
 }
 
-func (c *calculateLimitController) calculateResourceQuotaUsedProject(key string, p *v3.Project) error {
+func (c *calculateLimitController) calculateResourceQuotaUsedProject(key string, p *v3.Project) (*v3.Project, error) {
 	if p == nil || p.DeletionTimestamp != nil {
-		return nil
+		return nil, nil
 	}
 
-	return c.calculateProjectResourceQuota(fmt.Sprintf("%s:%s", c.clusterName, p.Name))
+	return nil, c.calculateProjectResourceQuota(fmt.Sprintf("%s:%s", c.clusterName, p.Name))
 }
 
 func (c *calculateLimitController) calculateProjectResourceQuota(projectID string) error {

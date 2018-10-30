@@ -1,6 +1,7 @@
 package nslabels
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -22,24 +23,24 @@ type namespaceHandler struct {
 	nsClient typescorev1.NamespaceInterface
 }
 
-func Register(cluster *config.UserOnlyContext) {
+func Register(ctx context.Context, cluster *config.UserOnlyContext) {
 	logrus.Infof("Registering namespaceHandler for adding labels ")
 	nsh := &namespaceHandler{
 		secrets:  cluster.Core.Secrets(""),
 		nsClient: cluster.Core.Namespaces(""),
 	}
-	cluster.Core.Namespaces("").AddHandler("namespaceHandler", nsh.Sync)
+	cluster.Core.Namespaces("").AddHandler(ctx, "namespaceHandler", nsh.Sync)
 }
 
-func (nsh *namespaceHandler) Sync(key string, ns *corev1.Namespace) error {
+func (nsh *namespaceHandler) Sync(key string, ns *corev1.Namespace) (*corev1.Namespace, error) {
 	if ns == nil {
-		return nil
+		return nil, nil
 	}
 	logrus.Debugf("namespaceHandler: Sync: key=%v, ns=%+v", key, *ns)
 
 	field, ok := ns.Annotations[ProjectIDFieldLabel]
 	if !ok {
-		return nil
+		return nil, nil
 	}
 
 	projectID := ""
@@ -47,7 +48,7 @@ func (nsh *namespaceHandler) Sync(key string, ns *corev1.Namespace) error {
 	if field != "" {
 		splits := strings.Split(field, ":")
 		if len(splits) != 2 {
-			return nil
+			return nil, nil
 		}
 		projectID = splits[1]
 		clusterID = splits[0]
@@ -57,10 +58,10 @@ func (nsh *namespaceHandler) Sync(key string, ns *corev1.Namespace) error {
 
 	if err := nsh.addProjectIDLabelToNamespace(ns, projectID, clusterID); err != nil {
 		logrus.Errorf("namespaceHandler: Sync: error adding project id label to namespace err=%v", err)
-		return nil
+		return nil, nil
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (nsh *namespaceHandler) addProjectIDLabelToNamespace(ns *corev1.Namespace, projectID string, clusterID string) error {

@@ -1,6 +1,7 @@
 package clusterprovisioner
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -39,7 +40,7 @@ type Provisioner struct {
 	backoff           *flowcontrol.Backoff
 }
 
-func Register(management *config.ManagementContext) {
+func Register(ctx context.Context, management *config.ManagementContext) {
 	p := &Provisioner{
 		Driver:            service.NewEngineService(NewPersistentStore(management.Core.Namespaces(""), management.Core)),
 		Clusters:          management.Management.Clusters(""),
@@ -49,8 +50,8 @@ func Register(management *config.ManagementContext) {
 	}
 
 	// Add handlers
-	p.Clusters.AddLifecycle("cluster-provisioner-controller", p)
-	management.Management.Nodes("").AddHandler("cluster-provisioner-controller", p.machineChanged)
+	p.Clusters.AddLifecycle(ctx, "cluster-provisioner-controller", p)
+	management.Management.Nodes("").AddHandler(ctx, "cluster-provisioner-controller", p.machineChanged)
 
 	local := &rkedialerfactory.RKEDialerFactory{
 		Factory: management.Dialer,
@@ -125,12 +126,12 @@ func (p *Provisioner) update(cluster *v3.Cluster, create bool) (*v3.Cluster, err
 	return cluster, nil
 }
 
-func (p *Provisioner) machineChanged(key string, machine *v3.Node) error {
+func (p *Provisioner) machineChanged(key string, machine *v3.Node) (*v3.Node, error) {
 	parts := strings.SplitN(key, "/", 2)
 
 	p.ClusterController.Enqueue("", parts[0])
 
-	return nil
+	return nil, nil
 }
 
 func (p *Provisioner) Create(cluster *v3.Cluster) (*v3.Cluster, error) {

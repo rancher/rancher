@@ -27,9 +27,9 @@ type PodsController struct {
 	clusterName        string
 }
 
-func (c *PodsController) sync(key string, obj *corev1.Pod) error {
+func (c *PodsController) sync(key string, obj *corev1.Pod) (*corev1.Pod, error) {
 	if obj == nil && !strings.HasSuffix(key, allEndpoints) {
-		return nil
+		return nil, nil
 	}
 
 	var pods []*corev1.Pod
@@ -42,16 +42,16 @@ func (c *PodsController) sync(key string, obj *corev1.Pod) error {
 		}
 		pods, err = c.podLister.List(namespace, labels.NewSelector())
 		if err != nil {
-			return err
+			return nil, err
 		}
 		services, err = c.serviceLister.List(namespace, labels.NewSelector())
 		if err != nil {
-			return err
+			return nil, err
 		}
 	} else {
 		services, err = c.serviceLister.List(obj.Namespace, labels.NewSelector())
 		if err != nil {
-			return err
+			return nil, err
 		}
 		pods = append(pods, obj)
 	}
@@ -60,19 +60,19 @@ func (c *PodsController) sync(key string, obj *corev1.Pod) error {
 	workloadsToUpdate := map[string]*workloadutil.Workload{}
 	nodeNameToMachine, err := getNodeNameToMachine(c.clusterName, c.machinesLister, c.nodeLister)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	for _, pod := range pods {
 		updated, err := c.updatePodEndpoints(pod, services, nodeNameToMachine)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if updated {
 			if pod.Spec.NodeName != "" && podHasHostPort(pod) {
 				nodesToUpdate[pod.Spec.NodeName] = true
 				workloads, err := c.workloadController.GetWorkloadsMatchingLabels(pod.Namespace, pod.Labels)
 				if err != nil {
-					return err
+					return nil, err
 				}
 				for _, w := range workloads {
 					workloadsToUpdate[key] = w
@@ -86,7 +86,7 @@ func (c *PodsController) sync(key string, obj *corev1.Pod) error {
 		c.workloadController.EnqueueWorkload(w)
 	}
 
-	return nil
+	return nil, nil
 }
 
 func podHasHostPort(obj *corev1.Pod) bool {

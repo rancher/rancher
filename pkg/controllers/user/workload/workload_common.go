@@ -1,6 +1,7 @@
 package workload
 
 import (
+	"context"
 	"strconv"
 	"strings"
 
@@ -90,7 +91,7 @@ type CommonController struct {
 	Sync                        func(key string, w *Workload) error
 }
 
-func NewWorkloadController(workload *config.UserOnlyContext, f func(key string, w *Workload) error) CommonController {
+func NewWorkloadController(ctx context.Context, workload *config.UserOnlyContext, f func(key string, w *Workload) error) CommonController {
 	c := CommonController{
 		DeploymentLister:            workload.Apps.Deployments("").Controller().Lister(),
 		ReplicationControllerLister: workload.Core.ReplicationControllers("").Controller().Lister(),
@@ -109,94 +110,94 @@ func NewWorkloadController(workload *config.UserOnlyContext, f func(key string, 
 		Sync:                        f,
 	}
 	if f != nil {
-		workload.Apps.Deployments("").AddHandler(getName(), c.syncDeployments)
-		workload.Core.ReplicationControllers("").AddHandler(getName(), c.syncReplicationControllers)
-		workload.Apps.ReplicaSets("").AddHandler(getName(), c.syncReplicaSet)
-		workload.Apps.DaemonSets("").AddHandler(getName(), c.syncDaemonSet)
-		workload.Apps.StatefulSets("").AddHandler(getName(), c.syncStatefulSet)
-		workload.BatchV1.Jobs("").AddHandler(getName(), c.syncJob)
-		workload.BatchV1Beta1.CronJobs("").AddHandler(getName(), c.syncCronJob)
+		workload.Apps.Deployments("").AddHandler(ctx, getName(), c.syncDeployments)
+		workload.Core.ReplicationControllers("").AddHandler(ctx, getName(), c.syncReplicationControllers)
+		workload.Apps.ReplicaSets("").AddHandler(ctx, getName(), c.syncReplicaSet)
+		workload.Apps.DaemonSets("").AddHandler(ctx, getName(), c.syncDaemonSet)
+		workload.Apps.StatefulSets("").AddHandler(ctx, getName(), c.syncStatefulSet)
+		workload.BatchV1.Jobs("").AddHandler(ctx, getName(), c.syncJob)
+		workload.BatchV1Beta1.CronJobs("").AddHandler(ctx, getName(), c.syncCronJob)
 	}
 	return c
 }
 
-func (c *CommonController) syncDeployments(key string, obj *corev1beta2.Deployment) error {
+func (c *CommonController) syncDeployments(key string, obj *corev1beta2.Deployment) (*corev1beta2.Deployment, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
-		return nil
+		return nil, nil
 	}
 
 	w, err := c.getWorkload(key, DeploymentType)
 	if err != nil || w == nil {
-		return err
+		return nil, err
 	}
 
-	return c.Sync(key, w)
+	return nil, c.Sync(key, w)
 }
 
-func (c *CommonController) syncReplicationControllers(key string, obj *corev1.ReplicationController) error {
+func (c *CommonController) syncReplicationControllers(key string, obj *corev1.ReplicationController) (*corev1.ReplicationController, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
-		return nil
+		return nil, nil
 	}
 	w, err := c.getWorkload(key, ReplicationControllerType)
 	if err != nil || w == nil {
-		return err
+		return nil, err
 	}
-	return c.Sync(key, w)
+	return nil, c.Sync(key, w)
 }
 
-func (c *CommonController) syncReplicaSet(key string, obj *corev1beta2.ReplicaSet) error {
+func (c *CommonController) syncReplicaSet(key string, obj *corev1beta2.ReplicaSet) (*corev1beta2.ReplicaSet, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
-		return nil
+		return nil, nil
 	}
 	w, err := c.getWorkload(key, ReplicaSetType)
 	if err != nil || w == nil {
-		return err
+		return nil, err
 	}
-	return c.Sync(key, w)
+	return nil, c.Sync(key, w)
 }
 
-func (c *CommonController) syncDaemonSet(key string, obj *corev1beta2.DaemonSet) error {
+func (c *CommonController) syncDaemonSet(key string, obj *corev1beta2.DaemonSet) (*corev1beta2.DaemonSet, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
-		return nil
+		return nil, nil
 	}
 	w, err := c.getWorkload(key, DaemonSetType)
 	if err != nil || w == nil {
-		return err
+		return nil, err
 	}
-	return c.Sync(key, w)
+	return nil, c.Sync(key, w)
 }
 
-func (c *CommonController) syncStatefulSet(key string, obj *corev1beta2.StatefulSet) error {
+func (c *CommonController) syncStatefulSet(key string, obj *corev1beta2.StatefulSet) (*corev1beta2.StatefulSet, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
-		return nil
+		return nil, nil
 	}
 	w, err := c.getWorkload(key, StatefulSetType)
 	if err != nil || w == nil {
-		return err
+		return nil, err
 	}
-	return c.Sync(key, w)
+	return nil, c.Sync(key, w)
 }
 
-func (c *CommonController) syncJob(key string, obj *corebatchv1.Job) error {
+func (c *CommonController) syncJob(key string, obj *corebatchv1.Job) (*corebatchv1.Job, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
-		return nil
+		return nil, nil
 	}
 	w, err := c.getWorkload(key, JobType)
 	if err != nil || w == nil {
-		return err
+		return nil, err
 	}
-	return c.Sync(key, w)
+	return nil, c.Sync(key, w)
 }
 
-func (c *CommonController) syncCronJob(key string, obj *corebatchv1beta1.CronJob) error {
+func (c *CommonController) syncCronJob(key string, obj *corebatchv1beta1.CronJob) (*corebatchv1beta1.CronJob, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
-		return nil
+		return nil, nil
 	}
 	w, err := c.getWorkload(key, CronJobType)
 	if err != nil || w == nil {
-		return err
+		return nil, err
 	}
-	return c.Sync(key, w)
+	return nil, c.Sync(key, w)
 }
 
 func (c CommonController) getWorkload(key string, objectType string) (*Workload, error) {

@@ -43,12 +43,12 @@ type Deployer struct {
 	clusterName        string
 }
 
-func (d *Deployer) ProjectSync(key string, alert *v3.ProjectAlert) error {
-	return d.sync()
+func (d *Deployer) ProjectSync(key string, alert *v3.ProjectAlert) (*v3.ProjectAlert, error) {
+	return nil, d.sync()
 }
 
-func (d *Deployer) ClusterSync(key string, alert *v3.ClusterAlert) error {
-	return d.sync()
+func (d *Deployer) ClusterSync(key string, alert *v3.ClusterAlert) (*v3.ClusterAlert, error) {
+	return nil, d.sync()
 }
 
 //deploy or clean up resources(alertmanager deployment, service, namespace) required by alerting.

@@ -1,6 +1,7 @@
 package podsecuritypolicy
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/rancher/types/apis/core/v1"
@@ -21,7 +22,7 @@ const namespaceByProjectNameIndex = "podsecuritypolicy.rbac.user.cattle.io/by-pr
 
 // RegisterBindings updates the pod security policy for this binding if it has been changed.  Also resync service
 // accounts so they pick up the change.  If no policy exists then exits without doing anything.
-func RegisterBindings(context *config.UserContext) {
+func RegisterBindings(ctx context.Context, context *config.UserContext) {
 	logrus.Infof("registering podsecuritypolicy project handler for cluster %v", context.ClusterName)
 
 	namespaceInformer := context.Core.Namespaces("").Controller().Informer()
@@ -44,7 +45,7 @@ func RegisterBindings(context *config.UserContext) {
 	}
 
 	context.Management.Management.PodSecurityPolicyTemplateProjectBindings("").
-		AddLifecycle("PodSecurityPolicyTemplateProjectBindingsLifecycleHandler", lifecycle)
+		AddLifecycle(ctx, "PodSecurityPolicyTemplateProjectBindingsLifecycleHandler", lifecycle)
 }
 
 func namespaceByProjectName(obj interface{}) ([]string, error) {

@@ -1,6 +1,7 @@
 package nodepool
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"sort"
@@ -31,7 +32,7 @@ type Controller struct {
 	Nodes              v3.NodeInterface
 }
 
-func Register(management *config.ManagementContext) {
+func Register(ctx context.Context, management *config.ManagementContext) {
 	p := &Controller{
 		NodePoolController: management.Management.NodePools("").Controller(),
 		NodePoolLister:     management.Management.NodePools("").Controller().Lister(),
@@ -41,8 +42,8 @@ func Register(management *config.ManagementContext) {
 	}
 
 	// Add handlers
-	p.NodePools.AddLifecycle("nodepool-provisioner", p)
-	management.Management.Nodes("").AddHandler("nodepool-provisioner", p.machineChanged)
+	p.NodePools.AddLifecycle(ctx, "nodepool-provisioner", p)
+	management.Management.Nodes("").AddHandler(ctx, "nodepool-provisioner", p.machineChanged)
 }
 
 func (c *Controller) Create(nodePool *v3.NodePool) (*v3.NodePool, error) {
@@ -79,11 +80,11 @@ func (c *Controller) Remove(nodePool *v3.NodePool) (*v3.NodePool, error) {
 	return nodePool, nil
 }
 
-func (c *Controller) machineChanged(key string, machine *v3.Node) error {
+func (c *Controller) machineChanged(key string, machine *v3.Node) (*v3.Node, error) {
 	if machine == nil {
 		nps, err := c.NodePoolLister.List("", labels.Everything())
 		if err != nil {
-			return err
+			return nil, err
 		}
 		for _, np := range nps {
 			c.NodePoolController.Enqueue(np.Namespace, np.Name)
@@ -93,7 +94,7 @@ func (c *Controller) machineChanged(key string, machine *v3.Node) error {
 		c.NodePoolController.Enqueue(ns, name)
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (c *Controller) createNode(name string, nodePool *v3.NodePool, simulate bool) (*v3.Node, error) {

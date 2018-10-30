@@ -5,14 +5,13 @@ import (
 	"sort"
 
 	"github.com/rancher/types/apis/management.cattle.io/v3"
-
 	"k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 )
 
-func (tm *RBACTemplateManager) syncForGlobalCatalog(key string, obj *v3.Catalog) error {
+func (tm *RBACTemplateManager) syncForGlobalCatalog(key string, obj *v3.Catalog) (*v3.Catalog, error) {
 	var templateRuleExists, templateVersionsRuleExists bool
 	// Not going to check here whether obj is nil/deleted or not. Whether global catalog is created, updated or deleted, this method reconciles
 	// the global user role. It gets all templates/templateversions for the global catalogs and updates the user role
@@ -20,7 +19,7 @@ func (tm *RBACTemplateManager) syncForGlobalCatalog(key string, obj *v3.Catalog)
 	//Get all templates created for global catalogs only and add them via resourceNames to the "user" role
 	r, err := labels.NewRequirement(catalogTypeLabel, selection.Equals, []string{"globalCatalog"})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	userRole, err := tm.globalRoleClient.Get("user", metav1.GetOptions{})
@@ -73,9 +72,9 @@ func (tm *RBACTemplateManager) syncForGlobalCatalog(key string, obj *v3.Catalog)
 		newRole.Rules = updatedRules
 		_, err = tm.globalRoleClient.Update(newRole)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return nil, nil
 }

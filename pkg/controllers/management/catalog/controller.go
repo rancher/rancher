@@ -69,15 +69,15 @@ func Run(ctx context.Context, cacheRoot string, refreshInterval int, management 
 	m := manager.New(management, cacheRoot)
 
 	controller := management.Management.Catalogs("").Controller()
-	controller.AddHandler("catalog", m.Sync)
+	controller.AddHandler(ctx, "catalog", m.Sync)
 
 	logrus.Infof("Starting project-level catalog controller")
 	projectCatalogController := management.Management.ProjectCatalogs("").Controller()
-	projectCatalogController.AddHandler("projectCatalog", m.ProjectCatalogSync)
+	projectCatalogController.AddHandler(ctx, "projectCatalog", m.ProjectCatalogSync)
 
 	logrus.Infof("Starting cluster-level catalog controller")
 	clusterCatalogController := management.Management.ClusterCatalogs("").Controller()
-	clusterCatalogController.AddHandler("clusterCatalog", m.ClusterCatalogSync)
+	clusterCatalogController.AddHandler(ctx, "clusterCatalog", m.ClusterCatalogSync)
 
 	go runRefreshCatalog(ctx, refreshInterval, controller, m)
 	go runRefreshProjectCatalog(ctx, refreshInterval, projectCatalogController, m)

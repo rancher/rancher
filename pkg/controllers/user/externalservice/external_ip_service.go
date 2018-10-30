@@ -32,30 +32,30 @@ func Register(ctx context.Context, workload *config.UserOnlyContext) {
 		endpoints:       workload.Core.Endpoints(""),
 		endpointsLister: workload.Core.Endpoints("").Controller().Lister(),
 	}
-	workload.Core.Services("").AddHandler("externalIpServiceController", c.sync)
+	workload.Core.Services("").AddHandler(ctx, "externalIpServiceController", c.sync)
 }
 
-func (c *Controller) sync(key string, obj *corev1.Service) error {
+func (c *Controller) sync(key string, obj *corev1.Service) (*corev1.Service, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
-		return nil
+		return nil, nil
 	}
 
 	if obj.Annotations == nil {
-		return nil
+		return nil, nil
 	}
 
 	var newSubsets []corev1.EndpointSubset
 	if val, ok := obj.Annotations[ExternalIPsAnnotation]; !ok || val == "" {
-		return nil
+		return nil, nil
 	}
 	var ipsStr []string
 	err := json.Unmarshal([]byte(obj.Annotations[ExternalIPsAnnotation]), &ipsStr)
 	if err != nil {
 		logrus.Debugf("Failed to unmarshal ipAddresses, error: %v", err)
-		return nil
+		return nil, nil
 	}
 	if ipsStr == nil {
-		return nil
+		return nil, nil
 	}
 
 	var addresses []corev1.EndpointAddress
@@ -80,7 +80,7 @@ func (c *Controller) sync(key string, obj *corev1.Service) error {
 
 	existing, err := c.endpointsLister.Get(obj.Namespace, obj.Name)
 	if err != nil && !apierrors.IsNotFound(err) {
-		return err
+		return nil, err
 	}
 
 	if existing == nil {
@@ -103,17 +103,17 @@ func (c *Controller) sync(key string, obj *corev1.Service) error {
 		}
 		logrus.Infof("Creating endpoints for external ip service [%s]: %v", key, ep.Subsets)
 		if _, err := c.endpoints.Create(ep); err != nil {
-			return err
+			return nil, err
 		}
 	} else if subsetsChanged(newSubsets, existing.Subsets) {
 		toUpdate := existing.DeepCopy()
 		toUpdate.Subsets = newSubsets
 		logrus.Infof("Updating endpoints for external ip service [%s]: %v", key, toUpdate.Subsets)
 		if _, err := c.endpoints.Update(toUpdate); err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 func subsetsChanged(new []corev1.EndpointSubset, old []corev1.EndpointSubset) bool {

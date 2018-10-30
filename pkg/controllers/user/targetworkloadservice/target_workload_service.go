@@ -50,39 +50,39 @@ type PodController struct {
 func Register(ctx context.Context, workload *config.UserOnlyContext) {
 	c := &Controller{
 		pods:            workload.Core.Pods(""),
-		workloadLister:  util.NewWorkloadController(workload, nil),
+		workloadLister:  util.NewWorkloadController(ctx, workload, nil),
 		podLister:       workload.Core.Pods("").Controller().Lister(),
 		namespaceLister: workload.Core.Namespaces("").Controller().Lister(),
 		serviceLister:   workload.Core.Services("").Controller().Lister(),
 		services:        workload.Core.Services(""),
 	}
 	p := &PodController{
-		workloadLister: util.NewWorkloadController(workload, nil),
+		workloadLister: util.NewWorkloadController(ctx, workload, nil),
 		pods:           workload.Core.Pods(""),
 		serviceLister:  workload.Core.Services("").Controller().Lister(),
 		services:       workload.Core.Services(""),
 	}
-	workload.Core.Services("").AddHandler("workloadServiceController", c.sync)
-	workload.Core.Pods("").AddHandler("podToWorkloadServiceController", p.sync)
+	workload.Core.Services("").AddHandler(ctx, "workloadServiceController", c.sync)
+	workload.Core.Pods("").AddHandler(ctx, "podToWorkloadServiceController", p.sync)
 }
 
-func (c *Controller) sync(key string, obj *corev1.Service) error {
+func (c *Controller) sync(key string, obj *corev1.Service) (*corev1.Service, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		if value, ok := workloadServiceUUIDToWorkloadIDs.Load(key); ok {
 			if err := c.updateServiceWorkloadPods(key, value.(map[string]bool)); err != nil {
-				return err
+				return nil, err
 			}
 		}
 		// delete from the workload map
 		workloadServiceUUIDToWorkloadIDs.Delete(key)
-		return nil
+		return nil, nil
 	}
 
 	workloadIDs := getServiceWorkloadIDs(obj)
 	// update pods (if needed) with service selector labels
 	targetWorkloadIDs, err := c.reconcilePods(key, obj, workloadIDs)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// if workloadIDs changed, push update for all the pods, so they reconcile the labels
@@ -98,13 +98,13 @@ func (c *Controller) sync(key string, obj *corev1.Service) error {
 	}
 
 	if err := c.updateServiceWorkloadPods(key, workloadIDsToUpdate); err != nil {
-		return err
+		return nil, err
 	}
 
 	//reset the map
 	workloadServiceUUIDToWorkloadIDs.Store(key, targetWorkloadIDs)
 
-	return nil
+	return nil, nil
 }
 
 func getServiceWorkloadIDs(obj *corev1.Service) []string {
@@ -252,14 +252,14 @@ func getServiceSelector(serviceName string) string {
 	return fmt.Sprintf("%s_%s", WorkloadIDLabelPrefix, serviceName)
 }
 
-func (c *PodController) sync(key string, obj *corev1.Pod) error {
+func (c *PodController) sync(key string, obj *corev1.Pod) (*corev1.Pod, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
-		return nil
+		return nil, nil
 	}
 	// filter out deployments that are match for the pods
 	workloads, err := c.workloadLister.GetWorkloadsMatchingLabels(obj.Namespace, obj.Labels)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	workloadServiceUUIDsToAdd := map[string]bool{}
@@ -277,7 +277,7 @@ func (c *PodController) sync(key string, obj *corev1.Pod) error {
 		parts := strings.Split(workloadServiceUUID, "/")
 		workloadService, err := c.serviceLister.Get(parts[0], parts[1])
 		if err != nil && !apierrors.IsNotFound(err) {
-			return err
+			return nil, err
 		}
 		if workloadService == nil {
 			logrus.Warnf("Failed to fetch service [%s]: [%v]", workloadServiceUUID, err)
@@ -307,10 +307,10 @@ func (c *PodController) sync(key string, obj *corev1.Pod) error {
 	}
 
 	if reflect.DeepEqual(obj.Labels, labels) {
-		return nil
+		return nil, nil
 	}
 	toUpdate := obj.DeepCopy()
 	toUpdate.Labels = labels
 	_, err = c.pods.Update(toUpdate)
-	return err
+	return nil, err
 }

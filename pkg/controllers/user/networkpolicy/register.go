@@ -1,12 +1,14 @@
 package networkpolicy
 
 import (
+	"context"
+
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 )
 
 // Register initializes the controllers and registers
-func Register(cluster *config.UserContext) {
+func Register(ctx context.Context, cluster *config.UserContext) {
 	logrus.Infof("Registering project network policy")
 
 	pnpLister := cluster.Management.Management.ProjectNetworkPolicies("").Controller().Lister()
@@ -41,14 +43,14 @@ func Register(cluster *config.UserContext) {
 
 	clusterNetAnnHandler := &clusterNetAnnHandler{clusters, cluster.ClusterName}
 
-	projects.Controller().AddClusterScopedHandler("projectSyncer", cluster.ClusterName, ps.Sync)
-	pnps.AddClusterScopedHandler("projectNetworkPolicySyncer", cluster.ClusterName, pnpsyncer.Sync)
-	nses.AddHandler("namespaceLifecycle", nss.Sync)
-	pods.AddHandler("podHandler", podHandler.Sync)
-	services.AddHandler("serviceHandler", serviceHandler.Sync)
+	projects.Controller().AddClusterScopedHandler(ctx, "projectSyncer", cluster.ClusterName, ps.Sync)
+	pnps.AddClusterScopedHandler(ctx, "projectNetworkPolicySyncer", cluster.ClusterName, pnpsyncer.Sync)
+	nses.AddHandler(ctx, "namespaceLifecycle", nss.Sync)
+	pods.AddHandler(ctx, "podHandler", podHandler.Sync)
+	services.AddHandler(ctx, "serviceHandler", serviceHandler.Sync)
 
-	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler("nodeHandler", nodeHandler.Sync)
-	clusters.AddHandler("clusterHandler", clusterHandler.Sync)
+	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler(ctx, "nodeHandler", nodeHandler.Sync)
+	clusters.AddHandler(ctx, "clusterHandler", clusterHandler.Sync)
 
-	clusters.AddHandler("clusterNetAnnHandler", clusterNetAnnHandler.Sync)
+	clusters.AddHandler(ctx, "clusterNetAnnHandler", clusterNetAnnHandler.Sync)
 }

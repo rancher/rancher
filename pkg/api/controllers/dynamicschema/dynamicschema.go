@@ -1,6 +1,7 @@
 package dynamicschema
 
 import (
+	"context"
 	"sync"
 
 	"github.com/rancher/norman/types"
@@ -17,22 +18,22 @@ type Controller struct {
 	known   map[string]bool
 }
 
-func Register(management *config.ScaledContext, schemas *types.Schemas) {
+func Register(ctx context.Context, management *config.ScaledContext, schemas *types.Schemas) {
 	c := &Controller{
 		Schemas: schemas,
 	}
-	management.Management.DynamicSchemas("").AddHandler("dynamic-schema", c.Sync)
+	management.Management.DynamicSchemas("").AddHandler(ctx, "dynamic-schema", c.Sync)
 }
 
-func (c *Controller) Sync(key string, dynamicSchema *v3.DynamicSchema) error {
+func (c *Controller) Sync(key string, dynamicSchema *v3.DynamicSchema) (*v3.DynamicSchema, error) {
 	c.Lock()
 	defer c.Unlock()
 
 	if dynamicSchema == nil {
-		return c.remove(key)
+		return nil, c.remove(key)
 	}
 
-	return c.add(dynamicSchema)
+	return nil, c.add(dynamicSchema)
 }
 
 func (c *Controller) remove(id string) error {

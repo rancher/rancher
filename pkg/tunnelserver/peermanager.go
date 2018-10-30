@@ -1,6 +1,7 @@
 package tunnelserver
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -18,8 +19,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/net"
 )
 
-func NewPeerManager(context *config.ScaledContext, dialer *remotedialer.Server) (peermanager.PeerManager, error) {
-	return startPeerManager(context, dialer)
+func NewPeerManager(ctx context.Context, context *config.ScaledContext, dialer *remotedialer.Server) (peermanager.PeerManager, error) {
+	return startPeerManager(ctx, context, dialer)
 }
 
 type peerManager struct {
@@ -33,7 +34,7 @@ type peerManager struct {
 	listeners map[chan<- peermanager.Peers]bool
 }
 
-func startPeerManager(context *config.ScaledContext, server *remotedialer.Server) (peermanager.PeerManager, error) {
+func startPeerManager(ctx context.Context, context *config.ScaledContext, server *remotedialer.Server) (peermanager.PeerManager, error) {
 	tokenBytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
 	if os.IsNotExist(err) || settings.Namespace.Get() == "" || settings.PeerServices.Get() == "" {
 		logrus.Infof("Running in single server mode, will not peer connections")
@@ -60,23 +61,23 @@ func startPeerManager(context *config.ScaledContext, server *remotedialer.Server
 		listeners: map[chan<- peermanager.Peers]bool{},
 	}
 
-	context.Core.Endpoints(settings.Namespace.Get()).AddHandler("peer-manager-controller", pm.syncService)
+	context.Core.Endpoints(settings.Namespace.Get()).AddHandler(ctx, "peer-manager-controller", pm.syncService)
 	return pm, nil
 }
 
-func (p *peerManager) syncService(key string, endpoint *v1.Endpoints) error {
+func (p *peerManager) syncService(key string, endpoint *v1.Endpoints) (*v1.Endpoints, error) {
 	if endpoint == nil {
-		return nil
+		return nil, nil
 	}
 
 	parts := strings.SplitN(key, "/", 2)
 	if len(parts) != 2 {
-		return nil
+		return nil, nil
 	}
 
 	ns, name := parts[0], parts[1]
 	if ns != settings.Namespace.Get() {
-		return nil
+		return nil, nil
 	}
 
 	for _, svc := range strings.Split(settings.PeerServices.Get(), ",") {
@@ -86,7 +87,7 @@ func (p *peerManager) syncService(key string, endpoint *v1.Endpoints) error {
 		}
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (p *peerManager) addRemovePeers(endpoints *v1.Endpoints) {

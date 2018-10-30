@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+
 	"github.com/rancher/rancher/pkg/pipeline/providers"
 	"github.com/rancher/rancher/pkg/pipeline/remote"
 	"github.com/rancher/rancher/pkg/ref"
@@ -28,7 +29,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 		sourceCodeCredentialLister: sourceCodeCredentialLister,
 	}
 
-	pipelines.AddClusterScopedLifecycle("pipeline-controller", cluster.ClusterName, pipelineLifecycle)
+	pipelines.AddClusterScopedLifecycle(ctx, "pipeline-controller", cluster.ClusterName, pipelineLifecycle)
 }
 
 func (l *Lifecycle) Create(obj *v3.Pipeline) (*v3.Pipeline, error) {

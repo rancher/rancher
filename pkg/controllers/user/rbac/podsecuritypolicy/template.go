@@ -1,6 +1,7 @@
 package podsecuritypolicy
 
 import (
+	"context"
 	"fmt"
 
 	v1beta12 "github.com/rancher/types/apis/extensions/v1beta1"
@@ -19,7 +20,7 @@ const clusterRoleByPSPTNameIndex = "podsecuritypolicy.rbac.user.cattle.io/pspt-n
 
 // RegisterTemplate propagates updates to pod security policy templates to their associated pod security policies.
 // Ignores pod security policy templates not assigned to a cluster or project.
-func RegisterTemplate(context *config.UserContext) {
+func RegisterTemplate(ctx context.Context, context *config.UserContext) {
 	logrus.Infof("registering podsecuritypolicy template handler for cluster %v", context.ClusterName)
 
 	policyInformer := context.Extensions.PodSecurityPolicies("").Controller().Informer()
@@ -46,7 +47,7 @@ func RegisterTemplate(context *config.UserContext) {
 
 	pspti := context.Management.Management.PodSecurityPolicyTemplates("")
 	psptSync := v3.NewPodSecurityPolicyTemplateLifecycleAdapter("cluster-pspt-sync_"+context.ClusterName, true, pspti, lfc)
-	context.Management.Management.PodSecurityPolicyTemplates("").AddHandler("pspt-sync", psptSync)
+	context.Management.Management.PodSecurityPolicyTemplates("").AddHandler(ctx, "pspt-sync", psptSync)
 }
 
 type Lifecycle struct {

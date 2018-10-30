@@ -27,16 +27,16 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 		projectAlerts: projectAlerts,
 		clusterName:   cluster.ClusterName,
 	}
-	projects.AddClusterScopedLifecycle("project-precan-alert-controller", cluster.ClusterName, projectLifecycle)
+	projects.AddClusterScopedLifecycle(ctx, "project-precan-alert-controller", cluster.ClusterName, projectLifecycle)
 
 	deployer := deploy.NewDeployer(cluster, alertmanager)
-	clusterAlerts.AddClusterScopedHandler("cluster-alert-deployer", cluster.ClusterName, deployer.ClusterSync)
-	projectAlerts.AddClusterScopedHandler("project-alert-deployer", cluster.ClusterName, deployer.ProjectSync)
+	clusterAlerts.AddClusterScopedHandler(ctx, "cluster-alert-deployer", cluster.ClusterName, deployer.ClusterSync)
+	projectAlerts.AddClusterScopedHandler(ctx, "project-alert-deployer", cluster.ClusterName, deployer.ProjectSync)
 
 	configSyncer := configsyner.NewConfigSyncer(ctx, cluster, alertmanager)
-	clusterAlerts.AddClusterScopedHandler("cluster-config-syncer", cluster.ClusterName, configSyncer.ClusterSync)
-	projectAlerts.AddClusterScopedHandler("project-config-syncer", cluster.ClusterName, configSyncer.ProjectSync)
-	notifiers.AddClusterScopedHandler("notifier-config-syncer", cluster.ClusterName, configSyncer.NotifierSync)
+	clusterAlerts.AddClusterScopedHandler(ctx, "cluster-config-syncer", cluster.ClusterName, configSyncer.ClusterSync)
+	projectAlerts.AddClusterScopedHandler(ctx, "project-config-syncer", cluster.ClusterName, configSyncer.ProjectSync)
+	notifiers.AddClusterScopedHandler(ctx, "notifier-config-syncer", cluster.ClusterName, configSyncer.NotifierSync)
 
 	statesyncer.StartStateSyncer(ctx, cluster, alertmanager)
 
@@ -44,7 +44,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	watcher.StartPodWatcher(ctx, cluster, alertmanager)
 	watcher.StartNodeWatcher(ctx, cluster, alertmanager)
 	watcher.StartWorkloadWatcher(ctx, cluster, alertmanager)
-	watcher.StartEventWatcher(cluster, alertmanager)
+	watcher.StartEventWatcher(ctx, cluster, alertmanager)
 
 	initClusterPreCanAlerts(clusterAlerts, cluster.ClusterName)
 

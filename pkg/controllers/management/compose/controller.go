@@ -1,6 +1,7 @@
 package compose
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -38,7 +39,7 @@ type Lifecycle struct {
 	ComposeClient   v3.ComposeConfigInterface
 }
 
-func Register(managementContext *config.ManagementContext, portGetter common.KubeConfigGetter) {
+func Register(ctx context.Context, managementContext *config.ManagementContext, portGetter common.KubeConfigGetter) {
 	composeClient := managementContext.Management.ComposeConfigs("")
 	tokenClient := managementContext.Management.Tokens("")
 	userClient := managementContext.Management.Users("")
@@ -49,12 +50,12 @@ func Register(managementContext *config.ManagementContext, portGetter common.Kub
 		UserClient:      userClient,
 		ComposeClient:   composeClient,
 	}
-	composeClient.AddHandler("compose-controller", l.sync)
+	composeClient.AddHandler(ctx, "compose-controller", l.sync)
 }
 
-func (l Lifecycle) sync(key string, obj *v3.ComposeConfig) error {
+func (l Lifecycle) sync(key string, obj *v3.ComposeConfig) (*v3.ComposeConfig, error) {
 	if key == "" || obj == nil {
-		return nil
+		return nil, nil
 	}
 	newObj, err := v3.ComposeConditionExecuted.Once(obj, func() (runtime.Object, error) {
 		obj, err := l.Create(obj)
@@ -66,8 +67,8 @@ func (l Lifecycle) sync(key string, obj *v3.ComposeConfig) error {
 		return obj, nil
 	})
 
-	_, err = l.ComposeClient.Update(newObj.(*v3.ComposeConfig))
-	return err
+	obj, _ = l.ComposeClient.Update(newObj.(*v3.ComposeConfig))
+	return obj, err
 }
 
 func (l Lifecycle) Create(obj *v3.ComposeConfig) (*v3.ComposeConfig, error) {

@@ -1,6 +1,7 @@
 package podsecuritypolicy
 
 import (
+	"context"
 	"fmt"
 
 	v12 "github.com/rancher/types/apis/core/v1"
@@ -29,7 +30,7 @@ type clusterManager struct {
 
 // RegisterCluster updates the pod security policy if the pod security policy template default for this cluster has been
 // updated, then resyncs all service accounts in this namespace.
-func RegisterCluster(context *config.UserContext) {
+func RegisterCluster(ctx context.Context, context *config.UserContext) {
 	logrus.Infof("registering podsecuritypolicy cluster handler for cluster %v", context.ClusterName)
 
 	m := &clusterManager{
@@ -45,15 +46,15 @@ func RegisterCluster(context *config.UserContext) {
 		serviceAccountsController: context.Core.ServiceAccounts("").Controller(),
 	}
 
-	context.Management.Management.Clusters("").AddHandler("ClusterSyncHandler", m.sync)
+	context.Management.Management.Clusters("").AddHandler(ctx, "ClusterSyncHandler", m.sync)
 }
 
-func (m *clusterManager) sync(key string, obj *v3.Cluster) error {
+func (m *clusterManager) sync(key string, obj *v3.Cluster) (*v3.Cluster, error) {
 	if obj == nil ||
 		m.clusterName != obj.Name ||
 		obj.Spec.DefaultPodSecurityPolicyTemplateName == obj.Status.AppliedPodSecurityPolicyTemplateName {
 		// Nothing to do
-		return nil
+		return nil, nil
 	}
 
 	if obj.Spec.DefaultPodSecurityPolicyTemplateName != "" {
@@ -64,7 +65,7 @@ func (m *clusterManager) sync(key string, obj *v3.Cluster) error {
 			if errors.IsNotFound(err) {
 				template, err := m.templateLister.Get("", obj.Spec.DefaultPodSecurityPolicyTemplateName)
 				if err != nil {
-					return fmt.Errorf("error getting pspt: %v", err)
+					return nil, fmt.Errorf("error getting pspt: %v", err)
 				}
 
 				objectMeta := metav1.ObjectMeta{}
@@ -84,10 +85,10 @@ func (m *clusterManager) sync(key string, obj *v3.Cluster) error {
 
 				_, err = m.policies.Create(psp)
 				if err != nil {
-					return fmt.Errorf("error creating psp: %v", err)
+					return nil, fmt.Errorf("error creating psp: %v", err)
 				}
 			} else {
-				return fmt.Errorf("error getting policy: %v", err)
+				return nil, fmt.Errorf("error getting policy: %v", err)
 			}
 		}
 
@@ -116,21 +117,21 @@ func (m *clusterManager) sync(key string, obj *v3.Cluster) error {
 
 				_, err := m.clusterRoles.Create(newRole)
 				if err != nil {
-					return fmt.Errorf("error creating cluster role: %v", err)
+					return nil, fmt.Errorf("error creating cluster role: %v", err)
 				}
 			} else {
-				return fmt.Errorf("error getting cluster role: %v", err)
+				return nil, fmt.Errorf("error getting cluster role: %v", err)
 			}
 		}
 
 		obj.Status.AppliedPodSecurityPolicyTemplateName = obj.Spec.DefaultPodSecurityPolicyTemplateName
 		_, err = m.clusters.Update(obj)
 		if err != nil {
-			return fmt.Errorf("error updating cluster: %v", err)
+			return nil, fmt.Errorf("error updating cluster: %v", err)
 		}
 
-		return resyncServiceAccounts(m.serviceAccountLister, m.serviceAccountsController, "")
+		return nil, resyncServiceAccounts(m.serviceAccountLister, m.serviceAccountsController, "")
 	}
 
-	return nil
+	return nil, nil
 }

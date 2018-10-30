@@ -62,20 +62,20 @@ func Register(ctx context.Context, workload *config.UserOnlyContext) {
 		serviceController: workload.Core.Services("").Controller(),
 		serviceLister:     workload.Core.Services("").Controller().Lister(),
 	}
-	workload.Core.Services("").AddHandler("dnsRecordController", c.sync)
-	workload.Core.Endpoints("").AddHandler("dnsRecordEndpointsController", e.reconcileServicesForEndpoint)
+	workload.Core.Services("").AddHandler(ctx, "dnsRecordController", c.sync)
+	workload.Core.Endpoints("").AddHandler(ctx, "dnsRecordEndpointsController", e.reconcileServicesForEndpoint)
 
 }
 
-func (c *Controller) sync(key string, obj *corev1.Service) error {
+func (c *Controller) sync(key string, obj *corev1.Service) (*corev1.Service, error) {
 	// no need to handle the remove
 	if obj == nil || obj.DeletionTimestamp != nil {
 		c.queueUpdateForExtNameSvc(key, true)
 		dnsServiceUUIDToTargetEndpointUUIDs.Delete(key)
-		return nil
+		return nil, nil
 	}
 	c.queueUpdateForExtNameSvc(key, false)
-	return c.reconcileEndpoints(key, obj)
+	return nil, c.reconcileEndpoints(key, obj)
 }
 
 func (c *Controller) reconcileEndpoints(key string, obj *corev1.Service) error {
@@ -209,7 +209,7 @@ func (c *Controller) reconcileEndpoints(key string, obj *corev1.Service) error {
 	return nil
 }
 
-func (c *EndpointController) reconcileServicesForEndpoint(key string, obj *corev1.Endpoints) error {
+func (c *EndpointController) reconcileServicesForEndpoint(key string, obj *corev1.Endpoints) (*corev1.Endpoints, error) {
 	var dnsRecordServicesToReconcile []string
 	dnsServiceUUIDToTargetEndpointUUIDs.Range(func(k, v interface{}) bool {
 		if _, ok := v.(map[string]bool)[key]; ok {
@@ -225,7 +225,7 @@ func (c *EndpointController) reconcileServicesForEndpoint(key string, obj *corev
 		c.serviceController.Enqueue(namespace, serviceName)
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (c *Controller) queueUpdateForExtNameSvc(key string, delete bool) {

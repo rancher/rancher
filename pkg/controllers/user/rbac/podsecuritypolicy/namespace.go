@@ -1,6 +1,8 @@
 package podsecuritypolicy
 
 import (
+	"context"
+
 	v12 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -16,7 +18,7 @@ type namespaceManager struct {
 // determine their parent project via an annotation on the namespace, and the namespace is not always present when the
 // service account handler is triggered.  So we have this handler to retrigger the serviceaccount handler once the
 // annotation has been added.
-func RegisterNamespace(context *config.UserContext) {
+func RegisterNamespace(ctx context.Context, context *config.UserContext) {
 	logrus.Infof("registering podsecuritypolicy namespace handler for cluster %v", context.ClusterName)
 
 	m := &namespaceManager{
@@ -24,14 +26,14 @@ func RegisterNamespace(context *config.UserContext) {
 		serviceAccountsController: context.Core.ServiceAccounts("").Controller(),
 	}
 
-	context.Core.Namespaces("").AddHandler("NamespaceSyncHandler", m.sync)
+	context.Core.Namespaces("").AddHandler(ctx, "NamespaceSyncHandler", m.sync)
 }
 
-func (m *namespaceManager) sync(key string, obj *v1.Namespace) error {
+func (m *namespaceManager) sync(key string, obj *v1.Namespace) (*v1.Namespace, error) {
 	if obj == nil || obj.DeletionTimestamp != nil ||
 		obj.Status.Phase == v1.NamespaceTerminating {
-		return nil
+		return nil, nil
 	}
 
-	return resyncServiceAccounts(m.serviceAccountLister, m.serviceAccountsController, obj.Name)
+	return nil, resyncServiceAccounts(m.serviceAccountLister, m.serviceAccountsController, obj.Name)
 }

@@ -27,7 +27,7 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext, ma
 	}
 
 	clusterClient := management.Management.Clusters("")
-	clusterClient.AddLifecycle("cluster-agent-controller-cleanup", lifecycle)
+	clusterClient.AddLifecycle(ctx, "cluster-agent-controller-cleanup", lifecycle)
 }
 
 type ClusterLifecycleCleanup struct {

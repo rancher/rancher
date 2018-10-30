@@ -2,6 +2,8 @@ package project
 
 import (
 	"context"
+	"strings"
+
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
@@ -12,7 +14,6 @@ import (
 	"github.com/rancher/types/config"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"strings"
 )
 
 // This controller is responsible for initializing source code
@@ -32,7 +33,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 		pipelineSettings:          cluster.Management.Project.PipelineSettings(""),
 	}
 
-	projects.AddClusterScopedHandler("pipeline-controller", cluster.ClusterName, projectSyncer.Sync)
+	projects.AddClusterScopedHandler(ctx, "pipeline-controller", cluster.ClusterName, projectSyncer.Sync)
 }
 
 type Syncer struct {
@@ -43,21 +44,21 @@ type Syncer struct {
 	clusterName               string
 }
 
-func (l *Syncer) Sync(key string, obj *v3.Project) error {
+func (l *Syncer) Sync(key string, obj *v3.Project) (*v3.Project, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		projectID := ""
 		splits := strings.Split(key, "/")
 		if len(splits) == 2 {
 			projectID = splits[1]
 		}
-		return l.cleanInternalRegistryEntry(projectID)
+		return nil, l.cleanInternalRegistryEntry(projectID)
 	}
 
 	if err := l.addSourceCodeProviderConfigs(obj); err != nil {
-		return err
+		return nil, err
 	}
 
-	return l.addPipelineSettings(obj)
+	return nil, l.addPipelineSettings(obj)
 }
 
 func (l *Syncer) addSourceCodeProviderConfigs(obj *v3.Project) error {

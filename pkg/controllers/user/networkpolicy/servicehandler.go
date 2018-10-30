@@ -18,26 +18,26 @@ type serviceHandler struct {
 	clusterNamespace string
 }
 
-func (sh *serviceHandler) Sync(key string, service *corev1.Service) error {
+func (sh *serviceHandler) Sync(key string, service *corev1.Service) (*corev1.Service, error) {
 	if service == nil || service.DeletionTimestamp != nil {
-		return nil
+		return nil, nil
 	}
 	disabled, err := isNetworkPolicyDisabled(sh.clusterNamespace, sh.clusterLister)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if disabled {
-		return nil
+		return nil, nil
 	}
 	moved, err := isNamespaceMoved(service.Namespace, sh.npmgr.nsLister)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if moved {
-		return nil
+		return nil, nil
 	}
 	logrus.Debugf("serviceHandler: Sync: %+v", *service)
-	return sh.npmgr.nodePortsUpdateHandler(service, sh.clusterNamespace)
+	return nil, sh.npmgr.nodePortsUpdateHandler(service, sh.clusterNamespace)
 }
 
 func (npmgr *netpolMgr) nodePortsUpdateHandler(service *corev1.Service, clusterNamespace string) error {

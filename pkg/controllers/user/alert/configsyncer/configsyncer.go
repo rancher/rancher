@@ -46,16 +46,16 @@ type ConfigSyncer struct {
 	alertManager       *manager.Manager
 }
 
-func (d *ConfigSyncer) ProjectSync(key string, alert *v3.ProjectAlert) error {
-	return d.sync()
+func (d *ConfigSyncer) ProjectSync(key string, alert *v3.ProjectAlert) (*v3.ProjectAlert, error) {
+	return nil, d.sync()
 }
 
-func (d *ConfigSyncer) ClusterSync(key string, alert *v3.ClusterAlert) error {
-	return d.sync()
+func (d *ConfigSyncer) ClusterSync(key string, alert *v3.ClusterAlert) (*v3.ClusterAlert, error) {
+	return nil, d.sync()
 }
 
-func (d *ConfigSyncer) NotifierSync(key string, alert *v3.Notifier) error {
-	return d.sync()
+func (d *ConfigSyncer) NotifierSync(key string, alert *v3.Notifier) (*v3.Notifier, error) {
+	return nil, d.sync()
 }
 
 //sync: update the secret which store the configuration of alertmanager given the latest configured notifiers and alerts rules.

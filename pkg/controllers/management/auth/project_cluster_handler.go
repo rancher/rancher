@@ -68,21 +68,21 @@ type projectLifecycle struct {
 	mgr *mgr
 }
 
-func (l *projectLifecycle) sync(key string, orig *v3.Project) error {
+func (l *projectLifecycle) sync(key string, orig *v3.Project) (*v3.Project, error) {
 	if orig == nil {
-		return nil
+		return nil, nil
 	}
 
 	obj := orig.DeepCopyObject()
 
 	obj, err := l.mgr.reconcileResourceToNamespace(obj, projectCreateController)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	obj, err = l.mgr.reconcileCreatorRTB(obj)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// update if it has changed
@@ -90,14 +90,14 @@ func (l *projectLifecycle) sync(key string, orig *v3.Project) error {
 		logrus.Infof("[%v] Updating project %v", projectCreateController, orig.Name)
 		_, err = l.mgr.mgmt.Management.Projects("").ObjectClient().Update(orig.Name, obj)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 	if err != nil && !kerrors.IsAlreadyExists(err) {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (l *projectLifecycle) Create(obj *v3.Project) (*v3.Project, error) {
@@ -119,29 +119,29 @@ type clusterLifecycle struct {
 	mgr *mgr
 }
 
-func (l *clusterLifecycle) sync(key string, orig *v3.Cluster) error {
+func (l *clusterLifecycle) sync(key string, orig *v3.Cluster) (*v3.Cluster, error) {
 	if orig == nil {
-		return nil
+		return nil, nil
 	}
 
 	obj := orig.DeepCopyObject()
 	obj, err := l.mgr.reconcileResourceToNamespace(obj, clusterCreateController)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	obj, err = l.mgr.createDefaultProject(obj)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	obj, err = l.mgr.createSystemProject(obj)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	obj, err = l.mgr.addRTAnnotation(obj, "cluster")
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// update if it has changed
@@ -149,13 +149,13 @@ func (l *clusterLifecycle) sync(key string, orig *v3.Cluster) error {
 		logrus.Infof("[%v] Updating cluster %v", clusterCreateController, orig.Name)
 		_, err = l.mgr.mgmt.Management.Clusters("").ObjectClient().Update(orig.Name, obj)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	obj, err = l.mgr.reconcileCreatorRTB(obj)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// update if it has changed
@@ -163,11 +163,11 @@ func (l *clusterLifecycle) sync(key string, orig *v3.Cluster) error {
 		logrus.Infof("[%v] Updating cluster %v", clusterCreateController, orig.Name)
 		_, err = l.mgr.mgmt.Management.Clusters("").ObjectClient().Update(orig.Name, obj)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (l *clusterLifecycle) Create(obj *v3.Cluster) (*v3.Cluster, error) {

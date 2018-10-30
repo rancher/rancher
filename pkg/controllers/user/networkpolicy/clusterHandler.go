@@ -30,26 +30,26 @@ clusterHandler enqueues resources for creating/deleting network policies
 based on cluster.Annotations[netPolAnnotation] and sets status if successful
 */
 
-func (ch *clusterHandler) Sync(key string, cluster *v3.Cluster) error {
+func (ch *clusterHandler) Sync(key string, cluster *v3.Cluster) (*v3.Cluster, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil ||
 		cluster.Name != ch.clusterNamespace ||
 		!v3.ClusterConditionReady.IsTrue(cluster) {
-		return nil
+		return nil, nil
 	}
 
 	if cluster.Spec.EnableNetworkPolicy == nil {
-		return nil
+		return nil, nil
 	}
 
 	toEnable := convert.ToBool(cluster.Annotations[netPolAnnotation])
 
 	if cluster.Status.AppliedEnableNetworkPolicy == toEnable {
-		return nil
+		return nil, nil
 	}
 
 	if toEnable != *cluster.Spec.EnableNetworkPolicy {
 		// allow clusterNetAnnHandler to update first
-		return nil
+		return nil, nil
 	}
 
 	var err error
@@ -62,17 +62,17 @@ func (ch *clusterHandler) Sync(key string, cluster *v3.Cluster) error {
 	}
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	cluster.Status.AppliedEnableNetworkPolicy = toEnable
 
 	_, err = ch.clusters.Update(cluster)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (ch *clusterHandler) createNetworkPolicies(cluster *v3.Cluster) error {

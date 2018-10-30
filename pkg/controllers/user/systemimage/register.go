@@ -21,6 +21,6 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 		deployments:      cluster.Apps.Deployments(""),
 		deploymentLister: cluster.Apps.Deployments("").Controller().Lister(),
 	}
-	projClient.AddClusterScopedHandler("system-image-upgrade-controller", cluster.ClusterName, syncer.Sync)
+	projClient.AddClusterScopedHandler(ctx, "system-image-upgrade-controller", cluster.ClusterName, syncer.Sync)
 
 }

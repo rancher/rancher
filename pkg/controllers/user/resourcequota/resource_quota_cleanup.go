@@ -19,16 +19,16 @@ type cleanupController struct {
 	resourceQuotaLister v1.ResourceQuotaLister
 }
 
-func (c *cleanupController) cleanup(key string, quota *corev1.ResourceQuota) error {
+func (c *cleanupController) cleanup(key string, quota *corev1.ResourceQuota) (*corev1.ResourceQuota, error) {
 	if quota == nil || quota.DeletionTimestamp != nil {
-		return nil
+		return nil, nil
 	}
 	cleanup, err := c.needToCleanup(quota)
 	if err != nil || !cleanup {
-		return err
+		return nil, err
 	}
 
-	return c.cleanupResourcequota(key, quota)
+	return nil, c.cleanupResourcequota(key, quota)
 }
 
 func (c *cleanupController) needToCleanup(quota *corev1.ResourceQuota) (bool, error) {

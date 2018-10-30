@@ -46,7 +46,7 @@ func StartWorkloadWatcher(ctx context.Context, cluster *config.UserContext, mana
 	d := &WorkloadWatcher{
 		projectAlerts:      projectAlerts,
 		projectAlertLister: projectAlerts.Controller().Lister(),
-		workloadController: workload.NewWorkloadController(cluster.UserOnlyContext(), nil),
+		workloadController: workload.NewWorkloadController(ctx, cluster.UserOnlyContext(), nil),
 		alertManager:       manager,
 		clusterName:        cluster.ClusterName,
 		clusterLister:      cluster.Management.Management.Clusters("").Controller().Lister(),

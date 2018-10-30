@@ -18,19 +18,19 @@ type reconcileController struct {
 	nsIndexer  clientcache.Indexer
 }
 
-func (r *reconcileController) reconcileNamespaces(key string, p *v3.Project) error {
+func (r *reconcileController) reconcileNamespaces(key string, p *v3.Project) (*v3.Project, error) {
 	if p == nil || p.DeletionTimestamp != nil {
-		return nil
+		return nil, nil
 	}
 	projectID := fmt.Sprintf("%s:%s", p.Namespace, p.Name)
 	namespaces, err := r.nsIndexer.ByIndex(nsByProjectIndex, projectID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, n := range namespaces {
 		ns := n.(*corev1.Namespace)
 		r.namespaces.Controller().Enqueue("", ns.Name)
 	}
-	return nil
+	return nil, nil
 }

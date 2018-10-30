@@ -1,6 +1,7 @@
 package clusterstatus
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
@@ -10,21 +11,21 @@ import (
 
 const TemporaryCredentialsAnnotationKey = "clusterstatus.management.cattle.io/temporary-security-credentials"
 
-func Register(management *config.ManagementContext) {
+func Register(ctx context.Context, management *config.ManagementContext) {
 	c := &clusterAnnotations{
 		clusters: management.Management.Clusters(""),
 	}
 
-	management.Management.Clusters("").AddHandler("temporary-credentials", c.sync)
+	management.Management.Clusters("").AddHandler(ctx, "temporary-credentials", c.sync)
 }
 
 type clusterAnnotations struct {
 	clusters v3.ClusterInterface
 }
 
-func (cd *clusterAnnotations) sync(key string, cluster *v3.Cluster) error {
+func (cd *clusterAnnotations) sync(key string, cluster *v3.Cluster) (*v3.Cluster, error) {
 	if key == "" || cluster == nil || cluster.DeletionTimestamp != nil {
-		return nil
+		return nil, nil
 	}
 
 	if eksConfig := cluster.Spec.AmazonElasticContainerServiceConfig; eksConfig != nil {
@@ -41,10 +42,10 @@ func (cd *clusterAnnotations) sync(key string, cluster *v3.Cluster) error {
 			cluster.Annotations[TemporaryCredentialsAnnotationKey] = newValue
 			_, err := cd.clusters.Update(cluster)
 			if err != nil {
-				return fmt.Errorf("error updating temporary credentials annotation: %v", err)
+				return nil, fmt.Errorf("error updating temporary credentials annotation: %v", err)
 			}
 		}
 	}
 
-	return nil
+	return nil, nil
 }

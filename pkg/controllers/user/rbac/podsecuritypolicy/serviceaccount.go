@@ -1,6 +1,7 @@
 package podsecuritypolicy
 
 import (
+	"context"
 	"fmt"
 
 	v13 "github.com/rancher/types/apis/core/v1"
@@ -27,7 +28,7 @@ const psptpbRoleBindingAnnotation = "podsecuritypolicy.rbac.user.cattle.io/psptp
 //		OR
 //		b. its cluster has a default PSPT assigned to it
 //  2. PSPs are bound to their associated service accounts via a cluster role binding
-func RegisterServiceAccount(context *config.UserContext) {
+func RegisterServiceAccount(ctx context.Context, context *config.UserContext) {
 	logrus.Infof("registering podsecuritypolicy serviceaccount handler for cluster %v", context.ClusterName)
 
 	psptpbInformer := context.Management.Management.PodSecurityPolicyTemplateProjectBindings("").Controller().Informer()
@@ -64,7 +65,7 @@ func RegisterServiceAccount(context *config.UserContext) {
 			Controller().Lister(),
 	}
 
-	context.Core.ServiceAccounts("").AddHandler("ServiceAccountLifecycleHandler", m.sync)
+	context.Core.ServiceAccounts("").AddHandler(ctx, "ServiceAccountLifecycleHandler", m.sync)
 }
 
 func psptpbByTargetProjectName(obj interface{}) ([]string, error) {
@@ -107,15 +108,15 @@ type serviceAccountManager struct {
 	psptpbLister       v3.PodSecurityPolicyTemplateProjectBindingLister
 }
 
-func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
+func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) (*v1.ServiceAccount, error) {
 	if obj == nil {
 		// do nothing
-		return nil
+		return nil, nil
 	}
 
 	namespace, err := m.namespaceLister.Get("", obj.Namespace)
 	if err != nil {
-		return fmt.Errorf("error getting projects: %v", err)
+		return nil, fmt.Errorf("error getting projects: %v", err)
 	}
 
 	var psptpbs []interface{}
@@ -123,7 +124,7 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 	if namespace.Annotations[projectIDAnnotation] != "" {
 		psptpbs, err = m.psptpbIndexer.ByIndex(psptpbByTargetProjectNameAnnotationIndex, namespace.Annotations[projectIDAnnotation])
 		if err != nil {
-			return fmt.Errorf("error getting psptpbs: %v", err)
+			return nil, fmt.Errorf("error getting psptpbs: %v", err)
 		}
 	}
 
@@ -133,7 +134,7 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 	for _, rawPSPTPB := range psptpbs {
 		psptpb, ok := rawPSPTPB.(*v3.PodSecurityPolicyTemplateProjectBinding)
 		if !ok {
-			return fmt.Errorf("could not convert to *v3.PodSecurityPolicyTemplateProjectBinding: %v", rawPSPTPB)
+			return nil, fmt.Errorf("could not convert to *v3.PodSecurityPolicyTemplateProjectBinding: %v", rawPSPTPB)
 		}
 
 		if psptpb.DeletionTimestamp != nil {
@@ -150,18 +151,18 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 
 	roleBindings, err := m.roleBindingIndexer.ByIndex(roleBindingByServiceAccountIndex, obj.Namespace+"-"+obj.Name)
 	if err != nil {
-		return fmt.Errorf("error getting role bindings: %v", err)
+		return nil, fmt.Errorf("error getting role bindings: %v", err)
 	}
 
 	cluster, err := m.clusterLister.Get("", m.clusterName)
 	if err != nil {
-		return fmt.Errorf("error getting cluster: %v", err)
+		return nil, fmt.Errorf("error getting cluster: %v", err)
 	}
 
 	for _, rawRoleBinding := range roleBindings {
 		roleBinding, ok := rawRoleBinding.(*rbac.RoleBinding)
 		if !ok {
-			return fmt.Errorf("could not convert to *rbac2.RoleBinding: %v", rawRoleBinding)
+			return nil, fmt.Errorf("could not convert to *rbac2.RoleBinding: %v", rawRoleBinding)
 		}
 
 		key := roleBinding.RoleRef.Name
@@ -169,7 +170,7 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 		if desiredBindings[key] == nil && okToDelete(obj, roleBinding, namespace, cluster, originalDesiredBindingsLen) {
 			err = m.roleBindings.DeleteNamespaced(roleBinding.Namespace, roleBinding.Name, &metav1.DeleteOptions{})
 			if err != nil {
-				return fmt.Errorf("error deleting role binding: %v", err)
+				return nil, fmt.Errorf("error deleting role binding: %v", err)
 			}
 		} else {
 			delete(desiredBindings, key)
@@ -212,7 +213,7 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 			},
 		})
 		if err != nil {
-			return fmt.Errorf("error creating binding: %v", err)
+			return nil, fmt.Errorf("error creating binding: %v", err)
 		}
 	}
 
@@ -259,16 +260,16 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) error {
 						},
 					})
 					if err != nil {
-						return fmt.Errorf("error creating role binding: %v", err)
+						return nil, fmt.Errorf("error creating role binding: %v", err)
 					}
 				} else {
-					return fmt.Errorf("error getting role binding %v: %v", roleBindingName, err)
+					return nil, fmt.Errorf("error getting role binding %v: %v", roleBindingName, err)
 				}
 			}
 		}
 	}
 
-	return nil
+	return nil, nil
 }
 
 func okToDelete(svcAct *v1.ServiceAccount, rb *rbac.RoleBinding, namespace *v1.Namespace, cluster *v3.Cluster,

@@ -18,7 +18,7 @@ type IngressEndpointsController struct {
 	clusterName        string
 }
 
-func (c *IngressEndpointsController) sync(key string, obj *extensionsv1beta1.Ingress) error {
+func (c *IngressEndpointsController) sync(key string, obj *extensionsv1beta1.Ingress) (*extensionsv1beta1.Ingress, error) {
 	namespace := ""
 	if obj != nil {
 		namespace = obj.Namespace
@@ -31,13 +31,13 @@ func (c *IngressEndpointsController) sync(key string, obj *extensionsv1beta1.Ing
 	c.workloadController.EnqueueAllWorkloads(namespace)
 
 	if obj == nil || obj.DeletionTimestamp != nil {
-		return nil
+		return nil, nil
 	}
 
 	if _, err := c.reconcileEndpointsForIngress(obj); err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return nil, nil
 }
 
 func (c *IngressEndpointsController) reconcileEndpointsForIngress(obj *extensionsv1beta1.Ingress) (bool, error) {

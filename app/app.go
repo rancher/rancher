@@ -62,7 +62,7 @@ func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config
 	}
 
 	scaledContext.Dialer = dialerFactory
-	scaledContext.PeerManager, err = tunnelserver.NewPeerManager(scaledContext, dialerFactory.TunnelServer)
+	scaledContext.PeerManager, err = tunnelserver.NewPeerManager(ctx, scaledContext, dialerFactory.TunnelServer)
 	if err != nil {
 		return nil, nil, err
 	}

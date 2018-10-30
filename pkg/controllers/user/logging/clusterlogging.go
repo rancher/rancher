@@ -102,7 +102,7 @@ func registerClusterLogging(ctx context.Context, cluster *config.UserContext) {
 		serviceLister:        cluster.Core.Services("").Controller().Lister(),
 	}
 
-	clusterloggingClient.AddClusterScopedHandler("cluster-logging-controller", cluster.ClusterName, syncer.Sync)
+	clusterloggingClient.AddClusterScopedHandler(ctx, "cluster-logging-controller", cluster.ClusterName, syncer.Sync)
 
 	go endpointWatcher.watch(ctx, watcherSyncInterval)
 }
@@ -115,30 +115,30 @@ func (e *endpointWatcher) watch(ctx context.Context, interval time.Duration) {
 	}
 }
 
-func (c *ClusterLoggingSyncer) Sync(key string, obj *v3.ClusterLogging) error {
+func (c *ClusterLoggingSyncer) Sync(key string, obj *v3.ClusterLogging) (*v3.ClusterLogging, error) {
 	if obj == nil || obj.DeletionTimestamp != nil || utils.GetClusterTarget(obj.Spec) == "none" {
 		isAllDisable, err := utils.CleanResource(c.namespaces, c.clusterLoggingLister, c.projectLoggingLister, obj, nil)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		if !isAllDisable {
 			if err := utils.UnsetSecret(c.secrets, loggingconfig.ClusterLoggingName, "cluster"); err != nil {
-				return err
+				return nil, err
 			}
 
 			if err := utils.UnsetSecret(c.secrets, loggingconfig.SSLSecretName, getClusterSecretPrefix(c.clusterName)); err != nil {
-				return err
+				return nil, err
 			}
 		}
 
 		if obj != nil && !reflect.DeepEqual(obj.Spec, obj.Status.AppliedSpec) {
-			return unsetClusterLogging(obj, c.clusterLoggings)
+			return nil, unsetClusterLogging(obj, c.clusterLoggings)
 		}
-		return nil
+		return nil, nil
 	}
 
-	return c.doSync(obj)
+	return nil, c.doSync(obj)
 }
 
 func (c *ClusterLoggingSyncer) doSync(obj *v3.ClusterLogging) error {

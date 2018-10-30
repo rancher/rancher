@@ -388,9 +388,11 @@ func (s *AuthzSuite) SetUpSuite(c *check.C) {
 	s.ctx = workload
 	s.setupCRDs(c)
 
-	rbac.Register(workload)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	ctx := context.Background()
+	rbac.Register(ctx, workload)
+
 	err := workload.Start(ctx)
 	c.Assert(err, check.IsNil)
 	err = workload.Management.Start(ctx)

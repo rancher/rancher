@@ -1,6 +1,7 @@
 package nodedriver
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -23,7 +24,7 @@ const (
 	driverNameLabel = "io.cattle.node_driver.name"
 )
 
-func Register(management *config.ManagementContext) {
+func Register(ctx context.Context, management *config.ManagementContext) {
 	nodeDriverClient := management.Management.NodeDrivers("")
 	nodeDriverLifecycle := &Lifecycle{
 		nodeDriverClient: nodeDriverClient,
@@ -32,7 +33,7 @@ func Register(management *config.ManagementContext) {
 	}
 
 	nodeDriverClient.
-		AddLifecycle("node-driver-controller", nodeDriverLifecycle)
+		AddLifecycle(ctx, "node-driver-controller", nodeDriverLifecycle)
 }
 
 type Lifecycle struct {
