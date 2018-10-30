@@ -1,6 +1,7 @@
 package podsecuritypolicy
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -11,7 +12,7 @@ import (
 
 const psptpbByPSPTNameIndex = "something.something.psptpb/pspt-name"
 
-func Register(management *config.ManagementContext) {
+func Register(ctx context.Context, management *config.ManagementContext) {
 	psptpbInformer := management.Management.PodSecurityPolicyTemplateProjectBindings("").Controller().Informer()
 	psptpbIndexers := map[string]cache.IndexFunc{
 		psptpbByPSPTNameIndex: PSPTPBByPSPTName,
@@ -25,7 +26,7 @@ func Register(management *config.ManagementContext) {
 		psptpbIndexer: psptpbInformer.GetIndexer(),
 	}
 
-	management.Management.PodSecurityPolicyTemplates("").AddLifecycle("mgmt-pspt-lfc-handler", lifecycle)
+	management.Management.PodSecurityPolicyTemplates("").AddLifecycle(ctx, "mgmt-pspt-lfc-handler", lifecycle)
 }
 
 type lifecycle struct {

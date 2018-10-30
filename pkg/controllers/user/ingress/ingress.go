@@ -31,26 +31,26 @@ func Register(ctx context.Context, workload *config.UserOnlyContext) {
 		serviceLister: workload.Core.Services("").Controller().Lister(),
 		nodeLister:    workload.Core.Nodes("").Controller().Lister(),
 	}
-	workload.Extensions.Ingresses("").AddHandler("ingressWorkloadController", c.sync)
+	workload.Extensions.Ingresses("").AddHandler(ctx, "ingressWorkloadController", c.sync)
 }
 
-func (c *Controller) sync(key string, obj *v1beta1.Ingress) error {
+func (c *Controller) sync(key string, obj *v1beta1.Ingress) (*v1beta1.Ingress, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
-		return nil
+		return nil, nil
 	}
 	state := GetIngressState(obj)
 	if state == nil {
-		return nil
+		return nil, nil
 	}
 
 	expectedServices, err := generateExpectedServices(state, obj)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	existingServices, err := getIngressRelatedServices(c.serviceLister, obj, expectedServices)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	needNodePort := c.needNodePort()
@@ -60,13 +60,13 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) error {
 		shouldDelete, toUpdate := updateOrDelete(obj, service, expectedServices, needNodePort)
 		if shouldDelete {
 			if err := c.services.DeleteNamespaced(obj.Namespace, service.Name, &metav1.DeleteOptions{}); err != nil {
-				return err
+				return nil, err
 			}
 			continue
 		}
 		if toUpdate != nil {
 			if _, err := c.services.Update(toUpdate); err != nil {
-				return err
+				return nil, err
 			}
 		}
 		// don't create the services which already exist
@@ -83,11 +83,11 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) error {
 		}
 		logrus.Infof("Creating %s service %s for ingress %s, port %d", ingressService.serviceName, toCreate.Spec.Type, key, ingressService.servicePort)
 		if _, err := c.services.Create(toCreate); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return nil, nil
 }
 
 func generateExpectedServices(state map[string]string, obj *v1beta1.Ingress) (map[string]ingressService, error) {

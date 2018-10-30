@@ -43,9 +43,9 @@ func New(ctx context.Context, scaledContext *config.ScaledContext, clusterManage
 		return nil, err
 	}
 
-	dynamicschema.Register(scaledContext, server.Schemas)
-	whitelistproxy.Register(scaledContext)
-	samlconfig.Register(scaledContext)
+	dynamicschema.Register(ctx, scaledContext, server.Schemas)
+	whitelistproxy.Register(ctx, scaledContext)
+	samlconfig.Register(ctx, scaledContext)
 	usercontrollers.Register(ctx, scaledContext, clusterManager)
 	err := settings.Register(scaledContext)
 

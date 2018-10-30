@@ -65,7 +65,7 @@ func registerProjectLogging(ctx context.Context, cluster *config.UserContext) {
 		projectLoggings: projectLoggings,
 	}
 
-	projectLoggings.AddClusterScopedHandler("project-logging-controller", cluster.ClusterName, syncer.Sync)
+	projectLoggings.AddClusterScopedHandler(ctx, "project-logging-controller", cluster.ClusterName, syncer.Sync)
 
 	go watcher.watch(ctx, watcherSyncInterval)
 }
@@ -78,19 +78,19 @@ func (p *projectLoggingEndpointWatcher) watch(ctx context.Context, interval time
 	}
 }
 
-func (c *ProjectLoggingSyncer) Sync(key string, obj *v3.ProjectLogging) error {
+func (c *ProjectLoggingSyncer) Sync(key string, obj *v3.ProjectLogging) (*v3.ProjectLogging, error) {
 	if obj == nil || obj.DeletionTimestamp != nil || utils.GetProjectTarget(obj.Spec) == "none" {
 		isAllDisable, err := utils.CleanResource(c.namespaces, c.clusterLoggingLister, c.projectLoggings.Controller().Lister(), nil, obj)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		if obj != nil && !isAllDisable {
 			if err = c.createOrUpdateProjectConfig(obj.Name); err != nil {
-				return err
+				return nil, err
 			}
 			if err := utils.UnsetSecret(c.secrets, loggingconfig.SSLSecretName, getProjectSecretPrefix(obj.Spec.ProjectName)); err != nil {
-				return err
+				return nil, err
 			}
 		}
 
@@ -104,7 +104,7 @@ func (c *ProjectLoggingSyncer) Sync(key string, obj *v3.ProjectLogging) error {
 			v3.LoggingConditionUpdated.Message(updatedObj, "")
 			_, updateErr = c.projectLoggings.Update(updatedObj)
 		}
-		return updateErr
+		return nil, updateErr
 	}
 
 	original := obj
@@ -112,16 +112,16 @@ func (c *ProjectLoggingSyncer) Sync(key string, obj *v3.ProjectLogging) error {
 
 	newObj, err := c.doSync(obj)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if newObj != nil && !reflect.DeepEqual(newObj, original) {
 		if _, err = c.projectLoggings.Update(newObj); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (c *ProjectLoggingSyncer) doSync(obj *v3.ProjectLogging) (*v3.ProjectLogging, error) {

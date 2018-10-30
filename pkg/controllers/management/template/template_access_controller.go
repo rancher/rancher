@@ -1,6 +1,7 @@
 package template
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -43,7 +44,7 @@ type RBACTemplateManager struct {
 	globalRoleClient      v3.GlobalRoleInterface
 }
 
-func Register(management *config.ManagementContext) {
+func Register(ctx context.Context, management *config.ManagementContext) {
 	t := RBACTemplateManager{
 		templateLister:        management.Management.Templates("").Controller().Lister(),
 		templateVersionLister: management.Management.TemplateVersions("").Controller().Lister(),
@@ -60,13 +61,13 @@ func Register(management *config.ManagementContext) {
 		globalRoleClient:      management.Management.GlobalRoles(""),
 	}
 
-	management.Management.Catalogs("").Controller().AddHandler("createGlobalTemplateBinding", t.syncForGlobalCatalog)
-	management.Management.ClusterCatalogs("").Controller().AddHandler("createClusterTemplateBinding", t.syncForClusterCatalog)
-	management.Management.ProjectCatalogs("").Controller().AddHandler("createProjectTemplateBinding", t.syncForProjectCatalog)
-	management.Management.ClusterRoleTemplateBindings("").Controller().AddHandler("addUserToClusterCatalog", t.syncCRBT)
-	management.Management.ProjectRoleTemplateBindings("").Controller().AddHandler("addUserToProjectCatalog", t.syncPRTB)
-	management.Management.Clusters("").Controller().AddHandler("syncClusters", t.syncCluster)
-	management.Management.Projects("").Controller().AddHandler("syncProjects", t.syncProject)
+	management.Management.Catalogs("").Controller().AddHandler(ctx, "createGlobalTemplateBinding", t.syncForGlobalCatalog)
+	management.Management.ClusterCatalogs("").Controller().AddHandler(ctx, "createClusterTemplateBinding", t.syncForClusterCatalog)
+	management.Management.ProjectCatalogs("").Controller().AddHandler(ctx, "createProjectTemplateBinding", t.syncForProjectCatalog)
+	management.Management.ClusterRoleTemplateBindings("").Controller().AddHandler(ctx, "addUserToClusterCatalog", t.syncCRBT)
+	management.Management.ProjectRoleTemplateBindings("").Controller().AddHandler(ctx, "addUserToProjectCatalog", t.syncPRTB)
+	management.Management.Clusters("").Controller().AddHandler(ctx, "syncClusters", t.syncCluster)
+	management.Management.Projects("").Controller().AddHandler(ctx, "syncProjects", t.syncProject)
 }
 
 func buildSubjectFromRTB(binding interface{}) (v1.Subject, bool, error) {
@@ -152,71 +153,71 @@ func (tm *RBACTemplateManager) getTemplateAndTemplateVersions(r *labels.Requirem
 	return tempArray, tempVersionArray, err
 }
 
-func (tm *RBACTemplateManager) syncForClusterCatalog(key string, obj *v3.ClusterCatalog) error {
+func (tm *RBACTemplateManager) syncForClusterCatalog(key string, obj *v3.ClusterCatalog) (*v3.ClusterCatalog, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		// cluster catalog deleted, reconcile this cluster
 		clusterName, _, err := cache.SplitMetaNamespaceKey(key)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		return tm.reconcileClusterCatalog(clusterName)
+		return nil, tm.reconcileClusterCatalog(clusterName)
 	}
 
-	return tm.reconcileClusterCatalog(obj.ClusterName)
+	return nil, tm.reconcileClusterCatalog(obj.ClusterName)
 }
 
-func (tm *RBACTemplateManager) syncForProjectCatalog(key string, obj *v3.ProjectCatalog) error {
+func (tm *RBACTemplateManager) syncForProjectCatalog(key string, obj *v3.ProjectCatalog) (*v3.ProjectCatalog, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		// project catalog deleted, reconcile this project
 		projectName, _, err := cache.SplitMetaNamespaceKey(key)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		// find cluster this project belongs to
 		clusters, err := tm.clusterLister.List("", labels.NewSelector())
 		for _, c := range clusters {
 			projects, err := tm.projectLister.List(c.Name, labels.NewSelector())
 			if err != nil {
-				return err
+				return nil, err
 			}
 			for _, p := range projects {
 				if p.Name == projectName {
 					if err = tm.reconcileProjectCatalog(projectName, c.Name); err != nil {
-						return err
+						return nil, err
 					}
 				}
 			}
 		}
-		return nil
+		return nil, nil
 	}
 	split := strings.SplitN(obj.ProjectName, ":", 2)
 	if len(split) != 2 {
-		return nil
+		return nil, nil
 	}
 	clusterName, projectName := split[0], split[1]
 
-	return tm.reconcileProjectCatalog(projectName, clusterName)
+	return nil, tm.reconcileProjectCatalog(projectName, clusterName)
 }
 
-func (tm *RBACTemplateManager) syncCRBT(key string, obj *v3.ClusterRoleTemplateBinding) error {
+func (tm *RBACTemplateManager) syncCRBT(key string, obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 	var clusterName string
 	var err error
 	if obj == nil || obj.DeletionTimestamp != nil {
 		// crtb is being removed, remove the user of this crtb from any CRBs for the templates
 		if key == "" {
-			return nil
+			return nil, nil
 		}
 		clusterName, _, err = cache.SplitMetaNamespaceKey(key)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	} else {
 		clusterName = obj.ClusterName
 	}
-	return tm.reconcileClusterCatalog(clusterName)
+	return nil, tm.reconcileClusterCatalog(clusterName)
 }
 
-func (tm *RBACTemplateManager) syncPRTB(key string, obj *v3.ProjectRoleTemplateBinding) error {
+func (tm *RBACTemplateManager) syncPRTB(key string, obj *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
 	var clusterName, projectName string
 
 	if obj == nil || obj.DeletionTimestamp != nil {
@@ -224,29 +225,29 @@ func (tm *RBACTemplateManager) syncPRTB(key string, obj *v3.ProjectRoleTemplateB
 		// we need to remove this user from CRB for templates of the project too
 		clusters, err := tm.clusterLister.List("", labels.NewSelector())
 		if err != nil {
-			return err
+			return nil, err
 		}
 		for _, c := range clusters {
 			if err = tm.reconcileClusterCatalog(c.Name); err != nil {
-				return err
+				return nil, err
 			}
 		}
 		if key == "" {
-			return nil
+			return nil, nil
 		}
 		projectName, _, err := cache.SplitMetaNamespaceKey(key)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		for _, c := range clusters {
 			projects, err := tm.projectLister.List(c.Name, labels.NewSelector())
 			if err != nil {
-				return err
+				return nil, err
 			}
 			for _, p := range projects {
 				if p.Name == projectName {
 					if err = tm.reconcileProjectCatalog(projectName, c.Name); err != nil {
-						return err
+						return nil, err
 					}
 				}
 			}
@@ -255,34 +256,34 @@ func (tm *RBACTemplateManager) syncPRTB(key string, obj *v3.ProjectRoleTemplateB
 		pName := strings.SplitN(obj.ProjectName, ":", 2)
 		if len(pName) != 2 {
 			log.Errorf("Project name incorrect")
-			return fmt.Errorf("project name incorrect")
+			return nil, fmt.Errorf("project name incorrect")
 		}
 		clusterName, projectName = pName[0], pName[1]
 		if err := tm.reconcileClusterCatalog(clusterName); err != nil {
-			return err
+			return nil, err
 		}
-		return tm.reconcileProjectCatalog(projectName, clusterName)
+		return nil, tm.reconcileProjectCatalog(projectName, clusterName)
 	}
-	return nil
+	return nil, nil
 }
 
-func (tm *RBACTemplateManager) syncCluster(key string, obj *v3.Cluster) error {
+func (tm *RBACTemplateManager) syncCluster(key string, obj *v3.Cluster) (*v3.Cluster, error) {
 	if key == "" && obj == nil {
-		return nil
+		return nil, nil
 	}
-	return tm.reconcileClusterCatalog(key)
+	return nil, tm.reconcileClusterCatalog(key)
 }
 
-func (tm *RBACTemplateManager) syncProject(key string, obj *v3.Project) error {
+func (tm *RBACTemplateManager) syncProject(key string, obj *v3.Project) (*v3.Project, error) {
 	if key == "" && obj == nil {
-		return nil
+		return nil, nil
 	}
 	split := strings.SplitN(key, "/", 2)
 	if len(split) != 2 {
-		return nil
+		return nil, nil
 	}
 	clusterName, projectName := split[0], split[1]
-	return tm.reconcileProjectCatalog(projectName, clusterName)
+	return nil, tm.reconcileProjectCatalog(projectName, clusterName)
 }
 
 func (tm *RBACTemplateManager) updateCRB(crb *v1.ClusterRoleBinding, subjects []v1.Subject) error {

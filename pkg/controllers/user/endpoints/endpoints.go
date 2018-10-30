@@ -48,22 +48,22 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		serviceLister:      workload.Core.Services("").Controller().Lister(),
 		podLister:          workload.Core.Pods("").Controller().Lister(),
 		podController:      workload.Core.Pods("").Controller(),
-		workloadController: workloadUtil.NewWorkloadController(workload.UserOnlyContext(), nil),
+		workloadController: workloadUtil.NewWorkloadController(ctx, workload.UserOnlyContext(), nil),
 		machinesLister:     workload.Management.Management.Nodes(workload.ClusterName).Controller().Lister(),
 		clusterName:        workload.ClusterName,
 	}
-	workload.Core.Services("").AddHandler("servicesEndpointsController", s.sync)
+	workload.Core.Services("").AddHandler(ctx, "servicesEndpointsController", s.sync)
 
 	p := &PodsController{
 		nodeLister:         workload.Core.Nodes("").Controller().Lister(),
 		pods:               workload.Core.Pods(""),
 		serviceLister:      workload.Core.Services("").Controller().Lister(),
 		podLister:          workload.Core.Pods("").Controller().Lister(),
-		workloadController: workloadUtil.NewWorkloadController(workload.UserOnlyContext(), nil),
+		workloadController: workloadUtil.NewWorkloadController(ctx, workload.UserOnlyContext(), nil),
 		machinesLister:     workload.Management.Management.Nodes(workload.ClusterName).Controller().Lister(),
 		clusterName:        workload.ClusterName,
 	}
-	workload.Core.Pods("").AddHandler("hostPortEndpointsController", p.sync)
+	workload.Core.Pods("").AddHandler(ctx, "hostPortEndpointsController", p.sync)
 
 	w := &WorkloadEndpointsController{
 		ingressLister:  workload.Extensions.Ingresses("").Controller().Lister(),
@@ -74,16 +74,16 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		clusterName:    workload.ClusterName,
 		isRKE:          isRKE,
 	}
-	w.WorkloadController = workloadUtil.NewWorkloadController(workload.UserOnlyContext(), w.UpdateEndpoints)
+	w.WorkloadController = workloadUtil.NewWorkloadController(ctx, workload.UserOnlyContext(), w.UpdateEndpoints)
 
 	i := &IngressEndpointsController{
-		workloadController: workloadUtil.NewWorkloadController(workload.UserOnlyContext(), nil),
+		workloadController: workloadUtil.NewWorkloadController(ctx, workload.UserOnlyContext(), nil),
 		ingressInterface:   workload.Extensions.Ingresses(""),
 		machinesLister:     workload.Management.Management.Nodes(workload.ClusterName).Controller().Lister(),
 		isRKE:              isRKE,
 		clusterName:        workload.ClusterName,
 	}
-	workload.Extensions.Ingresses("").AddHandler("ingressEndpointsController", i.sync)
+	workload.Extensions.Ingresses("").AddHandler(ctx, "ingressEndpointsController", i.sync)
 }
 
 func areEqualEndpoints(one []v3.PublicEndpoint, two []v3.PublicEndpoint) bool {

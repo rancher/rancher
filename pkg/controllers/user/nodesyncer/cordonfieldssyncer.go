@@ -1,14 +1,10 @@
 package nodesyncer
 
 import (
-	"fmt"
-
-	"strings"
-
 	"context"
-
+	"fmt"
+	"strings"
 	"sync"
-
 	"time"
 
 	"github.com/rancher/norman/types/convert"
@@ -30,25 +26,25 @@ const (
 var nodeMapLock = sync.Mutex{}
 var toIgnoreErrs = []string{"--ignore-daemonsets", "--delete-local-data", "--force", "did not complete within"}
 
-func (m *NodesSyncer) syncCordonFields(key string, obj *v3.Node) error {
+func (m *NodesSyncer) syncCordonFields(key string, obj *v3.Node) (*v3.Node, error) {
 	if obj == nil || obj.DeletionTimestamp != nil || obj.Spec.DesiredNodeUnschedulable == "" {
-		return nil
+		return nil, nil
 	}
 
 	if obj.Spec.DesiredNodeUnschedulable != "true" && obj.Spec.DesiredNodeUnschedulable != "false" {
-		return nil
+		return nil, nil
 	}
 
 	node, err := nodehelper.GetNodeForMachine(obj, m.nodeLister)
 	if err != nil || node == nil || node.DeletionTimestamp != nil {
-		return err
+		return nil, err
 	}
 	desiredValue := convert.ToBool(obj.Spec.DesiredNodeUnschedulable)
 	if node.Spec.Unschedulable != desiredValue {
 		toUpdate := node.DeepCopy()
 		toUpdate.Spec.Unschedulable = desiredValue
 		if _, err := m.nodeClient.Update(toUpdate); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	nodeCopy := obj.DeepCopy()
@@ -58,25 +54,25 @@ func (m *NodesSyncer) syncCordonFields(key string, obj *v3.Node) error {
 	nodeCopy.Spec.DesiredNodeUnschedulable = ""
 	_, err = m.machines.Update(nodeCopy)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return nil, nil
 }
 
-func (d *NodeDrain) drainNode(key string, obj *v3.Node) error {
+func (d *NodeDrain) drainNode(key string, obj *v3.Node) (*v3.Node, error) {
 	if obj == nil || obj.DeletionTimestamp != nil || obj.Spec.DesiredNodeUnschedulable == "" {
-		return nil
+		return nil, nil
 	}
 
 	if obj.Spec.DesiredNodeUnschedulable != "drain" && obj.Spec.DesiredNodeUnschedulable != "stopDrain" {
-		return nil
+		return nil, nil
 	}
 
 	if obj.Spec.DesiredNodeUnschedulable == "drain" {
 		nodeMapLock.Lock()
 		if _, ok := d.nodesToContext[obj.Name]; ok {
 			nodeMapLock.Unlock()
-			return nil
+			return nil, nil
 		}
 		ctx, cancel := context.WithCancel(d.ctx)
 		d.nodesToContext[obj.Name] = cancel
@@ -90,9 +86,9 @@ func (d *NodeDrain) drainNode(key string, obj *v3.Node) error {
 		if ok {
 			cancelFunc()
 		}
-		return d.resetDesiredNodeUnschedulable(obj)
+		return nil, d.resetDesiredNodeUnschedulable(obj)
 	}
-	return nil
+	return nil, nil
 }
 
 func (d *NodeDrain) updateNode(node *v3.Node, updateFunc func(node *v3.Node, originalErr error, kubeErr error), originalErr error, kubeErr error) (*v3.Node, error) {

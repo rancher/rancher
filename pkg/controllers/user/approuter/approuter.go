@@ -2,6 +2,7 @@ package approuter
 
 import (
 	"context"
+
 	"github.com/rancher/types/config"
 )
 
@@ -24,6 +25,6 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 		clusterName:            workload.ClusterName,
 		managementSecretLister: secretLister,
 	}
-	workload.Extensions.Ingresses("").AddHandler("approuterController", c.sync)
+	workload.Extensions.Ingresses("").AddHandler(ctx, "approuterController", c.sync)
 	go c.renew(ctx)
 }

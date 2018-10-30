@@ -1,6 +1,7 @@
 package ingresshostgen
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -15,11 +16,11 @@ type IngressHostGen struct {
 	ingress v1beta12.IngressInterface
 }
 
-func Register(userOnlyContext *config.UserOnlyContext) {
+func Register(ctx context.Context, userOnlyContext *config.UserOnlyContext) {
 	c := &IngressHostGen{
 		ingress: userOnlyContext.Extensions.Ingresses(""),
 	}
-	userOnlyContext.Extensions.Ingresses("").AddHandler("ingress-host-gen", c.sync)
+	userOnlyContext.Extensions.Ingresses("").AddHandler(ctx, "ingress-host-gen", c.sync)
 }
 
 func isGeneratedDomain(obj *v1beta1.Ingress, host, domain string) bool {
@@ -27,14 +28,14 @@ func isGeneratedDomain(obj *v1beta1.Ingress, host, domain string) bool {
 	return strings.HasSuffix(host, "."+domain) && len(parts) == 8 && parts[1] == obj.Namespace
 }
 
-func (i *IngressHostGen) sync(key string, obj *v1beta1.Ingress) error {
+func (i *IngressHostGen) sync(key string, obj *v1beta1.Ingress) (*v1beta1.Ingress, error) {
 	if obj == nil {
-		return nil
+		return nil, nil
 	}
 
 	ipDomain := settings.IngressIPDomain.Get()
 	if ipDomain == "" {
-		return nil
+		return nil, nil
 	}
 
 	var xipHost string
@@ -46,7 +47,7 @@ func (i *IngressHostGen) sync(key string, obj *v1beta1.Ingress) error {
 	}
 
 	if xipHost == "" {
-		return nil
+		return nil, nil
 	}
 
 	changed := false
@@ -58,7 +59,7 @@ func (i *IngressHostGen) sync(key string, obj *v1beta1.Ingress) error {
 	}
 
 	if !changed {
-		return nil
+		return nil, nil
 	}
 
 	obj = obj.DeepCopy()
@@ -68,6 +69,5 @@ func (i *IngressHostGen) sync(key string, obj *v1beta1.Ingress) error {
 		}
 	}
 
-	_, err := i.ingress.Update(obj)
-	return err
+	return i.ingress.Update(obj)
 }

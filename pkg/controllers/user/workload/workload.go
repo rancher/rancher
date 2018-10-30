@@ -37,7 +37,7 @@ func Register(ctx context.Context, workload *config.UserOnlyContext) {
 		serviceLister: workload.Core.Services("").Controller().Lister(),
 		services:      workload.Core.Services(""),
 	}
-	c.workloadController = NewWorkloadController(workload, c.CreateService)
+	c.workloadController = NewWorkloadController(ctx, workload, c.CreateService)
 }
 
 func getName() string {

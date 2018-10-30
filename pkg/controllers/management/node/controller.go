@@ -1,6 +1,7 @@
 package node
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -30,7 +31,7 @@ const (
 	amazonec2               = "amazonec2"
 )
 
-func Register(management *config.ManagementContext) {
+func Register(ctx context.Context, management *config.ManagementContext) {
 	secretStore, err := nodeconfig.NewStore(management.Core.Namespaces(""), management.Core)
 	if err != nil {
 		logrus.Fatal(err)
@@ -48,7 +49,7 @@ func Register(management *config.ManagementContext) {
 		clusterLister:             management.Management.Clusters("").Controller().Lister(),
 	}
 
-	nodeClient.AddLifecycle("node-controller", nodeLifecycle)
+	nodeClient.AddLifecycle(ctx, "node-controller", nodeLifecycle)
 }
 
 type Lifecycle struct {

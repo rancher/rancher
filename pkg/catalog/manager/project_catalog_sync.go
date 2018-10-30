@@ -7,20 +7,20 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func (m *Manager) ProjectCatalogSync(key string, obj *v3.ProjectCatalog) error {
+func (m *Manager) ProjectCatalogSync(key string, obj *v3.ProjectCatalog) (*v3.ProjectCatalog, error) {
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if obj == nil {
-		return m.deleteTemplates(name)
+		return nil, m.deleteTemplates(name)
 	}
 
 	// always get a refresh catalog from etcd
 	projectCatalog, err := m.projectCatalogClient.GetNamespaced(ns, name, metav1.GetOptions{})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	repoPath, commit, err := m.prepareRepoPath(obj.Catalog)
@@ -28,7 +28,7 @@ func (m *Manager) ProjectCatalogSync(key string, obj *v3.ProjectCatalog) error {
 		v3.CatalogConditionRefreshed.False(projectCatalog)
 		v3.CatalogConditionRefreshed.ReasonAndMessageFromError(projectCatalog, err)
 		m.projectCatalogClient.Update(projectCatalog)
-		return err
+		return nil, err
 	}
 
 	if commit == projectCatalog.Status.Commit {
@@ -38,7 +38,7 @@ func (m *Manager) ProjectCatalogSync(key string, obj *v3.ProjectCatalog) error {
 			v3.CatalogConditionRefreshed.Reason(projectCatalog, "")
 			m.projectCatalogClient.Update(projectCatalog)
 		}
-		return nil
+		return nil, nil
 	}
 
 	cmt := &CatalogInfo{
@@ -47,5 +47,5 @@ func (m *Manager) ProjectCatalogSync(key string, obj *v3.ProjectCatalog) error {
 	}
 
 	logrus.Infof("Updating project catalog %s", projectCatalog.Name)
-	return m.traverseAndUpdate(repoPath, commit, cmt)
+	return nil, m.traverseAndUpdate(repoPath, commit, cmt)
 }

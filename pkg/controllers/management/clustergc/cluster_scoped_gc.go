@@ -1,6 +1,7 @@
 package clustergc
 
 import (
+	"context"
 	"strings"
 
 	"github.com/rancher/norman/lifecycle"
@@ -18,7 +19,7 @@ const (
 	prtbByClusterIndex = "managment.cattle.io/prtb-by-cluster"
 )
 
-func Register(management *config.ManagementContext) {
+func Register(ctx context.Context, management *config.ManagementContext) {
 	informer := management.Management.ProjectRoleTemplateBindings("").Controller().Informer()
 	indexers := map[string]cache.IndexFunc{
 		prtbByClusterIndex: prtbByCluster,
@@ -38,7 +39,7 @@ func Register(management *config.ManagementContext) {
 		mgmt:               management,
 	}
 
-	management.Management.Clusters("").AddLifecycle("cluster-scoped-gc", gc)
+	management.Management.Clusters("").AddLifecycle(ctx, "cluster-scoped-gc", gc)
 }
 
 type gcLifecycle struct {

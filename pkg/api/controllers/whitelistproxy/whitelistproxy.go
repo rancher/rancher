@@ -1,28 +1,30 @@
 package whitelistproxy
 
 import (
+	"context"
+
 	"github.com/rancher/rancher/server/whitelist"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 )
 
-func Register(management *config.ScaledContext) {
-	management.Management.NodeDrivers("").AddHandler("whitelist-proxy", sync)
+func Register(ctx context.Context, management *config.ScaledContext) {
+	management.Management.NodeDrivers("").AddHandler(ctx, "whitelist-proxy", sync)
 }
 
-func sync(key string, nodeDriver *v3.NodeDriver) error {
+func sync(key string, nodeDriver *v3.NodeDriver) (*v3.NodeDriver, error) {
 	if key == "" || nodeDriver == nil {
-		return nil
+		return nil, nil
 	}
 	if nodeDriver.DeletionTimestamp != nil {
 		for _, d := range nodeDriver.Spec.WhitelistDomains {
 			whitelist.Proxy.Rm(d)
 		}
-		return nil
+		return nil, nil
 	}
 
 	for _, d := range nodeDriver.Spec.WhitelistDomains {
 		whitelist.Proxy.Add(d)
 	}
-	return nil
+	return nil, nil
 }

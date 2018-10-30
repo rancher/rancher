@@ -1,6 +1,7 @@
 package watcher
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
@@ -21,7 +22,7 @@ type EventWatcher struct {
 	clusterLister      v3.ClusterLister
 }
 
-func StartEventWatcher(cluster *config.UserContext, manager *manager.Manager) {
+func StartEventWatcher(ctx context.Context, cluster *config.UserContext, manager *manager.Manager) {
 	events := cluster.Core.Events("")
 
 	eventWatcher := &EventWatcher{
@@ -32,21 +33,21 @@ func StartEventWatcher(cluster *config.UserContext, manager *manager.Manager) {
 		clusterLister:      cluster.Management.Management.Clusters("").Controller().Lister(),
 	}
 
-	events.AddHandler("cluster-event-alerter", eventWatcher.Sync)
+	events.AddHandler(ctx, "cluster-event-alerter", eventWatcher.Sync)
 }
 
-func (l *EventWatcher) Sync(key string, obj *corev1.Event) error {
+func (l *EventWatcher) Sync(key string, obj *corev1.Event) (*corev1.Event, error) {
 	if l.alertManager.IsDeploy == false {
-		return nil
+		return nil, nil
 	}
 
 	if obj == nil {
-		return nil
+		return nil, nil
 	}
 
 	clusterAlerts, err := l.clusterAlertLister.List("", labels.NewSelector())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, alert := range clusterAlerts {
@@ -88,5 +89,5 @@ func (l *EventWatcher) Sync(key string, obj *corev1.Event) error {
 		}
 	}
 
-	return nil
+	return nil, nil
 }

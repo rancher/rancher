@@ -22,7 +22,7 @@ type ServicesController struct {
 	clusterName        string
 }
 
-func (s *ServicesController) sync(key string, obj *corev1.Service) error {
+func (s *ServicesController) sync(key string, obj *corev1.Service) (*corev1.Service, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		namespace := ""
 		if obj != nil {
@@ -33,14 +33,14 @@ func (s *ServicesController) sync(key string, obj *corev1.Service) error {
 		//since service is removed, there is no way to narrow down the pod/workload search
 		s.podController.Enqueue(namespace, allEndpoints)
 		s.workloadController.EnqueueAllWorkloads(namespace)
-		return nil
+		return nil, nil
 	}
 	_, err := s.reconcileEndpointsForService(obj)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (s *ServicesController) reconcileEndpointsForService(svc *corev1.Service) (bool, error) {

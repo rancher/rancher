@@ -68,7 +68,7 @@ func testCACertIsTransformedTo(t *testing.T, original string, final string) {
 		server:             &StubServerInterface{},
 	}
 
-	err := controller.sync("", &v3.ListenConfig{Enabled: true, CACerts: original})
+	_, err := controller.sync("", &v3.ListenConfig{Enabled: true, CACerts: original})
 	if err != nil {
 		t.Error(err)
 	}

@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"reflect"
 
 	"github.com/rancher/rke/cloudprovider/aws"
@@ -25,24 +26,24 @@ type controller struct {
 	nodeLister    v3.NodeLister
 }
 
-func Register(management *config.ManagementContext) {
+func Register(ctx context.Context, management *config.ManagementContext) {
 	c := controller{
 		clusterClient: management.Management.Clusters(""),
 		clusterLister: management.Management.Clusters("").Controller().Lister(),
 		nodeLister:    management.Management.Nodes("").Controller().Lister(),
 	}
 
-	c.clusterClient.AddHandler("clusterCreateUpdate", c.capsSync)
+	c.clusterClient.AddHandler(ctx, "clusterCreateUpdate", c.capsSync)
 }
 
-func (c *controller) capsSync(key string, cluster *v3.Cluster) error {
+func (c *controller) capsSync(key string, cluster *v3.Cluster) (*v3.Cluster, error) {
 	var err error
 	if cluster == nil || cluster.DeletionTimestamp != nil {
-		return nil
+		return nil, nil
 	}
 
 	if cluster.Spec.ImportedConfig != nil {
-		return nil
+		return nil, nil
 	}
 	capabilities := v3.Capabilities{}
 	capabilities.NodePortRange = DefaultNodePortRange
@@ -55,21 +56,21 @@ func (c *controller) capsSync(key string, cluster *v3.Cluster) error {
 		capabilities = c.AKSCapabilities(capabilities, *cluster.Spec.AzureKubernetesServiceConfig)
 	} else if cluster.Spec.RancherKubernetesEngineConfig != nil {
 		if capabilities, err = c.RKECapabilities(capabilities, *cluster.Spec.RancherKubernetesEngineConfig, cluster.Name); err != nil {
-			return err
+			return nil, err
 		}
 	} else {
-		return nil
+		return nil, nil
 	}
 
 	if !reflect.DeepEqual(capabilities, cluster.Status.Capabilities) {
 		toUpdateCluster := cluster.DeepCopy()
 		toUpdateCluster.Status.Capabilities = capabilities
 		if _, err := c.clusterClient.Update(toUpdateCluster); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (c *controller) GKECapabilities(capabilities v3.Capabilities, gkeConfig v3.GoogleKubernetesEngineConfig) v3.Capabilities {

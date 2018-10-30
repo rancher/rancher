@@ -2,6 +2,9 @@ package pipelineexecution
 
 import (
 	"context"
+	"strconv"
+	"strings"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/pipeline/engine"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
@@ -16,8 +19,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"strconv"
-	"strings"
 )
 
 //This controller is responsible for
@@ -138,7 +139,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 		pipelineSettingLister:   pipelineSettingLister,
 	}
 
-	pipelineExecutions.AddClusterScopedLifecycle(pipelineExecutionLifecycle.GetName(), cluster.ClusterName, pipelineExecutionLifecycle)
+	pipelineExecutions.AddClusterScopedLifecycle(ctx, pipelineExecutionLifecycle.GetName(), cluster.ClusterName, pipelineExecutionLifecycle)
 
 	go stateSyncer.sync(ctx, syncStateInterval)
 	go registryCertSyncer.sync(ctx, checkCertRotateInterval)

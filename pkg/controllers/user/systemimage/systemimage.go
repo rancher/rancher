@@ -22,14 +22,14 @@ type Syncer struct {
 	projects         v3.ProjectInterface
 }
 
-func (s *Syncer) Sync(key string, obj *v3.Project) error {
+func (s *Syncer) Sync(key string, obj *v3.Project) (*v3.Project, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
-		return nil
+		return nil, nil
 	}
 
 	projects, err := s.projectLister.List(s.clusterName, systemProjectLabels.AsSelector())
 	if err != nil {
-		return fmt.Errorf("get projects failed when try to upgrade system tools, %v", err)
+		return nil, fmt.Errorf("get projects failed when try to upgrade system tools, %v", err)
 	}
 
 	var systemProject *v3.Project
@@ -40,14 +40,14 @@ func (s *Syncer) Sync(key string, obj *v3.Project) error {
 	}
 
 	if systemProject == nil {
-		return nil
+		return nil, nil
 	}
 
 	versionMap := make(map[string]string)
 	curSysImageVersion := systemProject.Annotations[project.SystemImageVersionAnn]
 	if curSysImageVersion != "" {
 		if err = json.Unmarshal([]byte(curSysImageVersion), &versionMap); err != nil {
-			return fmt.Errorf("unmashal current system service version failed, %v", err)
+			return nil, fmt.Errorf("unmashal current system service version failed, %v", err)
 		}
 	}
 
@@ -56,7 +56,7 @@ func (s *Syncer) Sync(key string, obj *v3.Project) error {
 		oldVersion := versionMap[k]
 		newVersion, err := v.Upgrade(oldVersion)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if oldVersion != newVersion {
 			changed = true
@@ -65,17 +65,16 @@ func (s *Syncer) Sync(key string, obj *v3.Project) error {
 	}
 
 	if !changed {
-		return nil
+		return nil, nil
 	}
 
 	newVersion, err := json.Marshal(versionMap)
 	if err != nil {
-		return fmt.Errorf("marshal new system service version %v failed, %v", versionMap, err)
+		return nil, fmt.Errorf("marshal new system service version %v failed, %v", versionMap, err)
 	}
 
 	systemProject.Annotations[project.SystemImageVersionAnn] = string(newVersion)
-	_, err = s.projects.Update(systemProject)
-	return err
+	return s.projects.Update(systemProject)
 }
 
 func GetSystemImageVersion() (string, error) {

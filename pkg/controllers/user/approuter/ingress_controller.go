@@ -3,6 +3,7 @@ package approuter
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -13,7 +14,6 @@ import (
 	"github.com/sirupsen/logrus"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
-	"strings"
 )
 
 const (
@@ -41,14 +41,14 @@ func isGeneratedDomain(obj *extensionsv1beta1.Ingress, host, domain string) bool
 	return strings.HasSuffix(host, "."+domain) && len(parts) == 6 && parts[1] == obj.Namespace
 }
 
-func (c *Controller) sync(key string, obj *extensionsv1beta1.Ingress) error {
+func (c *Controller) sync(key string, obj *extensionsv1beta1.Ingress) (*extensionsv1beta1.Ingress, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
-		return nil
+		return nil, nil
 	}
 
 	ipDomain := settings.IngressIPDomain.Get()
 	if ipDomain != RdnsIPDomain {
-		return nil
+		return nil, nil
 	}
 
 	isNeedSync := false
@@ -60,12 +60,12 @@ func (c *Controller) sync(key string, obj *extensionsv1beta1.Ingress) error {
 	}
 
 	if !isNeedSync {
-		return nil
+		return nil, nil
 	}
 
 	serverURL := settings.RDNSServerBaseURL.Get()
 	if serverURL == "" {
-		return errors.New("settings.baseRDNSServerURL is not set, dns name might not be reachable")
+		return nil, errors.New("settings.baseRDNSServerURL is not set, dns name might not be reachable")
 	}
 
 	var ips []string
@@ -85,18 +85,18 @@ func (c *Controller) sync(key string, obj *extensionsv1beta1.Ingress) error {
 	created, fqdn, err := c.dnsClient.ApplyDomain(ips)
 	if err != nil {
 		logrus.WithError(err).Errorf("update fqdn [%s] to server [%s] error", fqdn, serverURL)
-		return err
+		return nil, err
 	}
 	//As a new secret is created, all the ingress obj will be updated
 	if created {
-		return c.refreshAll(fqdn)
+		return nil, c.refreshAll(fqdn)
 	}
 	return c.refresh(fqdn, obj)
 }
 
-func (c *Controller) refresh(rootDomain string, obj *extensionsv1beta1.Ingress) error {
+func (c *Controller) refresh(rootDomain string, obj *extensionsv1beta1.Ingress) (*extensionsv1beta1.Ingress, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
-		return errors.New("Got a nil ingress object")
+		return nil, errors.New("Got a nil ingress object")
 	}
 
 	annotations := obj.Annotations
@@ -112,10 +112,10 @@ func (c *Controller) refresh(rootDomain string, obj *extensionsv1beta1.Ingress) 
 	case ingressClassNginx:
 		targetHostname = c.getRdnsHostname(obj, rootDomain)
 	default:
-		return nil
+		return obj, nil
 	}
 	if targetHostname == "" {
-		return nil
+		return obj, nil
 	}
 
 	changed := false
@@ -127,7 +127,7 @@ func (c *Controller) refresh(rootDomain string, obj *extensionsv1beta1.Ingress) 
 	}
 
 	if !changed {
-		return nil
+		return obj, nil
 	}
 
 	newObj := obj.DeepCopy()
@@ -140,10 +140,10 @@ func (c *Controller) refresh(rootDomain string, obj *extensionsv1beta1.Ingress) 
 	}
 
 	if _, err := c.ingressInterface.Update(newObj); err != nil {
-		return err
+		return obj, err
 	}
 
-	return nil
+	return newObj, nil
 }
 
 func (c *Controller) refreshAll(rootDomain string) error {
@@ -152,7 +152,7 @@ func (c *Controller) refreshAll(rootDomain string) error {
 		return err
 	}
 	for _, obj := range ingresses {
-		if err = c.refresh(rootDomain, obj); err != nil {
+		if _, err = c.refresh(rootDomain, obj); err != nil {
 			logrus.WithError(err).Errorf("refresh ingress %s:%s hostname annotation error", obj.Namespace, obj.Name)
 		}
 	}

@@ -51,7 +51,7 @@ func StartPodWatcher(ctx context.Context, cluster *config.UserContext, manager *
 	projectAlertLifecycle := &ProjectAlertLifecycle{
 		podWatcher: podWatcher,
 	}
-	projectAlerts.AddClusterScopedLifecycle("project-alert-podtarget", cluster.ClusterName, projectAlertLifecycle)
+	projectAlerts.AddClusterScopedLifecycle(ctx, "project-alert-podtarget", cluster.ClusterName, projectAlertLifecycle)
 
 	go podWatcher.watch(ctx, syncInterval)
 }

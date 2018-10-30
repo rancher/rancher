@@ -7,15 +7,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (m *Manager) Sync(key string, obj *v3.Catalog) error {
+func (m *Manager) Sync(key string, obj *v3.Catalog) (*v3.Catalog, error) {
 	if obj == nil {
-		return m.deleteTemplates(key)
+		return nil, m.deleteTemplates(key)
 	}
 
 	// always get a refresh catalog from etcd
 	catalog, err := m.catalogClient.Get(key, metav1.GetOptions{})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	repoPath, commit, err := m.prepareRepoPath(*catalog)
@@ -23,7 +23,7 @@ func (m *Manager) Sync(key string, obj *v3.Catalog) error {
 		v3.CatalogConditionRefreshed.False(catalog)
 		v3.CatalogConditionRefreshed.ReasonAndMessageFromError(catalog, err)
 		m.catalogClient.Update(catalog)
-		return err
+		return nil, err
 	}
 
 	if commit == catalog.Status.Commit {
@@ -33,7 +33,7 @@ func (m *Manager) Sync(key string, obj *v3.Catalog) error {
 			v3.CatalogConditionRefreshed.Reason(catalog, "")
 			m.catalogClient.Update(catalog)
 		}
-		return nil
+		return nil, nil
 	}
 
 	cmt := &CatalogInfo{
@@ -41,5 +41,5 @@ func (m *Manager) Sync(key string, obj *v3.Catalog) error {
 	}
 
 	logrus.Infof("Updating catalog %s", catalog.Name)
-	return m.traverseAndUpdate(repoPath, commit, cmt)
+	return nil, m.traverseAndUpdate(repoPath, commit, cmt)
 }

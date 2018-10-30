@@ -22,17 +22,17 @@ type nsSyncer struct {
 }
 
 // Sync invokes Policy Handler to program the native network policies
-func (nss *nsSyncer) Sync(key string, ns *corev1.Namespace) error {
+func (nss *nsSyncer) Sync(key string, ns *corev1.Namespace) (*corev1.Namespace, error) {
 	if ns == nil || ns.DeletionTimestamp != nil {
-		return nil
+		return nil, nil
 	}
 
 	disabled, err := isNetworkPolicyDisabled(nss.clusterNamespace, nss.clusterLister)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if disabled {
-		return nil
+		return nil, nil
 	}
 
 	logrus.Debugf("nsSyncer: Sync: %v, %+v", ns.Name, *ns)
@@ -43,19 +43,19 @@ func (nss *nsSyncer) Sync(key string, ns *corev1.Namespace) error {
 		logrus.Debugf("nsSyncer: Sync: ns=%v projectID=%v", ns.Name, projectID)
 		// program project isolation network policy
 		if err := nss.npmgr.programNetworkPolicy(projectID, nss.clusterNamespace); err != nil {
-			return fmt.Errorf("nsSyncer: Sync: error programming network policy: %v (ns=%v, projectID=%v), ", err, ns.Name, projectID)
+			return nil, fmt.Errorf("nsSyncer: Sync: error programming network policy: %v (ns=%v, projectID=%v), ", err, ns.Name, projectID)
 		}
 	}
 	// handle moving of namespace between projects
 	if err := nss.syncOnMove(ns.Name, projectID, movedToNone); err != nil {
-		return fmt.Errorf("nsSyncer: Sync: error moving network policy: %v (ns=%v, projectID=%v), ", err, ns.Name, projectID)
+		return nil, fmt.Errorf("nsSyncer: Sync: error moving network policy: %v (ns=%v, projectID=%v), ", err, ns.Name, projectID)
 	}
 	if movedToNone {
-		return nil
+		return nil, nil
 	}
 
 	// handle if hostNetwork policy is needed
-	return nss.npmgr.handleHostNetwork(nss.clusterNamespace)
+	return nil, nss.npmgr.handleHostNetwork(nss.clusterNamespace)
 }
 
 func (nss *nsSyncer) syncOnMove(nsName string, projectID string, movedToNone bool) error {

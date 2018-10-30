@@ -40,13 +40,13 @@ type SyncController struct {
 	NsIndexer           clientcache.Indexer
 }
 
-func (c *SyncController) syncResourceQuota(key string, ns *corev1.Namespace) error {
+func (c *SyncController) syncResourceQuota(key string, ns *corev1.Namespace) (*corev1.Namespace, error) {
 	if ns == nil || ns.DeletionTimestamp != nil {
-		return nil
+		return nil, nil
 	}
 
 	_, err := c.CreateResourceQuota(ns)
-	return err
+	return nil, err
 }
 
 func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (*corev1.Namespace, error) {

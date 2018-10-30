@@ -2,6 +2,7 @@ package clusterdeploy
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -23,7 +24,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-func Register(management *config.ManagementContext, clusterManager *clustermanager.Manager) {
+func Register(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
 	c := &clusterDeploy{
 		systemAccountManager: systemaccount.NewManager(management),
 		userManager:          management.UserManager,
@@ -33,7 +34,7 @@ func Register(management *config.ManagementContext, clusterManager *clustermanag
 		clusterroles:         management.RBAC.ClusterRoles(""),
 	}
 
-	management.Management.Clusters("").AddHandler("cluster-deploy", c.sync)
+	management.Management.Clusters("").AddHandler(ctx, "cluster-deploy", c.sync)
 }
 
 type clusterDeploy struct {
@@ -45,13 +46,13 @@ type clusterDeploy struct {
 	clusterroles         rrbacv1.ClusterRoleInterface
 }
 
-func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) error {
+func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) (*v3.Cluster, error) {
 	var (
 		err, updateErr error
 	)
 
 	if key == "" || cluster == nil {
-		return nil
+		return nil, nil
 	}
 
 	original := cluster
@@ -63,9 +64,9 @@ func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) error {
 	}
 
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return updateErr
+	return nil, updateErr
 }
 
 func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {

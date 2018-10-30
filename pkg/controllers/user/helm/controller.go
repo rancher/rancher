@@ -1,6 +1,7 @@
 package helm
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -33,7 +34,7 @@ const (
 	AppIDsLabel     = "cattle.io/appIds"
 )
 
-func Register(user *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
+func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
 	appClient := user.Management.Project.Apps("")
 	stackLifecycle := &Lifecycle{
 		KubeConfigGetter:      kubeConfigGetter,
@@ -49,7 +50,7 @@ func Register(user *config.UserContext, kubeConfigGetter common.KubeConfigGetter
 		AppGetter:             user.Management.Project,
 		NsClient:              user.Core.Namespaces(""),
 	}
-	appClient.AddClusterScopedLifecycle("helm-controller", user.ClusterName, stackLifecycle)
+	appClient.AddClusterScopedLifecycle(ctx, "helm-controller", user.ClusterName, stackLifecycle)
 }
 
 type Lifecycle struct {
